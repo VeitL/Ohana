@@ -261,8 +261,22 @@ final class QuestManager {
 
     func currentActiveHuman(context: ModelContext) -> Human? {
         guard let humanId = activeHumanSelection.currentHumanId else { return nil }
-        let desc = FetchDescriptor<Human>()
-        let human = (try? context.fetch(desc))?.first { $0.id.uuidString == humanId }
+        guard let id = UUID(uuidString: humanId) else {
+            OhanaLog.warning("[QuestManager] active humanId=\(humanId) is invalid; skipping human share", category: "Economy")
+            return nil
+        }
+        let desc = FetchDescriptor<Human>(
+            predicate: #Predicate<Human> { human in
+                human.id == id
+            }
+        )
+        let human: Human?
+        do {
+            human = try context.fetch(desc).first
+        } catch {
+            OhanaLog.warning("[QuestManager] failed to fetch active humanId=\(humanId): \(error.localizedDescription)", category: "Economy")
+            return nil
+        }
         if human == nil {
             OhanaLog.warning("[QuestManager] humanId=\(humanId) not found in context; skipping human share", category: "Economy")
         }

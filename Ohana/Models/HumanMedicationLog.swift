@@ -148,7 +148,16 @@ enum HumanMedicationLogStore {
             }
         )
         descriptor.fetchLimit = 128
-        let logs = (try? context.fetch(descriptor)) ?? []
+        let logs: [HumanMedicationLog]
+        do {
+            logs = try context.fetch(descriptor)
+        } catch {
+            OhanaLog.warning(
+                "[HumanMedicationLogStore] failed to fetch matching log for humanId=\(humanId) medicationId=\(medicationId): \(error.localizedDescription)",
+                category: "Care"
+            )
+            logs = []
+        }
         return matchingLog(
             in: logs,
             humanId: humanId,

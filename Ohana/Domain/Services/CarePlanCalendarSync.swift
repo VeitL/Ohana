@@ -11,6 +11,23 @@ import SwiftData
 enum CarePlanCalendarSync {
     static let waterMaintenanceKinds: Set<String> = ["waterChange", "filterClean", "filterReplace"]
 
+    @MainActor
+    private static func fetchOrLog<T: PersistentModel>(
+        _ descriptor: FetchDescriptor<T>,
+        context: ModelContext,
+        operation: String
+    ) -> [T] {
+        do {
+            return try context.fetch(descriptor)
+        } catch {
+            OhanaLog.warning(
+                "CarePlanCalendarSync failed to \(operation): \(error.localizedDescription)",
+                category: "Care"
+            )
+            return []
+        }
+    }
+
     private static func eventStorageKey(kind: String, petKey: String) -> String {
         "careCalendarEventId_\(kind)_\(petKey)"
     }
@@ -22,7 +39,7 @@ enum CarePlanCalendarSync {
     private static func existingEvent(uuid: UUID, context: ModelContext) -> Event? {
         var d = FetchDescriptor<Event>(predicate: #Predicate<Event> { $0.id == uuid })
         d.fetchLimit = 1
-        return try? context.fetch(d).first
+        return fetchOrLog(d, context: context, operation: "fetch existing event").first
     }
 
     static func removeCalendarPlan(kind: String, petKey: String, context: ModelContext) {
@@ -189,7 +206,7 @@ enum CarePlanCalendarSync {
             }
         )
         descriptor.fetchLimit = 1
-        return (try? context.fetch(descriptor).isEmpty) == false
+        return !fetchOrLog(descriptor, context: context, operation: "fetch custom feed plan").isEmpty
     }
 
     private static func hasCustomWaterPlan(petKey: String, context: ModelContext) -> Bool {
@@ -200,7 +217,7 @@ enum CarePlanCalendarSync {
             }
         )
         descriptor.fetchLimit = 1
-        return (try? context.fetch(descriptor).isEmpty) == false
+        return !fetchOrLog(descriptor, context: context, operation: "fetch custom water plan").isEmpty
     }
 
     private static func removeLegacyDefaultPlanEvents(kind: String, pet: Pet, context: ModelContext) {
@@ -213,7 +230,7 @@ enum CarePlanCalendarSync {
                 $0.relatedEntityId == petKey
             }
         )
-        guard let events = try? context.fetch(descriptor) else { return }
+        let events = fetchOrLog(descriptor, context: context, operation: "fetch legacy default plan events")
         var didDelete = false
         for event in events where titles.contains(event.title) {
             context.delete(event)

@@ -17,9 +17,18 @@ private struct HygieneChartPoint: Identifiable {
     let label: String
 }
 
+private struct HygieneLedgerEntry: Identifiable {
+    let id: UUID
+    let date: Date
+    let type: HygieneType
+    let legacyLogId: UUID?
+}
+
 struct PetHygieneDetailContentView: View {
     let pet: Pet
     let allReminders: [Reminder]
+    let hygieneLedgerEvents: [CareLedgerEvent]
+    let legacyDeleteLogs: [PetHygieneLog]
 
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
@@ -37,9 +46,28 @@ struct PetHygieneDetailContentView: View {
     private var isDark: Bool { colorScheme == .dark }
     private var chromeAccent: Color { isDark ? Color.goPrimary : Color.goBlue }
 
+    private var hygieneEntries: [HygieneLedgerEntry] {
+        let petId = pet.id.uuidString
+        return hygieneLedgerEvents.compactMap { event in
+            guard event.eventKindEnum == .hygiene,
+                  event.subjectKind == CareLedgerSubjectKind.pet.rawValue,
+                  event.subjectId == petId,
+                  let type = HygieneType(rawValue: event.actionType) else { return nil }
+            let legacyLogId = event.legacyModelName == "PetHygieneLog"
+                ? event.legacyModelId.flatMap(UUID.init(uuidString:))
+                : nil
+            return HygieneLedgerEntry(
+                id: event.id,
+                date: event.occurredAt,
+                type: type,
+                legacyLogId: legacyLogId
+            )
+        }
+        .sorted { $0.date > $1.date }
+    }
+
     private func daysSince(_ type: HygieneType) -> Int? {
-        guard let last = pet.hygieneLogs.filter({ $0.type == type.rawValue })
-            .sorted(by: { $0.date > $1.date }).first else { return nil }
+        guard let last = hygieneEntries.first(where: { $0.type == type }) else { return nil }
         return Calendar.current.dateComponents([.day], from: last.date, to: Date()).day
     }
 
@@ -89,8 +117,8 @@ struct PetHygieneDetailContentView: View {
         let today = cal.startOfDay(for: Date())
         return (0 ..< 28).reversed().map { offset in
             let d = cal.date(byAdding: .day, value: -offset, to: today)!
-            let count = pet.hygieneLogs.count(where: {
-                $0.type == type.rawValue && cal.isDate($0.date, inSameDayAs: d)
+            let count = hygieneEntries.count(where: {
+                $0.type == type && cal.isDate($0.date, inSameDayAs: d)
             })
             return HygieneChartPoint(day: d, count: count, label: "")
         }
@@ -119,7 +147,7 @@ struct PetHygieneDetailContentView: View {
     private var monthlyTotalCount: Int {
         let cal = Calendar.current
         let now = Date()
-        return pet.hygieneLogs.count(where: { cal.isDate($0.date, equalTo: now, toGranularity: .month) })
+        return hygieneEntries.count(where: { cal.isDate($0.date, equalTo: now, toGranularity: .month) })
     }
 
     private var currentStrike: Int {
@@ -127,19 +155,19 @@ struct PetHygieneDetailContentView: View {
         var strike = 0
         var lastDateByType: [String: Date] = [:]
 
-        for log in pet.hygieneLogs.sorted(by: { $0.date < $1.date }) {
-            guard let type = HygieneType(rawValue: log.type) else { continue }
-            if let lastDate = lastDateByType[log.type] {
+        for entry in hygieneEntries.sorted(by: { $0.date < $1.date }) {
+            let type = entry.type
+            if let lastDate = lastDateByType[type.rawValue] {
                 let days = cal.dateComponents(
                     [.day],
                     from: cal.startOfDay(for: lastDate),
-                    to: cal.startOfDay(for: log.date)
+                    to: cal.startOfDay(for: entry.date)
                 ).day ?? 0
                 strike = days <= type.effectiveCycleDays(for: pet.id) ? strike + 1 : 1
             } else {
                 strike += 1
             }
-            lastDateByType[log.type] = log.date
+            lastDateByType[type.rawValue] = entry.date
         }
         return strike
     }
@@ -302,15 +330,15 @@ struct PetHygieneDetailContentView: View {
 
     // MARK: - 是否今天已完成
     private func isDoneToday(_ type: HygieneType) -> Bool {
-        pet.hygieneLogs.contains {
-            $0.type == type.rawValue && Calendar.current.isDateInToday($0.date)
+        hygieneEntries.contains {
+            $0.type == type && Calendar.current.isDateInToday($0.date)
         }
     }
 
     // MARK: - 护理类型卡片（重构）
     private func hygieneTypeCard(_ type: HygieneType) -> some View {
         _ = hygieneCycleRefresh
-        let logs = pet.hygieneLogs.filter { $0.type == type.rawValue }.sorted { $0.date > $1.date }
+        let logs = hygieneEntries.filter { $0.type == type }.sorted { $0.date > $1.date }
         let color = statusColor(type)
         let days = daysSince(type)
         let stripHasData = monthStripPoints(type).contains { $0.count > 0 }
@@ -443,7 +471,7 @@ struct PetHygieneDetailContentView: View {
                                 .font(OhanaFont.adaptive(size: 11, weight: .medium, design: .rounded))
                                 .foregroundStyle(Color.ohanaSecondaryText.opacity(0.7))
                             Spacer()
-                            Button { deleteHygieneLog(log) } label: {
+                            Button { deleteHygieneEntry(log) } label: {
                                 Image(systemName: "trash").accessibilityHidden(true).font(OhanaFont.adaptive(size: 10))
                                     .foregroundStyle(Color.ohanaSecondaryText.opacity(0.4))
                             }
@@ -483,7 +511,15 @@ struct PetHygieneDetailContentView: View {
         }
     }
 
-    private func deleteHygieneLog(_ log: PetHygieneLog) {
+    private func deleteHygieneEntry(_ entry: HygieneLedgerEntry) {
+        guard let logId = entry.legacyLogId,
+              let log = legacyDeleteLogs.first(where: { $0.id == logId }) else {
+            OhanaLog.warning(
+                "PetHygieneDetailView could not resolve hygiene log for ledger entry \(entry.id.uuidString)",
+                category: "Care"
+            )
+            return
+        }
         let command = DomainCommand.petHygieneDelete(petID: pet.id, recordID: log.id)
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
         commandQueue.enqueue(command) {

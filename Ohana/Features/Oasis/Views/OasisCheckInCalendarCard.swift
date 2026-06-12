@@ -197,7 +197,7 @@ struct OasisCheckInCalendarCard: View {
 
     private func lockedMakeupShopLabel(level: Int) -> some View {
         HStack(spacing: 4) {
-            Image(systemName: "lock.fill")
+            Image(systemName: "lock.fill") // a11y: allow decorative lock icon; capsule label describes the locked shop.
                 .font(OhanaFont.adaptive(size: 9, weight: .black))
                 .accessibilityHidden(true)
             Text(localization.tr(zh: "商店 Lv.\(level) 解锁", en: "Shop Lv.\(level)", de: "Shop Lv.\(level)"))
@@ -326,38 +326,54 @@ struct OasisCheckInCalendarCard: View {
         if cell.dateStr.isEmpty {
             Color.clear.frame(width: 34, height: 34) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
         } else {
-            Button {
-                if !cell.isChecked, !cell.isToday, !cell.isFuture, makeupPackCount > 0 {
+            if isMakeupEligible(cell) {
+                Button {
                     onRequestMakeup(cell.dateStr)
+                } label: {
+                    calendarDayCellContent(cell)
                 }
-            } label: {
-                ZStack {
-                    Circle()
-                        .fill(cellFillColor(cell))
-                        .frame(width: 34, height: 34) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
-                        .overlay(
-                            Circle().strokeBorder(
-                                cell.isToday ? Color.goPrimary : Color.clear,
-                                lineWidth: 1.5
-                            )
-                        )
-                    if cell.isChecked {
-                        Image(systemName: cell.isMakeup ? "arrow.uturn.backward" : "checkmark")
-                            .font(.system(size: cell.isMakeup ? 9 : 10, weight: .black))
-                            .foregroundStyle(Color.ohanaPrimaryActionText.opacity(cell.isMakeup ? 0.72 : 1))
-                    } else {
-                        Text("\(cell.day)")
-                            .font(OhanaFont.adaptive(size: 11, weight: cell.isToday ? .black : .medium, design: .rounded))
-                            .foregroundStyle(
-                                cell.isFuture ? Color.ohanaSecondaryText.opacity(0.35) :
-                                    cell.isToday ? Color.goPrimary : Color.ohanaSecondaryText
-                            )
-                    }
-                }
+                .buttonStyle(ScaleButtonStyle())
+                .accessibilityLabel(localization.tr(
+                    zh: "补签 \(cell.dateStr)",
+                    en: "Make up \(cell.dateStr)",
+                    de: "\(cell.dateStr) nachtragen"
+                ))
+            } else {
+                calendarDayCellContent(cell)
             }
-            .buttonStyle(ScaleButtonStyle())
-            .disabled(cell.isChecked || cell.isToday || cell.isFuture || makeupPackCount == 0)
         }
+    }
+
+    private func isMakeupEligible(_ cell: CalendarCell) -> Bool {
+        !cell.isChecked && !cell.isToday && !cell.isFuture && makeupPackCount > 0
+    }
+
+    private func calendarDayCellContent(_ cell: CalendarCell) -> some View {
+        ZStack {
+            Circle()
+                .fill(cellFillColor(cell))
+                .frame(width: 34, height: 34) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
+                .overlay(
+                    Circle().strokeBorder(
+                        cell.isToday ? Color.goPrimary : Color.clear,
+                        lineWidth: 1.5
+                    )
+                )
+            if cell.isChecked {
+                Image(systemName: cell.isMakeup ? "arrow.uturn.backward" : "checkmark")
+                    .font(.system(size: cell.isMakeup ? 9 : 10, weight: .black))
+                    .foregroundStyle(Color.ohanaPrimaryActionText.opacity(cell.isMakeup ? 0.72 : 1))
+            } else {
+                Text("\(cell.day)")
+                    .font(OhanaFont.adaptive(size: 11, weight: cell.isToday ? .black : .medium, design: .rounded))
+                    .foregroundStyle(
+                        cell.isFuture ? Color.ohanaSecondaryText.opacity(0.35) :
+                            cell.isToday ? Color.goPrimary : Color.ohanaSecondaryText
+                    )
+            }
+        }
+        .frame(maxWidth: .infinity, minHeight: 34)
+        .contentShape(Rectangle())
     }
 
     private func cellFillColor(_ cell: CalendarCell) -> Color {

@@ -149,6 +149,39 @@ struct QuickWaterCommandTests {
         #expect(WaterRuleMetadata.localizedTitle(for: event, l: L10n("de")) == "Wasser von Momo wechseln")
     }
 
+    @Test func quickWaterExecutorLatestAllEventsUsesFetchedStoreEvents() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let later = Event(
+            title: "Later",
+            startDate: date(year: 2026, month: 6, day: 1, hour: 12),
+            eventType: EventType.daily.rawValue,
+            relatedEntityType: EntityKind.pet.rawValue,
+            relatedEntityId: UUID().uuidString
+        )
+        let earlier = Event(
+            title: "Earlier",
+            startDate: date(year: 2026, month: 6, day: 1, hour: 8),
+            eventType: EventType.daily.rawValue,
+            relatedEntityType: EntityKind.pet.rawValue,
+            relatedEntityId: UUID().uuidString
+        )
+        let fallback = Event(
+            title: "Fallback",
+            startDate: date(year: 2026, month: 6, day: 1, hour: 6),
+            eventType: EventType.daily.rawValue,
+            relatedEntityType: EntityKind.pet.rawValue,
+            relatedEntityId: UUID().uuidString
+        )
+        context.insert(later)
+        context.insert(earlier)
+        try context.save()
+
+        let events = QuickWaterCommandExecutor(context: context).latestAllEvents(fallback: [fallback])
+
+        #expect(events.map(\.id) == [earlier.id, later.id])
+    }
+
     @Test func quickWaterExecutorPublishesRevisionWhenSavingPlan() throws {
         let container = try makeContainer()
         let context = container.mainContext

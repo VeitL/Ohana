@@ -176,10 +176,32 @@ enum FeedLogMetadata {
     static let treatFeedNoteMarker = "ohana_treat_feed"
 
     static func source(for log: PetCareLog) -> FeedLogSource? {
-        guard log.careType == .feeding else { return nil }
-        if log.note.hasPrefix(PetCareLog.plannedFeedNotePrefix) { return .manualReminder }
-        if autoDedupKey(for: log) != nil { return .autoMain }
-        if log.note.hasPrefix(treatFeedNoteMarker) { return .treat }
+        guard let source = source(
+            actionType: log.careType.rawValue,
+            note: log.note,
+            ledgerSource: nil,
+            sourceEventId: nil,
+            sourceReminderId: nil
+        ) else { return nil }
+        if source == .manualMain, autoDedupKey(for: log) != nil { return .autoMain }
+        return source
+    }
+
+    static func source(
+        actionType: String,
+        note: String,
+        ledgerSource: CareLedgerSource?,
+        sourceEventId: String?,
+        sourceReminderId: String?
+    ) -> FeedLogSource? {
+        guard actionType == CareType.feeding.rawValue else { return nil }
+        if note.hasPrefix(PetCareLog.plannedFeedNotePrefix) || ledgerSource == .reminder || sourceReminderId != nil {
+            return .manualReminder
+        }
+        if autoDedupKey(from: note) != nil || (ledgerSource == .service && sourceEventId != nil) {
+            return .autoMain
+        }
+        if note.hasPrefix(treatFeedNoteMarker) { return .treat }
         return .manualMain
     }
 

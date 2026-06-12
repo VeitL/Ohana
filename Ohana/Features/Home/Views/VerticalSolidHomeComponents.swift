@@ -143,7 +143,14 @@ struct VerticalSolidHomeDashboardPage: View {
     let allEvents: [Event]
     let humanMedications: [HumanMedication]
     let humanMedicationLogs: [HumanMedicationLog]
-    let expenseLogs: [PetExpenseLog]
+    let feedingLedgerEntries: [HomeFeedQuickActionEntry]
+    let careLedgerEntries: [HomeCareQuickActionEntry]
+    let hygieneLedgerEntries: [HomeHygieneQuickActionEntry]
+    let walkLedgerEntries: [HomeWalkQuickActionEntry]
+    let pottyLedgerEntries: [HomePottyQuickActionEntry]
+    let petExpenseLedgerEntries: [HomePetExpenseQuickActionEntry]
+    let petWeightLedgerEntries: [HomePetWeightQuickActionEntry]
+    let expenseEntries: [HomeExpensePreviewEntry]
     let avatarCacheRevision: Int
     let isLive: Bool
     let collapsedTopInset: CGFloat
@@ -198,7 +205,14 @@ struct VerticalSolidHomeDashboardPage: View {
                                 allEvents: allEvents,
                                 humanMedications: humanMedications,
                                 humanMedicationLogs: humanMedicationLogs,
-                                expenseLogs: expenseLogs,
+                                feedingLedgerEntries: feedingLedgerEntries,
+                                careLedgerEntries: careLedgerEntries,
+                                hygieneLedgerEntries: hygieneLedgerEntries,
+                                walkLedgerEntries: walkLedgerEntries,
+                                pottyLedgerEntries: pottyLedgerEntries,
+                                petExpenseLedgerEntries: petExpenseLedgerEntries,
+                                petWeightLedgerEntries: petWeightLedgerEntries,
+                                expenseEntries: expenseEntries,
                                 localization: localization,
                                 activeHumanID: activeHumanID,
                                 quickActionItemsRaw: $quickActionItemsRaw,

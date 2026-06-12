@@ -379,7 +379,11 @@ enum CoconutWalletService {
     }
 
     static func totalBalance(context: ModelContext) -> Int {
-        ((try? context.fetch(FetchDescriptor<CoconutAccount>())) ?? []).reduce(0) { $0 + $1.balance } // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
+        fetchOrLog(
+            FetchDescriptor<CoconutAccount>(),
+            context: context,
+            operation: "fetch coconut accounts for total balance"
+        ).reduce(0) { $0 + $1.balance }
     }
 
     static func balance(accountKey: String, context: ModelContext, fallback: Int = 0) -> Int {
@@ -387,7 +391,11 @@ enum CoconutWalletService {
             predicate: #Predicate<CoconutAccount> { $0.accountKey == accountKey }
         )
         descriptor.fetchLimit = 1
-        if let account = try? context.fetch(descriptor).first {
+        if let account = fetchFirstOrLog(
+            descriptor,
+            context: context,
+            operation: "fetch coconut account balance"
+        ) {
             return max(0, account.balance)
         }
         return max(0, fallback)
@@ -422,9 +430,13 @@ enum CoconutWalletService {
             sortBy: [SortDescriptor(\CoconutLedgerEntry.occurredAt, order: .reverse)]
         )
         descriptor.fetchLimit = limit
-        return ((try? context.fetch(descriptor)) ?? [])
-            .filter { $0.delta != 0 }
-            .map { $0.asCoconutLogEntry() }
+        return fetchOrLog(
+            descriptor,
+            context: context,
+            operation: "fetch recent coconut ledger projection"
+        )
+        .filter { $0.delta != 0 }
+        .map { $0.asCoconutLogEntry() }
     }
 
     static func refreshQuestProjection(context: ModelContext, manager: QuestManager? = nil) {
@@ -593,6 +605,30 @@ enum CoconutWalletService {
         descriptor.fetchLimit = 1
         return try context.fetch(descriptor).first
     }
+
+    private static func fetchFirstOrLog<T: PersistentModel>(
+        _ descriptor: FetchDescriptor<T>,
+        context: ModelContext,
+        operation: String
+    ) -> T? {
+        fetchOrLog(descriptor, context: context, operation: operation).first
+    }
+
+    private static func fetchOrLog<T: PersistentModel>(
+        _ descriptor: FetchDescriptor<T>,
+        context: ModelContext,
+        operation: String
+    ) -> [T] {
+        do {
+            return try context.fetch(descriptor)
+        } catch {
+            OhanaLog.warning(
+                "CoconutWalletService failed to \(operation): \(error.localizedDescription)",
+                category: "Economy"
+            )
+            return []
+        }
+    }
 }
 
 @MainActor
@@ -719,7 +755,11 @@ enum CoconutEconomyBootstrapService {
     ) throws {
         let humanById = Dictionary(uniqueKeysWithValues: humans.map { ($0.id.uuidString, $0) })
         let petById = Dictionary(uniqueKeysWithValues: pets.map { ($0.id.uuidString, $0) })
-        let accountByKey = Dictionary(uniqueKeysWithValues: ((try? context.fetch(FetchDescriptor<CoconutAccount>())) ?? []).map { ($0.accountKey, $0) }) // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
+        let accountByKey = Dictionary(uniqueKeysWithValues: fetchOrLog(
+            FetchDescriptor<CoconutAccount>(),
+            context: context,
+            operation: "fetch coconut accounts for legacy history import"
+        ).map { ($0.accountKey, $0) })
         var importedEntries: [CoconutLedgerEntry] = []
 
         for log in legacyLogs.prefix(200) {
@@ -790,6 +830,22 @@ enum CoconutEconomyBootstrapService {
             importedEntries.append(entry)
         }
         CloudSyncMutationRecorder.markModified(importedEntries, context: context)
+    }
+
+    private static func fetchOrLog<T: PersistentModel>(
+        _ descriptor: FetchDescriptor<T>,
+        context: ModelContext,
+        operation: String
+    ) -> [T] {
+        do {
+            return try context.fetch(descriptor)
+        } catch {
+            OhanaLog.warning(
+                "CoconutEconomyBootstrapService failed to \(operation): \(error.localizedDescription)",
+                category: "Economy"
+            )
+            return []
+        }
     }
 
     private static func decodeLegacyLogs(defaults: UserDefaults) -> [CoconutLogEntry] {

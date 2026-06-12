@@ -111,6 +111,10 @@ assert_bad scripts/audit-runtime-guardrails.sh "$fixtures/RuntimeBad.swift" \
   raw-timer-publisher repeat-forever timeline-animation
 assert_good scripts/audit-runtime-guardrails.sh "$fixtures/RuntimeGood.swift"
 
+assert_bad scripts/audit-shared-care-note-metadata.sh "$fixtures/SharedCareNoteMetadataBad.swift" \
+  shared-care-note-metadata
+assert_good scripts/audit-shared-care-note-metadata.sh "$fixtures/SharedCareNoteMetadataGood.swift"
+
 assert_scope_floor scripts/audit-ui-v4.sh
 assert_scope_floor scripts/audit-accessibility.sh
 assert_scope_floor scripts/audit-smoothness-risk.sh

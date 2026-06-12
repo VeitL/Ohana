@@ -39,7 +39,7 @@ final class OasisRewardLiveDataStore: ObservableObject {
             sortBy: [SortDescriptor(\Pet.createdAt, order: .forward)]
         )
         descriptor.fetchLimit = 80
-        return (try? context.fetch(descriptor)) ?? []
+        return fetch(descriptor, label: "pets", context: context)
     }
 
     private static func fetchHumans(context: ModelContext) -> [Human] {
@@ -47,7 +47,7 @@ final class OasisRewardLiveDataStore: ObservableObject {
             sortBy: [SortDescriptor(\Human.createdAt, order: .forward)]
         )
         descriptor.fetchLimit = 40
-        return (try? context.fetch(descriptor)) ?? []
+        return fetch(descriptor, label: "humans", context: context)
     }
 
     private static func fetchPlants(context: ModelContext) -> [Plant] {
@@ -55,7 +55,7 @@ final class OasisRewardLiveDataStore: ObservableObject {
             sortBy: [SortDescriptor(\Plant.createdAt, order: .forward)]
         )
         descriptor.fetchLimit = 60
-        return (try? context.fetch(descriptor)) ?? []
+        return fetch(descriptor, label: "plants", context: context)
     }
 
     private static func fetchUpgradeCoconuts(context: ModelContext) -> [OasisUpgradeCoconut] {
@@ -63,7 +63,7 @@ final class OasisRewardLiveDataStore: ObservableObject {
             sortBy: [SortDescriptor(\OasisUpgradeCoconut.level, order: .forward)]
         )
         descriptor.fetchLimit = 80
-        return (try? context.fetch(descriptor)) ?? []
+        return fetch(descriptor, label: "upgrade coconuts", context: context)
     }
 
     private static func fetchElectronicPets(context: ModelContext) -> [OasisElectronicPet] {
@@ -71,7 +71,7 @@ final class OasisRewardLiveDataStore: ObservableObject {
             sortBy: [SortDescriptor(\OasisElectronicPet.obtainedAt, order: .forward)]
         )
         descriptor.fetchLimit = 48
-        return (try? context.fetch(descriptor)) ?? []
+        return fetch(descriptor, label: "electronic pets", context: context)
     }
 
     private static func fetchCritterFragments(context: ModelContext) -> [OasisCritterFragmentBalance] {
@@ -79,7 +79,23 @@ final class OasisRewardLiveDataStore: ObservableObject {
             sortBy: [SortDescriptor(\OasisCritterFragmentBalance.updatedAt, order: .forward)]
         )
         descriptor.fetchLimit = 120
-        return (try? context.fetch(descriptor)) ?? []
+        return fetch(descriptor, label: "critter fragments", context: context)
+    }
+
+    private static func fetch<T: PersistentModel>(
+        _ descriptor: FetchDescriptor<T>,
+        label: String,
+        context: ModelContext
+    ) -> [T] {
+        do {
+            return try context.fetch(descriptor)
+        } catch {
+            OhanaLog.warning(
+                "[OasisRewardLiveDataStore] failed to fetch \(label): \(error.localizedDescription)",
+                category: "Oasis"
+            )
+            return []
+        }
     }
 }
 

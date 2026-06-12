@@ -8,6 +8,23 @@
 import Foundation
 import SwiftData
 
+@MainActor
+private func fetchMedicationCommandModelsOrLog<T: PersistentModel>(
+    _ descriptor: FetchDescriptor<T>,
+    context: ModelContext,
+    operation: String
+) -> [T] {
+    do {
+        return try context.fetch(descriptor)
+    } catch {
+        OhanaLog.warning(
+            "MedicationCommands failed to \(operation): \(error.localizedDescription)",
+            category: "Care"
+        )
+        return []
+    }
+}
+
 struct HumanMedicationCommandResult: Equatable {
     let medicationID: UUID
     let subjectID: UUID
@@ -167,7 +184,11 @@ enum HumanMedicationCommandService {
             },
             sortBy: [SortDescriptor(\HumanMedication.createdAt)]
         )
-        return (try? context.fetch(descriptor)) ?? []
+        return fetchMedicationCommandModelsOrLog(
+            descriptor,
+            context: context,
+            operation: "fetch quick human medications for reminder sync"
+        )
     }
 }
 
@@ -495,7 +516,11 @@ enum PetMedicationPlanCommandService {
                 event.relatedEntityType == entityType && event.relatedEntityId == medicationIDString
             }
         )
-        let events = (try? context.fetch(descriptor)) ?? []
+        let events = fetchMedicationCommandModelsOrLog(
+            descriptor,
+            context: context,
+            operation: "fetch pet medication calendar events"
+        )
         let removedEventIDs = events.map(\.id)
         for event in events {
             context.delete(event)
@@ -879,7 +904,11 @@ enum HumanMedicationPlanCommandService {
                 event.relatedEntityType == entityType && event.relatedEntityId == medicationIDString
             }
         )
-        let events = (try? context.fetch(descriptor)) ?? []
+        let events = fetchMedicationCommandModelsOrLog(
+            descriptor,
+            context: context,
+            operation: "fetch human medication calendar events"
+        )
         let removedEventIDs = events.map(\.id)
         for event in events {
             context.delete(event)
@@ -910,7 +939,11 @@ enum HumanMedicationPlanCommandService {
             },
             sortBy: [SortDescriptor(\HumanMedication.createdAt)]
         )
-        return (try? context.fetch(descriptor)) ?? []
+        return fetchMedicationCommandModelsOrLog(
+            descriptor,
+            context: context,
+            operation: "fetch human medication plans for reminder sync"
+        )
     }
 }
 

@@ -11,6 +11,7 @@ import SwiftUI
 struct PetExpenseDashboardContent: View {
     let pet: Pet
     let allHumans: [Human]
+    var allSharedCareSessions: [SharedCareSession] = []
     var showsCloseButton = true
     var onClose: () -> Void
     var onAdd: () -> Void
@@ -208,9 +209,15 @@ struct PetExpenseDashboardContent: View {
         guard !log.sharedSessionId.isEmpty else {
             return visibleNote.isEmpty ? l.expenseCategoryTitle(log.expenseCategory) : visibleNote
         }
-        let countSuffix = SharedCareMetadata.targetCount(from: log.note).map { " · \($0)只" } ?? ""
+        let session = sharedCareSession(for: log.sharedSessionId)
+        let countSuffix = SharedCareMetadata.targetCount(session: session, legacyNote: log.note).map { " · \($0)只" } ?? ""
         let detail = visibleNote.isEmpty ? l.expenseCategoryTitle(log.expenseCategory) : visibleNote
         return "\(l.tr(zh: "共同花费", en: "Shared expense", de: "Gemeinsame Ausgabe"))\(countSuffix) · \(detail)"
+    }
+
+    private func sharedCareSession(for id: String) -> SharedCareSession? {
+        guard !id.isEmpty else { return nil }
+        return allSharedCareSessions.first { $0.id.uuidString == id }
     }
 
     private func rowSubtitle(_ log: PetExpenseLog) -> String {

@@ -369,6 +369,33 @@ final class HomeRouteCoordinator: ObservableObject {
         modal = .coconutLog(subject)
     }
 
+    func openCoconutShop(_ category: ShopItem.ShopCategory, currentLevel: Int) {
+        let route = AppSheetRoute.coconutShop(category)
+        guard AppFeatureRouteGuard.allowsSheetRoute(route, currentLevel: currentLevel) else {
+            AppFeatureRouteGuard.recordIntercept(
+                AppFeatureRouteGuard.lockedRouteNote(for: route, currentLevel: currentLevel)
+            )
+            if let appSheetRouteSink {
+                appSheetRouteSink(.functionMenu(destination: .growthRoadmap))
+                fullScreen = nil
+                modal = nil
+                return
+            }
+            fullScreen = nil
+            modal = .functionMenu(destination: .growthRoadmap)
+            return
+        }
+
+        if let appSheetRouteSink {
+            appSheetRouteSink(.appSheet(route))
+            fullScreen = nil
+            modal = nil
+            return
+        }
+        fullScreen = nil
+        modal = .functionMenu(destination: .coconutShop)
+    }
+
     func openQuickMoment(_ pet: Pet) {
         if let appOverlayRouteSink {
             appOverlayRouteSink(.quickMoment(petID: pet.id))

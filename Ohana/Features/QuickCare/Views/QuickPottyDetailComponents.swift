@@ -55,6 +55,19 @@ struct PoopTypeSummary: Identifiable {
     var id: String { title }
 }
 
+struct PoopPottyLedgerEntry: Identifiable, Hashable {
+    let id: UUID
+    let date: Date
+    let pottyType: PottyType
+    let legacyLogId: UUID?
+}
+
+struct PoopLitterLedgerEntry: Identifiable, Hashable {
+    let id: UUID
+    let date: Date
+    let legacyLogId: UUID?
+}
+
 struct PoopInlineSheetGlassSurface: View {
     let cornerRadius: CGFloat
 
@@ -64,29 +77,29 @@ struct PoopInlineSheetGlassSurface: View {
 }
 
 enum PoopLogItem: Identifiable {
-    case potty(PetPottyLog)
+    case potty(PoopPottyLedgerEntry)
     case unknownPotty(PetPottyLog, targetCount: Int)
-    case litter(PetCareLog)
+    case litter(PoopLitterLedgerEntry)
 
     var id: String {
         switch self {
-        case let .potty(log): "potty-\(log.id.uuidString)"
+        case let .potty(entry): "potty-\(entry.id.uuidString)"
         case let .unknownPotty(log, _): "unknown-potty-\(log.id.uuidString)"
-        case let .litter(log): "litter-\(log.id.uuidString)"
+        case let .litter(entry): "litter-\(entry.id.uuidString)"
         }
     }
 
     var date: Date {
         switch self {
-        case let .potty(log): log.date
+        case let .potty(entry): entry.date
         case let .unknownPotty(log, _): log.date
-        case let .litter(log): log.date
+        case let .litter(entry): entry.date
         }
     }
 
     var title: String {
         switch self {
-        case let .potty(log): log.pottyType.rawValue
+        case let .potty(entry): entry.pottyType.rawValue
         case .unknownPotty: "未知噗噗"
         case .litter: CareType.litter.label
         }
@@ -94,8 +107,8 @@ enum PoopLogItem: Identifiable {
 
     func title(_ l: L10n) -> String {
         switch self {
-        case let .potty(log):
-            return log.pottyType.localizedLabel(l)
+        case let .potty(entry):
+            return entry.pottyType.localizedLabel(l)
         case let .unknownPotty(_, targetCount):
             if targetCount > 1 {
                 return l.tr(zh: "共同未知噗噗 · \(targetCount)只", en: "Shared mystery poop · \(targetCount)", de: "Unbekanntes Gruppen-Häufchen · \(targetCount)")
@@ -108,7 +121,7 @@ enum PoopLogItem: Identifiable {
 
     var icon: String {
         switch self {
-        case let .potty(log): log.pottyType.systemIconName
+        case let .potty(entry): entry.pottyType.systemIconName
         case .unknownPotty: "questionmark.circle.fill"
         case .litter: CareType.litter.systemIconName
         }
@@ -116,7 +129,7 @@ enum PoopLogItem: Identifiable {
 
     var detail: String? {
         switch self {
-        case let .potty(log): log.executorId == nil ? nil : "已记录"
+        case .potty: nil
         case .unknownPotty: "待认领"
         case .litter: nil
         }
@@ -124,12 +137,23 @@ enum PoopLogItem: Identifiable {
 
     func detail(_ l: L10n) -> String? {
         switch self {
-        case let .potty(log):
-            log.executorId == nil ? nil : l.tr(zh: "已记录", en: "Logged", de: "Erfasst")
+        case .potty:
+            nil
         case .unknownPotty:
             l.tr(zh: "待认领", en: "Needs claim", de: "Zuordnen")
         case .litter:
             nil
+        }
+    }
+
+    var canDelete: Bool {
+        switch self {
+        case let .potty(entry):
+            entry.legacyLogId != nil
+        case .unknownPotty:
+            true
+        case let .litter(entry):
+            entry.legacyLogId != nil
         }
     }
 
@@ -443,7 +467,7 @@ struct PoopLogRow: View {
                         .frame(width: 30, height: 30) // a11y: allow compact icon; menu row text owns accessibility.
                 }
             }
-            if showDelete {
+            if showDelete, item.canDelete {
                 Button(role: .destructive, action: onDelete) {
                     Image(systemName: "trash").accessibilityHidden(true)
                         .font(OhanaFont.adaptive(size: 11, weight: .bold))

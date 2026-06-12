@@ -335,9 +335,16 @@ enum FeedingPlanWriter {
                 event.relatedEntityType == stockType
             }
         )
-        let fetched = (try? context.fetch(descriptor)) ?? []
-        for event in stockReminderEvents(pet: pet, allEvents: fetched) {
-            eventsById[event.id] = event
+        do {
+            let fetched = try context.fetch(descriptor)
+            for event in stockReminderEvents(pet: pet, allEvents: fetched) {
+                eventsById[event.id] = event
+            }
+        } catch {
+            OhanaLog.warning(
+                "FeedingPlanWriter failed to fetch stock reminder events: \(error.localizedDescription)",
+                category: "Care"
+            )
         }
         return eventsById.values.sorted { $0.startDate < $1.startDate }
     }

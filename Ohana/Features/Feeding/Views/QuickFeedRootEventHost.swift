@@ -18,6 +18,7 @@ struct QuickFeedRootEventHost: ViewModifier {
     let planCalendarMonth: Date
     let planCalendarSelectedDate: Date
     let eventCount: Int
+    let feedingLedgerEventCount: Int
     let careLogCount: Int
     let foodRecordCount: Int
     let sharedSessionCount: Int
@@ -33,6 +34,7 @@ struct QuickFeedRootEventHost: ViewModifier {
     let onTreatFilterChange: () -> Void
     let onPlanCalendarChange: () -> Void
     let onEventCountChange: () -> Void
+    let onFeedingLedgerEventCountChange: () -> Void
     let onCareLogCountChange: () -> Void
     let onFoodRecordCountChange: () -> Void
     let onSharedSessionCountChange: () -> Void
@@ -62,6 +64,7 @@ struct QuickFeedRootEventHost: ViewModifier {
             .onChange(of: planCalendarMonth) { _, _ in onPlanCalendarChange() }
             .onChange(of: planCalendarSelectedDate) { _, _ in onPlanCalendarChange() }
             .onChange(of: eventCount) { _, _ in onEventCountChange() }
+            .onChange(of: feedingLedgerEventCount) { _, _ in onFeedingLedgerEventCountChange() }
             .onChange(of: careLogCount) { _, _ in onCareLogCountChange() }
             .onChange(of: foodRecordCount) { _, _ in onFoodRecordCountChange() }
             .onChange(of: sharedSessionCount) { _, _ in onSharedSessionCountChange() }

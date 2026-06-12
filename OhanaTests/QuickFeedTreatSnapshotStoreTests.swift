@@ -33,19 +33,24 @@ struct QuickFeedTreatSnapshotStoreTests {
             pet: pet
         )
         let mainFood = PetCareLog(date: today, amountGrams: 40, foodKind: .dry, pet: pet)
+        let lickableLedger = feedingLedgerEvent(from: lickable)
+        let jerkyLedger = feedingLedgerEvent(from: jerky)
+        let oldTreatLedger = feedingLedgerEvent(from: oldTreat)
+        let mainFoodLedger = feedingLedgerEvent(from: mainFood)
 
         let snapshot = QuickFeedTreatSnapshot.build(
             pet: pet,
-            careLogs: [lickable, jerky, oldTreat, mainFood],
+            feedingLedgerEvents: [lickableLedger, jerkyLedger, oldTreatLedger, mainFoodLedger],
+            legacyCareLogs: [lickable, jerky, oldTreat, mainFood],
             range: .days7,
             selectedKind: .lickable,
             now: now,
             calendar: calendar
         )
 
-        #expect(snapshot.logsInRange.map(\.id) == [lickable.id, jerky.id])
-        #expect(snapshot.filteredLogsInRange.map(\.id) == [lickable.id])
-        #expect(snapshot.filteredLogsToday.map(\.id) == [lickable.id])
+        #expect(snapshot.logsInRange.map(\.legacyModelId) == [lickable.id.uuidString, jerky.id.uuidString])
+        #expect(snapshot.filteredLogsInRange.map(\.legacyModelId) == [lickable.id.uuidString])
+        #expect(snapshot.filteredLogsToday.map(\.legacyModelId) == [lickable.id.uuidString])
         #expect(snapshot.filteredGramsToday == 8)
         #expect(snapshot.count(for: nil) == 2)
         #expect(snapshot.count(for: .lickable) == 1)
@@ -57,5 +62,21 @@ struct QuickFeedTreatSnapshotStoreTests {
 
     private func fixedDate() -> Date {
         Date(timeIntervalSince1970: 1_800_000_000)
+    }
+
+    private func feedingLedgerEvent(from log: PetCareLog) -> CareLedgerEvent {
+        CareLedgerEvent(
+            occurredAt: log.date,
+            subjectKind: .pet,
+            subjectId: log.pet?.id.uuidString,
+            eventKind: .care,
+            actionType: CareType.feeding.rawValue,
+            amountValue: log.amountGrams,
+            amountUnit: "g",
+            note: log.note,
+            source: .quickAction,
+            legacyModelName: "PetCareLog",
+            legacyModelId: log.id.uuidString
+        )
     }
 }

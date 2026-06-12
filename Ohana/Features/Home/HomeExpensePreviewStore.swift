@@ -9,9 +9,16 @@ import Combine
 import Foundation
 import SwiftData
 
+struct HomeExpensePreviewEntry: Equatable, Identifiable {
+    let id: UUID
+    let date: Date
+    let actorId: String
+    let amount: Double
+}
+
 @MainActor
 final class HomeExpensePreviewStore: ObservableObject {
-    @Published private(set) var expenseLogs: [PetExpenseLog] = []
+    @Published private(set) var expenseEntries: [HomeExpensePreviewEntry] = []
 
     private var activeKey = ""
     private var fetchTask: Task<Void, Never>?
@@ -30,11 +37,11 @@ final class HomeExpensePreviewStore: ObservableObject {
         fetchTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: 96) { [weak self] in
             guard let self else { return }
             let startedAt = CFAbsoluteTimeGetCurrent()
-            self.expenseLogs = Self.fetchExpenseLogs(context: context, humanID: humanID, now: now)
+            self.expenseEntries = Self.fetchExpenseEntries(context: context, humanID: humanID, now: now)
             AppPerformanceMonitor.shared.record(
                 "home_expense_preview_refresh",
                 startedAt: startedAt,
-                note: "\(self.expenseLogs.count) logs"
+                note: "\(self.expenseEntries.count) ledger entries"
             )
             self.fetchTask = nil
         }
@@ -44,8 +51,8 @@ final class HomeExpensePreviewStore: ObservableObject {
         activeKey = ""
         fetchTask?.cancel()
         fetchTask = nil
-        if !expenseLogs.isEmpty {
-            expenseLogs = []
+        if !expenseEntries.isEmpty {
+            expenseEntries = []
         }
     }
 
@@ -54,21 +61,39 @@ final class HomeExpensePreviewStore: ObservableObject {
         fetchTask = nil
     }
 
-    static func fetchExpenseLogs(context: ModelContext, humanID: UUID, now: Date = Date()) -> [PetExpenseLog] {
+    static func fetchExpenseEntries(context: ModelContext, humanID: UUID, now: Date = Date()) -> [HomeExpensePreviewEntry] {
         let calendar = Calendar.current
         let today = calendar.startOfDay(for: now)
         let monthStart = calendar.date(
             from: calendar.dateComponents([.year, .month], from: today)
         ) ?? today
-        let executorId = humanID.uuidString
-        var descriptor = FetchDescriptor<PetExpenseLog>(
-            predicate: #Predicate<PetExpenseLog> { log in
-                log.date >= monthStart && log.executorId == executorId
+        let actorId = humanID.uuidString
+        let expenseKind = CareLedgerEventKind.expense.rawValue
+        var descriptor = FetchDescriptor<CareLedgerEvent>(
+            predicate: #Predicate<CareLedgerEvent> { event in
+                event.occurredAt >= monthStart &&
+                    event.eventKind == expenseKind &&
+                    event.actorId == actorId
             },
-            sortBy: [SortDescriptor(\PetExpenseLog.date, order: .reverse)]
+            sortBy: [SortDescriptor(\CareLedgerEvent.occurredAt, order: .reverse)]
         )
         descriptor.fetchLimit = 80
-        return (try? context.fetch(descriptor)) ?? []
+        do {
+            return try context.fetch(descriptor).map { event in
+                HomeExpensePreviewEntry(
+                    id: event.id,
+                    date: event.occurredAt,
+                    actorId: actorId,
+                    amount: event.amountValue
+                )
+            }
+        } catch {
+            OhanaLog.warning(
+                "Home expense preview ledger fetch failed: \(error.localizedDescription)",
+                category: "Home"
+            )
+            return []
+        }
     }
 
     private func cacheKey(humanID: UUID, now: Date) -> String {

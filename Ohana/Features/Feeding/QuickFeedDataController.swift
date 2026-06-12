@@ -11,12 +11,18 @@ import Foundation
 @MainActor
 final class QuickFeedDataController: ObservableObject {
     @Published var loadedCareLogs: [PetCareLog] = []
+    @Published var loadedFeedingLedgerEvents: [CareLedgerEvent] = []
     @Published var loadedFoodRecords: [PetFoodRecord] = []
     @Published var hasLoadedFullCareLogs = false
+    @Published var hasLoadedFullFeedingLedgerEvents = false
     @Published var hasLoadedFullFoodRecords = false
 
     func observedCareLogs(fallback: [PetCareLog]) -> [PetCareLog] {
         hasLoadedFullCareLogs ? loadedCareLogs : fallback
+    }
+
+    func observedFeedingLedgerEvents(fallback: [CareLedgerEvent]) -> [CareLedgerEvent] {
+        hasLoadedFullFeedingLedgerEvents ? loadedFeedingLedgerEvents : fallback
     }
 
     func observedFoodRecords(fallback: [PetFoodRecord]) -> [PetFoodRecord] {
@@ -33,6 +39,17 @@ final class QuickFeedDataController: ObservableObject {
         guard force || !hasLoadedFullCareLogs else { return }
         loadedCareLogs = fetcher(petID, feedingType, fallback)
         hasLoadedFullCareLogs = true
+    }
+
+    func loadFullFeedingLedgerEvents(
+        petID: UUID,
+        fallback: [CareLedgerEvent],
+        force: Bool = false,
+        fetcher: (UUID, [CareLedgerEvent]) -> [CareLedgerEvent]
+    ) {
+        guard force || !hasLoadedFullFeedingLedgerEvents else { return }
+        loadedFeedingLedgerEvents = fetcher(petID, fallback)
+        hasLoadedFullFeedingLedgerEvents = true
     }
 
     func loadFullFoodRecords(

@@ -8,6 +8,23 @@
 import Foundation
 import SwiftData
 
+@MainActor
+private func fetchPetMilestoneModelsOrLog<T: PersistentModel>(
+    _ descriptor: FetchDescriptor<T>,
+    context: ModelContext,
+    operation: String
+) -> [T] {
+    do {
+        return try context.fetch(descriptor)
+    } catch {
+        OhanaLog.warning(
+            "PetMilestoneCommands failed to \(operation): \(error.localizedDescription)",
+            category: "Care"
+        )
+        return []
+    }
+}
+
 struct PetMilestoneCommandInput: Equatable {
     let date: Date
     let title: String
@@ -203,8 +220,17 @@ enum PetMilestoneCommandService {
         context: ModelContext
     ) -> [CareLedgerEvent] {
         let idString = milestone.id.uuidString
-        let events = (try? context.fetch(FetchDescriptor<CareLedgerEvent>())) ?? [] // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
-        return events.filter { $0.legacyModelName == "PetMilestone" && $0.legacyModelId == idString }
+        let modelName = "PetMilestone"
+        let descriptor = FetchDescriptor<CareLedgerEvent>(
+            predicate: #Predicate<CareLedgerEvent> { event in
+                event.legacyModelName == modelName && event.legacyModelId == idString
+            }
+        )
+        return fetchPetMilestoneModelsOrLog(
+            descriptor,
+            context: context,
+            operation: "fetch milestone ledger events"
+        )
     }
 }
 

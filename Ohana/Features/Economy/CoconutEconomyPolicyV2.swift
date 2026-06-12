@@ -586,7 +586,17 @@ enum EconomyDailyBudgetStore {
                 event.dayKey == dayKey && event.householdKey == householdKey
             }
         )
-        guard let events = try? context.fetch(descriptor), !events.isEmpty else { return .empty }
+        let events: [EconomyBudgetUsageEvent]
+        do {
+            events = try context.fetch(descriptor)
+        } catch {
+            OhanaLog.warning(
+                "[CoconutEconomyPolicyV2] failed to fetch persisted budget usage: \(error.localizedDescription)",
+                category: "Economy"
+            )
+            return .empty
+        }
+        guard !events.isEmpty else { return .empty }
 
         let objectKeySet = Set(careObjectKeys)
         return events.reduce(into: PersistedBudgetUsage()) { usage, event in
@@ -863,10 +873,28 @@ enum CoconutEconomyPolicyV2 {
     }
 
     static func careObjectCount(context: ModelContext) -> Int {
-        let petCount = ((try? context.fetch(FetchDescriptor<Pet>())) ?? []) // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
-            .count(where: { !$0.hasPassedAway })
+        let pets: [Pet]
+        do {
+            pets = try context.fetch(FetchDescriptor<Pet>())
+        } catch {
+            OhanaLog.warning(
+                "[CoconutEconomyPolicyV2] failed to fetch pets for care object count: \(error.localizedDescription)",
+                category: "Economy"
+            )
+            pets = []
+        }
+        let petCount = pets.count(where: { !$0.hasPassedAway })
 
-        let plantCount = (try? context.fetchCount(FetchDescriptor<Plant>())) ?? 0
+        let plantCount: Int
+        do {
+            plantCount = try context.fetchCount(FetchDescriptor<Plant>())
+        } catch {
+            OhanaLog.warning(
+                "[CoconutEconomyPolicyV2] failed to fetch plant count for care object count: \(error.localizedDescription)",
+                category: "Economy"
+            )
+            plantCount = 0
+        }
         return max(1, petCount + plantCount)
     }
 

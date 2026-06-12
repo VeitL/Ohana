@@ -44,8 +44,73 @@ nonisolated enum TodayFocusContent {
     }
 }
 
+nonisolated struct TodayFocusCareLedgerEntry: Equatable, Sendable {
+    let id: UUID
+    let petId: UUID
+    let eventKind: CareLedgerEventKind
+    let actionType: String
+    let date: Date
+    let sourceEventId: UUID?
+    let actorId: String?
+
+    init(
+        id: UUID,
+        petId: UUID,
+        eventKind: CareLedgerEventKind,
+        actionType: String,
+        date: Date,
+        sourceEventId: UUID? = nil,
+        actorId: String? = nil
+    ) {
+        self.id = id
+        self.petId = petId
+        self.eventKind = eventKind
+        self.actionType = actionType
+        self.date = date
+        self.sourceEventId = sourceEventId
+        self.actorId = actorId
+    }
+}
+
 nonisolated enum TodayFocusService {
     typealias Content = TodayFocusContent
+
+    static func refreshedQuests(
+        _ quests: [IslandQuest],
+        pets: [Pet] = [],
+        humans: [Human] = [],
+        events: [Event] = [],
+        careLedgerEntries: [TodayFocusCareLedgerEntry],
+        humanWeightLogs: [HumanWeightLog] = [],
+        calendar: Calendar = .current,
+        now: Date = Date(),
+        questProgress: TodayFocusQuestProgress = .fromDefaults()
+    ) -> [IslandQuest] {
+        quests.map { quest in
+            if quest.isCompleted { return quest }
+            let done = isQuestCompletedToday(
+                quest,
+                pets: pets,
+                humans: humans,
+                events: events,
+                careLedgerEntries: careLedgerEntries,
+                humanWeightLogs: humanWeightLogs,
+                calendar: calendar,
+                now: now,
+                questProgress: questProgress
+            )
+            guard done else { return quest }
+            return IslandQuest(
+                id: quest.id,
+                emoji: "✅",
+                title: quest.title,
+                subtitle: quest.subtitle,
+                isCompleted: true,
+                targetPetId: quest.targetPetId,
+                targetPlantId: quest.targetPlantId
+            )
+        }
+    }
 
     static func refreshedQuests(
         _ quests: [IslandQuest],
@@ -67,9 +132,11 @@ nonisolated enum TodayFocusService {
                 pets: pets,
                 humans: humans,
                 events: events,
-                careLogs: careLogs,
-                walkLogs: walkLogs,
-                pottyLogs: pottyLogs,
+                careLedgerEntries: legacyLedgerEntries(
+                    careLogs: careLogs,
+                    walkLogs: walkLogs,
+                    pottyLogs: pottyLogs
+                ),
                 humanWeightLogs: humanWeightLogs,
                 calendar: calendar,
                 now: now,
@@ -86,6 +153,31 @@ nonisolated enum TodayFocusService {
                 targetPlantId: quest.targetPlantId
             )
         }
+    }
+
+    @MainActor
+    static func refreshedQuests(
+        _ quests: [IslandQuest],
+        pets: [Pet] = [],
+        humans: [Human] = [],
+        events: [Event] = [],
+        careLedgerEntries: [TodayFocusCareLedgerEntry],
+        humanWeightLogs: [HumanWeightLog] = [],
+        calendar: Calendar = .current,
+        now: Date = Date(),
+        questManager: QuestManager
+    ) -> [IslandQuest] {
+        refreshedQuests(
+            quests,
+            pets: pets,
+            humans: humans,
+            events: events,
+            careLedgerEntries: careLedgerEntries,
+            humanWeightLogs: humanWeightLogs,
+            calendar: calendar,
+            now: now,
+            questProgress: TodayFocusQuestProgress(questManager: questManager)
+        )
     }
 
     @MainActor
@@ -143,9 +235,7 @@ nonisolated enum TodayFocusService {
         pets: [Pet],
         humans: [Human],
         events: [Event],
-        careLogs: [PetCareLog],
-        walkLogs: [PetWalkLog],
-        pottyLogs: [PetPottyLog],
+        careLedgerEntries: [TodayFocusCareLedgerEntry],
         humanWeightLogs: [HumanWeightLog],
         calendar: Calendar,
         now: Date,
@@ -154,50 +244,74 @@ nonisolated enum TodayFocusService {
         if quest.id.hasPrefix("q_feed_"), let petId = quest.targetPetId {
             if let event = carePlanEvent(for: quest, events: events) {
                 return event.isOccurrenceMarkedComplete(on: now)
-                    || hasPlannedCareLog(
+                    || hasCareLedgerEntry(
                         eventId: event.id,
                         petId: petId,
-                        careLogs: careLogs,
-                        careTypes: [.feeding],
-                        notePrefix: PetCareLog.plannedFeedNotePrefix,
+                        entries: careLedgerEntries,
+                        eventKinds: [.care],
+                        actionTypes: [CareType.feeding.rawValue],
                         calendar: calendar,
                         now: now
                     )
             }
-            return careLogs.contains { $0.careType == .feeding && $0.pet?.id == petId && calendar.isDate($0.date, inSameDayAs: now) }
+            return hasCareLedgerEntry(
+                petId: petId,
+                entries: careLedgerEntries,
+                eventKinds: [.care],
+                actionTypes: [CareType.feeding.rawValue],
+                calendar: calendar,
+                now: now
+            )
         }
         if quest.id.hasPrefix("q_water_"), !quest.id.hasPrefix("q_water_plant"), let petId = quest.targetPetId {
             if let event = carePlanEvent(for: quest, events: events) {
                 return event.isOccurrenceMarkedComplete(on: now)
-                    || hasPlannedCareLog(
+                    || hasCareLedgerEntry(
                         eventId: event.id,
                         petId: petId,
-                        careLogs: careLogs,
-                        careTypes: [.watering, .waterChange],
-                        notePrefix: PetCareLog.plannedWaterNotePrefix,
+                        entries: careLedgerEntries,
+                        eventKinds: [.care],
+                        actionTypes: [CareType.watering.rawValue, CareType.waterChange.rawValue],
                         calendar: calendar,
                         now: now
                     )
             }
-            return careLogs.contains {
-                ($0.careType == .watering || $0.careType == .waterChange)
-                    && $0.pet?.id == petId
-                    && calendar.isDate($0.date, inSameDayAs: now)
-            }
+            return hasCareLedgerEntry(
+                petId: petId,
+                entries: careLedgerEntries,
+                eventKinds: [.care],
+                actionTypes: [CareType.watering.rawValue, CareType.waterChange.rawValue],
+                calendar: calendar,
+                now: now
+            )
         }
         if quest.id == "q_walk" || quest.id.hasPrefix("q_walk_"), let petId = quest.targetPetId {
             if let event = carePlanEvent(for: quest, events: events) {
                 return event.isOccurrenceMarkedComplete(on: now) ||
-                    walkLogs.contains { $0.pet?.id == petId && calendar.isDate($0.startDate, inSameDayAs: now) }
+                    hasCareLedgerEntry(
+                        petId: petId,
+                        entries: careLedgerEntries,
+                        eventKinds: [.walk],
+                        actionTypes: nil,
+                        calendar: calendar,
+                        now: now
+                    )
             }
-            return walkLogs.contains { $0.pet?.id == petId && calendar.isDate($0.startDate, inSameDayAs: now) }
+            return hasCareLedgerEntry(
+                petId: petId,
+                entries: careLedgerEntries,
+                eventKinds: [.walk],
+                actionTypes: nil,
+                calendar: calendar,
+                now: now
+            )
         }
         if quest.id == "q_potty" || quest.id.hasPrefix("q_potty_"), let petId = quest.targetPetId {
             if let event = carePlanEvent(for: quest, events: events) {
                 return event.isOccurrenceMarkedComplete(on: now) ||
-                    hasPottyOrLitterLog(petId: petId, pottyLogs: pottyLogs, careLogs: careLogs, calendar: calendar, now: now)
+                    hasPottyOrLitterLedgerEntry(petId: petId, entries: careLedgerEntries, calendar: calendar, now: now)
             }
-            return hasPottyOrLitterLog(petId: petId, pottyLogs: pottyLogs, careLogs: careLogs, calendar: calendar, now: now)
+            return hasPottyOrLitterLedgerEntry(petId: petId, entries: careLedgerEntries, calendar: calendar, now: now)
         }
         if let eventId = IslandQuestEngine.eventId(fromQuestId: quest.id),
            let event = events.first(where: { $0.id == eventId }) {
@@ -214,9 +328,9 @@ nonisolated enum TodayFocusService {
         if quest.id.hasPrefix("q_play_"), let petId = quest.targetPetId {
             if let event = carePlanEvent(for: quest, events: events) {
                 return event.isOccurrenceMarkedComplete(on: now) ||
-                    hasPlayEquivalentLog(petId: petId, careLogs: careLogs, walkLogs: walkLogs, calendar: calendar, now: now)
+                    hasPlayEquivalentLedgerEntry(petId: petId, entries: careLedgerEntries, calendar: calendar, now: now)
             }
-            return hasPlayEquivalentLog(petId: petId, careLogs: careLogs, walkLogs: walkLogs, calendar: calendar, now: now)
+            return hasPlayEquivalentLedgerEntry(petId: petId, entries: careLedgerEntries, calendar: calendar, now: now)
         }
         if quest.id.hasPrefix("q_weight_"), let petId = quest.targetPetId {
             if let event = carePlanEvent(for: quest, events: events) {
@@ -264,54 +378,68 @@ nonisolated enum TodayFocusService {
         return events.first { $0.id == eventId }
     }
 
-    private static func hasPlannedCareLog(
-        eventId: UUID,
+    private static func hasCareLedgerEntry(
+        eventId: UUID? = nil,
         petId: UUID,
-        careLogs: [PetCareLog],
-        careTypes: [CareType],
-        notePrefix: String,
+        entries: [TodayFocusCareLedgerEntry],
+        eventKinds: [CareLedgerEventKind],
+        actionTypes: [String]?,
         calendar: Calendar,
         now: Date
     ) -> Bool {
-        let plannedPrefix = "\(notePrefix)\(eventId.uuidString)"
-        return careLogs.contains {
-            careTypes.contains($0.careType)
-                && $0.pet?.id == petId
-                && $0.note.hasPrefix(plannedPrefix)
-                && calendar.isDate($0.date, inSameDayAs: now)
+        entries.contains { entry in
+            entry.petId == petId &&
+                eventKinds.contains(entry.eventKind) &&
+                (actionTypes?.contains(entry.actionType) ?? true) &&
+                (eventId == nil || entry.sourceEventId == eventId) &&
+                calendar.isDate(entry.date, inSameDayAs: now)
         }
     }
 
-    private static func hasPottyOrLitterLog(
+    private static func hasPottyOrLitterLedgerEntry(
         petId: UUID,
-        pottyLogs: [PetPottyLog],
-        careLogs: [PetCareLog],
+        entries: [TodayFocusCareLedgerEntry],
         calendar: Calendar,
         now: Date
     ) -> Bool {
-        pottyLogs.contains { $0.pet?.id == petId && calendar.isDate($0.date, inSameDayAs: now) } ||
-            careLogs.contains {
-                $0.careType == .litter &&
-                    $0.pet?.id == petId &&
-                    calendar.isDate($0.date, inSameDayAs: now)
-            }
+        hasCareLedgerEntry(
+            petId: petId,
+            entries: entries,
+            eventKinds: [.potty],
+            actionTypes: nil,
+            calendar: calendar,
+            now: now
+        ) || hasCareLedgerEntry(
+            petId: petId,
+            entries: entries,
+            eventKinds: [.care],
+            actionTypes: [CareType.litter.rawValue],
+            calendar: calendar,
+            now: now
+        )
     }
 
-    private static func hasPlayEquivalentLog(
+    private static func hasPlayEquivalentLedgerEntry(
         petId: UUID,
-        careLogs: [PetCareLog],
-        walkLogs: [PetWalkLog],
+        entries: [TodayFocusCareLedgerEntry],
         calendar: Calendar,
         now: Date
     ) -> Bool {
-        careLogs.contains {
-            $0.careType == .play &&
-                $0.pet?.id == petId &&
-                calendar.isDate($0.date, inSameDayAs: now)
-        } || walkLogs.contains {
-            $0.pet?.id == petId &&
-                calendar.isDate($0.startDate, inSameDayAs: now)
-        }
+        hasCareLedgerEntry(
+            petId: petId,
+            entries: entries,
+            eventKinds: [.care],
+            actionTypes: [CareType.play.rawValue],
+            calendar: calendar,
+            now: now
+        ) || hasCareLedgerEntry(
+            petId: petId,
+            entries: entries,
+            eventKinds: [.walk],
+            actionTypes: nil,
+            calendar: calendar,
+            now: now
+        )
     }
 
     private static func hasPetWeightLog(
@@ -324,9 +452,80 @@ nonisolated enum TodayFocusService {
             calendar.isDate($0.date, inSameDayAs: now)
         } == true
     }
+
+    private static func legacyLedgerEntries(
+        careLogs: [PetCareLog],
+        walkLogs: [PetWalkLog],
+        pottyLogs: [PetPottyLog]
+    ) -> [TodayFocusCareLedgerEntry] {
+        careLogs.compactMap { log in
+            guard let petId = log.pet?.id else { return nil }
+            return TodayFocusCareLedgerEntry(
+                id: log.id,
+                petId: petId,
+                eventKind: .care,
+                actionType: log.careType.rawValue,
+                date: log.date,
+                sourceEventId: plannedCareEventId(from: log.note),
+                actorId: log.executorId
+            )
+        } + walkLogs.compactMap { log in
+            guard let petId = log.pet?.id else { return nil }
+            return TodayFocusCareLedgerEntry(
+                id: log.id,
+                petId: petId,
+                eventKind: .walk,
+                actionType: "walk",
+                date: log.startDate,
+                actorId: log.executorId
+            )
+        } + pottyLogs.compactMap { log in
+            guard let petId = log.pet?.id else { return nil }
+            return TodayFocusCareLedgerEntry(
+                id: log.id,
+                petId: petId,
+                eventKind: .potty,
+                actionType: log.pottyType.rawValue,
+                date: log.date,
+                actorId: log.executorId
+            )
+        }
+    }
+
+    private static func plannedCareEventId(from note: String) -> UUID? {
+        for prefix in [PetCareLog.plannedFeedNotePrefix, PetCareLog.plannedWaterNotePrefix]
+            where note.hasPrefix(prefix) {
+            return UUID(uuidString: String(note.dropFirst(prefix.count)))
+        }
+        return nil
+    }
 }
 
 nonisolated struct TodayFocusQuestRefresher {
+    func refreshedQuests(
+        _ quests: [IslandQuest],
+        pets: [Pet],
+        humans: [Human],
+        events: [Event] = [],
+        careLedgerEntries: [TodayFocusCareLedgerEntry],
+        humanWeightLogs: [HumanWeightLog],
+        calendar: Calendar,
+        now: Date,
+        questProgress: TodayFocusQuestProgress
+    ) -> [IslandQuest] {
+        TodayFocusService.refreshedQuests(
+            quests,
+            pets: pets,
+            humans: humans,
+            events: events,
+            careLedgerEntries: careLedgerEntries,
+            humanWeightLogs: humanWeightLogs,
+            calendar: calendar,
+            now: now,
+            questProgress: questProgress
+        )
+    }
+
     func refreshedQuests(
         _ quests: [IslandQuest],
         pets: [Pet],
@@ -352,6 +551,31 @@ nonisolated struct TodayFocusQuestRefresher {
             calendar: calendar,
             now: now,
             questProgress: questProgress
+        )
+    }
+
+    @MainActor
+    func refreshedQuests(
+        _ quests: [IslandQuest],
+        pets: [Pet],
+        humans: [Human],
+        events: [Event] = [],
+        careLedgerEntries: [TodayFocusCareLedgerEntry],
+        humanWeightLogs: [HumanWeightLog],
+        calendar: Calendar,
+        now: Date,
+        questManager: QuestManager
+    ) -> [IslandQuest] {
+        refreshedQuests(
+            quests,
+            pets: pets,
+            humans: humans,
+            events: events,
+            careLedgerEntries: careLedgerEntries,
+            humanWeightLogs: humanWeightLogs,
+            calendar: calendar,
+            now: now,
+            questProgress: TodayFocusQuestProgress(questManager: questManager)
         )
     }
 

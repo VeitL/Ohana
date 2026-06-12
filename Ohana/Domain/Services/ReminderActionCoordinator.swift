@@ -22,6 +22,32 @@ enum ReminderActionDispatchResult: Equatable {
 
 enum ReminderActionCoordinator {
     @MainActor
+    private static func fetchModelsOrLog<T: PersistentModel>(
+        _ descriptor: FetchDescriptor<T>,
+        context: ModelContext,
+        operation: String
+    ) -> [T] {
+        do {
+            return try context.fetch(descriptor)
+        } catch {
+            OhanaLog.warning(
+                "ReminderActionCoordinator failed to \(operation): \(error.localizedDescription)",
+                category: "Care"
+            )
+            return []
+        }
+    }
+
+    @MainActor
+    private static func fetchFirstOrLog<T: PersistentModel>(
+        _ descriptor: FetchDescriptor<T>,
+        context: ModelContext,
+        operation: String
+    ) -> T? {
+        fetchModelsOrLog(descriptor, context: context, operation: operation).first
+    }
+
+    @MainActor
     @discardableResult
     static func handle(
         userInfo: [AnyHashable: Any]?,
@@ -262,7 +288,11 @@ enum ReminderActionCoordinator {
     ) -> Reminder? {
         var descriptor = FetchDescriptor<Reminder>(predicate: predicate)
         descriptor.fetchLimit = 1
-        return (try? context.fetch(descriptor))?.first
+        return fetchFirstOrLog(
+            descriptor,
+            context: context,
+            operation: "fetch reminder"
+        )
     }
 
     @MainActor
@@ -273,7 +303,11 @@ enum ReminderActionCoordinator {
             }
         )
         descriptor.fetchLimit = 1
-        return (try? context.fetch(descriptor))?.first
+        return fetchFirstOrLog(
+            descriptor,
+            context: context,
+            operation: "fetch human medication"
+        )
     }
 
     @MainActor
@@ -284,7 +318,11 @@ enum ReminderActionCoordinator {
             }
         )
         descriptor.fetchLimit = 1
-        return (try? context.fetch(descriptor))?.first
+        return fetchFirstOrLog(
+            descriptor,
+            context: context,
+            operation: "fetch pet medication"
+        )
     }
 
     @MainActor
@@ -295,7 +333,11 @@ enum ReminderActionCoordinator {
             }
         )
         descriptor.fetchLimit = 1
-        return (try? context.fetch(descriptor))?.first
+        return fetchFirstOrLog(
+            descriptor,
+            context: context,
+            operation: "fetch human"
+        )
     }
 
     @MainActor
@@ -307,13 +349,21 @@ enum ReminderActionCoordinator {
             }
         )
         descriptor.fetchLimit = 1
-        return (try? context.fetch(descriptor))?.first
+        return fetchFirstOrLog(
+            descriptor,
+            context: context,
+            operation: "fetch pet for reminder event"
+        )
     }
 
     @MainActor
     private static func petContainingMedication(_ medicationId: UUID, context: ModelContext) -> Pet? {
         let descriptor = FetchDescriptor<Pet>()
-        let pets = (try? context.fetch(descriptor)) ?? []
+        let pets = fetchModelsOrLog(
+            descriptor,
+            context: context,
+            operation: "fetch pets for medication lookup"
+        )
         return pets.first { pet in
             pet.medications.contains { $0.id == medicationId }
         }

@@ -316,7 +316,7 @@ enum EventCompletionCommandService {
                     log.date >= today && log.date < tomorrow
                 }
             )
-            guard let logs = try? context.fetch(descriptor) else { return false }
+            let logs = fetchModelsOrLog(descriptor, context: context, operation: "fetch today potty logs for event completion")
             return logs.contains { $0.pet?.id.uuidString == petId }
         }
         if isWalk {
@@ -325,7 +325,7 @@ enum EventCompletionCommandService {
                     log.startDate >= today && log.startDate < tomorrow
                 }
             )
-            guard let logs = try? context.fetch(descriptor) else { return false }
+            let logs = fetchModelsOrLog(descriptor, context: context, operation: "fetch today walk logs for event completion")
             return logs.contains { $0.pet?.id.uuidString == petId }
         }
 
@@ -335,7 +335,7 @@ enum EventCompletionCommandService {
                 log.date >= today && log.date < tomorrow
             }
         )
-        guard let logs = try? context.fetch(descriptor) else { return false }
+        let logs = fetchModelsOrLog(descriptor, context: context, operation: "fetch today care logs for event completion")
         return logs.contains { $0.pet?.id.uuidString == petId && $0.type == careType }
     }
 
@@ -358,7 +358,7 @@ enum EventCompletionCommandService {
             predicate: #Predicate<CoconutLedgerEntry> { $0.transactionKey == transactionKey }
         )
         descriptor.fetchLimit = 1
-        return ((try? context.fetch(descriptor))?.isEmpty == false)
+        return fetchModelsOrLog(descriptor, context: context, operation: "fetch existing calendar reward").isEmpty == false
     }
 
     @MainActor
@@ -368,7 +368,24 @@ enum EventCompletionCommandService {
             predicate: #Predicate<Human> { $0.id == uuid }
         )
         descriptor.fetchLimit = 1
-        return try? context.fetch(descriptor).first
+        return fetchModelsOrLog(descriptor, context: context, operation: "fetch calendar reward executor").first
+    }
+
+    @MainActor
+    private static func fetchModelsOrLog<T: PersistentModel>(
+        _ descriptor: FetchDescriptor<T>,
+        context: ModelContext,
+        operation: String
+    ) -> [T] {
+        do {
+            return try context.fetch(descriptor)
+        } catch {
+            OhanaLog.warning(
+                "EventCompletionCommandService failed to \(operation): \(error.localizedDescription)",
+                category: "Calendar"
+            )
+            return []
+        }
     }
 
     private static func calendarBudgetKeys(

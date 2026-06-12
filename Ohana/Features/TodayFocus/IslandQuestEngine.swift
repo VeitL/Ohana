@@ -77,6 +77,7 @@ nonisolated enum IslandQuestEngine {
         plants: [Plant] = [],
         events: [Event] = [],
         humans: [Human] = [],
+        careLedgerEntries: [TodayFocusCareLedgerEntry] = [],
         now: Date = Date(),
         questProgress: TodayFocusQuestProgress = .fromDefaults()
     ) -> [IslandQuest] {
@@ -115,7 +116,14 @@ nonisolated enum IslandQuestEngine {
         }
 
         // ── 物种/品种默认护理计划：添加宠物后写入 Event，这里只取今天到期且尚未完成的项目。
-        for quest in carePlanQuests(from: events, pets: activePets, humans: humans, calendar: cal, now: now) {
+        for quest in carePlanQuests(
+            from: events,
+            pets: activePets,
+            humans: humans,
+            careLedgerEntries: careLedgerEntries,
+            calendar: cal,
+            now: now
+        ) {
             guard quests.count < maxQuests else { break }
             if !quests.contains(where: { $0.id == quest.id }) {
                 quests.append(quest)
@@ -146,12 +154,14 @@ nonisolated enum IslandQuestEngine {
         }
 
         // ── 轻量互动：每天最多一次家庭级陪玩引导；遛狗也视为已互动，避免给每只宠物轮流派发陪玩任务。
-        let hasAnyPlayEquivalentToday = activePets.contains { pet in
-            pet.careLogs.contains { $0.careType == .play && cal.isDate($0.date, inSameDayAs: now) }
-                || pet.walkLogs.contains { cal.isDate($0.startDate, inSameDayAs: now) }
-        }
+        let playEquivalentDoneToday = hasAnyPlayEquivalentToday(
+            pets: activePets,
+            careLedgerEntries: careLedgerEntries,
+            calendar: cal,
+            now: now
+        )
         if quests.count < maxQuests,
-           !hasAnyPlayEquivalentToday,
+           !playEquivalentDoneToday,
            let pet = PetPersonalityBehavior.preferredPet(from: activePets, actionType: "play", isAlreadyDone: { _ in false }) {
             quests.append(IslandQuest(
                 id: "q_play_\(pet.id.uuidString)",
@@ -269,6 +279,7 @@ nonisolated enum IslandQuestEngine {
         plants: [Plant] = [],
         events: [Event] = [],
         humans: [Human] = [],
+        careLedgerEntries: [TodayFocusCareLedgerEntry] = [],
         now: Date = Date(),
         questManager: QuestManager
     ) -> [IslandQuest] {
@@ -278,6 +289,7 @@ nonisolated enum IslandQuestEngine {
             plants: plants,
             events: events,
             humans: humans,
+            careLedgerEntries: careLedgerEntries,
             now: now,
             questProgress: TodayFocusQuestProgress(questManager: questManager)
         )
@@ -507,6 +519,7 @@ nonisolated enum IslandQuestEngine {
         from events: [Event],
         pets: [Pet],
         humans: [Human],
+        careLedgerEntries: [TodayFocusCareLedgerEntry],
         calendar: Calendar,
         now: Date
     ) -> [IslandQuest] {
@@ -521,7 +534,14 @@ nonisolated enum IslandQuestEngine {
             .compactMap { event -> IslandQuest? in
                 guard let pet = petById[event.relatedEntityId] else { return nil }
                 let kind = routineKind(for: event)
-                if isCarePlanEventCompleted(kind, event: event, pet: pet, calendar: calendar, now: now) {
+                if isCarePlanEventCompleted(
+                    kind,
+                    event: event,
+                    pet: pet,
+                    careLedgerEntries: careLedgerEntries,
+                    calendar: calendar,
+                    now: now
+                ) {
                     return nil
                 }
                 let id = questId(for: kind, event: event, pet: pet)
@@ -529,7 +549,14 @@ nonisolated enum IslandQuestEngine {
                     id: id,
                     emoji: emoji(for: kind, event: event),
                     title: routineTitle(for: kind, event: event, pet: pet),
-                    subtitle: routineSubtitle(for: kind, pet: pet, humans: humans, calendar: calendar, now: now),
+                    subtitle: routineSubtitle(
+                        for: kind,
+                        pet: pet,
+                        humans: humans,
+                        careLedgerEntries: careLedgerEntries,
+                        calendar: calendar,
+                        now: now
+                    ),
                     isCompleted: false,
                     targetPetId: pet.id,
                     targetPlantId: nil
@@ -647,14 +674,27 @@ nonisolated enum IslandQuestEngine {
         _ kind: RoutineKind,
         event: Event,
         pet: Pet,
+        careLedgerEntries: [TodayFocusCareLedgerEntry],
         calendar: Calendar,
         now: Date
     ) -> Bool {
         if event.isOccurrenceMarkedComplete(on: now) {
             return true
         }
+        let hasLedgerInput = !careLedgerEntries.isEmpty
         switch kind {
         case .feeding:
+            if hasLedgerInput {
+                return hasCareLedgerEntry(
+                    eventId: event.id,
+                    petId: pet.id,
+                    entries: careLedgerEntries,
+                    eventKinds: [.care],
+                    actionTypes: [CareType.feeding.rawValue],
+                    calendar: calendar,
+                    now: now
+                )
+            }
             return hasPlannedCareLog(
                 event: event,
                 pet: pet,
@@ -664,6 +704,17 @@ nonisolated enum IslandQuestEngine {
                 now: now
             )
         case .watering:
+            if hasLedgerInput {
+                return hasCareLedgerEntry(
+                    eventId: event.id,
+                    petId: pet.id,
+                    entries: careLedgerEntries,
+                    eventKinds: [.care],
+                    actionTypes: [CareType.watering.rawValue, CareType.waterChange.rawValue],
+                    calendar: calendar,
+                    now: now
+                )
+            }
             return hasPlannedCareLog(
                 event: event,
                 pet: pet,
@@ -673,16 +724,42 @@ nonisolated enum IslandQuestEngine {
                 now: now
             )
         case .walk:
+            if hasLedgerInput {
+                return hasCareLedgerEntry(
+                    petId: pet.id,
+                    entries: careLedgerEntries,
+                    eventKinds: [.walk],
+                    actionTypes: nil,
+                    calendar: calendar,
+                    now: now
+                )
+            }
             return pet.walkLogs.contains {
                 calendar.isDate($0.startDate, inSameDayAs: now)
             }
         case .potty:
+            if hasLedgerInput {
+                return hasPottyOrLitterLedgerEntry(
+                    petId: pet.id,
+                    entries: careLedgerEntries,
+                    calendar: calendar,
+                    now: now
+                )
+            }
             return pet.pottyLogs.contains {
                 calendar.isDate($0.date, inSameDayAs: now)
             } || pet.careLogs.contains {
                 $0.careType == .litter && calendar.isDate($0.date, inSameDayAs: now)
             }
         case .play:
+            if hasLedgerInput {
+                return hasPlayEquivalentLedgerEntry(
+                    petId: pet.id,
+                    entries: careLedgerEntries,
+                    calendar: calendar,
+                    now: now
+                )
+            }
             return pet.careLogs.contains {
                 $0.careType == .play && calendar.isDate($0.date, inSameDayAs: now)
             } || pet.walkLogs.contains {
@@ -695,6 +772,91 @@ nonisolated enum IslandQuestEngine {
         case .generic:
             return false
         }
+    }
+
+    private static func hasAnyPlayEquivalentToday(
+        pets: [Pet],
+        careLedgerEntries: [TodayFocusCareLedgerEntry],
+        calendar: Calendar,
+        now: Date
+    ) -> Bool {
+        if !careLedgerEntries.isEmpty {
+            let activePetIds = Set(pets.map(\.id))
+            return careLedgerEntries.contains { entry in
+                activePetIds.contains(entry.petId) &&
+                    calendar.isDate(entry.date, inSameDayAs: now) &&
+                    ((entry.eventKind == .care && entry.actionType == CareType.play.rawValue) ||
+                        entry.eventKind == .walk)
+            }
+        }
+        return pets.contains { pet in
+            pet.careLogs.contains { $0.careType == .play && calendar.isDate($0.date, inSameDayAs: now) }
+                || pet.walkLogs.contains { calendar.isDate($0.startDate, inSameDayAs: now) }
+        }
+    }
+
+    private static func hasCareLedgerEntry(
+        eventId: UUID? = nil,
+        petId: UUID,
+        entries: [TodayFocusCareLedgerEntry],
+        eventKinds: [CareLedgerEventKind],
+        actionTypes: [String]?,
+        calendar: Calendar,
+        now: Date
+    ) -> Bool {
+        entries.contains { entry in
+            entry.petId == petId &&
+                eventKinds.contains(entry.eventKind) &&
+                (actionTypes?.contains(entry.actionType) ?? true) &&
+                (eventId == nil || entry.sourceEventId == eventId) &&
+                calendar.isDate(entry.date, inSameDayAs: now)
+        }
+    }
+
+    private static func hasPottyOrLitterLedgerEntry(
+        petId: UUID,
+        entries: [TodayFocusCareLedgerEntry],
+        calendar: Calendar,
+        now: Date
+    ) -> Bool {
+        hasCareLedgerEntry(
+            petId: petId,
+            entries: entries,
+            eventKinds: [.potty],
+            actionTypes: nil,
+            calendar: calendar,
+            now: now
+        ) || hasCareLedgerEntry(
+            petId: petId,
+            entries: entries,
+            eventKinds: [.care],
+            actionTypes: [CareType.litter.rawValue],
+            calendar: calendar,
+            now: now
+        )
+    }
+
+    private static func hasPlayEquivalentLedgerEntry(
+        petId: UUID,
+        entries: [TodayFocusCareLedgerEntry],
+        calendar: Calendar,
+        now: Date
+    ) -> Bool {
+        hasCareLedgerEntry(
+            petId: petId,
+            entries: entries,
+            eventKinds: [.care],
+            actionTypes: [CareType.play.rawValue],
+            calendar: calendar,
+            now: now
+        ) || hasCareLedgerEntry(
+            petId: petId,
+            entries: entries,
+            eventKinds: [.walk],
+            actionTypes: nil,
+            calendar: calendar,
+            now: now
+        )
     }
 
     private static func hasPlannedCareLog(
@@ -717,6 +879,7 @@ nonisolated enum IslandQuestEngine {
         for kind: RoutineKind,
         pet: Pet,
         humans: [Human],
+        careLedgerEntries: [TodayFocusCareLedgerEntry],
         calendar: Calendar,
         now: Date
     ) -> String {
@@ -730,7 +893,7 @@ nonisolated enum IslandQuestEngine {
         case .generic: localized(zh: "按计划完成后，家人都能看到状态", en: "Complete the plan so the family can see the status")
         }
 
-        guard let last = lastRoutineActor(for: kind, pet: pet) else { return fallback }
+        guard let last = lastRoutineActor(for: kind, pet: pet, careLedgerEntries: careLedgerEntries) else { return fallback }
         let actor = humanDisplayName(id: last.executorId, humans: humans)
         return localized(
             zh: "上次由 \(actor) · \(relativeTime(from: last.date, to: now, calendar: calendar))",
@@ -738,7 +901,14 @@ nonisolated enum IslandQuestEngine {
         )
     }
 
-    private static func lastRoutineActor(for kind: RoutineKind, pet: Pet) -> (date: Date, executorId: String?)? {
+    private static func lastRoutineActor(
+        for kind: RoutineKind,
+        pet: Pet,
+        careLedgerEntries: [TodayFocusCareLedgerEntry]
+    ) -> (date: Date, executorId: String?)? {
+        if let ledgerActor = lastLedgerRoutineActor(for: kind, pet: pet, careLedgerEntries: careLedgerEntries) {
+            return ledgerActor
+        }
         switch kind {
         case .feeding:
             return pet.careLogs
@@ -772,6 +942,36 @@ nonisolated enum IslandQuestEngine {
                 .max { $0.date < $1.date }
         case .generic:
             return nil
+        }
+    }
+
+    private static func lastLedgerRoutineActor(
+        for kind: RoutineKind,
+        pet: Pet,
+        careLedgerEntries: [TodayFocusCareLedgerEntry]
+    ) -> (date: Date, executorId: String?)? {
+        guard !careLedgerEntries.isEmpty else { return nil }
+        return careLedgerEntries
+            .filter { ledgerEntry($0, matches: kind, petId: pet.id) }
+            .map { (date: $0.date, executorId: $0.actorId) }
+            .max { $0.date < $1.date }
+    }
+
+    private static func ledgerEntry(_ entry: TodayFocusCareLedgerEntry, matches kind: RoutineKind, petId: UUID) -> Bool {
+        guard entry.petId == petId else { return false }
+        switch kind {
+        case .feeding:
+            return entry.eventKind == .care && entry.actionType == CareType.feeding.rawValue
+        case .watering:
+            return entry.eventKind == .care && [CareType.watering.rawValue, CareType.waterChange.rawValue].contains(entry.actionType)
+        case .walk:
+            return entry.eventKind == .walk
+        case .potty:
+            return entry.eventKind == .potty || (entry.eventKind == .care && entry.actionType == CareType.litter.rawValue)
+        case .play:
+            return entry.eventKind == .care && entry.actionType == CareType.play.rawValue
+        case .weight, .generic:
+            return false
         }
     }
 

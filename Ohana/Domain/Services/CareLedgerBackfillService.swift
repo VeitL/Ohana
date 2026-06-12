@@ -9,24 +9,30 @@ import Foundation
 import SwiftData
 
 nonisolated enum CareLedgerBackfillService {
+    static let sourceFetchBatchSize = 64
+
     /// Isolation-agnostic: operates only on the supplied ModelContext, so it can
     /// run on the main context or inside a background @ModelActor.
     static func backfill(context: ModelContext) throws {
-        let existing = try context.fetch(FetchDescriptor<CareLedgerEvent>()) // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
-        var keys = Set(existing.compactMap { event -> String? in
-            guard let model = event.legacyModelName, let id = event.legacyModelId else { return nil }
-            return key(model, id)
-        })
+        var stagedKeys: Set<String> = []
 
-        func remember(_ model: String, _ id: String) -> Bool {
+        func shouldBackfill(_ model: String, _ id: String) throws -> Bool {
             let value = key(model, id)
-            guard !keys.contains(value) else { return false }
-            keys.insert(value)
+            guard !stagedKeys.contains(value) else { return false }
+            guard try !legacyLedgerExists(modelName: model, legacyModelId: id, context: context) else {
+                stagedKeys.insert(value)
+                return false
+            }
+            stagedKeys.insert(value)
             return true
         }
 
-        for log in try context.fetch(FetchDescriptor<PetCareLog>()) { // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
-            guard remember("PetCareLog", log.id.uuidString) else { continue }
+        try forEachSourceBatch(
+            FetchDescriptor<PetCareLog>(sortBy: [SortDescriptor(\.date)]),
+            context: context,
+            operation: "fetch pet care logs"
+        ) { log in
+            guard try shouldBackfill("PetCareLog", log.id.uuidString) else { return }
             CareLedgerService.record(
                 occurredAt: log.date,
                 actorKind: log.executorId == nil ? .unknown : .human,
@@ -46,8 +52,12 @@ nonisolated enum CareLedgerBackfillService {
             )
         }
 
-        for log in try context.fetch(FetchDescriptor<PetPottyLog>()) { // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
-            guard remember("PetPottyLog", log.id.uuidString) else { continue }
+        try forEachSourceBatch(
+            FetchDescriptor<PetPottyLog>(sortBy: [SortDescriptor(\.date)]),
+            context: context,
+            operation: "fetch pet potty logs"
+        ) { log in
+            guard try shouldBackfill("PetPottyLog", log.id.uuidString) else { return }
             CareLedgerService.record(
                 occurredAt: log.date,
                 actorKind: log.executorId == nil ? .unknown : .human,
@@ -64,8 +74,12 @@ nonisolated enum CareLedgerBackfillService {
             )
         }
 
-        for log in try context.fetch(FetchDescriptor<PetWalkLog>()) { // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
-            guard remember("PetWalkLog", log.id.uuidString) else { continue }
+        try forEachSourceBatch(
+            FetchDescriptor<PetWalkLog>(sortBy: [SortDescriptor(\.startDate)]),
+            context: context,
+            operation: "fetch pet walk logs"
+        ) { log in
+            guard try shouldBackfill("PetWalkLog", log.id.uuidString) else { return }
             CareLedgerService.record(
                 occurredAt: log.startDate,
                 actorKind: log.executorId == nil ? .unknown : .human,
@@ -86,8 +100,12 @@ nonisolated enum CareLedgerBackfillService {
             )
         }
 
-        for log in try context.fetch(FetchDescriptor<PetExpenseLog>()) { // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
-            guard remember("PetExpenseLog", log.id.uuidString) else { continue }
+        try forEachSourceBatch(
+            FetchDescriptor<PetExpenseLog>(sortBy: [SortDescriptor(\.date)]),
+            context: context,
+            operation: "fetch pet expense logs"
+        ) { log in
+            guard try shouldBackfill("PetExpenseLog", log.id.uuidString) else { return }
             CareLedgerService.record(
                 occurredAt: log.date,
                 actorKind: log.executorId == nil ? .unknown : .human,
@@ -107,8 +125,58 @@ nonisolated enum CareLedgerBackfillService {
             )
         }
 
-        for log in try context.fetch(FetchDescriptor<HumanWeightLog>()) { // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
-            guard remember("HumanWeightLog", log.id.uuidString) else { continue }
+        try forEachSourceBatch(
+            FetchDescriptor<PetWeightLog>(sortBy: [SortDescriptor(\.date)]),
+            context: context,
+            operation: "fetch pet weight logs"
+        ) { log in
+            guard try shouldBackfill("PetWeightLog", log.id.uuidString) else { return }
+            CareLedgerService.record(
+                occurredAt: log.date,
+                actorKind: log.executorId == nil ? .unknown : .human,
+                actorId: log.executorId,
+                subjectKind: .pet,
+                subjectId: log.pet?.id.uuidString,
+                eventKind: .weight,
+                actionType: "petWeight",
+                amountValue: log.weightInKg,
+                amountUnit: "kg",
+                source: .backfill,
+                legacyModelName: "PetWeightLog",
+                legacyModelId: log.id.uuidString,
+                context: context,
+                save: false
+            )
+        }
+
+        try forEachSourceBatch(
+            FetchDescriptor<PetHygieneLog>(sortBy: [SortDescriptor(\.date)]),
+            context: context,
+            operation: "fetch pet hygiene logs"
+        ) { log in
+            guard try shouldBackfill("PetHygieneLog", log.id.uuidString) else { return }
+            CareLedgerService.record(
+                occurredAt: log.date,
+                actorKind: log.executorId == nil ? .unknown : .human,
+                actorId: log.executorId,
+                subjectKind: .pet,
+                subjectId: log.pet?.id.uuidString,
+                eventKind: .hygiene,
+                actionType: log.hygieneType.rawValue,
+                source: .backfill,
+                legacyModelName: "PetHygieneLog",
+                legacyModelId: log.id.uuidString,
+                context: context,
+                save: false
+            )
+        }
+
+        try forEachSourceBatch(
+            FetchDescriptor<HumanWeightLog>(sortBy: [SortDescriptor(\.date)]),
+            context: context,
+            operation: "fetch human weight logs"
+        ) { log in
+            guard try shouldBackfill("HumanWeightLog", log.id.uuidString) else { return }
             CareLedgerService.record(
                 occurredAt: log.date,
                 actorKind: .human,
@@ -128,8 +196,12 @@ nonisolated enum CareLedgerBackfillService {
             )
         }
 
-        for log in try context.fetch(FetchDescriptor<HumanWorkoutLog>()) { // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
-            guard remember("HumanWorkoutLog", log.id.uuidString) else { continue }
+        try forEachSourceBatch(
+            FetchDescriptor<HumanWorkoutLog>(sortBy: [SortDescriptor(\.date)]),
+            context: context,
+            operation: "fetch human workout logs"
+        ) { log in
+            guard try shouldBackfill("HumanWorkoutLog", log.id.uuidString) else { return }
             CareLedgerService.record(
                 occurredAt: log.date,
                 actorKind: .human,
@@ -150,8 +222,12 @@ nonisolated enum CareLedgerBackfillService {
             )
         }
 
-        for log in try context.fetch(FetchDescriptor<PlantCareLog>()) { // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
-            guard remember("PlantCareLog", log.id.uuidString) else { continue }
+        try forEachSourceBatch(
+            FetchDescriptor<PlantCareLog>(sortBy: [SortDescriptor(\.date)]),
+            context: context,
+            operation: "fetch plant care logs"
+        ) { log in
+            guard try shouldBackfill("PlantCareLog", log.id.uuidString) else { return }
             CareLedgerService.record(
                 occurredAt: log.date,
                 actorKind: log.executorId == nil ? .unknown : .human,
@@ -169,8 +245,12 @@ nonisolated enum CareLedgerBackfillService {
             )
         }
 
-        for reminder in try context.fetch(FetchDescriptor<Reminder>()) { // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
-            guard remember("Reminder", reminder.id.uuidString) else { continue }
+        try forEachSourceBatch(
+            FetchDescriptor<Reminder>(sortBy: [SortDescriptor(\.scheduledAt)]),
+            context: context,
+            operation: "fetch reminders"
+        ) { reminder in
+            guard try shouldBackfill("Reminder", reminder.id.uuidString) else { return }
             let subject = CareLedgerService.subjectInfo(from: reminder.event)
             CareLedgerService.record(
                 occurredAt: reminder.completedAt ?? reminder.scheduledAt,
@@ -197,12 +277,56 @@ nonisolated enum CareLedgerBackfillService {
     private static func key(_ model: String, _ id: String) -> String {
         "\(model):\(id)"
     }
+
+    private static func forEachSourceBatch<T: PersistentModel>(
+        _ descriptor: FetchDescriptor<T>,
+        context: ModelContext,
+        operation: String,
+        _ body: (T) throws -> Void
+    ) throws {
+        var offset = 0
+        while true {
+            var batchDescriptor = descriptor
+            batchDescriptor.fetchLimit = sourceFetchBatchSize
+            batchDescriptor.fetchOffset = offset
+            let batch: [T]
+            do {
+                batch = try context.fetch(batchDescriptor)
+            } catch {
+                OhanaLog.warning(
+                    "CareLedgerBackfillService failed to \(operation): \(error.localizedDescription)",
+                    category: "Care"
+                )
+                throw error
+            }
+            guard !batch.isEmpty else { break }
+            for item in batch {
+                try body(item)
+            }
+            guard batch.count == sourceFetchBatchSize else { break }
+            offset += batch.count
+        }
+    }
+
+    private static func legacyLedgerExists(
+        modelName: String,
+        legacyModelId: String,
+        context: ModelContext
+    ) throws -> Bool {
+        var descriptor = FetchDescriptor<CareLedgerEvent>(
+            predicate: #Predicate<CareLedgerEvent> { event in
+                event.legacyModelName == modelName && event.legacyModelId == legacyModelId
+            }
+        )
+        descriptor.fetchLimit = 1
+        return try !context.fetch(descriptor).isEmpty
+    }
 }
 
 /// Runs the (potentially large, unbounded) care-ledger backfill on a dedicated
-/// background SwiftData context so the full-table fetch + insert never blocks
-/// the main thread. The backfill is idempotent and writes only persistent data,
-/// so it has no dependency on main-context live models or UI state.
+/// background SwiftData context so legacy table scans and inserts never block the
+/// main thread. The backfill is idempotent and writes only persistent data, so it
+/// has no dependency on main-context live models or UI state.
 @ModelActor
 actor CareLedgerBackfillActor {
     func run() throws {

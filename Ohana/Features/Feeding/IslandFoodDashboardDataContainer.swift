@@ -14,7 +14,8 @@ struct IslandFoodDashboard: View {
 
     @Query private var pets: [Pet]
     @Query private var allEvents: [Event]
-    @Query private var allCareLogs: [PetCareLog]
+    @Query private var allFeedingLedgerEvents: [CareLedgerEvent]
+    @Query private var legacyStockCareLogs: [PetCareLog]
     @Query private var allFoodRecords: [PetFoodRecord]
     @Query private var allSharedCareSessions: [SharedCareSession]
 
@@ -28,6 +29,8 @@ struct IslandFoodDashboard: View {
         let feedingEventType = EventType.foodChange.rawValue
         let stockReminderEntityType = FeedingPlanWriter.stockReminderEntityType
         let autoFeederEntityType = FeedRuleMetadata.autoFeederEntityType
+        let petSubject = CareLedgerSubjectKind.pet.rawValue
+        let careKind = CareLedgerEventKind.care.rawValue
         let feedingCareType = CareType.feeding.rawValue
         let sharedFeedingKind = SharedCareActionKind.feeding.rawValue
         let careLogWindowStart = Calendar.current.date(byAdding: .day, value: -730, to: Date()) ?? .distantPast
@@ -46,7 +49,17 @@ struct IslandFoodDashboard: View {
             },
             sort: \.startDate
         )
-        _allCareLogs = Query(
+        _allFeedingLedgerEvents = Query(
+            filter: #Predicate<CareLedgerEvent> { event in
+                event.subjectKind == petSubject &&
+                    event.eventKind == careKind &&
+                    event.actionType == feedingCareType &&
+                    event.occurredAt >= careLogWindowStart
+            },
+            sort: \.occurredAt,
+            order: .reverse
+        )
+        _legacyStockCareLogs = Query(
             filter: #Predicate<PetCareLog> { log in
                 log.type == feedingCareType && log.date >= careLogWindowStart
             },
@@ -76,7 +89,8 @@ struct IslandFoodDashboard: View {
             onOpenPet: onOpenPet,
             pets: pets,
             allEvents: allEvents,
-            allCareLogs: allCareLogs,
+            allFeedingLedgerEvents: allFeedingLedgerEvents,
+            legacyStockCareLogs: legacyStockCareLogs,
             allFoodRecords: allFoodRecords,
             allSharedCareSessions: allSharedCareSessions
         )

@@ -25,6 +25,7 @@ struct QuickFeedDetailSheet: View {
     let allEvents: [Event]
     let allHumans: [Human]
     let allPets: [Pet]
+    let feedingLedgerEvents: [CareLedgerEvent]
     let allCareLogs: [PetCareLog]
     let allFoodRecords: [PetFoodRecord]
     let allSharedCareSessions: [SharedCareSession]
@@ -44,6 +45,7 @@ struct QuickFeedDetailSheet: View {
         allEvents: [Event] = [],
         allHumans: [Human] = [],
         allPets: [Pet] = [],
+        feedingLedgerEvents: [CareLedgerEvent] = [],
         allCareLogs: [PetCareLog] = [],
         allFoodRecords: [PetFoodRecord] = [],
         allSharedCareSessions: [SharedCareSession] = []
@@ -57,6 +59,7 @@ struct QuickFeedDetailSheet: View {
         self.allEvents = allEvents
         self.allHumans = allHumans
         self.allPets = allPets
+        self.feedingLedgerEvents = feedingLedgerEvents
         self.allCareLogs = allCareLogs
         self.allFoodRecords = allFoodRecords
         self.allSharedCareSessions = allSharedCareSessions
@@ -73,6 +76,7 @@ struct QuickFeedDetailSheet: View {
             allEvents: allEvents,
             allHumans: allHumans,
             allPets: allPets,
+            feedingLedgerEvents: feedingLedgerEvents,
             allCareLogs: allCareLogs,
             allFoodRecords: allFoodRecords,
             allSharedCareSessions: allSharedCareSessions,
@@ -98,6 +102,7 @@ struct QuickFeedDetailContent: View {
     let allEvents: [Event]
     let allHumans: [Human]
     let allPets: [Pet]
+    let feedingLedgerEvents: [CareLedgerEvent]
     let allCareLogs: [PetCareLog]
     let allFoodRecords: [PetFoodRecord]
     let allSharedCareSessions: [SharedCareSession]
@@ -133,6 +138,7 @@ struct QuickFeedDetailContent: View {
         allEvents: [Event],
         allHumans: [Human],
         allPets: [Pet],
+        feedingLedgerEvents: [CareLedgerEvent],
         allCareLogs: [PetCareLog],
         allFoodRecords: [PetFoodRecord],
         allSharedCareSessions: [SharedCareSession],
@@ -149,6 +155,7 @@ struct QuickFeedDetailContent: View {
         self.allEvents = allEvents
         self.allHumans = allHumans
         self.allPets = allPets
+        self.feedingLedgerEvents = feedingLedgerEvents
         self.allCareLogs = allCareLogs
         self.allFoodRecords = allFoodRecords
         self.allSharedCareSessions = allSharedCareSessions
@@ -174,7 +181,8 @@ struct QuickFeedDetailContent: View {
                 pet: pet,
                 manualPlanEvents: initialRules.manualReminderEvents,
                 autoFeederEvents: initialRules.autoFeederEvents,
-                careLogs: allCareLogs,
+                feedingLedgerEvents: feedingLedgerEvents,
+                legacyCareLogs: allCareLogs,
                 range: .days7,
                 activeMode: initialFeedMode,
                 defaultFeedGrams: defaultFeedGrams.wrappedValue,
@@ -185,7 +193,7 @@ struct QuickFeedDetailContent: View {
             initial: QuickFeedPlanCalendarSnapshot.build(
                 manualEvents: initialRules.manualReminderEvents,
                 autoEvents: initialRules.autoFeederEvents,
-                careLogs: allCareLogs,
+                feedingLedgerEvents: feedingLedgerEvents,
                 activeMode: initialFeedMode,
                 month: initialNow,
                 selectedDate: initialNow,
@@ -195,7 +203,8 @@ struct QuickFeedDetailContent: View {
         _treatSnapshotStore = StateObject(wrappedValue: QuickFeedTreatSnapshotStore(
             initial: QuickFeedTreatSnapshot.build(
                 pet: pet,
-                careLogs: allCareLogs,
+                feedingLedgerEvents: feedingLedgerEvents,
+                legacyCareLogs: allCareLogs,
                 range: .days7,
                 selectedKind: nil,
                 now: initialNow
@@ -289,6 +298,10 @@ struct QuickFeedDetailContent: View {
 
     var observedCareLogs: [PetCareLog] {
         dataController.observedCareLogs(fallback: allCareLogs)
+    }
+
+    var observedFeedingLedgerEvents: [CareLedgerEvent] {
+        dataController.observedFeedingLedgerEvents(fallback: feedingLedgerEvents)
     }
 
     var observedFoodRecords: [PetFoodRecord] {
@@ -431,6 +444,7 @@ struct QuickFeedDetailContent: View {
             planCalendarMonth: draftStore.feedPlanCalendarMonth,
             planCalendarSelectedDate: draftStore.feedPlanCalendarSelectedDate,
             eventCount: allEvents.count,
+            feedingLedgerEventCount: feedingLedgerEvents.count,
             careLogCount: allCareLogs.count,
             foodRecordCount: allFoodRecords.count,
             sharedSessionCount: allSharedCareSessions.count,
@@ -457,6 +471,9 @@ struct QuickFeedDetailContent: View {
             },
             onEventCountChange: {
                 scheduleDeferredFeedRefresh([.reloadSnapshots, .syncDisplayedMode, .ensurePlanReminders])
+            },
+            onFeedingLedgerEventCountChange: {
+                scheduleDeferredFeedRefresh([.reloadFullCareLogsIfLoaded, .reloadSnapshots])
             },
             onCareLogCountChange: {
                 scheduleDeferredFeedRefresh([.reloadFullCareLogsIfLoaded, .reloadSnapshots])
@@ -632,6 +649,9 @@ struct QuickFeedDetailContent: View {
         if request.contains(.reloadFullCareLogsIfLoaded), dataController.hasLoadedFullCareLogs {
             loadFullCareLogs(force: true)
         }
+        if request.contains(.reloadFullCareLogsIfLoaded), dataController.hasLoadedFullFeedingLedgerEvents {
+            loadFullFeedingLedgerEvents(force: true)
+        }
         if request.contains(.reloadFullFoodRecordsIfLoaded), dataController.hasLoadedFullFoodRecords {
             loadFullFoodRecords(force: true)
         }
@@ -667,7 +687,7 @@ struct QuickFeedDetailContent: View {
     func scheduleDetailDataLoad(for sheet: ActiveFeedSheet) {
         let needsCareLogs = sheet.needsFullCareLogs
         let needsFoodRecords = sheet.needsFullFoodRecords
-        guard (needsCareLogs && !dataController.hasLoadedFullCareLogs) ||
+        guard (needsCareLogs && (!dataController.hasLoadedFullCareLogs || !dataController.hasLoadedFullFeedingLedgerEvents)) ||
             (needsFoodRecords && !dataController.hasLoadedFullFoodRecords)
         else { return }
 
@@ -676,6 +696,7 @@ struct QuickFeedDetailContent: View {
             FeedHomePerformance.measure("detail.lazyLoad") {
                 if needsCareLogs {
                     loadFullCareLogs()
+                    loadFullFeedingLedgerEvents()
                 }
                 if needsFoodRecords {
                     loadFullFoodRecords()
@@ -693,6 +714,15 @@ struct QuickFeedDetailContent: View {
             fallback: allCareLogs,
             force: force,
             fetcher: commandExecutor.fullCareLogs
+        )
+    }
+
+    func loadFullFeedingLedgerEvents(force: Bool = false) {
+        dataController.loadFullFeedingLedgerEvents(
+            petID: pet.id,
+            fallback: feedingLedgerEvents,
+            force: force,
+            fetcher: commandExecutor.fullFeedingLedgerEvents
         )
     }
 

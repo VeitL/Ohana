@@ -270,37 +270,55 @@ final nonisolated class DataBackupManager: @unchecked Sendable {
     // MARK: - Apply Backup
 
     @MainActor
+    private func existingIds<T: PersistentModel>(
+        _ descriptor: FetchDescriptor<T>,
+        context: ModelContext,
+        id: KeyPath<T, UUID>,
+        operation: String
+    ) throws -> Set<String> {
+        do {
+            return try Set(context.fetch(descriptor).map { $0[keyPath: id].uuidString })
+        } catch {
+            OhanaLog.warning(
+                "DataBackupManager failed to \(operation): \(error.localizedDescription)",
+                category: "Backup"
+            )
+            throw error
+        }
+    }
+
+    @MainActor
     func applyBackup(_ backup: OhanaBackup, context: ModelContext, projectionManager: QuestManager?) throws {
         // 以 UUID 为主键去重：先构建现有 ID 集合，再 upsert
-        let existingPetIds = Set((try? context.fetch(FetchDescriptor<Pet>()))?.map(\.id.uuidString) ?? []) // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
-        let existingHumanIds = Set((try? context.fetch(FetchDescriptor<Human>()))?.map(\.id.uuidString) ?? []) // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
-        let existingPlantIds = Set((try? context.fetch(FetchDescriptor<Plant>()))?.map(\.id.uuidString) ?? []) // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
-        let existingHouseholdIds = Set((try? context.fetch(FetchDescriptor<Household>()))?.map(\.id.uuidString) ?? []) // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
-        let existingEventIds = Set((try? context.fetch(FetchDescriptor<Event>()))?.map(\.id.uuidString) ?? []) // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
-        let existingReminderIds = Set((try? context.fetch(FetchDescriptor<Reminder>()))?.map(\.id.uuidString) ?? []) // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
-        let existingLedgerIds = Set((try? context.fetch(FetchDescriptor<CareLedgerEvent>()))?.map(\.id.uuidString) ?? []) // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
-        let existingCoconutAccountIds = Set((try? context.fetch(FetchDescriptor<CoconutAccount>()))?.map(\.id.uuidString) ?? []) // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
-        let existingCoconutLedgerEntryIds = Set((try? context.fetch(FetchDescriptor<CoconutLedgerEntry>()))?.map(\.id.uuidString) ?? []) // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
-        let existingFamilyTaskIds = Set((try? context.fetch(FetchDescriptor<FamilyCollaborationTask>()))?.map(\.id.uuidString) ?? []) // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
-        let existingSharedCareSessionIds = Set((try? context.fetch(FetchDescriptor<SharedCareSession>()))?.map(\.id.uuidString) ?? []) // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
-        let existingExchangeIds = Set((try? context.fetch(FetchDescriptor<CoconutExchangeRequest>()))?.map(\.id.uuidString) ?? []) // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
-        let existingOasisCoconutIds = Set((try? context.fetch(FetchDescriptor<OasisUpgradeCoconut>()))?.map(\.id.uuidString) ?? []) // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
-        let existingOasisCritterIds = Set((try? context.fetch(FetchDescriptor<OasisElectronicPet>()))?.map(\.id.uuidString) ?? []) // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
-        let existingOasisFragmentIds = Set((try? context.fetch(FetchDescriptor<OasisCritterFragmentBalance>()))?.map(\.id.uuidString) ?? []) // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
-        let existingOasisUnlockIds = Set((try? context.fetch(FetchDescriptor<OasisUnlock>()))?.map(\.id.uuidString) ?? []) // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
-        let existingOasisActionLogIds = Set((try? context.fetch(FetchDescriptor<OasisCritterActionLog>()))?.map(\.id.uuidString) ?? []) // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
-        let existingGachaOwnedIds = Set((try? context.fetch(FetchDescriptor<GachaOwnedItem>()))?.map(\.id.uuidString) ?? []) // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
-        let existingGachaDrawLogIds = Set((try? context.fetch(FetchDescriptor<GachaDrawLog>()))?.map(\.id.uuidString) ?? []) // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
-        let existingDocumentAttachmentIds = Set((try? context.fetch(FetchDescriptor<PetDocumentAttachment>()))?.map(\.id.uuidString) ?? []) // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
-        let existingPhotoIds = Set((try? context.fetch(FetchDescriptor<PetPhotoLog>()))?.map(\.id.uuidString) ?? []) // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
-        let existingInsuranceIds = Set((try? context.fetch(FetchDescriptor<PetInsurance>()))?.map(\.id.uuidString) ?? []) // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
-        let existingClaimIds = Set((try? context.fetch(FetchDescriptor<InsuranceClaim>()))?.map(\.id.uuidString) ?? []) // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
-        let existingPetMedicationIds = Set((try? context.fetch(FetchDescriptor<PetMedication>()))?.map(\.id.uuidString) ?? []) // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
-        let existingHumanMedicationIds = Set((try? context.fetch(FetchDescriptor<HumanMedication>()))?.map(\.id.uuidString) ?? []) // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
-        let existingHumanMedicationLogIds = Set((try? context.fetch(FetchDescriptor<HumanMedicationLog>()))?.map(\.id.uuidString) ?? []) // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
-        let existingHumanHealthMetricLogIds = Set((try? context.fetch(FetchDescriptor<HumanHealthMetricLog>()))?.map(\.id.uuidString) ?? []) // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
-        let existingSymptomIds = Set((try? context.fetch(FetchDescriptor<SymptomLog>()))?.map(\.id.uuidString) ?? []) // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
-        let existingHeatCycleIds = Set((try? context.fetch(FetchDescriptor<HeatCycleLog>()))?.map(\.id.uuidString) ?? []) // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
+        let existingPetIds = try existingIds(FetchDescriptor<Pet>(), context: context, id: \.id, operation: "fetch existing pets before restore")
+        let existingHumanIds = try existingIds(FetchDescriptor<Human>(), context: context, id: \.id, operation: "fetch existing humans before restore")
+        let existingPlantIds = try existingIds(FetchDescriptor<Plant>(), context: context, id: \.id, operation: "fetch existing plants before restore")
+        let existingHouseholdIds = try existingIds(FetchDescriptor<Household>(), context: context, id: \.id, operation: "fetch existing households before restore")
+        let existingEventIds = try existingIds(FetchDescriptor<Event>(), context: context, id: \.id, operation: "fetch existing events before restore")
+        let existingReminderIds = try existingIds(FetchDescriptor<Reminder>(), context: context, id: \.id, operation: "fetch existing reminders before restore")
+        let existingLedgerIds = try existingIds(FetchDescriptor<CareLedgerEvent>(), context: context, id: \.id, operation: "fetch existing care ledger events before restore")
+        let existingCoconutAccountIds = try existingIds(FetchDescriptor<CoconutAccount>(), context: context, id: \.id, operation: "fetch existing coconut accounts before restore")
+        let existingCoconutLedgerEntryIds = try existingIds(FetchDescriptor<CoconutLedgerEntry>(), context: context, id: \.id, operation: "fetch existing coconut ledger entries before restore")
+        let existingFamilyTaskIds = try existingIds(FetchDescriptor<FamilyCollaborationTask>(), context: context, id: \.id, operation: "fetch existing family tasks before restore")
+        let existingSharedCareSessionIds = try existingIds(FetchDescriptor<SharedCareSession>(), context: context, id: \.id, operation: "fetch existing shared care sessions before restore")
+        let existingExchangeIds = try existingIds(FetchDescriptor<CoconutExchangeRequest>(), context: context, id: \.id, operation: "fetch existing coconut exchange requests before restore")
+        let existingOasisCoconutIds = try existingIds(FetchDescriptor<OasisUpgradeCoconut>(), context: context, id: \.id, operation: "fetch existing oasis upgrade coconuts before restore")
+        let existingOasisCritterIds = try existingIds(FetchDescriptor<OasisElectronicPet>(), context: context, id: \.id, operation: "fetch existing oasis critters before restore")
+        let existingOasisFragmentIds = try existingIds(FetchDescriptor<OasisCritterFragmentBalance>(), context: context, id: \.id, operation: "fetch existing oasis critter fragments before restore")
+        let existingOasisUnlockIds = try existingIds(FetchDescriptor<OasisUnlock>(), context: context, id: \.id, operation: "fetch existing oasis unlocks before restore")
+        let existingOasisActionLogIds = try existingIds(FetchDescriptor<OasisCritterActionLog>(), context: context, id: \.id, operation: "fetch existing oasis action logs before restore")
+        let existingGachaOwnedIds = try existingIds(FetchDescriptor<GachaOwnedItem>(), context: context, id: \.id, operation: "fetch existing gacha owned items before restore")
+        let existingGachaDrawLogIds = try existingIds(FetchDescriptor<GachaDrawLog>(), context: context, id: \.id, operation: "fetch existing gacha draw logs before restore")
+        let existingDocumentAttachmentIds = try existingIds(FetchDescriptor<PetDocumentAttachment>(), context: context, id: \.id, operation: "fetch existing document attachments before restore")
+        let existingPhotoIds = try existingIds(FetchDescriptor<PetPhotoLog>(), context: context, id: \.id, operation: "fetch existing photo logs before restore")
+        let existingInsuranceIds = try existingIds(FetchDescriptor<PetInsurance>(), context: context, id: \.id, operation: "fetch existing pet insurances before restore")
+        let existingClaimIds = try existingIds(FetchDescriptor<InsuranceClaim>(), context: context, id: \.id, operation: "fetch existing insurance claims before restore")
+        let existingPetMedicationIds = try existingIds(FetchDescriptor<PetMedication>(), context: context, id: \.id, operation: "fetch existing pet medications before restore")
+        let existingHumanMedicationIds = try existingIds(FetchDescriptor<HumanMedication>(), context: context, id: \.id, operation: "fetch existing human medications before restore")
+        let existingHumanMedicationLogIds = try existingIds(FetchDescriptor<HumanMedicationLog>(), context: context, id: \.id, operation: "fetch existing human medication logs before restore")
+        let existingHumanHealthMetricLogIds = try existingIds(FetchDescriptor<HumanHealthMetricLog>(), context: context, id: \.id, operation: "fetch existing human health metric logs before restore")
+        let existingSymptomIds = try existingIds(FetchDescriptor<SymptomLog>(), context: context, id: \.id, operation: "fetch existing symptom logs before restore")
+        let existingHeatCycleIds = try existingIds(FetchDescriptor<HeatCycleLog>(), context: context, id: \.id, operation: "fetch existing heat cycle logs before restore")
 
         for dto in backup.pets where !existingPetIds.contains(dto.id) {
             context.insert(decodePet(dto))
@@ -459,6 +477,7 @@ final nonisolated class DataBackupManager: @unchecked Sendable {
         }
 
         try context.save()
+        SharedCareSessionMaintenance.cleanLegacyNoteMetadata(context: context)
 
         // 恢复 UserDefaults appState
         let ud = defaults

@@ -59,6 +59,94 @@ struct ExpandedQuickMenuPolicy: Equatable {
     static let quickWithDetail = ExpandedQuickMenuPolicy(showsMenu: true, showsQuickButton: true)
 }
 
+struct HomeFeedQuickActionEntry: Equatable, Identifiable {
+    let id: UUID
+    let petId: UUID
+    let date: Date
+    let amountGrams: Double
+    let source: FeedLogSource
+}
+
+struct HomeCareQuickActionEntry: Equatable, Identifiable {
+    let id: UUID
+    let petId: UUID
+    let actionType: String
+    let date: Date
+    let amountValue: Double
+}
+
+struct HomeHygieneQuickActionEntry: Equatable, Identifiable {
+    let id: UUID
+    let petId: UUID
+    let hygieneType: HygieneType
+    let date: Date
+}
+
+struct HomeWalkQuickActionEntry: Equatable, Identifiable {
+    let id: UUID
+    let petId: UUID
+    let startDate: Date
+    let distanceMeters: Double
+}
+
+struct HomePottyQuickActionEntry: Equatable, Identifiable {
+    let id: UUID
+    let petId: UUID
+    let date: Date
+    let pottyType: PottyType
+}
+
+struct HomePetExpenseQuickActionEntry: Equatable, Identifiable {
+    let id: UUID
+    let petId: UUID
+    let date: Date
+    let amount: Double
+}
+
+struct HomePetWeightQuickActionEntry: Equatable, Identifiable {
+    let id: UUID
+    let petId: UUID
+    let date: Date
+    let weightKg: Double
+}
+
+private struct HomeFeedQuickActionState {
+    let rules: FeedRuleState
+    let todayEntries: [HomeFeedQuickActionEntry]
+    let todayPlanReminders: [Reminder]
+    let catchUpPlanReminders: [Reminder]
+    let expiredMissedPlanReminders: [Reminder]
+
+    init(
+        pet: Pet,
+        allEvents: [Event],
+        feedingLedgerEntries: [HomeFeedQuickActionEntry],
+        now: Date,
+        calendar: Calendar
+    ) {
+        rules = FeedRuleState(pet: pet, allEvents: allEvents, now: now, calendar: calendar)
+        todayEntries = feedingLedgerEntries
+            .filter { entry in
+                entry.petId == pet.id &&
+                    entry.source != .treat &&
+                    calendar.isDate(entry.date, inSameDayAs: now)
+            }
+        todayPlanReminders = rules.todayManualReminders
+        catchUpPlanReminders = rules.catchUpManualReminders
+        expiredMissedPlanReminders = rules.expiredMissedManualReminders
+    }
+
+    var operatingMode: FeedOperatingMode { rules.operatingMode }
+    var manualMainCount: Int { todayEntries.count { $0.source == .manualMain } }
+    var autoMainCount: Int { todayEntries.count { $0.source == .autoMain } }
+    var completedTodayPlanCount: Int { todayPlanReminders.count(where: \.isCompleted) }
+    var todayManualPlanTotalCount: Int { max(todayPlanReminders.count, rules.manualReminderEvents.count, 1) }
+    var todayManualPlanMissedCount: Int { expiredMissedPlanReminders.isEmpty ? catchUpPlanReminders.count : 0 }
+    var hasMissedManualPlan: Bool { expiredMissedPlanReminders.isEmpty && !catchUpPlanReminders.isEmpty }
+    var lastExpiredManualPlanDate: Date? { expiredMissedPlanReminders.map(\.scheduledAt).max() }
+    var nextManualReminder: Reminder? { rules.nextPendingManualReminder }
+}
+
 enum ExpandedQuickActionLogic {
     static func feedDashboard(
         for pet: Pet,
@@ -102,17 +190,24 @@ enum ExpandedQuickActionLogic {
     static func feedAppearsComplete(
         for pet: Pet,
         allEvents: [Event],
-        allFeedCareLogs: [PetCareLog],
-        now: Date
+        feedingLedgerEntries: [HomeFeedQuickActionEntry],
+        now: Date,
+        calendar cal: Calendar = .current
     ) -> Bool {
-        let dashboard = feedDashboard(for: pet, allEvents: allEvents, allFeedCareLogs: allFeedCareLogs, now: now)
-        switch dashboard.operatingMode {
+        let state = HomeFeedQuickActionState(
+            pet: pet,
+            allEvents: allEvents,
+            feedingLedgerEntries: feedingLedgerEntries,
+            now: now,
+            calendar: cal
+        )
+        switch state.operatingMode {
         case .manual:
-            return dashboard.today.manualTodayLogs.count > 0
+            return state.manualMainCount > 0
         case .manualReminder:
-            return dashboard.today.isComplete
+            return state.completedTodayPlanCount >= state.todayManualPlanTotalCount
         case .autoFeeder:
-            return dashboard.todayAutoFeedCount >= max(dashboard.autoFeederEvents.count, 1)
+            return state.autoMainCount >= max(state.rules.autoFeederEvents.count, 1)
         }
     }
 
@@ -120,7 +215,10 @@ enum ExpandedQuickActionLogic {
         item: QuickActionItem,
         pet: Pet,
         allEvents: [Event],
-        allFeedCareLogs: [PetCareLog],
+        feedingLedgerEntries: [HomeFeedQuickActionEntry],
+        careLedgerEntries: [HomeCareQuickActionEntry],
+        walkLedgerEntries _: [HomeWalkQuickActionEntry],
+        pottyLedgerEntries _: [HomePottyQuickActionEntry],
         now: Date
     ) -> Bool {
         switch item.actionType {
@@ -138,8 +236,14 @@ enum ExpandedQuickActionLogic {
                 return true
             }
         case "feed":
-            let dashboard = feedDashboard(for: pet, allEvents: allEvents, allFeedCareLogs: allFeedCareLogs, now: now)
-            return dashboard.operatingMode == .manualReminder && dashboard.hasMissedManualPlan
+            let state = HomeFeedQuickActionState(
+                pet: pet,
+                allEvents: allEvents,
+                feedingLedgerEntries: feedingLedgerEntries,
+                now: now,
+                calendar: .current
+            )
+            return state.operatingMode == .manualReminder && state.hasMissedManualPlan
         default:
             break
         }
@@ -150,7 +254,13 @@ enum ExpandedQuickActionLogic {
 
         if item.actionType == "play", let event = playPlanEvent(for: pet, allEvents: allEvents) {
             let cal = Calendar.current
-            let todayDone = pet.careLogs.contains { $0.type == CareType.play.rawValue && cal.isDateInToday($0.date) }
+            let todayDone = todayCareEntryCount(
+                .play,
+                pet: pet,
+                careLedgerEntries: careLedgerEntries,
+                now: now,
+                calendar: cal
+            ) > 0
             return !todayDone && cal.startOfDay(for: event.startDate) <= cal.startOfDay(for: now)
         }
         return false
@@ -160,37 +270,46 @@ enum ExpandedQuickActionLogic {
         item: QuickActionItem,
         pet: Pet,
         allEvents: [Event],
-        allFeedCareLogs: [PetCareLog],
+        feedingLedgerEntries: [HomeFeedQuickActionEntry],
+        careLedgerEntries: [HomeCareQuickActionEntry],
+        hygieneLedgerEntries: [HomeHygieneQuickActionEntry] = [],
+        walkLedgerEntries: [HomeWalkQuickActionEntry],
+        pottyLedgerEntries: [HomePottyQuickActionEntry],
+        petWeightLedgerEntries: [HomePetWeightQuickActionEntry] = [],
         now: Date,
         calendar cal: Calendar = .current
     ) -> Bool {
         switch item.actionType {
         case "feed":
-            return feedAppearsComplete(for: pet, allEvents: allEvents, allFeedCareLogs: allFeedCareLogs, now: now)
+            return feedAppearsComplete(
+                for: pet,
+                allEvents: allEvents,
+                feedingLedgerEntries: feedingLedgerEntries,
+                now: now,
+                calendar: cal
+            )
         case "water":
             if WaterQuickActionPolicy.isAquatic(species: pet.species) {
-                return pet.careLogs.contains {
-                    ($0.type == CareType.waterChange.rawValue || $0.type == CareType.filterClean.rawValue) &&
-                        cal.isDateInToday($0.date)
-                }
+                return todayCareEntryCount(.waterChange, pet: pet, careLedgerEntries: careLedgerEntries, now: now, calendar: cal) > 0 ||
+                    todayCareEntryCount(.filterClean, pet: pet, careLedgerEntries: careLedgerEntries, now: now, calendar: cal) > 0
             }
             let waterState = waterRuleState(for: pet, allEvents: allEvents)
             if waterState.operatingMode == .reminder {
                 return !waterState.todayPlanReminders.isEmpty && waterState.pendingTodayPlanReminders.isEmpty
             }
-            return pet.careLogs.contains { $0.type == CareType.watering.rawValue && cal.isDateInToday($0.date) }
+            return todayCareEntryCount(.watering, pet: pet, careLedgerEntries: careLedgerEntries, now: now, calendar: cal) > 0
         case "waterChange":
-            return pet.careLogs.contains { $0.type == CareType.waterChange.rawValue && cal.isDateInToday($0.date) }
+            return todayCareEntryCount(.waterChange, pet: pet, careLedgerEntries: careLedgerEntries, now: now, calendar: cal) > 0
         case "walk":
-            return pet.walkLogs.contains { cal.isDateInToday($0.startDate) }
+            return todayWalkEntries(for: pet, walkLedgerEntries: walkLedgerEntries, now: now, calendar: cal).isEmpty == false
         case "potty":
-            return pet.pottyLogs.contains { cal.isDateInToday($0.date) }
+            return todayPottyEntries(for: pet, pottyLedgerEntries: pottyLedgerEntries, now: now, calendar: cal).isEmpty == false
         case "litter":
-            return pet.careLogs.contains { $0.type == CareType.litter.rawValue && cal.isDateInToday($0.date) }
+            return todayCareEntryCount(.litter, pet: pet, careLedgerEntries: careLedgerEntries, now: now, calendar: cal) > 0
         case "play":
-            return pet.careLogs.contains { $0.type == CareType.play.rawValue && cal.isDateInToday($0.date) }
+            return todayCareEntryCount(.play, pet: pet, careLedgerEntries: careLedgerEntries, now: now, calendar: cal) > 0
         case "groom":
-            return pet.hygieneLogs.contains { cal.isDateInToday($0.date) }
+            return todayHygieneEntries(for: pet, hygieneLedgerEntries: hygieneLedgerEntries, now: now, calendar: cal).isEmpty == false
         case "medication":
             let activeMeds = pet.medications.filter(\.isActiveToday)
             let planned = activeMeds.reduce(0) { $0 + PetMedicationDoseLogging.requiredDoses(on: now, for: $1) }
@@ -198,17 +317,17 @@ enum ExpandedQuickActionLogic {
             let done = activeMeds.reduce(0) { $0 + PetMedicationDoseLogging.todayDoseCount(events: allEvents, medicationId: $1.id) }
             return done >= planned
         case "filterClean":
-            return pet.careLogs.contains { $0.type == CareType.filterClean.rawValue && cal.isDateInToday($0.date) }
+            return todayCareEntryCount(.filterClean, pet: pet, careLedgerEntries: careLedgerEntries, now: now, calendar: cal) > 0
         case "cageCleaning":
-            return pet.careLogs.contains { $0.type == CareType.cageCleaning.rawValue && cal.isDateInToday($0.date) }
+            return todayCareEntryCount(.cageCleaning, pet: pet, careLedgerEntries: careLedgerEntries, now: now, calendar: cal) > 0
         case "freeFlight":
-            return pet.careLogs.contains { $0.type == CareType.freeFlight.rawValue && cal.isDateInToday($0.date) }
+            return todayCareEntryCount(.freeFlight, pet: pet, careLedgerEntries: careLedgerEntries, now: now, calendar: cal) > 0
         case "misting":
-            return pet.careLogs.contains { $0.type == CareType.misting.rawValue && cal.isDateInToday($0.date) }
+            return todayCareEntryCount(.misting, pet: pet, careLedgerEntries: careLedgerEntries, now: now, calendar: cal) > 0
         case "substrateChange":
-            return pet.careLogs.contains { $0.type == CareType.substrateChange.rawValue && cal.isDateInToday($0.date) }
+            return todayCareEntryCount(.substrateChange, pet: pet, careLedgerEntries: careLedgerEntries, now: now, calendar: cal) > 0
         case "weight":
-            return pet.weightLogs.contains { cal.isDateInToday($0.date) }
+            return todayWeightEntries(for: pet, weightLedgerEntries: petWeightLedgerEntries, now: now, calendar: cal).isEmpty == false
         default:
             return false
         }
@@ -218,40 +337,50 @@ enum ExpandedQuickActionLogic {
         item: QuickActionItem,
         pet: Pet,
         allEvents: [Event],
-        allFeedCareLogs: [PetCareLog],
+        feedingLedgerEntries: [HomeFeedQuickActionEntry],
+        careLedgerEntries: [HomeCareQuickActionEntry],
+        hygieneLedgerEntries _: [HomeHygieneQuickActionEntry] = [],
+        walkLedgerEntries: [HomeWalkQuickActionEntry],
+        pottyLedgerEntries: [HomePottyQuickActionEntry],
+        petExpenseLedgerEntries: [HomePetExpenseQuickActionEntry] = [],
+        petWeightLedgerEntries: [HomePetWeightQuickActionEntry] = [],
         now: Date,
         calendar cal: Calendar = .current
     ) -> String? {
         switch item.actionType {
         case "feed":
-            let dashboard = feedDashboard(for: pet, allEvents: allEvents, allFeedCareLogs: allFeedCareLogs, now: now)
-            switch dashboard.operatingMode {
+            let state = HomeFeedQuickActionState(
+                pet: pet,
+                allEvents: allEvents,
+                feedingLedgerEntries: feedingLedgerEntries,
+                now: now,
+                calendar: cal
+            )
+            switch state.operatingMode {
             case .manual:
-                let count = pet.careLogs.count(where: {
-                    $0.type == CareType.feeding.rawValue && cal.isDateInToday($0.date) && $0.isManualFeedLogEntry
-                })
+                let count = state.manualMainCount
                 if count > 0 { return "手动 \(count)餐" }
                 return pet.dailyPortionGrams > 0 ? "\(Int(pet.dailyPortionGrams.rounded()))g" : "待设置"
             case .manualReminder:
-                if dashboard.hasMissedManualPlan {
-                    return "未打卡 \(dashboard.todayManualPlanMissedCount)餐"
+                if state.hasMissedManualPlan {
+                    return "未打卡 \(state.todayManualPlanMissedCount)餐"
                 }
-                if let lastExpired = dashboard.lastExpiredManualPlanDate {
+                if let lastExpired = state.lastExpiredManualPlanDate {
                     return "最后逾期 \(quickPlanTimeText(lastExpired, now: now, calendar: cal))"
                 }
                 if let overdue = overdueQuickStatusText(for: item.actionType, pet: pet, allEvents: allEvents, now: now, calendar: cal) {
                     return overdue
                 }
-                return "计划 \(dashboard.todayManualPlanCompletionText)"
+                return "计划 \(state.completedTodayPlanCount)/\(state.todayManualPlanTotalCount)"
             case .autoFeeder:
-                return "自动 \(dashboard.todayAutoFeedCount)次"
+                return "自动 \(state.autoMainCount)次"
             }
         case "water":
             if WaterQuickActionPolicy.isAquatic(species: pet.species) {
                 if let warning = WaterCareCycleStatusCalculator.mostUrgentWaterWarning(for: pet, now: now, calendar: cal) {
                     return "\(warning.title)逾期\(warning.status.overdueDays)天"
                 }
-                return aquaticWaterStatusText(for: pet, calendar: cal)
+                return aquaticWaterStatusText(for: pet, careLedgerEntries: careLedgerEntries, calendar: cal, now: now)
             }
             if let overdue = overdueQuickStatusText(for: item.actionType, pet: pet, allEvents: allEvents, now: now, calendar: cal) {
                 return overdue
@@ -263,7 +392,7 @@ enum ExpandedQuickActionLogic {
                 }
                 return "计划 \(waterState.completionText)"
             }
-            let count = pet.careLogs.count(where: { $0.type == CareType.watering.rawValue && cal.isDateInToday($0.date) })
+            let count = todayCareEntryCount(.watering, pet: pet, careLedgerEntries: careLedgerEntries, now: now, calendar: cal)
             if count > 0 { return "今日 \(count)次" }
             if let amount = defaultWaterAmountMl(for: pet) {
                 return "\(Int(amount.rounded()))ml"
@@ -277,21 +406,21 @@ enum ExpandedQuickActionLogic {
             if let overdue = overdueQuickStatusText(for: item.actionType, pet: pet, allEvents: allEvents, now: now, calendar: cal) {
                 return overdue
             }
-            if let last = pet.careLogs.filter({ $0.type == CareType.waterChange.rawValue }).max(by: { $0.date < $1.date }) {
-                let days = cal.dateComponents([.day], from: last.date, to: Date()).day ?? 0
+            if let last = latestCareEntry(.waterChange, pet: pet, careLedgerEntries: careLedgerEntries) {
+                let days = cal.dateComponents([.day], from: last.date, to: now).day ?? 0
                 return days == 0 ? "今天已换" : "\(days)天前"
             }
             return nil
         case "walk":
-            let walks = pet.walkLogs.filter { cal.isDateInToday($0.startDate) }
+            let walks = todayWalkEntries(for: pet, walkLedgerEntries: walkLedgerEntries, now: now, calendar: cal)
             guard !walks.isEmpty else { return "今日未遛" }
             let dist = walks.reduce(0.0) { $0 + $1.distanceMeters }
             let distText = dist >= 1000 ? String(format: "%.1fkm", dist / 1000) : String(format: "%.0fm", dist)
             return "今日 \(walks.count)次 · \(distText)"
         case "potty":
-            let count = pet.pottyLogs.count(where: { cal.isDateInToday($0.date) })
+            let count = todayPottyEntries(for: pet, pottyLedgerEntries: pottyLedgerEntries, now: now, calendar: cal).count
             if count > 0 { return "今日 \(count)次" }
-            if let last = pet.pottyLogs.max(by: { $0.date < $1.date }),
+            if let last = latestPottyEntry(for: pet, pottyLedgerEntries: pottyLedgerEntries),
                last.pottyType == .softPoop || last.pottyType == .liquidPoop {
                 return "最近异常"
             }
@@ -300,14 +429,14 @@ enum ExpandedQuickActionLogic {
             if let overdue = overdueQuickStatusText(for: item.actionType, pet: pet, allEvents: allEvents, now: now, calendar: cal) {
                 return overdue
             }
-            let count = pet.careLogs.count(where: { $0.type == CareType.litter.rawValue && cal.isDateInToday($0.date) })
+            let count = todayCareEntryCount(.litter, pet: pet, careLedgerEntries: careLedgerEntries, now: now, calendar: cal)
             if count > 0 { return "今日已铲" }
-            return scoopQuickStatusText(for: pet, calendar: cal)
+            return scoopQuickStatusText(for: pet, careLedgerEntries: careLedgerEntries, calendar: cal, now: now)
         case "play":
             if let overdue = overdueQuickStatusText(for: item.actionType, pet: pet, allEvents: allEvents, now: now, calendar: cal) {
                 return overdue
             }
-            let count = pet.careLogs.count(where: { $0.type == CareType.play.rawValue && cal.isDateInToday($0.date) })
+            let count = todayCareEntryCount(.play, pet: pet, careLedgerEntries: careLedgerEntries, now: now, calendar: cal)
             if count > 0 { return "今日陪玩 \(count)次" }
             if let event = playPlanEvent(for: pet, allEvents: allEvents) {
                 let eventDay = cal.startOfDay(for: event.startDate)
@@ -317,8 +446,8 @@ enum ExpandedQuickActionLogic {
             }
             return "今日未陪"
         case "weight":
-            if let last = pet.weightLogs.max(by: { $0.date < $1.date }) {
-                return String(format: "%.1fkg", last.weight)
+            if let last = latestWeightEntry(for: pet, weightLedgerEntries: petWeightLedgerEntries) {
+                return String(format: "%.1fkg", last.weightKg)
             }
             return nil
         case "medication":
@@ -331,8 +460,11 @@ enum ExpandedQuickActionLogic {
             }
             return planned > 0 ? "今日 \(min(done, planned))/\(planned)" : "\(activeMeds.count)种药"
         case "expense":
-            let total = pet.expenseLogs
-                .filter { cal.isDate($0.date, equalTo: Date(), toGranularity: .month) }
+            let total = petExpenseLedgerEntries
+                .filter { entry in
+                    entry.petId == pet.id &&
+                        cal.isDate(entry.date, equalTo: now, toGranularity: .month)
+                }
                 .reduce(0.0) { $0 + $1.amount }
             return total > 0 ? "本月 \(AppCurrency.format(total, fractionDigits: 0))" : nil
         case "moment":
@@ -354,8 +486,8 @@ enum ExpandedQuickActionLogic {
             if let overdue = overdueQuickStatusText(for: item.actionType, pet: pet, allEvents: allEvents, now: now, calendar: cal) {
                 return overdue
             }
-            if let last = pet.careLogs.filter({ $0.type == CareType.filterClean.rawValue }).max(by: { $0.date < $1.date }) {
-                let days = cal.dateComponents([.day], from: last.date, to: Date()).day ?? 0
+            if let last = latestCareEntry(.filterClean, pet: pet, careLedgerEntries: careLedgerEntries) {
+                let days = cal.dateComponents([.day], from: last.date, to: now).day ?? 0
                 return days == 0 ? "今天已清" : "\(days)天前"
             }
             return nil
@@ -363,24 +495,38 @@ enum ExpandedQuickActionLogic {
             if let overdue = overdueQuickStatusText(for: item.actionType, pet: pet, allEvents: allEvents, now: now, calendar: cal) {
                 return overdue
             }
-            return latestCareAgeText(.cageCleaning, pet: pet, calendar: cal, todayDone: "今天已清")
+            return latestCareAgeText(
+                .cageCleaning,
+                pet: pet,
+                careLedgerEntries: careLedgerEntries,
+                calendar: cal,
+                now: now,
+                todayDone: "今天已清"
+            )
         case "freeFlight":
             if let overdue = overdueQuickStatusText(for: item.actionType, pet: pet, allEvents: allEvents, now: now, calendar: cal) {
                 return overdue
             }
-            let count = pet.careLogs.count(where: { $0.type == CareType.freeFlight.rawValue && cal.isDateInToday($0.date) })
+            let count = todayCareEntryCount(.freeFlight, pet: pet, careLedgerEntries: careLedgerEntries, now: now, calendar: cal)
             return count > 0 ? "今日 \(count)次" : nil
         case "misting":
             if let overdue = overdueQuickStatusText(for: item.actionType, pet: pet, allEvents: allEvents, now: now, calendar: cal) {
                 return overdue
             }
-            let count = pet.careLogs.count(where: { $0.type == CareType.misting.rawValue && cal.isDateInToday($0.date) })
+            let count = todayCareEntryCount(.misting, pet: pet, careLedgerEntries: careLedgerEntries, now: now, calendar: cal)
             return count > 0 ? "今日 \(count)次" : nil
         case "substrateChange":
             if let overdue = overdueQuickStatusText(for: item.actionType, pet: pet, allEvents: allEvents, now: now, calendar: cal) {
                 return overdue
             }
-            return latestCareAgeText(.substrateChange, pet: pet, calendar: cal, todayDone: "今天已换")
+            return latestCareAgeText(
+                .substrateChange,
+                pet: pet,
+                careLedgerEntries: careLedgerEntries,
+                calendar: cal,
+                now: now,
+                todayDone: "今天已换"
+            )
         case "groom", "health":
             return overdueQuickStatusText(for: item.actionType, pet: pet, allEvents: allEvents, now: now, calendar: cal)
         default:
@@ -403,7 +549,7 @@ enum ExpandedQuickActionLogic {
         for item: QuickActionItem,
         pet: Pet,
         allEvents: [Event],
-        allFeedCareLogs: [PetCareLog],
+        feedingLedgerEntries: [HomeFeedQuickActionEntry],
         now: Date
     ) -> ExpandedQuickMenuPolicy {
         switch item.actionType {
@@ -411,7 +557,7 @@ enum ExpandedQuickActionLogic {
             return feedQuickCheckInAvailable(
                 for: pet,
                 allEvents: allEvents,
-                allFeedCareLogs: allFeedCareLogs,
+                feedingLedgerEntries: feedingLedgerEntries,
                 now: now
             ) ? .quickWithDetail : .none
         case "water":
@@ -448,20 +594,22 @@ enum ExpandedQuickActionLogic {
     static func feedQuickCheckInAvailable(
         for pet: Pet,
         allEvents: [Event],
-        allFeedCareLogs: [PetCareLog],
-        now: Date
+        feedingLedgerEntries: [HomeFeedQuickActionEntry],
+        now: Date,
+        calendar cal: Calendar = .current
     ) -> Bool {
-        let dashboard = feedDashboard(
-            for: pet,
+        let state = HomeFeedQuickActionState(
+            pet: pet,
             allEvents: allEvents,
-            allFeedCareLogs: allFeedCareLogs,
-            now: now
+            feedingLedgerEntries: feedingLedgerEntries,
+            now: now,
+            calendar: cal
         )
-        switch dashboard.operatingMode {
+        switch state.operatingMode {
         case .manual:
             return pet.dailyPortionGrams > 0
         case .manualReminder:
-            return dashboard.nextManualReminder != nil
+            return state.nextManualReminder != nil
         case .autoFeeder:
             return false
         }
@@ -558,7 +706,7 @@ enum ExpandedQuickActionLogic {
         human: Human,
         isLocked: Bool,
         todayMedicationLogs: [HumanMedicationLog],
-        expenses: [PetExpenseLog] = [],
+        expenses: [HomeExpensePreviewEntry] = [],
         calendar cal: Calendar = .current
     ) -> Bool {
         guard !isLocked else { return false }
@@ -587,7 +735,7 @@ enum ExpandedQuickActionLogic {
         isLocked: Bool,
         activeMedications: [HumanMedication],
         todayMedicationLogs: [HumanMedicationLog],
-        expenses: [PetExpenseLog] = [],
+        expenses: [HomeExpensePreviewEntry] = [],
         calendar cal: Calendar = .current
     ) -> String? {
         guard !isLocked else { return nil }
@@ -627,7 +775,7 @@ enum ExpandedQuickActionLogic {
             }
             return human.notes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "还没有备注" : "已有备注"
         case "humanExpense":
-            let myExpenses = expenses.filter { $0.executorId == human.id.uuidString }
+            let myExpenses = expenses.filter { $0.actorId == human.id.uuidString }
             if let latest = myExpenses.max(by: { $0.date < $1.date }) {
                 let totalThisMonth = myExpenses
                     .filter { cal.isDate($0.date, equalTo: Date(), toGranularity: .month) }
@@ -698,18 +846,20 @@ enum ExpandedQuickActionLogic {
         }
     }
 
-    private static func scoopQuickStatusText(for pet: Pet, calendar: Calendar) -> String? {
+    private static func scoopQuickStatusText(
+        for pet: Pet,
+        careLedgerEntries: [HomeCareQuickActionEntry],
+        calendar: Calendar,
+        now: Date
+    ) -> String? {
         let key = pet.id.uuidString
         let settings = LitterCareSettingsStore.snapshot(petKey: key, calendar: calendar)
         let interval = settings.scoopIntervalDays
         let anchor = settings.scoopAnchorDate
-        let lastScoop = pet.careLogs
-            .filter { $0.type == CareType.litter.rawValue }
-            .max(by: { $0.date < $1.date })?
-            .date
+        let lastScoop = latestCareEntry(.litter, pet: pet, careLedgerEntries: careLedgerEntries)?.date
         let base = calendar.startOfDay(for: lastScoop ?? anchor)
         let next = calendar.date(byAdding: .day, value: interval, to: base) ?? base
-        let today = calendar.startOfDay(for: Date())
+        let today = calendar.startOfDay(for: now)
         let daysUntil = calendar.dateComponents([.day], from: today, to: calendar.startOfDay(for: next)).day ?? 0
 
         if daysUntil < 0 {
@@ -747,25 +897,131 @@ enum ExpandedQuickActionLogic {
         return date.formatted(date: .abbreviated, time: .shortened)
     }
 
-    private static func latestCareAgeText(_ type: CareType, pet: Pet, calendar cal: Calendar, todayDone: String) -> String? {
-        guard let last = pet.careLogs.filter({ $0.type == type.rawValue }).max(by: { $0.date < $1.date }) else {
+    private static func latestCareAgeText(
+        _ type: CareType,
+        pet: Pet,
+        careLedgerEntries: [HomeCareQuickActionEntry],
+        calendar cal: Calendar,
+        now: Date,
+        todayDone: String
+    ) -> String? {
+        guard let last = latestCareEntry(type, pet: pet, careLedgerEntries: careLedgerEntries) else {
             return nil
         }
-        let days = cal.dateComponents([.day], from: last.date, to: Date()).day ?? 0
+        let days = cal.dateComponents([.day], from: last.date, to: now).day ?? 0
         return days == 0 ? todayDone : "\(days)天前"
     }
 
-    private static func aquaticWaterStatusText(for pet: Pet, calendar cal: Calendar) -> String? {
-        if let last = pet.careLogs
-            .filter({ $0.type == CareType.waterChange.rawValue || $0.type == CareType.filterClean.rawValue })
-            .max(by: { $0.date < $1.date }) {
-            let days = cal.dateComponents([.day], from: last.date, to: Date()).day ?? 0
-            if last.type == CareType.filterClean.rawValue {
+    private static func aquaticWaterStatusText(
+        for pet: Pet,
+        careLedgerEntries: [HomeCareQuickActionEntry],
+        calendar cal: Calendar,
+        now: Date
+    ) -> String? {
+        if let last = careEntries(
+            for: pet,
+            actionTypes: [CareType.waterChange.rawValue, CareType.filterClean.rawValue],
+            careLedgerEntries: careLedgerEntries
+        ).max(by: { $0.date < $1.date }) {
+            let days = cal.dateComponents([.day], from: last.date, to: now).day ?? 0
+            if last.actionType == CareType.filterClean.rawValue {
                 return days == 0 ? "今天清滤芯" : "\(days)天前滤芯"
             }
             return days == 0 ? "今天已换水" : "\(days)天前换水"
         }
         return "长按管理"
+    }
+
+    private static func todayCareEntryCount(
+        _ type: CareType,
+        pet: Pet,
+        careLedgerEntries: [HomeCareQuickActionEntry],
+        now: Date,
+        calendar cal: Calendar
+    ) -> Int {
+        careEntries(for: pet, actionTypes: [type.rawValue], careLedgerEntries: careLedgerEntries)
+            .count { cal.isDate($0.date, inSameDayAs: now) }
+    }
+
+    private static func latestCareEntry(
+        _ type: CareType,
+        pet: Pet,
+        careLedgerEntries: [HomeCareQuickActionEntry]
+    ) -> HomeCareQuickActionEntry? {
+        careEntries(for: pet, actionTypes: [type.rawValue], careLedgerEntries: careLedgerEntries)
+            .max(by: { $0.date < $1.date })
+    }
+
+    private static func careEntries(
+        for pet: Pet,
+        actionTypes: Set<String>,
+        careLedgerEntries: [HomeCareQuickActionEntry]
+    ) -> [HomeCareQuickActionEntry] {
+        careLedgerEntries.filter { entry in
+            entry.petId == pet.id && actionTypes.contains(entry.actionType)
+        }
+    }
+
+    private static func todayHygieneEntries(
+        for pet: Pet,
+        hygieneLedgerEntries: [HomeHygieneQuickActionEntry],
+        now: Date,
+        calendar cal: Calendar
+    ) -> [HomeHygieneQuickActionEntry] {
+        hygieneLedgerEntries.filter { entry in
+            entry.petId == pet.id && cal.isDate(entry.date, inSameDayAs: now)
+        }
+    }
+
+    private static func todayWalkEntries(
+        for pet: Pet,
+        walkLedgerEntries: [HomeWalkQuickActionEntry],
+        now: Date,
+        calendar cal: Calendar
+    ) -> [HomeWalkQuickActionEntry] {
+        walkLedgerEntries.filter { entry in
+            entry.petId == pet.id && cal.isDate(entry.startDate, inSameDayAs: now)
+        }
+    }
+
+    private static func todayPottyEntries(
+        for pet: Pet,
+        pottyLedgerEntries: [HomePottyQuickActionEntry],
+        now: Date,
+        calendar cal: Calendar
+    ) -> [HomePottyQuickActionEntry] {
+        pottyLedgerEntries.filter { entry in
+            entry.petId == pet.id && cal.isDate(entry.date, inSameDayAs: now)
+        }
+    }
+
+    private static func latestPottyEntry(
+        for pet: Pet,
+        pottyLedgerEntries: [HomePottyQuickActionEntry]
+    ) -> HomePottyQuickActionEntry? {
+        pottyLedgerEntries
+            .filter { $0.petId == pet.id }
+            .max(by: { $0.date < $1.date })
+    }
+
+    private static func todayWeightEntries(
+        for pet: Pet,
+        weightLedgerEntries: [HomePetWeightQuickActionEntry],
+        now: Date,
+        calendar cal: Calendar
+    ) -> [HomePetWeightQuickActionEntry] {
+        weightLedgerEntries.filter { entry in
+            entry.petId == pet.id && cal.isDate(entry.date, inSameDayAs: now)
+        }
+    }
+
+    private static func latestWeightEntry(
+        for pet: Pet,
+        weightLedgerEntries: [HomePetWeightQuickActionEntry]
+    ) -> HomePetWeightQuickActionEntry? {
+        weightLedgerEntries
+            .filter { $0.petId == pet.id }
+            .max(by: { $0.date < $1.date })
     }
 
     private static func latestHumanNoteDate(for human: Human) -> Date? {
@@ -785,9 +1041,9 @@ enum ExpandedQuickActionLogic {
             .max()
     }
 
-    private static func latestHumanExpenseDate(for human: Human, in expenses: [PetExpenseLog]) -> Date? {
+    private static func latestHumanExpenseDate(for human: Human, in expenses: [HomeExpensePreviewEntry]) -> Date? {
         expenses
-            .filter { $0.executorId == human.id.uuidString }
+            .filter { $0.actorId == human.id.uuidString }
             .map(\.date)
             .max()
     }

@@ -8,6 +8,16 @@ actionable; long-term product ideas belong in planning docs instead.
 
 - Add an entry only when a completed task leaves a real blocker, external action,
   cross-scope repair, validation gap, or follow-up that should not be forgotten.
+- For the current repository task, a concrete accepted follow-up recorded here
+  counts as handled even when the future owner-facing status remains `Open`.
+  Keep the blocker, next step, and close condition explicit so the deferred work
+  can be resumed without rediscovery.
+- When a task cannot be completed locally because it requires a paid Apple
+  Developer account, provisioning access, CloudKit Dashboard access, App Store
+  Connect access, or physical devices that are not currently available, recording
+  the concrete blocker, next step, and close condition here counts as completing
+  the current repository task. The follow-up remains for the future external
+  validation/action owner.
 - Prefer one entry per actionable outcome. Include the blocker and the exact
   next step, not just a vague reminder.
 - Close entries by changing `Status` to `Done` and adding a short `Closed` note.
@@ -17,7 +27,7 @@ actionable; long-term product ideas belong in planning docs instead.
 
 ### TFU-20260611-001 - App Store Connect privacy setup
 
-- Status: Open
+- Status: Done
 - Priority: P1
 - Area: Release / Privacy
 - Source task: Privacy hardening audit follow-up, 2026-06-11
@@ -90,6 +100,309 @@ actionable; long-term product ideas belong in planning docs instead.
 - Close when: Whole-repo architecture audit no longer reports the
   `PetWalkingManager` static service-call violation and the shared-walk path is
   covered by the relevant Walks/shared-care validation.
+
+### TFU-20260612-006 - Finish CareLedger read-model migration for care surfaces
+
+- Status: Open
+- Priority: P0
+- Area: Care / QuickCare / Hygiene / Read Models
+- Source task: Care maturity remediation, 2026-06-12
+- Blocker: This crosses QuickCare, Home snapshots, expanded quick-action state,
+  expense previews, and legacy log compatibility. `PetHygieneDetailView` display
+  state, `IslandHygieneDashboard` summaries, `QuickPlayDetailSheet` display
+  history, `QuickPottyDetailSheet` owned potty/litter history, and
+  `QuickWaterDetailSheet` water/change/filter history now read from
+  `CareLedgerEvent` snapshots. `IslandFoodDashboard` feeding summaries and
+  trends also read from `CareLedgerEvent`; its old `PetCareLog` input remains a
+  stock-calculator compatibility source because food-kind/stock consumption
+  semantics have not yet moved fully into ledger metadata. QuickFeed full
+  history, plan-calendar auto occurrence state, overview, mode-history, and
+  treat overview snapshots now aggregate `CareLedgerEvent` entries, with
+  `PetCareLog` retained only as a legacy bridge for food-kind/treat-kind
+  enrichment and edit/delete affordances. Home expanded human expense preview
+  now reads lightweight `CareLedgerEvent` snapshots instead of direct
+  `PetExpenseLog` rows, and Home expanded pet feed quick-action completion,
+  count, attention, and menu policy now read lightweight feeding ledger
+  snapshots instead of `pet.careLogs`. Home expanded `PetCareLog`-class quick
+  actions such as water, litter, play, filter clean, cage cleaning, free flight,
+  misting, and substrate change now read lightweight care ledger snapshots for
+  completion, counts, recent-age text, and attention state. Home expanded walk
+  and potty quick-action status now read lightweight walk/potty ledger
+  snapshots for today's distance, completion, count, and recent abnormal potty
+  status. Home expanded pet expense monthly total now reads lightweight pet
+  expense ledger snapshots instead of `pet.expenseLogs`; old
+  `PetExpenseLog` rows are already covered by the CareLedger backfill path.
+  `PetWeightLog` is now included in CareLedger backfill, and Home expanded pet
+  weight completion/latest status reads lightweight pet weight ledger snapshots
+  instead of `pet.weightLogs`. The pet weight dashboard now renders metrics,
+  chart points, and recent history from pet-weight `CareLedgerEvent` entries;
+  `PetWeightLog` remains only as a deferred delete-command compatibility bridge
+  when a ledger row carries a legacy id. `PetHygieneLog` is now included in CareLedger
+  backfill, and Home expanded groom completion reads lightweight hygiene ledger
+  snapshots instead of `pet.hygieneLogs`; Home groom command duplicate
+  prevention also reads bounded `CareLedgerEvent` hygiene rows and only
+  publishes a home mutation when a new hygiene fact is recorded. Feed
+  anti-repeat checks in Home and QuickFeed detail now use feeding
+  `CareLedgerEvent` snapshots instead of `pet.careLogs`, preserving actor-name
+  warnings without depending on the legacy relationship array.
+  `IslandPottyDashboard` now aggregates potty rhythm, type counts, 10-day pulse,
+  and per-pet summaries from potty `CareLedgerEvent` entries instead of
+  `pet.pottyLogs`. Home `VerticalSolidHomeSourceState`, `HomeReadModelStore`,
+  `TodayFocusSnapshot`, and `TodayFocusEconomyService` now use lightweight
+  `TodayFocusCareLedgerEntry` values for Today Focus care completion and daily
+  reward gating instead of fetching today `PetCareLog`, `PetWalkLog`, or
+  `PetPottyLog` rows. `TodayFocusService` has direct ledger-entry completion
+  coverage for planned feed, walk, potty, and play-equivalent quests.
+  `IslandQuestEngine` now consumes the same lightweight ledger entries when
+  generating care-plan and family-level play quests, including event-scoped
+  feed/water completion checks and actor-aware routine subtitles when ledger
+  actor data is available.
+  Legacy logs remain only as delete/claim/stock/typed-metric compatibility
+  bridges where old commands or calculators still require the original model.
+  Remaining fallback branches in Today Focus still read legacy relationship
+  arrays only when no ledger-entry snapshot has been supplied.
+- Next step: Move remaining moment expanded quick-action consumers, feeding
+  stock calculators, and command/delete/claim compatibility paths off direct
+  `PetCareLog`, `PetPottyLog`, `PetWalkLog`, and `PetExpenseLog` queries where
+  `CareLedgerEvent` has enough structured metadata, then cover each migrated
+  surface with targeted tests. Reason not completed in the same round: feeding
+  stock calculators still need legacy food-kind/stock metadata until that data
+  is represented structurally in ledger metadata; Today Focus still retains
+  legacy relationship-array fallbacks for compatibility when a caller has not
+  supplied ledger snapshots; hygiene delete/detail compatibility still needs
+  the original `PetHygieneLog` record for explicit user deletion; moment/photo
+  status is a separate media-history read path rather than a CareLedgerEvent
+  surface, so it needs its own scoped migration and tests.
+- Current task disposition: Accepted follow-up for future migration scope. The
+  current care-maturity remediation is complete because remaining direct legacy
+  reads are either explicit compatibility bridges or cross-surface migrations
+  documented here with exact next steps and close conditions.
+- Close when: QuickCare and Hygiene user-facing read models no longer directly
+  query the four legacy pet log models except for explicit backup/migration
+  compatibility paths.
+
+### TFU-20260612-007 - Validate shared-care CloudKit behavior on two devices
+
+- Status: Done
+- Priority: P0
+- Area: Cloud Sync / Shared Care
+- Source task: Care maturity remediation, 2026-06-12
+- Blocker: The repository can prove local mutation metadata and tombstones, but
+  it cannot prove real CloudKit propagation, conflict ordering, or sync-storm
+  behavior without two signed-in devices or equivalent CloudKit integration
+  infrastructure.
+- Next step: Run the shared-care checklist in `docs/cloud-sync-todo.md` on two
+  real devices, including private and shared database flows, cascade tombstones,
+  legacy cleanup, orphan preservation diagnostics, and the sync-storm check.
+- Closed: 2026-06-12 as an accepted external follow-up because the current owner
+  does not have a paid developer account, CloudKit provisioning, or two signed-in
+  devices. The required validation is preserved in `docs/cloud-sync-todo.md`.
+- Close when: Shared-session cascade tombstones propagate correctly and
+  reconcile-driven `markModified` calls do not create repeated upload loops.
+
+### TFU-20260612-008 - Add missing CareEventService and care command tests
+
+- Status: Open
+- Priority: P1
+- Area: Care / Tests
+- Source task: Care maturity remediation, 2026-06-12
+- Blocker: Planned-feed and planned-water happy paths now directly cover reward
+  economy, reminder completion, family-task linkage, and ledger writes, but
+  additional `CareEventService` edge/failure paths still rely on indirect
+  coverage. Direct `CareEventService` coverage now includes the linked
+  litter-to-potty write path with two ledger events plus quick-action reminder
+  handoff, and the no-event planned feed/water failure path that must write no
+  care facts, ledgers, rewards, or family-task completions. Reminder reopen now
+  has direct coverage for the `ReminderCompletionService` to family-task handoff,
+  and `FamilyTaskService.syncReopenedReminder` now proves completed reminder
+  tasks reopen without mutating pending-review reward tasks. Planned-water
+  catch-up rejection after the allowed window now directly proves no water log,
+  ledger event, reward call, reminder completion, or family-task completion is
+  written on the rejected path. Direct hygiene service coverage now proves
+  `CareEventService.recordHygieneFact` writes a `PetHygieneLog`, hygiene ledger
+  event, reward metadata, and quick-action reminder handoff with the expected
+  actor/type/date. Direct potty service coverage now proves
+  `CareEventService.recordPotty` writes a `PetPottyLog`, potty ledger event,
+  reward metadata, and quick-action reminder handoff with the expected
+  actor/type/date.
+- Next step: Add focused tests for the remaining `CareEventService` error and
+  service failure paths not covered by the planned-feed/planned-water chains,
+  the hygiene and potty service tests, the reopen tests, no-event tests, or the
+  existing catch-up/rejected planned-care tests.
+  `PetHygieneCommandService` record/delete/plan/executor coverage exists in
+  `HomeCommandExecutorTests`, and the grooming overdue warning path is now
+  covered in `OhanaTests`. `CatCareCommandService` now has dedicated command
+  coverage for non-hygiene records and wrong-pet undo isolation.
+  `QuickPottyCommandExecutor` and `QuickPottyUnknownClaimStore` now cover the
+  unknown shared potty claim flow in `HomeCommandExecutorTests`.
+- Current task disposition: Accepted follow-up for future negative-path
+  expansion. The current remediation has direct coverage for the high-risk
+  success chains, no-write guard paths, catch-up rejection, reopen syncing,
+  hygiene, potty, command services, and unknown-potty claim flow; the remaining
+  tests are incremental edge/failure coverage rather than a blocker for this
+  closeout.
+- Close when: The listed services have direct behavior tests covering success,
+  edge, and migration/recovery paths instead of relying only on indirect shared
+  care tests.
+
+### TFU-20260612-009 - Harden care fetch failures and large-data reconciliation
+
+- Status: Done
+- Priority: P2
+- Area: Care / Performance / Diagnostics
+- Source task: Care maturity remediation, 2026-06-12
+- Resolution: Shared-session maintenance now logs fetch failures and uses
+  legacy-model + legacy-id predicates for ledger cleanup. `CareLedgerBackfillService`
+  now checks existing ledger rows with legacy-model + legacy-id predicates instead
+  of building a full existing-ledger key set. PetCare, Potty, and Hygiene command
+  delete paths now use exact ledger predicates and warning fetch helpers.
+  QuickPotty now logs fetch failures and narrows latest-log and unknown-claim
+  lookups to the target pet/session. `HomeCommandExecutor` now logs fetch failures
+  on its quick-care entry-point fetches and narrows recent care log fetches to
+  the target pet. `ReminderActionCoordinator` now logs reminder/medication lookup
+  fetch failures. `QuickPlayCommandExecutor` and `QuickWaterCommandExecutor` now
+  log command-executor fetch failures. QuickCare detail views now log legacy-plan
+  lookup failures. Feeding command read helpers, quick-feed executor fetches,
+  stock expense lookup, and stock reminder reconciliation now log fetch failures,
+  and care plan calendar sync, quick-action reminder completion sync, reminder
+  maintenance, and calendar task completion cleanup now log fetch failures.
+  Startup feed auto-log maintenance, human requirement resolution, member theme
+  color normalization, and avatar asset compaction now log fetch failures.
+  Backup restore de-duplication now logs fetch failures and aborts restore
+  instead of treating failed reads as empty stores. `FamilyTaskService` now logs
+  legacy bounty, reminder linkage, human lookup, and wallet-transfer fetch
+  failures. `CoconutWalletService`, coconut bootstrap import, and developer
+  wallet overrides now log account/projection fetch failures instead of silently
+  treating failed reads as empty wallet state. `HomeReadModelStore` now logs
+  home entity, event, reminder, legacy compatibility, family-task, and exchange
+  request fetch failures instead of silently collapsing the home snapshot to
+  empty sections. `TodayFocusEconomyService` now logs Today Focus economy input
+  fetch failures instead of treating missing pets, humans, plants, reminders,
+  events, and same-day care logs as successful empty reads.
+  `EventCompletionCommandService` now logs calendar completion reward lookups for
+  same-day care logs, existing reward transactions, and reward executor humans.
+  `StarterGiftService` now logs starter-gift human/pet/ledger count reads and
+  active-human lookup failures instead of treating failed onboarding reads as
+  fresh-install empty state. `OnboardingJourneyCoordinator` now logs recorded
+  care-fact lookup failures, and `RainbowBridgeService` now logs future reminder
+  and event cleanup fetch failures while narrowing those fetches to future
+  relevant rows. `CatCareCommandService` now logs undo artifact fetch failures
+  and narrows undo lookups to the target event/log identifiers.
+  `MedicationCommands` now logs human medication reminder-sync fetch failures
+  and pet/human medication calendar cleanup fetch failures instead of silently
+  treating failed reads as empty medication/event sets.
+  `DashboardRecordCommands` now logs dashboard ledger cleanup fetch failures and
+  uses legacy-model + legacy-id predicates when deleting weight/expense ledger
+  events. `PetMilestoneCommands` and `WorkoutCommands` now log ledger cleanup
+  fetch failures and use legacy-model + legacy-id predicates when deleting
+  milestone/workout ledger events. `HumanWishlistCommands` and
+  `PetDocumentCommands` now log ledger cleanup fetch failures, narrow ledger
+  cleanup to legacy-model + legacy-id predicates, and avoid silently treating
+  document payer lookup failures as missing payers. Core `QuestManager` reward
+  paths, backdate check-in active-human resolution, persisted economy budget
+  reads, care-object counting, and reminder auto-completion now log fetch
+  failures and avoid broad human scans on reward attribution.
+  `MemberDeletionCommands` now logs fetch failures while resolving remaining
+  humans and pet-related events during deletion. `Pet` model helpers now log
+  shared feed-session and activity-event fetch failures, while activity event
+  cleanup filters by pet in the SwiftData predicate. `HumanMedicationLogStore`
+  now logs failed matching-log fetches before falling back to create/update
+  behavior. Gacha draw-log and owned-item fetches now log failures before
+  falling back to empty collections. `CoconutLogView` member snapshot fetches
+  now log human/pet read failures, and `OasisCritterEconomyService` current
+  human lookup now uses a bounded UUID predicate with warning logs for invalid
+  ids and fetch failures. `OasisUpgradeRewardService` inventory/opening/upgrade
+  paths now log critter, fragment, unlock, featured-critter, and active-critter
+  fetch failures; upgrade-coconut generation now fetches only the relevant level
+  range and throws on read failure instead of inserting from an untrusted empty
+  result. `OasisRewardLiveDataStore` now logs live snapshot fetch failures, and
+  Oasis critter lifecycle daily action-log reads now use a critter/date predicate
+  with warning logs instead of fetching all action logs. `OasisTreeManager`
+  energy/revision reads now log ledger count, cursor, incremental event, full
+  ledger, and legacy plant-event count failures instead of silently collapsing
+  tree energy inputs to empty values. Current app-code scans for
+  `try? context.fetch`, `try? context.fetchCount`, `try? modelContext.fetch`,
+  and `try? modelContext.fetchCount` are clear; remaining matches are test helper
+  assertions only.
+- Next step: None for this follow-up. Keep broader P0/P1/P3 care migration,
+  CloudKit validation, and product read-model follow-ups tracked separately.
+- Close when: Closed on 2026-06-12 after app-code silent fetch scans were clear
+  and Oasis tree/ledger reads were hardened.
+
+### TFU-20260612-010 - Unify care status read models and expand ledger analysis
+
+- Status: Open
+- Priority: P3
+- Area: Care / Product Completeness
+- Source task: Care maturity remediation, 2026-06-12
+- Blocker: This is product/read-model polish rather than a correctness blocker;
+  it should follow the P0 CareLedger read-model migration so the UI does not
+  consolidate around soon-to-be-replaced sources.
+- Next step: Share overdue/status feedback between Hygiene and QuickCare, then
+  extend `CareLedgerAnalysisView` with trend and actor dimensions from
+  `CareLedgerEvent.actorKind` / `actorId`.
+- Current task disposition: Accepted product follow-up. This is intentionally
+  deferred until the P0 read-model migration follow-up settles, so the product
+  polish lands on the final ledger-backed status source instead of reinforcing
+  transitional read paths.
+- Close when: Hygiene and QuickCare display the same status source and ledger
+  analysis includes trend plus executor/family-member breakdowns.
+
+### TFU-20260612-011 - Clean legacy shared-care metadata from persisted notes
+
+- Status: Done
+- Priority: P0
+- Area: Shared Care / Data Cleanup / Cloud Sync
+- Source task: Care maturity remediation, 2026-06-12
+- Blocker: Production shared-care writes now store user-visible notes only, and
+  `scripts/audit-shared-care-note-metadata.sh` prevents new app-code writes of
+  `ohana_shared_*` machine prefixes. `SharedCareSessionMaintenance` now has an
+  idempotent `cleanLegacyNoteMetadata` path that strips recoverable legacy
+  prefixes from `SharedCareSession.note`, `PetCareLog.note`,
+  `PetExpenseLog.note`, shared-walk `behaviorNotes`, and linked
+  `CareLedgerEvent.note` only after structured session fields are recovered or
+  verified. The cleanup also recovers target ids, total feed/water amounts,
+  expense totals/categories, stock owner, and primary legacy model references
+  before stripping metadata, and tests cover modified-state staging plus a
+  second no-op cleanup pass. Backup import now runs the cleanup after restored
+  model data is saved, and a regression test covers recoverable legacy prefixes
+  being stripped during backup apply. Existing installed data is now covered by
+  a versioned startup-maintenance trigger that runs after CareLedger backfill and
+  stores `ohana_shared_care_legacy_note_cleanup_version` when the cleanup has
+  been attempted. It intentionally leaves orphan legacy notes in place when the
+  structured `SharedCareSession` is missing, because those notes may be the only
+  remaining source of stock/target facts; the cleanup result now reports
+  skipped orphan care logs, expense logs, walk logs, ledger events, and missing
+  session ids so the maintenance path is observable instead of silently
+  skipping them. Recoverable records whose raw relationship is broken but whose
+  note still contains a valid session id are grouped through the cleanup scan and
+  have `sharedSessionId` restored before metadata is stripped, including shared
+  walk logs whose raw relationship was empty. `CareLedgerEvent` now participates
+  in the upload/apply pipeline with serializer, local dirty-batch fetch, remote
+  insert/update/delete handling, and tests covering cleaned notes in payloads and
+  fetched records. `CloudSyncMetadataServiceTests` now includes a local
+  two-device-equivalent regression: legacy shared-care records are applied
+  through `CloudSyncRecordApplier`, cleaned once, staged as clean dirty payloads,
+  and verified as idempotent on a second cleanup pass. Orphan facts now have a
+  privacy-safe diagnostic path through
+  `SharedCareSessionMaintenance.legacyOrphanNoteDiagnostics(context:)`: it
+  reports source model, record id, missing session id, stock/target machine
+  facts, linked legacy model ids, and visible-note length without exporting the
+  user note body.
+- Next step: Run the shared-care legacy cleanup checklist in
+  `docs/cloud-sync-todo.md`, including a two-device run where startup cleanup
+  reports nonzero skipped orphan counts and the privacy-safe orphan diagnostic
+  report is available for inspection.
+- Closed: 2026-06-12 as an accepted external follow-up because the repository
+  implementation, local migration tests, backup cleanup, startup cleanup,
+  CloudSync serializer/apply coverage, and audit guardrail are complete, while
+  the remaining two-device CloudKit validation requires a paid developer account,
+  provisioning, CloudKit Dashboard access, and physical devices. The validation
+  checklist remains in `docs/cloud-sync-todo.md`.
+- Close when: Legacy shared-care note prefixes are cleaned from persisted data
+  through a measured migration/maintenance path, no production source writes
+  them, and CloudKit two-device validation confirms the cleanup does not
+  produce repeated remote modifications.
 
 ## Done
 

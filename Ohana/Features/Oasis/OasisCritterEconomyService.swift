@@ -26,7 +26,28 @@ enum OasisCritterEconomyService {
         activeHumanSelection: ActiveHumanSelecting = UserDefaultsActiveHumanSelection()
     ) -> Human? {
         guard let id = activeHumanSelection.currentHumanId else { return nil }
-        return (try? context.fetch(FetchDescriptor<Human>()))?.first { $0.id.uuidString == id } // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
+        guard let uuid = UUID(uuidString: id) else {
+            OhanaLog.warning(
+                "[OasisCritterEconomyService] active human id is invalid: \(id)",
+                category: "Oasis"
+            )
+            return nil
+        }
+        var descriptor = FetchDescriptor<Human>(
+            predicate: #Predicate<Human> { human in
+                human.id == uuid
+            }
+        )
+        descriptor.fetchLimit = 1
+        do {
+            return try context.fetch(descriptor).first
+        } catch {
+            OhanaLog.warning(
+                "[OasisCritterEconomyService] failed to fetch active human id=\(id): \(error.localizedDescription)",
+                category: "Oasis"
+            )
+            return nil
+        }
     }
 
     static func currentHumanBalance(context: ModelContext) -> Int {

@@ -166,7 +166,9 @@ nonisolated extension DataBackupManager {
                          executorId: l.executorId,
                          executorIdsRaw: nilIfEmpty(SharedCareParticipantIDs.encode(l.executorIds)),
                          petId: l.pet?.id.uuidString,
-                         sharedSessionId: l.sharedSessionId.isEmpty ? nil : l.sharedSessionId)
+                         sharedSessionId: l.sharedSessionId.isEmpty ? nil : l.sharedSessionId,
+                         behaviorNotes: l.behaviorNotes,
+                         moodRating: l.moodRating)
     }
 
     func encodeWeightLog(_ l: PetWeightLog) -> PetWeightLogBackup {

@@ -98,6 +98,62 @@ struct HomeCommandExecutorTests {
     }
 
     @MainActor
+    @Test func quickFeedByIdUsesLedgerForAntiRepeatWarning() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let now = makeDate(year: 2026, month: 6, day: 8, hour: 9, minute: 0)
+        let pet = Pet(name: "Momo", species: "猫")
+        let human = Human(name: "Guan")
+        pet.dailyPortionGrams = 50
+        pet.mainFoodKind = .dry
+        let previousFeed = CareLedgerEvent(
+            occurredAt: now.addingTimeInterval(-300),
+            actorKind: .human,
+            actorId: human.id.uuidString,
+            subjectKind: .pet,
+            subjectId: pet.id.uuidString,
+            eventKind: .care,
+            actionType: CareType.feeding.rawValue,
+            source: .quickAction,
+            legacyModelName: "PetCareLog",
+            legacyModelId: UUID().uuidString
+        )
+        context.insert(pet)
+        context.insert(human)
+        context.insert(previousFeed)
+        try context.save()
+
+        let executor = HomeCommandExecutor(modelContext: context)
+        var antiRepeatAlerts: [(String, String)] = []
+        var feedbacks: [ExpandedQuickActionExecutor.Feedback] = []
+
+        executor.performActionType(
+            "feed",
+            petID: pet.id,
+            executorId: "human-2",
+            now: now,
+            antiRepeatTitle: "Already logged",
+            antiRepeatMessage: { "\($0.executorName) \($0.minutesAgo)" },
+            openFeedDetail: { _, _ in },
+            showAntiRepeat: { title, message, _ in
+                antiRepeatAlerts.append((title, message))
+            },
+            startWalk: { _ in },
+            openWaterManagement: { _ in },
+            openMedication: { _ in },
+            feedback: { feedbacks.append($0) }
+        )
+
+        let careLogs = try context.fetch(FetchDescriptor<PetCareLog>())
+        let ledgerEvents = try context.fetch(FetchDescriptor<CareLedgerEvent>())
+        #expect(careLogs.isEmpty)
+        #expect(ledgerEvents.map(\.id) == [previousFeed.id])
+        #expect(antiRepeatAlerts.map(\.0) == ["Already logged"])
+        #expect(antiRepeatAlerts.map(\.1) == ["Guan 5"])
+        #expect(feedbacks.isEmpty)
+    }
+
+    @MainActor
     @Test func quickGroomByIdWritesOneHygieneFact() throws {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
@@ -130,6 +186,45 @@ struct HomeCommandExecutorTests {
     }
 
     @MainActor
+    @Test func quickGroomByIdUsesLedgerForSingleUseGuard() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let pet = Pet(name: "Momo", species: "狗")
+        let todayLedger = CareLedgerEvent(
+            occurredAt: Date(),
+            subjectKind: .pet,
+            subjectId: pet.id.uuidString,
+            eventKind: .hygiene,
+            actionType: HygieneType.bath.rawValue,
+            source: .quickAction,
+            legacyModelName: "PetHygieneLog",
+            legacyModelId: UUID().uuidString
+        )
+        context.insert(pet)
+        context.insert(todayLedger)
+        try context.save()
+
+        let executor = HomeCommandExecutor(modelContext: context)
+        var notices: [(String, String)] = []
+        var feedbacks: [ExpandedQuickActionExecutor.Feedback] = []
+
+        executor.applyGroomCheckIn(
+            raw: "bath",
+            petID: pet.id,
+            executorId: "human-1",
+            showSingleUseNotice: { notices.append(($0, $1)) },
+            feedback: { feedbacks.append($0) }
+        )
+
+        let hygieneLogs = try context.fetch(FetchDescriptor<PetHygieneLog>())
+        let ledgerEvents = try context.fetch(FetchDescriptor<CareLedgerEvent>())
+        #expect(hygieneLogs.isEmpty)
+        #expect(ledgerEvents.map(\.id) == [todayLedger.id])
+        #expect(notices.count == 1)
+        #expect(feedbacks.isEmpty)
+    }
+
+    @MainActor
     @Test func quickHealthByIdWritesOneHealthFact() throws {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
@@ -155,7 +250,7 @@ struct HomeCommandExecutorTests {
         #expect(healthLogs.count == 1)
         #expect(healthLogs.first?.pet?.id == pet.id)
         #expect(healthLogs.first?.healthLogType == .vaccine)
-        #expect(healthLogs.first?.note == "快捷打卡")
+        #expect(healthLogs.first?.note == L10n().tr(zh: "快捷打卡", en: "Quick check-in", de: "Schnell-Check-in"))
         #expect(careLogs.isEmpty)
         #expect(hygieneLogs.isEmpty)
         #expect(openedHealthRoute == false)
@@ -330,6 +425,53 @@ struct HomeCommandExecutorTests {
     }
 
     @MainActor
+    @Test func quickPottyCommandExecutorFindsTargetLogWhenOtherPetsHaveNewerPottyLogs() throws {
+        let revisionCenter = ReadModelRevisionCenter()
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let pet = Pet(name: "Momo", species: "狗")
+        let otherPet = Pet(name: "Nori", species: "猫")
+        context.insert(pet)
+        context.insert(otherPet)
+        let date = makeDate(year: 2026, month: 6, day: 8, hour: 19, minute: 10)
+        for offset in 1 ... 13 {
+            context.insert(PetPottyLog(
+                date: date.addingTimeInterval(TimeInterval(offset * 60)),
+                type: .softPoop,
+                pet: otherPet,
+                executorId: "noise-\(offset)"
+            ))
+        }
+        try context.save()
+
+        let questManager = TestQuestManagerProjection.manager
+        let oldCoconutCount = questManager.coconutCount
+        let oldCoconutLogs = questManager.coconutLogs
+        defer {
+            questManager.coconutCount = oldCoconutCount
+            questManager.coconutLogs = oldCoconutLogs
+            questManager.persistQuestFlags()
+        }
+        questManager.coconutCount = 0
+        questManager.coconutLogs = []
+
+        let result = QuickPottyCommandExecutor(context: context, revisionCenter: revisionCenter).record(
+            petID: pet.id,
+            selectedType: .softPoop,
+            isLitter: false,
+            executorId: "human-1",
+            date: date
+        )
+
+        let allPottyLogs = try context.fetch(FetchDescriptor<PetPottyLog>())
+        let targetLog = try #require(allPottyLogs.first { $0.pet?.id == pet.id })
+        #expect(allPottyLogs.count == 14)
+        #expect(result?.pottyLogID == targetLog.id)
+        #expect(result?.careLogID == nil)
+        #expect(revisionCenter.lastMutation?.affectedEntityIDs.contains(targetLog.id) == true)
+    }
+
+    @MainActor
     @Test func quickPottyCommandExecutorWritesLitterCareFactAndPublishesRevision() throws {
         let revisionCenter = ReadModelRevisionCenter()
         let container = try makeInMemoryContainer()
@@ -376,6 +518,89 @@ struct HomeCommandExecutorTests {
     }
 
     @MainActor
+    @Test func quickPottyUnknownSharedFlowCanBeClaimedAndRefreshesSessionAndLedger() throws {
+        let revisionCenter = ReadModelRevisionCenter()
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let first = Pet(name: "Milo", species: "猫")
+        let second = Pet(name: "Luna", species: "猫")
+        context.insert(first)
+        context.insert(second)
+        try context.save()
+
+        let beforeRevision = revisionCenter.homeRevision.value
+        let date = makeDate(year: 2026, month: 6, day: 8, hour: 21, minute: 20)
+        let result = QuickPottyCommandExecutor(context: context, revisionCenter: revisionCenter).recordUnknownSharedPotty(
+            sourcePetID: first.id,
+            targetIDs: [first.id, second.id],
+            type: .softPoop,
+            executorId: "human-1",
+            date: date
+        )
+
+        var sessions = try context.fetch(FetchDescriptor<SharedCareSession>())
+        var pottyLogs = try context.fetch(FetchDescriptor<PetPottyLog>())
+        var ledgerEvents = try context.fetch(FetchDescriptor<CareLedgerEvent>())
+        let session = try #require(sessions.first)
+        let unknownLog = try #require(pottyLogs.first)
+        let ledgerEvent = try #require(ledgerEvents.first)
+        let claimItems = QuickPottyUnknownClaimStore.items(for: second, context: context)
+        let claimItem = try #require(claimItems.first)
+
+        #expect(result?.petID == first.id)
+        #expect(result?.pottyLogID == unknownLog.id)
+        #expect(result?.careLogID == nil)
+        #expect(result?.action == "unknownSharedPotty")
+        #expect(result?.targetCount == 2)
+        #expect(sessions.count == 1)
+        #expect(session.actionKind == .pottyUnknown)
+        #expect(Set(session.targetPetIds) == [first.id.uuidString, second.id.uuidString])
+        #expect(pottyLogs.count == 1)
+        #expect(unknownLog.pet == nil)
+        #expect(unknownLog.sharedSessionId == session.id.uuidString)
+        #expect(ledgerEvents.count == 1)
+        #expect(ledgerEvent.subjectKind == CareLedgerSubjectKind.unknown.rawValue)
+        #expect(ledgerEvent.subjectId == nil)
+        #expect(revisionCenter.homeRevision.value == beforeRevision + 1)
+        #expect(revisionCenter.lastMutation?.command == .quickCare(entityID: first.id, action: "unknownSharedPotty"))
+
+        if case let .unknownPotty(itemLog, targetCount) = claimItem {
+            #expect(itemLog.id == unknownLog.id)
+            #expect(targetCount == 2)
+        } else {
+            Issue.record("Expected unknown shared potty claim item")
+        }
+
+        let claimResult = PetCareCommandExecutor(context: context, revisionCenter: revisionCenter).claimUnknownPottyLog(
+            unknownLog,
+            pet: second,
+            note: "test.potty.claim"
+        )
+
+        sessions = try context.fetch(FetchDescriptor<SharedCareSession>())
+        pottyLogs = try context.fetch(FetchDescriptor<PetPottyLog>())
+        ledgerEvents = try context.fetch(FetchDescriptor<CareLedgerEvent>())
+        let claimedSession = try #require(sessions.first)
+        let claimedLog = try #require(pottyLogs.first)
+        let claimedLedgerEvent = try #require(ledgerEvents.first)
+        #expect(claimResult.petID == second.id)
+        #expect(claimResult.logID == unknownLog.id)
+        #expect(claimResult.sharedSessionID == session.id.uuidString)
+        #expect(claimResult.updatedLedgerEventIDs == [claimedLedgerEvent.id])
+        #expect(claimedLog.pet?.id == second.id)
+        #expect(claimedSession.sourcePetId == second.id.uuidString)
+        #expect(claimedSession.speciesRaw == second.species)
+        #expect(claimedSession.targetPetIds == [second.id.uuidString])
+        #expect(claimedLedgerEvent.subjectKind == CareLedgerSubjectKind.pet.rawValue)
+        #expect(claimedLedgerEvent.subjectId == second.id.uuidString)
+        #expect(QuickPottyUnknownClaimStore.items(for: first, context: context).isEmpty)
+        #expect(QuickPottyUnknownClaimStore.items(for: second, context: context).isEmpty)
+        #expect(revisionCenter.homeRevision.value == beforeRevision + 2)
+        #expect(revisionCenter.lastMutation?.command == .quickCare(entityID: second.id, action: "claimUnknownPotty"))
+        #expect(revisionCenter.lastMutation?.note == "test.potty.claim")
+    }
+
+    @MainActor
     @Test func petCareTrackingCommandServiceRecordsAndDeletesLitterFact() throws {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
@@ -412,6 +637,25 @@ struct HomeCommandExecutorTests {
         #expect(ledgerEvents.count == 2)
         #expect(ledgerEvents.contains { $0.legacyModelName == "PetCareLog" && $0.legacyModelId == recorded.result.careLogID.uuidString })
         #expect(ledgerEvents.contains { $0.legacyModelName == "PetPottyLog" && $0.legacyModelId == recorded.result.linkedPottyLogID?.uuidString })
+        let unrelatedCareLedger = CareLedgerEvent(
+            subjectKind: .pet,
+            subjectId: pet.id.uuidString,
+            eventKind: .care,
+            actionType: CareType.litter.rawValue,
+            legacyModelName: "PetCareLog",
+            legacyModelId: "unrelated-care-log"
+        )
+        let unrelatedPottyLedger = CareLedgerEvent(
+            subjectKind: .pet,
+            subjectId: pet.id.uuidString,
+            eventKind: .potty,
+            actionType: PottyType.perfectPoop.rawValue,
+            legacyModelName: "PetPottyLog",
+            legacyModelId: "unrelated-potty-log"
+        )
+        context.insert(unrelatedCareLedger)
+        context.insert(unrelatedPottyLedger)
+        try context.save()
 
         let deleteResult = try PetCareTrackingCommandService.deleteCareLog(
             #require(careLogs.first),
@@ -427,7 +671,9 @@ struct HomeCommandExecutorTests {
         #expect(deleteResult.removedLedgerEventIDs.count == 2)
         #expect(careLogs.isEmpty)
         #expect(pottyLogs.isEmpty)
-        #expect(ledgerEvents.isEmpty)
+        let remainingLedgerIDs = Set(ledgerEvents.map(\.id))
+        let unrelatedLedgerIDs: Set<UUID> = [unrelatedCareLedger.id, unrelatedPottyLedger.id]
+        #expect(remainingLedgerIDs == unrelatedLedgerIDs)
     }
 
     @MainActor
@@ -452,6 +698,16 @@ struct HomeCommandExecutorTests {
         #expect(ledgerEvents.count == 1)
         #expect(ledgerEvents.first?.legacyModelName == "PetPottyLog")
         #expect(ledgerEvents.first?.legacyModelId == log.id.uuidString)
+        let unrelatedLedger = CareLedgerEvent(
+            subjectKind: .pet,
+            subjectId: pet.id.uuidString,
+            eventKind: .potty,
+            actionType: PottyType.softPoop.rawValue,
+            legacyModelName: "PetPottyLog",
+            legacyModelId: "unrelated-potty-log"
+        )
+        context.insert(unrelatedLedger)
+        try context.save()
 
         let result = PetPottyCommandService.deletePottyLog(log, pet: pet, context: context)
 
@@ -461,7 +717,7 @@ struct HomeCommandExecutorTests {
         #expect(result.logID == log.id)
         #expect(result.removedLedgerEventIDs.count == 1)
         #expect(pottyLogs.isEmpty)
-        #expect(ledgerEvents.isEmpty)
+        #expect(ledgerEvents.map(\.id) == [unrelatedLedger.id])
     }
 
     @MainActor
@@ -939,6 +1195,16 @@ struct HomeCommandExecutorTests {
         #expect(recorded.result.subjectID == pet.id)
         #expect(recorded.result.hygieneType == .bath)
         #expect(ledgerEvents.contains { $0.eventKind == CareLedgerEventKind.hygiene.rawValue && $0.legacyModelId == recorded.result.logID.uuidString })
+        let unrelatedLedger = CareLedgerEvent(
+            subjectKind: .pet,
+            subjectId: pet.id.uuidString,
+            eventKind: .hygiene,
+            actionType: HygieneType.brushing.rawValue,
+            legacyModelName: "PetHygieneLog",
+            legacyModelId: "unrelated-hygiene-log"
+        )
+        context.insert(unrelatedLedger)
+        try context.save()
 
         let deleted = PetHygieneCommandService.delete(
             recorded.log,
@@ -949,7 +1215,7 @@ struct HomeCommandExecutorTests {
         logs = try context.fetch(FetchDescriptor<PetHygieneLog>())
         ledgerEvents = try context.fetch(FetchDescriptor<CareLedgerEvent>())
         #expect(logs.isEmpty)
-        #expect(ledgerEvents.isEmpty)
+        #expect(ledgerEvents.map(\.id) == [unrelatedLedger.id])
         #expect(deleted.subjectID == pet.id)
         #expect(deleted.logID == recorded.result.logID)
         #expect(deleted.didDelete == true)
@@ -2840,13 +3106,28 @@ struct HomeCommandExecutorTests {
         )
         let log = try #require(try context.fetch(FetchDescriptor<HumanWorkoutLog>()).first)
         let ledgerEventID = try #require(createResult.ledgerEventID)
+        let unrelatedLedger = CareLedgerEvent(
+            occurredAt: log.date,
+            actorKind: .human,
+            actorId: human.id.uuidString,
+            subjectKind: .human,
+            subjectId: human.id.uuidString,
+            eventKind: .workout,
+            actionType: WorkoutType.walking.rawValue,
+            amountValue: 10,
+            amountUnit: "min",
+            legacyModelName: "HumanWorkoutLog",
+            legacyModelId: "unrelated-workout-log"
+        )
+        context.insert(unrelatedLedger)
+        try context.save()
 
         let deleteResult = WorkoutCommandService.deleteHumanWorkout(log, human: human, context: context)
 
         let logs = try context.fetch(FetchDescriptor<HumanWorkoutLog>())
         let ledgerEvents = try context.fetch(FetchDescriptor<CareLedgerEvent>())
         #expect(logs.isEmpty)
-        #expect(ledgerEvents.isEmpty)
+        #expect(ledgerEvents.map(\.id) == [unrelatedLedger.id])
         #expect(deleteResult.logID == createResult.logID)
         #expect(deleteResult.subjectID == human.id)
         #expect(deleteResult.removedLedgerEventIDs == [ledgerEventID])
@@ -4817,9 +5098,21 @@ struct HomeCommandExecutorTests {
             legacyModelName: "PetWeightLog",
             legacyModelId: log.id.uuidString
         )
+        let unrelatedLedger = CareLedgerEvent(
+            occurredAt: log.date,
+            subjectKind: .pet,
+            subjectId: pet.id.uuidString,
+            eventKind: .weight,
+            actionType: "weight",
+            amountValue: 4.8,
+            amountUnit: "kg",
+            legacyModelName: "PetWeightLog",
+            legacyModelId: "unrelated-weight-log"
+        )
         context.insert(pet)
         context.insert(log)
         context.insert(ledger)
+        context.insert(unrelatedLedger)
         try context.save()
 
         let result = DashboardRecordCommandService.deletePetWeight(log, pet: pet, context: context)
@@ -4832,7 +5125,7 @@ struct HomeCommandExecutorTests {
         #expect(result.recordKind == "PetWeightLog")
         #expect(result.removedLedgerEventIDs == [ledger.id])
         #expect(remainingLogs.isEmpty)
-        #expect(remainingLedgerEvents.isEmpty)
+        #expect(remainingLedgerEvents.map(\.id) == [unrelatedLedger.id])
     }
 
     @MainActor
@@ -4860,9 +5153,23 @@ struct HomeCommandExecutorTests {
             legacyModelName: "PetExpenseLog",
             legacyModelId: log.id.uuidString
         )
+        let unrelatedLedger = CareLedgerEvent(
+            occurredAt: log.date,
+            actorKind: .human,
+            actorId: human.id.uuidString,
+            subjectKind: .human,
+            subjectId: human.id.uuidString,
+            eventKind: .expense,
+            actionType: "food",
+            amountValue: 12,
+            amountUnit: "currency",
+            legacyModelName: "PetExpenseLog",
+            legacyModelId: "unrelated-expense-log"
+        )
         context.insert(human)
         context.insert(log)
         context.insert(ledger)
+        context.insert(unrelatedLedger)
         try context.save()
 
         let result = DashboardRecordCommandService.deleteHumanExpense(log, human: human, context: context)
@@ -4875,7 +5182,7 @@ struct HomeCommandExecutorTests {
         #expect(result.recordKind == "PetExpenseLog")
         #expect(result.removedLedgerEventIDs == [ledger.id])
         #expect(remainingExpenses.isEmpty)
-        #expect(remainingLedgerEvents.isEmpty)
+        #expect(remainingLedgerEvents.map(\.id) == [unrelatedLedger.id])
     }
 
     @MainActor
@@ -4960,6 +5267,17 @@ struct HomeCommandExecutorTests {
         #expect(ledger.legacyModelName == "PetMilestone")
         #expect(ledger.legacyModelId == createdMilestone.id.uuidString)
         #expect(ledger.coconutDelta == createResult.coconutDelta)
+        let unrelatedLedger = CareLedgerEvent(
+            occurredAt: createdMilestone.date,
+            subjectKind: .pet,
+            subjectId: pet.id.uuidString,
+            eventKind: .milestone,
+            actionType: "manual",
+            legacyModelName: "PetMilestone",
+            legacyModelId: "unrelated-milestone"
+        )
+        context.insert(unrelatedLedger)
+        try context.save()
 
         let deleteResult = PetMilestoneCommandService.deleteMilestone(
             createdMilestone,
@@ -4973,7 +5291,7 @@ struct HomeCommandExecutorTests {
         #expect(deleteResult.milestoneID == createdMilestone.id)
         #expect(deleteResult.removedLedgerEventIDs == [ledger.id])
         #expect(milestones.isEmpty)
-        #expect(ledgerEvents.isEmpty)
+        #expect(ledgerEvents.map(\.id) == [unrelatedLedger.id])
     }
 
     @MainActor
@@ -5107,9 +5425,18 @@ struct HomeCommandExecutorTests {
             legacyModelName: "PetDocument",
             legacyModelId: document.id.uuidString
         )
+        let unrelatedLedger = CareLedgerEvent(
+            subjectKind: .pet,
+            subjectId: pet.id.uuidString,
+            eventKind: .health,
+            actionType: "document",
+            legacyModelName: "PetDocument",
+            legacyModelId: "unrelated-document"
+        )
         context.insert(pet)
         context.insert(document)
         context.insert(ledger)
+        context.insert(unrelatedLedger)
         try context.save()
 
         let updateResult = PetDocumentCommandService.updateDocument(
@@ -5145,7 +5472,7 @@ struct HomeCommandExecutorTests {
         #expect(deleteResult.documentID == document.id)
         #expect(deleteResult.removedLedgerEventIDs == [ledger.id])
         #expect(documents.isEmpty)
-        #expect(ledgerEvents.isEmpty)
+        #expect(ledgerEvents.map(\.id) == [unrelatedLedger.id])
     }
 
     @MainActor
@@ -5320,6 +5647,18 @@ struct HomeCommandExecutorTests {
         )
         let redeemMutation = try #require(revisionCenter.lastMutation)
         let ledgerID = try #require(redeemed.ledgerEventID)
+        let unrelatedLedger = CareLedgerEvent(
+            actorKind: .human,
+            actorId: human.id.uuidString,
+            subjectKind: .human,
+            subjectId: human.id.uuidString,
+            eventKind: .coconut,
+            actionType: "humanWishlistRedeem",
+            legacyModelName: "WishlistItem",
+            legacyModelId: "unrelated-wishlist-item"
+        )
+        context.insert(unrelatedLedger)
+        try context.save()
         #expect(human.coconutBalance == 60)
         #expect(item.isRedeemed == true)
         #expect(redeemMutation.command == .humanWishlistRedeem(humanID: human.id, itemID: item.id))
@@ -5331,6 +5670,7 @@ struct HomeCommandExecutorTests {
         #expect(deleted.itemID == item.id)
         #expect(deleted.removedLedgerEventIDs == [ledgerID])
         #expect(try context.fetch(FetchDescriptor<WishlistItem>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<CareLedgerEvent>()).map(\.id) == [unrelatedLedger.id])
         #expect(deleteMutation.command == .humanWishlistDelete(humanID: human.id, itemID: item.id))
         #expect(deleteMutation.affectedEntityIDs == [human.id, item.id, ledgerID])
         #expect(deleteMutation.note == "test.wishlist.delete")

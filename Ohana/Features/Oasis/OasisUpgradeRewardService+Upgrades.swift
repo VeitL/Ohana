@@ -118,8 +118,7 @@ extension OasisUpgradeRewardService {
         }
 
         do {
-            let hasFeatured = ((try? context.fetch(FetchDescriptor<OasisElectronicPet>())) ?? []) // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
-                .contains { $0.isFeaturedOnOasis && !$0.isArchived }
+            let hasFeatured = hasFeaturedCritter(context: context)
             let critter = OasisElectronicPet(
                 catalogId: entry.id,
                 nameZh: entry.nameZh,
@@ -157,7 +156,7 @@ extension OasisUpgradeRewardService {
     static func setFeatured(_ critter: OasisElectronicPet, context: ModelContext) throws {
         normalizeLifecycle(for: critter, context: context)
         guard critter.lifeState != .dead else { return }
-        let all = (try? context.fetch(FetchDescriptor<OasisElectronicPet>())) ?? [] // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
+        let all = allElectronicPets(context: context)
         for item in all {
             item.isFeaturedOnOasis = item.id == critter.id
             if item.id == critter.id {
@@ -179,8 +178,7 @@ extension OasisUpgradeRewardService {
     }
 
     static func rewardFeaturedCritterFromCare(type: QuestManager.OhanaActionType, context: ModelContext) {
-        let candidates = ((try? context.fetch(FetchDescriptor<OasisElectronicPet>())) ?? []) // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
-            .filter { !$0.isArchived }
+        let candidates = activeCritters(context: context)
             .sorted(by: {
                 if $0.isFeaturedOnOasis != $1.isFeaturedOnOasis { return $0.isFeaturedOnOasis && !$1.isFeaturedOnOasis }
                 if $0.habitatSlot != $1.habitatSlot { return $0.habitatSlot < $1.habitatSlot }

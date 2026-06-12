@@ -33,29 +33,99 @@ struct QuickFeedOverviewSnapshotStoreTests {
             pet: pet
         )
         let oldLog = PetCareLog(date: oldDay, amountGrams: 99, foodKind: .dry, pet: pet)
+        let manualLedger = feedingLedgerEvent(from: manualLog)
+        let planLedger = feedingLedgerEvent(
+            from: planLog,
+            source: .reminder,
+            sourceEventId: planEvent.id.uuidString,
+            sourceReminderId: planReminder.id.uuidString
+        )
+        let autoLedger = feedingLedgerEvent(
+            from: autoLog,
+            note: "",
+            source: .service,
+            sourceEventId: planEvent.id.uuidString
+        )
+        let oldLedger = feedingLedgerEvent(from: oldLog)
 
         let snapshot = QuickFeedOverviewSnapshot.build(
             pet: pet,
             manualPlanEvents: [planEvent],
-            careLogs: [manualLog, planLog, autoLog, oldLog],
+            autoFeederEvents: [planEvent],
+            feedingLedgerEvents: [manualLedger, planLedger, autoLedger, oldLedger],
+            legacyCareLogs: [manualLog, planLog, autoLog, oldLog],
             range: .days7,
             activeMode: .autoFeeder,
             now: now,
             calendar: calendar
         )
 
-        #expect(snapshot.mainFoodLogsInRange.map(\.id).contains(oldLog.id) == false)
-        #expect(snapshot.feedModeLogsInRange.map(\.id) == [autoLog.id])
+        #expect(snapshot.mainFoodLogsInRange.map(\.legacyModelId).contains(oldLog.id.uuidString) == false)
+        #expect(snapshot.feedModeLogsInRange.map(\.legacyModelId) == [autoLog.id.uuidString])
         #expect(snapshot.sourceTotal(.manualMain) == 40)
         #expect(snapshot.sourceTotal(.manualReminder) == 30)
         #expect(snapshot.sourceTotal(.autoMain) == 20)
         #expect(snapshot.mainFoodChartPoints.last?.value == 60)
-        #expect(snapshot.todayAutoFeedLogs.map(\.id) == [autoLog.id])
+        #expect(snapshot.todayAutoFeedLogs.map(\.legacyModelId) == [autoLog.id.uuidString])
         #expect(snapshot.todayPlanReminders.map(\.id) == [planReminder.id])
         #expect(snapshot.nextPendingManualReminder?.id == planReminder.id)
     }
 
+    @Test func feedingEntriesIncludeLedgerOnlyEvents() {
+        let pet = Pet(name: "Momo", species: "猫")
+        pet.mainFoodKind = .wet
+        let date = fixedDate()
+        let ledger = CareLedgerEvent(
+            occurredAt: date,
+            subjectKind: .pet,
+            subjectId: pet.id.uuidString,
+            eventKind: .care,
+            actionType: CareType.feeding.rawValue,
+            amountValue: 24,
+            amountUnit: "g",
+            note: PetCareLog.manualFeedNoteMarker,
+            source: .quickAction,
+            legacyModelName: "PetCareLog",
+            legacyModelId: nil
+        )
+
+        let entries = QuickFeedOverviewSnapshot.feedingEntries(
+            pet: pet,
+            feedingLedgerEvents: [ledger],
+            legacyCareLogs: []
+        )
+
+        #expect(entries.map(\.id) == [ledger.id])
+        #expect(entries.first?.legacyModelId == nil)
+        #expect(entries.first?.foodKind == .wet)
+        #expect(entries.first?.source == .manualMain)
+    }
+
     private func fixedDate() -> Date {
         Date(timeIntervalSince1970: 1_800_000_000)
+    }
+
+    private func feedingLedgerEvent(
+        from log: PetCareLog,
+        note: String? = nil,
+        source: CareLedgerSource = .quickAction,
+        sourceEventId: String? = nil,
+        sourceReminderId: String? = nil
+    ) -> CareLedgerEvent {
+        CareLedgerEvent(
+            occurredAt: log.date,
+            subjectKind: .pet,
+            subjectId: log.pet?.id.uuidString,
+            eventKind: .care,
+            actionType: CareType.feeding.rawValue,
+            amountValue: log.amountGrams,
+            amountUnit: "g",
+            note: note ?? log.note,
+            source: source,
+            sourceEventId: sourceEventId,
+            sourceReminderId: sourceReminderId,
+            legacyModelName: "PetCareLog",
+            legacyModelId: log.id.uuidString
+        )
     }
 }

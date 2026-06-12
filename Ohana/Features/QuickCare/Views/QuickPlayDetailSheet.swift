@@ -8,11 +8,19 @@
 import SwiftData
 import SwiftUI
 
+private struct QuickPlayLedgerEntry: Identifiable {
+    let id: UUID
+    let date: Date
+    let legacyLogId: UUID?
+}
+
 struct QuickPlayDetailSheet: View {
     let pet: Pet
     let onRemove: () -> Void
     var onClose: (() -> Void)?
     var allEvents: [Event] = []
+    let playLedgerEvents: [CareLedgerEvent]
+    let legacyPlayDeleteLogs: [PetCareLog]
 
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
@@ -45,6 +53,22 @@ struct QuickPlayDetailSheet: View {
         )
     }
 
+    init(
+        pet: Pet,
+        onRemove: @escaping () -> Void,
+        onClose: (() -> Void)? = nil,
+        allEvents: [Event] = [],
+        playLedgerEvents: [CareLedgerEvent] = [],
+        legacyPlayDeleteLogs: [PetCareLog] = []
+    ) {
+        self.pet = pet
+        self.onRemove = onRemove
+        self.onClose = onClose
+        self.allEvents = allEvents
+        self.playLedgerEvents = playLedgerEvents
+        self.legacyPlayDeleteLogs = legacyPlayDeleteLogs
+    }
+
     private var playPlanEvent: Event? {
         allEvents
             .filter {
@@ -69,8 +93,22 @@ struct QuickPlayDetailSheet: View {
         let count: Int
     }
 
-    private var playLogs: [PetCareLog] {
-        pet.careLogs.filter { $0.type == CareType.play.rawValue }
+    private var playEntries: [QuickPlayLedgerEntry] {
+        playLedgerEvents.compactMap { event in
+            guard event.eventKindEnum == .care,
+                  event.subjectKind == CareLedgerSubjectKind.pet.rawValue,
+                  event.subjectId == petKey,
+                  event.actionType == CareType.play.rawValue else { return nil }
+            let legacyLogId = event.legacyModelName == "PetCareLog"
+                ? event.legacyModelId.flatMap(UUID.init(uuidString:))
+                : nil
+            return QuickPlayLedgerEntry(
+                id: event.id,
+                date: event.occurredAt,
+                legacyLogId: legacyLogId
+            )
+        }
+        .sorted { $0.date > $1.date }
     }
 
     private var monthPlayStrip: [DayCount] {
@@ -78,7 +116,7 @@ struct QuickPlayDetailSheet: View {
         let today = cal.startOfDay(for: Date())
         return (0 ..< 28).reversed().map { offset in
             let d = cal.date(byAdding: .day, value: -offset, to: today)!
-            let count = playLogs.count(where: { cal.isDate($0.date, inSameDayAs: d) })
+            let count = playEntries.count(where: { cal.isDate($0.date, inSameDayAs: d) })
             return DayCount(day: d, count: count)
         }
     }
@@ -93,27 +131,26 @@ struct QuickPlayDetailSheet: View {
         }
     }
 
-    private var recentLogs: [PetCareLog] {
-        playLogs
-            .sorted { $0.date > $1.date }
+    private var recentLogs: [QuickPlayLedgerEntry] {
+        playEntries
             .prefix(12)
             .map(\.self)
     }
 
     private var todayPlayCount: Int {
-        playLogs.count(where: { Calendar.current.isDateInToday($0.date) })
+        playEntries.count(where: { Calendar.current.isDateInToday($0.date) })
     }
 
     private var weekPlayCount: Int {
         let cutoff = Calendar.current.date(byAdding: .day, value: -6, to: Calendar.current.startOfDay(for: Date())) ?? Date()
-        return playLogs.count(where: { $0.date >= cutoff })
+        return playEntries.count(where: { $0.date >= cutoff })
     }
 
     private var streakDays: Int {
         let cal = Calendar.current
         var day = cal.startOfDay(for: Date())
         var streak = 0
-        while playLogs.contains(where: { cal.isDate($0.date, inSameDayAs: day) }) {
+        while playEntries.contains(where: { cal.isDate($0.date, inSameDayAs: day) }) {
             streak += 1
             guard let previous = cal.date(byAdding: .day, value: -1, to: day) else { break }
             day = previous
@@ -122,7 +159,7 @@ struct QuickPlayDetailSheet: View {
     }
 
     private var lastPlayText: String {
-        guard let last = playLogs.max(by: { $0.date < $1.date })?.date else {
+        guard let last = playEntries.first?.date else {
             return l.tr(zh: "还没有", en: "None yet", de: "Noch keine")
         }
         if Calendar.current.isDateInToday(last) {
@@ -444,7 +481,7 @@ struct QuickPlayDetailSheet: View {
         .background(Color.ohanaCardSurfaceElevated, in: RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous))
     }
 
-    private func recentLogRow(_ log: PetCareLog) -> some View {
+    private func recentLogRow(_ entry: QuickPlayLedgerEntry) -> some View {
         HStack(spacing: 10) {
             Image(systemName: "checkmark") // a11y: allow decorative icon covered by surrounding text or control
                 .font(OhanaFont.adaptive(size: 11, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
@@ -453,7 +490,7 @@ struct QuickPlayDetailSheet: View {
                 .background(playTint, in: Circle())
 
             VStack(alignment: .leading, spacing: 2) {
-                Text(log.date, format: .dateTime.month().day().hour().minute())
+                Text(entry.date, format: .dateTime.month().day().hour().minute())
                     .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Text(l.tr(zh: "已完成", en: "Done", de: "Erledigt"))
@@ -463,28 +500,35 @@ struct QuickPlayDetailSheet: View {
 
             Spacer()
 
-            Button {
-                UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                commandQueue.enqueue(.petCareDelete(petID: pet.id, logID: log.id)) {
-                    withAnimation(GoMotion.feedback) {
-                        _ = PetCareCommandExecutor(context: modelContext, services: appServices).deleteCareLog(
-                            log,
-                            pet: pet,
-                            note: "quickPlay.deleteRecentLog"
-                        )
+            if let log = legacyPlayDeleteLog(for: entry) {
+                Button {
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    commandQueue.enqueue(.petCareDelete(petID: pet.id, logID: log.id)) {
+                        withAnimation(GoMotion.feedback) {
+                            _ = PetCareCommandExecutor(context: modelContext, services: appServices).deleteCareLog(
+                                log,
+                                pet: pet,
+                                note: "quickPlay.deleteRecentLog"
+                            )
+                        }
                     }
+                } label: {
+                    Image(systemName: "trash") // a11y: allow decorative icon covered by surrounding text or control
+                        .font(OhanaFont.adaptive(size: 12, weight: .bold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                        .foregroundStyle(Color.ohanaTertiaryText)
+                        .frame(width: 36, height: 34) // a11y: allow decorative non-interactive frame; hit area handled by parent
                 }
-            } label: {
-                Image(systemName: "trash") // a11y: allow decorative icon covered by surrounding text or control
-                    .font(OhanaFont.adaptive(size: 12, weight: .bold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                    .foregroundStyle(Color.ohanaTertiaryText)
-                    .frame(width: 36, height: 34) // a11y: allow decorative non-interactive frame; hit area handled by parent
+                .buttonStyle(ScaleButtonStyle())
             }
-            .buttonStyle(ScaleButtonStyle())
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
         .background(Color.ohanaCardSurfaceElevated, in: RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous))
+    }
+
+    private func legacyPlayDeleteLog(for entry: QuickPlayLedgerEntry) -> PetCareLog? {
+        guard let legacyLogId = entry.legacyLogId else { return nil }
+        return legacyPlayDeleteLogs.first { $0.id == legacyLogId }
     }
 
     private var playPlanInlineOverlay: some View {
@@ -783,7 +827,15 @@ struct QuickPlayDetailSheet: View {
             }
         )
         descriptor.fetchLimit = 1
-        return try? modelContext.fetch(descriptor).first // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
+        do {
+            return try modelContext.fetch(descriptor).first // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
+        } catch {
+            OhanaLog.warning(
+                "QuickPlayDetailSheet failed to fetch play plan event: \(error.localizedDescription)",
+                category: "Care"
+            )
+            return nil
+        }
     }
 
     private func showToast(_ message: String) {

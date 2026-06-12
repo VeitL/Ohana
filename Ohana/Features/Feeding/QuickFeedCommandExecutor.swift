@@ -9,6 +9,24 @@ import Foundation
 import SwiftData
 
 @MainActor
+private func fetchQuickFeedModelsOrLog<T: PersistentModel>(
+    _ descriptor: FetchDescriptor<T>,
+    context: ModelContext,
+    operation: String,
+    fallback: [T] = []
+) -> [T] {
+    do {
+        return try context.fetch(descriptor)
+    } catch {
+        OhanaLog.warning(
+            "QuickFeedCommandExecutor failed to \(operation): \(error.localizedDescription)",
+            category: "Care"
+        )
+        return fallback
+    }
+}
+
+@MainActor
 struct QuickFeedCommandExecutor {
     private let context: ModelContext
     private let careEvents: CareEventRecording
@@ -56,7 +74,35 @@ struct QuickFeedCommandExecutor {
             sortBy: [SortDescriptor(\.date, order: .reverse)]
         )
         descriptor.fetchLimit = Self.fullCareLogsFetchCap
-        return (try? context.fetch(descriptor)) ?? fallback
+        return fetchQuickFeedModelsOrLog(
+            descriptor,
+            context: context,
+            operation: "fetch full care logs",
+            fallback: fallback
+        )
+    }
+
+    func fullFeedingLedgerEvents(petID: UUID, fallback: [CareLedgerEvent]) -> [CareLedgerEvent] {
+        let petKey = petID.uuidString
+        let petSubject = CareLedgerSubjectKind.pet.rawValue
+        let careKind = CareLedgerEventKind.care.rawValue
+        let feedingType = CareType.feeding.rawValue
+        var descriptor = FetchDescriptor<CareLedgerEvent>(
+            predicate: #Predicate<CareLedgerEvent> { event in
+                event.subjectKind == petSubject &&
+                    event.subjectId == petKey &&
+                    event.eventKind == careKind &&
+                    event.actionType == feedingType
+            },
+            sortBy: [SortDescriptor(\.occurredAt, order: .reverse)]
+        )
+        descriptor.fetchLimit = Self.fullCareLogsFetchCap
+        return fetchQuickFeedModelsOrLog(
+            descriptor,
+            context: context,
+            operation: "fetch full feeding ledger events",
+            fallback: fallback
+        )
     }
 
     func fullFoodRecords(petID: UUID, fallback: [PetFoodRecord]) -> [PetFoodRecord] {
@@ -67,14 +113,24 @@ struct QuickFeedCommandExecutor {
             sortBy: [SortDescriptor(\.startDate, order: .reverse)]
         )
         descriptor.fetchLimit = Self.fullFoodRecordsFetchCap
-        return (try? context.fetch(descriptor)) ?? fallback
+        return fetchQuickFeedModelsOrLog(
+            descriptor,
+            context: context,
+            operation: "fetch full food records",
+            fallback: fallback
+        )
     }
 
     func latestAllEvents(fallback: [Event]) -> [Event] {
         let descriptor = FetchDescriptor<Event>(
             sortBy: [SortDescriptor(\Event.startDate)]
         )
-        return (try? context.fetch(descriptor)) ?? fallback
+        return fetchQuickFeedModelsOrLog(
+            descriptor,
+            context: context,
+            operation: "fetch latest events",
+            fallback: fallback
+        )
     }
 
     func stockExpense(id: UUID) -> PetExpenseLog? {

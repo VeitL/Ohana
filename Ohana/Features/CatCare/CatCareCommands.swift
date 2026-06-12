@@ -101,17 +101,44 @@ enum CatCareCommandService {
     @MainActor
     private static func fetchEvent(id: UUID, petID: UUID, context: ModelContext) -> Event? {
         let idString = petID.uuidString
-        let events = (try? context.fetch(FetchDescriptor<Event>())) ?? [] // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
-        return events.first {
-            $0.id == id &&
-                $0.relatedEntityId == idString &&
-                $0.eventType == EventType.litterBox.rawValue
-        }
+        let eventType = EventType.litterBox.rawValue
+        var descriptor = FetchDescriptor<Event>(
+            predicate: #Predicate<Event> { event in
+                event.id == id &&
+                    event.relatedEntityId == idString &&
+                    event.eventType == eventType
+            }
+        )
+        descriptor.fetchLimit = 1
+        return fetchCatCareModelsOrLog(descriptor, context: context, operation: "fetch cat care event").first
     }
 
     @MainActor
     private static func fetchHygieneLog(id: UUID, petID: UUID, context: ModelContext) -> PetHygieneLog? {
-        let logs = (try? context.fetch(FetchDescriptor<PetHygieneLog>())) ?? [] // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
-        return logs.first { $0.id == id && $0.pet?.id == petID }
+        var descriptor = FetchDescriptor<PetHygieneLog>(
+            predicate: #Predicate<PetHygieneLog> { log in
+                log.id == id
+            }
+        )
+        descriptor.fetchLimit = 1
+        return fetchCatCareModelsOrLog(descriptor, context: context, operation: "fetch cat hygiene log")
+            .first { $0.pet?.id == petID }
+    }
+
+    @MainActor
+    private static func fetchCatCareModelsOrLog<T: PersistentModel>(
+        _ descriptor: FetchDescriptor<T>,
+        context: ModelContext,
+        operation: String
+    ) -> [T] {
+        do {
+            return try context.fetch(descriptor)
+        } catch {
+            OhanaLog.warning(
+                "CatCareCommandService failed to \(operation): \(error.localizedDescription)",
+                category: "Care"
+            )
+            return []
+        }
     }
 }

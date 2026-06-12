@@ -258,6 +258,8 @@ nonisolated enum CloudSyncRecordSerializer {
             CloudSyncRecordState.normalizedRecordId(log.id)
         case let session as SharedCareSession:
             CloudSyncRecordState.normalizedRecordId(session.id)
+        case let event as CareLedgerEvent:
+            CloudSyncRecordState.normalizedRecordId(event.id)
         case let entry as CoconutLedgerEntry:
             CloudSyncRecordState.normalizedRecordId(entry.id)
         default:
@@ -292,6 +294,8 @@ nonisolated enum CloudSyncRecordSerializer {
             petWeightLogFields(log)
         case let session as SharedCareSession:
             sharedCareSessionFields(session)
+        case let event as CareLedgerEvent:
+            careLedgerEventFields(event)
         case let entry as CoconutLedgerEntry:
             coconutLedgerEntryFields(entry)
         default:
@@ -527,6 +531,32 @@ nonisolated enum CloudSyncRecordSerializer {
             "primaryLegacyModelId": .string(session.primaryLegacyModelId),
             "note": .string(session.note),
             "createdAt": .date(session.createdAt)
+        ]
+    }
+
+    private static func careLedgerEventFields(_ event: CareLedgerEvent) -> [String: CloudSyncRecordFieldValue] {
+        [
+            "id": .string(CloudSyncRecordState.normalizedRecordId(event.id)),
+            "occurredAt": .date(event.occurredAt),
+            "actorKind": .string(event.actorKind),
+            "actorId": optionalString(event.actorId),
+            "subjectKind": .string(event.subjectKind),
+            "subjectId": optionalString(event.subjectId),
+            "eventKind": .string(event.eventKind),
+            "actionType": .string(event.actionType),
+            "amountValue": .double(event.amountValue),
+            "amountUnit": .string(event.amountUnit),
+            "note": .string(event.note),
+            "source": .string(event.source),
+            "sourceEventId": optionalString(event.sourceEventId),
+            "sourceReminderId": optionalString(event.sourceReminderId),
+            "legacyModelName": optionalString(event.legacyModelName),
+            "legacyModelId": optionalString(event.legacyModelId),
+            "coconutDelta": .int(event.coconutDelta),
+            "rewardLogId": optionalString(event.rewardLogId),
+            "privacyFieldRaw": optionalString(event.privacyFieldRaw),
+            "metadataJSON": .string(event.metadataJSON),
+            "createdAt": .date(event.createdAt)
         ]
     }
 

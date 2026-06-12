@@ -23,6 +23,42 @@ struct PetCareTrackingDeleteCommandResult: Equatable {
     let removedLedgerEventIDs: [UUID]
 }
 
+@MainActor
+private func fetchPetCareCommandModelsOrLog<T: PersistentModel>(
+    _ descriptor: FetchDescriptor<T>,
+    context: ModelContext,
+    operation: String
+) -> [T] {
+    do {
+        return try context.fetch(descriptor)
+    } catch {
+        OhanaLog.warning(
+            "PetCareCommands failed to \(operation): \(error.localizedDescription)",
+            category: "Care"
+        )
+        return []
+    }
+}
+
+@MainActor
+private func petCareCommandLedgerEvents(
+    forLegacyModelName modelName: String,
+    id: UUID,
+    context: ModelContext
+) -> [CareLedgerEvent] {
+    let idString = id.uuidString
+    let descriptor = FetchDescriptor<CareLedgerEvent>(
+        predicate: #Predicate<CareLedgerEvent> { event in
+            event.legacyModelName == modelName && event.legacyModelId == idString
+        }
+    )
+    return fetchPetCareCommandModelsOrLog(
+        descriptor,
+        context: context,
+        operation: "fetch ledger events for \(modelName)"
+    )
+}
+
 enum PetCareTrackingCommandService {
     @discardableResult
     @MainActor
@@ -121,7 +157,11 @@ enum PetCareTrackingCommandService {
     @MainActor
     private static func linkedPottyLog(for log: PetCareLog, pet: Pet, context: ModelContext) -> PetPottyLog? {
         guard log.careType == .litter else { return nil }
-        let logs = (try? context.fetch(FetchDescriptor<PetPottyLog>())) ?? [] // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
+        let logs = fetchPetCareCommandModelsOrLog(
+            FetchDescriptor<PetPottyLog>(),
+            context: context,
+            operation: "fetch linked potty logs"
+        )
         return logs
             .filter { candidate in
                 candidate.pet?.id == pet.id
@@ -139,9 +179,7 @@ enum PetCareTrackingCommandService {
         id: UUID,
         context: ModelContext
     ) -> [CareLedgerEvent] {
-        let idString = id.uuidString
-        let events = (try? context.fetch(FetchDescriptor<CareLedgerEvent>())) ?? [] // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
-        return events.filter { $0.legacyModelName == modelName && $0.legacyModelId == idString }
+        petCareCommandLedgerEvents(forLegacyModelName: modelName, id: id, context: context)
     }
 
     private static func reward(for type: CareType, pet: Pet) -> QuestManager.OhanaActionType {
@@ -240,9 +278,7 @@ enum PetPottyCommandService {
         id: UUID,
         context: ModelContext
     ) -> [CareLedgerEvent] {
-        let idString = id.uuidString
-        let events = (try? context.fetch(FetchDescriptor<CareLedgerEvent>())) ?? [] // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
-        return events.filter { $0.legacyModelName == modelName && $0.legacyModelId == idString }
+        petCareCommandLedgerEvents(forLegacyModelName: modelName, id: id, context: context)
     }
 }
 

@@ -121,7 +121,24 @@ enum OnboardingJourneyCoordinator {
             }
         )
         descriptor.fetchLimit = 1
-        return ((try? context.fetch(descriptor)) ?? []).isEmpty == false
+        return fetchModelsOrLog(descriptor, context: context, operation: "fetch recorded care business facts").isEmpty == false
+    }
+
+    @MainActor
+    private static func fetchModelsOrLog<T: PersistentModel>(
+        _ descriptor: FetchDescriptor<T>,
+        context: ModelContext,
+        operation: String
+    ) -> [T] {
+        do {
+            return try context.fetch(descriptor)
+        } catch {
+            OhanaLog.warning(
+                "OnboardingJourneyCoordinator failed to \(operation): \(error.localizedDescription)",
+                category: "Onboarding"
+            )
+            return []
+        }
     }
 }
 

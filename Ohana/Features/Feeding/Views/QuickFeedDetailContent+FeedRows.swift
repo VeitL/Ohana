@@ -30,6 +30,56 @@ extension QuickFeedDetailContent {
         )
     }
 
+    func feedLogRow(_ entry: QuickFeedLedgerEntry, compact: Bool, solidSurface _: Bool = false) -> some View {
+        let badge = feedLedgerBadge(for: entry)
+        let grams = feedLedgerDisplayGrams(for: entry)
+        let legacyLog = legacyFeedLog(for: entry)
+        return QuickFeedLogRow(
+            icon: badge.icon,
+            title: badge.title,
+            tint: badge.tint,
+            date: entry.date,
+            gramsText: grams > 0 ? formattedFoodWeight(grams) : "--",
+            compact: compact,
+            editTint: mainFoodTint,
+            onEdit: compact ? nil : legacyLog.map { log in
+                { beginEditingFeedLog(log) }
+            },
+            onDelete: compact ? nil : legacyLog.map { log in
+                { activeAlert = .deleteFeedLog(log) }
+            }
+        )
+    }
+
+    func legacyFeedLog(for entry: QuickFeedLedgerEntry) -> PetCareLog? {
+        guard let legacyModelId = entry.legacyModelId else { return nil }
+        return observedCareLogs.first { $0.id.uuidString == legacyModelId }
+    }
+
+    func feedLedgerBadge(for entry: QuickFeedLedgerEntry) -> (title: String, tint: Color, icon: String) {
+        if !entry.sharedSessionId.isEmpty {
+            let session = allSharedCareSessions.first { $0.id.uuidString == entry.sharedSessionId }
+            let countSuffix = SharedCareMetadata.targetCount(session: session, legacyNote: entry.note).map { " · \($0)只" } ?? ""
+            return ("\(l.tr(zh: "共同喂食", en: "Shared", de: "Gemeinsam"))\(countSuffix) · \(entry.foodKind.title(l))", foodKindTint(entry.foodKind), "person.2.fill")
+        }
+        return switch entry.source {
+        case .manualMain:
+            ("\(l.tr(zh: "手动", en: "Manual", de: "Manuell")) · \(entry.foodKind.title(l))", foodKindTint(entry.foodKind), "hand.tap.fill")
+        case .manualReminder:
+            ("\(l.tr(zh: "计划", en: "Plan", de: "Plan")) · \(entry.foodKind.title(l))", Color.goPurple, FeedRuleKind.manualReminder.iconName)
+        case .autoMain:
+            ("\(l.tr(zh: "自动", en: "Auto", de: "Auto")) · \(entry.foodKind.title(l))", Color.goTeal, FeedRuleKind.autoFeeder.iconName)
+        case .treat:
+            (entry.treatKind?.title(l) ?? l.tr(zh: "零食", en: "Treat", de: "Snack"), treatTint, entry.treatKind?.systemIconName ?? "birthday.cake.fill")
+        }
+    }
+
+    func feedLedgerDisplayGrams(for entry: QuickFeedLedgerEntry) -> Double {
+        entry.source == .treat
+            ? entry.displayAmountGrams
+            : QuickFeedOverviewSnapshot.effectiveMainFoodAmount(for: entry, pet: pet)
+    }
+
     func planReminderHistoryRow(_ reminder: Reminder, allowsCatchUp: Bool = false) -> some View {
         let isSatisfied = reminder.isCompleted
         let overdue = !isSatisfied && (reminder.isFailed || (reminder.isPending && reminder.scheduledAt < clockTick))

@@ -41,6 +41,18 @@ struct WaterChartPoint: Identifiable {
     var id: Date { date }
 }
 
+struct QuickWaterLedgerEntry: Identifiable, Hashable {
+    let id: UUID
+    let date: Date
+    let careType: CareType
+    let amountMl: Double
+    let legacyLogId: UUID?
+
+    var canDelete: Bool {
+        legacyLogId != nil
+    }
+}
+
 struct QuickWaterRuleSnapshot {
     let planEvents: [Event]
     let todayPlanReminders: [Reminder]
@@ -96,11 +108,11 @@ struct QuickWaterRuleSnapshot {
 }
 
 struct QuickWaterRenderSnapshot {
-    let todayWaterLogs: [PetCareLog]
-    let waterLogs: [PetCareLog]
-    let waterChangeLogs: [PetCareLog]
-    let filterCleanLogs: [PetCareLog]
-    let allWaterLogs: [PetCareLog]
+    let todayWaterLogs: [QuickWaterLedgerEntry]
+    let waterLogs: [QuickWaterLedgerEntry]
+    let waterChangeLogs: [QuickWaterLedgerEntry]
+    let filterCleanLogs: [QuickWaterLedgerEntry]
+    let allWaterLogs: [QuickWaterLedgerEntry]
     let rule: QuickWaterRuleSnapshot
 
     static let empty = QuickWaterRenderSnapshot(
@@ -112,39 +124,60 @@ struct QuickWaterRenderSnapshot {
         rule: .empty
     )
 
-    var lastWaterLog: PetCareLog? {
+    var lastWaterLog: QuickWaterLedgerEntry? {
         todayWaterLogs.first ?? waterLogs.first
     }
 
-    var lastWaterChange: PetCareLog? {
+    var lastWaterChange: QuickWaterLedgerEntry? {
         waterChangeLogs.first
     }
 
-    var lastFilterClean: PetCareLog? {
+    var lastFilterClean: QuickWaterLedgerEntry? {
         filterCleanLogs.first
     }
 
     static func build(
         pet: Pet,
         allEvents: [Event],
-        waterCareLogs: [PetCareLog],
+        waterLedgerEvents: [CareLedgerEvent],
         now: Date = Date(),
         calendar: Calendar = .current
     ) -> QuickWaterRenderSnapshot {
-        let todayWaterLogs = waterCareLogs.filter {
-            $0.type == CareType.watering.rawValue &&
+        let petKey = pet.id.uuidString
+        let waterEntries = waterLedgerEvents.compactMap { event -> QuickWaterLedgerEntry? in
+            guard event.eventKindEnum == .care,
+                  event.subjectKind == CareLedgerSubjectKind.pet.rawValue,
+                  event.subjectId == petKey,
+                  let careType = CareType(rawValue: event.actionType),
+                  careType == .watering || careType == .waterChange || careType == .filterClean
+            else { return nil }
+
+            let legacyLogId = event.legacyModelName == "PetCareLog"
+                ? event.legacyModelId.flatMap(UUID.init(uuidString:))
+                : nil
+            return QuickWaterLedgerEntry(
+                id: event.id,
+                date: event.occurredAt,
+                careType: careType,
+                amountMl: careType == .watering ? max(0, event.amountValue) : 0,
+                legacyLogId: legacyLogId
+            )
+        }
+        .sorted { $0.date > $1.date }
+        let todayWaterLogs = waterEntries.filter {
+            $0.careType == .watering &&
                 calendar.isDate($0.date, inSameDayAs: now)
         }
-        let waterLogs = waterCareLogs.filter { $0.type == CareType.watering.rawValue }
-        let waterChangeLogs = waterCareLogs.filter { $0.type == CareType.waterChange.rawValue }
-        let filterCleanLogs = waterCareLogs.filter { $0.type == CareType.filterClean.rawValue }
+        let waterLogs = waterEntries.filter { $0.careType == .watering }
+        let waterChangeLogs = waterEntries.filter { $0.careType == .waterChange }
+        let filterCleanLogs = waterEntries.filter { $0.careType == .filterClean }
 
         return QuickWaterRenderSnapshot(
             todayWaterLogs: todayWaterLogs,
             waterLogs: waterLogs,
             waterChangeLogs: waterChangeLogs,
             filterCleanLogs: filterCleanLogs,
-            allWaterLogs: waterCareLogs,
+            allWaterLogs: waterEntries,
             rule: QuickWaterRuleSnapshot.build(pet: pet, allEvents: allEvents, now: now, calendar: calendar)
         )
     }
@@ -471,7 +504,7 @@ struct MiniWaterGauge: View {
 }
 
 struct WaterLogRow: View {
-    let log: PetCareLog
+    let log: QuickWaterLedgerEntry
     let tint: Color
     var showDelete = true
     let onDelete: () -> Void
@@ -497,7 +530,7 @@ struct WaterLogRow: View {
             Text(log.date, format: .dateTime.month().day().hour().minute())
                 .font(OhanaFont.adaptive(size: 11, weight: .semibold, design: .rounded))
                 .foregroundStyle(Color.ohanaSecondaryText)
-            if showDelete {
+            if showDelete, log.canDelete {
                 Button(role: .destructive, action: onDelete) {
                     Image(systemName: "trash").accessibilityHidden(true)
                         .font(OhanaFont.adaptive(size: 11, weight: .bold))
@@ -1050,9 +1083,9 @@ struct WaterPlanSettingsSheet: View {
 }
 
 struct WaterHistorySheet: View {
-    let logs: [PetCareLog]
-    let tintForLog: (PetCareLog) -> Color
-    let onDelete: (PetCareLog) -> Void
+    let logs: [QuickWaterLedgerEntry]
+    let tintForLog: (QuickWaterLedgerEntry) -> Color
+    let onDelete: (QuickWaterLedgerEntry) -> Void
 
     @AppStorage("appLanguage") private var appLanguage = AppLanguage.fallbackCode
 

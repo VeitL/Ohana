@@ -6,7 +6,6 @@
 //
 
 import Foundation
-import SwiftData
 
 /// 防重复打卡工具类（家庭协作保护机制）
 @MainActor
@@ -15,32 +14,43 @@ final class AntiRepeatCareManager {
     /// - Parameters:
     ///   - pet: 目标宠物
     ///   - type: 护理操作类型 (CareType)
+    ///   - ledgerEvents: 候选 CareLedgerEvent 快照，调用方负责按场景预取并控制数量
     ///   - thresholdMinutes: 防重复时间窗口（分钟），喂食建议 120 分钟 (2小时)
     ///   - currentUserId: 当前用户的 ID，用于判断是否为"别人"代为操作的（可选）
     /// - Returns: 如果有近期记录，返回 (近期记录者名称, 几分钟前)；否则返回 nil
-    static func checkRecentCareLog(
+    static func checkRecentCareLedger(
         for pet: Pet,
         type: CareType,
+        ledgerEvents: [CareLedgerEvent],
         thresholdMinutes: Int = 120,
         currentUserId: String? = nil,
-        in humans: [Human]
+        in humans: [Human],
+        now: Date = Date()
     ) -> (executorName: String, minutesAgo: Int)? {
-        let now = Date()
+        let subjectKind = CareLedgerSubjectKind.pet.rawValue
+        let subjectId = pet.id.uuidString
+        let eventKind = CareLedgerEventKind.care.rawValue
+        let actionType = type.rawValue
+        let thresholdSeconds = Double(thresholdMinutes * 60)
+        let recentEvents = ledgerEvents
+            .filter { event in
+                event.subjectKind == subjectKind &&
+                    event.subjectId == subjectId &&
+                    event.eventKind == eventKind &&
+                    event.actionType == actionType &&
+                    now.timeIntervalSince(event.occurredAt) >= 0 &&
+                    now.timeIntervalSince(event.occurredAt) < thresholdSeconds
+            }
+            .sorted { $0.occurredAt > $1.occurredAt }
 
-        // 查找指定类型、且在时间窗口内的所有记录
-        let recentLogs = pet.careLogs
-            .filter { $0.careType == type }
-            .filter { now.timeIntervalSince($0.date) < Double(thresholdMinutes * 60) }
-            .sorted { $0.date > $1.date }
-
-        guard let latestLog = recentLogs.first else { return nil }
+        guard let latestEvent = recentEvents.first else { return nil }
 
         // 计算发生了多少分钟
-        let minutesAgo = Int(now.timeIntervalSince(latestLog.date) / 60)
+        let minutesAgo = Int(now.timeIntervalSince(latestEvent.occurredAt) / 60)
 
         // 解析执行者名称
         var executorName = "某人"
-        if let executorId = latestLog.executorId, !executorId.isEmpty {
+        if let executorId = latestEvent.actorId, !executorId.isEmpty {
             if executorId == currentUserId {
                 executorName = "你"
             } else if let human = humans.first(where: { $0.id.uuidString == executorId }) {

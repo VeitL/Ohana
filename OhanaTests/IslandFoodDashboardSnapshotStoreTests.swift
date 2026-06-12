@@ -14,6 +14,8 @@ struct IslandFoodDashboardSnapshotStoreTests {
         nori.dailyPortionGrams = 60
         let momoLog = PetCareLog(date: today.addingTimeInterval(3600), amountGrams: 40, foodKind: .dry, pet: momo)
         let noriLog = PetCareLog(date: today.addingTimeInterval(7200), amountGrams: 60, foodKind: .dry, pet: nori)
+        let momoLedger = feedingLedgerEvent(pet: momo, date: momoLog.date, grams: 40)
+        let noriLedger = feedingLedgerEvent(pet: nori, date: noriLog.date, grams: 60)
         let momoStock = PetFoodRecord(
             brand: "Dry",
             totalGrams: 1000,
@@ -26,7 +28,8 @@ struct IslandFoodDashboardSnapshotStoreTests {
             pets: [nori, momo],
             selectedPetId: nil,
             allEvents: [],
-            allCareLogs: [momoLog, noriLog],
+            allFeedingLedgerEvents: [momoLedger, noriLedger],
+            legacyStockCareLogs: [momoLog, noriLog],
             allFoodRecords: [momoStock],
             now: now,
             calendar: calendar
@@ -44,7 +47,8 @@ struct IslandFoodDashboardSnapshotStoreTests {
             pets: [nori, momo],
             selectedPetId: momo.id,
             allEvents: [],
-            allCareLogs: [momoLog, noriLog],
+            allFeedingLedgerEvents: [momoLedger, noriLedger],
+            legacyStockCareLogs: [momoLog, noriLog],
             allFoodRecords: [momoStock],
             now: now,
             calendar: calendar
@@ -58,5 +62,18 @@ struct IslandFoodDashboardSnapshotStoreTests {
 
     private func fixedDate() -> Date {
         Date(timeIntervalSince1970: 1_800_000_000)
+    }
+
+    private func feedingLedgerEvent(pet: Pet, date: Date, grams: Double) -> CareLedgerEvent {
+        CareLedgerEvent(
+            occurredAt: date,
+            subjectKind: .pet,
+            subjectId: pet.id.uuidString,
+            eventKind: .care,
+            actionType: CareType.feeding.rawValue,
+            amountValue: grams,
+            amountUnit: "g",
+            legacyModelName: "PetCareLog"
+        )
     }
 }

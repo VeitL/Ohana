@@ -30,7 +30,7 @@ enum ExpandedHumanQuickActionStateProvider {
         privacy: HumanPrivacyManaging,
         activeMedications: [HumanMedication],
         todayMedicationLogs: [HumanMedicationLog],
-        recentExpenses: [PetExpenseLog]
+        recentExpenses: [HomeExpensePreviewEntry]
     ) -> String? {
         ExpandedQuickActionLogic.humanCountText(
             item: item,
@@ -63,8 +63,8 @@ enum ExpandedHumanQuickActionStateProvider {
         return Array(logs.lazy.filter { $0.humanId == humanId }.prefix(limit))
     }
 
-    private static func expenses(for human: Human, in expenses: [PetExpenseLog], limit: Int) -> [PetExpenseLog] {
+    private static func expenses(for human: Human, in expenses: [HomeExpensePreviewEntry], limit: Int) -> [HomeExpensePreviewEntry] {
         let humanId = human.id.uuidString
-        return Array(expenses.lazy.filter { $0.executorId == humanId }.prefix(limit))
+        return Array(expenses.lazy.filter { $0.actorId == humanId }.prefix(limit))
     }
 }

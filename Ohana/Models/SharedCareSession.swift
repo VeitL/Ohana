@@ -53,6 +53,7 @@ nonisolated enum SharedCareParticipantIDs {
 }
 
 enum SharedCareMetadata {
+    static let legacyMetadataMarker = "ohana_shared_"
     static let feedNotePrefix = "ohana_shared_feed:"
     static let waterNotePrefix = "ohana_shared_water:"
     static let litterNotePrefix = "ohana_shared_litter:"
@@ -73,7 +74,9 @@ enum SharedCareMetadata {
         expenseNotePrefix
     ]
 
-    static func note(
+    // Backward-compatibility helper for reading or constructing legacy fixtures only.
+    // New shared-care writes store machine facts on SharedCareSession fields.
+    static func legacyEncodedNote(
         prefix: String,
         sessionId: UUID,
         stockTotalGrams: Double? = nil,
@@ -96,6 +99,26 @@ enum SharedCareMetadata {
             parts.append(cleanVisibleNote)
         }
         return parts.joined(separator: " ")
+    }
+
+    static func userNoteForStorage(_ note: String) -> String {
+        visibleNote(note).trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    static func hasLegacyMetadata(_ note: String) -> Bool {
+        metadataToken(in: note) != nil
+    }
+
+    static func legacySessionId(from note: String) -> UUID? {
+        guard let token = metadataToken(in: note),
+              let prefix = metadataNotePrefixes.first(where: { token.hasPrefix($0) }) else {
+            return nil
+        }
+        return UUID(uuidString: String(token.dropFirst(prefix.count)))
+    }
+
+    static func isStockOwner(_ note: String) -> Bool {
+        note.split(separator: " ").contains(Substring(stockOwnerKey))
     }
 
     static func visibleNote(_ note: String) -> String {
@@ -123,6 +146,13 @@ enum SharedCareMetadata {
         return Int(token.dropFirst(targetCountKey.count))
     }
 
+    static func targetCount(session: SharedCareSession?, legacyNote: String) -> Int? {
+        if let count = session?.targetPetIds.count, count > 0 {
+            return count
+        }
+        return targetCount(from: legacyNote)
+    }
+
     static func stockDeductionGrams(from note: String) -> Double? {
         guard note.contains(stockOwnerKey),
               let token = note.split(separator: " ").first(where: { $0.hasPrefix(stockTotalKey) }) else {
@@ -131,23 +161,23 @@ enum SharedCareMetadata {
         return Double(token.dropFirst(stockTotalKey.count))
     }
 
-    static func prefix(for actionKind: SharedCareActionKind) -> String {
-        switch actionKind {
-        case .feeding:
-            feedNotePrefix
-        case .watering:
-            waterNotePrefix
-        case .litterScoop, .litterChange:
-            litterNotePrefix
-        case .pottyUnknown:
-            unknownPottyNotePrefix
-        case .walk:
-            walkNotePrefix
-        case .expense:
-            expenseNotePrefix
-        case .waterChange, .filterClean, .cageCleaning, .freeFlight, .misting, .substrateChange, .play:
-            "\(careNotePrefix)\(actionKind.rawValue):"
+    static func stockTotalGrams(from note: String) -> Double? {
+        guard let token = note.split(separator: " ").first(where: { $0.hasPrefix(stockTotalKey) }) else {
+            return nil
         }
+        return Double(token.dropFirst(stockTotalKey.count))
+    }
+
+    private static func metadataToken(in note: String) -> String? {
+        let parts = note
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .components(separatedBy: .whitespacesAndNewlines)
+            .filter { !$0.isEmpty }
+        guard let first = parts.first,
+              metadataNotePrefixes.contains(where: { first.hasPrefix($0) }) else {
+            return nil
+        }
+        return first
     }
 }
 

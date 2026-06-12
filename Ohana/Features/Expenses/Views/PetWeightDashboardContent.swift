@@ -8,12 +8,46 @@
 import SwiftData
 import SwiftUI
 
+struct PetWeightLedgerEntry: Identifiable, Hashable {
+    let id: UUID
+    let legacyLogId: UUID?
+    let date: Date
+    let weightKilograms: Double
+
+    static func entries(from events: [CareLedgerEvent], petId: UUID) -> [PetWeightLedgerEntry] {
+        let petSubject = CareLedgerSubjectKind.pet.rawValue
+        let weightKind = CareLedgerEventKind.weight.rawValue
+        let petWeightAction = "petWeight"
+        let petIdString = petId.uuidString
+        return events.compactMap { event in
+            guard event.subjectKind == petSubject,
+                  event.subjectId == petIdString,
+                  event.eventKind == weightKind,
+                  event.actionType == petWeightAction,
+                  event.amountValue > 0 else { return nil }
+
+            let legacyLogId = event.legacyModelName == "PetWeightLog"
+                ? event.legacyModelId.flatMap(UUID.init(uuidString:))
+                : nil
+            return PetWeightLedgerEntry(
+                id: event.id,
+                legacyLogId: legacyLogId,
+                date: event.occurredAt,
+                weightKilograms: event.amountValue
+            )
+        }
+        .sorted { $0.date > $1.date }
+    }
+}
+
 struct PetWeightDashboardContent: View {
     let pet: Pet
     var showsCloseButton = true
     var onClose: () -> Void
     var onAdd: () -> Void
     var onRemove: (() -> Void)?
+    let weightLedgerEvents: [CareLedgerEvent]
+    let legacyWeightDeleteLogs: [PetWeightLog]
 
     @Environment(\.modelContext) private var modelContext
     @Environment(AppServices.self) private var appServices
@@ -49,11 +83,32 @@ struct PetWeightDashboardContent: View {
         }
     }
 
+    init(
+        pet: Pet,
+        showsCloseButton: Bool = true,
+        weightLedgerEvents: [CareLedgerEvent] = [],
+        legacyWeightDeleteLogs: [PetWeightLog] = [],
+        onClose: @escaping () -> Void,
+        onAdd: @escaping () -> Void,
+        onRemove: (() -> Void)? = nil
+    ) {
+        self.pet = pet
+        self.showsCloseButton = showsCloseButton
+        self.weightLedgerEvents = weightLedgerEvents
+        self.legacyWeightDeleteLogs = legacyWeightDeleteLogs
+        self.onClose = onClose
+        self.onAdd = onAdd
+        self.onRemove = onRemove
+    }
+
     private var l: L10n { L10n(appLanguage) }
-    private var logs: [PetWeightLog] { pet.weightLogs.sorted { $0.date > $1.date } }
+    private var entries: [PetWeightLedgerEntry] {
+        PetWeightLedgerEntry.entries(from: weightLedgerEvents, petId: pet.id)
+    }
+
     private func trendPoints(now: Date = Date()) -> [WeightTrendPoint] {
         WeightTrendDataBuilder.points(
-            from: logs.map { (date: $0.date, kilograms: $0.weightInKg) },
+            from: entries.map { (date: $0.date, kilograms: $0.weightKilograms) },
             rangeStart: selectedRange.startDate(now: now),
             rangeEnd: now
         )
@@ -102,7 +157,7 @@ struct PetWeightDashboardContent: View {
             FeatureHubMetric(
                 id: "count",
                 title: l.tr(zh: "记录", en: "Logs", de: "Einträge"),
-                value: "\(logs.count)"
+                value: "\(entries.count)"
             )
         ])
     }
@@ -139,15 +194,15 @@ struct PetWeightDashboardContent: View {
                 .font(OhanaFont.headline(.black))
                 .foregroundStyle(Color.ohanaPrimaryText)
 
-            if logs.isEmpty {
+            if entries.isEmpty {
                 emptyState(
                     icon: "scalemass.fill",
                     text: l.tr(zh: "还没有体重记录", en: "No weight logs yet", de: "Noch keine Gewichtseinträge")
                 )
             } else {
                 LazyVStack(spacing: 10) {
-                    ForEach(logs.prefix(20)) { log in
-                        weightRow(log)
+                    ForEach(entries.prefix(20)) { entry in
+                        weightRow(entry)
                     }
                 }
             }
@@ -167,51 +222,54 @@ struct PetWeightDashboardContent: View {
     }
 
     private var latestWeightText: String {
-        guard let latest = logs.first else { return "—" }
-        return AppMeasurementSystem.formatWeightKilograms(latest.weightInKg)
+        guard let latest = entries.first else { return "—" }
+        return AppMeasurementSystem.formatWeightKilograms(latest.weightKilograms)
     }
 
     private var weightDeltaText: String {
-        guard let latest = logs.first, let previous = logs.dropFirst().first else { return "—" }
-        let delta = latest.weightInKg - previous.weightInKg
+        guard let latest = entries.first, let previous = entries.dropFirst().first else { return "—" }
+        let delta = latest.weightKilograms - previous.weightKilograms
         return formatWeightDelta(delta)
     }
 
-    private func weightRow(_ log: PetWeightLog) -> some View {
+    private func weightRow(_ entry: PetWeightLedgerEntry) -> some View {
         HStack(spacing: 12) {
             Image(systemName: "scalemass.fill").accessibilityHidden(true)
                 .font(OhanaFont.adaptive(size: 14, weight: .black))
                 .foregroundStyle(Color.goPrimary)
                 .frame(width: 34, height: 34) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
             VStack(alignment: .leading, spacing: 3) {
-                Text(log.date.formatted(date: .abbreviated, time: .omitted))
+                Text(entry.date.formatted(date: .abbreviated, time: .omitted))
                     .font(OhanaFont.callout(.black))
                     .foregroundStyle(Color.ohanaPrimaryText)
-                Text(log.date.formatted(date: .omitted, time: .shortened))
+                Text(entry.date.formatted(date: .omitted, time: .shortened))
                     .font(OhanaFont.caption(.semibold))
                     .foregroundStyle(Color.ohanaSecondaryText)
             }
             Spacer()
-            Text(AppMeasurementSystem.formatWeightKilograms(log.weightInKg))
+            Text(AppMeasurementSystem.formatWeightKilograms(entry.weightKilograms))
                 .font(OhanaFont.callout(.black))
                 .foregroundStyle(Color.ohanaPrimaryText)
-            Button {
-                commandQueue.enqueue(
-                    .weightDelete(entityID: pet.id, entityKind: EntityKind.pet.rawValue, recordID: log.id)
-                ) {
-                    DashboardRecordCommandExecutor(context: modelContext, services: appServices).deletePetWeight(
-                        log,
-                        pet: pet,
-                        note: "dashboard.weight.delete.\(EntityKind.pet.rawValue)"
-                    )
+            if let legacyLogId = entry.legacyLogId {
+                Button {
+                    commandQueue.enqueue(
+                        .weightDelete(entityID: pet.id, entityKind: EntityKind.pet.rawValue, recordID: legacyLogId)
+                    ) {
+                        guard let log = legacyWeightDeleteLogs.first(where: { $0.id == legacyLogId }) else { return }
+                        DashboardRecordCommandExecutor(context: modelContext, services: appServices).deletePetWeight(
+                            log,
+                            pet: pet,
+                            note: "dashboard.weight.delete.\(EntityKind.pet.rawValue)"
+                        )
+                    }
+                } label: {
+                    Image(systemName: "trash").accessibilityHidden(true)
+                        .font(OhanaFont.adaptive(size: 13, weight: .bold))
+                        .foregroundStyle(Color.ohanaSecondaryText)
+                        .frame(width: 34, height: 34) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
                 }
-            } label: {
-                Image(systemName: "trash").accessibilityHidden(true)
-                    .font(OhanaFont.adaptive(size: 13, weight: .bold))
-                    .foregroundStyle(Color.ohanaSecondaryText)
-                    .frame(width: 34, height: 34) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
+                .buttonStyle(ScaleButtonStyle())
             }
-            .buttonStyle(ScaleButtonStyle())
         }
         .padding(14)
         .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous))

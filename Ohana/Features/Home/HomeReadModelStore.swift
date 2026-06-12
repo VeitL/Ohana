@@ -60,9 +60,12 @@ struct HomeReadModelPayload {
             pendingReminders: [],
             humanMedications: [],
             humanMedicationLogs: [],
-            careLogs: [],
-            walkLogs: [],
-            pottyLogs: [],
+            todayFocusCareLedgerEntries: [],
+            feedingLedgerEntries: [],
+            careLedgerEntries: [],
+            hygieneLedgerEntries: [],
+            walkLedgerEntries: [],
+            pottyLedgerEntries: [],
             humanWeightLogs: [],
             familyTasks: [],
             exchangeRequests: [],
@@ -334,9 +337,14 @@ final class HomeReadModelStore: ObservableObject {
             pendingReminders: fetches.pendingReminders(),
             humanMedications: fetches.humanMedications(),
             humanMedicationLogs: fetches.humanMedicationLogs(),
-            careLogs: fetches.careLogs(),
-            walkLogs: fetches.walkLogs(),
-            pottyLogs: fetches.pottyLogs(),
+            todayFocusCareLedgerEntries: fetches.todayFocusCareLedgerEntries(),
+            feedingLedgerEntries: fetches.feedingLedgerEntries(),
+            careLedgerEntries: fetches.careQuickActionEntries(),
+            hygieneLedgerEntries: fetches.hygieneQuickActionEntries(),
+            walkLedgerEntries: fetches.walkQuickActionEntries(),
+            pottyLedgerEntries: fetches.pottyQuickActionEntries(),
+            petExpenseLedgerEntries: fetches.petExpenseQuickActionEntries(),
+            petWeightLedgerEntries: fetches.petWeightQuickActionEntries(),
             humanWeightLogs: fetches.humanWeightLogs(),
             familyTasks: fetches.familyTasks(),
             exchangeRequests: fetches.exchangeRequests(),
@@ -399,9 +407,14 @@ actor HomeReadModelActor {
 
         let humanMedications = fetches.humanMedications()
         let humanMedicationLogs = fetches.humanMedicationLogs()
-        let careLogs = fetches.careLogs()
-        let walkLogs = fetches.walkLogs()
-        let pottyLogs = fetches.pottyLogs()
+        let todayFocusCareLedgerEntries = fetches.todayFocusCareLedgerEntries()
+        let feedingLedgerEntries = fetches.feedingLedgerEntries()
+        let careLedgerEntries = fetches.careQuickActionEntries()
+        let hygieneLedgerEntries = fetches.hygieneQuickActionEntries()
+        let walkLedgerEntries = fetches.walkQuickActionEntries()
+        let pottyLedgerEntries = fetches.pottyQuickActionEntries()
+        let petExpenseLedgerEntries = fetches.petExpenseQuickActionEntries()
+        let petWeightLedgerEntries = fetches.petWeightQuickActionEntries()
         let humanWeightLogs = fetches.humanWeightLogs()
         try Task.checkCancellation()
 
@@ -418,9 +431,14 @@ actor HomeReadModelActor {
             pendingReminders: pendingReminders,
             humanMedications: humanMedications,
             humanMedicationLogs: humanMedicationLogs,
-            careLogs: careLogs,
-            walkLogs: walkLogs,
-            pottyLogs: pottyLogs,
+            todayFocusCareLedgerEntries: todayFocusCareLedgerEntries,
+            feedingLedgerEntries: feedingLedgerEntries,
+            careLedgerEntries: careLedgerEntries,
+            hygieneLedgerEntries: hygieneLedgerEntries,
+            walkLedgerEntries: walkLedgerEntries,
+            pottyLedgerEntries: pottyLedgerEntries,
+            petExpenseLedgerEntries: petExpenseLedgerEntries,
+            petWeightLedgerEntries: petWeightLedgerEntries,
             humanWeightLogs: humanWeightLogs,
             familyTasks: familyTasks,
             exchangeRequests: exchangeRequests,
@@ -486,7 +504,7 @@ private nonisolated struct HomeReadModelFetches {
             sortBy: [SortDescriptor(\Pet.createdAt, order: .reverse)]
         )
         descriptor.fetchLimit = 80
-        return (try? context.fetch(descriptor)) ?? []
+        return fetchOrLog(descriptor, operation: "fetch home pets")
     }
 
     func humans() -> [Human] {
@@ -494,7 +512,7 @@ private nonisolated struct HomeReadModelFetches {
             sortBy: [SortDescriptor(\Human.createdAt, order: .reverse)]
         )
         descriptor.fetchLimit = 40
-        return (try? context.fetch(descriptor)) ?? []
+        return fetchOrLog(descriptor, operation: "fetch home humans")
     }
 
     func plants() -> [Plant] {
@@ -502,7 +520,7 @@ private nonisolated struct HomeReadModelFetches {
             sortBy: [SortDescriptor(\Plant.createdAt, order: .reverse)]
         )
         descriptor.fetchLimit = 60
-        return (try? context.fetch(descriptor)) ?? []
+        return fetchOrLog(descriptor, operation: "fetch home plants")
     }
 
     func electronicPets() -> [OasisElectronicPet] {
@@ -510,7 +528,7 @@ private nonisolated struct HomeReadModelFetches {
             sortBy: [SortDescriptor(\OasisElectronicPet.obtainedAt, order: .reverse)]
         )
         descriptor.fetchLimit = 24
-        return (try? context.fetch(descriptor)) ?? []
+        return fetchOrLog(descriptor, operation: "fetch home electronic pets")
     }
 
     func events() -> [Event] {
@@ -523,7 +541,7 @@ private nonisolated struct HomeReadModelFetches {
             sortBy: [SortDescriptor(\Event.startDate)]
         )
         windowDescriptor.fetchLimit = 400
-        let windowEvents = (try? context.fetch(windowDescriptor)) ?? []
+        let windowEvents: [Event] = fetchOrLog(windowDescriptor, operation: "fetch home event window")
 
         var recurringDescriptor = FetchDescriptor<Event>(
             predicate: #Predicate<Event> { event in
@@ -532,7 +550,7 @@ private nonisolated struct HomeReadModelFetches {
             sortBy: [SortDescriptor(\Event.startDate, order: .reverse)]
         )
         recurringDescriptor.fetchLimit = 400
-        let recurringEvents = ((try? context.fetch(recurringDescriptor)) ?? [])
+        let recurringEvents: [Event] = fetchOrLog(recurringDescriptor, operation: "fetch home recurring events")
             .filter { event in
                 guard let recurrenceEndDate = event.recurrenceEndDate else { return true }
                 return calendar.startOfDay(for: recurrenceEndDate) >= start
@@ -558,7 +576,7 @@ private nonisolated struct HomeReadModelFetches {
             sortBy: [SortDescriptor(\Reminder.scheduledAt)]
         )
         descriptor.fetchLimit = 60
-        return (try? context.fetch(descriptor)) ?? []
+        return fetchOrLog(descriptor, operation: "fetch home pending reminders")
     }
 
     func humanMedications() -> [HumanMedication] {
@@ -566,7 +584,7 @@ private nonisolated struct HomeReadModelFetches {
             sortBy: [SortDescriptor(\HumanMedication.createdAt, order: .reverse)]
         )
         descriptor.fetchLimit = 80
-        return (try? context.fetch(descriptor)) ?? []
+        return fetchOrLog(descriptor, operation: "fetch home human medications")
     }
 
     func humanMedicationLogs() -> [HumanMedicationLog] {
@@ -578,43 +596,204 @@ private nonisolated struct HomeReadModelFetches {
             sortBy: [SortDescriptor(\HumanMedicationLog.scheduledTime, order: .reverse)]
         )
         descriptor.fetchLimit = 80
-        return (try? context.fetch(descriptor)) ?? []
+        return fetchOrLog(descriptor, operation: "fetch home human medication logs")
     }
 
-    func careLogs() -> [PetCareLog] {
+    func todayFocusCareLedgerEntries() -> [TodayFocusCareLedgerEntry] {
         let today = calendar.startOfDay(for: now)
-        var descriptor = FetchDescriptor<PetCareLog>(
-            predicate: #Predicate<PetCareLog> { log in
-                log.date >= today
+        let petSubject = CareLedgerSubjectKind.pet.rawValue
+        let careKind = CareLedgerEventKind.care.rawValue
+        let walkKind = CareLedgerEventKind.walk.rawValue
+        let pottyKind = CareLedgerEventKind.potty.rawValue
+        var descriptor = FetchDescriptor<CareLedgerEvent>(
+            predicate: #Predicate<CareLedgerEvent> { event in
+                event.occurredAt >= today &&
+                    event.subjectKind == petSubject &&
+                    (event.eventKind == careKind ||
+                        event.eventKind == walkKind ||
+                        event.eventKind == pottyKind)
             },
-            sortBy: [SortDescriptor(\PetCareLog.date, order: .reverse)]
+            sortBy: [SortDescriptor(\CareLedgerEvent.occurredAt, order: .reverse)]
+        )
+        descriptor.fetchLimit = 360
+        do {
+            return try context.fetch(descriptor).compactMap(Self.todayFocusCareLedgerEntry(from:))
+        } catch {
+            OhanaLog.warning(
+                "Home read model today focus care ledger fetch failed: \(error.localizedDescription)",
+                category: "Home"
+            )
+            return []
+        }
+    }
+
+    func feedingLedgerEntries() -> [HomeFeedQuickActionEntry] {
+        let today = calendar.startOfDay(for: now)
+        let petSubject = CareLedgerSubjectKind.pet.rawValue
+        let careKind = CareLedgerEventKind.care.rawValue
+        let feedingAction = CareType.feeding.rawValue
+        var descriptor = FetchDescriptor<CareLedgerEvent>(
+            predicate: #Predicate<CareLedgerEvent> { event in
+                event.occurredAt >= today &&
+                    event.subjectKind == petSubject &&
+                    event.eventKind == careKind &&
+                    event.actionType == feedingAction
+            },
+            sortBy: [SortDescriptor(\CareLedgerEvent.occurredAt, order: .reverse)]
         )
         descriptor.fetchLimit = 180
-        return (try? context.fetch(descriptor)) ?? []
+        do {
+            return try context.fetch(descriptor).compactMap(Self.feedingLedgerEntry(from:))
+        } catch {
+            OhanaLog.warning(
+                "Home read model feeding ledger fetch failed: \(error.localizedDescription)",
+                category: "Home"
+            )
+            return []
+        }
     }
 
-    func walkLogs() -> [PetWalkLog] {
-        let today = calendar.startOfDay(for: now)
-        var descriptor = FetchDescriptor<PetWalkLog>(
-            predicate: #Predicate<PetWalkLog> { log in
-                log.startDate >= today
+    func careQuickActionEntries() -> [HomeCareQuickActionEntry] {
+        let petSubject = CareLedgerSubjectKind.pet.rawValue
+        let careKind = CareLedgerEventKind.care.rawValue
+        let feedingAction = CareType.feeding.rawValue
+        var descriptor = FetchDescriptor<CareLedgerEvent>(
+            predicate: #Predicate<CareLedgerEvent> { event in
+                event.subjectKind == petSubject &&
+                    event.eventKind == careKind &&
+                    event.actionType != feedingAction
             },
-            sortBy: [SortDescriptor(\PetWalkLog.startDate, order: .reverse)]
+            sortBy: [SortDescriptor(\CareLedgerEvent.occurredAt, order: .reverse)]
+        )
+        descriptor.fetchLimit = 360
+        do {
+            return try context.fetch(descriptor).compactMap(Self.careQuickActionEntry(from:))
+        } catch {
+            OhanaLog.warning(
+                "Home read model care ledger fetch failed: \(error.localizedDescription)",
+                category: "Home"
+            )
+            return []
+        }
+    }
+
+    func hygieneQuickActionEntries() -> [HomeHygieneQuickActionEntry] {
+        let petSubject = CareLedgerSubjectKind.pet.rawValue
+        let hygieneKind = CareLedgerEventKind.hygiene.rawValue
+        var descriptor = FetchDescriptor<CareLedgerEvent>(
+            predicate: #Predicate<CareLedgerEvent> { event in
+                event.subjectKind == petSubject &&
+                    event.eventKind == hygieneKind
+            },
+            sortBy: [SortDescriptor(\CareLedgerEvent.occurredAt, order: .reverse)]
+        )
+        descriptor.fetchLimit = 240
+        do {
+            return try context.fetch(descriptor).compactMap(Self.hygieneQuickActionEntry(from:))
+        } catch {
+            OhanaLog.warning(
+                "Home read model hygiene ledger fetch failed: \(error.localizedDescription)",
+                category: "Home"
+            )
+            return []
+        }
+    }
+
+    func walkQuickActionEntries() -> [HomeWalkQuickActionEntry] {
+        let today = calendar.startOfDay(for: now)
+        let petSubject = CareLedgerSubjectKind.pet.rawValue
+        let walkKind = CareLedgerEventKind.walk.rawValue
+        var descriptor = FetchDescriptor<CareLedgerEvent>(
+            predicate: #Predicate<CareLedgerEvent> { event in
+                event.occurredAt >= today &&
+                    event.subjectKind == petSubject &&
+                    event.eventKind == walkKind
+            },
+            sortBy: [SortDescriptor(\CareLedgerEvent.occurredAt, order: .reverse)]
         )
         descriptor.fetchLimit = 80
-        return (try? context.fetch(descriptor)) ?? []
+        do {
+            return try context.fetch(descriptor).compactMap(Self.walkQuickActionEntry(from:))
+        } catch {
+            OhanaLog.warning(
+                "Home read model walk ledger fetch failed: \(error.localizedDescription)",
+                category: "Home"
+            )
+            return []
+        }
     }
 
-    func pottyLogs() -> [PetPottyLog] {
-        let today = calendar.startOfDay(for: now)
-        var descriptor = FetchDescriptor<PetPottyLog>(
-            predicate: #Predicate<PetPottyLog> { log in
-                log.date >= today
+    func pottyQuickActionEntries() -> [HomePottyQuickActionEntry] {
+        let petSubject = CareLedgerSubjectKind.pet.rawValue
+        let pottyKind = CareLedgerEventKind.potty.rawValue
+        var descriptor = FetchDescriptor<CareLedgerEvent>(
+            predicate: #Predicate<CareLedgerEvent> { event in
+                event.subjectKind == petSubject &&
+                    event.eventKind == pottyKind
             },
-            sortBy: [SortDescriptor(\PetPottyLog.date, order: .reverse)]
+            sortBy: [SortDescriptor(\CareLedgerEvent.occurredAt, order: .reverse)]
         )
-        descriptor.fetchLimit = 120
-        return (try? context.fetch(descriptor)) ?? []
+        descriptor.fetchLimit = 180
+        do {
+            return try context.fetch(descriptor).compactMap(Self.pottyQuickActionEntry(from:))
+        } catch {
+            OhanaLog.warning(
+                "Home read model potty ledger fetch failed: \(error.localizedDescription)",
+                category: "Home"
+            )
+            return []
+        }
+    }
+
+    func petExpenseQuickActionEntries() -> [HomePetExpenseQuickActionEntry] {
+        let monthInterval = calendar.dateInterval(of: .month, for: now)
+        let monthStart = monthInterval?.start ?? calendar.startOfDay(for: now)
+        let monthEnd = monthInterval?.end ?? now
+        let petSubject = CareLedgerSubjectKind.pet.rawValue
+        let expenseKind = CareLedgerEventKind.expense.rawValue
+        var descriptor = FetchDescriptor<CareLedgerEvent>(
+            predicate: #Predicate<CareLedgerEvent> { event in
+                event.occurredAt >= monthStart &&
+                    event.occurredAt < monthEnd &&
+                    event.subjectKind == petSubject &&
+                    event.eventKind == expenseKind
+            },
+            sortBy: [SortDescriptor(\CareLedgerEvent.occurredAt, order: .reverse)]
+        )
+        descriptor.fetchLimit = 240
+        do {
+            return try context.fetch(descriptor).compactMap(Self.petExpenseQuickActionEntry(from:))
+        } catch {
+            OhanaLog.warning(
+                "Home read model pet expense ledger fetch failed: \(error.localizedDescription)",
+                category: "Home"
+            )
+            return []
+        }
+    }
+
+    func petWeightQuickActionEntries() -> [HomePetWeightQuickActionEntry] {
+        let petSubject = CareLedgerSubjectKind.pet.rawValue
+        let weightKind = CareLedgerEventKind.weight.rawValue
+        let petWeightAction = "petWeight"
+        var descriptor = FetchDescriptor<CareLedgerEvent>(
+            predicate: #Predicate<CareLedgerEvent> { event in
+                event.subjectKind == petSubject &&
+                    event.eventKind == weightKind &&
+                    event.actionType == petWeightAction
+            },
+            sortBy: [SortDescriptor(\CareLedgerEvent.occurredAt, order: .reverse)]
+        )
+        descriptor.fetchLimit = 240
+        do {
+            return try context.fetch(descriptor).compactMap(Self.petWeightQuickActionEntry(from:))
+        } catch {
+            OhanaLog.warning(
+                "Home read model pet weight ledger fetch failed: \(error.localizedDescription)",
+                category: "Home"
+            )
+            return []
+        }
     }
 
     func humanWeightLogs() -> [HumanWeightLog] {
@@ -626,7 +805,117 @@ private nonisolated struct HomeReadModelFetches {
             sortBy: [SortDescriptor(\HumanWeightLog.date, order: .reverse)]
         )
         descriptor.fetchLimit = 40
-        return (try? context.fetch(descriptor)) ?? []
+        return fetchOrLog(descriptor, operation: "fetch home human weight logs")
+    }
+
+    private static func feedingLedgerEntry(from event: CareLedgerEvent) -> HomeFeedQuickActionEntry? {
+        guard let subjectId = event.subjectId.flatMap({ UUID(uuidString: $0) }) else { return nil }
+        return HomeFeedQuickActionEntry(
+            id: event.id,
+            petId: subjectId,
+            date: event.occurredAt,
+            amountGrams: event.amountValue,
+            source: feedSource(
+                note: event.note,
+                ledgerSource: event.sourceEnum,
+                sourceEventId: event.sourceEventId,
+                sourceReminderId: event.sourceReminderId
+            )
+        )
+    }
+
+    private static func todayFocusCareLedgerEntry(from event: CareLedgerEvent) -> TodayFocusCareLedgerEntry? {
+        guard let subjectId = event.subjectId.flatMap({ UUID(uuidString: $0) }) else { return nil }
+        return TodayFocusCareLedgerEntry(
+            id: event.id,
+            petId: subjectId,
+            eventKind: event.eventKindEnum,
+            actionType: event.actionType,
+            date: event.occurredAt,
+            sourceEventId: event.sourceEventId.flatMap(UUID.init(uuidString:)),
+            actorId: event.actorId
+        )
+    }
+
+    private static func careQuickActionEntry(from event: CareLedgerEvent) -> HomeCareQuickActionEntry? {
+        guard let subjectId = event.subjectId.flatMap({ UUID(uuidString: $0) }) else { return nil }
+        return HomeCareQuickActionEntry(
+            id: event.id,
+            petId: subjectId,
+            actionType: event.actionType,
+            date: event.occurredAt,
+            amountValue: event.amountValue
+        )
+    }
+
+    private static func hygieneQuickActionEntry(from event: CareLedgerEvent) -> HomeHygieneQuickActionEntry? {
+        guard let subjectId = event.subjectId.flatMap({ UUID(uuidString: $0) }),
+              let hygieneType = HygieneType(rawValue: event.actionType) else { return nil }
+        return HomeHygieneQuickActionEntry(
+            id: event.id,
+            petId: subjectId,
+            hygieneType: hygieneType,
+            date: event.occurredAt
+        )
+    }
+
+    private static func walkQuickActionEntry(from event: CareLedgerEvent) -> HomeWalkQuickActionEntry? {
+        guard let subjectId = event.subjectId.flatMap({ UUID(uuidString: $0) }) else { return nil }
+        return HomeWalkQuickActionEntry(
+            id: event.id,
+            petId: subjectId,
+            startDate: event.occurredAt,
+            distanceMeters: event.amountValue
+        )
+    }
+
+    private static func pottyQuickActionEntry(from event: CareLedgerEvent) -> HomePottyQuickActionEntry? {
+        guard let subjectId = event.subjectId.flatMap({ UUID(uuidString: $0) }),
+              let pottyType = PottyType(rawValue: event.actionType) else { return nil }
+        return HomePottyQuickActionEntry(
+            id: event.id,
+            petId: subjectId,
+            date: event.occurredAt,
+            pottyType: pottyType
+        )
+    }
+
+    private static func petExpenseQuickActionEntry(from event: CareLedgerEvent) -> HomePetExpenseQuickActionEntry? {
+        guard let subjectId = event.subjectId.flatMap({ UUID(uuidString: $0) }) else { return nil }
+        return HomePetExpenseQuickActionEntry(
+            id: event.id,
+            petId: subjectId,
+            date: event.occurredAt,
+            amount: event.amountValue
+        )
+    }
+
+    private static func petWeightQuickActionEntry(from event: CareLedgerEvent) -> HomePetWeightQuickActionEntry? {
+        guard let subjectId = event.subjectId.flatMap({ UUID(uuidString: $0) }) else { return nil }
+        return HomePetWeightQuickActionEntry(
+            id: event.id,
+            petId: subjectId,
+            date: event.occurredAt,
+            weightKg: event.amountValue
+        )
+    }
+
+    private static func feedSource(
+        note: String,
+        ledgerSource: CareLedgerSource,
+        sourceEventId: String?,
+        sourceReminderId: String?
+    ) -> FeedLogSource {
+        if note.hasPrefix("ohana_plan_feed:") || ledgerSource == .reminder || sourceReminderId != nil {
+            return .manualReminder
+        }
+        if note.hasPrefix("ohana_auto_feed:") || (ledgerSource == .service && sourceEventId != nil) {
+            return .autoMain
+        }
+        if note.hasPrefix("ohana_treat_feed") {
+            return .treat
+        }
+        return .manualMain
     }
 
     func familyTasks() -> [FamilyCollaborationTask] {
@@ -642,7 +931,7 @@ private nonisolated struct HomeReadModelFetches {
             sortBy: [SortDescriptor(\FamilyCollaborationTask.updatedAt, order: .reverse)]
         )
         descriptor.fetchLimit = 80
-        return (try? context.fetch(descriptor)) ?? []
+        return fetchOrLog(descriptor, operation: "fetch home family tasks")
     }
 
     func exchangeRequests() -> [CoconutExchangeRequest] {
@@ -654,6 +943,21 @@ private nonisolated struct HomeReadModelFetches {
             sortBy: [SortDescriptor(\CoconutExchangeRequest.createdAt, order: .reverse)]
         )
         descriptor.fetchLimit = 40
-        return (try? context.fetch(descriptor)) ?? []
+        return fetchOrLog(descriptor, operation: "fetch home exchange requests")
+    }
+
+    private func fetchOrLog<T: PersistentModel>(
+        _ descriptor: FetchDescriptor<T>,
+        operation: String
+    ) -> [T] {
+        do {
+            return try context.fetch(descriptor)
+        } catch {
+            OhanaLog.warning(
+                "Home read model \(operation) failed: \(error.localizedDescription)",
+                category: "Home"
+            )
+            return []
+        }
     }
 }

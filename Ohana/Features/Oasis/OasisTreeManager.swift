@@ -479,7 +479,15 @@ final class OasisTreeManager {
     }
 
     private static func ledgerEventCount(modelContext: ModelContext) -> Int {
-        (try? modelContext.fetchCount(FetchDescriptor<CareLedgerEvent>())) ?? 0
+        do {
+            return try modelContext.fetchCount(FetchDescriptor<CareLedgerEvent>())
+        } catch {
+            OhanaLog.warning(
+                "[OasisTreeManager] failed to fetch ledger event count: \(error.localizedDescription)",
+                category: "Oasis"
+            )
+            return 0
+        }
     }
 
     private static func latestLedgerCursor(modelContext: ModelContext) -> LedgerEventCursor? {
@@ -487,8 +495,15 @@ final class OasisTreeManager {
             sortBy: [SortDescriptor(\.occurredAt, order: .reverse)]
         )
         descriptor.fetchLimit = 1
-        let events = (try? modelContext.fetch(descriptor)) ?? []
-        return events.first.map(cursor)
+        do {
+            return try modelContext.fetch(descriptor).first.map(cursor)
+        } catch {
+            OhanaLog.warning(
+                "[OasisTreeManager] failed to fetch latest ledger cursor: \(error.localizedDescription)",
+                category: "Oasis"
+            )
+            return nil
+        }
     }
 
     private static func ledgerEvents(after cursorDate: Date, modelContext: ModelContext) -> [CareLedgerEvent] {
@@ -499,11 +514,27 @@ final class OasisTreeManager {
             sortBy: [SortDescriptor(\.occurredAt)]
         )
         descriptor.fetchLimit = 256
-        return (try? modelContext.fetch(descriptor)) ?? []
+        do {
+            return try modelContext.fetch(descriptor)
+        } catch {
+            OhanaLog.warning(
+                "[OasisTreeManager] failed to fetch ledger events after cursor=\(cursorDate): \(error.localizedDescription)",
+                category: "Oasis"
+            )
+            return []
+        }
     }
 
     private static func allLedgerEvents(modelContext: ModelContext) -> [CareLedgerEvent] {
-        (try? modelContext.fetch(FetchDescriptor<CareLedgerEvent>())) ?? []
+        do {
+            return try modelContext.fetch(FetchDescriptor<CareLedgerEvent>())
+        } catch {
+            OhanaLog.warning(
+                "[OasisTreeManager] failed to fetch all ledger events: \(error.localizedDescription)",
+                category: "Oasis"
+            )
+            return []
+        }
     }
 
     private static func cacheMatchesLatestCursor(
@@ -655,9 +686,18 @@ final class OasisTreeManager {
         for human in humans {
             total += human.workoutLogs.count
         }
-        let plantEventCount = (try? modelContext.fetchCount( // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
-            FetchDescriptor<Event>(predicate: #Predicate { $0.relatedEntityType == "Plant" })
-        )) ?? 0
+        let plantEventCount: Int
+        do {
+            plantEventCount = try modelContext.fetchCount(
+                FetchDescriptor<Event>(predicate: #Predicate { $0.relatedEntityType == "Plant" })
+            )
+        } catch {
+            OhanaLog.warning(
+                "[OasisTreeManager] failed to fetch legacy plant event count: \(error.localizedDescription)",
+                category: "Oasis"
+            )
+            plantEventCount = 0
+        }
         return total + plantEventCount
     }
 

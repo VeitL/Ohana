@@ -211,7 +211,27 @@ enum BackdateCheckInCommandService {
         activeHumanSelection: ActiveHumanSelecting
     ) -> Human? {
         guard let activeID = activeHumanSelection.currentHumanId else { return nil }
-        return (try? context.fetch(FetchDescriptor<Human>()))?.first { $0.id.uuidString == activeID } // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
+        guard let id = UUID(uuidString: activeID) else {
+            OhanaLog.warning(
+                "[BackdateCheckInCommandService] active humanId=\(activeID) is invalid",
+                category: "Economy"
+            )
+            return nil
+        }
+        let descriptor = FetchDescriptor<Human>(
+            predicate: #Predicate<Human> { human in
+                human.id == id
+            }
+        )
+        do {
+            return try context.fetch(descriptor).first
+        } catch {
+            OhanaLog.warning(
+                "[BackdateCheckInCommandService] failed to fetch active humanId=\(activeID): \(error.localizedDescription)",
+                category: "Economy"
+            )
+            return nil
+        }
     }
 }
 
@@ -339,12 +359,11 @@ enum ShopPurchaseCommandService {
         } catch {
             context.rollback()
             wallet.refreshQuestProjection(context: context, manager: providedQuestManager)
-            let failure: ShopPurchaseFailure
-            if let walletError = error as? CoconutWalletError,
-               case let .insufficientBalance(_, missing) = walletError {
-                failure = .insufficientBalance(missing: missing)
+            let failure: ShopPurchaseFailure = if let walletError = error as? CoconutWalletError,
+                                                  case let .insufficientBalance(_, missing) = walletError {
+                .insufficientBalance(missing: missing)
             } else {
-                failure = .persistenceFailed
+                .persistenceFailed
             }
             return ShopPurchaseCommandResult(
                 humanID: buyer.id,
@@ -462,12 +481,11 @@ enum PetBondVaultUnlockCommandService {
         } catch {
             context.rollback()
             wallet.refreshQuestProjection(context: context, manager: providedQuestManager)
-            let failure: PetBondVaultUnlockFailure
-            if let walletError = error as? CoconutWalletError,
-               case .insufficientBalance = walletError {
-                failure = .insufficientBalance
+            let failure: PetBondVaultUnlockFailure = if let walletError = error as? CoconutWalletError,
+                                                        case .insufficientBalance = walletError {
+                .insufficientBalance
             } else {
-                failure = .persistenceFailed
+                .persistenceFailed
             }
             return PetBondVaultUnlockCommandResult(
                 petID: pet.id,

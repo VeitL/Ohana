@@ -360,6 +360,8 @@ struct DailyStreakDetailView: View {
                         .frame(width: 36, height: 36) // a11y: allow decorative non-interactive frame; hit area handled by parent
                         .background(Color.ohanaControlFill, in: Circle())
                 }
+                .buttonStyle(ScaleButtonStyle())
+                .accessibilityLabel("上个月")
 
                 Spacer()
 
@@ -369,20 +371,19 @@ struct DailyStreakDetailView: View {
 
                 Spacer()
 
-                Button {
-                    shiftCheckInMonth(by: 1)
-                } label: {
-                    Image(systemName: "chevron.right") // a11y: allow decorative icon covered by surrounding text or control
-                        .font(OhanaFont.adaptive(size: 14, weight: .bold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                        .foregroundStyle(
-                            cal.isDate(selectedMonth, equalTo: Date(), toGranularity: .month)
-                                ? Color.ohanaPrimaryText.opacity(0.15)
-                                : Color.ohanaPrimaryText.opacity(0.5)
-                        )
-                        .frame(width: 36, height: 36) // a11y: allow decorative non-interactive frame; hit area handled by parent
-                        .background(Color.ohanaControlFill, in: Circle())
+                let canMoveForward = !cal.isDate(selectedMonth, equalTo: Date(), toGranularity: .month)
+                if canMoveForward {
+                    Button {
+                        shiftCheckInMonth(by: 1)
+                    } label: {
+                        nextMonthIcon(isEnabled: true)
+                    }
+                    .buttonStyle(ScaleButtonStyle())
+                    .accessibilityLabel("下个月")
+                } else {
+                    nextMonthIcon(isEnabled: false)
+                        .accessibilityLabel("已经是当前月份")
                 }
-                .disabled(cal.isDate(selectedMonth, equalTo: Date(), toGranularity: .month))
             }
 
             HStack(spacing: 0) {
@@ -475,9 +476,20 @@ struct DailyStreakDetailView: View {
         .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
     }
 
+    private func nextMonthIcon(isEnabled: Bool) -> some View {
+        Image(systemName: "chevron.right") // a11y: allow decorative icon covered by surrounding text or control
+            .font(OhanaFont.adaptive(size: 14, weight: .bold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+            .foregroundStyle(isEnabled ? Color.ohanaPrimaryText.opacity(0.5) : Color.ohanaPrimaryText.opacity(0.15))
+            .frame(width: 36, height: 36) // a11y: allow decorative non-interactive frame; hit area handled by parent
+            .background(
+                isEnabled ? Color.ohanaControlFill : Color.ohanaControlFill.opacity(0.72),
+                in: Circle()
+            )
+    }
+
     private func lockedShopLabel(level: Int) -> some View {
         HStack(spacing: 4) {
-            Image(systemName: "lock.fill")
+            Image(systemName: "lock.fill") // a11y: allow decorative lock icon; capsule label describes the locked shop.
                 .font(OhanaFont.adaptive(size: 9, weight: .black))
                 .accessibilityHidden(true)
             Text("商店 Lv.\(level) 解锁")
@@ -605,48 +617,59 @@ struct DailyStreakDetailView: View {
     @ViewBuilder
     private func calendarDayCell(_ cell: CalendarCell) -> some View {
         if cell.dateStr.isEmpty {
-            Color.clear.frame(height: 40)
+            Color.clear.frame(minHeight: 40)
         } else {
-            Button {
-                if !cell.isChecked, !cell.isToday, !cell.isFuture, makeupPackCount > 0 {
+            if isMakeupEligible(cell) {
+                Button {
                     showMakeupConfirm = cell.dateStr
+                } label: {
+                    calendarDayCellContent(cell)
                 }
-            } label: {
-                ZStack {
-                    Circle()
-                        .fill(cellFillColor(cell))
-                        .frame(width: 36, height: 36) // a11y: allow decorative non-interactive frame; hit area handled by parent
-                        .overlay(
-                            Circle().strokeBorder(
-                                cell.isToday ? Color.goPrimary : .clear,
-                                lineWidth: 1.5
-                            )
-                        )
-                    if cell.isChecked {
-                        if cell.isMakeup {
-                            Image(systemName: "arrow.uturn.backward") // a11y: allow decorative icon covered by surrounding text or control
-                                .font(OhanaFont.adaptive(size: 9, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                                .foregroundStyle(Color.ohanaPrimaryActionText.opacity(0.72))
-                        } else {
-                            Image(systemName: "checkmark") // a11y: allow decorative icon covered by surrounding text or control
-                                .font(OhanaFont.adaptive(size: 10, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                                .foregroundStyle(Color.ohanaPrimaryActionText)
-                        }
-                    } else {
-                        Text("\(cell.day)")
-                            .font(OhanaFont.adaptive(size: 13, weight: cell.isToday ? .black : .medium, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                            .foregroundStyle(
-                                cell.isFuture ? Color.ohanaPrimaryText.opacity(0.2) :
-                                    cell.isToday ? Color.goPrimary :
-                                    Color.ohanaPrimaryText.opacity(0.7)
-                            )
-                    }
-                }
-                .frame(height: 40)
+                .buttonStyle(ScaleButtonStyle())
+                .accessibilityLabel("补签 \(cell.dateStr)")
+            } else {
+                calendarDayCellContent(cell)
             }
-            .buttonStyle(ScaleButtonStyle())
-            .disabled(cell.isChecked || cell.isToday || cell.isFuture || makeupPackCount == 0)
         }
+    }
+
+    private func isMakeupEligible(_ cell: CalendarCell) -> Bool {
+        !cell.isChecked && !cell.isToday && !cell.isFuture && makeupPackCount > 0
+    }
+
+    private func calendarDayCellContent(_ cell: CalendarCell) -> some View {
+        ZStack {
+            Circle()
+                .fill(cellFillColor(cell))
+                .frame(width: 36, height: 36) // a11y: allow decorative non-interactive frame; hit area handled by parent
+                .overlay(
+                    Circle().strokeBorder(
+                        cell.isToday ? Color.goPrimary : .clear,
+                        lineWidth: 1.5
+                    )
+                )
+            if cell.isChecked {
+                if cell.isMakeup {
+                    Image(systemName: "arrow.uturn.backward") // a11y: allow decorative icon covered by surrounding text or control
+                        .font(OhanaFont.adaptive(size: 9, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                        .foregroundStyle(Color.ohanaPrimaryActionText.opacity(0.72))
+                } else {
+                    Image(systemName: "checkmark") // a11y: allow decorative icon covered by surrounding text or control
+                        .font(OhanaFont.adaptive(size: 10, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                        .foregroundStyle(Color.ohanaPrimaryActionText)
+                }
+            } else {
+                Text("\(cell.day)")
+                    .font(OhanaFont.adaptive(size: 13, weight: cell.isToday ? .black : .medium, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                    .foregroundStyle(
+                        cell.isFuture ? Color.ohanaPrimaryText.opacity(0.2) :
+                            cell.isToday ? Color.goPrimary :
+                            Color.ohanaPrimaryText.opacity(0.7)
+                    )
+            }
+        }
+        .frame(maxWidth: .infinity, minHeight: 40)
+        .contentShape(Rectangle())
     }
 
     private func cellFillColor(_ cell: CalendarCell) -> Color {

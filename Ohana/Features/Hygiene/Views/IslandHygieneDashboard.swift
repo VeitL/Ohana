@@ -56,10 +56,19 @@ private struct HygienePetSummary: Identifiable {
     let latestDate: Date?
 }
 
+private struct HygieneDashboardAction: Identifiable, Hashable {
+    let id: UUID
+    let petId: UUID
+    let date: Date
+    let eventKind: CareLedgerEventKind
+    let actionType: String
+}
+
 struct IslandHygieneDashboardContentView: View {
     var standalone: Bool = true
     var onOpenPet: ((Pet) -> Void)?
     let pets: [Pet]
+    let careLedgerEvents: [CareLedgerEvent]
 
     @Environment(\.dismiss) private var dismiss
     @AppStorage("appLanguage") private var appLanguage = AppLanguage.fallbackCode
@@ -82,6 +91,37 @@ struct IslandHygieneDashboardContentView: View {
 
     private var hygieneCareTypes: Set<CareType> {
         [.litter, .waterChange, .filterClean, .cageCleaning, .misting, .substrateChange]
+    }
+
+    private var hygieneDashboardActions: [HygieneDashboardAction] {
+        careLedgerEvents.compactMap { event in
+            guard event.subjectKind == CareLedgerSubjectKind.pet.rawValue,
+                  let subjectId = event.subjectId,
+                  let petId = UUID(uuidString: subjectId) else { return nil }
+
+            switch event.eventKindEnum {
+            case .hygiene:
+                guard HygieneType(rawValue: event.actionType) != nil else { return nil }
+            case .care:
+                guard let careType = CareType(rawValue: event.actionType),
+                      hygieneCareTypes.contains(careType) else { return nil }
+            default:
+                return nil
+            }
+
+            return HygieneDashboardAction(
+                id: event.id,
+                petId: petId,
+                date: event.occurredAt,
+                eventKind: event.eventKindEnum,
+                actionType: event.actionType
+            )
+        }
+        .sorted { $0.date > $1.date }
+    }
+
+    private var hygieneDashboardActionsByPetId: [UUID: [HygieneDashboardAction]] {
+        Dictionary(grouping: hygieneDashboardActions, by: \.petId)
     }
 
     private var todayCount: Int {
@@ -489,35 +529,47 @@ struct IslandHygieneDashboardContentView: View {
     }
 
     private func hygieneActionCount(for pet: Pet, matching dateMatches: (Date) -> Bool) -> Int {
-        let hygiene = pet.hygieneLogs.count(where: { dateMatches($0.date) })
-        let care = pet.careLogs.count(where: { hygieneCareTypes.contains($0.careType) && dateMatches($0.date) })
-        return hygiene + care
+        hygieneDashboardActions(for: pet).count { dateMatches($0.date) }
     }
 
     private func hygieneActionDates(for pet: Pet) -> [Date] {
-        pet.hygieneLogs.map(\.date) + pet.careLogs.filter { hygieneCareTypes.contains($0.careType) }.map(\.date)
+        hygieneDashboardActions(for: pet).map(\.date)
     }
 
     private func latestAction(for pet: Pet) -> (title: String, date: Date)? {
-        let hygiene = pet.hygieneLogs.map {
-            (l.tr(zh: "护理", en: "Care", de: "Pflege") + " · \($0.hygieneType.rawValue)", $0.date)
-        }
-        let care = pet.careLogs
-            .filter { hygieneCareTypes.contains($0.careType) }
-            .map {
-                (l.tr(zh: "清洁", en: "Clean", de: "Reinigung") + " · \($0.careType.rawValue)", $0.date)
-            }
-        return (hygiene + care).max { $0.1 < $1.1 }
+        hygieneDashboardActions(for: pet)
+            .map { (hygieneActionTitle(for: $0), $0.date) }
+            .max { $0.1 < $1.1 }
     }
 
     private func overdueTypes(for pet: Pet) -> [HygieneType] {
         HygieneType.allCases.filter { type in
             let cycle = type.effectiveCycleDays(for: pet.id)
-            guard let last = pet.hygieneLogs.filter({ $0.type == type.rawValue }).max(by: { $0.date < $1.date }) else {
+            guard let last = hygieneDashboardActions(for: pet).first(where: {
+                $0.eventKind == .hygiene &&
+                    $0.actionType == type.rawValue
+            }) else {
                 return false
             }
             let days = Calendar.current.dateComponents([.day], from: last.date, to: Date()).day ?? 0
             return days >= cycle
+        }
+    }
+
+    private func hygieneDashboardActions(for pet: Pet) -> [HygieneDashboardAction] {
+        hygieneDashboardActionsByPetId[pet.id] ?? []
+    }
+
+    private func hygieneActionTitle(for action: HygieneDashboardAction) -> String {
+        switch action.eventKind {
+        case .hygiene:
+            let type = HygieneType(rawValue: action.actionType)?.rawValue ?? action.actionType
+            return l.tr(zh: "护理", en: "Care", de: "Pflege") + " · \(type)"
+        case .care:
+            let type = CareType(rawValue: action.actionType)?.rawValue ?? action.actionType
+            return l.tr(zh: "清洁", en: "Clean", de: "Reinigung") + " · \(type)"
+        default:
+            return action.actionType
         }
     }
 

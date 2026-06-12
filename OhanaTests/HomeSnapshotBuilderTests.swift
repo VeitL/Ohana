@@ -5,6 +5,127 @@ import Testing
 
 @MainActor
 struct HomeSnapshotBuilderTests {
+    @Test func pottyDashboardLedgerEntriesFilterPetPottyEvents() {
+        let petId = UUID()
+        let otherPetId = UUID()
+        let older = Date(timeIntervalSince1970: 100)
+        let newer = Date(timeIntervalSince1970: 200)
+        let olderEvent = CareLedgerEvent(
+            id: UUID(),
+            occurredAt: older,
+            subjectKind: .pet,
+            subjectId: petId.uuidString,
+            eventKind: .potty,
+            actionType: PottyType.pee.rawValue
+        )
+        let newerEvent = CareLedgerEvent(
+            id: UUID(),
+            occurredAt: newer,
+            subjectKind: .pet,
+            subjectId: petId.uuidString,
+            eventKind: .potty,
+            actionType: PottyType.softPoop.rawValue
+        )
+        let otherPetEvent = CareLedgerEvent(
+            subjectKind: .pet,
+            subjectId: otherPetId.uuidString,
+            eventKind: .potty,
+            actionType: PottyType.perfectPoop.rawValue
+        )
+        let wrongKindEvent = CareLedgerEvent(
+            subjectKind: .pet,
+            subjectId: petId.uuidString,
+            eventKind: .care,
+            actionType: CareType.litter.rawValue
+        )
+        let invalidTypeEvent = CareLedgerEvent(
+            subjectKind: .pet,
+            subjectId: petId.uuidString,
+            eventKind: .potty,
+            actionType: "not-a-potty-type"
+        )
+
+        let entries = IslandPottyDashboardLedgerEntry.entries(
+            from: [olderEvent, otherPetEvent, wrongKindEvent, invalidTypeEvent, newerEvent],
+            petIds: [petId]
+        )
+
+        #expect(entries.map(\.id) == [newerEvent.id, olderEvent.id])
+        #expect(entries.map(\.pottyType) == [.softPoop, .pee])
+        #expect(entries.allSatisfy { $0.petId == petId })
+    }
+
+    @Test func petWeightLedgerEntriesFilterPetWeightEvents() {
+        let petId = UUID()
+        let otherPetId = UUID()
+        let legacyLogId = UUID()
+        let older = Date(timeIntervalSince1970: 100)
+        let newer = Date(timeIntervalSince1970: 200)
+        let olderEvent = CareLedgerEvent(
+            id: UUID(),
+            occurredAt: older,
+            subjectKind: .pet,
+            subjectId: petId.uuidString,
+            eventKind: .weight,
+            actionType: "petWeight",
+            amountValue: 4.2,
+            amountUnit: "kg",
+            legacyModelName: "PetWeightLog",
+            legacyModelId: legacyLogId.uuidString
+        )
+        let newerEvent = CareLedgerEvent(
+            id: UUID(),
+            occurredAt: newer,
+            subjectKind: .pet,
+            subjectId: petId.uuidString,
+            eventKind: .weight,
+            actionType: "petWeight",
+            amountValue: 4.8,
+            amountUnit: "kg"
+        )
+        let otherPetEvent = CareLedgerEvent(
+            subjectKind: .pet,
+            subjectId: otherPetId.uuidString,
+            eventKind: .weight,
+            actionType: "petWeight",
+            amountValue: 6.1,
+            amountUnit: "kg"
+        )
+        let wrongKindEvent = CareLedgerEvent(
+            subjectKind: .pet,
+            subjectId: petId.uuidString,
+            eventKind: .expense,
+            actionType: "petWeight",
+            amountValue: 12,
+            amountUnit: "currency"
+        )
+        let wrongActionEvent = CareLedgerEvent(
+            subjectKind: .pet,
+            subjectId: petId.uuidString,
+            eventKind: .weight,
+            actionType: "humanWeight",
+            amountValue: 70,
+            amountUnit: "kg"
+        )
+        let zeroEvent = CareLedgerEvent(
+            subjectKind: .pet,
+            subjectId: petId.uuidString,
+            eventKind: .weight,
+            actionType: "petWeight",
+            amountValue: 0,
+            amountUnit: "kg"
+        )
+
+        let entries = PetWeightLedgerEntry.entries(
+            from: [olderEvent, otherPetEvent, wrongKindEvent, wrongActionEvent, zeroEvent, newerEvent],
+            petId: petId
+        )
+
+        #expect(entries.map(\.id) == [newerEvent.id, olderEvent.id])
+        #expect(entries.map(\.weightKilograms) == [4.8, 4.2])
+        #expect(entries.last?.legacyLogId == legacyLogId)
+    }
+
     @Test func snapshotOrdersVisiblePetsHumansAndCrittersByCreationDate() throws {
         let olderPet = Pet(name: "Momo", species: "猫")
         olderPet.createdAt = Date(timeIntervalSince1970: 10)
@@ -287,9 +408,11 @@ struct HomeSnapshotBuilderTests {
             pendingReminders: [],
             humanMedications: [],
             humanMedicationLogs: [],
-            careLogs: [],
-            walkLogs: [],
-            pottyLogs: [],
+            todayFocusCareLedgerEntries: [],
+            feedingLedgerEntries: [],
+            careLedgerEntries: [],
+            walkLedgerEntries: [],
+            pottyLedgerEntries: [],
             humanWeightLogs: [],
             familyTasks: [],
             exchangeRequests: [],
@@ -367,9 +490,7 @@ private final class TestTodayFocusManager: TodayFocusManaging {
         pets _: [Pet],
         humans _: [Human],
         events _: [Event],
-        careLogs _: [PetCareLog],
-        walkLogs _: [PetWalkLog],
-        pottyLogs _: [PetPottyLog],
+        careLedgerEntries _: [TodayFocusCareLedgerEntry],
         humanWeightLogs _: [HumanWeightLog],
         calendar _: Calendar,
         now _: Date

@@ -72,6 +72,21 @@ struct OhanaTests {
     }
 
     @MainActor
+    @Test func questManagerHumanLookupUsesExecutorIdPredicate() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let first = Human(name: "First")
+        let target = Human(name: "Target")
+        context.insert(first)
+        context.insert(target)
+        try context.save()
+
+        let manager = QuestManager()
+        #expect(manager.human(withId: target.id.uuidString, context: context)?.id == target.id)
+        #expect(manager.human(withId: UUID().uuidString, context: context) == nil)
+    }
+
+    @MainActor
     @Test func coconutEconomyV2CooldownRecordsDataButReducesReward() async throws {
         let userKey = "policy-cooldown-\(UUID().uuidString)"
         let date = dateForTest(year: 2026, month: 6, day: 9)
@@ -964,6 +979,248 @@ struct OhanaTests {
     }
 
     @MainActor
+    @Test func careEventServiceRecordCareFactLinksPottyLedgerAndQuickReminder() async throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let pet = Pet(name: "Momo", species: "猫")
+        context.insert(pet)
+        try context.save()
+
+        let economy = CareEventEconomyAwarderSpy(reward: (humanGot: 2, petGot: 1))
+        let quickReminders = QuickActionReminderCompleterSpy()
+        let dependencies = CareEventServiceDependencies(
+            questManager: QuestManager(),
+            economy: economy,
+            careLedger: CareLedgerService(),
+            reminderCompletion: NoopReminderCompleter(),
+            quickActionReminderCompletion: quickReminders,
+            familyTasks: FamilyTaskManagerSpy(),
+            revisions: SharedDomainRevisionPublisher()
+        )
+        let date = dateForTest(year: 2026, month: 6, day: 12, hour: 10)
+
+        let recorded = CareEventService.recordCareFact(
+            pet: pet,
+            type: .litter,
+            context: context,
+            executorId: "human-1",
+            reward: .potty(isLitter: true),
+            date: date,
+            createsLinkedPottyLog: true,
+            dependencies: dependencies
+        )
+
+        let careLogs = try context.fetch(FetchDescriptor<PetCareLog>())
+        let pottyLogs = try context.fetch(FetchDescriptor<PetPottyLog>())
+        let ledger = try context.fetch(FetchDescriptor<CareLedgerEvent>())
+        let careLedger = try #require(ledger.first { $0.legacyModelName == "PetCareLog" })
+        let pottyLedger = try #require(ledger.first { $0.legacyModelName == "PetPottyLog" })
+        let awardCall = try #require(economy.careAwardCalls.first)
+        let quickReminderCall = try #require(quickReminders.careCalls.first)
+
+        #expect(recorded.result.logID == careLogs.first?.id)
+        #expect(recorded.result.linkedPottyLogID == pottyLogs.first?.id)
+        #expect(recorded.result.coconutDelta == 3)
+        #expect(recorded.reward.humanGot == 2)
+        #expect(recorded.reward.petGot == 1)
+        #expect(careLogs.count == 1)
+        #expect(careLogs.first?.careType == .litter)
+        #expect(careLogs.first?.executorId == "human-1")
+        #expect(pottyLogs.count == 1)
+        #expect(pottyLogs.first?.pottyType == .perfectPoop)
+        #expect(pottyLogs.first?.executorId == "human-1")
+        #expect(ledger.count == 2)
+        #expect(careLedger.eventKindEnum == .care)
+        #expect(careLedger.actionType == CareType.litter.rawValue)
+        #expect(careLedger.coconutDelta == 3)
+        #expect(careLedger.legacyModelId == careLogs.first?.id.uuidString)
+        #expect(pottyLedger.eventKindEnum == .potty)
+        #expect(pottyLedger.actionType == PottyType.perfectPoop.rawValue)
+        #expect(pottyLedger.coconutDelta == 0)
+        #expect(pottyLedger.legacyModelId == pottyLogs.first?.id.uuidString)
+        #expect(awardCall.action == "litter")
+        #expect(awardCall.petID == pet.id)
+        #expect(quickReminderCall.petID == pet.id)
+        #expect(quickReminderCall.careType == .litter)
+        #expect(quickReminderCall.executorId == "human-1")
+        #expect(quickReminderCall.now == date)
+    }
+
+    @MainActor
+    @Test func careEventServiceRecordPottyLinksLedgerRewardAndQuickReminder() async throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let pet = Pet(name: "Momo", species: "猫")
+        context.insert(pet)
+        try context.save()
+
+        let economy = CareEventEconomyAwarderSpy(reward: (humanGot: 5, petGot: 2))
+        let quickReminders = QuickActionReminderCompleterSpy()
+        let dependencies = CareEventServiceDependencies(
+            questManager: QuestManager(),
+            economy: economy,
+            careLedger: CareLedgerService(),
+            reminderCompletion: NoopReminderCompleter(),
+            quickActionReminderCompletion: quickReminders,
+            familyTasks: FamilyTaskManagerSpy(),
+            revisions: SharedDomainRevisionPublisher()
+        )
+        let date = dateForTest(year: 2026, month: 6, day: 12, hour: 11)
+
+        let reward = CareEventService.recordPotty(
+            pet: pet,
+            type: .softPoop,
+            context: context,
+            executorId: "human-1",
+            date: date,
+            dependencies: dependencies
+        )
+
+        let logs = try context.fetch(FetchDescriptor<PetPottyLog>())
+        let log = try #require(logs.first)
+        let ledger = try context.fetch(FetchDescriptor<CareLedgerEvent>())
+        let pottyLedger = try #require(ledger.first)
+        let awardCall = try #require(economy.careAwardCalls.first)
+        let quickReminderCall = try #require(quickReminders.pottyCalls.first)
+
+        #expect(reward.humanGot == 5)
+        #expect(reward.petGot == 2)
+        #expect(logs.count == 1)
+        #expect(log.pottyType == .softPoop)
+        #expect(log.pet?.id == pet.id)
+        #expect(log.executorId == "human-1")
+        #expect(ledger.count == 1)
+        #expect(pottyLedger.eventKindEnum == .potty)
+        #expect(pottyLedger.actionType == PottyType.softPoop.rawValue)
+        #expect(pottyLedger.actorId == "human-1")
+        #expect(pottyLedger.subjectId == pet.id.uuidString)
+        #expect(pottyLedger.legacyModelName == "PetPottyLog")
+        #expect(pottyLedger.legacyModelId == log.id.uuidString)
+        #expect(pottyLedger.coconutDelta == 7)
+        #expect(awardCall.action == "potty")
+        #expect(awardCall.petID == pet.id)
+        #expect(awardCall.quality == "none")
+        #expect(quickReminderCall.petID == pet.id)
+        #expect(quickReminderCall.executorId == "human-1")
+        #expect(quickReminderCall.now == date)
+    }
+
+    @MainActor
+    @Test func careEventServiceRecordHygieneFactLinksLedgerRewardAndQuickReminder() async throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let pet = Pet(name: "Momo", species: "猫")
+        context.insert(pet)
+        try context.save()
+
+        let economy = CareEventEconomyAwarderSpy(reward: (humanGot: 3, petGot: 1))
+        let quickReminders = QuickActionReminderCompleterSpy()
+        let dependencies = CareEventServiceDependencies(
+            questManager: QuestManager(),
+            economy: economy,
+            careLedger: CareLedgerService(),
+            reminderCompletion: NoopReminderCompleter(),
+            quickActionReminderCompletion: quickReminders,
+            familyTasks: FamilyTaskManagerSpy(),
+            revisions: SharedDomainRevisionPublisher()
+        )
+        let date = dateForTest(year: 2026, month: 6, day: 12, hour: 15)
+
+        let recorded = CareEventService.recordHygieneFact(
+            pet: pet,
+            type: .brushing,
+            context: context,
+            executorId: "human-1",
+            date: date,
+            dependencies: dependencies
+        )
+
+        let logs = try context.fetch(FetchDescriptor<PetHygieneLog>())
+        let log = try #require(logs.first)
+        let ledger = try context.fetch(FetchDescriptor<CareLedgerEvent>())
+        let hygieneLedger = try #require(ledger.first)
+        let awardCall = try #require(economy.careAwardCalls.first)
+        let quickReminderCall = try #require(quickReminders.hygieneCalls.first)
+
+        #expect(recorded.result.logID == log.id)
+        #expect(recorded.result.subjectID == pet.id)
+        #expect(recorded.result.hygieneType == .brushing)
+        #expect(recorded.result.coconutDelta == 4)
+        #expect(recorded.reward.humanGot == 3)
+        #expect(recorded.reward.petGot == 1)
+        #expect(logs.count == 1)
+        #expect(log.hygieneType == .brushing)
+        #expect(log.pet?.id == pet.id)
+        #expect(log.executorId == "human-1")
+        #expect(ledger.count == 1)
+        #expect(hygieneLedger.eventKindEnum == .hygiene)
+        #expect(hygieneLedger.actionType == HygieneType.brushing.rawValue)
+        #expect(hygieneLedger.actorId == "human-1")
+        #expect(hygieneLedger.subjectId == pet.id.uuidString)
+        #expect(hygieneLedger.legacyModelName == "PetHygieneLog")
+        #expect(hygieneLedger.legacyModelId == log.id.uuidString)
+        #expect(hygieneLedger.coconutDelta == 4)
+        #expect(awardCall.action == "care.\(HygieneType.brushing.rawValue)")
+        #expect(awardCall.petID == pet.id)
+        #expect(quickReminderCall.petID == pet.id)
+        #expect(quickReminderCall.hygieneType == .brushing)
+        #expect(quickReminderCall.executorId == "human-1")
+        #expect(quickReminderCall.now == date)
+    }
+
+    @MainActor
+    @Test func careEventServicePlannedCareWithoutEventWritesNoFacts() async throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let pet = Pet(name: "Momo", species: "猫")
+        let feedReminder = Reminder(scheduledAt: dateForTest(year: 2026, month: 6, day: 12, hour: 8))
+        let waterReminder = Reminder(scheduledAt: dateForTest(year: 2026, month: 6, day: 12, hour: 9))
+        context.insert(pet)
+        context.insert(feedReminder)
+        context.insert(waterReminder)
+        try context.save()
+
+        let economy = CareEventEconomyAwarderSpy(reward: (humanGot: 9, petGot: 9))
+        let familyTasks = FamilyTaskManagerSpy()
+        let dependencies = CareEventServiceDependencies(
+            questManager: QuestManager(),
+            economy: economy,
+            careLedger: CareLedgerService(),
+            reminderCompletion: NoopReminderCompleter(),
+            quickActionReminderCompletion: NoopQuickActionReminderCompleter(),
+            familyTasks: familyTasks,
+            revisions: SharedDomainRevisionPublisher()
+        )
+
+        let feedReward = CareEventService.completePlannedFeed(
+            pet: pet,
+            reminder: feedReminder,
+            context: context,
+            executorId: "human-1",
+            date: feedReminder.scheduledAt,
+            dependencies: dependencies
+        )
+        let waterReward = CareEventService.completePlannedWater(
+            pet: pet,
+            reminder: waterReminder,
+            amountMl: 120,
+            context: context,
+            executorId: "human-1",
+            date: waterReminder.scheduledAt,
+            dependencies: dependencies
+        )
+
+        #expect(feedReward?.humanGot == nil)
+        #expect(waterReward?.humanGot == nil)
+        #expect(try context.fetch(FetchDescriptor<PetCareLog>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<CareLedgerEvent>()).isEmpty)
+        #expect(feedReminder.statusEnum == .pending)
+        #expect(waterReminder.statusEnum == .pending)
+        #expect(economy.careAwardCalls.isEmpty)
+        #expect(familyTasks.completedReminderIDs.isEmpty)
+    }
+
+    @MainActor
     @Test func reminderCompletionServiceWritesLedgerEvent() async throws {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
@@ -1069,6 +1326,97 @@ struct OhanaTests {
     }
 
     @MainActor
+    @Test func reminderCompletionServiceReopenSyncsFamilyTasks() async throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let event = Event(title: "Feed", relatedEntityType: EntityKind.pet.rawValue, relatedEntityId: UUID().uuidString)
+        let reminder = Reminder(event: event, scheduledAt: Date().addingTimeInterval(3600))
+        reminder.statusEnum = .completed
+        reminder.completedAt = Date()
+        context.insert(event)
+        context.insert(reminder)
+        try context.save()
+
+        let familyTasks = FamilyTaskManagerSpy()
+
+        ReminderCompletionService.reopen(
+            reminder,
+            by: "human-1",
+            context: context,
+            reschedule: false,
+            familyTasks: familyTasks
+        )
+
+        #expect(reminder.statusEnum == .pending)
+        #expect(reminder.completedAt == nil)
+        #expect(reminder.completedBy == "human-1")
+        #expect(familyTasks.reopenedReminderIDs == [reminder.id])
+    }
+
+    @MainActor
+    @Test func familyTaskServiceSyncReopenedReminderReopensCompletedTaskOnly() async throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let scheduledAt = dateForTest(year: 2026, month: 6, day: 12, hour: 9)
+        let completedAt = dateForTest(year: 2026, month: 6, day: 12, hour: 9, minute: 30)
+        let event = Event(title: "Feed Momo", relatedEntityType: EntityKind.pet.rawValue, relatedEntityId: UUID().uuidString)
+        let reminder = Reminder(event: event, scheduledAt: scheduledAt)
+        let completedTask = FamilyCollaborationTask(
+            title: "Feed Momo",
+            kind: .careReminder,
+            status: .completed,
+            relatedEventId: event.id.uuidString,
+            relatedReminderId: reminder.id.uuidString,
+            createdById: "parent",
+            createdByName: "Parent",
+            assignedToId: "human-1",
+            assignedToName: "Kid",
+            dueAt: scheduledAt
+        )
+        completedTask.completedAt = completedAt
+        completedTask.completedById = "human-1"
+        completedTask.completedByName = "Kid"
+
+        let reviewEvent = Event(title: "Bounty", relatedEntityType: EntityKind.pet.rawValue, relatedEntityId: UUID().uuidString)
+        let reviewReminder = Reminder(event: reviewEvent, scheduledAt: scheduledAt)
+        let pendingReviewTask = FamilyCollaborationTask(
+            title: "Bounty",
+            kind: .careReminder,
+            status: .pendingReview,
+            relatedEventId: reviewEvent.id.uuidString,
+            relatedReminderId: reviewReminder.id.uuidString,
+            createdById: "parent",
+            createdByName: "Parent",
+            assignedToId: "human-1",
+            assignedToName: "Kid",
+            rewardCoconuts: 10,
+            dueAt: scheduledAt
+        )
+        pendingReviewTask.completedAt = completedAt
+        pendingReviewTask.completedById = "human-1"
+        pendingReviewTask.completedByName = "Kid"
+        context.insert(event)
+        context.insert(reminder)
+        context.insert(completedTask)
+        context.insert(reviewEvent)
+        context.insert(reviewReminder)
+        context.insert(pendingReviewTask)
+        try context.save()
+
+        FamilyTaskService.syncReopenedReminder(reminder, context: context)
+        FamilyTaskService.syncReopenedReminder(reviewReminder, context: context)
+
+        #expect(completedTask.status == .active)
+        #expect(completedTask.completedAt == nil)
+        #expect(completedTask.completedById == nil)
+        #expect(completedTask.completedByName == nil)
+        #expect(pendingReviewTask.status == .pendingReview)
+        #expect(pendingReviewTask.completedAt == completedAt)
+        #expect(pendingReviewTask.completedById == "human-1")
+        #expect(pendingReviewTask.completedByName == "Kid")
+    }
+
+    @MainActor
     @Test func plannedFeedCompletionArchivesReminderAndActualCareLog() async throws {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
@@ -1093,6 +1441,92 @@ struct OhanaTests {
         #expect(event.isOccurrenceMarkedComplete(on: reminder.scheduledAt))
         #expect(ledger.contains { $0.actionType == "completePlannedCare" && $0.sourceReminderId == reminder.id.uuidString })
         #expect(ledger.contains { $0.eventKindEnum == .care && $0.sourceEventId == event.id.uuidString && $0.sourceReminderId == reminder.id.uuidString })
+    }
+
+    @MainActor
+    @Test func careEventServicePlannedFeedLinksRewardReminderFamilyTaskAndLedger() async throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let pet = Pet(name: "Momo", species: "猫")
+        let scheduledAt = dateForTest(year: 2026, month: 5, day: 8, hour: 8)
+        let event = Event(
+            title: "早餐",
+            startDate: scheduledAt,
+            eventType: EventType.foodChange.rawValue,
+            relatedEntityType: EntityKind.pet.rawValue,
+            relatedEntityId: pet.id.uuidString
+        )
+        event.feedRuleKindRaw = FeedRuleKind.manualReminder.rawValue
+        event.feedAmountGrams = 52
+        event.foodKindRaw = FeedFoodKind.wet.rawValue
+        let reminder = Reminder(event: event, scheduledAt: scheduledAt)
+        context.insert(pet)
+        context.insert(event)
+        context.insert(reminder)
+        try context.save()
+
+        let economy = CareEventEconomyAwarderSpy(reward: (humanGot: 4, petGot: 2))
+        let familyTasks = FamilyTaskManagerSpy()
+        let questManager = QuestManager()
+        questManager.isFirstMealRecorded = true
+        let dependencies = CareEventServiceDependencies(
+            questManager: questManager,
+            economy: economy,
+            careLedger: CareLedgerService(),
+            reminderCompletion: NoopReminderCompleter(),
+            quickActionReminderCompletion: NoopQuickActionReminderCompleter(),
+            familyTasks: familyTasks,
+            revisions: SharedDomainRevisionPublisher()
+        )
+
+        let reward = CareEventService.completePlannedFeed(
+            pet: pet,
+            reminder: reminder,
+            context: context,
+            quality: .precise,
+            executorId: "human-1",
+            date: scheduledAt,
+            dependencies: dependencies
+        )
+
+        let logs = try context.fetch(FetchDescriptor<PetCareLog>())
+        let log = try #require(logs.first)
+        let ledger = try context.fetch(FetchDescriptor<CareLedgerEvent>())
+        let reminderLedger = try #require(ledger.first { $0.actionType == "completePlannedCare" })
+        let careLedger = try #require(ledger.first { $0.legacyModelName == "PetCareLog" })
+        let awardCall = try #require(economy.careAwardCalls.first)
+
+        #expect(reward?.humanGot == 4)
+        #expect(reward?.petGot == 2)
+        #expect(logs.count == 1)
+        #expect(log.careType == .feeding)
+        #expect(log.amountGrams == 52)
+        #expect(log.foodKind == .wet)
+        #expect(log.pet?.id == pet.id)
+        #expect(reminder.statusEnum == .completed)
+        #expect(reminder.completedAt == scheduledAt)
+        #expect(reminder.completedBy == "human-1")
+        #expect(event.isOccurrenceMarkedComplete(on: scheduledAt))
+        #expect(economy.careAwardCalls.count == 1)
+        #expect(awardCall.action == "feed")
+        #expect(awardCall.petID == pet.id)
+        #expect(awardCall.quality == "precise")
+        #expect(familyTasks.completedReminderIDs == [reminder.id])
+        #expect(familyTasks.completedReminderHumanIDs == ["human-1"])
+        #expect(reminderLedger.eventKindEnum == .reminder)
+        #expect(reminderLedger.actorId == "human-1")
+        #expect(reminderLedger.source == CareLedgerSource.reminder.rawValue)
+        #expect(reminderLedger.sourceEventId == event.id.uuidString)
+        #expect(reminderLedger.sourceReminderId == reminder.id.uuidString)
+        #expect(careLedger.eventKindEnum == .care)
+        #expect(careLedger.actionType == CareType.feeding.rawValue)
+        #expect(careLedger.amountValue == 52)
+        #expect(careLedger.amountUnit == "g")
+        #expect(careLedger.coconutDelta == 6)
+        #expect(careLedger.source == CareLedgerSource.reminder.rawValue)
+        #expect(careLedger.sourceEventId == event.id.uuidString)
+        #expect(careLedger.sourceReminderId == reminder.id.uuidString)
+        #expect(careLedger.legacyModelId == log.id.uuidString)
     }
 
     @MainActor
@@ -1796,6 +2230,139 @@ struct OhanaTests {
     }
 
     @MainActor
+    @Test func careEventServicePlannedWaterLinksRewardReminderFamilyTaskAndLedger() async throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let pet = Pet(name: "Momo", species: "猫")
+        let scheduledAt = dateForTest(year: 2026, month: 5, day: 8, hour: 9)
+        let event = Event(
+            title: "Momo 喂水",
+            startDate: scheduledAt,
+            eventType: EventType.daily.rawValue,
+            relatedEntityType: WaterPlanWriter.entityType,
+            relatedEntityId: pet.id.uuidString
+        )
+        let reminder = Reminder(event: event, scheduledAt: scheduledAt)
+        context.insert(pet)
+        context.insert(event)
+        context.insert(reminder)
+        try context.save()
+
+        let economy = CareEventEconomyAwarderSpy(reward: (humanGot: 3, petGot: 1))
+        let familyTasks = FamilyTaskManagerSpy()
+        let dependencies = CareEventServiceDependencies(
+            questManager: QuestManager(),
+            economy: economy,
+            careLedger: CareLedgerService(),
+            reminderCompletion: NoopReminderCompleter(),
+            quickActionReminderCompletion: NoopQuickActionReminderCompleter(),
+            familyTasks: familyTasks,
+            revisions: SharedDomainRevisionPublisher()
+        )
+
+        let reward = CareEventService.completePlannedWater(
+            pet: pet,
+            reminder: reminder,
+            amountMl: 180,
+            context: context,
+            executorId: "human-1",
+            date: scheduledAt,
+            dependencies: dependencies
+        )
+
+        let logs = try context.fetch(FetchDescriptor<PetCareLog>())
+        let log = try #require(logs.first)
+        let ledger = try context.fetch(FetchDescriptor<CareLedgerEvent>())
+        let reminderLedger = try #require(ledger.first { $0.actionType == "completePlannedCare" })
+        let careLedger = try #require(ledger.first { $0.legacyModelName == "PetCareLog" })
+        let awardCall = try #require(economy.careAwardCalls.first)
+
+        #expect(reward?.humanGot == 3)
+        #expect(reward?.petGot == 1)
+        #expect(logs.count == 1)
+        #expect(log.careType == .watering)
+        #expect(log.amountMl == 180)
+        #expect(log.pet?.id == pet.id)
+        #expect(reminder.statusEnum == .completed)
+        #expect(reminder.completedAt == scheduledAt)
+        #expect(reminder.completedBy == "human-1")
+        #expect(event.isOccurrenceMarkedComplete(on: scheduledAt))
+        #expect(economy.careAwardCalls.count == 1)
+        #expect(awardCall.action == "water")
+        #expect(awardCall.petID == pet.id)
+        #expect(awardCall.quality == "none")
+        #expect(familyTasks.completedReminderIDs == [reminder.id])
+        #expect(familyTasks.completedReminderHumanIDs == ["human-1"])
+        #expect(reminderLedger.eventKindEnum == .reminder)
+        #expect(reminderLedger.actorId == "human-1")
+        #expect(reminderLedger.source == CareLedgerSource.reminder.rawValue)
+        #expect(reminderLedger.sourceEventId == event.id.uuidString)
+        #expect(reminderLedger.sourceReminderId == reminder.id.uuidString)
+        #expect(careLedger.eventKindEnum == .care)
+        #expect(careLedger.actionType == CareType.watering.rawValue)
+        #expect(careLedger.amountValue == 180)
+        #expect(careLedger.amountUnit == "ml")
+        #expect(careLedger.coconutDelta == 4)
+        #expect(careLedger.source == CareLedgerSource.reminder.rawValue)
+        #expect(careLedger.sourceEventId == event.id.uuidString)
+        #expect(careLedger.sourceReminderId == reminder.id.uuidString)
+        #expect(careLedger.legacyModelId == log.id.uuidString)
+    }
+
+    @MainActor
+    @Test func plannedWaterCatchUpAfterSixHoursIsRejectedWithoutSideEffects() async throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let pet = Pet(name: "Momo", species: "猫")
+        let scheduledAt = dateForTest(year: 2026, month: 5, day: 8, hour: 9)
+        let completedAt = dateForTest(year: 2026, month: 5, day: 8, hour: 16)
+        let event = Event(
+            title: "Momo 喂水",
+            startDate: scheduledAt,
+            eventType: EventType.daily.rawValue,
+            relatedEntityType: WaterPlanWriter.entityType,
+            relatedEntityId: pet.id.uuidString
+        )
+        let reminder = Reminder(event: event, scheduledAt: scheduledAt)
+        context.insert(pet)
+        context.insert(event)
+        context.insert(reminder)
+        try context.save()
+
+        let economy = CareEventEconomyAwarderSpy(reward: (humanGot: 7, petGot: 3))
+        let familyTasks = FamilyTaskManagerSpy()
+        let dependencies = CareEventServiceDependencies(
+            questManager: QuestManager(),
+            economy: economy,
+            careLedger: CareLedgerService(),
+            reminderCompletion: NoopReminderCompleter(),
+            quickActionReminderCompletion: NoopQuickActionReminderCompleter(),
+            familyTasks: familyTasks,
+            revisions: SharedDomainRevisionPublisher()
+        )
+
+        let reward = CareEventService.completePlannedWater(
+            pet: pet,
+            reminder: reminder,
+            amountMl: 180,
+            context: context,
+            executorId: "human-1",
+            date: completedAt,
+            dependencies: dependencies
+        )
+
+        #expect(reward == nil)
+        #expect(try context.fetch(FetchDescriptor<PetCareLog>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<CareLedgerEvent>()).isEmpty)
+        #expect(reminder.statusEnum == .pending)
+        #expect(reminder.completedAt == nil)
+        #expect(reminder.completedBy.isEmpty)
+        #expect(!event.isOccurrenceMarkedComplete(on: scheduledAt))
+        #expect(economy.careAwardCalls.isEmpty)
+        #expect(familyTasks.completedReminderIDs.isEmpty)
+    }
+
+    @MainActor
     @Test func quickCareCompletionCanCatchUpOlderPetPlanReminder() async throws {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
@@ -2441,6 +3008,56 @@ struct OhanaTests {
     }
 
     @MainActor
+    @Test func hygienePlanOverdueWarningUsesGroomingReminderAndClearsAfterCompletion() async throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        let scheduledAt = dateForTest(year: 2026, month: 5, day: 8, hour: 8)
+        let now = dateForTest(year: 2026, month: 5, day: 10, hour: 12)
+        let pet = Pet(name: "Momo", species: "狗")
+        let event = Event(
+            title: "Momo — 梳毛",
+            startDate: scheduledAt,
+            eventType: EventType.grooming.rawValue,
+            relatedEntityType: EntityKind.pet.rawValue,
+            relatedEntityId: pet.id.uuidString
+        )
+        let reminder = Reminder(event: event, scheduledAt: scheduledAt)
+        context.insert(pet)
+        context.insert(event)
+        context.insert(reminder)
+        try context.save()
+
+        let events = try context.fetch(FetchDescriptor<Event>())
+        let warning = try #require(CarePlanOverdueStatusCalculator.warning(
+            for: "groom",
+            pet: pet,
+            events: events,
+            now: now,
+            calendar: calendar
+        ))
+        #expect(warning.title == "护理")
+        #expect(warning.actionType == "groom")
+        #expect(warning.scheduledAt == scheduledAt)
+        #expect(warning.daysOverdue == 2)
+        #expect(warning.reminderId == reminder.id)
+        #expect(warning.eventId == event.id)
+
+        reminder.statusEnum = .completed
+        try context.save()
+
+        let completedEvents = try context.fetch(FetchDescriptor<Event>())
+        #expect(CarePlanOverdueStatusCalculator.warning(
+            for: "groom",
+            pet: pet,
+            events: completedEvents,
+            now: now,
+            calendar: calendar
+        ) == nil)
+    }
+
+    @MainActor
     @Test func feedStockEstimateUsesOnlyActiveOperatingModePlan() async throws {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
@@ -2836,7 +3453,8 @@ struct OhanaTests {
         let overviewSnapshot = QuickFeedOverviewSnapshot.build(
             pet: pet,
             manualPlanEvents: dashboard.manualPlanEvents,
-            careLogs: [],
+            feedingLedgerEvents: [],
+            legacyCareLogs: [],
             range: .days7,
             activeMode: .manualReminder,
             now: now,
@@ -2900,7 +3518,8 @@ struct OhanaTests {
         let overviewSnapshot = QuickFeedOverviewSnapshot.build(
             pet: pet,
             manualPlanEvents: dashboard.manualPlanEvents,
-            careLogs: [],
+            feedingLedgerEvents: [],
+            legacyCareLogs: [],
             range: .days7,
             activeMode: .manualReminder,
             now: now,
@@ -3390,6 +4009,92 @@ struct OhanaTests {
     }
 
     @MainActor
+    @Test func todayFocusServiceCompletesCareQuestsFromLedgerEntries() async throws {
+        let date = dateForTest(year: 2026, month: 6, day: 12, hour: 9)
+        let pet = Pet(name: "Momo", species: "狗")
+        let feedPlan = Event(
+            title: "喂食",
+            startDate: date,
+            eventType: EventType.daily.rawValue,
+            relatedEntityType: EntityKind.pet.rawValue,
+            relatedEntityId: pet.id.uuidString
+        )
+        let quests = [
+            IslandQuest(
+                id: "q_feed_\(pet.id.uuidString)_\(feedPlan.id.uuidString)",
+                emoji: "🍖",
+                title: "喂食",
+                subtitle: "",
+                isCompleted: false,
+                targetPetId: pet.id,
+                targetPlantId: nil
+            ),
+            IslandQuest(
+                id: "q_walk_\(pet.id.uuidString)",
+                emoji: "🚶",
+                title: "散步",
+                subtitle: "",
+                isCompleted: false,
+                targetPetId: pet.id,
+                targetPlantId: nil
+            ),
+            IslandQuest(
+                id: "q_potty_\(pet.id.uuidString)",
+                emoji: "💩",
+                title: "便便",
+                subtitle: "",
+                isCompleted: false,
+                targetPetId: pet.id,
+                targetPlantId: nil
+            ),
+            IslandQuest(
+                id: "q_play_\(pet.id.uuidString)",
+                emoji: "🎾",
+                title: "陪玩",
+                subtitle: "",
+                isCompleted: false,
+                targetPetId: pet.id,
+                targetPlantId: nil
+            )
+        ]
+        let ledgerEntries = [
+            TodayFocusCareLedgerEntry(
+                id: UUID(),
+                petId: pet.id,
+                eventKind: .care,
+                actionType: CareType.feeding.rawValue,
+                date: date,
+                sourceEventId: feedPlan.id
+            ),
+            TodayFocusCareLedgerEntry(
+                id: UUID(),
+                petId: pet.id,
+                eventKind: .walk,
+                actionType: "walk",
+                date: date
+            ),
+            TodayFocusCareLedgerEntry(
+                id: UUID(),
+                petId: pet.id,
+                eventKind: .potty,
+                actionType: PottyType.perfectPoop.rawValue,
+                date: date
+            )
+        ]
+
+        let refreshed = TodayFocusService.refreshedQuests(
+            quests,
+            pets: [pet],
+            events: [feedPlan],
+            careLedgerEntries: ledgerEntries,
+            now: date
+        )
+        let completionStates = refreshed.map(\.isCompleted)
+
+        #expect(completionStates == [true, true, true, true])
+    }
+
+    @MainActor
     @Test func todayFocusTreatsWalkAsPlayCompletion() async throws {
         let pet = Pet(name: "Momo", species: "狗")
         let playQuest = IslandQuest(
@@ -3550,6 +4255,69 @@ struct OhanaTests {
     }
 
     @MainActor
+    @Test func islandQuestEngineUsesLedgerEntriesForCarePlanGeneration() async throws {
+        let date = dateForTest(year: 2026, month: 6, day: 9, hour: 8)
+        let pet = Pet(name: "Momo", species: "狗")
+        let actor = Human(name: "Ari")
+        let breakfast = Event(
+            title: "喂食",
+            startDate: date,
+            eventType: EventType.daily.rawValue,
+            relatedEntityType: EntityKind.pet.rawValue,
+            relatedEntityId: pet.id.uuidString
+        )
+        let dinner = Event(
+            title: "喂食",
+            startDate: dateForTest(year: 2026, month: 6, day: 9, hour: 18),
+            eventType: EventType.daily.rawValue,
+            relatedEntityType: EntityKind.pet.rawValue,
+            relatedEntityId: pet.id.uuidString
+        )
+        let completedIntroProgress = TodayFocusQuestProgress(
+            isPetWizardCompleted: true,
+            isFirstMealRecorded: true,
+            isThemeColorSet: true
+        )
+        let ledgerEntries = [
+            TodayFocusCareLedgerEntry(
+                id: UUID(),
+                petId: pet.id,
+                eventKind: .care,
+                actionType: CareType.feeding.rawValue,
+                date: date,
+                sourceEventId: breakfast.id,
+                actorId: actor.id.uuidString
+            ),
+            TodayFocusCareLedgerEntry(
+                id: UUID(),
+                petId: pet.id,
+                eventKind: .walk,
+                actionType: "walk",
+                date: date,
+                actorId: actor.id.uuidString
+            )
+        ]
+
+        let quests = IslandQuestEngine.todayQuests(
+            pets: [pet],
+            reminders: [],
+            events: [breakfast, dinner],
+            humans: [actor],
+            careLedgerEntries: ledgerEntries,
+            now: date,
+            questProgress: completedIntroProgress
+        )
+        let ids = quests.map(\.id)
+        let remainingEventIds = Set(ids.compactMap { IslandQuestEngine.carePlanEventId(fromQuestId: $0) })
+        let dinnerQuest = quests.first { IslandQuestEngine.carePlanEventId(fromQuestId: $0.id) == dinner.id }
+
+        #expect(!remainingEventIds.contains(breakfast.id))
+        #expect(remainingEventIds.contains(dinner.id))
+        #expect(!ids.contains("q_play_\(pet.id.uuidString)"))
+        #expect(dinnerQuest?.subtitle.contains(actor.name) == true)
+    }
+
+    @MainActor
     @Test func islandQuestEngineIncludesRecurringCarePlanAfterStartDate() async throws {
         let start = dateForTest(year: 2026, month: 6, day: 1, hour: 8)
         let today = dateForTest(year: 2026, month: 6, day: 10, hour: 8)
@@ -3674,9 +4442,11 @@ struct OhanaTests {
             pendingReminders: [],
             humanMedications: [],
             humanMedicationLogs: [],
-            careLogs: [],
-            walkLogs: [],
-            pottyLogs: [],
+            todayFocusCareLedgerEntries: [],
+            feedingLedgerEntries: [],
+            careLedgerEntries: [],
+            walkLedgerEntries: [],
+            pottyLedgerEntries: [],
             humanWeightLogs: [],
             familyTasks: [],
             exchangeRequests: [],
@@ -3946,6 +4716,252 @@ struct OhanaTests {
 
         #expect(snapshot.score == 5)
         #expect(snapshot.nextStep.kind == .retention)
+    }
+
+    private struct CareAwardCall: Equatable {
+        let action: String
+        let petID: UUID?
+        let quality: String
+    }
+
+    private struct QuickActionCareCall: Equatable {
+        let petID: UUID
+        let careType: CareType
+        let executorId: String?
+        let now: Date
+    }
+
+    private struct QuickActionPottyCall: Equatable {
+        let petID: UUID
+        let executorId: String?
+        let now: Date
+    }
+
+    private struct QuickActionHygieneCall: Equatable {
+        let petID: UUID
+        let hygieneType: HygieneType
+        let executorId: String?
+        let now: Date
+    }
+
+    @MainActor
+    private final class CareEventEconomyAwarderSpy: CareEventEconomyAwarding {
+        let reward: (humanGot: Int, petGot: Int)
+        private(set) var careAwardCalls: [CareAwardCall] = []
+
+        init(reward: (humanGot: Int, petGot: Int)) {
+            self.reward = reward
+        }
+
+        func awardCareAction(
+            type: QuestManager.OhanaActionType,
+            pet: Pet?,
+            context _: ModelContext,
+            quality: QuestManager.QualityBonus
+        ) -> (humanGot: Int, petGot: Int) {
+            careAwardCalls.append(
+                CareAwardCall(
+                    action: actionName(type),
+                    petID: pet?.id,
+                    quality: qualityName(quality)
+                )
+            )
+            return reward
+        }
+
+        func awardSharedCareAction(
+            type _: QuestManager.OhanaActionType,
+            pets _: [Pet],
+            context _: ModelContext,
+            quality _: QuestManager.QualityBonus,
+            title _: String?
+        ) -> (humanGot: Int, petGot: Int) {
+            reward
+        }
+
+        private func actionName(_ type: QuestManager.OhanaActionType) -> String {
+            switch type {
+            case .feed: "feed"
+            case .water: "water"
+            case let .potty(isLitter): isLitter ? "litter" : "potty"
+            case let .care(type): "care.\(type.rawValue)"
+            case .health: "health"
+            case .expense: "expense"
+            case .milestone: "milestone"
+            case .weight: "weight"
+            case .dailyFocusCompletion: "dailyFocusCompletion"
+            case .walk: "walk"
+            case .general: "general"
+            }
+        }
+
+        private func qualityName(_ quality: QuestManager.QualityBonus) -> String {
+            switch quality {
+            case .none: "none"
+            case .precise: "precise"
+            case .withNote: "withNote"
+            case .withPhoto: "withPhoto"
+            case .preciseAndNote: "preciseAndNote"
+            case .preciseAndPhoto: "preciseAndPhoto"
+            case .preciseNotePhoto: "preciseNotePhoto"
+            }
+        }
+    }
+
+    @MainActor
+    private final class NoopReminderCompleter: ReminderCompleting {
+        func complete(_: Reminder, by _: String?, context _: ModelContext) {}
+        func skip(_: Reminder, by _: String?, context _: ModelContext) {}
+        func reopen(_: Reminder, by _: String?, context _: ModelContext, reschedule _: Bool) {}
+        func snoozeOneDay(_: Reminder, by _: String?, context _: ModelContext, reschedule _: Bool) {}
+    }
+
+    @MainActor
+    private final class NoopQuickActionReminderCompleter: QuickActionReminderCompleting {
+        func completeNearestPetCareReminder(
+            pet _: Pet,
+            type _: CareType,
+            context _: ModelContext,
+            executorId _: String?,
+            now _: Date
+        ) -> Reminder? {
+            nil
+        }
+
+        func completeNearestPetPottyReminder(
+            pet _: Pet,
+            context _: ModelContext,
+            executorId _: String?,
+            now _: Date
+        ) -> Reminder? {
+            nil
+        }
+
+        func completeNearestPetHygieneReminder(
+            pet _: Pet,
+            type _: HygieneType,
+            context _: ModelContext,
+            executorId _: String?,
+            now _: Date
+        ) -> Reminder? {
+            nil
+        }
+    }
+
+    @MainActor
+    private final class QuickActionReminderCompleterSpy: QuickActionReminderCompleting {
+        private(set) var careCalls: [QuickActionCareCall] = []
+        private(set) var pottyPetIDs: [UUID] = []
+        private(set) var pottyCalls: [QuickActionPottyCall] = []
+        private(set) var hygienePetIDs: [UUID] = []
+        private(set) var hygieneCalls: [QuickActionHygieneCall] = []
+
+        func completeNearestPetCareReminder(
+            pet: Pet,
+            type: CareType,
+            context _: ModelContext,
+            executorId: String?,
+            now: Date
+        ) -> Reminder? {
+            careCalls.append(QuickActionCareCall(
+                petID: pet.id,
+                careType: type,
+                executorId: executorId,
+                now: now
+            ))
+            return nil
+        }
+
+        func completeNearestPetPottyReminder(
+            pet: Pet,
+            context _: ModelContext,
+            executorId: String?,
+            now: Date
+        ) -> Reminder? {
+            pottyPetIDs.append(pet.id)
+            pottyCalls.append(QuickActionPottyCall(
+                petID: pet.id,
+                executorId: executorId,
+                now: now
+            ))
+            return nil
+        }
+
+        func completeNearestPetHygieneReminder(
+            pet: Pet,
+            type: HygieneType,
+            context _: ModelContext,
+            executorId: String?,
+            now: Date
+        ) -> Reminder? {
+            hygienePetIDs.append(pet.id)
+            hygieneCalls.append(QuickActionHygieneCall(
+                petID: pet.id,
+                hygieneType: type,
+                executorId: executorId,
+                now: now
+            ))
+            return nil
+        }
+    }
+
+    @MainActor
+    private final class FamilyTaskManagerSpy: FamilyTaskManaging {
+        private(set) var completedReminderIDs: [UUID] = []
+        private(set) var completedReminderHumanIDs: [String?] = []
+        private(set) var reopenedReminderIDs: [UUID] = []
+
+        func migrateLegacyBountiesIfNeeded(context _: ModelContext) {}
+
+        func assignReminder(
+            _: Reminder,
+            to _: Human,
+            by _: Human?,
+            rewardCoconuts _: Int,
+            note _: String,
+            context _: ModelContext
+        ) -> FamilyCollaborationTask? {
+            nil
+        }
+
+        func createHouseholdTask(
+            title _: String,
+            note _: String,
+            assignedTo _: Human?,
+            by _: Human?,
+            rewardCoconuts _: Int,
+            dueAt _: Date?,
+            emoji _: String,
+            context _: ModelContext
+        ) -> FamilyCollaborationTask? {
+            nil
+        }
+
+        func updateTask(
+            _: FamilyCollaborationTask,
+            title _: String,
+            note _: String,
+            assignedTo _: Human?,
+            rewardCoconuts _: Int,
+            dueAt _: Date?,
+            emoji _: String,
+            context _: ModelContext
+        ) {}
+
+        func delete(_: FamilyCollaborationTask, context _: ModelContext) {}
+        func rejectCompletion(_: FamilyCollaborationTask, by _: Human?, context _: ModelContext) {}
+        func confirmCompletion(_: FamilyCollaborationTask, by _: Human?, context _: ModelContext) {}
+        func complete(_: FamilyCollaborationTask, by _: Human?, context _: ModelContext) {}
+        func claim(_: FamilyCollaborationTask, by _: Human, context _: ModelContext) {}
+
+        func syncCompletedReminder(_ reminder: Reminder, completedBy humanId: String?, context _: ModelContext) {
+            completedReminderIDs.append(reminder.id)
+            completedReminderHumanIDs.append(humanId)
+        }
+
+        func syncReopenedReminder(_ reminder: Reminder, context _: ModelContext) {
+            reopenedReminderIDs.append(reminder.id)
+        }
     }
 
     private func makeInMemoryContainer() throws -> ModelContainer {

@@ -35,6 +35,23 @@ enum FamilyTaskService {
     }
 
     @MainActor
+    private static func fetchOrLog<T: PersistentModel>(
+        _ descriptor: FetchDescriptor<T>,
+        context: ModelContext,
+        operation: String
+    ) -> [T] {
+        do {
+            return try context.fetch(descriptor)
+        } catch {
+            OhanaLog.warning(
+                "FamilyTaskService failed to \(operation): \(error.localizedDescription)",
+                category: "FamilyTasks"
+            )
+            return []
+        }
+    }
+
+    @MainActor
     static func migrateLegacyBountiesIfNeeded(context: ModelContext) {
         syncLegacyBounties(context: context)
     }
@@ -46,7 +63,11 @@ enum FamilyTaskService {
               let legacy = try? JSONDecoder().decode([LegacyBountyTask].self, from: data),
               !legacy.isEmpty else { return }
 
-        let existing = (try? context.fetch(FetchDescriptor<FamilyCollaborationTask>())) ?? [] // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
+        let existing = fetchOrLog(
+            FetchDescriptor<FamilyCollaborationTask>(),
+            context: context,
+            operation: "fetch family tasks for legacy bounty sync"
+        )
         var existingById: [UUID: FamilyCollaborationTask] = [:]
         for task in existing {
             existingById[task.id] = task
@@ -537,7 +558,11 @@ enum FamilyTaskService {
             sortBy: [SortDescriptor(\.updatedAt, order: .reverse)]
         )
         descriptor.fetchLimit = 1
-        return (try? context.fetch(descriptor))?.first
+        return fetchOrLog(
+            descriptor,
+            context: context,
+            operation: "fetch active task for reminder"
+        ).first
     }
 
     private static func isReminderSyncActiveTask(_ task: FamilyCollaborationTask) -> Bool {
@@ -558,7 +583,11 @@ enum FamilyTaskService {
             sortBy: [SortDescriptor(\.updatedAt, order: .reverse)]
         )
         descriptor.fetchLimit = 1
-        return (try? context.fetch(descriptor))?.first
+        return fetchOrLog(
+            descriptor,
+            context: context,
+            operation: "fetch active or completed task for reminder"
+        ).first
     }
 
     @MainActor
@@ -568,7 +597,11 @@ enum FamilyTaskService {
             predicate: #Predicate<Reminder> { $0.id == uuid }
         )
         descriptor.fetchLimit = 1
-        return (try? context.fetch(descriptor))?.first
+        return fetchOrLog(
+            descriptor,
+            context: context,
+            operation: "fetch related reminder for family task"
+        ).first
     }
 
     @MainActor
@@ -578,7 +611,11 @@ enum FamilyTaskService {
             predicate: #Predicate<Human> { $0.id == uuid }
         )
         descriptor.fetchLimit = 1
-        return (try? context.fetch(descriptor))?.first
+        return fetchOrLog(
+            descriptor,
+            context: context,
+            operation: "fetch human for family task"
+        ).first
     }
 
     @MainActor
@@ -712,7 +749,11 @@ enum FamilyTaskService {
             }
         )
         descriptor.fetchLimit = 1
-        return ((try? context.fetch(descriptor)) ?? []).isEmpty == false
+        return !fetchOrLog(
+            descriptor,
+            context: context,
+            operation: "fetch wallet transaction for family task reward"
+        ).isEmpty
     }
 
     @MainActor

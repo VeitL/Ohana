@@ -96,9 +96,7 @@ enum FeedStockCalculator {
             if let sharedStockTotal = SharedCareMetadata.stockDeductionGrams(from: log.note) {
                 return max(0, sharedStockTotal)
             }
-            if log.note.hasPrefix(SharedCareMetadata.feedNotePrefix) {
-                return 0
-            }
+            return 0
         }
         return effectiveMainFoodAmount(for: log, pet: pet)
     }

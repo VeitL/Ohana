@@ -14,7 +14,8 @@ struct QuickWaterDetailSheet: View {
     var onClose: (() -> Void)?
     let allEvents: [Event]
     let allPets: [Pet]
-    let waterCareLogs: [PetCareLog]
+    let waterLedgerEvents: [CareLedgerEvent]
+    let legacyWaterDeleteLogs: [PetCareLog]
 
     @Environment(\.modelContext) var modelContext
     @Environment(\.dismiss) var dismiss
@@ -76,14 +77,16 @@ struct QuickWaterDetailSheet: View {
         onClose: (() -> Void)? = nil,
         allEvents: [Event] = [],
         allPets: [Pet] = [],
-        waterCareLogs: [PetCareLog] = []
+        waterLedgerEvents: [CareLedgerEvent] = [],
+        legacyWaterDeleteLogs: [PetCareLog] = []
     ) {
         self.pet = pet
         self.onRemove = onRemove
         self.onClose = onClose
         self.allEvents = allEvents
         self.allPets = allPets
-        self.waterCareLogs = waterCareLogs
+        self.waterLedgerEvents = waterLedgerEvents
+        self.legacyWaterDeleteLogs = legacyWaterDeleteLogs
         _displayedWaterMode = State(initialValue: WaterOperatingMode.stored(pet.id) ?? .manual)
     }
 
@@ -154,29 +157,29 @@ struct QuickWaterDetailSheet: View {
         activeInlineSheet != nil
     }
 
-    var todayWaterLogs: [PetCareLog] {
+    var todayWaterLogs: [QuickWaterLedgerEntry] {
         waterSnapshot.todayWaterLogs
     }
 
-    var waterChangeLogs: [PetCareLog] {
+    var waterChangeLogs: [QuickWaterLedgerEntry] {
         waterSnapshot.waterChangeLogs
     }
 
-    var filterCleanLogs: [PetCareLog] {
+    var filterCleanLogs: [QuickWaterLedgerEntry] {
         waterSnapshot.filterCleanLogs
     }
 
-    var allWaterLogs: [PetCareLog] {
+    var allWaterLogs: [QuickWaterLedgerEntry] {
         waterSnapshot.allWaterLogs
     }
 
-    var lastWaterLog: PetCareLog? { waterSnapshot.lastWaterLog }
-    var waterLogs: [PetCareLog] {
+    var lastWaterLog: QuickWaterLedgerEntry? { waterSnapshot.lastWaterLog }
+    var waterLogs: [QuickWaterLedgerEntry] {
         waterSnapshot.waterLogs
     }
 
-    var lastWaterChange: PetCareLog? { waterSnapshot.lastWaterChange }
-    var lastFilterClean: PetCareLog? { waterSnapshot.lastFilterClean }
+    var lastWaterChange: QuickWaterLedgerEntry? { waterSnapshot.lastWaterChange }
+    var lastFilterClean: QuickWaterLedgerEntry? { waterSnapshot.lastFilterClean }
     var waterElapsedDays: Int { daysSinceDate(lastWaterChange?.date ?? waterChangeAnchorDate) }
     var filterCleanElapsedDays: Int? { lastFilterClean.map { daysSinceDate($0.date) } }
     var filterReplaceElapsedDays: Int? { lastFilterClean.map { daysSinceDate($0.date) } }
@@ -287,7 +290,7 @@ struct QuickWaterDetailSheet: View {
             scheduleWaterSnapshotRefresh(milliseconds: refreshDelay, syncModeAfterRefresh: true)
             scheduleWaterPlanMaintenance(delayMilliseconds: maintenanceDelay)
         }
-        .onChange(of: waterCareLogs.count) { _, _ in
+        .onChange(of: waterLedgerEvents.count) { _, _ in
             scheduleWaterSnapshotRefresh()
         }
         .onChange(of: activeSheet?.id) { _, _ in

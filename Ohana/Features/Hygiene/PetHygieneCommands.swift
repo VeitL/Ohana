@@ -57,6 +57,23 @@ struct PetHygienePlanCommandResult: Equatable {
     let hygieneType: HygieneType
 }
 
+@MainActor
+private func fetchPetHygieneCommandModelsOrLog<T: PersistentModel>(
+    _ descriptor: FetchDescriptor<T>,
+    context: ModelContext,
+    operation: String
+) -> [T] {
+    do {
+        return try context.fetch(descriptor)
+    } catch {
+        OhanaLog.warning(
+            "PetHygieneCommands failed to \(operation): \(error.localizedDescription)",
+            category: "Care"
+        )
+        return []
+    }
+}
+
 enum PetHygieneCommandService {
     @discardableResult
     @MainActor
@@ -112,8 +129,16 @@ enum PetHygieneCommandService {
     @MainActor
     private static func ledgerEvents(for logID: UUID, context: ModelContext) -> [CareLedgerEvent] {
         let idString = logID.uuidString
-        let events = (try? context.fetch(FetchDescriptor<CareLedgerEvent>())) ?? [] // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
-        return events.filter { $0.legacyModelName == "PetHygieneLog" && $0.legacyModelId == idString }
+        let descriptor = FetchDescriptor<CareLedgerEvent>(
+            predicate: #Predicate<CareLedgerEvent> { event in
+                event.legacyModelName == "PetHygieneLog" && event.legacyModelId == idString
+            }
+        )
+        return fetchPetHygieneCommandModelsOrLog(
+            descriptor,
+            context: context,
+            operation: "fetch ledger events for PetHygieneLog"
+        )
     }
 
     @discardableResult

@@ -150,8 +150,21 @@ extension QuestManager {
 
     func human(withId humanId: String?, context: ModelContext) -> Human? {
         guard let humanId, !humanId.isEmpty else { return nil }
-        let desc = FetchDescriptor<Human>()
-        return (try? context.fetch(desc))?.first { $0.id.uuidString == humanId }
+        guard let id = UUID(uuidString: humanId) else {
+            OhanaLog.warning("[QuestManager] reward humanId=\(humanId) is invalid", category: "Economy")
+            return nil
+        }
+        let desc = FetchDescriptor<Human>(
+            predicate: #Predicate<Human> { human in
+                human.id == id
+            }
+        )
+        do {
+            return try context.fetch(desc).first
+        } catch {
+            OhanaLog.warning("[QuestManager] failed to fetch reward humanId=\(humanId): \(error.localizedDescription)", category: "Economy")
+            return nil
+        }
     }
 
     /// 多宠共同照护奖励：人类奖励只发一次，每只在世目标宠物各自获得成长椰子。

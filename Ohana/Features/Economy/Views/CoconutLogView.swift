@@ -62,13 +62,31 @@ private struct CoconutLogMemberSnapshot {
             sortBy: [SortDescriptor(\Human.createdAt)]
         )
         humanDescriptor.fetchLimit = 80
-        let humans = (try? context.fetch(humanDescriptor)) ?? []
+        let humans: [Human]
+        do {
+            humans = try context.fetch(humanDescriptor)
+        } catch {
+            OhanaLog.warning(
+                "[CoconutLogMemberSnapshot] failed to fetch humans: \(error.localizedDescription)",
+                category: "Economy"
+            )
+            humans = []
+        }
 
         var petDescriptor = FetchDescriptor<Pet>(
             sortBy: [SortDescriptor(\Pet.createdAt)]
         )
         petDescriptor.fetchLimit = 120
-        let pets = (try? context.fetch(petDescriptor)) ?? []
+        let pets: [Pet]
+        do {
+            pets = try context.fetch(petDescriptor)
+        } catch {
+            OhanaLog.warning(
+                "[CoconutLogMemberSnapshot] failed to fetch pets: \(error.localizedDescription)",
+                category: "Economy"
+            )
+            pets = []
+        }
 
         let visibleHumans = privacy
             .unlockedHumans(for: .wishlist, from: humans, viewedBy: activeHumanId)

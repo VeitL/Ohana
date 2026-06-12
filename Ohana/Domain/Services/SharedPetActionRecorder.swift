@@ -201,6 +201,7 @@ enum SharedPetActionRecorder {
         let dependencies = providedDependencies ?? .live()
         let targets = SharedPetTargetResolver.normalizedTargets(descriptor.targets, fallback: descriptor.sourcePet)
         let allocationTargetCount = max(targets.count, 1)
+        let visibleDescriptorNote = SharedCareMetadata.userNoteForStorage(descriptor.note)
         let session = SharedCareSession(
             date: descriptor.date,
             actionKind: descriptor.actionKind,
@@ -217,7 +218,7 @@ enum SharedPetActionRecorder {
             allocationMode: descriptor.allocationMode,
             foodKind: descriptor.foodKind,
             stockOwnerPetId: descriptor.stockOwnerPet?.id.uuidString ?? "",
-            note: descriptor.note
+            note: visibleDescriptorNote
         )
         context.insert(session)
 
@@ -228,7 +229,6 @@ enum SharedPetActionRecorder {
 
         switch descriptor.childLogStrategy {
         case let .care(type):
-            let prefix = SharedCareMetadata.prefix(for: descriptor.actionKind)
             let perPetGrams = distributedAmount(descriptor.totalAmountGrams, count: allocationTargetCount, fractionDigits: 0)
             let perPetMl = distributedAmount(descriptor.totalAmountMl, count: allocationTargetCount, fractionDigits: 0)
             for (index, target) in targets.enumerated() {
@@ -237,11 +237,7 @@ enum SharedPetActionRecorder {
                     type: type,
                     amountGrams: type == .feeding ? perPetGrams[index] : 0,
                     amountMl: type == .watering ? perPetMl[index] : 0,
-                    note: SharedCareMetadata.note(
-                        prefix: prefix,
-                        sessionId: session.id,
-                        targetCount: targets.count
-                    ),
+                    note: visibleDescriptorNote,
                     foodKind: descriptor.foodKind,
                     sharedSessionId: session.id.uuidString,
                     pet: target,
@@ -261,18 +257,14 @@ enum SharedPetActionRecorder {
             context.insert(log)
             pottyLog = log
         case let .expense(category, note):
+            let visibleExpenseNote = SharedCareMetadata.userNoteForStorage(note)
             let perPetAmounts = distributedAmount(descriptor.totalExpenseAmount, count: allocationTargetCount, fractionDigits: 2)
             for (index, target) in targets.enumerated() {
                 let log = PetExpenseLog(
                     date: descriptor.date,
                     amount: perPetAmounts[index],
                     category: category,
-                    note: SharedCareMetadata.note(
-                        prefix: SharedCareMetadata.expenseNotePrefix,
-                        sessionId: session.id,
-                        targetCount: targets.count,
-                        visibleNote: note
-                    ),
+                    note: visibleExpenseNote,
                     pet: target,
                     executorId: descriptor.executorId,
                     sharedSessionId: session.id.uuidString
@@ -490,11 +482,7 @@ enum SharedPetActionRecorder {
                 actionType: pottyLog.pottyType.rawValue,
                 amountValue: 0,
                 amountUnit: "",
-                note: SharedCareMetadata.note(
-                    prefix: SharedCareMetadata.unknownPottyNotePrefix,
-                    sessionId: session.id,
-                    targetCount: targets.count
-                ),
+                note: "",
                 source: descriptor.source,
                 sourceEventId: nil,
                 sourceReminderId: nil,

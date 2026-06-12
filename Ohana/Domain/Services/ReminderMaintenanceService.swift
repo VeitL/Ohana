@@ -23,7 +23,15 @@ enum ReminderMaintenanceService {
             },
             sortBy: [SortDescriptor(\Reminder.scheduledAt, order: .forward)]
         )
-        return (try? context.fetch(descriptor)) ?? []
+        do {
+            return try context.fetch(descriptor)
+        } catch {
+            OhanaLog.warning(
+                "ReminderMaintenanceService failed to fetch pending reminders: \(error.localizedDescription)",
+                category: "Care"
+            )
+            return []
+        }
     }
 
     @MainActor

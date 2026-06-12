@@ -91,6 +91,8 @@ nonisolated enum CloudSyncUploadBatchBuilder {
             try fetchPetWeightLog(id: localRecordId, context: context)
         case String(describing: SharedCareSession.self):
             try fetchSharedCareSession(id: localRecordId, context: context)
+        case String(describing: CareLedgerEvent.self):
+            try fetchCareLedgerEvent(id: localRecordId, context: context)
         case String(describing: CoconutLedgerEntry.self):
             try fetchCoconutLedgerEntry(id: localRecordId, context: context)
         default:
@@ -181,6 +183,14 @@ nonisolated enum CloudSyncUploadBatchBuilder {
     private static func fetchSharedCareSession(id: UUID, context: ModelContext) throws -> SharedCareSession? {
         var descriptor = FetchDescriptor<SharedCareSession>(
             predicate: #Predicate<SharedCareSession> { $0.id == id }
+        )
+        descriptor.fetchLimit = 1
+        return try context.fetch(descriptor).first
+    }
+
+    private static func fetchCareLedgerEvent(id: UUID, context: ModelContext) throws -> CareLedgerEvent? {
+        var descriptor = FetchDescriptor<CareLedgerEvent>(
+            predicate: #Predicate<CareLedgerEvent> { $0.id == id }
         )
         descriptor.fetchLimit = 1
         return try context.fetch(descriptor).first

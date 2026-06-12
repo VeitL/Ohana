@@ -10,6 +10,23 @@ import SwiftData
 import UIKit
 
 @MainActor
+private func fetchHomeCommandModelsOrLog<T: PersistentModel>(
+    _ descriptor: FetchDescriptor<T>,
+    context: ModelContext,
+    operation: String
+) -> [T] {
+    do {
+        return try context.fetch(descriptor)
+    } catch {
+        OhanaLog.warning(
+            "HomeCommandExecutor failed to \(operation): \(error.localizedDescription)",
+            category: "Care"
+        )
+        return []
+    }
+}
+
+@MainActor
 struct HomeCommandExecutor {
     let modelContext: ModelContext
     let careEvents: CareEventRecording
@@ -286,7 +303,7 @@ struct HomeCommandExecutor {
         showSingleUseNotice: (String, String) -> Void,
         feedback: (ExpandedQuickActionExecutor.Feedback) -> Void
     ) {
-        ExpandedQuickActionExecutor.applyGroomCheckIn(
+        let didRecord = ExpandedQuickActionExecutor.applyGroomCheckIn(
             raw: raw,
             pet: pet,
             executorId: executorId,
@@ -295,7 +312,9 @@ struct HomeCommandExecutor {
             feedback: feedback,
             careEvents: careEvents
         )
-        publishMutation(QuickCareCommand.grooming(petID: pet.id, type: raw))
+        if didRecord {
+            publishMutation(QuickCareCommand.grooming(petID: pet.id, type: raw))
+        }
     }
 
     func applyGroomCheckIn(
@@ -492,7 +511,11 @@ struct HomeCommandExecutor {
             }
         )
         descriptor.fetchLimit = 1
-        return try? modelContext.fetch(descriptor).first // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
+        return fetchHomeCommandModelsOrLog(
+            descriptor,
+            context: modelContext,
+            operation: "fetch pet"
+        ).first
     }
 
     private func fetchPlant(id: UUID) -> Plant? {
@@ -502,7 +525,11 @@ struct HomeCommandExecutor {
             }
         )
         descriptor.fetchLimit = 1
-        return try? modelContext.fetch(descriptor).first // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
+        return fetchHomeCommandModelsOrLog(
+            descriptor,
+            context: modelContext,
+            operation: "fetch plant"
+        ).first
     }
 
     private func fetchEvent(id: UUID) -> Event? {
@@ -512,7 +539,11 @@ struct HomeCommandExecutor {
             }
         )
         descriptor.fetchLimit = 1
-        return try? modelContext.fetch(descriptor).first // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
+        return fetchHomeCommandModelsOrLog(
+            descriptor,
+            context: modelContext,
+            operation: "fetch event"
+        ).first
     }
 
     private func fetchHuman(id: UUID) -> Human? {
@@ -522,11 +553,19 @@ struct HomeCommandExecutor {
             }
         )
         descriptor.fetchLimit = 1
-        return try? modelContext.fetch(descriptor).first // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
+        return fetchHomeCommandModelsOrLog(
+            descriptor,
+            context: modelContext,
+            operation: "fetch human"
+        ).first
     }
 
     private func fetchHumans() -> [Human] {
-        (try? modelContext.fetch(FetchDescriptor<Human>())) ?? [] // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
+        fetchHomeCommandModelsOrLog(
+            FetchDescriptor<Human>(),
+            context: modelContext,
+            operation: "fetch humans"
+        )
     }
 
     private func fetchCoconutExchangeRequest(id: UUID) -> CoconutExchangeRequest? {
@@ -536,7 +575,11 @@ struct HomeCommandExecutor {
             }
         )
         descriptor.fetchLimit = 1
-        return try? modelContext.fetch(descriptor).first // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
+        return fetchHomeCommandModelsOrLog(
+            descriptor,
+            context: modelContext,
+            operation: "fetch coconut exchange request"
+        ).first
     }
 
     private func fetchQuickCareEvents(petID: UUID, now: Date) -> [Event] {
@@ -549,7 +592,11 @@ struct HomeCommandExecutor {
             sortBy: [SortDescriptor(\.startDate, order: .forward)]
         )
         descriptor.fetchLimit = 400
-        return (try? modelContext.fetch(descriptor)) ?? [] // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
+        return fetchHomeCommandModelsOrLog(
+            descriptor,
+            context: modelContext,
+            operation: "fetch quick care events"
+        )
     }
 
     private func fetchRecentCareLogs(petID: UUID, now: Date) -> [PetCareLog] {
@@ -558,12 +605,16 @@ struct HomeCommandExecutor {
         let since = calendar.date(byAdding: .hour, value: -3, to: todayStart) ?? todayStart
         var descriptor = FetchDescriptor<PetCareLog>(
             predicate: #Predicate<PetCareLog> { log in
-                log.date >= since
+                log.pet?.id == petID && log.date >= since
             },
             sortBy: [SortDescriptor(\.date, order: .reverse)]
         )
         descriptor.fetchLimit = 300
-        return ((try? modelContext.fetch(descriptor)) ?? []).filter { $0.pet?.id == petID } // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
+        return fetchHomeCommandModelsOrLog(
+            descriptor,
+            context: modelContext,
+            operation: "fetch recent care logs"
+        )
     }
 
     private func fetchFoodRecords(petID: UUID) -> [PetFoodRecord] {
@@ -574,7 +625,11 @@ struct HomeCommandExecutor {
             sortBy: [SortDescriptor(\.startDate, order: .reverse)]
         )
         descriptor.fetchLimit = 120
-        return (try? modelContext.fetch(descriptor)) ?? [] // smoothness: allow command-side stock reminder rebuild; bounded to one pet
+        return fetchHomeCommandModelsOrLog(
+            descriptor,
+            context: modelContext,
+            operation: "fetch food records"
+        )
     }
 
     private func publishMutation(

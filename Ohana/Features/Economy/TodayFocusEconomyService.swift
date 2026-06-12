@@ -120,6 +120,7 @@ enum TodayFocusEconomyService {
             plants: data.plants,
             events: data.events,
             humans: data.humans,
+            careLedgerEntries: data.careLedgerEntries,
             now: now,
             questProgress: questProgress
         )
@@ -136,9 +137,7 @@ enum TodayFocusEconomyService {
             pets: data.pets,
             humans: data.humans,
             events: data.events,
-            careLogs: data.careLogs,
-            walkLogs: data.walkLogs,
-            pottyLogs: data.pottyLogs,
+            careLedgerEntries: data.careLedgerEntries,
             humanWeightLogs: data.humanWeightLogs,
             calendar: .current,
             now: now,
@@ -177,7 +176,7 @@ enum TodayFocusEconomyService {
             sortBy: [SortDescriptor(\Pet.createdAt, order: .reverse)]
         )
         descriptor.fetchLimit = 80
-        return (try? context.fetch(descriptor)) ?? []
+        return fetchOrLog(descriptor, context: context, operation: "fetch today focus pets")
     }
 
     private static func fetchHumans(context: ModelContext) -> [Human] {
@@ -185,7 +184,7 @@ enum TodayFocusEconomyService {
             sortBy: [SortDescriptor(\Human.createdAt, order: .reverse)]
         )
         descriptor.fetchLimit = 40
-        return (try? context.fetch(descriptor)) ?? []
+        return fetchOrLog(descriptor, context: context, operation: "fetch today focus humans")
     }
 
     private static func fetchPlants(context: ModelContext) -> [Plant] {
@@ -193,7 +192,7 @@ enum TodayFocusEconomyService {
             sortBy: [SortDescriptor(\Plant.createdAt, order: .reverse)]
         )
         descriptor.fetchLimit = 60
-        return (try? context.fetch(descriptor)) ?? []
+        return fetchOrLog(descriptor, context: context, operation: "fetch today focus plants")
     }
 
     private static func fetchTodayReminders(
@@ -210,7 +209,7 @@ enum TodayFocusEconomyService {
             sortBy: [SortDescriptor(\Reminder.scheduledAt)]
         )
         descriptor.fetchLimit = 80
-        return (try? context.fetch(descriptor)) ?? []
+        return fetchOrLog(descriptor, context: context, operation: "fetch today focus reminders")
     }
 
     private static func fetchTodayFocusEvents(
@@ -227,7 +226,11 @@ enum TodayFocusEconomyService {
             sortBy: [SortDescriptor(\Event.startDate)]
         )
         windowDescriptor.fetchLimit = 400
-        let windowEvents = (try? context.fetch(windowDescriptor)) ?? []
+        let windowEvents: [Event] = fetchOrLog(
+            windowDescriptor,
+            context: context,
+            operation: "fetch today focus event window"
+        )
 
         var recurringDescriptor = FetchDescriptor<Event>(
             predicate: #Predicate<Event> { event in
@@ -236,11 +239,15 @@ enum TodayFocusEconomyService {
             sortBy: [SortDescriptor(\Event.startDate, order: .reverse)]
         )
         recurringDescriptor.fetchLimit = 400
-        let recurringEvents = ((try? context.fetch(recurringDescriptor)) ?? [])
-            .filter { event in
-                guard let recurrenceEndDate = event.recurrenceEndDate else { return true }
-                return calendar.startOfDay(for: recurrenceEndDate) >= start
-            }
+        let recurringEvents: [Event] = fetchOrLog(
+            recurringDescriptor,
+            context: context,
+            operation: "fetch today focus recurring events"
+        )
+        .filter { event in
+            guard let recurrenceEndDate = event.recurrenceEndDate else { return true }
+            return calendar.startOfDay(for: recurrenceEndDate) >= start
+        }
 
         var seen: Set<UUID> = []
         return (windowEvents + recurringEvents)
@@ -252,52 +259,29 @@ enum TodayFocusEconomyService {
             .sorted { $0.startDate < $1.startDate }
     }
 
-    private static func fetchTodayCareLogs(
+    private static func fetchTodayCareLedgerEntries(
         context: ModelContext,
         now: Date,
         calendar: Calendar
-    ) -> [PetCareLog] {
+    ) -> [TodayFocusCareLedgerEntry] {
         let start = calendar.startOfDay(for: now)
-        var descriptor = FetchDescriptor<PetCareLog>(
-            predicate: #Predicate<PetCareLog> { log in
-                log.date >= start
+        let petSubject = CareLedgerSubjectKind.pet.rawValue
+        let careKind = CareLedgerEventKind.care.rawValue
+        let walkKind = CareLedgerEventKind.walk.rawValue
+        let pottyKind = CareLedgerEventKind.potty.rawValue
+        var descriptor = FetchDescriptor<CareLedgerEvent>(
+            predicate: #Predicate<CareLedgerEvent> { event in
+                event.occurredAt >= start &&
+                    event.subjectKind == petSubject &&
+                    (event.eventKind == careKind ||
+                        event.eventKind == walkKind ||
+                        event.eventKind == pottyKind)
             },
-            sortBy: [SortDescriptor(\PetCareLog.date, order: .reverse)]
+            sortBy: [SortDescriptor(\CareLedgerEvent.occurredAt, order: .reverse)]
         )
-        descriptor.fetchLimit = 180
-        return (try? context.fetch(descriptor)) ?? []
-    }
-
-    private static func fetchTodayWalkLogs(
-        context: ModelContext,
-        now: Date,
-        calendar: Calendar
-    ) -> [PetWalkLog] {
-        let start = calendar.startOfDay(for: now)
-        var descriptor = FetchDescriptor<PetWalkLog>(
-            predicate: #Predicate<PetWalkLog> { log in
-                log.startDate >= start
-            },
-            sortBy: [SortDescriptor(\PetWalkLog.startDate, order: .reverse)]
-        )
-        descriptor.fetchLimit = 80
-        return (try? context.fetch(descriptor)) ?? []
-    }
-
-    private static func fetchTodayPottyLogs(
-        context: ModelContext,
-        now: Date,
-        calendar: Calendar
-    ) -> [PetPottyLog] {
-        let start = calendar.startOfDay(for: now)
-        var descriptor = FetchDescriptor<PetPottyLog>(
-            predicate: #Predicate<PetPottyLog> { log in
-                log.date >= start
-            },
-            sortBy: [SortDescriptor(\PetPottyLog.date, order: .reverse)]
-        )
-        descriptor.fetchLimit = 120
-        return (try? context.fetch(descriptor)) ?? []
+        descriptor.fetchLimit = 360
+        return fetchOrLog(descriptor, context: context, operation: "fetch today focus care ledger")
+            .compactMap(todayFocusCareLedgerEntry(from:))
     }
 
     private static func fetchTodayHumanWeightLogs(
@@ -313,7 +297,36 @@ enum TodayFocusEconomyService {
             sortBy: [SortDescriptor(\HumanWeightLog.date, order: .reverse)]
         )
         descriptor.fetchLimit = 40
-        return (try? context.fetch(descriptor)) ?? []
+        return fetchOrLog(descriptor, context: context, operation: "fetch today focus human weight logs")
+    }
+
+    private static func fetchOrLog<T: PersistentModel>(
+        _ descriptor: FetchDescriptor<T>,
+        context: ModelContext,
+        operation: String
+    ) -> [T] {
+        do {
+            return try context.fetch(descriptor)
+        } catch {
+            OhanaLog.warning(
+                "Today Focus economy \(operation) failed: \(error.localizedDescription)",
+                category: "Economy"
+            )
+            return []
+        }
+    }
+
+    private static func todayFocusCareLedgerEntry(from event: CareLedgerEvent) -> TodayFocusCareLedgerEntry? {
+        guard let subjectId = event.subjectId.flatMap({ UUID(uuidString: $0) }) else { return nil }
+        return TodayFocusCareLedgerEntry(
+            id: event.id,
+            petId: subjectId,
+            eventKind: event.eventKindEnum,
+            actionType: event.actionType,
+            date: event.occurredAt,
+            sourceEventId: event.sourceEventId.flatMap(UUID.init(uuidString:)),
+            actorId: event.actorId
+        )
     }
 
     private static func visibleSnapshotHasNoBlockingNonQuestCards(
@@ -342,9 +355,7 @@ enum TodayFocusEconomyService {
         let plants: [Plant]
         let reminders: [Reminder]
         let events: [Event]
-        let careLogs: [PetCareLog]
-        let walkLogs: [PetWalkLog]
-        let pottyLogs: [PetPottyLog]
+        let careLedgerEntries: [TodayFocusCareLedgerEntry]
         let humanWeightLogs: [HumanWeightLog]
 
         init(context: ModelContext, now: Date, calendar: Calendar = .current) {
@@ -353,9 +364,7 @@ enum TodayFocusEconomyService {
             plants = TodayFocusEconomyService.fetchPlants(context: context)
             reminders = TodayFocusEconomyService.fetchTodayReminders(context: context, now: now, calendar: calendar)
             events = TodayFocusEconomyService.fetchTodayFocusEvents(context: context, now: now, calendar: calendar)
-            careLogs = TodayFocusEconomyService.fetchTodayCareLogs(context: context, now: now, calendar: calendar)
-            walkLogs = TodayFocusEconomyService.fetchTodayWalkLogs(context: context, now: now, calendar: calendar)
-            pottyLogs = TodayFocusEconomyService.fetchTodayPottyLogs(context: context, now: now, calendar: calendar)
+            careLedgerEntries = TodayFocusEconomyService.fetchTodayCareLedgerEntries(context: context, now: now, calendar: calendar)
             humanWeightLogs = TodayFocusEconomyService.fetchTodayHumanWeightLogs(context: context, now: now, calendar: calendar)
         }
     }

@@ -8,19 +8,36 @@
 import Combine
 import Foundation
 
+struct QuickFeedLedgerEntry: Identifiable, Hashable {
+    let id: UUID
+    let petId: UUID
+    let date: Date
+    let amountGrams: Double
+    let note: String
+    let source: FeedLogSource
+    let foodKind: FeedFoodKind
+    let treatKind: FeedTreatKind?
+    let legacyModelId: String?
+    let sharedSessionId: String
+
+    var displayAmountGrams: Double {
+        max(0, amountGrams)
+    }
+}
+
 struct QuickFeedOverviewSnapshot {
     let range: FeedOverviewRange
     let activeMode: FeedOperatingMode
     let startDate: Date
     let dates: [Date]
-    let mainFoodLogsInRange: [PetCareLog]
-    let feedModeLogsInRange: [PetCareLog]
-    let feedModeRecentLogs: [PetCareLog]
-    let recentMainFoodLogs: [PetCareLog]
+    let mainFoodLogsInRange: [QuickFeedLedgerEntry]
+    let feedModeLogsInRange: [QuickFeedLedgerEntry]
+    let feedModeRecentLogs: [QuickFeedLedgerEntry]
+    let recentMainFoodLogs: [QuickFeedLedgerEntry]
     let todayPlanReminders: [Reminder]
     let nextPendingManualReminder: Reminder?
-    let todayAutoFeedLogs: [PetCareLog]
-    let latestAutoFeedLog: PetCareLog?
+    let todayAutoFeedLogs: [QuickFeedLedgerEntry]
+    let latestAutoFeedLog: QuickFeedLedgerEntry?
     let feedModePlanRemindersInRange: [Reminder]
     let mainFoodChartPoints: [FeedOverviewChartPoint]
     let feedModeChartPoints: [FeedOverviewChartPoint]
@@ -31,7 +48,8 @@ struct QuickFeedOverviewSnapshot {
         pet: Pet,
         manualPlanEvents: [Event],
         autoFeederEvents: [Event] = [],
-        careLogs: [PetCareLog],
+        feedingLedgerEvents: [CareLedgerEvent],
+        legacyCareLogs: [PetCareLog],
         range: FeedOverviewRange,
         activeMode: FeedOperatingMode,
         defaultFeedGrams: Double = 0,
@@ -43,15 +61,24 @@ struct QuickFeedOverviewSnapshot {
         let dates = (0 ..< range.days).reversed().compactMap { offset in
             calendar.date(byAdding: .day, value: -offset, to: today)
         }
-        let mainLogs = FeedStockCalculator.mainFoodLogs(for: pet, since: startDate, careLogs: careLogs)
-        let feedModeLogs = mainLogs.filter { log in
+        let feedEntries = feedingEntries(
+            pet: pet,
+            feedingLedgerEvents: feedingLedgerEvents,
+            legacyCareLogs: legacyCareLogs,
+            manualPlanEvents: manualPlanEvents,
+            autoFeederEvents: autoFeederEvents
+        )
+        let mainLogs = feedEntries
+            .filter { $0.source != .treat && $0.date >= startDate }
+            .sorted { $0.date > $1.date }
+        let feedModeLogs = mainLogs.filter { entry in
             switch activeMode {
             case .manual:
-                FeedLogMetadata.source(for: log) == .manualMain
+                entry.source == .manualMain
             case .manualReminder:
-                FeedLogMetadata.source(for: log) == .manualReminder
+                entry.source == .manualReminder
             case .autoFeeder:
-                FeedLogMetadata.source(for: log) == .autoMain
+                entry.source == .autoMain
             }
         }
         let allPlanReminders = manualPlanEvents
@@ -69,26 +96,22 @@ struct QuickFeedOverviewSnapshot {
             .flatMap(\.reminders)
             .filter { $0.scheduledAt >= startDate && $0.scheduledAt <= now }
             .sorted { $0.scheduledAt > $1.scheduledAt }
-        let todayAutoFeedLogs = careLogs
+        let todayAutoFeedLogs = feedEntries
             .filter { log in
-                log.pet?.id == pet.id &&
-                    log.careType == .feeding &&
-                    calendar.isDate(log.date, inSameDayAs: now) &&
-                    FeedLogMetadata.source(for: log) == .autoMain
+                calendar.isDate(log.date, inSameDayAs: now) &&
+                    log.source == .autoMain
             }
             .sorted { $0.date > $1.date }
-        let latestAutoFeedLog = careLogs
+        let latestAutoFeedLog = feedEntries
             .filter { log in
-                log.pet?.id == pet.id &&
-                    log.careType == .feeding &&
-                    FeedLogMetadata.source(for: log) == .autoMain
+                log.source == .autoMain
             }
             .max { $0.date < $1.date }
         let recentMainFoodLogs = Array(mainLogs.sorted { $0.date > $1.date }.prefix(8))
         let sourceTotals = FeedLogSource.quickFeedMainSources.reduce(into: [FeedLogSource: Double]()) { totals, source in
             totals[source] = mainLogs
-                .filter { FeedLogMetadata.source(for: $0) == source }
-                .reduce(0) { $0 + FeedStockCalculator.effectiveMainFoodAmount(for: $1, pet: pet) }
+                .filter { $0.source == source }
+                .reduce(0) { $0 + effectiveMainFoodAmount(for: $1, pet: pet) }
         }
 
         return QuickFeedOverviewSnapshot(
@@ -123,18 +146,63 @@ struct QuickFeedOverviewSnapshot {
     }
 
     private static func chartPoints(
-        for logs: [PetCareLog],
+        for logs: [QuickFeedLedgerEntry],
         dates: [Date],
         pet: Pet,
         calendar: Calendar
     ) -> [FeedOverviewChartPoint] {
         let totalsByDay = Dictionary(grouping: logs) { calendar.startOfDay(for: $0.date) }
             .mapValues { dayLogs in
-                dayLogs.reduce(0) { $0 + FeedStockCalculator.effectiveMainFoodAmount(for: $1, pet: pet) }
+                dayLogs.reduce(0) { $0 + effectiveMainFoodAmount(for: $1, pet: pet) }
             }
         return dates.map { day in
             FeedOverviewChartPoint(date: day, value: totalsByDay[calendar.startOfDay(for: day)] ?? 0)
         }
+    }
+
+    static func feedingEntries(
+        pet: Pet,
+        feedingLedgerEvents: [CareLedgerEvent],
+        legacyCareLogs: [PetCareLog],
+        manualPlanEvents: [Event] = [],
+        autoFeederEvents: [Event] = []
+    ) -> [QuickFeedLedgerEntry] {
+        let legacyLogsById = Dictionary(uniqueKeysWithValues: legacyCareLogs.map { ($0.id.uuidString, $0) })
+        let eventFoodKinds = (manualPlanEvents + autoFeederEvents).reduce(into: [String: FeedFoodKind]()) { result, event in
+            result[event.id.uuidString] = event.foodKind
+        }
+        return feedingLedgerEvents.compactMap { event -> QuickFeedLedgerEntry? in
+            guard event.eventKindEnum == .care,
+                  event.actionType == CareType.feeding.rawValue,
+                  event.subjectKind == CareLedgerSubjectKind.pet.rawValue,
+                  event.subjectId == pet.id.uuidString
+            else { return nil }
+            let legacyLog = event.legacyModelId.flatMap { legacyLogsById[$0] }
+            let source = FeedLogMetadata.source(
+                actionType: event.actionType,
+                note: event.note,
+                ledgerSource: event.sourceEnum,
+                sourceEventId: event.sourceEventId,
+                sourceReminderId: event.sourceReminderId
+            ) ?? .manualMain
+            return QuickFeedLedgerEntry(
+                id: event.id,
+                petId: pet.id,
+                date: event.occurredAt,
+                amountGrams: event.amountValue,
+                note: event.note,
+                source: source,
+                foodKind: legacyLog?.foodKind ?? event.sourceEventId.flatMap { eventFoodKinds[$0] } ?? pet.mainFoodKind,
+                treatKind: legacyLog?.treatKind,
+                legacyModelId: event.legacyModelId,
+                sharedSessionId: legacyLog?.sharedSessionId ?? ""
+            )
+        }
+        .sorted { $0.date > $1.date }
+    }
+
+    static func effectiveMainFoodAmount(for entry: QuickFeedLedgerEntry, pet: Pet) -> Double {
+        entry.amountGrams > 0 ? entry.amountGrams : pet.dailyPortionGrams
     }
 
     private static func quickMainGramOptions(
@@ -142,7 +210,7 @@ struct QuickFeedOverviewSnapshot {
         defaultFeedGrams: Double,
         manualPlanEvents: [Event],
         autoFeederEvents: [Event],
-        recentMainFoodLogs: [PetCareLog]
+        recentMainFoodLogs: [QuickFeedLedgerEntry]
     ) -> [Double] {
         var values: [Double] = []
         func append(_ value: Double) {
@@ -155,7 +223,7 @@ struct QuickFeedOverviewSnapshot {
         manualPlanEvents.forEach { append(FeedRuleMetadata.amountGrams(from: $0)) }
         autoFeederEvents.forEach { append(FeedRuleMetadata.amountGrams(from: $0)) }
         recentMainFoodLogs
-            .filter { FeedLogMetadata.isMainFoodLog($0) && $0.amountGrams > 0 }
+            .filter { $0.source != .treat && $0.amountGrams > 0 }
             .forEach { append($0.amountGrams) }
         if values.isEmpty { values = [30, 40, 50, 60] }
         return Array(values.prefix(5))
@@ -169,7 +237,8 @@ private extension FeedLogSource {
 struct QuickFeedOverviewSnapshotRevision: Equatable {
     let manualPlanRevision: Int
     let autoFeederRevision: Int
-    let careLogRevision: Int
+    let feedingLedgerRevision: Int
+    let legacyCareLogBridgeRevision: Int
     let petRevision: Int
     let defaultFeedGrams: Int
     let rangeRawValue: String
@@ -180,7 +249,8 @@ struct QuickFeedOverviewSnapshotRevision: Equatable {
         pet: Pet,
         manualPlanEvents: [Event],
         autoFeederEvents: [Event],
-        careLogs: [PetCareLog],
+        feedingLedgerEvents: [CareLedgerEvent],
+        legacyCareLogs: [PetCareLog],
         range: FeedOverviewRange,
         activeMode: FeedOperatingMode,
         defaultFeedGrams: Double,
@@ -205,12 +275,23 @@ struct QuickFeedOverviewSnapshotRevision: Equatable {
                 hasher.combine(event.feedAmountGrams)
                 hasher.combine(event.foodKindRaw)
             },
-            careLogRevision: revisionHash(careLogs.prefix(240)) { hasher, log in
+            feedingLedgerRevision: revisionHash(feedingLedgerEvents.prefix(360)) { hasher, event in
+                hasher.combine(event.id)
+                hasher.combine(event.occurredAt.timeIntervalSince1970)
+                hasher.combine(event.subjectId)
+                hasher.combine(event.actionType)
+                hasher.combine(event.amountValue)
+                hasher.combine(event.note)
+                hasher.combine(event.source)
+                hasher.combine(event.sourceEventId)
+                hasher.combine(event.sourceReminderId)
+                hasher.combine(event.legacyModelId)
+            },
+            legacyCareLogBridgeRevision: revisionHash(legacyCareLogs.prefix(360)) { hasher, log in
                 hasher.combine(log.id)
-                hasher.combine(log.date.timeIntervalSince1970)
-                hasher.combine(log.amountGrams)
                 hasher.combine(log.foodKindRaw)
-                hasher.combine(log.note)
+                hasher.combine(log.treatKindRaw)
+                hasher.combine(log.sharedSessionId)
             },
             petRevision: revisionHash([pet]) { hasher, pet in
                 hasher.combine(pet.id)
@@ -252,7 +333,8 @@ final class QuickFeedOverviewSnapshotStore: ObservableObject {
         pet: Pet,
         manualPlanEvents: [Event],
         autoFeederEvents: [Event],
-        careLogs: [PetCareLog],
+        feedingLedgerEvents: [CareLedgerEvent],
+        legacyCareLogs: [PetCareLog],
         range: FeedOverviewRange,
         activeMode: FeedOperatingMode,
         defaultFeedGrams: Double,
@@ -263,7 +345,8 @@ final class QuickFeedOverviewSnapshotStore: ObservableObject {
             pet: pet,
             manualPlanEvents: manualPlanEvents,
             autoFeederEvents: autoFeederEvents,
-            careLogs: careLogs,
+            feedingLedgerEvents: feedingLedgerEvents,
+            legacyCareLogs: legacyCareLogs,
             range: range,
             activeMode: activeMode,
             defaultFeedGrams: defaultFeedGrams,
@@ -274,7 +357,8 @@ final class QuickFeedOverviewSnapshotStore: ObservableObject {
             pet: pet,
             manualPlanEvents: manualPlanEvents,
             autoFeederEvents: autoFeederEvents,
-            careLogs: careLogs,
+            feedingLedgerEvents: feedingLedgerEvents,
+            legacyCareLogs: legacyCareLogs,
             range: range,
             activeMode: activeMode,
             defaultFeedGrams: defaultFeedGrams,

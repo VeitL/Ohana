@@ -3,14 +3,36 @@
 //  Ohana
 //
 
+import Foundation
 import SwiftData
 
 enum MemberThemeColorMaintenanceService {
     @MainActor
+    private static func fetchOrLog<T: PersistentModel>(
+        _ descriptor: FetchDescriptor<T>,
+        context: ModelContext,
+        operation: String
+    ) -> [T] {
+        do {
+            return try context.fetch(descriptor)
+        } catch {
+            OhanaLog.warning(
+                "MemberThemeColorMaintenanceService failed to \(operation): \(error.localizedDescription)",
+                category: "Care"
+            )
+            return []
+        }
+    }
+
+    @MainActor
     static func normalizeReservedColors(context: ModelContext) {
         var didChange = false
 
-        let pets = (try? context.fetch(FetchDescriptor<Pet>())) ?? [] // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
+        let pets = fetchOrLog(
+            FetchDescriptor<Pet>(),
+            context: context,
+            operation: "fetch pets for theme color normalization"
+        )
         for pet in pets {
             let normalized = OhanaThemeColorPolicy.normalizedMemberThemeHex(
                 pet.themeColorHex,
@@ -22,7 +44,11 @@ enum MemberThemeColorMaintenanceService {
             }
         }
 
-        let humans = (try? context.fetch(FetchDescriptor<Human>())) ?? [] // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
+        let humans = fetchOrLog(
+            FetchDescriptor<Human>(),
+            context: context,
+            operation: "fetch humans for theme color normalization"
+        )
         for human in humans {
             let normalized = OhanaThemeColorPolicy.normalizedMemberThemeHex(
                 human.themeColorHex,

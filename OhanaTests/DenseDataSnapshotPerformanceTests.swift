@@ -79,9 +79,7 @@ struct DenseDataSnapshotPerformanceTests {
                 events: fixture.events,
                 humans: fixture.humans,
                 activeHumanId: activeHumanId,
-                careLogs: fixture.careLogs,
-                walkLogs: fixture.walkLogs,
-                pottyLogs: fixture.pottyLogs,
+                careLedgerEntries: fixture.todayFocusCareLedgerEntries,
                 humanWeightLogs: fixture.humanWeightLogs,
                 familyTasks: fixture.familyTasks,
                 exchangeRequests: fixture.exchangeRequests,
@@ -139,6 +137,40 @@ private struct DenseFixture {
     let ledgerEntries: [CoconutLedgerEntry]
     let photoLogs: [PetPhotoLog]
 
+    var todayFocusCareLedgerEntries: [TodayFocusCareLedgerEntry] {
+        careLogs.compactMap { log in
+            guard let petId = log.pet?.id else { return nil }
+            return TodayFocusCareLedgerEntry(
+                id: log.id,
+                petId: petId,
+                eventKind: .care,
+                actionType: log.careType.rawValue,
+                date: log.date,
+                actorId: log.executorId
+            )
+        } + walkLogs.compactMap { log in
+            guard let petId = log.pet?.id else { return nil }
+            return TodayFocusCareLedgerEntry(
+                id: log.id,
+                petId: petId,
+                eventKind: .walk,
+                actionType: "walk",
+                date: log.startDate,
+                actorId: log.executorId
+            )
+        } + pottyLogs.compactMap { log in
+            guard let petId = log.pet?.id else { return nil }
+            return TodayFocusCareLedgerEntry(
+                id: log.id,
+                petId: petId,
+                eventKind: .potty,
+                actionType: log.pottyType.rawValue,
+                date: log.date,
+                actorId: log.executorId
+            )
+        }
+    }
+
     var homeSource: VerticalSolidHomeSourceState {
         VerticalSolidHomeSourceState(
             pets: pets,
@@ -149,9 +181,11 @@ private struct DenseFixture {
             pendingReminders: reminders,
             humanMedications: [],
             humanMedicationLogs: [],
-            careLogs: careLogs,
-            walkLogs: walkLogs,
-            pottyLogs: pottyLogs,
+            todayFocusCareLedgerEntries: todayFocusCareLedgerEntries,
+            feedingLedgerEntries: [],
+            careLedgerEntries: [],
+            walkLedgerEntries: [],
+            pottyLedgerEntries: [],
             humanWeightLogs: humanWeightLogs,
             familyTasks: familyTasks,
             exchangeRequests: exchangeRequests,
@@ -526,9 +560,7 @@ private final class DenseFixtureTodayFocusManager: TodayFocusManaging {
         pets _: [Pet],
         humans _: [Human],
         events _: [Event],
-        careLogs _: [PetCareLog],
-        walkLogs _: [PetWalkLog],
-        pottyLogs _: [PetPottyLog],
+        careLedgerEntries _: [TodayFocusCareLedgerEntry],
         humanWeightLogs _: [HumanWeightLog],
         calendar _: Calendar,
         now _: Date

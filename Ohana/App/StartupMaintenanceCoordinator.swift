@@ -65,6 +65,10 @@ final class StartupMaintenanceCoordinator: ObservableObject {
                 await self.runCareLedgerBackfillIfNeeded(context: context)
             }
 
+            await runStep("shared_care_note_cleanup", delayMilliseconds: 5000) {
+                self.cleanLegacySharedCareNotesIfNeeded(context: context)
+            }
+
             await runStep("avatar_asset_compaction", delayMilliseconds: 90000) {
                 await self.compactAvatarAssetsIfNeeded(context: context)
             }
@@ -138,6 +142,19 @@ final class StartupMaintenanceCoordinator: ObservableObject {
                 note: "\(inserted) logs"
             )
         }
+    }
+
+    private func cleanLegacySharedCareNotesIfNeeded(context: ModelContext) {
+        let result = SharedCareLegacyNoteMaintenanceService.runIfNeeded(
+            context: context,
+            defaults: defaults
+        )
+        guard result.didRun else { return }
+        AppPerformanceMonitor.shared.record(
+            "startup_shared_care_note_cleanup",
+            valueMS: 0,
+            note: "\(result.cleanup.cleanedCount) cleaned, \(result.cleanup.skippedOrphanCount) skipped"
+        )
     }
 
     private func compactAvatarAssetsIfNeeded(context: ModelContext) async {

@@ -24,6 +24,13 @@ struct FoodPetSummary: Identifiable {
     let weekGrams: Double
 }
 
+struct FoodLedgerEntry: Identifiable, Hashable {
+    let id: UUID
+    let petId: UUID
+    let date: Date
+    let amountGrams: Double
+}
+
 struct FoodStockOverview {
     let remainingGrams: Double
     let totalGrams: Double
@@ -69,7 +76,8 @@ struct IslandFoodDashboardSnapshot {
         pets: [Pet],
         selectedPetId: UUID?,
         allEvents: [Event],
-        allCareLogs: [PetCareLog],
+        allFeedingLedgerEvents: [CareLedgerEvent],
+        legacyStockCareLogs: [PetCareLog],
         allFoodRecords: [PetFoodRecord],
         allSharedCareSessions: [SharedCareSession] = [],
         now: Date,
@@ -83,9 +91,11 @@ struct IslandFoodDashboardSnapshot {
         } ?? activePets
         let today = calendar.startOfDay(for: now)
         let cutoff = calendar.date(byAdding: .day, value: -6, to: today) ?? today
-        let queryFeedingLogs = allCareLogs.filter { $0.careType == .feeding }
-        let queryLogsByPetID = Dictionary(grouping: queryFeedingLogs.compactMap { log -> (UUID, PetCareLog)? in
-            guard let petID = log.pet?.id else { return nil }
+        let activePetsByID = petsByID(activePets)
+        let ledgerEntries = feedingLedgerEntries(from: allFeedingLedgerEvents)
+        let ledgerEntriesByPetID = Dictionary(grouping: ledgerEntries, by: \.petId)
+        let legacyStockLogsByPetID = Dictionary(grouping: legacyStockCareLogs.compactMap { log -> (UUID, PetCareLog)? in
+            guard log.careType == .feeding, let petID = log.pet?.id else { return nil }
             return (petID, log)
         }, by: \.0)
             .mapValues { $0.map(\.1) }
@@ -95,16 +105,10 @@ struct IslandFoodDashboardSnapshot {
         }, by: \.0)
             .mapValues { $0.map(\.1) }
 
-        func sourceLogs(for pet: Pet) -> [PetCareLog] {
-            let queried = queryLogsByPetID[pet.id] ?? []
-            if !queried.isEmpty { return queried }
-            return pet.careLogs.filter { $0.careType == .feeding }
-        }
-
-        let logsByPetID = Dictionary(uniqueKeysWithValues: activePets.map { pet in
-            (pet.id, sourceLogs(for: pet))
+        let entriesByPetID = Dictionary(uniqueKeysWithValues: activePets.map { pet in
+            (pet.id, ledgerEntriesByPetID[pet.id] ?? [])
         })
-        let selectedLogs = selectedPets.flatMap { logsByPetID[$0.id] ?? [] }
+        let selectedLogs = selectedPets.flatMap { entriesByPetID[$0.id] ?? [] }
         let todayLogs = selectedLogs.filter { calendar.isDate($0.date, inSameDayAs: now) }
         let weekLogs = selectedLogs.filter { $0.date >= cutoff }
         let dailyPoints = (0 ..< 7).reversed().map { offset in
@@ -112,28 +116,28 @@ struct IslandFoodDashboardSnapshot {
             let dayLogs = selectedLogs.filter { calendar.isDate($0.date, inSameDayAs: day) }
             return FoodDayPoint(
                 date: day,
-                grams: dayLogs.reduce(0) { $0 + amountGrams(for: $1) },
+                grams: dayLogs.reduce(0) { $0 + amountGrams(for: $1, petsByID: activePetsByID) },
                 count: dayLogs.count
             )
         }
         let petSummaries = selectedPets.map { pet in
-            let petLogs = logsByPetID[pet.id] ?? []
+            let petLogs = entriesByPetID[pet.id] ?? []
             let todayLogs = petLogs.filter { calendar.isDate($0.date, inSameDayAs: now) }
             let weekLogs = petLogs.filter { $0.date >= cutoff }
             return FoodPetSummary(
                 id: pet.id,
                 pet: pet,
                 todayCount: todayLogs.count,
-                todayGrams: todayLogs.reduce(0) { $0 + amountGrams(for: $1) },
+                todayGrams: todayLogs.reduce(0) { $0 + amountGrams(for: $1, petsByID: activePetsByID) },
                 weekCount: weekLogs.count,
-                weekGrams: weekLogs.reduce(0) { $0 + amountGrams(for: $1) }
+                weekGrams: weekLogs.reduce(0) { $0 + amountGrams(for: $1, petsByID: activePetsByID) }
             )
         }
         let stockByPetID = Dictionary(uniqueKeysWithValues: selectedPets.compactMap { pet -> (UUID, FoodStockOverview)? in
             guard let stock = foodStockOverview(
                 for: pet,
                 allEvents: allEvents,
-                careLogs: logsByPetID[pet.id] ?? [],
+                legacyStockCareLogs: legacyStockLogsByPetID[pet.id] ?? [],
                 foodRecords: recordsByPetID[pet.id] ?? [],
                 sharedCareSessions: allSharedCareSessions,
                 now: now,
@@ -152,9 +156,9 @@ struct IslandFoodDashboardSnapshot {
             activePets: activePets,
             selectedPets: selectedPets,
             todayFeedCount: todayLogs.count,
-            todayGrams: todayLogs.reduce(0) { $0 + amountGrams(for: $1) },
+            todayGrams: todayLogs.reduce(0) { $0 + amountGrams(for: $1, petsByID: activePetsByID) },
             weekFeedCount: weekLogs.count,
-            weekGrams: weekLogs.reduce(0) { $0 + amountGrams(for: $1) },
+            weekGrams: weekLogs.reduce(0) { $0 + amountGrams(for: $1, petsByID: activePetsByID) },
             dailyPoints: dailyPoints,
             petSummaries: petSummaries,
             lowestFoodDaysPet: lowestFoodDaysPet,
@@ -166,15 +170,37 @@ struct IslandFoodDashboardSnapshot {
         stockByPetID[pet.id]
     }
 
-    private static func amountGrams(for log: PetCareLog) -> Double {
-        if log.amountGrams > 0 { return log.amountGrams }
-        return log.pet?.dailyPortionGrams ?? 0
+    private static func feedingLedgerEntries(from events: [CareLedgerEvent]) -> [FoodLedgerEntry] {
+        events.compactMap { event in
+            guard event.eventKindEnum == .care,
+                  event.actionType == CareType.feeding.rawValue,
+                  event.subjectKind == CareLedgerSubjectKind.pet.rawValue,
+                  let subjectId = event.subjectId,
+                  let petId = UUID(uuidString: subjectId)
+            else { return nil }
+            return FoodLedgerEntry(
+                id: event.id,
+                petId: petId,
+                date: event.occurredAt,
+                amountGrams: max(0, event.amountValue)
+            )
+        }
+        .sorted { $0.date > $1.date }
+    }
+
+    private static func petsByID(_ pets: [Pet]) -> [UUID: Pet] {
+        Dictionary(uniqueKeysWithValues: pets.map { ($0.id, $0) })
+    }
+
+    private static func amountGrams(for entry: FoodLedgerEntry, petsByID: [UUID: Pet]) -> Double {
+        if entry.amountGrams > 0 { return entry.amountGrams }
+        return petsByID[entry.petId]?.dailyPortionGrams ?? 0
     }
 
     private static func foodStockOverview(
         for pet: Pet,
         allEvents: [Event],
-        careLogs: [PetCareLog],
+        legacyStockCareLogs: [PetCareLog],
         foodRecords: [PetFoodRecord],
         sharedCareSessions: [SharedCareSession],
         now: Date,
@@ -184,7 +210,7 @@ struct IslandFoodDashboardSnapshot {
             for: pet,
             foodKind: .dry,
             events: allEvents,
-            careLogs: careLogs,
+            careLogs: legacyStockCareLogs,
             foodRecords: foodRecords,
             sharedCareSessions: sharedCareSessions,
             now: now,
@@ -194,7 +220,7 @@ struct IslandFoodDashboardSnapshot {
             for: pet,
             foodKind: .wet,
             events: allEvents,
-            careLogs: careLogs,
+            careLogs: legacyStockCareLogs,
             foodRecords: foodRecords,
             sharedCareSessions: sharedCareSessions,
             now: now,
@@ -232,7 +258,8 @@ struct IslandFoodDashboardSnapshot {
 struct IslandFoodDashboardSnapshotRevision: Equatable {
     let petRevision: Int
     let eventRevision: Int
-    let careLogRevision: Int
+    let feedingLedgerRevision: Int
+    let legacyStockLogRevision: Int
     let foodRecordRevision: Int
     let sharedSessionRevision: Int
     let selectedPetRawValue: String
@@ -242,7 +269,8 @@ struct IslandFoodDashboardSnapshotRevision: Equatable {
         pets: [Pet],
         selectedPetId: UUID?,
         allEvents: [Event],
-        allCareLogs: [PetCareLog],
+        allFeedingLedgerEvents: [CareLedgerEvent],
+        legacyStockCareLogs: [PetCareLog],
         allFoodRecords: [PetFoodRecord],
         allSharedCareSessions: [SharedCareSession],
         now: Date
@@ -268,7 +296,14 @@ struct IslandFoodDashboardSnapshotRevision: Equatable {
                 hasher.combine(event.foodKindRaw)
                 hasher.combine(event.feedAmountGrams)
             },
-            careLogRevision: revisionHash(allCareLogs.prefix(500)) { hasher, log in
+            feedingLedgerRevision: revisionHash(allFeedingLedgerEvents.prefix(500)) { hasher, event in
+                hasher.combine(event.id)
+                hasher.combine(event.occurredAt.timeIntervalSince1970)
+                hasher.combine(event.subjectId)
+                hasher.combine(event.actionType)
+                hasher.combine(event.amountValue)
+            },
+            legacyStockLogRevision: revisionHash(legacyStockCareLogs.prefix(500)) { hasher, log in
                 hasher.combine(log.id)
                 hasher.combine(log.date.timeIntervalSince1970)
                 hasher.combine(log.amountGrams)
@@ -322,7 +357,8 @@ final class IslandFoodDashboardSnapshotStore: ObservableObject {
         pets: [Pet],
         selectedPetId: UUID?,
         allEvents: [Event],
-        allCareLogs: [PetCareLog],
+        allFeedingLedgerEvents: [CareLedgerEvent],
+        legacyStockCareLogs: [PetCareLog],
         allFoodRecords: [PetFoodRecord],
         allSharedCareSessions: [SharedCareSession],
         now: Date = Date(),
@@ -332,7 +368,8 @@ final class IslandFoodDashboardSnapshotStore: ObservableObject {
             pets: pets,
             selectedPetId: selectedPetId,
             allEvents: allEvents,
-            allCareLogs: allCareLogs,
+            allFeedingLedgerEvents: allFeedingLedgerEvents,
+            legacyStockCareLogs: legacyStockCareLogs,
             allFoodRecords: allFoodRecords,
             allSharedCareSessions: allSharedCareSessions,
             now: now
@@ -342,7 +379,8 @@ final class IslandFoodDashboardSnapshotStore: ObservableObject {
             pets: pets,
             selectedPetId: selectedPetId,
             allEvents: allEvents,
-            allCareLogs: allCareLogs,
+            allFeedingLedgerEvents: allFeedingLedgerEvents,
+            legacyStockCareLogs: legacyStockCareLogs,
             allFoodRecords: allFoodRecords,
             allSharedCareSessions: allSharedCareSessions,
             now: now

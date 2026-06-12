@@ -387,7 +387,15 @@ final class Pet {
                 ids.contains(session.id)
             }
         )
-        return try? context.fetch(descriptor)
+        do {
+            return try context.fetch(descriptor)
+        } catch {
+            OhanaLog.warning(
+                "[Pet] failed to fetch shared feed sessions for petId=\(id.uuidString): \(error.localizedDescription)",
+                category: "Care"
+            )
+            return nil
+        }
     }
 
     var genderSymbol: String {
@@ -438,13 +446,24 @@ final class Pet {
     /// 同步重置连续打卡。跨领域投影清理由调用方的 domain service 负责。
     func clearAllActivityRecords(in context: ModelContext) {
         let petIdStr = id.uuidString
-        if let events = try? context.fetch(FetchDescriptor<Event>()) { // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
+        let eventDescriptor = FetchDescriptor<Event>(
+            predicate: #Predicate<Event> { event in
+                event.relatedEntityId == petIdStr
+            }
+        )
+        do {
+            let events = try context.fetch(eventDescriptor)
             for event in events where event.relatedEntityId == petIdStr {
                 for reminder in event.reminders {
                     OhanaNotifications.current.cancel(notificationId: reminder.notificationId)
                 }
                 context.delete(event)
             }
+        } catch {
+            OhanaLog.warning(
+                "[Pet] failed to fetch activity events for petId=\(petIdStr): \(error.localizedDescription)",
+                category: "Care"
+            )
         }
 
         for log in Array(careLogs) {

@@ -31,7 +31,7 @@ extension QuestManager {
         let executorId = activeHumanSelection.currentHumanId
         var human: Human? = nil
         if let executorId {
-            human = (try? context.fetch(FetchDescriptor<Human>()))?.first(where: { $0.id.uuidString == executorId }) // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
+            human = self.human(withId: executorId, context: context)
         }
         let consumesBoost = isDoubleRewardBoostActive()
         let isCoolingDown = livePets.allSatisfy { isOnCooldown(petId: $0.id, type: type) }

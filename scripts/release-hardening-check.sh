@@ -67,6 +67,9 @@ scripts/audit-runtime-guardrails.sh --all
 section "Architecture boundaries"
 scripts/audit-architecture-boundaries.sh --all
 
+section "Shared-care note metadata"
+scripts/audit-shared-care-note-metadata.sh --all
+
 section "Release data safety"
 scripts/audit-release-data-safety.sh
 

@@ -665,6 +665,29 @@ struct CloudSyncMetadataServiceTests {
     @Test func recordSerializerKeepsLedgerEntriesAsImmutableFacts() throws {
         let container = try makeContainer()
         let context = ModelContext(container)
+        let event = CareLedgerEvent(
+            id: uuid("55555555-5555-4555-8555-555555555555"),
+            occurredAt: Date(timeIntervalSinceReferenceDate: 55),
+            actorKind: .human,
+            actorId: "human-1",
+            subjectKind: .pet,
+            subjectId: "pet-1",
+            eventKind: .care,
+            actionType: CareType.feeding.rawValue,
+            amountValue: 25,
+            amountUnit: "g",
+            note: "clean dinner",
+            source: .quickAction,
+            sourceEventId: "event-1",
+            sourceReminderId: "reminder-1",
+            legacyModelName: String(describing: PetCareLog.self),
+            legacyModelId: "care-log-1",
+            coconutDelta: 2,
+            rewardLogId: "reward-1",
+            privacyFieldRaw: "care",
+            metadataJSON: #"{"sharedSessionId":"session-1"}"#,
+            createdAt: Date(timeIntervalSinceReferenceDate: 56)
+        )
         let entry = CoconutLedgerEntry(
             id: uuid("66666666-6666-4666-8666-666666666666"),
             transactionKey: "tx-1",
@@ -683,14 +706,32 @@ struct CloudSyncMetadataServiceTests {
             createdAt: Date(timeIntervalSinceReferenceDate: 61)
         )
 
+        let eventState = try CloudSyncMetadataService.markModified(
+            entityName: String(describing: CareLedgerEvent.self),
+            localRecordId: event.id,
+            householdId: uuid("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"),
+            context: context
+        )
         let state = try CloudSyncMetadataService.markModified(
             entityName: String(describing: CoconutLedgerEntry.self),
             localRecordId: entry.id,
             householdId: uuid("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"),
             context: context
         )
+        let eventPayload = try CloudSyncRecordSerializer.payload(for: event, state: eventState)
         let payload = try CloudSyncRecordSerializer.payload(for: entry, state: state)
 
+        #expect(CloudSyncEntityRegistry.supportsUploadPipeline(for: String(describing: CareLedgerEvent.self)))
+        #expect(eventPayload.entityName == "CareLedgerEvent")
+        #expect(eventPayload.fields["actorKind"]?.stringValue == CareLedgerActorKind.human.rawValue)
+        #expect(eventPayload.fields["subjectKind"]?.stringValue == CareLedgerSubjectKind.pet.rawValue)
+        #expect(eventPayload.fields["eventKind"]?.stringValue == CareLedgerEventKind.care.rawValue)
+        #expect(eventPayload.fields["actionType"]?.stringValue == CareType.feeding.rawValue)
+        #expect(eventPayload.fields["amountValue"] == .double(25))
+        #expect(eventPayload.fields["note"]?.stringValue == "clean dinner")
+        #expect(eventPayload.fields["legacyModelName"]?.stringValue == String(describing: PetCareLog.self))
+        #expect(eventPayload.fields["metadataJSON"]?.stringValue == #"{"sharedSessionId":"session-1"}"#)
+        #expect(eventPayload.fields[CloudSyncRecordFieldKey.conflictPolicy]?.stringValue == CloudSyncConflictPolicy.appendOnly.rawValue)
         #expect(payload.fields["transactionKey"]?.stringValue == "tx-1")
         #expect(payload.fields["delta"]?.intValue == 7)
         #expect(payload.fields["balanceAfter"]?.intValue == 17)
@@ -760,8 +801,25 @@ struct CloudSyncMetadataServiceTests {
         household.id = uuid("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")
         let pet = Pet(name: "Momo")
         pet.id = uuid("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb")
+        let ledgerEvent = CareLedgerEvent(
+            id: uuid("cccccccc-cccc-4ccc-8ccc-cccccccccccc"),
+            occurredAt: Date(timeIntervalSinceReferenceDate: 150),
+            actorKind: .human,
+            actorId: "human-1",
+            subjectKind: .pet,
+            subjectId: normalized(pet.id),
+            eventKind: .care,
+            actionType: CareType.feeding.rawValue,
+            note: "clean dinner",
+            source: .quickAction,
+            legacyModelName: String(describing: PetCareLog.self),
+            legacyModelId: "care-log-1",
+            metadataJSON: "{}",
+            createdAt: Date(timeIntervalSinceReferenceDate: 151)
+        )
         context.insert(household)
         context.insert(pet)
+        context.insert(ledgerEvent)
 
         _ = try CloudSyncMetadataService.markModified(
             entityName: String(describing: Pet.self),
@@ -777,14 +835,23 @@ struct CloudSyncMetadataServiceTests {
             modifiedAt: Date(timeIntervalSinceReferenceDate: 100),
             context: context
         )
+        _ = try CloudSyncMetadataService.markModified(
+            entityName: String(describing: CareLedgerEvent.self),
+            localRecordId: ledgerEvent.id,
+            householdId: household.id,
+            modifiedAt: Date(timeIntervalSinceReferenceDate: 150),
+            context: context
+        )
 
         let payloads = try CloudSyncUploadBatchBuilder.dirtyPayloads(context: context)
 
-        #expect(payloads.map(\.entityName) == ["Household", "Pet"])
+        #expect(payloads.map(\.entityName) == ["Household", "CareLedgerEvent", "Pet"])
         #expect(payloads.map(\.recordName) == [
             "Household_aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+            "CareLedgerEvent_cccccccc-cccc-4ccc-8ccc-cccccccccccc",
             "Pet_bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"
         ])
+        #expect(payloads.first { $0.entityName == "CareLedgerEvent" }?.fields["note"]?.stringValue == "clean dinner")
     }
 
     @MainActor
@@ -2210,6 +2277,271 @@ struct CloudSyncMetadataServiceTests {
     }
 
     @MainActor
+    @Test func recordApplierInsertsAndUpdatesRemoteCareLedgerEvent() throws {
+        let container = try makeContainer()
+        let context = ModelContext(container)
+        let householdId = uuid("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")
+        let eventId = uuid("44444444-4444-4444-8444-444444444444")
+        let occurredAt = Date(timeIntervalSinceReferenceDate: 2450)
+        let createdAt = Date(timeIntervalSinceReferenceDate: 2451)
+        let record = try makeRecordPayload(
+            entityName: String(describing: CareLedgerEvent.self),
+            recordType: String(describing: CareLedgerEvent.self),
+            localRecordId: eventId,
+            householdId: householdId,
+            fields: [
+                "occurredAt": .date(occurredAt),
+                "actorKind": .string(CareLedgerActorKind.human.rawValue),
+                "actorId": .string("human-1"),
+                "subjectKind": .string(CareLedgerSubjectKind.pet.rawValue),
+                "subjectId": .string("pet-1"),
+                "eventKind": .string(CareLedgerEventKind.care.rawValue),
+                "actionType": .string(CareType.feeding.rawValue),
+                "amountValue": .double(25),
+                "amountUnit": .string("g"),
+                "note": .string("remote dinner"),
+                "source": .string(CareLedgerSource.quickAction.rawValue),
+                "sourceEventId": .string("event-1"),
+                "sourceReminderId": .string("reminder-1"),
+                "legacyModelName": .string(String(describing: PetCareLog.self)),
+                "legacyModelId": .string("care-log-1"),
+                "coconutDelta": .int(2),
+                "rewardLogId": .string("reward-1"),
+                "privacyFieldRaw": .string("care"),
+                "metadataJSON": .string(#"{"sharedSessionId":"session-1"}"#),
+                "createdAt": .date(createdAt)
+            ]
+        ).makeCKRecord()
+
+        let insertResult = try CloudSyncRecordApplier.apply(record, context: context)
+        let event = try #require(try fetchCareLedgerEvent(id: eventId, context: context))
+
+        #expect(insertResult == .inserted(entityName: "CareLedgerEvent", localRecordId: normalized(eventId)))
+        #expect(event.occurredAt == occurredAt)
+        #expect(event.actorKind == CareLedgerActorKind.human.rawValue)
+        #expect(event.actorId == "human-1")
+        #expect(event.subjectKind == CareLedgerSubjectKind.pet.rawValue)
+        #expect(event.subjectId == "pet-1")
+        #expect(event.eventKind == CareLedgerEventKind.care.rawValue)
+        #expect(event.actionType == CareType.feeding.rawValue)
+        #expect(event.amountValue == 25)
+        #expect(event.amountUnit == "g")
+        #expect(event.note == "remote dinner")
+        #expect(event.source == CareLedgerSource.quickAction.rawValue)
+        #expect(event.legacyModelName == String(describing: PetCareLog.self))
+        #expect(event.legacyModelId == "care-log-1")
+        #expect(event.metadataJSON == #"{"sharedSessionId":"session-1"}"#)
+        #expect(event.createdAt == createdAt)
+
+        let cleanedRecord = try makeRecordPayload(
+            entityName: String(describing: CareLedgerEvent.self),
+            recordType: String(describing: CareLedgerEvent.self),
+            localRecordId: eventId,
+            householdId: householdId,
+            lastModifiedAt: Date(timeIntervalSinceReferenceDate: 2460),
+            fields: [
+                "note": .string("clean dinner"),
+                "metadataJSON": .string(#"{"sharedSessionId":"session-1","cleaned":true}"#)
+            ]
+        ).makeCKRecord()
+
+        let updateResult = try CloudSyncRecordApplier.apply(cleanedRecord, context: context)
+
+        #expect(updateResult == .updated(entityName: "CareLedgerEvent", localRecordId: normalized(eventId)))
+        #expect(event.note == "clean dinner")
+        #expect(event.metadataJSON == #"{"sharedSessionId":"session-1","cleaned":true}"#)
+    }
+
+    @MainActor
+    @Test func cloudSyncAppliedLegacySharedCareRecordsCleanOnceAndUploadCleanPayloads() throws {
+        let container = try makeContainer()
+        let context = ModelContext(container)
+        let householdId = uuid("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")
+        let firstPetId = uuid("11111111-1111-4111-8111-111111111111")
+        let secondPetId = uuid("22222222-2222-4222-8222-222222222222")
+        let sessionId = uuid("33333333-3333-4333-8333-333333333333")
+        let firstLogId = uuid("44444444-4444-4444-8444-444444444444")
+        let secondLogId = uuid("55555555-5555-4555-8555-555555555555")
+        let ledgerEventId = uuid("66666666-6666-4666-8666-666666666666")
+        let cleanupDate = Date(timeIntervalSinceReferenceDate: 2600)
+
+        let records = try [
+            makeRecordPayload(
+                entityName: String(describing: Pet.self),
+                recordType: String(describing: Pet.self),
+                localRecordId: firstPetId,
+                householdId: householdId,
+                fields: [
+                    "name": .string("Milo"),
+                    "species": .string("cat")
+                ]
+            ).makeCKRecord(),
+            makeRecordPayload(
+                entityName: String(describing: Pet.self),
+                recordType: String(describing: Pet.self),
+                localRecordId: secondPetId,
+                householdId: householdId,
+                fields: [
+                    "name": .string("Luna"),
+                    "species": .string("cat")
+                ]
+            ).makeCKRecord(),
+            makeRecordPayload(
+                entityName: String(describing: SharedCareSession.self),
+                recordType: String(describing: SharedCareSession.self),
+                localRecordId: sessionId,
+                householdId: householdId,
+                fields: [
+                    "date": .date(Date(timeIntervalSinceReferenceDate: 2500)),
+                    "actionKindRaw": .string(SharedCareActionKind.feeding.rawValue),
+                    "executorId": .string("human-1"),
+                    "sourcePetId": .string(normalized(firstPetId)),
+                    "targetPetIdsRaw": .string(""),
+                    "speciesRaw": .string("cat"),
+                    "totalAmountGrams": .double(0),
+                    "allocationModeRaw": .string(SharedCareAllocationMode.equal.rawValue),
+                    "foodKindRaw": .string(FeedFoodKind.dry.rawValue),
+                    "stockOwnerPetId": .string(""),
+                    "primaryLegacyModelName": .string(""),
+                    "primaryLegacyModelId": .string(""),
+                    "note": .string(SharedCareMetadata.legacyEncodedNote(
+                        prefix: SharedCareMetadata.feedNotePrefix,
+                        sessionId: sessionId,
+                        targetCount: 2,
+                        visibleNote: "Feed session"
+                    )),
+                    "createdAt": .date(Date(timeIntervalSinceReferenceDate: 2501))
+                ]
+            ).makeCKRecord(),
+            makeRecordPayload(
+                entityName: String(describing: PetCareLog.self),
+                recordType: String(describing: PetCareLog.self),
+                localRecordId: firstLogId,
+                householdId: householdId,
+                fields: [
+                    "date": .date(Date(timeIntervalSinceReferenceDate: 2510)),
+                    "petId": .string(normalized(firstPetId)),
+                    "type": .string(CareType.feeding.rawValue),
+                    "amountGrams": .double(61),
+                    "foodKindRaw": .string(FeedFoodKind.dry.rawValue),
+                    "sharedSessionId": .string(""),
+                    "note": .string(SharedCareMetadata.legacyEncodedNote(
+                        prefix: SharedCareMetadata.feedNotePrefix,
+                        sessionId: sessionId,
+                        stockTotalGrams: 121,
+                        targetCount: 2,
+                        visibleNote: "Dinner note"
+                    ))
+                ]
+            ).makeCKRecord(),
+            makeRecordPayload(
+                entityName: String(describing: PetCareLog.self),
+                recordType: String(describing: PetCareLog.self),
+                localRecordId: secondLogId,
+                householdId: householdId,
+                fields: [
+                    "date": .date(Date(timeIntervalSinceReferenceDate: 2511)),
+                    "petId": .string(normalized(secondPetId)),
+                    "type": .string(CareType.feeding.rawValue),
+                    "amountGrams": .double(60),
+                    "foodKindRaw": .string(FeedFoodKind.dry.rawValue),
+                    "sharedSessionId": .string(normalized(sessionId)),
+                    "note": .string(SharedCareMetadata.legacyEncodedNote(
+                        prefix: SharedCareMetadata.feedNotePrefix,
+                        sessionId: sessionId,
+                        stockTotalGrams: 121,
+                        isStockOwner: true,
+                        targetCount: 2,
+                        visibleNote: "Dinner note"
+                    ))
+                ]
+            ).makeCKRecord(),
+            makeRecordPayload(
+                entityName: String(describing: CareLedgerEvent.self),
+                recordType: String(describing: CareLedgerEvent.self),
+                localRecordId: ledgerEventId,
+                householdId: householdId,
+                fields: [
+                    "occurredAt": .date(Date(timeIntervalSinceReferenceDate: 2512)),
+                    "actorKind": .string(CareLedgerActorKind.human.rawValue),
+                    "actorId": .string("human-1"),
+                    "subjectKind": .string(CareLedgerSubjectKind.pet.rawValue),
+                    "subjectId": .string(normalized(firstPetId)),
+                    "eventKind": .string(CareLedgerEventKind.care.rawValue),
+                    "actionType": .string(CareType.feeding.rawValue),
+                    "amountValue": .double(61),
+                    "amountUnit": .string("g"),
+                    "note": .string(SharedCareMetadata.legacyEncodedNote(
+                        prefix: SharedCareMetadata.careNotePrefix,
+                        sessionId: sessionId,
+                        targetCount: 2,
+                        visibleNote: "Ledger note"
+                    )),
+                    "source": .string(CareLedgerSource.quickAction.rawValue),
+                    "metadataJSON": .string(#"{"sharedSessionId":"legacy"}"#),
+                    "createdAt": .date(Date(timeIntervalSinceReferenceDate: 2513))
+                ]
+            ).makeCKRecord()
+        ]
+
+        for record in records {
+            _ = try CloudSyncRecordApplier.apply(record, context: context)
+        }
+        try context.save()
+
+        #expect(try CloudSyncMetadataService.dirtyStates(context: context).isEmpty)
+
+        let firstCleanup = SharedCareSessionMaintenance.cleanLegacyNoteMetadata(
+            context: context,
+            cleanedAt: cleanupDate
+        )
+        let secondCleanup = SharedCareSessionMaintenance.cleanLegacyNoteMetadata(
+            context: context,
+            cleanedAt: Date(timeIntervalSinceReferenceDate: 2610)
+        )
+        let session = try #require(try fetchSharedCareSession(id: sessionId, context: context))
+        let firstLog = try #require(try fetchPetCareLog(id: firstLogId, context: context))
+        let secondLog = try #require(try fetchPetCareLog(id: secondLogId, context: context))
+        let event = try #require(try fetchCareLedgerEvent(id: ledgerEventId, context: context))
+        let sessionState = try #require(try CloudSyncMetadataService.state(
+            entityName: String(describing: SharedCareSession.self),
+            localRecordId: sessionId,
+            context: context
+        ))
+
+        #expect(firstCleanup.cleanedCount == 4)
+        #expect(firstCleanup.skippedOrphanCount == 0)
+        #expect(secondCleanup.cleanedCount == 0)
+        #expect(secondCleanup.skippedOrphanCount == 0)
+        #expect(session.note == "Feed session")
+        #expect(Set(session.targetPetIds.map { $0.lowercased() }) == Set([normalized(firstPetId), normalized(secondPetId)]))
+        #expect(session.totalAmountGrams == 121)
+        #expect(session.stockOwnerPetId.lowercased() == normalized(secondPetId))
+        #expect(firstLog.note == "Dinner note")
+        #expect(firstLog.sharedSessionId.lowercased() == normalized(sessionId))
+        #expect(secondLog.note == "Dinner note")
+        #expect(secondLog.sharedSessionId.lowercased() == normalized(sessionId))
+        #expect(event.note == "Ledger note")
+        #expect(sessionState.hasPendingLocalChanges)
+        #expect(sessionState.lastModifiedAt == cleanupDate)
+
+        let payloads = try CloudSyncUploadBatchBuilder.dirtyPayloads(context: context)
+        let payloadNotes = payloads.compactMap { $0.fields["note"]?.stringValue }
+        let carePayloads = payloads.filter { $0.entityName == String(describing: PetCareLog.self) }
+        let sessionPayload = try #require(payloads.first { $0.entityName == String(describing: SharedCareSession.self) })
+        let sessionTargets = try #require(sessionPayload.fields["targetPetIdsRaw"]?.stringValue)
+            .split(separator: "|")
+            .map { String($0).lowercased() }
+
+        #expect(payloads.map(\.entityName).contains(String(describing: SharedCareSession.self)))
+        #expect(payloads.map(\.entityName).contains(String(describing: CareLedgerEvent.self)))
+        #expect(carePayloads.count == 2)
+        #expect(payloadNotes.allSatisfy { !$0.contains(SharedCareMetadata.legacyMetadataMarker) })
+        #expect(carePayloads.allSatisfy { $0.fields["sharedSessionId"]?.stringValue?.lowercased() == normalized(sessionId) })
+        #expect(Set(sessionTargets) == Set([normalized(firstPetId), normalized(secondPetId)]))
+    }
+
+    @MainActor
     @Test func recordApplierSkipsStaleRemoteMutableRecord() throws {
         let container = try makeContainer()
         let context = ModelContext(container)
@@ -2578,6 +2910,14 @@ struct CloudSyncMetadataServiceTests {
         return try context.fetch(descriptor).first
     }
 
+    private func fetchPetCareLog(id: UUID, context: ModelContext) throws -> PetCareLog? {
+        var descriptor = FetchDescriptor<PetCareLog>(
+            predicate: #Predicate<PetCareLog> { $0.id == id }
+        )
+        descriptor.fetchLimit = 1
+        return try context.fetch(descriptor).first
+    }
+
     private func fetchPetPottyLog(id: UUID, context: ModelContext) throws -> PetPottyLog? {
         var descriptor = FetchDescriptor<PetPottyLog>(
             predicate: #Predicate<PetPottyLog> { $0.id == id }
@@ -2597,6 +2937,14 @@ struct CloudSyncMetadataServiceTests {
     private func fetchSharedCareSession(id: UUID, context: ModelContext) throws -> SharedCareSession? {
         var descriptor = FetchDescriptor<SharedCareSession>(
             predicate: #Predicate<SharedCareSession> { $0.id == id }
+        )
+        descriptor.fetchLimit = 1
+        return try context.fetch(descriptor).first
+    }
+
+    private func fetchCareLedgerEvent(id: UUID, context: ModelContext) throws -> CareLedgerEvent? {
+        var descriptor = FetchDescriptor<CareLedgerEvent>(
+            predicate: #Predicate<CareLedgerEvent> { $0.id == id }
         )
         descriptor.fetchLimit = 1
         return try context.fetch(descriptor).first

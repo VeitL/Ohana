@@ -8,6 +8,23 @@
 import Foundation
 import SwiftData
 
+@MainActor
+private func fetchWorkoutCommandModelsOrLog<T: PersistentModel>(
+    _ descriptor: FetchDescriptor<T>,
+    context: ModelContext,
+    operation: String
+) -> [T] {
+    do {
+        return try context.fetch(descriptor)
+    } catch {
+        OhanaLog.warning(
+            "WorkoutCommands failed to \(operation): \(error.localizedDescription)",
+            category: "Care"
+        )
+        return []
+    }
+}
+
 struct WorkoutCommandResult: Equatable {
     let logID: UUID
     let subjectID: UUID?
@@ -100,7 +117,16 @@ enum WorkoutCommandService {
     @MainActor
     private static func ledgerEvents(for logID: UUID, context: ModelContext) -> [CareLedgerEvent] {
         let idString = logID.uuidString
-        let events = (try? context.fetch(FetchDescriptor<CareLedgerEvent>())) ?? [] // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
-        return events.filter { $0.legacyModelName == "HumanWorkoutLog" && $0.legacyModelId == idString }
+        let modelName = "HumanWorkoutLog"
+        let descriptor = FetchDescriptor<CareLedgerEvent>(
+            predicate: #Predicate<CareLedgerEvent> { event in
+                event.legacyModelName == modelName && event.legacyModelId == idString
+            }
+        )
+        return fetchWorkoutCommandModelsOrLog(
+            descriptor,
+            context: context,
+            operation: "fetch workout ledger events"
+        )
     }
 }

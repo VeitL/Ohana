@@ -304,6 +304,8 @@ nonisolated struct PetWalkLogBackup: Codable {
     var executorIdsRaw: String?
     var petId: String?
     var sharedSessionId: String?
+    var behaviorNotes: String?
+    var moodRating: Int?
 }
 
 nonisolated struct PetWeightLogBackup: Codable {

@@ -422,7 +422,15 @@ enum FeedStockExpenseLink {
             }
         )
         descriptor.fetchLimit = 1
-        return try? context.fetch(descriptor).first
+        do {
+            return try context.fetch(descriptor).first
+        } catch {
+            OhanaLog.warning(
+                "FeedStockExpenseLink failed to fetch expense: \(error.localizedDescription)",
+                category: "Care"
+            )
+            return nil
+        }
     }
 }
 
@@ -484,8 +492,15 @@ enum FeedRecordCommand {
         allEvents: [Event],
         context: ModelContext
     ) -> FeedStockCommandResult {
+        let sharedSessionId = log.sharedSessionId
         log.amountGrams = grams
         log.date = date
+        CloudSyncMutationRecorder.markModified(log, context: context, modifiedAt: date)
+        SharedCareSessionMaintenance.reconcileAfterDeletingChild(
+            sharedSessionId: sharedSessionId,
+            context: context,
+            reconciledAt: date
+        )
         context.safeSave()
         return FeedStockCommandResult(
             stockReminders: FeedingPlanWriter.rebuildFoodStockReminders(

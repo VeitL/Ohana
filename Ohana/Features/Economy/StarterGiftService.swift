@@ -176,16 +176,50 @@ enum StarterGiftService {
 
     @MainActor
     private static func dataCounts(context: ModelContext) -> (humans: Int, pets: Int, ledger: Int) {
-        let humans = (try? context.fetchCount(FetchDescriptor<Human>())) ?? 0
-        let pets = (try? context.fetchCount(FetchDescriptor<Pet>())) ?? 0
-        let ledger = (try? context.fetchCount(FetchDescriptor<CareLedgerEvent>())) ?? 0
+        let humans = fetchCountOrLog(FetchDescriptor<Human>(), context: context, operation: "fetch human count")
+        let pets = fetchCountOrLog(FetchDescriptor<Pet>(), context: context, operation: "fetch pet count")
+        let ledger = fetchCountOrLog(FetchDescriptor<CareLedgerEvent>(), context: context, operation: "fetch care ledger count")
         return (humans, pets, ledger)
     }
 
     @MainActor
     private static func activeHuman(matching id: String, context: ModelContext) -> Human? {
-        let humans = (try? context.fetch(FetchDescriptor<Human>())) ?? [] // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
+        let humans = fetchModelsOrLog(FetchDescriptor<Human>(), context: context, operation: "fetch starter gift humans")
         return humans.first { $0.id.uuidString == id } ?? humans.first
+    }
+
+    @MainActor
+    private static func fetchModelsOrLog<T: PersistentModel>(
+        _ descriptor: FetchDescriptor<T>,
+        context: ModelContext,
+        operation: String
+    ) -> [T] {
+        do {
+            return try context.fetch(descriptor)
+        } catch {
+            OhanaLog.warning(
+                "StarterGiftService failed to \(operation): \(error.localizedDescription)",
+                category: "Economy"
+            )
+            return []
+        }
+    }
+
+    @MainActor
+    private static func fetchCountOrLog(
+        _ descriptor: FetchDescriptor<some PersistentModel>,
+        context: ModelContext,
+        operation: String
+    ) -> Int {
+        do {
+            return try context.fetchCount(descriptor)
+        } catch {
+            OhanaLog.warning(
+                "StarterGiftService failed to \(operation): \(error.localizedDescription)",
+                category: "Economy"
+            )
+            return 0
+        }
     }
 
     private static func localizedGiftTitle() -> String {

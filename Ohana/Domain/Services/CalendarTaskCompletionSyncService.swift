@@ -10,6 +10,23 @@ enum CalendarTaskCompletionSyncService {
     private static let calendarSource = CareLedgerSource.calendar.rawValue
 
     @MainActor
+    private static func fetchOrLog<T: PersistentModel>(
+        _ descriptor: FetchDescriptor<T>,
+        context: ModelContext,
+        operation: String
+    ) -> [T] {
+        do {
+            return try context.fetch(descriptor)
+        } catch {
+            OhanaLog.warning(
+                "CalendarTaskCompletionSyncService failed to \(operation): \(error.localizedDescription)",
+                category: "Care"
+            )
+            return []
+        }
+    }
+
+    @MainActor
     static func syncPetTask(
         event: Event,
         occurrenceDate: Date,
@@ -224,15 +241,15 @@ enum CalendarTaskCompletionSyncService {
         case "PetCareLog":
             var descriptor = FetchDescriptor<PetCareLog>(predicate: #Predicate<PetCareLog> { $0.id == id })
             descriptor.fetchLimit = 1
-            if let model = try? context.fetch(descriptor).first { context.delete(model) }
+            if let model = fetchOrLog(descriptor, context: context, operation: "fetch generated pet care log").first { context.delete(model) }
         case "PetPottyLog":
             var descriptor = FetchDescriptor<PetPottyLog>(predicate: #Predicate<PetPottyLog> { $0.id == id })
             descriptor.fetchLimit = 1
-            if let model = try? context.fetch(descriptor).first { context.delete(model) }
+            if let model = fetchOrLog(descriptor, context: context, operation: "fetch generated pet potty log").first { context.delete(model) }
         case "PetHygieneLog":
             var descriptor = FetchDescriptor<PetHygieneLog>(predicate: #Predicate<PetHygieneLog> { $0.id == id })
             descriptor.fetchLimit = 1
-            if let model = try? context.fetch(descriptor).first { context.delete(model) }
+            if let model = fetchOrLog(descriptor, context: context, operation: "fetch generated pet hygiene log").first { context.delete(model) }
         default:
             return
         }
@@ -246,7 +263,7 @@ enum CalendarTaskCompletionSyncService {
         )
         descriptor.fetchLimit = 20
         let key = occurrenceKey(for: occurrenceDate)
-        return ((try? context.fetch(descriptor)) ?? []).filter {
+        return fetchOrLog(descriptor, context: context, operation: "fetch calendar ledger entries").filter {
             $0.source == calendarSource && $0.metadataJSON.contains("\"occurrence\":\"\(key)\"")
         }
     }

@@ -26,7 +26,7 @@ struct QuickFeedPlanCalendarSnapshotStoreTests {
         let snapshot = QuickFeedPlanCalendarSnapshot.build(
             manualEvents: [event],
             autoEvents: [],
-            careLogs: [],
+            feedingLedgerEvents: [],
             activeMode: .manualReminder,
             month: today,
             selectedDate: today,
@@ -55,18 +55,23 @@ struct QuickFeedPlanCalendarSnapshotStoreTests {
         )
         event.recurrenceDays = 1
         event.feedRuleKindRaw = FeedRuleKind.autoFeeder.rawValue
-        let log = PetCareLog(
-            date: event.startDate,
-            amountGrams: 35,
-            note: FeedLogMetadata.autoNote(eventId: event.id, scheduledAt: event.startDate),
-            foodKind: .dry,
-            pet: pet
+        let ledger = CareLedgerEvent(
+            occurredAt: event.startDate,
+            subjectKind: .pet,
+            subjectId: pet.id.uuidString,
+            eventKind: .care,
+            actionType: CareType.feeding.rawValue,
+            amountValue: 35,
+            amountUnit: "g",
+            source: .service,
+            sourceEventId: event.id.uuidString,
+            legacyModelName: "PetCareLog"
         )
 
         let snapshot = QuickFeedPlanCalendarSnapshot.build(
             manualEvents: [],
             autoEvents: [event],
-            careLogs: [log],
+            feedingLedgerEvents: [ledger],
             activeMode: .autoFeeder,
             month: today,
             selectedDate: today,
@@ -75,7 +80,49 @@ struct QuickFeedPlanCalendarSnapshotStoreTests {
         )
 
         #expect(snapshot.selectedDateOccurrences.count == 1)
-        #expect(snapshot.selectedDateOccurrences.first?.autoLog?.id == log.id)
+        #expect(snapshot.selectedDateOccurrences.first?.autoLedgerEvent?.id == ledger.id)
+        #expect(snapshot.selectedDateOccurrences.first?.isCompleted == true)
+    }
+
+    @Test func planCalendarSnapshotBuildsAutoOccurrencesFromBackfilledLedgerNote() {
+        let pet = Pet(name: "Momo", species: "猫")
+        let calendar = Calendar(identifier: .gregorian)
+        let now = fixedDate()
+        let today = calendar.startOfDay(for: now)
+        let event = Event(
+            title: "Auto",
+            startDate: calendar.date(bySettingHour: 7, minute: 30, second: 0, of: today) ?? today,
+            eventType: EventType.foodChange.rawValue,
+            relatedEntityType: FeedRuleMetadata.autoFeederEntityType,
+            relatedEntityId: pet.id.uuidString
+        )
+        event.recurrenceDays = 1
+        event.feedRuleKindRaw = FeedRuleKind.autoFeeder.rawValue
+        let ledger = CareLedgerEvent(
+            occurredAt: event.startDate,
+            subjectKind: .pet,
+            subjectId: pet.id.uuidString,
+            eventKind: .care,
+            actionType: CareType.feeding.rawValue,
+            amountValue: 35,
+            amountUnit: "g",
+            note: FeedLogMetadata.autoNote(eventId: event.id, scheduledAt: event.startDate),
+            source: .backfill,
+            legacyModelName: "PetCareLog"
+        )
+
+        let snapshot = QuickFeedPlanCalendarSnapshot.build(
+            manualEvents: [],
+            autoEvents: [event],
+            feedingLedgerEvents: [ledger],
+            activeMode: .autoFeeder,
+            month: today,
+            selectedDate: today,
+            now: now,
+            calendar: calendar
+        )
+
+        #expect(snapshot.selectedDateOccurrences.first?.autoLedgerEvent?.id == ledger.id)
         #expect(snapshot.selectedDateOccurrences.first?.isCompleted == true)
     }
 
@@ -97,7 +144,7 @@ struct QuickFeedPlanCalendarSnapshotStoreTests {
         let snapshot = QuickFeedPlanCalendarSnapshot.build(
             manualEvents: [],
             autoEvents: [event],
-            careLogs: [],
+            feedingLedgerEvents: [],
             activeMode: .autoFeeder,
             month: today,
             selectedDate: today,

@@ -43,7 +43,9 @@ extension QuickFeedDetailContent {
         let antiRepeatModel = QuickFeedAntiRepeatScreenModel(
             pet: pet,
             currentUserId: currentUserId,
-            humans: allHumans
+            humans: allHumans,
+            feedingLedgerEvents: feedingLedgerEvents,
+            now: Date()
         )
         if let warning = antiRepeatModel.recentFeedingWarning() {
             pendingRepeatAction = action
@@ -77,6 +79,9 @@ extension QuickFeedDetailContent {
             if visibleSheet.needsFullCareLogs, dataController.hasLoadedFullCareLogs {
                 loadFullCareLogs(force: true)
             }
+            if visibleSheet.needsFullCareLogs, dataController.hasLoadedFullFeedingLedgerEvents {
+                loadFullFeedingLedgerEvents(force: true)
+            }
             if visibleSheet.needsFullFoodRecords, dataController.hasLoadedFullFoodRecords {
                 loadFullFoodRecords(force: true)
             }
@@ -105,7 +110,8 @@ extension QuickFeedDetailContent {
             pet: pet,
             manualPlanEvents: feedScheduleEvents,
             autoFeederEvents: autoFeederEvents,
-            careLogs: observedCareLogs,
+            feedingLedgerEvents: observedFeedingLedgerEvents,
+            legacyCareLogs: observedCareLogs,
             range: draftStore.overviewRange,
             activeMode: activeFeedingMode,
             defaultFeedGrams: defaultFeedGrams,
@@ -118,7 +124,7 @@ extension QuickFeedDetailContent {
         planCalendarSnapshotStore.rebuild(
             manualEvents: feedScheduleEvents,
             autoEvents: autoFeederEvents,
-            careLogs: observedCareLogs,
+            feedingLedgerEvents: observedFeedingLedgerEvents,
             activeMode: activeFeedingMode,
             month: draftStore.feedPlanCalendarMonth,
             selectedDate: draftStore.feedPlanCalendarSelectedDate,
@@ -130,7 +136,8 @@ extension QuickFeedDetailContent {
     func refreshTreatSnapshot(force: Bool = false) {
         treatSnapshotStore.rebuild(
             pet: pet,
-            careLogs: observedCareLogs,
+            feedingLedgerEvents: observedFeedingLedgerEvents,
+            legacyCareLogs: observedCareLogs,
             range: draftStore.overviewRange,
             selectedKind: draftStore.selectedTreatOverviewKind,
             now: clockTick,

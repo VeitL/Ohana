@@ -17,6 +17,23 @@ struct QuickPlayCommandResult: Equatable {
 }
 
 @MainActor
+private func fetchQuickPlayModelsOrLog<T: PersistentModel>(
+    _ descriptor: FetchDescriptor<T>,
+    context: ModelContext,
+    operation: String
+) -> [T] {
+    do {
+        return try context.fetch(descriptor)
+    } catch {
+        OhanaLog.warning(
+            "QuickPlayCommandExecutor failed to \(operation): \(error.localizedDescription)",
+            category: "Care"
+        )
+        return []
+    }
+}
+
+@MainActor
 struct QuickPlayCommandExecutor {
     private let context: ModelContext
     private let careEvents: CareEventRecording
@@ -108,6 +125,10 @@ struct QuickPlayCommandExecutor {
             }
         )
         descriptor.fetchLimit = 1
-        return (try? context.fetch(descriptor))?.first
+        return fetchQuickPlayModelsOrLog(
+            descriptor,
+            context: context,
+            operation: "fetch pet"
+        ).first
     }
 }

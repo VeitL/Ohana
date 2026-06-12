@@ -197,6 +197,8 @@ nonisolated extension DataBackupManager {
         l.endDate = parseDate(dto.endDate)
         l.distanceMeters = dto.distanceMeters
         l.coconutsEarned = dto.coconutsEarned
+        l.behaviorNotes = dto.behaviorNotes
+        l.moodRating = dto.moodRating ?? 0
         return l
     }
 

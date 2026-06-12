@@ -170,6 +170,41 @@ enum CloudSyncMutationRecorder {
         )
     }
 
+    @discardableResult
+    static func markModified(
+        _ event: CareLedgerEvent,
+        context: ModelContext,
+        modifiedAt: Date = Date()
+    ) -> CloudSyncRecordState? {
+        markModified(
+            entityName: String(describing: CareLedgerEvent.self),
+            localRecordId: event.id,
+            householdId: sharedHouseholdId(context: context, now: modifiedAt),
+            fallbackHouseholdId: event.id,
+            modifiedAt: modifiedAt,
+            context: context
+        )
+    }
+
+    static func markModified(
+        _ events: [CareLedgerEvent],
+        context: ModelContext,
+        modifiedAt: Date = Date()
+    ) {
+        guard !events.isEmpty else { return }
+        let householdId = sharedHouseholdId(context: context, now: modifiedAt)
+        for event in events {
+            _ = markModified(
+                entityName: String(describing: CareLedgerEvent.self),
+                localRecordId: event.id,
+                householdId: householdId,
+                fallbackHouseholdId: event.id,
+                modifiedAt: modifiedAt,
+                context: context
+            )
+        }
+    }
+
     static func markModified(
         _ logs: [PetExpenseLog],
         context: ModelContext,

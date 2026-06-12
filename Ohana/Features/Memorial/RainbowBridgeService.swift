@@ -19,25 +19,46 @@ struct RainbowBridgeService {
         let now = Date()
 
         // 1. 删除该宠物关联的所有未来未完成 Reminder
-        let reminderDesc = FetchDescriptor<Reminder>()
-        if let reminders = try? context.fetch(reminderDesc) {
-            for r in reminders where r.isPending && r.scheduledAt >= now {
-                if r.event?.relatedEntityId == petIdStr {
-                    OhanaNotifications.current.cancel(notificationId: r.notificationId)
-                    context.delete(r)
-                }
+        let pendingStatus = ReminderStatus.pending.rawValue
+        let reminderDesc = FetchDescriptor<Reminder>(
+            predicate: #Predicate<Reminder> { reminder in
+                reminder.status == pendingStatus && reminder.scheduledAt >= now
             }
+        )
+        let reminders = fetchModelsOrLog(reminderDesc, context: context, operation: "fetch future pet reminders")
+        for reminder in reminders where reminder.event?.relatedEntityId == petIdStr {
+            OhanaNotifications.current.cancel(notificationId: reminder.notificationId)
+            context.delete(reminder)
         }
 
         // 2. 删除该宠物关联的所有未来 Event（保留历史已发生事件）
-        let eventDesc = FetchDescriptor<Event>()
-        if let events = try? context.fetch(eventDesc) {
-            for e in events where e.relatedEntityId == petIdStr && e.startDate > now {
-                context.delete(e)
+        let eventDesc = FetchDescriptor<Event>(
+            predicate: #Predicate<Event> { event in
+                event.relatedEntityId == petIdStr && event.startDate > now
             }
+        )
+        let events = fetchModelsOrLog(eventDesc, context: context, operation: "fetch future pet events")
+        for event in events {
+            context.delete(event)
         }
 
         context.safeSave()
+    }
+
+    private func fetchModelsOrLog<T: PersistentModel>(
+        _ descriptor: FetchDescriptor<T>,
+        context: ModelContext,
+        operation: String
+    ) -> [T] {
+        do {
+            return try context.fetch(descriptor)
+        } catch {
+            OhanaLog.warning(
+                "RainbowBridgeService failed to \(operation): \(error.localizedDescription)",
+                category: "Memorial"
+            )
+            return []
+        }
     }
 
     /// 撤销离世标记（误操作恢复）

@@ -8,6 +8,23 @@
 import Foundation
 import SwiftData
 
+@MainActor
+private func fetchPetDocumentModelsOrLog<T: PersistentModel>(
+    _ descriptor: FetchDescriptor<T>,
+    context: ModelContext,
+    operation: String
+) -> [T] {
+    do {
+        return try context.fetch(descriptor)
+    } catch {
+        OhanaLog.warning(
+            "PetDocumentCommands failed to \(operation): \(error.localizedDescription)",
+            category: "Care"
+        )
+        return []
+    }
+}
+
 struct PetDocumentAttachmentCommandInput: Equatable {
     let data: Data
     let filename: String
@@ -291,9 +308,18 @@ enum PetDocumentCommandService {
 
     @MainActor
     private static func validPayerId(_ payerId: String?, context: ModelContext) -> String? {
-        guard let payerId, !payerId.isEmpty, UUID(uuidString: payerId) != nil else { return nil }
-        let humans = (try? context.fetch(FetchDescriptor<Human>())) ?? [] // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
-        return humans.contains { $0.id.uuidString == payerId } ? payerId : nil
+        guard let payerId, !payerId.isEmpty, let id = UUID(uuidString: payerId) else { return nil }
+        let descriptor = FetchDescriptor<Human>(
+            predicate: #Predicate<Human> { human in
+                human.id == id
+            }
+        )
+        let humans = fetchPetDocumentModelsOrLog(
+            descriptor,
+            context: context,
+            operation: "fetch document payer"
+        )
+        return humans.isEmpty ? nil : payerId
     }
 
     @MainActor
@@ -303,8 +329,16 @@ enum PetDocumentCommandService {
         context: ModelContext
     ) -> [CareLedgerEvent] {
         let idString = id.uuidString
-        let events = (try? context.fetch(FetchDescriptor<CareLedgerEvent>())) ?? [] // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
-        return events.filter { $0.legacyModelName == modelName && $0.legacyModelId == idString }
+        let descriptor = FetchDescriptor<CareLedgerEvent>(
+            predicate: #Predicate<CareLedgerEvent> { event in
+                event.legacyModelName == modelName && event.legacyModelId == idString
+            }
+        )
+        return fetchPetDocumentModelsOrLog(
+            descriptor,
+            context: context,
+            operation: "fetch document ledger events"
+        )
     }
 }
 

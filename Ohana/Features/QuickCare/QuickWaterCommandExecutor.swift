@@ -27,6 +27,24 @@ enum QuickWaterDeletedLogKind {
 }
 
 @MainActor
+private func fetchQuickWaterModelsOrLog<T: PersistentModel>(
+    _ descriptor: FetchDescriptor<T>,
+    context: ModelContext,
+    operation: String,
+    fallback: [T] = []
+) -> [T] {
+    do {
+        return try context.fetch(descriptor)
+    } catch {
+        OhanaLog.warning(
+            "QuickWaterCommandExecutor failed to \(operation): \(error.localizedDescription)",
+            category: "Care"
+        )
+        return fallback
+    }
+}
+
+@MainActor
 struct QuickWaterCommandExecutor {
     private let context: ModelContext
     private let activeHumanSelection: ActiveHumanSelecting
@@ -68,7 +86,13 @@ struct QuickWaterCommandExecutor {
         let descriptor = FetchDescriptor<Event>(
             sortBy: [SortDescriptor(\Event.startDate)]
         )
-        return (try? context.fetch(descriptor)) ?? fallback
+        let events = fetchQuickWaterModelsOrLog(
+            descriptor,
+            context: context,
+            operation: "fetch latest events",
+            fallback: fallback
+        )
+        return events
     }
 
     func suggestedWaterPlanTimes(count: Int) -> [Date] {

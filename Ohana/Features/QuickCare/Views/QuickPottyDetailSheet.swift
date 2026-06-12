@@ -14,6 +14,9 @@ struct QuickPottyDetailSheet: View {
     var onClose: (() -> Void)?
     let allEvents: [Event]
     let allPets: [Pet]
+    let pottyLedgerEvents: [CareLedgerEvent]
+    let legacyPottyDeleteLogs: [PetPottyLog]
+    let legacyLitterDeleteLogs: [PetCareLog]
 
     @Environment(\.modelContext) var modelContext
     @Environment(\.dismiss) var dismiss
@@ -55,13 +58,19 @@ struct QuickPottyDetailSheet: View {
         onRemove: @escaping () -> Void,
         onClose: (() -> Void)? = nil,
         allEvents: [Event] = [],
-        allPets: [Pet] = []
+        allPets: [Pet] = [],
+        pottyLedgerEvents: [CareLedgerEvent] = [],
+        legacyPottyDeleteLogs: [PetPottyLog] = [],
+        legacyLitterDeleteLogs: [PetCareLog] = []
     ) {
         self.pet = pet
         self.onRemove = onRemove
         self.onClose = onClose
         self.allEvents = allEvents
         self.allPets = allPets
+        self.pottyLedgerEvents = pottyLedgerEvents
+        self.legacyPottyDeleteLogs = legacyPottyDeleteLogs
+        self.legacyLitterDeleteLogs = legacyLitterDeleteLogs
     }
 
     typealias PottyFocus = QuickPottyFocus
@@ -107,14 +116,29 @@ struct QuickPottyDetailSheet: View {
         isCatPet ? [.potty, .scoop, .litter] : [.potty]
     }
 
-    var todayPottyLogs: [PetPottyLog] {
-        pet.pottyLogs
+    var todayPottyLogs: [PoopPottyLedgerEntry] {
+        pottyLogs
             .filter { Calendar.current.isDateInToday($0.date) }
             .sorted { $0.date > $1.date }
     }
 
-    var pottyLogs: [PetPottyLog] {
-        pet.pottyLogs.sorted { $0.date > $1.date }
+    var pottyLogs: [PoopPottyLedgerEntry] {
+        pottyLedgerEvents.compactMap { event in
+            guard event.eventKindEnum == .potty,
+                  event.subjectKind == CareLedgerSubjectKind.pet.rawValue,
+                  event.subjectId == petKey,
+                  let pottyType = PottyType(rawValue: event.actionType) else { return nil }
+            let legacyLogId = event.legacyModelName == "PetPottyLog"
+                ? event.legacyModelId.flatMap(UUID.init(uuidString:))
+                : nil
+            return PoopPottyLedgerEntry(
+                id: event.id,
+                date: event.occurredAt,
+                pottyType: pottyType,
+                legacyLogId: legacyLogId
+            )
+        }
+        .sorted { $0.date > $1.date }
     }
 
     var unknownSharedPottyItems: [PoopLogItem] {
@@ -126,13 +150,25 @@ struct QuickPottyDetailSheet: View {
             .sorted { $0.date > $1.date }
     }
 
-    var litterLogs: [PetCareLog] {
-        pet.careLogs
-            .filter { $0.type == CareType.litter.rawValue }
-            .sorted { $0.date > $1.date }
+    var litterLogs: [PoopLitterLedgerEntry] {
+        pottyLedgerEvents.compactMap { event in
+            guard event.eventKindEnum == .care,
+                  event.subjectKind == CareLedgerSubjectKind.pet.rawValue,
+                  event.subjectId == petKey,
+                  event.actionType == CareType.litter.rawValue else { return nil }
+            let legacyLogId = event.legacyModelName == "PetCareLog"
+                ? event.legacyModelId.flatMap(UUID.init(uuidString:))
+                : nil
+            return PoopLitterLedgerEntry(
+                id: event.id,
+                date: event.occurredAt,
+                legacyLogId: legacyLogId
+            )
+        }
+        .sorted { $0.date > $1.date }
     }
 
-    var todayLitterLogs: [PetCareLog] {
+    var todayLitterLogs: [PoopLitterLedgerEntry] {
         litterLogs.filter { Calendar.current.isDateInToday($0.date) }
     }
 
@@ -166,8 +202,8 @@ struct QuickPottyDetailSheet: View {
         activeInlineSheet != nil
     }
 
-    var lastPottyLog: PetPottyLog? { pottyLogs.first }
-    var lastScoopLog: PetCareLog? { litterLogs.first }
+    var lastPottyLog: PoopPottyLedgerEntry? { pottyLogs.first }
+    var lastScoopLog: PoopLitterLedgerEntry? { litterLogs.first }
     var lastFullChange: Date? {
         LitterCareSettingsStore.lastFullChangeDate(petKey: petKey)
     }
@@ -186,7 +222,7 @@ struct QuickPottyDetailSheet: View {
     var last7DaysCounts: [(date: Date, count: Int)] {
         (0 ..< 7).map { offset in
             let date = Calendar.current.date(byAdding: .day, value: -offset, to: Date()) ?? Date()
-            let count = pet.pottyLogs.count(where: { Calendar.current.isDate($0.date, inSameDayAs: date) })
+            let count = pottyLogs.count(where: { Calendar.current.isDate($0.date, inSameDayAs: date) })
             return (date, count)
         }
         .reversed()
@@ -194,7 +230,7 @@ struct QuickPottyDetailSheet: View {
 
     var last7AbnormalRatio: Double {
         let start = Calendar.current.date(byAdding: .day, value: -7, to: Date()) ?? Date()
-        let logs = pet.pottyLogs.filter { $0.date >= start }
+        let logs = pottyLogs.filter { $0.date >= start }
         guard !logs.isEmpty else { return 0 }
         let abnormal = logs.count(where: { $0.pottyType == .softPoop || $0.pottyType == .liquidPoop })
         return Double(abnormal) / Double(logs.count)

@@ -23,10 +23,39 @@ private struct PottyPetSummary: Identifiable {
     let latestDate: Date?
 }
 
+struct IslandPottyDashboardLedgerEntry: Identifiable, Hashable {
+    let id: UUID
+    let petId: UUID
+    let date: Date
+    let pottyType: PottyType
+
+    static func entries(from events: [CareLedgerEvent], petIds: Set<UUID>) -> [IslandPottyDashboardLedgerEntry] {
+        let petSubject = CareLedgerSubjectKind.pet.rawValue
+        let pottyKind = CareLedgerEventKind.potty.rawValue
+        return events.compactMap { event in
+            guard event.subjectKind == petSubject,
+                  event.eventKind == pottyKind,
+                  let subjectId = event.subjectId,
+                  let petId = UUID(uuidString: subjectId),
+                  petIds.contains(petId),
+                  let pottyType = PottyType(rawValue: event.actionType) else { return nil }
+
+            return IslandPottyDashboardLedgerEntry(
+                id: event.id,
+                petId: petId,
+                date: event.occurredAt,
+                pottyType: pottyType
+            )
+        }
+        .sorted { $0.date > $1.date }
+    }
+}
+
 struct IslandPottyDashboardContentView: View {
     var standalone: Bool = true
     var onOpenPet: ((Pet) -> Void)?
     let pets: [Pet]
+    let pottyLedgerEvents: [CareLedgerEvent]
 
     @Environment(\.dismiss) private var dismiss
     @AppStorage("appLanguage") private var appLanguage = AppLanguage.fallbackCode
@@ -44,16 +73,22 @@ struct IslandPottyDashboardContentView: View {
         return activePets.filter { $0.id == selectedPetId }
     }
 
-    private var allLogs: [PetPottyLog] { selectedPets.flatMap(\.pottyLogs) }
-
-    private var todayLogs: [PetPottyLog] {
-        allLogs.filter { Calendar.current.isDateInToday($0.date) }
+    private var selectedPetIds: Set<UUID> {
+        Set(selectedPets.map(\.id))
     }
 
-    private var weekLogs: [PetPottyLog] {
+    private var pottyEntries: [IslandPottyDashboardLedgerEntry] {
+        IslandPottyDashboardLedgerEntry.entries(from: pottyLedgerEvents, petIds: selectedPetIds)
+    }
+
+    private var todayEntries: [IslandPottyDashboardLedgerEntry] {
+        pottyEntries.filter { Calendar.current.isDateInToday($0.date) }
+    }
+
+    private var weekEntries: [IslandPottyDashboardLedgerEntry] {
         let cal = Calendar.current
         let cutoff = cal.date(byAdding: .day, value: -6, to: cal.startOfDay(for: Date())) ?? Date()
-        return allLogs.filter { $0.date >= cutoff }
+        return pottyEntries.filter { $0.date >= cutoff }
     }
 
     private var dayPulses: [PottyDayPulse] {
@@ -61,14 +96,14 @@ struct IslandPottyDashboardContentView: View {
         let today = cal.startOfDay(for: Date())
         return (0 ..< 10).reversed().map { offset in
             let day = cal.date(byAdding: .day, value: -offset, to: today) ?? today
-            let count = allLogs.count(where: { cal.isDate($0.date, inSameDayAs: day) })
+            let count = pottyEntries.count(where: { cal.isDate($0.date, inSameDayAs: day) })
             return PottyDayPulse(date: day, count: count)
         }
     }
 
     private var typeCounts: [(type: PottyType, count: Int)] {
         PottyType.allCases.map { type in
-            (type, allLogs.count(where: { $0.type == type.rawValue }))
+            (type, pottyEntries.count(where: { $0.pottyType == type }))
         }
     }
 
@@ -77,14 +112,14 @@ struct IslandPottyDashboardContentView: View {
     }
 
     private var rhythmSummaryText: String {
-        guard !weekLogs.isEmpty else {
+        guard !weekEntries.isEmpty else {
             return l.tr(zh: "还没有形成规律", en: "No rhythm yet", de: "Noch kein Rhythmus")
         }
         let type = dominantType?.localizedLabel(l) ?? l.tr(zh: "混合记录", en: "mixed logs", de: "gemischt")
         return l.tr(
-            zh: "7 天共 \(weekLogs.count) 次 · \(type) 最多",
-            en: "7d · \(weekLogs.count)x · mostly \(type)",
-            de: "7 T. · \(weekLogs.count)x · meist \(type)"
+            zh: "7 天共 \(weekEntries.count) 次 · \(type) 最多",
+            en: "7d · \(weekEntries.count)x · mostly \(type)",
+            de: "7 T. · \(weekEntries.count)x · meist \(type)"
         )
     }
 
@@ -92,12 +127,13 @@ struct IslandPottyDashboardContentView: View {
         let cal = Calendar.current
         let cutoff = cal.date(byAdding: .day, value: -6, to: cal.startOfDay(for: Date())) ?? Date()
         return selectedPets.map { pet in
-            let latest = pet.pottyLogs.max { $0.date < $1.date }
+            let entries = pottyEntries.filter { $0.petId == pet.id }
+            let latest = entries.max { $0.date < $1.date }
             return PottyPetSummary(
                 id: pet.id,
                 pet: pet,
-                todayCount: pet.pottyLogs.count(where: { cal.isDateInToday($0.date) }),
-                weekCount: pet.pottyLogs.count(where: { $0.date >= cutoff }),
+                todayCount: entries.count(where: { cal.isDateInToday($0.date) }),
+                weekCount: entries.count(where: { $0.date >= cutoff }),
                 latestType: latest?.pottyType,
                 latestDate: latest?.date
             )
@@ -111,7 +147,7 @@ struct IslandPottyDashboardContentView: View {
             }
             .onAppear { animatePulse() }
             .onChange(of: selectedPetId) { _, _ in animatePulse() }
-            .onChange(of: allLogs.count) { _, _ in animatePulse() }
+            .onChange(of: pottyEntries.count) { _, _ in animatePulse() }
     }
 
     @ViewBuilder
@@ -203,7 +239,7 @@ struct IslandPottyDashboardContentView: View {
                     .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.goCardWhite.opacity(0.56))
                 HStack(alignment: .firstTextBaseline, spacing: 5) {
-                    Text("\(todayLogs.count)")
+                    Text("\(todayEntries.count)")
                         .font(OhanaFont.adaptive(size: 44, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.goCardWhite)
                     Text(l.tr(zh: "次", en: "x", de: "x"))

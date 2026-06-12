@@ -14,7 +14,14 @@ struct VerticalSolidHomeExpandedCardActions: View {
     let allEvents: [Event]
     let humanMedications: [HumanMedication]
     let humanMedicationLogs: [HumanMedicationLog]
-    let expenseLogs: [PetExpenseLog]
+    let feedingLedgerEntries: [HomeFeedQuickActionEntry]
+    let careLedgerEntries: [HomeCareQuickActionEntry]
+    let hygieneLedgerEntries: [HomeHygieneQuickActionEntry]
+    let walkLedgerEntries: [HomeWalkQuickActionEntry]
+    let pottyLedgerEntries: [HomePottyQuickActionEntry]
+    let petExpenseLedgerEntries: [HomePetExpenseQuickActionEntry]
+    let petWeightLedgerEntries: [HomePetWeightQuickActionEntry]
+    let expenseEntries: [HomeExpensePreviewEntry]
     let localization: L10n
     let activeHumanID: UUID?
     @Binding var quickActionItemsRaw: String
@@ -97,10 +104,95 @@ struct VerticalSolidHomeExpandedCardActions: View {
             "\(allEvents.count)",
             "\(humanMedications.count)",
             "\(humanMedicationLogs.count)",
-            "\(expenseLogs.count)",
+            feedingLedgerRevisionKey,
+            careLedgerRevisionKey,
+            hygieneLedgerRevisionKey,
+            walkLedgerRevisionKey,
+            pottyLedgerRevisionKey,
+            petExpenseLedgerRevisionKey,
+            petWeightLedgerRevisionKey,
+            "\(expenseEntries.count)",
             card.homePrimaryMetricValue,
             card.statusBadgeText ?? ""
         ].joined(separator: "|")
+    }
+
+    private var feedingLedgerRevisionKey: String {
+        feedingLedgerEntries.prefix(120).map { entry in
+            [
+                entry.id.uuidString,
+                entry.petId.uuidString,
+                entry.source.rawValue,
+                "\(Int(entry.date.timeIntervalSince1970))"
+            ].joined(separator: ":")
+        }.joined(separator: ";")
+    }
+
+    private var careLedgerRevisionKey: String {
+        careLedgerEntries.prefix(180).map { entry in
+            [
+                entry.id.uuidString,
+                entry.petId.uuidString,
+                entry.actionType,
+                "\(Int(entry.date.timeIntervalSince1970))",
+                "\(Int(entry.amountValue.rounded()))"
+            ].joined(separator: ":")
+        }.joined(separator: ";")
+    }
+
+    private var hygieneLedgerRevisionKey: String {
+        hygieneLedgerEntries.prefix(160).map { entry in
+            [
+                entry.id.uuidString,
+                entry.petId.uuidString,
+                entry.hygieneType.rawValue,
+                "\(Int(entry.date.timeIntervalSince1970))"
+            ].joined(separator: ":")
+        }.joined(separator: ";")
+    }
+
+    private var walkLedgerRevisionKey: String {
+        walkLedgerEntries.prefix(80).map { entry in
+            [
+                entry.id.uuidString,
+                entry.petId.uuidString,
+                "\(Int(entry.startDate.timeIntervalSince1970))",
+                "\(Int(entry.distanceMeters.rounded()))"
+            ].joined(separator: ":")
+        }.joined(separator: ";")
+    }
+
+    private var pottyLedgerRevisionKey: String {
+        pottyLedgerEntries.prefix(120).map { entry in
+            [
+                entry.id.uuidString,
+                entry.petId.uuidString,
+                entry.pottyType.rawValue,
+                "\(Int(entry.date.timeIntervalSince1970))"
+            ].joined(separator: ":")
+        }.joined(separator: ";")
+    }
+
+    private var petExpenseLedgerRevisionKey: String {
+        petExpenseLedgerEntries.prefix(160).map { entry in
+            [
+                entry.id.uuidString,
+                entry.petId.uuidString,
+                "\(Int(entry.date.timeIntervalSince1970))",
+                "\(Int(entry.amount.rounded()))"
+            ].joined(separator: ":")
+        }.joined(separator: ";")
+    }
+
+    private var petWeightLedgerRevisionKey: String {
+        petWeightLedgerEntries.prefix(160).map { entry in
+            [
+                entry.id.uuidString,
+                entry.petId.uuidString,
+                "\(Int(entry.date.timeIntervalSince1970))",
+                "\(Int((entry.weightKg * 1000).rounded()))"
+            ].joined(separator: ":")
+        }.joined(separator: ";")
     }
 
     private func scheduleRenderModelRefresh(normalizesStoredItems: Bool) {
@@ -380,21 +472,35 @@ struct VerticalSolidHomeExpandedCardActions: View {
                     item: item,
                     pet: pet,
                     allEvents: allEvents,
-                    allFeedCareLogs: pet.careLogs,
+                    feedingLedgerEntries: feedingLedgerEntries,
+                    careLedgerEntries: careLedgerEntries,
+                    hygieneLedgerEntries: hygieneLedgerEntries,
+                    walkLedgerEntries: walkLedgerEntries,
+                    pottyLedgerEntries: pottyLedgerEntries,
+                    petExpenseLedgerEntries: petExpenseLedgerEntries,
+                    petWeightLedgerEntries: petWeightLedgerEntries,
                     now: now
                 ),
                 isCompleted: ExpandedQuickActionLogic.isCompleted(
                     item: item,
                     pet: pet,
                     allEvents: allEvents,
-                    allFeedCareLogs: pet.careLogs,
+                    feedingLedgerEntries: feedingLedgerEntries,
+                    careLedgerEntries: careLedgerEntries,
+                    hygieneLedgerEntries: hygieneLedgerEntries,
+                    walkLedgerEntries: walkLedgerEntries,
+                    pottyLedgerEntries: pottyLedgerEntries,
+                    petWeightLedgerEntries: petWeightLedgerEntries,
                     now: now
                 ),
                 showsAttention: ExpandedQuickActionLogic.showsAttentionDot(
                     item: item,
                     pet: pet,
                     allEvents: allEvents,
-                    allFeedCareLogs: pet.careLogs,
+                    feedingLedgerEntries: feedingLedgerEntries,
+                    careLedgerEntries: careLedgerEntries,
+                    walkLedgerEntries: walkLedgerEntries,
+                    pottyLedgerEntries: pottyLedgerEntries,
                     now: now
                 ),
                 isLocked: false
@@ -442,7 +548,7 @@ struct VerticalSolidHomeExpandedCardActions: View {
             privacy: appServices.privacy,
             activeMedications: humanMedications,
             todayMedicationLogs: humanMedicationLogs,
-            recentExpenses: expenseLogs
+            recentExpenses: expenseEntries
         )
     }
 
@@ -474,7 +580,7 @@ struct VerticalSolidHomeExpandedCardActions: View {
                 for: item,
                 pet: pet,
                 allEvents: allEvents,
-                allFeedCareLogs: pet.careLogs,
+                feedingLedgerEntries: feedingLedgerEntries,
                 now: Date()
             )
             guard !options.isEmpty else { return policy }

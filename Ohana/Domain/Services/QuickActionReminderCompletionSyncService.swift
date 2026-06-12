@@ -7,6 +7,23 @@ import Foundation
 import SwiftData
 
 @MainActor
+private func fetchQuickActionReminderModelsOrLog<T: PersistentModel>(
+    _ descriptor: FetchDescriptor<T>,
+    context: ModelContext,
+    operation: String
+) -> [T] {
+    do {
+        return try context.fetch(descriptor)
+    } catch {
+        OhanaLog.warning(
+            "QuickActionReminderCompletionSyncService failed to \(operation): \(error.localizedDescription)",
+            category: "Care"
+        )
+        return []
+    }
+}
+
+@MainActor
 protocol QuickActionReminderCompleting {
     @discardableResult
     func completeNearestPetCareReminder(
@@ -185,7 +202,11 @@ final class QuickActionReminderCompletionSyncService: QuickActionReminderComplet
         )
         descriptor.fetchLimit = 96
 
-        let reminders = (try? context.fetch(descriptor)) ?? []
+        let reminders = fetchQuickActionReminderModelsOrLog(
+            descriptor,
+            context: context,
+            operation: "fetch pending pet reminders"
+        )
         let petId = pet.id.uuidString
         let matched = reminders.filter { reminder in
             guard let event = reminder.event,
@@ -273,7 +294,11 @@ extension CareEventService {
 
     @MainActor
     static func stockOwnerPet(for targets: [Pet], preferred: Pet, foodKind: FeedFoodKind, context: ModelContext) -> Pet {
-        let records = (try? context.fetch(FetchDescriptor<PetFoodRecord>())) ?? [] // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
+        let records = fetchQuickActionReminderModelsOrLog(
+            FetchDescriptor<PetFoodRecord>(),
+            context: context,
+            operation: "fetch food records for stock owner"
+        )
         if FeedStockCalculator.activeStockRecord(for: preferred, foodKind: foodKind, foodRecords: records) != nil {
             return preferred
         }

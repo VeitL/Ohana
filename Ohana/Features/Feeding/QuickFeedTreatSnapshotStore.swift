@@ -13,9 +13,9 @@ struct QuickFeedTreatSnapshot {
     let selectedKind: FeedTreatKind?
     let startDate: Date
     let dates: [Date]
-    let logsInRange: [PetCareLog]
-    let filteredLogsInRange: [PetCareLog]
-    let filteredLogsToday: [PetCareLog]
+    let logsInRange: [QuickFeedLedgerEntry]
+    let filteredLogsInRange: [QuickFeedLedgerEntry]
+    let filteredLogsToday: [QuickFeedLedgerEntry]
     let filteredGramsToday: Double
     let chartPoints: [FeedOverviewChartPoint]
     let filteredChartPoints: [FeedOverviewChartPoint]
@@ -25,7 +25,8 @@ struct QuickFeedTreatSnapshot {
 
     static func build(
         pet: Pet,
-        careLogs: [PetCareLog],
+        feedingLedgerEvents: [CareLedgerEvent],
+        legacyCareLogs: [PetCareLog],
         range: FeedOverviewRange,
         selectedKind: FeedTreatKind?,
         now: Date,
@@ -36,8 +37,13 @@ struct QuickFeedTreatSnapshot {
         let dates = (0 ..< range.days).reversed().compactMap { offset in
             calendar.date(byAdding: .day, value: -offset, to: today)
         }
-        let logs = FeedStockCalculator
-            .treatLogs(for: pet, since: startDate, careLogs: careLogs)
+        let logs = QuickFeedOverviewSnapshot
+            .feedingEntries(
+                pet: pet,
+                feedingLedgerEvents: feedingLedgerEvents,
+                legacyCareLogs: legacyCareLogs
+            )
+            .filter { $0.source == .treat && $0.date >= startDate }
             .sorted { $0.date > $1.date }
         let filtered = selectedKind.map { kind in
             logs.filter { ($0.treatKind ?? .other) == kind }
@@ -53,7 +59,7 @@ struct QuickFeedTreatSnapshot {
             logsInRange: logs,
             filteredLogsInRange: filtered,
             filteredLogsToday: todayLogs,
-            filteredGramsToday: todayLogs.reduce(0) { $0 + max(0, $1.amountGrams) },
+            filteredGramsToday: todayLogs.reduce(0) { $0 + $1.displayAmountGrams },
             chartPoints: countChartPoints(logs: logs, dates: dates, calendar: calendar),
             filteredChartPoints: countChartPoints(logs: filtered, dates: dates, calendar: calendar),
             countByKind: Dictionary(uniqueKeysWithValues: FeedTreatKind.allCases.map { kind in
@@ -76,7 +82,7 @@ struct QuickFeedTreatSnapshot {
     }
 
     private static func countChartPoints(
-        logs: [PetCareLog],
+        logs: [QuickFeedLedgerEntry],
         dates: [Date],
         calendar: Calendar
     ) -> [FeedOverviewChartPoint] {
@@ -89,7 +95,8 @@ struct QuickFeedTreatSnapshot {
 }
 
 struct QuickFeedTreatSnapshotRevision: Equatable {
-    let careLogRevision: Int
+    let feedingLedgerRevision: Int
+    let legacyCareLogBridgeRevision: Int
     let petRevision: Int
     let rangeRawValue: String
     let selectedKindRawValue: String
@@ -97,17 +104,25 @@ struct QuickFeedTreatSnapshotRevision: Equatable {
 
     static func make(
         pet: Pet,
-        careLogs: [PetCareLog],
+        feedingLedgerEvents: [CareLedgerEvent],
+        legacyCareLogs: [PetCareLog],
         range: FeedOverviewRange,
         selectedKind: FeedTreatKind?,
         now: Date
     ) -> QuickFeedTreatSnapshotRevision {
         QuickFeedTreatSnapshotRevision(
-            careLogRevision: revisionHash(careLogs.prefix(240)) { hasher, log in
+            feedingLedgerRevision: revisionHash(feedingLedgerEvents.prefix(360)) { hasher, event in
+                hasher.combine(event.id)
+                hasher.combine(event.occurredAt.timeIntervalSince1970)
+                hasher.combine(event.subjectId)
+                hasher.combine(event.actionType)
+                hasher.combine(event.amountValue)
+                hasher.combine(event.note)
+                hasher.combine(event.source)
+                hasher.combine(event.legacyModelId)
+            },
+            legacyCareLogBridgeRevision: revisionHash(legacyCareLogs.prefix(360)) { hasher, log in
                 hasher.combine(log.id)
-                hasher.combine(log.date.timeIntervalSince1970)
-                hasher.combine(log.amountGrams)
-                hasher.combine(log.note)
                 hasher.combine(log.treatKindRaw)
             },
             petRevision: revisionHash([pet]) { hasher, pet in
@@ -145,7 +160,8 @@ final class QuickFeedTreatSnapshotStore: ObservableObject {
 
     func rebuild(
         pet: Pet,
-        careLogs: [PetCareLog],
+        feedingLedgerEvents: [CareLedgerEvent],
+        legacyCareLogs: [PetCareLog],
         range: FeedOverviewRange,
         selectedKind: FeedTreatKind?,
         now: Date,
@@ -153,7 +169,8 @@ final class QuickFeedTreatSnapshotStore: ObservableObject {
     ) {
         let nextRevision = QuickFeedTreatSnapshotRevision.make(
             pet: pet,
-            careLogs: careLogs,
+            feedingLedgerEvents: feedingLedgerEvents,
+            legacyCareLogs: legacyCareLogs,
             range: range,
             selectedKind: selectedKind,
             now: now
@@ -161,7 +178,8 @@ final class QuickFeedTreatSnapshotStore: ObservableObject {
         guard force || nextRevision != revision else { return }
         snapshot = QuickFeedTreatSnapshot.build(
             pet: pet,
-            careLogs: careLogs,
+            feedingLedgerEvents: feedingLedgerEvents,
+            legacyCareLogs: legacyCareLogs,
             range: range,
             selectedKind: selectedKind,
             now: now

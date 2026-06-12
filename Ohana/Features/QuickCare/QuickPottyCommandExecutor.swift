@@ -18,6 +18,23 @@ struct QuickPottyCommandResult: Equatable {
 }
 
 @MainActor
+private func fetchQuickPottyModelsOrLog<T: PersistentModel>(
+    _ descriptor: FetchDescriptor<T>,
+    context: ModelContext,
+    operation: String
+) -> [T] {
+    do {
+        return try context.fetch(descriptor)
+    } catch {
+        OhanaLog.warning(
+            "QuickPottyCommandExecutor failed to \(operation): \(error.localizedDescription)",
+            category: "Care"
+        )
+        return []
+    }
+}
+
+@MainActor
 struct QuickPottyCommandExecutor {
     private let context: ModelContext
     private let careEvents: CareEventRecording
@@ -227,7 +244,11 @@ struct QuickPottyCommandExecutor {
             }
         )
         descriptor.fetchLimit = 1
-        return (try? context.fetch(descriptor))?.first
+        return fetchQuickPottyModelsOrLog(
+            descriptor,
+            context: context,
+            operation: "fetch pet"
+        ).first
     }
 
     private func fetchTargets(sourcePet: Pet, targetIDs: Set<UUID>) -> [Pet] {
@@ -238,17 +259,24 @@ struct QuickPottyCommandExecutor {
     }
 
     private func latestPottyLogID(petID: UUID, type: PottyType, date: Date) -> UUID? {
+        let typeRaw = type.rawValue
+        let lowerBound = date.addingTimeInterval(-0.001)
+        let upperBound = date.addingTimeInterval(0.001)
         var descriptor = FetchDescriptor<PetPottyLog>(
+            predicate: #Predicate<PetPottyLog> { log in
+                log.pet?.id == petID &&
+                    log.type == typeRaw &&
+                    log.date >= lowerBound &&
+                    log.date <= upperBound
+            },
             sortBy: [SortDescriptor(\.date, order: .reverse)]
         )
-        descriptor.fetchLimit = 12
-        return (try? context.fetch(descriptor))?
-            .first { log in
-                log.pet?.id == petID &&
-                    log.pottyType == type &&
-                    abs(log.date.timeIntervalSince(date)) < 0.001
-            }?
-            .id
+        descriptor.fetchLimit = 1
+        return fetchQuickPottyModelsOrLog(
+            descriptor,
+            context: context,
+            operation: "fetch latest potty log"
+        ).first?.id
     }
 
     private func publish(petID: UUID, action: String, affectedIDs: Set<UUID>, note: String) {

@@ -139,6 +139,9 @@ struct FocusHomeRouteSheetModifier: ViewModifier {
                 onClose: { routes.dismissModal() },
                 onPresentCoconutLog: { subject in
                     routes.openCoconutLog(subject)
+                },
+                onPresentCoconutShop: { category in
+                    routes.openCoconutShop(category, currentLevel: appServices.oasisTree.treeLevel.rawValue)
                 }
             )
             .ohanaSheetPagePresentation() // ui-v4: allow long streak overview
@@ -756,7 +759,7 @@ struct FocusHomeRouteSheetModifier: ViewModifier {
         case let .humanReport(id):
             if let human = human(id) {
                 HumanHealthReportView(human: human)
-                .ohanaSheetPagePresentation() // ui-v4: allow long overview/detail sheet
+                    .ohanaSheetPagePresentation() // ui-v4: allow long overview/detail sheet
             } else {
                 missingRouteDismissView()
             }

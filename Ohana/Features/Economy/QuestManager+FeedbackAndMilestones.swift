@@ -228,7 +228,16 @@ extension QuestManager {
                     r.scheduledAt < tomorrow
             }
         )
-        guard let reminders = try? context.fetch(descriptor) else { return }
+        let reminders: [Reminder]
+        do {
+            reminders = try context.fetch(descriptor)
+        } catch {
+            OhanaLog.warning(
+                "[QuestManager] failed to fetch reminders for reward auto-complete: \(error.localizedDescription)",
+                category: "Economy"
+            )
+            return
+        }
         // 找到关联该宠物且标题包含关键词的 Event -> Reminder
         for reminder in reminders {
             guard let event = reminder.event,
@@ -240,7 +249,14 @@ extension QuestManager {
             reminder.statusEnum = .completed
             reminder.completedAt = Date()
         }
-        try? context.save()
+        do {
+            try context.save()
+        } catch {
+            OhanaLog.warning(
+                "[QuestManager] failed to save reward auto-completed reminders: \(error.localizedDescription)",
+                category: "Economy"
+            )
+        }
     }
 
     /// 查询今日步数奖励是否已领取

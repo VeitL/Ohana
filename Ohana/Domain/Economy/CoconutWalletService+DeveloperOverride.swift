@@ -48,6 +48,14 @@ extension CoconutWalletService {
             predicate: #Predicate<CoconutAccount> { $0.accountKey == accountKey }
         )
         descriptor.fetchLimit = 1
-        return try? context.fetch(descriptor).first
+        do {
+            return try context.fetch(descriptor).first
+        } catch {
+            OhanaLog.warning(
+                "CoconutWalletService developer override failed to fetch account: \(error.localizedDescription)",
+                category: "Economy"
+            )
+            return nil
+        }
     }
 }

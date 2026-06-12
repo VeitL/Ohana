@@ -99,7 +99,7 @@ extension QuickWaterDetailSheet {
             let snapshot = QuickWaterRenderSnapshot.build(
                 pet: pet,
                 allEvents: allEvents,
-                waterCareLogs: waterCareLogs
+                waterLedgerEvents: waterLedgerEvents
             )
             waterSnapshot = snapshot
             if !snapshot.rule.planEvents.isEmpty {
@@ -705,7 +705,14 @@ extension QuickWaterDetailSheet {
         }
     }
 
-    func deleteLog(_ log: PetCareLog) {
+    func deleteLog(_ entry: QuickWaterLedgerEntry) {
+        guard let log = legacyWaterDeleteLog(for: entry) else {
+            OhanaLog.warning(
+                "QuickWaterDetailSheet could not resolve care log for ledger entry \(entry.id.uuidString)",
+                category: "Care"
+            )
+            return
+        }
         guard scheduleDeferredWaterAction({ deleteLogBusiness(log) }) else { return }
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
     }
@@ -770,11 +777,16 @@ extension QuickWaterDetailSheet {
         )
     }
 
-    func tint(for log: PetCareLog) -> Color {
-        if log.type == CareType.waterChange.rawValue {
+    func legacyWaterDeleteLog(for entry: QuickWaterLedgerEntry) -> PetCareLog? {
+        guard let legacyLogId = entry.legacyLogId else { return nil }
+        return legacyWaterDeleteLogs.first { $0.id == legacyLogId }
+    }
+
+    func tint(for log: QuickWaterLedgerEntry) -> Color {
+        if log.careType == .waterChange {
             return waterChangeTint
         }
-        if log.type == CareType.filterClean.rawValue {
+        if log.careType == .filterClean {
             return filterTint
         }
         return chromeTint

@@ -83,12 +83,20 @@ enum ExpandedQuickActionExecutor {
             (dashboard.operatingMode == .manualReminder && dashboard.nextManualReminder != nil)
 
         if willWriteFeedLog,
-           let warning = AntiRepeatCareManager.checkRecentCareLog(
+           let warning = AntiRepeatCareManager.checkRecentCareLedger(
                for: pet,
                type: .feeding,
+               ledgerEvents: recentCareLedgerEvents(
+                   for: pet,
+                   type: .feeding,
+                   thresholdMinutes: 120,
+                   context: modelContext,
+                   now: now
+               ),
                thresholdMinutes: 120,
                currentUserId: executorId,
-               in: humans
+               in: humans,
+               now: now
            ) {
             showAntiRepeat(antiRepeatTitle, antiRepeatMessage(warning), performFeed)
         } else {
@@ -290,6 +298,7 @@ enum ExpandedQuickActionExecutor {
         }
     }
 
+    @discardableResult
     static func applyGroomCheckIn(
         raw: String,
         pet: Pet,
@@ -298,7 +307,7 @@ enum ExpandedQuickActionExecutor {
         showSingleUseNotice: (String, String) -> Void,
         feedback: (Feedback) -> Void,
         careEvents: CareEventRecording
-    ) {
+    ) -> Bool {
         let type: HygieneType
         switch raw {
         case "bath": type = .bath
@@ -306,10 +315,10 @@ enum ExpandedQuickActionExecutor {
         case "nails": type = .nails
         case "brushing": type = .brushing
         case "ears": type = .ears
-        default: return
+        default: return false
         }
 
-        guard !pet.hygieneLogs.contains(where: { $0.type == type.rawValue && Calendar.current.isDateInToday($0.date) }) else {
+        guard !hasCompletedHygieneToday(pet: pet, type: type, context: modelContext) else {
             let l = L10n()
             showSingleUseNotice(
                 l.tr(zh: "今天已经完成了", en: "Already done today", de: "Heute schon erledigt"),
@@ -320,7 +329,7 @@ enum ExpandedQuickActionExecutor {
                 )
             )
             UINotificationFeedbackGenerator().notificationOccurred(.warning)
-            return
+            return false
         }
 
         let got = careEvents.recordHygiene(
@@ -333,6 +342,7 @@ enum ExpandedQuickActionExecutor {
         let delta = got.humanGot + got.petGot
         feedback(Feedback(cardId: pet.id, coconutDelta: delta, label: rewardLabel(title: L10n().hygieneTypeUILabel(type), delta: delta)))
         UINotificationFeedbackGenerator().notificationOccurred(.success)
+        return true
     }
 
     static func applyPottyCheckIn(
@@ -438,5 +448,75 @@ enum ExpandedQuickActionExecutor {
             en: "\(petName) \(careTitle) reward",
             de: "\(petName) \(careTitle) Belohnung"
         )
+    }
+
+    private static func hasCompletedHygieneToday(
+        pet: Pet,
+        type: HygieneType,
+        context: ModelContext,
+        calendar: Calendar = .current,
+        now: Date = Date()
+    ) -> Bool {
+        let subjectKind = CareLedgerSubjectKind.pet.rawValue
+        let subjectId = pet.id.uuidString
+        let eventKind = CareLedgerEventKind.hygiene.rawValue
+        let actionType = type.rawValue
+        let startOfDay = calendar.startOfDay(for: now)
+        let endOfDay = calendar.date(byAdding: .day, value: 1, to: startOfDay) ?? now
+        var descriptor = FetchDescriptor<CareLedgerEvent>(
+            predicate: #Predicate<CareLedgerEvent> { event in
+                event.subjectKind == subjectKind &&
+                    event.subjectId == subjectId &&
+                    event.eventKind == eventKind &&
+                    event.actionType == actionType &&
+                    event.occurredAt >= startOfDay &&
+                    event.occurredAt < endOfDay
+            }
+        )
+        descriptor.fetchLimit = 1
+        do {
+            return try context.fetch(descriptor).isEmpty == false
+        } catch {
+            OhanaLog.warning(
+                "Expanded quick action failed to fetch hygiene ledger duplicate state: \(error.localizedDescription)",
+                category: "Care"
+            )
+            return false
+        }
+    }
+
+    private static func recentCareLedgerEvents(
+        for pet: Pet,
+        type: CareType,
+        thresholdMinutes: Int,
+        context: ModelContext,
+        now: Date
+    ) -> [CareLedgerEvent] {
+        let subjectKind = CareLedgerSubjectKind.pet.rawValue
+        let subjectId = pet.id.uuidString
+        let eventKind = CareLedgerEventKind.care.rawValue
+        let actionType = type.rawValue
+        let since = now.addingTimeInterval(-Double(thresholdMinutes * 60))
+        var descriptor = FetchDescriptor<CareLedgerEvent>(
+            predicate: #Predicate<CareLedgerEvent> { event in
+                event.subjectKind == subjectKind &&
+                    event.subjectId == subjectId &&
+                    event.eventKind == eventKind &&
+                    event.actionType == actionType &&
+                    event.occurredAt >= since &&
+                    event.occurredAt <= now
+            },
+            sortBy: [SortDescriptor(\.occurredAt, order: .reverse)]
+        )
+        descriptor.fetchLimit = 12
+        do {
+            return try context.fetch(descriptor)
+        } catch {
+            OhanaLog.warning(
+                "Expanded quick action failed to fetch recent care ledger events: \(error.localizedDescription)",
+                category: "Care"
+            )
+            return []
+        }
     }
 }

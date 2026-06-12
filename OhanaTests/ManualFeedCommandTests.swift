@@ -5,6 +5,108 @@ import Testing
 
 @MainActor
 struct ManualFeedCommandTests {
+    @Test func quickFeedExecutorReadHelpersUseFetchedStoreRowsBeforeFallback() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let pet = Pet(name: "Momo", species: "猫")
+        let otherPet = Pet(name: "Luna", species: "猫")
+        let oldLog = PetCareLog(
+            date: date(year: 2026, month: 6, day: 1, hour: 8),
+            type: .feeding,
+            pet: pet,
+            executorId: "human-1"
+        )
+        let newLog = PetCareLog(
+            date: date(year: 2026, month: 6, day: 1, hour: 12),
+            type: .feeding,
+            pet: pet,
+            executorId: "human-1"
+        )
+        let fallbackLog = PetCareLog(
+            date: date(year: 2026, month: 6, day: 1, hour: 6),
+            type: .feeding,
+            pet: otherPet,
+            executorId: "fallback"
+        )
+        let oldRecord = PetFoodRecord(
+            brand: "Old",
+            dailyGrams: 40,
+            totalGrams: 400,
+            foodKind: .dry,
+            startDate: date(year: 2026, month: 6, day: 1, hour: 8),
+            pet: pet
+        )
+        let newRecord = PetFoodRecord(
+            brand: "New",
+            dailyGrams: 50,
+            totalGrams: 500,
+            foodKind: .dry,
+            startDate: date(year: 2026, month: 6, day: 1, hour: 12),
+            pet: pet
+        )
+        let otherRecord = PetFoodRecord(
+            brand: "Other",
+            dailyGrams: 60,
+            totalGrams: 600,
+            foodKind: .dry,
+            startDate: date(year: 2026, month: 6, day: 1, hour: 13),
+            pet: otherPet
+        )
+        let fallbackRecord = PetFoodRecord(
+            brand: "Fallback",
+            dailyGrams: 10,
+            totalGrams: 100,
+            foodKind: .dry,
+            startDate: date(year: 2026, month: 6, day: 1, hour: 6),
+            pet: otherPet
+        )
+        let laterEvent = Event(
+            title: "Later",
+            startDate: date(year: 2026, month: 6, day: 1, hour: 12),
+            eventType: EventType.daily.rawValue,
+            relatedEntityType: EntityKind.pet.rawValue,
+            relatedEntityId: pet.id.uuidString
+        )
+        let earlierEvent = Event(
+            title: "Earlier",
+            startDate: date(year: 2026, month: 6, day: 1, hour: 8),
+            eventType: EventType.daily.rawValue,
+            relatedEntityType: EntityKind.pet.rawValue,
+            relatedEntityId: pet.id.uuidString
+        )
+        let fallbackEvent = Event(
+            title: "Fallback",
+            startDate: date(year: 2026, month: 6, day: 1, hour: 6),
+            eventType: EventType.daily.rawValue,
+            relatedEntityType: EntityKind.pet.rawValue,
+            relatedEntityId: pet.id.uuidString
+        )
+        context.insert(pet)
+        context.insert(otherPet)
+        context.insert(oldLog)
+        context.insert(newLog)
+        context.insert(oldRecord)
+        context.insert(newRecord)
+        context.insert(otherRecord)
+        context.insert(laterEvent)
+        context.insert(earlierEvent)
+        try context.save()
+
+        let executor = QuickFeedCommandExecutor(context: context)
+
+        #expect(
+            executor.fullCareLogs(
+                petID: pet.id,
+                feedingType: CareType.feeding.rawValue,
+                fallback: [fallbackLog]
+            ).map(\.id) == [newLog.id, oldLog.id]
+        )
+        #expect(executor.fullFoodRecords(petID: pet.id, fallback: [fallbackRecord]).map(\.id) == [newRecord.id, oldRecord.id])
+        #expect(FeedCommandFetch.foodRecords(petID: pet.id, context: context, fallback: [fallbackRecord]).map(\.id) == [newRecord.id, oldRecord.id])
+        #expect(executor.latestAllEvents(fallback: [fallbackEvent]).map(\.id) == [earlierEvent.id, laterEvent.id])
+        #expect(FeedCommandFetch.latestEvents(context: context, fallback: [fallbackEvent]).map(\.id) == [earlierEvent.id, laterEvent.id])
+    }
+
     @Test func manualFeedCommandDoesNotDuplicateFoodStockReminderEvents() throws {
         let container = try makeContainer()
         let context = container.mainContext

@@ -13,7 +13,8 @@ struct IslandFoodDashboardContentView: View {
     var onOpenPet: ((Pet) -> Void)?
     let pets: [Pet]
     let allEvents: [Event]
-    let allCareLogs: [PetCareLog]
+    let allFeedingLedgerEvents: [CareLedgerEvent]
+    let legacyStockCareLogs: [PetCareLog]
     let allFoodRecords: [PetFoodRecord]
     let allSharedCareSessions: [SharedCareSession]
 
@@ -63,10 +64,11 @@ struct IslandFoodDashboardContentView: View {
             }
             .onChange(of: pets.count) { _, _ in rebuildSnapshot(force: true) }
             .onChange(of: allEvents.count) { _, _ in rebuildSnapshot(force: true) }
-            .onChange(of: allCareLogs.count) { _, _ in
+            .onChange(of: allFeedingLedgerEvents.count) { _, _ in
                 rebuildSnapshot(force: true)
                 playChartReveal()
             }
+            .onChange(of: legacyStockCareLogs.count) { _, _ in rebuildSnapshot(force: true) }
             .onChange(of: allFoodRecords.count) { _, _ in rebuildSnapshot(force: true) }
             .onChange(of: allSharedCareSessions.count) { _, _ in rebuildSnapshot(force: true) }
     }
@@ -419,7 +421,8 @@ struct IslandFoodDashboardContentView: View {
             pets: pets,
             selectedPetId: selectedPetId,
             allEvents: allEvents,
-            allCareLogs: allCareLogs,
+            allFeedingLedgerEvents: allFeedingLedgerEvents,
+            legacyStockCareLogs: legacyStockCareLogs,
             allFoodRecords: allFoodRecords,
             allSharedCareSessions: allSharedCareSessions,
             force: force

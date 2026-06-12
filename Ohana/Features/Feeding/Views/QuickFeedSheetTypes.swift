@@ -188,10 +188,10 @@ struct FeedPlanCalendarOccurrence: Identifiable {
     let date: Date
     let event: Event
     let reminder: Reminder?
-    let autoLog: PetCareLog?
+    let autoLedgerEvent: CareLedgerEvent?
 
     var isCompleted: Bool {
-        reminder?.isCompleted == true || autoLog != nil
+        reminder?.isCompleted == true || autoLedgerEvent != nil
     }
 }
 

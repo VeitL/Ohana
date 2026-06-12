@@ -11,6 +11,8 @@ import SwiftUI
 struct QuickPlayDetailRouteContainer: View {
     @Query private var pets: [Pet]
     @Query private var allEvents: [Event]
+    @Query private var playLedgerEvents: [CareLedgerEvent]
+    @Query private var legacyPlayDeleteLogs: [PetCareLog]
 
     let onRemove: () -> Void
     let onClose: (() -> Void)?
@@ -21,6 +23,9 @@ struct QuickPlayDetailRouteContainer: View {
         onClose: (() -> Void)? = nil
     ) {
         let petKey = id.uuidString
+        let petSubject = CareLedgerSubjectKind.pet.rawValue
+        let careKind = CareLedgerEventKind.care.rawValue
+        let playType = CareType.play.rawValue
         _pets = Query(filter: #Predicate<Pet> { pet in
             pet.id == id
         })
@@ -29,6 +34,24 @@ struct QuickPlayDetailRouteContainer: View {
                 event.relatedEntityId == petKey
             },
             sort: \.startDate
+        )
+        _playLedgerEvents = Query(
+            filter: #Predicate<CareLedgerEvent> { event in
+                event.subjectKind == petSubject &&
+                    event.subjectId == petKey &&
+                    event.eventKind == careKind &&
+                    event.actionType == playType
+            },
+            sort: \.occurredAt,
+            order: .reverse
+        )
+        _legacyPlayDeleteLogs = Query(
+            filter: #Predicate<PetCareLog> { log in
+                log.pet?.id == id &&
+                    log.type == playType
+            },
+            sort: \.date,
+            order: .reverse
         )
         self.onRemove = onRemove
         self.onClose = onClose
@@ -40,7 +63,9 @@ struct QuickPlayDetailRouteContainer: View {
                 pet: pet,
                 onRemove: onRemove,
                 onClose: onClose,
-                allEvents: allEvents
+                allEvents: allEvents,
+                playLedgerEvents: playLedgerEvents,
+                legacyPlayDeleteLogs: legacyPlayDeleteLogs
             )
         } else {
             QuickCareMissingRouteEntityView(kind: "pet")
@@ -54,6 +79,7 @@ struct QuickFeedDetailRouteContainer: View {
     @Query private var allEvents: [Event]
     @Query(sort: \Human.createdAt) private var allHumans: [Human]
     @Query(sort: \Pet.createdAt) private var allPets: [Pet]
+    @Query private var feedingLedgerEvents: [CareLedgerEvent]
     @Query private var allCareLogs: [PetCareLog]
     @Query private var allFoodRecords: [PetFoodRecord]
     @Query private var sharedCareSessions: [SharedCareSession]
@@ -75,6 +101,8 @@ struct QuickFeedDetailRouteContainer: View {
         let petKey = id.uuidString
         let dryStockKey = "\(petKey):\(FeedFoodKind.dry.rawValue)"
         let wetStockKey = "\(petKey):\(FeedFoodKind.wet.rawValue)"
+        let petSubject = CareLedgerSubjectKind.pet.rawValue
+        let careKind = CareLedgerEventKind.care.rawValue
         let feedingType = CareType.feeding.rawValue
         let sharedFeedingKind = SharedCareActionKind.feeding.rawValue
         let homeLogStartDate = Calendar.current.date(
@@ -93,6 +121,17 @@ struct QuickFeedDetailRouteContainer: View {
                     event.relatedEntityId == wetStockKey
             },
             sort: \.startDate
+        )
+        _feedingLedgerEvents = Query(
+            filter: #Predicate<CareLedgerEvent> { event in
+                event.subjectKind == petSubject &&
+                    event.subjectId == petKey &&
+                    event.eventKind == careKind &&
+                    event.actionType == feedingType &&
+                    event.occurredAt >= homeLogStartDate
+            },
+            sort: \.occurredAt,
+            order: .reverse
         )
         _allCareLogs = Query(
             filter: #Predicate<PetCareLog> { log in
@@ -137,6 +176,7 @@ struct QuickFeedDetailRouteContainer: View {
                 allEvents: allEvents,
                 allHumans: allHumans,
                 allPets: allPets,
+                feedingLedgerEvents: feedingLedgerEvents,
                 allCareLogs: allCareLogs,
                 allFoodRecords: allFoodRecords,
                 allSharedCareSessions: sharedCareSessions
@@ -152,7 +192,8 @@ struct QuickWaterDetailRouteContainer: View {
     @Query private var pets: [Pet]
     @Query private var allEvents: [Event]
     @Query(sort: \Pet.createdAt) private var allPets: [Pet]
-    @Query private var waterCareLogs: [PetCareLog]
+    @Query private var waterLedgerEvents: [CareLedgerEvent]
+    @Query private var legacyWaterDeleteLogs: [PetCareLog]
 
     let onRemove: () -> Void
     let onClose: (() -> Void)?
@@ -163,6 +204,8 @@ struct QuickWaterDetailRouteContainer: View {
         onClose: (() -> Void)? = nil
     ) {
         let petKey = id.uuidString
+        let petSubject = CareLedgerSubjectKind.pet.rawValue
+        let careKind = CareLedgerEventKind.care.rawValue
         let wateringType = CareType.watering.rawValue
         let waterChangeType = CareType.waterChange.rawValue
         let filterCleanType = CareType.filterClean.rawValue
@@ -176,7 +219,16 @@ struct QuickWaterDetailRouteContainer: View {
             },
             sort: \.startDate
         )
-        _waterCareLogs = Query(
+        _waterLedgerEvents = Query(
+            filter: #Predicate<CareLedgerEvent> { event in
+                event.subjectKind == petSubject &&
+                    event.subjectId == petKey &&
+                    event.eventKind == careKind
+            },
+            sort: \.occurredAt,
+            order: .reverse
+        )
+        _legacyWaterDeleteLogs = Query(
             filter: #Predicate<PetCareLog> { log in
                 (log.type == wateringType ||
                     log.type == waterChangeType ||
@@ -198,7 +250,8 @@ struct QuickWaterDetailRouteContainer: View {
                 onClose: onClose,
                 allEvents: allEvents,
                 allPets: allPets,
-                waterCareLogs: waterCareLogs
+                waterLedgerEvents: waterLedgerEvents,
+                legacyWaterDeleteLogs: legacyWaterDeleteLogs
             )
         } else {
             QuickCareMissingRouteEntityView(kind: "pet")
@@ -211,6 +264,9 @@ struct QuickPottyDetailRouteContainer: View {
     @Query private var pets: [Pet]
     @Query private var allEvents: [Event]
     @Query(sort: \Pet.createdAt) private var allPets: [Pet]
+    @Query private var pottyLedgerEvents: [CareLedgerEvent]
+    @Query private var legacyPottyDeleteLogs: [PetPottyLog]
+    @Query private var legacyLitterDeleteLogs: [PetCareLog]
 
     let onRemove: () -> Void
     let onClose: (() -> Void)?
@@ -221,6 +277,10 @@ struct QuickPottyDetailRouteContainer: View {
         onClose: (() -> Void)? = nil
     ) {
         let petKey = id.uuidString
+        let petSubject = CareLedgerSubjectKind.pet.rawValue
+        let pottyKind = CareLedgerEventKind.potty.rawValue
+        let careKind = CareLedgerEventKind.care.rawValue
+        let litterType = CareType.litter.rawValue
         _pets = Query(filter: #Predicate<Pet> { pet in
             pet.id == id
         })
@@ -229,6 +289,31 @@ struct QuickPottyDetailRouteContainer: View {
                 event.relatedEntityId == petKey
             },
             sort: \.startDate
+        )
+        _pottyLedgerEvents = Query(
+            filter: #Predicate<CareLedgerEvent> { event in
+                event.subjectKind == petSubject &&
+                    event.subjectId == petKey &&
+                    (event.eventKind == pottyKind ||
+                        (event.eventKind == careKind && event.actionType == litterType))
+            },
+            sort: \.occurredAt,
+            order: .reverse
+        )
+        _legacyPottyDeleteLogs = Query(
+            filter: #Predicate<PetPottyLog> { log in
+                log.pet?.id == id
+            },
+            sort: \.date,
+            order: .reverse
+        )
+        _legacyLitterDeleteLogs = Query(
+            filter: #Predicate<PetCareLog> { log in
+                log.pet?.id == id &&
+                    log.type == litterType
+            },
+            sort: \.date,
+            order: .reverse
         )
         self.onRemove = onRemove
         self.onClose = onClose
@@ -241,7 +326,10 @@ struct QuickPottyDetailRouteContainer: View {
                 onRemove: onRemove,
                 onClose: onClose,
                 allEvents: allEvents,
-                allPets: allPets
+                allPets: allPets,
+                pottyLedgerEvents: pottyLedgerEvents,
+                legacyPottyDeleteLogs: legacyPottyDeleteLogs,
+                legacyLitterDeleteLogs: legacyLitterDeleteLogs
             )
         } else {
             QuickCareMissingRouteEntityView(kind: "pet")

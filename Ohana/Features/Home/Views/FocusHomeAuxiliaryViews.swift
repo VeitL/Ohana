@@ -150,9 +150,7 @@ nonisolated struct TodayFocusSnapshot: Equatable, Sendable {
         events: [Event],
         humans: [Human],
         activeHumanId: String,
-        careLogs: [PetCareLog],
-        walkLogs: [PetWalkLog],
-        pottyLogs: [PetPottyLog],
+        careLedgerEntries: [TodayFocusCareLedgerEntry],
         humanWeightLogs: [HumanWeightLog],
         familyTasks: [FamilyCollaborationTask],
         exchangeRequests: [CoconutExchangeRequest],
@@ -166,6 +164,7 @@ nonisolated struct TodayFocusSnapshot: Equatable, Sendable {
             plants: plants,
             events: events,
             humans: humans,
+            careLedgerEntries: careLedgerEntries,
             now: now
         )
         let refreshedQuests = todayFocus.refreshedQuests(
@@ -173,9 +172,7 @@ nonisolated struct TodayFocusSnapshot: Equatable, Sendable {
             pets: pets,
             humans: humans,
             events: events,
-            careLogs: careLogs,
-            walkLogs: walkLogs,
-            pottyLogs: pottyLogs,
+            careLedgerEntries: careLedgerEntries,
             humanWeightLogs: humanWeightLogs,
             calendar: .current,
             now: now
@@ -221,9 +218,7 @@ nonisolated struct TodayFocusSnapshot: Equatable, Sendable {
         events: [Event],
         humans: [Human],
         activeHumanId: String,
-        careLogs: [PetCareLog],
-        walkLogs: [PetWalkLog],
-        pottyLogs: [PetPottyLog],
+        careLedgerEntries: [TodayFocusCareLedgerEntry],
         humanWeightLogs: [HumanWeightLog],
         familyTasks: [FamilyCollaborationTask],
         exchangeRequests: [CoconutExchangeRequest],
@@ -237,6 +232,7 @@ nonisolated struct TodayFocusSnapshot: Equatable, Sendable {
             plants: plants,
             events: events,
             humans: humans,
+            careLedgerEntries: careLedgerEntries,
             now: now,
             questProgress: questProgress
         )
@@ -245,9 +241,7 @@ nonisolated struct TodayFocusSnapshot: Equatable, Sendable {
             pets: pets,
             humans: humans,
             events: events,
-            careLogs: careLogs,
-            walkLogs: walkLogs,
-            pottyLogs: pottyLogs,
+            careLedgerEntries: careLedgerEntries,
             humanWeightLogs: humanWeightLogs,
             calendar: .current,
             now: now,

@@ -8,6 +8,23 @@
 import Foundation
 import SwiftData
 
+@MainActor
+private func fetchMemberDeletionModelsOrLog<T: PersistentModel>(
+    _ descriptor: FetchDescriptor<T>,
+    context: ModelContext,
+    operation: String
+) -> [T] {
+    do {
+        return try context.fetch(descriptor)
+    } catch {
+        OhanaLog.warning(
+            "MemberDeletionCommands failed to \(operation): \(error.localizedDescription)",
+            category: "Care"
+        )
+        return []
+    }
+}
+
 struct MemberDeletionCommandResult: Equatable {
     let entityID: UUID
     let kind: String
@@ -65,8 +82,17 @@ enum MemberDeletionCommandService {
     ) -> MemberDeletionCommandResult {
         let humanID = human.id
         let humanIDString = humanID.uuidString
-        let humans = (try? context.fetch(FetchDescriptor<Human>())) ?? [] // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
-        let hasRemainingHuman = humans.contains { $0.id.uuidString != humanIDString }
+        let remainingHumanDescriptor = FetchDescriptor<Human>(
+            predicate: #Predicate<Human> { candidate in
+                candidate.id != humanID
+            }
+        )
+        let remainingHumans = fetchMemberDeletionModelsOrLog(
+            remainingHumanDescriptor,
+            context: context,
+            operation: "fetch remaining humans for deletion"
+        )
+        let hasRemainingHuman = !remainingHumans.isEmpty
         let deletedCurrentHuman = activeHumanID == humanIDString
         let requiresReplacementHuman = !hasRemainingHuman
         let requiresAccountSwitch = deletedCurrentHuman && hasRemainingHuman
@@ -111,7 +137,11 @@ enum MemberDeletionCommandService {
                 event.relatedEntityId == relatedEntityID
             }
         )
-        return (try? context.fetch(descriptor)) ?? []
+        return fetchMemberDeletionModelsOrLog(
+            descriptor,
+            context: context,
+            operation: "fetch related events for pet deletion"
+        )
     }
 
     private static func removeQuickAccessItems(forPetID petID: UUID, userDefaults: UserDefaults) -> Int {

@@ -48,7 +48,7 @@ extension QuickFeedDetailContent {
             manageRow(
                 icon: "clock.arrow.circlepath",
                 title: l.tr(zh: "完整历史", en: "Full history", de: "Historie"),
-                value: "\(observedCareLogs.count)",
+                value: "\(allFeedLedgerEntries.count)",
                 tint: Color.goPrimary
             ) {
                 openFeedSheet(.history)
@@ -66,14 +66,14 @@ extension QuickFeedDetailContent {
     }
 
     var historySheet: some View {
-        let logs = observedCareLogs.sorted { $0.date > $1.date }
+        let logs = allFeedLedgerEntries
         return ScrollView {
             VStack(alignment: .leading, spacing: 12) {
                 if logs.isEmpty {
                     emptyInlineState(icon: "fork.knife", text: l.tr(zh: "还没有喂食记录", en: "No feeding logs yet", de: "Noch keine Einträge"))
                 } else {
-                    ForEach(logs) { log in
-                        feedLogRow(log, compact: false)
+                    ForEach(logs) { entry in
+                        feedLogRow(entry, compact: false)
                     }
                 }
             }

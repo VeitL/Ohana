@@ -508,8 +508,8 @@ extension QuickWaterDetailSheet {
         let today = calendar.startOfDay(for: Date())
         let start = calendar.date(byAdding: .day, value: -(dayCount - 1), to: today) ?? today
         let end = calendar.date(byAdding: .day, value: 1, to: today) ?? today.addingTimeInterval(86400)
-        let logs = waterCareLogs.filter { log in
-            log.type == type.rawValue &&
+        let logs = allWaterLogs.filter { log in
+            log.careType == type &&
                 log.date >= start &&
                 log.date < end
         }

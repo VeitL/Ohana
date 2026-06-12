@@ -18,6 +18,23 @@ enum HumanRequirementResolution: Equatable {
 
 enum HumanRequirementCoordinator {
     @MainActor
+    private static func fetchOrLog<T: PersistentModel>(
+        _ descriptor: FetchDescriptor<T>,
+        context: ModelContext,
+        operation: String
+    ) -> [T] {
+        do {
+            return try context.fetch(descriptor)
+        } catch {
+            OhanaLog.warning(
+                "HumanRequirementCoordinator failed to \(operation): \(error.localizedDescription)",
+                category: "Care"
+            )
+            return []
+        }
+    }
+
+    @MainActor
     static func resolve(
         hasOnboarded: Bool,
         currentActiveHumanId: String,
@@ -50,7 +67,7 @@ enum HumanRequirementCoordinator {
             sortBy: [SortDescriptor(\Human.createdAt, order: .forward)]
         )
         descriptor.fetchLimit = 1
-        return (try? context.fetch(descriptor))?.first
+        return fetchOrLog(descriptor, context: context, operation: "fetch first human").first
     }
 
     @MainActor
@@ -61,7 +78,7 @@ enum HumanRequirementCoordinator {
             }
         )
         descriptor.fetchLimit = 1
-        return ((try? context.fetch(descriptor))?.first) != nil
+        return fetchOrLog(descriptor, context: context, operation: "fetch active human").first != nil
     }
 }
 

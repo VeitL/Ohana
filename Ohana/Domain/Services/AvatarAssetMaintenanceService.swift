@@ -20,14 +20,38 @@ enum AvatarAssetMaintenanceService {
         let data: Data
     }
 
+    private static func fetchOrLog<T: PersistentModel>(
+        _ descriptor: FetchDescriptor<T>,
+        context: ModelContext,
+        operation: String
+    ) -> [T] {
+        do {
+            return try context.fetch(descriptor)
+        } catch {
+            OhanaLog.warning(
+                "AvatarAssetMaintenanceService failed to \(operation): \(error.localizedDescription)",
+                category: "Care"
+            )
+            return []
+        }
+    }
+
     static func compactStoredAvatars(context: ModelContext) async {
-        let existingPets = (try? context.fetch(FetchDescriptor<Pet>())) ?? [] // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
+        let existingPets = fetchOrLog(
+            FetchDescriptor<Pet>(),
+            context: context,
+            operation: "fetch pets before avatar compaction"
+        )
         let petPayloads = existingPets.compactMap { pet -> AvatarPayload? in
             guard let data = pet.avatarImageData else { return nil }
             return AvatarPayload(id: pet.id, data: data)
         }
 
-        let existingHumans = (try? context.fetch(FetchDescriptor<Human>())) ?? [] // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
+        let existingHumans = fetchOrLog(
+            FetchDescriptor<Human>(),
+            context: context,
+            operation: "fetch humans before avatar compaction"
+        )
         let humanPayloads = existingHumans.compactMap { human -> AvatarPayload? in
             guard let data = human.avatarImageData else { return nil }
             return AvatarPayload(id: human.id, data: data)
@@ -46,7 +70,11 @@ enum AvatarAssetMaintenanceService {
         }.value
 
         var didChange = false
-        let pets = (try? context.fetch(FetchDescriptor<Pet>())) ?? [] // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
+        let pets = fetchOrLog(
+            FetchDescriptor<Pet>(),
+            context: context,
+            operation: "fetch pets after avatar compaction"
+        )
         let compactedPets = Dictionary(uniqueKeysWithValues: updates.0)
         for pet in pets where compactedPets[pet.id] != nil {
             guard let compacted = compactedPets[pet.id] else { continue }
@@ -54,7 +82,11 @@ enum AvatarAssetMaintenanceService {
             didChange = true
         }
 
-        let humans = (try? context.fetch(FetchDescriptor<Human>())) ?? [] // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
+        let humans = fetchOrLog(
+            FetchDescriptor<Human>(),
+            context: context,
+            operation: "fetch humans after avatar compaction"
+        )
         let compactedHumans = Dictionary(uniqueKeysWithValues: updates.1)
         for human in humans where compactedHumans[human.id] != nil {
             guard let compacted = compactedHumans[human.id] else { continue }

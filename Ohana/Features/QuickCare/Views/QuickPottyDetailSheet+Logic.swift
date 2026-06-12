@@ -320,7 +320,14 @@ extension QuickPottyDetailSheet {
 
     func deleteItem(_ item: PoopLogItem) {
         switch item {
-        case let .potty(log), let .unknownPotty(log, _):
+        case let .potty(entry):
+            guard let log = legacyPottyDeleteLog(for: entry) else {
+                OhanaLog.warning(
+                    "QuickPottyDetailSheet could not resolve potty log for ledger entry \(entry.id.uuidString)",
+                    category: "Care"
+                )
+                return
+            }
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
             commandQueue.enqueue(.petPottyDelete(petID: pet.id, logID: log.id)) {
                 _ = PetCareCommandExecutor(context: modelContext, services: appServices).deletePottyLog(
@@ -329,7 +336,23 @@ extension QuickPottyDetailSheet {
                     note: "quickPotty.deletePotty"
                 )
             }
-        case let .litter(log):
+        case let .unknownPotty(log, _):
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            commandQueue.enqueue(.petPottyDelete(petID: pet.id, logID: log.id)) {
+                _ = PetCareCommandExecutor(context: modelContext, services: appServices).deletePottyLog(
+                    log,
+                    pet: pet,
+                    note: "quickPotty.deletePotty"
+                )
+            }
+        case let .litter(entry):
+            guard let log = legacyLitterDeleteLog(for: entry) else {
+                OhanaLog.warning(
+                    "QuickPottyDetailSheet could not resolve litter care log for ledger entry \(entry.id.uuidString)",
+                    category: "Care"
+                )
+                return
+            }
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
             commandQueue.enqueue(.petCareDelete(petID: pet.id, logID: log.id)) {
                 _ = PetCareCommandExecutor(context: modelContext, services: appServices).deleteCareLog(
@@ -340,6 +363,16 @@ extension QuickPottyDetailSheet {
                 syncScoopPlan(showToast: false)
             }
         }
+    }
+
+    func legacyPottyDeleteLog(for entry: PoopPottyLedgerEntry) -> PetPottyLog? {
+        guard let legacyLogId = entry.legacyLogId else { return nil }
+        return legacyPottyDeleteLogs.first { $0.id == legacyLogId }
+    }
+
+    func legacyLitterDeleteLog(for entry: PoopLitterLedgerEntry) -> PetCareLog? {
+        guard let legacyLogId = entry.legacyLogId else { return nil }
+        return legacyLitterDeleteLogs.first { $0.id == legacyLogId }
     }
 
     func claimUnknownPotty(_ log: PetPottyLog, target: Pet) {
@@ -383,7 +416,15 @@ extension QuickPottyDetailSheet {
             },
             sortBy: [SortDescriptor(\.startDate)]
         )
-        return (try? modelContext.fetch(descriptor)) ?? allEvents // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
+        do {
+            return try modelContext.fetch(descriptor) // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
+        } catch {
+            OhanaLog.warning(
+                "QuickPottyDetailSheet failed to fetch latest events: \(error.localizedDescription)",
+                category: "Care"
+            )
+            return allEvents
+        }
     }
 
     func scheduleCarePlanReminders(titleContains text: String) {
@@ -457,8 +498,8 @@ extension QuickPottyDetailSheet {
 
     func tint(for item: PoopLogItem) -> Color {
         switch item {
-        case let .potty(log):
-            pottyTypeColor(log.pottyType)
+        case let .potty(entry):
+            pottyTypeColor(entry.pottyType)
         case .unknownPotty:
             pottyTint
         case .litter:

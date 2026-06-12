@@ -177,8 +177,36 @@ struct VerticalSolidHomeView: View {
         sourceState.humanMedicationLogs
     }
 
-    var expenseLogs: [PetExpenseLog] {
-        expensePreviewStore.expenseLogs
+    var feedingLedgerEntries: [HomeFeedQuickActionEntry] {
+        sourceState.feedingLedgerEntries
+    }
+
+    var careLedgerEntries: [HomeCareQuickActionEntry] {
+        sourceState.careLedgerEntries
+    }
+
+    var hygieneLedgerEntries: [HomeHygieneQuickActionEntry] {
+        sourceState.hygieneLedgerEntries
+    }
+
+    var walkLedgerEntries: [HomeWalkQuickActionEntry] {
+        sourceState.walkLedgerEntries
+    }
+
+    var pottyLedgerEntries: [HomePottyQuickActionEntry] {
+        sourceState.pottyLedgerEntries
+    }
+
+    var petExpenseLedgerEntries: [HomePetExpenseQuickActionEntry] {
+        sourceState.petExpenseLedgerEntries
+    }
+
+    var petWeightLedgerEntries: [HomePetWeightQuickActionEntry] {
+        sourceState.petWeightLedgerEntries
+    }
+
+    var expenseEntries: [HomeExpensePreviewEntry] {
+        expensePreviewStore.expenseEntries
     }
 
     var avatarPreloadSignature: String {
@@ -285,7 +313,14 @@ struct VerticalSolidHomeView: View {
                         allEvents: allEvents,
                         humanMedications: humanMedications,
                         humanMedicationLogs: humanMedicationLogs,
-                        expenseLogs: expenseLogs,
+                        feedingLedgerEntries: feedingLedgerEntries,
+                        careLedgerEntries: careLedgerEntries,
+                        hygieneLedgerEntries: hygieneLedgerEntries,
+                        walkLedgerEntries: walkLedgerEntries,
+                        pottyLedgerEntries: pottyLedgerEntries,
+                        petExpenseLedgerEntries: petExpenseLedgerEntries,
+                        petWeightLedgerEntries: petWeightLedgerEntries,
+                        expenseEntries: expenseEntries,
                         avatarCacheRevision: avatarCacheRevision + avatarPipeline.revision,
                         isLive: lifecycle.isLive,
                         collapsedTopInset: homeCollapsedTopInset,

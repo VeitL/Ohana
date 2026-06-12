@@ -10,6 +10,23 @@ import SwiftData
 
 enum StartupFeedAutoLogMaintenanceService {
     @MainActor
+    private static func fetchOrLog<T: PersistentModel>(
+        _ descriptor: FetchDescriptor<T>,
+        context: ModelContext,
+        operation: String
+    ) -> [T] {
+        do {
+            return try context.fetch(descriptor)
+        } catch {
+            OhanaLog.warning(
+                "StartupFeedAutoLogMaintenanceService failed to \(operation): \(error.localizedDescription)",
+                category: "Care"
+            )
+            return []
+        }
+    }
+
+    @MainActor
     @discardableResult
     static func materializeDueAutoFeederLogs(
         context: ModelContext,
@@ -54,7 +71,7 @@ enum StartupFeedAutoLogMaintenanceService {
             },
             sortBy: [SortDescriptor(\Event.startDate, order: .forward)]
         )
-        return (try? context.fetch(descriptor)) ?? []
+        return fetchOrLog(descriptor, context: context, operation: "fetch auto-feeder events")
     }
 
     @MainActor
@@ -65,6 +82,6 @@ enum StartupFeedAutoLogMaintenanceService {
             }
         )
         descriptor.fetchLimit = 1
-        return (try? context.fetch(descriptor))?.first
+        return fetchOrLog(descriptor, context: context, operation: "fetch pet").first
     }
 }

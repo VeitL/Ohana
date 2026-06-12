@@ -18,7 +18,12 @@ enum FeedCommandFetch {
             sortBy: [SortDescriptor(\.startDate, order: .reverse)]
         )
         descriptor.fetchLimit = QuickFeedCommandExecutor.fullFoodRecordsFetchCap
-        return (try? context.fetch(descriptor)) ?? fallback
+        return fetchOrLog(
+            descriptor,
+            context: context,
+            fallback: fallback,
+            operation: "fetch food records"
+        )
     }
 
     @MainActor
@@ -26,6 +31,29 @@ enum FeedCommandFetch {
         let descriptor = FetchDescriptor<Event>(
             sortBy: [SortDescriptor(\Event.startDate)]
         )
-        return (try? context.fetch(descriptor)) ?? fallback
+        return fetchOrLog(
+            descriptor,
+            context: context,
+            fallback: fallback,
+            operation: "fetch latest events"
+        )
+    }
+
+    @MainActor
+    private static func fetchOrLog<T: PersistentModel>(
+        _ descriptor: FetchDescriptor<T>,
+        context: ModelContext,
+        fallback: [T],
+        operation: String
+    ) -> [T] {
+        do {
+            return try context.fetch(descriptor)
+        } catch {
+            OhanaLog.warning(
+                "FeedCommandFetch failed to \(operation): \(error.localizedDescription)",
+                category: "Care"
+            )
+            return fallback
+        }
     }
 }

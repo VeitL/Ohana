@@ -169,10 +169,20 @@ extension OasisUpgradeRewardService {
 
     static func actionLogs(for critter: OasisElectronicPet, context: ModelContext) -> [OasisCritterActionLog] {
         let startOfDay = Calendar.current.startOfDay(for: Date())
-        let logs = (try? context.fetch(FetchDescriptor<OasisCritterActionLog>())) ?? [] // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
-        return logs.filter {
-            $0.critterId == critter.id &&
-                $0.createdAt >= startOfDay
+        let critterId = critter.id
+        let descriptor = FetchDescriptor<OasisCritterActionLog>(
+            predicate: #Predicate<OasisCritterActionLog> { log in
+                log.critterId == critterId && log.createdAt >= startOfDay
+            }
+        )
+        do {
+            return try context.fetch(descriptor)
+        } catch {
+            OhanaLog.warning(
+                "[OasisUpgradeRewardService] failed to fetch daily action logs for critterId=\(critterId.uuidString): \(error.localizedDescription)",
+                category: "Oasis"
+            )
+            return []
         }
     }
 

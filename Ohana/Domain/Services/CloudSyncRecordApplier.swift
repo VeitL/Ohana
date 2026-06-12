@@ -238,6 +238,8 @@ nonisolated enum CloudSyncRecordApplier {
             try applyPetWeightLog(record, metadata: metadata, context: context)
         case String(describing: SharedCareSession.self):
             try applySharedCareSession(record, metadata: metadata, context: context)
+        case String(describing: CareLedgerEvent.self):
+            try applyCareLedgerEvent(record, metadata: metadata, context: context)
         case String(describing: CoconutLedgerEntry.self):
             try applyCoconutLedgerEntry(record, metadata: metadata, context: context)
         default:
@@ -601,6 +603,56 @@ nonisolated enum CloudSyncRecordApplier {
         return .inserted(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
     }
 
+    private static func applyCareLedgerEvent(
+        _ record: CKRecord,
+        metadata: RemoteMetadata,
+        context: ModelContext
+    ) throws -> CloudSyncRecordApplyResult {
+        let event: CareLedgerEvent
+        let result: CloudSyncRecordApplyResult
+        if let existing = try fetchCareLedgerEvent(id: metadata.localRecordUUID, context: context) {
+            event = existing
+            result = .updated(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
+        } else {
+            event = CareLedgerEvent(
+                id: metadata.localRecordUUID,
+                occurredAt: record.date(for: "occurredAt") ?? metadata.lastModifiedAt,
+                actorKind: CareLedgerActorKind(rawValue: record.string(for: "actorKind") ?? "") ?? .unknown,
+                actorId: record.string(for: "actorId"),
+                subjectKind: CareLedgerSubjectKind(rawValue: record.string(for: "subjectKind") ?? "") ?? .unknown,
+                subjectId: record.string(for: "subjectId"),
+                eventKind: CareLedgerEventKind(rawValue: record.string(for: "eventKind") ?? "") ?? .unknown,
+                actionType: record.string(for: "actionType") ?? "",
+                source: CareLedgerSource(rawValue: record.string(for: "source") ?? "") ?? .service,
+                createdAt: record.date(for: "createdAt") ?? metadata.lastModifiedAt
+            )
+            context.insert(event)
+            result = .inserted(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
+        }
+
+        event.occurredAt = record.date(for: "occurredAt") ?? event.occurredAt
+        event.actorKind = record.string(for: "actorKind") ?? event.actorKind
+        event.actorId = record.string(for: "actorId")
+        event.subjectKind = record.string(for: "subjectKind") ?? event.subjectKind
+        event.subjectId = record.string(for: "subjectId")
+        event.eventKind = record.string(for: "eventKind") ?? event.eventKind
+        event.actionType = record.string(for: "actionType") ?? event.actionType
+        event.amountValue = record.double(for: "amountValue") ?? event.amountValue
+        event.amountUnit = record.string(for: "amountUnit") ?? event.amountUnit
+        event.note = record.string(for: "note") ?? event.note
+        event.source = record.string(for: "source") ?? event.source
+        event.sourceEventId = record.string(for: "sourceEventId")
+        event.sourceReminderId = record.string(for: "sourceReminderId")
+        event.legacyModelName = record.string(for: "legacyModelName")
+        event.legacyModelId = record.string(for: "legacyModelId")
+        event.coconutDelta = record.int(for: "coconutDelta") ?? event.coconutDelta
+        event.rewardLogId = record.string(for: "rewardLogId")
+        event.privacyFieldRaw = record.string(for: "privacyFieldRaw")
+        event.metadataJSON = record.string(for: "metadataJSON") ?? event.metadataJSON
+        event.createdAt = record.date(for: "createdAt") ?? event.createdAt
+        return result
+    }
+
     private static func applyCoconutLedgerEntry(
         _ record: CKRecord,
         metadata: RemoteMetadata,
@@ -741,6 +793,10 @@ nonisolated enum CloudSyncRecordApplier {
             if let model = try fetchSharedCareSession(id: localRecordUUID, context: context) {
                 context.delete(model)
             }
+        case String(describing: CareLedgerEvent.self):
+            if let model = try fetchCareLedgerEvent(id: localRecordUUID, context: context) {
+                context.delete(model)
+            }
         case String(describing: CoconutLedgerEntry.self):
             if let model = try fetchCoconutLedgerEntry(id: localRecordUUID, context: context) {
                 context.delete(model)
@@ -833,6 +889,14 @@ nonisolated enum CloudSyncRecordApplier {
     private static func fetchSharedCareSession(id: UUID, context: ModelContext) throws -> SharedCareSession? {
         var descriptor = FetchDescriptor<SharedCareSession>(
             predicate: #Predicate<SharedCareSession> { $0.id == id }
+        )
+        descriptor.fetchLimit = 1
+        return try context.fetch(descriptor).first
+    }
+
+    private static func fetchCareLedgerEvent(id: UUID, context: ModelContext) throws -> CareLedgerEvent? {
+        var descriptor = FetchDescriptor<CareLedgerEvent>(
+            predicate: #Predicate<CareLedgerEvent> { $0.id == id }
         )
         descriptor.fetchLimit = 1
         return try context.fetch(descriptor).first

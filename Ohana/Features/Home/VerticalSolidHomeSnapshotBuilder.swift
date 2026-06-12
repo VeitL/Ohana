@@ -17,9 +17,14 @@ nonisolated struct VerticalSolidHomeSourceState {
     let pendingReminders: [Reminder]
     let humanMedications: [HumanMedication]
     let humanMedicationLogs: [HumanMedicationLog]
-    let careLogs: [PetCareLog]
-    let walkLogs: [PetWalkLog]
-    let pottyLogs: [PetPottyLog]
+    let todayFocusCareLedgerEntries: [TodayFocusCareLedgerEntry]
+    let feedingLedgerEntries: [HomeFeedQuickActionEntry]
+    let careLedgerEntries: [HomeCareQuickActionEntry]
+    let hygieneLedgerEntries: [HomeHygieneQuickActionEntry]
+    let walkLedgerEntries: [HomeWalkQuickActionEntry]
+    let pottyLedgerEntries: [HomePottyQuickActionEntry]
+    let petExpenseLedgerEntries: [HomePetExpenseQuickActionEntry]
+    let petWeightLedgerEntries: [HomePetWeightQuickActionEntry]
     let humanWeightLogs: [HumanWeightLog]
     let familyTasks: [FamilyCollaborationTask]
     let exchangeRequests: [CoconutExchangeRequest]
@@ -30,6 +35,62 @@ nonisolated struct VerticalSolidHomeSourceState {
     let petBondVaultRevision: Int
     let equippedTitleRaw: String
     let language: String
+
+    init(
+        pets: [Pet],
+        humans: [Human],
+        plants: [Plant],
+        electronicPets: [OasisElectronicPet],
+        events: [Event],
+        pendingReminders: [Reminder],
+        humanMedications: [HumanMedication],
+        humanMedicationLogs: [HumanMedicationLog],
+        todayFocusCareLedgerEntries: [TodayFocusCareLedgerEntry] = [],
+        feedingLedgerEntries: [HomeFeedQuickActionEntry],
+        careLedgerEntries: [HomeCareQuickActionEntry],
+        hygieneLedgerEntries: [HomeHygieneQuickActionEntry] = [],
+        walkLedgerEntries: [HomeWalkQuickActionEntry],
+        pottyLedgerEntries: [HomePottyQuickActionEntry],
+        petExpenseLedgerEntries: [HomePetExpenseQuickActionEntry] = [],
+        petWeightLedgerEntries: [HomePetWeightQuickActionEntry] = [],
+        humanWeightLogs: [HumanWeightLog],
+        familyTasks: [FamilyCollaborationTask],
+        exchangeRequests: [CoconutExchangeRequest],
+        activeHumanIdRaw: String,
+        hiddenPetIDsRaw: String,
+        homeCardOrderRaw: String,
+        showDummyCards: Bool,
+        petBondVaultRevision: Int,
+        equippedTitleRaw: String,
+        language: String
+    ) {
+        self.pets = pets
+        self.humans = humans
+        self.plants = plants
+        self.electronicPets = electronicPets
+        self.events = events
+        self.pendingReminders = pendingReminders
+        self.humanMedications = humanMedications
+        self.humanMedicationLogs = humanMedicationLogs
+        self.todayFocusCareLedgerEntries = todayFocusCareLedgerEntries
+        self.feedingLedgerEntries = feedingLedgerEntries
+        self.careLedgerEntries = careLedgerEntries
+        self.hygieneLedgerEntries = hygieneLedgerEntries
+        self.walkLedgerEntries = walkLedgerEntries
+        self.pottyLedgerEntries = pottyLedgerEntries
+        self.petExpenseLedgerEntries = petExpenseLedgerEntries
+        self.petWeightLedgerEntries = petWeightLedgerEntries
+        self.humanWeightLogs = humanWeightLogs
+        self.familyTasks = familyTasks
+        self.exchangeRequests = exchangeRequests
+        self.activeHumanIdRaw = activeHumanIdRaw
+        self.hiddenPetIDsRaw = hiddenPetIDsRaw
+        self.homeCardOrderRaw = homeCardOrderRaw
+        self.showDummyCards = showDummyCards
+        self.petBondVaultRevision = petBondVaultRevision
+        self.equippedTitleRaw = equippedTitleRaw
+        self.language = language
+    }
 
     var activeHumanId: UUID? {
         UUID(uuidString: activeHumanIdRaw)
@@ -53,7 +114,7 @@ nonisolated enum VerticalSolidHomeSnapshotBuilder {
             from: source,
             now: now,
             weightVisibleHumans: privacy.unlockedHumans(for: .weight, from: source.humans, viewedBy: source.activeHumanId),
-            makeTodayFocus: { pets, plants, reminders, events, humans, activeHumanId, careLogs, walkLogs, pottyLogs, humanWeightLogs, familyTasks, exchangeRequests in
+            makeTodayFocus: { pets, plants, reminders, events, humans, activeHumanId, todayFocusCareLedgerEntries, humanWeightLogs, familyTasks, exchangeRequests in
                 TodayFocusSnapshot.make(
                     pets: pets,
                     plants: plants,
@@ -61,9 +122,7 @@ nonisolated enum VerticalSolidHomeSnapshotBuilder {
                     events: events,
                     humans: humans,
                     activeHumanId: activeHumanId,
-                    careLogs: careLogs,
-                    walkLogs: walkLogs,
-                    pottyLogs: pottyLogs,
+                    careLedgerEntries: todayFocusCareLedgerEntries,
                     humanWeightLogs: humanWeightLogs,
                     familyTasks: familyTasks,
                     exchangeRequests: exchangeRequests,
@@ -86,7 +145,7 @@ nonisolated enum VerticalSolidHomeSnapshotBuilder {
             from: source,
             now: now,
             weightVisibleHumans: weightVisibleHumans(from: source),
-            makeTodayFocus: { pets, plants, reminders, events, humans, activeHumanId, careLogs, walkLogs, pottyLogs, humanWeightLogs, familyTasks, exchangeRequests in
+            makeTodayFocus: { pets, plants, reminders, events, humans, activeHumanId, todayFocusCareLedgerEntries, humanWeightLogs, familyTasks, exchangeRequests in
                 TodayFocusSnapshot.make(
                     pets: pets,
                     plants: plants,
@@ -94,9 +153,7 @@ nonisolated enum VerticalSolidHomeSnapshotBuilder {
                     events: events,
                     humans: humans,
                     activeHumanId: activeHumanId,
-                    careLogs: careLogs,
-                    walkLogs: walkLogs,
-                    pottyLogs: pottyLogs,
+                    careLedgerEntries: todayFocusCareLedgerEntries,
                     humanWeightLogs: humanWeightLogs,
                     familyTasks: familyTasks,
                     exchangeRequests: exchangeRequests,
@@ -123,9 +180,7 @@ nonisolated enum VerticalSolidHomeSnapshotBuilder {
             [Event],
             [Human],
             String,
-            [PetCareLog],
-            [PetWalkLog],
-            [PetPottyLog],
+            [TodayFocusCareLedgerEntry],
             [HumanWeightLog],
             [FamilyCollaborationTask],
             [CoconutExchangeRequest]
@@ -159,9 +214,7 @@ nonisolated enum VerticalSolidHomeSnapshotBuilder {
             source.events,
             weightVisibleHumans,
             source.activeHumanIdRaw,
-            source.careLogs,
-            source.walkLogs,
-            source.pottyLogs,
+            source.todayFocusCareLedgerEntries,
             source.humanWeightLogs,
             source.familyTasks,
             source.exchangeRequests
@@ -199,9 +252,14 @@ nonisolated enum VerticalSolidHomeSnapshotBuilder {
             reminderSignature(source.pendingReminders),
             medicationSignature(source.humanMedications),
             medicationLogSignature(source.humanMedicationLogs),
-            careSignature(source.careLogs),
-            walkSignature(source.walkLogs),
-            pottySignature(source.pottyLogs),
+            todayFocusCareLedgerSignature(source.todayFocusCareLedgerEntries),
+            feedingLedgerSignature(source.feedingLedgerEntries),
+            careLedgerSignature(source.careLedgerEntries),
+            hygieneLedgerSignature(source.hygieneLedgerEntries),
+            walkLedgerSignature(source.walkLedgerEntries),
+            pottyLedgerSignature(source.pottyLedgerEntries),
+            petExpenseLedgerSignature(source.petExpenseLedgerEntries),
+            petWeightLedgerSignature(source.petWeightLedgerEntries),
             humanWeightSignature(source.humanWeightLogs),
             familyTaskSignature(source.familyTasks),
             exchangeSignature(source.exchangeRequests),
@@ -401,36 +459,95 @@ nonisolated enum VerticalSolidHomeSnapshotBuilder {
         }.joined(separator: "|")
     }
 
-    private static func careSignature(_ logs: [PetCareLog]) -> String {
-        logs.map { log in
+    private static func todayFocusCareLedgerSignature(_ entries: [TodayFocusCareLedgerEntry]) -> String {
+        entries.map { entry in
             [
-                log.id.uuidString,
-                log.pet?.id.uuidString ?? "",
-                log.type,
-                String(Int(log.date.timeIntervalSince1970)),
-                log.note
+                entry.id.uuidString,
+                entry.petId.uuidString,
+                entry.eventKind.rawValue,
+                entry.actionType,
+                String(Int(entry.date.timeIntervalSince1970)),
+                entry.sourceEventId?.uuidString ?? "",
+                entry.actorId ?? ""
             ].joined(separator: ":")
         }.joined(separator: "|")
     }
 
-    private static func walkSignature(_ logs: [PetWalkLog]) -> String {
-        logs.map { log in
+    private static func feedingLedgerSignature(_ entries: [HomeFeedQuickActionEntry]) -> String {
+        entries.map { entry in
             [
-                log.id.uuidString,
-                log.pet?.id.uuidString ?? "",
-                String(Int(log.startDate.timeIntervalSince1970)),
-                String(timestamp(log.endDate))
+                entry.id.uuidString,
+                entry.petId.uuidString,
+                entry.source.rawValue,
+                String(Int(entry.date.timeIntervalSince1970)),
+                String(Int(entry.amountGrams.rounded()))
             ].joined(separator: ":")
         }.joined(separator: "|")
     }
 
-    private static func pottySignature(_ logs: [PetPottyLog]) -> String {
-        logs.map { log in
+    private static func careLedgerSignature(_ entries: [HomeCareQuickActionEntry]) -> String {
+        entries.map { entry in
             [
-                log.id.uuidString,
-                log.pet?.id.uuidString ?? "",
-                String(Int(log.date.timeIntervalSince1970)),
-                log.type
+                entry.id.uuidString,
+                entry.petId.uuidString,
+                entry.actionType,
+                String(Int(entry.date.timeIntervalSince1970)),
+                String(Int(entry.amountValue.rounded()))
+            ].joined(separator: ":")
+        }.joined(separator: "|")
+    }
+
+    private static func hygieneLedgerSignature(_ entries: [HomeHygieneQuickActionEntry]) -> String {
+        entries.map { entry in
+            [
+                entry.id.uuidString,
+                entry.petId.uuidString,
+                entry.hygieneType.rawValue,
+                String(Int(entry.date.timeIntervalSince1970))
+            ].joined(separator: ":")
+        }.joined(separator: "|")
+    }
+
+    private static func walkLedgerSignature(_ entries: [HomeWalkQuickActionEntry]) -> String {
+        entries.map { entry in
+            [
+                entry.id.uuidString,
+                entry.petId.uuidString,
+                String(Int(entry.startDate.timeIntervalSince1970)),
+                String(Int(entry.distanceMeters.rounded()))
+            ].joined(separator: ":")
+        }.joined(separator: "|")
+    }
+
+    private static func pottyLedgerSignature(_ entries: [HomePottyQuickActionEntry]) -> String {
+        entries.map { entry in
+            [
+                entry.id.uuidString,
+                entry.petId.uuidString,
+                entry.pottyType.rawValue,
+                String(Int(entry.date.timeIntervalSince1970))
+            ].joined(separator: ":")
+        }.joined(separator: "|")
+    }
+
+    private static func petExpenseLedgerSignature(_ entries: [HomePetExpenseQuickActionEntry]) -> String {
+        entries.map { entry in
+            [
+                entry.id.uuidString,
+                entry.petId.uuidString,
+                String(Int(entry.date.timeIntervalSince1970)),
+                String(Int(entry.amount.rounded()))
+            ].joined(separator: ":")
+        }.joined(separator: "|")
+    }
+
+    private static func petWeightLedgerSignature(_ entries: [HomePetWeightQuickActionEntry]) -> String {
+        entries.map { entry in
+            [
+                entry.id.uuidString,
+                entry.petId.uuidString,
+                String(Int(entry.date.timeIntervalSince1970)),
+                String(Int((entry.weightKg * 1000).rounded()))
             ].joined(separator: ":")
         }.joined(separator: "|")
     }

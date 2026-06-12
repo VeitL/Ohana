@@ -8,14 +8,12 @@ import SwiftData
 
 extension OasisUpgradeRewardService {
     static func ownsCritter(_ catalogId: String, context: ModelContext) -> Bool {
-        let all = (try? context.fetch(FetchDescriptor<OasisElectronicPet>())) ?? [] // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
-        return all.contains { $0.catalogId == catalogId && !$0.isArchived }
+        activeCritter(catalogId: catalogId, context: context) != nil
     }
 
     static func addFragments(critterId: String, amount: Int, context: ModelContext) {
         guard amount > 0 else { return }
-        let balances = (try? context.fetch(FetchDescriptor<OasisCritterFragmentBalance>())) ?? [] // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
-        if let balance = balances.first(where: { $0.catalogId == critterId }) {
+        if let balance = fragmentBalance(critterId: critterId, context: context) {
             balance.amount += amount
             balance.updatedAt = Date()
         } else {
@@ -24,14 +22,109 @@ extension OasisUpgradeRewardService {
     }
 
     static func fragmentBalance(critterId: String, context: ModelContext) -> OasisCritterFragmentBalance? {
-        let balances = (try? context.fetch(FetchDescriptor<OasisCritterFragmentBalance>())) ?? [] // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
-        return balances.first { $0.catalogId == critterId }
+        let catalogId = critterId
+        var descriptor = FetchDescriptor<OasisCritterFragmentBalance>(
+            predicate: #Predicate<OasisCritterFragmentBalance> { balance in
+                balance.catalogId == catalogId
+            }
+        )
+        descriptor.fetchLimit = 1
+        do {
+            return try context.fetch(descriptor).first
+        } catch {
+            OhanaLog.warning(
+                "[OasisUpgradeRewardService] failed to fetch fragment balance for critterId=\(catalogId): \(error.localizedDescription)",
+                category: "Oasis"
+            )
+            return nil
+        }
     }
 
     static func unlock(id: String, kind: OasisUpgradeRewardKind, sourceLevel: Int, context: ModelContext) {
-        let unlocks = (try? context.fetch(FetchDescriptor<OasisUnlock>())) ?? [] // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
-        guard !unlocks.contains(where: { $0.unlockId == id && $0.unlockKindRaw == kind.rawValue }) else { return }
+        let unlockId = id
+        let kindRaw = kind.rawValue
+        var descriptor = FetchDescriptor<OasisUnlock>(
+            predicate: #Predicate<OasisUnlock> { unlock in
+                unlock.unlockId == unlockId && unlock.unlockKindRaw == kindRaw
+            }
+        )
+        descriptor.fetchLimit = 1
+        do {
+            guard try context.fetch(descriptor).isEmpty else { return }
+        } catch {
+            OhanaLog.warning(
+                "[OasisUpgradeRewardService] failed to fetch unlock id=\(unlockId) kind=\(kindRaw): \(error.localizedDescription)",
+                category: "Oasis"
+            )
+            return
+        }
         context.insert(OasisUnlock(unlockId: id, unlockKind: kind, sourceLevel: sourceLevel))
+    }
+
+    static func activeCritter(catalogId: String, context: ModelContext) -> OasisElectronicPet? {
+        let id = catalogId
+        var descriptor = FetchDescriptor<OasisElectronicPet>(
+            predicate: #Predicate<OasisElectronicPet> { critter in
+                critter.catalogId == id && !critter.isArchived
+            }
+        )
+        descriptor.fetchLimit = 1
+        do {
+            return try context.fetch(descriptor).first
+        } catch {
+            OhanaLog.warning(
+                "[OasisUpgradeRewardService] failed to fetch active critter catalogId=\(id): \(error.localizedDescription)",
+                category: "Oasis"
+            )
+            return nil
+        }
+    }
+
+    static func hasFeaturedCritter(context: ModelContext) -> Bool {
+        var descriptor = FetchDescriptor<OasisElectronicPet>(
+            predicate: #Predicate<OasisElectronicPet> { critter in
+                critter.isFeaturedOnOasis && !critter.isArchived
+            }
+        )
+        descriptor.fetchLimit = 1
+        do {
+            return try !(context.fetch(descriptor)).isEmpty
+        } catch {
+            OhanaLog.warning(
+                "[OasisUpgradeRewardService] failed to fetch featured critter: \(error.localizedDescription)",
+                category: "Oasis"
+            )
+            return false
+        }
+    }
+
+    static func allElectronicPets(context: ModelContext) -> [OasisElectronicPet] {
+        do {
+            return try context.fetch(FetchDescriptor<OasisElectronicPet>())
+        } catch {
+            OhanaLog.warning(
+                "[OasisUpgradeRewardService] failed to fetch electronic pets: \(error.localizedDescription)",
+                category: "Oasis"
+            )
+            return []
+        }
+    }
+
+    static func activeCritters(context: ModelContext) -> [OasisElectronicPet] {
+        let descriptor = FetchDescriptor<OasisElectronicPet>(
+            predicate: #Predicate<OasisElectronicPet> { critter in
+                !critter.isArchived
+            }
+        )
+        do {
+            return try context.fetch(descriptor)
+        } catch {
+            OhanaLog.warning(
+                "[OasisUpgradeRewardService] failed to fetch active critters: \(error.localizedDescription)",
+                category: "Oasis"
+            )
+            return []
+        }
     }
 
     static func dailyWish(for action: OasisCritterAction) -> OasisCritterDailyWish {

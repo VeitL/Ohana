@@ -12,6 +12,7 @@ struct ExpenseHistoryContentView: View {
     let pet: Pet
     let allHumans: [Human]
     let allPets: [Pet]
+    let allSharedCareSessions: [SharedCareSession]
     var onRemove: (() -> Void)?
     var showsCloseButton: Bool = true
     @Environment(\.modelContext) private var modelContext
@@ -117,6 +118,7 @@ struct ExpenseHistoryContentView: View {
             PetExpenseDashboardContent(
                 pet: pet,
                 allHumans: allHumans,
+                allSharedCareSessions: allSharedCareSessions,
                 showsCloseButton: showsCloseButton,
                 onClose: { dismiss() },
                 onAdd: {
@@ -580,8 +582,14 @@ struct ExpenseHistoryContentView: View {
         guard !isReimbursement, !log.sharedSessionId.isEmpty else {
             return isReimbursement ? "保险报销" : log.category
         }
-        let countSuffix = SharedCareMetadata.targetCount(from: log.note).map { " · \($0)只" } ?? ""
+        let session = sharedCareSession(for: log.sharedSessionId)
+        let countSuffix = SharedCareMetadata.targetCount(session: session, legacyNote: log.note).map { " · \($0)只" } ?? ""
         return "共同花费\(countSuffix)"
+    }
+
+    private func sharedCareSession(for id: String) -> SharedCareSession? {
+        guard !id.isEmpty else { return nil }
+        return allSharedCareSessions.first { $0.id.uuidString == id }
     }
 
     private func payer(for log: PetExpenseLog) -> Human? {

@@ -578,7 +578,15 @@ enum GachaDrawService {
                 log.ownerHumanId == ownerId && log.drawDate >= start && log.drawDate < end
             }
         )
-        return (try? context.fetch(descriptor)) ?? []
+        do {
+            return try context.fetch(descriptor)
+        } catch {
+            OhanaLog.warning(
+                "[GachaDrawService] failed to fetch daily draw logs for humanId=\(ownerId): \(error.localizedDescription)",
+                category: "Gacha"
+            )
+            return []
+        }
     }
 
     @MainActor
@@ -589,7 +597,15 @@ enum GachaDrawService {
                 item.ownerHumanId == ownerId
             }
         )
-        return (try? context.fetch(descriptor)) ?? []
+        do {
+            return try context.fetch(descriptor)
+        } catch {
+            OhanaLog.warning(
+                "[GachaDrawService] failed to fetch owned items for humanId=\(ownerId): \(error.localizedDescription)",
+                category: "Gacha"
+            )
+            return []
+        }
     }
 
     static func collectionProgress(
