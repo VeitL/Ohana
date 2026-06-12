@@ -41,7 +41,7 @@ actionable; long-term product ideas belong in planning docs instead.
 
 ### TFU-20260611-002 - Wire Settings privacy policy row
 
-- Status: Open
+- Status: Closed
 - Priority: P2
 - Area: Settings / Privacy
 - Source task: Privacy hardening audit follow-up, 2026-06-11
