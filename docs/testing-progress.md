@@ -8,7 +8,7 @@
 | Phase | 范围 | 状态 | 备注 |
 |---|---|---|---|
 | 0 | 基线收尾（提交未完成改动） | 🟢 | 已于 2026-06-12 提交（`ff7ac89f`）；后续模块工作可能使当前工作区非空 |
-| 1 | `Ohana/Models` | ⬜ | |
+| 1 | `Ohana/Models` | 🟢 | 门禁通过并提交：`db44afe1`；P0 余留跨范围项见 TFU-20260612-012，TFU-20260612-013 已由 `e16e6953` 关闭 |
 | 2 | `Ohana/Domain` | ⬜ | |
 | 3 | `Ohana/Shared` | ⬜ | |
 | 4 | `Ohana/App` | ⬜ | |
@@ -22,7 +22,7 @@
 
 | 模块 | Phase | 状态 | 开工日期 | 余留项（P1/P2 指针） | 门禁 commit | 交接备注 |
 |---|---|---|---|---|---|---|
-| Models | 1 | ⬜ | | | | |
+| Models | 1 | 🟢 | 2026-06-12 | P0 余留跨范围项见 TFU-20260612-012；TFU-20260612-013 已关闭 | `db44afe1` | V68 tombstone 默认值、fallback indicator、V67→V68 临时磁盘迁移测试已补并执行；`Pet.clearAllActivityRecords` 需归 Domain/Members phase 迁移 |
 | Domain | 2 | ⬜ | | | | |
 | Shared | 3 | ⬜ | | | | |
 | App | 4 | ⬜ | | | | |
