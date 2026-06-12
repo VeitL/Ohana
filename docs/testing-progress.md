@@ -7,7 +7,7 @@
 
 | Phase | 范围 | 状态 | 备注 |
 |---|---|---|---|
-| 0 | 基线收尾（提交未完成改动） | 🟢 | 已于 2026-06-12 提交（`ff7ac89f`），工作区干净 |
+| 0 | 基线收尾（提交未完成改动） | 🟢 | 已于 2026-06-12 提交（`ff7ac89f`）；后续模块工作可能使当前工作区非空 |
 | 1 | `Ohana/Models` | ⬜ | |
 | 2 | `Ohana/Domain` | ⬜ | |
 | 3 | `Ohana/Shared` | ⬜ | |
@@ -39,7 +39,7 @@
 | Walks | 7 | ⬜ | | | | |
 | FamilyTasks | 7 | ⬜ | | | | |
 | Expenses | 7 | ⬜ | | | | |
-| DashboardRecords | 7 | ⬜ | | | | |
+| DashboardRecords | 7 | ⬜ | | 历史验证阻塞 TFU-20260612-013 已由 cross-scope repair 关闭 | | 接手时留意 `WeightHistoryView 2.swift` 曾误入仓库并阻塞 app target 编译 |
 | Calendar | 7 | ⬜ | | | | |
 | CrewRoster | 7 | ⬜ | | | | |
 | Gacha | 7 | ⬜ | | | | |

@@ -404,6 +404,30 @@ actionable; long-term product ideas belong in planning docs instead.
   them, and CloudKit two-device validation confirms the cleanup does not
   produce repeated remote modifications.
 
+### TFU-20260612-013 - Remove duplicate WeightHistoryView source file
+
+- Status: Closed
+- Priority: P0
+- Area: DashboardRecords / Validation
+- Source task: Models Phase 1 P0 remediation validation, 2026-06-12
+- Blocker: `Ohana/Features/DashboardRecords/Views/WeightHistoryView.swift` and
+  `Ohana/Features/DashboardRecords/Views/WeightHistoryView 2.swift` are both
+  tracked and both declare `struct WeightHistoryView`, so unfiltered app test
+  builds fail before the Models tests can run. The Models session is not allowed
+  to repair DashboardRecords.
+- Next step: Closed by deleting the duplicate tracked source file during the
+  explicitly authorized cross-scope validation repair.
+- Current task disposition: Models targeted tests were previously run with
+  `EXCLUDED_SOURCE_FILE_NAMES=WeightHistoryView\ 2.swift` solely to isolate the
+  Models fixes; rerun the gate without exclusions after this repair.
+- Closed: 2026-06-12 by removing
+  `Ohana/Features/DashboardRecords/Views/WeightHistoryView 2.swift`, the Xcode
+  duplicate that was accidentally added in `3eae88d7`.
+- Close when: The duplicate declaration is gone and
+  `scripts/test-simulator.sh -only-testing:OhanaTests/SharedModelContainerRecoveryTests`
+  plus `scripts/module-exit-gate.sh` run without excluding DashboardRecords
+  sources.
+
 ## Done
 
 Move completed entries here instead of deleting them when the history is useful.
