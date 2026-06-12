@@ -75,7 +75,7 @@
 
 | 工作项 | 优先级 | 状态 | 范围/验收 | 门禁 commit | 备注 |
 |---|---|---|---|---|---|
-| GAP-1 联机功能门 | P0 上架前 | 🟡 | FamilyTasks+云同步设置+CKShare 入口统一收进 `OnlineFeatureGate`；FamilyReports 留周报剥悬赏 | | 开工：2026-06-12；建议最先做（解锁 Members 复审前提） |
+| GAP-1 联机功能门 | P0 上架前 | 🟢 | FamilyTasks+云同步设置+CKShare 入口统一收进 `OnlineFeatureGate`；FamilyReports 留周报剥悬赏 | `59b5ceedc` | 开工：2026-06-12；门禁：`scripts/module-exit-gate.sh` PASS；验收通过，真实设备 / 真实 UI 追踪项见 `docs/planning/gap-1-online-feature-gate-acceptance-track-list.md`；未做 CloudKit 启用 |
 | GAP-2 回收站 | P0 上架前 | ⬜ | 成员+珍贵档案软删 30 天可恢复；流水直删但写 tombstone；涉及 schema 升版 | | Members 删除语义依赖它 |
 | GAP-3 自动备份 | P0 上架前 | ⬜ | 自动备份至 iCloud Drive 文件+失败可见+恢复端到端测试 | | 可与 GAP-1/2 并行（独立 worktree） |
 | GAP-4~9 小改造/验证 | P1 上架前 | ⬜ | 并入 Economy/Notifications/Home/Memorial 模块会话，明细见 inventory | | 模块 1b 时作为已知差距列入 |
