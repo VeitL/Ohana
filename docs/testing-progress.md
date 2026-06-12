@@ -78,7 +78,12 @@
 | GAP-1 联机功能门 | P0 上架前 | 🟢 | FamilyTasks+云同步设置+CKShare 入口统一收进 `OnlineFeatureGate`；FamilyReports 留周报剥悬赏 | `59b5ceedc` | 开工：2026-06-12；门禁：`scripts/module-exit-gate.sh` PASS；验收通过，真实设备 / 真实 UI 追踪项见 `docs/planning/gap-1-online-feature-gate-acceptance-track-list.md`；未做 CloudKit 启用 |
 | GAP-2 回收站 | P0 上架前 | 🟢 | 成员+珍贵档案软删 30 天可恢复；流水直删但写 tombstone；涉及 schema 升版 | `8bddfe1a6` | 开工：2026-06-12；门禁：`scripts/module-exit-gate.sh` PASS；自动验收通过，真实 UI 追踪项见 `docs/planning/gap-2-recycle-bin-acceptance-track-list.md`；schema 升至 `ArkSchemaV69` |
 | GAP-3 自动备份 | P0 上架前 | 🟢 | 自动备份至 iCloud Drive 文件+失败可见+恢复端到端测试 | `9b1ac1be1` | 开工：2026-06-12；门禁：`scripts/module-exit-gate.sh` PASS；自动验收通过，真实设备 / 真实 iCloud 追踪项见 `docs/planning/gap-3-automatic-backup-acceptance-track-list.md`；未启用 CloudKit 同步 |
-| GAP-4~9 小改造/验证 | P1 上架前 | ⬜ | 并入 Economy/Notifications/Home/Memorial 模块会话，明细见 inventory | | 模块 1b 时作为已知差距列入 |
+| GAP-4 总账恒等 | P1 上架前 | 🟢 | `QuestManager.coconutCount` 为钱包投影；正式岛屿总资产 ≡ 人类成员+宠物钱包；`system:legacy` 仅迁移兼容 | `1951f7834` | 开工：2026-06-12；门禁：`scripts/module-exit-gate.sh` PASS；自动验收通过，真实 UI / 正式包追踪项见 `docs/planning/gap-4-economy-ledger-acceptance-track-list.md` |
+| GAP-5 触顶感知 | P1 上架前 | ⬜ | 奖励触顶温和文案，九语言 | | 未开工；Economy 下一轮 |
+| GAP-6 通知分级 | P1 上架前 | ⬜ | 通知预算表 + 优先级/限额/合并/夜间免打扰 | | 未开工 |
+| GAP-7 补记结算 | P1 上架前 | ⬜ | 补记历史日期的记录，奖励计入操作当日预算/冷却；不满足则修 | | 未开工 |
+| GAP-8 单成员形态 | P1 上架前 | ⬜ | 单人单宠下排行榜、周报、心情、家人胶囊等逐面检查 | | 未开工 |
+| GAP-9 离世退场 | P1 上架前 | ⬜ | Memorial 规则书逐模块写明离世行为并测试 | | 未开工 |
 | GAP-10/11 合资+联机设计 | 1.x | ⬜ | 推迟，见 inventory | | |
 
 ## 待拍板问题（提问协议的异步兜底；产品主人答复后销项）
