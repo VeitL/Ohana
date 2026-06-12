@@ -1,14 +1,14 @@
-# 宪法差距人工验收总 Track List
+# 人工验收总 Track List
 
 更新日期：2026-06-12
 
-本文件是 GAP 建设阶段唯一的人工验收 track list。后续 GAP 不再新增 `gap-*-acceptance-track-list.md` 独立文件；需要人工目检、真机、真实 iCloud、真实通知或真实数据确认的项目，都追加到本文对应 GAP 小节。
+本文件是 GAP 建设阶段与模块门禁阶段唯一的人工验收 track list。后续不再新增 `gap-*-acceptance-track-list.md` 或模块单独 track list；需要人工目检、真机、真实 iCloud、真实通知或真实数据确认的项目，都追加到本文对应小节。
 
 自动测试、源码审计和门禁结论记录在 `docs/testing-progress.md` 与各模块规则书中；本文只保留足够让产品主人逐项验收的清单和关键自动验收摘要。
 
 ## 总览
 
-| GAP | 状态 | 门禁 commit | 自动验收摘要 | 人工验收状态 |
+| 项目 | 状态 | 门禁 commit | 自动验收摘要 | 人工验收状态 |
 |---|---|---|---|---|
 | GAP-1 联机功能门 | 🟢 | `59b5ceedc` | `OnlineFeatureGate` 不变量、路由/设置/CKShare 接受路径、`scripts/module-exit-gate.sh` 均通过 | 待真实设备 / 真实 UI 抽查 |
 | GAP-2 回收站 | 🟢 | `8bddfe1a6` | 回收站服务、schema V69 轻量迁移、备份往返、普通入口隐藏、`scripts/module-exit-gate.sh` 均通过 | 待真实 UI 抽查 |
@@ -19,6 +19,7 @@
 | GAP-7 补记结算 | 🟢 | `528cf2cdd` | 补记历史日期与操作日奖励结算测试、changed gate、`scripts/module-exit-gate.sh` 均通过 | 待真实 UI 补记路径抽查 |
 | GAP-8 单成员形态 | 🟢 | `6c4a98db2` | 单成员展示红绿测试、负面文案扫描、changed gate、`scripts/module-exit-gate.sh` 均通过 | 待单人单宠真实 UI 抽查 |
 | GAP-9 离世退场 | 🟢 | `e6a45e72c` | 纪念模式规则书、未来计划可逆退场、离世成员活跃入口过滤、奖励冻结定向测试、changed gate、`scripts/module-exit-gate.sh` 均通过 | 待真实 UI / 真机通知抽查 |
+| Phase 6 Members | 🟢 | `ead1e5fe4` | 创建派生日历事实 sync metadata、成员删除回收站聚合、Human 侧过期清理、RequiredHumanProfileView a11y、`scripts/module-exit-gate.sh` 均通过 | 待真实 UI 抽查 |
 
 ## GAP-1 联机功能门
 
@@ -264,8 +265,32 @@
   - 预期：纪念退场的未来安排不作为“待删除 / 30 天后清理”项目出现；回收站只显示真正删除或清空记录的内容。
   - 记录：
 
+## Phase 6 Members
+
+人工验收目标：成员创建 / 删除 / 恢复在真实 UI 中符合规则书，且必填主人资料页无明显无障碍或视觉回归。
+
+- [ ] 真实 UI 创建带生日和到家日的宠物成员。
+  - 预期：宠物保存成功；日历 / 提醒中能看到生日与到家纪念相关内容；首页可见性符合最多 6 张卡规则。
+  - 记录：
+
+- [ ] 真实 UI 创建带生日的人类成员。
+  - 预期：人类保存成功；生日相关日历事实可见；首页可见性符合最多 6 张卡规则。
+  - 记录：
+
+- [ ] 删除并恢复带生日提醒的人类成员。
+  - 预期：删除后 Human 与相关日历事实进入回收站语义，普通入口不再出现；恢复后 Human、相关 Event、被回收站抑制的 Reminder 回到可用状态。
+  - 记录：
+
+- [ ] 删除并恢复带生日 / 到家日的宠物成员。
+  - 预期：删除后宠物、相关日历事实和快捷入口一起退出普通 UI；恢复后宠物与相关日历事实回到原入口。
+  - 记录：
+
+- [ ] 打开必填主人资料页。
+  - 预期：顶部图标视觉正常；VoiceOver 不把纯装饰图标读成无意义 SF Symbol；按钮 / 可点区域没有小于 44pt 的明显问题。
+  - 记录：
+
 ## 验收后记录规则
 
 - 人工验收通过后，在对应条目的“记录”后补日期、设备 / 构建、结果。
 - 人工验收发现真实余留项时，写入 `docs/task-follow-ups.md`，并在本文对应条目下标注 follow-up 链接或标题。
-- 新 GAP 的人工验收项追加到本文，不再创建单独的 `gap-*-acceptance-track-list.md` 文件。
+- 新 GAP 或模块的人工验收项追加到本文，不再创建单独的 `gap-*-acceptance-track-list.md` 或模块 track list 文件。
