@@ -83,7 +83,7 @@
 | GAP-6 通知分级 | P1 上架前 | 🟢 | 通知预算表 + 优先级/限额/合并/夜间免打扰 | `6bb766cc3` | 开工：2026-06-12；门禁：`scripts/module-exit-gate.sh` PASS；自动验收通过，真机通知到达 / 点击动作追踪项见 `docs/planning/gap-acceptance-track-list.md#gap-6-通知分级`；未启用远程推送或 CloudKit 通知 |
 | GAP-7 补记结算 | P1 上架前 | 🟢 | 补记历史日期的记录，奖励计入操作当日预算/冷却；不满足则修 | `528cf2cdd` | 开工：2026-06-12；门禁：`scripts/module-exit-gate.sh` PASS；自动验收通过，真实 UI 补记路径追踪项见 `docs/planning/gap-acceptance-track-list.md#gap-7-补记结算`；未改 schema / 路由 / 启动路径 / CloudKit |
 | GAP-8 单成员形态 | P1 上架前 | 🟢 | 单人单宠下排行榜、周报、心情、家人胶囊等逐面检查 | `6c4a98db2` | 开工：2026-06-12；门禁：`scripts/module-exit-gate.sh` PASS；自动验收通过，真实 UI 单人单宠目检项见 `docs/planning/gap-acceptance-track-list.md#gap-8-单成员形态`；未改 schema / 路由 / 启动路径 / CloudKit |
-| GAP-9 离世退场 | P1 上架前 | ⬜ | Memorial 规则书逐模块写明离世行为并测试 | | 未开工 |
+| GAP-9 离世退场 | P1 上架前 | 🟡 | Memorial 规则书逐模块写明离世行为并测试 | | 开工：2026-06-12；梳理离世宠物在任务、提醒、心情、喂食计划、通知、钱包与纪念入口中的退场语义 |
 | GAP-10/11 合资+联机设计 | 1.x | ⬜ | 推迟，见 inventory | | |
 
 ## 待拍板问题（提问协议的异步兜底；产品主人答复后销项）

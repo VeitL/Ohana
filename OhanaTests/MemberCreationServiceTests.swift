@@ -284,6 +284,25 @@ struct MemberCreationServiceTests {
         #expect(visible.first?.id == promoted.id)
     }
 
+    @Test func deceasedHumanDoesNotAppearOnHomeCards() throws {
+        resetGlobalState()
+        let livingHuman = Human(name: "Living")
+        let memorialHuman = Human(name: "Memorial")
+        memorialHuman.passedAwayDate = Date()
+
+        let cards = FocusHomeCardDataSource.buildSnapshot(
+            pets: [],
+            humans: [livingHuman, memorialHuman],
+            electronicPets: [],
+            hiddenPetIDsRaw: "",
+            homeCardOrderRaw: "",
+            showDummyCards: false
+        )
+
+        #expect(cards.contains { $0.id == livingHuman.id })
+        #expect(!cards.contains { $0.id == memorialHuman.id })
+    }
+
     @Test func newHumanDefaultsHiddenFromHomeWhenHomeStackIsFull() throws {
         resetGlobalState()
         let container = try makeContainer()

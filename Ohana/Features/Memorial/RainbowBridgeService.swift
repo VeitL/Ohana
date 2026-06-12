@@ -2,7 +2,7 @@
 //  RainbowBridgeService.swift
 //  Ohana
 //
-//  任务一：宠物生命周期 — 标记离世 + 自动清理未来提醒/事件
+//  Pet lifecycle boundary for memorial mode.
 //
 
 import Foundation
@@ -10,36 +10,45 @@ import SwiftData
 
 @MainActor
 struct RainbowBridgeService {
+    private static let memorialBatchPrefix = "memorial:"
+    private static let memorialReminderActorPrefix = "system:memorial:"
+    private static let memorialTrashedBy = "system:memorial"
 
-    /// 标记宠物离世：设置 passedAwayDate，删除未来未完成的 Reminder 和 Event
+    /// 标记宠物离世：设置 passedAwayDate，并让未来计划退出活跃流但保留数据。
     func markPassedAway(pet: Pet, date: Date = Date(), context: ModelContext) {
         pet.passedAwayDate = date
 
         let petIdStr = pet.id.uuidString
-        let now = Date()
+        let cutoff = date
+        let batchId = Self.memorialBatchId(for: pet)
+        let actorId = Self.memorialReminderActorId(for: pet)
 
-        // 1. 删除该宠物关联的所有未来未完成 Reminder
         let pendingStatus = ReminderStatus.pending.rawValue
         let reminderDesc = FetchDescriptor<Reminder>(
             predicate: #Predicate<Reminder> { reminder in
-                reminder.status == pendingStatus && reminder.scheduledAt >= now
+                reminder.status == pendingStatus && reminder.scheduledAt >= cutoff
             }
         )
         let reminders = fetchModelsOrLog(reminderDesc, context: context, operation: "fetch future pet reminders")
         for reminder in reminders where reminder.event?.relatedEntityId == petIdStr {
             OhanaNotifications.current.cancel(notificationId: reminder.notificationId)
-            context.delete(reminder)
+            reminder.statusEnum = .skipped
+            reminder.completedAt = nil
+            reminder.completedBy = actorId
         }
 
-        // 2. 删除该宠物关联的所有未来 Event（保留历史已发生事件）
         let eventDesc = FetchDescriptor<Event>(
             predicate: #Predicate<Event> { event in
-                event.relatedEntityId == petIdStr && event.startDate > now
+                event.relatedEntityId == petIdStr && event.startDate > cutoff && event.trashedAt == nil
             }
         )
         let events = fetchModelsOrLog(eventDesc, context: context, operation: "fetch future pet events")
         for event in events {
-            context.delete(event)
+            event.trashedAt = date
+            event.trashExpiresAt = nil
+            event.trashBatchId = batchId
+            event.trashedByHumanId = Self.memorialTrashedBy
+            CloudSyncMutationRecorder.markModified(event, context: context, modifiedAt: date)
         }
 
         context.safeSave()
@@ -64,6 +73,60 @@ struct RainbowBridgeService {
     /// 撤销离世标记（误操作恢复）
     func undoPassedAway(pet: Pet, context: ModelContext) {
         pet.passedAwayDate = nil
+
+        let petIdStr = pet.id.uuidString
+        let batchId = Self.memorialBatchId(for: pet)
+        let actorId = Self.memorialReminderActorId(for: pet)
+
+        let skippedStatus = ReminderStatus.skipped.rawValue
+        let reminderDesc = FetchDescriptor<Reminder>(
+            predicate: #Predicate<Reminder> { reminder in
+                reminder.status == skippedStatus && reminder.completedBy == actorId
+            }
+        )
+        let reminders = fetchModelsOrLog(reminderDesc, context: context, operation: "fetch memorial-suppressed reminders")
+        var remindersToReschedule: [Reminder] = []
+        for reminder in reminders where reminder.event?.relatedEntityId == petIdStr {
+            reminder.statusEnum = .pending
+            reminder.completedAt = nil
+            reminder.completedBy = ""
+            reminder.event?.setOccurrenceMarkedComplete(false, on: reminder.scheduledAt)
+            if reminder.scheduledAt > Date() {
+                remindersToReschedule.append(reminder)
+            }
+        }
+
+        let eventDesc = FetchDescriptor<Event>(
+            predicate: #Predicate<Event> { event in
+                event.relatedEntityId == petIdStr && event.trashBatchId == batchId
+            }
+        )
+        let events = fetchModelsOrLog(eventDesc, context: context, operation: "fetch memorial-suppressed events")
+        for event in events where event.trashedByHumanId == Self.memorialTrashedBy {
+            event.trashedAt = nil
+            event.trashExpiresAt = nil
+            event.trashBatchId = ""
+            event.trashedByHumanId = ""
+            CloudSyncMutationRecorder.markModified(event, context: context)
+        }
+
         context.safeSave()
+
+        guard !remindersToReschedule.isEmpty else { return }
+        Task { @MainActor in
+            await ReminderSchedulingService.scheduleManyIfNeeded(
+                reminders: remindersToReschedule,
+                context: context,
+                source: .service
+            )
+        }
+    }
+
+    private static func memorialBatchId(for pet: Pet) -> String {
+        "\(memorialBatchPrefix)\(pet.id.uuidString)"
+    }
+
+    private static func memorialReminderActorId(for pet: Pet) -> String {
+        "\(memorialReminderActorPrefix)\(pet.id.uuidString)"
     }
 }

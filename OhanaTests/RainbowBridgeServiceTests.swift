@@ -5,7 +5,7 @@ import Testing
 
 @MainActor
 struct RainbowBridgeServiceTests {
-    @Test func markPassedAwayDeletesFuturePetRemindersAndEventsOnly() throws {
+    @Test func markPassedAwayKeepsFuturePlansButSuppressesThemFromActiveFlows() throws {
         let container = try makeContainer()
         let context = ModelContext(container)
         let now = Date()
@@ -59,16 +59,103 @@ struct RainbowBridgeServiceTests {
         let events = try context.fetch(FetchDescriptor<Event>())
         let reminders = try context.fetch(FetchDescriptor<Reminder>())
         #expect(pet.passedAwayDate == now)
-        #expect(!events.contains { $0.id == futureEventID })
+        #expect(events.contains { $0.id == futureEventID })
+        #expect(events.first { $0.id == futureEventID }?.trashedAt == now)
+        #expect(events.first { $0.id == futureEventID }?.trashBatchId == "memorial:\(pet.id.uuidString)")
+        #expect(events.first { $0.id == futureEventID }?.trashExpiresAt == nil)
         #expect(events.contains { $0.id == pastEventID })
         #expect(events.contains { $0.id == otherFutureEventID })
-        #expect(!reminders.contains { $0.id == futureReminderID })
+        #expect(reminders.contains { $0.id == futureReminderID })
+        #expect(reminders.first { $0.id == futureReminderID }?.statusEnum == .skipped)
+        #expect(reminders.first { $0.id == futureReminderID }?.completedBy == "system:memorial:\(pet.id.uuidString)")
         #expect(reminders.contains { $0.id == pastReminderID })
         #expect(reminders.contains { $0.id == otherFutureReminderID })
+        #expect(reminders.first { $0.id == pastReminderID }?.statusEnum == .pending)
+        #expect(reminders.first { $0.id == otherFutureReminderID }?.statusEnum == .pending)
+        #expect(events.first { $0.id == pastEventID }?.trashedAt == nil)
+        #expect(events.first { $0.id == otherFutureEventID }?.trashedAt == nil)
+    }
+
+    @Test func undoPassedAwayRestoresOnlyMemorialSuppressedFuturePlans() throws {
+        let container = try makeContainer()
+        let context = ModelContext(container)
+        let now = Date()
+        let future = now.addingTimeInterval(3600)
+        let pet = Pet(name: "Momo", species: "cat")
+        let event = Event(
+            title: "Future vet",
+            startDate: future,
+            eventType: EventType.vetVisit.rawValue,
+            relatedEntityType: EntityKind.pet.rawValue,
+            relatedEntityId: pet.id.uuidString
+        )
+        let memorialReminder = Reminder(event: event, scheduledAt: future)
+        let userSkippedEvent = Event(
+            title: "User skipped future vet",
+            startDate: future.addingTimeInterval(7200),
+            eventType: EventType.vetVisit.rawValue,
+            relatedEntityType: EntityKind.pet.rawValue,
+            relatedEntityId: pet.id.uuidString
+        )
+        let userSkippedReminder = Reminder(event: userSkippedEvent, scheduledAt: future.addingTimeInterval(7200))
+        userSkippedReminder.statusEnum = .skipped
+        userSkippedReminder.completedBy = "human-1"
+
+        context.insert(pet)
+        context.insert(event)
+        context.insert(userSkippedEvent)
+        context.insert(memorialReminder)
+        context.insert(userSkippedReminder)
+        try context.save()
+
+        RainbowBridgeService().markPassedAway(pet: pet, date: now, context: context)
+        RainbowBridgeService().undoPassedAway(pet: pet, context: context)
+
+        #expect(pet.passedAwayDate == nil)
+        #expect(event.trashedAt == nil)
+        #expect(event.trashBatchId.isEmpty)
+        #expect(event.trashExpiresAt == nil)
+        #expect(memorialReminder.statusEnum == .pending)
+        #expect(memorialReminder.completedBy.isEmpty)
+        #expect(memorialReminder.completedAt == nil)
+        #expect(userSkippedEvent.trashedAt == nil)
+        #expect(userSkippedReminder.statusEnum == .skipped)
+        #expect(userSkippedReminder.completedBy == "human-1")
+    }
+
+    @Test func deceasedHumanDoesNotReceiveEconomyRewards() throws {
+        let container = try makeContainer()
+        let context = ModelContext(container)
+        let human = Human(name: "Li")
+        human.passedAwayDate = Date()
+        context.insert(human)
+        try context.save()
+
+        let previousActiveHuman = UserDefaults.standard.string(forKey: "currentActiveHumanId")
+        defer {
+            if let previousActiveHuman {
+                UserDefaults.standard.set(previousActiveHuman, forKey: "currentActiveHumanId")
+            } else {
+                UserDefaults.standard.removeObject(forKey: "currentActiveHumanId")
+            }
+        }
+        UserDefaults.standard.set(human.id.uuidString, forKey: "currentActiveHumanId")
+
+        let reward = QuestManager().awardAction(
+            type: .dailyFocusCompletion,
+            pet: nil,
+            context: context,
+            quality: .none,
+            executorId: nil
+        )
+
+        #expect(reward.humanGot == 0)
+        #expect(reward.petGot == 0)
+        #expect(human.coconutBalance == 0)
     }
 
     private func makeContainer() throws -> ModelContainer {
-        let schema = Schema(ArkSchemaV64.models)
+        let schema = Schema(ArkSchemaV69.models)
         let config = ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)
         return try ModelContainer(for: schema, configurations: [config])
     }

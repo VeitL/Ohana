@@ -279,6 +279,9 @@ final class QuestManager {
         }
         if human == nil {
             OhanaLog.warning("[QuestManager] humanId=\(humanId) not found in context; skipping human share", category: "Economy")
+        } else if human?.hasPassedAway == true {
+            OhanaLog.warning("[QuestManager] active humanId=\(humanId) is memorialized; skipping human share", category: "Economy")
+            return nil
         }
         return human
     }

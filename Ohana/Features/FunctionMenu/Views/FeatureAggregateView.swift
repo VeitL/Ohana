@@ -22,7 +22,7 @@ struct FeatureAggregateView: View {
     @State private var humanAvatarCacheKey = "feature-aggregate-human-avatar-empty"
 
     private var activePets: [Pet] { pets.filter { !$0.hasPassedAway } }
-    private var visibleHumans: [Human] { humans.filter(\.shouldShowOnHome) }
+    private var visibleHumans: [Human] { humans.filter { $0.shouldShowOnHome && !$0.hasPassedAway } }
     private var activeHumanId: UUID? { UUID(uuidString: activeHumanIdStr) }
 
     private func isDog(_ pet: Pet) -> Bool {

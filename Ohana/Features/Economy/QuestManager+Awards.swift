@@ -160,7 +160,12 @@ extension QuestManager {
             }
         )
         do {
-            return try context.fetch(desc).first
+            let human = try context.fetch(desc).first
+            if human?.hasPassedAway == true {
+                OhanaLog.warning("[QuestManager] reward humanId=\(humanId) is memorialized; skipping human share", category: "Economy")
+                return nil
+            }
+            return human
         } catch {
             OhanaLog.warning("[QuestManager] failed to fetch reward humanId=\(humanId): \(error.localizedDescription)", category: "Economy")
             return nil

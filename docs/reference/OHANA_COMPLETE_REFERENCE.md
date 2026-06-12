@@ -1060,7 +1060,7 @@ func nextMilestone(currentStreak:) -> (days:, reward:, remaining:)? // UI 提示
 **模式**: `@MainActor` struct，静态方法
 
 ```swift
-static func markPassedAway(pet:, date:, context:)   // 标记离世，删除未来提醒/事件
+static func markPassedAway(pet:, date:, context:)   // 标记离世，未来提醒/事件退出活跃流但保留数据
 static func undoPassedAway(pet:, context:)           // 撤销离世（误操作恢复）
 ```
 
@@ -1576,7 +1576,7 @@ modelContext.safeSave()
 
 // 删除宠物时需手动删除关联 Events（relatedEntityId 匹配，不在 cascade 范围）
 
-// RainbowBridgeService.markPassedAway 会自动清理未来事件/提醒
+// RainbowBridgeService.markPassedAway 会让未来事件/提醒退出活跃流并保留数据
 ```
 
 ### 10.4 Swift Charts 注意事项

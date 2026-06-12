@@ -43,7 +43,7 @@
 
 ### MBR-010 宠物纪念模式由生命周期命令写入，撤销会清空
 
-任何情况下，标记宠物离世调用 `RainbowBridgeService.markPassedAway`，标记 Pet modified，并返回 action `passed.mark`；撤销调用 `RainbowBridgeService.undoPassedAway`，标记 Pet modified，并返回 action `passed.undo`。视图提示当前行为会“删除所有未来的提醒和事件”，但具体删除逻辑在 RainbowBridgeService 内。来源：`Ohana/Features/Members/MemberInteractionCommands.swift:14`、`Ohana/Features/Members/MemberInteractionCommands.swift:19`、`Ohana/Features/Members/MemberInteractionCommands.swift:20`、`Ohana/Features/Members/MemberInteractionCommands.swift:31`、`Ohana/Features/Members/MemberInteractionCommands.swift:35`、`Ohana/Features/Members/Views/PetBasicInfoDetailView+MemorialDanger.swift:87`。
+任何情况下，标记宠物离世调用 `RainbowBridgeService.markPassedAway`，标记 Pet modified，并返回 action `passed.mark`；撤销调用 `RainbowBridgeService.undoPassedAway`，标记 Pet modified，并返回 action `passed.undo`。未来提醒 / 事件由 `RainbowBridgeService` 以纪念退场标记退出活跃流，不硬删除；撤销只恢复纪念流程标记的内容。来源：`Ohana/Features/Members/MemberInteractionCommands.swift:14`、`Ohana/Features/Members/MemberInteractionCommands.swift:19`、`Ohana/Features/Members/MemberInteractionCommands.swift:20`、`Ohana/Features/Members/MemberInteractionCommands.swift:31`、`Ohana/Features/Members/MemberInteractionCommands.swift:35`、`Ohana/Features/Memorial/RainbowBridgeService.swift:16`。
 
 ### MBR-011 人类纪念模式只写 passedAwayDate
 
@@ -164,9 +164,9 @@ stateDiagram-v2
 
 代码现在是：Members 创建生日/到家日 Event，删除 Pet 时删除 related Event，但没有为这些 Event 调 `CloudSyncMutationRecorder.markModified/markDeleted`。Event 已接入 upload pipeline。怀疑意图是：成员相关 Event 应跨设备同步，并在删除时生成 tombstone。来源：`Ohana/Domain/Services/CloudSyncEntityRegistry.swift:101`、`Ohana/Features/Members/MemberCreationService.swift:344`、`Ohana/Features/Members/MemberCreationService.swift:394`、`Ohana/Features/Members/MemberDeletionCommands.swift:52`。
 
-### S-MEM-003 Pet 纪念模式提示与 Members 层可见行为不完全同源
+### S-MEM-003 Pet 纪念模式提示与 Members 层可见行为不完全同源（已由 GAP-9 收敛）
 
-代码现在是：UI 文案提示标记离世会删除未来提醒和事件；Members command 实际只委托 RainbowBridgeService 并标记 Pet modified。怀疑意图是：规则书应明确 RainbowBridgeService 的删除范围，否则 Members 代码本身无法证明 UI 承诺。来源：`Ohana/Features/Members/Views/PetBasicInfoDetailView+MemorialDanger.swift:87`、`Ohana/Features/Members/MemberInteractionCommands.swift:19`。
+GAP-9 已改为：UI 文案不再承诺删除；Members command 委托 `RainbowBridgeService`；规则书 `docs/specs/Memorial-logic.md` 明确未来提醒 / 事件以纪念退场标记退出活跃流并可撤销。来源：`Ohana/Features/Members/Views/PetBasicInfoDetailView+MemorialDanger.swift:93`、`Ohana/Features/Memorial/RainbowBridgeService.swift:16`。
 
 ### S-MEM-004 重复发布 member profile revision
 

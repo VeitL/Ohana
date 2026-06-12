@@ -4208,6 +4208,26 @@ struct OhanaTests {
     }
 
     @MainActor
+    @Test func islandQuestEngineDoesNotAssignWeightQuestToDeceasedHuman() async throws {
+        let human = Human(name: "Li")
+        human.passedAwayDate = Date()
+        let completedIntroProgress = TodayFocusQuestProgress(
+            isPetWizardCompleted: true,
+            isFirstMealRecorded: true,
+            isThemeColorSet: true
+        )
+
+        let quests = IslandQuestEngine.todayQuests(
+            pets: [],
+            reminders: [],
+            humans: [human],
+            questProgress: completedIntroProgress
+        )
+
+        #expect(!quests.contains { $0.id == "q_human_weight_\(human.id.uuidString)" })
+    }
+
+    @MainActor
     @Test func islandQuestEngineDoesNotCreatePlayTaskForEveryPetAfterInteraction() async throws {
         let momo = Pet(name: "Momo", species: "狗")
         let lilo = Pet(name: "Lilo", species: "猫")

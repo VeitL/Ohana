@@ -85,6 +85,7 @@ nonisolated enum IslandQuestEngine {
         TodayFocusDailyPreferenceCleanupStore.cleanupIfNeeded(date: now, calendar: cal)
         var quests: [IslandQuest] = []
         let activePets = pets.filter { !$0.hasPassedAway }
+        let activeHumans = humans.filter { !$0.hasPassedAway }
         let maxQuests = TodayFocusLimits.maxGeneratedQuests
 
         // ── 用药委托（最高优先级）：今日未达频次的活跃疗程
@@ -131,14 +132,14 @@ nonisolated enum IslandQuestEngine {
         }
 
         if activePets.isEmpty {
-            for quest in oasisBuildQuests(activePets: activePets, humans: humans, questProgress: questProgress) {
+            for quest in oasisBuildQuests(activePets: activePets, humans: activeHumans, questProgress: questProgress) {
                 guard quests.count < maxQuests else { break }
                 quests.append(quest)
             }
         }
 
         if quests.count < maxQuests,
-           let human = preferredHumanForWeight(from: humans, calendar: cal, now: now) {
+           let human = preferredHumanForWeight(from: activeHumans, calendar: cal, now: now) {
             quests.append(IslandQuest(
                 id: "q_human_weight_\(human.id.uuidString)",
                 emoji: "⚖️",

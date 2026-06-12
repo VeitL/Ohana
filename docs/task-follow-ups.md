@@ -25,6 +25,25 @@ actionable; long-term product ideas belong in planning docs instead.
 
 ## Open Items
 
+### TFU-20260612-017 - Validate GAP-9 memorial mode on real UI and device notifications
+
+- Status: Open
+- Priority: P1
+- Area: Memorial / Notifications / Release Validation
+- Source task: GAP-9 memorial exit, 2026-06-12
+- Blocker: Repository tests prove data retention, active-flow filtering, undo
+  restoration, and reward freeze invariants, but they cannot fully prove real
+  iOS notification cancellation / rescheduling behavior or the final visible
+  memorial experience across a real device data set.
+- Next step: Run the GAP-9 manual checklist in
+  `docs/planning/gap-acceptance-track-list.md#gap-9-离世退场`, especially
+  marking/undoing a pet, checking notification cancellation and restoration,
+  confirming memorial entry visibility, and scanning home/FAB/full-menu
+  active targets.
+- Close when: The GAP-9 track list's manual section is checked off on a real
+  device and any device-specific notification or UI defect is fixed or split
+  into its own scoped follow-up.
+
 ### TFU-20260612-016 - Validate GAP-6 notification delivery on real devices
 
 - Status: Open

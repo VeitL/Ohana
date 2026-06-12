@@ -18,8 +18,12 @@ struct FamilyWeeklyReportDashboardContentView: View {
 
     private var l: L10n { L10n(appLanguage) }
 
+    private var visibleHumans: [Human] {
+        humans.filter { !$0.hasPassedAway }
+    }
+
     private var visibleHumanCount: Int {
-        humans.count
+        visibleHumans.count
     }
 
     private var isSingleVisibleHumanFamily: Bool {
@@ -42,9 +46,11 @@ struct FamilyWeeklyReportDashboardContentView: View {
 
     private var rankedMembers: [MemberStat] {
         var dict: [String: MemberStat] = [:]
+        let visibleHumansById = Dictionary(uniqueKeysWithValues: visibleHumans.map { ($0.id.uuidString, $0) })
         for entry in allEntries {
             let id = entry.actorId ?? "unknown"
-            let human = humans.first { $0.id.uuidString == id }
+            guard id == "unknown" || visibleHumansById[id] != nil else { continue }
+            let human = visibleHumansById[id]
             let name = human?.name ?? "未指定"
             let emoji = human?.avatarEmoji ?? "👤"
             var stat = dict[id] ?? MemberStat(id: id, name: name, emoji: emoji, count: 0, coconuts: 0)

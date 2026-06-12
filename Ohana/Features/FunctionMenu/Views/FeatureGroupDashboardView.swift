@@ -19,7 +19,7 @@ struct FeatureGroupDashboardView: View {
     @State private var selectedItemID: String?
 
     private var activePets: [Pet] { pets.filter { !$0.hasPassedAway } }
-    private var visibleHumans: [Human] { humans.filter(\.shouldShowOnHome) }
+    private var visibleHumans: [Human] { humans.filter { $0.shouldShowOnHome && !$0.hasPassedAway } }
     private var currentTreeLevel: Int { appServices.oasisTree.treeLevel.rawValue }
 
     private var hasDogs: Bool {

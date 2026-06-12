@@ -23,7 +23,7 @@ nonisolated enum FocusHomeCardDataSource {
                 .filter { !$0.hasPassedAway && HomeCardVisibility.isPetVisible($0, raw: hiddenPetIDsRaw) }
                 .map { FocusCard.from($0, includeAvatarData: false, includeWalkDistance: false) }
                 + humans
-                .filter(\.shouldShowOnHome)
+                .filter { $0.shouldShowOnHome && !$0.hasPassedAway }
                 .map { FocusCard.from($0, includeAvatarData: false) }
                 + electronicPets
                 .filter { !$0.isArchived && $0.lifeState != .dead && $0.isFeaturedOnOasis }

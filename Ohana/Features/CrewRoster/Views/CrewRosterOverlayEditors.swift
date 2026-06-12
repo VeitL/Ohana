@@ -175,7 +175,7 @@ struct CrewRosterProfilePanel: View {
             }
             Button("取消", role: .cancel) {}
         } message: {
-            Text("将进入纪念模式，并删除未来未完成的提醒和事件。此操作可撤销。")
+            Text("将进入纪念模式，并让未来照护安排退出活跃提醒。原有数据会保留，此操作可撤销。")
         }
         .alert("撤销离世标记", isPresented: $showingPetUndoPassedAlert) {
             Button("撤销", role: .destructive) {
