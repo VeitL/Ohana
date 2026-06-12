@@ -1,7 +1,7 @@
 # 测试推进总账（跨会话唯一进度源）
 
 > 工作协议见 `docs/ai-module-test-playbook.md`。任何会话开工前先读本文件；收工前**必须**更新本文件对应行，否则视为未完成。
-> 状态图例：⬜ 未开始 ｜ 🔵 分析完成待修 ｜ 🟡 修复中 ｜ 🟢 已过门禁并提交 ｜ 🏁 对抗复审通过（成熟） ｜ ⛔ 阻塞（备注写明阻塞原因）
+> 状态图例：⬜ 未开始 ｜ 🔵 分析完成待修 ｜ 🟡 修复中 ｜ 🟢 已过门禁并提交 ｜ 🟢\* 已过门禁但带人工验收债（见 track list） ｜ 🏁 对抗复审通过（成熟） ｜ ⛔ 阻塞（备注写明阻塞原因）
 > 🏁 准则见手册「模块成熟度准则」：核心模块（Domain、Economy、Feeding、Members、Home）必须 🏁 才能进 Phase 8；外围小模块 🟢 即可。
 
 ## 阶段总览
@@ -15,7 +15,7 @@
 | 4 | `Ohana/App` | 🟢 | 门禁通过并提交：`e48c13af7`；无 P1/P2 余留 |
 | 5 | Home + TodayFocus + QuickCare | 🟢 | 门禁通过并提交：`b8e8710e`；TFU-20260612-015 已关闭，无 P1/P2 余留 |
 | 6 | 大模块（Feeding/Members/Oasis/Settings/Health/Economy） | 🟡 | Feeding 门禁通过并提交：`b49134977`；Members 门禁通过并提交：`ead1e5fe4`；Oasis 门禁通过并提交：`87423afd8`；Settings/Health/Economy 待启动 |
-| 6.5 | 宪法差距建设（联机门/回收站/自动备份） | ⬜ | 见下方「建设工作」表与 `docs/planning/constitution-gap-inventory.md` |
+| 6.5 | 宪法差距建设（联机门/回收站/自动备份） | 🟢* | GAP-1~9 全部过门禁并提交；*带验收债：64 项人工/真机验收项待清，见 `docs/planning/gap-acceptance-track-list.md`，必须在 🏁 复审与 Phase 9B 前清完 |
 | 7 | 中小模块批量 | ⬜ | |
 | 8 | 横向集成与全量回归 | ⬜ | 需总览会话主持 |
 | 8.5 | 演进就绪审查（联网/订阅/账户地基） | ⬜ | 需总览会话主持；产出审查报告与少量铺垫，非新功能 |
@@ -106,3 +106,4 @@
 | 2026-06-12 | 初始化 | Phase 0 完成（`ff7ac89f`）；总账与门禁脚本建立 |
 | 2026-06-12 | 宪法差距盘点 | 产品宪法 v1.1（D1~D18/G1~G10）逐条对照代码：3 个 P0 建设模块（联机门/回收站/自动备份，已拍板都上架前做）、6 项 P1 并入模块会话、合资推 1.x；裁剪三项全部拍板（联机面全收进门、周报留悬赏剥）。明细见 `docs/planning/constitution-gap-inventory.md`，新增 Phase 6.5 |
 | 2026-06-12 | 9A 前置项 | **9A.1 付费 Apple Developer 账号已办妥** ✅。解锁：真机签名安装（dogfooding）、App Store Connect 建档、TestFlight（9B 时用）。注意：CloudKit 验证虽技术上解锁，但按 D4 仍属 1.x，不得因账号到位而提前开工。待办：App Store Connect 注册 Bundle ID + 建档抢注 app 名称 |
+| 2026-06-12 | GAP 批次对账 | 账实核对：GAP-1~9、Members、Oasis 共 11 项的门禁 commit 全部存在且成对（fix+gate 记录）、工作区干净、AGENTS.md schema 行已同步 V69、九本规则书在 `docs/specs/`。发现：① main 领先 origin 9 个提交未推送→CI（含 SwiftLint 严格）未验证最近批次；② 64 项人工/真机验收债集中在 track list，已在 Phase 6.5 行标注 🟢*；③ 总览会话重跑 `module-exit-gate.sh` 抽查 **PASS**（全量单测+审计绿）。流程修正：验收债规则与 🟢* 状态入手册、收工协议加推送+CI 要求、复审采样节奏入手册 |
