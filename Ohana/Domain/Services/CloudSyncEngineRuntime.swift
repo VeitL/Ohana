@@ -110,7 +110,7 @@ final class LocalDeviceCloudSyncService: CloudSyncManaging {
 }
 
 nonisolated enum CloudSyncEngineRuntime {
-    static let containerIdentifier = "iCloud.HT.Ohana"
+    static let containerIdentifier = "iCloud.com.guanchen.li.Ohana"
     static let defaultSubscriptionID = "ohana-cloud-sync-engine"
     static let enabledDefaultsKey = "ohana_cloud_sync_enabled"
     static let databaseScopeDefaultsKey = "ohana_cloud_sync_database_scope"

@@ -187,8 +187,16 @@ private enum InputLatencyWarmupService {
         didWarmUp = true
 
         let startedAt = CFAbsoluteTimeGetCurrent()
-        OhanaFeedback.prepareInteraction()
-        warmUpTextInputSystem(startedAt: startedAt)
+        #if targetEnvironment(simulator)
+            AppPerformanceMonitor.shared.record(
+                "输入反馈预热",
+                startedAt: startedAt,
+                note: "simulator skipped"
+            )
+        #else
+            OhanaFeedback.prepareInteraction()
+            warmUpTextInputSystem(startedAt: startedAt)
+        #endif
     }
 
     private static func warmUpTextInputSystem(startedAt: CFAbsoluteTime) {

@@ -475,7 +475,7 @@ enum AppFlowPerformance {
 
 @MainActor
 private enum AppPerformanceSignposts {
-    private static let signposter = OSSignposter(subsystem: "HT.Ohana", category: "PerformanceProbes")
+    private static let signposter = OSSignposter(subsystem: "com.guanchen.li.Ohana", category: "PerformanceProbes")
 
     static func recordSample(_ name: String, valueMS: Double, note: String?) {
         switch name {

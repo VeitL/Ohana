@@ -57,15 +57,22 @@ extension VerticalSolidHomeView {
     }
 
     func scheduleGrowthOnboardingIfNeeded() {
+        guard hasOnboarded else {
+            cancelGrowthOnboardingPrompt()
+            return
+        }
+        guard pets.isEmpty, humans.isEmpty else {
+            cancelGrowthOnboardingPrompt()
+            return
+        }
         guard !growthOnboardingCompleted,
-              !showGrowthOnboarding,
-              pets.isEmpty,
-              humans.isEmpty else {
+              !showGrowthOnboarding else {
             return
         }
         growthOnboardingTask?.cancel()
         growthOnboardingTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: 680) {
             guard !growthOnboardingCompleted,
+                  hasOnboarded,
                   pets.isEmpty,
                   humans.isEmpty else {
                 growthOnboardingTask = nil
@@ -78,13 +85,18 @@ extension VerticalSolidHomeView {
         }
     }
 
-    func completeGrowthOnboarding() {
-        growthOnboardingCompleted = true
+    func cancelGrowthOnboardingPrompt() {
         growthOnboardingTask?.cancel()
         growthOnboardingTask = nil
+        guard showGrowthOnboarding else { return }
         withAnimation(GoMotion.feedback) {
             showGrowthOnboarding = false
         }
+    }
+
+    func completeGrowthOnboarding() {
+        growthOnboardingCompleted = true
+        cancelGrowthOnboardingPrompt()
     }
 
     func scheduleGrowthUnlockFeedbackIfNeeded() {

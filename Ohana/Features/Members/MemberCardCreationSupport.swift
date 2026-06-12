@@ -21,7 +21,7 @@ extension EnvironmentValues {
 }
 
 enum MemberCreationPerformance {
-    private nonisolated static let log = OSLog(subsystem: "HT.Ohana", category: "MemberCreationPerformance")
+    private nonisolated static let log = OSLog(subsystem: "com.guanchen.li.Ohana", category: "MemberCreationPerformance")
 
     nonisolated static func event(_ name: StaticString) {
         os_signpost(.event, log: log, name: name)

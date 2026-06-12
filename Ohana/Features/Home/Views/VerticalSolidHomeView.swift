@@ -38,6 +38,7 @@ struct VerticalSolidHomeView: View {
     @AppStorage(HomeCardVisibility.hiddenPetIDsKey) var hiddenPetIDsRaw = ""
     @AppStorage("goFocusHomeCardOrder.v1") var homeCardOrderRaw = ""
     @AppStorage("debugShowDummyCards") var showDummyCards = false
+    @AppStorage("ohana_has_onboarded") var hasOnboarded = false
     @AppStorage("ohanaGrowthOnboardingCompletedV1") var growthOnboardingCompleted = false
     @AppStorage("ohanaGrowthLastSeenTreeLevelV1") var growthLastSeenTreeLevel = 0
     @AppStorage("quickActionItems_v2") var quickActionItemsRaw = ""
@@ -510,6 +511,9 @@ struct VerticalSolidHomeView: View {
             scheduleHomeAppearHandoff()
         }
         .onChange(of: dataSignature) { _, _ in
+            if !pets.isEmpty || !humans.isEmpty {
+                cancelGrowthOnboardingPrompt()
+            }
             requestHomeSnapshotRefresh()
         }
         .onChange(of: controller.snapshot.todayFocus.refreshedQuests) { previous, current in
