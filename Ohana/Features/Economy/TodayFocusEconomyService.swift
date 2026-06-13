@@ -46,13 +46,14 @@ enum TodayFocusEconomyService {
         let markerKey = "\(rewardMarkerPrefix).\(normalizedUserKey(householdKey)).\(EconomyDailyBudgetStore.dayKey(for: now))"
         guard !UserDefaults.standard.bool(forKey: markerKey) else { return nil }
 
-        let reward = questManager.awardAction(
+        let reward = EconomyRewardDiscipline.awardNonCareReward(
             type: .dailyFocusCompletion,
             pet: nil,
             context: context,
             quality: .none,
             date: now,
-            executorId: executorId
+            executorId: executorId,
+            questManager: questManager
         )
         guard let result = questManager.lastEconomyRewardResult else { return nil }
         guard result.growthXP > 0 || result.totalCoconuts > 0 || reward.humanGot > 0 || reward.petGot > 0 else { return nil }

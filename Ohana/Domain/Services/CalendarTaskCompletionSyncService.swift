@@ -368,12 +368,13 @@ enum CalendarTaskCompletionSyncService {
         let walletBefore = Set(fetchOrLog(FetchDescriptor<CoconutLedgerEntry>(), context: context, operation: "fetch wallet entries before calendar reward").map(\.id))
         let budgetBefore = Set(fetchOrLog(FetchDescriptor<EconomyBudgetUsageEvent>(), context: context, operation: "fetch budget events before calendar reward").map(\.id))
         let questManager = QuestManager()
-        let reward = questManager.awardAction(
+        let reward = EconomyRewardDiscipline.awardCareAction(
             type: action,
             pet: pet,
             context: context,
             date: occurredAt,
-            executorId: executorId
+            executorId: executorId,
+            questManager: questManager
         )
         let walletEntries = fetchOrLog(FetchDescriptor<CoconutLedgerEntry>(), context: context, operation: "fetch wallet entries after calendar reward")
             .filter { !walletBefore.contains($0.id) }

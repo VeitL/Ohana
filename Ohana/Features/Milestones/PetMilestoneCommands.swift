@@ -144,7 +144,13 @@ enum PetMilestoneCommandService {
             logPrefix: "PetMilestoneCommandService"
         )
         let executorId = rewardHuman?.id.uuidString
-        let reward = questManager.awardAction(type: .milestone, pet: pet, context: context, executorId: executorId)
+        let reward = EconomyRewardDiscipline.awardNonCareReward(
+            type: .milestone,
+            pet: pet,
+            context: context,
+            executorId: executorId,
+            questManager: questManager
+        )
         let coconutDelta = max(0, reward.humanGot + reward.petGot)
         recordLedger(
             milestone: milestone,

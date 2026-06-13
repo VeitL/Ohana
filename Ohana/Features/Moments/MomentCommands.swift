@@ -55,11 +55,12 @@ enum MomentCommandService {
         var coconutDelta = 0
         if let savedLog = savedLogs.first {
             do {
-                let reward = questManager.awardAction(
+                let reward = EconomyRewardDiscipline.awardNonCareReward(
                     type: .general(humanReward: 1, petReward: 0, emoji: "📸", title: "记录时刻 +1🥥"),
                     pet: pet,
                     context: context,
-                    executorId: executorId
+                    executorId: executorId,
+                    questManager: questManager
                 )
                 coconutDelta = reward.humanGot + reward.petGot
                 careLedger.record(

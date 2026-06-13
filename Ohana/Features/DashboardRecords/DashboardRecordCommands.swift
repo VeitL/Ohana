@@ -75,7 +75,13 @@ enum WeightCommandService {
         )
         context.insert(log)
         let reward: (humanGot: Int, petGot: Int)? = if awardsReward {
-            questManager.awardAction(type: .weight, pet: pet, context: context, executorId: executorId)
+            EconomyRewardDiscipline.awardCareAction(
+                type: .weight,
+                pet: pet,
+                context: context,
+                executorId: executorId,
+                questManager: questManager
+            )
         } else {
             nil
         }

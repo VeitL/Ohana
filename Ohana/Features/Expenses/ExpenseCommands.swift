@@ -83,7 +83,13 @@ enum ExpenseCommandService {
             document = nil
         }
 
-        let reward = questManager.awardAction(type: .expense, pet: pet, context: context, executorId: executorId)
+        let reward = EconomyRewardDiscipline.awardNonCareReward(
+            type: .expense,
+            pet: pet,
+            context: context,
+            executorId: executorId,
+            questManager: questManager
+        )
         let coconutDelta = careLedger.rewardDelta(reward)
         let ledgerEvent = careLedger.record(
             occurredAt: log.date,
@@ -173,11 +179,12 @@ enum ExpenseCommandService {
         )
         context.insert(log)
 
-        let reward = questManager.awardAction(
+        let reward = EconomyRewardDiscipline.awardNonCareReward(
             type: .expense,
             pet: nil,
             context: context,
-            executorId: human.id.uuidString
+            executorId: human.id.uuidString,
+            questManager: questManager
         )
         let coconutDelta = careLedger.rewardDelta(reward)
         let ledgerEvent = careLedger.record(

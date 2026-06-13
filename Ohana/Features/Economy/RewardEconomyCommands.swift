@@ -206,11 +206,13 @@ enum BackdateCheckInCommandService {
         activeHumanSelection: ActiveHumanSelecting = UserDefaultsActiveHumanSelection()
     ) -> BackdateCheckInCommandResult {
         let human = currentActiveHuman(context: context, activeHumanSelection: activeHumanSelection)
-        let reward = (providedQuestManager ?? QuestManager()).awardAction(
+        let questManager = providedQuestManager ?? QuestManager()
+        let reward = EconomyRewardDiscipline.awardNonCareReward(
             type: action,
             pet: pet,
             context: context,
-            executorId: human?.id.uuidString
+            executorId: human?.id.uuidString,
+            questManager: questManager
         )
         return BackdateCheckInCommandResult(
             petID: pet.id,

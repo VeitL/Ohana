@@ -227,11 +227,12 @@ final class PetWalkingManager {
 
             var earnedCoconuts = 0
             if !isTooShortForReward {
-                let reward = questManager.awardAction(
+                let reward = EconomyRewardDiscipline.awardCareAction(
                     type: .walk(distanceMeters: distanceMeters),
                     pet: pet,
                     context: modelContext,
-                    executorId: executorId
+                    executorId: executorId,
+                    questManager: questManager
                 )
                 earnedCoconuts = reward.humanGot + reward.petGot
             }
@@ -273,11 +274,12 @@ final class PetWalkingManager {
         // 遛狗中每次便便：人+2, 宠物+5（OhanaActionType.potty(isLitter:false)）
         if poop > 0 {
             for pottyLog in pottyLogs {
-                let reward = questManager.awardAction(
+                let reward = EconomyRewardDiscipline.awardCareAction(
                     type: .potty(isLitter: false),
                     pet: pet,
                     context: modelContext,
-                    executorId: executorId
+                    executorId: executorId,
+                    questManager: questManager
                 )
                 let metadataJSON = careLedger.rewardMetadata(reward, questManager: questManager)
                 let ledgerEvent = careLedger.record(

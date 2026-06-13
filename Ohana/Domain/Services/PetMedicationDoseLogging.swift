@@ -80,11 +80,12 @@ nonisolated enum PetMedicationDoseLogging {
         do {
             var coconutDelta = 0
             if awardCoconut {
-                let reward = questManager.awardAction(
+                let reward = EconomyRewardDiscipline.awardCareAction(
                     type: .general(humanReward: 1, petReward: 0, emoji: "💊", title: "记录喂药 +1🥥"),
                     pet: pet,
                     context: modelContext,
-                    executorId: event.assigneeId
+                    executorId: event.assigneeId,
+                    questManager: questManager
                 )
                 coconutDelta = reward.humanGot + reward.petGot
             }
