@@ -25,9 +25,29 @@ actionable; long-term product ideas belong in planning docs instead.
 
 ## Open Items
 
-### TFU-20260613-007 - Fix CI build-test compiler failures outside Economy
+### TFU-20260613-008 - Green architecture boundary audit or refresh ratchet baseline
 
 - Status: Open
+- Priority: P1
+- Area: CI / Architecture Boundaries
+- Source task: CI repair round close-out, 2026-06-13
+- Blocker: GitHub Actions run `27452421109` proves `lint` and `build-test`
+  are green on `33f32ef1a`, but the `audits` job still fails only at
+  `scripts/audit-architecture-boundaries.sh --all`. The current failure groups
+  are `@Query` outside route/data containers, `NotificationCenter` string bus,
+  View-to-static service calls, oversized Swift file ratchet breaches, and
+  static service calls outside approved adapter/facade/backfill boundaries.
+- Next step: Run a separate architecture-audit green/baseline repair round.
+  Decide per failure whether to move code behind approved boundaries or refresh
+  a deliberate ratchet baseline, with focused commits and no TFU-006/007 scope
+  creep.
+- Close when: `scripts/audit-architecture-boundaries.sh --all` passes locally
+  and the GitHub Actions `audits` job reaches the later repository gates instead
+  of stopping at architecture boundaries.
+
+### TFU-20260613-007 - Fix CI build-test compiler failures outside Economy
+
+- Status: Done
 - Priority: P1
 - Area: CI Build / Recycle Bin / FamilyTasks
 - Source task: Economy adversarial P1 remediation close-out, 2026-06-13
@@ -44,10 +64,15 @@ actionable; long-term product ideas belong in planning docs instead.
   test suite rather than stopping at Swift compile.
 - Close when: GitHub Actions `build-test` reaches and completes the simulator
   test suite on the iPhone 17 destination for the current main branch.
+- Closed: 2026-06-13 in the CI repair round. Run `27452421109` on commit
+  `33f32ef1a` completed `build-test` successfully on the iPhone 17 simulator.
+  The final CI-only crash was isolated to `CoconutExchangeService.cancel`
+  constructing default wallet dependencies before the closed feature gate; the
+  service now checks the gate before default dependency creation.
 
 ### TFU-20260613-006 - Refresh CI tool-version pins or install pinned tools
 
-- Status: Open
+- Status: Done
 - Priority: P1
 - Area: CI / Tooling
 - Source task: Economy adversarial P1 remediation close-out, 2026-06-13
@@ -61,6 +86,10 @@ actionable; long-term product ideas belong in planning docs instead.
   fixture/audit confirmation.
 - Close when: GitHub Actions `audits` and `lint` pass their tool-version step
   and run the real repository gates on main.
+- Closed: 2026-06-13 in the CI repair round. Tool pins were refreshed in
+  `12078b7ff`; run `27452421109` passed both `audits` and `lint` tool-version
+  steps. Local verification also passed `scripts/check-tool-versions.sh
+  swiftlint` with SwiftLint `0.63.3`.
 
 ### TFU-20260613-005 - Add V68/V69 recycle-bin migration coverage
 
