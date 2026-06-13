@@ -25,6 +25,20 @@ actionable; long-term product ideas belong in planning docs instead.
 
 ## Open Items
 
+### TFU-20260613-010 - Re-audit expense-logging coconut reward (farm-risk)
+
+- Status: Open
+- Priority: P2
+- Area: Economy / Reward Policy
+- Source task: Care-completion chokepoint plan review, 2026-06-13
+- Blocker: 记录花费当前会产出椰子奖励，存在"记假账→刷椰子"的潜在 farm 向量。
+  D2 中间路线要求经济自洽防刷。本项与照护完成收口重构正交（收口只统一发奖
+  纪律，不改"是否发奖"的策略）。
+- Next step: 在 Economy 奖励策略复查中决定花费记录是否应发奖、是否限额或仅
+  在有真实金额/凭证时发奖；与 ECO-025 对应。
+- Close condition: 花费奖励策略明确并落地（发奖/限额/不发奖三选一），ECO-025
+  从"待复查"转为已确认决策。
+
 ### TFU-20260613-009 - Burn down recurring-findings audit baseline debt
 
 - Status: Open

@@ -91,7 +91,9 @@ extension QuestManager {
         date: Date = Date()
     ) -> Int {
         guard requestedReward > 0 else { return 0 }
-        let human = currentActiveHuman(context: context)
+        guard EconomyWalletWritePolicy.canWrite(pet),
+              let human = currentActiveHuman(context: context)
+        else { return 0 }
         let awarded = requestedReward
         let title = "\(days) 天连击！+\(awarded)🥥"
         let result = EconomyRewardResult(
@@ -109,38 +111,22 @@ extension QuestManager {
             baseCoconuts: awarded,
             luck: .none
         )
-        let delta: CoconutWalletDelta = if let human {
-            .human(
-                human,
-                delta: awarded,
-                entryKind: .reward,
-                source: .service,
-                title: title,
-                emoji: "🔥",
-                actorId: human.id.uuidString,
-                actorName: human.name,
-                subjectKind: .pet,
-                subjectId: pet.id.uuidString,
-                sourceModelName: "StreakRewardManager",
-                sourceModelId: "family_\(days)",
-                metadataJSON: result.metadataJSON,
-                transactionKey: "streak:family:\(days)"
-            )
-        } else {
-            .system(
-                delta: awarded,
-                entryKind: .reward,
-                source: .service,
-                title: title,
-                emoji: "🔥",
-                actorId: pet.id.uuidString,
-                actorName: pet.name,
-                sourceModelName: "StreakRewardManager",
-                sourceModelId: "family_\(days)",
-                metadataJSON: result.metadataJSON,
-                transactionKey: "streak:family:\(days)"
-            )
-        }
+        let delta = CoconutWalletDelta.human(
+            human,
+            delta: awarded,
+            entryKind: .reward,
+            source: .service,
+            title: title,
+            emoji: "🔥",
+            actorId: human.id.uuidString,
+            actorName: human.name,
+            subjectKind: .pet,
+            subjectId: pet.id.uuidString,
+            sourceModelName: "StreakRewardManager",
+            sourceModelId: "family_\(days)",
+            metadataJSON: result.metadataJSON,
+            transactionKey: "streak:family:\(days)"
+        )
 
         do {
             try wallet.apply(
@@ -156,8 +142,8 @@ extension QuestManager {
                 result,
                 type: .general(humanReward: awarded, petReward: 0, emoji: "🔥", title: title),
                 title: title,
-                actorId: human?.id.uuidString ?? pet.id.uuidString,
-                actorName: human?.name ?? pet.name
+                actorId: human.id.uuidString,
+                actorName: human.name
             )
             return awarded
         } catch {

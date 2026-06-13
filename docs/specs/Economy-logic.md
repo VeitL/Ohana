@@ -53,6 +53,12 @@
 - ECO-021：任何新增奖励入口必须能被 `scripts/audit-economy-boundaries.sh --all` 证明没有散落的 actor 归属缺口；若入口没有明确 executor，必须在规则书记录产品理由和 fallback owner。
 - ECO-022：Calendar / Today Focus / 通知完成宠物照护任务时，奖励归属、预算、冷却与钱包写入必须与同类型 QuickCare 照护动作等价；不得再使用单独的“Calendar 完成奖励”小管线。
 - ECO-023：取消完成 Calendar 照护 occurrence 时，必须按 occurrence 幂等撤销该次生成的奖励和预算占用；钱包用 `refund` / reversal 流水冲销，预算使用事件写删除 tombstone 后移除。
+- ECO-024（收口纪律，2026-06-13 拍板）：奖励派生是**纪律**而非**单一漏斗**。所有奖励入口分两个家族，二者都受 `audit-economy-boundaries.sh` 的 R5 规则覆盖，均不得 ad-hoc 直调 `awardAction`：
+  - **家族 1 照护事实**（产出 `PetCareLog` 类：喂食/喝水/便便/遛狗/用药剂量/清洁/健康记录/体重）→ 经 `CareEventService.recordCareFact` 收口，事实+奖励+账本+派生在一处一致发生。
+  - **家族 2 非照护奖励**（花费/时刻/手动里程碑/全清 bonus/补签结算）→ 各自写自己的事实+账本，再经**共享奖励原语**（同一套 owner 解析 + 预算 + 冻结钱包门 + 幂等），**不塞进 `recordCareFact`**。
+  - 判定：强行迁入家族 1 若需要伪造一个 `CareType`，即属家族 2，禁止过度收口（避免错误抽象）。
+  - 花费归属家族 2 且含 human expense（pet/human 对称，D10），不按宠物/人类拆分。
+- ECO-025（待复查，farm-risk）：花费记录当前可产出椰子奖励，存在"记假账→刷椰子"的潜在 farm 向量。本条登记为开放复查（见 `docs/task-follow-ups.md` TFU-20260613-010），D2 中间路线下需单独审"记录花费是否应发奖/限额"，本轮收口重构不处理。
 
 ## 当前代码来源
 

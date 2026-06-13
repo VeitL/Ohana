@@ -11,7 +11,7 @@
 | 项目 | 状态 | 门禁 commit | 自动验收摘要 | 人工验收状态 |
 |---|---|---|---|---|
 | GAP-1 联机功能门 | 🟢 | `59b5ceedc` | `OnlineFeatureGate` 不变量、路由/设置/CKShare 接受路径、`scripts/module-exit-gate.sh` 均通过 | 待真实设备 / 真实 UI 抽查 |
-| GAP-2 回收站 | 🟢 | `8bddfe1a6` | 回收站服务、schema V69 轻量迁移、备份往返、普通入口隐藏、对抗复审 P1 修复、`scripts/module-exit-gate.sh` 均通过 | 待真实 UI / 真机通知抽查 |
+| GAP-2 回收站 | 🏁 | `本次提交` | 回收站服务、schema V69 轻量迁移、备份往返、普通入口隐藏、对抗复审 P1 修复；2026-06-13 新视角复审零 P0/P1，`RecycleBinServiceTests` 通过 | 待真实 UI / 真机通知抽查 |
 | GAP-3 自动备份 | 🟢 | `9b1ac1be1` | 自动备份服务、生命周期触发、App reset、plist/entitlements、Debug build、`scripts/module-exit-gate.sh` 均通过 | 待真机 iCloud Drive 抽查 |
 | GAP-4 总账恒等 | 🟢 | `1951f7834` | 钱包总账恒等、`system:legacy` 排除、账本重放修复、Oasis 夹具、`scripts/module-exit-gate.sh` 均通过 | 待真实迁移样本 / 正式包抽查 |
 | GAP-5 触顶感知 | 🟢 | `1a775bc7c` | `recordOnly` 九语言文案、反馈中心、changed gate、`scripts/module-exit-gate.sh` 均通过 | 待真实 UI / 长语言抽查 |
@@ -23,7 +23,7 @@
 | Phase 6 Members | 🟢 | `ead1e5fe4` | 创建派生日历事实 sync metadata、成员删除回收站聚合、Human 侧过期清理、RequiredHumanProfileView a11y、`scripts/module-exit-gate.sh` 均通过 | 待真实 UI 抽查 |
 | Phase 6 Oasis | 🟢 | `87423afd8` | Oasis 当前主人钱包门、预算 / 冷却、休眠态救援、UI/a11y/smoothness/runtime 审计、Oasis 窄测试与 `scripts/module-exit-gate.sh` 均通过 | 待真实 UI 抽查 |
 | Phase 6 Settings + Health | 🟢 | `5d4e71928` | Debug-only 设置开发工具、真实通知开关策略、Health 删除/回收/schema V70/read-only 不变量、目标测试与 `scripts/module-exit-gate.sh` 均通过 | 待 Release 真机 / 真实 UI 抽查 |
-| Phase 6 Economy | 🟢 | `662852a01` | 兑换入口首发门禁、冻结钱包写入拒绝、特殊奖励 active human 归属、隐私 / 冻结财富口径、目标测试与 `scripts/module-exit-gate.sh` 均通过 | 待真实 UI 抽查 |
+| Phase 6 Economy | 🏁 | `本次提交` | 兑换入口首发门禁、冻结钱包写入拒绝、特殊奖励 active human 归属、隐私 / 冻结财富口径；2026-06-13 新视角 P1 修复后零 P0/P1，目标测试与 economy 全量审计通过 | 待真实 UI 抽查 |
 | Phase 7 Walks | 🟢 | `e0c1d69d3` | `WalkFeaturePolicy` active dog 硬门、回收/离世过滤、遛狗中便便事实+ledger、共享遛狗服务适配器、Walks 目标测试与 `scripts/module-exit-gate.sh` 均通过 | 待真机定位 / 真实 UI 抽查 |
 | Phase 7 Gacha + Shop | 🟢 | `本次提交` | 扭蛋概率/区间、合资抽取、冻结钱包、Shop 定价/汇率、购买合资、SwiftData 所有权迁移、备份恢复、Gacha/Shop CloudSync serializer/applier 与 schema 迁移目标测试均通过 | 待真机 App Icon / 真实 UI 抽查 |
 
@@ -50,6 +50,8 @@
 ## GAP-2 回收站
 
 人工验收目标：成员与珍贵档案可软删、可恢复；普通入口不暴露已回收对象；真实 UI 体验清楚。
+
+自动验收已完成（2026-06-13，新视角复审）：回收站服务软删 / 恢复 / 过期清理、schema V69 轻量迁移、备份往返、普通入口隐藏与通知重调度边界保持通过；本轮未发现新的 P0/P1，`scripts/test-simulator.sh -only-testing:OhanaTests/RecycleBinServiceTests` 通过。
 
 - [ ] 在真实 UI 中打开设置页的“回收站”。
   - 预期：设置页存在回收站入口；空回收站有得体空态；列表、恢复、清理过期按钮可理解。
@@ -387,7 +389,7 @@
 
 人工验收目标：首发 Economy 是纯单机、可理解、不可刷的轻量经济；正式用户不可达线下兑现入口；隐私只隐藏明细，离世 / 回收钱包退出活跃财富但历史保留。
 
-自动验收已完成（2026-06-12，门禁 commit `662852a01`）：目标测试覆盖 `system:legacy` 不进正式资产、隐私隐藏钱包计入总额但不出明细、离世 / 回收钱包拒绝写入并退出活跃财富、特殊奖励无 actor 时归属 active human 且不写 system、成就 / 商店 / 宠物金库冻结钱包拒绝、Shop / Today Focus 兑换门关闭不变量、补记操作日结算与经济模拟；`scripts/dev-check-changed.sh`、`scripts/module-exit-gate.sh` 均通过。
+自动验收已完成（2026-06-13，新视角复审）：目标测试覆盖 `system:legacy` 不进正式资产、隐私隐藏钱包计入总额但不出明细、离世 / 回收钱包拒绝写入并退出活跃财富、特殊奖励无 actor 时归属 active human 且不写 system、成就 / 商店 / 宠物金库冻结钱包拒绝、Shop / Today Focus 兑换门关闭不变量、补记操作日结算与经济模拟；本轮发现并修复 Streak 连击奖励无 active human 时写入 system wallet 的 P1 后，`scripts/dev-check-changed.sh`、`scripts/audit-economy-boundaries.sh --all`、`scripts/test-simulator.sh -only-testing:OhanaTests/HomeCommandExecutorTests` 均通过，当前零 P0/P1。
 
 - [ ] 用真实 UI 打开商店并遍历所有分类。
   - 预期：不出现“货币兑换 / 家庭线下兑现 / Cash Exchange”分类、卡片、表单或待处理兑换区块；普通外观 / 头像 / 特效 / 称号 / 加成道具仍可浏览。

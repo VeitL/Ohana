@@ -7162,6 +7162,42 @@ struct HomeCommandExecutorTests {
     }
 
     @MainActor
+    @Test func streakMilestoneWithoutActiveHumanDoesNotCreateSystemWallet() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let pet = Pet(name: "Momo", species: "猫")
+        pet.currentStreak = 7
+        context.insert(pet)
+        try context.save()
+
+        let defaults = UserDefaults.standard
+        let oldActiveHumanID = defaults.object(forKey: "currentActiveHumanId")
+        let oldClaimed = defaults.object(forKey: "streakRewards_claimed")
+        defer {
+            if let oldActiveHumanID {
+                defaults.set(oldActiveHumanID, forKey: "currentActiveHumanId")
+            } else {
+                defaults.removeObject(forKey: "currentActiveHumanId")
+            }
+            if let oldClaimed {
+                defaults.set(oldClaimed, forKey: "streakRewards_claimed")
+            } else {
+                defaults.removeObject(forKey: "streakRewards_claimed")
+            }
+        }
+        defaults.removeObject(forKey: "currentActiveHumanId")
+        defaults.removeObject(forKey: "streakRewards_claimed")
+
+        StreakRewardManager().checkAndAward(pet: pet, questManager: makeQuestManager(), context: context)
+
+        let walletEntries = try context.fetch(FetchDescriptor<CoconutLedgerEntry>())
+        let accounts = try context.fetch(FetchDescriptor<CoconutAccount>())
+        #expect(walletEntries.isEmpty)
+        #expect(accounts.isEmpty)
+        #expect((defaults.dictionary(forKey: "streakRewards_claimed") ?? [:])["family_7"] == nil)
+    }
+
+    @MainActor
     @Test func streakLargeMilestoneIgnoresDailyBudgetLimit() throws {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
