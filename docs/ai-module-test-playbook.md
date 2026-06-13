@@ -33,6 +33,10 @@ v2 核心变化：
 > 本会话只负责 **<模块名>**（Phase <X>）。范围限定在 `Ohana/Features/<模块名>`（或对应地基层目录），不许越界修其他模块。
 > 先把 `docs/testing-progress.md` 中该模块状态改为 🟡 并填开工日期，然后从六步循环第 1 步开始：只分析，不修改。
 
+**Phase 7 附加 boot prompt（标准模块 boot prompt 后追加）：**
+
+> 1b 分析时额外预检四类已知模式（来自 Economy/RecycleBin 复审）：① 本模块的奖励发放是否全部走预算/冷却管线，有无绕行路径；② 奖励归属是否按 executor、有无写 system 钱包；③ 派生状态生命周期是否完整（删除/恢复后的通知重排、tombstone 级联）；④ 关键边界是在服务层硬门还是只有 UI 软门。命中任何一类直接列 P1。
+
 收工协议（缺一项视为未完成）：
 1. `scripts/module-exit-gate.sh` 通过（贴输出摘要）。
 2. 按 Conventional Commit 提交，scope 用模块名。
@@ -273,6 +277,14 @@ AI 不可替代你的部分：真机手感、Apple 账号操作（证书/截图/
 
 每个模块仍独立会话、独立清单、独立 commit；互不相关的模块可按「并行会话规则」用 worktree 并行。
 **注意：** Walks 含后台定位——`audit-runtime-guardrails.sh` 必跑，验证只有进行中的遛狗保持后台定位。
+
+Phase 7 按高风险先行、低风险批量的顺序推进：
+
+1. **第一批**：Walks（后台定位）、Gacha + Shop（经济出口）、Medication（健康关键通知）、Memorial（D7 情感核心）、Onboarding（D17 首次体验）。
+2. **第二批**：Calendar、Notifications、Expenses、DashboardRecords、Achievements、GrowthUnlock。
+3. **第三批**：Documents、Insurance、Wishlist、Moments、PhotoAlbum、CrewRoster、FunctionMenu 等低风险模块；互不相关时可用独立 worktree 两到三个模块并行快跑。
+
+FamilyTasks 和 Plants 已在功能门后，Phase 7 只做「编译通过 + 门关闭时不可达」轻量核验，不走完整六步。
 
 ### Phase 8：横向集成与全量回归（总览会话主持）
 
