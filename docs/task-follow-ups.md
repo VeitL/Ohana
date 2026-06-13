@@ -34,11 +34,17 @@ actionable; long-term product ideas belong in planning docs instead.
 - Blocker: `docs/governance/manifests/recurring-findings-audit-baseline.json`
   intentionally registers existing full-repo recurring-findings debt so the new
   audits can enter CI without blocking unrelated work. Current baseline:
-  `economy-boundaries` has 5 `reward-actor-boundary` warnings across 5 files;
-  `derived-state-lifecycle` has 65 warnings across 58 files
+  `economy-boundaries` has 0 warnings;
+  `derived-state-lifecycle` has 63 warnings across 56 files
   (`derived-state-lifecycle-checklist`: 50,
-  `physical-delete-without-tombstone`: 15). The ratchet blocks new or increased
+  `physical-delete-without-tombstone`: 13). The ratchet blocks new or increased
   debt but does not by itself fix the existing files.
+- Progress: 2026-06-13 TFU repair round burned down the Economy executor
+  baseline from 5 to 0, removed the owned Calendar / CatCare physical-delete
+  baseline warnings, and added service-layer tombstones for the PetCare /
+  Hygiene / DashboardRecords `CareLedgerEvent` delete paths. The remaining 63
+  derived-state warnings are still unowned baseline debt and require future
+  module repair or explicitly approved allow comments before this TFU can close.
 - Next step: During Economy, RecycleBin, and Phase 7 module repair/review rounds,
   resolve the owned baseline warnings as real behavior fixes or approved local
   exceptions, then refresh the baseline downward with the matching audit command

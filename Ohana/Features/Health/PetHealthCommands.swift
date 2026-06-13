@@ -131,7 +131,7 @@ enum PetHealthCommandService {
 
         let reward: (humanGot: Int, petGot: Int)
         if awardsReward {
-            reward = questManager.awardAction(type: .health, pet: pet, context: context)
+            reward = questManager.awardAction(type: .health, pet: pet, context: context, executorId: input.executorId)
             oasisRewards.rewardFeaturedCritterFromCare(type: .health, context: context)
         } else {
             reward = (humanGot: 0, petGot: 0)

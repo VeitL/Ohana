@@ -601,7 +601,7 @@ enum CalendarEventCommandService {
         switch scope {
         case .wholeEvent:
             outcome = .deletedEvent(event.id)
-            context.delete(event)
+            deleteEventWithTombstones(event, context: context)
         case .singleOccurrence:
             outcome = deleteSingleOccurrence(event: event, occurrenceDate: occurrenceDate, context: context)
         case .thisAndFuture:
@@ -623,7 +623,7 @@ enum CalendarEventCommandService {
 
         if occurrenceStart == eventStart {
             guard let next = calendar.date(byAdding: .day, value: event.recurrenceDays, to: eventStart) else {
-                context.delete(event)
+                deleteEventWithTombstones(event, context: context)
                 return .deletedEvent(event.id)
             }
             let hasMore = event.recurrenceEndDate.map { next <= calendar.startOfDay(for: $0) } ?? true
@@ -631,7 +631,7 @@ enum CalendarEventCommandService {
                 event.startDate = next
                 return .advancedStart(event.id)
             }
-            context.delete(event)
+            deleteEventWithTombstones(event, context: context)
             return .deletedEvent(event.id)
         }
 
@@ -675,13 +675,23 @@ enum CalendarEventCommandService {
         let eventStart = calendar.startOfDay(for: event.startDate)
 
         if occurrenceStart <= eventStart {
-            context.delete(event)
+            deleteEventWithTombstones(event, context: context)
             return .deletedEvent(event.id)
         }
 
         let dayBefore = calendar.date(byAdding: .day, value: -1, to: occurrenceStart) ?? occurrenceStart
         event.recurrenceEndDate = dayBefore
         return .truncated(event.id)
+    }
+
+    @MainActor
+    private static func deleteEventWithTombstones(_ event: Event, context: ModelContext) {
+        let reminders = event.reminders
+        CloudSyncMutationRecorder.markDeleted(event, context: context)
+        for reminder in reminders {
+            CloudSyncMutationRecorder.markDeleted(reminder, context: context)
+        }
+        context.delete(event)
     }
 }
 

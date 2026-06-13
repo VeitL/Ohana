@@ -210,7 +210,8 @@ enum BackdateCheckInCommandService {
         let reward = (providedQuestManager ?? QuestManager()).awardAction(
             type: action,
             pet: pet,
-            context: context
+            context: context,
+            executorId: human?.id.uuidString
         )
         return BackdateCheckInCommandResult(
             petID: pet.id,

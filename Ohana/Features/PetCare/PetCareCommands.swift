@@ -135,6 +135,7 @@ enum PetCareTrackingCommandService {
         }
 
         for event in removedLedgerEvents {
+            CloudSyncMutationRecorder.markDeleted(event, context: context)
             context.delete(event)
         }
         if let linkedPotty {
@@ -233,6 +234,7 @@ enum PetPottyCommandService {
         let logID = log.id
         let ledgerEvents = ledgerEvents(forLegacyModelName: "PetPottyLog", id: logID, context: context)
         for event in ledgerEvents {
+            CloudSyncMutationRecorder.markDeleted(event, context: context)
             context.delete(event)
         }
         let sharedSessionId = log.sharedSessionId

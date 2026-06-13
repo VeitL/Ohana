@@ -19,6 +19,7 @@
 - 特殊奖励必须归属到正式成员钱包：优先使用明确 actor；没有 actor 时归到当前 active human；若没有可用当前主人则不写钱包奖励，只保留业务事实。首发新奖励不得落入 `system` / `system:legacy`。
 - 旧兼容钱包 API 也必须遵守相同归属规则：能解析到可写人类 / 宠物时才写钱包；无 actor 时只能归到当前 active human；解析不到可写正式成员时 no-op，不得创建或补写 `system` 正式余额流水。
 - 照护、花费、喂药、遛狗、时刻等可重复用户动作奖励必须先按明确执行人 `executorId` 归属；只有没有明确执行人时，才允许回退到当前 active human。
+- 体重、宠物花费、宠物健康、补签结算等由命令层已知执行人的奖励入口必须把 `executorId` 传进统一奖励管线；手动宠物里程碑没有独立 executor picker，奖励与照护账本 actor 均归属当前 active human；seed / 系统里程碑不产生人类 actor。
 - 离世或回收成员的钱包冻结：不再获得奖励、不再消费、不再领取成就，也不计入活跃财富总额 / 榜单 / 趋势；历史流水可见。撤销离世或从回收站恢复后才恢复钱包写入能力。
 - 商店正式消费支持岛屿合资：买家钱包不足但全岛未冻结人类钱包总额足够时，可由其他人类钱包补差额；总额仍不足时必须整体拒绝且不写任何钱包或购买事实。
 - FamilyTasks 悬赏功能首发由 `OnlineFeatureGate` 隐藏；未来解锁前，悬赏确认必须复用 Economy 钱包写入边界。悬赏转账失败时不得把任务标为完成，不得留下 payer / receiver 钱包流水或照护账本事件。
@@ -47,6 +48,7 @@
 - ECO-018：奖励归属以业务事实执行人为准。已有 `executorId` 的照护 / 花费 / 遛狗 / 喂药 / 时刻记录不得把奖励发给当前 active human；active human 只作为无明确执行人的兜底。
 - ECO-019：商店购买以全岛未冻结人类钱包作为可支配池；买家优先出资，其他人类钱包只补差额并记录各自支出流水。任何一笔出资失败时必须回滚整笔购买。
 - ECO-020：FamilyTasks 悬赏确认是钱包转账事实边界。若 payer 余额不足、钱包冻结、转账重复键冲突或持久化失败，确认命令必须返回失败并保持任务待审核；不得吞错后展示完成态，也不得落下半笔钱包 / ledger 事实。
+- ECO-021：任何新增奖励入口必须能被 `scripts/audit-economy-boundaries.sh --all` 证明没有散落的 actor 归属缺口；若入口没有明确 executor，必须在规则书记录产品理由和 fallback owner。
 
 ## 当前代码来源
 
@@ -63,6 +65,7 @@
 - 预算使用事件的 `dayKey` 来自经济奖励裁决日期，`createdAt` 保留真实写入时间：`Ohana/Features/Economy/CoconutEconomyPolicyV2.swift:653`。
 - 首发兑换入口由 `CoconutExchangeFeatureGate` 统一关闭；Shop、Home read model、Today Focus snapshot 与 `CoconutExchangeService` 写命令均必须读取同一判定点。
 - 奖励 owner 解析由 `EconomyRewardOwnerResolver` 统一：`Ohana/Features/Economy/EconomyRewardOwnerResolver.swift`。
+- 体重、宠物花费、宠物健康、补签、手动宠物里程碑等奖励入口均由各自 command/service 将 owner 传入 `QuestManager.awardAction`，并由 `OhanaTests/RecurringFindingsRepairTests.swift` 覆盖 executor 不回落 active human。
 - 商店合资出资计划由 `CoconutWalletFundingPlanner` 计算，钱包 mutation 由 `CoconutWalletMutationWriter` 写入；UI 只显示全岛可支配余额：`Ohana/Domain/Economy/CoconutWalletFundingPlanner.swift`。
 - FamilyTasks 悬赏转账暂由隐藏的 FamilyTasks 服务调用 Economy wallet mutation 边界；失败时 `confirmCompletion` 返回 `false` 并保持待审核：`Ohana/Features/FamilyTasks/FamilyTaskService.swift`。
 - 财富页以 `IslandWealthSnapshot` / `IslandWealthScreenModel` 为 UI 聚合边界。

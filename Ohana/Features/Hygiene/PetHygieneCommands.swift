@@ -114,6 +114,7 @@ enum PetHygieneCommandService {
         let logID = log.id
         let ledgerEvents = ledgerEvents(for: logID, context: context)
         for event in ledgerEvents {
+            CloudSyncMutationRecorder.markDeleted(event, context: context)
             context.delete(event)
         }
         CloudSyncMutationRecorder.markDeleted(log, pet: pet, context: context)

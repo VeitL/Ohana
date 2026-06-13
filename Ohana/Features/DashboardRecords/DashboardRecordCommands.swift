@@ -75,7 +75,7 @@ enum WeightCommandService {
         )
         context.insert(log)
         let reward: (humanGot: Int, petGot: Int)? = if awardsReward {
-            questManager.awardAction(type: .weight, pet: pet, context: context)
+            questManager.awardAction(type: .weight, pet: pet, context: context, executorId: executorId)
         } else {
             nil
         }
@@ -415,6 +415,7 @@ enum DashboardRecordCommandService {
         let sharedSessionId = log.sharedSessionId
         let ledgerEvents = ledgerEvents(forLegacyModelName: "PetExpenseLog", id: recordID, context: context)
         for event in ledgerEvents {
+            CloudSyncMutationRecorder.markDeleted(event, context: context)
             context.delete(event)
         }
         CloudSyncMutationRecorder.markDeleted(log, pet: pet, context: context)
@@ -459,6 +460,7 @@ enum DashboardRecordCommandService {
     ) -> DashboardRecordDeleteCommandResult {
         let ledgerEvents = ledgerEvents(forLegacyModelName: recordKind, id: recordID, context: context)
         for event in ledgerEvents {
+            CloudSyncMutationRecorder.markDeleted(event, context: context)
             context.delete(event)
         }
         markSyncedRecordDeletedIfNeeded(record, context: context)

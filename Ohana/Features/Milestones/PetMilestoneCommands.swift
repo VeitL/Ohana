@@ -137,7 +137,14 @@ enum PetMilestoneCommandService {
         context.insert(milestone)
         context.safeSave()
 
-        let reward = questManager.awardAction(type: .milestone, pet: pet, context: context)
+        let rewardHuman = EconomyRewardOwnerResolver.rewardHuman(
+            executorId: nil,
+            activeHumanSelection: UserDefaultsActiveHumanSelection(),
+            context: context,
+            logPrefix: "PetMilestoneCommandService"
+        )
+        let executorId = rewardHuman?.id.uuidString
+        let reward = questManager.awardAction(type: .milestone, pet: pet, context: context, executorId: executorId)
         let coconutDelta = max(0, reward.humanGot + reward.petGot)
         recordLedger(
             milestone: milestone,
@@ -145,6 +152,7 @@ enum PetMilestoneCommandService {
             actionType: "manual",
             source: .detail,
             coconutDelta: coconutDelta,
+            executorId: executorId,
             context: context,
             careLedger: careLedger
         )
@@ -181,14 +189,15 @@ enum PetMilestoneCommandService {
         actionType: String,
         source: CareLedgerSource,
         coconutDelta: Int,
+        executorId: String? = nil,
         context: ModelContext,
         save: Bool = true,
         careLedger: CareLedgerRecording = CareLedgerService()
     ) -> CareLedgerEvent {
         careLedger.record(
             occurredAt: milestone.date,
-            actorKind: .unknown,
-            actorId: nil,
+            actorKind: executorId == nil ? .unknown : .human,
+            actorId: executorId,
             subjectKind: .pet,
             subjectId: pet.id.uuidString,
             eventKind: .milestone,

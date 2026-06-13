@@ -88,10 +88,12 @@ enum CatCareCommandService {
         context: ModelContext
     ) -> CatCareUndoCommandResult {
         if let event = fetchEvent(id: eventID, petID: pet.id, context: context) {
+            CloudSyncMutationRecorder.markDeleted(event, context: context)
             context.delete(event)
         }
         if let hygieneLogID,
            let log = fetchHygieneLog(id: hygieneLogID, petID: pet.id, context: context) {
+            CloudSyncMutationRecorder.markDeleted(log, pet: pet, context: context)
             context.delete(log)
         }
         context.safeSave()

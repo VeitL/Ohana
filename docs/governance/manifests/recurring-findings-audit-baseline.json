@@ -63,8 +63,6 @@
             "Ohana/App/AppResetService.swift": 1,
             "Ohana/Domain/Services/CalendarTaskCompletionSyncService.swift": 1,
             "Ohana/Domain/Services/CarePlanCalendarSync.swift": 1,
-            "Ohana/Features/Calendar/CalendarCommands.swift": 1,
-            "Ohana/Features/CatCare/CatCareCommands.swift": 1,
             "Ohana/Features/Economy/CoconutEconomyPolicyV2.swift": 1,
             "Ohana/Features/FamilyTasks/FamilyCollaborationCommandExecutor.swift": 1,
             "Ohana/Features/FamilyTasks/FamilyTaskCommands.swift": 1,
@@ -76,26 +74,15 @@
             "Ohana/Features/QuickCare/WaterManagementSupport.swift": 1,
             "Ohana/Shared/Components/SwipeableEventRow.swift": 1
           },
-          "totalWarnings": 15
+          "totalWarnings": 13
         }
       },
-      "totalWarnings": 65
+      "totalWarnings": 63
     },
     "economy-boundaries": {
       "command": "scripts/audit-economy-boundaries.sh --all",
-      "rules": {
-        "reward-actor-boundary": {
-          "files": {
-            "Ohana/Features/DashboardRecords/DashboardRecordCommands.swift": 1,
-            "Ohana/Features/Economy/RewardEconomyCommands.swift": 1,
-            "Ohana/Features/Expenses/ExpenseCommands.swift": 1,
-            "Ohana/Features/Health/PetHealthCommands.swift": 1,
-            "Ohana/Features/Milestones/PetMilestoneCommands.swift": 1
-          },
-          "totalWarnings": 5
-        }
-      },
-      "totalWarnings": 5
+      "rules": {},
+      "totalWarnings": 0
     }
   },
   "description": "Ratchet baseline for recurring adversarial-review findings. Stored counts are accepted debt; new or increased file/rule counts fail the audits.",

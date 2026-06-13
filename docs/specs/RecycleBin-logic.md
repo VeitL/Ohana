@@ -17,6 +17,7 @@ Recoverable objects:
 Non-recoverable objects:
 
 - Single high-frequency fact deletion, such as one feeding, potty, weight, expense, health, hygiene, walk, medication, or claim record, keeps the existing second-confirmation UX and does not appear in recycle-bin UI. The command must still write a CloudSync deletion tombstone before physical deletion when the entity is in the sync pipeline.
+- Calendar whole-event deletion and recurrence-tail deletion do not appear in recycle-bin UI, but they must tombstone the deleted `Event` and its child `Reminder` records before physical deletion. Feature commands that remove a business fact and also remove derived upload-pipeline state, such as `CareLedgerEvent`, `Event`, or `PetHygieneLog`, must tombstone those derived records at the same command boundary.
 - App reset / delete-all-data remains immediate physical deletion and bypasses the recycle bin.
 
 ## Invariants
@@ -39,6 +40,8 @@ RB-008. App reset is the G6 privacy path and must remain immediate physical dele
 
 RB-009. Restoring an aggregate member also restores its derived active reminders. Future pending reminders must be scheduled again through the app notification scheduler after their source event is restored.
 
+RB-010. Single-record delete / undo commands are allowed to bypass recycle-bin retention only when the physical delete boundary also records deletion tombstones for every sync-pipeline source or derived record it removes. A UI confirmation is not a sync boundary; the service / command that calls `context.delete` owns the tombstone.
+
 ## State Machine
 
 ```mermaid
@@ -55,7 +58,7 @@ stateDiagram-v2
 - Schema: bump latest `ArkSchemaV68` to `ArkSchemaV69`; add lightweight soft-delete fields with defaults to recoverable source models and batch-cleared record models.
 - Service boundary: recycle-bin writes live in a domain service so views do not mutate trash fields directly.
 - UI: Settings exposes a recycle-bin entry. The screen lists recoverable member/archive items plus one row per bulk-clear batch, with restore and purge actions.
-- Tests: in-memory SwiftData tests cover member delete/restore, precious archive delete/restore, bulk clear batch restore, final purge tombstone timing, and app reset bypass.
+- Tests: in-memory SwiftData tests cover member delete/restore, precious archive delete/restore, bulk clear batch restore, final purge tombstone timing, app reset bypass, Calendar Event + Reminder tombstones, business fact delete + `CareLedgerEvent` tombstones, and CatCare undo tombstones.
 
 ## Open Follow-Up Policy
 
