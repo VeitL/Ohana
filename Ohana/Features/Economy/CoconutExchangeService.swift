@@ -43,9 +43,9 @@ enum CoconutExchangeService {
         careLedger providedCareLedger: CareLedgerRecording? = nil,
         projectionManager: QuestManager? = nil
     ) throws -> CoconutExchangeRequest {
+        guard CoconutExchangeFeatureGate.isEnabled else { throw CoconutExchangeError.featureDisabled }
         let wallet: CoconutWalletManaging = providedWallet ?? SwiftDataCoconutWalletManager()
         let careLedger: CareLedgerRecording = providedCareLedger ?? CareLedgerService()
-        guard CoconutExchangeFeatureGate.isEnabled else { throw CoconutExchangeError.featureDisabled }
         guard sender.id != receiver.id else { throw CoconutExchangeError.sameReceiver }
         guard CoconutWalletService.balance(for: sender, context: context) >= option.coconutCost else {
             throw CoconutExchangeError.insufficientBalance

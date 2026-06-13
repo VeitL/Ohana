@@ -4,6 +4,14 @@ import XCTest
 
 @MainActor
 final class CoconutWalletServiceTests: XCTestCase {
+    private static var processRetainedObjects: [AnyObject] = []
+
+    @discardableResult
+    private func retainUntilProcessExit<T: AnyObject>(_ object: T) -> T {
+        Self.processRetainedObjects.append(object)
+        return object
+    }
+
     func testCurrentSchemaCreatesInMemoryContainerAndKeepsLightweightStagesEmpty() throws {
         let container = try makeContainer()
         _ = ModelContext(container)
@@ -63,7 +71,7 @@ final class CoconutWalletServiceTests: XCTestCase {
         human.coconutBalance = 10
         let pet = Pet(name: "Miso")
         pet.coconutBalance = 5
-        let projection = QuestManager()
+        let projection = retainUntilProcessExit(QuestManager())
         context.insert(human)
         context.insert(pet)
         try context.save()
@@ -305,7 +313,7 @@ final class CoconutWalletServiceTests: XCTestCase {
         human.coconutBalance = 99
         try context.save()
 
-        let projection = QuestManager()
+        let projection = retainUntilProcessExit(QuestManager())
         CoconutWalletService.refreshQuestProjection(context: context, manager: projection)
 
         XCTAssertEqual(account.balance, 8)
@@ -317,7 +325,7 @@ final class CoconutWalletServiceTests: XCTestCase {
     func testWealthTotalsAndLeaderboardExcludeLegacySystemAccount() {
         let human = Human(name: "Guan")
         let pet = Pet(name: "Miso")
-        let model = IslandWealthScreenModel()
+        let model = retainUntilProcessExit(IslandWealthScreenModel())
         let humanAccount = CoconutAccount(
             accountKey: CoconutAccountKey.human(human.id),
             ownerKind: .human,
@@ -357,7 +365,7 @@ final class CoconutWalletServiceTests: XCTestCase {
     func testWealthTrendsExcludeLegacySystemLedgerEntries() {
         let human = Human(name: "Guan")
         let pet = Pet(name: "Miso")
-        let model = IslandWealthScreenModel()
+        let model = retainUntilProcessExit(IslandWealthScreenModel())
         let humanAccount = CoconutAccount(
             accountKey: CoconutAccountKey.human(human.id),
             ownerKind: .human,
@@ -423,7 +431,7 @@ final class CoconutWalletServiceTests: XCTestCase {
         let visibleHuman = Human(name: "Guan")
         let hiddenHuman = Human(name: "Private")
         let pet = Pet(name: "Miso")
-        let model = IslandWealthScreenModel()
+        let model = retainUntilProcessExit(IslandWealthScreenModel())
         let visibleAccount = CoconutAccount(
             accountKey: CoconutAccountKey.human(visibleHuman.id),
             ownerKind: .human,
@@ -471,7 +479,7 @@ final class CoconutWalletServiceTests: XCTestCase {
         let activePet = Pet(name: "Miso")
         let memorialPet = Pet(name: "Luna")
         memorialPet.passedAwayDate = Date()
-        let model = IslandWealthScreenModel()
+        let model = retainUntilProcessExit(IslandWealthScreenModel())
         let accounts = [
             CoconutAccount(
                 accountKey: CoconutAccountKey.human(activeHuman.id),
