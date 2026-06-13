@@ -87,6 +87,17 @@ enforced automatically rather than as prose — and add a bad/good fixture pair 
 requires a runner whose Xcode ships the iOS 26 SDK and an iPhone 17 simulator;
 see `docs/os-support-matrix.md`.
 
+CI is a remote release gate, not a heartbeat. Do not push solely to trigger
+GitHub Actions while a local task is still in progress, after every checkpoint
+commit, or after documentation-only bookkeeping that can be batched. Prefer
+local gates first, then push once at a natural handoff: module exit, CI-fix
+verification, PR/phase boundary, release candidate, or a batched group of small
+independent modules. After pushing, inspect the newest run once and record the
+URL/result; do not keep `gh run watch` running after a known tracked external
+blocker has already failed. If CI is already red for a documented external
+blocker, do not generate extra runs until either that blocker is being repaired
+or a meaningful new batch is ready to verify.
+
 UI/accessibility/smoothness are full-repo strict gates. CI runs
 `scripts/audit-ui-v4.sh --all`, `scripts/audit-accessibility.sh --all`, and
 `scripts/audit-smoothness-risk.sh --all`; the zero baseline is retained in

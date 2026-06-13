@@ -42,7 +42,7 @@ v2 核心变化：
 2. 按 Conventional Commit 提交，scope 用模块名。
 3. 更新 `docs/testing-progress.md`：状态 🟢、门禁 commit 哈希、余留项指针、给下一个会话的交接备注。
 4. 未修项写入 `docs/task-follow-ups.md`。
-5. **推送到 origin 并确认 CI 绿**（CI 含本地门禁没有的 SwiftLint 严格模式、SwiftFormat、全仓审计；不推送 = 这些门禁形同虚设）。批量工作时至少每 2~3 个工作项推送一次。
+5. **按 CI 频率纪律推送到 origin 并确认远端结果**（CI 含本地门禁没有的 SwiftLint 严格模式、SwiftFormat、全仓审计；长期不推送 = 这些门禁形同虚设）。一个工作项内的多个本地 commit、规则书占位回填、进度总账更新、纯文档收口，默认合并到同一次收工 push；不要为了每个 checkpoint 触发 CI。批量工作时每 2~3 个小工作项或一个高风险模块结束后推送一次；Phase 边界、CI 修复轮、Release/PR 边界必须推送。推送后查看最新 run 一次并记录 URL/结论；若 CI 因已登记的外部 blocker 红，记录对应 TFU 和通过的 job，不再反复触发同一红点。
 
 **验收债规则（人工验收的批量后置）**：需要真机/真实 iCloud/真实通知/真实数据的验收项，允许登记进 `docs/planning/gap-acceptance-track-list.md` 后先行提交，总账状态标 **🟢\***（带验收债）。约束：① 纯模拟器可完成的关键路径验收**不得**后置；② 验收债必须在该模块 🏁 对抗复审前清零（复审以人工验收过的状态为基准）；③ Phase 9B feature freeze 前全部验收债必须清零；④ 验收债项与 9A 真机矩阵/dogfooding 合并执行（装机后集中过）。
 
@@ -366,5 +366,5 @@ FamilyTasks 和 Plants 已在功能门后，Phase 7 只做「编译通过 + 门�
 4. **豁免注释一律人工审批。** `// xxx: allow` 是审计后门。
 5. **schema、启动、隐私、删除路径单独成轮单独 commit。**
 6. **收工必更新 `docs/testing-progress.md`。** 没更新总账 = 没完成；总览会话对账时以 git history 为准纠偏。
-7. **门禁不绿不提交，CI 红了停下。** 不绕过、不 force push。
+7. **门禁不绿不提交，CI 红了停下，但不要刷 CI。** 不绕过、不 force push；若 CI 红点已登记为外部 blocker，记录 run 和 TFU 后停止触发新 run，直到进入该 blocker 的修复轮或有新的有意义批次需要验证。
 8. **并行必用独立 worktree。** 两个会话共用一个 worktree 是事故之源。
