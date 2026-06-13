@@ -9,7 +9,7 @@ import Foundation
 import SwiftData
 
 enum CarePlanCalendarSync {
-    static let waterMaintenanceKinds: Set<String> = ["waterChange", "filterClean", "filterReplace"]
+    nonisolated static let waterMaintenanceKinds: Set<String> = ["waterChange", "filterClean", "filterReplace"]
 
     @MainActor
     private static func fetchOrLog<T: PersistentModel>(
@@ -28,7 +28,7 @@ enum CarePlanCalendarSync {
         }
     }
 
-    private static func eventStorageKey(kind: String, petKey: String) -> String {
+    private nonisolated static func eventStorageKey(kind: String, petKey: String) -> String {
         "careCalendarEventId_\(kind)_\(petKey)"
     }
 
@@ -179,7 +179,7 @@ enum CarePlanCalendarSync {
         return false
     }
 
-    static func waterMaintenanceKind(for event: Event) -> String? {
+    nonisolated static func waterMaintenanceKind(for event: Event) -> String? {
         let petKey = event.relatedEntityId
         guard !petKey.isEmpty else { return nil }
         return waterMaintenanceKinds.first { kind in

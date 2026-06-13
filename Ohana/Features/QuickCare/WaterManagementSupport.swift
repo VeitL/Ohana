@@ -184,7 +184,7 @@ nonisolated enum WaterRuleMetadata {
 }
 
 enum WaterPlanWriter {
-    static let entityType = "pet_water_plan"
+    nonisolated static let entityType = "pet_water_plan"
     private static let reminderWindowDays = 14
 
     static func suggestedTimes(count: Int, now: Date = Date(), calendar: Calendar = .current) -> [Date] {

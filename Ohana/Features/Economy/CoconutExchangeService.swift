@@ -115,8 +115,8 @@ enum CoconutExchangeService {
         context: ModelContext,
         careLedger providedCareLedger: CareLedgerRecording? = nil
     ) throws {
-        let careLedger: CareLedgerRecording = providedCareLedger ?? CareLedgerService()
         guard CoconutExchangeFeatureGate.isEnabled else { throw CoconutExchangeError.featureDisabled }
+        let careLedger: CareLedgerRecording = providedCareLedger ?? CareLedgerService()
         guard request.status == .pending else { throw CoconutExchangeError.notPending }
         guard request.receiverId == receiver.id.uuidString else { throw CoconutExchangeError.notReceiver }
 
@@ -149,9 +149,9 @@ enum CoconutExchangeService {
         careLedger providedCareLedger: CareLedgerRecording? = nil,
         projectionManager: QuestManager? = nil
     ) throws {
+        guard CoconutExchangeFeatureGate.isEnabled else { throw CoconutExchangeError.featureDisabled }
         let wallet: CoconutWalletManaging = providedWallet ?? SwiftDataCoconutWalletManager()
         let careLedger: CareLedgerRecording = providedCareLedger ?? CareLedgerService()
-        guard CoconutExchangeFeatureGate.isEnabled else { throw CoconutExchangeError.featureDisabled }
         guard request.status == .pending else { throw CoconutExchangeError.notPending }
         guard request.senderId == sender.id.uuidString else { throw CoconutExchangeError.notSender }
 
