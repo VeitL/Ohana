@@ -120,8 +120,6 @@ struct PetAllFeaturesSheet: View {
     }
 
     var body: some View {
-        let _ = newFeatureRevision
-
         NavigationStack {
             FeatureHubScaffold {
                 FeatureHubHeader(
@@ -326,7 +324,12 @@ struct PetAllFeaturesSheet: View {
         tint: Color,
         destination: PetAllFeatureDestination
     ) -> FeatureHubDestinationItem<PetAllFeatureDestination> {
-        FeatureHubDestinationItem(
+        let showsNewFeature: Bool = {
+            _ = newFeatureRevision
+            return destination.petFeature.map { GrowthNewFeatureStore.hasPending(feature: $0) } ?? false
+        }()
+
+        return FeatureHubDestinationItem(
             data: FeatureHubTileData(
                 id: id,
                 title: title,
@@ -334,7 +337,7 @@ struct PetAllFeaturesSheet: View {
                 subtitle: subtitle,
                 icon: icon,
                 tint: tint,
-                showsNewFeature: destination.petFeature.map { GrowthNewFeatureStore.hasPending(feature: $0) } ?? false
+                showsNewFeature: showsNewFeature
             ),
             destination: destination
         )

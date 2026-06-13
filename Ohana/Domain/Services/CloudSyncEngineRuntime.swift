@@ -1031,7 +1031,7 @@ final nonisolated class CloudSyncEngineDelegateAdapter: NSObject, CKSyncEngineDe
                 from: failure.error,
                 matching: failure.recordName
             ),
-                serverRecord[CloudSyncRecordFieldKey.recordKey] as? String != nil else {
+                serverRecord[CloudSyncRecordFieldKey.recordKey] is String else {
                 return nil
             }
             return (failure.recordName, serverRecord)

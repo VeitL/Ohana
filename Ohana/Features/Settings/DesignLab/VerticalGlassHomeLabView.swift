@@ -5,6 +5,7 @@
 //  Developer-only vertical glass home concept playground.
 //
 
+import Darwin
 import SwiftUI
 
 struct VerticalGlassHomeLabView: View {
@@ -461,11 +462,15 @@ private struct VerticalGlassHomeLabStage: View {
         for (index, card) in indexedCards {
             let frame = cardFrame(for: card, at: index, in: size, isSelected: false)
             let center = CGPoint(x: frame.midX, y: frame.midY)
-            let radians = -card.rotationDegrees * .pi / 180
+            let radians = Double(-card.rotationDegrees) * Double.pi / 180
+            let cosValue = CGFloat(Darwin.cos(radians))
+            let sinValue = CGFloat(Darwin.sin(radians))
             let dx = point.x - center.x
             let dy = point.y - center.y
-            let localX = cos(radians) * dx - sin(radians) * dy + frame.width / 2
-            let localY = sin(radians) * dx + cos(radians) * dy + frame.height / 2
+            let rotatedX = cosValue * dx - sinValue * dy
+            let rotatedY = sinValue * dx + cosValue * dy
+            let localX = rotatedX + frame.width / 2
+            let localY = rotatedY + frame.height / 2
             let localPoint = CGPoint(x: localX, y: localY)
             let visibleRect = CGRect(origin: .zero, size: frame.size)
                 .insetBy(dx: 5, dy: 5)

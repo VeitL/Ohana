@@ -16,7 +16,14 @@ struct FunctionMenuRootView: View {
     private var currentTreeLevel: Int { appServices.oasisTree.treeLevel.rawValue }
 
     var body: some View {
-        let _ = newFeatureRevision
+        let showsPendingGroup: (FeatureGroup) -> Bool = { group in
+            _ = newFeatureRevision
+            return GrowthNewFeatureStore.hasPending(group: group)
+        }
+        let showsPendingDestination: (FMDest) -> Bool = { destination in
+            _ = newFeatureRevision
+            return GrowthNewFeatureStore.hasPending(destination)
+        }
 
         ZStack {
             OhanaAppBackground()
@@ -48,7 +55,7 @@ struct FunctionMenuRootView: View {
                                     iconColor: group.color,
                                     title: group.title,
                                     status: compactSubtitle(for: subtitle(for: group)),
-                                    showsNewFeature: GrowthNewFeatureStore.hasPending(group: group)
+                                    showsNewFeature: showsPendingGroup(group)
                                 ) {
                                     select(.featureGroup(group))
                                 }
@@ -71,7 +78,7 @@ struct FunctionMenuRootView: View {
                                         iconColor: entry.color,
                                         title: entry.title,
                                         status: compactSubtitle(for: entry.subtitle),
-                                        showsNewFeature: GrowthNewFeatureStore.hasPending(entry.destination)
+                                        showsNewFeature: showsPendingDestination(entry.destination)
                                     ) {
                                         select(entry.destination)
                                     }

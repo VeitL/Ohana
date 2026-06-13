@@ -108,7 +108,10 @@ struct OasisBentoGridView: View {
     @AppStorage(GrowthNewFeatureStore.revisionKey) private var newFeatureRevision = 0
 
     var body: some View {
-        let _ = newFeatureRevision
+        let showsPendingFeature: (OasisBentoFeature) -> Bool = { feature in
+            _ = newFeatureRevision
+            return GrowthNewFeatureStore.hasPending(oasisFeature: feature)
+        }
 
         VStack(spacing: isCompact ? 6 : 8) {
             HStack(spacing: isCompact ? 6 : 8) {
@@ -117,7 +120,7 @@ struct OasisBentoGridView: View {
                     metric: snapshot.shopMetric,
                     accent: Color.goYellow,
                     lockedLevel: shopLockedLevel,
-                    showsNewFeature: GrowthNewFeatureStore.hasPending(oasisFeature: .shop),
+                    showsNewFeature: showsPendingFeature(.shop),
                     action: onOpenShop
                 )
                 bentoMiniCard(
@@ -129,7 +132,7 @@ struct OasisBentoGridView: View {
                     unavailableLabel: snapshot.achievementsLocked
                         ? localization.tr(zh: "暂无宠物", en: "No pets", de: "Keine Haustiere")
                         : nil,
-                    showsNewFeature: GrowthNewFeatureStore.hasPending(oasisFeature: .achievements),
+                    showsNewFeature: showsPendingFeature(.achievements),
                     action: onOpenAchievements
                 )
             }
@@ -140,7 +143,7 @@ struct OasisBentoGridView: View {
                     metric: snapshot.critterMetric,
                     accent: Color.goTeal,
                     lockedLevel: crittersLockedLevel,
-                    showsNewFeature: GrowthNewFeatureStore.hasPending(oasisFeature: .critters),
+                    showsNewFeature: showsPendingFeature(.critters),
                     action: onOpenCritters
                 )
                 bentoMiniCard(
@@ -148,7 +151,7 @@ struct OasisBentoGridView: View {
                     metric: "80",
                     accent: Color.goPrimary,
                     lockedLevel: gachaLockedLevel,
-                    showsNewFeature: GrowthNewFeatureStore.hasPending(oasisFeature: .gacha),
+                    showsNewFeature: showsPendingFeature(.gacha),
                     action: onOpenGacha
                 )
             }
