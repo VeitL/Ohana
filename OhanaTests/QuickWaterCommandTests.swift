@@ -212,6 +212,39 @@ struct QuickWaterCommandTests {
         #expect(center.homeRevision.value == 1)
     }
 
+    @Test func quickWaterExecutorNoopsForRecycledPetAtCommandBoundary() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let center = ReadModelRevisionCenter()
+        let pet = Pet(name: "Momo", species: "猫")
+        pet.trashedAt = date(year: 2026, month: 6, day: 1, hour: 9)
+        context.insert(pet)
+        try context.save()
+        let executor = QuickWaterCommandExecutor(
+            context: context,
+            activeHumanSelection: UserDefaultsActiveHumanSelection(),
+            careEvents: CareEventService(),
+            userNotifications: SharedUserNotificationManager(),
+            reminderScheduling: ReminderSchedulingManager(),
+            revisions: SharedDomainRevisionPublisher(center: center)
+        )
+
+        let result = executor.recordWater(
+            pet: pet,
+            targets: [pet],
+            amountMl: 120,
+            executorId: "human-1"
+        )
+
+        #expect(result.coconutDelta == 0)
+        #expect(result.targetCount == 0)
+        #expect(try context.fetch(FetchDescriptor<PetCareLog>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<CareLedgerEvent>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<CoconutLedgerEntry>()).isEmpty)
+        #expect(center.homeRevision.value == 0)
+        #expect(center.lastMutation == nil)
+    }
+
     @Test func plannedWaterCatchUpWithinSixHoursDoesNotAwardCoconuts() throws {
         let container = try makeContainer()
         let context = container.mainContext

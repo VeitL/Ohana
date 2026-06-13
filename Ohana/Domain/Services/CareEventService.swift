@@ -59,6 +59,62 @@ struct CareEventServiceDependencies {
     }
 }
 
+enum CareFactWriteDisposition: Equatable {
+    case active
+    case memorialHistoricalFactOnly
+    case noOp
+
+    var writesFact: Bool {
+        self != .noOp
+    }
+
+    var allowsDerivedEffects: Bool {
+        self == .active
+    }
+}
+
+enum CareFactWritePolicy {
+    @MainActor
+    static func disposition(
+        pet: Pet,
+        date: Date,
+        executorId: String?,
+        context: ModelContext
+    ) -> CareFactWriteDisposition {
+        guard pet.trashedAt == nil else { return .noOp }
+        if executorIsRecycled(executorId, context: context) { return .noOp }
+
+        guard let passedAwayDate = pet.passedAwayDate else { return .active }
+        return isHistorical(date, relativeToPassingDate: passedAwayDate) ? .memorialHistoricalFactOnly : .noOp
+    }
+
+    @MainActor
+    static func executorIsRecycled(_ executorId: String?, context: ModelContext) -> Bool {
+        guard let executorId,
+              let id = UUID(uuidString: executorId) else {
+            return false
+        }
+        var descriptor = FetchDescriptor<Human>(
+            predicate: #Predicate<Human> { human in
+                human.id == id
+            }
+        )
+        descriptor.fetchLimit = 1
+        guard let human = try? context.fetch(descriptor).first else { return false }
+        return human.trashedAt != nil
+    }
+
+    private static func isHistorical(_ date: Date, relativeToPassingDate passingDate: Date) -> Bool {
+        let calendar = Calendar.current
+        let dayAfterPassing = calendar.date(
+            byAdding: .day,
+            value: 1,
+            to: calendar.startOfDay(for: passingDate)
+        ) ?? passingDate
+        return date < dayAfterPassing
+    }
+}
+
 @MainActor
 final class CareEventService: CareEventRecording {
     let dependencies: CareEventServiceDependencies
@@ -77,6 +133,58 @@ final class CareEventService: CareEventRecording {
         let careType: CareType
         let linkedPottyLogID: UUID?
         let coconutDelta: Int
+    }
+
+    private static func noOpManualFeedResult(
+        pet: Pet,
+        amountGrams: Double,
+        executorId: String?,
+        date: Date,
+        foodKind: FeedFoodKind
+    ) -> (result: CareRecordResult, reward: (humanGot: Int, petGot: Int), log: PetCareLog) {
+        let log = PetCareLog(
+            date: date,
+            type: .feeding,
+            amountGrams: amountGrams,
+            note: PetCareLog.manualFeedNoteMarker,
+            foodKind: foodKind,
+            pet: nil,
+            executorId: executorId
+        )
+        return (
+            CareRecordResult(
+                logID: log.id,
+                subjectID: pet.id,
+                careType: .feeding,
+                linkedPottyLogID: nil,
+                coconutDelta: 0
+            ),
+            (0, 0),
+            log
+        )
+    }
+
+    private static func noOpCareFactResult(
+        pet: Pet,
+        type: CareType,
+        amountMl: Double,
+        executorId: String?,
+        reward _: QuestManager.OhanaActionType,
+        date: Date
+    ) -> (result: CareRecordResult, reward: (humanGot: Int, petGot: Int), log: PetCareLog, pottyLog: PetPottyLog?) {
+        let log = PetCareLog(date: date, type: type, amountMl: amountMl, pet: nil, executorId: executorId)
+        return (
+            CareRecordResult(
+                logID: log.id,
+                subjectID: pet.id,
+                careType: type,
+                linkedPottyLogID: nil,
+                coconutDelta: 0
+            ),
+            (0, 0),
+            log,
+            nil
+        )
     }
 
     @discardableResult
@@ -117,6 +225,21 @@ final class CareEventService: CareEventRecording {
         dependencies providedDependencies: CareEventServiceDependencies? = nil
     ) -> (result: CareRecordResult, reward: (humanGot: Int, petGot: Int), log: PetCareLog) {
         let dependencies = providedDependencies ?? .live()
+        let disposition = CareFactWritePolicy.disposition(
+            pet: pet,
+            date: date,
+            executorId: executorId,
+            context: context
+        )
+        guard disposition.writesFact else {
+            return noOpManualFeedResult(
+                pet: pet,
+                amountGrams: amountGrams,
+                executorId: executorId,
+                date: date,
+                foodKind: foodKind
+            )
+        }
         let log = PetCareLog(
             date: date,
             type: .feeding,
@@ -129,6 +252,20 @@ final class CareEventService: CareEventRecording {
         context.insert(log)
         CloudSyncMutationRecorder.markModified(log, context: context, modifiedAt: log.date)
         context.safeSave()
+
+        guard disposition.allowsDerivedEffects else {
+            return (
+                CareRecordResult(
+                    logID: log.id,
+                    subjectID: pet.id,
+                    careType: .feeding,
+                    linkedPottyLogID: nil,
+                    coconutDelta: 0
+                ),
+                (0, 0),
+                log
+            )
+        }
 
         dependencies.questManager.recordFirstMeal(actorId: executorId, context: context)
         let reward = dependencies.economy.awardCareAction(
@@ -181,6 +318,23 @@ final class CareEventService: CareEventRecording {
         dependencies providedDependencies: CareEventServiceDependencies? = nil
     ) -> PetCareLog {
         let dependencies = providedDependencies ?? .live()
+        let disposition = CareFactWritePolicy.disposition(
+            pet: pet,
+            date: date,
+            executorId: executorId,
+            context: context
+        )
+        guard disposition.writesFact else {
+            return PetCareLog(
+                date: date,
+                type: .feeding,
+                amountGrams: amountGrams,
+                note: FeedLogMetadata.treatFeedNoteMarker,
+                treatKind: treatKind,
+                pet: nil,
+                executorId: executorId
+            )
+        }
         let log = PetCareLog(
             date: date,
             type: .feeding,
@@ -193,6 +347,7 @@ final class CareEventService: CareEventRecording {
         context.insert(log)
         CloudSyncMutationRecorder.markModified(log, context: context, modifiedAt: date)
         context.safeSave()
+        guard disposition.allowsDerivedEffects else { return log }
         dependencies.careLedger.recordPetCare(
             log: log,
             pet: pet,
@@ -220,6 +375,14 @@ final class CareEventService: CareEventRecording {
     ) -> (humanGot: Int, petGot: Int)? {
         let dependencies = providedDependencies ?? .live()
         guard let event = reminder.event else { return nil }
+        guard CareFactWritePolicy.disposition(
+            pet: pet,
+            date: date,
+            executorId: executorId,
+            context: context
+        ) == .active else {
+            return nil
+        }
         let isCatchUp = reminder.scheduledAt < date
         guard !isCatchUp || FeedPlanCatchUpPolicy.isCatchUpEligible(reminder, now: date) else {
             return nil
@@ -305,6 +468,14 @@ final class CareEventService: CareEventRecording {
     ) -> (humanGot: Int, petGot: Int)? {
         let dependencies = providedDependencies ?? .live()
         guard let event = reminder.event else { return nil }
+        guard CareFactWritePolicy.disposition(
+            pet: pet,
+            date: date,
+            executorId: executorId,
+            context: context
+        ) == .active else {
+            return nil
+        }
         let isCatchUp = reminder.scheduledAt < date
         guard !isCatchUp || WaterPlanCatchUpPolicy.isCatchUpEligible(reminder, now: date) else {
             return nil
@@ -417,6 +588,22 @@ final class CareEventService: CareEventRecording {
         dependencies providedDependencies: CareEventServiceDependencies? = nil
     ) -> (result: CareRecordResult, reward: (humanGot: Int, petGot: Int), log: PetCareLog, pottyLog: PetPottyLog?) {
         let dependencies = providedDependencies ?? .live()
+        let disposition = CareFactWritePolicy.disposition(
+            pet: pet,
+            date: date,
+            executorId: executorId,
+            context: context
+        )
+        guard disposition.writesFact else {
+            return noOpCareFactResult(
+                pet: pet,
+                type: type,
+                amountMl: amountMl,
+                executorId: executorId,
+                reward: reward,
+                date: date
+            )
+        }
         let log = PetCareLog(
             date: date,
             type: type,
@@ -427,7 +614,7 @@ final class CareEventService: CareEventRecording {
         context.insert(log)
         CloudSyncMutationRecorder.markModified(log, context: context, modifiedAt: date)
         let pottyLog: PetPottyLog?
-        if createsLinkedPottyLog, type == .litter {
+        if disposition.allowsDerivedEffects, createsLinkedPottyLog, type == .litter {
             let linked = PetPottyLog(date: date, type: .perfectPoop, pet: pet, executorId: executorId)
             context.insert(linked)
             CloudSyncMutationRecorder.markModified(linked, context: context, modifiedAt: date)
@@ -436,6 +623,21 @@ final class CareEventService: CareEventRecording {
             pottyLog = nil
         }
         context.safeSave()
+
+        guard disposition.allowsDerivedEffects else {
+            return (
+                CareRecordResult(
+                    logID: log.id,
+                    subjectID: pet.id,
+                    careType: type,
+                    linkedPottyLogID: nil,
+                    coconutDelta: 0
+                ),
+                (0, 0),
+                log,
+                nil
+            )
+        }
 
         let award = dependencies.economy.awardCareAction(
             type: reward,
@@ -498,11 +700,19 @@ final class CareEventService: CareEventRecording {
         dependencies providedDependencies: CareEventServiceDependencies? = nil
     ) -> (humanGot: Int, petGot: Int) {
         let dependencies = providedDependencies ?? .live()
+        let disposition = CareFactWritePolicy.disposition(
+            pet: pet,
+            date: date,
+            executorId: executorId,
+            context: context
+        )
+        guard disposition.writesFact else { return (0, 0) }
         let log = PetPottyLog(date: date, type: type, pet: pet, executorId: executorId)
         context.insert(log)
         CloudSyncMutationRecorder.markModified(log, context: context, modifiedAt: date)
         context.safeSave()
 
+        guard disposition.allowsDerivedEffects else { return (0, 0) }
         let reward = dependencies.economy.awardCareAction(
             type: .potty(isLitter: false),
             pet: pet,
@@ -566,11 +776,42 @@ final class CareEventService: CareEventRecording {
         dependencies providedDependencies: CareEventServiceDependencies? = nil
     ) -> (result: HygieneRecordResult, reward: (humanGot: Int, petGot: Int), log: PetHygieneLog) {
         let dependencies = providedDependencies ?? .live()
+        let disposition = CareFactWritePolicy.disposition(
+            pet: pet,
+            date: date,
+            executorId: executorId,
+            context: context
+        )
+        guard disposition.writesFact else {
+            let log = PetHygieneLog(date: date, type: type, pet: nil, executorId: executorId)
+            return (
+                HygieneRecordResult(
+                    logID: log.id,
+                    subjectID: pet.id,
+                    hygieneType: type,
+                    coconutDelta: 0
+                ),
+                (0, 0),
+                log
+            )
+        }
         let log = PetHygieneLog(date: date, type: type, pet: pet, executorId: executorId)
         context.insert(log)
         CloudSyncMutationRecorder.markModified(log, context: context, modifiedAt: date)
         context.safeSave()
 
+        guard disposition.allowsDerivedEffects else {
+            return (
+                HygieneRecordResult(
+                    logID: log.id,
+                    subjectID: pet.id,
+                    hygieneType: type,
+                    coconutDelta: 0
+                ),
+                (0, 0),
+                log
+            )
+        }
         let reward = dependencies.economy.awardCareAction(
             type: .care(type: type),
             pet: pet,
@@ -631,11 +872,19 @@ final class CareEventService: CareEventRecording {
         dependencies providedDependencies: CareEventServiceDependencies? = nil
     ) -> (humanGot: Int, petGot: Int) {
         let dependencies = providedDependencies ?? .live()
+        let disposition = CareFactWritePolicy.disposition(
+            pet: pet,
+            date: date,
+            executorId: executorId,
+            context: context
+        )
+        guard disposition.writesFact else { return (0, 0) }
         let log = PetHealthLog(date: date, type: type, note: note, pet: pet, executorId: executorId)
         context.insert(log)
         CloudSyncMutationRecorder.markModified(log, context: context, modifiedAt: date)
         context.safeSave()
 
+        guard disposition.allowsDerivedEffects else { return (0, 0) }
         let reward = dependencies.economy.awardCareAction(
             type: .health,
             pet: pet,
@@ -685,10 +934,12 @@ final class CareEventService: CareEventRecording {
         dependencies providedDependencies: CareEventServiceDependencies? = nil
     ) -> (humanGot: Int, petGot: Int) {
         let dependencies = providedDependencies ?? .live()
-        let liveTargets = normalizedTargets(targets, fallback: sourcePet)
+        let liveTargets = SharedPetTargetResolver.normalizedTargets(targets, fallback: sourcePet)
+        guard !liveTargets.isEmpty else { return (0, 0) }
         guard liveTargets.count > 1 else {
+            let target = liveTargets[0]
             return recordManualFeed(
-                pet: sourcePet,
+                pet: target,
                 amountGrams: totalGrams,
                 context: context,
                 executorId: executorId,
@@ -736,10 +987,12 @@ final class CareEventService: CareEventRecording {
         dependencies providedDependencies: CareEventServiceDependencies? = nil
     ) -> (humanGot: Int, petGot: Int) {
         let dependencies = providedDependencies ?? .live()
-        let liveTargets = normalizedTargets(targets, fallback: sourcePet)
+        let liveTargets = SharedPetTargetResolver.normalizedTargets(targets, fallback: sourcePet)
+        guard !liveTargets.isEmpty else { return (0, 0) }
         guard liveTargets.count > 1 else {
+            let target = liveTargets[0]
             return recordCare(
-                pet: sourcePet,
+                pet: target,
                 type: .watering,
                 amountMl: totalMl,
                 context: context,
@@ -782,10 +1035,12 @@ final class CareEventService: CareEventRecording {
         dependencies providedDependencies: CareEventServiceDependencies? = nil
     ) -> (humanGot: Int, petGot: Int) {
         let dependencies = providedDependencies ?? .live()
-        let liveTargets = normalizedTargets(targets, fallback: sourcePet)
+        let liveTargets = SharedPetTargetResolver.normalizedTargets(targets, fallback: sourcePet)
+        guard !liveTargets.isEmpty else { return (0, 0) }
         guard liveTargets.count > 1 else {
+            let target = liveTargets[0]
             return recordCare(
-                pet: sourcePet,
+                pet: target,
                 type: .litter,
                 context: context,
                 executorId: executorId,
@@ -831,10 +1086,12 @@ final class CareEventService: CareEventRecording {
         dependencies providedDependencies: CareEventServiceDependencies? = nil
     ) -> (humanGot: Int, petGot: Int) {
         let dependencies = providedDependencies ?? .live()
-        let liveTargets = normalizedTargets(targets, fallback: sourcePet)
+        let liveTargets = SharedPetTargetResolver.normalizedTargets(targets, fallback: sourcePet)
+        guard !liveTargets.isEmpty else { return (0, 0) }
         guard liveTargets.count > 1 else {
+            let target = liveTargets[0]
             return recordCare(
-                pet: sourcePet,
+                pet: target,
                 type: type,
                 context: context,
                 executorId: executorId,
@@ -958,7 +1215,11 @@ final class CareEventService: CareEventRecording {
         date: Date = Date(),
         dependencies: CareEventServiceDependencies? = nil
     ) -> PetPottyLog {
-        let liveTargets = normalizedTargets(targets, fallback: sourcePet)
+        let liveTargets = SharedPetTargetResolver.normalizedTargets(targets, fallback: sourcePet)
+        guard !liveTargets.isEmpty,
+              !CareFactWritePolicy.executorIsRecycled(executorId, context: context) else {
+            return PetPottyLog(date: date, type: type, executorId: executorId)
+        }
         let result = SharedPetActionRecorder.record(
             SharedPetActionDescriptor(
                 actionKind: .pottyUnknown,

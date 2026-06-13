@@ -329,6 +329,106 @@ struct CareCompletionChokepointCharacterizationTests {
         #expect(ledgerEvents.allSatisfy { $0.subjectId != recycledPet.id.uuidString })
     }
 
+    @Test func recycledPetCareFactIsNoopAtFactBoundary() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let human = Human(name: "Guan")
+        let recycledPet = Pet(name: "Momo", species: "cat")
+        recycledPet.trashedAt = Date(timeIntervalSince1970: 1000)
+        context.insert(human)
+        context.insert(recycledPet)
+        try context.save()
+
+        let state = EconomyDefaultsState.capture()
+        defer { state.restore() }
+        resetEconomy(activeHumanID: human.id.uuidString, humans: [human], pets: [recycledPet])
+
+        _ = CareEventService.recordManualFeedFact(
+            pet: recycledPet,
+            amountGrams: 80,
+            context: context,
+            executorId: human.id.uuidString,
+            date: Date(timeIntervalSince1970: 2000),
+            dependencies: .live()
+        )
+
+        #expect(try context.fetch(FetchDescriptor<PetCareLog>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<CareLedgerEvent>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<CoconutLedgerEntry>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<EconomyBudgetUsageEvent>()).isEmpty)
+    }
+
+    @Test func deceasedPetHistoricalCareWritesOnlyFactWithoutDerivedEffects() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let human = Human(name: "Guan")
+        let deceasedPet = Pet(name: "Momo", species: "cat")
+        deceasedPet.passedAwayDate = Date(timeIntervalSince1970: 3000)
+        context.insert(human)
+        context.insert(deceasedPet)
+        try context.save()
+
+        let state = EconomyDefaultsState.capture()
+        defer { state.restore() }
+        resetEconomy(activeHumanID: human.id.uuidString, humans: [human], pets: [deceasedPet])
+
+        _ = CareEventService.recordManualFeedFact(
+            pet: deceasedPet,
+            amountGrams: 80,
+            context: context,
+            executorId: human.id.uuidString,
+            date: Date(timeIntervalSince1970: 2000),
+            dependencies: .live()
+        )
+
+        let careLogs = try context.fetch(FetchDescriptor<PetCareLog>())
+        #expect(careLogs.count == 1)
+        #expect(careLogs.first?.pet?.id == deceasedPet.id)
+        #expect(try context.fetch(FetchDescriptor<CareLedgerEvent>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<CoconutLedgerEntry>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<EconomyBudgetUsageEvent>()).isEmpty)
+    }
+
+    @Test func calendarCompletionForRecycledPetIsNoop() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let human = Human(name: "Guan")
+        let recycledPet = Pet(name: "Momo", species: "cat")
+        recycledPet.trashedAt = Date(timeIntervalSince1970: 1000)
+        let occurrenceDate = Date(timeIntervalSince1970: 2000)
+        let event = Event(
+            title: "Feed Momo 80g",
+            startDate: occurrenceDate,
+            eventType: EventType.daily.rawValue,
+            relatedEntityType: EntityKind.pet.rawValue,
+            relatedEntityId: recycledPet.id.uuidString
+        )
+        context.insert(human)
+        context.insert(recycledPet)
+        context.insert(event)
+        try context.save()
+
+        let state = EconomyDefaultsState.capture()
+        defer { state.restore() }
+        resetEconomy(activeHumanID: human.id.uuidString, humans: [human], pets: [recycledPet])
+
+        let result = CalendarEventCommandService.toggleCompletion(
+            event: event,
+            occurrenceDate: occurrenceDate,
+            pets: [recycledPet],
+            context: context,
+            executorId: human.id.uuidString,
+            now: Date(timeIntervalSince1970: 4000)
+        )
+
+        #expect(result.isCompleted == false)
+        #expect(event.isOccurrenceMarkedComplete(on: occurrenceDate) == false)
+        #expect(try context.fetch(FetchDescriptor<PetCareLog>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<CareLedgerEvent>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<CoconutLedgerEntry>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<EconomyBudgetUsageEvent>()).isEmpty)
+    }
+
     private func makeContainer() throws -> ModelContainer {
         let schema = Schema(ArkSchemaV71.models)
         let config = ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)

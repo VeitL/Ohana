@@ -188,6 +188,20 @@ struct SharedPetActionResult {
     let reward: (humanGot: Int, petGot: Int)
 
     var coconutDelta: Int { max(0, reward.humanGot) + max(0, reward.petGot) }
+
+    static func noOp() -> SharedPetActionResult {
+        SharedPetActionResult(
+            sessionID: UUID(),
+            targetPetIDs: [],
+            careLogIDs: [],
+            pottyLogID: nil,
+            pottyLog: nil,
+            expenseLogIDs: [],
+            walkLogIDs: [],
+            walkLogs: [],
+            reward: (0, 0)
+        )
+    }
 }
 
 enum SharedPetActionRecorder {
@@ -200,6 +214,10 @@ enum SharedPetActionRecorder {
     ) -> SharedPetActionResult {
         let dependencies = providedDependencies ?? .live()
         let targets = SharedPetTargetResolver.normalizedTargets(descriptor.targets, fallback: descriptor.sourcePet)
+        guard !targets.isEmpty,
+              !CareFactWritePolicy.executorIsRecycled(descriptor.executorId, context: context) else {
+            return .noOp()
+        }
         let allocationTargetCount = max(targets.count, 1)
         let visibleDescriptorNote = SharedCareMetadata.userNoteForStorage(descriptor.note)
         let session = SharedCareSession(

@@ -304,10 +304,29 @@ struct QuickWaterCommandExecutor {
         amountMl: Double,
         executorId: String?
     ) -> QuickWaterRewardResult {
-        let reward = targets.count > 1
+        guard EconomyWalletWritePolicy.canWrite(pet) else {
+            publishWaterMutation(
+                .waterLog(petID: pet.id, source: "manual"),
+                affectedEntityIDs: [pet.id],
+                wroteBusinessFact: false,
+                note: "manual_water_noop"
+            )
+            return QuickWaterRewardResult(coconutDelta: 0, targetCount: 0)
+        }
+        let liveTargets = SharedPetTargetResolver.normalizedTargets(targets, fallback: pet)
+        guard !liveTargets.isEmpty else {
+            publishWaterMutation(
+                .waterLog(petID: pet.id, source: "manual"),
+                affectedEntityIDs: [pet.id],
+                wroteBusinessFact: false,
+                note: "manual_water_noop"
+            )
+            return QuickWaterRewardResult(coconutDelta: 0, targetCount: 0)
+        }
+        let reward = liveTargets.count > 1
             ? careEvents.recordSharedWatering(
                 sourcePet: pet,
-                targets: targets,
+                targets: liveTargets,
                 totalMl: amountMl,
                 context: context,
                 executorId: executorId,
@@ -324,13 +343,13 @@ struct QuickWaterCommandExecutor {
                 date: Date()
             )
         publishWaterMutation(
-            .waterLog(petID: pet.id, source: targets.count > 1 ? "shared_manual" : "manual"),
-            affectedEntityIDs: targetIDs(pet: pet, targets: targets),
-            note: targets.count > 1 ? "shared_water" : "manual_water"
+            .waterLog(petID: pet.id, source: liveTargets.count > 1 ? "shared_manual" : "manual"),
+            affectedEntityIDs: targetIDs(pet: pet, targets: liveTargets),
+            note: liveTargets.count > 1 ? "shared_water" : "manual_water"
         )
         return QuickWaterRewardResult(
             coconutDelta: reward.humanGot + reward.petGot,
-            targetCount: max(targets.count, 1)
+            targetCount: liveTargets.count
         )
     }
 
@@ -343,7 +362,25 @@ struct QuickWaterCommandExecutor {
         cycleAnchor: Date,
         executorId: String?
     ) -> [Reminder] {
+        guard EconomyWalletWritePolicy.canWrite(pet) else {
+            publishWaterMutation(
+                .waterLog(petID: pet.id, source: "water_change"),
+                affectedEntityIDs: [pet.id],
+                wroteBusinessFact: false,
+                note: "water_change_noop"
+            )
+            return []
+        }
         let liveTargets = SharedPetTargetResolver.normalizedTargets(targets, fallback: pet)
+        guard !liveTargets.isEmpty else {
+            publishWaterMutation(
+                .waterLog(petID: pet.id, source: "water_change"),
+                affectedEntityIDs: [pet.id],
+                wroteBusinessFact: false,
+                note: "water_change_noop"
+            )
+            return []
+        }
         let reward = QuestManager.OhanaActionType.general(
             humanReward: 15,
             petReward: 2,
@@ -388,7 +425,25 @@ struct QuickWaterCommandExecutor {
         reminderOn: Bool,
         executorId: String?
     ) -> [Reminder] {
+        guard EconomyWalletWritePolicy.canWrite(pet) else {
+            publishWaterMutation(
+                .waterLog(petID: pet.id, source: "filter_clean"),
+                affectedEntityIDs: [pet.id],
+                wroteBusinessFact: false,
+                note: "filter_clean_noop"
+            )
+            return []
+        }
         let liveTargets = SharedPetTargetResolver.normalizedTargets(targets, fallback: pet)
+        guard !liveTargets.isEmpty else {
+            publishWaterMutation(
+                .waterLog(petID: pet.id, source: "filter_clean"),
+                affectedEntityIDs: [pet.id],
+                wroteBusinessFact: false,
+                note: "filter_clean_noop"
+            )
+            return []
+        }
         let reward = QuestManager.OhanaActionType.general(
             humanReward: 25,
             petReward: 2,

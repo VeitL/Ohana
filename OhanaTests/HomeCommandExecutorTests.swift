@@ -511,6 +511,32 @@ struct HomeCommandExecutorTests {
     }
 
     @MainActor
+    @Test func quickPlayCommandExecutorNoopsForRecycledPetAtCommandBoundary() throws {
+        let revisionCenter = ReadModelRevisionCenter()
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let pet = Pet(name: "Momo", species: "狗")
+        pet.trashedAt = makeDate(year: 2026, month: 6, day: 8, hour: 12, minute: 0)
+        context.insert(pet)
+        try context.save()
+
+        let beforeRevision = revisionCenter.homeRevision.value
+        let result = QuickPlayCommandExecutor(context: context, revisionCenter: revisionCenter).recordPlay(
+            petID: pet.id,
+            executorId: "human-1",
+            rewardTitle: "Momo play reward",
+            date: makeDate(year: 2026, month: 6, day: 8, hour: 18, minute: 0)
+        )
+
+        #expect(result == nil)
+        #expect(try context.fetch(FetchDescriptor<PetCareLog>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<CareLedgerEvent>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<CoconutLedgerEntry>()).isEmpty)
+        #expect(revisionCenter.homeRevision.value == beforeRevision)
+        #expect(revisionCenter.lastMutation == nil)
+    }
+
+    @MainActor
     @Test func quickPottyCommandExecutorWritesPottyFactAndPublishesRevision() throws {
         let revisionCenter = ReadModelRevisionCenter()
         let container = try makeInMemoryContainer()
@@ -554,6 +580,34 @@ struct HomeCommandExecutorTests {
         #expect(ledgerEvents.first?.actionType == PottyType.softPoop.rawValue)
         #expect(revisionCenter.homeRevision.value != beforeRevision)
         #expect(revisionCenter.lastMutation?.command == .quickCare(entityID: pet.id, action: PottyType.softPoop.rawValue))
+    }
+
+    @MainActor
+    @Test func quickPottyCommandExecutorNoopsForRecycledPetAtCommandBoundary() throws {
+        let revisionCenter = ReadModelRevisionCenter()
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let pet = Pet(name: "Momo", species: "狗")
+        pet.trashedAt = makeDate(year: 2026, month: 6, day: 8, hour: 12, minute: 0)
+        context.insert(pet)
+        try context.save()
+
+        let beforeRevision = revisionCenter.homeRevision.value
+        let result = QuickPottyCommandExecutor(context: context, revisionCenter: revisionCenter).record(
+            petID: pet.id,
+            selectedType: .softPoop,
+            isLitter: false,
+            executorId: "human-1",
+            date: makeDate(year: 2026, month: 6, day: 8, hour: 19, minute: 0)
+        )
+
+        #expect(result == nil)
+        #expect(try context.fetch(FetchDescriptor<PetPottyLog>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<PetCareLog>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<CareLedgerEvent>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<CoconutLedgerEntry>()).isEmpty)
+        #expect(revisionCenter.homeRevision.value == beforeRevision)
+        #expect(revisionCenter.lastMutation == nil)
     }
 
     @MainActor

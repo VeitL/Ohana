@@ -74,15 +74,8 @@ struct QuickPottyCommandExecutor {
         date: Date
     ) -> QuickPottyCommandResult? {
         let action = isLitter ? CareType.litter.rawValue : selectedType.rawValue
-        guard let pet = fetchPet(id: petID), !pet.hasPassedAway else {
-            revisions.publish(
-                DomainMutationResult(
-                    command: .quickCare(entityID: petID, action: action),
-                    affectedEntityIDs: [petID],
-                    wroteBusinessFact: false,
-                    note: "quickPotty.missingPet"
-                )
-            )
+        guard let pet = fetchPet(id: petID), EconomyWalletWritePolicy.canWrite(pet) else {
+            publishNoop(petID: petID, action: action, note: "quickPotty.missingPet")
             return nil
         }
 
@@ -145,7 +138,7 @@ struct QuickPottyCommandExecutor {
         executorId: String?,
         date: Date
     ) -> QuickPottyCommandResult? {
-        guard let sourcePet = fetchPet(id: sourcePetID), !sourcePet.hasPassedAway else {
+        guard let sourcePet = fetchPet(id: sourcePetID), EconomyWalletWritePolicy.canWrite(sourcePet) else {
             publishNoop(petID: sourcePetID, action: "unknownSharedPotty", note: "quickPotty.unknown.missingPet")
             return nil
         }
@@ -181,7 +174,7 @@ struct QuickPottyCommandExecutor {
         date: Date,
         isFullChange: Bool
     ) -> QuickPottyCommandResult? {
-        guard let sourcePet = fetchPet(id: sourcePetID), !sourcePet.hasPassedAway else {
+        guard let sourcePet = fetchPet(id: sourcePetID), EconomyWalletWritePolicy.canWrite(sourcePet) else {
             publishNoop(petID: sourcePetID, action: isFullChange ? "litterFullChange" : "litterScoop", note: "quickPotty.litter.missingPet")
             return nil
         }
@@ -254,7 +247,7 @@ struct QuickPottyCommandExecutor {
     private func fetchTargets(sourcePet: Pet, targetIDs: Set<UUID>) -> [Pet] {
         let ids = targetIDs.isEmpty ? [sourcePet.id] : Array(targetIDs)
         let targets = ids.compactMap { fetchPet(id: $0) }
-            .filter { !$0.hasPassedAway }
+            .filter(EconomyWalletWritePolicy.canWrite)
         return targets.isEmpty ? [sourcePet] : targets
     }
 
@@ -291,13 +284,10 @@ struct QuickPottyCommandExecutor {
     }
 
     private func publishNoop(petID: UUID, action: String, note: String) {
-        revisions.publish(
-            DomainMutationResult(
-                command: .quickCare(entityID: petID, action: action),
-                affectedEntityIDs: [petID],
-                wroteBusinessFact: false,
-                note: note
-            )
+        AppPerformanceMonitor.shared.record(
+            "domain_command_noop",
+            valueMS: 0,
+            note: note
         )
     }
 }

@@ -25,6 +25,73 @@ actionable; long-term product ideas belong in planning docs instead.
 
 ## Open Items
 
+### TFU-20260613-013 - Propagate Economy fact no-op to care command layers
+
+- Status: Open
+- Priority: P1
+- Area: Economy / QuickCare / Feeding / Frozen Lifecycle / Command Side Effects
+- Source task: Economy repair follow-up re-review after TFU-20260613-012 implementation,
+  2026-06-13
+- Blocker: 本轮复审发现 TFU-012 把 G4.1 硬门收到 `CareEventService` /
+  `SharedPetActionRecorder` 后，部分 command 层仍把 no-op 当成功：active pet + recycled
+  executor 时，`QuickPlayCommandExecutor` / `QuickPottyCommandExecutor` /
+  `QuickWaterCommandExecutor` / Home expanded quick actions 会先拿到服务层 detached
+  no-op result，再发布 `wroteBusinessFact: true` mutation、返回不存在的 log id 或继续保存
+  water-change/filter plans。Feeding 的 `ManualFeedCommand.recordManual` 还会在事实层
+  no-op 前修改 `pet.mainFoodKind` / `dailyPortionGrams`，并在 no-op / 离世历史事实-only
+  后重建库存提醒、返回 `didRecord: true`；`recordTreat` 同样无条件发布 feed mutation。
+- Next step: 让照护命令层消费事实写入结果或共享同一 preflight：回收 executor / 回收
+  target 必须整体 no-op（不发布 revision、不返回 fake log id、不保存计划 / reminder /
+  stock 派生、不改默认喂食设置）；离世历史事实只允许事实写入，命令层不得追加设置、
+  reminder、stock、quest、Oasis 等派生。优先用 `CareFactWriteDisposition` 或服务 result
+  显式表达 `didWriteFact` / `allowsDerivedEffects`，避免调用方用 reward==0 猜状态。
+- Close condition: 新增 in-memory tests 覆盖 active pet + recycled executor 的
+  QuickPlay / QuickPotty / QuickWater / Home / Feeding no-op 路径，以及 deceased pet
+  historical feeding fact-only 路径；验证无 `Pet*Log` / `CareLedgerEvent` /
+  `CoconutLedgerEntry` / `EconomyBudgetUsageEvent` / Domain revision / plan-reminder
+  派生（历史事实-only 例外只保留事实）。相关目标测试、`scripts/dev-check-changed.sh`、
+  `scripts/audit-economy-boundaries.sh --all`、`scripts/tests/run-audit-fixture-tests.sh`
+  与 `scripts/module-exit-gate.sh` 通过后，再开全新纯复审清零 P0/P1。
+
+### TFU-20260613-012 - Repair post-7845db4c7 Economy hard-gate review findings
+
+- Status: Open
+- Priority: P1
+- Area: Economy / Care Completion / Frozen Lifecycle / Audit Guardrails
+- Source task: Economy pure adversarial re-review after `7845db4c7`, 2026-06-13
+- Blocker: 本轮纯复审发现 Economy P1 修复轮仍未把 G4.1 冻结边界收进事实写入
+  收口：`CareEventService.recordCareFact` / `recordManualFeedFact` / `recordPotty` /
+  `recordHygieneFact` 等会先插入事实，再由奖励层 no-op；回收宠作为 source 或单目标
+  仍可写 `PetCareLog` / `PetPottyLog` / ledger / reminder 派生。共享入口过滤后
+  `liveTargets.count <= 1` 时回退到 `sourcePet` 单宠路径，source 已回收或过滤结果为空也
+  不是整体 no-op。Calendar / Today Focus / 通知完成路径也只 fetch pet，不用
+  `EconomyWalletWritePolicy.canWrite` 拦截回收对象。R5 `reward-direct-care-discipline`
+  审计以整文件 allowlist 放行 `CalendarTaskCompletionSyncService`、`PetMedicationDoseLogging`、
+  `PetHealthCommands`、`PetWalkingManager`、`DashboardRecordCommands`，同文件新增裸
+  `EconomyRewardDiscipline.awardCareAction` 坏例不会被抓。
+- Next step: 在事实写入收口层统一实现 G4.1：回收 target / executor 整体 no-op，不写
+  fact / ledger / session / reminder 派生；离世 target 只允许历史照护事实且不发奖、不推进
+  reminder / quest / streak / Oasis 等派生；显式冻结 executor 继续奖励 no-op 且不回落 active
+  human。修复共享入口的空过滤结果与 source 回收退回单宠路径；Calendar / Today Focus /
+  通知 completion 的 pet resolver 改用 `EconomyWalletWritePolicy.canWrite` 或等价生命周期
+  门。R5 改为函数/块级 allowlist 或语义检查，并加一个位于现有 allowlisted 文件内的 bad
+  fixture，证明同文件裸 discipline 调用会失败。
+- Close condition: 新增 in-memory tests 覆盖 recycled source / recycled single target /
+  deceased historical-only no-derived / Calendar-or-notification recycled pet completion no-op；
+  新增 R5 bad/good fixture 覆盖 allowlisted 文件内新坏例；`scripts/audit-economy-boundaries.sh --all`、
+  `scripts/tests/run-audit-fixture-tests.sh`、相关目标测试与 `scripts/module-exit-gate.sh`
+  通过，并由全新纯复审会话确认 P0/P1=0 后 Economy 才可标 🏁。
+- Repair note: 2026-06-13 repair session implemented G4.1 fact-write policy gates,
+  shared-care empty/source-recycled no-op handling, Calendar/reminder pet completion no-op,
+  QuickCare command-boundary recycled-object no-op, and function-level
+  `reward-direct-care-discipline` allowlist. Passing validation: targeted simulator
+  suites, `scripts/dev-check-changed.sh`, `scripts/audit-economy-boundaries.sh --all`,
+  `scripts/tests/run-audit-fixture-tests.sh`, and `git diff --check`. `scripts/module-exit-gate.sh`
+  passed changed checks/localization but its full unit step was blocked by local
+  CoreSimulatorService `connection refused` after targeted simulator suites had passed;
+  rerun module gate when CoreSimulator is available, then open a fresh pure re-review
+  before closing this TFU / marking Economy 🏁.
+
 ### TFU-20260613-011 - Repair post-chokepoint Economy P1 findings
 
 - Status: Done

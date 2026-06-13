@@ -38,6 +38,7 @@ enum CalendarTaskCompletionSyncService {
     }
 
     @MainActor
+    @discardableResult
     static func syncPetTask(
         event: Event,
         occurrenceDate: Date,
@@ -48,18 +49,25 @@ enum CalendarTaskCompletionSyncService {
         operationDate: Date = Date(),
         sourceReminderId: String? = nil,
         careLedger providedCareLedger: CareLedgerRecording? = nil
-    ) {
+    ) -> Bool {
         let careLedger = providedCareLedger ?? CareLedgerService()
         guard event.relatedEntityType == EntityKind.pet.rawValue || event.relatedEntityType == "pet",
-              let pet = pets.first(where: { $0.id.uuidString == event.relatedEntityId }) else { return }
+              let pet = pets.first(where: { $0.id.uuidString == event.relatedEntityId }) else { return false }
 
         if !isCompleted {
             deleteCalendarGeneratedRecords(event: event, occurrenceDate: occurrenceDate, context: context)
-            return
+            return true
         }
-        guard calendarLedgerEntries(event: event, occurrenceDate: occurrenceDate, context: context).isEmpty else { return }
-
         let occurredAt = occurrenceTimestamp(for: event, occurrenceDate: occurrenceDate)
+        let disposition = CareFactWritePolicy.disposition(
+            pet: pet,
+            date: occurredAt,
+            executorId: executorId,
+            context: context
+        )
+        guard disposition.writesFact else { return false }
+        guard calendarLedgerEntries(event: event, occurrenceDate: occurrenceDate, context: context).isEmpty else { return true }
+
         if let careType = careType(for: event) {
             insertCareLog(
                 pet: pet,
@@ -71,7 +79,8 @@ enum CalendarTaskCompletionSyncService {
                 executorId: executorId,
                 sourceReminderId: sourceReminderId,
                 context: context,
-                careLedger: careLedger
+                careLedger: careLedger,
+                disposition: disposition
             )
         } else if let pottyType = pottyType(for: event) {
             insertPottyLog(
@@ -84,7 +93,8 @@ enum CalendarTaskCompletionSyncService {
                 executorId: executorId,
                 sourceReminderId: sourceReminderId,
                 context: context,
-                careLedger: careLedger
+                careLedger: careLedger,
+                disposition: disposition
             )
         } else if let hygieneType = hygieneType(for: event) {
             insertHygieneLog(
@@ -97,14 +107,31 @@ enum CalendarTaskCompletionSyncService {
                 executorId: executorId,
                 sourceReminderId: sourceReminderId,
                 context: context,
-                careLedger: careLedger
+                careLedger: careLedger,
+                disposition: disposition
             )
         }
+        return true
     }
 
     static func isPetTask(event: Event) -> Bool {
         guard event.relatedEntityType == EntityKind.pet.rawValue || event.relatedEntityType == "pet" else { return false }
         return careType(for: event) != nil || pottyType(for: event) != nil || hygieneType(for: event) != nil
+    }
+
+    @MainActor
+    static func canWritePetTaskFact(event: Event, occurrenceDate: Date, pets: [Pet], context: ModelContext, executorId: String?) -> Bool {
+        guard isPetTask(event: event),
+              let pet = pets.first(where: { $0.id.uuidString == event.relatedEntityId }) else {
+            return false
+        }
+        let occurredAt = occurrenceTimestamp(for: event, occurrenceDate: occurrenceDate)
+        return CareFactWritePolicy.disposition(
+            pet: pet,
+            date: occurredAt,
+            executorId: executorId,
+            context: context
+        ).writesFact
     }
 
     @MainActor
@@ -118,7 +145,8 @@ enum CalendarTaskCompletionSyncService {
         executorId: String?,
         sourceReminderId: String?,
         context: ModelContext,
-        careLedger: CareLedgerRecording
+        careLedger: CareLedgerRecording,
+        disposition: CareFactWriteDisposition
     ) {
         let amountGrams = careType == .feeding ? feedAmount(from: event, fallback: pet.dailyPortionGrams) : 0
         let amountMl = careType == .watering ? 250.0 : 0
@@ -135,6 +163,7 @@ enum CalendarTaskCompletionSyncService {
         context.insert(log)
         CloudSyncMutationRecorder.markModified(log, context: context, modifiedAt: occurredAt)
         context.safeSave()
+        guard disposition.allowsDerivedEffects else { return }
         let rewardTrace = awardGeneratedCare(
             action: rewardAction(for: careType, pet: pet),
             pet: pet,
@@ -175,12 +204,14 @@ enum CalendarTaskCompletionSyncService {
         executorId: String?,
         sourceReminderId: String?,
         context: ModelContext,
-        careLedger: CareLedgerRecording
+        careLedger: CareLedgerRecording,
+        disposition: CareFactWriteDisposition
     ) {
         let log = PetPottyLog(date: occurredAt, type: pottyType, pet: pet, executorId: executorId)
         context.insert(log)
         CloudSyncMutationRecorder.markModified(log, context: context, modifiedAt: occurredAt)
         context.safeSave()
+        guard disposition.allowsDerivedEffects else { return }
         let rewardTrace = awardGeneratedCare(
             action: .potty(isLitter: false),
             pet: pet,
@@ -219,12 +250,14 @@ enum CalendarTaskCompletionSyncService {
         executorId: String?,
         sourceReminderId: String?,
         context: ModelContext,
-        careLedger: CareLedgerRecording
+        careLedger: CareLedgerRecording,
+        disposition: CareFactWriteDisposition
     ) {
         let log = PetHygieneLog(date: occurredAt, type: hygieneType, pet: pet, executorId: executorId)
         context.insert(log)
         CloudSyncMutationRecorder.markModified(log, context: context, modifiedAt: occurredAt)
         context.safeSave()
+        guard disposition.allowsDerivedEffects else { return }
         let rewardTrace = awardGeneratedCare(
             action: .care(type: hygieneType),
             pet: pet,

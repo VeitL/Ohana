@@ -71,14 +71,11 @@ struct QuickPlayCommandExecutor {
         rewardTitle: String,
         date: Date = Date()
     ) -> QuickPlayCommandResult? {
-        guard let pet = fetchPet(id: petID), !pet.hasPassedAway else {
-            revisions.publish(
-                DomainMutationResult(
-                    command: .quickCare(entityID: petID, action: CareType.play.rawValue),
-                    affectedEntityIDs: [petID],
-                    wroteBusinessFact: false,
-                    note: "quickPlay.missingPet"
-                )
+        guard let pet = fetchPet(id: petID), EconomyWalletWritePolicy.canWrite(pet) else {
+            AppPerformanceMonitor.shared.record(
+                "domain_command_noop",
+                valueMS: 0,
+                note: "quickPlay.missingPet"
             )
             return nil
         }

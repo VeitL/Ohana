@@ -286,6 +286,21 @@ enum CalendarEventCommandService {
     ) -> CalendarEventCompletionResult {
         let reminderCompletion = providedReminderCompletion ?? ReminderCompletionService()
         let shouldComplete = !event.isOccurrenceMarkedComplete(on: occurrenceDate)
+        if shouldComplete,
+           CalendarTaskCompletionSyncService.isPetTask(event: event),
+           !CalendarTaskCompletionSyncService.canWritePetTaskFact(
+               event: event,
+               occurrenceDate: occurrenceDate,
+               pets: pets,
+               context: context,
+               executorId: executorId
+           ) {
+            return CalendarEventCompletionResult(
+                eventID: event.id,
+                isCompleted: event.recurrenceDays <= 0 ? event.isCompleted : event.isOccurrenceMarkedComplete(on: occurrenceDate),
+                syncedReminderCount: 0
+            )
+        }
         event.setOccurrenceMarkedComplete(shouldComplete, on: occurrenceDate)
         if event.recurrenceDays <= 0 {
             event.isCompleted = shouldComplete

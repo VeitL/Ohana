@@ -328,26 +328,58 @@ def scan_direct_reward_chokepoint(path: pathlib.Path, lines: list[str], warnings
             )
 
 
-def direct_care_discipline_allowed(path: str) -> bool:
-    allowed_exact = {
-        "Ohana/Domain/Services/CareEventRecording.swift",
-        "Ohana/Domain/Services/CalendarTaskCompletionSyncService.swift",
-        "Ohana/Domain/Services/PetMedicationDoseLogging.swift",
-        "Ohana/Features/DashboardRecords/DashboardRecordCommands.swift",
-        "Ohana/Features/Health/PetHealthCommands.swift",
-        "Ohana/Features/Walks/PetWalkingManager.swift",
-    }
-    return path in allowed_exact
+ALLOWED_CARE_DISCIPLINE_CONTEXTS: dict[str, set[str]] = {
+    "Ohana/Domain/Services/CareEventRecording.swift": {
+        "awardCareAction",
+        "awardSharedCareAction",
+    },
+    "Ohana/Domain/Services/CalendarTaskCompletionSyncService.swift": {
+        "awardGeneratedCare",
+    },
+    "Ohana/Domain/Services/PetMedicationDoseLogging.swift": {
+        "recordDose",
+    },
+    "Ohana/Features/DashboardRecords/DashboardRecordCommands.swift": {
+        "recordPetWeight",
+    },
+    "Ohana/Features/Health/PetHealthCommands.swift": {
+        "recordHealth",
+    },
+    "Ohana/Features/Walks/PetWalkingManager.swift": {
+        "stop",
+    },
+}
+
+
+FUNC_SIGNATURE_RE = re.compile(
+    r"^\s*(?:(?:private|fileprivate|internal|public|open|static|class|mutating|nonisolated)\s+)*func\s+([A-Za-z_][A-Za-z0-9_]*)\s*\("
+)
+
+
+def enclosing_function_name(lines: list[str], index: int) -> str | None:
+    for cursor in range(index, -1, -1):
+        match = FUNC_SIGNATURE_RE.search(lines[cursor])
+        if match:
+            return match.group(1)
+    return None
+
+
+def direct_care_discipline_allowed(path: str, lines: list[str], index: int) -> bool:
+    allowed_functions = ALLOWED_CARE_DISCIPLINE_CONTEXTS.get(path)
+    if not allowed_functions:
+        return False
+    function_name = enclosing_function_name(lines, index)
+    return function_name in allowed_functions
 
 
 def scan_direct_care_discipline_chokepoint(path: pathlib.Path, lines: list[str], warnings: list[WarningItem]) -> None:
     path_str = rel(path)
-    if direct_care_discipline_allowed(path_str):
-        return
     for idx, line in enumerate(lines, start=1):
         if allowed_line(line):
             continue
         if DIRECT_CARE_DISCIPLINE_CALL_RE.search(line):
+            if direct_care_discipline_allowed(path_str, lines, idx - 1):
+                continue
             add(
                 warnings,
                 "reward-direct-care-discipline",
