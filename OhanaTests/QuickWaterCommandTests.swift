@@ -245,6 +245,81 @@ struct QuickWaterCommandTests {
         #expect(center.lastMutation == nil)
     }
 
+    @Test func quickWaterExecutorNoopsForRecycledExecutorDisposition() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let center = ReadModelRevisionCenter()
+        let pet = Pet(name: "Momo", species: "猫")
+        let executorHuman = Human(name: "Former caretaker")
+        executorHuman.trashedAt = date(year: 2026, month: 6, day: 1, hour: 9)
+        context.insert(pet)
+        context.insert(executorHuman)
+        try context.save()
+        let executor = QuickWaterCommandExecutor(
+            context: context,
+            activeHumanSelection: UserDefaultsActiveHumanSelection(),
+            careEvents: CareEventService(),
+            userNotifications: SharedUserNotificationManager(),
+            reminderScheduling: ReminderSchedulingManager(),
+            revisions: SharedDomainRevisionPublisher(center: center)
+        )
+
+        let result = executor.recordWater(
+            pet: pet,
+            targets: [pet],
+            amountMl: 120,
+            executorId: executorHuman.id.uuidString
+        )
+
+        #expect(result.coconutDelta == 0)
+        #expect(result.targetCount == 0)
+        #expect(try context.fetch(FetchDescriptor<PetCareLog>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<CareLedgerEvent>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<CoconutLedgerEntry>()).isEmpty)
+        #expect(center.homeRevision.value == 0)
+        #expect(center.lastMutation == nil)
+    }
+
+    @Test func quickWaterChangeNoopsDerivedPlanForRecycledExecutorDisposition() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let center = ReadModelRevisionCenter()
+        let pet = Pet(name: "Momo", species: "鱼")
+        let executorHuman = Human(name: "Former caretaker")
+        executorHuman.trashedAt = date(year: 2026, month: 6, day: 1, hour: 9)
+        context.insert(pet)
+        context.insert(executorHuman)
+        try context.save()
+        defer { clearWaterDefaults(for: pet) }
+        let executor = QuickWaterCommandExecutor(
+            context: context,
+            activeHumanSelection: UserDefaultsActiveHumanSelection(),
+            careEvents: CareEventService(),
+            userNotifications: SharedUserNotificationManager(),
+            reminderScheduling: ReminderSchedulingManager(),
+            revisions: SharedDomainRevisionPublisher(center: center)
+        )
+
+        let reminders = executor.recordWaterChange(
+            pet: pet,
+            targets: [pet],
+            allEvents: [],
+            intervalDays: 7,
+            reminderOn: true,
+            cycleAnchor: date(year: 2026, month: 6, day: 1),
+            executorId: executorHuman.id.uuidString
+        )
+
+        #expect(reminders.isEmpty)
+        #expect(try context.fetch(FetchDescriptor<PetCareLog>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<Event>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<Reminder>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<CareLedgerEvent>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<CoconutLedgerEntry>()).isEmpty)
+        #expect(center.homeRevision.value == 0)
+        #expect(center.lastMutation == nil)
+    }
+
     @Test func plannedWaterCatchUpWithinSixHoursDoesNotAwardCoconuts() throws {
         let container = try makeContainer()
         let context = container.mainContext
