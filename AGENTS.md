@@ -70,7 +70,8 @@ Rules in this file and `docs/` are enforced mechanically, not only by memory.
 - `audits`: audit self-tests first (`scripts/tests/run-audit-fixture-tests.sh`
   proves every audit rule still fires and that scan scope has not collapsed),
   then direct strict whole-repo UI V4, accessibility, and smoothness audits,
-  whole-repo strict runtime guardrails and architecture boundaries,
+  whole-repo strict runtime guardrails and architecture boundaries, ratcheted
+  recurring-findings audits for economy boundaries and derived-state lifecycle,
   localization coverage, release data-safety, governance manifests, resource
   integrity / xattr pre-sign checks, git size, and a gitleaks secret scan
   (`.gitleaks.toml`).

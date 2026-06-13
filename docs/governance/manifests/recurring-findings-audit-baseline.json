@@ -1,0 +1,108 @@
+{
+  "audits": {
+    "derived-state-lifecycle": {
+      "command": "scripts/audit-derived-state-lifecycle.sh --all",
+      "rules": {
+        "derived-state-lifecycle-checklist": {
+          "files": {
+            "Ohana/App/AppResetService.swift": 1,
+            "Ohana/App/AppServices.swift": 1,
+            "Ohana/Domain/Services/CalendarTaskCompletionSyncService.swift": 1,
+            "Ohana/Domain/Services/CloudSyncEntityRegistry.swift": 1,
+            "Ohana/Domain/Services/DataBackupDTOs.swift": 1,
+            "Ohana/Domain/Services/DataBackupManager+Encode.swift": 1,
+            "Ohana/Domain/Services/PetActivityRecordCleanupService.swift": 1,
+            "Ohana/Features/CatCare/CatCareCommands.swift": 1,
+            "Ohana/Features/DashboardRecords/DashboardRecordCommands.swift": 1,
+            "Ohana/Features/Documents/PetDocumentCommands.swift": 1,
+            "Ohana/Features/Economy/CoconutEconomyPolicyV2.swift": 1,
+            "Ohana/Features/Economy/CoconutExchangeManaging.swift": 1,
+            "Ohana/Features/FamilyTasks/FamilyCollaborationCommandExecutor.swift": 1,
+            "Ohana/Features/FamilyTasks/FamilyTaskManaging.swift": 1,
+            "Ohana/Features/Feeding/FeedCommandFetch.swift": 1,
+            "Ohana/Features/Feeding/FeedStockSupport.swift": 1,
+            "Ohana/Features/Feeding/IslandFoodDashboardDataContainer.swift": 1,
+            "Ohana/Features/Health/PetHealthActiveState.swift": 1,
+            "Ohana/Features/HumanHealth/HumanHealthCommands.swift": 1,
+            "Ohana/Features/Insurance/InsuranceCommands.swift": 1,
+            "Ohana/Features/Medication/MedicationCommands.swift": 1,
+            "Ohana/Features/Members/HumanDetailSheetRouteContainer.swift": 1,
+            "Ohana/Features/Members/MemberDeletionCommands.swift": 1,
+            "Ohana/Features/Members/PetDetailSheetRouteContainer.swift": 1,
+            "Ohana/Features/Milestones/PetMilestoneCommands.swift": 1,
+            "Ohana/Features/Oasis/OasisUpgradeRewardService+Opening.swift": 1,
+            "Ohana/Features/PetCare/PetCareCommands.swift": 1,
+            "Ohana/Features/PhotoAlbum/PetPhotoAlbumCommands.swift": 1,
+            "Ohana/Features/QuickCare/QuickCareRouteContainer.swift": 1,
+            "Ohana/Features/Settings/Views/SettingsView.swift": 1,
+            "Ohana/Features/Shop/ShopPurchaseRecordStore.swift": 1,
+            "Ohana/Features/Walks/WalkFeaturePolicy.swift": 1,
+            "Ohana/Features/Walks/WalkRouteContainer.swift": 1,
+            "Ohana/Features/Walks/WalkTrackingSupport.swift": 1,
+            "Ohana/Features/Wishlist/HumanWishlistCommands.swift": 1,
+            "Ohana/Features/Workouts/WorkoutCommands.swift": 1,
+            "Ohana/Models/HeatCycleLog.swift": 1,
+            "Ohana/Models/PetCareLog.swift": 1,
+            "Ohana/Models/PetExpenseLog.swift": 1,
+            "Ohana/Models/PetFoodRecord.swift": 1,
+            "Ohana/Models/PetHealthLog.swift": 1,
+            "Ohana/Models/PetHygieneLog.swift": 1,
+            "Ohana/Models/PetMedication.swift": 1,
+            "Ohana/Models/PetMilestone.swift": 1,
+            "Ohana/Models/PetPhotoLog.swift": 1,
+            "Ohana/Models/PetPottyLog.swift": 1,
+            "Ohana/Models/PetWalkLog.swift": 1,
+            "Ohana/Models/PetWeightLog.swift": 1,
+            "Ohana/Models/RecycleBinBatch.swift": 1,
+            "Ohana/Models/SymptomLog.swift": 1
+          },
+          "totalWarnings": 50
+        },
+        "physical-delete-without-tombstone": {
+          "files": {
+            "Ohana/App/AppResetService.swift": 1,
+            "Ohana/Domain/Services/CalendarTaskCompletionSyncService.swift": 1,
+            "Ohana/Domain/Services/CarePlanCalendarSync.swift": 1,
+            "Ohana/Features/Calendar/CalendarCommands.swift": 1,
+            "Ohana/Features/CatCare/CatCareCommands.swift": 1,
+            "Ohana/Features/Economy/CoconutEconomyPolicyV2.swift": 1,
+            "Ohana/Features/FamilyTasks/FamilyCollaborationCommandExecutor.swift": 1,
+            "Ohana/Features/FamilyTasks/FamilyTaskCommands.swift": 1,
+            "Ohana/Features/FamilyTasks/FamilyTaskManaging.swift": 1,
+            "Ohana/Features/FamilyTasks/FamilyTaskService.swift": 1,
+            "Ohana/Features/Hygiene/Views/PetHygieneDetailView.swift": 1,
+            "Ohana/Features/Notifications/ReminderSchedulingService.swift": 1,
+            "Ohana/Features/Oasis/OasisUpgradeRewardService+Opening.swift": 1,
+            "Ohana/Features/QuickCare/WaterManagementSupport.swift": 1,
+            "Ohana/Shared/Components/SwipeableEventRow.swift": 1
+          },
+          "totalWarnings": 15
+        }
+      },
+      "totalWarnings": 65
+    },
+    "economy-boundaries": {
+      "command": "scripts/audit-economy-boundaries.sh --all",
+      "rules": {
+        "reward-actor-boundary": {
+          "files": {
+            "Ohana/Features/DashboardRecords/DashboardRecordCommands.swift": 1,
+            "Ohana/Features/Economy/RewardEconomyCommands.swift": 1,
+            "Ohana/Features/Expenses/ExpenseCommands.swift": 1,
+            "Ohana/Features/Health/PetHealthCommands.swift": 1,
+            "Ohana/Features/Milestones/PetMilestoneCommands.swift": 1
+          },
+          "totalWarnings": 5
+        }
+      },
+      "totalWarnings": 5
+    }
+  },
+  "description": "Ratchet baseline for recurring adversarial-review findings. Stored counts are accepted debt; new or increased file/rule counts fail the audits.",
+  "policyDocuments": [
+    "AGENTS.md",
+    "docs/planning/recurring-findings-audit-spec.md"
+  ],
+  "schema": "ohana.governance.recurring-findings-audit-baseline.v1",
+  "updated": "2026-06-13"
+}

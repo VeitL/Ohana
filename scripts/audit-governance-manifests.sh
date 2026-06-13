@@ -31,6 +31,7 @@ REQUIRED_FILES = [
     "runtime-energy-ownership.json",
     "release-resource-ownership.json",
     "full-scope-audit-baseline.json",
+    "recurring-findings-audit-baseline.json",
 ]
 
 failures: list[str] = []
@@ -182,6 +183,53 @@ if full_scope:
         fail(f"{where} must define audits.")
     else:
         for audit_name in ("ui-v4", "accessibility", "smoothness"):
+            audit = audits.get(audit_name)
+            if not isinstance(audit, dict):
+                fail(f"{where} missing audit: {audit_name}")
+                continue
+            require_text(audit, "command", f"{where} {audit_name}")
+            total = audit.get("totalWarnings")
+            if not isinstance(total, int) or total < 0:
+                fail(f"{where} {audit_name} must define non-negative totalWarnings.")
+            rules = audit.get("rules")
+            if not isinstance(rules, dict):
+                fail(f"{where} {audit_name} must define rules.")
+                continue
+            rule_total = 0
+            for rule_id, rule_data in rules.items():
+                if not isinstance(rule_data, dict):
+                    fail(f"{where} {audit_name}.{rule_id} must be an object.")
+                    continue
+                files = rule_data.get("files")
+                if not isinstance(files, dict):
+                    fail(f"{where} {audit_name}.{rule_id} must define files.")
+                    continue
+                file_total = 0
+                for path, count in files.items():
+                    if not isinstance(path, str) or not path.endswith(".swift"):
+                        fail(f"{where} {audit_name}.{rule_id} has invalid path: {path}")
+                    if not isinstance(count, int) or count < 0:
+                        fail(f"{where} {audit_name}.{rule_id} has invalid count for {path}.")
+                    else:
+                        file_total += count
+                declared = rule_data.get("totalWarnings")
+                if not isinstance(declared, int) or declared != file_total:
+                    fail(
+                        f"{where} {audit_name}.{rule_id} totalWarnings must equal "
+                        f"sum(files): {declared} != {file_total}"
+                    )
+                rule_total += file_total
+            if isinstance(total, int) and total != rule_total:
+                fail(f"{where} {audit_name} totalWarnings must equal rule totals: {total} != {rule_total}")
+
+recurring = manifests.get("recurring-findings-audit-baseline.json", {})
+if recurring:
+    where = "recurring findings audit baseline"
+    audits = recurring.get("audits")
+    if not isinstance(audits, dict):
+        fail(f"{where} must define audits.")
+    else:
+        for audit_name in ("economy-boundaries", "derived-state-lifecycle"):
             audit = audits.get(audit_name)
             if not isinstance(audit, dict):
                 fail(f"{where} missing audit: {audit_name}")

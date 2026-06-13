@@ -115,10 +115,20 @@ assert_bad scripts/audit-shared-care-note-metadata.sh "$fixtures/SharedCareNoteM
   shared-care-note-metadata
 assert_good scripts/audit-shared-care-note-metadata.sh "$fixtures/SharedCareNoteMetadataGood.swift"
 
+assert_bad scripts/audit-economy-boundaries.sh "$fixtures/RecurringEconomyBoundariesBad.swift" \
+  coconut-balance-direct-write reward-actor-boundary view-soft-gate-without-service-hard-gate
+assert_good scripts/audit-economy-boundaries.sh "$fixtures/RecurringEconomyBoundariesGood.swift"
+
+assert_bad scripts/audit-derived-state-lifecycle.sh "$fixtures/DerivedStateLifecycleBad.swift" \
+  derived-state-lifecycle-checklist physical-delete-without-tombstone
+assert_good scripts/audit-derived-state-lifecycle.sh "$fixtures/DerivedStateLifecycleGood.swift"
+
 assert_scope_floor scripts/audit-ui-v4.sh
 assert_scope_floor scripts/audit-accessibility.sh
 assert_scope_floor scripts/audit-smoothness-risk.sh
 assert_scope_floor scripts/audit-runtime-guardrails.sh
+assert_scope_floor scripts/audit-economy-boundaries.sh
+assert_scope_floor scripts/audit-derived-state-lifecycle.sh
 
 echo
 if [[ "$failures" -gt 0 ]]; then

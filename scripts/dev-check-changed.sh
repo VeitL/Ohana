@@ -187,6 +187,8 @@ if [[ ${#app_swift_files[@]} -gt 0 ]]; then
   run "Smoothness audit for touched app Swift" scripts/audit-smoothness-risk.sh ${audit_mode[@]+"${audit_mode[@]}"} "${app_swift_files[@]}"
   run "Runtime guardrails for touched app Swift" scripts/audit-runtime-guardrails.sh ${audit_mode[@]+"${audit_mode[@]}"} "${app_swift_files[@]}"
   run "Shared-care note metadata audit for touched app Swift" scripts/audit-shared-care-note-metadata.sh ${audit_mode[@]+"${audit_mode[@]}"} "${app_swift_files[@]}"
+  run "Economy boundaries audit for touched app Swift" scripts/audit-economy-boundaries.sh ${audit_mode[@]+"${audit_mode[@]}"} "${app_swift_files[@]}"
+  run "Derived-state lifecycle audit for touched app Swift" scripts/audit-derived-state-lifecycle.sh ${audit_mode[@]+"${audit_mode[@]}"} "${app_swift_files[@]}"
 fi
 
 if [[ ${#build_reasons[@]} -gt 0 ]]; then

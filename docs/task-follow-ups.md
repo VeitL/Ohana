@@ -25,6 +25,29 @@ actionable; long-term product ideas belong in planning docs instead.
 
 ## Open Items
 
+### TFU-20260613-009 - Burn down recurring-findings audit baseline debt
+
+- Status: Open
+- Priority: P1
+- Area: Governance / Economy Boundaries / Derived State Lifecycle
+- Source task: Recurring findings audit mechanization, 2026-06-13
+- Blocker: `docs/governance/manifests/recurring-findings-audit-baseline.json`
+  intentionally registers existing full-repo recurring-findings debt so the new
+  audits can enter CI without blocking unrelated work. Current baseline:
+  `economy-boundaries` has 5 `reward-actor-boundary` warnings across 5 files;
+  `derived-state-lifecycle` has 65 warnings across 58 files
+  (`derived-state-lifecycle-checklist`: 50,
+  `physical-delete-without-tombstone`: 15). The ratchet blocks new or increased
+  debt but does not by itself fix the existing files.
+- Next step: During Economy, RecycleBin, and Phase 7 module repair/review rounds,
+  resolve the owned baseline warnings as real behavior fixes or approved local
+  exceptions, then refresh the baseline downward with the matching audit command
+  only after review.
+- Close when: Both `scripts/audit-economy-boundaries.sh --all` and
+  `scripts/audit-derived-state-lifecycle.sh --all` pass with a zero baseline, or
+  every remaining warning has an explicit approved allow comment and the
+  manifest records no unowned recurring-findings debt.
+
 ### TFU-20260613-008 - Green architecture boundary audit or refresh ratchet baseline
 
 - Status: Done
