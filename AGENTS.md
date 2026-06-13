@@ -78,7 +78,14 @@ Rules in this file and `docs/` are enforced mechanically, not only by memory.
   tool versions pinned via `scripts/ci-tool-versions.env` and
   `scripts/check-tool-versions.sh`. SwiftLint runs with `--strict`, and
   SwiftFormat runs as a required lint gate.
-- `build-test`: `xcodebuild test` on the `iPhone 17` simulator (by name).
+- `build-test`: `xcodebuild test` on the `iPhone 17` simulator (by name). This
+  per-push gate runs the **unit suite only** — `OhanaUITests` is skipped
+  (`-skip-testing:OhanaUITests`) because the current UI tests are Xcode template
+  stubs with ~zero coverage and a high cold-runner cost. The local
+  `scripts/module-exit-gate.sh` still runs the full plan; do not assume CI
+  covers UI flows until real UITests + a nightly job exist. Build intermediates
+  are cached (`actions/cache` on `DerivedData/Build`) and logs use `-quiet`
+  instead of an `xcbeautify` brew install; the raw `.xcresult` is uploaded.
 
 Treat a red CI as a blocking failure. Do not merge around it. When you add a new
 rule, prefer encoding it as a lint rule, audit script check, or test so it is
@@ -87,16 +94,25 @@ enforced automatically rather than as prose — and add a bad/good fixture pair 
 requires a runner whose Xcode ships the iOS 26 SDK and an iPhone 17 simulator;
 see `docs/os-support-matrix.md`.
 
-CI is a remote release gate, not a heartbeat. Do not push solely to trigger
-GitHub Actions while a local task is still in progress, after every checkpoint
-commit, or after documentation-only bookkeeping that can be batched. Prefer
-local gates first, then push once at a natural handoff: module exit, CI-fix
-verification, PR/phase boundary, release candidate, or a batched group of small
-independent modules. After pushing, inspect the newest run once and record the
-URL/result; do not keep `gh run watch` running after a known tracked external
-blocker has already failed. If CI is already red for a documented external
-blocker, do not generate extra runs until either that blocker is being repaired
-or a meaningful new batch is ready to verify.
+CI push cadence (solo-developer reality). The governing fact: SwiftLint
+`--strict`, SwiftFormat, and the whole-repo audits run **only in CI** — the
+default local gate does not run them. So completed work that has not reached CI
+is work whose lint/format/audit gates have not actually run. Therefore **push
+every completed work-item promptly** (module exit, CI-fix verification, a GAP
+item, a fix batch) and keep going — do not wait on the run. The hard bound:
+**`main` must not lead `origin` by more than one completed work-item or one
+working day.** A larger backlog means those CI-only gates are dormant and a
+later red bisects across many commits — the exact failure the reconciliation log
+flagged twice (9 and 14 commits ahead). This is a solo project: CI minutes,
+notification noise, and contending for shared runners are not real costs here,
+so the old "batch to a natural handoff / don't push per checkpoint" guidance is
+retired — it manufactured the backlog it warned against.
+
+"Not a heartbeat" is now narrow and still holds: do not push a broken or
+mid-task tree just to watch Actions run, and do not re-trigger a run for a
+**known, already-tracked red external blocker** (record the run URL + TFU and
+stop until that blocker enters a repair round). After any push, inspect the
+newest run once and record the URL/result; do not keep `gh run watch` looping.
 
 UI/accessibility/smoothness are full-repo strict gates. CI runs
 `scripts/audit-ui-v4.sh --all`, `scripts/audit-accessibility.sh --all`, and

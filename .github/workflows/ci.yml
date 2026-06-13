@@ -108,6 +108,19 @@ jobs:
   # a newer macos image or a self-hosted runner — do NOT mark this job optional
   # and learn to ignore it. A required check that cannot go green is a gate in
   # name only. See docs/os-support-matrix.md.
+  #
+  # Speed notes (this job is the wall-clock long pole):
+  #   - UITests are skipped here (-skip-testing:OhanaUITests). The local
+  #     module-exit-gate runs the full plan; the per-push CI gate is the unit
+  #     suite. The current OhanaUITests are Xcode template stubs (launch +
+  #     measure() perf) with ~zero regression value and a high time cost on a
+  #     cold runner. Flesh them into real flows + a nightly job before relying
+  #     on CI for UI coverage.
+  #   - Build intermediates are cached across runs (no SPM deps, so the cache
+  #     target is just DerivedData/Build). Exact-key miss on every source change
+  #     is expected; restore-keys give the latest partial cache for incremental.
+  #   - xcbeautify (a brew install ~1min) is dropped in favor of `-quiet`;
+  #     errors still print, and the raw xcresult is uploaded as an artifact.
   # ----------------------------------------------------------------------------
   build-test:
     runs-on: macos-15
@@ -117,8 +130,13 @@ jobs:
       - uses: actions/checkout@v4
       - name: Select latest Xcode
         run: sudo xcode-select -s "$(ls -d /Applications/Xcode_*.app | sort -V | tail -1)"
-      - name: Install xcbeautify
-        run: brew install xcbeautify
+      - name: Cache build intermediates
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/DerivedData/Build
+          key: deriveddata-${{ runner.os }}-${{ hashFiles('**/*.swift', 'Ohana.xcodeproj/project.pbxproj') }}
+          restore-keys: |
+            deriveddata-${{ runner.os }}-
       - name: Show toolchain
         run: |
           xcodebuild -version
@@ -128,7 +146,6 @@ jobs:
           }
       - name: Build & test
         run: |
-          set -o pipefail
           xcodebuild test \
             -project Ohana.xcodeproj \
             -scheme Ohana \
@@ -137,7 +154,9 @@ jobs:
             -destination 'platform=iOS Simulator,name=iPhone 17' \
             -derivedDataPath "$RUNNER_TEMP/DerivedData" \
             -resultBundlePath "$RUNNER_TEMP/TestResults.xcresult" \
-            CODE_SIGNING_ALLOWED=NO | xcbeautify
+            -skip-testing:OhanaUITests \
+            -quiet \
+            CODE_SIGNING_ALLOWED=NO
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@v4
