@@ -79,9 +79,9 @@ Rules in this file and `docs/` are enforced mechanically, not only by memory.
   `scripts/check-tool-versions.sh`. SwiftLint runs with `--strict`, and
   SwiftFormat runs as a required lint gate.
 - `build-test`: `xcodebuild test` on the `iPhone 17` simulator (by name). This
-  per-push gate runs the **unit suite only** — `OhanaUITests` is skipped
-  (`-skip-testing:OhanaUITests`) because the current UI tests are Xcode template
-  stubs with ~zero coverage and a high cold-runner cost. The local
+  per-push gate runs the **unit suite only** (`-only-testing:OhanaTests`)
+  because the current UI tests are Xcode template stubs with ~zero coverage and
+  a high cold-runner cost. The local
   `scripts/module-exit-gate.sh` still runs the full plan; do not assume CI
   covers UI flows until real UITests + a nightly job exist. Build intermediates
   are cached (`actions/cache` on `DerivedData/Build`) and logs use `-quiet`

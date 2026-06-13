@@ -110,9 +110,9 @@ jobs:
   # name only. See docs/os-support-matrix.md.
   #
   # Speed notes (this job is the wall-clock long pole):
-  #   - UITests are skipped here (-skip-testing:OhanaUITests). The local
-  #     module-exit-gate runs the full plan; the per-push CI gate is the unit
-  #     suite. The current OhanaUITests are Xcode template stubs (launch +
+  #   - Only the unit test bundle runs here (-only-testing:OhanaTests). The
+  #     local module-exit-gate runs the full plan; the per-push CI gate is the
+  #     unit suite. The current OhanaUITests are Xcode template stubs (launch +
   #     measure() perf) with ~zero regression value and a high time cost on a
   #     cold runner. Flesh them into real flows + a nightly job before relying
   #     on CI for UI coverage.
@@ -154,7 +154,7 @@ jobs:
             -destination 'platform=iOS Simulator,name=iPhone 17' \
             -derivedDataPath "$RUNNER_TEMP/DerivedData" \
             -resultBundlePath "$RUNNER_TEMP/TestResults.xcresult" \
-            -skip-testing:OhanaUITests \
+            -only-testing:OhanaTests \
             -quiet \
             CODE_SIGNING_ALLOWED=NO
       - name: Upload test results
