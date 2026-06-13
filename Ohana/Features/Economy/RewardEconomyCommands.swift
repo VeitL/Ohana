@@ -194,7 +194,6 @@ struct BackdateCheckInCommandResult: Equatable {
     var totalCoconuts: Int { humanGot + petGot }
     var didAward: Bool { totalCoconuts > 0 }
 }
-
 enum BackdateCheckInCommandService {
     @discardableResult
     @MainActor
