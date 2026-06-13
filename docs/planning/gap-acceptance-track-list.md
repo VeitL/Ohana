@@ -24,7 +24,7 @@
 | Phase 6 Oasis | 🟢 | `87423afd8` | Oasis 当前主人钱包门、预算 / 冷却、休眠态救援、UI/a11y/smoothness/runtime 审计、Oasis 窄测试与 `scripts/module-exit-gate.sh` 均通过 | 待真实 UI 抽查 |
 | Phase 6 Settings + Health | 🟢 | `5d4e71928` | Debug-only 设置开发工具、真实通知开关策略、Health 删除/回收/schema V70/read-only 不变量、目标测试与 `scripts/module-exit-gate.sh` 均通过 | 待 Release 真机 / 真实 UI 抽查 |
 | Phase 6 Economy | 🟢 | `662852a01` | 兑换入口首发门禁、冻结钱包写入拒绝、特殊奖励 active human 归属、隐私 / 冻结财富口径、目标测试与 `scripts/module-exit-gate.sh` 均通过 | 待真实 UI 抽查 |
-| Phase 7 Walks | 🟢 | `本次提交` | `WalkFeaturePolicy` active dog 硬门、回收/离世过滤、遛狗中便便事实+ledger、共享遛狗服务适配器、Walks 目标测试与 `scripts/module-exit-gate.sh` 均通过 | 待真机定位 / 真实 UI 抽查 |
+| Phase 7 Walks | 🟢 | `e0c1d69d3` | `WalkFeaturePolicy` active dog 硬门、回收/离世过滤、遛狗中便便事实+ledger、共享遛狗服务适配器、Walks 目标测试与 `scripts/module-exit-gate.sh` 均通过 | 待真机定位 / 真实 UI 抽查 |
 
 ## GAP-1 联机功能门
 
@@ -416,7 +416,7 @@
 
 人工验收目标：遛狗只服务活跃狗狗；回收 / 离世对象不再进入启动、统计、详情和首页卡片；真实定位、权限与后台表现符合“只有遛狗中才定位”的边界。
 
-自动验收已完成（2026-06-13，门禁 commit `本次提交`）：`WalkFeaturePolicy` 作为 Walks active dog/lifecycle 统一判定点；非狗、已离世、回收宠物无法启动遛狗；共享遛狗目标只保留活跃狗狗；首页卡、总结页、详情页和 banner 统计不读取回收 walk / poop marker；遛狗中标记便便会先写 `PetPottyLog` 与 `CareLedgerEvent`，再走奖励管线；共享遛狗静态调用已收进基础设施适配器；`scripts/dev-check-changed.sh` 与 `scripts/module-exit-gate.sh` 均通过。未改 schema / CloudKit / 启动路径。
+自动验收已完成（2026-06-13，门禁 commit `e0c1d69d3`）：`WalkFeaturePolicy` 作为 Walks active dog/lifecycle 统一判定点；非狗、已离世、回收宠物无法启动遛狗；共享遛狗目标只保留活跃狗狗；首页卡、总结页、详情页和 banner 统计不读取回收 walk / poop marker；遛狗中标记便便会先写 `PetPottyLog` 与 `CareLedgerEvent`，再走奖励管线；共享遛狗静态调用已收进基础设施适配器；`scripts/dev-check-changed.sh` 与 `scripts/module-exit-gate.sh` 均通过。未改 schema / CloudKit / 启动路径。
 
 - [ ] 在真实 UI 中分别准备狗、猫/其他非狗、已离世狗、回收站中的狗，遍历首页卡片、全功能菜单、宠物详情和 Walks 入口。
   - 预期：只有活跃狗狗可看到并进入开始遛狗；非狗、已离世、回收宠物没有可达 active Walks 入口，深层返回也不会开始定位。
