@@ -37,6 +37,13 @@ actionable; long-term product ideas belong in planning docs instead.
   are `@Query` outside route/data containers, `NotificationCenter` string bus,
   View-to-static service calls, oversized Swift file ratchet breaches, and
   static service calls outside approved adapter/facade/backfill boundaries.
+  Reconfirmed on run `27463715466` after the Phase 7 Gacha+Shop and process/CI
+  commits: `build-test` and `lint` are green; `audits` still stops at
+  architecture boundaries. New/worsened signals to fold into the repair round
+  include `CoconutShopView+Commands.swift` calling
+  `ShopPurchaseFulfillmentService` statically from a View extension, plus
+  ratchet growth in Gacha/CloudSync/backup/schema files touched by the
+  Gacha+Shop round.
 - Next step: Run a separate architecture-audit green/baseline repair round.
   Decide per failure whether to move code behind approved boundaries or refresh
   a deliberate ratchet baseline, with focused commits and no TFU-006/007 scope
