@@ -243,6 +243,13 @@ final class QuestManager {
         Self.defaults.set(dict, forKey: Keys.cooldownLogs)
     }
 
+    func clearCooldown(petId: UUID?, type: OhanaActionType) {
+        let key = cooldownKey(petId: petId, type: type)
+        var dict = Self.defaults.dictionary(forKey: Keys.cooldownLogs) ?? [:]
+        dict.removeValue(forKey: key)
+        Self.defaults.set(dict, forKey: Keys.cooldownLogs)
+    }
+
     func walkDailyRewardKey(humanId: String, date: Date = Date()) -> String {
         let formatter = DateFormatter()
         formatter.calendar = Calendar(identifier: .gregorian)

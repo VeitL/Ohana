@@ -237,6 +237,23 @@ enum ReminderActionCoordinator {
             return .completed
         }
 
+        if let event = reminder.event,
+           CalendarTaskCompletionSyncService.isPetTask(event: event) {
+            guard let pet = pet(for: event, context: context) else {
+                return .missingPet
+            }
+            if !event.isOccurrenceMarkedComplete(on: reminder.scheduledAt) {
+                CalendarTaskCompletionSyncService.syncPetTask(
+                    event: event,
+                    occurrenceDate: reminder.scheduledAt,
+                    isCompleted: true,
+                    pets: [pet],
+                    context: context,
+                    executorId: executorId,
+                    sourceReminderId: reminder.id.uuidString
+                )
+            }
+        }
         reminderCompletion.complete(reminder, by: executorId, context: context)
         return .completed
     }

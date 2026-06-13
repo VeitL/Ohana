@@ -242,16 +242,6 @@ enum RecycleBinService {
             .map { item(kind: .petHealthLog, id: $0.id, title: $0.note.isEmpty ? $0.type : $0.note, subtitle: $0.pet?.name ?? "", source: $0) }
         items.append(contentsOf: petHealthLogs)
 
-        let symptomLogs: [RecycleBinListItem] = trashed(SymptomLog.self, context: context)
-            .filter(\.trashBatchId.isEmpty)
-            .map { item(kind: .symptomLog, id: $0.id, title: $0.symptomName.isEmpty ? $0.categoryRaw : $0.symptomName, subtitle: $0.pet?.name ?? "", source: $0) }
-        items.append(contentsOf: symptomLogs)
-
-        let heatCycleLogs: [RecycleBinListItem] = trashed(HeatCycleLog.self, context: context)
-            .filter(\.trashBatchId.isEmpty)
-            .map { item(kind: .heatCycleLog, id: $0.id, title: $0.statusRaw, subtitle: $0.pet?.name ?? "", source: $0) }
-        items.append(contentsOf: heatCycleLogs)
-
         return items
     }
 

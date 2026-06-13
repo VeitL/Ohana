@@ -42,6 +42,20 @@ enum CarePlanCalendarSync {
         return fetchOrLog(d, context: context, operation: "fetch existing event").first
     }
 
+    private static func tombstoneAndDelete(_ event: Event, context: ModelContext, deletedAt: Date = Date()) {
+        for reminder in event.reminders {
+            tombstoneAndDelete(reminder, context: context, deletedAt: deletedAt)
+        }
+        CloudSyncMutationRecorder.markDeleted(event, context: context, deletedAt: deletedAt)
+        context.delete(event)
+    }
+
+    private static func tombstoneAndDelete(_ reminder: Reminder, context: ModelContext, deletedAt: Date = Date()) {
+        OhanaNotifications.current.cancel(notificationId: reminder.notificationId)
+        CloudSyncMutationRecorder.markDeleted(reminder, context: context, deletedAt: deletedAt)
+        context.delete(reminder)
+    }
+
     static func removeCalendarPlan(kind: String, petKey: String, context: ModelContext) {
         let key = eventStorageKey(kind: kind, petKey: petKey)
         guard let idStr = UserDefaults.standard.string(forKey: key),
@@ -50,7 +64,7 @@ enum CarePlanCalendarSync {
             UserDefaults.standard.removeObject(forKey: key)
             return
         }
-        context.delete(ev)
+        tombstoneAndDelete(ev, context: context)
         UserDefaults.standard.removeObject(forKey: key)
         context.safeSave()
     }
@@ -233,7 +247,7 @@ enum CarePlanCalendarSync {
         let events = fetchOrLog(descriptor, context: context, operation: "fetch legacy default plan events")
         var didDelete = false
         for event in events where titles.contains(event.title) {
-            context.delete(event)
+            tombstoneAndDelete(event, context: context)
             didDelete = true
         }
         if didDelete {
@@ -330,7 +344,7 @@ enum CarePlanCalendarSync {
                 reminder.completedAt = nil
                 reminder.completedBy = ""
                 for extra in ev.reminders.dropFirst() {
-                    context.delete(extra)
+                    tombstoneAndDelete(extra, context: context)
                 }
             } else {
                 context.insert(Reminder(event: ev, scheduledAt: reminderDate))

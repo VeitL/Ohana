@@ -436,7 +436,8 @@ enum PetHealthDeleteCommandService {
         let recordID = log.id
         let deletedAt = Date()
         deleteLedgerEvents(modelName: "SymptomLog", modelId: recordID, context: context, deletedAt: deletedAt)
-        RecycleBinService.moveToRecycleBin(log, now: deletedAt, context: context)
+        CloudSyncMutationRecorder.markDeleted(log, pet: pet, context: context, deletedAt: deletedAt)
+        context.delete(log)
         context.safeSave()
         return PetHealthDeleteResult(
             subjectID: pet.id,
@@ -456,7 +457,8 @@ enum PetHealthDeleteCommandService {
         let recordID = log.id
         let deletedAt = Date()
         deleteLedgerEvents(modelName: "HeatCycleLog", modelId: recordID, context: context, deletedAt: deletedAt)
-        RecycleBinService.moveToRecycleBin(log, now: deletedAt, context: context)
+        CloudSyncMutationRecorder.markDeleted(log, pet: pet, context: context, deletedAt: deletedAt)
+        context.delete(log)
         context.safeSave()
         return PetHealthDeleteResult(
             subjectID: pet.id,

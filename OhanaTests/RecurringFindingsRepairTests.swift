@@ -251,6 +251,196 @@ struct RecurringFindingsRepairTests {
         #expect(try cloudSyncState(entityName: String(describing: PetHygieneLog.self), id: hygieneLogID, context: context)?.isDeletionTombstone == true)
     }
 
+    @Test func calendarCareCompletionUsesRewardPipelineAndUndoReversesGeneratedFacts() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let now = Date(timeIntervalSince1970: 1_800_000_020)
+        let human = Human(name: "Guan")
+        let pet = Pet(name: "Momo", species: "dog")
+        let event = Event(
+            title: "Feed Momo 42g",
+            startDate: now,
+            eventType: EventType.daily.rawValue,
+            relatedEntityType: EntityKind.pet.rawValue,
+            relatedEntityId: pet.id.uuidString
+        )
+        context.insert(human)
+        context.insert(pet)
+        context.insert(event)
+        try context.save()
+
+        let state = EconomyDefaultsState.capture()
+        defer { state.restore() }
+        prepareEconomyDefaults(
+            activeHumanID: human.id.uuidString,
+            questManager: makeQuestManager(),
+            memberIDs: [human.id.uuidString],
+            petID: pet.id
+        )
+
+        let completed = CalendarEventCommandService.toggleCompletion(
+            event: event,
+            occurrenceDate: now,
+            pets: [pet],
+            context: context,
+            executorId: human.id.uuidString,
+            now: now
+        )
+
+        let careLog = try #require(try context.fetch(FetchDescriptor<PetCareLog>()).first)
+        let careLedger = try #require(try context.fetch(FetchDescriptor<CareLedgerEvent>()).first {
+            $0.legacyModelName == String(describing: PetCareLog.self) && $0.legacyModelId == careLog.id.uuidString
+        })
+        let positiveEntries = try context.fetch(FetchDescriptor<CoconutLedgerEntry>()).filter { $0.delta > 0 }
+        let budgetEvents = try context.fetch(FetchDescriptor<EconomyBudgetUsageEvent>()).filter { $0.actionKey == "feed" }
+        #expect(completed.isCompleted)
+        #expect(careLog.pet?.id == pet.id)
+        #expect(careLedger.source == CareLedgerSource.calendar.rawValue)
+        #expect(careLedger.coconutDelta > 0)
+        #expect(positiveEntries.contains { $0.ownerId == human.id.uuidString })
+        #expect(budgetEvents.isEmpty == false)
+
+        let reopened = CalendarEventCommandService.toggleCompletion(
+            event: event,
+            occurrenceDate: now,
+            pets: [pet],
+            context: context,
+            executorId: human.id.uuidString,
+            now: now
+        )
+
+        let allEntries = try context.fetch(FetchDescriptor<CoconutLedgerEntry>())
+        #expect(reopened.isCompleted == false)
+        #expect(try context.fetch(FetchDescriptor<PetCareLog>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<EconomyBudgetUsageEvent>()).filter { $0.actionKey == "feed" }.isEmpty)
+        #expect(allEntries.contains { $0.delta < 0 && $0.metadataJSON.contains("calendarCareUndo") })
+        #expect(try cloudSyncState(entityName: String(describing: PetCareLog.self), id: careLog.id, context: context)?.isDeletionTombstone == true)
+        #expect(try cloudSyncState(entityName: String(describing: CareLedgerEvent.self), id: careLedger.id, context: context)?.isDeletionTombstone == true)
+        for event in budgetEvents {
+            #expect(try cloudSyncState(entityName: String(describing: EconomyBudgetUsageEvent.self), id: event.id, context: context)?.isDeletionTombstone == true)
+        }
+    }
+
+    @Test func notificationCompleteForDailyCareReminderRecordsCareFactAndReward() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let now = Date(timeIntervalSince1970: 1_800_000_030)
+        let human = Human(name: "Guan")
+        let pet = Pet(name: "Momo", species: "dog")
+        let event = Event(
+            title: "Drink water",
+            startDate: now,
+            eventType: EventType.daily.rawValue,
+            relatedEntityType: EntityKind.pet.rawValue,
+            relatedEntityId: pet.id.uuidString
+        )
+        let reminder = Reminder(event: event, scheduledAt: now)
+        context.insert(human)
+        context.insert(pet)
+        context.insert(event)
+        context.insert(reminder)
+        try context.save()
+
+        let state = EconomyDefaultsState.capture()
+        defer { state.restore() }
+        prepareEconomyDefaults(
+            activeHumanID: human.id.uuidString,
+            questManager: makeQuestManager(),
+            memberIDs: [human.id.uuidString],
+            petID: pet.id
+        )
+
+        let result = ReminderActionCoordinator.handle(
+            userInfo: [
+                "action": "COMPLETE",
+                "reminderId": reminder.id.uuidString
+            ],
+            currentActiveHumanId: human.id.uuidString,
+            context: context
+        )
+
+        let careLog = try #require(try context.fetch(FetchDescriptor<PetCareLog>()).first)
+        let positiveEntries = try context.fetch(FetchDescriptor<CoconutLedgerEntry>()).filter { $0.delta > 0 }
+        #expect(result == .completed)
+        #expect(reminder.statusEnum == .completed)
+        #expect(event.isOccurrenceMarkedComplete(on: now))
+        #expect(careLog.careType == .watering)
+        #expect(careLog.pet?.id == pet.id)
+        #expect(positiveEntries.contains { $0.ownerId == human.id.uuidString })
+    }
+
+    @Test func symptomAndHeatDeletesBypassRecycleBinAndWriteTombstones() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let pet = Pet(name: "Momo", species: "dog")
+        let symptom = SymptomLog(
+            date: Date(timeIntervalSince1970: 1_800_000_040),
+            category: .skin,
+            symptomName: "itchy",
+            severity: .mild,
+            pet: pet
+        )
+        let heat = HeatCycleLog(
+            startDate: Date(timeIntervalSince1970: 1_800_000_041),
+            status: .estrus,
+            pet: pet
+        )
+        context.insert(pet)
+        context.insert(symptom)
+        context.insert(heat)
+        try context.save()
+
+        _ = PetHealthDeleteCommandService.deleteSymptomLog(symptom, pet: pet, context: context)
+        _ = PetHealthDeleteCommandService.deleteHeatCycleLog(heat, pet: pet, context: context)
+
+        #expect(try context.fetch(FetchDescriptor<SymptomLog>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<HeatCycleLog>()).isEmpty)
+        #expect(try cloudSyncState(entityName: String(describing: SymptomLog.self), id: symptom.id, context: context)?.isDeletionTombstone == true)
+        #expect(try cloudSyncState(entityName: String(describing: HeatCycleLog.self), id: heat.id, context: context)?.isDeletionTombstone == true)
+    }
+
+    @Test func carePlanAndWaterPlanDeletesTombstoneEvents() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let pet = Pet(name: "Momo", species: "fish")
+        context.insert(pet)
+        try context.save()
+        let start = Date(timeIntervalSince1970: 1_800_000_050)
+
+        CarePlanCalendarSync.syncWaterChangePlan(
+            pet: pet,
+            context: context,
+            intervalDays: 7,
+            enabled: true,
+            cycleAnchor: start
+        )
+        let carePlanEvent = try #require(try context.fetch(FetchDescriptor<Event>()).first)
+        CarePlanCalendarSync.syncWaterChangePlan(
+            pet: pet,
+            context: context,
+            intervalDays: 7,
+            enabled: false,
+            cycleAnchor: start
+        )
+
+        let waterPlanEvent = Event(
+            title: "Momo drink",
+            startDate: start,
+            eventType: EventType.daily.rawValue,
+            relatedEntityType: WaterPlanWriter.entityType,
+            relatedEntityId: pet.id.uuidString
+        )
+        let reminder = Reminder(event: waterPlanEvent, scheduledAt: start)
+        context.insert(waterPlanEvent)
+        context.insert(reminder)
+        try context.save()
+        WaterPlanWriter.deletePlan(pet: pet, allEvents: [waterPlanEvent], context: context)
+
+        #expect(try cloudSyncState(entityName: String(describing: Event.self), id: carePlanEvent.id, context: context)?.isDeletionTombstone == true)
+        #expect(try cloudSyncState(entityName: String(describing: Event.self), id: waterPlanEvent.id, context: context)?.isDeletionTombstone == true)
+        #expect(try cloudSyncState(entityName: String(describing: Reminder.self), id: reminder.id, context: context)?.isDeletionTombstone == true)
+    }
+
     private func makeContainer() throws -> ModelContainer {
         let schema = Schema(ArkSchemaV71.models)
         let config = ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)

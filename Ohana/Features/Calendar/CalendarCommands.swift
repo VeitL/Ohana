@@ -134,282 +134,16 @@ enum EventCompletionCommandService {
         executorId: String? = nil,
         now: Date = Date()
     ) -> EventCompletionRewardResult {
-        guard event.isActionableTask else {
-            return EventCompletionRewardResult(awarded: false, skippedByExistingCare: false, coconutDelta: 0)
-        }
-        guard !hasTodayCareCheckIn(for: event, context: context, now: now) else {
-            return EventCompletionRewardResult(awarded: false, skippedByExistingCare: true, coconutDelta: 0)
-        }
-
-        let occurrenceKey = Event.occurrenceStorageKey(for: occurrenceDate)
-        let transactionKey = "eventReward:\(event.id.uuidString):\(occurrenceKey)"
-        guard !hasExistingCalendarReward(transactionKey: transactionKey, context: context) else {
-            return EventCompletionRewardResult(awarded: false, skippedByExistingCare: false, coconutDelta: 0)
-        }
-
-        let human = currentHuman(id: executorId, context: context)
-        let budgetKeys = calendarBudgetKeys(for: human, fallbackMemberId: executorId, context: context)
-        let budget = EconomyDailyBudgetStore.snapshot(
-            householdKey: budgetKeys.household,
-            memberKey: budgetKeys.member,
-            careObjectCount: CoconutEconomyPolicyV2.careObjectCount(context: context),
-            date: now,
-            context: context
+        _ = (
+            event,
+            occurrenceDate,
+            context,
+            wallet,
+            careLedger,
+            executorId,
+            now
         )
-        let requestedCoconuts = 5
-        let scaledCoconuts = Int(ceil(Double(requestedCoconuts) * budget.budgetStage.coconutMultiplier))
-        let awardedCoconuts = min(scaledCoconuts, budget.remainingFatigueCoconuts)
-        let effectiveStage: EconomyBudgetStage = if budget.budgetStage == .normal, awardedCoconuts < requestedCoconuts {
-            .fatigue
-        } else if budget.budgetStage != .cooldown, awardedCoconuts == 0 {
-            .recordOnly
-        } else {
-            budget.budgetStage
-        }
-        guard awardedCoconuts > 0 else {
-            return EventCompletionRewardResult(awarded: false, skippedByExistingCare: false, coconutDelta: 0)
-        }
-
-        let rewardTitle = event.title + " 完成奖励"
-        let result = EconomyRewardResult(
-            growthXP: 0,
-            humanCoconuts: awardedCoconuts,
-            petCoconuts: 0,
-            bonusCoconuts: 0,
-            luckyCoconuts: 0,
-            budgetMultiplier: budget.budgetStage.coconutMultiplier,
-            budgetStage: effectiveStage,
-            reason: effectiveStage.reason,
-            actionKey: "calendarEventCompletion",
-            isOnCooldown: false,
-            baseGrowthXP: 0,
-            baseCoconuts: min(requestedCoconuts, awardedCoconuts),
-            luck: .none
-        )
-        let metadataJSON = rewardMetadata(result: result, occurrenceKey: occurrenceKey)
-        let delta: CoconutWalletDelta = if let human {
-            .human(
-                human,
-                delta: awardedCoconuts,
-                entryKind: .reward,
-                source: .service,
-                title: rewardTitle,
-                emoji: "🥥",
-                actorId: human.id.uuidString,
-                actorName: human.name,
-                subjectKind: subjectKind(for: event),
-                subjectId: event.relatedEntityId.isEmpty ? nil : event.relatedEntityId,
-                sourceModelName: "CalendarEventCompletionReward",
-                sourceModelId: "\(event.id.uuidString):\(occurrenceKey)",
-                metadataJSON: metadataJSON,
-                occurredAt: now,
-                transactionKey: transactionKey
-            )
-        } else {
-            .system(
-                delta: awardedCoconuts,
-                entryKind: .reward,
-                source: .service,
-                title: rewardTitle,
-                emoji: "🥥",
-                actorId: executorId ?? "system",
-                actorName: nil,
-                sourceModelName: "CalendarEventCompletionReward",
-                sourceModelId: "\(event.id.uuidString):\(occurrenceKey)",
-                metadataJSON: metadataJSON,
-                occurredAt: now,
-                transactionKey: transactionKey
-            )
-        }
-
-        let walletEntries: [CoconutLedgerEntry]
-        do {
-            walletEntries = try wallet.apply(
-                deltas: [delta],
-                context: context,
-                save: false,
-                postsRewardFeedback: true,
-                updatesProjection: true,
-                projectionManager: nil
-            )
-        } catch {
-            AppPerformanceMonitor.shared.record(
-                "calendar.eventCompletion.walletFailed",
-                valueMS: 0,
-                note: error.localizedDescription
-            )
-            return EventCompletionRewardResult(awarded: false, skippedByExistingCare: false, coconutDelta: 0)
-        }
-        let coconutDelta = walletEntries.reduce(0) { $0 + max(0, $1.delta) }
-        careLedger.record(
-            occurredAt: now,
-            actorKind: human == nil ? .unknown : .human,
-            actorId: human?.id.uuidString ?? executorId,
-            subjectKind: subjectKind(for: event),
-            subjectId: event.relatedEntityId.isEmpty ? nil : event.relatedEntityId,
-            eventKind: .coconut,
-            actionType: "eventCompletionReward",
-            amountValue: 0,
-            amountUnit: "",
-            note: event.title,
-            source: .calendar,
-            sourceEventId: event.id.uuidString,
-            sourceReminderId: nil,
-            legacyModelName: nil,
-            legacyModelId: nil,
-            coconutDelta: coconutDelta,
-            rewardLogId: nil,
-            privacyFieldRaw: nil,
-            metadataJSON: metadataJSON,
-            context: context,
-            save: false
-        )
-        EconomyDailyBudgetStore.commit(
-            result,
-            householdKey: budgetKeys.household,
-            memberKey: budgetKeys.member,
-            date: now,
-            context: context,
-            save: false,
-            writeDefaults: false
-        )
-        do {
-            try context.save()
-            EconomyDailyBudgetStore.commit(
-                result,
-                householdKey: budgetKeys.household,
-                memberKey: budgetKeys.member,
-                date: now,
-                context: nil,
-                save: false
-            )
-        } catch {
-            context.rollback()
-            wallet.refreshQuestProjection(context: context)
-            AppPerformanceMonitor.shared.record(
-                "calendar.eventCompletion.saveFailed",
-                valueMS: 0,
-                note: error.localizedDescription
-            )
-            return EventCompletionRewardResult(awarded: false, skippedByExistingCare: false, coconutDelta: 0)
-        }
-        return EventCompletionRewardResult(awarded: coconutDelta > 0, skippedByExistingCare: false, coconutDelta: coconutDelta)
-    }
-
-    @MainActor
-    private static func hasTodayCareCheckIn(for event: Event, context: ModelContext, now: Date) -> Bool {
-        guard event.relatedEntityType == EntityKind.pet.rawValue || event.relatedEntityType == "pet" else { return false }
-        let petId = event.relatedEntityId
-        let text = "\(event.title) \(event.eventType)".lowercased()
-        let isFeeding = text.contains("喂") || text.contains("feed") || text.contains("吃")
-        let isWatering = text.contains("水") || text.contains("喝")
-        let isPotty = text.contains("便") || text.contains("铲") || text.contains("potty")
-        let isWalk = text.contains("遛") || text.contains("散步") || text.contains("巡岛") || text.contains("walk")
-        guard isFeeding || isWatering || isPotty || isWalk else { return false }
-
-        let calendar = Calendar.current
-        let today = calendar.startOfDay(for: now)
-        let tomorrow = calendar.date(byAdding: .day, value: 1, to: today) ?? now
-        if isPotty {
-            let descriptor = FetchDescriptor<PetPottyLog>(
-                predicate: #Predicate { log in
-                    log.date >= today && log.date < tomorrow
-                }
-            )
-            let logs = fetchModelsOrLog(descriptor, context: context, operation: "fetch today potty logs for event completion")
-            return logs.contains { $0.pet?.id.uuidString == petId }
-        }
-        if isWalk {
-            let descriptor = FetchDescriptor<PetWalkLog>(
-                predicate: #Predicate { log in
-                    log.startDate >= today && log.startDate < tomorrow
-                }
-            )
-            let logs = fetchModelsOrLog(descriptor, context: context, operation: "fetch today walk logs for event completion")
-            return logs.contains { $0.pet?.id.uuidString == petId }
-        }
-
-        let careType = isFeeding ? CareType.feeding.rawValue : CareType.watering.rawValue
-        let descriptor = FetchDescriptor<PetCareLog>(
-            predicate: #Predicate { log in
-                log.date >= today && log.date < tomorrow
-            }
-        )
-        let logs = fetchModelsOrLog(descriptor, context: context, operation: "fetch today care logs for event completion")
-        return logs.contains { $0.pet?.id.uuidString == petId && $0.type == careType }
-    }
-
-    private static func subjectKind(for event: Event) -> CareLedgerSubjectKind {
-        switch event.relatedEntityType {
-        case EntityKind.pet.rawValue, "pet":
-            .pet
-        case EntityKind.human.rawValue, "human":
-            .human
-        case EntityKind.plant.rawValue, "plant":
-            .plant
-        default:
-            event.relatedEntityId.isEmpty ? .system : .unknown
-        }
-    }
-
-    @MainActor
-    private static func hasExistingCalendarReward(transactionKey: String, context: ModelContext) -> Bool {
-        var descriptor = FetchDescriptor<CoconutLedgerEntry>(
-            predicate: #Predicate<CoconutLedgerEntry> { $0.transactionKey == transactionKey }
-        )
-        descriptor.fetchLimit = 1
-        return fetchModelsOrLog(descriptor, context: context, operation: "fetch existing calendar reward").isEmpty == false
-    }
-
-    @MainActor
-    private static func currentHuman(id: String?, context: ModelContext) -> Human? {
-        guard let id, let uuid = UUID(uuidString: id) else { return nil }
-        var descriptor = FetchDescriptor<Human>(
-            predicate: #Predicate<Human> { $0.id == uuid }
-        )
-        descriptor.fetchLimit = 1
-        return fetchModelsOrLog(descriptor, context: context, operation: "fetch calendar reward executor").first
-    }
-
-    @MainActor
-    private static func fetchModelsOrLog<T: PersistentModel>(
-        _ descriptor: FetchDescriptor<T>,
-        context: ModelContext,
-        operation: String
-    ) -> [T] {
-        do {
-            return try context.fetch(descriptor)
-        } catch {
-            OhanaLog.warning(
-                "EventCompletionCommandService failed to \(operation): \(error.localizedDescription)",
-                category: "Calendar"
-            )
-            return []
-        }
-    }
-
-    private static func calendarBudgetKeys(
-        for human: Human?,
-        fallbackMemberId: String?,
-        context: ModelContext
-    ) -> (household: String, member: String) {
-        (
-            CoconutEconomyPolicyV2.householdBudgetKey(context: context),
-            human?.id.uuidString ?? fallbackMemberId ?? CoconutEconomyPolicyV2.currentUserKey()
-        )
-    }
-
-    private static func rewardMetadata(result: EconomyRewardResult, occurrenceKey: String) -> String {
-        guard let data = result.metadataJSON.data(using: .utf8),
-              var object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-            return "{\"occurrence\":\"\(occurrenceKey)\"}"
-        }
-        object["occurrence"] = occurrenceKey
-        guard let mergedData = try? JSONSerialization.data(withJSONObject: object, options: [.sortedKeys]),
-              let json = String(data: mergedData, encoding: .utf8) else {
-            return result.metadataJSON
-        }
-        return json
+        return EventCompletionRewardResult(awarded: false, skippedByExistingCare: false, coconutDelta: 0)
     }
 }
 
@@ -476,14 +210,16 @@ struct EventCompletionCommandExecutor {
             executorId: executorId,
             now: now
         )
-        revisions.publish(
-            DomainMutationResult(
-                command: .todayFocus(entityID: event.id, action: "eventCompleteReward"),
-                affectedEntityIDs: [event.id],
-                wroteBusinessFact: result.awarded,
-                note: note
+        if result.awarded {
+            revisions.publish(
+                DomainMutationResult(
+                    command: .todayFocus(entityID: event.id, action: "eventCompleteReward"),
+                    affectedEntityIDs: [event.id],
+                    wroteBusinessFact: true,
+                    note: note
+                )
             )
-        )
+        }
         return result
     }
 }
@@ -551,6 +287,9 @@ enum CalendarEventCommandService {
         let reminderCompletion = providedReminderCompletion ?? ReminderCompletionService()
         let shouldComplete = !event.isOccurrenceMarkedComplete(on: occurrenceDate)
         event.setOccurrenceMarkedComplete(shouldComplete, on: occurrenceDate)
+        if event.recurrenceDays <= 0 {
+            event.isCompleted = shouldComplete
+        }
         CalendarTaskCompletionSyncService.syncPetTask(
             event: event,
             occurrenceDate: occurrenceDate,

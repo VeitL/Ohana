@@ -578,7 +578,7 @@ private final class DenseFixtureTodayFocusManager: TodayFocusManaging {
         false
     }
 
-    func completeEvent(_ event: Event, on _: Date, context _: ModelContext) -> TodayFocusEventCompletionCommandResult {
+    func completeEvent(_ event: Event, on _: Date, context _: ModelContext, executorId _: String?) -> TodayFocusEventCompletionCommandResult {
         TodayFocusEventCompletionCommandResult(eventID: event.id, isCompleted: true, didChange: true)
     }
 

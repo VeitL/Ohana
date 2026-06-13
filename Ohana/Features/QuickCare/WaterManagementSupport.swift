@@ -273,6 +273,7 @@ enum WaterPlanWriter {
             for reminder in pendingReminders {
                 OhanaNotifications.current.cancel(notificationId: reminder.notificationId)
                 if reminder.scheduledAt > now {
+                    CloudSyncMutationRecorder.markDeleted(reminder, context: context)
                     context.delete(reminder)
                     didChange = true
                 }
@@ -318,8 +319,10 @@ enum WaterPlanWriter {
     private static func deleteEvent(_ event: Event, context: ModelContext) {
         for reminder in event.reminders {
             OhanaNotifications.current.cancel(notificationId: reminder.notificationId)
+            CloudSyncMutationRecorder.markDeleted(reminder, context: context)
             context.delete(reminder)
         }
+        CloudSyncMutationRecorder.markDeleted(event, context: context)
         context.delete(event)
     }
 

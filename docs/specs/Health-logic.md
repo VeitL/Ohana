@@ -27,7 +27,7 @@ Deleting a `PetHealthLog` deletes or tombstones the whole derived chain created 
 - linked `Reminder` and any pending local notification;
 - linked `CareLedgerEvent` rows for the health and expense facts.
 
-Deleting `SymptomLog` or `HeatCycleLog` follows the same Health rule: normal pages hide it immediately, ledger rows for that legacy model are removed, and the model has recycle/tombstone fields so backup/recycle/sync metadata can preserve deletion state.
+Deleting `SymptomLog` or `HeatCycleLog` follows Product Foundation D16's single-high-frequency-fact rule: the record does not appear in the recycle-bin UI. The command writes CloudSync tombstones for the source record and related ledger rows, then physically deletes the local record after confirmation.
 
 ## Active Read Model Rule
 
@@ -42,10 +42,12 @@ Memorial/history presentation may still show historical active records, but it m
 
 ## Schema
 
-This module bumps the current SwiftData schema from `ArkSchemaV69` to `ArkSchemaV70` by adding lightweight recycle fields to:
+This module bumped the SwiftData schema from `ArkSchemaV69` to `ArkSchemaV70` by adding lightweight recycle fields to:
 
 - `SymptomLog`
 - `HeatCycleLog`
+
+Those fields are kept for backup / migration compatibility, but active product deletion semantics for `SymptomLog` and `HeatCycleLog` are direct delete + tombstone, not recycle-bin retention. `PetHealthLog` remains a recoverable medical / vaccine archive.
 
 `ArkMigrationPlan.stages` remains empty because the change is add-only with defaults.
 
@@ -58,4 +60,3 @@ Health user-facing copy must go through `L10n.tr`, `AppLocalizedText`, or existi
 - No CloudKit enablement.
 - No medical diagnosis logic beyond existing alert heuristics.
 - No cross-module redesign of Medication, Calendar, or Memorial beyond enforcing Health write/read invariants at their Health entry points.
-

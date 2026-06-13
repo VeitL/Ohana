@@ -96,6 +96,7 @@ enum FeedingPlanWriter {
             for reminder in pendingReminders {
                 OhanaNotifications.current.cancel(notificationId: reminder.notificationId)
                 if reminder.scheduledAt > now {
+                    CloudSyncMutationRecorder.markDeleted(reminder, context: context)
                     context.delete(reminder)
                     didChange = true
                 }
@@ -370,6 +371,7 @@ enum FeedingPlanWriter {
         CloudSyncMutationRecorder.markDeleted(event, context: context)
         for reminder in event.reminders {
             OhanaNotifications.current.cancel(notificationId: reminder.notificationId)
+            CloudSyncMutationRecorder.markDeleted(reminder, context: context)
             context.delete(reminder)
         }
         context.delete(event)

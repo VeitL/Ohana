@@ -1564,6 +1564,8 @@ struct HomeCommandExecutorTests {
         context.insert(heat)
         try context.save()
 
+        let symptomID = symptom.id
+        let heatID = heat.id
         let deletedHealth = PetHealthDeleteCommandService.deleteHealthLog(health, pet: pet, context: context)
         let deletedSymptom = PetHealthDeleteCommandService.deleteSymptomLog(symptom, pet: pet, context: context)
         let deletedHeat = PetHealthDeleteCommandService.deleteHeatCycleLog(heat, pet: pet, context: context)
@@ -1575,8 +1577,10 @@ struct HomeCommandExecutorTests {
         #expect(symptomLogs.activeRecycleBinItems.isEmpty)
         #expect(heatLogs.activeRecycleBinItems.isEmpty)
         #expect(healthLogs.first?.trashedAt != nil)
-        #expect(symptomLogs.first?.trashedAt != nil)
-        #expect(heatLogs.first?.trashedAt != nil)
+        #expect(symptomLogs.isEmpty)
+        #expect(heatLogs.isEmpty)
+        #expect(try cloudSyncState(entityName: String(describing: SymptomLog.self), id: symptomID, context: context)?.isDeletionTombstone == true)
+        #expect(try cloudSyncState(entityName: String(describing: HeatCycleLog.self), id: heatID, context: context)?.isDeletionTombstone == true)
         #expect(deletedHealth.subjectID == pet.id)
         #expect(deletedHealth.kind == "health")
         #expect(deletedSymptom.subjectID == pet.id)
@@ -4471,7 +4475,7 @@ struct HomeCommandExecutorTests {
     }
 
     @MainActor
-    @Test func eventCompletionRewardSkipsWhenCareAlreadyLoggedToday() throws {
+    @Test func eventCompletionRewardServiceIsNoOpForCareTask() throws {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
         let now = Date(timeIntervalSince1970: 1_800_000_000)
@@ -4501,12 +4505,13 @@ struct HomeCommandExecutorTests {
 
         let ledgerEvents = try context.fetch(FetchDescriptor<CareLedgerEvent>())
         #expect(result.awarded == false)
-        #expect(result.skippedByExistingCare == true)
+        #expect(result.skippedByExistingCare == false)
+        #expect(result.coconutDelta == 0)
         #expect(ledgerEvents.isEmpty)
     }
 
     @MainActor
-    @Test func eventCompletionRewardWritesLedgerForGeneralTask() throws {
+    @Test func eventCompletionRewardServiceIsNoOpForGeneralTask() throws {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
         let now = Date(timeIntervalSince1970: 1_800_000_000)
@@ -4535,15 +4540,15 @@ struct HomeCommandExecutorTests {
         )
 
         let ledgerEvents = try context.fetch(FetchDescriptor<CareLedgerEvent>())
-        #expect(result.awarded == true)
-        #expect(ledgerEvents.count == 1)
-        #expect(ledgerEvents.first?.eventKind == CareLedgerEventKind.coconut.rawValue)
-        #expect(ledgerEvents.first?.actionType == "eventCompletionReward")
-        #expect(ledgerEvents.first?.sourceEventId == event.id.uuidString)
+        let walletEntries = try context.fetch(FetchDescriptor<CoconutLedgerEntry>())
+        #expect(result.awarded == false)
+        #expect(result.coconutDelta == 0)
+        #expect(ledgerEvents.isEmpty)
+        #expect(walletEntries.isEmpty)
     }
 
     @MainActor
-    @Test func eventCompletionRewardIsIdempotentPerOccurrence() throws {
+    @Test func eventCompletionRewardServiceStaysNoOpOnReplay() throws {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
         let now = Date(timeIntervalSince1970: 1_800_000_000)
@@ -4584,16 +4589,16 @@ struct HomeCommandExecutorTests {
 
         let walletEntries = try context.fetch(FetchDescriptor<CoconutLedgerEntry>())
         let budgetEvents = try context.fetch(FetchDescriptor<EconomyBudgetUsageEvent>())
-        #expect(first.coconutDelta == 5)
+        #expect(first.coconutDelta == 0)
+        #expect(first.awarded == false)
         #expect(replay.awarded == false)
-        #expect(human.coconutBalance == 5)
-        #expect(walletEntries.count == 1)
-        #expect(walletEntries.first?.transactionKey == "eventReward:\(event.id.uuidString):\(Event.occurrenceStorageKey(for: now))")
-        #expect(budgetEvents.count { $0.actionKey == "calendarEventCompletion" } == 2)
+        #expect(human.coconutBalance == 0)
+        #expect(walletEntries.isEmpty)
+        #expect(budgetEvents.count { $0.actionKey == "calendarEventCompletion" } == 0)
     }
 
     @MainActor
-    @Test func eventCompletionRewardConsumesRemainingDailyBudget() throws {
+    @Test func eventCompletionRewardServiceDoesNotConsumeDailyBudget() throws {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
         let now = Date(timeIntervalSince1970: 1_800_000_000)
@@ -4644,15 +4649,15 @@ struct HomeCommandExecutorTests {
             now: now
         )
 
-        #expect(result.coconutDelta == 2)
-        #expect(human.coconutBalance == 2)
-        let rewardEntry = try #require(try context.fetch(FetchDescriptor<CoconutLedgerEntry>()).first)
-        #expect(rewardEntry.delta == 2)
-        #expect(rewardEntry.metadataJSON.contains("\"budgetStage\":\"fatigue\""))
+        #expect(result.awarded == false)
+        #expect(result.coconutDelta == 0)
+        #expect(human.coconutBalance == 0)
+        let rewardEntries = try context.fetch(FetchDescriptor<CoconutLedgerEntry>())
+        #expect(rewardEntries.isEmpty)
     }
 
     @MainActor
-    @Test func eventCompletionCommandExecutorPublishesRewardRevision() throws {
+    @Test func eventCompletionCommandExecutorDoesNotPublishForNoOpReward() throws {
         let revisionCenter = ReadModelRevisionCenter()
         let container = try makeInMemoryContainer()
         let context = container.mainContext
@@ -4679,14 +4684,10 @@ struct HomeCommandExecutorTests {
             now: now,
             note: "test.eventCompletion.reward"
         )
-        let mutation = try #require(revisionCenter.lastMutation)
 
-        #expect(result.awarded)
-        #expect(mutation.command == .todayFocus(entityID: event.id, action: "eventCompleteReward"))
-        #expect(mutation.affectedEntityIDs == [event.id])
-        #expect(mutation.wroteBusinessFact)
-        #expect(mutation.note == "test.eventCompletion.reward")
-        #expect(revisionCenter.homeRevision.value == beforeRevision + 1)
+        #expect(result.awarded == false)
+        #expect(revisionCenter.lastMutation == nil)
+        #expect(revisionCenter.homeRevision.value == beforeRevision)
     }
 
     @MainActor
@@ -7878,6 +7879,12 @@ struct HomeCommandExecutorTests {
 
     private func makeDate(year: Int, month: Int, day: Int) -> Date {
         Calendar(identifier: .gregorian).date(from: DateComponents(year: year, month: month, day: day)) ?? .distantPast
+    }
+
+    private func cloudSyncState(entityName: String, id: UUID, context: ModelContext) throws -> CloudSyncRecordState? {
+        try context.fetch(FetchDescriptor<CloudSyncRecordState>()).first {
+            $0.entityName == entityName && $0.localRecordId == CloudSyncRecordState.normalizedRecordId(id)
+        }
     }
 
     private func makeDate(year: Int, month: Int, day: Int, hour: Int, minute: Int) -> Date {

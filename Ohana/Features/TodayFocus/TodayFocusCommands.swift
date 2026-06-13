@@ -20,21 +20,51 @@ enum TodayFocusCommandService {
     static func completeEvent(
         _ event: Event,
         on date: Date,
-        context: ModelContext
+        context: ModelContext,
+        executorId: String? = nil
     ) -> TodayFocusEventCompletionCommandResult {
         let wasOccurrenceComplete = event.isOccurrenceMarkedComplete(on: date)
         let wasCompleted = event.isCompleted
 
-        event.setOccurrenceMarkedComplete(true, on: date)
-        if event.recurrenceDays <= 0 {
-            event.isCompleted = true
+        if !wasOccurrenceComplete {
+            let pet = pet(for: event, context: context)
+            if CalendarTaskCompletionSyncService.isPetTask(event: event), pet == nil {
+                return TodayFocusEventCompletionCommandResult(
+                    eventID: event.id,
+                    isCompleted: wasCompleted,
+                    didChange: false
+                )
+            }
+            CalendarEventCommandService.toggleCompletion(
+                event: event,
+                occurrenceDate: date,
+                pets: pet.map { [$0] } ?? [],
+                context: context,
+                executorId: executorId
+            )
         }
-        context.safeSave()
 
         return TodayFocusEventCompletionCommandResult(
             eventID: event.id,
             isCompleted: event.recurrenceDays <= 0 ? event.isCompleted : event.isOccurrenceMarkedComplete(on: date),
             didChange: !wasOccurrenceComplete || wasCompleted != event.isCompleted
         )
+    }
+
+    @MainActor
+    private static func pet(for event: Event, context: ModelContext) -> Pet? {
+        guard event.relatedEntityType == EntityKind.pet.rawValue || event.relatedEntityType == "pet",
+              let petId = UUID(uuidString: event.relatedEntityId) else { return nil }
+        var descriptor = FetchDescriptor<Pet>(predicate: #Predicate<Pet> { $0.id == petId })
+        descriptor.fetchLimit = 1
+        do {
+            return try context.fetch(descriptor).first
+        } catch {
+            OhanaLog.warning(
+                "TodayFocusCommandService failed to fetch completion pet: \(error.localizedDescription)",
+                category: "TodayFocus"
+            )
+            return nil
+        }
     }
 }

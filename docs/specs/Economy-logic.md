@@ -25,6 +25,8 @@
 - FamilyTasks 悬赏功能首发由 `OnlineFeatureGate` 隐藏；未来解锁前，悬赏确认必须复用 Economy 钱包写入边界。悬赏转账失败时不得把任务标为完成，不得留下 payer / receiver 钱包流水或照护账本事件。
 - Economy 首发可见 UI、奖励反馈、钱包流水标题与时间文案必须走已注册语言 fallback；Debug / Preview / 内部测试文案不作为本轮首发阻塞。
 - 财富页使用 Economy screen snapshot / read model 聚合，SwiftUI 视图不直接在 body 中重放账本或扫描成员模型；后续若大数据仍卡顿，再继续拆后台 snapshot store。
+- Calendar / Today Focus / 通知中的宠物照护任务完成不是独立经济活动；它必须等价进入照护事实 + `QuestManager.awardAction` 预算 / 冷却管线。普通非照护日程完成不得凭空产生椰子。
+- 撤销一个已经完成的 Calendar 照护 occurrence 是纠错操作：必须撤销该 occurrence 生成的照护事实、照护账本、钱包奖励与预算占用；钱包以反向冲销流水表达，不物理删除历史奖励流水。
 
 ## 业务不变量
 
@@ -49,6 +51,8 @@
 - ECO-019：商店购买以全岛未冻结人类钱包作为可支配池；买家优先出资，其他人类钱包只补差额并记录各自支出流水。任何一笔出资失败时必须回滚整笔购买。
 - ECO-020：FamilyTasks 悬赏确认是钱包转账事实边界。若 payer 余额不足、钱包冻结、转账重复键冲突或持久化失败，确认命令必须返回失败并保持任务待审核；不得吞错后展示完成态，也不得落下半笔钱包 / ledger 事实。
 - ECO-021：任何新增奖励入口必须能被 `scripts/audit-economy-boundaries.sh --all` 证明没有散落的 actor 归属缺口；若入口没有明确 executor，必须在规则书记录产品理由和 fallback owner。
+- ECO-022：Calendar / Today Focus / 通知完成宠物照护任务时，奖励归属、预算、冷却与钱包写入必须与同类型 QuickCare 照护动作等价；不得再使用单独的“Calendar 完成奖励”小管线。
+- ECO-023：取消完成 Calendar 照护 occurrence 时，必须按 occurrence 幂等撤销该次生成的奖励和预算占用；钱包用 `refund` / reversal 流水冲销，预算使用事件写删除 tombstone 后移除。
 
 ## 当前代码来源
 
@@ -63,6 +67,7 @@
 - 奖励反馈 UI 通过 `CoconutRewardFeedbackOverlay` 展示事件标题：`Ohana/Features/TodayFocus/Views/CheckInRewardFeedback.swift:89`。
 - 普通照护记录先用用户选择的 `date` 写照护事实，再调用经济奖励入口；奖励入口默认以当前操作时间做预算 / 冷却裁决：`Ohana/Domain/Services/CareEventService.swift:82`、`Ohana/Domain/Services/CareEventRecording.swift:567`、`Ohana/Features/Economy/QuestManager+Awards.swift:17`。
 - 预算使用事件的 `dayKey` 来自经济奖励裁决日期，`createdAt` 保留真实写入时间：`Ohana/Features/Economy/CoconutEconomyPolicyV2.swift:653`。
+- Calendar / Today Focus / 通知完成宠物照护任务统一经 `CalendarTaskCompletionSyncService` 生成照护事实，再进入 `QuestManager.awardAction`；旧 `EventCompletionCommandService.awardCompletionIfEligible` 仅保留兼容 no-op，不得直接写钱包 / ledger / 预算事件。
 - 首发兑换入口由 `CoconutExchangeFeatureGate` 统一关闭；Shop、Home read model、Today Focus snapshot 与 `CoconutExchangeService` 写命令均必须读取同一判定点。
 - 奖励 owner 解析由 `EconomyRewardOwnerResolver` 统一：`Ohana/Features/Economy/EconomyRewardOwnerResolver.swift`。
 - 体重、宠物花费、宠物健康、补签、手动宠物里程碑等奖励入口均由各自 command/service 将 owner 传入 `QuestManager.awardAction`，并由 `OhanaTests/RecurringFindingsRepairTests.swift` 覆盖 executor 不回落 active human。

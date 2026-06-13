@@ -398,8 +398,8 @@ struct HomeCommandExecutor {
         recordMedicationDose(medication: medication, pet: pet)
     }
 
-    func completeTodayFocusEvent(_ event: Event, on date: Date = Date()) {
-        let result = todayFocus.completeEvent(event, on: date, context: modelContext)
+    func completeTodayFocusEvent(_ event: Event, on date: Date = Date(), executorId: String? = nil) {
+        let result = todayFocus.completeEvent(event, on: date, context: modelContext, executorId: resolvedExecutorId(executorId))
         publishMutation(
             .todayFocus(entityID: result.eventID, action: "eventComplete"),
             affected: [result.eventID],
@@ -407,7 +407,7 @@ struct HomeCommandExecutor {
         )
     }
 
-    func completeTodayFocusEvent(eventID: UUID, on date: Date = Date()) {
+    func completeTodayFocusEvent(eventID: UUID, on date: Date = Date(), executorId: String? = nil) {
         guard let event = fetchEvent(id: eventID) else {
             publishNoop(
                 .todayFocus(entityID: eventID, action: "eventComplete"),
@@ -415,7 +415,15 @@ struct HomeCommandExecutor {
             )
             return
         }
-        completeTodayFocusEvent(event, on: date)
+        completeTodayFocusEvent(event, on: date, executorId: executorId)
+    }
+
+    private func resolvedExecutorId(_ explicit: String?) -> String? {
+        if let explicit, !explicit.isEmpty {
+            return explicit
+        }
+        let stored = UserDefaults.standard.string(forKey: "currentActiveHumanId") ?? ""
+        return stored.isEmpty ? nil : stored
     }
 
     func recordPlantCare(_ type: PlantCareType, plant: Plant, executorId: String?) {

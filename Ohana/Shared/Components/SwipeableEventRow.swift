@@ -21,17 +21,13 @@ struct SwipeableEventRow: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(AppServices.self) private var appServices
     @AppStorage(AppPerformanceMode.powerSavingKey) private var powerSavingMode = false
-    @AppStorage("currentActiveHumanId") private var activeHumanIdRaw = ""
 
-    @StateObject private var commandQueue = DeferredDomainCommandQueue()
     @State private var offsetX: CGFloat = 0
     @State private var isTriggerred = false
     @State private var showDeleteConfirmAlert = false
     @State private var celebrationParticles: [CelebrationParticle] = []
     @AppStorage("shop_equip_fx_stars") private var equipFxStars: Bool = false
-    @State private var coconutFloats: [CoconutFloat] = []
     @State private var showDetail = false
-    @State private var showSkipReason = false
     @State private var activeDragAxis: DragAxis? = nil
 
     // Overdue emphasis stays static in list geometry; rows must not drift while the user scans.
@@ -67,12 +63,6 @@ struct SwipeableEventRow: View {
         return event.startDate
     }
 
-    private struct CoconutFloat: Identifiable {
-        let id = UUID()
-        var offsetY: CGFloat = 0
-        var opacity: Double = 1.0
-    }
-
     var body: some View {
         ZStack {
             // 完成粒子层
@@ -83,16 +73,6 @@ struct SwipeableEventRow: View {
                     .transition(.asymmetric(insertion: .scale(scale: 0.1).combined(with: .opacity), removal: .opacity))
             }
             .animation(GoMotion.feedback, value: celebrationParticles.count)
-
-            // 椰子浮字
-            ForEach(coconutFloats) { f in
-                Text("+5🥥")
-                    .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
-                    .foregroundStyle(Color.goPrimary)
-                    .offset(y: f.offsetY)
-                    .opacity(f.opacity)
-                    .allowsHitTesting(false)
-            }
 
             // 左滑背景（完成，仅行动任务才可完成）
             if offsetX < 0, event.isActionableTask {
@@ -173,17 +153,6 @@ struct SwipeableEventRow: View {
             }
             withAnimation(.easeInOut(duration: 0.55).repeatForever(autoreverses: true)) { // ui-v4: allow overdue warning breath, gated by reduce-work policy. // smoothness: allow pre-existing or workload-gated path surfaced by accessibility font migration; tracked by full-scope ratchet.
                 overdueBreath = true
-            }
-        }
-        .overlay(alignment: .top) {
-            if showSkipReason {
-                Text("今日已打卡，不重复奖励 🥥")
-                    .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
-                    .foregroundStyle(Color.arkInk)
-                    .padding(.horizontal, 14).padding(.vertical, 8)
-                    .background(Color.goYellow, in: Capsule())
-                    .transition(.move(edge: .top).combined(with: .opacity))
-                    .offset(y: -8)
             }
         }
     }
@@ -400,31 +369,6 @@ struct SwipeableEventRow: View {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) {
             UINotificationFeedbackGenerator().notificationOccurred(.success)
         }
-        if !event.isOccurrenceMarkedComplete(on: occurrenceDate) {
-            let eventID = event.id
-            let executorId = activeHumanIdRaw.isEmpty ? nil : activeHumanIdRaw
-            commandQueue.enqueue(.todayFocus(entityID: eventID, action: "eventCompleteReward"), delayMilliseconds: 70) {
-                let result = EventCompletionCommandExecutor(
-                    context: modelContext,
-                    wallet: appServices.coconutWallet,
-                    careLedger: appServices.careLedger,
-                    revisions: appServices.domainRevisions
-                ).awardCompletionIfEligible(
-                    event: event,
-                    occurrenceDate: occurrenceDate,
-                    executorId: executorId,
-                    note: "event.completion.reward"
-                )
-                if result.awarded {
-                    spawnCoconutFloat()
-                } else if result.skippedByExistingCare {
-                    withAnimation(GoMotion.feedback) { showSkipReason = true }
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-                        withAnimation(GoMotion.feedback) { showSkipReason = false }
-                    }
-                }
-            }
-        }
         launchCelebrationParticles()
         withAnimation(GoMotion.page) { offsetX = -800 }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.28) {
@@ -478,22 +422,6 @@ struct SwipeableEventRow: View {
             )
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) { celebrationParticles.removeAll() }
-    }
-
-    private func spawnCoconutFloat() {
-        let f = CoconutFloat()
-        coconutFloats.append(f)
-        let id = f.id
-        withAnimation(GoMotion.page) {
-            if let idx = coconutFloats.firstIndex(where: { $0.id == id }) {
-                coconutFloats[idx].offsetY = -60
-                coconutFloats[idx].opacity = 0
-            }
-        }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-            coconutFloats.removeAll { $0.id == id }
-        }
-        _ = f
     }
 }
 
