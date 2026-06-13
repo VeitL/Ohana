@@ -39,6 +39,18 @@ protocol CareEventRecording {
     ) -> (humanGot: Int, petGot: Int)
 
     @discardableResult
+    func recordSharedManualFeedFact(
+        sourcePet: Pet,
+        targets: [Pet],
+        totalGrams: Double,
+        foodKind: FeedFoodKind,
+        context: ModelContext,
+        executorId: String?,
+        quality: QuestManager.QualityBonus,
+        date: Date
+    ) -> SharedPetActionResult
+
+    @discardableResult
     func recordTreatFeed(
         pet: Pet,
         amountGrams: Double,
@@ -105,6 +117,16 @@ protocol CareEventRecording {
     ) -> (humanGot: Int, petGot: Int)
 
     @discardableResult
+    func recordSharedWateringFact(
+        sourcePet: Pet,
+        targets: [Pet],
+        totalMl: Double,
+        context: ModelContext,
+        executorId: String?,
+        date: Date
+    ) -> SharedPetActionResult
+
+    @discardableResult
     func recordSharedCare(
         sourcePet: Pet,
         targets: [Pet],
@@ -120,6 +142,21 @@ protocol CareEventRecording {
     ) -> (humanGot: Int, petGot: Int)
 
     @discardableResult
+    func recordSharedCareFact(
+        sourcePet: Pet,
+        targets: [Pet],
+        type: CareType,
+        actionKind: SharedCareActionKind,
+        context: ModelContext,
+        executorId: String?,
+        reward: QuestManager.OhanaActionType,
+        rewardTitle: String?,
+        quality: QuestManager.QualityBonus,
+        date: Date,
+        source: CareLedgerSource
+    ) -> SharedPetActionResult
+
+    @discardableResult
     func recordSharedLitterCare(
         sourcePet: Pet,
         targets: [Pet],
@@ -128,6 +165,16 @@ protocol CareEventRecording {
         date: Date,
         isFullChange: Bool
     ) -> (humanGot: Int, petGot: Int)
+
+    @discardableResult
+    func recordSharedLitterCareFact(
+        sourcePet: Pet,
+        targets: [Pet],
+        context: ModelContext,
+        executorId: String?,
+        date: Date,
+        isFullChange: Bool
+    ) -> SharedPetActionResult
 
     @discardableResult
     func recordUnknownSharedPotty(
@@ -147,6 +194,15 @@ protocol CareEventRecording {
         executorId: String?,
         date: Date
     ) -> (humanGot: Int, petGot: Int)
+
+    @discardableResult
+    func recordPottyFact(
+        pet: Pet,
+        type: PottyType,
+        context: ModelContext,
+        executorId: String?,
+        date: Date
+    ) -> (result: CareEventService.PottyRecordResult, reward: (humanGot: Int, petGot: Int), log: PetPottyLog?)
 
     @discardableResult
     func recordHygiene(
@@ -175,6 +231,16 @@ protocol CareEventRecording {
         executorId: String?,
         date: Date
     ) -> (humanGot: Int, petGot: Int)
+
+    @discardableResult
+    func recordHealthFact(
+        pet: Pet,
+        type: HealthLogType,
+        note: String,
+        context: ModelContext,
+        executorId: String?,
+        date: Date
+    ) -> (result: CareEventService.HealthRecordResult, reward: (humanGot: Int, petGot: Int), log: PetHealthLog?)
 
     @discardableResult
     func recordSharedExpense(
@@ -209,6 +275,29 @@ extension CareEventService {
             quality: quality,
             date: date,
             foodKind: foodKind,
+            dependencies: dependencies
+        )
+    }
+
+    func recordSharedManualFeedFact(
+        sourcePet: Pet,
+        targets: [Pet],
+        totalGrams: Double,
+        foodKind: FeedFoodKind,
+        context: ModelContext,
+        executorId: String?,
+        quality: QuestManager.QualityBonus,
+        date: Date
+    ) -> SharedPetActionResult {
+        CareEventService.recordSharedManualFeedFact(
+            sourcePet: sourcePet,
+            targets: targets,
+            totalGrams: totalGrams,
+            foodKind: foodKind,
+            context: context,
+            executorId: executorId,
+            quality: quality,
+            date: date,
             dependencies: dependencies
         )
     }
@@ -385,6 +474,25 @@ extension CareEventService {
         )
     }
 
+    func recordSharedWateringFact(
+        sourcePet: Pet,
+        targets: [Pet],
+        totalMl: Double,
+        context: ModelContext,
+        executorId: String?,
+        date: Date
+    ) -> SharedPetActionResult {
+        CareEventService.recordSharedWateringFact(
+            sourcePet: sourcePet,
+            targets: targets,
+            totalMl: totalMl,
+            context: context,
+            executorId: executorId,
+            date: date,
+            dependencies: dependencies
+        )
+    }
+
     func recordSharedCare(
         sourcePet: Pet,
         targets: [Pet],
@@ -414,6 +522,35 @@ extension CareEventService {
         )
     }
 
+    func recordSharedCareFact(
+        sourcePet: Pet,
+        targets: [Pet],
+        type: CareType,
+        actionKind: SharedCareActionKind,
+        context: ModelContext,
+        executorId: String?,
+        reward: QuestManager.OhanaActionType,
+        rewardTitle: String?,
+        quality: QuestManager.QualityBonus,
+        date: Date,
+        source: CareLedgerSource
+    ) -> SharedPetActionResult {
+        CareEventService.recordSharedCareFact(
+            sourcePet: sourcePet,
+            targets: targets,
+            type: type,
+            actionKind: actionKind,
+            context: context,
+            executorId: executorId,
+            reward: reward,
+            rewardTitle: rewardTitle,
+            quality: quality,
+            date: date,
+            source: source,
+            dependencies: dependencies
+        )
+    }
+
     func recordSharedLitterCare(
         sourcePet: Pet,
         targets: [Pet],
@@ -423,6 +560,25 @@ extension CareEventService {
         isFullChange: Bool
     ) -> (humanGot: Int, petGot: Int) {
         CareEventService.recordSharedLitterCare(
+            sourcePet: sourcePet,
+            targets: targets,
+            context: context,
+            executorId: executorId,
+            date: date,
+            isFullChange: isFullChange,
+            dependencies: dependencies
+        )
+    }
+
+    func recordSharedLitterCareFact(
+        sourcePet: Pet,
+        targets: [Pet],
+        context: ModelContext,
+        executorId: String?,
+        date: Date,
+        isFullChange: Bool
+    ) -> SharedPetActionResult {
+        CareEventService.recordSharedLitterCareFact(
             sourcePet: sourcePet,
             targets: targets,
             context: context,
@@ -460,6 +616,23 @@ extension CareEventService {
         date: Date
     ) -> (humanGot: Int, petGot: Int) {
         CareEventService.recordPotty(
+            pet: pet,
+            type: type,
+            context: context,
+            executorId: executorId,
+            date: date,
+            dependencies: dependencies
+        )
+    }
+
+    func recordPottyFact(
+        pet: Pet,
+        type: PottyType,
+        context: ModelContext,
+        executorId: String?,
+        date: Date
+    ) -> (result: CareEventService.PottyRecordResult, reward: (humanGot: Int, petGot: Int), log: PetPottyLog?) {
+        CareEventService.recordPottyFact(
             pet: pet,
             type: type,
             context: context,
@@ -512,6 +685,25 @@ extension CareEventService {
         date: Date
     ) -> (humanGot: Int, petGot: Int) {
         CareEventService.recordHealth(
+            pet: pet,
+            type: type,
+            note: note,
+            context: context,
+            executorId: executorId,
+            date: date,
+            dependencies: dependencies
+        )
+    }
+
+    func recordHealthFact(
+        pet: Pet,
+        type: HealthLogType,
+        note: String,
+        context: ModelContext,
+        executorId: String?,
+        date: Date
+    ) -> (result: CareEventService.HealthRecordResult, reward: (humanGot: Int, petGot: Int), log: PetHealthLog?) {
+        CareEventService.recordHealthFact(
             pet: pet,
             type: type,
             note: note,

@@ -186,8 +186,17 @@ struct SharedPetActionResult {
     let walkLogIDs: [UUID]
     let walkLogs: [PetWalkLog]
     let reward: (humanGot: Int, petGot: Int)
+    let disposition: CareFactWriteDisposition
 
     var coconutDelta: Int { max(0, reward.humanGot) + max(0, reward.petGot) }
+
+    var didWriteFact: Bool {
+        disposition.didWriteFact
+    }
+
+    var allowsDerivedEffects: Bool {
+        disposition.allowsDerivedEffects
+    }
 
     static func noOp() -> SharedPetActionResult {
         SharedPetActionResult(
@@ -199,7 +208,8 @@ struct SharedPetActionResult {
             expenseLogIDs: [],
             walkLogIDs: [],
             walkLogs: [],
-            reward: (0, 0)
+            reward: (0, 0),
+            disposition: .noOp
         )
     }
 }
@@ -390,7 +400,8 @@ enum SharedPetActionRecorder {
             expenseLogIDs: expenseLogs.map(\.1.id),
             walkLogIDs: walkLogs.map(\.1.id),
             walkLogs: walkLogs.map(\.1),
-            reward: reward
+            reward: reward,
+            disposition: .active
         )
     }
 
