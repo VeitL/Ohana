@@ -430,7 +430,9 @@ extension SettingsView {
     private func canUseOnlineCollaborationForSettings() -> Bool {
         guard OnlineFeatureGate.allows(.onlineCollaboration) else {
             householdSharePresentation = nil
-            OnlineFeatureGateNoticeCenter.post(.cloudShareInviteBlocked)
+            Task { @MainActor in
+                OnlineFeatureGateNoticeCenter.post(.cloudShareInviteBlocked)
+            }
             return false
         }
         return true

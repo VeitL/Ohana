@@ -11,6 +11,7 @@ import SwiftUI
 struct RecycleBinView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
+    @Environment(AppServices.self) private var appServices
     @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
 
     @State private var items: [RecycleBinListItem] = []
@@ -202,11 +203,11 @@ struct RecycleBinView: View {
     }
 
     private func refresh() {
-        items = RecycleBinService.listItems(context: modelContext)
+        items = appServices.recycleBin.listItems(context: modelContext)
     }
 
     private func restore(_ item: RecycleBinListItem) {
-        let result = RecycleBinService.restoreItem(item, context: modelContext)
+        let result = appServices.recycleBin.restoreItem(item, context: modelContext)
         statusMessage = result.didChange
             ? l.tr(zh: "已恢复", en: "Restored", de: "Wiederhergestellt")
             : l.tr(zh: "项目已不可用", en: "Item is no longer available", de: "Element ist nicht mehr verfügbar")
@@ -214,7 +215,7 @@ struct RecycleBinView: View {
     }
 
     private func purgeExpired() {
-        let result = RecycleBinService.purgeExpired(context: modelContext)
+        let result = appServices.recycleBin.purgeExpired(context: modelContext)
         statusMessage = result.didChange
             ? l.tr(
                 zh: "已清理 \(result.purgedSourceCount + result.purgedBatchCount) 项过期内容",

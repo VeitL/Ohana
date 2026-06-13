@@ -44,7 +44,9 @@ final class OhanaCloudSharingAppDelegate: NSObject, UIApplicationDelegate {
         userDidAcceptCloudKitShareWith cloudKitShareMetadata: CKShare.Metadata
     ) {
         guard OnlineFeatureGate.allows(.onlineCollaboration) else {
-            OnlineFeatureGateNoticeCenter.post(.cloudShareInviteBlocked)
+            Task { @MainActor in
+                OnlineFeatureGateNoticeCenter.post(.cloudShareInviteBlocked)
+            }
             OhanaLog.info(
                 "Cloud sync share acceptance blocked by OnlineFeatureGate.",
                 category: "CloudSync"

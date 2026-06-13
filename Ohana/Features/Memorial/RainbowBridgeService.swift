@@ -13,6 +13,15 @@ struct RainbowBridgeService {
     private static let memorialBatchPrefix = "memorial:"
     private static let memorialReminderActorPrefix = "system:memorial:"
     private static let memorialTrashedBy = "system:memorial"
+    private let reminderScheduling: ReminderSchedulingManaging
+
+    init() {
+        reminderScheduling = ReminderSchedulingManager()
+    }
+
+    init(reminderScheduling: ReminderSchedulingManaging) {
+        self.reminderScheduling = reminderScheduling
+    }
 
     /// 标记宠物离世：设置 passedAwayDate，并让未来计划退出活跃流但保留数据。
     func markPassedAway(pet: Pet, date: Date = Date(), context: ModelContext) {
@@ -113,8 +122,9 @@ struct RainbowBridgeService {
         context.safeSave()
 
         guard !remindersToReschedule.isEmpty else { return }
+        let reminderScheduling = reminderScheduling
         Task { @MainActor in
-            await ReminderSchedulingService.scheduleManyIfNeeded(
+            await reminderScheduling.scheduleManyIfNeeded(
                 reminders: remindersToReschedule,
                 context: context,
                 source: .service

@@ -5,6 +5,7 @@
 //  Visible app-level notices for online surfaces blocked in the launch build.
 //
 
+import Combine
 import Foundation
 
 enum OnlineFeatureGateNoticeReason: String, Identifiable, Sendable {
@@ -30,22 +31,11 @@ enum OnlineFeatureGateNoticeReason: String, Identifiable, Sendable {
     }
 }
 
+@MainActor
 enum OnlineFeatureGateNoticeCenter {
-    static let notificationName = Notification.Name("OhanaOnlineFeatureGateNotice")
-    static let reasonUserInfoKey = "reason"
+    static let notices = PassthroughSubject<OnlineFeatureGateNoticeReason, Never>()
 
     static func post(_ reason: OnlineFeatureGateNoticeReason) {
-        NotificationCenter.default.post(
-            name: notificationName,
-            object: nil,
-            userInfo: [reasonUserInfoKey: reason.rawValue]
-        )
-    }
-
-    static func reason(from notification: Notification) -> OnlineFeatureGateNoticeReason? {
-        guard let rawValue = notification.userInfo?[reasonUserInfoKey] as? String else {
-            return nil
-        }
-        return OnlineFeatureGateNoticeReason(rawValue: rawValue)
+        notices.send(reason)
     }
 }

@@ -277,7 +277,7 @@ extension CoconutShopView {
 
     @discardableResult
     func activateBoost(_ item: ShopItem) -> Bool {
-        ShopPurchaseFulfillmentService.fulfillConsumable(
+        appServices.shopPurchaseFulfillment.fulfillConsumable(
             item: item,
             context: modelContext,
             services: appServices
@@ -295,7 +295,7 @@ extension CoconutShopView {
             de: "\(item.name(l)) erstattet"
         )
         do {
-            try ShopPurchaseFulfillmentService.refundPurchase(
+            try appServices.shopPurchaseFulfillment.refundPurchase(
                 item: item,
                 purchase: purchase,
                 humans: humans,

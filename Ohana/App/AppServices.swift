@@ -26,11 +26,13 @@ final class AppServices {
     let passcodes: HumanPasscodeManaging
     let appIcons: AppIconManaging
     let shopInventory: ShopInventoryManaging
+    let shopPurchaseFulfillment: ShopPurchaseFulfilling
     let islandToasts: IslandToastManager
     let metricKit: MetricKitObserving
     let backups: DataBackupManaging
     let automaticBackups: AutomaticBackupManaging
     let appReset: AppResetting
+    let recycleBin: RecycleBinManaging
     let medicationReminders: MedicationReminderManaging
     let userNotifications: UserNotificationManaging
     let notificationRoutes: NotificationRoutePublishing
@@ -115,11 +117,13 @@ final class AppServices {
             passcodes: StaticHumanPasscodeManager(),
             appIcons: SystemAppIconManager(),
             shopInventory: UserDefaultsShopInventoryManager(),
+            shopPurchaseFulfillment: ShopPurchaseFulfillmentService(),
             islandToasts: IslandToastManager(),
             metricKit: MetricKitObserver(),
             backups: SharedDataBackupManagerAdapter(questManager: questManager),
             automaticBackups: automaticBackups,
             appReset: StaticAppResetter(questManager: questManager),
+            recycleBin: StaticRecycleBinManager(),
             medicationReminders: SharedMedicationReminderManager(careLedger: careLedger),
             userNotifications: SharedUserNotificationManager(manager: notificationManager),
             notificationRoutes: SharedNotificationRoutePublisher(center: notificationRouteCenter),
@@ -178,11 +182,13 @@ final class AppServices {
         passcodes: HumanPasscodeManaging,
         appIcons: AppIconManaging,
         shopInventory: ShopInventoryManaging,
+        shopPurchaseFulfillment: ShopPurchaseFulfilling,
         islandToasts: IslandToastManager,
         metricKit: MetricKitObserving,
         backups: DataBackupManaging,
         automaticBackups: AutomaticBackupManaging,
         appReset: AppResetting,
+        recycleBin: RecycleBinManaging,
         medicationReminders: MedicationReminderManaging,
         userNotifications: UserNotificationManaging,
         notificationRoutes: NotificationRoutePublishing,
@@ -215,11 +221,13 @@ final class AppServices {
         self.passcodes = passcodes
         self.appIcons = appIcons
         self.shopInventory = shopInventory
+        self.shopPurchaseFulfillment = shopPurchaseFulfillment
         self.islandToasts = islandToasts
         self.metricKit = metricKit
         self.backups = backups
         self.automaticBackups = automaticBackups
         self.appReset = appReset
+        self.recycleBin = recycleBin
         self.medicationReminders = medicationReminders
         self.userNotifications = userNotifications
         self.notificationRoutes = notificationRoutes

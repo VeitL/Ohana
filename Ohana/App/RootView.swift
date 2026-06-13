@@ -76,8 +76,8 @@ struct RootView: View {
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
             appSwitcherSnapshotCoverRequested = false
         }
-        .onReceive(NotificationCenter.default.publisher(for: OnlineFeatureGateNoticeCenter.notificationName)) { notification in
-            onlineGateNoticeReason = OnlineFeatureGateNoticeCenter.reason(from: notification)
+        .onReceive(OnlineFeatureGateNoticeCenter.notices) { reason in
+            onlineGateNoticeReason = reason
         }
         .alert(Text(l.tr(zh: "数据异常", en: "Data issue", de: "Datenproblem")), isPresented: $showDBFallbackAlert) {
             Button(l.tr(zh: "我知道了", en: "Got it", de: "Verstanden"), role: .cancel) {

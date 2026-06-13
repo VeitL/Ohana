@@ -7,9 +7,55 @@ import Foundation
 import SwiftData
 
 @MainActor
-enum ShopPurchaseFulfillmentService {
+protocol ShopPurchaseFulfilling {
     @discardableResult
-    static func fulfillConsumable(
+    func fulfillConsumable(
+        item: ShopItem,
+        context: ModelContext,
+        services: AppServices
+    ) -> Bool
+
+    @discardableResult
+    func refundPurchase(
+        item: ShopItem,
+        purchase: ShopPurchaseCommandResult,
+        humans: [Human],
+        context: ModelContext,
+        services: AppServices,
+        title: String,
+        reason: String,
+        now: Date
+    ) throws -> Bool
+}
+
+extension ShopPurchaseFulfilling {
+    @discardableResult
+    func refundPurchase(
+        item: ShopItem,
+        purchase: ShopPurchaseCommandResult,
+        humans: [Human],
+        context: ModelContext,
+        services: AppServices,
+        title: String,
+        reason: String
+    ) throws -> Bool {
+        try refundPurchase(
+            item: item,
+            purchase: purchase,
+            humans: humans,
+            context: context,
+            services: services,
+            title: title,
+            reason: reason,
+            now: Date()
+        )
+    }
+}
+
+@MainActor
+struct ShopPurchaseFulfillmentService: ShopPurchaseFulfilling {
+    @discardableResult
+    func fulfillConsumable(
         item: ShopItem,
         context: ModelContext,
         services: AppServices
@@ -35,7 +81,7 @@ enum ShopPurchaseFulfillmentService {
     }
 
     @discardableResult
-    static func refundPurchase(
+    func refundPurchase(
         item: ShopItem,
         purchase: ShopPurchaseCommandResult,
         humans: [Human],
@@ -103,7 +149,7 @@ enum ShopPurchaseFulfillmentService {
         return true
     }
 
-    private static func refundContributions(
+    private func refundContributions(
         item: ShopItem,
         purchase: ShopPurchaseCommandResult,
         humans: [Human]
