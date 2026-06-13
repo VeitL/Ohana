@@ -49,7 +49,7 @@ enum AppResetService {
 
         resetLocalDefaults(defaults, preservedValues: preservedDefaults)
         if options.cleanUpAutomaticBackups {
-            AutomaticBackupStatusStore(defaults: defaults).resetAfterAppReset()
+            AutomaticBackupStatusStore.resetAfterAppReset(defaults: defaults)
             try? ICloudDriveAutomaticBackupFileStore().removeManagedAutomaticBackupsSynchronously()
         }
         if options.deleteCustomBackground {

@@ -141,6 +141,13 @@ final class AutomaticBackupStatusStore {
         self.defaults = defaults
     }
 
+    static func resetAfterAppReset(defaults: UserDefaults) {
+        for key in defaults.dictionaryRepresentation().keys where key.hasPrefix(keyPrefix) {
+            defaults.removeObject(forKey: key)
+        }
+        defaults.set(false, forKey: enabledKey)
+    }
+
     func snapshot(now _: Date = Date()) -> AutomaticBackupStatus {
         AutomaticBackupStatus(
             isEnabled: isEnabled,
@@ -190,10 +197,7 @@ final class AutomaticBackupStatusStore {
     }
 
     func resetAfterAppReset(now _: Date = Date()) {
-        for key in defaults.dictionaryRepresentation().keys where key.hasPrefix(Self.keyPrefix) {
-            defaults.removeObject(forKey: key)
-        }
-        defaults.set(false, forKey: Self.enabledKey)
+        Self.resetAfterAppReset(defaults: defaults)
     }
 
     private var isEnabled: Bool {
