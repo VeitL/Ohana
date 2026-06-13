@@ -347,8 +347,11 @@ private struct DenseFixture {
     }
 
     private static func makeCareLogs(pets: [Pet], humans: [Human], now: Date) -> [PetCareLog] {
-        (0 ..< 720).map { index in
-            PetCareLog(
+        var logs: [PetCareLog] = []
+        logs.reserveCapacity(720)
+
+        for index in 0 ..< 720 {
+            let log = PetCareLog(
                 date: now.addingTimeInterval(TimeInterval(-index * 7200)),
                 type: index.isMultiple(of: 2) ? .feeding : .watering,
                 amountGrams: Double(20 + index % 40),
@@ -356,7 +359,10 @@ private struct DenseFixture {
                 pet: pets[index % pets.count],
                 executorId: humans[index % humans.count].id.uuidString
             )
+            logs.append(log)
         }
+
+        return logs
     }
 
     private static func makeWalkLogs(pets: [Pet], humans: [Human], now: Date) -> [PetWalkLog] {
