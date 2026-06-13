@@ -45,6 +45,12 @@ actionable; long-term product ideas belong in planning docs instead.
   Hygiene / DashboardRecords `CareLedgerEvent` delete paths. The remaining 63
   derived-state warnings are still unowned baseline debt and require future
   module repair or explicitly approved allow comments before this TFU can close.
+  Second 2026-06-13 repair round closed the owned Economy / GAP-2 P1 findings
+  from the second adversarial review: Calendar / Today Focus / notification care
+  completion now enters the care fact + reward pipeline, Calendar occurrence
+  undo writes reversal / tombstone facts, CarePlan / Feeding / Water plan deletes
+  write upload-pipeline tombstones, and SymptomLog / HeatCycleLog now direct
+  delete with tombstones while PetHealthLog remains recoverable.
 - Next step: During Economy, RecycleBin, and Phase 7 module repair/review rounds,
   resolve the owned baseline warnings as real behavior fixes or approved local
   exceptions, then refresh the baseline downward with the matching audit command
