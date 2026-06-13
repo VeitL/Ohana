@@ -143,6 +143,7 @@ enum PetWalkCommandService {
         let trimmedNotes = notes.trimmingCharacters(in: .whitespacesAndNewlines)
         walk.moodRating = normalizedRating
         walk.behaviorNotes = trimmedNotes.isEmpty ? nil : trimmedNotes
+        CloudSyncMutationRecorder.markModified(walk, context: context)
         context.safeSave()
         return PetWalkSummaryCommandResult(
             petID: pet.id,

@@ -49,19 +49,7 @@ struct WalkDetailView: View {
     }
 
     private var walkPoopMarkers: [WalkPoopMarker] {
-        pet.pottyLogs
-            .filter { $0.walkLogId == walk.id.uuidString }
-            .sorted { $0.date < $1.date }
-            .map {
-                WalkPoopMarker(
-                    id: $0.id,
-                    date: $0.date,
-                    latitude: $0.latitude,
-                    longitude: $0.longitude,
-                    accuracyMeters: $0.locationAccuracyMeters,
-                    type: $0.pottyType
-                )
-            }
+        WalkFeaturePolicy.activePoopMarkers(for: walk, pet: pet)
     }
 
     private var shouldAnimateRainbowWalkEffects: Bool {

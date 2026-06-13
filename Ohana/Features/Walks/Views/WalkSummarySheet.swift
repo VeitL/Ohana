@@ -26,16 +26,20 @@ struct WalkSummarySheet: View {
     private let weeklyGoalStepKm: Double = 0.5
     private let weeklyGoalMaxKm: Double = 100
 
+    private var activeWalks: [PetWalkLog] {
+        WalkFeaturePolicy.activeWalkLogs(for: pet)
+    }
+
     private var sortedWalks: [PetWalkLog] {
-        pet.walkLogs.sorted(by: { $0.startDate > $1.startDate })
+        activeWalks.sorted(by: { $0.startDate > $1.startDate })
     }
 
     private var totalDistance: Double {
-        pet.walkLogs.reduce(0) { $0 + $1.distanceMeters }
+        activeWalks.reduce(0) { $0 + $1.distanceMeters }
     }
 
     private var totalDuration: TimeInterval {
-        pet.walkLogs.reduce(0) { $0 + $1.durationSeconds }
+        activeWalks.reduce(0) { $0 + $1.durationSeconds }
     }
 
     // MARK: - 本周步行距离
@@ -47,7 +51,7 @@ struct WalkSummarySheet: View {
 
     private var thisWeekDistanceKm: Double {
         let start = weekStartDate
-        return pet.walkLogs
+        return activeWalks
             .filter { $0.startDate >= start }
             .reduce(0) { $0 + $1.distanceMeters } / 1000.0
     }

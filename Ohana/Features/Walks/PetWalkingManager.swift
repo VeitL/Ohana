@@ -66,6 +66,7 @@ struct WalkPoopMarker: Identifiable, Equatable {
     }
 }
 
+@MainActor
 @Observable
 final class PetWalkingManager {
     var currentPet: Pet?
@@ -85,13 +86,26 @@ final class PetWalkingManager {
     private var resumeTime: Date? // 最近一次 resume/start 时间
     private var timer: Timer?
     private var walkStopStartedAt: CFAbsoluteTime?
-    private let locationManager: LocationManager
+    private let locationManager: any WalkLocationManaging
     private let questManager: QuestManager
+    private let careLedger: CareLedgerRecording
+    private let walkCareEvents: WalkCareEventManaging
     private let activeHumanSelection: ActiveHumanSelecting = UserDefaultsActiveHumanSelection()
 
-    init(locationManager: LocationManager, questManager: QuestManager = QuestManager()) {
+    init(
+        locationManager: any WalkLocationManaging,
+        questManager: QuestManager,
+        careLedger: CareLedgerRecording = CareLedgerService(),
+        walkCareEvents: WalkCareEventManaging? = nil
+    ) {
         self.locationManager = locationManager
         self.questManager = questManager
+        self.careLedger = careLedger
+        self.walkCareEvents = walkCareEvents ?? StaticWalkCareEventManager()
+    }
+
+    convenience init(locationManager: any WalkLocationManaging) {
+        self.init(locationManager: locationManager, questManager: QuestManager())
     }
 
     var hasActiveLocationWalk: Bool {
@@ -101,6 +115,8 @@ final class PetWalkingManager {
 
     // MARK: - Actions
     func start(pet: Pet) {
+        guard WalkFeaturePolicy.canStartWalk(for: pet) else { return }
+
         currentPet = pet
         phase = .running
         startTime = Date()
@@ -165,7 +181,8 @@ final class PetWalkingManager {
         let poopMarkers = activePoopMarkers
         let poop = max(poopCount, poopMarkers.count)
 
-        guard let pet = currentPet else {
+        guard let pet = currentPet, WalkFeaturePolicy.canStartWalk(for: pet) else {
+            reset()
             walkStopStartedAt = nil
             return
         }
@@ -187,10 +204,10 @@ final class PetWalkingManager {
 
         // N2/Phase54: 遛狗椰子奖励（距离 < 20m 不发放奖励，日志正常保存）
         let isTooShortForReward = !CoconutWalkRewardPolicy.isRewardable(distanceMeters: distanceMeters)
-        let normalizedTargets = SharedPetTargetResolver.normalizedTargets(sharedTargets, fallback: pet)
+        let normalizedTargets = WalkFeaturePolicy.normalizedWalkTargets(sharedTargets, fallback: pet)
         let walkLogs: [PetWalkLog]
         if normalizedTargets.count > 1 {
-            let result = CareEventService.recordSharedWalk(
+            let result = walkCareEvents.recordSharedWalk(
                 sourcePet: pet,
                 targets: normalizedTargets,
                 distanceMeters: distanceMeters,
@@ -255,13 +272,39 @@ final class PetWalkingManager {
 
         // 遛狗中每次便便：人+2, 宠物+5（OhanaActionType.potty(isLitter:false)）
         if poop > 0 {
-            for _ in 0 ..< poop {
-                questManager.awardAction(
+            for pottyLog in pottyLogs {
+                let reward = questManager.awardAction(
                     type: .potty(isLitter: false),
                     pet: pet,
                     context: modelContext,
                     executorId: executorId
                 )
+                let metadataJSON = careLedger.rewardMetadata(reward, questManager: questManager)
+                let ledgerEvent = careLedger.record(
+                    occurredAt: pottyLog.date,
+                    actorKind: executorId == nil ? .unknown : .human,
+                    actorId: executorId,
+                    subjectKind: .pet,
+                    subjectId: pet.id.uuidString,
+                    eventKind: .potty,
+                    actionType: pottyLog.pottyType.rawValue,
+                    amountValue: 0,
+                    amountUnit: "",
+                    note: "walk.poop",
+                    source: .quickAction,
+                    sourceEventId: nil,
+                    sourceReminderId: nil,
+                    legacyModelName: String(describing: PetPottyLog.self),
+                    legacyModelId: pottyLog.id.uuidString,
+                    coconutDelta: careLedger.rewardDelta(reward),
+                    rewardLogId: nil,
+                    privacyFieldRaw: nil,
+                    metadataJSON: metadataJSON,
+                    context: modelContext,
+                    save: false
+                )
+                CloudSyncMutationRecorder.markModified(ledgerEvent, context: modelContext, modifiedAt: endedAt)
+                careLedger.syncOasisTreeEnergyIfNeeded(metadataJSON: metadataJSON, context: modelContext)
             }
         }
 
@@ -372,8 +415,10 @@ final class PetWalkingManager {
     private func startTimer() {
         stopTimer()
         timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
-            guard let self, let r = self.resumeTime else { return }
-            self.elapsedTime = self.pausedElapsed + Date().timeIntervalSince(r)
+            Task { @MainActor [weak self] in
+                guard let self, let r = self.resumeTime else { return }
+                self.elapsedTime = self.pausedElapsed + Date().timeIntervalSince(r)
+            }
         }
     }
 

@@ -14,13 +14,13 @@ struct AppWalkRouteContainer: View {
 
     init(id: UUID, onDismiss: @escaping () -> Void) {
         _pets = Query(filter: #Predicate<Pet> { pet in
-            pet.id == id
+            pet.id == id && pet.trashedAt == nil
         })
         self.onDismiss = onDismiss
     }
 
     var body: some View {
-        if let pet = pets.first {
+        if let pet = pets.first, WalkFeaturePolicy.canStartWalk(for: pet) {
             WalkTrackingFullScreen(
                 pet: pet,
                 onMinimize: onDismiss

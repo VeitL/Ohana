@@ -18,7 +18,7 @@ struct DogActivityCard: View {
     @StateObject private var commandQueue = DeferredDomainCommandQueue()
 
     private var walkCountToday: Int {
-        pet.walkLogs.count(where: { Calendar.current.isDateInToday($0.startDate) })
+        WalkFeaturePolicy.activeWalkLogs(for: pet).count(where: { Calendar.current.isDateInToday($0.startDate) })
     }
 
     private var playCountToday: Int {
@@ -30,7 +30,7 @@ struct DogActivityCard: View {
         var cal = Calendar.current
         cal.firstWeekday = 2
         let start = cal.dateComponents([.calendar, .yearForWeekOfYear, .weekOfYear], from: Date()).date ?? Date()
-        return pet.walkLogs
+        return WalkFeaturePolicy.activeWalkLogs(for: pet)
             .filter { $0.startDate >= start }
             .reduce(0) { $0 + $1.distanceMeters } / 1000.0
     }

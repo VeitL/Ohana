@@ -18,10 +18,11 @@ struct WalkTrackingSnapshot {
 
     @MainActor
     static func make(pet: Pet, manager: PetWalkingManaging) -> WalkTrackingSnapshot {
+        let activeWalks = WalkFeaturePolicy.activeWalkLogs(for: pet)
         let latestWalk: PetWalkLog? = if manager.lastCompletedPetId == pet.id, let completed = manager.lastCompletedWalk {
-            completed
+            completed.trashedAt == nil ? completed : activeWalks.max { $0.startDate < $1.startDate }
         } else {
-            pet.walkLogs.max { $0.startDate < $1.startDate }
+            activeWalks.max { $0.startDate < $1.startDate }
         }
         let routeCoordinates: [CLLocationCoordinate2D] = if manager.lastCompletedPetId == pet.id, !manager.lastCompletedRouteCoordinates.isEmpty {
             manager.lastCompletedRouteCoordinates
@@ -30,15 +31,12 @@ struct WalkTrackingSnapshot {
         }
         let poopMarkers: [WalkPoopMarker] = if manager.lastCompletedPetId == pet.id, !manager.lastCompletedPoopMarkers.isEmpty {
             manager.lastCompletedPoopMarkers
-        } else if let walkId = latestWalk?.id.uuidString {
-            pet.pottyLogs
-                .filter { $0.walkLogId == walkId }
-                .sorted { $0.date < $1.date }
-                .map(WalkPoopMarker.init(log:))
+        } else if let latestWalk {
+            WalkFeaturePolicy.activePoopMarkers(for: latestWalk, pet: pet)
         } else {
             []
         }
-        let weekDistanceKm = pet.walkLogs
+        let weekDistanceKm = activeWalks
             .filter { $0.startDate >= Self.weekStartDate() }
             .reduce(0) { $0 + $1.distanceMeters } / 1000.0
         return WalkTrackingSnapshot(
@@ -81,37 +79,6 @@ struct WalkTrackingCommandExecutor {
             goal,
             for: pet,
             note: "walk.card.goal"
-        )
-    }
-}
-
-struct WalkTrackingCardHost: View {
-    let pet: Pet
-    var onCloseSummaryToPetCard: (() -> Void)?
-
-    @Environment(\.modelContext) private var modelContext
-    @Environment(AppServices.self) private var appServices
-    @Query(sort: \Pet.createdAt) private var allPets: [Pet]
-    @Query(sort: \Human.createdAt) private var allHumans: [Human]
-
-    var body: some View {
-        let commandExecutor = WalkTrackingCommandExecutor(modelContext: modelContext, services: appServices)
-        WalkTrackingCard(
-            pet: pet,
-            allPets: allPets,
-            allHumans: allHumans,
-            snapshot: WalkTrackingSnapshot.make(pet: pet, manager: appServices.walking),
-            onCloseSummaryToPetCard: onCloseSummaryToPetCard,
-            onStopWalk: { sharedTargets, executorIds in
-                commandExecutor.stopWalk(
-                    manager: appServices.walking,
-                    sharedTargets: sharedTargets,
-                    executorIds: executorIds
-                )
-            },
-            onSaveWeeklyGoal: { goal in
-                commandExecutor.saveWeeklyGoal(goal, for: pet)
-            }
         )
     }
 }

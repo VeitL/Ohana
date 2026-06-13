@@ -286,7 +286,7 @@ struct GlobalWalkBanner: View {
         }()
         let latestWalk = mgr.lastCompletedPetId == pet.id
             ? mgr.lastCompletedWalk
-            : pet.walkLogs.sorted { $0.startDate > $1.startDate }.first
+            : WalkFeaturePolicy.activeWalkLogs(for: pet).sorted { $0.startDate > $1.startDate }.first
         let distance = latestWalk?.distanceMeters ?? locationProvider.totalDistance
         let poop: Int = {
             if case let .finished(_, poopCount) = mgr.phase, mgr.currentPet?.id == pet.id {

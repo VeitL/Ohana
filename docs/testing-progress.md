@@ -16,7 +16,7 @@
 | 5 | Home + TodayFocus + QuickCare | 🟢 | 门禁通过并提交：`b8e8710e`；TFU-20260612-015 已关闭，无 P1/P2 余留 |
 | 6 | 大模块（Feeding/Members/Oasis/Settings/Health/Economy） | 🟢 | Feeding 门禁通过并提交：`b49134977`；Members 门禁通过并提交：`ead1e5fe4`；Oasis 门禁通过并提交：`87423afd8`；Settings/Health 门禁通过并提交：`5d4e71928`；Economy 原门禁：`662852a01`，复审修复轮门禁：`1679ddd66` |
 | 6.5 | 宪法差距建设（联机门/回收站/自动备份/植物门） | 🟢* | GAP-1~9 与 GAP-12 全部过门禁并提交；*带验收债：人工/真机验收项见 `docs/planning/gap-acceptance-track-list.md`，必须在 🏁 复审与 Phase 9B 前清完 |
-| 7 | 中小模块批量 | ⬜ | |
+| 7 | 中小模块批量 | 🟡 | Walks 门禁通过（2026-06-13，本次提交）；按第一批高风险模块继续推进，注入复审模式预检清单 |
 | 8 | 横向集成与全量回归 | ⬜ | 需总览会话主持 |
 | 8.5 | 演进就绪审查（联网/订阅/账户地基） | ⬜ | 需总览会话主持；产出审查报告与少量铺垫，非新功能 |
 | 9 | 上架工程（9A 前置/9B RC/9C 提审上线后） | ⬜ | 9A 前置项**现在就可并行启动**（开发者账号为最长前置）；详见手册 Phase 9 |
@@ -39,7 +39,7 @@
 | Health | 6 | 🟢 | 2026-06-12 | 无 P1/P2 代码余留；真实 UI 抽查见统一 track list | `5d4e71928` | 规则书见 `docs/specs/Health-logic.md`；健康记录删除清理派生费用/日历事件/提醒/ledger，健康/症状/发情记录进回收站并可恢复，已故/回收宠物只读；schema 升至 `ArkSchemaV70`；目标测试与 `scripts/module-exit-gate.sh` PASS；未启用 CloudKit、未改路由或启动路径 |
 | Economy | 6 | 🟢 | 2026-06-12 | 无 P1/P2 代码余留；真实 UI 抽查见统一 track list；需重新对抗复审后才可标 🏁 | `1679ddd66` | 规则书见 `docs/specs/Economy-logic.md`；线下兑现入口首发门关闭，冻结钱包拒绝成就 / 商店 / 金库 / 奖励写入，特殊奖励与 legacy 兼容奖励无 actor 时归属 active human 且不写 system，隐私钱包计入总额但隐藏明细，离世 / 回收钱包退出活跃财富且历史保留；2026-06-13 复审修复轮已完成：重复喂药 / 时刻奖励进入预算冷却管线，照护 / 花费 / 遛狗奖励按 executor 归属，首宠欢迎奖励不写 system，商店支持岛屿合资，兑换服务层硬门，财富趋势排除 system，遛狗先存事实再发奖；本轮追加根因边界：`EconomyRewardOwnerResolver`、`CoconutWalletFundingPlanner` / `CoconutWalletMutationWriter`；TFU-20260613-001~002 已关闭；`scripts/module-exit-gate.sh` PASS；未改 schema / 路由 / 启动路径 / CloudKit |
 | Medication | 7 | ⬜ | | | | |
-| Walks | 7 | ⬜ | | | | |
+| Walks | 7 | 🟢 | 2026-06-13 | 无 P1/P2 代码余留；真机定位 / 真实 UI 抽查见统一 track list | `本次提交` | 规则书见 `docs/specs/Walks-logic.md`；`WalkFeaturePolicy` 统一 active dog/lifecycle 判定，非狗 / 已离世 / 回收宠物不可启动遛狗；Walks 统计与详情排除回收 walk / poop marker；遛狗中便便写 `PetPottyLog` + `CareLedgerEvent` 并进入奖励管线；共享遛狗调用收进基础设施适配器；目标测试、changed gate 与 `scripts/module-exit-gate.sh` PASS；未改 schema / CloudKit / 启动路径 |
 | FamilyTasks | 7 | ⬜ | | | | |
 | Expenses | 7 | ⬜ | | | | |
 | DashboardRecords | 7 | ⬜ | | 历史验证阻塞 TFU-20260612-013 已由 cross-scope repair 关闭 | | 接手时留意 `WeightHistoryView 2.swift` 曾误入仓库并阻塞 app target 编译 |

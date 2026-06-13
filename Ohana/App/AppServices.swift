@@ -53,13 +53,12 @@ final class AppServices {
         let activeHumanSelection = UserDefaultsActiveHumanSelection()
         let notificationRouteCenter = OhanaNotificationRouteCenter()
         let notificationManager = NotificationManager(routeCenter: notificationRouteCenter)
-        let locationManager = LocationManager()
         let revisionCenter = ReadModelRevisionCenter()
         let avatarPipeline = AvatarPipeline()
         let coconutWallet = SwiftDataCoconutWalletManager()
         let domainRevisions = SharedDomainRevisionPublisher(center: revisionCenter)
         let questManager = QuestManager(wallet: coconutWallet, revisions: domainRevisions)
-        let walkingManager = PetWalkingManager(locationManager: locationManager, questManager: questManager)
+        let locationManager = LocationManager()
         let careLedger = CareLedgerService()
         let automaticBackups = AutomaticBackupService()
         let oasisRewardManager = StaticOasisRewardManager(
@@ -79,19 +78,24 @@ final class AppServices {
         let familyTasks = StaticFamilyTaskManager(wallet: coconutWallet, careLedger: careLedger, questManager: questManager)
         let reminderCompletion = ReminderCompletionService(careLedger: careLedger, familyTasks: familyTasks)
         let quickActionReminderCompletion = QuickActionReminderCompletionSyncService(reminderCompletion: reminderCompletion)
+        let careEventDependencies = CareEventServiceDependencies(
+            questManager: questManager,
+            economy: careEventEconomy,
+            careLedger: careLedger,
+            reminderCompletion: reminderCompletion,
+            quickActionReminderCompletion: quickActionReminderCompletion,
+            familyTasks: familyTasks,
+            revisions: domainRevisions
+        )
+        let walkingManager = PetWalkingManager(
+            locationManager: locationManager,
+            questManager: questManager,
+            careLedger: careLedger,
+            walkCareEvents: StaticWalkCareEventManager(dependencies: careEventDependencies)
+        )
         AppWorkloadPolicy.shared.hasRunningWalkProvider = { walkingManager.hasActiveLocationWalk }
         self.init(
-            careEvents: CareEventService(
-                dependencies: CareEventServiceDependencies(
-                    questManager: questManager,
-                    economy: careEventEconomy,
-                    careLedger: careLedger,
-                    reminderCompletion: reminderCompletion,
-                    quickActionReminderCompletion: quickActionReminderCompletion,
-                    familyTasks: familyTasks,
-                    revisions: domainRevisions
-                )
-            ),
+            careEvents: CareEventService(dependencies: careEventDependencies),
             activeHumanSelection: activeHumanSelection,
             coconutWallet: coconutWallet,
             coconutExchange: StaticCoconutExchangeManager(wallet: coconutWallet, careLedger: careLedger, questManager: questManager),

@@ -3,6 +3,31 @@ import Foundation
 import SwiftData
 
 @MainActor
+protocol WalkLocationManaging: AnyObject {
+    var currentLocation: CLLocation? { get }
+    var collectedLocations: [CLLocation] { get }
+    var totalDistance: Double { get }
+
+    func startWalkSession()
+    func stopWalkSession()
+    func pauseWalkSession()
+    func resumeWalkSession()
+    func stopAllLocationActivity()
+    func promoteActiveWalkToBackgroundDelivery()
+    func returnActiveWalkToForegroundDelivery()
+    func enforceNoLocationUnlessRunningWalk(_ isRunningWalk: Bool, reason: String)
+    func routeLocationsForPersistence(maxCount: Int) -> [CLLocation]
+}
+
+extension WalkLocationManaging {
+    func routeLocationsForPersistence() -> [CLLocation] {
+        routeLocationsForPersistence(maxCount: 600)
+    }
+}
+
+extension LocationManager: WalkLocationManaging {}
+
+@MainActor
 protocol PetWalkingManaging: AnyObject {
     var currentPet: Pet? { get set }
     var phase: WalkPhase { get set }
