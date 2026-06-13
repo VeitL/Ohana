@@ -70,14 +70,14 @@ reject_backup_pattern() {
   fi
 }
 
-require_pattern "$shared_container" 'Schema\(ArkSchemaV64\.models\)' \
-  "SharedModelContainer should open the current ArkSchemaV64 model set."
+require_pattern "$shared_container" 'Schema\(ArkSchemaV71\.models\)' \
+  "SharedModelContainer should open the current ArkSchemaV71 model set."
 
-require_pattern "$data_backup_dtos" 'var schemaVersion: Int = 24' \
-  "OhanaBackup.schemaVersion should be 24 after adding human gender identity backups."
+require_pattern "$data_backup_dtos" 'var schemaVersion: Int = 25' \
+  "OhanaBackup.schemaVersion should be 25 after adding shop purchase backups."
 
-require_pattern "$data_backup" 'guard backup\.schemaVersion <= 24' \
-  "DataBackupManager import guard should allow backup schemaVersion 24."
+require_pattern "$data_backup" 'guard backup\.schemaVersion <= 25' \
+  "DataBackupManager import guard should allow backup schemaVersion 25."
 
 require_section_pattern "$data_backup_dtos" 'struct HumanBackup' 'struct EventBackup' 'var passedAwayDate: String\?' \
   "HumanBackup should include passedAwayDate so human memorial state survives backup/restore."
