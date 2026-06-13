@@ -4,11 +4,12 @@ struct RecurringEconomyBoundariesGoodCommand {
     let questManager: QuestManager
 
     func record(pet: Pet, context: ModelContext, executorId: String) {
-        _ = questManager.awardAction(
+        _ = EconomyRewardDiscipline.awardCareAction(
             type: .feeding,
             pet: pet,
             context: context,
-            executorId: executorId
+            executorId: executorId,
+            questManager: questManager
         )
     }
 }

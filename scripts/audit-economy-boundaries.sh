@@ -14,6 +14,7 @@ Purpose:
   - R1: coconutBalance writes must stay inside the wallet mutation pipeline.
   - R2: reward calls must carry an executor/actor and must not route to system wallets.
   - R4: feature/frozen/read-only gates visible in Views must also have a service-layer hard gate.
+  - R5: feature/domain code must not call QuestManager.awardAction directly; use shared reward discipline primitives.
 
 Baseline:
   Full-scope debt is ratcheted in
@@ -295,6 +296,34 @@ def scan_reward_actor_boundaries(path: pathlib.Path, lines: list[str], warnings:
         idx = end + 1
 
 
+DIRECT_REWARD_CALL_RE = re.compile(r"\.[ \t]*(?:awardAction)\s*\(")
+
+
+def direct_reward_call_allowed(path: str) -> bool:
+    allowed_exact = {
+        "Ohana/Features/Economy/EconomyRewardDiscipline.swift",
+    }
+    return path in allowed_exact
+
+
+def scan_direct_reward_chokepoint(path: pathlib.Path, lines: list[str], warnings: list[WarningItem]) -> None:
+    path_str = rel(path)
+    if direct_reward_call_allowed(path_str):
+        return
+    for idx, line in enumerate(lines, start=1):
+        if allowed_line(line):
+            continue
+        if DIRECT_REWARD_CALL_RE.search(line):
+            add(
+                warnings,
+                "reward-direct-awardaction",
+                path_str,
+                idx,
+                line,
+                "QuestManager.awardAction is the low-level reward primitive; feature and domain callers must use EconomyRewardDiscipline care/non-care entry points.",
+            )
+
+
 GATE_RULES: list[tuple[str, re.Pattern[str], re.Pattern[str], str]] = [
     (
         "online-feature-gate",
@@ -364,6 +393,7 @@ def scan(files: list[pathlib.Path]) -> list[WarningItem]:
         lines = read_lines(path)
         scan_coconut_balance_writes(path, lines, warnings)
         scan_reward_actor_boundaries(path, lines, warnings)
+        scan_direct_reward_chokepoint(path, lines, warnings)
     scan_service_gate_coverage(files, warnings)
     return sorted(warnings, key=lambda item: (item.rule, item.path, item.line, item.snippet))
 
