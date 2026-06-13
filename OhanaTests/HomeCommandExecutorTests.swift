@@ -6056,6 +6056,75 @@ struct HomeCommandExecutorTests {
         #expect(ledger.subjectKind == CareLedgerSubjectKind.system.rawValue)
         #expect(ledger.coconutDelta == -item.cost)
         #expect(ledger.metadataJSON.contains(item.id))
+
+        let purchaseRecords = try context.fetch(FetchDescriptor<ShopPurchaseRecord>())
+        let purchaseRecord = try #require(purchaseRecords.first)
+        #expect(purchaseRecords.count == 1)
+        #expect(purchaseRecord.itemId == item.id)
+        #expect(purchaseRecord.buyerHumanId == human.id.uuidString)
+        #expect(purchaseRecord.transactionKey == "shop:\(item.id):\(human.id.uuidString)")
+
+        let duplicate = ShopPurchaseCommandService.purchase(
+            item: item,
+            buyer: human,
+            itemName: "Redeemed Lime Glow",
+            context: context,
+            questManager: questManager,
+            wallet: SwiftDataCoconutWalletManager(),
+            careLedger: CareLedgerService()
+        )
+        #expect(duplicate.didPurchase == true)
+        #expect(duplicate.transactionKey == nil)
+        #expect(human.coconutBalance == 500 - item.cost)
+        #expect(try context.fetch(FetchDescriptor<CareLedgerEvent>()).count == 1)
+        #expect(try context.fetch(FetchDescriptor<ShopPurchaseRecord>()).count == 1)
+
+        let duplicateRefundDelete = try ShopPurchaseRecordStore.deleteOwnershipRecord(
+            itemID: item.id,
+            transactionKey: duplicate.transactionKey,
+            context: context
+        )
+        #expect(duplicateRefundDelete == false)
+        #expect(try context.fetch(FetchDescriptor<ShopPurchaseRecord>()).count == 1)
+    }
+
+    @MainActor
+    @Test func shopPurchaseRecordStoreMigratesLegacyDefaultsOnce() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let defaultsName = "ShopPurchaseRecordStoreTests.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: defaultsName))
+        defer {
+            defaults.removePersistentDomain(forName: defaultsName)
+        }
+        defaults.set(
+            [
+                "fx_lime_glow",
+                "title_guardian",
+                "boost_double",
+                Avatar2DAccess.shopItemId,
+                AppIconCatalog.defaultItemId
+            ].joined(separator: ","),
+            forKey: ShopPurchaseRecordStore.legacyDefaultsKey
+        )
+
+        let inserted = try ShopPurchaseRecordStore.migrateLegacyDefaultsIfNeeded(
+            context: context,
+            defaults: defaults,
+            now: Date(timeIntervalSinceReferenceDate: 42)
+        )
+        let secondPass = try ShopPurchaseRecordStore.migrateLegacyDefaultsIfNeeded(
+            context: context,
+            defaults: defaults,
+            now: Date(timeIntervalSinceReferenceDate: 84)
+        )
+        let records = try context.fetch(FetchDescriptor<ShopPurchaseRecord>())
+
+        #expect(inserted == 2)
+        #expect(secondPass == 0)
+        #expect(Set(records.map(\.itemId)) == ["fx_lime_glow", "title_guardian"])
+        #expect(records.map(\.isLegacyImport).filter { !$0 }.isEmpty)
+        #expect(defaults.bool(forKey: ShopPurchaseRecordStore.legacyMigrationDefaultsKey))
     }
 
     @MainActor
@@ -7671,7 +7740,7 @@ struct HomeCommandExecutorTests {
     }
 
     private func makeInMemoryContainer() throws -> ModelContainer {
-        let schema = Schema(ArkSchemaV70.models)
+        let schema = Schema(ArkSchemaV71.models)
         let config = ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)
         return try ModelContainer(for: schema, configurations: [config])
     }

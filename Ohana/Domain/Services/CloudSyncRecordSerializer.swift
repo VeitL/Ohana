@@ -274,6 +274,12 @@ nonisolated enum CloudSyncRecordSerializer {
             CloudSyncRecordState.normalizedRecordId(event.id)
         case let entry as CoconutLedgerEntry:
             CloudSyncRecordState.normalizedRecordId(entry.id)
+        case let item as GachaOwnedItem:
+            CloudSyncRecordState.normalizedRecordId(item.id)
+        case let log as GachaDrawLog:
+            CloudSyncRecordState.normalizedRecordId(log.id)
+        case let record as ShopPurchaseRecord:
+            CloudSyncRecordState.normalizedRecordId(record.id)
         default:
             throw CloudSyncRecordSerializationError.missingLocalRecordId(entityName: entityName)
         }
@@ -314,6 +320,12 @@ nonisolated enum CloudSyncRecordSerializer {
             careLedgerEventFields(event)
         case let entry as CoconutLedgerEntry:
             coconutLedgerEntryFields(entry)
+        case let item as GachaOwnedItem:
+            gachaOwnedItemFields(item)
+        case let log as GachaDrawLog:
+            gachaDrawLogFields(log)
+        case let record as ShopPurchaseRecord:
+            shopPurchaseRecordFields(record)
         default:
             throw CloudSyncRecordSerializationError.unsupportedEntity(entityName: entityName)
         }
@@ -644,6 +656,61 @@ nonisolated enum CloudSyncRecordSerializer {
             "metadataJSON": .string(entry.metadataJSON),
             "occurredAt": .date(entry.occurredAt),
             "createdAt": .date(entry.createdAt)
+        ]
+    }
+
+    private static func gachaOwnedItemFields(_ item: GachaOwnedItem) -> [String: CloudSyncRecordFieldValue] {
+        [
+            "id": .string(CloudSyncRecordState.normalizedRecordId(item.id)),
+            "ownerHumanId": .string(item.ownerHumanId),
+            "seriesId": .string(item.seriesId),
+            "itemId": .string(item.itemId),
+            "rarityRaw": .string(item.rarityRaw),
+            "isHidden": .bool(item.isHidden),
+            "ownedCount": .int(item.ownedCount),
+            "firstObtainedAt": .date(item.firstObtainedAt),
+            "latestObtainedAt": .date(item.latestObtainedAt),
+            "createdAt": .date(item.createdAt)
+        ]
+    }
+
+    private static func gachaDrawLogFields(_ log: GachaDrawLog) -> [String: CloudSyncRecordFieldValue] {
+        [
+            "id": .string(CloudSyncRecordState.normalizedRecordId(log.id)),
+            "ownerHumanId": .string(log.ownerHumanId),
+            "ownerName": .string(log.ownerName),
+            "seriesId": .string(log.seriesId),
+            "itemId": .string(log.itemId),
+            "rarityRaw": .string(log.rarityRaw),
+            "isHidden": .bool(log.isHidden),
+            "isNew": .bool(log.isNew),
+            "outcomeKindRaw": .string(log.outcomeKindRaw),
+            "instantResultId": .string(log.instantResultId),
+            "instantTitleZh": .string(log.instantTitleZh),
+            "instantTitleEn": .string(log.instantTitleEn),
+            "instantTitleDe": .string(log.instantTitleDe),
+            "instantDetailZh": .string(log.instantDetailZh),
+            "instantDetailEn": .string(log.instantDetailEn),
+            "instantDetailDe": .string(log.instantDetailDe),
+            "instantSymbol": .string(log.instantSymbol),
+            "instantCoconutDelta": .int(log.instantCoconutDelta),
+            "costCoconuts": .int(log.costCoconuts),
+            "dailySequence": .int(log.dailySequence),
+            "drawDate": .date(log.drawDate),
+            "createdAt": .date(log.createdAt)
+        ]
+    }
+
+    private static func shopPurchaseRecordFields(_ record: ShopPurchaseRecord) -> [String: CloudSyncRecordFieldValue] {
+        [
+            "id": .string(CloudSyncRecordState.normalizedRecordId(record.id)),
+            "transactionKey": .string(record.transactionKey),
+            "itemId": .string(record.itemId),
+            "buyerHumanId": .string(record.buyerHumanId),
+            "purchasedAt": .date(record.purchasedAt),
+            "sourceRaw": .string(record.sourceRaw),
+            "isLegacyImport": .bool(record.isLegacyImport),
+            "createdAt": .date(record.createdAt)
         ]
     }
 

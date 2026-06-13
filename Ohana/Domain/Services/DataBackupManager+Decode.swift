@@ -818,4 +818,18 @@ nonisolated extension DataBackupManager {
         if let uuid = UUID(uuidString: dto.id) { log.id = uuid }
         return log
     }
+
+    func decodeShopPurchaseRecord(_ dto: ShopPurchaseRecordBackup) -> ShopPurchaseRecord {
+        let record = ShopPurchaseRecord(
+            id: UUID(uuidString: dto.id) ?? UUID(),
+            transactionKey: dto.transactionKey,
+            itemId: dto.itemId,
+            buyerHumanId: dto.buyerHumanId.isEmpty ? nil : dto.buyerHumanId,
+            purchasedAt: parseDate(dto.purchasedAt) ?? Date(),
+            sourceRaw: dto.sourceRaw,
+            isLegacyImport: dto.isLegacyImport,
+            createdAt: parseDate(dto.createdAt) ?? parseDate(dto.purchasedAt) ?? Date()
+        )
+        return record
+    }
 }

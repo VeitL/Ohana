@@ -17,7 +17,7 @@ final class CoconutWalletServiceTests: XCTestCase {
         _ = ModelContext(container)
 
         let schemaNames = ArkMigrationPlan.schemas.map { String(describing: $0) }
-        XCTAssertTrue(schemaNames.contains("ArkSchemaV70"))
+        XCTAssertTrue(schemaNames.contains("ArkSchemaV71"))
         XCTAssertTrue(ArkMigrationPlan.stages.isEmpty)
     }
 
@@ -715,7 +715,7 @@ final class CoconutWalletServiceTests: XCTestCase {
     }
 
     private func makeContainer() throws -> ModelContainer {
-        let schema = Schema(ArkSchemaV70.models)
+        let schema = Schema(ArkSchemaV71.models)
         let config = ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)
         return try ModelContainer(for: schema, configurations: [config])
     }

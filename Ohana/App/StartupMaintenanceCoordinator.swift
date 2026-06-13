@@ -69,6 +69,10 @@ final class StartupMaintenanceCoordinator: ObservableObject {
                 self.cleanLegacySharedCareNotesIfNeeded(context: context)
             }
 
+            await runStep("shop_purchase_defaults_migration", delayMilliseconds: 5000) {
+                self.migrateLegacyShopPurchasesIfNeeded(context: context)
+            }
+
             await runStep("avatar_asset_compaction", delayMilliseconds: 90000) {
                 await self.compactAvatarAssetsIfNeeded(context: context)
             }
@@ -155,6 +159,25 @@ final class StartupMaintenanceCoordinator: ObservableObject {
             valueMS: 0,
             note: "\(result.cleanup.cleanedCount) cleaned, \(result.cleanup.skippedOrphanCount) skipped"
         )
+    }
+
+    private func migrateLegacyShopPurchasesIfNeeded(context: ModelContext) {
+        do {
+            let inserted = try ShopPurchaseRecordStore.migrateLegacyDefaultsIfNeeded(
+                context: context,
+                defaults: defaults
+            )
+            AppPerformanceMonitor.shared.record(
+                "startup_shop_purchase_defaults_migration",
+                valueMS: 0,
+                note: "\(inserted) records"
+            )
+        } catch {
+            context.rollback()
+            #if DEBUG
+                OhanaLog.error("Shop purchase defaults migration failed: \(error.localizedDescription)", category: "StartupMaintenance")
+            #endif
+        }
     }
 
     private func compactAvatarAssetsIfNeeded(context: ModelContext) async {

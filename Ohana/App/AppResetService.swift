@@ -98,6 +98,7 @@ enum AppResetService {
         try delete(CoconutExchangeRequest.self, in: context)
         try delete(SharedCareSession.self, in: context)
         try delete(RecycleBinBatch.self, in: context)
+        try delete(ShopPurchaseRecord.self, in: context)
         try delete(GachaDrawLog.self, in: context)
         try delete(GachaOwnedItem.self, in: context)
         try delete(OasisCritterActionLog.self, in: context)

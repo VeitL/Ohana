@@ -11,12 +11,12 @@ import SwiftUI
 struct InventoryContentView: View {
     let pets: [Pet]
     let humans: [Human]
+    let purchaseRecords: [ShopPurchaseRecord]
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
     @Environment(AppServices.self) private var appServices
     @AppStorage("appLanguage") private var appLanguage = "zh"
-    @AppStorage("purchasedShopItems") private var purchasedRaw: String = ""
 
     // Equip states
     @AppStorage("shop_equipped_title") private var equippedTitle: String = ""
@@ -43,10 +43,18 @@ struct InventoryContentView: View {
     }
 
     private var purchasedSet: Set<String> {
-        Set(purchasedRaw.split(separator: ",").map(String.init))
+        ShopPurchaseRecordStore.ownedItemIDs(from: purchaseRecords)
     }
 
     private var l: L10n { L10n(appLanguage) }
+
+    private var activeHumans: [Human] {
+        humans.filter(EconomyWalletWritePolicy.canWrite)
+    }
+
+    private var activePets: [Pet] {
+        pets.filter(EconomyWalletWritePolicy.canWrite)
+    }
 
     private var myEffects: [ShopItem] {
         allEffectsAndTitles.filter { $0.category == .effect && purchasedSet.contains($0.id) }
@@ -143,16 +151,16 @@ struct InventoryContentView: View {
         }
         .onAppear { loadConsumableInventory() }
         .confirmationDialog("选择要绑定破框卡片的宠物", isPresented: $showPetPickerForPopout, titleVisibility: .visible) {
-            ForEach(pets) { pet in
+            ForEach(activePets) { pet in
                 Button(pet.name) { equipPopoutPet = pet }
             }
             Button(l.tr(zh: "取消", en: "Cancel", de: "Abbrechen"), role: .cancel) {}
         }
         .confirmationDialog(l.tr(zh: "选择要升级 2.5D 头像的成员", en: "Choose who gets the 2.5D avatar", de: "Wähle das 2,5D-Avatar-Ziel"), isPresented: $showAvatarTargetPicker, titleVisibility: .visible) {
-            ForEach(humans) { human in
+            ForEach(activeHumans) { human in
                 Button(human.name) { upgradeHumanTo2DAvatar(human) }
             }
-            ForEach(pets) { pet in
+            ForEach(activePets) { pet in
                 Button(pet.name) { upgradePetTo2DAvatar(pet) }
             }
             Button(l.tr(zh: "取消", en: "Cancel", de: "Abbrechen"), role: .cancel) {}
@@ -307,10 +315,10 @@ struct InventoryContentView: View {
                 case "fx_rainbow_poop": equipFxRainbowPoop = val
                 case "fx_popout_card":
                     equipFxPopoutCard = val
-                    if val, !pets.contains(where: { $0.cardStyleRaw == "popout" }) {
-                        if pets.count == 1 {
-                            equipPopoutPet = pets.first
-                        } else if pets.count > 1 {
+                    if val, !activePets.contains(where: { $0.cardStyleRaw == "popout" }) {
+                        if activePets.count == 1 {
+                            equipPopoutPet = activePets.first
+                        } else if activePets.count > 1 {
                             showPetPickerForPopout = true
                         }
                     }
@@ -338,9 +346,9 @@ struct InventoryContentView: View {
             HStack(spacing: 10) {
                 if item.id == "fx_popout_card" {
                     Button {
-                        if pets.count == 1 {
-                            equipPopoutPet = pets.first
-                        } else if pets.count > 1 {
+                        if activePets.count == 1 {
+                            equipPopoutPet = activePets.first
+                        } else if activePets.count > 1 {
                             showPetPickerForPopout = true
                         }
                     } label: {

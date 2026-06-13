@@ -133,7 +133,7 @@ nonisolated enum GachaSeriesCatalog {
     static let totalBasisPoints = 10000
     static let hiddenBasisPoints = 200
     static let commonBasisPoints = 2000
-    static let coconutGrandBundleBasisPoints = 500
+    static let coconutGrandBundleBasisPoints = 200
     static let otherBasisPoints = 7800
     static let coconutGrandBundleResultId = "coconut_grand_bundle_500"
     static let defaultSeriesId = "plush_coconut_squad_v1"
@@ -168,8 +168,8 @@ nonisolated enum GachaSeriesCatalog {
                 instant("coconut_echo_8", .instantReward, "椰奶返礼", "Coconut Milk Treat", "Kokosmilch-Gruß", "nana 偷偷塞回 8 颗椰子。", "nana quietly returns 8 coconuts.", "nana gibt heimlich 8 Kokosnüsse zurück.", 900, "🥥", coconutDelta: 8),
                 instant("lucky_leaf_10", .instantReward, "幸运叶片", "Lucky Leaf", "Glücksblatt", "叶片亮了一下，返还 10 颗椰子。", "A leaf glows and returns 10 coconuts.", "Ein Blatt leuchtet und gibt 10 Kokosnüsse zurück.", 900, "🍃", coconutDelta: 10),
                 instant(coconutGrandBundleResultId, .instantReward, "椰子大礼包", "Coconut Grand Bundle", "Großes Kokospaket", "哗啦啦，500 颗椰子从盒子里掉下来！", "A grand bundle drops 500 coconuts from the box!", "Ein großes Paket lässt 500 Kokosnüsse herausfallen!", coconutGrandBundleBasisPoints, "🎁", coconutDelta: 500),
-                instant("message_soft_paw", .message, "软爪留言", "Soft Paw Note", "Weiche-Pfote-Notiz", "今天也被好好照顾了，辛苦啦。", "Someone is cared for today. Nice work.", "Heute wurde jemand gut umsorgt. Gut gemacht.", 1200, "💌"),
-                instant("message_coconut_oracle", .message, "椰壳占卜", "Coconut Oracle", "Kokos-Orakel", "椰壳说：再敲一次之前先喝口水。", "The shell says: sip water before the next crack.", "Die Schale sagt: vor dem nächsten Öffnen Wasser trinken.", 1200, "🔮"),
+                instant("message_soft_paw", .message, "软爪留言", "Soft Paw Note", "Weiche-Pfote-Notiz", "今天也被好好照顾了，辛苦啦。", "Someone is cared for today. Nice work.", "Heute wurde jemand gut umsorgt. Gut gemacht.", 1350, "💌"),
+                instant("message_coconut_oracle", .message, "椰壳占卜", "Coconut Oracle", "Kokos-Orakel", "椰壳说：再敲一次之前先喝口水。", "The shell says: sip water before the next crack.", "Die Schale sagt: vor dem nächsten Öffnen Wasser trinken.", 1350, "🔮"),
                 instant("message_nana_wink", .message, "nana 眨眼", "nana Wink", "nana zwinkert", "nana 眨了一下眼：好运已经在排队。", "nana winks: luck is already lining up.", "nana zwinkert: Das Glück steht schon an.", 1050, "✨"),
                 instant("message_ohana_breeze", .message, "Ohana 微风", "Ohana Breeze", "Ohana-Brise", "一阵海风路过，把家里的疲惫吹轻了一点。", "A sea breeze passes and lightens the day.", "Eine Meeresbrise macht den Tag leichter.", 1050, "🌴")
             ]
@@ -202,8 +202,8 @@ nonisolated enum GachaSeriesCatalog {
                 instant("noir_ribbon_return_8", .instantReward, "黑缎返礼", "Satin Return", "Satin-Gruß", "缎带一抖，返还 8 颗椰子。", "A satin ribbon flicks back 8 coconuts.", "Ein Satinband gibt 8 Kokosnüsse zurück.", 900, "🥥", coconutDelta: 8),
                 instant("noir_moon_return_10", .instantReward, "月相折扣", "Moon Phase Refund", "Mondphasen-Erstattung", "月相扣轻轻亮起，返还 10 颗椰子。", "The moon clasp glows and returns 10 coconuts.", "Die Mondspange leuchtet und gibt 10 Kokosnüsse zurück.", 900, "🌙", coconutDelta: 10),
                 instant(coconutGrandBundleResultId, .instantReward, "椰子大礼包", "Coconut Grand Bundle", "Großes Kokospaket", "黑盒突然打开，500 颗椰子落下来！", "The noir box bursts open with 500 coconuts!", "Die Noir-Box öffnet sich mit 500 Kokosnüssen!", coconutGrandBundleBasisPoints, "🎁", coconutDelta: 500),
-                instant("noir_message_after_rain", .message, "雨后便签", "After-Rain Note", "Nach-dem-Regen-Notiz", "雨会停，衣角的光会留下。", "Rain passes; the little shine stays.", "Regen vergeht; der kleine Glanz bleibt.", 1200, "💌"),
-                instant("noir_message_velvet", .message, "丝绒低语", "Velvet Whisper", "Samtflüstern", "今天也可以低调地漂亮。", "Today can be quietly beautiful.", "Heute darf still schön sein.", 1200, "✦"),
+                instant("noir_message_after_rain", .message, "雨后便签", "After-Rain Note", "Nach-dem-Regen-Notiz", "雨会停，衣角的光会留下。", "Rain passes; the little shine stays.", "Regen vergeht; der kleine Glanz bleibt.", 1350, "💌"),
+                instant("noir_message_velvet", .message, "丝绒低语", "Velvet Whisper", "Samtflüstern", "今天也可以低调地漂亮。", "Today can be quietly beautiful.", "Heute darf still schön sein.", 1350, "✦"),
                 instant("noir_message_oracle", .message, "夜潮预言", "Night Tide Oracle", "Nachttide-Orakel", "下一次惊喜，正在慢慢靠近。", "The next surprise is drifting closer.", "Die nächste Überraschung treibt näher.", 1050, "🔮"),
                 instant("noir_message_ohana", .message, "Ohana 银线", "Ohana Silver Thread", "Ohana-Silberfaden", "有些连接安静，却从不松开。", "Some bonds are quiet and never loosen.", "Manche Bande sind leise und lösen sich nie.", 1050, "○")
             ]
@@ -523,6 +523,7 @@ final class GachaDrawLog {
 enum GachaDrawError: Error, Equatable {
     case missingHuman
     case insufficientBalance(missing: Int)
+    case walletFrozen
     case invalidSeries
     case lockedSeries
 }
@@ -656,6 +657,7 @@ enum GachaDrawService {
         let wallet: CoconutWalletManaging = providedWallet ?? SwiftDataCoconutWalletManager()
         let careLedger: CareLedgerRecording = providedCareLedger ?? CareLedgerService()
         guard let human else { throw GachaDrawError.missingHuman }
+        guard EconomyWalletWritePolicy.canWrite(human) else { throw GachaDrawError.walletFrozen }
         let series = GachaSeriesCatalog.series(id: seriesId)
         guard series.probabilityTotalBasisPoints == GachaSeriesCatalog.totalBasisPoints else {
             throw GachaDrawError.invalidSeries
@@ -663,9 +665,14 @@ enum GachaDrawService {
 
         let logs = dailyDrawLogs(for: human.id.uuidString, context: context, now: now)
         let usedToday = dailyDrawCount(for: human.id.uuidString, in: logs, now: now)
-        let humanBalance = CoconutWalletService.balance(for: human, context: context)
-        guard humanBalance >= costPerDraw else {
-            throw GachaDrawError.insufficientBalance(missing: costPerDraw - humanBalance)
+        let fundingPlan = CoconutWalletFundingPlanner.humanCofundingPlan(
+            cost: costPerDraw,
+            primaryHuman: human,
+            context: context,
+            logPrefix: "GachaDrawService"
+        )
+        guard fundingPlan.missing == 0 else {
+            throw GachaDrawError.insufficientBalance(missing: fundingPlan.missing)
         }
 
         let ownedItems = ownedItems(for: human.id.uuidString, context: context)
@@ -724,8 +731,15 @@ enum GachaDrawService {
             drawDate: now
         )
         context.insert(log)
+        if let owned {
+            CloudSyncMutationRecorder.markModified(owned, context: context, modifiedAt: now)
+        }
+        CloudSyncMutationRecorder.markModified(log, context: context, modifiedAt: now)
 
-        let baseMetadata = "\"seriesId\":\"\(series.id)\",\"outcomeKind\":\"\(rollResult.kind.rawValue)\",\"itemId\":\"\(item?.id ?? "")\",\"instantResultId\":\"\(rollResult.instantResult?.id ?? "")\",\"instantCoconutDelta\":\(instantCoconutDelta),\"rarity\":\"\(item?.rarity.rawValue ?? "")\",\"hidden\":\(item?.isHidden ?? false)"
+        let cofundingMetadata = fundingPlan.contributions.count > 1
+            ? ",\"cofunded\":true,\"fundingSourceCount\":\(fundingPlan.contributions.count)"
+            : ""
+        let baseMetadata = "\"seriesId\":\"\(series.id)\",\"outcomeKind\":\"\(rollResult.kind.rawValue)\",\"itemId\":\"\(item?.id ?? "")\",\"instantResultId\":\"\(rollResult.instantResult?.id ?? "")\",\"instantCoconutDelta\":\(instantCoconutDelta),\"rarity\":\"\(item?.rarity.rawValue ?? "")\",\"hidden\":\(item?.isHidden ?? false)\(cofundingMetadata)"
 
         let costLedger = careLedger.record(
             occurredAt: now,
@@ -750,25 +764,28 @@ enum GachaDrawService {
             context: context,
             save: false
         )
-        var walletDeltas: [CoconutWalletDelta] = [
-            .human(
-                human,
-                delta: -costPerDraw,
-                entryKind: .spend,
+        var walletDeltas: [CoconutWalletDelta] = fundingPlan.contributions.map { contribution in
+            let isBuyer = contribution.human.id == human.id
+            return .human(
+                contribution.human,
+                delta: -contribution.amount,
+                entryKind: isBuyer ? .spend : .transferOut,
                 source: .gacha,
-                title: "盲盒抽取",
+                title: isBuyer ? "盲盒抽取" : "合资补差：盲盒抽取",
                 emoji: "🥥",
-                actorId: human.id.uuidString,
-                actorName: human.name,
-                subjectKind: .system,
-                subjectId: nil,
+                actorId: contribution.human.id.uuidString,
+                actorName: contribution.human.name,
+                subjectKind: isBuyer ? .system : .human,
+                subjectId: isBuyer ? nil : human.id.uuidString,
                 sourceModelName: "GachaDrawLog",
                 sourceModelId: log.id.uuidString,
                 careLedgerEventId: costLedger.id.uuidString,
                 metadataJSON: "{\(baseMetadata),\"ledgerPart\":\"cost\"}",
-                transactionKey: "gacha:\(log.id.uuidString):cost"
+                transactionKey: fundingPlan.contributions.count == 1
+                    ? "gacha:\(log.id.uuidString):cost"
+                    : "gacha:\(log.id.uuidString):cost:\(contribution.human.id.uuidString)"
             )
-        ]
+        }
         if instantCoconutDelta > 0 {
             let instantLedger = careLedger.record(
                 occurredAt: now,

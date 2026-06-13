@@ -335,7 +335,7 @@ struct CloudSyncMetadataServiceTests {
 
     @MainActor
     @Test func entityRegistryCoversCurrentSwiftDataSchema() {
-        let schemaNames = Set(ArkSchemaV64.models.map { String(describing: $0) })
+        let schemaNames = Set(ArkSchemaV71.models.map { String(describing: $0) })
         let descriptorNames = Set(CloudSyncEntityRegistry.descriptors.map(\.entityName))
 
         #expect(descriptorNames == schemaNames)
@@ -550,6 +550,56 @@ struct CloudSyncMetadataServiceTests {
         #expect(payload.fields["executorId"]?.stringValue == executorId)
         #expect(payload.fields["amountGrams"] == .double(25))
         #expect(payload.fields[CloudSyncRecordFieldKey.conflictPolicy]?.stringValue == CloudSyncConflictPolicy.appendOnly.rawValue)
+    }
+
+    @MainActor
+    @Test func recordSerializerBuildsGachaAndShopPurchasePayloads() throws {
+        let container = try makeContainer()
+        let context = ModelContext(container)
+        let householdId = uuid("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")
+        let ownerId = uuid("77777777-7777-4777-8777-777777777777")
+        let ownedItem = GachaOwnedItem(
+            ownerHumanId: ownerId.uuidString,
+            seriesId: GachaSeriesCatalog.defaultSeriesId,
+            itemId: "plush_coconut_sleepy",
+            rarity: .common,
+            ownedCount: 2,
+            firstObtainedAt: Date(timeIntervalSinceReferenceDate: 10),
+            latestObtainedAt: Date(timeIntervalSinceReferenceDate: 20)
+        )
+        ownedItem.id = uuid("88888888-8888-4888-8888-888888888888")
+        let ownedState = try CloudSyncMetadataService.markModified(
+            entityName: String(describing: GachaOwnedItem.self),
+            localRecordId: ownedItem.id,
+            householdId: householdId,
+            context: context
+        )
+        let ownedPayload = try CloudSyncRecordSerializer.payload(for: ownedItem, state: ownedState)
+
+        #expect(ownedPayload.recordType == "GachaOwnedItem")
+        #expect(ownedPayload.fields["ownerHumanId"]?.stringValue == ownerId.uuidString)
+        #expect(ownedPayload.fields["ownedCount"] == .int(2))
+        #expect(ownedPayload.fields[CloudSyncRecordFieldKey.conflictPolicy]?.stringValue == CloudSyncConflictPolicy.lastWriterWins.rawValue)
+
+        let purchase = ShopPurchaseRecord(
+            id: uuid("99999999-9999-4999-8999-999999999999"),
+            transactionKey: "shop:fx_lime_glow:\(ownerId.uuidString)",
+            itemId: "fx_lime_glow",
+            buyerHumanId: ownerId.uuidString,
+            purchasedAt: Date(timeIntervalSinceReferenceDate: 30)
+        )
+        let purchaseState = try CloudSyncMetadataService.markModified(
+            entityName: String(describing: ShopPurchaseRecord.self),
+            localRecordId: purchase.id,
+            householdId: householdId,
+            context: context
+        )
+        let purchasePayload = try CloudSyncRecordSerializer.payload(for: purchase, state: purchaseState)
+
+        #expect(purchasePayload.recordType == "ShopPurchaseRecord")
+        #expect(purchasePayload.fields["transactionKey"]?.stringValue == purchase.transactionKey)
+        #expect(purchasePayload.fields["itemId"]?.stringValue == "fx_lime_glow")
+        #expect(purchasePayload.fields["buyerHumanId"]?.stringValue == ownerId.uuidString)
     }
 
     @MainActor
@@ -2217,6 +2267,61 @@ struct CloudSyncMetadataServiceTests {
     }
 
     @MainActor
+    @Test func recordApplierInsertsRemoteGachaAndShopPurchaseFacts() throws {
+        let container = try makeContainer()
+        let context = ModelContext(container)
+        let householdId = uuid("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")
+        let ownerId = uuid("77777777-7777-4777-8777-777777777777")
+        let gachaId = uuid("88888888-8888-4888-8888-888888888888")
+        let purchaseId = uuid("99999999-9999-4999-8999-999999999999")
+
+        let gachaRecord = try makeRecordPayload(
+            entityName: String(describing: GachaOwnedItem.self),
+            recordType: String(describing: GachaOwnedItem.self),
+            localRecordId: gachaId,
+            householdId: householdId,
+            fields: [
+                "ownerHumanId": .string(ownerId.uuidString),
+                "seriesId": .string(GachaSeriesCatalog.defaultSeriesId),
+                "itemId": .string("plush_coconut_sleepy"),
+                "rarityRaw": .string(GachaRarity.common.rawValue),
+                "isHidden": .bool(false),
+                "ownedCount": .int(3),
+                "firstObtainedAt": .date(Date(timeIntervalSinceReferenceDate: 10)),
+                "latestObtainedAt": .date(Date(timeIntervalSinceReferenceDate: 20)),
+                "createdAt": .date(Date(timeIntervalSinceReferenceDate: 10))
+            ]
+        ).makeCKRecord()
+        let purchaseRecord = try makeRecordPayload(
+            entityName: String(describing: ShopPurchaseRecord.self),
+            recordType: String(describing: ShopPurchaseRecord.self),
+            localRecordId: purchaseId,
+            householdId: householdId,
+            fields: [
+                "transactionKey": .string("shop:fx_lime_glow:\(ownerId.uuidString)"),
+                "itemId": .string("fx_lime_glow"),
+                "buyerHumanId": .string(ownerId.uuidString),
+                "purchasedAt": .date(Date(timeIntervalSinceReferenceDate: 30)),
+                "sourceRaw": .string("shop"),
+                "isLegacyImport": .bool(false),
+                "createdAt": .date(Date(timeIntervalSinceReferenceDate: 30))
+            ]
+        ).makeCKRecord()
+
+        let gachaResult = try CloudSyncRecordApplier.apply(gachaRecord, context: context)
+        let purchaseResult = try CloudSyncRecordApplier.apply(purchaseRecord, context: context)
+
+        #expect(gachaResult == .inserted(entityName: "GachaOwnedItem", localRecordId: normalized(gachaId)))
+        #expect(purchaseResult == .inserted(entityName: "ShopPurchaseRecord", localRecordId: normalized(purchaseId)))
+        let gachaItems = try context.fetch(FetchDescriptor<GachaOwnedItem>())
+        let purchases = try context.fetch(FetchDescriptor<ShopPurchaseRecord>())
+        #expect(gachaItems.first?.ownedCount == 3)
+        #expect(gachaItems.first?.ownerHumanId == ownerId.uuidString)
+        #expect(purchases.first?.itemId == "fx_lime_glow")
+        #expect(purchases.first?.buyerHumanId == ownerId.uuidString)
+    }
+
+    @MainActor
     @Test func recordApplierInsertsRemotePetScopedCareFacts() throws {
         let container = try makeContainer()
         let context = ModelContext(container)
@@ -2998,7 +3103,7 @@ struct CloudSyncMetadataServiceTests {
 
     @MainActor
     private func makeContainer() throws -> ModelContainer {
-        let schema = Schema(ArkSchemaV67.models)
+        let schema = Schema(ArkSchemaV71.models)
         let config = ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)
         return try ModelContainer(for: schema, configurations: [config])
     }

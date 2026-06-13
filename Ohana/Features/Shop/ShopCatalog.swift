@@ -210,7 +210,7 @@ enum ShopCatalog {
             emoji: "🖼️",
             nameText: .init(zh: "2.5D 头像券", en: "2.5D Avatar Pass", de: "2,5D-Avatarpass"),
             descriptionText: .init(zh: "购买后指定 1 位人类或宠物升级 2.5D 头像。", en: "Upgrade one human or pet to a 2.5D avatar.", de: "Wertet einen Menschen oder ein Tier auf einen 2,5D-Avatar auf."),
-            cost: 1500,
+            cost: 1200,
             category: .avatar2d,
             isConsumable: true
         )
@@ -232,11 +232,11 @@ enum ShopCatalog {
     ]
 
     private static let boostItems: [ShopItem] = [
-        ShopItem(id: "boost_double", emoji: "⚡️", nameText: .init(zh: "金色幸运券", en: "Golden Luck", de: "Goldenes Glück"), descriptionText: .init(zh: "下次普通照护触发金色幸运，受每日预算控制。", en: "Turns the next regular care reward into Golden Luck, within the daily budget.", de: "Macht die nächste normale Pflege zu goldenem Glück, im Tagesbudget."), cost: 220, category: .boost, isConsumable: true),
-        ShopItem(id: "boost_streak", emoji: "🛡️", nameText: .init(zh: "Streak 保护盾", en: "Streak Shield", de: "Streak-Schild"), descriptionText: .init(zh: "48 小时内漏签 1 天也不断连胜。", en: "Protects one missed day within 48 hours.", de: "Schützt einen verpassten Tag innerhalb von 48 Stunden."), cost: 260, category: .boost, isConsumable: true),
+        ShopItem(id: "boost_double", emoji: "⚡️", nameText: .init(zh: "金色幸运券", en: "Golden Luck", de: "Goldenes Glück"), descriptionText: .init(zh: "下次普通照护触发金色幸运，受每日预算控制。", en: "Turns the next regular care reward into Golden Luck, within the daily budget.", de: "Macht die nächste normale Pflege zu goldenem Glück, im Tagesbudget."), cost: 80, category: .boost, isConsumable: true),
+        ShopItem(id: "boost_streak", emoji: "🛡️", nameText: .init(zh: "Streak 保护盾", en: "Streak Shield", de: "Streak-Schild"), descriptionText: .init(zh: "48 小时内漏签 1 天也不断连胜。", en: "Protects one missed day within 48 hours.", de: "Schützt einen verpassten Tag innerhalb von 48 Stunden."), cost: 180, category: .boost, isConsumable: true),
         ShopItem(id: "boost_tree", emoji: "🌱", nameText: .init(zh: "树能量 +20XP", en: "Tree XP +20", de: "Baum-XP +20"), descriptionText: .init(zh: "可重复注入；只要椰子足够，就能为生命之树加速。", en: "Inject repeatedly as long as you have enough coconuts.", de: "Wiederholt einspeisen, solange genug Kokosnüsse vorhanden sind."), cost: 80, category: .boost, isConsumable: true),
         ShopItem(id: "boost_tree_large", emoji: "🌳", nameText: .init(zh: "树能量包 +60XP", en: "Tree XP Pack +60", de: "Baum-XP-Paket +60"), descriptionText: .init(zh: "Lv.5 后可重复购买；椰子足够就能继续注入。", en: "Repeatable after Lv.5 as long as you have enough coconuts.", de: "Ab Lv.5 wiederholbar, solange genug Kokosnüsse vorhanden sind."), cost: 220, category: .boost, isConsumable: true),
-        ShopItem(id: "boost_backdate_single", emoji: "📅", nameText: .init(zh: "补签券 ×1", en: "Backdate Pass ×1", de: "Nachtragspass ×1"), descriptionText: .init(zh: "获得 1 张昨日补签券，放入百宝箱。", en: "Adds one yesterday backdate pass.", de: "Fügt einen Nachtragspass für gestern hinzu."), cost: 150, category: .boost, isConsumable: true),
-        ShopItem(id: "boost_backdate_pack", emoji: "🗓️", nameText: .init(zh: "补签券 ×3", en: "Backdate Pass ×3", de: "Nachtragspass ×3"), descriptionText: .init(zh: "获得 3 张昨日补签券，适合连续补签。", en: "Adds three backdate passes.", de: "Fügt drei Nachtragspässe hinzu."), cost: 350, category: .boost, isConsumable: true)
+        ShopItem(id: "boost_backdate_single", emoji: "📅", nameText: .init(zh: "补签券 ×1", en: "Backdate Pass ×1", de: "Nachtragspass ×1"), descriptionText: .init(zh: "获得 1 张昨日补签券，放入百宝箱。", en: "Adds one yesterday backdate pass.", de: "Fügt einen Nachtragspass für gestern hinzu."), cost: 240, category: .boost, isConsumable: true),
+        ShopItem(id: "boost_backdate_pack", emoji: "🗓️", nameText: .init(zh: "补签券 ×3", en: "Backdate Pass ×3", de: "Nachtragspass ×3"), descriptionText: .init(zh: "获得 3 张昨日补签券，适合连续补签。", en: "Adds three backdate passes.", de: "Fügt drei Nachtragspässe hinzu."), cost: 580, category: .boost, isConsumable: true)
     ]
 }

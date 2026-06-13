@@ -4,6 +4,7 @@ import SwiftUI
 struct CoconutShopView: View {
     let humans: [Human]
     let pets: [Pet]
+    let purchaseRecords: [ShopPurchaseRecord]
     let exchangeRequests: [CoconutExchangeRequest]
 
     @Environment(\.dismiss) var dismiss
@@ -12,7 +13,6 @@ struct CoconutShopView: View {
     @Environment(AppServices.self) var appServices
 
     @AppStorage("appLanguage") var appLanguage = "zh"
-    @AppStorage("purchasedShopItems") var purchasedRaw = ""
     @AppStorage("currentActiveHumanId") var activeHumanId = ""
     @AppStorage("shop_equipped_title") var equippedTitle = ""
     @AppStorage("shop_equip_fx_lime_glow") var equipFxLimeGlow = false
@@ -38,10 +38,12 @@ struct CoconutShopView: View {
         initialCategory: ShopItem.ShopCategory = .appIcon,
         humans: [Human] = [],
         pets: [Pet] = [],
+        purchaseRecords: [ShopPurchaseRecord] = [],
         exchangeRequests: [CoconutExchangeRequest] = []
     ) {
         self.humans = humans
         self.pets = pets
+        self.purchaseRecords = purchaseRecords
         self.exchangeRequests = exchangeRequests
         _selectedCategory = State(initialValue: initialCategory.isVisibleInFirstRelease ? initialCategory : .appIcon)
     }
@@ -82,7 +84,7 @@ struct CoconutShopView: View {
     var tertiaryText: Color { Color.ohanaTertiaryText }
 
     var purchasedSet: Set<String> {
-        Set(purchasedRaw.split(separator: ",").map(String.init))
+        ShopPurchaseRecordStore.ownedItemIDs(from: purchaseRecords)
     }
 
     var allItems: [ShopItem] {
@@ -97,13 +99,28 @@ struct CoconutShopView: View {
         selectedCategory.isVisibleInFirstRelease ? selectedCategory : .appIcon
     }
 
+    var selectedActiveHuman: Human? {
+        humans.first { $0.id.uuidString == activeHumanId }
+    }
+
     var currentHuman: Human? {
-        humans.first { $0.id.uuidString == activeHumanId } ?? humans.first
+        if let selectedActiveHuman {
+            return selectedActiveHuman
+        }
+        return activeHumans.first
     }
 
     var otherHumans: [Human] {
         guard let currentHuman else { return [] }
-        return humans.filter { $0.id != currentHuman.id }
+        return activeHumans.filter { $0.id != currentHuman.id }
+    }
+
+    var activeHumans: [Human] {
+        humans.filter(EconomyWalletWritePolicy.canWrite)
+    }
+
+    var activePets: [Pet] {
+        pets.filter(EconomyWalletWritePolicy.canWrite)
     }
 
     var currentHumanBalance: Int {

@@ -45,8 +45,8 @@
 | DashboardRecords | 7 | ⬜ | | 历史验证阻塞 TFU-20260612-013 已由 cross-scope repair 关闭 | | 接手时留意 `WeightHistoryView 2.swift` 曾误入仓库并阻塞 app target 编译 |
 | Calendar | 7 | ⬜ | | | | |
 | CrewRoster | 7 | ⬜ | | | | |
-| Gacha | 7 | ⬜ | | | | |
-| Shop | 7 | ⬜ | | | | |
+| Gacha | 7 | 🟢 | 2026-06-13 | 无 P1/P2 代码余留；真实 UI 抽查见统一 track list | `本次提交` | 与 Shop 合并一轮；规则书见 `docs/specs/GachaShop-logic.md`；Q1~Q8/Q11~Q13/Q15~Q16 选 A，Q9/Q10/Q14 选 B；大奖概率降至 2% 且奖额/id 保持 500🥥，留言概率补齐；抽取支持岛屿合资但当前主人仍拥有记录 / 奖励，冻结钱包硬拒绝；GachaOwnedItem / GachaDrawLog 已接入 CloudSync serializer/applier；目标测试、changed gate 与 `scripts/module-exit-gate.sh` PASS；schema 升至 `ArkSchemaV71`，未启用 CloudKit |
+| Shop | 7 | 🟢 | 2026-06-13 | 无 P1/P2 代码余留；真机 App Icon / 真实 UI 抽查见统一 track list | `本次提交` | 与 Gacha 合并一轮；规则书见 `docs/specs/GachaShop-logic.md`；定价与隐藏汇率按规则书调整，Shop 购买支持岛屿合资；App Icon 改为先扣款后换图标，失败按出资人退款；非消耗品所有权迁至 `ShopPurchaseRecord`，旧 `purchasedShopItems` 启动迁移，备份恢复保留购买记录；购买履约收进 `ShopPurchaseFulfillmentService`，成员创建头像券复用 Shop/cofund/frozen 规则；ShopPurchaseRecord 已接入 CloudSync serializer/applier；目标测试、changed gate 与 `scripts/module-exit-gate.sh` PASS；schema 升至 `ArkSchemaV71`，未启用 CloudKit |
 | Documents | 7 | ⬜ | | | | |
 | Insurance | 7 | ⬜ | | | | |
 | GrowthUnlock | 7 | ⬜ | | | | |
@@ -113,3 +113,4 @@
 | 2026-06-13 | Phase 7 开工前裁定 | 核验：推送已清零 ✓、Economy 修复轮按治本协议执行（表征→重构→行为三连 commit）✓、GAP-2 四条 P1 全修 ✓、GAP-12 植物门完成 ✓。**修正：GAP-2 的 🏁 降回 🟢**（修复后无新一轮复审记录，不符 🏁 判定）。**硬阻塞：CI build-test 红**（TFU-20260613-007 P1：FamilyTasks 地图视图等非 Economy 面编译失败；TFU-006：CI 工具版本 pin 过期）。**裁定：Phase 7 前先开 CI 修复轮清掉 TFU-006/007；Economy 与 GAP-2 的重新复审与 Phase 7 并行，不阻塞开工** |
 | 2026-06-13 | Phase 7 调度补充 | Economy 与 GAP-2 重新复审改为 Phase 7 并行项，只挡 Phase 8 不挡 Phase 7；Phase 7 模块 boot prompt 必须追加「复审模式预检清单」：奖励预算/冷却管线、executor/system 钱包归属、删除/恢复派生状态生命周期、服务层硬门 vs UI 软门，命中任一类直接列 P1。批次顺序：第一批 Walks、Gacha+Shop、Medication、Memorial、Onboarding；第二批 Calendar、Notifications、Expenses、DashboardRecords、Achievements、GrowthUnlock；第三批 Documents、Insurance、Wishlist、Moments、PhotoAlbum、CrewRoster、FunctionMenu 等低风险模块可并行快跑。FamilyTasks 与 Plants 已在门后，仅做编译通过 + 不可达轻量核验 |
 | 2026-06-13 | CI 修复轮收口 | TFU-20260613-006/007 已关闭：工具 pin 已刷新并经 CI tool-version 步验证，`build-test` 在 GitHub Actions run `27452421109` 对 commit `33f32ef1a` 绿；本地补充验证 `scripts/dev-check-changed.sh`、`scripts/build-debug-fast.sh`、`scripts/test-simulator.sh -only-testing:OhanaTests/CoconutWalletServiceTests`、SwiftLint 0.63.3 strict lint 均通过。剩余 CI 红点仅 `Architecture boundaries audit`，已单独登记 TFU-20260613-008，不并入本 CI 修复轮；Phase 7 可按第一批从 Walks 开始 |
+| 2026-06-13 | Phase 7 Gacha + Shop 收口 | Gacha 与 Shop 合并建设完成：规则书 `docs/specs/GachaShop-logic.md` 已落地；概率 / 定价 / 汇率 / 合资 / 冻结钱包 / App Icon 失败退款 / SwiftData 所有权迁移 / 备份恢复 / CloudSync serializer-applier / schema V71 均有目标测试覆盖；`scripts/dev-check-changed.sh` 与 `scripts/module-exit-gate.sh` PASS。真机 App Icon、真实 UI 分类遍历、真实扭蛋动画、旧安装样本迁移和长语言目检留在统一人工验收 track list |

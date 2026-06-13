@@ -97,19 +97,19 @@ extension CoconutShopView {
 
     func purchaseAndApplyAppIcon(_ item: ShopItem, descriptor: AppIconShopDescriptor) {
         guard canAfford(item) else { return }
-        appServices.appIcons.setIcon(descriptor) { result in
-            switch result {
-            case .success:
-                enqueueShopPurchase(item, note: "coconutShop.appIcon") { _ in
-                    markPurchased(item)
+        enqueueShopPurchase(item, note: "coconutShop.appIcon") { result in
+            appServices.appIcons.setIcon(descriptor) { applyResult in
+                switch applyResult {
+                case .success:
                     selectedAppIcon = descriptor.itemId
                     pendingPurchaseItem = nil
                     showPurchaseSuccess(item)
+                case let .failure(error):
+                    refundPurchase(item, purchase: result, reason: "appIconApplyFailed")
+                    pendingPurchaseItem = nil
+                    UINotificationFeedbackGenerator().notificationOccurred(.error)
+                    showToast(error.localizedDescription, icon: "exclamationmark.triangle.fill", tint: Color.goOrange)
                 }
-            case let .failure(error):
-                pendingPurchaseItem = nil
-                UINotificationFeedbackGenerator().notificationOccurred(.error)
-                showToast(error.localizedDescription, icon: "exclamationmark.triangle.fill", tint: Color.goOrange)
             }
         }
     }
@@ -147,7 +147,6 @@ extension CoconutShopView {
                     return
                 }
             } else {
-                markPurchased(item)
                 activateOwnedItem(item)
             }
 
@@ -243,13 +242,6 @@ extension CoconutShopView {
         return true
     }
 
-    func markPurchased(_ item: ShopItem) {
-        guard !item.isConsumable else { return }
-        var current = purchasedSet
-        current.insert(item.id)
-        purchasedRaw = current.sorted().joined(separator: ",")
-    }
-
     func showPurchaseSuccess(_ item: ShopItem) {
         UINotificationFeedbackGenerator().notificationOccurred(.success)
         spawnConfetti()
@@ -285,70 +277,33 @@ extension CoconutShopView {
 
     @discardableResult
     func activateBoost(_ item: ShopItem) -> Bool {
-        switch item.id {
-        case "boost_tree", "boost_tree_large":
-            return appServices.oasisTree.applyPurchasedEnergyBoost(cost: item.cost, modelContext: modelContext)
-        case "boost_double":
-            appServices.shopInventory.activateDoubleRewardBoost()
-            return true
-        case "boost_streak":
-            appServices.shopInventory.activateStreakShield(until: Date().addingTimeInterval(172_800))
-            return true
-        case "boost_backdate_single", "boost_backdate_pack":
-            appServices.shopInventory.addBackdatePasses(item.id == "boost_backdate_pack" ? 3 : 1)
-            return true
-        case Avatar2DAccess.shopItemId:
-            Avatar2DAccess.addExtraPasses(1)
-            return true
-        default:
-            return true
-        }
+        ShopPurchaseFulfillmentService.fulfillConsumable(
+            item: item,
+            context: modelContext,
+            services: appServices
+        )
     }
 
     func refundPurchasedConsumable(_ item: ShopItem, purchase: ShopPurchaseCommandResult) {
+        refundPurchase(item, purchase: purchase, reason: "consumableActivationFailed")
+    }
+
+    func refundPurchase(_ item: ShopItem, purchase: ShopPurchaseCommandResult, reason: String) {
         let title = l.tr(
             zh: "退回「\(item.name(l))」",
             en: "Refunded \(item.name(l))",
             de: "\(item.name(l)) erstattet"
         )
-        let refundSource = purchase.transactionKey
-            ?? purchase.ledgerEventID?.uuidString
-            ?? UUID().uuidString
-        let contributions = purchase.fundingContributions.isEmpty
-            ? currentHuman.map { [ShopPurchaseFundingContribution(humanID: $0.id, amount: item.cost)] } ?? []
-            : purchase.fundingContributions
-        let refundDeltas: [CoconutWalletDelta] = contributions.compactMap { contribution in
-            guard contribution.amount > 0 else { return nil }
-            guard let recipient = humans.first(where: { $0.id == contribution.humanID }) else { return nil }
-            return .human(
-                recipient,
-                delta: contribution.amount,
-                entryKind: .refund,
-                source: .shop,
-                title: title,
-                emoji: item.emoji,
-                actorId: recipient.id.uuidString,
-                actorName: recipient.name,
-                subjectKind: .system,
-                subjectId: nil,
-                sourceModelName: "ShopCatalog",
-                sourceModelId: item.id,
-                careLedgerEventId: purchase.ledgerEventID?.uuidString,
-                metadataJSON: "{\"shopItemId\":\"\(item.id)\",\"refund\":true,\"purchaseTransactionKey\":\"\(refundSource)\"}",
-                transactionKey: "shop:\(item.id):refund:\(recipient.id.uuidString):\(refundSource)"
-            )
-        }
-        guard !refundDeltas.isEmpty else { return }
         do {
-            try appServices.coconutWallet.apply(
-                deltas: refundDeltas,
+            try ShopPurchaseFulfillmentService.refundPurchase(
+                item: item,
+                purchase: purchase,
+                humans: humans,
                 context: modelContext,
-                save: false,
-                postsRewardFeedback: true,
-                updatesProjection: true,
-                projectionManager: appServices.questManager
+                services: appServices,
+                title: title,
+                reason: reason
             )
-            try modelContext.save()
         } catch {
             modelContext.rollback()
             appServices.coconutWallet.refreshQuestProjection(context: modelContext, manager: appServices.questManager)
@@ -423,7 +378,7 @@ extension CoconutShopView {
             if !equipFxPopoutCard {
                 return l.tr(zh: "未启用", en: "Off", de: "Aus")
             }
-            return pets.contains { $0.cardStyleRaw == "popout" }
+            return activePets.contains { $0.cardStyleRaw == "popout" }
                 ? l.tr(zh: "已启用 · 可更换", en: "On · Change", de: "Aktiv · Ändern")
                 : l.tr(zh: "选择宠物/素材", en: "Choose pet/asset", de: "Tier/Motiv wählen")
         case "fx_stars":
@@ -442,7 +397,7 @@ extension CoconutShopView {
         case "fx_lime_glow": equipFxLimeGlow
         case "fx_rainbow": equipFxRainbow
         case "fx_rainbow_poop": equipFxRainbowPoop
-        case "fx_popout_card": equipFxPopoutCard && pets.contains { $0.cardStyleRaw == "popout" }
+        case "fx_popout_card": equipFxPopoutCard && activePets.contains { $0.cardStyleRaw == "popout" }
         case "fx_stars": equipFxStars
         case "fx_firework": equipFxFirework
         case "title_guardian", "title_pioneer", "title_chef": equippedTitle == item.id
@@ -510,8 +465,8 @@ extension CoconutShopView {
     }
 
     func openPopoutPetPicker() {
-        if pets.count == 1 {
-            equipPopoutPet = pets.first
+        if activePets.count == 1 {
+            equipPopoutPet = activePets.first
         } else {
             activePicker = .popoutPet
         }

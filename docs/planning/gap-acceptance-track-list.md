@@ -25,6 +25,7 @@
 | Phase 6 Settings + Health | 🟢 | `5d4e71928` | Debug-only 设置开发工具、真实通知开关策略、Health 删除/回收/schema V70/read-only 不变量、目标测试与 `scripts/module-exit-gate.sh` 均通过 | 待 Release 真机 / 真实 UI 抽查 |
 | Phase 6 Economy | 🟢 | `662852a01` | 兑换入口首发门禁、冻结钱包写入拒绝、特殊奖励 active human 归属、隐私 / 冻结财富口径、目标测试与 `scripts/module-exit-gate.sh` 均通过 | 待真实 UI 抽查 |
 | Phase 7 Walks | 🟢 | `e0c1d69d3` | `WalkFeaturePolicy` active dog 硬门、回收/离世过滤、遛狗中便便事实+ledger、共享遛狗服务适配器、Walks 目标测试与 `scripts/module-exit-gate.sh` 均通过 | 待真机定位 / 真实 UI 抽查 |
+| Phase 7 Gacha + Shop | 🟢 | `本次提交` | 扭蛋概率/区间、合资抽取、冻结钱包、Shop 定价/汇率、购买合资、SwiftData 所有权迁移、备份恢复、Gacha/Shop CloudSync serializer/applier 与 schema 迁移目标测试均通过 | 待真机 App Icon / 真实 UI 抽查 |
 
 ## GAP-1 联机功能门
 
@@ -436,6 +437,37 @@
 
 - [ ] 准备一个已回收的 walk / poop marker 样本，打开 DogActivityCard、WalkSummarySheet、WalkDetailView 和 GlobalWalkBanner。
   - 预期：普通统计、周摘要、详情路线和 banner 不显示已回收 walk / poop marker；恢复样本后可重新进入正常统计。
+  - 记录：
+
+## Phase 7 Gacha + Shop
+
+人工验收目标：扭蛋与商店作为首发经济消费出口，可理解、不可套利、状态反馈得体；所有权迁移后真实 UI 与库存表现符合预期。
+
+自动验收已完成（2026-06-13，门禁 commit `本次提交`）：目标测试覆盖大奖概率 2%、概率区间、Shop 新价格、隐藏汇率线性、扭蛋岛屿合资、冻结钱包拒绝、Shop 合资与重复非消耗品不二次扣款、旧 `purchasedShopItems` 导入 SwiftData、备份恢复保留购买记录、Gacha/Shop CloudSync serializer/applier、V67→最新 schema 轻量迁移。
+
+- [ ] 真机购买一个 App Icon，并处理系统弹窗的成功 / 失败或取消路径。
+  - 为什么需要人工：系统 App Icon 切换弹窗与 SpringBoard 图标刷新依赖真机系统行为，单元测试只能验证扣款 / 退款顺序。
+  - 预期：成功时先完成购买事实，再切换图标并显示已拥有 / 已选中；失败或取消时按实际出资人退款，不留下已拥有状态。
+  - 记录：
+
+- [ ] 真实 UI 打开商店，遍历 App Icon、2.5D 头像、外观特效、称号、加成道具和百宝箱。
+  - 为什么需要人工：需要产品主人确认真实布局、分类可理解性和已购 / 库存视觉状态；自动测试已覆盖底层所有权与库存事实。
+  - 预期：不出现 Cash Exchange / 线下兑现入口；非消耗品购买后在商店与百宝箱显示已拥有，重复点击不再次扣款；消耗品显示库存或激活状态。
+  - 记录：
+
+- [ ] 真实 UI 执行一次扭蛋抽取，并查看抽取结果、收藏进度和椰子历史。
+  - 为什么需要人工：抽取动画、结果卡、收藏进度和钱包历史的观感需要真实 UI 目检；业务概率和钱包写入已自动验证。
+  - 预期：余额足够或岛屿合资足够时可抽；余额不足或当前主人钱包冻结时得体失败；大奖仍显示 / 发放 500🥥，但入口文案不暗示可套利。
+  - 记录：
+
+- [ ] 用带旧版 `purchasedShopItems` 的真实安装样本升级后打开商店和百宝箱。
+  - 为什么需要人工：旧安装样本来自真实设备 / 备份数据，无法由当前单元测试完全代表。
+  - 预期：旧版已购 App Icon / 特效 / 称号迁入 SwiftData 所有权；加成道具、头像券等消耗品不被误当作永久所有权；旧偏好仍保留。
+  - 记录：
+
+- [ ] 切换中文、英文、德文及任一长语言后打开扭蛋和商店全分类。
+  - 为什么需要人工：长语言截断、按钮拥挤和商品卡可读性需要真实 UI 目检。
+  - 预期：价格、库存、已购、抽取结果、错误提示不重叠、不遮挡主要按钮，长文案可理解。
   - 记录：
 
 ## 验收后记录规则

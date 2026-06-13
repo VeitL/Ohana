@@ -19,6 +19,7 @@ enum MemberCreationError: LocalizedError {
     case avatarPassRequired
     case insufficientCoconuts(missing: Int)
     case missingActiveHuman
+    case walletFrozen
     case saveFailed(String)
 
     var errorDescription: String? {
@@ -33,6 +34,8 @@ enum MemberCreationError: LocalizedError {
             "Need \(missing) more coconuts."
         case .missingActiveHuman:
             "No active human member."
+        case .walletFrozen:
+            "This wallet is frozen."
         case let .saveFailed(message):
             message
         }
@@ -73,7 +76,7 @@ final class MemberCreationService: MemberCreating {
            let match = humans.first(where: { $0.id.uuidString == activeId }) {
             return match
         }
-        return humans.first
+        return humans.first(where: EconomyWalletWritePolicy.canWrite)
     }
 
     func purchaseAvatarPassForCurrentDraft(
@@ -81,72 +84,33 @@ final class MemberCreationService: MemberCreating {
         context: ModelContext,
         l: L10n
     ) throws {
-        let cost = avatarPassCost
         guard let human = currentHuman(in: humans) else {
             throw ServiceError.missingActiveHuman
         }
-        let humanBalance = CoconutWalletService.balance(for: human, context: context)
-        guard humanBalance >= cost else {
-            throw ServiceError.insufficientCoconuts(missing: max(0, cost - humanBalance))
+        guard let item = ShopCatalog.item(id: Avatar2DAccess.shopItemId) else {
+            throw ServiceError.saveFailed("2.5D Avatar Pass is missing from the shop catalog.")
         }
-        let purchaseId = UUID().uuidString
-        let metadataJSON = "{\"shopItemId\":\"\(Avatar2DAccess.shopItemId)\",\"surface\":\"memberCreation\",\"purchaseId\":\"\(purchaseId)\"}"
         let title = l.tr(zh: "兑换「2.5D 头像券」", en: "Redeemed 2.5D Avatar Pass", de: "2,5D-Avatarpass eingelöst")
-        let ledger = careLedger.record(
-            occurredAt: Date(),
-            actorKind: .human,
-            actorId: human.id.uuidString,
-            subjectKind: .system,
-            subjectId: nil,
-            eventKind: .coconut,
-            actionType: "memberCreationAvatarPassPurchase",
-            amountValue: 0,
-            amountUnit: "",
-            note: l.tr(zh: "2.5D 头像券", en: "2.5D Avatar Pass", de: "2,5D-Avatarpass"),
-            source: .economy,
-            sourceEventId: nil,
-            sourceReminderId: nil,
-            legacyModelName: nil,
-            legacyModelId: nil,
-            coconutDelta: -cost,
-            rewardLogId: nil,
-            privacyFieldRaw: nil,
-            metadataJSON: metadataJSON,
+        let result = ShopPurchaseCommandService.purchase(
+            item: item,
+            buyer: human,
+            itemName: title,
             context: context,
-            save: false
+            questManager: questManager,
+            wallet: wallet,
+            careLedger: careLedger
         )
-        do {
-            try wallet.apply(
-                deltas: [
-                    .human(
-                        human,
-                        delta: -cost,
-                        entryKind: .spend,
-                        source: .shop,
-                        title: title,
-                        emoji: "2.5D",
-                        actorId: human.id.uuidString,
-                        actorName: human.name,
-                        subjectKind: .system,
-                        subjectId: nil,
-                        sourceModelName: "Avatar2DAccess",
-                        sourceModelId: Avatar2DAccess.shopItemId,
-                        careLedgerEventId: ledger.id.uuidString,
-                        metadataJSON: metadataJSON,
-                        transactionKey: "shop:memberCreation:\(Avatar2DAccess.shopItemId):\(human.id.uuidString):\(purchaseId)"
-                    )
-                ],
-                context: context,
-                save: false,
-                postsRewardFeedback: true,
-                updatesProjection: true,
-                projectionManager: questManager
-            )
-            try context.save()
-        } catch {
-            context.rollback()
-            wallet.refreshQuestProjection(context: context, manager: questManager)
-            throw error
+        guard result.didPurchase else {
+            switch result.failure {
+            case .missingActiveHuman:
+                throw ServiceError.missingActiveHuman
+            case let .insufficientBalance(missing):
+                throw ServiceError.insufficientCoconuts(missing: missing)
+            case .walletFrozen:
+                throw ServiceError.walletFrozen
+            case .persistenceFailed, nil:
+                throw ServiceError.saveFailed("2.5D Avatar Pass purchase was not saved.")
+            }
         }
         Avatar2DAccess.addExtraPasses(1)
     }

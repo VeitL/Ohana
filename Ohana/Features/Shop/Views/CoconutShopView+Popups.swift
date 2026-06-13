@@ -77,15 +77,15 @@ extension CoconutShopView {
             VStack(spacing: 8) {
                 if Avatar2DAccess.extraPassCount <= 0 {
                     emptyPickerText(l.tr(zh: "暂无可用头像券。", en: "No avatar passes available.", de: "Keine Avatarpässe verfügbar."))
-                } else if humans.isEmpty, pets.isEmpty {
+                } else if activeHumans.isEmpty, activePets.isEmpty {
                     emptyPickerText(l.tr(zh: "请先创建一个人类或宠物成员。", en: "Create a human or pet first.", de: "Erstelle zuerst einen Menschen oder ein Tier."))
                 } else {
-                    ForEach(humans) { human in
+                    ForEach(activeHumans) { human in
                         targetRow(icon: human.avatarEmoji.isEmpty ? "👤" : human.avatarEmoji, title: human.name, subtitle: l.tr(zh: "人类", en: "Human", de: "Mensch")) {
                             upgradeHumanTo2DAvatar(human)
                         }
                     }
-                    ForEach(pets) { pet in
+                    ForEach(activePets) { pet in
                         targetRow(icon: pet.avatarEmoji.isEmpty ? "🐾" : pet.avatarEmoji, title: pet.name, subtitle: l.tr(zh: "宠物", en: "Pet", de: "Tier")) {
                             upgradePetTo2DAvatar(pet)
                         }
@@ -99,10 +99,10 @@ extension CoconutShopView {
     var petPickerList: some View {
         ScrollView {
             VStack(spacing: 8) {
-                if pets.isEmpty {
+                if activePets.isEmpty {
                     emptyPickerText(l.tr(zh: "还没有宠物可以绑定。", en: "No pet to bind yet.", de: "Noch kein Tier zum Binden."))
                 } else {
-                    ForEach(pets) { pet in
+                    ForEach(activePets) { pet in
                         targetRow(icon: pet.avatarEmoji.isEmpty ? "🐾" : pet.avatarEmoji, title: pet.name, subtitle: pet.species) {
                             activePicker = nil
                             equipPopoutPet = pet

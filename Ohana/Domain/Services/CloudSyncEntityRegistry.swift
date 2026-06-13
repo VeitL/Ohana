@@ -64,6 +64,7 @@ nonisolated enum CloudSyncEntityRegistry {
         mutable(OasisCritterFragmentBalance.self, fieldPolicies: ["amount": .maxValue]),
         mutable(OasisUnlock.self),
         mutable(GachaOwnedItem.self, fieldPolicies: ["ownedCount": .maxValue]),
+        mutable(ShopPurchaseRecord.self),
 
         appendOnly(WaterLog.self),
         appendOnly(PetCareLog.self),
@@ -91,6 +92,7 @@ nonisolated enum CloudSyncEntityRegistry {
         appendOnly(GachaDrawLog.self),
 
         derived(CoconutAccount.self, fieldPolicies: ["balance": .ledgerProjection]),
+        localMetadata(RecycleBinBatch.self),
         localMetadata(CloudSyncRecordState.self)
     ]
 
@@ -113,7 +115,10 @@ nonisolated enum CloudSyncEntityRegistry {
         String(describing: PetWeightLog.self),
         String(describing: SharedCareSession.self),
         String(describing: CareLedgerEvent.self),
-        String(describing: CoconutLedgerEntry.self)
+        String(describing: CoconutLedgerEntry.self),
+        String(describing: GachaOwnedItem.self),
+        String(describing: GachaDrawLog.self),
+        String(describing: ShopPurchaseRecord.self)
     ]
 
     static func supportsUploadPipeline(for entityName: String) -> Bool {

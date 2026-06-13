@@ -322,6 +322,33 @@ enum ShopPurchaseCommandService {
                 fundingContributions: []
             )
         }
+        if !item.isConsumable {
+            do {
+                if try ShopPurchaseRecordStore.isOwned(itemID: item.id, context: context) {
+                    return ShopPurchaseCommandResult(
+                        humanID: buyer.id,
+                        itemID: item.id,
+                        cost: item.cost,
+                        didPurchase: true,
+                        failure: nil,
+                        ledgerEventID: nil,
+                        transactionKey: nil,
+                        fundingContributions: []
+                    )
+                }
+            } catch {
+                return ShopPurchaseCommandResult(
+                    humanID: buyer.id,
+                    itemID: item.id,
+                    cost: item.cost,
+                    didPurchase: false,
+                    failure: .persistenceFailed,
+                    ledgerEventID: nil,
+                    transactionKey: nil,
+                    fundingContributions: []
+                )
+            }
+        }
         let fundingPlan = CoconutWalletFundingPlanner.humanCofundingPlan(
             cost: item.cost,
             primaryHuman: buyer,
@@ -405,6 +432,12 @@ enum ShopPurchaseCommandService {
                 postsRewardFeedback: true,
                 updatesProjection: true,
                 projectionManager: providedQuestManager ?? QuestManager()
+            )
+            try ShopPurchaseRecordStore.insertOwnershipRecordIfNeeded(
+                item: item,
+                buyer: buyer,
+                transactionKey: transactionKey,
+                context: context
             )
             try context.save()
         } catch {

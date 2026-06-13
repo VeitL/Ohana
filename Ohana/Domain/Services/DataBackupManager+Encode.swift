@@ -836,4 +836,17 @@ nonisolated extension DataBackupManager {
             createdAt: d(log.createdAt)
         )
     }
+
+    func encodeShopPurchaseRecord(_ record: ShopPurchaseRecord) -> ShopPurchaseRecordBackup {
+        ShopPurchaseRecordBackup(
+            id: record.id.uuidString,
+            transactionKey: record.transactionKey,
+            itemId: record.itemId,
+            buyerHumanId: record.buyerHumanId,
+            purchasedAt: d(record.purchasedAt),
+            sourceRaw: record.sourceRaw,
+            isLegacyImport: record.isLegacyImport,
+            createdAt: d(record.createdAt)
+        )
+    }
 }

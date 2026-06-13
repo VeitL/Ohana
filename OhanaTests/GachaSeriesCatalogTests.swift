@@ -14,9 +14,27 @@ struct GachaSeriesCatalogTests {
             #expect(series.commonProbabilityBasisPoints == 2000)
             #expect(series.hiddenProbabilityBasisPoints == 200)
             #expect(series.instantResultProbabilityBasisPoints == 7800)
-            #expect(series.instantResults.first { $0.id == GachaSeriesCatalog.coconutGrandBundleResultId }?.probabilityBasisPoints == 500)
+            #expect(series.instantResults.first { $0.id == GachaSeriesCatalog.coconutGrandBundleResultId }?.probabilityBasisPoints == 200)
             #expect(series.instantResults.first { $0.id == GachaSeriesCatalog.coconutGrandBundleResultId }?.coconutDelta == 500)
         }
+    }
+
+    @Test func shopCatalogPricesMatchEconomyPolicy() throws {
+        #expect(try #require(ShopCatalog.item(id: "boost_double")).cost == 80)
+        #expect(try #require(ShopCatalog.item(id: "boost_streak")).cost == 180)
+        #expect(try #require(ShopCatalog.item(id: "boost_backdate_single")).cost == 240)
+        #expect(try #require(ShopCatalog.item(id: "boost_backdate_pack")).cost == 580)
+        #expect(try #require(ShopCatalog.item(id: Avatar2DAccess.shopItemId)).cost == 1200)
+    }
+
+    @Test func hiddenExchangeOptionsKeepLinearRates() throws {
+        let jpy = CoconutExchangeOption.options(for: "JP")
+        #expect(jpy.map(\.coconutCost) == [500, 1000, 2000])
+        #expect(jpy.map(\.localAmount) == [75, 150, 300])
+
+        let cny = CoconutExchangeOption.options(for: "CN")
+        #expect(cny.map(\.coconutCost) == [500, 1000, 2000])
+        #expect(cny.map(\.localAmount) == [2.5, 5, 10])
     }
 
     @Test func gachaCollectibleAssetsAreConfigured() {
@@ -44,8 +62,8 @@ struct GachaSeriesCatalogTests {
         #expect(GachaDrawService.roll(in: series, forcedRoll: 2199).item?.rarity == .common)
         #expect(GachaDrawService.roll(in: series, forcedRoll: 2200).kind != .collectible)
         #expect(GachaDrawService.roll(in: series, forcedRoll: 5000).instantResult?.id == GachaSeriesCatalog.coconutGrandBundleResultId)
-        #expect(GachaDrawService.roll(in: series, forcedRoll: 5499).instantResult?.id == GachaSeriesCatalog.coconutGrandBundleResultId)
-        #expect(GachaDrawService.roll(in: series, forcedRoll: 5500).instantResult?.id != GachaSeriesCatalog.coconutGrandBundleResultId)
+        #expect(GachaDrawService.roll(in: series, forcedRoll: 5199).instantResult?.id == GachaSeriesCatalog.coconutGrandBundleResultId)
+        #expect(GachaDrawService.roll(in: series, forcedRoll: 5200).instantResult?.id != GachaSeriesCatalog.coconutGrandBundleResultId)
         #expect(GachaDrawService.roll(in: series, forcedRoll: 9999).kind != .collectible)
     }
 
@@ -152,6 +170,37 @@ struct GachaSeriesCatalogTests {
         let ownedItems = try context.fetch(FetchDescriptor<GachaOwnedItem>())
         #expect(ownedItems.count == 1)
         #expect(ownedItems[0].ownedCount == 3)
+    }
+
+    @MainActor
+    @Test func drawUsesIslandCofundingWhenBuyerBalanceIsShort() throws {
+        let container = try makeGachaContainer()
+        let context = container.mainContext
+        let series = GachaSeriesCatalog.series(id: GachaSeriesCatalog.defaultSeriesId)
+        let buyer = Human(name: "Ava")
+        buyer.coconutBalance = 10
+        let contributor = Human(name: "Guan")
+        contributor.coconutBalance = 100
+        contributor.createdAt = buyer.createdAt.addingTimeInterval(1)
+        context.insert(buyer)
+        context.insert(contributor)
+        try context.save()
+
+        let outcome = try GachaDrawService.draw(
+            seriesId: series.id,
+            human: buyer,
+            context: context,
+            now: Date(timeIntervalSince1970: 350),
+            forcedRoll: 200
+        )
+
+        let walletEntries = try context.fetch(FetchDescriptor<CoconutLedgerEntry>())
+        #expect(outcome.log.ownerHumanId == buyer.id.uuidString)
+        #expect(buyer.coconutBalance == 0)
+        #expect(contributor.coconutBalance == 30)
+        #expect(walletEntries.count(where: { $0.ownerId == buyer.id.uuidString && $0.delta == -10 }) == 1)
+        #expect(walletEntries.count(where: { $0.ownerId == contributor.id.uuidString && $0.delta == -70 }) == 1)
+        #expect(walletEntries.allSatisfy { $0.balanceAfter >= 0 })
     }
 
     @MainActor

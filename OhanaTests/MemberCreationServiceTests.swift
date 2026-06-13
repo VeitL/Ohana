@@ -141,7 +141,7 @@ struct MemberCreationServiceTests {
         #expect(Avatar2DAccess.extraPassCount == 1)
         let ledgers = try context.fetch(FetchDescriptor<CareLedgerEvent>())
         #expect(ledgers.count == 1)
-        #expect(ledgers.first?.actionType == "memberCreationAvatarPassPurchase")
+        #expect(ledgers.first?.actionType == "shopPurchase")
         #expect(ledgers.first?.coconutDelta == -avatarPassCost)
 
         _ = try saveMember(
@@ -543,7 +543,7 @@ struct MemberCreationServiceTests {
     }
 
     private func makeContainer() throws -> ModelContainer {
-        let schema = Schema(ArkSchemaV70.models)
+        let schema = Schema(ArkSchemaV71.models)
         let config = ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)
         return try ModelContainer(for: schema, configurations: [config])
     }

@@ -310,6 +310,72 @@ enum CloudSyncMutationRecorder {
     }
 
     @discardableResult
+    static func markModified(
+        _ item: GachaOwnedItem,
+        context: ModelContext,
+        modifiedAt: Date = Date()
+    ) -> CloudSyncRecordState? {
+        markModified(
+            entityName: String(describing: GachaOwnedItem.self),
+            localRecordId: item.id,
+            householdId: sharedHouseholdId(context: context, now: modifiedAt),
+            fallbackHouseholdId: uuid(from: item.ownerHumanId) ?? item.id,
+            modifiedAt: modifiedAt,
+            context: context
+        )
+    }
+
+    @discardableResult
+    static func markModified(
+        _ log: GachaDrawLog,
+        context: ModelContext,
+        modifiedAt: Date = Date()
+    ) -> CloudSyncRecordState? {
+        markModified(
+            entityName: String(describing: GachaDrawLog.self),
+            localRecordId: log.id,
+            householdId: sharedHouseholdId(context: context, now: modifiedAt),
+            fallbackHouseholdId: uuid(from: log.ownerHumanId) ?? log.id,
+            modifiedAt: modifiedAt,
+            context: context
+        )
+    }
+
+    @discardableResult
+    static func markModified(
+        _ record: ShopPurchaseRecord,
+        context: ModelContext,
+        modifiedAt: Date = Date()
+    ) -> CloudSyncRecordState? {
+        markModified(
+            entityName: String(describing: ShopPurchaseRecord.self),
+            localRecordId: record.id,
+            householdId: sharedHouseholdId(context: context, now: modifiedAt),
+            fallbackHouseholdId: uuid(from: record.buyerHumanId) ?? record.id,
+            modifiedAt: modifiedAt,
+            context: context
+        )
+    }
+
+    @discardableResult
+    static func markDeleted(
+        _ record: ShopPurchaseRecord,
+        context: ModelContext,
+        deletedAt: Date = Date(),
+        deletedByHumanId: String? = nil
+    ) -> CloudSyncRecordState? {
+        markDeleted(
+            entityName: String(describing: ShopPurchaseRecord.self),
+            localRecordId: record.id,
+            householdId: sharedHouseholdId(context: context, now: deletedAt),
+            fallbackHouseholdId: uuid(from: record.buyerHumanId) ?? record.id,
+            deletedAt: deletedAt,
+            deletedByHumanId: uuid(from: deletedByHumanId),
+            context: context
+        )
+    }
+
+    @discardableResult
     static func markDeleted(
         _ event: CareLedgerEvent,
         context: ModelContext,

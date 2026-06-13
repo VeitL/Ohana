@@ -59,11 +59,32 @@ struct GachaView: View {
 
     private var l: L10n { L10n(appLanguage) }
     private var series: GachaSeriesEntry { GachaSeriesCatalog.series(id: selectedSeriesId) }
-    private var currentHuman: Human? { humans.first { $0.id.uuidString == activeHumanId } }
+
+    private var selectedActiveHuman: Human? {
+        humans.first { $0.id.uuidString == activeHumanId }
+    }
+
+    private var currentHuman: Human? {
+        if let selectedActiveHuman {
+            return selectedActiveHuman
+        }
+        return humans.first(where: EconomyWalletWritePolicy.canWrite)
+    }
+
+    private var currentHumanWalletIsFrozen: Bool {
+        guard let currentHuman else { return false }
+        return !EconomyWalletWritePolicy.canWrite(currentHuman)
+    }
 
     private var currentCoconutBalance: Int {
         guard let currentHuman else { return 0 }
         return appServices.coconutWallet.balance(for: currentHuman, context: modelContext)
+    }
+
+    private var islandSpendableHumanBalance: Int {
+        humans
+            .filter(EconomyWalletWritePolicy.canWrite)
+            .reduce(0) { $0 + max(0, appServices.coconutWallet.balance(for: $1, context: modelContext)) }
     }
 
     private var currentHumanLogs: [GachaDrawLog] {
@@ -113,7 +134,8 @@ struct GachaView: View {
 
     private var canDraw: Bool {
         currentHuman != nil &&
-            currentCoconutBalance >= appServices.gacha.costPerDraw &&
+            !currentHumanWalletIsFrozen &&
+            islandSpendableHumanBalance >= appServices.gacha.costPerDraw &&
             !isDrawing &&
             selectedSeriesUnlocked
     }
@@ -450,7 +472,10 @@ struct GachaView: View {
         if currentHuman == nil {
             return l.tr(zh: "先切换本人账户", en: "Choose your account", de: "Konto wählen")
         }
-        if currentHuman != nil, currentCoconutBalance < appServices.gacha.costPerDraw {
+        if currentHumanWalletIsFrozen {
+            return l.tr(zh: "钱包已冻结", en: "Wallet frozen", de: "Wallet eingefroren")
+        }
+        if islandSpendableHumanBalance < appServices.gacha.costPerDraw {
             return l.tr(zh: "椰子不足", en: "Not enough coconuts", de: "Nicht genug Kokos")
         }
         if !selectedSeriesUnlocked {
@@ -1030,6 +1055,8 @@ struct GachaView: View {
             l.tr(zh: "先切换到本人账户", en: "Switch to your account first", de: "Wechsle zuerst zu deinem Konto")
         case let .insufficientBalance(missing):
             l.tr(zh: "还差 \(missing)🥥", en: "Need \(missing)🥥 more", de: "Noch \(missing)🥥 nötig")
+        case .walletFrozen:
+            l.tr(zh: "该钱包已冻结，历史仍可查看。", en: "This wallet is frozen. History remains available.", de: "Dieses Wallet ist eingefroren. Der Verlauf bleibt sichtbar.")
         case .invalidSeries:
             l.tr(zh: "这个系列概率配置不完整", en: "This series has invalid odds", de: "Diese Serie hat ungültige Chancen")
         case .lockedSeries:

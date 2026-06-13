@@ -136,7 +136,7 @@ final nonisolated class DataBackupManager: @unchecked Sendable {
         let decoder = JSONDecoder()
         let backup = try decoder.decode(OhanaBackup.self, from: data)
 
-        guard backup.schemaVersion <= 24 else {
+        guard backup.schemaVersion <= 25 else {
             throw BackupError.unsupportedVersion(backup.schemaVersion)
         }
 
@@ -188,9 +188,14 @@ final nonisolated class DataBackupManager: @unchecked Sendable {
         let oasisCritterActionLogs = try context.fetch(FetchDescriptor<OasisCritterActionLog>()) // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
         let gachaOwnedItems = try context.fetch(FetchDescriptor<GachaOwnedItem>()) // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
         let gachaDrawLogs = try context.fetch(FetchDescriptor<GachaDrawLog>()) // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
+        let shopPurchaseRecords = try context.fetch(FetchDescriptor<ShopPurchaseRecord>()) // smoothness: explicit backup/export scan only
         let recycleBinBatches = try context.fetch(FetchDescriptor<RecycleBinBatch>()) // smoothness: allow legacy full backup scan; scoped to explicit backup/export
 
         let ud = defaults
+        let purchasedShopItems = ShopPurchaseRecordStore
+            .ownedItemIDs(from: shopPurchaseRecords)
+            .sorted()
+            .joined(separator: ",")
         let coconutLogProjection = coconutLedgerEntries
             .sorted { $0.occurredAt > $1.occurredAt }
             .prefix(200)
@@ -207,7 +212,7 @@ final nonisolated class DataBackupManager: @unchecked Sendable {
             coconutCount: coconutAccounts.reduce(0) { $0 + $1.balance },
             coconutLogsJSON: coconutLogsJSON,
             bountyTasksJSON: ud.string(forKey: "bountyTasks") ?? "[]",
-            purchasedShopItems: ud.string(forKey: "purchasedShopItems") ?? "",
+            purchasedShopItems: purchasedShopItems,
             selectedAppIcon: ud.string(forKey: AppIconCatalog.selectedIconKey),
             gachaHistoryJSON: ud.string(forKey: "gachaHistory") ?? "[]",
             celebratedMilestoneDays: ud.string(forKey: "celebratedMilestoneDays") ?? "",
@@ -264,6 +269,7 @@ final nonisolated class DataBackupManager: @unchecked Sendable {
             oasisCritterActionLogs: oasisCritterActionLogs.map(encodeOasisCritterActionLog),
             gachaOwnedItems: gachaOwnedItems.map(encodeGachaOwnedItem),
             gachaDrawLogs: gachaDrawLogs.map(encodeGachaDrawLog),
+            shopPurchaseRecords: shopPurchaseRecords.map(encodeShopPurchaseRecord),
             appState: appState
         )
         let trashStates = encodeTrashStates(
@@ -334,6 +340,7 @@ final nonisolated class DataBackupManager: @unchecked Sendable {
         let existingOasisActionLogIds = try existingIds(FetchDescriptor<OasisCritterActionLog>(), context: context, id: \.id, operation: "fetch existing oasis action logs before restore")
         let existingGachaOwnedIds = try existingIds(FetchDescriptor<GachaOwnedItem>(), context: context, id: \.id, operation: "fetch existing gacha owned items before restore")
         let existingGachaDrawLogIds = try existingIds(FetchDescriptor<GachaDrawLog>(), context: context, id: \.id, operation: "fetch existing gacha draw logs before restore")
+        let existingShopPurchaseRecordIds = try existingIds(FetchDescriptor<ShopPurchaseRecord>(), context: context, id: \.id, operation: "fetch existing shop purchase records before restore")
         let existingDocumentAttachmentIds = try existingIds(FetchDescriptor<PetDocumentAttachment>(), context: context, id: \.id, operation: "fetch existing document attachments before restore")
         let existingPhotoIds = try existingIds(FetchDescriptor<PetPhotoLog>(), context: context, id: \.id, operation: "fetch existing photo logs before restore")
         let existingInsuranceIds = try existingIds(FetchDescriptor<PetInsurance>(), context: context, id: \.id, operation: "fetch existing pet insurances before restore")
@@ -501,6 +508,17 @@ final nonisolated class DataBackupManager: @unchecked Sendable {
         for dto in backup.gachaDrawLogs ?? [] where !existingGachaDrawLogIds.contains(dto.id) {
             context.insert(decodeGachaDrawLog(dto))
         }
+        for dto in backup.shopPurchaseRecords ?? [] where !existingShopPurchaseRecordIds.contains(dto.id) {
+            if try !ShopPurchaseRecordStore.isOwned(itemID: dto.itemId, context: context) {
+                context.insert(decodeShopPurchaseRecord(dto))
+            }
+        }
+        if backup.shopPurchaseRecords == nil {
+            try insertLegacyShopPurchaseRecords(
+                purchasedShopItemsRaw: backup.appState.purchasedShopItems,
+                context: context
+            )
+        }
         for dto in backup.recycleBinBatches ?? [] where !existingRecycleBinBatchIds.contains(dto.id) {
             context.insert(decodeRecycleBinBatch(dto))
         }
@@ -541,5 +559,40 @@ final nonisolated class DataBackupManager: @unchecked Sendable {
         } else {
             CoconutWalletService.refreshQuestProjection(context: context, manager: projectionManager)
         }
+    }
+
+    private func insertLegacyShopPurchaseRecords(
+        purchasedShopItemsRaw: String,
+        context: ModelContext
+    ) throws {
+        let itemIDs = ShopPurchaseRecordStore.legacyPurchasedItemIDs(raw: purchasedShopItemsRaw)
+        for itemID in itemIDs {
+            guard isLegacyShopOwnershipItemID(itemID),
+                  try !ShopPurchaseRecordStore.isOwned(itemID: itemID, context: context)
+            else {
+                continue
+            }
+            context.insert(ShopPurchaseRecord(
+                transactionKey: "legacyBackup:\(itemID)",
+                itemId: itemID,
+                buyerHumanId: nil,
+                purchasedAt: Date(timeIntervalSince1970: 0),
+                sourceRaw: "legacyBackup",
+                isLegacyImport: true,
+                createdAt: Date(timeIntervalSince1970: 0)
+            ))
+        }
+    }
+
+    private func isLegacyShopOwnershipItemID(_ itemID: String) -> Bool {
+        guard itemID != AppIconCatalog.defaultItemId,
+              itemID != "boost_avatar2d_extra",
+              !itemID.hasPrefix("boost_")
+        else {
+            return false
+        }
+        return itemID.hasPrefix("appicon_") ||
+            itemID.hasPrefix("fx_") ||
+            itemID.hasPrefix("title_")
     }
 }

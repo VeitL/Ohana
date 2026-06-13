@@ -246,6 +246,12 @@ nonisolated enum CloudSyncRecordApplier {
             try applyCareLedgerEvent(record, metadata: metadata, context: context)
         case String(describing: CoconutLedgerEntry.self):
             try applyCoconutLedgerEntry(record, metadata: metadata, context: context)
+        case String(describing: GachaOwnedItem.self):
+            try applyGachaOwnedItem(record, metadata: metadata, context: context)
+        case String(describing: GachaDrawLog.self):
+            try applyGachaDrawLog(record, metadata: metadata, context: context)
+        case String(describing: ShopPurchaseRecord.self):
+            try applyShopPurchaseRecord(record, metadata: metadata, context: context)
         default:
             .skippedUnsupported(entityName: descriptor.entityName)
         }
@@ -793,6 +799,117 @@ nonisolated enum CloudSyncRecordApplier {
         return .inserted(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
     }
 
+    private static func applyGachaOwnedItem(
+        _ record: CKRecord,
+        metadata: RemoteMetadata,
+        context: ModelContext
+    ) throws -> CloudSyncRecordApplyResult {
+        let item: GachaOwnedItem
+        let result: CloudSyncRecordApplyResult
+        if let existing = try fetchGachaOwnedItem(id: metadata.localRecordUUID, context: context) {
+            item = existing
+            result = .updated(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
+        } else {
+            item = GachaOwnedItem()
+            item.id = metadata.localRecordUUID
+            context.insert(item)
+            result = .inserted(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
+        }
+
+        item.ownerHumanId = record.string(for: "ownerHumanId") ?? item.ownerHumanId
+        item.seriesId = record.string(for: "seriesId") ?? item.seriesId
+        item.itemId = record.string(for: "itemId") ?? item.itemId
+        item.rarityRaw = record.string(for: "rarityRaw") ?? item.rarityRaw
+        item.isHidden = record.bool(for: "isHidden") ?? item.isHidden
+        item.ownedCount = max(item.ownedCount, record.int(for: "ownedCount") ?? item.ownedCount)
+        item.firstObtainedAt = record.date(for: "firstObtainedAt") ?? item.firstObtainedAt
+        item.latestObtainedAt = record.date(for: "latestObtainedAt") ?? item.latestObtainedAt
+        item.createdAt = record.date(for: "createdAt") ?? item.createdAt
+        return result
+    }
+
+    private static func applyGachaDrawLog(
+        _ record: CKRecord,
+        metadata: RemoteMetadata,
+        context: ModelContext
+    ) throws -> CloudSyncRecordApplyResult {
+        let log: GachaDrawLog
+        let result: CloudSyncRecordApplyResult
+        if let existing = try fetchGachaDrawLog(id: metadata.localRecordUUID, context: context) {
+            log = existing
+            result = .updated(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
+        } else {
+            log = GachaDrawLog()
+            log.id = metadata.localRecordUUID
+            context.insert(log)
+            result = .inserted(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
+        }
+
+        log.ownerHumanId = record.string(for: "ownerHumanId") ?? log.ownerHumanId
+        log.ownerName = record.string(for: "ownerName") ?? log.ownerName
+        log.seriesId = record.string(for: "seriesId") ?? log.seriesId
+        log.itemId = record.string(for: "itemId") ?? log.itemId
+        log.rarityRaw = record.string(for: "rarityRaw") ?? log.rarityRaw
+        log.isHidden = record.bool(for: "isHidden") ?? log.isHidden
+        log.isNew = record.bool(for: "isNew") ?? log.isNew
+        log.outcomeKindRaw = record.string(for: "outcomeKindRaw") ?? log.outcomeKindRaw
+        log.instantResultId = record.string(for: "instantResultId") ?? log.instantResultId
+        log.instantTitleZh = record.string(for: "instantTitleZh") ?? log.instantTitleZh
+        log.instantTitleEn = record.string(for: "instantTitleEn") ?? log.instantTitleEn
+        log.instantTitleDe = record.string(for: "instantTitleDe") ?? log.instantTitleDe
+        log.instantDetailZh = record.string(for: "instantDetailZh") ?? log.instantDetailZh
+        log.instantDetailEn = record.string(for: "instantDetailEn") ?? log.instantDetailEn
+        log.instantDetailDe = record.string(for: "instantDetailDe") ?? log.instantDetailDe
+        log.instantSymbol = record.string(for: "instantSymbol") ?? log.instantSymbol
+        log.instantCoconutDelta = record.int(for: "instantCoconutDelta") ?? log.instantCoconutDelta
+        log.costCoconuts = record.int(for: "costCoconuts") ?? log.costCoconuts
+        log.dailySequence = record.int(for: "dailySequence") ?? log.dailySequence
+        log.drawDate = record.date(for: "drawDate") ?? log.drawDate
+        log.createdAt = record.date(for: "createdAt") ?? log.createdAt
+        return result
+    }
+
+    private static func applyShopPurchaseRecord(
+        _ record: CKRecord,
+        metadata: RemoteMetadata,
+        context: ModelContext
+    ) throws -> CloudSyncRecordApplyResult {
+        let purchase: ShopPurchaseRecord
+        let result: CloudSyncRecordApplyResult
+        let existingById = try fetchShopPurchaseRecord(id: metadata.localRecordUUID, context: context)
+        let existingByTransactionKey = try fetchShopPurchaseRecord(
+            transactionKey: record.string(for: "transactionKey") ?? "",
+            context: context
+        )
+        if let existing = existingById ?? existingByTransactionKey {
+            purchase = existing
+            purchase.id = metadata.localRecordUUID
+            result = .updated(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
+        } else {
+            purchase = ShopPurchaseRecord(
+                id: metadata.localRecordUUID,
+                transactionKey: record.string(for: "transactionKey") ?? metadata.recordKey,
+                itemId: record.string(for: "itemId") ?? "",
+                buyerHumanId: record.string(for: "buyerHumanId"),
+                purchasedAt: record.date(for: "purchasedAt") ?? metadata.lastModifiedAt,
+                sourceRaw: record.string(for: "sourceRaw") ?? "shop",
+                isLegacyImport: record.bool(for: "isLegacyImport") ?? false,
+                createdAt: record.date(for: "createdAt") ?? metadata.lastModifiedAt
+            )
+            context.insert(purchase)
+            result = .inserted(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
+        }
+
+        purchase.transactionKey = record.string(for: "transactionKey") ?? purchase.transactionKey
+        purchase.itemId = record.string(for: "itemId") ?? purchase.itemId
+        purchase.buyerHumanId = record.string(for: "buyerHumanId") ?? purchase.buyerHumanId
+        purchase.purchasedAt = record.date(for: "purchasedAt") ?? purchase.purchasedAt
+        purchase.sourceRaw = record.string(for: "sourceRaw") ?? purchase.sourceRaw
+        purchase.isLegacyImport = record.bool(for: "isLegacyImport") ?? purchase.isLegacyImport
+        purchase.createdAt = record.date(for: "createdAt") ?? purchase.createdAt
+        return result
+    }
+
     private static func upsertState(
         metadata: RemoteMetadata,
         record: CKRecord,
@@ -900,6 +1017,18 @@ nonisolated enum CloudSyncRecordApplier {
             }
         case String(describing: CoconutLedgerEntry.self):
             if let model = try fetchCoconutLedgerEntry(id: localRecordUUID, context: context) {
+                context.delete(model)
+            }
+        case String(describing: GachaOwnedItem.self):
+            if let model = try fetchGachaOwnedItem(id: localRecordUUID, context: context) {
+                context.delete(model)
+            }
+        case String(describing: GachaDrawLog.self):
+            if let model = try fetchGachaDrawLog(id: localRecordUUID, context: context) {
+                context.delete(model)
+            }
+        case String(describing: ShopPurchaseRecord.self):
+            if let model = try fetchShopPurchaseRecord(id: localRecordUUID, context: context) {
                 context.delete(model)
             }
         default:
@@ -1022,6 +1151,39 @@ nonisolated enum CloudSyncRecordApplier {
     private static func fetchCoconutLedgerEntry(id: UUID, context: ModelContext) throws -> CoconutLedgerEntry? {
         var descriptor = FetchDescriptor<CoconutLedgerEntry>(
             predicate: #Predicate<CoconutLedgerEntry> { $0.id == id }
+        )
+        descriptor.fetchLimit = 1
+        return try context.fetch(descriptor).first
+    }
+
+    private static func fetchGachaOwnedItem(id: UUID, context: ModelContext) throws -> GachaOwnedItem? {
+        var descriptor = FetchDescriptor<GachaOwnedItem>(
+            predicate: #Predicate<GachaOwnedItem> { $0.id == id }
+        )
+        descriptor.fetchLimit = 1
+        return try context.fetch(descriptor).first
+    }
+
+    private static func fetchGachaDrawLog(id: UUID, context: ModelContext) throws -> GachaDrawLog? {
+        var descriptor = FetchDescriptor<GachaDrawLog>(
+            predicate: #Predicate<GachaDrawLog> { $0.id == id }
+        )
+        descriptor.fetchLimit = 1
+        return try context.fetch(descriptor).first
+    }
+
+    private static func fetchShopPurchaseRecord(id: UUID, context: ModelContext) throws -> ShopPurchaseRecord? {
+        var descriptor = FetchDescriptor<ShopPurchaseRecord>(
+            predicate: #Predicate<ShopPurchaseRecord> { $0.id == id }
+        )
+        descriptor.fetchLimit = 1
+        return try context.fetch(descriptor).first
+    }
+
+    private static func fetchShopPurchaseRecord(transactionKey: String, context: ModelContext) throws -> ShopPurchaseRecord? {
+        guard !transactionKey.isEmpty else { return nil }
+        var descriptor = FetchDescriptor<ShopPurchaseRecord>(
+            predicate: #Predicate<ShopPurchaseRecord> { $0.transactionKey == transactionKey }
         )
         descriptor.fetchLimit = 1
         return try context.fetch(descriptor).first

@@ -149,9 +149,16 @@ struct AutomaticBackupServiceTests {
         try HumanPasscodeService.setPasscode("2468", for: human)
         let pet = Pet(name: "Backup Miso")
         let careLog = PetCareLog(type: .feeding, amountGrams: 28, pet: pet, executorId: human.id.uuidString)
+        let purchase = ShopPurchaseRecord(
+            transactionKey: "shop:fx_lime_glow:\(human.id.uuidString)",
+            itemId: "fx_lime_glow",
+            buyerHumanId: human.id.uuidString,
+            purchasedAt: now
+        )
         context.insert(human)
         context.insert(pet)
         context.insert(careLog)
+        context.insert(purchase)
         try context.save()
 
         let store = AutomaticBackupStatusStore(defaults: defaults)
@@ -192,6 +199,7 @@ struct AutomaticBackupServiceTests {
         #expect(try context.fetch(FetchDescriptor<Human>()).first?.name == "Backup Guardian")
         #expect(try context.fetch(FetchDescriptor<Pet>()).first?.name == "Backup Miso")
         #expect(try context.fetch(FetchDescriptor<PetCareLog>()).first?.amountGrams == 28)
+        #expect(try context.fetch(FetchDescriptor<ShopPurchaseRecord>()).first?.itemId == "fx_lime_glow")
     }
 
     private func isolatedDefaults() throws -> (String, UserDefaults) {
@@ -200,7 +208,7 @@ struct AutomaticBackupServiceTests {
     }
 
     private func makeInMemoryContainer() throws -> ModelContainer {
-        let schema = Schema(ArkSchemaV70.models)
+        let schema = Schema(ArkSchemaV71.models)
         let config = ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)
         return try ModelContainer(for: schema, configurations: [config])
     }

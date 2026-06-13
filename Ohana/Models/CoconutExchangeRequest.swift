@@ -105,7 +105,7 @@ struct CoconutExchangeOption: Identifiable, Equatable {
             ]
         case "JP":
             [
-                .init(countryCode: "JP", currencyCode: "JPY", coconutCost: 500, localAmount: 80),
+                .init(countryCode: "JP", currencyCode: "JPY", coconutCost: 500, localAmount: 75),
                 .init(countryCode: "JP", currencyCode: "JPY", coconutCost: 1000, localAmount: 150),
                 .init(countryCode: "JP", currencyCode: "JPY", coconutCost: 2000, localAmount: 300)
             ]
@@ -123,7 +123,7 @@ struct CoconutExchangeOption: Identifiable, Equatable {
             ]
         default:
             [
-                .init(countryCode: "CN", currencyCode: "CNY", coconutCost: 500, localAmount: 2),
+                .init(countryCode: "CN", currencyCode: "CNY", coconutCost: 500, localAmount: 2.5),
                 .init(countryCode: "CN", currencyCode: "CNY", coconutCost: 1000, localAmount: 5),
                 .init(countryCode: "CN", currencyCode: "CNY", coconutCost: 2000, localAmount: 10)
             ]
