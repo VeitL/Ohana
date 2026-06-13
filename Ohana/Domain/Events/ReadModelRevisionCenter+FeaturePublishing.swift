@@ -24,15 +24,18 @@ extension ReadModelRevisionCenter {
     }
 
     func publishPetCareRecord(_ result: PetCareTrackingCommandResult, note: String) {
-        var affected: Set<UUID> = [result.petID, result.careLogID]
-        if let linkedPottyLogID = result.linkedPottyLogID {
+        var affected: Set<UUID> = [result.petID]
+        if result.didRecord {
+            affected.insert(result.careLogID)
+        }
+        if result.didRecord, let linkedPottyLogID = result.linkedPottyLogID {
             affected.insert(linkedPottyLogID)
         }
         publish(
             DomainMutationResult(
                 command: .petCareRecord(petID: result.petID, type: result.careType.rawValue),
                 affectedEntityIDs: affected,
-                wroteBusinessFact: true,
+                wroteBusinessFact: result.didRecord,
                 note: note
             )
         )
@@ -517,11 +520,12 @@ extension ReadModelRevisionCenter {
     }
 
     func publishPetHygieneRecord(_ result: PetHygieneCheckInCommandResult, note: String) {
+        let affected: Set<UUID> = result.didRecord ? [result.subjectID, result.logID] : [result.subjectID]
         publish(
             DomainMutationResult(
                 command: .petHygieneRecord(petID: result.subjectID, type: result.hygieneType.rawValue),
-                affectedEntityIDs: [result.subjectID, result.logID],
-                wroteBusinessFact: true,
+                affectedEntityIDs: affected,
+                wroteBusinessFact: result.didRecord,
                 note: note
             )
         )

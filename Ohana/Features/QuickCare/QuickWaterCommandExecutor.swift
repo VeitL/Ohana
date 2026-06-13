@@ -323,8 +323,8 @@ struct QuickWaterCommandExecutor {
             )
             return QuickWaterRewardResult(coconutDelta: 0, targetCount: 0)
         }
-        let reward = liveTargets.count > 1
-            ? careEvents.recordSharedWatering(
+        let recorded = if liveTargets.count > 1 {
+            careEvents.recordSharedWateringFact(
                 sourcePet: pet,
                 targets: liveTargets,
                 totalMl: amountMl,
@@ -332,7 +332,8 @@ struct QuickWaterCommandExecutor {
                 executorId: executorId,
                 date: Date()
             )
-            : careEvents.recordCare(
+        } else {
+            singleCareResult(careEvents.recordCareFact(
                 pet: pet,
                 type: .watering,
                 amountMl: amountMl,
@@ -340,15 +341,28 @@ struct QuickWaterCommandExecutor {
                 executorId: executorId,
                 reward: .water,
                 quality: .none,
-                date: Date()
+                date: Date(),
+                source: .quickAction,
+                createsLinkedPottyLog: false
+            ))
+        }
+        guard recorded.didWriteFact else {
+            publishWaterMutation(
+                .waterLog(petID: pet.id, source: "manual"),
+                affectedEntityIDs: [pet.id],
+                wroteBusinessFact: false,
+                note: "manual_water_noop"
             )
+            return QuickWaterRewardResult(coconutDelta: 0, targetCount: 0)
+        }
         publishWaterMutation(
             .waterLog(petID: pet.id, source: liveTargets.count > 1 ? "shared_manual" : "manual"),
             affectedEntityIDs: targetIDs(pet: pet, targets: liveTargets),
+            wroteBusinessFact: recorded.allowsDerivedEffects,
             note: liveTargets.count > 1 ? "shared_water" : "manual_water"
         )
         return QuickWaterRewardResult(
-            coconutDelta: reward.humanGot + reward.petGot,
+            coconutDelta: recorded.reward.humanGot + recorded.reward.petGot,
             targetCount: liveTargets.count
         )
     }
@@ -387,7 +401,7 @@ struct QuickWaterCommandExecutor {
             emoji: CareType.waterChange.emoji,
             title: "\(pet.name) 换水奖励"
         )
-        _ = careEvents.recordSharedCare(
+        let recorded = careEvents.recordSharedCareFact(
             sourcePet: pet,
             targets: liveTargets,
             type: .waterChange,
@@ -400,6 +414,15 @@ struct QuickWaterCommandExecutor {
             date: Date(),
             source: .quickAction
         )
+        guard recorded.didWriteFact, recorded.allowsDerivedEffects else {
+            publishWaterMutation(
+                .waterLog(petID: pet.id, source: "water_change"),
+                affectedEntityIDs: [pet.id],
+                wroteBusinessFact: false,
+                note: "water_change_noop"
+            )
+            return []
+        }
         publishWaterMutation(
             .waterLog(petID: pet.id, source: liveTargets.count > 1 ? "shared_water_change" : "water_change"),
             affectedEntityIDs: targetIDs(pet: pet, targets: liveTargets),
@@ -450,7 +473,7 @@ struct QuickWaterCommandExecutor {
             emoji: CareType.filterClean.emoji,
             title: "\(pet.name) 清理滤材报酬"
         )
-        _ = careEvents.recordSharedCare(
+        let recorded = careEvents.recordSharedCareFact(
             sourcePet: pet,
             targets: liveTargets,
             type: .filterClean,
@@ -463,6 +486,15 @@ struct QuickWaterCommandExecutor {
             date: Date(),
             source: .quickAction
         )
+        guard recorded.didWriteFact, recorded.allowsDerivedEffects else {
+            publishWaterMutation(
+                .waterLog(petID: pet.id, source: "filter_clean"),
+                affectedEntityIDs: [pet.id],
+                wroteBusinessFact: false,
+                note: "filter_clean_noop"
+            )
+            return []
+        }
         publishWaterMutation(
             .waterLog(petID: pet.id, source: liveTargets.count > 1 ? "shared_filter_clean" : "filter_clean"),
             affectedEntityIDs: targetIDs(pet: pet, targets: liveTargets),
@@ -533,5 +565,22 @@ struct QuickWaterCommandExecutor {
     private func targetIDs(pet: Pet, targets: [Pet]) -> Set<UUID> {
         let ids = targets.isEmpty ? [pet.id] : targets.map(\.id)
         return Set(ids)
+    }
+
+    private func singleCareResult(
+        _ recorded: (result: CareEventService.CareRecordResult, reward: (humanGot: Int, petGot: Int), log: PetCareLog, pottyLog: PetPottyLog?)
+    ) -> SharedPetActionResult {
+        SharedPetActionResult(
+            sessionID: recorded.result.logID,
+            targetPetIDs: recorded.result.didWriteFact ? [recorded.result.subjectID] : [],
+            careLogIDs: recorded.result.didWriteFact ? [recorded.result.logID] : [],
+            pottyLogID: recorded.result.linkedPottyLogID,
+            pottyLog: recorded.pottyLog,
+            expenseLogIDs: [],
+            walkLogIDs: [],
+            walkLogs: [],
+            reward: recorded.reward,
+            disposition: recorded.result.disposition
+        )
     }
 }

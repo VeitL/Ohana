@@ -225,7 +225,7 @@ enum SharedPetActionRecorder {
         let dependencies = providedDependencies ?? .live()
         let targets = SharedPetTargetResolver.normalizedTargets(descriptor.targets, fallback: descriptor.sourcePet)
         guard !targets.isEmpty,
-              !CareFactWritePolicy.executorIsRecycled(descriptor.executorId, context: context) else {
+              !CareFactWritePolicy.executorCannotWrite(descriptor.executorId, context: context) else {
             return .noOp()
         }
         let allocationTargetCount = max(targets.count, 1)

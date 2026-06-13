@@ -90,6 +90,7 @@ struct HomeCommandExecutor {
         self.todayFocus = todayFocus
     }
 
+    @discardableResult
     func performActionType(
         _ actionType: String,
         petID: UUID,
@@ -103,7 +104,7 @@ struct HomeCommandExecutor {
         openWaterManagement: (UUID) -> Void,
         openMedication: (UUID) -> Void,
         feedback: @escaping (ExpandedQuickActionExecutor.Feedback) -> Void
-    ) {
+    ) -> Bool {
         let flowStartedAt = AppFlowPerformance.start(
             AppPerformanceFlows.quickCareCommand,
             note: ["action": actionType, "entry": "id"]
@@ -116,7 +117,7 @@ struct HomeCommandExecutor {
                 note: ["action": actionType, "reason": "missing_pet"]
             )
             publishNoop(QuickCareCommand.action(petID: petID, action: actionType), note: "home.quickCare.missingPet")
-            return
+            return false
         }
 
         let events = fetchQuickCareEvents(petID: petID, now: now)
@@ -136,7 +137,7 @@ struct HomeCommandExecutor {
             ]
         )
 
-        performActionType(
+        let didRecord = performActionType(
             actionType,
             pet: pet,
             executorId: executorId,
@@ -170,16 +171,18 @@ struct HomeCommandExecutor {
         )
         AppFlowPerformance.mark(
             AppPerformanceFlows.quickCareCommand,
-            AppPerformancePhases.writeSuccess,
+            didRecord ? AppPerformancePhases.writeSuccess : AppPerformancePhases.noop,
             startedAt: flowStartedAt,
             note: ["action": actionType]
         )
+        return didRecord
     }
 
     func scheduleMedicationReminders(for pet: Pet) {
         medicationReminders.scheduleMedicationReminders(for: pet, context: modelContext)
     }
 
+    @discardableResult
     func performActionType(
         _ actionType: String,
         pet: Pet,
@@ -199,14 +202,14 @@ struct HomeCommandExecutor {
         openMedication: (Pet) -> Void,
         feedback: @escaping (ExpandedQuickActionExecutor.Feedback) -> Void,
         recordPerformance: Bool = true
-    ) {
+    ) -> Bool {
         let flowStartedAt = recordPerformance
             ? AppFlowPerformance.start(
                 AppPerformanceFlows.quickCareCommand,
                 note: ["action": actionType, "entry": "snapshot"]
             )
             : nil
-        ExpandedQuickActionExecutor.performActionType(
+        let didRecord = ExpandedQuickActionExecutor.performActionType(
             actionType,
             pet: pet,
             executorId: executorId,
@@ -229,6 +232,18 @@ struct HomeCommandExecutor {
             questManager: questManager,
             medicationReminders: medicationReminders
         )
+        guard didRecord else {
+            publishNoop(QuickCareCommand.action(petID: pet.id, action: actionType), note: "home.quickCare.factNoop")
+            if let flowStartedAt {
+                AppFlowPerformance.mark(
+                    AppPerformanceFlows.quickCareCommand,
+                    AppPerformancePhases.noop,
+                    startedAt: flowStartedAt,
+                    note: ["action": actionType]
+                )
+            }
+            return false
+        }
         publishMutation(QuickCareCommand.action(petID: pet.id, action: actionType))
         if let flowStartedAt {
             AppFlowPerformance.mark(
@@ -238,6 +253,7 @@ struct HomeCommandExecutor {
                 note: ["action": actionType]
             )
         }
+        return true
     }
 
     func completePlannedFeed(
@@ -344,7 +360,7 @@ struct HomeCommandExecutor {
         openHealth: (Pet) -> Void,
         feedback: (ExpandedQuickActionExecutor.Feedback) -> Void
     ) {
-        ExpandedQuickActionExecutor.applyHealthCheckIn(
+        let didRecord = ExpandedQuickActionExecutor.applyHealthCheckIn(
             raw: raw,
             pet: pet,
             executorId: executorId,
@@ -353,7 +369,9 @@ struct HomeCommandExecutor {
             feedback: feedback,
             careEvents: careEvents
         )
-        publishMutation(QuickCareCommand.health(petID: pet.id, type: raw))
+        if didRecord {
+            publishMutation(QuickCareCommand.health(petID: pet.id, type: raw))
+        }
     }
 
     func applyHealthCheckIn(
@@ -669,13 +687,8 @@ struct HomeCommandExecutor {
         )
     }
 
-    private func publishNoop(_ command: DomainCommand, note: String) {
-        revisions.publishDomainMutation(
-            command: command,
-            affectedEntityIDs: [],
-            wroteBusinessFact: false,
-            note: note
-        )
+    private func publishNoop(_: DomainCommand, note: String) {
+        AppPerformanceMonitor.shared.record("domain_command_noop", valueMS: 0, note: note)
     }
 
     private func publishNoop(_ command: some FeatureDomainCommand, note: String) {

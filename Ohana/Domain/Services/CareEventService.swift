@@ -86,7 +86,7 @@ enum CareFactWritePolicy {
         context: ModelContext
     ) -> CareFactWriteDisposition {
         guard pet.trashedAt == nil else { return .noOp }
-        if executorIsRecycled(executorId, context: context) { return .noOp }
+        if executorCannotWrite(executorId, context: context) { return .noOp }
 
         guard let passedAwayDate = pet.passedAwayDate else { return .active }
         return isHistorical(date, relativeToPassingDate: passedAwayDate) ? .memorialHistoricalFactOnly : .noOp
@@ -106,6 +106,22 @@ enum CareFactWritePolicy {
         descriptor.fetchLimit = 1
         guard let human = try? context.fetch(descriptor).first else { return false }
         return human.trashedAt != nil
+    }
+
+    @MainActor
+    static func executorCannotWrite(_ executorId: String?, context: ModelContext) -> Bool {
+        guard let executorId,
+              let id = UUID(uuidString: executorId) else {
+            return false
+        }
+        var descriptor = FetchDescriptor<Human>(
+            predicate: #Predicate<Human> { human in
+                human.id == id
+            }
+        )
+        descriptor.fetchLimit = 1
+        guard let human = try? context.fetch(descriptor).first else { return false }
+        return !EconomyWalletWritePolicy.canWrite(human)
     }
 
     private static func isHistorical(_ date: Date, relativeToPassingDate passingDate: Date) -> Bool {
@@ -1557,7 +1573,7 @@ final class CareEventService: CareEventRecording {
     ) -> PetPottyLog {
         let liveTargets = SharedPetTargetResolver.normalizedTargets(targets, fallback: sourcePet)
         guard !liveTargets.isEmpty,
-              !CareFactWritePolicy.executorIsRecycled(executorId, context: context) else {
+              !CareFactWritePolicy.executorCannotWrite(executorId, context: context) else {
             return PetPottyLog(date: date, type: type, executorId: executorId)
         }
         let result = SharedPetActionRecorder.record(

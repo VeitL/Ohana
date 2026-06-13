@@ -92,6 +92,10 @@ struct QuickPottyCommandExecutor {
                 source: .quickAction,
                 createsLinkedPottyLog: false
             )
+            guard recorded.result.didWriteFact else {
+                publishNoop(petID: pet.id, action: action, note: "quickPotty.litter.factNoop")
+                return nil
+            }
             publish(petID: pet.id, action: action, affectedIDs: [pet.id, recorded.result.logID], note: "quickPotty.litter")
             return QuickPottyCommandResult(
                 petID: pet.id,
@@ -103,14 +107,18 @@ struct QuickPottyCommandExecutor {
             )
         }
 
-        let reward = careEvents.recordPotty(
+        let recorded = careEvents.recordPottyFact(
             pet: pet,
             type: selectedType,
             context: context,
             executorId: executorId,
             date: date
         )
-        let logID = latestPottyLogID(petID: pet.id, type: selectedType, date: date)
+        guard recorded.result.didWriteFact else {
+            publishNoop(petID: pet.id, action: action, note: "quickPotty.record.factNoop")
+            return nil
+        }
+        let logID = recorded.result.logID
         var affectedIDs: Set<UUID> = [pet.id]
         if let logID {
             affectedIDs.insert(logID)
@@ -125,7 +133,7 @@ struct QuickPottyCommandExecutor {
             petID: pet.id,
             careLogID: nil,
             pottyLogID: logID,
-            coconutDelta: reward.humanGot + reward.petGot,
+            coconutDelta: recorded.reward.humanGot + recorded.reward.petGot,
             action: action,
             targetCount: 1
         )
@@ -140,6 +148,10 @@ struct QuickPottyCommandExecutor {
     ) -> QuickPottyCommandResult? {
         guard let sourcePet = fetchPet(id: sourcePetID), EconomyWalletWritePolicy.canWrite(sourcePet) else {
             publishNoop(petID: sourcePetID, action: "unknownSharedPotty", note: "quickPotty.unknown.missingPet")
+            return nil
+        }
+        guard !CareFactWritePolicy.executorCannotWrite(executorId, context: context) else {
+            publishNoop(petID: sourcePetID, action: "unknownSharedPotty", note: "quickPotty.unknown.factNoop")
             return nil
         }
         let targets = fetchTargets(sourcePet: sourcePet, targetIDs: targetIDs)
@@ -179,10 +191,11 @@ struct QuickPottyCommandExecutor {
             return nil
         }
         let targets = fetchTargets(sourcePet: sourcePet, targetIDs: targetIDs)
+        let result: SharedPetActionResult?
         let reward: (humanGot: Int, petGot: Int)
         let careLogID: UUID?
         if targets.count > 1 {
-            reward = careEvents.recordSharedLitterCare(
+            let recorded = careEvents.recordSharedLitterCareFact(
                 sourcePet: sourcePet,
                 targets: targets,
                 context: context,
@@ -190,6 +203,8 @@ struct QuickPottyCommandExecutor {
                 date: date,
                 isFullChange: isFullChange
             )
+            result = recorded
+            reward = recorded.reward
             careLogID = nil
         } else {
             let recorded = careEvents.recordCareFact(
@@ -204,11 +219,21 @@ struct QuickPottyCommandExecutor {
                 source: .quickAction,
                 createsLinkedPottyLog: false
             )
+            result = nil
             reward = recorded.reward
             careLogID = recorded.result.logID
+            guard recorded.result.didWriteFact else {
+                let action = isFullChange ? "litterFullChange" : "litterScoop"
+                publishNoop(petID: sourcePet.id, action: action, note: "quickPotty.litterCare.factNoop")
+                return nil
+            }
         }
 
         let action = isFullChange ? "litterFullChange" : "litterScoop"
+        if let result, !result.didWriteFact {
+            publishNoop(petID: sourcePet.id, action: action, note: "quickPotty.litterCare.factNoop")
+            return nil
+        }
         var affectedIDs = Set(targets.map(\.id))
         affectedIDs.insert(sourcePet.id)
         if let careLogID {

@@ -284,9 +284,11 @@ struct CareCompletionChokepointCharacterizationTests {
             dependencies: .live()
         )
 
+        #expect(record.result.disposition == .noOp)
+        #expect(record.result.didWriteFact == false)
         #expect(record.log.executorId == frozenExecutor.id.uuidString)
         #expect(record.reward.humanGot + record.reward.petGot == 0)
-        #expect(try context.fetch(FetchDescriptor<PetCareLog>()).count == 1)
+        #expect(try context.fetch(FetchDescriptor<PetCareLog>()).isEmpty)
         #expect(try context.fetch(FetchDescriptor<CoconutLedgerEntry>()).isEmpty)
         #expect(try context.fetch(FetchDescriptor<EconomyBudgetUsageEvent>()).isEmpty)
     }

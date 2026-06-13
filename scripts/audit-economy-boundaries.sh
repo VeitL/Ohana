@@ -16,6 +16,7 @@ Purpose:
   - R4: feature/frozen/read-only gates visible in Views must also have a service-layer hard gate.
   - R5: feature/domain code must not call QuestManager.awardAction directly; use shared reward discipline primitives.
   - R5b: care rewards must enter audited care-fact chokepoints, not bare EconomyRewardDiscipline calls.
+  - R5c: care-fact chokepoint results must consume disposition before publishing or applying derived effects.
 
 Baseline:
   Full-scope debt is ratcheted in
@@ -301,6 +302,13 @@ DIRECT_REWARD_CALL_RE = re.compile(r"\.[ \t]*(?:awardAction)\s*\(")
 DIRECT_CARE_DISCIPLINE_CALL_RE = re.compile(
     r"\bEconomyRewardDiscipline\.[ \t]*(?:awardCareAction|awardSharedCareAction)\s*\("
 )
+CARE_FACT_CALL_RE = re.compile(
+    r"\b(?:recordManualFeedFact|recordSharedManualFeedFact|recordCareFact|recordSharedWateringFact|"
+    r"recordSharedCareFact|recordSharedLitterCareFact|recordPottyFact|recordHygieneFact|recordHealthFact)\s*\("
+)
+CARE_FACT_DISPOSITION_CONSUME_RE = re.compile(
+    r"\b(?:didWriteFact|allowsDerivedEffects|disposition|writesFact)\b"
+)
 
 
 def direct_reward_call_allowed(path: str) -> bool:
@@ -390,6 +398,39 @@ def scan_direct_care_discipline_chokepoint(path: pathlib.Path, lines: list[str],
             )
 
 
+def scan_care_fact_disposition_consumption(path: pathlib.Path, lines: list[str], warnings: list[WarningItem]) -> None:
+    path_str = rel(path)
+    if path_str in {
+        "Ohana/Domain/Services/CareEventRecording.swift",
+        "Ohana/Domain/Services/CareEventService.swift",
+    }:
+        return
+
+    for idx, line in enumerate(lines, start=1):
+        stripped = line.strip()
+        if allowed_line(line):
+            continue
+        if stripped.startswith("func ") or stripped.startswith("static func "):
+            continue
+        if not CARE_FACT_CALL_RE.search(line):
+            continue
+
+        window = "\n".join(lines[idx - 1:min(len(lines), idx + 50)])
+        if "economy-boundary: allow" in window:
+            continue
+        if CARE_FACT_DISPOSITION_CONSUME_RE.search(window):
+            continue
+
+        add(
+            warnings,
+            "care-fact-disposition-unconsumed",
+            path_str,
+            idx,
+            line,
+            "Care-fact chokepoint results must consume didWriteFact/allowsDerivedEffects/disposition before publishing revisions, feedback, plans, reminders, stock changes, or other derived effects.",
+        )
+
+
 GATE_RULES: list[tuple[str, re.Pattern[str], re.Pattern[str], str]] = [
     (
         "online-feature-gate",
@@ -461,6 +502,7 @@ def scan(files: list[pathlib.Path]) -> list[WarningItem]:
         scan_reward_actor_boundaries(path, lines, warnings)
         scan_direct_reward_chokepoint(path, lines, warnings)
         scan_direct_care_discipline_chokepoint(path, lines, warnings)
+        scan_care_fact_disposition_consumption(path, lines, warnings)
     scan_service_gate_coverage(files, warnings)
     return sorted(warnings, key=lambda item: (item.rule, item.path, item.line, item.snippet))
 

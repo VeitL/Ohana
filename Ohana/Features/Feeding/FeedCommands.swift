@@ -48,15 +48,11 @@ enum ManualFeedCommand {
         date: Date = Date()
     ) -> ManualFeedCommandResult {
         let careEvents = careEvents ?? CareEventService()
-        pet.mainFoodKind = foodKind
-        if saveAsDefault {
-            pet.dailyPortionGrams = grams
-        }
 
         let quality = QuestManager.QualityBonus.compose(precise: true, hasNote: false, hasPhoto: false)
-        let normalizedTargets = targets.isEmpty ? [pet] : targets
-        let reward = if normalizedTargets.count > 1 {
-            careEvents.recordSharedManualFeed(
+        let normalizedTargets = SharedPetTargetResolver.normalizedTargets(targets, fallback: pet)
+        let recorded = if normalizedTargets.count > 1 {
+            careEvents.recordSharedManualFeedFact(
                 sourcePet: pet,
                 targets: normalizedTargets,
                 totalGrams: grams,
@@ -67,31 +63,55 @@ enum ManualFeedCommand {
                 date: date
             )
         } else {
-            careEvents.recordManualFeed(
+            singleCareResult(careEvents.recordManualFeedFact(
                 pet: pet,
                 amountGrams: grams,
                 context: context,
                 executorId: executorId,
                 quality: quality,
                 date: date,
-                foodKind: foodKind
+                foodKind: foodKind,
+                source: .quickAction
+            ))
+        }
+
+        guard recorded.didWriteFact else {
+            return ManualFeedCommandResult(
+                foodKind: foodKind,
+                grams: grams,
+                targetCount: 0,
+                affectsStock: false,
+                stockReminders: [],
+                didRecord: false,
+                coconutDelta: 0
             )
         }
-        let stockReminders = FeedingPlanWriter.rebuildFoodStockReminders(
-            pet: pet,
-            allEvents: allEvents,
-            context: context,
-            now: date
-        )
+
+        let allowsDerivedEffects = recorded.allowsDerivedEffects
+        if allowsDerivedEffects {
+            pet.mainFoodKind = foodKind
+            if saveAsDefault {
+                pet.dailyPortionGrams = grams
+            }
+        }
+        let stockReminders = allowsDerivedEffects
+            ? FeedingPlanWriter.rebuildFoodStockReminders(
+                pet: pet,
+                allEvents: allEvents,
+                context: context,
+                now: date
+            )
+            : []
 
         return ManualFeedCommandResult(
             foodKind: foodKind,
             grams: grams,
-            targetCount: normalizedTargets.count,
-            affectsStock: FeedStockCalculator.activeStockRecord(for: pet, foodKind: foodKind, foodRecords: foodRecords, now: date) != nil,
+            targetCount: recorded.targetPetIDs.count,
+            affectsStock: allowsDerivedEffects &&
+                FeedStockCalculator.activeStockRecord(for: pet, foodKind: foodKind, foodRecords: foodRecords, now: date) != nil,
             stockReminders: stockReminders,
             didRecord: true,
-            coconutDelta: reward.humanGot + reward.petGot
+            coconutDelta: recorded.reward.humanGot + recorded.reward.petGot
         )
     }
 
@@ -134,6 +154,23 @@ enum ManualFeedCommand {
             coconutDelta: (reward?.humanGot ?? 0) + (reward?.petGot ?? 0)
         )
     }
+}
+
+private func singleCareResult(
+    _ recorded: (result: CareEventService.CareRecordResult, reward: (humanGot: Int, petGot: Int), log: PetCareLog)
+) -> SharedPetActionResult {
+    SharedPetActionResult(
+        sessionID: recorded.result.logID,
+        targetPetIDs: recorded.result.didWriteFact ? [recorded.result.subjectID] : [],
+        careLogIDs: recorded.result.didWriteFact ? [recorded.result.logID] : [],
+        pottyLogID: nil,
+        pottyLog: nil,
+        expenseLogIDs: [],
+        walkLogIDs: [],
+        walkLogs: [],
+        reward: recorded.reward,
+        disposition: recorded.result.disposition
+    )
 }
 
 struct TreatFeedCommandResult {

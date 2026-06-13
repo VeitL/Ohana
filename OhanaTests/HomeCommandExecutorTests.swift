@@ -565,6 +565,34 @@ struct HomeCommandExecutorTests {
     }
 
     @MainActor
+    @Test func quickPlayCommandExecutorNoopsForPassedAwayExecutorDisposition() throws {
+        let revisionCenter = ReadModelRevisionCenter()
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let pet = Pet(name: "Momo", species: "狗")
+        let executorHuman = Human(name: "Memorial caretaker")
+        executorHuman.passedAwayDate = makeDate(year: 2026, month: 6, day: 8, hour: 12, minute: 0)
+        context.insert(pet)
+        context.insert(executorHuman)
+        try context.save()
+
+        let beforeRevision = revisionCenter.homeRevision.value
+        let result = QuickPlayCommandExecutor(context: context, revisionCenter: revisionCenter).recordPlay(
+            petID: pet.id,
+            executorId: executorHuman.id.uuidString,
+            rewardTitle: "Momo play reward",
+            date: makeDate(year: 2026, month: 6, day: 8, hour: 18, minute: 0)
+        )
+
+        #expect(result == nil)
+        #expect(try context.fetch(FetchDescriptor<PetCareLog>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<CareLedgerEvent>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<CoconutLedgerEntry>()).isEmpty)
+        #expect(revisionCenter.homeRevision.value == beforeRevision)
+        #expect(revisionCenter.lastMutation == nil)
+    }
+
+    @MainActor
     @Test func homeQuickCareNoopsForRecycledExecutorDisposition() throws {
         let revisionCenter = ReadModelRevisionCenter()
         let container = try makeInMemoryContainer()

@@ -52,6 +52,19 @@ actionable; long-term product ideas belong in planning docs instead.
   派生（历史事实-only 例外只保留事实）。相关目标测试、`scripts/dev-check-changed.sh`、
   `scripts/audit-economy-boundaries.sh --all`、`scripts/tests/run-audit-fixture-tests.sh`
   与 `scripts/module-exit-gate.sh` 通过后，再开全新纯复审清零 P0/P1。
+- Repair note: 2026-06-13 repair session implemented typed fact disposition
+  consumption across QuickPlay / QuickPotty / QuickWater / Home expanded quick
+  actions, ManualFeed, PetCare, and PetHygiene command layers; no-op now returns
+  nil / `didRecord: false`, avoids fake log IDs, revisions, plans / reminders,
+  stock/default setting mutations, and feedback. Executor write policy now uses
+  `EconomyWalletWritePolicy.canWrite` for recycled/deceased humans. Added
+  `care-fact-disposition-unconsumed` audit with fixture. Passing validation:
+  targeted simulator suites (`HomeCommandExecutorTests`, `QuickWaterCommandTests`,
+  `ManualFeedCommandTests`, `CareCompletionChokepointCharacterizationTests`) 200
+  tests, `scripts/audit-economy-boundaries.sh --all`,
+  `scripts/tests/run-audit-fixture-tests.sh`, `scripts/dev-check-changed.sh`,
+  `git diff --check`, and `scripts/module-exit-gate.sh` PASS. Still requires a
+  fresh pure adversarial re-review before this TFU can close / Economy can be 🏁.
 
 ### TFU-20260613-012 - Repair post-7845db4c7 Economy hard-gate review findings
 

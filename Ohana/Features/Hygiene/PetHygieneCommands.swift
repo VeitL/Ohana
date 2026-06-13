@@ -41,6 +41,7 @@ struct PetHygieneCheckInCommandResult: Equatable {
     let subjectID: UUID
     let hygieneType: HygieneType
     let coconutDelta: Int
+    var didRecord: Bool = true
 }
 
 struct PetHygieneDeleteCommandResult: Equatable {
@@ -93,12 +94,25 @@ enum PetHygieneCommandService {
             executorId: executorId,
             date: date
         )
+        guard recorded.result.didWriteFact else {
+            return (
+                PetHygieneCheckInCommandResult(
+                    logID: recorded.result.logID,
+                    subjectID: recorded.result.subjectID,
+                    hygieneType: recorded.result.hygieneType,
+                    coconutDelta: 0,
+                    didRecord: false
+                ),
+                recorded.log
+            )
+        }
         return (
             PetHygieneCheckInCommandResult(
                 logID: recorded.result.logID,
                 subjectID: recorded.result.subjectID,
                 hygieneType: recorded.result.hygieneType,
-                coconutDelta: recorded.result.coconutDelta
+                coconutDelta: recorded.result.coconutDelta,
+                didRecord: true
             ),
             recorded.log
         )
@@ -291,7 +305,15 @@ struct PetHygieneCommandExecutor {
             executorId: executorId,
             date: date
         )
-        revisions.publishPetHygieneRecord(recorded.result, note: note)
+        if recorded.result.didRecord {
+            revisions.publishPetHygieneRecord(recorded.result, note: note)
+        } else {
+            AppPerformanceMonitor.shared.record(
+                "domain_command_noop",
+                valueMS: 0,
+                note: note
+            )
+        }
         return recorded
     }
 

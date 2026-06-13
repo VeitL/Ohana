@@ -98,6 +98,14 @@ struct QuickPlayCommandExecutor {
             source: .quickAction,
             createsLinkedPottyLog: false
         )
+        guard recorded.result.didWriteFact else {
+            AppPerformanceMonitor.shared.record(
+                "domain_command_noop",
+                valueMS: 0,
+                note: "quickPlay.factNoop"
+            )
+            return nil
+        }
         revisions.publish(
             DomainMutationResult(
                 command: .quickCare(entityID: pet.id, action: CareType.play.rawValue),

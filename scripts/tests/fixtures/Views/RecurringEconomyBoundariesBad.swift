@@ -22,3 +22,24 @@ struct RecurringEconomyBoundariesBadView: View {
         }
     }
 }
+
+struct RecurringEconomyUnconsumedFactCommand {
+    let careEvents: CareEventRecording
+    let context: ModelContext
+
+    func record(pet: Pet, executorId: String) {
+        let recorded = careEvents.recordCareFact(
+            pet: pet,
+            type: .feeding,
+            amountMl: 0,
+            context: context,
+            executorId: executorId,
+            reward: .feeding,
+            quality: .none,
+            date: Date(),
+            source: .quickAction,
+            createsLinkedPottyLog: false
+        )
+        print(recorded.result.logID)
+    }
+}

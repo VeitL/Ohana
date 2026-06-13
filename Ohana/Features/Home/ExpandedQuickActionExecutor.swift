@@ -18,6 +18,7 @@ enum ExpandedQuickActionExecutor {
         let label: String?
     }
 
+    @discardableResult
     static func performFeedCheckIn(
         pet: Pet,
         executorId: String?,
@@ -34,8 +35,8 @@ enum ExpandedQuickActionExecutor {
         showAntiRepeat: @escaping (_ title: String, _ message: String, _ pendingAction: @escaping () -> Void) -> Void,
         feedback: @escaping (Feedback) -> Void,
         careEvents: CareEventRecording
-    ) {
-        let performFeed = {
+    ) -> Bool {
+        let performFeed: () -> Bool = {
             let dashboard = ExpandedQuickActionLogic.feedDashboard(
                 for: pet,
                 allEvents: allEvents,
@@ -47,7 +48,7 @@ enum ExpandedQuickActionExecutor {
                 let amount = pet.dailyPortionGrams
                 guard amount > 0 else {
                     openFeedDetail(true)
-                    return
+                    return false
                 }
                 let result = ManualFeedCommand.recordManual(
                     pet: pet,
@@ -62,14 +63,18 @@ enum ExpandedQuickActionExecutor {
                     careEvents: careEvents,
                     date: now
                 )
+                guard result.didRecord else { return false }
                 let coconutDelta = result.coconutDelta
                 feedback(Feedback(cardId: pet.id, coconutDelta: coconutDelta, label: rewardLabel(actionType: "feed", delta: coconutDelta)))
                 UINotificationFeedbackGenerator().notificationOccurred(.success)
+                return true
             case .manualReminder:
-                if completePlannedFeed(pet) { return }
+                if completePlannedFeed(pet) { return true }
                 openFeedDetail(false)
+                return false
             case .autoFeeder:
                 openFeedDetail(false)
+                return false
             }
         }
 
@@ -98,12 +103,14 @@ enum ExpandedQuickActionExecutor {
                in: humans,
                now: now
            ) {
-            showAntiRepeat(antiRepeatTitle, antiRepeatMessage(warning), performFeed)
+            showAntiRepeat(antiRepeatTitle, antiRepeatMessage(warning)) { _ = performFeed() }
+            return false
         } else {
-            performFeed()
+            return performFeed()
         }
     }
 
+    @discardableResult
     static func performWaterCheckIn(
         pet: Pet,
         executorId: String?,
@@ -113,10 +120,10 @@ enum ExpandedQuickActionExecutor {
         openWaterManagement: (Pet) -> Void,
         feedback: (Feedback) -> Void,
         careEvents: CareEventRecording
-    ) {
+    ) -> Bool {
         guard !WaterQuickActionPolicy.isAquatic(species: pet.species) else {
             openWaterManagement(pet)
-            return
+            return false
         }
 
         let state = ExpandedQuickActionLogic.waterRuleState(for: pet, allEvents: allEvents, now: now)
@@ -130,16 +137,17 @@ enum ExpandedQuickActionExecutor {
                     executorId: executorId,
                     date: now
                 )
-                let delta = (reward?.humanGot ?? 0) + (reward?.petGot ?? 0)
+                guard let reward else { return false }
+                let delta = reward.humanGot + reward.petGot
                 feedback(Feedback(cardId: pet.id, coconutDelta: delta, label: rewardLabel(actionType: "water", delta: delta)))
                 UINotificationFeedbackGenerator().notificationOccurred(.success)
-                return
+                return true
             }
             openWaterManagement(pet)
-            return
+            return false
         }
 
-        let got = careEvents.recordCare(
+        let recorded = careEvents.recordCareFact(
             pet: pet,
             type: .watering,
             amountMl: ExpandedQuickActionLogic.defaultWaterAmountMl(for: pet) ?? 0,
@@ -147,13 +155,18 @@ enum ExpandedQuickActionExecutor {
             executorId: executorId,
             reward: .water,
             quality: .none,
-            date: now
+            date: now,
+            source: .quickAction,
+            createsLinkedPottyLog: false
         )
-        let delta = got.humanGot + got.petGot
+        guard recorded.result.didWriteFact else { return false }
+        let delta = recorded.reward.humanGot + recorded.reward.petGot
         feedback(Feedback(cardId: pet.id, coconutDelta: delta, label: rewardLabel(actionType: "water", delta: delta)))
         UINotificationFeedbackGenerator().notificationOccurred(.success)
+        return true
     }
 
+    @discardableResult
     static func performMedicationCheckIn(
         pet: Pet,
         allEvents: [Event],
@@ -162,12 +175,12 @@ enum ExpandedQuickActionExecutor {
         feedback: (Feedback) -> Void,
         questManager: QuestManager,
         medicationReminders providedMedicationReminders: MedicationReminderManaging? = nil
-    ) {
+    ) -> Bool {
         let medicationReminders = providedMedicationReminders ?? SharedMedicationReminderManager()
         let activeMeds = pet.medications.filter(\.isActiveToday)
         guard !activeMeds.isEmpty else {
             openMedication(pet)
-            return
+            return false
         }
 
         let targetMedication = activeMeds.first { medication in
@@ -179,7 +192,7 @@ enum ExpandedQuickActionExecutor {
 
         guard let medication = targetMedication else {
             openMedication(pet)
-            return
+            return false
         }
 
         PetMedicationDoseLogging.recordDose(
@@ -193,8 +206,10 @@ enum ExpandedQuickActionExecutor {
         medicationReminders.scheduleMedicationReminders(for: pet, context: modelContext)
         feedback(Feedback(cardId: pet.id, coconutDelta: 1, label: rewardLabel(actionType: "medication", delta: 1)))
         UINotificationFeedbackGenerator().notificationOccurred(.success)
+        return true
     }
 
+    @discardableResult
     static func performActionType(
         _ actionType: String,
         pet: Pet,
@@ -217,11 +232,11 @@ enum ExpandedQuickActionExecutor {
         careEvents: CareEventRecording,
         questManager: QuestManager,
         medicationReminders providedMedicationReminders: MedicationReminderManaging? = nil
-    ) {
+    ) -> Bool {
         let medicationReminders = providedMedicationReminders ?? SharedMedicationReminderManager()
         switch actionType {
         case "feed":
-            performFeedCheckIn(
+            return performFeedCheckIn(
                 pet: pet,
                 executorId: executorId,
                 allEvents: allEvents,
@@ -239,7 +254,7 @@ enum ExpandedQuickActionExecutor {
                 careEvents: careEvents
             )
         case "water":
-            performWaterCheckIn(
+            return performWaterCheckIn(
                 pet: pet,
                 executorId: executorId,
                 allEvents: allEvents,
@@ -251,9 +266,9 @@ enum ExpandedQuickActionExecutor {
             )
         case "walk":
             startWalk(pet)
-            UINotificationFeedbackGenerator().notificationOccurred(.success)
+            return false
         case "litter":
-            let got = careEvents.recordCare(
+            let recorded = careEvents.recordCareFact(
                 pet: pet,
                 type: .litter,
                 amountMl: 0,
@@ -261,16 +276,21 @@ enum ExpandedQuickActionExecutor {
                 executorId: executorId,
                 reward: .potty(isLitter: true),
                 quality: .none,
-                date: now
+                date: now,
+                source: .quickAction,
+                createsLinkedPottyLog: false
             )
-            let delta = got.humanGot + got.petGot
+            guard recorded.result.didWriteFact else { return false }
+            let delta = recorded.reward.humanGot + recorded.reward.petGot
             feedback(Feedback(cardId: pet.id, coconutDelta: delta, label: rewardLabel(actionType: "litter", delta: delta)))
             UINotificationFeedbackGenerator().notificationOccurred(.success)
+            return true
         case "play":
-            performSpecialCare(.play, pet: pet, executorId: executorId, modelContext: modelContext, feedback: feedback, careEvents: careEvents)
-            UINotificationFeedbackGenerator().notificationOccurred(.success)
+            let didRecord = performSpecialCare(.play, pet: pet, executorId: executorId, modelContext: modelContext, feedback: feedback, careEvents: careEvents)
+            if didRecord { UINotificationFeedbackGenerator().notificationOccurred(.success) }
+            return didRecord
         case "medication":
-            performMedicationCheckIn(
+            return performMedicationCheckIn(
                 pet: pet,
                 allEvents: allEvents,
                 modelContext: modelContext,
@@ -281,20 +301,25 @@ enum ExpandedQuickActionExecutor {
             )
         case "waterChange", "filterClean":
             openWaterManagement(pet)
+            return false
         case "cageCleaning":
-            performSpecialCare(.cageCleaning, pet: pet, executorId: executorId, modelContext: modelContext, feedback: feedback, careEvents: careEvents)
-            UINotificationFeedbackGenerator().notificationOccurred(.success)
+            let didRecord = performSpecialCare(.cageCleaning, pet: pet, executorId: executorId, modelContext: modelContext, feedback: feedback, careEvents: careEvents)
+            if didRecord { UINotificationFeedbackGenerator().notificationOccurred(.success) }
+            return didRecord
         case "freeFlight":
-            performSpecialCare(.freeFlight, pet: pet, executorId: executorId, modelContext: modelContext, feedback: feedback, careEvents: careEvents)
-            UINotificationFeedbackGenerator().notificationOccurred(.success)
+            let didRecord = performSpecialCare(.freeFlight, pet: pet, executorId: executorId, modelContext: modelContext, feedback: feedback, careEvents: careEvents)
+            if didRecord { UINotificationFeedbackGenerator().notificationOccurred(.success) }
+            return didRecord
         case "misting":
-            performSpecialCare(.misting, pet: pet, executorId: executorId, modelContext: modelContext, feedback: feedback, careEvents: careEvents)
-            UINotificationFeedbackGenerator().notificationOccurred(.success)
+            let didRecord = performSpecialCare(.misting, pet: pet, executorId: executorId, modelContext: modelContext, feedback: feedback, careEvents: careEvents)
+            if didRecord { UINotificationFeedbackGenerator().notificationOccurred(.success) }
+            return didRecord
         case "substrateChange":
-            performSpecialCare(.substrateChange, pet: pet, executorId: executorId, modelContext: modelContext, feedback: feedback, careEvents: careEvents)
-            UINotificationFeedbackGenerator().notificationOccurred(.success)
+            let didRecord = performSpecialCare(.substrateChange, pet: pet, executorId: executorId, modelContext: modelContext, feedback: feedback, careEvents: careEvents)
+            if didRecord { UINotificationFeedbackGenerator().notificationOccurred(.success) }
+            return didRecord
         default:
-            break
+            return false
         }
     }
 
@@ -332,14 +357,15 @@ enum ExpandedQuickActionExecutor {
             return false
         }
 
-        let got = careEvents.recordHygiene(
+        let recorded = careEvents.recordHygieneFact(
             pet: pet,
             type: type,
             context: modelContext,
             executorId: executorId,
             date: Date()
         )
-        let delta = got.humanGot + got.petGot
+        guard recorded.result.didWriteFact else { return false }
+        let delta = recorded.reward.humanGot + recorded.reward.petGot
         feedback(Feedback(cardId: pet.id, coconutDelta: delta, label: rewardLabel(title: L10n().hygieneTypeUILabel(type), delta: delta)))
         UINotificationFeedbackGenerator().notificationOccurred(.success)
         return true
@@ -357,13 +383,15 @@ enum ExpandedQuickActionExecutor {
             UINotificationFeedbackGenerator().notificationOccurred(.warning)
             return false
         }
-        let got = careEvents.recordPotty(pet: pet, type: type, context: modelContext, executorId: executorId, date: Date())
-        let delta = got.humanGot + got.petGot
+        let recorded = careEvents.recordPottyFact(pet: pet, type: type, context: modelContext, executorId: executorId, date: Date())
+        guard recorded.result.didWriteFact else { return false }
+        let delta = recorded.reward.humanGot + recorded.reward.petGot
         feedback(Feedback(cardId: pet.id, coconutDelta: delta, label: rewardLabel(title: L10n().pottyTypeUILabel(type), delta: delta)))
         UINotificationFeedbackGenerator().notificationOccurred(.success)
         return true
     }
 
+    @discardableResult
     static func applyHealthCheckIn(
         raw: String,
         pet: Pet,
@@ -372,7 +400,7 @@ enum ExpandedQuickActionExecutor {
         openHealth: (Pet) -> Void,
         feedback: (Feedback) -> Void,
         careEvents: CareEventRecording
-    ) {
+    ) -> Bool {
         let type: HealthLogType
         switch raw {
         case "vaccine":
@@ -383,9 +411,9 @@ enum ExpandedQuickActionExecutor {
             type = .checkup
         default:
             openHealth(pet)
-            return
+            return false
         }
-        let reward = careEvents.recordHealth(
+        let recorded = careEvents.recordHealthFact(
             pet: pet,
             type: type,
             note: L10n().tr(zh: "快捷打卡", en: "Quick check-in", de: "Schnell-Check-in"),
@@ -393,11 +421,14 @@ enum ExpandedQuickActionExecutor {
             executorId: executorId,
             date: Date()
         )
-        let delta = reward.humanGot + reward.petGot
+        guard recorded.result.didWriteFact else { return false }
+        let delta = recorded.reward.humanGot + recorded.reward.petGot
         feedback(Feedback(cardId: pet.id, coconutDelta: delta, label: rewardLabel(actionType: "health", delta: delta)))
         UINotificationFeedbackGenerator().notificationOccurred(.success)
+        return true
     }
 
+    @discardableResult
     static func performSpecialCare(
         _ type: CareType,
         pet: Pet,
@@ -405,7 +436,7 @@ enum ExpandedQuickActionExecutor {
         modelContext: ModelContext,
         feedback: (Feedback) -> Void,
         careEvents: CareEventRecording
-    ) {
+    ) -> Bool {
         let rewardAmounts: (human: Int, pet: Int) = switch type {
         case .filterClean: (25, 2)
         case .cageCleaning, .freeFlight, .substrateChange: (10, 2)
@@ -418,9 +449,22 @@ enum ExpandedQuickActionExecutor {
             emoji: type.emoji,
             title: specialCareRewardTitle(type, petName: pet.name)
         )
-        let got = careEvents.recordCare(pet: pet, type: type, amountMl: 0, context: modelContext, executorId: executorId, reward: reward, quality: .none, date: Date())
-        let delta = got.humanGot + got.petGot
+        let recorded = careEvents.recordCareFact(
+            pet: pet,
+            type: type,
+            amountMl: 0,
+            context: modelContext,
+            executorId: executorId,
+            reward: reward,
+            quality: .none,
+            date: Date(),
+            source: .quickAction,
+            createsLinkedPottyLog: false
+        )
+        guard recorded.result.didWriteFact else { return false }
+        let delta = recorded.reward.humanGot + recorded.reward.petGot
         feedback(Feedback(cardId: pet.id, coconutDelta: delta, label: rewardLabel(title: L10n().careTypeUILabel(type), delta: delta)))
+        return true
     }
 
     static func rewardLabel(actionType: String, delta: Int, l: L10n = L10n()) -> String? {

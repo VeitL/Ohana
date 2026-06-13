@@ -14,6 +14,7 @@ struct PetCareTrackingCommandResult: Equatable {
     let linkedPottyLogID: UUID?
     let careType: CareType
     let coconutDelta: Int
+    var didRecord: Bool = true
 }
 
 struct PetCareTrackingDeleteCommandResult: Equatable {
@@ -84,13 +85,27 @@ enum PetCareTrackingCommandService {
                 foodKind: .dry,
                 source: .detail
             )
+            guard recorded.result.didWriteFact else {
+                return (
+                    PetCareTrackingCommandResult(
+                        petID: pet.id,
+                        careLogID: recorded.result.logID,
+                        linkedPottyLogID: nil,
+                        careType: .feeding,
+                        coconutDelta: 0,
+                        didRecord: false
+                    ),
+                    recorded.log
+                )
+            }
             return (
                 PetCareTrackingCommandResult(
                     petID: pet.id,
                     careLogID: recorded.result.logID,
                     linkedPottyLogID: nil,
                     careType: .feeding,
-                    coconutDelta: recorded.result.coconutDelta
+                    coconutDelta: recorded.result.coconutDelta,
+                    didRecord: true
                 ),
                 recorded.log
             )
@@ -108,13 +123,27 @@ enum PetCareTrackingCommandService {
             source: .detail,
             createsLinkedPottyLog: type == .litter
         )
+        guard recorded.result.didWriteFact else {
+            return (
+                PetCareTrackingCommandResult(
+                    petID: pet.id,
+                    careLogID: recorded.result.logID,
+                    linkedPottyLogID: nil,
+                    careType: type,
+                    coconutDelta: 0,
+                    didRecord: false
+                ),
+                recorded.log
+            )
+        }
         return (
             PetCareTrackingCommandResult(
                 petID: pet.id,
                 careLogID: recorded.result.logID,
                 linkedPottyLogID: recorded.result.linkedPottyLogID,
                 careType: type,
-                coconutDelta: recorded.result.coconutDelta
+                coconutDelta: recorded.result.coconutDelta,
+                didRecord: true
             ),
             recorded.log
         )
@@ -327,10 +356,18 @@ struct PetCareCommandExecutor {
             executorId: executorId,
             date: date
         )
-        revisions.publishPetCareRecord(
-            recorded.result,
-            note: note ?? "petCareTracking.record.\(recorded.result.careType.rawValue)"
-        )
+        if recorded.result.didRecord {
+            revisions.publishPetCareRecord(
+                recorded.result,
+                note: note ?? "petCareTracking.record.\(recorded.result.careType.rawValue)"
+            )
+        } else {
+            AppPerformanceMonitor.shared.record(
+                "domain_command_noop",
+                valueMS: 0,
+                note: note ?? "petCareTracking.record.noop.\(recorded.result.careType.rawValue)"
+            )
+        }
         return recorded
     }
 
