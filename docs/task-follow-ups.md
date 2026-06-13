@@ -27,7 +27,7 @@ actionable; long-term product ideas belong in planning docs instead.
 
 ### TFU-20260613-008 - Green architecture boundary audit or refresh ratchet baseline
 
-- Status: Open
+- Status: Done
 - Priority: P1
 - Area: CI / Architecture Boundaries
 - Source task: CI repair round close-out, 2026-06-13
@@ -51,6 +51,14 @@ actionable; long-term product ideas belong in planning docs instead.
 - Close when: `scripts/audit-architecture-boundaries.sh --all` passes locally
   and the GitHub Actions `audits` job reaches the later repository gates instead
   of stopping at architecture boundaries.
+- Closed: 2026-06-13 in the architecture boundary repair round. Local
+  `scripts/audit-architecture-boundaries.sh --all` passed after moving `@Query`
+  ownership behind data containers, replacing the online-gate `NotificationCenter`
+  string bus with a typed publisher, routing static service calls through
+  `AppServices`/infrastructure adapters, and deliberately refreshing the
+  oversized Swift file ratchet baseline. Follow-up CI script pin drift was fixed
+  in `69658a888`; GitHub Actions run `27464485820` on `90ee16ba4` passed
+  `audits`, `lint`, and `build-test`.
 
 ### TFU-20260613-007 - Fix CI build-test compiler failures outside Economy
 
