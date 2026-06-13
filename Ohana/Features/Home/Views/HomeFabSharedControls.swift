@@ -26,8 +26,10 @@ struct HomeFabActionRow: View {
     @AppStorage(GrowthNewFeatureStore.revisionKey) private var newFeatureRevision = 0
 
     var body: some View {
-        let _ = newFeatureRevision
-        let showsNewFeature = GrowthNewFeatureStore.hasPending(homeShortcut: item)
+        let showsNewFeature: Bool = {
+            _ = newFeatureRevision
+            return GrowthNewFeatureStore.hasPending(homeShortcut: item)
+        }()
 
         HStack(spacing: 10) {
             HStack(spacing: 6) {

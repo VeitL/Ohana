@@ -281,48 +281,50 @@ enum CloudSyncInitialHouseholdMergeRuntime {
     }
 
     private static func snapshotRecordCount(in backup: OhanaBackup) -> Int {
-        backup.pets.count
-            + backup.humans.count
-            + backup.events.count
-            + backup.reminders.count
-            + backup.households.count
-            + backup.plants.count
-            + backup.petCareLogs.count
-            + backup.petPottyLogs.count
-            + backup.petWalkLogs.count
-            + backup.petWeightLogs.count
-            + backup.petExpenseLogs.count
-            + backup.petHealthLogs.count
-            + backup.petHygieneLogs.count
-            + backup.petFoodRecords.count
-            + backup.petDocuments.count
-            + (backup.petDocumentAttachments?.count ?? 0)
-            + backup.petMilestones.count
-            + (backup.petPhotoLogs?.count ?? 0)
-            + (backup.petInsurances?.count ?? 0)
-            + (backup.insuranceClaims?.count ?? 0)
-            + (backup.petMedications?.count ?? 0)
-            + (backup.symptomLogs?.count ?? 0)
-            + (backup.heatCycleLogs?.count ?? 0)
-            + backup.humanWeightLogs.count
-            + backup.humanWorkoutLogs.count
-            + (backup.humanMedications?.count ?? 0)
-            + (backup.humanMedicationLogs?.count ?? 0)
-            + (backup.humanHealthMetricLogs?.count ?? 0)
-            + backup.waterLogs.count
-            + backup.wishlistItems.count
-            + (backup.careLedgerEvents?.count ?? 0)
-            + (backup.coconutAccounts?.count ?? 0)
-            + (backup.coconutLedgerEntries?.count ?? 0)
-            + (backup.familyCollaborationTasks?.count ?? 0)
-            + (backup.sharedCareSessions?.count ?? 0)
-            + (backup.coconutExchangeRequests?.count ?? 0)
-            + (backup.oasisUpgradeCoconuts?.count ?? 0)
-            + (backup.oasisElectronicPets?.count ?? 0)
-            + (backup.oasisCritterFragments?.count ?? 0)
-            + (backup.oasisUnlocks?.count ?? 0)
-            + (backup.oasisCritterActionLogs?.count ?? 0)
-            + (backup.gachaOwnedItems?.count ?? 0)
-            + (backup.gachaDrawLogs?.count ?? 0)
+        var count = 0
+        count += backup.pets.count
+        count += backup.humans.count
+        count += backup.events.count
+        count += backup.reminders.count
+        count += backup.households.count
+        count += backup.plants.count
+        count += backup.petCareLogs.count
+        count += backup.petPottyLogs.count
+        count += backup.petWalkLogs.count
+        count += backup.petWeightLogs.count
+        count += backup.petExpenseLogs.count
+        count += backup.petHealthLogs.count
+        count += backup.petHygieneLogs.count
+        count += backup.petFoodRecords.count
+        count += backup.petDocuments.count
+        count += backup.petDocumentAttachments?.count ?? 0
+        count += backup.petMilestones.count
+        count += backup.petPhotoLogs?.count ?? 0
+        count += backup.petInsurances?.count ?? 0
+        count += backup.insuranceClaims?.count ?? 0
+        count += backup.petMedications?.count ?? 0
+        count += backup.symptomLogs?.count ?? 0
+        count += backup.heatCycleLogs?.count ?? 0
+        count += backup.humanWeightLogs.count
+        count += backup.humanWorkoutLogs.count
+        count += backup.humanMedications?.count ?? 0
+        count += backup.humanMedicationLogs?.count ?? 0
+        count += backup.humanHealthMetricLogs?.count ?? 0
+        count += backup.waterLogs.count
+        count += backup.wishlistItems.count
+        count += backup.careLedgerEvents?.count ?? 0
+        count += backup.coconutAccounts?.count ?? 0
+        count += backup.coconutLedgerEntries?.count ?? 0
+        count += backup.familyCollaborationTasks?.count ?? 0
+        count += backup.sharedCareSessions?.count ?? 0
+        count += backup.coconutExchangeRequests?.count ?? 0
+        count += backup.oasisUpgradeCoconuts?.count ?? 0
+        count += backup.oasisElectronicPets?.count ?? 0
+        count += backup.oasisCritterFragments?.count ?? 0
+        count += backup.oasisUnlocks?.count ?? 0
+        count += backup.oasisCritterActionLogs?.count ?? 0
+        count += backup.gachaOwnedItems?.count ?? 0
+        count += backup.gachaDrawLogs?.count ?? 0
+        return count
     }
 }

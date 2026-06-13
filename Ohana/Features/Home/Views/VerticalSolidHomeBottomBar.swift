@@ -603,8 +603,10 @@ private struct VerticalSolidHomeFabShortcutButton: View {
     @AppStorage(GrowthNewFeatureStore.revisionKey) private var newFeatureRevision = 0
 
     var body: some View {
-        let _ = newFeatureRevision
-        let showsNewFeature = GrowthNewFeatureStore.hasPending(expandedShortcut: shortcut)
+        let showsNewFeature: Bool = {
+            _ = newFeatureRevision
+            return GrowthNewFeatureStore.hasPending(expandedShortcut: shortcut)
+        }()
 
         Button(action: action) {
             VStack(spacing: 5) {
@@ -668,8 +670,10 @@ private struct VerticalSolidHomeHomeFabShortcutButton: View {
     @AppStorage(GrowthNewFeatureStore.revisionKey) private var newFeatureRevision = 0
 
     var body: some View {
-        let _ = newFeatureRevision
-        let showsNewFeature = GrowthNewFeatureStore.hasPending(homeShortcut: shortcut)
+        let showsNewFeature: Bool = {
+            _ = newFeatureRevision
+            return GrowthNewFeatureStore.hasPending(homeShortcut: shortcut)
+        }()
 
         Button(action: action) {
             VStack(spacing: 5) {

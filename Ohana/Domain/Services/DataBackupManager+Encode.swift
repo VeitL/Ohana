@@ -264,7 +264,7 @@ nonisolated extension DataBackupManager {
             eventId: r.event?.id.uuidString,
             completedAt: d(r.completedAt),
             completedBy: r.completedBy.isEmpty ? nil : r.completedBy,
-            createdAt: d(r.createdAt)
+            createdAt: iso.string(from: r.createdAt)
         )
     }
 
@@ -747,7 +747,7 @@ nonisolated extension DataBackupManager {
             sourceLevel: critter.sourceLevel,
             obtainedAt: d(critter.obtainedAt),
             lastInteractionAt: d(critter.lastInteractionAt),
-            lastStateRefreshAt: d(critter.lastStateRefreshAt),
+            lastStateRefreshAt: iso.string(from: critter.lastStateRefreshAt),
             lifeStateRaw: critter.lifeStateRaw,
             deathReasonRaw: critter.deathReasonRaw,
             riskStartedAt: d(critter.riskStartedAt),

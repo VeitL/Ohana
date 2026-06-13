@@ -103,7 +103,7 @@ struct OasisRewardPresentationModifier: ViewModifier {
             } else {
                 lockedOasisRoute(route)
             }
-            }
+        }
     }
 
     private var emptyOasisRoute: some View {
