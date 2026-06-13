@@ -16,11 +16,11 @@ enum AppResetService {
         context: ModelContext,
         defaults: UserDefaults = .standard
     ) throws {
+        let options = Options()
         try reset(
             context: context,
             defaults: defaults,
-            options: Options(),
-            questManager: QuestManager()
+            options: options
         )
     }
 
@@ -29,11 +29,12 @@ enum AppResetService {
         defaults: UserDefaults = .standard,
         options: Options
     ) throws {
-        try reset(
+        let questManager = options.resetSharedRuntimeState ? QuestManager() : nil
+        try resetInternal(
             context: context,
             defaults: defaults,
             options: options,
-            questManager: QuestManager()
+            questManager: questManager
         )
     }
 
@@ -42,6 +43,20 @@ enum AppResetService {
         defaults: UserDefaults = .standard,
         options: Options,
         questManager: QuestManager
+    ) throws {
+        try resetInternal(
+            context: context,
+            defaults: defaults,
+            options: options,
+            questManager: questManager
+        )
+    }
+
+    private static func resetInternal(
+        context: ModelContext,
+        defaults: UserDefaults,
+        options: Options,
+        questManager: QuestManager?
     ) throws {
         let preservedDefaults = preservedDefaultValues(in: defaults, options: options)
         try deleteAllPersistentModels(in: context)
@@ -59,7 +74,7 @@ enum AppResetService {
             UNUserNotificationCenter.current().removeAllPendingNotificationRequests()
             UNUserNotificationCenter.current().removeAllDeliveredNotifications()
         }
-        if options.resetSharedRuntimeState {
+        if options.resetSharedRuntimeState, let questManager {
             resetSharedRuntimeState(questManager: questManager)
         }
 
