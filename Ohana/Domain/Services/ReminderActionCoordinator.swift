@@ -250,6 +250,7 @@ enum ReminderActionCoordinator {
                     pets: [pet],
                     context: context,
                     executorId: executorId,
+                    operationDate: Date(),
                     sourceReminderId: reminder.id.uuidString
                 )
             }

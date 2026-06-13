@@ -19,12 +19,12 @@ enum SharedPetTargetResolver {
         let sourceSpecies = normalizedSpecies(sourcePet.species)
         var seen = Set<UUID>()
         var liveTargets = candidates.filter { pet in
-            guard !pet.hasPassedAway, !seen.contains(pet.id) else { return false }
+            guard EconomyWalletWritePolicy.canWrite(pet), !seen.contains(pet.id) else { return false }
             guard normalizedSpecies(pet.species) == sourceSpecies else { return false }
             seen.insert(pet.id)
             return true
         }
-        if !sourcePet.hasPassedAway, !liveTargets.contains(where: { $0.id == sourcePet.id }) {
+        if EconomyWalletWritePolicy.canWrite(sourcePet), !liveTargets.contains(where: { $0.id == sourcePet.id }) {
             liveTargets.insert(sourcePet, at: 0)
         }
         return liveTargets.sorted { lhs, rhs in
@@ -38,7 +38,7 @@ enum SharedPetTargetResolver {
     static func sameSpeciesTargets(sourcePet: Pet, allPets: [Pet], explicitTargetIds: Set<UUID> = []) -> [Pet] {
         let species = normalizedSpecies(sourcePet.species)
         let sameSpecies = allPets.filter { pet in
-            !pet.hasPassedAway && normalizedSpecies(pet.species) == species
+            EconomyWalletWritePolicy.canWrite(pet) && normalizedSpecies(pet.species) == species
         }
         let selected = explicitTargetIds.isEmpty ? sameSpecies : sameSpecies.filter { explicitTargetIds.contains($0.id) }
         return normalizedTargets(selected, fallback: sourcePet)

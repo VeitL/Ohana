@@ -296,7 +296,8 @@ enum CalendarEventCommandService {
             isCompleted: shouldComplete,
             pets: pets,
             context: context,
-            executorId: executorId
+            executorId: executorId,
+            operationDate: now
         )
 
         let remindersToSync = remindersForCompletionSync(event: event, now: now)

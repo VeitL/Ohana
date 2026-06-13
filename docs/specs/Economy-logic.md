@@ -59,6 +59,8 @@
   - 判定：强行迁入家族 1 若需要伪造一个 `CareType`，即属家族 2，禁止过度收口（避免错误抽象）。
   - 花费归属家族 2 且含 human expense（pet/human 对称，D10），不按宠物/人类拆分。
 - ECO-025（待复查，farm-risk）：花费记录当前可产出椰子奖励，存在"记假账→刷椰子"的潜在 farm 向量。本条登记为开放复查（见 `docs/task-follow-ups.md` TFU-20260613-010），D2 中间路线下需单独审"记录花费是否应发奖/限额"，本轮收口重构不处理。
+- ECO-026（冻结成员照护行为，2026-06-13 拍板，实现 G4.1）：① 离世成员（`hasPassedAway`）可补记历史照护事实但不发奖、不派生；② 回收成员（`trashedAt != nil`）作为照护对象/执行人整体 no-op（不写事实、不发奖、不派生），UI 挡入口；③ executor 冻结时奖励 no-op 且不回落 active human（`EconomyRewardOwnerResolver.explicitHuman` 返回 nil 后不得 `?? activeHuman`）；④ 此边界统一持有在事实写入收口（`recordCareFact` / `SharedPetActionRecorder` / `EconomyRewardOwnerResolver`），禁止只在奖励层做导致"写事实不发奖"的半状态。共享照护 target 解析必须用 `EconomyWalletWritePolicy.canWrite` 同时过滤 `hasPassedAway` 与 `trashedAt`。
+- ECO-027（补记奖励按操作日，强化 ECO-010 至所有完成入口）：Calendar / 通知补完成历史 occurrence 时，照护事实保留历史日期，但奖励的预算/冷却结算必须按**操作当日 dayKey**，不得写入历史 dayKey 绕过今日预算触顶。所有"完成照护任务"的入口（QuickCare / Calendar / TodayFocus / 通知）一致适用。
 
 ## 当前代码来源
 

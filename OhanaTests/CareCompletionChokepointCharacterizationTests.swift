@@ -259,6 +259,76 @@ struct CareCompletionChokepointCharacterizationTests {
         #expect(try context.fetch(FetchDescriptor<EconomyBudgetUsageEvent>()).isEmpty)
     }
 
+    @Test func frozenExplicitCareExecutorDoesNotFallbackToActiveHumanOrPetReward() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let activeHuman = Human(name: "Active")
+        let frozenExecutor = Human(name: "Frozen")
+        frozenExecutor.passedAwayDate = Date(timeIntervalSince1970: 1000)
+        let pet = Pet(name: "Momo", species: "cat")
+        context.insert(activeHuman)
+        context.insert(frozenExecutor)
+        context.insert(pet)
+        try context.save()
+
+        let state = EconomyDefaultsState.capture()
+        defer { state.restore() }
+        resetEconomy(activeHumanID: activeHuman.id.uuidString, humans: [activeHuman, frozenExecutor], pets: [pet])
+
+        let record = CareEventService.recordManualFeedFact(
+            pet: pet,
+            amountGrams: 80,
+            context: context,
+            executorId: frozenExecutor.id.uuidString,
+            date: Date(timeIntervalSince1970: 2000),
+            dependencies: .live()
+        )
+
+        #expect(record.log.executorId == frozenExecutor.id.uuidString)
+        #expect(record.reward.humanGot + record.reward.petGot == 0)
+        #expect(try context.fetch(FetchDescriptor<PetCareLog>()).count == 1)
+        #expect(try context.fetch(FetchDescriptor<CoconutLedgerEntry>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<EconomyBudgetUsageEvent>()).isEmpty)
+    }
+
+    @Test func sharedCareFiltersRecycledTargetsBeforeWritingFacts() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let human = Human(name: "Guan")
+        let sourcePet = Pet(name: "Momo", species: "cat")
+        let recycledPet = Pet(name: "Nana", species: "cat")
+        recycledPet.trashedAt = Date(timeIntervalSince1970: 1000)
+        context.insert(human)
+        context.insert(sourcePet)
+        context.insert(recycledPet)
+        try context.save()
+
+        let state = EconomyDefaultsState.capture()
+        defer { state.restore() }
+        resetEconomy(activeHumanID: human.id.uuidString, humans: [human], pets: [sourcePet, recycledPet])
+
+        _ = CareEventService.recordSharedManualFeed(
+            sourcePet: sourcePet,
+            targets: [sourcePet, recycledPet],
+            totalGrams: 120,
+            foodKind: .dry,
+            context: context,
+            executorId: human.id.uuidString,
+            date: Date(timeIntervalSince1970: 2000)
+        )
+
+        let careLogs = try context.fetch(FetchDescriptor<PetCareLog>())
+        let sharedSessions = try context.fetch(FetchDescriptor<SharedCareSession>())
+        let walletEntries = try context.fetch(FetchDescriptor<CoconutLedgerEntry>())
+        let ledgerEvents = try context.fetch(FetchDescriptor<CareLedgerEvent>())
+
+        #expect(sharedSessions.isEmpty)
+        #expect(careLogs.count == 1)
+        #expect(careLogs.allSatisfy { $0.pet?.id == sourcePet.id })
+        #expect(walletEntries.allSatisfy { $0.ownerId != recycledPet.id.uuidString })
+        #expect(ledgerEvents.allSatisfy { $0.subjectId != recycledPet.id.uuidString })
+    }
+
     private func makeContainer() throws -> ModelContainer {
         let schema = Schema(ArkSchemaV71.models)
         let config = ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)

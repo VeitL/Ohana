@@ -15,6 +15,7 @@ Purpose:
   - R2: reward calls must carry an executor/actor and must not route to system wallets.
   - R4: feature/frozen/read-only gates visible in Views must also have a service-layer hard gate.
   - R5: feature/domain code must not call QuestManager.awardAction directly; use shared reward discipline primitives.
+  - R5b: care rewards must enter audited care-fact chokepoints, not bare EconomyRewardDiscipline calls.
 
 Baseline:
   Full-scope debt is ratcheted in
@@ -297,6 +298,9 @@ def scan_reward_actor_boundaries(path: pathlib.Path, lines: list[str], warnings:
 
 
 DIRECT_REWARD_CALL_RE = re.compile(r"\.[ \t]*(?:awardAction)\s*\(")
+DIRECT_CARE_DISCIPLINE_CALL_RE = re.compile(
+    r"\bEconomyRewardDiscipline\.[ \t]*(?:awardCareAction|awardSharedCareAction)\s*\("
+)
 
 
 def direct_reward_call_allowed(path: str) -> bool:
@@ -321,6 +325,36 @@ def scan_direct_reward_chokepoint(path: pathlib.Path, lines: list[str], warnings
                 idx,
                 line,
                 "QuestManager.awardAction is the low-level reward primitive; feature and domain callers must use EconomyRewardDiscipline care/non-care entry points.",
+            )
+
+
+def direct_care_discipline_allowed(path: str) -> bool:
+    allowed_exact = {
+        "Ohana/Domain/Services/CareEventRecording.swift",
+        "Ohana/Domain/Services/CalendarTaskCompletionSyncService.swift",
+        "Ohana/Domain/Services/PetMedicationDoseLogging.swift",
+        "Ohana/Features/DashboardRecords/DashboardRecordCommands.swift",
+        "Ohana/Features/Health/PetHealthCommands.swift",
+        "Ohana/Features/Walks/PetWalkingManager.swift",
+    }
+    return path in allowed_exact
+
+
+def scan_direct_care_discipline_chokepoint(path: pathlib.Path, lines: list[str], warnings: list[WarningItem]) -> None:
+    path_str = rel(path)
+    if direct_care_discipline_allowed(path_str):
+        return
+    for idx, line in enumerate(lines, start=1):
+        if allowed_line(line):
+            continue
+        if DIRECT_CARE_DISCIPLINE_CALL_RE.search(line):
+            add(
+                warnings,
+                "reward-direct-care-discipline",
+                path_str,
+                idx,
+                line,
+                "Care rewards must enter an audited care-fact chokepoint; do not call EconomyRewardDiscipline.awardCareAction/awardSharedCareAction as a standalone reward.",
             )
 
 
@@ -394,6 +428,7 @@ def scan(files: list[pathlib.Path]) -> list[WarningItem]:
         scan_coconut_balance_writes(path, lines, warnings)
         scan_reward_actor_boundaries(path, lines, warnings)
         scan_direct_reward_chokepoint(path, lines, warnings)
+        scan_direct_care_discipline_chokepoint(path, lines, warnings)
     scan_service_gate_coverage(files, warnings)
     return sorted(warnings, key=lambda item: (item.rule, item.path, item.line, item.snippet))
 

@@ -10,6 +10,12 @@ struct RecurringEconomyBoundariesBadView: View {
         Button("Bad") {
             pet.coconutBalance += 1
             _ = questManager.awardAction(type: .feeding, pet: pet, context: context)
+            _ = EconomyRewardDiscipline.awardCareAction(
+                type: .feeding,
+                pet: pet,
+                context: context,
+                questManager: questManager
+            )
             if CoconutExchangeFeatureGate.isEnabled {
                 print("UI-only exchange gate")
             }

@@ -1,15 +1,19 @@
+import Foundation
 import SwiftData
 
 struct RecurringEconomyBoundariesGoodCommand {
-    let questManager: QuestManager
+    let careEvents: CareEventRecording
 
     func record(pet: Pet, context: ModelContext, executorId: String) {
-        _ = EconomyRewardDiscipline.awardCareAction(
-            type: .feeding,
+        _ = careEvents.recordCare(
             pet: pet,
+            type: .feeding,
+            amountMl: 0,
             context: context,
             executorId: executorId,
-            questManager: questManager
+            reward: .feeding,
+            quality: .none,
+            date: Date()
         )
     }
 }

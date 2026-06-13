@@ -25,6 +25,38 @@ actionable; long-term product ideas belong in planning docs instead.
 
 ## Open Items
 
+### TFU-20260613-011 - Repair post-chokepoint Economy P1 findings
+
+- Status: Done
+- Priority: P1
+- Area: Economy / Care Completion / Audit Guardrails
+- Source task: Economy post-chokepoint adversarial review, 2026-06-13
+- Blocker: 本轮纯对抗复审发现 4 条 P1：显式 executor 已离世或回收时
+  `EconomyRewardOwnerResolver` 会回退 active human；Calendar/通知补完成历史
+  occurrence 时奖励按历史事实日进入预算/冷却；共享照护 target resolver 过滤
+  `hasPassedAway` 但未过滤 `trashedAt`；R5 fixture 把无事实/ledger 的
+  `EconomyRewardDiscipline.awardCareAction` 直调当作 Good，不能证明 ECO-024
+  的两家族纪律。
+- Next step（含 2026-06-13 产品决策 G4.1 / ECO-026 / ECO-027）：
+  根因归组——P1-1 与 P1-3 同根因（冻结门只在奖励层、事实层漏做），统一修：
+  在事实写入收口持有冻结门，**离世可补记历史事实但不发奖不派生、回收整体 no-op、
+  executor 冻结时奖励 no-op 且不回落 active human**（删除 `?? activeHuman` 回落，
+  改为显式 executor 无效/冻结即 no-op）；共享 target 用 `canWrite` 同时过滤
+  `hasPassedAway` 与 `trashedAt`。P1-2 独立修：Calendar/通知完成路径事实日期与
+  奖励操作日分离，奖励按操作当日 dayKey 结算（ECO-027）。P1-4 独立修：收紧 R5
+  fixture 与审计，让家族 1 只能经 care fact 收口、家族 2 必须伴随自己的事实+ledger，
+  Good fixture 不得放行无事实/ledger 的 discipline 直调。
+- Close condition: 新增覆盖四条复现的 in-memory tests 与 bad/good audit
+  fixture，`scripts/audit-economy-boundaries.sh --all`、`scripts/tests/run-audit-fixture-tests.sh`
+  和相关目标测试通过，并由全新纯复审会话确认 P0/P1=0 后才允许 Economy 标 🏁。
+- Closed: 2026-06-13 修复轮完成。P1-1/P1-3 红测覆盖冻结 executor 不回落
+  active human、共享照护过滤回收 target；P1-2 红测覆盖 Calendar 历史 occurrence
+  事实日与奖励操作日分离；P1-4 fixture/audit 覆盖裸
+  `EconomyRewardDiscipline.awardCareAction` 不再作为 Good。目标测试、
+  `scripts/tests/run-audit-fixture-tests.sh`、`scripts/dev-check-changed.sh`、
+  `scripts/module-exit-gate.sh` 均通过。Economy 总账仍保持 🟢，需另开全新纯复审
+  会话确认 P0/P1=0 后才可标 🏁。
+
 ### TFU-20260613-010 - Re-audit expense-logging coconut reward (farm-risk)
 
 - Status: Open

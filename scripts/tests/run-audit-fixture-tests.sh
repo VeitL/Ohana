@@ -117,7 +117,7 @@ assert_good scripts/audit-shared-care-note-metadata.sh "$fixtures/SharedCareNote
 
 assert_bad scripts/audit-economy-boundaries.sh "$fixtures/RecurringEconomyBoundariesBad.swift" \
   coconut-balance-direct-write reward-actor-boundary reward-direct-awardaction \
-  view-soft-gate-without-service-hard-gate
+  reward-direct-care-discipline view-soft-gate-without-service-hard-gate
 assert_good scripts/audit-economy-boundaries.sh "$fixtures/RecurringEconomyBoundariesGood.swift"
 
 assert_bad scripts/audit-derived-state-lifecycle.sh "$fixtures/DerivedStateLifecycleBad.swift" \

@@ -34,6 +34,10 @@ extension QuestManager {
             context: context,
             logPrefix: "QuestManager"
         )
+        if EconomyRewardOwnerResolver.hasExplicitExecutor(executorId), human == nil {
+            lastEconomyRewardResult = .empty
+            return (0, 0)
+        }
         let consumesBoost = isDoubleRewardBoostActive()
         let isCoolingDown = isOnCooldown(petId: pet?.id, type: type)
         let budgetKeys = economyBudgetKeys(for: human, context: context)
@@ -177,6 +181,10 @@ extension QuestManager {
             context: context,
             logPrefix: "QuestManager"
         )
+        if EconomyRewardOwnerResolver.hasExplicitExecutor(executorId), human == nil {
+            lastEconomyRewardResult = .empty
+            return (0, 0)
+        }
         let consumesBoost = isDoubleRewardBoostActive()
         let isCoolingDown = livePets.allSatisfy { isOnCooldown(petId: $0.id, type: type) }
         let budgetKeys = economyBudgetKeys(for: human, context: context)

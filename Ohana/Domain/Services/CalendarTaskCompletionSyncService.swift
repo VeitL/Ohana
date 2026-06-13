@@ -45,6 +45,7 @@ enum CalendarTaskCompletionSyncService {
         pets: [Pet],
         context: ModelContext,
         executorId: String?,
+        operationDate: Date = Date(),
         sourceReminderId: String? = nil,
         careLedger providedCareLedger: CareLedgerRecording? = nil
     ) {
@@ -66,6 +67,7 @@ enum CalendarTaskCompletionSyncService {
                 careType: careType,
                 occurredAt: occurredAt,
                 occurrenceDate: occurrenceDate,
+                rewardDate: operationDate,
                 executorId: executorId,
                 sourceReminderId: sourceReminderId,
                 context: context,
@@ -78,6 +80,7 @@ enum CalendarTaskCompletionSyncService {
                 pottyType: pottyType,
                 occurredAt: occurredAt,
                 occurrenceDate: occurrenceDate,
+                rewardDate: operationDate,
                 executorId: executorId,
                 sourceReminderId: sourceReminderId,
                 context: context,
@@ -90,6 +93,7 @@ enum CalendarTaskCompletionSyncService {
                 hygieneType: hygieneType,
                 occurredAt: occurredAt,
                 occurrenceDate: occurrenceDate,
+                rewardDate: operationDate,
                 executorId: executorId,
                 sourceReminderId: sourceReminderId,
                 context: context,
@@ -110,6 +114,7 @@ enum CalendarTaskCompletionSyncService {
         careType: CareType,
         occurredAt: Date,
         occurrenceDate: Date,
+        rewardDate: Date,
         executorId: String?,
         sourceReminderId: String?,
         context: ModelContext,
@@ -134,7 +139,7 @@ enum CalendarTaskCompletionSyncService {
             action: rewardAction(for: careType, pet: pet),
             pet: pet,
             occurrenceDate: occurrenceDate,
-            occurredAt: occurredAt,
+            rewardDate: rewardDate,
             executorId: executorId,
             context: context,
             careLedger: careLedger
@@ -166,6 +171,7 @@ enum CalendarTaskCompletionSyncService {
         pottyType: PottyType,
         occurredAt: Date,
         occurrenceDate: Date,
+        rewardDate: Date,
         executorId: String?,
         sourceReminderId: String?,
         context: ModelContext,
@@ -179,7 +185,7 @@ enum CalendarTaskCompletionSyncService {
             action: .potty(isLitter: false),
             pet: pet,
             occurrenceDate: occurrenceDate,
-            occurredAt: occurredAt,
+            rewardDate: rewardDate,
             executorId: executorId,
             context: context,
             careLedger: careLedger
@@ -209,6 +215,7 @@ enum CalendarTaskCompletionSyncService {
         hygieneType: HygieneType,
         occurredAt: Date,
         occurrenceDate: Date,
+        rewardDate: Date,
         executorId: String?,
         sourceReminderId: String?,
         context: ModelContext,
@@ -222,7 +229,7 @@ enum CalendarTaskCompletionSyncService {
             action: .care(type: hygieneType),
             pet: pet,
             occurrenceDate: occurrenceDate,
-            occurredAt: occurredAt,
+            rewardDate: rewardDate,
             executorId: executorId,
             context: context,
             careLedger: careLedger
@@ -360,7 +367,7 @@ enum CalendarTaskCompletionSyncService {
         action: QuestManager.OhanaActionType,
         pet: Pet,
         occurrenceDate: Date,
-        occurredAt: Date,
+        rewardDate: Date,
         executorId: String?,
         context: ModelContext,
         careLedger: CareLedgerRecording
@@ -372,7 +379,7 @@ enum CalendarTaskCompletionSyncService {
             type: action,
             pet: pet,
             context: context,
-            date: occurredAt,
+            date: rewardDate,
             executorId: executorId,
             questManager: questManager
         )

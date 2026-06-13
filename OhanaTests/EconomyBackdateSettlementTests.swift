@@ -170,6 +170,78 @@ struct EconomyBackdateSettlementTests {
         #expect(careLogs.map(\.date).sorted() == [firstHistoricalDate, secondHistoricalDate].sorted())
     }
 
+    @MainActor
+    @Test func calendarHistoricalOccurrenceUsesOperationDayForBudget() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let operationDate = Date(timeIntervalSince1970: 1_800_000_000)
+        let historicalDate = Calendar.current.date(byAdding: .day, value: -30, to: operationDate)!
+        let human = Human(name: "Guan")
+        let pet = Pet(name: "Momo", species: "cat")
+        let event = Event(
+            title: "Feed Momo 80g",
+            startDate: historicalDate,
+            eventType: EventType.daily.rawValue,
+            relatedEntityType: EntityKind.pet.rawValue,
+            relatedEntityId: pet.id.uuidString
+        )
+        context.insert(human)
+        context.insert(pet)
+        context.insert(event)
+        try context.save()
+
+        let objectKeys = ["pet.\(pet.id.uuidString)"]
+        let defaults = UserDefaults.standard
+        let oldActiveHumanID = defaults.object(forKey: "currentActiveHumanId")
+        let oldCooldownLogs = defaults.object(forKey: QuestManager.Keys.cooldownLogs)
+        let oldBoostDouble = defaults.object(forKey: "shop_boostDoubleActive")
+        defer {
+            restoreDefaults(
+                activeHumanID: oldActiveHumanID,
+                cooldownLogs: oldCooldownLogs,
+                boostDouble: oldBoostDouble
+            )
+            resetBudget(memberKey: human.id.uuidString, careObjectKeys: objectKeys, date: operationDate)
+            resetBudget(memberKey: human.id.uuidString, careObjectKeys: objectKeys, date: historicalDate)
+        }
+        defaults.set(human.id.uuidString, forKey: "currentActiveHumanId")
+        defaults.removeObject(forKey: QuestManager.Keys.cooldownLogs)
+        defaults.removeObject(forKey: "shop_boostDoubleActive")
+        resetBudget(memberKey: human.id.uuidString, careObjectKeys: objectKeys, date: operationDate)
+        resetBudget(memberKey: human.id.uuidString, careObjectKeys: objectKeys, date: historicalDate)
+
+        let historicalDayKey = EconomyDailyBudgetStore.dayKey(for: historicalDate)
+        let operationDayKey = EconomyDailyBudgetStore.dayKey(for: operationDate)
+        let historicalUsageCountBefore = usageEvents(
+            context: context,
+            dayKey: historicalDayKey,
+            actionKey: "feed"
+        ).count
+
+        let completed = CalendarEventCommandService.toggleCompletion(
+            event: event,
+            occurrenceDate: historicalDate,
+            pets: [pet],
+            context: context,
+            executorId: human.id.uuidString,
+            now: operationDate
+        )
+
+        let careLog = try #require(try context.fetch(FetchDescriptor<PetCareLog>()).first)
+        let ledger = try #require(try context.fetch(FetchDescriptor<CareLedgerEvent>()).first)
+        let operationUsageEvents = usageEvents(context: context, dayKey: operationDayKey, actionKey: "feed")
+        let rewardLedgerEntries = try context.fetch(FetchDescriptor<CoconutLedgerEntry>())
+            .filter { $0.source == .careEvent && $0.delta > 0 }
+
+        #expect(completed.isCompleted)
+        #expect(Calendar.current.isDate(careLog.date, inSameDayAs: historicalDate))
+        #expect(Calendar.current.isDate(ledger.occurredAt, inSameDayAs: historicalDate))
+        #expect(usageEvents(context: context, dayKey: historicalDayKey, actionKey: "feed").count == historicalUsageCountBefore)
+        #expect(operationUsageEvents.isEmpty == false)
+        #expect(rewardLedgerEntries.isEmpty == false)
+        #expect(rewardLedgerEntries.allSatisfy { EconomyDailyBudgetStore.dayKey(for: $0.occurredAt) != historicalDayKey })
+    }
+
     private func makeContainer() throws -> ModelContainer {
         let schema = Schema(ArkSchemaV71.models)
         let config = ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)

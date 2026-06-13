@@ -14,8 +14,15 @@ enum EconomyRewardOwnerResolver {
         context: ModelContext,
         logPrefix: String
     ) -> Human? {
-        explicitHuman(id: executorId, context: context, logPrefix: logPrefix)
-            ?? activeHuman(selection: activeHumanSelection, context: context, logPrefix: logPrefix)
+        if hasExplicitExecutor(executorId) {
+            return explicitHuman(id: executorId, context: context, logPrefix: logPrefix)
+        }
+        return activeHuman(selection: activeHumanSelection, context: context, logPrefix: logPrefix)
+    }
+
+    static func hasExplicitExecutor(_ executorId: String?) -> Bool {
+        guard let executorId else { return false }
+        return !executorId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
     @MainActor
