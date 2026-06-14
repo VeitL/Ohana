@@ -25,6 +25,34 @@ actionable; long-term product ideas belong in planning docs instead.
 
 ## Open Items
 
+### TFU-20260614-008 - Repair pre-existing CI architecture-boundary gate
+
+- Status: Open
+- Priority: P1
+- Area: CI / Architecture Boundaries / File Size Ratchet / Service Injection
+- Source task: Economy dirty-executor P0 fix and push verification; Codex
+  implementation session, 2026-06-14.
+- Blocker: CI runs `scripts/audit-architecture-boundaries.sh --all`, and the
+  gate is already red before the dirty-executor fix. Runs `27500716652`
+  (`be0dd1eeb`) and `27501530627` (`7ded53a6a`) both fail at the same
+  architecture step while lint and local module exit are green. Current full
+  audit failures include oversized ratchet violations in
+  `CalendarTaskCompletionSyncService.swift`, `CareEventRecording.swift`,
+  `CareEventService.swift`, `SharedPetActionRecorder.swift`,
+  `FeedCommands.swift`, `PetHealthCommands.swift`, `MedicationCommands.swift`,
+  `SharedModelContainer.swift`, and several small baseline overruns, plus
+  static `CareEventService` references in Economy/Feeding/QuickWater command
+  paths. This is cross-module architecture cleanup, not part of the Economy
+  dirty-executor behavior fix.
+- Next step: Run `scripts/audit-architecture-boundaries.sh --all`, split or
+  shrink oversized files without raising the ratchet baseline, and either route
+  the static service calls through injected protocols/adapters or justify a
+  narrow architecture-boundary allowlist with tests. Keep the cleanup in a
+  separate commit from Economy behavior fixes.
+- Close condition: `scripts/audit-architecture-boundaries.sh --all` passes
+  locally; a pushed CI run passes `audits`, `lint`, and `build-test`; update
+  this TFU with the closing commit/run URL.
+
 ### TFU-20260614-006 - Close Economy pure-review P1 leftovers before maturity
 
 - Status: Open
