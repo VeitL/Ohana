@@ -15,8 +15,8 @@ struct FamilyWeeklyReportDashboardView: View {
 
     var body: some View {
         FamilyWeeklyReportDashboardContentView(
-            pets: pets.activeRecycleBinItems,
-            humans: humans.activeRecycleBinItems,
+            pets: pets,
+            humans: humans,
             ledgerEvents: ledgerEvents
         )
     }

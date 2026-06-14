@@ -57,6 +57,8 @@ final class PetHealthLog {
     var nextCheckupDate: Date? // 下次体检提醒日期（仅体检记录使用）
     var executorId: String? // ArkSchemaV38: 执行该记录的 Human.id.uuidString
     var pet: Pet?
+    // Legacy recycle-bin columns kept only for stores that already migrated through the retired deletion model.
+    // Active product code must not read or write these fields.
     var trashedAt: Date?
     var trashExpiresAt: Date?
     var trashBatchId: String = ""

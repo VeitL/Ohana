@@ -14,7 +14,7 @@ struct AppWalkRouteContainer: View {
 
     init(id: UUID, onDismiss: @escaping () -> Void) {
         _pets = Query(filter: #Predicate<Pet> { pet in
-            pet.id == id && pet.trashedAt == nil
+            pet.id == id
         })
         self.onDismiss = onDismiss
     }

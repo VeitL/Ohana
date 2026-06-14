@@ -2,7 +2,9 @@
 //  RecycleBinBatch.swift
 //  Ohana
 //
-//  Metadata row for grouped recycle-bin operations.
+//  Legacy V69 schema row retained only so stores that already migrated through
+//  the cancelled recycle-bin model continue to open. No product flow creates,
+//  restores, or syncs this row.
 //
 
 import Foundation
@@ -16,6 +18,8 @@ final class RecycleBinBatch {
     var subtitle: String
     var sourceEntityName: String
     var sourceEntityId: String
+    // Legacy recycle-bin columns kept only for stores that already migrated through the retired deletion model.
+    // Active product code must not read or write these fields.
     var trashedAt: Date
     var trashExpiresAt: Date
     var trashedByHumanId: String

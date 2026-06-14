@@ -5,7 +5,7 @@ import Testing
 
 @MainActor
 struct RainbowBridgeServiceTests {
-    @Test func markPassedAwayKeepsFuturePlansButSuppressesThemFromActiveFlows() throws {
+    @Test func markPassedAwayKeepsExistingPlansReadOnlyWithoutDerivedSuppression() throws {
         let container = try makeContainer()
         let context = ModelContext(container)
         let now = Date()
@@ -60,23 +60,18 @@ struct RainbowBridgeServiceTests {
         let reminders = try context.fetch(FetchDescriptor<Reminder>())
         #expect(pet.passedAwayDate == now)
         #expect(events.contains { $0.id == futureEventID })
-        #expect(events.first { $0.id == futureEventID }?.trashedAt == now)
-        #expect(events.first { $0.id == futureEventID }?.trashBatchId == "memorial:\(pet.id.uuidString)")
-        #expect(events.first { $0.id == futureEventID }?.trashExpiresAt == nil)
         #expect(events.contains { $0.id == pastEventID })
         #expect(events.contains { $0.id == otherFutureEventID })
         #expect(reminders.contains { $0.id == futureReminderID })
-        #expect(reminders.first { $0.id == futureReminderID }?.statusEnum == .skipped)
-        #expect(reminders.first { $0.id == futureReminderID }?.completedBy == "system:memorial:\(pet.id.uuidString)")
+        #expect(reminders.first { $0.id == futureReminderID }?.statusEnum == .pending)
+        #expect(reminders.first { $0.id == futureReminderID }?.completedBy.isEmpty == true)
         #expect(reminders.contains { $0.id == pastReminderID })
         #expect(reminders.contains { $0.id == otherFutureReminderID })
         #expect(reminders.first { $0.id == pastReminderID }?.statusEnum == .pending)
         #expect(reminders.first { $0.id == otherFutureReminderID }?.statusEnum == .pending)
-        #expect(events.first { $0.id == pastEventID }?.trashedAt == nil)
-        #expect(events.first { $0.id == otherFutureEventID }?.trashedAt == nil)
     }
 
-    @Test func undoPassedAwayRestoresOnlyMemorialSuppressedFuturePlans() throws {
+    @Test func undoPassedAwayOnlyClearsLifecycleField() throws {
         let container = try makeContainer()
         let context = ModelContext(container)
         let now = Date()
@@ -112,13 +107,11 @@ struct RainbowBridgeServiceTests {
         RainbowBridgeService().undoPassedAway(pet: pet, context: context)
 
         #expect(pet.passedAwayDate == nil)
-        #expect(event.trashedAt == nil)
-        #expect(event.trashBatchId.isEmpty)
-        #expect(event.trashExpiresAt == nil)
+        #expect(event.title == "Future vet")
         #expect(memorialReminder.statusEnum == .pending)
         #expect(memorialReminder.completedBy.isEmpty)
         #expect(memorialReminder.completedAt == nil)
-        #expect(userSkippedEvent.trashedAt == nil)
+        #expect(userSkippedEvent.title == "User skipped future vet")
         #expect(userSkippedReminder.statusEnum == .skipped)
         #expect(userSkippedReminder.completedBy == "human-1")
     }

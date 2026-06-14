@@ -9,18 +9,18 @@ import Foundation
 
 extension Pet {
     var canWriteHealthFacts: Bool {
-        trashedAt == nil && !hasPassedAway
+        !hasPassedAway
     }
 
     var activeHealthLogs: [PetHealthLog] {
-        healthLogs.activeRecycleBinItems
+        healthLogs
     }
 
     var activeSymptomLogs: [SymptomLog] {
-        symptomLogs.activeRecycleBinItems
+        symptomLogs
     }
 
     var activeHeatCycleLogs: [HeatCycleLog] {
-        heatCycleLogs.activeRecycleBinItems
+        heatCycleLogs
     }
 }

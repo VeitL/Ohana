@@ -25,6 +25,409 @@ actionable; long-term product ideas belong in planning docs instead.
 
 ## Open Items
 
+### TFU-20260614-006 - Close Economy pure-review P1 leftovers before maturity
+
+- Status: Open
+- Priority: P1
+- Area: Economy / Shared Feed / Planned Catch-up / Insurance Expense Ledger /
+  Test Gate
+- Source task: Economy fresh pure adversarial review; Codex pure review session,
+  2026-06-14.
+- Blocker: 本轮纯复审在当前候选工作树上仍发现 Economy 不能 🏁 的 P1。①
+  shared manual feed 多目标路径在 `SharedPetActionRecorder.record` 的 no-op gate
+  之前调用 `QuestManager.recordFirstMeal`；invalid / missing / recycled explicit
+  executor 会让 recorder no-op，但 first-meal special reward / flag 已可能通过
+  special reward active-human fallback 写入。② planned feed / water catch-up
+  已开始拆 `factDate` 与 `operationDate`，但 `isCatchUp` 分支仍直接返回 0 奖励并写
+  0 delta ledger；现有测试还断言 "within six hours does not award coconuts"，与
+  ECO-010 / ECO-027 的"奖励按操作日预算 / 冷却结算，允许时发奖"相反。③
+  Insurance 自动保费 schedule 与报销会直接插入 `PetExpenseLog`，没有走
+  `ExpenseCommandService` / non-care expense ledger 纪律，也没有同边界
+  `CareLedgerEvent`。④ clean `HomeCommandExecutorTests` 仍红在
+  `insurancePolicyServiceCreatesPolicyPaymentScheduleAndCalendarEvents`，测试传入
+  新 executor UUID 却仍期望 `"human-1"`。附带 P2：`recordUnknownSharedPotty`
+  服务 API 在 no-op 时仍返回 detached `PetPottyLog`，容易让未来 caller 用非空对象
+  误判成功。
+- Next step: 补红测后修复：shared manual feed invalid / missing / recycled executor
+  不得写 first-meal special reward、flag、wallet、fact、ledger、revision 或 UI 成功；
+  planned feed / water 历史 occurrence 写历史 fact，奖励 / cooldown / wallet ledger
+  用 operation day，预算允许时发奖，预算触顶时 recordOnly；Insurance 保费 / 报销
+  expense 入口要么改为明确的计划模型不写真实 `PetExpenseLog`，要么走同一
+  expense fact + ledger 纪律并补产品选择测试；修复 insurance 测试断言。扩展
+  economy audit / fixture 覆盖 "pre-recorder derived effect" 和直接 expense fact
+  缺 ledger 的真实坏例；把 `recordUnknownSharedPotty` 改为 typed result 或让 caller
+  不可能用 detached fallback 当成功。
+- Progress: 2026-06-14 care-derivation executor architecture work retired the
+  old recycled/deceased historical fact-only split under the product-owner
+  two-state model, restored the dirty-executor characterization witness, and
+  moved care command side effects toward typed executor outcomes. This TFU
+  remains Open because Insurance expense ledger discipline and the final
+  fresh pure adversarial Economy review have not been closed in this session.
+- Close condition: 新红测先失败后修绿；`scripts/audit-economy-boundaries.sh --all`、
+  `scripts/tests/run-audit-fixture-tests.sh`、相关 targeted simulator suite、
+  `git diff --check` 与 module exit gate 通过；再开全新纯对抗复审，P0/P1=0 后
+  Economy 才可标 🏁。
+
+### TFU-20260614-005 - Split planned catch-up fact date from reward operation date
+
+- Status: Done
+- Priority: P1
+- Area: Economy / QuickFeed / QuickWater / Reminders / Memorial Historical Facts /
+  Backdate Settlement
+- Source task: Economy fresh pure adversarial review; Codex pure review session,
+  2026-06-14.
+- Blocker: 本轮纯复审发现 QuickCare planned catch-up 仍未落实 ECO-027 的
+  "事实按历史 occurrence，奖励 / 冷却 / 预算按操作日"。QuickFeed 的
+  `completeSelectedPlanOccurrence` 用 occurrence date 构造 reminder，但随后
+  `completePlannedFeed` / `ManualFeedCommand.completePlanned` 没把
+  `reminder.scheduledAt` 作为事实时间传入；`CareEventService.completePlannedFeed`
+  用单一 `date` 同时做 `CareFactWritePolicy.disposition`、`PetCareLog.date`、
+  reminder completedAt 和奖励结算。QuickWater 同类：`QuickWaterCommandExecutor`
+  固定传 `Date()` 给 `CareEventService.completePlannedWater`，service 同样用该
+  操作时间写 `PetCareLog.date`。结果是补完成历史计划时照护事实落到操作日；若宠物
+  已在计划 occurrence 之后离世，历史 occurrence 本应允许写 fact-only，却因为用操作
+  日做 disposition 直接 no-op。
+- Next step: 给 planned feed / planned water 分别补红测：① active pet 的历史
+  reminder catch-up 写 `PetCareLog.date == reminder.scheduledAt`，但预算 /
+  cooldown / wallet ledger 仍以 operation date 结算；② pet 在 scheduledAt 之后
+  离世时，catch-up 写历史 fact-only，不完成奖励 / ledger / reminder-derived /
+  Oasis 派生；③ notification manual-feed reminder branch 走同一语义。实现上把
+  planned completion result 改成 typed disposition，显式传 `occurredAt` 与
+  `operationDate`，所有 QuickFeed / QuickWater / notification planned completion
+  caller 统一消费该 typed result。
+- Close condition: 新红测先失败后修绿；planned feed / water 历史 occurrence 的
+  fact date、reward dayKey、memorial fact-only、UI / revision / reminder 派生语义
+  均一致；`scripts/audit-economy-boundaries.sh --all`、
+  `scripts/tests/run-audit-fixture-tests.sh`、相关 targeted simulator suite 与
+  `git diff --check` PASS；再开全新纯对抗复审，P0/P1=0 后 Economy 才可标 🏁。
+- Closed: 2026-06-14 in the care-derivation executor architecture work.
+  Planned feed/water result types now carry `factDate` and `operationDate`, and
+  command/UI callers consume typed result state. The old memorial fact-only
+  half of this TFU was retired by the product-owner two-state decision: deceased
+  members are read-only/no-write. Remaining Economy maturity risk is tracked by
+  TFU-20260614-006 and the required final pure adversarial review.
+
+### TFU-20260614-004 - Finish QuickPotty no-op propagation and restore Economy test gate
+
+- Status: Done
+- Priority: P1
+- Area: Economy / QuickPotty / UI Feedback / Reminder Settings / Audit Guardrails /
+  Test Gate
+- Source task: Economy fresh pure adversarial review; Codex pure review session,
+  2026-06-14.
+- Blocker: 本轮纯复审在当前 P1 修复工作树上又发现 no-op 语义没有贯穿
+  QuickPotty 入口族。`QuickPottyDetailSheet.logUnknownGroupPotty` 和 `recordScoop`
+  在 command 返回前就保存 `SharedPetSelectionMemory`，因此 missing / recycled /
+  deceased explicit executor 导致 `QuickPottyCommandExecutor` no-op 时仍留下共享选择
+  记忆。`doFullChange` 更严重：它预先保存选择和本地 cycle anchor，在 deferred
+  command 中忽略 `recordLitterCare` 返回值；即使 care fact no-op，仍会
+  `LitterCareSettingsStore.markFullChange`、同步 scoop / litter reminders，并展示
+  success haptic / toast。现有 `scripts/audit-economy-boundaries.sh --all` 仍 PASS，
+  因为 result-consumption 规则没有覆盖 `recordLitterCare` /
+  `recordUnknownSharedPotty`。此外 clean DerivedData targeted simulator build 当前
+  编译失败：`OhanaTests/HomeCommandExecutorTests.swift` 多个 success-path tests 使用
+  `executorHuman.id.uuidString` 但没有创建/插入 `executorHuman`，阻断 Economy 目标
+  测试和模块 exit gate。
+- Next step: 给 QuickPotty unknown shared / scoop / full-change 补红测：invalid /
+  missing / recycled explicit executor 下不得写 selection memory、litter settings、
+  reminders、revision success 或 UI success feedback。把 QuickPotty 入口统一消费
+  typed result（`didRecord` / `didWriteFact` / `allowsDerivedEffects` 等价均可），
+  `doFullChange` 必须在确认 fact 写入后才执行 settings/reminder/success 派生。扩展
+  economy audit 与 bad fixture 覆盖 `recordLitterCare` 和
+  `recordUnknownSharedPotty` 的未消费结果。修复 `HomeCommandExecutorTests` 中缺失的
+  executor fixture，并用 clean DerivedData 重跑目标 suite。
+- Close condition: 新红测先失败后修绿；QuickPotty no-op 时无 fact、ledger、
+  reward、revision success、reminder/settings 派生、selection persistence 或 UI
+  success feedback；audit bad fixture 能抓本轮真实坏例；clean DerivedData 目标
+  simulator suite PASS；`scripts/audit-economy-boundaries.sh --all`、
+  `scripts/tests/run-audit-fixture-tests.sh`、`git diff --check` PASS；再开全新纯
+  对抗复审，P0/P1=0 后 Economy 才可标 🏁。
+- Closed: 2026-06-14 in the care-derivation executor architecture work.
+  QuickPotty command/UI paths now consume typed write results before selection
+  memory, settings, reminders, success feedback, or revision effects. The
+  `HomeCommandExecutorTests` gate has passed in this session.
+
+### TFU-20260614-003 - Propagate no-op results through Economy UI feedback and secondary actors
+
+- Status: Done
+- Priority: P1
+- Area: Economy / QuickFeed / QuickWater / Walks / Shared Expense / UI Feedback /
+  Audit Guardrails
+- Source task: Economy fresh pure adversarial review; Codex pure review session,
+  2026-06-14.
+- Blocker: 本轮纯复审发现 TFU-014/TFU-20260614-002 后仍有入口没有把 typed no-op
+  语义传播到最后一层。QuickFeed detail 的 manual / treat 保存路径调用 command 后
+  不检查 `didRecord`，no-op 仍会保存共享选择记忆并展示成功反馈。QuickWater detail
+  的 planned water / manual water / water change / filter clean 也没有可消费的
+  `didRecord` 结果，command no-op 后仍触发成功 haptic、局部 feedback 和“已记录”
+  toast。Walk 的 shared `executorIds` 只做字符串去重，只有 primary `executorId`
+  经过 `CareFactWritePolicy.executorCannotWrite`；active primary + 回收/离世 secondary
+  executor 仍会写 walk fact / ledger / reward / `executorIds` metadata。Dashboard
+  shared expense 复用 `SharedPetActionResult`，但 revision 层无条件发布
+  `wroteBusinessFact: true`，即使 recorder 返回 `.noOp()`。
+- Next step: 为每个入口补红测：QuickFeed manual/treat UI action 在 invalid/missing/
+  recycled executor 下不得成功反馈或写选择/default 派生；QuickWater planned/manual/
+  water-change/filter no-op 不得成功反馈或 schedule 派生；single/shared walk 任一非空
+  executor id 不可解析或不可写时整体 no-op；shared expense no-op 不发布 success
+  revision。实现上让所有这些入口消费 `didRecord` / `didWriteFact` / `allowsDerivedEffects`
+  或等价 typed result，且 R5/fixture 不再只证明服务函数消费 disposition，也要覆盖
+  caller/UI/revision 层结果消费。
+- Close condition: 新红测先失败后修绿；上述入口在 no-op 时无 fact、ledger、reward、
+  revision success、reminder/stock/Oasis 派生、selection/default persistence 或 UI
+  success feedback；`scripts/audit-economy-boundaries.sh --all`、
+  `scripts/tests/run-audit-fixture-tests.sh`、相关 simulator tests 通过；再开全新纯
+  对抗复审，P0/P1=0 后 Economy 才可标 🏁。
+- Closed: 2026-06-14 in the care-derivation executor architecture work.
+  QuickFeed, QuickWater, walk/shared executor, and shared-derived revision
+  callers now consume typed result/disposition state before user-visible
+  success or derived side effects. Final Economy maturity remains gated by
+  TFU-20260614-006 plus a fresh pure adversarial review.
+
+### TFU-20260614-002 - Treat unresolved explicit care executors as no-op
+
+- Status: Done
+- Priority: P1
+- Area: Economy / CareFactWritePolicy / Active Human / Notifications / Oasis /
+  Audit Guardrails
+- Source task: Economy fresh pure adversarial review round 1 after
+  TFU-20260614-001 repair; Codex pure review session, 2026-06-14.
+- Blocker: 本轮纯复审发现显式 executor 生命周期门仍有 P1 缝隙：
+  `CareFactWritePolicy.executorCannotWrite` 只在 executor id 成功解析到
+  `Human` 且该 human 不可写时返回 no-op；invalid UUID、已被 purge 的 UUID、
+  或 SwiftData fetch 失败都会返回可写。结果是 Calendar / notification /
+  QuickCare / medication / shared care 等入口在 stale `currentActiveHumanId`
+  或显式传入已删除 executor UUID 时仍会写照护事实、ledger、reminder/revision/
+  stock/Oasis 派生；`EconomyRewardOwnerResolver` 后续拒绝奖励并不够，因为事实
+  层已经产生半状态，且 `CareEventRecording` 的 Oasis care echo 当前在 reward
+  调用后仍可被触发。
+- Next step: 补红测覆盖 active pet + unresolved explicit executor 的入口族：
+  direct care fact、shared care、medication dose，以及 Calendar/notification
+  代表路径；随后把 `CareFactWritePolicy.executorCannotWrite` 改为"非空显式
+  executor 必须解析到 `EconomyWalletWritePolicy.canWrite == true` 的 Human，
+  否则 command no-op"，并补审计 fixture 防止 invalid/missing executor 回退为可写。
+- Close condition: 新红测先失败后修绿；无 executor 的系统/unknown 路径保持原语义，
+  非空 invalid/missing/purged executor 对 fact/ledger/reward/revision/reminder/
+  stock/Oasis 全链路 no-op；`scripts/audit-economy-boundaries.sh --all`、
+  `scripts/tests/run-audit-fixture-tests.sh`、相关 simulator tests 通过；再开全新
+  纯对抗复审，P0/P1=0 后 Economy 才可标 🏁。
+- Closed: 2026-06-14 by product-owner two-state decision and executor
+  architecture update. This TFU's old target behavior was superseded:
+  invalid/missing/physically-deleted explicit executor ids must not drop active
+  target facts. Active target facts still write; reward ownership falls back to
+  a writable active human or fact-only/no-reward when no owner exists. Deceased
+  executors still no-op.
+
+### TFU-20260614-001 - Close shared-care source and hygiene session maintenance gaps
+
+- Status: Done
+- Priority: P1
+- Area: Economy / Shared Care / BatchAward / Session Maintenance / Audit Guardrails
+- Source task: Economy fresh pure adversarial review, 2026-06-14; Codex pure
+  review session after TFU-20260613-016 P2 repair.
+- Blocker: 本轮纯复审发现 shared-care 仍有两条 P1 入口族缺口。第一，
+  `SharedPetTargetResolver.normalizedTargets` 只用 `EconomyWalletWritePolicy.canWrite`
+  过滤候选 targets，没有把 `sourcePet` 自身作为先验冻结门；当 sourcePet 已回收
+  / 离世但调用方传入活跃同物种 targets 时，
+  `CareEventService.recordSharedManualFeedFact` / `recordSharedWateringFact` /
+  `recordSharedLitterCareFact` / `recordSharedCareFact` 的单目标分支会给活跃 target
+  写事实、ledger、reward，多目标分支会创建 `SharedCareSession(sourcePetId:)`
+  指向冻结 source。第二，TFU-016 P2 修复新增的 shared hygiene session 只补了
+  创建路径：`SharedPetActionRecorder` 会写 `PetHygieneLog` 并把 session
+  `primaryLegacyModelName/Id` 指向第一条 hygiene log，但 `PetHygieneLog` 没有
+  `sharedSessionId` 字段，`SharedCareSessionMaintenance.deleteCascade` /
+  `reconcile` / `recoverStructuredMetadata` / `ledgerEvents` 仍只识别 care/potty/
+  expense/walk。因此删除 shared hygiene session 会留下 orphan hygiene fact /
+  hygiene ledger / wallet reward，reconcile 会把有效 hygiene session 当 orphan 删除。
+- Next step: 先补红测：source 回收/离世 + explicit active targets 对所有 shared
+  care service 入口必须整体 no-op；`QuestManager.batchAward(.care(.bath))` 生成的
+  shared hygiene session 经 `deleteCascade` 必须删除 hygiene facts 和对应
+  `CareLedgerEvent`，经 `reconcile` 不得误删 session。随后修统一 source
+  disposition / canWrite 门，并让 hygiene 参与 shared-session maintenance，或给
+  hygiene 建立等价 typed session linkage。
+- Close condition: 新红测先失败后修绿；入口族测试覆盖 shared feed/water/litter/
+  generic care/walk/unknown potty/batch hygiene 的 source no-op 与 maintenance；
+  `scripts/audit-economy-boundaries.sh --all`、
+  `scripts/tests/run-audit-fixture-tests.sh`、相关 simulator tests 通过；再开全新纯
+  对抗复审，P0/P1=0 后 Economy 才可标 🏁。
+- Closed 2026-06-14: Fix session completed. `SharedPetTargetResolver` now treats
+  sourcePet as the shared-care hard lifecycle gate, so frozen/recycled/deceased
+  source actions with explicit active targets return no-op across feed/water/
+  litter/generic care/walk/unknown potty. `SharedCareSessionMaintenance` now
+  includes shared hygiene facts in reconcile, cascade delete, primary legacy
+  refresh, ledger lookup, and modified tracking; deleting a primary shared
+  hygiene fact reconciles the session to surviving facts. Validation passed:
+  `scripts/test-simulator.sh -only-testing:OhanaTests/QuestManagerBatchAwardTests`
+  (9 tests),
+  `scripts/test-simulator.sh -only-testing:OhanaTests/CareCompletionChokepointCharacterizationTests -only-testing:OhanaTests/QuestManagerBatchAwardTests -only-testing:OhanaTests/SharedCareSessionMaintenanceTests -only-testing:OhanaTests/SharedPetActionRecorderTests -only-testing:OhanaTests/CalendarTaskCompletionSyncServiceTests -only-testing:OhanaTests/TodayFocusCommandTests -only-testing:OhanaTests/ReminderActionCoordinatorTests`
+  (55 tests), `scripts/audit-economy-boundaries.sh --all`,
+  `scripts/tests/run-audit-fixture-tests.sh`, `scripts/dev-check-changed.sh`
+  (exit 0; derived-state lifecycle checklist warnings only), and
+  `git diff --check`. `QuestManagerBatchAwardTests` was rerun after SwiftFormat
+  and remained PASS (9 tests). Economy remains 🟢 until a separate fresh pure
+  adversarial review reports P0/P1=0.
+
+### TFU-20260613-016 - Stop memorial calendar completion derived effects after Economy pure review
+
+- Status: Done
+- Priority: P2
+- Area: Economy / Calendar / Today Focus / Notifications / Care Ledger / Batch
+  Compatibility
+- Source task: Economy fresh pure adversarial review, 2026-06-13; Codex pure
+  review session after TFU-20260613-015 repair. Reconfirmed and expanded by
+  the follow-up Codex pure review session requested as "全新纯复审".
+- Blocker: 本轮纯复审发现 deceased pet 的 Calendar / Today Focus / notification
+  historical care completion 仍把 fact-only 误当作完成成功。`CalendarTaskCompletionSyncService.syncPetTask`
+  在 `CareFactWriteDisposition.memorialHistoricalFactOnly` 下会写历史
+  `PetCareLog` / `PetPottyLog` / `PetHygieneLog`，各 insert helper 因
+  `allowsDerivedEffects == false` 跳过 reward / ledger，但 `syncPetTask` 仍返回
+  `true`。上层 `CalendarEventCommandService.toggleCompletion` 随后会设置
+  occurrence completed、同步 reminder；`ReminderActionCoordinator` 也会继续
+  `reminderCompletion.complete` 并返回 `.completed`；Calendar executor 会发布成功
+  revision。违反 G4/G4.1 与入口矩阵里 "deceased historical fact-only 只写事实，无
+  reward / ledger / reminder / revision / Oasis 派生" 的约束。撤销路径还只能
+  通过 generated `CareLedgerEvent` 找回生成 fact；memorial fact-only 不写 ledger，
+  因而 reopen / undo 清不掉该历史 fact，重复开关会重复写历史事实。第二条 P1：
+  R5 `reward-direct-care-discipline` allowlist 仍对
+  `CalendarTaskCompletionSyncService.awardGeneratedCare` 按函数名放行，但该函数自身
+  没有消费 `CareFactWritePolicy` / disposition；`scripts/audit-economy-boundaries.sh --all`
+  仍会 PASS，不能证明同函数先过 disposition。附带 P2：legacy
+  `QuestManager.batchAward` 的 non-litter potty / hygiene 修复仍在
+  `QuestManager+BatchAward` 私有 helper 内直接写 fact / ledger / reminder / revision，
+  没有委托 shared / single typed chokepoint，且不生成 `SharedCareSession`；当前测试只
+  证明奖励不倍增，未证明入口族结构收口。
+- Next step: Code repair is complete. Open the required fresh pure adversarial
+  Economy review; P0/P1=0 in that separate review is required before Economy can
+  be marked 🏁.
+- Close condition: Satisfied for the TFU code repair. Economy remains 🟢 until a
+  later fresh pure adversarial review independently reports P0/P1=0.
+- Repair update 2026-06-13: P1 portion fixed locally. `CalendarTaskCompletionSyncService.syncPetTask`
+  now returns a typed `PetTaskSyncResult`, so Calendar / Today Focus / notification
+  callers distinguish active completion from memorial historical fact-only. Deceased-pet
+  historical completion now writes at most one history fact, does not complete occurrence
+  or reminder, does not publish success revision, and reopen can remove legacy no-ledger
+  fact-only records. R5 now requires `CalendarTaskCompletionSyncService.awardGeneratedCare`
+  to consume `CareFactWritePolicy.disposition` in the same function, and the bad fixture
+  includes an allowlisted-without-disposition `awardGeneratedCare` case. Validation:
+  `scripts/test-simulator.sh -only-testing:OhanaTests/CareCompletionChokepointCharacterizationTests -only-testing:OhanaTests/HomeCommandExecutorTests -only-testing:OhanaTests/ReminderActionCoordinatorTests -only-testing:OhanaTests/EconomyBackdateSettlementTests -only-testing:OhanaTests/QuestManagerBatchAwardTests -only-testing:OhanaTests/RecurringFindingsRepairTests`
+  PASS (214 tests), `scripts/audit-economy-boundaries.sh --all` PASS,
+  `scripts/tests/run-audit-fixture-tests.sh` PASS, `scripts/dev-check-changed.sh` PASS
+  with derived-state checklist warnings only, and `git diff --check` PASS.
+- Closed: 2026-06-14 修复落地。Legacy `QuestManager.batchAward` non-litter potty
+  / hygiene now delegates to `SharedPetActionRecorder` with typed shared child
+  strategies. Non-litter potty creates one `SharedCareSession`, per-pet
+  `PetPottyLog` facts linked by `sharedSessionId`, per-fact potty ledger, one
+  shared reward, reminder handoff, Oasis sync, and shared revision through the
+  recorder. Hygiene creates one `SharedCareSession`, per-pet `PetHygieneLog`
+  facts, per-fact hygiene ledger, one shared reward, reminder handoff, Oasis
+  sync, and shared revision through the recorder; the session points at the
+  first hygiene log through `primaryLegacyModelName/Id` because `PetHygieneLog`
+  has no schema field for `sharedSessionId`. `QuestManagerBatchAwardTests` now
+  assert the session action kind, target set, primary legacy model, potty
+  session linkage, per-fact ledger, and single shared reward. Validation:
+  `scripts/test-simulator.sh -only-testing:OhanaTests/QuestManagerBatchAwardTests`
+  PASS (5 tests);
+  `scripts/test-simulator.sh -only-testing:OhanaTests/CareCompletionChokepointCharacterizationTests -only-testing:OhanaTests/HomeCommandExecutorTests -only-testing:OhanaTests/ReminderActionCoordinatorTests -only-testing:OhanaTests/EconomyBackdateSettlementTests -only-testing:OhanaTests/QuestManagerBatchAwardTests -only-testing:OhanaTests/RecurringFindingsRepairTests`
+  PASS (214 tests); `scripts/audit-economy-boundaries.sh --all` PASS;
+  `scripts/tests/run-audit-fixture-tests.sh` PASS; `scripts/dev-check-changed.sh`
+  PASS with existing derived-state checklist warnings only; `git diff --check`
+  PASS. Economy stays 🟢 and still requires a fresh pure adversarial review
+  before 🏁.
+
+### TFU-20260613-015 - Restore single-walk care ledger consistency after Economy pure review
+
+- Status: Done
+- Priority: P1
+- Area: Economy / Walks / Care Ledger / Audit Guardrails
+- Source task: Economy fresh pure adversarial review, 2026-06-13; Codex pure
+  review session after TFU-014 structural hardening.
+- Blocker: 本轮纯复审发现单宠遛狗仍保留半笔账根因。`PetWalkingManager.stop`
+  的 single-target 分支先写 `PetWalkLog`，再经
+  `EconomyRewardDiscipline.awardCareAction(.walk)` 写钱包奖励和预算占用，但没有
+  为该 `PetWalkLog` 写 `CareLedgerEvent(eventKind: .walk)`；只有遛狗中 poop marker
+  会写 potty ledger。共享遛狗通过 `CareEventService.recordSharedWalk` /
+  `SharedPetActionRecorder` 会写 walk ledger，所以同一 walk 业务动作在单宠与共享
+  入口账本语义不等价，违反 G1/G2 与 Economy 入口矩阵。现有测试
+  `singleWalkPersistsWalkFactBeforeWalletRewardAndLinksPottyMarkers` 只断言 potty
+  ledger，未断言 walk ledger；`scripts/audit-economy-boundaries.sh --all` 也无法抓
+  "事实+奖励但缺 care ledger"。
+- Next step: 将 `PetWalkingManager.stop` single-target 分支改为与共享 walk 一样在
+  `PetWalkLog` 和 wallet reward 成功后写一条 walk `CareLedgerEvent`，并把
+  `coconutsEarned` / `coconutDelta` / metadata 与 reward 保持一致；补红测覆盖
+  single walk 无 poop 时也必须有 walk ledger，single walk 有 poop 时必须同时有
+  walk ledger + potty ledger，且 recycled/frozen executor 仍全 no-op。同步补审计或
+  入口族测试，防止以后只测 shared walk。
+- Close condition: single walk / shared walk / walk poop 目标测试通过；
+  `scripts/audit-economy-boundaries.sh --all`、`scripts/tests/run-audit-fixture-tests.sh`、
+  `git diff --check` 通过；修复后再开全新纯对抗复审，P0/P1=0 才可标 Economy 🏁。
+- Closed: 2026-06-13 修复落地。`PetWalkingManager.stop` single-target 分支为
+  `PetWalkLog` 写入 walk `CareLedgerEvent`，并保持 reward metadata /
+  `coconutDelta` / `coconutsEarned` 一致；`QuestManager.batchAward` 的 non-litter
+  potty、hygiene 与 custom general litter 改为事实族 + 单次 shared reward + per-fact
+  ledger。验证通过：
+  `scripts/test-simulator.sh -only-testing:OhanaTests/CareCompletionChokepointCharacterizationTests -only-testing:OhanaTests/QuestManagerBatchAwardTests`、
+  `scripts/audit-economy-boundaries.sh --all`、
+  `scripts/tests/run-audit-fixture-tests.sh`、`git diff --check`。Economy 仍需后续
+  全新纯对抗复审 P0/P1=0 才可标 🏁。
+
+### TFU-20260613-014 - Close remaining Economy no-op leaks after TFU-013
+
+- Status: Open
+- Priority: P1
+- Area: Economy / Feeding / Calendar / Today Focus / Walks / Health / Medication /
+  DashboardRecords / Audit Guardrails
+- Source task: Economy pure adversarial re-review after TFU-20260613-013 repair,
+  2026-06-13; Codex pure review session, CI intentionally ignored.
+- Blocker: 本轮纯复审发现 TFU-013 仍未把 G4/G4.1 no-op 语义传播到所有事实 /
+  command / revision 边界。`recordTreatFeed` 返回 detached `PetCareLog` 但不暴露
+  `didWriteFact`，Treat feed 和 QuickFeed manual no-op 仍会发布成功 feed mutation；
+  planned manual feed 在事实 no-op 后仍会重建库存提醒，通知动作仍返回 `.completed`。
+  Calendar / Today Focus 对 pet-task no-op 会返回 unchanged result，但执行器 / Home
+  继续发布 `wroteBusinessFact: true` mutation 和成功反馈。R5 函数级 allowlist 仍放行
+  `PetWalkingManager.stop`、`WeightCommandService.recordPetWeight`、
+  `PetMedicationDoseLogging.recordDose`、`PetHealthCommandService.recordHealth` 等
+  direct `EconomyRewardDiscipline` 调用点，这些函数没有先消费
+  `CareFactWritePolicy.disposition`，因此 recycled/frozen executor 或部分 frozen target
+  仍可写事实、ledger、reminder/Oasis/库存等派生，最多只是 wallet reward 被跳过。
+- Next step: 将 `CareFactWriteDisposition` 或等价 typed result 扩到 Treat feed、
+  planned feed、Calendar/Today Focus completion、single walk、weight、pet medication
+  dose、pet health 等 R5 allowlisted care-fact 函数；所有调用方在 no-op 或
+  historical fact-only 时必须停止 revision、success feedback、stock/reminder/plan、
+  Oasis、ledger 和 reward 派生。收紧 `scripts/audit-economy-boundaries.sh`：覆盖
+  `recordTreatFeed` / `completePlannedFeed`，并要求 R5 allowlisted functions 在直调
+  `EconomyRewardDiscipline` 前同函数消费 `CareFactWritePolicy` / disposition。
+- Close condition: 新增 in-memory tests 覆盖 active pet + recycled/deceased executor
+  的 Treat feed、QuickFeed manual、planned feed notification、Calendar executor、
+  Today Focus executor、single walk、walk poop、weight、pet medication dose、pet
+  health no-op；覆盖 deceased target historical fact-only 只写事实且无 ledger/reward/
+  derived；覆盖 recycled target 全 no-op。验证无 `Pet*Log` / `Event` / `Reminder` /
+  `CareLedgerEvent` / `CoconutLedgerEntry` / `EconomyBudgetUsageEvent` / Domain
+  revision / success feedback / stock-reminder / Oasis 派生（历史事实-only 例外只保留
+  事实）。相关目标测试、`scripts/audit-economy-boundaries.sh --all`、
+  `scripts/tests/run-audit-fixture-tests.sh`、`scripts/dev-check-changed.sh` 与
+  `scripts/module-exit-gate.sh` 通过后，再开全新纯复审；P0/P1=0 才可标 Economy 🏁。
+- Repair update 2026-06-13: TFU-014 修复实现已落地。Treat / planned feed、
+  Calendar / Today Focus、notification completion、single walk、weight、pet
+  medication dose、pet health 的 no-op / historical fact-only 语义已继续向 command、
+  revision、feedback、ledger、reminder/stock/Oasis 派生传播；R5 allowlisted
+  `EconomyRewardDiscipline` 调用点改为先消费 `CareFactWritePolicy` / typed
+  disposition；`reward-direct-care-discipline-disposition` 与 expanded
+  `care-fact-disposition-unconsumed` 审计/fixture 已补。验证：目标测试 204 PASS，
+  `scripts/audit-economy-boundaries.sh --all` PASS，`scripts/tests/run-audit-fixture-tests.sh`
+  PASS，`scripts/dev-check-changed.sh` PASS，`git diff --check` PASS。仍保持 Open：
+  `scripts/module-exit-gate.sh` 后续已在结构补强会话通过；Economy 必须再经全新纯复审 P0/P1=0 后才可 🏁。
+- Structural hardening update 2026-06-13: Codex implementation/self-review session
+  completed the higher exit checklist without granting maturity. Added
+  `docs/planning/economy-care-entrypoint-matrix.md`; migrated legacy
+  `QuestManager.batchAward` to typed care chokepoints; gated `FeedAutoLogMaterializer`,
+  CatCare command/revision, and medication UI feedback on typed no-op results; added
+  `QuestManagerBatchAwardTests` and `pet-medication-dose-result-unconsumed` audit
+  coverage. Validation: targeted simulator suites 214 PASS,
+  `scripts/module-exit-gate.sh` PASS,
+  `scripts/audit-economy-boundaries.sh --all` PASS,
+  `scripts/tests/run-audit-fixture-tests.sh` PASS,
+  `scripts/dev-check-changed.sh` PASS, `git diff --check` PASS. This was not the
+  required fresh pure adversarial review; TFU remains Open and Economy stays 🟢.
+
 ### TFU-20260613-013 - Propagate Economy fact no-op to care command layers
 
 - Status: Open
@@ -963,3 +1366,43 @@ actionable; long-term product ideas belong in planning docs instead.
 ## Done
 
 Move completed entries here instead of deleting them when the history is useful.
+
+### TFU-20260614-007 - Propagate historical fact-only disposition through care command revisions
+
+- Status: Done
+- Priority: P1
+- Area: Economy / Care Commands / Revision Publishing / UI Feedback /
+  Historical Fact-only
+- Source task: Economy fresh pure adversarial review; Codex pure review session,
+  2026-06-14.
+- Blocker: 本轮纯复审发现 `CareFactWriteDisposition.memorialHistoricalFactOnly`
+  仍没有贯穿所有 command / revision 层。多个 command result 只暴露 `didRecord`，
+  或 publisher 只消费 `didRecord`，导致离世宠物历史 fact-only 虽然已在 service 层
+  跳过 reward / ledger / reminder / Oasis，却仍被上层当作 success revision。
+  代表坏例：`QuickFeedCommandExecutor.completePlanned`、`QuickWaterCommandExecutor.completePlannedWater`
+  和 `HomeCommandExecutor.completePlannedFeed` 发布 planned completion mutation 时只看
+  `didRecord`；`PetCareTrackingCommandResult`、`PetHygieneCheckInCommandResult`、
+  `CatCareCommandResult`、`PetHealthCommandResult`、`WeightCommandResult` 等入口族
+  没有把 `allowsDerivedEffects` 作为 revision/success 的硬门，`ReadModelRevisionCenter`
+  对这些结果用 `didRecord` 或固定 `true` 发布 `wroteBusinessFact`。这违反 G4.1 /
+  ECO-026 与入口矩阵中“deceased historical fact-only 只写事实，无 reward / ledger /
+  reminder / revision / Oasis 派生”的规则。
+- Next step: 先补入口族红测：对 planned feed/water、PetCare、Hygiene、CatCare、
+  PetHealth、PetWeight、Medication 代表入口分别构造 pet 已离世但
+  `date <= passedAwayDate` 的历史 fact-only 写入，断言只保留事实，不推进 home/domain
+  revision、不展示 success feedback、不写 ledger/reward/reminder/stock/Oasis。实现上
+  让相关 result 暴露 `allowsDerivedEffects` 或等价 typed disposition，并让 executor /
+  publisher / UI 统一使用 `didRecord && allowsDerivedEffects` 作为派生成功门；
+  R5/audit fixture 要覆盖“allowlisted 函数调用方未消费 disposition”的坏例。
+- Close condition: 新红测先失败后修绿；上述入口族 historical fact-only 与 no-op
+  语义在 service、command、executor、revision、UI feedback 层一致；
+  `scripts/audit-economy-boundaries.sh --all`、`scripts/tests/run-audit-fixture-tests.sh`、
+  相关 targeted simulator suite 与 `git diff --check` PASS；再开全新纯对抗复审，
+  P0/P1=0 后 Economy 才可标 🏁。
+- Closed: 2026-06-14 by product-owner two-state deletion decision. The
+  `memorialHistoricalFactOnly` branch was retired: deceased members are
+  read-only and do not write historical care facts, rewards, ledger, reminders,
+  stock, Oasis, or revisions. The remaining acceptance moved to the
+  care-derivation executor architecture work: all active fact writes must return
+  a typed outcome, and all no-op outcomes must suppress command, executor,
+  revision, and UI feedback side effects.

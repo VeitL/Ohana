@@ -11,7 +11,7 @@ struct FamilyActivityStripRouteContainer: View {
     var body: some View {
         FamilyActivityStripView(
             pet: pet,
-            humans: humans.activeRecycleBinItems,
+            humans: humans,
             style: style,
             onExpand: onExpand
         )

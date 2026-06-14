@@ -23,8 +23,8 @@ struct ExpandedHumanFeaturesSheet: View {
     var body: some View {
         ExpandedHumanFeaturesContentSheet(
             human: human,
-            allPets: allPets.activeRecycleBinItems,
-            allHumans: allHumans.activeRecycleBinItems,
+            allPets: allPets,
+            allHumans: allHumans,
             allPendingReminders: allPendingReminders,
             allMeds: allMeds,
             allReports: allReports

@@ -217,7 +217,7 @@ enum PetDocumentCommandService {
         context: ModelContext
     ) -> PetDocumentDeleteCommandResult {
         let documentID = document.id
-        RecycleBinService.moveToRecycleBin(document, context: context)
+        PhysicalDeletionService.deleteDocument(document, pet: pet, context: context)
         context.safeSave()
         return PetDocumentDeleteCommandResult(
             petID: pet.id,

@@ -440,7 +440,6 @@ enum PetHealthDeleteCommandService {
     ) -> PetHealthDeleteResult {
         let recordID = log.id
         let deletedAt = Date()
-        let batchId = RecycleBinService.aggregateTrashBatchId(kind: "petHealthLog", id: recordID)
         let derived = derivedRecords(for: log, pet: pet, context: context)
 
         for reminder in derived.reminders {
@@ -453,11 +452,11 @@ enum PetHealthDeleteCommandService {
             context.delete(event)
         }
         for expense in derived.expenses {
-            RecycleBinService.moveToRecycleBin(
+            PhysicalDeletionService.deletePetScopedRecord(
                 expense,
-                now: deletedAt,
-                batchId: batchId,
-                context: context
+                pet: pet,
+                context: context,
+                deletedAt: deletedAt
             )
         }
         for ledger in derived.ledgerEvents {
@@ -465,7 +464,7 @@ enum PetHealthDeleteCommandService {
             context.delete(ledger)
         }
 
-        RecycleBinService.moveToRecycleBin(log, now: deletedAt, context: context)
+        PhysicalDeletionService.deletePetScopedRecord(log, pet: pet, context: context, deletedAt: deletedAt)
         context.safeSave()
         return PetHealthDeleteResult(
             subjectID: pet.id,
@@ -591,8 +590,7 @@ enum PetHealthDeleteCommandService {
     ) -> [PetExpenseLog] {
         guard log.cost > 0 else { return [] }
         return fetchAll(PetExpenseLog.self, context: context).filter { expense in
-            guard expense.trashedAt == nil,
-                  expense.pet?.id == pet.id,
+            guard expense.pet?.id == pet.id,
                   expense.category == ExpenseCategory.medical.rawValue,
                   abs(expense.amount - log.cost) < 0.001,
                   abs(expense.date.timeIntervalSince(log.date)) < 1

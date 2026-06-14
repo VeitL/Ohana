@@ -6,11 +6,11 @@ nonisolated enum CoconutExchangeFeatureGate {
 
 nonisolated enum EconomyWalletWritePolicy {
     static func canWrite(_ human: Human) -> Bool {
-        !human.hasPassedAway && human.trashedAt == nil
+        !human.hasPassedAway
     }
 
     static func canWrite(_ pet: Pet) -> Bool {
-        !pet.hasPassedAway && pet.trashedAt == nil
+        !pet.hasPassedAway
     }
 }
 

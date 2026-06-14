@@ -170,18 +170,23 @@ struct MemberProfileCommandResult: Equatable {
     let entityID: UUID
     let kind: String
     let changedFields: Set<String>
+
+    var didWrite: Bool { !changedFields.isEmpty }
 }
 
 struct MemberLifecycleCommandResult: Equatable {
     let entityID: UUID
     let kind: String
     let action: String
+
+    var didWrite: Bool { action != "no-op" }
 }
 
 struct MemberHomeVisibilityCommandResult: Equatable {
     let entityID: UUID
     let kind: String
     let visible: Bool
+    let didWrite: Bool
 }
 
 struct PetWalkGoalCommandResult: Equatable {
@@ -204,6 +209,9 @@ enum MemberProfileCommandService {
         input: PetProfileCommandInput,
         context: ModelContext
     ) -> MemberProfileCommandResult {
+        guard !pet.hasPassedAway else {
+            return MemberProfileCommandResult(entityID: pet.id, kind: EntityKind.pet.rawValue, changedFields: [])
+        }
         let trimmedName = input.name.trimmingCharacters(in: .whitespacesAndNewlines)
         pet.name = trimmedName.isEmpty ? pet.name : trimmedName
         pet.avatarImageData = input.avatarImageData
@@ -310,6 +318,9 @@ enum MemberProfileCommandService {
         input: HumanProfileCommandInput,
         context: ModelContext
     ) -> MemberProfileCommandResult {
+        guard !human.hasPassedAway else {
+            return MemberProfileCommandResult(entityID: human.id, kind: EntityKind.human.rawValue, changedFields: [])
+        }
         let trimmedName = input.name.trimmingCharacters(in: .whitespacesAndNewlines)
         human.name = trimmedName.isEmpty ? human.name : trimmedName
         human.avatarImageData = input.avatarImageData

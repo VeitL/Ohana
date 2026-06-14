@@ -76,7 +76,7 @@ enum PetPhotoAlbumCommandService {
         context: ModelContext
     ) -> PetPhotoAlbumDeleteResult {
         let photoID = photo.id
-        RecycleBinService.moveToRecycleBin(photo, context: context)
+        PhysicalDeletionService.deletePetScopedRecord(photo, pet: pet, context: context)
         context.safeSave()
         return PetPhotoAlbumDeleteResult(petID: pet.id, photoID: photoID)
     }

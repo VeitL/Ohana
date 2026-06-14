@@ -83,7 +83,7 @@ struct FamilyWeeklyReportDashboardContentView: View {
 
     private var weekPhotoMemories: [PhotoMemory] {
         activePets.flatMap { pet in
-            pet.photoLogs.activeRecycleBinItems
+            pet.photoLogs
                 .filter { weekInterval.contains($0.date) }
                 .map {
                     PhotoMemory(
@@ -100,7 +100,7 @@ struct FamilyWeeklyReportDashboardContentView: View {
 
     private var weekWeightTrends: [WeightTrend] {
         activePets.compactMap { pet in
-            let logs = pet.weightLogs.activeRecycleBinItems
+            let logs = pet.weightLogs
                 .filter { $0.date < weekInterval.end }
                 .sorted { $0.date < $1.date }
             guard let latest = logs.last else { return nil }
@@ -514,18 +514,18 @@ struct FamilyWeeklyReportDashboardContentView: View {
         }
         // Fallback keeps older local data visible before ledger backfill has run.
         var entries: [ReportEntry] = []
-        for log in pet.careLogs.activeRecycleBinItems where interval.contains(log.date) {
+        for log in pet.careLogs where interval.contains(log.date) {
             entries.append(entry(date: log.date, actorId: log.executorId, pet: pet, title: log.careType.rawValue, icon: log.careType.systemIconName, color: Color(hex: log.careType.accentColorHex), coconuts: 1))
         }
-        for log in pet.pottyLogs.activeRecycleBinItems where interval.contains(log.date) {
+        for log in pet.pottyLogs where interval.contains(log.date) {
             entries.append(entry(date: log.date, actorId: log.executorId, pet: pet, title: log.pottyType.rawValue, icon: log.pottyType.systemIconName, color: .goOrange, coconuts: 1))
         }
-        for log in pet.walkLogs.activeRecycleBinItems where interval.contains(log.startDate) {
+        for log in pet.walkLogs where interval.contains(log.startDate) {
             for executorId in log.executorIds {
                 entries.append(entry(date: log.startDate, actorId: executorId, pet: pet, title: "遛狗", icon: "figure.walk", color: .goTeal, coconuts: log.coconutsEarned))
             }
         }
-        for log in pet.expenseLogs.activeRecycleBinItems where interval.contains(log.date) {
+        for log in pet.expenseLogs where interval.contains(log.date) {
             entries.append(entry(date: log.date, actorId: log.executorId, pet: pet, title: log.expenseCategory.rawValue, icon: log.expenseCategory.systemIconName, color: .goYellow, coconuts: 0))
         }
         return entries

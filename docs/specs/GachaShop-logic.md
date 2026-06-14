@@ -10,7 +10,7 @@
 - Gacha 是付费抽取的消费出口，不是照护奖励；其椰子产出不进入照护预算 / 冷却管线。防刷靠抽取成本、概率、期望值与账本可重放，大奖命中时真实发放 500🥥。
 - Gacha 每抽成本为 80🥥；大奖 `coconut_grand_bundle_500` 保持 500🥥 与既有 id / 文案，但概率从 5% 降为 2%。腾出的 300bp 分配给无椰子产出的 message 类结果，保证每个系列概率总和仍为 10000bp。
 - Gacha 抽取消费支持岛屿合资：当前抽取人 / 买家优先出资，余额不足时从其他未冻结人类钱包补差额；藏品、抽取日志和即时奖励仍归抽取人，出资人只记录补差支出。
-- 当前 active human 缺失时，Gacha / Shop 可回退第一位可写人类；若 active human 明确存在但已离世或进入回收站，则阻止操作并显示冻结反馈，不自动切人。
+- 当前 active human 缺失时，Gacha / Shop 可回退第一位可写人类；若 active human 明确存在但已离世，则阻止操作并显示冻结反馈，不自动切人。被删除的人类已物理移除，不是可选择钱包。
 - Gacha 默认系列始终可抽；Noir 系列必须在同一 owner 集齐 Nana 8 个普通款后解锁；隐藏款必须在同一系列普通款集齐后才可能产出。
 - Shop 价格按首发经济合理性固定：金色幸运券 80🥥，Streak 保护盾 180🥥，补签券 ×1 为 240🥥，补签券 ×3 为 580🥥，2.5D 头像券 1200🥥。
 - 保护盾是事前保险，必须低于确定性事后补救的补签券；补签包保留折扣但不能比保护盾便宜到反向激励。
@@ -19,7 +19,7 @@
 - Shop 所有道具发放必须收进服务层 fulfilment 边界，不由 View 直接承担业务发放。View 只负责触发购买、展示结果、打开后续 picker / sheet。
 - `purchasedShopItems` 的非消耗品所有权必须从 `UserDefaults` 迁入 SwiftData append-only 购买记录；偏好与设备态（当前图标、称号、特效开关）继续保留在 `UserDefaults`。
 - GachaOwnedItem、GachaDrawLog 与 Shop 非消耗品购买记录必须接入 CloudSync serializer / applier；首发不启用 CloudKit，但同步地基语义必须闭合。
-- Shop / Gacha 只允许对未离世、未回收的人类钱包消费；2.5D 头像升级与 Popout card 目标只允许活跃人类 / 宠物。
+- Shop / Gacha 只允许对未离世的人类钱包消费；2.5D 头像升级与 Popout card 目标只允许活跃人类 / 宠物。
 
 ## 业务不变量
 
@@ -29,7 +29,7 @@
 - GS-004：Gacha 消费必须通过钱包 / CareLedger 服务层写入；不得让任何人类钱包透支，不得绕过账本直接改 `coconutBalance`。
 - GS-005：Gacha 合资时，买家优先出资；其他可写人类按稳定顺序补差额。任一钱包写入失败，整次抽取必须回滚，不留下 draw log、owned item 或半笔支出。
 - GS-006：Gacha 即时椰子奖励是抽奖回报，不走照护预算；但必须是 `CoconutLedgerEntry` + `CareLedgerEvent` 可重放事实，并归属抽取人。
-- GS-007：Gacha 对离世 / 回收 active human 必须抛冻结错误；对缺失 active human 可选择第一位可写人类；没有可写人类时不可抽。
+- GS-007：Gacha 对离世 active human 必须抛冻结错误；对缺失 active human 可选择第一位可写人类；没有可写人类时不可抽。
 - GS-008：Shop 分类 `cashExchange` 在 `CoconutExchangeFeatureGate.isEnabled == false` 时不可见；直接调用 create/confirm/cancel 也不得写入请求或钱包。
 - GS-009：Shop 正式购买必须通过 `ShopPurchaseCommandService` / `RewardEconomyCommandExecutor`；买家不足时使用岛屿合资，仍不得透支，不得写 system 钱包。
 - GS-010：Shop 道具发放必须在购买成功后由 fulfilment 服务完成；发放失败必须退款给实际出资人，并在 metadata 中记录失败原因。
@@ -37,7 +37,7 @@
 - GS-012：非消耗品所有权是持久业务事实，存入 SwiftData append-only 购买记录并参与备份 / 恢复 / CloudSync；设备偏好仍留在 `UserDefaults`。
 - GS-013：消耗品库存（补签券、头像券库存、保护盾有效期、幸运券状态）是当前设备消费状态，首发继续由现有 inventory/defaults 管理，但发放入口必须服务化。
 - GS-014：2.5D 头像券购买入口（含 Members 建档流程）必须复用 Shop 消费语义：合资、冻结钱包、账本、退款边界一致。
-- GS-015：2.5D 升级目标和 Popout card 目标只允许活跃人类 / 宠物；离世 / 回收对象保留历史，不参与新外观消费。
+- GS-015：2.5D 升级目标和 Popout card 目标只允许活跃人类 / 宠物；离世对象保留历史，不参与新外观消费。
 - GS-016：隐藏兑换价格表虽然首发不可达，仍必须保持每个国家同一线性汇率，避免未来打开时出现反直觉套利。
 - GS-017：Gacha / Shop 规则必须有自动测试护栏：概率总和与区间、价格表、汇率线性、合资消费、冻结拒绝、App Icon 失败退款、SwiftData 所有权迁移、CloudSync serializer / applier。
 

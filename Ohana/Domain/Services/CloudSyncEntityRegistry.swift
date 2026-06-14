@@ -37,6 +37,12 @@ nonisolated struct CloudSyncEntityDescriptor: Equatable {
 }
 
 nonisolated enum CloudSyncEntityRegistry {
+    static let localOnlySchemaEntityNames: Set<String> = [
+        // Legacy store compatibility for the retired user-visible recycle-bin model.
+        // It must stay out of CloudSync descriptors and upload paths.
+        String(describing: RecycleBinBatch.self)
+    ]
+
     static let descriptors: [CloudSyncEntityDescriptor] = [
         mutable(Pet.self, excluded: ["ckRecordName"], fieldPolicies: ["coconutBalance": .ledgerProjection]),
         mutable(
@@ -92,7 +98,6 @@ nonisolated enum CloudSyncEntityRegistry {
         appendOnly(GachaDrawLog.self),
 
         derived(CoconutAccount.self, fieldPolicies: ["balance": .ledgerProjection]),
-        localMetadata(RecycleBinBatch.self),
         localMetadata(CloudSyncRecordState.self)
     ]
 

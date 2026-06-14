@@ -11,8 +11,8 @@ Usage:
 
 Purpose:
   Checklist audit for recurring derived-state lifecycle bugs:
-  - Delete/recycle/tombstone paths should show restore/reschedule/cascade or
-    other derived-state symmetry in the same service boundary.
+  - Delete/tombstone paths should show cascade, cancel/reschedule, or other
+    derived-state symmetry in the same service boundary.
   - Physical deletes should be paired with a CloudSync tombstone/recordDeletion
     hint unless explicitly allowed.
 
@@ -21,7 +21,7 @@ Baseline:
   docs/governance/manifests/recurring-findings-audit-baseline.json.
 
 Allowlist:
-  Add "derived-state: allow <reason>" on the line/file for deliberate
+  Add "derived-state: allow <reason>" on the exact line for deliberate
   exceptions approved by the product owner.
 USAGE
 }
@@ -145,11 +145,11 @@ def add(warnings: list[WarningItem], rule: str, path: str, line: int, snippet: s
 
 
 DELETE_MARKER_RE = re.compile(
-    r"\b(?:tombstone|isDeletionTombstone|trashExpiresAt|trashedAt|isDeleted|RecycleBin|recycl|purgeExpired|context\.delete|\.delete\s*\()",
+    r"\b(?:tombstone|isDeletionTombstone|isDeleted|markDeleted|recordDeletion|context\.delete|\.delete\s*\()",
     re.IGNORECASE,
 )
 SYMMETRY_RE = re.compile(
-    r"\b(?:restore|reschedule|scheduleManyIfNeeded|cascade|child|children|recordDeletion|tombstone|isDeletionTombstone|rebuild|reopen|pending|quick\s*access)",
+    r"\b(?:cancel|reschedule|scheduleManyIfNeeded|cascade|child|children|recordDeletion|markDeleted|tombstone|isDeletionTombstone|rebuild|pending|quick\s*access)",
     re.IGNORECASE,
 )
 PHYSICAL_DELETE_RE = re.compile(r"\b(?:context|modelContext)\.delete\s*\(|\.delete\s*\(")
@@ -171,8 +171,6 @@ def first_match(lines: list[str], pattern: re.Pattern[str]) -> tuple[int, str] |
 def scan_file(path: pathlib.Path, warnings: list[WarningItem]) -> None:
     path_str = rel(path)
     text = path.read_text(encoding="utf-8", errors="ignore")
-    if "derived-state: allow" in text:
-        return
     lines = text.splitlines()
 
     marker = first_match(lines, DELETE_MARKER_RE)
@@ -184,7 +182,7 @@ def scan_file(path: pathlib.Path, warnings: list[WarningItem]) -> None:
             path_str,
             line,
             snippet,
-            "Delete/recycle/tombstone lifecycle code must show restore, reschedule, cascade, tombstone, or derived-state rebuilding symmetry in the same service boundary.",
+            "Delete/tombstone lifecycle code must show cascade, cancel/reschedule, tombstone, or derived-state rebuilding symmetry in the same service boundary.",
         )
 
     physical_delete = first_match(lines, PHYSICAL_DELETE_RE)

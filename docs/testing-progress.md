@@ -15,7 +15,7 @@
 | 4 | `Ohana/App` | 🟢 | 门禁通过并提交：`e48c13af7`；无 P1/P2 余留 |
 | 5 | Home + TodayFocus + QuickCare | 🟢 | 门禁通过并提交：`b8e8710e`；TFU-20260612-015 已关闭，无 P1/P2 余留 |
 | 6 | 大模块（Feeding/Members/Oasis/Settings/Health/Economy） | 🟢 | Feeding 门禁通过并提交：`b49134977`；Members 门禁通过并提交：`ead1e5fe4`；Oasis 门禁通过并提交：`87423afd8`；Settings/Health 门禁通过并提交：`5d4e71928`；Economy 原门禁：`662852a01`，复审修复轮门禁：`1679ddd66` |
-| 6.5 | 宪法差距建设（联机门/回收站/自动备份/植物门） | 🟢* | GAP-1~9 与 GAP-12 全部过门禁并提交；*带验收债：人工/真机验收项见 `docs/planning/gap-acceptance-track-list.md`，必须在 🏁 复审与 Phase 9B 前清完 |
+| 6.5 | 宪法差距建设（联机门/删除模型/自动备份/植物门） | 🟢* | GAP-1、GAP-3~9 与 GAP-12 已过门禁并提交；GAP-2 用户可见回收站按 2026-06-14 产品决策退役，删除模型改为不可恢复物理删除 + 不可见 sync tombstone；*带验收债：人工/真机验收项见 `docs/planning/gap-acceptance-track-list.md`，必须在 🏁 复审与 Phase 9B 前清完 |
 | 7 | 中小模块批量 | 🟡 | Walks 门禁通过（2026-06-13，`e0c1d69d3`）；按第一批高风险模块继续推进，注入复审模式预检清单 |
 | 8 | 横向集成与全量回归 | ⬜ | 需总览会话主持 |
 | 8.5 | 演进就绪审查（联网/订阅/账户地基） | ⬜ | 需总览会话主持；产出审查报告与少量铺垫，非新功能 |
@@ -33,13 +33,13 @@
 | TodayFocus | 5 | 🟢 | 2026-06-12 | 无 | `b8e8710e` | Phase 5 审计与门禁通过；本轮未发现需修改的 TodayFocus P0/P1 项 |
 | QuickCare | 5 | 🟢 | 2026-06-12 | 无 | `b8e8710e` | `ExecutorPickerBar` 的 SwiftData 查询已迁入 QuickCare feature 容器，Shared 只保留纯展示组件；空/多成员 picker smoke tests 已补 |
 | Feeding | 6 | 🟢 | 2026-06-12 | 跨模块 read-model 余留见 TFU-20260612-006 | `b49134977` | CloudSync `Event` / `PetFoodRecord` 上传与 apply 支持已补；Feeding 计划、粮仓、断粮提醒、自动投喂日志会写入 dirty/tombstone；dashboard 内容 revision 与本地化已修复；模块门禁通过 |
-| Members | 6 | 🟢 | 2026-06-12 | P1/P2 余留见 TFU-20260612-018~021 | `ead1e5fe4` | Human/Pet 删除聚合进入回收站并可恢复相关 Event/Reminder；Human 侧私密记录回收期保留、过期清理写 tombstone；成员创建生日/到家日 Event 与 Reminder 写 sync metadata；RequiredHumanProfileView a11y 修复；`scripts/module-exit-gate.sh` PASS；真实 UI 抽查见统一 track list |
+| Members | 6 | 🟢 | 2026-06-12 | P1/P2 余留见 TFU-20260612-018~021 | `ead1e5fe4` | 2026-06-14 删除模型已改为不可恢复物理删除：Human/Pet/Plant 及相关 Event/Reminder/从属记录经 `PhysicalDeletionService` 写 sync tombstone 后删除；离世成员资料更新、首页显示开关、清空记录命令 no-op 且不发布假 revision；成员创建生日/到家日 Event 与 Reminder 写 sync metadata；RequiredHumanProfileView a11y 修复；真实 UI 抽查见统一 track list |
 | Oasis | 6 | 🟢 | 2026-06-12 | 无 | `87423afd8` | 开工：2026-06-12；规则书见 `docs/specs/Oasis-logic.md`；当前主人钱包门、预算/冷却产出、一次性幂等奖励、休眠可唤回语义已落地；`scripts/module-exit-gate.sh` PASS；真实 UI 抽查见 `docs/planning/gap-acceptance-track-list.md#phase-6-oasis`；未改 schema / 路由 / 启动路径 / CloudKit |
 | Settings | 6 | 🟢 | 2026-06-12 | P2 余留见 TFU-20260612-022 | `5d4e71928` | 规则书见 `docs/specs/Settings-logic.md`；开发/测试入口收进 Debug-only，通知开关接入 `NotificationDeliveryPolicy`，空 About 入口隐藏；目标测试、UI/a11y/smoothness/runtime 审计与 `scripts/module-exit-gate.sh` PASS；真实 UI / 真机通知抽查见统一 track list |
-| Health | 6 | 🟢 | 2026-06-12 | 无 P1/P2 代码余留；真实 UI 抽查见统一 track list | `5d4e71928` | 规则书见 `docs/specs/Health-logic.md`；健康记录删除清理派生费用/日历事件/提醒/ledger，健康/症状/发情记录进回收站并可恢复，已故/回收宠物只读；schema 升至 `ArkSchemaV70`；目标测试与 `scripts/module-exit-gate.sh` PASS；未启用 CloudKit、未改路由或启动路径 |
-| Economy | 6 | 🟢 | 2026-06-13 | TFU-20260613-013 修复实现完成且 module gate PASS；仍不得 🏁：需由全新纯复审确认 P0/P1=0；真实 UI 抽查见统一 track list | `本次提交` | 规则书见 `docs/specs/Economy-logic.md`；当前 Economy 已完成钱包冻结门、system wallet 防回退、预算/冷却、首发门、Calendar/Today Focus/通知照护完成事实+奖励+撤销 tombstone、Streak system wallet P1、收口重构与 R5 `reward-direct-awardaction` 审计；2026-06-13 收口重构后纯对抗复审发现 4 条 P1：显式冻结 executor 回落 active human、Calendar/通知历史 occurrence 奖励按事实日结算、共享照护未过滤回收 target、R5 fixture 放行无事实/ledger 的 `EconomyRewardDiscipline` 直调；2026-06-13 P1 修复轮按护栏三件套完成：红测先行后修绿，冻结 executor 奖励 no-op 且不回落 active human，共享照护 target 改用 `EconomyWalletWritePolicy.canWrite` 过滤离世/回收，Calendar/通知完成路径事实日与奖励操作日分离，R5 新增 `reward-direct-care-discipline` fixture/audit；本轮 post-`7845db4c7` 纯复审新增 2 条 P1：G4.1 事实写入硬门未收口、R5 path-level allowlist 过宽；2026-06-13 TFU-012 修复实现：新增 `CareFactWritePolicy` 事实写入硬门，回收 target/executor no-op，离世 target 仅历史事实且跳过 reward/ledger/reminder/quest/Oasis 派生，共享照护空过滤和 source 回收 no-op，Calendar/通知宠物完成写入前拦截，QuickCare command 边界回收对象 no-op，R5 改函数级 `reward-direct-care-discipline` allowlist；本轮 Codex 复审新增 P1：QuickCare/Home/Feeding command 层仍会在服务 no-op 后发布成功 mutation、返回 fake log id 或继续写计划/库存 reminder/默认喂食设置，已登记 TFU-20260613-013；2026-06-13 TFU-013 修复实现：typed fact disposition 已传播到 QuickPlay / QuickPotty / QuickWater / Home / ManualFeed / PetCare / PetHygiene command 层，no-op 不再发布 revision / feedback / fake log id / 计划或库存默认派生；executor write policy 扩为 `EconomyWalletWritePolicy.canWrite`，覆盖回收 / 离世 human；新增 `care-fact-disposition-unconsumed` 审计与 fixture；目标测试 200、economy --all、fixture、dev-check、diff-check、module-exit-gate PASS；仍需全新纯复审确认 P0/P1=0 后才可 🏁 |
+| Health | 6 | 🟢 | 2026-06-12 | 无 P1/P2 代码余留；真实 UI 抽查见统一 track list | `5d4e71928` | 规则书见 `docs/specs/Health-logic.md`；2026-06-14 删除模型已改为确认后物理删除 + sync tombstone，健康记录删除清理派生费用/日历事件/提醒/ledger，症状/发情记录不进入恢复态；已故宠物只读；schema 升至 `ArkSchemaV70` 且 legacy 字段仅为存储兼容；目标测试与 `scripts/module-exit-gate.sh` PASS；未启用 CloudKit、未改路由或启动路径 |
+| Economy | 6 | 🟢 | 2026-06-14 | TFU-20260614-006 open；TFU-20260614-007 已由二态模型决策退役；最终纯复审 pending，不得 🏁；真实 UI 抽查见统一 track list | `本次提交` | 规则书见 `docs/specs/Economy-logic.md`；2026-06-14 care-derivation executor 架构会话已按产品主人 option A 收口：用户可见回收站和可恢复软删退役，删除走 `PhysicalDeletionService` 物理删除 + 不可见 sync tombstone，离世成员只读且照护写入/编辑/历史补记/派生 no-op；`CareFactWriteDisposition` 二态化，脏 executor id 不再丢 active target 事实；raw `DomainRevisionPublishing.publish` 加 token，care-family command/revision 路径消费 typed executor outcome；R5/derived lifecycle 审计和 fixture 已同步。legacy recycle 字段仅为既有 store compatibility 保留，活跃产品流不得读写。Economy 仍保持 🟢，需另开全新纯对抗复审 P0/P1=0 后才可 🏁 |
 | Medication | 7 | ⬜ | | | | |
-| Walks | 7 | 🟢 | 2026-06-13 | 无 P1/P2 代码余留；真机定位 / 真实 UI 抽查见统一 track list | `e0c1d69d3` | 规则书见 `docs/specs/Walks-logic.md`；`WalkFeaturePolicy` 统一 active dog/lifecycle 判定，非狗 / 已离世 / 回收宠物不可启动遛狗；Walks 统计与详情排除回收 walk / poop marker；遛狗中便便写 `PetPottyLog` + `CareLedgerEvent` 并进入奖励管线；共享遛狗调用收进基础设施适配器；目标测试、changed gate 与 `scripts/module-exit-gate.sh` PASS；未改 schema / CloudKit / 启动路径 |
+| Walks | 7 | 🟢 | 2026-06-13 | 无 P1/P2 代码余留；真机定位 / 真实 UI 抽查见统一 track list | `e0c1d69d3` | 规则书见 `docs/specs/Walks-logic.md`；`WalkFeaturePolicy` 统一 active dog/lifecycle 判定，非狗 / 已离世宠物不可启动遛狗；删除后的 walk / poop marker 已物理移除且不作为产品可见状态；遛狗中便便写 `PetPottyLog` + `CareLedgerEvent` 并进入奖励管线；共享遛狗调用收进基础设施适配器；目标测试、changed gate 与 `scripts/module-exit-gate.sh` PASS；未改 schema / CloudKit / 启动路径 |
 | FamilyTasks | 7 | ⬜ | | | | |
 | Expenses | 7 | ⬜ | | | | |
 | DashboardRecords | 7 | ⬜ | | 历史验证阻塞 TFU-20260612-013 已由 cross-scope repair 关闭 | | 接手时留意 `WeightHistoryView 2.swift` 曾误入仓库并阻塞 app target 编译 |
@@ -71,12 +71,160 @@
 | FamilyReports | 7 | ⬜ | | | | |
 | FunctionMenu | 7 | ⬜ | | | | |
 
+> Economy architecture note (2026-06-14, Codex care-derivation executor
+> architecture session, not a pure review):
+> Product-owner option A is now the governing model: user-visible recycle bin
+> and recoverable soft delete are retired; member deletion is irreversible
+> physical delete with invisible sync tombstones, and deceased members are
+> read-only/no-write. The care write disposition has been simplified to active
+> write vs no-op, dirty executor ids no longer drop active-target facts, raw
+> domain revision publishing is token-gated, and care-family command/revision
+> paths consume typed executor outcomes. Legacy recycle fields remain only for
+> store compatibility until a future schema retirement; active product flows must
+> not read/write them. Validation for this architecture work includes
+> `scripts/build-debug-fast.sh` PASS, targeted simulator suites PASS, economy
+> and derived-state audits PASS with existing baselines only, fixture tests PASS,
+> and `scripts/module-exit-gate.sh` PASS. Economy remains 🟢 and must not be marked 🏁 until a separate fresh pure
+> adversarial review reports P0/P1=0.
+>
+> Economy current review note (2026-06-14, Codex fresh pure adversarial review):
+> P0=0 / P1=3 / P2=1. P1 findings are tracked as TFU-20260614-004:
+> QuickPotty detail still performs selection/settings/reminder/UI success effects
+> before or without consuming command no-op for unknown shared potty, scoop, and
+> full-change paths; `scripts/audit-economy-boundaries.sh --all` misses these
+> QuickPotty result-consumption bad examples; clean-DerivedData targeted simulator
+> build fails compiling `OhanaTests/HomeCommandExecutorTests.swift` because several
+> tests use `executorHuman` without declaring/inserting the fixture. P2:
+> `recordUnknownSharedPotty` still returns a detached fallback `PetPottyLog`
+> instead of a typed shared result. Current inspection shows the prior TFU-003
+> QuickFeed / QuickWater / shared expense revision / plural walk executor issues
+> appear patched in this worktree, but this review still has P1. Validation:
+> `scripts/audit-economy-boundaries.sh --all` PASS (792 files),
+> `scripts/tests/run-audit-fixture-tests.sh` PASS, `git diff --check` PASS, clean
+> DerivedData target suite FAIL at compile. Economy remains 🟢 and must not be
+> marked 🏁.
+>
+> Economy previous review note (2026-06-14, Codex fresh pure adversarial review):
+> P0=0 / P1=4 / P2=1. P1 findings are tracked as TFU-20260614-003:
+> QuickFeed detail manual/treat and QuickWater detail planned/manual/water-change/
+> filter paths still show success feedback after typed no-op results; Walk secondary
+> `executorIds` are not validated with `EconomyWalletWritePolicy.canWrite`; shared
+> expense no-op still publishes a success revision. P2: `recordUnknownSharedPotty`
+> still returns a detached fallback `PetPottyLog` instead of a typed shared result.
+> Validation run in this review: `scripts/audit-economy-boundaries.sh --all` PASS
+> (792 files), `scripts/tests/run-audit-fixture-tests.sh` PASS, `git diff --check`
+> PASS. Targeted simulator tests were attempted but did not reach xcodebuild because
+> another `scripts/test-simulator.sh -only-testing:OhanaTests/HomeCommandExecutorTests`
+> process held `.build/locks/test-main-b6cf423d5931-tests.lock`; the waiting process
+> was cancelled with exit 130. Economy remains 🟢 and must not be marked 🏁.
+
+> Economy current review note (2026-06-14, Codex fresh pure adversarial review):
+> P0=0 / P1=2 / P2=0. P1 findings are tracked as TFU-20260614-001:
+> shared-care sourcePet is not a hard lifecycle gate when explicit active targets
+> are supplied, and TFU-016's shared hygiene sessions are not recognized by
+> `SharedCareSessionMaintenance` delete/reconcile/ledger paths. Validation run in
+> this review: `scripts/audit-economy-boundaries.sh --all` PASS (792 files),
+> `scripts/tests/run-audit-fixture-tests.sh` PASS, and targeted simulator suite
+> PASS (46 tests). Economy remains 🟢 and must not be marked 🏁 until a later
+> fresh pure review finds P0/P1=0.
+>
+> Economy repair note (2026-06-14, Codex fix session for TFU-20260614-001):
+> Shared-care sourcePet lifecycle is now a hard no-op gate even when explicit
+> active targets are supplied, and shared hygiene sessions now participate in
+> `SharedCareSessionMaintenance` reconcile/delete/primary/ledger paths. New
+> tests cover shared source no-op across feed/water/litter/generic care/walk/
+> unknown potty plus hygiene session reconcile, cascade delete, and primary-fact
+> deletion. Validation passed: `QuestManagerBatchAwardTests` 9 tests, key
+> Economy simulator suite 55 tests, `scripts/audit-economy-boundaries.sh --all`,
+> `scripts/tests/run-audit-fixture-tests.sh`, `scripts/dev-check-changed.sh`
+> (exit 0; derived-state lifecycle checklist warnings only), and
+> `git diff --check`; `QuestManagerBatchAwardTests` was rerun after SwiftFormat
+> and remained PASS. Economy remains 🟢; a separate fresh pure adversarial
+> review is still required before 🏁.
+>
+> Economy current review note (2026-06-14, Codex fresh pure adversarial review
+> round 1 after TFU-20260614-001 repair):
+> P0=0 / P1=1 / P2=0. P1 is tracked as TFU-20260614-002: non-empty explicit
+> executor ids that are invalid, missing, or already purged are still treated as
+> writable by `CareFactWritePolicy.executorCannotWrite`, so fact/ledger/
+> reminder/revision/Oasis derived writes can occur before reward owner resolution
+> rejects the wallet reward. Validation run in this review: targeted simulator
+> suite PASS (55 tests), `scripts/audit-economy-boundaries.sh --all` PASS
+> (792 files), and `scripts/tests/run-audit-fixture-tests.sh` PASS. Why this
+> escaped prior rounds: previous rules and tests modeled frozen executor as an
+> existing Human with `hasPassedAway`/`trashedAt`, but did not include the
+> post-purge stale active-human id state; G4.1/ECO-026 and the module playbook
+> were updated to make unresolved explicit executor a hard no-op boundary.
+> Economy remains 🟢 and must not be marked 🏁.
+>
+> Economy current review note (2026-06-14, Codex fresh pure adversarial review
+> round 2 with TFU-20260614-002 still open):
+> P0=0 / P1=1 / P2=1. P1 remains TFU-20260614-002: non-empty explicit
+> executor ids that are invalid, missing, or already purged still pass
+> `CareFactWritePolicy.executorCannotWrite` as writable at the fact layer. P2:
+> `CareEventRecording.recordUnknownSharedPotty` / `CareEventService.recordUnknownSharedPotty`
+> still return a detached `PetPottyLog` fallback instead of a typed
+> `SharedPetActionResult`; current QuickCare executor prechecks prevent an active
+> success leak, so this is not upgraded to P1 in this round. Validation:
+> targeted simulator suite PASS (242 tests), `scripts/audit-economy-boundaries.sh --all`
+> PASS (792 files), and `scripts/tests/run-audit-fixture-tests.sh` PASS. Economy
+> remains 🟢 and must not be marked 🏁.
+>
+> Economy previous review note (2026-06-13, Codex fresh pure adversarial review):
+> P0=0 / P1=1 / P2=1. P1 is tracked as TFU-20260613-015
+> (`PetWalkingManager.stop` single-walk path writes `PetWalkLog` + wallet reward /
+> budget usage but no walk `CareLedgerEvent`; shared walk does write walk ledger).
+> Economy remains 🟢 and must not be marked 🏁 until a later fresh pure review finds
+> P0/P1=0.
+>
+> Economy repair note (2026-06-13, Codex fix session): TFU-20260613-015 is fixed
+> and closed locally. Validation passed:
+> `scripts/test-simulator.sh -only-testing:OhanaTests/CareCompletionChokepointCharacterizationTests -only-testing:OhanaTests/QuestManagerBatchAwardTests`,
+> `scripts/audit-economy-boundaries.sh --all`,
+> `scripts/tests/run-audit-fixture-tests.sh`, and `git diff --check`. Economy
+> remains 🟢; a separate fresh pure adversarial review is still required before
+> 🏁.
+>
+> Economy current review note (2026-06-13, Codex fresh pure adversarial review
+> after TFU-20260613-015): P0=0 / P1=2 / P2=1. P1 is tracked as
+> TFU-20260613-016: deceased-pet historical Calendar / Today Focus /
+> notification care completion still writes the history fact and then completes
+> occurrence / reminder / success revision; R5 still allows
+> `CalendarTaskCompletionSyncService.awardGeneratedCare` by function name without
+> proving same-function disposition consumption. P2: legacy `QuestManager.batchAward`
+> non-litter potty / hygiene still uses private direct fact/ledger helpers rather
+> than a shared typed chokepoint. Economy remains 🟢 and must not be marked 🏁.
+>
+> Economy repair note (2026-06-13, Codex fix session): TFU-20260613-016 P1 is
+> fixed locally. Calendar / Today Focus / notification memorial historical
+> fact-only now writes only the history fact, does not complete occurrence or
+> reminder, does not publish success revision, and can clean legacy no-ledger
+> fact-only records on reopen. R5 now requires `awardGeneratedCare` to consume
+> `CareFactWritePolicy.disposition` in the same function and has a matching bad
+> fixture. Validation passed: targeted simulator suites 214 tests,
+> `scripts/audit-economy-boundaries.sh --all`,
+> `scripts/tests/run-audit-fixture-tests.sh`, `scripts/dev-check-changed.sh`, and
+> `git diff --check`.
+>
+> Economy repair note (2026-06-14, Codex fix session): TFU-20260613-016 P2 is
+> fixed locally. Legacy `QuestManager.batchAward` non-litter potty / hygiene now
+> delegates to `SharedPetActionRecorder` typed shared child strategies and
+> creates `SharedCareSession`; non-litter potty facts link back through
+> `sharedSessionId`, and hygiene sessions point at the first `PetHygieneLog`
+> through `primaryLegacyModelName/Id`. Validation passed:
+> `scripts/test-simulator.sh -only-testing:OhanaTests/QuestManagerBatchAwardTests`
+> (5 tests), the key simulator suite (214 tests),
+> `scripts/audit-economy-boundaries.sh --all`,
+> `scripts/tests/run-audit-fixture-tests.sh`, `scripts/dev-check-changed.sh`, and
+> `git diff --check`. Economy stays 🟢 and still needs a fresh pure adversarial
+> review before 🏁.
+
 ## 建设工作（宪法差距，2026-06-12 盘点）
 
 | 工作项 | 优先级 | 状态 | 范围/验收 | 门禁 commit | 备注 |
 |---|---|---|---|---|---|
 | GAP-1 联机功能门 | P0 上架前 | 🟢 | FamilyTasks+云同步设置+CKShare 入口统一收进 `OnlineFeatureGate`；FamilyReports 留周报剥悬赏 | `59b5ceedc` | 开工：2026-06-12；门禁：`scripts/module-exit-gate.sh` PASS；验收通过，真实设备 / 真实 UI 追踪项见 `docs/planning/gap-acceptance-track-list.md#gap-1-联机功能门`；未做 CloudKit 启用 |
-| GAP-2 回收站 | P0 上架前 | 🏁 | 成员+珍贵档案软删 30 天可恢复；流水直删但写 tombstone；涉及 schema 升版 | `本次提交` | 开工：2026-06-12；门禁：`scripts/module-exit-gate.sh` PASS；自动验收通过，真实 UI 追踪项见 `docs/planning/gap-acceptance-track-list.md#gap-2-回收站`；schema 升至 `ArkSchemaV69`；2026-06-13 对抗复审 P1 已修：30 天到期改为服务层硬边界，恢复 Event/Reminder 后重新排未来本地通知，Pet 期满 purge 为级联子记录写 tombstone，单条流水直删路径写 CloudSync tombstone；2026-06-13 TFU 修复轮补齐 Calendar whole-event / recurrence 删除的 `Event` + `Reminder` tombstone，PetCare/Hygiene/DashboardRecords 删除业务 fact 时的 `CareLedgerEvent` tombstone，以及 CatCare undo 的 `Event` / `PetHygieneLog` tombstone；`scripts/audit-derived-state-lifecycle.sh --all` baseline 从 65 降至 63，剩余为跨模块存量债，TFU-20260613-009 保持 open；2026-06-13 第二轮修复补齐 Calendar 生成照护事实撤销、CarePlan / Feeding / Water 计划删除的上传管线实体 tombstone，并按产品拍板将 SymptomLog / HeatCycleLog 改为直删 + tombstone、PetHealthLog 保持珍贵档案回收；2026-06-13 新视角复审未发现新的 P0/P1，`RecycleBinServiceTests` 通过；同日收口重构后再次复审未发现新的 P0/P1，`scripts/audit-derived-state-lifecycle.sh --all` 无新增债，`scripts/module-exit-gate.sh` PASS，保持 🏁；未改路由 / 启动路径 / CloudKit |
+| GAP-2 删除模型 | P0 上架前 | 🟢 | 用户可见回收站按 2026-06-14 产品决策退役；成员删除为确认后不可恢复物理删除，CloudSync 仅保留用户不可见 sync tombstone；旧 V69 schema 和 legacy 字段只为 store compatibility 保留 | `本次提交` | 旧 GAP-2 回收站验收记录作历史参考，不再代表当前产品模型；本轮改为 `PhysicalDeletionService` 统一 tombstone+delete，移除回收站 UI/恢复路径/备份恢复态，并更新 derived-state lifecycle 审计。仍需随 Economy 架构改造通过最终纯复审后再判断成熟度，不标 🏁 |
 | GAP-3 自动备份 | P0 上架前 | 🟢 | 自动备份至 iCloud Drive 文件+失败可见+恢复端到端测试 | `9b1ac1be1` | 开工：2026-06-12；门禁：`scripts/module-exit-gate.sh` PASS；自动验收通过，真实设备 / 真实 iCloud 追踪项见 `docs/planning/gap-acceptance-track-list.md#gap-3-自动备份`；未启用 CloudKit 同步 |
 | GAP-4 总账恒等 | P1 上架前 | 🟢 | `QuestManager.coconutCount` 为钱包投影；正式岛屿总资产 ≡ 人类成员+宠物钱包；`system:legacy` 仅迁移兼容 | `1951f7834` | 开工：2026-06-12；门禁：`scripts/module-exit-gate.sh` PASS；自动验收通过，真实 UI / 正式包追踪项见 `docs/planning/gap-acceptance-track-list.md#gap-4-总账恒等` |
 | GAP-5 触顶感知 | P1 上架前 | 🟢 | 奖励触顶温和文案，九语言；recordOnly 记录照常完成且奖励反馈不暴露预算数字 | `1a775bc7c` | 开工：2026-06-12；门禁：`scripts/module-exit-gate.sh` PASS；自动验收通过，真实 UI / 长语言视觉追踪项见 `docs/planning/gap-acceptance-track-list.md#gap-5-触顶感知` |
@@ -110,6 +258,8 @@
 | 2026-06-12 | GAP 批次对账 | 账实核对：GAP-1~9、Members、Oasis 共 11 项的门禁 commit 全部存在且成对（fix+gate 记录）、工作区干净、AGENTS.md schema 行已同步 V69、九本规则书在 `docs/specs/`。发现：① main 领先 origin 9 个提交未推送→CI（含 SwiftLint 严格）未验证最近批次；② 64 项人工/真机验收债集中在 track list，已在 Phase 6.5 行标注 🟢*；③ 总览会话重跑 `module-exit-gate.sh` 抽查 **PASS**（全量单测+审计绿）。流程修正：验收债规则与 🟢* 状态入手册、收工协议加推送+CI 要求、复审采样节奏入手册 |
 | 2026-06-12 | Phase 6 收尾检验 + 宪法 v1.3 | Settings/Health（`5d4e71928`）与 Economy（`662852a01`）账实一致、schema V70 已同步、工作区干净。**违规两项**：① main 领先 origin 14 提交未推送（收工协议第 5 条连续未执行，CI 空转）；② 对抗复审为零（采样规则被跨过两次）。**裁定：Phase 7 开工前必须先 push+CI 绿 + 完成 Economy 与 RecycleBin 两个复审采样**。新决策入宪：D19 植物功能门（GAP-12 登记，P0）、D20 多语言扩展就绪（8.5 增审查项） |
 | 2026-06-13 | Economy 复审修复轮 | 对 7 条 P1 + 2 条 P2 按根因归组执行：表征测试提交 `7c7f18b08`，纯重构提交 `67afc59a7`，行为修复提交 `1679ddd66`。新增 legacy 无 actor 不写 system、FamilyTasks 悬赏失败保持待审核且无半笔账测试；`scripts/module-exit-gate.sh` PASS。Economy 状态降回 🟢，需下一轮重新对抗复审清零后才可回 🏁 |
+| 2026-06-14 | 架构改造执行检阅 | 读 Codex 完整执行过程 + 核实代码。**纠错**:一度疑 token 是空壳（`rg` 把 `CareDerivationToken` 渲染成 `n`），读实际文件确认 token 真实（`fileprivate init`），方向对、executor 框架与一批 command 迁移有实质进展。**但发现三问，不能放行**：① **P0 数据丢失**——`executorCannotWrite`（CareEventService.swift:145）对无效 UUID/已删 Human 返回 true→disposition `.noOp`→连事实都不写，违反 G3（删成员后缓存 id 当 executor 记照护→事实静默丢失）；② **证人被改**——Codex 把旧表征测试 `executorId:"human-1"`→真实 UUID 让其变绿，把 #1 回归洗白，无测试盯防；③ **焊死未完成**——token 没加到 `DomainRevisionPublishing.publish` 闸门（无 token 参数），command 仍能直接 publish 绕过，验收"构造不出绕过"不满足，主防线退回 R6 采样；④ 工程卫生：巨大未提交脏树、无分簇提交（不可二分回滚）、停在全量门禁红。**新增手册铁律「表征测试不可篡改」**。待产品决策：无效/脏 executorId 是否该丢事实 |
+| 2026-06-14 | 复审熔断 → 架构改造 | Economy/care-completion 连续 14 轮复审未收敛。诊断：复审驱动横切不变量数学上不收敛（违反点=分支×派生点，组合爆炸，复审只采样）；且 `disposition{didWriteFact,allowsDerivedEffects}` 字段早已存在但只是建议——发副作用权力仍散落在 12+ command（各自手动逐分支 guard，且只挡 revision、漏 reminder/stock/feedback/Oasis）。**用户选路线 A（架构封死）**：建 `CareDerivationExecutor` 单一派生执行器，收走 command 的副作用触发权，让违反编译期/审计期无法表达。规格 `docs/planning/care-derivation-executor-spec.md`。**熔断规则入手册**（同根因≥3轮或"加了字段还在漏"=权力没收走→禁止再开复审修复轮，转架构改造，验收=构造不出绕过，全程只结尾做一次复审）。**停止 Economy 复审-修复循环**，TFU-013~007 系列以架构改造统一终结 |
 | 2026-06-13 | 评估 Codex 自诊断 | Codex 给 5 条原因,经评估重排:#2 返回类型不表达状态=杠杆根因(#1 入口驱动是其果、#4 审计抓不到语义是二阶);**采纳 Codex #3**——不变量是 fact→ledger→budget→reminder→revision→stock→UI 整条派生链,故 `allowsDerivedEffects` 必须是**每个派生点的统一闸门**,不能只在 reward 层消费(否则下一轮又漏一层);#5（规则当天加严）半真,但 TFU-011 的 executor 回落/共享未过滤在旧 G4/ECO-018 下本就违规,不可全归于"标准变了"。**Codex 漏掉的元因**:协议规定同根因≥3轮必开重构轮,却连续点对点=AI 能分析却不反思自己选了治标→靠流程强制不靠自觉。下一轮结构验收钉死:disposition 沿完整派生链做闸门+强制消费+审计 |
 | 2026-06-13 | 收敛诊断（冻结门打地鼠） | TFU-011→012→013 同一根因（冻结成员生命周期门）连续 3 轮复现，沿调用栈层层外推（owner→事实写入→命令层），属点对点打地鼠而非结构封死。诊断：① 它是负向不变量（要求副作用不发生），开放式枚举难穷尽；② 真根因=命令层用 `reward==0` 猜状态，缺类型化处置信号；③ 根因重构轮该触发未触发。**裁定：下一轮是结构轮不是补丁轮**——收口返回 `CareFactWriteDisposition{didWriteFact, allowsDerivedEffects}`，command 必须消费，配审计禁止猜状态；UI 层硬挡回收/离世成员进选择器。收敛判据=下一轮复审"构造不出绕过"而非"又找到第 N 个绕过点"。手册「根因重构轮」加强制触发（同根因≥2轮即停止点对点）|
 | 2026-06-13 | 收口重构检阅 | 收口重构落地核验:护栏三件套 commit 分离正确(表征`471b22d41`→纯重构`6ce358843`→行为修复独立)、`EconomyRewardDiscipline` 10+ 文件采纳、R5 `reward-direct-awardaction` 审计绿(792 文件)+fixture 自检过、推送/工作区干净。**纠正:Economy 🏁→🟢**——重构改了 10+ 奖励路由,重构后只有机器门禁+自我断言,缺全新会话对抗复审(全新复审发生在重构之前,抓到 Streak P1 已修)。**新增「🏁 完整性防呆」入手册**:🏁 只能纯复审会话授予、需引用复审会话独立证据、改业务代码自动失效。GAP-2 的"收口重构后复审仍零"亦属自我断言,但 GAP-2 未被本重构结构性改动,风险低,保留 🏁 但注记 |
@@ -129,3 +279,5 @@
 | 2026-06-13 | Economy + GAP-2 第二轮 P1 修复轮 | 已按产品选择修复第二轮复审新增 P1：Calendar / Today Focus / 通知照护完成统一写照护事实并走 `QuestManager.awardAction`；旧 Calendar 完成奖励服务保留 no-op；Calendar occurrence 撤销冲销钱包并 tombstone 生成事实 / ledger / budget 事件；CarePlan / Feeding / Water 计划删除写 `Event` / `Reminder` tombstone；SymptomLog / HeatCycleLog 改为直删 + tombstone，PetHealthLog 保持回收站。新增 / 更新 `OhanaTests/RecurringFindingsRepairTests.swift` 与 `OhanaTests/HomeCommandExecutorTests.swift` 覆盖；本地窄测试 PASS，`scripts/module-exit-gate.sh` PASS（771 个单测 + 3 个模板 UI tests）；CI 按用户确认跳过。Economy 与 GAP-2 状态回到 🟢，但仍需全新会话重新对抗复审零 P0/P1 才可 🏁 |
 | 2026-06-13 | Economy + GAP-2 新视角清零复审 | RecycleBin 未发现新的 P0/P1；Economy 发现 1 条 P1（Streak 连击奖励无 active human 时仍 fallback 写 system wallet），已修为无 active human 或冻结 pet 时直接不发奖、不记 claimed、不写 system。验证：`scripts/dev-check-changed.sh` PASS，`scripts/audit-economy-boundaries.sh --all` PASS，`scripts/test-simulator.sh -only-testing:OhanaTests/HomeCommandExecutorTests` PASS（159 tests），`scripts/test-simulator.sh -only-testing:OhanaTests/RecycleBinServiceTests` PASS（9 tests）。Economy 与 GAP-2 均标 🏁，人工 / 真机 UI 验收债仍留统一 track list |
 | 2026-06-13 | 收口重构落地 + Economy/GAP-2 复审确认 | 按护栏三件套完成 Economy 收口：表征测试 `CareCompletionChokepointCharacterizationTests` 先行，纯重构新增 `EconomyRewardDiscipline`，家族 1 照护奖励与家族 2 非照护奖励均通过共享奖励纪律入口，未把花费/时刻/全清/补签伪装成 `CareType`；R5 `reward-direct-awardaction` 审计与 bad/good fixture 纳入 `scripts/audit-economy-boundaries.sh`。验证：`scripts/tests/run-audit-fixture-tests.sh` PASS，`scripts/audit-economy-boundaries.sh --all` PASS（792 files），`scripts/audit-derived-state-lifecycle.sh --all` 无新增债（仍有既有 baseline），`scripts/module-exit-gate.sh` PASS。落地后重新攻击 Economy 与 RecycleBin，未发现新的 P0/P1，二者保持 🏁；CI run `27468716740` 已推送后检查，检查时状态为 in_progress。 |
+| 2026-06-14 | Economy 全新纯对抗复审 | 本轮纯复审会话（Codex，2026-06-14，用户要求“全新纯对抗复审”）发现 Economy P0=0 / P1=4 / P2=1，不能标 🏁，状态保持 🟢。P1：shared manual feed 在 recorder no-op gate 前触发 first-meal special reward / flag；planned feed / water catch-up 被错误固化为 0 奖励而非 operation-day 预算结算；Insurance 保费 / 报销直接写 `PetExpenseLog` 但缺同边界 expense ledger 纪律；`HomeCommandExecutorTests` 目标套件仍有 1 个失败。P2：`recordUnknownSharedPotty` no-op 时仍返回 detached `PetPottyLog`，API 容易误判成功。已登记 TFU-20260614-006。验证：`scripts/audit-economy-boundaries.sh --all` PASS（792 files），`scripts/tests/run-audit-fixture-tests.sh` PASS，`DERIVED_DATA_PATH=/tmp/OhanaDerivedData/economy-pure-review-20260614 scripts/test-simulator.sh -only-testing:OhanaTests/HomeCommandExecutorTests` FAIL（174 tests，1 failure），`git diff --check` PASS。 |
+| 2026-06-14 | Care 派生执行器架构改造收口 | 按产品主人 option A 落地二态删除/离世模型：用户可见回收站与可恢复软删退役，删除走物理删除 + 不可见 sync tombstone，离世成员只读且不写照护事实/编辑/派生；`CareFactWriteDisposition` 简化为 active/no-op，dirty executor 不再导致 active target 事实丢失；raw domain revision publish 加 token，care-family command/revision/UI feedback 入口消费 typed `CareWriteOutcome`；旧 `RecycleBinService`/UI/备份恢复态移除，GAP-2 改为删除模型历史项。TFU-20260614-002~005/007 已由架构/新产品规则关闭，TFU-20260614-006 仍保留 Insurance expense ledger 与最终纯复审债。验证截至本地：targeted simulator suites PASS、`scripts/build-debug-fast.sh` PASS、economy/derived audits 与 fixture tests PASS、`scripts/module-exit-gate.sh` PASS（834 unit tests + 3 UI template tests）。push/CI 待本会话结尾执行。Economy 保持 🟢，不得 🏁，完成后还需全新纯对抗复审 P0/P1=0。 |

@@ -97,7 +97,7 @@ struct PetMomentsHubView: View {
     }
 
     private var realPhotos: [PetPhotoLog] {
-        pet.photoLogs.activeRecycleBinItems
+        pet.photoLogs
             .filter { !$0.imageData.isEmpty }
             .sorted { $0.date > $1.date }
     }

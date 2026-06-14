@@ -5,7 +5,7 @@ import Testing
 
 @MainActor
 struct PetActivityRecordCleanupServiceTests {
-    @Test func cleanupMovesPetActivityFactsToSingleRecycleBatchAndRestoresThem() throws {
+    @Test func cleanupPhysicallyDeletesPetActivityFactsAndWritesSyncTombstones() throws {
         let container = try makeContainer()
         let context = container.mainContext
         let pet = Pet(name: "Momo", species: "狗")
@@ -61,52 +61,82 @@ struct PetActivityRecordCleanupServiceTests {
         let documents = try context.fetch(FetchDescriptor<PetDocument>())
         let insurances = try context.fetch(FetchDescriptor<PetInsurance>())
         let events = try context.fetch(FetchDescriptor<Event>())
-        let batches = try context.fetch(FetchDescriptor<RecycleBinBatch>())
+        let reminders = try context.fetch(FetchDescriptor<Reminder>())
 
         #expect(result.petID == pet.id)
         #expect(result.deletedActivityRecordCount == 4)
         #expect(result.deletedEventCount == 1)
-        let batchID = try #require(result.recycleBatchID)
         #expect(result.cancelledNotificationIDs == ["notification-momo"])
         #expect(result.didResetStreak)
         #expect(notifications.cancelledIDs == ["notification-momo"])
         #expect(pet.currentStreak == 0)
         #expect(pet.lastCheckInDate == nil)
-        #expect(careLogs.count == 2)
-        #expect(careLog.trashedAt != nil)
-        #expect(careLog.trashBatchId == RecycleBinService.petActivityClearBatchId(batchID))
-        #expect(careLogs.activeRecycleBinItems.map { $0.pet?.id } == [otherPet.id])
-        #expect(pottyLogs.activeRecycleBinItems.isEmpty)
-        #expect(walkLogs.activeRecycleBinItems.isEmpty)
-        #expect(weightLogs.activeRecycleBinItems.isEmpty)
+        #expect(Set(careLogs.map(\.id)) == Set([otherCareLog.id]))
+        #expect(pottyLogs.isEmpty)
+        #expect(walkLogs.isEmpty)
+        #expect(weightLogs.isEmpty)
         #expect(documents.map { $0.pet?.id } == [pet.id])
         #expect(insurances.map { $0.pet?.id } == [pet.id])
-        #expect(events.activeRecycleBinItems.map(\.relatedEntityId) == [otherPet.id.uuidString])
-        #expect(reminder.statusEnum == .skipped)
-        #expect(reminder.completedBy.hasPrefix("system:recycle:"))
-        #expect(batches.map(\.id) == [batchID])
+        #expect(Set(events.map(\.relatedEntityId)) == Set([otherPet.id.uuidString]))
+        #expect(reminders.isEmpty)
+        #expect(deletionTombstone(PetCareLog.self, id: careLog.id, context: context) != nil)
+        #expect(deletionTombstone(PetPottyLog.self, id: pottyLog.id, context: context) != nil)
+        #expect(deletionTombstone(PetWalkLog.self, id: walkLog.id, context: context) != nil)
+        #expect(deletionTombstone(PetWeightLog.self, id: weightLog.id, context: context) != nil)
+        #expect(deletionTombstone(Event.self, id: event.id, context: context) != nil)
+        #expect(deletionTombstone(Reminder.self, id: reminder.id, context: context) != nil)
+    }
 
-        let recycleItem = try #require(RecycleBinService.listItems(context: context).first {
-            $0.kind == .petActivityClearBatch && $0.batchID == batchID
-        })
-        let restore = RecycleBinService.restoreItem(recycleItem, context: context)
+    @Test func cleanupNoOpsForPassedAwayPet() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let pet = Pet(name: "Momo", species: "狗")
+        pet.passedAwayDate = Date(timeIntervalSince1970: 1_800_000_000)
+        pet.currentStreak = 5
+        let careLog = PetCareLog(type: .feeding, pet: pet)
+        let event = Event(
+            title: "Momo reminder",
+            eventType: EventType.daily.rawValue,
+            relatedEntityType: EntityKind.pet.rawValue,
+            relatedEntityId: pet.id.uuidString
+        )
+        context.insert(pet)
+        context.insert(careLog)
+        context.insert(event)
         try context.save()
 
-        #expect(restore.restoredBatchCount == 1)
-        #expect(restore.restoredSourceCount == 6)
+        let notifications = FakeReminderNotificationScheduler()
+        let result = PetActivityRecordCleanupService(notifications: notifications)
+            .clearActivityRecords(for: pet, context: context)
+        try context.save()
+
+        let careLogs = try context.fetch(FetchDescriptor<PetCareLog>())
+        let events = try context.fetch(FetchDescriptor<Event>())
+        #expect(result.deletedActivityRecordCount == 0)
+        #expect(result.deletedEventCount == 0)
+        #expect(!result.didResetStreak)
+        #expect(notifications.cancelledIDs.isEmpty)
         #expect(pet.currentStreak == 5)
-        #expect(pet.lastCheckInDate == Date(timeIntervalSince1970: 1_800_000_000))
-        #expect(try context.fetch(FetchDescriptor<RecycleBinBatch>()).isEmpty)
-        #expect(try context.fetch(FetchDescriptor<PetCareLog>()).activeRecycleBinItems.count == 2)
-        #expect(try context.fetch(FetchDescriptor<Event>()).activeRecycleBinItems.count == 2)
-        #expect(reminder.statusEnum == .pending)
-        #expect(reminder.completedBy.isEmpty)
+        #expect(careLogs.map(\.id) == [careLog.id])
+        #expect(events.map(\.id) == [event.id])
+        #expect(deletionTombstone(PetCareLog.self, id: careLog.id, context: context) == nil)
+        #expect(deletionTombstone(Event.self, id: event.id, context: context) == nil)
     }
 
     private func makeContainer() throws -> ModelContainer {
         let schema = Schema(ArkSchemaV71.models)
         let config = ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)
         return try ModelContainer(for: schema, configurations: [config])
+    }
+
+    private func deletionTombstone<T>(
+        _: T.Type,
+        id: UUID,
+        context: ModelContext
+    ) -> CloudSyncRecordState? {
+        let key = CloudSyncRecordState.recordKey(entityName: String(describing: T.self), localRecordId: id)
+        return (try? context.fetch(FetchDescriptor<CloudSyncRecordState>()))?
+            .first { $0.recordKey == key && $0.isDeletionTombstone }
     }
 }
 

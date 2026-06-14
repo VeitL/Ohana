@@ -10,8 +10,8 @@ struct EditPetSheet: View {
     var body: some View {
         EditPetContentSheet(
             pet: pet,
-            allPets: allPets.activeRecycleBinItems,
-            allHumans: allHumans.activeRecycleBinItems
+            allPets: allPets,
+            allHumans: allHumans
         )
     }
 }

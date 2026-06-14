@@ -129,7 +129,7 @@ struct CoconutShopView: View {
 
     var islandSpendableHumanBalance: Int {
         humans
-            .filter { !$0.hasPassedAway && $0.trashedAt == nil }
+            .filter { !$0.hasPassedAway }
             .reduce(0) { $0 + max(0, $1.coconutBalance) }
     }
 

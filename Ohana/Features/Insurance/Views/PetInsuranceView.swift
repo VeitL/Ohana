@@ -21,7 +21,7 @@ struct PetInsuranceView: View {
     @StateObject private var commandQueue = DeferredDomainCommandQueue()
 
     private var sorted: [PetInsurance] {
-        pet.insurances.activeRecycleBinItems.sorted { $0.renewalDate > $1.renewalDate }
+        pet.insurances.sorted { $0.renewalDate > $1.renewalDate }
     }
 
     var body: some View {

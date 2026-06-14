@@ -24,6 +24,8 @@ final class PetFoodRecord {
     var calculationModeRaw: String = FeedStockCalculationMode.manualOrPlan.rawValue
     var executorId: String? // ArkSchemaV11: 执行该动作的 Human.id.uuidString
     var pet: Pet?
+    // Legacy recycle-bin columns kept only for stores that already migrated through the retired deletion model.
+    // Active product code must not read or write these fields.
     var trashedAt: Date?
     var trashExpiresAt: Date?
     var trashBatchId: String = ""

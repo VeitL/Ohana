@@ -484,18 +484,18 @@ struct BountyBoardContentView: View {
         var expense: [String: Int] = [:]
 
         for pet in pets {
-            for log in pet.careLogs.activeRecycleBinItems where log.date >= start {
+            for log in pet.careLogs where log.date >= start {
                 if let id = log.executorId, !id.isEmpty { care[id, default: 0] += 1 }
             }
-            for log in pet.pottyLogs.activeRecycleBinItems where log.date >= start {
+            for log in pet.pottyLogs where log.date >= start {
                 if let id = log.executorId, !id.isEmpty { potty[id, default: 0] += 1 }
             }
-            for log in pet.walkLogs.activeRecycleBinItems where log.startDate >= start {
+            for log in pet.walkLogs where log.startDate >= start {
                 for id in log.executorIds where !id.isEmpty {
                     walk[id, default: 0] += 1
                 }
             }
-            for log in pet.expenseLogs.activeRecycleBinItems where log.date >= start {
+            for log in pet.expenseLogs where log.date >= start {
                 if let id = log.executorId, !id.isEmpty { expense[id, default: 0] += 1 }
             }
         }

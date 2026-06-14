@@ -3,7 +3,7 @@ import Foundation
 @MainActor
 enum WalkFeaturePolicy {
     static func canStartWalk(for pet: Pet) -> Bool {
-        isDog(pet) && !pet.hasPassedAway && pet.trashedAt == nil
+        isDog(pet) && !pet.hasPassedAway
     }
 
     static func normalizedWalkTargets(_ targets: [Pet], fallback sourcePet: Pet) -> [Pet] {
@@ -12,17 +12,14 @@ enum WalkFeaturePolicy {
     }
 
     static func activeWalkLogs(for pet: Pet) -> [PetWalkLog] {
-        guard pet.trashedAt == nil else { return [] }
-        return pet.walkLogs.activeRecycleBinItems
+        pet.walkLogs
     }
 
     static func activePottyLogs(for pet: Pet) -> [PetPottyLog] {
-        guard pet.trashedAt == nil else { return [] }
-        return pet.pottyLogs.activeRecycleBinItems
+        pet.pottyLogs
     }
 
     static func activePoopMarkers(for walk: PetWalkLog, pet: Pet) -> [WalkPoopMarker] {
-        guard walk.trashedAt == nil else { return [] }
         let walkID = walk.id.uuidString
         return activePottyLogs(for: pet)
             .filter { $0.walkLogId == walkID }

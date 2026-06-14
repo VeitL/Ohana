@@ -14,8 +14,8 @@ struct WalkTrackingCardHost: View {
         let commandExecutor = WalkTrackingCommandExecutor(modelContext: modelContext, services: appServices)
         WalkTrackingCard(
             pet: pet,
-            allPets: allPets.activeRecycleBinItems,
-            allHumans: allHumans.activeRecycleBinItems,
+            allPets: allPets,
+            allHumans: allHumans,
             snapshot: WalkTrackingSnapshot.make(pet: pet, manager: appServices.walking),
             onCloseSummaryToPetCard: onCloseSummaryToPetCard,
             onStopWalk: { sharedTargets, executorIds in

@@ -471,11 +471,11 @@ final class CoconutWalletServiceTests: XCTestCase {
         XCTAssertFalse(model.leaderboard.contains { $0.entityId == hiddenHuman.id.uuidString })
     }
 
-    func testWealthActiveAssetsExcludeFrozenWalletOwners() {
+    func testWealthActiveAssetsExcludeDeceasedWalletOwners() {
         let activeHuman = Human(name: "Guan")
         let hiddenHuman = Human(name: "Private")
-        let recycledHuman = Human(name: "Recycled")
-        recycledHuman.trashedAt = Date()
+        let deceasedHuman = Human(name: "Deceased")
+        deceasedHuman.passedAwayDate = Date()
         let activePet = Pet(name: "Miso")
         let memorialPet = Pet(name: "Luna")
         memorialPet.passedAwayDate = Date()
@@ -496,10 +496,10 @@ final class CoconutWalletServiceTests: XCTestCase {
                 balance: 40
             ),
             CoconutAccount(
-                accountKey: CoconutAccountKey.human(recycledHuman.id),
+                accountKey: CoconutAccountKey.human(deceasedHuman.id),
                 ownerKind: .human,
-                ownerId: recycledHuman.id.uuidString,
-                displayName: recycledHuman.name,
+                ownerId: deceasedHuman.id.uuidString,
+                displayName: deceasedHuman.name,
                 balance: 80
             ),
             CoconutAccount(
@@ -520,8 +520,8 @@ final class CoconutWalletServiceTests: XCTestCase {
 
         model.applyQuerySnapshot(
             pets: [activePet, memorialPet],
-            allHumans: [activeHuman, hiddenHuman, recycledHuman],
-            visibleHumans: [activeHuman, recycledHuman],
+            allHumans: [activeHuman, hiddenHuman, deceasedHuman],
+            visibleHumans: [activeHuman, deceasedHuman],
             hiddenHumanIds: [hiddenHuman.id.uuidString],
             walletAccounts: accounts,
             walletLedgerEntries: [],
@@ -532,10 +532,10 @@ final class CoconutWalletServiceTests: XCTestCase {
         XCTAssertEqual(model.totalAssets, 55)
         XCTAssertEqual(Set(model.leaderboard.map(\.entityId)), Set([activeHuman.id.uuidString, activePet.id.uuidString]))
         XCTAssertFalse(model.leaderboard.contains { $0.entityId == hiddenHuman.id.uuidString })
-        XCTAssertFalse(model.leaderboard.contains { $0.entityId == recycledHuman.id.uuidString })
+        XCTAssertFalse(model.leaderboard.contains { $0.entityId == deceasedHuman.id.uuidString })
         XCTAssertFalse(model.leaderboard.contains { $0.entityId == memorialPet.id.uuidString })
 
-        model.selectedActorId = recycledHuman.id.uuidString
+        model.selectedActorId = deceasedHuman.id.uuidString
         XCTAssertEqual(model.displayedAssets, 0)
     }
 
@@ -650,7 +650,7 @@ final class CoconutWalletServiceTests: XCTestCase {
         human.passedAwayDate = Date()
         let pet = Pet(name: "Miso")
         pet.coconutBalance = 20
-        pet.trashedAt = Date()
+        pet.passedAwayDate = Date()
         context.insert(human)
         context.insert(pet)
         try context.save()

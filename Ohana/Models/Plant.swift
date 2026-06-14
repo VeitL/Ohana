@@ -24,6 +24,8 @@ final class Plant {
     var lastFertilizedDate: Date?
     var notes: String
     var createdAt: Date
+    // Legacy recycle-bin columns kept only for stores that already migrated through the retired deletion model.
+    // Active product code must not read or write these fields.
     var trashedAt: Date?
     var trashExpiresAt: Date?
     var trashBatchId: String = ""

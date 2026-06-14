@@ -27,12 +27,11 @@ struct QuickPlayDetailRouteContainer: View {
         let careKind = CareLedgerEventKind.care.rawValue
         let playType = CareType.play.rawValue
         _pets = Query(filter: #Predicate<Pet> { pet in
-            pet.id == id && pet.trashedAt == nil
+            pet.id == id
         })
         _allEvents = Query(
             filter: #Predicate<Event> { event in
-                event.relatedEntityId == petKey &&
-                    event.trashedAt == nil
+                event.relatedEntityId == petKey
             },
             sort: \.startDate
         )
@@ -49,9 +48,7 @@ struct QuickPlayDetailRouteContainer: View {
         _legacyPlayDeleteLogs = Query(
             filter: #Predicate<PetCareLog> { log in
                 log.pet?.id == id &&
-                    log.type == playType &&
-                    log.trashedAt == nil &&
-                    log.pet?.trashedAt == nil
+                    log.type == playType
             },
             sort: \.date,
             order: .reverse
@@ -115,26 +112,15 @@ struct QuickFeedDetailRouteContainer: View {
         ) ?? Date().addingTimeInterval(-6 * 86400)
 
         _pets = Query(filter: #Predicate<Pet> { pet in
-            pet.id == id && pet.trashedAt == nil
+            pet.id == id
         })
-        _allHumans = Query(
-            filter: #Predicate<Human> { human in
-                human.trashedAt == nil
-            },
-            sort: \.createdAt
-        )
-        _allPets = Query(
-            filter: #Predicate<Pet> { pet in
-                pet.trashedAt == nil
-            },
-            sort: \.createdAt
-        )
+        _allHumans = Query(sort: \.createdAt)
+        _allPets = Query(sort: \.createdAt)
         _allEvents = Query(
             filter: #Predicate<Event> { event in
-                (event.relatedEntityId == petKey ||
+                event.relatedEntityId == petKey ||
                     event.relatedEntityId == dryStockKey ||
-                    event.relatedEntityId == wetStockKey) &&
-                    event.trashedAt == nil
+                    event.relatedEntityId == wetStockKey
             },
             sort: \.startDate
         )
@@ -153,18 +139,14 @@ struct QuickFeedDetailRouteContainer: View {
             filter: #Predicate<PetCareLog> { log in
                 log.type == feedingType &&
                     log.pet?.id == id &&
-                    log.date >= homeLogStartDate &&
-                    log.trashedAt == nil &&
-                    log.pet?.trashedAt == nil
+                    log.date >= homeLogStartDate
             },
             sort: \.date,
             order: .reverse
         )
         _allFoodRecords = Query(
             filter: #Predicate<PetFoodRecord> { record in
-                record.pet?.id == id &&
-                    record.trashedAt == nil &&
-                    record.pet?.trashedAt == nil
+                record.pet?.id == id
             },
             sort: \.startDate,
             order: .reverse
@@ -231,18 +213,12 @@ struct QuickWaterDetailRouteContainer: View {
         let filterCleanType = CareType.filterClean.rawValue
 
         _pets = Query(filter: #Predicate<Pet> { pet in
-            pet.id == id && pet.trashedAt == nil
+            pet.id == id
         })
-        _allPets = Query(
-            filter: #Predicate<Pet> { pet in
-                pet.trashedAt == nil
-            },
-            sort: \.createdAt
-        )
+        _allPets = Query(sort: \.createdAt)
         _allEvents = Query(
             filter: #Predicate<Event> { event in
-                event.relatedEntityId == petKey &&
-                    event.trashedAt == nil
+                event.relatedEntityId == petKey
             },
             sort: \.startDate
         )
@@ -260,9 +236,7 @@ struct QuickWaterDetailRouteContainer: View {
                 (log.type == wateringType ||
                     log.type == waterChangeType ||
                     log.type == filterCleanType) &&
-                    log.pet?.id == id &&
-                    log.trashedAt == nil &&
-                    log.pet?.trashedAt == nil
+                    log.pet?.id == id
             },
             sort: \.date,
             order: .reverse
@@ -311,18 +285,12 @@ struct QuickPottyDetailRouteContainer: View {
         let careKind = CareLedgerEventKind.care.rawValue
         let litterType = CareType.litter.rawValue
         _pets = Query(filter: #Predicate<Pet> { pet in
-            pet.id == id && pet.trashedAt == nil
+            pet.id == id
         })
-        _allPets = Query(
-            filter: #Predicate<Pet> { pet in
-                pet.trashedAt == nil
-            },
-            sort: \.createdAt
-        )
+        _allPets = Query(sort: \.createdAt)
         _allEvents = Query(
             filter: #Predicate<Event> { event in
-                event.relatedEntityId == petKey &&
-                    event.trashedAt == nil
+                event.relatedEntityId == petKey
             },
             sort: \.startDate
         )
@@ -338,9 +306,7 @@ struct QuickPottyDetailRouteContainer: View {
         )
         _legacyPottyDeleteLogs = Query(
             filter: #Predicate<PetPottyLog> { log in
-                log.pet?.id == id &&
-                    log.trashedAt == nil &&
-                    log.pet?.trashedAt == nil
+                log.pet?.id == id
             },
             sort: \.date,
             order: .reverse
@@ -348,9 +314,7 @@ struct QuickPottyDetailRouteContainer: View {
         _legacyLitterDeleteLogs = Query(
             filter: #Predicate<PetCareLog> { log in
                 log.pet?.id == id &&
-                    log.type == litterType &&
-                    log.trashedAt == nil &&
-                    log.pet?.trashedAt == nil
+                    log.type == litterType
             },
             sort: \.date,
             order: .reverse

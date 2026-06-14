@@ -29,15 +29,15 @@ struct WeeklyReportCard: View {
     }
 
     private var weekWalks: [PetWalkLog] {
-        pet.walkLogs.activeRecycleBinItems.filter { $0.startDate >= weekStart && $0.startDate < weekEnd }
+        pet.walkLogs.filter { $0.startDate >= weekStart && $0.startDate < weekEnd }
     }
 
     private var weekPotties: [PetPottyLog] {
-        pet.pottyLogs.activeRecycleBinItems.filter { $0.date >= weekStart && $0.date < weekEnd }
+        pet.pottyLogs.filter { $0.date >= weekStart && $0.date < weekEnd }
     }
 
     private var weekExpenses: Double {
-        pet.expenseLogs.activeRecycleBinItems
+        pet.expenseLogs
             .filter { $0.date >= weekStart && $0.date < weekEnd }
             .reduce(0) { $0 + $1.amount }
     }
@@ -177,7 +177,7 @@ struct WeeklyReportCard: View {
     }
 
     private var latestWeight: String {
-        if let w = pet.weightLogs.activeRecycleBinItems.sorted(by: { $0.date > $1.date }).first {
+        if let w = pet.weightLogs.sorted(by: { $0.date > $1.date }).first {
             return String(format: "%.1fkg", w.weight)
         }
         return "--"
@@ -187,7 +187,7 @@ struct WeeklyReportCard: View {
         let cal = Calendar.current
         let hasWalk = weekWalks.contains { cal.isDate($0.startDate, inSameDayAs: date) }
         let hasPotty = weekPotties.contains { cal.isDate($0.date, inSameDayAs: date) }
-        let hasHygiene = pet.hygieneLogs.activeRecycleBinItems.contains { cal.isDate($0.date, inSameDayAs: date) }
+        let hasHygiene = pet.hygieneLogs.contains { cal.isDate($0.date, inSameDayAs: date) }
         return hasWalk || hasPotty || hasHygiene
     }
 

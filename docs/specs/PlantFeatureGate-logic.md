@@ -10,7 +10,7 @@
 
 - 首发 gate 恒为关闭。
 - gate 关闭时，用户不能添加植物、看到植物 tab、打开植物卡片、进入植物详情、从 FunctionMenu 进入植物面、收到植物 quest、看到植物心情/负反馈信号。
-- `Plant`、`PlantCareLog`、Plants 模块源码、备份/恢复、回收站底层、CloudSync registry 保留，用于数据安全、未来迁移和解锁时复用。
+- `Plant`、`PlantCareLog`、Plants 模块源码、备份/恢复、物理删除边界、CloudSync registry 保留，用于数据安全、未来迁移和解锁时复用。
 - gate 不依赖 `OnlineFeatureGate`、CloudKit、iCloud、家庭人数、build configuration、UserDefaults 字符串或订阅 product id。
 - gate 关闭时，植物历史事实不应影响首发用户可见体验；数据可以留存，但 Today Focus、Oasis 可见状态、心情信号不得因为植物数据改变。
 
@@ -74,7 +74,7 @@
 
 ### Data Safety And Future Sync Surfaces
 
-- `Ohana/Domain/Services/RecycleBinService.swift` 与 `Ohana/Features/Settings/Views/RecycleBinView.swift`：保留已有植物数据的恢复/清理能力，属于 D16 数据安全面，不作为植物功能入口。
+- `Ohana/Domain/Services/PhysicalDeletionService.swift`：植物删除必须写不可见 sync tombstone 后物理删除；没有用户可见恢复/清理入口。
 - `Ohana/Domain/Services/DataBackupManager*.swift` 与 `DataBackupDTOs.swift`：备份/恢复继续包含植物数据，避免未来解锁或用户旧数据丢失。
 - `Ohana/Domain/Services/CloudSyncEntityRegistry.swift` 与 serializer：Plant/PlantCareLog registry 保留；首发不启用 CloudKit。
 - `Ohana/Domain/Services/CareLedger*.swift` 与 `Ohana/Features/CareLedger/*.swift`：历史 plantCare 数据可保留，但 gate closed 时不应作为首发可见植物体验的来源。
@@ -87,6 +87,6 @@
 1. 修改 `PlantFeatureGate` 内部判定，不改各入口散落条件。
 2. 确认 O8 的产品形态：免费更新、付费解锁、或与联机/家庭套餐组合。
 3. 若需要等级节奏，继续让 `GrowthUnlockPolicy` 决定可见等级；若不需要等级节奏，gate 打开后直接显示植物入口。
-4. 解锁前重跑入口、quest、mood、备份恢复、回收站和通知回归，确认历史植物数据不会造成重复任务或重复派生。
+4. 解锁前重跑入口、quest、mood、备份恢复、物理删除和通知回归，确认历史植物数据不会造成重复任务或重复派生。
 
 No call site may decide plant availability from `GrowthUnlockPolicy.isOutOfScope`, `EntityType.isAvailable` hard-coded booleans, build flags, demo mode, existing plant count, backup contents, CloudKit state, or entitlement strings directly.

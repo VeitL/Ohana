@@ -48,23 +48,20 @@ enum MemberDeletionCommandService {
         let now = Date()
         let petID = pet.id
         let petIDString = petID.uuidString
-        let relatedEvents = fetchEvents(relatedEntityID: petIDString, context: context).activeRecycleBinItems
-        let batchId = RecycleBinService.aggregateTrashBatchId(kind: EntityKind.pet.rawValue, id: petID)
+        let relatedEvents = fetchEvents(relatedEntityID: petIDString, context: context)
         for event in relatedEvents {
-            RecycleBinService.moveToRecycleBin(
+            PhysicalDeletionService.deleteEvent(
                 event,
-                now: now,
-                batchId: batchId,
-                context: context
+                context: context,
+                deletedAt: now
             )
         }
 
         let removedQuickActionCount = removeQuickAccessItems(forPetID: petID, userDefaults: userDefaults)
-        RecycleBinService.moveToRecycleBin(
+        PhysicalDeletionService.deletePet(
             pet,
-            now: now,
-            batchId: batchId,
-            context: context
+            context: context,
+            deletedAt: now
         )
         context.safeSave()
 
@@ -90,7 +87,7 @@ enum MemberDeletionCommandService {
         let humanIDString = humanID.uuidString
         let remainingHumanDescriptor = FetchDescriptor<Human>(
             predicate: #Predicate<Human> { candidate in
-                candidate.id != humanID && candidate.trashedAt == nil
+                candidate.id != humanID && candidate.passedAwayDate == nil
             }
         )
         let remainingHumans = fetchMemberDeletionModelsOrLog(
@@ -104,23 +101,20 @@ enum MemberDeletionCommandService {
         let requiresAccountSwitch = deletedCurrentHuman && hasRemainingHuman
 
         let now = Date()
-        let relatedEvents = fetchEvents(relatedEntityID: humanIDString, context: context).activeRecycleBinItems
-        let batchId = RecycleBinService.aggregateTrashBatchId(kind: EntityKind.human.rawValue, id: humanID)
+        let relatedEvents = fetchEvents(relatedEntityID: humanIDString, context: context)
         for event in relatedEvents {
-            RecycleBinService.moveToRecycleBin(
+            PhysicalDeletionService.deleteEvent(
                 event,
-                now: now,
-                trashedByHumanId: activeHumanID,
-                batchId: batchId,
-                context: context
+                context: context,
+                deletedAt: now,
+                deletedByHumanId: activeHumanID
             )
         }
-        RecycleBinService.moveToRecycleBin(
+        PhysicalDeletionService.deleteHuman(
             human,
-            now: now,
-            trashedByHumanId: activeHumanID,
-            batchId: batchId,
-            context: context
+            context: context,
+            deletedAt: now,
+            deletedByHumanId: activeHumanID
         )
         context.safeSave()
 
@@ -140,21 +134,18 @@ enum MemberDeletionCommandService {
     static func deletePlant(_ plant: Plant, context: ModelContext) -> MemberDeletionCommandResult {
         let now = Date()
         let plantID = plant.id
-        let relatedEvents = fetchEvents(relatedEntityID: plantID.uuidString, context: context).activeRecycleBinItems
-        let batchId = RecycleBinService.aggregateTrashBatchId(kind: EntityKind.plant.rawValue, id: plantID)
+        let relatedEvents = fetchEvents(relatedEntityID: plantID.uuidString, context: context)
         for event in relatedEvents {
-            RecycleBinService.moveToRecycleBin(
+            PhysicalDeletionService.deleteEvent(
                 event,
-                now: now,
-                batchId: batchId,
-                context: context
+                context: context,
+                deletedAt: now
             )
         }
-        RecycleBinService.moveToRecycleBin(
+        PhysicalDeletionService.deletePlant(
             plant,
-            now: now,
-            batchId: batchId,
-            context: context
+            context: context,
+            deletedAt: now
         )
         context.safeSave()
 

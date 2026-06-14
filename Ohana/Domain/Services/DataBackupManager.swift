@@ -189,7 +189,6 @@ final nonisolated class DataBackupManager: @unchecked Sendable {
         let gachaOwnedItems = try context.fetch(FetchDescriptor<GachaOwnedItem>()) // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
         let gachaDrawLogs = try context.fetch(FetchDescriptor<GachaDrawLog>()) // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
         let shopPurchaseRecords = try context.fetch(FetchDescriptor<ShopPurchaseRecord>()) // smoothness: explicit backup/export scan only
-        let recycleBinBatches = try context.fetch(FetchDescriptor<RecycleBinBatch>()) // smoothness: allow legacy full backup scan; scoped to explicit backup/export
 
         let ud = defaults
         let purchasedShopItems = ShopPurchaseRecordStore
@@ -224,7 +223,7 @@ final nonisolated class DataBackupManager: @unchecked Sendable {
             )
         )
 
-        var backup = OhanaBackup(
+        return OhanaBackup(
             exportedAt: iso.string(from: Date()),
             pets: pets.map(encodePet),
             humans: humans.map(encodeHuman),
@@ -272,30 +271,6 @@ final nonisolated class DataBackupManager: @unchecked Sendable {
             shopPurchaseRecords: shopPurchaseRecords.map(encodeShopPurchaseRecord),
             appState: appState
         )
-        let trashStates = encodeTrashStates(
-            pets: pets,
-            humans: humans,
-            events: events,
-            plants: plants,
-            careLogs: careLogs,
-            pottyLogs: pottyLogs,
-            walkLogs: walkLogs,
-            weightLogs: weightLogs,
-            expenseLogs: expLogs,
-            healthLogs: healthLogs,
-            symptomLogs: symptoms,
-            heatCycleLogs: heatCycles,
-            hygieneLogs: hygLogs,
-            foodRecords: foodRecs,
-            documents: docs,
-            milestones: milestones,
-            photoLogs: photos,
-            insurances: insurances,
-            petMedications: petMeds
-        )
-        backup.trashStates = trashStates.isEmpty ? nil : trashStates
-        backup.recycleBinBatches = recycleBinBatches.isEmpty ? nil : recycleBinBatches.map(encodeRecycleBinBatch)
-        return backup
     }
 
     // MARK: - Apply Backup
@@ -344,7 +319,6 @@ final nonisolated class DataBackupManager: @unchecked Sendable {
         let existingDocumentAttachmentIds = try existingIds(FetchDescriptor<PetDocumentAttachment>(), context: context, id: \.id, operation: "fetch existing document attachments before restore")
         let existingPhotoIds = try existingIds(FetchDescriptor<PetPhotoLog>(), context: context, id: \.id, operation: "fetch existing photo logs before restore")
         let existingInsuranceIds = try existingIds(FetchDescriptor<PetInsurance>(), context: context, id: \.id, operation: "fetch existing pet insurances before restore")
-        let existingRecycleBinBatchIds = try existingIds(FetchDescriptor<RecycleBinBatch>(), context: context, id: \.id, operation: "fetch existing recycle bin batches before restore")
         let existingClaimIds = try existingIds(FetchDescriptor<InsuranceClaim>(), context: context, id: \.id, operation: "fetch existing insurance claims before restore")
         let existingPetMedicationIds = try existingIds(FetchDescriptor<PetMedication>(), context: context, id: \.id, operation: "fetch existing pet medications before restore")
         let existingHumanMedicationIds = try existingIds(FetchDescriptor<HumanMedication>(), context: context, id: \.id, operation: "fetch existing human medications before restore")
@@ -519,12 +493,6 @@ final nonisolated class DataBackupManager: @unchecked Sendable {
                 context: context
             )
         }
-        for dto in backup.recycleBinBatches ?? [] where !existingRecycleBinBatchIds.contains(dto.id) {
-            context.insert(decodeRecycleBinBatch(dto))
-        }
-
-        try context.save()
-        try applyTrashStates(backup.trashStates ?? [], context: context)
         try context.save()
         SharedCareSessionMaintenance.cleanLegacyNoteMetadata(context: context)
 

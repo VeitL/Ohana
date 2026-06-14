@@ -51,9 +51,9 @@ struct SettingsPetManagementSheet: View {
         } message: {
             let name = petToDelete?.name ?? ""
             Text(l.tr(
-                zh: "请输入「\(name)」确认删除。删除后可在回收站中保留 30 天。",
-                en: "Enter \"\(name)\" to confirm. Deleted pets stay recoverable for 30 days.",
-                de: "Gib „\(name)“ zur Bestätigung ein. Gelöschte Tiere bleiben 30 Tage wiederherstellbar."
+                zh: "请输入「\(name)」确认删除。确认后将永久删除，无法恢复。",
+                en: "Enter \"\(name)\" to confirm. This permanently deletes the pet and cannot be undone.",
+                de: "Gib „\(name)“ zur Bestätigung ein. Das Tier wird dauerhaft gelöscht und kann nicht wiederhergestellt werden."
             ))
         }
         .alert(l.tr(zh: "重置 \(petToReset?.name ?? "") 的数据", en: "Reset \(petToReset?.name ?? "")'s data", de: "Daten von \(petToReset?.name ?? "") zurücksetzen"), isPresented: $showingResetPetData) {
@@ -66,9 +66,9 @@ struct SettingsPetManagementSheet: View {
             }
         } message: {
             Text(l.tr(
-                zh: "将清除该宠物所有日志记录（体重、花费、健康、护理、遛狗、噗噗等），基础信息保留。清除记录会在回收站中保留 30 天。",
-                en: "All logs for this pet will be cleared, including weight, expenses, health, care, walks, and potty logs. Basic profile details stay. Cleared records remain recoverable for 30 days.",
-                de: "Alle Protokolle dieses Tiers werden geleert, darunter Gewicht, Ausgaben, Gesundheit, Pflege, Spaziergänge und Toiletteneinträge. Basisdaten bleiben erhalten. Geleerte Einträge bleiben 30 Tage wiederherstellbar."
+                zh: "将永久清除该宠物所有日志记录（体重、花费、健康、护理、遛狗、噗噗等），基础信息保留。此操作无法恢复。",
+                en: "All logs for this pet will be permanently cleared, including weight, expenses, health, care, walks, and potty logs. Basic profile details stay. This cannot be undone.",
+                de: "Alle Protokolle dieses Tiers werden dauerhaft gelöscht, darunter Gewicht, Ausgaben, Gesundheit, Pflege, Spaziergänge und Toiletteneinträge. Basisdaten bleiben erhalten. Dies kann nicht rückgängig gemacht werden."
             ))
         }
     }

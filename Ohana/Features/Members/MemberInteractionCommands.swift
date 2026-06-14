@@ -50,6 +50,9 @@ enum MemberLifecycleCommandService {
         questManager: QuestManager? = nil,
         cleanupService: PetActivityRecordCleanupService? = nil
     ) -> MemberLifecycleCommandResult {
+        guard !pet.hasPassedAway else {
+            return MemberLifecycleCommandResult(entityID: pet.id, kind: EntityKind.pet.rawValue, action: "no-op")
+        }
         let cleanupService = cleanupService ?? PetActivityRecordCleanupService()
         cleanupService.clearActivityRecords(for: pet, context: context)
         let manager = questManager ?? QuestManager()
@@ -105,13 +108,22 @@ enum MemberHomeVisibilityCommandService {
         visible: Bool,
         context: ModelContext
     ) -> MemberHomeVisibilityCommandResult {
+        guard !human.hasPassedAway else {
+            return MemberHomeVisibilityCommandResult(
+                entityID: human.id,
+                kind: EntityKind.human.rawValue,
+                visible: human.shouldShowOnHome,
+                didWrite: false
+            )
+        }
         human.shouldShowOnHome = visible
         CloudSyncMutationRecorder.markModified(human, context: context)
         context.safeSave()
         return MemberHomeVisibilityCommandResult(
             entityID: human.id,
             kind: EntityKind.human.rawValue,
-            visible: visible
+            visible: visible,
+            didWrite: true
         )
     }
 }
@@ -316,7 +328,8 @@ struct MemberCommandExecutor {
         let result = MemberHomeVisibilityCommandResult(
             entityID: petID,
             kind: EntityKind.pet.rawValue,
-            visible: visible
+            visible: visible,
+            didWrite: true
         )
         revisions.publishMemberHomeVisibility(result, note: note)
         return result

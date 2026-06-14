@@ -7,8 +7,8 @@ struct BountyBoardView: View {
 
     var body: some View {
         BountyBoardContentView(
-            humans: humans.activeRecycleBinItems,
-            pets: pets.activeRecycleBinItems
+            humans: humans,
+            pets: pets
         )
     }
 }

@@ -178,7 +178,7 @@ enum PetMilestoneCommandService {
         context: ModelContext
     ) -> PetMilestoneDeleteCommandResult {
         let milestoneID = milestone.id
-        RecycleBinService.moveToRecycleBin(milestone, context: context)
+        PhysicalDeletionService.deletePetScopedRecord(milestone, pet: pet, context: context)
         context.safeSave()
         return PetMilestoneDeleteCommandResult(
             petID: pet.id,

@@ -196,7 +196,7 @@ final class MemberCreationService: MemberCreating {
             if !shouldShowOnHome {
                 HomeCardVisibility.restoreHiddenPetIDsRaw(previousHiddenHomePetIDsRaw)
             }
-            context.delete(pet)
+            context.delete(pet) // derived-state: allow local rollback after failed first save; no persisted record or sync deletion exists yet
             throw ServiceError.saveFailed(error.localizedDescription)
         }
 
@@ -329,7 +329,7 @@ final class MemberCreationService: MemberCreating {
         do {
             try context.save()
         } catch {
-            context.delete(human)
+            context.delete(human) // derived-state: allow local rollback after failed first save; no persisted record or sync deletion exists yet
             throw ServiceError.saveFailed(error.localizedDescription)
         }
 

@@ -501,9 +501,6 @@ private nonisolated struct HomeReadModelFetches {
 
     func pets() -> [Pet] {
         var descriptor = FetchDescriptor<Pet>(
-            predicate: #Predicate<Pet> { pet in
-                pet.trashedAt == nil
-            },
             sortBy: [SortDescriptor(\Pet.createdAt, order: .reverse)]
         )
         descriptor.fetchLimit = 80
@@ -512,9 +509,6 @@ private nonisolated struct HomeReadModelFetches {
 
     func humans() -> [Human] {
         var descriptor = FetchDescriptor<Human>(
-            predicate: #Predicate<Human> { human in
-                human.trashedAt == nil
-            },
             sortBy: [SortDescriptor(\Human.createdAt, order: .reverse)]
         )
         descriptor.fetchLimit = 40
@@ -523,9 +517,6 @@ private nonisolated struct HomeReadModelFetches {
 
     func plants() -> [Plant] {
         var descriptor = FetchDescriptor<Plant>(
-            predicate: #Predicate<Plant> { plant in
-                plant.trashedAt == nil
-            },
             sortBy: [SortDescriptor(\Plant.createdAt, order: .reverse)]
         )
         descriptor.fetchLimit = 60

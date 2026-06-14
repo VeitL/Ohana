@@ -32,7 +32,6 @@ final class AppServices {
     let backups: DataBackupManaging
     let automaticBackups: AutomaticBackupManaging
     let appReset: AppResetting
-    let recycleBin: RecycleBinManaging
     let medicationReminders: MedicationReminderManaging
     let userNotifications: UserNotificationManaging
     let notificationRoutes: NotificationRoutePublishing
@@ -123,7 +122,6 @@ final class AppServices {
             backups: SharedDataBackupManagerAdapter(questManager: questManager),
             automaticBackups: automaticBackups,
             appReset: StaticAppResetter(questManager: questManager),
-            recycleBin: StaticRecycleBinManager(),
             medicationReminders: SharedMedicationReminderManager(careLedger: careLedger),
             userNotifications: SharedUserNotificationManager(manager: notificationManager),
             notificationRoutes: SharedNotificationRoutePublisher(center: notificationRouteCenter),
@@ -188,7 +186,6 @@ final class AppServices {
         backups: DataBackupManaging,
         automaticBackups: AutomaticBackupManaging,
         appReset: AppResetting,
-        recycleBin: RecycleBinManaging,
         medicationReminders: MedicationReminderManaging,
         userNotifications: UserNotificationManaging,
         notificationRoutes: NotificationRoutePublishing,
@@ -227,7 +224,6 @@ final class AppServices {
         self.backups = backups
         self.automaticBackups = automaticBackups
         self.appReset = appReset
-        self.recycleBin = recycleBin
         self.medicationReminders = medicationReminders
         self.userNotifications = userNotifications
         self.notificationRoutes = notificationRoutes

@@ -16,6 +16,8 @@ final class PetMilestone {
     var emoji: String
     var notes: String
     var pet: Pet?
+    // Legacy recycle-bin columns kept only for stores that already migrated through the retired deletion model.
+    // Active product code must not read or write these fields.
     var trashedAt: Date?
     var trashExpiresAt: Date?
     var trashBatchId: String = ""

@@ -10,8 +10,8 @@ struct HumanBasicInfoDetailView: View {
     var body: some View {
         HumanBasicInfoDetailContentView(
             human: human,
-            allPets: allPets.activeRecycleBinItems,
-            allHumans: allHumans.activeRecycleBinItems
+            allPets: allPets,
+            allHumans: allHumans
         )
     }
 }

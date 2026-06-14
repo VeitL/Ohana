@@ -15,6 +15,8 @@ final class PetPhotoLog {
     var date: Date
     var note: String // 可选备注（最多 140 字）
     var createdAt: Date
+    // Legacy recycle-bin columns kept only for stores that already migrated through the retired deletion model.
+    // Active product code must not read or write these fields.
     var trashedAt: Date?
     var trashExpiresAt: Date?
     var trashBatchId: String = ""

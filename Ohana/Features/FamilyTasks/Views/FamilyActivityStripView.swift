@@ -52,7 +52,7 @@ struct FamilyActivityStripView: View {
         let today = Date()
         var entries: [ActivityEntry] = []
 
-        for log in pet.careLogs.activeRecycleBinItems where cal.isDate(log.date, inSameDayAs: today) {
+        for log in pet.careLogs where cal.isDate(log.date, inSameDayAs: today) {
             entries.append(ActivityEntry(
                 date: log.date,
                 executorId: log.executorId,
@@ -61,7 +61,7 @@ struct FamilyActivityStripView: View {
                 dedupKey: "\(log.executorId ?? "nil")_care_\(log.type)"
             ))
         }
-        for log in pet.pottyLogs.activeRecycleBinItems where cal.isDate(log.date, inSameDayAs: today) {
+        for log in pet.pottyLogs where cal.isDate(log.date, inSameDayAs: today) {
             entries.append(ActivityEntry(
                 date: log.date,
                 executorId: log.executorId,
@@ -70,7 +70,7 @@ struct FamilyActivityStripView: View {
                 dedupKey: "\(log.executorId ?? "nil")_potty"
             ))
         }
-        for log in pet.walkLogs.activeRecycleBinItems where cal.isDate(log.startDate, inSameDayAs: today) {
+        for log in pet.walkLogs where cal.isDate(log.startDate, inSameDayAs: today) {
             for executorId in log.executorIds {
                 entries.append(ActivityEntry(
                     date: log.startDate,
@@ -81,7 +81,7 @@ struct FamilyActivityStripView: View {
                 ))
             }
         }
-        for log in pet.expenseLogs.activeRecycleBinItems where cal.isDate(log.date, inSameDayAs: today) {
+        for log in pet.expenseLogs where cal.isDate(log.date, inSameDayAs: today) {
             entries.append(ActivityEntry(
                 date: log.date,
                 executorId: log.executorId,

@@ -97,7 +97,7 @@ enum AppResetService {
         try delete(FamilyCollaborationTask.self, in: context)
         try delete(CoconutExchangeRequest.self, in: context)
         try delete(SharedCareSession.self, in: context)
-        try delete(RecycleBinBatch.self, in: context)
+        try delete(RecycleBinBatch.self, in: context) // legacy V69 compatibility row
         try delete(ShopPurchaseRecord.self, in: context)
         try delete(GachaDrawLog.self, in: context)
         try delete(GachaOwnedItem.self, in: context)
@@ -140,7 +140,7 @@ enum AppResetService {
     private static func delete<T: PersistentModel>(_: T.Type, in context: ModelContext) throws {
         let values = try context.fetch(FetchDescriptor<T>()) // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
         for value in values {
-            context.delete(value)
+            context.delete(value) // derived-state: allow privacy reset local wipe intentionally bypasses sync tombstones
         }
     }
 

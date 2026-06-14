@@ -47,7 +47,7 @@ struct AppPetDetailSheetRouteContainer: View {
         onPresentCoconutLog: ((CoconutLogSubject?) -> Void)? = nil
     ) {
         _pets = Query(filter: #Predicate<Pet> { pet in
-            pet.id == id && pet.trashedAt == nil
+            pet.id == id
         })
         self.destination = destination
         self.onMissing = onMissing

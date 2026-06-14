@@ -20,7 +20,7 @@ struct WalkTrackingSnapshot {
     static func make(pet: Pet, manager: PetWalkingManaging) -> WalkTrackingSnapshot {
         let activeWalks = WalkFeaturePolicy.activeWalkLogs(for: pet)
         let latestWalk: PetWalkLog? = if manager.lastCompletedPetId == pet.id, let completed = manager.lastCompletedWalk {
-            completed.trashedAt == nil ? completed : activeWalks.max { $0.startDate < $1.startDate }
+            completed
         } else {
             activeWalks.max { $0.startDate < $1.startDate }
         }

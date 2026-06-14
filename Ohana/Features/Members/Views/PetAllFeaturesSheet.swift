@@ -101,17 +101,17 @@ struct PetAllFeaturesSheet: View {
     }
 
     private var archiveSnapshot: ArchiveMemorySnapshot { ArchiveMemorySnapshot(pet: pet) }
-    private var activeCareLogs: [PetCareLog] { pet.careLogs.activeRecycleBinItems }
-    private var activePottyLogs: [PetPottyLog] { pet.pottyLogs.activeRecycleBinItems }
-    private var activeWalkLogs: [PetWalkLog] { pet.walkLogs.activeRecycleBinItems }
-    private var activeWeightLogs: [PetWeightLog] { pet.weightLogs.activeRecycleBinItems }
-    private var activeExpenseLogs: [PetExpenseLog] { pet.expenseLogs.activeRecycleBinItems }
-    private var activeHealthLogs: [PetHealthLog] { pet.healthLogs.activeRecycleBinItems }
-    private var activePhotoLogs: [PetPhotoLog] { pet.photoLogs.activeRecycleBinItems }
-    private var activeMilestones: [PetMilestone] { pet.milestones.activeRecycleBinItems }
-    private var activeMedications: [PetMedication] { pet.medications.activeRecycleBinItems }
-    private var activeInsurances: [PetInsurance] { pet.insurances.activeRecycleBinItems }
-    private var activeDocuments: [PetDocument] { pet.documents.activeRecycleBinItems }
+    private var activeCareLogs: [PetCareLog] { pet.careLogs }
+    private var activePottyLogs: [PetPottyLog] { pet.pottyLogs }
+    private var activeWalkLogs: [PetWalkLog] { pet.walkLogs }
+    private var activeWeightLogs: [PetWeightLog] { pet.weightLogs }
+    private var activeExpenseLogs: [PetExpenseLog] { pet.expenseLogs }
+    private var activeHealthLogs: [PetHealthLog] { pet.healthLogs }
+    private var activePhotoLogs: [PetPhotoLog] { pet.photoLogs }
+    private var activeMilestones: [PetMilestone] { pet.milestones }
+    private var activeMedications: [PetMedication] { pet.medications }
+    private var activeInsurances: [PetInsurance] { pet.insurances }
+    private var activeDocuments: [PetDocument] { pet.documents }
 
     private var protectionDocumentCount: Int {
         activeDocuments.count(where: { doc in
@@ -513,13 +513,13 @@ struct ArchiveMemorySnapshot {
     let nextStep: ArchiveMemoryNextStep
 
     init(pet: Pet) {
-        let healthLogs = pet.healthLogs.activeRecycleBinItems
-        let weightLogs = pet.weightLogs.activeRecycleBinItems
-        let photoLogs = pet.photoLogs.activeRecycleBinItems
-        let milestones = pet.milestones.activeRecycleBinItems
-        let documents = pet.documents.activeRecycleBinItems
-        let insurances = pet.insurances.activeRecycleBinItems
-        let medications = pet.medications.activeRecycleBinItems
+        let healthLogs = pet.healthLogs
+        let weightLogs = pet.weightLogs
+        let photoLogs = pet.photoLogs
+        let milestones = pet.milestones
+        let documents = pet.documents
+        let insurances = pet.insurances
+        let medications = pet.medications
         let hasBasicProfile = Self.hasBasicProfile(pet)
         let hasHealthOrWeight = !healthLogs.isEmpty || !weightLogs.isEmpty
         let hasMemory = !photoLogs.isEmpty || !milestones.isEmpty

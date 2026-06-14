@@ -369,7 +369,7 @@ struct RecurringFindingsRepairTests {
         #expect(positiveEntries.contains { $0.ownerId == human.id.uuidString })
     }
 
-    @Test func symptomAndHeatDeletesBypassRecycleBinAndWriteTombstones() throws {
+    @Test func symptomAndHeatDeletesWriteTombstones() throws {
         let container = try makeContainer()
         let context = container.mainContext
         let pet = Pet(name: "Momo", species: "dog")

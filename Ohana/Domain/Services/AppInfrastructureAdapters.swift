@@ -92,28 +92,6 @@ final class StaticAppResetter: AppResetting {
 }
 
 @MainActor
-protocol RecycleBinManaging {
-    func listItems(context: ModelContext) -> [RecycleBinListItem]
-    func restoreItem(_ item: RecycleBinListItem, context: ModelContext) -> RecycleBinRestoreResult
-    func purgeExpired(context: ModelContext) -> RecycleBinPurgeResult
-}
-
-@MainActor
-struct StaticRecycleBinManager: RecycleBinManaging {
-    func listItems(context: ModelContext) -> [RecycleBinListItem] {
-        RecycleBinService.listItems(context: context)
-    }
-
-    func restoreItem(_ item: RecycleBinListItem, context: ModelContext) -> RecycleBinRestoreResult {
-        RecycleBinService.restoreItem(item, context: context)
-    }
-
-    func purgeExpired(context: ModelContext) -> RecycleBinPurgeResult {
-        RecycleBinService.purgeExpired(context: context)
-    }
-}
-
-@MainActor
 protocol WalkCareEventManaging {
     @discardableResult
     func recordSharedWalk(

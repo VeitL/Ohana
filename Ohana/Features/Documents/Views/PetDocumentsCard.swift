@@ -10,7 +10,7 @@ struct PetDocumentsCard: View {
     let pet: Pet
 
     private var documents: [PetDocument] {
-        pet.documents.activeRecycleBinItems
+        pet.documents
     }
 
     private var expiringSoon: [PetDocument] {

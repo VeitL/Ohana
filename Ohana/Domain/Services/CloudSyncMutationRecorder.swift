@@ -449,6 +449,24 @@ enum CloudSyncMutationRecorder {
 
     @discardableResult
     static func markDeleted(
+        _ plant: Plant,
+        context: ModelContext,
+        deletedAt: Date = Date(),
+        deletedByHumanId: String? = nil
+    ) -> CloudSyncRecordState? {
+        markDeleted(
+            entityName: String(describing: Plant.self),
+            localRecordId: plant.id,
+            householdId: sharedHouseholdId(context: context, now: deletedAt),
+            fallbackHouseholdId: plant.id,
+            deletedAt: deletedAt,
+            deletedByHumanId: uuid(from: deletedByHumanId),
+            context: context
+        )
+    }
+
+    @discardableResult
+    static func markDeleted(
         _ event: Event,
         context: ModelContext,
         deletedAt: Date = Date(),
@@ -797,6 +815,24 @@ enum CloudSyncMutationRecorder {
             context: context,
             deletedAt: deletedAt,
             deletedByHumanId: deletedByHumanId
+        )
+    }
+
+    @discardableResult
+    static func markDeleted(
+        _ attachment: PetDocumentAttachment,
+        context: ModelContext,
+        deletedAt: Date = Date(),
+        deletedByHumanId: String? = nil
+    ) -> CloudSyncRecordState? {
+        markDeleted(
+            entityName: String(describing: PetDocumentAttachment.self),
+            localRecordId: attachment.id,
+            householdId: sharedHouseholdId(context: context, now: deletedAt),
+            fallbackHouseholdId: attachment.id,
+            deletedAt: deletedAt,
+            deletedByHumanId: uuid(from: deletedByHumanId),
+            context: context
         )
     }
 

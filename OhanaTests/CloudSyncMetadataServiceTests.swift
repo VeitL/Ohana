@@ -335,11 +335,13 @@ struct CloudSyncMetadataServiceTests {
 
     @MainActor
     @Test func entityRegistryCoversCurrentSwiftDataSchema() {
-        let schemaNames = Set(ArkSchemaV71.models.map { String(describing: $0) })
+        let schemaNames = Set(ArkSchemaV72.models.map { String(describing: $0) })
+            .subtracting(CloudSyncEntityRegistry.localOnlySchemaEntityNames)
         let descriptorNames = Set(CloudSyncEntityRegistry.descriptors.map(\.entityName))
 
         #expect(descriptorNames == schemaNames)
         #expect(CloudSyncEntityRegistry.descriptors.count == descriptorNames.count)
+        #expect(CloudSyncEntityRegistry.localOnlySchemaEntityNames.isDisjoint(with: descriptorNames))
     }
 
     @MainActor

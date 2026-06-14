@@ -17,6 +17,9 @@ Purpose:
   - R5: feature/domain code must not call QuestManager.awardAction directly; use shared reward discipline primitives.
   - R5b: care rewards must enter audited care-fact chokepoints, not bare EconomyRewardDiscipline calls.
   - R5c: care-fact chokepoint results must consume disposition before publishing or applying derived effects.
+  - R5d: explicit care executors that cannot resolve to a writable Human must be command no-op.
+  - R5e: care command no-op results must be consumed before UI feedback/revision/secondary actor writes.
+  - R6: care command/view code must not publish derived revision/no-op side effects outside CareDerivationExecutor.
 
 Baseline:
   Full-scope debt is ratcheted in
@@ -303,11 +306,58 @@ DIRECT_CARE_DISCIPLINE_CALL_RE = re.compile(
     r"\bEconomyRewardDiscipline\.[ \t]*(?:awardCareAction|awardSharedCareAction)\s*\("
 )
 CARE_FACT_CALL_RE = re.compile(
-    r"\b(?:recordManualFeedFact|recordSharedManualFeedFact|recordCareFact|recordSharedWateringFact|"
-    r"recordSharedCareFact|recordSharedLitterCareFact|recordPottyFact|recordHygieneFact|recordHealthFact)\s*\("
+    r"\.\s*(?:recordSharedManualFeedFact|recordManualFeedFact|recordSharedWateringFact|"
+    r"recordSharedCareFact|recordSharedLitterCareFact|recordTreatFeedFact|recordTreatFeed|"
+    r"recordCareFact|recordPottyFact|recordHygieneFact|recordHealthFact|completePlannedFeed)\s*\("
 )
 CARE_FACT_DISPOSITION_CONSUME_RE = re.compile(
-    r"\b(?:didWriteFact|allowsDerivedEffects|disposition|writesFact)\b"
+    r"\b(?:didWriteFact|didRecord|allowsDerivedEffects|disposition|writesFact)\b"
+)
+CARE_FACT_WRITE_POLICY_CONSUME_RE = re.compile(
+    r"\b(?:CareFactWritePolicy\.(?:disposition|executorCannotWrite)|didWriteFact|allowsDerivedEffects|disposition)\b"
+)
+PET_MEDICATION_DOSE_RESULT_CONSUME_RE = re.compile(r"\bdidRecord\b")
+CARE_COMMAND_RESULT_CALL_RE = re.compile(
+    r"\b(?:commandExecutor\.)?(?:recordManual|recordTreat|recordWater|completePlannedWater|"
+    r"recordWaterChange|recordFilterClean|recordSharedPetExpense|recordLitterCare|"
+    r"recordUnknownSharedPotty)\s*\("
+)
+CARE_COMMAND_SUCCESS_EFFECT_RE = re.compile(
+    r"\b(?:afterFoodLogSaved|showSaveConfirmation|showTreatSavedCelebration|"
+    r"trigger[A-Za-z0-9_]*Feedback|scheduleCarePlanReminders|"
+    r"UINotificationFeedbackGenerator|SharedPetSelectionMemory\.saveSelection|"
+    r"LitterCareSettingsStore|syncScoopPlan|syncLitterChangePlan|"
+    r"wroteBusinessFact\s*:\s*true)\b"
+)
+CARE_COMMAND_PRE_RESULT_DERIVED_EFFECT_RE = re.compile(
+    r"\b(?:afterFoodLogSaved|showTreatSavedCelebration|"
+    r"trigger[A-Za-z0-9_]*Feedback|scheduleCarePlanReminders|"
+    r"SharedPetSelectionMemory\.saveSelection|LitterCareSettingsStore|"
+    r"syncScoopPlan|syncLitterChangePlan|"
+    r"UINotificationFeedbackGenerator\(\)\.notificationOccurred\(\.success\)|"
+    r"wroteBusinessFact\s*:\s*true)\b"
+)
+CARE_COMMAND_RESULT_CONSUME_RE = re.compile(
+    r"\b(?:didRecord|didWriteFact|allowsDerivedEffects)\b|"
+    r"\bguard\s+(?:let\s+)?[A-Za-z0-9_]*\s*=|!=\s*nil"
+)
+CARE_DERIVATION_DIRECT_PUBLISH_RE = re.compile(
+    r"\b(?:revisions\.publish(?:DomainMutation|[A-Za-z0-9_]*)\s*\(|"
+    r"publishDomainMutation\s*\(|"
+    r"AppPerformanceMonitor\.shared\.record\(\s*\"domain_command_noop\")"
+)
+CARE_DERIVATION_GATE_RE = re.compile(
+    r"\b(?:CareDerivationExecutor|derivations\.derive|derive[A-Za-z0-9_]*\s*\()"
+)
+CARE_DERIVATION_CONTEXT_RE = re.compile(
+    r"\b(?:recordCareFact|recordManualFeedFact|recordPottyFact|recordHygieneFact|"
+    r"recordHealthFact|completePlannedFeedResult|completePlannedWaterResult|"
+    r"recordDoseResult|recordManual|recordTreat|recordWater|recordWaterChange|"
+    r"recordFilterClean|recordLitterCare|recordUnknownSharedPotty|"
+    r"PetCareTrackingCommandResult|PetHygieneCheckInCommandResult|"
+    r"PetMedicationDoseCommandResult|PetHealthCommandResult|"
+    r"CalendarEventCompletionResult|TodayFocusEventCompletionCommandResult|"
+    r"CareWriteOutcome|CareDerivationResult)\b"
 )
 
 
@@ -345,7 +395,7 @@ ALLOWED_CARE_DISCIPLINE_CONTEXTS: dict[str, set[str]] = {
         "awardGeneratedCare",
     },
     "Ohana/Domain/Services/PetMedicationDoseLogging.swift": {
-        "recordDose",
+        "recordDoseResult",
     },
     "Ohana/Features/DashboardRecords/DashboardRecordCommands.swift": {
         "recordPetWeight",
@@ -355,6 +405,32 @@ ALLOWED_CARE_DISCIPLINE_CONTEXTS: dict[str, set[str]] = {
     },
     "Ohana/Features/Walks/PetWalkingManager.swift": {
         "stop",
+    },
+    "scripts/tests/fixtures/Views/RecurringEconomyBoundariesBad.swift": {
+        "awardGeneratedCare",
+        "recordDoseResult",
+    },
+}
+
+CARE_DISCIPLINE_CONTEXTS_REQUIRING_WRITE_POLICY: dict[str, set[str]] = {
+    "Ohana/Domain/Services/CalendarTaskCompletionSyncService.swift": {
+        "awardGeneratedCare",
+    },
+    "Ohana/Domain/Services/PetMedicationDoseLogging.swift": {
+        "recordDoseResult",
+    },
+    "Ohana/Features/DashboardRecords/DashboardRecordCommands.swift": {
+        "recordPetWeight",
+    },
+    "Ohana/Features/Health/PetHealthCommands.swift": {
+        "recordHealth",
+    },
+    "Ohana/Features/Walks/PetWalkingManager.swift": {
+        "stop",
+    },
+    "scripts/tests/fixtures/Views/RecurringEconomyBoundariesBad.swift": {
+        "awardGeneratedCare",
+        "recordDoseResult",
     },
 }
 
@@ -372,6 +448,31 @@ def enclosing_function_name(lines: list[str], index: int) -> str | None:
     return None
 
 
+def enclosing_function_start(lines: list[str], index: int) -> int | None:
+    for cursor in range(index, -1, -1):
+        if FUNC_SIGNATURE_RE.search(lines[cursor]):
+            return cursor
+    return None
+
+
+def enclosing_function_bounds(lines: list[str], index: int) -> tuple[int, int] | None:
+    start = enclosing_function_start(lines, index)
+    if start is None:
+        return None
+    depth = 0
+    opened = False
+    for cursor in range(start, len(lines)):
+        for char in lines[cursor]:
+            if char == "{":
+                depth += 1
+                opened = True
+            elif char == "}":
+                depth -= 1
+        if opened and depth <= 0:
+            return (start, cursor)
+    return (start, len(lines) - 1)
+
+
 def direct_care_discipline_allowed(path: str, lines: list[str], index: int) -> bool:
     allowed_functions = ALLOWED_CARE_DISCIPLINE_CONTEXTS.get(path)
     if not allowed_functions:
@@ -380,13 +481,37 @@ def direct_care_discipline_allowed(path: str, lines: list[str], index: int) -> b
     return function_name in allowed_functions
 
 
+def direct_care_discipline_requires_write_policy(path: str, function_name: str | None) -> bool:
+    required_functions = CARE_DISCIPLINE_CONTEXTS_REQUIRING_WRITE_POLICY.get(path)
+    return bool(required_functions and function_name in required_functions)
+
+
+def direct_care_discipline_consumes_write_policy(lines: list[str], index: int) -> bool:
+    start = enclosing_function_start(lines, index)
+    if start is None:
+        return False
+    function_prefix = "\n".join(lines[start:index + 1])
+    return bool(CARE_FACT_WRITE_POLICY_CONSUME_RE.search(function_prefix))
+
+
 def scan_direct_care_discipline_chokepoint(path: pathlib.Path, lines: list[str], warnings: list[WarningItem]) -> None:
     path_str = rel(path)
     for idx, line in enumerate(lines, start=1):
         if allowed_line(line):
             continue
         if DIRECT_CARE_DISCIPLINE_CALL_RE.search(line):
+            function_name = enclosing_function_name(lines, idx - 1)
             if direct_care_discipline_allowed(path_str, lines, idx - 1):
+                if direct_care_discipline_requires_write_policy(path_str, function_name) and not direct_care_discipline_consumes_write_policy(lines, idx - 1):
+                    add(
+                        warnings,
+                        "reward-direct-care-discipline-disposition",
+                        path_str,
+                        idx,
+                        line,
+                        "R5 care reward allowlisted functions must consume CareFactWritePolicy/disposition before calling EconomyRewardDiscipline.",
+                    )
+                    continue
                 continue
             add(
                 warnings,
@@ -431,6 +556,144 @@ def scan_care_fact_disposition_consumption(path: pathlib.Path, lines: list[str],
         )
 
 
+def scan_pet_medication_dose_result_consumption(path: pathlib.Path, lines: list[str], warnings: list[WarningItem]) -> None:
+    path_str = rel(path)
+    for idx, line in enumerate(lines, start=1):
+        if allowed_line(line) or ".recordDose" not in line:
+            continue
+
+        prefix = "\n".join(lines[max(0, idx - 8):idx])
+        if "PetMedicationCommandExecutor" not in prefix:
+            continue
+
+        window = "\n".join(lines[idx - 1:min(len(lines), idx + 30)])
+        if "economy-boundary: allow" in window:
+            continue
+        if PET_MEDICATION_DOSE_RESULT_CONSUME_RE.search(window):
+            continue
+
+        add(
+            warnings,
+            "pet-medication-dose-result-unconsumed",
+            path_str,
+            idx,
+            line,
+            "Pet medication dose command results must consume didRecord before scheduling reminders, publishing success feedback, or refreshing UI state.",
+        )
+
+
+def scan_care_fact_executor_resolution(path: pathlib.Path, lines: list[str], warnings: list[WarningItem]) -> None:
+    path_str = rel(path)
+    for idx, line in enumerate(lines, start=1):
+        if "executorCannotWrite" not in line or not re.search(r"\bfunc\s+executorCannotWrite\s*\(", line):
+            continue
+        body = "\n".join(lines[idx - 1:min(len(lines), idx + 60)])
+        drop_fact_patterns = [
+            r"UUID\(uuidString:\s*executorId\)[\s\S]{0,120}?else\s*\{[\s\S]{0,80}?return true",
+            r"context\.fetch\(descriptor\)\.first[\s\S]{0,120}?else\s*\{[\s\S]{0,80}?return true",
+        ]
+        if any(re.search(pattern, body) for pattern in drop_fact_patterns):
+            add(
+                warnings,
+                "care-fact-executor-resolution-drops-fact",
+                path_str,
+                idx,
+                line,
+                "Care fact executor write policy must not drop active-pet facts for dirty executor ids; invalid/missing explicit executors should keep the fact path and let rewards use fallback ownership.",
+            )
+
+
+def scan_care_command_result_success_consumption(path: pathlib.Path, lines: list[str], warnings: list[WarningItem]) -> None:
+    path_str = rel(path)
+    for idx, line in enumerate(lines, start=1):
+        if allowed_line(line) or not CARE_COMMAND_RESULT_CALL_RE.search(line):
+            continue
+
+        function_start = enclosing_function_start(lines, idx - 1)
+        pre_start = 0 if function_start is None else function_start + 1
+        pre_window = "\n".join(lines[pre_start:idx - 1])
+        window = "\n".join(lines[max(0, idx - 12):min(len(lines), idx + 45)])
+        if "economy-boundary: allow" in window:
+            continue
+        if CARE_COMMAND_PRE_RESULT_DERIVED_EFFECT_RE.search(pre_window):
+            add(
+                warnings,
+                "care-command-result-unconsumed",
+                path_str,
+                idx,
+                line,
+                "Care command derived effects must not run before the command result is known to have recorded a fact.",
+            )
+            continue
+        if not CARE_COMMAND_SUCCESS_EFFECT_RE.search(window):
+            continue
+        if CARE_COMMAND_RESULT_CONSUME_RE.search(window):
+            continue
+        add(
+            warnings,
+            "care-command-result-unconsumed",
+            path_str,
+            idx,
+            line,
+            "Care command results must consume didRecord/didWriteFact/allowsDerivedEffects before UI success feedback, selection/default persistence, reminders, or revision success.",
+        )
+
+
+def scan_secondary_executor_write_policy(path: pathlib.Path, lines: list[str], warnings: list[WarningItem]) -> None:
+    path_str = rel(path)
+    for idx, line in enumerate(lines, start=1):
+        if allowed_line(line):
+            continue
+        if "SharedCareParticipantIDs.normalized" not in line or "sharedExecutorIds" not in line:
+            continue
+
+        window = "\n".join(lines[max(0, idx - 12):min(len(lines), idx + 20)])
+        if "economy-boundary: allow" in window:
+            continue
+        if "anyExecutorCannotWrite" in window or "executorIdsCannotWrite" in window:
+            continue
+        add(
+            warnings,
+            "care-secondary-executor-policy-unchecked",
+            path_str,
+            idx,
+            line,
+            "Secondary explicit care executor ids must be validated with EconomyWalletWritePolicy/CareFactWritePolicy before walk/session facts, ledger, reward, or metadata writes.",
+        )
+
+
+def scan_care_derivation_direct_publish(path: pathlib.Path, lines: list[str], warnings: list[WarningItem]) -> None:
+    path_str = rel(path)
+    if path_str in {
+        "Ohana/Domain/Events/DomainRevisionPublishing.swift",
+        "Ohana/Domain/Services/CareDerivationExecutor.swift",
+    }:
+        return
+    for idx, line in enumerate(lines, start=1):
+        if allowed_line(line) or not CARE_DERIVATION_DIRECT_PUBLISH_RE.search(line):
+            continue
+        bounds = enclosing_function_bounds(lines, idx - 1)
+        if bounds is None:
+            continue
+        start, end = bounds
+        function_block = "\n".join(lines[start:end + 1])
+        function_prefix = "\n".join(lines[start:idx])
+        if "economy-boundary: allow" in function_block:
+            continue
+        if not CARE_DERIVATION_CONTEXT_RE.search(function_block):
+            continue
+        if CARE_DERIVATION_GATE_RE.search(function_prefix):
+            continue
+        add(
+            warnings,
+            "care-derivation-direct-publish",
+            path_str,
+            idx,
+            line,
+            "Care command/view code that writes care facts must publish revision/no-op derived effects through CareDerivationExecutor in the same function, not by direct revision/no-op calls.",
+        )
+
+
 GATE_RULES: list[tuple[str, re.Pattern[str], re.Pattern[str], str]] = [
     (
         "online-feature-gate",
@@ -458,9 +721,9 @@ GATE_RULES: list[tuple[str, re.Pattern[str], re.Pattern[str], str]] = [
     ),
     (
         "lifecycle-readonly-gate",
-        re.compile(r"\b(?:passedAwayDate|trashedAt|isReadOnly|readOnly)\b"),
-        re.compile(r"\b(?:passedAwayDate|trashedAt|readOnly|isReadOnly)\b"),
-        "Memorial/recycle read-only UI checks must be backed by command/service lifecycle guards.",
+        re.compile(r"\b(?:passedAwayDate|hasPassedAway|isReadOnly|readOnly)\b"),
+        re.compile(r"\b(?:passedAwayDate|hasPassedAway|readOnly|isReadOnly)\b"),
+        "Deceased/read-only UI checks must be backed by command/service lifecycle guards.",
     ),
 ]
 
@@ -468,8 +731,11 @@ GATE_RULES: list[tuple[str, re.Pattern[str], re.Pattern[str], str]] = [
 def scan_service_gate_coverage(files: list[pathlib.Path], warnings: list[WarningItem]) -> None:
     occurrences: dict[str, list[tuple[str, int, str]]] = {rule: [] for rule, _, _, _ in GATE_RULES}
     hard_gate_seen: dict[str, bool] = {rule: False for rule, _, _, _ in GATE_RULES}
+    service_files = files
+    if any(rel(path).startswith("Ohana/") for path in files):
+        service_files = sorted((ROOT / "Ohana").rglob("*.swift"))
 
-    for path in files:
+    for path in service_files:
         path_str = rel(path)
         if not path.is_file():
             continue
@@ -478,6 +744,13 @@ def scan_service_gate_coverage(files: list[pathlib.Path], warnings: list[Warning
         for rule, view_re, service_re, _ in GATE_RULES:
             if is_service_path(path_str) and service_re.search(content):
                 hard_gate_seen[rule] = True
+
+    for path in files:
+        path_str = rel(path)
+        if not path.is_file():
+            continue
+        lines = read_lines(path)
+        for rule, view_re, _, _ in GATE_RULES:
             if is_view_path(path_str):
                 for idx, line in enumerate(lines, start=1):
                     if allowed_line(line):
@@ -503,6 +776,11 @@ def scan(files: list[pathlib.Path]) -> list[WarningItem]:
         scan_direct_reward_chokepoint(path, lines, warnings)
         scan_direct_care_discipline_chokepoint(path, lines, warnings)
         scan_care_fact_disposition_consumption(path, lines, warnings)
+        scan_pet_medication_dose_result_consumption(path, lines, warnings)
+        scan_care_fact_executor_resolution(path, lines, warnings)
+        scan_care_command_result_success_consumption(path, lines, warnings)
+        scan_secondary_executor_write_policy(path, lines, warnings)
+        scan_care_derivation_direct_publish(path, lines, warnings)
     scan_service_gate_coverage(files, warnings)
     return sorted(warnings, key=lambda item: (item.rule, item.path, item.line, item.snippet))
 

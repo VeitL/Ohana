@@ -6,18 +6,15 @@ import Testing
 
 @MainActor
 struct WalksLogicTests {
-    @Test func walkEligibilityBlocksNonDogDeceasedAndRecycledPets() {
+    @Test func walkEligibilityBlocksNonDogAndDeceasedPets() {
         let dog = Pet(name: "Piper", species: "狗")
         let cat = Pet(name: "Mochi", species: "猫")
         let deceasedDog = Pet(name: "Sunny", species: "dog")
         deceasedDog.passedAwayDate = Date()
-        let recycledDog = Pet(name: "Rex", species: "犬")
-        recycledDog.trashedAt = Date()
 
         #expect(WalkFeaturePolicy.canStartWalk(for: dog))
         #expect(!WalkFeaturePolicy.canStartWalk(for: cat))
         #expect(!WalkFeaturePolicy.canStartWalk(for: deceasedDog))
-        #expect(!WalkFeaturePolicy.canStartWalk(for: recycledDog))
     }
 
     @Test func sharedWalkTargetsKeepOnlyEligibleDogs() {
@@ -26,39 +23,27 @@ struct WalksLogicTests {
         let cat = Pet(name: "Mochi", species: "猫")
         let deceasedDog = Pet(name: "Sunny", species: "dog")
         deceasedDog.passedAwayDate = Date()
-        let recycledDog = Pet(name: "Bingo", species: "dog")
-        recycledDog.trashedAt = Date()
 
         let targets = WalkFeaturePolicy.normalizedWalkTargets(
-            [cat, secondDog, deceasedDog, recycledDog],
+            [cat, secondDog, deceasedDog],
             fallback: source
         )
 
         #expect(targets.map(\.id) == [source.id, secondDog.id])
     }
 
-    @Test func trackingSnapshotIgnoresRecycledWalksAndPoopMarkers() {
+    @Test func trackingSnapshotUsesPersistedWalksAndPoopMarkers() {
         let pet = Pet(name: "Piper", species: "狗")
         let activeWalk = PetWalkLog(startDate: Date().addingTimeInterval(-600), pet: pet)
         activeWalk.distanceMeters = 1200
-        let recycledWalk = PetWalkLog(startDate: Date(), pet: pet)
-        recycledWalk.distanceMeters = 8000
-        recycledWalk.trashedAt = Date()
         let activePotty = PetPottyLog(
             date: Date().addingTimeInterval(-580),
             type: .perfectPoop,
             pet: pet,
             walkLogId: activeWalk.id.uuidString
         )
-        let recycledPotty = PetPottyLog(
-            date: Date().addingTimeInterval(-570),
-            type: .softPoop,
-            pet: pet,
-            walkLogId: activeWalk.id.uuidString
-        )
-        recycledPotty.trashedAt = Date()
-        pet.walkLogs = [activeWalk, recycledWalk]
-        pet.pottyLogs = [activePotty, recycledPotty]
+        pet.walkLogs = [activeWalk]
+        pet.pottyLogs = [activePotty]
 
         let snapshot = WalkTrackingSnapshot.make(pet: pet, manager: FakeWalkManager())
 
@@ -71,11 +56,11 @@ struct WalksLogicTests {
         let location = FakeWalkLocationManager()
         let manager = PetWalkingManager(locationManager: location, questManager: QuestManager())
         let cat = Pet(name: "Mochi", species: "猫")
-        let recycledDog = Pet(name: "Rex", species: "狗")
-        recycledDog.trashedAt = Date()
+        let deceasedDog = Pet(name: "Rex", species: "狗")
+        deceasedDog.passedAwayDate = Date()
 
         manager.start(pet: cat)
-        manager.start(pet: recycledDog)
+        manager.start(pet: deceasedDog)
 
         #expect(manager.currentPet == nil)
         #expect(manager.phase == .idle)

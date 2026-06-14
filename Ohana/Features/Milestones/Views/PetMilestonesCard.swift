@@ -10,7 +10,7 @@ struct PetMilestonesCard: View {
     let pet: Pet
 
     private var milestones: [PetMilestone] {
-        pet.milestones.activeRecycleBinItems
+        pet.milestones
     }
 
     var body: some View {

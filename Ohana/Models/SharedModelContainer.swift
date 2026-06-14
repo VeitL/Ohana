@@ -876,13 +876,13 @@ enum ArkSchemaV68: VersionedSchema {
     static var models: [any PersistentModel.Type] { ArkSchemaV67.models }
 }
 
-// MARK: - Schema V69（回收站软删除字段）
+// MARK: - Schema V69（legacy 回收站软删除字段，保留以打开既有 store）
 enum ArkSchemaV69: VersionedSchema {
     static var versionIdentifier = Schema.Version(69, 0, 0)
     static var models: [any PersistentModel.Type] { ArkSchemaV68.models + [RecycleBinBatch.self] }
 }
 
-// MARK: - Schema V70（症状与发情记录回收站字段）
+// MARK: - Schema V70（legacy 症状与发情记录回收站字段，保留以打开既有 store）
 enum ArkSchemaV70: VersionedSchema {
     static var versionIdentifier = Schema.Version(70, 0, 0)
     static var models: [any PersistentModel.Type] { ArkSchemaV69.models }

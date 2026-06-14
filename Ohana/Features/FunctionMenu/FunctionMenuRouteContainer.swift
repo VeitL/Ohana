@@ -12,8 +12,8 @@ struct FunctionMenuDestinationRouteContainer: View {
         FunctionMenuDestinationRouter(
             destination: destination,
             parentPath: $parentPath,
-            pets: pets.activeRecycleBinItems,
-            humans: humans.activeRecycleBinItems,
+            pets: pets,
+            humans: humans,
             plants: []
         )
     }
@@ -32,8 +32,8 @@ struct FunctionMenuRootRouteContainer: View {
             appLanguage: appLanguage,
             onSelect: onSelect,
             onClose: onClose,
-            pets: pets.activeRecycleBinItems,
-            humans: humans.activeRecycleBinItems
+            pets: pets,
+            humans: humans
         )
     }
 }

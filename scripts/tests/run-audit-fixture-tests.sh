@@ -117,7 +117,11 @@ assert_good scripts/audit-shared-care-note-metadata.sh "$fixtures/SharedCareNote
 
 assert_bad scripts/audit-economy-boundaries.sh "$fixtures/RecurringEconomyBoundariesBad.swift" \
   coconut-balance-direct-write reward-actor-boundary reward-direct-awardaction \
-  reward-direct-care-discipline care-fact-disposition-unconsumed \
+  reward-direct-care-discipline reward-direct-care-discipline-disposition \
+  care-fact-disposition-unconsumed pet-medication-dose-result-unconsumed \
+  care-fact-executor-resolution-drops-fact care-command-result-unconsumed \
+  care-derivation-direct-publish \
+  care-secondary-executor-policy-unchecked \
   view-soft-gate-without-service-hard-gate
 assert_good scripts/audit-economy-boundaries.sh "$fixtures/RecurringEconomyBoundariesGood.swift"
 

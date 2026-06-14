@@ -1,7 +1,7 @@
 # Members 业务规则书
 
-> 状态：已按 2026-06-12 产品答复与 Phase 6 Members 修复结果更新；S-MEM-004/005/006 仍为余留项。
-> 范围：`Ohana/Features/Members`。来源行号按 2026-06-12 当前工作区记录。
+> 状态：已按 2026-06-14 产品主人二态删除模型更新；S-MEM-004/006 仍为余留项。
+> 范围：`Ohana/Features/Members`。来源行号按 2026-06-14 当前工作区记录。
 
 ## 1. 业务不变量
 
@@ -41,9 +41,9 @@
 
 任何情况下，`HumanAllFeaturesSheet.open` 在目的地声明了 privacy field 且该字段对当前 viewer locked 时，不打开目的地，只设置 `lockedField` 并触发 warning feedback。来源：`Ohana/Features/Members/Views/HumanAllFeaturesSheet.swift:187`。
 
-### MBR-010 宠物纪念模式由生命周期命令写入，撤销会清空
+### MBR-010 宠物纪念模式只写生命周期字段
 
-任何情况下，标记宠物离世调用 `RainbowBridgeService.markPassedAway`，标记 Pet modified，并返回 action `passed.mark`；撤销调用 `RainbowBridgeService.undoPassedAway`，标记 Pet modified，并返回 action `passed.undo`。未来提醒 / 事件由 `RainbowBridgeService` 以纪念退场标记退出活跃流，不硬删除；撤销只恢复纪念流程标记的内容。来源：`Ohana/Features/Members/MemberInteractionCommands.swift:14`、`Ohana/Features/Members/MemberInteractionCommands.swift:19`、`Ohana/Features/Members/MemberInteractionCommands.swift:20`、`Ohana/Features/Members/MemberInteractionCommands.swift:31`、`Ohana/Features/Members/MemberInteractionCommands.swift:35`、`Ohana/Features/Memorial/RainbowBridgeService.swift:16`。
+任何情况下，标记宠物离世调用 `RainbowBridgeService.markPassedAway`，只设置 `passedAwayDate`、标记 Pet modified，并返回 action `passed.mark`；撤销调用 `RainbowBridgeService.undoPassedAway`，清空 `passedAwayDate`、标记 Pet modified，并返回 action `passed.undo`。标记离世不删除、不恢复、不改写未来 Event / Reminder / 照护事实；既有数据只读保留。来源：`Ohana/Features/Members/MemberInteractionCommands.swift:14`、`Ohana/Features/Members/MemberInteractionCommands.swift:19`、`Ohana/Features/Members/MemberInteractionCommands.swift:20`、`Ohana/Features/Members/MemberInteractionCommands.swift:31`、`Ohana/Features/Members/MemberInteractionCommands.swift:35`、`Ohana/Features/Memorial/RainbowBridgeService.swift:19`。
 
 ### MBR-011 人类纪念模式只写 passedAwayDate
 
@@ -53,13 +53,13 @@
 
 任何情况下，清空宠物记录会调用 `PetActivityRecordCleanupService.clearActivityRecords`，清空 per-pet quest auxiliary state，标记 Pet modified 并保存。来源：`Ohana/Features/Members/MemberInteractionCommands.swift:47`、`Ohana/Features/Members/MemberInteractionCommands.swift:53`、`Ohana/Features/Members/MemberInteractionCommands.swift:55`、`Ohana/Features/Members/MemberInteractionCommands.swift:57`。
 
-### MBR-013 删除宠物会软删宠物与相关 Event，移除 quick actions，并调和 shared sessions
+### MBR-013 删除宠物会物理删除宠物与相关 Event，并写 CloudSync tombstone
 
-任何情况下，删除 Pet 会抓取 `relatedEntityId == pet.id.uuidString` 且未在回收站的 Event，用同一 aggregate batch 软删相关 Event 与 Pet；相关 Event 下 pending / failed / snoozed 的 Reminder 会被标记为 `skipped`，`completedBy` 写入 `system:recycle:<batch>`，并写入 CloudSync 本地 dirty state。删除会移除 `quickActionItems_v2` 中指向该 Pet 的条目，保存后对引用该 Pet 的 shared sessions 调用 reconcile。返回结果包含进入回收站的 Event IDs 和 quick action 数量；真正 tombstone 只发生在 30 天过期清理。来源：`Ohana/Features/Members/MemberDeletionCommands.swift:51`、`Ohana/Features/Members/MemberDeletionCommands.swift:52`、`Ohana/Features/Members/MemberDeletionCommands.swift:54`、`Ohana/Features/Members/MemberDeletionCommands.swift:63`、`Ohana/Domain/Services/RecycleBinService.swift:98`、`Ohana/Domain/Services/RecycleBinService.swift:491`、`Ohana/Domain/Services/RecycleBinService.swift:508`。
+任何情况下，删除 Pet 会抓取 `relatedEntityId == pet.id.uuidString` 的 Event，先通过 `PhysicalDeletionService.deleteEvent` 为 Event 与 Reminder 写不可见 sync tombstone 并物理删除，再移除 `quickActionItems_v2` 中指向该 Pet 的条目，最后通过 `PhysicalDeletionService.deletePet` 为 Pet 及从属照护 / 健康 / 遛狗 / 档案等记录写 tombstone 并物理删除。删除没有用户可见回收站、恢复窗口或 30 天过期清理。来源：`Ohana/Features/Members/MemberDeletionCommands.swift:51`、`Ohana/Features/Members/MemberDeletionCommands.swift:53`、`Ohana/Features/Members/MemberDeletionCommands.swift:61`、`Ohana/Domain/Services/PhysicalDeletionService.swift:14`、`Ohana/Domain/Services/PhysicalDeletionService.swift:44`。
 
-### MBR-014 删除人类会软删 Human 与成员日历事实，并在过期清理人类侧私密数据
+### MBR-014 删除人类会物理删除 Human、成员日历事实与人类侧从属数据
 
-任何情况下，删除 Human 会先查询是否还存在其他未回收 Human；如果删除的是 active human 且还有剩余 human，返回 `requiresAccountSwitch = true`；如果没有剩余 human，返回 `requiresReplacementHuman = true`。删除会用同一 aggregate batch 软删 Human 与 `relatedEntityId == human.id.uuidString` 的 Event，并抑制这些 Event 下由回收站流程管理的 Reminder。`HumanMedication`、`HumanMedicationLog`、`HumanHealthReport`、`WishlistItem`、直接归属该 Human 的无宠物 `PetExpenseLog`、以及该 Human 关系下的体重 / 运动 / 健康指标日志在 30 天回收期内保留；过期清理时与 Human 一起物理删除并写 tombstone。来源：`Ohana/Features/Members/MemberDeletionCommands.swift:91`、`Ohana/Features/Members/MemberDeletionCommands.swift:107`、`Ohana/Features/Members/MemberDeletionCommands.swift:118`、`Ohana/Domain/Services/RecycleBinService.swift:383`、`Ohana/Domain/Services/RecycleBinService.swift:524`。
+任何情况下，删除 Human 会先查询是否还存在其他 active Human（`passedAwayDate == nil`）；如果删除的是 active human 且还有剩余 active human，返回 `requiresAccountSwitch = true`；如果没有剩余 active human，返回 `requiresReplacementHuman = true`。删除会通过 `PhysicalDeletionService.deleteEvent` 删除相关 Event / Reminder，通过 `PhysicalDeletionService.deleteHuman` 删除 Human、直接归属的人类侧费用、用药、健康、愿望清单、体重 / 运动 / 健康指标日志等从属数据，并为可同步实体写不可见 sync tombstone。来源：`Ohana/Features/Members/MemberDeletionCommands.swift:88`、`Ohana/Features/Members/MemberDeletionCommands.swift:103`、`Ohana/Features/Members/MemberDeletionCommands.swift:113`、`Ohana/Domain/Services/PhysicalDeletionService.swift:61`。
 
 ### MBR-015 删除人类后的 UI 路由由 notification route event 接管
 
@@ -119,7 +119,7 @@ stateDiagram-v2
     Memorial --> Deleted: delete member
 ```
 
-代码实际约束：Pet memorial 委托 RainbowBridgeService；Human memorial 只改 `passedAwayDate`。删除 Pet 和删除 Human 都先进入回收站，30 天过期清理时才物理删除并写 tombstone；Human 过期清理还会清掉已确认的人类侧私密字符串关联记录。来源：`Ohana/Features/Members/MemberInteractionCommands.swift:14`、`Ohana/Features/Members/MemberInteractionCommands.swift:68`、`Ohana/Features/Members/MemberDeletionCommands.swift:43`、`Ohana/Features/Members/MemberDeletionCommands.swift:84`、`Ohana/Domain/Services/RecycleBinService.swift:155`。
+代码实际约束：Pet memorial 委托 RainbowBridgeService；Human memorial 只改 `passedAwayDate`。删除 Pet 和删除 Human 直接进入 `PhysicalDeletionService`：先写不可见 sync tombstone，再物理删除相关 Event / Reminder、成员和从属记录；没有用户可恢复中转态或到期清理。来源：`Ohana/Features/Members/MemberInteractionCommands.swift:14`、`Ohana/Features/Members/MemberInteractionCommands.swift:68`、`Ohana/Features/Members/MemberDeletionCommands.swift:43`、`Ohana/Features/Members/MemberDeletionCommands.swift:81`、`Ohana/Domain/Services/PhysicalDeletionService.swift:14`。
 
 ### 2.4 Human deletion account routing
 
@@ -146,8 +146,8 @@ stateDiagram-v2
 
 ### 多设备 / CloudSync
 
-- Pet/Human 创建、更新、生命周期、回收站软删与过期 tombstone 会写 CloudSync state。来源：`Ohana/Features/Members/MemberCreationService.swift:228`、`Ohana/Features/Members/MemberCreationService.swift:338`、`Ohana/Features/Members/MemberProfileCommands.swift:274`、`Ohana/Features/Members/MemberInteractionCommands.swift:20`、`Ohana/Domain/Services/RecycleBinService.swift:416`、`Ohana/Domain/Services/RecycleBinService.swift:449`。
-- Members 创建的生日 / 到家日 Event 与生日 Reminder 会写 CloudSync 本地 dirty state；删除成员时相关 Event 先软删并写 dirty，过期清理时写 tombstone。`Reminder` 及若干人类侧模型目前只记录本地 sync metadata，不扩大 `CloudSyncEntityRegistry.uploadPipelineEntityNames`，因此不启用 CloudKit 上传 / 拉取流水线。来源：`Ohana/Features/Members/MemberCreationService.swift:355`、`Ohana/Features/Members/MemberCreationService.swift:407`、`Ohana/Features/Members/MemberCreationService.swift:410`、`Ohana/Features/Members/MemberCreationService.swift:423`、`Ohana/Domain/Services/CloudSyncMutationRecorder.swift:76`、`Ohana/Domain/Services/CloudSyncMutationRecorder.swift:771`。
+- Pet/Human 创建、active 成员资料更新、生命周期标记与不可恢复删除会写 CloudSync state；离世成员资料更新 / 首页显示开关 / 清空记录命令在服务层 no-op，不发布假 revision。来源：`Ohana/Features/Members/MemberCreationService.swift:228`、`Ohana/Features/Members/MemberCreationService.swift:338`、`Ohana/Features/Members/MemberProfileCommands.swift:207`、`Ohana/Features/Members/MemberProfileCommands.swift:282`、`Ohana/Features/Members/MemberInteractionCommands.swift:47`、`Ohana/Domain/Events/ReadModelRevisionCenter+AppAndMembers.swift:24`。
+- Members 创建的生日 / 到家日 Event 与生日 Reminder 会写 CloudSync 本地 dirty state；删除成员时相关 Event、Reminder、成员和从属记录在 `PhysicalDeletionService` 边界写不可见 sync tombstone 后物理删除。`Reminder` 及若干人类侧模型目前只记录本地 sync metadata，不扩大 `CloudSyncEntityRegistry.uploadPipelineEntityNames`，因此不启用 CloudKit 上传 / 拉取流水线。来源：`Ohana/Features/Members/MemberCreationService.swift:355`、`Ohana/Features/Members/MemberCreationService.swift:407`、`Ohana/Features/Members/MemberCreationService.swift:410`、`Ohana/Features/Members/MemberCreationService.swift:423`、`Ohana/Domain/Services/PhysicalDeletionService.swift:14`、`Ohana/Domain/Services/PhysicalDeletionService.swift:44`。
 
 ### 时区 / 跨午夜 / 时间回拨
 
@@ -158,11 +158,11 @@ stateDiagram-v2
 
 ### S-MEM-001 Human 删除留下字符串关联敏感数据（已修复）
 
-2026-06-12 修复结果：删除 Human 时 Human 与成员生日等相关 Event 进入同一回收站 aggregate batch，Reminder 被可逆抑制；回收期内人类侧私密字符串关联记录保留以支持恢复，过期清理时与 Human 一起删除并写 CloudSync tombstone。覆盖测试：`RecycleBinServiceTests.memberDeletionSuppressesRelatedRemindersAndRestoreReactivatesThem`、`RecycleBinServiceTests.expiredHumanPurgeDeletesHumanScopedStringRecordsWithTombstones`。
+2026-06-14 二态模型修复结果：删除 Human 时相关 Event / Reminder、人类侧私密字符串关联记录和 Human 本体在同一物理删除边界写 tombstone 后删除，不再保留回收期恢复数据。覆盖测试：`PhysicalDeletionServiceTests.petDeletionPhysicallyDeletesChildFactsAndWritesSyncTombstones`、`HomeCommandExecutorTests.memberDeletionServicesPhysicallyDeleteMembersAndWriteTombstones`。
 
 ### S-MEM-002 Members Event 同步不完整（已修复）
 
-2026-06-12 修复结果：Members 创建的 Human birthday Event、Pet birthday Event、Pet birthday Reminder、Pet home anniversary Event 都写入 CloudSync 本地 dirty state；成员删除路径通过回收站软删相关 Event，并在过期 purge 时写 tombstone。覆盖测试：`MemberCreationServiceTests.petCreationWritesBirthdayHomeMilestonesAndRevision`、`MemberCreationServiceTests.humanCreationWritesBirthdayEventCloudSyncState`、`RecycleBinServiceTests.memberDeletionSuppressesRelatedRemindersAndRestoreReactivatesThem`。
+2026-06-14 二态模型修复结果：Members 创建的 Human birthday Event、Pet birthday Event、Pet birthday Reminder、Pet home anniversary Event 都写入 CloudSync 本地 dirty state；成员删除路径通过 `PhysicalDeletionService` 对相关 Event / Reminder 写 tombstone 后物理删除。覆盖测试：`MemberCreationServiceTests.petCreationWritesBirthdayHomeMilestonesAndRevision`、`MemberCreationServiceTests.humanCreationWritesBirthdayEventCloudSyncState`、`PhysicalDeletionServiceTests.petDeletionPhysicallyDeletesChildFactsAndWritesSyncTombstones`。
 
 ### S-MEM-003 Pet 纪念模式提示与 Members 层可见行为不完全同源（已由 GAP-9 收敛）
 
@@ -172,9 +172,9 @@ GAP-9 已改为：UI 文案不再承诺删除；Members command 委托 `RainbowB
 
 代码现在是：`MemberCommandExecutor.update*Profile` 已发布 member profile revision；部分 View 在调用 executor 后又手动 `appServices.domainRevisions.publishMemberProfile`。产品意图是每次资料保存只发布一次 domain mutation；本轮未修，见 `docs/task-follow-ups.md` 的 Members revision 余留项。来源：`Ohana/Features/Members/MemberInteractionCommands.swift:277`、`Ohana/Features/Members/Views/PetBasicInfoDetailView+Commands.swift:73`、`Ohana/Features/Members/Views/HumanBasicInfoDetailView.swift:635`、`Ohana/Features/Members/Views/EditHumanSheet.swift:148`。
 
-### S-MEM-005 人类纪念模式没有阻止编辑/删除路径（余留）
+### S-MEM-005 离世成员 command 层只读硬门（已修复）
 
-代码现在是：Human all-features header 在 `hasPassedAway` 时显示“纪念模式 · 只读”，但 `MemberLifecycleCommandService.markHumanPassedAway` 只写日期；未看到 Members 层统一阻止 Human 编辑、删除、隐私切换等命令。产品意图是若文案承诺只读，则 command 或 route 层需要硬边界；本轮未修，见 `docs/task-follow-ups.md` 的 Human memorial read-only 余留项。来源：`Ohana/Features/Members/Views/HumanAllFeaturesSheet.swift:197`、`Ohana/Features/Members/MemberInteractionCommands.swift:68`、`Ohana/Features/Members/MemberProfileCommands.swift:308`、`Ohana/Features/Members/MemberDeletionCommands.swift:84`。
+2026-06-14 二态模型修复结果：Pet/Human profile 更新、Human 首页显示开关、清空离世宠物记录在 command/service 层 no-op，且 revision 发布器不会为 no-op 发布假派生。删除成员仍属于 D8 明确确认后的不可恢复删除路径，不走回收站。覆盖测试：`HomeCommandExecutorTests.memberCommandsNoOpForPassedAwayProfileVisibilityAndRecordClear`、`PetActivityRecordCleanupServiceTests.cleanupNoOpsForPassedAwayPet`。
 
 ### S-MEM-006 本地化覆盖不完整（余留）
 
@@ -185,4 +185,4 @@ GAP-9 已改为：UI 文案不再承诺删除；Members command 委托 `RainbowB
 - 2026-06-12 产品答复采用 A 路径：S-MEM-001、S-MEM-002 纳入本轮 P0 修复；RequiredHumanProfileView a11y 纳入 P1 修复。
 - S-MEM-001 / S-MEM-002 已有定向测试覆盖并通过。
 - RequiredHumanProfileView 的 decorative icon 已隐藏给 VoiceOver，44pt 容器通过 `scripts/audit-accessibility.sh Ohana/Features/Members`。
-- S-MEM-004 / S-MEM-005 / S-MEM-006 与 Economy 侧删除后钱包/账本可见性审计作为跨范围余留，写入 `docs/task-follow-ups.md`。
+- S-MEM-004 / S-MEM-006 与 Economy 侧删除后钱包/账本可见性审计作为跨范围余留，写入 `docs/task-follow-ups.md`。

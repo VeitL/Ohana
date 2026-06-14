@@ -43,8 +43,9 @@ AB-001. Automatic backup is enabled by default. The user can turn it off in
 Settings; when off, lifecycle triggers must do nothing and must not write files.
 
 AB-002. Automatic backups use the same `OhanaBackup` projection as manual
-export, including GAP-2 recycle-bin `trashStates` and `recycleBinBatches`, and
-continuing to omit local-only secrets such as human PIN hash/salt.
+export. User-visible recoverable-delete state is not part of the backup
+contract because the 2026-06-14 product model removed that feature; backups
+continue to omit local-only secrets such as human PIN hash/salt.
 
 AB-003. Automatic backups are files in the user's iCloud Drive ubiquity
 container, not CloudKit records. No automatic-backup code may call CKShare,

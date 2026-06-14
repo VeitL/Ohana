@@ -1475,10 +1475,9 @@ struct HomeCommandExecutorTests {
         #expect(deletedPolicy.petID == petID)
         #expect(try (context.fetch(FetchDescriptor<InsuranceClaim>())).isEmpty)
         let policies = try context.fetch(FetchDescriptor<PetInsurance>())
-        #expect(policies.count == 1)
-        #expect(policies.first?.id == policyID)
-        #expect(policies.first?.trashedAt != nil)
-        #expect(policies.activeRecycleBinItems.isEmpty)
+        #expect(policies.isEmpty)
+        #expect(try cloudSyncState(entityName: String(describing: InsuranceClaim.self), id: claimID, context: context)?.isDeletionTombstone == true)
+        #expect(try cloudSyncState(entityName: String(describing: PetInsurance.self), id: policyID, context: context)?.isDeletionTombstone == true)
     }
 
     @MainActor
@@ -1849,6 +1848,7 @@ struct HomeCommandExecutorTests {
         context.insert(heat)
         try context.save()
 
+        let healthID = health.id
         let symptomID = symptom.id
         let heatID = heat.id
         let deletedHealth = PetHealthDeleteCommandService.deleteHealthLog(health, pet: pet, context: context)
@@ -1858,12 +1858,10 @@ struct HomeCommandExecutorTests {
         let healthLogs = try context.fetch(FetchDescriptor<PetHealthLog>())
         let symptomLogs = try context.fetch(FetchDescriptor<SymptomLog>())
         let heatLogs = try context.fetch(FetchDescriptor<HeatCycleLog>())
-        #expect(healthLogs.activeRecycleBinItems.isEmpty)
-        #expect(symptomLogs.activeRecycleBinItems.isEmpty)
-        #expect(heatLogs.activeRecycleBinItems.isEmpty)
-        #expect(healthLogs.first?.trashedAt != nil)
+        #expect(healthLogs.isEmpty)
         #expect(symptomLogs.isEmpty)
         #expect(heatLogs.isEmpty)
+        #expect(try cloudSyncState(entityName: String(describing: PetHealthLog.self), id: healthID, context: context)?.isDeletionTombstone == true)
         #expect(try cloudSyncState(entityName: String(describing: SymptomLog.self), id: symptomID, context: context)?.isDeletionTombstone == true)
         #expect(try cloudSyncState(entityName: String(describing: HeatCycleLog.self), id: heatID, context: context)?.isDeletionTombstone == true)
         #expect(deletedHealth.subjectID == pet.id)
@@ -1924,80 +1922,74 @@ struct HomeCommandExecutorTests {
         let ledgerEvents = try context.fetch(FetchDescriptor<CareLedgerEvent>())
 
         #expect(deleteResult.recordID == result.logID)
-        #expect(healthLogs.count == 1)
-        #expect(healthLogs.first?.trashedAt != nil)
-        #expect(healthLogs.activeRecycleBinItems.isEmpty)
-        #expect(expenses.count == 1)
-        #expect(expenses.first?.id == result.expenseLogID)
-        #expect(expenses.first?.trashedAt != nil)
-        #expect(expenses.activeRecycleBinItems.isEmpty)
+        #expect(healthLogs.isEmpty)
+        #expect(expenses.isEmpty)
         #expect(events.isEmpty)
         #expect(reminders.isEmpty)
         #expect(ledgerEvents.isEmpty)
         #expect(fakeNotifications.cancelledIds == ["health-reminder"])
+        #expect(try cloudSyncState(entityName: String(describing: PetHealthLog.self), id: result.logID, context: context)?.isDeletionTombstone == true)
+        if let expenseLogID = result.expenseLogID {
+            #expect(try cloudSyncState(entityName: String(describing: PetExpenseLog.self), id: expenseLogID, context: context)?.isDeletionTombstone == true)
+        }
     }
 
     @MainActor
-    @Test func petHealthWriteCommandsRejectDeceasedAndRecycledPets() throws {
+    @Test func petHealthWriteCommandsRejectDeceasedPets() throws {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
         let deceasedPet = Pet(name: "Momo", species: "狗")
         deceasedPet.passedAwayDate = makeDate(year: 2026, month: 6, day: 1)
-        let recycledPet = Pet(name: "Nori", species: "猫")
         context.insert(deceasedPet)
-        context.insert(recycledPet)
-        RecycleBinService.moveToRecycleBin(recycledPet, context: context)
         try context.save()
 
-        for pet in [deceasedPet, recycledPet] {
-            let healthResult = PetHealthCommandService.recordHealth(
-                pet: pet,
-                input: PetHealthRecordCommandInput(
-                    type: .checkup,
-                    date: makeDate(year: 2026, month: 6, day: 8),
-                    name: "Annual",
-                    note: "",
-                    vetName: "",
-                    cost: 0,
-                    expirationDate: nil,
-                    nextCheckupDate: nil,
-                    executorId: nil,
-                    source: .detail,
-                    includesNameInNote: true
-                ),
-                context: context,
-                awardsReward: false,
-                questManager: makeQuestManager()
-            )
-            let symptomResult = PetSymptomCommandService.recordSymptom(
-                pet: pet,
-                input: PetSymptomCommandInput(
-                    date: makeDate(year: 2026, month: 6, day: 8),
-                    category: .other,
-                    symptomName: "cough",
-                    severity: .mild,
-                    note: "",
-                    photoData: nil
-                ),
-                context: context
-            )
-            let heatResult = PetHeatCycleCommandService.recordHeatCycle(
-                pet: pet,
-                input: PetHeatCycleCommandInput(
-                    startDate: makeDate(year: 2026, month: 6, day: 8),
-                    endDate: nil,
-                    status: .estrus,
-                    note: "",
-                    isMated: false,
-                    expectedDeliveryDate: nil
-                ),
-                context: context
-            )
+        let healthResult = PetHealthCommandService.recordHealth(
+            pet: deceasedPet,
+            input: PetHealthRecordCommandInput(
+                type: .checkup,
+                date: makeDate(year: 2026, month: 6, day: 8),
+                name: "Annual",
+                note: "",
+                vetName: "",
+                cost: 0,
+                expirationDate: nil,
+                nextCheckupDate: nil,
+                executorId: nil,
+                source: .detail,
+                includesNameInNote: true
+            ),
+            context: context,
+            awardsReward: false,
+            questManager: makeQuestManager()
+        )
+        let symptomResult = PetSymptomCommandService.recordSymptom(
+            pet: deceasedPet,
+            input: PetSymptomCommandInput(
+                date: makeDate(year: 2026, month: 6, day: 8),
+                category: .other,
+                symptomName: "cough",
+                severity: .mild,
+                note: "",
+                photoData: nil
+            ),
+            context: context
+        )
+        let heatResult = PetHeatCycleCommandService.recordHeatCycle(
+            pet: deceasedPet,
+            input: PetHeatCycleCommandInput(
+                startDate: makeDate(year: 2026, month: 6, day: 8),
+                endDate: nil,
+                status: .estrus,
+                note: "",
+                isMated: false,
+                expectedDeliveryDate: nil
+            ),
+            context: context
+        )
 
-            #expect(healthResult == nil)
-            #expect(symptomResult == nil)
-            #expect(heatResult == nil)
-        }
+        #expect(healthResult == nil)
+        #expect(symptomResult == nil)
+        #expect(heatResult == nil)
 
         #expect(try context.fetch(FetchDescriptor<PetHealthLog>()).isEmpty)
         #expect(try context.fetch(FetchDescriptor<SymptomLog>()).isEmpty)
@@ -2388,13 +2380,10 @@ struct HomeCommandExecutorTests {
         #expect(result.kind == EntityKind.pet.rawValue)
         #expect(result.removedRelatedEventIDs == [relatedEvent.id])
         #expect(result.removedQuickActionCount == 2)
-        #expect(pets.count == 1)
-        #expect(pets.first?.id == pet.id)
-        #expect(pets.first?.trashedAt != nil)
-        #expect(pets.activeRecycleBinItems.isEmpty)
-        #expect(events.count == 2)
-        #expect(relatedEvent.trashedAt != nil)
-        #expect(Set(events.activeRecycleBinItems.map(\.id)) == Set([unrelatedEvent.id]))
+        #expect(pets.isEmpty)
+        #expect(Set(events.map(\.id)) == Set([unrelatedEvent.id]))
+        #expect(try cloudSyncState(entityName: String(describing: Pet.self), id: pet.id, context: context)?.isDeletionTombstone == true)
+        #expect(try cloudSyncState(entityName: String(describing: Event.self), id: relatedEvent.id, context: context)?.isDeletionTombstone == true)
         #expect(quickActionJSON.contains("\"id\":\"keep\"") || quickActionJSON.contains("\"id\": \"keep\""))
         #expect(!quickActionJSON.contains("remove-pet"))
         #expect(!quickActionJSON.contains("remove-entity"))
@@ -2422,9 +2411,8 @@ struct HomeCommandExecutorTests {
         #expect(result.clearsActiveHumanID == true)
         #expect(result.requiresAccountSwitch == true)
         #expect(result.requiresReplacementHuman == false)
-        #expect(humans.count == 2)
-        #expect(activeHuman.trashedAt != nil)
-        #expect(Set(humans.activeRecycleBinItems.map(\.id)) == Set([remainingHuman.id]))
+        #expect(Set(humans.map(\.id)) == Set([remainingHuman.id]))
+        #expect(try cloudSyncState(entityName: String(describing: Human.self), id: activeHuman.id, context: context)?.isDeletionTombstone == true)
     }
 
     @MainActor
@@ -2445,9 +2433,8 @@ struct HomeCommandExecutorTests {
         #expect(result.clearsActiveHumanID == true)
         #expect(result.requiresAccountSwitch == false)
         #expect(result.requiresReplacementHuman == true)
-        #expect(humans.count == 1)
-        #expect(human.trashedAt != nil)
-        #expect(humans.activeRecycleBinItems.isEmpty)
+        #expect(humans.isEmpty)
+        #expect(try cloudSyncState(entityName: String(describing: Human.self), id: human.id, context: context)?.isDeletionTombstone == true)
     }
 
     @MainActor
@@ -2464,9 +2451,8 @@ struct HomeCommandExecutorTests {
         #expect(result.entityID == plant.id)
         #expect(result.kind == EntityKind.plant.rawValue)
         #expect(result.removedRelatedEventIDs.isEmpty)
-        #expect(plants.count == 1)
-        #expect(plant.trashedAt != nil)
-        #expect(plants.activeRecycleBinItems.isEmpty)
+        #expect(plants.isEmpty)
+        #expect(try cloudSyncState(entityName: String(describing: Plant.self), id: plant.id, context: context)?.isDeletionTombstone == true)
     }
 
     @MainActor
@@ -2816,6 +2802,88 @@ struct HomeCommandExecutorTests {
     }
 
     @MainActor
+    @Test func memberCommandsNoOpForPassedAwayProfileVisibilityAndRecordClear() throws {
+        let revisionCenter = ReadModelRevisionCenter()
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let human = Human(name: "Old")
+        human.shouldShowOnHome = true
+        human.passedAwayDate = makeDate(year: 2026, month: 6, day: 1)
+        let pet = Pet(name: "Momo", species: "狗")
+        pet.passedAwayDate = makeDate(year: 2026, month: 6, day: 1)
+        let careLog = PetCareLog(
+            date: makeDate(year: 2026, month: 6, day: 8),
+            type: .feeding,
+            pet: pet
+        )
+        context.insert(human)
+        context.insert(pet)
+        context.insert(careLog)
+        try context.save()
+
+        let executor = MemberCommandExecutor(context: context, revisionCenter: revisionCenter)
+        let beforeRevision = revisionCenter.homeRevision.value
+        let humanProfile = executor.updateHumanProfile(
+            human,
+            input: HumanProfileCommandInput(
+                name: "New",
+                avatarImageData: nil,
+                avatarEmoji: "🧑",
+                role: "owner",
+                gender: "female",
+                birthday: nil,
+                bloodType: "A",
+                heightText: "180",
+                mbti: "infj",
+                nationality: "CN",
+                city: "Berlin",
+                themeHex: "ffcc00",
+                notes: "new note",
+                preservedNoteParts: [],
+                shouldShowOnHome: false
+            ),
+            note: "test.member.noop.human"
+        )
+        let petProfile = executor.updatePetProfile(
+            pet,
+            input: PetProfileCommandInput(
+                name: "New Momo",
+                avatarImageData: nil,
+                avatarEmoji: "🐕",
+                species: "狗",
+                breed: "Shiba",
+                gender: "female",
+                isNeutered: true,
+                birthday: nil,
+                homeDate: nil,
+                themeHex: "ffcc00",
+                notes: "new note"
+            ),
+            note: "test.member.noop.pet"
+        )
+        let visibility = executor.setHumanHomeVisibility(
+            human,
+            visible: false,
+            note: "test.member.noop.visibility"
+        )
+        let clearResult = executor.clearPetActivityRecords(
+            pet,
+            note: "test.member.noop.clear"
+        )
+
+        let careLogs = try context.fetch(FetchDescriptor<PetCareLog>())
+        #expect(!humanProfile.didWrite)
+        #expect(!petProfile.didWrite)
+        #expect(!visibility.didWrite)
+        #expect(!clearResult.didWrite)
+        #expect(human.name == "Old")
+        #expect(human.shouldShowOnHome)
+        #expect(pet.name == "Momo")
+        #expect(careLogs.map(\.id) == [careLog.id])
+        #expect(revisionCenter.homeRevision.value == beforeRevision)
+    }
+
+    @MainActor
     @Test func memberHomeVisibilityServiceUpdatesHumanVisibility() throws {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
@@ -2833,6 +2901,7 @@ struct HomeCommandExecutorTests {
         #expect(result.entityID == human.id)
         #expect(result.kind == EntityKind.human.rawValue)
         #expect(result.visible == false)
+        #expect(result.didWrite)
         #expect(human.shouldShowOnHome == false)
     }
 
@@ -2870,21 +2939,15 @@ struct HomeCommandExecutorTests {
 
         let careLogs = try context.fetch(FetchDescriptor<PetCareLog>())
         let events = try context.fetch(FetchDescriptor<Event>())
-        let batches = try context.fetch(FetchDescriptor<RecycleBinBatch>())
-        let batch = try #require(batches.first)
-        let expectedBatchID = RecycleBinService.petActivityClearBatchId(batch.id)
         #expect(humanResult.entityID == human.id)
         #expect(humanResult.action == "passed.mark")
         #expect(human.passedAwayDate == passedDate)
         #expect(clearResult.entityID == pet.id)
         #expect(clearResult.action == "records.clear")
-        #expect(careLogs.count == 1)
-        #expect(events.count == 1)
-        #expect(careLogs.first?.trashedAt != nil)
-        #expect(events.first?.trashedAt != nil)
-        #expect(careLogs.first?.trashBatchId == expectedBatchID)
-        #expect(events.first?.trashBatchId == expectedBatchID)
-        #expect(batches.count == 1)
+        #expect(careLogs.isEmpty)
+        #expect(events.isEmpty)
+        #expect(try cloudSyncState(entityName: String(describing: PetCareLog.self), id: careLog.id, context: context)?.isDeletionTombstone == true)
+        #expect(try cloudSyncState(entityName: String(describing: Event.self), id: event.id, context: context)?.isDeletionTombstone == true)
     }
 
     @MainActor
@@ -3387,10 +3450,9 @@ struct HomeCommandExecutorTests {
         logs = try context.fetch(FetchDescriptor<PetPhotoLog>())
         #expect(deleteResult.petID == pet.id)
         #expect(deleteResult.photoID == photo.id)
-        #expect(logs.count == 2)
-        #expect(photo.trashedAt != nil)
-        #expect(logs.activeRecycleBinItems.count == 1)
-        #expect(!logs.activeRecycleBinItems.contains { $0.id == photo.id })
+        #expect(logs.count == 1)
+        #expect(!logs.contains { $0.id == photo.id })
+        #expect(try cloudSyncState(entityName: String(describing: PetPhotoLog.self), id: photo.id, context: context)?.isDeletionTombstone == true)
     }
 
     @MainActor
@@ -3428,10 +3490,8 @@ struct HomeCommandExecutorTests {
         let deleteMutation = try #require(revisionCenter.lastMutation)
         #expect(deleted.photoID == photo.id)
         let photos = try context.fetch(FetchDescriptor<PetPhotoLog>())
-        #expect(photos.count == 1)
-        #expect(photos.first?.id == photo.id)
-        #expect(photos.first?.trashedAt != nil)
-        #expect(photos.activeRecycleBinItems.isEmpty)
+        #expect(photos.isEmpty)
+        #expect(try cloudSyncState(entityName: String(describing: PetPhotoLog.self), id: photo.id, context: context)?.isDeletionTombstone == true)
         #expect(deleteMutation.command == .petPhotoDelete(petID: pet.id, photoID: photo.id))
         #expect(deleteMutation.note == "test.photo.delete")
         #expect(revisionCenter.homeRevision.value == beforeRevision + 3)
@@ -5577,7 +5637,7 @@ struct HomeCommandExecutorTests {
         #expect(expenses.count == 2)
         #expect(Set(expenses.compactMap { $0.pet?.id }) == Set([first.id, second.id]))
         #expect(ledgerEvents.count == 2)
-        #expect(Set(ledgerEvents.map(\.legacyModelId)) == Set(expenses.map { $0.id.uuidString }))
+        #expect(Set(ledgerEvents.map(\.legacyModelId)) == Set(expenses.map(\.id.uuidString)))
         #expect(walletEntries.isEmpty)
         #expect(revisionCenter.homeRevision.value == beforeRevision + 1)
         #expect(mutation.command == .expenseEntry(entityID: first.id, entityKind: EntityKind.pet.rawValue))
@@ -5679,10 +5739,8 @@ struct HomeCommandExecutorTests {
         let deleteMutation = try #require(revisionCenter.lastMutation)
         #expect(deleted.documentID == document.id)
         let documents = try context.fetch(FetchDescriptor<PetDocument>())
-        #expect(documents.count == 1)
-        #expect(documents.first?.id == document.id)
-        #expect(documents.first?.trashedAt != nil)
-        #expect(documents.activeRecycleBinItems.isEmpty)
+        #expect(documents.isEmpty)
+        #expect(try cloudSyncState(entityName: String(describing: PetDocument.self), id: document.id, context: context)?.isDeletionTombstone == true)
         #expect(deleteMutation.command == .petDocumentDelete(petID: pet.id, documentID: document.id))
         #expect(deleteMutation.note == "test.document.delete")
         #expect(revisionCenter.homeRevision.value == beforeRevision + 3)
@@ -6297,10 +6355,8 @@ struct HomeCommandExecutorTests {
         #expect(deleteResult.petID == pet.id)
         #expect(deleteResult.milestoneID == createdMilestone.id)
         #expect(deleteResult.removedLedgerEventIDs.isEmpty)
-        #expect(milestones.count == 1)
-        #expect(milestones.first?.id == createdMilestone.id)
-        #expect(milestones.first?.trashedAt != nil)
-        #expect(milestones.activeRecycleBinItems.isEmpty)
+        #expect(milestones.isEmpty)
+        #expect(try cloudSyncState(entityName: String(describing: PetMilestone.self), id: createdMilestone.id, context: context)?.isDeletionTombstone == true)
         #expect(Set(ledgerEvents.map(\.id)) == Set([ledger.id, unrelatedLedger.id]))
     }
 
@@ -6481,10 +6537,8 @@ struct HomeCommandExecutorTests {
         #expect(deleteResult.petID == pet.id)
         #expect(deleteResult.documentID == document.id)
         #expect(deleteResult.removedLedgerEventIDs.isEmpty)
-        #expect(documents.count == 1)
-        #expect(documents.first?.id == document.id)
-        #expect(documents.first?.trashedAt != nil)
-        #expect(documents.activeRecycleBinItems.isEmpty)
+        #expect(documents.isEmpty)
+        #expect(try cloudSyncState(entityName: String(describing: PetDocument.self), id: document.id, context: context)?.isDeletionTombstone == true)
         #expect(Set(ledgerEvents.map(\.id)) == Set([ledger.id, unrelatedLedger.id]))
     }
 
@@ -7047,12 +7101,12 @@ struct HomeCommandExecutorTests {
     }
 
     @MainActor
-    @Test func shopPurchaseCommandServiceRejectsFrozenHumanWalletWithoutWrites() throws {
+    @Test func shopPurchaseCommandServiceRejectsDeceasedHumanWalletWithoutWrites() throws {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
         let human = Human(name: "Guan")
         human.coconutBalance = 500
-        human.trashedAt = makeDate(year: 2026, month: 6, day: 1)
+        human.passedAwayDate = makeDate(year: 2026, month: 6, day: 1)
         let item = try #require(ShopCatalog.item(id: "fx_lime_glow"))
         context.insert(human)
         try context.save()

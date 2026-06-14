@@ -22,6 +22,7 @@ extension ReadModelRevisionCenter {
     }
 
     func publishMemberProfile(_ result: MemberProfileCommandResult, note: String) {
+        guard result.didWrite else { return }
         publish(
             DomainMutationResult(
                 command: .memberProfile(entityID: result.entityID, kind: result.kind),
@@ -44,6 +45,7 @@ extension ReadModelRevisionCenter {
     }
 
     func publishMemberHomeVisibility(_ result: MemberHomeVisibilityCommandResult, note: String) {
+        guard result.didWrite else { return }
         publish(
             DomainMutationResult(
                 command: .memberHomeVisibility(
@@ -59,6 +61,7 @@ extension ReadModelRevisionCenter {
     }
 
     func publishMemberLifecycle(_ result: MemberLifecycleCommandResult, note: String) {
+        guard result.didWrite else { return }
         publish(
             DomainMutationResult(
                 command: .memberLifecycle(

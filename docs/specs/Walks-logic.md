@@ -6,12 +6,12 @@ Walks is the dog-only outdoor walk feature for the first-release care loop. It
 may use foreground and background location only while a user has an active dog
 walk in progress. Historical walk data remains available through archive and
 memorial surfaces, but active Walks routes, cards, stats, and rewards must only
-operate on living, non-recycled dogs.
+operate on living dogs.
 
 ## Launch Semantics
 
 - Active GPS walks are dog-only.
-- A pet that is not a dog, has passed away, or is in the recycle bin cannot
+- A pet that is not a dog or has passed away cannot
   enter the active Walks route and cannot start a walk through the service
   boundary.
 - Running walk state is the only app state allowed to keep continuous location
@@ -21,19 +21,19 @@ operate on living, non-recycled dogs.
 - Walk and in-walk potty rewards must go through the normal quest/economy
   budget and cooldown pipeline with the executor id. Walks must not write a
   system wallet or mutate balances directly.
-- Active Walks stats, summaries, maps, banners, and cards read only active
-  recycle-bin items. Recycled `PetWalkLog` and `PetPottyLog` records are
-  historical/recovery data and must not affect active Walks UI.
+- Active Walks stats, summaries, maps, banners, and cards read only existing
+  local walk facts for active dogs. Deleted records are physically removed after
+  tombstone recording and are not a product-visible state.
 
 ## Collected Surfaces
 
 ### Route And Start Boundary
 
-- `Ohana/Features/Walks/WalkRouteContainer.swift`: the typed route must fetch
-  only non-recycled pets and must reject non-dog or deceased pets before mounting
+- `Ohana/Features/Walks/WalkRouteContainer.swift`: the typed route must reject
+  non-dog or deceased pets before mounting
   `WalkTrackingFullScreen`.
 - `Ohana/Features/Walks/PetWalkingManager.swift`: `start(pet:)` is the hard
-  service boundary. It must no-op for non-dog, deceased, or recycled pets before
+  service boundary. It must no-op for non-dog or deceased pets before
   changing phase or starting location.
 - `Ohana/Features/Walks/WalkingLocationAdapters.swift`: the app-facing walking
   protocol delegates to the same manager boundary and must not add a second
