@@ -15,6 +15,7 @@ struct ManualFeedCommandResult {
     let affectsStock: Bool
     let stockReminders: [Reminder]
     let didRecord: Bool
+    let allowsDerivedEffects: Bool
     let coconutDelta: Int
 }
 
@@ -83,6 +84,7 @@ enum ManualFeedCommand {
                 affectsStock: false,
                 stockReminders: [],
                 didRecord: false,
+                allowsDerivedEffects: false,
                 coconutDelta: 0
             )
         }
@@ -111,6 +113,7 @@ enum ManualFeedCommand {
                 FeedStockCalculator.activeStockRecord(for: pet, foodKind: foodKind, foodRecords: foodRecords, now: date) != nil,
             stockReminders: stockReminders,
             didRecord: true,
+            allowsDerivedEffects: allowsDerivedEffects,
             coconutDelta: recorded.reward.humanGot + recorded.reward.petGot
         )
     }
@@ -130,28 +133,45 @@ enum ManualFeedCommand {
         let event = reminder.event
         let foodKind = event?.foodKind ?? pet.mainFoodKind
         let grams = event.map { FeedRuleMetadata.amountGrams(from: $0, fallback: pet.dailyPortionGrams) } ?? pet.dailyPortionGrams
-        let reward = careEvents.completePlannedFeed(
+        let completed = careEvents.completePlannedFeedResult(
             pet: pet,
             reminder: reminder,
             context: context,
             quality: .precise,
             executorId: executorId,
-            date: date
+            occurredAt: nil,
+            operationDate: date
         )
-        let stockReminders = FeedingPlanWriter.rebuildFoodStockReminders(
-            pet: pet,
-            allEvents: allEvents,
-            context: context,
-            now: date
-        )
+        guard completed.didRecord else {
+            return ManualFeedCommandResult(
+                foodKind: foodKind,
+                grams: grams,
+                targetCount: 0,
+                affectsStock: false,
+                stockReminders: [],
+                didRecord: false,
+                allowsDerivedEffects: false,
+                coconutDelta: 0
+            )
+        }
+        let stockReminders = completed.allowsDerivedEffects
+            ? FeedingPlanWriter.rebuildFoodStockReminders(
+                pet: pet,
+                allEvents: allEvents,
+                context: context,
+                now: date
+            )
+            : []
         return ManualFeedCommandResult(
             foodKind: foodKind,
             grams: grams,
             targetCount: 1,
-            affectsStock: FeedStockCalculator.activeStockRecord(for: pet, foodKind: foodKind, foodRecords: foodRecords, now: date) != nil,
+            affectsStock: completed.allowsDerivedEffects &&
+                FeedStockCalculator.activeStockRecord(for: pet, foodKind: foodKind, foodRecords: foodRecords, now: date) != nil,
             stockReminders: stockReminders,
-            didRecord: reward != nil,
-            coconutDelta: (reward?.humanGot ?? 0) + (reward?.petGot ?? 0)
+            didRecord: true,
+            allowsDerivedEffects: completed.allowsDerivedEffects,
+            coconutDelta: completed.coconutDelta
         )
     }
 }
@@ -175,6 +195,8 @@ private func singleCareResult(
 
 struct TreatFeedCommandResult {
     let grams: Double
+    let didRecord: Bool
+    let allowsDerivedEffects: Bool
 }
 
 enum TreatFeedCommand {
@@ -188,7 +210,7 @@ enum TreatFeedCommand {
         careEvents: CareEventRecording? = nil
     ) -> TreatFeedCommandResult {
         let careEvents = careEvents ?? CareEventService()
-        _ = careEvents.recordTreatFeed(
+        let recorded = careEvents.recordTreatFeedFact(
             pet: pet,
             amountGrams: grams,
             context: context,
@@ -196,7 +218,11 @@ enum TreatFeedCommand {
             date: Date(),
             treatKind: treatKind
         )
-        return TreatFeedCommandResult(grams: grams)
+        return TreatFeedCommandResult(
+            grams: grams,
+            didRecord: recorded.result.didWriteFact,
+            allowsDerivedEffects: recorded.result.allowsDerivedEffects
+        )
     }
 }
 

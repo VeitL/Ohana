@@ -376,7 +376,8 @@ nonisolated extension DataBackupManager {
     func encodeHygieneLog(_ l: PetHygieneLog) -> PetHygieneLogBackup {
         PetHygieneLogBackup(id: l.id.uuidString, date: d(l.date), type: l.type,
                             petId: l.pet?.id.uuidString,
-                            executorId: l.executorId)
+                            executorId: l.executorId,
+                            sharedSessionId: l.sharedSessionId.isEmpty ? nil : l.sharedSessionId)
     }
 
     func encodeFoodRecord(_ r: PetFoodRecord) -> PetFoodRecordBackup {

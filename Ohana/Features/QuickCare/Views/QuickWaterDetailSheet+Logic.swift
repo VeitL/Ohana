@@ -586,8 +586,6 @@ extension QuickWaterDetailSheet {
             return
         }
         guard scheduleDeferredWaterAction({ completePlannedWater(reminder) }) else { return }
-        UINotificationFeedbackGenerator().notificationOccurred(.success)
-        triggerWaterFeedback()
     }
 
     func completePlannedWater(_ reminder: Reminder) {
@@ -597,47 +595,44 @@ extension QuickWaterDetailSheet {
             amountMl: defaultWaterAmountMl ?? 0,
             executorId: commandExecutor.activeExecutorId()
         )
+        guard result.didRecord else { return }
+        guard result.allowsDerivedEffects else { return }
+        UINotificationFeedbackGenerator().notificationOccurred(.success)
+        triggerWaterFeedback()
         showSaveConfirmation(result.coconutDelta > 0 ? localizedWaterPlanReward(result.coconutDelta) : l.tr(zh: "已完成喂水", en: "Water check-in complete", de: "Trink-Check-in erledigt"))
         scheduleWaterPlanMaintenance(delayMilliseconds: 180)
     }
 
     func commitWater() {
         guard scheduleDeferredWaterAction(commitWaterBusiness) else { return }
-        UINotificationFeedbackGenerator().notificationOccurred(.success)
-        triggerWaterFeedback()
     }
 
     func commitWaterBusiness() {
-        SharedPetSelectionMemory.saveSelection(
-            Set(selectedWaterTargets.map(\.id)),
-            sourcePet: pet,
-            scope: "quickCare.water",
-            candidates: sameSpeciesWaterPets
-        )
         let result = commandExecutor.recordWater(
             pet: pet,
             targets: selectedWaterTargets,
             amountMl: defaultWaterAmountMl ?? 0,
             executorId: commandExecutor.activeExecutorId()
         )
-        let actionText = result.targetCount > 1 ? localizedSharedWaterLogged(result.targetCount) : l.tr(zh: "已记录喂水", en: "Water logged", de: "Trinken eingetragen")
-        showSaveConfirmation(result.coconutDelta > 0 ? "\(actionText) +\(result.coconutDelta)🥥" : actionText)
-    }
-
-    func doWaterChange() {
-        guard scheduleDeferredWaterAction(recordWaterChangeBusiness) else { return }
-        UINotificationFeedbackGenerator().notificationOccurred(.success)
-        triggerWaterChangeFeedback()
-    }
-
-    func recordWaterChangeBusiness() {
+        guard result.didRecord, result.allowsDerivedEffects else { return }
         SharedPetSelectionMemory.saveSelection(
             Set(selectedWaterTargets.map(\.id)),
             sourcePet: pet,
             scope: "quickCare.water",
             candidates: sameSpeciesWaterPets
         )
-        let reminders = commandExecutor.recordWaterChange(
+        UINotificationFeedbackGenerator().notificationOccurred(.success)
+        triggerWaterFeedback()
+        let actionText = result.targetCount > 1 ? localizedSharedWaterLogged(result.targetCount) : l.tr(zh: "已记录喂水", en: "Water logged", de: "Trinken eingetragen")
+        showSaveConfirmation(result.coconutDelta > 0 ? "\(actionText) +\(result.coconutDelta)🥥" : actionText)
+    }
+
+    func doWaterChange() {
+        guard scheduleDeferredWaterAction(recordWaterChangeBusiness) else { return }
+    }
+
+    func recordWaterChangeBusiness() {
+        let result = commandExecutor.recordWaterChange(
             pet: pet,
             targets: selectedWaterTargets,
             allEvents: allEvents,
@@ -646,24 +641,25 @@ extension QuickWaterDetailSheet {
             cycleAnchor: waterChangeAnchorDate,
             executorId: commandExecutor.activeExecutorId()
         )
-        scheduleCarePlanReminders(reminders)
-        showSaveConfirmation(l.tr(zh: "已记录换水", en: "Water change logged", de: "Wasserwechsel eingetragen"))
-    }
-
-    func doFilterClean() {
-        guard scheduleDeferredWaterAction(recordFilterCleanBusiness) else { return }
-        UINotificationFeedbackGenerator().notificationOccurred(.success)
-        triggerFilterFeedback()
-    }
-
-    func recordFilterCleanBusiness() {
+        guard result.didRecord, result.allowsDerivedEffects else { return }
         SharedPetSelectionMemory.saveSelection(
             Set(selectedWaterTargets.map(\.id)),
             sourcePet: pet,
             scope: "quickCare.water",
             candidates: sameSpeciesWaterPets
         )
-        let reminders = commandExecutor.recordFilterClean(
+        scheduleCarePlanReminders(result.reminders)
+        UINotificationFeedbackGenerator().notificationOccurred(.success)
+        triggerWaterChangeFeedback()
+        showSaveConfirmation(l.tr(zh: "已记录换水", en: "Water change logged", de: "Wasserwechsel eingetragen"))
+    }
+
+    func doFilterClean() {
+        guard scheduleDeferredWaterAction(recordFilterCleanBusiness) else { return }
+    }
+
+    func recordFilterCleanBusiness() {
+        let result = commandExecutor.recordFilterClean(
             pet: pet,
             targets: selectedWaterTargets,
             allEvents: allEvents,
@@ -672,7 +668,16 @@ extension QuickWaterDetailSheet {
             reminderOn: filterReminderOn,
             executorId: commandExecutor.activeExecutorId()
         )
-        scheduleCarePlanReminders(reminders)
+        guard result.didRecord, result.allowsDerivedEffects else { return }
+        SharedPetSelectionMemory.saveSelection(
+            Set(selectedWaterTargets.map(\.id)),
+            sourcePet: pet,
+            scope: "quickCare.water",
+            candidates: sameSpeciesWaterPets
+        )
+        scheduleCarePlanReminders(result.reminders)
+        UINotificationFeedbackGenerator().notificationOccurred(.success)
+        triggerFilterFeedback()
         showSaveConfirmation(l.tr(zh: "滤芯已清洗", en: "Filter cleaned", de: "Filter gereinigt"))
     }
 

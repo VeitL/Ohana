@@ -37,7 +37,7 @@ private func fetchQuickPlayModelsOrLog<T: PersistentModel>(
 struct QuickPlayCommandExecutor {
     private let context: ModelContext
     private let careEvents: CareEventRecording
-    private let revisions: DomainRevisionPublishing
+    private let derivations: CareDerivationExecutor
 
     init(context: ModelContext) {
         self.init(
@@ -62,7 +62,7 @@ struct QuickPlayCommandExecutor {
     ) {
         self.context = context
         self.careEvents = careEvents
-        self.revisions = revisions
+        derivations = CareDerivationExecutor(revisions: revisions)
     }
 
     func recordPlay(
@@ -72,10 +72,12 @@ struct QuickPlayCommandExecutor {
         date: Date = Date()
     ) -> QuickPlayCommandResult? {
         guard let pet = fetchPet(id: petID), EconomyWalletWritePolicy.canWrite(pet) else {
-            AppPerformanceMonitor.shared.record(
-                "domain_command_noop",
-                valueMS: 0,
-                note: "quickPlay.missingPet"
+            derivations.derive(
+                .noOp(
+                    command: .quickCare(entityID: petID, action: CareType.play.rawValue),
+                    affectedEntityIDs: [petID],
+                    note: "quickPlay.missingPet"
+                )
             )
             return nil
         }
@@ -99,21 +101,37 @@ struct QuickPlayCommandExecutor {
             createsLinkedPottyLog: false
         )
         guard recorded.result.didWriteFact else {
-            AppPerformanceMonitor.shared.record(
-                "domain_command_noop",
-                valueMS: 0,
-                note: "quickPlay.factNoop"
+            derivations.derive(
+                .noOp(
+                    command: .quickCare(entityID: pet.id, action: CareType.play.rawValue),
+                    affectedEntityIDs: [pet.id],
+                    note: "quickPlay.factNoop"
+                )
             )
             return nil
         }
-        revisions.publish(
-            DomainMutationResult(
-                command: .quickCare(entityID: pet.id, action: CareType.play.rawValue),
-                affectedEntityIDs: [pet.id],
-                wroteBusinessFact: true,
-                note: "quickPlay.record"
+        let derivation = derivations.derive(
+            .active(
+                disposition: recorded.result.disposition,
+                fact: CareWriteOutcome.FactPayload(
+                    subjectID: pet.id,
+                    logIDs: [recorded.result.logID],
+                    factDate: date,
+                    operationDate: date
+                ),
+                revision: CareWriteOutcome.RevisionPayload(
+                    command: .quickCare(entityID: pet.id, action: CareType.play.rawValue),
+                    affectedEntityIDs: [pet.id, recorded.result.logID],
+                    note: "quickPlay.record"
+                ),
+                reward: CareWriteOutcome.RewardPayload(
+                    humanDelta: recorded.reward.humanGot,
+                    petDelta: recorded.reward.petGot
+                ),
+                noopNote: "quickPlay.factOnly"
             )
         )
+        guard derivation.isUserVisibleSuccess else { return nil }
         return QuickPlayCommandResult(
             petID: pet.id,
             logID: recorded.result.logID,

@@ -12,6 +12,22 @@ struct TodayFocusEventCompletionCommandResult: Equatable {
     let eventID: UUID
     let isCompleted: Bool
     let didChange: Bool
+    let didWriteFact: Bool
+    let allowsDerivedEffects: Bool
+
+    init(
+        eventID: UUID,
+        isCompleted: Bool,
+        didChange: Bool,
+        didWriteFact: Bool? = nil,
+        allowsDerivedEffects: Bool? = nil
+    ) {
+        self.eventID = eventID
+        self.isCompleted = isCompleted
+        self.didChange = didChange
+        self.didWriteFact = didWriteFact ?? didChange
+        self.allowsDerivedEffects = allowsDerivedEffects ?? didChange
+    }
 }
 
 enum TodayFocusCommandService {
@@ -25,6 +41,7 @@ enum TodayFocusCommandService {
     ) -> TodayFocusEventCompletionCommandResult {
         let wasOccurrenceComplete = event.isOccurrenceMarkedComplete(on: date)
         let wasCompleted = event.isCompleted
+        var completionResult: CalendarEventCompletionResult?
 
         if !wasOccurrenceComplete {
             let pet = pet(for: event, context: context)
@@ -32,10 +49,12 @@ enum TodayFocusCommandService {
                 return TodayFocusEventCompletionCommandResult(
                     eventID: event.id,
                     isCompleted: wasCompleted,
-                    didChange: false
+                    didChange: false,
+                    didWriteFact: false,
+                    allowsDerivedEffects: false
                 )
             }
-            CalendarEventCommandService.toggleCompletion(
+            completionResult = CalendarEventCommandService.toggleCompletion(
                 event: event,
                 occurrenceDate: date,
                 pets: pet.map { [$0] } ?? [],
@@ -47,7 +66,9 @@ enum TodayFocusCommandService {
         return TodayFocusEventCompletionCommandResult(
             eventID: event.id,
             isCompleted: event.recurrenceDays <= 0 ? event.isCompleted : event.isOccurrenceMarkedComplete(on: date),
-            didChange: !wasOccurrenceComplete || wasCompleted != event.isCompleted
+            didChange: wasOccurrenceComplete != event.isOccurrenceMarkedComplete(on: date) || wasCompleted != event.isCompleted,
+            didWriteFact: completionResult?.didWriteFact ?? false,
+            allowsDerivedEffects: completionResult?.allowsDerivedEffects ?? false
         )
     }
 

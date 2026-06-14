@@ -73,7 +73,7 @@ extension ReadModelRevisionCenter {
     }
 
     func publishCatCareRecord(_ result: CatCareCommandResult, note: String) {
-        var affected: Set<UUID> = [result.petID, result.eventID]
+        var affected: Set<UUID> = result.didRecord ? [result.petID, result.eventID] : [result.petID]
         if let hygieneLogID = result.hygieneLogID {
             affected.insert(hygieneLogID)
         }
@@ -81,7 +81,7 @@ extension ReadModelRevisionCenter {
             DomainMutationResult(
                 command: .catCareRecord(petID: result.petID, action: result.actionRaw),
                 affectedEntityIDs: affected,
-                wroteBusinessFact: true,
+                wroteBusinessFact: result.didRecord,
                 note: note
             )
         )
@@ -160,7 +160,7 @@ extension ReadModelRevisionCenter {
             DomainMutationResult(
                 command: .calendarEventCompletion(eventID: result.eventID, isCompleted: result.isCompleted),
                 affectedEntityIDs: [result.eventID],
-                wroteBusinessFact: true,
+                wroteBusinessFact: result.didChange,
                 note: note
             )
         )
@@ -206,15 +206,15 @@ extension ReadModelRevisionCenter {
         result: WeightCommandResult,
         note: String
     ) {
-        var affected: Set<UUID> = [subjectID, result.logID]
-        if let ledgerEventID = result.ledgerEventID {
+        var affected: Set<UUID> = result.didRecord ? [subjectID, result.logID] : [subjectID]
+        if result.didRecord, let ledgerEventID = result.ledgerEventID {
             affected.insert(ledgerEventID)
         }
         publish(
             DomainMutationResult(
                 command: command,
                 affectedEntityIDs: affected,
-                wroteBusinessFact: true,
+                wroteBusinessFact: result.didRecord,
                 note: note
             )
         )
@@ -459,7 +459,7 @@ extension ReadModelRevisionCenter {
             DomainMutationResult(
                 command: .medicationDose(petID: result.subjectID, medicationID: result.medicationID),
                 affectedEntityIDs: [result.subjectID, result.medicationID, result.eventID],
-                wroteBusinessFact: true,
+                wroteBusinessFact: result.didRecord,
                 note: note
             )
         )

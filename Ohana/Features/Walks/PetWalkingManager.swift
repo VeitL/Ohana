@@ -189,7 +189,17 @@ final class PetWalkingManager {
 
         // 隐式读取当前设备执行者（静默，不弹窗）
         let executorId = activeHumanSelection.currentHumanId
+        guard !CareFactWritePolicy.executorCannotWrite(executorId, context: modelContext) else {
+            reset()
+            walkStopStartedAt = nil
+            return
+        }
         let executorIds = SharedCareParticipantIDs.normalized(sharedExecutorIds, preferredFirst: executorId)
+        guard !CareFactWritePolicy.anyExecutorCannotWrite(executorIds, context: modelContext) else {
+            reset()
+            walkStopStartedAt = nil
+            return
+        }
 
         let startedAt = startTime ?? Date()
         let endedAt = Date()
@@ -225,17 +235,43 @@ final class PetWalkingManager {
             modelContext.insert(walkLog)
             modelContext.safeSave()
 
-            var earnedCoconuts = 0
+            var reward: (humanGot: Int, petGot: Int)?
             if !isTooShortForReward {
-                let reward = EconomyRewardDiscipline.awardCareAction(
+                reward = EconomyRewardDiscipline.awardCareAction(
                     type: .walk(distanceMeters: distanceMeters),
                     pet: pet,
                     context: modelContext,
                     executorId: executorId,
                     questManager: questManager
                 )
-                earnedCoconuts = reward.humanGot + reward.petGot
             }
+            let metadataJSON = careLedger.rewardMetadata(reward, questManager: questManager)
+            let ledgerEvent = careLedger.record(
+                occurredAt: startedAt,
+                actorKind: executorId == nil ? .unknown : .human,
+                actorId: executorId,
+                subjectKind: .pet,
+                subjectId: pet.id.uuidString,
+                eventKind: .walk,
+                actionType: "walk",
+                amountValue: distanceMeters,
+                amountUnit: "m",
+                note: walkLog.behaviorNotes ?? "",
+                source: .quickAction,
+                sourceEventId: nil,
+                sourceReminderId: nil,
+                legacyModelName: String(describing: PetWalkLog.self),
+                legacyModelId: walkLog.id.uuidString,
+                coconutDelta: careLedger.rewardDelta(reward),
+                rewardLogId: nil,
+                privacyFieldRaw: nil,
+                metadataJSON: metadataJSON,
+                context: modelContext,
+                save: false
+            )
+            CloudSyncMutationRecorder.markModified(ledgerEvent, context: modelContext, modifiedAt: endedAt)
+            careLedger.syncOasisTreeEnergyIfNeeded(metadataJSON: metadataJSON, context: modelContext)
+            let earnedCoconuts = reward.map { $0.humanGot + $0.petGot } ?? 0
             walkLog.coconutsEarned = earnedCoconuts
             walkLogs = [walkLog]
         }

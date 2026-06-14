@@ -381,6 +381,7 @@ nonisolated struct PetHygieneLogBackup: Codable {
     var type: String
     var petId: String?
     var executorId: String?
+    var sharedSessionId: String?
 }
 
 nonisolated struct PetFoodRecordBackup: Codable {

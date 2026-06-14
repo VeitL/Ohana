@@ -14,7 +14,16 @@ struct PetCareTrackingCommandResult: Equatable {
     let linkedPottyLogID: UUID?
     let careType: CareType
     let coconutDelta: Int
-    var didRecord: Bool = true
+    let occurredAt: Date
+    let disposition: CareFactWriteDisposition
+
+    var didRecord: Bool {
+        disposition.didWriteFact
+    }
+
+    var allowsDerivedEffects: Bool {
+        disposition.allowsDerivedEffects
+    }
 }
 
 struct PetCareTrackingDeleteCommandResult: Equatable {
@@ -93,7 +102,8 @@ enum PetCareTrackingCommandService {
                         linkedPottyLogID: nil,
                         careType: .feeding,
                         coconutDelta: 0,
-                        didRecord: false
+                        occurredAt: date,
+                        disposition: recorded.result.disposition
                     ),
                     recorded.log
                 )
@@ -105,7 +115,8 @@ enum PetCareTrackingCommandService {
                     linkedPottyLogID: nil,
                     careType: .feeding,
                     coconutDelta: recorded.result.coconutDelta,
-                    didRecord: true
+                    occurredAt: date,
+                    disposition: recorded.result.disposition
                 ),
                 recorded.log
             )
@@ -131,7 +142,8 @@ enum PetCareTrackingCommandService {
                     linkedPottyLogID: nil,
                     careType: type,
                     coconutDelta: 0,
-                    didRecord: false
+                    occurredAt: date,
+                    disposition: recorded.result.disposition
                 ),
                 recorded.log
             )
@@ -143,7 +155,8 @@ enum PetCareTrackingCommandService {
                 linkedPottyLogID: recorded.result.linkedPottyLogID,
                 careType: type,
                 coconutDelta: recorded.result.coconutDelta,
-                didRecord: true
+                occurredAt: date,
+                disposition: recorded.result.disposition
             ),
             recorded.log
         )
@@ -319,6 +332,7 @@ enum PetPottyCommandService {
 struct PetCareCommandExecutor {
     let context: ModelContext
     let revisions: DomainRevisionPublishing
+    private let derivations: CareDerivationExecutor
 
     init(context: ModelContext) {
         self.init(context: context, revisions: SharedDomainRevisionPublisher())
@@ -335,6 +349,7 @@ struct PetCareCommandExecutor {
     init(context: ModelContext, revisions: DomainRevisionPublishing) {
         self.context = context
         self.revisions = revisions
+        self.derivations = CareDerivationExecutor(revisions: revisions)
     }
 
     @discardableResult
@@ -356,18 +371,7 @@ struct PetCareCommandExecutor {
             executorId: executorId,
             date: date
         )
-        if recorded.result.didRecord {
-            revisions.publishPetCareRecord(
-                recorded.result,
-                note: note ?? "petCareTracking.record.\(recorded.result.careType.rawValue)"
-            )
-        } else {
-            AppPerformanceMonitor.shared.record(
-                "domain_command_noop",
-                valueMS: 0,
-                note: note ?? "petCareTracking.record.noop.\(recorded.result.careType.rawValue)"
-            )
-        }
+        deriveCareRecord(recorded.result, note: note)
         return recorded
     }
 
@@ -400,11 +404,12 @@ struct PetCareCommandExecutor {
         note: String
     ) -> PetPottyClaimCommandResult {
         let result = PetPottyCommandService.claimUnknownPottyLog(log, pet: pet, context: context)
-        revisions.publishDomainMutation(
-            command: .quickCare(entityID: pet.id, action: "claimUnknownPotty"),
-            affectedEntityIDs: [pet.id, log.id],
-            wroteBusinessFact: true,
-            note: note
+        derivations.derive(
+            .derivedMutation(
+                command: .quickCare(entityID: pet.id, action: "claimUnknownPotty"),
+                affectedEntityIDs: [pet.id, log.id],
+                note: note
+            )
         )
         return result
     }
@@ -416,7 +421,7 @@ struct PetCareCommandExecutor {
         note: String = "catCare.record"
     ) -> CatCareCommandResult {
         let result = CatCareCommandService.record(pet: pet, input: input, context: context)
-        revisions.publishCatCareRecord(result, note: note)
+        deriveCatCareRecord(result, note: note)
         return result
     }
 
@@ -435,5 +440,86 @@ struct PetCareCommandExecutor {
         )
         revisions.publishCatCareUndo(result, note: note)
         return result
+    }
+
+    private func deriveCareRecord(
+        _ result: PetCareTrackingCommandResult,
+        note: String?
+    ) {
+        let revisionNote = note ?? "petCareTracking.record.\(result.careType.rawValue)"
+        let command = DomainCommand.petCareRecord(
+            petID: result.petID,
+            type: result.careType.rawValue
+        )
+        guard result.didRecord else {
+            derivations.derive(
+                .noOp(
+                    command: command,
+                    affectedEntityIDs: [result.petID],
+                    note: note ?? "petCareTracking.record.noop.\(result.careType.rawValue)"
+                )
+            )
+            return
+        }
+        var affected: Set<UUID> = [result.petID, result.careLogID]
+        if let linkedPottyLogID = result.linkedPottyLogID {
+            affected.insert(linkedPottyLogID)
+        }
+        derivations.derive(
+            .active(
+                disposition: result.disposition,
+                fact: CareWriteOutcome.FactPayload(
+                    subjectID: result.petID,
+                    logIDs: Array(affected.subtracting([result.petID])),
+                    factDate: result.occurredAt,
+                    operationDate: result.occurredAt
+                ),
+                revision: CareWriteOutcome.RevisionPayload(
+                    command: command,
+                    affectedEntityIDs: affected,
+                    note: revisionNote
+                ),
+                reward: CareWriteOutcome.RewardPayload(
+                    humanDelta: result.coconutDelta,
+                    petDelta: 0
+                ),
+                noopNote: "\(revisionNote).factOnly"
+            )
+        )
+    }
+
+    private func deriveCatCareRecord(_ result: CatCareCommandResult, note: String) {
+        let command = DomainCommand.catCareRecord(petID: result.petID, action: result.actionRaw)
+        guard result.didRecord else {
+            derivations.derive(
+                .noOp(
+                    command: command,
+                    affectedEntityIDs: [result.petID],
+                    note: "\(note).noop"
+                )
+            )
+            return
+        }
+        var affected: Set<UUID> = [result.petID, result.eventID]
+        if let hygieneLogID = result.hygieneLogID {
+            affected.insert(hygieneLogID)
+        }
+        derivations.derive(
+            .active(
+                disposition: result.disposition,
+                fact: CareWriteOutcome.FactPayload(
+                    subjectID: result.petID,
+                    logIDs: Array(affected.subtracting([result.petID])),
+                    factDate: result.occurredAt,
+                    operationDate: result.occurredAt
+                ),
+                revision: CareWriteOutcome.RevisionPayload(
+                    command: command,
+                    affectedEntityIDs: affected,
+                    note: note
+                ),
+                noopNote: "\(note).factOnly"
+            )
+        )
     }
 }

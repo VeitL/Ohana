@@ -53,6 +53,7 @@ struct ReminderActionCoordinatorTests {
     @Test func manualFeedReminderCompletesThroughCareService() throws {
         let container = try makeContainer()
         let context = container.mainContext
+        let executor = Human(name: "Executor")
         let pet = Pet(name: "Momo", species: "猫")
         let event = Event(
             title: "早餐",
@@ -62,6 +63,7 @@ struct ReminderActionCoordinatorTests {
         )
         event.feedRuleKindRaw = FeedRuleKind.manualReminder.rawValue
         let reminder = Reminder(event: event, scheduledAt: Date().addingTimeInterval(60))
+        context.insert(executor)
         context.insert(pet)
         context.insert(event)
         context.insert(reminder)
@@ -72,7 +74,7 @@ struct ReminderActionCoordinatorTests {
                 "action": "COMPLETE",
                 "reminderId": reminder.id.uuidString
             ],
-            currentActiveHumanId: "human-1",
+            currentActiveHumanId: executor.id.uuidString,
             context: context
         )
 
@@ -88,6 +90,7 @@ struct ReminderActionCoordinatorTests {
         let container = try makeContainer()
         let context = container.mainContext
         let now = Date()
+        let executor = Human(name: "Executor")
         let pet = Pet(name: "Momo", species: "猫")
         pet.dailyPortionGrams = 50
         pet.mainFoodKind = .dry
@@ -120,6 +123,7 @@ struct ReminderActionCoordinatorTests {
             relatedEntityId: FeedingPlanWriter.stockReminderEntityId(pet: pet, foodKind: .dry)
         )
         let staleReminder = Reminder(event: staleEvent, scheduledAt: staleEvent.startDate)
+        context.insert(executor)
         context.insert(pet)
         context.insert(event)
         context.insert(reminder)
@@ -133,7 +137,7 @@ struct ReminderActionCoordinatorTests {
                 "action": "COMPLETE",
                 "reminderId": reminder.id.uuidString
             ],
-            currentActiveHumanId: "human-1",
+            currentActiveHumanId: executor.id.uuidString,
             context: context
         )
 
@@ -144,6 +148,100 @@ struct ReminderActionCoordinatorTests {
         #expect(reminder.statusEnum == .completed)
         #expect(stockEvents.count == 1)
         #expect(stockEvents.first?.id != staleEvent.id)
+    }
+
+    @Test func manualFeedNotificationNoopDoesNotCompleteOrRebuildStockForDeceasedExecutor() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let now = Date()
+        let executor = Human(name: "Former caretaker")
+        executor.passedAwayDate = now
+        let pet = Pet(name: "Momo", species: "猫")
+        pet.dailyPortionGrams = 50
+        pet.mainFoodKind = .dry
+        pet.foodTrackingMode = .precise
+        pet.foodReminderEnabled = true
+        pet.foodReminderAdvanceDays = 2
+        let event = Event(
+            title: "Breakfast",
+            eventType: EventType.foodChange.rawValue,
+            relatedEntityType: EntityKind.pet.rawValue,
+            relatedEntityId: pet.id.uuidString
+        )
+        event.feedRuleKindRaw = FeedRuleKind.manualReminder.rawValue
+        event.feedAmountGrams = 50
+        event.foodKindRaw = FeedFoodKind.dry.rawValue
+        let reminder = Reminder(event: event, scheduledAt: now.addingTimeInterval(60))
+        let foodRecord = PetFoodRecord(
+            brand: "Test",
+            dailyGrams: 50,
+            totalGrams: 10000,
+            foodKind: .dry,
+            startDate: now,
+            pet: pet
+        )
+        context.insert(executor)
+        context.insert(pet)
+        context.insert(event)
+        context.insert(reminder)
+        context.insert(foodRecord)
+        try context.save()
+
+        let result = ReminderActionCoordinator.handle(
+            userInfo: [
+                "action": "COMPLETE",
+                "reminderId": reminder.id.uuidString
+            ],
+            currentActiveHumanId: executor.id.uuidString,
+            context: context
+        )
+
+        #expect(result == .skipped)
+        #expect(reminder.statusEnum == .pending)
+        #expect(event.isOccurrenceMarkedComplete(on: reminder.scheduledAt) == false)
+        #expect(try context.fetch(FetchDescriptor<PetCareLog>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<CareLedgerEvent>()).isEmpty)
+        #expect(stockReminderEvents(for: pet, context: context).isEmpty)
+    }
+
+    @Test func calendarNotificationForDeceasedPetDoesNotWriteHistoricalFactOrCompleteReminder() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let human = Human(name: "Guan")
+        let occurrence = Date(timeIntervalSince1970: 2000)
+        let deceasedPet = Pet(name: "Momo", species: "猫")
+        deceasedPet.passedAwayDate = Date(timeIntervalSince1970: 3000)
+        let event = Event(
+            title: "Feed Momo 42g",
+            startDate: occurrence,
+            eventType: EventType.daily.rawValue,
+            relatedEntityType: EntityKind.pet.rawValue,
+            relatedEntityId: deceasedPet.id.uuidString
+        )
+        let reminder = Reminder(event: event, scheduledAt: occurrence)
+        context.insert(human)
+        context.insert(deceasedPet)
+        context.insert(event)
+        context.insert(reminder)
+        try context.save()
+
+        let result = ReminderActionCoordinator.handle(
+            userInfo: [
+                "action": "COMPLETE",
+                "reminderId": reminder.id.uuidString
+            ],
+            currentActiveHumanId: human.id.uuidString,
+            context: context
+        )
+
+        let careLogs = try context.fetch(FetchDescriptor<PetCareLog>())
+        #expect(result == .skipped)
+        #expect(reminder.statusEnum == .pending)
+        #expect(event.isOccurrenceMarkedComplete(on: occurrence) == false)
+        #expect(careLogs.isEmpty)
+        #expect(try context.fetch(FetchDescriptor<CareLedgerEvent>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<CoconutLedgerEntry>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<EconomyBudgetUsageEvent>()).isEmpty)
     }
 
     @Test func humanMedicationNotificationCompleteWritesDoseLog() throws {

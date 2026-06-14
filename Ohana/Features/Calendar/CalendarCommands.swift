@@ -228,6 +228,31 @@ struct CalendarEventCompletionResult: Equatable {
     let eventID: UUID
     let isCompleted: Bool
     let syncedReminderCount: Int
+    let didChange: Bool
+    let didWriteFact: Bool
+    let allowsDerivedEffects: Bool
+    let factDate: Date?
+    let operationDate: Date
+
+    init(
+        eventID: UUID,
+        isCompleted: Bool,
+        syncedReminderCount: Int,
+        didChange: Bool = true,
+        didWriteFact: Bool? = nil,
+        allowsDerivedEffects: Bool? = nil,
+        factDate: Date? = nil,
+        operationDate: Date = Date()
+    ) {
+        self.eventID = eventID
+        self.isCompleted = isCompleted
+        self.syncedReminderCount = syncedReminderCount
+        self.didChange = didChange
+        self.didWriteFact = didWriteFact ?? didChange
+        self.allowsDerivedEffects = allowsDerivedEffects ?? didChange
+        self.factDate = factDate
+        self.operationDate = operationDate
+    }
 }
 
 enum CalendarEventDeletionScope: Equatable {
@@ -286,34 +311,47 @@ enum CalendarEventCommandService {
     ) -> CalendarEventCompletionResult {
         let reminderCompletion = providedReminderCompletion ?? ReminderCompletionService()
         let shouldComplete = !event.isOccurrenceMarkedComplete(on: occurrenceDate)
-        if shouldComplete,
-           CalendarTaskCompletionSyncService.isPetTask(event: event),
-           !CalendarTaskCompletionSyncService.canWritePetTaskFact(
-               event: event,
-               occurrenceDate: occurrenceDate,
-               pets: pets,
-               context: context,
-               executorId: executorId
-           ) {
-            return CalendarEventCompletionResult(
-                eventID: event.id,
-                isCompleted: event.recurrenceDays <= 0 ? event.isCompleted : event.isOccurrenceMarkedComplete(on: occurrenceDate),
-                syncedReminderCount: 0
+        var petTaskSyncResult: CalendarTaskCompletionSyncService.PetTaskSyncResult?
+        if CalendarTaskCompletionSyncService.isPetTask(event: event) {
+            let syncResult = CalendarTaskCompletionSyncService.syncPetTask(
+                event: event,
+                occurrenceDate: occurrenceDate,
+                isCompleted: shouldComplete,
+                pets: pets,
+                context: context,
+                executorId: executorId,
+                operationDate: now
             )
+            petTaskSyncResult = syncResult
+            if !shouldComplete && syncResult == .noOp {
+                return CalendarEventCompletionResult(
+                    eventID: event.id,
+                    isCompleted: event.recurrenceDays <= 0 ? event.isCompleted : event.isOccurrenceMarkedComplete(on: occurrenceDate),
+                    syncedReminderCount: 0,
+                    didChange: false,
+                    didWriteFact: false,
+                    allowsDerivedEffects: false,
+                    factDate: nil,
+                    operationDate: now
+                )
+            }
+            if shouldComplete && !syncResult.shouldCompleteOccurrence {
+                return CalendarEventCompletionResult(
+                    eventID: event.id,
+                    isCompleted: event.recurrenceDays <= 0 ? event.isCompleted : event.isOccurrenceMarkedComplete(on: occurrenceDate),
+                    syncedReminderCount: 0,
+                    didChange: false,
+                    didWriteFact: syncResult.didWriteFact,
+                    allowsDerivedEffects: syncResult.allowsDerivedEffects,
+                    factDate: occurrenceDate,
+                    operationDate: now
+                )
+            }
         }
         event.setOccurrenceMarkedComplete(shouldComplete, on: occurrenceDate)
         if event.recurrenceDays <= 0 {
             event.isCompleted = shouldComplete
         }
-        CalendarTaskCompletionSyncService.syncPetTask(
-            event: event,
-            occurrenceDate: occurrenceDate,
-            isCompleted: shouldComplete,
-            pets: pets,
-            context: context,
-            executorId: executorId,
-            operationDate: now
-        )
 
         let remindersToSync = remindersForCompletionSync(event: event, now: now)
         for reminder in remindersToSync {
@@ -330,7 +368,12 @@ enum CalendarEventCommandService {
         return CalendarEventCompletionResult(
             eventID: event.id,
             isCompleted: shouldComplete,
-            syncedReminderCount: remindersToSync.count
+            syncedReminderCount: remindersToSync.count,
+            didChange: true,
+            didWriteFact: petTaskSyncResult?.didWriteFact ?? true,
+            allowsDerivedEffects: petTaskSyncResult?.allowsDerivedEffects ?? true,
+            factDate: occurrenceDate,
+            operationDate: now
         )
     }
 
@@ -444,6 +487,7 @@ enum CalendarEventCommandService {
 struct CalendarCommandExecutor {
     let context: ModelContext
     let revisions: DomainRevisionPublishing
+    private let derivations: CareDerivationExecutor
     let reminderScheduling: ReminderSchedulingManaging
     let reminderCompletion: ReminderCompleting
 
@@ -482,6 +526,7 @@ struct CalendarCommandExecutor {
     ) {
         self.context = context
         self.revisions = revisions
+        derivations = CareDerivationExecutor(revisions: revisions)
         self.reminderScheduling = reminderScheduling
         self.reminderCompletion = reminderCompletion
     }
@@ -528,7 +573,7 @@ struct CalendarCommandExecutor {
             executorId: executorId,
             reminderCompletion: reminderCompletion
         )
-        revisions.publishCalendarEventCompletion(result, note: note)
+        deriveCalendarCompletion(result, occurrenceDate: occurrenceDate, note: note)
         return result
     }
 
@@ -547,6 +592,42 @@ struct CalendarCommandExecutor {
         )
         revisions.publishCalendarEventDeletion(outcome, scope: scope, note: note)
         return outcome
+    }
+
+    @discardableResult
+    private func deriveCalendarCompletion(
+        _ result: CalendarEventCompletionResult,
+        occurrenceDate: Date,
+        note: String
+    ) -> CareDerivationResult {
+        let command = DomainCommand.calendarEventCompletion(eventID: result.eventID, isCompleted: result.isCompleted)
+        guard result.didWriteFact || result.didChange else {
+            return derivations.derive(
+                .noOp(
+                    command: command,
+                    affectedEntityIDs: [result.eventID],
+                    note: note
+                )
+            )
+        }
+
+        return derivations.derive(
+            .active(
+                disposition: result.allowsDerivedEffects ? .active : .noOp,
+                fact: CareWriteOutcome.FactPayload(
+                    subjectID: result.eventID,
+                    logIDs: [result.eventID],
+                    factDate: result.factDate ?? occurrenceDate,
+                    operationDate: result.operationDate
+                ),
+                revision: CareWriteOutcome.RevisionPayload(
+                    command: command,
+                    affectedEntityIDs: [result.eventID],
+                    note: note
+                ),
+                noopNote: note
+            )
+        )
     }
 }
 

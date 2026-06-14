@@ -101,9 +101,10 @@ extension VerticalSolidHomeView {
             let petID = target.pet.id
             let medicationID = target.medication.id
             enqueueHomeCommand(.medicationDose(petID: petID, medicationID: medicationID)) {
-                commandExecutor.recordMedicationDose(petID: petID, medicationID: medicationID)
-                applyTodayFocusMutationFeedback(entityId: petID)
-                UINotificationFeedbackGenerator().notificationOccurred(.success)
+                if commandExecutor.recordMedicationDose(petID: petID, medicationID: medicationID) {
+                    applyTodayFocusMutationFeedback(entityId: petID)
+                    UINotificationFeedbackGenerator().notificationOccurred(.success)
+                }
             }
             return
         }
@@ -112,9 +113,10 @@ extension VerticalSolidHomeView {
            let event = allEvents.first(where: { $0.id == eventId }) {
             let eventID = event.id
             enqueueHomeCommand(.todayFocus(entityID: eventID, action: "eventComplete")) {
-                commandExecutor.completeTodayFocusEvent(eventID: eventID)
-                applyTodayFocusMutationFeedback(entityId: eventID)
-                UINotificationFeedbackGenerator().notificationOccurred(.success)
+                if commandExecutor.completeTodayFocusEvent(eventID: eventID) {
+                    applyTodayFocusMutationFeedback(entityId: eventID)
+                    UINotificationFeedbackGenerator().notificationOccurred(.success)
+                }
             }
             return
         }

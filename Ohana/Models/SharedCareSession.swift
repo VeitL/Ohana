@@ -11,7 +11,9 @@ import SwiftData
 enum SharedCareActionKind: String, Codable, CaseIterable {
     case feeding
     case watering
+    case potty
     case pottyUnknown
+    case hygiene
     case litterScoop
     case litterChange
     case waterChange

@@ -39,15 +39,6 @@ extension QuickFeedDetailContent {
         draftStore.inputError = nil
         let foodKind = selectedFoodKind ?? draftStore.manualFoodKindDraft
         let action = {
-            if saveAsDefault {
-                defaultFeedGrams = grams
-            }
-            SharedPetSelectionMemory.saveSelection(
-                Set(selectedFeedTargets.map(\.id)),
-                sourcePet: pet,
-                scope: "feeding.manual",
-                candidates: sameSpeciesFeedPets
-            )
             let result = commandExecutor.recordManual(
                 pet: pet,
                 targets: selectedFeedTargets,
@@ -57,6 +48,20 @@ extension QuickFeedDetailContent {
                 foodRecords: observedFoodRecords,
                 allEvents: allEvents,
                 executorId: currentUserId
+            )
+            guard result.didRecord else { return }
+            guard result.allowsDerivedEffects else {
+                reloadFeedSnapshots(forceSnapshot: true)
+                return
+            }
+            if saveAsDefault {
+                defaultFeedGrams = grams
+            }
+            SharedPetSelectionMemory.saveSelection(
+                Set(selectedFeedTargets.map(\.id)),
+                sourcePet: pet,
+                scope: "feeding.manual",
+                candidates: sameSpeciesFeedPets
             )
             triggerFeedCheckInFeedback(foodKind: result.foodKind, grams: result.grams, affectsStock: result.affectsStock)
             let message = result.targetCount > 1
@@ -92,6 +97,10 @@ extension QuickFeedDetailContent {
                     l.tr(zh: "补录窗口已过", en: "Catch-up window closed", de: "Nachtrag nicht mehr möglich"),
                     tint: Color.goRed
                 )
+                return
+            }
+            guard result.allowsDerivedEffects else {
+                reloadFeedSnapshots(forceSnapshot: true)
                 return
             }
             triggerFeedCheckInFeedback(foodKind: result.foodKind, grams: result.grams, affectsStock: result.affectsStock)
@@ -132,6 +141,11 @@ extension QuickFeedDetailContent {
             treatKind: draftStore.selectedTreatKind,
             executorId: currentUserId
         )
+        guard result.didRecord else { return }
+        guard result.allowsDerivedEffects else {
+            reloadFeedSnapshots(forceSnapshot: true)
+            return
+        }
         showTreatSavedCelebration()
         triggerTreatCheckInFeedback(grams: result.grams)
         afterFoodLogSaved(message: l.tr(zh: "已记录零食", en: "Treat saved", de: "Snack gespeichert"), tint: treatTint)

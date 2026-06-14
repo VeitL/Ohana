@@ -41,7 +41,16 @@ struct PetHygieneCheckInCommandResult: Equatable {
     let subjectID: UUID
     let hygieneType: HygieneType
     let coconutDelta: Int
-    var didRecord: Bool = true
+    let occurredAt: Date
+    let disposition: CareFactWriteDisposition
+
+    var didRecord: Bool {
+        disposition.didWriteFact
+    }
+
+    var allowsDerivedEffects: Bool {
+        disposition.allowsDerivedEffects
+    }
 }
 
 struct PetHygieneDeleteCommandResult: Equatable {
@@ -101,7 +110,8 @@ enum PetHygieneCommandService {
                     subjectID: recorded.result.subjectID,
                     hygieneType: recorded.result.hygieneType,
                     coconutDelta: 0,
-                    didRecord: false
+                    occurredAt: date,
+                    disposition: recorded.result.disposition
                 ),
                 recorded.log
             )
@@ -112,7 +122,8 @@ enum PetHygieneCommandService {
                 subjectID: recorded.result.subjectID,
                 hygieneType: recorded.result.hygieneType,
                 coconutDelta: recorded.result.coconutDelta,
-                didRecord: true
+                occurredAt: date,
+                disposition: recorded.result.disposition
             ),
             recorded.log
         )
@@ -133,6 +144,11 @@ enum PetHygieneCommandService {
         }
         CloudSyncMutationRecorder.markDeleted(log, pet: pet, context: context)
         context.delete(log)
+        SharedCareSessionMaintenance.reconcileAfterDeletingHygieneChild(
+            logID: logID,
+            ledgerEvents: ledgerEvents,
+            context: context
+        )
         context.safeSave()
         return PetHygieneDeleteCommandResult(
             logID: logID,
@@ -254,6 +270,7 @@ enum PetHygieneCommandService {
 struct PetHygieneCommandExecutor {
     let context: ModelContext
     let revisions: DomainRevisionPublishing
+    private let derivations: CareDerivationExecutor
     let reminderScheduling: ReminderSchedulingManaging
 
     init(context: ModelContext) {
@@ -287,6 +304,7 @@ struct PetHygieneCommandExecutor {
     ) {
         self.context = context
         self.revisions = revisions
+        self.derivations = CareDerivationExecutor(revisions: revisions)
         self.reminderScheduling = reminderScheduling
     }
 
@@ -305,15 +323,7 @@ struct PetHygieneCommandExecutor {
             executorId: executorId,
             date: date
         )
-        if recorded.result.didRecord {
-            revisions.publishPetHygieneRecord(recorded.result, note: note)
-        } else {
-            AppPerformanceMonitor.shared.record(
-                "domain_command_noop",
-                valueMS: 0,
-                note: note
-            )
-        }
+        deriveRecord(recorded.result, note: note)
         return recorded
     }
 
@@ -346,5 +356,43 @@ struct PetHygieneCommandExecutor {
         )
         revisions.publishPetHygienePlan(result, note: note)
         return result
+    }
+
+    private func deriveRecord(_ result: PetHygieneCheckInCommandResult, note: String) {
+        let command = DomainCommand.petHygieneRecord(
+            petID: result.subjectID,
+            type: result.hygieneType.rawValue
+        )
+        guard result.didRecord else {
+            derivations.derive(
+                .noOp(
+                    command: command,
+                    affectedEntityIDs: [result.subjectID],
+                    note: note
+                )
+            )
+            return
+        }
+        derivations.derive(
+            .active(
+                disposition: result.disposition,
+                fact: CareWriteOutcome.FactPayload(
+                    subjectID: result.subjectID,
+                    logIDs: [result.logID],
+                    factDate: result.occurredAt,
+                    operationDate: result.occurredAt
+                ),
+                revision: CareWriteOutcome.RevisionPayload(
+                    command: command,
+                    affectedEntityIDs: [result.subjectID, result.logID],
+                    note: note
+                ),
+                reward: CareWriteOutcome.RewardPayload(
+                    humanDelta: result.coconutDelta,
+                    petDelta: 0
+                ),
+                noopNote: "\(note).factOnly"
+            )
+        )
     }
 }

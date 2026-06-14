@@ -505,7 +505,8 @@ nonisolated enum CloudSyncRecordApplier {
             date: record.date(for: "date") ?? metadata.lastModifiedAt,
             type: HygieneType(rawValue: record.string(for: "type") ?? "") ?? .bath,
             pet: pet,
-            executorId: record.string(for: "executorId")
+            executorId: record.string(for: "executorId"),
+            sharedSessionId: record.string(for: "sharedSessionId") ?? ""
         )
         log.id = metadata.localRecordUUID
         context.insert(log)

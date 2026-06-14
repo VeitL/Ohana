@@ -30,20 +30,20 @@ private func fetchQuickFeedModelsOrLog<T: PersistentModel>(
 struct QuickFeedCommandExecutor {
     private let context: ModelContext
     private let careEvents: CareEventRecording
-    private let revisions: DomainRevisionPublishing
+    private let derivations: CareDerivationExecutor
     private let reminderScheduling: ReminderSchedulingManaging
 
     init(context: ModelContext) {
         self.context = context
         careEvents = CareEventService()
-        revisions = SharedDomainRevisionPublisher()
+        derivations = CareDerivationExecutor()
         reminderScheduling = ReminderSchedulingManager()
     }
 
     init(context: ModelContext, revisionCenter: ReadModelRevisionCenter) {
         self.context = context
         careEvents = CareEventService()
-        revisions = SharedDomainRevisionPublisher(center: revisionCenter)
+        derivations = CareDerivationExecutor(revisions: SharedDomainRevisionPublisher(center: revisionCenter))
         reminderScheduling = ReminderSchedulingManager()
     }
 
@@ -55,7 +55,7 @@ struct QuickFeedCommandExecutor {
     ) {
         self.context = context
         self.careEvents = careEvents
-        self.revisions = revisions
+        derivations = CareDerivationExecutor(revisions: revisions)
         self.reminderScheduling = reminderScheduling
     }
 
@@ -153,7 +153,7 @@ struct QuickFeedCommandExecutor {
             defaultEnabled: defaultEnabled,
             context: context
         )
-        publishFeedMutation(.feedSettings(petID: pet.id), affectedEntityIDs: [pet.id])
+        deriveFeedMutation(.feedSettings(petID: pet.id), affectedEntityIDs: [pet.id])
     }
 
     func recordManual(
@@ -178,9 +178,10 @@ struct QuickFeedCommandExecutor {
             executorId: executorId,
             careEvents: careEvents
         )
-        publishFeedMutation(
+        deriveFeedMutation(
             .feedLog(petID: pet.id, source: "manual"),
             affectedEntityIDs: targetIDs(pet: pet, targets: targets),
+            wroteBusinessFact: result.didRecord && result.allowsDerivedEffects,
             note: result.targetCount > 1 ? "shared_manual_feed" : "manual_feed"
         )
         return result
@@ -202,11 +203,11 @@ struct QuickFeedCommandExecutor {
             executorId: executorId,
             careEvents: careEvents
         )
-        publishFeedMutation(
+        deriveFeedMutation(
             .feedLog(petID: pet.id, source: "planned"),
             affectedEntityIDs: [pet.id],
-            wroteBusinessFact: result.didRecord,
-            note: result.didRecord ? "planned_feed_completed" : "planned_feed_noop"
+            wroteBusinessFact: result.didRecord && result.allowsDerivedEffects,
+            note: result.didRecord && result.allowsDerivedEffects ? "planned_feed_completed" : "planned_feed_noop"
         )
         return result
     }
@@ -225,9 +226,10 @@ struct QuickFeedCommandExecutor {
             executorId: executorId,
             careEvents: careEvents
         )
-        publishFeedMutation(
+        deriveFeedMutation(
             .feedLog(petID: pet.id, source: "treat"),
             affectedEntityIDs: [pet.id],
+            wroteBusinessFact: result.didRecord && result.allowsDerivedEffects,
             note: treatKind.rawValue
         )
         return result
@@ -248,7 +250,7 @@ struct QuickFeedCommandExecutor {
             allEvents: allEvents,
             context: context
         )
-        publishFeedMutation(
+        deriveFeedMutation(
             .feedPlan(petID: pet.id, action: "save_\(kind.rawValue)"),
             affectedEntityIDs: targetIDs(pet: pet, targets: targets),
             note: "targets:\(result.targetCount)"
@@ -262,7 +264,7 @@ struct QuickFeedCommandExecutor {
             allEvents: allEvents,
             context: context
         )
-        publishFeedMutation(.feedMode(petID: pet.id, mode: FeedOperatingMode.manual.rawValue), affectedEntityIDs: [pet.id])
+        deriveFeedMutation(.feedMode(petID: pet.id, mode: FeedOperatingMode.manual.rawValue), affectedEntityIDs: [pet.id])
     }
 
     func activateExistingRule(
@@ -277,7 +279,7 @@ struct QuickFeedCommandExecutor {
             context: context
         )
         let targetMode: FeedOperatingMode = kind == .manualReminder ? .manualReminder : .autoFeeder
-        publishFeedMutation(
+        deriveFeedMutation(
             .feedMode(petID: pet.id, mode: targetMode.rawValue),
             affectedEntityIDs: [pet.id],
             wroteBusinessFact: result.didSwitch,
@@ -289,7 +291,7 @@ struct QuickFeedCommandExecutor {
     func setFeedMode(_ mode: FeedOperatingMode, pet: Pet) {
         let previousMode = FeedOperatingMode.stored(for: pet.id)
         SetFeedModeCommand.run(mode, pet: pet)
-        publishFeedMutation(
+        deriveFeedMutation(
             .feedMode(petID: pet.id, mode: mode.rawValue),
             affectedEntityIDs: [pet.id],
             wroteBusinessFact: previousMode != mode,
@@ -310,7 +312,7 @@ struct QuickFeedCommandExecutor {
             allEvents: allEvents,
             context: context
         )
-        publishFeedMutation(
+        deriveFeedMutation(
             .feedPlan(petID: pet.id, action: "delete_\(kind.rawValue)"),
             affectedEntityIDs: [pet.id],
             note: result.shouldSwitchToManual ? "switch_to_manual" : nil
@@ -358,7 +360,7 @@ struct QuickFeedCommandExecutor {
             expenseDate: expenseDate,
             expenseNote: expenseNote
         )
-        publishFeedMutation(
+        deriveFeedMutation(
             .feedStock(petID: pet.id, action: recordToUpdate == nil ? "create" : "update"),
             affectedEntityIDs: [pet.id],
             note: foodKind.rawValue
@@ -379,7 +381,7 @@ struct QuickFeedCommandExecutor {
             allEvents: allEvents,
             context: context
         )
-        publishFeedMutation(
+        deriveFeedMutation(
             .feedStock(petID: pet.id, action: "reminder_settings"),
             affectedEntityIDs: [pet.id],
             note: enabled ? "enabled" : "disabled"
@@ -400,7 +402,7 @@ struct QuickFeedCommandExecutor {
             allEvents: allEvents,
             context: context
         )
-        publishFeedMutation(
+        deriveFeedMutation(
             .feedStock(petID: pet.id, action: "correct"),
             affectedEntityIDs: [pet.id],
             note: record.foodKind.rawValue
@@ -423,7 +425,7 @@ struct QuickFeedCommandExecutor {
             allEvents: allEvents,
             context: context
         )
-        publishFeedMutation(.feedLog(petID: pet.id, source: "update"), affectedEntityIDs: [pet.id])
+        deriveFeedMutation(.feedLog(petID: pet.id, source: "update"), affectedEntityIDs: [pet.id])
         return result
     }
 
@@ -434,7 +436,7 @@ struct QuickFeedCommandExecutor {
             allEvents: allEvents,
             context: context
         )
-        publishFeedMutation(.feedLog(petID: pet.id, source: "delete"), affectedEntityIDs: [pet.id])
+        deriveFeedMutation(.feedLog(petID: pet.id, source: "delete"), affectedEntityIDs: [pet.id])
         return result
     }
 
@@ -445,7 +447,7 @@ struct QuickFeedCommandExecutor {
             allEvents: allEvents,
             context: context
         )
-        publishFeedMutation(
+        deriveFeedMutation(
             .feedStock(petID: pet.id, action: "delete_record"),
             affectedEntityIDs: [pet.id],
             note: record.foodKind.rawValue
@@ -459,7 +461,7 @@ struct QuickFeedCommandExecutor {
             allEvents: allEvents,
             context: context
         )
-        publishFeedMutation(
+        deriveFeedMutation(
             .feedMaintenance(petID: pet.id, action: "materialize_auto_logs"),
             affectedEntityIDs: [pet.id],
             wroteBusinessFact: result.insertedCount > 0,
@@ -486,7 +488,7 @@ struct QuickFeedCommandExecutor {
             context: context
         )
         if existing == nil, let petID = UUID(uuidString: event.relatedEntityId) {
-            publishFeedMutation(
+            deriveFeedMutation(
                 .feedMaintenance(petID: petID, action: "create_plan_reminder"),
                 affectedEntityIDs: [petID],
                 note: event.id.uuidString
@@ -498,7 +500,7 @@ struct QuickFeedCommandExecutor {
     func setMainFoodKind(pet: Pet, foodKind: FeedFoodKind) {
         let previousKind = pet.mainFoodKind
         SetMainFoodKindCommand.run(pet: pet, foodKind: foodKind, context: context)
-        publishFeedMutation(
+        deriveFeedMutation(
             .feedSettings(petID: pet.id),
             affectedEntityIDs: [pet.id],
             wroteBusinessFact: previousKind != foodKind,
@@ -516,21 +518,26 @@ struct QuickFeedCommandExecutor {
         await reminderScheduling.scheduleManyIfNeeded(reminders: reminders, context: context, source: .detail)
     }
 
-    private func publishFeedMutation(
+    private func deriveFeedMutation(
         _ command: DomainCommand,
         affectedEntityIDs: Set<UUID>,
         wroteBusinessFact: Bool = true,
         note: String? = nil
     ) {
         guard wroteBusinessFact else {
-            AppPerformanceMonitor.shared.record("domain_command_noop", valueMS: 0, note: note ?? "\(command)")
+            derivations.derive(
+                .noOp(
+                    command: command,
+                    affectedEntityIDs: affectedEntityIDs,
+                    note: note ?? "\(command)"
+                )
+            )
             return
         }
-        revisions.publish(
-            DomainMutationResult(
+        derivations.derive(
+            .derivedMutation(
                 command: command,
                 affectedEntityIDs: affectedEntityIDs,
-                wroteBusinessFact: true,
                 note: note
             )
         )

@@ -4,6 +4,7 @@ import Testing
 @testable import Ohana
 
 @MainActor
+@Suite(.serialized)
 struct QuickWaterCommandTests {
     @Test func waterPlanWriterReplacesOldPlanEvents() throws {
         let container = try makeContainer()
@@ -212,12 +213,12 @@ struct QuickWaterCommandTests {
         #expect(center.homeRevision.value == 1)
     }
 
-    @Test func quickWaterExecutorNoopsForRecycledPetAtCommandBoundary() throws {
+    @Test func quickWaterExecutorNoopsForDeceasedPetAtCommandBoundary() throws {
         let container = try makeContainer()
         let context = container.mainContext
         let center = ReadModelRevisionCenter()
         let pet = Pet(name: "Momo", species: "猫")
-        pet.trashedAt = date(year: 2026, month: 6, day: 1, hour: 9)
+        pet.passedAwayDate = date(year: 2026, month: 6, day: 1, hour: 9)
         context.insert(pet)
         try context.save()
         let executor = QuickWaterCommandExecutor(
@@ -245,16 +246,17 @@ struct QuickWaterCommandTests {
         #expect(center.lastMutation == nil)
     }
 
-    @Test func quickWaterExecutorNoopsForRecycledExecutorDisposition() throws {
+    @Test func quickWaterExecutorWritesForMissingExecutorThroughFallbackOwner() throws {
         let container = try makeContainer()
         let context = container.mainContext
         let center = ReadModelRevisionCenter()
         let pet = Pet(name: "Momo", species: "猫")
-        let executorHuman = Human(name: "Former caretaker")
-        executorHuman.trashedAt = date(year: 2026, month: 6, day: 1, hour: 9)
+        let activeHuman = Human(name: "Active")
         context.insert(pet)
-        context.insert(executorHuman)
+        context.insert(activeHuman)
         try context.save()
+        let cleanup = isolateEconomy(activeHumanID: activeHuman.id.uuidString, context: context, pets: [pet])
+        defer { cleanup() }
         let executor = QuickWaterCommandExecutor(
             context: context,
             activeHumanSelection: UserDefaultsActiveHumanSelection(),
@@ -268,29 +270,39 @@ struct QuickWaterCommandTests {
             pet: pet,
             targets: [pet],
             amountMl: 120,
-            executorId: executorHuman.id.uuidString
+            executorId: UUID().uuidString
         )
 
-        #expect(result.coconutDelta == 0)
-        #expect(result.targetCount == 0)
-        #expect(try context.fetch(FetchDescriptor<PetCareLog>()).isEmpty)
-        #expect(try context.fetch(FetchDescriptor<CareLedgerEvent>()).isEmpty)
-        #expect(try context.fetch(FetchDescriptor<CoconutLedgerEntry>()).isEmpty)
-        #expect(center.homeRevision.value == 0)
-        #expect(center.lastMutation == nil)
+        #expect(result.coconutDelta > 0)
+        #expect(result.targetCount == 1)
+        #expect(try context.fetch(FetchDescriptor<PetCareLog>()).count == 1)
+        #expect(!(try context.fetch(FetchDescriptor<CareLedgerEvent>())).isEmpty)
+        #expect(!(try context.fetch(FetchDescriptor<CoconutLedgerEntry>())).isEmpty)
+        #expect(activeHuman.coconutBalance > 0)
+        #expect(center.homeRevision.value == 1)
+        #expect(center.lastMutation?.wroteBusinessFact == true)
     }
 
-    @Test func quickWaterChangeNoopsDerivedPlanForRecycledExecutorDisposition() throws {
+    @Test func plannedWaterCommandWritesForMissingExecutorDisposition() throws {
         let container = try makeContainer()
         let context = container.mainContext
         let center = ReadModelRevisionCenter()
-        let pet = Pet(name: "Momo", species: "鱼")
-        let executorHuman = Human(name: "Former caretaker")
-        executorHuman.trashedAt = date(year: 2026, month: 6, day: 1, hour: 9)
+        let pet = Pet(name: "Momo", species: "猫")
+        let scheduledAt = Date().addingTimeInterval(-60)
+        let event = Event(
+            title: "Momo 喂水",
+            startDate: scheduledAt,
+            eventType: EventType.daily.rawValue,
+            relatedEntityType: WaterPlanWriter.entityType,
+            relatedEntityId: pet.id.uuidString
+        )
+        let reminder = Reminder(event: event, scheduledAt: scheduledAt)
         context.insert(pet)
-        context.insert(executorHuman)
+        context.insert(event)
+        context.insert(reminder)
         try context.save()
-        defer { clearWaterDefaults(for: pet) }
+        let cleanup = isolateEconomy(activeHumanID: nil, context: context, pets: [pet])
+        defer { cleanup() }
         let executor = QuickWaterCommandExecutor(
             context: context,
             activeHumanSelection: UserDefaultsActiveHumanSelection(),
@@ -300,43 +312,166 @@ struct QuickWaterCommandTests {
             revisions: SharedDomainRevisionPublisher(center: center)
         )
 
-        let reminders = executor.recordWaterChange(
+        let result = executor.completePlannedWater(
+            pet: pet,
+            reminder: reminder,
+            amountMl: 120,
+            executorId: UUID().uuidString
+        )
+
+        #expect(result.didRecord)
+        #expect(result.coconutDelta == 0)
+        #expect(reminder.isCompleted)
+        #expect(try context.fetch(FetchDescriptor<PetCareLog>()).count == 1)
+        #expect(!(try context.fetch(FetchDescriptor<CareLedgerEvent>())).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<CoconutLedgerEntry>()).isEmpty)
+        #expect(center.homeRevision.value == 1)
+        #expect(center.lastMutation?.wroteBusinessFact == true)
+    }
+
+    @Test func quickWaterChangeWritesDerivedPlanForMissingExecutorDisposition() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let center = ReadModelRevisionCenter()
+        let pet = Pet(name: "Momo", species: "鱼")
+        context.insert(pet)
+        try context.save()
+        defer { clearWaterDefaults(for: pet) }
+        let cleanup = isolateEconomy(activeHumanID: nil, context: context, pets: [pet])
+        defer { cleanup() }
+        let executor = QuickWaterCommandExecutor(
+            context: context,
+            activeHumanSelection: UserDefaultsActiveHumanSelection(),
+            careEvents: CareEventService(),
+            userNotifications: SharedUserNotificationManager(),
+            reminderScheduling: ReminderSchedulingManager(),
+            revisions: SharedDomainRevisionPublisher(center: center)
+        )
+
+        let result = executor.recordWaterChange(
             pet: pet,
             targets: [pet],
             allEvents: [],
             intervalDays: 7,
             reminderOn: true,
             cycleAnchor: date(year: 2026, month: 6, day: 1),
-            executorId: executorHuman.id.uuidString
+            executorId: UUID().uuidString
         )
 
-        #expect(reminders.isEmpty)
-        #expect(try context.fetch(FetchDescriptor<PetCareLog>()).isEmpty)
-        #expect(try context.fetch(FetchDescriptor<Event>()).isEmpty)
-        #expect(try context.fetch(FetchDescriptor<Reminder>()).isEmpty)
-        #expect(try context.fetch(FetchDescriptor<CareLedgerEvent>()).isEmpty)
+        #expect(result.didRecord)
+        #expect(!result.reminders.isEmpty)
+        #expect(try context.fetch(FetchDescriptor<PetCareLog>()).count == 1)
+        #expect(!(try context.fetch(FetchDescriptor<Event>())).isEmpty)
+        #expect(!(try context.fetch(FetchDescriptor<Reminder>())).isEmpty)
+        #expect(!(try context.fetch(FetchDescriptor<CareLedgerEvent>())).isEmpty)
         #expect(try context.fetch(FetchDescriptor<CoconutLedgerEntry>()).isEmpty)
-        #expect(center.homeRevision.value == 0)
-        #expect(center.lastMutation == nil)
+        #expect(center.homeRevision.value > 0)
+        #expect(center.lastMutation?.wroteBusinessFact == true)
     }
 
-    @Test func plannedWaterCatchUpWithinSixHoursDoesNotAwardCoconuts() throws {
+    @Test func filterCleanWritesDerivedPlanForMissingExecutorDisposition() throws {
         let container = try makeContainer()
         let context = container.mainContext
-        let now = date(year: 2026, month: 6, day: 1, hour: 12)
+        let center = ReadModelRevisionCenter()
+        let pet = Pet(name: "Momo", species: "鱼")
+        context.insert(pet)
+        try context.save()
+        defer { clearWaterDefaults(for: pet) }
+        let cleanup = isolateEconomy(activeHumanID: nil, context: context, pets: [pet])
+        defer { cleanup() }
+        let executor = QuickWaterCommandExecutor(
+            context: context,
+            activeHumanSelection: UserDefaultsActiveHumanSelection(),
+            careEvents: CareEventService(),
+            userNotifications: SharedUserNotificationManager(),
+            reminderScheduling: ReminderSchedulingManager(),
+            revisions: SharedDomainRevisionPublisher(center: center)
+        )
+
+        let result = executor.recordFilterClean(
+            pet: pet,
+            targets: [pet],
+            allEvents: [],
+            cleanIntervalDays: 14,
+            replaceIntervalDays: 60,
+            reminderOn: true,
+            executorId: UUID().uuidString
+        )
+
+        #expect(result.didRecord)
+        #expect(!result.reminders.isEmpty)
+        #expect(try context.fetch(FetchDescriptor<PetCareLog>()).count == 1)
+        #expect(!(try context.fetch(FetchDescriptor<Event>())).isEmpty)
+        #expect(!(try context.fetch(FetchDescriptor<Reminder>())).isEmpty)
+        #expect(!(try context.fetch(FetchDescriptor<CareLedgerEvent>())).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<CoconutLedgerEntry>()).isEmpty)
+        #expect(center.homeRevision.value > 0)
+        #expect(center.lastMutation?.wroteBusinessFact == true)
+    }
+
+    @Test func plannedWaterCatchUpWithinSixHoursAwardsOnOperationDay() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let now = date(year: 2026, month: 6, day: 2, hour: 1)
+        let scheduledAt = date(year: 2026, month: 6, day: 1, hour: 20)
         let pet = Pet(name: "Momo", species: "猫")
         let event = Event(
             title: "Momo 喂水",
-            startDate: date(year: 2026, month: 6, day: 1, hour: 8),
+            startDate: scheduledAt,
             eventType: EventType.daily.rawValue,
             relatedEntityType: WaterPlanWriter.entityType,
             relatedEntityId: pet.id.uuidString
         )
-        let reminder = Reminder(event: event, scheduledAt: date(year: 2026, month: 6, day: 1, hour: 8))
+        let reminder = Reminder(event: event, scheduledAt: scheduledAt)
+        let executorHuman = Human(name: "Guan")
         context.insert(pet)
+        context.insert(executorHuman)
         context.insert(event)
         context.insert(reminder)
         try context.save()
+        let defaults = UserDefaults.standard
+        let oldActiveHumanID = defaults.object(forKey: "currentActiveHumanId")
+        let oldCooldownLogs = defaults.object(forKey: QuestManager.Keys.cooldownLogs)
+        let careObjectKeys = ["pet.\(pet.id.uuidString)"]
+        let householdKey = CoconutEconomyPolicyV2.householdBudgetKey()
+        defaults.set(executorHuman.id.uuidString, forKey: "currentActiveHumanId")
+        defaults.removeObject(forKey: QuestManager.Keys.cooldownLogs)
+        EconomyDailyBudgetStore.reset(
+            householdKey: householdKey,
+            memberKey: executorHuman.id.uuidString,
+            careObjectKeys: careObjectKeys,
+            date: scheduledAt
+        )
+        EconomyDailyBudgetStore.reset(
+            householdKey: householdKey,
+            memberKey: executorHuman.id.uuidString,
+            careObjectKeys: careObjectKeys,
+            date: now
+        )
+        defer {
+            if let oldCooldownLogs {
+                defaults.set(oldCooldownLogs, forKey: QuestManager.Keys.cooldownLogs)
+            } else {
+                defaults.removeObject(forKey: QuestManager.Keys.cooldownLogs)
+            }
+            if let oldActiveHumanID {
+                defaults.set(oldActiveHumanID, forKey: "currentActiveHumanId")
+            } else {
+                defaults.removeObject(forKey: "currentActiveHumanId")
+            }
+            EconomyDailyBudgetStore.reset(
+                householdKey: householdKey,
+                memberKey: executorHuman.id.uuidString,
+                careObjectKeys: careObjectKeys,
+                date: scheduledAt
+            )
+            EconomyDailyBudgetStore.reset(
+                householdKey: householdKey,
+                memberKey: executorHuman.id.uuidString,
+                careObjectKeys: careObjectKeys,
+                date: now
+            )
+        }
 
         let reward = CareEventService.completePlannedWater(
             pet: pet,
@@ -347,11 +482,18 @@ struct QuickWaterCommandTests {
             date: now
         )
         let logs = try context.fetch(FetchDescriptor<PetCareLog>())
+        let careLedger = try context.fetch(FetchDescriptor<CareLedgerEvent>())
+        let budgetEvents = try context.fetch(FetchDescriptor<EconomyBudgetUsageEvent>())
+        let historicalDayKey = EconomyDailyBudgetStore.dayKey(for: scheduledAt)
+        let operationDayKey = EconomyDailyBudgetStore.dayKey(for: now)
 
-        #expect(reward?.humanGot == 0)
-        #expect(reward?.petGot == 0)
+        #expect((reward?.humanGot ?? 0) + (reward?.petGot ?? 0) > 0)
         #expect(reminder.isCompleted)
         #expect(logs.count == 1)
+        #expect(logs.first?.date == scheduledAt)
+        #expect(careLedger.contains { $0.eventKindEnum == .care && $0.coconutDelta > 0 && $0.occurredAt == scheduledAt })
+        #expect(budgetEvents.contains { $0.actionKey == "water" && $0.dayKey == operationDayKey })
+        #expect(!budgetEvents.contains { $0.actionKey == "water" && $0.dayKey == historicalDayKey })
     }
 
     @Test func plannedWaterCatchUpAfterSixHoursIsRejected() throws {
@@ -367,7 +509,9 @@ struct QuickWaterCommandTests {
             relatedEntityId: pet.id.uuidString
         )
         let reminder = Reminder(event: event, scheduledAt: date(year: 2026, month: 6, day: 1, hour: 8))
+        let executorHuman = Human(name: "Guan")
         context.insert(pet)
+        context.insert(executorHuman)
         context.insert(event)
         context.insert(reminder)
         try context.save()
@@ -462,6 +606,36 @@ struct QuickWaterCommandTests {
             UserDefaults.standard.removeObject(forKey: "careCalendarDefaultSuppressed_\(kind)_\(petKey)")
             UserDefaults.standard.removeObject(forKey: "careCalendarEventId_\(kind)_\(petKey)")
             UserDefaults.standard.removeObject(forKey: "careCalendarEventId_default_\(kind)_\(petKey)")
+        }
+    }
+
+    private func isolateEconomy(activeHumanID: String?, context: ModelContext, pets: [Pet]) -> () -> Void {
+        let defaults = UserDefaults.standard
+        let previousActiveHumanID = defaults.object(forKey: "currentActiveHumanId")
+        let previousCooldownLogs = defaults.object(forKey: QuestManager.Keys.cooldownLogs)
+        if let activeHumanID {
+            defaults.set(activeHumanID, forKey: "currentActiveHumanId")
+        } else {
+            defaults.removeObject(forKey: "currentActiveHumanId")
+        }
+        defaults.removeObject(forKey: QuestManager.Keys.cooldownLogs)
+        let careObjectKeys = pets.map(\.id.uuidString)
+        EconomyDailyBudgetStore.reset(
+            householdKey: CoconutEconomyPolicyV2.householdBudgetKey(context: context),
+            memberKey: activeHumanID ?? "missing-owner",
+            careObjectKeys: careObjectKeys
+        )
+        return {
+            if let previousActiveHumanID {
+                defaults.set(previousActiveHumanID, forKey: "currentActiveHumanId")
+            } else {
+                defaults.removeObject(forKey: "currentActiveHumanId")
+            }
+            if let previousCooldownLogs {
+                defaults.set(previousCooldownLogs, forKey: QuestManager.Keys.cooldownLogs)
+            } else {
+                defaults.removeObject(forKey: QuestManager.Keys.cooldownLogs)
+            }
         }
     }
 }

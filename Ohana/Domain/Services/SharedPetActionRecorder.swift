@@ -15,6 +15,7 @@ enum SharedPetTargetResolver {
 
     @MainActor
     static func normalizedTargets(_ targets: [Pet], fallback sourcePet: Pet) -> [Pet] {
+        guard EconomyWalletWritePolicy.canWrite(sourcePet) else { return [] }
         let candidates = targets.isEmpty ? [sourcePet] : targets
         let sourceSpecies = normalizedSpecies(sourcePet.species)
         var seen = Set<UUID>()
@@ -103,7 +104,9 @@ enum SharedPetSelectionMemory {
 
 enum SharedPetChildLogStrategy {
     case care(type: CareType)
+    case potty(type: PottyType)
     case unknownPotty(type: PottyType)
+    case hygiene(type: HygieneType)
     case expense(category: ExpenseCategory, note: String)
     case walk(distanceMeters: Double, endDate: Date?, coconutsEarned: Int, behaviorNotes: String?, moodRating: Int)
 }
@@ -180,13 +183,43 @@ struct SharedPetActionResult {
     let sessionID: UUID
     let targetPetIDs: [UUID]
     let careLogIDs: [UUID]
+    let pottyLogIDs: [UUID]
     let pottyLogID: UUID?
     let pottyLog: PetPottyLog?
+    let hygieneLogIDs: [UUID]
     let expenseLogIDs: [UUID]
     let walkLogIDs: [UUID]
     let walkLogs: [PetWalkLog]
     let reward: (humanGot: Int, petGot: Int)
     let disposition: CareFactWriteDisposition
+
+    init(
+        sessionID: UUID,
+        targetPetIDs: [UUID],
+        careLogIDs: [UUID],
+        pottyLogIDs: [UUID] = [],
+        pottyLogID: UUID?,
+        pottyLog: PetPottyLog?,
+        hygieneLogIDs: [UUID] = [],
+        expenseLogIDs: [UUID],
+        walkLogIDs: [UUID],
+        walkLogs: [PetWalkLog],
+        reward: (humanGot: Int, petGot: Int),
+        disposition: CareFactWriteDisposition
+    ) {
+        self.sessionID = sessionID
+        self.targetPetIDs = targetPetIDs
+        self.careLogIDs = careLogIDs
+        self.pottyLogIDs = pottyLogIDs
+        self.pottyLogID = pottyLogID
+        self.pottyLog = pottyLog
+        self.hygieneLogIDs = hygieneLogIDs
+        self.expenseLogIDs = expenseLogIDs
+        self.walkLogIDs = walkLogIDs
+        self.walkLogs = walkLogs
+        self.reward = reward
+        self.disposition = disposition
+    }
 
     var coconutDelta: Int { max(0, reward.humanGot) + max(0, reward.petGot) }
 
@@ -225,7 +258,8 @@ enum SharedPetActionRecorder {
         let dependencies = providedDependencies ?? .live()
         let targets = SharedPetTargetResolver.normalizedTargets(descriptor.targets, fallback: descriptor.sourcePet)
         guard !targets.isEmpty,
-              !CareFactWritePolicy.executorCannotWrite(descriptor.executorId, context: context) else {
+              !CareFactWritePolicy.executorCannotWrite(descriptor.executorId, context: context),
+              !CareFactWritePolicy.anyExecutorCannotWrite(descriptor.executorIds, context: context) else {
             return .noOp()
         }
         let allocationTargetCount = max(targets.count, 1)
@@ -251,6 +285,8 @@ enum SharedPetActionRecorder {
         context.insert(session)
 
         var careLogs: [(Pet, PetCareLog)] = []
+        var pottyLogs: [(Pet, PetPottyLog)] = []
+        var hygieneLogs: [(Pet, PetHygieneLog)] = []
         var expenseLogs: [(Pet, PetExpenseLog)] = []
         var walkLogs: [(Pet, PetWalkLog)] = []
         var pottyLog: PetPottyLog?
@@ -274,6 +310,18 @@ enum SharedPetActionRecorder {
                 context.insert(log)
                 careLogs.append((target, log))
             }
+        case let .potty(type):
+            for target in targets {
+                let log = PetPottyLog(
+                    date: descriptor.date,
+                    type: type,
+                    pet: target,
+                    executorId: descriptor.executorId,
+                    sharedSessionId: session.id.uuidString
+                )
+                context.insert(log)
+                pottyLogs.append((target, log))
+            }
         case let .unknownPotty(type):
             let log = PetPottyLog(
                 date: descriptor.date,
@@ -284,6 +332,18 @@ enum SharedPetActionRecorder {
             )
             context.insert(log)
             pottyLog = log
+        case let .hygiene(type):
+            for target in targets {
+                let log = PetHygieneLog(
+                    date: descriptor.date,
+                    type: type,
+                    pet: target,
+                    executorId: descriptor.executorId,
+                    sharedSessionId: session.id.uuidString
+                )
+                context.insert(log)
+                hygieneLogs.append((target, log))
+            }
         case let .expense(category, note):
             let visibleExpenseNote = SharedCareMetadata.userNoteForStorage(note)
             let perPetAmounts = distributedAmount(descriptor.totalExpenseAmount, count: allocationTargetCount, fractionDigits: 2)
@@ -319,15 +379,24 @@ enum SharedPetActionRecorder {
             }
         }
 
-        if let primary = primaryLegacyModel(careLogs: careLogs, pottyLog: pottyLog, expenseLogs: expenseLogs, walkLogs: walkLogs) {
+        if let primary = primaryLegacyModel(
+            careLogs: careLogs,
+            pottyLogs: pottyLogs,
+            pottyLog: pottyLog,
+            hygieneLogs: hygieneLogs,
+            expenseLogs: expenseLogs,
+            walkLogs: walkLogs
+        ) {
             session.primaryLegacyModelName = primary.name
             session.primaryLegacyModelId = primary.id
         }
         CloudSyncMutationRecorder.markModified(session, context: context, modifiedAt: descriptor.date)
         CloudSyncMutationRecorder.markModified(careLogs.map(\.1), context: context, modifiedAt: descriptor.date)
+        CloudSyncMutationRecorder.markModified(pottyLogs.map(\.1), context: context, modifiedAt: descriptor.date)
         if let pottyLog {
             CloudSyncMutationRecorder.markModified(pottyLog, context: context, modifiedAt: descriptor.date)
         }
+        CloudSyncMutationRecorder.markModified(hygieneLogs.map(\.1), context: context, modifiedAt: descriptor.date)
         CloudSyncMutationRecorder.markModified(expenseLogs.map(\.1), context: context, modifiedAt: descriptor.date)
         context.safeSave()
 
@@ -356,7 +425,9 @@ enum SharedPetActionRecorder {
             session: session,
             targets: targets,
             careLogs: careLogs,
+            pottyLogs: pottyLogs,
             pottyLog: pottyLog,
+            hygieneLogs: hygieneLogs,
             expenseLogs: expenseLogs,
             walkLogs: walkLogs,
             reward: reward,
@@ -379,24 +450,50 @@ enum SharedPetActionRecorder {
                 )
             }
         }
+        if !pottyLogs.isEmpty {
+            for pair in pottyLogs {
+                dependencies.quickActionReminderCompletion.completeNearestPetPottyReminder(
+                    pet: pair.0,
+                    context: context,
+                    executorId: descriptor.executorId,
+                    now: descriptor.date
+                )
+            }
+        }
+        if case let .hygiene(type) = descriptor.childLogStrategy {
+            for pair in hygieneLogs {
+                dependencies.quickActionReminderCompletion.completeNearestPetHygieneReminder(
+                    pet: pair.0,
+                    type: type,
+                    context: context,
+                    executorId: descriptor.executorId,
+                    now: descriptor.date
+                )
+            }
+        }
 
-        publishRevision(
+        deriveRevision(
             descriptor: descriptor,
             session: session,
             targets: targets,
             careLogs: careLogs.map(\.1),
+            pottyLogs: pottyLogs.map(\.1),
             pottyLog: pottyLog,
+            hygieneLogs: hygieneLogs.map(\.1),
             expenseLogs: expenseLogs.map(\.1),
             walkLogs: walkLogs.map(\.1),
-            revisions: dependencies.revisions
+            reward: reward,
+            derivations: CareDerivationExecutor(revisions: dependencies.revisions)
         )
 
         return SharedPetActionResult(
             sessionID: session.id,
             targetPetIDs: targets.map(\.id),
             careLogIDs: careLogs.map(\.1.id),
+            pottyLogIDs: pottyLogs.map(\.1.id),
             pottyLogID: pottyLog?.id,
             pottyLog: pottyLog,
+            hygieneLogIDs: hygieneLogs.map(\.1.id),
             expenseLogIDs: expenseLogs.map(\.1.id),
             walkLogIDs: walkLogs.map(\.1.id),
             walkLogs: walkLogs.map(\.1),
@@ -406,30 +503,54 @@ enum SharedPetActionRecorder {
     }
 
     @MainActor
-    private static func publishRevision(
+    private static func deriveRevision(
         descriptor: SharedPetActionDescriptor,
         session: SharedCareSession,
         targets: [Pet],
         careLogs: [PetCareLog],
+        pottyLogs: [PetPottyLog],
         pottyLog: PetPottyLog?,
+        hygieneLogs: [PetHygieneLog],
         expenseLogs: [PetExpenseLog],
         walkLogs: [PetWalkLog],
-        revisions: DomainRevisionPublishing
+        reward: (humanGot: Int, petGot: Int),
+        derivations: CareDerivationExecutor
     ) {
         var affected = Set(targets.map(\.id))
         affected.insert(session.id)
         careLogs.forEach { affected.insert($0.id) }
+        pottyLogs.forEach { affected.insert($0.id) }
         if let pottyLog { affected.insert(pottyLog.id) }
+        hygieneLogs.forEach { affected.insert($0.id) }
         expenseLogs.forEach { affected.insert($0.id) }
         walkLogs.forEach { affected.insert($0.id) }
-        revisions.publishDomainMutation(
-            command: .quickCare(
-                entityID: descriptor.sourcePet.id,
-                action: "shared.\(descriptor.actionKind.rawValue)"
-            ),
-            affectedEntityIDs: affected,
-            wroteBusinessFact: true,
-            note: "sharedPetAction.\(descriptor.actionKind.rawValue)"
+        derivations.derive(
+            .active(
+                disposition: .active,
+                fact: CareWriteOutcome.FactPayload(
+                    subjectID: descriptor.sourcePet.id,
+                    logIDs: Array(affected),
+                    factDate: descriptor.date,
+                    operationDate: descriptor.date
+                ),
+                revision: CareWriteOutcome.RevisionPayload(
+                    command: .quickCare(
+                        entityID: descriptor.sourcePet.id,
+                        action: "shared.\(descriptor.actionKind.rawValue)"
+                    ),
+                    affectedEntityIDs: affected,
+                    note: "sharedPetAction.\(descriptor.actionKind.rawValue)"
+                ),
+                reward: CareWriteOutcome.RewardPayload(
+                    humanDelta: reward.humanGot,
+                    petDelta: reward.petGot
+                ),
+                sharedSession: CareWriteOutcome.SharedSessionPayload(
+                    sessionID: session.id,
+                    sourcePetID: descriptor.sourcePet.id,
+                    targetPetIDs: targets.map(\.id)
+                )
+            )
         )
     }
 
@@ -451,12 +572,16 @@ enum SharedPetActionRecorder {
 
     private static func primaryLegacyModel(
         careLogs: [(Pet, PetCareLog)],
+        pottyLogs: [(Pet, PetPottyLog)],
         pottyLog: PetPottyLog?,
+        hygieneLogs: [(Pet, PetHygieneLog)],
         expenseLogs: [(Pet, PetExpenseLog)],
         walkLogs: [(Pet, PetWalkLog)]
     ) -> (name: String, id: String)? {
         if let log = careLogs.first?.1 { return ("PetCareLog", log.id.uuidString) }
+        if let log = pottyLogs.first?.1 { return ("PetPottyLog", log.id.uuidString) }
         if let pottyLog { return ("PetPottyLog", pottyLog.id.uuidString) }
+        if let log = hygieneLogs.first?.1 { return ("PetHygieneLog", log.id.uuidString) }
         if let log = expenseLogs.first?.1 { return ("PetExpenseLog", log.id.uuidString) }
         if let log = walkLogs.first?.1 { return ("PetWalkLog", log.id.uuidString) }
         return nil
@@ -468,7 +593,9 @@ enum SharedPetActionRecorder {
         session: SharedCareSession,
         targets: [Pet],
         careLogs: [(Pet, PetCareLog)],
+        pottyLogs: [(Pet, PetPottyLog)],
         pottyLog: PetPottyLog?,
+        hygieneLogs: [(Pet, PetHygieneLog)],
         expenseLogs: [(Pet, PetExpenseLog)],
         walkLogs: [(Pet, PetWalkLog)],
         reward: (humanGot: Int, petGot: Int),
@@ -501,6 +628,22 @@ enum SharedPetActionRecorder {
             )
         }
 
+        for (index, pair) in pottyLogs.enumerated() {
+            dependencies.careLedger.recordPetPotty(
+                log: pair.1,
+                pet: pair.0,
+                source: descriptor.source,
+                coconutDelta: index == 0 ? dependencies.careLedger.rewardDelta(reward) : 0,
+                metadataJSON: index == 0 ? metadata : sharedMetadata(
+                    sessionID: session.id,
+                    targetCount: targets.count,
+                    executorIds: descriptor.executorIds
+                ),
+                context: context,
+                save: true
+            )
+        }
+
         if let pottyLog {
             dependencies.careLedger.record(
                 occurredAt: descriptor.date,
@@ -522,6 +665,36 @@ enum SharedPetActionRecorder {
                 rewardLogId: nil,
                 privacyFieldRaw: nil,
                 metadataJSON: sharedMetadata(
+                    sessionID: session.id,
+                    targetCount: targets.count,
+                    executorIds: descriptor.executorIds
+                ),
+                context: context,
+                save: true
+            )
+        }
+
+        for (index, pair) in hygieneLogs.enumerated() {
+            dependencies.careLedger.record(
+                occurredAt: pair.1.date,
+                actorKind: descriptor.executorId == nil ? .unknown : .human,
+                actorId: descriptor.executorId,
+                subjectKind: .pet,
+                subjectId: pair.0.id.uuidString,
+                eventKind: .hygiene,
+                actionType: pair.1.hygieneType.rawValue,
+                amountValue: 0,
+                amountUnit: "",
+                note: "",
+                source: descriptor.source,
+                sourceEventId: nil,
+                sourceReminderId: nil,
+                legacyModelName: "PetHygieneLog",
+                legacyModelId: pair.1.id.uuidString,
+                coconutDelta: index == 0 ? dependencies.careLedger.rewardDelta(reward) : 0,
+                rewardLogId: nil,
+                privacyFieldRaw: nil,
+                metadataJSON: index == 0 ? metadata : sharedMetadata(
                     sessionID: session.id,
                     targetCount: targets.count,
                     executorIds: descriptor.executorIds

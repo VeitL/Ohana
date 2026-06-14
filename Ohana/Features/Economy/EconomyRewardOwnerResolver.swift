@@ -15,7 +15,13 @@ enum EconomyRewardOwnerResolver {
         logPrefix: String
     ) -> Human? {
         if hasExplicitExecutor(executorId) {
-            return explicitHuman(id: executorId, context: context, logPrefix: logPrefix)
+            if let explicit = explicitHuman(id: executorId, context: context, logPrefix: logPrefix) {
+                return explicit
+            }
+            OhanaLog.warning(
+                "[\(logPrefix)] falling back to active human for unresolved executorId=\(executorId ?? "")",
+                category: "Economy"
+            )
         }
         return activeHuman(selection: activeHumanSelection, context: context, logPrefix: logPrefix)
     }

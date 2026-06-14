@@ -61,6 +61,16 @@ protocol CareEventRecording {
     ) -> PetCareLog
 
     @discardableResult
+    func recordTreatFeedFact(
+        pet: Pet,
+        amountGrams: Double,
+        context: ModelContext,
+        executorId: String?,
+        date: Date,
+        treatKind: FeedTreatKind
+    ) -> (result: CareEventService.TreatFeedRecordResult, log: PetCareLog)
+
+    @discardableResult
     func completePlannedFeed(
         pet: Pet,
         reminder: Reminder,
@@ -71,6 +81,17 @@ protocol CareEventRecording {
     ) -> (humanGot: Int, petGot: Int)?
 
     @discardableResult
+    func completePlannedFeedResult(
+        pet: Pet,
+        reminder: Reminder,
+        context: ModelContext,
+        quality: QuestManager.QualityBonus,
+        executorId: String?,
+        occurredAt: Date?,
+        operationDate: Date
+    ) -> PlannedCareCompletionResult
+
+    @discardableResult
     func completePlannedWater(
         pet: Pet,
         reminder: Reminder,
@@ -79,6 +100,17 @@ protocol CareEventRecording {
         executorId: String?,
         date: Date
     ) -> (humanGot: Int, petGot: Int)?
+
+    @discardableResult
+    func completePlannedWaterResult(
+        pet: Pet,
+        reminder: Reminder,
+        amountMl: Double,
+        context: ModelContext,
+        executorId: String?,
+        occurredAt: Date?,
+        operationDate: Date
+    ) -> PlannedCareCompletionResult
 
     @discardableResult
     func recordCare(
@@ -367,6 +399,25 @@ extension CareEventService {
         )
     }
 
+    func recordTreatFeedFact(
+        pet: Pet,
+        amountGrams: Double,
+        context: ModelContext,
+        executorId: String?,
+        date: Date,
+        treatKind: FeedTreatKind
+    ) -> (result: CareEventService.TreatFeedRecordResult, log: PetCareLog) {
+        CareEventService.recordTreatFeedFact(
+            pet: pet,
+            amountGrams: amountGrams,
+            context: context,
+            executorId: executorId,
+            date: date,
+            treatKind: treatKind,
+            dependencies: dependencies
+        )
+    }
+
     func completePlannedFeed(
         pet: Pet,
         reminder: Reminder,
@@ -386,6 +437,27 @@ extension CareEventService {
         )
     }
 
+    func completePlannedFeedResult(
+        pet: Pet,
+        reminder: Reminder,
+        context: ModelContext,
+        quality: QuestManager.QualityBonus,
+        executorId: String?,
+        occurredAt: Date?,
+        operationDate: Date
+    ) -> PlannedCareCompletionResult {
+        CareEventService.completePlannedFeedResult(
+            pet: pet,
+            reminder: reminder,
+            context: context,
+            quality: quality,
+            executorId: executorId,
+            occurredAt: occurredAt,
+            operationDate: operationDate,
+            dependencies: dependencies
+        )
+    }
+
     func completePlannedWater(
         pet: Pet,
         reminder: Reminder,
@@ -401,6 +473,27 @@ extension CareEventService {
             context: context,
             executorId: executorId,
             date: date,
+            dependencies: dependencies
+        )
+    }
+
+    func completePlannedWaterResult(
+        pet: Pet,
+        reminder: Reminder,
+        amountMl: Double,
+        context: ModelContext,
+        executorId: String?,
+        occurredAt: Date?,
+        operationDate: Date
+    ) -> PlannedCareCompletionResult {
+        CareEventService.completePlannedWaterResult(
+            pet: pet,
+            reminder: reminder,
+            amountMl: amountMl,
+            context: context,
+            executorId: executorId,
+            occurredAt: occurredAt,
+            operationDate: operationDate,
             dependencies: dependencies
         )
     }
@@ -761,6 +854,7 @@ final class StaticCareEventEconomyAwarder: CareEventEconomyAwarding {
         pet: Pet?,
         context: ModelContext,
         quality: QuestManager.QualityBonus,
+        date: Date,
         executorId: String?
     ) -> (humanGot: Int, petGot: Int) {
         let reward = EconomyRewardDiscipline.awardCareAction(
@@ -768,6 +862,7 @@ final class StaticCareEventEconomyAwarder: CareEventEconomyAwarding {
             pet: pet,
             context: context,
             quality: quality,
+            date: date,
             executorId: executorId,
             questManager: questManager
         )

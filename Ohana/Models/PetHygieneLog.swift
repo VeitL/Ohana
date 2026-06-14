@@ -82,17 +82,19 @@ final class PetHygieneLog {
     var type: String
     var executorId: String? // ArkSchemaV38: 执行该记录的 Human.id.uuidString
     var pet: Pet?
+    var sharedSessionId: String = ""
     var trashedAt: Date?
     var trashExpiresAt: Date?
     var trashBatchId: String = ""
     var trashedByHumanId: String = ""
 
-    init(date: Date = Date(), type: HygieneType = .bath, pet: Pet? = nil, executorId: String? = nil) {
+    init(date: Date = Date(), type: HygieneType = .bath, pet: Pet? = nil, executorId: String? = nil, sharedSessionId: String = "") {
         self.id = UUID()
         self.date = date
         self.type = type.rawValue
         self.executorId = executorId
         self.pet = pet
+        self.sharedSessionId = sharedSessionId
     }
 
     var hygieneType: HygieneType {

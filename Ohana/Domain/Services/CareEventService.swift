@@ -16,6 +16,7 @@ protocol CareEventEconomyAwarding {
         pet: Pet?,
         context: ModelContext,
         quality: QuestManager.QualityBonus,
+        date: Date,
         executorId: String?
     ) -> (humanGot: Int, petGot: Int)
 
@@ -61,11 +62,10 @@ struct CareEventServiceDependencies {
 
 enum CareFactWriteDisposition: Equatable {
     case active
-    case memorialHistoricalFactOnly
     case noOp
 
     var didWriteFact: Bool {
-        self != .noOp
+        self == .active
     }
 
     var writesFact: Bool {
@@ -77,6 +77,38 @@ enum CareFactWriteDisposition: Equatable {
     }
 }
 
+struct PlannedCareCompletionResult {
+    let logID: UUID?
+    let subjectID: UUID?
+    let factDate: Date?
+    let operationDate: Date
+    let reward: (humanGot: Int, petGot: Int)
+    let disposition: CareFactWriteDisposition
+
+    var didRecord: Bool {
+        disposition.didWriteFact && logID != nil
+    }
+
+    var allowsDerivedEffects: Bool {
+        disposition.allowsDerivedEffects
+    }
+
+    var coconutDelta: Int {
+        max(0, reward.humanGot) + max(0, reward.petGot)
+    }
+
+    static func noOp(operationDate: Date) -> PlannedCareCompletionResult {
+        PlannedCareCompletionResult(
+            logID: nil,
+            subjectID: nil,
+            factDate: nil,
+            operationDate: operationDate,
+            reward: (0, 0),
+            disposition: .noOp
+        )
+    }
+}
+
 enum CareFactWritePolicy {
     @MainActor
     static func disposition(
@@ -85,35 +117,18 @@ enum CareFactWritePolicy {
         executorId: String?,
         context: ModelContext
     ) -> CareFactWriteDisposition {
-        guard pet.trashedAt == nil else { return .noOp }
+        guard EconomyWalletWritePolicy.canWrite(pet) else { return .noOp }
         if executorCannotWrite(executorId, context: context) { return .noOp }
-
-        guard let passedAwayDate = pet.passedAwayDate else { return .active }
-        return isHistorical(date, relativeToPassingDate: passedAwayDate) ? .memorialHistoricalFactOnly : .noOp
-    }
-
-    @MainActor
-    static func executorIsRecycled(_ executorId: String?, context: ModelContext) -> Bool {
-        guard let executorId,
-              let id = UUID(uuidString: executorId) else {
-            return false
-        }
-        var descriptor = FetchDescriptor<Human>(
-            predicate: #Predicate<Human> { human in
-                human.id == id
-            }
-        )
-        descriptor.fetchLimit = 1
-        guard let human = try? context.fetch(descriptor).first else { return false }
-        return human.trashedAt != nil
+        return .active
     }
 
     @MainActor
     static func executorCannotWrite(_ executorId: String?, context: ModelContext) -> Bool {
-        guard let executorId,
-              let id = UUID(uuidString: executorId) else {
+        guard let executorId = executorId?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !executorId.isEmpty else {
             return false
         }
+        guard let id = UUID(uuidString: executorId) else { return false }
         var descriptor = FetchDescriptor<Human>(
             predicate: #Predicate<Human> { human in
                 human.id == id
@@ -121,17 +136,16 @@ enum CareFactWritePolicy {
         )
         descriptor.fetchLimit = 1
         guard let human = try? context.fetch(descriptor).first else { return false }
-        return !EconomyWalletWritePolicy.canWrite(human)
+        return human.hasPassedAway
     }
 
-    private static func isHistorical(_ date: Date, relativeToPassingDate passingDate: Date) -> Bool {
-        let calendar = Calendar.current
-        let dayAfterPassing = calendar.date(
-            byAdding: .day,
-            value: 1,
-            to: calendar.startOfDay(for: passingDate)
-        ) ?? passingDate
-        return date < dayAfterPassing
+    @MainActor
+    static func anyExecutorCannotWrite(_ executorIds: [String], context: ModelContext) -> Bool {
+        executorIds.contains { executorCannotWrite($0, context: context) }
+    }
+
+    static func plannedFactDate(scheduledAt: Date, operationDate: Date) -> Date {
+        scheduledAt < operationDate ? scheduledAt : operationDate
     }
 }
 
@@ -201,6 +215,21 @@ final class CareEventService: CareEventRecording {
         let subjectID: UUID
         let healthType: HealthLogType
         let coconutDelta: Int
+        let disposition: CareFactWriteDisposition
+
+        var didWriteFact: Bool {
+            disposition.didWriteFact
+        }
+
+        var allowsDerivedEffects: Bool {
+            disposition.allowsDerivedEffects
+        }
+    }
+
+    struct TreatFeedRecordResult: Equatable {
+        let logID: UUID
+        let subjectID: UUID
+        let grams: Double
         let disposition: CareFactWriteDisposition
 
         var didWriteFact: Bool {
@@ -353,6 +382,7 @@ final class CareEventService: CareEventRecording {
             pet: pet,
             context: context,
             quality: quality,
+            date: Date(),
             executorId: executorId
         )
         dependencies.careLedger.recordPetCare(
@@ -397,6 +427,28 @@ final class CareEventService: CareEventRecording {
         treatKind: FeedTreatKind = .other,
         dependencies providedDependencies: CareEventServiceDependencies? = nil
     ) -> PetCareLog {
+        recordTreatFeedFact(
+            pet: pet,
+            amountGrams: amountGrams,
+            context: context,
+            executorId: executorId,
+            date: date,
+            treatKind: treatKind,
+            dependencies: providedDependencies
+        ).log
+    }
+
+    @discardableResult
+    @MainActor
+    static func recordTreatFeedFact(
+        pet: Pet,
+        amountGrams: Double,
+        context: ModelContext,
+        executorId: String? = nil,
+        date: Date = Date(),
+        treatKind: FeedTreatKind = .other,
+        dependencies providedDependencies: CareEventServiceDependencies? = nil
+    ) -> (result: TreatFeedRecordResult, log: PetCareLog) {
         let dependencies = providedDependencies ?? .live()
         let disposition = CareFactWritePolicy.disposition(
             pet: pet,
@@ -405,7 +457,7 @@ final class CareEventService: CareEventRecording {
             context: context
         )
         guard disposition.writesFact else {
-            return PetCareLog(
+            let log = PetCareLog(
                 date: date,
                 type: .feeding,
                 amountGrams: amountGrams,
@@ -413,6 +465,15 @@ final class CareEventService: CareEventRecording {
                 treatKind: treatKind,
                 pet: nil,
                 executorId: executorId
+            )
+            return (
+                result: TreatFeedRecordResult(
+                    logID: log.id,
+                    subjectID: pet.id,
+                    grams: amountGrams,
+                    disposition: disposition
+                ),
+                log: log
             )
         }
         let log = PetCareLog(
@@ -427,7 +488,17 @@ final class CareEventService: CareEventRecording {
         context.insert(log)
         CloudSyncMutationRecorder.markModified(log, context: context, modifiedAt: date)
         context.safeSave()
-        guard disposition.allowsDerivedEffects else { return log }
+        guard disposition.allowsDerivedEffects else {
+            return (
+                result: TreatFeedRecordResult(
+                    logID: log.id,
+                    subjectID: pet.id,
+                    grams: amountGrams,
+                    disposition: disposition
+                ),
+                log: log
+            )
+        }
         dependencies.careLedger.recordPetCare(
             log: log,
             pet: pet,
@@ -439,7 +510,15 @@ final class CareEventService: CareEventRecording {
             context: context,
             save: true
         )
-        return log
+        return (
+            result: TreatFeedRecordResult(
+                logID: log.id,
+                subjectID: pet.id,
+                grams: amountGrams,
+                disposition: disposition
+            ),
+            log: log
+        )
     }
 
     @discardableResult
@@ -453,23 +532,50 @@ final class CareEventService: CareEventRecording {
         date: Date = Date(),
         dependencies providedDependencies: CareEventServiceDependencies? = nil
     ) -> (humanGot: Int, petGot: Int)? {
-        let dependencies = providedDependencies ?? .live()
-        guard let event = reminder.event else { return nil }
-        guard CareFactWritePolicy.disposition(
+        let result = completePlannedFeedResult(
             pet: pet,
-            date: date,
+            reminder: reminder,
+            context: context,
+            quality: quality,
+            executorId: executorId,
+            operationDate: date,
+            dependencies: providedDependencies
+        )
+        return result.didRecord ? result.reward : nil
+    }
+
+    @discardableResult
+    @MainActor
+    static func completePlannedFeedResult(
+        pet: Pet,
+        reminder: Reminder,
+        context: ModelContext,
+        quality: QuestManager.QualityBonus = .precise,
+        executorId: String? = nil,
+        occurredAt providedOccurredAt: Date? = nil,
+        operationDate: Date = Date(),
+        dependencies providedDependencies: CareEventServiceDependencies? = nil
+    ) -> PlannedCareCompletionResult {
+        let dependencies = providedDependencies ?? .live()
+        guard let event = reminder.event else { return .noOp(operationDate: operationDate) }
+        let occurredAt = providedOccurredAt ?? CareFactWritePolicy.plannedFactDate(
+            scheduledAt: reminder.scheduledAt,
+            operationDate: operationDate
+        )
+        let disposition = CareFactWritePolicy.disposition(
+            pet: pet,
+            date: occurredAt,
             executorId: executorId,
             context: context
-        ) == .active else {
-            return nil
-        }
-        let isCatchUp = reminder.scheduledAt < date
-        guard !isCatchUp || FeedPlanCatchUpPolicy.isCatchUpEligible(reminder, now: date) else {
-            return nil
+        )
+        guard disposition.writesFact else { return .noOp(operationDate: operationDate) }
+        let isCatchUp = reminder.scheduledAt < operationDate
+        guard !disposition.allowsDerivedEffects || !isCatchUp || FeedPlanCatchUpPolicy.isCatchUpEligible(reminder, now: operationDate) else {
+            return .noOp(operationDate: operationDate)
         }
 
         let log = PetCareLog(
-            date: date,
+            date: occurredAt,
             type: .feeding,
             amountGrams: feedAmount(from: event, fallback: pet.dailyPortionGrams),
             note: "\(PetCareLog.plannedFeedNotePrefix)\(event.id.uuidString)",
@@ -480,8 +586,20 @@ final class CareEventService: CareEventRecording {
         context.insert(log)
         CloudSyncMutationRecorder.markModified(log, context: context, modifiedAt: log.date)
 
+        guard disposition.allowsDerivedEffects else {
+            context.safeSave()
+            return PlannedCareCompletionResult(
+                logID: log.id,
+                subjectID: pet.id,
+                factDate: occurredAt,
+                operationDate: operationDate,
+                reward: (0, 0),
+                disposition: disposition
+            )
+        }
+
         reminder.statusEnum = .completed
-        reminder.completedAt = date
+        reminder.completedAt = operationDate
         if let executorId {
             reminder.completedBy = executorId
         }
@@ -498,27 +616,13 @@ final class CareEventService: CareEventRecording {
         )
         dependencies.familyTasks.syncCompletedReminder(reminder, completedBy: executorId, context: context)
 
-        if isCatchUp {
-            dependencies.careLedger.recordPetCare(
-                log: log,
-                pet: pet,
-                source: .reminder,
-                sourceEventId: event.id.uuidString,
-                sourceReminderId: reminder.id.uuidString,
-                coconutDelta: 0,
-                metadataJSON: "",
-                context: context,
-                save: true
-            )
-            return (0, 0)
-        }
-
         dependencies.questManager.recordFirstMeal(actorId: executorId, context: context)
         let reward = dependencies.economy.awardCareAction(
             type: .feed,
             pet: pet,
             context: context,
             quality: quality,
+            date: operationDate,
             executorId: executorId
         )
         dependencies.careLedger.recordPetCare(
@@ -532,7 +636,14 @@ final class CareEventService: CareEventRecording {
             context: context,
             save: true
         )
-        return reward
+        return PlannedCareCompletionResult(
+            logID: log.id,
+            subjectID: pet.id,
+            factDate: occurredAt,
+            operationDate: operationDate,
+            reward: reward,
+            disposition: disposition
+        )
     }
 
     @discardableResult
@@ -546,23 +657,50 @@ final class CareEventService: CareEventRecording {
         date: Date = Date(),
         dependencies providedDependencies: CareEventServiceDependencies? = nil
     ) -> (humanGot: Int, petGot: Int)? {
-        let dependencies = providedDependencies ?? .live()
-        guard let event = reminder.event else { return nil }
-        guard CareFactWritePolicy.disposition(
+        let result = completePlannedWaterResult(
             pet: pet,
-            date: date,
+            reminder: reminder,
+            amountMl: amountMl,
+            context: context,
+            executorId: executorId,
+            operationDate: date,
+            dependencies: providedDependencies
+        )
+        return result.didRecord ? result.reward : nil
+    }
+
+    @discardableResult
+    @MainActor
+    static func completePlannedWaterResult(
+        pet: Pet,
+        reminder: Reminder,
+        amountMl: Double,
+        context: ModelContext,
+        executorId: String? = nil,
+        occurredAt providedOccurredAt: Date? = nil,
+        operationDate: Date = Date(),
+        dependencies providedDependencies: CareEventServiceDependencies? = nil
+    ) -> PlannedCareCompletionResult {
+        let dependencies = providedDependencies ?? .live()
+        guard let event = reminder.event else { return .noOp(operationDate: operationDate) }
+        let occurredAt = providedOccurredAt ?? CareFactWritePolicy.plannedFactDate(
+            scheduledAt: reminder.scheduledAt,
+            operationDate: operationDate
+        )
+        let disposition = CareFactWritePolicy.disposition(
+            pet: pet,
+            date: occurredAt,
             executorId: executorId,
             context: context
-        ) == .active else {
-            return nil
-        }
-        let isCatchUp = reminder.scheduledAt < date
-        guard !isCatchUp || WaterPlanCatchUpPolicy.isCatchUpEligible(reminder, now: date) else {
-            return nil
+        )
+        guard disposition.writesFact else { return .noOp(operationDate: operationDate) }
+        let isCatchUp = reminder.scheduledAt < operationDate
+        guard !disposition.allowsDerivedEffects || !isCatchUp || WaterPlanCatchUpPolicy.isCatchUpEligible(reminder, now: operationDate) else {
+            return .noOp(operationDate: operationDate)
         }
 
         let log = PetCareLog(
-            date: date,
+            date: occurredAt,
             type: .watering,
             amountMl: max(0, amountMl),
             note: "\(PetCareLog.plannedWaterNotePrefix)\(event.id.uuidString)",
@@ -572,8 +710,20 @@ final class CareEventService: CareEventRecording {
         context.insert(log)
         CloudSyncMutationRecorder.markModified(log, context: context, modifiedAt: log.date)
 
+        guard disposition.allowsDerivedEffects else {
+            context.safeSave()
+            return PlannedCareCompletionResult(
+                logID: log.id,
+                subjectID: pet.id,
+                factDate: occurredAt,
+                operationDate: operationDate,
+                reward: (0, 0),
+                disposition: disposition
+            )
+        }
+
         reminder.statusEnum = .completed
-        reminder.completedAt = date
+        reminder.completedAt = operationDate
         if let executorId {
             reminder.completedBy = executorId
         }
@@ -590,26 +740,12 @@ final class CareEventService: CareEventRecording {
         )
         dependencies.familyTasks.syncCompletedReminder(reminder, completedBy: executorId, context: context)
 
-        if isCatchUp {
-            dependencies.careLedger.recordPetCare(
-                log: log,
-                pet: pet,
-                source: .reminder,
-                sourceEventId: event.id.uuidString,
-                sourceReminderId: reminder.id.uuidString,
-                coconutDelta: 0,
-                metadataJSON: "",
-                context: context,
-                save: true
-            )
-            return (0, 0)
-        }
-
         let reward = dependencies.economy.awardCareAction(
             type: .water,
             pet: pet,
             context: context,
             quality: .none,
+            date: operationDate,
             executorId: executorId
         )
         dependencies.careLedger.recordPetCare(
@@ -623,7 +759,14 @@ final class CareEventService: CareEventRecording {
             context: context,
             save: true
         )
-        return reward
+        return PlannedCareCompletionResult(
+            logID: log.id,
+            subjectID: pet.id,
+            factDate: occurredAt,
+            operationDate: operationDate,
+            reward: reward,
+            disposition: disposition
+        )
     }
 
     @discardableResult
@@ -725,6 +868,7 @@ final class CareEventService: CareEventRecording {
             pet: pet,
             context: context,
             quality: quality,
+            date: Date(),
             executorId: executorId
         )
         dependencies.careLedger.recordPetCare(
@@ -843,6 +987,7 @@ final class CareEventService: CareEventRecording {
             pet: pet,
             context: context,
             quality: .none,
+            date: Date(),
             executorId: executorId
         )
         dependencies.careLedger.recordPetPotty(
@@ -974,6 +1119,7 @@ final class CareEventService: CareEventRecording {
             pet: pet,
             context: context,
             quality: .none,
+            date: Date(),
             executorId: executorId
         )
         let metadataJSON = dependencies.careLedger.rewardMetadata(reward, questManager: dependencies.questManager)
@@ -1093,6 +1239,7 @@ final class CareEventService: CareEventRecording {
             pet: pet,
             context: context,
             quality: .none,
+            date: Date(),
             executorId: executorId
         )
         let metadataJSON = dependencies.careLedger.rewardMetadata(reward, questManager: dependencies.questManager)

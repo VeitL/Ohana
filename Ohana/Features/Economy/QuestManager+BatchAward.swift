@@ -5,16 +5,16 @@
 
 import Foundation
 import SwiftData
-import UIKit
 
 extension QuestManager {
     // MARK: - 批量打卡（任务三）
 
-    /// 对多只宠物执行同一类型的打卡，合并计算椰子奖励，统一写一次 CoconutLogEntry
+    /// Legacy batch care compatibility. Delegates fact, ledger, reward, reminder,
+    /// revision, and Oasis side effects to the typed care chokepoints.
     /// - Parameters:
     ///   - type:    打卡类型（如 .feed / .water / .potty(isLitter:false) 等）
-    ///   - pets:    目标宠物数组（跳过已离世的宠物）
-    ///   - context: ModelContext，用于写 PetCareLog 和 save
+    ///   - pets:    目标宠物数组（冻结成员经 `CareFactWritePolicy` 过滤）
+    ///   - context: ModelContext，用于统一照护写入
     /// - Returns:   (totalHuman, totalPet) 合并后的总发放椰子数
     @MainActor
     @discardableResult
@@ -25,155 +25,241 @@ extension QuestManager {
     ) -> (totalHuman: Int, totalPet: Int) {
         guard !pets.isEmpty else { return (0, 0) }
 
-        let livePets = pets.filter { EconomyWalletWritePolicy.canWrite($0) }
-        guard !livePets.isEmpty else { return (0, 0) }
-
         let executorId = activeHumanSelection.currentHumanId
-        var human: Human? = nil
-        if let executorId {
-            human = self.human(withId: executorId, context: context)
+        let now = Date()
+        let eligiblePets = pets.filter {
+            CareFactWritePolicy.disposition(
+                pet: $0,
+                date: now,
+                executorId: executorId,
+                context: context
+            ).allowsDerivedEffects
         }
-        let consumesBoost = isDoubleRewardBoostActive()
-        let isCoolingDown = livePets.allSatisfy { isOnCooldown(petId: $0.id, type: type) }
-        let budgetKeys = economyBudgetKeys(for: human, context: context)
-        let objectKeys = careObjectKeys(for: livePets)
-        let result = CoconutEconomyPolicyV2.sharedReward(
-            for: type,
-            targetCount: livePets.count,
-            quality: .none,
-            isOnCooldown: isCoolingDown,
-            userKey: budgetKeys.household,
-            memberKey: budgetKeys.member,
-            careObjectKeys: objectKeys,
-            careObjectCount: CoconutEconomyPolicyV2.careObjectCount(context: context),
-            hasHumanAccount: human != nil,
-            forcedLuck: consumesBoost ? .golden : nil,
-            context: context
-        )
-        lastEconomyRewardResult = result
-        let petAwards = Self.distribute(result.petCoconuts, count: livePets.count)
-        let humanTotal = human == nil ? 0 : result.humanCoconuts
-
-        // ── 1. 写 PetCareLog（每只宠物独立一条）
-        let careTypeEnum: CareType? = switch type {
-        case .feed: .feeding
-        case .water: .watering
-        case let .general(_, _, _, t) where t.contains("铲砂") || t.contains("铲屎"):
-            .litter
-        case let .general(_, _, _, t) where t.contains("陪玩") || t.contains("逗玩"):
-            .play
-        default: nil
-        }
-
-        for pet in livePets {
-            if let ct = careTypeEnum {
-                let log = PetCareLog(type: ct, pet: pet, executorId: executorId)
-                context.insert(log)
-            } else if case .potty = type {
-                let log = PetPottyLog(date: Date(), type: .perfectPoop, pet: pet, executorId: executorId)
-                context.insert(log)
-            }
-        }
-
-        // ── 2. 钱包账户（人类只发一次，不乘以宠物数量）
-        let petTotal = petAwards.reduce(0, +)
-
-        // ── 3. 钱包流水
-        let logEmoji = result.luck == .golden ? "🎁" : type.emoji
-        let petNames = livePets.prefix(3).map(\.name).joined(separator: "、")
-            + (livePets.count > 3 ? " 等\(livePets.count)只" : "")
-        var baseTitle = "一键全家\(type.emoji) · \(petNames)"
-        if result.luck != .none {
-            baseTitle += result.luck == .golden ? " · 金色幸运" : " · 小幸运"
-        }
-        var walletDeltas: [CoconutWalletDelta] = []
-        for (index, pet) in livePets.enumerated() where petAwards[index] > 0 {
-            walletDeltas.append(.pet(
-                pet,
-                delta: petAwards[index],
-                entryKind: .reward,
-                source: .careEvent,
-                title: baseTitle,
-                emoji: logEmoji,
-                actorId: pet.id.uuidString,
-                actorName: pet.name,
-                subjectKind: .pet,
-                subjectId: pet.id.uuidString,
-                metadataJSON: result.metadataJSON
-            ))
-        }
-        if let human, humanTotal > 0 {
-            walletDeltas.append(.human(
-                human,
-                delta: humanTotal,
-                entryKind: .reward,
-                source: .careEvent,
-                title: baseTitle,
-                emoji: "🥥",
-                actorId: human.id.uuidString,
-                actorName: human.name,
-                subjectKind: .human,
-                subjectId: human.id.uuidString,
-                metadataJSON: result.metadataJSON
-            ))
-        }
-
-        // ── 4. 持久化
-        do {
-            try wallet.apply(
-                deltas: walletDeltas,
-                context: context,
-                save: false,
-                postsRewardFeedback: false,
-                updatesProjection: true,
-                projectionManager: self
-            )
-            EconomyDailyBudgetStore.commit(
-                result,
-                householdKey: budgetKeys.household,
-                memberKey: budgetKeys.member,
-                careObjectKeys: objectKeys,
-                context: context,
-                save: false,
-                writeDefaults: false
-            )
-            try context.save()
-            EconomyDailyBudgetStore.commit(
-                result,
-                householdKey: budgetKeys.household,
-                memberKey: budgetKeys.member,
-                careObjectKeys: objectKeys,
-                context: nil,
-                save: false
-            )
-            if consumesBoost {
-                clearDoubleRewardBoost()
-            }
-            for pet in livePets {
-                if !isOnCooldown(petId: pet.id, type: type) {
-                    recordCooldown(petId: pet.id, type: type)
-                }
-                streakRewards.checkAndAward(pet: pet, questManager: self, context: context)
-            }
-            postEconomyFeedback(
-                result,
-                type: type,
-                title: baseTitle,
-                actorId: human?.id.uuidString ?? "batch",
-                actorName: human?.name ?? "全家打卡"
-            )
-        } catch {
-            context.rollback()
+        guard !eligiblePets.isEmpty else {
             lastEconomyRewardResult = .empty
-            wallet.refreshQuestProjection(context: context, manager: self)
-            #if DEBUG
-                OhanaLog.error("[batchAward] save failed: \(error)", category: "Economy")
-            #endif
             return (0, 0)
         }
 
-        // 震动反馈
-        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-        return (humanTotal, petTotal)
+        let dependencies = batchAwardDependencies()
+        var total = (human: 0, pet: 0)
+        for group in Self.sameSpeciesGroups(eligiblePets) {
+            guard let sourcePet = group.first else { continue }
+            let reward = recordBatchAwardGroup(
+                type: type,
+                sourcePet: sourcePet,
+                targets: group,
+                executorId: executorId,
+                date: now,
+                context: context,
+                dependencies: dependencies
+            )
+            total.human += reward.humanGot
+            total.pet += reward.petGot
+        }
+        return (total.human, total.pet)
+    }
+
+    private func recordBatchAwardGroup(
+        type: OhanaActionType,
+        sourcePet: Pet,
+        targets: [Pet],
+        executorId: String?,
+        date: Date,
+        context: ModelContext,
+        dependencies: CareEventServiceDependencies
+    ) -> (humanGot: Int, petGot: Int) {
+        switch type {
+        case .feed:
+            let result = CareEventService.recordSharedManualFeedFact(
+                sourcePet: sourcePet,
+                targets: targets,
+                totalGrams: 0,
+                foodKind: .dry,
+                context: context,
+                executorId: executorId,
+                date: date,
+                dependencies: dependencies
+            )
+            guard result.didWriteFact, result.allowsDerivedEffects else { return (0, 0) }
+            return result.reward
+        case .water:
+            let result = CareEventService.recordSharedWateringFact(
+                sourcePet: sourcePet,
+                targets: targets,
+                totalMl: 0,
+                context: context,
+                executorId: executorId,
+                date: date,
+                dependencies: dependencies
+            )
+            guard result.didWriteFact, result.allowsDerivedEffects else { return (0, 0) }
+            return result.reward
+        case let .potty(isLitter):
+            if isLitter {
+                let result = CareEventService.recordSharedLitterCareFact(
+                    sourcePet: sourcePet,
+                    targets: targets,
+                    context: context,
+                    executorId: executorId,
+                    date: date,
+                    dependencies: dependencies
+                )
+                guard result.didWriteFact, result.allowsDerivedEffects else { return (0, 0) }
+                return result.reward
+            } else {
+                return recordSharedBatchPotty(
+                    sourcePet: sourcePet,
+                    targets,
+                    executorId: executorId,
+                    date: date,
+                    context: context,
+                    dependencies: dependencies,
+                    reward: type,
+                    rewardTitle: batchRewardTitle(type: type, targets: targets)
+                )
+            }
+        case let .care(type):
+            return recordSharedBatchHygiene(
+                sourcePet: sourcePet,
+                targets,
+                type: type,
+                executorId: executorId,
+                date: date,
+                context: context,
+                dependencies: dependencies,
+                reward: .care(type: type),
+                rewardTitle: batchRewardTitle(type: .care(type: type), targets: targets)
+            )
+        case let .general(_, _, _, title) where title.contains("铲砂") || title.contains("铲屎"):
+            let result = CareEventService.recordSharedCareFact(
+                sourcePet: sourcePet,
+                targets: targets,
+                type: .litter,
+                actionKind: .litterScoop,
+                context: context,
+                executorId: executorId,
+                reward: type,
+                rewardTitle: batchRewardTitle(type: type, targets: targets),
+                date: date,
+                dependencies: dependencies
+            )
+            guard result.didWriteFact, result.allowsDerivedEffects else { return (0, 0) }
+            return result.reward
+        case let .general(_, _, _, title) where title.contains("陪玩") || title.contains("逗玩"):
+            let result = CareEventService.recordSharedCareFact(
+                sourcePet: sourcePet,
+                targets: targets,
+                type: .play,
+                actionKind: .play,
+                context: context,
+                executorId: executorId,
+                reward: type,
+                rewardTitle: "共同陪玩 · \(targets.count)只",
+                date: date,
+                dependencies: dependencies
+            )
+            guard result.didWriteFact, result.allowsDerivedEffects else { return (0, 0) }
+            return result.reward
+        default:
+            lastEconomyRewardResult = .empty
+            return (0, 0)
+        }
+    }
+
+    private func recordSharedBatchPotty(
+        sourcePet: Pet,
+        _ targets: [Pet],
+        executorId: String?,
+        date: Date,
+        context: ModelContext,
+        dependencies: CareEventServiceDependencies,
+        reward: OhanaActionType,
+        rewardTitle: String
+    ) -> (humanGot: Int, petGot: Int) {
+        let result = SharedPetActionRecorder.record(
+            SharedPetActionDescriptor(
+                actionKind: .potty,
+                sourcePet: sourcePet,
+                targets: targets,
+                date: date,
+                executorId: executorId,
+                allocationMode: .equal,
+                childLogStrategy: .potty(type: .perfectPoop),
+                reward: reward,
+                rewardTitle: rewardTitle,
+                source: .quickAction
+            ),
+            context: context,
+            dependencies: dependencies
+        )
+        guard result.didWriteFact, result.allowsDerivedEffects else { return (0, 0) }
+        return result.reward
+    }
+
+    private func recordSharedBatchHygiene(
+        sourcePet: Pet,
+        _ targets: [Pet],
+        type: HygieneType,
+        executorId: String?,
+        date: Date,
+        context: ModelContext,
+        dependencies: CareEventServiceDependencies,
+        reward: OhanaActionType,
+        rewardTitle: String
+    ) -> (humanGot: Int, petGot: Int) {
+        let result = SharedPetActionRecorder.record(
+            SharedPetActionDescriptor(
+                actionKind: .hygiene,
+                sourcePet: sourcePet,
+                targets: targets,
+                date: date,
+                executorId: executorId,
+                allocationMode: .equal,
+                childLogStrategy: .hygiene(type: type),
+                reward: reward,
+                rewardTitle: rewardTitle,
+                source: .quickAction
+            ),
+            context: context,
+            dependencies: dependencies
+        )
+        guard result.didWriteFact, result.allowsDerivedEffects else { return (0, 0) }
+        return result.reward
+    }
+
+    private func batchRewardTitle(type: OhanaActionType, targets: [Pet]) -> String {
+        let petNames = targets.prefix(3).map(\.name).joined(separator: "、")
+            + (targets.count > 3 ? " 等\(targets.count)只" : "")
+        return "一键全家\(type.emoji) · \(petNames)"
+    }
+
+    private func batchAwardDependencies() -> CareEventServiceDependencies {
+        let careLedger = CareLedgerService()
+        let familyTasks = StaticFamilyTaskManager(wallet: wallet, careLedger: careLedger, questManager: self)
+        let reminderCompletion = ReminderCompletionService(careLedger: careLedger, familyTasks: familyTasks)
+        return CareEventServiceDependencies(
+            questManager: self,
+            economy: StaticCareEventEconomyAwarder(questManager: self),
+            careLedger: careLedger,
+            reminderCompletion: reminderCompletion,
+            quickActionReminderCompletion: QuickActionReminderCompletionSyncService(reminderCompletion: reminderCompletion),
+            familyTasks: familyTasks,
+            revisions: revisions
+        )
+    }
+
+    private static func sameSpeciesGroups(_ pets: [Pet]) -> [[Pet]] {
+        Dictionary(grouping: pets) { SharedPetTargetResolver.normalizedSpecies($0.species) }
+            .values
+            .map { group in
+                group.sorted { lhs, rhs in
+                    if lhs.createdAt == rhs.createdAt { return lhs.id.uuidString < rhs.id.uuidString }
+                    return lhs.createdAt < rhs.createdAt
+                }
+            }
+            .sorted { lhs, rhs in
+                guard let left = lhs.first, let right = rhs.first else { return false }
+                return SharedPetTargetResolver.normalizedSpecies(left.species) < SharedPetTargetResolver.normalizedSpecies(right.species)
+            }
     }
 }

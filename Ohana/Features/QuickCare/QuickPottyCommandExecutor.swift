@@ -38,7 +38,7 @@ private func fetchQuickPottyModelsOrLog<T: PersistentModel>(
 struct QuickPottyCommandExecutor {
     private let context: ModelContext
     private let careEvents: CareEventRecording
-    private let revisions: DomainRevisionPublishing
+    private let derivations: CareDerivationExecutor
 
     init(context: ModelContext) {
         self.init(
@@ -63,7 +63,7 @@ struct QuickPottyCommandExecutor {
     ) {
         self.context = context
         self.careEvents = careEvents
-        self.revisions = revisions
+        derivations = CareDerivationExecutor(revisions: revisions)
     }
 
     func record(
@@ -75,7 +75,7 @@ struct QuickPottyCommandExecutor {
     ) -> QuickPottyCommandResult? {
         let action = isLitter ? CareType.litter.rawValue : selectedType.rawValue
         guard let pet = fetchPet(id: petID), EconomyWalletWritePolicy.canWrite(pet) else {
-            publishNoop(petID: petID, action: action, note: "quickPotty.missingPet")
+            deriveNoop(petID: petID, action: action, note: "quickPotty.missingPet")
             return nil
         }
 
@@ -93,10 +93,20 @@ struct QuickPottyCommandExecutor {
                 createsLinkedPottyLog: false
             )
             guard recorded.result.didWriteFact else {
-                publishNoop(petID: pet.id, action: action, note: "quickPotty.litter.factNoop")
+                deriveNoop(petID: pet.id, action: action, note: "quickPotty.litter.factNoop")
                 return nil
             }
-            publish(petID: pet.id, action: action, affectedIDs: [pet.id, recorded.result.logID], note: "quickPotty.litter")
+            let derivation = derive(
+                petID: pet.id,
+                action: action,
+                affectedIDs: [pet.id, recorded.result.logID],
+                logIDs: [recorded.result.logID],
+                disposition: recorded.result.disposition,
+                reward: recorded.reward,
+                date: date,
+                note: "quickPotty.litter"
+            )
+            guard derivation.isUserVisibleSuccess else { return nil }
             return QuickPottyCommandResult(
                 petID: pet.id,
                 careLogID: recorded.result.logID,
@@ -115,7 +125,7 @@ struct QuickPottyCommandExecutor {
             date: date
         )
         guard recorded.result.didWriteFact else {
-            publishNoop(petID: pet.id, action: action, note: "quickPotty.record.factNoop")
+            deriveNoop(petID: pet.id, action: action, note: "quickPotty.record.factNoop")
             return nil
         }
         let logID = recorded.result.logID
@@ -123,12 +133,17 @@ struct QuickPottyCommandExecutor {
         if let logID {
             affectedIDs.insert(logID)
         }
-        publish(
+        let derivation = derive(
             petID: pet.id,
             action: action,
             affectedIDs: affectedIDs,
+            logIDs: logID.map { [$0] } ?? [],
+            disposition: recorded.result.disposition,
+            reward: recorded.reward,
+            date: date,
             note: "quickPotty.record"
         )
+        guard derivation.isUserVisibleSuccess else { return nil }
         return QuickPottyCommandResult(
             petID: pet.id,
             careLogID: nil,
@@ -147,11 +162,11 @@ struct QuickPottyCommandExecutor {
         date: Date
     ) -> QuickPottyCommandResult? {
         guard let sourcePet = fetchPet(id: sourcePetID), EconomyWalletWritePolicy.canWrite(sourcePet) else {
-            publishNoop(petID: sourcePetID, action: "unknownSharedPotty", note: "quickPotty.unknown.missingPet")
+            deriveNoop(petID: sourcePetID, action: "unknownSharedPotty", note: "quickPotty.unknown.missingPet")
             return nil
         }
         guard !CareFactWritePolicy.executorCannotWrite(executorId, context: context) else {
-            publishNoop(petID: sourcePetID, action: "unknownSharedPotty", note: "quickPotty.unknown.factNoop")
+            deriveNoop(petID: sourcePetID, action: "unknownSharedPotty", note: "quickPotty.unknown.factNoop")
             return nil
         }
         let targets = fetchTargets(sourcePet: sourcePet, targetIDs: targetIDs)
@@ -163,12 +178,17 @@ struct QuickPottyCommandExecutor {
             executorId: executorId,
             date: date
         )
-        publish(
+        let derivation = derive(
             petID: sourcePet.id,
             action: "unknownSharedPotty",
             affectedIDs: Set(targets.map(\.id)).union([sourcePet.id, log.id]),
+            logIDs: [log.id],
+            disposition: .active,
+            reward: (0, 0),
+            date: date,
             note: "quickPotty.unknownShared"
         )
+        guard derivation.isUserVisibleSuccess else { return nil }
         return QuickPottyCommandResult(
             petID: sourcePet.id,
             careLogID: nil,
@@ -187,7 +207,7 @@ struct QuickPottyCommandExecutor {
         isFullChange: Bool
     ) -> QuickPottyCommandResult? {
         guard let sourcePet = fetchPet(id: sourcePetID), EconomyWalletWritePolicy.canWrite(sourcePet) else {
-            publishNoop(petID: sourcePetID, action: isFullChange ? "litterFullChange" : "litterScoop", note: "quickPotty.litter.missingPet")
+            deriveNoop(petID: sourcePetID, action: isFullChange ? "litterFullChange" : "litterScoop", note: "quickPotty.litter.missingPet")
             return nil
         }
         let targets = fetchTargets(sourcePet: sourcePet, targetIDs: targetIDs)
@@ -224,14 +244,14 @@ struct QuickPottyCommandExecutor {
             careLogID = recorded.result.logID
             guard recorded.result.didWriteFact else {
                 let action = isFullChange ? "litterFullChange" : "litterScoop"
-                publishNoop(petID: sourcePet.id, action: action, note: "quickPotty.litterCare.factNoop")
+                deriveNoop(petID: sourcePet.id, action: action, note: "quickPotty.litterCare.factNoop")
                 return nil
             }
         }
 
         let action = isFullChange ? "litterFullChange" : "litterScoop"
         if let result, !result.didWriteFact {
-            publishNoop(petID: sourcePet.id, action: action, note: "quickPotty.litterCare.factNoop")
+            deriveNoop(petID: sourcePet.id, action: action, note: "quickPotty.litterCare.factNoop")
             return nil
         }
         var affectedIDs = Set(targets.map(\.id))
@@ -239,12 +259,17 @@ struct QuickPottyCommandExecutor {
         if let careLogID {
             affectedIDs.insert(careLogID)
         }
-        publish(
+        let derivation = derive(
             petID: sourcePet.id,
             action: action,
             affectedIDs: affectedIDs,
+            logIDs: careLogID.map { [$0] } ?? result?.careLogIDs ?? [],
+            disposition: result?.disposition ?? .active,
+            reward: reward,
+            date: date,
             note: isFullChange ? "quickPotty.litterFullChange" : "quickPotty.litterScoop"
         )
+        guard derivation.isUserVisibleSuccess else { return nil }
         return QuickPottyCommandResult(
             petID: sourcePet.id,
             careLogID: careLogID,
@@ -297,22 +322,46 @@ struct QuickPottyCommandExecutor {
         ).first?.id
     }
 
-    private func publish(petID: UUID, action: String, affectedIDs: Set<UUID>, note: String) {
-        revisions.publish(
-            DomainMutationResult(
-                command: .quickCare(entityID: petID, action: action),
-                affectedEntityIDs: affectedIDs,
-                wroteBusinessFact: true,
-                note: note
+    private func derive(
+        petID: UUID,
+        action: String,
+        affectedIDs: Set<UUID>,
+        logIDs: [UUID],
+        disposition: CareFactWriteDisposition,
+        reward: (humanGot: Int, petGot: Int),
+        date: Date,
+        note: String
+    ) -> CareDerivationResult {
+        derivations.derive(
+            .active(
+                disposition: disposition,
+                fact: CareWriteOutcome.FactPayload(
+                    subjectID: petID,
+                    logIDs: logIDs,
+                    factDate: date,
+                    operationDate: date
+                ),
+                revision: CareWriteOutcome.RevisionPayload(
+                    command: .quickCare(entityID: petID, action: action),
+                    affectedEntityIDs: affectedIDs,
+                    note: note
+                ),
+                reward: CareWriteOutcome.RewardPayload(
+                    humanDelta: reward.humanGot,
+                    petDelta: reward.petGot
+                ),
+                noopNote: "\(note).factOnly"
             )
         )
     }
 
-    private func publishNoop(petID: UUID, action: String, note: String) {
-        AppPerformanceMonitor.shared.record(
-            "domain_command_noop",
-            valueMS: 0,
-            note: note
+    private func deriveNoop(petID: UUID, action: String, note: String) {
+        derivations.derive(
+            .noOp(
+                command: .quickCare(entityID: petID, action: action),
+                affectedEntityIDs: [petID],
+                note: note
+            )
         )
     }
 }

@@ -32,6 +32,7 @@ struct HomeCommandExecutor {
     let careEvents: CareEventRecording
     let coconutExchange: CoconutExchangeManaging
     let revisions: DomainRevisionPublishing
+    let derivations: CareDerivationExecutor
     let questManager: QuestManager
     let medicationReminders: MedicationReminderManaging
     let todayFocus: TodayFocusManaging
@@ -85,6 +86,7 @@ struct HomeCommandExecutor {
         self.careEvents = careEvents
         self.coconutExchange = coconutExchange
         self.revisions = revisions
+        self.derivations = CareDerivationExecutor(revisions: revisions)
         self.questManager = questManager
         self.medicationReminders = medicationReminders
         self.todayFocus = todayFocus
@@ -274,7 +276,7 @@ struct HomeCommandExecutor {
             careEvents: careEvents,
             date: now
         )
-        if result.didRecord {
+        if result.didRecord && result.allowsDerivedEffects {
             publishMutation(QuickCareCommand.plannedFeed(petID: pet.id, reminderID: reminder.id))
         }
         return result
@@ -394,8 +396,9 @@ struct HomeCommandExecutor {
         )
     }
 
-    func recordMedicationDose(medication: PetMedication, pet: Pet) {
-        PetMedicationDoseLogging.recordDose(
+    @discardableResult
+    func recordMedicationDose(medication: PetMedication, pet: Pet) -> Bool {
+        let result = PetMedicationDoseLogging.recordDoseResult(
             medication: medication,
             pet: pet,
             modelContext: modelContext,
@@ -403,37 +406,53 @@ struct HomeCommandExecutor {
             questManager: questManager,
             medicationReminders: medicationReminders
         )
+        guard result.didRecord, result.allowsDerivedEffects else {
+            publishNoop(QuickCareCommand.medicationDose(petID: pet.id, medicationID: medication.id), note: "home.medicationDose.noop")
+            return false
+        }
         scheduleMedicationReminders(for: pet)
         publishMutation(QuickCareCommand.medicationDose(petID: pet.id, medicationID: medication.id))
+        return true
     }
 
-    func recordMedicationDose(petID: UUID, medicationID: UUID) {
+    @discardableResult
+    func recordMedicationDose(petID: UUID, medicationID: UUID) -> Bool {
         guard let pet = fetchPet(id: petID),
               let medication = pet.medications.first(where: { $0.id == medicationID }) else {
             publishNoop(QuickCareCommand.medicationDose(petID: petID, medicationID: medicationID), note: "home.medicationDose.missingTarget")
-            return
+            return false
         }
-        recordMedicationDose(medication: medication, pet: pet)
+        return recordMedicationDose(medication: medication, pet: pet)
     }
 
-    func completeTodayFocusEvent(_ event: Event, on date: Date = Date(), executorId: String? = nil) {
+    @discardableResult
+    func completeTodayFocusEvent(_ event: Event, on date: Date = Date(), executorId: String? = nil) -> Bool {
         let result = todayFocus.completeEvent(event, on: date, context: modelContext, executorId: resolvedExecutorId(executorId))
+        guard result.didChange, result.allowsDerivedEffects else {
+            publishNoop(
+                .todayFocus(entityID: result.eventID, action: "eventComplete"),
+                note: "home.todayFocusEvent.noop"
+            )
+            return false
+        }
         publishMutation(
             .todayFocus(entityID: result.eventID, action: "eventComplete"),
             affected: [result.eventID],
             note: "home.todayFocusEvent"
         )
+        return true
     }
 
-    func completeTodayFocusEvent(eventID: UUID, on date: Date = Date(), executorId: String? = nil) {
+    @discardableResult
+    func completeTodayFocusEvent(eventID: UUID, on date: Date = Date(), executorId: String? = nil) -> Bool {
         guard let event = fetchEvent(id: eventID) else {
             publishNoop(
                 .todayFocus(entityID: eventID, action: "eventComplete"),
                 note: "home.todayFocusEvent.missingEvent"
             )
-            return
+            return false
         }
-        completeTodayFocusEvent(event, on: date, executorId: executorId)
+        return completeTodayFocusEvent(event, on: date, executorId: executorId)
     }
 
     private func resolvedExecutorId(_ explicit: String?) -> String? {
@@ -517,7 +536,7 @@ struct HomeCommandExecutor {
             executorId: executorId,
             now: now
         )
-        guard result.didRecord else { return false }
+        guard result.didRecord, result.allowsDerivedEffects else { return false }
         let delta = result.coconutDelta
         feedback(
             ExpandedQuickActionExecutor.Feedback(
@@ -663,11 +682,12 @@ struct HomeCommandExecutor {
         affected: Set<UUID>,
         note: String
     ) {
-        revisions.publishDomainMutation(
-            command: command,
-            affectedEntityIDs: affected,
-            wroteBusinessFact: true,
-            note: note
+        derivations.derive(
+            .derivedMutation(
+                command: command,
+                affectedEntityIDs: affected,
+                note: note
+            )
         )
     }
 
@@ -687,8 +707,14 @@ struct HomeCommandExecutor {
         )
     }
 
-    private func publishNoop(_: DomainCommand, note: String) {
-        AppPerformanceMonitor.shared.record("domain_command_noop", valueMS: 0, note: note)
+    private func publishNoop(_ command: DomainCommand, note: String) {
+        derivations.derive(
+            .noOp(
+                command: command,
+                affectedEntityIDs: [],
+                note: note
+            )
+        )
     }
 
     private func publishNoop(_ command: some FeatureDomainCommand, note: String) {

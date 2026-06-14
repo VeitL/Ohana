@@ -627,12 +627,13 @@ struct PetMedicationContentView: View {
     @MainActor
     private func recordDose(for med: PetMedication) {
         guard !pet.hasPassedAway else { return }
-        PetMedicationCommandExecutor(context: modelContext, services: appServices).recordDose(
+        let result = PetMedicationCommandExecutor(context: modelContext, services: appServices).recordDose(
             medication: med,
             pet: pet,
             awardCoconut: true,
             note: "pet.medication.list.dose"
         )
+        guard result.didRecord, result.allowsDerivedEffects else { return }
         appServices.medicationReminders.scheduleMedicationReminders(for: pet, context: modelContext)
         UINotificationFeedbackGenerator().notificationOccurred(.success)
         doseRefreshToken = UUID()

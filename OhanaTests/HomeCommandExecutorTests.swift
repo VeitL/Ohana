@@ -11,6 +11,7 @@ struct HomeCommandExecutorTests {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
         let pet = Pet(name: "Momo", species: "狗")
+        let executorHuman = insertExecutorHuman(in: context)
         context.insert(pet)
         try context.save()
 
@@ -21,7 +22,7 @@ struct HomeCommandExecutorTests {
         executor.performActionType(
             "water",
             petID: pet.id,
-            executorId: "human-1",
+            executorId: executorHuman.id.uuidString,
             now: Date(timeIntervalSince1970: 1_800_000_000),
             antiRepeatTitle: "Already logged",
             antiRepeatMessage: { "\($0.executorName) \($0.minutesAgo)" },
@@ -39,6 +40,65 @@ struct HomeCommandExecutorTests {
         #expect(logs.first?.careType == .watering)
         #expect(feedbacks.map(\.cardId) == [pet.id])
         #expect(openedWaterRoute == false)
+    }
+
+    @MainActor
+    @Test func plannedFeedForDeceasedPetNoopsWithoutHomeRevision() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let revisionCenter = ReadModelRevisionCenter()
+        let executorHuman = insertExecutorHuman(in: context)
+        let scheduledAt = Date(timeIntervalSince1970: 1_800_000_000)
+        let operationDate = scheduledAt.addingTimeInterval(3 * 24 * 60 * 60)
+        let pet = Pet(name: "Momo", species: "猫")
+        pet.passedAwayDate = scheduledAt.addingTimeInterval(60)
+        pet.dailyPortionGrams = 50
+        pet.mainFoodKind = .dry
+        let event = Event(
+            title: "Breakfast dry 50g",
+            startDate: scheduledAt,
+            eventType: EventType.foodChange.rawValue,
+            relatedEntityType: EntityKind.pet.rawValue,
+            relatedEntityId: pet.id.uuidString
+        )
+        event.feedRuleKindRaw = FeedRuleKind.manualReminder.rawValue
+        event.feedAmountGrams = 50
+        event.foodKindRaw = FeedFoodKind.dry.rawValue
+        let reminder = Reminder(event: event, scheduledAt: scheduledAt)
+        context.insert(pet)
+        context.insert(event)
+        context.insert(reminder)
+        try context.save()
+
+        let executor = HomeCommandExecutor(
+            modelContext: context,
+            careEvents: CareEventService(),
+            coconutExchange: StaticCoconutExchangeManager(),
+            revisions: SharedDomainRevisionPublisher(center: revisionCenter),
+            questManager: QuestManager(
+                wallet: SwiftDataCoconutWalletManager(),
+                revisions: SharedDomainRevisionPublisher(center: revisionCenter)
+            ),
+            medicationReminders: MedicationReminderManagerSpy(),
+            todayFocus: StaticTodayFocusManager()
+        )
+        let beforeRevision = revisionCenter.homeRevision.value
+
+        let result = executor.completePlannedFeed(
+            pet: pet,
+            reminder: reminder,
+            allEvents: [event],
+            foodRecords: [],
+            executorId: executorHuman.id.uuidString,
+            now: operationDate
+        )
+        let logs = try context.fetch(FetchDescriptor<PetCareLog>())
+
+        #expect(result.didRecord == false)
+        #expect(!result.allowsDerivedEffects)
+        #expect(logs.isEmpty)
+        #expect(revisionCenter.homeRevision.value == beforeRevision)
+        #expect(revisionCenter.lastMutation == nil)
     }
 
     @MainActor
@@ -179,6 +239,7 @@ struct HomeCommandExecutorTests {
         let context = container.mainContext
         let now = makeDate(year: 2026, month: 6, day: 8, hour: 9, minute: 0)
         let pet = Pet(name: "Momo", species: "猫")
+        let executorHuman = insertExecutorHuman(in: context)
         pet.dailyPortionGrams = 50
         pet.mainFoodKind = .dry
         pet.foodTrackingMode = .precise
@@ -203,7 +264,7 @@ struct HomeCommandExecutorTests {
             executor.performActionType(
                 "feed",
                 petID: pet.id,
-                executorId: "human-1",
+                executorId: executorHuman.id.uuidString,
                 now: date,
                 antiRepeatTitle: "Already logged",
                 antiRepeatMessage: { "\($0.executorName) \($0.minutesAgo)" },
@@ -290,6 +351,7 @@ struct HomeCommandExecutorTests {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
         let pet = Pet(name: "Momo", species: "狗")
+        let executorHuman = insertExecutorHuman(in: context)
         context.insert(pet)
         try context.save()
 
@@ -300,7 +362,7 @@ struct HomeCommandExecutorTests {
         executor.applyGroomCheckIn(
             raw: "bath",
             petID: pet.id,
-            executorId: "human-1",
+            executorId: executorHuman.id.uuidString,
             showSingleUseNotice: { notices.append(($0, $1)) },
             feedback: { feedbacks.append($0) }
         )
@@ -361,6 +423,7 @@ struct HomeCommandExecutorTests {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
         let pet = Pet(name: "Momo", species: "狗")
+        let executorHuman = insertExecutorHuman(in: context)
         context.insert(pet)
         try context.save()
 
@@ -371,7 +434,7 @@ struct HomeCommandExecutorTests {
         executor.applyHealthCheckIn(
             raw: "vaccine",
             petID: pet.id,
-            executorId: "human-1",
+            executorId: executorHuman.id.uuidString,
             openHealth: { _ in openedHealthRoute = true },
             feedback: { feedbacks.append($0) }
         )
@@ -394,6 +457,7 @@ struct HomeCommandExecutorTests {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
         let pet = Pet(name: "Momo", species: "狗")
+        let executorHuman = insertExecutorHuman(in: context)
         context.insert(pet)
         try context.save()
         let questManager = TestQuestManagerProjection.manager
@@ -413,7 +477,7 @@ struct HomeCommandExecutorTests {
             type: .feeding,
             amountGrams: 88,
             context: context,
-            executorId: "human-1",
+            executorId: executorHuman.id.uuidString,
             date: date
         )
 
@@ -438,6 +502,7 @@ struct HomeCommandExecutorTests {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
         let pet = Pet(name: "Momo", species: "狗")
+        let executorHuman = insertExecutorHuman(in: context)
         context.insert(pet)
         try context.save()
 
@@ -446,7 +511,7 @@ struct HomeCommandExecutorTests {
             pet: pet,
             type: .play,
             context: context,
-            executorId: "human-1",
+            executorId: executorHuman.id.uuidString,
             date: date
         )
 
@@ -457,7 +522,7 @@ struct HomeCommandExecutorTests {
         #expect(logs.first?.pet?.id == pet.id)
         #expect(logs.first?.careType == .play)
         #expect(logs.first?.date == date)
-        #expect(logs.first?.executorId == "human-1")
+        #expect(logs.first?.executorId == executorHuman.id.uuidString)
         #expect(recorded.result.petID == pet.id)
         #expect(recorded.result.careType == .play)
         #expect(recorded.result.linkedPottyLogID == nil)
@@ -473,6 +538,7 @@ struct HomeCommandExecutorTests {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
         let pet = Pet(name: "Momo", species: "狗")
+        let executorHuman = insertExecutorHuman(in: context)
         context.insert(pet)
         try context.save()
 
@@ -491,7 +557,7 @@ struct HomeCommandExecutorTests {
         let date = makeDate(year: 2026, month: 6, day: 8, hour: 18, minute: 0)
         let result = QuickPlayCommandExecutor(context: context, revisionCenter: revisionCenter).recordPlay(
             petID: pet.id,
-            executorId: "human-1",
+            executorId: executorHuman.id.uuidString,
             rewardTitle: "Momo play reward",
             date: date
         )
@@ -503,7 +569,7 @@ struct HomeCommandExecutorTests {
         #expect(logs.count == 1)
         #expect(logs.first?.careType == .play)
         #expect(logs.first?.date == date)
-        #expect(logs.first?.executorId == "human-1")
+        #expect(logs.first?.executorId == executorHuman.id.uuidString)
         #expect(ledgerEvents.count == 1)
         #expect(ledgerEvents.first?.actionType == CareType.play.rawValue)
         #expect(revisionCenter.homeRevision.value != beforeRevision)
@@ -511,12 +577,12 @@ struct HomeCommandExecutorTests {
     }
 
     @MainActor
-    @Test func quickPlayCommandExecutorNoopsForRecycledPetAtCommandBoundary() throws {
+    @Test func quickPlayCommandExecutorNoopsForDeceasedPetAtCommandBoundary() throws {
         let revisionCenter = ReadModelRevisionCenter()
         let container = try makeInMemoryContainer()
         let context = container.mainContext
         let pet = Pet(name: "Momo", species: "狗")
-        pet.trashedAt = makeDate(year: 2026, month: 6, day: 8, hour: 12, minute: 0)
+        pet.passedAwayDate = makeDate(year: 2026, month: 6, day: 8, hour: 12, minute: 0)
         context.insert(pet)
         try context.save()
 
@@ -537,31 +603,53 @@ struct HomeCommandExecutorTests {
     }
 
     @MainActor
-    @Test func quickPlayCommandExecutorNoopsForRecycledExecutorDisposition() throws {
+    @Test func quickPlayCommandExecutorWritesForMissingExecutorThroughFallbackOwner() throws {
         let revisionCenter = ReadModelRevisionCenter()
         let container = try makeInMemoryContainer()
         let context = container.mainContext
         let pet = Pet(name: "Momo", species: "狗")
-        let executorHuman = Human(name: "Former caretaker")
-        executorHuman.trashedAt = makeDate(year: 2026, month: 6, day: 8, hour: 12, minute: 0)
+        let activeHuman = Human(name: "Active")
         context.insert(pet)
-        context.insert(executorHuman)
+        context.insert(activeHuman)
         try context.save()
+        let defaults = UserDefaults.standard
+        let oldActiveHumanID = defaults.object(forKey: "currentActiveHumanId")
+        let oldCooldownLogs = defaults.object(forKey: QuestManager.Keys.cooldownLogs)
+        defer {
+            if let oldActiveHumanID {
+                defaults.set(oldActiveHumanID, forKey: "currentActiveHumanId")
+            } else {
+                defaults.removeObject(forKey: "currentActiveHumanId")
+            }
+            if let oldCooldownLogs {
+                defaults.set(oldCooldownLogs, forKey: QuestManager.Keys.cooldownLogs)
+            } else {
+                defaults.removeObject(forKey: QuestManager.Keys.cooldownLogs)
+            }
+            EconomyDailyBudgetStore.resetAll()
+        }
+        defaults.set(activeHuman.id.uuidString, forKey: "currentActiveHumanId")
+        defaults.removeObject(forKey: QuestManager.Keys.cooldownLogs)
+        EconomyDailyBudgetStore.resetAll()
+        let missingExecutorID = UUID().uuidString
 
         let beforeRevision = revisionCenter.homeRevision.value
         let result = QuickPlayCommandExecutor(context: context, revisionCenter: revisionCenter).recordPlay(
             petID: pet.id,
-            executorId: executorHuman.id.uuidString,
+            executorId: missingExecutorID,
             rewardTitle: "Momo play reward",
             date: makeDate(year: 2026, month: 6, day: 8, hour: 18, minute: 0)
         )
+        let walletEntries = try context.fetch(FetchDescriptor<CoconutLedgerEntry>())
 
-        #expect(result == nil)
-        #expect(try context.fetch(FetchDescriptor<PetCareLog>()).isEmpty)
-        #expect(try context.fetch(FetchDescriptor<CareLedgerEvent>()).isEmpty)
-        #expect(try context.fetch(FetchDescriptor<CoconutLedgerEntry>()).isEmpty)
-        #expect(revisionCenter.homeRevision.value == beforeRevision)
-        #expect(revisionCenter.lastMutation == nil)
+        #expect(result?.petID == pet.id)
+        #expect((result?.coconutDelta ?? 0) > 0)
+        #expect(try context.fetch(FetchDescriptor<PetCareLog>()).count == 1)
+        #expect(!(try context.fetch(FetchDescriptor<CareLedgerEvent>())).isEmpty)
+        #expect(walletEntries.contains { $0.ownerId == activeHuman.id.uuidString && $0.delta > 0 })
+        #expect(walletEntries.allSatisfy { $0.ownerId != missingExecutorID })
+        #expect(revisionCenter.homeRevision.value != beforeRevision)
+        #expect(revisionCenter.lastMutation != nil)
     }
 
     @MainActor
@@ -593,13 +681,13 @@ struct HomeCommandExecutorTests {
     }
 
     @MainActor
-    @Test func homeQuickCareNoopsForRecycledExecutorDisposition() throws {
+    @Test func homeQuickCareNoopsForDeceasedExecutorDisposition() throws {
         let revisionCenter = ReadModelRevisionCenter()
         let container = try makeInMemoryContainer()
         let context = container.mainContext
         let pet = Pet(name: "Momo", species: "狗")
         let executorHuman = Human(name: "Former caretaker")
-        executorHuman.trashedAt = makeDate(year: 2026, month: 6, day: 8, hour: 12, minute: 0)
+        executorHuman.passedAwayDate = makeDate(year: 2026, month: 6, day: 8, hour: 12, minute: 0)
         context.insert(pet)
         context.insert(executorHuman)
         try context.save()
@@ -645,6 +733,7 @@ struct HomeCommandExecutorTests {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
         let pet = Pet(name: "Momo", species: "狗")
+        let executorHuman = insertExecutorHuman(in: context)
         context.insert(pet)
         try context.save()
 
@@ -665,7 +754,7 @@ struct HomeCommandExecutorTests {
             petID: pet.id,
             selectedType: .softPoop,
             isLitter: false,
-            executorId: "human-1",
+            executorId: executorHuman.id.uuidString,
             date: date
         )
 
@@ -677,7 +766,7 @@ struct HomeCommandExecutorTests {
         #expect(result?.careLogID == nil)
         #expect(pottyLogs.count == 1)
         #expect(pottyLogs.first?.pottyType == .softPoop)
-        #expect(pottyLogs.first?.executorId == "human-1")
+        #expect(pottyLogs.first?.executorId == executorHuman.id.uuidString)
         #expect(careLogs.isEmpty)
         #expect(ledgerEvents.count == 1)
         #expect(ledgerEvents.first?.actionType == PottyType.softPoop.rawValue)
@@ -686,12 +775,12 @@ struct HomeCommandExecutorTests {
     }
 
     @MainActor
-    @Test func quickPottyCommandExecutorNoopsForRecycledPetAtCommandBoundary() throws {
+    @Test func quickPottyCommandExecutorNoopsForDeceasedPetAtCommandBoundary() throws {
         let revisionCenter = ReadModelRevisionCenter()
         let container = try makeInMemoryContainer()
         let context = container.mainContext
         let pet = Pet(name: "Momo", species: "狗")
-        pet.trashedAt = makeDate(year: 2026, month: 6, day: 8, hour: 12, minute: 0)
+        pet.passedAwayDate = makeDate(year: 2026, month: 6, day: 8, hour: 12, minute: 0)
         context.insert(pet)
         try context.save()
 
@@ -714,13 +803,13 @@ struct HomeCommandExecutorTests {
     }
 
     @MainActor
-    @Test func quickPottyCommandExecutorNoopsForRecycledExecutorDisposition() throws {
+    @Test func quickPottyCommandExecutorNoopsForDeceasedExecutorDisposition() throws {
         let revisionCenter = ReadModelRevisionCenter()
         let container = try makeInMemoryContainer()
         let context = container.mainContext
         let pet = Pet(name: "Momo", species: "狗")
         let executorHuman = Human(name: "Former caretaker")
-        executorHuman.trashedAt = makeDate(year: 2026, month: 6, day: 8, hour: 12, minute: 0)
+        executorHuman.passedAwayDate = makeDate(year: 2026, month: 6, day: 8, hour: 12, minute: 0)
         context.insert(pet)
         context.insert(executorHuman)
         try context.save()
@@ -750,6 +839,7 @@ struct HomeCommandExecutorTests {
         let context = container.mainContext
         let pet = Pet(name: "Momo", species: "狗")
         let otherPet = Pet(name: "Nori", species: "猫")
+        let executorHuman = insertExecutorHuman(in: context)
         context.insert(pet)
         context.insert(otherPet)
         let date = makeDate(year: 2026, month: 6, day: 8, hour: 19, minute: 10)
@@ -778,7 +868,7 @@ struct HomeCommandExecutorTests {
             petID: pet.id,
             selectedType: .softPoop,
             isLitter: false,
-            executorId: "human-1",
+            executorId: executorHuman.id.uuidString,
             date: date
         )
 
@@ -796,6 +886,7 @@ struct HomeCommandExecutorTests {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
         let pet = Pet(name: "Momo", species: "猫")
+        let executorHuman = insertExecutorHuman(in: context)
         context.insert(pet)
         try context.save()
 
@@ -816,7 +907,7 @@ struct HomeCommandExecutorTests {
             petID: pet.id,
             selectedType: .perfectPoop,
             isLitter: true,
-            executorId: "human-1",
+            executorId: executorHuman.id.uuidString,
             date: date
         )
 
@@ -828,7 +919,7 @@ struct HomeCommandExecutorTests {
         #expect(result?.pottyLogID == nil)
         #expect(careLogs.count == 1)
         #expect(careLogs.first?.careType == .litter)
-        #expect(careLogs.first?.executorId == "human-1")
+        #expect(careLogs.first?.executorId == executorHuman.id.uuidString)
         #expect(pottyLogs.isEmpty)
         #expect(ledgerEvents.count == 1)
         #expect(ledgerEvents.first?.actionType == CareType.litter.rawValue)
@@ -843,6 +934,7 @@ struct HomeCommandExecutorTests {
         let context = container.mainContext
         let first = Pet(name: "Milo", species: "猫")
         let second = Pet(name: "Luna", species: "猫")
+        let executorHuman = insertExecutorHuman(in: context)
         context.insert(first)
         context.insert(second)
         try context.save()
@@ -853,7 +945,7 @@ struct HomeCommandExecutorTests {
             sourcePetID: first.id,
             targetIDs: [first.id, second.id],
             type: .softPoop,
-            executorId: "human-1",
+            executorId: executorHuman.id.uuidString,
             date: date
         )
 
@@ -924,6 +1016,7 @@ struct HomeCommandExecutorTests {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
         let pet = Pet(name: "Momo", species: "猫")
+        let executorHuman = insertExecutorHuman(in: context)
         context.insert(pet)
         try context.save()
         let questManager = TestQuestManagerProjection.manager
@@ -942,7 +1035,7 @@ struct HomeCommandExecutorTests {
             pet: pet,
             type: .litter,
             context: context,
-            executorId: "human-1",
+            executorId: executorHuman.id.uuidString,
             date: date
         )
 
@@ -1045,6 +1138,7 @@ struct HomeCommandExecutorTests {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
         let pet = Pet(name: "Momo", species: "猫")
+        let executorHuman = insertExecutorHuman(in: context)
         context.insert(pet)
         try context.save()
 
@@ -1053,7 +1147,7 @@ struct HomeCommandExecutorTests {
         let recorded = executor.recordCare(
             pet: pet,
             type: .litter,
-            executorId: "human-1",
+            executorId: executorHuman.id.uuidString,
             date: makeDate(year: 2026, month: 6, day: 8, hour: 9, minute: 30),
             note: "test.pet.care.record"
         )
@@ -1079,7 +1173,7 @@ struct HomeCommandExecutorTests {
             date: makeDate(year: 2026, month: 6, day: 8, hour: 10, minute: 0),
             type: .perfectPoop,
             pet: pet,
-            executorId: "human-1"
+            executorId: executorHuman.id.uuidString
         )
         context.insert(potty)
         CareLedgerService.recordPetPotty(log: potty, pet: pet, source: .service, context: context)
@@ -1102,6 +1196,7 @@ struct HomeCommandExecutorTests {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
         let pet = Pet(name: "Momo", species: "狗")
+        let executorHuman = insertExecutorHuman(in: context)
         context.insert(pet)
         try context.save()
 
@@ -1118,7 +1213,7 @@ struct HomeCommandExecutorTests {
                 cost: 48.5,
                 expirationDate: expirationDate,
                 nextCheckupDate: nil,
-                executorId: "human-1",
+                executorId: executorHuman.id.uuidString,
                 source: .detail,
                 includesNameInNote: true
             ),
@@ -1391,6 +1486,7 @@ struct HomeCommandExecutorTests {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
         let pet = Pet(name: "Momo", species: "狗")
+        let executorHuman = insertExecutorHuman(in: context)
         context.insert(pet)
         try context.save()
 
@@ -1412,7 +1508,7 @@ struct HomeCommandExecutorTests {
                 otherFeeAmount: 10,
                 otherFeeNote: "Service fee",
                 autoGeneratesPayments: true,
-                executorId: "human-1"
+                executorId: executorHuman.id.uuidString
             ),
             context: context
         )
@@ -1435,7 +1531,7 @@ struct HomeCommandExecutorTests {
         #expect(expenses.count == 1)
         #expect(expense.amount == 130)
         #expect(expense.note == "Care Plus 首期保费（含Service fee）")
-        #expect(expense.executorId == "human-1")
+        #expect(expense.executorId == executorHuman.id.uuidString)
         #expect(events.count == 1)
         #expect(event.relatedEntityId == policy.id.uuidString)
         #expect(event.eventType == EventType.insurancePremium.rawValue)
@@ -1494,6 +1590,7 @@ struct HomeCommandExecutorTests {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
         let pet = Pet(name: "Momo", species: "狗")
+        let executorHuman = insertExecutorHuman(in: context)
         context.insert(pet)
         try context.save()
 
@@ -1502,7 +1599,7 @@ struct HomeCommandExecutorTests {
             pet: pet,
             type: .bath,
             context: context,
-            executorId: "human-1",
+            executorId: executorHuman.id.uuidString,
             date: date
         )
 
@@ -1514,7 +1611,7 @@ struct HomeCommandExecutorTests {
         #expect(logs.first?.pet?.id == pet.id)
         #expect(logs.first?.hygieneType == .bath)
         #expect(logs.first?.date == date)
-        #expect(logs.first?.executorId == "human-1")
+        #expect(logs.first?.executorId == executorHuman.id.uuidString)
         #expect(recorded.result.subjectID == pet.id)
         #expect(recorded.result.hygieneType == .bath)
         #expect(ledgerEvents.contains { $0.eventKind == CareLedgerEventKind.hygiene.rawValue && $0.legacyModelId == recorded.result.logID.uuidString })
@@ -1604,6 +1701,7 @@ struct HomeCommandExecutorTests {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
         let pet = Pet(name: "Momo", species: "狗")
+        let executorHuman = insertExecutorHuman(in: context)
         context.insert(pet)
         try context.save()
 
@@ -1612,7 +1710,7 @@ struct HomeCommandExecutorTests {
         let recorded = executor.record(
             pet: pet,
             type: .bath,
-            executorId: "human-1",
+            executorId: executorHuman.id.uuidString,
             date: makeDate(year: 2026, month: 6, day: 8, hour: 10, minute: 30),
             note: "test.hygiene.record"
         )
@@ -1785,6 +1883,7 @@ struct HomeCommandExecutorTests {
         defer { OhanaNotifications.useLive() }
 
         let pet = Pet(name: "Momo", species: "狗")
+        let executorHuman = insertExecutorHuman(in: context)
         context.insert(pet)
         try context.save()
 
@@ -1801,7 +1900,7 @@ struct HomeCommandExecutorTests {
                 cost: 20,
                 expirationDate: expirationDate,
                 nextCheckupDate: nil,
-                executorId: "human-1",
+                executorId: executorHuman.id.uuidString,
                 source: .detail,
                 includesNameInNote: true,
                 expirationReminderLeadDays: 14
@@ -1981,6 +2080,134 @@ struct HomeCommandExecutorTests {
         #expect(result.didChange == true)
         #expect(event.isCompleted == true)
         #expect(event.isOccurrenceMarkedComplete(on: start) == true)
+    }
+
+    @MainActor
+    @Test func todayFocusExecutorWritesPetTaskFactForMissingExecutor() throws {
+        let revisionCenter = ReadModelRevisionCenter()
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let occurrence = makeDate(year: 2026, month: 6, day: 8)
+        let pet = Pet(name: "Momo", species: "猫")
+        let event = Event(
+            title: "Feed Momo 42g",
+            startDate: occurrence,
+            eventType: EventType.daily.rawValue,
+            relatedEntityType: EntityKind.pet.rawValue,
+            relatedEntityId: pet.id.uuidString
+        )
+        context.insert(pet)
+        context.insert(event)
+        try context.save()
+
+        let defaults = UserDefaults.standard
+        let oldActiveHumanID = defaults.object(forKey: "currentActiveHumanId")
+        defer {
+            if let oldActiveHumanID {
+                defaults.set(oldActiveHumanID, forKey: "currentActiveHumanId")
+            } else {
+                defaults.removeObject(forKey: "currentActiveHumanId")
+            }
+            EconomyDailyBudgetStore.resetAll()
+        }
+        defaults.removeObject(forKey: "currentActiveHumanId")
+        EconomyDailyBudgetStore.resetAll()
+
+        let executor = HomeCommandExecutor(
+            modelContext: context,
+            careEvents: CareEventService(),
+            coconutExchange: StaticCoconutExchangeManager(),
+            revisions: SharedDomainRevisionPublisher(center: revisionCenter),
+            questManager: QuestManager(),
+            medicationReminders: SharedMedicationReminderManager(),
+            todayFocus: StaticTodayFocusManager()
+        )
+        let beforeRevision = revisionCenter.homeRevision.value
+        let missingExecutorID = UUID().uuidString
+
+        let didComplete = executor.completeTodayFocusEvent(event, on: occurrence, executorId: missingExecutorID)
+
+        let careLogs = try context.fetch(FetchDescriptor<PetCareLog>())
+        let ledgerEvents = try context.fetch(FetchDescriptor<CareLedgerEvent>())
+        let walletEntries = try context.fetch(FetchDescriptor<CoconutLedgerEntry>())
+        let mutation = try #require(revisionCenter.lastMutation)
+        #expect(didComplete == true)
+        #expect(event.isOccurrenceMarkedComplete(on: occurrence))
+        #expect(careLogs.count == 1)
+        #expect(careLogs.first?.pet?.id == pet.id)
+        #expect(ledgerEvents.contains { $0.legacyModelId == careLogs.first?.id.uuidString })
+        #expect(walletEntries.isEmpty)
+        #expect(revisionCenter.homeRevision.value == beforeRevision + 1)
+        #expect(mutation.command == .todayFocus(entityID: event.id, action: "eventComplete"))
+        #expect(mutation.wroteBusinessFact == true)
+    }
+
+    @MainActor
+    @Test func todayFocusCompletionForDeceasedPetNoopsWithoutHistoricalFactOrRevision() throws {
+        let revisionCenter = ReadModelRevisionCenter()
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let human = Human(name: "Guan")
+        let occurrence = makeDate(year: 2026, month: 6, day: 1, hour: 9, minute: 0)
+        let deceasedPet = Pet(name: "Momo", species: "猫")
+        deceasedPet.passedAwayDate = makeDate(year: 2026, month: 6, day: 2, hour: 9, minute: 0)
+        let event = Event(
+            title: "Feed Momo 42g",
+            startDate: occurrence,
+            eventType: EventType.daily.rawValue,
+            relatedEntityType: EntityKind.pet.rawValue,
+            relatedEntityId: deceasedPet.id.uuidString
+        )
+        context.insert(human)
+        context.insert(deceasedPet)
+        context.insert(event)
+        try context.save()
+
+        let defaults = UserDefaults.standard
+        let oldActiveHumanID = defaults.object(forKey: "currentActiveHumanId")
+        let oldCooldownLogs = defaults.object(forKey: QuestManager.Keys.cooldownLogs)
+        defer {
+            if let oldActiveHumanID {
+                defaults.set(oldActiveHumanID, forKey: "currentActiveHumanId")
+            } else {
+                defaults.removeObject(forKey: "currentActiveHumanId")
+            }
+            if let oldCooldownLogs {
+                defaults.set(oldCooldownLogs, forKey: QuestManager.Keys.cooldownLogs)
+            } else {
+                defaults.removeObject(forKey: QuestManager.Keys.cooldownLogs)
+            }
+            EconomyDailyBudgetStore.resetAll()
+        }
+        defaults.set(human.id.uuidString, forKey: "currentActiveHumanId")
+        defaults.removeObject(forKey: QuestManager.Keys.cooldownLogs)
+        EconomyDailyBudgetStore.reset(
+            householdKey: CoconutEconomyPolicyV2.householdBudgetKey(),
+            memberKey: human.id.uuidString,
+            careObjectKeys: [deceasedPet.id.uuidString]
+        )
+        let executor = HomeCommandExecutor(
+            modelContext: context,
+            careEvents: CareEventService(),
+            coconutExchange: StaticCoconutExchangeManager(),
+            revisions: SharedDomainRevisionPublisher(center: revisionCenter),
+            questManager: QuestManager(),
+            medicationReminders: SharedMedicationReminderManager(),
+            todayFocus: StaticTodayFocusManager()
+        )
+        let beforeRevision = revisionCenter.homeRevision.value
+
+        executor.completeTodayFocusEvent(event, on: occurrence, executorId: human.id.uuidString)
+
+        let careLogs = try context.fetch(FetchDescriptor<PetCareLog>())
+        #expect(event.isOccurrenceMarkedComplete(on: occurrence) == false)
+        #expect(event.isCompleted == false)
+        #expect(careLogs.isEmpty)
+        #expect(try context.fetch(FetchDescriptor<CareLedgerEvent>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<CoconutLedgerEntry>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<EconomyBudgetUsageEvent>()).isEmpty)
+        #expect(revisionCenter.homeRevision.value == beforeRevision)
+        #expect(revisionCenter.lastMutation == nil)
     }
 
     @MainActor
@@ -3095,6 +3322,7 @@ struct HomeCommandExecutorTests {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
         let pet = Pet(name: "Momo", species: "狗")
+        let executorHuman = insertExecutorHuman(in: context)
         context.insert(pet)
         try context.save()
         let beforeRevision = revisionCenter.homeRevision.value
@@ -3106,7 +3334,7 @@ struct HomeCommandExecutorTests {
             locationLatitude: 52.52,
             locationLongitude: 13.40,
             locationPlacename: "Berlin",
-            executorId: "human-1",
+            executorId: executorHuman.id.uuidString,
             date: Date(timeIntervalSince1970: 1_800_000_000),
             revisionNote: "test.quickMoment"
         )
@@ -3214,6 +3442,7 @@ struct HomeCommandExecutorTests {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
         let pet = Pet(name: "Momo", species: "狗")
+        let executorHuman = insertExecutorHuman(in: context)
         context.insert(pet)
         try context.save()
 
@@ -3223,7 +3452,7 @@ struct HomeCommandExecutorTests {
             weight: 8.4,
             date: date,
             context: context,
-            executorId: "human-1"
+            executorId: executorHuman.id.uuidString
         )
 
         let logs = try context.fetch(FetchDescriptor<PetWeightLog>())
@@ -3232,7 +3461,7 @@ struct HomeCommandExecutorTests {
         #expect(logs.first?.pet?.id == pet.id)
         #expect(logs.first?.weight == 8.4)
         #expect(logs.first?.date == date)
-        #expect(logs.first?.executorId == "human-1")
+        #expect(logs.first?.executorId == executorHuman.id.uuidString)
         #expect(result.coconutDelta == 0)
     }
 
@@ -3241,6 +3470,7 @@ struct HomeCommandExecutorTests {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
         let pet = Pet(name: "Momo", species: "狗")
+        let executorHuman = insertExecutorHuman(in: context)
         context.insert(pet)
         try context.save()
 
@@ -3250,7 +3480,7 @@ struct HomeCommandExecutorTests {
             weight: 8.4,
             date: date,
             context: context,
-            executorId: "human-1",
+            executorId: executorHuman.id.uuidString,
             ledgerSource: .detail
         )
 
@@ -3261,7 +3491,7 @@ struct HomeCommandExecutorTests {
         #expect(ledgerEvents.count == 1)
         #expect(ledgerEvents.first?.id == result.ledgerEventID)
         #expect(ledgerEvents.first?.actorKind == CareLedgerActorKind.human.rawValue)
-        #expect(ledgerEvents.first?.actorId == "human-1")
+        #expect(ledgerEvents.first?.actorId == executorHuman.id.uuidString)
         #expect(ledgerEvents.first?.subjectKind == CareLedgerSubjectKind.pet.rawValue)
         #expect(ledgerEvents.first?.subjectId == pet.id.uuidString)
         #expect(ledgerEvents.first?.eventKind == CareLedgerEventKind.weight.rawValue)
@@ -5002,6 +5232,7 @@ struct HomeCommandExecutorTests {
         let context = container.mainContext
         let now = Date(timeIntervalSince1970: 1_800_000_000)
         let pet = Pet(name: "Momo", species: "狗")
+        let executorHuman = insertExecutorHuman(in: context)
         let event = Event(
             title: "喂食 Momo 42g",
             startDate: now,
@@ -5018,7 +5249,7 @@ struct HomeCommandExecutorTests {
             occurrenceDate: now,
             pets: [pet],
             context: context,
-            executorId: "human-1",
+            executorId: executorHuman.id.uuidString,
             now: now
         )
 
@@ -5034,7 +5265,7 @@ struct HomeCommandExecutorTests {
             occurrenceDate: now,
             pets: [pet],
             context: context,
-            executorId: "human-1",
+            executorId: executorHuman.id.uuidString,
             now: now
         )
 
@@ -5042,6 +5273,66 @@ struct HomeCommandExecutorTests {
         #expect(reopened.isCompleted == false)
         #expect(event.isCompleted == false)
         #expect(careLogs.isEmpty)
+    }
+
+    @MainActor
+    @Test func calendarCommandExecutorWritesPetTaskFactForMissingExecutor() throws {
+        let revisionCenter = ReadModelRevisionCenter()
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let occurrence = makeDate(year: 2026, month: 6, day: 8, hour: 9, minute: 0)
+        let pet = Pet(name: "Momo", species: "猫")
+        let event = Event(
+            title: "Feed Momo 42g",
+            startDate: occurrence,
+            eventType: EventType.daily.rawValue,
+            relatedEntityType: EntityKind.pet.rawValue,
+            relatedEntityId: pet.id.uuidString
+        )
+        context.insert(pet)
+        context.insert(event)
+        try context.save()
+
+        let defaults = UserDefaults.standard
+        let oldActiveHumanID = defaults.object(forKey: "currentActiveHumanId")
+        defer {
+            if let oldActiveHumanID {
+                defaults.set(oldActiveHumanID, forKey: "currentActiveHumanId")
+            } else {
+                defaults.removeObject(forKey: "currentActiveHumanId")
+            }
+            EconomyDailyBudgetStore.resetAll()
+        }
+        defaults.removeObject(forKey: "currentActiveHumanId")
+        EconomyDailyBudgetStore.resetAll()
+
+        let executor = CalendarCommandExecutor(context: context, revisionCenter: revisionCenter)
+        let beforeRevision = revisionCenter.homeRevision.value
+        let missingExecutorID = UUID().uuidString
+
+        let result = executor.toggleCompletion(
+            event: event,
+            occurrenceDate: occurrence,
+            pets: [pet],
+            executorId: missingExecutorID,
+            note: "test.calendar.missing.executor"
+        )
+
+        let logs = try context.fetch(FetchDescriptor<PetCareLog>())
+        let ledgerEvents = try context.fetch(FetchDescriptor<CareLedgerEvent>())
+        let walletEntries = try context.fetch(FetchDescriptor<CoconutLedgerEntry>())
+        let mutation = try #require(revisionCenter.lastMutation)
+        #expect(result.isCompleted == true)
+        #expect(result.didWriteFact == true)
+        #expect(result.allowsDerivedEffects == true)
+        #expect(event.isOccurrenceMarkedComplete(on: occurrence))
+        #expect(logs.count == 1)
+        #expect(logs.first?.pet?.id == pet.id)
+        #expect(ledgerEvents.contains { $0.legacyModelId == logs.first?.id.uuidString })
+        #expect(walletEntries.isEmpty)
+        #expect(revisionCenter.homeRevision.value == beforeRevision + 1)
+        #expect(mutation.command == .calendarEventCompletion(eventID: event.id, isCompleted: true))
+        #expect(mutation.wroteBusinessFact == true)
     }
 
     @MainActor
@@ -5232,6 +5523,65 @@ struct HomeCommandExecutorTests {
         #expect(expenseMutation.affectedEntityIDs.contains(expense.logID))
         #expect(expenseMutation.note == "test.dashboard.expense")
         #expect(revisionCenter.homeRevision.value == beforeRevision + 3)
+    }
+
+    @MainActor
+    @Test func dashboardSharedExpenseWritesFactAndRevisionForMissingExecutor() throws {
+        let revisionCenter = ReadModelRevisionCenter()
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let first = Pet(name: "Milo", species: "猫")
+        let second = Pet(name: "Luna", species: "cat")
+        context.insert(first)
+        context.insert(second)
+        try context.save()
+
+        let defaults = UserDefaults.standard
+        let oldActiveHumanID = defaults.object(forKey: "currentActiveHumanId")
+        defer {
+            if let oldActiveHumanID {
+                defaults.set(oldActiveHumanID, forKey: "currentActiveHumanId")
+            } else {
+                defaults.removeObject(forKey: "currentActiveHumanId")
+            }
+            EconomyDailyBudgetStore.resetAll()
+        }
+        defaults.removeObject(forKey: "currentActiveHumanId")
+        EconomyDailyBudgetStore.resetAll()
+
+        let executor = DashboardRecordCommandExecutor(context: context, revisionCenter: revisionCenter)
+        let beforeRevision = revisionCenter.homeRevision.value
+        let missingExecutorID = UUID().uuidString
+        let result = executor.recordSharedPetExpense(
+            sourcePet: first,
+            targets: [first, second],
+            amount: 24,
+            date: makeDate(year: 2026, month: 6, day: 11, hour: 9, minute: 0),
+            category: .food,
+            note: "Shared bag",
+            executorId: missingExecutorID,
+            command: .expenseEntry(entityID: first.id, entityKind: EntityKind.pet.rawValue),
+            revisionNote: "test.dashboard.shared.expense.missing.executor"
+        )
+
+        let sessions = try context.fetch(FetchDescriptor<SharedCareSession>())
+        let expenses = try context.fetch(FetchDescriptor<PetExpenseLog>())
+        let ledgerEvents = try context.fetch(FetchDescriptor<CareLedgerEvent>())
+        let walletEntries = try context.fetch(FetchDescriptor<CoconutLedgerEntry>())
+        let mutation = try #require(revisionCenter.lastMutation)
+        #expect(result.didWriteFact == true)
+        #expect(result.allowsDerivedEffects == true)
+        #expect(result.coconutDelta == 0)
+        #expect(Set(result.targetPetIDs) == Set([first.id, second.id]))
+        #expect(sessions.count == 1)
+        #expect(expenses.count == 2)
+        #expect(Set(expenses.compactMap { $0.pet?.id }) == Set([first.id, second.id]))
+        #expect(ledgerEvents.count == 2)
+        #expect(Set(ledgerEvents.map(\.legacyModelId)) == Set(expenses.map { $0.id.uuidString }))
+        #expect(walletEntries.isEmpty)
+        #expect(revisionCenter.homeRevision.value == beforeRevision + 1)
+        #expect(mutation.command == .expenseEntry(entityID: first.id, entityKind: EntityKind.pet.rawValue))
+        #expect(mutation.wroteBusinessFact == true)
     }
 
     @MainActor
@@ -5444,6 +5794,7 @@ struct HomeCommandExecutorTests {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
         let pet = Pet(name: "Momo", species: "狗")
+        let executorHuman = insertExecutorHuman(in: context)
         context.insert(pet)
         try context.save()
 
@@ -5460,7 +5811,7 @@ struct HomeCommandExecutorTests {
                 cost: 0,
                 expirationDate: nil,
                 nextCheckupDate: nil,
-                executorId: "human-1",
+                executorId: executorHuman.id.uuidString,
                 source: .detail,
                 includesNameInNote: true
             ),
@@ -5536,6 +5887,7 @@ struct HomeCommandExecutorTests {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
         let pet = Pet(name: "Momo", species: "猫")
+        let executorHuman = insertExecutorHuman(in: context)
         context.insert(pet)
         try context.save()
 
@@ -5549,7 +5901,7 @@ struct HomeCommandExecutorTests {
             saveAsDefault: true,
             foodRecords: [],
             allEvents: [],
-            executorId: "human-1"
+            executorId: executorHuman.id.uuidString
         )
 
         let logs = try context.fetch(FetchDescriptor<PetCareLog>())
@@ -5565,6 +5917,173 @@ struct HomeCommandExecutorTests {
         #expect(ledgerEvents.contains { $0.legacyModelId == logs.first?.id.uuidString })
         #expect(revisionCenter.homeRevision.value == beforeRevision + 1)
         #expect(mutation.command == .feedLog(petID: pet.id, source: "manual"))
+        #expect(mutation.affectedEntityIDs == [pet.id])
+        #expect(mutation.wroteBusinessFact == true)
+    }
+
+    @MainActor
+    @Test func quickFeedExecutorManualNoopDoesNotPublishRevisionForDeceasedExecutor() throws {
+        let revisionCenter = ReadModelRevisionCenter()
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let now = makeDate(year: 2026, month: 6, day: 8)
+        let human = Human(name: "Former caretaker")
+        human.passedAwayDate = now
+        let pet = Pet(name: "Momo", species: "猫")
+        context.insert(human)
+        context.insert(pet)
+        try context.save()
+
+        let beforeRevision = revisionCenter.homeRevision.value
+        let executor = QuickFeedCommandExecutor(context: context, revisionCenter: revisionCenter)
+        let result = executor.recordManual(
+            pet: pet,
+            targets: [],
+            grams: 42,
+            foodKind: .dry,
+            saveAsDefault: true,
+            foodRecords: [],
+            allEvents: [],
+            executorId: human.id.uuidString
+        )
+
+        #expect(result.didRecord == false)
+        #expect(try context.fetch(FetchDescriptor<PetCareLog>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<CareLedgerEvent>()).isEmpty)
+        #expect(revisionCenter.homeRevision.value == beforeRevision)
+        #expect(revisionCenter.lastMutation == nil)
+    }
+
+    @MainActor
+    @Test func quickFeedExecutorManualWritesFactAndDefaultsForMissingExecutor() throws {
+        let revisionCenter = ReadModelRevisionCenter()
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let pet = Pet(name: "Momo", species: "猫")
+        pet.mainFoodKind = .wet
+        pet.dailyPortionGrams = 18
+        context.insert(pet)
+        try context.save()
+
+        let defaults = UserDefaults.standard
+        let oldActiveHumanID = defaults.object(forKey: "currentActiveHumanId")
+        defer {
+            if let oldActiveHumanID {
+                defaults.set(oldActiveHumanID, forKey: "currentActiveHumanId")
+            } else {
+                defaults.removeObject(forKey: "currentActiveHumanId")
+            }
+        }
+        defaults.removeObject(forKey: "currentActiveHumanId")
+
+        let beforeRevision = revisionCenter.homeRevision.value
+        let executor = QuickFeedCommandExecutor(context: context, revisionCenter: revisionCenter)
+        let missingExecutorID = UUID().uuidString
+        let result = executor.recordManual(
+            pet: pet,
+            targets: [],
+            grams: 42,
+            foodKind: .dry,
+            saveAsDefault: true,
+            foodRecords: [],
+            allEvents: [],
+            executorId: missingExecutorID
+        )
+
+        let logs = try context.fetch(FetchDescriptor<PetCareLog>())
+        let ledgerEvents = try context.fetch(FetchDescriptor<CareLedgerEvent>())
+        let walletEntries = try context.fetch(FetchDescriptor<CoconutLedgerEntry>())
+        let mutation = try #require(revisionCenter.lastMutation)
+        #expect(result.didRecord == true)
+        #expect(result.allowsDerivedEffects == true)
+        #expect(result.coconutDelta == 0)
+        #expect(pet.mainFoodKind == .dry)
+        #expect(pet.dailyPortionGrams == 42)
+        #expect(logs.count == 1)
+        #expect(logs.first?.pet?.id == pet.id)
+        #expect(logs.first?.careType == .feeding)
+        #expect(logs.first?.amountGrams == 42)
+        #expect(ledgerEvents.contains { $0.legacyModelId == logs.first?.id.uuidString })
+        #expect(walletEntries.isEmpty)
+        #expect(revisionCenter.homeRevision.value == beforeRevision + 1)
+        #expect(mutation.command == .feedLog(petID: pet.id, source: "manual"))
+        #expect(mutation.affectedEntityIDs == [pet.id])
+        #expect(mutation.wroteBusinessFact == true)
+    }
+
+    @MainActor
+    @Test func quickFeedExecutorTreatNoopDoesNotPublishRevisionForDeceasedExecutor() throws {
+        let revisionCenter = ReadModelRevisionCenter()
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let now = makeDate(year: 2026, month: 6, day: 8)
+        let human = Human(name: "Former caretaker")
+        human.passedAwayDate = now
+        let pet = Pet(name: "Momo", species: "猫")
+        context.insert(human)
+        context.insert(pet)
+        try context.save()
+
+        let beforeRevision = revisionCenter.homeRevision.value
+        let executor = QuickFeedCommandExecutor(context: context, revisionCenter: revisionCenter)
+        _ = executor.recordTreat(
+            pet: pet,
+            grams: 12,
+            treatKind: .freezeDried,
+            executorId: human.id.uuidString
+        )
+
+        #expect(try context.fetch(FetchDescriptor<PetCareLog>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<CareLedgerEvent>()).isEmpty)
+        #expect(revisionCenter.homeRevision.value == beforeRevision)
+        #expect(revisionCenter.lastMutation == nil)
+    }
+
+    @MainActor
+    @Test func quickFeedExecutorTreatWritesFactAndRevisionForMissingExecutor() throws {
+        let revisionCenter = ReadModelRevisionCenter()
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let pet = Pet(name: "Momo", species: "猫")
+        context.insert(pet)
+        try context.save()
+
+        let defaults = UserDefaults.standard
+        let oldActiveHumanID = defaults.object(forKey: "currentActiveHumanId")
+        defer {
+            if let oldActiveHumanID {
+                defaults.set(oldActiveHumanID, forKey: "currentActiveHumanId")
+            } else {
+                defaults.removeObject(forKey: "currentActiveHumanId")
+            }
+        }
+        defaults.removeObject(forKey: "currentActiveHumanId")
+
+        let beforeRevision = revisionCenter.homeRevision.value
+        let executor = QuickFeedCommandExecutor(context: context, revisionCenter: revisionCenter)
+        let missingExecutorID = UUID().uuidString
+        let result = executor.recordTreat(
+            pet: pet,
+            grams: 12,
+            treatKind: .freezeDried,
+            executorId: missingExecutorID
+        )
+
+        let logs = try context.fetch(FetchDescriptor<PetCareLog>())
+        let ledgerEvents = try context.fetch(FetchDescriptor<CareLedgerEvent>())
+        let walletEntries = try context.fetch(FetchDescriptor<CoconutLedgerEntry>())
+        let mutation = try #require(revisionCenter.lastMutation)
+        #expect(result.didRecord == true)
+        #expect(result.allowsDerivedEffects == true)
+        #expect(logs.count == 1)
+        #expect(logs.first?.pet?.id == pet.id)
+        #expect(logs.first?.careType == .feeding)
+        #expect(logs.first?.amountGrams == 12)
+        #expect(logs.first?.treatKind == .freezeDried)
+        #expect(ledgerEvents.contains { $0.legacyModelId == logs.first?.id.uuidString })
+        #expect(walletEntries.isEmpty)
+        #expect(revisionCenter.homeRevision.value == beforeRevision + 1)
+        #expect(mutation.command == .feedLog(petID: pet.id, source: "treat"))
         #expect(mutation.affectedEntityIDs == [pet.id])
         #expect(mutation.wroteBusinessFact == true)
     }
@@ -7804,6 +8323,7 @@ struct HomeCommandExecutorTests {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
         let pet = Pet(name: "Momo", species: "猫")
+        let executorHuman = insertExecutorHuman(in: context)
         context.insert(pet)
         try context.save()
 
@@ -7814,7 +8334,7 @@ struct HomeCommandExecutorTests {
                 emoji: "🧹",
                 recordsHygiene: true,
                 occurredAt: makeDate(year: 2026, month: 6, day: 8, hour: 8, minute: 30),
-                executorId: "human-1"
+                executorId: executorHuman.id.uuidString
             ),
             context: context
         )
@@ -7852,6 +8372,7 @@ struct HomeCommandExecutorTests {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
         let pet = Pet(name: "Momo", species: "猫")
+        let executorHuman = insertExecutorHuman(in: context)
         context.insert(pet)
         try context.save()
 
@@ -7862,7 +8383,7 @@ struct HomeCommandExecutorTests {
                 emoji: "🥩",
                 recordsHygiene: false,
                 occurredAt: makeDate(year: 2026, month: 6, day: 8, hour: 9, minute: 0),
-                executorId: "human-1"
+                executorId: executorHuman.id.uuidString
             ),
             context: context
         )
@@ -7882,6 +8403,7 @@ struct HomeCommandExecutorTests {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
         let pet = Pet(name: "Momo", species: "猫")
+        let executorHuman = insertExecutorHuman(in: context)
         context.insert(pet)
         try context.save()
 
@@ -7894,7 +8416,7 @@ struct HomeCommandExecutorTests {
                 emoji: "🧹",
                 recordsHygiene: true,
                 occurredAt: makeDate(year: 2026, month: 6, day: 8, hour: 8, minute: 30),
-                executorId: "human-1"
+                executorId: executorHuman.id.uuidString
             ),
             note: "test.cat.record"
         )
@@ -7916,6 +8438,39 @@ struct HomeCommandExecutorTests {
         #expect(mutation.affectedEntityIDs == [pet.id, recorded.eventID, hygieneLogID])
         #expect(mutation.note == "test.cat.undo")
         #expect(revisionCenter.homeRevision.value == beforeRevision + 2)
+    }
+
+    @MainActor
+    @Test func petCareCommandExecutorDoesNotPublishCatCareRevisionWhenFactNoops() throws {
+        let revisionCenter = ReadModelRevisionCenter()
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let executorHuman = Human(name: "Former caretaker")
+        executorHuman.passedAwayDate = makeDate(year: 2026, month: 6, day: 8, hour: 8, minute: 0)
+        let pet = Pet(name: "Momo", species: "猫")
+        context.insert(executorHuman)
+        context.insert(pet)
+        try context.save()
+
+        let executor = PetCareCommandExecutor(context: context, revisionCenter: revisionCenter)
+        let beforeRevision = revisionCenter.homeRevision.value
+        let recorded = executor.recordCatCare(
+            pet: pet,
+            input: CatCareCommandInput(
+                actionRaw: "铲猫砂",
+                emoji: "🧹",
+                recordsHygiene: true,
+                occurredAt: makeDate(year: 2026, month: 6, day: 8, hour: 8, minute: 30),
+                executorId: executorHuman.id.uuidString
+            ),
+            note: "test.cat.record.noop"
+        )
+
+        #expect(recorded.didRecord == false)
+        #expect(revisionCenter.lastMutation == nil)
+        #expect(revisionCenter.homeRevision.value == beforeRevision)
+        #expect(try context.fetch(FetchDescriptor<Event>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<PetHygieneLog>()).isEmpty)
     }
 
     @MainActor
@@ -7964,7 +8519,7 @@ struct HomeCommandExecutorTests {
     }
 
     private func makeInMemoryContainer() throws -> ModelContainer {
-        let schema = Schema(ArkSchemaV71.models)
+        let schema = Schema(ArkSchemaV72.models)
         let config = ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)
         return try ModelContainer(for: schema, configurations: [config])
     }
@@ -8038,6 +8593,13 @@ struct HomeCommandExecutorTests {
     @MainActor
     private func makeQuestManager() -> QuestManager {
         QuestManager(wallet: SwiftDataCoconutWalletManager(), revisions: SharedDomainRevisionPublisher())
+    }
+
+    @discardableResult
+    private func insertExecutorHuman(in context: ModelContext, name: String = "Executor") -> Human {
+        let human = Human(name: name)
+        context.insert(human)
+        return human
     }
 
     @MainActor

@@ -11,6 +11,13 @@ import SwiftData
 nonisolated enum PetMedicationDoseLogging {
     static let relatedEntityTypeMedication = MedicationEventLink.petMedicationDose
 
+    struct RecordDoseResult {
+        let event: Event
+        let didRecord: Bool
+        let coconutDelta: Int
+        let allowsDerivedEffects: Bool
+    }
+
     /// 某日该药应喂次数（`asNeeded` 为 0，不产生委托）
     static func requiredDoses(on date: Date, for med: PetMedication) -> Int {
         guard med.isActive else { return 0 }
@@ -62,6 +69,32 @@ nonisolated enum PetMedicationDoseLogging {
         careLedger providedCareLedger: CareLedgerRecording? = nil,
         medicationReminders providedMedicationReminders: MedicationReminderManaging? = nil
     ) -> Event {
+        recordDoseResult(
+            medication: medication,
+            pet: pet,
+            modelContext: modelContext,
+            decrementRemaining: decrementRemaining,
+            awardCoconut: awardCoconut,
+            questManager: questManager,
+            activeHumanSelection: activeHumanSelection,
+            careLedger: providedCareLedger,
+            medicationReminders: providedMedicationReminders
+        ).event
+    }
+
+    @discardableResult
+    @MainActor
+    static func recordDoseResult(
+        medication: PetMedication,
+        pet: Pet,
+        modelContext: ModelContext,
+        decrementRemaining: Bool = true,
+        awardCoconut: Bool = false,
+        questManager: QuestManager,
+        activeHumanSelection: ActiveHumanSelecting = UserDefaultsActiveHumanSelection(),
+        careLedger providedCareLedger: CareLedgerRecording? = nil,
+        medicationReminders providedMedicationReminders: MedicationReminderManaging? = nil
+    ) -> RecordDoseResult {
         let careLedger = providedCareLedger ?? CareLedgerService()
         let medicationReminders = providedMedicationReminders ?? SharedMedicationReminderManager()
         let event = Event(
@@ -75,11 +108,25 @@ nonisolated enum PetMedicationDoseLogging {
         if let hid = activeHumanSelection.currentHumanId {
             event.assigneeId = hid
         }
+        let disposition = CareFactWritePolicy.disposition(
+            pet: pet,
+            date: event.startDate,
+            executorId: event.assigneeId,
+            context: modelContext
+        )
+        guard disposition.didWriteFact else {
+            return RecordDoseResult(
+                event: event,
+                didRecord: false,
+                coconutDelta: 0,
+                allowsDerivedEffects: false
+            )
+        }
         modelContext.insert(event)
 
+        var coconutDelta = 0
         do {
-            var coconutDelta = 0
-            if awardCoconut {
+            if awardCoconut, disposition.allowsDerivedEffects {
                 let reward = EconomyRewardDiscipline.awardCareAction(
                     type: .general(humanReward: 1, petReward: 0, emoji: "💊", title: "记录喂药 +1🥥"),
                     pet: pet,
@@ -89,33 +136,37 @@ nonisolated enum PetMedicationDoseLogging {
                 )
                 coconutDelta = reward.humanGot + reward.petGot
             }
-            careLedger.record(
-                occurredAt: event.startDate,
-                actorKind: event.assigneeId == nil ? .unknown : .human,
-                actorId: event.assigneeId,
-                subjectKind: .pet,
-                subjectId: pet.id.uuidString,
-                eventKind: .medication,
-                actionType: "petMedicationDose",
-                amountValue: 0,
-                amountUnit: "",
-                note: event.title,
-                source: .detail,
-                sourceEventId: event.id.uuidString,
-                sourceReminderId: nil,
-                legacyModelName: "Event",
-                legacyModelId: event.id.uuidString,
-                coconutDelta: coconutDelta,
-                rewardLogId: nil,
-                privacyFieldRaw: nil,
-                metadataJSON: "{\"medicationId\":\"\(medication.id.uuidString)\"}",
-                context: modelContext,
-                save: false
-            )
-            if decrementRemaining {
+            if disposition.allowsDerivedEffects {
+                careLedger.record(
+                    occurredAt: event.startDate,
+                    actorKind: event.assigneeId == nil ? .unknown : .human,
+                    actorId: event.assigneeId,
+                    subjectKind: .pet,
+                    subjectId: pet.id.uuidString,
+                    eventKind: .medication,
+                    actionType: "petMedicationDose",
+                    amountValue: 0,
+                    amountUnit: "",
+                    note: event.title,
+                    source: .detail,
+                    sourceEventId: event.id.uuidString,
+                    sourceReminderId: nil,
+                    legacyModelName: "Event",
+                    legacyModelId: event.id.uuidString,
+                    coconutDelta: coconutDelta,
+                    rewardLogId: nil,
+                    privacyFieldRaw: nil,
+                    metadataJSON: "{\"medicationId\":\"\(medication.id.uuidString)\"}",
+                    context: modelContext,
+                    save: false
+                )
+            }
+            if decrementRemaining, disposition.allowsDerivedEffects {
                 PetMedicationPlanStorageKeys.decrementRemainingAmount(medication: medication)
             }
-            medicationReminders.recordDose(for: medication.id)
+            if disposition.allowsDerivedEffects {
+                medicationReminders.recordDose(for: medication.id)
+            }
             try modelContext.save()
         } catch {
             modelContext.rollback()
@@ -125,6 +176,11 @@ nonisolated enum PetMedicationDoseLogging {
             #endif
         }
 
-        return event
+        return RecordDoseResult(
+            event: event,
+            didRecord: true,
+            coconutDelta: coconutDelta,
+            allowsDerivedEffects: disposition.allowsDerivedEffects
+        )
     }
 }

@@ -76,6 +76,28 @@ struct PetHealthCommandResult: Equatable {
     let eventID: UUID?
     let reminderID: UUID?
     let coconutDelta: Int
+    let didRecord: Bool
+    let allowsDerivedEffects: Bool
+
+    init(
+        logID: UUID,
+        subjectID: UUID,
+        expenseLogID: UUID?,
+        eventID: UUID?,
+        reminderID: UUID?,
+        coconutDelta: Int,
+        didRecord: Bool = true,
+        allowsDerivedEffects: Bool = true
+    ) {
+        self.logID = logID
+        self.subjectID = subjectID
+        self.expenseLogID = expenseLogID
+        self.eventID = eventID
+        self.reminderID = reminderID
+        self.coconutDelta = coconutDelta
+        self.didRecord = didRecord
+        self.allowsDerivedEffects = allowsDerivedEffects
+    }
 }
 
 enum PetHealthCommandService {
@@ -92,7 +114,13 @@ enum PetHealthCommandService {
         reminderScheduling providedReminderScheduling: ReminderSchedulingManaging? = nil,
         oasisRewards providedOasisRewards: OasisRewardManaging? = nil
     ) -> PetHealthCommandResult? {
-        guard pet.canWriteHealthFacts else { return nil }
+        let disposition = CareFactWritePolicy.disposition(
+            pet: pet,
+            date: input.date,
+            executorId: input.executorId,
+            context: context
+        )
+        guard disposition.didWriteFact else { return nil }
         let careLedger = providedCareLedger ?? CareLedgerService()
         let reminderScheduling = providedReminderScheduling ?? ReminderSchedulingManager()
         let oasisRewards = providedOasisRewards ?? StaticOasisRewardManager(
@@ -112,6 +140,20 @@ enum PetHealthCommandService {
         log.expirationDate = input.expirationDate
         log.nextCheckupDate = input.nextCheckupDate
         context.insert(log)
+
+        let allowsDerivedEffects = disposition.allowsDerivedEffects
+        guard allowsDerivedEffects else {
+            context.safeSave()
+            return PetHealthCommandResult(
+                logID: log.id,
+                subjectID: pet.id,
+                expenseLogID: nil,
+                eventID: nil,
+                reminderID: nil,
+                coconutDelta: 0,
+                allowsDerivedEffects: false
+            )
+        }
 
         let expense = makeExpenseIfNeeded(
             pet: pet,
@@ -215,7 +257,8 @@ enum PetHealthCommandService {
             expenseLogID: expense?.id,
             eventID: event?.id,
             reminderID: reminder?.id,
-            coconutDelta: coconutDelta
+            coconutDelta: coconutDelta,
+            allowsDerivedEffects: true
         )
     }
 
@@ -592,6 +635,7 @@ enum PetHealthDeleteCommandService {
 struct PetHealthCommandExecutor {
     let context: ModelContext
     let revisions: DomainRevisionPublishing
+    private let derivations: CareDerivationExecutor
     let questManager: QuestManager
     let careLedger: CareLedgerRecording
     let reminderScheduling: ReminderSchedulingManaging
@@ -650,6 +694,7 @@ struct PetHealthCommandExecutor {
     ) {
         self.context = context
         self.revisions = revisions
+        derivations = CareDerivationExecutor(revisions: revisions)
         self.questManager = questManager
         self.careLedger = careLedger
         self.reminderScheduling = reminderScheduling
@@ -675,17 +720,16 @@ struct PetHealthCommandExecutor {
             reminderScheduling: reminderScheduling,
             oasisRewards: oasisRewards
         ) else {
-            revisions.publish(
-                DomainMutationResult(
+            derivations.derive(
+                .noOp(
                     command: .petHealthRecord(petID: pet.id, type: input.type.rawValue),
                     affectedEntityIDs: [pet.id],
-                    wroteBusinessFact: false,
                     note: "pet.health.readOnly"
                 )
             )
             return nil
         }
-        revisions.publishPetHealthRecord(result, type: input.type.rawValue, note: note)
+        deriveHealthRecord(result, type: input.type.rawValue, factDate: input.date, note: note)
         return result
     }
 
@@ -751,5 +795,45 @@ struct PetHealthCommandExecutor {
         let result = PetHealthDeleteCommandService.deleteHeatCycleLog(log, pet: pet, context: context)
         revisions.publishPetHealthDelete(result, note: note)
         return result
+    }
+
+    @discardableResult
+    private func deriveHealthRecord(
+        _ result: PetHealthCommandResult,
+        type: String,
+        factDate: Date,
+        note: String
+    ) -> CareDerivationResult {
+        var affected: Set<UUID> = [result.subjectID, result.logID]
+        if let expenseLogID = result.expenseLogID {
+            affected.insert(expenseLogID)
+        }
+        if let eventID = result.eventID {
+            affected.insert(eventID)
+        }
+        if let reminderID = result.reminderID {
+            affected.insert(reminderID)
+        }
+        return derivations.derive(
+            .active(
+                disposition: result.allowsDerivedEffects ? .active : .noOp,
+                fact: CareWriteOutcome.FactPayload(
+                    subjectID: result.subjectID,
+                    logIDs: [result.logID],
+                    factDate: factDate,
+                    operationDate: factDate
+                ),
+                revision: CareWriteOutcome.RevisionPayload(
+                    command: .petHealthRecord(petID: result.subjectID, type: type),
+                    affectedEntityIDs: affected,
+                    note: note
+                ),
+                reward: CareWriteOutcome.RewardPayload(
+                    humanDelta: result.coconutDelta,
+                    petDelta: 0
+                ),
+                noopNote: note
+            )
+        )
     }
 }

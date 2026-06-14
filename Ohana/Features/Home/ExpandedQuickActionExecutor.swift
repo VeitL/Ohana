@@ -63,7 +63,7 @@ enum ExpandedQuickActionExecutor {
                     careEvents: careEvents,
                     date: now
                 )
-                guard result.didRecord else { return false }
+                guard result.didRecord, result.allowsDerivedEffects else { return false }
                 let coconutDelta = result.coconutDelta
                 feedback(Feedback(cardId: pet.id, coconutDelta: coconutDelta, label: rewardLabel(actionType: "feed", delta: coconutDelta)))
                 UINotificationFeedbackGenerator().notificationOccurred(.success)
@@ -129,16 +129,17 @@ enum ExpandedQuickActionExecutor {
         let state = ExpandedQuickActionLogic.waterRuleState(for: pet, allEvents: allEvents, now: now)
         if state.operatingMode == .reminder {
             if let reminder = state.nextPendingReminder {
-                let reward = careEvents.completePlannedWater(
+                let result = careEvents.completePlannedWaterResult(
                     pet: pet,
                     reminder: reminder,
                     amountMl: ExpandedQuickActionLogic.defaultWaterAmountMl(for: pet) ?? 0,
                     context: modelContext,
                     executorId: executorId,
-                    date: now
+                    occurredAt: nil,
+                    operationDate: now
                 )
-                guard let reward else { return false }
-                let delta = reward.humanGot + reward.petGot
+                guard result.didRecord, result.allowsDerivedEffects else { return false }
+                let delta = result.coconutDelta
                 feedback(Feedback(cardId: pet.id, coconutDelta: delta, label: rewardLabel(actionType: "water", delta: delta)))
                 UINotificationFeedbackGenerator().notificationOccurred(.success)
                 return true
@@ -159,7 +160,7 @@ enum ExpandedQuickActionExecutor {
             source: .quickAction,
             createsLinkedPottyLog: false
         )
-        guard recorded.result.didWriteFact else { return false }
+        guard recorded.result.didWriteFact, recorded.result.allowsDerivedEffects else { return false }
         let delta = recorded.reward.humanGot + recorded.reward.petGot
         feedback(Feedback(cardId: pet.id, coconutDelta: delta, label: rewardLabel(actionType: "water", delta: delta)))
         UINotificationFeedbackGenerator().notificationOccurred(.success)
@@ -195,7 +196,7 @@ enum ExpandedQuickActionExecutor {
             return false
         }
 
-        PetMedicationDoseLogging.recordDose(
+        let result = PetMedicationDoseLogging.recordDoseResult(
             medication: medication,
             pet: pet,
             modelContext: modelContext,
@@ -203,8 +204,9 @@ enum ExpandedQuickActionExecutor {
             questManager: questManager,
             medicationReminders: medicationReminders
         )
+        guard result.didRecord, result.allowsDerivedEffects else { return false }
         medicationReminders.scheduleMedicationReminders(for: pet, context: modelContext)
-        feedback(Feedback(cardId: pet.id, coconutDelta: 1, label: rewardLabel(actionType: "medication", delta: 1)))
+        feedback(Feedback(cardId: pet.id, coconutDelta: result.coconutDelta, label: rewardLabel(actionType: "medication", delta: result.coconutDelta)))
         UINotificationFeedbackGenerator().notificationOccurred(.success)
         return true
     }
@@ -280,7 +282,7 @@ enum ExpandedQuickActionExecutor {
                 source: .quickAction,
                 createsLinkedPottyLog: false
             )
-            guard recorded.result.didWriteFact else { return false }
+            guard recorded.result.didWriteFact, recorded.result.allowsDerivedEffects else { return false }
             let delta = recorded.reward.humanGot + recorded.reward.petGot
             feedback(Feedback(cardId: pet.id, coconutDelta: delta, label: rewardLabel(actionType: "litter", delta: delta)))
             UINotificationFeedbackGenerator().notificationOccurred(.success)
@@ -364,7 +366,7 @@ enum ExpandedQuickActionExecutor {
             executorId: executorId,
             date: Date()
         )
-        guard recorded.result.didWriteFact else { return false }
+        guard recorded.result.didWriteFact, recorded.result.allowsDerivedEffects else { return false }
         let delta = recorded.reward.humanGot + recorded.reward.petGot
         feedback(Feedback(cardId: pet.id, coconutDelta: delta, label: rewardLabel(title: L10n().hygieneTypeUILabel(type), delta: delta)))
         UINotificationFeedbackGenerator().notificationOccurred(.success)
@@ -384,7 +386,7 @@ enum ExpandedQuickActionExecutor {
             return false
         }
         let recorded = careEvents.recordPottyFact(pet: pet, type: type, context: modelContext, executorId: executorId, date: Date())
-        guard recorded.result.didWriteFact else { return false }
+        guard recorded.result.didWriteFact, recorded.result.allowsDerivedEffects else { return false }
         let delta = recorded.reward.humanGot + recorded.reward.petGot
         feedback(Feedback(cardId: pet.id, coconutDelta: delta, label: rewardLabel(title: L10n().pottyTypeUILabel(type), delta: delta)))
         UINotificationFeedbackGenerator().notificationOccurred(.success)
@@ -421,7 +423,7 @@ enum ExpandedQuickActionExecutor {
             executorId: executorId,
             date: Date()
         )
-        guard recorded.result.didWriteFact else { return false }
+        guard recorded.result.didWriteFact, recorded.result.allowsDerivedEffects else { return false }
         let delta = recorded.reward.humanGot + recorded.reward.petGot
         feedback(Feedback(cardId: pet.id, coconutDelta: delta, label: rewardLabel(actionType: "health", delta: delta)))
         UINotificationFeedbackGenerator().notificationOccurred(.success)
@@ -461,7 +463,7 @@ enum ExpandedQuickActionExecutor {
             source: .quickAction,
             createsLinkedPottyLog: false
         )
-        guard recorded.result.didWriteFact else { return false }
+        guard recorded.result.didWriteFact, recorded.result.allowsDerivedEffects else { return false }
         let delta = recorded.reward.humanGot + recorded.reward.petGot
         feedback(Feedback(cardId: pet.id, coconutDelta: delta, label: rewardLabel(title: L10n().careTypeUILabel(type), delta: delta)))
         return true

@@ -992,15 +992,17 @@ struct OhanaTests {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
         let pet = Pet(name: "Momo", species: "猫")
+        let executorId = "human-1"
         context.insert(pet)
+        try context.save()
 
-        CareEventService.recordManualFeed(pet: pet, amountGrams: 42, context: context, executorId: "human-1")
+        CareEventService.recordManualFeed(pet: pet, amountGrams: 42, context: context, executorId: executorId)
 
         let logs = try context.fetch(FetchDescriptor<PetCareLog>())
         #expect(logs.count == 1)
         #expect(logs.first?.careType == .feeding)
         #expect(logs.first?.amountGrams == 42)
-        #expect(logs.first?.executorId == "human-1")
+        #expect(logs.first?.executorId == executorId)
 
         let ledger = try context.fetch(FetchDescriptor<CareLedgerEvent>())
         #expect(ledger.count == 1)
@@ -1014,6 +1016,7 @@ struct OhanaTests {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
         let pet = Pet(name: "Momo", species: "猫")
+        let executorId = "human-1"
         context.insert(pet)
         try context.save()
 
@@ -1034,7 +1037,7 @@ struct OhanaTests {
             pet: pet,
             type: .litter,
             context: context,
-            executorId: "human-1",
+            executorId: executorId,
             reward: .potty(isLitter: true),
             date: date,
             createsLinkedPottyLog: true,
@@ -1056,10 +1059,10 @@ struct OhanaTests {
         #expect(recorded.reward.petGot == 1)
         #expect(careLogs.count == 1)
         #expect(careLogs.first?.careType == .litter)
-        #expect(careLogs.first?.executorId == "human-1")
+        #expect(careLogs.first?.executorId == executorId)
         #expect(pottyLogs.count == 1)
         #expect(pottyLogs.first?.pottyType == .perfectPoop)
-        #expect(pottyLogs.first?.executorId == "human-1")
+        #expect(pottyLogs.first?.executorId == executorId)
         #expect(ledger.count == 2)
         #expect(careLedger.eventKindEnum == .care)
         #expect(careLedger.actionType == CareType.litter.rawValue)
@@ -1073,7 +1076,7 @@ struct OhanaTests {
         #expect(awardCall.petID == pet.id)
         #expect(quickReminderCall.petID == pet.id)
         #expect(quickReminderCall.careType == .litter)
-        #expect(quickReminderCall.executorId == "human-1")
+        #expect(quickReminderCall.executorId == executorId)
         #expect(quickReminderCall.now == date)
     }
 
@@ -1082,6 +1085,7 @@ struct OhanaTests {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
         let pet = Pet(name: "Momo", species: "猫")
+        let executorId = "human-1"
         context.insert(pet)
         try context.save()
 
@@ -1102,7 +1106,7 @@ struct OhanaTests {
             pet: pet,
             type: .softPoop,
             context: context,
-            executorId: "human-1",
+            executorId: executorId,
             date: date,
             dependencies: dependencies
         )
@@ -1119,11 +1123,11 @@ struct OhanaTests {
         #expect(logs.count == 1)
         #expect(log.pottyType == .softPoop)
         #expect(log.pet?.id == pet.id)
-        #expect(log.executorId == "human-1")
+        #expect(log.executorId == executorId)
         #expect(ledger.count == 1)
         #expect(pottyLedger.eventKindEnum == .potty)
         #expect(pottyLedger.actionType == PottyType.softPoop.rawValue)
-        #expect(pottyLedger.actorId == "human-1")
+        #expect(pottyLedger.actorId == executorId)
         #expect(pottyLedger.subjectId == pet.id.uuidString)
         #expect(pottyLedger.legacyModelName == "PetPottyLog")
         #expect(pottyLedger.legacyModelId == log.id.uuidString)
@@ -1132,7 +1136,7 @@ struct OhanaTests {
         #expect(awardCall.petID == pet.id)
         #expect(awardCall.quality == "none")
         #expect(quickReminderCall.petID == pet.id)
-        #expect(quickReminderCall.executorId == "human-1")
+        #expect(quickReminderCall.executorId == executorId)
         #expect(quickReminderCall.now == date)
     }
 
@@ -1141,6 +1145,7 @@ struct OhanaTests {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
         let pet = Pet(name: "Momo", species: "猫")
+        let executorId = "human-1"
         context.insert(pet)
         try context.save()
 
@@ -1161,7 +1166,7 @@ struct OhanaTests {
             pet: pet,
             type: .brushing,
             context: context,
-            executorId: "human-1",
+            executorId: executorId,
             date: date,
             dependencies: dependencies
         )
@@ -1182,11 +1187,11 @@ struct OhanaTests {
         #expect(logs.count == 1)
         #expect(log.hygieneType == .brushing)
         #expect(log.pet?.id == pet.id)
-        #expect(log.executorId == "human-1")
+        #expect(log.executorId == executorId)
         #expect(ledger.count == 1)
         #expect(hygieneLedger.eventKindEnum == .hygiene)
         #expect(hygieneLedger.actionType == HygieneType.brushing.rawValue)
-        #expect(hygieneLedger.actorId == "human-1")
+        #expect(hygieneLedger.actorId == executorId)
         #expect(hygieneLedger.subjectId == pet.id.uuidString)
         #expect(hygieneLedger.legacyModelName == "PetHygieneLog")
         #expect(hygieneLedger.legacyModelId == log.id.uuidString)
@@ -1195,7 +1200,7 @@ struct OhanaTests {
         #expect(awardCall.petID == pet.id)
         #expect(quickReminderCall.petID == pet.id)
         #expect(quickReminderCall.hygieneType == .brushing)
-        #expect(quickReminderCall.executorId == "human-1")
+        #expect(quickReminderCall.executorId == executorId)
         #expect(quickReminderCall.now == date)
     }
 
@@ -1452,6 +1457,7 @@ struct OhanaTests {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
         let pet = Pet(name: "Momo", species: "猫")
+        let executorId = "human-1"
         let event = Event(
             title: "早餐 45g",
             eventType: EventType.foodChange.rawValue,
@@ -1462,8 +1468,9 @@ struct OhanaTests {
         context.insert(pet)
         context.insert(event)
         context.insert(reminder)
+        try context.save()
 
-        CareEventService.completePlannedFeed(pet: pet, reminder: reminder, context: context, executorId: "human-1")
+        CareEventService.completePlannedFeed(pet: pet, reminder: reminder, context: context, executorId: executorId)
 
         let logs = try context.fetch(FetchDescriptor<PetCareLog>())
         let ledger = try context.fetch(FetchDescriptor<CareLedgerEvent>())
@@ -1479,6 +1486,7 @@ struct OhanaTests {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
         let pet = Pet(name: "Momo", species: "猫")
+        let executorId = "human-1"
         let scheduledAt = dateForTest(year: 2026, month: 5, day: 8, hour: 8)
         let event = Event(
             title: "早餐",
@@ -1515,7 +1523,7 @@ struct OhanaTests {
             reminder: reminder,
             context: context,
             quality: .precise,
-            executorId: "human-1",
+            executorId: executorId,
             date: scheduledAt,
             dependencies: dependencies
         )
@@ -1536,16 +1544,16 @@ struct OhanaTests {
         #expect(log.pet?.id == pet.id)
         #expect(reminder.statusEnum == .completed)
         #expect(reminder.completedAt == scheduledAt)
-        #expect(reminder.completedBy == "human-1")
+        #expect(reminder.completedBy == executorId)
         #expect(event.isOccurrenceMarkedComplete(on: scheduledAt))
         #expect(economy.careAwardCalls.count == 1)
         #expect(awardCall.action == "feed")
         #expect(awardCall.petID == pet.id)
         #expect(awardCall.quality == "precise")
         #expect(familyTasks.completedReminderIDs == [reminder.id])
-        #expect(familyTasks.completedReminderHumanIDs == ["human-1"])
+        #expect(familyTasks.completedReminderHumanIDs == [executorId])
         #expect(reminderLedger.eventKindEnum == .reminder)
-        #expect(reminderLedger.actorId == "human-1")
+        #expect(reminderLedger.actorId == executorId)
         #expect(reminderLedger.source == CareLedgerSource.reminder.rawValue)
         #expect(reminderLedger.sourceEventId == event.id.uuidString)
         #expect(reminderLedger.sourceReminderId == reminder.id.uuidString)
@@ -1561,24 +1569,13 @@ struct OhanaTests {
     }
 
     @MainActor
-    @Test func plannedFeedCatchUpWithinSixHoursDoesNotAwardCoconuts() async throws {
+    @Test func plannedFeedCatchUpWithinSixHoursAwardsOnOperationDay() async throws {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
-        let previousCoconutCount = TestQuestManagerProjection.manager.coconutCount
-        let previousFirstMeal = TestQuestManagerProjection.manager.isFirstMealRecorded
-        let previousLogs = TestQuestManagerProjection.manager.coconutLogs
-        TestQuestManagerProjection.manager.coconutCount = 0
-        TestQuestManagerProjection.manager.isFirstMealRecorded = false
-        TestQuestManagerProjection.manager.coconutLogs = []
-        defer {
-            TestQuestManagerProjection.manager.coconutCount = previousCoconutCount
-            TestQuestManagerProjection.manager.isFirstMealRecorded = previousFirstMeal
-            TestQuestManagerProjection.manager.coconutLogs = previousLogs
-        }
-
         let pet = Pet(name: "Momo", species: "猫")
-        let scheduledAt = dateForTest(year: 2026, month: 5, day: 8, hour: 8)
-        let completedAt = dateForTest(year: 2026, month: 5, day: 8, hour: 10)
+        let executorId = "human-1"
+        let scheduledAt = dateForTest(year: 2026, month: 5, day: 8, hour: 23)
+        let completedAt = dateForTest(year: 2026, month: 5, day: 9, hour: 1)
         let event = Event(
             title: "早餐 45g",
             startDate: scheduledAt,
@@ -1591,23 +1588,44 @@ struct OhanaTests {
         context.insert(pet)
         context.insert(event)
         context.insert(reminder)
+        try context.save()
+        let economy = CareEventEconomyAwarderSpy(reward: (humanGot: 4, petGot: 2))
+        let questManager = QuestManager()
+        questManager.isFirstMealRecorded = true
+        let dependencies = CareEventServiceDependencies(
+            questManager: questManager,
+            economy: economy,
+            careLedger: CareLedgerService(),
+            reminderCompletion: NoopReminderCompleter(),
+            quickActionReminderCompletion: NoopQuickActionReminderCompleter(),
+            familyTasks: FamilyTaskManagerSpy(),
+            revisions: SharedDomainRevisionPublisher()
+        )
 
         let reward = CareEventService.completePlannedFeed(
             pet: pet,
             reminder: reminder,
             context: context,
-            executorId: "human-1",
-            date: completedAt
+            executorId: executorId,
+            date: completedAt,
+            dependencies: dependencies
         )
 
+        let logs = try context.fetch(FetchDescriptor<PetCareLog>())
+        let log = try #require(logs.first)
         let ledger = try context.fetch(FetchDescriptor<CareLedgerEvent>())
-        #expect(reward?.humanGot == 0)
-        #expect(reward?.petGot == 0)
-        #expect(TestQuestManagerProjection.manager.coconutCount == 0)
-        #expect(!TestQuestManagerProjection.manager.isFirstMealRecorded)
-        #expect(pet.coconutBalance == 0)
-        #expect(ledger.contains { $0.eventKindEnum == .care && $0.sourceReminderId == reminder.id.uuidString && $0.coconutDelta == 0 })
+        let careLedger = try #require(ledger.first { $0.eventKindEnum == .care })
+        let awardCall = try #require(economy.careAwardCalls.first)
+        #expect(reward?.humanGot == 4)
+        #expect(reward?.petGot == 2)
+        #expect(log.date == scheduledAt)
+        #expect(awardCall.date == completedAt)
+        #expect(careLedger.occurredAt == scheduledAt)
+        #expect(careLedger.coconutDelta == 6)
+        #expect(careLedger.sourceReminderId == reminder.id.uuidString)
         #expect(reminder.statusEnum == .completed)
+        #expect(reminder.completedAt == completedAt)
+        #expect(event.isOccurrenceMarkedComplete(on: scheduledAt))
     }
 
     @MainActor
@@ -1615,6 +1633,7 @@ struct OhanaTests {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
         let pet = Pet(name: "Momo", species: "猫")
+        let executorId = "human-1"
         let scheduledAt = dateForTest(year: 2026, month: 5, day: 8, hour: 8)
         let completedAt = dateForTest(year: 2026, month: 5, day: 8, hour: 15)
         let event = Event(
@@ -1629,12 +1648,13 @@ struct OhanaTests {
         context.insert(pet)
         context.insert(event)
         context.insert(reminder)
+        try context.save()
 
         let reward = CareEventService.completePlannedFeed(
             pet: pet,
             reminder: reminder,
             context: context,
-            executorId: "human-1",
+            executorId: executorId,
             date: completedAt
         )
 
@@ -1672,7 +1692,9 @@ struct OhanaTests {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
         let pet = Pet(name: "Momo", species: "猫")
+        let executorId = "human-1"
         context.insert(pet)
+        try context.save()
 
         #expect(pet.mainFoodKind == .dry)
         pet.mainFoodKind = .wet
@@ -1680,7 +1702,7 @@ struct OhanaTests {
             pet: pet,
             amountGrams: 85,
             context: context,
-            executorId: "human-1",
+            executorId: executorId,
             foodKind: pet.mainFoodKind
         )
 
@@ -2228,6 +2250,7 @@ struct OhanaTests {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
         let pet = Pet(name: "Momo", species: "猫")
+        let executorId = "human-1"
         let event = Event(
             title: "Momo 喂水",
             startDate: Date().addingTimeInterval(-60),
@@ -2246,7 +2269,7 @@ struct OhanaTests {
             reminder: reminder,
             amountMl: 180,
             context: context,
-            executorId: "human-1"
+            executorId: executorId
         )
 
         let logs = try context.fetch(FetchDescriptor<PetCareLog>())
@@ -2254,9 +2277,9 @@ struct OhanaTests {
         #expect(log.careType == .watering)
         #expect(log.amountMl == 180)
         #expect(log.note.hasPrefix(PetCareLog.plannedWaterNotePrefix))
-        #expect(log.executorId == "human-1")
+        #expect(log.executorId == executorId)
         #expect(reminder.statusEnum == .completed)
-        #expect(reminder.completedBy == "human-1")
+        #expect(reminder.completedBy == executorId)
         #expect(event.isOccurrenceMarkedComplete(on: reminder.scheduledAt))
     }
 
@@ -2265,6 +2288,7 @@ struct OhanaTests {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
         let pet = Pet(name: "Momo", species: "猫")
+        let executorId = "human-1"
         let scheduledAt = dateForTest(year: 2026, month: 5, day: 8, hour: 9)
         let event = Event(
             title: "Momo 喂水",
@@ -2296,7 +2320,7 @@ struct OhanaTests {
             reminder: reminder,
             amountMl: 180,
             context: context,
-            executorId: "human-1",
+            executorId: executorId,
             date: scheduledAt,
             dependencies: dependencies
         )
@@ -2316,16 +2340,16 @@ struct OhanaTests {
         #expect(log.pet?.id == pet.id)
         #expect(reminder.statusEnum == .completed)
         #expect(reminder.completedAt == scheduledAt)
-        #expect(reminder.completedBy == "human-1")
+        #expect(reminder.completedBy == executorId)
         #expect(event.isOccurrenceMarkedComplete(on: scheduledAt))
         #expect(economy.careAwardCalls.count == 1)
         #expect(awardCall.action == "water")
         #expect(awardCall.petID == pet.id)
         #expect(awardCall.quality == "none")
         #expect(familyTasks.completedReminderIDs == [reminder.id])
-        #expect(familyTasks.completedReminderHumanIDs == ["human-1"])
+        #expect(familyTasks.completedReminderHumanIDs == [executorId])
         #expect(reminderLedger.eventKindEnum == .reminder)
-        #expect(reminderLedger.actorId == "human-1")
+        #expect(reminderLedger.actorId == executorId)
         #expect(reminderLedger.source == CareLedgerSource.reminder.rawValue)
         #expect(reminderLedger.sourceEventId == event.id.uuidString)
         #expect(reminderLedger.sourceReminderId == reminder.id.uuidString)
@@ -2345,6 +2369,7 @@ struct OhanaTests {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
         let pet = Pet(name: "Momo", species: "猫")
+        let executorId = "human-1"
         let scheduledAt = dateForTest(year: 2026, month: 5, day: 8, hour: 9)
         let completedAt = dateForTest(year: 2026, month: 5, day: 8, hour: 16)
         let event = Event(
@@ -2377,7 +2402,7 @@ struct OhanaTests {
             reminder: reminder,
             amountMl: 180,
             context: context,
-            executorId: "human-1",
+            executorId: executorId,
             date: completedAt,
             dependencies: dependencies
         )
@@ -3611,7 +3636,9 @@ struct OhanaTests {
         let context = container.mainContext
         let now = dateForTest(year: 2026, month: 5, day: 8, hour: 8)
         let pet = Pet(name: "Momo", species: "猫")
+        let executorId = "human-1"
         context.insert(pet)
+        try context.save()
 
         FeedingPlanWriter.saveFoodPurchase(
             pet: pet,
@@ -3621,13 +3648,13 @@ struct OhanaTests {
             dailyGrams: 50,
             reminderEnabled: false,
             reminderAdvanceDays: 7,
-            executorId: "human-1",
+            executorId: executorId,
             allEvents: [],
             context: context,
             now: now
         )
-        CareEventService.recordManualFeed(pet: pet, amountGrams: 120, context: context, executorId: "human-1", date: now.addingTimeInterval(60))
-        CareEventService.recordTreatFeed(pet: pet, amountGrams: 20, context: context, executorId: "human-1", date: now.addingTimeInterval(120))
+        CareEventService.recordManualFeed(pet: pet, amountGrams: 120, context: context, executorId: executorId, date: now.addingTimeInterval(60))
+        CareEventService.recordTreatFeed(pet: pet, amountGrams: 20, context: context, executorId: executorId, date: now.addingTimeInterval(120))
 
         let snapshot = FeedStockCalculator.snapshot(for: pet, now: now.addingTimeInterval(180))
         let records = try context.fetch(FetchDescriptor<PetFoodRecord>())
@@ -4783,6 +4810,7 @@ struct OhanaTests {
         let action: String
         let petID: UUID?
         let quality: String
+        let date: Date
     }
 
     private struct QuickActionCareCall: Equatable {
@@ -4819,13 +4847,15 @@ struct OhanaTests {
             pet: Pet?,
             context _: ModelContext,
             quality: QuestManager.QualityBonus,
+            date: Date,
             executorId _: String?
         ) -> (humanGot: Int, petGot: Int) {
             careAwardCalls.append(
                 CareAwardCall(
                     action: actionName(type),
                     petID: pet?.id,
-                    quality: qualityName(quality)
+                    quality: qualityName(quality),
+                    date: date
                 )
             )
             return reward

@@ -67,6 +67,47 @@ struct SharedPetActionRecorderTests {
         #expect(second.coconutBalance == 1)
     }
 
+    @Test func sharedHygieneWritesSessionIdAndCascadeFindsChildren() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let human = Human(name: "Guan")
+        let first = Pet(name: "Milo", species: "cat")
+        let second = Pet(name: "Luna", species: "cat")
+        context.insert(human)
+        context.insert(first)
+        context.insert(second)
+        try context.save()
+
+        let cleanup = isolateEconomy(activeHumanID: human.id.uuidString)
+        defer { cleanup() }
+
+        let result = SharedPetActionRecorder.record(
+            SharedPetActionDescriptor(
+                actionKind: .hygiene,
+                sourcePet: first,
+                targets: [first, second],
+                date: Date(timeIntervalSince1970: 2_100_000_000),
+                executorId: human.id.uuidString,
+                childLogStrategy: .hygiene(type: .bath)
+            ),
+            context: context
+        )
+
+        let session = try #require(try context.fetch(FetchDescriptor<SharedCareSession>()).first)
+        let hygieneLogs = try context.fetch(FetchDescriptor<PetHygieneLog>())
+
+        #expect(result.didWriteFact)
+        #expect(result.hygieneLogIDs.count == 2)
+        #expect(hygieneLogs.count == 2)
+        #expect(Set(hygieneLogs.map(\.sharedSessionId)) == Set([session.id.uuidString]))
+
+        let deleteResult = SharedCareSessionMaintenance.deleteCascade(session, context: context)
+        let remainingHygieneLogs = try context.fetch(FetchDescriptor<PetHygieneLog>())
+
+        #expect(Set(deleteResult.hygieneLogIDs) == Set(hygieneLogs.map(\.id)))
+        #expect(remainingHygieneLogs.isEmpty)
+    }
+
     @Test func sharedFeedAndWaterAllocateRemaindersToSourcePet() throws {
         let container = try makeContainer()
         let context = container.mainContext
@@ -1147,6 +1188,75 @@ struct SharedPetActionRecorderTests {
         #expect(ledgerEvents.contains { $0.metadataJSON.contains(coWalker.id.uuidString) })
     }
 
+    @Test func sharedWalkNoopsWhenSecondaryExecutorHasPassedAway() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let primary = Human(name: "Guan")
+        let coWalker = Human(name: "Mia")
+        coWalker.passedAwayDate = Date(timeIntervalSince1970: 6000)
+        let first = Pet(name: "Biscuit", species: "狗")
+        let second = Pet(name: "Toast", species: "dog")
+        context.insert(primary)
+        context.insert(coWalker)
+        context.insert(first)
+        context.insert(second)
+        try context.save()
+
+        let cleanup = isolateEconomy(activeHumanID: primary.id.uuidString)
+        defer { cleanup() }
+
+        let result = CareEventService.recordSharedWalk(
+            sourcePet: first,
+            targets: [first, second],
+            distanceMeters: 1200,
+            endDate: Date(timeIntervalSince1970: 6200),
+            context: context,
+            executorId: primary.id.uuidString,
+            executorIds: [primary.id.uuidString, coWalker.id.uuidString],
+            startDate: Date(timeIntervalSince1970: 6100)
+        )
+
+        #expect(result.didWriteFact == false)
+        #expect(try context.fetch(FetchDescriptor<SharedCareSession>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<PetWalkLog>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<CareLedgerEvent>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<CoconutLedgerEntry>()).isEmpty)
+    }
+
+    @Test func sharedWalkWritesFactWhenSecondaryExecutorIsMissing() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let primary = Human(name: "Guan")
+        let first = Pet(name: "Biscuit", species: "狗")
+        let second = Pet(name: "Toast", species: "dog")
+        context.insert(primary)
+        context.insert(first)
+        context.insert(second)
+        try context.save()
+
+        let cleanup = isolateEconomy(activeHumanID: primary.id.uuidString)
+        defer { cleanup() }
+        let missingExecutorID = UUID().uuidString
+
+        let result = CareEventService.recordSharedWalk(
+            sourcePet: first,
+            targets: [first, second],
+            distanceMeters: 1200,
+            endDate: Date(timeIntervalSince1970: 6200),
+            context: context,
+            executorId: primary.id.uuidString,
+            executorIds: [primary.id.uuidString, missingExecutorID],
+            startDate: Date(timeIntervalSince1970: 6100)
+        )
+
+        #expect(result.didWriteFact)
+        #expect(try context.fetch(FetchDescriptor<SharedCareSession>()).count == 1)
+        #expect(try context.fetch(FetchDescriptor<PetWalkLog>()).count == 2)
+        #expect(try context.fetch(FetchDescriptor<CareLedgerEvent>()).contains { $0.eventKind == CareLedgerEventKind.walk.rawValue })
+        #expect(try context.fetch(FetchDescriptor<CoconutLedgerEntry>()).contains { $0.ownerId == primary.id.uuidString && $0.delta > 0 })
+        #expect(try context.fetch(FetchDescriptor<CoconutLedgerEntry>()).allSatisfy { $0.ownerId != missingExecutorID })
+    }
+
     @Test func backupRoundTripsSharedSessionExpenseAndWalkFields() throws {
         let container = try makeContainer()
         let context = container.mainContext
@@ -1198,7 +1308,7 @@ struct SharedPetActionRecorderTests {
     }
 
     private func makeContainer() throws -> ModelContainer {
-        let schema = Schema(ArkSchemaV67.models)
+        let schema = Schema(ArkSchemaV72.models)
         let config = ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)
         return try ModelContainer(for: schema, configurations: [config])
     }

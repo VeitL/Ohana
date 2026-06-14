@@ -546,12 +546,13 @@ struct PetHealthDetailContentView: View {
 
     @MainActor
     func recordMedicationDose(_ item: PetHealthMedicationDoseItem) {
-        PetMedicationCommandExecutor(context: modelContext, services: appServices).recordDose(
+        let result = PetMedicationCommandExecutor(context: modelContext, services: appServices).recordDose(
             medication: item.medication,
             pet: pet,
             awardCoconut: true,
             note: "pet.health.medication.dose"
         )
+        guard result.didRecord, result.allowsDerivedEffects else { return }
         appServices.medicationReminders.scheduleMedicationReminders(for: pet, context: modelContext)
         OhanaFeedback.success()
         medicationDoseRefreshToken = UUID()

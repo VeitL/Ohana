@@ -10,6 +10,8 @@ struct CatCareCommandTests {
         let context = container.mainContext
         let pet = Pet(name: "Momo", species: "cat")
         let otherPet = Pet(name: "Nori", species: "cat")
+        let executor = Human(name: "Executor")
+        context.insert(executor)
         context.insert(pet)
         context.insert(otherPet)
         try context.save()
@@ -21,7 +23,7 @@ struct CatCareCommandTests {
                 emoji: "L",
                 recordsHygiene: true,
                 occurredAt: Date(timeIntervalSince1970: 1_780_000_000),
-                executorId: "human-1"
+                executorId: executor.id.uuidString
             ),
             context: context
         )
@@ -53,6 +55,8 @@ struct CatCareCommandTests {
         let container = try makeContainer()
         let context = container.mainContext
         let pet = Pet(name: "Momo", species: "cat")
+        let executor = Human(name: "Executor")
+        context.insert(executor)
         context.insert(pet)
         try context.save()
 
@@ -63,7 +67,7 @@ struct CatCareCommandTests {
                 emoji: "F",
                 recordsHygiene: false,
                 occurredAt: Date(timeIntervalSince1970: 1_780_000_300),
-                executorId: "human-1"
+                executorId: executor.id.uuidString
             ),
             context: context
         )
@@ -74,6 +78,61 @@ struct CatCareCommandTests {
         #expect(events.first?.relatedEntityId == pet.id.uuidString)
         #expect(events.first?.eventType == EventType.litterBox.rawValue)
         #expect(try context.fetch(FetchDescriptor<PetHygieneLog>()).isEmpty)
+    }
+
+    @Test func recordNoopsForDeceasedExecutorBeforeEventAndHygieneFact() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let executor = Human(name: "Former caretaker")
+        executor.passedAwayDate = Date(timeIntervalSince1970: 100)
+        let pet = Pet(name: "Momo", species: "cat")
+        context.insert(executor)
+        context.insert(pet)
+        try context.save()
+
+        let recorded = CatCareCommandService.record(
+            pet: pet,
+            input: CatCareCommandInput(
+                actionRaw: "Scoop litter",
+                emoji: "L",
+                recordsHygiene: true,
+                occurredAt: Date(timeIntervalSince1970: 1_780_000_000),
+                executorId: executor.id.uuidString
+            ),
+            context: context
+        )
+
+        #expect(recorded.didRecord == false)
+        #expect(recorded.hygieneLogID == nil)
+        #expect(try context.fetch(FetchDescriptor<Event>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<PetHygieneLog>()).isEmpty)
+    }
+
+    @Test func recordNoopsForDeceasedPetWithoutHistoricalFact() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let pet = Pet(name: "Momo", species: "cat")
+        pet.passedAwayDate = Date(timeIntervalSince1970: 1_780_000_100)
+        context.insert(pet)
+        try context.save()
+
+        let recorded = CatCareCommandService.record(
+            pet: pet,
+            input: CatCareCommandInput(
+                actionRaw: "Scoop litter",
+                emoji: "L",
+                recordsHygiene: true,
+                occurredAt: Date(timeIntervalSince1970: 1_780_000_000),
+                executorId: nil
+            ),
+            context: context
+        )
+
+        #expect(recorded.didRecord == false)
+        #expect(recorded.hygieneLogID == nil)
+        #expect(try context.fetch(FetchDescriptor<Event>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<PetHygieneLog>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<CareLedgerEvent>()).isEmpty)
     }
 
     private func makeContainer() throws -> ModelContainer {

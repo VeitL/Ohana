@@ -211,7 +211,7 @@ struct ManualFeedCommandTests {
         #expect(reminders.first?.id != staleEvent.id)
     }
 
-    @Test func manualFeedCommandNoopsDefaultsAndStockForRecycledExecutorDisposition() throws {
+    @Test func manualFeedCommandNoopsDefaultsAndStockForDeceasedExecutorDisposition() throws {
         let container = try makeContainer()
         let context = container.mainContext
         let now = date(year: 2026, month: 5, day: 1, hour: 9)
@@ -222,7 +222,7 @@ struct ManualFeedCommandTests {
         pet.foodReminderEnabled = true
         pet.foodReminderAdvanceDays = 2
         let executorHuman = Human(name: "Former caretaker")
-        executorHuman.trashedAt = now
+        executorHuman.passedAwayDate = now
         let foodRecord = PetFoodRecord(
             brand: "Test",
             dailyGrams: 50,
@@ -424,6 +424,75 @@ struct ManualFeedCommandTests {
             context: context
         ))
         #expect(state.hasPendingLocalChanges)
+    }
+
+    @Test func autoFeedMaterializerNoopsForDeceasedPetBeforeFactAndLedger() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let now = date(year: 2026, month: 5, day: 2, hour: 10)
+        let pet = Pet(name: "Momo", species: "猫")
+        pet.passedAwayDate = now
+        let event = Event(
+            title: "自动喂食器 干粮 35g",
+            startDate: date(year: 2026, month: 5, day: 2, hour: 8),
+            eventType: EventType.foodChange.rawValue,
+            relatedEntityType: FeedRuleMetadata.autoFeederEntityType,
+            relatedEntityId: pet.id.uuidString
+        )
+        event.recurrenceDays = 1
+        event.feedRuleKindRaw = FeedRuleKind.autoFeeder.rawValue
+        event.feedAmountGrams = 35
+        event.foodKindRaw = FeedFoodKind.dry.rawValue
+        context.insert(pet)
+        context.insert(event)
+        try context.save()
+        FeedOperatingMode.set(pet.id, mode: .autoFeeder)
+
+        let inserted = FeedAutoLogMaterializer.materializeDueLogs(
+            pet: pet,
+            allEvents: [event],
+            context: context,
+            now: now
+        )
+
+        #expect(inserted == 0)
+        #expect(try context.fetch(FetchDescriptor<PetCareLog>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<CareLedgerEvent>()).isEmpty)
+    }
+
+    @Test func autoFeedMaterializerDoesNotWriteHistoricalFactForDeceasedPet() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let now = date(year: 2026, month: 5, day: 2, hour: 10)
+        let pet = Pet(name: "Momo", species: "猫")
+        pet.passedAwayDate = date(year: 2026, month: 5, day: 2, hour: 12)
+        let event = Event(
+            title: "自动喂食器 干粮 35g",
+            startDate: date(year: 2026, month: 5, day: 2, hour: 8),
+            eventType: EventType.foodChange.rawValue,
+            relatedEntityType: FeedRuleMetadata.autoFeederEntityType,
+            relatedEntityId: pet.id.uuidString
+        )
+        event.recurrenceDays = 1
+        event.feedRuleKindRaw = FeedRuleKind.autoFeeder.rawValue
+        event.feedAmountGrams = 35
+        event.foodKindRaw = FeedFoodKind.dry.rawValue
+        context.insert(pet)
+        context.insert(event)
+        try context.save()
+        FeedOperatingMode.set(pet.id, mode: .autoFeeder)
+
+        let inserted = FeedAutoLogMaterializer.materializeDueLogs(
+            pet: pet,
+            allEvents: [event],
+            context: context,
+            now: now
+        )
+        let logs = try context.fetch(FetchDescriptor<PetCareLog>())
+
+        #expect(inserted == 0)
+        #expect(logs.isEmpty)
+        #expect(try context.fetch(FetchDescriptor<CareLedgerEvent>()).isEmpty)
     }
 
     @Test func legacyAutoFeedDedupKeyStillReadsFromNote() throws {

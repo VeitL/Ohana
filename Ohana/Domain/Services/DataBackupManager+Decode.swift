@@ -314,7 +314,8 @@ nonisolated extension DataBackupManager {
         let l = PetHygieneLog(date: parseDate(dto.date) ?? Date(),
                               type: HygieneType(rawValue: dto.type) ?? .bath,
                               pet: dto.petId.flatMap { pets[$0] },
-                              executorId: dto.executorId)
+                              executorId: dto.executorId,
+                              sharedSessionId: dto.sharedSessionId ?? "")
         if let uuid = UUID(uuidString: dto.id) { l.id = uuid }
         return l
     }

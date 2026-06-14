@@ -184,12 +184,13 @@ struct PetMedicationDetailContentSheet: View {
 
     private var recordDoseButton: some View {
         Button {
-            PetMedicationCommandExecutor(context: modelContext, services: appServices).recordDose(
+            let result = PetMedicationCommandExecutor(context: modelContext, services: appServices).recordDose(
                 medication: medication,
                 pet: pet,
                 awardCoconut: true,
                 note: "pet.medication.detail.dose"
             )
+            guard result.didRecord, result.allowsDerivedEffects else { return }
             appServices.medicationReminders.scheduleMedicationReminders(for: pet, context: modelContext)
             UINotificationFeedbackGenerator().notificationOccurred(.success)
         } label: {

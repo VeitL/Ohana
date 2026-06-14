@@ -194,7 +194,7 @@ enum ReminderActionCoordinator {
             return .missingPet
         }
 
-        PetMedicationCommandExecutor(
+        let result = PetMedicationCommandExecutor(
             context: context,
             revisions: domainRevisions,
             questManager: questManager,
@@ -206,6 +206,7 @@ enum ReminderActionCoordinator {
             activeHumanSelection: FixedActiveHumanSelection(currentHumanId: executorId),
             note: "notification.pet.medication.complete"
         )
+        guard result.didRecord, result.allowsDerivedEffects else { return .skipped }
         medicationReminders.scheduleMedicationReminders(for: pet, context: context)
         return .completed
     }
@@ -225,7 +226,7 @@ enum ReminderActionCoordinator {
             }
             let foodRecords = FeedCommandFetch.foodRecords(petID: pet.id, context: context, fallback: [])
             let allEvents = FeedCommandFetch.latestEvents(context: context, fallback: [event])
-            _ = ManualFeedCommand.completePlanned(
+            let result = ManualFeedCommand.completePlanned(
                 pet: pet,
                 reminder: reminder,
                 foodRecords: foodRecords,
@@ -234,6 +235,7 @@ enum ReminderActionCoordinator {
                 executorId: executorId,
                 careEvents: careEvents
             )
+            guard result.didRecord, result.allowsDerivedEffects else { return .skipped }
             return .completed
         }
 
@@ -243,7 +245,7 @@ enum ReminderActionCoordinator {
                 return .missingPet
             }
             if !event.isOccurrenceMarkedComplete(on: reminder.scheduledAt) {
-                let didSync = CalendarTaskCompletionSyncService.syncPetTask(
+                let syncResult = CalendarTaskCompletionSyncService.syncPetTask(
                     event: event,
                     occurrenceDate: reminder.scheduledAt,
                     isCompleted: true,
@@ -253,7 +255,15 @@ enum ReminderActionCoordinator {
                     operationDate: Date(),
                     sourceReminderId: reminder.id.uuidString
                 )
-                guard didSync else { return .skipped }
+                guard syncResult.shouldCompleteOccurrence else { return .skipped }
+            } else if !CalendarTaskCompletionSyncService.canCompletePetTask(
+                event: event,
+                occurrenceDate: reminder.scheduledAt,
+                pets: [pet],
+                context: context,
+                executorId: executorId
+            ) {
+                return .skipped
             }
         }
         reminderCompletion.complete(reminder, by: executorId, context: context)

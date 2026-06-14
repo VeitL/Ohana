@@ -474,6 +474,7 @@ struct PetMomentsHubView: View {
         var affected: Set<UUID> = [pet.id, result.sessionID]
         affected.formUnion(result.careLogIDs)
         affected.formUnion(result.pottyLogIDs)
+        affected.formUnion(result.hygieneLogIDs)
         affected.formUnion(result.expenseLogIDs)
         affected.formUnion(result.walkLogIDs)
         affected.formUnion(result.ledgerEventIDs)

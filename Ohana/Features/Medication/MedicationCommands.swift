@@ -124,6 +124,25 @@ struct PetMedicationDoseCommandResult: Equatable {
     let medicationID: UUID
     let eventID: UUID
     let coconutDelta: Int
+    let didRecord: Bool
+
+    let allowsDerivedEffects: Bool
+
+    init(
+        subjectID: UUID,
+        medicationID: UUID,
+        eventID: UUID,
+        coconutDelta: Int,
+        didRecord: Bool,
+        allowsDerivedEffects: Bool? = nil
+    ) {
+        self.subjectID = subjectID
+        self.medicationID = medicationID
+        self.eventID = eventID
+        self.coconutDelta = coconutDelta
+        self.didRecord = didRecord
+        self.allowsDerivedEffects = allowsDerivedEffects ?? didRecord
+    }
 }
 
 enum HumanMedicationCommandService {
@@ -538,6 +557,7 @@ enum PetMedicationPlanCommandService {
 struct PetMedicationCommandExecutor {
     let context: ModelContext
     let revisions: DomainRevisionPublishing
+    private let derivations: CareDerivationExecutor
     let questManager: QuestManager
     let medicationReminders: MedicationReminderManaging
 
@@ -576,6 +596,7 @@ struct PetMedicationCommandExecutor {
     ) {
         self.context = context
         self.revisions = revisions
+        derivations = CareDerivationExecutor(revisions: revisions)
         self.questManager = questManager
         self.medicationReminders = medicationReminders
     }
@@ -662,7 +683,7 @@ struct PetMedicationCommandExecutor {
         activeHumanSelection: ActiveHumanSelecting = UserDefaultsActiveHumanSelection(),
         note: String
     ) -> PetMedicationDoseCommandResult {
-        let event = PetMedicationDoseLogging.recordDose(
+        let recorded = PetMedicationDoseLogging.recordDoseResult(
             medication: medication,
             pet: pet,
             modelContext: context,
@@ -675,11 +696,53 @@ struct PetMedicationCommandExecutor {
         let result = PetMedicationDoseCommandResult(
             subjectID: pet.id,
             medicationID: medication.id,
-            eventID: event.id,
-            coconutDelta: awardCoconut ? 1 : 0
+            eventID: recorded.event.id,
+            coconutDelta: recorded.coconutDelta,
+            didRecord: recorded.didRecord,
+            allowsDerivedEffects: recorded.allowsDerivedEffects
         )
-        revisions.publishPetMedicationDose(result, note: note)
+        deriveDose(result, factDate: recorded.event.startDate, note: note)
         return result
+    }
+
+    @discardableResult
+    private func deriveDose(
+        _ result: PetMedicationDoseCommandResult,
+        factDate: Date,
+        note: String
+    ) -> CareDerivationResult {
+        let command = DomainCommand.medicationDose(petID: result.subjectID, medicationID: result.medicationID)
+        guard result.didRecord else {
+            return derivations.derive(
+                .noOp(
+                    command: command,
+                    affectedEntityIDs: [result.subjectID, result.medicationID],
+                    note: note
+                )
+            )
+        }
+
+        return derivations.derive(
+            .active(
+                disposition: result.allowsDerivedEffects ? .active : .noOp,
+                fact: CareWriteOutcome.FactPayload(
+                    subjectID: result.subjectID,
+                    logIDs: [result.eventID],
+                    factDate: factDate,
+                    operationDate: factDate
+                ),
+                revision: CareWriteOutcome.RevisionPayload(
+                    command: command,
+                    affectedEntityIDs: [result.subjectID, result.medicationID, result.eventID],
+                    note: note
+                ),
+                reward: CareWriteOutcome.RewardPayload(
+                    humanDelta: result.coconutDelta,
+                    petDelta: 0
+                ),
+                noopNote: note
+            )
+        )
     }
 }
 

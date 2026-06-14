@@ -27,14 +27,7 @@ extension AddExpenseSheet {
         let savedReceiptDrafts = receiptDrafts()
         let hasActiveInsurance = !activeInsurances.isEmpty
         let savedTargets = selectedExpenseTargets
-        SharedPetSelectionMemory.saveSelection(
-            Set(savedTargets.map(\.id)),
-            sourcePet: pet,
-            scope: "expense.shared",
-            candidates: sameSpeciesExpensePets
-        )
         let command = DomainCommand.expenseEntry(entityID: pet.id, entityKind: EntityKind.pet.rawValue)
-        UINotificationFeedbackGenerator().notificationOccurred(.success)
 
         commandQueue.enqueue(command) {
             let executor = DashboardRecordCommandExecutor(context: modelContext, services: appServices)
@@ -53,6 +46,11 @@ extension AddExpenseSheet {
                     command: command,
                     revisionNote: "dashboard.expense.sharedEntry"
                 )
+                guard result.didWriteFact else {
+                    isSaving = false
+                    UINotificationFeedbackGenerator().notificationOccurred(.warning)
+                    return
+                }
                 coconutDelta = result.coconutDelta
                 savedLogID = result.expenseLogIDs.first
             } else {
@@ -73,6 +71,13 @@ extension AddExpenseSheet {
                 coconutDelta = result.coconutDelta
                 savedLogID = result.logID
             }
+            SharedPetSelectionMemory.saveSelection(
+                Set(savedTargets.map(\.id)),
+                sourcePet: pet,
+                scope: "expense.shared",
+                candidates: sameSpeciesExpensePets
+            )
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
             onSaved?()
             onRewarded?(coconutDelta)
 

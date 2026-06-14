@@ -190,12 +190,6 @@ extension QuickPottyDetailSheet {
     func logUnknownGroupPotty() {
         let targetIDs = Set(selectedPottyTargets.map(\.id))
         let executorId = activeExecutorId()
-        SharedPetSelectionMemory.saveSelection(
-            targetIDs,
-            sourcePet: pet,
-            scope: "quickCare.potty",
-            candidates: sameSpeciesPottyPets
-        )
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
         commandQueue.enqueue(.quickCare(entityID: pet.id, action: "unknownSharedPotty")) {
             guard pottyCommandExecutor.recordUnknownSharedPotty(
@@ -209,6 +203,12 @@ extension QuickPottyDetailSheet {
                 showSaveConfirmation(l.tr(zh: "未找到成员", en: "Member not found", de: "Mitglied nicht gefunden"))
                 return
             }
+            SharedPetSelectionMemory.saveSelection(
+                targetIDs,
+                sourcePet: pet,
+                scope: "quickCare.potty",
+                candidates: sameSpeciesPottyPets
+            )
             UINotificationFeedbackGenerator().notificationOccurred(.success)
             pottyFeedbackToken = CheckInFeedbackToken(kind: .gain, deltaText: "+1", tint: pottyTint)
             scheduleFeedbackClear()
@@ -234,12 +234,6 @@ extension QuickPottyDetailSheet {
         let targets = selectedPottyTargets
         let targetIDs = Set(targets.map(\.id))
         let executorId = activeExecutorId()
-        SharedPetSelectionMemory.saveSelection(
-            targetIDs,
-            sourcePet: pet,
-            scope: "quickCare.potty",
-            candidates: sameSpeciesPottyPets
-        )
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
         commandQueue.enqueue(.quickCare(entityID: pet.id, action: "litterScoop")) {
             guard let result = pottyCommandExecutor.recordLitterCare(
@@ -253,6 +247,12 @@ extension QuickPottyDetailSheet {
                 showSaveConfirmation(l.tr(zh: "未找到成员", en: "Member not found", de: "Mitglied nicht gefunden"))
                 return
             }
+            SharedPetSelectionMemory.saveSelection(
+                targetIDs,
+                sourcePet: pet,
+                scope: "quickCare.potty",
+                candidates: sameSpeciesPottyPets
+            )
             syncScoopPlan(for: targets, showToast: false)
             let delta = result.coconutDelta
             UINotificationFeedbackGenerator().notificationOccurred(.success)
@@ -272,26 +272,35 @@ extension QuickPottyDetailSheet {
         let targets = selectedPottyTargets
         let targetIDs = Set(targets.map(\.id))
         let executorId = activeExecutorId()
-        SharedPetSelectionMemory.saveSelection(
-            targetIDs,
-            sourcePet: pet,
-            scope: "quickCare.potty",
-            candidates: sameSpeciesPottyPets
-        )
-        litterCycleAnchorDate = cycleAnchor
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
         commandQueue.enqueue(.quickCare(entityID: pet.id, action: "litterFullChange")) {
-            LitterCareSettingsStore.markFullChange(petKey: petKey, changedAt: now, cycleAnchor: cycleAnchor)
+            guard canApplyPottyDerivedEffects(executorId: executorId) else {
+                UINotificationFeedbackGenerator().notificationOccurred(.warning)
+                showSaveConfirmation(l.tr(zh: "未找到成员", en: "Member not found", de: "Mitglied nicht gefunden"))
+                return
+            }
 
             if shouldRecordLitterCare {
-                _ = pottyCommandExecutor.recordLitterCare(
+                guard pottyCommandExecutor.recordLitterCare(
                     sourcePetID: pet.id,
                     targetIDs: targetIDs,
                     executorId: executorId,
                     date: now,
                     isFullChange: true
-                )
+                ) != nil else {
+                    UINotificationFeedbackGenerator().notificationOccurred(.warning)
+                    showSaveConfirmation(l.tr(zh: "未找到成员", en: "Member not found", de: "Mitglied nicht gefunden"))
+                    return
+                }
             }
+            LitterCareSettingsStore.markFullChange(petKey: petKey, changedAt: now, cycleAnchor: cycleAnchor)
+            SharedPetSelectionMemory.saveSelection(
+                targetIDs,
+                sourcePet: pet,
+                scope: "quickCare.potty",
+                candidates: sameSpeciesPottyPets
+            )
+            litterCycleAnchorDate = cycleAnchor
             syncScoopPlan(for: targets, showToast: false)
             syncLitterChangePlan(for: targets, showToast: false)
             UINotificationFeedbackGenerator().notificationOccurred(.success)
@@ -402,6 +411,11 @@ extension QuickPottyDetailSheet {
 
     func activeExecutorId() -> String? {
         appServices.activeHumanSelection.currentHumanId
+    }
+
+    func canApplyPottyDerivedEffects(executorId: String?) -> Bool {
+        EconomyWalletWritePolicy.canWrite(pet) &&
+            !CareFactWritePolicy.executorCannotWrite(executorId, context: modelContext)
     }
 
     func normalizedSpecies(_ value: String) -> String {

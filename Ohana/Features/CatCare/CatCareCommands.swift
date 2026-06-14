@@ -35,6 +35,16 @@ struct CatCareCommandResult: Equatable {
     let actionRaw: String
     let eventID: UUID
     let hygieneLogID: UUID?
+    let occurredAt: Date
+    let disposition: CareFactWriteDisposition
+
+    var didRecord: Bool {
+        disposition.didWriteFact
+    }
+
+    var allowsDerivedEffects: Bool {
+        disposition.allowsDerivedEffects
+    }
 }
 
 struct CatCareUndoCommandResult: Equatable {
@@ -51,6 +61,23 @@ enum CatCareCommandService {
         input: CatCareCommandInput,
         context: ModelContext
     ) -> CatCareCommandResult {
+        let disposition = CareFactWritePolicy.disposition(
+            pet: pet,
+            date: input.occurredAt,
+            executorId: input.executorId,
+            context: context
+        )
+        guard disposition.didWriteFact else {
+            return CatCareCommandResult(
+                petID: pet.id,
+                actionRaw: input.actionRaw,
+                eventID: UUID(),
+                hygieneLogID: nil,
+                occurredAt: input.occurredAt,
+                disposition: disposition
+            )
+        }
+
         let event = Event(
             title: "\(input.emoji) \(input.actionRaw)",
             startDate: input.occurredAt,
@@ -75,7 +102,9 @@ enum CatCareCommandService {
             petID: pet.id,
             actionRaw: input.actionRaw,
             eventID: event.id,
-            hygieneLogID: hygieneLog?.id
+            hygieneLogID: hygieneLog?.id,
+            occurredAt: input.occurredAt,
+            disposition: disposition
         )
     }
 

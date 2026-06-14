@@ -12,18 +12,20 @@ struct SharedCareSessionDeleteResult: Equatable {
     let sessionID: UUID
     let careLogIDs: [UUID]
     let pottyLogIDs: [UUID]
+    let hygieneLogIDs: [UUID]
     let expenseLogIDs: [UUID]
     let walkLogIDs: [UUID]
     let ledgerEventIDs: [UUID]
 
     var deletedChildCount: Int {
-        careLogIDs.count + pottyLogIDs.count + expenseLogIDs.count + walkLogIDs.count
+        careLogIDs.count + pottyLogIDs.count + hygieneLogIDs.count + expenseLogIDs.count + walkLogIDs.count
     }
 }
 
 struct SharedCareLegacyNoteCleanupResult: Equatable {
     let sessionIDs: [UUID]
     let careLogIDs: [UUID]
+    let hygieneLogIDs: [UUID]
     let expenseLogIDs: [UUID]
     let walkLogIDs: [UUID]
     let ledgerEventIDs: [UUID]
@@ -36,6 +38,7 @@ struct SharedCareLegacyNoteCleanupResult: Equatable {
     static let empty = SharedCareLegacyNoteCleanupResult(
         sessionIDs: [],
         careLogIDs: [],
+        hygieneLogIDs: [],
         expenseLogIDs: [],
         walkLogIDs: [],
         ledgerEventIDs: [],
@@ -47,7 +50,7 @@ struct SharedCareLegacyNoteCleanupResult: Equatable {
     )
 
     var cleanedCount: Int {
-        sessionIDs.count + careLogIDs.count + expenseLogIDs.count + walkLogIDs.count + ledgerEventIDs.count
+        sessionIDs.count + careLogIDs.count + hygieneLogIDs.count + expenseLogIDs.count + walkLogIDs.count + ledgerEventIDs.count
     }
 
     var skippedOrphanCount: Int {
@@ -138,9 +141,17 @@ enum SharedCareSessionMaintenance {
         let sessionID = session.id.uuidString
         let careLogs = fetchCareLogs(sessionID: sessionID, context: context)
         let pottyLogs = fetchPottyLogs(sessionID: sessionID, context: context)
+        let hygieneLogs = fetchHygieneLogs(session: session, context: context)
         let expenseLogs = fetchExpenseLogs(sessionID: sessionID, context: context)
         let walkLogs = fetchWalkLogs(sessionID: sessionID, context: context)
-        let ledgerEvents = ledgerEvents(careLogs: careLogs, pottyLogs: pottyLogs, expenseLogs: expenseLogs, walkLogs: walkLogs, context: context)
+        let ledgerEvents = ledgerEvents(
+            careLogs: careLogs,
+            pottyLogs: pottyLogs,
+            hygieneLogs: hygieneLogs,
+            expenseLogs: expenseLogs,
+            walkLogs: walkLogs,
+            context: context
+        )
 
         CloudSyncMutationRecorder.markDeleted(session, context: context, deletedAt: deletedAt, deletedByHumanId: deletedByHumanId)
         for event in ledgerEvents {
@@ -152,6 +163,10 @@ enum SharedCareSessionMaintenance {
             context.delete(log)
         }
         for log in pottyLogs {
+            CloudSyncMutationRecorder.markDeleted(log, pet: log.pet, context: context, deletedAt: deletedAt, deletedByHumanId: deletedByHumanId)
+            context.delete(log)
+        }
+        for log in hygieneLogs {
             CloudSyncMutationRecorder.markDeleted(log, pet: log.pet, context: context, deletedAt: deletedAt, deletedByHumanId: deletedByHumanId)
             context.delete(log)
         }
@@ -172,6 +187,7 @@ enum SharedCareSessionMaintenance {
             sessionID: sessionUUID,
             careLogIDs: careLogs.map(\.id),
             pottyLogIDs: pottyLogs.map(\.id),
+            hygieneLogIDs: hygieneLogs.map(\.id),
             expenseLogIDs: expenseLogs.map(\.id),
             walkLogIDs: walkLogs.map(\.id),
             ledgerEventIDs: ledgerEvents.map(\.id)
@@ -200,6 +216,24 @@ enum SharedCareSessionMaintenance {
         session.sourcePetId = pet.id.uuidString
         session.speciesRaw = pet.species
         reconcile(session, context: context)
+    }
+
+    @MainActor
+    static func reconcileAfterDeletingHygieneChild(
+        logID: UUID,
+        ledgerEvents: [CareLedgerEvent],
+        context: ModelContext,
+        reconciledAt: Date = Date()
+    ) {
+        let sessionIDs = sessionIDsReferencingHygieneLog(
+            logID: logID,
+            ledgerEvents: ledgerEvents,
+            context: context
+        )
+        for sessionID in sessionIDs {
+            guard let session = fetchSession(id: sessionID, context: context) else { continue }
+            reconcile(session, context: context, reconciledAt: reconciledAt)
+        }
     }
 
     @MainActor
@@ -267,6 +301,7 @@ enum SharedCareSessionMaintenance {
         let scan = legacyMetadataScan(context: context)
         var changedSessions: [SharedCareSession] = []
         var changedCareLogs: [PetCareLog] = []
+        var changedHygieneLogs: [PetHygieneLog] = []
         var changedExpenseLogs: [PetExpenseLog] = []
         var changedWalkLogs: [PetWalkLog] = []
         var changedLedgerEvents: [CareLedgerEvent] = []
@@ -279,6 +314,7 @@ enum SharedCareSessionMaintenance {
                 id: { $0.id }
             )
             let pottyLogs = fetchPottyLogs(sessionID: sessionIDString, context: context)
+            let hygieneLogs = fetchHygieneLogs(session: session, context: context)
             let expenseLogs = uniqueByID(
                 fetchExpenseLogs(sessionID: sessionIDString, context: context) + (scan.expenseLogsBySessionID[sessionID] ?? []),
                 id: { $0.id }
@@ -291,6 +327,7 @@ enum SharedCareSessionMaintenance {
                 ledgerEvents(
                     careLogs: careLogs,
                     pottyLogs: pottyLogs,
+                    hygieneLogs: hygieneLogs,
                     expenseLogs: expenseLogs,
                     walkLogs: walkLogs,
                     context: context
@@ -302,6 +339,7 @@ enum SharedCareSessionMaintenance {
                 session: session,
                 careLogs: careLogs,
                 pottyLogs: pottyLogs,
+                hygieneLogs: hygieneLogs,
                 expenseLogs: expenseLogs,
                 walkLogs: walkLogs
             )
@@ -324,6 +362,10 @@ enum SharedCareSessionMaintenance {
                 if logChanged {
                     changedCareLogs.append(log)
                 }
+            }
+            for log in hygieneLogs where log.sharedSessionId != sessionIDString {
+                log.sharedSessionId = sessionIDString
+                changedHygieneLogs.append(log)
             }
             for log in expenseLogs {
                 var logChanged = restoreSharedSessionIdIfNeeded(
@@ -366,11 +408,13 @@ enum SharedCareSessionMaintenance {
             CloudSyncMutationRecorder.markModified(session, context: context, modifiedAt: cleanedAt)
         }
         CloudSyncMutationRecorder.markModified(changedCareLogs, context: context, modifiedAt: cleanedAt)
+        CloudSyncMutationRecorder.markModified(changedHygieneLogs, context: context, modifiedAt: cleanedAt)
         CloudSyncMutationRecorder.markModified(changedExpenseLogs, context: context, modifiedAt: cleanedAt)
         CloudSyncMutationRecorder.markModified(changedWalkLogs, context: context, modifiedAt: cleanedAt)
         CloudSyncMutationRecorder.markModified(changedLedgerEvents, context: context, modifiedAt: cleanedAt)
         if !changedSessions.isEmpty ||
             !changedCareLogs.isEmpty ||
+            !changedHygieneLogs.isEmpty ||
             !changedExpenseLogs.isEmpty ||
             !changedWalkLogs.isEmpty ||
             !changedLedgerEvents.isEmpty {
@@ -380,6 +424,7 @@ enum SharedCareSessionMaintenance {
         return SharedCareLegacyNoteCleanupResult(
             sessionIDs: changedSessions.map(\.id),
             careLogIDs: changedCareLogs.map(\.id),
+            hygieneLogIDs: changedHygieneLogs.map(\.id),
             expenseLogIDs: changedExpenseLogs.map(\.id),
             walkLogIDs: changedWalkLogs.map(\.id),
             ledgerEventIDs: changedLedgerEvents.map(\.id),
@@ -396,10 +441,11 @@ enum SharedCareSessionMaintenance {
         let sessionID = session.id.uuidString
         let careLogs = fetchCareLogs(sessionID: sessionID, context: context)
         let pottyLogs = fetchPottyLogs(sessionID: sessionID, context: context)
+        let hygieneLogs = fetchHygieneLogs(session: session, context: context)
         let expenseLogs = fetchExpenseLogs(sessionID: sessionID, context: context)
         let walkLogs = fetchWalkLogs(sessionID: sessionID, context: context)
 
-        guard !careLogs.isEmpty || !pottyLogs.isEmpty || !expenseLogs.isEmpty || !walkLogs.isEmpty else {
+        guard !careLogs.isEmpty || !pottyLogs.isEmpty || !hygieneLogs.isEmpty || !expenseLogs.isEmpty || !walkLogs.isEmpty else {
             CloudSyncMutationRecorder.markDeleted(session, context: context, deletedAt: reconciledAt)
             context.delete(session)
             return
@@ -409,20 +455,32 @@ enum SharedCareSessionMaintenance {
             session: session,
             careLogs: careLogs,
             pottyLogs: pottyLogs,
+            hygieneLogs: hygieneLogs,
             expenseLogs: expenseLogs,
             walkLogs: walkLogs
         )
+        for log in hygieneLogs where log.sharedSessionId != sessionID {
+            log.sharedSessionId = sessionID
+        }
 
         session.note = SharedCareMetadata.userNoteForStorage(session.note)
         refreshStockOwnerMetadata(session: session, careLogs: careLogs)
         refreshSharedCareMetadata(session: session, careLogs: careLogs)
         refreshExpenseMetadata(session: session, expenseLogs: expenseLogs)
         refreshWalkMetadata(session: session, walkLogs: walkLogs)
-        refreshPrimaryLegacyModel(session: session, careLogs: careLogs, pottyLogs: pottyLogs, expenseLogs: expenseLogs, walkLogs: walkLogs)
+        refreshPrimaryLegacyModel(
+            session: session,
+            careLogs: careLogs,
+            pottyLogs: pottyLogs,
+            hygieneLogs: hygieneLogs,
+            expenseLogs: expenseLogs,
+            walkLogs: walkLogs
+        )
         markReconciledFactsModified(
             session: session,
             careLogs: careLogs,
             pottyLogs: pottyLogs,
+            hygieneLogs: hygieneLogs,
             expenseLogs: expenseLogs,
             walkLogs: walkLogs,
             context: context,
@@ -474,11 +532,18 @@ enum SharedCareSessionMaintenance {
         session: SharedCareSession,
         careLogs: [PetCareLog],
         pottyLogs: [PetPottyLog],
+        hygieneLogs: [PetHygieneLog],
         expenseLogs: [PetExpenseLog],
         walkLogs: [PetWalkLog]
     ) -> Bool {
         var changed = false
-        let targetIds = orderedTargetIds(careLogs: careLogs, pottyLogs: pottyLogs, expenseLogs: expenseLogs, walkLogs: walkLogs)
+        let targetIds = orderedTargetIds(
+            careLogs: careLogs,
+            pottyLogs: pottyLogs,
+            hygieneLogs: hygieneLogs,
+            expenseLogs: expenseLogs,
+            walkLogs: walkLogs
+        )
         if !targetIds.isEmpty {
             changed = assign(targetIds.joined(separator: "|"), to: \.targetPetIdsRaw, on: session) || changed
         }
@@ -494,7 +559,14 @@ enum SharedCareSessionMaintenance {
             }
         }
         changed = recoverStockOwner(session: session, careLogs: careLogs) || changed
-        changed = recoverPrimaryLegacyModel(session: session, careLogs: careLogs, pottyLogs: pottyLogs, expenseLogs: expenseLogs, walkLogs: walkLogs) || changed
+        changed = recoverPrimaryLegacyModel(
+            session: session,
+            careLogs: careLogs,
+            pottyLogs: pottyLogs,
+            hygieneLogs: hygieneLogs,
+            expenseLogs: expenseLogs,
+            walkLogs: walkLogs
+        ) || changed
         return changed
     }
 
@@ -513,6 +585,7 @@ enum SharedCareSessionMaintenance {
         session: SharedCareSession,
         careLogs: [PetCareLog],
         pottyLogs: [PetPottyLog],
+        hygieneLogs: [PetHygieneLog],
         expenseLogs: [PetExpenseLog],
         walkLogs: [PetWalkLog]
     ) -> Bool {
@@ -520,6 +593,8 @@ enum SharedCareSessionMaintenance {
             ("PetCareLog", log.id.uuidString)
         } else if let log = pottyLogs.first {
             ("PetPottyLog", log.id.uuidString)
+        } else if let log = hygieneLogs.first {
+            ("PetHygieneLog", log.id.uuidString)
         } else if let log = expenseLogs.first {
             ("PetExpenseLog", log.id.uuidString)
         } else if let log = walkLogs.first {
@@ -577,6 +652,7 @@ enum SharedCareSessionMaintenance {
         session: SharedCareSession,
         careLogs: [PetCareLog],
         pottyLogs: [PetPottyLog],
+        hygieneLogs: [PetHygieneLog],
         expenseLogs: [PetExpenseLog],
         walkLogs: [PetWalkLog]
     ) {
@@ -585,6 +661,9 @@ enum SharedCareSessionMaintenance {
             session.primaryLegacyModelId = log.id.uuidString
         } else if let log = pottyLogs.first {
             session.primaryLegacyModelName = "PetPottyLog"
+            session.primaryLegacyModelId = log.id.uuidString
+        } else if let log = hygieneLogs.first {
+            session.primaryLegacyModelName = "PetHygieneLog"
             session.primaryLegacyModelId = log.id.uuidString
         } else if let log = expenseLogs.first {
             session.primaryLegacyModelName = "PetExpenseLog"
@@ -598,12 +677,13 @@ enum SharedCareSessionMaintenance {
     private static func orderedTargetIds(
         careLogs: [PetCareLog],
         pottyLogs: [PetPottyLog],
+        hygieneLogs: [PetHygieneLog],
         expenseLogs: [PetExpenseLog],
         walkLogs: [PetWalkLog]
     ) -> [String] {
         var seen = Set<String>()
         var result: [String] = []
-        for pet in careLogs.compactMap(\.pet) + pottyLogs.compactMap(\.pet) + expenseLogs.compactMap(\.pet) + walkLogs.compactMap(\.pet) {
+        for pet in careLogs.compactMap(\.pet) + pottyLogs.compactMap(\.pet) + hygieneLogs.compactMap(\.pet) + expenseLogs.compactMap(\.pet) + walkLogs.compactMap(\.pet) {
             let id = pet.id.uuidString
             guard !seen.contains(id) else { continue }
             seen.insert(id)
@@ -617,6 +697,7 @@ enum SharedCareSessionMaintenance {
         session: SharedCareSession,
         careLogs: [PetCareLog],
         pottyLogs: [PetPottyLog],
+        hygieneLogs: [PetHygieneLog],
         expenseLogs: [PetExpenseLog],
         walkLogs: [PetWalkLog],
         context: ModelContext,
@@ -625,6 +706,7 @@ enum SharedCareSessionMaintenance {
         CloudSyncMutationRecorder.markModified(session, context: context, modifiedAt: modifiedAt)
         CloudSyncMutationRecorder.markModified(careLogs, context: context, modifiedAt: modifiedAt)
         CloudSyncMutationRecorder.markModified(pottyLogs, context: context, modifiedAt: modifiedAt)
+        CloudSyncMutationRecorder.markModified(hygieneLogs, context: context, modifiedAt: modifiedAt)
         CloudSyncMutationRecorder.markModified(expenseLogs, context: context, modifiedAt: modifiedAt)
         CloudSyncMutationRecorder.markModified(walkLogs, context: context, modifiedAt: modifiedAt)
     }
@@ -741,6 +823,45 @@ enum SharedCareSessionMaintenance {
     }
 
     @MainActor
+    private static func sessionIDsReferencingHygieneLog(
+        logID: UUID,
+        ledgerEvents: [CareLedgerEvent],
+        context: ModelContext
+    ) -> [UUID] {
+        var ids = Set(ledgerEvents.compactMap { sharedSessionID(from: $0.metadataJSON) })
+        var hygieneDescriptor = FetchDescriptor<PetHygieneLog>(
+            predicate: #Predicate<PetHygieneLog> { log in
+                log.id == logID
+            }
+        )
+        hygieneDescriptor.fetchLimit = 1
+        if let log = fetchOrLog(hygieneDescriptor, context: context, operation: "fetch shared hygiene child").first,
+           let sessionID = UUID(uuidString: log.sharedSessionId) {
+            ids.insert(sessionID)
+        }
+        let idString = logID.uuidString
+        let descriptor = FetchDescriptor<SharedCareSession>(
+            predicate: #Predicate<SharedCareSession> { session in
+                session.primaryLegacyModelName == "PetHygieneLog" && session.primaryLegacyModelId == idString
+            },
+            sortBy: [SortDescriptor(\.date)]
+        )
+        for session in fetchOrLog(descriptor, context: context, operation: "fetch shared hygiene sessions") {
+            ids.insert(session.id)
+        }
+        return ids.sorted { $0.uuidString < $1.uuidString }
+    }
+
+    private static func sharedSessionID(from metadataJSON: String) -> UUID? {
+        guard let data = metadataJSON.data(using: .utf8),
+              let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let raw = object["sharedSessionId"] as? String else {
+            return nil
+        }
+        return UUID(uuidString: raw)
+    }
+
+    @MainActor
     private static func fetchSession(id: UUID, context: ModelContext) -> SharedCareSession? {
         var descriptor = FetchDescriptor<SharedCareSession>(
             predicate: #Predicate<SharedCareSession> { session in
@@ -831,6 +952,61 @@ enum SharedCareSessionMaintenance {
     }
 
     @MainActor
+    private static func fetchHygieneLogs(session: SharedCareSession, context: ModelContext) -> [PetHygieneLog] {
+        let sessionID = session.id.uuidString
+        let direct = fetchHygieneLogs(sessionID: sessionID, context: context)
+        let ids = hygieneLogIDs(session: session, context: context)
+        var logs: [PetHygieneLog] = []
+        for id in ids.sorted(by: { $0.uuidString < $1.uuidString }) {
+            var descriptor = FetchDescriptor<PetHygieneLog>(
+                predicate: #Predicate<PetHygieneLog> { log in
+                    log.id == id
+                },
+                sortBy: [SortDescriptor(\.date)]
+            )
+            descriptor.fetchLimit = 1
+            logs += fetchOrLog(descriptor, context: context, operation: "fetch shared hygiene log")
+        }
+        return uniqueByID(direct + logs, id: { $0.id })
+    }
+
+    @MainActor
+    private static func fetchHygieneLogs(sessionID: String, context: ModelContext) -> [PetHygieneLog] {
+        let descriptor = FetchDescriptor<PetHygieneLog>(
+            predicate: #Predicate<PetHygieneLog> { log in
+                log.sharedSessionId == sessionID
+            },
+            sortBy: [SortDescriptor(\.date)]
+        )
+        return fetchOrLog(descriptor, context: context, operation: "fetch shared hygiene logs")
+    }
+
+    @MainActor
+    private static func hygieneLogIDs(session: SharedCareSession, context: ModelContext) -> Set<UUID> {
+        var ids = Set<UUID>()
+        if session.primaryLegacyModelName == "PetHygieneLog",
+           let primaryID = UUID(uuidString: session.primaryLegacyModelId) {
+            ids.insert(primaryID)
+        }
+
+        let sessionID = session.id
+        let descriptor = FetchDescriptor<CareLedgerEvent>(
+            predicate: #Predicate<CareLedgerEvent> { event in
+                event.legacyModelName == "PetHygieneLog"
+            },
+            sortBy: [SortDescriptor(\.occurredAt)]
+        )
+        let events = fetchOrLog(descriptor, context: context, operation: "fetch shared hygiene ledger events")
+        for event in events where sharedSessionID(from: event.metadataJSON) == sessionID || event.metadataJSON.contains(sessionID.uuidString) {
+            if let idString = event.legacyModelId,
+               let id = UUID(uuidString: idString) {
+                ids.insert(id)
+            }
+        }
+        return ids
+    }
+
+    @MainActor
     private static func fetchExpenseLogs(sessionID: String, context: ModelContext) -> [PetExpenseLog] {
         let descriptor = FetchDescriptor<PetExpenseLog>(
             predicate: #Predicate<PetExpenseLog> { log in
@@ -856,16 +1032,19 @@ enum SharedCareSessionMaintenance {
     private static func ledgerEvents(
         careLogs: [PetCareLog],
         pottyLogs: [PetPottyLog],
+        hygieneLogs: [PetHygieneLog],
         expenseLogs: [PetExpenseLog],
         walkLogs: [PetWalkLog],
         context: ModelContext
     ) -> [CareLedgerEvent] {
         let careLogIDs = Set(careLogs.map(\.id.uuidString))
         let pottyLogIDs = Set(pottyLogs.map(\.id.uuidString))
+        let hygieneLogIDs = Set(hygieneLogs.map(\.id.uuidString))
         let expenseLogIDs = Set(expenseLogs.map(\.id.uuidString))
         let walkLogIDs = Set(walkLogs.map(\.id.uuidString))
         return ledgerEvents(forLegacyModelName: "PetCareLog", ids: careLogIDs, context: context)
             + ledgerEvents(forLegacyModelName: "PetPottyLog", ids: pottyLogIDs, context: context)
+            + ledgerEvents(forLegacyModelName: "PetHygieneLog", ids: hygieneLogIDs, context: context)
             + ledgerEvents(forLegacyModelName: "PetExpenseLog", ids: expenseLogIDs, context: context)
             + ledgerEvents(forLegacyModelName: "PetWalkLog", ids: walkLogIDs, context: context)
     }

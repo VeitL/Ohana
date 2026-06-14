@@ -35,6 +35,13 @@ enum FeedAutoLogMaterializer {
             for dueDate in FeedRuleMetadata.dueOccurrences(for: event, through: now, calendar: calendar) {
                 let key = FeedLogMetadata.autoDedupKey(eventId: event.id, scheduledAt: dueDate)
                 guard !existingKeys.contains(key) else { continue }
+                let disposition = CareFactWritePolicy.disposition(
+                    pet: pet,
+                    date: dueDate,
+                    executorId: nil,
+                    context: context
+                )
+                guard disposition.didWriteFact else { continue }
                 let log = PetCareLog(
                     date: dueDate,
                     type: .feeding,
@@ -46,17 +53,19 @@ enum FeedAutoLogMaterializer {
                 )
                 context.insert(log)
                 CloudSyncMutationRecorder.markModified(log, context: context, modifiedAt: dueDate)
-                careLedger.recordPetCare(
-                    log: log,
-                    pet: pet,
-                    source: .service,
-                    sourceEventId: event.id.uuidString,
-                    sourceReminderId: nil,
-                    coconutDelta: 0,
-                    metadataJSON: "",
-                    context: context,
-                    save: true
-                )
+                if disposition.allowsDerivedEffects {
+                    careLedger.recordPetCare(
+                        log: log,
+                        pet: pet,
+                        source: .service,
+                        sourceEventId: event.id.uuidString,
+                        sourceReminderId: nil,
+                        coconutDelta: 0,
+                        metadataJSON: "",
+                        context: context,
+                        save: true
+                    )
+                }
                 existingKeys.insert(key)
                 inserted += 1
             }

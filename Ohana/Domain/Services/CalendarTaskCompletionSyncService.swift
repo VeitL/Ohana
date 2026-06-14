@@ -9,6 +9,34 @@ import SwiftData
 enum CalendarTaskCompletionSyncService {
     private static let calendarSource = CareLedgerSource.calendar.rawValue
 
+    enum PetTaskSyncResult: Equatable {
+        case noOp
+        case activeCompleted
+        case reopened
+
+        var shouldCompleteOccurrence: Bool {
+            self == .activeCompleted
+        }
+
+        var didWriteFact: Bool {
+            switch self {
+            case .activeCompleted, .reopened:
+                true
+            case .noOp:
+                false
+            }
+        }
+
+        var allowsDerivedEffects: Bool {
+            switch self {
+            case .activeCompleted, .reopened:
+                true
+            case .noOp:
+                false
+            }
+        }
+    }
+
     private struct GeneratedRewardTrace {
         let reward: (humanGot: Int, petGot: Int)
         let walletEntries: [CoconutLedgerEntry]
@@ -17,6 +45,16 @@ enum CalendarTaskCompletionSyncService {
 
         var coconutDelta: Int {
             max(0, reward.humanGot) + max(0, reward.petGot)
+        }
+    }
+
+    private struct CalendarGeneratedFactOnlyRecords {
+        var careLogs: [PetCareLog] = []
+        var pottyLogs: [PetPottyLog] = []
+        var hygieneLogs: [PetHygieneLog] = []
+
+        var isEmpty: Bool {
+            careLogs.isEmpty && pottyLogs.isEmpty && hygieneLogs.isEmpty
         }
     }
 
@@ -49,15 +87,11 @@ enum CalendarTaskCompletionSyncService {
         operationDate: Date = Date(),
         sourceReminderId: String? = nil,
         careLedger providedCareLedger: CareLedgerRecording? = nil
-    ) -> Bool {
+    ) -> PetTaskSyncResult {
         let careLedger = providedCareLedger ?? CareLedgerService()
         guard event.relatedEntityType == EntityKind.pet.rawValue || event.relatedEntityType == "pet",
-              let pet = pets.first(where: { $0.id.uuidString == event.relatedEntityId }) else { return false }
+              let pet = pets.first(where: { $0.id.uuidString == event.relatedEntityId }) else { return .noOp }
 
-        if !isCompleted {
-            deleteCalendarGeneratedRecords(event: event, occurrenceDate: occurrenceDate, context: context)
-            return true
-        }
         let occurredAt = occurrenceTimestamp(for: event, occurrenceDate: occurrenceDate)
         let disposition = CareFactWritePolicy.disposition(
             pet: pet,
@@ -65,10 +99,18 @@ enum CalendarTaskCompletionSyncService {
             executorId: executorId,
             context: context
         )
-        guard disposition.writesFact else { return false }
-        guard calendarLedgerEntries(event: event, occurrenceDate: occurrenceDate, context: context).isEmpty else { return true }
+        guard disposition.writesFact else { return .noOp }
+        if !isCompleted {
+            deleteCalendarGeneratedRecords(event: event, occurrenceDate: occurrenceDate, context: context)
+            deleteCalendarGeneratedFactOnlyRecords(event: event, occurrenceDate: occurrenceDate, pet: pet, context: context)
+            return .reopened
+        }
+        if !calendarLedgerEntries(event: event, occurrenceDate: occurrenceDate, context: context).isEmpty {
+            return .activeCompleted
+        }
+        guard calendarGeneratedFactOnlyRecords(event: event, occurrenceDate: occurrenceDate, pet: pet, context: context).isEmpty else { return .noOp }
 
-        if let careType = careType(for: event) {
+        let didInsert: Bool = if let careType = careType(for: event) {
             insertCareLog(
                 pet: pet,
                 event: event,
@@ -110,8 +152,11 @@ enum CalendarTaskCompletionSyncService {
                 careLedger: careLedger,
                 disposition: disposition
             )
+        } else {
+            false
         }
-        return true
+        guard didInsert else { return .noOp }
+        return disposition.allowsDerivedEffects ? .activeCompleted : .noOp
     }
 
     static func isPetTask(event: Event) -> Bool {
@@ -135,6 +180,21 @@ enum CalendarTaskCompletionSyncService {
     }
 
     @MainActor
+    static func canCompletePetTask(event: Event, occurrenceDate: Date, pets: [Pet], context: ModelContext, executorId: String?) -> Bool {
+        guard isPetTask(event: event),
+              let pet = pets.first(where: { $0.id.uuidString == event.relatedEntityId }) else {
+            return false
+        }
+        let occurredAt = occurrenceTimestamp(for: event, occurrenceDate: occurrenceDate)
+        return CareFactWritePolicy.disposition(
+            pet: pet,
+            date: occurredAt,
+            executorId: executorId,
+            context: context
+        ).allowsDerivedEffects
+    }
+
+    @MainActor
     private static func insertCareLog(
         pet: Pet,
         event: Event,
@@ -147,7 +207,7 @@ enum CalendarTaskCompletionSyncService {
         context: ModelContext,
         careLedger: CareLedgerRecording,
         disposition: CareFactWriteDisposition
-    ) {
+    ) -> Bool {
         let amountGrams = careType == .feeding ? feedAmount(from: event, fallback: pet.dailyPortionGrams) : 0
         let amountMl = careType == .watering ? 250.0 : 0
         let log = PetCareLog(
@@ -163,7 +223,7 @@ enum CalendarTaskCompletionSyncService {
         context.insert(log)
         CloudSyncMutationRecorder.markModified(log, context: context, modifiedAt: occurredAt)
         context.safeSave()
-        guard disposition.allowsDerivedEffects else { return }
+        guard disposition.allowsDerivedEffects else { return true }
         let rewardTrace = awardGeneratedCare(
             action: rewardAction(for: careType, pet: pet),
             pet: pet,
@@ -191,6 +251,7 @@ enum CalendarTaskCompletionSyncService {
             context: context,
             careLedger: careLedger
         )
+        return true
     }
 
     @MainActor
@@ -206,12 +267,18 @@ enum CalendarTaskCompletionSyncService {
         context: ModelContext,
         careLedger: CareLedgerRecording,
         disposition: CareFactWriteDisposition
-    ) {
-        let log = PetPottyLog(date: occurredAt, type: pottyType, pet: pet, executorId: executorId)
+    ) -> Bool {
+        let log = PetPottyLog(
+            date: occurredAt,
+            type: pottyType,
+            pet: pet,
+            executorId: executorId,
+            sharedSessionId: calendarFactOnlySessionId(for: event, occurrenceDate: occurrenceDate)
+        )
         context.insert(log)
         CloudSyncMutationRecorder.markModified(log, context: context, modifiedAt: occurredAt)
         context.safeSave()
-        guard disposition.allowsDerivedEffects else { return }
+        guard disposition.allowsDerivedEffects else { return true }
         let rewardTrace = awardGeneratedCare(
             action: .potty(isLitter: false),
             pet: pet,
@@ -237,6 +304,7 @@ enum CalendarTaskCompletionSyncService {
             context: context,
             careLedger: careLedger
         )
+        return true
     }
 
     @MainActor
@@ -252,12 +320,12 @@ enum CalendarTaskCompletionSyncService {
         context: ModelContext,
         careLedger: CareLedgerRecording,
         disposition: CareFactWriteDisposition
-    ) {
+    ) -> Bool {
         let log = PetHygieneLog(date: occurredAt, type: hygieneType, pet: pet, executorId: executorId)
         context.insert(log)
         CloudSyncMutationRecorder.markModified(log, context: context, modifiedAt: occurredAt)
         context.safeSave()
-        guard disposition.allowsDerivedEffects else { return }
+        guard disposition.allowsDerivedEffects else { return true }
         let rewardTrace = awardGeneratedCare(
             action: .care(type: hygieneType),
             pet: pet,
@@ -283,6 +351,7 @@ enum CalendarTaskCompletionSyncService {
             context: context,
             careLedger: careLedger
         )
+        return true
     }
 
     @MainActor
@@ -353,6 +422,34 @@ enum CalendarTaskCompletionSyncService {
     }
 
     @MainActor
+    private static func deleteCalendarGeneratedFactOnlyRecords(
+        event: Event,
+        occurrenceDate: Date,
+        pet: Pet,
+        context: ModelContext
+    ) {
+        let records = calendarGeneratedFactOnlyRecords(
+            event: event,
+            occurrenceDate: occurrenceDate,
+            pet: pet,
+            context: context
+        )
+        for model in records.careLogs {
+            CloudSyncMutationRecorder.markDeleted(model, pet: model.pet, context: context)
+            context.delete(model)
+        }
+        for model in records.pottyLogs {
+            CloudSyncMutationRecorder.markDeleted(model, pet: model.pet, context: context)
+            context.delete(model)
+        }
+        for model in records.hygieneLogs {
+            CloudSyncMutationRecorder.markDeleted(model, pet: model.pet, context: context)
+            context.delete(model)
+        }
+        if !records.isEmpty { context.safeSave() }
+    }
+
+    @MainActor
     private static func deleteLegacyModel(name: String?, idString: String?, context: ModelContext) {
         guard let name, let idString, let id = UUID(uuidString: idString) else { return }
         switch name {
@@ -396,6 +493,60 @@ enum CalendarTaskCompletionSyncService {
     }
 
     @MainActor
+    private static func calendarGeneratedFactOnlyRecords(
+        event: Event,
+        occurrenceDate: Date,
+        pet: Pet,
+        context: ModelContext
+    ) -> CalendarGeneratedFactOnlyRecords {
+        let occurredAt = occurrenceTimestamp(for: event, occurrenceDate: occurrenceDate)
+        if let careType = careType(for: event) {
+            let marker = noteMarker(for: event, occurrenceDate: occurrenceDate, careType: careType)
+            let logs = fetchOrLog(
+                FetchDescriptor<PetCareLog>(),
+                context: context,
+                operation: "fetch calendar fact-only care logs"
+            ).filter {
+                $0.pet?.id == pet.id
+                    && $0.careType == careType
+                    && $0.note == marker
+                    && sameTimestamp($0.date, occurredAt)
+            }
+            return CalendarGeneratedFactOnlyRecords(careLogs: logs)
+        }
+
+        if let pottyType = pottyType(for: event) {
+            let marker = calendarFactOnlySessionId(for: event, occurrenceDate: occurrenceDate)
+            let logs = fetchOrLog(
+                FetchDescriptor<PetPottyLog>(),
+                context: context,
+                operation: "fetch calendar fact-only potty logs"
+            ).filter {
+                $0.pet?.id == pet.id
+                    && $0.pottyType == pottyType
+                    && ($0.sharedSessionId == marker || ($0.sharedSessionId.isEmpty && $0.walkLogId == nil))
+                    && sameTimestamp($0.date, occurredAt)
+            }
+            return CalendarGeneratedFactOnlyRecords(pottyLogs: logs)
+        }
+
+        if let hygieneType = hygieneType(for: event) {
+            let logs = fetchOrLog(
+                FetchDescriptor<PetHygieneLog>(),
+                context: context,
+                operation: "fetch calendar fact-only hygiene logs"
+            ).filter {
+                $0.pet?.id == pet.id
+                    && $0.hygieneType == hygieneType
+                    && sameTimestamp($0.date, occurredAt)
+            }
+            return CalendarGeneratedFactOnlyRecords(hygieneLogs: logs)
+        }
+
+        return CalendarGeneratedFactOnlyRecords()
+    }
+
+    @MainActor
     private static func awardGeneratedCare(
         action: QuestManager.OhanaActionType,
         pet: Pet,
@@ -405,6 +556,20 @@ enum CalendarTaskCompletionSyncService {
         context: ModelContext,
         careLedger: CareLedgerRecording
     ) -> GeneratedRewardTrace {
+        let disposition = CareFactWritePolicy.disposition(
+            pet: pet,
+            date: rewardDate,
+            executorId: executorId,
+            context: context
+        )
+        guard disposition.allowsDerivedEffects else {
+            return GeneratedRewardTrace(
+                reward: (0, 0),
+                walletEntries: [],
+                budgetEvents: [],
+                metadataJSON: occurrenceMetadata(for: occurrenceDate)
+            )
+        }
         let walletBefore = Set(fetchOrLog(FetchDescriptor<CoconutLedgerEntry>(), context: context, operation: "fetch wallet entries before calendar reward").map(\.id))
         let budgetBefore = Set(fetchOrLog(FetchDescriptor<EconomyBudgetUsageEvent>(), context: context, operation: "fetch budget events before calendar reward").map(\.id))
         let questManager = QuestManager()
@@ -647,6 +812,14 @@ enum CalendarTaskCompletionSyncService {
             return "\(PetCareLog.plannedFeedNotePrefix)\(event.id.uuidString):calendar:\(key)"
         }
         return "ohana_calendar_event:\(event.id.uuidString):\(key)"
+    }
+
+    private static func calendarFactOnlySessionId(for event: Event, occurrenceDate: Date) -> String {
+        "calendar:\(event.id.uuidString):\(occurrenceKey(for: occurrenceDate))"
+    }
+
+    private static func sameTimestamp(_ lhs: Date, _ rhs: Date) -> Bool {
+        abs(lhs.timeIntervalSince(rhs)) < 0.001
     }
 
     private static func feedAmount(from event: Event, fallback: Double) -> Double {

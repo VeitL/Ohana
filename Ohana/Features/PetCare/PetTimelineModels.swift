@@ -295,6 +295,10 @@ enum PetTimelineItemsBuilder {
             l.tr(zh: "共同喂食", en: "Shared feeding", de: "Gemeinsames Füttern")
         case .watering:
             l.tr(zh: "共同喂水", en: "Shared water", de: "Gemeinsames Wasser")
+        case .potty:
+            l.tr(zh: "共同便便", en: "Shared potty", de: "Gemeinsames Geschäft")
+        case .hygiene:
+            l.tr(zh: "共同护理", en: "Shared hygiene", de: "Gemeinsame Pflege")
         case .litterScoop:
             l.tr(zh: "共同铲砂", en: "Shared litter scoop", de: "Gemeinsames Klo-Reinigen")
         case .litterChange:

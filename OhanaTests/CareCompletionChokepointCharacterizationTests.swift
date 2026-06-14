@@ -53,6 +53,99 @@ struct CareCompletionChokepointCharacterizationTests {
         #expect(medicationReminders.recordedMedicationIDs == [medication.id])
     }
 
+    @Test func medicationDoseNoopsForDeceasedExecutorBeforeFactLedgerAndReminder() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let activeHuman = Human(name: "Active")
+        let executor = Human(name: "Former caretaker")
+        executor.passedAwayDate = Date(timeIntervalSince1970: 1000)
+        let pet = Pet(name: "Momo", species: "cat")
+        let medication = PetMedication(
+            name: "Antibiotic",
+            dosage: "1 pill",
+            frequency: .daily,
+            remainingAmount: 5,
+            pet: pet
+        )
+        context.insert(activeHuman)
+        context.insert(executor)
+        context.insert(pet)
+        context.insert(medication)
+        try context.save()
+
+        let state = EconomyDefaultsState.capture()
+        defer { state.restore() }
+        resetEconomy(activeHumanID: activeHuman.id.uuidString, humans: [activeHuman, executor], pets: [pet])
+        let medicationReminders = MedicationReminderManagerSpy()
+
+        _ = PetMedicationDoseLogging.recordDose(
+            medication: medication,
+            pet: pet,
+            modelContext: context,
+            awardCoconut: true,
+            questManager: makeQuestManager(),
+            activeHumanSelection: FixedActiveHumanSelection(id: executor.id.uuidString),
+            medicationReminders: medicationReminders
+        )
+
+        #expect(try context.fetch(FetchDescriptor<Event>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<CareLedgerEvent>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<CoconutLedgerEntry>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<EconomyBudgetUsageEvent>()).isEmpty)
+        #expect(medication.remainingAmount == 5)
+        #expect(medicationReminders.recordedMedicationIDs.isEmpty)
+    }
+
+    @Test func medicationDoseCommandExecutorPropagatesNoopBeforeRevisionReminderAndFeedback() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let activeHuman = Human(name: "Active")
+        let executor = Human(name: "Former caretaker")
+        executor.passedAwayDate = Date(timeIntervalSince1970: 1000)
+        let pet = Pet(name: "Momo", species: "cat")
+        let medication = PetMedication(
+            name: "Antibiotic",
+            dosage: "1 pill",
+            frequency: .daily,
+            remainingAmount: 5,
+            pet: pet
+        )
+        context.insert(activeHuman)
+        context.insert(executor)
+        context.insert(pet)
+        context.insert(medication)
+        try context.save()
+
+        let state = EconomyDefaultsState.capture()
+        defer { state.restore() }
+        resetEconomy(activeHumanID: activeHuman.id.uuidString, humans: [activeHuman, executor], pets: [pet])
+        let revisionCenter = ReadModelRevisionCenter()
+        let medicationReminders = MedicationReminderManagerSpy()
+        let commandExecutor = PetMedicationCommandExecutor(
+            context: context,
+            revisions: SharedDomainRevisionPublisher(center: revisionCenter),
+            questManager: makeQuestManager(),
+            medicationReminders: medicationReminders
+        )
+
+        let result = commandExecutor.recordDose(
+            medication: medication,
+            pet: pet,
+            awardCoconut: true,
+            activeHumanSelection: FixedActiveHumanSelection(id: executor.id.uuidString),
+            note: "test.pet.medication.dose.noop"
+        )
+
+        #expect(result.didRecord == false)
+        #expect(revisionCenter.lastMutation == nil)
+        #expect(try context.fetch(FetchDescriptor<Event>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<CareLedgerEvent>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<CoconutLedgerEntry>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<EconomyBudgetUsageEvent>()).isEmpty)
+        #expect(medication.remainingAmount == 5)
+        #expect(medicationReminders.recordedMedicationIDs.isEmpty)
+    }
+
     @Test func singleWalkPersistsWalkFactBeforeWalletRewardAndLinksPottyMarkers() throws {
         let container = try makeContainer()
         let context = container.mainContext
@@ -84,9 +177,40 @@ struct CareCompletionChokepointCharacterizationTests {
         #expect(walkLog.distanceMeters == 900)
         #expect(walkLog.coconutsEarned > 0)
         #expect(pottyLog.walkLogId == walkLog.id.uuidString)
+        #expect(ledgers.contains { $0.eventKind == CareLedgerEventKind.walk.rawValue && $0.legacyModelId == walkLog.id.uuidString })
         #expect(ledgers.contains { $0.eventKind == CareLedgerEventKind.potty.rawValue && $0.legacyModelId == pottyLog.id.uuidString })
         #expect(budgetEvents.contains { $0.actionKey == "walk" })
         #expect(budgetEvents.contains { $0.actionKey == "potty" })
+    }
+
+    @Test func singleWalkNoopsForDeceasedExecutorBeforeWalkPottyLedgerAndReward() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let activeHuman = Human(name: "Active")
+        let executor = Human(name: "Former walker")
+        executor.passedAwayDate = Date(timeIntervalSince1970: 1000)
+        let pet = Pet(name: "Piper", species: "dog")
+        context.insert(activeHuman)
+        context.insert(executor)
+        context.insert(pet)
+        try context.save()
+
+        let state = EconomyDefaultsState.capture()
+        defer { state.restore() }
+        resetEconomy(activeHumanID: executor.id.uuidString, humans: [activeHuman, executor], pets: [pet])
+        let location = FakeWalkLocationManager()
+        location.totalDistance = 900
+        let manager = PetWalkingManager(locationManager: location, questManager: makeQuestManager())
+
+        manager.start(pet: pet)
+        manager.addPoop(type: .perfectPoop)
+        manager.stop(modelContext: context)
+
+        #expect(try context.fetch(FetchDescriptor<PetWalkLog>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<PetPottyLog>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<CareLedgerEvent>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<CoconutLedgerEntry>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<EconomyBudgetUsageEvent>()).isEmpty)
     }
 
     @Test func sharedWalkWritesSessionChildFactsLedgerRewardAndBudgetOnce() throws {
@@ -293,25 +417,206 @@ struct CareCompletionChokepointCharacterizationTests {
         #expect(try context.fetch(FetchDescriptor<EconomyBudgetUsageEvent>()).isEmpty)
     }
 
-    @Test func sharedCareFiltersRecycledTargetsBeforeWritingFacts() throws {
+    @Test func missingExplicitCareExecutorWritesFactLedgerRewardAndOasisEchoThroughFallbackOwner() throws {
         let container = try makeContainer()
         let context = container.mainContext
-        let human = Human(name: "Guan")
-        let sourcePet = Pet(name: "Momo", species: "cat")
-        let recycledPet = Pet(name: "Nana", species: "cat")
-        recycledPet.trashedAt = Date(timeIntervalSince1970: 1000)
-        context.insert(human)
-        context.insert(sourcePet)
-        context.insert(recycledPet)
+        let activeHuman = Human(name: "Active")
+        let pet = Pet(name: "Momo", species: "cat")
+        let critter = OasisElectronicPet(
+            catalogId: "leafling",
+            nameZh: "叶灵",
+            nameEn: "Leafling",
+            nameDe: "Blattling",
+            emoji: "🌱",
+            rarity: .common,
+            xp: 0,
+            bond: 0,
+            isFeaturedOnOasis: true,
+            sourceLevel: 1
+        )
+        context.insert(activeHuman)
+        context.insert(pet)
+        context.insert(critter)
         try context.save()
 
         let state = EconomyDefaultsState.capture()
         defer { state.restore() }
-        resetEconomy(activeHumanID: human.id.uuidString, humans: [human], pets: [sourcePet, recycledPet])
+        resetEconomy(activeHumanID: activeHuman.id.uuidString, humans: [activeHuman], pets: [pet])
+        let missingExecutorID = UUID().uuidString
+
+        let record = CareEventService.recordManualFeedFact(
+            pet: pet,
+            amountGrams: 80,
+            context: context,
+            executorId: missingExecutorID,
+            date: Date(timeIntervalSince1970: 2000),
+            dependencies: .live()
+        )
+
+        let walletEntries = try context.fetch(FetchDescriptor<CoconutLedgerEntry>())
+
+        #expect(record.result.disposition == .active)
+        #expect(record.result.didWriteFact)
+        #expect(record.reward.humanGot + record.reward.petGot > 0)
+        #expect(activeHuman.coconutBalance > 0)
+        #expect(critter.xp > 0)
+        #expect(critter.bond > 0)
+        #expect(try context.fetch(FetchDescriptor<PetCareLog>()).count == 1)
+        #expect(!(try context.fetch(FetchDescriptor<CareLedgerEvent>())).isEmpty)
+        #expect(walletEntries.contains { $0.ownerId == activeHuman.id.uuidString && $0.delta > 0 })
+        #expect(walletEntries.allSatisfy { $0.ownerId != missingExecutorID })
+        #expect(!(try context.fetch(FetchDescriptor<EconomyBudgetUsageEvent>())).isEmpty)
+        #expect(!(try context.fetch(FetchDescriptor<OasisCritterActionLog>())).isEmpty)
+    }
+
+    @Test func sharedCareWritesForMissingExplicitExecutorThroughFallbackOwner() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let activeHuman = Human(name: "Active")
+        let first = Pet(name: "Momo", species: "cat")
+        let second = Pet(name: "Nana", species: "cat")
+        context.insert(activeHuman)
+        context.insert(first)
+        context.insert(second)
+        try context.save()
+
+        let state = EconomyDefaultsState.capture()
+        defer { state.restore() }
+        resetEconomy(activeHumanID: activeHuman.id.uuidString, humans: [activeHuman], pets: [first, second])
+        let missingExecutorID = UUID().uuidString
+
+        let result = CareEventService.recordSharedWateringFact(
+            sourcePet: first,
+            targets: [first, second],
+            totalMl: 120,
+            context: context,
+            executorId: missingExecutorID,
+            date: Date(timeIntervalSince1970: 2000)
+        )
+
+        let walletEntries = try context.fetch(FetchDescriptor<CoconutLedgerEntry>())
+
+        #expect(result.disposition == .active)
+        #expect(result.didWriteFact)
+        #expect(result.coconutDelta > 0)
+        #expect(try context.fetch(FetchDescriptor<SharedCareSession>()).count == 1)
+        #expect(try context.fetch(FetchDescriptor<PetCareLog>()).count == 2)
+        #expect(!(try context.fetch(FetchDescriptor<CareLedgerEvent>())).isEmpty)
+        #expect(walletEntries.contains { $0.ownerId == activeHuman.id.uuidString && $0.delta > 0 })
+        #expect(walletEntries.allSatisfy { $0.ownerId != missingExecutorID })
+        #expect(!(try context.fetch(FetchDescriptor<EconomyBudgetUsageEvent>())).isEmpty)
+    }
+
+    @Test func medicationDoseWritesForMissingExplicitExecutorThroughFallbackOwner() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let activeHuman = Human(name: "Active")
+        let pet = Pet(name: "Momo", species: "cat")
+        let medication = PetMedication(
+            name: "Antibiotic",
+            dosage: "1 pill",
+            frequency: .daily,
+            remainingAmount: 5,
+            pet: pet
+        )
+        context.insert(activeHuman)
+        context.insert(pet)
+        context.insert(medication)
+        try context.save()
+
+        let state = EconomyDefaultsState.capture()
+        defer { state.restore() }
+        resetEconomy(activeHumanID: activeHuman.id.uuidString, humans: [activeHuman], pets: [pet])
+        let medicationReminders = MedicationReminderManagerSpy()
+        let missingExecutorID = UUID().uuidString
+
+        let result = PetMedicationDoseLogging.recordDoseResult(
+            medication: medication,
+            pet: pet,
+            modelContext: context,
+            awardCoconut: true,
+            questManager: makeQuestManager(),
+            activeHumanSelection: FixedActiveHumanSelection(id: missingExecutorID),
+            medicationReminders: medicationReminders
+        )
+
+        let walletEntries = try context.fetch(FetchDescriptor<CoconutLedgerEntry>())
+
+        #expect(result.didRecord)
+        #expect(result.coconutDelta > 0)
+        #expect(result.allowsDerivedEffects)
+        #expect(try context.fetch(FetchDescriptor<Event>()).count == 1)
+        #expect(!(try context.fetch(FetchDescriptor<CareLedgerEvent>())).isEmpty)
+        #expect(walletEntries.contains { $0.ownerId == activeHuman.id.uuidString && $0.delta > 0 })
+        #expect(walletEntries.allSatisfy { $0.ownerId != missingExecutorID })
+        #expect(!(try context.fetch(FetchDescriptor<EconomyBudgetUsageEvent>())).isEmpty)
+        #expect(medication.remainingAmount == 4)
+        #expect(medicationReminders.recordedMedicationIDs == [medication.id])
+    }
+
+    @Test func calendarCompletionForMissingExplicitExecutorWritesFactAndCompletesThroughFallbackOwner() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let activeHuman = Human(name: "Active")
+        let pet = Pet(name: "Momo", species: "cat")
+        let occurrenceDate = Date(timeIntervalSince1970: 2000)
+        let event = Event(
+            title: "Feed Momo 80g",
+            startDate: occurrenceDate,
+            eventType: EventType.daily.rawValue,
+            relatedEntityType: EntityKind.pet.rawValue,
+            relatedEntityId: pet.id.uuidString
+        )
+        context.insert(activeHuman)
+        context.insert(pet)
+        context.insert(event)
+        try context.save()
+
+        let state = EconomyDefaultsState.capture()
+        defer { state.restore() }
+        resetEconomy(activeHumanID: activeHuman.id.uuidString, humans: [activeHuman], pets: [pet])
+        let missingExecutorID = UUID().uuidString
+
+        let result = CalendarEventCommandService.toggleCompletion(
+            event: event,
+            occurrenceDate: occurrenceDate,
+            pets: [pet],
+            context: context,
+            executorId: missingExecutorID,
+            now: Date(timeIntervalSince1970: 4000)
+        )
+
+        let walletEntries = try context.fetch(FetchDescriptor<CoconutLedgerEntry>())
+
+        #expect(result.isCompleted)
+        #expect(result.didChange)
+        #expect(event.isOccurrenceMarkedComplete(on: occurrenceDate))
+        #expect(try context.fetch(FetchDescriptor<PetCareLog>()).count == 1)
+        #expect(!(try context.fetch(FetchDescriptor<CareLedgerEvent>())).isEmpty)
+        #expect(walletEntries.contains { $0.ownerId == activeHuman.id.uuidString && $0.delta > 0 })
+        #expect(walletEntries.allSatisfy { $0.ownerId != missingExecutorID })
+        #expect(!(try context.fetch(FetchDescriptor<EconomyBudgetUsageEvent>())).isEmpty)
+    }
+
+    @Test func sharedCareFiltersDeceasedTargetsBeforeWritingFacts() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let human = Human(name: "Guan")
+        let sourcePet = Pet(name: "Momo", species: "cat")
+        let deceasedPet = Pet(name: "Nana", species: "cat")
+        deceasedPet.passedAwayDate = Date(timeIntervalSince1970: 1000)
+        context.insert(human)
+        context.insert(sourcePet)
+        context.insert(deceasedPet)
+        try context.save()
+
+        let state = EconomyDefaultsState.capture()
+        defer { state.restore() }
+        resetEconomy(activeHumanID: human.id.uuidString, humans: [human], pets: [sourcePet, deceasedPet])
 
         _ = CareEventService.recordSharedManualFeed(
             sourcePet: sourcePet,
-            targets: [sourcePet, recycledPet],
+            targets: [sourcePet, deceasedPet],
             totalGrams: 120,
             foodKind: .dry,
             context: context,
@@ -327,26 +632,26 @@ struct CareCompletionChokepointCharacterizationTests {
         #expect(sharedSessions.isEmpty)
         #expect(careLogs.count == 1)
         #expect(careLogs.allSatisfy { $0.pet?.id == sourcePet.id })
-        #expect(walletEntries.allSatisfy { $0.ownerId != recycledPet.id.uuidString })
-        #expect(ledgerEvents.allSatisfy { $0.subjectId != recycledPet.id.uuidString })
+        #expect(walletEntries.allSatisfy { $0.ownerId != deceasedPet.id.uuidString })
+        #expect(ledgerEvents.allSatisfy { $0.subjectId != deceasedPet.id.uuidString })
     }
 
-    @Test func recycledPetCareFactIsNoopAtFactBoundary() throws {
+    @Test func deceasedPetCareFactIsNoopAtFactBoundary() throws {
         let container = try makeContainer()
         let context = container.mainContext
         let human = Human(name: "Guan")
-        let recycledPet = Pet(name: "Momo", species: "cat")
-        recycledPet.trashedAt = Date(timeIntervalSince1970: 1000)
+        let deceasedPet = Pet(name: "Momo", species: "cat")
+        deceasedPet.passedAwayDate = Date(timeIntervalSince1970: 1000)
         context.insert(human)
-        context.insert(recycledPet)
+        context.insert(deceasedPet)
         try context.save()
 
         let state = EconomyDefaultsState.capture()
         defer { state.restore() }
-        resetEconomy(activeHumanID: human.id.uuidString, humans: [human], pets: [recycledPet])
+        resetEconomy(activeHumanID: human.id.uuidString, humans: [human], pets: [deceasedPet])
 
         _ = CareEventService.recordManualFeedFact(
-            pet: recycledPet,
+            pet: deceasedPet,
             amountGrams: 80,
             context: context,
             executorId: human.id.uuidString,
@@ -360,7 +665,7 @@ struct CareCompletionChokepointCharacterizationTests {
         #expect(try context.fetch(FetchDescriptor<EconomyBudgetUsageEvent>()).isEmpty)
     }
 
-    @Test func deceasedPetHistoricalCareWritesOnlyFactWithoutDerivedEffects() throws {
+    @Test func deceasedPetHistoricalCareDoesNotWriteFactOrDerivedEffects() throws {
         let container = try makeContainer()
         let context = container.mainContext
         let human = Human(name: "Guan")
@@ -384,40 +689,93 @@ struct CareCompletionChokepointCharacterizationTests {
         )
 
         let careLogs = try context.fetch(FetchDescriptor<PetCareLog>())
-        #expect(careLogs.count == 1)
-        #expect(careLogs.first?.pet?.id == deceasedPet.id)
+        #expect(careLogs.isEmpty)
         #expect(try context.fetch(FetchDescriptor<CareLedgerEvent>()).isEmpty)
         #expect(try context.fetch(FetchDescriptor<CoconutLedgerEntry>()).isEmpty)
         #expect(try context.fetch(FetchDescriptor<EconomyBudgetUsageEvent>()).isEmpty)
     }
 
-    @Test func calendarCompletionForRecycledPetIsNoop() throws {
+    @Test func weightAndHealthNoopForDeceasedExecutorBeforeFactLedgerAndDerivedEffects() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let activeHuman = Human(name: "Active")
+        let executor = Human(name: "Former caretaker")
+        executor.passedAwayDate = Date(timeIntervalSince1970: 1000)
+        let pet = Pet(name: "Momo", species: "cat")
+        context.insert(activeHuman)
+        context.insert(executor)
+        context.insert(pet)
+        try context.save()
+
+        let state = EconomyDefaultsState.capture()
+        defer { state.restore() }
+        resetEconomy(activeHumanID: activeHuman.id.uuidString, humans: [activeHuman, executor], pets: [pet])
+
+        _ = WeightCommandService.recordPetWeight(
+            pet: pet,
+            weight: 4.2,
+            date: Date(timeIntervalSince1970: 2000),
+            context: context,
+            executorId: executor.id.uuidString,
+            ledgerSource: .detail
+        )
+        let health = PetHealthCommandService.recordHealth(
+            pet: pet,
+            input: PetHealthRecordCommandInput(
+                type: .vaccine,
+                date: Date(timeIntervalSince1970: 2100),
+                name: "Rabies",
+                note: "",
+                vetName: "",
+                cost: 0,
+                expirationDate: Date(timeIntervalSince1970: 2200),
+                nextCheckupDate: nil,
+                executorId: executor.id.uuidString,
+                source: .detail,
+                includesNameInNote: true,
+                expirationReminderLeadDays: 1
+            ),
+            context: context,
+            questManager: makeQuestManager()
+        )
+
+        #expect(health == nil)
+        #expect(try context.fetch(FetchDescriptor<PetWeightLog>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<PetHealthLog>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<Event>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<Reminder>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<CareLedgerEvent>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<CoconutLedgerEntry>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<EconomyBudgetUsageEvent>()).isEmpty)
+    }
+
+    @Test func calendarCompletionForDeceasedPetIsNoop() throws {
         let container = try makeContainer()
         let context = container.mainContext
         let human = Human(name: "Guan")
-        let recycledPet = Pet(name: "Momo", species: "cat")
-        recycledPet.trashedAt = Date(timeIntervalSince1970: 1000)
+        let deceasedPet = Pet(name: "Momo", species: "cat")
+        deceasedPet.passedAwayDate = Date(timeIntervalSince1970: 1000)
         let occurrenceDate = Date(timeIntervalSince1970: 2000)
         let event = Event(
             title: "Feed Momo 80g",
             startDate: occurrenceDate,
             eventType: EventType.daily.rawValue,
             relatedEntityType: EntityKind.pet.rawValue,
-            relatedEntityId: recycledPet.id.uuidString
+            relatedEntityId: deceasedPet.id.uuidString
         )
         context.insert(human)
-        context.insert(recycledPet)
+        context.insert(deceasedPet)
         context.insert(event)
         try context.save()
 
         let state = EconomyDefaultsState.capture()
         defer { state.restore() }
-        resetEconomy(activeHumanID: human.id.uuidString, humans: [human], pets: [recycledPet])
+        resetEconomy(activeHumanID: human.id.uuidString, humans: [human], pets: [deceasedPet])
 
         let result = CalendarEventCommandService.toggleCompletion(
             event: event,
             occurrenceDate: occurrenceDate,
-            pets: [recycledPet],
+            pets: [deceasedPet],
             context: context,
             executorId: human.id.uuidString,
             now: Date(timeIntervalSince1970: 4000)
@@ -429,6 +787,105 @@ struct CareCompletionChokepointCharacterizationTests {
         #expect(try context.fetch(FetchDescriptor<CareLedgerEvent>()).isEmpty)
         #expect(try context.fetch(FetchDescriptor<CoconutLedgerEntry>()).isEmpty)
         #expect(try context.fetch(FetchDescriptor<EconomyBudgetUsageEvent>()).isEmpty)
+    }
+
+    @Test func calendarHistoricalCompletionForDeceasedPetDoesNotWriteFactOrComplete() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let human = Human(name: "Guan")
+        let deceasedPet = Pet(name: "Momo", species: "cat")
+        deceasedPet.passedAwayDate = Date(timeIntervalSince1970: 3000)
+        let occurrenceDate = Date(timeIntervalSince1970: 2000)
+        let operationDate = Date(timeIntervalSince1970: 4000)
+        let event = Event(
+            title: "Feed Momo 80g",
+            startDate: occurrenceDate,
+            eventType: EventType.daily.rawValue,
+            relatedEntityType: EntityKind.pet.rawValue,
+            relatedEntityId: deceasedPet.id.uuidString
+        )
+        context.insert(human)
+        context.insert(deceasedPet)
+        context.insert(event)
+        try context.save()
+
+        let state = EconomyDefaultsState.capture()
+        defer { state.restore() }
+        resetEconomy(activeHumanID: human.id.uuidString, humans: [human], pets: [deceasedPet])
+
+        let first = CalendarEventCommandService.toggleCompletion(
+            event: event,
+            occurrenceDate: occurrenceDate,
+            pets: [deceasedPet],
+            context: context,
+            executorId: human.id.uuidString,
+            now: operationDate
+        )
+        let second = CalendarEventCommandService.toggleCompletion(
+            event: event,
+            occurrenceDate: occurrenceDate,
+            pets: [deceasedPet],
+            context: context,
+            executorId: human.id.uuidString,
+            now: operationDate
+        )
+
+        let careLogs = try context.fetch(FetchDescriptor<PetCareLog>())
+        #expect(first.isCompleted == false)
+        #expect(first.didChange == false)
+        #expect(second.isCompleted == false)
+        #expect(second.didChange == false)
+        #expect(event.isOccurrenceMarkedComplete(on: occurrenceDate) == false)
+        #expect(careLogs.isEmpty)
+        #expect(try context.fetch(FetchDescriptor<CareLedgerEvent>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<CoconutLedgerEntry>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<EconomyBudgetUsageEvent>()).isEmpty)
+    }
+
+    @Test func calendarReopenForDeceasedPetLeavesLegacyFactOnlyHistoryReadOnly() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let human = Human(name: "Guan")
+        let deceasedPet = Pet(name: "Momo", species: "cat")
+        deceasedPet.passedAwayDate = Date(timeIntervalSince1970: 3000)
+        let occurrenceDate = Date(timeIntervalSince1970: 2000)
+        let event = Event(
+            title: "Feed Momo 80g",
+            startDate: occurrenceDate,
+            eventType: EventType.daily.rawValue,
+            relatedEntityType: EntityKind.pet.rawValue,
+            relatedEntityId: deceasedPet.id.uuidString
+        )
+        let legacyFactOnlyLog = PetCareLog(
+            date: occurrenceDate,
+            type: .feeding,
+            amountGrams: 80,
+            note: "\(PetCareLog.plannedFeedNotePrefix)\(event.id.uuidString):calendar:\(Event.occurrenceStorageKey(for: occurrenceDate))",
+            pet: deceasedPet,
+            executorId: human.id.uuidString
+        )
+        event.setOccurrenceMarkedComplete(true, on: occurrenceDate)
+        event.isCompleted = true
+        context.insert(human)
+        context.insert(deceasedPet)
+        context.insert(event)
+        context.insert(legacyFactOnlyLog)
+        try context.save()
+
+        let result = CalendarEventCommandService.toggleCompletion(
+            event: event,
+            occurrenceDate: occurrenceDate,
+            pets: [deceasedPet],
+            context: context,
+            executorId: human.id.uuidString,
+            now: Date(timeIntervalSince1970: 4000)
+        )
+
+        #expect(result.isCompleted)
+        #expect(result.didChange == false)
+        #expect(event.isOccurrenceMarkedComplete(on: occurrenceDate))
+        #expect(try context.fetch(FetchDescriptor<PetCareLog>()).count == 1)
+        #expect(try context.fetch(FetchDescriptor<CareLedgerEvent>()).isEmpty)
     }
 
     private func makeContainer() throws -> ModelContainer {

@@ -30,12 +30,23 @@ struct WeightCommandResult: Equatable {
     let subjectID: UUID?
     let coconutDelta: Int
     let ledgerEventID: UUID?
+    let didRecord: Bool
+    let allowsDerivedEffects: Bool
 
-    init(logID: UUID, subjectID: UUID?, coconutDelta: Int, ledgerEventID: UUID? = nil) {
+    init(
+        logID: UUID,
+        subjectID: UUID?,
+        coconutDelta: Int,
+        ledgerEventID: UUID? = nil,
+        didRecord: Bool = true,
+        allowsDerivedEffects: Bool = true
+    ) {
         self.logID = logID
         self.subjectID = subjectID
         self.coconutDelta = coconutDelta
         self.ledgerEventID = ledgerEventID
+        self.didRecord = didRecord
+        self.allowsDerivedEffects = allowsDerivedEffects
     }
 }
 
@@ -65,6 +76,21 @@ enum WeightCommandService {
     ) -> WeightCommandResult {
         let questManager = providedQuestManager ?? QuestManager()
         let careLedger: CareLedgerRecording = providedCareLedger ?? CareLedgerService()
+        let disposition = CareFactWritePolicy.disposition(
+            pet: pet,
+            date: date,
+            executorId: executorId,
+            context: context
+        )
+        guard disposition.didWriteFact else {
+            return WeightCommandResult(
+                logID: UUID(),
+                subjectID: pet.id,
+                coconutDelta: 0,
+                didRecord: false,
+                allowsDerivedEffects: false
+            )
+        }
         let log = PetWeightLog(
             date: date,
             weight: weight,
@@ -74,7 +100,8 @@ enum WeightCommandService {
             executorId: executorId
         )
         context.insert(log)
-        let reward: (humanGot: Int, petGot: Int)? = if awardsReward {
+        let allowsDerivedEffects = disposition.allowsDerivedEffects
+        let reward: (humanGot: Int, petGot: Int)? = if awardsReward, allowsDerivedEffects {
             EconomyRewardDiscipline.awardCareAction(
                 type: .weight,
                 pet: pet,
@@ -86,7 +113,7 @@ enum WeightCommandService {
             nil
         }
 
-        let ledgerEvent = ledgerSource.map { source in
+        let ledgerEvent = allowsDerivedEffects ? ledgerSource.map { source in
             careLedger.record(
                 occurredAt: log.date,
                 actorKind: executorId == nil ? .unknown : .human,
@@ -110,16 +137,18 @@ enum WeightCommandService {
                 context: context,
                 save: false
             )
-        }
+        } : nil
 
-        if !awardsReward || ledgerEvent != nil {
+        if !awardsReward || !allowsDerivedEffects || ledgerEvent != nil {
             context.safeSave()
         }
         return WeightCommandResult(
             logID: log.id,
             subjectID: pet.id,
             coconutDelta: careLedger.rewardDelta(reward),
-            ledgerEventID: ledgerEvent?.id
+            ledgerEventID: ledgerEvent?.id,
+            didRecord: true,
+            allowsDerivedEffects: allowsDerivedEffects
         )
     }
 
@@ -149,6 +178,7 @@ enum WeightCommandService {
 struct DashboardRecordCommandExecutor {
     let context: ModelContext
     let revisions: DomainRevisionPublishing
+    private let derivations: CareDerivationExecutor
     let questManager: QuestManager
     let careLedger: CareLedgerRecording
     let careEvents: CareEventRecording
@@ -192,6 +222,7 @@ struct DashboardRecordCommandExecutor {
     ) {
         self.context = context
         self.revisions = revisions
+        derivations = CareDerivationExecutor(revisions: revisions)
         self.questManager = questManager
         self.careLedger = careLedger
         self.careEvents = careEvents
@@ -223,7 +254,7 @@ struct DashboardRecordCommandExecutor {
             questManager: questManager,
             careLedger: careLedger
         )
-        revisions.publishWeightEntry(command: command, subjectID: pet.id, result: result, note: note)
+        derivePetWeight(result, command: command, subjectID: pet.id, factDate: date, note: note)
         return result
     }
 
@@ -320,15 +351,39 @@ struct DashboardRecordCommandExecutor {
             source: source,
             careEvents: careEvents
         )
+        guard result.didWriteFact else {
+            derivations.derive(
+                .noOp(
+                    command: command,
+                    affectedEntityIDs: [sourcePet.id],
+                    note: revisionNote
+                )
+            )
+            return result
+        }
         var affectedIDs = Set(result.targetPetIDs)
         affectedIDs.insert(result.sessionID)
         result.expenseLogIDs.forEach { affectedIDs.insert($0) }
-        revisions.publish(
-            DomainMutationResult(
-                command: command,
-                affectedEntityIDs: affectedIDs,
-                wroteBusinessFact: true,
-                note: revisionNote
+        derivations.derive(
+            .active(
+                disposition: result.disposition,
+                fact: CareWriteOutcome.FactPayload(
+                    subjectID: sourcePet.id,
+                    logIDs: result.expenseLogIDs,
+                    factDate: date,
+                    operationDate: date
+                ),
+                revision: CareWriteOutcome.RevisionPayload(
+                    command: command,
+                    affectedEntityIDs: affectedIDs,
+                    note: revisionNote
+                ),
+                sharedSession: CareWriteOutcome.SharedSessionPayload(
+                    sessionID: result.sessionID,
+                    sourcePetID: sourcePet.id,
+                    targetPetIDs: result.targetPetIDs
+                ),
+                noopNote: "\(revisionNote).factOnly"
             )
         )
         return result
@@ -372,6 +427,51 @@ struct DashboardRecordCommandExecutor {
         let result = DashboardRecordCommandService.deleteHumanExpense(log, human: human, context: context)
         revisions.publishExpenseDelete(result, note: note)
         return result
+    }
+
+    @discardableResult
+    private func derivePetWeight(
+        _ result: WeightCommandResult,
+        command: DomainCommand,
+        subjectID: UUID,
+        factDate: Date,
+        note: String
+    ) -> CareDerivationResult {
+        guard result.didRecord else {
+            return derivations.derive(
+                .noOp(
+                    command: command,
+                    affectedEntityIDs: [subjectID],
+                    note: note
+                )
+            )
+        }
+        var affected: Set<UUID> = [subjectID, result.logID]
+        if let ledgerEventID = result.ledgerEventID {
+            affected.insert(ledgerEventID)
+        }
+        return derivations.derive(
+            .active(
+                disposition: result.allowsDerivedEffects ? .active : .noOp,
+                fact: CareWriteOutcome.FactPayload(
+                    subjectID: subjectID,
+                    logIDs: [result.logID],
+                    factDate: factDate,
+                    operationDate: factDate
+                ),
+                revision: CareWriteOutcome.RevisionPayload(
+                    command: command,
+                    affectedEntityIDs: affected,
+                    note: note
+                ),
+                reward: CareWriteOutcome.RewardPayload(
+                    humanDelta: result.coconutDelta,
+                    petDelta: 0
+                ),
+                ledger: result.ledgerEventID.map { CareWriteOutcome.LedgerPayload(eventIDs: [$0]) },
+                noopNote: note
+            )
+        )
     }
 }
 
