@@ -20,6 +20,7 @@ Purpose:
   - R5d: explicit care executors that cannot resolve to a writable Human must be command no-op.
   - R5e: care command no-op results must be consumed before UI feedback/revision/secondary actor writes.
   - R6: care command/view code must not publish derived revision/no-op side effects outside CareDerivationExecutor.
+  - R7: PetExpenseLog business writes must record a same-boundary CareLedgerEvent.
 
 Baseline:
   Full-scope debt is ratcheted in
@@ -359,6 +360,18 @@ CARE_DERIVATION_CONTEXT_RE = re.compile(
     r"CalendarEventCompletionResult|TodayFocusEventCompletionCommandResult|"
     r"CareWriteOutcome|CareDerivationResult)\b"
 )
+PET_EXPENSE_LOG_CONSTRUCTOR_RE = re.compile(r"\bPetExpenseLog\s*\(")
+PET_EXPENSE_CONTEXT_INSERT_RE = re.compile(r"\b(?:context|modelContext)\.insert\s*\(")
+PET_EXPENSE_LEDGER_MARKER_RE = re.compile(
+    r"\b(?:ExpenseCommandService\.recordPetExpense|recordPetExpense\s*\(|"
+    r"recordSharedPetExpense\s*\(|recordSharedExpense\s*\(|recordLedger\s*\(|"
+    r"careLedger\.record\s*\(|CareLedgerService\(\)\.record\s*\(|"
+    r"legacyModelName\s*:\s*\"PetExpenseLog\")"
+)
+PET_EXPENSE_IMPORT_BOUNDARY_ALLOWLIST = {
+    "Ohana/Domain/Services/CloudSyncRecordApplier.swift",
+    "Ohana/Domain/Services/DataBackupManager+Decode.swift",
+}
 
 
 def direct_reward_call_allowed(path: str) -> bool:
@@ -471,6 +484,30 @@ def enclosing_function_bounds(lines: list[str], index: int) -> tuple[int, int] |
         if opened and depth <= 0:
             return (start, cursor)
     return (start, len(lines) - 1)
+
+
+def function_bounds(lines: list[str]) -> list[tuple[str, int, int]]:
+    bounds: list[tuple[str, int, int]] = []
+    for idx, line in enumerate(lines):
+        match = FUNC_SIGNATURE_RE.search(line)
+        if not match:
+            continue
+        block_bounds = enclosing_function_bounds(lines, idx)
+        if block_bounds is None:
+            continue
+        bounds.append((match.group(1), block_bounds[0], block_bounds[1]))
+    return bounds
+
+
+def same_file_expense_ledger_consumer(lines: list[str], producer_name: str, producer_start: int) -> bool:
+    call_re = re.compile(r"\b" + re.escape(producer_name) + r"\s*\(")
+    for _, start, end in function_bounds(lines):
+        if start == producer_start:
+            continue
+        block = "\n".join(lines[start:end + 1])
+        if call_re.search(block) and PET_EXPENSE_LEDGER_MARKER_RE.search(block):
+            return True
+    return False
 
 
 def direct_care_discipline_allowed(path: str, lines: list[str], index: int) -> bool:
@@ -694,6 +731,38 @@ def scan_care_derivation_direct_publish(path: pathlib.Path, lines: list[str], wa
         )
 
 
+def scan_pet_expense_ledger_boundary(path: pathlib.Path, lines: list[str], warnings: list[WarningItem]) -> None:
+    path_str = rel(path)
+    if path_str in PET_EXPENSE_IMPORT_BOUNDARY_ALLOWLIST:
+        return
+
+    for idx, line in enumerate(lines, start=1):
+        if allowed_line(line) or not PET_EXPENSE_LOG_CONSTRUCTOR_RE.search(line):
+            continue
+        bounds = enclosing_function_bounds(lines, idx - 1)
+        if bounds is None:
+            continue
+        start, end = bounds
+        function_block = "\n".join(lines[start:end + 1])
+        if "economy-boundary: allow" in function_block:
+            continue
+        if not PET_EXPENSE_CONTEXT_INSERT_RE.search(function_block):
+            continue
+        if PET_EXPENSE_LEDGER_MARKER_RE.search(function_block):
+            continue
+        function_name = enclosing_function_name(lines, idx - 1)
+        if function_name and same_file_expense_ledger_consumer(lines, function_name, start):
+            continue
+        add(
+            warnings,
+            "pet-expense-ledger-boundary",
+            path_str,
+            idx,
+            line,
+            "PetExpenseLog business writes must record a same-boundary CareLedgerEvent or enter ExpenseCommandService.recordPetExpense/shared expense recording.",
+        )
+
+
 GATE_RULES: list[tuple[str, re.Pattern[str], re.Pattern[str], str]] = [
     (
         "online-feature-gate",
@@ -781,6 +850,7 @@ def scan(files: list[pathlib.Path]) -> list[WarningItem]:
         scan_care_command_result_success_consumption(path, lines, warnings)
         scan_secondary_executor_write_policy(path, lines, warnings)
         scan_care_derivation_direct_publish(path, lines, warnings)
+        scan_pet_expense_ledger_boundary(path, lines, warnings)
     scan_service_gate_coverage(files, warnings)
     return sorted(warnings, key=lambda item: (item.rule, item.path, item.line, item.snippet))
 

@@ -45,10 +45,10 @@ enum ExpenseCommandService {
         receiptTitle: String? = nil,
         receiptCategory: DocumentCategory? = nil,
         receiptAttachments: [ExpenseReceiptAttachmentDraft] = [],
+        awardsReward: Bool = true,
         questManager providedQuestManager: QuestManager? = nil,
         careLedger providedCareLedger: CareLedgerRecording? = nil
     ) -> ExpenseCommandResult {
-        let questManager = providedQuestManager ?? QuestManager()
         let careLedger = providedCareLedger ?? CareLedgerService()
         let cleanNote = note.trimmingCharacters(in: .whitespacesAndNewlines)
         let log = PetExpenseLog(
@@ -83,13 +83,19 @@ enum ExpenseCommandService {
             document = nil
         }
 
-        let reward = EconomyRewardDiscipline.awardNonCareReward(
-            type: .expense,
-            pet: pet,
-            context: context,
-            executorId: executorId,
-            questManager: questManager
-        )
+        let reward: (humanGot: Int, petGot: Int)?
+        if awardsReward {
+            let questManager = providedQuestManager ?? QuestManager()
+            reward = EconomyRewardDiscipline.awardNonCareReward(
+                type: .expense,
+                pet: pet,
+                context: context,
+                executorId: executorId,
+                questManager: questManager
+            )
+        } else {
+            reward = nil
+        }
         let coconutDelta = careLedger.rewardDelta(reward)
         let ledgerEvent = careLedger.record(
             occurredAt: log.date,

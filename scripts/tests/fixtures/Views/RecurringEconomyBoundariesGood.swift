@@ -16,4 +16,16 @@ struct RecurringEconomyBoundariesGoodCommand {
             date: Date()
         )
     }
+
+    func recordExpense(pet: Pet, context: ModelContext, executorId: String) {
+        ExpenseCommandService.recordPetExpense(
+            pet: pet,
+            amount: 42,
+            date: Date(),
+            category: .medical,
+            note: "good.expense",
+            context: context,
+            executorId: executorId
+        )
+    }
 }

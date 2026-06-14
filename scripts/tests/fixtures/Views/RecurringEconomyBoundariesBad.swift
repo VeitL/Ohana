@@ -205,3 +205,19 @@ struct RecurringEconomyCareDerivationDirectPublishCommand {
         )
     }
 }
+
+struct RecurringEconomyExpenseWithoutLedgerCommand {
+    let context: ModelContext
+
+    func saveExpense(pet: Pet, executorId: String) {
+        let expense = PetExpenseLog(
+            date: Date(),
+            amount: 42,
+            category: .medical,
+            note: "bad.expense",
+            pet: pet,
+            executorId: executorId
+        )
+        context.insert(expense)
+    }
+}
