@@ -27,7 +27,7 @@ actionable; long-term product ideas belong in planning docs instead.
 
 ### TFU-20260614-008 - Repair pre-existing CI architecture-boundary gate
 
-- Status: In Progress
+- Status: Done
 - Priority: P1
 - Area: CI / Architecture Boundaries / File Size Ratchet / Service Injection
 - Source task: Economy dirty-executor P0 fix and push verification; Codex
@@ -52,6 +52,10 @@ actionable; long-term product ideas belong in planning docs instead.
 - Close condition: `scripts/audit-architecture-boundaries.sh --all` passes
   locally; a pushed CI run passes `audits`, `lint`, and `build-test`; update
   this TFU with the closing commit/run URL.
+- Closed: 2026-06-14 by Codex implementation/CI verification session. Closing
+  commits `8abbf0ed9` and `3e8fbf5ff`; CI run `27502212959`
+  (https://github.com/VeitL/Ohana/actions/runs/27502212959) passed `audits`,
+  `lint`, and `build-test`.
 
 ### TFU-20260614-006 - Close Economy pure-review P1 leftovers before maturity
 
