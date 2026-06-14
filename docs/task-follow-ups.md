@@ -25,6 +25,35 @@ actionable; long-term product ideas belong in planning docs instead.
 
 ## Open Items
 
+### TFU-20260614-015 - Clear shared-care child references when deleting a human executor
+
+- Status: Open
+- Priority: P1
+- Area: Domain / Physical Deletion / Shared Care / Member Lifecycle
+- Source task: Domain first-release local physical deletion cascade pure
+  adversarial review; Codex, 2026-06-14.
+- Blocker: 本轮首发可达面纯复审发现 P0=0 / P1=1 / P2=0，Domain 仍
+  不能标 🏁。P1：`PhysicalDeletionService.deleteHuman` 将
+  `SharedCareSession.executorIds` 只含被删 human 的 session 物理删除，但
+  active pet 的 child facts（如 `PetCareLog.sharedSessionId`、
+  `PetWalkLog.sharedSessionId`、`PetExpenseLog.sharedSessionId`）必须保留，
+  当前路径没有清这些 child 引用，删除后可留下指向已删除
+  `SharedCareSession` 的 orphan `sharedSessionId`。这违反本地物理删除级联
+  的 session/child 一致性验收，也说明现有入口族测试只插入了 session，
+  未插入对应 child facts。
+- Next step: 先补红测：构造 active pet + human + `SharedCareSession`
+  executorIds 仅含该 human + 至少一个 active pet child log（feeding/walk
+  或 expense）带同一 `sharedSessionId`，调用
+  `PhysicalDeletionService.deleteHuman` 后断言不会留下 child log 指向不存在
+  的 session。再覆盖多 executor 情况：session 移除被删 human 后保留时，
+  child shared metadata 不得重新暴露被删 human 或与 session executor set
+  矛盾。实现应在 shared-care 边界统一处理 session 删除/降级/child
+  reference 清理，而不是只补单个 log 类型。
+- Close condition: 新红测先失败后修绿；`PhysicalDeletionServiceTests`、
+  `SharedPetActionRecorderTests`、`HomeCommandExecutorTests`、derived-state
+  lifecycle audit、fixture tests、module exit gate、push 和 CI 全绿；随后
+  另开首发可达面纯复审，P0/P1=0 才能把 Domain 标 🏁。
+
 ### TFU-20260614-014 - Enforce CloudSync live-apply deletion wins, parent lifecycle, and natural identity
 
 - Status: Open (deferred to CloudKit 1.x; first-release unreachable while `cloudKitDatabase: .none`)
