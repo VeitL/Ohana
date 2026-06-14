@@ -590,7 +590,7 @@ struct QuickWaterCommandExecutor {
     }
 
     private func singleCareResult(
-        _ recorded: (result: CareEventService.CareRecordResult, reward: (humanGot: Int, petGot: Int), log: PetCareLog, pottyLog: PetPottyLog?)
+        _ recorded: (result: CareRecordResult, reward: (humanGot: Int, petGot: Int), log: PetCareLog, pottyLog: PetPottyLog?)
     ) -> SharedPetActionResult {
         SharedPetActionResult(
             sessionID: recorded.result.logID,

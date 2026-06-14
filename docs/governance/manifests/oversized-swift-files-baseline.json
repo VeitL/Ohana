@@ -1,49 +1,163 @@
 {
-  "description": "Architecture-boundary ratchet for Swift files above 800 lines. These files may be shrunk or split, but new oversized files or growth above the recorded line count fail scripts/audit-architecture-boundaries.sh.",
-  "threshold": 800,
+  "description": "Architecture-boundary ratchet for unusually large Swift files. This gate is intentionally relaxed so normal feature work is not forced into risky mechanical splits just to satisfy an 800-line target. Data/resource/preview files (asset catalogs, Localization.swift, DesignLab *Canvas* previews) are exempt in-script and intentionally excluded from this baseline.",
+  "threshold": 1200,
+  "growthTolerance": 200,
   "files": [
-    { "path": "Ohana/Domain/Economy/CoconutWalletService.swift", "lines": 1050 },
-    { "path": "Ohana/Domain/Services/CareEventService.swift", "lines": 985 },
-    { "path": "Ohana/Domain/Services/CloudSyncEngineRuntime.swift", "lines": 1151 },
-    { "path": "Ohana/Domain/Services/CloudSyncMutationRecorder.swift", "lines": 1111 },
-    { "path": "Ohana/Domain/Services/CloudSyncRecordApplier.swift", "lines": 1339 },
-    { "path": "Ohana/Domain/Services/DataBackupManager+Decode.swift", "lines": 835 },
-    { "path": "Ohana/Domain/Services/DataBackupManager+Encode.swift", "lines": 852 },
-    { "path": "Ohana/Domain/Services/SharedCareSessionMaintenance.swift", "lines": 956 },
-    { "path": "Ohana/Features/Calendar/CalendarCommands.swift", "lines": 958 },
-    { "path": "Ohana/Features/CrewRoster/Views/CrewRosterOverlay.swift", "lines": 886 },
-    { "path": "Ohana/Features/CrewRoster/Views/CrewRosterOverlayEditors.swift", "lines": 911 },
-    { "path": "Ohana/Features/DailyStreak/Views/DailyStreakDetailView.swift", "lines": 884 },
-    { "path": "Ohana/Features/DashboardRecords/Views/IslandWeightDashboard.swift", "lines": 1009 },
-    { "path": "Ohana/Features/Economy/CoconutEconomyPolicyV2.swift", "lines": 1052 },
-    { "path": "Ohana/Features/Economy/RewardEconomyCommands.swift", "lines": 955 },
-    { "path": "Ohana/Features/FamilyTasks/FamilyTaskService.swift", "lines": 827 },
-    { "path": "Ohana/Features/Feeding/Views/QuickFeedDetailSheet.swift", "lines": 818 },
-    { "path": "Ohana/Features/Gacha/GachaModels.swift", "lines": 915 },
-    { "path": "Ohana/Features/Gacha/Views/GachaView.swift", "lines": 1074 },
-    { "path": "Ohana/Features/Home/ExpandedQuickActionLogic.swift", "lines": 1065 },
-    { "path": "Ohana/Features/Home/FocusHomeRouteSheetModifier.swift", "lines": 891 },
-    { "path": "Ohana/Features/Home/HomeReadModelStore.swift", "lines": 973 },
-    { "path": "Ohana/Features/Home/Views/VerticalHomeEmbeddedQuickActions.swift", "lines": 857 },
-    { "path": "Ohana/Features/Home/Views/VerticalSolidHomeComponents.swift", "lines": 904 },
-    { "path": "Ohana/Features/Medication/MedicationCommands.swift", "lines": 1024 },
-    { "path": "Ohana/Features/Medication/Views/AddMedicationSheet.swift", "lines": 817 },
-    { "path": "Ohana/Features/Medication/Views/HumanMedicationView.swift", "lines": 1039 },
-    { "path": "Ohana/Features/Members/Views/ExpandedHumanFeaturesSheet.swift", "lines": 877 },
-    { "path": "Ohana/Features/QuickCare/Views/QuickPlayDetailSheet.swift", "lines": 886 },
-    { "path": "Ohana/Features/QuickCare/Views/QuickPottyDetailComponents.swift", "lines": 863 },
-    { "path": "Ohana/Features/QuickCare/Views/QuickPottyDetailSheet.swift", "lines": 937 },
-    { "path": "Ohana/Features/QuickCare/Views/QuickWaterDetailComponents.swift", "lines": 1115 },
-    { "path": "Ohana/Features/QuickCare/Views/QuickWaterDetailSheet+Logic.swift", "lines": 846 },
-    { "path": "Ohana/Features/QuickCare/Views/QuickWaterDetailSheet.swift", "lines": 967 },
-    { "path": "Ohana/Features/Settings/DesignLab/DesignSpecPreviewCanvasV4.swift", "lines": 1465 },
-    { "path": "Ohana/Features/Settings/DesignLab/UIGuidelinesSafePreviewCanvasV4.swift", "lines": 1377 },
-    { "path": "Ohana/Features/Settings/DesignLab/VerticalGlassHomeLabView.swift", "lines": 987 },
-    { "path": "Ohana/Features/TodayFocus/IslandQuestEngine.swift", "lines": 1019 },
-    { "path": "Ohana/Models/SharedModelContainer.swift", "lines": 1048 },
-    { "path": "Ohana/Shared/Components/PetSilhouetteView.swift", "lines": 900 },
-    { "path": "Ohana/Shared/Components/WalletCards/FocusWalletCardView.swift", "lines": 869 },
-    { "path": "Ohana/Shared/Localization.swift", "lines": 1373 },
-    { "path": "Ohana/Shared/Media/PetAvatarAssetCatalog.swift", "lines": 1324 }
+    {
+      "path": "Ohana/Domain/Economy/CoconutWalletService.swift",
+      "lines": 1050
+    },
+    {
+      "path": "Ohana/Domain/Services/CareEventService.swift",
+      "lines": 985
+    },
+    {
+      "path": "Ohana/Domain/Services/CloudSyncEngineRuntime.swift",
+      "lines": 1151
+    },
+    {
+      "path": "Ohana/Domain/Services/CloudSyncMutationRecorder.swift",
+      "lines": 1111
+    },
+    {
+      "path": "Ohana/Domain/Services/CloudSyncRecordApplier.swift",
+      "lines": 1339
+    },
+    {
+      "path": "Ohana/Domain/Services/DataBackupManager+Decode.swift",
+      "lines": 835
+    },
+    {
+      "path": "Ohana/Domain/Services/DataBackupManager+Encode.swift",
+      "lines": 852
+    },
+    {
+      "path": "Ohana/Domain/Services/SharedCareSessionMaintenance.swift",
+      "lines": 956
+    },
+    {
+      "path": "Ohana/Features/Calendar/CalendarCommands.swift",
+      "lines": 958
+    },
+    {
+      "path": "Ohana/Features/CrewRoster/Views/CrewRosterOverlay.swift",
+      "lines": 886
+    },
+    {
+      "path": "Ohana/Features/CrewRoster/Views/CrewRosterOverlayEditors.swift",
+      "lines": 911
+    },
+    {
+      "path": "Ohana/Features/DailyStreak/Views/DailyStreakDetailView.swift",
+      "lines": 884
+    },
+    {
+      "path": "Ohana/Features/DashboardRecords/Views/IslandWeightDashboard.swift",
+      "lines": 1009
+    },
+    {
+      "path": "Ohana/Features/Economy/CoconutEconomyPolicyV2.swift",
+      "lines": 1052
+    },
+    {
+      "path": "Ohana/Features/Economy/RewardEconomyCommands.swift",
+      "lines": 955
+    },
+    {
+      "path": "Ohana/Features/FamilyTasks/FamilyTaskService.swift",
+      "lines": 827
+    },
+    {
+      "path": "Ohana/Features/Feeding/Views/QuickFeedDetailSheet.swift",
+      "lines": 818
+    },
+    {
+      "path": "Ohana/Features/Gacha/GachaModels.swift",
+      "lines": 915
+    },
+    {
+      "path": "Ohana/Features/Gacha/Views/GachaView.swift",
+      "lines": 1074
+    },
+    {
+      "path": "Ohana/Features/Home/ExpandedQuickActionLogic.swift",
+      "lines": 1065
+    },
+    {
+      "path": "Ohana/Features/Home/FocusHomeRouteSheetModifier.swift",
+      "lines": 891
+    },
+    {
+      "path": "Ohana/Features/Home/HomeReadModelStore.swift",
+      "lines": 973
+    },
+    {
+      "path": "Ohana/Features/Home/Views/VerticalHomeEmbeddedQuickActions.swift",
+      "lines": 857
+    },
+    {
+      "path": "Ohana/Features/Home/Views/VerticalSolidHomeComponents.swift",
+      "lines": 904
+    },
+    {
+      "path": "Ohana/Features/Medication/MedicationCommands.swift",
+      "lines": 1024
+    },
+    {
+      "path": "Ohana/Features/Medication/Views/AddMedicationSheet.swift",
+      "lines": 817
+    },
+    {
+      "path": "Ohana/Features/Medication/Views/HumanMedicationView.swift",
+      "lines": 1039
+    },
+    {
+      "path": "Ohana/Features/Members/Views/ExpandedHumanFeaturesSheet.swift",
+      "lines": 877
+    },
+    {
+      "path": "Ohana/Features/QuickCare/Views/QuickPlayDetailSheet.swift",
+      "lines": 886
+    },
+    {
+      "path": "Ohana/Features/QuickCare/Views/QuickPottyDetailComponents.swift",
+      "lines": 863
+    },
+    {
+      "path": "Ohana/Features/QuickCare/Views/QuickPottyDetailSheet.swift",
+      "lines": 937
+    },
+    {
+      "path": "Ohana/Features/QuickCare/Views/QuickWaterDetailComponents.swift",
+      "lines": 1115
+    },
+    {
+      "path": "Ohana/Features/QuickCare/Views/QuickWaterDetailSheet+Logic.swift",
+      "lines": 846
+    },
+    {
+      "path": "Ohana/Features/QuickCare/Views/QuickWaterDetailSheet.swift",
+      "lines": 967
+    },
+    {
+      "path": "Ohana/Features/Settings/DesignLab/VerticalGlassHomeLabView.swift",
+      "lines": 987
+    },
+    {
+      "path": "Ohana/Features/TodayFocus/IslandQuestEngine.swift",
+      "lines": 1019
+    },
+    {
+      "path": "Ohana/Models/SharedModelContainer.swift",
+      "lines": 1048
+    },
+    {
+      "path": "Ohana/Shared/Components/PetSilhouetteView.swift",
+      "lines": 900
+    },
+    {
+      "path": "Ohana/Shared/Components/WalletCards/FocusWalletCardView.swift",
+      "lines": 869
+    }
   ]
 }

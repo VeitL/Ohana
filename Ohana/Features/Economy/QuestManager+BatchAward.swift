@@ -41,6 +41,7 @@ extension QuestManager {
         }
 
         let dependencies = batchAwardDependencies()
+        let careEvents: CareEventRecording = CareEventService(dependencies: dependencies)
         var total = (human: 0, pet: 0)
         for group in Self.sameSpeciesGroups(eligiblePets) {
             guard let sourcePet = group.first else { continue }
@@ -51,6 +52,7 @@ extension QuestManager {
                 executorId: executorId,
                 date: now,
                 context: context,
+                careEvents: careEvents,
                 dependencies: dependencies
             )
             total.human += reward.humanGot
@@ -66,43 +68,43 @@ extension QuestManager {
         executorId: String?,
         date: Date,
         context: ModelContext,
+        careEvents: CareEventRecording,
         dependencies: CareEventServiceDependencies
     ) -> (humanGot: Int, petGot: Int) {
         switch type {
         case .feed:
-            let result = CareEventService.recordSharedManualFeedFact(
+            let result = careEvents.recordSharedManualFeedFact(
                 sourcePet: sourcePet,
                 targets: targets,
                 totalGrams: 0,
                 foodKind: .dry,
                 context: context,
                 executorId: executorId,
-                date: date,
-                dependencies: dependencies
+                quality: .none,
+                date: date
             )
             guard result.didWriteFact, result.allowsDerivedEffects else { return (0, 0) }
             return result.reward
         case .water:
-            let result = CareEventService.recordSharedWateringFact(
+            let result = careEvents.recordSharedWateringFact(
                 sourcePet: sourcePet,
                 targets: targets,
                 totalMl: 0,
                 context: context,
                 executorId: executorId,
-                date: date,
-                dependencies: dependencies
+                date: date
             )
             guard result.didWriteFact, result.allowsDerivedEffects else { return (0, 0) }
             return result.reward
         case let .potty(isLitter):
             if isLitter {
-                let result = CareEventService.recordSharedLitterCareFact(
+                let result = careEvents.recordSharedLitterCareFact(
                     sourcePet: sourcePet,
                     targets: targets,
                     context: context,
                     executorId: executorId,
                     date: date,
-                    dependencies: dependencies
+                    isFullChange: false
                 )
                 guard result.didWriteFact, result.allowsDerivedEffects else { return (0, 0) }
                 return result.reward
@@ -131,7 +133,7 @@ extension QuestManager {
                 rewardTitle: batchRewardTitle(type: .care(type: type), targets: targets)
             )
         case let .general(_, _, _, title) where title.contains("铲砂") || title.contains("铲屎"):
-            let result = CareEventService.recordSharedCareFact(
+            let result = careEvents.recordSharedCareFact(
                 sourcePet: sourcePet,
                 targets: targets,
                 type: .litter,
@@ -140,13 +142,14 @@ extension QuestManager {
                 executorId: executorId,
                 reward: type,
                 rewardTitle: batchRewardTitle(type: type, targets: targets),
+                quality: .none,
                 date: date,
-                dependencies: dependencies
+                source: .quickAction
             )
             guard result.didWriteFact, result.allowsDerivedEffects else { return (0, 0) }
             return result.reward
         case let .general(_, _, _, title) where title.contains("陪玩") || title.contains("逗玩"):
-            let result = CareEventService.recordSharedCareFact(
+            let result = careEvents.recordSharedCareFact(
                 sourcePet: sourcePet,
                 targets: targets,
                 type: .play,
@@ -155,8 +158,9 @@ extension QuestManager {
                 executorId: executorId,
                 reward: type,
                 rewardTitle: "共同陪玩 · \(targets.count)只",
+                quality: .none,
                 date: date,
-                dependencies: dependencies
+                source: .quickAction
             )
             guard result.didWriteFact, result.allowsDerivedEffects else { return (0, 0) }
             return result.reward

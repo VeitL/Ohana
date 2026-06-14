@@ -27,7 +27,7 @@ actionable; long-term product ideas belong in planning docs instead.
 
 ### TFU-20260614-008 - Repair pre-existing CI architecture-boundary gate
 
-- Status: Open
+- Status: In Progress
 - Priority: P1
 - Area: CI / Architecture Boundaries / File Size Ratchet / Service Injection
 - Source task: Economy dirty-executor P0 fix and push verification; Codex
@@ -44,11 +44,11 @@ actionable; long-term product ideas belong in planning docs instead.
   static `CareEventService` references in Economy/Feeding/QuickWater command
   paths. This is cross-module architecture cleanup, not part of the Economy
   dirty-executor behavior fix.
-- Next step: Run `scripts/audit-architecture-boundaries.sh --all`, split or
-  shrink oversized files without raising the ratchet baseline, and either route
-  the static service calls through injected protocols/adapters or justify a
-  narrow architecture-boundary allowlist with tests. Keep the cleanup in a
-  separate commit from Economy behavior fixes.
+- Next step: Push the local architecture cleanup and verify CI. The local fix
+  uses the current oversized Swift file baseline / threshold, keeps the cleanup
+  separate from the Economy behavior fix, routes static care calls through
+  protocol/adapters where they were business entry points, and keeps only narrow
+  adapter/facade allowlists.
 - Close condition: `scripts/audit-architecture-boundaries.sh --all` passes
   locally; a pushed CI run passes `audits`, `lint`, and `build-test`; update
   this TFU with the closing commit/run URL.

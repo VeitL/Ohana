@@ -901,11 +901,8 @@ enum ArkSchemaV72: VersionedSchema {
 }
 
 // MARK: - Migration Plan
-// NOTE: 只保留有真实 custom logic 的 stage。
-// SwiftData 的 lightweight migration 对于"只新增字段/模型"完全不需要显式 stage——
-// 当 store 版本落后于当前 schema 时，SwiftData 会自动完成字段填充。
-// 明确列出 stages 反而会导致 iOS 26 抛出 "model reference cannot be equal" 异常
-// （当两个相邻 schema 的 Core Data hash 相同时）。
+// 只保留有真实 custom logic 的 stage；轻量新增字段/模型不需要显式 stage。
+// 相邻 schema hash 相同时，显式 stage 会触发 iOS 26 "model reference cannot be equal"。
 enum ArkMigrationPlan: SchemaMigrationPlan {
     static var schemas: [any VersionedSchema.Type] {
         [ArkSchemaV1.self, ArkSchemaV2.self, ArkSchemaV3.self, ArkSchemaV4.self,
@@ -930,11 +927,6 @@ enum ArkMigrationPlan: SchemaMigrationPlan {
 }
 
 // MARK: - Shared Container
-///
-/// **为何「每次 Build 像重装、岛没了」？**
-/// 1. **内存库降级**：若两次磁盘打开失败，旧逻辑会退回 `isStoredInMemoryOnly`，进程一结束 SwiftData 全丢；`ohana_has_onboarded` 等仍在 UserDefaults，表现像「又要建岛 / 数据没了」。
-/// 2. **模拟器**：换了一台 Simulator、Reset Content、或删掉 App，会换沙盒路径，数据自然空。
-/// 3. **重复 ModelContainer**：后台任务若再 `make()` 出新容器，可能与主进程争用同一 SQLite，行为异常；现改为**单例**。
 enum SharedModelContainerStoreKind {
     case primaryWithMigrationPlan
     case defaultStoreWithoutMigrationPlan

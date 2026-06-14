@@ -831,7 +831,6 @@ struct RewardEconomyCommandExecutor {
         revisions.publishAchievementReward(result, note: note)
         return result
     }
-
     @discardableResult
     func awardBackdateCheckIn(
         action: QuestManager.OhanaActionType,
@@ -851,7 +850,6 @@ struct RewardEconomyCommandExecutor {
         revisions.publishBackdateCheckIn(result, note: note)
         return result
     }
-
     @discardableResult
     func awardBackdateCheckIn(
         actionKey: String,

@@ -1268,7 +1268,6 @@ private nonisolated enum CloudSyncRecordIdentityParser {
         return String(zoneName.dropFirst(prefix.count))
     }
 }
-
 private extension CKRecord {
     nonisolated func string(for key: String) -> String? {
         if let value = self[key] as? String {

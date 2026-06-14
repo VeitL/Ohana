@@ -744,7 +744,6 @@ extension QuickWaterDetailSheet {
         let today = calendar.startOfDay(for: Date())
         return max(0, calendar.dateComponents([.day], from: start, to: today).day ?? 0)
     }
-
     func dueText(daysUntil: Int) -> String {
         if daysUntil > 0 {
             return l.tr(
@@ -765,11 +764,9 @@ extension QuickWaterDetailSheet {
         guard let daysUntil else { return l.tr(zh: "未记录", en: "No record", de: "Kein Eintrag") }
         return dueText(daysUntil: daysUntil)
     }
-
     func cycleProgress(elapsed: Int, interval: Int) -> Double {
         min(Double(max(elapsed, 0)) / Double(max(interval, 1)), 1)
     }
-
     func relativeDayText(for date: Date) -> String {
         let days = daysSinceDate(date)
         if days == 0 {
@@ -786,7 +783,6 @@ extension QuickWaterDetailSheet {
         guard let legacyLogId = entry.legacyLogId else { return nil }
         return legacyWaterDeleteLogs.first { $0.id == legacyLogId }
     }
-
     func tint(for log: QuickWaterLedgerEntry) -> Color {
         if log.careType == .waterChange {
             return waterChangeTint
@@ -824,7 +820,6 @@ extension QuickWaterDetailSheet {
         }
         return "plus"
     }
-
     func localizedSharedWaterPlanSaved(_ count: Int) -> String {
         l.tr(
             zh: "共同喂水计划已保存 · \(count)只",

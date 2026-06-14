@@ -387,7 +387,7 @@ def scan_direct_reward_chokepoint(path: pathlib.Path, lines: list[str], warnings
 
 
 ALLOWED_CARE_DISCIPLINE_CONTEXTS: dict[str, set[str]] = {
-    "Ohana/Domain/Services/CareEventRecording.swift": {
+    "Ohana/Domain/Services/CareEventEconomyAwarder.swift": {
         "awardCareAction",
         "awardSharedCareAction",
     },
@@ -527,6 +527,7 @@ def scan_care_fact_disposition_consumption(path: pathlib.Path, lines: list[str],
     path_str = rel(path)
     if path_str in {
         "Ohana/Domain/Services/CareEventRecording.swift",
+        "Ohana/Domain/Services/CareEventService+RecordingAdapter.swift",
         "Ohana/Domain/Services/CareEventService.swift",
     }:
         return

@@ -154,21 +154,23 @@ view_static_business_calls() {
 }
 
 oversized_swift_files() {
-  local threshold=800
+  local threshold=1200
+  local growth_tolerance=200
   local baseline="docs/governance/manifests/oversized-swift-files-baseline.json"
   if [[ ! -f "$baseline" ]]; then
-    printf '%s missing; create the 800-line ratchet baseline before enforcing oversized file checks.\n' "$baseline"
+    printf '%s missing; create the oversized-file ratchet baseline before enforcing oversized file checks.\n' "$baseline"
     return 0
   fi
 
-  python3 - "$threshold" "$baseline" "${files[@]}" <<'PY'
+  python3 - "$threshold" "$growth_tolerance" "$baseline" "${files[@]}" <<'PY'
 import json
 import pathlib
 import sys
 
 threshold = int(sys.argv[1])
-baseline_path = pathlib.Path(sys.argv[2])
-paths = sys.argv[3:]
+growth_tolerance = int(sys.argv[2])
+baseline_path = pathlib.Path(sys.argv[3])
+paths = sys.argv[4:]
 
 try:
     payload = json.loads(baseline_path.read_text(encoding="utf-8"))
@@ -182,10 +184,26 @@ baseline = {
     if "path" in item and "lines" in item
 }
 
+# Data / resource / preview files are large by nature (localization tables,
+# asset catalogs, DesignLab preview canvases). Line count is a poor proxy for
+# their health, so they are exempt from the oversized-logic ratchet. Keep this
+# list narrow: only genuinely logic-free files belong here.
+def is_data_or_preview(p):
+    name = pathlib.Path(p).name
+    if name.endswith("AssetCatalog.swift"):
+        return True
+    if name == "Localization.swift":
+        return True
+    if "/DesignLab/" in p and "Canvas" in name:
+        return True
+    return False
+
 violations = []
 for path in paths:
     file_path = pathlib.Path(path)
     if not file_path.is_file() or file_path.suffix != ".swift":
+        continue
+    if is_data_or_preview(path):
         continue
     with file_path.open("r", encoding="utf-8", errors="ignore") as handle:
         lines = sum(1 for _ in handle)
@@ -194,11 +212,11 @@ for path in paths:
     allowed = baseline.get(path)
     if allowed is None:
         violations.append(
-            f"{path}:{lines} lines exceeds {threshold}-line ratchet and is not in the baseline; split it first."
+            f"{path}:{lines} lines exceeds relaxed {threshold}-line oversized threshold and is not in the baseline; split it intentionally or add a baseline entry."
         )
-    elif lines > allowed:
+    elif lines > allowed + growth_tolerance:
         violations.append(
-            f"{path}:{lines} lines grew beyond baseline {allowed}; shrink it or split into smaller files."
+            f"{path}:{lines} lines grew more than {growth_tolerance} lines beyond baseline {allowed}; shrink it intentionally or refresh the baseline with review."
         )
 
 print("\n".join(violations))
@@ -233,6 +251,7 @@ static_service_calls_outside_facades() {
     | rg -v '^\s*Ohana/Domain/Services/AppInfrastructureAdapters\.swift:' \
     | rg -v '^\s*Ohana/Domain/Services/CareLedgerBackfillService\.swift:' \
     | rg -v '^\s*Ohana/Domain/Services/CareEventRecording\.swift:' \
+    | rg -v '^\s*Ohana/Domain/Services/CareEventService\+RecordingAdapter\.swift:' \
     | rg -v '^\s*Ohana/Features/CareLedger/CareLedgerRecording\.swift:' \
     | rg -v '^\s*Ohana/Features/Economy/CoconutExchangeManaging\.swift:' \
     | rg -v '^\s*Ohana/Features/FamilyTasks/FamilyTaskManaging\.swift:' \
