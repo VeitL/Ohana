@@ -1,10 +1,10 @@
 # Economy 规则书
 
 确认日期：2026-06-12  
-最近更新：2026-06-13
+最近更新：2026-06-14
 适用范围：Phase 6 Economy 模块；覆盖椰子钱包、正式岛屿总资产、奖励预算 / 冷却、商店消费、宠物成长椰子、成就奖励、财富页与椰子历史。
 
-本规则书覆盖宪法 D2/D3/D7/D12/D13/D14/G2/G4/G8 在 Economy 模块中的首发语义，并保留 GAP-4 总账恒等、GAP-5 触顶感知、GAP-7 补记结算的已验证规则。
+本规则书覆盖宪法 D2/D3/D7/D8/D12/D13/D14/G2/G4/G5/G8 在 Economy 模块中的首发语义，并保留 GAP-4 总账恒等、GAP-5 触顶感知、GAP-7 补记结算的已验证规则。
 
 ## 已确认产品决定
 
@@ -20,7 +20,7 @@
 - 旧兼容钱包 API 也必须遵守相同归属规则：能解析到可写人类 / 宠物时才写钱包；无 actor 时只能归到当前 active human；解析不到可写正式成员时 no-op，不得创建或补写 `system` 正式余额流水。
 - 照护、花费、喂药、遛狗、时刻等可重复用户动作奖励必须先按明确执行人 `executorId` 归属；只有没有明确执行人时，才允许回退到当前 active human。
 - 体重、宠物花费、宠物健康、补签结算等由命令层已知执行人的奖励入口必须把 `executorId` 传进统一奖励管线；手动宠物里程碑没有独立 executor picker，奖励与照护账本 actor 均归属当前 active human；seed / 系统里程碑不产生人类 actor。
-- 离世或回收成员的钱包冻结：不再获得奖励、不再消费、不再领取成就，也不计入活跃财富总额 / 榜单 / 趋势；历史流水可见。撤销离世或从回收站恢复后才恢复钱包写入能力。
+- 离世成员的钱包冻结：不再获得奖励、不再消费、不再领取成就，也不计入活跃财富总额 / 榜单 / 趋势；历史流水可见。用户可见回收站 / 可恢复删除已取消，成员删除为确认后物理删除；未来 CloudSync sync tombstone 只传播删除，不形成钱包恢复态。
 - 商店正式消费支持岛屿合资：买家钱包不足但全岛未冻结人类钱包总额足够时，可由其他人类钱包补差额；总额仍不足时必须整体拒绝且不写任何钱包或购买事实。
 - FamilyTasks 悬赏功能首发由 `OnlineFeatureGate` 隐藏；未来解锁前，悬赏确认必须复用 Economy 钱包写入边界。悬赏转账失败时不得把任务标为完成，不得留下 payer / receiver 钱包流水或照护账本事件。
 - Economy 首发可见 UI、奖励反馈、钱包流水标题与时间文案必须走已注册语言 fallback；Debug / Preview / 内部测试文案不作为本轮首发阻塞。
@@ -42,10 +42,10 @@
 - ECO-010：补记历史照护记录获得的椰子奖励必须按操作日进入 `EconomyBudgetUsageEvent` 与冷却判断。历史日期已经触顶不得阻止今天的诚实补记获得今天预算内的奖励；今天已经触顶或处于冷却时，历史补记只记录事实，不额外产出椰子。
 - ECO-011：补记产生的钱包奖励流水应按操作日显示在椰子历史中；照护历史仍按照护事实日期显示。两条时间轴不得互相污染。
 - ECO-012：首发版 `CoconutExchangeFeatureGate` 恒为关闭；Shop 分类、兑换表单、Today Focus 兑换卡、Home 待读模型中的待确认兑换入口均不可达。直接调用 UI 命令或 `CoconutExchangeService` 创建 / 确认 / 取消也必须 no-op / 抛 feature-disabled，不产生兑换请求或钱包写入。
-- ECO-013：财富页活跃总资产 = 所有未冻结正式成员钱包余额之和，包含隐私锁住的人类成员；排行榜、筛选器、流水列表和个人余额不得泄漏隐私锁住成员的明细，也不得把离世 / 回收成员当作活跃财富 owner 展示。
+- ECO-013：财富页活跃总资产 = 所有未冻结正式成员钱包余额之和，包含隐私锁住的人类成员；排行榜、筛选器、流水列表和个人余额不得泄漏隐私锁住成员的明细，也不得把离世成员当作活跃财富 owner 展示。
 - ECO-014：特殊奖励与旧兼容钱包 API 不得创建新的 `system` 正式影响余额流水。`system:legacy` 仅可由迁移兼容和明确非余额历史承接使用。
-- ECO-015：`Human.hasPassedAway` / `Pet.hasPassedAway` / `trashedAt != nil` 的成员钱包为冻结状态；成就领奖、宠物金库消费、特殊奖励、商店消费、兑换创建 / 确认 / 取消等 Economy 命令不得写入冻结钱包。
-- ECO-016：宠物成长椰子只能用于该宠物自己的成长 / 外观 / 纪念历史。宠物离世或回收时金库展示历史和预览，但购买 / 投喂按钮必须不可执行。
+- ECO-015：`Human.hasPassedAway` / `Pet.hasPassedAway` 的成员钱包为冻结状态；成就领奖、宠物金库消费、特殊奖励、商店消费、兑换创建 / 确认 / 取消等 Economy 命令不得写入冻结钱包。用户可见删除不再产生可恢复冻结钱包态；被删除成员从 active 经济集合物理移除，必要的 CloudSync sync tombstone 不参与钱包展示或写入。
+- ECO-016：宠物成长椰子只能用于该宠物自己的成长 / 外观 / 纪念历史。宠物离世时金库展示历史和预览，但购买 / 投喂按钮必须不可执行；宠物被删除后不再有用户可达金库恢复路径。
 - ECO-017：财富页 screen model 只吃不可变快照值。图表、榜单、总资产、筛选和颜色计算不得在 SwiftUI body 中直接依赖 SwiftData 模型对象。
 - ECO-018：奖励归属以业务事实执行人为准。已有 `executorId` 的照护 / 花费 / 遛狗 / 喂药 / 时刻记录不得把奖励发给当前 active human；active human 只作为无明确执行人的兜底。
 - ECO-019：商店购买以全岛未冻结人类钱包作为可支配池；买家优先出资，其他人类钱包只补差额并记录各自支出流水。任何一笔出资失败时必须回滚整笔购买。
@@ -59,8 +59,8 @@
   - 判定：强行迁入家族 1 若需要伪造一个 `CareType`，即属家族 2，禁止过度收口（避免错误抽象）。
   - 花费归属家族 2 且含 human expense（pet/human 对称，D10），不按宠物/人类拆分。
 - ECO-025（待复查，farm-risk）：花费记录当前可产出椰子奖励，存在"记假账→刷椰子"的潜在 farm 向量。本条登记为开放复查（见 `docs/task-follow-ups.md` TFU-20260613-010），D2 中间路线下需单独审"记录花费是否应发奖/限额"，本轮收口重构不处理。
-- ECO-026（冻结成员照护行为，2026-06-13 拍板，实现 G4.1）：① 离世成员（`hasPassedAway`）可补记历史照护事实但不发奖、不派生；② 回收成员（`trashedAt != nil`）作为照护对象/执行人整体 no-op（不写事实、不发奖、不派生），UI 挡入口；③ executor 冻结时奖励 no-op 且不回落 active human（`EconomyRewardOwnerResolver.explicitHuman` 返回 nil 后不得 `?? activeHuman`）；④ 此边界统一持有在事实写入收口（`recordCareFact` / `SharedPetActionRecorder` / `EconomyRewardOwnerResolver`），禁止只在奖励层做导致"写事实不发奖"的半状态。共享照护 target 解析必须用 `EconomyWalletWritePolicy.canWrite` 同时过滤 `hasPassedAway` 与 `trashedAt`。
-- ECO-027（补记奖励按操作日，强化 ECO-010 至所有完成入口）：Calendar / 通知补完成历史 occurrence 时，照护事实保留历史日期，但奖励的预算/冷却结算必须按**操作当日 dayKey**，不得写入历史 dayKey 绕过今日预算触顶。所有"完成照护任务"的入口（QuickCare / Calendar / TodayFocus / 通知）一致适用。
+- ECO-026（冻结成员照护行为，2026-06-14 产品主人拍板二态模型，实现 G4.1）：① active 照护对象正常写事实，所有 reward / ledger / reminder / stock / Oasis / revision 派生必须统一经照护派生执行器裁决；② 离世成员（`hasPassedAway`）作为照护对象或 executor 时完全只读，任何照护写入、编辑、历史补记和派生都必须 no-op；③ 用户可见回收站 / 可恢复删除 / `trashedAt` 删除中转态取消，不再作为照护写入或钱包写入边界；④ 非空显式 executor id 若不可解析、已被物理删除或不可写，**不得丢失 active 照护对象的事实**：事实仍写入，奖励归属走明确 fallback（可写 active human；没有可用 owner 则事实-only 无奖励），且不得把奖励伪装成原 executor；⑤ 共享照护 target 解析必须只接受 active target，离世 target 被过滤或整体 no-op，不允许半笔账。
+- ECO-027（补记奖励按操作日，强化 ECO-010 至所有完成入口）：Calendar / 通知 / Today Focus / QuickCare 补完成历史 occurrence 时，active 照护对象的照护事实保留历史日期，但奖励的预算/冷却结算必须按**操作当日 dayKey**，不得写入历史 dayKey 绕过今日预算触顶。离世照护对象不补写历史事实。所有"完成照护任务"的入口一致适用。
 
 ## 当前代码来源
 
@@ -117,14 +117,15 @@
 
 冻结钱包状态：
 
-1. `activeWallet`：正式在世 / 未回收成员，可正常收入与消费。
-2. `frozenWallet`：成员离世或进入回收站，钱包历史可见但不可写。
-3. `restoredWallet`：撤销离世或恢复回收后回到 `activeWallet`。
+1. `activeWallet`：正式在世成员，可正常收入与消费。
+2. `frozenWallet`：成员离世，钱包历史可见但不可写。
+3. `deletedWalletRemoved`：成员经不可恢复确认后物理删除，用户界面不再展示该钱包；未来 CloudSync sync tombstone 只传播删除。
 
 允许迁移：
 
 - `activeWallet -> frozenWallet`
-- `frozenWallet -> restoredWallet -> activeWallet`
+- `frozenWallet -> activeWallet`：仅限纠错撤销离世标记的显式生命周期动作。
+- `activeWallet -> deletedWalletRemoved`
 
 ## 边界
 
