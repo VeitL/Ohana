@@ -759,6 +759,7 @@ nonisolated enum CloudSyncRecordApplier {
         context: ModelContext
     ) throws -> CloudSyncRecordApplyResult {
         if try fetchCoconutLedgerEntry(id: metadata.localRecordUUID, context: context) != nil {
+            CoconutWalletService.reconcileFormalAccountBalancesWithLedger(context: context)
             return .updated(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
         }
 
@@ -797,6 +798,7 @@ nonisolated enum CloudSyncRecordApplier {
         entry.sourceRaw = sourceRaw
         entry.subjectKindRaw = subjectKindRaw
         context.insert(entry)
+        CoconutWalletService.reconcileFormalAccountBalancesWithLedger(context: context)
         return .inserted(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
     }
 

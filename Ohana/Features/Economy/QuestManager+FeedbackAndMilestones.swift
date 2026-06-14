@@ -45,9 +45,9 @@ extension QuestManager {
     }
 
     func publishCoconutProjectionRevision(note: String) {
-        revisions.publishNoop(
-            command: .settingsCoconutBalance(humanID: nil, amount: coconutCount),
-            affectedEntityIDs: [],
+        AppPerformanceMonitor.shared.record(
+            "domain_command_noop",
+            valueMS: 0,
             note: note
         )
     }

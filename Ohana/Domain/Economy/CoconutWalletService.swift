@@ -29,7 +29,7 @@ struct CoconutWalletReconciliationSummary: Equatable {
     let correctedAccountCount: Int
     let createdAccountCount: Int
 
-    var didChange: Bool {
+    nonisolated var didChange: Bool {
         correctedAccountCount > 0 || createdAccountCount > 0
     }
 }
@@ -287,7 +287,7 @@ enum CoconutWalletService {
         var stagedBalances: [String: Int] = [:]
 
         for delta in meaningfulDeltas {
-            if isFrozenWrite(delta) {
+            if try isFrozenWrite(delta, context: context) {
                 throw CoconutWalletError.walletFrozen(accountName: delta.ownerName)
             }
             let account = try existingAccount(for: delta, context: context, cache: &accountsByKey)
@@ -465,7 +465,7 @@ enum CoconutWalletService {
     }
 
     @discardableResult
-    static func reconcileFormalAccountBalancesWithLedger(context: ModelContext) -> CoconutWalletReconciliationSummary {
+    nonisolated static func reconcileFormalAccountBalancesWithLedger(context: ModelContext) -> CoconutWalletReconciliationSummary {
         let entries = fetchOrLog(
             FetchDescriptor<CoconutLedgerEntry>(),
             context: context,
@@ -665,7 +665,7 @@ enum CoconutWalletService {
         delta.entryKind == .openingBalance ? 0 : max(0, delta.cachedBalance)
     }
 
-    private static func isFrozenWrite(_ delta: CoconutWalletDelta) -> Bool {
+    private static func isFrozenWrite(_ delta: CoconutWalletDelta, context: ModelContext) throws -> Bool {
         guard delta.affectsBalance,
               delta.entryKind != .openingBalance,
               delta.entryKind != .legacyHistory else {
@@ -673,12 +673,47 @@ enum CoconutWalletService {
         }
         switch delta.ownerKind {
         case .human:
-            return delta.human.map { !EconomyWalletWritePolicy.canWrite($0) } ?? false
+            if let human = delta.human {
+                return !EconomyWalletWritePolicy.canWrite(human)
+            }
+            guard let id = resolvedOwnerId(for: delta),
+                  let human = try fetchHuman(id: id, context: context) else {
+                return true
+            }
+            return !EconomyWalletWritePolicy.canWrite(human)
         case .pet:
-            return delta.pet.map { !EconomyWalletWritePolicy.canWrite($0) } ?? false
+            if let pet = delta.pet {
+                return !EconomyWalletWritePolicy.canWrite(pet)
+            }
+            guard let id = resolvedOwnerId(for: delta),
+                  let pet = try fetchPet(id: id, context: context) else {
+                return true
+            }
+            return !EconomyWalletWritePolicy.canWrite(pet)
         case .system:
             return false
         }
+    }
+
+    private static func resolvedOwnerId(for delta: CoconutWalletDelta) -> UUID? {
+        if let id = UUID(uuidString: delta.ownerId.trimmingCharacters(in: .whitespacesAndNewlines)) {
+            return id
+        }
+
+        let prefix: String
+        switch delta.ownerKind {
+        case .human:
+            prefix = "human:"
+        case .pet:
+            prefix = "pet:"
+        case .system:
+            return nil
+        }
+
+        guard delta.accountKey.hasPrefix(prefix) else {
+            return nil
+        }
+        return UUID(uuidString: String(delta.accountKey.dropFirst(prefix.count)))
     }
 
     private static func syncCache(for delta: CoconutWalletDelta, balance: Int) {
@@ -692,7 +727,7 @@ enum CoconutWalletService {
         }
     }
 
-    private static func isFormalMemberAccount(_ ownerKind: CoconutWalletOwnerKind) -> Bool {
+    private nonisolated static func isFormalMemberAccount(_ ownerKind: CoconutWalletOwnerKind) -> Bool {
         switch ownerKind {
         case .human, .pet:
             true
@@ -702,7 +737,7 @@ enum CoconutWalletService {
     }
 
     @discardableResult
-    private static func syncMemberCache(for account: CoconutAccount, balance: Int, context: ModelContext) -> Bool {
+    private nonisolated static func syncMemberCache(for account: CoconutAccount, balance: Int, context: ModelContext) -> Bool {
         guard let id = UUID(uuidString: account.ownerId) else { return false }
         do {
             switch account.ownerKind {
@@ -730,7 +765,7 @@ enum CoconutWalletService {
         }
     }
 
-    private static func fetchHuman(id: UUID, context: ModelContext) throws -> Human? {
+    private nonisolated static func fetchHuman(id: UUID, context: ModelContext) throws -> Human? {
         var descriptor = FetchDescriptor<Human>(
             predicate: #Predicate<Human> { $0.id == id }
         )
@@ -738,7 +773,7 @@ enum CoconutWalletService {
         return try context.fetch(descriptor).first
     }
 
-    private static func fetchPet(id: UUID, context: ModelContext) throws -> Pet? {
+    private nonisolated static func fetchPet(id: UUID, context: ModelContext) throws -> Pet? {
         var descriptor = FetchDescriptor<Pet>(
             predicate: #Predicate<Pet> { $0.id == id }
         )
@@ -754,7 +789,7 @@ enum CoconutWalletService {
         fetchOrLog(descriptor, context: context, operation: operation).first
     }
 
-    private static func fetchOrLog<T: PersistentModel>(
+    private nonisolated static func fetchOrLog<T: PersistentModel>(
         _ descriptor: FetchDescriptor<T>,
         context: ModelContext,
         operation: String

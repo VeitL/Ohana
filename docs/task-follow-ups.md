@@ -25,6 +25,63 @@ actionable; long-term product ideas belong in planning docs instead.
 
 ## Open Items
 
+### TFU-20260614-009 - Close Domain current-code pure-review P1s before maturity
+
+- Status: Open (repair implemented locally; awaiting CI and fresh pure review)
+- Priority: P1
+- Area: Domain / Care Derivation / Physical Deletion / Wallet / CloudSync /
+  CareLedger
+- Source task: Domain fresh pure adversarial review; Codex pure review session,
+  2026-06-14.
+- Blocker: 本轮 Domain 纯复审（当前代码首次对抗复审，禁止业务代码修改）发现
+  P0=0 / P1=5 / P2=2，Domain 不能标 🏁。P1：① `DomainRevisionPublishing`
+  仍暴露无 token 的 care-family typed publish / no-op 出口，command 仍能编译出
+  绕过 `CareDerivationExecutor` 的 revision 副作用；② `PhysicalDeletionService`
+  删除 Pet/Human 时只处理关系数组和少量 human scoped rows，未清理
+  `CoconutAccount` / `CoconutLedgerEntry` / `CareLedgerEvent` /
+  `SharedCareSession` 等字符串 ID 关联行，且现有测试仍断言 shared session 保留
+  已删 pet id；③ `CareLedgerService.record` 只 insert，不写
+  `CloudSyncRecordState` dirty，常见 care fact 会同步 `Pet*Log` 但不同步
+  同边界 `CareLedgerEvent`；④ `CloudSyncRecordApplier.applyCoconutLedgerEntry`
+  只插远端 ledger，不重放 `CoconutAccount` projection，而 `CoconutAccount` 又是
+  notUploadable derived record；⑤ `CoconutWalletService.apply` 的 frozen gate 只看
+  `CoconutWalletDelta.human/pet` 可选对象，手工构造 ownerKind=.human/.pet 但
+  不带模型引用的 delta 可绕过离世/删除钱包硬门。P2：`recordUnknownSharedPotty`
+  no-op 返回 detached `PetPottyLog`；shared manual feed 多目标路径在 recorder
+  事实写入前调用 first-meal special reward，仍有 crash/失败半笔账窗口。
+- Next step: 先补红测：Domain revision token 编译/审计坏例；Pet/Human 删除后钱包
+  account/ledger/shared session/care ledger 无 orphan 且 sync tombstone 完整；care
+  fact + ledger dirty-state 成对进入 CloudSync upload queue；远端
+  `CoconutLedgerEntry` apply 后立即重放 `CoconutAccount` / member cache；
+  raw `CoconutWalletDelta` 不带模型引用时必须按 ownerId 解析并拒绝冻结/已删 owner；
+  unknown shared potty no-op 返回 typed no-op；shared feed first-meal 在事实成功后
+  派生。再做结构修复：token 加到 care-family typed publish/no-op 或移除 command
+  可见出口；删除边界统一通过 physical deletion cascade；CareLedger dirty marking
+  下沉到 ledger write boundary；CloudSync apply batch 结束后重放钱包 projection。
+- Close condition: 新红测先失败后修绿；`scripts/audit-economy-boundaries.sh --all`、
+  `scripts/audit-derived-state-lifecycle.sh --all`、CloudSync/PhysicalDeletion/
+  CoconutWallet/CareLedger targeted simulator suites、`scripts/tests/run-audit-fixture-tests.sh`、
+  `scripts/module-exit-gate.sh` 与 CI PASS；随后开全新 Domain 纯对抗复审，P0/P1=0
+  才能把 Domain 标 🏁。
+- Progress: 2026-06-14 Codex Domain repair session implemented all five P1
+  repairs and both P2 repairs in the current worktree: care-family typed
+  revision/no-op exits were removed from `DomainRevisionPublishing` so no-op
+  care command paths go through `CareDerivationExecutor`; physical pet/human
+  deletion now removes wallet accounts, wallet ledger, care ledger, and shared
+  session string references with sync tombstones; `CareLedgerService.record`
+  stages `CareLedgerEvent` for CloudSync; remote `CoconutLedgerEntry` apply
+  replays wallet projection through `CoconutWalletService`; raw wallet deltas
+  without model references resolve by owner id/account key and fail closed for
+  frozen/deleted member wallets; unknown shared potty no-op returns nil instead
+  of a detached fake log; shared manual feed defers first-meal derivation until
+  after recorder success. Local validation PASS:
+  `scripts/test-simulator.sh -only-testing:OhanaTests/PhysicalDeletionServiceTests -only-testing:OhanaTests/CloudSyncMetadataServiceTests -only-testing:OhanaTests/CoconutWalletServiceTests`,
+  `scripts/test-simulator.sh -only-testing:OhanaTests/SharedPetActionRecorderTests -only-testing:OhanaTests/QuestManagerBatchAwardTests`,
+  `scripts/test-simulator.sh -only-testing:OhanaTests/HomeCommandExecutorTests`,
+  `scripts/tests/run-audit-fixture-tests.sh`, and `scripts/module-exit-gate.sh`
+  (841 unit tests + 3 UI template tests). Still open until the repair commit is
+  pushed, CI is green, and a new pure adversarial Domain review reports P0/P1=0.
+
 ### TFU-20260614-008 - Repair pre-existing CI architecture-boundary gate
 
 - Status: Done

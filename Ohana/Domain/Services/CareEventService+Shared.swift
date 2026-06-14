@@ -70,7 +70,6 @@ extension CareEventService {
         }
 
         let stockOwner = stockOwnerPet(for: liveTargets, preferred: sourcePet, foodKind: foodKind, context: context)
-        dependencies.questManager.recordFirstMeal(actorId: executorId, context: context)
         let result = SharedPetActionRecorder.record(
             SharedPetActionDescriptor(
                 actionKind: .feeding,
@@ -91,6 +90,9 @@ extension CareEventService {
             context: context,
             dependencies: dependencies
         )
+        if result.allowsDerivedEffects {
+            dependencies.questManager.recordFirstMeal(actorId: executorId, context: context)
+        }
         return result
     }
 
@@ -447,10 +449,10 @@ extension CareEventService {
         executorId: String? = nil,
         date: Date = Date(),
         dependencies: CareEventServiceDependencies? = nil
-    ) -> PetPottyLog {
+    ) -> PetPottyLog? {
         let liveTargets = SharedPetTargetResolver.normalizedTargets(targets, fallback: sourcePet)
         guard !liveTargets.isEmpty else {
-            return PetPottyLog(date: date, type: type, executorId: executorId)
+            return nil
         }
         let result = SharedPetActionRecorder.record(
             SharedPetActionDescriptor(
@@ -465,6 +467,6 @@ extension CareEventService {
             context: context,
             dependencies: dependencies
         )
-        return result.pottyLog ?? PetPottyLog(date: date, type: type, executorId: executorId)
+        return result.pottyLog
     }
 }

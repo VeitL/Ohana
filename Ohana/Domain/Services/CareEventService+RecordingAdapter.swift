@@ -406,7 +406,7 @@ extension CareEventService {
         context: ModelContext,
         executorId: String?,
         date: Date
-    ) -> PetPottyLog {
+    ) -> PetPottyLog? {
         CareEventService.recordUnknownSharedPotty(
             sourcePet: sourcePet,
             targets: targets,

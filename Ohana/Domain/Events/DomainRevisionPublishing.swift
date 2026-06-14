@@ -16,7 +16,6 @@ protocol DomainRevisionPublishing {
         note: String,
         token: CareDerivationToken
     )
-    func publishNoop(command: DomainCommand, affectedEntityIDs: Set<UUID>, note: String)
     func publishCoconutRewardFeedback(_ event: OhanaCoconutRewardEvent)
     func publishFailure(command: DomainCommand, error: Error)
     func publishSettingsActiveHumanSwitch(_ result: SettingsActiveHumanSwitchCommandResult, note: String)
@@ -29,10 +28,8 @@ protocol DomainRevisionPublishing {
     func publishMemberProfileChange(entityID: UUID, kind: String, note: String)
     func publishMemberHomeVisibility(_ result: MemberHomeVisibilityCommandResult, note: String)
     func publishMemberLifecycle(_ result: MemberLifecycleCommandResult, note: String)
-    func publishPetCareRecord(_ result: PetCareTrackingCommandResult, note: String)
     func publishPetCareDelete(_ result: PetCareTrackingDeleteCommandResult, note: String)
     func publishPetPottyDelete(_ result: PetPottyDeleteCommandResult, note: String)
-    func publishCatCareRecord(_ result: CatCareCommandResult, note: String)
     func publishCatCareUndo(_ result: CatCareUndoCommandResult, note: String)
     func publishPetWalkGoal(_ result: PetWalkGoalCommandResult, note: String)
     func publishPetWalkSummary(_ result: PetWalkSummaryCommandResult, note: String)
@@ -95,8 +92,6 @@ protocol DomainRevisionPublishing {
     func publishPetMedicationPlan(_ result: PetMedicationPlanCommandResult, note: String)
     func publishPetMedicationPlanDelete(_ result: PetMedicationPlanDeleteCommandResult, note: String)
     func publishPetMedicationPlanActivation(_ result: PetMedicationPlanActivationCommandResult, note: String)
-    func publishPetMedicationDose(_ result: PetMedicationDoseCommandResult, note: String)
-    func publishPetHygieneRecord(_ result: PetHygieneCheckInCommandResult, note: String)
     func publishPetHygieneDelete(_ result: PetHygieneDeleteCommandResult, note: String)
     func publishPetHygienePlan(_ result: PetHygienePlanCommandResult, note: String)
     func publishPetDocumentCreate(_ result: PetDocumentCommandResult, category: DocumentCategory, note: String)
@@ -159,17 +154,6 @@ final class SharedDomainRevisionPublisher: DomainRevisionPublishing {
         )
     }
 
-    func publishNoop(command: DomainCommand, affectedEntityIDs: Set<UUID>, note: String) {
-        center.publish(
-            DomainMutationResult(
-                command: command,
-                affectedEntityIDs: affectedEntityIDs,
-                wroteBusinessFact: false,
-                note: note
-            )
-        )
-    }
-
     func publishCoconutRewardFeedback(_ event: OhanaCoconutRewardEvent) {
         center.publishCoconutRewardFeedback(event)
     }
@@ -218,20 +202,12 @@ final class SharedDomainRevisionPublisher: DomainRevisionPublishing {
         center.publishMemberLifecycle(result, note: note)
     }
 
-    func publishPetCareRecord(_ result: PetCareTrackingCommandResult, note: String) {
-        center.publishPetCareRecord(result, note: note)
-    }
-
     func publishPetCareDelete(_ result: PetCareTrackingDeleteCommandResult, note: String) {
         center.publishPetCareDelete(result, note: note)
     }
 
     func publishPetPottyDelete(_ result: PetPottyDeleteCommandResult, note: String) {
         center.publishPetPottyDelete(result, note: note)
-    }
-
-    func publishCatCareRecord(_ result: CatCareCommandResult, note: String) {
-        center.publishCatCareRecord(result, note: note)
     }
 
     func publishCatCareUndo(_ result: CatCareUndoCommandResult, note: String) {
@@ -437,14 +413,6 @@ final class SharedDomainRevisionPublisher: DomainRevisionPublishing {
 
     func publishPetMedicationPlanActivation(_ result: PetMedicationPlanActivationCommandResult, note: String) {
         center.publishPetMedicationPlanActivation(result, note: note)
-    }
-
-    func publishPetMedicationDose(_ result: PetMedicationDoseCommandResult, note: String) {
-        center.publishPetMedicationDose(result, note: note)
-    }
-
-    func publishPetHygieneRecord(_ result: PetHygieneCheckInCommandResult, note: String) {
-        center.publishPetHygieneRecord(result, note: note)
     }
 
     func publishPetHygieneDelete(_ result: PetHygieneDeleteCommandResult, note: String) {

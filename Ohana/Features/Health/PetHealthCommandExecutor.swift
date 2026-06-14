@@ -116,10 +116,12 @@ struct PetHealthCommandExecutor {
         emptyNote: String = "pet.symptom.empty"
     ) -> PetSymptomCommandResult? {
         guard let result = PetSymptomCommandService.recordSymptom(pet: pet, input: input, context: context, careLedger: careLedger) else {
-            revisions.publishNoop(
-                command: .petHealthRecord(petID: pet.id, type: "symptom"),
-                affectedEntityIDs: [pet.id],
-                note: emptyNote
+            derivations.derive(
+                .noOp(
+                    command: .petHealthRecord(petID: pet.id, type: "symptom"),
+                    affectedEntityIDs: [pet.id],
+                    note: emptyNote
+                )
             )
             return nil
         }
@@ -134,10 +136,12 @@ struct PetHealthCommandExecutor {
         note: String
         ) -> PetHeatCycleCommandResult? {
         guard let result = PetHeatCycleCommandService.recordHeatCycle(pet: pet, input: input, context: context) else {
-            revisions.publishNoop(
-                command: .petHealthRecord(petID: pet.id, type: "heat"),
-                affectedEntityIDs: [pet.id],
-                note: "pet.health.readOnly"
+            derivations.derive(
+                .noOp(
+                    command: .petHealthRecord(petID: pet.id, type: "heat"),
+                    affectedEntityIDs: [pet.id],
+                    note: "pet.health.readOnly"
+                )
             )
             return nil
         }

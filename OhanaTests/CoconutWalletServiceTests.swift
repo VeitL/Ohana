@@ -704,6 +704,45 @@ final class CoconutWalletServiceTests: XCTestCase {
         XCTAssertTrue(try context.fetch(FetchDescriptor<CoconutLedgerEntry>()).isEmpty)
     }
 
+    func testWalletApplyRejectsFrozenRawMemberDeltaWithoutObjectReference() throws {
+        let container = try makeContainer()
+        let context = ModelContext(container)
+        let human = Human(name: "Guan")
+        human.coconutBalance = 20
+        human.passedAwayDate = Date()
+        context.insert(human)
+        try context.save()
+
+        XCTAssertThrowsError(
+            try CoconutWalletService.apply(
+                deltas: [
+                    CoconutWalletDelta(
+                        accountKey: CoconutAccountKey.human(human.id),
+                        ownerKind: .human,
+                        ownerId: human.id.uuidString,
+                        ownerName: human.name,
+                        cachedBalance: 20,
+                        delta: 1,
+                        entryKind: .reward,
+                        source: .service,
+                        title: "Raw frozen reward",
+                        transactionKey: "raw-frozen-human-reward"
+                    )
+                ],
+                context: context,
+                save: true,
+                postsRewardFeedback: false
+            )
+        ) { error in
+            guard case CoconutWalletError.walletFrozen = error else {
+                return XCTFail("Expected walletFrozen, got \(error)")
+            }
+        }
+
+        XCTAssertEqual(human.coconutBalance, 20)
+        XCTAssertTrue(try context.fetch(FetchDescriptor<CoconutLedgerEntry>()).isEmpty)
+    }
+
     private var defaultsSuiteName: String {
         "CoconutWalletServiceTests"
     }

@@ -59,10 +59,66 @@ final nonisolated class CareLedgerService {
             metadataJSON: metadataJSON
         )
         context.insert(event)
+        markModifiedForCloudSync(event, context: context, modifiedAt: occurredAt)
         if save {
             context.safeSave()
         }
         return event
+    }
+
+    private static func markModifiedForCloudSync(
+        _ event: CareLedgerEvent,
+        context: ModelContext,
+        modifiedAt: Date
+    ) {
+        let entityName = String(describing: CareLedgerEvent.self)
+        guard CloudSyncEntityRegistry.descriptor(for: entityName)?.uploadsToCloudKit == true else {
+            return
+        }
+        do {
+            try CloudSyncMetadataService.markModified(
+                entityName: entityName,
+                localRecordId: event.id,
+                householdId: sharedHouseholdId(context: context, now: modifiedAt) ?? event.id,
+                modifiedAt: modifiedAt,
+                context: context
+            )
+        } catch {
+            OhanaLog.warning(
+                "CareLedgerService failed to mark ledger event dirty: \(error.localizedDescription)",
+                category: "CloudSync"
+            )
+        }
+    }
+
+    private static func sharedHouseholdId(context: ModelContext, now: Date) -> UUID? {
+        do {
+            var descriptor = FetchDescriptor<Household>(
+                sortBy: [SortDescriptor(\.createdAt)]
+            )
+            descriptor.fetchLimit = 1
+            if let household = try context.fetch(descriptor).first {
+                return household.id
+            }
+
+            let household = Household()
+            household.createdAt = now
+            context.insert(household)
+            try CloudSyncMetadataService.markModified(
+                entityName: String(describing: Household.self),
+                localRecordId: household.id,
+                householdId: household.id,
+                modifiedAt: now,
+                context: context
+            )
+            return household.id
+        } catch {
+            OhanaLog.warning(
+                "CareLedgerService failed to resolve CloudSync household: \(error.localizedDescription)",
+                category: "CloudSync"
+            )
+            return nil
+        }
     }
 
     @MainActor

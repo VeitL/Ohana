@@ -532,10 +532,12 @@ struct CalendarCommandExecutor {
             context: context,
             reminderScheduling: reminderScheduling
         ) else {
-            revisions.publishNoop(
-                command: command,
-                affectedEntityIDs: [],
-                note: "calendar.event.create.empty"
+            derivations.derive(
+                .noOp(
+                    command: command,
+                    affectedEntityIDs: [],
+                    note: "calendar.event.create.empty"
+                )
             )
             return nil
         }

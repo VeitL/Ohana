@@ -217,7 +217,7 @@ protocol CareEventRecording {
         context: ModelContext,
         executorId: String?,
         date: Date
-    ) -> PetPottyLog
+    ) -> PetPottyLog?
 
     @discardableResult
     func recordPotty(

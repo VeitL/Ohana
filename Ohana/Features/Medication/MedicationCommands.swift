@@ -620,10 +620,12 @@ struct PetMedicationCommandExecutor {
             scheduleReminders: scheduleReminders,
             medicationReminders: medicationReminders
         ) else {
-            revisions.publishNoop(
-                command: .petMedicationPlan(petID: pet.id, medicationID: existingMedication?.id),
-                affectedEntityIDs: [pet.id],
-                note: emptyNote
+            derivations.derive(
+                .noOp(
+                    command: .petMedicationPlan(petID: pet.id, medicationID: existingMedication?.id),
+                    affectedEntityIDs: [pet.id],
+                    note: emptyNote
+                )
             )
             return nil
         }

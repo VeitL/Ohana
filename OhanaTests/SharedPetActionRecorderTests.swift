@@ -893,9 +893,10 @@ struct SharedPetActionRecorderTests {
         ))
 
         #expect(sessions.count == 1)
-        #expect(session.targetPetIds == [first.id.uuidString, second.id.uuidString])
-        #expect(session.stockOwnerPetId == first.id.uuidString)
-        #expect(session.totalAmountGrams == 120)
+        #expect(session.targetPetIds == [second.id.uuidString])
+        #expect(session.sourcePetId.isEmpty)
+        #expect(session.stockOwnerPetId.isEmpty)
+        #expect(session.totalAmountGrams == 60)
         #expect(feedLogs.count == 1)
         #expect(visibleLog.pet?.id == second.id)
         #expect(FeedStockCalculator.stockDeductionAmount(for: visibleLog, pet: second, sharedCareSessions: sessions) == 0)
@@ -1026,13 +1027,13 @@ struct SharedPetActionRecorderTests {
         let cleanup = isolateEconomy(activeHumanID: nil)
         defer { cleanup() }
 
-        let log = CareEventService.recordUnknownSharedPotty(
+        let log = try #require(CareEventService.recordUnknownSharedPotty(
             sourcePet: first,
             targets: [first, second],
             type: .softPoop,
             context: context,
             date: Date(timeIntervalSince1970: 3000)
-        )
+        ))
 
         let result = PetPottyCommandService.claimUnknownPottyLog(log, pet: second, context: context)
         let sessions = try context.fetch(FetchDescriptor<SharedCareSession>())
@@ -1058,13 +1059,13 @@ struct SharedPetActionRecorderTests {
         let cleanup = isolateEconomy(activeHumanID: nil)
         defer { cleanup() }
 
-        let log = CareEventService.recordUnknownSharedPotty(
+        let log = try #require(CareEventService.recordUnknownSharedPotty(
             sourcePet: first,
             targets: [first, second],
             type: .softPoop,
             context: context,
             date: Date(timeIntervalSince1970: 3000)
-        )
+        ))
 
         let sessions = try context.fetch(FetchDescriptor<SharedCareSession>())
         let pottyLogs = try context.fetch(FetchDescriptor<PetPottyLog>())
@@ -1081,6 +1082,30 @@ struct SharedPetActionRecorderTests {
         #expect(ledgerEvents.allSatisfy { !$0.note.contains("ohana_shared_") })
         #expect(first.coconutBalance == 0)
         #expect(second.coconutBalance == 0)
+    }
+
+    @Test func unknownSharedPottyNoopReturnsNilWithoutDetachedFact() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let source = Pet(name: "Milo", species: "猫")
+        source.passedAwayDate = Date(timeIntervalSinceReferenceDate: 1)
+        let target = Pet(name: "Luna", species: "猫")
+        context.insert(source)
+        context.insert(target)
+        try context.save()
+
+        let log = CareEventService.recordUnknownSharedPotty(
+            sourcePet: source,
+            targets: [target],
+            type: .softPoop,
+            context: context,
+            date: Date(timeIntervalSinceReferenceDate: 3000)
+        )
+
+        #expect(log?.id == nil)
+        #expect(try context.fetch(FetchDescriptor<SharedCareSession>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<PetPottyLog>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<CareLedgerEvent>()).isEmpty)
     }
 
     @Test func sharedEnvironmentExpenseAndWalkUseUnifiedSessionProjection() throws {

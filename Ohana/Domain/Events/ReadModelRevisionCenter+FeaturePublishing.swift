@@ -23,24 +23,6 @@ extension ReadModelRevisionCenter {
         )
     }
 
-    func publishPetCareRecord(_ result: PetCareTrackingCommandResult, note: String) {
-        var affected: Set<UUID> = [result.petID]
-        if result.didRecord {
-            affected.insert(result.careLogID)
-        }
-        if result.didRecord, let linkedPottyLogID = result.linkedPottyLogID {
-            affected.insert(linkedPottyLogID)
-        }
-        publish(
-            DomainMutationResult(
-                command: .petCareRecord(petID: result.petID, type: result.careType.rawValue),
-                affectedEntityIDs: affected,
-                wroteBusinessFact: result.didRecord,
-                note: note
-            )
-        )
-    }
-
     func publishPetCareDelete(_ result: PetCareTrackingDeleteCommandResult, note: String) {
         var affected = Set(result.removedLedgerEventIDs)
         affected.insert(result.petID)
@@ -67,21 +49,6 @@ extension ReadModelRevisionCenter {
                 command: .petPottyDelete(petID: result.petID, logID: result.logID),
                 affectedEntityIDs: affected,
                 wroteBusinessFact: true,
-                note: note
-            )
-        )
-    }
-
-    func publishCatCareRecord(_ result: CatCareCommandResult, note: String) {
-        var affected: Set<UUID> = result.didRecord ? [result.petID, result.eventID] : [result.petID]
-        if let hygieneLogID = result.hygieneLogID {
-            affected.insert(hygieneLogID)
-        }
-        publish(
-            DomainMutationResult(
-                command: .catCareRecord(petID: result.petID, action: result.actionRaw),
-                affectedEntityIDs: affected,
-                wroteBusinessFact: result.didRecord,
                 note: note
             )
         )
@@ -517,17 +484,6 @@ extension ReadModelRevisionCenter {
         )
     }
 
-    func publishPetMedicationDose(_ result: PetMedicationDoseCommandResult, note: String) {
-        publish(
-            DomainMutationResult(
-                command: .medicationDose(petID: result.subjectID, medicationID: result.medicationID),
-                affectedEntityIDs: [result.subjectID, result.medicationID, result.eventID],
-                wroteBusinessFact: result.didRecord,
-                note: note
-            )
-        )
-    }
-
     func publishPetHealthRecord(_ result: PetHealthCommandResult, type: String, note: String) {
         var affected: Set<UUID> = [result.subjectID, result.logID]
         if let expenseLogID = result.expenseLogID {
@@ -577,18 +533,6 @@ extension ReadModelRevisionCenter {
                 command: .petHealthDelete(petID: result.subjectID, kind: result.kind, recordID: result.recordID),
                 affectedEntityIDs: [result.subjectID, result.recordID],
                 wroteBusinessFact: result.didDelete,
-                note: note
-            )
-        )
-    }
-
-    func publishPetHygieneRecord(_ result: PetHygieneCheckInCommandResult, note: String) {
-        let affected: Set<UUID> = result.didRecord ? [result.subjectID, result.logID] : [result.subjectID]
-        publish(
-            DomainMutationResult(
-                command: .petHygieneRecord(petID: result.subjectID, type: result.hygieneType.rawValue),
-                affectedEntityIDs: affected,
-                wroteBusinessFact: result.didRecord,
                 note: note
             )
         )

@@ -217,6 +217,7 @@ enum HumanNoteCommandService {
 struct HumanCareCommandExecutor {
     let context: ModelContext
     let revisions: DomainRevisionPublishing
+    private let derivations: CareDerivationExecutor
     let careLedger: CareLedgerRecording
     let reminderScheduling: ReminderSchedulingManaging
     let medicationReminders: MedicationReminderManaging
@@ -262,6 +263,7 @@ struct HumanCareCommandExecutor {
     ) {
         self.context = context
         self.revisions = revisions
+        derivations = CareDerivationExecutor(revisions: revisions)
         self.careLedger = careLedger
         self.reminderScheduling = reminderScheduling
         self.medicationReminders = medicationReminders
@@ -334,10 +336,12 @@ struct HumanCareCommandExecutor {
             reminderEnabled: reminderEnabled,
             medicationReminders: medicationReminders
         ) else {
-            revisions.publishNoop(
-                command: .quickHumanMedication(humanID: human.id),
-                affectedEntityIDs: [human.id],
-                note: emptyNote
+            derivations.derive(
+                .noOp(
+                    command: .quickHumanMedication(humanID: human.id),
+                    affectedEntityIDs: [human.id],
+                    note: emptyNote
+                )
             )
             return nil
         }
@@ -362,10 +366,12 @@ struct HumanCareCommandExecutor {
             scheduleReminders: scheduleReminders,
             medicationReminders: medicationReminders
         ) else {
-            revisions.publishNoop(
-                command: .humanMedicationPlan(humanID: human.id, medicationID: existingMedication?.id),
-                affectedEntityIDs: [human.id],
-                note: emptyNote
+            derivations.derive(
+                .noOp(
+                    command: .humanMedicationPlan(humanID: human.id, medicationID: existingMedication?.id),
+                    affectedEntityIDs: [human.id],
+                    note: emptyNote
+                )
             )
             return nil
         }
@@ -466,10 +472,12 @@ struct HumanCareCommandExecutor {
             notes: notes,
             context: context
         ) else {
-            revisions.publishNoop(
-                command: .humanHealthMetric(humanID: human.id, metricKey: metricKey),
-                affectedEntityIDs: [human.id],
-                note: emptyNote
+            derivations.derive(
+                .noOp(
+                    command: .humanHealthMetric(humanID: human.id, metricKey: metricKey),
+                    affectedEntityIDs: [human.id],
+                    note: emptyNote
+                )
             )
             return nil
         }
@@ -513,10 +521,12 @@ struct HumanCareCommandExecutor {
             scheduleNotification: scheduleNotification,
             reminderScheduling: reminderScheduling
         ) else {
-            revisions.publishNoop(
-                command: .humanNote(humanID: human.id),
-                affectedEntityIDs: [human.id],
-                note: emptyNote
+            derivations.derive(
+                .noOp(
+                    command: .humanNote(humanID: human.id),
+                    affectedEntityIDs: [human.id],
+                    note: emptyNote
+                )
             )
             return nil
         }

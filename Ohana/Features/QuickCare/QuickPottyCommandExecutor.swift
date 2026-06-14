@@ -166,14 +166,17 @@ struct QuickPottyCommandExecutor {
             return nil
         }
         let targets = fetchTargets(sourcePet: sourcePet, targetIDs: targetIDs)
-        let log = careEvents.recordUnknownSharedPotty(
+        guard let log = careEvents.recordUnknownSharedPotty(
             sourcePet: sourcePet,
             targets: targets,
             type: type,
             context: context,
             executorId: executorId,
             date: date
-        )
+        ) else {
+            deriveNoop(petID: sourcePet.id, action: "unknownSharedPotty", note: "quickPotty.unknown.factNoop")
+            return nil
+        }
         let derivation = derive(
             petID: sourcePet.id,
             action: "unknownSharedPotty",

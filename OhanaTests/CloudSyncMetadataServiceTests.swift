@@ -2526,6 +2526,51 @@ struct CloudSyncMetadataServiceTests {
     }
 
     @MainActor
+    @Test func recordApplierReplaysRemoteCoconutLedgerIntoWalletProjection() throws {
+        let container = try makeContainer()
+        let context = ModelContext(container)
+        let householdId = uuid("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")
+        let humanId = uuid("77777777-7777-4777-8777-777777777777")
+        let ledgerId = uuid("88888888-8888-4888-8888-888888888888")
+        let human = Human(name: "Guan")
+        human.id = humanId
+        context.insert(human)
+
+        let record = try makeRecordPayload(
+            entityName: String(describing: CoconutLedgerEntry.self),
+            recordType: String(describing: CoconutLedgerEntry.self),
+            localRecordId: ledgerId,
+            householdId: householdId,
+            fields: [
+                "transactionKey": .string("remote-ledger-reward"),
+                "accountKey": .string(CoconutAccountKey.human(humanId)),
+                "ownerKindRaw": .string(CoconutWalletOwnerKind.human.rawValue),
+                "ownerId": .string(normalized(humanId)),
+                "ownerName": .string("Guan"),
+                "delta": .int(7),
+                "balanceBefore": .int(0),
+                "balanceAfter": .int(7),
+                "affectsBalance": .bool(true),
+                "entryKindRaw": .string(CoconutWalletEntryKind.reward.rawValue),
+                "sourceRaw": .string(CoconutWalletSource.careEvent.rawValue),
+                "title": .string("Remote care reward"),
+                "emoji": .string("coconut"),
+                "subjectKindRaw": .string(CareLedgerSubjectKind.human.rawValue),
+                "subjectId": .string(normalized(humanId)),
+                "occurredAt": .date(Date(timeIntervalSinceReferenceDate: 2500)),
+                "createdAt": .date(Date(timeIntervalSinceReferenceDate: 2501))
+            ]
+        ).makeCKRecord()
+
+        let result = try CloudSyncRecordApplier.apply(record, context: context)
+        let accounts = try context.fetch(FetchDescriptor<CoconutAccount>())
+
+        #expect(result == .inserted(entityName: "CoconutLedgerEntry", localRecordId: normalized(ledgerId)))
+        #expect(accounts.first { $0.accountKey == CoconutAccountKey.human(humanId) }?.balance == 7)
+        #expect(human.coconutBalance == 7)
+    }
+
+    @MainActor
     @Test func recordApplierInsertsAndUpdatesRemoteFeedingScheduleAndFoodRecord() throws {
         let container = try makeContainer()
         let context = ModelContext(container)

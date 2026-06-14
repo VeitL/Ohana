@@ -311,6 +311,24 @@ enum CloudSyncMutationRecorder {
 
     @discardableResult
     static func markDeleted(
+        _ entry: CoconutLedgerEntry,
+        context: ModelContext,
+        deletedAt: Date = Date(),
+        deletedByHumanId: String? = nil
+    ) -> CloudSyncRecordState? {
+        markDeleted(
+            entityName: String(describing: CoconutLedgerEntry.self),
+            localRecordId: entry.id,
+            householdId: sharedHouseholdId(context: context, now: deletedAt),
+            fallbackHouseholdId: entry.id,
+            deletedAt: deletedAt,
+            deletedByHumanId: uuid(from: deletedByHumanId),
+            context: context
+        )
+    }
+
+    @discardableResult
+    static func markDeleted(
         _ event: EconomyBudgetUsageEvent,
         context: ModelContext,
         deletedAt: Date = Date(),
