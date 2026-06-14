@@ -973,6 +973,57 @@ struct CloudSyncMetadataServiceTests {
     }
 
     @MainActor
+    @Test func uploadBatchBuilderBuildsDirtyPayloadsForRegisteredGachaAndShopEntities() throws {
+        let container = try makeContainer()
+        let context = ModelContext(container)
+        let household = Household(name: "Shared Home")
+        household.id = uuid("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")
+        let ownerId = uuid("77777777-7777-4777-8777-777777777777")
+        let ownedItem = GachaOwnedItem(
+            ownerHumanId: ownerId.uuidString,
+            seriesId: GachaSeriesCatalog.defaultSeriesId,
+            itemId: "plush_coconut_sleepy",
+            rarity: .common,
+            ownedCount: 2,
+            firstObtainedAt: Date(timeIntervalSinceReferenceDate: 10),
+            latestObtainedAt: Date(timeIntervalSinceReferenceDate: 20)
+        )
+        ownedItem.id = uuid("88888888-8888-4888-8888-888888888888")
+        let drawLog = GachaDrawLog(
+            ownerHumanId: ownerId.uuidString,
+            ownerName: "Guan",
+            seriesId: GachaSeriesCatalog.defaultSeriesId,
+            itemId: "plush_coconut_sleepy",
+            rarity: .common,
+            isNew: true,
+            drawDate: Date(timeIntervalSinceReferenceDate: 30)
+        )
+        drawLog.id = uuid("99999999-9999-4999-8999-999999999999")
+        let purchase = ShopPurchaseRecord(
+            id: uuid("66666666-6666-4666-8666-666666666666"),
+            transactionKey: "shop:fx_lime_glow:\(ownerId.uuidString)",
+            itemId: "fx_lime_glow",
+            buyerHumanId: ownerId.uuidString,
+            purchasedAt: Date(timeIntervalSinceReferenceDate: 40)
+        )
+        context.insert(household)
+        context.insert(ownedItem)
+        context.insert(drawLog)
+        context.insert(purchase)
+
+        CloudSyncMutationRecorder.markModified(ownedItem, context: context, modifiedAt: Date(timeIntervalSinceReferenceDate: 100))
+        CloudSyncMutationRecorder.markModified(drawLog, context: context, modifiedAt: Date(timeIntervalSinceReferenceDate: 110))
+        CloudSyncMutationRecorder.markModified(purchase, context: context, modifiedAt: Date(timeIntervalSinceReferenceDate: 120))
+
+        let payloads = try CloudSyncUploadBatchBuilder.dirtyPayloads(context: context)
+
+        #expect(payloads.map(\.entityName) == ["GachaOwnedItem", "GachaDrawLog", "ShopPurchaseRecord"])
+        #expect(payloads.first { $0.entityName == "GachaOwnedItem" }?.fields["ownerHumanId"]?.stringValue == ownerId.uuidString)
+        #expect(payloads.first { $0.entityName == "GachaDrawLog" }?.fields["ownerHumanId"]?.stringValue == ownerId.uuidString)
+        #expect(payloads.first { $0.entityName == "ShopPurchaseRecord" }?.fields["buyerHumanId"]?.stringValue == ownerId.uuidString)
+    }
+
+    @MainActor
     @Test func uploadBatchBuilderDoesNotFetchLocalModelForTombstone() throws {
         let container = try makeContainer()
         let context = ModelContext(container)
@@ -2967,6 +3018,625 @@ struct CloudSyncMetadataServiceTests {
     }
 
     @MainActor
+    @Test func recordApplierRemotePetTombstoneCascadesDerivedState() throws {
+        let container = try makeContainer()
+        let context = ModelContext(container)
+        let petId = uuid("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb")
+        let survivorId = uuid("cccccccc-cccc-4ccc-8ccc-cccccccccccc")
+        let householdId = uuid("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")
+        let deletedAt = Date(timeIntervalSinceReferenceDate: 4100)
+        let pet = Pet(name: "Milo", species: "cat")
+        pet.id = petId
+        let survivor = Pet(name: "Luna", species: "cat")
+        survivor.id = survivorId
+        let session = SharedCareSession(
+            date: Date(timeIntervalSinceReferenceDate: 100),
+            actionKind: .feeding,
+            sourcePetId: pet.id.uuidString,
+            targetPetIds: [pet.id.uuidString, survivor.id.uuidString],
+            species: "cat",
+            totalAmountGrams: 120,
+            stockOwnerPetId: pet.id.uuidString
+        )
+        let deletedLog = PetCareLog(
+            date: session.date,
+            type: .feeding,
+            amountGrams: 60,
+            sharedSessionId: session.id.uuidString,
+            pet: pet
+        )
+        let survivorLog = PetCareLog(
+            date: session.date,
+            type: .feeding,
+            amountGrams: 60,
+            sharedSessionId: session.id.uuidString,
+            pet: survivor
+        )
+        let account = CoconutAccount(
+            accountKey: CoconutAccountKey.pet(pet.id),
+            ownerKind: .pet,
+            ownerId: pet.id.uuidString,
+            displayName: pet.name,
+            balance: 12
+        )
+        let walletEntry = CoconutLedgerEntry(
+            transactionKey: "remote-delete-pet-wallet-entry",
+            accountKey: CoconutAccountKey.pet(pet.id),
+            ownerKind: .pet,
+            ownerId: pet.id.uuidString,
+            ownerName: pet.name,
+            delta: 12,
+            balanceBefore: 0,
+            balanceAfter: 12,
+            entryKind: .reward,
+            source: .careEvent,
+            title: "Reward",
+            emoji: "coconut",
+            subjectKind: .pet,
+            subjectId: pet.id.uuidString,
+            sourceModelName: "PetCareLog",
+            sourceModelId: deletedLog.id.uuidString
+        )
+        let careLedger = CareLedgerEvent(
+            occurredAt: session.date,
+            actorKind: .unknown,
+            subjectKind: .pet,
+            subjectId: pet.id.uuidString,
+            eventKind: .care,
+            actionType: CareType.feeding.rawValue,
+            source: .quickAction,
+            legacyModelName: "PetCareLog",
+            legacyModelId: deletedLog.id.uuidString
+        )
+        context.insert(pet)
+        context.insert(survivor)
+        context.insert(session)
+        context.insert(deletedLog)
+        context.insert(survivorLog)
+        context.insert(account)
+        context.insert(walletEntry)
+        context.insert(careLedger)
+        try context.save()
+
+        let record = try makeRecordPayload(
+            entityName: String(describing: Pet.self),
+            recordType: String(describing: Pet.self),
+            localRecordId: petId,
+            householdId: householdId,
+            isDeleted: true,
+            lastModifiedAt: deletedAt,
+            fields: [CloudSyncRecordFieldKey.deletedAt: .date(deletedAt)]
+        ).makeCKRecord()
+
+        let result = try CloudSyncRecordApplier.apply(record, context: context)
+
+        let sessions = try context.fetch(FetchDescriptor<SharedCareSession>())
+        let accounts = try context.fetch(FetchDescriptor<CoconutAccount>())
+        let walletEntries = try context.fetch(FetchDescriptor<CoconutLedgerEntry>())
+        let careLedgers = try context.fetch(FetchDescriptor<CareLedgerEvent>())
+        let careLogs = try context.fetch(FetchDescriptor<PetCareLog>())
+        #expect(result == .deleted(entityName: "Pet", localRecordId: normalized(petId)))
+        #expect(try fetchPet(id: petId, context: context) == nil)
+        #expect(accounts.allSatisfy { $0.ownerId != pet.id.uuidString })
+        #expect(walletEntries.allSatisfy { $0.ownerId != pet.id.uuidString && $0.subjectId != pet.id.uuidString })
+        #expect(careLedgers.allSatisfy { $0.subjectId != pet.id.uuidString && $0.legacyModelId != deletedLog.id.uuidString })
+        #expect(careLogs.allSatisfy { $0.pet?.id != pet.id })
+        #expect(careLogs.contains { $0.pet?.id == survivor.id })
+        #expect(sessions.allSatisfy { session in
+            !session.targetPetIds.contains(pet.id.uuidString)
+                && session.sourcePetId != pet.id.uuidString
+                && session.stockOwnerPetId != pet.id.uuidString
+        })
+        #expect(CoconutWalletService.totalBalance(context: context) == 0)
+    }
+
+    @MainActor
+    @Test func recordApplierRemoteLedgerTombstoneReplaysWalletProjection() throws {
+        let container = try makeContainer()
+        let context = ModelContext(container)
+        let humanId = uuid("22222222-2222-4222-8222-222222222222")
+        let householdId = uuid("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")
+        let ledgerId = uuid("dddddddd-dddd-4ddd-8ddd-dddddddddddd")
+        let deletedAt = Date(timeIntervalSinceReferenceDate: 4200)
+        let human = Human(name: "Avery")
+        human.id = humanId
+        human.coconutBalance = 10
+        let account = CoconutAccount(
+            accountKey: CoconutAccountKey.human(human.id),
+            ownerKind: .human,
+            ownerId: human.id.uuidString,
+            displayName: human.name,
+            balance: 10
+        )
+        let entry = CoconutLedgerEntry(
+            id: ledgerId,
+            transactionKey: "remote-ledger-delete",
+            accountKey: CoconutAccountKey.human(human.id),
+            ownerKind: .human,
+            ownerId: human.id.uuidString,
+            ownerName: human.name,
+            delta: 10,
+            balanceBefore: 0,
+            balanceAfter: 10,
+            entryKind: .reward,
+            source: .careEvent,
+            title: "Reward",
+            emoji: "coconut",
+            occurredAt: Date(timeIntervalSinceReferenceDate: 100)
+        )
+        context.insert(human)
+        context.insert(account)
+        context.insert(entry)
+        try context.save()
+
+        let record = try makeRecordPayload(
+            entityName: String(describing: CoconutLedgerEntry.self),
+            recordType: String(describing: CoconutLedgerEntry.self),
+            localRecordId: ledgerId,
+            householdId: householdId,
+            isDeleted: true,
+            lastModifiedAt: deletedAt,
+            fields: [CloudSyncRecordFieldKey.deletedAt: .date(deletedAt)]
+        ).makeCKRecord()
+
+        let result = try CloudSyncRecordApplier.apply(record, context: context)
+
+        #expect(result == .deleted(entityName: "CoconutLedgerEntry", localRecordId: normalized(ledgerId)))
+        #expect(try context.fetch(FetchDescriptor<CoconutLedgerEntry>()).isEmpty)
+        #expect(account.balance == 0)
+        #expect(human.coconutBalance == 0)
+    }
+
+    @MainActor
+    @Test func recordApplierRemoteEventTombstoneCancelsReminderBoundary() throws {
+        let container = try makeContainer()
+        let context = ModelContext(container)
+        let eventId = uuid("11111111-1111-4111-8111-111111111111")
+        let householdId = uuid("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")
+        let deletedAt = Date(timeIntervalSinceReferenceDate: 4300)
+        let event = Event(
+            title: "Vet visit",
+            startDate: Date(timeIntervalSinceReferenceDate: 100),
+            eventType: EventType.vetVisit.rawValue
+        )
+        event.id = eventId
+        let reminder = Reminder(event: event, scheduledAt: Date(timeIntervalSinceReferenceDate: 90))
+        reminder.id = uuid("22222222-2222-4222-8222-222222222222")
+        reminder.notificationId = "remote-event-reminder"
+        event.reminders = [reminder]
+        context.insert(event)
+        context.insert(reminder)
+        try context.save()
+
+        let scheduler = CapturingReminderNotificationScheduler()
+        OhanaNotifications.current = scheduler
+        defer { OhanaNotifications.useLive() }
+        let record = try makeRecordPayload(
+            entityName: String(describing: Event.self),
+            recordType: String(describing: Event.self),
+            localRecordId: eventId,
+            householdId: householdId,
+            isDeleted: true,
+            lastModifiedAt: deletedAt,
+            fields: [CloudSyncRecordFieldKey.deletedAt: .date(deletedAt)]
+        ).makeCKRecord()
+
+        let result = try CloudSyncRecordApplier.apply(record, context: context)
+
+        #expect(result == .deleted(entityName: "Event", localRecordId: normalized(eventId)))
+        #expect(try fetchEvent(id: eventId, context: context) == nil)
+        #expect(try fetchReminder(id: reminder.id, context: context) == nil)
+        #expect(scheduler.cancelledNotificationIds == ["remote-event-reminder"])
+    }
+
+    @MainActor
+    @Test func recordApplierRemoteSharedCareSessionTombstoneCascadesChildrenAndLedger() throws {
+        let container = try makeContainer()
+        let context = ModelContext(container)
+        let householdId = uuid("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")
+        let sessionId = uuid("11111111-1111-4111-8111-111111111111")
+        let petId = uuid("22222222-2222-4222-8222-222222222222")
+        let careLogId = uuid("33333333-3333-4333-8333-333333333333")
+        let expenseLogId = uuid("44444444-4444-4444-8444-444444444444")
+        let ledgerId = uuid("55555555-5555-4555-8555-555555555555")
+        let stockEventId = uuid("66666666-6666-4666-8666-666666666666")
+        let stockReminderId = uuid("77777777-7777-4777-8777-777777777777")
+        let deletedAt = Date(timeIntervalSinceReferenceDate: 4400)
+        let pet = Pet(name: "Momo")
+        pet.id = petId
+        pet.dailyPortionGrams = 100
+        pet.foodReminderEnabled = true
+        pet.foodReminderAdvanceDays = 2
+        let session = SharedCareSession(
+            date: Date(timeIntervalSinceReferenceDate: 120),
+            actionKind: .feeding,
+            sourcePetId: pet.id.uuidString,
+            targetPetIds: [pet.id.uuidString],
+            primaryLegacyModelName: String(describing: PetCareLog.self),
+            primaryLegacyModelId: careLogId.uuidString
+        )
+        session.id = sessionId
+        let careLog = PetCareLog(
+            date: session.date,
+            type: .feeding,
+            amountGrams: 40,
+            sharedSessionId: session.id.uuidString,
+            pet: pet
+        )
+        careLog.id = careLogId
+        let expense = PetExpenseLog(
+            date: session.date,
+            amount: 12,
+            category: .other,
+            note: "Shared supplies",
+            pet: pet,
+            sharedSessionId: session.id.uuidString
+        )
+        expense.id = expenseLogId
+        let ledger = CareLedgerEvent(
+            id: ledgerId,
+            occurredAt: session.date,
+            actorKind: .unknown,
+            subjectKind: .pet,
+            subjectId: pet.id.uuidString,
+            eventKind: .care,
+            actionType: CareType.feeding.rawValue,
+            source: .quickAction,
+            legacyModelName: String(describing: PetCareLog.self),
+            legacyModelId: careLog.id.uuidString
+        )
+        let staleEvent = Event(
+            title: "Old stock reminder",
+            startDate: Date(timeIntervalSinceReferenceDate: 900),
+            eventType: EventType.shoppingList.rawValue,
+            relatedEntityType: FeedingPlanWriter.stockReminderEntityType,
+            relatedEntityId: FeedingPlanWriter.stockReminderEntityId(pet: pet, foodKind: .dry)
+        )
+        staleEvent.id = stockEventId
+        staleEvent.foodKindRaw = FeedFoodKind.dry.rawValue
+        let staleReminder = Reminder(event: staleEvent, scheduledAt: staleEvent.startDate)
+        staleReminder.id = stockReminderId
+        staleReminder.notificationId = "remote-shared-stock-reminder"
+        staleEvent.reminders = [staleReminder]
+        context.insert(pet)
+        context.insert(session)
+        context.insert(careLog)
+        context.insert(expense)
+        context.insert(ledger)
+        context.insert(staleEvent)
+        context.insert(staleReminder)
+        try context.save()
+
+        let scheduler = CapturingReminderNotificationScheduler()
+        OhanaNotifications.current = scheduler
+        defer { OhanaNotifications.useLive() }
+        let record = try makeRecordPayload(
+            entityName: String(describing: SharedCareSession.self),
+            recordType: String(describing: SharedCareSession.self),
+            localRecordId: sessionId,
+            householdId: householdId,
+            isDeleted: true,
+            lastModifiedAt: deletedAt,
+            fields: [CloudSyncRecordFieldKey.deletedAt: .date(deletedAt)]
+        ).makeCKRecord()
+
+        let result = try CloudSyncRecordApplier.apply(record, context: context)
+
+        #expect(result == .deleted(entityName: "SharedCareSession", localRecordId: normalized(sessionId)))
+        #expect(try fetchSharedCareSession(id: sessionId, context: context) == nil)
+        #expect(try fetchPetCareLog(id: careLogId, context: context) == nil)
+        #expect(try fetchPetExpenseLog(id: expenseLogId, context: context) == nil)
+        #expect(try fetchCareLedgerEvent(id: ledgerId, context: context) == nil)
+        #expect(try fetchEvent(id: stockEventId, context: context) == nil)
+        #expect(try fetchReminder(id: stockReminderId, context: context) == nil)
+        #expect(scheduler.cancelledNotificationIds == ["remote-shared-stock-reminder"])
+    }
+
+    @MainActor
+    @Test func recordApplierRemotePetCareLogTombstoneReconcilesLedgerAndSharedSession() throws {
+        let container = try makeContainer()
+        let context = ModelContext(container)
+        let householdId = uuid("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")
+        let sessionId = uuid("11111111-1111-4111-8111-111111111111")
+        let petId = uuid("22222222-2222-4222-8222-222222222222")
+        let careLogId = uuid("33333333-3333-4333-8333-333333333333")
+        let ledgerId = uuid("44444444-4444-4444-8444-444444444444")
+        let deletedAt = Date(timeIntervalSinceReferenceDate: 4500)
+        let pet = Pet(name: "Momo")
+        pet.id = petId
+        let session = SharedCareSession(
+            date: Date(timeIntervalSinceReferenceDate: 130),
+            actionKind: .feeding,
+            sourcePetId: pet.id.uuidString,
+            targetPetIds: [pet.id.uuidString],
+            primaryLegacyModelName: String(describing: PetCareLog.self),
+            primaryLegacyModelId: careLogId.uuidString
+        )
+        session.id = sessionId
+        let careLog = PetCareLog(
+            date: session.date,
+            type: .feeding,
+            amountGrams: 40,
+            sharedSessionId: session.id.uuidString,
+            pet: pet
+        )
+        careLog.id = careLogId
+        let ledger = CareLedgerEvent(
+            id: ledgerId,
+            occurredAt: session.date,
+            actorKind: .unknown,
+            subjectKind: .pet,
+            subjectId: pet.id.uuidString,
+            eventKind: .care,
+            actionType: CareType.feeding.rawValue,
+            source: .quickAction,
+            legacyModelName: String(describing: PetCareLog.self),
+            legacyModelId: careLog.id.uuidString
+        )
+        context.insert(pet)
+        context.insert(session)
+        context.insert(careLog)
+        context.insert(ledger)
+        try context.save()
+
+        let record = try makeRecordPayload(
+            entityName: String(describing: PetCareLog.self),
+            recordType: String(describing: PetCareLog.self),
+            localRecordId: careLogId,
+            householdId: householdId,
+            isDeleted: true,
+            lastModifiedAt: deletedAt,
+            fields: [CloudSyncRecordFieldKey.deletedAt: .date(deletedAt)]
+        ).makeCKRecord()
+
+        let result = try CloudSyncRecordApplier.apply(record, context: context)
+
+        #expect(result == .deleted(entityName: "PetCareLog", localRecordId: normalized(careLogId)))
+        #expect(try fetchPetCareLog(id: careLogId, context: context) == nil)
+        #expect(try fetchCareLedgerEvent(id: ledgerId, context: context) == nil)
+        #expect(try fetchSharedCareSession(id: sessionId, context: context) == nil)
+    }
+
+    @MainActor
+    @Test func recordApplierRemoteFeedingLogTombstoneRebuildsStockReminder() throws {
+        let container = try makeContainer()
+        let context = ModelContext(container)
+        let householdId = uuid("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")
+        let petId = uuid("11111111-1111-4111-8111-111111111111")
+        let careLogId = uuid("22222222-2222-4222-8222-222222222222")
+        let stockEventId = uuid("33333333-3333-4333-8333-333333333333")
+        let stockReminderId = uuid("44444444-4444-4444-8444-444444444444")
+        let deletedAt = Date(timeIntervalSinceReferenceDate: 4550)
+        let pet = Pet(name: "Momo")
+        pet.id = petId
+        pet.dailyPortionGrams = 100
+        pet.foodReminderEnabled = true
+        pet.foodReminderAdvanceDays = 2
+        let foodRecord = PetFoodRecord(
+            brand: "Dry stock",
+            dailyGrams: 100,
+            totalGrams: 1000,
+            foodKind: .dry,
+            startDate: Date(timeIntervalSinceReferenceDate: 100),
+            pet: pet
+        )
+        let careLog = PetCareLog(
+            date: Date(timeIntervalSinceReferenceDate: 200),
+            type: .feeding,
+            amountGrams: 40,
+            foodKind: .dry,
+            pet: pet
+        )
+        careLog.id = careLogId
+        let staleEvent = Event(
+            title: "Old stock reminder",
+            startDate: Date(timeIntervalSinceReferenceDate: 900),
+            eventType: EventType.shoppingList.rawValue,
+            relatedEntityType: FeedingPlanWriter.stockReminderEntityType,
+            relatedEntityId: FeedingPlanWriter.stockReminderEntityId(pet: pet, foodKind: .dry)
+        )
+        staleEvent.id = stockEventId
+        staleEvent.foodKindRaw = FeedFoodKind.dry.rawValue
+        let staleReminder = Reminder(event: staleEvent, scheduledAt: staleEvent.startDate)
+        staleReminder.id = stockReminderId
+        staleReminder.notificationId = "remote-feed-stock-reminder"
+        staleEvent.reminders = [staleReminder]
+        context.insert(pet)
+        context.insert(foodRecord)
+        context.insert(careLog)
+        context.insert(staleEvent)
+        context.insert(staleReminder)
+        try context.save()
+
+        let scheduler = CapturingReminderNotificationScheduler()
+        OhanaNotifications.current = scheduler
+        defer { OhanaNotifications.useLive() }
+        let record = try makeRecordPayload(
+            entityName: String(describing: PetCareLog.self),
+            recordType: String(describing: PetCareLog.self),
+            localRecordId: careLogId,
+            householdId: householdId,
+            isDeleted: true,
+            lastModifiedAt: deletedAt,
+            fields: [CloudSyncRecordFieldKey.deletedAt: .date(deletedAt)]
+        ).makeCKRecord()
+
+        let result = try CloudSyncRecordApplier.apply(record, context: context)
+
+        #expect(result == .deleted(entityName: "PetCareLog", localRecordId: normalized(careLogId)))
+        #expect(try fetchPetCareLog(id: careLogId, context: context) == nil)
+        #expect(try fetchEvent(id: stockEventId, context: context) == nil)
+        #expect(try fetchReminder(id: stockReminderId, context: context) == nil)
+        #expect(scheduler.cancelledNotificationIds == ["remote-feed-stock-reminder"])
+    }
+
+    @MainActor
+    @Test func recordApplierRemotePetFoodRecordTombstoneRebuildsStockReminder() throws {
+        let container = try makeContainer()
+        let context = ModelContext(container)
+        let householdId = uuid("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")
+        let petId = uuid("55555555-5555-4555-8555-555555555555")
+        let foodRecordId = uuid("66666666-6666-4666-8666-666666666666")
+        let stockEventId = uuid("77777777-7777-4777-8777-777777777777")
+        let stockReminderId = uuid("88888888-8888-4888-8888-888888888888")
+        let deletedAt = Date(timeIntervalSinceReferenceDate: 4560)
+        let pet = Pet(name: "Momo")
+        pet.id = petId
+        pet.dailyPortionGrams = 100
+        pet.foodReminderEnabled = true
+        pet.foodReminderAdvanceDays = 2
+        let foodRecord = PetFoodRecord(
+            brand: "Dry stock",
+            dailyGrams: 100,
+            totalGrams: 1000,
+            foodKind: .dry,
+            startDate: Date(timeIntervalSinceReferenceDate: 100),
+            pet: pet
+        )
+        foodRecord.id = foodRecordId
+        let staleEvent = Event(
+            title: "Old stock reminder",
+            startDate: Date(timeIntervalSinceReferenceDate: 900),
+            eventType: EventType.shoppingList.rawValue,
+            relatedEntityType: FeedingPlanWriter.stockReminderEntityType,
+            relatedEntityId: FeedingPlanWriter.stockReminderEntityId(pet: pet, foodKind: .dry)
+        )
+        staleEvent.id = stockEventId
+        staleEvent.foodKindRaw = FeedFoodKind.dry.rawValue
+        let staleReminder = Reminder(event: staleEvent, scheduledAt: staleEvent.startDate)
+        staleReminder.id = stockReminderId
+        staleReminder.notificationId = "remote-food-stock-reminder"
+        staleEvent.reminders = [staleReminder]
+        context.insert(pet)
+        context.insert(foodRecord)
+        context.insert(staleEvent)
+        context.insert(staleReminder)
+        try context.save()
+
+        let scheduler = CapturingReminderNotificationScheduler()
+        OhanaNotifications.current = scheduler
+        defer { OhanaNotifications.useLive() }
+        let record = try makeRecordPayload(
+            entityName: String(describing: PetFoodRecord.self),
+            recordType: String(describing: PetFoodRecord.self),
+            localRecordId: foodRecordId,
+            householdId: householdId,
+            isDeleted: true,
+            lastModifiedAt: deletedAt,
+            fields: [CloudSyncRecordFieldKey.deletedAt: .date(deletedAt)]
+        ).makeCKRecord()
+
+        let result = try CloudSyncRecordApplier.apply(record, context: context)
+
+        #expect(result == .deleted(entityName: "PetFoodRecord", localRecordId: normalized(foodRecordId)))
+        #expect(try fetchPetFoodRecord(id: foodRecordId, context: context) == nil)
+        #expect(try fetchEvent(id: stockEventId, context: context) == nil)
+        #expect(try fetchReminder(id: stockReminderId, context: context) == nil)
+        #expect(scheduler.cancelledNotificationIds == ["remote-food-stock-reminder"])
+    }
+
+    @MainActor
+    @Test func recordApplierRemotePetHealthLogTombstoneCascadesDerivedRecords() throws {
+        let container = try makeContainer()
+        let context = ModelContext(container)
+        let householdId = uuid("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")
+        let petId = uuid("11111111-1111-4111-8111-111111111111")
+        let healthLogId = uuid("22222222-2222-4222-8222-222222222222")
+        let eventId = uuid("33333333-3333-4333-8333-333333333333")
+        let reminderId = uuid("44444444-4444-4444-8444-444444444444")
+        let expenseId = uuid("55555555-5555-4555-8555-555555555555")
+        let directLedgerId = uuid("66666666-6666-4666-8666-666666666666")
+        let expenseLedgerId = uuid("77777777-7777-4777-8777-777777777777")
+        let deletedAt = Date(timeIntervalSinceReferenceDate: 4600)
+        let date = Date(timeIntervalSinceReferenceDate: 200)
+        let expirationDate = Date(timeIntervalSinceReferenceDate: 600)
+        let pet = Pet(name: "Momo")
+        pet.id = petId
+        let health = PetHealthLog(date: date, type: .vaccine, note: "Rabies", pet: pet)
+        health.id = healthLogId
+        health.cost = 48
+        health.expirationDate = expirationDate
+        let event = Event(
+            title: "Rabies expires",
+            startDate: expirationDate,
+            eventType: EventType.vaccine.rawValue,
+            relatedEntityType: EntityKind.pet.rawValue,
+            relatedEntityId: pet.id.uuidString
+        )
+        event.id = eventId
+        let reminder = Reminder(event: event, scheduledAt: expirationDate.addingTimeInterval(-86400))
+        reminder.id = reminderId
+        reminder.notificationId = "remote-health-reminder"
+        event.reminders = [reminder]
+        let expense = PetExpenseLog(
+            date: date,
+            amount: health.cost,
+            category: .medical,
+            note: health.note,
+            pet: pet
+        )
+        expense.id = expenseId
+        let directLedger = CareLedgerEvent(
+            id: directLedgerId,
+            occurredAt: date,
+            actorKind: .unknown,
+            subjectKind: .pet,
+            subjectId: pet.id.uuidString,
+            eventKind: .health,
+            actionType: HealthLogType.vaccine.rawValue,
+            source: .detail,
+            sourceEventId: event.id.uuidString,
+            sourceReminderId: reminder.id.uuidString,
+            legacyModelName: String(describing: PetHealthLog.self),
+            legacyModelId: health.id.uuidString
+        )
+        let expenseLedger = CareLedgerEvent(
+            id: expenseLedgerId,
+            occurredAt: date,
+            actorKind: .unknown,
+            subjectKind: .pet,
+            subjectId: pet.id.uuidString,
+            eventKind: .expense,
+            actionType: ExpenseCategory.medical.rawValue,
+            source: .detail,
+            legacyModelName: String(describing: PetExpenseLog.self),
+            legacyModelId: expense.id.uuidString
+        )
+        context.insert(pet)
+        context.insert(health)
+        context.insert(event)
+        context.insert(reminder)
+        context.insert(expense)
+        context.insert(directLedger)
+        context.insert(expenseLedger)
+        try context.save()
+
+        let scheduler = CapturingReminderNotificationScheduler()
+        OhanaNotifications.current = scheduler
+        defer { OhanaNotifications.useLive() }
+        let record = try makeRecordPayload(
+            entityName: String(describing: PetHealthLog.self),
+            recordType: String(describing: PetHealthLog.self),
+            localRecordId: healthLogId,
+            householdId: householdId,
+            isDeleted: true,
+            lastModifiedAt: deletedAt,
+            fields: [CloudSyncRecordFieldKey.deletedAt: .date(deletedAt)]
+        ).makeCKRecord()
+
+        let result = try CloudSyncRecordApplier.apply(record, context: context)
+
+        #expect(result == .deleted(entityName: "PetHealthLog", localRecordId: normalized(healthLogId)))
+        #expect(try fetchPetHealthLog(id: healthLogId, context: context) == nil)
+        #expect(try fetchEvent(id: eventId, context: context) == nil)
+        #expect(try fetchReminder(id: reminderId, context: context) == nil)
+        #expect(try fetchPetExpenseLog(id: expenseId, context: context) == nil)
+        #expect(try fetchCareLedgerEvent(id: directLedgerId, context: context) == nil)
+        #expect(try fetchCareLedgerEvent(id: expenseLedgerId, context: context) == nil)
+        #expect(scheduler.cancelledNotificationIds == ["remote-health-reminder"])
+    }
+
+    @MainActor
     @Test func recordApplierAppliesCloudKitHardDeletionAsSyncedTombstone() throws {
         let container = try makeContainer()
         let context = ModelContext(container)
@@ -3245,6 +3915,14 @@ struct CloudSyncMetadataServiceTests {
         return try context.fetch(descriptor).first
     }
 
+    private func fetchReminder(id: UUID, context: ModelContext) throws -> Reminder? {
+        var descriptor = FetchDescriptor<Reminder>(
+            predicate: #Predicate<Reminder> { $0.id == id }
+        )
+        descriptor.fetchLimit = 1
+        return try context.fetch(descriptor).first
+    }
+
     private func fetchPetCareLog(id: UUID, context: ModelContext) throws -> PetCareLog? {
         var descriptor = FetchDescriptor<PetCareLog>(
             predicate: #Predicate<PetCareLog> { $0.id == id }
@@ -3277,6 +3955,22 @@ struct CloudSyncMetadataServiceTests {
         return try context.fetch(descriptor).first
     }
 
+    private func fetchPetExpenseLog(id: UUID, context: ModelContext) throws -> PetExpenseLog? {
+        var descriptor = FetchDescriptor<PetExpenseLog>(
+            predicate: #Predicate<PetExpenseLog> { $0.id == id }
+        )
+        descriptor.fetchLimit = 1
+        return try context.fetch(descriptor).first
+    }
+
+    private func fetchPetHealthLog(id: UUID, context: ModelContext) throws -> PetHealthLog? {
+        var descriptor = FetchDescriptor<PetHealthLog>(
+            predicate: #Predicate<PetHealthLog> { $0.id == id }
+        )
+        descriptor.fetchLimit = 1
+        return try context.fetch(descriptor).first
+    }
+
     private func fetchSharedCareSession(id: UUID, context: ModelContext) throws -> SharedCareSession? {
         var descriptor = FetchDescriptor<SharedCareSession>(
             predicate: #Predicate<SharedCareSession> { $0.id == id }
@@ -3292,6 +3986,45 @@ struct CloudSyncMetadataServiceTests {
         descriptor.fetchLimit = 1
         return try context.fetch(descriptor).first
     }
+}
+
+private final class CapturingReminderNotificationScheduler: ReminderNotificationScheduling, @unchecked Sendable {
+    private(set) var cancelledNotificationIds: [String] = []
+
+    func schedule(reminder _: Reminder) {}
+
+    func schedule(
+        reminder _: Reminder,
+        existingNotificationIds _: Set<String>?,
+        completion: ((ReminderNotificationScheduleResult) -> Void)?
+    ) {
+        completion?(.skippedPastDue)
+    }
+
+    func schedule(
+        reminder _: Reminder,
+        deliveryDate _: Date?,
+        existingNotificationIds _: Set<String>?,
+        completion: ((ReminderNotificationScheduleResult) -> Void)?
+    ) {
+        completion?(.skippedPastDue)
+    }
+
+    func pendingNotificationIds() async -> Set<String> { [] }
+
+    func scheduleRollingWindow(reminders _: [Reminder]) {}
+
+    func refillWindowIfNeeded(allReminders _: [Reminder]) {}
+
+    func cancel(notificationId: String) {
+        cancelledNotificationIds.append(notificationId)
+    }
+
+    func cancelAll(for _: String, reminders: [Reminder]) {
+        cancelledNotificationIds.append(contentsOf: reminders.map(\.notificationId))
+    }
+
+    func compensate(reminders _: [Reminder]) {}
 }
 
 private struct StaticCloudSyncUploadPayloadProvider: CloudSyncEngineUploadPayloadProviding {

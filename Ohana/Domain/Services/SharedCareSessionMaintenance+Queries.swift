@@ -6,8 +6,7 @@
 import Foundation
 import SwiftData
 
-extension SharedCareSessionMaintenance {
-    @MainActor
+nonisolated extension SharedCareSessionMaintenance {
     static func legacyMetadataScan(context: ModelContext) -> LegacyMetadataScan {
         let sessions = fetchSessionsWithLegacyMetadata(context: context)
         let careLogs = fetchCareLogsWithLegacyMetadata(context: context)
@@ -118,7 +117,6 @@ extension SharedCareSessionMaintenance {
         ids.insert(sessionID)
     }
 
-    @MainActor
     static func sessionIDsReferencingHygieneLog(
         logID: UUID,
         ledgerEvents: [CareLedgerEvent],
@@ -157,7 +155,6 @@ extension SharedCareSessionMaintenance {
         return UUID(uuidString: raw)
     }
 
-    @MainActor
     static func fetchSession(id: UUID, context: ModelContext) -> SharedCareSession? {
         var descriptor = FetchDescriptor<SharedCareSession>(
             predicate: #Predicate<SharedCareSession> { session in
@@ -168,7 +165,6 @@ extension SharedCareSessionMaintenance {
         return fetchFirstOrLog(descriptor, context: context, operation: "fetch session")
     }
 
-    @MainActor
     static func fetchSessionsWithLegacyMetadata(context: ModelContext) -> [SharedCareSession] {
         let marker = SharedCareMetadata.legacyMetadataMarker
         let descriptor = FetchDescriptor<SharedCareSession>(
@@ -180,7 +176,6 @@ extension SharedCareSessionMaintenance {
         return fetchOrLog(descriptor, context: context, operation: "fetch legacy shared-care note sessions")
     }
 
-    @MainActor
     static func fetchCareLogsWithLegacyMetadata(context: ModelContext) -> [PetCareLog] {
         let marker = SharedCareMetadata.legacyMetadataMarker
         let descriptor = FetchDescriptor<PetCareLog>(
@@ -192,7 +187,6 @@ extension SharedCareSessionMaintenance {
         return fetchOrLog(descriptor, context: context, operation: "fetch legacy shared-care note care logs")
     }
 
-    @MainActor
     static func fetchExpenseLogsWithLegacyMetadata(context: ModelContext) -> [PetExpenseLog] {
         let marker = SharedCareMetadata.legacyMetadataMarker
         let descriptor = FetchDescriptor<PetExpenseLog>(
@@ -204,7 +198,6 @@ extension SharedCareSessionMaintenance {
         return fetchOrLog(descriptor, context: context, operation: "fetch legacy shared-care note expense logs")
     }
 
-    @MainActor
     static func fetchSharedWalkLogsWithLegacyMetadata(context: ModelContext) -> [PetWalkLog] {
         let descriptor = FetchDescriptor<PetWalkLog>(
             sortBy: [SortDescriptor(\.startDate)]
@@ -213,7 +206,6 @@ extension SharedCareSessionMaintenance {
             .filter { ($0.behaviorNotes).map(SharedCareMetadata.hasLegacyMetadata) ?? false }
     }
 
-    @MainActor
     static func fetchLedgerEventsWithLegacyMetadata(context: ModelContext) -> [CareLedgerEvent] {
         let marker = SharedCareMetadata.legacyMetadataMarker
         let descriptor = FetchDescriptor<CareLedgerEvent>(
@@ -225,7 +217,6 @@ extension SharedCareSessionMaintenance {
         return fetchOrLog(descriptor, context: context, operation: "fetch legacy shared-care note ledger events")
     }
 
-    @MainActor
     static func fetchCareLogs(sessionID: String, context: ModelContext) -> [PetCareLog] {
         let descriptor = FetchDescriptor<PetCareLog>(
             predicate: #Predicate<PetCareLog> { log in
@@ -236,7 +227,6 @@ extension SharedCareSessionMaintenance {
         return fetchOrLog(descriptor, context: context, operation: "fetch shared care logs")
     }
 
-    @MainActor
     static func fetchPottyLogs(sessionID: String, context: ModelContext) -> [PetPottyLog] {
         let descriptor = FetchDescriptor<PetPottyLog>(
             predicate: #Predicate<PetPottyLog> { log in
@@ -247,7 +237,6 @@ extension SharedCareSessionMaintenance {
         return fetchOrLog(descriptor, context: context, operation: "fetch shared potty logs")
     }
 
-    @MainActor
     static func fetchHygieneLogs(session: SharedCareSession, context: ModelContext) -> [PetHygieneLog] {
         let sessionID = session.id.uuidString
         let direct = fetchHygieneLogs(sessionID: sessionID, context: context)
@@ -266,7 +255,6 @@ extension SharedCareSessionMaintenance {
         return uniqueByID(direct + logs, id: { $0.id })
     }
 
-    @MainActor
     static func fetchHygieneLogs(sessionID: String, context: ModelContext) -> [PetHygieneLog] {
         let descriptor = FetchDescriptor<PetHygieneLog>(
             predicate: #Predicate<PetHygieneLog> { log in
@@ -277,7 +265,6 @@ extension SharedCareSessionMaintenance {
         return fetchOrLog(descriptor, context: context, operation: "fetch shared hygiene logs")
     }
 
-    @MainActor
     static func hygieneLogIDs(session: SharedCareSession, context: ModelContext) -> Set<UUID> {
         var ids = Set<UUID>()
         if session.primaryLegacyModelName == "PetHygieneLog",
@@ -302,7 +289,6 @@ extension SharedCareSessionMaintenance {
         return ids
     }
 
-    @MainActor
     static func fetchExpenseLogs(sessionID: String, context: ModelContext) -> [PetExpenseLog] {
         let descriptor = FetchDescriptor<PetExpenseLog>(
             predicate: #Predicate<PetExpenseLog> { log in
@@ -313,7 +299,6 @@ extension SharedCareSessionMaintenance {
         return fetchOrLog(descriptor, context: context, operation: "fetch shared expense logs")
     }
 
-    @MainActor
     static func fetchWalkLogs(sessionID: String, context: ModelContext) -> [PetWalkLog] {
         let descriptor = FetchDescriptor<PetWalkLog>(
             predicate: #Predicate<PetWalkLog> { log in
@@ -324,7 +309,6 @@ extension SharedCareSessionMaintenance {
         return fetchOrLog(descriptor, context: context, operation: "fetch shared walk logs")
     }
 
-    @MainActor
     static func ledgerEvents(
         careLogs: [PetCareLog],
         pottyLogs: [PetPottyLog],
@@ -345,7 +329,6 @@ extension SharedCareSessionMaintenance {
             + ledgerEvents(forLegacyModelName: "PetWalkLog", ids: walkLogIDs, context: context)
     }
 
-    @MainActor
     static func ledgerEvents(
         forLegacyModelName modelName: String,
         ids: Set<String>,
@@ -380,7 +363,6 @@ extension SharedCareSessionMaintenance {
         return result
     }
 
-    @MainActor
     static func fetchFirstOrLog<T: PersistentModel>(
         _ descriptor: FetchDescriptor<T>,
         context: ModelContext,
@@ -389,7 +371,6 @@ extension SharedCareSessionMaintenance {
         fetchOrLog(descriptor, context: context, operation: operation).first
     }
 
-    @MainActor
     static func fetchOrLog<T: PersistentModel>(
         _ descriptor: FetchDescriptor<T>,
         context: ModelContext,
@@ -406,7 +387,6 @@ extension SharedCareSessionMaintenance {
         }
     }
 
-    @MainActor
     static func markDeletedSharedSessionState(
         sessionID: UUID,
         context: ModelContext,

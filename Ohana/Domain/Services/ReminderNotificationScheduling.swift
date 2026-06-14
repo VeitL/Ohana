@@ -18,7 +18,7 @@
 import Foundation
 
 /// The subset of notification operations that domain services depend on.
-protocol ReminderNotificationScheduling: Sendable {
+nonisolated protocol ReminderNotificationScheduling: Sendable {
     func schedule(reminder: Reminder)
     func schedule(
         reminder: Reminder,

@@ -99,6 +99,12 @@ nonisolated enum CloudSyncUploadBatchBuilder {
             try fetchCareLedgerEvent(id: localRecordId, context: context)
         case String(describing: CoconutLedgerEntry.self):
             try fetchCoconutLedgerEntry(id: localRecordId, context: context)
+        case String(describing: GachaOwnedItem.self):
+            try fetchGachaOwnedItem(id: localRecordId, context: context)
+        case String(describing: GachaDrawLog.self):
+            try fetchGachaDrawLog(id: localRecordId, context: context)
+        case String(describing: ShopPurchaseRecord.self):
+            try fetchShopPurchaseRecord(id: localRecordId, context: context)
         default:
             nil
         }
@@ -219,6 +225,30 @@ nonisolated enum CloudSyncUploadBatchBuilder {
     private static func fetchCoconutLedgerEntry(id: UUID, context: ModelContext) throws -> CoconutLedgerEntry? {
         var descriptor = FetchDescriptor<CoconutLedgerEntry>(
             predicate: #Predicate<CoconutLedgerEntry> { $0.id == id }
+        )
+        descriptor.fetchLimit = 1
+        return try context.fetch(descriptor).first
+    }
+
+    private static func fetchGachaOwnedItem(id: UUID, context: ModelContext) throws -> GachaOwnedItem? {
+        var descriptor = FetchDescriptor<GachaOwnedItem>(
+            predicate: #Predicate<GachaOwnedItem> { $0.id == id }
+        )
+        descriptor.fetchLimit = 1
+        return try context.fetch(descriptor).first
+    }
+
+    private static func fetchGachaDrawLog(id: UUID, context: ModelContext) throws -> GachaDrawLog? {
+        var descriptor = FetchDescriptor<GachaDrawLog>(
+            predicate: #Predicate<GachaDrawLog> { $0.id == id }
+        )
+        descriptor.fetchLimit = 1
+        return try context.fetch(descriptor).first
+    }
+
+    private static func fetchShopPurchaseRecord(id: UUID, context: ModelContext) throws -> ShopPurchaseRecord? {
+        var descriptor = FetchDescriptor<ShopPurchaseRecord>(
+            predicate: #Predicate<ShopPurchaseRecord> { $0.id == id }
         )
         descriptor.fetchLimit = 1
         return try context.fetch(descriptor).first

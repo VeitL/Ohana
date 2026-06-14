@@ -255,9 +255,8 @@ enum FeedingPlanWriter {
         return rebuildFoodStockReminder(pet: pet, allEvents: allEvents, context: context, now: now, calendar: calendar)
     }
 
-    @MainActor
     @discardableResult
-    static func rebuildFoodStockReminder(
+    nonisolated static func rebuildFoodStockReminder(
         pet: Pet,
         allEvents: [Event],
         context: ModelContext,
@@ -267,9 +266,31 @@ enum FeedingPlanWriter {
         rebuildFoodStockReminders(pet: pet, allEvents: allEvents, context: context, now: now, calendar: calendar).first
     }
 
-    @MainActor
     @discardableResult
-    static func rebuildFoodStockReminders(
+    nonisolated static func rebuildFoodStockReminders(
+        pets: [Pet],
+        context: ModelContext,
+        now: Date = Date(),
+        calendar: Calendar = .current
+    ) -> [Reminder] {
+        guard !pets.isEmpty else { return [] }
+        let allEvents = allEventsForStockReminderRebuild(context: context)
+        var seen = Set<UUID>()
+        var reminders: [Reminder] = []
+        for pet in pets where seen.insert(pet.id).inserted {
+            reminders.append(contentsOf: rebuildFoodStockReminders(
+                pet: pet,
+                allEvents: allEvents,
+                context: context,
+                now: now,
+                calendar: calendar
+            ))
+        }
+        return reminders
+    }
+
+    @discardableResult
+    nonisolated static func rebuildFoodStockReminders(
         pet: Pet,
         allEvents: [Event],
         context: ModelContext,
@@ -309,7 +330,7 @@ enum FeedingPlanWriter {
         return reminders
     }
 
-    private static func stockReminderTitle(pet: Pet, foodKind: FeedFoodKind, l: L10n = L10n()) -> String {
+    private nonisolated static func stockReminderTitle(pet: Pet, foodKind: FeedFoodKind, l: L10n = L10n()) -> String {
         let kindTitle = foodKind.title(l)
         return l.tr(
             zh: "\(pet.name) \(kindTitle)快要断粮了，记得补充粮仓",
@@ -318,19 +339,18 @@ enum FeedingPlanWriter {
         )
     }
 
-    static func stockReminderEvents(pet: Pet, allEvents: [Event]) -> [Event] {
+    nonisolated static func stockReminderEvents(pet: Pet, allEvents: [Event]) -> [Event] {
         allEvents.filter {
             $0.relatedEntityType == stockReminderEntityType &&
                 ($0.relatedEntityId == pet.id.uuidString || $0.relatedEntityId.hasPrefix("\(pet.id.uuidString):"))
         }
     }
 
-    static func stockReminderEntityId(pet: Pet, foodKind: FeedFoodKind) -> String {
+    nonisolated static func stockReminderEntityId(pet: Pet, foodKind: FeedFoodKind) -> String {
         "\(pet.id.uuidString):\(foodKind.rawValue)"
     }
 
-    @MainActor
-    private static func currentStockReminderEvents(pet: Pet, allEvents: [Event], context: ModelContext) -> [Event] {
+    private nonisolated static func currentStockReminderEvents(pet: Pet, allEvents: [Event], context: ModelContext) -> [Event] {
         var eventsById: [UUID: Event] = [:]
         for event in stockReminderEvents(pet: pet, allEvents: allEvents) {
             eventsById[event.id] = event
@@ -356,7 +376,7 @@ enum FeedingPlanWriter {
         return eventsById.values.sorted { $0.startDate < $1.startDate }
     }
 
-    static func foodReminderDate(
+    nonisolated static func foodReminderDate(
         pet: Pet,
         snapshot: FeedStockSnapshot,
         calendar: Calendar = .current
@@ -366,8 +386,7 @@ enum FeedingPlanWriter {
         return calendar.date(bySettingHour: 9, minute: 0, second: 0, of: raw) ?? raw
     }
 
-    @MainActor
-    private static func deleteEvent(_ event: Event, context: ModelContext) {
+    private nonisolated static func deleteEvent(_ event: Event, context: ModelContext) {
         CloudSyncMutationRecorder.markDeleted(event, context: context)
         for reminder in event.reminders {
             OhanaNotifications.current.cancel(notificationId: reminder.notificationId)
@@ -375,6 +394,18 @@ enum FeedingPlanWriter {
             context.delete(reminder)
         }
         context.delete(event)
+    }
+
+    private nonisolated static func allEventsForStockReminderRebuild(context: ModelContext) -> [Event] {
+        do {
+            return try context.fetch(FetchDescriptor<Event>())
+        } catch {
+            OhanaLog.warning(
+                "FeedingPlanWriter failed to fetch events for stock reminder rebuild: \(error.localizedDescription)",
+                category: "Care"
+            )
+            return []
+        }
     }
 
     @MainActor

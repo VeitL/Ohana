@@ -8,8 +8,7 @@
 import Foundation
 import SwiftData
 
-@MainActor
-enum CloudSyncMutationRecorder {
+nonisolated enum CloudSyncMutationRecorder {
     @discardableResult
     static func markModified(
         _ household: Household,
@@ -373,6 +372,42 @@ enum CloudSyncMutationRecorder {
             householdId: sharedHouseholdId(context: context, now: modifiedAt),
             fallbackHouseholdId: uuid(from: log.ownerHumanId) ?? log.id,
             modifiedAt: modifiedAt,
+            context: context
+        )
+    }
+
+    @discardableResult
+    static func markDeleted(
+        _ item: GachaOwnedItem,
+        context: ModelContext,
+        deletedAt: Date = Date(),
+        deletedByHumanId: String? = nil
+    ) -> CloudSyncRecordState? {
+        markDeleted(
+            entityName: String(describing: GachaOwnedItem.self),
+            localRecordId: item.id,
+            householdId: sharedHouseholdId(context: context, now: deletedAt),
+            fallbackHouseholdId: uuid(from: item.ownerHumanId) ?? item.id,
+            deletedAt: deletedAt,
+            deletedByHumanId: uuid(from: deletedByHumanId),
+            context: context
+        )
+    }
+
+    @discardableResult
+    static func markDeleted(
+        _ log: GachaDrawLog,
+        context: ModelContext,
+        deletedAt: Date = Date(),
+        deletedByHumanId: String? = nil
+    ) -> CloudSyncRecordState? {
+        markDeleted(
+            entityName: String(describing: GachaDrawLog.self),
+            localRecordId: log.id,
+            householdId: sharedHouseholdId(context: context, now: deletedAt),
+            fallbackHouseholdId: uuid(from: log.ownerHumanId) ?? log.id,
+            deletedAt: deletedAt,
+            deletedByHumanId: uuid(from: deletedByHumanId),
             context: context
         )
     }

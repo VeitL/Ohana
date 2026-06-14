@@ -6,7 +6,7 @@
 import Foundation
 import SwiftData
 
-extension CloudSyncMutationRecorder {
+nonisolated extension CloudSyncMutationRecorder {
     static func supportsLocalMutationRecording(for entityName: String) -> Bool {
         CloudSyncEntityRegistry.descriptor(for: entityName)?.uploadsToCloudKit == true
     }

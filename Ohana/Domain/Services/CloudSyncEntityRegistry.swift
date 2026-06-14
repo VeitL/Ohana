@@ -36,6 +36,17 @@ nonisolated struct CloudSyncEntityDescriptor: Equatable {
     }
 }
 
+nonisolated enum CloudSyncPhysicalDeletionParent: String, Codable, CaseIterable {
+    case pet = "Pet"
+    case human = "Human"
+}
+
+nonisolated struct CloudSyncPhysicalDeletionOwnership: Equatable {
+    let parent: CloudSyncPhysicalDeletionParent
+    let entityName: String
+    let reason: String
+}
+
 nonisolated enum CloudSyncEntityRegistry {
     static let localOnlySchemaEntityNames: Set<String> = [
         // Legacy store compatibility for the retired user-visible recycle-bin model.
@@ -125,6 +136,60 @@ nonisolated enum CloudSyncEntityRegistry {
         String(describing: GachaDrawLog.self),
         String(describing: ShopPurchaseRecord.self)
     ]
+
+    static let physicalDeletionOwnerships: [CloudSyncPhysicalDeletionOwnership] = [
+        deletionOwnership(Event.self, parent: .pet, reason: "relatedEntityId"),
+        deletionOwnership(Reminder.self, parent: .pet, reason: "event.reminders"),
+        deletionOwnership(PetRelationship.self, parent: .pet, reason: "fromPetId/toPetId"),
+        deletionOwnership(FamilyCollaborationTask.self, parent: .pet, reason: "relatedPetId"),
+        deletionOwnership(SharedCareSession.self, parent: .pet, reason: "source/target/stock owner pet ids"),
+        deletionOwnership(PetCareLog.self, parent: .pet, reason: "pet relationship"),
+        deletionOwnership(PetPottyLog.self, parent: .pet, reason: "pet relationship"),
+        deletionOwnership(PetHygieneLog.self, parent: .pet, reason: "pet relationship"),
+        deletionOwnership(PetHealthLog.self, parent: .pet, reason: "pet relationship"),
+        deletionOwnership(PetWalkLog.self, parent: .pet, reason: "pet relationship"),
+        deletionOwnership(PetExpenseLog.self, parent: .pet, reason: "pet relationship"),
+        deletionOwnership(PetWeightLog.self, parent: .pet, reason: "pet relationship"),
+        deletionOwnership(PetFoodRecord.self, parent: .pet, reason: "pet relationship"),
+        deletionOwnership(PetMedication.self, parent: .pet, reason: "pet relationship"),
+        deletionOwnership(PetPhotoLog.self, parent: .pet, reason: "pet relationship"),
+        deletionOwnership(PetMilestone.self, parent: .pet, reason: "pet relationship"),
+        deletionOwnership(PetDocument.self, parent: .pet, reason: "pet relationship"),
+        deletionOwnership(PetDocumentAttachment.self, parent: .pet, reason: "document.attachments"),
+        deletionOwnership(PetInsurance.self, parent: .pet, reason: "pet relationship"),
+        deletionOwnership(InsuranceClaim.self, parent: .pet, reason: "insurance.claims"),
+        deletionOwnership(SymptomLog.self, parent: .pet, reason: "pet relationship"),
+        deletionOwnership(HeatCycleLog.self, parent: .pet, reason: "pet relationship"),
+        deletionOwnership(CoconutAccount.self, parent: .pet, reason: "ownerKind/ownerId"),
+        deletionOwnership(CoconutLedgerEntry.self, parent: .pet, reason: "owner/actor/subject/source"),
+        deletionOwnership(CareLedgerEvent.self, parent: .pet, reason: "actor/subject/legacy source"),
+        deletionOwnership(EconomyBudgetUsageEvent.self, parent: .pet, reason: "careObjectKey/scopeKey"),
+
+        deletionOwnership(Event.self, parent: .human, reason: "relatedEntityId"),
+        deletionOwnership(Reminder.self, parent: .human, reason: "event.reminders"),
+        deletionOwnership(HumanMedication.self, parent: .human, reason: "humanId"),
+        deletionOwnership(HumanMedicationLog.self, parent: .human, reason: "humanId"),
+        deletionOwnership(HumanHealthReport.self, parent: .human, reason: "humanId"),
+        deletionOwnership(WishlistItem.self, parent: .human, reason: "creator/redeemer"),
+        deletionOwnership(GachaOwnedItem.self, parent: .human, reason: "ownerHumanId"),
+        deletionOwnership(GachaDrawLog.self, parent: .human, reason: "ownerHumanId"),
+        deletionOwnership(ShopPurchaseRecord.self, parent: .human, reason: "buyerHumanId"),
+        deletionOwnership(PetExpenseLog.self, parent: .human, reason: "executorId without pet"),
+        deletionOwnership(HumanWeightLog.self, parent: .human, reason: "human/executor"),
+        deletionOwnership(HumanWorkoutLog.self, parent: .human, reason: "human relationship"),
+        deletionOwnership(HumanHealthMetricLog.self, parent: .human, reason: "human relationship"),
+        deletionOwnership(CoconutAccount.self, parent: .human, reason: "ownerKind/ownerId"),
+        deletionOwnership(CoconutLedgerEntry.self, parent: .human, reason: "owner/actor/subject/source"),
+        deletionOwnership(CareLedgerEvent.self, parent: .human, reason: "actor/subject"),
+        deletionOwnership(EconomyBudgetUsageEvent.self, parent: .human, reason: "memberKey/scopeKey"),
+        deletionOwnership(SharedCareSession.self, parent: .human, reason: "executorIds"),
+        deletionOwnership(CoconutExchangeRequest.self, parent: .human, reason: "sender/receiver"),
+        deletionOwnership(FamilyCollaborationTask.self, parent: .human, reason: "human actor fields")
+    ]
+
+    static func physicalDeletionOwnedEntityNames(parent: CloudSyncPhysicalDeletionParent) -> Set<String> {
+        Set(physicalDeletionOwnerships.filter { $0.parent == parent }.map(\.entityName))
+    }
 
     static func supportsUploadPipeline(for entityName: String) -> Bool {
         uploadPipelineEntityNames.contains(CloudSyncRecordState.normalizedEntityName(entityName))
@@ -223,6 +288,18 @@ nonisolated enum CloudSyncEntityRegistry {
             defaultConflictPolicy: defaultConflictPolicy,
             excludedFieldNames: excluded,
             fieldPolicies: fieldPolicies
+        )
+    }
+
+    private static func deletionOwnership<T>(
+        _: T.Type,
+        parent: CloudSyncPhysicalDeletionParent,
+        reason: String
+    ) -> CloudSyncPhysicalDeletionOwnership {
+        CloudSyncPhysicalDeletionOwnership(
+            parent: parent,
+            entityName: CloudSyncRecordState.normalizedEntityName(String(describing: T.self)),
+            reason: reason
         )
     }
 }

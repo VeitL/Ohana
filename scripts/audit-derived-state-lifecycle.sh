@@ -15,6 +15,10 @@ Purpose:
     derived-state symmetry in the same service boundary.
   - Physical deletes should be paired with a CloudSync tombstone/recordDeletion
     hint unless explicitly allowed.
+  - CloudSync upload-pipeline registry entries should be backed by
+    CloudSyncUploadBatchBuilder local-model fetch cases.
+  - Local physical-deletion owned-entity registry entries should be backed by
+    PhysicalDeletionService cascade coverage for the same parent kind.
 
 Baseline:
   Full-scope debt is ratcheted in
@@ -168,6 +172,151 @@ def first_match(lines: list[str], pattern: re.Pattern[str]) -> tuple[int, str] |
     return None
 
 
+def line_number(text: str, offset: int) -> int:
+    return text.count("\n", 0, offset) + 1
+
+
+def parse_upload_pipeline_entities(text: str) -> list[tuple[str, int, str]]:
+    match = re.search(
+        r"uploadPipelineEntityNames[^=]*=\s*\[(?P<body>.*?)\]",
+        text,
+        flags=re.DOTALL,
+    )
+    if match is None:
+        return []
+
+    entities: list[tuple[str, int, str]] = []
+    body = match.group("body")
+    body_start = match.start("body")
+    for entity_match in re.finditer(r"String\(describing:\s*([A-Za-z0-9_]+)\.self\)", body):
+        entity_name = entity_match.group(1)
+        absolute_start = body_start + entity_match.start()
+        line = line_number(text, absolute_start)
+        snippet = text.splitlines()[line - 1] if line <= len(text.splitlines()) else entity_name
+        entities.append((entity_name, line, snippet))
+    return entities
+
+
+def parse_physical_deletion_ownerships(text: str) -> list[tuple[str, str, int, str]]:
+    ownerships: list[tuple[str, str, int, str]] = []
+    lines = text.splitlines()
+    for ownership_match in re.finditer(
+        r"deletionOwnership\(\s*([A-Za-z0-9_]+)\.self\s*,\s*parent:\s*\.(pet|human)\b",
+        text,
+    ):
+        entity_name = ownership_match.group(1)
+        parent = ownership_match.group(2)
+        line = line_number(text, ownership_match.start())
+        snippet = lines[line - 1] if line <= len(lines) else entity_name
+        ownerships.append((parent, entity_name, line, snippet))
+    return ownerships
+
+
+def parse_physical_deletion_coverage(text: str, parent: str) -> set[str]:
+    match = re.search(
+        rf"{re.escape(parent)}DeletionCascadeCoverageEntityNames[^=]*=\s*\[(?P<body>.*?)\]",
+        text,
+        flags=re.DOTALL,
+    )
+    if match is None:
+        return set()
+
+    body = match.group("body")
+    return {
+        entity_match.group(1)
+        for entity_match in re.finditer(r"String\(describing:\s*([A-Za-z0-9_]+)\.self\)", body)
+    }
+
+
+def builder_has_upload_case(builder_text: str, entity_name: str) -> bool:
+    pattern = rf"case\s+String\(describing:\s*{re.escape(entity_name)}\.self\)\s*:"
+    return re.search(pattern, builder_text) is not None
+
+
+def scan_upload_builder_coverage(files: list[pathlib.Path], warnings: list[WarningItem]) -> None:
+    registry_path = ROOT / "Ohana/Domain/Services/CloudSyncEntityRegistry.swift"
+    builder_path = ROOT / "Ohana/Domain/Services/CloudSyncUploadBatchBuilder.swift"
+    scanned = set(files)
+
+    if registry_path in scanned or builder_path in scanned:
+        if not registry_path.is_file() or not builder_path.is_file():
+            return
+        registry_text = registry_path.read_text(encoding="utf-8", errors="ignore")
+        builder_text = builder_path.read_text(encoding="utf-8", errors="ignore")
+        source_path = rel(registry_path)
+        entities = parse_upload_pipeline_entities(registry_text)
+    else:
+        fixture_candidates = []
+        for path in files:
+            if not path.is_file():
+                continue
+            text = path.read_text(encoding="utf-8", errors="ignore")
+            if "uploadPipelineEntityNames" in text and "CloudSyncUploadBatchBuilder" in text:
+                fixture_candidates.append((path, text))
+        if not fixture_candidates:
+            return
+        path, registry_text = fixture_candidates[0]
+        builder_text = registry_text
+        source_path = rel(path)
+        entities = parse_upload_pipeline_entities(registry_text)
+
+    for entity_name, line, snippet in entities:
+        if builder_has_upload_case(builder_text, entity_name):
+            continue
+        add(
+            warnings,
+            "cloudsync-upload-builder-coverage",
+            source_path,
+            line,
+            snippet,
+            f"{entity_name} is registered for the CloudSync upload pipeline but CloudSyncUploadBatchBuilder has no matching local-model case.",
+        )
+
+
+def scan_physical_deletion_cascade_coverage(files: list[pathlib.Path], warnings: list[WarningItem]) -> None:
+    registry_path = ROOT / "Ohana/Domain/Services/CloudSyncEntityRegistry.swift"
+    deletion_path = ROOT / "Ohana/Domain/Services/PhysicalDeletionService.swift"
+    scanned = set(files)
+
+    if registry_path in scanned or deletion_path in scanned:
+        if not registry_path.is_file() or not deletion_path.is_file():
+            return
+        registry_text = registry_path.read_text(encoding="utf-8", errors="ignore")
+        deletion_text = deletion_path.read_text(encoding="utf-8", errors="ignore")
+        source_path = rel(registry_path)
+    else:
+        fixture_candidates = []
+        for path in files:
+            if not path.is_file():
+                continue
+            text = path.read_text(encoding="utf-8", errors="ignore")
+            if "physicalDeletionOwnerships" in text and "DeletionCascadeCoverageEntityNames" in text:
+                fixture_candidates.append((path, text))
+        if not fixture_candidates:
+            return
+        path, registry_text = fixture_candidates[0]
+        deletion_text = registry_text
+        source_path = rel(path)
+
+    ownerships = parse_physical_deletion_ownerships(registry_text)
+    coverage = {
+        "pet": parse_physical_deletion_coverage(deletion_text, "pet"),
+        "human": parse_physical_deletion_coverage(deletion_text, "human"),
+    }
+
+    for parent, entity_name, line, snippet in ownerships:
+        if entity_name in coverage[parent]:
+            continue
+        add(
+            warnings,
+            "physical-deletion-cascade-coverage",
+            source_path,
+            line,
+            snippet,
+            f"{entity_name} is registered as {parent}-owned/scoped but PhysicalDeletionService has no matching local cascade coverage entry.",
+        )
+
+
 def scan_file(path: pathlib.Path, warnings: list[WarningItem]) -> None:
     path_str = rel(path)
     text = path.read_text(encoding="utf-8", errors="ignore")
@@ -203,6 +352,8 @@ def scan(files: list[pathlib.Path]) -> list[WarningItem]:
     for path in files:
         if path.is_file():
             scan_file(path, warnings)
+    scan_upload_builder_coverage(files, warnings)
+    scan_physical_deletion_cascade_coverage(files, warnings)
     return sorted(warnings, key=lambda item: (item.rule, item.path, item.line, item.snippet))
 
 

@@ -8,8 +8,68 @@
 import Foundation
 import SwiftData
 
-@MainActor
-enum PhysicalDeletionService {
+nonisolated enum PhysicalDeletionService {
+    private static let petDeletionCascadeCoverageEntityNames: Set<String> = [
+        String(describing: Event.self),
+        String(describing: Reminder.self),
+        String(describing: PetRelationship.self),
+        String(describing: FamilyCollaborationTask.self),
+        String(describing: SharedCareSession.self),
+        String(describing: PetCareLog.self),
+        String(describing: PetPottyLog.self),
+        String(describing: PetHygieneLog.self),
+        String(describing: PetHealthLog.self),
+        String(describing: PetWalkLog.self),
+        String(describing: PetExpenseLog.self),
+        String(describing: PetWeightLog.self),
+        String(describing: PetFoodRecord.self),
+        String(describing: PetMedication.self),
+        String(describing: PetPhotoLog.self),
+        String(describing: PetMilestone.self),
+        String(describing: PetDocument.self),
+        String(describing: PetDocumentAttachment.self),
+        String(describing: PetInsurance.self),
+        String(describing: InsuranceClaim.self),
+        String(describing: SymptomLog.self),
+        String(describing: HeatCycleLog.self),
+        String(describing: CoconutAccount.self),
+        String(describing: CoconutLedgerEntry.self),
+        String(describing: CareLedgerEvent.self),
+        String(describing: EconomyBudgetUsageEvent.self)
+    ]
+
+    private static let humanDeletionCascadeCoverageEntityNames: Set<String> = [
+        String(describing: Event.self),
+        String(describing: Reminder.self),
+        String(describing: HumanMedication.self),
+        String(describing: HumanMedicationLog.self),
+        String(describing: HumanHealthReport.self),
+        String(describing: WishlistItem.self),
+        String(describing: GachaOwnedItem.self),
+        String(describing: GachaDrawLog.self),
+        String(describing: ShopPurchaseRecord.self),
+        String(describing: PetExpenseLog.self),
+        String(describing: HumanWeightLog.self),
+        String(describing: HumanWorkoutLog.self),
+        String(describing: HumanHealthMetricLog.self),
+        String(describing: CoconutAccount.self),
+        String(describing: CoconutLedgerEntry.self),
+        String(describing: CareLedgerEvent.self),
+        String(describing: EconomyBudgetUsageEvent.self),
+        String(describing: SharedCareSession.self),
+        String(describing: CoconutExchangeRequest.self),
+        String(describing: FamilyCollaborationTask.self)
+    ]
+
+    static func localPhysicalDeletionCascadeCoverage(parent: CloudSyncPhysicalDeletionParent) -> Set<String> {
+        switch parent {
+        case .pet:
+            petDeletionCascadeCoverageEntityNames
+        case .human:
+            humanDeletionCascadeCoverageEntityNames
+        }
+    }
+
     @discardableResult
     static func deleteEvent(
         _ event: Event,
@@ -49,6 +109,25 @@ enum PhysicalDeletionService {
     ) {
         let petId = pet.id.uuidString
         let legacyModelIds = petScopedLegacyModelIds(for: pet)
+        deleteRelatedEvents(
+            entityKind: EntityKind.pet.rawValue,
+            entityId: petId,
+            context: context,
+            deletedAt: deletedAt,
+            deletedByHumanId: deletedByHumanId
+        )
+        deletePetRelationships(
+            petId: pet.id,
+            context: context,
+            deletedAt: deletedAt,
+            deletedByHumanId: deletedByHumanId
+        )
+        deleteFamilyTasksReferencingPet(
+            petId: petId,
+            context: context,
+            deletedAt: deletedAt,
+            deletedByHumanId: deletedByHumanId
+        )
         deletePetDerivedRows(
             petId: petId,
             legacyModelIds: legacyModelIds,
@@ -79,7 +158,19 @@ enum PhysicalDeletionService {
         deletedAt: Date = Date(),
         deletedByHumanId: String? = nil
     ) -> Int {
-        let childCount = deleteHumanScopedRows(for: human, context: context, deletedAt: deletedAt, deletedByHumanId: deletedByHumanId)
+        let relatedEventCount = deleteRelatedEvents(
+            entityKind: EntityKind.human.rawValue,
+            entityId: human.id.uuidString,
+            context: context,
+            deletedAt: deletedAt,
+            deletedByHumanId: deletedByHumanId
+        )
+        let childCount = relatedEventCount + deleteHumanScopedRows(
+            for: human,
+            context: context,
+            deletedAt: deletedAt,
+            deletedByHumanId: deletedByHumanId
+        )
         CloudSyncMutationRecorder.markDeleted(
             human,
             context: context,
@@ -113,54 +204,115 @@ enum PhysicalDeletionService {
         deletedAt: Date = Date(),
         deletedByHumanId: String? = nil
     ) -> Bool {
+        let sharedSessionIds = sharedSessionIds(for: record)
+        if let healthLog = record as? PetHealthLog {
+            deletePetHealthDerivedRows(
+                for: healthLog,
+                pet: pet,
+                context: context,
+                deletedAt: deletedAt,
+                deletedByHumanId: deletedByHumanId
+            )
+        }
+        if let legacy = petScopedLegacyReference(for: record) {
+            deleteCareLedgerEvents(
+                legacyModelName: legacy.modelName,
+                legacyModelId: legacy.modelId,
+                context: context,
+                deletedAt: deletedAt,
+                deletedByHumanId: deletedByHumanId
+            )
+        }
+        if let linkedPotty = linkedPottyLog(for: record, pet: pet, context: context) {
+            deleteCareLedgerEvents(
+                legacyModelName: String(describing: PetPottyLog.self),
+                legacyModelId: linkedPotty.id.uuidString,
+                context: context,
+                deletedAt: deletedAt,
+                deletedByHumanId: deletedByHumanId
+            )
+            CloudSyncMutationRecorder.markDeleted(
+                linkedPotty,
+                pet: linkedPotty.pet ?? pet,
+                context: context,
+                deletedAt: deletedAt,
+                deletedByHumanId: deletedByHumanId
+            )
+            context.delete(linkedPotty)
+        }
+
+        let didDelete: Bool
         switch record {
         case let log as PetCareLog:
             CloudSyncMutationRecorder.markDeleted(log, pet: pet, context: context, deletedAt: deletedAt, deletedByHumanId: deletedByHumanId)
             context.delete(log)
+            didDelete = true
         case let log as PetPottyLog:
             CloudSyncMutationRecorder.markDeleted(log, pet: pet, context: context, deletedAt: deletedAt, deletedByHumanId: deletedByHumanId)
             context.delete(log)
+            didDelete = true
         case let log as PetHygieneLog:
             CloudSyncMutationRecorder.markDeleted(log, pet: pet, context: context, deletedAt: deletedAt, deletedByHumanId: deletedByHumanId)
             context.delete(log)
+            didDelete = true
         case let log as PetHealthLog:
             CloudSyncMutationRecorder.markDeleted(log, pet: pet, context: context, deletedAt: deletedAt, deletedByHumanId: deletedByHumanId)
             context.delete(log)
+            didDelete = true
         case let log as PetWalkLog:
             CloudSyncMutationRecorder.markDeleted(log, pet: pet, context: context, deletedAt: deletedAt, deletedByHumanId: deletedByHumanId)
             context.delete(log)
+            didDelete = true
         case let log as PetExpenseLog:
             CloudSyncMutationRecorder.markDeleted(log, pet: pet, context: context, deletedAt: deletedAt, deletedByHumanId: deletedByHumanId)
             context.delete(log)
+            didDelete = true
         case let log as PetWeightLog:
             CloudSyncMutationRecorder.markDeleted(log, pet: pet, context: context, deletedAt: deletedAt, deletedByHumanId: deletedByHumanId)
             context.delete(log)
+            didDelete = true
         case let record as PetFoodRecord:
             CloudSyncMutationRecorder.markDeleted(record, pet: pet, context: context, deletedAt: deletedAt, deletedByHumanId: deletedByHumanId)
             context.delete(record)
+            didDelete = true
         case let medication as PetMedication:
             CloudSyncMutationRecorder.markDeleted(medication, pet: pet, context: context, deletedAt: deletedAt, deletedByHumanId: deletedByHumanId)
             context.delete(medication)
+            didDelete = true
         case let photo as PetPhotoLog:
             CloudSyncMutationRecorder.markDeleted(photo, pet: pet, context: context, deletedAt: deletedAt, deletedByHumanId: deletedByHumanId)
             context.delete(photo)
+            didDelete = true
         case let milestone as PetMilestone:
             CloudSyncMutationRecorder.markDeleted(milestone, pet: pet, context: context, deletedAt: deletedAt, deletedByHumanId: deletedByHumanId)
             context.delete(milestone)
+            didDelete = true
         case let document as PetDocument:
             deleteDocument(document, pet: pet, context: context, deletedAt: deletedAt, deletedByHumanId: deletedByHumanId)
+            didDelete = true
         case let insurance as PetInsurance:
             deleteInsurance(insurance, pet: pet, context: context, deletedAt: deletedAt, deletedByHumanId: deletedByHumanId)
+            didDelete = true
         case let log as SymptomLog:
             CloudSyncMutationRecorder.markDeleted(log, pet: pet, context: context, deletedAt: deletedAt, deletedByHumanId: deletedByHumanId)
             context.delete(log)
+            didDelete = true
         case let log as HeatCycleLog:
             CloudSyncMutationRecorder.markDeleted(log, pet: pet, context: context, deletedAt: deletedAt, deletedByHumanId: deletedByHumanId)
             context.delete(log)
+            didDelete = true
         default:
             return false
         }
-        return true
+
+        for sharedSessionId in sharedSessionIds {
+            SharedCareSessionMaintenance.reconcileAfterDeletingChild(
+                sharedSessionId: sharedSessionId,
+                context: context,
+                reconciledAt: deletedAt
+            )
+        }
+        return didDelete
     }
 
     static func deleteDocument(
@@ -293,7 +445,18 @@ enum PhysicalDeletionService {
         deletedCount += deleteRows(fetchAll(HumanHealthReport.self, context: context).filter { $0.humanId == humanId }, context: context) {
             CloudSyncMutationRecorder.markDeleted($0, context: context, deletedAt: deletedAt, deletedByHumanId: deletedByHumanId)
         }
-        deletedCount += deleteRows(fetchAll(WishlistItem.self, context: context).filter { $0.creatorId == humanId }, context: context) {
+        deletedCount += deleteRows(fetchAll(WishlistItem.self, context: context).filter {
+            idsMatch($0.creatorId, humanId) || idsMatch($0.redeemedById, humanId)
+        }, context: context) {
+            CloudSyncMutationRecorder.markDeleted($0, context: context, deletedAt: deletedAt, deletedByHumanId: deletedByHumanId)
+        }
+        deletedCount += deleteRows(fetchAll(GachaOwnedItem.self, context: context).filter { idsMatch($0.ownerHumanId, humanId) }, context: context) {
+            CloudSyncMutationRecorder.markDeleted($0, context: context, deletedAt: deletedAt, deletedByHumanId: deletedByHumanId)
+        }
+        deletedCount += deleteRows(fetchAll(GachaDrawLog.self, context: context).filter { idsMatch($0.ownerHumanId, humanId) }, context: context) {
+            CloudSyncMutationRecorder.markDeleted($0, context: context, deletedAt: deletedAt, deletedByHumanId: deletedByHumanId)
+        }
+        deletedCount += deleteRows(fetchAll(ShopPurchaseRecord.self, context: context).filter { idsMatch($0.buyerHumanId, humanId) }, context: context) {
             CloudSyncMutationRecorder.markDeleted($0, context: context, deletedAt: deletedAt, deletedByHumanId: deletedByHumanId)
         }
         deletedCount += deleteRows(fetchAll(PetExpenseLog.self, context: context).filter { $0.executorId == humanId && $0.pet == nil }, context: context) {
@@ -321,10 +484,26 @@ enum PhysicalDeletionService {
         }, context: context) {
             CloudSyncMutationRecorder.markDeleted($0, context: context, deletedAt: deletedAt, deletedByHumanId: deletedByHumanId)
         }
+        deletedCount += deleteRows(fetchAll(EconomyBudgetUsageEvent.self, context: context).filter { event in
+            referencesHuman(event, humanId: humanId)
+        }, context: context) {
+            CloudSyncMutationRecorder.markDeleted($0, context: context, deletedAt: deletedAt, deletedByHumanId: deletedByHumanId)
+        }
+        deletedCount += deleteRows(fetchAll(CoconutExchangeRequest.self, context: context).filter { request in
+            idsMatch(request.senderId, humanId) || idsMatch(request.receiverId, humanId)
+        }, context: context) {
+            markGenericDeleted(entityName: String(describing: CoconutExchangeRequest.self), localRecordId: $0.id, parentId: humanId, context: context, deletedAt: deletedAt, deletedByHumanId: deletedByHumanId)
+        }
+        deletedCount += deleteRows(fetchAll(FamilyCollaborationTask.self, context: context).filter { task in
+            referencesHuman(task, humanId: humanId)
+        }, context: context) {
+            markGenericDeleted(entityName: String(describing: FamilyCollaborationTask.self), localRecordId: $0.id, parentId: humanId, context: context, deletedAt: deletedAt, deletedByHumanId: deletedByHumanId)
+        }
         deletedCount += scrubSharedCareSessionsReferencingHuman(
             humanId: humanId,
             context: context,
-            deletedAt: deletedAt
+            deletedAt: deletedAt,
+            deletedByHumanId: deletedByHumanId
         )
 
         return deletedCount
@@ -350,6 +529,246 @@ enum PhysicalDeletionService {
         )
     }
 
+    private static func petScopedLegacyReference(for record: any PersistentModel) -> (modelName: String, modelId: String)? {
+        switch record {
+        case let log as PetCareLog:
+            (String(describing: PetCareLog.self), log.id.uuidString)
+        case let log as PetPottyLog:
+            (String(describing: PetPottyLog.self), log.id.uuidString)
+        case let log as PetHygieneLog:
+            (String(describing: PetHygieneLog.self), log.id.uuidString)
+        case let log as PetHealthLog:
+            (String(describing: PetHealthLog.self), log.id.uuidString)
+        case let log as PetWalkLog:
+            (String(describing: PetWalkLog.self), log.id.uuidString)
+        case let log as PetExpenseLog:
+            (String(describing: PetExpenseLog.self), log.id.uuidString)
+        case let log as PetWeightLog:
+            (String(describing: PetWeightLog.self), log.id.uuidString)
+        case let record as PetFoodRecord:
+            (String(describing: PetFoodRecord.self), record.id.uuidString)
+        case let medication as PetMedication:
+            (String(describing: PetMedication.self), medication.id.uuidString)
+        case let photo as PetPhotoLog:
+            (String(describing: PetPhotoLog.self), photo.id.uuidString)
+        case let document as PetDocument:
+            (String(describing: PetDocument.self), document.id.uuidString)
+        case let insurance as PetInsurance:
+            (String(describing: PetInsurance.self), insurance.id.uuidString)
+        case let log as SymptomLog:
+            (String(describing: SymptomLog.self), log.id.uuidString)
+        case let log as HeatCycleLog:
+            (String(describing: HeatCycleLog.self), log.id.uuidString)
+        default:
+            nil
+        }
+    }
+
+    private static func sharedSessionIds(for record: any PersistentModel) -> [String] {
+        switch record {
+        case let log as PetCareLog:
+            [log.sharedSessionId].filter { !$0.isEmpty }
+        case let log as PetPottyLog:
+            [log.sharedSessionId].filter { !$0.isEmpty }
+        case let log as PetHygieneLog:
+            [log.sharedSessionId].filter { !$0.isEmpty }
+        case let log as PetWalkLog:
+            [log.sharedSessionId].filter { !$0.isEmpty }
+        case let log as PetExpenseLog:
+            [log.sharedSessionId].filter { !$0.isEmpty }
+        default:
+            []
+        }
+    }
+
+    private static func linkedPottyLog(
+        for record: any PersistentModel,
+        pet: Pet?,
+        context: ModelContext
+    ) -> PetPottyLog? {
+        guard let careLog = record as? PetCareLog,
+              careLog.careType == .litter else {
+            return nil
+        }
+        return fetchAll(PetPottyLog.self, context: context)
+            .filter { candidate in
+                (pet == nil || candidate.pet?.id == pet?.id)
+                    && candidate.executorId == careLog.executorId
+                    && abs(candidate.date.timeIntervalSince(careLog.date)) < 2
+            }
+            .min { lhs, rhs in
+                abs(lhs.date.timeIntervalSince(careLog.date)) < abs(rhs.date.timeIntervalSince(careLog.date))
+            }
+    }
+
+    private static func deleteCareLedgerEvents(
+        legacyModelName: String,
+        legacyModelId: String,
+        context: ModelContext,
+        deletedAt: Date,
+        deletedByHumanId: String?
+    ) {
+        _ = deleteRows(fetchAll(CareLedgerEvent.self, context: context).filter { event in
+            event.legacyModelName == legacyModelName && idsMatch(event.legacyModelId, legacyModelId)
+        }, context: context) {
+            CloudSyncMutationRecorder.markDeleted($0, context: context, deletedAt: deletedAt, deletedByHumanId: deletedByHumanId)
+        }
+    }
+
+    private static func deletePetHealthDerivedRows(
+        for log: PetHealthLog,
+        pet providedPet: Pet?,
+        context: ModelContext,
+        deletedAt: Date,
+        deletedByHumanId: String?
+    ) {
+        guard let pet = providedPet ?? log.pet else { return }
+        let allLedger = fetchAll(CareLedgerEvent.self, context: context)
+        let healthLogId = log.id.uuidString
+        let directHealthLedger = allLedger.filter { ledger in
+            ledger.legacyModelName == String(describing: PetHealthLog.self) &&
+                idsMatch(ledger.legacyModelId, healthLogId)
+        }
+
+        let events = petHealthEventsLinkedTo(
+            log,
+            pet: pet,
+            healthLedger: directHealthLedger,
+            context: context
+        )
+        let eventIds = Set(events.map { CloudSyncRecordState.normalizedRecordId($0.id.uuidString) })
+
+        let reminders = unique(
+            events.flatMap(\.reminders) + fetchAll(Reminder.self, context: context).filter { reminder in
+                guard let eventId = reminder.event?.id.uuidString else { return false }
+                return eventIds.contains(CloudSyncRecordState.normalizedRecordId(eventId))
+            },
+            by: \.id
+        )
+        let reminderIds = Set(reminders.map { CloudSyncRecordState.normalizedRecordId($0.id.uuidString) })
+
+        let expenses = petHealthExpensesLinkedTo(log, pet: pet, context: context)
+        let expenseIds = Set(expenses.map { CloudSyncRecordState.normalizedRecordId($0.id.uuidString) })
+
+        let derivedLedgerEvents = unique(allLedger.filter { ledger in
+            if ledger.legacyModelName == String(describing: PetHealthLog.self) &&
+                idsMatch(ledger.legacyModelId, healthLogId) {
+                return false
+            }
+            if ledger.legacyModelName == String(describing: PetExpenseLog.self),
+               let legacyModelId = ledger.legacyModelId,
+               expenseIds.contains(CloudSyncRecordState.normalizedRecordId(legacyModelId)) {
+                return false
+            }
+            if let sourceEventId = ledger.sourceEventId,
+               eventIds.contains(CloudSyncRecordState.normalizedRecordId(sourceEventId)) {
+                return true
+            }
+            if let sourceReminderId = ledger.sourceReminderId,
+               reminderIds.contains(CloudSyncRecordState.normalizedRecordId(sourceReminderId)) {
+                return true
+            }
+            return false
+        }, by: \.id)
+
+        for reminder in reminders {
+            OhanaNotifications.current.cancel(notificationId: reminder.notificationId)
+            CloudSyncMutationRecorder.markDeleted(
+                reminder,
+                context: context,
+                deletedAt: deletedAt,
+                deletedByHumanId: deletedByHumanId
+            )
+            context.delete(reminder)
+        }
+        for event in events {
+            CloudSyncMutationRecorder.markDeleted(
+                event,
+                context: context,
+                deletedAt: deletedAt,
+                deletedByHumanId: deletedByHumanId
+            )
+            context.delete(event)
+        }
+        for expense in expenses {
+            _ = deletePetScopedRecord(
+                expense,
+                pet: pet,
+                context: context,
+                deletedAt: deletedAt,
+                deletedByHumanId: deletedByHumanId
+            )
+        }
+        for ledger in derivedLedgerEvents {
+            CloudSyncMutationRecorder.markDeleted(
+                ledger,
+                context: context,
+                deletedAt: deletedAt,
+                deletedByHumanId: deletedByHumanId
+            )
+            context.delete(ledger)
+        }
+    }
+
+    private static func petHealthEventsLinkedTo(
+        _ log: PetHealthLog,
+        pet: Pet,
+        healthLedger: [CareLedgerEvent],
+        context: ModelContext
+    ) -> [Event] {
+        let allEvents = fetchAll(Event.self, context: context)
+        let sourceEventIds = Set(healthLedger.compactMap { ledger in
+            ledger.sourceEventId.map(CloudSyncRecordState.normalizedRecordId)
+        })
+        var linked = allEvents.filter { event in
+            sourceEventIds.contains(CloudSyncRecordState.normalizedRecordId(event.id.uuidString))
+        }
+
+        if let expirationDate = log.expirationDate,
+           let eventType = petHealthExpirationEventType(for: log.healthLogType) {
+            linked += allEvents.filter { event in
+                event.relatedEntityType == EntityKind.pet.rawValue &&
+                    idsMatch(event.relatedEntityId, pet.id.uuidString) &&
+                    event.eventType == eventType.rawValue &&
+                    abs(event.startDate.timeIntervalSince(expirationDate)) < 1
+            }
+        }
+        return unique(linked, by: \.id)
+    }
+
+    private static func petHealthExpensesLinkedTo(
+        _ log: PetHealthLog,
+        pet: Pet,
+        context: ModelContext
+    ) -> [PetExpenseLog] {
+        guard log.cost > 0 else { return [] }
+        return fetchAll(PetExpenseLog.self, context: context).filter { expense in
+            guard expense.pet?.id == pet.id,
+                  expense.category == ExpenseCategory.medical.rawValue,
+                  abs(expense.amount - log.cost) < 0.001,
+                  abs(expense.date.timeIntervalSince(log.date)) < 1
+            else { return false }
+            return expense.note.isEmpty ||
+                log.note.isEmpty ||
+                log.note.localizedCaseInsensitiveContains(expense.note) ||
+                expense.note.localizedCaseInsensitiveContains(log.note) ||
+                expense.note == log.healthLogType.rawValue
+        }
+    }
+
+    private static func petHealthExpirationEventType(for type: HealthLogType) -> EventType? {
+        switch type {
+        case .vaccine:
+            .vaccine
+        case .dewormingInternal:
+            .internalDeworming
+        case .dewormingExternal:
+            .externalDeworming
+        default:
+            nil
+        }
+    }
+
     private static func deletePetDerivedRows(
         petId: String,
         legacyModelIds: Set<String>,
@@ -371,6 +790,84 @@ enum PhysicalDeletionService {
             referencesPet(event, petId: petId) || legacyModelIds.containsNormalized(event.legacyModelId)
         }, context: context) {
             CloudSyncMutationRecorder.markDeleted($0, context: context, deletedAt: deletedAt, deletedByHumanId: deletedByHumanId)
+        }
+
+        _ = deleteRows(fetchAll(EconomyBudgetUsageEvent.self, context: context).filter { event in
+            referencesPet(event, petId: petId)
+        }, context: context) {
+            CloudSyncMutationRecorder.markDeleted($0, context: context, deletedAt: deletedAt, deletedByHumanId: deletedByHumanId)
+        }
+    }
+
+    @discardableResult
+    private static func deleteRelatedEvents(
+        entityKind: String,
+        entityId: String,
+        context: ModelContext,
+        deletedAt: Date,
+        deletedByHumanId: String?
+    ) -> Int {
+        deleteRows(fetchAll(Event.self, context: context).filter { event in
+            event.relatedEntityType == entityKind && idsMatch(event.relatedEntityId, entityId)
+        }, context: context) { event in
+            for reminder in event.reminders {
+                OhanaNotifications.current.cancel(notificationId: reminder.notificationId)
+                CloudSyncMutationRecorder.markDeleted(
+                    reminder,
+                    context: context,
+                    deletedAt: deletedAt,
+                    deletedByHumanId: deletedByHumanId
+                )
+            }
+            CloudSyncMutationRecorder.markDeleted(
+                event,
+                context: context,
+                deletedAt: deletedAt,
+                deletedByHumanId: deletedByHumanId
+            )
+        }
+    }
+
+    @discardableResult
+    private static func deletePetRelationships(
+        petId: UUID,
+        context: ModelContext,
+        deletedAt: Date,
+        deletedByHumanId: String?
+    ) -> Int {
+        let petIdString = petId.uuidString
+        return deleteRows(fetchAll(PetRelationship.self, context: context).filter { relationship in
+            relationship.fromPetId == petId || relationship.toPetId == petId
+        }, context: context) {
+            markGenericDeleted(
+                entityName: String(describing: PetRelationship.self),
+                localRecordId: $0.id,
+                parentId: petIdString,
+                context: context,
+                deletedAt: deletedAt,
+                deletedByHumanId: deletedByHumanId
+            )
+        }
+    }
+
+    @discardableResult
+    private static func deleteFamilyTasksReferencingPet(
+        petId: String,
+        context: ModelContext,
+        deletedAt: Date,
+        deletedByHumanId: String?
+    ) -> Int {
+        deleteRows(fetchAll(FamilyCollaborationTask.self, context: context).filter { task in
+            idsMatch(task.relatedPetId, petId)
+        }, context: context) {
+            markGenericDeleted(
+                entityName: String(describing: FamilyCollaborationTask.self),
+                localRecordId: $0.id,
+                parentId: petId,
+                context: context,
+                deletedAt: deletedAt,
+                deletedByHumanId: deletedByHumanId
+            )
         }
     }
 
@@ -432,18 +929,26 @@ enum PhysicalDeletionService {
     private static func scrubSharedCareSessionsReferencingHuman(
         humanId: String,
         context: ModelContext,
-        deletedAt: Date
+        deletedAt: Date,
+        deletedByHumanId: String?
     ) -> Int {
         var changedCount = 0
         for session in fetchAll(SharedCareSession.self, context: context) {
             let originalExecutors = session.executorIds
             let filteredExecutors = originalExecutors.filter { !idsMatch($0, humanId) }
             guard filteredExecutors.count != originalExecutors.count else { continue }
-            session.setExecutorIds(filteredExecutors, primaryExecutorId: filteredExecutors.first)
             if filteredExecutors.isEmpty {
-                session.executorId = nil
-                session.executorIdsRaw = ""
+                CloudSyncMutationRecorder.markDeleted(
+                    session,
+                    context: context,
+                    deletedAt: deletedAt,
+                    deletedByHumanId: deletedByHumanId
+                )
+                context.delete(session)
+                changedCount += 1
+                continue
             }
+            session.setExecutorIds(filteredExecutors, primaryExecutorId: filteredExecutors.first)
             CloudSyncMutationRecorder.markModified(session, context: context, modifiedAt: deletedAt)
             changedCount += 1
         }
@@ -470,6 +975,21 @@ enum PhysicalDeletionService {
         idsMatch(event.actorId, humanId) || idsMatch(event.subjectId, humanId)
     }
 
+    private static func referencesPet(_ event: EconomyBudgetUsageEvent, petId: String) -> Bool {
+        idsMatch(event.careObjectKey, petId) || idsMatch(event.scopeKey, petId)
+    }
+
+    private static func referencesHuman(_ event: EconomyBudgetUsageEvent, humanId: String) -> Bool {
+        idsMatch(event.memberKey, humanId) || idsMatch(event.scopeKey, humanId)
+    }
+
+    private static func referencesHuman(_ task: FamilyCollaborationTask, humanId: String) -> Bool {
+        idsMatch(task.createdById, humanId) ||
+            idsMatch(task.assignedToId, humanId) ||
+            idsMatch(task.claimedById, humanId) ||
+            idsMatch(task.completedById, humanId)
+    }
+
     private static func idsMatch(_ lhs: String?, _ rhs: String) -> Bool {
         guard let lhs else { return false }
         let left = CloudSyncRecordState.normalizedRecordId(lhs)
@@ -489,6 +1009,25 @@ enum PhysicalDeletionService {
         return rows.count
     }
 
+    private static func markGenericDeleted(
+        entityName: String,
+        localRecordId: UUID,
+        parentId: String,
+        context: ModelContext,
+        deletedAt: Date,
+        deletedByHumanId: String?
+    ) {
+        _ = CloudSyncMutationRecorder.markDeleted(
+            entityName: entityName,
+            localRecordId: localRecordId,
+            householdId: CloudSyncMutationRecorder.sharedHouseholdId(context: context, now: deletedAt),
+            fallbackHouseholdId: CloudSyncMutationRecorder.uuid(from: parentId),
+            deletedAt: deletedAt,
+            deletedByHumanId: CloudSyncMutationRecorder.uuid(from: deletedByHumanId),
+            context: context
+        )
+    }
+
     private static func fetchAll<T: PersistentModel>(_: T.Type, context: ModelContext) -> [T] {
         do {
             return try context.fetch(FetchDescriptor<T>())
@@ -497,10 +1036,15 @@ enum PhysicalDeletionService {
             return []
         }
     }
+
+    private static func unique<T, ID: Hashable>(_ values: [T], by keyPath: KeyPath<T, ID>) -> [T] {
+        var seen: Set<ID> = []
+        return values.filter { seen.insert($0[keyPath: keyPath]).inserted }
+    }
 }
 
 private extension Set<String> {
-    func containsNormalized(_ value: String?) -> Bool {
+    nonisolated func containsNormalized(_ value: String?) -> Bool {
         guard let value else { return false }
         let normalizedValue = CloudSyncRecordState.normalizedRecordId(value)
         return contains { CloudSyncRecordState.normalizedRecordId($0) == normalizedValue }

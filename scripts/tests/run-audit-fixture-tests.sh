@@ -127,7 +127,8 @@ assert_bad scripts/audit-economy-boundaries.sh "$fixtures/RecurringEconomyBounda
 assert_good scripts/audit-economy-boundaries.sh "$fixtures/RecurringEconomyBoundariesGood.swift"
 
 assert_bad scripts/audit-derived-state-lifecycle.sh "$fixtures/DerivedStateLifecycleBad.swift" \
-  derived-state-lifecycle-checklist physical-delete-without-tombstone
+  derived-state-lifecycle-checklist physical-delete-without-tombstone \
+  cloudsync-upload-builder-coverage physical-deletion-cascade-coverage
 assert_good scripts/audit-derived-state-lifecycle.sh "$fixtures/DerivedStateLifecycleGood.swift"
 
 assert_scope_floor scripts/audit-ui-v4.sh

@@ -69,3 +69,39 @@ a legacy fixture containing `ohana_shared_*` note prefixes.
 - [ ] Tune user-facing copy for iCloud unavailable, share invitation, accepted share, revoked access, retry pending, and offline states in all supported localization fallbacks.
 - [ ] Review member exit/removal permissions and decide which local data should remain visible after access is revoked.
 - [ ] Add any real-device-only regressions from CloudKit testing as targeted unit, integration, or manual QA checklist coverage.
+
+## CloudKit-Enable-Time Architecture (deferred from Domain review, 2026-06-14)
+
+These come from the Domain adversarial review (TFU-20260614-010/011/012/014).
+They are **unreachable at first release** because `cloudKitDatabase: .none`
+means no remote records ever arrive — `CloudSyncRecordApplier.apply /
+applyLiveRecord / applyHardDeletedRecord` cannot be triggered single-device.
+They are real and must be done **before CloudKit is enabled in 1.x**, when there
+is real remote data to validate against. Do **not** build this policy layer at
+first release: there is no remote data to test it, so it would be building on sand.
+
+- [ ] Build a `CloudSyncApplyDisposition` (or equivalent) policy layer: every
+  `applyXxx` first passes a single policy that decides **deletion-wins**,
+  **parent-active-required**, **owner-active-required**, and **natural-key
+  merge**, then performs entity mutation. No `applyXxx` mutates directly.
+- [ ] deletion-wins: a live remote Pet/Human/record must not resurrect a local
+  delete tombstone (TFU-014).
+- [ ] parent/owner lifecycle: late remote child/fact records must not insert
+  under a deleted/deceased parent (orphan guard) (TFU-014).
+- [ ] natural-key merge: `GachaOwnedItem` (and similar entities) must merge by natural key,
+  not random id, to avoid duplicate ownership projection (TFU-014).
+- [ ] remote delete must dispatch to the same domain delete outcome as local
+  physical delete (Pet/Human/Event/SharedCareSession/feeding fact+stock+reminder
+  cascade) — i.e. one delete dispatcher, not per-entity switches
+  (TFU-010/011/012).
+- [ ] remote CoconutLedger tombstone delete must replay the wallet account
+  projection (TFU-010).
+- [ ] upload builder must have a fetch case for every registered entity
+  (Gacha/Shop), enforced by the registry-coverage audit (TFU-013 upload side).
+
+> Reachability rule (applies to all module reviews): a finding that is provably
+> unreachable at first release (gated off by `.none` / a disabled feature gate /
+> a code path that cannot run single-device) does **not** block that module's
+> first-release 🏁. It must be logged here with the gate evidence, and the review
+> session must confirm the unreachability. First-release 🏁 = zero P0/P1 **within
+> the first-release-reachable surface**.

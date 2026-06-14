@@ -54,7 +54,7 @@ nonisolated enum SharedCareParticipantIDs {
     }
 }
 
-enum SharedCareMetadata {
+nonisolated enum SharedCareMetadata {
     static let legacyMetadataMarker = "ohana_shared_"
     static let feedNotePrefix = "ohana_shared_feed:"
     static let waterNotePrefix = "ohana_shared_water:"

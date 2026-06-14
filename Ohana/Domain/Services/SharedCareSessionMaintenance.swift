@@ -99,7 +99,7 @@ enum SharedCareLegacyNoteMaintenanceService {
     }
 }
 
-enum SharedCareSessionMaintenance {
+nonisolated enum SharedCareSessionMaintenance {
     struct LegacyMetadataScan {
         let sessionIDs: [UUID]
         let missingSessionIDs: [UUID]
@@ -130,7 +130,6 @@ enum SharedCareSessionMaintenance {
     }
 
     @discardableResult
-    @MainActor
     static func deleteCascade(
         _ session: SharedCareSession,
         context: ModelContext,
@@ -144,6 +143,7 @@ enum SharedCareSessionMaintenance {
         let hygieneLogs = fetchHygieneLogs(session: session, context: context)
         let expenseLogs = fetchExpenseLogs(sessionID: sessionID, context: context)
         let walkLogs = fetchWalkLogs(sessionID: sessionID, context: context)
+        let stockReminderPets = feedingStockReminderPets(affectedBy: careLogs)
         let ledgerEvents = ledgerEvents(
             careLogs: careLogs,
             pottyLogs: pottyLogs,
@@ -182,6 +182,7 @@ enum SharedCareSessionMaintenance {
         context.safeSave()
         markDeletedSharedSessionState(sessionID: sessionUUID, context: context, deletedAt: deletedAt, deletedByHumanId: deletedByHumanId)
         context.safeSave()
+        FeedingPlanWriter.rebuildFoodStockReminders(pets: stockReminderPets, context: context, now: deletedAt)
 
         return SharedCareSessionDeleteResult(
             sessionID: sessionUUID,
@@ -194,7 +195,6 @@ enum SharedCareSessionMaintenance {
         )
     }
 
-    @MainActor
     static func reconcileAfterDeletingChild(
         sharedSessionId: String,
         context: ModelContext,
@@ -436,7 +436,6 @@ enum SharedCareSessionMaintenance {
         )
     }
 
-    @MainActor
     static func reconcile(_ session: SharedCareSession, context: ModelContext, reconciledAt: Date = Date()) {
         let sessionID = session.id.uuidString
         let careLogs = fetchCareLogs(sessionID: sessionID, context: context)
@@ -488,7 +487,6 @@ enum SharedCareSessionMaintenance {
         )
     }
 
-    @MainActor
     private static func refreshStockOwnerMetadata(session: SharedCareSession, careLogs: [PetCareLog]) {
         let feedingLogs = careLogs.filter { $0.careType == .feeding }
         guard !feedingLogs.isEmpty else { return }
@@ -504,21 +502,18 @@ enum SharedCareSessionMaintenance {
         }
     }
 
-    @MainActor
     private static func refreshSharedCareMetadata(session _: SharedCareSession, careLogs: [PetCareLog]) {
         for log in careLogs where log.careType != .feeding {
             log.note = SharedCareMetadata.userNoteForStorage(log.note)
         }
     }
 
-    @MainActor
     private static func refreshExpenseMetadata(session _: SharedCareSession, expenseLogs: [PetExpenseLog]) {
         for log in expenseLogs {
             log.note = SharedCareMetadata.userNoteForStorage(log.note)
         }
     }
 
-    @MainActor
     private static func refreshWalkMetadata(session _: SharedCareSession, walkLogs: [PetWalkLog]) {
         for log in walkLogs {
             guard let notes = log.behaviorNotes else { continue }
@@ -527,7 +522,16 @@ enum SharedCareSessionMaintenance {
         }
     }
 
-    @MainActor
+    private static func feedingStockReminderPets(affectedBy careLogs: [PetCareLog]) -> [Pet] {
+        var seen = Set<UUID>()
+        var pets: [Pet] = []
+        for log in careLogs where log.careType == .feeding {
+            guard let pet = log.pet, seen.insert(pet.id).inserted else { continue }
+            pets.append(pet)
+        }
+        return pets
+    }
+
     private static func recoverStructuredMetadata(
         session: SharedCareSession,
         careLogs: [PetCareLog],
@@ -570,7 +574,6 @@ enum SharedCareSessionMaintenance {
         return changed
     }
 
-    @MainActor
     private static func recoverStockOwner(session: SharedCareSession, careLogs: [PetCareLog]) -> Bool {
         let feedingLogs = careLogs.filter { $0.careType == .feeding }
         guard !feedingLogs.isEmpty else { return false }
@@ -692,7 +695,6 @@ enum SharedCareSessionMaintenance {
         return result
     }
 
-    @MainActor
     private static func markReconciledFactsModified(
         session: SharedCareSession,
         careLogs: [PetCareLog],

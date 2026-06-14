@@ -23,7 +23,7 @@ enum FeedStockDailyBasis {
     case unavailable
 }
 
-enum FeedStockCalculator {
+nonisolated enum FeedStockCalculator {
     static func mainFoodLogs(
         for pet: Pet,
         foodKind: FeedFoodKind? = nil,

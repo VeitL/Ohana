@@ -138,7 +138,7 @@ enum FeedStockCalculationMode: String, CaseIterable, Identifiable {
     var id: String { rawValue }
 }
 
-enum FeedStockRecordMetadata {
+nonisolated enum FeedStockRecordMetadata {
     private static let calculationModePrefix = "stockCalculationMode:"
 
     static func calculationMode(from notes: String) -> FeedStockCalculationMode? {
@@ -171,7 +171,7 @@ enum FeedStockRecordMetadata {
     }
 }
 
-enum FeedLogMetadata {
+nonisolated enum FeedLogMetadata {
     static let autoFeedNotePrefix = "ohana_auto_feed:"
     static let treatFeedNoteMarker = "ohana_treat_feed"
 

@@ -338,10 +338,6 @@ enum PetHealthCommandService {
             nil
         }
     }
-
-    static func expirationEventTypeForDeletion(for type: HealthLogType) -> EventType? {
-        expirationEventType(for: type)
-    }
 }
 
 struct PetSymptomCommandInput: Equatable {
@@ -440,30 +436,6 @@ enum PetHealthDeleteCommandService {
     ) -> PetHealthDeleteResult {
         let recordID = log.id
         let deletedAt = Date()
-        let derived = derivedRecords(for: log, pet: pet, context: context)
-
-        for reminder in derived.reminders {
-            OhanaNotifications.current.cancel(notificationId: reminder.notificationId)
-            CloudSyncMutationRecorder.markDeleted(reminder, context: context, deletedAt: deletedAt)
-            context.delete(reminder)
-        }
-        for event in derived.events {
-            CloudSyncMutationRecorder.markDeleted(event, context: context, deletedAt: deletedAt)
-            context.delete(event)
-        }
-        for expense in derived.expenses {
-            PhysicalDeletionService.deletePetScopedRecord(
-                expense,
-                pet: pet,
-                context: context,
-                deletedAt: deletedAt
-            )
-        }
-        for ledger in derived.ledgerEvents {
-            CloudSyncMutationRecorder.markDeleted(ledger, context: context, deletedAt: deletedAt)
-            context.delete(ledger)
-        }
-
         PhysicalDeletionService.deletePetScopedRecord(log, pet: pet, context: context, deletedAt: deletedAt)
         context.safeSave()
         return PetHealthDeleteResult(
@@ -516,93 +488,6 @@ enum PetHealthDeleteCommandService {
         )
     }
 
-    private static func derivedRecords(
-        for log: PetHealthLog,
-        pet: Pet,
-        context: ModelContext
-    ) -> (expenses: [PetExpenseLog], events: [Event], reminders: [Reminder], ledgerEvents: [CareLedgerEvent]) {
-        let allLedger = fetchAll(CareLedgerEvent.self, context: context)
-        let healthLogId = log.id.uuidString
-        let directHealthLedger = allLedger.filter {
-            $0.legacyModelName == "PetHealthLog" && $0.legacyModelId == healthLogId
-        }
-
-        var events = eventsLinkedToHealthLog(log, pet: pet, healthLedger: directHealthLedger, context: context)
-        let eventIds = Set(events.map(\.id.uuidString))
-        var reminders = events.flatMap(\.reminders)
-        reminders += fetchAll(Reminder.self, context: context).filter { reminder in
-            guard let eventId = reminder.event?.id.uuidString else { return false }
-            return eventIds.contains(eventId)
-        }
-        reminders = unique(reminders, by: \.id)
-        let reminderIds = Set(reminders.map(\.id.uuidString))
-
-        let expenses = expensesLinkedToHealthLog(log, pet: pet, context: context)
-        let expenseIds = Set(expenses.map(\.id.uuidString))
-
-        var ledgerEvents = directHealthLedger
-        ledgerEvents += allLedger.filter { ledger in
-            if ledger.legacyModelName == "PetExpenseLog",
-               let legacyModelId = ledger.legacyModelId,
-               expenseIds.contains(legacyModelId) {
-                return true
-            }
-            if let sourceEventId = ledger.sourceEventId, eventIds.contains(sourceEventId) {
-                return true
-            }
-            if let sourceReminderId = ledger.sourceReminderId, reminderIds.contains(sourceReminderId) {
-                return true
-            }
-            return false
-        }
-
-        events = unique(events, by: \.id)
-        ledgerEvents = unique(ledgerEvents, by: \.id)
-        return (expenses, events, reminders, ledgerEvents)
-    }
-
-    private static func eventsLinkedToHealthLog(
-        _ log: PetHealthLog,
-        pet: Pet,
-        healthLedger: [CareLedgerEvent],
-        context: ModelContext
-    ) -> [Event] {
-        let allEvents = fetchAll(Event.self, context: context)
-        let sourceEventIds = Set(healthLedger.compactMap(\.sourceEventId))
-        var linked = allEvents.filter { sourceEventIds.contains($0.id.uuidString) }
-
-        if let expirationDate = log.expirationDate,
-           let eventType = PetHealthCommandService.expirationEventTypeForDeletion(for: log.healthLogType) {
-            linked += allEvents.filter { event in
-                event.relatedEntityType == EntityKind.pet.rawValue &&
-                    event.relatedEntityId == pet.id.uuidString &&
-                    event.eventType == eventType.rawValue &&
-                    abs(event.startDate.timeIntervalSince(expirationDate)) < 1
-            }
-        }
-        return unique(linked, by: \.id)
-    }
-
-    private static func expensesLinkedToHealthLog(
-        _ log: PetHealthLog,
-        pet: Pet,
-        context: ModelContext
-    ) -> [PetExpenseLog] {
-        guard log.cost > 0 else { return [] }
-        return fetchAll(PetExpenseLog.self, context: context).filter { expense in
-            guard expense.pet?.id == pet.id,
-                  expense.category == ExpenseCategory.medical.rawValue,
-                  abs(expense.amount - log.cost) < 0.001,
-                  abs(expense.date.timeIntervalSince(log.date)) < 1
-            else { return false }
-            return expense.note.isEmpty ||
-                log.note.isEmpty ||
-                log.note.localizedCaseInsensitiveContains(expense.note) ||
-                expense.note.localizedCaseInsensitiveContains(log.note) ||
-                expense.note == log.healthLogType.rawValue
-        }
-    }
-
     private static func deleteLedgerEvents(
         modelName: String,
         modelId: UUID,
@@ -621,10 +506,5 @@ enum PetHealthDeleteCommandService {
 
     private static func fetchAll<T: PersistentModel>(_: T.Type, context: ModelContext) -> [T] {
         (try? context.fetch(FetchDescriptor<T>())) ?? []
-    }
-
-    private static func unique<T, ID: Hashable>(_ values: [T], by keyPath: KeyPath<T, ID>) -> [T] {
-        var seen: Set<ID> = []
-        return values.filter { seen.insert($0[keyPath: keyPath]).inserted }
     }
 }

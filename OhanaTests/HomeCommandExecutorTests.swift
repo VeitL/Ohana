@@ -2464,6 +2464,58 @@ struct HomeCommandExecutorTests {
     }
 
     @MainActor
+    @Test func memberDeletionServiceDeletesHumanScopedGachaAndShopRecords() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let activeHuman = Human(name: "Guan")
+        let remainingHuman = Human(name: "Alex")
+        let ownedItem = GachaOwnedItem(
+            ownerHumanId: activeHuman.id.uuidString,
+            seriesId: GachaSeriesCatalog.defaultSeriesId,
+            itemId: "plush_coconut_sleepy",
+            rarity: .common,
+            ownedCount: 2
+        )
+        let drawLog = GachaDrawLog(
+            ownerHumanId: activeHuman.id.uuidString,
+            ownerName: activeHuman.name,
+            seriesId: GachaSeriesCatalog.defaultSeriesId,
+            itemId: "plush_coconut_sleepy",
+            rarity: .common,
+            isNew: true,
+            drawDate: makeDate(year: 2026, month: 6, day: 14)
+        )
+        let purchase = ShopPurchaseRecord(
+            transactionKey: "shop:fx_lime_glow:\(activeHuman.id.uuidString)",
+            itemId: "fx_lime_glow",
+            buyerHumanId: activeHuman.id.uuidString,
+            purchasedAt: makeDate(year: 2026, month: 6, day: 14)
+        )
+        context.insert(activeHuman)
+        context.insert(remainingHuman)
+        context.insert(ownedItem)
+        context.insert(drawLog)
+        context.insert(purchase)
+        try context.save()
+        let ownedItemId = ownedItem.id
+        let drawLogId = drawLog.id
+        let purchaseId = purchase.id
+
+        _ = MemberDeletionCommandService.deleteHuman(
+            activeHuman,
+            activeHumanID: activeHuman.id.uuidString,
+            context: context
+        )
+
+        #expect(try context.fetch(FetchDescriptor<GachaOwnedItem>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<GachaDrawLog>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<ShopPurchaseRecord>()).isEmpty)
+        #expect(try cloudSyncState(entityName: String(describing: GachaOwnedItem.self), id: ownedItemId, context: context)?.isDeletionTombstone == true)
+        #expect(try cloudSyncState(entityName: String(describing: GachaDrawLog.self), id: drawLogId, context: context)?.isDeletionTombstone == true)
+        #expect(try cloudSyncState(entityName: String(describing: ShopPurchaseRecord.self), id: purchaseId, context: context)?.isDeletionTombstone == true)
+    }
+
+    @MainActor
     @Test func memberDeletionServiceDeletesLastHumanAndRequestsReplacement() throws {
         let container = try makeInMemoryContainer()
         let context = container.mainContext

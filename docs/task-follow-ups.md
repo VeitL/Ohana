@@ -25,6 +25,228 @@ actionable; long-term product ideas belong in planning docs instead.
 
 ## Open Items
 
+### TFU-20260614-014 - Enforce CloudSync live-apply deletion wins, parent lifecycle, and natural identity
+
+- Status: Open (deferred to CloudKit 1.x; first-release unreachable while `cloudKitDatabase: .none`)
+- Priority: P1
+- Area: Domain / CloudSync / Physical Deletion / Parent Lifecycle / Gacha
+- Source task: Domain fresh pure adversarial review after local
+  TFU-20260614-013 repair; Codex, 2026-06-14.
+- Blocker: 本轮纯复审发现 P0=0 / P1=3 / P2=0，Domain 仍不能标
+  🏁。P1-1：`CloudSyncRecordApplier.apply` only skips a live remote record
+  when the same record key has an older `lastModifiedAt`; a newer live `Pet` or
+  `Human` record clears local deletion tombstone state and re-inserts the
+  deleted member, violating D8/G5 irreversible delete semantics. P1-2：live
+  child/fact apply paths do not enforce that the parent still exists and is
+  active; pet-scoped records fall back to `pet = nil`, and Gacha/Shop records
+  accept `ownerHumanId` / `buyerHumanId` even after that human was physically
+  deleted, so late remote records can recreate orphan data after a member
+  deletion. P1-3：`GachaOwnedItem` is a mutable ownership projection whose real
+  identity is `(ownerHumanId, seriesId, itemId)`, but CloudSync apply merges
+  only by random local id; concurrent devices can create duplicate ownership
+  rows instead of applying the declared `ownedCount` max policy to one record.
+- Next step: Do not patch per entity. First add red tests in
+  `CloudSyncMetadataServiceTests`: 1) local deleted `Human`/`Pet` tombstone plus
+  newer live remote record must not resurrect the member or clear tombstone; 2)
+  after `PhysicalDeletionService.deleteHuman/deletePet`, live remote child
+  records with that deleted owner/parent must be skipped/tombstoned, not
+  inserted as orphan rows; include Gacha/Shop and one pet-scoped fact; 3)
+  remote `GachaOwnedItem` with same owner+series+item but different id must
+  merge into the existing ownership projection and keep one row with max count.
+  Then implement one CloudSync live-apply disposition/policy layer that decides
+  delete-wins, parent existence/active eligibility, and natural-key merge before
+  entity-specific mutation.
+- Close condition: New red tests fail before implementation and pass after the
+  policy layer; `CloudSyncMetadataServiceTests`, `PhysicalDeletionServiceTests`,
+  `HomeCommandExecutorTests`, CloudSync/economy/derived audits,
+  `scripts/tests/run-audit-fixture-tests.sh`, `scripts/dev-check-changed.sh`,
+  module exit gate, push, and CI pass. Then run a fresh pure Domain review;
+  P0/P1=0 is required before Domain can be marked 🏁.
+- Progress: 2026-06-14 总览裁定该 live remote apply policy is 1.x work, not a
+  first-release blocker, because `cloudKitDatabase: .none` makes these paths
+  unreachable on the single-device first-release surface. The deferred
+  CloudKit-enable-time architecture is recorded in `docs/cloud-sync-todo.md`.
+  The first-release-reachable local physical deletion cascade was closed in a
+  separate Domain local-cascade round with registry-generated coverage audit,
+  entrance-family tests, `scripts/module-exit-gate.sh` PASS, and pending push /
+  CI / fresh pure review before Domain may be marked 🏁.
+
+### TFU-20260614-013 - Close Domain Gacha/Shop CloudSync upload and human-delete lifecycle gaps
+
+- Status: Open (repair implemented locally; pending final pure review and CI)
+- Priority: P1
+- Area: Domain / CloudSync / Physical Deletion / Gacha / Shop / Human Lifecycle
+- Source task: Domain TFU-20260614-012 repair followed by fresh pure
+  adversarial review; Codex, 2026-06-14.
+- Blocker: 修复 TFU-20260614-012 后，本轮全新纯对抗复审发现 P0=0 /
+  P1=2 / P2=0，Domain 仍不能标 🏁。P1-1：`CloudSyncEntityRegistry`
+  把 `GachaOwnedItem` / `GachaDrawLog` / `ShopPurchaseRecord` 列入
+  upload pipeline，业务入口也会写 dirty state，但
+  `CloudSyncUploadBatchBuilder.localModel` 没有对应 fetch 分支，dirty
+  payload 构建会抛 `missingLocalModel`，导致本地 Gacha/Shop 记录无法上传。
+  P1-2：`PhysicalDeletionService.deleteHuman` 的 human-scoped cascade 未删除
+  `GachaOwnedItem.ownerHumanId`、`GachaDrawLog.ownerHumanId`、
+  `ShopPurchaseRecord.buyerHumanId` 关联的记录；删除成员后仍留下人属收藏、
+  抽取日志和购买记录，违反 G5 “删除成员物理真删该成员所有记录”。同时
+  本地 recorder 只有 Gacha modified，没有 Gacha deleted overload，修删除
+  cascade 时必须补 sync tombstone 出口。
+- Next step: 先补红测，不先改实现：1) 在 `CloudSyncMetadataServiceTests`
+  插入三类 Gacha/Shop 实例并 mark dirty，断言
+  `CloudSyncUploadBatchBuilder.dirtyPayloads` 产出对应 payload，而不是
+  `missingLocalModel`；2) 在 physical/member deletion 测试插入同一 human
+  的 `GachaOwnedItem` / `GachaDrawLog` / `ShopPurchaseRecord`，调用
+  `MemberDeletionCommandService.deleteHuman`，断言三类记录物理删除并留下
+  sync tombstone；3) 补入口族测试或审计，证明 registry upload pipeline
+  新增实体时必须同时覆盖 serializer、applier、upload builder fetch、
+  mutation modified/deleted 和 physical deletion lifecycle（按实体能力）。
+  实现上补 upload builder fetch cases；human cascade 补 Gacha/Shop 删除并
+  写 tombstone，Gacha 需新增 markDeleted overload。
+- Close condition: 新红测先失败后修绿；CloudSync / PhysicalDeletion /
+  MemberDeletion / Gacha / Shop targeted simulator suites、
+  `scripts/audit-derived-state-lifecycle.sh --all`、
+  `scripts/audit-economy-boundaries.sh --all`、
+  `scripts/tests/run-audit-fixture-tests.sh`、`scripts/dev-check-changed.sh`
+  PASS；按用户要求跳过 CI 时须明确记录；随后另开全新 Domain 纯对抗复审，
+  P0/P1=0 才能把 Domain 标 🏁。
+- Progress: 2026-06-14 Codex repair session fixed the local implementation:
+  `CloudSyncUploadBatchBuilder` now has local-model fetch cases for
+  `GachaOwnedItem` / `GachaDrawLog` / `ShopPurchaseRecord`;
+  `CloudSyncMutationRecorder` now emits Gacha delete tombstones; and
+  `PhysicalDeletionService.deleteHuman` cascades human-owned Gacha/Shop records
+  with sync tombstones. Added red-to-green tests for upload payload construction
+  and member deletion cascade, plus `cloudsync-upload-builder-coverage` in
+  `scripts/audit-derived-state-lifecycle.sh` with bad/good fixtures. Validation
+  passed locally: `CloudSyncMetadataServiceTests` (94 tests),
+  `HomeCommandExecutorTests` (177 tests), `PhysicalDeletionServiceTests`
+  (4 tests), `scripts/tests/run-audit-fixture-tests.sh`,
+  `scripts/audit-derived-state-lifecycle.sh --all`,
+  `scripts/audit-economy-boundaries.sh --all`, `scripts/dev-check-changed.sh`,
+  and `git diff --check`. CI was intentionally skipped per user direction.
+  Domain remains 🟢 until a fresh pure adversarial review reports P0/P1=0.
+
+### TFU-20260614-012 - Rebuild feeding stock reminders on CloudSync remote deletes
+
+- Status: Open (repair implemented locally; superseded by TFU-20260614-013 for
+  remaining review P1)
+- Priority: P1
+- Area: Domain / CloudSync / Feeding / Stock Reminders / Delete Dispatch
+- Source task: Domain CloudSync delete-dispatch repair follow-up pure
+  adversarial review; Codex, 2026-06-14.
+- Blocker: 修复 TFU-20260614-011 后，本轮全新纯对抗复审发现
+  P0=0 / P1=1 / P2=0，Domain 仍不能标 🏁。P1：远端
+  `PetCareLog` / `PetFoodRecord` tombstone 或 hard deletion 现在会进入
+  `PhysicalDeletionService.deletePetScopedRecord`，可以删除 fact / ledger /
+  shared session，但没有执行本地喂食删除路径的
+  `FeedingPlanWriter.rebuildFoodStockReminders`。结果是库存事实已删，旧的
+  `pet_food_stock` Event/Reminder 仍按删除前库存存在；通知调度也不会被等价刷新。
+  本地 `FeedRecordCommand.deleteLog` 和 `deleteFoodRecord` 都会 rebuild stock
+  reminder，CloudSync 远端删除与本地 command 不等价，违反 G1/G4.1 的一动作一派生
+  与派生生命周期一致性。
+- Next step: 先补红测：在 `CloudSyncMetadataServiceTests` 构造启用断粮提醒的
+  active pet、`PetFoodRecord`、feeding `PetCareLog`、既有 `pet_food_stock`
+  Event/Reminder；分别 apply 远端 `PetCareLog` tombstone 与 `PetFoodRecord`
+  tombstone，断言旧 stock reminder 被删除/重建，必要的 notification cancel /
+  schedule 可由 fake scheduler 捕获。实现上不要在 switch 里继续散补；让 CloudSync
+  pet-scoped delete dispatcher 能返回 affected pet + derived families，并把 feeding
+  stock reminder rebuild 作为同边界派生步骤。同步补 derived-state lifecycle 审计
+  bad/good fixture，抓远端 feed fact / stock fact 删除后未重建 stock reminder 的坏例。
+- Close condition: 新红测先失败后修绿；CloudSync / Feeding / PhysicalDeletion
+  targeted simulator suites、`scripts/audit-derived-state-lifecycle.sh --all`、
+  `scripts/audit-economy-boundaries.sh --all`、
+  `scripts/tests/run-audit-fixture-tests.sh`、`scripts/dev-check-changed.sh`
+  PASS；按用户要求跳过 CI 时须明确记录；随后另开全新 Domain 纯对抗复审，
+  P0/P1=0 才能把 Domain 标 🏁。
+- Progress: 2026-06-14 Codex repair session fixed the original remote feeding
+  stock-reminder rebuild gap locally: remote feeding `PetCareLog` and
+  `PetFoodRecord` deletes now rebuild affected stock reminders; targeted
+  CloudSync tests and changed-file gates passed. Follow-up pure adversarial
+  review found two remaining Gacha/Shop CloudSync/delete lifecycle P1s, now
+  tracked separately in TFU-20260614-013. Domain remains 🟢.
+
+### TFU-20260614-011 - Close remaining Domain CloudSync delete dispatch gaps
+
+- Status: Open (repair implemented locally; superseded by TFU-20260614-012 for
+  remaining review P1)
+- Priority: P1
+- Area: Domain / CloudSync / Delete Dispatch / Notifications / SharedCare /
+  CareLedger
+- Source task: Domain CloudSync remote-delete repair plus follow-up pure
+  adversarial review; Codex, 2026-06-14.
+- Blocker: 修复 TFU-20260614-010 后，本轮全新纯对抗复审发现 P0=0 /
+  P1=2 / P2=1，Domain 仍不能标 🏁。P1-1：`CloudSyncRecordApplier`
+  对远端 `Event` tombstone / hard deletion 仍裸 `context.delete`，绕过
+  `PhysicalDeletionService.deleteEvent` 的 notification cancellation 与
+  reminder delete/mark boundary。P1-2：远端 `SharedCareSession` tombstone /
+  hard deletion 仍只删除 session 本体，绕过
+  `SharedCareSessionMaintenance.deleteCascade`，可留下 child care/potty/
+  hygiene/expense/walk facts 与 `CareLedgerEvent` orphan。P2：远端
+  Pet-scoped fact tombstones（care/potty/hygiene/expense/walk 等）仍裸删
+  单个 fact，没有消费本地 command delete boundary 的 ledger 清理与 shared
+  session reconcile；如果配套 tombstone 延迟或丢失，会出现短期派生不一致。
+- Next step: 禁止继续扩大 `deleteLocalModel` 的裸 switch 补丁；先补红测再改
+  架构。红测至少覆盖：远端 Event tombstone 取消本机通知并删除/标记 reminders；
+  远端 SharedCareSession tombstone 级联 child facts + ledger；远端 PetCareLog /
+  PetExpenseLog / PetWalkLog tombstone 要么消费 typed domain delete dispatcher，
+  要么证明同 batch ledger/session tombstones 到达前不会暴露不一致。实现应引入
+  CloudSync delete disposition/dispatcher，把 entity family 映射到
+  `PhysicalDeletionService`、`SharedCareSessionMaintenance`、pet fact command
+  delete 等等价边界；`R6`/derived-state lifecycle 审计补 bad/good fixture，抓
+  remote delete applier 裸删派生 state。
+- Close condition: 新红测先失败后修绿；CloudSync / PhysicalDeletion /
+  SharedCare / notification / CareLedger targeted simulator suites、
+  `scripts/audit-derived-state-lifecycle.sh --all`、
+  `scripts/audit-economy-boundaries.sh --all`、
+  `scripts/tests/run-audit-fixture-tests.sh` 和 `scripts/module-exit-gate.sh`
+  PASS；随后另开全新 Domain 纯对抗复审，P0/P1=0 才能把 Domain 标 🏁。
+- Progress: 2026-06-14 Codex repair session fixed the original Event /
+  SharedCareSession / pet-scoped fact delete gaps locally: remote Event deletes
+  now call `PhysicalDeletionService.deleteEvent`; remote SharedCareSession
+  deletes call `SharedCareSessionMaintenance.deleteCascade`; remote pet-scoped
+  fact deletes call `PhysicalDeletionService.deletePetScopedRecord`, clearing
+  ledger and reconciling shared sessions. Follow-up pure adversarial review found
+  one remaining CloudSync feeding stock-reminder derived-state gap, now tracked
+  separately in TFU-20260614-012. Domain remains 🟢.
+
+### TFU-20260614-010 - Close Domain CloudSync remote-delete side effects
+
+- Status: Open
+- Priority: P1
+- Area: Domain / CloudSync / Physical Deletion / Wallet / CareLedger
+- Source task: Domain fresh pure adversarial review after `f5cc637c8`; Codex
+  pure review session, 2026-06-14.
+- Blocker: 本轮 Domain 全新纯对抗复审（禁止业务代码修改）发现 P0=0 / P1=2 /
+  P2=0，Domain 不能标 🏁。P1-1：`CloudSyncRecordApplier` apply 远端
+  Pet/Human tombstone 或 CloudKit hard deletion 时只走裸 `context.delete`，绕过
+  `PhysicalDeletionService.deletePet/deleteHuman` 的 wallet account、wallet ledger、
+  care ledger、shared session 字符串引用级联，远端删除传播后本机可留下孤儿派生状态。
+  P1-2：同一 delete applier 删除远端 `CoconutLedgerEntry` tombstone 时也只裸删
+  ledger，不像远端 ledger 插入/更新那样调用
+  `CoconutWalletService.reconcileFormalAccountBalancesWithLedger`，导致
+  `CoconutAccount` / member balance projection 继续保留旧余额，违反 G2 可重放。
+- Next step: 先补红测，不先改实现：在 `CloudSyncMetadataServiceTests` 加远端 Pet
+  tombstone / hard deletion 场景，预置 `CoconutAccount`、`CoconutLedgerEntry`、
+  `CareLedgerEvent`、`SharedCareSession` 关联 deleted pet，断言 apply 后无 orphan 且
+  island total 回到 ledger replay；再加远端 `CoconutLedgerEntry` tombstone 场景，预置
+  account balance 与 ledger entry，断言 apply 后立即 replay 到 0。修复应在
+  CloudSync delete boundary 统一调用 domain deletion/reconcile 等等价 typed delete
+  outcome，而不是继续逐 entity 裸删；同时补 derived-state lifecycle / audit fixture，
+  让 CloudSync delete applier 不能绕过 cascade/replay 纪律。
+- Close condition: 新红测先失败后修绿；`scripts/audit-economy-boundaries.sh --all`、
+  `scripts/audit-derived-state-lifecycle.sh --all`、CloudSync/PhysicalDeletion/
+  CoconutWallet targeted simulator suites、`scripts/tests/run-audit-fixture-tests.sh`、
+  `scripts/module-exit-gate.sh` 与 CI PASS；随后另开全新 Domain 纯对抗复审，P0/P1=0
+  才能把 Domain 标 🏁。
+- Progress: 2026-06-14 Codex repair session fixed the original two P1s locally:
+  remote Pet/Human tombstone and hard deletion now route through
+  `PhysicalDeletionService.deletePet/deleteHuman`, and remote
+  `CoconutLedgerEntry` tombstone replays wallet projection through
+  `CoconutWalletService.reconcileFormalAccountBalancesWithLedger`. Added
+  red-to-green tests in `CloudSyncMetadataServiceTests`; targeted simulator
+  suites and audits passed locally. CI was skipped by user request. Follow-up
+  pure adversarial review found additional same-family CloudSync delete dispatch
+  gaps, now tracked in TFU-20260614-011, so Domain remains 🟢 and this item
+  stays open until a fresh review reports P0/P1=0.
+
 ### TFU-20260614-009 - Close Domain current-code pure-review P1s before maturity
 
 - Status: Open (repair implemented locally; awaiting CI and fresh pure review)
@@ -81,6 +303,10 @@ actionable; long-term product ideas belong in planning docs instead.
   `scripts/tests/run-audit-fixture-tests.sh`, and `scripts/module-exit-gate.sh`
   (841 unit tests + 3 UI template tests). Still open until the repair commit is
   pushed, CI is green, and a new pure adversarial Domain review reports P0/P1=0.
+- Progress: 2026-06-14 Codex fresh pure review after repair commit `f5cc637c8`
+  confirmed the local care chokepoint / shared / reminder / physical-deletion /
+  wallet targeted suites pass, but found new CloudSync remote-delete P1s tracked
+  separately in TFU-20260614-010. Domain remains 🟢 and cannot be marked 🏁.
 
 ### TFU-20260614-008 - Repair pre-existing CI architecture-boundary gate
 
