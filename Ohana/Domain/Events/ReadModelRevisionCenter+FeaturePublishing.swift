@@ -181,6 +181,69 @@ extension ReadModelRevisionCenter {
         )
     }
 
+    func publishReminderCommand(_ result: ReminderCommandResult, note: String) {
+        var affected: Set<UUID> = [result.reminderID]
+        if let eventID = result.eventID {
+            affected.insert(eventID)
+        }
+        publish(
+            DomainMutationResult(
+                command: .reminderCompletion(reminderID: result.reminderID),
+                affectedEntityIDs: affected,
+                wroteBusinessFact: true,
+                note: note
+            )
+        )
+    }
+
+    func publishFamilyTask(_ command: FamilyTaskCommand, wroteBusinessFact: Bool) {
+        publish(
+            DomainMutationResult(
+                command: command.domainCommand,
+                affectedEntityIDs: command.affectedEntityIDs,
+                wroteBusinessFact: wroteBusinessFact,
+                note: command.revisionNote
+            )
+        )
+    }
+
+    func publishLegacyBounty(taskID: UUID, action: String, note: String) {
+        publish(
+            DomainMutationResult(
+                command: .legacyBounty(taskID: taskID, action: action),
+                affectedEntityIDs: [taskID],
+                wroteBusinessFact: true,
+                note: note
+            )
+        )
+    }
+
+    func publishSharedCareSessionDelete(
+        _ result: SharedCareSessionDeleteResult,
+        sourcePetID: UUID,
+        note: String
+    ) {
+        var affected: Set<UUID> = [sourcePetID, result.sessionID]
+        affected.formUnion(result.careLogIDs)
+        affected.formUnion(result.pottyLogIDs)
+        affected.formUnion(result.hygieneLogIDs)
+        affected.formUnion(result.expenseLogIDs)
+        affected.formUnion(result.walkLogIDs)
+        affected.formUnion(result.ledgerEventIDs)
+        publish(
+            DomainMutationResult(
+                command: .command(
+                    "petMoments",
+                    "deleteSharedCareSession",
+                    ["sessionId": result.sessionID.uuidString]
+                ),
+                affectedEntityIDs: affected,
+                wroteBusinessFact: true,
+                note: note
+            )
+        )
+    }
+
     func publishCalendarEventDeletion(
         _ outcome: CalendarEventDeletionOutcome,
         scope: CalendarEventDeletionScope,

@@ -104,13 +104,6 @@ struct FamilyCollaborationCommandExecutor {
     }
 
     private func publish(_ command: FamilyTaskCommand, wroteBusinessFact: Bool = true) {
-        revisions.publish(
-            DomainMutationResult(
-                command: command.domainCommand,
-                affectedEntityIDs: command.affectedEntityIDs,
-                wroteBusinessFact: wroteBusinessFact,
-                note: command.revisionNote
-            )
-        )
+        revisions.publishFamilyTask(command, wroteBusinessFact: wroteBusinessFact)
     }
 }

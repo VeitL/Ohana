@@ -117,6 +117,17 @@ extension ReadModelRevisionCenter {
         )
     }
 
+    func publishMemberCreation(entityID: UUID, kind: String, note: String) {
+        publish(
+            DomainMutationResult(
+                command: .memberCreation(entityID: entityID, kind: kind),
+                affectedEntityIDs: [entityID],
+                wroteBusinessFact: true,
+                note: note
+            )
+        )
+    }
+
     func publishPetCardAppearance(_ result: PetCardAppearanceCommandResult, note: String) {
         publish(
             DomainMutationResult(

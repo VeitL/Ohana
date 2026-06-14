@@ -334,13 +334,10 @@ struct HumanCareCommandExecutor {
             reminderEnabled: reminderEnabled,
             medicationReminders: medicationReminders
         ) else {
-            revisions.publish(
-                DomainMutationResult(
-                    command: .quickHumanMedication(humanID: human.id),
-                    affectedEntityIDs: [human.id],
-                    wroteBusinessFact: false,
-                    note: emptyNote
-                )
+            revisions.publishNoop(
+                command: .quickHumanMedication(humanID: human.id),
+                affectedEntityIDs: [human.id],
+                note: emptyNote
             )
             return nil
         }
@@ -365,13 +362,10 @@ struct HumanCareCommandExecutor {
             scheduleReminders: scheduleReminders,
             medicationReminders: medicationReminders
         ) else {
-            revisions.publish(
-                DomainMutationResult(
-                    command: .humanMedicationPlan(humanID: human.id, medicationID: existingMedication?.id),
-                    affectedEntityIDs: [human.id],
-                    wroteBusinessFact: false,
-                    note: emptyNote
-                )
+            revisions.publishNoop(
+                command: .humanMedicationPlan(humanID: human.id, medicationID: existingMedication?.id),
+                affectedEntityIDs: [human.id],
+                note: emptyNote
             )
             return nil
         }
@@ -472,13 +466,10 @@ struct HumanCareCommandExecutor {
             notes: notes,
             context: context
         ) else {
-            revisions.publish(
-                DomainMutationResult(
-                    command: .humanHealthMetric(humanID: human.id, metricKey: metricKey),
-                    affectedEntityIDs: [human.id],
-                    wroteBusinessFact: false,
-                    note: emptyNote
-                )
+            revisions.publishNoop(
+                command: .humanHealthMetric(humanID: human.id, metricKey: metricKey),
+                affectedEntityIDs: [human.id],
+                note: emptyNote
             )
             return nil
         }
@@ -522,13 +513,10 @@ struct HumanCareCommandExecutor {
             scheduleNotification: scheduleNotification,
             reminderScheduling: reminderScheduling
         ) else {
-            revisions.publish(
-                DomainMutationResult(
-                    command: .humanNote(humanID: human.id),
-                    affectedEntityIDs: [human.id],
-                    wroteBusinessFact: false,
-                    note: emptyNote
-                )
+            revisions.publishNoop(
+                command: .humanNote(humanID: human.id),
+                affectedEntityIDs: [human.id],
+                note: emptyNote
             )
             return nil
         }

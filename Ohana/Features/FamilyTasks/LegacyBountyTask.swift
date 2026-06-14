@@ -109,8 +109,8 @@ struct LegacyBountyCommandExecutor {
         current.insert(task, at: 0)
         return persist(
             current,
-            command: .legacyBounty(taskID: task.id, action: "create"),
-            affected: [task.id],
+            taskID: task.id,
+            action: "create",
             note: "legacy.bounty.create"
         )
     }
@@ -119,8 +119,8 @@ struct LegacyBountyCommandExecutor {
         let current = tasks.filter { $0.id != id }
         return persist(
             current,
-            command: .legacyBounty(taskID: id, action: "delete"),
-            affected: [id],
+            taskID: id,
+            action: "delete",
             note: "legacy.bounty.delete"
         )
     }
@@ -169,27 +169,20 @@ struct LegacyBountyCommandExecutor {
 
         return persist(
             current,
-            command: .legacyBounty(taskID: id, action: "complete"),
-            affected: [id],
+            taskID: id,
+            action: "complete",
             note: "legacy.bounty.complete"
         )
     }
 
     private func persist(
         _ tasks: [BountyTask],
-        command: DomainCommand,
-        affected: Set<UUID>,
+        taskID: UUID,
+        action: String,
         note: String
     ) -> String? {
         guard let raw = BountyTask.encode(tasks) else { return nil }
-        revisions.publish(
-            DomainMutationResult(
-                command: command,
-                affectedEntityIDs: affected,
-                wroteBusinessFact: true,
-                note: note
-            )
-        )
+        revisions.publishLegacyBounty(taskID: taskID, action: action, note: note)
         return raw
     }
 }

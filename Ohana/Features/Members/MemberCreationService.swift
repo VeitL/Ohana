@@ -450,13 +450,7 @@ final class MemberCreationService: MemberCreating {
     }
 
     private func publishMemberCreation(id: UUID, kind: String, revisions: DomainRevisionPublishing) {
-        revisions.publish(
-            DomainMutationResult(
-                command: .memberCreation(entityID: id, kind: kind),
-                affectedEntityIDs: [id],
-                note: kind
-            )
-        )
+        revisions.publishMemberCreation(entityID: id, kind: kind, note: kind)
     }
 
     private func speciesEmoji(_ species: String) -> String {

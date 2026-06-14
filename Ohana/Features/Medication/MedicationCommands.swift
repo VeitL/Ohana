@@ -620,13 +620,10 @@ struct PetMedicationCommandExecutor {
             scheduleReminders: scheduleReminders,
             medicationReminders: medicationReminders
         ) else {
-            revisions.publish(
-                DomainMutationResult(
-                    command: .petMedicationPlan(petID: pet.id, medicationID: existingMedication?.id),
-                    affectedEntityIDs: [pet.id],
-                    wroteBusinessFact: false,
-                    note: emptyNote
-                )
+            revisions.publishNoop(
+                command: .petMedicationPlan(petID: pet.id, medicationID: existingMedication?.id),
+                affectedEntityIDs: [pet.id],
+                note: emptyNote
             )
             return nil
         }

@@ -471,17 +471,9 @@ struct PetMomentsHubView: View {
             context: modelContext,
             deletedByHumanId: activeHumanId.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
         )
-        var affected: Set<UUID> = [pet.id, result.sessionID]
-        affected.formUnion(result.careLogIDs)
-        affected.formUnion(result.pottyLogIDs)
-        affected.formUnion(result.hygieneLogIDs)
-        affected.formUnion(result.expenseLogIDs)
-        affected.formUnion(result.walkLogIDs)
-        affected.formUnion(result.ledgerEventIDs)
-        appServices.domainRevisions.publishDomainMutation(
-            command: .command("petMoments", "deleteSharedCareSession", ["sessionId": result.sessionID.uuidString]),
-            affectedEntityIDs: affected,
-            wroteBusinessFact: true,
+        appServices.domainRevisions.publishSharedCareSessionDelete(
+            result,
+            sourcePetID: pet.id,
             note: "petMoments.sharedSession.delete"
         )
         pendingSharedSessionDelete = nil

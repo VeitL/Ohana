@@ -233,7 +233,7 @@ struct CareDerivationExecutor {
 
     private func publishRevisionIfNeeded(
         _ payload: CareWriteOutcome.RevisionPayload?,
-        token _: CareDerivationToken
+        token: CareDerivationToken
     ) -> Bool {
         guard let payload else { return false }
         revisions.publish(
@@ -242,7 +242,8 @@ struct CareDerivationExecutor {
                 affectedEntityIDs: payload.affectedEntityIDs,
                 wroteBusinessFact: true,
                 note: payload.note
-            )
+            ),
+            token: token
         )
         return true
     }

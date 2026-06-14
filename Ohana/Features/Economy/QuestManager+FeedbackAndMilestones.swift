@@ -45,10 +45,9 @@ extension QuestManager {
     }
 
     func publishCoconutProjectionRevision(note: String) {
-        revisions.publishDomainMutation(
+        revisions.publishNoop(
             command: .settingsCoconutBalance(humanID: nil, amount: coconutCount),
             affectedEntityIDs: [],
-            wroteBusinessFact: false,
             note: note
         )
     }

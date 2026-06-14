@@ -211,14 +211,7 @@ struct EventCompletionCommandExecutor {
             now: now
         )
         if result.awarded {
-            revisions.publish(
-                DomainMutationResult(
-                    command: .todayFocus(entityID: event.id, action: "eventCompleteReward"),
-                    affectedEntityIDs: [event.id],
-                    wroteBusinessFact: true,
-                    note: note
-                )
-            )
+            revisions.publishEventCompletionReward(result, eventID: event.id, note: note)
         }
         return result
     }
@@ -539,12 +532,10 @@ struct CalendarCommandExecutor {
             context: context,
             reminderScheduling: reminderScheduling
         ) else {
-            revisions.publish(
-                DomainMutationResult(
-                    command: command,
-                    wroteBusinessFact: false,
-                    note: "calendar.event.create.empty"
-                )
+            revisions.publishNoop(
+                command: command,
+                affectedEntityIDs: [],
+                note: "calendar.event.create.empty"
             )
             return nil
         }
@@ -777,18 +768,7 @@ struct ReminderCommandExecutor {
             eventID: reminder.event?.id,
             action: action
         )
-        var affected: Set<UUID> = [result.reminderID]
-        if let eventID = result.eventID {
-            affected.insert(eventID)
-        }
-        revisions.publish(
-            DomainMutationResult(
-                command: .reminderCompletion(reminderID: result.reminderID),
-                affectedEntityIDs: affected,
-                wroteBusinessFact: true,
-                note: note
-            )
-        )
+        revisions.publishReminderCommand(result, note: note)
         return result
     }
 }

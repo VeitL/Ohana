@@ -8,19 +8,22 @@ protocol DomainRevisionPublishing {
     var homeRevisionUpdates: AnyPublisher<HomeRevision, Never> { get }
     var coconutRewardEvents: AnyPublisher<OhanaCoconutRewardEvent, Never> { get }
 
-    func publish(_ result: DomainMutationResult)
+    func publish(_ result: DomainMutationResult, token: CareDerivationToken)
     func publishDomainMutation(
         command: DomainCommand,
         affectedEntityIDs: Set<UUID>,
         wroteBusinessFact: Bool,
-        note: String
+        note: String,
+        token: CareDerivationToken
     )
+    func publishNoop(command: DomainCommand, affectedEntityIDs: Set<UUID>, note: String)
     func publishCoconutRewardFeedback(_ event: OhanaCoconutRewardEvent)
     func publishFailure(command: DomainCommand, error: Error)
     func publishSettingsActiveHumanSwitch(_ result: SettingsActiveHumanSwitchCommandResult, note: String)
     func publishSettingsCoconutBalance(_ result: SettingsCoconutBalanceCommandResult, note: String)
     func publishHumanPrivacy(_ result: HumanPrivacyCommandResult, note: String)
     func publishMemberCreation(_ result: PlantCreationCommandResult, note: String)
+    func publishMemberCreation(entityID: UUID, kind: String, note: String)
     func publishMemberDeletion(_ result: MemberDeletionCommandResult, note: String)
     func publishMemberProfile(_ result: MemberProfileCommandResult, note: String)
     func publishMemberProfileChange(entityID: UUID, kind: String, note: String)
@@ -36,9 +39,18 @@ protocol DomainRevisionPublishing {
     func publishPlantCare(_ result: PlantCareCommandResult, note: String)
     func publishCalendarEventPlan(_ result: CalendarEventPlanCommandResult, relatedEntityId: String, note: String)
     func publishCalendarEventCompletion(_ result: CalendarEventCompletionResult, note: String)
+    func publishEventCompletionReward(_ result: EventCompletionRewardResult, eventID: UUID, note: String)
     func publishCalendarEventDeletion(
         _ outcome: CalendarEventDeletionOutcome,
         scope: CalendarEventDeletionScope,
+        note: String
+    )
+    func publishReminderCommand(_ result: ReminderCommandResult, note: String)
+    func publishFamilyTask(_ command: FamilyTaskCommand, wroteBusinessFact: Bool)
+    func publishLegacyBounty(taskID: UUID, action: String, note: String)
+    func publishSharedCareSessionDelete(
+        _ result: SharedCareSessionDeleteResult,
+        sourcePetID: UUID,
         note: String
     )
     func publishQuickMoment(_ result: MomentCommandResult, petID: UUID?, note: String)
@@ -128,7 +140,7 @@ final class SharedDomainRevisionPublisher: DomainRevisionPublishing {
         center.coconutRewardEvents
     }
 
-    func publish(_ result: DomainMutationResult) {
+    func publish(_ result: DomainMutationResult, token _: CareDerivationToken) {
         center.publish(result)
     }
 
@@ -136,13 +148,25 @@ final class SharedDomainRevisionPublisher: DomainRevisionPublishing {
         command: DomainCommand,
         affectedEntityIDs: Set<UUID>,
         wroteBusinessFact: Bool,
-        note: String
+        note: String,
+        token _: CareDerivationToken
     ) {
         center.publishDomainMutation(
             command: command,
             affectedEntityIDs: affectedEntityIDs,
             wroteBusinessFact: wroteBusinessFact,
             note: note
+        )
+    }
+
+    func publishNoop(command: DomainCommand, affectedEntityIDs: Set<UUID>, note: String) {
+        center.publish(
+            DomainMutationResult(
+                command: command,
+                affectedEntityIDs: affectedEntityIDs,
+                wroteBusinessFact: false,
+                note: note
+            )
         )
     }
 
@@ -168,6 +192,10 @@ final class SharedDomainRevisionPublisher: DomainRevisionPublishing {
 
     func publishMemberCreation(_ result: PlantCreationCommandResult, note: String) {
         center.publishMemberCreation(result, note: note)
+    }
+
+    func publishMemberCreation(entityID: UUID, kind: String, note: String) {
+        center.publishMemberCreation(entityID: entityID, kind: kind, note: note)
     }
 
     func publishMemberDeletion(_ result: MemberDeletionCommandResult, note: String) {
@@ -230,12 +258,36 @@ final class SharedDomainRevisionPublisher: DomainRevisionPublishing {
         center.publishCalendarEventCompletion(result, note: note)
     }
 
+    func publishEventCompletionReward(_ result: EventCompletionRewardResult, eventID: UUID, note: String) {
+        center.publishEventCompletionReward(result, eventID: eventID, note: note)
+    }
+
     func publishCalendarEventDeletion(
         _ outcome: CalendarEventDeletionOutcome,
         scope: CalendarEventDeletionScope,
         note: String
     ) {
         center.publishCalendarEventDeletion(outcome, scope: scope, note: note)
+    }
+
+    func publishReminderCommand(_ result: ReminderCommandResult, note: String) {
+        center.publishReminderCommand(result, note: note)
+    }
+
+    func publishFamilyTask(_ command: FamilyTaskCommand, wroteBusinessFact: Bool) {
+        center.publishFamilyTask(command, wroteBusinessFact: wroteBusinessFact)
+    }
+
+    func publishLegacyBounty(taskID: UUID, action: String, note: String) {
+        center.publishLegacyBounty(taskID: taskID, action: action, note: note)
+    }
+
+    func publishSharedCareSessionDelete(
+        _ result: SharedCareSessionDeleteResult,
+        sourcePetID: UUID,
+        note: String
+    ) {
+        center.publishSharedCareSessionDelete(result, sourcePetID: sourcePetID, note: note)
     }
 
     func publishQuickMoment(_ result: MomentCommandResult, petID: UUID?, note: String) {
