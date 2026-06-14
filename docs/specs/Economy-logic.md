@@ -59,7 +59,7 @@
   - 判定：强行迁入家族 1 若需要伪造一个 `CareType`，即属家族 2，禁止过度收口（避免错误抽象）。
   - 花费归属家族 2 且含 human expense（pet/human 对称，D10），不按宠物/人类拆分。
 - ECO-025（待复查，farm-risk）：花费记录当前可产出椰子奖励，存在"记假账→刷椰子"的潜在 farm 向量。本条登记为开放复查（见 `docs/task-follow-ups.md` TFU-20260613-010），D2 中间路线下需单独审"记录花费是否应发奖/限额"，本轮收口重构不处理。
-- ECO-026（冻结成员照护行为，2026-06-14 产品主人拍板二态模型，实现 G4.1）：① active 照护对象正常写事实，所有 reward / ledger / reminder / stock / Oasis / revision 派生必须统一经照护派生执行器裁决；② 离世成员（`hasPassedAway`）作为照护对象或 executor 时完全只读，任何照护写入、编辑、历史补记和派生都必须 no-op；③ 用户可见回收站 / 可恢复删除 / 删除中转态取消，旧软删字段仅允许作为 legacy store compatibility 存在，不再作为照护写入或钱包写入边界；④ 非空显式 executor id 若不可解析、已被物理删除或不可写，**不得丢失 active 照护对象的事实**：事实仍写入，奖励归属走明确 fallback（可写 active human；没有可用 owner 则事实-only 无奖励），且不得把奖励伪装成原 executor；⑤ 共享照护 target 解析必须只接受 active target，离世 target 被过滤或整体 no-op，不允许半笔账。
+- ECO-026（冻结成员照护行为，2026-06-14 产品主人拍板二态模型，实现 G4.1）：① active 照护对象正常写事实，所有 reward / ledger / reminder / stock / Oasis / revision 派生必须统一经照护派生执行器裁决；② 离世成员（`hasPassedAway`）作为照护对象时完全只读，任何照护写入、编辑、历史补记和派生都必须 no-op；③ 用户可见回收站 / 可恢复删除 / 删除中转态取消，旧软删字段仅允许作为 legacy store compatibility 存在，不再作为照护写入或钱包写入边界；④ 非空显式 executor id 若不可解析、已被物理删除或不可写（含离世），**不得丢失 active 照护对象的事实**：事实仍写入，奖励归属走明确 fallback（可写 active human；没有可用 owner 则 fact-only 无奖励），且不得把奖励伪装成原 executor；⑤ 共享照护 target 解析必须只接受 active target，离世 target 被过滤或整体 no-op，不允许半笔账。
 - ECO-027（补记奖励按操作日，强化 ECO-010 至所有完成入口）：Calendar / 通知 / Today Focus / QuickCare 补完成历史 occurrence 时，active 照护对象的照护事实保留历史日期，但奖励的预算/冷却结算必须按**操作当日 dayKey**，不得写入历史 dayKey 绕过今日预算触顶。离世照护对象不补写历史事实。所有"完成照护任务"的入口一致适用。
 
 ## 当前代码来源

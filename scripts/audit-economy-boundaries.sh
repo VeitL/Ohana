@@ -314,7 +314,7 @@ CARE_FACT_DISPOSITION_CONSUME_RE = re.compile(
     r"\b(?:didWriteFact|didRecord|allowsDerivedEffects|disposition|writesFact)\b"
 )
 CARE_FACT_WRITE_POLICY_CONSUME_RE = re.compile(
-    r"\b(?:CareFactWritePolicy\.(?:disposition|executorCannotWrite)|didWriteFact|allowsDerivedEffects|disposition)\b"
+    r"\b(?:CareFactWritePolicy\.disposition|didWriteFact|allowsDerivedEffects|disposition)\b"
 )
 PET_MEDICATION_DOSE_RESULT_CONSUME_RE = re.compile(r"\bdidRecord\b")
 CARE_COMMAND_RESULT_CALL_RE = re.compile(
@@ -651,15 +651,14 @@ def scan_secondary_executor_write_policy(path: pathlib.Path, lines: list[str], w
         if "economy-boundary: allow" in window:
             continue
         if "anyExecutorCannotWrite" in window or "executorIdsCannotWrite" in window:
-            continue
-        add(
-            warnings,
-            "care-secondary-executor-policy-unchecked",
-            path_str,
-            idx,
-            line,
-            "Secondary explicit care executor ids must be validated with EconomyWalletWritePolicy/CareFactWritePolicy before walk/session facts, ledger, reward, or metadata writes.",
-        )
+            add(
+                warnings,
+                "care-secondary-executor-policy-unchecked",
+                path_str,
+                idx,
+                line,
+                "Secondary explicit care executor ids must not gate active-target fact writes; unresolved/non-writable executors are handled by reward-owner fallback, not by dropping the fact.",
+            )
 
 
 def scan_care_derivation_direct_publish(path: pathlib.Path, lines: list[str], warnings: list[WarningItem]) -> None:

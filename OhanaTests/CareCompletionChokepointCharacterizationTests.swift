@@ -53,7 +53,7 @@ struct CareCompletionChokepointCharacterizationTests {
         #expect(medicationReminders.recordedMedicationIDs == [medication.id])
     }
 
-    @Test func medicationDoseNoopsForDeceasedExecutorBeforeFactLedgerAndReminder() throws {
+    @Test func medicationDoseWritesForDeceasedExecutorThroughFallbackOwner() throws {
         let container = try makeContainer()
         let context = container.mainContext
         let activeHuman = Human(name: "Active")
@@ -88,15 +88,17 @@ struct CareCompletionChokepointCharacterizationTests {
             medicationReminders: medicationReminders
         )
 
-        #expect(try context.fetch(FetchDescriptor<Event>()).isEmpty)
-        #expect(try context.fetch(FetchDescriptor<CareLedgerEvent>()).isEmpty)
-        #expect(try context.fetch(FetchDescriptor<CoconutLedgerEntry>()).isEmpty)
-        #expect(try context.fetch(FetchDescriptor<EconomyBudgetUsageEvent>()).isEmpty)
-        #expect(medication.remainingAmount == 5)
-        #expect(medicationReminders.recordedMedicationIDs.isEmpty)
+        let walletEntries = try context.fetch(FetchDescriptor<CoconutLedgerEntry>())
+        #expect(try context.fetch(FetchDescriptor<Event>()).count == 1)
+        #expect(!(try context.fetch(FetchDescriptor<CareLedgerEvent>())).isEmpty)
+        #expect(walletEntries.contains { $0.ownerId == activeHuman.id.uuidString && $0.delta > 0 })
+        #expect(walletEntries.allSatisfy { $0.ownerId != executor.id.uuidString })
+        #expect(!(try context.fetch(FetchDescriptor<EconomyBudgetUsageEvent>())).isEmpty)
+        #expect(medication.remainingAmount == 4)
+        #expect(medicationReminders.recordedMedicationIDs == [medication.id])
     }
 
-    @Test func medicationDoseCommandExecutorPropagatesNoopBeforeRevisionReminderAndFeedback() throws {
+    @Test func medicationDoseCommandExecutorPublishesForDeceasedExecutorFallbackOwner() throws {
         let container = try makeContainer()
         let context = container.mainContext
         let activeHuman = Human(name: "Active")
@@ -133,17 +135,19 @@ struct CareCompletionChokepointCharacterizationTests {
             pet: pet,
             awardCoconut: true,
             activeHumanSelection: FixedActiveHumanSelection(id: executor.id.uuidString),
-            note: "test.pet.medication.dose.noop"
+            note: "test.pet.medication.dose.fallback"
         )
 
-        #expect(result.didRecord == false)
-        #expect(revisionCenter.lastMutation == nil)
-        #expect(try context.fetch(FetchDescriptor<Event>()).isEmpty)
-        #expect(try context.fetch(FetchDescriptor<CareLedgerEvent>()).isEmpty)
-        #expect(try context.fetch(FetchDescriptor<CoconutLedgerEntry>()).isEmpty)
-        #expect(try context.fetch(FetchDescriptor<EconomyBudgetUsageEvent>()).isEmpty)
-        #expect(medication.remainingAmount == 5)
-        #expect(medicationReminders.recordedMedicationIDs.isEmpty)
+        let walletEntries = try context.fetch(FetchDescriptor<CoconutLedgerEntry>())
+        #expect(result.didRecord)
+        #expect(revisionCenter.lastMutation != nil)
+        #expect(try context.fetch(FetchDescriptor<Event>()).count == 1)
+        #expect(!(try context.fetch(FetchDescriptor<CareLedgerEvent>())).isEmpty)
+        #expect(walletEntries.contains { $0.ownerId == activeHuman.id.uuidString && $0.delta > 0 })
+        #expect(walletEntries.allSatisfy { $0.ownerId != executor.id.uuidString })
+        #expect(!(try context.fetch(FetchDescriptor<EconomyBudgetUsageEvent>())).isEmpty)
+        #expect(medication.remainingAmount == 4)
+        #expect(medicationReminders.recordedMedicationIDs == [medication.id])
     }
 
     @Test func singleWalkPersistsWalkFactBeforeWalletRewardAndLinksPottyMarkers() throws {
@@ -183,7 +187,7 @@ struct CareCompletionChokepointCharacterizationTests {
         #expect(budgetEvents.contains { $0.actionKey == "potty" })
     }
 
-    @Test func singleWalkNoopsForDeceasedExecutorBeforeWalkPottyLedgerAndReward() throws {
+    @Test func singleWalkWritesFactsForDeceasedExecutorThroughFallbackOwner() throws {
         let container = try makeContainer()
         let context = container.mainContext
         let activeHuman = Human(name: "Active")
@@ -197,7 +201,7 @@ struct CareCompletionChokepointCharacterizationTests {
 
         let state = EconomyDefaultsState.capture()
         defer { state.restore() }
-        resetEconomy(activeHumanID: executor.id.uuidString, humans: [activeHuman, executor], pets: [pet])
+        resetEconomy(activeHumanID: activeHuman.id.uuidString, humans: [activeHuman, executor], pets: [pet])
         let location = FakeWalkLocationManager()
         location.totalDistance = 900
         let manager = PetWalkingManager(locationManager: location, questManager: makeQuestManager())
@@ -206,11 +210,13 @@ struct CareCompletionChokepointCharacterizationTests {
         manager.addPoop(type: .perfectPoop)
         manager.stop(modelContext: context)
 
-        #expect(try context.fetch(FetchDescriptor<PetWalkLog>()).isEmpty)
-        #expect(try context.fetch(FetchDescriptor<PetPottyLog>()).isEmpty)
-        #expect(try context.fetch(FetchDescriptor<CareLedgerEvent>()).isEmpty)
-        #expect(try context.fetch(FetchDescriptor<CoconutLedgerEntry>()).isEmpty)
-        #expect(try context.fetch(FetchDescriptor<EconomyBudgetUsageEvent>()).isEmpty)
+        let walletEntries = try context.fetch(FetchDescriptor<CoconutLedgerEntry>())
+        #expect(try context.fetch(FetchDescriptor<PetWalkLog>()).count == 1)
+        #expect(try context.fetch(FetchDescriptor<PetPottyLog>()).count == 1)
+        #expect(!(try context.fetch(FetchDescriptor<CareLedgerEvent>())).isEmpty)
+        #expect(walletEntries.contains { $0.ownerId == activeHuman.id.uuidString && $0.delta > 0 })
+        #expect(walletEntries.allSatisfy { $0.ownerId != executor.id.uuidString })
+        #expect(!(try context.fetch(FetchDescriptor<EconomyBudgetUsageEvent>())).isEmpty)
     }
 
     @Test func sharedWalkWritesSessionChildFactsLedgerRewardAndBudgetOnce() throws {
@@ -383,7 +389,7 @@ struct CareCompletionChokepointCharacterizationTests {
         #expect(try context.fetch(FetchDescriptor<EconomyBudgetUsageEvent>()).isEmpty)
     }
 
-    @Test func frozenExplicitCareExecutorDoesNotFallbackToActiveHumanOrPetReward() throws {
+    @Test func frozenExplicitCareExecutorWritesActiveTargetFactThroughFallbackOwner() throws {
         let container = try makeContainer()
         let context = container.mainContext
         let activeHuman = Human(name: "Active")
@@ -408,13 +414,15 @@ struct CareCompletionChokepointCharacterizationTests {
             dependencies: .live()
         )
 
-        #expect(record.result.disposition == .noOp)
-        #expect(record.result.didWriteFact == false)
+        let walletEntries = try context.fetch(FetchDescriptor<CoconutLedgerEntry>())
+        #expect(record.result.disposition == .active)
+        #expect(record.result.didWriteFact)
         #expect(record.log.executorId == frozenExecutor.id.uuidString)
-        #expect(record.reward.humanGot + record.reward.petGot == 0)
-        #expect(try context.fetch(FetchDescriptor<PetCareLog>()).isEmpty)
-        #expect(try context.fetch(FetchDescriptor<CoconutLedgerEntry>()).isEmpty)
-        #expect(try context.fetch(FetchDescriptor<EconomyBudgetUsageEvent>()).isEmpty)
+        #expect(record.reward.humanGot + record.reward.petGot > 0)
+        #expect(try context.fetch(FetchDescriptor<PetCareLog>()).count == 1)
+        #expect(walletEntries.contains { $0.ownerId == activeHuman.id.uuidString && $0.delta > 0 })
+        #expect(walletEntries.allSatisfy { $0.ownerId != frozenExecutor.id.uuidString })
+        #expect(!(try context.fetch(FetchDescriptor<EconomyBudgetUsageEvent>())).isEmpty)
     }
 
     @Test func missingExplicitCareExecutorWritesFactLedgerRewardAndOasisEchoThroughFallbackOwner() throws {
@@ -695,7 +703,7 @@ struct CareCompletionChokepointCharacterizationTests {
         #expect(try context.fetch(FetchDescriptor<EconomyBudgetUsageEvent>()).isEmpty)
     }
 
-    @Test func weightAndHealthNoopForDeceasedExecutorBeforeFactLedgerAndDerivedEffects() throws {
+    @Test func weightAndHealthWriteFactsForDeceasedExecutorThroughFallbackOwner() throws {
         let container = try makeContainer()
         let context = container.mainContext
         let activeHuman = Human(name: "Active")
@@ -739,14 +747,15 @@ struct CareCompletionChokepointCharacterizationTests {
             questManager: makeQuestManager()
         )
 
-        #expect(health == nil)
-        #expect(try context.fetch(FetchDescriptor<PetWeightLog>()).isEmpty)
-        #expect(try context.fetch(FetchDescriptor<PetHealthLog>()).isEmpty)
-        #expect(try context.fetch(FetchDescriptor<Event>()).isEmpty)
-        #expect(try context.fetch(FetchDescriptor<Reminder>()).isEmpty)
-        #expect(try context.fetch(FetchDescriptor<CareLedgerEvent>()).isEmpty)
-        #expect(try context.fetch(FetchDescriptor<CoconutLedgerEntry>()).isEmpty)
-        #expect(try context.fetch(FetchDescriptor<EconomyBudgetUsageEvent>()).isEmpty)
+        let walletEntries = try context.fetch(FetchDescriptor<CoconutLedgerEntry>())
+        #expect(health != nil)
+        #expect(try context.fetch(FetchDescriptor<PetWeightLog>()).count == 1)
+        #expect(try context.fetch(FetchDescriptor<PetHealthLog>()).count == 1)
+        #expect(try context.fetch(FetchDescriptor<Event>()).count == 1)
+        #expect(!(try context.fetch(FetchDescriptor<CareLedgerEvent>())).isEmpty)
+        #expect(walletEntries.contains { $0.ownerId == activeHuman.id.uuidString && $0.delta > 0 })
+        #expect(walletEntries.allSatisfy { $0.ownerId != executor.id.uuidString })
+        #expect(!(try context.fetch(FetchDescriptor<EconomyBudgetUsageEvent>())).isEmpty)
     }
 
     @Test func calendarCompletionForDeceasedPetIsNoop() throws {

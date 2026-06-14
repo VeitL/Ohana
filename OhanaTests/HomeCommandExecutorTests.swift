@@ -653,17 +653,31 @@ struct HomeCommandExecutorTests {
     }
 
     @MainActor
-    @Test func quickPlayCommandExecutorNoopsForPassedAwayExecutorDisposition() throws {
+    @Test func quickPlayCommandExecutorWritesForPassedAwayExecutorThroughFallbackOwner() throws {
         let revisionCenter = ReadModelRevisionCenter()
         let container = try makeInMemoryContainer()
         let context = container.mainContext
+        let activeHuman = Human(name: "Active")
         let pet = Pet(name: "Momo", species: "狗")
         let executorHuman = Human(name: "Memorial caretaker")
         executorHuman.passedAwayDate = makeDate(year: 2026, month: 6, day: 8, hour: 12, minute: 0)
+        context.insert(activeHuman)
         context.insert(pet)
         context.insert(executorHuman)
         try context.save()
 
+        let defaults = UserDefaults.standard
+        let oldActiveHumanID = defaults.object(forKey: "currentActiveHumanId")
+        defer {
+            if let oldActiveHumanID {
+                defaults.set(oldActiveHumanID, forKey: "currentActiveHumanId")
+            } else {
+                defaults.removeObject(forKey: "currentActiveHumanId")
+            }
+            EconomyDailyBudgetStore.resetAll()
+        }
+        defaults.set(activeHuman.id.uuidString, forKey: "currentActiveHumanId")
+        EconomyDailyBudgetStore.resetAll()
         let beforeRevision = revisionCenter.homeRevision.value
         let result = QuickPlayCommandExecutor(context: context, revisionCenter: revisionCenter).recordPlay(
             petID: pet.id,
@@ -672,26 +686,42 @@ struct HomeCommandExecutorTests {
             date: makeDate(year: 2026, month: 6, day: 8, hour: 18, minute: 0)
         )
 
-        #expect(result == nil)
-        #expect(try context.fetch(FetchDescriptor<PetCareLog>()).isEmpty)
-        #expect(try context.fetch(FetchDescriptor<CareLedgerEvent>()).isEmpty)
-        #expect(try context.fetch(FetchDescriptor<CoconutLedgerEntry>()).isEmpty)
-        #expect(revisionCenter.homeRevision.value == beforeRevision)
-        #expect(revisionCenter.lastMutation == nil)
+        let walletEntries = try context.fetch(FetchDescriptor<CoconutLedgerEntry>())
+        #expect(result?.petID == pet.id)
+        #expect(try context.fetch(FetchDescriptor<PetCareLog>()).count == 1)
+        #expect(!(try context.fetch(FetchDescriptor<CareLedgerEvent>())).isEmpty)
+        #expect(walletEntries.contains { $0.ownerId == activeHuman.id.uuidString && $0.delta > 0 })
+        #expect(walletEntries.allSatisfy { $0.ownerId != executorHuman.id.uuidString })
+        #expect(revisionCenter.homeRevision.value != beforeRevision)
+        #expect(revisionCenter.lastMutation != nil)
     }
 
     @MainActor
-    @Test func homeQuickCareNoopsForDeceasedExecutorDisposition() throws {
+    @Test func homeQuickCareWritesForDeceasedExecutorThroughFallbackOwner() throws {
         let revisionCenter = ReadModelRevisionCenter()
         let container = try makeInMemoryContainer()
         let context = container.mainContext
+        let activeHuman = Human(name: "Active")
         let pet = Pet(name: "Momo", species: "狗")
         let executorHuman = Human(name: "Former caretaker")
         executorHuman.passedAwayDate = makeDate(year: 2026, month: 6, day: 8, hour: 12, minute: 0)
+        context.insert(activeHuman)
         context.insert(pet)
         context.insert(executorHuman)
         try context.save()
 
+        let defaults = UserDefaults.standard
+        let oldActiveHumanID = defaults.object(forKey: "currentActiveHumanId")
+        defer {
+            if let oldActiveHumanID {
+                defaults.set(oldActiveHumanID, forKey: "currentActiveHumanId")
+            } else {
+                defaults.removeObject(forKey: "currentActiveHumanId")
+            }
+            EconomyDailyBudgetStore.resetAll()
+        }
+        defaults.set(activeHuman.id.uuidString, forKey: "currentActiveHumanId")
+        EconomyDailyBudgetStore.resetAll()
         let executor = HomeCommandExecutor(
             modelContext: context,
             careEvents: CareEventService(),
@@ -719,12 +749,14 @@ struct HomeCommandExecutorTests {
             feedback: { feedbacks.append($0) }
         )
 
-        #expect(feedbacks.isEmpty)
-        #expect(try context.fetch(FetchDescriptor<PetCareLog>()).isEmpty)
-        #expect(try context.fetch(FetchDescriptor<CareLedgerEvent>()).isEmpty)
-        #expect(try context.fetch(FetchDescriptor<CoconutLedgerEntry>()).isEmpty)
-        #expect(revisionCenter.homeRevision.value == beforeRevision)
-        #expect(revisionCenter.lastMutation == nil)
+        let walletEntries = try context.fetch(FetchDescriptor<CoconutLedgerEntry>())
+        #expect(!feedbacks.isEmpty)
+        #expect(try context.fetch(FetchDescriptor<PetCareLog>()).count == 1)
+        #expect(!(try context.fetch(FetchDescriptor<CareLedgerEvent>())).isEmpty)
+        #expect(walletEntries.contains { $0.ownerId == activeHuman.id.uuidString && $0.delta > 0 })
+        #expect(walletEntries.allSatisfy { $0.ownerId != executorHuman.id.uuidString })
+        #expect(revisionCenter.homeRevision.value != beforeRevision)
+        #expect(revisionCenter.lastMutation != nil)
     }
 
     @MainActor
@@ -803,17 +835,31 @@ struct HomeCommandExecutorTests {
     }
 
     @MainActor
-    @Test func quickPottyCommandExecutorNoopsForDeceasedExecutorDisposition() throws {
+    @Test func quickPottyCommandExecutorWritesForDeceasedExecutorThroughFallbackOwner() throws {
         let revisionCenter = ReadModelRevisionCenter()
         let container = try makeInMemoryContainer()
         let context = container.mainContext
+        let activeHuman = Human(name: "Active")
         let pet = Pet(name: "Momo", species: "狗")
         let executorHuman = Human(name: "Former caretaker")
         executorHuman.passedAwayDate = makeDate(year: 2026, month: 6, day: 8, hour: 12, minute: 0)
+        context.insert(activeHuman)
         context.insert(pet)
         context.insert(executorHuman)
         try context.save()
 
+        let defaults = UserDefaults.standard
+        let oldActiveHumanID = defaults.object(forKey: "currentActiveHumanId")
+        defer {
+            if let oldActiveHumanID {
+                defaults.set(oldActiveHumanID, forKey: "currentActiveHumanId")
+            } else {
+                defaults.removeObject(forKey: "currentActiveHumanId")
+            }
+            EconomyDailyBudgetStore.resetAll()
+        }
+        defaults.set(activeHuman.id.uuidString, forKey: "currentActiveHumanId")
+        EconomyDailyBudgetStore.resetAll()
         let beforeRevision = revisionCenter.homeRevision.value
         let result = QuickPottyCommandExecutor(context: context, revisionCenter: revisionCenter).record(
             petID: pet.id,
@@ -823,13 +869,15 @@ struct HomeCommandExecutorTests {
             date: makeDate(year: 2026, month: 6, day: 8, hour: 19, minute: 0)
         )
 
-        #expect(result == nil)
-        #expect(try context.fetch(FetchDescriptor<PetPottyLog>()).isEmpty)
+        let walletEntries = try context.fetch(FetchDescriptor<CoconutLedgerEntry>())
+        #expect(result?.petID == pet.id)
+        #expect(try context.fetch(FetchDescriptor<PetPottyLog>()).count == 1)
         #expect(try context.fetch(FetchDescriptor<PetCareLog>()).isEmpty)
-        #expect(try context.fetch(FetchDescriptor<CareLedgerEvent>()).isEmpty)
-        #expect(try context.fetch(FetchDescriptor<CoconutLedgerEntry>()).isEmpty)
-        #expect(revisionCenter.homeRevision.value == beforeRevision)
-        #expect(revisionCenter.lastMutation == nil)
+        #expect(!(try context.fetch(FetchDescriptor<CareLedgerEvent>())).isEmpty)
+        #expect(walletEntries.contains { $0.ownerId == activeHuman.id.uuidString && $0.delta > 0 })
+        #expect(walletEntries.allSatisfy { $0.ownerId != executorHuman.id.uuidString })
+        #expect(revisionCenter.homeRevision.value != beforeRevision)
+        #expect(revisionCenter.lastMutation != nil)
     }
 
     @MainActor
@@ -5980,18 +6028,32 @@ struct HomeCommandExecutorTests {
     }
 
     @MainActor
-    @Test func quickFeedExecutorManualNoopDoesNotPublishRevisionForDeceasedExecutor() throws {
+    @Test func quickFeedExecutorManualWritesFactAndRevisionForDeceasedExecutorFallbackOwner() throws {
         let revisionCenter = ReadModelRevisionCenter()
         let container = try makeInMemoryContainer()
         let context = container.mainContext
         let now = makeDate(year: 2026, month: 6, day: 8)
+        let activeHuman = Human(name: "Active")
         let human = Human(name: "Former caretaker")
         human.passedAwayDate = now
         let pet = Pet(name: "Momo", species: "猫")
+        context.insert(activeHuman)
         context.insert(human)
         context.insert(pet)
         try context.save()
 
+        let defaults = UserDefaults.standard
+        let oldActiveHumanID = defaults.object(forKey: "currentActiveHumanId")
+        defer {
+            if let oldActiveHumanID {
+                defaults.set(oldActiveHumanID, forKey: "currentActiveHumanId")
+            } else {
+                defaults.removeObject(forKey: "currentActiveHumanId")
+            }
+            EconomyDailyBudgetStore.resetAll()
+        }
+        defaults.set(activeHuman.id.uuidString, forKey: "currentActiveHumanId")
+        EconomyDailyBudgetStore.resetAll()
         let beforeRevision = revisionCenter.homeRevision.value
         let executor = QuickFeedCommandExecutor(context: context, revisionCenter: revisionCenter)
         let result = executor.recordManual(
@@ -6005,11 +6067,15 @@ struct HomeCommandExecutorTests {
             executorId: human.id.uuidString
         )
 
-        #expect(result.didRecord == false)
-        #expect(try context.fetch(FetchDescriptor<PetCareLog>()).isEmpty)
-        #expect(try context.fetch(FetchDescriptor<CareLedgerEvent>()).isEmpty)
-        #expect(revisionCenter.homeRevision.value == beforeRevision)
-        #expect(revisionCenter.lastMutation == nil)
+        let walletEntries = try context.fetch(FetchDescriptor<CoconutLedgerEntry>())
+        #expect(result.didRecord)
+        #expect(result.allowsDerivedEffects)
+        #expect(try context.fetch(FetchDescriptor<PetCareLog>()).count == 1)
+        #expect(!(try context.fetch(FetchDescriptor<CareLedgerEvent>())).isEmpty)
+        #expect(walletEntries.contains { $0.ownerId == activeHuman.id.uuidString && $0.delta > 0 })
+        #expect(walletEntries.allSatisfy { $0.ownerId != human.id.uuidString })
+        #expect(revisionCenter.homeRevision.value == beforeRevision + 1)
+        #expect(revisionCenter.lastMutation != nil)
     }
 
     @MainActor
@@ -6070,31 +6136,48 @@ struct HomeCommandExecutorTests {
     }
 
     @MainActor
-    @Test func quickFeedExecutorTreatNoopDoesNotPublishRevisionForDeceasedExecutor() throws {
+    @Test func quickFeedExecutorTreatWritesFactAndRevisionForDeceasedExecutor() throws {
         let revisionCenter = ReadModelRevisionCenter()
         let container = try makeInMemoryContainer()
         let context = container.mainContext
         let now = makeDate(year: 2026, month: 6, day: 8)
+        let activeHuman = Human(name: "Active")
         let human = Human(name: "Former caretaker")
         human.passedAwayDate = now
         let pet = Pet(name: "Momo", species: "猫")
+        context.insert(activeHuman)
         context.insert(human)
         context.insert(pet)
         try context.save()
 
+        let defaults = UserDefaults.standard
+        let oldActiveHumanID = defaults.object(forKey: "currentActiveHumanId")
+        defer {
+            if let oldActiveHumanID {
+                defaults.set(oldActiveHumanID, forKey: "currentActiveHumanId")
+            } else {
+                defaults.removeObject(forKey: "currentActiveHumanId")
+            }
+            EconomyDailyBudgetStore.resetAll()
+        }
+        defaults.set(activeHuman.id.uuidString, forKey: "currentActiveHumanId")
+        EconomyDailyBudgetStore.resetAll()
         let beforeRevision = revisionCenter.homeRevision.value
         let executor = QuickFeedCommandExecutor(context: context, revisionCenter: revisionCenter)
-        _ = executor.recordTreat(
+        let result = executor.recordTreat(
             pet: pet,
             grams: 12,
             treatKind: .freezeDried,
             executorId: human.id.uuidString
         )
 
-        #expect(try context.fetch(FetchDescriptor<PetCareLog>()).isEmpty)
-        #expect(try context.fetch(FetchDescriptor<CareLedgerEvent>()).isEmpty)
-        #expect(revisionCenter.homeRevision.value == beforeRevision)
-        #expect(revisionCenter.lastMutation == nil)
+        #expect(result.didRecord)
+        #expect(result.allowsDerivedEffects)
+        #expect(try context.fetch(FetchDescriptor<PetCareLog>()).count == 1)
+        #expect(!(try context.fetch(FetchDescriptor<CareLedgerEvent>())).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<CoconutLedgerEntry>()).isEmpty)
+        #expect(revisionCenter.homeRevision.value == beforeRevision + 1)
+        #expect(revisionCenter.lastMutation != nil)
     }
 
     @MainActor
@@ -8495,13 +8578,15 @@ struct HomeCommandExecutorTests {
     }
 
     @MainActor
-    @Test func petCareCommandExecutorDoesNotPublishCatCareRevisionWhenFactNoops() throws {
+    @Test func petCareCommandExecutorPublishesCatCareRevisionForDeceasedExecutorFallbackOwner() throws {
         let revisionCenter = ReadModelRevisionCenter()
         let container = try makeInMemoryContainer()
         let context = container.mainContext
+        let activeHuman = Human(name: "Active")
         let executorHuman = Human(name: "Former caretaker")
         executorHuman.passedAwayDate = makeDate(year: 2026, month: 6, day: 8, hour: 8, minute: 0)
         let pet = Pet(name: "Momo", species: "猫")
+        context.insert(activeHuman)
         context.insert(executorHuman)
         context.insert(pet)
         try context.save()
@@ -8517,14 +8602,14 @@ struct HomeCommandExecutorTests {
                 occurredAt: makeDate(year: 2026, month: 6, day: 8, hour: 8, minute: 30),
                 executorId: executorHuman.id.uuidString
             ),
-            note: "test.cat.record.noop"
+            note: "test.cat.record.fallback"
         )
 
-        #expect(recorded.didRecord == false)
-        #expect(revisionCenter.lastMutation == nil)
-        #expect(revisionCenter.homeRevision.value == beforeRevision)
-        #expect(try context.fetch(FetchDescriptor<Event>()).isEmpty)
-        #expect(try context.fetch(FetchDescriptor<PetHygieneLog>()).isEmpty)
+        #expect(recorded.didRecord)
+        #expect(revisionCenter.lastMutation != nil)
+        #expect(revisionCenter.homeRevision.value == beforeRevision + 1)
+        #expect(try context.fetch(FetchDescriptor<Event>()).count == 1)
+        #expect(try context.fetch(FetchDescriptor<PetHygieneLog>()).count == 1)
     }
 
     @MainActor

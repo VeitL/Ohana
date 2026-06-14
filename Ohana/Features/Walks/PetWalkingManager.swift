@@ -189,21 +189,17 @@ final class PetWalkingManager {
 
         // 隐式读取当前设备执行者（静默，不弹窗）
         let executorId = activeHumanSelection.currentHumanId
-        guard !CareFactWritePolicy.executorCannotWrite(executorId, context: modelContext) else {
-            reset()
-            walkStopStartedAt = nil
-            return
-        }
         let executorIds = SharedCareParticipantIDs.normalized(sharedExecutorIds, preferredFirst: executorId)
-        guard !CareFactWritePolicy.anyExecutorCannotWrite(executorIds, context: modelContext) else {
-            reset()
-            walkStopStartedAt = nil
-            return
-        }
 
         let startedAt = startTime ?? Date()
         let endedAt = Date()
         let distanceMeters = locationManager.totalDistance
+        let disposition = CareFactWritePolicy.disposition(
+            pet: pet,
+            date: startedAt,
+            executorId: executorId,
+            context: modelContext
+        )
 
         let routeLocations = locationManager.routeLocationsForPersistence()
         let routeCoordinates = routeLocations.map(\.coordinate)
@@ -236,7 +232,7 @@ final class PetWalkingManager {
             modelContext.safeSave()
 
             var reward: (humanGot: Int, petGot: Int)?
-            if !isTooShortForReward {
+            if !isTooShortForReward, disposition.allowsDerivedEffects {
                 reward = EconomyRewardDiscipline.awardCareAction(
                     type: .walk(distanceMeters: distanceMeters),
                     pet: pet,
@@ -308,7 +304,7 @@ final class PetWalkingManager {
         }
 
         // 遛狗中每次便便：人+2, 宠物+5（OhanaActionType.potty(isLitter:false)）
-        if poop > 0 {
+        if poop > 0, disposition.allowsDerivedEffects {
             for pottyLog in pottyLogs {
                 let reward = EconomyRewardDiscipline.awardCareAction(
                     type: .potty(isLitter: false),

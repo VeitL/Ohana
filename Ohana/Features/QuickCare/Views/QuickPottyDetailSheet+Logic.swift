@@ -414,8 +414,7 @@ extension QuickPottyDetailSheet {
     }
 
     func canApplyPottyDerivedEffects(executorId: String?) -> Bool {
-        EconomyWalletWritePolicy.canWrite(pet) &&
-            !CareFactWritePolicy.executorCannotWrite(executorId, context: modelContext)
+        EconomyWalletWritePolicy.canWrite(pet)
     }
 
     func normalizedSpecies(_ value: String) -> String {

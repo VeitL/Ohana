@@ -165,10 +165,6 @@ struct QuickPottyCommandExecutor {
             deriveNoop(petID: sourcePetID, action: "unknownSharedPotty", note: "quickPotty.unknown.missingPet")
             return nil
         }
-        guard !CareFactWritePolicy.executorCannotWrite(executorId, context: context) else {
-            deriveNoop(petID: sourcePetID, action: "unknownSharedPotty", note: "quickPotty.unknown.factNoop")
-            return nil
-        }
         let targets = fetchTargets(sourcePet: sourcePet, targetIDs: targetIDs)
         let log = careEvents.recordUnknownSharedPotty(
             sourcePet: sourcePet,

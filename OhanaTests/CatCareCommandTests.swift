@@ -80,7 +80,7 @@ struct CatCareCommandTests {
         #expect(try context.fetch(FetchDescriptor<PetHygieneLog>()).isEmpty)
     }
 
-    @Test func recordNoopsForDeceasedExecutorBeforeEventAndHygieneFact() throws {
+    @Test func recordWritesForDeceasedExecutorWhenTargetIsActive() throws {
         let container = try makeContainer()
         let context = container.mainContext
         let executor = Human(name: "Former caretaker")
@@ -102,10 +102,10 @@ struct CatCareCommandTests {
             context: context
         )
 
-        #expect(recorded.didRecord == false)
-        #expect(recorded.hygieneLogID == nil)
-        #expect(try context.fetch(FetchDescriptor<Event>()).isEmpty)
-        #expect(try context.fetch(FetchDescriptor<PetHygieneLog>()).isEmpty)
+        #expect(recorded.didRecord)
+        #expect(recorded.hygieneLogID != nil)
+        #expect(try context.fetch(FetchDescriptor<Event>()).count == 1)
+        #expect(try context.fetch(FetchDescriptor<PetHygieneLog>()).count == 1)
     }
 
     @Test func recordNoopsForDeceasedPetWithoutHistoricalFact() throws {

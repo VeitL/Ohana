@@ -20,7 +20,7 @@
 ### 通风口：`CareDerivationExecutor`（新建，单一派生执行器）
 - **输入**：一个 `CareWriteOutcome`——service 返回的 `disposition` + 所有派生所需 payload（petID、logID、reward 参数、reminder/stock 上下文、feedback 上下文、shared session 信息、factDate/operationDate）。
 - **内部一处 gate**：`guard outcome.allowsDerivedEffects else { return .noop }`——**所有**派生副作用在这一个判定之后统一发出（revision、reward via `EconomyRewardDiscipline`、ledger、reminder、stock、feedback、Oasis、selection memory）。
-- **离世只读分支也在这里一处判定**：`outcome.kind == .noOp` 且 note 标明 deceased target / deceased executor 时，事实、奖励、ledger、reminder、stock、feedback、Oasis、revision 全部跳过。2026-06-14 二态模型取消旧纪念历史事实分支：离世成员不再补写历史照护事实。
+- **离世只读分支也在这里一处判定**：`outcome.kind == .noOp` 且 note 标明 deceased target 时，事实、奖励、ledger、reminder、stock、feedback、Oasis、revision 全部跳过。executor 不再决定 active target 的事实写入；不可解析、已删除、不可写或离世 executor 只影响奖励 owner 解析（fallback 到可写 active human，否则 fact-only 无奖励），不得丢事实。2026-06-14 二态模型取消旧纪念历史事实分支：离世成员不再补写历史照护事实。
 
 ### 焊死窗户（关键的第三步，决定收不收敛）
 command 层在结构上**失去**直接发副作用的能力：
@@ -47,7 +47,7 @@ command 层在结构上**失去**直接发副作用的能力：
 | Oasis | 历史/no-op 仍触发 | 007 |
 | budget/cooldown 结算日 | 历史 occurrence 用 fact day | 005/006 |
 
-executor 用一个 `allowsDerivedEffects` + `kind`（active / noop）统一裁决全部，**operationDate vs factDate 也在 executor 一处分离**（active 历史事实用历史日、budget/cooldown/reward 用操作日，解决 005/006）。离世成员不进入 historical fact-only：其结果是完整 no-op。
+executor 用一个 `allowsDerivedEffects` + `kind`（active / noop）统一裁决全部，**operationDate vs factDate 也在 executor 一处分离**（active 历史事实用历史日、budget/cooldown/reward 用操作日，解决 005/006）。离世照护对象不进入 historical fact-only：其结果是完整 no-op；不可写 executor 不改变 active target 的事实写入，只改变奖励 owner。
 
 ## 护栏三件套（架构改造，强制且严格）
 

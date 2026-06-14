@@ -150,7 +150,7 @@ struct ReminderActionCoordinatorTests {
         #expect(stockEvents.first?.id != staleEvent.id)
     }
 
-    @Test func manualFeedNotificationNoopDoesNotCompleteOrRebuildStockForDeceasedExecutor() throws {
+    @Test func manualFeedNotificationWritesFactAndRebuildsStockForDeceasedExecutor() throws {
         let container = try makeContainer()
         let context = container.mainContext
         let now = Date()
@@ -196,12 +196,12 @@ struct ReminderActionCoordinatorTests {
             context: context
         )
 
-        #expect(result == .skipped)
-        #expect(reminder.statusEnum == .pending)
-        #expect(event.isOccurrenceMarkedComplete(on: reminder.scheduledAt) == false)
-        #expect(try context.fetch(FetchDescriptor<PetCareLog>()).isEmpty)
-        #expect(try context.fetch(FetchDescriptor<CareLedgerEvent>()).isEmpty)
-        #expect(stockReminderEvents(for: pet, context: context).isEmpty)
+        #expect(result == .completed)
+        #expect(reminder.statusEnum == .completed)
+        #expect(event.isOccurrenceMarkedComplete(on: reminder.scheduledAt))
+        #expect(try context.fetch(FetchDescriptor<PetCareLog>()).count == 1)
+        #expect(!(try context.fetch(FetchDescriptor<CareLedgerEvent>())).isEmpty)
+        #expect(stockReminderEvents(for: pet, context: context).count == 1)
     }
 
     @Test func calendarNotificationForDeceasedPetDoesNotWriteHistoricalFactOrCompleteReminder() throws {

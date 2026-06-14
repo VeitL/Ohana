@@ -164,8 +164,13 @@ struct RecurringEconomyQuickPottyResultUnconsumedCommand {
 }
 
 struct RecurringEconomySecondaryExecutorUncheckedCommand {
+    let context: ModelContext
+
     func stop(sharedExecutorIds: [String], executorId: String?) {
         let executorIds = SharedCareParticipantIDs.normalized(sharedExecutorIds, preferredFirst: executorId)
+        guard !CareFactWritePolicy.anyExecutorCannotWrite(executorIds, context: context) else {
+            return
+        }
         print(executorIds)
     }
 }

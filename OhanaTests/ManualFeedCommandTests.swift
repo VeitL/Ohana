@@ -211,7 +211,7 @@ struct ManualFeedCommandTests {
         #expect(reminders.first?.id != staleEvent.id)
     }
 
-    @Test func manualFeedCommandNoopsDefaultsAndStockForDeceasedExecutorDisposition() throws {
+    @Test func manualFeedCommandWritesFactDefaultsAndStockForDeceasedExecutor() throws {
         let container = try makeContainer()
         let context = container.mainContext
         let now = date(year: 2026, month: 5, day: 1, hour: 9)
@@ -249,16 +249,16 @@ struct ManualFeedCommandTests {
             date: now
         )
 
-        #expect(result.didRecord == false)
-        #expect(result.targetCount == 0)
-        #expect(result.stockReminders.isEmpty)
+        #expect(result.didRecord)
+        #expect(result.targetCount == 1)
+        #expect(result.stockReminders.count == 1)
         #expect(result.coconutDelta == 0)
-        #expect(pet.mainFoodKind == .wet)
-        #expect(pet.dailyPortionGrams == 25)
-        #expect(try context.fetch(FetchDescriptor<PetCareLog>()).isEmpty)
-        #expect(try context.fetch(FetchDescriptor<Event>()).isEmpty)
-        #expect(try context.fetch(FetchDescriptor<Reminder>()).isEmpty)
-        #expect(try context.fetch(FetchDescriptor<CareLedgerEvent>()).isEmpty)
+        #expect(pet.mainFoodKind == .dry)
+        #expect(pet.dailyPortionGrams == 50)
+        #expect(try context.fetch(FetchDescriptor<PetCareLog>()).count == 1)
+        #expect(try context.fetch(FetchDescriptor<Event>()).count == 1)
+        #expect(try context.fetch(FetchDescriptor<Reminder>()).count == 1)
+        #expect(!(try context.fetch(FetchDescriptor<CareLedgerEvent>())).isEmpty)
         #expect(try context.fetch(FetchDescriptor<CoconutLedgerEntry>()).isEmpty)
     }
 

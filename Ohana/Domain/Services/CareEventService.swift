@@ -113,35 +113,12 @@ enum CareFactWritePolicy {
     @MainActor
     static func disposition(
         pet: Pet,
-        date: Date,
-        executorId: String?,
-        context: ModelContext
+        date _: Date,
+        executorId _: String?,
+        context _: ModelContext
     ) -> CareFactWriteDisposition {
         guard EconomyWalletWritePolicy.canWrite(pet) else { return .noOp }
-        if executorCannotWrite(executorId, context: context) { return .noOp }
         return .active
-    }
-
-    @MainActor
-    static func executorCannotWrite(_ executorId: String?, context: ModelContext) -> Bool {
-        guard let executorId = executorId?.trimmingCharacters(in: .whitespacesAndNewlines),
-              !executorId.isEmpty else {
-            return false
-        }
-        guard let id = UUID(uuidString: executorId) else { return false }
-        var descriptor = FetchDescriptor<Human>(
-            predicate: #Predicate<Human> { human in
-                human.id == id
-            }
-        )
-        descriptor.fetchLimit = 1
-        guard let human = try? context.fetch(descriptor).first else { return false }
-        return human.hasPassedAway
-    }
-
-    @MainActor
-    static func anyExecutorCannotWrite(_ executorIds: [String], context: ModelContext) -> Bool {
-        executorIds.contains { executorCannotWrite($0, context: context) }
     }
 
     static func plannedFactDate(scheduledAt: Date, operationDate: Date) -> Date {
@@ -1719,8 +1696,7 @@ final class CareEventService: CareEventRecording {
         dependencies: CareEventServiceDependencies? = nil
     ) -> PetPottyLog {
         let liveTargets = SharedPetTargetResolver.normalizedTargets(targets, fallback: sourcePet)
-        guard !liveTargets.isEmpty,
-              !CareFactWritePolicy.executorCannotWrite(executorId, context: context) else {
+        guard !liveTargets.isEmpty else {
             return PetPottyLog(date: date, type: type, executorId: executorId)
         }
         let result = SharedPetActionRecorder.record(

@@ -6,7 +6,7 @@ import Testing
 @MainActor
 @Suite(.serialized)
 struct QuestManagerBatchAwardTests {
-    @Test func batchAwardNoopsForDeceasedExecutorBeforeFactsLedgerAndRewards() throws {
+    @Test func batchAwardWritesActiveTargetFactForDeceasedExecutorWithoutRewardOwner() throws {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
         let executor = Human(name: "Archived")
@@ -33,9 +33,9 @@ struct QuestManagerBatchAwardTests {
         #expect(result.totalPet == 0)
         #expect(executor.coconutBalance == 0)
         #expect(pet.coconutBalance == 0)
-        #expect(try context.fetch(FetchDescriptor<PetCareLog>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<PetCareLog>()).count == 1)
         #expect(try context.fetch(FetchDescriptor<SharedCareSession>()).isEmpty)
-        #expect(try context.fetch(FetchDescriptor<CareLedgerEvent>()).isEmpty)
+        #expect(!(try context.fetch(FetchDescriptor<CareLedgerEvent>())).isEmpty)
         #expect(try context.fetch(FetchDescriptor<CoconutLedgerEntry>()).isEmpty)
         #expect(try context.fetch(FetchDescriptor<EconomyBudgetUsageEvent>()).isEmpty)
     }

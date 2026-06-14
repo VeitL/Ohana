@@ -1186,7 +1186,7 @@ struct SharedPetActionRecorderTests {
         #expect(ledgerEvents.contains { $0.metadataJSON.contains(coWalker.id.uuidString) })
     }
 
-    @Test func sharedWalkNoopsWhenSecondaryExecutorHasPassedAway() throws {
+    @Test func sharedWalkWritesFactWhenSecondaryExecutorHasPassedAway() throws {
         let container = try makeContainer()
         let context = container.mainContext
         let primary = Human(name: "Guan")
@@ -1214,11 +1214,12 @@ struct SharedPetActionRecorderTests {
             startDate: Date(timeIntervalSince1970: 6100)
         )
 
-        #expect(result.didWriteFact == false)
-        #expect(try context.fetch(FetchDescriptor<SharedCareSession>()).isEmpty)
-        #expect(try context.fetch(FetchDescriptor<PetWalkLog>()).isEmpty)
-        #expect(try context.fetch(FetchDescriptor<CareLedgerEvent>()).isEmpty)
-        #expect(try context.fetch(FetchDescriptor<CoconutLedgerEntry>()).isEmpty)
+        #expect(result.didWriteFact)
+        #expect(try context.fetch(FetchDescriptor<SharedCareSession>()).count == 1)
+        #expect(try context.fetch(FetchDescriptor<PetWalkLog>()).count == 2)
+        #expect(try context.fetch(FetchDescriptor<CareLedgerEvent>()).contains { $0.eventKind == CareLedgerEventKind.walk.rawValue })
+        #expect(try context.fetch(FetchDescriptor<CoconutLedgerEntry>()).contains { $0.ownerId == primary.id.uuidString && $0.delta > 0 })
+        #expect(try context.fetch(FetchDescriptor<CoconutLedgerEntry>()).allSatisfy { $0.ownerId != coWalker.id.uuidString })
     }
 
     @Test func sharedWalkWritesFactWhenSecondaryExecutorIsMissing() throws {
