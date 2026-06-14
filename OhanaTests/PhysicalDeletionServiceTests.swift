@@ -475,6 +475,123 @@ struct PhysicalDeletionServiceTests {
         #expect(deletionTombstone(FamilyCollaborationTask.self, id: task.id, context: context) != nil)
     }
 
+    @Test func deleteHumanDetachesSharedCareChildrenWhenOnlyExecutorSessionIsRemoved() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let human = Human(name: "Guan")
+        let survivor = Human(name: "Alex")
+        let pet = Pet(name: "Momo")
+        let humanId = human.id.uuidString
+        let session = SharedCareSession(
+            actionKind: .feeding,
+            sourcePetId: pet.id.uuidString,
+            targetPetIds: [pet.id.uuidString],
+            species: pet.species
+        )
+        session.setExecutorIds([humanId], primaryExecutorId: humanId)
+        let careLog = PetCareLog(type: .feeding, sharedSessionId: session.id.uuidString, pet: pet, executorId: humanId)
+        let pottyLog = PetPottyLog(type: .pee, pet: pet, executorId: humanId, sharedSessionId: session.id.uuidString)
+        let hygieneLog = PetHygieneLog(type: .bath, pet: pet, executorId: humanId, sharedSessionId: session.id.uuidString)
+        let expenseLog = PetExpenseLog(amount: 12, pet: pet, executorId: humanId, sharedSessionId: session.id.uuidString)
+        let walkLog = PetWalkLog(pet: pet, executorId: humanId, executorIds: [humanId], sharedSessionId: session.id.uuidString)
+
+        context.insert(human)
+        context.insert(survivor)
+        context.insert(pet)
+        context.insert(session)
+        context.insert(careLog)
+        context.insert(pottyLog)
+        context.insert(hygieneLog)
+        context.insert(expenseLog)
+        context.insert(walkLog)
+        try context.save()
+
+        PhysicalDeletionService.deleteHuman(human, context: context, deletedByHumanId: survivor.id.uuidString)
+        try context.save()
+
+        let careLogs = try context.fetch(FetchDescriptor<PetCareLog>())
+        let pottyLogs = try context.fetch(FetchDescriptor<PetPottyLog>())
+        let hygieneLogs = try context.fetch(FetchDescriptor<PetHygieneLog>())
+        let expenseLogs = try context.fetch(FetchDescriptor<PetExpenseLog>())
+        let walkLogs = try context.fetch(FetchDescriptor<PetWalkLog>())
+
+        #expect(try context.fetch(FetchDescriptor<SharedCareSession>()).isEmpty)
+        #expect(careLogs.map(\.id) == [careLog.id])
+        #expect(pottyLogs.map(\.id) == [pottyLog.id])
+        #expect(hygieneLogs.map(\.id) == [hygieneLog.id])
+        #expect(expenseLogs.map(\.id) == [expenseLog.id])
+        #expect(walkLogs.map(\.id) == [walkLog.id])
+        #expect(careLogs.first?.sharedSessionId == "")
+        #expect(pottyLogs.first?.sharedSessionId == "")
+        #expect(hygieneLogs.first?.sharedSessionId == "")
+        #expect(expenseLogs.first?.sharedSessionId == "")
+        #expect(walkLogs.first?.sharedSessionId == "")
+        #expect(careLogs.first?.executorId == nil)
+        #expect(pottyLogs.first?.executorId == nil)
+        #expect(hygieneLogs.first?.executorId == nil)
+        #expect(expenseLogs.first?.executorId == nil)
+        #expect(walkLogs.first?.executorId == nil)
+        #expect(walkLogs.first?.executorIds.isEmpty == true)
+        #expect(deletionTombstone(SharedCareSession.self, id: session.id, context: context) != nil)
+    }
+
+    @Test func deleteHumanScrubsSharedCareChildrenWhenSessionKeepsOtherExecutors() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let human = Human(name: "Guan")
+        let survivor = Human(name: "Alex")
+        let pet = Pet(name: "Momo")
+        let humanId = human.id.uuidString
+        let survivorId = survivor.id.uuidString
+        let session = SharedCareSession(
+            actionKind: .walk,
+            sourcePetId: pet.id.uuidString,
+            targetPetIds: [pet.id.uuidString],
+            species: pet.species
+        )
+        session.setExecutorIds([humanId, survivorId], primaryExecutorId: humanId)
+        let careLog = PetCareLog(type: .play, sharedSessionId: session.id.uuidString, pet: pet, executorId: humanId)
+        let pottyLog = PetPottyLog(type: .pee, pet: pet, executorId: humanId, sharedSessionId: session.id.uuidString)
+        let hygieneLog = PetHygieneLog(type: .bath, pet: pet, executorId: humanId, sharedSessionId: session.id.uuidString)
+        let expenseLog = PetExpenseLog(amount: 12, pet: pet, executorId: humanId, sharedSessionId: session.id.uuidString)
+        let walkLog = PetWalkLog(pet: pet, executorId: humanId, executorIds: [humanId, survivorId], sharedSessionId: session.id.uuidString)
+
+        context.insert(human)
+        context.insert(survivor)
+        context.insert(pet)
+        context.insert(session)
+        context.insert(careLog)
+        context.insert(pottyLog)
+        context.insert(hygieneLog)
+        context.insert(expenseLog)
+        context.insert(walkLog)
+        try context.save()
+
+        PhysicalDeletionService.deleteHuman(human, context: context, deletedByHumanId: survivorId)
+        try context.save()
+
+        let sessions = try context.fetch(FetchDescriptor<SharedCareSession>())
+        let careLogs = try context.fetch(FetchDescriptor<PetCareLog>())
+        let pottyLogs = try context.fetch(FetchDescriptor<PetPottyLog>())
+        let hygieneLogs = try context.fetch(FetchDescriptor<PetHygieneLog>())
+        let expenseLogs = try context.fetch(FetchDescriptor<PetExpenseLog>())
+        let walkLogs = try context.fetch(FetchDescriptor<PetWalkLog>())
+
+        #expect(sessions.map(\.id) == [session.id])
+        #expect(sessions.first?.executorIds == [survivorId])
+        #expect(careLogs.first?.sharedSessionId == session.id.uuidString)
+        #expect(pottyLogs.first?.sharedSessionId == session.id.uuidString)
+        #expect(hygieneLogs.first?.sharedSessionId == session.id.uuidString)
+        #expect(expenseLogs.first?.sharedSessionId == session.id.uuidString)
+        #expect(walkLogs.first?.sharedSessionId == session.id.uuidString)
+        #expect(careLogs.first?.executorId == survivorId)
+        #expect(pottyLogs.first?.executorId == survivorId)
+        #expect(hygieneLogs.first?.executorId == survivorId)
+        #expect(expenseLogs.first?.executorId == survivorId)
+        #expect(walkLogs.first?.executorId == survivorId)
+        #expect(walkLogs.first?.executorIds == [survivorId])
+    }
+
     @Test func careLedgerRecordEnqueuesCloudSyncDirtyState() throws {
         let container = try makeContainer()
         let context = container.mainContext

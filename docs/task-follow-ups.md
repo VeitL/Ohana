@@ -27,7 +27,8 @@ actionable; long-term product ideas belong in planning docs instead.
 
 ### TFU-20260614-015 - Clear shared-care child references when deleting a human executor
 
-- Status: Open
+- Status: Open - local repair implemented; pending no-CI follow-up validation,
+  push/CI, and final pure review before close.
 - Priority: P1
 - Area: Domain / Physical Deletion / Shared Care / Member Lifecycle
 - Source task: Domain first-release local physical deletion cascade pure
@@ -49,6 +50,13 @@ actionable; long-term product ideas belong in planning docs instead.
   child shared metadata 不得重新暴露被删 human 或与 session executor set
   矛盾。实现应在 shared-care 边界统一处理 session 删除/降级/child
   reference 清理，而不是只补单个 log 类型。
+- Progress: 2026-06-14 Codex no-CI repair 已补红测并修绿。新增入口族覆盖
+  `PetCareLog` / `PetPottyLog` / `PetHygieneLog` / `PetExpenseLog` /
+  `PetWalkLog` 两种路径：唯一 executor 被删时 session 删除但 child facts
+  保留并清空 `sharedSessionId` / executor；多 executor 时 session 保留且
+  child executor metadata 收敛到 survivor。实现拆入
+  `PhysicalDeletionService+SharedCareScrubbing.swift`，避免增长 oversized
+  baseline 文件。按用户要求未跑/触发 CI，Domain 不得标 🏁。
 - Close condition: 新红测先失败后修绿；`PhysicalDeletionServiceTests`、
   `SharedPetActionRecorderTests`、`HomeCommandExecutorTests`、derived-state
   lifecycle audit、fixture tests、module exit gate、push 和 CI 全绿；随后

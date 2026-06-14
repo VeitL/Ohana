@@ -938,6 +938,14 @@ nonisolated enum PhysicalDeletionService {
             let filteredExecutors = originalExecutors.filter { !idsMatch($0, humanId) }
             guard filteredExecutors.count != originalExecutors.count else { continue }
             if filteredExecutors.isEmpty {
+                changedCount += scrubSharedCareChildrenReferencingSession(
+                    session,
+                    deletedHumanId: humanId,
+                    remainingExecutorIds: [],
+                    clearsSessionLink: true,
+                    context: context,
+                    modifiedAt: deletedAt
+                )
                 CloudSyncMutationRecorder.markDeleted(
                     session,
                     context: context,
@@ -949,6 +957,14 @@ nonisolated enum PhysicalDeletionService {
                 continue
             }
             session.setExecutorIds(filteredExecutors, primaryExecutorId: filteredExecutors.first)
+            changedCount += scrubSharedCareChildrenReferencingSession(
+                session,
+                deletedHumanId: humanId,
+                remainingExecutorIds: filteredExecutors,
+                clearsSessionLink: false,
+                context: context,
+                modifiedAt: deletedAt
+            )
             CloudSyncMutationRecorder.markModified(session, context: context, modifiedAt: deletedAt)
             changedCount += 1
         }
