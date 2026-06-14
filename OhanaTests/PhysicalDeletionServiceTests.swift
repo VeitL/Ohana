@@ -727,6 +727,18 @@ struct PhysicalDeletionServiceTests {
         let hygieneLog = PetHygieneLog(type: .bath, pet: pet, executorId: humanId, sharedSessionId: session.id.uuidString)
         let expenseLog = PetExpenseLog(amount: 12, pet: pet, executorId: humanId, sharedSessionId: session.id.uuidString)
         let walkLog = PetWalkLog(pet: pet, executorId: humanId, executorIds: [humanId, survivorId], sharedSessionId: session.id.uuidString)
+        let careLedger = CareLedgerEvent(
+            occurredAt: session.date,
+            actorKind: .human,
+            actorId: humanId,
+            subjectKind: .pet,
+            subjectId: pet.id.uuidString,
+            eventKind: .care,
+            actionType: CareType.play.rawValue,
+            source: .service,
+            legacyModelName: String(describing: PetCareLog.self),
+            legacyModelId: careLog.id.uuidString
+        )
 
         context.insert(human)
         context.insert(survivor)
@@ -737,6 +749,7 @@ struct PhysicalDeletionServiceTests {
         context.insert(hygieneLog)
         context.insert(expenseLog)
         context.insert(walkLog)
+        context.insert(careLedger)
         try context.save()
 
         PhysicalDeletionService.deleteHuman(human, context: context, deletedByHumanId: survivorId)
@@ -748,6 +761,7 @@ struct PhysicalDeletionServiceTests {
         let hygieneLogs = try context.fetch(FetchDescriptor<PetHygieneLog>())
         let expenseLogs = try context.fetch(FetchDescriptor<PetExpenseLog>())
         let walkLogs = try context.fetch(FetchDescriptor<PetWalkLog>())
+        let ledgers = try context.fetch(FetchDescriptor<CareLedgerEvent>())
 
         #expect(sessions.map(\.id) == [session.id])
         #expect(sessions.first?.executorIds == [survivorId])
@@ -762,6 +776,9 @@ struct PhysicalDeletionServiceTests {
         #expect(expenseLogs.first?.executorId == survivorId)
         #expect(walkLogs.first?.executorId == survivorId)
         #expect(walkLogs.first?.executorIds == [survivorId])
+        #expect(ledgers.map(\.id) == [careLedger.id])
+        #expect(ledgers.first?.actorKind == CareLedgerActorKind.human.rawValue)
+        #expect(ledgers.first?.actorId == survivorId)
     }
 
     @Test func careLedgerRecordEnqueuesCloudSyncDirtyState() throws {

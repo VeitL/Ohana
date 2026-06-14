@@ -146,70 +146,97 @@ extension PhysicalDeletionService {
         var changedFoodRecords: [PetFoodRecord] = []
         var changedExpenseLogs: [PetExpenseLog] = []
         var retainedFactKeys: Set<RetainedPetFactKey> = []
+        var retainedFactActorIds: [RetainedPetFactKey: String] = [:]
 
         for log in fetchScrubbableRows(PetCareLog.self, context: context) where log.pet != nil {
-            retainedFactKeys.insert(retainedPetFactKey(for: log))
-            guard sharedCareIdsMatch(log.executorId, humanId) else { continue }
-            log.executorId = nil
-            changedCareLogs.append(log)
+            let key = retainedPetFactKey(for: log)
+            retainedFactKeys.insert(key)
+            if sharedCareIdsMatch(log.executorId, humanId) {
+                log.executorId = nil
+                changedCareLogs.append(log)
+            }
+            recordRetainedActorId(log.executorId, deletedHumanId: humanId, factKey: key, actorIds: &retainedFactActorIds)
         }
         for log in fetchScrubbableRows(PetPottyLog.self, context: context) where log.pet != nil {
-            retainedFactKeys.insert(retainedPetFactKey(for: log))
-            guard sharedCareIdsMatch(log.executorId, humanId) else { continue }
-            log.executorId = nil
-            changedPottyLogs.append(log)
+            let key = retainedPetFactKey(for: log)
+            retainedFactKeys.insert(key)
+            if sharedCareIdsMatch(log.executorId, humanId) {
+                log.executorId = nil
+                changedPottyLogs.append(log)
+            }
+            recordRetainedActorId(log.executorId, deletedHumanId: humanId, factKey: key, actorIds: &retainedFactActorIds)
         }
         for log in fetchScrubbableRows(PetHygieneLog.self, context: context) where log.pet != nil {
-            retainedFactKeys.insert(retainedPetFactKey(for: log))
-            guard sharedCareIdsMatch(log.executorId, humanId) else { continue }
-            log.executorId = nil
-            changedHygieneLogs.append(log)
+            let key = retainedPetFactKey(for: log)
+            retainedFactKeys.insert(key)
+            if sharedCareIdsMatch(log.executorId, humanId) {
+                log.executorId = nil
+                changedHygieneLogs.append(log)
+            }
+            recordRetainedActorId(log.executorId, deletedHumanId: humanId, factKey: key, actorIds: &retainedFactActorIds)
         }
         for log in fetchScrubbableRows(PetHealthLog.self, context: context) where log.pet != nil {
-            retainedFactKeys.insert(retainedPetFactKey(for: log))
-            guard sharedCareIdsMatch(log.executorId, humanId) else { continue }
-            log.executorId = nil
-            changedHealthLogs.append(log)
+            let key = retainedPetFactKey(for: log)
+            retainedFactKeys.insert(key)
+            if sharedCareIdsMatch(log.executorId, humanId) {
+                log.executorId = nil
+                changedHealthLogs.append(log)
+            }
+            recordRetainedActorId(log.executorId, deletedHumanId: humanId, factKey: key, actorIds: &retainedFactActorIds)
         }
         for log in fetchScrubbableRows(PetWalkLog.self, context: context) where log.pet != nil {
-            retainedFactKeys.insert(retainedPetFactKey(for: log))
-            guard walkExecutorIdsContain(log, humanId: humanId) else { continue }
-            let remainingExecutorIds = log.executorIds.filter { !sharedCareIdsMatch($0, humanId) }
-            if remainingExecutorIds.isEmpty {
-                log.executorId = nil
-                log.executorIdsRaw = ""
-            } else {
-                log.setExecutorIds(remainingExecutorIds, primaryExecutorId: remainingExecutorIds.first)
+            let key = retainedPetFactKey(for: log)
+            retainedFactKeys.insert(key)
+            if walkExecutorIdsContain(log, humanId: humanId) {
+                let remainingExecutorIds = log.executorIds.filter { !sharedCareIdsMatch($0, humanId) }
+                if remainingExecutorIds.isEmpty {
+                    log.executorId = nil
+                    log.executorIdsRaw = ""
+                } else {
+                    log.setExecutorIds(remainingExecutorIds, primaryExecutorId: remainingExecutorIds.first)
+                }
+                changedWalkLogs.append(log)
             }
-            changedWalkLogs.append(log)
+            recordRetainedActorId(log.executorId, deletedHumanId: humanId, factKey: key, actorIds: &retainedFactActorIds)
         }
         for log in fetchScrubbableRows(PetWeightLog.self, context: context) where log.pet != nil {
-            retainedFactKeys.insert(retainedPetFactKey(for: log))
-            guard sharedCareIdsMatch(log.executorId, humanId) else { continue }
-            log.executorId = nil
-            changedWeightLogs.append(log)
+            let key = retainedPetFactKey(for: log)
+            retainedFactKeys.insert(key)
+            if sharedCareIdsMatch(log.executorId, humanId) {
+                log.executorId = nil
+                changedWeightLogs.append(log)
+            }
+            recordRetainedActorId(log.executorId, deletedHumanId: humanId, factKey: key, actorIds: &retainedFactActorIds)
         }
         for record in fetchScrubbableRows(PetFoodRecord.self, context: context) where record.pet != nil {
-            retainedFactKeys.insert(retainedPetFactKey(for: record))
-            guard sharedCareIdsMatch(record.executorId, humanId) else { continue }
-            record.executorId = nil
-            changedFoodRecords.append(record)
+            let key = retainedPetFactKey(for: record)
+            retainedFactKeys.insert(key)
+            if sharedCareIdsMatch(record.executorId, humanId) {
+                record.executorId = nil
+                changedFoodRecords.append(record)
+            }
+            recordRetainedActorId(record.executorId, deletedHumanId: humanId, factKey: key, actorIds: &retainedFactActorIds)
         }
         for log in fetchScrubbableRows(PetExpenseLog.self, context: context) where log.pet != nil {
-            retainedFactKeys.insert(retainedPetFactKey(for: log))
-            guard sharedCareIdsMatch(log.executorId, humanId) else { continue }
-            log.executorId = nil
-            changedExpenseLogs.append(log)
+            let key = retainedPetFactKey(for: log)
+            retainedFactKeys.insert(key)
+            if sharedCareIdsMatch(log.executorId, humanId) {
+                log.executorId = nil
+                changedExpenseLogs.append(log)
+            }
+            recordRetainedActorId(log.executorId, deletedHumanId: humanId, factKey: key, actorIds: &retainedFactActorIds)
         }
 
         let changedCareLedgers = scrubCareLedgerActors(
             humanId: humanId,
             retainedFactKeys: retainedFactKeys,
+            retainedFactActorIds: retainedFactActorIds,
             context: context
         )
         let changedCoconutLedgers = scrubCoconutLedgerActors(
             humanId: humanId,
             retainedFactKeys: retainedFactKeys,
+            retainedFactActorIds: retainedFactActorIds,
             context: context
         )
 
@@ -239,14 +266,21 @@ extension PhysicalDeletionService {
     private nonisolated static func scrubCareLedgerActors(
         humanId: String,
         retainedFactKeys: Set<RetainedPetFactKey>,
+        retainedFactActorIds: [RetainedPetFactKey: String],
         context: ModelContext
     ) -> [CareLedgerEvent] {
         guard !retainedFactKeys.isEmpty else { return [] }
         var changedEvents: [CareLedgerEvent] = []
         for event in fetchScrubbableRows(CareLedgerEvent.self, context: context)
             where sharedCareIdsMatch(event.actorId, humanId) && retainedFactKeys.contains(retainedPetFactKey(for: event)) {
-            event.actorKind = CareLedgerActorKind.unknown.rawValue
-            event.actorId = nil
+            let factKey = retainedPetFactKey(for: event)
+            if let retainedActorId = retainedFactActorIds[factKey] {
+                event.actorKind = CareLedgerActorKind.human.rawValue
+                event.actorId = retainedActorId
+            } else {
+                event.actorKind = CareLedgerActorKind.unknown.rawValue
+                event.actorId = nil
+            }
             changedEvents.append(event)
         }
         return changedEvents
@@ -255,6 +289,7 @@ extension PhysicalDeletionService {
     private nonisolated static func scrubCoconutLedgerActors(
         humanId: String,
         retainedFactKeys: Set<RetainedPetFactKey>,
+        retainedFactActorIds: [RetainedPetFactKey: String],
         context: ModelContext
     ) -> [CoconutLedgerEntry] {
         guard !retainedFactKeys.isEmpty else { return [] }
@@ -266,7 +301,7 @@ extension PhysicalDeletionService {
                   !sharedCareIdsMatch(entry.subjectId, humanId) else {
                 continue
             }
-            entry.actorId = nil
+            entry.actorId = retainedFactActorIds[retainedPetFactKey(for: entry)]
             entry.actorName = nil
             changedEntries.append(entry)
         }
@@ -294,6 +329,20 @@ extension PhysicalDeletionService {
 
     private nonisolated static func walkExecutorIdsContain(_ log: PetWalkLog, humanId: String) -> Bool {
         sharedCareIdsMatch(log.executorId, humanId) || log.executorIds.contains { sharedCareIdsMatch($0, humanId) }
+    }
+
+    private nonisolated static func recordRetainedActorId(
+        _ executorId: String?,
+        deletedHumanId: String,
+        factKey: RetainedPetFactKey,
+        actorIds: inout [RetainedPetFactKey: String]
+    ) {
+        guard let executorId,
+              !CloudSyncRecordState.normalizedRecordId(executorId).isEmpty,
+              !sharedCareIdsMatch(executorId, deletedHumanId) else {
+            return
+        }
+        actorIds[factKey] = executorId
     }
 
     private nonisolated static func sharedCareIdsMatch(_ lhs: String?, _ rhs: String) -> Bool {

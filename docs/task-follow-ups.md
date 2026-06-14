@@ -61,9 +61,10 @@ actionable; long-term product ideas belong in planning docs instead.
 - Progress: 2026-06-14 no-CI 修复会话已本地补红测并修绿：`deleteHuman`
   现在先维护 shared session，再对所有 retained active pet fact keys 做兜底
   executor scrub；普通 active pet facts 清 deleted executor，matching
-  `CareLedgerEvent` actor 改 unknown，pet-owned `CoconutLedgerEntry` 清
-  actor，保留 fact/ledger 可回放一致性。新增测试覆盖普通 care/potty/
-  hygiene/health/walk/weight/food/pet expense facts、shared-only-executor
+  `CareLedgerEvent` / pet-owned `CoconutLedgerEntry` 保留并把 actor 统一收敛到
+  retained survivor executor，若没有 survivor 则收敛为 unknown/nil，保留
+  fact/ledger 可回放一致性。新增测试覆盖普通 care/potty/hygiene/health/walk/
+  weight/food/pet expense facts、shared-only-executor ledger、shared survivor
   ledger、backfill 和 backup 不回灌 deleted human id。验证见
   `docs/testing-progress.md` 2026-06-14 Domain TFU-20260614-016 no-CI
   修复记录；按用户要求未跑 CI、未推送、未最终纯复审。
