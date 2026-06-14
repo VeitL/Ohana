@@ -25,6 +25,49 @@ actionable; long-term product ideas belong in planning docs instead.
 
 ## Open Items
 
+### TFU-20260614-016 - Scrub deleted human executors from retained active pet facts
+
+- Status: Open - local repair implemented; pending push/CI and final pure
+  review before close.
+- Priority: P1
+- Area: Domain / Physical Deletion / Member Lifecycle / Care Facts / CareLedger
+- Source task: Domain first-release reachable-surface pure adversarial review;
+  Codex, 2026-06-14, after local no-CI repair commit `3cc140333`.
+- Blocker: 本轮首发可达面纯复审发现 P0=0 / P1=1 / P2=0，Domain
+  仍不能标 🏁。P1：`PhysicalDeletionService.deleteHuman` 只 scrub 了
+  shared-care child facts；普通 active pet facts（`PetCareLog` /
+  `PetPottyLog` / `PetHygieneLog` / `PetHealthLog` / `PetWalkLog` /
+  `PetWeightLog` / `PetFoodRecord` / pet-scoped `PetExpenseLog`）会保留
+  被物理删除 human 的 `executorId` / `executorIdsRaw`。同一删除路径又会删除
+  `actorId == humanId` 的 `CareLedgerEvent`，导致 active pet fact 保留但
+  ledger 消失；后续 `CareLedgerBackfillService.backfill` 会从保留下来的
+  `log.executorId` 把已删除 human id 重新写回 ledger。备份编码也会导出这些
+  retained pet fact 的 `executorId`。这违反 D8/G5 的物理真删、G4.1 的
+  deleted executor 不得伪装归属，以及 G1 的 fact/ledger 一致性。
+- Next step: 先补入口族红测：构造 active pet + human executor + 普通非
+  shared 的 care/potty/hygiene/health/walk/weight/food/pet expense facts，
+  以及对应 `CareLedgerEvent`；调用 `PhysicalDeletionService.deleteHuman`
+  后断言 active pet facts 保留但不再含 deleted human id，matching
+  care ledger 不得消失或回填 deleted actor（按产品语义更新为 unknown /
+  fallback actor），CloudSync dirty state 要标记这些 scrubbed facts/ledger。
+  再补 backfill/backup 断言：删除后跑 `CareLedgerBackfillService.backfill`
+  或导出备份，不得重新出现 deleted human id。
+- Close condition: 新红测先失败后修绿；实现以一个 retained-pet-fact
+  scrubber 收口普通 facts 和 shared facts 的 deleted executor 语义，避免逐
+  log 类型散补；`PhysicalDeletionServiceTests`、`CareLedgerBackfillActorTests`
+  或等价 backfill/backup 测试、economy/derived audits、fixture tests、
+  module exit gate、push 和 CI 全绿；随后另开首发可达面纯复审，P0/P1=0
+  才能把 Domain 标 🏁。
+- Progress: 2026-06-14 no-CI 修复会话已本地补红测并修绿：`deleteHuman`
+  现在先维护 shared session，再对所有 retained active pet fact keys 做兜底
+  executor scrub；普通 active pet facts 清 deleted executor，matching
+  `CareLedgerEvent` actor 改 unknown，pet-owned `CoconutLedgerEntry` 清
+  actor，保留 fact/ledger 可回放一致性。新增测试覆盖普通 care/potty/
+  hygiene/health/walk/weight/food/pet expense facts、shared-only-executor
+  ledger、backfill 和 backup 不回灌 deleted human id。验证见
+  `docs/testing-progress.md` 2026-06-14 Domain TFU-20260614-016 no-CI
+  修复记录；按用户要求未跑 CI、未推送、未最终纯复审。
+
 ### TFU-20260614-015 - Clear shared-care child references when deleting a human executor
 
 - Status: Open - local repair implemented; pending no-CI follow-up validation,

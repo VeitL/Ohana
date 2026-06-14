@@ -471,6 +471,13 @@ nonisolated enum PhysicalDeletionService {
         deletedCount += deleteRows(fetchAll(HumanHealthMetricLog.self, context: context).filter { $0.human?.id == human.id }, context: context) {
             CloudSyncMutationRecorder.markDeleted($0, context: context, deletedAt: deletedAt, deletedByHumanId: deletedByHumanId)
         }
+        deletedCount += scrubSharedCareSessionsReferencingHuman(
+            humanId: humanId,
+            context: context,
+            deletedAt: deletedAt,
+            deletedByHumanId: deletedByHumanId
+        )
+        deletedCount += scrubRetainedPetFactsReferencingHuman(humanId: humanId, context: context, modifiedAt: deletedAt)
         deletedCount += deleteRows(fetchAll(CoconutAccount.self, context: context).filter { account in
             account.ownerKind == .human && idsMatch(account.ownerId, humanId)
         }, context: context) { _ in }
@@ -499,12 +506,6 @@ nonisolated enum PhysicalDeletionService {
         }, context: context) {
             markGenericDeleted(entityName: String(describing: FamilyCollaborationTask.self), localRecordId: $0.id, parentId: humanId, context: context, deletedAt: deletedAt, deletedByHumanId: deletedByHumanId)
         }
-        deletedCount += scrubSharedCareSessionsReferencingHuman(
-            humanId: humanId,
-            context: context,
-            deletedAt: deletedAt,
-            deletedByHumanId: deletedByHumanId
-        )
 
         return deletedCount
     }

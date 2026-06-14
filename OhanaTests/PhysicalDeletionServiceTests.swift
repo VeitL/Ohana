@@ -494,6 +494,18 @@ struct PhysicalDeletionServiceTests {
         let hygieneLog = PetHygieneLog(type: .bath, pet: pet, executorId: humanId, sharedSessionId: session.id.uuidString)
         let expenseLog = PetExpenseLog(amount: 12, pet: pet, executorId: humanId, sharedSessionId: session.id.uuidString)
         let walkLog = PetWalkLog(pet: pet, executorId: humanId, executorIds: [humanId], sharedSessionId: session.id.uuidString)
+        let careLedger = CareLedgerEvent(
+            occurredAt: session.date,
+            actorKind: .human,
+            actorId: humanId,
+            subjectKind: .pet,
+            subjectId: pet.id.uuidString,
+            eventKind: .care,
+            actionType: CareType.feeding.rawValue,
+            source: .service,
+            legacyModelName: String(describing: PetCareLog.self),
+            legacyModelId: careLog.id.uuidString
+        )
 
         context.insert(human)
         context.insert(survivor)
@@ -504,6 +516,7 @@ struct PhysicalDeletionServiceTests {
         context.insert(hygieneLog)
         context.insert(expenseLog)
         context.insert(walkLog)
+        context.insert(careLedger)
         try context.save()
 
         PhysicalDeletionService.deleteHuman(human, context: context, deletedByHumanId: survivor.id.uuidString)
@@ -514,6 +527,7 @@ struct PhysicalDeletionServiceTests {
         let hygieneLogs = try context.fetch(FetchDescriptor<PetHygieneLog>())
         let expenseLogs = try context.fetch(FetchDescriptor<PetExpenseLog>())
         let walkLogs = try context.fetch(FetchDescriptor<PetWalkLog>())
+        let ledgers = try context.fetch(FetchDescriptor<CareLedgerEvent>())
 
         #expect(try context.fetch(FetchDescriptor<SharedCareSession>()).isEmpty)
         #expect(careLogs.map(\.id) == [careLog.id])
@@ -532,7 +546,165 @@ struct PhysicalDeletionServiceTests {
         #expect(expenseLogs.first?.executorId == nil)
         #expect(walkLogs.first?.executorId == nil)
         #expect(walkLogs.first?.executorIds.isEmpty == true)
+        #expect(ledgers.map(\.id) == [careLedger.id])
+        #expect(ledgers.first?.actorKind == CareLedgerActorKind.unknown.rawValue)
+        #expect(ledgers.first?.actorId == nil)
         #expect(deletionTombstone(SharedCareSession.self, id: session.id, context: context) != nil)
+    }
+
+    @Test func deleteHumanScrubsExecutorFromRetainedPetFactsAndLedgers() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let human = Human(name: "Guan")
+        let survivor = Human(name: "Alex")
+        let pet = Pet(name: "Momo")
+        let humanId = human.id.uuidString
+        let petId = pet.id.uuidString
+        let occurredAt = Date(timeIntervalSinceReferenceDate: 1000)
+
+        let careLog = PetCareLog(date: occurredAt, type: .feeding, pet: pet, executorId: humanId)
+        let pottyLog = PetPottyLog(date: occurredAt, type: .pee, pet: pet, executorId: humanId)
+        let hygieneLog = PetHygieneLog(date: occurredAt, type: .bath, pet: pet, executorId: humanId)
+        let healthLog = PetHealthLog(date: occurredAt, type: .vaccine, pet: pet, executorId: humanId)
+        let walkLog = PetWalkLog(startDate: occurredAt, pet: pet, executorId: humanId, executorIds: [humanId])
+        let weightLog = PetWeightLog(date: occurredAt, weight: 6.2, pet: pet, executorId: humanId)
+        let foodRecord = PetFoodRecord(
+            brand: "Kibble",
+            dailyGrams: 80,
+            totalGrams: 1000,
+            startDate: occurredAt,
+            pet: pet,
+            executorId: humanId
+        )
+        let expenseLog = PetExpenseLog(date: occurredAt, amount: 12, pet: pet, executorId: humanId)
+
+        let factKeys = [
+            ("PetCareLog", careLog.id.uuidString, CareLedgerEventKind.care, CareType.feeding.rawValue),
+            ("PetPottyLog", pottyLog.id.uuidString, CareLedgerEventKind.potty, PottyType.pee.rawValue),
+            ("PetHygieneLog", hygieneLog.id.uuidString, CareLedgerEventKind.hygiene, HygieneType.bath.rawValue),
+            ("PetHealthLog", healthLog.id.uuidString, CareLedgerEventKind.health, HealthLogType.vaccine.rawValue),
+            ("PetWalkLog", walkLog.id.uuidString, CareLedgerEventKind.walk, "walk"),
+            ("PetWeightLog", weightLog.id.uuidString, CareLedgerEventKind.weight, "weight"),
+            ("PetFoodRecord", foodRecord.id.uuidString, CareLedgerEventKind.care, CareType.feeding.rawValue),
+            ("PetExpenseLog", expenseLog.id.uuidString, CareLedgerEventKind.expense, ExpenseCategory.other.rawValue)
+        ]
+        let careLedgerEvents = factKeys.map { modelName, modelId, eventKind, actionType in
+            CareLedgerEvent(
+                occurredAt: occurredAt,
+                actorKind: .human,
+                actorId: humanId,
+                subjectKind: .pet,
+                subjectId: petId,
+                eventKind: eventKind,
+                actionType: actionType,
+                source: .service,
+                legacyModelName: modelName,
+                legacyModelId: modelId
+            )
+        }
+        let coconutAccount = CoconutAccount(
+            accountKey: CoconutAccountKey.pet(pet.id),
+            ownerKind: .pet,
+            ownerId: petId,
+            displayName: pet.name,
+            balance: 3
+        )
+        let coconutLedger = CoconutLedgerEntry(
+            transactionKey: "retained-pet-reward",
+            accountKey: CoconutAccountKey.pet(pet.id),
+            ownerKind: .pet,
+            ownerId: petId,
+            ownerName: pet.name,
+            delta: 3,
+            balanceBefore: 0,
+            balanceAfter: 3,
+            entryKind: .reward,
+            source: .careEvent,
+            title: "Reward",
+            emoji: "🥥",
+            actorId: humanId,
+            actorName: human.name,
+            subjectKind: .pet,
+            subjectId: petId,
+            sourceModelName: "PetCareLog",
+            sourceModelId: careLog.id.uuidString,
+            careLedgerEventId: careLedgerEvents.first?.id.uuidString
+        )
+
+        context.insert(human)
+        context.insert(survivor)
+        context.insert(pet)
+        context.insert(careLog)
+        context.insert(pottyLog)
+        context.insert(hygieneLog)
+        context.insert(healthLog)
+        context.insert(walkLog)
+        context.insert(weightLog)
+        context.insert(foodRecord)
+        context.insert(expenseLog)
+        context.insert(coconutAccount)
+        context.insert(coconutLedger)
+        careLedgerEvents.forEach(context.insert)
+        try context.save()
+
+        PhysicalDeletionService.deleteHuman(human, context: context, deletedByHumanId: survivor.id.uuidString)
+        try context.save()
+
+        let careLogs = try context.fetch(FetchDescriptor<PetCareLog>())
+        let pottyLogs = try context.fetch(FetchDescriptor<PetPottyLog>())
+        let hygieneLogs = try context.fetch(FetchDescriptor<PetHygieneLog>())
+        let healthLogs = try context.fetch(FetchDescriptor<PetHealthLog>())
+        let walkLogs = try context.fetch(FetchDescriptor<PetWalkLog>())
+        let weightLogs = try context.fetch(FetchDescriptor<PetWeightLog>())
+        let foodRecords = try context.fetch(FetchDescriptor<PetFoodRecord>())
+        let expenseLogs = try context.fetch(FetchDescriptor<PetExpenseLog>())
+        let ledgers = try context.fetch(FetchDescriptor<CareLedgerEvent>())
+        let coconutLedgers = try context.fetch(FetchDescriptor<CoconutLedgerEntry>())
+
+        #expect(careLogs.map(\.id) == [careLog.id])
+        #expect(pottyLogs.map(\.id) == [pottyLog.id])
+        #expect(hygieneLogs.map(\.id) == [hygieneLog.id])
+        #expect(healthLogs.map(\.id) == [healthLog.id])
+        #expect(walkLogs.map(\.id) == [walkLog.id])
+        #expect(weightLogs.map(\.id) == [weightLog.id])
+        #expect(foodRecords.map(\.id) == [foodRecord.id])
+        #expect(expenseLogs.map(\.id) == [expenseLog.id])
+        #expect(careLogs.first?.executorId == nil)
+        #expect(pottyLogs.first?.executorId == nil)
+        #expect(hygieneLogs.first?.executorId == nil)
+        #expect(healthLogs.first?.executorId == nil)
+        #expect(walkLogs.first?.executorId == nil)
+        #expect(walkLogs.first?.executorIds.isEmpty == true)
+        #expect(weightLogs.first?.executorId == nil)
+        #expect(foodRecords.first?.executorId == nil)
+        #expect(expenseLogs.first?.executorId == nil)
+
+        #expect(Set(ledgers.map(\.id)) == Set(careLedgerEvents.map(\.id)))
+        #expect(ledgers.allSatisfy { $0.actorKind == CareLedgerActorKind.unknown.rawValue })
+        #expect(ledgers.allSatisfy { $0.actorId == nil })
+        #expect(ledgers.allSatisfy { $0.subjectId == petId })
+        #expect(coconutLedgers.map(\.id) == [coconutLedger.id])
+        #expect(coconutLedgers.first?.actorId == nil)
+        #expect(coconutLedgers.first?.actorName == nil)
+
+        try CareLedgerBackfillService.backfill(context: context)
+        try context.save()
+        let ledgersAfterBackfill = try context.fetch(FetchDescriptor<CareLedgerEvent>())
+        #expect(Set(ledgersAfterBackfill.map(\.id)) == Set(careLedgerEvents.map(\.id)))
+        #expect(ledgersAfterBackfill.allSatisfy { $0.actorId != humanId })
+
+        let backup = try TestDataBackupManagerProjection.manager.buildBackup(context: context)
+        #expect(backup.petCareLogs.first { $0.id == careLog.id.uuidString }?.executorId == nil)
+        #expect(backup.petPottyLogs.first { $0.id == pottyLog.id.uuidString }?.executorId == nil)
+        #expect(backup.petHygieneLogs.first { $0.id == hygieneLog.id.uuidString }?.executorId == nil)
+        #expect(backup.petHealthLogs.first { $0.id == healthLog.id.uuidString }?.executorId == nil)
+        #expect(backup.petWalkLogs.first { $0.id == walkLog.id.uuidString }?.executorId == nil)
+        #expect(backup.petWalkLogs.first { $0.id == walkLog.id.uuidString }?.executorIdsRaw == nil)
+        #expect(backup.petWeightLogs.first { $0.id == weightLog.id.uuidString }?.executorId == nil)
+        #expect(backup.petFoodRecords.first { $0.id == foodRecord.id.uuidString }?.executorId == nil)
+        #expect(backup.petExpenseLogs.first { $0.id == expenseLog.id.uuidString }?.executorId == nil)
+        #expect((backup.careLedgerEvents ?? []).allSatisfy { $0.actorId != humanId })
+        #expect((backup.coconutLedgerEntries ?? []).allSatisfy { $0.actorId != humanId })
     }
 
     @Test func deleteHumanScrubsSharedCareChildrenWhenSessionKeepsOtherExecutors() throws {
