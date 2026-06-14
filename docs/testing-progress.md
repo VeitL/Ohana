@@ -37,7 +37,7 @@
 | Oasis | 6 | 🟢 | 2026-06-12 | 无 | `87423afd8` | 开工：2026-06-12；规则书见 `docs/specs/Oasis-logic.md`；当前主人钱包门、预算/冷却产出、一次性幂等奖励、休眠可唤回语义已落地；`scripts/module-exit-gate.sh` PASS；真实 UI 抽查见 `docs/planning/gap-acceptance-track-list.md#phase-6-oasis`；未改 schema / 路由 / 启动路径 / CloudKit |
 | Settings | 6 | 🟢 | 2026-06-12 | P2 余留见 TFU-20260612-022 | `5d4e71928` | 规则书见 `docs/specs/Settings-logic.md`；开发/测试入口收进 Debug-only，通知开关接入 `NotificationDeliveryPolicy`，空 About 入口隐藏；目标测试、UI/a11y/smoothness/runtime 审计与 `scripts/module-exit-gate.sh` PASS；真实 UI / 真机通知抽查见统一 track list |
 | Health | 6 | 🟢 | 2026-06-12 | 无 P1/P2 代码余留；真实 UI 抽查见统一 track list | `5d4e71928` | 规则书见 `docs/specs/Health-logic.md`；2026-06-14 删除模型已改为确认后物理删除 + sync tombstone，健康记录删除清理派生费用/日历事件/提醒/ledger，症状/发情记录不进入恢复态；已故宠物只读；schema 升至 `ArkSchemaV70` 且 legacy 字段仅为存储兼容；目标测试与 `scripts/module-exit-gate.sh` PASS；未启用 CloudKit、未改路由或启动路径 |
-| Economy | 6 | 🟢 | 2026-06-14 | TFU-20260614-006 open；TFU-20260614-007 已由二态模型决策退役；最终纯复审 pending，不得 🏁；真实 UI 抽查见统一 track list | `本次提交` | 规则书见 `docs/specs/Economy-logic.md`；2026-06-14 care-derivation executor 架构会话已按产品主人 option A 收口：用户可见回收站和可恢复软删退役，删除走 `PhysicalDeletionService` 物理删除 + 不可见 sync tombstone，离世成员只读且照护写入/编辑/历史补记/派生 no-op；`CareFactWriteDisposition` 二态化，脏 executor id 不再丢 active target 事实；raw `DomainRevisionPublishing.publish` 加 token，care-family command/revision 路径消费 typed executor outcome；R5/derived lifecycle 审计和 fixture 已同步。legacy recycle 字段仅为既有 store compatibility 保留，活跃产品流不得读写。Economy 仍保持 🟢，需另开全新纯对抗复审 P0/P1=0 后才可 🏁 |
+| Economy | 6 | 🟢 | 2026-06-14 | TFU-20260614-006 open；本轮纯复审 P0=0 / P1=1 / P2=0，不得 🏁；真实 UI 抽查见统一 track list | `c3c5e5f53` | 规则书见 `docs/specs/Economy-logic.md`；2026-06-14 care-derivation executor 架构会话已按产品主人 option A 收口：用户可见回收站和可恢复软删退役，删除走 `PhysicalDeletionService` 物理删除 + 不可见 sync tombstone，离世成员只读且照护写入/编辑/历史补记/派生 no-op；`CareFactWriteDisposition` 二态化，脏 executor id 不再丢 active target 事实；raw `DomainRevisionPublishing.publish` 加 token，care-family command/revision 路径消费 typed executor outcome；R5/derived lifecycle 审计和 fixture 已同步。最终纯复审仍发现 Insurance expense fact 缺同边界 ledger 纪律，见 TFU-20260614-006。legacy recycle 字段仅为既有 store compatibility 保留，活跃产品流不得读写。Economy 仍保持 🟢，需修复 P1 后另开全新纯对抗复审 P0/P1=0 才可 🏁 |
 | Medication | 7 | ⬜ | | | | |
 | Walks | 7 | 🟢 | 2026-06-13 | 无 P1/P2 代码余留；真机定位 / 真实 UI 抽查见统一 track list | `e0c1d69d3` | 规则书见 `docs/specs/Walks-logic.md`；`WalkFeaturePolicy` 统一 active dog/lifecycle 判定，非狗 / 已离世宠物不可启动遛狗；删除后的 walk / poop marker 已物理移除且不作为产品可见状态；遛狗中便便写 `PetPottyLog` + `CareLedgerEvent` 并进入奖励管线；共享遛狗调用收进基础设施适配器；目标测试、changed gate 与 `scripts/module-exit-gate.sh` PASS；未改 schema / CloudKit / 启动路径 |
 | FamilyTasks | 7 | ⬜ | | | | |
@@ -86,6 +86,22 @@
 > and derived-state audits PASS with existing baselines only, fixture tests PASS,
 > and `scripts/module-exit-gate.sh` PASS. Economy remains 🟢 and must not be marked 🏁 until a separate fresh pure
 > adversarial review reports P0/P1=0.
+>
+> Economy final pure review note (2026-06-14, Codex final pure adversarial
+> review after CI-green commit `c3c5e5f53`):
+> P0=0 / P1=1 / P2=0. P1 remains TFU-20260614-006: Insurance policy auto
+> payment schedule and claim reimbursement still insert `PetExpenseLog` without
+> same-boundary `CareLedgerEvent` / expense-ledger discipline
+> (`Ohana/Features/Insurance/InsuranceCommands.swift:164`,
+> `Ohana/Features/Insurance/InsuranceCommands.swift:335`,
+> `Ohana/Features/Insurance/InsuranceCommands.swift:384`), unlike
+> `ExpenseCommandService.recordPetExpense` which writes both expense fact and
+> ledger. Validation: CI run `27502634100` PASS (`audits`, `lint`,
+> `build-test`), `scripts/audit-economy-boundaries.sh --all` PASS,
+> `scripts/tests/run-audit-fixture-tests.sh` PASS,
+> `scripts/audit-derived-state-lifecycle.sh --all` exit 0 with existing
+> baseline warnings, and targeted simulator suites PASS (48 tests). Economy
+> remains 🟢 and must not be marked 🏁.
 >
 > Economy current review note (2026-06-14, Codex fresh pure adversarial review):
 > P0=0 / P1=3 / P2=1. P1 findings are tracked as TFU-20260614-004:

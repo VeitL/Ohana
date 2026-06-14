@@ -95,6 +95,16 @@ actionable; long-term product ideas belong in planning docs instead.
   moved care command side effects toward typed executor outcomes. This TFU
   remains Open because Insurance expense ledger discipline and the final
   fresh pure adversarial Economy review have not been closed in this session.
+- Review update: 2026-06-14 final pure adversarial Economy review after
+  commits `7ded53a6a`, `8abbf0ed9`, `3e8fbf5ff`, and `c3c5e5f53` found
+  P0=0 / P1=1 / P2=0. The remaining P1 is still this TFU's Insurance expense
+  ledger item: `InsurancePolicyCommandService.generatePaymentSchedule` and
+  `makeReimbursementExpenseIfNeeded` insert `PetExpenseLog` records without
+  the same-boundary `CareLedgerEvent` discipline used by
+  `ExpenseCommandService.recordPetExpense`. Shared feed, planned catch-up,
+  dirty executor, deceased care target, shared walk, and the old target test
+  gate were verified green by targeted tests and CI; do not close this TFU
+  until the Insurance expense ledger path has a red test and fix.
 - Close condition: 新红测先失败后修绿；`scripts/audit-economy-boundaries.sh --all`、
   `scripts/tests/run-audit-fixture-tests.sh`、相关 targeted simulator suite、
   `git diff --check` 与 module exit gate 通过；再开全新纯对抗复审，P0/P1=0 后
