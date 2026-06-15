@@ -22,6 +22,8 @@ Purpose:
     live in Domain, App, Shared, or Features instead.
   - Models/ do not read UserDefaults or feature preference stores; persistence
     models expose data, while feature/app layers own preferences.
+  - Models/ do not declare store/writer/service/command types or accept
+    ModelContext write authority.
   - @Query only appears in screen/route data containers.
   - Views do not directly use UserDefaults or construct command executors.
   - Swift files above 800 lines are ratcheted; no new oversized files and no
@@ -451,6 +453,46 @@ models_persistence_side_effects() {
     | rg -v '^Ohana/Models/SharedModelContainer\.swift:' || true
 }
 
+models_behavior_types() {
+  local scoped_files=()
+  if [[ "$mode" == "all" ]]; then
+    while IFS= read -r file; do
+      [[ -n "$file" ]] && scoped_files+=("$file")
+    done < <(find Ohana/Models -maxdepth 1 -name '*.swift' | sort)
+  else
+    for file in "${files[@]}"; do
+      case "$file" in
+        Ohana/Models/*.swift)
+          [[ -f "$file" ]] && scoped_files+=("$file")
+          ;;
+      esac
+    done
+  fi
+  [[ ${#scoped_files[@]} -eq 0 ]] && return 0
+  rg -n --with-filename --pcre2 '^\s*(nonisolated\s+)?(enum|struct|final\s+class|class)\s+[A-Za-z0-9_]*(Store|Service|Manager|Executor|Writer|Command)\b' "${scoped_files[@]}" \
+    | rg -v '^Ohana/Models/SharedModelContainer\.swift:' || true
+}
+
+models_writer_context_dependencies() {
+  local scoped_files=()
+  if [[ "$mode" == "all" ]]; then
+    while IFS= read -r file; do
+      [[ -n "$file" ]] && scoped_files+=("$file")
+    done < <(find Ohana/Models -maxdepth 1 -name '*.swift' | sort)
+  else
+    for file in "${files[@]}"; do
+      case "$file" in
+        Ohana/Models/*.swift)
+          [[ -f "$file" ]] && scoped_files+=("$file")
+          ;;
+      esac
+    done
+  fi
+  [[ ${#scoped_files[@]} -eq 0 ]] && return 0
+  rg -n --with-filename --pcre2 '\bModelContext\b|\bcontext\.(insert|delete|save)\b|\bsafeSave\b' "${scoped_files[@]}" \
+    | rg -v '^Ohana/Models/SharedModelContainer\.swift:' || true
+}
+
 record_matches \
   "models-non-schema-source" \
   "Models/ may contain SwiftData models, schema/migration containers, or model extensions only; move taxonomy, routes, stores, catalogs, and presentation helpers out." \
@@ -460,6 +502,16 @@ record_matches \
   "models-persistence-side-effect" \
   "Models must not read/write UserDefaults or feature preference stores; move preference behavior to Feature/App/Shared boundaries." \
   models_persistence_side_effects
+
+record_matches \
+  "models-behavior-type" \
+  "Models must not declare store/writer/service/command behavior types; keep write and service authority in Domain/Feature/App layers." \
+  models_behavior_types
+
+record_matches \
+  "models-writer-context-dependency" \
+  "Models must not accept ModelContext or perform context insert/delete/save writes; route persistence behavior through writer/service layers." \
+  models_writer_context_dependencies
 
 record_matches \
   "models-layer-pollution" \

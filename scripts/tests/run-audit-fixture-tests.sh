@@ -147,7 +147,7 @@ run_audit scripts/audit-architecture-boundaries.sh --changed
 if [[ "$status" -ne 1 ]]; then
   fail "scripts/audit-architecture-boundaries.sh ArchitectureModelBoundariesBad.swift: expected strict exit 1, got $status"
 else
-  for rule in models-presentation-framework-dependency models-non-schema-source models-persistence-side-effect; do
+  for rule in models-presentation-framework-dependency models-non-schema-source models-persistence-side-effect models-behavior-type models-writer-context-dependency; do
     if ! grep -qF "[$rule]" <<<"$output"; then
       fail "scripts/audit-architecture-boundaries.sh ArchitectureModelBoundariesBad.swift: rule [$rule] no longer fires"
     fi

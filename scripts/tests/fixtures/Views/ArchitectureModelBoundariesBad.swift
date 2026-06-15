@@ -16,3 +16,9 @@ enum ArchitectureModelBoundariesBadStatus: String, Codable {
         Image(systemName: "pawprint.fill")
     }
 }
+
+enum ArchitectureModelBoundaryStore {
+    static func save(context: ModelContext) {
+        context.insert(ArchitectureModelBoundariesBadStatus.active)
+    }
+}
