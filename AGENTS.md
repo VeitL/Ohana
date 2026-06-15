@@ -99,21 +99,26 @@ CI push cadence (solo-developer reality). The governing fact: SwiftLint
 `--strict`, SwiftFormat, and the whole-repo audits run **only in CI** — the
 default local gate does not run them. So completed work that has not reached CI
 is work whose lint/format/audit gates have not actually run. Therefore **push
-every completed work-item promptly** (module exit, CI-fix verification, a GAP
-item, a fix batch) and keep going — do not wait on the run. The hard bound:
+every completed work-item or coherent fix batch promptly** (module exit,
+CI-fix verification, a GAP item, a complete audit-rule batch) and keep going —
+do not wait on the run. Do not split a single coherent repair into multiple
+pushes just to sample CI, and do not push audit-only, documentation-only, or
+fixture-only fragments before the local cheap gates for that batch have passed.
+The hard bound:
 **`main` must not lead `origin` by more than one completed work-item or one
 working day.** A larger backlog means those CI-only gates are dormant and a
 later red bisects across many commits — the exact failure the reconciliation log
 flagged twice (9 and 14 commits ahead). This is a solo project: CI minutes,
-notification noise, and contending for shared runners are not real costs here,
-so the old "batch to a natural handoff / don't push per checkpoint" guidance is
-retired — it manufactured the backlog it warned against.
+notification noise, and contending for shared runners are smaller costs than a
+large unvalidated backlog, but CI still belongs at completed handoff points, not
+inside the inner edit loop.
 
 "Not a heartbeat" is now narrow and still holds: do not push a broken or
 mid-task tree just to watch Actions run, and do not re-trigger a run for a
 **known, already-tracked red external blocker** (record the run URL + TFU and
 stop until that blocker enters a repair round). After any push, inspect the
-newest run once and record the URL/result; do not keep `gh run watch` looping.
+newest run once and record the URL/result; do not keep `gh run watch` looping or
+poll CI repeatedly unless the user explicitly asks for a monitor.
 
 UI/accessibility/smoothness are full-repo strict gates. CI runs
 `scripts/audit-ui-v4.sh --all`, `scripts/audit-accessibility.sh --all`, and
@@ -147,6 +152,7 @@ Default to fast-change mode unless the user explicitly asks for exhaustive valid
 - Make focused edits and avoid checkpoint builds after every small step.
 - Treat local app builds as an expensive validation step, not as a heartbeat. Batch related edits first, use cheap checks while iterating, and run `scripts/build-debug-fast.sh` only at meaningful handoff points: after a coherent compiler-surface change, after fixing a build failure, before reporting medium/high-risk implementation complete, or when the user explicitly asks for a build.
 - Do not run repeated build-debug loops just to regain confidence after every small patch. If the previous build succeeded and the next change is documentation-only, comment-only, formatting-only, audit-only, copy-only, or a narrow visual modifier change that does not alter Swift types/APIs/control flow, skip another build and say which lighter validation was used instead.
+- For a multi-file refactor, prefer one build at the end of the coherent compiler-surface batch. While shaping the batch, use `rg`, `bash -n`, path-specific audits, targeted unit tests, and `scripts/dev-check-changed.sh`; do not start another app build merely because a small follow-up edit was made after a passing cheap gate.
 - Do not routinely run `scripts/build-debug-fast.sh` immediately after a successful `scripts/test-simulator.sh` run for the same change when the test command already compiled the app on the pinned `iPhone 17` simulator. Treat that successful test run as satisfying the app compile check unless the task touched project settings, entitlements, signing, assets/resources, Info.plist, app launch packaging, scheme/build configuration, or another surface that needs a standalone app build; if a standalone build is skipped, say that the simulator test covered compilation.
 - When using long type-check diagnostics, run them as a scoped performance investigation: one baseline when needed and one verification after a batch of type-check-oriented edits. Do not leave `-warn-long-function-bodies` / `-warn-long-expression-type-checking` builds in the normal edit loop.
 - Do not let “focused” become under-fixing. When the root cause crosses helper, call-site, or state boundaries inside the task scope, fix that root cause decisively, update the affected paths, and add or adjust the narrow guardrail that prevents recurrence. A fix is not complete if it merely hides the symptom, leaves a known broken path in place, or creates a plausible new failure mode.
