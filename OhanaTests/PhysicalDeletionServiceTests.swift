@@ -338,13 +338,13 @@ struct PhysicalDeletionServiceTests {
         let medicationEvent = Event(
             title: "Medication",
             eventType: EventType.petMedication.rawValue,
-            relatedEntityType: MedicationEventLink.petMedicationPlan,
+            relatedEntityType: DomainEntityLinkRegistry.petMedicationPlan,
             relatedEntityId: medication.id.uuidString
         )
         let insuranceEvent = Event(
             title: "Insurance",
             eventType: EventType.insurancePremium.rawValue,
-            relatedEntityType: "pet_insurance",
+            relatedEntityType: DomainEntityLinkRegistry.petInsurance,
             relatedEntityId: insurance.id.uuidString
         )
         let survivorEvent = Event(
@@ -553,13 +553,13 @@ struct PhysicalDeletionServiceTests {
         let medicationEvent = Event(
             title: "Human medication",
             eventType: EventType.medication.rawValue,
-            relatedEntityType: MedicationEventLink.humanMedicationPlan,
+            relatedEntityType: DomainEntityLinkRegistry.humanMedicationPlan,
             relatedEntityId: medication.id.uuidString
         )
         let noteEvent = Event(
             title: "Human note",
             eventType: EventType.task.rawValue,
-            relatedEntityType: "human_note",
+            relatedEntityType: DomainEntityLinkRegistry.humanNote,
             relatedEntityId: humanId
         )
         let retainedPetEvent = Event(

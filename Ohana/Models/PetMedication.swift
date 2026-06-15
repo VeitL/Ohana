@@ -10,12 +10,6 @@ import Foundation
 import SwiftData
 import SwiftUI
 
-enum MedicationEventLink {
-    nonisolated static let humanMedicationPlan = "human_medication"
-    nonisolated static let petMedicationPlan = "pet_medication_plan"
-    nonisolated static let petMedicationDose = "pet_medication"
-}
-
 /// 宠物用药频率
 enum PetMedicationFrequency: String, Codable, CaseIterable, Identifiable {
     case daily = "每天"

@@ -636,22 +636,22 @@ struct MemberLifecycleGateTests {
         )
         let petMedicationEvent = Event(
             title: "Pet medication",
-            relatedEntityType: MedicationEventLink.petMedicationPlan,
+            relatedEntityType: DomainEntityLinkRegistry.petMedicationPlan,
             relatedEntityId: petMedication.id.uuidString
         )
         let humanMedicationEvent = Event(
             title: "Human medication",
-            relatedEntityType: MedicationEventLink.humanMedicationPlan,
+            relatedEntityType: DomainEntityLinkRegistry.humanMedicationPlan,
             relatedEntityId: humanMedication.id.uuidString
         )
         let insuranceEvent = Event(
             title: "Insurance",
-            relatedEntityType: "pet_insurance",
+            relatedEntityType: DomainEntityLinkRegistry.petInsurance,
             relatedEntityId: insurance.id.uuidString
         )
         let humanNote = Event(
             title: "Human note",
-            relatedEntityType: "human_note",
+            relatedEntityType: DomainEntityLinkRegistry.humanNote,
             relatedEntityId: human.id.uuidString
         )
         let assignedPetEvent = Event(

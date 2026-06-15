@@ -186,7 +186,7 @@ final class MedicationReminderService {
                     "scheduledAt": fireDate.timeIntervalSince1970,
                     "doseIndex": doseIdx,
                     "eventType": EventType.petMedication.rawValue,
-                    "relatedEntityType": MedicationEventLink.petMedicationPlan,
+                    "relatedEntityType": DomainEntityLinkRegistry.petMedicationPlan,
                     "relatedEntityId": med.id.uuidString
                 ].merging(NotificationDeliveryPolicy.userInfo(for: classification)) { _, new in new }
                 content.categoryIdentifier = "MED_REMINDER"
@@ -244,7 +244,7 @@ final class MedicationReminderService {
             "medicationId": med.id.uuidString,
             "petId": pet.id.uuidString,
             "eventType": EventType.petMedication.rawValue,
-            "relatedEntityType": MedicationEventLink.petMedicationPlan,
+            "relatedEntityType": DomainEntityLinkRegistry.petMedicationPlan,
             "relatedEntityId": med.id.uuidString
         ].merging(NotificationDeliveryPolicy.userInfo(for: classification)) { _, new in new }
 
@@ -327,7 +327,7 @@ final class MedicationReminderService {
                 "scheduledAt": fireDate.timeIntervalSince1970,
                 "doseIndex": dose.doseIndex,
                 "eventType": EventType.medication.rawValue,
-                "relatedEntityType": MedicationEventLink.humanMedicationPlan,
+                "relatedEntityType": DomainEntityLinkRegistry.humanMedicationPlan,
                 "relatedEntityId": med.id.uuidString
             ].merging(NotificationDeliveryPolicy.userInfo(for: classification)) { _, new in new }
             content.categoryIdentifier = "HUMAN_MED_REMINDER"

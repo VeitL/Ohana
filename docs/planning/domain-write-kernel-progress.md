@@ -14,7 +14,7 @@
 | 3 | Schedule writer 首批收口 | 🟢 | `scripts/module-exit-gate.sh` PASS；raw Event/Reminder scan 收口 | required | Event/Reminder 写入已收进 writer；下一步是本 Phase 唯一一次 commit/push + CI |
 | 4 | Fact / ledger / economy 收口 | ⬜ | pending | pending | care fact、expense、wallet ledger、reward、family task completion 改为 plan 驱动 |
 | 5 | Restore / sync / import 收口 | 🟢 | Rehydrate batch 1-7 local PASS：backup/cloud schedule+ledger、care facts、member content、root/remaining restore、economy/task/Oasis/gacha/shop/import、CloudSync metadata/apply 已改走集中 writer/service；restore/apply bypass audit + fixtures PASS | required | Phase 5 本地收口完成；下一步是本 Phase 唯一一次 commit/push + CI + 纯复审。 |
-| 6 | R8/R9 审计升级 | 🟡 | schedule 审计已升级；全 effects 审计待补 | pending | 禁 direct constructor、raw matcher、restore/apply bypass、effect guessing、feature taxonomy string |
+| 6 | R8/R9 审计升级 | 🟢 | R8/R9 fixture + audit PASS；raw effect subject、feature taxonomy string、restore/apply bypass、direct constructor 已覆盖 | required | 本地完成；下一步 commit/push 一次并查一次 CI。 |
 | 7 | 依赖倒挂收缩 | ⬜ | pending | pending | taxonomy、policy result、mutation plan 保持 feature-neutral；Domain/Models 不新增 feature command result/string |
 
 ## Phase 明细
@@ -141,3 +141,5 @@ Raw Intent / DTO / Restore Record
 - 2026-06-15 17:01:36 +0200 Phase 5 local checkpoint：rehydrate batch 4 landed for Backup member-content paths via `DomainMemberContentRehydrateWriteKernel`; targeted simulator tests PASS（264 tests）；full member lifecycle audit PASS；full economy boundary audit PASS；covered backup decode+insert scan empty. Phase remains 🟡; no Phase-end CI triggered.
 
 - 2026-06-15 17:19:44 +0200 Phase 5 local complete：rehydrate batch 5-7 landed for Backup root/remaining/economy/task/Oasis/gacha/shop/import paths and CloudSync non-care apply/metadata paths via `DomainGeneralRehydrateWriteKernel` / `CloudSyncMetadataService`; restore/apply bypass audit and fixtures added. Validation: changed-file gate PASS; fixture tests PASS; full member lifecycle audit PASS（814 files, warnings=0）; full economy boundary audit PASS（814 files）; targeted simulator tests PASS（264 tests）; restore/apply direct insert/constructor scan empty; git diff check PASS. No Phase-end CI triggered yet.
+
+- 2026-06-15 17:41:29 +0200 Phase 6 complete：本地完成：R8/R9 audit upgraded: raw effect subject guessing and feature taxonomy strings now have bad/good fixtures; MedicationEventLink removed in favor of DomainEntityLinkRegistry; release data-safety audit updated for rehydrate writers; fixture tests, member audit, release audit, changed gate, targeted simulator tests PASS；Phase-end CI required。

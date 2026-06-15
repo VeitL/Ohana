@@ -9,7 +9,7 @@ import Foundation
 import SwiftData
 
 nonisolated enum PetMedicationDoseLogging {
-    static let relatedEntityTypeMedication = MedicationEventLink.petMedicationDose
+    static let relatedEntityTypeMedication = DomainEntityLinkRegistry.petMedicationDose
 
     static func doseMedicationId(for event: Event) -> UUID? {
         guard event.eventType == EventType.petMedicationDose.rawValue else { return nil }

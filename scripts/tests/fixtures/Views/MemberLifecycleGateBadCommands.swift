@@ -12,6 +12,21 @@ enum MemberLifecycleGateBadCommandService {
             event.relatedEntityId == pet.id.uuidString
     }
 
+    static func publishReminderEffect(event: Event, revisions: DomainRevisionPublishing) {
+        if event.relatedEntityType == EntityKind.pet.rawValue,
+           let petId = UUID(uuidString: event.relatedEntityId) {
+            revisions.publishDomainMutation(
+                .calendarChange,
+                affectedEntityIDs: [petId],
+                note: "bad.raw.effect.subject"
+            )
+        }
+    }
+
+    static func rawFeatureTaxonomyString() -> String {
+        "pet_food_stock"
+    }
+
     @MainActor
     static func createPetReminder(pet: Pet, context: ModelContext) {
         let event = Event(

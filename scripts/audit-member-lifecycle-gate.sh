@@ -232,6 +232,46 @@ DOMAIN_MEMBER_OWNER_ID_RE = re.compile(
 DOMAIN_MEMBER_ASSIGNEE_RE = re.compile(
     r"event\.assigneeId\s*==|idsMatch\(\s*event\.assigneeId\b"
 )
+EFFECT_SUBJECT_RESOLUTION_RE = re.compile(
+    r"DomainSubjectResolver\.resolve"
+    r"|DomainSubjectResolutionRequest"
+    r"|DomainResolvedSubjectKey"
+    r"|DomainEntityLinkRegistry\."
+    r"|MemberLifecycleActiveScheduleResolver\."
+)
+EFFECT_EMISSION_RE = re.compile(
+    r"\baffectedEntityIDs\b"
+    r"|\baffected\.(?:insert|formUnion)\b"
+    r"|\bpublish[A-Za-z0-9_]*\s*\("
+    r"|publishDomainMutation\s*\("
+    r"|DomainMutationResult\s*\("
+    r"|CareWriteOutcome\.RevisionPayload\s*\("
+    r"|OhanaNotifications\.current\."
+    r"|notificationRoutes\.publishRouteEvent\s*\("
+    r"|AppRouteNotificationEvent\s*\("
+    r"|FocusHomeReminderDestination"
+    r"|CareLedgerService\s*\("
+    r"|\bcareLedger\.record\s*\("
+)
+RAW_EFFECT_OWNER_TYPE_RE = re.compile(
+    r"\b(?:event\.)?relatedEntityType\s*(?:==|!=)"
+)
+RAW_EFFECT_OWNER_ID_RE = re.compile(
+    r"\b(?:event\.)?relatedEntityId\s*(?:==|!=)"
+    r"|UUID\s*\(\s*uuidString:\s*(?:event\.)?relatedEntityId\b"
+    r"|idsMatch\(\s*(?:event\.)?relatedEntityId\b"
+)
+RAW_EFFECT_ASSIGNEE_RE = re.compile(
+    r"\b(?:event\.)?assigneeId\s*(?:==|!=)"
+    r"|idsMatch\(\s*(?:event\.)?assigneeId\b"
+)
+FEATURE_TAXONOMY_STRING_RE = re.compile(
+    r'"(?:pet_food_stock|pet_auto_feeder|pet_water_plan|pet_insurance|'
+    r'pet_medication_plan|pet_medication|human_medication|human_note)"'
+)
+FEATURE_TAXONOMY_ALLOWLIST = {
+    "Ohana/Domain/Services/DomainEntityLinkRegistry.swift",
+}
 DIRECT_SCHEDULE_CONSTRUCTOR_RE = re.compile(r"\b(?:Event|Reminder)\s*\(")
 DIRECT_SCHEDULE_INSERT_RE = re.compile(r"\b(?:context|modelContext)\.insert\s*\(")
 AUTHORIZED_SCHEDULE_WRITER_RE = re.compile(
@@ -351,11 +391,26 @@ def requires_lifecycle_gate(path: str, func_name: str, body: str, is_private: bo
 
 warnings: list[WarningItem] = []
 domain_ownership_warnings: list[WarningItem] = []
+effect_subject_warnings: list[WarningItem] = []
+feature_taxonomy_warnings: list[WarningItem] = []
 rehydrate_bypass_warnings: list[WarningItem] = []
 files = collect_files()
 for path in files:
     path_str = rel(path)
     lines = path.read_text(encoding="utf-8", errors="ignore").splitlines()
+    if path_str not in FEATURE_TAXONOMY_ALLOWLIST:
+        for idx, line in enumerate(lines, start=1):
+            stripped = line.lstrip()
+            if allowed_line(line) or stripped.startswith("//") or stripped.startswith("///"):
+                continue
+            if FEATURE_TAXONOMY_STRING_RE.search(line):
+                feature_taxonomy_warnings.append(
+                    WarningItem(
+                        path_str,
+                        idx,
+                        line.strip(),
+                    )
+                )
     checks_rehydrate_bypass = path_str in REHYDRATE_ENTRY_PATHS or (
         targets and path_str.startswith("scripts/tests/fixtures/")
     )
@@ -420,6 +475,30 @@ for path in files:
                     )
                 )
 
+    checks_effect_subject = (
+        path_str.startswith("Ohana/Domain/")
+        or path_str.startswith("Ohana/Features/")
+        or (targets and path_str.startswith("scripts/tests/fixtures/"))
+    )
+    if checks_effect_subject:
+        for func_name, start_line, body, _ in function_blocks(lines):
+            if "member-lifecycle-gate: allow" in body:
+                continue
+            if EFFECT_SUBJECT_RESOLUTION_RE.search(body):
+                continue
+            if not EFFECT_EMISSION_RE.search(body):
+                continue
+            raw_owner_guess = RAW_EFFECT_OWNER_TYPE_RE.search(body) and RAW_EFFECT_OWNER_ID_RE.search(body)
+            raw_assignee_guess = RAW_EFFECT_ASSIGNEE_RE.search(body)
+            if raw_owner_guess or raw_assignee_guess:
+                effect_subject_warnings.append(
+                    WarningItem(
+                        path_str,
+                        start_line,
+                        f"func {func_name} emits effects from raw relatedEntityType/relatedEntityId or assigneeId",
+                    )
+                )
+
     if allowed_path(path_str) or not is_write_path(path_str):
         continue
     for idx, line in enumerate(lines, start=1):
@@ -460,6 +539,14 @@ for item in rehydrate_bypass_warnings:
     print(f"[member-lifecycle-rehydrate-bypass] {item.path}:{item.line}: restore/sync/apply entrypoints must submit snapshots to a rehydrate writer instead of constructing or inserting persistence models directly.")
     print(f"    {item.snippet}")
 
+for item in effect_subject_warnings:
+    print(f"[member-lifecycle-raw-effect-subject] {item.path}:{item.line}: effects, revisions, notifications, routes, and ledgers must consume typed DomainSubjectResolution/DomainResolvedSubjectKey instead of guessing from raw relatedEntity/assignee fields.")
+    print(f"    {item.snippet}")
+
+for item in feature_taxonomy_warnings:
+    print(f"[member-lifecycle-feature-taxonomy-string] {item.path}:{item.line}: persisted member schedule link taxonomy strings must live in DomainEntityLinkRegistry and be referenced through typed registry constants.")
+    print(f"    {item.snippet}")
+
 for item in warnings:
     rule = "member-lifecycle-direct-write-gate"
     message = "write paths must use MemberLifecycleGate/MemberWritePolicy instead of hand-rolled deceased-member gates."
@@ -475,7 +562,7 @@ for item in warnings:
     print(f"[{rule}] {item.path}:{item.line}: {message}")
     print(f"    {item.snippet}")
 
-total_warnings = len(warnings) + len(domain_ownership_warnings) + len(rehydrate_bypass_warnings)
+total_warnings = len(warnings) + len(domain_ownership_warnings) + len(effect_subject_warnings) + len(feature_taxonomy_warnings) + len(rehydrate_bypass_warnings)
 print(f"member lifecycle gate audit: scanned {len(files)} file(s); warnings={total_warnings}")
 if total_warnings and strict:
     sys.exit(1)

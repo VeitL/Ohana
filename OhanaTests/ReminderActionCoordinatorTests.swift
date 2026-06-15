@@ -368,7 +368,7 @@ struct ReminderActionCoordinatorTests {
         #expect(result == .completed)
         #expect(events.count == 1)
         #expect(events.first?.eventType == EventType.petMedicationDose.rawValue)
-        #expect(events.first?.relatedEntityType == MedicationEventLink.petMedicationDose)
+        #expect(events.first?.relatedEntityType == DomainEntityLinkRegistry.petMedicationDose)
         #expect(events.first?.relatedEntityId == medication.id.uuidString)
         #expect(medication.remainingAmount == 1)
         #expect(medicationReminders.recordedMedicationIDs == [medication.id])

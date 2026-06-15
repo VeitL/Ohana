@@ -85,8 +85,11 @@ require_section_pattern "$data_backup_dtos" 'struct HumanBackup' 'struct EventBa
 require_backup_pattern 'passedAwayDate: d\(h\.passedAwayDate\)' \
   "encodeHuman should export Human.passedAwayDate."
 
-require_backup_pattern 'h\.passedAwayDate = parseDate\(dto\.passedAwayDate\)' \
-  "decodeHuman should restore Human.passedAwayDate."
+require_backup_pattern 'passedAwayDate: parseDate\(dto\.passedAwayDate\)' \
+  "decodeHumanSnapshot should carry Human.passedAwayDate into the rehydrate snapshot."
+
+require_pattern "Ohana/Domain/Services/DomainGeneralRehydrateWriteKernel.swift" 'human\.passedAwayDate = snapshot\.passedAwayDate' \
+  "DomainGeneralRehydrateWriter should restore Human.passedAwayDate."
 
 require_pattern "$data_backup_dtos" 'struct HumanHealthMetricLogBackup: Codable' \
   "DataBackupManager should define HumanHealthMetricLogBackup."
@@ -100,8 +103,11 @@ require_backup_pattern 'FetchDescriptor<HumanHealthMetricLog>' \
 require_backup_pattern 'humanHealthMetricLogs: humanHealthMetricLogs\.map\(encodeHumanHealthMetricLog\)' \
   "buildBackup should encode human health metric logs."
 
-require_backup_pattern 'decodeHumanHealthMetricLog\(dto, humans: humanById\)' \
-  "applyBackup should decode human health metric logs with human relationships."
+require_backup_pattern 'insertHumanHealthMetricLogIfNeeded' \
+  "applyBackup should import human health metric logs through the member-content rehydrate writer."
+
+require_backup_pattern 'decodeHumanHealthMetricLogSnapshot\(dto\)' \
+  "applyBackup should decode human health metric logs into rehydrate snapshots."
 
 require_pattern "$data_backup_dtos" 'var coconutAccounts: \[CoconutAccountBackup\]\?' \
   "OhanaBackup should include V58 CoconutAccount backups."
@@ -115,11 +121,17 @@ require_backup_pattern 'coconutAccounts: coconutAccounts\.map\(encodeCoconutAcco
 require_backup_pattern 'coconutLedgerEntries: coconutLedgerEntries\.map\(encodeCoconutLedgerEntry\)' \
   "buildBackup should export V58 CoconutLedgerEntry rows."
 
-require_backup_pattern 'decodeCoconutAccount\(dto\)' \
-  "applyBackup should import V58 CoconutAccount rows."
+require_backup_pattern 'insertCoconutAccountIfNeeded' \
+  "applyBackup should import V58 CoconutAccount rows through the general rehydrate writer."
 
-require_backup_pattern 'decodeCoconutLedgerEntry\(dto\)' \
-  "applyBackup should import V58 CoconutLedgerEntry rows."
+require_backup_pattern 'decodeCoconutAccountSnapshot\(dto\)' \
+  "applyBackup should decode V58 CoconutAccount rows into rehydrate snapshots."
+
+require_backup_pattern 'upsertCoconutLedgerEntry' \
+  "applyBackup should import V58 CoconutLedgerEntry rows through the general rehydrate writer."
+
+require_backup_pattern 'decodeCoconutLedgerEntrySnapshot\(dto\)' \
+  "applyBackup should decode V58 CoconutLedgerEntry rows into rehydrate snapshots."
 
 reject_backup_pattern '\b(pinHash|pinSalt|pinFailedAttempts|pinLockedUntil)\s*:' \
   "Backups must not encode PIN hash/salt/lockout fields."

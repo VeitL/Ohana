@@ -119,9 +119,9 @@ enum DomainEntityLinkRegistry {
     nonisolated static let petAutoFeeder = "pet_auto_feeder"
     nonisolated static let petWaterPlan = "pet_water_plan"
     nonisolated static let petInsurance = "pet_insurance"
-    nonisolated static let petMedicationPlan = MedicationEventLink.petMedicationPlan
-    nonisolated static let petMedicationDose = MedicationEventLink.petMedicationDose
-    nonisolated static let humanMedicationPlan = MedicationEventLink.humanMedicationPlan
+    nonisolated static let petMedicationPlan = "pet_medication_plan"
+    nonisolated static let petMedicationDose = "pet_medication"
+    nonisolated static let humanMedicationPlan = "human_medication"
     nonisolated static let humanNote = "human_note"
 
     nonisolated static func role(for link: DomainEntityLink) -> DomainEntityLinkRole {

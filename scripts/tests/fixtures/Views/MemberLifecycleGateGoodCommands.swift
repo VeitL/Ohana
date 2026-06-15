@@ -12,6 +12,22 @@ enum MemberLifecycleGateGoodCommandService {
         MemberLifecycleActiveScheduleResolver.eventBelongsToPet(event, petId: pet.id.uuidString)
     }
 
+    static func publishReminderEffect(event: Event, revisions: DomainRevisionPublishing) {
+        let resolution = DomainSubjectResolver.resolve(
+            request: DomainSubjectResolutionRequest(event: event),
+            catalog: DomainSubjectResolutionCatalog()
+        )
+        revisions.publishDomainMutation(
+            .calendarChange,
+            affectedEntityIDs: resolution.affectedEntityIDs,
+            note: "good.typed.effect.subject"
+        )
+    }
+
+    static func registryFeatureTaxonomyString() -> String {
+        DomainEntityLinkRegistry.petFoodStock
+    }
+
     @MainActor
     static func createPetReminder(pet: Pet, context: ModelContext) {
         let intent = DomainScheduleCreateIntent(
