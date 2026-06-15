@@ -1,9 +1,0 @@
-phase	status	local_validation	phase_end_ci	ci_result	updated_at	note
-0	pending	write matrix not produced yet	pending	pending	2026-06-15T00:00:00Z	Start here before another implementation batch.
-1	partial	Event/Reminder taxonomy started; all-app subject resolution pending	pending	pending	2026-06-15T00:00:00Z	Schedule work began before full all-app matrix.
-2	partial	Schedule write token exists; global AuthorizedMutationPlan pending	pending	pending	2026-06-15T00:00:00Z	Capability model is not yet app-wide.
-3	completed	Event/Reminder first closure passed module-exit gate locally	pending	pending	2026-06-15T00:00:00Z	Phase-end CI still needs one push/run after commit.
-4	pending	pending	pending	pending	2026-06-15T00:00:00Z	
-5	pending	pending	pending	pending	2026-06-15T00:00:00Z	
-6	partial	Member lifecycle schedule audit upgraded; full R8/R9 pending	pending	pending	2026-06-15T00:00:00Z	Audit currently covers schedule closure, not all effects.
-7	pending	pending	pending	pending	2026-06-15T00:00:00Z	
