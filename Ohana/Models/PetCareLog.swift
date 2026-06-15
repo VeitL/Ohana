@@ -156,21 +156,3 @@ final class PetCareLog {
         careType == .feeding && !isPlannedFeedLogEntry && !isAutoFeedLogEntry && !isTreatFeedLogEntry
     }
 }
-
-// MARK: - 首页喂食模式（与 QuickFeedDetailSheet 分段控件同步）
-enum HomeFeedRecordMode: String {
-    case manual
-    case planned
-
-    static func storedRaw(for petId: UUID) -> String {
-        HomeFeedRecordModePreferenceStore.storedRaw(for: petId, fallback: manual.rawValue)
-    }
-
-    static func isPlanned(for petId: UUID) -> Bool {
-        storedRaw(for: petId) == planned.rawValue
-    }
-
-    static func set(_ petId: UUID, mode: HomeFeedRecordMode) {
-        HomeFeedRecordModePreferenceStore.set(petId, rawValue: mode.rawValue)
-    }
-}

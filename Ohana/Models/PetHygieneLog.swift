@@ -48,26 +48,6 @@ enum HygieneType: String, Codable, CaseIterable {
 
     /// 实际周期天数（优先使用用户自定义，fallback 到默认值）
     var cycleDays: Int { defaultCycleDays }
-
-    /// UserDefaults key for custom cycle
-    static func customCycleDaysKey(petId: UUID, type: HygieneType) -> String {
-        PetHygieneCyclePreferenceStore.customCycleDaysKey(petId: petId, type: type)
-    }
-
-    /// 读取某只宠物某类型的自定义周期天数（nil 表示使用默认值）
-    static func customCycleDays(for type: HygieneType, petId: UUID) -> Int? {
-        PetHygieneCyclePreferenceStore.customCycleDays(for: type, petId: petId)
-    }
-
-    /// 设定自定义周期天数（≤0 表示恢复默认）
-    static func setCustomCycleDays(_ days: Int, for type: HygieneType, petId: UUID) {
-        PetHygieneCyclePreferenceStore.setCustomCycleDays(days, for: type, petId: petId)
-    }
-
-    /// 获取针对特定宠物的实际周期天数（自定义优先）
-    func effectiveCycleDays(for petId: UUID) -> Int {
-        HygieneType.customCycleDays(for: self, petId: petId) ?? defaultCycleDays
-    }
 }
 
 extension HygieneType: Identifiable {

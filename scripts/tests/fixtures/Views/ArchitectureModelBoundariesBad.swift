@@ -4,6 +4,10 @@ import SwiftUI
 enum ArchitectureModelBoundariesBadStatus: String, Codable {
     case active
 
+    var persistedValue: String? {
+        UserDefaults.standard.string(forKey: "architecture-model-bad")
+    }
+
     var color: Color {
         .goPrimary
     }

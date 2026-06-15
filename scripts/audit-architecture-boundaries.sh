@@ -20,6 +20,8 @@ Purpose:
   - Models/ sources declare @Model, schema/migration containers, or model
     extensions; taxonomy, route, store, catalog, and presentation helper files
     live in Domain, App, Shared, or Features instead.
+  - Models/ do not read UserDefaults or feature preference stores; persistence
+    models expose data, while feature/app layers own preferences.
   - @Query only appears in screen/route data containers.
   - Views do not directly use UserDefaults or construct command executors.
   - Swift files above 800 lines are ratcheted; no new oversized files and no
@@ -429,10 +431,35 @@ print("\n".join(violations))
 PY
 }
 
+models_persistence_side_effects() {
+  local scoped_files=()
+  if [[ "$mode" == "all" ]]; then
+    while IFS= read -r file; do
+      [[ -n "$file" ]] && scoped_files+=("$file")
+    done < <(find Ohana/Models -maxdepth 1 -name '*.swift' | sort)
+  else
+    for file in "${files[@]}"; do
+      case "$file" in
+        Ohana/Models/*.swift)
+          [[ -f "$file" ]] && scoped_files+=("$file")
+          ;;
+      esac
+    done
+  fi
+  [[ ${#scoped_files[@]} -eq 0 ]] && return 0
+  rg -n --with-filename --pcre2 'UserDefaults\.standard|\b[A-Za-z0-9_]*PreferenceStore\.' "${scoped_files[@]}" \
+    | rg -v '^Ohana/Models/SharedModelContainer\.swift:' || true
+}
+
 record_matches \
   "models-non-schema-source" \
   "Models/ may contain SwiftData models, schema/migration containers, or model extensions only; move taxonomy, routes, stores, catalogs, and presentation helpers out." \
   models_non_schema_sources
+
+record_matches \
+  "models-persistence-side-effect" \
+  "Models must not read/write UserDefaults or feature preference stores; move preference behavior to Feature/App/Shared boundaries." \
+  models_persistence_side_effects
 
 record_matches \
   "models-layer-pollution" \
