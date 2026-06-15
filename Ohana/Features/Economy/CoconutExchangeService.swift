@@ -9,6 +9,7 @@ enum CoconutExchangeError: LocalizedError {
     case notPending
     case notSender
     case notReceiver
+    case memberInactive
 
     var errorDescription: String? {
         switch self {
@@ -26,6 +27,8 @@ enum CoconutExchangeError: LocalizedError {
             "只有发起人可以取消。"
         case .notReceiver:
             "只有接收人可以确认。"
+        case .memberInactive:
+            "纪念成员不能进行货币兑换。"
         }
     }
 }
@@ -47,6 +50,10 @@ enum CoconutExchangeService {
         let wallet: CoconutWalletManaging = providedWallet ?? SwiftDataCoconutWalletManager()
         let careLedger: CareLedgerRecording = providedCareLedger ?? CareLedgerService()
         guard sender.id != receiver.id else { throw CoconutExchangeError.sameReceiver }
+        guard EconomyWalletWritePolicy.canWrite(sender),
+              EconomyWalletWritePolicy.canWrite(receiver) else {
+            throw CoconutExchangeError.memberInactive
+        }
         guard CoconutWalletService.balance(for: sender, context: context) >= option.coconutCost else {
             throw CoconutExchangeError.insufficientBalance
         }
@@ -119,6 +126,7 @@ enum CoconutExchangeService {
         let careLedger: CareLedgerRecording = providedCareLedger ?? CareLedgerService()
         guard request.status == .pending else { throw CoconutExchangeError.notPending }
         guard request.receiverId == receiver.id.uuidString else { throw CoconutExchangeError.notReceiver }
+        guard EconomyWalletWritePolicy.canWrite(receiver) else { throw CoconutExchangeError.memberInactive }
 
         request.status = .confirmed
         request.confirmedAt = Date()
@@ -154,6 +162,7 @@ enum CoconutExchangeService {
         let careLedger: CareLedgerRecording = providedCareLedger ?? CareLedgerService()
         guard request.status == .pending else { throw CoconutExchangeError.notPending }
         guard request.senderId == sender.id.uuidString else { throw CoconutExchangeError.notSender }
+        guard EconomyWalletWritePolicy.canWrite(sender) else { throw CoconutExchangeError.memberInactive }
 
         request.status = .cancelled
         request.cancelledAt = Date()

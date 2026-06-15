@@ -51,9 +51,13 @@ struct ExpandedHumanFeaturesContentSheet: View {
     private var humanReminders: [Reminder] {
         guard !isAllPrivateForViewer,
               !human.isPrivate(.medication, viewedBy: activeHumanId) else { return [] }
-        return allPendingReminders.filter {
-            $0.event?.relatedEntityType == "Human" &&
-                $0.event?.relatedEntityId == human.id.uuidString
+        return allPendingReminders.filter { reminder in
+            guard let event = reminder.event else { return false }
+            return MemberLifecycleActiveScheduleResolver.eventBelongsToHuman(
+                event,
+                humanId: human.id.uuidString,
+                humanMedications: allMeds
+            )
         }
     }
 

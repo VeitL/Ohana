@@ -334,7 +334,7 @@ extension CalendarView {
 
     // MARK: - Go Event Row
     func goEventRow(_ event: Event, occurrenceDate: Date) -> some View {
-        let relatedPetColor: Color? = pets.first(where: { $0.id.uuidString == event.relatedEntityId })
+        let relatedPetColor: Color? = MemberLifecycleActiveScheduleResolver.petTarget(for: event, pets: pets)
             .map { Color(hex: $0.themeColorHex) }
             ?? plants.first(where: { $0.id.uuidString == event.relatedEntityId })
             .map { Color(hex: $0.themeColorHex) }

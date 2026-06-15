@@ -107,11 +107,11 @@ nonisolated enum PhysicalDeletionService {
         deletedAt: Date = Date(),
         deletedByHumanId: String? = nil
     ) {
+        // member-lifecycle-gate: allow physical deletion is an explicit data-removal boundary, not an active member write.
         let petId = pet.id.uuidString
         let legacyModelIds = petScopedLegacyModelIds(for: pet)
-        deleteRelatedEvents(
-            entityKind: EntityKind.pet.rawValue,
-            entityId: petId,
+        _ = deletePetRelatedEvents(
+            pet,
             context: context,
             deletedAt: deletedAt,
             deletedByHumanId: deletedByHumanId
@@ -158,9 +158,12 @@ nonisolated enum PhysicalDeletionService {
         deletedAt: Date = Date(),
         deletedByHumanId: String? = nil
     ) -> Int {
-        let relatedEventCount = deleteRelatedEvents(
-            entityKind: EntityKind.human.rawValue,
-            entityId: human.id.uuidString,
+        // member-lifecycle-gate: allow physical deletion is an explicit data-removal boundary, not an active member write.
+        let humanId = human.id.uuidString
+        let humanMedications = fetchAll(HumanMedication.self, context: context).filter { $0.humanId == humanId }
+        let relatedEventCount = deleteHumanRelatedEvents(
+            humanId: humanId,
+            humanMedications: humanMedications,
             context: context,
             deletedAt: deletedAt,
             deletedByHumanId: deletedByHumanId
@@ -204,6 +207,7 @@ nonisolated enum PhysicalDeletionService {
         deletedAt: Date = Date(),
         deletedByHumanId: String? = nil
     ) -> Bool {
+        // member-lifecycle-gate: allow physical deletion is an explicit data-removal boundary, not an active member write.
         let sharedSessionIds = sharedSessionIds(for: record)
         if let healthLog = record as? PetHealthLog {
             deletePetHealthDerivedRows(
@@ -322,6 +326,7 @@ nonisolated enum PhysicalDeletionService {
         deletedAt: Date = Date(),
         deletedByHumanId: String? = nil
     ) {
+        // member-lifecycle-gate: allow physical deletion is an explicit data-removal boundary, not an active member write.
         for attachment in document.attachments {
             CloudSyncMutationRecorder.markDeleted(
                 attachment,
@@ -348,6 +353,7 @@ nonisolated enum PhysicalDeletionService {
         deletedAt: Date = Date(),
         deletedByHumanId: String? = nil
     ) {
+        // member-lifecycle-gate: allow physical deletion is an explicit data-removal boundary, not an active member write.
         for claim in insurance.claims {
             CloudSyncMutationRecorder.markDeleted(
                 claim,
@@ -730,8 +736,7 @@ nonisolated enum PhysicalDeletionService {
         if let expirationDate = log.expirationDate,
            let eventType = petHealthExpirationEventType(for: log.healthLogType) {
             linked += allEvents.filter { event in
-                event.relatedEntityType == EntityKind.pet.rawValue &&
-                    idsMatch(event.relatedEntityId, pet.id.uuidString) &&
+                MemberLifecycleActiveScheduleResolver.eventBelongsToPet(event, petId: pet.id.uuidString) &&
                     event.eventType == eventType.rawValue &&
                     abs(event.startDate.timeIntervalSince(expirationDate)) < 1
             }
@@ -802,33 +807,91 @@ nonisolated enum PhysicalDeletionService {
         }
     }
 
-    @discardableResult
-    private static func deleteRelatedEvents(
-        entityKind: String,
-        entityId: String,
+    private static func deletePetRelatedEvents(
+        _ pet: Pet,
         context: ModelContext,
         deletedAt: Date,
         deletedByHumanId: String?
     ) -> Int {
-        deleteRows(fetchAll(Event.self, context: context).filter { event in
-            event.relatedEntityType == entityKind && idsMatch(event.relatedEntityId, entityId)
-        }, context: context) { event in
-            for reminder in event.reminders {
-                OhanaNotifications.current.cancel(notificationId: reminder.notificationId)
-                CloudSyncMutationRecorder.markDeleted(
-                    reminder,
-                    context: context,
-                    deletedAt: deletedAt,
-                    deletedByHumanId: deletedByHumanId
-                )
+        let events = fetchAll(Event.self, context: context).filter { event in
+            MemberLifecycleActiveScheduleResolver.eventBelongsToPet(
+                event,
+                petId: pet.id.uuidString,
+                petMedications: pet.medications,
+                insurances: pet.insurances
+            )
+        }
+        return deleteEvents(events, context: context, deletedAt: deletedAt, deletedByHumanId: deletedByHumanId)
+    }
+
+    @discardableResult
+    private static func deleteHumanRelatedEvents(
+        humanId: String,
+        humanMedications: [HumanMedication],
+        context: ModelContext,
+        deletedAt: Date,
+        deletedByHumanId: String?
+    ) -> Int {
+        let pets = fetchAll(Pet.self, context: context)
+        let petMedications = pets.flatMap(\.medications)
+        let insurances = pets.flatMap(\.insurances)
+        var eventsToDelete: [Event] = []
+        var retainedAssignedEvents: [Event] = []
+
+        for event in fetchAll(Event.self, context: context) {
+            if MemberLifecycleActiveScheduleResolver.eventOwnedByHuman(
+                event,
+                humanId: humanId,
+                humanMedications: humanMedications
+            ) {
+                eventsToDelete.append(event)
+                continue
             }
-            CloudSyncMutationRecorder.markDeleted(
+
+            guard MemberLifecycleActiveScheduleResolver.eventAssignedToHuman(event, humanId: humanId) else { continue }
+            if MemberLifecycleActiveScheduleResolver.petTarget(
+                for: event,
+                pets: pets,
+                petMedications: petMedications,
+                insurances: insurances
+            ) != nil {
+                retainedAssignedEvents.append(event)
+            } else {
+                eventsToDelete.append(event)
+            }
+        }
+
+        let deletedCount = deleteEvents(
+            eventsToDelete,
+            context: context,
+            deletedAt: deletedAt,
+            deletedByHumanId: deletedByHumanId
+        )
+        let uniqueRetainedAssignedEvents = unique(retainedAssignedEvents, by: \.id)
+        for event in uniqueRetainedAssignedEvents {
+            event.assigneeId = nil
+            CloudSyncMutationRecorder.markModified(event, context: context, modifiedAt: deletedAt)
+        }
+        return deletedCount + uniqueRetainedAssignedEvents.count
+    }
+
+    @discardableResult
+    private static func deleteEvents(
+        _ events: [Event],
+        context: ModelContext,
+        deletedAt: Date,
+        deletedByHumanId: String?
+    ) -> Int {
+        let uniqueEvents = unique(events, by: \.id)
+        for event in uniqueEvents {
+            _ = deleteEvent(
                 event,
                 context: context,
                 deletedAt: deletedAt,
                 deletedByHumanId: deletedByHumanId
             )
         }
+        return uniqueEvents.count
     }
 
     @discardableResult

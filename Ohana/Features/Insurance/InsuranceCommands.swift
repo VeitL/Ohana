@@ -446,15 +446,20 @@ enum InsurancePolicyCommandService {
             expenseIDs.append(expense.logID)
 
             if insurance.showInCalendar {
-                let event = Event(
+                let intent = DomainScheduleCreateIntent(
                     title: "🛡️ \(name) 缴费",
                     startDate: payDate,
                     isAllDay: true,
                     eventType: EventType.insurancePremium.rawValue,
-                    relatedEntityType: "pet_insurance",
-                    relatedEntityId: insurance.id.uuidString
+                    relatedEntityType: DomainEntityLinkRegistry.petInsurance,
+                    relatedEntityId: insurance.id.uuidString,
+                    writeKind: .care,
+                    source: .domainService
                 )
-                context.insert(event)
+                guard let plan = DomainScheduleWriteAuthorizer.authorizeCreate(intent: intent, context: context) else {
+                    continue
+                }
+                let event = DomainScheduleWriter.createEvent(plan: plan, context: context).event
                 CloudSyncMutationRecorder.markModified(event, context: context, modifiedAt: payDate)
                 events.append(event)
             }

@@ -7,26 +7,30 @@
 
 import Foundation
 
-enum MemberWriteKind: Equatable {
+nonisolated enum MemberWriteKind: Equatable {
     case care
     case memorial
+    case memorialContentWithOptionalDerivations
     case profileEdit
+    case presentationPreference
+    case accountSecurity
+    case collaboration
     case lifecycle(MemberLifecycleAction)
 }
 
-enum MemberLifecycleAction: Equatable {
+nonisolated enum MemberLifecycleAction: Equatable {
     case markPassedAway
     case undoPassedAway
     case clearActivityRecords
 }
 
-enum MemberWriteDenialReason: Equatable {
+nonisolated enum MemberWriteDenialReason: Equatable {
     case missingMemberTarget
     case memberPassedAway
     case unsupportedWriteKind
 }
 
-struct MemberWriteAllowance: Equatable {
+nonisolated struct MemberWriteAllowance: Equatable {
     let writeKind: MemberWriteKind
     let allowsContentWrite: Bool
     let allowsCareFactWrite: Bool
@@ -35,7 +39,7 @@ struct MemberWriteAllowance: Equatable {
     let allowsRevisionPublish: Bool
 }
 
-enum MemberWriteDisposition: Equatable {
+nonisolated enum MemberWriteDisposition: Equatable {
     case allow(MemberWriteAllowance)
     case deny(MemberWriteDenialReason)
 
@@ -138,7 +142,18 @@ enum MemberLifecycleGate {
                     allowsRevisionPublish: true
                 )
             )
-        case .profileEdit:
+        case .memorialContentWithOptionalDerivations:
+            return .allow(
+                MemberWriteAllowance(
+                    writeKind: writeKind,
+                    allowsContentWrite: true,
+                    allowsCareFactWrite: false,
+                    allowsDerivedEffects: !hasPassedAway,
+                    allowsEconomyDerivation: false,
+                    allowsRevisionPublish: true
+                )
+            )
+        case .profileEdit, .presentationPreference, .accountSecurity:
             guard !hasPassedAway else { return .deny(.memberPassedAway) }
             return .allow(
                 MemberWriteAllowance(
@@ -147,6 +162,18 @@ enum MemberLifecycleGate {
                     allowsCareFactWrite: false,
                     allowsDerivedEffects: false,
                     allowsEconomyDerivation: false,
+                    allowsRevisionPublish: true
+                )
+            )
+        case .collaboration:
+            guard !hasPassedAway else { return .deny(.memberPassedAway) }
+            return .allow(
+                MemberWriteAllowance(
+                    writeKind: writeKind,
+                    allowsContentWrite: true,
+                    allowsCareFactWrite: false,
+                    allowsDerivedEffects: true,
+                    allowsEconomyDerivation: true,
                     allowsRevisionPublish: true
                 )
             )
@@ -168,7 +195,7 @@ enum MemberLifecycleGate {
     }
 }
 
-enum MemberWriteIntent: Equatable {
+nonisolated enum MemberWriteIntent: Equatable {
     case activeOnly
     case memorialContent
 

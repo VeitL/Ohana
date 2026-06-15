@@ -89,8 +89,8 @@ enum CalendarTaskCompletionSyncService {
         careLedger providedCareLedger: CareLedgerRecording? = nil
     ) -> PetTaskSyncResult {
         let careLedger = providedCareLedger ?? CareLedgerService()
-        guard event.relatedEntityType == EntityKind.pet.rawValue || event.relatedEntityType == "pet",
-              let pet = pets.first(where: { $0.id.uuidString == event.relatedEntityId }) else { return .noOp }
+        guard isPetTask(event: event),
+              let pet = MemberLifecycleActiveScheduleResolver.petTarget(for: event, pets: pets) else { return .noOp }
 
         let occurredAt = occurrenceTimestamp(for: event, occurrenceDate: occurrenceDate)
         let disposition = CareFactWritePolicy.disposition(
@@ -168,14 +168,13 @@ enum CalendarTaskCompletionSyncService {
     }
 
     static func isPetTask(event: Event) -> Bool {
-        guard event.relatedEntityType == EntityKind.pet.rawValue || event.relatedEntityType == "pet" else { return false }
-        return careType(for: event) != nil || pottyType(for: event) != nil || hygieneType(for: event) != nil
+        careType(for: event) != nil || pottyType(for: event) != nil || hygieneType(for: event) != nil
     }
 
     @MainActor
     static func canWritePetTaskFact(event: Event, occurrenceDate: Date, pets: [Pet], context: ModelContext, executorId: String?) -> Bool {
         guard isPetTask(event: event),
-              let pet = pets.first(where: { $0.id.uuidString == event.relatedEntityId }) else {
+              let pet = MemberLifecycleActiveScheduleResolver.petTarget(for: event, pets: pets) else {
             return false
         }
         let occurredAt = occurrenceTimestamp(for: event, occurrenceDate: occurrenceDate)
@@ -190,7 +189,7 @@ enum CalendarTaskCompletionSyncService {
     @MainActor
     static func canCompletePetTask(event: Event, occurrenceDate: Date, pets: [Pet], context: ModelContext, executorId: String?) -> Bool {
         guard isPetTask(event: event),
-              let pet = pets.first(where: { $0.id.uuidString == event.relatedEntityId }) else {
+              let pet = MemberLifecycleActiveScheduleResolver.petTarget(for: event, pets: pets) else {
             return false
         }
         let occurredAt = occurrenceTimestamp(for: event, occurrenceDate: occurrenceDate)

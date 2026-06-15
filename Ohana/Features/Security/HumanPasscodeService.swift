@@ -14,6 +14,7 @@ enum HumanPasscodeError: Error, Equatable {
     case passcodeNotSet
     case currentPasscodeIncorrect
     case confirmationMismatch
+    case memberInactive
 }
 
 enum HumanPasscodeVerification: Equatable {
@@ -22,6 +23,7 @@ enum HumanPasscodeVerification: Equatable {
     case invalidFormat
     case incorrect(remainingAttempts: Int)
     case locked(until: Date)
+    case memberInactive
 }
 
 enum HumanPasscodeService {
@@ -37,6 +39,9 @@ enum HumanPasscodeService {
     }
 
     static func setPasscode(_ pin: String, for human: Human) throws {
+        guard MemberLifecycleGate.disposition(human: human, writeKind: .accountSecurity).writesContent else {
+            throw HumanPasscodeError.memberInactive
+        }
         guard isValidPin(pin) else { throw HumanPasscodeError.invalidFormat }
         let salt = makeSalt()
         human.pinSalt = salt
@@ -46,6 +51,9 @@ enum HumanPasscodeService {
     }
 
     static func changePasscode(currentPin: String, newPin: String, for human: Human, now: Date = Date()) throws -> HumanPasscodeVerification {
+        guard MemberLifecycleGate.disposition(human: human, writeKind: .accountSecurity).writesContent else {
+            return .memberInactive
+        }
         guard hasPasscode(human) else { throw HumanPasscodeError.passcodeNotSet }
         guard isValidPin(newPin) else { throw HumanPasscodeError.invalidFormat }
 
@@ -56,6 +64,9 @@ enum HumanPasscodeService {
     }
 
     static func removePasscode(currentPin: String, for human: Human, now: Date = Date()) throws -> HumanPasscodeVerification {
+        guard MemberLifecycleGate.disposition(human: human, writeKind: .accountSecurity).writesContent else {
+            return .memberInactive
+        }
         guard hasPasscode(human) else { throw HumanPasscodeError.passcodeNotSet }
         let result = verify(currentPin, for: human, now: now)
         guard result == .success else { return result }
@@ -64,6 +75,7 @@ enum HumanPasscodeService {
     }
 
     static func clearPasscode(for human: Human) {
+        guard MemberLifecycleGate.disposition(human: human, writeKind: .accountSecurity).writesContent else { return }
         human.pinHash = ""
         human.pinSalt = ""
         human.pinFailedAttempts = 0
@@ -72,6 +84,9 @@ enum HumanPasscodeService {
 
     @discardableResult
     static func verify(_ pin: String, for human: Human, now: Date = Date()) -> HumanPasscodeVerification {
+        guard MemberLifecycleGate.disposition(human: human, writeKind: .accountSecurity).writesContent else {
+            return .memberInactive
+        }
         guard hasPasscode(human) else { return .noPasscode }
         guard isValidPin(pin) else { return .invalidFormat }
 

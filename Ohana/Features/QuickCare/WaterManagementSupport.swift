@@ -230,16 +230,21 @@ enum WaterPlanWriter {
         var createdReminders: [Reminder] = []
         for time in normalizedTimes(times, count: times.count, now: now, calendar: calendar) {
             let startDate = nextOccurrenceDate(forTimeOfDay: time, after: now, calendar: calendar)
-            let event = Event(
+            let intent = DomainScheduleCreateIntent(
                 title: "\(pet.name) 喂水",
                 startDate: startDate,
+                isAllDay: false,
                 eventType: EventType.daily.rawValue,
                 relatedEntityType: entityType,
-                relatedEntityId: pet.id.uuidString
+                relatedEntityId: pet.id.uuidString,
+                recurrenceDays: 1,
+                writeKind: .care,
+                source: .domainService
             )
-            event.recurrenceDays = 1
-            event.isAllDay = false
-            context.insert(event)
+            guard let plan = DomainScheduleWriteAuthorizer.authorizeCreate(intent: intent, context: context) else {
+                continue
+            }
+            let event = DomainScheduleWriter.createEvent(plan: plan, context: context).event
             createdReminders.append(contentsOf: createUpcomingReminders(for: event, context: context, now: now, calendar: calendar))
         }
 
@@ -345,14 +350,24 @@ enum WaterPlanWriter {
         now: Date,
         calendar: Calendar
     ) -> [Reminder] {
+        guard let mutation = DomainScheduleWriteAuthorizer.authorizeExistingEventMutation(
+            event: event,
+            writeKind: .care,
+            context: context
+        ) else { return [] }
         let existingKeys = Set(event.reminders.map { reminderKey(eventId: event.id, scheduledAt: $0.scheduledAt) })
         var created: [Reminder] = []
         for occurrence in upcomingOccurrences(for: event, now: now, daysAhead: reminderWindowDays, calendar: calendar) {
             let key = reminderKey(eventId: event.id, scheduledAt: occurrence)
             guard !existingKeys.contains(key) else { continue }
-            let reminder = Reminder(event: event, scheduledAt: occurrence)
-            context.insert(reminder)
-            created.append(reminder)
+            if let reminder = DomainScheduleWriter.createReminder(
+                for: event,
+                scheduledAt: occurrence,
+                mutation: mutation,
+                context: context
+            ) {
+                created.append(reminder)
+            }
         }
         return created
     }

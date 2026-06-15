@@ -121,6 +121,7 @@ enum TodayFocusEconomyService {
             plants: data.plants,
             events: data.events,
             humans: data.humans,
+            humanMedications: data.humanMedications,
             careLedgerEntries: data.careLedgerEntries,
             now: now,
             questProgress: questProgress
@@ -187,6 +188,14 @@ enum TodayFocusEconomyService {
         )
         descriptor.fetchLimit = 40
         return fetchOrLog(descriptor, context: context, operation: "fetch today focus humans")
+    }
+
+    private static func fetchHumanMedications(context: ModelContext) -> [HumanMedication] {
+        var descriptor = FetchDescriptor<HumanMedication>(
+            sortBy: [SortDescriptor(\HumanMedication.createdAt, order: .reverse)]
+        )
+        descriptor.fetchLimit = 120
+        return fetchOrLog(descriptor, context: context, operation: "fetch today focus human medications")
     }
 
     private static func fetchPlants(context: ModelContext) -> [Plant] {
@@ -355,6 +364,7 @@ enum TodayFocusEconomyService {
     private struct TodayFocusCompletionData {
         let pets: [Pet]
         let humans: [Human]
+        let humanMedications: [HumanMedication]
         let plants: [Plant]
         let reminders: [Reminder]
         let events: [Event]
@@ -364,6 +374,7 @@ enum TodayFocusEconomyService {
         init(context: ModelContext, now: Date, calendar: Calendar = .current) {
             pets = TodayFocusEconomyService.fetchPets(context: context)
             humans = TodayFocusEconomyService.fetchHumans(context: context)
+            humanMedications = TodayFocusEconomyService.fetchHumanMedications(context: context)
             plants = PlantFeatureGate.allows(.plants) ? TodayFocusEconomyService.fetchPlants(context: context) : []
             reminders = TodayFocusEconomyService.fetchTodayReminders(context: context, now: now, calendar: calendar)
             events = TodayFocusEconomyService.fetchTodayFocusEvents(context: context, now: now, calendar: calendar)

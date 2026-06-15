@@ -32,6 +32,7 @@ struct PetCardAppearanceCommandResult: Equatable {
 enum Avatar2DUpgradeFailure: Equatable {
     case missingProfile
     case noPass
+    case memberInactive
 }
 
 struct Avatar2DUpgradeCommandResult: Equatable {
@@ -628,6 +629,9 @@ enum PetCardAppearanceCommandService {
         sourceRaw: String,
         context: ModelContext
     ) -> PetCardAppearanceCommandResult {
+        guard MemberLifecycleGate.disposition(pet: pet, writeKind: .presentationPreference).writesContent else {
+            return PetCardAppearanceCommandResult(petID: pet.id, action: "enablePopout")
+        }
         pet.cardPopoutImageData = imageData
         pet.cardPopoutSourceRaw = sourceRaw
         pet.cardStyleRaw = "popout"
@@ -641,6 +645,9 @@ enum PetCardAppearanceCommandService {
         pet: Pet,
         context: ModelContext
     ) -> PetCardAppearanceCommandResult {
+        guard MemberLifecycleGate.disposition(pet: pet, writeKind: .presentationPreference).writesContent else {
+            return PetCardAppearanceCommandResult(petID: pet.id, action: "restoreClassic")
+        }
         pet.cardStyleRaw = "classic"
         context.safeSave()
         return PetCardAppearanceCommandResult(petID: pet.id, action: "restoreClassic")
@@ -654,6 +661,14 @@ enum Avatar2DUpgradeCommandService {
         _ human: Human,
         context: ModelContext
     ) -> Avatar2DUpgradeCommandResult {
+        guard MemberLifecycleGate.disposition(human: human, writeKind: .presentationPreference).writesContent else {
+            return Avatar2DUpgradeCommandResult(
+                entityID: human.id,
+                kind: EntityKind.human.rawValue,
+                didUpgrade: false,
+                failure: .memberInactive
+            )
+        }
         let rawGender = HumanProfileOptions.normalizedGender(human.genderRaw)
         let avatarGender: String = switch rawGender {
         case "男", "女", "非二元":
@@ -696,6 +711,14 @@ enum Avatar2DUpgradeCommandService {
         _ pet: Pet,
         context: ModelContext
     ) -> Avatar2DUpgradeCommandResult {
+        guard MemberLifecycleGate.disposition(pet: pet, writeKind: .presentationPreference).writesContent else {
+            return Avatar2DUpgradeCommandResult(
+                entityID: pet.id,
+                kind: EntityKind.pet.rawValue,
+                didUpgrade: false,
+                failure: .memberInactive
+            )
+        }
         guard let data = PetAvatarAssetCatalog.avatarData(
             species: pet.species,
             breed: pet.breed,

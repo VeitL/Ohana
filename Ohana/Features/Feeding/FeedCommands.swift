@@ -141,6 +141,18 @@ enum ManualFeedCommand {
         let event = reminder.event
         let foodKind = event?.foodKind ?? pet.mainFoodKind
         let grams = event.map { FeedRuleMetadata.amountGrams(from: $0, fallback: pet.dailyPortionGrams) } ?? pet.dailyPortionGrams
+        guard MemberLifecycleGate.disposition(pet: pet, writeKind: .care).allowsCareFactWrite else {
+            return ManualFeedCommandResult(
+                foodKind: foodKind,
+                grams: grams,
+                targetCount: 0,
+                affectsStock: false,
+                stockReminders: [],
+                didRecord: false,
+                allowsDerivedEffects: false,
+                coconutDelta: 0
+            )
+        }
         let completed = careEvents.completePlannedFeedResult(
             pet: pet,
             reminder: reminder,

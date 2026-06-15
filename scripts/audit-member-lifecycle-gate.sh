@@ -148,7 +148,7 @@ DIRECT_GATE_RE = re.compile(
 FUNC_DECL_RE = re.compile(
     r"\b(?:(?P<privacy>private|fileprivate)\s+)?(?:static\s+)?func\s+(?P<name>[A-Za-z_][A-Za-z0-9_]*)\s*\("
 )
-MEMBER_PARAM_RE = re.compile(r"\b(?:pet|human)\s*:\s*(?:Pet|Human)\b")
+MEMBER_PARAM_RE = re.compile(r"\b[A-Za-z_][A-Za-z0-9_]*\s*:\s*(?:Pet|Human)\??\b")
 WRITE_EFFECT_RE = re.compile(
     r"\bcontext\.(?:insert|delete|safeSave)\b"
     r"|\bcenter\.(?:add|removePendingNotificationRequests)\b"
@@ -167,15 +167,89 @@ GATE_CONSUMPTION_RE = re.compile(
     r"|CareFactWritePolicy\.disposition"
     r"|EconomyWalletWritePolicy\.canWrite"
     r"|SharedPetTargetResolver\.normalizedTargets"
+    r"|MemberLifecycleActiveScheduleResolver\.reminderTargetsActiveMember"
     r"|canWriteActiveFeedData"
     r"|canWriteActiveCarePlan"
     r"|canWriteActiveWaterPlan"
+    r"|canWriteActiveWaterData"
+    r"|canWriteCollaboration"
+    r"|canWriteRelatedPet"
+    r"|reminderTargetsWritableMember"
+    r"|pet\.canWriteHealthFacts"
+    r"|HumanPasscodeService\.(?:setPasscode|changePasscode|removePasscode|clearPasscode|verify)"
+    r"|CarePlanCalendarSync\.(?:suppressDefaultPlan|removeCalendarPlan|removeActiveCalendarPlans|ensureDefaultPlans|reconcileDefaultPlanOverrides|sync[A-Za-z0-9_]+)"
+    r"|WaterPlanWriter\.(?:replacePlan|deletePlan|deactivateReminderOperations|ensureUpcomingReminders)"
+    r"|FeedingPlanWriter\.(?:replacePlan|deletePlan|deactivateManualReminderOperations|clearFeedModePlans|ensureUpcomingManualReminders|saveFoodPurchase|correctFoodStock|rebuildFoodStockReminder|rebuildFoodStockReminders)"
     r"|MemberLifecycleActiveScheduleCleanup"
     r"|PetCareTrackingCommandService\.deleteCareLog"
     r"|PetPottyCommandService\.deletePottyLog"
     r"|PetHygieneCommandService\.delete"
     r"|CatCareCommandService\.undo"
 )
+DOMAIN_OWNERSHIP_RESOLVER_ALLOWLIST = {
+    "Ohana/Domain/Services/MemberLifecycleActiveScheduleResolver.swift",
+}
+DOMAIN_EXACT_EVENT_MATCHER_FUNCTIONS = {
+    "Ohana/Domain/Services/CarePlanCalendarSync.swift": {
+        "existingEvent",
+        "isDefaultGeneratedCalendarPlan",
+        "shouldShowModeScopedPlanOccurrence",
+        "waterMaintenanceKind",
+        "isWaterMaintenancePlan",
+        "waterMaintenancePlanEvents",
+        "hasCustomFeedPlan",
+        "hasCustomWaterPlan",
+        "removeLegacyDefaultPlanEvents",
+        "upsert",
+        "upsertWithSingleReminder",
+    },
+    "Ohana/Domain/Services/CalendarTaskCompletionSyncService.swift": {
+        "deleteCalendarGeneratedRecords",
+        "deleteCalendarGeneratedFactOnlyRecords",
+        "calendarLedgerEntries",
+        "calendarGeneratedFactOnlyRecords",
+    },
+    "Ohana/Domain/Services/PetMedicationDoseLogging.swift": {
+        "doseCount",
+        "logDose",
+    },
+    "Ohana/Domain/Services/PetActivityRecordCleanupService.swift": {
+        "deletePetActivityRecords",
+    },
+    "Ohana/Domain/Services/StartupFeedAutoLogMaintenanceService.swift": {
+        "run",
+    },
+    "Ohana/Domain/Services/QuickActionReminderCompletionSyncService.swift": {
+        "markMatchingReminderCompleted",
+    },
+}
+DOMAIN_MEMBER_OWNER_TYPE_RE = re.compile(
+    r"relatedEntityType\s*(?:==|!=)\s*(?:EntityKind\.(?:pet|human)\.rawValue|[\"'](?:pet|Pet|human|Human|human_note|pet_insurance)[\"'])"
+)
+DOMAIN_MEMBER_OWNER_ID_RE = re.compile(
+    r"relatedEntityId\s*(?:==|!=)|idsMatch\(\s*event\.relatedEntityId\b|\bid\.uuidString\s*==\s*event\.relatedEntityId\b"
+)
+DOMAIN_MEMBER_ASSIGNEE_RE = re.compile(
+    r"event\.assigneeId\s*==|idsMatch\(\s*event\.assigneeId\b"
+)
+DIRECT_SCHEDULE_CONSTRUCTOR_RE = re.compile(r"\b(?:Event|Reminder)\s*\(")
+DIRECT_SCHEDULE_INSERT_RE = re.compile(r"\b(?:context|modelContext)\.insert\s*\(")
+AUTHORIZED_SCHEDULE_WRITER_RE = re.compile(
+    r"DomainScheduleWriteAuthorizer\.authorizeCreate|DomainScheduleWriter\.createEvent"
+)
+ALLOWED_RAW_SCHEDULE_CONSTRUCTOR_FUNCTIONS = {
+    "Ohana/Domain/Services/DomainScheduleWriteKernel.swift": {
+        "makeUnpersistedReminder",
+        "constructEvent",
+        "createReminder",
+        "createReminders",
+    },
+    "Ohana/Domain/Services/CloudSyncRecordApplier.swift": {"applyEvent"},
+    "Ohana/Domain/Services/DataBackupManager+Decode.swift": {"decodeEvent", "decodeReminder"},
+}
+LEGACY_DIRECT_SCHEDULE_WRITER_FUNCTIONS = {
+    "Ohana/Domain/Services/CloudSyncRecordApplier.swift": {"applyEvent"},
+}
 CRITICAL_GATE_FUNCTIONS = {
     "Ohana/Domain/Services/CarePlanCalendarSync.swift": {
         "reconcileDefaultPlanOverrides",
@@ -252,18 +326,65 @@ def requires_lifecycle_gate(path: str, func_name: str, body: str, is_private: bo
         return True
     if is_private:
         return False
-    if mode == "changed" and MEMBER_PARAM_RE.search(body) and WRITE_EFFECT_RE.search(body):
+    if MEMBER_PARAM_RE.search(body) and WRITE_EFFECT_RE.search(body):
         return True
     return False
 
 
 warnings: list[WarningItem] = []
+domain_ownership_warnings: list[WarningItem] = []
 files = collect_files()
 for path in files:
     path_str = rel(path)
+    lines = path.read_text(encoding="utf-8", errors="ignore").splitlines()
+    for func_name, start_line, body, _ in function_blocks(lines):
+        if "member-lifecycle-gate: allow" in body:
+            continue
+        if (
+            DIRECT_SCHEDULE_CONSTRUCTOR_RE.search(body)
+            and func_name not in ALLOWED_RAW_SCHEDULE_CONSTRUCTOR_FUNCTIONS.get(path_str, set())
+        ):
+            warnings.append(
+                WarningItem(
+                    path_str,
+                    start_line,
+                    f"func {func_name} directly constructs raw Event/Reminder outside the schedule writer or rehydrate boundary",
+                )
+            )
+
+    checks_domain_ownership = (
+        path_str.startswith("Ohana/Domain/")
+        or (targets and path_str.startswith("scripts/tests/fixtures/"))
+    )
+    if checks_domain_ownership and path_str not in DOMAIN_OWNERSHIP_RESOLVER_ALLOWLIST:
+        for func_name, start_line, body, _ in function_blocks(lines):
+            if func_name in DOMAIN_EXACT_EVENT_MATCHER_FUNCTIONS.get(path_str, set()):
+                continue
+            if "member-lifecycle-gate: allow" in body:
+                continue
+            if (
+                "MemberLifecycleActiveScheduleResolver." not in body
+                and DOMAIN_MEMBER_OWNER_TYPE_RE.search(body)
+                and DOMAIN_MEMBER_OWNER_ID_RE.search(body)
+            ):
+                domain_ownership_warnings.append(
+                    WarningItem(
+                        path_str,
+                        start_line,
+                        f"func {func_name} hand-rolls Event/Reminder -> member ownership from relatedEntityType/relatedEntityId",
+                    )
+                )
+            if "MemberLifecycleActiveScheduleResolver." not in body and DOMAIN_MEMBER_ASSIGNEE_RE.search(body):
+                domain_ownership_warnings.append(
+                    WarningItem(
+                        path_str,
+                        start_line,
+                        f"func {func_name} hand-rolls human ownership from event.assigneeId",
+                    )
+                )
+
     if allowed_path(path_str) or not is_write_path(path_str):
         continue
-    lines = path.read_text(encoding="utf-8", errors="ignore").splitlines()
     for idx, line in enumerate(lines, start=1):
         if allowed_line(line):
             continue
@@ -272,6 +393,19 @@ for path in files:
     for func_name, start_line, body, is_private in function_blocks(lines):
         if "member-lifecycle-gate: allow" in body:
             continue
+        if (
+            DIRECT_SCHEDULE_CONSTRUCTOR_RE.search(body)
+            and DIRECT_SCHEDULE_INSERT_RE.search(body)
+            and not AUTHORIZED_SCHEDULE_WRITER_RE.search(body)
+            and func_name not in LEGACY_DIRECT_SCHEDULE_WRITER_FUNCTIONS.get(path_str, set())
+        ):
+            warnings.append(
+                WarningItem(
+                    path_str,
+                    start_line,
+                    f"func {func_name} directly constructs/inserts Event or Reminder instead of using DomainScheduleWriter",
+                )
+            )
         if requires_lifecycle_gate(path_str, func_name, body, is_private) and not GATE_CONSUMPTION_RE.search(body):
             warnings.append(
                 WarningItem(
@@ -281,16 +415,27 @@ for path in files:
                 )
             )
 
+for item in domain_ownership_warnings:
+    print(f"[member-lifecycle-domain-ownership-matcher] {item.path}:{item.line}: Domain Event/Reminder -> Pet/Human ownership must use MemberLifecycleActiveScheduleResolver.")
+    print(f"    {item.snippet}")
+
 for item in warnings:
     rule = "member-lifecycle-direct-write-gate"
     message = "write paths must use MemberLifecycleGate/MemberWritePolicy instead of hand-rolled deceased-member gates."
     if item.snippet.startswith("func ") and "without MemberLifecycleGate" in item.snippet:
         rule = "member-lifecycle-missing-disposition"
         message = "member-scoped write paths must consume MemberLifecycleGate/MemberWritePolicy before mutating."
+    elif item.snippet.startswith("func ") and "DomainScheduleWriter" in item.snippet:
+        rule = "member-lifecycle-direct-schedule-writer"
+        message = "member-scoped Event/Reminder writes must go through DomainScheduleWriteAuthorizer and DomainScheduleWriter."
+    elif item.snippet.startswith("func ") and "raw Event/Reminder" in item.snippet:
+        rule = "member-lifecycle-raw-schedule-constructor"
+        message = "raw Event/Reminder construction is allowed only inside DomainScheduleWriter or explicit rehydrate/apply boundaries."
     print(f"[{rule}] {item.path}:{item.line}: {message}")
     print(f"    {item.snippet}")
 
-print(f"member lifecycle gate audit: scanned {len(files)} file(s); warnings={len(warnings)}")
-if warnings and strict:
+total_warnings = len(warnings) + len(domain_ownership_warnings)
+print(f"member lifecycle gate audit: scanned {len(files)} file(s); warnings={total_warnings}")
+if total_warnings and strict:
     sys.exit(1)
 PY

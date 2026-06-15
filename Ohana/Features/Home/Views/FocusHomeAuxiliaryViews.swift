@@ -149,6 +149,7 @@ nonisolated struct TodayFocusSnapshot: Equatable, Sendable {
         reminders: [Reminder],
         events: [Event],
         humans: [Human],
+        humanMedications: [HumanMedication] = [],
         activeHumanId: String,
         careLedgerEntries: [TodayFocusCareLedgerEntry],
         humanWeightLogs: [HumanWeightLog],
@@ -165,6 +166,7 @@ nonisolated struct TodayFocusSnapshot: Equatable, Sendable {
             plants: visiblePlants,
             events: events,
             humans: humans,
+            humanMedications: humanMedications,
             careLedgerEntries: careLedgerEntries,
             now: now
         )
@@ -218,6 +220,7 @@ nonisolated struct TodayFocusSnapshot: Equatable, Sendable {
         reminders: [Reminder],
         events: [Event],
         humans: [Human],
+        humanMedications: [HumanMedication] = [],
         activeHumanId: String,
         careLedgerEntries: [TodayFocusCareLedgerEntry],
         humanWeightLogs: [HumanWeightLog],
@@ -234,6 +237,7 @@ nonisolated struct TodayFocusSnapshot: Equatable, Sendable {
             plants: visiblePlants,
             events: events,
             humans: humans,
+            humanMedications: humanMedications,
             careLedgerEntries: careLedgerEntries,
             now: now,
             questProgress: questProgress

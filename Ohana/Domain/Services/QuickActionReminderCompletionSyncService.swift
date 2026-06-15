@@ -210,7 +210,7 @@ final class QuickActionReminderCompletionSyncService: QuickActionReminderComplet
         let petId = pet.id.uuidString
         let matched = reminders.filter { reminder in
             guard let event = reminder.event,
-                  isPetEvent(event, petId: petId) else { return false }
+                  MemberLifecycleActiveScheduleResolver.eventBelongsToPet(event, petId: petId) else { return false }
             return matches(event)
         }
         guard !matched.isEmpty else { return nil }
@@ -222,12 +222,6 @@ final class QuickActionReminderCompletionSyncService: QuickActionReminderComplet
         let reminderCompletion = providedReminderCompletion ?? ReminderCompletionService()
         reminderCompletion.complete(selected, by: executorId, context: context)
         return selected
-    }
-
-    private static func isPetEvent(_ event: Event, petId: String) -> Bool {
-        let type = event.relatedEntityType.lowercased()
-        return (type == EntityKind.pet.rawValue.lowercased() || type == "pet" || type == WaterPlanWriter.entityType.lowercased()) &&
-            event.relatedEntityId == petId
     }
 
     private static func matchesCare(_ event: Event, type: CareType) -> Bool {

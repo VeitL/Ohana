@@ -74,15 +74,16 @@ enum TodayFocusCommandService {
 
     @MainActor
     private static func pet(for event: Event, context: ModelContext) -> Pet? {
-        guard event.relatedEntityType == EntityKind.pet.rawValue || event.relatedEntityType == "pet",
-              let petId = UUID(uuidString: event.relatedEntityId) else { return nil }
-        var descriptor = FetchDescriptor<Pet>(predicate: #Predicate<Pet> { $0.id == petId })
-        descriptor.fetchLimit = 1
+        let descriptor = FetchDescriptor<Pet>()
         do {
-            return try context.fetch(descriptor).first
+            return MemberLifecycleActiveScheduleResolver.petTarget(
+                for: event,
+                pets: try context.fetch(descriptor),
+                includePassedAway: false
+            )
         } catch {
             OhanaLog.warning(
-                "TodayFocusCommandService failed to fetch completion pet: \(error.localizedDescription)",
+                "TodayFocusCommandService failed to fetch completion pets: \(error.localizedDescription)",
                 category: "TodayFocus"
             )
             return nil

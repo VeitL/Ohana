@@ -3557,12 +3557,13 @@ struct HomeCommandExecutorTests {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
         let plant = Plant(name: "Fern")
+        let executorHuman = insertExecutorHuman(in: context)
         context.insert(plant)
         try context.save()
 
         let executor = HomeCommandExecutor(modelContext: context)
 
-        executor.recordPlantCare(.watering, plantID: plant.id, executorId: "human-1")
+        executor.recordPlantCare(.watering, plantID: plant.id, executorId: executorHuman.id.uuidString)
 
         let logs = try context.fetch(FetchDescriptor<PlantCareLog>())
         let events = try context.fetch(FetchDescriptor<Event>())
@@ -3570,12 +3571,12 @@ struct HomeCommandExecutorTests {
         #expect(logs.count == 1)
         #expect(logs.first?.plant?.id == plant.id)
         #expect(logs.first?.careType == .watering)
-        #expect(logs.first?.executorId == "human-1")
+        #expect(logs.first?.executorId == executorHuman.id.uuidString)
         #expect(plant.lastWateredDate != nil)
         #expect(events.count == 1)
         #expect(events.first?.relatedEntityType == EntityKind.plant.rawValue)
         #expect(events.first?.relatedEntityId == plant.id.uuidString)
-        #expect(events.first?.assigneeId == "human-1")
+        #expect(events.first?.assigneeId == executorHuman.id.uuidString)
         #expect(ledgerEvents.count == 1)
         #expect(ledgerEvents.first?.eventKind == CareLedgerEventKind.plantCare.rawValue)
         #expect(ledgerEvents.first?.legacyModelName == "PlantCareLog")
@@ -3586,12 +3587,13 @@ struct HomeCommandExecutorTests {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
         let plant = Plant(name: "Fern")
+        let executorHuman = insertExecutorHuman(in: context)
         context.insert(plant)
         try context.save()
 
         let executor = HomeCommandExecutor(modelContext: context)
 
-        executor.recordPlantCare(.fertilizing, plantID: plant.id, executorId: "human-1")
+        executor.recordPlantCare(.fertilizing, plantID: plant.id, executorId: executorHuman.id.uuidString)
 
         let logs = try context.fetch(FetchDescriptor<PlantCareLog>())
         let events = try context.fetch(FetchDescriptor<Event>())
@@ -3599,7 +3601,7 @@ struct HomeCommandExecutorTests {
         #expect(logs.count == 1)
         #expect(logs.first?.plant?.id == plant.id)
         #expect(logs.first?.careType == .fertilizing)
-        #expect(logs.first?.executorId == "human-1")
+        #expect(logs.first?.executorId == executorHuman.id.uuidString)
         #expect(plant.lastFertilizedDate != nil)
         #expect(events.count == 1)
         #expect(events.first?.eventType == EventType.fertilizing.rawValue)
@@ -5523,7 +5525,10 @@ struct HomeCommandExecutorTests {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
         let start = makeDate(year: 2026, month: 6, day: 10, hour: 9, minute: 30)
-        let relatedID = UUID()
+        let pet = Pet(name: "Momo", species: "猫")
+        let executorHuman = insertExecutorHuman(in: context)
+        context.insert(pet)
+        try context.save()
 
         let input = CalendarEventPlanCommandInput(
             title: "  Vet visit  ",
@@ -5531,11 +5536,11 @@ struct HomeCommandExecutorTests {
             isAllDay: false,
             eventType: .task,
             relatedEntityType: EntityKind.pet.rawValue,
-            relatedEntityId: relatedID.uuidString,
+            relatedEntityId: pet.id.uuidString,
             recurrenceDays: 0,
             recurrenceEndDate: nil,
             reminderLeadMinutes: 30,
-            assigneeId: "human-1"
+            assigneeId: executorHuman.id.uuidString
         )
 
         let result = try #require(CalendarEventPlanCommandService.createEvent(
@@ -5557,8 +5562,8 @@ struct HomeCommandExecutorTests {
         #expect(event.startDate == start)
         #expect(event.eventType == EventType.task.rawValue)
         #expect(event.relatedEntityType == EntityKind.pet.rawValue)
-        #expect(event.relatedEntityId == relatedID.uuidString)
-        #expect(event.assigneeId == "human-1")
+        #expect(event.relatedEntityId == pet.id.uuidString)
+        #expect(event.assigneeId == executorHuman.id.uuidString)
         #expect(reminder.event?.id == event.id)
         #expect(reminder.scheduledAt == start.addingTimeInterval(-30 * 60))
     }
@@ -5753,10 +5758,11 @@ struct HomeCommandExecutorTests {
         let start = makeDate(year: 2026, month: 6, day: 1)
         let occurrence = makeDate(year: 2026, month: 6, day: 5)
         let end = makeDate(year: 2026, month: 6, day: 10)
+        let executorHuman = insertExecutorHuman(in: context)
         let event = Event(title: "Daily care", startDate: start, eventType: EventType.daily.rawValue)
         event.recurrenceDays = 1
         event.recurrenceEndDate = end
-        event.assigneeId = "human-1"
+        event.assigneeId = executorHuman.id.uuidString
         event.feedRuleKindRaw = "manual"
         event.feedAmountGrams = 42
         context.insert(event)
@@ -5780,7 +5786,7 @@ struct HomeCommandExecutorTests {
         #expect(Calendar.current.isDate(original.recurrenceEndDate ?? .distantPast, inSameDayAs: makeDate(year: 2026, month: 6, day: 4)))
         #expect(Calendar.current.isDate(split.startDate, inSameDayAs: makeDate(year: 2026, month: 6, day: 6)))
         #expect(Calendar.current.isDate(split.recurrenceEndDate ?? .distantPast, inSameDayAs: end))
-        #expect(split.assigneeId == "human-1")
+        #expect(split.assigneeId == executorHuman.id.uuidString)
         #expect(split.feedRuleKindRaw == "manual")
         #expect(split.feedAmountGrams == 42)
     }
@@ -5816,14 +5822,16 @@ struct HomeCommandExecutorTests {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
         let start = makeDate(year: 2026, month: 6, day: 10, hour: 9, minute: 0)
-        let relatedID = UUID()
+        let human = Human(name: "Guan")
+        context.insert(human)
+        try context.save()
         let input = CalendarEventPlanCommandInput(
             title: " Morning task ",
             startDate: start,
             isAllDay: false,
             eventType: .task,
             relatedEntityType: EntityKind.human.rawValue,
-            relatedEntityId: relatedID.uuidString,
+            relatedEntityId: human.id.uuidString,
             recurrenceDays: 0,
             recurrenceEndDate: nil,
             reminderLeadMinutes: nil,
@@ -5840,7 +5848,7 @@ struct HomeCommandExecutorTests {
         #expect(event.title == "Morning task")
         #expect(createMutation.command == .calendarEventPlan(eventID: event.id))
         #expect(createMutation.affectedEntityIDs.contains(event.id))
-        #expect(createMutation.affectedEntityIDs.contains(relatedID))
+        #expect(createMutation.affectedEntityIDs.contains(human.id))
         #expect(createMutation.note == "calendar.event.created")
 
         let completed = executor.toggleCompletion(

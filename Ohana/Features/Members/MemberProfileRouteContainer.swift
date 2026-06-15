@@ -47,16 +47,13 @@ struct AppHumanRouteContainer: View {
         onPresentCoconutLog: @escaping (CoconutLogSubject?) -> Void = { _ in }
     ) {
         let humanKey = id.uuidString
-        let humanType = "Human"
         let pendingStatus = "pending"
         _humans = Query(filter: #Predicate<Human> { human in
             human.id == id
         })
         _allPendingReminders = Query(
             filter: #Predicate<Reminder> { reminder in
-                reminder.status == pendingStatus &&
-                    reminder.event?.relatedEntityType == humanType &&
-                    reminder.event?.relatedEntityId == humanKey
+                reminder.status == pendingStatus
             },
             sort: \.scheduledAt
         )

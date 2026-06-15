@@ -204,7 +204,7 @@ enum HumanMedicationPlanCommandService {
             guard let start = HumanMedicationSchedulePlan.date(on: firstDay, minuteOfDay: minute, calendar: calendar) else {
                 continue
             }
-            let event = Event(
+            let intent = DomainScheduleCreateIntent(
                 title: calendarEventTitle(
                     for: medication,
                     human: human,
@@ -214,13 +214,18 @@ enum HumanMedicationPlanCommandService {
                 ),
                 startDate: start,
                 eventType: EventType.medication.rawValue,
-                relatedEntityType: humanMedicationEntityType,
-                relatedEntityId: medication.id.uuidString
+                relatedEntityType: DomainEntityLinkRegistry.humanMedicationPlan,
+                relatedEntityId: medication.id.uuidString,
+                recurrenceDays: medication.frequency == .weekly ? 7 : 1,
+                recurrenceEndDate: medication.endDate.map { calendar.startOfDay(for: $0) },
+                assigneeId: human.id.uuidString,
+                writeKind: .care,
+                source: .domainService
             )
-            event.recurrenceDays = medication.frequency == .weekly ? 7 : 1
-            event.recurrenceEndDate = medication.endDate.map { calendar.startOfDay(for: $0) }
-            event.assigneeId = human.id.uuidString
-            context.insert(event)
+            guard let plan = DomainScheduleWriteAuthorizer.authorizeCreate(intent: intent, context: context) else {
+                continue
+            }
+            let event = DomainScheduleWriter.createEvent(plan: plan, context: context).event
             CloudSyncMutationRecorder.markModified(event, context: context, modifiedAt: start)
             createdEventIDs.append(event.id)
         }

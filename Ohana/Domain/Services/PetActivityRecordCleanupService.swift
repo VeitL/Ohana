@@ -44,18 +44,13 @@ struct PetActivityRecordCleanupService {
                 didResetStreak: false
             )
         }
-        let petIdString = petId.uuidString
         var deletedEventCount = 0
         var cancelledNotificationIDs: [String] = []
 
-        let descriptor = FetchDescriptor<Event>(
-            predicate: #Predicate<Event> { event in
-                event.relatedEntityId == petIdString
-            }
-        )
+        let descriptor = FetchDescriptor<Event>()
         do {
             let events = try context.fetch(descriptor)
-            for event in events where event.relatedEntityId == petIdString {
+            for event in events where MemberLifecycleActiveScheduleResolver.eventBelongsToPet(event, petId: petId.uuidString) {
                 for reminder in event.reminders {
                     notifications.cancel(notificationId: reminder.notificationId)
                     cancelledNotificationIDs.append(reminder.notificationId)
@@ -71,7 +66,7 @@ struct PetActivityRecordCleanupService {
             }
         } catch {
             OhanaLog.warning(
-                "[PetActivityRecordCleanupService] failed to fetch activity events for petId=\(petIdString): \(error.localizedDescription)",
+                "[PetActivityRecordCleanupService] failed to fetch activity events for petId=\(petId.uuidString): \(error.localizedDescription)",
                 category: "Care"
             )
         }

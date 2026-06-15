@@ -337,6 +337,14 @@ enum PetPottyCommandService {
         context: ModelContext
     ) -> PetPottyClaimCommandResult {
         let sharedSessionId = log.sharedSessionId
+        guard MemberLifecycleGate.disposition(pet: pet, writeKind: .care).allowsCareFactWrite else {
+            return PetPottyClaimCommandResult(
+                petID: pet.id,
+                logID: log.id,
+                sharedSessionID: sharedSessionId,
+                updatedLedgerEventIDs: []
+            )
+        }
         log.pet = pet
 
         let ledgerEvents = ledgerEvents(forLegacyModelName: "PetPottyLog", id: log.id, context: context)

@@ -235,31 +235,49 @@ enum PetHygieneCommandService {
             eventEndDate = nil
         }
 
-        let event = Event(
+        let intent = DomainScheduleCreateIntent(
             title: fullTitle,
             startDate: eventStart,
             endDate: eventEndDate,
             isAllDay: input.isAllDay,
             eventType: EventType.grooming.rawValue,
             relatedEntityType: EntityKind.pet.rawValue,
-            relatedEntityId: pet.id.uuidString
+            relatedEntityId: pet.id.uuidString,
+            recurrenceDays: input.repeatDays,
+            recurrenceEndDate: input.hasEndDate
+                ? calendar.startOfDay(for: input.endDate)
+                : (input.repeatDays > 0 ? calendar.date(byAdding: .year, value: 1, to: dayStart) : nil),
+            reminderDates: [reminderTime],
+            writeKind: .care,
+            source: .userCommand
         )
-        event.recurrenceDays = input.repeatDays
-        if input.hasEndDate {
-            event.recurrenceEndDate = calendar.startOfDay(for: input.endDate)
-        } else if input.repeatDays > 0 {
-            event.recurrenceEndDate = calendar.date(byAdding: .year, value: 1, to: dayStart)
-        }
 
         if input.repeatDays > 0 {
             CarePlanCalendarSync.suppressDefaultPlan(kind: "groom", pet: pet, context: context)
             HygieneType.setCustomCycleDays(input.repeatDays, for: type, petId: pet.id)
         }
-        context.insert(event)
-
-        let reminder = Reminder(event: event, scheduledAt: reminderTime)
+        guard let plan = DomainScheduleWriteAuthorizer.authorizeCreate(intent: intent, context: context) else {
+            return PetHygienePlanCommandResult(
+                eventID: UUID(),
+                reminderID: UUID(),
+                subjectID: pet.id,
+                hygieneType: type,
+                didCreate: false
+            )
+        }
+        let result = DomainScheduleWriter.createEvent(plan: plan, context: context)
+        let event = result.event
+        guard let reminder = result.reminders.first else {
+            context.delete(event)
+            return PetHygienePlanCommandResult(
+                eventID: UUID(),
+                reminderID: UUID(),
+                subjectID: pet.id,
+                hygieneType: type,
+                didCreate: false
+            )
+        }
         reminder.statusEnum = .pending
-        context.insert(reminder)
         context.safeSave()
 
         if scheduleNotification {

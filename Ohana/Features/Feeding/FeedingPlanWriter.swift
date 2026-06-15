@@ -38,19 +38,25 @@ enum FeedingPlanWriter {
 
         for meal in meals {
             let startDate = nextOccurrenceDate(forTimeOfDay: meal.time, after: now, calendar: calendar)
-            let event = Event(
+            let relatedEntityType = draft.kind == .autoFeeder ? FeedRuleMetadata.autoFeederEntityType : EntityKind.pet.rawValue
+            let intent = DomainScheduleCreateIntent(
                 title: FeedRuleMetadata.title(kind: draft.kind, date: startDate, amountGrams: meal.grams, foodKind: meal.foodKind),
                 startDate: startDate,
                 eventType: EventType.foodChange.rawValue,
-                relatedEntityType: draft.kind == .autoFeeder ? FeedRuleMetadata.autoFeederEntityType : EntityKind.pet.rawValue,
-                relatedEntityId: pet.id.uuidString
+                relatedEntityType: relatedEntityType,
+                relatedEntityId: pet.id.uuidString,
+                recurrenceDays: 1,
+                writeKind: .care,
+                source: .domainService
             )
-            event.recurrenceDays = 1
+            guard let plan = DomainScheduleWriteAuthorizer.authorizeCreate(intent: intent, context: context) else {
+                continue
+            }
+            let event = DomainScheduleWriter.createEvent(plan: plan, context: context).event
             event.feedRuleKindRaw = draft.kind.rawValue
             event.foodKindRaw = meal.foodKind.rawValue
             event.feedAmountGrams = meal.grams
             event.feedPlanGroupId = feedPlanGroupId
-            context.insert(event)
             CloudSyncMutationRecorder.markModified(event, context: context, modifiedAt: startDate)
             createdEvents.append(event)
 
@@ -324,19 +330,27 @@ enum FeedingPlanWriter {
             guard snapshot.totalGrams > 0,
                   let reminderDate = foodReminderDate(pet: pet, snapshot: snapshot, calendar: calendar),
                   reminderDate > now else { continue }
-            let event = Event(
+            let intent = DomainScheduleCreateIntent(
                 title: stockReminderTitle(pet: pet, foodKind: foodKind),
                 startDate: reminderDate,
                 eventType: EventType.shoppingList.rawValue,
                 relatedEntityType: stockReminderEntityType,
-                relatedEntityId: stockReminderEntityId(pet: pet, foodKind: foodKind)
+                relatedEntityId: stockReminderEntityId(pet: pet, foodKind: foodKind),
+                reminderDates: [reminderDate],
+                writeKind: .care,
+                source: .domainService
             )
+            guard let plan = DomainScheduleWriteAuthorizer.authorizeCreate(intent: intent, context: context) else {
+                continue
+            }
+            let result = DomainScheduleWriter.createEvent(plan: plan, context: context)
+            let event = result.event
             event.foodKindRaw = foodKind.rawValue
-            let reminder = Reminder(event: event, scheduledAt: reminderDate)
-            context.insert(event)
             CloudSyncMutationRecorder.markModified(event, context: context, modifiedAt: reminderDate)
-            context.insert(reminder)
-            reminders.append(reminder)
+            for reminder in result.reminders {
+                CloudSyncMutationRecorder.markModified(reminder, context: context, modifiedAt: reminderDate)
+                reminders.append(reminder)
+            }
         }
         context.safeSave()
         return reminders
@@ -431,15 +445,25 @@ enum FeedingPlanWriter {
         now: Date,
         calendar: Calendar
     ) -> [Reminder] {
+        guard let mutation = DomainScheduleWriteAuthorizer.authorizeExistingEventMutation(
+            event: event,
+            writeKind: .care,
+            context: context
+        ) else { return [] }
         let existingKeys = Set(event.reminders.map { reminderKey(eventId: event.id, scheduledAt: $0.scheduledAt) })
         var created: [Reminder] = []
 
         for occurrence in upcomingOccurrences(for: event, now: now, daysAhead: manualReminderWindowDays, calendar: calendar) {
             let key = reminderKey(eventId: event.id, scheduledAt: occurrence)
             guard !existingKeys.contains(key) else { continue }
-            let reminder = Reminder(event: event, scheduledAt: occurrence)
-            context.insert(reminder)
-            created.append(reminder)
+            if let reminder = DomainScheduleWriter.createReminder(
+                for: event,
+                scheduledAt: occurrence,
+                mutation: mutation,
+                context: context
+            ) {
+                created.append(reminder)
+            }
         }
         return created
     }

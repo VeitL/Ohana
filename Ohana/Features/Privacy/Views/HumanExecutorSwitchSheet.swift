@@ -245,6 +245,11 @@ struct HumanExecutorSwitchSheet: View {
             isError = true
             statusMessage = "请输入 4 位数字"
             UINotificationFeedbackGenerator().notificationOccurred(.error)
+        case .memberInactive:
+            pin = ""
+            isError = true
+            statusMessage = "纪念成员不能切换为执行人"
+            UINotificationFeedbackGenerator().notificationOccurred(.error)
         }
     }
 

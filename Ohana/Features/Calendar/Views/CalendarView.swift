@@ -139,7 +139,14 @@ struct CalendarView: View {
     var filteredEvents: [Event] {
         var result = events.filter {
             !CarePlanCalendarSync.isDefaultGeneratedCalendarPlan($0, pets: pets) &&
-                !eventIsRelatedToDeceasedMember($0)
+                !MemberLifecycleActiveScheduleResolver.eventTargetsDeceasedActiveSchedule(
+                    $0,
+                    pets: pets,
+                    humans: humans,
+                    petMedications: petMedications,
+                    humanMedications: humanMedications,
+                    insurances: insurances
+                )
         }
         if let petId = effectivePetFilterId {
             result = result.filter { eventIsRelatedToPet($0, petId: petId) }
@@ -151,54 +158,35 @@ struct CalendarView: View {
     }
 
     func eventIsRelatedToDeceasedMember(_ event: Event) -> Bool {
-        guard eventIsActiveSchedule(event) else { return false }
-        if pets.contains(where: { $0.hasPassedAway && eventIsRelatedToPet(event, petId: $0.id.uuidString) }) {
-            return true
-        }
-        if humans.contains(where: { $0.hasPassedAway && eventIsRelatedToHuman(event, humanId: $0.id.uuidString) }) {
-            return true
-        }
-        return false
+        MemberLifecycleActiveScheduleResolver.eventTargetsDeceasedActiveSchedule(
+            event,
+            pets: pets,
+            humans: humans,
+            petMedications: petMedications,
+            humanMedications: humanMedications,
+            insurances: insurances
+        )
     }
 
     func eventIsActiveSchedule(_ event: Event, now: Date = Date()) -> Bool {
-        event.startDate >= now ||
-            event.recurrenceDays > 0 ||
-            event.reminders.contains { !$0.isCompleted && $0.scheduledAt >= now }
+        MemberLifecycleActiveScheduleResolver.isActiveSchedule(event, now: now)
     }
 
     func eventIsRelatedToPet(_ event: Event, petId: String) -> Bool {
-        let entityType = event.relatedEntityType.lowercased()
-        if event.relatedEntityId == petId {
-            return entityType == EntityKind.pet.rawValue.lowercased()
-                || entityType == "pet"
-                || entityType == "pet_food_stock"
-                || entityType == FeedRuleMetadata.autoFeederEntityType.lowercased()
-                || entityType == WaterPlanWriter.entityType.lowercased()
-        }
-        if entityType == "pet_insurance" {
-            return insurances.first { $0.id.uuidString == event.relatedEntityId }?.pet?.id.uuidString == petId
-        }
-        if entityType == PetMedicationDoseLogging.relatedEntityTypeMedication.lowercased() ||
-            entityType == MedicationEventLink.petMedicationPlan.lowercased() {
-            return petMedications.first { $0.id.uuidString == event.relatedEntityId }?.pet?.id.uuidString == petId
-        }
-        return false
+        MemberLifecycleActiveScheduleResolver.eventBelongsToPet(
+            event,
+            petId: petId,
+            petMedications: petMedications,
+            insurances: insurances
+        )
     }
 
     func eventIsRelatedToHuman(_ event: Event, humanId: String) -> Bool {
-        let entityType = event.relatedEntityType.lowercased()
-        if event.assigneeId == humanId {
-            return true
-        }
-        if event.relatedEntityId == humanId {
-            return entityType == EntityKind.human.rawValue.lowercased()
-                || entityType == "human"
-        }
-        if entityType == MedicationEventLink.humanMedicationPlan {
-            return humanMedications.first { $0.id.uuidString == event.relatedEntityId }?.humanId == humanId
-        }
-        return false
+        MemberLifecycleActiveScheduleResolver.eventBelongsToHuman(
+            event,
+            humanId: humanId,
+            humanMedications: humanMedications
+        )
     }
 
     /// 首页嵌入时为全局顶栏 + 外层宠物条预留空间。

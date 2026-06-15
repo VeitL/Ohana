@@ -135,7 +135,7 @@ struct FamilyCollaborationDashboardView: View {
         let endOfToday = Calendar.current.date(byAdding: .day, value: 1, to: Calendar.current.startOfDay(for: Date())) ?? Date()
         return pendingReminders.filter { reminder in
             guard let event = reminder.event,
-                  event.assigneeId == activeHumanId,
+                  MemberLifecycleActiveScheduleResolver.eventAssignedToHuman(event, humanId: activeHumanId),
                   reminder.scheduledAt < endOfToday else { return false }
             return isActivePetEvent(event)
         }
@@ -146,7 +146,7 @@ struct FamilyCollaborationDashboardView: View {
         let endOfToday = Calendar.current.date(byAdding: .day, value: 1, to: Calendar.current.startOfDay(for: Date())) ?? Date()
         return pendingReminders.filter { reminder in
             guard let event = reminder.event,
-                  (event.assigneeId ?? "").isEmpty,
+                  MemberLifecycleActiveScheduleResolver.eventHasNoHumanAssignee(event),
                   reminder.scheduledAt < endOfToday else { return false }
             return isActivePetEvent(event)
         }

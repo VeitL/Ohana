@@ -82,15 +82,30 @@ enum CatCareCommandService {
             )
         }
 
-        let event = Event(
+        let eventIntent = DomainScheduleCreateIntent(
             title: "\(input.emoji) \(input.actionRaw)",
             startDate: input.occurredAt,
             isAllDay: false,
             eventType: EventType.litterBox.rawValue,
             relatedEntityType: EntityKind.pet.rawValue,
-            relatedEntityId: pet.id.uuidString
+            relatedEntityId: pet.id.uuidString,
+            writeKind: .care,
+            source: .userCommand
         )
-        context.insert(event)
+        guard let plan = DomainScheduleWriteAuthorizer.authorizeCreate(
+            intent: eventIntent,
+            context: context
+        ) else {
+            return CatCareCommandResult(
+                petID: pet.id,
+                actionRaw: input.actionRaw,
+                eventID: UUID(),
+                hygieneLogID: nil,
+                occurredAt: input.occurredAt,
+                disposition: .noOp
+            )
+        }
+        let event = DomainScheduleWriter.createEvent(plan: plan, context: context).event
         CloudSyncMutationRecorder.markModified(event, context: context, modifiedAt: input.occurredAt)
 
         let hygieneLog: PetHygieneLog?

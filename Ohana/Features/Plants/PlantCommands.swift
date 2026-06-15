@@ -28,6 +28,41 @@ enum PlantCareCommandService {
         careLedger providedCareLedger: CareLedgerRecording? = nil
     ) -> PlantCareCommandResult {
         let careLedger = providedCareLedger ?? CareLedgerService()
+        let eventIntent = DomainScheduleCreateIntent(
+            title: "\(type.emoji) 给 \(plant.name)\(type.displayName)",
+            startDate: now,
+            isAllDay: false,
+            eventType: type == .watering ? EventType.watering.rawValue : EventType.fertilizing.rawValue,
+            relatedEntityType: EntityKind.plant.rawValue,
+            relatedEntityId: plant.id.uuidString,
+            assigneeId: executorId,
+            writeKind: .care,
+            source: .userCommand
+        )
+        let plan = DomainScheduleWriteAuthorizer.authorizeCreate(intent: eventIntent, context: context)
+            ?? DomainScheduleWriteAuthorizer.authorizeCreate(
+                intent: DomainScheduleCreateIntent(
+                    title: eventIntent.title,
+                    startDate: eventIntent.startDate,
+                    isAllDay: eventIntent.isAllDay,
+                    eventType: eventIntent.eventType,
+                    relatedEntityType: eventIntent.relatedLink.rawType,
+                    relatedEntityId: eventIntent.relatedLink.rawId,
+                    writeKind: eventIntent.writeKind,
+                    source: eventIntent.source
+                ),
+                context: context
+            )
+        guard let plan else {
+            return PlantCareCommandResult(
+                plantID: plant.id,
+                logID: UUID(),
+                eventID: UUID(),
+                ledgerEventID: UUID(),
+                careType: type
+            )
+        }
+        let authorizedExecutorId = plan.intent.assigneeId
         switch type {
         case .watering:
             plant.lastWateredDate = now
@@ -35,25 +70,16 @@ enum PlantCareCommandService {
             plant.lastFertilizedDate = now
         }
 
-        let log = PlantCareLog(date: now, careType: type, executorId: executorId)
+        let log = PlantCareLog(date: now, careType: type, executorId: authorizedExecutorId)
         log.plant = plant
         context.insert(log)
 
-        let event = Event(
-            title: "\(type.emoji) 给 \(plant.name)\(type.displayName)",
-            startDate: now,
-            isAllDay: false,
-            eventType: type == .watering ? EventType.watering.rawValue : EventType.fertilizing.rawValue,
-            relatedEntityType: EntityKind.plant.rawValue,
-            relatedEntityId: plant.id.uuidString
-        )
-        event.assigneeId = executorId
-        context.insert(event)
+        let event = DomainScheduleWriter.createEvent(plan: plan, context: context).event
 
         let ledgerEvent = careLedger.record(
             occurredAt: log.date,
-            actorKind: executorId == nil ? .unknown : .human,
-            actorId: executorId,
+            actorKind: authorizedExecutorId == nil ? .unknown : .human,
+            actorId: authorizedExecutorId,
             subjectKind: .plant,
             subjectId: plant.id.uuidString,
             eventKind: .plantCare,

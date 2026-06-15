@@ -84,6 +84,8 @@ extension CoconutShopView {
             return l.tr(zh: "只有发起人可以取消。", en: "Only the sender can cancel.", de: "Nur der Absender kann abbrechen.")
         case .notReceiver:
             return l.tr(zh: "只有接收人可以确认。", en: "Only the receiver can confirm.", de: "Nur der Empfänger kann bestätigen.")
+        case .memberInactive:
+            return l.tr(zh: "纪念成员不能进行货币兑换。", en: "Memorial members cannot use cash exchange.", de: "Gedenkmitglieder können den Geldtausch nicht verwenden.")
         }
     }
 
@@ -503,6 +505,8 @@ extension CoconutShopView {
                     : l.tr(zh: "请先补充物种或品种资料后再试。", en: "Add species or breed details first.", de: "Ergänze zuerst Art oder Rasse.")
             case .noPass, nil:
                 l.tr(zh: "当前没有可用的 2.5D 头像券。", en: "No 2.5D avatar pass available.", de: "Kein 2,5D-Avatarpass verfügbar.")
+            case .memberInactive:
+                l.tr(zh: "纪念成员不能再升级头像。", en: "Memorial members cannot upgrade avatars.", de: "Gedenkmitglieder können Avatare nicht mehr aktualisieren.")
             }
             showToast(message, icon: "exclamationmark.triangle.fill", tint: Color.goOrange)
             return

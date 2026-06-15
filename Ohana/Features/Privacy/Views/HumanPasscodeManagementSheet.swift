@@ -330,6 +330,8 @@ struct HumanPasscodeManagementSheet: View {
             showError("请输入 4 位数字")
         case .noPasscode:
             showError("此账户还没有密码")
+        case .memberInactive:
+            showError("纪念成员不能修改密码")
         }
     }
 

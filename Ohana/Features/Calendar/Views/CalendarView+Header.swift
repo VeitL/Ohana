@@ -143,7 +143,7 @@ extension CalendarView {
                         var seen: [String] = []
                         var colors: [Color] = []
                         for ev in dayEvents {
-                            if let pet = pets.first(where: { $0.id.uuidString == ev.relatedEntityId }) {
+                            if let pet = MemberLifecycleActiveScheduleResolver.petTarget(for: ev, pets: pets) {
                                 let hex = pet.themeColorHex
                                 if !seen.contains(hex) {
                                     seen.append(hex)

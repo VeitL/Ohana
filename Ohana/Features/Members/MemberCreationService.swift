@@ -314,17 +314,16 @@ final class MemberCreationService: MemberCreating {
             IslandQuestEngine.markInitialHumanWeightRecorded(humanId: human.id)
         }
         if draft.hasBirthday {
-            let event = Event(
+            createMemberSchedule(
                 title: "\(draft.trimmedName)\(L10n.current.humanWizBirthdayEventSuffix)",
                 startDate: draft.birthday,
                 isAllDay: true,
                 eventType: EventType.birthday.rawValue,
-                relatedEntityType: "Human",
-                relatedEntityId: human.id.uuidString
+                relatedEntityType: EntityKind.human.rawValue,
+                relatedEntityId: human.id.uuidString,
+                recurrenceDays: 365,
+                context: context
             )
-            event.recurrenceDays = 365
-            context.insert(event)
-            CloudSyncMutationRecorder.markModified(event, context: context)
         }
         do {
             try context.save()
@@ -366,33 +365,29 @@ final class MemberCreationService: MemberCreating {
 
     private func insertPetRelatedRecords(pet: Pet, draft: MemberCreationDraft, context: ModelContext) {
         if draft.hasBirthday {
-            let birthdayEvent = Event(
+            createMemberSchedule(
                 title: "\(draft.trimmedName) 的生日 🎂",
                 startDate: draft.birthday,
                 isAllDay: true,
                 eventType: EventType.birthday.rawValue,
-                relatedEntityType: "Pet",
-                relatedEntityId: pet.id.uuidString
+                relatedEntityType: EntityKind.pet.rawValue,
+                relatedEntityId: pet.id.uuidString,
+                recurrenceDays: 365,
+                reminderDates: [draft.birthday],
+                context: context
             )
-            birthdayEvent.recurrenceDays = 365
-            context.insert(birthdayEvent)
-            CloudSyncMutationRecorder.markModified(birthdayEvent, context: context)
-            let reminder = Reminder(event: birthdayEvent, scheduledAt: draft.birthday)
-            context.insert(reminder)
-            CloudSyncMutationRecorder.markModified(reminder, context: context)
         }
         if draft.hasHomeDate {
-            let event = Event(
+            createMemberSchedule(
                 title: "\(draft.trimmedName) 的到家纪念日 🏠",
                 startDate: draft.homeDate,
                 isAllDay: true,
                 eventType: EventType.anniversary.rawValue,
-                relatedEntityType: "Pet",
-                relatedEntityId: pet.id.uuidString
+                relatedEntityType: EntityKind.pet.rawValue,
+                relatedEntityId: pet.id.uuidString,
+                recurrenceDays: 365,
+                context: context
             )
-            event.recurrenceDays = 365
-            context.insert(event)
-            CloudSyncMutationRecorder.markModified(event, context: context)
         }
         if draft.hasHomeDate {
             let milestones = [100, 365, 500, 730, 1000, 1095]
@@ -407,6 +402,41 @@ final class MemberCreationService: MemberCreating {
                 }
             }
         }
+    }
+
+    @discardableResult
+    private func createMemberSchedule(
+        title: String,
+        startDate: Date,
+        isAllDay: Bool,
+        eventType: String,
+        relatedEntityType: String,
+        relatedEntityId: String,
+        recurrenceDays: Int,
+        reminderDates: [Date] = [],
+        context: ModelContext
+    ) -> DomainScheduleWriteResult? {
+        let intent = DomainScheduleCreateIntent(
+            title: title,
+            startDate: startDate,
+            isAllDay: isAllDay,
+            eventType: eventType,
+            relatedEntityType: relatedEntityType,
+            relatedEntityId: relatedEntityId,
+            recurrenceDays: recurrenceDays,
+            reminderDates: reminderDates,
+            writeKind: .memorialContentWithOptionalDerivations,
+            source: .domainService
+        )
+        guard let plan = DomainScheduleWriteAuthorizer.authorizeCreate(intent: intent, context: context) else {
+            return nil
+        }
+        let result = DomainScheduleWriter.createEvent(plan: plan, context: context)
+        CloudSyncMutationRecorder.markModified(result.event, context: context)
+        for reminder in result.reminders {
+            CloudSyncMutationRecorder.markModified(reminder, context: context)
+        }
+        return result
     }
 
     private func recordThemeColorIfNeeded(

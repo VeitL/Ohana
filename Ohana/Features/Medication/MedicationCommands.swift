@@ -510,7 +510,7 @@ enum PetMedicationPlanCommandService {
             guard let start = HumanMedicationSchedulePlan.date(on: firstDay, minuteOfDay: minute) else {
                 continue
             }
-            let event = Event(
+            let intent = DomainScheduleCreateIntent(
                 title: calendarEventTitle(
                     for: medication,
                     pet: pet,
@@ -519,12 +519,17 @@ enum PetMedicationPlanCommandService {
                 ),
                 startDate: start,
                 eventType: EventType.petMedication.rawValue,
-                relatedEntityType: MedicationEventLink.petMedicationPlan,
-                relatedEntityId: medication.id.uuidString
+                relatedEntityType: DomainEntityLinkRegistry.petMedicationPlan,
+                relatedEntityId: medication.id.uuidString,
+                recurrenceDays: recurrenceDays,
+                recurrenceEndDate: medication.endDate.map { Calendar.current.startOfDay(for: $0) },
+                writeKind: .care,
+                source: .domainService
             )
-            event.recurrenceDays = recurrenceDays
-            event.recurrenceEndDate = medication.endDate.map { Calendar.current.startOfDay(for: $0) }
-            context.insert(event)
+            guard let plan = DomainScheduleWriteAuthorizer.authorizeCreate(intent: intent, context: context) else {
+                continue
+            }
+            let event = DomainScheduleWriter.createEvent(plan: plan, context: context).event
             CloudSyncMutationRecorder.markModified(event, context: context, modifiedAt: start)
             createdEventIDs.append(event.id)
         }

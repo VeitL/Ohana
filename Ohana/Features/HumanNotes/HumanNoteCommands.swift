@@ -48,7 +48,7 @@ enum HumanNoteCommandService {
         }
         let disposition = MemberLifecycleGate.disposition(
             human: human,
-            writeKind: reminderDate == nil ? .memorial : .care
+            writeKind: reminderDate == nil ? .memorial : .memorialContentWithOptionalDerivations
         )
         guard disposition.writesContent else { return nil }
 
@@ -69,7 +69,7 @@ enum HumanNoteCommandService {
         human.notes = human.notes.isEmpty ? entry : human.notes + "\n\n" + entry
         CloudSyncMutationRecorder.markModified(human, context: context, modifiedAt: date)
 
-        let reminderPair = effectiveReminderDate.map {
+        let reminderPair = effectiveReminderDate.flatMap {
             createReminder(
                 human: human,
                 note: cleanNote,
@@ -110,6 +110,9 @@ enum HumanNoteCommandService {
         rawString: String,
         context: ModelContext
     ) -> HumanNoteDeleteResult {
+        guard MemberLifecycleGate.disposition(human: human, writeKind: .memorial).writesContent else {
+            return HumanNoteDeleteResult(subjectID: human.id, didDelete: false)
+        }
         let target = rawString.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !target.isEmpty, !human.notes.isEmpty else {
             return HumanNoteDeleteResult(subjectID: human.id, didDelete: false)
@@ -200,22 +203,26 @@ enum HumanNoteCommandService {
         reminderDate: Date,
         l: L10n,
         context: ModelContext
-    ) -> (event: Event, reminder: Reminder) {
+    ) -> (event: Event, reminder: Reminder)? {
         let title = note.isEmpty
             ? l.tr(zh: "\(human.name) 的记录提醒", en: "\(human.name)'s note reminder", de: "Notizerinnerung für \(human.name)")
             : note
-        let event = Event(
+        let intent = DomainScheduleCreateIntent(
             title: title,
             startDate: reminderDate,
             eventType: EventType.task.rawValue,
-            relatedEntityType: "human_note",
-            relatedEntityId: human.id.uuidString
+            relatedEntityType: DomainEntityLinkRegistry.humanNote,
+            relatedEntityId: human.id.uuidString,
+            reminderLeadMinutes: 0,
+            assigneeId: human.id.uuidString,
+            writeKind: .memorialContentWithOptionalDerivations,
+            source: .userCommand
         )
-        event.assigneeId = human.id.uuidString
-        let reminder = Reminder(event: event, scheduledAt: reminderDate)
-        event.reminders.append(reminder)
-        context.insert(event)
-        context.insert(reminder)
+        guard let plan = DomainScheduleWriteAuthorizer.authorizeCreate(intent: intent, context: context) else { return nil }
+        let writeResult = DomainScheduleWriter.createEvent(plan: plan, context: context)
+        let event = writeResult.event
+        guard !writeResult.reminders.isEmpty else { return nil }
+        let reminder = writeResult.reminders[0]
         CloudSyncMutationRecorder.markModified(event, context: context, modifiedAt: reminderDate)
         CloudSyncMutationRecorder.markModified(reminder, context: context, modifiedAt: reminderDate)
         return (event, reminder)

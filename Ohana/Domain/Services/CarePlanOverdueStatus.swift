@@ -132,7 +132,12 @@ nonisolated enum CarePlanOverdueStatusCalculator {
         let hasExpiredFeedMiss = !feedRules.expiredMissedManualReminders.isEmpty
         let reminderWarnings = events.flatMap { event -> [CarePlanOverdueStatus] in
             guard event.isActionableTask,
-                  eventBelongsToPet(event, pet: pet),
+                  MemberLifecycleActiveScheduleResolver.eventBelongsToPet(
+                      event,
+                      petId: pet.id.uuidString,
+                      petMedications: pet.medications,
+                      insurances: pet.insurances
+                  ),
                   !FeedRuleMetadata.isAutoFeederEvent(event, pet: pet),
                   let actionType = planActionType(for: event),
                   let title = warningTitle(for: actionType) else {
@@ -182,7 +187,11 @@ nonisolated enum CarePlanOverdueStatusCalculator {
     ) -> [CarePlanOverdueStatus] {
         let eventWarnings = events.flatMap { event -> [CarePlanOverdueStatus] in
             guard event.isActionableTask,
-                  eventBelongsToHuman(event, human: human, medications: medications),
+                  MemberLifecycleActiveScheduleResolver.eventBelongsToHuman(
+                      event,
+                      humanId: human.id.uuidString,
+                      humanMedications: medications
+                  ),
                   let actionType = humanPlanActionType(for: event),
                   let title = humanWarningTitle(for: actionType) else {
                 return []
@@ -340,49 +349,6 @@ nonisolated enum CarePlanOverdueStatusCalculator {
         )
     }
 
-    private static func eventBelongsToPet(_ event: Event, pet: Pet) -> Bool {
-        let petId = pet.id.uuidString
-        let entityType = event.relatedEntityType.lowercased()
-
-        if event.relatedEntityId == petId {
-            return entityType.isEmpty ||
-                entityType == EntityKind.pet.rawValue.lowercased() ||
-                entityType == "pet" ||
-                entityType.hasPrefix("pet_")
-        }
-
-        if event.eventType == EventType.petMedication.rawValue ||
-            event.eventType == EventType.petMedicationDose.rawValue ||
-            entityType == MedicationEventLink.petMedicationPlan.lowercased() ||
-            entityType == PetMedicationDoseLogging.relatedEntityTypeMedication.lowercased() {
-            return pet.medications.contains { $0.id.uuidString == event.relatedEntityId }
-        }
-
-        return false
-    }
-
-    private static func eventBelongsToHuman(_ event: Event, human: Human, medications: [HumanMedication]) -> Bool {
-        let humanId = human.id.uuidString
-        let entityType = event.relatedEntityType.lowercased()
-
-        if event.assigneeId == humanId {
-            return true
-        }
-
-        if event.relatedEntityId == humanId {
-            return entityType.isEmpty ||
-                entityType == EntityKind.human.rawValue.lowercased() ||
-                entityType == "human" ||
-                entityType.hasPrefix("human_")
-        }
-
-        if entityType == MedicationEventLink.humanMedicationPlan {
-            return medications.first { $0.id.uuidString == event.relatedEntityId }?.humanId == humanId
-        }
-
-        return false
-    }
-
     private static func eventBelongsToPlant(_ event: Event, plant: Plant) -> Bool {
         let plantId = plant.id.uuidString
         let entityType = event.relatedEntityType.lowercased()
@@ -400,9 +366,6 @@ nonisolated enum CarePlanOverdueStatusCalculator {
             event.relatedEntityType.lowercased() == MedicationEventLink.petMedicationPlan.lowercased() ||
             event.relatedEntityType.lowercased() == PetMedicationDoseLogging.relatedEntityTypeMedication {
             return "medication"
-        }
-        if FeedRuleMetadata.isAutoFeederEvent(event, petId: event.relatedEntityId) {
-            return nil
         }
         if event.feedRuleKind == .manualReminder || event.eventType == EventType.foodChange.rawValue {
             return "feed"
@@ -645,13 +608,5 @@ nonisolated enum CarePlanOverdueStatusCalculator {
 
     private static func matchesAny(_ text: String, _ needles: [String]) -> Bool {
         needles.contains { text.contains($0.lowercased()) }
-    }
-}
-
-private extension FeedRuleMetadata {
-    nonisolated static func isAutoFeederEvent(_ event: Event, petId: String) -> Bool {
-        event.relatedEntityType == autoFeederEntityType &&
-            event.relatedEntityId == petId &&
-            event.eventType == EventType.foodChange.rawValue
     }
 }

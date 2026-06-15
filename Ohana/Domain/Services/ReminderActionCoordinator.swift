@@ -374,18 +374,13 @@ enum ReminderActionCoordinator {
 
     @MainActor
     private static func pet(for event: Event, context: ModelContext) -> Pet? {
-        guard let id = UUID(uuidString: event.relatedEntityId) else { return nil }
-        var descriptor = FetchDescriptor<Pet>(
-            predicate: #Predicate<Pet> { pet in
-                pet.id == id
-            }
-        )
-        descriptor.fetchLimit = 1
-        return fetchFirstOrLog(
+        let descriptor = FetchDescriptor<Pet>()
+        let pets = fetchModelsOrLog(
             descriptor,
             context: context,
-            operation: "fetch pet for reminder event"
+            operation: "fetch pets for reminder event"
         )
+        return MemberLifecycleActiveScheduleResolver.petTarget(for: event, pets: pets)
     }
 
     @MainActor

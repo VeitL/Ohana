@@ -311,6 +311,11 @@ struct HumanAccountSwitcherSheet: View {
             statusMessage = "请输入 4 位数字"
         case .noPasscode:
             completePendingAccess(for: human)
+        case .memberInactive:
+            pin = ""
+            isError = true
+            statusMessage = "纪念成员不能切换或修改安全设置"
+            UINotificationFeedbackGenerator().notificationOccurred(.error)
         }
     }
 

@@ -7,4 +7,24 @@ enum MemberLifecycleGateGoodCommandService {
         guard disposition.allowsCareFactWrite else { return }
         context.insert(PetCareLog(type: .feeding, pet: pet))
     }
+
+    static func petOwnedEvent(_ event: Event, pet: Pet) -> Bool {
+        MemberLifecycleActiveScheduleResolver.eventBelongsToPet(event, petId: pet.id.uuidString)
+    }
+
+    @MainActor
+    static func createPetReminder(pet: Pet, context: ModelContext) {
+        let intent = DomainScheduleCreateIntent(
+            title: "Vet",
+            startDate: Date(),
+            eventType: EventType.task.rawValue,
+            relatedEntityType: EntityKind.pet.rawValue,
+            relatedEntityId: pet.id.uuidString,
+            writeKind: .care
+        )
+        guard let plan = DomainScheduleWriteAuthorizer.authorizeCreate(intent: intent, context: context) else {
+            return
+        }
+        _ = DomainScheduleWriter.createEvent(plan: plan, context: context)
+    }
 }

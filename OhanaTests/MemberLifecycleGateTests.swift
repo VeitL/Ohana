@@ -391,6 +391,118 @@ struct MemberLifecycleGateTests {
         #expect(try context.fetch(FetchDescriptor<Reminder>()).isEmpty)
     }
 
+    @Test func deceasedPetQuickWaterWrappersDoNotPersistSettingsOrMode() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let pet = Pet(name: "Momo", species: "fish")
+        pet.passedAwayDate = Date(timeIntervalSince1970: 1_800_000_116)
+        context.insert(pet)
+        try context.save()
+
+        let now = Date(timeIntervalSince1970: 1_800_001_320)
+        let executor = QuickWaterCommandExecutor(context: context)
+        executor.persistWaterSettings(pet: pet, intervalDays: 9, reminderOn: true, cycleAnchor: now)
+        executor.persistWaterAmountSettings(pet: pet, enabled: false, amountMl: 880)
+        executor.persistFilterSettings(pet: pet, cleanIntervalDays: 5, replaceIntervalDays: 25, reminderOn: true)
+        let waterChange = executor.saveWaterChangePlan(
+            pet: pet,
+            allEvents: [],
+            intervalDays: 9,
+            reminderOn: true,
+            cycleAnchor: now
+        )
+        let filter = executor.syncFilterPlan(
+            pet: pet,
+            allEvents: [],
+            cleanIntervalDays: 5,
+            replaceIntervalDays: 25,
+            reminderOn: true
+        )
+        let plan = executor.saveWaterPlan(pet: pet, targets: [pet], times: [now], count: 1, allEvents: [])
+        executor.setWaterMode(.reminder, pet: pet)
+
+        let snapshot = WaterCareSettingsStore.snapshot(petKey: pet.id.uuidString, now: now)
+        #expect(waterChange.isEmpty)
+        #expect(filter.isEmpty)
+        #expect(plan.targetCount == 0)
+        #expect(plan.reminders.isEmpty)
+        #expect(WaterOperatingMode.stored(pet.id) == nil)
+        #expect(snapshot.waterIntervalDays == 3)
+        #expect(snapshot.filterCleanIntervalDays == 14)
+        #expect(snapshot.filterReplaceIntervalDays == 90)
+        #expect(!snapshot.waterReminderOn)
+        #expect(!snapshot.filterReminderOn)
+        #expect(snapshot.waterAmountEnabled)
+        #expect(snapshot.waterAmountMl == 250)
+        #expect(try context.fetch(FetchDescriptor<Event>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<Reminder>()).isEmpty)
+    }
+
+    @Test func deceasedHumanNoteWithReminderWritesMemorialContentOnly() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let human = Human(name: "Ava")
+        human.passedAwayDate = Date(timeIntervalSince1970: 1_800_000_117)
+        context.insert(human)
+        try context.save()
+
+        let result = HumanNoteCommandService.recordNote(
+            human: human,
+            note: "A favorite memory",
+            date: Date(timeIntervalSince1970: 1_800_001_330),
+            imageAttachments: [],
+            fileAttachments: [],
+            reminderDate: Date(timeIntervalSince1970: 1_800_002_000),
+            appLanguage: AppLanguage.fallbackCode,
+            context: context,
+            scheduleNotification: false
+        )
+
+        #expect(result?.subjectID == human.id)
+        #expect(result?.eventID == nil)
+        #expect(result?.reminderID == nil)
+        #expect(human.notes.contains("A favorite memory"))
+        #expect(!human.notes.contains("Reminder:"))
+        #expect(!human.notes.contains("提醒："))
+        #expect(try context.fetch(FetchDescriptor<Event>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<Reminder>()).isEmpty)
+    }
+
+    @Test func deceasedPetCanCreateMemorialCalendarDateWithoutReminder() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let pet = Pet(name: "Momo", species: "cat")
+        pet.passedAwayDate = Date(timeIntervalSince1970: 1_800_000_118)
+        context.insert(pet)
+        try context.save()
+
+        let result = CalendarEventPlanCommandService.createEvent(
+            input: CalendarEventPlanCommandInput(
+                title: "Momo day",
+                startDate: Date(timeIntervalSince1970: 1_800_002_200),
+                isAllDay: true,
+                eventType: .anniversary,
+                relatedEntityType: EntityKind.pet.rawValue,
+                relatedEntityId: pet.id.uuidString,
+                recurrenceDays: 365,
+                recurrenceEndDate: nil,
+                reminderLeadMinutes: 30,
+                assigneeId: nil
+            ),
+            context: context,
+            scheduleNotifications: false
+        )
+
+        let events = try context.fetch(FetchDescriptor<Event>())
+        let createdEvent = try #require(events.first)
+        #expect(result != nil)
+        #expect(result?.reminderIDs.isEmpty == true)
+        #expect(events.count == 1)
+        #expect(createdEvent.eventType == EventType.anniversary.rawValue)
+        #expect(!MemberLifecycleActiveScheduleResolver.isActiveSchedule(createdEvent, now: Date(timeIntervalSince1970: 1_800_001_400)))
+        #expect(try context.fetch(FetchDescriptor<Reminder>()).isEmpty)
+    }
+
     @Test func markingPetPassedAwayRemovesFutureActiveSchedules() throws {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
@@ -450,6 +562,168 @@ struct MemberLifecycleGateTests {
         #expect(reminders.contains { $0.id == pastReminderID })
         #expect(events.contains { $0.id == otherFutureEventID })
         #expect(reminders.contains { $0.id == otherFutureReminderID })
+    }
+
+    @Test func foodStockReminderUsesUnifiedPetResolver() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let pet = Pet(name: "Momo", species: "cat")
+        let passDate = Date(timeIntervalSince1970: 1_800_001_450)
+        let event = Event(
+            title: "Stock",
+            startDate: passDate.addingTimeInterval(3600),
+            eventType: EventType.shoppingList.rawValue,
+            relatedEntityType: FeedingPlanWriter.stockReminderEntityType,
+            relatedEntityId: FeedingPlanWriter.stockReminderEntityId(pet: pet, foodKind: .dry)
+        )
+        let reminder = Reminder(event: event, scheduledAt: event.startDate)
+        let eventID = event.id
+        let reminderID = reminder.id
+        context.insert(pet)
+        context.insert(event)
+        context.insert(reminder)
+        try context.save()
+
+        #expect(MemberLifecycleActiveScheduleResolver.eventBelongsToPet(event, petId: pet.id.uuidString))
+        pet.passedAwayDate = passDate
+        #expect(MemberLifecycleActiveScheduleResolver.eventTargetsDeceasedActiveSchedule(event, pets: [pet], humans: [], now: passDate))
+
+        _ = MemberLifecycleCommandService.markPetPassedAway(pet, date: passDate, context: context)
+
+        let events = try context.fetch(FetchDescriptor<Event>())
+        let reminders = try context.fetch(FetchDescriptor<Reminder>())
+        #expect(!events.contains { $0.id == eventID })
+        #expect(!reminders.contains { $0.id == reminderID })
+    }
+
+    @Test func activeScheduleResolverCoversMemberOwnershipMatrix() {
+        let pet = Pet(name: "Momo", species: "cat")
+        let otherPet = Pet(name: "Nori", species: "cat")
+        let human = Human(name: "Ava")
+        let otherHuman = Human(name: "Guan")
+        let petMedication = PetMedication(name: "Drops", pet: pet)
+        let humanMedication = HumanMedication(humanId: human.id.uuidString, name: "Vitamin")
+        let insurance = PetInsurance(companyName: "Care", pet: pet)
+
+        let directPet = Event(
+            title: "Pet care",
+            relatedEntityType: EntityKind.pet.rawValue,
+            relatedEntityId: pet.id.uuidString
+        )
+        let directHuman = Event(
+            title: "Human check",
+            relatedEntityType: EntityKind.human.rawValue,
+            relatedEntityId: human.id.uuidString
+        )
+        let foodStock = Event(
+            title: "Food stock",
+            relatedEntityType: FeedingPlanWriter.stockReminderEntityType,
+            relatedEntityId: FeedingPlanWriter.stockReminderEntityId(pet: pet, foodKind: .dry)
+        )
+        let petMedicationEvent = Event(
+            title: "Pet medication",
+            relatedEntityType: MedicationEventLink.petMedicationPlan,
+            relatedEntityId: petMedication.id.uuidString
+        )
+        let humanMedicationEvent = Event(
+            title: "Human medication",
+            relatedEntityType: MedicationEventLink.humanMedicationPlan,
+            relatedEntityId: humanMedication.id.uuidString
+        )
+        let insuranceEvent = Event(
+            title: "Insurance",
+            relatedEntityType: "pet_insurance",
+            relatedEntityId: insurance.id.uuidString
+        )
+        let humanNote = Event(
+            title: "Human note",
+            relatedEntityType: "human_note",
+            relatedEntityId: human.id.uuidString
+        )
+        let assignedPetEvent = Event(
+            title: "Assigned pet task",
+            relatedEntityType: EntityKind.pet.rawValue,
+            relatedEntityId: pet.id.uuidString
+        )
+        assignedPetEvent.assigneeId = human.id.uuidString
+        let assignedOnlyEvent = Event(title: "Assigned household task")
+        assignedOnlyEvent.assigneeId = human.id.uuidString
+        let reminderOnly = Reminder(event: nil, scheduledAt: Date(timeIntervalSince1970: 1_800_003_000))
+
+        #expect(MemberLifecycleActiveScheduleResolver.petTarget(for: directPet, pets: [pet, otherPet])?.id == pet.id)
+        #expect(MemberLifecycleActiveScheduleResolver.humanOwner(for: directHuman, humans: [human, otherHuman], humanMedications: [])?.id == human.id)
+        #expect(MemberLifecycleActiveScheduleResolver.petTarget(for: foodStock, pets: [pet, otherPet])?.id == pet.id)
+        #expect(MemberLifecycleActiveScheduleResolver.petTarget(
+            for: petMedicationEvent,
+            pets: [pet, otherPet],
+            petMedications: [petMedication]
+        )?.id == pet.id)
+        #expect(MemberLifecycleActiveScheduleResolver.humanOwner(for: humanMedicationEvent, humans: [human, otherHuman], humanMedications: [humanMedication])?.id == human.id)
+        #expect(MemberLifecycleActiveScheduleResolver.petTarget(
+            for: insuranceEvent,
+            pets: [pet, otherPet],
+            insurances: [insurance]
+        )?.id == pet.id)
+        #expect(MemberLifecycleActiveScheduleResolver.humanOwner(for: humanNote, humans: [human, otherHuman], humanMedications: [])?.id == human.id)
+        #expect(MemberLifecycleActiveScheduleResolver.humanInvolved(in: assignedPetEvent, humans: [human, otherHuman], humanMedications: [])?.id == human.id)
+        #expect(MemberLifecycleActiveScheduleResolver.humanOwner(for: assignedPetEvent, humans: [human, otherHuman], humanMedications: []) == nil)
+        #expect(MemberLifecycleActiveScheduleResolver.humanInvolved(in: assignedOnlyEvent, humans: [human, otherHuman], humanMedications: [])?.id == human.id)
+        #expect(MemberLifecycleActiveScheduleResolver.reminderTargetsActiveMember(reminderOnly, activePets: [], activeHumans: []))
+    }
+
+    @Test func domainScheduleResolutionAndAuthorizationCoverIndirectMembers() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let pet = Pet(name: "Momo", species: "cat")
+        let human = Human(name: "Ava")
+        let petMedication = PetMedication(name: "Drops", pet: pet)
+        let humanMedication = HumanMedication(humanId: human.id.uuidString, name: "Vitamin")
+        let insurance = PetInsurance(companyName: "Care", pet: pet)
+        context.insert(pet)
+        context.insert(human)
+        context.insert(petMedication)
+        context.insert(humanMedication)
+        context.insert(insurance)
+        try context.save()
+
+        let stockIntent = DomainScheduleCreateIntent(
+            title: "Food stock",
+            startDate: Date(timeIntervalSince1970: 1_800_003_100),
+            relatedEntityType: DomainEntityLinkRegistry.petFoodStock,
+            relatedEntityId: "\(pet.id.uuidString):dry",
+            writeKind: .care
+        )
+        let petMedicationIntent = DomainScheduleCreateIntent(
+            title: "Pet medication",
+            startDate: Date(timeIntervalSince1970: 1_800_003_200),
+            relatedEntityType: DomainEntityLinkRegistry.petMedicationPlan,
+            relatedEntityId: petMedication.id.uuidString,
+            writeKind: .care
+        )
+        let humanMedicationIntent = DomainScheduleCreateIntent(
+            title: "Human medication",
+            startDate: Date(timeIntervalSince1970: 1_800_003_300),
+            relatedEntityType: DomainEntityLinkRegistry.humanMedicationPlan,
+            relatedEntityId: humanMedication.id.uuidString,
+            writeKind: .care
+        )
+        let insuranceIntent = DomainScheduleCreateIntent(
+            title: "Insurance",
+            startDate: Date(timeIntervalSince1970: 1_800_003_400),
+            relatedEntityType: DomainEntityLinkRegistry.petInsurance,
+            relatedEntityId: insurance.id.uuidString,
+            writeKind: .care
+        )
+
+        #expect(DomainScheduleSubjectResolver.resolve(intent: stockIntent, context: context).owner == .pet(pet.id))
+        #expect(DomainScheduleSubjectResolver.resolve(intent: petMedicationIntent, context: context).owner == .pet(pet.id))
+        #expect(DomainScheduleSubjectResolver.resolve(intent: humanMedicationIntent, context: context).owner == .human(human.id))
+        #expect(DomainScheduleSubjectResolver.resolve(intent: insuranceIntent, context: context).owner == .pet(pet.id))
+        #expect(DomainScheduleWriteAuthorizer.authorizeCreate(intent: insuranceIntent, context: context) != nil)
+
+        pet.passedAwayDate = Date(timeIntervalSince1970: 1_800_003_500)
+
+        #expect(DomainScheduleWriteAuthorizer.authorizeCreate(intent: insuranceIntent, context: context) == nil)
     }
 
     @Test func deceasedPetCannotWriteWalkGoalOrSummary() throws {
@@ -582,6 +856,156 @@ struct MemberLifecycleGateTests {
         #expect(try context.fetch(FetchDescriptor<PetPhotoLog>()).count == 1)
         #expect(try context.fetch(FetchDescriptor<CareLedgerEvent>()).isEmpty)
         #expect(try context.fetch(FetchDescriptor<Reminder>()).isEmpty)
+    }
+
+    @Test func deceasedMembersRejectPresentationSecurityEconomyAndSettingsWrites() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let pet = Pet(name: "Momo", species: "cat")
+        pet.passedAwayDate = Date(timeIntervalSince1970: 1_800_000_119)
+        pet.cardStyleRaw = "classic"
+        let human = Human(name: "Ava")
+        human.passedAwayDate = Date(timeIntervalSince1970: 1_800_000_120)
+        human.coconutBalance = 7
+        human.shouldShowOnHome = false
+        human.pinSalt = "test-salt"
+        human.pinHash = HumanPasscodeService.hashForTesting(pin: "1234", salt: "test-salt")
+        context.insert(pet)
+        context.insert(human)
+        try context.save()
+
+        _ = PetCardAppearanceCommandService.enablePopout(
+            pet: pet,
+            imageData: Data([1, 2, 3]),
+            sourceRaw: "test",
+            context: context
+        )
+        let petUpgrade = Avatar2DUpgradeCommandService.upgradePet(pet, context: context)
+        let syncResult = SettingsCommandService.syncHomeCardStackAfterActiveHumanSwitch(
+            from: "",
+            to: human,
+            pets: [pet],
+            humans: [human],
+            electronicPets: [],
+            hiddenPetIDsRaw: "",
+            homeCardOrderRaw: "",
+            context: context
+        )
+        let balanceResult = SettingsCommandService.applyCoconutBalanceTest(
+            amount: 99,
+            human: human,
+            title: "test",
+            actorName: human.name,
+            context: context,
+            wallet: SwiftDataCoconutWalletManager(),
+            projectionManager: QuestManager()
+        )
+        let privacyResult = HumanPrivacyCommandService.setPrivateField(
+            .weight,
+            isPrivate: true,
+            for: human,
+            context: context
+        )
+        let verifyResult = HumanPasscodeService.verify("0000", for: human)
+        HumanPasscodeService.clearPasscode(for: human)
+
+        do {
+            try HumanPasscodeService.setPasscode("2468", for: human)
+            Issue.record("Expected deceased human passcode set to throw memberInactive")
+        } catch HumanPasscodeError.memberInactive {
+        } catch {
+            Issue.record("Expected memberInactive, got \(error)")
+        }
+
+        #expect(pet.cardStyleRaw == "classic")
+        #expect(pet.cardPopoutImageData == nil)
+        #expect(!petUpgrade.didUpgrade)
+        #expect(petUpgrade.failure == .memberInactive)
+        #expect(!syncResult.didSyncHomeStack)
+        #expect(balanceResult.amount == 7)
+        #expect(balanceResult.legacyDelta == 0)
+        #expect(human.coconutBalance == 7)
+        #expect(privacyResult.changedFields.isEmpty)
+        #expect(human.privateFields.isEmpty)
+        #expect(verifyResult == .memberInactive)
+        #expect(human.pinHash == HumanPasscodeService.hashForTesting(pin: "1234", salt: "test-salt"))
+    }
+
+    @Test func deceasedPetDerivedCareWrappersDoNotWrite() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let pet = Pet(name: "Momo", species: "cat")
+        pet.passedAwayDate = Date(timeIntervalSince1970: 1_800_000_121)
+        pet.currentStreak = 3
+        let pottyLog = PetPottyLog(
+            date: Date(),
+            type: .perfectPoop,
+            pet: nil,
+            sharedSessionId: "shared-claim"
+        )
+        let ledger = CareLedgerEvent(
+            subjectKind: .unknown,
+            subjectId: nil,
+            eventKind: .potty,
+            actionType: PottyType.perfectPoop.rawValue,
+            legacyModelName: "PetPottyLog",
+            legacyModelId: pottyLog.id.uuidString
+        )
+        context.insert(pet)
+        context.insert(pottyLog)
+        context.insert(ledger)
+        try context.save()
+
+        StreakManager.refreshStreak(for: pet, context: context)
+        let claim = PetPottyCommandService.claimUnknownPottyLog(pottyLog, pet: pet, context: context)
+
+        #expect(pet.currentStreak == 3)
+        #expect(pet.lastCheckInDate == nil)
+        #expect(claim.updatedLedgerEventIDs.isEmpty)
+        #expect(pottyLog.pet == nil)
+        #expect(ledger.subjectKind == CareLedgerSubjectKind.unknown.rawValue)
+        #expect(ledger.subjectId == nil)
+    }
+
+    @Test func deceasedMembersCannotMutateFamilyTasks() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let activeHuman = Human(name: "Guan")
+        let deceasedHuman = Human(name: "Ava")
+        deceasedHuman.passedAwayDate = Date(timeIntervalSince1970: 1_800_000_122)
+        let deceasedPet = Pet(name: "Momo", species: "cat")
+        deceasedPet.passedAwayDate = Date(timeIntervalSince1970: 1_800_000_123)
+        let task = FamilyCollaborationTask(
+            title: "Pet task",
+            kind: .householdTask,
+            relatedPetId: deceasedPet.id.uuidString,
+            createdById: activeHuman.id.uuidString,
+            createdByName: activeHuman.name
+        )
+        context.insert(activeHuman)
+        context.insert(deceasedHuman)
+        context.insert(deceasedPet)
+        context.insert(task)
+        try context.save()
+
+        let created = FamilyTaskService.createHouseholdTask(
+            title: "Assign",
+            note: "",
+            assignedTo: deceasedHuman,
+            by: activeHuman,
+            rewardCoconuts: 0,
+            dueAt: nil,
+            emoji: "checkmark",
+            context: context
+        )
+        FamilyTaskService.claim(task, by: activeHuman, context: context)
+        FamilyTaskService.complete(task, by: activeHuman, context: context)
+
+        #expect(created == nil)
+        #expect(task.claimedById == nil)
+        #expect(task.status == .active)
+        #expect(task.completedAt == nil)
+        #expect(try context.fetch(FetchDescriptor<FamilyCollaborationTask>()).map(\.id) == [task.id])
     }
 
     private func makeInMemoryContainer() throws -> ModelContainer {

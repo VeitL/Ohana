@@ -322,6 +322,73 @@ struct PhysicalDeletionServiceTests {
         #expect(deletionTombstone(EconomyBudgetUsageEvent.self, id: budgetUsage.id, context: context) != nil)
     }
 
+    @Test func deletePetUsesUnifiedResolverForIndirectScheduleEvents() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let pet = Pet(name: "Momo", species: "cat")
+        let survivor = Pet(name: "Luna", species: "cat")
+        let medication = PetMedication(name: "Drops", pet: pet)
+        let insurance = PetInsurance(companyName: "Care", pet: pet)
+        let stockEvent = Event(
+            title: "Food stock",
+            eventType: EventType.shoppingList.rawValue,
+            relatedEntityType: FeedingPlanWriter.stockReminderEntityType,
+            relatedEntityId: FeedingPlanWriter.stockReminderEntityId(pet: pet, foodKind: .dry)
+        )
+        let medicationEvent = Event(
+            title: "Medication",
+            eventType: EventType.petMedication.rawValue,
+            relatedEntityType: MedicationEventLink.petMedicationPlan,
+            relatedEntityId: medication.id.uuidString
+        )
+        let insuranceEvent = Event(
+            title: "Insurance",
+            eventType: EventType.insurancePremium.rawValue,
+            relatedEntityType: "pet_insurance",
+            relatedEntityId: insurance.id.uuidString
+        )
+        let survivorEvent = Event(
+            title: "Survivor",
+            eventType: EventType.daily.rawValue,
+            relatedEntityType: EntityKind.pet.rawValue,
+            relatedEntityId: survivor.id.uuidString
+        )
+        let stockReminder = Reminder(event: stockEvent)
+        let medicationReminder = Reminder(event: medicationEvent)
+        let insuranceReminder = Reminder(event: insuranceEvent)
+        let survivorReminder = Reminder(event: survivorEvent)
+        stockEvent.reminders = [stockReminder]
+        medicationEvent.reminders = [medicationReminder]
+        insuranceEvent.reminders = [insuranceReminder]
+        survivorEvent.reminders = [survivorReminder]
+
+        context.insert(pet)
+        context.insert(survivor)
+        context.insert(medication)
+        context.insert(insurance)
+        context.insert(stockEvent)
+        context.insert(medicationEvent)
+        context.insert(insuranceEvent)
+        context.insert(survivorEvent)
+        context.insert(stockReminder)
+        context.insert(medicationReminder)
+        context.insert(insuranceReminder)
+        context.insert(survivorReminder)
+        try context.save()
+
+        PhysicalDeletionService.deletePet(pet, context: context)
+        try context.save()
+
+        #expect(try context.fetch(FetchDescriptor<Event>()).map(\.id) == [survivorEvent.id])
+        #expect(try context.fetch(FetchDescriptor<Reminder>()).map(\.id) == [survivorReminder.id])
+        #expect(deletionTombstone(Event.self, id: stockEvent.id, context: context) != nil)
+        #expect(deletionTombstone(Event.self, id: medicationEvent.id, context: context) != nil)
+        #expect(deletionTombstone(Event.self, id: insuranceEvent.id, context: context) != nil)
+        #expect(deletionTombstone(Reminder.self, id: stockReminder.id, context: context) != nil)
+        #expect(deletionTombstone(Reminder.self, id: medicationReminder.id, context: context) != nil)
+        #expect(deletionTombstone(Reminder.self, id: insuranceReminder.id, context: context) != nil)
+    }
+
     @Test func deleteHumanCascadesFirstReleaseRegisteredOwnedEntities() throws {
         let container = try makeContainer()
         let context = container.mainContext
@@ -473,6 +540,74 @@ struct PhysicalDeletionServiceTests {
         #expect(deletionTombstone(EconomyBudgetUsageEvent.self, id: budgetUsage.id, context: context) != nil)
         #expect(deletionTombstone(CoconutExchangeRequest.self, id: exchange.id, context: context) != nil)
         #expect(deletionTombstone(FamilyCollaborationTask.self, id: task.id, context: context) != nil)
+    }
+
+    @Test func deleteHumanUsesUnifiedResolverForMedicationNotesAndAssignments() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let human = Human(name: "Guan")
+        let survivor = Human(name: "Ava")
+        let pet = Pet(name: "Momo")
+        let humanId = human.id.uuidString
+        let medication = HumanMedication(humanId: humanId, name: "Vitamin")
+        let medicationEvent = Event(
+            title: "Human medication",
+            eventType: EventType.medication.rawValue,
+            relatedEntityType: MedicationEventLink.humanMedicationPlan,
+            relatedEntityId: medication.id.uuidString
+        )
+        let noteEvent = Event(
+            title: "Human note",
+            eventType: EventType.task.rawValue,
+            relatedEntityType: "human_note",
+            relatedEntityId: humanId
+        )
+        let retainedPetEvent = Event(
+            title: "Pet task",
+            eventType: EventType.daily.rawValue,
+            relatedEntityType: EntityKind.pet.rawValue,
+            relatedEntityId: pet.id.uuidString
+        )
+        retainedPetEvent.assigneeId = humanId
+        let assignedOnlyEvent = Event(title: "Assigned household task", eventType: EventType.task.rawValue)
+        assignedOnlyEvent.assigneeId = humanId
+        let medicationReminder = Reminder(event: medicationEvent)
+        let noteReminder = Reminder(event: noteEvent)
+        let retainedReminder = Reminder(event: retainedPetEvent)
+        let assignedOnlyReminder = Reminder(event: assignedOnlyEvent)
+        medicationEvent.reminders = [medicationReminder]
+        noteEvent.reminders = [noteReminder]
+        retainedPetEvent.reminders = [retainedReminder]
+        assignedOnlyEvent.reminders = [assignedOnlyReminder]
+
+        context.insert(human)
+        context.insert(survivor)
+        context.insert(pet)
+        context.insert(medication)
+        context.insert(medicationEvent)
+        context.insert(noteEvent)
+        context.insert(retainedPetEvent)
+        context.insert(assignedOnlyEvent)
+        context.insert(medicationReminder)
+        context.insert(noteReminder)
+        context.insert(retainedReminder)
+        context.insert(assignedOnlyReminder)
+        try context.save()
+
+        PhysicalDeletionService.deleteHuman(human, context: context, deletedByHumanId: survivor.id.uuidString)
+        try context.save()
+
+        let events = try context.fetch(FetchDescriptor<Event>())
+        let reminders = try context.fetch(FetchDescriptor<Reminder>())
+        #expect(events.map(\.id) == [retainedPetEvent.id])
+        #expect(reminders.map(\.id) == [retainedReminder.id])
+        #expect(events.first?.assigneeId == nil)
+        #expect(deletionTombstone(Event.self, id: medicationEvent.id, context: context) != nil)
+        #expect(deletionTombstone(Event.self, id: noteEvent.id, context: context) != nil)
+        #expect(deletionTombstone(Event.self, id: assignedOnlyEvent.id, context: context) != nil)
+        #expect(deletionTombstone(Reminder.self, id: medicationReminder.id, context: context) != nil)
+        #expect(deletionTombstone(Reminder.self, id: noteReminder.id, context: context) != nil)
+        #expect(deletionTombstone(Reminder.self, id: assignedOnlyReminder.id, context: context) != nil)
     }
 
     @Test func deleteHumanDetachesSharedCareChildrenWhenOnlyExecutorSessionIsRemoved() throws {

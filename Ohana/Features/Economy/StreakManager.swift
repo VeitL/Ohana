@@ -13,6 +13,7 @@ enum StreakManager {
     /// 调用时机：App foreground / 任意记录写入后。
     @MainActor
     static func refreshStreak(for pet: Pet, context: ModelContext) {
+        guard MemberLifecycleGate.disposition(pet: pet, writeKind: .care).allowsDerivedEffects else { return }
         let cal = Calendar.current
         let today = cal.startOfDay(for: Date())
         let yesterday = cal.date(byAdding: .day, value: -1, to: today)!

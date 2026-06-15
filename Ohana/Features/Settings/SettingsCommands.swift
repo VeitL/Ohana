@@ -33,6 +33,13 @@ enum SettingsCommandService {
         homeCardOrderRaw: String,
         context: ModelContext
     ) -> SettingsActiveHumanSwitchCommandResult {
+        guard MemberLifecycleGate.disposition(human: human, writeKind: .presentationPreference).writesContent else {
+            return SettingsActiveHumanSwitchCommandResult(
+                humanID: human.id,
+                didSyncHomeStack: false,
+                updatedHomeCardOrderRaw: homeCardOrderRaw
+            )
+        }
         var updatedOrderRaw = homeCardOrderRaw
         let didChange = HomeActiveHumanCardSync.applyAfterAccountSwitch(
             from: oldHumanIdRaw,
@@ -71,6 +78,13 @@ enum SettingsCommandService {
             wallet.legacySystemBalance(
                 context: context,
                 fallback: wallet.totalBalance(context: context)
+            )
+        }
+        if let human, !EconomyWalletWritePolicy.canWrite(human) {
+            return SettingsCoconutBalanceCommandResult(
+                humanID: human.id,
+                amount: current,
+                legacyDelta: 0
             )
         }
         let delta = amount - current

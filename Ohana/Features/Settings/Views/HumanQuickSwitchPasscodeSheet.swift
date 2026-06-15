@@ -159,6 +159,15 @@ struct HumanQuickSwitchPasscodeSheet: View {
                 de: "Gib 4 Ziffern ein"
             )
             UINotificationFeedbackGenerator().notificationOccurred(.error)
+        case .memberInactive:
+            pin = ""
+            isError = true
+            message = l.tr(
+                zh: "纪念成员不能切换为当前账户",
+                en: "Memorial members cannot become the current account",
+                de: "Gedenkmitglieder können nicht zum aktuellen Konto werden"
+            )
+            UINotificationFeedbackGenerator().notificationOccurred(.error)
         }
     }
 

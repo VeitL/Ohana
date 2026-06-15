@@ -113,8 +113,49 @@ struct RainbowBridgeServiceTests {
         #expect(pet.passedAwayDate == nil)
         #expect(!events.contains { $0.id == eventID })
         #expect(!reminders.contains { $0.id == reminderID })
-        #expect(!events.contains { $0.id == skippedEventID })
-        #expect(!reminders.contains { $0.id == skippedReminderID })
+        #expect(events.contains { $0.id == skippedEventID })
+        #expect(reminders.contains { $0.id == skippedReminderID })
+    }
+
+    @Test func markPassedAwayTrimsRecurringFutureRemindersButKeepsHistoricalOccurrences() throws {
+        let container = try makeContainer()
+        let context = ModelContext(container)
+        let now = Date()
+        let pet = Pet(name: "Momo", species: "cat")
+        let recurring = Event(
+            title: "Daily care",
+            startDate: now.addingTimeInterval(-86400),
+            eventType: EventType.daily.rawValue,
+            relatedEntityType: EntityKind.pet.rawValue,
+            relatedEntityId: pet.id.uuidString
+        )
+        recurring.recurrenceDays = 1
+        recurring.completedOccurrences = ["past-occurrence"]
+        let pastReminder = Reminder(event: recurring, scheduledAt: now.addingTimeInterval(-3600))
+        pastReminder.statusEnum = .completed
+        pastReminder.completedAt = now.addingTimeInterval(-1800)
+        let futureReminder = Reminder(event: recurring, scheduledAt: now.addingTimeInterval(3600))
+        let eventID = recurring.id
+        let pastReminderID = pastReminder.id
+        let futureReminderID = futureReminder.id
+
+        context.insert(pet)
+        context.insert(recurring)
+        context.insert(pastReminder)
+        context.insert(futureReminder)
+        try context.save()
+
+        RainbowBridgeService().markPassedAway(pet: pet, date: now, context: context)
+
+        let events = try context.fetch(FetchDescriptor<Event>())
+        let reminders = try context.fetch(FetchDescriptor<Reminder>())
+        let retainedEvent = try #require(events.first { $0.id == eventID })
+        #expect(retainedEvent.recurrenceDays == 0)
+        #expect(retainedEvent.recurrenceEndDate == now)
+        #expect(retainedEvent.completedOccurrences == ["past-occurrence"])
+        #expect(reminders.contains { $0.id == pastReminderID })
+        #expect(!reminders.contains { $0.id == futureReminderID })
+        #expect(!MemberLifecycleActiveScheduleResolver.isActiveSchedule(retainedEvent, now: now))
     }
 
     @Test func deceasedHumanDoesNotReceiveEconomyRewards() throws {

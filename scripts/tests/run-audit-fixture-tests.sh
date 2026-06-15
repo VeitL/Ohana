@@ -89,6 +89,7 @@ assert_scope_floor() {
 }
 
 fixtures="scripts/tests/fixtures/Views"
+agent_skill_fixtures="scripts/tests/fixtures/AgentSkills"
 
 assert_bad scripts/audit-ui-v4.sh "$fixtures/UiV4Bad.swift" \
   background system-text-color hardcoded-white-black material shadow \
@@ -127,8 +128,25 @@ assert_bad scripts/audit-economy-boundaries.sh "$fixtures/RecurringEconomyBounda
 assert_good scripts/audit-economy-boundaries.sh "$fixtures/RecurringEconomyBoundariesGood.swift"
 
 assert_bad scripts/audit-member-lifecycle-gate.sh "$fixtures/MemberLifecycleGateBadCommands.swift" \
-  member-lifecycle-direct-write-gate member-lifecycle-missing-disposition
+  member-lifecycle-direct-write-gate member-lifecycle-missing-disposition \
+  member-lifecycle-domain-ownership-matcher member-lifecycle-direct-schedule-writer
+run_audit scripts/audit-member-lifecycle-gate.sh --all "$fixtures/MemberLifecycleGateBadCommands.swift"
+if [[ "$status" -ne 1 ]]; then
+  fail "scripts/audit-member-lifecycle-gate.sh --all MemberLifecycleGateBadCommands.swift: expected strict exit 1, got $status"
+else
+  for rule in member-lifecycle-direct-write-gate member-lifecycle-missing-disposition member-lifecycle-domain-ownership-matcher member-lifecycle-direct-schedule-writer; do
+    if ! grep -qF "[$rule]" <<<"$output"; then
+      fail "scripts/audit-member-lifecycle-gate.sh --all MemberLifecycleGateBadCommands.swift: rule [$rule] no longer fires"
+    fi
+  done
+  echo "ok  scripts/audit-member-lifecycle-gate.sh --all catches member lifecycle fixture rules"
+fi
 assert_good scripts/audit-member-lifecycle-gate.sh "$fixtures/MemberLifecycleGateGoodCommands.swift"
+
+assert_bad scripts/audit-agent-skill-governance.sh "$agent_skill_fixtures/SelfImprovingBad/SKILL.md" \
+  skill-missing-required-output skill-missing-human-approval skill-missing-evidence \
+  skill-auto-mutation skill-priority-over-governance
+assert_good scripts/audit-agent-skill-governance.sh "$agent_skill_fixtures/SelfImprovingGood/SKILL.md"
 
 assert_bad scripts/audit-derived-state-lifecycle.sh "$fixtures/DerivedStateLifecycleBad.swift" \
   derived-state-lifecycle-checklist physical-delete-without-tombstone \

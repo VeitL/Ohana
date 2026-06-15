@@ -134,21 +134,12 @@ enum FocusHomeReminderDeepLinkRouter {
     ) -> FocusHomeReminderDestination {
         let entityType = event.relatedEntityType.lowercased()
 
-        if entityType == MedicationEventLink.humanMedicationPlan,
-           let medicationId = UUID(uuidString: event.relatedEntityId),
-           let medication = humanMedications.first(where: { $0.id == medicationId }),
-           let human = humans.first(where: { $0.id.uuidString == medication.humanId }) {
-            return .humanQuick("humanMedication", human)
-        }
-
-        if isHumanEntity(entityType),
-           let human = humans.first(where: { $0.id.uuidString == event.relatedEntityId }) {
+        if let human = MemberLifecycleActiveScheduleResolver.humanOwner(
+            for: event,
+            humans: humans,
+            humanMedications: humanMedications
+        ) {
             return humanDestination(for: event, human: human)
-        }
-
-        if entityType == "human_note",
-           let human = humans.first(where: { $0.id.uuidString == event.relatedEntityId }) {
-            return .humanQuick("humanNote", human)
         }
 
         if isPlantEntity(entityType) {
@@ -156,8 +147,21 @@ enum FocusHomeReminderDeepLinkRouter {
             return .functionMenu(.growthRoadmap)
         }
 
-        if let pet = pet(for: event, pets: pets) {
+        if let pet = MemberLifecycleActiveScheduleResolver.petTarget(
+            for: event,
+            pets: pets,
+            includePassedAway: false
+        ) {
             return petDestination(for: event, pet: pet)
+        }
+
+        if let human = MemberLifecycleActiveScheduleResolver.humanInvolved(
+            in: event,
+            humans: humans,
+            humanMedications: humanMedications,
+            includePassedAway: false
+        ) {
+            return humanDestination(for: event, human: human)
         }
 
         return calendarDestination(for: event)
@@ -203,35 +207,6 @@ enum FocusHomeReminderDeepLinkRouter {
         if isPetEntity(entityType),
            let pet = pets.first(where: { $0.id.uuidString == id }) {
             return .petFeature(.basicInfo, pet)
-        }
-        return nil
-    }
-
-    private static func pet(for event: Event, pets: [Pet]) -> Pet? {
-        let entityType = event.relatedEntityType.lowercased()
-        if isPetEntity(entityType) ||
-            entityType == FeedRuleMetadata.autoFeederEntityType ||
-            entityType == WaterPlanWriter.entityType.lowercased() {
-            return pets.first { $0.id.uuidString == event.relatedEntityId && !$0.hasPassedAway }
-        }
-        if entityType == FeedingPlanWriter.stockReminderEntityType {
-            return pets.first { pet in
-                let id = pet.id.uuidString
-                return event.relatedEntityId == id || event.relatedEntityId.hasPrefix("\(id):")
-            }
-        }
-        if entityType == PetMedicationDoseLogging.relatedEntityTypeMedication ||
-            entityType == MedicationEventLink.petMedicationPlan {
-            guard let medicationId = UUID(uuidString: event.relatedEntityId) else { return nil }
-            return pets.first { pet in
-                !pet.hasPassedAway && pet.medications.contains(where: { $0.id == medicationId })
-            }
-        }
-        if entityType == "pet_insurance" {
-            guard let insuranceId = UUID(uuidString: event.relatedEntityId) else { return nil }
-            return pets.first { pet in
-                !pet.hasPassedAway && pet.insurances.contains(where: { $0.id == insuranceId })
-            }
         }
         return nil
     }

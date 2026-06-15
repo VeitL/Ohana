@@ -97,24 +97,27 @@ nonisolated enum PetMedicationDoseLogging {
     ) -> RecordDoseResult {
         let careLedger = providedCareLedger ?? CareLedgerService()
         let medicationReminders = providedMedicationReminders ?? SharedMedicationReminderManager()
-        let event = Event(
+        let now = Date()
+        let requestedAssigneeId = activeHumanSelection.currentHumanId
+        let previewIntent = DomainScheduleCreateIntent(
             title: "💊 \(pet.name) 服用 \(medication.name)",
-            startDate: Date(),
+            startDate: now,
             isAllDay: false,
             eventType: EventType.petMedicationDose.rawValue,
             relatedEntityType: relatedEntityTypeMedication,
-            relatedEntityId: medication.id.uuidString
+            relatedEntityId: medication.id.uuidString,
+            assigneeId: requestedAssigneeId,
+            writeKind: .care,
+            source: .domainService
         )
-        if let hid = activeHumanSelection.currentHumanId {
-            event.assigneeId = hid
-        }
         let disposition = CareFactWritePolicy.disposition(
             pet: pet,
-            date: event.startDate,
-            executorId: event.assigneeId,
+            date: now,
+            executorId: requestedAssigneeId,
             context: modelContext
         )
         guard disposition.didWriteFact else {
+            let event = DomainScheduleWriter.makeUnpersistedEvent(intent: previewIntent)
             return RecordDoseResult(
                 event: event,
                 didRecord: false,
@@ -123,12 +126,35 @@ nonisolated enum PetMedicationDoseLogging {
             )
         }
         let actor = CareFactWritePolicy.executorResolution(
-            requestedExecutorId: event.assigneeId,
+            requestedExecutorId: requestedAssigneeId,
             context: modelContext,
             logPrefix: "PetMedicationDoseLogging"
         )
-        event.assigneeId = actor.effectiveExecutorId
-        modelContext.insert(event)
+        let writeIntent = DomainScheduleCreateIntent(
+            title: previewIntent.title,
+            startDate: previewIntent.startDate,
+            isAllDay: previewIntent.isAllDay,
+            eventType: previewIntent.eventType,
+            relatedEntityType: previewIntent.relatedLink.rawType,
+            relatedEntityId: previewIntent.relatedLink.rawId,
+            assigneeId: actor.effectiveExecutorId,
+            writeKind: .care,
+            source: .domainService
+        )
+        guard let plan = DomainScheduleWriteAuthorizer.authorizeCreate(
+            intent: writeIntent,
+            context: modelContext
+        ) else {
+            let event = DomainScheduleWriter.makeUnpersistedEvent(intent: writeIntent)
+            return RecordDoseResult(
+                event: event,
+                didRecord: false,
+                coconutDelta: 0,
+                allowsDerivedEffects: false
+            )
+        }
+        let event = DomainScheduleWriter.createEvent(plan: plan, context: modelContext).event
+        CloudSyncMutationRecorder.markModified(event, context: modelContext, modifiedAt: now)
 
         var coconutDelta = 0
         do {

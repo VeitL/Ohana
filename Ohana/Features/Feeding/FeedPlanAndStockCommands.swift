@@ -697,8 +697,20 @@ enum FeedMaintenanceCommand {
     @MainActor
     static func reminder(for event: Event, scheduledAt: Date, existing: Reminder?, context: ModelContext) -> Reminder {
         if let existing { return existing }
-        let created = Reminder(event: event, scheduledAt: scheduledAt)
-        context.insert(created)
+        guard let mutation = DomainScheduleWriteAuthorizer.authorizeExistingEventMutation(
+            event: event,
+            writeKind: .care,
+            context: context
+        ),
+            let created = DomainScheduleWriter.createReminder(
+                for: event,
+                scheduledAt: scheduledAt,
+                mutation: mutation,
+                context: context
+            )
+        else {
+            return DomainScheduleWriter.makeUnpersistedReminder(event: event, scheduledAt: scheduledAt)
+        }
         context.safeSave()
         return created
     }

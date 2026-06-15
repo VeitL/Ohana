@@ -109,12 +109,8 @@ enum CarePlanCalendarSync {
     /// default recommendation events are implementation scaffolding, not user-created calendar items.
     /// Explicit plans created from feature settings use non-default keys or reminder-backed events and remain visible.
     static func isDefaultGeneratedCalendarPlan(_ event: Event, pets: [Pet]) -> Bool {
-        let entityType = event.relatedEntityType.lowercased()
-        guard entityType == EntityKind.pet.rawValue.lowercased() || entityType == "pet" else {
-            return false
-        }
-
-        let petKey = event.relatedEntityId
+        guard let pet = MemberLifecycleActiveScheduleResolver.petTarget(for: event, pets: pets) else { return false }
+        let petKey = pet.id.uuidString
         if knownDefaultPlanKinds.contains(where: { kind in
             UserDefaults.standard.string(forKey: eventStorageKey(kind: kind, petKey: petKey)) == event.id.uuidString
         }) {
@@ -124,8 +120,7 @@ enum CarePlanCalendarSync {
         guard
             event.recurrenceDays > 0,
             event.feedRuleKindRaw.isEmpty,
-            event.reminders.isEmpty,
-            let pet = pets.first(where: { $0.id.uuidString == petKey })
+            event.reminders.isEmpty
         else {
             return false
         }
@@ -142,7 +137,7 @@ enum CarePlanCalendarSync {
         now: Date = Date(),
         calendar: Calendar = .current
     ) -> Bool {
-        guard let pet = pets.first(where: { $0.id.uuidString == event.relatedEntityId }) else {
+        guard let pet = MemberLifecycleActiveScheduleResolver.petTarget(for: event, pets: pets) else {
             return true
         }
 
@@ -223,7 +218,7 @@ enum CarePlanCalendarSync {
     }
 
     static func isWaterMaintenancePlan(_ event: Event, pet: Pet, kinds: Set<String>) -> Bool {
-        guard event.relatedEntityId == pet.id.uuidString else { return false }
+        guard MemberLifecycleActiveScheduleResolver.eventBelongsToPet(event, petId: pet.id.uuidString) else { return false }
         guard let kind = waterMaintenanceKind(for: event) else { return false }
         return kinds.contains(kind)
     }
@@ -260,14 +255,10 @@ enum CarePlanCalendarSync {
         let titles = defaultPlanTitleCandidates(kind: kind, pet: pet)
         guard !titles.isEmpty else { return }
 
-        let descriptor = FetchDescriptor<Event>(
-            predicate: #Predicate<Event> {
-                $0.relatedEntityId == petKey
-            }
-        )
+        let descriptor = FetchDescriptor<Event>()
         let events = fetchOrLog(descriptor, context: context, operation: "fetch legacy default plan events")
         var didDelete = false
-        for event in events where titles.contains(event.title) {
+        for event in events where MemberLifecycleActiveScheduleResolver.eventBelongsToPet(event, petId: petKey) && titles.contains(event.title) {
             tombstoneAndDelete(event, context: context)
             didDelete = true
         }
@@ -311,6 +302,17 @@ enum CarePlanCalendarSync {
             removeCalendarPlan(kind: kind, petKey: petKey, context: context)
             return
         }
+        let createIntent = DomainScheduleCreateIntent(
+            title: title,
+            startDate: startDate,
+            isAllDay: true,
+            eventType: eventType.rawValue,
+            relatedEntityType: EntityKind.pet.rawValue,
+            relatedEntityId: petKey,
+            recurrenceDays: max(1, recurrenceDays),
+            writeKind: .care,
+            source: .domainService
+        )
         let key = eventStorageKey(kind: kind, petKey: petKey)
         if let idStr = UserDefaults.standard.string(forKey: key),
            let uuid = UUID(uuidString: idStr),
@@ -325,16 +327,11 @@ enum CarePlanCalendarSync {
             context.safeSave()
             return
         }
-        let ev = Event(
-            title: title,
-            startDate: startDate,
-            isAllDay: true,
-            eventType: eventType.rawValue,
-            relatedEntityType: EntityKind.pet.rawValue,
-            relatedEntityId: petKey
-        )
-        ev.recurrenceDays = max(1, recurrenceDays)
-        context.insert(ev)
+        guard let plan = DomainScheduleWriteAuthorizer.authorizeCreate(
+            intent: createIntent,
+            context: context
+        ) else { return }
+        let ev = DomainScheduleWriter.createEvent(plan: plan, context: context).event
         UserDefaults.standard.set(ev.id.uuidString, forKey: key)
         context.safeSave()
     }
@@ -355,6 +352,18 @@ enum CarePlanCalendarSync {
         }
         let key = eventStorageKey(kind: kind, petKey: petKey)
         let reminderDate = morningReminderDate(on: startDate)
+        let createIntent = DomainScheduleCreateIntent(
+            title: title,
+            startDate: startDate,
+            isAllDay: true,
+            eventType: eventType.rawValue,
+            relatedEntityType: EntityKind.pet.rawValue,
+            relatedEntityId: petKey,
+            recurrenceDays: max(1, recurrenceDays),
+            reminderDates: [reminderDate],
+            writeKind: .care,
+            source: .domainService
+        )
 
         if let idStr = UserDefaults.standard.string(forKey: key),
            let uuid = UUID(uuidString: idStr),
@@ -376,23 +385,28 @@ enum CarePlanCalendarSync {
                     tombstoneAndDelete(extra, context: context)
                 }
             } else {
-                context.insert(Reminder(event: ev, scheduledAt: reminderDate))
+                if let mutation = DomainScheduleWriteAuthorizer.authorizeExistingEventMutation(
+                    event: ev,
+                    writeKind: .care,
+                    context: context
+                ) {
+                    DomainScheduleWriter.createReminder(
+                        for: ev,
+                        scheduledAt: reminderDate,
+                        mutation: mutation,
+                        context: context
+                    )
+                }
             }
             context.safeSave()
             return
         }
 
-        let ev = Event(
-            title: title,
-            startDate: startDate,
-            isAllDay: true,
-            eventType: eventType.rawValue,
-            relatedEntityType: EntityKind.pet.rawValue,
-            relatedEntityId: petKey
-        )
-        ev.recurrenceDays = max(1, recurrenceDays)
-        context.insert(ev)
-        context.insert(Reminder(event: ev, scheduledAt: reminderDate))
+        guard let plan = DomainScheduleWriteAuthorizer.authorizeCreate(
+            intent: createIntent,
+            context: context
+        ) else { return }
+        let ev = DomainScheduleWriter.createEvent(plan: plan, context: context).event
         UserDefaults.standard.set(ev.id.uuidString, forKey: key)
         context.safeSave()
     }

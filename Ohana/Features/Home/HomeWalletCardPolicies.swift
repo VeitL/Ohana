@@ -211,6 +211,9 @@ enum HomeActiveHumanCardSync {
         hiddenPetIDsRaw: String,
         homeCardOrderRaw: inout String
     ) -> Bool {
+        guard MemberLifecycleGate.disposition(human: newHuman, writeKind: .presentationPreference).writesContent else {
+            return false
+        }
         let newId = newHuman.id.uuidString
         let oldId = UUID(uuidString: oldHumanIdRaw)?.uuidString
         let stackIds = currentHomeStackIds(
@@ -239,7 +242,8 @@ enum HomeActiveHumanCardSync {
         guard let oldId,
               oldId != newId,
               let oldHuman = humans.first(where: { $0.id.uuidString == oldId }),
-              oldHuman.shouldShowOnHome else {
+              oldHuman.shouldShowOnHome,
+              MemberLifecycleGate.disposition(human: oldHuman, writeKind: .presentationPreference).writesContent else {
             return false
         }
 

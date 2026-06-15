@@ -45,6 +45,7 @@ enum MemberDeletionCommandService {
         context: ModelContext,
         userDefaults: UserDefaults = .standard
     ) -> MemberDeletionCommandResult {
+        // member-lifecycle-gate: allow physical deletion is an explicit data-removal boundary, not an active member write.
         let now = Date()
         let petID = pet.id
         let petIDString = petID.uuidString
@@ -83,6 +84,7 @@ enum MemberDeletionCommandService {
         activeHumanID: String,
         context: ModelContext
     ) -> MemberDeletionCommandResult {
+        // member-lifecycle-gate: allow physical deletion is an explicit data-removal boundary, not an active member write.
         let humanID = human.id
         let humanIDString = humanID.uuidString
         let remainingHumanDescriptor = FetchDescriptor<Human>(

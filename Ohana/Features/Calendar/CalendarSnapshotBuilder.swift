@@ -193,7 +193,7 @@ enum CalendarSnapshotBuilder {
         visibilityContext: VisibilityContext
     ) -> Bool {
         let calendar = visibilityContext.calendar
-        guard let pet = visibilityContext.petById[event.relatedEntityId] else {
+        guard let pet = visibilityContext.pet(for: event) else {
             return true
         }
 
@@ -231,7 +231,7 @@ enum CalendarSnapshotBuilder {
     }
 
     private struct VisibilityContext {
-        let petById: [String: Pet]
+        let pets: [Pet]
         let feedModeByPetId: [String: FeedOperatingMode]
         let waterModeByPetId: [String: WaterOperatingMode]
         let today: Date
@@ -242,15 +242,14 @@ enum CalendarSnapshotBuilder {
             self.now = now
             self.calendar = calendar
             self.today = calendar.startOfDay(for: now)
-            let petLookup = Dictionary(uniqueKeysWithValues: pets.map { ($0.id.uuidString, $0) })
-            self.petById = petLookup
+            self.pets = pets
 
             var hasManualFeedEvents = Set<String>()
             var hasAutoFeedEvents = Set<String>()
             var hasWaterPlanEvents = Set<String>()
 
             for event in allEvents {
-                guard let pet = petLookup[event.relatedEntityId] else { continue }
+                guard let pet = MemberLifecycleActiveScheduleResolver.petTarget(for: event, pets: pets) else { continue }
                 let petId = pet.id.uuidString
                 if FeedRuleMetadata.isManualReminderEvent(event, pet: pet) {
                     hasManualFeedEvents.insert(petId)
@@ -278,6 +277,10 @@ enum CalendarSnapshotBuilder {
                     hasPlanEvents: hasWaterPlanEvents.contains(petId)
                 ))
             })
+        }
+
+        func pet(for event: Event) -> Pet? {
+            MemberLifecycleActiveScheduleResolver.petTarget(for: event, pets: pets)
         }
 
         private static func feedMode(

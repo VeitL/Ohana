@@ -123,6 +123,7 @@ struct QuickWaterCommandExecutor {
         reminderOn: Bool,
         cycleAnchor: Date
     ) {
+        guard canWriteActiveWaterData(for: pet) else { return }
         WaterCareSettingsStore.saveWaterSettings(
             petKey: pet.id.uuidString,
             intervalDays: intervalDays,
@@ -132,6 +133,7 @@ struct QuickWaterCommandExecutor {
     }
 
     func persistWaterAmountSettings(pet: Pet, enabled: Bool, amountMl: Double?) {
+        guard canWriteActiveWaterData(for: pet) else { return }
         WaterCareSettingsStore.saveWaterAmountSettings(
             petKey: pet.id.uuidString,
             enabled: enabled,
@@ -145,6 +147,7 @@ struct QuickWaterCommandExecutor {
         replaceIntervalDays: Int,
         reminderOn: Bool
     ) {
+        guard canWriteActiveWaterData(for: pet) else { return }
         WaterCareSettingsStore.saveFilterSettings(
             petKey: pet.id.uuidString,
             cleanIntervalDays: cleanIntervalDays,
@@ -160,6 +163,16 @@ struct QuickWaterCommandExecutor {
         reminderOn: Bool,
         cycleAnchor: Date
     ) -> [Reminder] {
+        guard canWriteActiveWaterData(for: pet) else {
+            CarePlanCalendarSync.removeActiveCalendarPlans(for: pet, context: context)
+            deriveWaterMutation(
+                .waterPlan(petID: pet.id, action: "save_water_change"),
+                affectedEntityIDs: [pet.id],
+                wroteBusinessFact: false,
+                note: "water_change_plan_noop"
+            )
+            return []
+        }
         persistWaterSettings(
             pet: pet,
             intervalDays: intervalDays,
@@ -184,6 +197,16 @@ struct QuickWaterCommandExecutor {
         replaceIntervalDays: Int,
         reminderOn: Bool
     ) -> [Reminder] {
+        guard canWriteActiveWaterData(for: pet) else {
+            CarePlanCalendarSync.removeActiveCalendarPlans(for: pet, context: context)
+            deriveWaterMutation(
+                .waterPlan(petID: pet.id, action: "save_filter"),
+                affectedEntityIDs: [pet.id],
+                wroteBusinessFact: false,
+                note: "filter_plan_noop"
+            )
+            return []
+        }
         persistFilterSettings(
             pet: pet,
             cleanIntervalDays: cleanIntervalDays,
@@ -211,7 +234,9 @@ struct QuickWaterCommandExecutor {
         let normalized = WaterPlanWriter.normalizedTimes(times, count: count)
         var latestEvents = allEvents
         var reminders: [Reminder] = []
+        var writableTargets: [Pet] = []
         for target in targets {
+            let targetIsWritable = canWriteActiveWaterData(for: target)
             let created = WaterPlanWriter.replacePlan(
                 pet: target,
                 times: normalized,
@@ -222,22 +247,35 @@ struct QuickWaterCommandExecutor {
             let replacedEventIds = Set(WaterPlanWriter.planEvents(pet: target, allEvents: latestEvents).map(\.id))
             latestEvents = latestEvents
                 .filter { !replacedEventIds.contains($0.id) } + created.compactMap(\.event)
-            WaterOperatingMode.set(target.id, mode: .reminder)
+            if targetIsWritable {
+                WaterOperatingMode.set(target.id, mode: .reminder)
+                writableTargets.append(target)
+            }
         }
         deriveWaterMutation(
             .waterPlan(petID: pet.id, action: "save_drink"),
             affectedEntityIDs: targetIDs(pet: pet, targets: targets),
-            note: "targets:\(targets.count)"
+            wroteBusinessFact: !writableTargets.isEmpty,
+            note: "targets:\(writableTargets.count)"
         )
         return QuickWaterPlanSaveResult(
             normalizedTimes: normalized,
             optimisticPlanEvents: WaterPlanWriter.planEvents(pet: pet, allEvents: latestEvents),
             reminders: reminders,
-            targetCount: targets.count
+            targetCount: writableTargets.count
         )
     }
 
     func setWaterMode(_ mode: WaterOperatingMode, pet: Pet) {
+        guard canWriteActiveWaterData(for: pet) else {
+            deriveWaterMutation(
+                .waterMode(petID: pet.id, mode: mode.rawValue),
+                affectedEntityIDs: [pet.id],
+                wroteBusinessFact: false,
+                note: "water_mode_noop"
+            )
+            return
+        }
         let previousMode = WaterOperatingMode.stored(pet.id)
         WaterOperatingMode.set(pet.id, mode: mode)
         deriveWaterMutation(
@@ -582,6 +620,10 @@ struct QuickWaterCommandExecutor {
                 note: note
             )
         )
+    }
+
+    private func canWriteActiveWaterData(for pet: Pet) -> Bool {
+        MemberWritePolicy.disposition(pet: pet, intent: .activeOnly).allowsDerivedEffects
     }
 
     private func targetIDs(pet: Pet, targets: [Pet]) -> Set<UUID> {

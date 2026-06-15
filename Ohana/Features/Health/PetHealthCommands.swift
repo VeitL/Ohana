@@ -167,16 +167,13 @@ enum PetHealthCommandService {
             executorId: actor.effectiveExecutorId,
             context: context
         )
-        let event = makeExpirationEventIfNeeded(
+        let expirationSchedule = makeExpirationScheduleIfNeeded(
             pet: pet,
             input: input,
             context: context
         )
-        let reminder = makeExpirationReminderIfNeeded(
-            event: event,
-            input: input,
-            context: context
-        )
+        let event = expirationSchedule?.event
+        let reminder = expirationSchedule?.reminder
 
         let reward: (humanGot: Int, petGot: Int)
         if awardsReward {
@@ -291,50 +288,50 @@ enum PetHealthCommandService {
     }
 
     @MainActor
-    private static func makeExpirationEventIfNeeded(
+    private static func makeExpirationScheduleIfNeeded(
         pet: Pet,
         input: PetHealthRecordCommandInput,
         context: ModelContext
-    ) -> Event? {
+    ) -> (event: Event, reminder: Reminder?)? {
         guard let dueDate = input.expirationDate,
               let eventType = expirationEventType(for: input.type)
         else { return nil }
-        let event = Event(
+
+        let reminderDates: [Date]
+        if let leadDays = input.expirationReminderLeadDays {
+            let scheduledAt = Calendar.current.date(
+                byAdding: .day,
+                value: -leadDays,
+                to: dueDate
+            ) ?? dueDate
+            reminderDates = scheduledAt > Date() ? [scheduledAt] : []
+        } else {
+            reminderDates = []
+        }
+
+        let intent = DomainScheduleCreateIntent(
             title: "\(eventType.emoji) \(pet.name) · \(input.recordName)到期提醒",
             startDate: dueDate,
             isAllDay: true,
             eventType: eventType.rawValue,
             relatedEntityType: EntityKind.pet.rawValue,
-            relatedEntityId: pet.id.uuidString
+            relatedEntityId: pet.id.uuidString,
+            reminderDates: reminderDates,
+            writeKind: .care,
+            source: .userCommand
         )
-        context.insert(event)
+        guard let plan = DomainScheduleWriteAuthorizer.authorizeCreate(intent: intent, context: context) else {
+            return nil
+        }
+        let result = DomainScheduleWriter.createEvent(plan: plan, context: context)
+        let event = result.event
         CloudSyncMutationRecorder.markModified(event, context: context, modifiedAt: dueDate)
-        return event
-    }
-
-    @MainActor
-    private static func makeExpirationReminderIfNeeded(
-        event: Event?,
-        input: PetHealthRecordCommandInput,
-        context: ModelContext
-    ) -> Reminder? {
-        guard let event,
-              let dueDate = input.expirationDate,
-              let leadDays = input.expirationReminderLeadDays
-        else { return nil }
-
-        let scheduledAt = Calendar.current.date(
-            byAdding: .day,
-            value: -leadDays,
-            to: dueDate
-        ) ?? dueDate
-        guard scheduledAt > Date() else { return nil }
-
-        let reminder = Reminder(event: event, scheduledAt: scheduledAt)
-        reminder.statusEnum = .pending
-        context.insert(reminder)
-        CloudSyncMutationRecorder.markModified(reminder, context: context, modifiedAt: scheduledAt)
-        return reminder
+        let reminder = result.reminders.first
+        if let reminder {
+            reminder.statusEnum = .pending
+            CloudSyncMutationRecorder.markModified(reminder, context: context, modifiedAt: reminder.scheduledAt)
+        }
+        return (event, reminder)
     }
 
     private static func expirationEventType(for type: HealthLogType) -> EventType? {

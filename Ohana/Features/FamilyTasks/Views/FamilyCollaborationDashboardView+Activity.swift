@@ -236,20 +236,34 @@ extension FamilyCollaborationDashboardView {
     }
 
     func isActivePetEvent(_ event: Event) -> Bool {
-        let type = event.relatedEntityType.lowercased()
-        guard type == "pet" || type == EntityKind.pet.rawValue.lowercased() else { return false }
-        return pets.contains { $0.id.uuidString == event.relatedEntityId }
+        MemberLifecycleActiveScheduleResolver.petTarget(
+            for: event,
+            pets: activePets,
+            includePassedAway: false
+        ) != nil
     }
 
     func reminderSubtitle(_ reminder: Reminder) -> String {
         let petName = reminder.event.flatMap { event in
-            pets.first { $0.id.uuidString == event.relatedEntityId }?.name
+            MemberLifecycleActiveScheduleResolver.petTarget(
+                for: event,
+                pets: activePets,
+                includePassedAway: false
+            )?.name
         } ?? l.tr(zh: "家庭", en: "Family", de: "Familie")
         return "\(petName) · \(relativeTime(from: reminder.scheduledAt))"
     }
 
     func openReminders(for pet: Pet) -> [Reminder] {
-        openReminders.filter { $0.event?.relatedEntityId == pet.id.uuidString }
+        openReminders.filter { reminder in
+            guard let event = reminder.event else { return false }
+            return MemberLifecycleActiveScheduleResolver.eventBelongsToPet(
+                event,
+                petId: pet.id.uuidString,
+                petMedications: pet.medications,
+                insurances: pet.insurances
+            )
+        }
     }
 
     func careGapLabels(for pet: Pet) -> [String] {

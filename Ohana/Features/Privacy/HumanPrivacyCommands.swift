@@ -90,6 +90,9 @@ enum HumanPrivacyCommandService {
         for human: Human,
         context: ModelContext
     ) -> HumanPrivacyCommandResult {
+        guard MemberLifecycleGate.disposition(human: human, writeKind: .accountSecurity).writesContent else {
+            return HumanPrivacyCommandResult(humanID: human.id, action: "privacy.field", changedFields: [])
+        }
         let before = human.privateFields
         human.setPrivate(field, isPrivate)
         context.safeSave()
@@ -107,6 +110,13 @@ enum HumanPrivacyCommandService {
         for human: Human,
         context: ModelContext
     ) -> HumanPrivacyCommandResult {
+        guard MemberLifecycleGate.disposition(human: human, writeKind: .accountSecurity).writesContent else {
+            return HumanPrivacyCommandResult(
+                humanID: human.id,
+                action: isPrivate ? "privacy.allPrivate" : "privacy.allPublic",
+                changedFields: []
+            )
+        }
         let before = human.privateFields
         for field in HumanPrivateField.allCases {
             human.setPrivate(field, isPrivate)
@@ -123,7 +133,7 @@ enum HumanPrivacyCommandService {
         switch result {
         case .success, .incorrect, .locked:
             true
-        case .invalidFormat, .noPasscode:
+        case .invalidFormat, .noPasscode, .memberInactive:
             false
         }
     }

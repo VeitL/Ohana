@@ -49,23 +49,31 @@ enum CalendarEventPlanCommandService {
         reminderScheduling providedReminderScheduling: ReminderSchedulingManaging? = nil
     ) -> CalendarEventPlanCommandResult? {
         guard !input.cleanTitle.isEmpty else { return nil }
-        guard lifecycleDisposition(for: input, context: context).allowsDerivedEffects else { return nil }
-
-        let event = Event(
+        let intent = DomainScheduleCreateIntent(
             title: input.cleanTitle,
             startDate: input.startDate,
             endDate: nil,
             isAllDay: input.isAllDay,
             eventType: input.eventType.rawValue,
             relatedEntityType: input.relatedEntityType,
-            relatedEntityId: input.relatedEntityId
+            relatedEntityId: input.relatedEntityId,
+            recurrenceDays: input.recurrenceDays,
+            recurrenceEndDate: input.recurrenceEndDate,
+            reminderLeadMinutes: input.reminderLeadMinutes,
+            assigneeId: input.assigneeId,
+            writeKind: writeKind(for: input),
+            source: .userCommand
         )
-        event.recurrenceDays = input.recurrenceDays
-        event.recurrenceEndDate = input.recurrenceDays > 0 ? input.recurrenceEndDate : nil
-        event.assigneeId = input.assigneeId
-        context.insert(event)
-
-        let createdReminders = createReminders(for: event, input: input, context: context)
+        guard let plan = DomainScheduleWriteAuthorizer.authorizeCreate(intent: intent, context: context) else {
+            return nil
+        }
+        let writeResult = DomainScheduleWriter.createEvent(
+            plan: plan,
+            context: context,
+            maxReminderOccurrences: maxReminderOccurrences
+        )
+        let event = writeResult.event
+        let createdReminders = writeResult.reminders
         context.safeSave()
 
         let shouldScheduleReminders = scheduleNotifications && !createdReminders.isEmpty
@@ -87,110 +95,15 @@ enum CalendarEventPlanCommandService {
         )
     }
 
-    @MainActor
-    private static func createReminders(
-        for event: Event,
-        input: CalendarEventPlanCommandInput,
-        context: ModelContext
-    ) -> [Reminder] {
-        guard let leadMinutes = input.reminderLeadMinutes else { return [] }
-
-        let calendar = Calendar.current
-        if input.recurrenceDays >= 1, let recurrenceEndDate = input.recurrenceEndDate {
-            var reminders: [Reminder] = []
-            var cursor = input.startDate
-            var safetyCount = 0
-            while cursor <= recurrenceEndDate, safetyCount < maxReminderOccurrences {
-                let scheduled = calendar.date(byAdding: .minute, value: -leadMinutes, to: cursor) ?? cursor
-                let reminder = Reminder(event: event, scheduledAt: scheduled)
-                context.insert(reminder)
-                reminders.append(reminder)
-
-                guard let next = calendar.date(byAdding: .day, value: input.recurrenceDays, to: cursor),
-                      next > cursor else {
-                    break
-                }
-                cursor = next
-                safetyCount += 1
-            }
-            return reminders
+    private static func writeKind(for input: CalendarEventPlanCommandInput) -> MemberWriteKind {
+        switch input.eventType {
+        case .birthday, .anniversary:
+            .memorialContentWithOptionalDerivations
+        case .daily, .health, .task, .shoppingList, .chore, .vaccine, .externalDeworming,
+             .internalDeworming, .grooming, .vetVisit, .foodChange, .litterBox, .watering,
+             .fertilizing, .medication, .petMedication, .petMedicationDose, .insurancePremium:
+            .care
         }
-
-        let scheduled = calendar.date(byAdding: .minute, value: -leadMinutes, to: input.startDate) ?? input.startDate
-        let reminder = Reminder(event: event, scheduledAt: scheduled)
-        context.insert(reminder)
-        return [reminder]
-    }
-
-    @MainActor
-    private static func lifecycleDisposition(
-        for input: CalendarEventPlanCommandInput,
-        context: ModelContext
-    ) -> MemberWriteDisposition {
-        let relatedDisposition = relatedEntityDisposition(for: input, context: context)
-        guard relatedDisposition.allowsDerivedEffects else { return relatedDisposition }
-        return assigneeDisposition(assigneeId: input.assigneeId, context: context)
-    }
-
-    @MainActor
-    private static func relatedEntityDisposition(
-        for input: CalendarEventPlanCommandInput,
-        context: ModelContext
-    ) -> MemberWriteDisposition {
-        if input.relatedEntityType == EntityKind.pet.rawValue || input.relatedEntityType == "pet" {
-            guard let id = UUID(uuidString: input.relatedEntityId) else {
-                return .missingMemberTarget
-            }
-            guard let pet = fetchPet(id: id, context: context) else {
-                return .missingMemberTarget
-            }
-            return MemberLifecycleGate.disposition(pet: pet, writeKind: .care)
-        }
-        if input.relatedEntityType == EntityKind.human.rawValue || input.relatedEntityType == "human" {
-            guard let id = UUID(uuidString: input.relatedEntityId) else {
-                return .missingMemberTarget
-            }
-            guard let human = fetchHuman(id: id, context: context) else {
-                return .missingMemberTarget
-            }
-            return MemberLifecycleGate.disposition(human: human, writeKind: .care)
-        }
-        return .activeWritable
-    }
-
-    @MainActor
-    private static func assigneeDisposition(
-        assigneeId: String?,
-        context: ModelContext
-    ) -> MemberWriteDisposition {
-        guard let assigneeId, !assigneeId.isEmpty else { return .activeWritable }
-        guard let id = UUID(uuidString: assigneeId),
-              let human = fetchHuman(id: id, context: context) else {
-            return .missingMemberTarget
-        }
-        return MemberLifecycleGate.disposition(human: human, writeKind: .care)
-    }
-
-    @MainActor
-    private static func fetchPet(id: UUID, context: ModelContext) -> Pet? {
-        var descriptor = FetchDescriptor<Pet>(
-            predicate: #Predicate<Pet> { pet in
-                pet.id == id
-            }
-        )
-        descriptor.fetchLimit = 1
-        return try? context.fetch(descriptor).first
-    }
-
-    @MainActor
-    private static func fetchHuman(id: UUID, context: ModelContext) -> Human? {
-        var descriptor = FetchDescriptor<Human>(
-            predicate: #Predicate<Human> { human in
-                human.id == id
-            }
-        )
-        descriptor.fetchLimit = 1
-        return try? context.fetch(descriptor).first
     }
 }
 
@@ -503,28 +416,50 @@ enum CalendarEventCommandService {
         let hasAfter = event.recurrenceEndDate.map { nextOccurrence <= calendar.startOfDay(for: $0) } ?? true
 
         if hasAfter {
-            let newEvent = Event(
+            let splitIntent = DomainScheduleCreateIntent(
                 title: event.title,
                 startDate: nextOccurrence,
                 endDate: event.endDate,
                 isAllDay: event.isAllDay,
                 eventType: event.eventType,
                 relatedEntityType: event.relatedEntityType,
-                relatedEntityId: event.relatedEntityId
+                relatedEntityId: event.relatedEntityId,
+                recurrenceDays: event.recurrenceDays,
+                recurrenceEndDate: event.recurrenceEndDate,
+                assigneeId: event.assigneeId,
+                writeKind: writeKind(for: event),
+                source: .domainService
             )
-            newEvent.recurrenceDays = event.recurrenceDays
-            newEvent.recurrenceEndDate = event.recurrenceEndDate
-            newEvent.assigneeId = event.assigneeId
+            guard let plan = DomainScheduleWriteAuthorizer.authorizeCreate(
+                intent: splitIntent,
+                context: context
+            ) else {
+                event.recurrenceEndDate = dayBefore
+                return .truncated(event.id)
+            }
+            let newEvent = DomainScheduleWriter.createEvent(plan: plan, context: context).event
             newEvent.feedRuleKindRaw = event.feedRuleKindRaw
             newEvent.foodKindRaw = event.foodKindRaw
             newEvent.feedAmountGrams = event.feedAmountGrams
-            context.insert(newEvent)
+            newEvent.feedPlanGroupId = event.feedPlanGroupId
             event.recurrenceEndDate = dayBefore
             return .split(originalID: event.id, newEventID: newEvent.id)
         }
 
         event.recurrenceEndDate = dayBefore
         return .truncated(event.id)
+    }
+
+    private static func writeKind(for event: Event) -> MemberWriteKind {
+        switch EventType(rawValue: event.eventType) {
+        case .birthday, .anniversary:
+            .memorialContentWithOptionalDerivations
+        case .daily, .health, .task, .shoppingList, .chore, .vaccine, .externalDeworming,
+             .internalDeworming, .grooming, .vetVisit, .foodChange, .litterBox, .watering,
+             .fertilizing, .medication, .petMedication, .petMedicationDose, .insurancePremium,
+             .none:
+            .care
+        }
     }
 
     @MainActor
