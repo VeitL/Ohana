@@ -19,6 +19,7 @@ struct HumanHealthMetricDeleteCommandResult: Equatable {
     let humanID: UUID
     let metricKey: String
     let logID: UUID
+    let didChange: Bool
 }
 
 enum HumanHealthMetricCommandService {
@@ -34,6 +35,7 @@ enum HumanHealthMetricCommandService {
         context: ModelContext
     ) -> HumanHealthMetricCommandResult? {
         guard value > 0, value.isFinite else { return nil }
+        guard MemberWritePolicy.disposition(human: human, intent: .activeOnly).allowsDerivedEffects else { return nil }
         let cleanNotes = notes.trimmingCharacters(in: .whitespacesAndNewlines)
         let log = HumanHealthMetricLog(
             metricKey: metricKey,
@@ -45,6 +47,7 @@ enum HumanHealthMetricCommandService {
         )
         context.insert(log)
         human.healthMetricLogs.append(log)
+        CloudSyncMutationRecorder.markModified(log, context: context, modifiedAt: date)
         context.safeSave()
         return HumanHealthMetricCommandResult(
             log: log,
@@ -61,6 +64,14 @@ enum HumanHealthMetricCommandService {
         human: Human,
         context: ModelContext
     ) -> HumanHealthMetricDeleteCommandResult {
+        guard MemberWritePolicy.disposition(human: human, intent: .activeOnly).allowsDerivedEffects else {
+            return HumanHealthMetricDeleteCommandResult(
+                humanID: human.id,
+                metricKey: log.metricKey,
+                logID: log.id,
+                didChange: false
+            )
+        }
         let logID = log.id
         let metricKey = log.metricKey
         human.healthMetricLogs.removeAll { $0.id == logID }
@@ -70,7 +81,8 @@ enum HumanHealthMetricCommandService {
         return HumanHealthMetricDeleteCommandResult(
             humanID: human.id,
             metricKey: metricKey,
-            logID: logID
+            logID: logID,
+            didChange: true
         )
     }
 }
@@ -90,6 +102,7 @@ struct HumanHealthReportCommandResult: Equatable {
     let humanID: UUID
     let reportID: UUID
     let reportType: String
+    let didChange: Bool
 }
 
 enum HumanHealthReportCommandService {
@@ -100,6 +113,14 @@ enum HumanHealthReportCommandService {
         input: HumanHealthReportCommandInput,
         context: ModelContext
     ) -> HumanHealthReportCommandResult {
+        guard MemberWritePolicy.disposition(human: human, intent: .activeOnly).allowsDerivedEffects else {
+            return HumanHealthReportCommandResult(
+                humanID: human.id,
+                reportID: UUID(),
+                reportType: input.reportType.rawValue,
+                didChange: false
+            )
+        }
         let report = HumanHealthReport(
             humanId: human.id.uuidString,
             reportType: input.reportType,
@@ -112,11 +133,13 @@ enum HumanHealthReportCommandService {
             notes: input.notes.trimmingCharacters(in: .whitespacesAndNewlines)
         )
         context.insert(report)
+        CloudSyncMutationRecorder.markModified(report, context: context, modifiedAt: input.reportDate)
         context.safeSave()
         return HumanHealthReportCommandResult(
             humanID: human.id,
             reportID: report.id,
-            reportType: report.reportTypeRaw
+            reportType: report.reportTypeRaw,
+            didChange: true
         )
     }
 
@@ -128,6 +151,14 @@ enum HumanHealthReportCommandService {
         input: HumanHealthReportCommandInput,
         context: ModelContext
     ) -> HumanHealthReportCommandResult {
+        guard MemberWritePolicy.disposition(human: human, intent: .activeOnly).allowsDerivedEffects else {
+            return HumanHealthReportCommandResult(
+                humanID: human.id,
+                reportID: report.id,
+                reportType: report.reportTypeRaw,
+                didChange: false
+            )
+        }
         report.humanId = human.id.uuidString
         report.reportType = input.reportType
         report.conclusion = input.conclusion
@@ -137,11 +168,13 @@ enum HumanHealthReportCommandService {
         report.nextCheckDate = input.nextCheckDate
         report.summary = input.summary.trimmingCharacters(in: .whitespacesAndNewlines)
         report.notes = input.notes.trimmingCharacters(in: .whitespacesAndNewlines)
+        CloudSyncMutationRecorder.markModified(report, context: context, modifiedAt: input.reportDate)
         context.safeSave()
         return HumanHealthReportCommandResult(
             humanID: human.id,
             reportID: report.id,
-            reportType: report.reportTypeRaw
+            reportType: report.reportTypeRaw,
+            didChange: true
         )
     }
 
@@ -152,6 +185,14 @@ enum HumanHealthReportCommandService {
         human: Human,
         context: ModelContext
     ) -> HumanHealthReportCommandResult {
+        guard MemberWritePolicy.disposition(human: human, intent: .activeOnly).allowsDerivedEffects else {
+            return HumanHealthReportCommandResult(
+                humanID: human.id,
+                reportID: report.id,
+                reportType: report.reportTypeRaw,
+                didChange: false
+            )
+        }
         let reportID = report.id
         let reportType = report.reportTypeRaw
         CloudSyncMutationRecorder.markDeleted(report, context: context)
@@ -160,7 +201,8 @@ enum HumanHealthReportCommandService {
         return HumanHealthReportCommandResult(
             humanID: human.id,
             reportID: reportID,
-            reportType: reportType
+            reportType: reportType,
+            didChange: true
         )
     }
 }
@@ -198,7 +240,9 @@ struct HumanHealthReportCommandExecutor {
             input: input,
             context: context
         )
-        revisions.publishHumanHealthReport(result, action: "create", note: note)
+        if result.didChange {
+            revisions.publishHumanHealthReport(result, action: "create", note: note)
+        }
         return result
     }
 
@@ -215,7 +259,9 @@ struct HumanHealthReportCommandExecutor {
             input: input,
             context: context
         )
-        revisions.publishHumanHealthReport(result, action: "update", note: note)
+        if result.didChange {
+            revisions.publishHumanHealthReport(result, action: "update", note: note)
+        }
         return result
     }
 
@@ -230,7 +276,9 @@ struct HumanHealthReportCommandExecutor {
             human: human,
             context: context
         )
-        revisions.publishHumanHealthReport(result, action: "delete", note: note)
+        if result.didChange {
+            revisions.publishHumanHealthReport(result, action: "delete", note: note)
+        }
         return result
     }
 }

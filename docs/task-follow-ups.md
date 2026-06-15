@@ -25,6 +25,213 @@ actionable; long-term product ideas belong in planning docs instead.
 
 ## Open Items
 
+### TFU-20260615-001 - Close Feeding plan/stock lifecycle and actor-policy gaps
+
+- Status: Open - local repair and module gate verified; closure blocked by
+  push/CI and a separate fresh pure review
+- Priority: P1
+- Area: Domain / Feeding / Memorial / Stock Reminders / CareLedger / Executor Resolution
+- Source task: Domain first-release reachable-surface fresh pure review; Codex,
+  2026-06-15.
+- Blocker: Fresh first-release reachable reviews on 2026-06-15 found and
+  reconfirmed P0=0 / P1=1 / P2=0, so Domain cannot be marked 🏁. The Feeding
+  plan/stock command family still
+  bypasses the member lifecycle and effective-actor policies. `SaveFoodStockCommand.run`
+  can mutate pet food tracking fields, create/update `PetFoodRecord`, rebuild stock
+  `Event`/`Reminder`, and optionally write `PetExpenseLog` + `CareLedgerEvent`
+  for a deceased pet. Its expense path also stores the raw `expensePayerId` in
+  both the expense fact and ledger, so an active pet plus deceased/missing payer
+  can persist a bad actor instead of the effective active human. Related stock
+  and feeding-arrangement commands (`StockReminderSettingsCommand`,
+  `CorrectStockCommand`, `DeleteFeedPlanCommand`, `SetMainFoodKindCommand`,
+  `FeedMaintenanceCommand.ensureUpcomingPlanReminders`, and `SwitchFeedModeCommand`)
+  can still mutate feed settings, plan/reminder state, or materialized feed work
+  without an active-writable target guard.
+- Next step: Add red tests for deceased pet `SaveFoodStockCommand`,
+  stock-reminder settings, stock correction, feed-plan deletion, feed-mode switch,
+  and upcoming-plan reminder maintenance: each must no-op with no `PetFoodRecord`,
+  `PetExpenseLog`, `CareLedgerEvent`, `Event`/`Reminder`, pet food-setting
+  mutation, or success revision. Add active-pet tests where `expensePayerId` is
+  deceased/missing/physically deleted and assert `PetExpenseLog` plus
+  `CareLedgerEvent` use the same effective actor as the reward/economy policy
+  (or unknown/fact-only when no owner is available). Then route this command
+  family through one Feeding plan/stock write disposition built on
+  `MemberWritePolicy` and `CareFactWritePolicy.executorResolution`; only publish,
+  rebuild reminders, or sync expense ledgers after an active-writable result.
+- Close condition: Red tests fail before the fix and pass after; targeted
+  Feeding/Home/Reminder/economy tests, derived/economy audits, fixture tests,
+  `scripts/dev-check-changed.sh`, `scripts/module-exit-gate.sh`, push, and CI
+  are green. Then run a fresh Domain pure review and require P0/P1=0 before 🏁.
+- Progress: 2026-06-15 repair session added the red tests and fixed the Feeding
+  plan/stock command family. `SaveFoodStockCommand`, stock reminders/correction,
+  feed record edits/deletes, plan delete, main food kind, maintenance, and feed
+  mode switching now no-op for deceased pets through `MemberWritePolicy`;
+  stock expense payer fallback uses the command `executorId` through
+  `EconomyRewardOwnerResolver` and writes the same effective actor to
+  `PetExpenseLog` and `CareLedgerEvent`; QuickFeed executor revision publishing
+  consumes typed did-change/no-op results; the stock payer menu filters deceased
+  humans. Validation passed:
+  `scripts/test-simulator.sh -only-testing:OhanaTests/ManualFeedCommandTests`
+  (17 tests),
+  `scripts/test-simulator.sh -only-testing:OhanaTests/HomeCommandExecutorTests`
+  (182 tests),
+  `scripts/test-simulator.sh -only-testing:OhanaTests/CareCompletionChokepointCharacterizationTests -only-testing:OhanaTests/CareDerivationExecutorSuccessCharacterizationTests -only-testing:OhanaTests/RecurringFindingsRepairTests -only-testing:OhanaTests/ReminderActionCoordinatorTests -only-testing:OhanaTests/CatCareCommandTests`
+  (58 tests), `scripts/dev-check-changed.sh`,
+  `scripts/tests/run-audit-fixture-tests.sh`,
+  `scripts/audit-economy-boundaries.sh --all`, `git diff --check`, and
+  `scripts/audit-derived-state-lifecycle.sh --all` exit 0 with existing
+  full-repo review warnings only. 2026-06-15 follow-up repair closed
+  TFU-20260615-002 and restored local `scripts/module-exit-gate.sh` PASS; this
+  item still waits for push/CI and a separate fresh pure review before Domain
+  can be considered for 🏁.
+
+### TFU-20260615-002 - Restore shared walk secondary executor persistence and backup round trip
+
+- Status: Done
+- Priority: P1
+- Area: Domain / Shared Care / Walks / Backup / Module Gate
+- Source task: Domain Feeding plan/stock repair module-exit validation; Codex,
+  2026-06-15.
+- Blocker: `scripts/module-exit-gate.sh` reaches the full unit suite and fails
+  outside the Feeding repair scope. Isolated validation confirms
+  `scripts/test-simulator.sh -only-testing:OhanaTests/SharedPetActionRecorderTests`
+  fails in `sharedWalkStoresMultipleExecutorsOnSessionLogsAndLedger` and
+  `backupRoundTripsSharedSessionExpenseAndWalkFields`: shared walk sessions and
+  `PetWalkLog.executorIds` persist only the primary executor, so the secondary
+  co-walker is missing from session/log metadata and from backup DTO round-trip
+  data.
+- Next step: In the shared walk writer path, preserve the accepted secondary
+  executor IDs on `SharedCareSession.executorIds`, child `PetWalkLog.executorIds`,
+  related ledger/session metadata, and backup encode/decode DTOs. Keep invalid,
+  missing, or deceased secondary executors filtered/fallback-safe according to
+  the existing shared-care policy.
+- Close condition: The two failing SharedPetActionRecorder tests fail before
+  the fix and pass after; `scripts/test-simulator.sh -only-testing:OhanaTests/SharedPetActionRecorderTests`
+  passes; `scripts/module-exit-gate.sh` passes; then rerun Domain pure review
+  before considering 🏁.
+- Closed: 2026-06-15. `SharedPetActionRecorder` now keeps shared-walk
+  participant `executorIds` separate from the effective primary actor: session
+  and `PetWalkLog` rows preserve the secondary co-walker while ledger/reward
+  ownership still uses the resolved effective actor. Backup encode/decode
+  already round-tripped `executorIdsRaw` once the writer stored it. Updated
+  legacy happy-path CareEventService tests to insert a real `Human` executor
+  instead of asserting that invalid `"human-1"` should persist as an actor.
+  Validation PASS:
+  `scripts/test-simulator.sh -only-testing:OhanaTests/SharedPetActionRecorderTests`
+  (25 tests) and `scripts/module-exit-gate.sh` (changed audits,
+  localization, 876 unit tests + 3 UI template tests) on the iPhone 17
+  simulator.
+
+### TFU-20260614-019 - Split memorial-safe content from active-only command writes
+
+- Status: Open
+- Priority: P1
+- Area: Domain / Memorial / Member Lifecycle / Feature Commands / UI Routes
+- Source task: Domain first-release reachable-surface pure adversarial review;
+  Codex, 2026-06-14, current commit `24fc54c21`.
+- Blocker: 2026-06-14 产品宪法 v1.5 将 D7 改为"照护只读，回忆可写"。
+  本轮按新宪法重判：纪念照片、回忆文字、纪念日、悼念笔记本身允许；但纪念内容
+  不得进入经济系统、照护事实、提醒、任务、健康趋势、连胜或 Oasis 派生。当前缺
+  少服务层的 target write policy，导致 active-only 命令仍可对去世 pet/human 写
+  事实或派生：`ExpenseCommandService.recordPetExpense` 会写 `PetExpenseLog` +
+  `CareLedgerEvent`；`PetDocumentCommandService.createDocument` 在 cost > 0 时写
+  expense + ledger；`InsurancePolicyCommandService.savePolicy/createClaim/updateClaimStatus`
+  会写保险、保费/报销 expense 与 calendar event；`PetMedicationPlanCommandService.savePlan`
+  会写用药计划和 event/reminder；`PetMilestoneCommandService.createMilestone` 和
+  `MomentCommandService.recordMoment` 虽可被解释为纪念内容，但当前会进入奖励/ledger
+  纪律；human 侧 `ExpenseCommandService.recordHumanExpense`、
+  `WeightCommandService.recordHumanWeight`、`WorkoutCommandService.recordHumanWorkout`、
+  `HumanMedicationCommandService` / `HumanMedicationPlanCommandService` /
+  `HumanMedicationDoseCommandService`、`HumanHealthMetricCommandService` /
+  `HumanHealthReportCommandService`、`HumanWishlistCommandService` 以及带
+  `reminderDate` 的 `HumanNoteCommandService.recordNote` 也没有 deceased target
+  硬门。UI feature hub 仍只显示 memorial banner/read-only 文案，未把写入型目的地
+  和 memorial-safe 目的地区分。
+- Next step: 先补入口族红测：去世 pet/human 分别覆盖 pet expense、pet document
+  with cost、insurance policy/claim、pet medication plan、milestone、quick moment、
+  human expense、human weight/workout、human medication plan/dose、human health
+  metric/report、wishlist、human note with reminder；断言 active-only 路径无 fact、
+  无 ledger、无 reward、无 event/reminder、无 success revision。另补 memorial-safe
+  红/绿测试：PetPhotoAlbum 与纯悼念文字/纪念日允许写入，但不得写 ledger/reward/
+  reminder。实现上以统一 `MemberWritePolicy` / memorial disposition 区分
+  `.activeOnlyNoOp`、`.memorialContentOnly`、`.activeWritable`，command、executor、
+  revision 与 UI route 都消费 typed result。
+- Close condition: 新红测先失败后修绿；所有 deceased member 写入入口消费同一个
+  typed policy/result，不能靠单个 view 判断；相关 command / route / revision
+  入口族测试、derived/economy audits、fixture tests、module exit gate、push 和 CI
+  全绿；随后另开首发可达面纯复审，P0/P1=0 才能把 Domain 标 🏁。
+
+### TFU-20260614-018 - Resolve unwritable executors consistently across fact, ledger, and reward
+
+- Status: Open
+- Priority: P1
+- Area: Domain / Economy / CareFactWritePolicy / Reward Owner Resolution / Tests
+- Source task: Domain first-release reachable-surface pure adversarial review;
+  Codex, 2026-06-14, current commit `24fc54c21`.
+- Blocker: 本轮按更新后的 G4.1/ECO-026 重判：active 照护对象 + 不可解析/已删除/
+  不可写（含离世）显式 executor 时，事实不得丢失，奖励可 fallback 到可写 active
+  human；因此"fallback 本身"不再是 P1。真正 P1 是归属解析没有 typed result，
+  事实、ledger、reward、特殊奖励与测试断言不一致：`CareFactWritePolicy.disposition`
+  只检查 target pet；`EconomyRewardOwnerResolver.rewardHuman` 用 optional nil 同时表达
+  missing 与 frozen/deceased，再回落 active human；但 `CareEventService.recordManualFeedFact`
+  仍把原 deceased executorId 写入 `PetCareLog.executorId`，`CareLedgerService.recordPetCare`
+  以该 executorId 写 `CareLedgerEvent.actorId`，同时钱包流水/预算归属 active human。
+  喂食路径还把原 executorId 传给 `QuestManager.recordFirstMeal`。现有
+  `CareCompletionChokepointCharacterizationTests` 与 `HomeCommandExecutorTests` 只断言
+  active human wallet 获得奖励、deceased wallet 未写，没有断言 care fact / ledger /
+  wallet / budget / feedback 的 effective actor 一致性，等于漏掉 G4.1 "fallback 归属必须
+  明确、不得伪装为原 executor 发奖"。
+- Next step: 先补入口族红测覆盖 direct care、shared care、pet medication dose、
+  walk、weight/health、Calendar/notification 代表路径：active target + deceased/
+  missing/physically-deleted executor 必须写 fact，但 `CareLedgerEvent`、wallet entry、
+  budget event、Oasis/feedback/revision metadata 的 effective actor 必须一致地指向
+  fallback active human；没有可用 owner 时 fact-only、ledger coconutDelta=0、无 wallet/
+  budget/Oasis。实现上把 executor resolution 改为 typed result：
+  `.none` / `.missingOrDeleted` / `.unwritableHuman` / `.activeHuman`，禁止用 optional
+  nil 猜状态；必要时区分 `requestedExecutorId` 与 `effectiveActorId`，旧表征测试不得只用
+  "wallet 没写 deceased" 当通过条件。
+- Close condition: 新红测先失败后修绿；所有 care-family 入口的 fact、care ledger、
+  reward wallet、budget、Oasis/feedback 与 revision 对同一动作的 actor 归属一致；
+  missing/physically-deleted executor 的 active target fact 语义仍保留；
+  `CareCompletionChokepointCharacterizationTests`、Home/Reminder/Walk/Health/Medication
+  相关入口族测试、economy audits、fixture tests、module exit gate、push 和 CI 全绿；
+  随后另开首发可达面纯复审，P0/P1=0 才能把 Domain 标 🏁。
+
+### TFU-20260614-017 - Delete PetMilestone ledger with the milestone fact
+
+- Status: Open
+- Priority: P1
+- Area: Domain / Pet Milestones / Physical Deletion / CareLedger / Tests
+- Source task: Domain first-release reachable-surface pure adversarial review;
+  Codex, 2026-06-14, current commit `24fc54c21`.
+- Blocker: 本轮首发可达面继续纯复审发现该 P1；随后横向扩展复审又登记
+  TFU-20260614-018 与 TFU-20260614-019；2026-06-14 宪法 v1.5 后重判仍为
+  P1：纪念日内容本身可写，但当前 milestone 入口进入奖励/ledger 纪律，且删除
+  仍留下 orphan ledger。最终总账见 `docs/testing-progress.md` Domain 行。
+  `PetMilestoneCommandService.createMilestone` 会写
+  `PetMilestone` fact、发非照护奖励，并写
+  `CareLedgerEvent(legacyModelName: "PetMilestone", legacyModelId:
+  milestone.id)`；但 `deleteMilestone` 只调用
+  `PhysicalDeletionService.deletePetScopedRecord` 删除 milestone 本体。该服务的
+  `petScopedLegacyReference` 漏掉 `PetMilestone`，所以 matching care ledger
+  不会 tombstone/delete，删除后留下指向已物理删除 fact 的 ledger。现有
+  `petMilestoneCommandServiceCreatesRewardsAndDeletesLedger` 测试还断言
+  `removedLedgerEventIDs.isEmpty` 且 ledger 继续存在，属于“测试断言违反宪法”
+  的绿测。
+- Next step: 先补红测并改正既有断言：构造 pet，调用
+  `PetMilestoneCommandService.createMilestone`，确认 `PetMilestone` 和 matching
+  `CareLedgerEvent` 都存在；再调用 `deleteMilestone`，断言 milestone 与
+  matching `CareLedgerEvent` 均被删除并写 deletion tombstone，返回值包含
+  removed ledger id。实现上把 `PetMilestone` 纳入
+  `PhysicalDeletionService.petScopedLegacyReference` 或等价 typed lifecycle
+  矩阵，并补审计/fixture：凡写 `CareLedgerEvent.legacyModelName` 的本地 fact
+  删除路径，必须有 matching ledger cleanup 覆盖。
+- Close condition: 新红测先失败后修绿；旧测试不再断言 orphan ledger 为正确；
+  ledger cleanup 矩阵由写 ledger 的 fact registry 或审计约束覆盖，避免继续逐
+  command 漏接；`HomeCommandExecutorTests`、相关 physical deletion / economy
+  audits、fixture tests、module exit gate、push 和 CI 全绿；随后另开首发可达面
+  纯复审，P0/P1=0 才能把 Domain 标 🏁。
+
 ### TFU-20260614-016 - Scrub deleted human executors from retained active pet facts
 
 - Status: Open - local repair implemented; pending push/CI and final pure

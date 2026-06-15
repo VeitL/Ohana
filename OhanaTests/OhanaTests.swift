@@ -992,7 +992,9 @@ struct OhanaTests {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
         let pet = Pet(name: "Momo", species: "猫")
-        let executorId = "human-1"
+        let executor = Human(name: "Guan")
+        let executorId = executor.id.uuidString
+        context.insert(executor)
         context.insert(pet)
         try context.save()
 
@@ -1016,7 +1018,9 @@ struct OhanaTests {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
         let pet = Pet(name: "Momo", species: "猫")
-        let executorId = "human-1"
+        let executor = Human(name: "Guan")
+        let executorId = executor.id.uuidString
+        context.insert(executor)
         context.insert(pet)
         try context.save()
 
@@ -1085,7 +1089,9 @@ struct OhanaTests {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
         let pet = Pet(name: "Momo", species: "猫")
-        let executorId = "human-1"
+        let executor = Human(name: "Guan")
+        let executorId = executor.id.uuidString
+        context.insert(executor)
         context.insert(pet)
         try context.save()
 
@@ -1145,7 +1151,9 @@ struct OhanaTests {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
         let pet = Pet(name: "Momo", species: "猫")
-        let executorId = "human-1"
+        let executor = Human(name: "Guan")
+        let executorId = executor.id.uuidString
+        context.insert(executor)
         context.insert(pet)
         try context.save()
 
@@ -1486,7 +1494,9 @@ struct OhanaTests {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
         let pet = Pet(name: "Momo", species: "猫")
-        let executorId = "human-1"
+        let executor = Human(name: "Guan")
+        let executorId = executor.id.uuidString
+        context.insert(executor)
         let scheduledAt = dateForTest(year: 2026, month: 5, day: 8, hour: 8)
         let event = Event(
             title: "早餐",
@@ -2250,7 +2260,9 @@ struct OhanaTests {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
         let pet = Pet(name: "Momo", species: "猫")
-        let executorId = "human-1"
+        let executor = Human(name: "Guan")
+        let executorId = executor.id.uuidString
+        context.insert(executor)
         let event = Event(
             title: "Momo 喂水",
             startDate: Date().addingTimeInterval(-60),
@@ -2288,7 +2300,9 @@ struct OhanaTests {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
         let pet = Pet(name: "Momo", species: "猫")
-        let executorId = "human-1"
+        let executor = Human(name: "Guan")
+        let executorId = executor.id.uuidString
+        context.insert(executor)
         let scheduledAt = dateForTest(year: 2026, month: 5, day: 8, hour: 9)
         let event = Event(
             title: "Momo 喂水",

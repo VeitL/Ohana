@@ -100,6 +100,11 @@ enum CalendarTaskCompletionSyncService {
             context: context
         )
         guard disposition.writesFact else { return .noOp }
+        let actor = CareFactWritePolicy.executorResolution(
+            requestedExecutorId: executorId,
+            context: context,
+            logPrefix: "CalendarTaskCompletionSyncService.syncPetTask"
+        )
         if !isCompleted {
             deleteCalendarGeneratedRecords(event: event, occurrenceDate: occurrenceDate, context: context)
             deleteCalendarGeneratedFactOnlyRecords(event: event, occurrenceDate: occurrenceDate, pet: pet, context: context)
@@ -118,7 +123,8 @@ enum CalendarTaskCompletionSyncService {
                 occurredAt: occurredAt,
                 occurrenceDate: occurrenceDate,
                 rewardDate: operationDate,
-                executorId: executorId,
+                executorId: actor.effectiveExecutorId,
+                rewardExecutorId: actor.rewardExecutorId,
                 sourceReminderId: sourceReminderId,
                 context: context,
                 careLedger: careLedger,
@@ -132,7 +138,8 @@ enum CalendarTaskCompletionSyncService {
                 occurredAt: occurredAt,
                 occurrenceDate: occurrenceDate,
                 rewardDate: operationDate,
-                executorId: executorId,
+                executorId: actor.effectiveExecutorId,
+                rewardExecutorId: actor.rewardExecutorId,
                 sourceReminderId: sourceReminderId,
                 context: context,
                 careLedger: careLedger,
@@ -146,7 +153,8 @@ enum CalendarTaskCompletionSyncService {
                 occurredAt: occurredAt,
                 occurrenceDate: occurrenceDate,
                 rewardDate: operationDate,
-                executorId: executorId,
+                executorId: actor.effectiveExecutorId,
+                rewardExecutorId: actor.rewardExecutorId,
                 sourceReminderId: sourceReminderId,
                 context: context,
                 careLedger: careLedger,
@@ -203,6 +211,7 @@ enum CalendarTaskCompletionSyncService {
         occurrenceDate: Date,
         rewardDate: Date,
         executorId: String?,
+        rewardExecutorId: String?,
         sourceReminderId: String?,
         context: ModelContext,
         careLedger: CareLedgerRecording,
@@ -221,7 +230,7 @@ enum CalendarTaskCompletionSyncService {
             executorId: executorId
         )
         context.insert(log)
-        CloudSyncMutationRecorder.markModified(log, context: context, modifiedAt: occurredAt)
+        CloudSyncMutationRecorder.markModified(log, context: context, modifiedAt: rewardDate)
         context.safeSave()
         guard disposition.allowsDerivedEffects else { return true }
         let rewardTrace = awardGeneratedCare(
@@ -229,7 +238,7 @@ enum CalendarTaskCompletionSyncService {
             pet: pet,
             occurrenceDate: occurrenceDate,
             rewardDate: rewardDate,
-            executorId: executorId,
+            executorId: rewardExecutorId,
             context: context,
             careLedger: careLedger
         )
@@ -263,6 +272,7 @@ enum CalendarTaskCompletionSyncService {
         occurrenceDate: Date,
         rewardDate: Date,
         executorId: String?,
+        rewardExecutorId: String?,
         sourceReminderId: String?,
         context: ModelContext,
         careLedger: CareLedgerRecording,
@@ -276,7 +286,7 @@ enum CalendarTaskCompletionSyncService {
             sharedSessionId: calendarFactOnlySessionId(for: event, occurrenceDate: occurrenceDate)
         )
         context.insert(log)
-        CloudSyncMutationRecorder.markModified(log, context: context, modifiedAt: occurredAt)
+        CloudSyncMutationRecorder.markModified(log, context: context, modifiedAt: rewardDate)
         context.safeSave()
         guard disposition.allowsDerivedEffects else { return true }
         let rewardTrace = awardGeneratedCare(
@@ -284,7 +294,7 @@ enum CalendarTaskCompletionSyncService {
             pet: pet,
             occurrenceDate: occurrenceDate,
             rewardDate: rewardDate,
-            executorId: executorId,
+            executorId: rewardExecutorId,
             context: context,
             careLedger: careLedger
         )
@@ -316,6 +326,7 @@ enum CalendarTaskCompletionSyncService {
         occurrenceDate: Date,
         rewardDate: Date,
         executorId: String?,
+        rewardExecutorId: String?,
         sourceReminderId: String?,
         context: ModelContext,
         careLedger: CareLedgerRecording,
@@ -323,7 +334,7 @@ enum CalendarTaskCompletionSyncService {
     ) -> Bool {
         let log = PetHygieneLog(date: occurredAt, type: hygieneType, pet: pet, executorId: executorId)
         context.insert(log)
-        CloudSyncMutationRecorder.markModified(log, context: context, modifiedAt: occurredAt)
+        CloudSyncMutationRecorder.markModified(log, context: context, modifiedAt: rewardDate)
         context.safeSave()
         guard disposition.allowsDerivedEffects else { return true }
         let rewardTrace = awardGeneratedCare(
@@ -331,7 +342,7 @@ enum CalendarTaskCompletionSyncService {
             pet: pet,
             occurrenceDate: occurrenceDate,
             rewardDate: rewardDate,
-            executorId: executorId,
+            executorId: rewardExecutorId,
             context: context,
             careLedger: careLedger
         )

@@ -143,13 +143,10 @@ struct RecurringFindingsRepairTests {
             questManager: questManager
         )
 
-        let ledger = try #require(try context.fetch(FetchDescriptor<CareLedgerEvent>()).first {
-            $0.legacyModelName == "PetMilestone" && $0.legacyModelId == result.milestoneIDs.first?.uuidString
-        })
-        #expect(result.coconutDelta > 0)
-        #expect(activeHuman.coconutBalance > 0)
-        #expect(ledger.actorKind == CareLedgerActorKind.human.rawValue)
-        #expect(ledger.actorId == activeHuman.id.uuidString)
+        #expect(result.milestoneIDs.count == 1)
+        #expect(result.coconutDelta == 0)
+        #expect(activeHuman.coconutBalance == 0)
+        #expect(try context.fetch(FetchDescriptor<CareLedgerEvent>()).isEmpty)
     }
 
     @Test func calendarWholeEventDeleteTombstonesEventAndCascadeReminders() throws {
@@ -237,6 +234,9 @@ struct RecurringFindingsRepairTests {
             context: context
         )
         let hygieneLogID = try #require(recorded.hygieneLogID)
+        let ledger = try #require(try context.fetch(FetchDescriptor<CareLedgerEvent>()).first {
+            $0.legacyModelName == "PetHygieneLog" && $0.legacyModelId == hygieneLogID.uuidString
+        })
 
         _ = CatCareCommandService.undo(
             pet: pet,
@@ -247,8 +247,10 @@ struct RecurringFindingsRepairTests {
 
         #expect(try context.fetch(FetchDescriptor<Event>()).isEmpty)
         #expect(try context.fetch(FetchDescriptor<PetHygieneLog>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<CareLedgerEvent>()).isEmpty)
         #expect(try cloudSyncState(entityName: String(describing: Event.self), id: recorded.eventID, context: context)?.isDeletionTombstone == true)
         #expect(try cloudSyncState(entityName: String(describing: PetHygieneLog.self), id: hygieneLogID, context: context)?.isDeletionTombstone == true)
+        #expect(try cloudSyncState(entityName: String(describing: CareLedgerEvent.self), id: ledger.id, context: context)?.isDeletionTombstone == true)
     }
 
     @Test func calendarCareCompletionUsesRewardPipelineAndUndoReversesGeneratedFacts() throws {
@@ -319,6 +321,336 @@ struct RecurringFindingsRepairTests {
         for event in budgetEvents {
             #expect(try cloudSyncState(entityName: String(describing: EconomyBudgetUsageEvent.self), id: event.id, context: context)?.isDeletionTombstone == true)
         }
+    }
+
+    @Test func calendarHistoricalCareCompletionMarksDirtyAtOperationDate() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let occurrenceDate = Date(timeIntervalSince1970: 1_700_000_000)
+        let operationDate = Date(timeIntervalSince1970: 1_800_000_025)
+        let human = Human(name: "Guan")
+        let pet = Pet(name: "Momo", species: "dog")
+        let event = Event(
+            title: "Feed Momo 42g",
+            startDate: occurrenceDate,
+            eventType: EventType.daily.rawValue,
+            relatedEntityType: EntityKind.pet.rawValue,
+            relatedEntityId: pet.id.uuidString
+        )
+        context.insert(human)
+        context.insert(pet)
+        context.insert(event)
+        try context.save()
+
+        let state = EconomyDefaultsState.capture()
+        defer { state.restore() }
+        prepareEconomyDefaults(
+            activeHumanID: human.id.uuidString,
+            questManager: makeQuestManager(),
+            memberIDs: [human.id.uuidString],
+            petID: pet.id
+        )
+
+        let result = CalendarTaskCompletionSyncService.syncPetTask(
+            event: event,
+            occurrenceDate: occurrenceDate,
+            isCompleted: true,
+            pets: [pet],
+            context: context,
+            executorId: human.id.uuidString,
+            operationDate: operationDate
+        )
+
+        let careLog = try #require(try context.fetch(FetchDescriptor<PetCareLog>()).first)
+        let syncState = try #require(try cloudSyncState(entityName: String(describing: PetCareLog.self), id: careLog.id, context: context))
+        #expect(result == .activeCompleted)
+        #expect(careLog.date == occurrenceDate)
+        #expect(syncState.lastModifiedAt == operationDate)
+    }
+
+    @Test func plannedFeedCatchUpMarksDirtyAtOperationDate() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let occurrenceDate = Date(timeIntervalSince1970: 1_800_000_060)
+        let operationDate = occurrenceDate.addingTimeInterval(60 * 60)
+        let human = Human(name: "Guan")
+        let pet = Pet(name: "Momo", species: "dog")
+        let event = Event(
+            title: "Feed Momo 42g",
+            startDate: occurrenceDate,
+            eventType: EventType.daily.rawValue,
+            relatedEntityType: EntityKind.pet.rawValue,
+            relatedEntityId: pet.id.uuidString
+        )
+        let reminder = Reminder(event: event, scheduledAt: occurrenceDate)
+        context.insert(human)
+        context.insert(pet)
+        context.insert(event)
+        context.insert(reminder)
+        try context.save()
+
+        let state = EconomyDefaultsState.capture()
+        defer { state.restore() }
+        prepareEconomyDefaults(
+            activeHumanID: human.id.uuidString,
+            questManager: makeQuestManager(),
+            memberIDs: [human.id.uuidString],
+            petID: pet.id
+        )
+
+        let result = CareEventService.completePlannedFeedResult(
+            pet: pet,
+            reminder: reminder,
+            context: context,
+            executorId: human.id.uuidString,
+            operationDate: operationDate
+        )
+
+        let careLog = try #require(try context.fetch(FetchDescriptor<PetCareLog>()).first)
+        let syncState = try #require(try cloudSyncState(entityName: String(describing: PetCareLog.self), id: careLog.id, context: context))
+        #expect(result.didRecord)
+        #expect(careLog.date == occurrenceDate)
+        #expect(syncState.lastModifiedAt == operationDate)
+    }
+
+    @Test func plannedWaterCatchUpMarksDirtyAtOperationDate() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let occurrenceDate = Date(timeIntervalSince1970: 1_800_000_070)
+        let operationDate = occurrenceDate.addingTimeInterval(60 * 60)
+        let human = Human(name: "Guan")
+        let pet = Pet(name: "Momo", species: "dog")
+        let event = Event(
+            title: "Drink water",
+            startDate: occurrenceDate,
+            eventType: EventType.watering.rawValue,
+            relatedEntityType: EntityKind.pet.rawValue,
+            relatedEntityId: pet.id.uuidString
+        )
+        let reminder = Reminder(event: event, scheduledAt: occurrenceDate)
+        context.insert(human)
+        context.insert(pet)
+        context.insert(event)
+        context.insert(reminder)
+        try context.save()
+
+        let state = EconomyDefaultsState.capture()
+        defer { state.restore() }
+        prepareEconomyDefaults(
+            activeHumanID: human.id.uuidString,
+            questManager: makeQuestManager(),
+            memberIDs: [human.id.uuidString],
+            petID: pet.id
+        )
+
+        let result = CareEventService.completePlannedWaterResult(
+            pet: pet,
+            reminder: reminder,
+            amountMl: 120,
+            context: context,
+            executorId: human.id.uuidString,
+            operationDate: operationDate
+        )
+
+        let careLog = try #require(try context.fetch(FetchDescriptor<PetCareLog>()).first)
+        let syncState = try #require(try cloudSyncState(entityName: String(describing: PetCareLog.self), id: careLog.id, context: context))
+        #expect(result.didRecord)
+        #expect(careLog.date == occurrenceDate)
+        #expect(syncState.lastModifiedAt == operationDate)
+    }
+
+    @Test func humanMedicationPlanAndDoseWritesCloudSyncDirtyState() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let startDate = Date(timeIntervalSince1970: 1_800_000_080)
+        let scheduledTime = Calendar.current.date(
+            bySettingHour: 8,
+            minute: 0,
+            second: 0,
+            of: startDate
+        ) ?? startDate
+        let human = Human(name: "Guan")
+        context.insert(human)
+        try context.save()
+
+        let created = try #require(HumanMedicationPlanCommandService.savePlan(
+            human: human,
+            editing: nil,
+            input: HumanMedicationPlanCommandInput(
+                name: "Vitamin D",
+                dosage: "1 tablet",
+                frequency: .daily,
+                customFrequencyNote: "",
+                doseMinutes: [8 * 60],
+                weeklyWeekday: 2,
+                startDate: startDate,
+                endDate: nil,
+                colorHex: "FF6B8A",
+                visibleNotes: "",
+                isActive: true,
+                appLanguage: "en"
+            ),
+            context: context,
+            scheduleReminders: false
+        ))
+
+        let medicationState = try #require(try cloudSyncState(
+            entityName: String(describing: HumanMedication.self),
+            id: created.medicationID,
+            context: context
+        ))
+        let calendarEventID = try #require(created.calendarEventIDs.first)
+        let event = try #require(try context.fetch(FetchDescriptor<Event>()).first { $0.id == calendarEventID })
+        let eventState = try #require(try cloudSyncState(
+            entityName: String(describing: Event.self),
+            id: calendarEventID,
+            context: context
+        ))
+
+        let dose = HumanMedicationDoseCommandService.setDoseStatus(
+            human: human,
+            medicationID: created.medicationID,
+            scheduledTime: scheduledTime,
+            status: .taken,
+            context: context,
+            now: scheduledTime
+        )
+        let doseLogID = try #require(dose.logID)
+        let doseLogState = try #require(try cloudSyncState(
+            entityName: String(describing: HumanMedicationLog.self),
+            id: doseLogID,
+            context: context
+        ))
+
+        #expect(medicationState.isDeletionTombstone == false)
+        #expect(medicationState.lastModifiedAt == startDate)
+        #expect(eventState.isDeletionTombstone == false)
+        #expect(eventState.lastModifiedAt == event.startDate)
+        #expect(dose.didChange == true)
+        #expect(dose.recordedLedgerEvent == true)
+        #expect(doseLogState.isDeletionTombstone == false)
+        #expect(doseLogState.lastModifiedAt == scheduledTime)
+    }
+
+    @Test func humanMedicationActiveOnlyCommandsNoopForDeceasedHuman() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let startDate = Date(timeIntervalSince1970: 1_800_000_090)
+        let scheduledTime = Calendar.current.date(
+            bySettingHour: 8,
+            minute: 0,
+            second: 0,
+            of: startDate
+        ) ?? startDate
+        let human = Human(name: "Guan")
+        context.insert(human)
+        try context.save()
+
+        let created = try #require(HumanMedicationPlanCommandService.savePlan(
+            human: human,
+            editing: nil,
+            input: HumanMedicationPlanCommandInput(
+                name: "Vitamin D",
+                dosage: "1 tablet",
+                frequency: .daily,
+                customFrequencyNote: "",
+                doseMinutes: [8 * 60],
+                weeklyWeekday: 2,
+                startDate: startDate,
+                endDate: nil,
+                colorHex: "FF6B8A",
+                visibleNotes: "",
+                isActive: true,
+                appLanguage: "en"
+            ),
+            context: context,
+            scheduleReminders: false
+        ))
+        let medication = try #require(try context.fetch(FetchDescriptor<HumanMedication>()).first)
+        let originalCalendarEventCount = try context.fetch(FetchDescriptor<Event>()).count
+        human.passedAwayDate = Date(timeIntervalSince1970: 1_700_000_000)
+        try context.save()
+
+        let blockedSave = HumanMedicationPlanCommandService.savePlan(
+            human: human,
+            editing: nil,
+            input: HumanMedicationPlanCommandInput(
+                name: "New medicine",
+                dosage: "2 tablets",
+                frequency: .daily,
+                customFrequencyNote: "",
+                doseMinutes: [9 * 60],
+                weeklyWeekday: 2,
+                startDate: startDate,
+                endDate: nil,
+                colorHex: "00AEEF",
+                visibleNotes: "",
+                isActive: true,
+                appLanguage: "en"
+            ),
+            context: context,
+            scheduleReminders: false
+        )
+        let activation = HumanMedicationPlanCommandService.setPlanActive(
+            human: human,
+            medication: medication,
+            isActive: false,
+            appLanguage: "en",
+            context: context,
+            scheduleReminders: false
+        )
+        let dose = HumanMedicationDoseCommandService.setDoseStatus(
+            human: human,
+            medicationID: created.medicationID,
+            scheduledTime: scheduledTime,
+            status: .taken,
+            context: context,
+            now: scheduledTime
+        )
+        let deletion = HumanMedicationPlanCommandService.deletePlan(
+            human: human,
+            medication: medication,
+            context: context,
+            scheduleReminders: false
+        )
+
+        #expect(blockedSave == nil)
+        #expect(activation.didChange == false)
+        #expect(dose.didChange == false)
+        #expect(dose.recordedLedgerEvent == false)
+        #expect(deletion.didChange == false)
+        #expect(try context.fetch(FetchDescriptor<HumanMedication>()).count == 1)
+        #expect(try context.fetch(FetchDescriptor<Event>()).count == originalCalendarEventCount)
+        #expect(try context.fetch(FetchDescriptor<HumanMedicationLog>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<CareLedgerEvent>()).isEmpty)
+        #expect(medication.isActive == true)
+    }
+
+    @Test func reminderDedupeTombstonesRemovedDuplicate() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let scheduledAt = Date(timeIntervalSince1970: 1_800_000_026)
+        let event = Event(
+            title: "Drink water",
+            startDate: scheduledAt,
+            eventType: EventType.daily.rawValue,
+            relatedEntityType: EntityKind.pet.rawValue,
+            relatedEntityId: UUID().uuidString
+        )
+        let first = Reminder(event: event, scheduledAt: scheduledAt)
+        let duplicate = Reminder(event: event, scheduledAt: scheduledAt.addingTimeInterval(10))
+        context.insert(event)
+        context.insert(first)
+        context.insert(duplicate)
+        try context.save()
+
+        let kept = ReminderSchedulingService.deduplicate(reminders: [duplicate, first], context: context)
+
+        let reminders = try context.fetch(FetchDescriptor<Reminder>())
+        #expect(kept.map(\.id) == [first.id])
+        #expect(reminders.count == 1)
+        #expect(reminders.first?.id == first.id)
+        #expect(try cloudSyncState(entityName: String(describing: Reminder.self), id: duplicate.id, context: context)?.isDeletionTombstone == true)
     }
 
     @Test func notificationCompleteForDailyCareReminderRecordsCareFactAndReward() throws {

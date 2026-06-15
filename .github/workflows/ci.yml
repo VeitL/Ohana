@@ -67,6 +67,8 @@ jobs:
         run: scripts/audit-architecture-boundaries.sh --all
       - name: Economy boundaries audit (whole repo, ratcheted)
         run: scripts/audit-economy-boundaries.sh --all
+      - name: Member lifecycle gate audit (whole repo, strict)
+        run: scripts/audit-member-lifecycle-gate.sh --all
       - name: Derived-state lifecycle audit (whole repo, ratcheted)
         run: scripts/audit-derived-state-lifecycle.sh --all
       - name: Shared-care note metadata audit (whole repo, strict)

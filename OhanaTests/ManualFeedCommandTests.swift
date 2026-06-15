@@ -333,7 +333,7 @@ struct ManualFeedCommandTests {
             expenseDate: date(year: 2026, month: 5, day: 1),
             expenseNote: "food stock"
         )
-        let record = result.record
+        let record = try #require(result.record)
 
         #expect(record.calculationModeRaw == FeedStockCalculationMode.autoFeeder.rawValue)
         #expect(FeedStockRecordMetadata.calculationMode(for: record) == .autoFeeder)
@@ -361,6 +361,263 @@ struct ManualFeedCommandTests {
         #expect(recordState.hasPendingLocalChanges)
         #expect(expenseState.hasPendingLocalChanges)
         #expect(petState.hasPendingLocalChanges)
+    }
+
+    @Test func foodStockExpenseUpdateKeepsCareLedgerInSync() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let pet = Pet(name: "Momo", species: "猫")
+        let payer = Human(name: "Guan")
+        context.insert(pet)
+        context.insert(payer)
+        try context.save()
+
+        let created = SaveFoodStockCommand.run(
+            pet: pet,
+            brand: "Test",
+            totalGrams: 1200,
+            purchaseDate: nil,
+            openDate: date(year: 2026, month: 5, day: 1),
+            dailyGrams: 60,
+            foodKind: .dry,
+            calculationMode: .autoFeeder,
+            reminderEnabled: false,
+            reminderAdvanceDays: 7,
+            executorId: nil,
+            allEvents: [],
+            context: context,
+            recordToUpdate: nil,
+            previousExpenseId: nil,
+            expenseAmount: 19.5,
+            expensePayerId: nil,
+            expenseDate: date(year: 2026, month: 5, day: 1),
+            expenseNote: "food stock"
+        )
+        let createdRecord = try #require(created.record)
+        let expenseId = try #require(createdRecord.expenseId)
+
+        _ = SaveFoodStockCommand.run(
+            pet: pet,
+            brand: "Test Plus",
+            totalGrams: 1500,
+            purchaseDate: nil,
+            openDate: date(year: 2026, month: 5, day: 2),
+            dailyGrams: 75,
+            foodKind: .dry,
+            calculationMode: .autoFeeder,
+            reminderEnabled: false,
+            reminderAdvanceDays: 7,
+            executorId: nil,
+            allEvents: [],
+            context: context,
+            recordToUpdate: createdRecord,
+            previousExpenseId: expenseId,
+            expenseAmount: 27.25,
+            expensePayerId: payer.id.uuidString,
+            expenseDate: date(year: 2026, month: 5, day: 2),
+            expenseNote: "food stock update"
+        )
+
+        let expenses = try context.fetch(FetchDescriptor<PetExpenseLog>())
+        let ledgers = try context.fetch(FetchDescriptor<CareLedgerEvent>())
+        let expense = try #require(expenses.first { $0.id == expenseId })
+        let ledger = try #require(ledgers.first {
+            $0.legacyModelName == "PetExpenseLog" && $0.legacyModelId == expenseId.uuidString
+        })
+
+        #expect(expenses.count == 1)
+        #expect(ledgers.count == 1)
+        #expect(expense.amount == 27.25)
+        #expect(expense.note == "food stock update")
+        #expect(expense.executorId == payer.id.uuidString)
+        #expect(ledger.amountValue == expense.amount)
+        #expect(ledger.note == expense.note)
+        #expect(ledger.actorId == payer.id.uuidString)
+        #expect(ledger.occurredAt == expense.date)
+    }
+
+    @Test func foodStockExpenseUsesEffectiveActorForDeceasedPayer() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let pet = Pet(name: "Momo", species: "猫")
+        let activeHuman = Human(name: "Guan")
+        let deceasedPayer = Human(name: "Old payer")
+        deceasedPayer.passedAwayDate = date(year: 2026, month: 5, day: 1)
+        context.insert(pet)
+        context.insert(activeHuman)
+        context.insert(deceasedPayer)
+        try context.save()
+
+        _ = SaveFoodStockCommand.run(
+            pet: pet,
+            brand: "Test",
+            totalGrams: 1200,
+            purchaseDate: nil,
+            openDate: date(year: 2026, month: 5, day: 2),
+            dailyGrams: 60,
+            foodKind: .dry,
+            calculationMode: .manualOrPlan,
+            reminderEnabled: false,
+            reminderAdvanceDays: 7,
+            executorId: activeHuman.id.uuidString,
+            allEvents: [],
+            context: context,
+            recordToUpdate: nil,
+            previousExpenseId: nil,
+            expenseAmount: 27.25,
+            expensePayerId: deceasedPayer.id.uuidString,
+            expenseDate: date(year: 2026, month: 5, day: 2),
+            expenseNote: "food stock"
+        )
+
+        let expense = try #require(try context.fetch(FetchDescriptor<PetExpenseLog>()).first)
+        let ledger = try #require(try context.fetch(FetchDescriptor<CareLedgerEvent>()).first)
+
+        #expect(expense.executorId == activeHuman.id.uuidString)
+        #expect(ledger.actorId == activeHuman.id.uuidString)
+        #expect(ledger.actorKind == CareLedgerActorKind.human.rawValue)
+    }
+
+    @Test func saveFoodStockNoopsForDeceasedPetBeforeFactReminderExpenseLedger() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let pet = Pet(name: "Momo", species: "猫")
+        pet.passedAwayDate = date(year: 2026, month: 5, day: 1)
+        pet.foodTrackingMode = .casual
+        pet.foodReminderEnabled = false
+        pet.foodReminderAdvanceDays = 3
+        context.insert(pet)
+        try context.save()
+
+        let result = SaveFoodStockCommand.run(
+            pet: pet,
+            brand: "Test",
+            totalGrams: 1200,
+            purchaseDate: nil,
+            openDate: date(year: 2026, month: 5, day: 2),
+            dailyGrams: 60,
+            foodKind: .dry,
+            calculationMode: .manualOrPlan,
+            reminderEnabled: true,
+            reminderAdvanceDays: 1,
+            executorId: nil,
+            allEvents: [],
+            context: context,
+            recordToUpdate: nil,
+            previousExpenseId: nil,
+            expenseAmount: 27.25,
+            expensePayerId: nil,
+            expenseDate: date(year: 2026, month: 5, day: 2),
+            expenseNote: "food stock"
+        )
+
+        #expect(result.stockReminders.isEmpty)
+        #expect(try context.fetch(FetchDescriptor<PetFoodRecord>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<PetExpenseLog>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<CareLedgerEvent>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<Event>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<Reminder>()).isEmpty)
+        #expect(pet.foodTrackingMode == .casual)
+        #expect(pet.foodReminderEnabled == false)
+        #expect(pet.foodReminderAdvanceDays == 3)
+    }
+
+    @Test func feedPlanAndStockCommandsNoopForDeceasedPet() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let now = date(year: 2026, month: 5, day: 1, hour: 7)
+        let pet = Pet(name: "Momo", species: "猫")
+        pet.foodReminderEnabled = false
+        pet.foodReminderAdvanceDays = 4
+        pet.mainFoodKind = .dry
+        let record = PetFoodRecord(
+            brand: "Test",
+            dailyGrams: 60,
+            totalGrams: 1200,
+            foodKind: .dry,
+            startDate: now,
+            pet: pet
+        )
+        context.insert(pet)
+        context.insert(record)
+        try context.save()
+
+        let manualDraft = FeedPlanDraft(
+            kind: .manualReminder,
+            meals: [FeedPlanMealDraft(time: date(year: 2026, month: 5, day: 1, hour: 8), foodKind: .dry, grams: 45)],
+            now: now
+        )
+        _ = FeedingPlanWriter.replacePlan(pet: pet, draft: manualDraft, allEvents: [], context: context, now: now)
+        var events = try context.fetch(FetchDescriptor<Event>())
+        let autoDraft = FeedPlanDraft(
+            kind: .autoFeeder,
+            meals: [FeedPlanMealDraft(time: date(year: 2026, month: 5, day: 1, hour: 18), foodKind: .wet, grams: 30)],
+            now: now
+        )
+        _ = FeedingPlanWriter.replacePlan(pet: pet, draft: autoDraft, allEvents: events, context: context, now: now)
+        events = try context.fetch(FetchDescriptor<Event>())
+        FeedOperatingMode.set(pet.id, mode: .autoFeeder)
+        pet.passedAwayDate = date(year: 2026, month: 5, day: 2)
+        try context.save()
+
+        let beforeEventIds = Set(events.map(\.id))
+        let beforeReminderIds = Set((try context.fetch(FetchDescriptor<Reminder>())).map(\.id))
+
+        let stockSettings = StockReminderSettingsCommand.run(
+            pet: pet,
+            enabled: true,
+            advanceDays: 1,
+            allEvents: events,
+            context: context
+        )
+        let correction = CorrectStockCommand.run(
+            pet: pet,
+            record: record,
+            remainingGrams: 100,
+            allEvents: events,
+            context: context
+        )
+        let deletion = DeleteFeedPlanCommand.run(
+            pet: pet,
+            kind: .autoFeeder,
+            activeMode: .autoFeeder,
+            allEvents: events,
+            context: context
+        )
+        SetMainFoodKindCommand.run(pet: pet, foodKind: .wet, context: context)
+        let directModeChanged = SetFeedModeCommand.run(.manual, pet: pet)
+        let ensuredReminders = FeedMaintenanceCommand.ensureUpcomingPlanReminders(
+            pet: pet,
+            allEvents: events,
+            context: context,
+            now: now
+        )
+        SwitchFeedModeCommand.switchToManual(pet: pet, allEvents: events, context: context)
+        let switchResult = SwitchFeedModeCommand.activateExistingRule(
+            pet: pet,
+            kind: .manualReminder,
+            allEvents: events,
+            context: context
+        )
+
+        #expect(stockSettings.stockReminders.isEmpty)
+        #expect(correction.stockReminders.isEmpty)
+        #expect(deletion.stockReminders.isEmpty)
+        #expect(!deletion.shouldSwitchToManual)
+        #expect(!directModeChanged)
+        #expect(ensuredReminders.isEmpty)
+        if case .switched = switchResult {
+            Issue.record("Deceased pet feed mode switch should no-op.")
+        }
+        let afterEvents = try context.fetch(FetchDescriptor<Event>())
+        let afterReminders = try context.fetch(FetchDescriptor<Reminder>())
+        #expect(Set(afterEvents.map(\.id)) == beforeEventIds)
+        #expect(Set(afterReminders.map(\.id)) == beforeReminderIds)
+        #expect(record.remainingCorrectionGrams == nil)
+        #expect(pet.foodReminderEnabled == false)
+        #expect(pet.foodReminderAdvanceDays == 4)
+        #expect(pet.mainFoodKind == .dry)
+        #expect(FeedOperatingMode.resolved(pet: pet, allEvents: afterEvents, now: now) == .autoFeeder)
     }
 
     @Test func legacyFoodStockMetadataStillReadsFromNotes() throws {

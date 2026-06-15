@@ -49,17 +49,26 @@ enum ExpenseCommandService {
         questManager providedQuestManager: QuestManager? = nil,
         careLedger providedCareLedger: CareLedgerRecording? = nil
     ) -> ExpenseCommandResult {
+        guard MemberWritePolicy.disposition(pet: pet, intent: .activeOnly).allowsDerivedEffects else {
+            return ExpenseCommandResult(logID: UUID(), subjectID: pet.id, coconutDelta: 0)
+        }
         let careLedger = providedCareLedger ?? CareLedgerService()
         let cleanNote = note.trimmingCharacters(in: .whitespacesAndNewlines)
+        let actor = CareFactWritePolicy.executorResolution(
+            requestedExecutorId: executorId,
+            context: context,
+            logPrefix: "ExpenseCommandService.recordPetExpense"
+        )
         let log = PetExpenseLog(
             date: date,
             amount: amount,
             category: category,
             note: cleanNote,
             pet: pet,
-            executorId: executorId
+            executorId: actor.effectiveExecutorId
         )
         context.insert(log)
+        CloudSyncMutationRecorder.markModified(log, context: context, modifiedAt: date)
 
         let document: PetDocument?
         if !receiptAttachments.isEmpty {
@@ -75,6 +84,7 @@ enum ExpenseCommandService {
                 pet: pet
             )
             context.insert(receiptDocument)
+            CloudSyncMutationRecorder.markModified(receiptDocument, context: context, modifiedAt: log.date)
             for attachment in receiptDocument.attachments {
                 context.insert(attachment)
             }
@@ -90,7 +100,7 @@ enum ExpenseCommandService {
                 type: .expense,
                 pet: pet,
                 context: context,
-                executorId: executorId,
+                executorId: actor.rewardExecutorId,
                 questManager: questManager
             )
         } else {
@@ -99,8 +109,8 @@ enum ExpenseCommandService {
         let coconutDelta = careLedger.rewardDelta(reward)
         let ledgerEvent = careLedger.record(
             occurredAt: log.date,
-            actorKind: executorId == nil ? .unknown : .human,
-            actorId: executorId,
+            actorKind: actor.effectiveExecutorId == nil ? .unknown : .human,
+            actorId: actor.effectiveExecutorId,
             subjectKind: .pet,
             subjectId: pet.id.uuidString,
             eventKind: .expense,
@@ -172,6 +182,9 @@ enum ExpenseCommandService {
         questManager providedQuestManager: QuestManager? = nil,
         careLedger providedCareLedger: CareLedgerRecording? = nil
     ) -> ExpenseCommandResult {
+        guard MemberWritePolicy.disposition(human: human, intent: .activeOnly).allowsDerivedEffects else {
+            return ExpenseCommandResult(logID: UUID(), subjectID: human.id, coconutDelta: 0)
+        }
         let questManager = providedQuestManager ?? QuestManager()
         let careLedger = providedCareLedger ?? CareLedgerService()
         let cleanNote = note.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -184,6 +197,7 @@ enum ExpenseCommandService {
             executorId: human.id.uuidString
         )
         context.insert(log)
+        CloudSyncMutationRecorder.markModified(log, context: context, modifiedAt: date)
 
         let reward = EconomyRewardDiscipline.awardNonCareReward(
             type: .expense,

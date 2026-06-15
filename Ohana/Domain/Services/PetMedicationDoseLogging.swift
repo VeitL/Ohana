@@ -122,6 +122,12 @@ nonisolated enum PetMedicationDoseLogging {
                 allowsDerivedEffects: false
             )
         }
+        let actor = CareFactWritePolicy.executorResolution(
+            requestedExecutorId: event.assigneeId,
+            context: modelContext,
+            logPrefix: "PetMedicationDoseLogging"
+        )
+        event.assigneeId = actor.effectiveExecutorId
         modelContext.insert(event)
 
         var coconutDelta = 0
@@ -131,7 +137,7 @@ nonisolated enum PetMedicationDoseLogging {
                     type: .general(humanReward: 1, petReward: 0, emoji: "💊", title: "记录喂药 +1🥥"),
                     pet: pet,
                     context: modelContext,
-                    executorId: event.assigneeId,
+                    executorId: actor.rewardExecutorId,
                     questManager: questManager
                 )
                 coconutDelta = reward.humanGot + reward.petGot
@@ -139,8 +145,8 @@ nonisolated enum PetMedicationDoseLogging {
             if disposition.allowsDerivedEffects {
                 careLedger.record(
                     occurredAt: event.startDate,
-                    actorKind: event.assigneeId == nil ? .unknown : .human,
-                    actorId: event.assigneeId,
+                    actorKind: actor.effectiveExecutorId == nil ? .unknown : .human,
+                    actorId: actor.effectiveExecutorId,
                     subjectKind: .pet,
                     subjectId: pet.id.uuidString,
                     eventKind: .medication,

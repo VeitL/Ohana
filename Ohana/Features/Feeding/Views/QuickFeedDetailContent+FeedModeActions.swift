@@ -231,6 +231,8 @@ extension QuickFeedDetailContent {
             case .missingPlan:
                 commandExecutor.setFeedMode(.manual, pet: pet)
                 feedHomeController.setModeImmediately(.manual, pet: pet)
+            case .noOp:
+                break
             }
         case .autoFeeder:
             let result = commandExecutor.activateExistingRule(

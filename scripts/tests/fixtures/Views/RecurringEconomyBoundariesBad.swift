@@ -220,4 +220,21 @@ struct RecurringEconomyExpenseWithoutLedgerCommand {
         )
         context.insert(expense)
     }
+
+    func saveExpenseThroughNonLedgerHelper(pet: Pet, executorId: String) {
+        let expense = PetExpenseLog(
+            date: Date(),
+            amount: 42,
+            category: .medical,
+            note: "bad.expense.helper",
+            pet: pet,
+            executorId: executorId
+        )
+        context.insert(expense)
+        updateExpenseMetadata(expense)
+    }
+
+    private func updateExpenseMetadata(_ expense: PetExpenseLog) {
+        expense.note = "still.no.ledger"
+    }
 }

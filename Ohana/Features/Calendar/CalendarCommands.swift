@@ -49,6 +49,7 @@ enum CalendarEventPlanCommandService {
         reminderScheduling providedReminderScheduling: ReminderSchedulingManaging? = nil
     ) -> CalendarEventPlanCommandResult? {
         guard !input.cleanTitle.isEmpty else { return nil }
+        guard lifecycleDisposition(for: input, context: context).allowsDerivedEffects else { return nil }
 
         let event = Event(
             title: input.cleanTitle,
@@ -119,6 +120,51 @@ enum CalendarEventPlanCommandService {
         let reminder = Reminder(event: event, scheduledAt: scheduled)
         context.insert(reminder)
         return [reminder]
+    }
+
+    @MainActor
+    private static func lifecycleDisposition(
+        for input: CalendarEventPlanCommandInput,
+        context: ModelContext
+    ) -> MemberWriteDisposition {
+        guard let id = UUID(uuidString: input.relatedEntityId) else {
+            return .activeWritable
+        }
+        if input.relatedEntityType == EntityKind.pet.rawValue || input.relatedEntityType == "pet" {
+            guard let pet = fetchPet(id: id, context: context) else {
+                return .activeWritable
+            }
+            return MemberLifecycleGate.disposition(pet: pet, writeKind: .care)
+        }
+        if input.relatedEntityType == EntityKind.human.rawValue || input.relatedEntityType == "human" {
+            guard let human = fetchHuman(id: id, context: context) else {
+                return .activeWritable
+            }
+            return MemberLifecycleGate.disposition(human: human, writeKind: .care)
+        }
+        return .activeWritable
+    }
+
+    @MainActor
+    private static func fetchPet(id: UUID, context: ModelContext) -> Pet? {
+        var descriptor = FetchDescriptor<Pet>(
+            predicate: #Predicate<Pet> { pet in
+                pet.id == id
+            }
+        )
+        descriptor.fetchLimit = 1
+        return try? context.fetch(descriptor).first
+    }
+
+    @MainActor
+    private static func fetchHuman(id: UUID, context: ModelContext) -> Human? {
+        var descriptor = FetchDescriptor<Human>(
+            predicate: #Predicate<Human> { human in
+                human.id == id
+            }
+        )
+        descriptor.fetchLimit = 1
+        return try? context.fetch(descriptor).first
     }
 }
 

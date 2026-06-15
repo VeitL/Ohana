@@ -85,10 +85,14 @@ enum HumanWishlistCommandService {
         let title = input.title.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !title.isEmpty else { throw HumanWishlistCommandError.emptyTitle }
         guard input.cost > 0 else { throw HumanWishlistCommandError.invalidCost }
+        guard MemberWritePolicy.disposition(human: human, intent: .activeOnly).allowsDerivedEffects else {
+            throw HumanWishlistCommandError.itemOwnershipMismatch
+        }
 
         let item = WishlistItem(title: title, cost: input.cost, creatorId: human.id.uuidString)
         item.createdAt = input.createdAt
         context.insert(item)
+        CloudSyncMutationRecorder.markModified(item, context: context, modifiedAt: input.createdAt)
         context.safeSave()
         return HumanWishlistCommandResult(
             humanID: human.id,
@@ -113,6 +117,9 @@ enum HumanWishlistCommandService {
         let questManager = providedQuestManager ?? QuestManager()
         let careLedger: CareLedgerRecording = providedCareLedger ?? CareLedgerService()
         let wallet: CoconutWalletManaging = providedWallet ?? SwiftDataCoconutWalletManager()
+        guard MemberWritePolicy.disposition(human: human, intent: .activeOnly).allowsDerivedEffects else {
+            throw HumanWishlistCommandError.itemOwnershipMismatch
+        }
         guard item.creatorId == human.id.uuidString else {
             throw HumanWishlistCommandError.itemOwnershipMismatch
         }
@@ -125,6 +132,7 @@ enum HumanWishlistCommandService {
 
         item.isRedeemed = true
         item.redeemedById = normalizedId(redeemedById)
+        CloudSyncMutationRecorder.markModified(item, context: context)
 
         let ledger = careLedger.record(
             occurredAt: Date(),
@@ -199,6 +207,9 @@ enum HumanWishlistCommandService {
         for human: Human,
         context: ModelContext
     ) throws -> HumanWishlistDeleteCommandResult {
+        guard MemberWritePolicy.disposition(human: human, intent: .activeOnly).allowsDerivedEffects else {
+            throw HumanWishlistCommandError.itemOwnershipMismatch
+        }
         guard item.creatorId == human.id.uuidString else {
             throw HumanWishlistCommandError.itemOwnershipMismatch
         }

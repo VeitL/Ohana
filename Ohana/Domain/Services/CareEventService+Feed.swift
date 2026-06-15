@@ -89,6 +89,11 @@ extension CareEventService {
                 foodKind: foodKind
             )
         }
+        let actor = CareFactWritePolicy.executorResolution(
+            requestedExecutorId: executorId,
+            context: context,
+            logPrefix: "CareEventService recordManualFeedFact"
+        )
         let log = PetCareLog(
             date: date,
             type: .feeding,
@@ -96,10 +101,10 @@ extension CareEventService {
             note: PetCareLog.manualFeedNoteMarker,
             foodKind: foodKind,
             pet: pet,
-            executorId: executorId
+            executorId: actor.effectiveExecutorId
         )
         context.insert(log)
-        CloudSyncMutationRecorder.markModified(log, context: context, modifiedAt: log.date)
+        CloudSyncMutationRecorder.markModified(log, context: context, modifiedAt: date)
         context.safeSave()
 
         guard disposition.allowsDerivedEffects else {
@@ -117,14 +122,14 @@ extension CareEventService {
             )
         }
 
-        dependencies.questManager.recordFirstMeal(actorId: executorId, context: context)
+        dependencies.questManager.recordFirstMeal(actorId: actor.rewardExecutorId, context: context)
         let reward = dependencies.economy.awardCareAction(
             type: .feed,
             pet: pet,
             context: context,
             quality: quality,
             date: Date(),
-            executorId: executorId
+            executorId: actor.rewardExecutorId
         )
         dependencies.careLedger.recordPetCare(
             log: log,
@@ -141,7 +146,7 @@ extension CareEventService {
             pet: pet,
             type: .feeding,
             context: context,
-            executorId: executorId,
+            executorId: actor.effectiveExecutorId,
             now: date
         )
         return (
@@ -217,6 +222,11 @@ extension CareEventService {
                 log: log
             )
         }
+        let actor = CareFactWritePolicy.executorResolution(
+            requestedExecutorId: executorId,
+            context: context,
+            logPrefix: "CareEventService recordTreatFeedFact"
+        )
         let log = PetCareLog(
             date: date,
             type: .feeding,
@@ -224,7 +234,7 @@ extension CareEventService {
             note: FeedLogMetadata.treatFeedNoteMarker,
             treatKind: treatKind,
             pet: pet,
-            executorId: executorId
+            executorId: actor.effectiveExecutorId
         )
         context.insert(log)
         CloudSyncMutationRecorder.markModified(log, context: context, modifiedAt: date)
@@ -310,6 +320,11 @@ extension CareEventService {
             context: context
         )
         guard disposition.writesFact else { return .noOp(operationDate: operationDate) }
+        let actor = CareFactWritePolicy.executorResolution(
+            requestedExecutorId: executorId,
+            context: context,
+            logPrefix: "CareEventService completePlannedFeedResult"
+        )
         let isCatchUp = reminder.scheduledAt < operationDate
         guard !disposition.allowsDerivedEffects || !isCatchUp || FeedPlanCatchUpPolicy.isCatchUpEligible(reminder, now: operationDate) else {
             return .noOp(operationDate: operationDate)
@@ -322,10 +337,10 @@ extension CareEventService {
             note: "\(PetCareLog.plannedFeedNotePrefix)\(event.id.uuidString)",
             foodKind: event.foodKind,
             pet: pet,
-            executorId: executorId
+            executorId: actor.effectiveExecutorId
         )
         context.insert(log)
-        CloudSyncMutationRecorder.markModified(log, context: context, modifiedAt: log.date)
+        CloudSyncMutationRecorder.markModified(log, context: context, modifiedAt: operationDate)
 
         guard disposition.allowsDerivedEffects else {
             context.safeSave()
@@ -341,8 +356,8 @@ extension CareEventService {
 
         reminder.statusEnum = .completed
         reminder.completedAt = operationDate
-        if let executorId {
-            reminder.completedBy = executorId
+        if let effectiveExecutorId = actor.effectiveExecutorId {
+            reminder.completedBy = effectiveExecutorId
         }
         event.setOccurrenceMarkedComplete(true, on: reminder.scheduledAt)
         OhanaNotifications.current.cancel(notificationId: reminder.notificationId)
@@ -350,21 +365,21 @@ extension CareEventService {
         dependencies.careLedger.recordReminderState(
             reminder: reminder,
             actionType: "completePlannedCare",
-            actorId: executorId,
+            actorId: actor.effectiveExecutorId,
             source: .reminder,
             context: context,
             save: true
         )
-        dependencies.familyTasks.syncCompletedReminder(reminder, completedBy: executorId, context: context)
+        dependencies.familyTasks.syncCompletedReminder(reminder, completedBy: actor.effectiveExecutorId, context: context)
 
-        dependencies.questManager.recordFirstMeal(actorId: executorId, context: context)
+        dependencies.questManager.recordFirstMeal(actorId: actor.rewardExecutorId, context: context)
         let reward = dependencies.economy.awardCareAction(
             type: .feed,
             pet: pet,
             context: context,
             quality: quality,
             date: operationDate,
-            executorId: executorId
+            executorId: actor.rewardExecutorId
         )
         dependencies.careLedger.recordPetCare(
             log: log,
@@ -435,6 +450,11 @@ extension CareEventService {
             context: context
         )
         guard disposition.writesFact else { return .noOp(operationDate: operationDate) }
+        let actor = CareFactWritePolicy.executorResolution(
+            requestedExecutorId: executorId,
+            context: context,
+            logPrefix: "CareEventService completePlannedWaterResult"
+        )
         let isCatchUp = reminder.scheduledAt < operationDate
         guard !disposition.allowsDerivedEffects || !isCatchUp || WaterPlanCatchUpPolicy.isCatchUpEligible(reminder, now: operationDate) else {
             return .noOp(operationDate: operationDate)
@@ -446,10 +466,10 @@ extension CareEventService {
             amountMl: max(0, amountMl),
             note: "\(PetCareLog.plannedWaterNotePrefix)\(event.id.uuidString)",
             pet: pet,
-            executorId: executorId
+            executorId: actor.effectiveExecutorId
         )
         context.insert(log)
-        CloudSyncMutationRecorder.markModified(log, context: context, modifiedAt: log.date)
+        CloudSyncMutationRecorder.markModified(log, context: context, modifiedAt: operationDate)
 
         guard disposition.allowsDerivedEffects else {
             context.safeSave()
@@ -465,8 +485,8 @@ extension CareEventService {
 
         reminder.statusEnum = .completed
         reminder.completedAt = operationDate
-        if let executorId {
-            reminder.completedBy = executorId
+        if let effectiveExecutorId = actor.effectiveExecutorId {
+            reminder.completedBy = effectiveExecutorId
         }
         event.setOccurrenceMarkedComplete(true, on: reminder.scheduledAt)
         OhanaNotifications.current.cancel(notificationId: reminder.notificationId)
@@ -474,12 +494,12 @@ extension CareEventService {
         dependencies.careLedger.recordReminderState(
             reminder: reminder,
             actionType: "completePlannedCare",
-            actorId: executorId,
+            actorId: actor.effectiveExecutorId,
             source: .reminder,
             context: context,
             save: true
         )
-        dependencies.familyTasks.syncCompletedReminder(reminder, completedBy: executorId, context: context)
+        dependencies.familyTasks.syncCompletedReminder(reminder, completedBy: actor.effectiveExecutorId, context: context)
 
         let reward = dependencies.economy.awardCareAction(
             type: .water,
@@ -487,7 +507,7 @@ extension CareEventService {
             context: context,
             quality: .none,
             date: operationDate,
-            executorId: executorId
+            executorId: actor.rewardExecutorId
         )
         dependencies.careLedger.recordPetCare(
             log: log,

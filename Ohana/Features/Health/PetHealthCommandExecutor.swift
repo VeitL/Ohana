@@ -152,21 +152,27 @@ struct PetHealthCommandExecutor {
     @discardableResult
     func deleteHealthLog(_ log: PetHealthLog, pet: Pet, note: String) -> PetHealthDeleteResult {
         let result = PetHealthDeleteCommandService.deleteHealthLog(log, pet: pet, context: context)
-        revisions.publishPetHealthDelete(result, note: note)
+        if result.didDelete {
+            revisions.publishPetHealthDelete(result, note: note)
+        }
         return result
     }
 
     @discardableResult
     func deleteSymptomLog(_ log: SymptomLog, pet: Pet, note: String) -> PetHealthDeleteResult {
         let result = PetHealthDeleteCommandService.deleteSymptomLog(log, pet: pet, context: context)
-        revisions.publishPetHealthDelete(result, note: note)
+        if result.didDelete {
+            revisions.publishPetHealthDelete(result, note: note)
+        }
         return result
     }
 
     @discardableResult
     func deleteHeatCycleLog(_ log: HeatCycleLog, pet: Pet, note: String) -> PetHealthDeleteResult {
         let result = PetHealthDeleteCommandService.deleteHeatCycleLog(log, pet: pet, context: context)
-        revisions.publishPetHealthDelete(result, note: note)
+        if result.didDelete {
+            revisions.publishPetHealthDelete(result, note: note)
+        }
         return result
     }
 

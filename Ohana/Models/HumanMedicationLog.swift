@@ -93,7 +93,8 @@ enum HumanMedicationLogStore {
         status: HumanMedicationStatus,
         existingLogs: [HumanMedicationLog],
         context: ModelContext,
-        calendar: Calendar = .current
+        calendar: Calendar = .current,
+        now: Date = Date()
     ) -> HumanMedicationDoseLogUpdate {
         let matching = matchingLog(
             in: existingLogs,
@@ -118,7 +119,7 @@ enum HumanMedicationLogStore {
                 medicationId: medicationId,
                 scheduledTime: scheduledTime,
                 status: status,
-                recordedTime: Date()
+                recordedTime: now
             )
             context.insert(log)
             return HumanMedicationDoseLogUpdate(log: log, previousStatus: nil, didChange: true)
@@ -130,7 +131,7 @@ enum HumanMedicationLogStore {
         }
 
         log.status = status
-        log.recordedTime = status == .pending ? nil : Date()
+        log.recordedTime = status == .pending ? nil : now
         return HumanMedicationDoseLogUpdate(log: log, previousStatus: previous, didChange: true)
     }
 

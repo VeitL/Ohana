@@ -121,6 +121,11 @@ enum PetHealthCommandService {
             context: context
         )
         guard disposition.didWriteFact else { return nil }
+        let actor = CareFactWritePolicy.executorResolution(
+            requestedExecutorId: input.executorId,
+            context: context,
+            logPrefix: "PetHealthCommandService.recordHealth"
+        )
         let careLedger = providedCareLedger ?? CareLedgerService()
         let reminderScheduling = providedReminderScheduling ?? ReminderSchedulingManager()
         let oasisRewards = providedOasisRewards ?? StaticOasisRewardManager(
@@ -133,13 +138,14 @@ enum PetHealthCommandService {
             type: input.type,
             note: input.composedNote,
             pet: pet,
-            executorId: input.executorId
+            executorId: actor.effectiveExecutorId
         )
         log.vetName = input.vetName.trimmingCharacters(in: .whitespacesAndNewlines)
         log.cost = input.cost
         log.expirationDate = input.expirationDate
         log.nextCheckupDate = input.nextCheckupDate
         context.insert(log)
+        CloudSyncMutationRecorder.markModified(log, context: context, modifiedAt: input.date)
 
         let allowsDerivedEffects = disposition.allowsDerivedEffects
         guard allowsDerivedEffects else {
@@ -158,6 +164,7 @@ enum PetHealthCommandService {
         let expense = makeExpenseIfNeeded(
             pet: pet,
             input: input,
+            executorId: actor.effectiveExecutorId,
             context: context
         )
         let event = makeExpirationEventIfNeeded(
@@ -177,7 +184,7 @@ enum PetHealthCommandService {
                 type: .health,
                 pet: pet,
                 context: context,
-                executorId: input.executorId,
+                executorId: actor.rewardExecutorId,
                 questManager: questManager
             )
             oasisRewards.rewardFeaturedCritterFromCare(type: .health, context: context)
@@ -189,8 +196,8 @@ enum PetHealthCommandService {
 
         careLedger.record(
             occurredAt: log.date,
-            actorKind: input.executorId == nil ? .unknown : .human,
-            actorId: input.executorId,
+            actorKind: actor.effectiveExecutorId == nil ? .unknown : .human,
+            actorId: actor.effectiveExecutorId,
             subjectKind: .pet,
             subjectId: pet.id.uuidString,
             eventKind: .health,
@@ -214,8 +221,8 @@ enum PetHealthCommandService {
         if let expense {
             careLedger.record(
                 occurredAt: expense.date,
-                actorKind: input.executorId == nil ? .unknown : .human,
-                actorId: input.executorId,
+                actorKind: actor.effectiveExecutorId == nil ? .unknown : .human,
+                actorId: actor.effectiveExecutorId,
                 subjectKind: .pet,
                 subjectId: pet.id.uuidString,
                 eventKind: .expense,
@@ -266,6 +273,7 @@ enum PetHealthCommandService {
     private static func makeExpenseIfNeeded(
         pet: Pet,
         input: PetHealthRecordCommandInput,
+        executorId: String?,
         context: ModelContext
     ) -> PetExpenseLog? {
         guard input.cost > 0 else { return nil }
@@ -275,9 +283,10 @@ enum PetHealthCommandService {
             category: .medical,
             note: input.recordName,
             pet: pet,
-            executorId: input.executorId
+            executorId: executorId
         )
         context.insert(expense)
+        CloudSyncMutationRecorder.markModified(expense, context: context, modifiedAt: input.date)
         return expense
     }
 
@@ -299,6 +308,7 @@ enum PetHealthCommandService {
             relatedEntityId: pet.id.uuidString
         )
         context.insert(event)
+        CloudSyncMutationRecorder.markModified(event, context: context, modifiedAt: dueDate)
         return event
     }
 
@@ -323,6 +333,7 @@ enum PetHealthCommandService {
         let reminder = Reminder(event: event, scheduledAt: scheduledAt)
         reminder.statusEnum = .pending
         context.insert(reminder)
+        CloudSyncMutationRecorder.markModified(reminder, context: context, modifiedAt: scheduledAt)
         return reminder
     }
 
@@ -385,6 +396,7 @@ enum PetSymptomCommandService {
             pet: pet
         )
         context.insert(log)
+        CloudSyncMutationRecorder.markModified(log, context: context, modifiedAt: input.date)
 
         let ledgerEvent = careLedger.record(
             occurredAt: log.date,
@@ -434,6 +446,14 @@ enum PetHealthDeleteCommandService {
         pet: Pet,
         context: ModelContext
     ) -> PetHealthDeleteResult {
+        guard MemberWritePolicy.disposition(pet: pet, intent: .activeOnly).allowsDerivedEffects else {
+            return PetHealthDeleteResult(
+                subjectID: pet.id,
+                recordID: log.id,
+                kind: "health",
+                didDelete: false
+            )
+        }
         let recordID = log.id
         let deletedAt = Date()
         PhysicalDeletionService.deletePetScopedRecord(log, pet: pet, context: context, deletedAt: deletedAt)
@@ -453,6 +473,14 @@ enum PetHealthDeleteCommandService {
         pet: Pet,
         context: ModelContext
     ) -> PetHealthDeleteResult {
+        guard MemberWritePolicy.disposition(pet: pet, intent: .activeOnly).allowsDerivedEffects else {
+            return PetHealthDeleteResult(
+                subjectID: pet.id,
+                recordID: log.id,
+                kind: "symptom",
+                didDelete: false
+            )
+        }
         let recordID = log.id
         let deletedAt = Date()
         deleteLedgerEvents(modelName: "SymptomLog", modelId: recordID, context: context, deletedAt: deletedAt)
@@ -474,6 +502,14 @@ enum PetHealthDeleteCommandService {
         pet: Pet,
         context: ModelContext
     ) -> PetHealthDeleteResult {
+        guard MemberWritePolicy.disposition(pet: pet, intent: .activeOnly).allowsDerivedEffects else {
+            return PetHealthDeleteResult(
+                subjectID: pet.id,
+                recordID: log.id,
+                kind: "heat",
+                didDelete: false
+            )
+        }
         let recordID = log.id
         let deletedAt = Date()
         deleteLedgerEvents(modelName: "HeatCycleLog", modelId: recordID, context: context, deletedAt: deletedAt)

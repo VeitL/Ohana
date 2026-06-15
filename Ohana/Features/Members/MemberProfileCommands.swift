@@ -209,7 +209,7 @@ enum MemberProfileCommandService {
         input: PetProfileCommandInput,
         context: ModelContext
     ) -> MemberProfileCommandResult {
-        guard !pet.hasPassedAway else {
+        guard MemberLifecycleGate.disposition(pet: pet, writeKind: .profileEdit).writesContent else {
             return MemberProfileCommandResult(entityID: pet.id, kind: EntityKind.pet.rawValue, changedFields: [])
         }
         let trimmedName = input.name.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -318,7 +318,7 @@ enum MemberProfileCommandService {
         input: HumanProfileCommandInput,
         context: ModelContext
     ) -> MemberProfileCommandResult {
-        guard !human.hasPassedAway else {
+        guard MemberLifecycleGate.disposition(human: human, writeKind: .profileEdit).writesContent else {
             return MemberProfileCommandResult(entityID: human.id, kind: EntityKind.human.rawValue, changedFields: [])
         }
         let trimmedName = input.name.trimmingCharacters(in: .whitespacesAndNewlines)

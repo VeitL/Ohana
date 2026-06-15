@@ -41,7 +41,8 @@ enum OasisCritterEconomyService {
         descriptor.fetchLimit = 1
         do {
             let human = try context.fetch(descriptor).first
-            if human?.hasPassedAway == true {
+            if let human,
+               !MemberLifecycleGate.disposition(human: human, writeKind: .care).allowsEconomyDerivation {
                 OhanaLog.warning(
                     "[OasisCritterEconomyService] active human id=\(id) is memorialized; skipping Oasis wallet access",
                     category: "Oasis"

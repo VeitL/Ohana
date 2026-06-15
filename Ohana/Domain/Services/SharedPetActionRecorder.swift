@@ -222,13 +222,22 @@ enum SharedPetActionRecorder {
         guard !targets.isEmpty else {
             return .noOp()
         }
+        let actor = CareFactWritePolicy.executorResolution(
+            requestedExecutorId: descriptor.executorId,
+            context: context,
+            logPrefix: "SharedPetActionRecorder.record"
+        )
+        let effectiveExecutorIds = SharedCareParticipantIDs.normalized(
+            descriptor.executorIds,
+            preferredFirst: actor.effectiveExecutorId ?? descriptor.executorId
+        )
         let allocationTargetCount = max(targets.count, 1)
         let visibleDescriptorNote = SharedCareMetadata.userNoteForStorage(descriptor.note)
         let session = SharedCareSession(
             date: descriptor.date,
             actionKind: descriptor.actionKind,
-            executorId: descriptor.executorId,
-            executorIds: descriptor.executorIds,
+            executorId: actor.effectiveExecutorId,
+            executorIds: effectiveExecutorIds,
             sourcePetId: descriptor.sourcePet.id.uuidString,
             targetPetIds: targets.map(\.id.uuidString),
             species: descriptor.sourcePet.species,
@@ -265,7 +274,7 @@ enum SharedPetActionRecorder {
                     foodKind: descriptor.foodKind,
                     sharedSessionId: session.id.uuidString,
                     pet: target,
-                    executorId: descriptor.executorId
+                    executorId: actor.effectiveExecutorId
                 )
                 context.insert(log)
                 careLogs.append((target, log))
@@ -276,7 +285,7 @@ enum SharedPetActionRecorder {
                     date: descriptor.date,
                     type: type,
                     pet: target,
-                    executorId: descriptor.executorId,
+                    executorId: actor.effectiveExecutorId,
                     sharedSessionId: session.id.uuidString
                 )
                 context.insert(log)
@@ -287,7 +296,7 @@ enum SharedPetActionRecorder {
                 date: descriptor.date,
                 type: type,
                 pet: nil,
-                executorId: descriptor.executorId,
+                executorId: actor.effectiveExecutorId,
                 sharedSessionId: session.id.uuidString
             )
             context.insert(log)
@@ -298,7 +307,7 @@ enum SharedPetActionRecorder {
                     date: descriptor.date,
                     type: type,
                     pet: target,
-                    executorId: descriptor.executorId,
+                    executorId: actor.effectiveExecutorId,
                     sharedSessionId: session.id.uuidString
                 )
                 context.insert(log)
@@ -314,7 +323,7 @@ enum SharedPetActionRecorder {
                     category: category,
                     note: visibleExpenseNote,
                     pet: target,
-                    executorId: descriptor.executorId,
+                    executorId: actor.effectiveExecutorId,
                     sharedSessionId: session.id.uuidString
                 )
                 context.insert(log)
@@ -325,8 +334,8 @@ enum SharedPetActionRecorder {
                 let log = PetWalkLog(
                     startDate: descriptor.date,
                     pet: target,
-                    executorId: descriptor.executorId,
-                    executorIds: descriptor.executorIds,
+                    executorId: actor.effectiveExecutorId,
+                    executorIds: effectiveExecutorIds,
                     sharedSessionId: session.id.uuidString
                 )
                 log.endDate = endDate
@@ -367,7 +376,7 @@ enum SharedPetActionRecorder {
                 context: context,
                 quality: descriptor.rewardQuality,
                 title: descriptor.rewardTitle,
-                executorId: descriptor.executorId
+                executorId: actor.rewardExecutorId
             )
         } else {
             (0, 0)
@@ -405,7 +414,7 @@ enum SharedPetActionRecorder {
                     pet: target,
                     type: careType,
                     context: context,
-                    executorId: descriptor.executorId,
+                    executorId: actor.effectiveExecutorId,
                     now: descriptor.date
                 )
             }
@@ -415,7 +424,7 @@ enum SharedPetActionRecorder {
                 dependencies.quickActionReminderCompletion.completeNearestPetPottyReminder(
                     pet: pair.0,
                     context: context,
-                    executorId: descriptor.executorId,
+                    executorId: actor.effectiveExecutorId,
                     now: descriptor.date
                 )
             }
@@ -426,7 +435,7 @@ enum SharedPetActionRecorder {
                     pet: pair.0,
                     type: type,
                     context: context,
-                    executorId: descriptor.executorId,
+                    executorId: actor.effectiveExecutorId,
                     now: descriptor.date
                 )
             }
@@ -607,8 +616,8 @@ enum SharedPetActionRecorder {
         if let pottyLog {
             dependencies.careLedger.record(
                 occurredAt: descriptor.date,
-                actorKind: descriptor.executorId == nil ? .unknown : .human,
-                actorId: descriptor.executorId,
+                actorKind: pottyLog.executorId == nil ? .unknown : .human,
+                actorId: pottyLog.executorId,
                 subjectKind: .unknown,
                 subjectId: nil,
                 eventKind: .potty,
@@ -637,8 +646,8 @@ enum SharedPetActionRecorder {
         for (index, pair) in hygieneLogs.enumerated() {
             dependencies.careLedger.record(
                 occurredAt: pair.1.date,
-                actorKind: descriptor.executorId == nil ? .unknown : .human,
-                actorId: descriptor.executorId,
+                actorKind: pair.1.executorId == nil ? .unknown : .human,
+                actorId: pair.1.executorId,
                 subjectKind: .pet,
                 subjectId: pair.0.id.uuidString,
                 eventKind: .hygiene,

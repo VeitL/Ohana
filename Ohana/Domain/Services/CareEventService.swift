@@ -117,8 +117,21 @@ enum CareFactWritePolicy {
         executorId _: String?,
         context _: ModelContext
     ) -> CareFactWriteDisposition {
-        guard EconomyWalletWritePolicy.canWrite(pet) else { return .noOp }
-        return .active
+        MemberLifecycleGate.disposition(pet: pet, writeKind: .care).allowsCareFactWrite ? .active : .noOp
+    }
+
+    @MainActor
+    static func executorResolution(
+        requestedExecutorId: String?,
+        context: ModelContext,
+        logPrefix: String
+    ) -> EconomyRewardOwnerResolution {
+        EconomyRewardOwnerResolver.executorResolution(
+            executorId: requestedExecutorId,
+            activeHumanSelection: UserDefaultsActiveHumanSelection(),
+            context: context,
+            logPrefix: logPrefix
+        )
     }
 
     static func plannedFactDate(scheduledAt: Date, operationDate: Date) -> Date {

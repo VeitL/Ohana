@@ -217,10 +217,13 @@ struct CareDerivationExecutorSuccessCharacterizationTests {
         #expect(weight.ledgerEventID != nil)
         #expect(catCare.didRecord)
         #expect(catCare.hygieneLogID != nil)
+        let catCareHygieneLogID = try #require(catCare.hygieneLogID)
         #expect(try context.fetch(FetchDescriptor<PetHealthLog>()).count == 1)
         #expect(try context.fetch(FetchDescriptor<PetWeightLog>()).count == 1)
         #expect(try context.fetch(FetchDescriptor<PetHygieneLog>()).count == 1)
-        #expect(try context.fetch(FetchDescriptor<CareLedgerEvent>()).count >= 2)
+        #expect(try context.fetch(FetchDescriptor<CareLedgerEvent>()).contains {
+            $0.legacyModelName == "PetHygieneLog" && $0.legacyModelId == catCareHygieneLogID.uuidString
+        })
     }
 
     private func makeContainer() throws -> ModelContainer {

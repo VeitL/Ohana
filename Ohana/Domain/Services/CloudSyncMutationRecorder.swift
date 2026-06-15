@@ -108,6 +108,15 @@ nonisolated enum CloudSyncMutationRecorder {
 
     @discardableResult
     static func markModified(
+        _ log: HumanMedicationLog,
+        context: ModelContext,
+        modifiedAt: Date = Date()
+    ) -> CloudSyncRecordState? {
+        markHumanScopedModified(HumanMedicationLog.self, id: log.id, humanId: log.humanId, context: context, modifiedAt: modifiedAt)
+    }
+
+    @discardableResult
+    static func markModified(
         _ item: WishlistItem,
         context: ModelContext,
         modifiedAt: Date = Date()
@@ -223,11 +232,128 @@ nonisolated enum CloudSyncMutationRecorder {
 
     @discardableResult
     static func markModified(
+        _ milestone: PetMilestone,
+        context: ModelContext,
+        modifiedAt: Date = Date()
+    ) -> CloudSyncRecordState? {
+        markPetScopedModified(PetMilestone.self, id: milestone.id, petId: milestone.pet?.id, context: context, modifiedAt: modifiedAt)
+    }
+
+    @discardableResult
+    static func markModified(
+        _ photo: PetPhotoLog,
+        context: ModelContext,
+        modifiedAt: Date = Date()
+    ) -> CloudSyncRecordState? {
+        markPetScopedModified(PetPhotoLog.self, id: photo.id, petId: photo.pet?.id, context: context, modifiedAt: modifiedAt)
+    }
+
+    @discardableResult
+    static func markModified(
+        _ log: SymptomLog,
+        context: ModelContext,
+        modifiedAt: Date = Date()
+    ) -> CloudSyncRecordState? {
+        markPetScopedModified(SymptomLog.self, id: log.id, petId: log.pet?.id, context: context, modifiedAt: modifiedAt)
+    }
+
+    @discardableResult
+    static func markModified(
+        _ log: HeatCycleLog,
+        context: ModelContext,
+        modifiedAt: Date = Date()
+    ) -> CloudSyncRecordState? {
+        markPetScopedModified(HeatCycleLog.self, id: log.id, petId: log.pet?.id, context: context, modifiedAt: modifiedAt)
+    }
+
+    @discardableResult
+    static func markModified(
+        _ document: PetDocument,
+        context: ModelContext,
+        modifiedAt: Date = Date()
+    ) -> CloudSyncRecordState? {
+        markPetScopedModified(PetDocument.self, id: document.id, petId: document.pet?.id, context: context, modifiedAt: modifiedAt)
+    }
+
+    @discardableResult
+    static func markModified(
+        _ insurance: PetInsurance,
+        context: ModelContext,
+        modifiedAt: Date = Date()
+    ) -> CloudSyncRecordState? {
+        markPetScopedModified(PetInsurance.self, id: insurance.id, petId: insurance.pet?.id, context: context, modifiedAt: modifiedAt)
+    }
+
+    @discardableResult
+    static func markModified(
+        _ claim: InsuranceClaim,
+        context: ModelContext,
+        modifiedAt: Date = Date()
+    ) -> CloudSyncRecordState? {
+        markPetScopedModified(InsuranceClaim.self, id: claim.id, petId: claim.insurance?.pet?.id, context: context, modifiedAt: modifiedAt)
+    }
+
+    @discardableResult
+    static func markModified(
+        _ log: HumanWeightLog,
+        context: ModelContext,
+        modifiedAt: Date = Date()
+    ) -> CloudSyncRecordState? {
+        markHumanScopedModified(
+            HumanWeightLog.self,
+            id: log.id,
+            humanId: log.human?.id.uuidString ?? log.executorId ?? "",
+            context: context,
+            modifiedAt: modifiedAt
+        )
+    }
+
+    @discardableResult
+    static func markModified(
+        _ log: HumanWorkoutLog,
+        context: ModelContext,
+        modifiedAt: Date = Date()
+    ) -> CloudSyncRecordState? {
+        markHumanScopedModified(
+            HumanWorkoutLog.self,
+            id: log.id,
+            humanId: log.human?.id.uuidString ?? "",
+            context: context,
+            modifiedAt: modifiedAt
+        )
+    }
+
+    @discardableResult
+    static func markModified(
+        _ log: HumanHealthMetricLog,
+        context: ModelContext,
+        modifiedAt: Date = Date()
+    ) -> CloudSyncRecordState? {
+        markHumanScopedModified(
+            HumanHealthMetricLog.self,
+            id: log.id,
+            humanId: log.human?.id.uuidString ?? "",
+            context: context,
+            modifiedAt: modifiedAt
+        )
+    }
+
+    @discardableResult
+    static func markModified(
         _ record: PetFoodRecord,
         context: ModelContext,
         modifiedAt: Date = Date()
     ) -> CloudSyncRecordState? {
         markPetScopedModified(PetFoodRecord.self, id: record.id, petId: record.pet?.id, context: context, modifiedAt: modifiedAt)
+    }
+
+    @discardableResult
+    static func markModified(
+        _ medication: PetMedication,
+        context: ModelContext,
+        modifiedAt: Date = Date()
+    ) -> CloudSyncRecordState? {
+        markPetScopedModified(PetMedication.self, id: medication.id, petId: medication.pet?.id, context: context, modifiedAt: modifiedAt)
     }
 
     @discardableResult

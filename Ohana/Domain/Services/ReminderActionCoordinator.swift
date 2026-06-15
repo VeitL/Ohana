@@ -165,6 +165,9 @@ enum ReminderActionCoordinator {
             source: .notification,
             careLedger: careLedger
         )
+        guard result.didChange else {
+            return .ignoredAction
+        }
         domainRevisions.publishHumanMedicationDose(
             result,
             scheduledMinute: Int(scheduledAt.timeIntervalSince1970 / 60),

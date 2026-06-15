@@ -192,7 +192,7 @@ extension QuickFeedDetailContent {
                     Button(l.tr(zh: "未指定", en: "Unspecified", de: "Nicht angegeben")) {
                         draftStore.stockExpensePayerId = nil
                     }
-                    ForEach(allHumans) { human in
+                    ForEach(allHumans.filter { !$0.hasPassedAway }) { human in
                         Button(human.name) {
                             draftStore.stockExpensePayerId = human.id.uuidString
                         }

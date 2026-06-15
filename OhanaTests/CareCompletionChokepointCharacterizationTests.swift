@@ -89,8 +89,9 @@ struct CareCompletionChokepointCharacterizationTests {
         )
 
         let walletEntries = try context.fetch(FetchDescriptor<CoconutLedgerEntry>())
+        let medicationLedger = try #require(try context.fetch(FetchDescriptor<CareLedgerEvent>()).first)
         #expect(try context.fetch(FetchDescriptor<Event>()).count == 1)
-        #expect(!(try context.fetch(FetchDescriptor<CareLedgerEvent>())).isEmpty)
+        #expect(medicationLedger.actorId == activeHuman.id.uuidString)
         #expect(walletEntries.contains { $0.ownerId == activeHuman.id.uuidString && $0.delta > 0 })
         #expect(walletEntries.allSatisfy { $0.ownerId != executor.id.uuidString })
         #expect(!(try context.fetch(FetchDescriptor<EconomyBudgetUsageEvent>())).isEmpty)
@@ -342,19 +343,17 @@ struct CareCompletionChokepointCharacterizationTests {
         )
 
         let photo = try #require(try context.fetch(FetchDescriptor<PetPhotoLog>()).first)
-        let ledger = try #require(try context.fetch(FetchDescriptor<CareLedgerEvent>()).first)
+        let ledgerEvents = try context.fetch(FetchDescriptor<CareLedgerEvent>())
         let walletEntries = try context.fetch(FetchDescriptor<CoconutLedgerEntry>())
 
         #expect(result.savedLogIDs == [photo.id])
-        #expect(result.coconutDelta > 0)
-        #expect(ledger.eventKind == CareLedgerEventKind.milestone.rawValue)
-        #expect(ledger.legacyModelName == "PetPhotoLog")
-        #expect(ledger.legacyModelId == photo.id.uuidString)
-        #expect(walletEntries.contains { $0.ownerId == human.id.uuidString && $0.delta > 0 })
+        #expect(result.coconutDelta == 0)
+        #expect(ledgerEvents.isEmpty)
+        #expect(walletEntries.isEmpty)
         #expect(try context.fetch(FetchDescriptor<PetCareLog>()).isEmpty)
     }
 
-    @Test func frozenPetExpenseKeepsFactAndLedgerButDoesNotWriteWalletReward() throws {
+    @Test func deceasedPetExpenseNoopsWithoutFactLedgerOrReward() throws {
         let container = try makeContainer()
         let context = container.mainContext
         let human = Human(name: "Guan")
@@ -379,14 +378,179 @@ struct CareCompletionChokepointCharacterizationTests {
             questManager: makeQuestManager()
         )
 
-        let ledger = try #require(try context.fetch(FetchDescriptor<CareLedgerEvent>()).first)
-
         #expect(result.coconutDelta == 0)
-        #expect(try context.fetch(FetchDescriptor<PetExpenseLog>()).count == 1)
-        #expect(ledger.eventKind == CareLedgerEventKind.expense.rawValue)
-        #expect(ledger.coconutDelta == 0)
+        #expect(try context.fetch(FetchDescriptor<PetExpenseLog>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<CareLedgerEvent>()).isEmpty)
         #expect(try context.fetch(FetchDescriptor<CoconutLedgerEntry>()).isEmpty)
         #expect(try context.fetch(FetchDescriptor<EconomyBudgetUsageEvent>()).isEmpty)
+    }
+
+    @Test func deceasedPetMemorialMomentWritesPhotoOnly() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let human = Human(name: "Guan")
+        let pet = Pet(name: "Momo", species: "cat")
+        pet.passedAwayDate = Date(timeIntervalSince1970: 1000)
+        context.insert(human)
+        context.insert(pet)
+        try context.save()
+
+        let state = EconomyDefaultsState.capture()
+        defer { state.restore() }
+        resetEconomy(activeHumanID: human.id.uuidString, humans: [human], pets: [pet])
+
+        let result = MomentCommandService.recordMoment(
+            pet: pet,
+            note: "remembering the sunny window",
+            photoData: [Data([1, 2, 3])],
+            locationLatitude: 0,
+            locationLongitude: 0,
+            locationPlacename: "",
+            context: context,
+            executorId: human.id.uuidString,
+            date: Date(timeIntervalSince1970: 2500),
+            questManager: makeQuestManager()
+        )
+
+        let photos = try context.fetch(FetchDescriptor<PetPhotoLog>())
+        #expect(result.savedLogIDs == photos.map(\.id))
+        #expect(photos.count == 1)
+        #expect(result.coconutDelta == 0)
+        #expect(try context.fetch(FetchDescriptor<CareLedgerEvent>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<CoconutLedgerEntry>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<EconomyBudgetUsageEvent>()).isEmpty)
+    }
+
+    @Test func activeOnlyPetCommandsNoopForDeceasedPet() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let pet = Pet(name: "Momo", species: "cat")
+        pet.passedAwayDate = Date(timeIntervalSince1970: 1000)
+        context.insert(pet)
+        try context.save()
+
+        let document = PetDocumentCommandService.createDocument(
+            input: PetDocumentCreateCommandInput(
+                title: "Passport",
+                category: .passport,
+                issuingAuthority: "City",
+                notes: "",
+                issueDate: Date(timeIntervalSince1970: 2000),
+                expiryDate: nil,
+                cost: 20,
+                payerId: nil,
+                documentNumber: "P-1",
+                attachments: []
+            ),
+            pet: pet,
+            context: context
+        )
+        let insurance = InsurancePolicyCommandService.savePolicy(
+            existing: nil,
+            pet: pet,
+            input: InsurancePolicySaveCommandInput(
+                companyName: "Care",
+                policyNumber: "P",
+                productName: "Plan",
+                annualPremium: 120,
+                coverageAmount: 1000,
+                startDate: Date(timeIntervalSince1970: 2000),
+                renewalDate: Date(timeIntervalSince1970: 4000),
+                notes: "",
+                paymentFrequency: .monthly,
+                paymentDayOfMonth: 1,
+                showInCalendar: true,
+                otherFeeAmount: 0,
+                otherFeeNote: "",
+                autoGeneratesPayments: true,
+                executorId: nil
+            ),
+            context: context
+        )
+        let medication = PetMedicationPlanCommandService.savePlan(
+            pet: pet,
+            editing: nil,
+            input: PetMedicationPlanCommandInput(
+                name: "Pill",
+                dosage: "1",
+                frequency: .daily,
+                doseMinutes: [480],
+                startDate: Date(timeIntervalSince1970: 2000),
+                endDate: nil,
+                colorHex: "FF0000",
+                notes: "",
+                isActive: true,
+                remainingAmount: 5
+            ),
+            context: context
+        )
+
+        #expect(!document.didChange)
+        #expect(!insurance.didChange)
+        #expect(medication == nil)
+        #expect(try context.fetch(FetchDescriptor<PetDocument>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<PetInsurance>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<PetMedication>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<PetExpenseLog>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<Event>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<CareLedgerEvent>()).isEmpty)
+    }
+
+    @Test func activeOnlyHumanCommandsNoopForDeceasedHumanButMemorialNoteWritesWithoutReminder() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let human = Human(name: "Guan")
+        human.passedAwayDate = Date(timeIntervalSince1970: 1000)
+        context.insert(human)
+        try context.save()
+
+        let weight = WeightCommandService.recordHumanWeight(
+            human: human,
+            weight: 62,
+            date: Date(timeIntervalSince1970: 2000),
+            context: context
+        )
+        let workout = WorkoutCommandService.recordHumanWorkout(
+            human: human,
+            type: .walking,
+            durationMinutes: 20,
+            date: Date(timeIntervalSince1970: 2000),
+            context: context
+        )
+        let metric = HumanHealthMetricCommandService.recordMetric(
+            human: human,
+            metricKey: "tsh",
+            unitCode: "mIU_L",
+            value: 4.2,
+            date: Date(timeIntervalSince1970: 2000),
+            notes: "",
+            context: context
+        )
+        let note = try #require(HumanNoteCommandService.recordNote(
+            human: human,
+            note: "We miss your laugh",
+            date: Date(timeIntervalSince1970: 2000),
+            imageAttachments: [],
+            fileAttachments: [],
+            reminderDate: nil,
+            appLanguage: "en",
+            context: context,
+            scheduleNotification: false
+        ))
+
+        #expect(!weight.didRecord)
+        #expect(workout.ledgerEventID == nil)
+        #expect(metric == nil)
+        #expect(note.subjectID == human.id)
+        #expect(note.eventID == nil)
+        #expect(note.reminderID == nil)
+        #expect(human.notes.contains("We miss your laugh"))
+        #expect(try context.fetch(FetchDescriptor<HumanWeightLog>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<HumanWorkoutLog>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<HumanHealthMetricLog>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<Event>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<Reminder>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<CareLedgerEvent>()).isEmpty)
     }
 
     @Test func frozenExplicitCareExecutorWritesActiveTargetFactThroughFallbackOwner() throws {
@@ -415,9 +579,11 @@ struct CareCompletionChokepointCharacterizationTests {
         )
 
         let walletEntries = try context.fetch(FetchDescriptor<CoconutLedgerEntry>())
+        let ledger = try #require(try context.fetch(FetchDescriptor<CareLedgerEvent>()).first)
         #expect(record.result.disposition == .active)
         #expect(record.result.didWriteFact)
-        #expect(record.log.executorId == frozenExecutor.id.uuidString)
+        #expect(record.log.executorId == activeHuman.id.uuidString)
+        #expect(ledger.actorId == activeHuman.id.uuidString)
         #expect(record.reward.humanGot + record.reward.petGot > 0)
         #expect(try context.fetch(FetchDescriptor<PetCareLog>()).count == 1)
         #expect(walletEntries.contains { $0.ownerId == activeHuman.id.uuidString && $0.delta > 0 })
@@ -462,9 +628,12 @@ struct CareCompletionChokepointCharacterizationTests {
         )
 
         let walletEntries = try context.fetch(FetchDescriptor<CoconutLedgerEntry>())
+        let ledger = try #require(try context.fetch(FetchDescriptor<CareLedgerEvent>()).first)
 
         #expect(record.result.disposition == .active)
         #expect(record.result.didWriteFact)
+        #expect(record.log.executorId == activeHuman.id.uuidString)
+        #expect(ledger.actorId == activeHuman.id.uuidString)
         #expect(record.reward.humanGot + record.reward.petGot > 0)
         #expect(activeHuman.coconutBalance > 0)
         #expect(critter.xp > 0)
@@ -503,13 +672,17 @@ struct CareCompletionChokepointCharacterizationTests {
         )
 
         let walletEntries = try context.fetch(FetchDescriptor<CoconutLedgerEntry>())
+        let careLogs = try context.fetch(FetchDescriptor<PetCareLog>())
+        let ledgers = try context.fetch(FetchDescriptor<CareLedgerEvent>())
 
         #expect(result.disposition == .active)
         #expect(result.didWriteFact)
         #expect(result.coconutDelta > 0)
         #expect(try context.fetch(FetchDescriptor<SharedCareSession>()).count == 1)
-        #expect(try context.fetch(FetchDescriptor<PetCareLog>()).count == 2)
-        #expect(!(try context.fetch(FetchDescriptor<CareLedgerEvent>())).isEmpty)
+        #expect(careLogs.count == 2)
+        #expect(careLogs.allSatisfy { $0.executorId == activeHuman.id.uuidString })
+        #expect(!ledgers.isEmpty)
+        #expect(ledgers.allSatisfy { $0.actorId != missingExecutorID })
         #expect(walletEntries.contains { $0.ownerId == activeHuman.id.uuidString && $0.delta > 0 })
         #expect(walletEntries.allSatisfy { $0.ownerId != missingExecutorID })
         #expect(!(try context.fetch(FetchDescriptor<EconomyBudgetUsageEvent>())).isEmpty)
@@ -549,12 +722,14 @@ struct CareCompletionChokepointCharacterizationTests {
         )
 
         let walletEntries = try context.fetch(FetchDescriptor<CoconutLedgerEntry>())
+        let event = try #require(try context.fetch(FetchDescriptor<Event>()).first)
+        let ledger = try #require(try context.fetch(FetchDescriptor<CareLedgerEvent>()).first)
 
         #expect(result.didRecord)
         #expect(result.coconutDelta > 0)
         #expect(result.allowsDerivedEffects)
-        #expect(try context.fetch(FetchDescriptor<Event>()).count == 1)
-        #expect(!(try context.fetch(FetchDescriptor<CareLedgerEvent>())).isEmpty)
+        #expect(event.assigneeId == activeHuman.id.uuidString)
+        #expect(ledger.actorId == activeHuman.id.uuidString)
         #expect(walletEntries.contains { $0.ownerId == activeHuman.id.uuidString && $0.delta > 0 })
         #expect(walletEntries.allSatisfy { $0.ownerId != missingExecutorID })
         #expect(!(try context.fetch(FetchDescriptor<EconomyBudgetUsageEvent>())).isEmpty)
@@ -595,12 +770,14 @@ struct CareCompletionChokepointCharacterizationTests {
         )
 
         let walletEntries = try context.fetch(FetchDescriptor<CoconutLedgerEntry>())
+        let log = try #require(try context.fetch(FetchDescriptor<PetCareLog>()).first)
+        let ledger = try #require(try context.fetch(FetchDescriptor<CareLedgerEvent>()).first)
 
         #expect(result.isCompleted)
         #expect(result.didChange)
         #expect(event.isOccurrenceMarkedComplete(on: occurrenceDate))
-        #expect(try context.fetch(FetchDescriptor<PetCareLog>()).count == 1)
-        #expect(!(try context.fetch(FetchDescriptor<CareLedgerEvent>())).isEmpty)
+        #expect(log.executorId == activeHuman.id.uuidString)
+        #expect(ledger.actorId == activeHuman.id.uuidString)
         #expect(walletEntries.contains { $0.ownerId == activeHuman.id.uuidString && $0.delta > 0 })
         #expect(walletEntries.allSatisfy { $0.ownerId != missingExecutorID })
         #expect(!(try context.fetch(FetchDescriptor<EconomyBudgetUsageEvent>())).isEmpty)

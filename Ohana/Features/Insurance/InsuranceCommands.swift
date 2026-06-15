@@ -133,8 +133,16 @@ enum InsurancePolicyCommandService {
         input: InsurancePolicySaveCommandInput,
         context: ModelContext
     ) -> InsurancePolicyCommandResult {
+        guard MemberWritePolicy.disposition(pet: pet, intent: .activeOnly).allowsDerivedEffects else {
+            return InsurancePolicyCommandResult(
+                policyID: insurance?.id ?? UUID(),
+                petID: pet.id,
+                didChange: false
+            )
+        }
         if let insurance {
             apply(input, to: insurance)
+            CloudSyncMutationRecorder.markModified(insurance, context: context)
             context.safeSave()
             return InsurancePolicyCommandResult(
                 policyID: insurance.id,
@@ -160,6 +168,7 @@ enum InsurancePolicyCommandService {
             pet: pet
         )
         context.insert(insurance)
+        CloudSyncMutationRecorder.markModified(insurance, context: context, modifiedAt: input.startDate)
 
         let schedule = input.autoGeneratesPayments && input.annualPremium > 0
             ? generatePaymentSchedule(for: insurance, pet: pet, executorId: input.executorId, context: context)
@@ -182,8 +191,14 @@ enum InsurancePolicyCommandService {
         pet: Pet,
         context: ModelContext
     ) -> InsurancePolicyCommandResult {
+        guard MemberWritePolicy.disposition(pet: pet, intent: .activeOnly).allowsDerivedEffects else {
+            return InsurancePolicyCommandResult(policyID: insurance.id, petID: pet.id, didChange: false)
+        }
         let didChange = insurance.isActive != isActive
         insurance.isActive = isActive
+        if didChange {
+            CloudSyncMutationRecorder.markModified(insurance, context: context)
+        }
         context.safeSave()
         return InsurancePolicyCommandResult(
             policyID: insurance.id,
@@ -199,6 +214,9 @@ enum InsurancePolicyCommandService {
         pet: Pet,
         context: ModelContext
     ) -> InsurancePolicyCommandResult {
+        guard MemberWritePolicy.disposition(pet: pet, intent: .activeOnly).allowsDerivedEffects else {
+            return InsurancePolicyCommandResult(policyID: insurance.id, petID: pet.id, didChange: false)
+        }
         let policyID = insurance.id
         let petID = pet.id
         PhysicalDeletionService.deleteInsurance(insurance, pet: pet, context: context)
@@ -218,6 +236,15 @@ enum InsurancePolicyCommandService {
         input: InsuranceClaimCommandInput,
         context: ModelContext
     ) -> InsuranceClaimCommandResult {
+        guard MemberWritePolicy.disposition(pet: pet, intent: .activeOnly).allowsDerivedEffects else {
+            return InsuranceClaimCommandResult(
+                claimID: UUID(),
+                policyID: insurance.id,
+                petID: pet.id,
+                expenseLogID: nil,
+                didChange: false
+            )
+        }
         let approvedAmount = input.status == .approved ? input.claimedAmount : 0
         let approvedAt = input.status == .approved ? (input.approvedAt ?? input.claimDate) : nil
         let claim = InsuranceClaim(
@@ -233,6 +260,7 @@ enum InsurancePolicyCommandService {
         )
         claim.approvedAt = approvedAt
         context.insert(claim)
+        CloudSyncMutationRecorder.markModified(claim, context: context, modifiedAt: input.claimDate)
 
         let expenseID = makeReimbursementExpenseIfNeeded(
             insurance: insurance,
@@ -264,6 +292,15 @@ enum InsurancePolicyCommandService {
         approvedAt: Date = Date(),
         executorId: String? = nil
     ) -> InsuranceClaimCommandResult {
+        guard MemberWritePolicy.disposition(pet: pet, intent: .activeOnly).allowsDerivedEffects else {
+            return InsuranceClaimCommandResult(
+                claimID: claim.id,
+                policyID: insurance.id,
+                petID: pet.id,
+                expenseLogID: nil,
+                didChange: false
+            )
+        }
         let oldStatus = claim.claimStatus
         let oldApprovedAmount = claim.approvedAmount
         claim.statusRaw = status.rawValue
@@ -280,6 +317,9 @@ enum InsurancePolicyCommandService {
                 executorId: executorId,
                 context: context
             )
+        }
+        if oldStatus != status || oldApprovedAmount != claim.approvedAmount {
+            CloudSyncMutationRecorder.markModified(claim, context: context, modifiedAt: approvedAt)
         }
 
         context.safeSave()
@@ -300,6 +340,15 @@ enum InsurancePolicyCommandService {
         pet: Pet,
         context: ModelContext
     ) -> InsuranceClaimCommandResult {
+        guard MemberWritePolicy.disposition(pet: pet, intent: .activeOnly).allowsDerivedEffects else {
+            return InsuranceClaimCommandResult(
+                claimID: claim.id,
+                policyID: insurance.id,
+                petID: pet.id,
+                expenseLogID: nil,
+                didChange: false
+            )
+        }
         let claimID = claim.id
         CloudSyncMutationRecorder.markDeleted(claim, pet: pet, context: context)
         context.delete(claim)
@@ -406,6 +455,7 @@ enum InsurancePolicyCommandService {
                     relatedEntityId: insurance.id.uuidString
                 )
                 context.insert(event)
+                CloudSyncMutationRecorder.markModified(event, context: context, modifiedAt: payDate)
                 events.append(event)
             }
         }
@@ -448,11 +498,13 @@ struct InsuranceCommandExecutor {
             input: input,
             context: context
         )
-        revisions.publishInsurancePolicy(
-            result,
-            action: insurance == nil ? "create" : "update",
-            note: note
-        )
+        if result.didChange {
+            revisions.publishInsurancePolicy(
+                result,
+                action: insurance == nil ? "create" : "update",
+                note: note
+            )
+        }
         return result
     }
 
@@ -469,18 +521,22 @@ struct InsuranceCommandExecutor {
             pet: pet,
             context: context
         )
-        revisions.publishInsurancePolicy(
-            result,
-            action: isActive ? "activate" : "deactivate",
-            note: note
-        )
+        if result.didChange {
+            revisions.publishInsurancePolicy(
+                result,
+                action: isActive ? "activate" : "deactivate",
+                note: note
+            )
+        }
         return result
     }
 
     @discardableResult
     func deletePolicy(_ insurance: PetInsurance, pet: Pet, note: String) -> InsurancePolicyCommandResult {
         let result = InsurancePolicyCommandService.deletePolicy(insurance, pet: pet, context: context)
-        revisions.publishInsurancePolicy(result, action: "delete", note: note)
+        if result.didChange {
+            revisions.publishInsurancePolicy(result, action: "delete", note: note)
+        }
         return result
     }
 
@@ -497,7 +553,9 @@ struct InsuranceCommandExecutor {
             input: input,
             context: context
         )
-        revisions.publishInsuranceClaim(result, action: "create", note: note)
+        if result.didChange {
+            revisions.publishInsuranceClaim(result, action: "create", note: note)
+        }
         return result
     }
 
@@ -518,7 +576,9 @@ struct InsuranceCommandExecutor {
             context: context,
             executorId: executorId
         )
-        revisions.publishInsuranceClaim(result, action: "status.\(status.rawValue)", note: note)
+        if result.didChange {
+            revisions.publishInsuranceClaim(result, action: "status.\(status.rawValue)", note: note)
+        }
         return result
     }
 
@@ -535,7 +595,9 @@ struct InsuranceCommandExecutor {
             pet: pet,
             context: context
         )
-        revisions.publishInsuranceClaim(result, action: "delete", note: note)
+        if result.didChange {
+            revisions.publishInsuranceClaim(result, action: "delete", note: note)
+        }
         return result
     }
 }

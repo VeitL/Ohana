@@ -288,6 +288,44 @@ struct ReminderActionCoordinatorTests {
         ))
     }
 
+    @Test func humanMedicationNotificationBlocksDeceasedHuman() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let revisionCenter = ReadModelRevisionCenter()
+        let revisions = SharedDomainRevisionPublisher(center: revisionCenter)
+        let human = Human(name: "Guan")
+        human.passedAwayDate = Date(timeIntervalSince1970: 1_780_800_000)
+        let medication = HumanMedication(
+            humanId: human.id.uuidString,
+            name: "Vitamin D",
+            dosage: "1 tablet",
+            frequency: .daily
+        )
+        let scheduledAt = Date(timeIntervalSince1970: 1_780_921_200)
+        context.insert(human)
+        context.insert(medication)
+        try context.save()
+
+        let beforeRevision = revisionCenter.homeRevision.value
+        let result = ReminderActionCoordinator.handle(
+            userInfo: [
+                "action": "COMPLETE",
+                "humanMedicationId": medication.id.uuidString,
+                "humanId": human.id.uuidString,
+                "scheduledAt": scheduledAt.timeIntervalSince1970
+            ],
+            currentActiveHumanId: human.id.uuidString,
+            context: context,
+            domainRevisions: revisions
+        )
+
+        #expect(result == .ignoredAction)
+        #expect(try context.fetch(FetchDescriptor<HumanMedicationLog>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<CareLedgerEvent>()).isEmpty)
+        #expect(revisionCenter.homeRevision.value == beforeRevision)
+        #expect(revisionCenter.lastMutation == nil)
+    }
+
     @Test func petMedicationNotificationCompleteWritesDoseAndDecrementsRemainingAmount() throws {
         let container = try makeContainer()
         let context = container.mainContext

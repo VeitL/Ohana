@@ -111,7 +111,8 @@ struct HomeCommandExecutor {
             AppPerformanceFlows.quickCareCommand,
             note: ["action": actionType, "entry": "id"]
         )
-        guard let pet = fetchPet(id: petID), !pet.hasPassedAway else {
+        guard let pet = fetchPet(id: petID),
+              MemberLifecycleGate.disposition(pet: pet, writeKind: .care).allowsCareFactWrite else {
             AppFlowPerformance.mark(
                 AppPerformanceFlows.quickCareCommand,
                 AppPerformancePhases.noop,
@@ -307,7 +308,8 @@ struct HomeCommandExecutor {
         executorId: String?,
         feedback: (ExpandedQuickActionExecutor.Feedback) -> Void
     ) {
-        guard let pet = fetchPet(id: petID), !pet.hasPassedAway else {
+        guard let pet = fetchPet(id: petID),
+              MemberLifecycleGate.disposition(pet: pet, writeKind: .care).allowsCareFactWrite else {
             publishNoop(QuickCareCommand.potty(petID: petID, type: raw), note: "home.potty.missingPet")
             return
         }
@@ -342,7 +344,8 @@ struct HomeCommandExecutor {
         showSingleUseNotice: (String, String) -> Void,
         feedback: (ExpandedQuickActionExecutor.Feedback) -> Void
     ) {
-        guard let pet = fetchPet(id: petID), !pet.hasPassedAway else {
+        guard let pet = fetchPet(id: petID),
+              MemberLifecycleGate.disposition(pet: pet, writeKind: .care).allowsCareFactWrite else {
             publishNoop(QuickCareCommand.grooming(petID: petID, type: raw), note: "home.groom.missingPet")
             return
         }
@@ -383,7 +386,8 @@ struct HomeCommandExecutor {
         openHealth: (UUID) -> Void,
         feedback: (ExpandedQuickActionExecutor.Feedback) -> Void
     ) {
-        guard let pet = fetchPet(id: petID), !pet.hasPassedAway else {
+        guard let pet = fetchPet(id: petID),
+              MemberLifecycleGate.disposition(pet: pet, writeKind: .care).allowsCareFactWrite else {
             publishNoop(QuickCareCommand.health(petID: petID, type: raw), note: "home.health.missingPet")
             return
         }

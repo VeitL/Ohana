@@ -26,6 +26,9 @@ enum FeedingPlanWriter {
         now: Date = Date(),
         calendar: Calendar = .current
     ) -> FeedingPlanWriteResult {
+        guard canWriteActiveFeedData(for: pet) else {
+            return FeedingPlanWriteResult(events: [], reminders: [])
+        }
         CarePlanCalendarSync.suppressDefaultPlan(kind: "feed", pet: pet, context: context)
         deletePlan(pet: pet, kind: draft.kind, allEvents: allEvents, context: context, save: false)
 
@@ -73,6 +76,7 @@ enum FeedingPlanWriter {
         context: ModelContext,
         save: Bool = true
     ) {
+        guard canWriteActiveFeedData(for: pet) else { return }
         var didDelete = false
         for event in planEvents(pet: pet, kind: kind, allEvents: allEvents) {
             deleteEvent(event, context: context)
@@ -90,6 +94,7 @@ enum FeedingPlanWriter {
         context: ModelContext,
         now: Date = Date()
     ) {
+        guard canWriteActiveFeedData(for: pet) else { return }
         var didChange = false
         for event in planEvents(pet: pet, kind: .manualReminder, allEvents: allEvents) {
             let pendingReminders = event.reminders.filter(\.isPending)
@@ -113,6 +118,7 @@ enum FeedingPlanWriter {
         allEvents: [Event],
         context: ModelContext
     ) {
+        guard canWriteActiveFeedData(for: pet) else { return }
         CarePlanCalendarSync.suppressDefaultPlan(kind: "feed", pet: pet, context: context)
         deletePlan(pet: pet, kind: .manualReminder, allEvents: allEvents, context: context)
         deletePlan(pet: pet, kind: .autoFeeder, allEvents: allEvents, context: context)
@@ -127,6 +133,7 @@ enum FeedingPlanWriter {
         now: Date = Date(),
         calendar: Calendar = .current
     ) -> [Reminder] {
+        guard canWriteActiveFeedData(for: pet) else { return [] }
         var created: [Reminder] = []
         for event in planEvents(pet: pet, kind: .manualReminder, allEvents: allEvents) {
             created.append(contentsOf: createUpcomingManualReminders(for: event, context: context, now: now, calendar: calendar))
@@ -171,6 +178,9 @@ enum FeedingPlanWriter {
         calendar: Calendar = .current,
         rebuildReminder: Bool = true
     ) -> PetFoodRecord {
+        guard canWriteActiveFeedData(for: pet) else {
+            return recordToUpdate ?? PetFoodRecord(executorId: executorId)
+        }
         let sanitizedTotal = max(0, totalGrams)
         let sanitizedDaily = max(0, dailyGrams ?? pet.dailyPortionGrams)
         let finalBrand = brand.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -246,11 +256,11 @@ enum FeedingPlanWriter {
         calendar: Calendar = .current,
         rebuildReminder: Bool = true
     ) -> Reminder? {
+        guard let pet = record.pet, canWriteActiveFeedData(for: pet) else { return nil }
         record.remainingCorrectionGrams = max(0, remainingGrams)
         record.remainingCorrectionDate = now
         CloudSyncMutationRecorder.markModified(record, context: context, modifiedAt: now)
         context.safeSave()
-        guard let pet = record.pet else { return nil }
         guard rebuildReminder else { return nil }
         return rebuildFoodStockReminder(pet: pet, allEvents: allEvents, context: context, now: now, calendar: calendar)
     }
@@ -263,7 +273,8 @@ enum FeedingPlanWriter {
         now: Date = Date(),
         calendar: Calendar = .current
     ) -> Reminder? {
-        rebuildFoodStockReminders(pet: pet, allEvents: allEvents, context: context, now: now, calendar: calendar).first
+        guard canWriteActiveFeedData(for: pet) else { return nil }
+        return rebuildFoodStockReminders(pet: pet, allEvents: allEvents, context: context, now: now, calendar: calendar).first
     }
 
     @discardableResult
@@ -277,7 +288,7 @@ enum FeedingPlanWriter {
         let allEvents = allEventsForStockReminderRebuild(context: context)
         var seen = Set<UUID>()
         var reminders: [Reminder] = []
-        for pet in pets where seen.insert(pet.id).inserted {
+        for pet in pets where seen.insert(pet.id).inserted && canWriteActiveFeedData(for: pet) {
             reminders.append(contentsOf: rebuildFoodStockReminders(
                 pet: pet,
                 allEvents: allEvents,
@@ -297,6 +308,7 @@ enum FeedingPlanWriter {
         now: Date = Date(),
         calendar: Calendar = .current
     ) -> [Reminder] {
+        guard canWriteActiveFeedData(for: pet) else { return [] }
         for event in currentStockReminderEvents(pet: pet, allEvents: allEvents, context: context) {
             deleteEvent(event, context: context)
         }
@@ -374,6 +386,10 @@ enum FeedingPlanWriter {
             )
         }
         return eventsById.values.sorted { $0.startDate < $1.startDate }
+    }
+
+    private nonisolated static func canWriteActiveFeedData(for pet: Pet) -> Bool {
+        MemberLifecycleGate.disposition(pet: pet, writeKind: .care).allowsDerivedEffects
     }
 
     nonisolated static func foodReminderDate(

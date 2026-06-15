@@ -28,9 +28,6 @@ protocol DomainRevisionPublishing {
     func publishMemberProfileChange(entityID: UUID, kind: String, note: String)
     func publishMemberHomeVisibility(_ result: MemberHomeVisibilityCommandResult, note: String)
     func publishMemberLifecycle(_ result: MemberLifecycleCommandResult, note: String)
-    func publishPetCareDelete(_ result: PetCareTrackingDeleteCommandResult, note: String)
-    func publishPetPottyDelete(_ result: PetPottyDeleteCommandResult, note: String)
-    func publishCatCareUndo(_ result: CatCareUndoCommandResult, note: String)
     func publishPetWalkGoal(_ result: PetWalkGoalCommandResult, note: String)
     func publishPetWalkSummary(_ result: PetWalkSummaryCommandResult, note: String)
     func publishPlantCare(_ result: PlantCareCommandResult, note: String)
@@ -200,18 +197,6 @@ final class SharedDomainRevisionPublisher: DomainRevisionPublishing {
 
     func publishMemberLifecycle(_ result: MemberLifecycleCommandResult, note: String) {
         center.publishMemberLifecycle(result, note: note)
-    }
-
-    func publishPetCareDelete(_ result: PetCareTrackingDeleteCommandResult, note: String) {
-        center.publishPetCareDelete(result, note: note)
-    }
-
-    func publishPetPottyDelete(_ result: PetPottyDeleteCommandResult, note: String) {
-        center.publishPetPottyDelete(result, note: note)
-    }
-
-    func publishCatCareUndo(_ result: CatCareUndoCommandResult, note: String) {
-        center.publishCatCareUndo(result, note: note)
     }
 
     func publishPetWalkGoal(_ result: PetWalkGoalCommandResult, note: String) {

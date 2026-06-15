@@ -18,7 +18,10 @@ struct OasisRewardCommandExecutor {
     }
 
     func currentHumanCoconutBalance(humans: [Human], currentActiveHumanId: String) -> Int {
-        guard let human = humans.first(where: { $0.id.uuidString == currentActiveHumanId && !$0.hasPassedAway }) else {
+        guard let human = humans.first(where: {
+            $0.id.uuidString == currentActiveHumanId &&
+                MemberLifecycleGate.disposition(human: $0, writeKind: .care).allowsEconomyDerivation
+        }) else {
             return rewards.currentHumanBalance(context: context)
         }
         return CoconutWalletService.balance(for: human, context: context)

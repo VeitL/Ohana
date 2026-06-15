@@ -32,7 +32,10 @@ struct PetActivityRecordCleanupService {
         deletedByHumanId: String? = nil
     ) -> PetActivityRecordCleanupResult {
         let petId = pet.id
-        guard !pet.hasPassedAway else {
+        guard MemberLifecycleGate.disposition(
+            pet: pet,
+            writeKind: .lifecycle(.clearActivityRecords)
+        ).isAllowed else {
             return PetActivityRecordCleanupResult(
                 petID: petId,
                 deletedActivityRecordCount: 0,

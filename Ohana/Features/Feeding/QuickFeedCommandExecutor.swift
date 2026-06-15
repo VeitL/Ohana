@@ -139,14 +139,14 @@ struct QuickFeedCommandExecutor {
     }
 
     func saveManualSettings(pet: Pet, foodKind: FeedFoodKind, grams: Double, defaultEnabled: Bool = true) {
-        ManualFeedCommand.saveSettings(
+        let didChange = ManualFeedCommand.saveSettings(
             pet: pet,
             foodKind: foodKind,
             grams: grams,
             defaultEnabled: defaultEnabled,
             context: context
         )
-        deriveFeedMutation(.feedSettings(petID: pet.id), affectedEntityIDs: [pet.id])
+        deriveFeedMutation(.feedSettings(petID: pet.id), affectedEntityIDs: [pet.id], wroteBusinessFact: didChange)
     }
 
     func recordManual(
@@ -246,18 +246,23 @@ struct QuickFeedCommandExecutor {
         deriveFeedMutation(
             .feedPlan(petID: pet.id, action: "save_\(kind.rawValue)"),
             affectedEntityIDs: targetIDs(pet: pet, targets: targets),
+            wroteBusinessFact: result.didChange,
             note: "targets:\(result.targetCount)"
         )
         return result
     }
 
     func switchToManual(pet: Pet, allEvents: [Event]) {
-        SwitchFeedModeCommand.switchToManual(
+        let didChange = SwitchFeedModeCommand.switchToManual(
             pet: pet,
             allEvents: allEvents,
             context: context
         )
-        deriveFeedMutation(.feedMode(petID: pet.id, mode: FeedOperatingMode.manual.rawValue), affectedEntityIDs: [pet.id])
+        deriveFeedMutation(
+            .feedMode(petID: pet.id, mode: FeedOperatingMode.manual.rawValue),
+            affectedEntityIDs: [pet.id],
+            wroteBusinessFact: didChange
+        )
     }
 
     func activateExistingRule(
@@ -283,11 +288,11 @@ struct QuickFeedCommandExecutor {
 
     func setFeedMode(_ mode: FeedOperatingMode, pet: Pet) {
         let previousMode = FeedOperatingMode.stored(for: pet.id)
-        SetFeedModeCommand.run(mode, pet: pet)
+        let didChange = SetFeedModeCommand.run(mode, pet: pet)
         deriveFeedMutation(
             .feedMode(petID: pet.id, mode: mode.rawValue),
             affectedEntityIDs: [pet.id],
-            wroteBusinessFact: previousMode != mode,
+            wroteBusinessFact: didChange && previousMode != mode,
             note: "optimistic_mode"
         )
     }
@@ -308,6 +313,7 @@ struct QuickFeedCommandExecutor {
         deriveFeedMutation(
             .feedPlan(petID: pet.id, action: "delete_\(kind.rawValue)"),
             affectedEntityIDs: [pet.id],
+            wroteBusinessFact: result.didChange,
             note: result.shouldSwitchToManual ? "switch_to_manual" : nil
         )
         return result
@@ -356,6 +362,7 @@ struct QuickFeedCommandExecutor {
         deriveFeedMutation(
             .feedStock(petID: pet.id, action: recordToUpdate == nil ? "create" : "update"),
             affectedEntityIDs: [pet.id],
+            wroteBusinessFact: result.didChange && result.allowsDerivedEffects,
             note: foodKind.rawValue
         )
         return result
@@ -377,6 +384,7 @@ struct QuickFeedCommandExecutor {
         deriveFeedMutation(
             .feedStock(petID: pet.id, action: "reminder_settings"),
             affectedEntityIDs: [pet.id],
+            wroteBusinessFact: result.didChange && result.allowsDerivedEffects,
             note: enabled ? "enabled" : "disabled"
         )
         return result
@@ -398,6 +406,7 @@ struct QuickFeedCommandExecutor {
         deriveFeedMutation(
             .feedStock(petID: pet.id, action: "correct"),
             affectedEntityIDs: [pet.id],
+            wroteBusinessFact: result.didChange && result.allowsDerivedEffects,
             note: record.foodKind.rawValue
         )
         return result
@@ -418,7 +427,11 @@ struct QuickFeedCommandExecutor {
             allEvents: allEvents,
             context: context
         )
-        deriveFeedMutation(.feedLog(petID: pet.id, source: "update"), affectedEntityIDs: [pet.id])
+        deriveFeedMutation(
+            .feedLog(petID: pet.id, source: "update"),
+            affectedEntityIDs: [pet.id],
+            wroteBusinessFact: result.didChange && result.allowsDerivedEffects
+        )
         return result
     }
 
@@ -429,7 +442,11 @@ struct QuickFeedCommandExecutor {
             allEvents: allEvents,
             context: context
         )
-        deriveFeedMutation(.feedLog(petID: pet.id, source: "delete"), affectedEntityIDs: [pet.id])
+        deriveFeedMutation(
+            .feedLog(petID: pet.id, source: "delete"),
+            affectedEntityIDs: [pet.id],
+            wroteBusinessFact: result.didChange && result.allowsDerivedEffects
+        )
         return result
     }
 
@@ -443,6 +460,7 @@ struct QuickFeedCommandExecutor {
         deriveFeedMutation(
             .feedStock(petID: pet.id, action: "delete_record"),
             affectedEntityIDs: [pet.id],
+            wroteBusinessFact: result.didChange && result.allowsDerivedEffects,
             note: record.foodKind.rawValue
         )
         return result
@@ -492,11 +510,11 @@ struct QuickFeedCommandExecutor {
 
     func setMainFoodKind(pet: Pet, foodKind: FeedFoodKind) {
         let previousKind = pet.mainFoodKind
-        SetMainFoodKindCommand.run(pet: pet, foodKind: foodKind, context: context)
+        let didChange = SetMainFoodKindCommand.run(pet: pet, foodKind: foodKind, context: context)
         deriveFeedMutation(
             .feedSettings(petID: pet.id),
             affectedEntityIDs: [pet.id],
-            wroteBusinessFact: previousKind != foodKind,
+            wroteBusinessFact: didChange && previousKind != foodKind,
             note: "main_food_kind:\(foodKind.rawValue)"
         )
     }

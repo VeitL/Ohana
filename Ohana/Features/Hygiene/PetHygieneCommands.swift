@@ -65,6 +65,7 @@ struct PetHygienePlanCommandResult: Equatable {
     let reminderID: UUID
     let subjectID: UUID
     let hygieneType: HygieneType
+    let didCreate: Bool
 }
 
 @MainActor
@@ -137,6 +138,14 @@ enum PetHygieneCommandService {
         context: ModelContext
     ) -> PetHygieneDeleteCommandResult {
         let logID = log.id
+        guard MemberLifecycleGate.disposition(pet: pet, writeKind: .care).allowsDerivedEffects else {
+            return PetHygieneDeleteCommandResult(
+                logID: logID,
+                subjectID: pet.id,
+                didDelete: false,
+                removedLedgerEventIDs: []
+            )
+        }
         let ledgerEvents = ledgerEvents(for: logID, context: context)
         for event in ledgerEvents {
             CloudSyncMutationRecorder.markDeleted(event, context: context)
@@ -183,6 +192,16 @@ enum PetHygieneCommandService {
         scheduleNotification: Bool = true,
         reminderScheduling providedReminderScheduling: ReminderSchedulingManaging? = nil
     ) -> PetHygienePlanCommandResult {
+        guard MemberWritePolicy.disposition(pet: pet, intent: .activeOnly).allowsDerivedEffects else {
+            return PetHygienePlanCommandResult(
+                eventID: UUID(),
+                reminderID: UUID(),
+                subjectID: pet.id,
+                hygieneType: type,
+                didCreate: false
+            )
+        }
+
         let calendar = Calendar.current
         let title = "\(pet.name) — \(type.rawValue)"
         let fullTitle = input.customNote.isEmpty ? title : "\(title) — \(input.customNote)"
@@ -261,7 +280,8 @@ enum PetHygieneCommandService {
             eventID: event.id,
             reminderID: reminder.id,
             subjectID: pet.id,
-            hygieneType: type
+            hygieneType: type,
+            didCreate: true
         )
     }
 }
@@ -354,7 +374,9 @@ struct PetHygieneCommandExecutor {
             scheduleNotification: scheduleNotification,
             reminderScheduling: reminderScheduling
         )
-        revisions.publishPetHygienePlan(result, note: note)
+        if result.didCreate {
+            revisions.publishPetHygienePlan(result, note: note)
+        }
         return result
     }
 

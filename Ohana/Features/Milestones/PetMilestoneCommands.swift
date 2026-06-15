@@ -53,6 +53,10 @@ enum PetMilestoneCommandService {
         for pet: Pet,
         context: ModelContext
     ) -> PetMilestoneCommandResult {
+        let disposition = MemberWritePolicy.disposition(pet: pet, intent: .memorialContent)
+        guard disposition.writesContent else {
+            return PetMilestoneCommandResult(petID: pet.id, milestoneIDs: [], coconutDelta: 0)
+        }
         var existingTitles = Set(pet.milestones.map(\.title))
         var created: [(milestone: PetMilestone, actionType: String)] = []
 
@@ -60,6 +64,7 @@ enum PetMilestoneCommandService {
             guard let date, !existingTitles.contains(title) else { return }
             let milestone = PetMilestone(date: date, title: title, emoji: emoji, notes: notes, pet: pet)
             context.insert(milestone)
+            CloudSyncMutationRecorder.markModified(milestone, context: context, modifiedAt: date)
             existingTitles.insert(title)
             created.append((milestone, actionType))
         }
@@ -88,16 +93,18 @@ enum PetMilestoneCommandService {
             )
         }
 
-        for entry in created {
-            recordLedger(
-                milestone: entry.milestone,
-                pet: pet,
-                actionType: entry.actionType,
-                source: .service,
-                coconutDelta: 0,
-                context: context,
-                save: false
-            )
+        if disposition.allowsDerivedEffects {
+            for entry in created {
+                recordLedger(
+                    milestone: entry.milestone,
+                    pet: pet,
+                    actionType: entry.actionType,
+                    source: .service,
+                    coconutDelta: 0,
+                    context: context,
+                    save: false
+                )
+            }
         }
         if !created.isEmpty {
             context.safeSave()
@@ -118,6 +125,10 @@ enum PetMilestoneCommandService {
         questManager providedQuestManager: QuestManager? = nil,
         careLedger providedCareLedger: CareLedgerRecording? = nil
     ) -> PetMilestoneCommandResult {
+        let disposition = MemberWritePolicy.disposition(pet: pet, intent: .memorialContent)
+        guard disposition.writesContent else {
+            return PetMilestoneCommandResult(petID: pet.id, milestoneIDs: [], coconutDelta: 0)
+        }
         let questManager = providedQuestManager ?? QuestManager()
         let careLedger = providedCareLedger ?? CareLedgerService()
         let title = input.title.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -135,7 +146,16 @@ enum PetMilestoneCommandService {
             location: input.location
         )
         context.insert(milestone)
+        CloudSyncMutationRecorder.markModified(milestone, context: context, modifiedAt: input.date)
         context.safeSave()
+
+        guard disposition.allowsDerivedEffects else {
+            return PetMilestoneCommandResult(
+                petID: pet.id,
+                milestoneIDs: [milestone.id],
+                coconutDelta: 0
+            )
+        }
 
         let rewardHuman = EconomyRewardOwnerResolver.rewardHuman(
             executorId: nil,
@@ -177,13 +197,17 @@ enum PetMilestoneCommandService {
         pet: Pet,
         context: ModelContext
     ) -> PetMilestoneDeleteCommandResult {
+        guard MemberWritePolicy.disposition(pet: pet, intent: .memorialContent).writesContent else {
+            return PetMilestoneDeleteCommandResult(petID: pet.id, milestoneID: milestone.id, removedLedgerEventIDs: [])
+        }
         let milestoneID = milestone.id
+        let removedLedgerEventIDs = ledgerEvents(for: milestone, context: context).map(\.id)
         PhysicalDeletionService.deletePetScopedRecord(milestone, pet: pet, context: context)
         context.safeSave()
         return PetMilestoneDeleteCommandResult(
             petID: pet.id,
             milestoneID: milestoneID,
-            removedLedgerEventIDs: []
+            removedLedgerEventIDs: removedLedgerEventIDs
         )
     }
 

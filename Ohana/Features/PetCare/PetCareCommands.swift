@@ -31,6 +31,7 @@ struct PetCareTrackingDeleteCommandResult: Equatable {
     let careLogID: UUID
     let linkedPottyLogID: UUID?
     let removedLedgerEventIDs: [UUID]
+    let didDelete: Bool
 }
 
 @MainActor
@@ -170,6 +171,24 @@ enum PetCareTrackingCommandService {
         context: ModelContext
     ) -> PetCareTrackingDeleteCommandResult {
         let careLogID = log.id
+        guard MemberLifecycleGate.disposition(pet: pet, writeKind: .care).allowsDerivedEffects else {
+            return PetCareTrackingDeleteCommandResult(
+                petID: pet.id,
+                careLogID: careLogID,
+                linkedPottyLogID: nil,
+                removedLedgerEventIDs: [],
+                didDelete: false
+            )
+        }
+        guard log.pet?.id == pet.id else {
+            return PetCareTrackingDeleteCommandResult(
+                petID: pet.id,
+                careLogID: careLogID,
+                linkedPottyLogID: nil,
+                removedLedgerEventIDs: [],
+                didDelete: false
+            )
+        }
         let linkedPotty = linkedPottyLog(for: log, pet: pet, context: context)
         var removedLedgerEvents = ledgerEvents(forLegacyModelName: "PetCareLog", id: careLogID, context: context)
         if let linkedPotty {
@@ -194,7 +213,8 @@ enum PetCareTrackingCommandService {
             petID: pet.id,
             careLogID: careLogID,
             linkedPottyLogID: linkedPotty?.id,
-            removedLedgerEventIDs: removedLedgerEvents.map(\.id)
+            removedLedgerEventIDs: removedLedgerEvents.map(\.id),
+            didDelete: true
         )
     }
 
@@ -256,6 +276,7 @@ struct PetPottyDeleteCommandResult: Equatable {
     let petID: UUID
     let logID: UUID
     let removedLedgerEventIDs: [UUID]
+    let didDelete: Bool
 }
 
 struct PetPottyClaimCommandResult: Equatable {
@@ -274,6 +295,22 @@ enum PetPottyCommandService {
         context: ModelContext
     ) -> PetPottyDeleteCommandResult {
         let logID = log.id
+        guard MemberLifecycleGate.disposition(pet: pet, writeKind: .care).allowsDerivedEffects else {
+            return PetPottyDeleteCommandResult(
+                petID: pet.id,
+                logID: logID,
+                removedLedgerEventIDs: [],
+                didDelete: false
+            )
+        }
+        guard canDeletePottyLog(log, from: pet) else {
+            return PetPottyDeleteCommandResult(
+                petID: pet.id,
+                logID: logID,
+                removedLedgerEventIDs: [],
+                didDelete: false
+            )
+        }
         let ledgerEvents = ledgerEvents(forLegacyModelName: "PetPottyLog", id: logID, context: context)
         for event in ledgerEvents {
             CloudSyncMutationRecorder.markDeleted(event, context: context)
@@ -287,7 +324,8 @@ enum PetPottyCommandService {
         return PetPottyDeleteCommandResult(
             petID: pet.id,
             logID: logID,
-            removedLedgerEventIDs: ledgerEvents.map(\.id)
+            removedLedgerEventIDs: ledgerEvents.map(\.id),
+            didDelete: true
         )
     }
 
@@ -325,6 +363,13 @@ enum PetPottyCommandService {
         context: ModelContext
     ) -> [CareLedgerEvent] {
         petCareCommandLedgerEvents(forLegacyModelName: modelName, id: id, context: context)
+    }
+
+    private static func canDeletePottyLog(_ log: PetPottyLog, from pet: Pet) -> Bool {
+        if log.pet?.id == pet.id {
+            return true
+        }
+        return log.pet == nil && !log.sharedSessionId.isEmpty
     }
 }
 
@@ -382,7 +427,7 @@ struct PetCareCommandExecutor {
         note: String
     ) -> PetCareTrackingDeleteCommandResult {
         let result = PetCareTrackingCommandService.deleteCareLog(log, pet: pet, context: context)
-        revisions.publishPetCareDelete(result, note: note)
+        deriveCareDelete(result, note: note)
         return result
     }
 
@@ -393,7 +438,7 @@ struct PetCareCommandExecutor {
         note: String
     ) -> PetPottyDeleteCommandResult {
         let result = PetPottyCommandService.deletePottyLog(log, pet: pet, context: context)
-        revisions.publishPetPottyDelete(result, note: note)
+        derivePottyDelete(result, note: note)
         return result
     }
 
@@ -438,7 +483,7 @@ struct PetCareCommandExecutor {
             hygieneLogID: hygieneLogID,
             context: context
         )
-        revisions.publishCatCareUndo(result, note: note)
+        deriveCatCareUndo(result, note: note)
         return result
     }
 
@@ -488,6 +533,61 @@ struct PetCareCommandExecutor {
         )
     }
 
+    private func deriveCareDelete(_ result: PetCareTrackingDeleteCommandResult, note: String) {
+        let command = DomainCommand.petCareDelete(petID: result.petID, logID: result.careLogID)
+        var affected = Set(result.removedLedgerEventIDs)
+        affected.insert(result.petID)
+        affected.insert(result.careLogID)
+        if let linkedPottyLogID = result.linkedPottyLogID {
+            affected.insert(linkedPottyLogID)
+        }
+
+        guard result.didDelete else {
+            derivations.derive(
+                .noOp(
+                    command: command,
+                    affectedEntityIDs: affected,
+                    note: "\(note).noop"
+                )
+            )
+            return
+        }
+
+        derivations.derive(
+            .derivedMutation(
+                command: command,
+                affectedEntityIDs: affected,
+                note: note
+            )
+        )
+    }
+
+    private func derivePottyDelete(_ result: PetPottyDeleteCommandResult, note: String) {
+        let command = DomainCommand.petPottyDelete(petID: result.petID, logID: result.logID)
+        var affected = Set(result.removedLedgerEventIDs)
+        affected.insert(result.petID)
+        affected.insert(result.logID)
+
+        guard result.didDelete else {
+            derivations.derive(
+                .noOp(
+                    command: command,
+                    affectedEntityIDs: affected,
+                    note: "\(note).noop"
+                )
+            )
+            return
+        }
+
+        derivations.derive(
+            .derivedMutation(
+                command: command,
+                affectedEntityIDs: affected,
+                note: note
+            )
+        )
+    }
+
     private func deriveCatCareRecord(_ result: CatCareCommandResult, note: String) {
         let command = DomainCommand.catCareRecord(petID: result.petID, action: result.actionRaw)
         guard result.didRecord else {
@@ -519,6 +619,34 @@ struct PetCareCommandExecutor {
                     note: note
                 ),
                 noopNote: "\(note).factOnly"
+            )
+        )
+    }
+
+    private func deriveCatCareUndo(_ result: CatCareUndoCommandResult, note: String) {
+        let command = DomainCommand.catCareUndo(petID: result.petID, eventID: result.eventID)
+        var affected: Set<UUID> = [result.petID, result.eventID]
+        if let hygieneLogID = result.hygieneLogID {
+            affected.insert(hygieneLogID)
+        }
+        affected.formUnion(result.removedLedgerEventIDs)
+
+        guard result.didDelete else {
+            derivations.derive(
+                .noOp(
+                    command: command,
+                    affectedEntityIDs: affected,
+                    note: "\(note).noop"
+                )
+            )
+            return
+        }
+
+        derivations.derive(
+            .derivedMutation(
+                command: command,
+                affectedEntityIDs: affected,
+                note: note
             )
         )
     }

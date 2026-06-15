@@ -146,6 +146,7 @@ enum ReminderSchedulingService {
     @MainActor
     static func deduplicate(reminders: [Reminder], context: ModelContext, careLedger providedCareLedger: CareLedgerRecording? = nil) -> [Reminder] {
         let careLedger = providedCareLedger ?? CareLedgerService()
+        let now = Date()
         var seen: Set<String> = []
         var kept: [Reminder] = []
         var didChange = false
@@ -161,6 +162,7 @@ enum ReminderSchedulingService {
                     context: context,
                     save: false
                 )
+                CloudSyncMutationRecorder.markDeleted(reminder, context: context, deletedAt: now)
                 context.delete(reminder)
                 didChange = true
             } else {

@@ -6,7 +6,61 @@
 import Foundation
 import SwiftData
 
+struct EconomyRewardOwnerResolution: Equatable {
+    let requestedExecutorId: String?
+    let effectiveExecutorId: String?
+    let rewardExecutorId: String?
+    let usedFallback: Bool
+}
+
 enum EconomyRewardOwnerResolver {
+    @MainActor
+    static func executorResolution(
+        executorId: String?,
+        activeHumanSelection: ActiveHumanSelecting,
+        context: ModelContext,
+        logPrefix: String
+    ) -> EconomyRewardOwnerResolution {
+        let requestedExecutorId = normalizedExecutorId(executorId)
+        guard let requestedExecutorId else {
+            return EconomyRewardOwnerResolution(
+                requestedExecutorId: nil,
+                effectiveExecutorId: nil,
+                rewardExecutorId: nil,
+                usedFallback: false
+            )
+        }
+
+        if explicitHuman(id: requestedExecutorId, context: context, logPrefix: logPrefix) != nil {
+            return EconomyRewardOwnerResolution(
+                requestedExecutorId: requestedExecutorId,
+                effectiveExecutorId: requestedExecutorId,
+                rewardExecutorId: requestedExecutorId,
+                usedFallback: false
+            )
+        }
+
+        if let fallback = activeHuman(
+            selection: activeHumanSelection,
+            context: context,
+            logPrefix: logPrefix
+        ) {
+            return EconomyRewardOwnerResolution(
+                requestedExecutorId: requestedExecutorId,
+                effectiveExecutorId: fallback.id.uuidString,
+                rewardExecutorId: fallback.id.uuidString,
+                usedFallback: true
+            )
+        }
+
+        return EconomyRewardOwnerResolution(
+            requestedExecutorId: requestedExecutorId,
+            effectiveExecutorId: nil,
+            rewardExecutorId: requestedExecutorId,
+            usedFallback: false
+        )
+    }
+
     @MainActor
     static func rewardHuman(
         executorId: String?,
@@ -27,8 +81,13 @@ enum EconomyRewardOwnerResolver {
     }
 
     static func hasExplicitExecutor(_ executorId: String?) -> Bool {
-        guard let executorId else { return false }
-        return !executorId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        normalizedExecutorId(executorId) != nil
+    }
+
+    static func normalizedExecutorId(_ executorId: String?) -> String? {
+        guard let executorId else { return nil }
+        let trimmed = executorId.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
     }
 
     @MainActor

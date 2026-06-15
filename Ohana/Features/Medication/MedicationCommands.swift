@@ -98,6 +98,7 @@ struct HumanMedicationPlanDeleteCommandResult: Equatable {
     let medicationID: UUID
     let removedCalendarEventIDs: [UUID]
     let scheduledReminderSync: Bool
+    let didChange: Bool
 }
 
 struct HumanMedicationPlanActivationCommandResult: Equatable {
@@ -163,6 +164,7 @@ enum HumanMedicationCommandService {
     ) -> HumanMedicationCommandResult? {
         let cleanName = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !cleanName.isEmpty else { return nil }
+        guard MemberWritePolicy.disposition(human: human, intent: .activeOnly).allowsDerivedEffects else { return nil }
 
         let medication = HumanMedication(
             humanId: human.id.uuidString,
@@ -176,6 +178,7 @@ enum HumanMedicationCommandService {
         )
         medication.isActive = true
         context.insert(medication)
+        CloudSyncMutationRecorder.markModified(medication, context: context, modifiedAt: startDate)
         context.safeSave()
 
         if reminderEnabled {
@@ -262,6 +265,7 @@ struct PetMedicationPlanDeleteCommandResult: Equatable {
     let medicationID: UUID
     let removedCalendarEventIDs: [UUID]
     let scheduledReminderSync: Bool
+    let didChange: Bool
 }
 
 struct PetMedicationPlanActivationCommandResult: Equatable {
@@ -318,6 +322,7 @@ enum PetMedicationPlanCommandService {
         medicationReminders providedMedicationReminders: MedicationReminderManaging? = nil
     ) -> PetMedicationPlanCommandResult? {
         guard !input.cleanName.isEmpty else { return nil }
+        guard MemberWritePolicy.disposition(pet: pet, intent: .activeOnly).allowsDerivedEffects else { return nil }
 
         let medication: PetMedication
         let created: Bool
@@ -340,6 +345,7 @@ enum PetMedicationPlanCommandService {
         }
 
         apply(input, to: medication, pet: pet)
+        CloudSyncMutationRecorder.markModified(medication, context: context, modifiedAt: input.startDate)
         let calendarSync = syncCalendarEvents(
             for: medication,
             pet: pet,
@@ -373,6 +379,15 @@ enum PetMedicationPlanCommandService {
         scheduleReminders: Bool = true,
         medicationReminders providedMedicationReminders: MedicationReminderManaging? = nil
     ) -> PetMedicationPlanDeleteCommandResult {
+        guard MemberWritePolicy.disposition(pet: pet, intent: .activeOnly).allowsDerivedEffects else {
+            return PetMedicationPlanDeleteCommandResult(
+                subjectID: pet.id,
+                medicationID: medication.id,
+                removedCalendarEventIDs: [],
+                scheduledReminderSync: false,
+                didChange: false
+            )
+        }
         let medicationID = medication.id
         let removedEventIDs = removeCalendarEvents(for: medicationID, context: context)
         CloudSyncMutationRecorder.markDeleted(medication, pet: pet, context: context)
@@ -389,7 +404,8 @@ enum PetMedicationPlanCommandService {
             subjectID: pet.id,
             medicationID: medicationID,
             removedCalendarEventIDs: removedEventIDs,
-            scheduledReminderSync: scheduleReminders
+            scheduledReminderSync: scheduleReminders,
+            didChange: true
         )
     }
 
@@ -403,8 +419,22 @@ enum PetMedicationPlanCommandService {
         scheduleReminders: Bool = true,
         medicationReminders providedMedicationReminders: MedicationReminderManaging? = nil
     ) -> PetMedicationPlanActivationCommandResult {
+        guard MemberWritePolicy.disposition(pet: pet, intent: .activeOnly).allowsDerivedEffects else {
+            return PetMedicationPlanActivationCommandResult(
+                subjectID: pet.id,
+                medicationID: medication.id,
+                isActive: medication.isActive,
+                didChange: false,
+                calendarEventIDs: [],
+                removedCalendarEventIDs: [],
+                scheduledReminderSync: false
+            )
+        }
         let didChange = medication.isActive != isActive
         medication.isActive = isActive
+        if didChange {
+            CloudSyncMutationRecorder.markModified(medication, context: context)
+        }
         let calendarSync = syncCalendarEvents(
             for: medication,
             pet: pet,
@@ -495,6 +525,7 @@ enum PetMedicationPlanCommandService {
             event.recurrenceDays = recurrenceDays
             event.recurrenceEndDate = medication.endDate.map { Calendar.current.startOfDay(for: $0) }
             context.insert(event)
+            CloudSyncMutationRecorder.markModified(event, context: context, modifiedAt: start)
             createdEventIDs.append(event.id)
         }
 
@@ -649,6 +680,7 @@ struct PetMedicationCommandExecutor {
             scheduleReminders: scheduleReminders,
             medicationReminders: medicationReminders
         )
+        guard result.didChange else { return result }
         revisions.publishPetMedicationPlanDelete(result, note: note)
         return result
     }
@@ -669,6 +701,9 @@ struct PetMedicationCommandExecutor {
             scheduleReminders: scheduleReminders,
             medicationReminders: medicationReminders
         )
+        guard result.didChange || !result.calendarEventIDs.isEmpty || !result.removedCalendarEventIDs.isEmpty else {
+            return result
+        }
         revisions.publishPetMedicationPlanActivation(result, note: note)
         return result
     }

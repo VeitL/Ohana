@@ -126,6 +126,10 @@ assert_bad scripts/audit-economy-boundaries.sh "$fixtures/RecurringEconomyBounda
   view-soft-gate-without-service-hard-gate
 assert_good scripts/audit-economy-boundaries.sh "$fixtures/RecurringEconomyBoundariesGood.swift"
 
+assert_bad scripts/audit-member-lifecycle-gate.sh "$fixtures/MemberLifecycleGateBadCommands.swift" \
+  member-lifecycle-direct-write-gate member-lifecycle-missing-disposition
+assert_good scripts/audit-member-lifecycle-gate.sh "$fixtures/MemberLifecycleGateGoodCommands.swift"
+
 assert_bad scripts/audit-derived-state-lifecycle.sh "$fixtures/DerivedStateLifecycleBad.swift" \
   derived-state-lifecycle-checklist physical-delete-without-tombstone \
   cloudsync-upload-builder-coverage physical-deletion-cascade-coverage
@@ -136,6 +140,7 @@ assert_scope_floor scripts/audit-accessibility.sh
 assert_scope_floor scripts/audit-smoothness-risk.sh
 assert_scope_floor scripts/audit-runtime-guardrails.sh
 assert_scope_floor scripts/audit-economy-boundaries.sh
+assert_scope_floor scripts/audit-member-lifecycle-gate.sh
 assert_scope_floor scripts/audit-derived-state-lifecycle.sh
 
 echo

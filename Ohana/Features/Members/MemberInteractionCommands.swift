@@ -50,7 +50,10 @@ enum MemberLifecycleCommandService {
         questManager: QuestManager? = nil,
         cleanupService: PetActivityRecordCleanupService? = nil
     ) -> MemberLifecycleCommandResult {
-        guard !pet.hasPassedAway else {
+        guard MemberLifecycleGate.disposition(
+            pet: pet,
+            writeKind: .lifecycle(.clearActivityRecords)
+        ).isAllowed else {
             return MemberLifecycleCommandResult(entityID: pet.id, kind: EntityKind.pet.rawValue, action: "no-op")
         }
         let cleanupService = cleanupService ?? PetActivityRecordCleanupService()
@@ -108,7 +111,7 @@ enum MemberHomeVisibilityCommandService {
         visible: Bool,
         context: ModelContext
     ) -> MemberHomeVisibilityCommandResult {
-        guard !human.hasPassedAway else {
+        guard MemberLifecycleGate.disposition(human: human, writeKind: .profileEdit).writesContent else {
             return MemberHomeVisibilityCommandResult(
                 entityID: human.id,
                 kind: EntityKind.human.rawValue,

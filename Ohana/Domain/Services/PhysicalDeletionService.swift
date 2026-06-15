@@ -552,6 +552,8 @@ nonisolated enum PhysicalDeletionService {
             (String(describing: PetMedication.self), medication.id.uuidString)
         case let photo as PetPhotoLog:
             (String(describing: PetPhotoLog.self), photo.id.uuidString)
+        case let milestone as PetMilestone:
+            (String(describing: PetMilestone.self), milestone.id.uuidString)
         case let document as PetDocument:
             (String(describing: PetDocument.self), document.id.uuidString)
         case let insurance as PetInsurance:

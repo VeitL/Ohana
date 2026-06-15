@@ -86,12 +86,14 @@ struct PetDocumentCommandResult: Equatable {
     let documentID: UUID
     let expenseLogIDs: [UUID]
     let ledgerEventIDs: [UUID]
+    let didChange: Bool
 }
 
 struct PetDocumentDeleteCommandResult: Equatable {
     let petID: UUID
     let documentID: UUID
     let removedLedgerEventIDs: [UUID]
+    let didChange: Bool
 }
 
 enum PetDocumentCommandService {
@@ -104,6 +106,10 @@ enum PetDocumentCommandService {
         now: Date = Date(),
         careLedger providedCareLedger: CareLedgerRecording? = nil
     ) -> PetDocumentCommandResult {
+        let disposition = MemberLifecycleGate.disposition(pet: pet, writeKind: writeKind(for: input))
+        guard disposition.writesContent else {
+            return PetDocumentCommandResult(petID: pet.id, documentID: UUID(), expenseLogIDs: [], ledgerEventIDs: [], didChange: false)
+        }
         let careLedger = providedCareLedger ?? CareLedgerService()
         let finalTitle = input.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             ? "\(pet.name)\(input.category.rawValue)"
@@ -116,28 +122,39 @@ enum PetDocumentCommandService {
         document.cost = max(0, input.cost)
         applyAttachments(input.attachments, to: document, context: context)
 
-        let expenseLogs = makeExpensesIfNeeded(
-            pet: pet,
-            document: document,
-            category: input.category,
-            amount: document.cost,
-            issueDate: input.issueDate,
-            payerId: validPayerId(input.payerId, context: context),
-            now: now,
-            context: context
-        )
+        let expenseLogs = disposition.allowsDerivedEffects
+            ? makeExpensesIfNeeded(
+                pet: pet,
+                document: document,
+                category: input.category,
+                amount: document.cost,
+                issueDate: input.issueDate,
+                payerId: validPayerId(input.payerId, context: context),
+                now: now,
+                context: context
+            )
+            : []
 
         context.insert(document)
-        if !input.documentNumber.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+        CloudSyncMutationRecorder.markModified(document, context: context, modifiedAt: now)
+        if disposition.allowsDerivedEffects,
+           !input.documentNumber.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
            input.category == .passport {
             pet.passportNumber = input.documentNumber.trimmingCharacters(in: .whitespacesAndNewlines)
         }
 
         let ledgerEvents = expenseLogs.map { expense in
-            careLedger.record(
+            let actor = CareFactWritePolicy.executorResolution(
+                requestedExecutorId: expense.executorId,
+                context: context,
+                logPrefix: "PetDocumentCommandService.createDocument"
+            )
+            expense.executorId = actor.effectiveExecutorId
+            CloudSyncMutationRecorder.markModified(expense, context: context, modifiedAt: expense.date)
+            return careLedger.record(
                 occurredAt: expense.date,
-                actorKind: expense.executorId == nil ? .unknown : .human,
-                actorId: expense.executorId,
+                actorKind: actor.effectiveExecutorId == nil ? .unknown : .human,
+                actorId: actor.effectiveExecutorId,
                 subjectKind: .pet,
                 subjectId: pet.id.uuidString,
                 eventKind: .expense,
@@ -164,7 +181,8 @@ enum PetDocumentCommandService {
             petID: pet.id,
             documentID: document.id,
             expenseLogIDs: expenseLogs.map(\.id),
-            ledgerEventIDs: ledgerEvents.map(\.id)
+            ledgerEventIDs: ledgerEvents.map(\.id),
+            didChange: true
         )
     }
 
@@ -176,6 +194,10 @@ enum PetDocumentCommandService {
         input: PetDocumentUpdateCommandInput,
         context: ModelContext
     ) -> PetDocumentCommandResult {
+        let disposition = MemberLifecycleGate.disposition(pet: pet, writeKind: writeKind(for: input))
+        guard disposition.writesContent else {
+            return PetDocumentCommandResult(petID: pet.id, documentID: document.id, expenseLogIDs: [], ledgerEventIDs: [], didChange: false)
+        }
         document.title = input.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             ? "\(pet.name)\(input.category.rawValue)"
             : input.title.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -200,12 +222,14 @@ enum PetDocumentCommandService {
             )
             document.attachmentFilename = filename
         }
+        CloudSyncMutationRecorder.markModified(document, context: context)
         context.safeSave()
         return PetDocumentCommandResult(
             petID: pet.id,
             documentID: document.id,
             expenseLogIDs: [],
-            ledgerEventIDs: []
+            ledgerEventIDs: [],
+            didChange: true
         )
     }
 
@@ -216,13 +240,18 @@ enum PetDocumentCommandService {
         pet: Pet,
         context: ModelContext
     ) -> PetDocumentDeleteCommandResult {
+        let disposition = MemberLifecycleGate.disposition(pet: pet, writeKind: writeKind(for: document))
+        guard disposition.writesContent else {
+            return PetDocumentDeleteCommandResult(petID: pet.id, documentID: document.id, removedLedgerEventIDs: [], didChange: false)
+        }
         let documentID = document.id
         PhysicalDeletionService.deleteDocument(document, pet: pet, context: context)
         context.safeSave()
         return PetDocumentDeleteCommandResult(
             petID: pet.id,
             documentID: documentID,
-            removedLedgerEventIDs: []
+            removedLedgerEventIDs: [],
+            didChange: true
         )
     }
 
@@ -249,6 +278,30 @@ enum PetDocumentCommandService {
         for attachment in document.attachments {
             context.insert(attachment)
         }
+    }
+
+    private static func writeKind(for input: PetDocumentCreateCommandInput) -> MemberWriteKind {
+        if input.cost > 0 ||
+            input.expiryDate != nil ||
+            (input.category == .passport && !input.documentNumber.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty) {
+            return .care
+        }
+        return .memorial
+    }
+
+    private static func writeKind(for input: PetDocumentUpdateCommandInput) -> MemberWriteKind {
+        if input.cost > 0 || input.expiryDate != nil || input.category == .passport {
+            return .care
+        }
+        return .memorial
+    }
+
+    private static func writeKind(for document: PetDocument) -> MemberWriteKind {
+        let category = DocumentCategory(rawValue: document.category)
+        if document.cost > 0 || document.expiryDate != nil || category == .passport {
+            return .care
+        }
+        return .memorial
     }
 
     private static func sanitizedAttachment(
@@ -298,6 +351,7 @@ enum PetDocumentCommandService {
                 executorId: plan.payerId
             )
             context.insert(expense)
+            CloudSyncMutationRecorder.markModified(expense, context: context, modifiedAt: expense.date)
             return expense
         }
     }
@@ -315,7 +369,8 @@ enum PetDocumentCommandService {
             context: context,
             operation: "fetch document payer"
         )
-        return humans.isEmpty ? nil : payerId
+        guard let human = humans.first, EconomyWalletWritePolicy.canWrite(human) else { return nil }
+        return payerId
     }
 
     @MainActor
@@ -367,7 +422,9 @@ struct PetDocumentCommandExecutor {
         note: String
     ) -> PetDocumentCommandResult {
         let result = PetDocumentCommandService.createDocument(input: input, pet: pet, context: context)
-        revisions.publishPetDocumentCreate(result, category: input.category, note: note)
+        if result.didChange {
+            revisions.publishPetDocumentCreate(result, category: input.category, note: note)
+        }
         return result
     }
 
@@ -379,7 +436,9 @@ struct PetDocumentCommandExecutor {
         note: String
     ) -> PetDocumentCommandResult {
         let result = PetDocumentCommandService.updateDocument(document, pet: pet, input: input, context: context)
-        revisions.publishPetDocumentUpdate(result, note: note)
+        if result.didChange {
+            revisions.publishPetDocumentUpdate(result, note: note)
+        }
         return result
     }
 
@@ -390,7 +449,9 @@ struct PetDocumentCommandExecutor {
         note: String
     ) -> PetDocumentDeleteCommandResult {
         let result = PetDocumentCommandService.deleteDocument(document, pet: pet, context: context)
-        revisions.publishPetDocumentDelete(result, note: note)
+        if result.didChange {
+            revisions.publishPetDocumentDelete(result, note: note)
+        }
         return result
     }
 }

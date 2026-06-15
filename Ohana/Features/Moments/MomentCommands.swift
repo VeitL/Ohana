@@ -35,6 +35,12 @@ enum MomentCommandService {
         guard !cleanNote.isEmpty || !photoData.isEmpty else {
             return MomentCommandResult(savedLogIDs: [], coconutDelta: 0)
         }
+        let disposition = pet.map {
+            MemberLifecycleGate.disposition(pet: $0, writeKind: .memorial)
+        } ?? .memorialContentOnly
+        guard disposition.writesContent else {
+            return MomentCommandResult(savedLogIDs: [], coconutDelta: 0)
+        }
 
         let payloads = photoData.isEmpty ? [Data(count: 1)] : photoData
         var savedLogs: [PetPhotoLog] = []
@@ -49,11 +55,12 @@ enum MomentCommandService {
                 locationPlacename: locationPlacename
             )
             context.insert(log)
+            CloudSyncMutationRecorder.markModified(log, context: context, modifiedAt: log.date)
             savedLogs.append(log)
         }
 
         var coconutDelta = 0
-        if let savedLog = savedLogs.first {
+        if let savedLog = savedLogs.first, disposition.allowsDerivedEffects {
             do {
                 let reward = EconomyRewardDiscipline.awardNonCareReward(
                     type: .general(humanReward: 1, petReward: 0, emoji: "📸", title: "记录时刻 +1🥥"),
@@ -95,6 +102,8 @@ enum MomentCommandService {
                 #endif
                 return MomentCommandResult(savedLogIDs: [], coconutDelta: 0)
             }
+        } else {
+            context.safeSave()
         }
 
         return MomentCommandResult(savedLogIDs: savedLogs.map(\.id), coconutDelta: coconutDelta)

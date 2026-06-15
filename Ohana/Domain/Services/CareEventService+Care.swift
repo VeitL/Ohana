@@ -89,18 +89,23 @@ extension CareEventService {
                 date: date
             )
         }
+        let actor = CareFactWritePolicy.executorResolution(
+            requestedExecutorId: executorId,
+            context: context,
+            logPrefix: "CareEventService recordCareFact"
+        )
         let log = PetCareLog(
             date: date,
             type: type,
             amountMl: amountMl,
             pet: pet,
-            executorId: executorId
+            executorId: actor.effectiveExecutorId
         )
         context.insert(log)
         CloudSyncMutationRecorder.markModified(log, context: context, modifiedAt: date)
         let pottyLog: PetPottyLog?
         if disposition.allowsDerivedEffects, createsLinkedPottyLog, type == .litter {
-            let linked = PetPottyLog(date: date, type: .perfectPoop, pet: pet, executorId: executorId)
+            let linked = PetPottyLog(date: date, type: .perfectPoop, pet: pet, executorId: actor.effectiveExecutorId)
             context.insert(linked)
             CloudSyncMutationRecorder.markModified(linked, context: context, modifiedAt: date)
             pottyLog = linked
@@ -131,7 +136,7 @@ extension CareEventService {
             context: context,
             quality: quality,
             date: Date(),
-            executorId: executorId
+            executorId: actor.rewardExecutorId
         )
         dependencies.careLedger.recordPetCare(
             log: log,
@@ -159,7 +164,7 @@ extension CareEventService {
             pet: pet,
             type: type,
             context: context,
-            executorId: executorId,
+            executorId: actor.effectiveExecutorId,
             now: date
         )
         return (
@@ -226,7 +231,12 @@ extension CareEventService {
                 nil
             )
         }
-        let log = PetPottyLog(date: date, type: type, pet: pet, executorId: executorId)
+        let actor = CareFactWritePolicy.executorResolution(
+            requestedExecutorId: executorId,
+            context: context,
+            logPrefix: "CareEventService recordPottyFact"
+        )
+        let log = PetPottyLog(date: date, type: type, pet: pet, executorId: actor.effectiveExecutorId)
         context.insert(log)
         CloudSyncMutationRecorder.markModified(log, context: context, modifiedAt: date)
         context.safeSave()
@@ -250,7 +260,7 @@ extension CareEventService {
             context: context,
             quality: .none,
             date: Date(),
-            executorId: executorId
+            executorId: actor.rewardExecutorId
         )
         dependencies.careLedger.recordPetPotty(
             log: log,
@@ -264,7 +274,7 @@ extension CareEventService {
         dependencies.quickActionReminderCompletion.completeNearestPetPottyReminder(
             pet: pet,
             context: context,
-            executorId: executorId,
+            executorId: actor.effectiveExecutorId,
             now: date
         )
         let result = PottyRecordResult(
@@ -358,7 +368,12 @@ extension CareEventService {
                 log
             )
         }
-        let log = PetHygieneLog(date: date, type: type, pet: pet, executorId: executorId)
+        let actor = CareFactWritePolicy.executorResolution(
+            requestedExecutorId: executorId,
+            context: context,
+            logPrefix: "CareEventService recordHygieneFact"
+        )
+        let log = PetHygieneLog(date: date, type: type, pet: pet, executorId: actor.effectiveExecutorId)
         context.insert(log)
         CloudSyncMutationRecorder.markModified(log, context: context, modifiedAt: date)
         context.safeSave()
@@ -382,13 +397,13 @@ extension CareEventService {
             context: context,
             quality: .none,
             date: Date(),
-            executorId: executorId
+            executorId: actor.rewardExecutorId
         )
         let metadataJSON = dependencies.careLedger.rewardMetadata(reward, questManager: dependencies.questManager)
         dependencies.careLedger.record(
             occurredAt: log.date,
-            actorKind: executorId == nil ? .unknown : .human,
-            actorId: executorId,
+            actorKind: actor.effectiveExecutorId == nil ? .unknown : .human,
+            actorId: actor.effectiveExecutorId,
             subjectKind: .pet,
             subjectId: pet.id.uuidString,
             eventKind: .hygiene,
@@ -413,7 +428,7 @@ extension CareEventService {
             pet: pet,
             type: type,
             context: context,
-            executorId: executorId,
+            executorId: actor.effectiveExecutorId,
             now: date
         )
         let result = HygieneRecordResult(
@@ -478,7 +493,12 @@ extension CareEventService {
                 nil
             )
         }
-        let log = PetHealthLog(date: date, type: type, note: note, pet: pet, executorId: executorId)
+        let actor = CareFactWritePolicy.executorResolution(
+            requestedExecutorId: executorId,
+            context: context,
+            logPrefix: "CareEventService recordHealthFact"
+        )
+        let log = PetHealthLog(date: date, type: type, note: note, pet: pet, executorId: actor.effectiveExecutorId)
         context.insert(log)
         CloudSyncMutationRecorder.markModified(log, context: context, modifiedAt: date)
         context.safeSave()
@@ -502,13 +522,13 @@ extension CareEventService {
             context: context,
             quality: .none,
             date: Date(),
-            executorId: executorId
+            executorId: actor.rewardExecutorId
         )
         let metadataJSON = dependencies.careLedger.rewardMetadata(reward, questManager: dependencies.questManager)
         dependencies.careLedger.record(
             occurredAt: log.date,
-            actorKind: executorId == nil ? .unknown : .human,
-            actorId: executorId,
+            actorKind: actor.effectiveExecutorId == nil ? .unknown : .human,
+            actorId: actor.effectiveExecutorId,
             subjectKind: .pet,
             subjectId: pet.id.uuidString,
             eventKind: .health,

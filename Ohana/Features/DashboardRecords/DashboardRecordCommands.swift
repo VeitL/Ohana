@@ -56,6 +56,7 @@ struct DashboardRecordDeleteCommandResult: Equatable {
     let recordID: UUID
     let recordKind: String
     let removedLedgerEventIDs: [UUID]
+    let didChange: Bool
 }
 
 enum WeightCommandService {
@@ -91,22 +92,28 @@ enum WeightCommandService {
                 allowsDerivedEffects: false
             )
         }
+        let actor = CareFactWritePolicy.executorResolution(
+            requestedExecutorId: executorId,
+            context: context,
+            logPrefix: "WeightCommandService.recordPetWeight"
+        )
         let log = PetWeightLog(
             date: date,
             weight: weight,
             weightUnit: weightUnit,
             bcsScore: bcsScore,
             pet: pet,
-            executorId: executorId
+            executorId: actor.effectiveExecutorId
         )
         context.insert(log)
+        CloudSyncMutationRecorder.markModified(log, context: context, modifiedAt: date)
         let allowsDerivedEffects = disposition.allowsDerivedEffects
         let reward: (humanGot: Int, petGot: Int)? = if awardsReward, allowsDerivedEffects {
             EconomyRewardDiscipline.awardCareAction(
                 type: .weight,
                 pet: pet,
                 context: context,
-                executorId: executorId,
+                executorId: actor.rewardExecutorId,
                 questManager: questManager
             )
         } else {
@@ -116,8 +123,8 @@ enum WeightCommandService {
         let ledgerEvent = allowsDerivedEffects ? ledgerSource.map { source in
             careLedger.record(
                 occurredAt: log.date,
-                actorKind: executorId == nil ? .unknown : .human,
-                actorId: executorId,
+                actorKind: actor.effectiveExecutorId == nil ? .unknown : .human,
+                actorId: actor.effectiveExecutorId,
                 subjectKind: .pet,
                 subjectId: pet.id.uuidString,
                 eventKind: .weight,
@@ -161,6 +168,15 @@ enum WeightCommandService {
         context: ModelContext,
         executorId: String? = nil
     ) -> WeightCommandResult {
+        guard MemberWritePolicy.disposition(human: human, intent: .activeOnly).allowsDerivedEffects else {
+            return WeightCommandResult(
+                logID: UUID(),
+                subjectID: human.id,
+                coconutDelta: 0,
+                didRecord: false,
+                allowsDerivedEffects: false
+            )
+        }
         let log = HumanWeightLog(
             date: date,
             weight: weight,
@@ -169,6 +185,7 @@ enum WeightCommandService {
         )
         context.insert(log)
         human.weightLogs.append(log)
+        CloudSyncMutationRecorder.markModified(log, context: context, modifiedAt: date)
         context.safeSave()
         return WeightCommandResult(logID: log.id, subjectID: human.id, coconutDelta: 0)
     }
@@ -274,6 +291,7 @@ struct DashboardRecordCommandExecutor {
             context: context,
             executorId: executorId
         )
+        guard result.didRecord else { return result }
         revisions.publishWeightEntry(command: command, subjectID: human.id, result: result, note: note)
         return result
     }
@@ -281,14 +299,18 @@ struct DashboardRecordCommandExecutor {
     @discardableResult
     func deletePetWeight(_ log: PetWeightLog, pet: Pet, note: String) -> DashboardRecordDeleteCommandResult {
         let result = DashboardRecordCommandService.deletePetWeight(log, pet: pet, context: context)
-        revisions.publishWeightDelete(result, note: note)
+        if result.didChange {
+            revisions.publishWeightDelete(result, note: note)
+        }
         return result
     }
 
     @discardableResult
     func deleteHumanWeight(_ log: HumanWeightLog, human: Human, note: String) -> DashboardRecordDeleteCommandResult {
         let result = DashboardRecordCommandService.deleteHumanWeight(log, human: human, context: context)
-        revisions.publishWeightDelete(result, note: note)
+        if result.didChange {
+            revisions.publishWeightDelete(result, note: note)
+        }
         return result
     }
 
@@ -322,6 +344,7 @@ struct DashboardRecordCommandExecutor {
             questManager: questManager,
             careLedger: careLedger
         )
+        guard result.ledgerEventID != nil else { return result }
         revisions.publishExpenseEntry(command: command, subjectID: pet.id, result: result, note: revisionNote)
         return result
     }
@@ -411,6 +434,7 @@ struct DashboardRecordCommandExecutor {
             questManager: questManager,
             careLedger: careLedger
         )
+        guard result.ledgerEventID != nil else { return result }
         revisions.publishExpenseEntry(command: command, subjectID: human.id, result: result, note: revisionNote)
         return result
     }
@@ -418,14 +442,18 @@ struct DashboardRecordCommandExecutor {
     @discardableResult
     func deletePetExpense(_ log: PetExpenseLog, pet: Pet, note: String) -> DashboardRecordDeleteCommandResult {
         let result = DashboardRecordCommandService.deletePetExpense(log, pet: pet, context: context)
-        revisions.publishExpenseDelete(result, note: note)
+        if result.didChange {
+            revisions.publishExpenseDelete(result, note: note)
+        }
         return result
     }
 
     @discardableResult
     func deleteHumanExpense(_ log: PetExpenseLog, human: Human, note: String) -> DashboardRecordDeleteCommandResult {
         let result = DashboardRecordCommandService.deleteHumanExpense(log, human: human, context: context)
-        revisions.publishExpenseDelete(result, note: note)
+        if result.didChange {
+            revisions.publishExpenseDelete(result, note: note)
+        }
         return result
     }
 
@@ -483,7 +511,15 @@ enum DashboardRecordCommandService {
         pet: Pet,
         context: ModelContext
     ) -> DashboardRecordDeleteCommandResult {
-        deleteRecord(
+        guard MemberWritePolicy.disposition(pet: pet, intent: .activeOnly).allowsDerivedEffects else {
+            return noOpDeleteResult(
+                subjectID: pet.id,
+                subjectKind: EntityKind.pet.rawValue,
+                recordID: log.id,
+                recordKind: "PetWeightLog"
+            )
+        }
+        return deleteRecord(
             log,
             subjectID: pet.id,
             subjectKind: EntityKind.pet.rawValue,
@@ -500,7 +536,15 @@ enum DashboardRecordCommandService {
         human: Human,
         context: ModelContext
     ) -> DashboardRecordDeleteCommandResult {
-        deleteRecord(
+        guard MemberWritePolicy.disposition(human: human, intent: .activeOnly).allowsDerivedEffects else {
+            return noOpDeleteResult(
+                subjectID: human.id,
+                subjectKind: EntityKind.human.rawValue,
+                recordID: log.id,
+                recordKind: "HumanWeightLog"
+            )
+        }
+        return deleteRecord(
             log,
             subjectID: human.id,
             subjectKind: EntityKind.human.rawValue,
@@ -517,6 +561,14 @@ enum DashboardRecordCommandService {
         pet: Pet,
         context: ModelContext
     ) -> DashboardRecordDeleteCommandResult {
+        guard MemberWritePolicy.disposition(pet: pet, intent: .activeOnly).allowsDerivedEffects else {
+            return noOpDeleteResult(
+                subjectID: pet.id,
+                subjectKind: EntityKind.pet.rawValue,
+                recordID: log.id,
+                recordKind: "PetExpenseLog"
+            )
+        }
         let recordID = log.id
         let sharedSessionId = log.sharedSessionId
         let ledgerEvents = ledgerEvents(forLegacyModelName: "PetExpenseLog", id: recordID, context: context)
@@ -533,7 +585,8 @@ enum DashboardRecordCommandService {
             subjectKind: EntityKind.pet.rawValue,
             recordID: recordID,
             recordKind: "PetExpenseLog",
-            removedLedgerEventIDs: ledgerEvents.map(\.id)
+            removedLedgerEventIDs: ledgerEvents.map(\.id),
+            didChange: true
         )
     }
 
@@ -544,7 +597,15 @@ enum DashboardRecordCommandService {
         human: Human,
         context: ModelContext
     ) -> DashboardRecordDeleteCommandResult {
-        deleteRecord(
+        guard MemberWritePolicy.disposition(human: human, intent: .activeOnly).allowsDerivedEffects else {
+            return noOpDeleteResult(
+                subjectID: human.id,
+                subjectKind: EntityKind.human.rawValue,
+                recordID: log.id,
+                recordKind: "PetExpenseLog"
+            )
+        }
+        return deleteRecord(
             log,
             subjectID: human.id,
             subjectKind: EntityKind.human.rawValue,
@@ -577,7 +638,24 @@ enum DashboardRecordCommandService {
             subjectKind: subjectKind,
             recordID: recordID,
             recordKind: recordKind,
-            removedLedgerEventIDs: ledgerEvents.map(\.id)
+            removedLedgerEventIDs: ledgerEvents.map(\.id),
+            didChange: true
+        )
+    }
+
+    private static func noOpDeleteResult(
+        subjectID: UUID,
+        subjectKind: String,
+        recordID: UUID,
+        recordKind: String
+    ) -> DashboardRecordDeleteCommandResult {
+        DashboardRecordDeleteCommandResult(
+            subjectID: subjectID,
+            subjectKind: subjectKind,
+            recordID: recordID,
+            recordKind: recordKind,
+            removedLedgerEventIDs: [],
+            didChange: false
         )
     }
 

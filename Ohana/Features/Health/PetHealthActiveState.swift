@@ -9,7 +9,7 @@ import Foundation
 
 extension Pet {
     var canWriteHealthFacts: Bool {
-        !hasPassedAway
+        MemberLifecycleGate.disposition(pet: self, writeKind: .care).allowsCareFactWrite
     }
 
     var activeHealthLogs: [PetHealthLog] {

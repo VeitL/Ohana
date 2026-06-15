@@ -20,6 +20,7 @@ struct ManualFeedCommandResult {
 }
 
 enum ManualFeedCommand {
+    @discardableResult
     @MainActor
     static func saveSettings(
         pet: Pet,
@@ -27,11 +28,18 @@ enum ManualFeedCommand {
         grams: Double,
         defaultEnabled: Bool = true,
         context: ModelContext
-    ) {
+    ) -> Bool {
+        guard MemberWritePolicy.disposition(pet: pet, intent: .activeOnly).allowsDerivedEffects else {
+            return false
+        }
+        guard pet.mainFoodKind != foodKind ||
+            pet.dailyPortionGrams != (defaultEnabled ? grams : 0)
+        else { return false }
         pet.mainFoodKind = foodKind
         pet.dailyPortionGrams = defaultEnabled ? grams : 0
         CloudSyncMutationRecorder.markModified(pet, context: context)
         context.safeSave()
+        return true
     }
 
     @MainActor

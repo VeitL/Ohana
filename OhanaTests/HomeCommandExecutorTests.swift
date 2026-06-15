@@ -1129,6 +1129,7 @@ struct HomeCommandExecutorTests {
         #expect(deleteResult.careLogID == recorded.result.careLogID)
         #expect(deleteResult.linkedPottyLogID == recorded.result.linkedPottyLogID)
         #expect(deleteResult.removedLedgerEventIDs.count == 2)
+        #expect(deleteResult.didDelete)
         #expect(careLogs.isEmpty)
         #expect(pottyLogs.isEmpty)
         let remainingLedgerIDs = Set(ledgerEvents.map(\.id))
@@ -1176,8 +1177,108 @@ struct HomeCommandExecutorTests {
         #expect(result.petID == pet.id)
         #expect(result.logID == log.id)
         #expect(result.removedLedgerEventIDs.count == 1)
+        #expect(result.didDelete)
         #expect(pottyLogs.isEmpty)
         #expect(ledgerEvents.map(\.id) == [unrelatedLedger.id])
+    }
+
+    @MainActor
+    @Test func petCareAndPottyDeleteNoopWhenPetDoesNotOwnLog() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let owner = Pet(name: "Momo", species: "狗")
+        let other = Pet(name: "Nori", species: "狗")
+        let careLog = PetCareLog(
+            date: makeDate(year: 2026, month: 6, day: 8, hour: 9, minute: 0),
+            type: .play,
+            pet: owner,
+            executorId: "human-1"
+        )
+        let pottyLog = PetPottyLog(
+            date: makeDate(year: 2026, month: 6, day: 8, hour: 10, minute: 0),
+            type: .perfectPoop,
+            pet: owner,
+            executorId: "human-1"
+        )
+        context.insert(owner)
+        context.insert(other)
+        context.insert(careLog)
+        context.insert(pottyLog)
+        CareLedgerService.recordPetCare(log: careLog, pet: owner, source: .service, context: context)
+        CareLedgerService.recordPetPotty(log: pottyLog, pet: owner, source: .service, context: context)
+        try context.save()
+
+        let wrongCareDelete = PetCareTrackingCommandService.deleteCareLog(careLog, pet: other, context: context)
+        let wrongPottyDelete = PetPottyCommandService.deletePottyLog(pottyLog, pet: other, context: context)
+
+        #expect(wrongCareDelete.didDelete == false)
+        #expect(wrongCareDelete.removedLedgerEventIDs.isEmpty)
+        #expect(wrongPottyDelete.didDelete == false)
+        #expect(wrongPottyDelete.removedLedgerEventIDs.isEmpty)
+        #expect(try context.fetch(FetchDescriptor<PetCareLog>()).map(\.id) == [careLog.id])
+        #expect(try context.fetch(FetchDescriptor<PetPottyLog>()).map(\.id) == [pottyLog.id])
+        #expect(try context.fetch(FetchDescriptor<CareLedgerEvent>()).count == 2)
+        #expect(try context.fetch(FetchDescriptor<CloudSyncRecordState>()).allSatisfy { !$0.isDeletionTombstone })
+    }
+
+    @MainActor
+    @Test func petCareCommandExecutorDeletesUnclaimedSharedPottyLog() throws {
+        let revisionCenter = ReadModelRevisionCenter()
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let first = Pet(name: "Momo", species: "猫")
+        let second = Pet(name: "Nori", species: "猫")
+        let executorHuman = insertExecutorHuman(in: context)
+        let session = SharedCareSession(
+            date: makeDate(year: 2026, month: 6, day: 8, hour: 11, minute: 0),
+            actionKind: .pottyUnknown,
+            sourcePetId: first.id.uuidString,
+            targetPetIds: [first.id.uuidString, second.id.uuidString],
+            species: first.species
+        )
+        let log = PetPottyLog(
+            date: session.date,
+            type: .perfectPoop,
+            pet: nil,
+            executorId: executorHuman.id.uuidString,
+            sharedSessionId: session.id.uuidString
+        )
+        context.insert(first)
+        context.insert(second)
+        context.insert(session)
+        context.insert(log)
+        let ledger = CareLedgerService.record(
+            occurredAt: log.date,
+            actorKind: .human,
+            actorId: executorHuman.id.uuidString,
+            subjectKind: .unknown,
+            subjectId: nil,
+            eventKind: .potty,
+            actionType: PottyType.perfectPoop.rawValue,
+            source: .service,
+            legacyModelName: String(describing: PetPottyLog.self),
+            legacyModelId: log.id.uuidString,
+            context: context
+        )
+        try context.save()
+
+        let executor = PetCareCommandExecutor(context: context, revisionCenter: revisionCenter)
+        let beforeRevision = revisionCenter.homeRevision.value
+        let result = executor.deletePottyLog(log, pet: first, note: "test.pet.potty.delete.unclaimed")
+
+        #expect(result.didDelete)
+        #expect(result.logID == log.id)
+        #expect(result.removedLedgerEventIDs.count == 1)
+        #expect(try context.fetch(FetchDescriptor<PetPottyLog>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<CareLedgerEvent>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<SharedCareSession>()).isEmpty)
+        let syncStates = try context.fetch(FetchDescriptor<CloudSyncRecordState>())
+        let pottyKey = CloudSyncRecordState.recordKey(entityName: String(describing: PetPottyLog.self), localRecordId: log.id)
+        let ledgerKey = CloudSyncRecordState.recordKey(entityName: String(describing: CareLedgerEvent.self), localRecordId: ledger.id)
+        #expect(syncStates.contains { $0.recordKey == pottyKey && $0.isDeletionTombstone })
+        #expect(syncStates.contains { $0.recordKey == ledgerKey && $0.isDeletionTombstone })
+        #expect(revisionCenter.homeRevision.value == beforeRevision + 1)
+        #expect(revisionCenter.lastMutation?.command == .petPottyDelete(petID: first.id, logID: log.id))
     }
 
     @MainActor
@@ -1213,6 +1314,7 @@ struct HomeCommandExecutorTests {
         )
         mutation = try #require(revisionCenter.lastMutation)
         #expect(deletedCare.careLogID == recorded.result.careLogID)
+        #expect(deletedCare.didDelete)
         #expect(mutation.command == .petCareDelete(petID: pet.id, logID: recorded.result.careLogID))
         #expect(mutation.affectedEntityIDs.contains(linkedPottyID))
         #expect(mutation.note == "test.pet.care.delete")
@@ -1234,9 +1336,67 @@ struct HomeCommandExecutorTests {
         )
         mutation = try #require(revisionCenter.lastMutation)
         #expect(deletedPotty.logID == potty.id)
+        #expect(deletedPotty.didDelete)
         #expect(mutation.command == .petPottyDelete(petID: pet.id, logID: potty.id))
         #expect(mutation.note == "test.pet.potty.delete")
         #expect(revisionCenter.homeRevision.value == beforeRevision + 3)
+    }
+
+    @MainActor
+    @Test func petCareCommandExecutorDoesNotPublishDeleteRevisionForWrongPet() throws {
+        let revisionCenter = ReadModelRevisionCenter()
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let owner = Pet(name: "Momo", species: "狗")
+        let other = Pet(name: "Nori", species: "狗")
+        let executorHuman = insertExecutorHuman(in: context)
+        context.insert(owner)
+        context.insert(other)
+        try context.save()
+
+        let executor = PetCareCommandExecutor(context: context, revisionCenter: revisionCenter)
+        let recorded = executor.recordCare(
+            pet: owner,
+            type: .play,
+            executorId: executorHuman.id.uuidString,
+            date: makeDate(year: 2026, month: 6, day: 8, hour: 9, minute: 0),
+            note: "test.pet.care.record"
+        )
+        let recordMutation = try #require(revisionCenter.lastMutation)
+        let beforeDeleteRevision = revisionCenter.homeRevision.value
+        let careLog = try #require(try context.fetch(FetchDescriptor<PetCareLog>()).first)
+
+        let delete = executor.deleteCareLog(careLog, pet: other, note: "test.pet.care.delete.wrongPet")
+
+        #expect(delete.didDelete == false)
+        #expect(delete.careLogID == recorded.result.careLogID)
+        #expect(revisionCenter.lastMutation == recordMutation)
+        #expect(revisionCenter.homeRevision.value == beforeDeleteRevision)
+        #expect(try context.fetch(FetchDescriptor<PetCareLog>()).map(\.id) == [careLog.id])
+        #expect(try context.fetch(FetchDescriptor<CareLedgerEvent>()).count == 1)
+
+        let pottyLog = PetPottyLog(
+            date: makeDate(year: 2026, month: 6, day: 8, hour: 10, minute: 0),
+            type: .perfectPoop,
+            pet: owner,
+            executorId: executorHuman.id.uuidString
+        )
+        context.insert(pottyLog)
+        CareLedgerService.recordPetPotty(log: pottyLog, pet: owner, source: .service, context: context)
+        try context.save()
+        let beforePottyDeleteRevision = revisionCenter.homeRevision.value
+
+        let pottyDelete = executor.deletePottyLog(
+            pottyLog,
+            pet: other,
+            note: "test.pet.potty.delete.wrongPet"
+        )
+
+        #expect(pottyDelete.didDelete == false)
+        #expect(revisionCenter.lastMutation == recordMutation)
+        #expect(revisionCenter.homeRevision.value == beforePottyDeleteRevision)
+        #expect(try context.fetch(FetchDescriptor<PetPottyLog>()).map(\.id) == [pottyLog.id])
+        #expect(try context.fetch(FetchDescriptor<CareLedgerEvent>()).count == 2)
     }
 
     @MainActor
@@ -1364,6 +1524,7 @@ struct HomeCommandExecutorTests {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
         let pet = Pet(name: "Momo", species: "狗")
+        let executorHuman = insertExecutorHuman(in: context)
         let insurance = PetInsurance(
             companyName: "Ohana Care",
             productName: "Care Plus",
@@ -1388,7 +1549,7 @@ struct HomeCommandExecutorTests {
                 claimedAmount: 120,
                 status: .approved,
                 note: "  clinic  ",
-                executorId: "human-1",
+                executorId: executorHuman.id.uuidString,
                 relatedExpenseLogId: relatedExpenseLogId,
                 approvedAt: claimDate
             ),
@@ -1416,7 +1577,7 @@ struct HomeCommandExecutorTests {
         #expect(expense.amount == -120)
         #expect(expense.expenseCategory == .insurancePremium)
         #expect(expense.note == "保险报销到账：Care Plus")
-        #expect(expense.executorId == "human-1")
+        #expect(expense.executorId == executorHuman.id.uuidString)
         #expect(result.policyID == insurance.id)
         #expect(result.petID == pet.id)
         #expect(result.didChange == true)
@@ -1427,6 +1588,7 @@ struct HomeCommandExecutorTests {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
         let pet = Pet(name: "Momo", species: "狗")
+        let executorHuman = insertExecutorHuman(in: context)
         let insurance = PetInsurance(
             companyName: "Ohana Care",
             productName: "",
@@ -1452,7 +1614,7 @@ struct HomeCommandExecutorTests {
             pet: pet,
             context: context,
             approvedAt: approvedAt,
-            executorId: "human-2"
+            executorId: executorHuman.id.uuidString
         )
         let second = InsurancePolicyCommandService.updateClaimStatus(
             claim,
@@ -1461,7 +1623,7 @@ struct HomeCommandExecutorTests {
             pet: pet,
             context: context,
             approvedAt: approvedAt,
-            executorId: "human-2"
+            executorId: executorHuman.id.uuidString
         )
 
         let claims = try context.fetch(FetchDescriptor<InsuranceClaim>())
@@ -1474,7 +1636,7 @@ struct HomeCommandExecutorTests {
         #expect(expenses.count == 1)
         #expect(expense.amount == -80)
         #expect(expense.note == "保险报销到账：Ohana Care")
-        #expect(expense.executorId == "human-2")
+        #expect(expense.executorId == executorHuman.id.uuidString)
         #expect(first.expenseLogID == expense.id)
         #expect(first.didChange == true)
         #expect(second.expenseLogID == nil)
@@ -2592,7 +2754,8 @@ struct HomeCommandExecutorTests {
             petID: petID,
             careLogID: careLogID,
             linkedPottyLogID: linkedPottyLogID,
-            removedLedgerEventIDs: [ledgerEventID]
+            removedLedgerEventIDs: [ledgerEventID],
+            didDelete: true
         )
         let beforeRevision = revisionCenter.homeRevision.value
 
@@ -3473,10 +3636,8 @@ struct HomeCommandExecutorTests {
         #expect(logs.first?.pet?.id == pet.id)
         #expect(logs.first?.note == "park day")
         #expect(logs.first?.locationPlacename == "Berlin")
-        #expect(ledgerEvents.count == 1)
-        #expect(ledgerEvents.first?.eventKind == CareLedgerEventKind.milestone.rawValue)
-        #expect(ledgerEvents.first?.actionType == "petMoment")
-        #expect(ledgerEvents.first?.legacyModelName == "PetPhotoLog")
+        #expect(result.coconutDelta == 0)
+        #expect(ledgerEvents.isEmpty)
     }
 
     @MainActor
@@ -4224,9 +4385,99 @@ struct HomeCommandExecutorTests {
         )
         mutation = try #require(revisionCenter.lastMutation)
         #expect(deleted.medicationID == medication.id)
+        #expect(deleted.didChange == true)
         #expect(mutation.command == .humanMedicationPlanDelete(humanID: human.id, medicationID: medication.id))
         #expect(mutation.note == "test.human.medication.delete")
         #expect(revisionCenter.homeRevision.value == beforeRevision + 4)
+    }
+
+    @MainActor
+    @Test func humanCareMedicationCommandsNoopForDeceasedHumanWithoutRevision() throws {
+        let revisionCenter = ReadModelRevisionCenter()
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let human = Human(name: "Guan")
+        context.insert(human)
+        try context.save()
+
+        let executor = HumanCareCommandExecutor(context: context, revisionCenter: revisionCenter)
+        let input = HumanMedicationPlanCommandInput(
+            name: "Vitamin D",
+            dosage: "1 tablet",
+            frequency: .daily,
+            customFrequencyNote: "",
+            doseMinutes: [9 * 60],
+            weeklyWeekday: 2,
+            startDate: makeDate(year: 2026, month: 6, day: 8),
+            endDate: nil,
+            colorHex: "FF6B8A",
+            visibleNotes: "",
+            isActive: true,
+            appLanguage: "en"
+        )
+        let created = try #require(executor.saveMedicationPlan(
+            human: human,
+            editing: nil,
+            input: input,
+            scheduleReminders: false
+        ))
+        let medication = try #require(try context.fetch(FetchDescriptor<HumanMedication>()).first)
+        human.passedAwayDate = makeDate(year: 2026, month: 6, day: 9)
+        try context.save()
+
+        let beforeRevision = revisionCenter.homeRevision.value
+        let beforeMutation = revisionCenter.lastMutation
+        let blockedSave = executor.saveMedicationPlan(
+            human: human,
+            editing: nil,
+            input: HumanMedicationPlanCommandInput(
+                name: "New medicine",
+                dosage: "2 tablets",
+                frequency: .daily,
+                customFrequencyNote: "",
+                doseMinutes: [10 * 60],
+                weeklyWeekday: 2,
+                startDate: makeDate(year: 2026, month: 6, day: 10),
+                endDate: nil,
+                colorHex: "00AEEF",
+                visibleNotes: "",
+                isActive: true,
+                appLanguage: "en"
+            ),
+            scheduleReminders: false
+        )
+        let activation = executor.setMedicationPlanActive(
+            human: human,
+            medication: medication,
+            isActive: false,
+            appLanguage: "en",
+            scheduleReminders: false
+        )
+        let dose = executor.setMedicationDoseStatus(
+            human: human,
+            medicationID: created.medicationID,
+            scheduledTime: makeDate(year: 2026, month: 6, day: 8, hour: 9, minute: 0),
+            status: .taken,
+            now: makeDate(year: 2026, month: 6, day: 8, hour: 9, minute: 0)
+        )
+        let deletion = executor.deleteMedicationPlan(
+            human: human,
+            medication: medication,
+            scheduleReminders: false,
+            note: "test.human.medication.delete.noop"
+        )
+
+        #expect(blockedSave == nil)
+        #expect(activation.didChange == false)
+        #expect(dose.didChange == false)
+        #expect(dose.recordedLedgerEvent == false)
+        #expect(deletion.didChange == false)
+        #expect(revisionCenter.homeRevision.value == beforeRevision)
+        #expect(revisionCenter.lastMutation == beforeMutation)
+        #expect(try context.fetch(FetchDescriptor<HumanMedication>()).count == 1)
+        #expect(try context.fetch(FetchDescriptor<HumanMedicationLog>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<CareLedgerEvent>()).isEmpty)
+        #expect(medication.isActive == true)
     }
 
     @MainActor
@@ -6407,8 +6658,7 @@ struct HomeCommandExecutorTests {
         #expect(first.milestoneIDs.count == 3)
         #expect(second.milestoneIDs.isEmpty)
         #expect(milestones.count == 3)
-        #expect(ledgerEvents.count == 3)
-        #expect(Set(ledgerEvents.compactMap(\.legacyModelName)) == ["PetMilestone"])
+        #expect(ledgerEvents.isEmpty)
     }
 
     @MainActor
@@ -6457,16 +6707,13 @@ struct HomeCommandExecutorTests {
         var milestones = try context.fetch(FetchDescriptor<PetMilestone>())
         var ledgerEvents = try context.fetch(FetchDescriptor<CareLedgerEvent>())
         let createdMilestone = try #require(milestones.first)
-        let ledger = try #require(ledgerEvents.first)
         #expect(createResult.petID == pet.id)
         #expect(createResult.milestoneIDs == [createdMilestone.id])
-        #expect(createResult.coconutDelta > 0)
+        #expect(createResult.coconutDelta == 0)
         #expect(createdMilestone.title == "First beach day")
         #expect(createdMilestone.emoji == "🎉")
         #expect(createdMilestone.pet?.id == pet.id)
-        #expect(ledger.legacyModelName == "PetMilestone")
-        #expect(ledger.legacyModelId == createdMilestone.id.uuidString)
-        #expect(ledger.coconutDelta == createResult.coconutDelta)
+        #expect(ledgerEvents.isEmpty)
         let unrelatedLedger = CareLedgerEvent(
             occurredAt: createdMilestone.date,
             subjectKind: .pet,
@@ -6492,7 +6739,7 @@ struct HomeCommandExecutorTests {
         #expect(deleteResult.removedLedgerEventIDs.isEmpty)
         #expect(milestones.isEmpty)
         #expect(try cloudSyncState(entityName: String(describing: PetMilestone.self), id: createdMilestone.id, context: context)?.isDeletionTombstone == true)
-        #expect(Set(ledgerEvents.map(\.id)) == Set([ledger.id, unrelatedLedger.id]))
+        #expect(ledgerEvents.map(\.id) == [unrelatedLedger.id])
     }
 
     @MainActor
@@ -7494,10 +7741,10 @@ struct HomeCommandExecutorTests {
         )
 
         let budgetEvents = try context.fetch(FetchDescriptor<EconomyBudgetUsageEvent>())
-        #expect(first.coconutDelta > 0)
+        #expect(first.coconutDelta == 0)
         #expect(second.coconutDelta == 0)
-        #expect(human.coconutBalance == first.coconutDelta)
-        #expect(budgetEvents.contains { $0.actionKey.contains("记录时刻") })
+        #expect(human.coconutBalance == 0)
+        #expect(budgetEvents.isEmpty)
     }
 
     @MainActor
@@ -8611,6 +8858,9 @@ struct HomeCommandExecutorTests {
         )
         var mutation = try #require(revisionCenter.lastMutation)
         let hygieneLogID = try #require(recorded.hygieneLogID)
+        let ledger = try #require(try context.fetch(FetchDescriptor<CareLedgerEvent>()).first {
+            $0.legacyModelName == "PetHygieneLog" && $0.legacyModelId == hygieneLogID.uuidString
+        })
         #expect(mutation.command == .catCareRecord(petID: pet.id, action: "铲猫砂"))
         #expect(mutation.affectedEntityIDs == [pet.id, recorded.eventID, hygieneLogID])
         #expect(mutation.note == "test.cat.record")
@@ -8623,10 +8873,68 @@ struct HomeCommandExecutorTests {
         )
         mutation = try #require(revisionCenter.lastMutation)
         #expect(undone.eventID == recorded.eventID)
+        #expect(undone.didDelete)
+        #expect(undone.removedLedgerEventIDs == [ledger.id])
         #expect(mutation.command == .catCareUndo(petID: pet.id, eventID: recorded.eventID))
-        #expect(mutation.affectedEntityIDs == [pet.id, recorded.eventID, hygieneLogID])
+        #expect(mutation.affectedEntityIDs == [pet.id, recorded.eventID, hygieneLogID, ledger.id])
         #expect(mutation.note == "test.cat.undo")
         #expect(revisionCenter.homeRevision.value == beforeRevision + 2)
+    }
+
+    @MainActor
+    @Test func petCareCommandExecutorDoesNotPublishCatCareUndoRevisionWhenNothingDeleted() throws {
+        let revisionCenter = ReadModelRevisionCenter()
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let pet = Pet(name: "Momo", species: "猫")
+        let otherPet = Pet(name: "Nori", species: "猫")
+        let executorHuman = insertExecutorHuman(in: context)
+        context.insert(pet)
+        context.insert(otherPet)
+        try context.save()
+        let defaults = UserDefaults.standard
+        let oldActiveHumanID = defaults.object(forKey: "currentActiveHumanId")
+        defer {
+            if let oldActiveHumanID {
+                defaults.set(oldActiveHumanID, forKey: "currentActiveHumanId")
+            } else {
+                defaults.removeObject(forKey: "currentActiveHumanId")
+            }
+            EconomyDailyBudgetStore.resetAll()
+        }
+        defaults.set(executorHuman.id.uuidString, forKey: "currentActiveHumanId")
+        EconomyDailyBudgetStore.resetAll()
+
+        let executor = PetCareCommandExecutor(context: context, revisionCenter: revisionCenter)
+        let recorded = executor.recordCatCare(
+            pet: pet,
+            input: CatCareCommandInput(
+                actionRaw: "铲猫砂",
+                emoji: "🧹",
+                recordsHygiene: true,
+                occurredAt: makeDate(year: 2026, month: 6, day: 8, hour: 8, minute: 30),
+                executorId: executorHuman.id.uuidString
+            ),
+            note: "test.cat.record"
+        )
+        let recordMutation = try #require(revisionCenter.lastMutation)
+        let hygieneLogID = try #require(recorded.hygieneLogID)
+        let beforeUndoRevision = revisionCenter.homeRevision.value
+
+        let undo = executor.undoCatCare(
+            pet: otherPet,
+            eventID: recorded.eventID,
+            hygieneLogID: hygieneLogID,
+            note: "test.cat.undo.wrongPet"
+        )
+
+        #expect(undo.didDelete == false)
+        #expect(undo.removedLedgerEventIDs.isEmpty)
+        #expect(revisionCenter.lastMutation == recordMutation)
+        #expect(revisionCenter.homeRevision.value == beforeUndoRevision)
+        #expect(try context.fetch(FetchDescriptor<Event>()).map(\.id) == [recorded.eventID])
+        #expect(try context.fetch(FetchDescriptor<PetHygieneLog>()).map(\.id) == [hygieneLogID])
+        #expect(try context.fetch(FetchDescriptor<CareLedgerEvent>()).count == 1)
     }
 
     @MainActor
@@ -8642,6 +8950,18 @@ struct HomeCommandExecutorTests {
         context.insert(executorHuman)
         context.insert(pet)
         try context.save()
+        let defaults = UserDefaults.standard
+        let oldActiveHumanID = defaults.object(forKey: "currentActiveHumanId")
+        defer {
+            if let oldActiveHumanID {
+                defaults.set(oldActiveHumanID, forKey: "currentActiveHumanId")
+            } else {
+                defaults.removeObject(forKey: "currentActiveHumanId")
+            }
+            EconomyDailyBudgetStore.resetAll()
+        }
+        defaults.set(activeHuman.id.uuidString, forKey: "currentActiveHumanId")
+        EconomyDailyBudgetStore.resetAll()
 
         let executor = PetCareCommandExecutor(context: context, revisionCenter: revisionCenter)
         let beforeRevision = revisionCenter.homeRevision.value
@@ -8696,9 +9016,10 @@ struct HomeCommandExecutorTests {
         )
 
         let records = try context.fetch(FetchDescriptor<PetFoodRecord>())
+        let record = try #require(result.record)
         let mutation = try #require(revisionCenter.lastMutation)
         #expect(records.count == 1)
-        #expect(records.first?.id == result.record.id)
+        #expect(records.first?.id == record.id)
         #expect(records.first?.pet?.id == pet.id)
         #expect(records.first?.brand == "Royal Canin")
         #expect(records.first?.totalGrams == 1200)

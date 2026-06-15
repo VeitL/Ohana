@@ -42,6 +42,7 @@ enum PetHeatCycleCommandService {
             pet: pet
         )
         context.insert(log)
+        CloudSyncMutationRecorder.markModified(log, context: context, modifiedAt: input.startDate)
         context.safeSave()
 
         return PetHeatCycleCommandResult(

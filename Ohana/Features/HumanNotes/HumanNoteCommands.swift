@@ -46,6 +46,11 @@ enum HumanNoteCommandService {
         guard !cleanNote.isEmpty || !imageAttachments.isEmpty || !fileAttachments.isEmpty || reminderDate != nil else {
             return nil
         }
+        let disposition = MemberLifecycleGate.disposition(
+            human: human,
+            writeKind: reminderDate == nil ? .memorial : .care
+        )
+        guard disposition.writesContent else { return nil }
 
         let attachments = persistAttachments(
             images: imageAttachments,
@@ -53,16 +58,18 @@ enum HumanNoteCommandService {
             humanID: human.id
         )
         let l = L10n(appLanguage)
+        let effectiveReminderDate = disposition.allowsDerivedEffects ? reminderDate : nil
         let entry = noteEntry(
             note: cleanNote,
             date: date,
             attachments: attachments,
-            reminderDate: reminderDate,
+            reminderDate: effectiveReminderDate,
             l: l
         )
         human.notes = human.notes.isEmpty ? entry : human.notes + "\n\n" + entry
+        CloudSyncMutationRecorder.markModified(human, context: context, modifiedAt: date)
 
-        let reminderPair = reminderDate.map {
+        let reminderPair = effectiveReminderDate.map {
             createReminder(
                 human: human,
                 note: cleanNote,
@@ -209,6 +216,8 @@ enum HumanNoteCommandService {
         event.reminders.append(reminder)
         context.insert(event)
         context.insert(reminder)
+        CloudSyncMutationRecorder.markModified(event, context: context, modifiedAt: reminderDate)
+        CloudSyncMutationRecorder.markModified(reminder, context: context, modifiedAt: reminderDate)
         return (event, reminder)
     }
 }
@@ -293,6 +302,7 @@ struct HumanCareCommandExecutor {
             notes: notes,
             source: source
         )
+        guard result.ledgerEventID != nil else { return result }
         revisions.publishHumanWorkout(result, command: command, note: note)
         return result
     }
@@ -305,7 +315,9 @@ struct HumanCareCommandExecutor {
         note: String
     ) -> WorkoutDeleteCommandResult {
         let result = WorkoutCommandService.deleteHumanWorkout(log, human: human, context: context)
-        revisions.publishHumanWorkoutDelete(result, command: command, note: note)
+        if result.didChange {
+            revisions.publishHumanWorkoutDelete(result, command: command, note: note)
+        }
         return result
     }
 
@@ -403,7 +415,9 @@ struct HumanCareCommandExecutor {
         )
         let revisionNote = note
             ?? (result.scheduledReminderSync ? "human.medication.plan.activation.reminders" : "human.medication.plan.activation")
-        revisions.publishHumanMedicationPlanActivation(result, note: revisionNote)
+        if result.didChange || !result.calendarEventIDs.isEmpty || !result.removedCalendarEventIDs.isEmpty {
+            revisions.publishHumanMedicationPlanActivation(result, note: revisionNote)
+        }
         return result
     }
 
@@ -421,7 +435,9 @@ struct HumanCareCommandExecutor {
             scheduleReminders: scheduleReminders,
             medicationReminders: medicationReminders
         )
-        revisions.publishHumanMedicationPlanDelete(result, note: note)
+        if result.didChange {
+            revisions.publishHumanMedicationPlanDelete(result, note: note)
+        }
         return result
     }
 
@@ -448,7 +464,9 @@ struct HumanCareCommandExecutor {
         let scheduledMinute = Int(scheduledTime.timeIntervalSince1970 / 60)
         let revisionNote = note
             ?? (result.recordedLedgerEvent ? "human.medication.dose.ledger" : "human.medication.dose")
-        revisions.publishHumanMedicationDose(result, scheduledMinute: scheduledMinute, note: revisionNote)
+        if result.didChange {
+            revisions.publishHumanMedicationDose(result, scheduledMinute: scheduledMinute, note: revisionNote)
+        }
         return result
     }
 
@@ -492,7 +510,9 @@ struct HumanCareCommandExecutor {
         note: String
     ) -> HumanHealthMetricDeleteCommandResult {
         let result = HumanHealthMetricCommandService.deleteMetricLog(log, human: human, context: context)
-        revisions.publishHumanHealthMetricDelete(result, note: note)
+        if result.didChange {
+            revisions.publishHumanHealthMetricDelete(result, note: note)
+        }
         return result
     }
 

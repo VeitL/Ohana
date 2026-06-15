@@ -51,6 +51,8 @@ struct CatCareUndoCommandResult: Equatable {
     let petID: UUID
     let eventID: UUID
     let hygieneLogID: UUID?
+    let removedLedgerEventIDs: [UUID]
+    let didDelete: Bool
 }
 
 enum CatCareCommandService {
@@ -59,8 +61,10 @@ enum CatCareCommandService {
     static func record(
         pet: Pet,
         input: CatCareCommandInput,
-        context: ModelContext
+        context: ModelContext,
+        careEvents providedCareEvents: CareEventRecording? = nil
     ) -> CatCareCommandResult {
+        let careEvents = providedCareEvents ?? CareEventService()
         let disposition = CareFactWritePolicy.disposition(
             pet: pet,
             date: input.occurredAt,
@@ -83,18 +87,27 @@ enum CatCareCommandService {
             startDate: input.occurredAt,
             isAllDay: false,
             eventType: EventType.litterBox.rawValue,
-            relatedEntityType: "Pet",
+            relatedEntityType: EntityKind.pet.rawValue,
             relatedEntityId: pet.id.uuidString
         )
         context.insert(event)
+        CloudSyncMutationRecorder.markModified(event, context: context, modifiedAt: input.occurredAt)
 
         let hygieneLog: PetHygieneLog?
+        let resultDisposition: CareFactWriteDisposition
         if input.recordsHygiene {
-            let log = PetHygieneLog(date: input.occurredAt, type: .bath, pet: pet, executorId: input.executorId)
-            context.insert(log)
-            hygieneLog = log
+            let recorded = careEvents.recordHygieneFact(
+                pet: pet,
+                type: .bath,
+                context: context,
+                executorId: input.executorId,
+                date: input.occurredAt
+            )
+            hygieneLog = recorded.log
+            resultDisposition = recorded.result.disposition
         } else {
             hygieneLog = nil
+            resultDisposition = disposition
         }
         context.safeSave()
 
@@ -104,7 +117,7 @@ enum CatCareCommandService {
             eventID: event.id,
             hygieneLogID: hygieneLog?.id,
             occurredAt: input.occurredAt,
-            disposition: disposition
+            disposition: resultDisposition
         )
     }
 
@@ -116,17 +129,42 @@ enum CatCareCommandService {
         hygieneLogID: UUID?,
         context: ModelContext
     ) -> CatCareUndoCommandResult {
+        guard MemberLifecycleGate.disposition(pet: pet, writeKind: .care).allowsDerivedEffects else {
+            return CatCareUndoCommandResult(
+                petID: pet.id,
+                eventID: eventID,
+                hygieneLogID: hygieneLogID,
+                removedLedgerEventIDs: [],
+                didDelete: false
+            )
+        }
+        var removedLedgerEventIDs: [UUID] = []
+        var didDelete = false
         if let event = fetchEvent(id: eventID, petID: pet.id, context: context) {
             CloudSyncMutationRecorder.markDeleted(event, context: context)
             context.delete(event)
+            didDelete = true
         }
         if let hygieneLogID,
            let log = fetchHygieneLog(id: hygieneLogID, petID: pet.id, context: context) {
+            let ledgerEvents = fetchLedgerEvents(for: hygieneLogID, context: context)
+            removedLedgerEventIDs = ledgerEvents.map(\.id)
+            for ledger in ledgerEvents {
+                CloudSyncMutationRecorder.markDeleted(ledger, context: context)
+                context.delete(ledger)
+            }
             CloudSyncMutationRecorder.markDeleted(log, pet: pet, context: context)
             context.delete(log)
+            didDelete = true
         }
         context.safeSave()
-        return CatCareUndoCommandResult(petID: pet.id, eventID: eventID, hygieneLogID: hygieneLogID)
+        return CatCareUndoCommandResult(
+            petID: pet.id,
+            eventID: eventID,
+            hygieneLogID: hygieneLogID,
+            removedLedgerEventIDs: removedLedgerEventIDs,
+            didDelete: didDelete
+        )
     }
 
     @MainActor
@@ -154,6 +192,17 @@ enum CatCareCommandService {
         descriptor.fetchLimit = 1
         return fetchCatCareModelsOrLog(descriptor, context: context, operation: "fetch cat hygiene log")
             .first { $0.pet?.id == petID }
+    }
+
+    @MainActor
+    private static func fetchLedgerEvents(for hygieneLogID: UUID, context: ModelContext) -> [CareLedgerEvent] {
+        let idString = hygieneLogID.uuidString
+        let descriptor = FetchDescriptor<CareLedgerEvent>(
+            predicate: #Predicate<CareLedgerEvent> { event in
+                event.legacyModelName == "PetHygieneLog" && event.legacyModelId == idString
+            }
+        )
+        return fetchCatCareModelsOrLog(descriptor, context: context, operation: "fetch cat hygiene ledger events")
     }
 
     @MainActor

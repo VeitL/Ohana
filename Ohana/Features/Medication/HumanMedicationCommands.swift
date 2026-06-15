@@ -20,6 +20,7 @@ enum HumanMedicationPlanCommandService {
         medicationReminders providedMedicationReminders: MedicationReminderManaging? = nil
     ) -> HumanMedicationPlanCommandResult? {
         guard !input.cleanName.isEmpty else { return nil }
+        guard MemberWritePolicy.disposition(human: human, intent: .activeOnly).allowsDerivedEffects else { return nil }
 
         let medication: HumanMedication
         let created: Bool
@@ -43,6 +44,7 @@ enum HumanMedicationPlanCommandService {
         }
 
         apply(input, to: medication, human: human)
+        CloudSyncMutationRecorder.markModified(medication, context: context, modifiedAt: input.startDate)
         let calendarSync = syncCalendarEvents(
             for: medication,
             human: human,
@@ -79,6 +81,16 @@ enum HumanMedicationPlanCommandService {
         medicationReminders providedMedicationReminders: MedicationReminderManaging? = nil
     ) -> HumanMedicationPlanDeleteCommandResult {
         let medicationID = medication.id
+        guard MemberWritePolicy.disposition(human: human, intent: .activeOnly).allowsDerivedEffects else {
+            return HumanMedicationPlanDeleteCommandResult(
+                subjectID: human.id,
+                medicationID: medicationID,
+                removedCalendarEventIDs: [],
+                scheduledReminderSync: false,
+                didChange: false
+            )
+        }
+
         let removedEventIDs = removeCalendarEvents(for: medicationID, context: context)
         CloudSyncMutationRecorder.markDeleted(medication, context: context)
         context.delete(medication)
@@ -96,7 +108,8 @@ enum HumanMedicationPlanCommandService {
             subjectID: human.id,
             medicationID: medicationID,
             removedCalendarEventIDs: removedEventIDs,
-            scheduledReminderSync: scheduleReminders
+            scheduledReminderSync: scheduleReminders,
+            didChange: true
         )
     }
 
@@ -111,8 +124,23 @@ enum HumanMedicationPlanCommandService {
         scheduleReminders: Bool = true,
         medicationReminders providedMedicationReminders: MedicationReminderManaging? = nil
     ) -> HumanMedicationPlanActivationCommandResult {
+        guard MemberWritePolicy.disposition(human: human, intent: .activeOnly).allowsDerivedEffects else {
+            return HumanMedicationPlanActivationCommandResult(
+                subjectID: human.id,
+                medicationID: medication.id,
+                isActive: medication.isActive,
+                didChange: false,
+                calendarEventIDs: [],
+                removedCalendarEventIDs: [],
+                scheduledReminderSync: false
+            )
+        }
+
         let didChange = medication.isActive != isActive
         medication.isActive = isActive
+        if didChange {
+            CloudSyncMutationRecorder.markModified(medication, context: context)
+        }
         let calendarSync = syncCalendarEvents(
             for: medication,
             human: human,
@@ -193,6 +221,7 @@ enum HumanMedicationPlanCommandService {
             event.recurrenceEndDate = medication.endDate.map { calendar.startOfDay(for: $0) }
             event.assigneeId = human.id.uuidString
             context.insert(event)
+            CloudSyncMutationRecorder.markModified(event, context: context, modifiedAt: start)
             createdEventIDs.append(event.id)
         }
 
@@ -293,6 +322,17 @@ enum HumanMedicationDoseCommandService {
         now: Date = Date(),
         careLedger providedCareLedger: CareLedgerRecording? = nil
     ) -> HumanMedicationDoseCommandResult {
+        guard MemberWritePolicy.disposition(human: human, intent: .activeOnly).allowsDerivedEffects else {
+            return HumanMedicationDoseCommandResult(
+                subjectID: human.id,
+                medicationID: medicationID,
+                logID: nil,
+                status: status,
+                didChange: false,
+                recordedLedgerEvent: false
+            )
+        }
+
         let careLedger = providedCareLedger ?? CareLedgerService()
         let update = HumanMedicationLogStore.applyDoseStatus(
             humanId: human.id.uuidString,
@@ -300,8 +340,12 @@ enum HumanMedicationDoseCommandService {
             scheduledTime: scheduledTime,
             status: status,
             existingLogs: [],
-            context: context
+            context: context,
+            now: now
         )
+        if update.didChange, let log = update.log {
+            CloudSyncMutationRecorder.markModified(log, context: context, modifiedAt: now)
+        }
 
         var recordedLedgerEvent = false
         if update.shouldRecordLedgerEvent, let log = update.log {

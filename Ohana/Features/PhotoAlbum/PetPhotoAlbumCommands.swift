@@ -36,6 +36,9 @@ enum PetPhotoAlbumCommandService {
         guard !payloads.isEmpty else {
             return PetPhotoAlbumCreateResult(petID: pet.id, photoIDs: [])
         }
+        guard MemberLifecycleGate.disposition(pet: pet, writeKind: .memorial).writesContent else {
+            return PetPhotoAlbumCreateResult(petID: pet.id, photoIDs: [])
+        }
 
         var logs: [PetPhotoLog] = []
         for (index, data) in payloads.enumerated() {
@@ -59,6 +62,9 @@ enum PetPhotoAlbumCommandService {
         pet: Pet,
         context: ModelContext
     ) -> PetPhotoAlbumUpdateResult {
+        guard MemberLifecycleGate.disposition(pet: pet, writeKind: .memorial).writesContent else {
+            return PetPhotoAlbumUpdateResult(petID: pet.id, photoID: photo.id, didChange: false)
+        }
         let cleanNote = note.trimmingCharacters(in: .whitespacesAndNewlines)
         let didChange = photo.note != cleanNote
         photo.note = cleanNote
@@ -75,6 +81,9 @@ enum PetPhotoAlbumCommandService {
         pet: Pet,
         context: ModelContext
     ) -> PetPhotoAlbumDeleteResult {
+        guard MemberLifecycleGate.disposition(pet: pet, writeKind: .memorial).writesContent else {
+            return PetPhotoAlbumDeleteResult(petID: pet.id, photoID: photo.id)
+        }
         let photoID = photo.id
         PhysicalDeletionService.deletePetScopedRecord(photo, pet: pet, context: context)
         context.safeSave()

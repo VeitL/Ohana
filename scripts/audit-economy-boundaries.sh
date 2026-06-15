@@ -499,7 +499,18 @@ def function_bounds(lines: list[str]) -> list[tuple[str, int, int]]:
     return bounds
 
 
-def same_file_expense_ledger_consumer(lines: list[str], producer_name: str, producer_start: int) -> bool:
+def same_file_expense_ledger_callee(lines: list[str], producer_block: str, producer_start: int) -> bool:
+    for helper_name, start, end in function_bounds(lines):
+        if start == producer_start:
+            continue
+        block = "\n".join(lines[start:end + 1])
+        call_re = re.compile(r"\b" + re.escape(helper_name) + r"\s*\(")
+        if call_re.search(producer_block) and PET_EXPENSE_LEDGER_MARKER_RE.search(block):
+            return True
+    return False
+
+
+def same_file_expense_ledger_caller(lines: list[str], producer_name: str, producer_start: int) -> bool:
     call_re = re.compile(r"\b" + re.escape(producer_name) + r"\s*\(")
     for _, start, end in function_bounds(lines):
         if start == producer_start:
@@ -750,8 +761,10 @@ def scan_pet_expense_ledger_boundary(path: pathlib.Path, lines: list[str], warni
             continue
         if PET_EXPENSE_LEDGER_MARKER_RE.search(function_block):
             continue
+        if same_file_expense_ledger_callee(lines, function_block, start):
+            continue
         function_name = enclosing_function_name(lines, idx - 1)
-        if function_name and same_file_expense_ledger_consumer(lines, function_name, start):
+        if function_name and same_file_expense_ledger_caller(lines, function_name, start):
             continue
         add(
             warnings,

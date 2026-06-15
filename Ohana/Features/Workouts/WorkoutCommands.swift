@@ -35,6 +35,7 @@ struct WorkoutDeleteCommandResult: Equatable {
     let logID: UUID
     let subjectID: UUID
     let removedLedgerEventIDs: [UUID]
+    let didChange: Bool
 }
 
 enum WorkoutCommandService {
@@ -52,6 +53,9 @@ enum WorkoutCommandService {
         source: CareLedgerSource = .quickAction,
         careLedger providedCareLedger: CareLedgerRecording? = nil
     ) -> WorkoutCommandResult {
+        guard MemberWritePolicy.disposition(human: human, intent: .activeOnly).allowsDerivedEffects else {
+            return WorkoutCommandResult(logID: UUID(), subjectID: human.id, ledgerEventID: nil)
+        }
         let careLedger = providedCareLedger ?? CareLedgerService()
         let cleanNotes = notes.trimmingCharacters(in: .whitespacesAndNewlines)
         let log = HumanWorkoutLog(
@@ -66,6 +70,7 @@ enum WorkoutCommandService {
             human: human
         )
         context.insert(log)
+        CloudSyncMutationRecorder.markModified(log, context: context, modifiedAt: date)
         let ledgerEvent = careLedger.record(
             occurredAt: log.date,
             actorKind: .human,
@@ -100,6 +105,14 @@ enum WorkoutCommandService {
         human: Human,
         context: ModelContext
     ) -> WorkoutDeleteCommandResult {
+        guard MemberWritePolicy.disposition(human: human, intent: .activeOnly).allowsDerivedEffects else {
+            return WorkoutDeleteCommandResult(
+                logID: log.id,
+                subjectID: human.id,
+                removedLedgerEventIDs: [],
+                didChange: false
+            )
+        }
         let ledgerEvents = ledgerEvents(for: log.id, context: context)
         for event in ledgerEvents {
             CloudSyncMutationRecorder.markDeleted(event, context: context)
@@ -112,7 +125,8 @@ enum WorkoutCommandService {
         return WorkoutDeleteCommandResult(
             logID: logID,
             subjectID: human.id,
-            removedLedgerEventIDs: ledgerEvents.map(\.id)
+            removedLedgerEventIDs: ledgerEvents.map(\.id),
+            didChange: true
         )
     }
 

@@ -34,7 +34,7 @@ extension ReadModelRevisionCenter {
             DomainMutationResult(
                 command: .petCareDelete(petID: result.petID, logID: result.careLogID),
                 affectedEntityIDs: affected,
-                wroteBusinessFact: true,
+                wroteBusinessFact: result.didDelete,
                 note: note
             )
         )
@@ -48,22 +48,7 @@ extension ReadModelRevisionCenter {
             DomainMutationResult(
                 command: .petPottyDelete(petID: result.petID, logID: result.logID),
                 affectedEntityIDs: affected,
-                wroteBusinessFact: true,
-                note: note
-            )
-        )
-    }
-
-    func publishCatCareUndo(_ result: CatCareUndoCommandResult, note: String) {
-        var affected: Set<UUID> = [result.petID, result.eventID]
-        if let hygieneLogID = result.hygieneLogID {
-            affected.insert(hygieneLogID)
-        }
-        publish(
-            DomainMutationResult(
-                command: .catCareUndo(petID: result.petID, eventID: result.eventID),
-                affectedEntityIDs: affected,
-                wroteBusinessFact: true,
+                wroteBusinessFact: result.didDelete,
                 note: note
             )
         )
@@ -262,7 +247,7 @@ extension ReadModelRevisionCenter {
                     recordID: result.recordID
                 ),
                 affectedEntityIDs: affected,
-                wroteBusinessFact: true,
+                wroteBusinessFact: result.didChange,
                 note: note
             )
         )
@@ -303,7 +288,7 @@ extension ReadModelRevisionCenter {
                     recordID: result.recordID
                 ),
                 affectedEntityIDs: affected,
-                wroteBusinessFact: true,
+                wroteBusinessFact: result.didChange,
                 note: note
             )
         )
@@ -553,11 +538,14 @@ extension ReadModelRevisionCenter {
     }
 
     func publishPetHygienePlan(_ result: PetHygienePlanCommandResult, note: String) {
+        let affected: Set<UUID> = result.didCreate
+            ? [result.subjectID, result.eventID, result.reminderID]
+            : [result.subjectID]
         publish(
             DomainMutationResult(
                 command: .petHygienePlan(petID: result.subjectID, type: result.hygieneType.rawValue),
-                affectedEntityIDs: [result.subjectID, result.eventID, result.reminderID],
-                wroteBusinessFact: true,
+                affectedEntityIDs: affected,
+                wroteBusinessFact: result.didCreate,
                 note: note
             )
         )

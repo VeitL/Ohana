@@ -33,7 +33,7 @@ extension ReadModelRevisionCenter {
             DomainMutationResult(
                 command: command,
                 affectedEntityIDs: affected,
-                wroteBusinessFact: true,
+                wroteBusinessFact: result.didChange,
                 note: note
             )
         )
@@ -93,7 +93,7 @@ extension ReadModelRevisionCenter {
             DomainMutationResult(
                 command: .humanMedicationPlanDelete(humanID: result.subjectID, medicationID: result.medicationID),
                 affectedEntityIDs: affected,
-                wroteBusinessFact: true,
+                wroteBusinessFact: result.didChange,
                 note: note
             )
         )
@@ -139,7 +139,7 @@ extension ReadModelRevisionCenter {
                     logID: result.logID
                 ),
                 affectedEntityIDs: [result.humanID, result.logID],
-                wroteBusinessFact: true,
+                wroteBusinessFact: result.didChange,
                 note: note
             )
         )
@@ -183,7 +183,7 @@ extension ReadModelRevisionCenter {
                     action: action
                 ),
                 affectedEntityIDs: [result.humanID, result.reportID],
-                wroteBusinessFact: true,
+                wroteBusinessFact: result.didChange,
                 note: note
             )
         )

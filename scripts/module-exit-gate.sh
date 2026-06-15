@@ -51,10 +51,12 @@ if [[ "${MODE}" == "all" ]]; then
   run_step "runtime guardrails (all)" scripts/audit-runtime-guardrails.sh --all
   run_step "architecture boundaries" scripts/audit-architecture-boundaries.sh
   run_step "economy boundaries (all)" scripts/audit-economy-boundaries.sh --all
+  run_step "member lifecycle gate (all)" scripts/audit-member-lifecycle-gate.sh --all
   run_step "derived-state lifecycle (all)" scripts/audit-derived-state-lifecycle.sh --all
 else
   run_step "runtime guardrails (changed)" scripts/audit-runtime-guardrails.sh --changed
   run_step "economy boundaries (changed)" scripts/audit-economy-boundaries.sh --changed
+  run_step "member lifecycle gate (changed)" scripts/audit-member-lifecycle-gate.sh --changed
   run_step "derived-state lifecycle (changed)" scripts/audit-derived-state-lifecycle.sh --changed
 fi
 
