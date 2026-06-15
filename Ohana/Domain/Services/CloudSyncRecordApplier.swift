@@ -395,6 +395,9 @@ nonisolated enum CloudSyncRecordApplier {
             source: .cloudApply,
             context: context
         )
+        guard result.event != nil else {
+            return .skippedUnsupported(entityName: metadata.entityName)
+        }
         return result.inserted
             ? .inserted(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
             : .updated(entityName: metadata.entityName, localRecordId: metadata.localRecordId)

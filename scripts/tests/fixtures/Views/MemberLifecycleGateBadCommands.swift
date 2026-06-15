@@ -43,3 +43,16 @@ enum MemberLifecycleGateBadCommandService {
         context.insert(Pet(name: "Bypass"))
     }
 }
+
+enum DomainRehydrateDispositionBadFixture {
+    case normalized
+    case legacyHistoryOnly
+    case quarantined(unregisteredType: String)
+
+    var allowsPersistence: Bool {
+        switch self {
+        case .normalized, .legacyHistoryOnly, .quarantined:
+            true
+        }
+    }
+}

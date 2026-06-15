@@ -131,12 +131,12 @@ assert_bad scripts/audit-member-lifecycle-gate.sh "$fixtures/MemberLifecycleGate
   member-lifecycle-direct-write-gate member-lifecycle-missing-disposition \
   member-lifecycle-domain-ownership-matcher member-lifecycle-direct-schedule-writer \
   member-lifecycle-raw-effect-subject member-lifecycle-feature-taxonomy-string \
-  member-lifecycle-rehydrate-bypass
+  member-lifecycle-rehydrate-bypass member-lifecycle-rehydrate-disposition-unconsumed
 run_audit scripts/audit-member-lifecycle-gate.sh --all "$fixtures/MemberLifecycleGateBadCommands.swift"
 if [[ "$status" -ne 1 ]]; then
   fail "scripts/audit-member-lifecycle-gate.sh --all MemberLifecycleGateBadCommands.swift: expected strict exit 1, got $status"
 else
-  for rule in member-lifecycle-direct-write-gate member-lifecycle-missing-disposition member-lifecycle-domain-ownership-matcher member-lifecycle-direct-schedule-writer member-lifecycle-raw-effect-subject member-lifecycle-feature-taxonomy-string member-lifecycle-rehydrate-bypass; do
+  for rule in member-lifecycle-direct-write-gate member-lifecycle-missing-disposition member-lifecycle-domain-ownership-matcher member-lifecycle-direct-schedule-writer member-lifecycle-raw-effect-subject member-lifecycle-feature-taxonomy-string member-lifecycle-rehydrate-bypass member-lifecycle-rehydrate-disposition-unconsumed; do
     if ! grep -qF "[$rule]" <<<"$output"; then
       fail "scripts/audit-member-lifecycle-gate.sh --all MemberLifecycleGateBadCommands.swift: rule [$rule] no longer fires"
     fi

@@ -29,11 +29,25 @@ nonisolated enum DomainRehydrateDisposition: Equatable {
     case dropEffects
 
     var allowsPersistence: Bool {
-        true
+        switch self {
+        case .normalized, .legacyHistoryOnly, .dropEffects:
+            true
+        case .quarantined:
+            false
+        }
     }
 
     var allowsDerivedEffects: Bool {
         false
+    }
+
+    var requiresHistoryOnlySchedule: Bool {
+        switch self {
+        case .legacyHistoryOnly:
+            true
+        case .normalized, .quarantined, .dropEffects:
+            false
+        }
     }
 }
 
@@ -166,8 +180,15 @@ nonisolated enum DomainRehydrateAuthorizer {
         source: DomainRehydrateSourceKind,
         context: ModelContext
     ) -> AuthorizedDomainRehydratePlan {
-        let request = event.map(DomainSubjectResolutionRequest.init(event:)) ?? DomainSubjectResolutionRequest()
-        return authorize(source: source, scope: .rehydrate, request: request, context: context)
+        guard let event else {
+            return legacyHistoryOnlyPlan(source: source, scope: .rehydrate)
+        }
+        return authorize(
+            source: source,
+            scope: .rehydrate,
+            request: DomainSubjectResolutionRequest(event: event),
+            context: context
+        )
     }
 
     static func authorizeCareLedger(
@@ -215,16 +236,38 @@ nonisolated enum DomainRehydrateAuthorizer {
         }
         return .normalized
     }
+
+    private static func legacyHistoryOnlyPlan(
+        source: DomainRehydrateSourceKind,
+        scope: DomainMutationScope
+    ) -> AuthorizedDomainRehydratePlan {
+        AuthorizedDomainRehydratePlan(
+            source: source,
+            scope: scope,
+            subject: DomainSubjectResolution(
+                link: DomainEntityLink(rawType: "", rawId: ""),
+                role: .unscoped,
+                owner: nil,
+                assignee: nil,
+                displayTarget: nil,
+                effectTargets: [],
+                unresolvedOwner: false,
+                unresolvedAssignee: false,
+                unregisteredType: nil
+            ),
+            disposition: .legacyHistoryOnly
+        )
+    }
 }
 
 nonisolated struct DomainScheduleRehydrateEventResult {
-    let event: Event
+    let event: Event?
     let inserted: Bool
     let plan: AuthorizedDomainRehydratePlan
 }
 
 nonisolated struct DomainScheduleRehydrateReminderResult {
-    let reminder: Reminder
+    let reminder: Reminder?
     let inserted: Bool
     let plan: AuthorizedDomainRehydratePlan
 }
@@ -242,7 +285,7 @@ nonisolated enum DomainScheduleRehydrateWriter {
             context: context
         )
         guard plan.disposition.allowsPersistence else {
-            throw DomainRehydrateWriteError.persistenceDenied
+            return DomainScheduleRehydrateEventResult(event: nil, inserted: false, plan: plan)
         }
 
         let event: Event
@@ -281,8 +324,11 @@ nonisolated enum DomainScheduleRehydrateWriter {
             source: source,
             context: context
         )
+        guard linkedEvent != nil else {
+            return DomainScheduleRehydrateReminderResult(reminder: nil, inserted: false, plan: plan)
+        }
         guard plan.disposition.allowsPersistence else {
-            throw DomainRehydrateWriteError.persistenceDenied
+            return DomainScheduleRehydrateReminderResult(reminder: nil, inserted: false, plan: plan)
         }
 
         let reminder: Reminder
@@ -314,9 +360,15 @@ nonisolated enum DomainScheduleRehydrateWriter {
         event.eventType = snapshot.eventType
         event.relatedEntityType = snapshot.relatedEntityType
         event.relatedEntityId = snapshot.relatedEntityId
-        event.recurrenceDays = snapshot.recurrenceDays
-        event.recurrenceEndDate = snapshot.recurrenceEndDate
-        event.isCompleted = snapshot.isCompleted
+        if plan.disposition.requiresHistoryOnlySchedule {
+            event.recurrenceDays = 0
+            event.recurrenceEndDate = nil
+            event.isCompleted = true
+        } else {
+            event.recurrenceDays = snapshot.recurrenceDays
+            event.recurrenceEndDate = snapshot.recurrenceEndDate
+            event.isCompleted = snapshot.isCompleted
+        }
         event.completedOccurrences = snapshot.completedOccurrences
         event.createdAt = snapshot.createdAt
         event.assigneeId = snapshot.assigneeId
@@ -335,11 +387,24 @@ nonisolated enum DomainScheduleRehydrateWriter {
         plan.consumeAuthorization()
         reminder.event = event
         reminder.scheduledAt = snapshot.scheduledAt
-        reminder.status = snapshot.status
+        reminder.status = rehydratedReminderStatus(snapshot.status, disposition: plan.disposition)
         reminder.notificationId = snapshot.notificationId
         reminder.completedAt = snapshot.completedAt
         reminder.completedBy = snapshot.completedBy
         reminder.createdAt = snapshot.createdAt
+    }
+
+    private static func rehydratedReminderStatus(
+        _ status: String,
+        disposition: DomainRehydrateDisposition
+    ) -> String {
+        guard disposition.requiresHistoryOnlySchedule else { return status }
+        switch ReminderStatus(rawValue: status) {
+        case .completed, .skipped:
+            return status
+        case .pending, .snoozed, .failed, nil:
+            return ReminderStatus.skipped.rawValue
+        }
     }
 
     private static func fetchEvent(id: UUID, context: ModelContext) throws -> Event? {

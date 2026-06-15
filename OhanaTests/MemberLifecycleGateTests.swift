@@ -718,6 +718,114 @@ struct MemberLifecycleGateTests {
         #expect(missingDirectPetResolution.unresolvedOwner)
     }
 
+    @Test func scheduleRehydrateQuarantinesUnregisteredLinksBeforePersistence() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let snapshot = DomainScheduleRehydrateEventSnapshot(
+            id: UUID(),
+            title: "Unknown remote plan",
+            startDate: Date(timeIntervalSince1970: 1_900_000_000),
+            endDate: nil,
+            isAllDay: false,
+            eventType: EventType.task.rawValue,
+            relatedEntityType: "new_remote_member_link",
+            relatedEntityId: UUID().uuidString,
+            recurrenceDays: 1,
+            recurrenceEndDate: Date(timeIntervalSince1970: 1_900_086_400),
+            isCompleted: false,
+            completedOccurrences: [],
+            createdAt: Date(timeIntervalSince1970: 1_800_000_000),
+            assigneeId: nil,
+            feedRuleKindRaw: "",
+            foodKindRaw: FeedFoodKind.dry.rawValue,
+            feedAmountGrams: 0,
+            feedPlanGroupId: ""
+        )
+
+        let result = try DomainScheduleRehydrateWriter.upsertEvent(
+            snapshot: snapshot,
+            source: .backupRestore,
+            context: context
+        )
+
+        #expect(result.event == nil)
+        #expect(!result.inserted)
+        if case let .quarantined(unregisteredType) = result.plan.disposition {
+            #expect(unregisteredType == "new_remote_member_link")
+        } else {
+            Issue.record("Expected unregistered schedule link to be quarantined.")
+        }
+        #expect(try context.fetch(FetchDescriptor<Event>()).isEmpty)
+    }
+
+    @Test func scheduleRehydrateMakesUnresolvedOwnerHistoryOnly() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let snapshot = DomainScheduleRehydrateEventSnapshot(
+            id: UUID(),
+            title: "Missing pet plan",
+            startDate: Date(timeIntervalSince1970: 1_900_000_000),
+            endDate: nil,
+            isAllDay: false,
+            eventType: EventType.task.rawValue,
+            relatedEntityType: EntityKind.pet.rawValue,
+            relatedEntityId: UUID().uuidString,
+            recurrenceDays: 1,
+            recurrenceEndDate: Date(timeIntervalSince1970: 1_900_086_400),
+            isCompleted: false,
+            completedOccurrences: [],
+            createdAt: Date(timeIntervalSince1970: 1_800_000_000),
+            assigneeId: nil,
+            feedRuleKindRaw: "",
+            foodKindRaw: FeedFoodKind.dry.rawValue,
+            feedAmountGrams: 0,
+            feedPlanGroupId: ""
+        )
+
+        let result = try DomainScheduleRehydrateWriter.upsertEvent(
+            snapshot: snapshot,
+            source: .backupRestore,
+            context: context
+        )
+        let event = try #require(result.event)
+
+        #expect(result.inserted)
+        #expect(result.plan.disposition == .legacyHistoryOnly)
+        #expect(event.isCompleted)
+        #expect(event.recurrenceDays == 0)
+        #expect(event.recurrenceEndDate == nil)
+        #expect(!MemberLifecycleActiveScheduleResolver.isActiveSchedule(
+            event,
+            now: Date(timeIntervalSince1970: 1_899_999_000)
+        ))
+    }
+
+    @Test func scheduleRehydrateSkipsReminderWithoutResolvedEvent() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let snapshot = DomainScheduleRehydrateReminderSnapshot(
+            id: UUID(),
+            scheduledAt: Date(timeIntervalSince1970: 1_900_000_000),
+            status: ReminderStatus.pending.rawValue,
+            notificationId: UUID().uuidString,
+            eventId: UUID(),
+            completedAt: nil,
+            completedBy: "",
+            createdAt: Date(timeIntervalSince1970: 1_800_000_000)
+        )
+
+        let result = try DomainScheduleRehydrateWriter.upsertReminder(
+            snapshot: snapshot,
+            source: .backupRestore,
+            context: context
+        )
+
+        #expect(result.reminder == nil)
+        #expect(!result.inserted)
+        #expect(result.plan.disposition == .legacyHistoryOnly)
+        #expect(try context.fetch(FetchDescriptor<Reminder>()).isEmpty)
+    }
+
     @Test func domainScheduleResolutionAndAuthorizationCoverIndirectMembers() throws {
         let container = try makeInMemoryContainer()
         let context = container.mainContext

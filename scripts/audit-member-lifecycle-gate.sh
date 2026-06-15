@@ -295,6 +295,11 @@ REHYDRATE_DIRECT_MODEL_CONSTRUCTOR_RE = re.compile(
     r"GachaOwnedItem|GachaDrawLog|ShopPurchaseRecord|CloudSyncRecordState"
     r")\s*\("
 )
+REHYDRATE_DISPOSITION_TYPE_RE = re.compile(r"\bDomainRehydrateDisposition[A-Za-z0-9_]*\b")
+REHYDRATE_QUARANTINE_DENIAL_RE = re.compile(
+    r"case\s+\.quarantined(?:\([^)]*\))?\s*:\s*\n\s*false"
+)
+REHYDRATE_HISTORY_SCHEDULE_RE = re.compile(r"\brequiresHistoryOnlySchedule\b")
 ALLOWED_RAW_SCHEDULE_CONSTRUCTOR_FUNCTIONS = {
     "Ohana/Domain/Services/DomainScheduleWriteKernel.swift": {
         "makeUnpersistedReminder",
@@ -428,6 +433,24 @@ for path in files:
                         f"func {func_name} constructs or inserts restore/apply models outside a rehydrate writer",
                     )
                 )
+    text = "\n".join(lines)
+    if REHYDRATE_DISPOSITION_TYPE_RE.search(text):
+        if ".quarantined" in text and not REHYDRATE_QUARANTINE_DENIAL_RE.search(text):
+            rehydrate_bypass_warnings.append(
+                WarningItem(
+                    path_str,
+                    1,
+                    "DomainRehydrateDisposition.quarantined must deny active persistence instead of acting as metadata",
+                )
+            )
+        if ".legacyHistoryOnly" in text and not REHYDRATE_HISTORY_SCHEDULE_RE.search(text):
+            rehydrate_bypass_warnings.append(
+                WarningItem(
+                    path_str,
+                    1,
+                    "DomainRehydrateDisposition.legacyHistoryOnly must be consumed by schedule writers as non-actionable history",
+                )
+            )
 
     for func_name, start_line, body, _ in function_blocks(lines):
         if "member-lifecycle-gate: allow" in body:
@@ -536,7 +559,10 @@ for item in domain_ownership_warnings:
     print(f"    {item.snippet}")
 
 for item in rehydrate_bypass_warnings:
-    print(f"[member-lifecycle-rehydrate-bypass] {item.path}:{item.line}: restore/sync/apply entrypoints must submit snapshots to a rehydrate writer instead of constructing or inserting persistence models directly.")
+    if "DomainRehydrateDisposition" in item.snippet:
+        print(f"[member-lifecycle-rehydrate-disposition-unconsumed] {item.path}:{item.line}: rehydrate disposition cases must be consumed as hard persistence/history policy, not metadata.")
+    else:
+        print(f"[member-lifecycle-rehydrate-bypass] {item.path}:{item.line}: restore/sync/apply entrypoints must submit snapshots to a rehydrate writer instead of constructing or inserting persistence models directly.")
     print(f"    {item.snippet}")
 
 for item in effect_subject_warnings:
