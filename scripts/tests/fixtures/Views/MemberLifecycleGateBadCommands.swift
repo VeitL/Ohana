@@ -113,10 +113,11 @@ enum DomainRehydrateDispositionBadFixture {
     case normalized
     case legacyHistoryOnly
     case quarantined(unregisteredType: String)
+    case rejected(reason: String)
 
     var allowsPersistence: Bool {
         switch self {
-        case .normalized, .legacyHistoryOnly, .quarantined:
+        case .normalized, .legacyHistoryOnly, .quarantined, .rejected:
             true
         }
     }
@@ -125,7 +126,7 @@ enum DomainRehydrateDispositionBadFixture {
         switch self {
         case .legacyHistoryOnly:
             true
-        case .normalized, .quarantined:
+        case .normalized, .quarantined, .rejected:
             false
         }
     }

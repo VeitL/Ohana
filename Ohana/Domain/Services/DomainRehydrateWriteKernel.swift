@@ -26,13 +26,14 @@ nonisolated enum DomainRehydrateDisposition: Equatable {
     case normalized
     case legacyHistoryOnly
     case quarantined(unregisteredType: String)
+    case rejected(reason: String)
     case dropEffects
 
     var allowsPersistence: Bool {
         switch self {
         case .normalized, .legacyHistoryOnly, .dropEffects:
             true
-        case .quarantined:
+        case .quarantined, .rejected:
             false
         }
     }
@@ -45,10 +46,17 @@ nonisolated enum DomainRehydrateDisposition: Equatable {
         switch self {
         case .legacyHistoryOnly:
             true
-        case .normalized, .quarantined, .dropEffects:
+        case .normalized, .quarantined, .rejected, .dropEffects:
             false
         }
     }
+}
+
+nonisolated enum DomainRehydrateSubjectRequirement: Equatable {
+    case historyCompatible
+    case requiredPet
+    case requiredHuman
+    case household
 }
 
 nonisolated struct DomainScheduleRehydrateEventSnapshot: Equatable {
@@ -210,34 +218,75 @@ nonisolated enum DomainRehydrateAuthorizer {
     static func authorizeSubject(
         request: DomainSubjectResolutionRequest,
         source: DomainRehydrateSourceKind,
-        context: ModelContext
+        context: ModelContext,
+        requirement: DomainRehydrateSubjectRequirement = .historyCompatible
     ) -> AuthorizedDomainRehydratePlan {
-        authorize(source: source, scope: .rehydrate, request: request, context: context)
+        authorize(source: source, scope: .rehydrate, request: request, context: context, requirement: requirement)
+    }
+
+    static func rejectSubject(
+        source: DomainRehydrateSourceKind,
+        reason: String
+    ) -> AuthorizedDomainRehydratePlan {
+        AuthorizedDomainRehydratePlan(
+            source: source,
+            scope: .rehydrate,
+            subject: unscopedSubject(),
+            disposition: .rejected(reason: reason)
+        )
     }
 
     private static func authorize(
         source: DomainRehydrateSourceKind,
         scope: DomainMutationScope,
         request: DomainSubjectResolutionRequest,
-        context: ModelContext
+        context: ModelContext,
+        requirement: DomainRehydrateSubjectRequirement = .historyCompatible
     ) -> AuthorizedDomainRehydratePlan {
         let subject = DomainSubjectResolver.resolve(request: request, context: context)
         return AuthorizedDomainRehydratePlan(
             source: source,
             scope: scope,
             subject: subject,
-            disposition: disposition(for: subject)
+            disposition: disposition(for: subject, requirement: requirement)
         )
     }
 
-    private static func disposition(for subject: DomainSubjectResolution) -> DomainRehydrateDisposition {
+    private static func disposition(
+        for subject: DomainSubjectResolution,
+        requirement: DomainRehydrateSubjectRequirement
+    ) -> DomainRehydrateDisposition {
         if let unregisteredType = subject.unregisteredType {
             return .quarantined(unregisteredType: unregisteredType)
         }
-        if subject.unresolvedOwner || subject.unresolvedAssignee {
-            return .legacyHistoryOnly
+        if subject.unresolvedAssignee {
+            return requirement == .historyCompatible
+                ? .legacyHistoryOnly
+                : .rejected(reason: "unresolvedAssignee")
         }
-        return .normalized
+
+        switch requirement {
+        case .historyCompatible:
+            if subject.unresolvedOwner {
+                return .legacyHistoryOnly
+            }
+            return .normalized
+        case .requiredPet:
+            guard case .pet? = subject.owner else {
+                return .rejected(reason: subject.unresolvedOwner ? "unresolvedRequiredPet" : "missingRequiredPet")
+            }
+            return .normalized
+        case .requiredHuman:
+            guard case .human? = subject.owner else {
+                return .rejected(reason: subject.unresolvedOwner ? "unresolvedRequiredHuman" : "missingRequiredHuman")
+            }
+            return .normalized
+        case .household:
+            if subject.unresolvedOwner {
+                return .rejected(reason: "unexpectedUnresolvedHouseholdOwner")
+            }
+            return .normalized
+        }
     }
 
     private static func legacyHistoryOnlyPlan(
@@ -247,18 +296,22 @@ nonisolated enum DomainRehydrateAuthorizer {
         AuthorizedDomainRehydratePlan(
             source: source,
             scope: scope,
-            subject: DomainSubjectResolution(
-                link: DomainEntityLink(rawType: "", rawId: ""),
-                role: .unscoped,
-                owner: nil,
-                assignee: nil,
-                displayTarget: nil,
-                effectTargets: [],
-                unresolvedOwner: false,
-                unresolvedAssignee: false,
-                unregisteredType: nil
-            ),
+            subject: unscopedSubject(),
             disposition: .legacyHistoryOnly
+        )
+    }
+
+    private static func unscopedSubject() -> DomainSubjectResolution {
+        DomainSubjectResolution(
+            link: DomainEntityLink(rawType: "", rawId: ""),
+            role: .unscoped,
+            owner: nil,
+            assignee: nil,
+            displayTarget: nil,
+            effectTargets: [],
+            unresolvedOwner: false,
+            unresolvedAssignee: false,
+            unregisteredType: nil
         )
     }
 }
@@ -578,6 +631,10 @@ nonisolated struct DomainCareLedgerRehydrateResult {
     let event: CareLedgerEvent
     let inserted: Bool
     let plan: AuthorizedDomainRehydratePlan
+
+    var didPersist: Bool {
+        plan.disposition.allowsPersistence
+    }
 }
 
 nonisolated enum DomainCareLedgerRehydrateWriter {

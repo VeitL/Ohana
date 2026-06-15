@@ -2327,6 +2327,9 @@ struct CloudSyncMetadataServiceTests {
         let ownerId = uuid("77777777-7777-4777-8777-777777777777")
         let gachaId = uuid("88888888-8888-4888-8888-888888888888")
         let purchaseId = uuid("99999999-9999-4999-8999-999999999999")
+        let owner = Human(name: "Guan")
+        owner.id = ownerId
+        context.insert(owner)
 
         let gachaRecord = try makeRecordPayload(
             entityName: String(describing: GachaOwnedItem.self),
@@ -2372,6 +2375,63 @@ struct CloudSyncMetadataServiceTests {
         #expect(gachaItems.first?.ownerHumanId == ownerId.uuidString)
         #expect(purchases.first?.itemId == "fx_lime_glow")
         #expect(purchases.first?.buyerHumanId == ownerId.uuidString)
+    }
+
+    @MainActor
+    @Test func recordApplierSkipsMemberScopedFactsWithoutResolvedOwner() throws {
+        let container = try makeContainer()
+        let context = ModelContext(container)
+        let householdId = uuid("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")
+        let careLogId = uuid("11111111-1111-4111-8111-111111111111")
+        let missingOwnerId = uuid("77777777-7777-4777-8777-777777777777")
+        let gachaId = uuid("88888888-8888-4888-8888-888888888888")
+        let careRecord = try makeRecordPayload(
+            entityName: String(describing: PetCareLog.self),
+            recordType: String(describing: PetCareLog.self),
+            localRecordId: careLogId,
+            householdId: householdId,
+            fields: [
+                "date": .date(Date(timeIntervalSinceReferenceDate: 2100)),
+                "type": .string(CareType.feeding.rawValue),
+                "amountGrams": .double(12),
+                "foodKindRaw": .string(FeedFoodKind.dry.rawValue)
+            ]
+        ).makeCKRecord()
+        let gachaRecord = try makeRecordPayload(
+            entityName: String(describing: GachaOwnedItem.self),
+            recordType: String(describing: GachaOwnedItem.self),
+            localRecordId: gachaId,
+            householdId: householdId,
+            fields: [
+                "ownerHumanId": .string(missingOwnerId.uuidString),
+                "seriesId": .string(GachaSeriesCatalog.defaultSeriesId),
+                "itemId": .string("plush_coconut_sleepy"),
+                "rarityRaw": .string(GachaRarity.common.rawValue),
+                "isHidden": .bool(false),
+                "ownedCount": .int(1),
+                "firstObtainedAt": .date(Date(timeIntervalSinceReferenceDate: 10)),
+                "latestObtainedAt": .date(Date(timeIntervalSinceReferenceDate: 20)),
+                "createdAt": .date(Date(timeIntervalSinceReferenceDate: 10))
+            ]
+        ).makeCKRecord()
+
+        let careResult = try CloudSyncRecordApplier.apply(careRecord, context: context)
+        let gachaResult = try CloudSyncRecordApplier.apply(gachaRecord, context: context)
+
+        #expect(careResult == .skippedUnsupported(entityName: "PetCareLog"))
+        #expect(gachaResult == .skippedUnsupported(entityName: "GachaOwnedItem"))
+        #expect(try context.fetch(FetchDescriptor<PetCareLog>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<GachaOwnedItem>()).isEmpty)
+        #expect(try CloudSyncMetadataService.state(
+            entityName: String(describing: PetCareLog.self),
+            localRecordId: careLogId,
+            context: context
+        ) == nil)
+        #expect(try CloudSyncMetadataService.state(
+            entityName: String(describing: GachaOwnedItem.self),
+            localRecordId: gachaId,
+            context: context
+        ) == nil)
     }
 
     @MainActor
@@ -2450,10 +2510,18 @@ struct CloudSyncMetadataServiceTests {
         let context = ModelContext(container)
         let householdId = uuid("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")
         let sessionId = uuid("33333333-3333-4333-8333-333333333333")
-        let sourcePetId = normalized(uuid("11111111-1111-4111-8111-111111111111"))
-        let targetPetId = normalized(uuid("22222222-2222-4222-8222-222222222222"))
+        let sourcePetUUID = uuid("11111111-1111-4111-8111-111111111111")
+        let targetPetUUID = uuid("22222222-2222-4222-8222-222222222222")
+        let sourcePetId = normalized(sourcePetUUID)
+        let targetPetId = normalized(targetPetUUID)
         let sessionDate = Date(timeIntervalSinceReferenceDate: 2400)
         let createdAt = Date(timeIntervalSinceReferenceDate: 2401)
+        let sourcePet = Pet(name: "Momo")
+        let targetPet = Pet(name: "Nori")
+        sourcePet.id = sourcePetUUID
+        targetPet.id = targetPetUUID
+        context.insert(sourcePet)
+        context.insert(targetPet)
         let record = try makeRecordPayload(
             entityName: String(describing: SharedCareSession.self),
             recordType: String(describing: SharedCareSession.self),

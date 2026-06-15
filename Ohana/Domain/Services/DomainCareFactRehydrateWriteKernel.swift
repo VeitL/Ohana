@@ -138,6 +138,10 @@ nonisolated struct DomainSharedCareSessionRehydrateSnapshot: Equatable {
 nonisolated struct DomainCareFactRehydrateResult {
     let inserted: Bool
     let plan: AuthorizedDomainRehydratePlan
+
+    var didPersist: Bool {
+        plan.disposition.allowsPersistence
+    }
 }
 
 nonisolated enum DomainCareFactRehydrateWriter {
@@ -148,6 +152,7 @@ nonisolated enum DomainCareFactRehydrateWriter {
         context: ModelContext
     ) throws -> DomainCareFactRehydrateResult {
         let plan = authorize(petId: snapshot.petId, source: source, context: context)
+        guard plan.disposition.allowsPersistence else { return DomainCareFactRehydrateResult(inserted: false, plan: plan) }
         guard try fetchPetCareLog(id: snapshot.id, context: context) == nil else {
             return DomainCareFactRehydrateResult(inserted: false, plan: plan)
         }
@@ -177,6 +182,7 @@ nonisolated enum DomainCareFactRehydrateWriter {
         context: ModelContext
     ) throws -> DomainCareFactRehydrateResult {
         let plan = authorize(petId: snapshot.petId, source: source, context: context)
+        guard plan.disposition.allowsPersistence else { return DomainCareFactRehydrateResult(inserted: false, plan: plan) }
         guard try fetchPetPottyLog(id: snapshot.id, context: context) == nil else {
             return DomainCareFactRehydrateResult(inserted: false, plan: plan)
         }
@@ -204,6 +210,7 @@ nonisolated enum DomainCareFactRehydrateWriter {
         context: ModelContext
     ) throws -> DomainCareFactRehydrateResult {
         let plan = authorize(petId: snapshot.petId, source: source, context: context)
+        guard plan.disposition.allowsPersistence else { return DomainCareFactRehydrateResult(inserted: false, plan: plan) }
         guard try fetchPetHygieneLog(id: snapshot.id, context: context) == nil else {
             return DomainCareFactRehydrateResult(inserted: false, plan: plan)
         }
@@ -227,6 +234,7 @@ nonisolated enum DomainCareFactRehydrateWriter {
         context: ModelContext
     ) throws -> DomainCareFactRehydrateResult {
         let plan = authorize(petId: snapshot.petId, source: source, context: context)
+        guard plan.disposition.allowsPersistence else { return DomainCareFactRehydrateResult(inserted: false, plan: plan) }
         guard try fetchPetHealthLog(id: snapshot.id, context: context) == nil else {
             return DomainCareFactRehydrateResult(inserted: false, plan: plan)
         }
@@ -254,6 +262,7 @@ nonisolated enum DomainCareFactRehydrateWriter {
         context: ModelContext
     ) throws -> DomainCareFactRehydrateResult {
         let plan = authorize(petId: snapshot.petId, source: source, context: context)
+        guard plan.disposition.allowsPersistence else { return DomainCareFactRehydrateResult(inserted: false, plan: plan) }
         guard try fetchPetWalkLog(id: snapshot.id, context: context) == nil else {
             return DomainCareFactRehydrateResult(inserted: false, plan: plan)
         }
@@ -287,6 +296,7 @@ nonisolated enum DomainCareFactRehydrateWriter {
         context: ModelContext
     ) throws -> DomainCareFactRehydrateResult {
         let plan = authorize(petId: snapshot.petId, source: source, context: context)
+        guard plan.disposition.allowsPersistence else { return DomainCareFactRehydrateResult(inserted: false, plan: plan) }
         guard try fetchPetExpenseLog(id: snapshot.id, context: context) == nil else {
             return DomainCareFactRehydrateResult(inserted: false, plan: plan)
         }
@@ -313,6 +323,7 @@ nonisolated enum DomainCareFactRehydrateWriter {
         context: ModelContext
     ) throws -> DomainCareFactRehydrateResult {
         let plan = authorize(petId: snapshot.petId, source: source, context: context)
+        guard plan.disposition.allowsPersistence else { return DomainCareFactRehydrateResult(inserted: false, plan: plan) }
         let foodRecord: PetFoodRecord
         let inserted: Bool
         if let existing = try fetchPetFoodRecord(id: snapshot.id, context: context) {
@@ -360,6 +371,7 @@ nonisolated enum DomainCareFactRehydrateWriter {
         context: ModelContext
     ) throws -> DomainCareFactRehydrateResult {
         let plan = authorize(petId: snapshot.petId, source: source, context: context)
+        guard plan.disposition.allowsPersistence else { return DomainCareFactRehydrateResult(inserted: false, plan: plan) }
         guard try fetchPetWeightLog(id: snapshot.id, context: context) == nil else {
             return DomainCareFactRehydrateResult(inserted: false, plan: plan)
         }
@@ -383,7 +395,8 @@ nonisolated enum DomainCareFactRehydrateWriter {
         source: DomainRehydrateSourceKind,
         context: ModelContext
     ) throws -> DomainCareFactRehydrateResult {
-        let plan = authorize(petId: UUID(uuidString: snapshot.sourcePetId), source: source, context: context)
+        let plan = try authorizeSharedCareSession(snapshot: snapshot, source: source, context: context)
+        guard plan.disposition.allowsPersistence else { return DomainCareFactRehydrateResult(inserted: false, plan: plan) }
         guard try fetchSharedCareSession(id: snapshot.id, context: context) == nil else {
             return DomainCareFactRehydrateResult(inserted: false, plan: plan)
         }
@@ -417,6 +430,26 @@ nonisolated enum DomainCareFactRehydrateWriter {
         return DomainCareFactRehydrateResult(inserted: true, plan: plan)
     }
 
+    private static func authorizeSharedCareSession(
+        snapshot: DomainSharedCareSessionRehydrateSnapshot,
+        source: DomainRehydrateSourceKind,
+        context: ModelContext
+    ) throws -> AuthorizedDomainRehydratePlan {
+        let petId = try firstResolvablePetId(
+            rawIds: [snapshot.sourcePetId, snapshot.stockOwnerPetId] + snapshot.targetPetIds,
+            context: context
+        )
+        return authorize(petId: petId, source: source, context: context)
+    }
+
+    private static func firstResolvablePetId(rawIds: [String], context: ModelContext) throws -> UUID? {
+        let candidateIds = rawIds.compactMap { UUID(uuidString: $0) }
+        for candidateId in candidateIds where try fetchPet(id: candidateId, context: context) != nil {
+            return candidateId
+        }
+        return candidateIds.first
+    }
+
     private static func authorize(
         petId: UUID?,
         source: DomainRehydrateSourceKind,
@@ -431,7 +464,8 @@ nonisolated enum DomainCareFactRehydrateWriter {
         return DomainRehydrateAuthorizer.authorizeSubject(
             request: request,
             source: source,
-            context: context
+            context: context,
+            requirement: .requiredPet
         )
     }
 

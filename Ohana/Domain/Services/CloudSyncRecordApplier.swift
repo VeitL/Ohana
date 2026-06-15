@@ -214,6 +214,19 @@ nonisolated enum CloudSyncRecordApplier {
         CloudSyncEntityRegistry.supportsUploadPipeline(for: entityName)
     }
 
+    private static func rehydrateApplyResult(
+        inserted: Bool,
+        didPersist: Bool,
+        metadata: RemoteMetadata
+    ) -> CloudSyncRecordApplyResult {
+        guard didPersist else {
+            return .skippedUnsupported(entityName: metadata.entityName)
+        }
+        return inserted
+            ? .inserted(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
+            : .updated(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
+    }
+
     private static func applyLiveRecord(
         _ record: CKRecord,
         metadata: RemoteMetadata,
@@ -278,9 +291,7 @@ nonisolated enum CloudSyncRecordApplier {
             source: .cloudApply,
             context: context
         )
-        return result.inserted
-            ? .inserted(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
-            : .updated(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
+        return rehydrateApplyResult(inserted: result.inserted, didPersist: result.didPersist, metadata: metadata)
     }
 
     private static func applyPet(
@@ -344,9 +355,7 @@ nonisolated enum CloudSyncRecordApplier {
             source: .cloudApply,
             context: context
         )
-        return result.inserted
-            ? .inserted(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
-            : .updated(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
+        return rehydrateApplyResult(inserted: result.inserted, didPersist: result.didPersist, metadata: metadata)
     }
 
     private static func applyHuman(
@@ -380,9 +389,7 @@ nonisolated enum CloudSyncRecordApplier {
             source: .cloudApply,
             context: context
         )
-        return result.inserted
-            ? .inserted(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
-            : .updated(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
+        return rehydrateApplyResult(inserted: result.inserted, didPersist: result.didPersist, metadata: metadata)
     }
 
     private static func applyEvent(
@@ -451,9 +458,7 @@ nonisolated enum CloudSyncRecordApplier {
             source: .cloudApply,
             context: context
         )
-        return result.inserted
-            ? .inserted(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
-            : .updated(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
+        return rehydrateApplyResult(inserted: result.inserted, didPersist: result.didPersist, metadata: metadata)
     }
 
     private static func applyPetPottyLog(
@@ -477,9 +482,7 @@ nonisolated enum CloudSyncRecordApplier {
             source: .cloudApply,
             context: context
         )
-        return result.inserted
-            ? .inserted(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
-            : .updated(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
+        return rehydrateApplyResult(inserted: result.inserted, didPersist: result.didPersist, metadata: metadata)
     }
 
     private static func applyPetHygieneLog(
@@ -499,9 +502,7 @@ nonisolated enum CloudSyncRecordApplier {
             source: .cloudApply,
             context: context
         )
-        return result.inserted
-            ? .inserted(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
-            : .updated(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
+        return rehydrateApplyResult(inserted: result.inserted, didPersist: result.didPersist, metadata: metadata)
     }
 
     private static func applyPetHealthLog(
@@ -525,9 +526,7 @@ nonisolated enum CloudSyncRecordApplier {
             source: .cloudApply,
             context: context
         )
-        return result.inserted
-            ? .inserted(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
-            : .updated(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
+        return rehydrateApplyResult(inserted: result.inserted, didPersist: result.didPersist, metadata: metadata)
     }
 
     private static func applyPetWalkLog(
@@ -554,9 +553,7 @@ nonisolated enum CloudSyncRecordApplier {
             source: .cloudApply,
             context: context
         )
-        return result.inserted
-            ? .inserted(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
-            : .updated(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
+        return rehydrateApplyResult(inserted: result.inserted, didPersist: result.didPersist, metadata: metadata)
     }
 
     private static func applyPetExpenseLog(
@@ -578,9 +575,7 @@ nonisolated enum CloudSyncRecordApplier {
             source: .cloudApply,
             context: context
         )
-        return result.inserted
-            ? .inserted(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
-            : .updated(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
+        return rehydrateApplyResult(inserted: result.inserted, didPersist: result.didPersist, metadata: metadata)
     }
 
     private static func applyPetFoodRecord(
@@ -609,9 +604,7 @@ nonisolated enum CloudSyncRecordApplier {
             source: .cloudApply,
             context: context
         )
-        return result.inserted
-            ? .inserted(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
-            : .updated(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
+        return rehydrateApplyResult(inserted: result.inserted, didPersist: result.didPersist, metadata: metadata)
     }
 
     private static func applyPetWeightLog(
@@ -632,9 +625,7 @@ nonisolated enum CloudSyncRecordApplier {
             source: .cloudApply,
             context: context
         )
-        return result.inserted
-            ? .inserted(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
-            : .updated(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
+        return rehydrateApplyResult(inserted: result.inserted, didPersist: result.didPersist, metadata: metadata)
     }
 
     private static func applySharedCareSession(
@@ -668,9 +659,7 @@ nonisolated enum CloudSyncRecordApplier {
             source: .cloudApply,
             context: context
         )
-        return result.inserted
-            ? .inserted(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
-            : .updated(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
+        return rehydrateApplyResult(inserted: result.inserted, didPersist: result.didPersist, metadata: metadata)
     }
 
     private static func applyCareLedgerEvent(
@@ -707,9 +696,7 @@ nonisolated enum CloudSyncRecordApplier {
             source: .cloudApply,
             context: context
         )
-        return result.inserted
-            ? .inserted(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
-            : .updated(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
+        return rehydrateApplyResult(inserted: result.inserted, didPersist: result.didPersist, metadata: metadata)
     }
 
     private static func applyCoconutLedgerEntry(
@@ -747,9 +734,7 @@ nonisolated enum CloudSyncRecordApplier {
             source: .cloudApply,
             context: context
         )
-        return result.inserted
-            ? .inserted(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
-            : .updated(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
+        return rehydrateApplyResult(inserted: result.inserted, didPersist: result.didPersist, metadata: metadata)
     }
 
     private static func applyGachaOwnedItem(
@@ -774,9 +759,7 @@ nonisolated enum CloudSyncRecordApplier {
             source: .cloudApply,
             context: context
         )
-        return result.inserted
-            ? .inserted(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
-            : .updated(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
+        return rehydrateApplyResult(inserted: result.inserted, didPersist: result.didPersist, metadata: metadata)
     }
 
     private static func applyGachaDrawLog(
@@ -813,9 +796,7 @@ nonisolated enum CloudSyncRecordApplier {
             source: .cloudApply,
             context: context
         )
-        return result.inserted
-            ? .inserted(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
-            : .updated(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
+        return rehydrateApplyResult(inserted: result.inserted, didPersist: result.didPersist, metadata: metadata)
     }
 
     private static func applyShopPurchaseRecord(
@@ -843,9 +824,7 @@ nonisolated enum CloudSyncRecordApplier {
             source: .cloudApply,
             context: context
         )
-        return result.inserted
-            ? .inserted(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
-            : .updated(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
+        return rehydrateApplyResult(inserted: result.inserted, didPersist: result.didPersist, metadata: metadata)
     }
 
     private static func upsertState(

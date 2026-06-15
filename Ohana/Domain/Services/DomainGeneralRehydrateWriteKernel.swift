@@ -342,9 +342,13 @@ nonisolated struct DomainShopPurchaseRecordRehydrateSnapshot: Equatable {
 }
 
 nonisolated struct DomainGeneralRehydrateResult<Model> {
-    let model: Model
+    let model: Model?
     let inserted: Bool
     let plan: AuthorizedDomainRehydratePlan
+
+    var didPersist: Bool {
+        model != nil
+    }
 }
 
 nonisolated enum DomainGeneralRehydrateWriter {
@@ -469,7 +473,10 @@ nonisolated enum DomainGeneralRehydrateWriter {
         source: DomainRehydrateSourceKind,
         context: ModelContext
     ) throws -> DomainGeneralRehydrateResult<WishlistItem> {
-        let plan = authorizeHumanString(snapshot.creatorId, source: source, context: context)
+        let plan = authorizeHumanString(snapshot.creatorId, source: source, context: context, requirement: .requiredHuman)
+        guard plan.disposition.allowsPersistence else {
+            return DomainGeneralRehydrateResult(model: nil, inserted: false, plan: plan)
+        }
         if let existing = try fetchWishlistItem(id: snapshot.id, context: context) {
             return DomainGeneralRehydrateResult(model: existing, inserted: false, plan: plan)
         }
@@ -489,6 +496,9 @@ nonisolated enum DomainGeneralRehydrateWriter {
         context: ModelContext
     ) throws -> DomainGeneralRehydrateResult<CoconutAccount> {
         let plan = authorizeWallet(ownerKindRaw: snapshot.ownerKindRaw, ownerId: snapshot.ownerId, source: source, context: context)
+        guard plan.disposition.allowsPersistence else {
+            return DomainGeneralRehydrateResult(model: nil, inserted: false, plan: plan)
+        }
         if let existing = try fetchCoconutAccount(id: snapshot.id, context: context) {
             return DomainGeneralRehydrateResult(model: existing, inserted: false, plan: plan)
         }
@@ -515,6 +525,9 @@ nonisolated enum DomainGeneralRehydrateWriter {
         context: ModelContext
     ) throws -> DomainGeneralRehydrateResult<CoconutLedgerEntry> {
         let plan = authorizeLedger(snapshot: snapshot, source: source, context: context)
+        guard plan.disposition.allowsPersistence else {
+            return DomainGeneralRehydrateResult(model: nil, inserted: false, plan: plan)
+        }
         if let existing = try fetchCoconutLedgerEntry(id: snapshot.id, context: context) {
             CoconutWalletService.reconcileFormalAccountBalancesWithLedger(context: context)
             return DomainGeneralRehydrateResult(model: existing, inserted: false, plan: plan)
@@ -562,6 +575,9 @@ nonisolated enum DomainGeneralRehydrateWriter {
         context: ModelContext
     ) throws -> DomainGeneralRehydrateResult<FamilyCollaborationTask> {
         let plan = authorizeFamilyTask(snapshot: snapshot, source: source, context: context)
+        guard plan.disposition.allowsPersistence else {
+            return DomainGeneralRehydrateResult(model: nil, inserted: false, plan: plan)
+        }
         if let existing = try fetchFamilyCollaborationTask(id: snapshot.id, context: context) {
             return DomainGeneralRehydrateResult(model: existing, inserted: false, plan: plan)
         }
@@ -600,7 +616,16 @@ nonisolated enum DomainGeneralRehydrateWriter {
         source: DomainRehydrateSourceKind,
         context: ModelContext
     ) throws -> DomainGeneralRehydrateResult<CoconutExchangeRequest> {
-        let plan = authorizeHumanString(snapshot.senderId, assigneeId: snapshot.receiverId, source: source, context: context)
+        let plan = authorizeHumanString(
+            snapshot.senderId,
+            assigneeId: snapshot.receiverId,
+            source: source,
+            context: context,
+            requirement: .requiredHuman
+        )
+        guard plan.disposition.allowsPersistence else {
+            return DomainGeneralRehydrateResult(model: nil, inserted: false, plan: plan)
+        }
         if let existing = try fetchCoconutExchangeRequest(id: snapshot.id, context: context) {
             return DomainGeneralRehydrateResult(model: existing, inserted: false, plan: plan)
         }
@@ -790,7 +815,10 @@ nonisolated enum DomainGeneralRehydrateWriter {
         source: DomainRehydrateSourceKind,
         context: ModelContext
     ) throws -> DomainGeneralRehydrateResult<GachaOwnedItem> {
-        let plan = authorizeHumanString(snapshot.ownerHumanId, source: source, context: context)
+        let plan = authorizeHumanString(snapshot.ownerHumanId, source: source, context: context, requirement: .requiredHuman)
+        guard plan.disposition.allowsPersistence else {
+            return DomainGeneralRehydrateResult(model: nil, inserted: false, plan: plan)
+        }
         let item: GachaOwnedItem
         let inserted: Bool
         if let existing = try fetchGachaOwnedItem(id: snapshot.id, context: context) {
@@ -821,7 +849,10 @@ nonisolated enum DomainGeneralRehydrateWriter {
         source: DomainRehydrateSourceKind,
         context: ModelContext
     ) throws -> DomainGeneralRehydrateResult<GachaDrawLog> {
-        let plan = authorizeHumanString(snapshot.ownerHumanId, source: source, context: context)
+        let plan = authorizeHumanString(snapshot.ownerHumanId, source: source, context: context, requirement: .requiredHuman)
+        guard plan.disposition.allowsPersistence else {
+            return DomainGeneralRehydrateResult(model: nil, inserted: false, plan: plan)
+        }
         let log: GachaDrawLog
         let inserted: Bool
         if let existing = try fetchGachaDrawLog(id: snapshot.id, context: context) {
@@ -844,7 +875,10 @@ nonisolated enum DomainGeneralRehydrateWriter {
         source: DomainRehydrateSourceKind,
         context: ModelContext
     ) throws -> DomainGeneralRehydrateResult<ShopPurchaseRecord> {
-        let plan = authorizeHumanString(snapshot.buyerHumanId, source: source, context: context)
+        let plan = authorizeHumanString(snapshot.buyerHumanId, source: source, context: context, requirement: .requiredHuman)
+        guard plan.disposition.allowsPersistence else {
+            return DomainGeneralRehydrateResult(model: nil, inserted: false, plan: plan)
+        }
         let purchase: ShopPurchaseRecord
         let inserted: Bool
         if let existing = try fetchShopPurchaseRecord(id: snapshot.id, context: context)
@@ -999,7 +1033,8 @@ nonisolated enum DomainGeneralRehydrateWriter {
         _ id: String,
         assigneeId: String? = nil,
         source: DomainRehydrateSourceKind,
-        context: ModelContext
+        context: ModelContext,
+        requirement: DomainRehydrateSubjectRequirement = .historyCompatible
     ) -> AuthorizedDomainRehydratePlan {
         let trimmed = id.trimmingCharacters(in: .whitespacesAndNewlines)
         let request = trimmed.isEmpty
@@ -1009,7 +1044,12 @@ nonisolated enum DomainGeneralRehydrateWriter {
                 relatedEntityId: trimmed,
                 assigneeId: assigneeId
             )
-        return DomainRehydrateAuthorizer.authorizeSubject(request: request, source: source, context: context)
+        return DomainRehydrateAuthorizer.authorizeSubject(
+            request: request,
+            source: source,
+            context: context,
+            requirement: requirement
+        )
     }
 
     private static func authorizeWallet(
@@ -1018,20 +1058,24 @@ nonisolated enum DomainGeneralRehydrateWriter {
         source: DomainRehydrateSourceKind,
         context: ModelContext
     ) -> AuthorizedDomainRehydratePlan {
-        switch CoconutWalletOwnerKind(rawValue: ownerKindRaw) ?? .system {
+        guard let ownerKind = CoconutWalletOwnerKind(rawValue: ownerKindRaw) else {
+            return DomainRehydrateAuthorizer.rejectSubject(source: source, reason: "invalidWalletOwnerKind")
+        }
+        switch ownerKind {
         case .pet:
-            DomainRehydrateAuthorizer.authorizeSubject(
+            return DomainRehydrateAuthorizer.authorizeSubject(
                 request: DomainSubjectResolutionRequest(
                     relatedEntityType: EntityKind.pet.rawValue,
                     relatedEntityId: ownerId
                 ),
                 source: source,
-                context: context
+                context: context,
+                requirement: .requiredPet
             )
         case .human:
-            authorizeHumanString(ownerId, source: source, context: context)
+            return authorizeHumanString(ownerId, source: source, context: context, requirement: .requiredHuman)
         case .system:
-            authorizeHousehold(source: source, context: context)
+            return authorizeHousehold(source: source, context: context)
         }
     }
 
@@ -1040,21 +1084,7 @@ nonisolated enum DomainGeneralRehydrateWriter {
         source: DomainRehydrateSourceKind,
         context: ModelContext
     ) -> AuthorizedDomainRehydratePlan {
-        switch CareLedgerSubjectKind(rawValue: snapshot.subjectKindRaw) ?? .system {
-        case .pet:
-            DomainRehydrateAuthorizer.authorizeSubject(
-                request: DomainSubjectResolutionRequest(
-                    relatedEntityType: EntityKind.pet.rawValue,
-                    relatedEntityId: snapshot.subjectId ?? ""
-                ),
-                source: source,
-                context: context
-            )
-        case .human:
-            authorizeHumanString(snapshot.subjectId ?? "", source: source, context: context)
-        case .plant, .household, .system, .unknown:
-            authorizeWallet(ownerKindRaw: snapshot.ownerKindRaw, ownerId: snapshot.ownerId, source: source, context: context)
-        }
+        authorizeWallet(ownerKindRaw: snapshot.ownerKindRaw, ownerId: snapshot.ownerId, source: source, context: context)
     }
 
     private static func authorizeFamilyTask(
@@ -1070,14 +1100,16 @@ nonisolated enum DomainGeneralRehydrateWriter {
                     assigneeId: snapshot.assignedToId
                 ),
                 source: source,
-                context: context
+                context: context,
+                requirement: .requiredPet
             )
         }
         return authorizeHumanString(
             snapshot.createdById,
             assigneeId: snapshot.assignedToId,
             source: source,
-            context: context
+            context: context,
+            requirement: .requiredHuman
         )
     }
 
@@ -1088,7 +1120,8 @@ nonisolated enum DomainGeneralRehydrateWriter {
         DomainRehydrateAuthorizer.authorizeSubject(
             request: DomainSubjectResolutionRequest(),
             source: source,
-            context: context
+            context: context,
+            requirement: .household
         )
     }
 }

@@ -2,6 +2,7 @@
 
 > 工作协议：本文件是 Phase 0 产物，只做全 app 扫描和分类，不修改业务代码。Phase 内只跑本地验证；Phase 结束后才允许按 `docs/planning/domain-write-kernel-progress.md` 记录一次 CI。
 > 状态图例：⬜ 未收口 ｜ 🔵 已有局部内核/待扩展 ｜ 🟡 高风险旁路 ｜ 🟢 当前可作为目标形态 ｜ ⛔ 阻塞待决策
+> 当前状态：🏁 已完成。本文档作为 Domain write-kernel Phase 0 全 app 写入地图归档；Phase 0-7 的实施、CI、复审结果以 `docs/planning/domain-write-kernel-progress.md` 为准。
 
 ## 扫描范围
 
@@ -84,4 +85,4 @@ The previous member-lifecycle conclusion still holds, but scoped to the whole ap
 - Restore/sync/import are first-class writers and must be treated as rehydrate modes, not exceptions.
 - Effects are part of the write boundary: ledger, reward, notification, revision, sync dirty mark, and deep link routing must consume the same typed resolution/plan.
 
-Phase 0 exit criterion is satisfied when this matrix is reviewed and kept in sync with `docs/planning/domain-write-kernel-progress.md`. Implementation should continue with Phase 1/2 foundations before expanding Phase 4/5 writers, while Phase 6 audits are added beside each newly sealed boundary.
+Phase 0 exit criterion is satisfied. The matrix has served its planning purpose and is now a completed reference map. Implementation and closeout proceeded through Phase 1-7 and are tracked in `docs/planning/domain-write-kernel-progress.md`.

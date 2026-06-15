@@ -360,7 +360,10 @@ REHYDRATE_DIRECT_MODEL_CONSTRUCTOR_RE = re.compile(
 )
 REHYDRATE_DISPOSITION_TYPE_RE = re.compile(r"\bDomainRehydrateDisposition[A-Za-z0-9_]*\b")
 REHYDRATE_QUARANTINE_DENIAL_RE = re.compile(
-    r"case\s+\.quarantined(?:\([^)]*\))?\s*:\s*\n\s*false"
+    r"case\s+[^\n:]*\.quarantined(?:\([^)]*\))?[^\n:]*:\s*\n\s*false"
+)
+REHYDRATE_REJECTED_DENIAL_RE = re.compile(
+    r"case\s+[^\n:]*\.rejected(?:\([^)]*\))?[^\n:]*:\s*\n\s*false"
 )
 REHYDRATE_HISTORY_SCHEDULE_RE = re.compile(r"\brequiresHistoryOnlySchedule\b")
 REHYDRATE_HISTORY_EXISTING_REMINDERS_RE = re.compile(r"\bevent\.reminders\b")
@@ -528,6 +531,14 @@ for path in files:
                     path_str,
                     1,
                     "DomainRehydrateDisposition.quarantined must deny active persistence instead of acting as metadata",
+                )
+            )
+        if ".rejected" in text and not REHYDRATE_REJECTED_DENIAL_RE.search(text):
+            rehydrate_bypass_warnings.append(
+                WarningItem(
+                    path_str,
+                    1,
+                    "DomainRehydrateDisposition.rejected must deny active persistence instead of acting as metadata",
                 )
             )
         if ".legacyHistoryOnly" in text and not REHYDRATE_HISTORY_SCHEDULE_RE.search(text):

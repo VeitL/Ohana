@@ -2133,6 +2133,150 @@ struct MemberLifecycleGateTests {
         #expect(try context.fetch(FetchDescriptor<FamilyCollaborationTask>()).map(\.id) == [task.id])
     }
 
+    @Test func rehydrateWritersRejectRequiredMemberScopedFactsWithoutOwners() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let now = Date(timeIntervalSince1970: 1_900_100_000)
+        let missingHumanId = UUID()
+
+        let careResult = try DomainCareFactRehydrateWriter.insertPetCareLogIfNeeded(
+            snapshot: DomainPetCareLogRehydrateSnapshot(
+                id: UUID(),
+                date: now,
+                typeRaw: CareType.feeding.rawValue,
+                amountGrams: 12,
+                amountMl: 0,
+                note: "remote orphan care",
+                foodKindRaw: FeedFoodKind.dry.rawValue,
+                treatKindRaw: nil,
+                autoFeedDedupKey: "",
+                sharedSessionId: "",
+                petId: nil,
+                executorId: nil
+            ),
+            source: .cloudApply,
+            context: context
+        )
+        let medicationResult = try DomainMemberContentRehydrateWriter.insertHumanMedicationIfNeeded(
+            snapshot: DomainHumanMedicationRehydrateSnapshot(
+                id: UUID(),
+                humanId: "",
+                name: "Vitamin",
+                dosage: "",
+                frequencyRaw: MedicationFrequency.daily.rawValue,
+                customFrequencyNote: "",
+                firstDoseTime: now,
+                startDate: now,
+                endDate: nil,
+                colorHex: "88AAFF",
+                notes: "",
+                isActive: true,
+                createdAt: now
+            ),
+            source: .cloudApply,
+            context: context
+        )
+        let ledgerResult = try DomainGeneralRehydrateWriter.upsertCoconutLedgerEntry(
+            snapshot: DomainCoconutLedgerEntryRehydrateSnapshot(
+                id: UUID(),
+                transactionKey: "remote-orphan-ledger",
+                accountKey: CoconutAccountKey.human(missingHumanId),
+                ownerKindRaw: CoconutWalletOwnerKind.human.rawValue,
+                ownerId: missingHumanId.uuidString,
+                ownerName: "Missing",
+                delta: 7,
+                balanceBefore: 0,
+                balanceAfter: 7,
+                affectsBalance: true,
+                entryKindRaw: CoconutWalletEntryKind.reward.rawValue,
+                sourceRaw: CoconutWalletSource.careEvent.rawValue,
+                title: "Remote reward",
+                emoji: "coconut",
+                actorId: nil,
+                actorName: nil,
+                subjectKindRaw: CareLedgerSubjectKind.human.rawValue,
+                subjectId: missingHumanId.uuidString,
+                sourceModelName: "",
+                sourceModelId: "",
+                careLedgerEventId: nil,
+                metadataJSON: "",
+                occurredAt: now,
+                createdAt: now
+            ),
+            source: .cloudApply,
+            context: context
+        )
+        let gachaResult = try DomainGeneralRehydrateWriter.upsertGachaOwnedItem(
+            snapshot: DomainGachaOwnedItemRehydrateSnapshot(
+                id: UUID(),
+                ownerHumanId: "",
+                seriesId: GachaSeriesCatalog.defaultSeriesId,
+                itemId: "plush_coconut_sleepy",
+                rarityRaw: GachaRarity.common.rawValue,
+                isHidden: false,
+                ownedCount: 1,
+                firstObtainedAt: now,
+                latestObtainedAt: now,
+                createdAt: now
+            ),
+            source: .cloudApply,
+            context: context
+        )
+
+        #expect(!careResult.didPersist)
+        #expect(careResult.plan.disposition == .rejected(reason: "missingRequiredPet"))
+        #expect(!medicationResult.didPersist)
+        #expect(medicationResult.plan.disposition == .rejected(reason: "unresolvedRequiredHuman"))
+        #expect(!ledgerResult.didPersist)
+        #expect(ledgerResult.plan.disposition == .rejected(reason: "unresolvedRequiredHuman"))
+        #expect(!gachaResult.didPersist)
+        #expect(gachaResult.plan.disposition == .rejected(reason: "missingRequiredHuman"))
+        #expect(try context.fetch(FetchDescriptor<PetCareLog>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<HumanMedication>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<CoconutLedgerEntry>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<GachaOwnedItem>()).isEmpty)
+    }
+
+    @Test func sharedCareSessionRehydrateUsesRegisteredTargetPetAsOwnerFallback() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let targetPet = Pet(name: "Nori", species: "cat")
+        context.insert(targetPet)
+        try context.save()
+        let now = Date(timeIntervalSince1970: 1_900_200_000)
+
+        let result = try DomainCareFactRehydrateWriter.insertSharedCareSessionIfNeeded(
+            snapshot: DomainSharedCareSessionRehydrateSnapshot(
+                id: UUID(),
+                date: now,
+                actionKindRaw: SharedCareActionKind.feeding.rawValue,
+                executorId: nil,
+                executorIdsRaw: "",
+                sourcePetId: "",
+                targetPetIds: [targetPet.id.uuidString],
+                speciesRaw: "cat",
+                totalAmountGrams: 30,
+                totalAmountMl: 0,
+                totalExpenseAmount: 0,
+                expenseCategoryRaw: ExpenseCategory.other.rawValue,
+                currencyCode: "EUR",
+                allocationModeRaw: SharedCareAllocationMode.equal.rawValue,
+                foodKindRaw: FeedFoodKind.dry.rawValue,
+                stockOwnerPetId: "",
+                primaryLegacyModelName: String(describing: PetCareLog.self),
+                primaryLegacyModelId: UUID().uuidString,
+                note: "target fallback",
+                createdAt: now
+            ),
+            source: .cloudApply,
+            context: context
+        )
+
+        #expect(result.didPersist)
+        #expect(result.plan.disposition == .normalized)
+        #expect(try context.fetch(FetchDescriptor<SharedCareSession>()).count == 1)
+    }
+
     private func makeInMemoryContainer() throws -> ModelContainer {
         let schema = Schema(ArkSchemaV72.models)
         let config = ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)
