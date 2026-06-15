@@ -186,7 +186,7 @@ enum ReminderSchedulingService {
         save: Bool = true,
         careLedger: CareLedgerRecording
     ) {
-        let subject = CareLedgerService.subjectInfo(from: reminder.event, context: context)
+        let subject = careLedger.subjectInfo(from: reminder.event, context: context)
         careLedger.record(
             occurredAt: Date(),
             actorKind: .unknown,

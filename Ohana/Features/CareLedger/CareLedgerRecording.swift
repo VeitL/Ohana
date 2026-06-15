@@ -62,6 +62,7 @@ protocol CareLedgerRecording {
     func rewardDelta(_ reward: (humanGot: Int, petGot: Int)?) -> Int
     func rewardMetadata(_ reward: (humanGot: Int, petGot: Int)?, questManager: QuestManager) -> String
     func syncOasisTreeEnergyIfNeeded(metadataJSON: String, context: ModelContext)
+    func subjectInfo(from event: Event?, context: ModelContext) -> CareLedgerSubjectInfo
 
     @discardableResult
     func recordEventCompletionReward(
@@ -212,6 +213,10 @@ extension CareLedgerService: CareLedgerRecording {
     func syncOasisTreeEnergyIfNeeded(metadataJSON: String, context: ModelContext) {
         guard CoconutEconomyPolicyV2.metadataValue(named: "growthXP", in: metadataJSON) > 0 else { return }
         OasisTreeManagerRegistry.current.refreshLedgerEnergy(modelContext: context)
+    }
+
+    func subjectInfo(from event: Event?, context: ModelContext) -> CareLedgerSubjectInfo {
+        CareLedgerService.subjectInfo(from: event, context: context)
     }
 
     func recordEventCompletionReward(
