@@ -8,10 +8,14 @@ import SwiftData
 
 @MainActor
 protocol ReminderCompleting {
-    func complete(_ reminder: Reminder, by humanId: String?, context: ModelContext)
-    func skip(_ reminder: Reminder, by humanId: String?, context: ModelContext)
-    func reopen(_ reminder: Reminder, by humanId: String?, context: ModelContext, reschedule: Bool)
-    func snoozeOneDay(_ reminder: Reminder, by humanId: String?, context: ModelContext, reschedule: Bool)
+    @discardableResult
+    func complete(_ reminder: Reminder, by humanId: String?, context: ModelContext) -> Bool
+    @discardableResult
+    func skip(_ reminder: Reminder, by humanId: String?, context: ModelContext) -> Bool
+    @discardableResult
+    func reopen(_ reminder: Reminder, by humanId: String?, context: ModelContext, reschedule: Bool) -> Bool
+    @discardableResult
+    func snoozeOneDay(_ reminder: Reminder, by humanId: String?, context: ModelContext, reschedule: Bool) -> Bool
 }
 
 @MainActor
@@ -30,15 +34,18 @@ final class ReminderCompletionService: ReminderCompleting {
         self.reminderScheduling = reminderScheduling ?? DomainServiceDependencyRegistry.reminderScheduling(careLedger: careLedger)
     }
 
-    func complete(_ reminder: Reminder, by humanId: String?, context: ModelContext) {
+    @discardableResult
+    func complete(_ reminder: Reminder, by humanId: String?, context: ModelContext) -> Bool {
         Self.complete(reminder, by: humanId, context: context, careLedger: careLedger, familyTasks: familyTasks)
     }
 
-    func skip(_ reminder: Reminder, by humanId: String?, context: ModelContext) {
+    @discardableResult
+    func skip(_ reminder: Reminder, by humanId: String?, context: ModelContext) -> Bool {
         Self.skip(reminder, by: humanId, context: context, careLedger: careLedger)
     }
 
-    func reopen(_ reminder: Reminder, by humanId: String?, context: ModelContext, reschedule: Bool = true) {
+    @discardableResult
+    func reopen(_ reminder: Reminder, by humanId: String?, context: ModelContext, reschedule: Bool = true) -> Bool {
         Self.reopen(
             reminder,
             by: humanId,
@@ -50,7 +57,8 @@ final class ReminderCompletionService: ReminderCompleting {
         )
     }
 
-    func snoozeOneDay(_ reminder: Reminder, by humanId: String?, context: ModelContext, reschedule: Bool = true) {
+    @discardableResult
+    func snoozeOneDay(_ reminder: Reminder, by humanId: String?, context: ModelContext, reschedule: Bool = true) -> Bool {
         Self.snoozeOneDay(
             reminder,
             by: humanId,
@@ -62,40 +70,88 @@ final class ReminderCompletionService: ReminderCompleting {
     }
 
     @MainActor
+    @discardableResult
     static func complete(
         _ reminder: Reminder,
         by humanId: String?,
         context: ModelContext,
         careLedger: CareLedgerRecording = CareLedgerService(),
         familyTasks providedFamilyTasks: FamilyTaskManaging? = nil
-    ) {
+    ) -> Bool {
         let familyTasks = providedFamilyTasks ?? DomainServiceDependencyRegistry.familyTasks()
-        reminder.statusEnum = .completed
-        reminder.completedAt = Date()
-        reminder.completedBy = humanId ?? ""
-        reminder.event?.setOccurrenceMarkedComplete(true, on: reminder.scheduledAt)
-        OhanaNotifications.current.cancel(notificationId: reminder.notificationId)
+        let now = Date()
+        guard let mutation = DomainScheduleWriteAuthorizer.authorizeExistingReminderMutation(
+            reminder: reminder,
+            writeKind: .care,
+            source: .domainService,
+            context: context
+        ),
+            DomainScheduleWriter.completeReminder(
+                reminder,
+                mutation: mutation,
+                completedBy: humanId,
+                completedAt: now,
+                context: context
+            )
+        else {
+            return false
+        }
         context.safeSave()
-        careLedger.recordReminderState(reminder: reminder, actionType: "complete", actorId: humanId, source: .service, context: context, save: true)
-        familyTasks.syncCompletedReminder(reminder, completedBy: humanId, context: context)
+        runReminderEffects(
+            reminder,
+            actionType: "complete",
+            actorId: humanId,
+            occurredAt: now,
+            context: context,
+            careLedger: careLedger
+        ) {
+            OhanaNotifications.current.cancel(notificationId: reminder.notificationId)
+            familyTasks.syncCompletedReminder(reminder, completedBy: humanId, context: context)
+        }
+        return true
     }
 
     @MainActor
+    @discardableResult
     static func skip(
         _ reminder: Reminder,
         by humanId: String?,
         context: ModelContext,
         careLedger: CareLedgerRecording = CareLedgerService()
-    ) {
-        reminder.statusEnum = .skipped
-        reminder.completedAt = nil
-        reminder.completedBy = humanId ?? ""
-        OhanaNotifications.current.cancel(notificationId: reminder.notificationId)
+    ) -> Bool {
+        let now = Date()
+        guard let mutation = DomainScheduleWriteAuthorizer.authorizeExistingReminderMutation(
+            reminder: reminder,
+            writeKind: .care,
+            source: .domainService,
+            context: context
+        ),
+            DomainScheduleWriter.skipReminder(
+                reminder,
+                mutation: mutation,
+                skippedBy: humanId,
+                skippedAt: now,
+                context: context
+            )
+        else {
+            return false
+        }
         context.safeSave()
-        careLedger.recordReminderState(reminder: reminder, actionType: "skip", actorId: humanId, source: .service, context: context, save: true)
+        runReminderEffects(
+            reminder,
+            actionType: "skip",
+            actorId: humanId,
+            occurredAt: now,
+            context: context,
+            careLedger: careLedger
+        ) {
+            OhanaNotifications.current.cancel(notificationId: reminder.notificationId)
+        }
+        return true
     }
 
     @MainActor
+    @discardableResult
     static func reopen(
         _ reminder: Reminder,
         by humanId: String?,
@@ -104,31 +160,54 @@ final class ReminderCompletionService: ReminderCompleting {
         careLedger: CareLedgerRecording = CareLedgerService(),
         familyTasks providedFamilyTasks: FamilyTaskManaging? = nil,
         reminderScheduling providedReminderScheduling: ReminderSchedulingManaging? = nil
-    ) {
+    ) -> Bool {
         let familyTasks = providedFamilyTasks ?? DomainServiceDependencyRegistry.familyTasks()
         let reminderScheduling = providedReminderScheduling ?? DomainServiceDependencyRegistry.reminderScheduling(careLedger: careLedger)
-        reminder.statusEnum = .pending
-        reminder.completedAt = nil
-        reminder.completedBy = humanId ?? ""
-        reminder.event?.setOccurrenceMarkedComplete(false, on: reminder.scheduledAt)
-        if reschedule {
-            Task { @MainActor in
-                await reminderScheduling.scheduleIfNeeded(
-                    reminder: reminder,
-                    context: context,
-                    source: .service,
-                    existingNotificationIds: nil,
-                    operation: "schedule",
-                    saveLedger: true
-                )
-            }
+        let now = Date()
+        guard let mutation = DomainScheduleWriteAuthorizer.authorizeExistingReminderMutation(
+            reminder: reminder,
+            writeKind: .care,
+            source: .domainService,
+            context: context
+        ),
+            DomainScheduleWriter.reopenReminder(
+                reminder,
+                mutation: mutation,
+                reopenedBy: humanId,
+                reopenedAt: now,
+                context: context
+            )
+        else {
+            return false
         }
         context.safeSave()
-        careLedger.recordReminderState(reminder: reminder, actionType: "reopen", actorId: humanId, source: .service, context: context, save: true)
-        familyTasks.syncReopenedReminder(reminder, context: context)
+        runReminderEffects(
+            reminder,
+            actionType: "reopen",
+            actorId: humanId,
+            occurredAt: now,
+            context: context,
+            careLedger: careLedger
+        ) {
+            if reschedule {
+                Task { @MainActor in
+                    await reminderScheduling.scheduleIfNeeded(
+                        reminder: reminder,
+                        context: context,
+                        source: .service,
+                        existingNotificationIds: nil,
+                        operation: "schedule",
+                        saveLedger: true
+                    )
+                }
+            }
+            familyTasks.syncReopenedReminder(reminder, context: context)
+        }
+        return true
     }
 
     @MainActor
+    @discardableResult
     static func snoozeOneDay(
         _ reminder: Reminder,
         by humanId: String?,
@@ -136,19 +215,75 @@ final class ReminderCompletionService: ReminderCompleting {
         reschedule: Bool = true,
         careLedger: CareLedgerRecording = CareLedgerService(),
         reminderScheduling providedReminderScheduling: ReminderSchedulingManaging? = nil
-    ) {
+    ) -> Bool {
         let reminderScheduling = providedReminderScheduling ?? DomainServiceDependencyRegistry.reminderScheduling(careLedger: careLedger)
-        reminder.statusEnum = .pending
-        reminder.completedAt = nil
-        reminder.completedBy = humanId ?? ""
-        reminder.scheduledAt = Calendar.current.date(byAdding: .day, value: 1, to: reminder.scheduledAt)
-            ?? Date().addingTimeInterval(86400)
-        if reschedule {
-            Task { @MainActor in
-                await reminderScheduling.cancelAndReschedule(reminder: reminder, context: context, source: .service)
-            }
+        let now = Date()
+        guard let mutation = DomainScheduleWriteAuthorizer.authorizeExistingReminderMutation(
+            reminder: reminder,
+            writeKind: .care,
+            source: .domainService,
+            context: context
+        ),
+            DomainScheduleWriter.snoozeReminderOneDay(
+                reminder,
+                mutation: mutation,
+                snoozedBy: humanId,
+                snoozedAt: now,
+                context: context
+            )
+        else {
+            return false
         }
         context.safeSave()
-        careLedger.recordReminderState(reminder: reminder, actionType: "snoozeOneDay", actorId: humanId, source: .service, context: context, save: true)
+        runReminderEffects(
+            reminder,
+            actionType: "snoozeOneDay",
+            actorId: humanId,
+            occurredAt: now,
+            context: context,
+            careLedger: careLedger
+        ) {
+            if reschedule {
+                Task { @MainActor in
+                    await reminderScheduling.cancelAndReschedule(reminder: reminder, context: context, source: .service)
+                }
+            }
+        }
+        return true
+    }
+
+    private static func runReminderEffects(
+        _ reminder: Reminder,
+        actionType: String,
+        actorId: String?,
+        occurredAt: Date,
+        context: ModelContext,
+        careLedger: CareLedgerRecording,
+        effects: () -> Void
+    ) {
+        guard let event = reminder.event,
+              let plan = DomainEffectWriteAuthorizer.authorizeSubjectEffect(
+                  subjectRequest: DomainSubjectResolutionRequest(event: event),
+                  occurredAt: occurredAt,
+                  writeKind: .care,
+                  source: .domainService,
+                  executorId: actorId,
+                  unresolvedAssigneePolicy: .drop,
+                  context: context,
+                  logPrefix: "ReminderCompletion:\(actionType)"
+              ) else {
+            return
+        }
+        DomainEffectDispatcher.run(plan: plan) { _ in
+            effects()
+            careLedger.recordReminderState(
+                reminder: reminder,
+                actionType: actionType,
+                actorId: actorId,
+                source: .service,
+                context: context,
+                save: true
+            )
+        }
     }
 }

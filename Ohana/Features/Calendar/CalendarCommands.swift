@@ -301,6 +301,24 @@ enum CalendarEventCommandService {
         let reminderCompletion = providedReminderCompletion ?? ReminderCompletionService()
         let shouldComplete = !event.isOccurrenceMarkedComplete(on: occurrenceDate)
         let affectedSubjectIDs = affectedSubjectIDs(for: event, context: context)
+        guard let mutation = DomainScheduleWriteAuthorizer.authorizeExistingEventMutation(
+            event: event,
+            writeKind: writeKind(for: event),
+            source: .userCommand,
+            context: context
+        ) else {
+            return CalendarEventCompletionResult(
+                eventID: event.id,
+                isCompleted: event.recurrenceDays <= 0 ? event.isCompleted : event.isOccurrenceMarkedComplete(on: occurrenceDate),
+                syncedReminderCount: 0,
+                affectedSubjectIDs: affectedSubjectIDs,
+                didChange: false,
+                didWriteFact: false,
+                allowsDerivedEffects: false,
+                factDate: nil,
+                operationDate: now
+            )
+        }
         var petTaskSyncResult: CalendarTaskCompletionSyncService.PetTaskSyncResult?
         if CalendarTaskCompletionSyncService.isPetTask(event: event) {
             let syncResult = CalendarTaskCompletionSyncService.syncPetTask(
@@ -340,9 +358,25 @@ enum CalendarEventCommandService {
                 )
             }
         }
-        event.setOccurrenceMarkedComplete(shouldComplete, on: occurrenceDate)
-        if event.recurrenceDays <= 0 {
-            event.isCompleted = shouldComplete
+        guard DomainScheduleWriter.setEventOccurrenceCompletion(
+            event,
+            occurrenceDate: occurrenceDate,
+            isCompleted: shouldComplete,
+            mutation: mutation,
+            context: context,
+            modifiedAt: now
+        ) else {
+            return CalendarEventCompletionResult(
+                eventID: event.id,
+                isCompleted: event.recurrenceDays <= 0 ? event.isCompleted : event.isOccurrenceMarkedComplete(on: occurrenceDate),
+                syncedReminderCount: 0,
+                affectedSubjectIDs: affectedSubjectIDs,
+                didChange: false,
+                didWriteFact: false,
+                allowsDerivedEffects: false,
+                factDate: nil,
+                operationDate: now
+            )
         }
 
         let remindersToSync = remindersForCompletionSync(event: event, now: now)
@@ -714,8 +748,8 @@ struct ReminderCommandExecutor {
 
     @discardableResult
     func complete(_ reminder: Reminder, by humanId: String?, note: String) -> ReminderCommandResult {
-        reminderCompletion.complete(reminder, by: humanId, context: context)
-        return publish(reminder, action: "complete", note: note)
+        let didComplete = reminderCompletion.complete(reminder, by: humanId, context: context)
+        return publish(reminder, action: didComplete ? "complete" : "complete.noop", note: note)
     }
 
     @discardableResult
@@ -727,48 +761,58 @@ struct ReminderCommandExecutor {
         emoji: String = "✅",
         note: String
     ) -> ReminderCommandResult {
-        reminderCompletion.complete(reminder, by: humanId, context: context)
-        if amount != 0 {
+        let didComplete = reminderCompletion.complete(reminder, by: humanId, context: context)
+        if didComplete, amount != 0, let effectPlan = authorizedReminderEconomyEffect(
+            reminder,
+            by: humanId,
+            logPrefix: "ReminderCommandExecutor.completeWithCoconutReward"
+        ) {
+            var rewardError: Error?
             var didApplyWalletDelta = false
-            do {
-                try wallet.applyActorDelta(
-                    amount: amount,
-                    emoji: emoji,
-                    title: title,
-                    actorId: humanId,
-                    actorName: nil,
-                    entryKind: amount > 0 ? .reward : .spend,
-                    source: .service,
-                    context: context,
-                    save: false,
-                    postsRewardFeedback: true
-                )
-                didApplyWalletDelta = true
-            } catch {
+            DomainEffectDispatcher.runEconomy(plan: effectPlan) { _ in
+                do {
+                    try wallet.applyActorDelta(
+                        amount: amount,
+                        emoji: emoji,
+                        title: title,
+                        actorId: humanId,
+                        actorName: nil,
+                        entryKind: amount > 0 ? .reward : .spend,
+                        source: .service,
+                        context: context,
+                        save: false,
+                        postsRewardFeedback: true
+                    )
+                    didApplyWalletDelta = true
+                } catch {
+                    rewardError = error
+                }
+                if didApplyWalletDelta {
+                    careLedger.recordCoconut(
+                        delta: amount,
+                        title: title,
+                        actorId: humanId,
+                        actorName: nil,
+                        source: .economy,
+                        context: context
+                    )
+                }
+            }
+            if let rewardError {
                 AppPerformanceMonitor.shared.record(
                     "reminder.reward.walletFailed",
                     valueMS: 0,
-                    note: error.localizedDescription
-                )
-            }
-            if didApplyWalletDelta {
-                careLedger.recordCoconut(
-                    delta: amount,
-                    title: title,
-                    actorId: humanId,
-                    actorName: nil,
-                    source: .economy,
-                    context: context
+                    note: rewardError.localizedDescription
                 )
             }
         }
-        return publish(reminder, action: "complete.reward", note: note)
+        return publish(reminder, action: didComplete ? "complete.reward" : "complete.reward.noop", note: note)
     }
 
     @discardableResult
     func skip(_ reminder: Reminder, by humanId: String?, note: String) -> ReminderCommandResult {
-        reminderCompletion.skip(reminder, by: humanId, context: context)
-        return publish(reminder, action: "skip", note: note)
+        let didSkip = reminderCompletion.skip(reminder, by: humanId, context: context)
+        return publish(reminder, action: didSkip ? "skip" : "skip.noop", note: note)
     }
 
     @discardableResult
@@ -778,8 +822,8 @@ struct ReminderCommandExecutor {
         reschedule: Bool = true,
         note: String
     ) -> ReminderCommandResult {
-        reminderCompletion.reopen(reminder, by: humanId, context: context, reschedule: reschedule)
-        return publish(reminder, action: "reopen", note: note)
+        let didReopen = reminderCompletion.reopen(reminder, by: humanId, context: context, reschedule: reschedule)
+        return publish(reminder, action: didReopen ? "reopen" : "reopen.noop", note: note)
     }
 
     @discardableResult
@@ -789,8 +833,8 @@ struct ReminderCommandExecutor {
         reschedule: Bool = true,
         note: String
     ) -> ReminderCommandResult {
-        reminderCompletion.snoozeOneDay(reminder, by: humanId, context: context, reschedule: reschedule)
-        return publish(reminder, action: "snoozeOneDay", note: note)
+        let didSnooze = reminderCompletion.snoozeOneDay(reminder, by: humanId, context: context, reschedule: reschedule)
+        return publish(reminder, action: didSnooze ? "snoozeOneDay" : "snoozeOneDay.noop", note: note)
     }
 
     @discardableResult
@@ -811,5 +855,22 @@ struct ReminderCommandExecutor {
             request: DomainSubjectResolutionRequest(event: event),
             context: context
         ).affectedEntityIDs
+    }
+
+    private func authorizedReminderEconomyEffect(
+        _ reminder: Reminder,
+        by humanId: String?,
+        logPrefix: String
+    ) -> AuthorizedDomainEffectWrite? {
+        guard let event = reminder.event else { return nil }
+        return DomainEffectWriteAuthorizer.authorizeSubjectEffect(
+            subjectRequest: DomainSubjectResolutionRequest(event: event),
+            writeKind: .care,
+            source: .domainService,
+            executorId: humanId,
+            unresolvedAssigneePolicy: .drop,
+            context: context,
+            logPrefix: logPrefix
+        )
     }
 }

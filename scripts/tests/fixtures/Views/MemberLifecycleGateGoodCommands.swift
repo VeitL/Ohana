@@ -1,11 +1,29 @@
+import Foundation
 import SwiftData
 
 enum MemberLifecycleGateGoodCommandService {
     @MainActor
     static func recordCare(pet: Pet, context: ModelContext) {
-        let disposition = MemberLifecycleGate.disposition(pet: pet, writeKind: .care)
-        guard disposition.allowsCareFactWrite else { return }
-        context.insert(PetCareLog(type: .feeding, pet: pet))
+        let intent = DomainCareFactCreateIntent(
+            kind: .care(
+                type: .feeding,
+                amountGrams: 0,
+                amountMl: 0,
+                note: "",
+                foodKind: .dry,
+                treatKind: nil,
+                autoFeedDedupKey: "",
+                sharedSessionId: ""
+            ),
+            occurredAt: Date()
+        )
+        guard let write = DomainCareFactWriteAuthorizer.authorizePetFact(
+            pet: pet,
+            intent: intent,
+            context: context,
+            logPrefix: "good.fixture"
+        ) else { return }
+        _ = DomainCareFactWriter.createCareLog(plan: write, context: context)
     }
 
     static func petOwnedEvent(_ event: Event, pet: Pet) -> Bool {

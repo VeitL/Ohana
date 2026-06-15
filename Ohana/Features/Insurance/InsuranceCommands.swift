@@ -133,7 +133,17 @@ enum InsurancePolicyCommandService {
         input: InsurancePolicySaveCommandInput,
         context: ModelContext
     ) -> InsurancePolicyCommandResult {
-        guard MemberWritePolicy.disposition(pet: pet, intent: .activeOnly).allowsDerivedEffects else {
+        let modifiedAt = insurance == nil ? input.startDate : Date()
+        guard let write = DomainMemberFactWriteAuthorizer.authorizePetFact(
+            pet: pet,
+            occurredAt: input.startDate,
+            modifiedAt: modifiedAt,
+            writeKind: .care,
+            source: .userCommand,
+            executorId: input.executorId,
+            context: context,
+            logPrefix: "InsurancePolicyCommandService.savePolicy"
+        ) else {
             return InsurancePolicyCommandResult(
                 policyID: insurance?.id ?? UUID(),
                 petID: pet.id,
@@ -141,8 +151,24 @@ enum InsurancePolicyCommandService {
             )
         }
         if let insurance {
-            apply(input, to: insurance)
-            CloudSyncMutationRecorder.markModified(insurance, context: context)
+            DomainMemberFactWriter.updatePetInsurancePolicy(
+                plan: write,
+                insurance: insurance,
+                companyName: input.companyName,
+                policyNumber: input.policyNumber,
+                productName: input.productName,
+                annualPremium: input.annualPremium,
+                coverageAmount: input.coverageAmount,
+                startDate: input.startDate,
+                renewalDate: input.renewalDate,
+                notes: input.notes,
+                paymentFrequency: input.paymentFrequency,
+                paymentDayOfMonth: input.paymentDayOfMonth,
+                showInCalendar: input.showInCalendar,
+                otherFeeAmount: input.otherFeeAmount,
+                otherFeeNote: input.otherFeeNote,
+                context: context
+            )
             context.safeSave()
             return InsurancePolicyCommandResult(
                 policyID: insurance.id,
@@ -151,7 +177,8 @@ enum InsurancePolicyCommandService {
             )
         }
 
-        let insurance = PetInsurance(
+        let insurance = DomainMemberFactWriter.createPetInsurancePolicy(
+            plan: write,
             companyName: input.companyName,
             policyNumber: input.policyNumber,
             productName: input.productName,
@@ -165,10 +192,9 @@ enum InsurancePolicyCommandService {
             showInCalendar: input.showInCalendar,
             otherFeeAmount: input.otherFeeAmount,
             otherFeeNote: input.otherFeeNote,
-            pet: pet
+            pet: pet,
+            context: context
         )
-        context.insert(insurance)
-        CloudSyncMutationRecorder.markModified(insurance, context: context, modifiedAt: input.startDate)
 
         let schedule = input.autoGeneratesPayments && input.annualPremium > 0
             ? generatePaymentSchedule(for: insurance, pet: pet, executorId: input.executorId, context: context)
@@ -191,14 +217,21 @@ enum InsurancePolicyCommandService {
         pet: Pet,
         context: ModelContext
     ) -> InsurancePolicyCommandResult {
-        guard MemberWritePolicy.disposition(pet: pet, intent: .activeOnly).allowsDerivedEffects else {
+        guard let write = DomainMemberFactWriteAuthorizer.authorizePetFact(
+            pet: pet,
+            occurredAt: Date(),
+            writeKind: .care,
+            context: context,
+            logPrefix: "InsurancePolicyCommandService.setPolicyActive"
+        ) else {
             return InsurancePolicyCommandResult(policyID: insurance.id, petID: pet.id, didChange: false)
         }
-        let didChange = insurance.isActive != isActive
-        insurance.isActive = isActive
-        if didChange {
-            CloudSyncMutationRecorder.markModified(insurance, context: context)
-        }
+        let didChange = DomainMemberFactWriter.setPetInsurancePolicyActive(
+            plan: write,
+            insurance: insurance,
+            isActive: isActive,
+            context: context
+        )
         context.safeSave()
         return InsurancePolicyCommandResult(
             policyID: insurance.id,
@@ -214,12 +247,18 @@ enum InsurancePolicyCommandService {
         pet: Pet,
         context: ModelContext
     ) -> InsurancePolicyCommandResult {
-        guard MemberWritePolicy.disposition(pet: pet, intent: .activeOnly).allowsDerivedEffects else {
+        guard let write = DomainMemberFactWriteAuthorizer.authorizePetFact(
+            pet: pet,
+            occurredAt: Date(),
+            writeKind: .care,
+            context: context,
+            logPrefix: "InsurancePolicyCommandService.deletePolicy"
+        ) else {
             return InsurancePolicyCommandResult(policyID: insurance.id, petID: pet.id, didChange: false)
         }
         let policyID = insurance.id
         let petID = pet.id
-        PhysicalDeletionService.deleteInsurance(insurance, pet: pet, context: context)
+        DomainMemberFactWriter.deletePetInsurancePolicy(plan: write, insurance: insurance, pet: pet, context: context)
         context.safeSave()
         return InsurancePolicyCommandResult(
             policyID: policyID,
@@ -236,7 +275,15 @@ enum InsurancePolicyCommandService {
         input: InsuranceClaimCommandInput,
         context: ModelContext
     ) -> InsuranceClaimCommandResult {
-        guard MemberWritePolicy.disposition(pet: pet, intent: .activeOnly).allowsDerivedEffects else {
+        guard let write = DomainMemberFactWriteAuthorizer.authorizePetFact(
+            pet: pet,
+            occurredAt: input.claimDate,
+            writeKind: .care,
+            source: .userCommand,
+            executorId: input.executorId,
+            context: context,
+            logPrefix: "InsurancePolicyCommandService.createClaim"
+        ) else {
             return InsuranceClaimCommandResult(
                 claimID: UUID(),
                 policyID: insurance.id,
@@ -247,7 +294,8 @@ enum InsurancePolicyCommandService {
         }
         let approvedAmount = input.status == .approved ? input.claimedAmount : 0
         let approvedAt = input.status == .approved ? (input.approvedAt ?? input.claimDate) : nil
-        let claim = InsuranceClaim(
+        let claim = DomainMemberFactWriter.createInsuranceClaim(
+            plan: write,
             claimDate: input.claimDate,
             incidentDate: input.incidentDate,
             totalExpense: input.totalExpense,
@@ -256,11 +304,10 @@ enum InsurancePolicyCommandService {
             status: input.status,
             note: input.note,
             relatedExpenseLogId: input.relatedExpenseLogId,
-            insurance: insurance
+            approvedAt: approvedAt,
+            insurance: insurance,
+            context: context
         )
-        claim.approvedAt = approvedAt
-        context.insert(claim)
-        CloudSyncMutationRecorder.markModified(claim, context: context, modifiedAt: input.claimDate)
 
         let expenseID = makeReimbursementExpenseIfNeeded(
             insurance: insurance,
@@ -292,7 +339,15 @@ enum InsurancePolicyCommandService {
         approvedAt: Date = Date(),
         executorId: String? = nil
     ) -> InsuranceClaimCommandResult {
-        guard MemberWritePolicy.disposition(pet: pet, intent: .activeOnly).allowsDerivedEffects else {
+        guard let write = DomainMemberFactWriteAuthorizer.authorizePetFact(
+            pet: pet,
+            occurredAt: approvedAt,
+            writeKind: .care,
+            source: .userCommand,
+            executorId: executorId,
+            context: context,
+            logPrefix: "InsurancePolicyCommandService.updateClaimStatus"
+        ) else {
             return InsuranceClaimCommandResult(
                 claimID: claim.id,
                 policyID: insurance.id,
@@ -303,24 +358,33 @@ enum InsurancePolicyCommandService {
         }
         let oldStatus = claim.claimStatus
         let oldApprovedAmount = claim.approvedAmount
-        claim.statusRaw = status.rawValue
 
         var expenseID: UUID?
+        let nextApprovedAmount: Double
+        let nextApprovedAt: Date?
         if status == .approved, claim.approvedAmount == 0 {
-            claim.approvedAmount = claim.claimedAmount
-            claim.approvedAt = approvedAt
+            nextApprovedAmount = claim.claimedAmount
+            nextApprovedAt = approvedAt
             expenseID = makeReimbursementExpenseIfNeeded(
                 insurance: insurance,
                 pet: pet,
-                amount: claim.approvedAmount,
+                amount: nextApprovedAmount,
                 approvedDate: approvedAt,
                 executorId: executorId,
                 context: context
             )
+        } else {
+            nextApprovedAmount = claim.approvedAmount
+            nextApprovedAt = claim.approvedAt
         }
-        if oldStatus != status || oldApprovedAmount != claim.approvedAmount {
-            CloudSyncMutationRecorder.markModified(claim, context: context, modifiedAt: approvedAt)
-        }
+        let didChange = DomainMemberFactWriter.updateInsuranceClaimStatus(
+            plan: write,
+            claim: claim,
+            status: status,
+            approvedAmount: nextApprovedAmount,
+            approvedAt: nextApprovedAt,
+            context: context
+        )
 
         context.safeSave()
         return InsuranceClaimCommandResult(
@@ -328,7 +392,7 @@ enum InsurancePolicyCommandService {
             policyID: insurance.id,
             petID: pet.id,
             expenseLogID: expenseID,
-            didChange: oldStatus != status || oldApprovedAmount != claim.approvedAmount
+            didChange: didChange || oldStatus != status || oldApprovedAmount != nextApprovedAmount
         )
     }
 
@@ -340,7 +404,13 @@ enum InsurancePolicyCommandService {
         pet: Pet,
         context: ModelContext
     ) -> InsuranceClaimCommandResult {
-        guard MemberWritePolicy.disposition(pet: pet, intent: .activeOnly).allowsDerivedEffects else {
+        guard let write = DomainMemberFactWriteAuthorizer.authorizePetFact(
+            pet: pet,
+            occurredAt: Date(),
+            writeKind: .care,
+            context: context,
+            logPrefix: "InsurancePolicyCommandService.deleteClaim"
+        ) else {
             return InsuranceClaimCommandResult(
                 claimID: claim.id,
                 policyID: insurance.id,
@@ -350,8 +420,7 @@ enum InsurancePolicyCommandService {
             )
         }
         let claimID = claim.id
-        CloudSyncMutationRecorder.markDeleted(claim, pet: pet, context: context)
-        context.delete(claim)
+        DomainMemberFactWriter.deleteInsuranceClaim(plan: write, claim: claim, pet: pet, context: context)
         context.safeSave()
         return InsuranceClaimCommandResult(
             claimID: claimID,
@@ -393,23 +462,6 @@ enum InsurancePolicyCommandService {
             awardsReward: false
         )
         return result.logID
-    }
-
-    @MainActor
-    private static func apply(_ input: InsurancePolicySaveCommandInput, to insurance: PetInsurance) {
-        insurance.companyName = input.companyName
-        insurance.policyNumber = input.policyNumber
-        insurance.productName = input.productName
-        insurance.annualPremium = input.annualPremium
-        insurance.coverageAmount = input.coverageAmount
-        insurance.startDate = input.startDate
-        insurance.renewalDate = input.renewalDate
-        insurance.notes = input.notes
-        insurance.paymentFrequencyRaw = input.paymentFrequency.rawValue
-        insurance.paymentDayOfMonth = input.paymentDayOfMonth
-        insurance.showInCalendar = input.showInCalendar
-        insurance.otherFeeAmount = input.otherFeeAmount
-        insurance.otherFeeNote = input.otherFeeNote
     }
 
     @discardableResult

@@ -1264,8 +1264,10 @@ struct OhanaTests {
     @Test func reminderCompletionServiceWritesLedgerEvent() async throws {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
-        let event = Event(title: "喂药", relatedEntityType: EntityKind.pet.rawValue, relatedEntityId: UUID().uuidString)
+        let pet = Pet(name: "Momo", species: "猫")
+        let event = Event(title: "喂药", relatedEntityType: EntityKind.pet.rawValue, relatedEntityId: pet.id.uuidString)
         let reminder = Reminder(event: event, scheduledAt: Date())
+        context.insert(pet)
         context.insert(event)
         context.insert(reminder)
 
@@ -1348,8 +1350,10 @@ struct OhanaTests {
     @Test func reminderCompletionServiceReopenAndSnoozeWriteLedgerEvents() async throws {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
-        let event = Event(title: "服药", relatedEntityType: EntityKind.human.rawValue, relatedEntityId: UUID().uuidString)
+        let human = Human(name: "Guan")
+        let event = Event(title: "服药", relatedEntityType: EntityKind.human.rawValue, relatedEntityId: human.id.uuidString)
         let reminder = Reminder(event: event, scheduledAt: Date().addingTimeInterval(3600))
+        context.insert(human)
         context.insert(event)
         context.insert(reminder)
 
@@ -1369,10 +1373,12 @@ struct OhanaTests {
     @Test func reminderCompletionServiceReopenSyncsFamilyTasks() async throws {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
-        let event = Event(title: "Feed", relatedEntityType: EntityKind.pet.rawValue, relatedEntityId: UUID().uuidString)
+        let pet = Pet(name: "Momo", species: "猫")
+        let event = Event(title: "Feed", relatedEntityType: EntityKind.pet.rawValue, relatedEntityId: pet.id.uuidString)
         let reminder = Reminder(event: event, scheduledAt: Date().addingTimeInterval(3600))
         reminder.statusEnum = .completed
         reminder.completedAt = Date()
+        context.insert(pet)
         context.insert(event)
         context.insert(reminder)
         try context.save()
@@ -4927,10 +4933,10 @@ struct OhanaTests {
 
     @MainActor
     private final class NoopReminderCompleter: ReminderCompleting {
-        func complete(_: Reminder, by _: String?, context _: ModelContext) {}
-        func skip(_: Reminder, by _: String?, context _: ModelContext) {}
-        func reopen(_: Reminder, by _: String?, context _: ModelContext, reschedule _: Bool) {}
-        func snoozeOneDay(_: Reminder, by _: String?, context _: ModelContext, reschedule _: Bool) {}
+        func complete(_: Reminder, by _: String?, context _: ModelContext) -> Bool { false }
+        func skip(_: Reminder, by _: String?, context _: ModelContext) -> Bool { false }
+        func reopen(_: Reminder, by _: String?, context _: ModelContext, reschedule _: Bool) -> Bool { false }
+        func snoozeOneDay(_: Reminder, by _: String?, context _: ModelContext, reschedule _: Bool) -> Bool { false }
     }
 
     @MainActor

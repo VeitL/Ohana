@@ -282,6 +282,28 @@ MEMBER_EFFECT_WRITE_RE = re.compile(
 MEMBER_EFFECT_DISPATCHER_RE = re.compile(
     r"\bDomain(?:CareFactEffectsDispatcher|MemberFactEffectsDispatcher|EffectDispatcher)\."
 )
+WRITER_TOKEN_SCOPE_PATHS = {
+    "Ohana/Domain/Services/ReminderCompletionService.swift",
+    "Ohana/Features/Calendar/CalendarCommands.swift",
+    "Ohana/Features/Insurance/InsuranceCommands.swift",
+}
+WRITER_TOKEN_REQUIRED_MODEL_RE = re.compile(
+    r"\b(?:context|modelContext)\.insert\s*\(\s*(?:PetCareLog|PetPottyLog|PetHygieneLog|PetHealthLog|"
+    r"PetExpenseLog|PetWalkLog|PetInsurance|InsuranceClaim)\b"
+    r"|\b(?:PetInsurance|InsuranceClaim)\s*\("
+)
+WRITER_TOKEN_REQUIRED_REMINDER_STATE_RE = re.compile(
+    r"\breminder\.(?:statusEnum|completedAt|completedBy|scheduledAt)\s*="
+    r"|\bsetOccurrenceMarkedComplete\s*\("
+)
+WRITER_TOKEN_REQUIRED_EFFECT_RE = re.compile(
+    r"\bwallet\.applyActorDelta\s*\("
+    r"|\bcareLedger\.recordCoconut\s*\("
+)
+WRITER_TOKEN_CONSUMPTION_RE = re.compile(
+    r"\bDomain(?:CareFactWriter|MemberFactWriter|ScheduleWriter)\."
+    r"|\bDomain(?:CareFactEffectsDispatcher|MemberFactEffectsDispatcher|EffectDispatcher)\."
+)
 RAW_EFFECT_OWNER_TYPE_RE = re.compile(
     r"\b(?:event\.)?relatedEntityType\s*(?:==|!=)"
 )
@@ -451,6 +473,7 @@ warnings: list[WarningItem] = []
 domain_ownership_warnings: list[WarningItem] = []
 effect_subject_warnings: list[WarningItem] = []
 member_effect_warnings: list[WarningItem] = []
+writer_token_bypass_warnings: list[WarningItem] = []
 schedule_delete_warnings: list[WarningItem] = []
 feature_taxonomy_warnings: list[WarningItem] = []
 rehydrate_bypass_warnings: list[WarningItem] = []
@@ -623,6 +646,27 @@ for path in files:
                     )
                 )
 
+    checks_writer_token = path_str in WRITER_TOKEN_SCOPE_PATHS or (
+        targets and path_str.startswith("scripts/tests/fixtures/")
+    )
+    if checks_writer_token:
+        for func_name, start_line, body, _ in function_blocks(lines):
+            if "member-lifecycle-gate: allow" in body:
+                continue
+            requires_writer_token = (
+                WRITER_TOKEN_REQUIRED_MODEL_RE.search(body)
+                or WRITER_TOKEN_REQUIRED_REMINDER_STATE_RE.search(body)
+                or WRITER_TOKEN_REQUIRED_EFFECT_RE.search(body)
+            )
+            if requires_writer_token and not WRITER_TOKEN_CONSUMPTION_RE.search(body):
+                writer_token_bypass_warnings.append(
+                    WarningItem(
+                        path_str,
+                        start_line,
+                        f"func {func_name} mutates member-scoped state/effects without consuming a writer token or effects dispatcher",
+                    )
+                )
+
     checks_member_effect_dispatcher = path_str in MEMBER_EFFECT_DISPATCHER_SCOPE_PATHS or (
         targets and path_str.startswith("scripts/tests/fixtures/")
     )
@@ -706,6 +750,10 @@ for item in member_effect_warnings:
     print(f"[member-lifecycle-effect-dispatcher-bypass] {item.path}:{item.line}: member-scoped ledger, wallet, reminder, and reward effects must consume an authorized Domain*EffectsDispatcher plan.")
     print(f"    {item.snippet}")
 
+for item in writer_token_bypass_warnings:
+    print(f"[member-lifecycle-writer-token-bypass] {item.path}:{item.line}: member-scoped active writes must consume a typed writer token or effects dispatcher, not only a lifecycle guard.")
+    print(f"    {item.snippet}")
+
 for item in schedule_delete_warnings:
     print(f"[member-lifecycle-schedule-delete-bypass] {item.path}:{item.line}: member-scoped Event/Reminder deletes must consume DomainScheduleWriteAuthorizer and DomainScheduleWriter.")
     print(f"    {item.snippet}")
@@ -729,7 +777,7 @@ for item in warnings:
     print(f"[{rule}] {item.path}:{item.line}: {message}")
     print(f"    {item.snippet}")
 
-total_warnings = len(warnings) + len(domain_ownership_warnings) + len(effect_subject_warnings) + len(member_effect_warnings) + len(schedule_delete_warnings) + len(feature_taxonomy_warnings) + len(rehydrate_bypass_warnings)
+total_warnings = len(warnings) + len(domain_ownership_warnings) + len(effect_subject_warnings) + len(member_effect_warnings) + len(writer_token_bypass_warnings) + len(schedule_delete_warnings) + len(feature_taxonomy_warnings) + len(rehydrate_bypass_warnings)
 print(f"member lifecycle gate audit: scanned {len(files)} file(s); warnings={total_warnings}")
 if total_warnings and strict:
     sys.exit(1)

@@ -73,8 +73,10 @@ struct ContentView: View {
                     .zIndex(80)
             }
 
-            CoconutRewardFeedbackOverlay()
-                .zIndex(120)
+            if !Self.isRunningTests {
+                CoconutRewardFeedbackOverlay()
+                    .zIndex(120)
+            }
 
             if let starterGiftAmount {
                 StarterGiftCeremonyOverlay(
@@ -306,6 +308,15 @@ struct ContentView: View {
             from: nil,
             for: nil
         )
+    }
+}
+
+private extension ContentView {
+    static var isRunningTests: Bool {
+        let environment = ProcessInfo.processInfo.environment
+        return environment["XCTestConfigurationFilePath"] != nil
+            || environment["XCTestBundlePath"] != nil
+            || environment["XCTestSessionIdentifier"] != nil
     }
 }
 

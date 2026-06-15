@@ -199,6 +199,173 @@ enum DomainMemberFactWriteAuthorizer {
 
 nonisolated enum DomainMemberFactWriter {
     @discardableResult
+    static func createPetInsurancePolicy(
+        plan: AuthorizedDomainMemberFactWrite,
+        companyName: String,
+        policyNumber: String,
+        productName: String,
+        annualPremium: Double,
+        coverageAmount: Double,
+        startDate: Date,
+        renewalDate: Date,
+        notes: String,
+        paymentFrequency: InsurancePaymentFrequency,
+        paymentDayOfMonth: Int,
+        showInCalendar: Bool,
+        otherFeeAmount: Double,
+        otherFeeNote: String,
+        pet: Pet,
+        context: ModelContext
+    ) -> PetInsurance {
+        plan.consume()
+        let insurance = PetInsurance(
+            companyName: companyName,
+            policyNumber: policyNumber,
+            productName: productName,
+            annualPremium: annualPremium,
+            coverageAmount: coverageAmount,
+            startDate: startDate,
+            renewalDate: renewalDate,
+            notes: notes,
+            paymentFrequency: paymentFrequency,
+            paymentDayOfMonth: paymentDayOfMonth,
+            showInCalendar: showInCalendar,
+            otherFeeAmount: otherFeeAmount,
+            otherFeeNote: otherFeeNote,
+            pet: pet
+        )
+        context.insert(insurance)
+        CloudSyncMutationRecorder.markModified(insurance, context: context, modifiedAt: plan.modifiedAt)
+        return insurance
+    }
+
+    static func updatePetInsurancePolicy(
+        plan: AuthorizedDomainMemberFactWrite,
+        insurance: PetInsurance,
+        companyName: String,
+        policyNumber: String,
+        productName: String,
+        annualPremium: Double,
+        coverageAmount: Double,
+        startDate: Date,
+        renewalDate: Date,
+        notes: String,
+        paymentFrequency: InsurancePaymentFrequency,
+        paymentDayOfMonth: Int,
+        showInCalendar: Bool,
+        otherFeeAmount: Double,
+        otherFeeNote: String,
+        context: ModelContext
+    ) {
+        plan.consume()
+        insurance.companyName = companyName
+        insurance.policyNumber = policyNumber
+        insurance.productName = productName
+        insurance.annualPremium = annualPremium
+        insurance.coverageAmount = coverageAmount
+        insurance.startDate = startDate
+        insurance.renewalDate = renewalDate
+        insurance.notes = notes
+        insurance.paymentFrequencyRaw = paymentFrequency.rawValue
+        insurance.paymentDayOfMonth = max(1, min(28, paymentDayOfMonth))
+        insurance.showInCalendar = showInCalendar
+        insurance.otherFeeAmount = otherFeeAmount
+        insurance.otherFeeNote = otherFeeNote
+        CloudSyncMutationRecorder.markModified(insurance, context: context, modifiedAt: plan.modifiedAt)
+    }
+
+    static func setPetInsurancePolicyActive(
+        plan: AuthorizedDomainMemberFactWrite,
+        insurance: PetInsurance,
+        isActive: Bool,
+        context: ModelContext
+    ) -> Bool {
+        plan.consume()
+        let didChange = insurance.isActive != isActive
+        insurance.isActive = isActive
+        if didChange {
+            CloudSyncMutationRecorder.markModified(insurance, context: context, modifiedAt: plan.modifiedAt)
+        }
+        return didChange
+    }
+
+    static func deletePetInsurancePolicy(
+        plan: AuthorizedDomainMemberFactWrite,
+        insurance: PetInsurance,
+        pet: Pet,
+        context: ModelContext
+    ) {
+        plan.consume()
+        PhysicalDeletionService.deleteInsurance(insurance, pet: pet, context: context)
+    }
+
+    @discardableResult
+    static func createInsuranceClaim(
+        plan: AuthorizedDomainMemberFactWrite,
+        claimDate: Date,
+        incidentDate: Date,
+        totalExpense: Double,
+        claimedAmount: Double,
+        approvedAmount: Double,
+        status: ClaimStatus,
+        note: String,
+        relatedExpenseLogId: String?,
+        approvedAt: Date?,
+        insurance: PetInsurance,
+        context: ModelContext
+    ) -> InsuranceClaim {
+        plan.consume()
+        let claim = InsuranceClaim(
+            claimDate: claimDate,
+            incidentDate: incidentDate,
+            totalExpense: totalExpense,
+            claimedAmount: claimedAmount,
+            approvedAmount: approvedAmount,
+            status: status,
+            note: note,
+            relatedExpenseLogId: relatedExpenseLogId,
+            insurance: insurance
+        )
+        claim.approvedAt = approvedAt
+        context.insert(claim)
+        CloudSyncMutationRecorder.markModified(claim, context: context, modifiedAt: plan.modifiedAt)
+        return claim
+    }
+
+    static func updateInsuranceClaimStatus(
+        plan: AuthorizedDomainMemberFactWrite,
+        claim: InsuranceClaim,
+        status: ClaimStatus,
+        approvedAmount: Double,
+        approvedAt: Date?,
+        context: ModelContext
+    ) -> Bool {
+        plan.consume()
+        let oldStatus = claim.claimStatus
+        let oldApprovedAmount = claim.approvedAmount
+        let oldApprovedAt = claim.approvedAt
+        claim.statusRaw = status.rawValue
+        claim.approvedAmount = approvedAmount
+        claim.approvedAt = approvedAt
+        let didChange = oldStatus != status || oldApprovedAmount != approvedAmount || oldApprovedAt != approvedAt
+        if didChange {
+            CloudSyncMutationRecorder.markModified(claim, context: context, modifiedAt: plan.modifiedAt)
+        }
+        return didChange
+    }
+
+    static func deleteInsuranceClaim(
+        plan: AuthorizedDomainMemberFactWrite,
+        claim: InsuranceClaim,
+        pet: Pet,
+        context: ModelContext
+    ) {
+        plan.consume()
+        CloudSyncMutationRecorder.markDeleted(claim, pet: pet, context: context, deletedAt: plan.modifiedAt)
+        context.delete(claim)
+    }
+
+    @discardableResult
     static func createPetDocument(
         plan: AuthorizedDomainMemberFactWrite,
         title: String,

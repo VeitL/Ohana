@@ -246,6 +246,45 @@ nonisolated enum DomainScheduleWriteAuthorizer {
         )
     }
 
+    static func authorizeExistingReminderMutation(
+        reminder: Reminder,
+        writeKind: MemberWriteKind,
+        source: DomainScheduleSourceKind = .domainService,
+        context: ModelContext
+    ) -> AuthorizedDomainScheduleMutation? {
+        guard let event = reminder.event else {
+            return authorizeUnscopedMutation(writeKind: writeKind, source: source, context: context)
+        }
+        return authorizeExistingEventMutation(
+            event: event,
+            writeKind: writeKind,
+            source: source,
+            context: context
+        )
+    }
+
+    private static func authorizeUnscopedMutation(
+        writeKind: MemberWriteKind,
+        source: DomainScheduleSourceKind,
+        context: ModelContext
+    ) -> AuthorizedDomainScheduleMutation? {
+        let request = DomainMutationAuthorizationRequest(
+            scope: .schedule,
+            source: DomainMutationSourceKind(scheduleSource: source),
+            subjectRequest: DomainSubjectResolutionRequest(),
+            writeKind: writeKind,
+            unresolvedAssigneePolicy: .drop
+        )
+        guard let mutationPlan = DomainPolicyAuthorizer.authorize(request, context: context) else { return nil }
+        return AuthorizedDomainScheduleMutation(
+            mutationPlan: mutationPlan,
+            resolution: mutationPlan.subject,
+            disposition: mutationPlan.disposition,
+            writeKind: writeKind,
+            source: source
+        )
+    }
+
     static func authorizeExistingEventUpdate(
         event: Event,
         intent: DomainScheduleCreateIntent,
@@ -422,6 +461,109 @@ nonisolated enum DomainScheduleWriter {
         dates.compactMap { date in
             createReminder(for: event, scheduledAt: date, mutation: mutation, context: context)
         }
+    }
+
+    @discardableResult
+    static func setEventOccurrenceCompletion(
+        _ event: Event,
+        occurrenceDate: Date,
+        isCompleted: Bool,
+        mutation: AuthorizedDomainScheduleMutation,
+        context: ModelContext,
+        modifiedAt: Date
+    ) -> Bool {
+        _ = mutation.token
+        mutation.mutationPlan.consumeAuthorization()
+        guard mutation.writesContent else { return false }
+        event.setOccurrenceMarkedComplete(isCompleted, on: occurrenceDate)
+        if event.recurrenceDays <= 0 {
+            event.isCompleted = isCompleted
+        }
+        CloudSyncMutationRecorder.markModified(event, context: context, modifiedAt: modifiedAt)
+        return true
+    }
+
+    @discardableResult
+    static func completeReminder(
+        _ reminder: Reminder,
+        mutation: AuthorizedDomainScheduleMutation,
+        completedBy humanId: String?,
+        completedAt: Date,
+        context: ModelContext
+    ) -> Bool {
+        _ = mutation.token
+        mutation.mutationPlan.consumeAuthorization()
+        guard mutation.writesContent else { return false }
+        reminder.statusEnum = .completed
+        reminder.completedAt = completedAt
+        reminder.completedBy = humanId ?? ""
+        if let event = reminder.event {
+            event.setOccurrenceMarkedComplete(true, on: reminder.scheduledAt)
+            CloudSyncMutationRecorder.markModified(event, context: context, modifiedAt: completedAt)
+        }
+        CloudSyncMutationRecorder.markModified(reminder, context: context, modifiedAt: completedAt)
+        return true
+    }
+
+    @discardableResult
+    static func skipReminder(
+        _ reminder: Reminder,
+        mutation: AuthorizedDomainScheduleMutation,
+        skippedBy humanId: String?,
+        skippedAt: Date,
+        context: ModelContext
+    ) -> Bool {
+        _ = mutation.token
+        mutation.mutationPlan.consumeAuthorization()
+        guard mutation.writesContent else { return false }
+        reminder.statusEnum = .skipped
+        reminder.completedAt = nil
+        reminder.completedBy = humanId ?? ""
+        CloudSyncMutationRecorder.markModified(reminder, context: context, modifiedAt: skippedAt)
+        return true
+    }
+
+    @discardableResult
+    static func reopenReminder(
+        _ reminder: Reminder,
+        mutation: AuthorizedDomainScheduleMutation,
+        reopenedBy humanId: String?,
+        reopenedAt: Date,
+        context: ModelContext
+    ) -> Bool {
+        _ = mutation.token
+        mutation.mutationPlan.consumeAuthorization()
+        guard mutation.writesContent else { return false }
+        reminder.statusEnum = .pending
+        reminder.completedAt = nil
+        reminder.completedBy = humanId ?? ""
+        if let event = reminder.event {
+            event.setOccurrenceMarkedComplete(false, on: reminder.scheduledAt)
+            CloudSyncMutationRecorder.markModified(event, context: context, modifiedAt: reopenedAt)
+        }
+        CloudSyncMutationRecorder.markModified(reminder, context: context, modifiedAt: reopenedAt)
+        return true
+    }
+
+    @discardableResult
+    static func snoozeReminderOneDay(
+        _ reminder: Reminder,
+        mutation: AuthorizedDomainScheduleMutation,
+        snoozedBy humanId: String?,
+        snoozedAt: Date,
+        context: ModelContext,
+        calendar: Calendar = .current
+    ) -> Bool {
+        _ = mutation.token
+        mutation.mutationPlan.consumeAuthorization()
+        guard mutation.writesContent else { return false }
+        reminder.statusEnum = .pending
+        reminder.completedAt = nil
+        reminder.completedBy = humanId ?? ""
+        reminder.scheduledAt = calendar.date(byAdding: .day, value: 1, to: reminder.scheduledAt)
+            ?? snoozedAt.addingTimeInterval(86400)
+        CloudSyncMutationRecorder.markModified(reminder, context: context, modifiedAt: snoozedAt)
+        return true
     }
 
     private static func createReminders(

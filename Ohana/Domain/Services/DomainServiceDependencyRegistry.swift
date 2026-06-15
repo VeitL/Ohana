@@ -171,10 +171,10 @@ private final class DomainNoOpCareEventEconomyAwarder: CareEventEconomyAwarding 
 
 @MainActor
 private final class DomainNoOpReminderCompleter: ReminderCompleting {
-    func complete(_: Reminder, by _: String?, context _: ModelContext) {}
-    func skip(_: Reminder, by _: String?, context _: ModelContext) {}
-    func reopen(_: Reminder, by _: String?, context _: ModelContext, reschedule _: Bool) {}
-    func snoozeOneDay(_: Reminder, by _: String?, context _: ModelContext, reschedule _: Bool) {}
+    func complete(_: Reminder, by _: String?, context _: ModelContext) -> Bool { false }
+    func skip(_: Reminder, by _: String?, context _: ModelContext) -> Bool { false }
+    func reopen(_: Reminder, by _: String?, context _: ModelContext, reschedule _: Bool) -> Bool { false }
+    func snoozeOneDay(_: Reminder, by _: String?, context _: ModelContext, reschedule _: Bool) -> Bool { false }
 }
 
 @MainActor
