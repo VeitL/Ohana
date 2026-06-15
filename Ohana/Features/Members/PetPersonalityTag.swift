@@ -18,6 +18,19 @@ nonisolated struct CustomPersonalityTagRecord: Codable, Identifiable, Equatable 
     func title(l: L10n) -> String { l.tr(zh: titleZh, en: titleEn, de: titleEn) }
 }
 
+nonisolated enum CustomPersonalityTagPreferenceStore {
+    private static let key = "ohana_custom_personality_tags_v1"
+    private static let defaults = UserDefaults.standard
+
+    static func load() -> [CustomPersonalityTagRecord] {
+        guard let data = defaults.string(forKey: key)?.data(using: .utf8),
+              let arr = try? JSONDecoder().decode([CustomPersonalityTagRecord].self, from: data) else {
+            return []
+        }
+        return arr
+    }
+}
+
 nonisolated enum CustomPersonalityTagStore {
     static func load() -> [CustomPersonalityTagRecord] {
         CustomPersonalityTagPreferenceStore.load()

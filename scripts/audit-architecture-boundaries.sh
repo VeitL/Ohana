@@ -17,6 +17,9 @@ Usage:
 Purpose:
   Enforce the architecture boundaries established by the P0-P4 refactor:
   - Models/ contains SwiftData models only, not service/manager infrastructure.
+  - Models/ sources declare @Model, schema/migration containers, or model
+    extensions; taxonomy, route, store, catalog, and presentation helper files
+    live in Domain, App, Shared, or Features instead.
   - @Query only appears in screen/route data containers.
   - Views do not directly use UserDefaults or construct command executors.
   - Swift files above 800 lines are ratcheted; no new oversized files and no
@@ -374,6 +377,62 @@ models_presentation_framework_dependencies() {
   rg -n --with-filename --pcre2 '^\s*import\s+SwiftUI\b|(:|->)\s*(some\s+|any\s+)?(Color|View|Image|LinearGradient)\b|\bsome\s+View\b|\b(Color|Image|LinearGradient)\s*(\.|\()' "${scoped_files[@]}" \
     | rg -v ':\s*(//|/\*|\*)' || true
 }
+
+models_non_schema_sources() {
+  local scoped_files=()
+  if [[ "$mode" == "all" ]]; then
+    while IFS= read -r file; do
+      [[ -n "$file" ]] && scoped_files+=("$file")
+    done < <(find Ohana/Models -maxdepth 1 -name '*.swift' | sort)
+  else
+    for file in "${files[@]}"; do
+      case "$file" in
+        Ohana/Models/*.swift)
+          [[ -f "$file" ]] && scoped_files+=("$file")
+          ;;
+      esac
+    done
+  fi
+  [[ ${#scoped_files[@]} -eq 0 ]] && return 0
+  python3 - "${scoped_files[@]}" <<'PY'
+import pathlib
+import re
+import sys
+
+allowed_patterns = [
+    re.compile(r"^\s*@Model\b", re.MULTILINE),
+    re.compile(r"\bVersionedSchema\b"),
+    re.compile(r"\bSchemaMigrationPlan\b"),
+    re.compile(r"\btypealias\s+ArkSchema\b"),
+    re.compile(r"\bMigrationStage\b"),
+    re.compile(r"^\s*(public\s+|private\s+|fileprivate\s+|internal\s+)?extension\s+[A-Z][A-Za-z0-9_]*\b", re.MULTILINE),
+]
+
+violations = []
+for raw_path in sys.argv[1:]:
+    path = pathlib.Path(raw_path)
+    try:
+        text = path.read_text(encoding="utf-8")
+    except UnicodeDecodeError:
+        text = path.read_text(encoding="utf-8", errors="ignore")
+    non_comment_text = "\n".join(
+        line for line in text.splitlines()
+        if not line.lstrip().startswith(("//", "/*", "*"))
+    )
+    if any(pattern.search(non_comment_text) for pattern in allowed_patterns):
+        continue
+    violations.append(
+        f"{raw_path}: Models sources must declare SwiftData models, schema/migration containers, or model extensions; move taxonomy, routes, stores, catalogs, and presentation helpers out of Models."
+    )
+
+print("\n".join(violations))
+PY
+}
+
+record_matches \
+  "models-non-schema-source" \
+  "Models/ may contain SwiftData models, schema/migration containers, or model extensions only; move taxonomy, routes, stores, catalogs, and presentation helpers out." \
+  models_non_schema_sources
 
 record_matches \
   "models-layer-pollution" \

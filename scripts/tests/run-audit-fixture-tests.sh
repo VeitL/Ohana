@@ -146,10 +146,13 @@ cp "$fixtures/ArchitectureModelBoundariesBad.swift" "$architecture_model_fixture
 run_audit scripts/audit-architecture-boundaries.sh --changed
 if [[ "$status" -ne 1 ]]; then
   fail "scripts/audit-architecture-boundaries.sh ArchitectureModelBoundariesBad.swift: expected strict exit 1, got $status"
-elif ! grep -qF "[models-presentation-framework-dependency]" <<<"$output"; then
-  fail "scripts/audit-architecture-boundaries.sh ArchitectureModelBoundariesBad.swift: rule [models-presentation-framework-dependency] no longer fires"
 else
-  echo "ok  scripts/audit-architecture-boundaries.sh catches Models presentation dependency rule"
+  for rule in models-presentation-framework-dependency models-non-schema-source; do
+    if ! grep -qF "[$rule]" <<<"$output"; then
+      fail "scripts/audit-architecture-boundaries.sh ArchitectureModelBoundariesBad.swift: rule [$rule] no longer fires"
+    fi
+  done
+  echo "ok  scripts/audit-architecture-boundaries.sh catches Models boundary rules"
 fi
 cp "$fixtures/ArchitectureModelBoundariesGood.swift" "$architecture_model_fixture_path"
 run_audit scripts/audit-architecture-boundaries.sh --changed
