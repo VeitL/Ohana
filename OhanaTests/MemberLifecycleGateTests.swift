@@ -800,6 +800,194 @@ struct MemberLifecycleGateTests {
         ))
     }
 
+    @Test func scheduleRehydrateHistoryOnlyTerminalizesExistingReminders() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let pet = Pet(name: "Momo", species: "cat")
+        let event = Event(
+            title: "Existing plan",
+            startDate: Date(timeIntervalSince1970: 1_900_000_000),
+            eventType: EventType.task.rawValue,
+            relatedEntityType: EntityKind.pet.rawValue,
+            relatedEntityId: pet.id.uuidString
+        )
+        event.recurrenceDays = 1
+        event.recurrenceEndDate = Date(timeIntervalSince1970: 1_900_086_400)
+        let reminder = Reminder(event: event, scheduledAt: Date(timeIntervalSince1970: 1_900_000_500))
+        reminder.status = ReminderStatus.pending.rawValue
+        reminder.notificationId = "history-existing-reminder"
+        event.reminders = [reminder]
+        context.insert(pet)
+        context.insert(event)
+        context.insert(reminder)
+        try context.save()
+
+        let snapshot = DomainScheduleRehydrateEventSnapshot(
+            id: event.id,
+            title: "Missing pet plan",
+            startDate: event.startDate,
+            endDate: nil,
+            isAllDay: false,
+            eventType: EventType.task.rawValue,
+            relatedEntityType: EntityKind.pet.rawValue,
+            relatedEntityId: UUID().uuidString,
+            recurrenceDays: 1,
+            recurrenceEndDate: Date(timeIntervalSince1970: 1_900_086_400),
+            isCompleted: false,
+            completedOccurrences: [],
+            createdAt: Date(timeIntervalSince1970: 1_800_000_000),
+            assigneeId: nil,
+            feedRuleKindRaw: "",
+            foodKindRaw: FeedFoodKind.dry.rawValue,
+            feedAmountGrams: 0,
+            feedPlanGroupId: ""
+        )
+
+        let result = try DomainScheduleRehydrateWriter.upsertEvent(
+            snapshot: snapshot,
+            source: .backupRestore,
+            context: context
+        )
+
+        #expect(result.event?.id == event.id)
+        #expect(!result.inserted)
+        #expect(result.plan.disposition == .legacyHistoryOnly)
+        #expect(event.isCompleted)
+        #expect(event.recurrenceDays == 0)
+        #expect(reminder.statusEnum == .skipped)
+        #expect(result.notificationIdsToCancel == ["history-existing-reminder"])
+        #expect(!MemberLifecycleActiveScheduleResolver.isActiveSchedule(
+            event,
+            now: Date(timeIntervalSince1970: 1_899_999_000)
+        ))
+    }
+
+    @Test func scheduleRehydrateQuarantineNeutralizesExistingScheduleWithoutPersistingRawLink() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let pet = Pet(name: "Momo", species: "cat")
+        let event = Event(
+            title: "Existing plan",
+            startDate: Date(timeIntervalSince1970: 1_900_000_000),
+            eventType: EventType.task.rawValue,
+            relatedEntityType: EntityKind.pet.rawValue,
+            relatedEntityId: pet.id.uuidString
+        )
+        event.recurrenceDays = 1
+        let reminder = Reminder(event: event, scheduledAt: Date(timeIntervalSince1970: 1_900_000_500))
+        reminder.status = ReminderStatus.pending.rawValue
+        reminder.notificationId = "quarantine-existing-reminder"
+        event.reminders = [reminder]
+        context.insert(pet)
+        context.insert(event)
+        context.insert(reminder)
+        try context.save()
+
+        let snapshot = DomainScheduleRehydrateEventSnapshot(
+            id: event.id,
+            title: "Unknown remote plan",
+            startDate: event.startDate,
+            endDate: nil,
+            isAllDay: false,
+            eventType: EventType.task.rawValue,
+            relatedEntityType: "new_remote_member_link",
+            relatedEntityId: UUID().uuidString,
+            recurrenceDays: 1,
+            recurrenceEndDate: Date(timeIntervalSince1970: 1_900_086_400),
+            isCompleted: false,
+            completedOccurrences: [],
+            createdAt: Date(timeIntervalSince1970: 1_800_000_000),
+            assigneeId: nil,
+            feedRuleKindRaw: "",
+            foodKindRaw: FeedFoodKind.dry.rawValue,
+            feedAmountGrams: 0,
+            feedPlanGroupId: ""
+        )
+
+        let result = try DomainScheduleRehydrateWriter.upsertEvent(
+            snapshot: snapshot,
+            source: .cloudApply,
+            context: context
+        )
+
+        #expect(result.event?.id == event.id)
+        #expect(!result.inserted)
+        if case let .quarantined(unregisteredType) = result.plan.disposition {
+            #expect(unregisteredType == "new_remote_member_link")
+        } else {
+            Issue.record("Expected unregistered schedule link to be quarantined.")
+        }
+        #expect(event.relatedEntityType == EntityKind.pet.rawValue)
+        #expect(event.relatedEntityId == pet.id.uuidString)
+        #expect(event.isCompleted)
+        #expect(event.recurrenceDays == 0)
+        #expect(reminder.statusEnum == .skipped)
+        #expect(result.notificationIdsToCancel == ["quarantine-existing-reminder"])
+        #expect(!MemberLifecycleActiveScheduleResolver.isActiveSchedule(
+            event,
+            now: Date(timeIntervalSince1970: 1_899_999_000)
+        ))
+    }
+
+    @Test func backupRestoreRehydratesExistingSchedulesThroughWriter() throws {
+        let suiteName = "OhanaTests.BackupScheduleRehydrate.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let manager = DataBackupManager(defaults: defaults)
+        let scheduler = CapturingReminderNotificationScheduler()
+        OhanaNotifications.current = scheduler
+        defer { OhanaNotifications.useLive() }
+        let eventId = UUID()
+        let source = try makeInMemoryContainer()
+        let sourceContext = source.mainContext
+        let missingPetEvent = Event(
+            title: "Missing pet plan",
+            startDate: Date(timeIntervalSince1970: 1_900_000_000),
+            eventType: EventType.task.rawValue,
+            relatedEntityType: EntityKind.pet.rawValue,
+            relatedEntityId: UUID().uuidString
+        )
+        missingPetEvent.id = eventId
+        missingPetEvent.recurrenceDays = 1
+        missingPetEvent.recurrenceEndDate = Date(timeIntervalSince1970: 1_900_086_400)
+        sourceContext.insert(missingPetEvent)
+        try sourceContext.save()
+        let backup = try manager.buildBackup(context: sourceContext)
+
+        let target = try makeInMemoryContainer()
+        let targetContext = target.mainContext
+        let pet = Pet(name: "Momo", species: "cat")
+        let existingEvent = Event(
+            title: "Existing plan",
+            startDate: Date(timeIntervalSince1970: 1_900_000_000),
+            eventType: EventType.task.rawValue,
+            relatedEntityType: EntityKind.pet.rawValue,
+            relatedEntityId: pet.id.uuidString
+        )
+        existingEvent.id = eventId
+        existingEvent.recurrenceDays = 1
+        let reminder = Reminder(event: existingEvent, scheduledAt: Date(timeIntervalSince1970: 1_900_000_500))
+        reminder.status = ReminderStatus.pending.rawValue
+        reminder.notificationId = "restore-existing-reminder"
+        existingEvent.reminders = [reminder]
+        targetContext.insert(pet)
+        targetContext.insert(existingEvent)
+        targetContext.insert(reminder)
+        try targetContext.save()
+
+        try manager.applyBackup(backup, context: targetContext, projectionManager: nil)
+
+        #expect(existingEvent.title == "Missing pet plan")
+        #expect(existingEvent.isCompleted)
+        #expect(existingEvent.recurrenceDays == 0)
+        #expect(reminder.statusEnum == .skipped)
+        #expect(scheduler.cancelledNotificationIds == ["restore-existing-reminder"])
+        #expect(!MemberLifecycleActiveScheduleResolver.isActiveSchedule(
+            existingEvent,
+            now: Date(timeIntervalSince1970: 1_899_999_000)
+        ))
+    }
+
     @Test func scheduleRehydrateSkipsReminderWithoutResolvedEvent() throws {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
@@ -824,6 +1012,48 @@ struct MemberLifecycleGateTests {
         #expect(!result.inserted)
         #expect(result.plan.disposition == .legacyHistoryOnly)
         #expect(try context.fetch(FetchDescriptor<Reminder>()).isEmpty)
+    }
+
+    @Test func scheduleRehydrateSkipsExistingReminderWhenLinkedEventIsMissing() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let event = Event(title: "Local orphan source", startDate: Date(timeIntervalSince1970: 1_900_000_000))
+        event.recurrenceDays = 1
+        let reminder = Reminder(event: event, scheduledAt: Date(timeIntervalSince1970: 1_900_000_500))
+        reminder.status = ReminderStatus.pending.rawValue
+        reminder.notificationId = "local-orphan-reminder"
+        event.reminders = [reminder]
+        context.insert(event)
+        context.insert(reminder)
+        try context.save()
+        let snapshot = DomainScheduleRehydrateReminderSnapshot(
+            id: reminder.id,
+            scheduledAt: reminder.scheduledAt,
+            status: ReminderStatus.pending.rawValue,
+            notificationId: "remote-orphan-reminder",
+            eventId: UUID(),
+            completedAt: nil,
+            completedBy: "",
+            createdAt: Date(timeIntervalSince1970: 1_800_000_000)
+        )
+
+        let result = try DomainScheduleRehydrateWriter.upsertReminder(
+            snapshot: snapshot,
+            source: .backupRestore,
+            context: context
+        )
+
+        #expect(result.reminder?.id == reminder.id)
+        #expect(!result.inserted)
+        #expect(result.plan.disposition == .legacyHistoryOnly)
+        #expect(event.isCompleted)
+        #expect(event.recurrenceDays == 0)
+        #expect(reminder.statusEnum == .skipped)
+        #expect(result.notificationIdsToCancel == ["local-orphan-reminder"])
+        #expect(!MemberLifecycleActiveScheduleResolver.isActiveSchedule(
+            event,
+            now: Date(timeIntervalSince1970: 1_899_999_000)
+        ))
     }
 
     @Test func domainScheduleResolutionAndAuthorizationCoverIndirectMembers() throws {
@@ -1905,5 +2135,44 @@ struct MemberLifecycleGateTests {
         let schema = Schema(ArkSchemaV72.models)
         let config = ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)
         return try ModelContainer(for: schema, configurations: [config])
+    }
+
+    private final class CapturingReminderNotificationScheduler: ReminderNotificationScheduling, @unchecked Sendable {
+        private(set) var cancelledNotificationIds: [String] = []
+
+        func schedule(reminder _: Reminder) {}
+
+        func schedule(
+            reminder _: Reminder,
+            existingNotificationIds _: Set<String>?,
+            completion: ((ReminderNotificationScheduleResult) -> Void)?
+        ) {
+            completion?(.skippedPastDue)
+        }
+
+        func schedule(
+            reminder _: Reminder,
+            deliveryDate _: Date?,
+            existingNotificationIds _: Set<String>?,
+            completion: ((ReminderNotificationScheduleResult) -> Void)?
+        ) {
+            completion?(.skippedPastDue)
+        }
+
+        func pendingNotificationIds() async -> Set<String> { [] }
+
+        func scheduleRollingWindow(reminders _: [Reminder]) {}
+
+        func refillWindowIfNeeded(allReminders _: [Reminder]) {}
+
+        func cancel(notificationId: String) {
+            cancelledNotificationIds.append(notificationId)
+        }
+
+        func cancelAll(for _: Pet, reminders: [Reminder]) {
+            cancelledNotificationIds.append(contentsOf: reminders.map(\.notificationId))
+        }
+
+        func compensate(reminders _: [Reminder]) {}
     }
 }

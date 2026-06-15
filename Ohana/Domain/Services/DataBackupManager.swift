@@ -295,9 +295,9 @@ final nonisolated class DataBackupManager: @unchecked Sendable {
 
     @MainActor
     func applyBackup(_ backup: OhanaBackup, context: ModelContext, projectionManager: QuestManager?) throws {
-        // 以 UUID 为主键去重：先构建现有 ID 集合，再 upsert
-        let existingEventIds = try existingIds(FetchDescriptor<Event>(), context: context, id: \.id, operation: "fetch existing events before restore")
-        let existingReminderIds = try existingIds(FetchDescriptor<Reminder>(), context: context, id: \.id, operation: "fetch existing reminders before restore")
+        // 以 UUID 为主键去重：先构建现有 ID 集合，再 upsert。
+        // Event/Reminder 不能在 writer 前过滤；rehydrate writer 必须重新解析已有 schedule aggregate。
+        var rehydrateNotificationIdsToCancel: [String] = []
         let existingLedgerIds = try existingIds(FetchDescriptor<CareLedgerEvent>(), context: context, id: \.id, operation: "fetch existing care ledger events before restore")
         let existingSharedCareSessionIds = try existingIds(FetchDescriptor<SharedCareSession>(), context: context, id: \.id, operation: "fetch existing shared care sessions before restore")
         for dto in backup.pets {
@@ -328,21 +328,23 @@ final nonisolated class DataBackupManager: @unchecked Sendable {
                 context: context
             )
         }
-        for dto in backup.events where !existingEventIds.contains(dto.id) {
-            try DomainScheduleRehydrateWriter.upsertEvent(
+        for dto in backup.events {
+            let result = try DomainScheduleRehydrateWriter.upsertEvent(
                 snapshot: decodeEventSnapshot(dto),
                 source: .backupRestore,
                 context: context
             )
+            rehydrateNotificationIdsToCancel.append(contentsOf: result.notificationIdsToCancel)
         }
         try context.save()
 
-        for dto in backup.reminders where !existingReminderIds.contains(dto.id) {
-            try DomainScheduleRehydrateWriter.upsertReminder(
+        for dto in backup.reminders {
+            let result = try DomainScheduleRehydrateWriter.upsertReminder(
                 snapshot: decodeReminderSnapshot(dto),
                 source: .backupRestore,
                 context: context
             )
+            rehydrateNotificationIdsToCancel.append(contentsOf: result.notificationIdsToCancel)
         }
 
         // 日志类通过 rehydrate writer 插入，避免恢复路径绕过 subject/policy 解析。
@@ -624,6 +626,7 @@ final nonisolated class DataBackupManager: @unchecked Sendable {
         }
         try context.save()
         SharedCareSessionMaintenance.cleanLegacyNoteMetadata(context: context)
+        DomainRehydrateEffectsDispatcher.cancelNotifications(rehydrateNotificationIdsToCancel)
 
         // 恢复 UserDefaults appState
         let ud = defaults

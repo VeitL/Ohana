@@ -42,6 +42,23 @@ enum MemberLifecycleGateBadCommandService {
     static func applyBackup(context: ModelContext) {
         context.insert(Pet(name: "Bypass"))
     }
+
+    static func restoreSchedules(backup: OhanaBackup) {
+        let existingEventIds: Set<String> = []
+        for dto in backup.events where !existingEventIds.contains(dto.id) {
+            _ = dto
+        }
+    }
+
+    static func markSkippedCloudApplySynced(result: CloudSyncRecordApplyResult, state: CloudSyncRecordState) {
+        if result == .skippedUnsupported(entityName: "Event") {
+            CloudSyncMetadataService.markSynced(state, ckRecordName: "bad", ckChangeTag: "bad", ckZoneName: "bad")
+        }
+    }
+
+    static func neutralizeExistingReminderRowOnly(existing: Reminder, plan: AuthorizedDomainRehydratePlan) {
+        makeReminderHistoryOnly(existing, plan: plan)
+    }
 }
 
 enum DomainRehydrateDispositionBadFixture {
@@ -53,6 +70,15 @@ enum DomainRehydrateDispositionBadFixture {
         switch self {
         case .normalized, .legacyHistoryOnly, .quarantined:
             true
+        }
+    }
+
+    var requiresHistoryOnlySchedule: Bool {
+        switch self {
+        case .legacyHistoryOnly:
+            true
+        case .normalized, .quarantined:
+            false
         }
     }
 }

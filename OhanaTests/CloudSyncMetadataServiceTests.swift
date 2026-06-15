@@ -2731,6 +2731,101 @@ struct CloudSyncMetadataServiceTests {
     }
 
     @MainActor
+    @Test func recordApplierQuarantinedRemoteEventWithoutLocalRowDoesNotMarkSynced() throws {
+        let container = try makeContainer()
+        let context = ModelContext(container)
+        let householdId = uuid("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")
+        let eventId = uuid("44444444-4444-4444-8444-444444444444")
+        let eventRecord = try makeRecordPayload(
+            entityName: String(describing: Event.self),
+            recordType: String(describing: Event.self),
+            localRecordId: eventId,
+            householdId: householdId,
+            fields: [
+                "title": .string("Unknown remote plan"),
+                "startDate": .date(Date(timeIntervalSinceReferenceDate: 2470)),
+                "isAllDay": .bool(false),
+                "eventType": .string(EventType.task.rawValue),
+                "relatedEntityType": .string("new_remote_member_link"),
+                "relatedEntityId": .string(UUID().uuidString),
+                "recurrenceDays": .int(1),
+                "isCompleted": .bool(false),
+                "createdAt": .date(Date(timeIntervalSinceReferenceDate: 2470))
+            ]
+        ).makeCKRecord()
+
+        let result = try CloudSyncRecordApplier.apply(eventRecord, context: context)
+
+        #expect(result == .skippedUnsupported(entityName: "Event"))
+        #expect(try fetchEvent(id: eventId, context: context) == nil)
+        #expect(try CloudSyncMetadataService.state(
+            entityName: String(describing: Event.self),
+            localRecordId: eventId,
+            context: context
+        ) == nil)
+    }
+
+    @MainActor
+    @Test func recordApplierQuarantinedRemoteEventNeutralizesExistingScheduleAndCancelsReminder() throws {
+        let container = try makeContainer()
+        let context = ModelContext(container)
+        let householdId = uuid("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")
+        let eventId = uuid("44444444-4444-4444-8444-555555555555")
+        let pet = Pet(name: "Momo", species: "cat")
+        let event = Event(
+            title: "Local plan",
+            startDate: Date(timeIntervalSinceReferenceDate: 2470),
+            eventType: EventType.task.rawValue,
+            relatedEntityType: EntityKind.pet.rawValue,
+            relatedEntityId: pet.id.uuidString
+        )
+        event.id = eventId
+        event.recurrenceDays = 1
+        let reminder = Reminder(event: event, scheduledAt: Date(timeIntervalSinceReferenceDate: 2480))
+        reminder.notificationId = "quarantined-remote-reminder"
+        event.reminders = [reminder]
+        context.insert(pet)
+        context.insert(event)
+        context.insert(reminder)
+        try context.save()
+        let scheduler = CapturingReminderNotificationScheduler()
+        OhanaNotifications.current = scheduler
+        defer { OhanaNotifications.useLive() }
+        let eventRecord = try makeRecordPayload(
+            entityName: String(describing: Event.self),
+            recordType: String(describing: Event.self),
+            localRecordId: eventId,
+            householdId: householdId,
+            fields: [
+                "title": .string("Unknown remote plan"),
+                "startDate": .date(Date(timeIntervalSinceReferenceDate: 2470)),
+                "isAllDay": .bool(false),
+                "eventType": .string(EventType.task.rawValue),
+                "relatedEntityType": .string("new_remote_member_link"),
+                "relatedEntityId": .string(UUID().uuidString),
+                "recurrenceDays": .int(1),
+                "isCompleted": .bool(false),
+                "createdAt": .date(Date(timeIntervalSinceReferenceDate: 2470))
+            ]
+        ).makeCKRecord()
+
+        let result = try CloudSyncRecordApplier.apply(eventRecord, context: context)
+
+        #expect(result == .updated(entityName: "Event", localRecordId: normalized(eventId)))
+        #expect(event.relatedEntityType == EntityKind.pet.rawValue)
+        #expect(event.relatedEntityId == pet.id.uuidString)
+        #expect(event.isCompleted)
+        #expect(event.recurrenceDays == 0)
+        #expect(reminder.statusEnum == .skipped)
+        #expect(scheduler.cancelledNotificationIds == ["quarantined-remote-reminder"])
+        #expect(try CloudSyncMetadataService.state(
+            entityName: String(describing: Event.self),
+            localRecordId: eventId,
+            context: context
+        ) != nil)
+    }
+
+    @MainActor
     @Test func cloudSyncAppliedLegacySharedCareRecordsCleanOnceAndUploadCleanPayloads() throws {
         let container = try makeContainer()
         let context = ModelContext(container)

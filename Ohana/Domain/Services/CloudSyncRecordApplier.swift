@@ -47,6 +47,19 @@ nonisolated struct CloudSyncRecordApplySummary: Equatable, Sendable {
     }
 }
 
+private nonisolated struct CloudSyncRecordApplyOutcome {
+    let result: CloudSyncRecordApplyResult
+    let notificationIdsToCancel: [String]
+
+    init(
+        result: CloudSyncRecordApplyResult,
+        notificationIdsToCancel: [String] = []
+    ) {
+        self.result = result
+        self.notificationIdsToCancel = notificationIdsToCancel
+    }
+}
+
 nonisolated enum CloudSyncRecordApplyError: LocalizedError, Equatable {
     case missingLocalRecordId(recordName: String)
     case invalidLocalRecordId(entityName: String, localRecordId: String)
@@ -94,7 +107,11 @@ nonisolated enum CloudSyncRecordApplier {
             return .deleted(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
         }
 
-        let result = try applyLiveRecord(record, metadata: metadata, descriptor: descriptor, context: context)
+        let outcome = try applyLiveRecord(record, metadata: metadata, descriptor: descriptor, context: context)
+        let result = outcome.result
+        if case .skippedUnsupported = result {
+            return result
+        }
         let state = try upsertState(metadata: metadata, record: record, context: context)
         state.isDeleted = false
         state.isDeletionTombstone = false
@@ -107,6 +124,10 @@ nonisolated enum CloudSyncRecordApplier {
             ckZoneName: record.recordID.zoneID.zoneName,
             syncedAt: Date()
         )
+        if !outcome.notificationIdsToCancel.isEmpty {
+            try context.save()
+            DomainRehydrateEffectsDispatcher.cancelNotifications(outcome.notificationIdsToCancel)
+        }
         return result
     }
 
@@ -198,46 +219,46 @@ nonisolated enum CloudSyncRecordApplier {
         metadata: RemoteMetadata,
         descriptor: CloudSyncEntityDescriptor,
         context: ModelContext
-    ) throws -> CloudSyncRecordApplyResult {
+    ) throws -> CloudSyncRecordApplyOutcome {
         switch descriptor.entityName {
         case String(describing: Household.self):
-            try applyHousehold(record, metadata: metadata, context: context)
+            CloudSyncRecordApplyOutcome(result: try applyHousehold(record, metadata: metadata, context: context))
         case String(describing: Pet.self):
-            try applyPet(record, metadata: metadata, context: context)
+            CloudSyncRecordApplyOutcome(result: try applyPet(record, metadata: metadata, context: context))
         case String(describing: Human.self):
-            try applyHuman(record, metadata: metadata, context: context)
+            CloudSyncRecordApplyOutcome(result: try applyHuman(record, metadata: metadata, context: context))
         case String(describing: Event.self):
             try applyEvent(record, metadata: metadata, context: context)
         case String(describing: PetCareLog.self):
-            try applyPetCareLog(record, metadata: metadata, context: context)
+            CloudSyncRecordApplyOutcome(result: try applyPetCareLog(record, metadata: metadata, context: context))
         case String(describing: PetPottyLog.self):
-            try applyPetPottyLog(record, metadata: metadata, context: context)
+            CloudSyncRecordApplyOutcome(result: try applyPetPottyLog(record, metadata: metadata, context: context))
         case String(describing: PetHygieneLog.self):
-            try applyPetHygieneLog(record, metadata: metadata, context: context)
+            CloudSyncRecordApplyOutcome(result: try applyPetHygieneLog(record, metadata: metadata, context: context))
         case String(describing: PetHealthLog.self):
-            try applyPetHealthLog(record, metadata: metadata, context: context)
+            CloudSyncRecordApplyOutcome(result: try applyPetHealthLog(record, metadata: metadata, context: context))
         case String(describing: PetWalkLog.self):
-            try applyPetWalkLog(record, metadata: metadata, context: context)
+            CloudSyncRecordApplyOutcome(result: try applyPetWalkLog(record, metadata: metadata, context: context))
         case String(describing: PetExpenseLog.self):
-            try applyPetExpenseLog(record, metadata: metadata, context: context)
+            CloudSyncRecordApplyOutcome(result: try applyPetExpenseLog(record, metadata: metadata, context: context))
         case String(describing: PetFoodRecord.self):
-            try applyPetFoodRecord(record, metadata: metadata, context: context)
+            CloudSyncRecordApplyOutcome(result: try applyPetFoodRecord(record, metadata: metadata, context: context))
         case String(describing: PetWeightLog.self):
-            try applyPetWeightLog(record, metadata: metadata, context: context)
+            CloudSyncRecordApplyOutcome(result: try applyPetWeightLog(record, metadata: metadata, context: context))
         case String(describing: SharedCareSession.self):
-            try applySharedCareSession(record, metadata: metadata, context: context)
+            CloudSyncRecordApplyOutcome(result: try applySharedCareSession(record, metadata: metadata, context: context))
         case String(describing: CareLedgerEvent.self):
-            try applyCareLedgerEvent(record, metadata: metadata, context: context)
+            CloudSyncRecordApplyOutcome(result: try applyCareLedgerEvent(record, metadata: metadata, context: context))
         case String(describing: CoconutLedgerEntry.self):
-            try applyCoconutLedgerEntry(record, metadata: metadata, context: context)
+            CloudSyncRecordApplyOutcome(result: try applyCoconutLedgerEntry(record, metadata: metadata, context: context))
         case String(describing: GachaOwnedItem.self):
-            try applyGachaOwnedItem(record, metadata: metadata, context: context)
+            CloudSyncRecordApplyOutcome(result: try applyGachaOwnedItem(record, metadata: metadata, context: context))
         case String(describing: GachaDrawLog.self):
-            try applyGachaDrawLog(record, metadata: metadata, context: context)
+            CloudSyncRecordApplyOutcome(result: try applyGachaDrawLog(record, metadata: metadata, context: context))
         case String(describing: ShopPurchaseRecord.self):
-            try applyShopPurchaseRecord(record, metadata: metadata, context: context)
+            CloudSyncRecordApplyOutcome(result: try applyShopPurchaseRecord(record, metadata: metadata, context: context))
         default:
-            .skippedUnsupported(entityName: descriptor.entityName)
+            CloudSyncRecordApplyOutcome(result: .skippedUnsupported(entityName: descriptor.entityName))
         }
     }
 
@@ -368,7 +389,7 @@ nonisolated enum CloudSyncRecordApplier {
         _ record: CKRecord,
         metadata: RemoteMetadata,
         context: ModelContext
-    ) throws -> CloudSyncRecordApplyResult {
+    ) throws -> CloudSyncRecordApplyOutcome {
         let existing = try fetchEvent(id: metadata.localRecordUUID, context: context)
         let snapshot = DomainScheduleRehydrateEventSnapshot(
             id: metadata.localRecordUUID,
@@ -396,11 +417,15 @@ nonisolated enum CloudSyncRecordApplier {
             context: context
         )
         guard result.event != nil else {
-            return .skippedUnsupported(entityName: metadata.entityName)
+            return CloudSyncRecordApplyOutcome(result: .skippedUnsupported(entityName: metadata.entityName))
         }
-        return result.inserted
+        let applyResult: CloudSyncRecordApplyResult = result.inserted
             ? .inserted(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
             : .updated(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
+        return CloudSyncRecordApplyOutcome(
+            result: applyResult,
+            notificationIdsToCancel: result.notificationIdsToCancel
+        )
     }
 
     private static func applyPetCareLog(

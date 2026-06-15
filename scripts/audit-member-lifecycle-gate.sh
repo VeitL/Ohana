@@ -300,6 +300,18 @@ REHYDRATE_QUARANTINE_DENIAL_RE = re.compile(
     r"case\s+\.quarantined(?:\([^)]*\))?\s*:\s*\n\s*false"
 )
 REHYDRATE_HISTORY_SCHEDULE_RE = re.compile(r"\brequiresHistoryOnlySchedule\b")
+REHYDRATE_HISTORY_EXISTING_REMINDERS_RE = re.compile(r"\bevent\.reminders\b")
+REHYDRATE_HISTORY_NOTIFICATION_CLEANUP_RE = re.compile(
+    r"\bnotificationIdsToCancel\b|\bDomainRehydrateEffectsDispatcher\b|\bcancelNotifications\b"
+)
+REHYDRATE_ROW_ONLY_REMINDER_NEUTRALIZE_RE = re.compile(
+    r"\bmakeReminderHistoryOnly\s*\(\s*existing\s*,\s*plan:\s*plan\s*\)"
+)
+REHYDRATE_AGGREGATE_REMINDER_NEUTRALIZE_RE = re.compile(r"\bmakeReminderAggregateHistoryOnly\b")
+REHYDRATE_RESTORE_PREFILTER_RE = re.compile(
+    r"for\s+\w+\s+in\s+backup\.(?:events|reminders)\s+where\s+!existing(?:Event|Reminder)Ids\.contains\s*\("
+)
+REHYDRATE_SKIPPED_MARK_SYNC_GUARD_RE = re.compile(r"case\s+\.skippedUnsupported\s*=\s*result")
 ALLOWED_RAW_SCHEDULE_CONSTRUCTOR_FUNCTIONS = {
     "Ohana/Domain/Services/DomainScheduleWriteKernel.swift": {
         "makeUnpersistedReminder",
@@ -420,6 +432,15 @@ for path in files:
         targets and path_str.startswith("scripts/tests/fixtures/")
     )
     if checks_rehydrate_bypass:
+        for idx, line in enumerate(lines, start=1):
+            if REHYDRATE_RESTORE_PREFILTER_RE.search(line):
+                rehydrate_bypass_warnings.append(
+                    WarningItem(
+                        path_str,
+                        idx,
+                        "DomainRehydrateDisposition restore must not filter existing Event/Reminder before the rehydrate writer",
+                    )
+                )
         for func_name, start_line, body, _ in function_blocks(lines):
             if "member-lifecycle-gate: allow" in body:
                 continue
@@ -449,6 +470,43 @@ for path in files:
                     path_str,
                     1,
                     "DomainRehydrateDisposition.legacyHistoryOnly must be consumed by schedule writers as non-actionable history",
+                )
+            )
+        if ".legacyHistoryOnly" in text and REHYDRATE_HISTORY_SCHEDULE_RE.search(text) and not REHYDRATE_HISTORY_EXISTING_REMINDERS_RE.search(text):
+            rehydrate_bypass_warnings.append(
+                WarningItem(
+                    path_str,
+                    1,
+                    "DomainRehydrateDisposition.legacyHistoryOnly must terminalize existing Event.reminders, not only the Event row",
+                )
+            )
+        if ".legacyHistoryOnly" in text and REHYDRATE_HISTORY_SCHEDULE_RE.search(text) and not REHYDRATE_HISTORY_NOTIFICATION_CLEANUP_RE.search(text):
+            rehydrate_bypass_warnings.append(
+                WarningItem(
+                    path_str,
+                    1,
+                    "DomainRehydrateDisposition.legacyHistoryOnly must surface notification cleanup effects for terminalized reminders",
+                )
+            )
+        if REHYDRATE_ROW_ONLY_REMINDER_NEUTRALIZE_RE.search(text) and not REHYDRATE_AGGREGATE_REMINDER_NEUTRALIZE_RE.search(text):
+            rehydrate_bypass_warnings.append(
+                WarningItem(
+                    path_str,
+                    1,
+                    "Existing orphan/denied Reminder rehydrate must neutralize its owning Event aggregate, not only the Reminder row",
+                )
+            )
+    if (
+        path_str == "Ohana/Domain/Services/CloudSyncRecordApplier.swift"
+        or path_str.startswith("scripts/tests/fixtures/")
+    ):
+        text = "\n".join(lines)
+        if "CloudSyncMetadataService.markSynced" in text and ".skippedUnsupported" in text and not REHYDRATE_SKIPPED_MARK_SYNC_GUARD_RE.search(text):
+            rehydrate_bypass_warnings.append(
+                WarningItem(
+                    path_str,
+                    1,
+                    "DomainRehydrateDisposition skipped/quarantined cloud apply must not be marked synced before a local quarantine/neutralization is materialized",
                 )
             )
 

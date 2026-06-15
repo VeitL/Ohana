@@ -183,6 +183,9 @@ nonisolated enum DomainRehydrateAuthorizer {
         guard let event else {
             return legacyHistoryOnlyPlan(source: source, scope: .rehydrate)
         }
+        if DomainScheduleRehydrateWriter.isHistoryOnlySchedule(event) {
+            return legacyHistoryOnlyPlan(source: source, scope: .rehydrate)
+        }
         return authorize(
             source: source,
             scope: .rehydrate,
@@ -264,12 +267,42 @@ nonisolated struct DomainScheduleRehydrateEventResult {
     let event: Event?
     let inserted: Bool
     let plan: AuthorizedDomainRehydratePlan
+    let notificationIdsToCancel: [String]
 }
 
 nonisolated struct DomainScheduleRehydrateReminderResult {
     let reminder: Reminder?
     let inserted: Bool
     let plan: AuthorizedDomainRehydratePlan
+    let notificationIdsToCancel: [String]
+}
+
+nonisolated enum DomainRehydrateEffectsDispatcher {
+    static func dispatch(
+        event result: DomainScheduleRehydrateEventResult,
+        notifications: ReminderNotificationScheduling = OhanaNotifications.current
+    ) {
+        cancelNotifications(result.notificationIdsToCancel, notifications: notifications)
+    }
+
+    static func dispatch(
+        reminder result: DomainScheduleRehydrateReminderResult,
+        notifications: ReminderNotificationScheduling = OhanaNotifications.current
+    ) {
+        cancelNotifications(result.notificationIdsToCancel, notifications: notifications)
+    }
+
+    static func cancelNotifications(
+        _ notificationIds: [String],
+        notifications: ReminderNotificationScheduling = OhanaNotifications.current
+    ) {
+        var seen: Set<String> = []
+        for notificationId in notificationIds {
+            let trimmed = notificationId.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmed.isEmpty, seen.insert(trimmed).inserted else { continue }
+            notifications.cancel(notificationId: trimmed)
+        }
+    }
 }
 
 nonisolated enum DomainScheduleRehydrateWriter {
@@ -284,16 +317,30 @@ nonisolated enum DomainScheduleRehydrateWriter {
             source: source,
             context: context
         )
-        guard plan.disposition.allowsPersistence else {
-            return DomainScheduleRehydrateEventResult(event: nil, inserted: false, plan: plan)
-        }
 
         let event: Event
         let inserted: Bool
         if let existing = try fetchEvent(id: snapshot.id, context: context) {
             event = existing
             inserted = false
+            if !plan.disposition.allowsPersistence {
+                let notificationIdsToCancel = makeScheduleHistoryOnly(event, plan: plan)
+                return DomainScheduleRehydrateEventResult(
+                    event: event,
+                    inserted: false,
+                    plan: plan,
+                    notificationIdsToCancel: notificationIdsToCancel
+                )
+            }
         } else {
+            guard plan.disposition.allowsPersistence else {
+                return DomainScheduleRehydrateEventResult(
+                    event: nil,
+                    inserted: false,
+                    plan: plan,
+                    notificationIdsToCancel: []
+                )
+            }
             event = Event(
                 title: snapshot.title,
                 startDate: snapshot.startDate,
@@ -308,8 +355,13 @@ nonisolated enum DomainScheduleRehydrateWriter {
             inserted = true
         }
 
-        apply(snapshot: snapshot, to: event, plan: plan)
-        return DomainScheduleRehydrateEventResult(event: event, inserted: inserted, plan: plan)
+        let notificationIdsToCancel = apply(snapshot: snapshot, to: event, plan: plan)
+        return DomainScheduleRehydrateEventResult(
+            event: event,
+            inserted: inserted,
+            plan: plan,
+            notificationIdsToCancel: notificationIdsToCancel
+        )
     }
 
     @discardableResult
@@ -324,16 +376,45 @@ nonisolated enum DomainScheduleRehydrateWriter {
             source: source,
             context: context
         )
+        let existing = try fetchReminder(id: snapshot.id, context: context)
         guard linkedEvent != nil else {
-            return DomainScheduleRehydrateReminderResult(reminder: nil, inserted: false, plan: plan)
+            if let existing {
+                let notificationIdsToCancel = makeReminderAggregateHistoryOnly(existing, plan: plan)
+                return DomainScheduleRehydrateReminderResult(
+                    reminder: existing,
+                    inserted: false,
+                    plan: plan,
+                    notificationIdsToCancel: notificationIdsToCancel
+                )
+            }
+            return DomainScheduleRehydrateReminderResult(
+                reminder: nil,
+                inserted: false,
+                plan: plan,
+                notificationIdsToCancel: []
+            )
         }
         guard plan.disposition.allowsPersistence else {
-            return DomainScheduleRehydrateReminderResult(reminder: nil, inserted: false, plan: plan)
+            if let existing {
+                let notificationIdsToCancel = makeReminderAggregateHistoryOnly(existing, plan: plan)
+                return DomainScheduleRehydrateReminderResult(
+                    reminder: existing,
+                    inserted: false,
+                    plan: plan,
+                    notificationIdsToCancel: notificationIdsToCancel
+                )
+            }
+            return DomainScheduleRehydrateReminderResult(
+                reminder: nil,
+                inserted: false,
+                plan: plan,
+                notificationIdsToCancel: []
+            )
         }
 
         let reminder: Reminder
         let inserted: Bool
-        if let existing = try fetchReminder(id: snapshot.id, context: context) {
+        if let existing {
             reminder = existing
             inserted = false
         } else {
@@ -343,15 +424,20 @@ nonisolated enum DomainScheduleRehydrateWriter {
             inserted = true
         }
 
-        apply(snapshot: snapshot, event: linkedEvent, to: reminder, plan: plan)
-        return DomainScheduleRehydrateReminderResult(reminder: reminder, inserted: inserted, plan: plan)
+        let notificationIdsToCancel = apply(snapshot: snapshot, event: linkedEvent, to: reminder, plan: plan)
+        return DomainScheduleRehydrateReminderResult(
+            reminder: reminder,
+            inserted: inserted,
+            plan: plan,
+            notificationIdsToCancel: notificationIdsToCancel
+        )
     }
 
     private static func apply(
         snapshot: DomainScheduleRehydrateEventSnapshot,
         to event: Event,
         plan: AuthorizedDomainRehydratePlan
-    ) {
+    ) -> [String] {
         plan.consumeAuthorization()
         event.title = snapshot.title
         event.startDate = snapshot.startDate
@@ -360,14 +446,14 @@ nonisolated enum DomainScheduleRehydrateWriter {
         event.eventType = snapshot.eventType
         event.relatedEntityType = snapshot.relatedEntityType
         event.relatedEntityId = snapshot.relatedEntityId
+        let notificationIdsToCancel: [String]
         if plan.disposition.requiresHistoryOnlySchedule {
-            event.recurrenceDays = 0
-            event.recurrenceEndDate = nil
-            event.isCompleted = true
+            notificationIdsToCancel = makeScheduleHistoryOnly(event)
         } else {
             event.recurrenceDays = snapshot.recurrenceDays
             event.recurrenceEndDate = snapshot.recurrenceEndDate
             event.isCompleted = snapshot.isCompleted
+            notificationIdsToCancel = []
         }
         event.completedOccurrences = snapshot.completedOccurrences
         event.createdAt = snapshot.createdAt
@@ -376,6 +462,7 @@ nonisolated enum DomainScheduleRehydrateWriter {
         event.foodKindRaw = snapshot.foodKindRaw
         event.feedAmountGrams = snapshot.feedAmountGrams
         event.feedPlanGroupId = snapshot.feedPlanGroupId
+        return notificationIdsToCancel
     }
 
     private static func apply(
@@ -383,8 +470,11 @@ nonisolated enum DomainScheduleRehydrateWriter {
         event: Event?,
         to reminder: Reminder,
         plan: AuthorizedDomainRehydratePlan
-    ) {
+    ) -> [String] {
         plan.consumeAuthorization()
+        let notificationIdsToCancel = plan.disposition.requiresHistoryOnlySchedule
+            ? cancellableNotificationIds(for: reminder, replacingWith: snapshot.notificationId)
+            : []
         reminder.event = event
         reminder.scheduledAt = snapshot.scheduledAt
         reminder.status = rehydratedReminderStatus(snapshot.status, disposition: plan.disposition)
@@ -392,6 +482,47 @@ nonisolated enum DomainScheduleRehydrateWriter {
         reminder.completedAt = snapshot.completedAt
         reminder.completedBy = snapshot.completedBy
         reminder.createdAt = snapshot.createdAt
+        return notificationIdsToCancel
+    }
+
+    static func isHistoryOnlySchedule(_ event: Event) -> Bool {
+        event.isCompleted && event.recurrenceDays == 0
+    }
+
+    private static func makeScheduleHistoryOnly(
+        _ event: Event,
+        plan: AuthorizedDomainRehydratePlan? = nil
+    ) -> [String] {
+        plan?.consumeAuthorization()
+        event.recurrenceDays = 0
+        event.recurrenceEndDate = nil
+        event.isCompleted = true
+        var notificationIdsToCancel: [String] = []
+        for reminder in event.reminders {
+            notificationIdsToCancel.append(contentsOf: makeReminderHistoryOnly(reminder))
+        }
+        return notificationIdsToCancel
+    }
+
+    private static func makeReminderAggregateHistoryOnly(
+        _ reminder: Reminder,
+        plan: AuthorizedDomainRehydratePlan? = nil
+    ) -> [String] {
+        if let event = reminder.event {
+            return makeScheduleHistoryOnly(event, plan: plan)
+        }
+        return makeReminderHistoryOnly(reminder, plan: plan)
+    }
+
+    private static func makeReminderHistoryOnly(
+        _ reminder: Reminder,
+        plan: AuthorizedDomainRehydratePlan? = nil
+    ) -> [String] {
+        plan?.consumeAuthorization()
+        let notificationIdsToCancel = cancellableNotificationIds(for: reminder)
+        guard !isTerminalReminderStatus(reminder.status) else { return notificationIdsToCancel }
+        reminder.status = ReminderStatus.skipped.rawValue
+        return notificationIdsToCancel
     }
 
     private static func rehydratedReminderStatus(
@@ -399,12 +530,31 @@ nonisolated enum DomainScheduleRehydrateWriter {
         disposition: DomainRehydrateDisposition
     ) -> String {
         guard disposition.requiresHistoryOnlySchedule else { return status }
+        return historyOnlyReminderStatus(status)
+    }
+
+    private static func historyOnlyReminderStatus(_ status: String) -> String {
         switch ReminderStatus(rawValue: status) {
         case .completed, .skipped:
-            return status
+            status
         case .pending, .snoozed, .failed, nil:
-            return ReminderStatus.skipped.rawValue
+            ReminderStatus.skipped.rawValue
         }
+    }
+
+    private static func isTerminalReminderStatus(_ status: String) -> Bool {
+        historyOnlyReminderStatus(status) == status
+    }
+
+    private static func cancellableNotificationIds(
+        for reminder: Reminder,
+        replacingWith replacementNotificationId: String? = nil
+    ) -> [String] {
+        var ids = [reminder.notificationId]
+        if let replacementNotificationId {
+            ids.append(replacementNotificationId)
+        }
+        return ids
     }
 
     private static func fetchEvent(id: UUID, context: ModelContext) throws -> Event? {
