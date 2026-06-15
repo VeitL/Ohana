@@ -91,9 +91,11 @@ assert_scope_floor() {
 fixtures="scripts/tests/fixtures/Views"
 agent_skill_fixtures="scripts/tests/fixtures/AgentSkills"
 architecture_fixture_path="Ohana/Domain/__ArchitectureBoundaryFixture.swift"
+architecture_model_fixture_path="Ohana/Models/__ArchitectureModelBoundaryFixture.swift"
 
 cleanup_architecture_fixture() {
   rm -f "$architecture_fixture_path"
+  rm -f "$architecture_model_fixture_path"
 }
 
 trap cleanup_architecture_fixture EXIT
@@ -137,6 +139,24 @@ if [[ "$status" -ne 0 ]]; then
   fail "scripts/audit-architecture-boundaries.sh ArchitectureBoundariesGood.swift: expected clean exit 0, got $status: $output"
 else
   echo "ok  scripts/audit-architecture-boundaries.sh passes ArchitectureBoundariesGood.swift"
+fi
+cleanup_architecture_fixture
+
+cp "$fixtures/ArchitectureModelBoundariesBad.swift" "$architecture_model_fixture_path"
+run_audit scripts/audit-architecture-boundaries.sh --changed
+if [[ "$status" -ne 1 ]]; then
+  fail "scripts/audit-architecture-boundaries.sh ArchitectureModelBoundariesBad.swift: expected strict exit 1, got $status"
+elif ! grep -qF "[models-presentation-framework-dependency]" <<<"$output"; then
+  fail "scripts/audit-architecture-boundaries.sh ArchitectureModelBoundariesBad.swift: rule [models-presentation-framework-dependency] no longer fires"
+else
+  echo "ok  scripts/audit-architecture-boundaries.sh catches Models presentation dependency rule"
+fi
+cp "$fixtures/ArchitectureModelBoundariesGood.swift" "$architecture_model_fixture_path"
+run_audit scripts/audit-architecture-boundaries.sh --changed
+if [[ "$status" -ne 0 ]]; then
+  fail "scripts/audit-architecture-boundaries.sh ArchitectureModelBoundariesGood.swift: expected clean exit 0, got $status: $output"
+else
+  echo "ok  scripts/audit-architecture-boundaries.sh passes ArchitectureModelBoundariesGood.swift"
 fi
 cleanup_architecture_fixture
 

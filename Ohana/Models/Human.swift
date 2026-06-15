@@ -7,7 +7,6 @@
 
 import Foundation
 import SwiftData
-import SwiftUI
 
 enum HumanPrivateField: String, CaseIterable, Identifiable {
     case weight

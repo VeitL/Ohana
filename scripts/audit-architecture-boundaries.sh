@@ -31,6 +31,7 @@ Purpose:
     implementations; adapters live at feature/app boundaries.
   - Domain services return semantic presentation tokens instead of SwiftUI
     Color/View types.
+  - Models do not import SwiftUI or expose SwiftUI Color/View/Image types.
 USAGE
 }
 
@@ -344,6 +345,26 @@ domain_presentation_framework_dependencies() {
     | rg -v '^Ohana/Models/' || true
 }
 
+models_presentation_framework_dependencies() {
+  local scoped_files=()
+  if [[ "$mode" == "all" ]]; then
+    while IFS= read -r file; do
+      [[ -n "$file" ]] && scoped_files+=("$file")
+    done < <(find Ohana/Models -maxdepth 1 -name '*.swift' | sort)
+  else
+    for file in "${files[@]}"; do
+      case "$file" in
+        Ohana/Models/*.swift)
+          [[ -f "$file" ]] && scoped_files+=("$file")
+          ;;
+      esac
+    done
+  fi
+  [[ ${#scoped_files[@]} -eq 0 ]] && return 0
+  rg -n --with-filename --pcre2 '^\s*import\s+SwiftUI\b|(:|->)\s*(some\s+|any\s+)?(Color|View|Image|LinearGradient)\b|\bsome\s+View\b|\b(Color|Image|LinearGradient)\s*(\.|\()' "${scoped_files[@]}" \
+    | rg -v ':\s*(//|/\*|\*)' || true
+}
+
 record_matches \
   "models-layer-pollution" \
   "Service/manager/executor/support files must not live directly under Ohana/Models." \
@@ -428,6 +449,11 @@ record_matches \
   "domain-presentation-framework-dependency" \
   "Domain services must expose semantic presentation tokens instead of SwiftUI Color/View types; map tokens to SwiftUI at feature/shared presentation boundaries." \
   domain_presentation_framework_dependencies
+
+record_matches \
+  "models-presentation-framework-dependency" \
+  "Models must not import SwiftUI or expose SwiftUI Color/View/Image types; keep persisted/domain data UI-neutral and map presentation tokens at Shared/Feature boundaries." \
+  models_presentation_framework_dependencies
 
 if [[ ! -s "$warnings_file" ]]; then
   echo "Architecture boundaries: passed (${mode})."

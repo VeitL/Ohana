@@ -6,7 +6,6 @@
 
 import Foundation
 import SwiftData
-import SwiftUI
 
 /// 报告类型
 enum HealthReportType: String, Codable, CaseIterable, Identifiable {
@@ -59,15 +58,6 @@ enum ReportConclusion: String, Codable, CaseIterable, Identifiable {
     case critical = "危急"
 
     var id: String { rawValue }
-
-    var color: Color {
-        switch self {
-        case .normal: .goTeal
-        case .attention: .goYellow
-        case .abnormal: .goOrange
-        case .critical: .goRed
-        }
-    }
 
     var emoji: String {
         switch self {

@@ -5,7 +5,6 @@
 
 import Foundation
 import SwiftData
-import SwiftUI
 
 /// 服药频率
 enum MedicationFrequency: String, Codable, CaseIterable, Identifiable {

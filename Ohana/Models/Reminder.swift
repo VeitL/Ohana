@@ -7,7 +7,6 @@
 
 import Foundation
 import SwiftData
-import SwiftUI
 
 enum ReminderStatus: String, Codable {
     case pending

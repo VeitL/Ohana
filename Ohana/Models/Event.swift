@@ -7,7 +7,6 @@
 
 import Foundation
 import SwiftData
-import SwiftUI
 
 // MARK: - Event Types
 enum EventType: String, Codable, CaseIterable, Identifiable {

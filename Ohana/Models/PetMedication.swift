@@ -8,7 +8,6 @@
 
 import Foundation
 import SwiftData
-import SwiftUI
 
 /// 宠物用药频率
 enum PetMedicationFrequency: String, Codable, CaseIterable, Identifiable {

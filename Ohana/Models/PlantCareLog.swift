@@ -7,7 +7,6 @@
 
 import Foundation
 import SwiftData
-import SwiftUI
 
 enum PlantCareType: String, Codable, CaseIterable, Identifiable {
     case watering

@@ -7,7 +7,6 @@
 //
 
 import Foundation
-import SwiftUI
 
 enum PetBondVaultItemKind: String, CaseIterable, Hashable {
     case cardBorder = "card_border"
