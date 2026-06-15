@@ -377,6 +377,12 @@ The repository may include `.codex/skills/ui-ux-pro-max/`, installed from `nextl
 
 Use `ui-ux-pro-max` for broad UX questions, accessibility checks, SwiftUI form/chart/sheet guidance, and product-category inspiration. Then implement through Ohana shared components and verify with `scripts/audit-ui-v4.sh` and `scripts/build-debug-fast.sh`.
 
+## Self-Improving Advisory Skill
+
+The repository may include `.codex/skills/self-improving/`. Treat this skill as an advisory reflection and proposal layer only: it may turn user corrections, failed gates, repeated review misses, or reusable workflows into an improvement proposal, but it must not mutate source, tests, scripts, skills, `AGENTS.md`, or governance docs without explicit user approval.
+
+`AGENTS.md`, current user requests, governance docs, tests, audit scripts, and current source remain higher authority. Self-improving output must prefer concrete evidence, tests, bad/good fixtures, audits, or checklists over vague reminders, and pure review sessions must remain non-mutating.
+
 ## Animation Pattern Memory
 
 Use `docs/open-swiftui-animations-memory.md` and `docs/pow-animation-memory.md` as Ohana's local memory for patterns learned from `amosgyamfi/open-swiftui-animations` and `EmergeTools/Pow`. Treat them as inspiration and implementation guidance, not as vendored source code.

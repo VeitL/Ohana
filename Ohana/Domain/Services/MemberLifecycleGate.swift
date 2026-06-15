@@ -21,6 +21,7 @@ enum MemberLifecycleAction: Equatable {
 }
 
 enum MemberWriteDenialReason: Equatable {
+    case missingMemberTarget
     case memberPassedAway
     case unsupportedWriteKind
 }
@@ -61,6 +62,8 @@ enum MemberWriteDisposition: Equatable {
     )
 
     static let noOp = MemberWriteDisposition.deny(.memberPassedAway)
+
+    static let missingMemberTarget = MemberWriteDisposition.deny(.missingMemberTarget)
 
     nonisolated var isAllowed: Bool {
         if case .allow = self { return true }

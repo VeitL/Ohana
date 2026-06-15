@@ -30,6 +30,18 @@ enum AppPetDetailSheetDestination: Hashable {
     case bondVault
 }
 
+extension AppPetDetailSheetDestination {
+    var isAvailableInMemorialMode: Bool {
+        switch self {
+        case .allFeatures, .basicInfo, .momentHistory, .documents, .achievements, .retention:
+            true
+        case .food, .weight, .expense, .feed, .water, .potty, .litter, .play, .hygiene,
+             .walkSummary, .health, .medication, .bondVault:
+            false
+        }
+    }
+}
+
 struct AppPetDetailSheetRouteContainer: View {
     @Query private var pets: [Pet]
     let destination: AppPetDetailSheetDestination
@@ -67,66 +79,70 @@ struct AppPetDetailSheetRouteContainer: View {
 
     @ViewBuilder
     private func petDestination(for pet: Pet) -> some View {
-        switch destination {
-        case .allFeatures:
-            PetAllFeaturesSheet(
-                pet: pet,
-                onOpenDestination: { destination in
-                    onOpenFeatureDestination?(pet.id, destination)
+        if pet.hasPassedAway && !destination.isAvailableInMemorialMode {
+            PetRouteMissingEntityView(kind: "memorial")
+        } else {
+            switch destination {
+            case .allFeatures:
+                PetAllFeaturesSheet(
+                    pet: pet,
+                    onOpenDestination: { destination in
+                        onOpenFeatureDestination?(pet.id, destination)
+                    }
+                )
+            case .basicInfo:
+                NavigationStack { PetBasicInfoDetailView(pet: pet) }
+            case .food:
+                NavigationStack { PetFoodManagementView(pet: pet) }
+            case .weight:
+                NavigationStack { WeightHistoryView(pet: pet) }
+            case .expense:
+                NavigationStack { ExpenseHistoryView(pet: pet) }
+            case let .feed(opensManualSheet):
+                QuickFeedDetailRouteContainer(
+                    id: pet.id,
+                    onRemove: onDismiss,
+                    onClose: onDismiss,
+                    opensManualSheetOnAppear: opensManualSheet
+                )
+            case .water:
+                QuickWaterDetailRouteContainer(id: pet.id, onRemove: onDismiss, onClose: onDismiss)
+            case .potty:
+                QuickPottyDetailRouteContainer(id: pet.id, onRemove: onDismiss, onClose: onDismiss)
+            case .litter:
+                QuickPottyDetailRouteContainer(id: pet.id, onRemove: onDismiss, onClose: onDismiss)
+            case .play:
+                QuickPlayDetailRouteContainer(id: pet.id, onRemove: onDismiss, onClose: onDismiss)
+            case .hygiene:
+                NavigationStack { PetHygieneDetailView(pet: pet) }
+            case .walkSummary:
+                NavigationStack { WalkSummarySheet(pet: pet) }
+            case let .health(initialSection):
+                NavigationStack {
+                    PetHealthDetailView(
+                        pet: pet,
+                        isModal: true,
+                        initialSection: initialSection
+                    )
                 }
-            )
-        case .basicInfo:
-            NavigationStack { PetBasicInfoDetailView(pet: pet) }
-        case .food:
-            NavigationStack { PetFoodManagementView(pet: pet) }
-        case .weight:
-            NavigationStack { WeightHistoryView(pet: pet) }
-        case .expense:
-            NavigationStack { ExpenseHistoryView(pet: pet) }
-        case let .feed(opensManualSheet):
-            QuickFeedDetailRouteContainer(
-                id: pet.id,
-                onRemove: onDismiss,
-                onClose: onDismiss,
-                opensManualSheetOnAppear: opensManualSheet
-            )
-        case .water:
-            QuickWaterDetailRouteContainer(id: pet.id, onRemove: onDismiss, onClose: onDismiss)
-        case .potty:
-            QuickPottyDetailRouteContainer(id: pet.id, onRemove: onDismiss, onClose: onDismiss)
-        case .litter:
-            QuickPottyDetailRouteContainer(id: pet.id, onRemove: onDismiss, onClose: onDismiss)
-        case .play:
-            QuickPlayDetailRouteContainer(id: pet.id, onRemove: onDismiss, onClose: onDismiss)
-        case .hygiene:
-            NavigationStack { PetHygieneDetailView(pet: pet) }
-        case .walkSummary:
-            NavigationStack { WalkSummarySheet(pet: pet) }
-        case let .health(initialSection):
-            NavigationStack {
-                PetHealthDetailView(
-                    pet: pet,
-                    isModal: true,
-                    initialSection: initialSection
-                )
+            case .medication:
+                NavigationStack { PetMedicationView(pet: pet) }
+            case .momentHistory:
+                PetMomentsHubRouteContainer(pet: pet)
+            case .documents:
+                DocumentsListView(pet: pet, showsCloseButton: true)
+            case .achievements:
+                NavigationStack {
+                    AchievementWallView(
+                        pet: pet,
+                        onPresentCoconutLog: onPresentCoconutLog
+                    )
+                }
+            case .retention:
+                PetRetentionHubView(pet: pet, showsCloseButton: true)
+            case .bondVault:
+                NavigationStack { PetBondVaultView(pet: pet) }
             }
-        case .medication:
-            NavigationStack { PetMedicationView(pet: pet) }
-        case .momentHistory:
-            PetMomentsHubRouteContainer(pet: pet)
-        case .documents:
-            DocumentsListView(pet: pet, showsCloseButton: true)
-        case .achievements:
-            NavigationStack {
-                AchievementWallView(
-                    pet: pet,
-                    onPresentCoconutLog: onPresentCoconutLog
-                )
-            }
-        case .retention:
-            PetRetentionHubView(pet: pet, showsCloseButton: true)
-        case .bondVault:
-            NavigationStack { PetBondVaultView(pet: pet) }
         }
     }
 }

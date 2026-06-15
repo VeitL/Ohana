@@ -123,6 +123,22 @@ struct MemberLifecycleGateTests {
             context: context,
             scheduleNotifications: false
         )
+        let deceasedAssigneePlan = CalendarEventPlanCommandService.createEvent(
+            input: CalendarEventPlanCommandInput(
+                title: "Assigned task",
+                startDate: Date(timeIntervalSince1970: 1_800_000_350),
+                isAllDay: false,
+                eventType: .task,
+                relatedEntityType: "",
+                relatedEntityId: "",
+                recurrenceDays: 0,
+                recurrenceEndDate: nil,
+                reminderLeadMinutes: 30,
+                assigneeId: human.id.uuidString
+            ),
+            context: context,
+            scheduleNotifications: false
+        )
         let hygienePlan = PetHygieneCommandService.createPlan(
             pet: pet,
             type: .brushing,
@@ -141,6 +157,7 @@ struct MemberLifecycleGateTests {
 
         #expect(petPlan == nil)
         #expect(humanPlan == nil)
+        #expect(deceasedAssigneePlan == nil)
         #expect(!hygienePlan.didCreate)
         #expect(try context.fetch(FetchDescriptor<Event>()).isEmpty)
         #expect(try context.fetch(FetchDescriptor<Reminder>()).isEmpty)
@@ -202,6 +219,85 @@ struct MemberLifecycleGateTests {
         #expect(try context.fetch(FetchDescriptor<Reminder>()).isEmpty)
     }
 
+    @Test func missingMemberTargetsCannotCreateCalendarPlans() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let missingPetID = UUID()
+        let missingHumanID = UUID()
+
+        let petPlan = CalendarEventPlanCommandService.createEvent(
+            input: CalendarEventPlanCommandInput(
+                title: "Vet visit",
+                startDate: Date(timeIntervalSince1970: 1_800_000_710),
+                isAllDay: false,
+                eventType: .task,
+                relatedEntityType: EntityKind.pet.rawValue,
+                relatedEntityId: missingPetID.uuidString,
+                recurrenceDays: 0,
+                recurrenceEndDate: nil,
+                reminderLeadMinutes: 30,
+                assigneeId: nil
+            ),
+            context: context,
+            scheduleNotifications: false
+        )
+        let humanPlan = CalendarEventPlanCommandService.createEvent(
+            input: CalendarEventPlanCommandInput(
+                title: "Check in",
+                startDate: Date(timeIntervalSince1970: 1_800_000_720),
+                isAllDay: false,
+                eventType: .task,
+                relatedEntityType: EntityKind.human.rawValue,
+                relatedEntityId: missingHumanID.uuidString,
+                recurrenceDays: 0,
+                recurrenceEndDate: nil,
+                reminderLeadMinutes: 30,
+                assigneeId: nil
+            ),
+            context: context,
+            scheduleNotifications: false
+        )
+        let invalidPetPlan = CalendarEventPlanCommandService.createEvent(
+            input: CalendarEventPlanCommandInput(
+                title: "Bad target",
+                startDate: Date(timeIntervalSince1970: 1_800_000_730),
+                isAllDay: false,
+                eventType: .task,
+                relatedEntityType: EntityKind.pet.rawValue,
+                relatedEntityId: "missing",
+                recurrenceDays: 0,
+                recurrenceEndDate: nil,
+                reminderLeadMinutes: 30,
+                assigneeId: nil
+            ),
+            context: context,
+            scheduleNotifications: false
+        )
+        let missingAssigneePlan = CalendarEventPlanCommandService.createEvent(
+            input: CalendarEventPlanCommandInput(
+                title: "Missing assignee",
+                startDate: Date(timeIntervalSince1970: 1_800_000_740),
+                isAllDay: false,
+                eventType: .task,
+                relatedEntityType: "",
+                relatedEntityId: "",
+                recurrenceDays: 0,
+                recurrenceEndDate: nil,
+                reminderLeadMinutes: 30,
+                assigneeId: missingHumanID.uuidString
+            ),
+            context: context,
+            scheduleNotifications: false
+        )
+
+        #expect(petPlan == nil)
+        #expect(humanPlan == nil)
+        #expect(invalidPetPlan == nil)
+        #expect(missingAssigneePlan == nil)
+        #expect(try context.fetch(FetchDescriptor<Event>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<Reminder>()).isEmpty)
+    }
+
     @Test func deceasedPetCannotWriteDirectFeedingPlansOrStockRecords() throws {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
@@ -244,6 +340,161 @@ struct MemberLifecycleGateTests {
         #expect(try context.fetch(FetchDescriptor<Event>()).isEmpty)
         #expect(try context.fetch(FetchDescriptor<Reminder>()).isEmpty)
         #expect(try context.fetch(FetchDescriptor<PetFoodRecord>()).isEmpty)
+    }
+
+    @Test func deceasedPetCannotWriteWaterOrCarePlanSchedules() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let pet = Pet(name: "Momo", species: "cat")
+        pet.passedAwayDate = Date(timeIntervalSince1970: 1_800_000_114)
+        context.insert(pet)
+        try context.save()
+
+        let now = Date(timeIntervalSince1970: 1_800_001_300)
+        _ = WaterPlanWriter.replacePlan(
+            pet: pet,
+            times: [now],
+            allEvents: [],
+            context: context,
+            now: now
+        )
+        CarePlanCalendarSync.syncWaterChangePlan(
+            pet: pet,
+            context: context,
+            intervalDays: 7,
+            enabled: true,
+            cycleAnchor: now
+        )
+        CarePlanCalendarSync.syncFilterPlan(
+            pet: pet,
+            context: context,
+            cleanIntervalDays: 7,
+            replaceIntervalDays: 30,
+            enabled: true
+        )
+        CarePlanCalendarSync.syncScoopPlan(
+            pet: pet,
+            context: context,
+            intervalDays: 1,
+            enabled: true,
+            anchor: now
+        )
+        CarePlanCalendarSync.syncPlayPlan(
+            pet: pet,
+            context: context,
+            intervalDays: 3,
+            enabled: true,
+            anchor: now
+        )
+
+        #expect(try context.fetch(FetchDescriptor<Event>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<Reminder>()).isEmpty)
+    }
+
+    @Test func markingPetPassedAwayRemovesFutureActiveSchedules() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let pet = Pet(name: "Momo", species: "cat")
+        let otherPet = Pet(name: "Nori", species: "cat")
+        let passDate = Date(timeIntervalSince1970: 1_800_001_400)
+        let future = passDate.addingTimeInterval(3600)
+        let past = passDate.addingTimeInterval(-3600)
+        let futureEvent = Event(
+            title: "Future care",
+            startDate: future,
+            eventType: EventType.daily.rawValue,
+            relatedEntityType: EntityKind.pet.rawValue,
+            relatedEntityId: pet.id.uuidString
+        )
+        let pastEvent = Event(
+            title: "Past care",
+            startDate: past,
+            eventType: EventType.daily.rawValue,
+            relatedEntityType: EntityKind.pet.rawValue,
+            relatedEntityId: pet.id.uuidString
+        )
+        let otherFutureEvent = Event(
+            title: "Other future care",
+            startDate: future,
+            eventType: EventType.daily.rawValue,
+            relatedEntityType: EntityKind.pet.rawValue,
+            relatedEntityId: otherPet.id.uuidString
+        )
+        let futureReminder = Reminder(event: futureEvent, scheduledAt: future)
+        let pastReminder = Reminder(event: pastEvent, scheduledAt: past)
+        let otherFutureReminder = Reminder(event: otherFutureEvent, scheduledAt: future)
+        let futureEventID = futureEvent.id
+        let pastEventID = pastEvent.id
+        let otherFutureEventID = otherFutureEvent.id
+        let futureReminderID = futureReminder.id
+        let pastReminderID = pastReminder.id
+        let otherFutureReminderID = otherFutureReminder.id
+        context.insert(pet)
+        context.insert(otherPet)
+        context.insert(futureEvent)
+        context.insert(pastEvent)
+        context.insert(otherFutureEvent)
+        context.insert(futureReminder)
+        context.insert(pastReminder)
+        context.insert(otherFutureReminder)
+        try context.save()
+
+        _ = MemberLifecycleCommandService.markPetPassedAway(pet, date: passDate, context: context)
+
+        let events = try context.fetch(FetchDescriptor<Event>())
+        let reminders = try context.fetch(FetchDescriptor<Reminder>())
+        #expect(pet.passedAwayDate == passDate)
+        #expect(!events.contains { $0.id == futureEventID })
+        #expect(!reminders.contains { $0.id == futureReminderID })
+        #expect(events.contains { $0.id == pastEventID })
+        #expect(reminders.contains { $0.id == pastReminderID })
+        #expect(events.contains { $0.id == otherFutureEventID })
+        #expect(reminders.contains { $0.id == otherFutureReminderID })
+    }
+
+    @Test func deceasedPetCannotWriteWalkGoalOrSummary() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let pet = Pet(name: "Momo", species: "dog")
+        pet.passedAwayDate = Date(timeIntervalSince1970: 1_800_000_115)
+        pet.weeklyWalkGoalKm = 2
+        let walk = PetWalkLog(startDate: Date(timeIntervalSince1970: 1_800_001_500), pet: pet)
+        context.insert(pet)
+        context.insert(walk)
+        try context.save()
+
+        let goal = PetWalkCommandService.saveWeeklyGoal(8, for: pet, context: context)
+        let summary = PetWalkCommandService.saveSummary(
+            for: walk,
+            pet: pet,
+            moodRating: 5,
+            notes: "still active",
+            context: context
+        )
+
+        #expect(goal.didWrite == false)
+        #expect(goal.goalKm == 2)
+        #expect(summary.didWrite == false)
+        #expect(walk.moodRating == 0)
+        #expect(walk.behaviorNotes == nil)
+        #expect(try context.fetch(FetchDescriptor<CloudSyncRecordState>()).isEmpty)
+    }
+
+    @Test func deceasedFeatureHubsExposeOnlyMemorialSafeDestinations() {
+        #expect(PetAllFeatureDestination.moments.isAvailableInMemorialMode)
+        #expect(PetAllFeatureDestination.documents.isAvailableInMemorialMode)
+        #expect(PetAllFeatureDestination.retention.isAvailableInMemorialMode)
+        #expect(!PetAllFeatureDestination.food.isAvailableInMemorialMode)
+        #expect(!PetAllFeatureDestination.health.isAvailableInMemorialMode)
+        #expect(!PetAllFeatureDestination.walks.isAvailableInMemorialMode)
+        #expect(!PetAllFeatureDestination.bondVault.isAvailableInMemorialMode)
+
+        #expect(HumanAllFeatureDestination.basicInfo.isAvailableInMemorialMode)
+        #expect(HumanAllFeatureDestination.notes.isAvailableInMemorialMode)
+        #expect(!HumanAllFeatureDestination.medication.isAvailableInMemorialMode)
+        #expect(!HumanAllFeatureDestination.weight.isAvailableInMemorialMode)
+        #expect(!HumanAllFeatureDestination.expense.isAvailableInMemorialMode)
+        #expect(!HumanAllFeatureDestination.wishlist.isAvailableInMemorialMode)
     }
 
     @Test func deceasedPetCannotDeleteOrUndoCareFacts() throws {

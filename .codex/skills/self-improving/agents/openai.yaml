@@ -1,0 +1,4 @@
+interface:
+  display_name: "Self-Improving"
+  short_description: "Turn failures into approved, testable agent improvements"
+  default_prompt: "Use $self-improving to turn this failure into an evidence-backed improvement proposal."

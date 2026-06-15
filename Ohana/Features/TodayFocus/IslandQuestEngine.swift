@@ -253,7 +253,10 @@ nonisolated enum IslandQuestEngine {
         }
 
         // ── 今日提醒（仅在有真实提醒时显示）
-        let todayReminders = reminders.filter { cal.isDate($0.scheduledAt, inSameDayAs: now) }
+        let todayReminders = reminders.filter {
+            cal.isDate($0.scheduledAt, inSameDayAs: now) &&
+                reminderTargetsActiveMember($0, activePets: activePets, activeHumans: activeHumans)
+        }
         if quests.count < maxQuests, !todayReminders.isEmpty {
             let allDone = todayReminders.allSatisfy(\.isCompleted)
             let pending = todayReminders.count(where: { !$0.isCompleted })
@@ -983,6 +986,32 @@ nonisolated enum IslandQuestEngine {
             return localized(zh: "家人", en: "Family")
         }
         return human.name.isEmpty ? localized(zh: "家人", en: "Family") : human.name
+    }
+
+    private static func reminderTargetsActiveMember(
+        _ reminder: Reminder,
+        activePets: [Pet],
+        activeHumans: [Human]
+    ) -> Bool {
+        guard let event = reminder.event else { return true }
+        let entityType = event.relatedEntityType.lowercased()
+        let petEntityTypes = [
+            EntityKind.pet.rawValue.lowercased(),
+            "pet",
+            "pet_food_stock",
+            FeedRuleMetadata.autoFeederEntityType.lowercased(),
+            WaterPlanWriter.entityType.lowercased()
+        ]
+        if petEntityTypes.contains(entityType) {
+            return activePets.contains { $0.id.uuidString == event.relatedEntityId }
+        }
+        if entityType == EntityKind.human.rawValue.lowercased() || entityType == "human" || entityType == "human_note" {
+            return activeHumans.contains { $0.id.uuidString == event.relatedEntityId }
+        }
+        if let assigneeId = event.assigneeId {
+            return activeHumans.contains { $0.id.uuidString == assigneeId }
+        }
+        return true
     }
 
     private static func relativeTime(from date: Date, to now: Date, calendar: Calendar) -> String {

@@ -16,6 +16,9 @@ enum MemberLifecycleCommandService {
         date: Date,
         context: ModelContext
     ) -> MemberLifecycleCommandResult {
+        guard MemberLifecycleGate.disposition(pet: pet, writeKind: .lifecycle(.markPassedAway)).isAllowed else {
+            return MemberLifecycleCommandResult(entityID: pet.id, kind: EntityKind.pet.rawValue, action: "no-op")
+        }
         RainbowBridgeService().markPassedAway(pet: pet, date: date, context: context)
         CloudSyncMutationRecorder.markModified(pet, context: context, modifiedAt: date)
         context.safeSave()
@@ -32,6 +35,9 @@ enum MemberLifecycleCommandService {
         _ pet: Pet,
         context: ModelContext
     ) -> MemberLifecycleCommandResult {
+        guard MemberLifecycleGate.disposition(pet: pet, writeKind: .lifecycle(.undoPassedAway)).isAllowed else {
+            return MemberLifecycleCommandResult(entityID: pet.id, kind: EntityKind.pet.rawValue, action: "no-op")
+        }
         RainbowBridgeService().undoPassedAway(pet: pet, context: context)
         CloudSyncMutationRecorder.markModified(pet, context: context)
         context.safeSave()
@@ -76,7 +82,11 @@ enum MemberLifecycleCommandService {
         date: Date,
         context: ModelContext
     ) -> MemberLifecycleCommandResult {
+        guard MemberLifecycleGate.disposition(human: human, writeKind: .lifecycle(.markPassedAway)).isAllowed else {
+            return MemberLifecycleCommandResult(entityID: human.id, kind: EntityKind.human.rawValue, action: "no-op")
+        }
         human.passedAwayDate = date
+        MemberLifecycleActiveScheduleCleanup.removeFutureSchedules(for: human, passedAwayAt: date, context: context)
         CloudSyncMutationRecorder.markModified(human, context: context, modifiedAt: date)
         context.safeSave()
         return MemberLifecycleCommandResult(
@@ -92,6 +102,9 @@ enum MemberLifecycleCommandService {
         _ human: Human,
         context: ModelContext
     ) -> MemberLifecycleCommandResult {
+        guard MemberLifecycleGate.disposition(human: human, writeKind: .lifecycle(.undoPassedAway)).isAllowed else {
+            return MemberLifecycleCommandResult(entityID: human.id, kind: EntityKind.human.rawValue, action: "no-op")
+        }
         human.passedAwayDate = nil
         CloudSyncMutationRecorder.markModified(human, context: context)
         context.safeSave()
@@ -139,10 +152,13 @@ enum PetWalkCommandService {
         for pet: Pet,
         context: ModelContext
     ) -> PetWalkGoalCommandResult {
+        guard MemberWritePolicy.disposition(pet: pet, intent: .activeOnly).allowsCareFactWrite else {
+            return PetWalkGoalCommandResult(petID: pet.id, goalKm: pet.weeklyWalkGoalKm, didWrite: false)
+        }
         pet.weeklyWalkGoalKm = max(0, goalKm)
         CloudSyncMutationRecorder.markModified(pet, context: context)
         context.safeSave()
-        return PetWalkGoalCommandResult(petID: pet.id, goalKm: pet.weeklyWalkGoalKm)
+        return PetWalkGoalCommandResult(petID: pet.id, goalKm: pet.weeklyWalkGoalKm, didWrite: true)
     }
 
     @discardableResult
@@ -154,6 +170,15 @@ enum PetWalkCommandService {
         notes: String,
         context: ModelContext
     ) -> PetWalkSummaryCommandResult {
+        guard MemberWritePolicy.disposition(pet: pet, intent: .activeOnly).allowsCareFactWrite else {
+            return PetWalkSummaryCommandResult(
+                petID: pet.id,
+                walkID: walk.id,
+                moodRating: walk.moodRating,
+                hasNotes: !(walk.behaviorNotes ?? "").isEmpty,
+                didWrite: false
+            )
+        }
         let normalizedRating = min(5, max(0, moodRating))
         let trimmedNotes = notes.trimmingCharacters(in: .whitespacesAndNewlines)
         walk.moodRating = normalizedRating
@@ -164,7 +189,8 @@ enum PetWalkCommandService {
             petID: pet.id,
             walkID: walk.id,
             moodRating: normalizedRating,
-            hasNotes: !trimmedNotes.isEmpty
+            hasNotes: !trimmedNotes.isEmpty,
+            didWrite: true
         )
     }
 }
@@ -198,7 +224,9 @@ struct PetWalkCommandExecutor {
         note: String
     ) -> PetWalkGoalCommandResult {
         let result = PetWalkCommandService.saveWeeklyGoal(goalKm, for: pet, context: context)
-        revisions.publishPetWalkGoal(result, note: note)
+        if result.didWrite {
+            revisions.publishPetWalkGoal(result, note: note)
+        }
         return result
     }
 
@@ -217,7 +245,9 @@ struct PetWalkCommandExecutor {
             notes: notes,
             context: context
         )
-        revisions.publishPetWalkSummary(result, note: note)
+        if result.didWrite {
+            revisions.publishPetWalkSummary(result, note: note)
+        }
         return result
     }
 }

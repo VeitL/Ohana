@@ -220,6 +220,10 @@ enum WaterPlanWriter {
         now: Date = Date(),
         calendar: Calendar = .current
     ) -> [Reminder] {
+        guard canWriteActiveWaterPlan(for: pet) else {
+            deletePlan(pet: pet, allEvents: allEvents, context: context)
+            return []
+        }
         CarePlanCalendarSync.suppressDefaultPlan(kind: "drink", pet: pet, context: context)
         deletePlan(pet: pet, allEvents: allEvents, context: context, save: false)
 
@@ -293,6 +297,10 @@ enum WaterPlanWriter {
         now: Date = Date(),
         calendar: Calendar = .current
     ) -> [Reminder] {
+        guard canWriteActiveWaterPlan(for: pet) else {
+            deletePlan(pet: pet, allEvents: allEvents, context: context)
+            return []
+        }
         var created: [Reminder] = []
         for event in planEvents(pet: pet, allEvents: allEvents) {
             created.append(contentsOf: createUpcomingReminders(for: event, context: context, now: now, calendar: calendar))
@@ -324,6 +332,10 @@ enum WaterPlanWriter {
         }
         CloudSyncMutationRecorder.markDeleted(event, context: context)
         context.delete(event)
+    }
+
+    private static func canWriteActiveWaterPlan(for pet: Pet) -> Bool {
+        MemberWritePolicy.disposition(pet: pet, intent: .activeOnly).allowsDerivedEffects
     }
 
     @MainActor

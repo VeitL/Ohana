@@ -127,22 +127,48 @@ enum CalendarEventPlanCommandService {
         for input: CalendarEventPlanCommandInput,
         context: ModelContext
     ) -> MemberWriteDisposition {
-        guard let id = UUID(uuidString: input.relatedEntityId) else {
-            return .activeWritable
-        }
+        let relatedDisposition = relatedEntityDisposition(for: input, context: context)
+        guard relatedDisposition.allowsDerivedEffects else { return relatedDisposition }
+        return assigneeDisposition(assigneeId: input.assigneeId, context: context)
+    }
+
+    @MainActor
+    private static func relatedEntityDisposition(
+        for input: CalendarEventPlanCommandInput,
+        context: ModelContext
+    ) -> MemberWriteDisposition {
         if input.relatedEntityType == EntityKind.pet.rawValue || input.relatedEntityType == "pet" {
+            guard let id = UUID(uuidString: input.relatedEntityId) else {
+                return .missingMemberTarget
+            }
             guard let pet = fetchPet(id: id, context: context) else {
-                return .activeWritable
+                return .missingMemberTarget
             }
             return MemberLifecycleGate.disposition(pet: pet, writeKind: .care)
         }
         if input.relatedEntityType == EntityKind.human.rawValue || input.relatedEntityType == "human" {
+            guard let id = UUID(uuidString: input.relatedEntityId) else {
+                return .missingMemberTarget
+            }
             guard let human = fetchHuman(id: id, context: context) else {
-                return .activeWritable
+                return .missingMemberTarget
             }
             return MemberLifecycleGate.disposition(human: human, writeKind: .care)
         }
         return .activeWritable
+    }
+
+    @MainActor
+    private static func assigneeDisposition(
+        assigneeId: String?,
+        context: ModelContext
+    ) -> MemberWriteDisposition {
+        guard let assigneeId, !assigneeId.isEmpty else { return .activeWritable }
+        guard let id = UUID(uuidString: assigneeId),
+              let human = fetchHuman(id: id, context: context) else {
+            return .missingMemberTarget
+        }
+        return MemberLifecycleGate.disposition(human: human, writeKind: .care)
     }
 
     @MainActor

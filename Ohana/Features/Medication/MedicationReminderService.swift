@@ -116,6 +116,10 @@ final class MedicationReminderService {
     // MARK: - 调度单个宠物的用药通知（覆盖替换）
 
     func scheduleMedicationReminders(for pet: Pet, context: ModelContext? = nil) {
+        guard MemberWritePolicy.disposition(pet: pet, intent: .activeOnly).allowsDerivedEffects else {
+            cancelMedicationReminders(for: pet.id)
+            return
+        }
         let meds = pet.medications.filter(\.isActiveToday)
 
         // 先移除该宠物旧的用药通知
@@ -268,9 +272,14 @@ final class MedicationReminderService {
     // MARK: - 取消某只宠物所有用药通知
 
     func cancelMedicationReminders(for petId: UUID) {
-        let prefix = "medreminder_\(petId.uuidString)"
+        let prefixes = [
+            "medreminder_\(petId.uuidString)",
+            "medend_\(petId.uuidString)"
+        ]
         center.getPendingNotificationRequests { requests in
-            let ids = requests.map(\.identifier).filter { $0.hasPrefix(prefix) }
+            let ids = requests
+                .map(\.identifier)
+                .filter { identifier in prefixes.contains { identifier.hasPrefix($0) } }
             self.center.removePendingNotificationRequests(withIdentifiers: ids)
         }
     }
@@ -278,6 +287,10 @@ final class MedicationReminderService {
     // MARK: - 调度单个人的用药通知
 
     func scheduleHumanMedicationReminders(for human: Human, meds: [HumanMedication], context: ModelContext? = nil) {
+        guard MemberWritePolicy.disposition(human: human, intent: .activeOnly).allowsDerivedEffects else {
+            cancelHumanMedicationReminders(for: human.id)
+            return
+        }
         let prefix = "humanmedreminder_\(human.id.uuidString)"
         center.getPendingNotificationRequests { requests in
             let ids = requests

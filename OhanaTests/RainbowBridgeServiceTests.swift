@@ -5,7 +5,7 @@ import Testing
 
 @MainActor
 struct RainbowBridgeServiceTests {
-    @Test func markPassedAwayKeepsExistingPlansReadOnlyWithoutDerivedSuppression() throws {
+    @Test func markPassedAwayRemovesFutureSchedulesAndKeepsHistoryReadOnly() throws {
         let container = try makeContainer()
         let context = ModelContext(container)
         let now = Date()
@@ -59,19 +59,17 @@ struct RainbowBridgeServiceTests {
         let events = try context.fetch(FetchDescriptor<Event>())
         let reminders = try context.fetch(FetchDescriptor<Reminder>())
         #expect(pet.passedAwayDate == now)
-        #expect(events.contains { $0.id == futureEventID })
+        #expect(!events.contains { $0.id == futureEventID })
         #expect(events.contains { $0.id == pastEventID })
         #expect(events.contains { $0.id == otherFutureEventID })
-        #expect(reminders.contains { $0.id == futureReminderID })
-        #expect(reminders.first { $0.id == futureReminderID }?.statusEnum == .pending)
-        #expect(reminders.first { $0.id == futureReminderID }?.completedBy.isEmpty == true)
+        #expect(!reminders.contains { $0.id == futureReminderID })
         #expect(reminders.contains { $0.id == pastReminderID })
         #expect(reminders.contains { $0.id == otherFutureReminderID })
         #expect(reminders.first { $0.id == pastReminderID }?.statusEnum == .pending)
         #expect(reminders.first { $0.id == otherFutureReminderID }?.statusEnum == .pending)
     }
 
-    @Test func undoPassedAwayOnlyClearsLifecycleField() throws {
+    @Test func undoPassedAwayClearsLifecycleFieldWithoutRestoringFutureSchedules() throws {
         let container = try makeContainer()
         let context = ModelContext(container)
         let now = Date()
@@ -85,6 +83,8 @@ struct RainbowBridgeServiceTests {
             relatedEntityId: pet.id.uuidString
         )
         let memorialReminder = Reminder(event: event, scheduledAt: future)
+        let eventID = event.id
+        let reminderID = memorialReminder.id
         let userSkippedEvent = Event(
             title: "User skipped future vet",
             startDate: future.addingTimeInterval(7200),
@@ -95,6 +95,8 @@ struct RainbowBridgeServiceTests {
         let userSkippedReminder = Reminder(event: userSkippedEvent, scheduledAt: future.addingTimeInterval(7200))
         userSkippedReminder.statusEnum = .skipped
         userSkippedReminder.completedBy = "human-1"
+        let skippedEventID = userSkippedEvent.id
+        let skippedReminderID = userSkippedReminder.id
 
         context.insert(pet)
         context.insert(event)
@@ -106,14 +108,13 @@ struct RainbowBridgeServiceTests {
         RainbowBridgeService().markPassedAway(pet: pet, date: now, context: context)
         RainbowBridgeService().undoPassedAway(pet: pet, context: context)
 
+        let events = try context.fetch(FetchDescriptor<Event>())
+        let reminders = try context.fetch(FetchDescriptor<Reminder>())
         #expect(pet.passedAwayDate == nil)
-        #expect(event.title == "Future vet")
-        #expect(memorialReminder.statusEnum == .pending)
-        #expect(memorialReminder.completedBy.isEmpty)
-        #expect(memorialReminder.completedAt == nil)
-        #expect(userSkippedEvent.title == "User skipped future vet")
-        #expect(userSkippedReminder.statusEnum == .skipped)
-        #expect(userSkippedReminder.completedBy == "human-1")
+        #expect(!events.contains { $0.id == eventID })
+        #expect(!reminders.contains { $0.id == reminderID })
+        #expect(!events.contains { $0.id == skippedEventID })
+        #expect(!reminders.contains { $0.id == skippedReminderID })
     }
 
     @Test func deceasedHumanDoesNotReceiveEconomyRewards() throws {
@@ -148,7 +149,7 @@ struct RainbowBridgeServiceTests {
     }
 
     private func makeContainer() throws -> ModelContainer {
-        let schema = Schema(ArkSchemaV71.models)
+        let schema = Schema(ArkSchemaV72.models)
         let config = ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)
         return try ModelContainer(for: schema, configurations: [config])
     }

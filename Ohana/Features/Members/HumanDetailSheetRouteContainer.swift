@@ -21,6 +21,17 @@ enum AppHumanDetailSheetDestination: Hashable {
     case note
 }
 
+extension AppHumanDetailSheetDestination {
+    var isAvailableInMemorialMode: Bool {
+        switch self {
+        case .basicInfo, .note:
+            true
+        case .medication, .weight, .workout, .workoutDashboard, .metrics, .report, .expense, .wishlist:
+            false
+        }
+    }
+}
+
 struct HumanAllFeaturesRouteContainer: View {
     @Query private var humans: [Human]
     @Query private var allMeds: [HumanMedication]
@@ -71,6 +82,9 @@ struct HumanAllFeaturesRouteContainer: View {
                 allReports: allReports,
                 allExpenses: allExpenses,
                 onOpenDestination: { destination in
+                    guard !human.hasPassedAway || destination.isAvailableInMemorialMode else {
+                        return
+                    }
                     onOpenDestination(human.id, destination)
                 }
             )
@@ -112,35 +126,39 @@ struct AppHumanDetailSheetRouteContainer: View {
 
     @ViewBuilder
     private func humanDestination(for human: Human) -> some View {
-        switch destination {
-        case .basicInfo:
-            NavigationStack { HumanBasicInfoDetailView(human: human) }
-        case .medication:
-            NavigationStack {
-                HumanMedicationView(
-                    human: human,
-                    showsDoneButton: true,
-                    onDoseTaken: {
-                        onHumanDoseTaken(human.id)
-                    }
-                )
+        if human.hasPassedAway && !destination.isAvailableInMemorialMode {
+            HumanRouteMissingEntityView(kind: "memorial")
+        } else {
+            switch destination {
+            case .basicInfo:
+                NavigationStack { HumanBasicInfoDetailView(human: human) }
+            case .medication:
+                NavigationStack {
+                    HumanMedicationView(
+                        human: human,
+                        showsDoneButton: true,
+                        onDoseTaken: {
+                            onHumanDoseTaken(human.id)
+                        }
+                    )
+                }
+            case .weight:
+                NavigationStack { HumanWeightHistoryView(human: human) }
+            case .workout:
+                HumanWorkoutHistoryView(human: human)
+            case .workoutDashboard:
+                CoHealthDashboardFullView(human: human)
+            case .metrics:
+                HumanHealthCheckupView(human: human)
+            case .report:
+                HumanHealthReportView(human: human)
+            case .expense:
+                NavigationStack { HumanExpenseDetailView(human: human) }
+            case .wishlist:
+                HumanWishlistView(human: human)
+            case .note:
+                HumanNoteHistorySheet(human: human)
             }
-        case .weight:
-            NavigationStack { HumanWeightHistoryView(human: human) }
-        case .workout:
-            HumanWorkoutHistoryView(human: human)
-        case .workoutDashboard:
-            CoHealthDashboardFullView(human: human)
-        case .metrics:
-            HumanHealthCheckupView(human: human)
-        case .report:
-            HumanHealthReportView(human: human)
-        case .expense:
-            NavigationStack { HumanExpenseDetailView(human: human) }
-        case .wishlist:
-            HumanWishlistView(human: human)
-        case .note:
-            HumanNoteHistorySheet(human: human)
         }
     }
 }

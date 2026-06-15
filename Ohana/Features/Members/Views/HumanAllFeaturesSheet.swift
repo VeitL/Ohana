@@ -53,6 +53,15 @@ extension HumanAllFeatureDestination: Identifiable {
             .note
         }
     }
+
+    var isAvailableInMemorialMode: Bool {
+        switch self {
+        case .basicInfo, .notes:
+            true
+        case .weight, .workout, .metrics, .medication, .report, .expense, .wishlist:
+            false
+        }
+    }
 }
 
 struct HumanAllFeaturesSheet: View {
@@ -122,7 +131,7 @@ struct HumanAllFeaturesSheet: View {
 
                 FeatureHubMetricStrip(metrics: metrics)
 
-                ForEach(sections) { section in
+                ForEach(visibleSections) { section in
                     FeatureHubSectionActionView(section: section) { destination in
                         open(destination)
                     }
@@ -185,6 +194,9 @@ struct HumanAllFeaturesSheet: View {
     }
 
     private func open(_ destination: HumanAllFeatureDestination) {
+        guard !human.hasPassedAway || destination.isAvailableInMemorialMode else {
+            return
+        }
         if let field = destination.privacyField,
            appServices.privacy.isLocked(field, for: human, viewedBy: activeHumanId) {
             lockedField = field
@@ -233,6 +245,20 @@ struct HumanAllFeaturesSheet: View {
                 value: lockedValue(.expense, visible: monthlyExpenseText)
             )
         ]
+    }
+
+    private var visibleSections: [FeatureHubSectionData<HumanAllFeatureDestination>] {
+        guard human.hasPassedAway else { return sections }
+        return sections.compactMap { section in
+            let items = section.items.filter(\.destination.isAvailableInMemorialMode)
+            guard !items.isEmpty else { return nil }
+            return FeatureHubSectionData(
+                id: section.id,
+                title: section.title,
+                subtitle: section.subtitle,
+                items: items
+            )
+        }
     }
 
     private var sections: [FeatureHubSectionData<HumanAllFeatureDestination>] {

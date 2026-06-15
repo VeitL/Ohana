@@ -79,7 +79,7 @@ struct PetBasicInfoDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                if isEditing {
+                if isEditing, !pet.hasPassedAway {
                     Button {
                         saveChanges()
                         withAnimation { isEditing = false }
@@ -88,7 +88,7 @@ struct PetBasicInfoDetailView: View {
                             .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(Color.goPrimary)
                     }
-                } else {
+                } else if !pet.hasPassedAway {
                     Button {
                         loadEditState()
                         withAnimation { isEditing = true }
@@ -104,6 +104,11 @@ struct PetBasicInfoDetailView: View {
                 ToolbarItem(placement: .topBarLeading) {
                     Button("取消") { withAnimation { isEditing = false } }
                 }
+            }
+        }
+        .onChange(of: pet.hasPassedAway) { _, hasPassedAway in
+            if hasPassedAway {
+                isEditing = false
             }
         }
     }

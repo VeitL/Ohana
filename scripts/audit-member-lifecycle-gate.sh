@@ -145,12 +145,19 @@ def allowed_line(line: str) -> bool:
 DIRECT_GATE_RE = re.compile(
     r"\b(?:guard|if)\b.*(?:hasPassedAway|passedAwayDate\s*(?:==|!=|<|>|<=|>=))"
 )
-FUNC_DECL_RE = re.compile(r"\b(?:static\s+)?func\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(")
+FUNC_DECL_RE = re.compile(
+    r"\b(?:(?P<privacy>private|fileprivate)\s+)?(?:static\s+)?func\s+(?P<name>[A-Za-z_][A-Za-z0-9_]*)\s*\("
+)
 MEMBER_PARAM_RE = re.compile(r"\b(?:pet|human)\s*:\s*(?:Pet|Human)\b")
 WRITE_EFFECT_RE = re.compile(
     r"\bcontext\.(?:insert|delete|safeSave)\b"
+    r"|\bcenter\.(?:add|removePendingNotificationRequests)\b"
     r"|CloudSyncMutationRecorder\.mark(?:Modified|Deleted)"
-    r"|CarePlanCalendarSync\.suppressDefaultPlan"
+    r"|\b(?:pet|human)\.[A-Za-z_][A-Za-z0-9_]*\s*="
+    r"|RainbowBridgeService\(\)\.(?:markPassedAway|undoPassedAway)"
+    r"|CarePlanCalendarSync\.(?:suppressDefaultPlan|removeCalendarPlan|removeActiveCalendarPlans|ensureDefaultPlans|reconcileDefaultPlanOverrides|sync[A-Za-z0-9_]+)"
+    r"|\b(?:upsert|upsertWithSingleReminder|removeCalendarPlan|removeActiveCalendarPlans)\("
+    r"|WaterPlanWriter\.(?:replacePlan|deletePlan|deactivateReminderOperations|ensureUpcomingReminders)"
     r"|FeedingPlanWriter\.(?:replacePlan|deletePlan|deactivateManualReminderOperations|clearFeedModePlans|ensureUpcomingManualReminders|saveFoodPurchase|correctFoodStock|rebuildFoodStockReminder)"
     r"|OhanaNotifications\.current\.cancel"
 )
@@ -161,12 +168,26 @@ GATE_CONSUMPTION_RE = re.compile(
     r"|EconomyWalletWritePolicy\.canWrite"
     r"|SharedPetTargetResolver\.normalizedTargets"
     r"|canWriteActiveFeedData"
+    r"|canWriteActiveCarePlan"
+    r"|canWriteActiveWaterPlan"
+    r"|MemberLifecycleActiveScheduleCleanup"
     r"|PetCareTrackingCommandService\.deleteCareLog"
     r"|PetPottyCommandService\.deletePottyLog"
     r"|PetHygieneCommandService\.delete"
     r"|CatCareCommandService\.undo"
 )
 CRITICAL_GATE_FUNCTIONS = {
+    "Ohana/Domain/Services/CarePlanCalendarSync.swift": {
+        "reconcileDefaultPlanOverrides",
+        "ensureDefaultPlans",
+        "syncWaterChangePlan",
+        "syncFilterPlan",
+        "syncLitterFullChangePlan",
+        "syncScoopPlan",
+        "syncPlayPlan",
+        "upsert",
+        "upsertWithSingleReminder",
+    },
     "Ohana/Features/Feeding/FeedingPlanWriter.swift": {
         "replacePlan",
         "deletePlan",
@@ -178,14 +199,22 @@ CRITICAL_GATE_FUNCTIONS = {
         "rebuildFoodStockReminder",
         "rebuildFoodStockReminders",
     },
+    "Ohana/Features/Medication/MedicationReminderService.swift": {
+        "scheduleMedicationReminders",
+        "scheduleHumanMedicationReminders",
+    },
+    "Ohana/Features/QuickCare/WaterManagementSupport.swift": {
+        "replacePlan",
+        "ensureUpcomingReminders",
+    },
     "Ohana/Features/PetCare/PetCareCommands.swift": {"deleteCareLog", "deletePottyLog"},
     "Ohana/Features/CatCare/CatCareCommands.swift": {"undo"},
     "Ohana/Features/Hygiene/PetHygieneCommands.swift": {"delete"},
 }
 
 
-def function_blocks(lines: list[str]) -> list[tuple[str, int, str]]:
-    blocks: list[tuple[str, int, str]] = []
+def function_blocks(lines: list[str]) -> list[tuple[str, int, str, bool]]:
+    blocks: list[tuple[str, int, str, bool]] = []
     idx = 0
     while idx < len(lines):
         match = FUNC_DECL_RE.search(lines[idx])
@@ -206,15 +235,24 @@ def function_blocks(lines: list[str]) -> list[tuple[str, int, str]]:
             if saw_open and brace_depth <= 0:
                 break
             end += 1
-        blocks.append((match.group(1), start + 1, "\n".join(lines[start : end + 1])))
+        blocks.append((
+            match.group("name"),
+            start + 1,
+            "\n".join(lines[start : end + 1]),
+            match.group("privacy") is not None,
+        ))
         idx = max(end + 1, idx + 1)
     return blocks
 
 
-def requires_lifecycle_gate(path: str, func_name: str, body: str) -> bool:
+def requires_lifecycle_gate(path: str, func_name: str, body: str, is_private: bool) -> bool:
     if func_name in CRITICAL_GATE_FUNCTIONS.get(path, set()):
         return True
     if path.startswith("scripts/tests/fixtures/") and MEMBER_PARAM_RE.search(body) and WRITE_EFFECT_RE.search(body):
+        return True
+    if is_private:
+        return False
+    if mode == "changed" and MEMBER_PARAM_RE.search(body) and WRITE_EFFECT_RE.search(body):
         return True
     return False
 
@@ -231,10 +269,10 @@ for path in files:
             continue
         if DIRECT_GATE_RE.search(line):
             warnings.append(WarningItem(path_str, idx, line.strip()))
-    for func_name, start_line, body in function_blocks(lines):
+    for func_name, start_line, body, is_private in function_blocks(lines):
         if "member-lifecycle-gate: allow" in body:
             continue
-        if requires_lifecycle_gate(path_str, func_name, body) and not GATE_CONSUMPTION_RE.search(body):
+        if requires_lifecycle_gate(path_str, func_name, body, is_private) and not GATE_CONSUMPTION_RE.search(body):
             warnings.append(
                 WarningItem(
                     path_str,

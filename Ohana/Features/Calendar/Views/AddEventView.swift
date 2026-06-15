@@ -40,6 +40,8 @@ struct AddEventContentView: View {
     @FocusState private var titleFocused: Bool
 
     private var l: L10n { L10n(appLanguage) }
+    private var activePets: [Pet] { pets.filter { !$0.hasPassedAway } }
+    private var activeHumans: [Human] { humans.filter { !$0.hasPassedAway } }
 
     private enum RecurrenceOption: String, CaseIterable, Identifiable {
         case none
@@ -175,7 +177,7 @@ struct AddEventContentView: View {
             }
         }
         .onAppear {
-            if assigneeId == nil, humans.contains(where: { $0.id.uuidString == currentActiveHumanId }) {
+            if assigneeId == nil, activeHumans.contains(where: { $0.id.uuidString == currentActiveHumanId }) {
                 assigneeId = currentActiveHumanId
             }
         }
@@ -332,7 +334,7 @@ struct AddEventContentView: View {
                         relatedEntityId = ""
                     }
 
-                    ForEach(pets) { pet in
+                    ForEach(activePets) { pet in
                         relatedPersonChip(
                             title: pet.name,
                             imageData: pet.avatarImageData,
@@ -345,7 +347,7 @@ struct AddEventContentView: View {
                         }
                     }
 
-                    ForEach(humans) { human in
+                    ForEach(activeHumans) { human in
                         relatedPersonChip(
                             title: human.name,
                             imageData: human.avatarImageData,
@@ -434,7 +436,7 @@ struct AddEventContentView: View {
                         assigneeId = nil
                     }
 
-                    ForEach(humans) { human in
+                    ForEach(activeHumans) { human in
                         relatedPersonChip(
                             title: human.name,
                             imageData: human.avatarImageData,

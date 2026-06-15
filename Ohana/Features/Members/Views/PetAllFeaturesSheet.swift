@@ -77,6 +77,15 @@ extension PetAllFeatureDestination: Identifiable {
             .expense
         }
     }
+
+    var isAvailableInMemorialMode: Bool {
+        switch self {
+        case .basicInfo, .documents, .moments, .timeline, .achievements, .retention:
+            true
+        case .health, .medications, .food, .hygiene, .walks, .potty, .weight, .expense, .bondVault:
+            false
+        }
+    }
 }
 
 struct PetAllFeaturesSheet: View {
@@ -143,7 +152,7 @@ struct PetAllFeaturesSheet: View {
 
                 FeatureHubMetricStrip(metrics: petMetrics)
 
-                ForEach(petSections) { section in
+                ForEach(visiblePetSections) { section in
                     FeatureHubSectionActionView(section: section) { destination in
                         open(destination)
                     }
@@ -155,6 +164,9 @@ struct PetAllFeaturesSheet: View {
     }
 
     private func open(_ destination: PetAllFeatureDestination) {
+        guard !pet.hasPassedAway || destination.isAvailableInMemorialMode else {
+            return
+        }
         if let feature = destination.petFeature {
             GrowthNewFeatureStore.markVisited(feature: feature)
         }
@@ -188,6 +200,20 @@ struct PetAllFeaturesSheet: View {
                 items: financeItems
             )
         ]
+    }
+
+    private var visiblePetSections: [FeatureHubSectionData<PetAllFeatureDestination>] {
+        guard pet.hasPassedAway else { return petSections }
+        return petSections.compactMap { section in
+            let items = section.items.filter(\.destination.isAvailableInMemorialMode)
+            guard !items.isEmpty else { return nil }
+            return FeatureHubSectionData(
+                id: section.id,
+                title: section.title,
+                subtitle: section.subtitle,
+                items: items
+            )
+        }
     }
 
     private var dailyItems: [FeatureHubDestinationItem<PetAllFeatureDestination>] {

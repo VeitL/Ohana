@@ -56,6 +56,23 @@ enum CarePlanCalendarSync {
         context.delete(reminder)
     }
 
+    private static func canWriteActiveCarePlan(for pet: Pet) -> Bool {
+        MemberWritePolicy.disposition(pet: pet, intent: .activeOnly).allowsDerivedEffects
+    }
+
+    static func removeActiveCalendarPlans(for pet: Pet, context: ModelContext) {
+        let petKey = pet.id.uuidString
+        for kind in knownDefaultPlanKinds {
+            removeCalendarPlan(kind: kind, petKey: petKey, context: context)
+            if let defaultKind = kind.split(separator: "_").last.map(String.init) {
+                removeLegacyDefaultPlanEvents(kind: defaultKind, pet: pet, context: context)
+            }
+        }
+        for kind in ["waterChange", "filterClean", "filterReplace", "litterFull", "scoop", "play"] {
+            removeCalendarPlan(kind: kind, petKey: petKey, context: context)
+        }
+    }
+
     static func removeCalendarPlan(kind: String, petKey: String, context: ModelContext) {
         let key = eventStorageKey(kind: kind, petKey: petKey)
         guard let idStr = UserDefaults.standard.string(forKey: key),
@@ -77,6 +94,10 @@ enum CarePlanCalendarSync {
     }
 
     static func reconcileDefaultPlanOverrides(for pet: Pet, context: ModelContext) {
+        guard canWriteActiveCarePlan(for: pet) else {
+            removeActiveCalendarPlans(for: pet, context: context)
+            return
+        }
         let petKey = pet.id.uuidString
         for kind in ["feed", "drink", "litter", "waterChange", "filter", "groom", "play"] where shouldSkipDefaultPlan(kind: kind, petKey: petKey, context: context) {
             removeCalendarPlan(kind: "default_\(kind)", petKey: petKey, context: context)
@@ -286,6 +307,10 @@ enum CarePlanCalendarSync {
         context: ModelContext
     ) {
         let petKey = pet.id.uuidString
+        guard canWriteActiveCarePlan(for: pet) else {
+            removeCalendarPlan(kind: kind, petKey: petKey, context: context)
+            return
+        }
         let key = eventStorageKey(kind: kind, petKey: petKey)
         if let idStr = UserDefaults.standard.string(forKey: key),
            let uuid = UUID(uuidString: idStr),
@@ -324,6 +349,10 @@ enum CarePlanCalendarSync {
         context: ModelContext
     ) {
         let petKey = pet.id.uuidString
+        guard canWriteActiveCarePlan(for: pet) else {
+            removeCalendarPlan(kind: kind, petKey: petKey, context: context)
+            return
+        }
         let key = eventStorageKey(kind: kind, petKey: petKey)
         let reminderDate = morningReminderDate(on: startDate)
 
@@ -390,6 +419,10 @@ enum CarePlanCalendarSync {
     }
 
     static func ensureDefaultPlans(for pet: Pet, context: ModelContext, startDate: Date = Date()) {
+        guard canWriteActiveCarePlan(for: pet) else {
+            removeActiveCalendarPlans(for: pet, context: context)
+            return
+        }
         let items = defaultPlanItems(for: pet)
         guard !items.isEmpty else { return }
         let petKey = pet.id.uuidString
@@ -601,6 +634,10 @@ enum CarePlanCalendarSync {
     /// 与铲屎计划一致：「起算日」与最近一次换水记录取较晚者为基准，再按间隔推算下次。
     static func syncWaterChangePlan(pet: Pet, context: ModelContext, intervalDays: Int, enabled: Bool, cycleAnchor: Date) {
         let petKey = pet.id.uuidString
+        guard canWriteActiveCarePlan(for: pet) else {
+            removeActiveCalendarPlans(for: pet, context: context)
+            return
+        }
         if intervalDays > 0 {
             suppressDefaultPlan(kind: "waterChange", pet: pet, context: context)
         }
@@ -629,6 +666,10 @@ enum CarePlanCalendarSync {
         enabled: Bool
     ) {
         let petKey = pet.id.uuidString
+        guard canWriteActiveCarePlan(for: pet) else {
+            removeActiveCalendarPlans(for: pet, context: context)
+            return
+        }
         if cleanIntervalDays > 0 || replaceIntervalDays > 0 {
             suppressDefaultPlan(kind: "filter", pet: pet, context: context)
         }
@@ -665,6 +706,10 @@ enum CarePlanCalendarSync {
 
     static func syncLitterFullChangePlan(pet: Pet, context: ModelContext, intervalDays: Int, enabled: Bool, cycleAnchor: Date) {
         let petKey = pet.id.uuidString
+        guard canWriteActiveCarePlan(for: pet) else {
+            removeActiveCalendarPlans(for: pet, context: context)
+            return
+        }
         guard enabled, intervalDays > 0 else {
             removeCalendarPlan(kind: "litterFull", petKey: petKey, context: context)
             return
@@ -693,6 +738,10 @@ enum CarePlanCalendarSync {
 
     static func syncScoopPlan(pet: Pet, context: ModelContext, intervalDays: Int, enabled: Bool, anchor: Date) {
         let petKey = pet.id.uuidString
+        guard canWriteActiveCarePlan(for: pet) else {
+            removeActiveCalendarPlans(for: pet, context: context)
+            return
+        }
         if intervalDays > 0 {
             suppressDefaultPlan(kind: "litter", pet: pet, context: context)
         }
@@ -715,6 +764,10 @@ enum CarePlanCalendarSync {
 
     static func syncPlayPlan(pet: Pet, context: ModelContext, intervalDays: Int, enabled: Bool, anchor: Date) {
         let petKey = pet.id.uuidString
+        guard canWriteActiveCarePlan(for: pet) else {
+            removeActiveCalendarPlans(for: pet, context: context)
+            return
+        }
         if intervalDays > 0 {
             suppressDefaultPlan(kind: "play", pet: pet, context: context)
         }

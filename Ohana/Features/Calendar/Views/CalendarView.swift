@@ -137,7 +137,10 @@ struct CalendarView: View {
     }
 
     var filteredEvents: [Event] {
-        var result = events.filter { !CarePlanCalendarSync.isDefaultGeneratedCalendarPlan($0, pets: pets) }
+        var result = events.filter {
+            !CarePlanCalendarSync.isDefaultGeneratedCalendarPlan($0, pets: pets) &&
+                !eventIsRelatedToDeceasedMember($0)
+        }
         if let petId = effectivePetFilterId {
             result = result.filter { eventIsRelatedToPet($0, petId: petId) }
         }
@@ -145,6 +148,23 @@ struct CalendarView: View {
             result = result.filter { eventIsRelatedToHuman($0, humanId: humanId) }
         }
         return result
+    }
+
+    func eventIsRelatedToDeceasedMember(_ event: Event) -> Bool {
+        guard eventIsActiveSchedule(event) else { return false }
+        if pets.contains(where: { $0.hasPassedAway && eventIsRelatedToPet(event, petId: $0.id.uuidString) }) {
+            return true
+        }
+        if humans.contains(where: { $0.hasPassedAway && eventIsRelatedToHuman(event, humanId: $0.id.uuidString) }) {
+            return true
+        }
+        return false
+    }
+
+    func eventIsActiveSchedule(_ event: Event, now: Date = Date()) -> Bool {
+        event.startDate >= now ||
+            event.recurrenceDays > 0 ||
+            event.reminders.contains { !$0.isCompleted && $0.scheduledAt >= now }
     }
 
     func eventIsRelatedToPet(_ event: Event, petId: String) -> Bool {

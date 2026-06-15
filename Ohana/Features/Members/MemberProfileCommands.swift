@@ -192,6 +192,7 @@ struct MemberHomeVisibilityCommandResult: Equatable {
 struct PetWalkGoalCommandResult: Equatable {
     let petID: UUID
     let goalKm: Double
+    let didWrite: Bool
 }
 
 struct PetWalkSummaryCommandResult: Equatable {
@@ -199,6 +200,7 @@ struct PetWalkSummaryCommandResult: Equatable {
     let walkID: UUID
     let moodRating: Int
     let hasNotes: Bool
+    let didWrite: Bool
 }
 
 enum MemberProfileCommandService {

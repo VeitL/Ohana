@@ -75,7 +75,7 @@ struct HumanBasicInfoDetailContentView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                if isViewingOwnProfile {
+                if isViewingOwnProfile, !human.hasPassedAway {
                     if isEditing {
                         Button {
                             saveChanges()
@@ -102,6 +102,11 @@ struct HumanBasicInfoDetailContentView: View {
                 ToolbarItem(placement: .topBarLeading) {
                     Button("取消") { withAnimation { isEditing = false } }
                 }
+            }
+        }
+        .onChange(of: human.hasPassedAway) { _, hasPassedAway in
+            if hasPassedAway {
+                isEditing = false
             }
         }
         .alert("首页卡片堆已满", isPresented: $showingHomeStackFullAlert) {
