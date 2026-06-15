@@ -32,6 +32,7 @@ Purpose:
   - Domain services return semantic presentation tokens instead of SwiftUI
     Color/View types.
   - Models do not import SwiftUI or expose SwiftUI Color/View/Image types.
+  - Domain/Models do not import platform UI frameworks such as UIKit.
 USAGE
 }
 
@@ -345,6 +346,15 @@ domain_presentation_framework_dependencies() {
     | rg -v '^Ohana/Models/' || true
 }
 
+domain_platform_ui_framework_dependencies() {
+  local scoped_files=()
+  while IFS= read -r file; do
+    [[ -n "$file" ]] && scoped_files+=("$file")
+  done < <(domain_or_models_scope)
+  [[ ${#scoped_files[@]} -eq 0 ]] && return 0
+  rg -n --with-filename --pcre2 '^\s*import\s+UIKit\b|\b(UIImage|UIColor|UIFont|UIView|UIGraphicsImageRenderer)\b' "${scoped_files[@]}" || true
+}
+
 models_presentation_framework_dependencies() {
   local scoped_files=()
   if [[ "$mode" == "all" ]]; then
@@ -449,6 +459,11 @@ record_matches \
   "domain-presentation-framework-dependency" \
   "Domain services must expose semantic presentation tokens instead of SwiftUI Color/View types; map tokens to SwiftUI at feature/shared presentation boundaries." \
   domain_presentation_framework_dependencies
+
+record_matches \
+  "domain-platform-ui-framework-dependency" \
+  "Domain/Models must not import UIKit or expose UIKit image/view/color types; move platform media/presentation work to Shared/Feature/App boundaries." \
+  domain_platform_ui_framework_dependencies
 
 record_matches \
   "models-presentation-framework-dependency" \

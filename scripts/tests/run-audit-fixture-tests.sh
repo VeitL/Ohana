@@ -126,12 +126,12 @@ run_audit scripts/audit-architecture-boundaries.sh --changed
 if [[ "$status" -ne 1 ]]; then
   fail "scripts/audit-architecture-boundaries.sh ArchitectureBoundariesBad.swift: expected strict exit 1, got $status"
 else
-  for rule in domain-feature-command-dependency domain-feature-reward-type-dependency domain-feature-implementation-dependency domain-feature-live-default-dependency domain-feature-taxonomy-literal domain-presentation-framework-dependency; do
+  for rule in domain-feature-command-dependency domain-feature-reward-type-dependency domain-feature-implementation-dependency domain-feature-live-default-dependency domain-feature-taxonomy-literal domain-presentation-framework-dependency domain-platform-ui-framework-dependency; do
     if ! grep -qF "[$rule]" <<<"$output"; then
       fail "scripts/audit-architecture-boundaries.sh ArchitectureBoundariesBad.swift: rule [$rule] no longer fires"
     fi
   done
-  echo "ok  scripts/audit-architecture-boundaries.sh catches Domain feature dependency rules"
+  echo "ok  scripts/audit-architecture-boundaries.sh catches Domain dependency rules"
 fi
 cp "$fixtures/ArchitectureBoundariesGood.swift" "$architecture_fixture_path"
 run_audit scripts/audit-architecture-boundaries.sh --changed
