@@ -11,6 +11,18 @@ import SwiftData
 nonisolated enum PetMedicationDoseLogging {
     static let relatedEntityTypeMedication = MedicationEventLink.petMedicationDose
 
+    static func doseMedicationId(for event: Event) -> UUID? {
+        guard event.eventType == EventType.petMedicationDose.rawValue else { return nil }
+        return DomainEntityLinkRegistry.resolvedId(
+            for: DomainEntityLink(event: event),
+            role: .petMedicationDose
+        )
+    }
+
+    static func isDoseEvent(_ event: Event, medicationId: UUID) -> Bool {
+        doseMedicationId(for: event) == medicationId
+    }
+
     struct RecordDoseResult {
         let event: Event
         let didRecord: Bool
@@ -45,9 +57,7 @@ nonisolated enum PetMedicationDoseLogging {
 
     static func doseCount(on date: Date, events: [Event], medicationId: UUID, calendar: Calendar = .current) -> Int {
         events.count(where: { ev in
-            ev.eventType == EventType.petMedicationDose.rawValue
-                && ev.relatedEntityType == relatedEntityTypeMedication
-                && ev.relatedEntityId == medicationId.uuidString
+            isDoseEvent(ev, medicationId: medicationId)
                 && calendar.isDate(ev.startDate, inSameDayAs: date)
         })
     }

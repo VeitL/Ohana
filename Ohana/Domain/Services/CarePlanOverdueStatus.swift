@@ -350,21 +350,17 @@ nonisolated enum CarePlanOverdueStatusCalculator {
     }
 
     private static func eventBelongsToPlant(_ event: Event, plant: Plant) -> Bool {
-        let plantId = plant.id.uuidString
-        let entityType = event.relatedEntityType.lowercased()
-
-        guard event.relatedEntityId == plantId else { return false }
-        return entityType.isEmpty ||
-            entityType == EntityKind.plant.rawValue.lowercased() ||
-            entityType == "plant" ||
-            entityType.hasPrefix("plant_")
+        let link = DomainEntityLink(event: event)
+        guard DomainEntityLinkRegistry.plantId(for: link) == plant.id else { return false }
+        return linkRole(for: event).isPlantScoped || DomainEntityLinkRegistry.role(for: link) == .unscoped
     }
 
     private static func planActionType(for event: Event) -> String? {
+        let role = linkRole(for: event)
         if event.eventType == EventType.petMedication.rawValue ||
             event.eventType == EventType.petMedicationDose.rawValue ||
-            event.relatedEntityType.lowercased() == MedicationEventLink.petMedicationPlan.lowercased() ||
-            event.relatedEntityType.lowercased() == PetMedicationDoseLogging.relatedEntityTypeMedication {
+            role == .petMedicationPlan ||
+            role == .petMedicationDose {
             return "medication"
         }
         if event.feedRuleKind == .manualReminder || event.eventType == EventType.foodChange.rawValue {
@@ -412,7 +408,7 @@ nonisolated enum CarePlanOverdueStatusCalculator {
             event.eventType == EventType.vetVisit.rawValue {
             return "health"
         }
-        if event.eventType == EventType.insurancePremium.rawValue {
+        if event.eventType == EventType.insurancePremium.rawValue || role == .petInsurance {
             return "insurance"
         }
 
@@ -420,8 +416,9 @@ nonisolated enum CarePlanOverdueStatusCalculator {
     }
 
     private static func humanPlanActionType(for event: Event) -> String? {
+        let role = linkRole(for: event)
         if event.eventType == EventType.medication.rawValue ||
-            event.relatedEntityType.lowercased() == MedicationEventLink.humanMedicationPlan {
+            role == .humanMedicationPlan {
             return "humanMedication"
         }
 
@@ -603,7 +600,11 @@ nonisolated enum CarePlanOverdueStatusCalculator {
     }
 
     private static func normalizedText(for event: Event) -> String {
-        "\(event.title) \(event.eventType) \(event.relatedEntityType)".lowercased()
+        "\(event.title) \(event.eventType)".lowercased()
+    }
+
+    private static func linkRole(for event: Event) -> DomainEntityLinkRole {
+        DomainEntityLinkRegistry.role(for: event)
     }
 
     private static func matchesAny(_ text: String, _ needles: [String]) -> Bool {

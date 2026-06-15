@@ -5863,7 +5863,8 @@ struct HomeCommandExecutorTests {
         #expect(completed.isCompleted)
         #expect(event.isOccurrenceMarkedComplete(on: start))
         #expect(completionMutation.command == .calendarEventCompletion(eventID: event.id, isCompleted: true))
-        #expect(completionMutation.affectedEntityIDs == [event.id])
+        #expect(completionMutation.affectedEntityIDs.contains(event.id))
+        #expect(completionMutation.affectedEntityIDs.contains(human.id))
         #expect(completionMutation.note == "test.calendar.complete")
 
         let deletion = executor.delete(
@@ -9101,7 +9102,7 @@ struct HomeCommandExecutorTests {
         func scheduleRollingWindow(reminders _: [Reminder]) {}
         func refillWindowIfNeeded(allReminders _: [Reminder]) {}
         func cancel(notificationId: String) { cancelledIds.append(notificationId) }
-        func cancelAll(for _: String, reminders _: [Reminder]) {}
+        func cancelAll(for _: Pet, reminders _: [Reminder]) {}
         func compensate(reminders _: [Reminder]) {}
     }
 

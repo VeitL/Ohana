@@ -89,14 +89,11 @@ extension ReadModelRevisionCenter {
 
     func publishCalendarEventPlan(
         _ result: CalendarEventPlanCommandResult,
-        relatedEntityId: String,
         note: String
     ) {
         var affected = Set(result.reminderIDs)
         affected.insert(result.eventID)
-        if let relatedID = UUID(uuidString: relatedEntityId) {
-            affected.insert(relatedID)
-        }
+        affected.formUnion(result.affectedSubjectIDs)
         publish(
             DomainMutationResult(
                 command: .calendarEventPlan(eventID: result.eventID),
@@ -111,7 +108,7 @@ extension ReadModelRevisionCenter {
         publish(
             DomainMutationResult(
                 command: .calendarEventCompletion(eventID: result.eventID, isCompleted: result.isCompleted),
-                affectedEntityIDs: [result.eventID],
+                affectedEntityIDs: result.revisionAffectedEntityIDs,
                 wroteBusinessFact: result.didChange,
                 note: note
             )
@@ -134,14 +131,10 @@ extension ReadModelRevisionCenter {
     }
 
     func publishReminderCommand(_ result: ReminderCommandResult, note: String) {
-        var affected: Set<UUID> = [result.reminderID]
-        if let eventID = result.eventID {
-            affected.insert(eventID)
-        }
         publish(
             DomainMutationResult(
                 command: .reminderCompletion(reminderID: result.reminderID),
-                affectedEntityIDs: affected,
+                affectedEntityIDs: result.revisionAffectedEntityIDs,
                 wroteBusinessFact: true,
                 note: note
             )
@@ -295,14 +288,10 @@ extension ReadModelRevisionCenter {
     }
 
     func publishReminderAction(_ result: ReminderCommandResult, note: String) {
-        var affected: Set<UUID> = [result.reminderID]
-        if let eventID = result.eventID {
-            affected.insert(eventID)
-        }
         publish(
             DomainMutationResult(
                 command: .reminderCompletion(reminderID: result.reminderID),
-                affectedEntityIDs: affected,
+                affectedEntityIDs: result.revisionAffectedEntityIDs,
                 wroteBusinessFact: true,
                 note: note
             )

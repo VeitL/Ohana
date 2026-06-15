@@ -15,15 +15,15 @@ nonisolated enum MemberLifecycleActiveScheduleResolver {
         insurances: [PetInsurance] = [],
         includePassedAway: Bool = true
     ) -> Pet? {
-        let medicationCandidates = petMedicationCandidates(pets: pets, explicit: petMedications)
-        let insuranceCandidates = insuranceCandidates(pets: pets, explicit: insurances)
-        return pets.first { pet in
-            (includePassedAway || !pet.hasPassedAway) && eventBelongsToPet(
-                event,
-                petId: pet.id.uuidString,
-                petMedications: medicationCandidates,
-                insurances: insuranceCandidates
-            )
+        let resolution = subjectResolution(
+            for: event,
+            petMedications: petMedicationCandidates(pets: pets, explicit: petMedications),
+            insurances: insuranceCandidates(pets: pets, explicit: insurances),
+            pets: pets
+        )
+        guard case let .pet(petId) = resolution.owner else { return nil }
+        return pets.first {
+            $0.id == petId && (includePassedAway || !$0.hasPassedAway)
         }
     }
 
@@ -33,12 +33,14 @@ nonisolated enum MemberLifecycleActiveScheduleResolver {
         humanMedications: [HumanMedication],
         includePassedAway: Bool = true
     ) -> Human? {
-        humans.first { human in
-            (includePassedAway || !human.hasPassedAway) && eventOwnedByHuman(
-                event,
-                humanId: human.id.uuidString,
-                humanMedications: humanMedications
-            )
+        let resolution = subjectResolution(
+            for: event,
+            humanMedications: humanMedicationCandidates(humans: humans, explicit: humanMedications),
+            humans: humans
+        )
+        guard case let .human(humanId) = resolution.owner else { return nil }
+        return humans.first {
+            $0.id == humanId && (includePassedAway || !$0.hasPassedAway)
         }
     }
 
@@ -48,12 +50,13 @@ nonisolated enum MemberLifecycleActiveScheduleResolver {
         humanMedications: [HumanMedication],
         includePassedAway: Bool = true
     ) -> Human? {
-        humans.first { human in
-            (includePassedAway || !human.hasPassedAway) && eventBelongsToHuman(
-                event,
-                humanId: human.id.uuidString,
-                humanMedications: humanMedications
-            )
+        let resolution = subjectResolution(
+            for: event,
+            humanMedications: humanMedicationCandidates(humans: humans, explicit: humanMedications),
+            humans: humans
+        )
+        return humans.first { human in
+            (includePassedAway || !human.hasPassedAway) && resolution.lifecycleTargets.contains(.human(human.id))
         }
     }
 
@@ -67,26 +70,20 @@ nonisolated enum MemberLifecycleActiveScheduleResolver {
         now: Date = Date()
     ) -> Bool {
         guard isActiveSchedule(event, now: now) else { return false }
-        let medicationCandidates = petMedicationCandidates(pets: pets, explicit: petMedications)
-        let insuranceCandidates = insuranceCandidates(pets: pets, explicit: insurances)
-        if pets.contains(where: { pet in
-            pet.hasPassedAway && eventBelongsToPet(
-                event,
-                petId: pet.id.uuidString,
-                petMedications: medicationCandidates,
-                insurances: insuranceCandidates
-            )
-        }) {
+        let resolution = subjectResolution(
+            for: event,
+            petMedications: petMedicationCandidates(pets: pets, explicit: petMedications),
+            humanMedications: humanMedicationCandidates(humans: humans, explicit: humanMedications),
+            insurances: insuranceCandidates(pets: pets, explicit: insurances),
+            pets: pets,
+            humans: humans
+        )
+        if pets.contains(where: { $0.hasPassedAway && resolution.lifecycleTargets.contains(.pet($0.id)) }) {
             return true
         }
 
-        let humanMedicationCandidates = humanMedicationCandidates(humans: humans, explicit: humanMedications)
         return humans.contains { human in
-            human.hasPassedAway && eventBelongsToHuman(
-                event,
-                humanId: human.id.uuidString,
-                humanMedications: humanMedicationCandidates
-            )
+            human.hasPassedAway && resolution.lifecycleTargets.contains(.human(human.id))
         }
     }
 
@@ -99,32 +96,29 @@ nonisolated enum MemberLifecycleActiveScheduleResolver {
         insurances: [PetInsurance] = []
     ) -> Bool {
         guard let event = reminder.event else { return true }
-        let medicationCandidates = petMedicationCandidates(pets: activePets, explicit: petMedications)
-        let insuranceCandidates = insuranceCandidates(pets: activePets, explicit: insurances)
-        if isPetScopedEntityType(event.relatedEntityType) {
-            return activePets.contains { pet in
-                eventBelongsToPet(
-                    event,
-                    petId: pet.id.uuidString,
-                    petMedications: medicationCandidates,
-                    insurances: insuranceCandidates
-                )
-            }
+        let resolution = subjectResolution(
+            for: event,
+            petMedications: petMedicationCandidates(pets: activePets, explicit: petMedications),
+            humanMedications: humanMedicationCandidates(humans: activeHumans, explicit: humanMedications),
+            insurances: insuranceCandidates(pets: activePets, explicit: insurances),
+            pets: activePets,
+            humans: activeHumans
+        )
+        if resolution.role.isPetScoped {
+            guard case let .pet(petId) = resolution.owner else { return false }
+            return activePets.contains { $0.id == petId }
         }
 
-        let humanMedicationCandidates = humanMedicationCandidates(humans: activeHumans, explicit: humanMedications)
-        if isHumanScopedEntityType(event.relatedEntityType) {
+        if resolution.role.isHumanScoped {
             return activeHumans.contains { human in
-                eventBelongsToHuman(
-                    event,
-                    humanId: human.id.uuidString,
-                    humanMedications: humanMedicationCandidates
-                )
+                resolution.lifecycleTargets.contains(.human(human.id))
             }
         }
 
-        if let assigneeId = event.assigneeId, !assigneeId.isEmpty {
-            return activeHumans.contains { $0.id.uuidString == assigneeId }
+        if let assignee = resolution.assignee {
+            return activeHumans.contains { human in
+                assignee == .human(human.id)
+            }
         }
         return true
     }
@@ -135,21 +129,12 @@ nonisolated enum MemberLifecycleActiveScheduleResolver {
         petMedications: [PetMedication] = [],
         insurances: [PetInsurance] = []
     ) -> Bool {
-        let link = DomainEntityLink(rawType: event.relatedEntityType, rawId: event.relatedEntityId)
-        let role = DomainEntityLinkRegistry.role(for: link)
-        if role == .petFoodStock {
-            return event.relatedEntityId == petId || event.relatedEntityId.hasPrefix("\(petId):")
-        }
-        if event.relatedEntityId == petId {
-            return role == .directPet || role == .petAutoFeeder || role == .petWaterPlan
-        }
-        if role == .petInsurance {
-            return insurances.first { $0.id.uuidString == event.relatedEntityId }?.pet?.id.uuidString == petId
-        }
-        if role == .petMedicationDose || role == .petMedicationPlan {
-            return petMedications.first { $0.id.uuidString == event.relatedEntityId }?.pet?.id.uuidString == petId
-        }
-        return false
+        guard let id = UUID(uuidString: petId) else { return false }
+        return subjectResolution(
+            for: event,
+            petMedications: petMedications,
+            insurances: insurances
+        ).owner == .pet(id)
     }
 
     static func eventBelongsToHuman(
@@ -157,18 +142,31 @@ nonisolated enum MemberLifecycleActiveScheduleResolver {
         humanId: String,
         humanMedications: [HumanMedication] = []
     ) -> Bool {
-        if eventAssignedToHuman(event, humanId: humanId) {
-            return true
-        }
-        return eventOwnedByHuman(event, humanId: humanId, humanMedications: humanMedications)
+        guard let id = UUID(uuidString: humanId) else { return false }
+        return subjectResolution(
+            for: event,
+            humanMedications: humanMedications
+        ).lifecycleTargets.contains(.human(id))
     }
 
     static func eventAssignedToHuman(_ event: Event, humanId: String) -> Bool {
-        event.assigneeId == humanId
+        guard let id = UUID(uuidString: humanId) else { return false }
+        return subjectResolution(for: event).assignee == .human(id)
+    }
+
+    static func humanAssignee(
+        for event: Event,
+        humans: [Human],
+        includePassedAway: Bool = true
+    ) -> Human? {
+        guard case let .human(humanId) = subjectResolution(for: event, humans: humans).assignee else { return nil }
+        return humans.first {
+            $0.id == humanId && (includePassedAway || !$0.hasPassedAway)
+        }
     }
 
     static func eventHasNoHumanAssignee(_ event: Event) -> Bool {
-        (event.assigneeId ?? "").isEmpty
+        subjectResolution(for: event).assignee == nil
     }
 
     static func eventOwnedByHuman(
@@ -176,15 +174,11 @@ nonisolated enum MemberLifecycleActiveScheduleResolver {
         humanId: String,
         humanMedications: [HumanMedication]
     ) -> Bool {
-        let link = DomainEntityLink(rawType: event.relatedEntityType, rawId: event.relatedEntityId)
-        let role = DomainEntityLinkRegistry.role(for: link)
-        if event.relatedEntityId == humanId {
-            return role == .directHuman || role == .humanNote
-        }
-        if role == .humanMedicationPlan {
-            return humanMedications.first { $0.id.uuidString == event.relatedEntityId }?.humanId == humanId
-        }
-        return false
+        guard let id = UUID(uuidString: humanId) else { return false }
+        return subjectResolution(
+            for: event,
+            humanMedications: humanMedications
+        ).owner == .human(id)
     }
 
     static func isActiveSchedule(_ event: Event, now: Date = Date()) -> Bool {
@@ -218,14 +212,6 @@ nonisolated enum MemberLifecycleActiveScheduleResolver {
         event.eventType == EventType.birthday.rawValue || event.eventType == EventType.anniversary.rawValue
     }
 
-    private static func isPetScopedEntityType(_ raw: String) -> Bool {
-        DomainEntityLinkRegistry.role(for: DomainEntityLink(rawType: raw, rawId: "")).isPetScoped
-    }
-
-    private static func isHumanScopedEntityType(_ raw: String) -> Bool {
-        DomainEntityLinkRegistry.role(for: DomainEntityLink(rawType: raw, rawId: "")).isHumanScoped
-    }
-
     private static func isFutureActionableReminder(_ reminder: Reminder, now: Date) -> Bool {
         reminder.scheduledAt >= now && !isTerminalReminder(reminder)
     }
@@ -244,5 +230,25 @@ nonisolated enum MemberLifecycleActiveScheduleResolver {
 
     private static func insuranceCandidates(pets: [Pet], explicit: [PetInsurance]) -> [PetInsurance] {
         explicit.isEmpty ? pets.flatMap(\.insurances) : explicit
+    }
+
+    private static func subjectResolution(
+        for event: Event,
+        petMedications: [PetMedication] = [],
+        humanMedications: [HumanMedication] = [],
+        insurances: [PetInsurance] = [],
+        pets: [Pet] = [],
+        humans: [Human] = []
+    ) -> DomainSubjectResolution {
+        DomainSubjectResolver.resolve(
+            request: DomainSubjectResolutionRequest(event: event),
+            catalog: DomainSubjectResolutionCatalog(
+                pets: pets,
+                petMedications: petMedications,
+                humanMedications: humanMedications,
+                insurances: insurances,
+                humans: humans
+            )
+        )
     }
 }

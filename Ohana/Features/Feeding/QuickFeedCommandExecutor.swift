@@ -498,7 +498,11 @@ struct QuickFeedCommandExecutor {
             existing: existing,
             context: context
         )
-        if existing == nil, let petID = UUID(uuidString: event.relatedEntityId) {
+        let resolution = DomainSubjectResolver.resolve(
+            request: DomainSubjectResolutionRequest(event: event),
+            catalog: DomainSubjectResolutionCatalog()
+        )
+        if existing == nil, case let .pet(petID) = resolution.owner {
             deriveFeedMutation(
                 .feedMaintenance(petID: petID, action: "create_plan_reminder"),
                 affectedEntityIDs: [petID],

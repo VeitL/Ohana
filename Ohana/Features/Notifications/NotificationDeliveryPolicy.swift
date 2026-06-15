@@ -125,9 +125,13 @@ nonisolated enum NotificationDeliveryPolicy {
     static let nonCriticalDailyLimit = 5
 
     static func classification(for event: Event) -> NotificationDeliveryClassification {
+        let role = linkRole(for: event)
         if event.eventType == EventType.petMedication.rawValue ||
             event.eventType == EventType.petMedicationDose.rawValue ||
-            event.eventType == EventType.medication.rawValue {
+            event.eventType == EventType.medication.rawValue ||
+            role == .petMedicationPlan ||
+            role == .petMedicationDose ||
+            role == .humanMedicationPlan {
             return NotificationDeliveryClassification(tier: .healthCritical, category: .medication, mergeAllowed: false)
         }
 
@@ -139,15 +143,15 @@ nonisolated enum NotificationDeliveryPolicy {
             return NotificationDeliveryClassification(tier: .healthCritical, category: .health, mergeAllowed: false)
         }
 
-        if event.relatedEntityType == "pet_food_stock" {
+        if role == .petFoodStock {
             return NotificationDeliveryClassification(tier: .healthCritical, category: .foodStock, mergeAllowed: false)
         }
 
-        if event.eventType == EventType.foodChange.rawValue {
+        if event.eventType == EventType.foodChange.rawValue || role == .petAutoFeeder {
             return NotificationDeliveryClassification(tier: .routine, category: .feeding, mergeAllowed: true)
         }
 
-        if event.eventType == EventType.watering.rawValue {
+        if event.eventType == EventType.watering.rawValue || role == .petWaterPlan {
             return NotificationDeliveryClassification(tier: .routine, category: .hydration, mergeAllowed: true)
         }
 
@@ -160,7 +164,7 @@ nonisolated enum NotificationDeliveryPolicy {
             return NotificationDeliveryClassification(tier: .routine, category: .plantCare, mergeAllowed: true)
         }
 
-        if event.eventType == EventType.insurancePremium.rawValue {
+        if event.eventType == EventType.insurancePremium.rawValue || role == .petInsurance {
             return NotificationDeliveryClassification(tier: .routine, category: .insurance, mergeAllowed: true)
         }
 
@@ -291,9 +295,18 @@ nonisolated enum NotificationDeliveryPolicy {
     }
 
     private static func subjectKey(for event: Event) -> String {
-        let rawId = event.relatedEntityId
-        let normalizedId = rawId.split(separator: ":", maxSplits: 1).first.map(String.init) ?? rawId
-        return "\(event.relatedEntityType):\(normalizedId)"
+        DomainResolvedSubjectKey(resolution: subjectResolution(for: event)).rawValue
+    }
+
+    private static func linkRole(for event: Event) -> DomainEntityLinkRole {
+        DomainEntityLinkRegistry.role(for: event)
+    }
+
+    private static func subjectResolution(for event: Event) -> DomainSubjectResolution {
+        DomainSubjectResolver.resolve(
+            request: DomainSubjectResolutionRequest(event: event),
+            catalog: DomainSubjectResolutionCatalog()
+        )
     }
 
     private static func dayKey(for date: Date, calendar: Calendar) -> String {

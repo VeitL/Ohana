@@ -164,46 +164,28 @@ nonisolated enum CloudSyncRecordApplier {
             deletedByHumanId: nil,
             context: context
         )
-        let state: CloudSyncRecordState
-        let existingState: CloudSyncRecordState? = if let matchedState {
-            matchedState
-        } else {
-            try CloudSyncMetadataService.state(recordKey: recordKey, context: context)
-        }
-        if let existing = existingState {
-            state = existing
-            state.householdId = householdId
-            state.conflictPolicy = descriptor.defaultConflictPolicy
-        } else {
-            state = CloudSyncRecordState(
+        let state = try CloudSyncMetadataService.upsertAppliedRemoteState(
+            snapshot: CloudSyncAppliedRecordStateSnapshot(
+                recordKey: recordKey,
                 entityName: descriptor.entityName,
                 localRecordId: localRecordUUID,
                 householdId: householdUUID,
                 ckZoneName: recordID.zoneID.zoneName,
                 ckRecordName: recordID.recordName,
                 ckChangeTag: "",
-                conflictPolicy: descriptor.defaultConflictPolicy,
+                conflictPolicy: matchedState?.conflictPolicy ?? descriptor.defaultConflictPolicy,
                 isDeleted: true,
+                isDeletionTombstone: true,
                 deletedAt: deletedAt,
-                hasPendingLocalChanges: false,
+                deletedByHumanId: "",
                 lastModifiedAt: deletedAt,
                 lastSyncedAt: Date(),
-                createdAt: deletedAt,
+                createdAt: matchedState?.createdAt ?? deletedAt,
                 updatedAt: Date()
-            )
-            context.insert(state)
-        }
-        state.ckRecordName = recordID.recordName
-        state.ckZoneName = recordID.zoneID.zoneName
-        state.ckChangeTag = ""
-        state.isDeleted = true
-        state.isDeletionTombstone = true
-        state.deletedAt = deletedAt
-        state.deletedByHumanId = ""
-        state.hasPendingLocalChanges = false
-        state.lastModifiedAt = deletedAt
-        state.lastSyncedAt = Date()
-        state.updatedAt = Date()
+            ),
+            context: context
+        )
+        _ = state
         return .deleted(entityName: descriptor.entityName, localRecordId: localRecordId)
     }
 
@@ -264,25 +246,20 @@ nonisolated enum CloudSyncRecordApplier {
         metadata: RemoteMetadata,
         context: ModelContext
     ) throws -> CloudSyncRecordApplyResult {
-        if let household = try fetchHousehold(id: metadata.localRecordUUID, context: context) {
-            if let name = record.string(for: "name") {
-                household.name = name
-            }
-            if let createdAt = record.date(for: "createdAt") {
-                household.createdAt = createdAt
-            }
-            if let totalProsperity = record.int(for: "totalProsperity") {
-                household.totalProsperity = max(household.totalProsperity, totalProsperity)
-            }
-            return .updated(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
-        }
-
-        let household = Household(name: record.string(for: "name") ?? "")
-        household.id = metadata.localRecordUUID
-        household.createdAt = record.date(for: "createdAt") ?? metadata.lastModifiedAt
-        household.totalProsperity = max(0, record.int(for: "totalProsperity") ?? 0)
-        context.insert(household)
-        return .inserted(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
+        let existing = try fetchHousehold(id: metadata.localRecordUUID, context: context)
+        let result = try DomainGeneralRehydrateWriter.upsertHousehold(
+            snapshot: DomainHouseholdRehydrateSnapshot(
+                id: metadata.localRecordUUID,
+                name: record.string(for: "name") ?? existing?.name ?? "",
+                createdAt: record.date(for: "createdAt") ?? existing?.createdAt ?? metadata.lastModifiedAt,
+                totalProsperity: record.int(for: "totalProsperity") ?? existing?.totalProsperity ?? 0
+            ),
+            source: .cloudApply,
+            context: context
+        )
+        return result.inserted
+            ? .inserted(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
+            : .updated(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
     }
 
     private static func applyPet(
@@ -290,66 +267,65 @@ nonisolated enum CloudSyncRecordApplier {
         metadata: RemoteMetadata,
         context: ModelContext
     ) throws -> CloudSyncRecordApplyResult {
-        let pet: Pet
-        let result: CloudSyncRecordApplyResult
-        if let existing = try fetchPet(id: metadata.localRecordUUID, context: context) {
-            pet = existing
-            result = .updated(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
-        } else {
-            pet = Pet(name: record.string(for: "name") ?? "")
-            pet.id = metadata.localRecordUUID
-            context.insert(pet)
-            result = .inserted(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
-        }
-
-        pet.name = record.string(for: "name") ?? pet.name
-        pet.species = record.string(for: "species") ?? pet.species
-        pet.breed = record.string(for: "breed") ?? pet.breed
-        pet.birthday = record.date(for: "birthday")
-        pet.gender = record.string(for: "gender") ?? pet.gender
-        pet.isNeutered = record.bool(for: "isNeutered") ?? pet.isNeutered
-        pet.avatarEmoji = record.string(for: "avatarEmoji") ?? pet.avatarEmoji
-        pet.avatarImageData = record.assetData(for: "avatarImageData")
-        pet.microchipID = record.string(for: "microchipID") ?? pet.microchipID
-        pet.vetContact = record.string(for: "vetContact") ?? pet.vetContact
-        pet.vetClinicName = record.string(for: "vetClinicName") ?? pet.vetClinicName
-        pet.vetDoctorName = record.string(for: "vetDoctorName") ?? pet.vetDoctorName
-        pet.vetAddress = record.string(for: "vetAddress") ?? pet.vetAddress
-        pet.allergies = record.string(for: "allergies") ?? pet.allergies
-        pet.passportNumber = record.string(for: "passportNumber") ?? pet.passportNumber
-        pet.passportExpiryDate = record.date(for: "passportExpiryDate")
-        pet.formerName = record.string(for: "formerName") ?? pet.formerName
-        pet.lineageInfo = record.string(for: "lineageInfo") ?? pet.lineageInfo
-        pet.themeColorHex = record.string(for: "themeColorHex") ?? pet.themeColorHex
-        pet.homeDate = record.date(for: "homeDate")
-        pet.birthCountry = record.string(for: "birthCountry") ?? pet.birthCountry
-        pet.birthCity = record.string(for: "birthCity") ?? pet.birthCity
-        pet.foodBrand = record.string(for: "foodBrand") ?? pet.foodBrand
-        pet.restockDate = record.date(for: "restockDate")
-        pet.restockWeight = record.double(for: "restockWeight") ?? pet.restockWeight
-        pet.dailyPortionGrams = record.double(for: "dailyPortionGrams") ?? pet.dailyPortionGrams
-        pet.mainFoodKindRaw = record.string(for: "mainFoodKindRaw") ?? pet.mainFoodKindRaw
-        pet.foodPrice = record.double(for: "foodPrice") ?? pet.foodPrice
-        pet.isShared = record.bool(for: "isShared") ?? pet.isShared
-        pet.ckRecordName = record.recordID.recordName
-        pet.createdAt = record.date(for: "createdAt") ?? pet.createdAt
-        pet.notes = record.string(for: "notes") ?? pet.notes
-        pet.coatColor = record.string(for: "coatColor") ?? pet.coatColor
-        pet.eyeColor = record.string(for: "eyeColor") ?? pet.eyeColor
-        pet.currentStreak = record.int(for: "currentStreak") ?? pet.currentStreak
-        pet.lastCheckInDate = record.date(for: "lastCheckInDate")
-        pet.foodTrackingModeRaw = record.string(for: "foodTrackingModeRaw") ?? pet.foodTrackingModeRaw
-        pet.casualOpenDate = record.date(for: "casualOpenDate")
-        pet.casualDurationDays = record.int(for: "casualDurationDays") ?? pet.casualDurationDays
-        pet.foodReminderEnabled = record.bool(for: "foodReminderEnabled") ?? pet.foodReminderEnabled
-        pet.foodReminderAdvanceDays = record.int(for: "foodReminderAdvanceDays") ?? pet.foodReminderAdvanceDays
-        pet.passedAwayDate = record.date(for: "passedAwayDate")
-        pet.cardStyleRaw = record.string(for: "cardStyleRaw") ?? pet.cardStyleRaw
-        pet.cardPopoutImageData = record.assetData(for: "cardPopoutImageData")
-        pet.cardPopoutSourceRaw = record.string(for: "cardPopoutSourceRaw")
-        pet.weeklyWalkGoalKm = record.double(for: "weeklyWalkGoalKm") ?? pet.weeklyWalkGoalKm
-        pet.personalityTagsRaw = record.string(for: "personalityTagsRaw") ?? pet.personalityTagsRaw
-        return result
+        let existing = try fetchPet(id: metadata.localRecordUUID, context: context)
+        let result = try DomainGeneralRehydrateWriter.upsertPet(
+            snapshot: DomainPetRehydrateSnapshot(
+                id: metadata.localRecordUUID,
+                name: record.string(for: "name") ?? existing?.name ?? "",
+                species: record.string(for: "species") ?? existing?.species ?? "狗",
+                breed: record.string(for: "breed") ?? existing?.breed ?? "",
+                birthday: record.date(for: "birthday"),
+                gender: record.string(for: "gender") ?? existing?.gender ?? "unknown",
+                isNeutered: record.bool(for: "isNeutered") ?? existing?.isNeutered ?? false,
+                avatarEmoji: record.string(for: "avatarEmoji") ?? existing?.avatarEmoji ?? "🐾",
+                avatarImageData: record.assetData(for: "avatarImageData"),
+                microchipID: record.string(for: "microchipID") ?? existing?.microchipID ?? "",
+                vetContact: record.string(for: "vetContact") ?? existing?.vetContact ?? "",
+                vetClinicName: record.string(for: "vetClinicName") ?? existing?.vetClinicName ?? "",
+                vetDoctorName: record.string(for: "vetDoctorName") ?? existing?.vetDoctorName ?? "",
+                vetAddress: record.string(for: "vetAddress") ?? existing?.vetAddress ?? "",
+                allergies: record.string(for: "allergies") ?? existing?.allergies ?? "",
+                passportNumber: record.string(for: "passportNumber") ?? existing?.passportNumber ?? "",
+                passportExpiryDate: record.date(for: "passportExpiryDate"),
+                formerName: record.string(for: "formerName") ?? existing?.formerName ?? "",
+                lineageInfo: record.string(for: "lineageInfo") ?? existing?.lineageInfo ?? "",
+                themeColorHex: record.string(for: "themeColorHex") ?? existing?.themeColorHex ?? OhanaThemeColorPolicy.petFallbackHex,
+                homeDate: record.date(for: "homeDate"),
+                birthCountry: record.string(for: "birthCountry") ?? existing?.birthCountry ?? "",
+                birthCity: record.string(for: "birthCity") ?? existing?.birthCity ?? "",
+                foodBrand: record.string(for: "foodBrand") ?? existing?.foodBrand ?? "",
+                restockDate: record.date(for: "restockDate"),
+                restockWeight: record.double(for: "restockWeight") ?? existing?.restockWeight ?? 0,
+                dailyPortionGrams: record.double(for: "dailyPortionGrams") ?? existing?.dailyPortionGrams ?? 0,
+                mainFoodKindRaw: record.string(for: "mainFoodKindRaw") ?? existing?.mainFoodKindRaw ?? FeedFoodKind.dry.rawValue,
+                foodPrice: record.double(for: "foodPrice") ?? existing?.foodPrice ?? 0,
+                isShared: record.bool(for: "isShared") ?? existing?.isShared ?? false,
+                ckRecordName: record.recordID.recordName,
+                createdAt: record.date(for: "createdAt") ?? existing?.createdAt ?? metadata.lastModifiedAt,
+                notes: record.string(for: "notes") ?? existing?.notes ?? "",
+                coatColor: record.string(for: "coatColor") ?? existing?.coatColor ?? "",
+                eyeColor: record.string(for: "eyeColor") ?? existing?.eyeColor ?? "",
+                currentStreak: record.int(for: "currentStreak") ?? existing?.currentStreak ?? 0,
+                lastCheckInDate: record.date(for: "lastCheckInDate"),
+                foodTrackingModeRaw: record.string(for: "foodTrackingModeRaw") ?? existing?.foodTrackingModeRaw ?? FoodTrackingMode.casual.rawValue,
+                casualOpenDate: record.date(for: "casualOpenDate"),
+                casualDurationDays: record.int(for: "casualDurationDays") ?? existing?.casualDurationDays ?? 0,
+                foodReminderEnabled: record.bool(for: "foodReminderEnabled") ?? existing?.foodReminderEnabled ?? false,
+                foodReminderAdvanceDays: record.int(for: "foodReminderAdvanceDays") ?? existing?.foodReminderAdvanceDays ?? 7,
+                coconutBalance: existing?.coconutBalance ?? 0,
+                passedAwayDate: record.date(for: "passedAwayDate"),
+                cardStyleRaw: record.string(for: "cardStyleRaw") ?? existing?.cardStyleRaw ?? "classic",
+                cardPopoutImageData: record.assetData(for: "cardPopoutImageData"),
+                cardPopoutSourceRaw: record.string(for: "cardPopoutSourceRaw"),
+                weeklyWalkGoalKm: record.double(for: "weeklyWalkGoalKm") ?? existing?.weeklyWalkGoalKm ?? 0,
+                personalityTagsRaw: record.string(for: "personalityTagsRaw") ?? existing?.personalityTagsRaw ?? ""
+            ),
+            source: .cloudApply,
+            context: context
+        )
+        return result.inserted
+            ? .inserted(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
+            : .updated(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
     }
 
     private static func applyHuman(
@@ -357,36 +333,35 @@ nonisolated enum CloudSyncRecordApplier {
         metadata: RemoteMetadata,
         context: ModelContext
     ) throws -> CloudSyncRecordApplyResult {
-        let human: Human
-        let result: CloudSyncRecordApplyResult
-        if let existing = try fetchHuman(id: metadata.localRecordUUID, context: context) {
-            human = existing
-            result = .updated(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
-        } else {
-            human = Human(name: record.string(for: "name") ?? "")
-            human.id = metadata.localRecordUUID
-            context.insert(human)
-            result = .inserted(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
-        }
-
-        human.name = record.string(for: "name") ?? human.name
-        human.birthday = record.date(for: "birthday")
-        human.bloodType = record.string(for: "bloodType") ?? human.bloodType
-        human.avatarEmoji = record.string(for: "avatarEmoji") ?? human.avatarEmoji
-        human.avatarImageData = record.assetData(for: "avatarImageData")
-        human.role = record.string(for: "role") ?? human.role
-        human.notes = record.string(for: "notes") ?? human.notes
-        human.createdAt = record.date(for: "createdAt") ?? human.createdAt
-        human.nationality = record.string(for: "nationality") ?? human.nationality
-        human.city = record.string(for: "city") ?? human.city
-        human.shouldShowOnHome = record.bool(for: "shouldShowOnHome") ?? human.shouldShowOnHome
-        human.themeColorHex = record.string(for: "themeColorHex") ?? human.themeColorHex
-        human.genderIdentityRaw = record.string(for: "genderIdentityRaw")
-        human.privateFieldsRaw = record.string(for: "privateFieldsRaw") ?? human.privateFieldsRaw
-        human.heightCm = record.double(for: "heightCm") ?? human.heightCm
-        human.mbti = record.string(for: "mbti") ?? human.mbti
-        human.passedAwayDate = record.date(for: "passedAwayDate")
-        return result
+        let existing = try fetchHuman(id: metadata.localRecordUUID, context: context)
+        let result = try DomainGeneralRehydrateWriter.upsertHuman(
+            snapshot: DomainHumanRehydrateSnapshot(
+                id: metadata.localRecordUUID,
+                name: record.string(for: "name") ?? existing?.name ?? "",
+                birthday: record.date(for: "birthday"),
+                bloodType: record.string(for: "bloodType") ?? existing?.bloodType ?? "",
+                avatarEmoji: record.string(for: "avatarEmoji") ?? existing?.avatarEmoji ?? "👤",
+                avatarImageData: record.assetData(for: "avatarImageData"),
+                role: record.string(for: "role") ?? existing?.role ?? "member",
+                genderIdentityRaw: record.string(for: "genderIdentityRaw"),
+                notes: record.string(for: "notes") ?? existing?.notes ?? "",
+                createdAt: record.date(for: "createdAt") ?? existing?.createdAt ?? metadata.lastModifiedAt,
+                nationality: record.string(for: "nationality") ?? existing?.nationality ?? "",
+                city: record.string(for: "city") ?? existing?.city ?? "",
+                coconutBalance: existing?.coconutBalance ?? 0,
+                shouldShowOnHome: record.bool(for: "shouldShowOnHome") ?? existing?.shouldShowOnHome ?? true,
+                mbti: record.string(for: "mbti") ?? existing?.mbti ?? "",
+                privateFieldsRaw: record.string(for: "privateFieldsRaw") ?? existing?.privateFieldsRaw ?? "",
+                themeColorHex: record.string(for: "themeColorHex") ?? existing?.themeColorHex ?? OhanaThemeColorPolicy.humanFallbackHex,
+                heightCm: record.double(for: "heightCm") ?? existing?.heightCm ?? 0,
+                passedAwayDate: record.date(for: "passedAwayDate")
+            ),
+            source: .cloudApply,
+            context: context
+        )
+        return result.inserted
+            ? .inserted(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
+            : .updated(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
     }
 
     private static func applyEvent(
@@ -394,44 +369,35 @@ nonisolated enum CloudSyncRecordApplier {
         metadata: RemoteMetadata,
         context: ModelContext
     ) throws -> CloudSyncRecordApplyResult {
-        let event: Event
-        let result: CloudSyncRecordApplyResult
-        if let existing = try fetchEvent(id: metadata.localRecordUUID, context: context) {
-            event = existing
-            result = .updated(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
-        } else {
-            event = Event(
-                title: record.string(for: "title") ?? "",
-                startDate: record.date(for: "startDate") ?? metadata.lastModifiedAt,
-                endDate: record.date(for: "endDate"),
-                isAllDay: record.bool(for: "isAllDay") ?? false,
-                eventType: record.string(for: "eventType") ?? EventType.daily.rawValue,
-                relatedEntityType: record.string(for: "relatedEntityType") ?? "",
-                relatedEntityId: record.string(for: "relatedEntityId") ?? ""
-            )
-            event.id = metadata.localRecordUUID
-            context.insert(event)
-            result = .inserted(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
-        }
-
-        event.title = record.string(for: "title") ?? event.title
-        event.startDate = record.date(for: "startDate") ?? event.startDate
-        event.endDate = record.date(for: "endDate")
-        event.isAllDay = record.bool(for: "isAllDay") ?? event.isAllDay
-        event.eventType = record.string(for: "eventType") ?? event.eventType
-        event.relatedEntityType = record.string(for: "relatedEntityType") ?? event.relatedEntityType
-        event.relatedEntityId = record.string(for: "relatedEntityId") ?? event.relatedEntityId
-        event.recurrenceDays = record.int(for: "recurrenceDays") ?? event.recurrenceDays
-        event.recurrenceEndDate = record.date(for: "recurrenceEndDate")
-        event.isCompleted = record.bool(for: "isCompleted") ?? event.isCompleted
-        event.completedOccurrences = record.stringList(for: "completedOccurrences") ?? event.completedOccurrences
-        event.createdAt = record.date(for: "createdAt") ?? event.createdAt
-        event.assigneeId = record.string(for: "assigneeId")
-        event.feedRuleKindRaw = record.string(for: "feedRuleKindRaw") ?? event.feedRuleKindRaw
-        event.foodKindRaw = record.string(for: "foodKindRaw") ?? event.foodKindRaw
-        event.feedAmountGrams = record.double(for: "feedAmountGrams") ?? event.feedAmountGrams
-        event.feedPlanGroupId = record.string(for: "feedPlanGroupId") ?? event.feedPlanGroupId
-        return result
+        let existing = try fetchEvent(id: metadata.localRecordUUID, context: context)
+        let snapshot = DomainScheduleRehydrateEventSnapshot(
+            id: metadata.localRecordUUID,
+            title: record.string(for: "title") ?? existing?.title ?? "",
+            startDate: record.date(for: "startDate") ?? existing?.startDate ?? metadata.lastModifiedAt,
+            endDate: record.date(for: "endDate"),
+            isAllDay: record.bool(for: "isAllDay") ?? existing?.isAllDay ?? false,
+            eventType: record.string(for: "eventType") ?? existing?.eventType ?? EventType.daily.rawValue,
+            relatedEntityType: record.string(for: "relatedEntityType") ?? existing?.relatedEntityType ?? "",
+            relatedEntityId: record.string(for: "relatedEntityId") ?? existing?.relatedEntityId ?? "",
+            recurrenceDays: record.int(for: "recurrenceDays") ?? existing?.recurrenceDays ?? 0,
+            recurrenceEndDate: record.date(for: "recurrenceEndDate"),
+            isCompleted: record.bool(for: "isCompleted") ?? existing?.isCompleted ?? false,
+            completedOccurrences: record.stringList(for: "completedOccurrences") ?? existing?.completedOccurrences ?? [],
+            createdAt: record.date(for: "createdAt") ?? existing?.createdAt ?? metadata.lastModifiedAt,
+            assigneeId: record.string(for: "assigneeId"),
+            feedRuleKindRaw: record.string(for: "feedRuleKindRaw") ?? existing?.feedRuleKindRaw ?? "",
+            foodKindRaw: record.string(for: "foodKindRaw") ?? existing?.foodKindRaw ?? FeedFoodKind.dry.rawValue,
+            feedAmountGrams: record.double(for: "feedAmountGrams") ?? existing?.feedAmountGrams ?? 0,
+            feedPlanGroupId: record.string(for: "feedPlanGroupId") ?? existing?.feedPlanGroupId ?? ""
+        )
+        let result = try DomainScheduleRehydrateWriter.upsertEvent(
+            snapshot: snapshot,
+            source: .cloudApply,
+            context: context
+        )
+        return result.inserted
+            ? .inserted(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
+            : .updated(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
     }
 
     private static func applyPetCareLog(
@@ -439,32 +405,27 @@ nonisolated enum CloudSyncRecordApplier {
         metadata: RemoteMetadata,
         context: ModelContext
     ) throws -> CloudSyncRecordApplyResult {
-        if try fetchPetCareLog(id: metadata.localRecordUUID, context: context) != nil {
-            return .updated(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
-        }
-
-        let petId = record.string(for: "petId").flatMap(UUID.init(uuidString:))
-        let pet: Pet? = if let petId {
-            try fetchPet(id: petId, context: context)
-        } else {
-            nil
-        }
-        let log = PetCareLog(
-            date: record.date(for: "date") ?? metadata.lastModifiedAt,
-            type: CareType(rawValue: record.string(for: "type") ?? "") ?? .feeding,
-            amountGrams: record.double(for: "amountGrams") ?? 0,
-            amountMl: record.double(for: "amountMl") ?? 0,
-            note: record.string(for: "note") ?? "",
-            foodKind: FeedFoodKind(rawValue: record.string(for: "foodKindRaw") ?? "") ?? .dry,
-            treatKind: record.string(for: "treatKindRaw").flatMap(FeedTreatKind.init(rawValue:)),
-            autoFeedDedupKey: record.string(for: "autoFeedDedupKey") ?? "",
-            sharedSessionId: record.string(for: "sharedSessionId") ?? "",
-            pet: pet,
-            executorId: record.string(for: "executorId")
+        let result = try DomainCareFactRehydrateWriter.insertPetCareLogIfNeeded(
+            snapshot: DomainPetCareLogRehydrateSnapshot(
+                id: metadata.localRecordUUID,
+                date: record.date(for: "date") ?? metadata.lastModifiedAt,
+                typeRaw: record.string(for: "type") ?? CareType.feeding.rawValue,
+                amountGrams: record.double(for: "amountGrams") ?? 0,
+                amountMl: record.double(for: "amountMl") ?? 0,
+                note: record.string(for: "note") ?? "",
+                foodKindRaw: record.string(for: "foodKindRaw") ?? FeedFoodKind.dry.rawValue,
+                treatKindRaw: record.string(for: "treatKindRaw"),
+                autoFeedDedupKey: record.string(for: "autoFeedDedupKey") ?? "",
+                sharedSessionId: record.string(for: "sharedSessionId") ?? "",
+                petId: record.string(for: "petId").flatMap(UUID.init(uuidString:)),
+                executorId: record.string(for: "executorId")
+            ),
+            source: .cloudApply,
+            context: context
         )
-        log.id = metadata.localRecordUUID
-        context.insert(log)
-        return .inserted(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
+        return result.inserted
+            ? .inserted(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
+            : .updated(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
     }
 
     private static func applyPetPottyLog(
@@ -472,25 +433,25 @@ nonisolated enum CloudSyncRecordApplier {
         metadata: RemoteMetadata,
         context: ModelContext
     ) throws -> CloudSyncRecordApplyResult {
-        if try fetchPetPottyLog(id: metadata.localRecordUUID, context: context) != nil {
-            return .updated(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
-        }
-
-        let pet = try petReference(from: record, context: context)
-        let log = PetPottyLog(
-            date: record.date(for: "date") ?? metadata.lastModifiedAt,
-            type: PottyType(rawValue: record.string(for: "type") ?? "") ?? .perfectPoop,
-            pet: pet,
-            executorId: record.string(for: "executorId"),
-            latitude: record.double(for: "latitude"),
-            longitude: record.double(for: "longitude"),
-            locationAccuracyMeters: record.double(for: "locationAccuracyMeters"),
-            walkLogId: record.string(for: "walkLogId"),
-            sharedSessionId: record.string(for: "sharedSessionId") ?? ""
+        let result = try DomainCareFactRehydrateWriter.insertPetPottyLogIfNeeded(
+            snapshot: DomainPetPottyLogRehydrateSnapshot(
+                id: metadata.localRecordUUID,
+                date: record.date(for: "date") ?? metadata.lastModifiedAt,
+                typeRaw: record.string(for: "type") ?? PottyType.perfectPoop.rawValue,
+                petId: record.string(for: "petId").flatMap(UUID.init(uuidString:)),
+                executorId: record.string(for: "executorId"),
+                latitude: record.double(for: "latitude"),
+                longitude: record.double(for: "longitude"),
+                locationAccuracyMeters: record.double(for: "locationAccuracyMeters"),
+                walkLogId: record.string(for: "walkLogId"),
+                sharedSessionId: record.string(for: "sharedSessionId") ?? ""
+            ),
+            source: .cloudApply,
+            context: context
         )
-        log.id = metadata.localRecordUUID
-        context.insert(log)
-        return .inserted(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
+        return result.inserted
+            ? .inserted(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
+            : .updated(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
     }
 
     private static func applyPetHygieneLog(
@@ -498,21 +459,21 @@ nonisolated enum CloudSyncRecordApplier {
         metadata: RemoteMetadata,
         context: ModelContext
     ) throws -> CloudSyncRecordApplyResult {
-        if try fetchPetHygieneLog(id: metadata.localRecordUUID, context: context) != nil {
-            return .updated(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
-        }
-
-        let pet = try petReference(from: record, context: context)
-        let log = PetHygieneLog(
-            date: record.date(for: "date") ?? metadata.lastModifiedAt,
-            type: HygieneType(rawValue: record.string(for: "type") ?? "") ?? .bath,
-            pet: pet,
-            executorId: record.string(for: "executorId"),
-            sharedSessionId: record.string(for: "sharedSessionId") ?? ""
+        let result = try DomainCareFactRehydrateWriter.insertPetHygieneLogIfNeeded(
+            snapshot: DomainPetHygieneLogRehydrateSnapshot(
+                id: metadata.localRecordUUID,
+                date: record.date(for: "date") ?? metadata.lastModifiedAt,
+                typeRaw: record.string(for: "type") ?? HygieneType.bath.rawValue,
+                petId: record.string(for: "petId").flatMap(UUID.init(uuidString:)),
+                executorId: record.string(for: "executorId"),
+                sharedSessionId: record.string(for: "sharedSessionId") ?? ""
+            ),
+            source: .cloudApply,
+            context: context
         )
-        log.id = metadata.localRecordUUID
-        context.insert(log)
-        return .inserted(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
+        return result.inserted
+            ? .inserted(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
+            : .updated(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
     }
 
     private static func applyPetHealthLog(
@@ -520,25 +481,25 @@ nonisolated enum CloudSyncRecordApplier {
         metadata: RemoteMetadata,
         context: ModelContext
     ) throws -> CloudSyncRecordApplyResult {
-        if try fetchPetHealthLog(id: metadata.localRecordUUID, context: context) != nil {
-            return .updated(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
-        }
-
-        let pet = try petReference(from: record, context: context)
-        let log = PetHealthLog(
-            date: record.date(for: "date") ?? metadata.lastModifiedAt,
-            type: HealthLogType(rawValue: record.string(for: "type") ?? "") ?? .general,
-            note: record.string(for: "note") ?? "",
-            pet: pet,
-            executorId: record.string(for: "executorId")
+        let result = try DomainCareFactRehydrateWriter.insertPetHealthLogIfNeeded(
+            snapshot: DomainPetHealthLogRehydrateSnapshot(
+                id: metadata.localRecordUUID,
+                date: record.date(for: "date") ?? metadata.lastModifiedAt,
+                typeRaw: record.string(for: "type") ?? HealthLogType.general.rawValue,
+                note: record.string(for: "note") ?? "",
+                petId: record.string(for: "petId").flatMap(UUID.init(uuidString:)),
+                executorId: record.string(for: "executorId"),
+                vetName: record.string(for: "vetName") ?? "",
+                cost: record.double(for: "cost") ?? 0,
+                expirationDate: record.date(for: "expirationDate"),
+                nextCheckupDate: record.date(for: "nextCheckupDate")
+            ),
+            source: .cloudApply,
+            context: context
         )
-        log.id = metadata.localRecordUUID
-        log.vetName = record.string(for: "vetName") ?? ""
-        log.cost = record.double(for: "cost") ?? 0
-        log.expirationDate = record.date(for: "expirationDate")
-        log.nextCheckupDate = record.date(for: "nextCheckupDate")
-        context.insert(log)
-        return .inserted(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
+        return result.inserted
+            ? .inserted(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
+            : .updated(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
     }
 
     private static func applyPetWalkLog(
@@ -546,31 +507,28 @@ nonisolated enum CloudSyncRecordApplier {
         metadata: RemoteMetadata,
         context: ModelContext
     ) throws -> CloudSyncRecordApplyResult {
-        if try fetchPetWalkLog(id: metadata.localRecordUUID, context: context) != nil {
-            return .updated(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
-        }
-
-        let pet = try petReference(from: record, context: context)
-        let log = PetWalkLog(
-            startDate: record.date(for: "startDate") ?? metadata.lastModifiedAt,
-            pet: pet,
-            executorId: record.string(for: "executorId"),
-            executorIds: SharedCareParticipantIDs.decode(
-                record.string(for: "executorIdsRaw") ?? "",
-                fallback: record.string(for: "executorId")
+        let result = try DomainCareFactRehydrateWriter.insertPetWalkLogIfNeeded(
+            snapshot: DomainPetWalkLogRehydrateSnapshot(
+                id: metadata.localRecordUUID,
+                startDate: record.date(for: "startDate") ?? metadata.lastModifiedAt,
+                petId: record.string(for: "petId").flatMap(UUID.init(uuidString:)),
+                executorId: record.string(for: "executorId"),
+                executorIdsRaw: record.string(for: "executorIdsRaw") ?? "",
+                sharedSessionId: record.string(for: "sharedSessionId") ?? "",
+                endDate: record.date(for: "endDate"),
+                distanceMeters: record.double(for: "distanceMeters") ?? 0,
+                coconutsEarned: record.int(for: "coconutsEarned") ?? 0,
+                mapSnapshotData: record.assetData(for: "mapSnapshotData"),
+                routeLocationsData: record.assetData(for: "routeLocationsData"),
+                behaviorNotes: record.string(for: "behaviorNotes"),
+                moodRating: record.int(for: "moodRating") ?? 0
             ),
-            sharedSessionId: record.string(for: "sharedSessionId") ?? ""
+            source: .cloudApply,
+            context: context
         )
-        log.id = metadata.localRecordUUID
-        log.endDate = record.date(for: "endDate")
-        log.distanceMeters = record.double(for: "distanceMeters") ?? 0
-        log.coconutsEarned = record.int(for: "coconutsEarned") ?? 0
-        log.mapSnapshotData = record.assetData(for: "mapSnapshotData")
-        log.routeLocationsData = record.assetData(for: "routeLocationsData")
-        log.behaviorNotes = record.string(for: "behaviorNotes")
-        log.moodRating = record.int(for: "moodRating") ?? 0
-        context.insert(log)
-        return .inserted(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
+        return result.inserted
+            ? .inserted(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
+            : .updated(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
     }
 
     private static func applyPetExpenseLog(
@@ -578,23 +536,23 @@ nonisolated enum CloudSyncRecordApplier {
         metadata: RemoteMetadata,
         context: ModelContext
     ) throws -> CloudSyncRecordApplyResult {
-        if try fetchPetExpenseLog(id: metadata.localRecordUUID, context: context) != nil {
-            return .updated(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
-        }
-
-        let pet = try petReference(from: record, context: context)
-        let log = PetExpenseLog(
-            date: record.date(for: "date") ?? metadata.lastModifiedAt,
-            amount: record.double(for: "amount") ?? 0,
-            category: ExpenseCategory(rawValue: record.string(for: "category") ?? "") ?? .other,
-            note: record.string(for: "note") ?? "",
-            pet: pet,
-            executorId: record.string(for: "executorId"),
-            sharedSessionId: record.string(for: "sharedSessionId") ?? ""
+        let result = try DomainCareFactRehydrateWriter.insertPetExpenseLogIfNeeded(
+            snapshot: DomainPetExpenseLogRehydrateSnapshot(
+                id: metadata.localRecordUUID,
+                date: record.date(for: "date") ?? metadata.lastModifiedAt,
+                amount: record.double(for: "amount") ?? 0,
+                categoryRaw: record.string(for: "category") ?? ExpenseCategory.other.rawValue,
+                note: record.string(for: "note") ?? "",
+                petId: record.string(for: "petId").flatMap(UUID.init(uuidString:)),
+                executorId: record.string(for: "executorId"),
+                sharedSessionId: record.string(for: "sharedSessionId") ?? ""
+            ),
+            source: .cloudApply,
+            context: context
         )
-        log.id = metadata.localRecordUUID
-        context.insert(log)
-        return .inserted(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
+        return result.inserted
+            ? .inserted(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
+            : .updated(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
     }
 
     private static func applyPetFoodRecord(
@@ -602,43 +560,30 @@ nonisolated enum CloudSyncRecordApplier {
         metadata: RemoteMetadata,
         context: ModelContext
     ) throws -> CloudSyncRecordApplyResult {
-        let foodRecord: PetFoodRecord
-        let result: CloudSyncRecordApplyResult
-        if let existing = try fetchPetFoodRecord(id: metadata.localRecordUUID, context: context) {
-            foodRecord = existing
-            result = .updated(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
-        } else {
-            foodRecord = try PetFoodRecord(
-                brand: record.string(for: "brand") ?? "",
-                dailyGrams: record.double(for: "dailyGrams") ?? 0,
-                totalGrams: record.double(for: "totalGrams") ?? 0,
-                foodKind: FeedFoodKind(rawValue: record.string(for: "foodKindRaw") ?? "") ?? .dry,
+        let existing = try fetchPetFoodRecord(id: metadata.localRecordUUID, context: context)
+        let result = try DomainCareFactRehydrateWriter.upsertPetFoodRecord(
+            snapshot: DomainPetFoodRecordRehydrateSnapshot(
+                id: metadata.localRecordUUID,
+                brand: record.string(for: "brand") ?? existing?.brand ?? "",
+                dailyGrams: record.double(for: "dailyGrams") ?? existing?.dailyGrams ?? 0,
+                totalGrams: record.double(for: "totalGrams") ?? existing?.totalGrams ?? 0,
+                foodKindRaw: record.string(for: "foodKindRaw") ?? existing?.foodKindRaw ?? FeedFoodKind.dry.rawValue,
                 purchaseDate: record.date(for: "purchaseDate"),
-                startDate: record.date(for: "startDate") ?? metadata.lastModifiedAt,
-                pet: petReference(from: record, context: context),
-                executorId: record.string(for: "executorId"),
+                startDate: record.date(for: "startDate") ?? existing?.startDate ?? metadata.lastModifiedAt,
+                remainingCorrectionGrams: record.double(for: "remainingCorrectionGrams"),
+                remainingCorrectionDate: record.date(for: "remainingCorrectionDate"),
+                notes: record.string(for: "notes") ?? existing?.notes ?? "",
                 expenseId: record.string(for: "expenseId").flatMap(UUID.init(uuidString:)),
-                calculationMode: FeedStockCalculationMode(rawValue: record.string(for: "calculationModeRaw") ?? "") ?? .manualOrPlan
-            )
-            foodRecord.id = metadata.localRecordUUID
-            context.insert(foodRecord)
-            result = .inserted(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
-        }
-
-        foodRecord.brand = record.string(for: "brand") ?? foodRecord.brand
-        foodRecord.dailyGrams = record.double(for: "dailyGrams") ?? foodRecord.dailyGrams
-        foodRecord.totalGrams = record.double(for: "totalGrams") ?? foodRecord.totalGrams
-        foodRecord.foodKindRaw = record.string(for: "foodKindRaw") ?? foodRecord.foodKindRaw
-        foodRecord.purchaseDate = record.date(for: "purchaseDate")
-        foodRecord.startDate = record.date(for: "startDate") ?? foodRecord.startDate
-        foodRecord.remainingCorrectionGrams = record.double(for: "remainingCorrectionGrams")
-        foodRecord.remainingCorrectionDate = record.date(for: "remainingCorrectionDate")
-        foodRecord.notes = record.string(for: "notes") ?? foodRecord.notes
-        foodRecord.expenseId = record.string(for: "expenseId").flatMap(UUID.init(uuidString:))
-        foodRecord.calculationModeRaw = record.string(for: "calculationModeRaw") ?? foodRecord.calculationModeRaw
-        foodRecord.executorId = record.string(for: "executorId")
-        foodRecord.pet = try petReference(from: record, context: context)
-        return result
+                calculationModeRaw: record.string(for: "calculationModeRaw") ?? existing?.calculationModeRaw ?? FeedStockCalculationMode.manualOrPlan.rawValue,
+                executorId: record.string(for: "executorId"),
+                petId: record.string(for: "petId").flatMap(UUID.init(uuidString:))
+            ),
+            source: .cloudApply,
+            context: context
+        )
+        return result.inserted
+            ? .inserted(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
+            : .updated(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
     }
 
     private static func applyPetWeightLog(
@@ -646,22 +591,22 @@ nonisolated enum CloudSyncRecordApplier {
         metadata: RemoteMetadata,
         context: ModelContext
     ) throws -> CloudSyncRecordApplyResult {
-        if try fetchPetWeightLog(id: metadata.localRecordUUID, context: context) != nil {
-            return .updated(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
-        }
-
-        let pet = try petReference(from: record, context: context)
-        let log = PetWeightLog(
-            date: record.date(for: "date") ?? metadata.lastModifiedAt,
-            weight: record.double(for: "weight") ?? 0,
-            weightUnit: record.string(for: "weightUnit") ?? "kg",
-            bcsScore: record.int(for: "bcsScore") ?? 0,
-            pet: pet,
-            executorId: record.string(for: "executorId")
+        let result = try DomainCareFactRehydrateWriter.insertPetWeightLogIfNeeded(
+            snapshot: DomainPetWeightLogRehydrateSnapshot(
+                id: metadata.localRecordUUID,
+                date: record.date(for: "date") ?? metadata.lastModifiedAt,
+                weight: record.double(for: "weight") ?? 0,
+                weightUnit: record.string(for: "weightUnit") ?? "kg",
+                bcsScore: record.int(for: "bcsScore") ?? 0,
+                petId: record.string(for: "petId").flatMap(UUID.init(uuidString:)),
+                executorId: record.string(for: "executorId")
+            ),
+            source: .cloudApply,
+            context: context
         )
-        log.id = metadata.localRecordUUID
-        context.insert(log)
-        return .inserted(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
+        return result.inserted
+            ? .inserted(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
+            : .updated(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
     }
 
     private static func applySharedCareSession(
@@ -669,40 +614,35 @@ nonisolated enum CloudSyncRecordApplier {
         metadata: RemoteMetadata,
         context: ModelContext
     ) throws -> CloudSyncRecordApplyResult {
-        if try fetchSharedCareSession(id: metadata.localRecordUUID, context: context) != nil {
-            return .updated(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
-        }
-
-        let targetPetIds = (record.string(for: "targetPetIdsRaw") ?? "")
-            .split(separator: "|")
-            .map(String.init)
-        let session = SharedCareSession(
-            date: record.date(for: "date") ?? metadata.lastModifiedAt,
-            actionKind: SharedCareActionKind(rawValue: record.string(for: "actionKindRaw") ?? "") ?? .feeding,
-            executorId: record.string(for: "executorId"),
-            executorIds: SharedCareParticipantIDs.decode(
-                record.string(for: "executorIdsRaw") ?? "",
-                fallback: record.string(for: "executorId")
+        let result = try DomainCareFactRehydrateWriter.insertSharedCareSessionIfNeeded(
+            snapshot: DomainSharedCareSessionRehydrateSnapshot(
+                id: metadata.localRecordUUID,
+                date: record.date(for: "date") ?? metadata.lastModifiedAt,
+                actionKindRaw: record.string(for: "actionKindRaw") ?? SharedCareActionKind.feeding.rawValue,
+                executorId: record.string(for: "executorId"),
+                executorIdsRaw: record.string(for: "executorIdsRaw") ?? "",
+                sourcePetId: record.string(for: "sourcePetId") ?? "",
+                targetPetIds: (record.string(for: "targetPetIdsRaw") ?? "").split(separator: "|").map(String.init),
+                speciesRaw: record.string(for: "speciesRaw") ?? "",
+                totalAmountGrams: record.double(for: "totalAmountGrams") ?? 0,
+                totalAmountMl: record.double(for: "totalAmountMl") ?? 0,
+                totalExpenseAmount: record.double(for: "totalExpenseAmount") ?? 0,
+                expenseCategoryRaw: record.string(for: "expenseCategoryRaw") ?? ExpenseCategory.other.rawValue,
+                currencyCode: record.string(for: "currencyCode") ?? "",
+                allocationModeRaw: record.string(for: "allocationModeRaw") ?? SharedCareAllocationMode.equal.rawValue,
+                foodKindRaw: record.string(for: "foodKindRaw") ?? FeedFoodKind.dry.rawValue,
+                stockOwnerPetId: record.string(for: "stockOwnerPetId") ?? "",
+                primaryLegacyModelName: record.string(for: "primaryLegacyModelName") ?? "",
+                primaryLegacyModelId: record.string(for: "primaryLegacyModelId") ?? "",
+                note: record.string(for: "note") ?? "",
+                createdAt: record.date(for: "createdAt") ?? metadata.lastModifiedAt
             ),
-            sourcePetId: record.string(for: "sourcePetId") ?? "",
-            targetPetIds: targetPetIds,
-            species: record.string(for: "speciesRaw") ?? "",
-            totalAmountGrams: record.double(for: "totalAmountGrams") ?? 0,
-            totalAmountMl: record.double(for: "totalAmountMl") ?? 0,
-            totalExpenseAmount: record.double(for: "totalExpenseAmount") ?? 0,
-            expenseCategory: ExpenseCategory(rawValue: record.string(for: "expenseCategoryRaw") ?? "") ?? .other,
-            currencyCode: record.string(for: "currencyCode") ?? "",
-            allocationMode: SharedCareAllocationMode(rawValue: record.string(for: "allocationModeRaw") ?? "") ?? .equal,
-            foodKind: FeedFoodKind(rawValue: record.string(for: "foodKindRaw") ?? "") ?? .dry,
-            stockOwnerPetId: record.string(for: "stockOwnerPetId") ?? "",
-            primaryLegacyModelName: record.string(for: "primaryLegacyModelName") ?? "",
-            primaryLegacyModelId: record.string(for: "primaryLegacyModelId") ?? "",
-            note: record.string(for: "note") ?? ""
+            source: .cloudApply,
+            context: context
         )
-        session.id = metadata.localRecordUUID
-        session.createdAt = record.date(for: "createdAt") ?? session.createdAt
-        context.insert(session)
-        return .inserted(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
+        return result.inserted
+            ? .inserted(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
+            : .updated(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
     }
 
     private static func applyCareLedgerEvent(
@@ -710,49 +650,38 @@ nonisolated enum CloudSyncRecordApplier {
         metadata: RemoteMetadata,
         context: ModelContext
     ) throws -> CloudSyncRecordApplyResult {
-        let event: CareLedgerEvent
-        let result: CloudSyncRecordApplyResult
-        if let existing = try fetchCareLedgerEvent(id: metadata.localRecordUUID, context: context) {
-            event = existing
-            result = .updated(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
-        } else {
-            event = CareLedgerEvent(
-                id: metadata.localRecordUUID,
-                occurredAt: record.date(for: "occurredAt") ?? metadata.lastModifiedAt,
-                actorKind: CareLedgerActorKind(rawValue: record.string(for: "actorKind") ?? "") ?? .unknown,
-                actorId: record.string(for: "actorId"),
-                subjectKind: CareLedgerSubjectKind(rawValue: record.string(for: "subjectKind") ?? "") ?? .unknown,
-                subjectId: record.string(for: "subjectId"),
-                eventKind: CareLedgerEventKind(rawValue: record.string(for: "eventKind") ?? "") ?? .unknown,
-                actionType: record.string(for: "actionType") ?? "",
-                source: CareLedgerSource(rawValue: record.string(for: "source") ?? "") ?? .service,
-                createdAt: record.date(for: "createdAt") ?? metadata.lastModifiedAt
-            )
-            context.insert(event)
-            result = .inserted(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
-        }
-
-        event.occurredAt = record.date(for: "occurredAt") ?? event.occurredAt
-        event.actorKind = record.string(for: "actorKind") ?? event.actorKind
-        event.actorId = record.string(for: "actorId")
-        event.subjectKind = record.string(for: "subjectKind") ?? event.subjectKind
-        event.subjectId = record.string(for: "subjectId")
-        event.eventKind = record.string(for: "eventKind") ?? event.eventKind
-        event.actionType = record.string(for: "actionType") ?? event.actionType
-        event.amountValue = record.double(for: "amountValue") ?? event.amountValue
-        event.amountUnit = record.string(for: "amountUnit") ?? event.amountUnit
-        event.note = record.string(for: "note") ?? event.note
-        event.source = record.string(for: "source") ?? event.source
-        event.sourceEventId = record.string(for: "sourceEventId")
-        event.sourceReminderId = record.string(for: "sourceReminderId")
-        event.legacyModelName = record.string(for: "legacyModelName")
-        event.legacyModelId = record.string(for: "legacyModelId")
-        event.coconutDelta = record.int(for: "coconutDelta") ?? event.coconutDelta
-        event.rewardLogId = record.string(for: "rewardLogId")
-        event.privacyFieldRaw = record.string(for: "privacyFieldRaw")
-        event.metadataJSON = record.string(for: "metadataJSON") ?? event.metadataJSON
-        event.createdAt = record.date(for: "createdAt") ?? event.createdAt
-        return result
+        let existing = try fetchCareLedgerEvent(id: metadata.localRecordUUID, context: context)
+        let snapshot = DomainCareLedgerRehydrateSnapshot(
+            id: metadata.localRecordUUID,
+            occurredAt: record.date(for: "occurredAt") ?? existing?.occurredAt ?? metadata.lastModifiedAt,
+            actorKind: record.string(for: "actorKind") ?? existing?.actorKind ?? CareLedgerActorKind.unknown.rawValue,
+            actorId: record.string(for: "actorId"),
+            subjectKind: record.string(for: "subjectKind") ?? existing?.subjectKind ?? CareLedgerSubjectKind.unknown.rawValue,
+            subjectId: record.string(for: "subjectId"),
+            eventKind: record.string(for: "eventKind") ?? existing?.eventKind ?? CareLedgerEventKind.unknown.rawValue,
+            actionType: record.string(for: "actionType") ?? existing?.actionType ?? "",
+            amountValue: record.double(for: "amountValue") ?? existing?.amountValue ?? 0,
+            amountUnit: record.string(for: "amountUnit") ?? existing?.amountUnit ?? "",
+            note: record.string(for: "note") ?? existing?.note ?? "",
+            source: record.string(for: "source") ?? existing?.source ?? CareLedgerSource.service.rawValue,
+            sourceEventId: record.string(for: "sourceEventId"),
+            sourceReminderId: record.string(for: "sourceReminderId"),
+            legacyModelName: record.string(for: "legacyModelName"),
+            legacyModelId: record.string(for: "legacyModelId"),
+            coconutDelta: record.int(for: "coconutDelta") ?? existing?.coconutDelta ?? 0,
+            rewardLogId: record.string(for: "rewardLogId"),
+            privacyFieldRaw: record.string(for: "privacyFieldRaw"),
+            metadataJSON: record.string(for: "metadataJSON") ?? existing?.metadataJSON ?? "",
+            createdAt: record.date(for: "createdAt") ?? existing?.createdAt ?? metadata.lastModifiedAt
+        )
+        let result = try DomainCareLedgerRehydrateWriter.upsertCareLedgerEvent(
+            snapshot: snapshot,
+            source: .cloudApply,
+            context: context
+        )
+        return result.inserted
+            ? .inserted(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
+            : .updated(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
     }
 
     private static func applyCoconutLedgerEntry(
@@ -760,48 +689,39 @@ nonisolated enum CloudSyncRecordApplier {
         metadata: RemoteMetadata,
         context: ModelContext
     ) throws -> CloudSyncRecordApplyResult {
-        if try fetchCoconutLedgerEntry(id: metadata.localRecordUUID, context: context) != nil {
-            CoconutWalletService.reconcileFormalAccountBalancesWithLedger(context: context)
-            return .updated(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
-        }
-
-        let ownerKindRaw = record.string(for: "ownerKindRaw") ?? CoconutWalletOwnerKind.system.rawValue
-        let entryKindRaw = record.string(for: "entryKindRaw") ?? CoconutWalletEntryKind.adjustment.rawValue
-        let sourceRaw = record.string(for: "sourceRaw") ?? CoconutWalletSource.service.rawValue
-        let subjectKindRaw = record.string(for: "subjectKindRaw") ?? CareLedgerSubjectKind.system.rawValue
-        let entry = CoconutLedgerEntry(
-            id: metadata.localRecordUUID,
-            transactionKey: record.string(for: "transactionKey") ?? metadata.recordKey,
-            accountKey: record.string(for: "accountKey") ?? "system:legacy",
-            ownerKind: CoconutWalletOwnerKind(rawValue: ownerKindRaw) ?? .system,
-            ownerId: record.string(for: "ownerId") ?? "",
-            ownerName: record.string(for: "ownerName") ?? "",
-            delta: record.int(for: "delta") ?? 0,
-            balanceBefore: record.int(for: "balanceBefore") ?? 0,
-            balanceAfter: record.int(for: "balanceAfter") ?? 0,
-            affectsBalance: record.bool(for: "affectsBalance") ?? true,
-            entryKind: CoconutWalletEntryKind(rawValue: entryKindRaw) ?? .adjustment,
-            source: CoconutWalletSource(rawValue: sourceRaw) ?? .service,
-            title: record.string(for: "title") ?? "",
-            emoji: record.string(for: "emoji") ?? "",
-            actorId: record.string(for: "actorId"),
-            actorName: record.string(for: "actorName"),
-            subjectKind: CareLedgerSubjectKind(rawValue: subjectKindRaw) ?? .system,
-            subjectId: record.string(for: "subjectId"),
-            sourceModelName: record.string(for: "sourceModelName") ?? "",
-            sourceModelId: record.string(for: "sourceModelId") ?? "",
-            careLedgerEventId: record.string(for: "careLedgerEventId"),
-            metadataJSON: record.string(for: "metadataJSON") ?? "",
-            occurredAt: record.date(for: "occurredAt") ?? metadata.lastModifiedAt,
-            createdAt: record.date(for: "createdAt") ?? metadata.lastModifiedAt
+        let result = try DomainGeneralRehydrateWriter.upsertCoconutLedgerEntry(
+            snapshot: DomainCoconutLedgerEntryRehydrateSnapshot(
+                id: metadata.localRecordUUID,
+                transactionKey: record.string(for: "transactionKey") ?? metadata.recordKey,
+                accountKey: record.string(for: "accountKey") ?? "system:legacy",
+                ownerKindRaw: record.string(for: "ownerKindRaw") ?? CoconutWalletOwnerKind.system.rawValue,
+                ownerId: record.string(for: "ownerId") ?? "",
+                ownerName: record.string(for: "ownerName") ?? "",
+                delta: record.int(for: "delta") ?? 0,
+                balanceBefore: record.int(for: "balanceBefore") ?? 0,
+                balanceAfter: record.int(for: "balanceAfter") ?? 0,
+                affectsBalance: record.bool(for: "affectsBalance") ?? true,
+                entryKindRaw: record.string(for: "entryKindRaw") ?? CoconutWalletEntryKind.adjustment.rawValue,
+                sourceRaw: record.string(for: "sourceRaw") ?? CoconutWalletSource.service.rawValue,
+                title: record.string(for: "title") ?? "",
+                emoji: record.string(for: "emoji") ?? "",
+                actorId: record.string(for: "actorId"),
+                actorName: record.string(for: "actorName"),
+                subjectKindRaw: record.string(for: "subjectKindRaw") ?? CareLedgerSubjectKind.system.rawValue,
+                subjectId: record.string(for: "subjectId"),
+                sourceModelName: record.string(for: "sourceModelName") ?? "",
+                sourceModelId: record.string(for: "sourceModelId") ?? "",
+                careLedgerEventId: record.string(for: "careLedgerEventId"),
+                metadataJSON: record.string(for: "metadataJSON") ?? "",
+                occurredAt: record.date(for: "occurredAt") ?? metadata.lastModifiedAt,
+                createdAt: record.date(for: "createdAt") ?? metadata.lastModifiedAt
+            ),
+            source: .cloudApply,
+            context: context
         )
-        entry.ownerKindRaw = ownerKindRaw
-        entry.entryKindRaw = entryKindRaw
-        entry.sourceRaw = sourceRaw
-        entry.subjectKindRaw = subjectKindRaw
-        context.insert(entry)
-        CoconutWalletService.reconcileFormalAccountBalancesWithLedger(context: context)
-        return .inserted(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
+        return result.inserted
+            ? .inserted(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
+            : .updated(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
     }
 
     private static func applyGachaOwnedItem(
@@ -809,28 +729,26 @@ nonisolated enum CloudSyncRecordApplier {
         metadata: RemoteMetadata,
         context: ModelContext
     ) throws -> CloudSyncRecordApplyResult {
-        let item: GachaOwnedItem
-        let result: CloudSyncRecordApplyResult
-        if let existing = try fetchGachaOwnedItem(id: metadata.localRecordUUID, context: context) {
-            item = existing
-            result = .updated(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
-        } else {
-            item = GachaOwnedItem()
-            item.id = metadata.localRecordUUID
-            context.insert(item)
-            result = .inserted(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
-        }
-
-        item.ownerHumanId = record.string(for: "ownerHumanId") ?? item.ownerHumanId
-        item.seriesId = record.string(for: "seriesId") ?? item.seriesId
-        item.itemId = record.string(for: "itemId") ?? item.itemId
-        item.rarityRaw = record.string(for: "rarityRaw") ?? item.rarityRaw
-        item.isHidden = record.bool(for: "isHidden") ?? item.isHidden
-        item.ownedCount = max(item.ownedCount, record.int(for: "ownedCount") ?? item.ownedCount)
-        item.firstObtainedAt = record.date(for: "firstObtainedAt") ?? item.firstObtainedAt
-        item.latestObtainedAt = record.date(for: "latestObtainedAt") ?? item.latestObtainedAt
-        item.createdAt = record.date(for: "createdAt") ?? item.createdAt
-        return result
+        let existing = try fetchGachaOwnedItem(id: metadata.localRecordUUID, context: context)
+        let result = try DomainGeneralRehydrateWriter.upsertGachaOwnedItem(
+            snapshot: DomainGachaOwnedItemRehydrateSnapshot(
+                id: metadata.localRecordUUID,
+                ownerHumanId: record.string(for: "ownerHumanId") ?? existing?.ownerHumanId ?? "",
+                seriesId: record.string(for: "seriesId") ?? existing?.seriesId ?? "",
+                itemId: record.string(for: "itemId") ?? existing?.itemId ?? "",
+                rarityRaw: record.string(for: "rarityRaw") ?? existing?.rarityRaw ?? GachaRarity.common.rawValue,
+                isHidden: record.bool(for: "isHidden") ?? existing?.isHidden ?? false,
+                ownedCount: record.int(for: "ownedCount") ?? existing?.ownedCount ?? 1,
+                firstObtainedAt: record.date(for: "firstObtainedAt") ?? existing?.firstObtainedAt ?? metadata.lastModifiedAt,
+                latestObtainedAt: record.date(for: "latestObtainedAt") ?? existing?.latestObtainedAt ?? metadata.lastModifiedAt,
+                createdAt: record.date(for: "createdAt") ?? existing?.createdAt ?? metadata.lastModifiedAt
+            ),
+            source: .cloudApply,
+            context: context
+        )
+        return result.inserted
+            ? .inserted(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
+            : .updated(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
     }
 
     private static func applyGachaDrawLog(
@@ -838,40 +756,38 @@ nonisolated enum CloudSyncRecordApplier {
         metadata: RemoteMetadata,
         context: ModelContext
     ) throws -> CloudSyncRecordApplyResult {
-        let log: GachaDrawLog
-        let result: CloudSyncRecordApplyResult
-        if let existing = try fetchGachaDrawLog(id: metadata.localRecordUUID, context: context) {
-            log = existing
-            result = .updated(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
-        } else {
-            log = GachaDrawLog()
-            log.id = metadata.localRecordUUID
-            context.insert(log)
-            result = .inserted(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
-        }
-
-        log.ownerHumanId = record.string(for: "ownerHumanId") ?? log.ownerHumanId
-        log.ownerName = record.string(for: "ownerName") ?? log.ownerName
-        log.seriesId = record.string(for: "seriesId") ?? log.seriesId
-        log.itemId = record.string(for: "itemId") ?? log.itemId
-        log.rarityRaw = record.string(for: "rarityRaw") ?? log.rarityRaw
-        log.isHidden = record.bool(for: "isHidden") ?? log.isHidden
-        log.isNew = record.bool(for: "isNew") ?? log.isNew
-        log.outcomeKindRaw = record.string(for: "outcomeKindRaw") ?? log.outcomeKindRaw
-        log.instantResultId = record.string(for: "instantResultId") ?? log.instantResultId
-        log.instantTitleZh = record.string(for: "instantTitleZh") ?? log.instantTitleZh
-        log.instantTitleEn = record.string(for: "instantTitleEn") ?? log.instantTitleEn
-        log.instantTitleDe = record.string(for: "instantTitleDe") ?? log.instantTitleDe
-        log.instantDetailZh = record.string(for: "instantDetailZh") ?? log.instantDetailZh
-        log.instantDetailEn = record.string(for: "instantDetailEn") ?? log.instantDetailEn
-        log.instantDetailDe = record.string(for: "instantDetailDe") ?? log.instantDetailDe
-        log.instantSymbol = record.string(for: "instantSymbol") ?? log.instantSymbol
-        log.instantCoconutDelta = record.int(for: "instantCoconutDelta") ?? log.instantCoconutDelta
-        log.costCoconuts = record.int(for: "costCoconuts") ?? log.costCoconuts
-        log.dailySequence = record.int(for: "dailySequence") ?? log.dailySequence
-        log.drawDate = record.date(for: "drawDate") ?? log.drawDate
-        log.createdAt = record.date(for: "createdAt") ?? log.createdAt
-        return result
+        let existing = try fetchGachaDrawLog(id: metadata.localRecordUUID, context: context)
+        let result = try DomainGeneralRehydrateWriter.upsertGachaDrawLog(
+            snapshot: DomainGachaDrawLogRehydrateSnapshot(
+                id: metadata.localRecordUUID,
+                ownerHumanId: record.string(for: "ownerHumanId") ?? existing?.ownerHumanId ?? "",
+                ownerName: record.string(for: "ownerName") ?? existing?.ownerName ?? "",
+                seriesId: record.string(for: "seriesId") ?? existing?.seriesId ?? "",
+                itemId: record.string(for: "itemId") ?? existing?.itemId ?? "",
+                rarityRaw: record.string(for: "rarityRaw") ?? existing?.rarityRaw ?? GachaRarity.common.rawValue,
+                isHidden: record.bool(for: "isHidden") ?? existing?.isHidden ?? false,
+                isNew: record.bool(for: "isNew") ?? existing?.isNew ?? false,
+                outcomeKindRaw: record.string(for: "outcomeKindRaw") ?? existing?.outcomeKindRaw ?? GachaOutcomeKind.collectible.rawValue,
+                instantResultId: record.string(for: "instantResultId") ?? existing?.instantResultId ?? "",
+                instantTitleZh: record.string(for: "instantTitleZh") ?? existing?.instantTitleZh ?? "",
+                instantTitleEn: record.string(for: "instantTitleEn") ?? existing?.instantTitleEn ?? "",
+                instantTitleDe: record.string(for: "instantTitleDe") ?? existing?.instantTitleDe ?? "",
+                instantDetailZh: record.string(for: "instantDetailZh") ?? existing?.instantDetailZh ?? "",
+                instantDetailEn: record.string(for: "instantDetailEn") ?? existing?.instantDetailEn ?? "",
+                instantDetailDe: record.string(for: "instantDetailDe") ?? existing?.instantDetailDe ?? "",
+                instantSymbol: record.string(for: "instantSymbol") ?? existing?.instantSymbol ?? "",
+                instantCoconutDelta: record.int(for: "instantCoconutDelta") ?? existing?.instantCoconutDelta ?? 0,
+                costCoconuts: record.int(for: "costCoconuts") ?? existing?.costCoconuts ?? GachaDrawService.costPerDraw,
+                dailySequence: record.int(for: "dailySequence") ?? existing?.dailySequence ?? 1,
+                drawDate: record.date(for: "drawDate") ?? existing?.drawDate ?? metadata.lastModifiedAt,
+                createdAt: record.date(for: "createdAt") ?? existing?.createdAt ?? metadata.lastModifiedAt
+            ),
+            source: .cloudApply,
+            context: context
+        )
+        return result.inserted
+            ? .inserted(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
+            : .updated(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
     }
 
     private static func applyShopPurchaseRecord(
@@ -879,40 +795,29 @@ nonisolated enum CloudSyncRecordApplier {
         metadata: RemoteMetadata,
         context: ModelContext
     ) throws -> CloudSyncRecordApplyResult {
-        let purchase: ShopPurchaseRecord
-        let result: CloudSyncRecordApplyResult
         let existingById = try fetchShopPurchaseRecord(id: metadata.localRecordUUID, context: context)
         let existingByTransactionKey = try fetchShopPurchaseRecord(
             transactionKey: record.string(for: "transactionKey") ?? "",
             context: context
         )
-        if let existing = existingById ?? existingByTransactionKey {
-            purchase = existing
-            purchase.id = metadata.localRecordUUID
-            result = .updated(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
-        } else {
-            purchase = ShopPurchaseRecord(
+        let existing = existingById ?? existingByTransactionKey
+        let result = try DomainGeneralRehydrateWriter.upsertShopPurchaseRecord(
+            snapshot: DomainShopPurchaseRecordRehydrateSnapshot(
                 id: metadata.localRecordUUID,
-                transactionKey: record.string(for: "transactionKey") ?? metadata.recordKey,
-                itemId: record.string(for: "itemId") ?? "",
-                buyerHumanId: record.string(for: "buyerHumanId"),
-                purchasedAt: record.date(for: "purchasedAt") ?? metadata.lastModifiedAt,
-                sourceRaw: record.string(for: "sourceRaw") ?? "shop",
-                isLegacyImport: record.bool(for: "isLegacyImport") ?? false,
-                createdAt: record.date(for: "createdAt") ?? metadata.lastModifiedAt
-            )
-            context.insert(purchase)
-            result = .inserted(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
-        }
-
-        purchase.transactionKey = record.string(for: "transactionKey") ?? purchase.transactionKey
-        purchase.itemId = record.string(for: "itemId") ?? purchase.itemId
-        purchase.buyerHumanId = record.string(for: "buyerHumanId") ?? purchase.buyerHumanId
-        purchase.purchasedAt = record.date(for: "purchasedAt") ?? purchase.purchasedAt
-        purchase.sourceRaw = record.string(for: "sourceRaw") ?? purchase.sourceRaw
-        purchase.isLegacyImport = record.bool(for: "isLegacyImport") ?? purchase.isLegacyImport
-        purchase.createdAt = record.date(for: "createdAt") ?? purchase.createdAt
-        return result
+                transactionKey: record.string(for: "transactionKey") ?? existing?.transactionKey ?? metadata.recordKey,
+                itemId: record.string(for: "itemId") ?? existing?.itemId ?? "",
+                buyerHumanId: record.string(for: "buyerHumanId") ?? existing?.buyerHumanId ?? "",
+                purchasedAt: record.date(for: "purchasedAt") ?? existing?.purchasedAt ?? metadata.lastModifiedAt,
+                sourceRaw: record.string(for: "sourceRaw") ?? existing?.sourceRaw ?? "shop",
+                isLegacyImport: record.bool(for: "isLegacyImport") ?? existing?.isLegacyImport ?? false,
+                createdAt: record.date(for: "createdAt") ?? existing?.createdAt ?? metadata.lastModifiedAt
+            ),
+            source: .cloudApply,
+            context: context
+        )
+        return result.inserted
+            ? .inserted(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
+            : .updated(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
     }
 
     private static func upsertState(
@@ -920,14 +825,9 @@ nonisolated enum CloudSyncRecordApplier {
         record: CKRecord,
         context: ModelContext
     ) throws -> CloudSyncRecordState {
-        let state: CloudSyncRecordState
-        if let existing = try CloudSyncMetadataService.state(recordKey: metadata.recordKey, context: context) {
-            state = existing
-            state.householdId = metadata.householdId
-            state.conflictPolicy = metadata.conflictPolicy
-            state.lastModifiedAt = metadata.lastModifiedAt
-        } else {
-            state = CloudSyncRecordState(
+        try CloudSyncMetadataService.upsertAppliedRemoteState(
+            snapshot: CloudSyncAppliedRecordStateSnapshot(
+                recordKey: metadata.recordKey,
                 entityName: metadata.entityName,
                 localRecordId: metadata.localRecordUUID,
                 householdId: metadata.householdUUID,
@@ -938,16 +838,14 @@ nonisolated enum CloudSyncRecordApplier {
                 isDeleted: metadata.isDeleted,
                 isDeletionTombstone: metadata.isDeleted,
                 deletedAt: metadata.deletedAt,
-                deletedByHumanId: metadata.deletedByHumanUUID,
-                hasPendingLocalChanges: false,
+                deletedByHumanId: metadata.deletedByHumanId,
                 lastModifiedAt: metadata.lastModifiedAt,
-                lastSyncedAt: Date(),
+                lastSyncedAt: nil,
                 createdAt: metadata.lastModifiedAt,
                 updatedAt: Date()
-            )
-            context.insert(state)
-        }
-        return state
+            ),
+            context: context
+        )
     }
 
     private static func deleteLocalModel(metadata: RemoteMetadata, context: ModelContext) throws {

@@ -115,9 +115,28 @@ enum CareFactWritePolicy {
         pet: Pet,
         date _: Date,
         executorId _: String?,
-        context _: ModelContext
+        context: ModelContext
     ) -> CareFactWriteDisposition {
-        MemberLifecycleGate.disposition(pet: pet, writeKind: .care).allowsCareFactWrite ? .active : .noOp
+        authorizePetCareFact(pet: pet, context: context)?.allowsCareFactWrite == true ? .active : .noOp
+    }
+
+    @MainActor
+    static func authorizePetCareFact(
+        pet: Pet,
+        context: ModelContext
+    ) -> AuthorizedMutationPlan? {
+        DomainPolicyAuthorizer.authorize(
+            DomainMutationAuthorizationRequest(
+                scope: .careFact,
+                source: .domainService,
+                subjectRequest: DomainSubjectResolutionRequest(
+                    relatedEntityType: EntityKind.pet.rawValue,
+                    relatedEntityId: pet.id.uuidString
+                ),
+                writeKind: .care
+            ),
+            context: context
+        )
     }
 
     @MainActor

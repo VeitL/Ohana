@@ -27,4 +27,12 @@ enum MemberLifecycleGateGoodCommandService {
         }
         _ = DomainScheduleWriter.createEvent(plan: plan, context: context)
     }
+
+    static func applyBackup(snapshot: DomainPetRehydrateSnapshot, context: ModelContext) throws {
+        try DomainGeneralRehydrateWriter.upsertPet(
+            snapshot: snapshot,
+            source: .backupRestore,
+            context: context
+        )
+    }
 }

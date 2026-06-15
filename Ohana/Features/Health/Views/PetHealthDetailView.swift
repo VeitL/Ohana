@@ -261,8 +261,7 @@ struct PetHealthDetailContentView: View {
 
     var medicationDoseEvents: [Event] {
         allEvents.filter {
-            $0.eventType == EventType.petMedicationDose.rawValue
-                && $0.relatedEntityType == PetMedicationDoseLogging.relatedEntityTypeMedication
+            PetMedicationDoseLogging.doseMedicationId(for: $0) != nil
         }
     }
 
@@ -592,7 +591,7 @@ struct PetHealthDetailContentView: View {
     func medicationDoseCount(on day: Date, for medication: PetMedication) -> Int {
         let calendar = Calendar.current
         return medicationDoseEvents.count(where: {
-            $0.relatedEntityId == medication.id.uuidString
+            PetMedicationDoseLogging.isDoseEvent($0, medicationId: medication.id)
                 && calendar.isDate($0.startDate, inSameDayAs: day)
         })
     }

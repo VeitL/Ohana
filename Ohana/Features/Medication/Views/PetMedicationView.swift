@@ -26,11 +26,10 @@ struct PetMedicationContentView: View {
     private var l: L10n { L10n(appLanguage) }
     private var chromeAccent: Color { colorScheme == .dark ? Color.goPrimary : Color.goBlue }
     private var medicationEvents: [Event] {
-        let ids = Set(pet.medications.map(\.id.uuidString))
+        let ids = Set(pet.medications.map(\.id))
         return allEvents.filter {
-            $0.eventType == EventType.petMedicationDose.rawValue &&
-                $0.relatedEntityType == PetMedicationDoseLogging.relatedEntityTypeMedication &&
-                ids.contains($0.relatedEntityId)
+            guard let medicationId = PetMedicationDoseLogging.doseMedicationId(for: $0) else { return false }
+            return ids.contains(medicationId)
         }
     }
 
@@ -344,7 +343,7 @@ struct PetMedicationContentView: View {
         }
         let done = pet.medications.reduce(0) { total, medication in
             let count = medicationEvents.count(where: { event in
-                event.relatedEntityId == medication.id.uuidString &&
+                PetMedicationDoseLogging.isDoseEvent(event, medicationId: medication.id) &&
                     Calendar.current.isDate(event.startDate, inSameDayAs: day)
             })
             return total + min(count, max(0, PetMedicationDoseLogging.requiredDoses(on: day, for: medication)))

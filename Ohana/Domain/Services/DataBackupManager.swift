@@ -296,195 +296,324 @@ final nonisolated class DataBackupManager: @unchecked Sendable {
     @MainActor
     func applyBackup(_ backup: OhanaBackup, context: ModelContext, projectionManager: QuestManager?) throws {
         // 以 UUID 为主键去重：先构建现有 ID 集合，再 upsert
-        let existingPetIds = try existingIds(FetchDescriptor<Pet>(), context: context, id: \.id, operation: "fetch existing pets before restore")
-        let existingHumanIds = try existingIds(FetchDescriptor<Human>(), context: context, id: \.id, operation: "fetch existing humans before restore")
-        let existingPlantIds = try existingIds(FetchDescriptor<Plant>(), context: context, id: \.id, operation: "fetch existing plants before restore")
-        let existingHouseholdIds = try existingIds(FetchDescriptor<Household>(), context: context, id: \.id, operation: "fetch existing households before restore")
         let existingEventIds = try existingIds(FetchDescriptor<Event>(), context: context, id: \.id, operation: "fetch existing events before restore")
         let existingReminderIds = try existingIds(FetchDescriptor<Reminder>(), context: context, id: \.id, operation: "fetch existing reminders before restore")
         let existingLedgerIds = try existingIds(FetchDescriptor<CareLedgerEvent>(), context: context, id: \.id, operation: "fetch existing care ledger events before restore")
-        let existingCoconutAccountIds = try existingIds(FetchDescriptor<CoconutAccount>(), context: context, id: \.id, operation: "fetch existing coconut accounts before restore")
-        let existingCoconutLedgerEntryIds = try existingIds(FetchDescriptor<CoconutLedgerEntry>(), context: context, id: \.id, operation: "fetch existing coconut ledger entries before restore")
-        let existingFamilyTaskIds = try existingIds(FetchDescriptor<FamilyCollaborationTask>(), context: context, id: \.id, operation: "fetch existing family tasks before restore")
         let existingSharedCareSessionIds = try existingIds(FetchDescriptor<SharedCareSession>(), context: context, id: \.id, operation: "fetch existing shared care sessions before restore")
-        let existingExchangeIds = try existingIds(FetchDescriptor<CoconutExchangeRequest>(), context: context, id: \.id, operation: "fetch existing coconut exchange requests before restore")
-        let existingOasisCoconutIds = try existingIds(FetchDescriptor<OasisUpgradeCoconut>(), context: context, id: \.id, operation: "fetch existing oasis upgrade coconuts before restore")
-        let existingOasisCritterIds = try existingIds(FetchDescriptor<OasisElectronicPet>(), context: context, id: \.id, operation: "fetch existing oasis critters before restore")
-        let existingOasisFragmentIds = try existingIds(FetchDescriptor<OasisCritterFragmentBalance>(), context: context, id: \.id, operation: "fetch existing oasis critter fragments before restore")
-        let existingOasisUnlockIds = try existingIds(FetchDescriptor<OasisUnlock>(), context: context, id: \.id, operation: "fetch existing oasis unlocks before restore")
-        let existingOasisActionLogIds = try existingIds(FetchDescriptor<OasisCritterActionLog>(), context: context, id: \.id, operation: "fetch existing oasis action logs before restore")
-        let existingGachaOwnedIds = try existingIds(FetchDescriptor<GachaOwnedItem>(), context: context, id: \.id, operation: "fetch existing gacha owned items before restore")
-        let existingGachaDrawLogIds = try existingIds(FetchDescriptor<GachaDrawLog>(), context: context, id: \.id, operation: "fetch existing gacha draw logs before restore")
-        let existingShopPurchaseRecordIds = try existingIds(FetchDescriptor<ShopPurchaseRecord>(), context: context, id: \.id, operation: "fetch existing shop purchase records before restore")
-        let existingDocumentAttachmentIds = try existingIds(FetchDescriptor<PetDocumentAttachment>(), context: context, id: \.id, operation: "fetch existing document attachments before restore")
-        let existingPhotoIds = try existingIds(FetchDescriptor<PetPhotoLog>(), context: context, id: \.id, operation: "fetch existing photo logs before restore")
-        let existingInsuranceIds = try existingIds(FetchDescriptor<PetInsurance>(), context: context, id: \.id, operation: "fetch existing pet insurances before restore")
-        let existingClaimIds = try existingIds(FetchDescriptor<InsuranceClaim>(), context: context, id: \.id, operation: "fetch existing insurance claims before restore")
-        let existingPetMedicationIds = try existingIds(FetchDescriptor<PetMedication>(), context: context, id: \.id, operation: "fetch existing pet medications before restore")
-        let existingHumanMedicationIds = try existingIds(FetchDescriptor<HumanMedication>(), context: context, id: \.id, operation: "fetch existing human medications before restore")
-        let existingHumanMedicationLogIds = try existingIds(FetchDescriptor<HumanMedicationLog>(), context: context, id: \.id, operation: "fetch existing human medication logs before restore")
-        let existingHumanHealthMetricLogIds = try existingIds(FetchDescriptor<HumanHealthMetricLog>(), context: context, id: \.id, operation: "fetch existing human health metric logs before restore")
-        let existingSymptomIds = try existingIds(FetchDescriptor<SymptomLog>(), context: context, id: \.id, operation: "fetch existing symptom logs before restore")
-        let existingHeatCycleIds = try existingIds(FetchDescriptor<HeatCycleLog>(), context: context, id: \.id, operation: "fetch existing heat cycle logs before restore")
-
-        for dto in backup.pets where !existingPetIds.contains(dto.id) {
-            context.insert(decodePet(dto))
+        for dto in backup.pets {
+            try DomainGeneralRehydrateWriter.upsertPet(
+                snapshot: decodePetSnapshot(dto),
+                source: .backupRestore,
+                context: context
+            )
         }
-        for dto in backup.humans where !existingHumanIds.contains(dto.id) {
-            context.insert(decodeHuman(dto))
+        for dto in backup.humans {
+            try DomainGeneralRehydrateWriter.upsertHuman(
+                snapshot: decodeHumanSnapshot(dto),
+                source: .backupRestore,
+                context: context
+            )
         }
-        for dto in backup.plants where !existingPlantIds.contains(dto.id) {
-            context.insert(decodePlant(dto))
+        for dto in backup.plants {
+            try DomainGeneralRehydrateWriter.insertPlantIfNeeded(
+                snapshot: decodePlantSnapshot(dto),
+                source: .backupRestore,
+                context: context
+            )
         }
-        for dto in backup.households where !existingHouseholdIds.contains(dto.id) {
-            context.insert(decodeHousehold(dto))
+        for dto in backup.households {
+            try DomainGeneralRehydrateWriter.upsertHousehold(
+                snapshot: decodeHouseholdSnapshot(dto),
+                source: .backupRestore,
+                context: context
+            )
         }
         for dto in backup.events where !existingEventIds.contains(dto.id) {
-            context.insert(decodeEvent(dto))
+            try DomainScheduleRehydrateWriter.upsertEvent(
+                snapshot: decodeEventSnapshot(dto),
+                source: .backupRestore,
+                context: context
+            )
         }
         try context.save()
-
-        let petById = try Dictionary(
-            uniqueKeysWithValues: (context.fetch(FetchDescriptor<Pet>())).map { ($0.id.uuidString, $0) } // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
-        )
-        let humanById = try Dictionary(
-            uniqueKeysWithValues: (context.fetch(FetchDescriptor<Human>())).map { ($0.id.uuidString, $0) } // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
-        )
-        let eventById = try Dictionary(
-            uniqueKeysWithValues: (context.fetch(FetchDescriptor<Event>())).map { ($0.id.uuidString, $0) } // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
-        )
 
         for dto in backup.reminders where !existingReminderIds.contains(dto.id) {
-            context.insert(decodeReminder(dto, events: eventById))
+            try DomainScheduleRehydrateWriter.upsertReminder(
+                snapshot: decodeReminderSnapshot(dto),
+                source: .backupRestore,
+                context: context
+            )
         }
 
-        // 日志类直接插入（不去重，避免重复计算可由调用方在 import 前清空）
+        // 日志类通过 rehydrate writer 插入，避免恢复路径绕过 subject/policy 解析。
         for dto in backup.petCareLogs {
-            context.insert(decodeCareLog(dto, pets: petById))
+            try DomainCareFactRehydrateWriter.insertPetCareLogIfNeeded(
+                snapshot: decodeCareLogSnapshot(dto),
+                source: .backupRestore,
+                context: context
+            )
         }
         for dto in backup.petPottyLogs {
-            context.insert(decodePottyLog(dto, pets: petById))
+            try DomainCareFactRehydrateWriter.insertPetPottyLogIfNeeded(
+                snapshot: decodePottyLogSnapshot(dto),
+                source: .backupRestore,
+                context: context
+            )
         }
         for dto in backup.petWalkLogs {
-            context.insert(decodeWalkLog(dto, pets: petById))
+            try DomainCareFactRehydrateWriter.insertPetWalkLogIfNeeded(
+                snapshot: decodeWalkLogSnapshot(dto),
+                source: .backupRestore,
+                context: context
+            )
         }
         for dto in backup.petWeightLogs {
-            context.insert(decodeWeightLog(dto, pets: petById))
+            try DomainCareFactRehydrateWriter.insertPetWeightLogIfNeeded(
+                snapshot: decodeWeightLogSnapshot(dto),
+                source: .backupRestore,
+                context: context
+            )
         }
         for dto in backup.petExpenseLogs {
-            context.insert(decodeExpenseLog(dto, pets: petById))
+            try DomainCareFactRehydrateWriter.insertPetExpenseLogIfNeeded(
+                snapshot: decodeExpenseLogSnapshot(dto),
+                source: .backupRestore,
+                context: context
+            )
         }
         for dto in backup.petHealthLogs {
-            context.insert(decodeHealthLog(dto, pets: petById))
+            try DomainCareFactRehydrateWriter.insertPetHealthLogIfNeeded(
+                snapshot: decodeHealthLogSnapshot(dto),
+                source: .backupRestore,
+                context: context
+            )
         }
         for dto in backup.petHygieneLogs {
-            context.insert(decodeHygieneLog(dto, pets: petById))
+            try DomainCareFactRehydrateWriter.insertPetHygieneLogIfNeeded(
+                snapshot: decodeHygieneLogSnapshot(dto),
+                source: .backupRestore,
+                context: context
+            )
         }
         for dto in backup.petFoodRecords {
-            context.insert(decodeFoodRecord(dto, pets: petById))
+            try DomainCareFactRehydrateWriter.upsertPetFoodRecord(
+                snapshot: decodeFoodRecordSnapshot(dto),
+                source: .backupRestore,
+                context: context
+            )
         }
         for dto in backup.petDocuments {
-            context.insert(decodeDocument(dto, pets: petById))
+            try DomainMemberContentRehydrateWriter.insertPetDocumentIfNeeded(
+                snapshot: decodeDocumentSnapshot(dto),
+                source: .backupRestore,
+                context: context
+            )
         }
-        for dto in backup.petPhotoLogs ?? [] where !existingPhotoIds.contains(dto.id) {
-            context.insert(decodePhotoLog(dto, pets: petById))
+        for dto in backup.petPhotoLogs ?? [] {
+            try DomainMemberContentRehydrateWriter.insertPetPhotoLogIfNeeded(
+                snapshot: decodePhotoLogSnapshot(dto),
+                source: .backupRestore,
+                context: context
+            )
         }
-        for dto in backup.petInsurances ?? [] where !existingInsuranceIds.contains(dto.id) {
-            context.insert(decodeInsurance(dto, pets: petById))
+        for dto in backup.petInsurances ?? [] {
+            try DomainMemberContentRehydrateWriter.insertPetInsuranceIfNeeded(
+                snapshot: decodeInsuranceSnapshot(dto),
+                source: .backupRestore,
+                context: context
+            )
         }
-        for dto in backup.petMedications ?? [] where !existingPetMedicationIds.contains(dto.id) {
-            context.insert(decodePetMedication(dto, pets: petById))
+        for dto in backup.petMedications ?? [] {
+            try DomainMemberContentRehydrateWriter.insertPetMedicationIfNeeded(
+                snapshot: decodePetMedicationSnapshot(dto),
+                source: .backupRestore,
+                context: context
+            )
         }
-        for dto in backup.humanMedications ?? [] where !existingHumanMedicationIds.contains(dto.id) {
-            context.insert(decodeHumanMedication(dto))
+        for dto in backup.humanMedications ?? [] {
+            try DomainMemberContentRehydrateWriter.insertHumanMedicationIfNeeded(
+                snapshot: decodeHumanMedicationSnapshot(dto),
+                source: .backupRestore,
+                context: context
+            )
         }
-        for dto in backup.symptomLogs ?? [] where !existingSymptomIds.contains(dto.id) {
-            context.insert(decodeSymptomLog(dto, pets: petById))
+        for dto in backup.symptomLogs ?? [] {
+            try DomainMemberContentRehydrateWriter.insertSymptomLogIfNeeded(
+                snapshot: decodeSymptomLogSnapshot(dto),
+                source: .backupRestore,
+                context: context
+            )
         }
-        for dto in backup.heatCycleLogs ?? [] where !existingHeatCycleIds.contains(dto.id) {
-            context.insert(decodeHeatCycleLog(dto, pets: petById))
+        for dto in backup.heatCycleLogs ?? [] {
+            try DomainMemberContentRehydrateWriter.insertHeatCycleLogIfNeeded(
+                snapshot: decodeHeatCycleLogSnapshot(dto),
+                source: .backupRestore,
+                context: context
+            )
         }
         try context.save()
 
-        let documentById = try Dictionary(
-            uniqueKeysWithValues: (context.fetch(FetchDescriptor<PetDocument>())).map { ($0.id.uuidString, $0) } // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
-        )
-        let insuranceById = try Dictionary(
-            uniqueKeysWithValues: (context.fetch(FetchDescriptor<PetInsurance>())).map { ($0.id.uuidString, $0) } // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
-        )
-
-        for dto in backup.petDocumentAttachments ?? [] where !existingDocumentAttachmentIds.contains(dto.id) {
-            if let attachment = decodeDocumentAttachment(dto) {
-                documentById[dto.documentId]?.attachments.append(attachment)
-                context.insert(attachment)
-            }
+        for dto in backup.petDocumentAttachments ?? [] {
+            try DomainMemberContentRehydrateWriter.insertPetDocumentAttachmentIfNeeded(
+                snapshot: decodeDocumentAttachmentSnapshot(dto),
+                source: .backupRestore,
+                context: context
+            )
         }
-        for dto in backup.insuranceClaims ?? [] where !existingClaimIds.contains(dto.id) {
-            context.insert(decodeInsuranceClaim(dto, insurances: insuranceById))
+        for dto in backup.insuranceClaims ?? [] {
+            try DomainMemberContentRehydrateWriter.insertInsuranceClaimIfNeeded(
+                snapshot: decodeInsuranceClaimSnapshot(dto),
+                source: .backupRestore,
+                context: context
+            )
         }
-        for dto in backup.humanMedicationLogs ?? [] where !existingHumanMedicationLogIds.contains(dto.id) {
-            context.insert(decodeHumanMedicationLog(dto))
+        for dto in backup.humanMedicationLogs ?? [] {
+            try DomainMemberContentRehydrateWriter.insertHumanMedicationLogIfNeeded(
+                snapshot: decodeHumanMedicationLogSnapshot(dto),
+                source: .backupRestore,
+                context: context
+            )
         }
-        for dto in backup.humanHealthMetricLogs ?? [] where !existingHumanHealthMetricLogIds.contains(dto.id) {
-            context.insert(decodeHumanHealthMetricLog(dto, humans: humanById))
+        for dto in backup.humanHealthMetricLogs ?? [] {
+            try DomainMemberContentRehydrateWriter.insertHumanHealthMetricLogIfNeeded(
+                snapshot: decodeHumanHealthMetricLogSnapshot(dto),
+                source: .backupRestore,
+                context: context
+            )
         }
         for dto in backup.petMilestones {
-            context.insert(decodeMilestone(dto, pets: petById))
+            try DomainMemberContentRehydrateWriter.insertPetMilestoneIfNeeded(
+                snapshot: decodeMilestoneSnapshot(dto),
+                source: .backupRestore,
+                context: context
+            )
         }
         for dto in backup.humanWeightLogs {
-            context.insert(decodeHumanWeight(dto, humans: humanById))
+            try DomainMemberContentRehydrateWriter.insertHumanWeightLogIfNeeded(
+                snapshot: decodeHumanWeightSnapshot(dto),
+                source: .backupRestore,
+                context: context
+            )
         }
         for dto in backup.humanWorkoutLogs {
-            context.insert(decodeHumanWorkout(dto, humans: humanById))
+            try DomainMemberContentRehydrateWriter.insertHumanWorkoutLogIfNeeded(
+                snapshot: decodeHumanWorkoutSnapshot(dto),
+                source: .backupRestore,
+                context: context
+            )
         }
         for dto in backup.waterLogs {
-            context.insert(decodeWaterLog(dto))
+            try DomainGeneralRehydrateWriter.insertWaterLogIfNeeded(
+                snapshot: decodeWaterLogSnapshot(dto),
+                source: .backupRestore,
+                context: context
+            )
         }
         for dto in backup.wishlistItems {
-            context.insert(decodeWishlist(dto))
+            try DomainGeneralRehydrateWriter.insertWishlistItemIfNeeded(
+                snapshot: decodeWishlistSnapshot(dto),
+                source: .backupRestore,
+                context: context
+            )
         }
         for dto in backup.careLedgerEvents ?? [] where !existingLedgerIds.contains(dto.id) {
-            context.insert(decodeCareLedgerEvent(dto))
+            try DomainCareLedgerRehydrateWriter.upsertCareLedgerEvent(
+                snapshot: decodeCareLedgerEventSnapshot(dto),
+                source: .backupRestore,
+                context: context
+            )
         }
-        for dto in backup.coconutAccounts ?? [] where !existingCoconutAccountIds.contains(dto.id) {
-            context.insert(decodeCoconutAccount(dto))
+        for dto in backup.coconutAccounts ?? [] {
+            try DomainGeneralRehydrateWriter.insertCoconutAccountIfNeeded(
+                snapshot: decodeCoconutAccountSnapshot(dto),
+                source: .backupRestore,
+                context: context
+            )
         }
-        for dto in backup.coconutLedgerEntries ?? [] where !existingCoconutLedgerEntryIds.contains(dto.id) {
-            context.insert(decodeCoconutLedgerEntry(dto))
+        for dto in backup.coconutLedgerEntries ?? [] {
+            try DomainGeneralRehydrateWriter.upsertCoconutLedgerEntry(
+                snapshot: decodeCoconutLedgerEntrySnapshot(dto),
+                source: .backupRestore,
+                context: context
+            )
         }
-        for dto in backup.familyCollaborationTasks ?? [] where !existingFamilyTaskIds.contains(dto.id) {
-            context.insert(decodeFamilyCollaborationTask(dto))
+        for dto in backup.familyCollaborationTasks ?? [] {
+            try DomainGeneralRehydrateWriter.insertFamilyCollaborationTaskIfNeeded(
+                snapshot: decodeFamilyCollaborationTaskSnapshot(dto),
+                source: .backupRestore,
+                context: context
+            )
         }
         for dto in backup.sharedCareSessions ?? [] where !existingSharedCareSessionIds.contains(dto.id) {
-            context.insert(decodeSharedCareSession(dto))
+            try DomainCareFactRehydrateWriter.insertSharedCareSessionIfNeeded(
+                snapshot: decodeSharedCareSessionSnapshot(dto),
+                source: .backupRestore,
+                context: context
+            )
         }
-        for dto in backup.coconutExchangeRequests ?? [] where !existingExchangeIds.contains(dto.id) {
-            context.insert(decodeCoconutExchangeRequest(dto))
+        for dto in backup.coconutExchangeRequests ?? [] {
+            try DomainGeneralRehydrateWriter.insertCoconutExchangeRequestIfNeeded(
+                snapshot: decodeCoconutExchangeRequestSnapshot(dto),
+                source: .backupRestore,
+                context: context
+            )
         }
-        for dto in backup.oasisUpgradeCoconuts ?? [] where !existingOasisCoconutIds.contains(dto.id) {
-            context.insert(decodeOasisUpgradeCoconut(dto))
+        for dto in backup.oasisUpgradeCoconuts ?? [] {
+            try DomainGeneralRehydrateWriter.insertOasisUpgradeCoconutIfNeeded(
+                snapshot: decodeOasisUpgradeCoconutSnapshot(dto),
+                source: .backupRestore,
+                context: context
+            )
         }
-        for dto in backup.oasisElectronicPets ?? [] where !existingOasisCritterIds.contains(dto.id) {
-            context.insert(decodeOasisElectronicPet(dto))
+        for dto in backup.oasisElectronicPets ?? [] {
+            try DomainGeneralRehydrateWriter.insertOasisElectronicPetIfNeeded(
+                snapshot: decodeOasisElectronicPetSnapshot(dto),
+                source: .backupRestore,
+                context: context
+            )
         }
-        for dto in backup.oasisCritterFragments ?? [] where !existingOasisFragmentIds.contains(dto.id) {
-            context.insert(decodeOasisCritterFragment(dto))
+        for dto in backup.oasisCritterFragments ?? [] {
+            try DomainGeneralRehydrateWriter.insertOasisCritterFragmentIfNeeded(
+                snapshot: decodeOasisCritterFragmentSnapshot(dto),
+                source: .backupRestore,
+                context: context
+            )
         }
-        for dto in backup.oasisUnlocks ?? [] where !existingOasisUnlockIds.contains(dto.id) {
-            context.insert(decodeOasisUnlock(dto))
+        for dto in backup.oasisUnlocks ?? [] {
+            try DomainGeneralRehydrateWriter.insertOasisUnlockIfNeeded(
+                snapshot: decodeOasisUnlockSnapshot(dto),
+                source: .backupRestore,
+                context: context
+            )
         }
-        for dto in backup.oasisCritterActionLogs ?? [] where !existingOasisActionLogIds.contains(dto.id) {
-            context.insert(decodeOasisCritterActionLog(dto))
+        for dto in backup.oasisCritterActionLogs ?? [] {
+            try DomainGeneralRehydrateWriter.insertOasisCritterActionLogIfNeeded(
+                snapshot: decodeOasisCritterActionLogSnapshot(dto),
+                source: .backupRestore,
+                context: context
+            )
         }
-        for dto in backup.gachaOwnedItems ?? [] where !existingGachaOwnedIds.contains(dto.id) {
-            context.insert(decodeGachaOwnedItem(dto))
+        for dto in backup.gachaOwnedItems ?? [] {
+            try DomainGeneralRehydrateWriter.upsertGachaOwnedItem(
+                snapshot: decodeGachaOwnedItemSnapshot(dto),
+                source: .backupRestore,
+                context: context
+            )
         }
-        for dto in backup.gachaDrawLogs ?? [] where !existingGachaDrawLogIds.contains(dto.id) {
-            context.insert(decodeGachaDrawLog(dto))
+        for dto in backup.gachaDrawLogs ?? [] {
+            try DomainGeneralRehydrateWriter.upsertGachaDrawLog(
+                snapshot: decodeGachaDrawLogSnapshot(dto),
+                source: .backupRestore,
+                context: context
+            )
         }
-        for dto in backup.shopPurchaseRecords ?? [] where !existingShopPurchaseRecordIds.contains(dto.id) {
+        for dto in backup.shopPurchaseRecords ?? [] {
             if try !ShopPurchaseRecordStore.isOwned(itemID: dto.itemId, context: context) {
-                context.insert(decodeShopPurchaseRecord(dto))
+                try DomainGeneralRehydrateWriter.upsertShopPurchaseRecord(
+                    snapshot: decodeShopPurchaseRecordSnapshot(dto),
+                    source: .backupRestore,
+                    context: context
+                )
             }
         }
         if backup.shopPurchaseRecords == nil {
@@ -540,15 +669,20 @@ final nonisolated class DataBackupManager: @unchecked Sendable {
             else {
                 continue
             }
-            context.insert(ShopPurchaseRecord(
-                transactionKey: "legacyBackup:\(itemID)",
-                itemId: itemID,
-                buyerHumanId: nil,
-                purchasedAt: Date(timeIntervalSince1970: 0),
-                sourceRaw: "legacyBackup",
-                isLegacyImport: true,
-                createdAt: Date(timeIntervalSince1970: 0)
-            ))
+            try DomainGeneralRehydrateWriter.upsertShopPurchaseRecord(
+                snapshot: DomainShopPurchaseRecordRehydrateSnapshot(
+                    id: UUID(),
+                    transactionKey: "legacyBackup:\(itemID)",
+                    itemId: itemID,
+                    buyerHumanId: "",
+                    purchasedAt: Date(timeIntervalSince1970: 0),
+                    sourceRaw: "legacyBackup",
+                    isLegacyImport: true,
+                    createdAt: Date(timeIntervalSince1970: 0)
+                ),
+                source: .backupRestore,
+                context: context
+            )
         }
     }
 

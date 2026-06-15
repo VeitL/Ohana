@@ -35,7 +35,7 @@ nonisolated protocol ReminderNotificationScheduling: Sendable {
     func scheduleRollingWindow(reminders: [Reminder])
     func refillWindowIfNeeded(allReminders: [Reminder])
     func cancel(notificationId: String)
-    func cancelAll(for petId: String, reminders: [Reminder])
+    func cancelAll(for pet: Pet, reminders: [Reminder])
     func compensate(reminders: [Reminder])
 }
 

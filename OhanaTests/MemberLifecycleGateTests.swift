@@ -80,6 +80,20 @@ struct MemberLifecycleGateTests {
         #expect(!cleanup.writesContent)
     }
 
+    @Test func lifecycleScheduleCleanupAllowsOnlyCleanupEffects() {
+        let pet = Pet(name: "Momo", species: "cat")
+        pet.passedAwayDate = Date(timeIntervalSince1970: 1_800_000_106)
+
+        let cleanup = MemberLifecycleGate.disposition(pet: pet, writeKind: .lifecycle(.cleanupActiveSchedules))
+
+        #expect(cleanup.isAllowed)
+        #expect(!cleanup.writesContent)
+        #expect(!cleanup.allowsCareFactWrite)
+        #expect(cleanup.allowsDerivedEffects)
+        #expect(!cleanup.allowsEconomyDerivation)
+        #expect(!cleanup.allowsRevisionPublish)
+    }
+
     @Test func deceasedMembersCannotCreateActiveCalendarOrHygienePlans() throws {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
@@ -648,7 +662,16 @@ struct MemberLifecycleGateTests {
         assignedPetEvent.assigneeId = human.id.uuidString
         let assignedOnlyEvent = Event(title: "Assigned household task")
         assignedOnlyEvent.assigneeId = human.id.uuidString
+        let missingAssignedOnlyEvent = Event(title: "Missing assignee household task")
+        missingAssignedOnlyEvent.assigneeId = UUID().uuidString
         let reminderOnly = Reminder(event: nil, scheduledAt: Date(timeIntervalSince1970: 1_800_003_000))
+        let catalog = DomainSubjectResolutionCatalog(
+            pets: [pet, otherPet],
+            petMedications: [petMedication],
+            humanMedications: [humanMedication],
+            insurances: [insurance],
+            humans: [human, otherHuman]
+        )
 
         #expect(MemberLifecycleActiveScheduleResolver.petTarget(for: directPet, pets: [pet, otherPet])?.id == pet.id)
         #expect(MemberLifecycleActiveScheduleResolver.humanOwner(for: directHuman, humans: [human, otherHuman], humanMedications: [])?.id == human.id)
@@ -668,7 +691,31 @@ struct MemberLifecycleGateTests {
         #expect(MemberLifecycleActiveScheduleResolver.humanInvolved(in: assignedPetEvent, humans: [human, otherHuman], humanMedications: [])?.id == human.id)
         #expect(MemberLifecycleActiveScheduleResolver.humanOwner(for: assignedPetEvent, humans: [human, otherHuman], humanMedications: []) == nil)
         #expect(MemberLifecycleActiveScheduleResolver.humanInvolved(in: assignedOnlyEvent, humans: [human, otherHuman], humanMedications: [])?.id == human.id)
+        #expect(MemberLifecycleActiveScheduleResolver.humanInvolved(in: missingAssignedOnlyEvent, humans: [human, otherHuman], humanMedications: []) == nil)
+        let missingAssigneeResolution = DomainSubjectResolver.resolve(
+            request: DomainSubjectResolutionRequest(event: missingAssignedOnlyEvent),
+            catalog: catalog
+        )
+        #expect(missingAssigneeResolution.assignee == nil)
+        #expect(missingAssigneeResolution.unresolvedAssignee)
         #expect(MemberLifecycleActiveScheduleResolver.reminderTargetsActiveMember(reminderOnly, activePets: [], activeHumans: []))
+        #expect(DomainSubjectResolver.resolve(request: DomainSubjectResolutionRequest(
+            relatedEntityType: DomainEntityLinkRegistry.petInsurance,
+            relatedEntityId: insurance.id.uuidString
+        ), catalog: catalog).owner == .pet(pet.id))
+        #expect(DomainSubjectResolver.resolve(request: DomainSubjectResolutionRequest(
+            relatedEntityType: DomainEntityLinkRegistry.humanMedicationPlan,
+            relatedEntityId: humanMedication.id.uuidString
+        ), catalog: catalog).owner == .human(human.id))
+        let missingDirectPetResolution = DomainSubjectResolver.resolve(
+            request: DomainSubjectResolutionRequest(
+                relatedEntityType: EntityKind.pet.rawValue,
+                relatedEntityId: UUID().uuidString
+            ),
+            catalog: catalog
+        )
+        #expect(missingDirectPetResolution.owner == nil)
+        #expect(missingDirectPetResolution.unresolvedOwner)
     }
 
     @Test func domainScheduleResolutionAndAuthorizationCoverIndirectMembers() throws {
@@ -724,6 +771,744 @@ struct MemberLifecycleGateTests {
         pet.passedAwayDate = Date(timeIntervalSince1970: 1_800_003_500)
 
         #expect(DomainScheduleWriteAuthorizer.authorizeCreate(intent: insuranceIntent, context: context) == nil)
+    }
+
+    @Test func domainSubjectResolutionSeparatesOwnerAssigneeDisplayAndEffects() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let pet = Pet(name: "Momo", species: "cat")
+        let human = Human(name: "Ava")
+        context.insert(pet)
+        context.insert(human)
+        try context.save()
+
+        let resolution = DomainSubjectResolver.resolve(
+            request: DomainSubjectResolutionRequest(
+                relatedEntityType: EntityKind.pet.rawValue,
+                relatedEntityId: pet.id.uuidString,
+                assigneeId: human.id.uuidString
+            ),
+            context: context
+        )
+
+        #expect(resolution.owner == .pet(pet.id))
+        #expect(resolution.assignee == .human(human.id))
+        #expect(resolution.displayTarget == .pet(pet.id))
+        #expect(resolution.effectTargets == [.pet(pet.id), .human(human.id)])
+        #expect(resolution.lifecycleTargets == [.pet(pet.id), .human(human.id)])
+        #expect(!resolution.hasUnregisteredLinkType)
+    }
+
+    @Test func domainResolvedSubjectKeyNormalizesOwnerAliasesAndCompoundLinks() {
+        let pet = Pet(name: "Momo", species: "cat")
+        let directPet = DomainSubjectResolver.resolve(
+            request: DomainSubjectResolutionRequest(
+                relatedEntityType: EntityKind.pet.rawValue,
+                relatedEntityId: pet.id.uuidString
+            ),
+            catalog: DomainSubjectResolutionCatalog()
+        )
+        let directPetAlias = DomainSubjectResolver.resolve(
+            request: DomainSubjectResolutionRequest(
+                relatedEntityType: "pet",
+                relatedEntityId: pet.id.uuidString
+            ),
+            catalog: DomainSubjectResolutionCatalog()
+        )
+        let dryStock = DomainSubjectResolver.resolve(
+            request: DomainSubjectResolutionRequest(
+                relatedEntityType: DomainEntityLinkRegistry.petFoodStock,
+                relatedEntityId: "\(pet.id.uuidString):dry"
+            ),
+            catalog: DomainSubjectResolutionCatalog()
+        )
+        let wetStock = DomainSubjectResolver.resolve(
+            request: DomainSubjectResolutionRequest(
+                relatedEntityType: DomainEntityLinkRegistry.petFoodStock,
+                relatedEntityId: "\(pet.id.uuidString):wet"
+            ),
+            catalog: DomainSubjectResolutionCatalog()
+        )
+
+        let expected = "\(EntityKind.pet.rawValue):\(pet.id.uuidString)"
+        #expect(DomainResolvedSubjectKey(resolution: directPet).rawValue == expected)
+        #expect(DomainResolvedSubjectKey(resolution: directPetAlias).rawValue == expected)
+        #expect(DomainResolvedSubjectKey(resolution: dryStock).rawValue == expected)
+        #expect(DomainResolvedSubjectKey(resolution: wetStock).rawValue == expected)
+    }
+
+    @Test func notificationDeliveryPolicyMergesAliasPetSubjectsThroughDomainResolution() {
+        let pet = Pet(name: "Momo", species: "cat")
+        let scheduledAt = Date(timeIntervalSince1970: 1_800_004_200)
+        let firstEvent = Event(
+            title: "Water",
+            eventType: EventType.watering.rawValue,
+            relatedEntityType: EntityKind.pet.rawValue,
+            relatedEntityId: pet.id.uuidString
+        )
+        let aliasEvent = Event(
+            title: "Water alias",
+            eventType: EventType.watering.rawValue,
+            relatedEntityType: "pet",
+            relatedEntityId: pet.id.uuidString
+        )
+        let firstReminder = Reminder(event: firstEvent, scheduledAt: scheduledAt)
+        let aliasReminder = Reminder(event: aliasEvent, scheduledAt: scheduledAt.addingTimeInterval(10))
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0) ?? .current
+
+        let decisions = NotificationDeliveryPolicy.plan(
+            reminders: [aliasReminder, firstReminder],
+            calendar: calendar
+        )
+        let deliveredCount = decisions.values.count(where: { decision in
+            if case .deliver = decision { return true }
+            return false
+        })
+        let mergedCount = decisions.values.count(where: { decision in
+            if case .merged = decision { return true }
+            return false
+        })
+        let stockClassification = NotificationDeliveryPolicy.classification(
+            for: Event(
+                title: "Food stock",
+                relatedEntityType: DomainEntityLinkRegistry.petFoodStock,
+                relatedEntityId: "\(pet.id.uuidString):dry"
+            )
+        )
+
+        #expect(deliveredCount == 1)
+        #expect(mergedCount == 1)
+        #expect(stockClassification.category == .foodStock)
+        #expect(stockClassification.tier == .healthCritical)
+    }
+
+    @Test func overdueStatusUsesDomainLinkRolesForMedicationAndPlantLinks() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0) ?? .current
+        let scheduledAt = Date(timeIntervalSince1970: 1_800_004_400)
+        let now = scheduledAt.addingTimeInterval(86400)
+        let pet = Pet(name: "Momo", species: "cat")
+        let medication = PetMedication(name: "Drops", pet: pet)
+        let plant = Plant(name: "Fern", species: "fern")
+        let medicationEvent = Event(
+            title: "Dose",
+            startDate: scheduledAt,
+            eventType: EventType.task.rawValue,
+            relatedEntityType: DomainEntityLinkRegistry.petMedicationPlan,
+            relatedEntityId: medication.id.uuidString
+        )
+        let plantEvent = Event(
+            title: "Water plant",
+            startDate: scheduledAt,
+            eventType: EventType.task.rawValue,
+            relatedEntityType: "plant_watering",
+            relatedEntityId: plant.id.uuidString
+        )
+        let medicationReminder = Reminder(event: medicationEvent, scheduledAt: scheduledAt)
+        let plantReminder = Reminder(event: plantEvent, scheduledAt: scheduledAt)
+        context.insert(pet)
+        context.insert(medication)
+        context.insert(plant)
+        context.insert(medicationEvent)
+        context.insert(plantEvent)
+        context.insert(medicationReminder)
+        context.insert(plantReminder)
+        try context.save()
+        let events = try context.fetch(FetchDescriptor<Event>())
+
+        let medicationWarning = try #require(CarePlanOverdueStatusCalculator.warning(
+            for: "medication",
+            pet: pet,
+            events: events,
+            now: now,
+            calendar: calendar
+        ))
+        let plantWarning = try #require(CarePlanOverdueStatusCalculator.plantWarning(
+            for: plant,
+            events: events,
+            now: now,
+            calendar: calendar
+        ))
+
+        #expect(medicationWarning.actionType == "medication")
+        #expect(medicationWarning.reminderId == medicationReminder.id)
+        #expect(plantWarning.actionType == "plantWatering")
+        #expect(plantWarning.reminderId == plantReminder.id)
+    }
+
+    @Test func familyTasksResolveReminderSubjectThroughDomainResolver() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let creator = Human(name: "Guan")
+        let assignee = Human(name: "Ava")
+        let humanOwner = Human(name: "Mira")
+        let pet = Pet(name: "Momo", species: "cat")
+        let petMedication = PetMedication(name: "Drops", pet: pet)
+        let humanMedication = HumanMedication(humanId: humanOwner.id.uuidString, name: "Vitamin")
+        let scheduledAt = Date(timeIntervalSince1970: 1_800_004_600)
+        let petMedicationEvent = Event(
+            title: "Pet dose",
+            startDate: scheduledAt,
+            eventType: EventType.task.rawValue,
+            relatedEntityType: DomainEntityLinkRegistry.petMedicationPlan,
+            relatedEntityId: petMedication.id.uuidString
+        )
+        let humanMedicationEvent = Event(
+            title: "Human dose",
+            startDate: scheduledAt,
+            eventType: EventType.task.rawValue,
+            relatedEntityType: DomainEntityLinkRegistry.humanMedicationPlan,
+            relatedEntityId: humanMedication.id.uuidString
+        )
+        let petReminder = Reminder(event: petMedicationEvent, scheduledAt: scheduledAt)
+        let humanReminder = Reminder(event: humanMedicationEvent, scheduledAt: scheduledAt)
+        context.insert(creator)
+        context.insert(assignee)
+        context.insert(humanOwner)
+        context.insert(pet)
+        context.insert(petMedication)
+        context.insert(humanMedication)
+        context.insert(petMedicationEvent)
+        context.insert(humanMedicationEvent)
+        context.insert(petReminder)
+        context.insert(humanReminder)
+        try context.save()
+
+        let petTask = try #require(FamilyTaskService.assignReminder(
+            petReminder,
+            to: assignee,
+            by: creator,
+            rewardCoconuts: 0,
+            context: context
+        ))
+        let humanTask = try #require(FamilyTaskService.assignReminder(
+            humanReminder,
+            to: assignee,
+            by: creator,
+            rewardCoconuts: 5,
+            context: context
+        ))
+
+        #expect(petTask.relatedPetId == pet.id.uuidString)
+        #expect(humanTask.relatedPetId == nil)
+        #expect(petMedicationEvent.assigneeId == assignee.id.uuidString)
+        #expect(humanMedicationEvent.assigneeId == assignee.id.uuidString)
+
+        FamilyTaskService.submitForReview(humanTask, by: assignee, context: context)
+
+        let reviewLedger = try #require(try context.fetch(FetchDescriptor<CareLedgerEvent>())
+            .first { $0.actionType == "familyTaskSubmitReview" })
+        #expect(reviewLedger.subjectKind == CareLedgerSubjectKind.human.rawValue)
+        #expect(reviewLedger.subjectId == humanOwner.id.uuidString)
+    }
+
+    @Test func memberDeletionResultsUseDomainResolverForIndirectScheduleLinks() throws {
+        let petContainer = try makeInMemoryContainer()
+        let petContext = petContainer.mainContext
+        let pet = Pet(name: "Momo", species: "cat")
+        let petMedication = PetMedication(name: "Drops", pet: pet)
+        let petMedicationEvent = Event(
+            title: "Pet dose",
+            eventType: EventType.task.rawValue,
+            relatedEntityType: DomainEntityLinkRegistry.petMedicationPlan,
+            relatedEntityId: petMedication.id.uuidString
+        )
+        petContext.insert(pet)
+        petContext.insert(petMedication)
+        petContext.insert(petMedicationEvent)
+        try petContext.save()
+
+        let petResult = MemberDeletionCommandService.deletePet(pet, context: petContext)
+
+        #expect(petResult.removedRelatedEventIDs.contains(petMedicationEvent.id))
+        #expect(try petContext.fetch(FetchDescriptor<Event>()).isEmpty)
+
+        let humanContainer = try makeInMemoryContainer()
+        let humanContext = humanContainer.mainContext
+        let human = Human(name: "Mira")
+        let survivor = Human(name: "Ava")
+        let humanMedication = HumanMedication(humanId: human.id.uuidString, name: "Vitamin")
+        let humanMedicationEvent = Event(
+            title: "Human dose",
+            eventType: EventType.task.rawValue,
+            relatedEntityType: DomainEntityLinkRegistry.humanMedicationPlan,
+            relatedEntityId: humanMedication.id.uuidString
+        )
+        humanContext.insert(human)
+        humanContext.insert(survivor)
+        humanContext.insert(humanMedication)
+        humanContext.insert(humanMedicationEvent)
+        try humanContext.save()
+
+        let humanResult = MemberDeletionCommandService.deleteHuman(
+            human,
+            activeHumanID: survivor.id.uuidString,
+            context: humanContext
+        )
+
+        #expect(humanResult.removedRelatedEventIDs.contains(humanMedicationEvent.id))
+        #expect(try humanContext.fetch(FetchDescriptor<Event>()).isEmpty)
+    }
+
+    @Test func domainPolicyAuthorizerRequiresRegisteredTaxonomyForNonEmptyLinks() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let pet = Pet(name: "Momo", species: "cat")
+        context.insert(pet)
+        try context.save()
+
+        let knownPlan = DomainPolicyAuthorizer.authorize(
+            DomainMutationAuthorizationRequest(
+                scope: .schedule,
+                source: .userCommand,
+                subjectRequest: DomainSubjectResolutionRequest(
+                    relatedEntityType: EntityKind.pet.rawValue,
+                    relatedEntityId: pet.id.uuidString
+                ),
+                writeKind: .care
+            ),
+            context: context
+        )
+        let missingPetResolution = DomainSubjectResolver.resolve(
+            request: DomainSubjectResolutionRequest(
+                relatedEntityType: EntityKind.pet.rawValue,
+                relatedEntityId: UUID().uuidString
+            ),
+            context: context
+        )
+        let unknownPlan = DomainPolicyAuthorizer.authorize(
+            DomainMutationAuthorizationRequest(
+                scope: .schedule,
+                source: .userCommand,
+                subjectRequest: DomainSubjectResolutionRequest(
+                    relatedEntityType: "pet_vaccine_plan",
+                    relatedEntityId: pet.id.uuidString
+                ),
+                writeKind: .care
+            ),
+            context: context
+        )
+        let unscopedPlan = DomainPolicyAuthorizer.authorize(
+            DomainMutationAuthorizationRequest(
+                scope: .schedule,
+                source: .userCommand,
+                subjectRequest: DomainSubjectResolutionRequest(),
+                writeKind: .memorial
+            ),
+            context: context
+        )
+
+        #expect(knownPlan?.subject.owner == .pet(pet.id))
+        #expect(knownPlan?.writesContent == true)
+        #expect(missingPetResolution.owner == nil)
+        #expect(missingPetResolution.unresolvedOwner)
+        #expect(unknownPlan == nil)
+        #expect(unscopedPlan?.subject.role == .unscoped)
+        #expect(unscopedPlan?.writesContent == true)
+        #expect(unscopedPlan?.allowsDerivedEffects == false)
+    }
+
+    @Test func domainPolicyAuthorizerCarriesLifecycleDispositionInPlan() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let pet = Pet(name: "Momo", species: "cat")
+        context.insert(pet)
+        try context.save()
+
+        let request = DomainMutationAuthorizationRequest(
+            scope: .memberContent,
+            source: .userCommand,
+            subjectRequest: DomainSubjectResolutionRequest(
+                relatedEntityType: EntityKind.pet.rawValue,
+                relatedEntityId: pet.id.uuidString
+            ),
+            writeKind: .care
+        )
+        #expect(DomainPolicyAuthorizer.authorize(request, context: context) != nil)
+
+        pet.passedAwayDate = Date(timeIntervalSince1970: 1_800_003_600)
+
+        let deniedCare = DomainPolicyAuthorizer.authorize(request, context: context)
+        let memorialPlan = DomainPolicyAuthorizer.authorize(
+            DomainMutationAuthorizationRequest(
+                scope: .memberContent,
+                source: .userCommand,
+                subjectRequest: request.subjectRequest,
+                writeKind: .memorial
+            ),
+            context: context
+        )
+
+        #expect(deniedCare == nil)
+        #expect(memorialPlan?.writesContent == true)
+        #expect(memorialPlan?.allowsCareFactWrite == false)
+        #expect(memorialPlan?.allowsDerivedEffects == false)
+        #expect(memorialPlan?.allowsEconomyDerivation == false)
+    }
+
+    @Test func scheduleAuthorizerConsumesGenericMutationPlanAndDropsInvalidAssignee() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let pet = Pet(name: "Momo", species: "cat")
+        context.insert(pet)
+        try context.save()
+
+        let intent = DomainScheduleCreateIntent(
+            title: "Care",
+            startDate: Date(timeIntervalSince1970: 1_800_003_700),
+            relatedEntityType: EntityKind.pet.rawValue,
+            relatedEntityId: pet.id.uuidString,
+            assigneeId: "not-a-uuid",
+            writeKind: .care
+        )
+        let deniedGenericPlan = DomainPolicyAuthorizer.authorize(
+            DomainMutationAuthorizationRequest(
+                scope: .schedule,
+                source: .userCommand,
+                subjectRequest: DomainSubjectResolutionRequest(
+                    link: intent.relatedLink,
+                    assigneeId: intent.assigneeId
+                ),
+                writeKind: .care,
+                unresolvedAssigneePolicy: .deny
+            ),
+            context: context
+        )
+        let schedulePlan = DomainScheduleWriteAuthorizer.authorizeCreate(intent: intent, context: context)
+        let missingHumanId = UUID().uuidString
+        let missingAssigneeIntent = DomainScheduleCreateIntent(
+            title: "Care",
+            startDate: Date(timeIntervalSince1970: 1_800_003_701),
+            relatedEntityType: EntityKind.pet.rawValue,
+            relatedEntityId: pet.id.uuidString,
+            assigneeId: missingHumanId,
+            writeKind: .care
+        )
+        let deniedMissingHumanPlan = DomainPolicyAuthorizer.authorize(
+            DomainMutationAuthorizationRequest(
+                scope: .schedule,
+                source: .userCommand,
+                subjectRequest: DomainSubjectResolutionRequest(
+                    link: missingAssigneeIntent.relatedLink,
+                    assigneeId: missingAssigneeIntent.assigneeId
+                ),
+                writeKind: .care,
+                unresolvedAssigneePolicy: .deny
+            ),
+            context: context
+        )
+        let missingAssigneeSchedulePlan = DomainScheduleWriteAuthorizer.authorizeCreate(
+            intent: missingAssigneeIntent,
+            context: context
+        )
+
+        #expect(deniedGenericPlan == nil)
+        #expect(schedulePlan?.mutationPlan.scope == .schedule)
+        #expect(schedulePlan?.mutationPlan.source == .userCommand)
+        #expect(schedulePlan?.intent.assigneeId == nil)
+        #expect(schedulePlan?.resolution.owner == .pet(pet.id))
+        #expect(schedulePlan?.resolution.assignee == nil)
+        #expect(deniedMissingHumanPlan == nil)
+        #expect(missingAssigneeSchedulePlan?.intent.assigneeId == nil)
+        #expect(missingAssigneeSchedulePlan?.resolution.assignee == nil)
+    }
+
+    @Test func careFactWritePolicyConsumesGenericMutationPlanWithoutConflatingActor() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let pet = Pet(name: "Momo", species: "cat")
+        let inactiveExecutor = Human(name: "Ava")
+        inactiveExecutor.passedAwayDate = Date(timeIntervalSince1970: 1_800_003_750)
+        context.insert(pet)
+        context.insert(inactiveExecutor)
+        try context.save()
+
+        let plan = CareFactWritePolicy.authorizePetCareFact(pet: pet, context: context)
+        let disposition = CareFactWritePolicy.disposition(
+            pet: pet,
+            date: Date(timeIntervalSince1970: 1_800_003_760),
+            executorId: inactiveExecutor.id.uuidString,
+            context: context
+        )
+
+        #expect(plan?.scope == .careFact)
+        #expect(plan?.subject.owner == .pet(pet.id))
+        #expect(plan?.subject.assignee == nil)
+        #expect(disposition == .active)
+
+        pet.passedAwayDate = Date(timeIntervalSince1970: 1_800_003_770)
+
+        #expect(CareFactWritePolicy.authorizePetCareFact(pet: pet, context: context) == nil)
+        #expect(CareFactWritePolicy.disposition(
+            pet: pet,
+            date: Date(timeIntervalSince1970: 1_800_003_780),
+            executorId: nil,
+            context: context
+        ) == .noOp)
+    }
+
+    @Test func calendarPlanRevisionConsumesTypedAffectedSubjectIDs() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let pet = Pet(name: "Momo", species: "cat")
+        let insurance = PetInsurance(companyName: "Care", pet: pet)
+        context.insert(pet)
+        context.insert(insurance)
+        try context.save()
+
+        let input = CalendarEventPlanCommandInput(
+            title: "Insurance",
+            startDate: Date(timeIntervalSince1970: 1_800_003_790),
+            isAllDay: false,
+            eventType: .insurancePremium,
+            relatedEntityType: DomainEntityLinkRegistry.petInsurance,
+            relatedEntityId: insurance.id.uuidString,
+            recurrenceDays: 0,
+            recurrenceEndDate: nil,
+            reminderLeadMinutes: 15,
+            assigneeId: nil
+        )
+        let result = try #require(CalendarEventPlanCommandService.createEvent(
+            input: input,
+            context: context,
+            scheduleNotifications: false
+        ))
+        let center = ReadModelRevisionCenter()
+
+        center.publishCalendarEventPlan(result, note: "test.calendar.indirect")
+
+        let mutation = try #require(center.lastMutation)
+        #expect(result.affectedSubjectIDs.contains(pet.id))
+        #expect(result.affectedSubjectIDs.contains(insurance.id))
+        #expect(mutation.affectedEntityIDs.contains(pet.id))
+        #expect(mutation.affectedEntityIDs.contains(insurance.id))
+        #expect(mutation.affectedEntityIDs.contains(result.eventID))
+        for reminderID in result.reminderIDs {
+            #expect(mutation.affectedEntityIDs.contains(reminderID))
+        }
+    }
+
+    @Test func calendarCompletionAndReminderRevisionsConsumeTypedAffectedSubjectIDs() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let pet = Pet(name: "Momo", species: "cat")
+        let insurance = PetInsurance(companyName: "Care", pet: pet)
+        let event = Event(
+            title: "Insurance",
+            startDate: Date(timeIntervalSince1970: 1_800_003_800),
+            eventType: EventType.insurancePremium.rawValue,
+            relatedEntityType: DomainEntityLinkRegistry.petInsurance,
+            relatedEntityId: insurance.id.uuidString
+        )
+        let reminder = Reminder(event: event, scheduledAt: event.startDate)
+        context.insert(pet)
+        context.insert(insurance)
+        context.insert(event)
+        context.insert(reminder)
+        try context.save()
+
+        let completion = CalendarEventCommandService.toggleCompletion(
+            event: event,
+            occurrenceDate: event.startDate,
+            pets: [pet],
+            context: context,
+            executorId: nil
+        )
+        let center = ReadModelRevisionCenter()
+        center.publishCalendarEventCompletion(completion, note: "test.calendar.complete")
+        var mutation = try #require(center.lastMutation)
+
+        #expect(completion.affectedSubjectIDs.contains(pet.id))
+        #expect(completion.affectedSubjectIDs.contains(insurance.id))
+        #expect(mutation.affectedEntityIDs.contains(event.id))
+        #expect(mutation.affectedEntityIDs.contains(pet.id))
+        #expect(mutation.affectedEntityIDs.contains(insurance.id))
+
+        let reminderResult = ReminderCommandExecutor(context: context, revisionCenter: center)
+            .complete(reminder, by: nil, note: "test.reminder.complete")
+        mutation = try #require(center.lastMutation)
+
+        #expect(reminderResult.affectedSubjectIDs.contains(pet.id))
+        #expect(reminderResult.affectedSubjectIDs.contains(insurance.id))
+        #expect(mutation.affectedEntityIDs.contains(reminder.id))
+        #expect(mutation.affectedEntityIDs.contains(event.id))
+        #expect(mutation.affectedEntityIDs.contains(pet.id))
+        #expect(mutation.affectedEntityIDs.contains(insurance.id))
+    }
+
+    @Test func careLedgerSubjectResolutionUsesDomainResolver() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let pet = Pet(name: "Momo", species: "cat")
+        let human = Human(name: "Ava")
+        let insurance = PetInsurance(companyName: "Care", pet: pet)
+        context.insert(pet)
+        context.insert(human)
+        context.insert(insurance)
+        try context.save()
+
+        let insuranceEvent = Event(
+            title: "Insurance",
+            startDate: Date(timeIntervalSince1970: 1_800_003_800),
+            eventType: EventType.insurancePremium.rawValue,
+            relatedEntityType: DomainEntityLinkRegistry.petInsurance,
+            relatedEntityId: insurance.id.uuidString
+        )
+        let assigneeOnlyEvent = Event(title: "Assigned household task")
+        assigneeOnlyEvent.assigneeId = human.id.uuidString
+        let legacyUnknownEvent = Event(
+            title: "Legacy",
+            relatedEntityType: "legacy_custom",
+            relatedEntityId: "legacy-id"
+        )
+
+        let insuranceSubject = CareLedgerService.subjectInfo(from: insuranceEvent, context: context)
+        let assigneeSubject = CareLedgerService.subjectInfo(from: assigneeOnlyEvent, context: context)
+        let legacySubject = CareLedgerService.subjectInfo(from: legacyUnknownEvent, context: context)
+        let emptySubject = CareLedgerService.subjectInfo(from: nil, context: context)
+
+        #expect(insuranceSubject.kind == .pet)
+        #expect(insuranceSubject.id == pet.id.uuidString)
+        #expect(assigneeSubject.kind == .human)
+        #expect(assigneeSubject.id == human.id.uuidString)
+        #expect(legacySubject.kind == .unknown)
+        #expect(legacySubject.id == "legacy-id")
+        #expect(emptySubject.kind == .system)
+        #expect(emptySubject.id == nil)
+    }
+
+    @Test func careLedgerWritesUseResolvedIndirectScheduleSubject() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let pet = Pet(name: "Momo", species: "cat")
+        let insurance = PetInsurance(companyName: "Care", pet: pet)
+        let event = Event(
+            title: "Insurance",
+            startDate: Date(timeIntervalSince1970: 1_800_003_900),
+            eventType: EventType.insurancePremium.rawValue,
+            relatedEntityType: DomainEntityLinkRegistry.petInsurance,
+            relatedEntityId: insurance.id.uuidString
+        )
+        let reminder = Reminder(event: event, scheduledAt: event.startDate)
+        context.insert(pet)
+        context.insert(insurance)
+        context.insert(event)
+        context.insert(reminder)
+        try context.save()
+
+        CareLedgerService.recordReminderState(
+            reminder: reminder,
+            actionType: "scheduleSuccess",
+            actorId: nil,
+            source: .service,
+            context: context
+        )
+        _ = CareLedgerService().recordEventCompletionReward(
+            event: event,
+            occurrenceDate: event.startDate,
+            actorId: nil,
+            coconutDelta: 1,
+            occurredAt: Date(timeIntervalSince1970: 1_800_003_901),
+            context: context
+        )
+
+        let ledgers = try context.fetch(FetchDescriptor<CareLedgerEvent>())
+        let reminderLedger = ledgers.first { $0.actionType == "scheduleSuccess" }
+        let rewardLedger = ledgers.first { $0.actionType == "eventCompletionReward" }
+
+        #expect(reminderLedger?.subjectKind == CareLedgerSubjectKind.pet.rawValue)
+        #expect(reminderLedger?.subjectId == pet.id.uuidString)
+        #expect(rewardLedger?.subjectKind == CareLedgerSubjectKind.pet.rawValue)
+        #expect(rewardLedger?.subjectId == pet.id.uuidString)
+    }
+
+    @Test func rewardAutoCompleteUsesResolvedIndirectPetScheduleSubject() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let pet = Pet(name: "Momo", species: "cat")
+        let otherPet = Pet(name: "Nori", species: "cat")
+        let medication = PetMedication(name: "Drops", pet: pet)
+        let otherMedication = PetMedication(name: "Vitamin", pet: otherPet)
+        let scheduledAt = Calendar.current.startOfDay(for: Date()).addingTimeInterval(12 * 3600)
+        let medicationEvent = Event(
+            title: "用药 Drops",
+            startDate: scheduledAt,
+            eventType: EventType.medication.rawValue,
+            relatedEntityType: DomainEntityLinkRegistry.petMedicationPlan,
+            relatedEntityId: medication.id.uuidString
+        )
+        let otherMedicationEvent = Event(
+            title: "用药 Vitamin",
+            startDate: scheduledAt,
+            eventType: EventType.medication.rawValue,
+            relatedEntityType: DomainEntityLinkRegistry.petMedicationPlan,
+            relatedEntityId: otherMedication.id.uuidString
+        )
+        let medicationReminder = Reminder(event: medicationEvent, scheduledAt: scheduledAt)
+        let otherMedicationReminder = Reminder(event: otherMedicationEvent, scheduledAt: scheduledAt)
+        context.insert(pet)
+        context.insert(otherPet)
+        context.insert(medication)
+        context.insert(otherMedication)
+        context.insert(medicationEvent)
+        context.insert(otherMedicationEvent)
+        context.insert(medicationReminder)
+        context.insert(otherMedicationReminder)
+        try context.save()
+
+        QuestManager().autoCompleteReminders(petId: pet.id, careKeyword: "用药", context: context)
+
+        #expect(medicationReminder.statusEnum == .completed)
+        #expect(otherMedicationReminder.statusEnum == .pending)
+    }
+
+    @Test func reminderDeepLinkUsesResolvedIndirectScheduleSubject() {
+        let pet = Pet(name: "Momo", species: "cat")
+        let human = Human(name: "Ava")
+        let insurance = PetInsurance(companyName: "Care", pet: pet)
+        let humanMedication = HumanMedication(humanId: human.id.uuidString, name: "Vitamin")
+        let insuranceEvent = Event(
+            title: "Insurance",
+            eventType: EventType.insurancePremium.rawValue,
+            relatedEntityType: DomainEntityLinkRegistry.petInsurance,
+            relatedEntityId: insurance.id.uuidString
+        )
+        let humanMedicationPayload = OhanaReminderRoutePayload(userInfo: [
+            "relatedEntityType": DomainEntityLinkRegistry.humanMedicationPlan,
+            "relatedEntityId": humanMedication.id.uuidString
+        ])!
+
+        let eventDestination = FocusHomeReminderDeepLinkRouter.destination(
+            for: insuranceEvent,
+            pets: [pet],
+            humans: [human],
+            plants: [],
+            humanMedications: [humanMedication]
+        )
+        let fallbackDestination = FocusHomeReminderDeepLinkRouter.destination(
+            for: humanMedicationPayload,
+            reminders: [],
+            events: [],
+            pets: [pet],
+            humans: [human],
+            plants: [],
+            humanMedications: [humanMedication]
+        )
+
+        if case let .functionMenu(.petInsurance(persistentID)) = eventDestination {
+            #expect(persistentID == pet.persistentModelID)
+        } else {
+            Issue.record("Expected pet insurance destination for indirect insurance event")
+        }
+
+        if case let .humanDetail(routedHuman) = fallbackDestination {
+            #expect(routedHuman.id == human.id)
+        } else {
+            Issue.record("Expected human detail destination for indirect human medication payload")
+        }
     }
 
     @Test func deceasedPetCannotWriteWalkGoalOrSummary() throws {

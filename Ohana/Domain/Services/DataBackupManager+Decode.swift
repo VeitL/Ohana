@@ -14,326 +14,359 @@ nonisolated extension DataBackupManager {
         return iso.date(from: s)
     }
 
-    func decodePet(_ dto: PetBackup) -> Pet {
-        let p = Pet(name: dto.name, species: dto.species, breed: dto.breed,
-                    birthday: parseDate(dto.birthday), gender: dto.gender,
-                    isNeutered: dto.isNeutered)
-        if let uuid = UUID(uuidString: dto.id) { p.id = uuid }
-        p.avatarEmoji = dto.avatarEmoji
-        p.microchipID = dto.microchipID
-        p.vetContact = dto.vetContact
-        p.allergies = dto.allergies
-        p.passportNumber = dto.passportNumber
-        p.passportExpiryDate = parseDate(dto.passportExpiryDate)
-        p.formerName = dto.formerName
-        p.lineageInfo = dto.lineageInfo
-        p.themeColorHex = OhanaThemeColorPolicy.normalizedMemberThemeHex(
-            dto.themeColorHex,
-            fallback: OhanaThemeColorPolicy.petFallbackHex
+    func decodePetSnapshot(_ dto: PetBackup) -> DomainPetRehydrateSnapshot {
+        DomainPetRehydrateSnapshot(
+            id: UUID(uuidString: dto.id) ?? UUID(),
+            name: dto.name,
+            species: dto.species,
+            breed: dto.breed,
+            birthday: parseDate(dto.birthday),
+            gender: dto.gender,
+            isNeutered: dto.isNeutered,
+            avatarEmoji: dto.avatarEmoji,
+            avatarImageData: nil,
+            microchipID: dto.microchipID,
+            vetContact: dto.vetContact,
+            vetClinicName: "",
+            vetDoctorName: "",
+            vetAddress: "",
+            allergies: dto.allergies,
+            passportNumber: dto.passportNumber,
+            passportExpiryDate: parseDate(dto.passportExpiryDate),
+            formerName: dto.formerName,
+            lineageInfo: dto.lineageInfo,
+            themeColorHex: dto.themeColorHex,
+            homeDate: parseDate(dto.homeDate),
+            birthCountry: dto.birthCountry,
+            birthCity: dto.birthCity,
+            foodBrand: dto.foodBrand,
+            restockDate: parseDate(dto.restockDate),
+            restockWeight: dto.restockWeight,
+            dailyPortionGrams: dto.dailyPortionGrams,
+            mainFoodKindRaw: dto.mainFoodKindRaw ?? FeedFoodKind.dry.rawValue,
+            foodPrice: dto.foodPrice,
+            isShared: dto.isShared,
+            ckRecordName: "",
+            createdAt: parseDate(dto.createdAt) ?? Date(),
+            notes: dto.notes,
+            coatColor: dto.coatColor,
+            eyeColor: dto.eyeColor,
+            currentStreak: dto.currentStreak,
+            lastCheckInDate: parseDate(dto.lastCheckInDate),
+            foodTrackingModeRaw: dto.foodTrackingModeRaw,
+            casualOpenDate: parseDate(dto.casualOpenDate),
+            casualDurationDays: dto.casualDurationDays,
+            foodReminderEnabled: dto.foodReminderEnabled ?? false,
+            foodReminderAdvanceDays: dto.foodReminderAdvanceDays ?? 7,
+            coconutBalance: dto.coconutBalance,
+            passedAwayDate: parseDate(dto.passedAwayDate),
+            cardStyleRaw: dto.cardStyleRaw ?? "classic",
+            cardPopoutImageData: dto.cardPopoutImageBase64.flatMap { Data(base64Encoded: $0) },
+            cardPopoutSourceRaw: dto.cardPopoutSourceRaw,
+            weeklyWalkGoalKm: 0,
+            personalityTagsRaw: dto.personalityTagsRaw ?? ""
         )
-        p.homeDate = parseDate(dto.homeDate)
-        p.birthCountry = dto.birthCountry
-        p.birthCity = dto.birthCity
-        p.foodBrand = dto.foodBrand
-        p.restockDate = parseDate(dto.restockDate)
-        p.restockWeight = dto.restockWeight
-        p.dailyPortionGrams = dto.dailyPortionGrams
-        p.mainFoodKindRaw = dto.mainFoodKindRaw ?? FeedFoodKind.dry.rawValue
-        p.foodPrice = dto.foodPrice
-        p.isShared = dto.isShared
-        p.createdAt = parseDate(dto.createdAt) ?? Date()
-        p.notes = dto.notes
-        p.coatColor = dto.coatColor
-        p.eyeColor = dto.eyeColor
-        p.currentStreak = dto.currentStreak
-        p.lastCheckInDate = parseDate(dto.lastCheckInDate)
-        p.foodTrackingModeRaw = dto.foodTrackingModeRaw
-        p.casualOpenDate = parseDate(dto.casualOpenDate)
-        p.casualDurationDays = dto.casualDurationDays
-        p.foodReminderEnabled = dto.foodReminderEnabled ?? false
-        p.foodReminderAdvanceDays = dto.foodReminderAdvanceDays ?? 7
-        p.coconutBalance = dto.coconutBalance
-        p.passedAwayDate = parseDate(dto.passedAwayDate)
-        p.cardStyleRaw = dto.cardStyleRaw ?? "classic"
-        if let raw = dto.cardPopoutImageBase64, let data = Data(base64Encoded: raw) {
-            p.cardPopoutImageData = data
-        }
-        p.cardPopoutSourceRaw = dto.cardPopoutSourceRaw
-        p.personalityTagsRaw = dto.personalityTagsRaw ?? ""
-        return p
     }
 
-    func decodeHuman(_ dto: HumanBackup) -> Human {
-        let h = Human(name: dto.name, birthday: parseDate(dto.birthday),
-                      bloodType: dto.bloodType, avatarEmoji: dto.avatarEmoji,
-                      role: dto.role, nationality: dto.nationality, city: dto.city)
-        if let uuid = UUID(uuidString: dto.id) { h.id = uuid }
-        h.appleUserIdentifier = ""
-        h.genderIdentityRaw = HumanProfileOptions.storedGenderIdentity(
-            dto.genderIdentityRaw ?? HumanProfileOptions.genderMetadata(from: dto.notes)
+    func decodeHumanSnapshot(_ dto: HumanBackup) -> DomainHumanRehydrateSnapshot {
+        DomainHumanRehydrateSnapshot(
+            id: UUID(uuidString: dto.id) ?? UUID(),
+            name: dto.name,
+            birthday: parseDate(dto.birthday),
+            bloodType: dto.bloodType,
+            avatarEmoji: dto.avatarEmoji,
+            avatarImageData: dto.avatarImageBase64.flatMap { Data(base64Encoded: $0) },
+            role: dto.role,
+            genderIdentityRaw: dto.genderIdentityRaw ?? HumanProfileOptions.genderMetadata(from: dto.notes),
+            notes: HumanProfileOptions.visibleNoteParts(from: dto.notes).joined(separator: "｜"),
+            createdAt: parseDate(dto.createdAt) ?? Date(),
+            nationality: dto.nationality,
+            city: dto.city,
+            coconutBalance: dto.coconutBalance,
+            shouldShowOnHome: dto.shouldShowOnHome,
+            mbti: dto.mbti ?? "",
+            privateFieldsRaw: dto.privateFieldsRaw ?? "",
+            themeColorHex: dto.themeColorHex ?? "",
+            heightCm: dto.heightCm ?? 0,
+            passedAwayDate: parseDate(dto.passedAwayDate)
         )
-        h.notes = HumanProfileOptions.visibleNoteParts(from: dto.notes).joined(separator: "｜")
-        h.createdAt = parseDate(dto.createdAt) ?? Date()
-        h.coconutBalance = dto.coconutBalance
-        h.shouldShowOnHome = dto.shouldShowOnHome
-        h.mbti = dto.mbti ?? ""
-        h.privateFieldsRaw = dto.privateFieldsRaw ?? ""
-        h.themeColorHex = OhanaThemeColorPolicy.normalizedMemberThemeHex(
-            dto.themeColorHex ?? "",
-            fallback: OhanaThemeColorPolicy.humanFallbackHex
-        )
-        h.heightCm = dto.heightCm ?? 0
-        h.avatarImageData = dto.avatarImageBase64.flatMap { Data(base64Encoded: $0) }
-        h.passedAwayDate = parseDate(dto.passedAwayDate)
-        return h
     }
 
-    func decodeHousehold(_ dto: HouseholdBackup) -> Household {
-        let h = Household(name: dto.name)
-        if let uuid = UUID(uuidString: dto.id) { h.id = uuid }
-        h.createdAt = parseDate(dto.createdAt) ?? Date()
-        h.totalProsperity = dto.totalProsperity
-        return h
+    func decodeHouseholdSnapshot(_ dto: HouseholdBackup) -> DomainHouseholdRehydrateSnapshot {
+        DomainHouseholdRehydrateSnapshot(
+            id: UUID(uuidString: dto.id) ?? UUID(),
+            name: dto.name,
+            createdAt: parseDate(dto.createdAt) ?? Date(),
+            totalProsperity: dto.totalProsperity
+        )
     }
 
-    func decodeEvent(_ dto: EventBackup) -> Event {
-        let e = Event(
+    func decodeEventSnapshot(_ dto: EventBackup) -> DomainScheduleRehydrateEventSnapshot {
+        DomainScheduleRehydrateEventSnapshot(
+            id: UUID(uuidString: dto.id) ?? UUID(),
             title: dto.title,
             startDate: parseDate(dto.startDate) ?? Date(),
             endDate: parseDate(dto.endDate),
             isAllDay: dto.isAllDay,
             eventType: dto.eventType,
             relatedEntityType: dto.relatedEntityType,
-            relatedEntityId: dto.relatedEntityId
+            relatedEntityId: dto.relatedEntityId,
+            recurrenceDays: dto.recurrenceDays,
+            recurrenceEndDate: parseDate(dto.recurrenceEndDate),
+            isCompleted: dto.isCompleted,
+            completedOccurrences: dto.completedOccurrences ?? [],
+            createdAt: parseDate(dto.createdAt) ?? Date(),
+            assigneeId: dto.assigneeId,
+            feedRuleKindRaw: dto.feedRuleKindRaw ?? "",
+            foodKindRaw: dto.foodKindRaw ?? FeedFoodKind.dry.rawValue,
+            feedAmountGrams: dto.feedAmountGrams ?? 0,
+            feedPlanGroupId: dto.feedPlanGroupId ?? ""
         )
-        if let uuid = UUID(uuidString: dto.id) { e.id = uuid }
-        e.recurrenceDays = dto.recurrenceDays
-        e.recurrenceEndDate = parseDate(dto.recurrenceEndDate)
-        e.isCompleted = dto.isCompleted
-        e.completedOccurrences = dto.completedOccurrences ?? []
-        e.createdAt = parseDate(dto.createdAt) ?? Date()
-        e.assigneeId = dto.assigneeId
-        e.feedRuleKindRaw = dto.feedRuleKindRaw ?? ""
-        e.foodKindRaw = dto.foodKindRaw ?? FeedFoodKind.dry.rawValue
-        e.feedAmountGrams = dto.feedAmountGrams ?? 0
-        e.feedPlanGroupId = dto.feedPlanGroupId ?? ""
-        return e
     }
 
-    func decodeReminder(_ dto: ReminderBackup, events: [String: Event]) -> Reminder {
-        let r = Reminder(
-            event: dto.eventId.flatMap { events[$0] },
-            scheduledAt: parseDate(dto.scheduledAt) ?? Date()
+    func decodeReminderSnapshot(_ dto: ReminderBackup) -> DomainScheduleRehydrateReminderSnapshot {
+        DomainScheduleRehydrateReminderSnapshot(
+            id: UUID(uuidString: dto.id) ?? UUID(),
+            scheduledAt: parseDate(dto.scheduledAt) ?? Date(),
+            status: dto.status,
+            notificationId: dto.notificationId,
+            eventId: dto.eventId.flatMap(UUID.init(uuidString:)),
+            completedAt: parseDate(dto.completedAt),
+            completedBy: dto.completedBy ?? "",
+            createdAt: parseDate(dto.createdAt) ?? Date()
         )
-        if let uuid = UUID(uuidString: dto.id) { r.id = uuid }
-        r.status = dto.status
-        r.notificationId = dto.notificationId
-        r.completedAt = parseDate(dto.completedAt)
-        r.completedBy = dto.completedBy ?? ""
-        r.createdAt = parseDate(dto.createdAt) ?? Date()
-        return r
     }
 
-    func decodeCareLog(_ dto: PetCareLogBackup, pets: [String: Pet]) -> PetCareLog {
-        let l = PetCareLog(date: parseDate(dto.date) ?? Date(),
-                           type: CareType(rawValue: dto.type) ?? .feeding,
-                           amountGrams: dto.amountGrams, amountMl: dto.amountMl, note: dto.note,
-                           foodKind: FeedFoodKind(rawValue: dto.foodKindRaw ?? "") ?? .dry,
-                           treatKind: dto.treatKindRaw.flatMap(FeedTreatKind.init(rawValue:)),
-                           sharedSessionId: dto.sharedSessionId ?? "",
-                           pet: dto.petId.flatMap { pets[$0] },
-                           executorId: dto.executorId)
-        if let uuid = UUID(uuidString: dto.id) { l.id = uuid }
-        return l
-    }
-
-    func decodePottyLog(_ dto: PetPottyLogBackup, pets: [String: Pet]) -> PetPottyLog {
-        let l = PetPottyLog(date: parseDate(dto.date) ?? Date(),
-                            type: PottyType(rawValue: dto.type) ?? .perfectPoop,
-                            pet: dto.petId.flatMap { pets[$0] },
-                            executorId: dto.executorId,
-                            latitude: dto.latitude,
-                            longitude: dto.longitude,
-                            locationAccuracyMeters: dto.locationAccuracyMeters,
-                            walkLogId: dto.walkLogId,
-                            sharedSessionId: dto.sharedSessionId ?? "")
-        if let uuid = UUID(uuidString: dto.id) { l.id = uuid }
-        return l
-    }
-
-    func decodeSharedCareSession(_ dto: SharedCareSessionBackup) -> SharedCareSession {
-        let session = SharedCareSession(
+    func decodeCareLogSnapshot(_ dto: PetCareLogBackup) -> DomainPetCareLogRehydrateSnapshot {
+        DomainPetCareLogRehydrateSnapshot(
+            id: UUID(uuidString: dto.id) ?? UUID(),
             date: parseDate(dto.date) ?? Date(),
-            actionKind: SharedCareActionKind(rawValue: dto.actionKindRaw) ?? .feeding,
+            typeRaw: dto.type,
+            amountGrams: dto.amountGrams,
+            amountMl: dto.amountMl,
+            note: dto.note,
+            foodKindRaw: dto.foodKindRaw ?? FeedFoodKind.dry.rawValue,
+            treatKindRaw: dto.treatKindRaw,
+            autoFeedDedupKey: "",
+            sharedSessionId: dto.sharedSessionId ?? "",
+            petId: dto.petId.flatMap(UUID.init(uuidString:)),
+            executorId: dto.executorId
+        )
+    }
+
+    func decodePottyLogSnapshot(_ dto: PetPottyLogBackup) -> DomainPetPottyLogRehydrateSnapshot {
+        DomainPetPottyLogRehydrateSnapshot(
+            id: UUID(uuidString: dto.id) ?? UUID(),
+            date: parseDate(dto.date) ?? Date(),
+            typeRaw: dto.type,
+            petId: dto.petId.flatMap(UUID.init(uuidString:)),
             executorId: dto.executorId,
-            executorIds: SharedCareParticipantIDs.decode(dto.executorIdsRaw ?? "", fallback: dto.executorId),
+            latitude: dto.latitude,
+            longitude: dto.longitude,
+            locationAccuracyMeters: dto.locationAccuracyMeters,
+            walkLogId: dto.walkLogId,
+            sharedSessionId: dto.sharedSessionId ?? ""
+        )
+    }
+
+    func decodeSharedCareSessionSnapshot(_ dto: SharedCareSessionBackup) -> DomainSharedCareSessionRehydrateSnapshot {
+        DomainSharedCareSessionRehydrateSnapshot(
+            id: UUID(uuidString: dto.id) ?? UUID(),
+            date: parseDate(dto.date) ?? Date(),
+            actionKindRaw: dto.actionKindRaw,
+            executorId: dto.executorId,
+            executorIdsRaw: dto.executorIdsRaw ?? "",
             sourcePetId: dto.sourcePetId,
             targetPetIds: dto.targetPetIdsRaw.split(separator: "|").map(String.init),
-            species: dto.speciesRaw,
+            speciesRaw: dto.speciesRaw,
             totalAmountGrams: dto.totalAmountGrams,
             totalAmountMl: dto.totalAmountMl,
             totalExpenseAmount: dto.totalExpenseAmount ?? 0,
-            expenseCategory: ExpenseCategory(rawValue: dto.expenseCategoryRaw ?? "") ?? .other,
+            expenseCategoryRaw: dto.expenseCategoryRaw ?? ExpenseCategory.other.rawValue,
             currencyCode: dto.currencyCode ?? "",
-            allocationMode: SharedCareAllocationMode(rawValue: dto.allocationModeRaw) ?? .equal,
-            foodKind: FeedFoodKind(rawValue: dto.foodKindRaw) ?? .dry,
+            allocationModeRaw: dto.allocationModeRaw,
+            foodKindRaw: dto.foodKindRaw,
             stockOwnerPetId: dto.stockOwnerPetId,
             primaryLegacyModelName: dto.primaryLegacyModelName ?? "",
             primaryLegacyModelId: dto.primaryLegacyModelId ?? "",
-            note: dto.note
+            note: dto.note,
+            createdAt: parseDate(dto.createdAt) ?? Date()
         )
-        if let uuid = UUID(uuidString: dto.id) { session.id = uuid }
-        session.createdAt = parseDate(dto.createdAt) ?? session.createdAt
-        return session
     }
 
-    func decodeWalkLog(_ dto: PetWalkLogBackup, pets: [String: Pet]) -> PetWalkLog {
-        let l = PetWalkLog(startDate: parseDate(dto.startDate) ?? Date(),
-                           pet: dto.petId.flatMap { pets[$0] },
-                           executorId: dto.executorId,
-                           executorIds: SharedCareParticipantIDs.decode(dto.executorIdsRaw ?? "", fallback: dto.executorId),
-                           sharedSessionId: dto.sharedSessionId ?? "")
-        if let uuid = UUID(uuidString: dto.id) { l.id = uuid }
-        l.endDate = parseDate(dto.endDate)
-        l.distanceMeters = dto.distanceMeters
-        l.coconutsEarned = dto.coconutsEarned
-        l.behaviorNotes = dto.behaviorNotes
-        l.moodRating = dto.moodRating ?? 0
-        return l
+    func decodeWalkLogSnapshot(_ dto: PetWalkLogBackup) -> DomainPetWalkLogRehydrateSnapshot {
+        DomainPetWalkLogRehydrateSnapshot(
+            id: UUID(uuidString: dto.id) ?? UUID(),
+            startDate: parseDate(dto.startDate) ?? Date(),
+            petId: dto.petId.flatMap(UUID.init(uuidString:)),
+            executorId: dto.executorId,
+            executorIdsRaw: dto.executorIdsRaw ?? "",
+            sharedSessionId: dto.sharedSessionId ?? "",
+            endDate: parseDate(dto.endDate),
+            distanceMeters: dto.distanceMeters,
+            coconutsEarned: dto.coconutsEarned,
+            mapSnapshotData: nil,
+            routeLocationsData: nil,
+            behaviorNotes: dto.behaviorNotes,
+            moodRating: dto.moodRating ?? 0
+        )
     }
 
-    func decodeWeightLog(_ dto: PetWeightLogBackup, pets: [String: Pet]) -> PetWeightLog {
-        let l = PetWeightLog(date: parseDate(dto.date) ?? Date(), weight: dto.weight, pet: dto.petId.flatMap { pets[$0] }, executorId: dto.executorId)
-        if let uuid = UUID(uuidString: dto.id) { l.id = uuid }
-        return l
-    }
-
-    func decodeExpenseLog(_ dto: PetExpenseLogBackup, pets: [String: Pet]) -> PetExpenseLog {
-        let l = PetExpenseLog(date: parseDate(dto.date) ?? Date(),
-                              amount: dto.amount,
-                              category: ExpenseCategory(rawValue: dto.category) ?? .other,
-                              note: dto.note,
-                              pet: dto.petId.flatMap { pets[$0] },
-                              executorId: dto.executorId,
-                              sharedSessionId: dto.sharedSessionId ?? "")
-        if let uuid = UUID(uuidString: dto.id) { l.id = uuid }
-        return l
-    }
-
-    func decodeHealthLog(_ dto: PetHealthLogBackup, pets: [String: Pet]) -> PetHealthLog {
-        let l = PetHealthLog(date: parseDate(dto.date) ?? Date(),
-                             type: HealthLogType(rawValue: dto.type) ?? .general,
-                             note: dto.note,
-                             pet: dto.petId.flatMap { pets[$0] },
-                             executorId: dto.executorId)
-        if let uuid = UUID(uuidString: dto.id) { l.id = uuid }
-        l.vetName = dto.vetName
-        l.cost = dto.cost
-        l.expirationDate = parseDate(dto.expirationDate)
-        return l
-    }
-
-    func decodeHygieneLog(_ dto: PetHygieneLogBackup, pets: [String: Pet]) -> PetHygieneLog {
-        let l = PetHygieneLog(date: parseDate(dto.date) ?? Date(),
-                              type: HygieneType(rawValue: dto.type) ?? .bath,
-                              pet: dto.petId.flatMap { pets[$0] },
-                              executorId: dto.executorId,
-                              sharedSessionId: dto.sharedSessionId ?? "")
-        if let uuid = UUID(uuidString: dto.id) { l.id = uuid }
-        return l
-    }
-
-    func decodeFoodRecord(_ dto: PetFoodRecordBackup, pets: [String: Pet]) -> PetFoodRecord {
-        let l = PetFoodRecord(brand: dto.brand, dailyGrams: dto.dailyGrams,
-                              totalGrams: dto.totalGrams ?? 0,
-                              foodKind: FeedFoodKind(rawValue: dto.foodKindRaw ?? "") ?? .dry,
-                              purchaseDate: parseDate(dto.purchaseDate ?? ""),
-                              startDate: parseDate(dto.date) ?? Date(),
-                              pet: dto.petId.flatMap { pets[$0] },
-                              executorId: dto.executorId)
-        if let uuid = UUID(uuidString: dto.id) { l.id = uuid }
-        l.remainingCorrectionGrams = dto.remainingCorrectionGrams
-        l.remainingCorrectionDate = parseDate(dto.remainingCorrectionDate ?? "")
-        l.notes = dto.notes ?? ""
-        return l
-    }
-
-    func decodeDocument(_ dto: PetDocumentBackup, pets: [String: Pet]) -> PetDocument {
-        let l = PetDocument(title: dto.title,
-                            category: DocumentCategory(rawValue: dto.categoryRaw) ?? .other,
-                            pet: dto.petId.flatMap { pets[$0] })
-        if let uuid = UUID(uuidString: dto.id) { l.id = uuid }
-        l.expiryDate = parseDate(dto.expiryDate)
-        l.issueDate = parseDate(dto.issueDate)
-        l.issuingAuthority = dto.issuingAuthority ?? ""
-        l.notes = dto.notes ?? ""
-        l.reminderDate = parseDate(dto.reminderDate)
-        l.cost = dto.cost ?? 0
-        l.attachmentData = dto.attachmentBase64.flatMap { Data(base64Encoded: $0) }
-        l.attachmentFilename = dto.attachmentFilename ?? ""
-        return l
-    }
-
-    func decodeDocumentAttachment(_ dto: PetDocumentAttachmentBackup) -> PetDocumentAttachment? {
-        guard let data = Data(base64Encoded: dto.dataBase64) else { return nil }
-        let l = PetDocumentAttachment(data: data, filename: dto.filename, isImage: dto.isImage)
-        if let uuid = UUID(uuidString: dto.id) { l.id = uuid }
-        return l
-    }
-
-    func decodeMilestone(_ dto: PetMilestoneBackup, pets: [String: Pet]) -> PetMilestone {
-        let l = PetMilestone(date: parseDate(dto.date) ?? Date(),
-                             title: dto.title, emoji: dto.emoji, notes: dto.notes,
-                             pet: dto.petId.flatMap { pets[$0] })
-        if let uuid = UUID(uuidString: dto.id) { l.id = uuid }
-        return l
-    }
-
-    func decodeHumanWeight(_ dto: HumanWeightLogBackup, humans: [String: Human]) -> HumanWeightLog {
-        let l = HumanWeightLog(
+    func decodeWeightLogSnapshot(_ dto: PetWeightLogBackup) -> DomainPetWeightLogRehydrateSnapshot {
+        DomainPetWeightLogRehydrateSnapshot(
+            id: UUID(uuidString: dto.id) ?? UUID(),
             date: parseDate(dto.date) ?? Date(),
             weight: dto.weight,
-            human: dto.humanId.flatMap { humans[$0] },
+            weightUnit: "kg",
+            bcsScore: 0,
+            petId: dto.petId.flatMap(UUID.init(uuidString:)),
             executorId: dto.executorId
         )
-        if let uuid = UUID(uuidString: dto.id) { l.id = uuid }
-        return l
     }
 
-    func decodeHumanWorkout(_ dto: HumanWorkoutLogBackup, humans: [String: Human]) -> HumanWorkoutLog {
-        let l = HumanWorkoutLog(date: parseDate(dto.date) ?? Date(),
-                                type: WorkoutType(rawValue: dto.typeRaw) ?? .walking,
-                                durationMinutes: dto.durationMinutes,
-                                notes: dto.notes,
-                                human: dto.humanId.flatMap { humans[$0] })
-        if let uuid = UUID(uuidString: dto.id) { l.id = uuid }
-        return l
+    func decodeExpenseLogSnapshot(_ dto: PetExpenseLogBackup) -> DomainPetExpenseLogRehydrateSnapshot {
+        DomainPetExpenseLogRehydrateSnapshot(
+            id: UUID(uuidString: dto.id) ?? UUID(),
+            date: parseDate(dto.date) ?? Date(),
+            amount: dto.amount,
+            categoryRaw: dto.category,
+            note: dto.note,
+            petId: dto.petId.flatMap(UUID.init(uuidString:)),
+            executorId: dto.executorId,
+            sharedSessionId: dto.sharedSessionId ?? ""
+        )
     }
 
-    func decodeWaterLog(_ dto: WaterLogBackup) -> WaterLog {
-        let l = WaterLog(date: parseDate(dto.date) ?? Date(), amountMl: dto.amountMl,
-                         note: dto.note)
-        if let uuid = UUID(uuidString: dto.id) { l.id = uuid }
-        return l
+    func decodeHealthLogSnapshot(_ dto: PetHealthLogBackup) -> DomainPetHealthLogRehydrateSnapshot {
+        DomainPetHealthLogRehydrateSnapshot(
+            id: UUID(uuidString: dto.id) ?? UUID(),
+            date: parseDate(dto.date) ?? Date(),
+            typeRaw: dto.type,
+            note: dto.note,
+            petId: dto.petId.flatMap(UUID.init(uuidString:)),
+            executorId: dto.executorId,
+            vetName: dto.vetName,
+            cost: dto.cost,
+            expirationDate: parseDate(dto.expirationDate),
+            nextCheckupDate: nil
+        )
     }
 
-    func decodePhotoLog(_ dto: PetPhotoLogBackup, pets: [String: Pet]) -> PetPhotoLog {
-        let l = PetPhotoLog(
+    func decodeHygieneLogSnapshot(_ dto: PetHygieneLogBackup) -> DomainPetHygieneLogRehydrateSnapshot {
+        DomainPetHygieneLogRehydrateSnapshot(
+            id: UUID(uuidString: dto.id) ?? UUID(),
+            date: parseDate(dto.date) ?? Date(),
+            typeRaw: dto.type,
+            petId: dto.petId.flatMap(UUID.init(uuidString:)),
+            executorId: dto.executorId,
+            sharedSessionId: dto.sharedSessionId ?? ""
+        )
+    }
+
+    func decodeFoodRecordSnapshot(_ dto: PetFoodRecordBackup) -> DomainPetFoodRecordRehydrateSnapshot {
+        DomainPetFoodRecordRehydrateSnapshot(
+            id: UUID(uuidString: dto.id) ?? UUID(),
+            brand: dto.brand,
+            dailyGrams: dto.dailyGrams,
+            totalGrams: dto.totalGrams ?? 0,
+            foodKindRaw: dto.foodKindRaw ?? FeedFoodKind.dry.rawValue,
+            purchaseDate: parseDate(dto.purchaseDate ?? ""),
+            startDate: parseDate(dto.date) ?? Date(),
+            remainingCorrectionGrams: dto.remainingCorrectionGrams,
+            remainingCorrectionDate: parseDate(dto.remainingCorrectionDate ?? ""),
+            notes: dto.notes ?? "",
+            expenseId: nil,
+            calculationModeRaw: FeedStockCalculationMode.manualOrPlan.rawValue,
+            executorId: dto.executorId,
+            petId: dto.petId.flatMap(UUID.init(uuidString:))
+        )
+    }
+
+    func decodeDocumentSnapshot(_ dto: PetDocumentBackup) -> DomainPetDocumentRehydrateSnapshot {
+        DomainPetDocumentRehydrateSnapshot(
+            id: UUID(uuidString: dto.id) ?? UUID(),
+            title: dto.title,
+            categoryRaw: dto.categoryRaw,
+            expiryDate: parseDate(dto.expiryDate),
+            petId: dto.petId.flatMap(UUID.init(uuidString:)),
+            issueDate: parseDate(dto.issueDate),
+            issuingAuthority: dto.issuingAuthority ?? "",
+            notes: dto.notes ?? "",
+            reminderDate: parseDate(dto.reminderDate),
+            cost: dto.cost ?? 0,
+            attachmentData: dto.attachmentBase64.flatMap { Data(base64Encoded: $0) },
+            attachmentFilename: dto.attachmentFilename ?? ""
+        )
+    }
+
+    func decodeDocumentAttachmentSnapshot(_ dto: PetDocumentAttachmentBackup) -> DomainPetDocumentAttachmentRehydrateSnapshot {
+        DomainPetDocumentAttachmentRehydrateSnapshot(
+            id: UUID(uuidString: dto.id) ?? UUID(),
+            documentId: UUID(uuidString: dto.documentId),
+            data: Data(base64Encoded: dto.dataBase64),
+            filename: dto.filename,
+            isImage: dto.isImage
+        )
+    }
+
+    func decodeMilestoneSnapshot(_ dto: PetMilestoneBackup) -> DomainPetMilestoneRehydrateSnapshot {
+        DomainPetMilestoneRehydrateSnapshot(
+            id: UUID(uuidString: dto.id) ?? UUID(),
+            date: parseDate(dto.date) ?? Date(),
+            title: dto.title,
+            emoji: dto.emoji,
+            notes: dto.notes,
+            petId: dto.petId.flatMap(UUID.init(uuidString:))
+        )
+    }
+
+    func decodeHumanWeightSnapshot(_ dto: HumanWeightLogBackup) -> DomainHumanWeightLogRehydrateSnapshot {
+        DomainHumanWeightLogRehydrateSnapshot(
+            id: UUID(uuidString: dto.id) ?? UUID(),
+            date: parseDate(dto.date) ?? Date(),
+            weight: dto.weight,
+            humanId: dto.humanId.flatMap(UUID.init(uuidString:)),
+            executorId: dto.executorId
+        )
+    }
+
+    func decodeHumanWorkoutSnapshot(_ dto: HumanWorkoutLogBackup) -> DomainHumanWorkoutLogRehydrateSnapshot {
+        DomainHumanWorkoutLogRehydrateSnapshot(
+            id: UUID(uuidString: dto.id) ?? UUID(),
+            date: parseDate(dto.date) ?? Date(),
+            typeRaw: dto.typeRaw,
+            durationMinutes: dto.durationMinutes,
+            notes: dto.notes,
+            humanId: dto.humanId.flatMap(UUID.init(uuidString:))
+        )
+    }
+
+    func decodeWaterLogSnapshot(_ dto: WaterLogBackup) -> DomainWaterLogRehydrateSnapshot {
+        DomainWaterLogRehydrateSnapshot(
+            id: UUID(uuidString: dto.id) ?? UUID(),
+            date: parseDate(dto.date) ?? Date(),
+            amountMl: dto.amountMl,
+            note: dto.note
+        )
+    }
+
+    func decodePhotoLogSnapshot(_ dto: PetPhotoLogBackup) -> DomainPetPhotoLogRehydrateSnapshot {
+        DomainPetPhotoLogRehydrateSnapshot(
+            id: UUID(uuidString: dto.id) ?? UUID(),
             imageData: Data(base64Encoded: dto.imageBase64) ?? Data(),
             date: parseDate(dto.date) ?? Date(),
             note: dto.note,
-            pet: dto.petId.flatMap { pets[$0] },
+            createdAt: parseDate(dto.createdAt) ?? Date(),
+            petId: dto.petId.flatMap(UUID.init(uuidString:)),
             locationLatitude: dto.locationLatitude,
             locationLongitude: dto.locationLongitude,
             locationPlacename: dto.locationPlacename
         )
-        if let uuid = UUID(uuidString: dto.id) { l.id = uuid }
-        l.createdAt = parseDate(dto.createdAt) ?? Date()
-        return l
     }
 
-    func decodeInsurance(_ dto: PetInsuranceBackup, pets: [String: Pet]) -> PetInsurance {
-        let l = PetInsurance(
+    func decodeInsuranceSnapshot(_ dto: PetInsuranceBackup) -> DomainPetInsuranceRehydrateSnapshot {
+        DomainPetInsuranceRehydrateSnapshot(
+            id: UUID(uuidString: dto.id) ?? UUID(),
             companyName: dto.companyName,
             policyNumber: dto.policyNumber,
             productName: dto.productName,
@@ -342,152 +375,147 @@ nonisolated extension DataBackupManager {
             startDate: parseDate(dto.startDate) ?? Date(),
             renewalDate: parseDate(dto.renewalDate) ?? Date(),
             notes: dto.notes,
-            paymentFrequency: InsurancePaymentFrequency(rawValue: dto.paymentFrequencyRaw) ?? .annual,
+            isActive: dto.isActive,
+            createdAt: parseDate(dto.createdAt) ?? Date(),
+            paymentFrequencyRaw: dto.paymentFrequencyRaw,
             paymentDayOfMonth: dto.paymentDayOfMonth,
             showInCalendar: dto.showInCalendar,
             otherFeeAmount: dto.otherFeeAmount,
             otherFeeNote: dto.otherFeeNote,
             firstPremiumPaymentDate: parseDate(dto.firstPremiumPaymentDate),
-            pet: dto.petId.flatMap { pets[$0] }
+            petId: dto.petId.flatMap(UUID.init(uuidString:))
         )
-        if let uuid = UUID(uuidString: dto.id) { l.id = uuid }
-        l.isActive = dto.isActive
-        l.createdAt = parseDate(dto.createdAt) ?? Date()
-        return l
     }
 
-    func decodeInsuranceClaim(_ dto: InsuranceClaimBackup, insurances: [String: PetInsurance]) -> InsuranceClaim {
-        let l = InsuranceClaim(
+    func decodeInsuranceClaimSnapshot(_ dto: InsuranceClaimBackup) -> DomainInsuranceClaimRehydrateSnapshot {
+        DomainInsuranceClaimRehydrateSnapshot(
+            id: UUID(uuidString: dto.id) ?? UUID(),
+            insuranceId: dto.insuranceId.flatMap(UUID.init(uuidString:)),
             claimDate: parseDate(dto.claimDate) ?? Date(),
             incidentDate: parseDate(dto.incidentDate) ?? Date(),
             totalExpense: dto.totalExpense,
             claimedAmount: dto.claimedAmount,
             approvedAmount: dto.approvedAmount,
-            status: ClaimStatus(rawValue: dto.statusRaw) ?? .submitted,
+            statusRaw: dto.statusRaw,
             note: dto.note,
             relatedExpenseLogId: dto.relatedExpenseLogId,
-            insurance: dto.insuranceId.flatMap { insurances[$0] }
+            approvedAt: parseDate(dto.approvedAt),
+            createdAt: parseDate(dto.createdAt) ?? Date()
         )
-        if let uuid = UUID(uuidString: dto.id) { l.id = uuid }
-        l.approvedAt = parseDate(dto.approvedAt)
-        l.createdAt = parseDate(dto.createdAt) ?? Date()
-        return l
     }
 
-    func decodePetMedication(_ dto: PetMedicationBackup, pets: [String: Pet]) -> PetMedication {
-        let l = PetMedication(
+    func decodePetMedicationSnapshot(_ dto: PetMedicationBackup) -> DomainPetMedicationRehydrateSnapshot {
+        DomainPetMedicationRehydrateSnapshot(
+            id: UUID(uuidString: dto.id) ?? UUID(),
             name: dto.name,
             dosage: dto.dosage,
-            frequency: PetMedicationFrequency(rawValue: dto.frequencyRaw) ?? .daily,
+            frequencyRaw: dto.frequencyRaw,
+            customFrequencyNote: dto.customFrequencyNote,
             startDate: parseDate(dto.startDate) ?? Date(),
             endDate: parseDate(dto.endDate),
             colorHex: dto.colorHex,
             notes: dto.notes,
-            pet: dto.petId.flatMap { pets[$0] }
+            isActive: dto.isActive,
+            remainingAmount: max(0, dto.remainingAmount ?? 0),
+            createdAt: parseDate(dto.createdAt) ?? Date(),
+            petId: dto.petId.flatMap(UUID.init(uuidString:))
         )
-        if let uuid = UUID(uuidString: dto.id) { l.id = uuid }
-        l.customFrequencyNote = dto.customFrequencyNote
-        l.isActive = dto.isActive
-        l.remainingAmount = max(0, dto.remainingAmount ?? 0)
-        l.createdAt = parseDate(dto.createdAt) ?? Date()
-        return l
     }
 
-    func decodeHumanMedication(_ dto: HumanMedicationBackup) -> HumanMedication {
-        let l = HumanMedication(
+    func decodeHumanMedicationSnapshot(_ dto: HumanMedicationBackup) -> DomainHumanMedicationRehydrateSnapshot {
+        DomainHumanMedicationRehydrateSnapshot(
+            id: UUID(uuidString: dto.id) ?? UUID(),
             humanId: dto.humanId,
             name: dto.name,
             dosage: dto.dosage,
-            frequency: MedicationFrequency(rawValue: dto.frequencyRaw) ?? .daily,
+            frequencyRaw: dto.frequencyRaw,
+            customFrequencyNote: dto.customFrequencyNote,
             firstDoseTime: parseDate(dto.firstDoseTime) ?? Date(),
             startDate: parseDate(dto.startDate) ?? Date(),
             endDate: parseDate(dto.endDate),
             colorHex: dto.colorHex,
-            notes: dto.notes
+            notes: dto.notes,
+            isActive: dto.isActive,
+            createdAt: parseDate(dto.createdAt) ?? Date()
         )
-        if let uuid = UUID(uuidString: dto.id) { l.id = uuid }
-        l.customFrequencyNote = dto.customFrequencyNote
-        l.isActive = dto.isActive
-        l.createdAt = parseDate(dto.createdAt) ?? Date()
-        return l
     }
 
-    func decodeHumanMedicationLog(_ dto: HumanMedicationLogBackup) -> HumanMedicationLog {
-        let l = HumanMedicationLog(
+    func decodeHumanMedicationLogSnapshot(_ dto: HumanMedicationLogBackup) -> DomainHumanMedicationLogRehydrateSnapshot {
+        DomainHumanMedicationLogRehydrateSnapshot(
+            id: UUID(uuidString: dto.id) ?? UUID(),
             humanId: dto.humanId,
             medicationId: dto.medicationId,
             scheduledTime: parseDate(dto.scheduledTime) ?? Date(),
-            status: HumanMedicationStatus(rawValue: dto.statusRaw) ?? .pending,
-            recordedTime: parseDate(dto.recordedTime)
+            statusRaw: dto.statusRaw,
+            recordedTime: parseDate(dto.recordedTime),
+            createdAt: parseDate(dto.createdAt) ?? Date()
         )
-        if let uuid = UUID(uuidString: dto.id) { l.id = uuid }
-        l.createdAt = parseDate(dto.createdAt) ?? Date()
-        return l
     }
 
-    func decodeHumanHealthMetricLog(_ dto: HumanHealthMetricLogBackup, humans: [String: Human]) -> HumanHealthMetricLog {
-        let log = HumanHealthMetricLog(
+    func decodeHumanHealthMetricLogSnapshot(_ dto: HumanHealthMetricLogBackup) -> DomainHumanHealthMetricLogRehydrateSnapshot {
+        DomainHumanHealthMetricLogRehydrateSnapshot(
+            id: UUID(uuidString: dto.id) ?? UUID(),
             metricKey: dto.metricKey,
             unitCode: dto.unitCode,
             value: dto.value,
             date: parseDate(dto.date) ?? Date(),
             notes: dto.notes,
-            human: dto.humanId.flatMap { humans[$0] }
+            humanId: dto.humanId.flatMap(UUID.init(uuidString:)),
+            createdAt: parseDate(dto.createdAt) ?? Date()
         )
-        if let uuid = UUID(uuidString: dto.id) { log.id = uuid }
-        log.createdAt = parseDate(dto.createdAt) ?? Date()
-        return log
     }
 
-    func decodeSymptomLog(_ dto: SymptomLogBackup, pets: [String: Pet]) -> SymptomLog {
-        let l = SymptomLog(
+    func decodeSymptomLogSnapshot(_ dto: SymptomLogBackup) -> DomainSymptomLogRehydrateSnapshot {
+        DomainSymptomLogRehydrateSnapshot(
+            id: UUID(uuidString: dto.id) ?? UUID(),
             date: parseDate(dto.date) ?? Date(),
-            category: SymptomCategory(rawValue: dto.categoryRaw) ?? .other,
+            categoryRaw: dto.categoryRaw,
             symptomName: dto.symptomName,
-            severity: SymptomSeverity(rawValue: dto.severityRaw) ?? .mild,
+            severityRaw: dto.severityRaw,
             note: dto.note,
             photoData: dto.photoBase64.flatMap { Data(base64Encoded: $0) },
-            pet: dto.petId.flatMap { pets[$0] }
+            petId: dto.petId.flatMap(UUID.init(uuidString:))
         )
-        if let uuid = UUID(uuidString: dto.id) { l.id = uuid }
-        return l
     }
 
-    func decodeHeatCycleLog(_ dto: HeatCycleLogBackup, pets: [String: Pet]) -> HeatCycleLog {
-        let l = HeatCycleLog(
+    func decodeHeatCycleLogSnapshot(_ dto: HeatCycleLogBackup) -> DomainHeatCycleLogRehydrateSnapshot {
+        DomainHeatCycleLogRehydrateSnapshot(
+            id: UUID(uuidString: dto.id) ?? UUID(),
             startDate: parseDate(dto.startDate) ?? Date(),
             endDate: parseDate(dto.endDate),
-            status: HeatCycleStatus(rawValue: dto.statusRaw) ?? .proestrus,
+            statusRaw: dto.statusRaw,
             note: dto.note,
             isMated: dto.isMated,
             expectedDeliveryDate: parseDate(dto.expectedDeliveryDate),
-            pet: dto.petId.flatMap { pets[$0] }
+            petId: dto.petId.flatMap(UUID.init(uuidString:))
         )
-        if let uuid = UUID(uuidString: dto.id) { l.id = uuid }
-        return l
     }
 
-    func decodeWishlist(_ dto: WishlistItemBackup) -> WishlistItem {
-        let l = WishlistItem(title: dto.title, cost: dto.cost, creatorId: dto.creatorId)
-        if let uuid = UUID(uuidString: dto.id) { l.id = uuid }
-        l.isRedeemed = dto.isRedeemed
-        l.createdAt = parseDate(dto.createdAt) ?? Date()
-        return l
+    func decodeWishlistSnapshot(_ dto: WishlistItemBackup) -> DomainWishlistItemRehydrateSnapshot {
+        DomainWishlistItemRehydrateSnapshot(
+            id: UUID(uuidString: dto.id) ?? UUID(),
+            title: dto.title,
+            cost: dto.cost,
+            creatorId: dto.creatorId,
+            isRedeemed: dto.isRedeemed,
+            createdAt: parseDate(dto.createdAt) ?? Date()
+        )
     }
 
-    func decodeCareLedgerEvent(_ dto: CareLedgerEventBackup) -> CareLedgerEvent {
-        let event = CareLedgerEvent(
+    func decodeCareLedgerEventSnapshot(_ dto: CareLedgerEventBackup) -> DomainCareLedgerRehydrateSnapshot {
+        DomainCareLedgerRehydrateSnapshot(
+            id: UUID(uuidString: dto.id) ?? UUID(),
             occurredAt: parseDate(dto.occurredAt) ?? Date(),
-            actorKind: CareLedgerActorKind(rawValue: dto.actorKind) ?? .unknown,
+            actorKind: dto.actorKind,
             actorId: dto.actorId,
-            subjectKind: CareLedgerSubjectKind(rawValue: dto.subjectKind) ?? .unknown,
+            subjectKind: dto.subjectKind,
             subjectId: dto.subjectId,
-            eventKind: CareLedgerEventKind(rawValue: dto.eventKind) ?? .unknown,
+            eventKind: dto.eventKind,
             actionType: dto.actionType,
             amountValue: dto.amountValue,
             amountUnit: dto.amountUnit,
             note: dto.note,
-            source: CareLedgerSource(rawValue: dto.source) ?? .importData,
+            source: dto.source,
             sourceEventId: dto.sourceEventId,
             sourceReminderId: dto.sourceReminderId,
             legacyModelName: dto.legacyModelName,
@@ -498,14 +526,13 @@ nonisolated extension DataBackupManager {
             metadataJSON: dto.metadataJSON,
             createdAt: parseDate(dto.createdAt) ?? Date()
         )
-        if let uuid = UUID(uuidString: dto.id) { event.id = uuid }
-        return event
     }
 
-    func decodeCoconutAccount(_ dto: CoconutAccountBackup) -> CoconutAccount {
-        let account = CoconutAccount(
+    func decodeCoconutAccountSnapshot(_ dto: CoconutAccountBackup) -> DomainCoconutAccountRehydrateSnapshot {
+        DomainCoconutAccountRehydrateSnapshot(
+            id: UUID(uuidString: dto.id) ?? UUID(),
             accountKey: dto.accountKey,
-            ownerKind: CoconutWalletOwnerKind(rawValue: dto.ownerKindRaw) ?? .system,
+            ownerKindRaw: dto.ownerKindRaw,
             ownerId: dto.ownerId,
             displayName: dto.displayName,
             balance: dto.balance,
@@ -513,28 +540,27 @@ nonisolated extension DataBackupManager {
             updatedAt: parseDate(dto.updatedAt) ?? Date(),
             metadataJSON: dto.metadataJSON
         )
-        if let uuid = UUID(uuidString: dto.id) { account.id = uuid }
-        return account
     }
 
-    func decodeCoconutLedgerEntry(_ dto: CoconutLedgerEntryBackup) -> CoconutLedgerEntry {
-        let entry = CoconutLedgerEntry(
+    func decodeCoconutLedgerEntrySnapshot(_ dto: CoconutLedgerEntryBackup) -> DomainCoconutLedgerEntryRehydrateSnapshot {
+        DomainCoconutLedgerEntryRehydrateSnapshot(
+            id: UUID(uuidString: dto.id) ?? UUID(),
             transactionKey: dto.transactionKey,
             accountKey: dto.accountKey,
-            ownerKind: CoconutWalletOwnerKind(rawValue: dto.ownerKindRaw) ?? .system,
+            ownerKindRaw: dto.ownerKindRaw,
             ownerId: dto.ownerId,
             ownerName: dto.ownerName,
             delta: dto.delta,
             balanceBefore: dto.balanceBefore,
             balanceAfter: dto.balanceAfter,
             affectsBalance: dto.affectsBalance,
-            entryKind: CoconutWalletEntryKind(rawValue: dto.entryKindRaw) ?? .adjustment,
-            source: CoconutWalletSource(rawValue: dto.sourceRaw) ?? .importData,
+            entryKindRaw: dto.entryKindRaw,
+            sourceRaw: dto.sourceRaw,
             title: dto.title,
             emoji: dto.emoji,
             actorId: dto.actorId,
             actorName: dto.actorName,
-            subjectKind: CareLedgerSubjectKind(rawValue: dto.subjectKindRaw) ?? .system,
+            subjectKindRaw: dto.subjectKindRaw,
             subjectId: dto.subjectId,
             sourceModelName: dto.sourceModelName,
             sourceModelId: dto.sourceModelId,
@@ -543,16 +569,15 @@ nonisolated extension DataBackupManager {
             occurredAt: parseDate(dto.occurredAt) ?? Date(),
             createdAt: parseDate(dto.createdAt) ?? Date()
         )
-        if let uuid = UUID(uuidString: dto.id) { entry.id = uuid }
-        return entry
     }
 
-    func decodeFamilyCollaborationTask(_ dto: FamilyCollaborationTaskBackup) -> FamilyCollaborationTask {
-        let task = FamilyCollaborationTask(
+    func decodeFamilyCollaborationTaskSnapshot(_ dto: FamilyCollaborationTaskBackup) -> DomainFamilyCollaborationTaskRehydrateSnapshot {
+        DomainFamilyCollaborationTaskRehydrateSnapshot(
+            id: UUID(uuidString: dto.id) ?? UUID(),
             title: dto.title,
             note: dto.note,
-            kind: FamilyCollaborationTaskKind(rawValue: dto.kindRaw) ?? .householdTask,
-            status: FamilyCollaborationTaskStatus(rawValue: dto.statusRaw) ?? .active,
+            kindRaw: dto.kindRaw,
+            statusRaw: dto.statusRaw,
             relatedPetId: dto.relatedPetId,
             relatedEventId: dto.relatedEventId,
             relatedReminderId: dto.relatedReminderId,
@@ -560,23 +585,22 @@ nonisolated extension DataBackupManager {
             createdByName: dto.createdByName,
             assignedToId: dto.assignedToId,
             assignedToName: dto.assignedToName,
+            claimedById: dto.claimedById,
+            claimedByName: dto.claimedByName,
+            completedById: dto.completedById,
+            completedByName: dto.completedByName,
             rewardCoconuts: dto.rewardCoconuts,
             dueAt: parseDate(dto.dueAt),
-            emoji: dto.emoji,
-            createdAt: parseDate(dto.createdAt) ?? Date()
+            completedAt: parseDate(dto.completedAt),
+            createdAt: parseDate(dto.createdAt) ?? Date(),
+            updatedAt: parseDate(dto.updatedAt) ?? parseDate(dto.createdAt) ?? Date(),
+            emoji: dto.emoji
         )
-        if let uuid = UUID(uuidString: dto.id) { task.id = uuid }
-        task.claimedById = dto.claimedById
-        task.claimedByName = dto.claimedByName
-        task.completedById = dto.completedById
-        task.completedByName = dto.completedByName
-        task.completedAt = parseDate(dto.completedAt)
-        task.updatedAt = parseDate(dto.updatedAt) ?? task.createdAt
-        return task
     }
 
-    func decodeCoconutExchangeRequest(_ dto: CoconutExchangeRequestBackup) -> CoconutExchangeRequest {
-        let request = CoconutExchangeRequest(
+    func decodeCoconutExchangeRequestSnapshot(_ dto: CoconutExchangeRequestBackup) -> DomainCoconutExchangeRequestRehydrateSnapshot {
+        DomainCoconutExchangeRequestRehydrateSnapshot(
+            id: UUID(uuidString: dto.id) ?? UUID(),
             senderId: dto.senderId,
             senderName: dto.senderName,
             receiverId: dto.receiverId,
@@ -584,23 +608,22 @@ nonisolated extension DataBackupManager {
             coconutCost: dto.coconutCost,
             currencyCode: dto.currencyCode,
             localAmount: dto.localAmount,
-            status: CoconutExchangeRequestStatus(rawValue: dto.statusRaw) ?? .pending,
+            statusRaw: dto.statusRaw,
             createdAt: parseDate(dto.createdAt) ?? Date(),
             confirmedAt: parseDate(dto.confirmedAt),
             cancelledAt: parseDate(dto.cancelledAt),
             updatedAt: parseDate(dto.updatedAt) ?? Date(),
             note: dto.note
         )
-        if let uuid = UUID(uuidString: dto.id) { request.id = uuid }
-        return request
     }
 
-    func decodeOasisUpgradeCoconut(_ dto: OasisUpgradeCoconutBackup) -> OasisUpgradeCoconut {
-        let coconut = OasisUpgradeCoconut(
+    func decodeOasisUpgradeCoconutSnapshot(_ dto: OasisUpgradeCoconutBackup) -> DomainOasisUpgradeCoconutRehydrateSnapshot {
+        DomainOasisUpgradeCoconutRehydrateSnapshot(
+            id: UUID(uuidString: dto.id) ?? UUID(),
             level: dto.level,
             createdAt: parseDate(dto.createdAt) ?? Date(),
             openedAt: parseDate(dto.openedAt),
-            rewardKind: OasisUpgradeRewardKind(rawValue: dto.rewardKindRaw) ?? .coconuts,
+            rewardKindRaw: dto.rewardKindRaw,
             rewardCatalogId: dto.rewardCatalogId,
             guaranteedCritterId: dto.guaranteedCritterId,
             coconutAmount: dto.coconutAmount,
@@ -616,18 +639,17 @@ nonisolated extension DataBackupManager {
             descriptionEn: dto.descriptionEn,
             descriptionDe: dto.descriptionDe
         )
-        if let uuid = UUID(uuidString: dto.id) { coconut.id = uuid }
-        return coconut
     }
 
-    func decodeOasisElectronicPet(_ dto: OasisElectronicPetBackup) -> OasisElectronicPet {
-        let critter = OasisElectronicPet(
+    func decodeOasisElectronicPetSnapshot(_ dto: OasisElectronicPetBackup) -> DomainOasisElectronicPetRehydrateSnapshot {
+        DomainOasisElectronicPetRehydrateSnapshot(
+            id: UUID(uuidString: dto.id) ?? UUID(),
             catalogId: dto.catalogId,
             nameZh: dto.nameZh,
             nameEn: dto.nameEn,
             nameDe: dto.nameDe,
             emoji: dto.emoji,
-            rarity: OasisElectronicPetRarity(rawValue: dto.rarityRaw) ?? .common,
+            rarityRaw: dto.rarityRaw,
             nickname: dto.nickname,
             level: dto.level,
             starLevel: dto.starLevel,
@@ -655,37 +677,34 @@ nonisolated extension DataBackupManager {
             lastGentlePromptAt: parseDate(dto.lastGentlePromptAt),
             isArchived: dto.isArchived
         )
-        if let uuid = UUID(uuidString: dto.id) { critter.id = uuid }
-        return critter
     }
 
-    func decodeOasisCritterFragment(_ dto: OasisCritterFragmentBackup) -> OasisCritterFragmentBalance {
-        let fragment = OasisCritterFragmentBalance(
+    func decodeOasisCritterFragmentSnapshot(_ dto: OasisCritterFragmentBackup) -> DomainOasisCritterFragmentRehydrateSnapshot {
+        DomainOasisCritterFragmentRehydrateSnapshot(
+            id: UUID(uuidString: dto.id) ?? UUID(),
             catalogId: dto.catalogId,
             amount: dto.amount,
             updatedAt: parseDate(dto.updatedAt) ?? Date()
         )
-        if let uuid = UUID(uuidString: dto.id) { fragment.id = uuid }
-        return fragment
     }
 
-    func decodeOasisUnlock(_ dto: OasisUnlockBackup) -> OasisUnlock {
-        let unlock = OasisUnlock(
+    func decodeOasisUnlockSnapshot(_ dto: OasisUnlockBackup) -> DomainOasisUnlockRehydrateSnapshot {
+        DomainOasisUnlockRehydrateSnapshot(
+            id: UUID(uuidString: dto.id) ?? UUID(),
             unlockId: dto.unlockId,
-            unlockKind: OasisUpgradeRewardKind(rawValue: dto.unlockKindRaw) ?? .decoration,
+            unlockKindRaw: dto.unlockKindRaw,
             sourceLevel: dto.sourceLevel,
             createdAt: parseDate(dto.createdAt) ?? Date(),
             metadataJSON: dto.metadataJSON
         )
-        if let uuid = UUID(uuidString: dto.id) { unlock.id = uuid }
-        return unlock
     }
 
-    func decodeOasisCritterActionLog(_ dto: OasisCritterActionLogBackup) -> OasisCritterActionLog {
-        let log = OasisCritterActionLog(
+    func decodeOasisCritterActionLogSnapshot(_ dto: OasisCritterActionLogBackup) -> DomainOasisCritterActionLogRehydrateSnapshot {
+        DomainOasisCritterActionLogRehydrateSnapshot(
+            id: UUID(uuidString: dto.id) ?? UUID(),
             critterId: dto.critterId.flatMap(UUID.init(uuidString:)),
             critterCatalogId: dto.critterCatalogId,
-            action: OasisCritterAction(rawValue: dto.actionRaw) ?? .rest,
+            actionRaw: dto.actionRaw,
             createdAt: parseDate(dto.createdAt) ?? Date(),
             coconutDelta: dto.coconutDelta,
             fragmentDelta: dto.fragmentDelta,
@@ -695,65 +714,60 @@ nonisolated extension DataBackupManager {
             noteEn: dto.noteEn,
             noteDe: dto.noteDe
         )
-        if let uuid = UUID(uuidString: dto.id) { log.id = uuid }
-        return log
     }
 
-    func decodeGachaOwnedItem(_ dto: GachaOwnedItemBackup) -> GachaOwnedItem {
-        let item = GachaOwnedItem(
+    func decodeGachaOwnedItemSnapshot(_ dto: GachaOwnedItemBackup) -> DomainGachaOwnedItemRehydrateSnapshot {
+        DomainGachaOwnedItemRehydrateSnapshot(
+            id: UUID(uuidString: dto.id) ?? UUID(),
             ownerHumanId: dto.ownerHumanId,
             seriesId: dto.seriesId,
             itemId: dto.itemId,
-            rarity: GachaRarity(rawValue: dto.rarityRaw) ?? .common,
+            rarityRaw: dto.rarityRaw,
             isHidden: dto.isHidden,
             ownedCount: dto.ownedCount,
             firstObtainedAt: parseDate(dto.firstObtainedAt) ?? Date(),
-            latestObtainedAt: parseDate(dto.latestObtainedAt) ?? Date()
+            latestObtainedAt: parseDate(dto.latestObtainedAt) ?? Date(),
+            createdAt: parseDate(dto.createdAt) ?? parseDate(dto.firstObtainedAt) ?? Date()
         )
-        item.createdAt = parseDate(dto.createdAt) ?? item.firstObtainedAt
-        if let uuid = UUID(uuidString: dto.id) { item.id = uuid }
-        return item
     }
 
-    func decodeGachaDrawLog(_ dto: GachaDrawLogBackup) -> GachaDrawLog {
-        let log = GachaDrawLog(
+    func decodeGachaDrawLogSnapshot(_ dto: GachaDrawLogBackup) -> DomainGachaDrawLogRehydrateSnapshot {
+        DomainGachaDrawLogRehydrateSnapshot(
+            id: UUID(uuidString: dto.id) ?? UUID(),
             ownerHumanId: dto.ownerHumanId,
             ownerName: dto.ownerName,
             seriesId: dto.seriesId,
             itemId: dto.itemId,
-            rarity: GachaRarity(rawValue: dto.rarityRaw) ?? .common,
+            rarityRaw: dto.rarityRaw,
             isHidden: dto.isHidden,
             isNew: dto.isNew,
-            outcomeKind: GachaOutcomeKind(rawValue: dto.outcomeKindRaw ?? "") ?? .collectible,
+            outcomeKindRaw: dto.outcomeKindRaw ?? GachaOutcomeKind.collectible.rawValue,
+            instantResultId: dto.instantResultId ?? "",
+            instantTitleZh: dto.instantTitleZh ?? "",
+            instantTitleEn: dto.instantTitleEn ?? "",
+            instantTitleDe: dto.instantTitleDe ?? "",
+            instantDetailZh: dto.instantDetailZh ?? "",
+            instantDetailEn: dto.instantDetailEn ?? "",
+            instantDetailDe: dto.instantDetailDe ?? "",
+            instantSymbol: dto.instantSymbol ?? "",
+            instantCoconutDelta: dto.instantCoconutDelta ?? 0,
             costCoconuts: dto.costCoconuts,
             dailySequence: dto.dailySequence,
-            drawDate: parseDate(dto.drawDate) ?? Date()
+            drawDate: parseDate(dto.drawDate) ?? Date(),
+            createdAt: parseDate(dto.createdAt) ?? parseDate(dto.drawDate) ?? Date()
         )
-        log.instantResultId = dto.instantResultId ?? ""
-        log.instantTitleZh = dto.instantTitleZh ?? ""
-        log.instantTitleEn = dto.instantTitleEn ?? ""
-        log.instantTitleDe = dto.instantTitleDe ?? ""
-        log.instantDetailZh = dto.instantDetailZh ?? ""
-        log.instantDetailEn = dto.instantDetailEn ?? ""
-        log.instantDetailDe = dto.instantDetailDe ?? ""
-        log.instantSymbol = dto.instantSymbol ?? ""
-        log.instantCoconutDelta = dto.instantCoconutDelta ?? 0
-        log.createdAt = parseDate(dto.createdAt) ?? log.drawDate
-        if let uuid = UUID(uuidString: dto.id) { log.id = uuid }
-        return log
     }
 
-    func decodeShopPurchaseRecord(_ dto: ShopPurchaseRecordBackup) -> ShopPurchaseRecord {
-        let record = ShopPurchaseRecord(
+    func decodeShopPurchaseRecordSnapshot(_ dto: ShopPurchaseRecordBackup) -> DomainShopPurchaseRecordRehydrateSnapshot {
+        DomainShopPurchaseRecordRehydrateSnapshot(
             id: UUID(uuidString: dto.id) ?? UUID(),
             transactionKey: dto.transactionKey,
             itemId: dto.itemId,
-            buyerHumanId: dto.buyerHumanId.isEmpty ? nil : dto.buyerHumanId,
+            buyerHumanId: dto.buyerHumanId,
             purchasedAt: parseDate(dto.purchasedAt) ?? Date(),
             sourceRaw: dto.sourceRaw,
             isLegacyImport: dto.isLegacyImport,
             createdAt: parseDate(dto.createdAt) ?? parseDate(dto.purchasedAt) ?? Date()
         )
-        return record
     }
 }

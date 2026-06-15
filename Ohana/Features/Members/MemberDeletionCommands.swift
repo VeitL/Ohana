@@ -48,8 +48,7 @@ enum MemberDeletionCommandService {
         // member-lifecycle-gate: allow physical deletion is an explicit data-removal boundary, not an active member write.
         let now = Date()
         let petID = pet.id
-        let petIDString = petID.uuidString
-        let relatedEvents = fetchEvents(relatedEntityID: petIDString, context: context)
+        let relatedEvents = fetchPetEvents(pet, context: context)
         for event in relatedEvents {
             PhysicalDeletionService.deleteEvent(
                 event,
@@ -103,7 +102,7 @@ enum MemberDeletionCommandService {
         let requiresAccountSwitch = deletedCurrentHuman && hasRemainingHuman
 
         let now = Date()
-        let relatedEvents = fetchEvents(relatedEntityID: humanIDString, context: context)
+        let relatedEvents = fetchHumanOwnedEvents(humanId: humanIDString, context: context)
         for event in relatedEvents {
             PhysicalDeletionService.deleteEvent(
                 event,
@@ -136,7 +135,7 @@ enum MemberDeletionCommandService {
     static func deletePlant(_ plant: Plant, context: ModelContext) -> MemberDeletionCommandResult {
         let now = Date()
         let plantID = plant.id
-        let relatedEvents = fetchEvents(relatedEntityID: plantID.uuidString, context: context)
+        let relatedEvents = fetchPlantEvents(plant, context: context)
         for event in relatedEvents {
             PhysicalDeletionService.deleteEvent(
                 event,
@@ -163,17 +162,55 @@ enum MemberDeletionCommandService {
     }
 
     @MainActor
-    private static func fetchEvents(relatedEntityID: String, context: ModelContext) -> [Event] {
-        let descriptor = FetchDescriptor<Event>(
-            predicate: #Predicate<Event> { event in
-                event.relatedEntityId == relatedEntityID
-            }
-        )
-        return fetchMemberDeletionModelsOrLog(
-            descriptor,
+    private static func fetchPetEvents(_ pet: Pet, context: ModelContext) -> [Event] {
+        fetchEvents(context: context, operation: "fetch pet-related events for deletion").filter { event in
+            MemberLifecycleActiveScheduleResolver.eventBelongsToPet(
+                event,
+                petId: pet.id.uuidString,
+                petMedications: pet.medications,
+                insurances: pet.insurances
+            )
+        }
+    }
+
+    @MainActor
+    private static func fetchHumanOwnedEvents(humanId: String, context: ModelContext) -> [Event] {
+        let humanMedications = fetchMemberDeletionModelsOrLog(
+            FetchDescriptor<HumanMedication>(),
             context: context,
-            operation: "fetch related events for pet deletion"
+            operation: "fetch human medications for deletion event resolution"
+        ).filter { $0.humanId == humanId }
+
+        return fetchEvents(context: context, operation: "fetch human-owned events for deletion").filter { event in
+            MemberLifecycleActiveScheduleResolver.eventOwnedByHuman(
+                event,
+                humanId: humanId,
+                humanMedications: humanMedications
+            )
+        }
+    }
+
+    @MainActor
+    private static func fetchPlantEvents(_ plant: Plant, context: ModelContext) -> [Event] {
+        fetchEvents(context: context, operation: "fetch plant-related events for deletion").filter { event in
+            eventBelongsToPlant(event, plantId: plant.id.uuidString)
+        }
+    }
+
+    @MainActor
+    private static func fetchEvents(context: ModelContext, operation: String) -> [Event] {
+        fetchMemberDeletionModelsOrLog(
+            FetchDescriptor<Event>(),
+            context: context,
+            operation: operation
         )
+    }
+
+    private static func eventBelongsToPlant(_ event: Event, plantId: String) -> Bool {
+        let link = DomainEntityLink(event: event)
+        guard DomainEntityLinkRegistry.plantId(for: link)?.uuidString == plantId else { return false }
+        let role = DomainEntityLinkRegistry.role(for: link)
+        return role.isPlantScoped || role == .unscoped
     }
 
     private static func removeQuickAccessItems(forPetID petID: UUID, userDefaults: UserDefaults) -> Int {

@@ -26,9 +26,6 @@ struct IslandFoodDashboard: View {
         self.standalone = standalone
         self.onOpenPet = onOpenPet
 
-        let feedingEventType = EventType.foodChange.rawValue
-        let stockReminderEntityType = FeedingPlanWriter.stockReminderEntityType
-        let autoFeederEntityType = FeedRuleMetadata.autoFeederEntityType
         let petSubject = CareLedgerSubjectKind.pet.rawValue
         let careKind = CareLedgerEventKind.care.rawValue
         let feedingCareType = CareType.feeding.rawValue
@@ -41,14 +38,7 @@ struct IslandFoodDashboard: View {
             },
             sort: \.name
         )
-        _allEvents = Query(
-            filter: #Predicate<Event> { event in
-                event.eventType == feedingEventType ||
-                    event.relatedEntityType == stockReminderEntityType ||
-                    event.relatedEntityType == autoFeederEntityType
-            },
-            sort: \.startDate
-        )
+        _allEvents = Query(sort: \.startDate)
         _allFeedingLedgerEvents = Query(
             filter: #Predicate<CareLedgerEvent> { event in
                 event.subjectKind == petSubject &&

@@ -4020,7 +4020,7 @@ private final class CapturingReminderNotificationScheduler: ReminderNotification
         cancelledNotificationIds.append(notificationId)
     }
 
-    func cancelAll(for _: String, reminders: [Reminder]) {
+    func cancelAll(for _: Pet, reminders: [Reminder]) {
         cancelledNotificationIds.append(contentsOf: reminders.map(\.notificationId))
     }
 

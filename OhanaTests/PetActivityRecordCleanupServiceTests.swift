@@ -165,6 +165,6 @@ private final class FakeReminderNotificationScheduler: ReminderNotificationSched
     func scheduleRollingWindow(reminders _: [Reminder]) {}
     func refillWindowIfNeeded(allReminders _: [Reminder]) {}
     func cancel(notificationId: String) { cancelledIDs.append(notificationId) }
-    func cancelAll(for _: String, reminders _: [Reminder]) {}
+    func cancelAll(for _: Pet, reminders _: [Reminder]) {}
     func compensate(reminders _: [Reminder]) {}
 }

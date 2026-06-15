@@ -66,7 +66,7 @@ nonisolated enum CloudSyncMutationRecorder {
             entityName: String(describing: Event.self),
             localRecordId: event.id,
             householdId: sharedHouseholdId(context: context, now: modifiedAt),
-            fallbackHouseholdId: uuid(from: event.relatedEntityId) ?? event.id,
+            fallbackHouseholdId: fallbackHouseholdId(for: event, context: context),
             modifiedAt: modifiedAt,
             context: context
         )
@@ -82,7 +82,7 @@ nonisolated enum CloudSyncMutationRecorder {
             entityName: String(describing: Reminder.self),
             localRecordId: reminder.id,
             householdId: sharedHouseholdId(context: context, now: modifiedAt),
-            fallbackHouseholdId: reminder.event.flatMap { uuid(from: $0.relatedEntityId) } ?? reminder.id,
+            fallbackHouseholdId: fallbackHouseholdId(for: reminder, context: context),
             modifiedAt: modifiedAt,
             context: context
         )
@@ -655,7 +655,7 @@ nonisolated enum CloudSyncMutationRecorder {
             entityName: String(describing: Event.self),
             localRecordId: event.id,
             householdId: sharedHouseholdId(context: context, now: deletedAt),
-            fallbackHouseholdId: uuid(from: event.relatedEntityId) ?? event.id,
+            fallbackHouseholdId: fallbackHouseholdId(for: event, context: context),
             deletedAt: deletedAt,
             deletedByHumanId: uuid(from: deletedByHumanId),
             context: context
@@ -673,7 +673,7 @@ nonisolated enum CloudSyncMutationRecorder {
             entityName: String(describing: Reminder.self),
             localRecordId: reminder.id,
             householdId: sharedHouseholdId(context: context, now: deletedAt),
-            fallbackHouseholdId: reminder.event.flatMap { uuid(from: $0.relatedEntityId) } ?? reminder.id,
+            fallbackHouseholdId: fallbackHouseholdId(for: reminder, context: context),
             deletedAt: deletedAt,
             deletedByHumanId: uuid(from: deletedByHumanId),
             context: context
@@ -1179,6 +1179,30 @@ nonisolated enum CloudSyncMutationRecorder {
             )
             return nil
         }
+    }
+
+    private static func fallbackHouseholdId(for reminder: Reminder, context: ModelContext) -> UUID {
+        reminder.event.map { fallbackHouseholdId(for: $0, context: context) } ?? reminder.id
+    }
+
+    private static func fallbackHouseholdId(for event: Event, context: ModelContext) -> UUID {
+        let resolution = DomainSubjectResolver.resolve(
+            request: DomainSubjectResolutionRequest(event: event),
+            context: context
+        )
+        if let owner = resolution.owner {
+            return owner.id
+        }
+        if let displayTarget = resolution.displayTarget {
+            return displayTarget.id
+        }
+        if let plantId = DomainEntityLinkRegistry.plantId(for: event) {
+            return plantId
+        }
+        let link = DomainEntityLink(event: event)
+        return DomainEntityLinkRegistry.affectedEntityId(for: link, role: resolution.role)
+            ?? uuid(from: link.trimmedId)
+            ?? event.id
     }
 
     static func markDeleted(

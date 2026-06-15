@@ -336,7 +336,10 @@ extension CalendarView {
     func goEventRow(_ event: Event, occurrenceDate: Date) -> some View {
         let relatedPetColor: Color? = MemberLifecycleActiveScheduleResolver.petTarget(for: event, pets: pets)
             .map { Color(hex: $0.themeColorHex) }
-            ?? plants.first(where: { $0.id.uuidString == event.relatedEntityId })
+            ?? DomainEntityLinkRegistry.plantId(
+                for: DomainEntityLink(event: event)
+            )
+            .flatMap { plantId in plants.first(where: { $0.id == plantId }) }
             .map { Color(hex: $0.themeColorHex) }
         return SwipeableEventRow(
             event: event,

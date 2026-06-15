@@ -71,12 +71,14 @@ struct QuickPlayDetailSheet: View {
 
     private var playPlanEvent: Event? {
         allEvents
-            .filter {
-                $0.relatedEntityId == petKey &&
-                    $0.title == playPlanTitle
-            }
+            .filter(isPlayPlanEvent)
             .sorted { $0.startDate < $1.startDate }
             .first
+    }
+
+    private func isPlayPlanEvent(_ event: Event) -> Bool {
+        MemberLifecycleActiveScheduleResolver.eventBelongsToPet(event, petId: petKey) &&
+            event.title == playPlanTitle
     }
 
     private var missedPlayPlanReminder: Reminder? {
@@ -774,7 +776,7 @@ struct QuickPlayDetailSheet: View {
         playPlanSaveTask?.cancel()
         closePlayPlanEditor()
         playPlanSaveTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: playPlanSaveDelayMilliseconds) {
-            CarePlanCalendarSync.syncPlayPlan(
+            let event = CarePlanCalendarSync.syncPlayPlan(
                 pet: pet,
                 context: modelContext,
                 intervalDays: playPlanIntervalDays,
@@ -782,7 +784,7 @@ struct QuickPlayDetailSheet: View {
                 anchor: playPlanAnchorDate
             )
             showToast(l.tr(zh: "计划已保存", en: "Plan saved", de: "Plan gespeichert"))
-            if let event = fetchPlayPlanEvent() {
+            if let event {
                 Task { @MainActor in
                     await appServices.reminderScheduling.scheduleManyIfNeeded(reminders: event.reminders, context: modelContext, source: .detail)
                 }
@@ -816,26 +818,6 @@ struct QuickPlayDetailSheet: View {
 
     private var playPlanSaveDelayMilliseconds: UInt64 {
         AppWorkloadPolicy.shared.interactionMotionBudget(isVisible: true).allowsMotion ? 120 : 40
-    }
-
-    private func fetchPlayPlanEvent() -> Event? {
-        let key = petKey
-        let title = playPlanTitle
-        var descriptor = FetchDescriptor<Event>(
-            predicate: #Predicate<Event> {
-                $0.relatedEntityId == key && $0.title == title
-            }
-        )
-        descriptor.fetchLimit = 1
-        do {
-            return try modelContext.fetch(descriptor).first // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
-        } catch {
-            OhanaLog.warning(
-                "QuickPlayDetailSheet failed to fetch play plan event: \(error.localizedDescription)",
-                category: "Care"
-            )
-            return nil
-        }
     }
 
     private func showToast(_ message: String) {

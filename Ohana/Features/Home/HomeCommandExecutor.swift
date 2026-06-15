@@ -631,16 +631,10 @@ struct HomeCommandExecutor {
         ).first
     }
 
-    private func fetchQuickCareEvents(petID: UUID, now: Date) -> [Event] {
-        let petKey = petID.uuidString
-        let todayStart = Calendar.current.startOfDay(for: now)
-        var descriptor = FetchDescriptor<Event>(
-            predicate: #Predicate<Event> { event in
-                event.relatedEntityId == petKey || event.startDate >= todayStart
-            },
+    private func fetchQuickCareEvents(petID _: UUID, now _: Date) -> [Event] {
+        let descriptor = FetchDescriptor<Event>(
             sortBy: [SortDescriptor(\.startDate, order: .forward)]
         )
-        descriptor.fetchLimit = 400
         return fetchHomeCommandModelsOrLog(
             descriptor,
             context: modelContext,

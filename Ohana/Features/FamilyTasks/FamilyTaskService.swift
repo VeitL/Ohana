@@ -11,6 +11,24 @@ import SwiftData
 enum FamilyTaskService {
     static let rewardCap = 500
 
+    private struct FamilyTaskSubject {
+        let relatedPetId: String?
+        let ledgerSubjectKind: CareLedgerSubjectKind
+        let ledgerSubjectId: String?
+
+        static let household = FamilyTaskSubject(
+            relatedPetId: nil,
+            ledgerSubjectKind: .household,
+            ledgerSubjectId: nil
+        )
+    }
+
+    private struct AuthorizedReminderAssigneeUpdate {
+        let event: Event
+        let intent: DomainScheduleCreateIntent
+        let mutation: AuthorizedDomainScheduleMutation
+    }
+
     static func cappedReward(_ value: Int) -> Int {
         min(rewardCap, max(0, value))
     }
@@ -72,7 +90,7 @@ enum FamilyTaskService {
 
     @MainActor
     private static func canWriteRelatedPet(for task: FamilyCollaborationTask, context: ModelContext) -> Bool {
-        guard let relatedPetId = task.relatedPetId, !relatedPetId.isEmpty else { return true }
+        guard let relatedPetId = taskSubject(for: task, context: context).relatedPetId else { return true }
         guard let pet = pet(idRaw: relatedPetId, context: context) else { return false }
         return canWriteCollaboration(for: pet)
     }
@@ -110,6 +128,66 @@ enum FamilyTaskService {
         let petIdRaw = idRaw.split(separator: ":").first.map(String.init) ?? idRaw
         guard let uuid = UUID(uuidString: petIdRaw) else { return nil }
         return pets(context: context).first { $0.id == uuid }
+    }
+
+    @MainActor
+    private static func taskSubject(for reminder: Reminder, context: ModelContext) -> FamilyTaskSubject {
+        guard let event = reminder.event else { return .household }
+        let resolution = DomainSubjectResolver.resolve(
+            request: DomainSubjectResolutionRequest(event: event),
+            context: context
+        )
+        return taskSubject(from: resolution)
+    }
+
+    @MainActor
+    private static func taskSubject(for task: FamilyCollaborationTask, context: ModelContext) -> FamilyTaskSubject {
+        if let reminder = reminder(for: task, context: context) {
+            return taskSubject(for: reminder, context: context)
+        }
+        guard let relatedPetId = normalizedPetId(task.relatedPetId) else { return .household }
+        return FamilyTaskSubject(
+            relatedPetId: relatedPetId,
+            ledgerSubjectKind: .pet,
+            ledgerSubjectId: relatedPetId
+        )
+    }
+
+    private static func taskSubject(from resolution: DomainSubjectResolution) -> FamilyTaskSubject {
+        switch resolution.owner {
+        case let .pet(petId):
+            FamilyTaskSubject(
+                relatedPetId: petId.uuidString,
+                ledgerSubjectKind: .pet,
+                ledgerSubjectId: petId.uuidString
+            )
+        case let .human(humanId):
+            FamilyTaskSubject(
+                relatedPetId: nil,
+                ledgerSubjectKind: .human,
+                ledgerSubjectId: humanId.uuidString
+            )
+        case nil where resolution.role.isPlantScoped:
+            FamilyTaskSubject(
+                relatedPetId: nil,
+                ledgerSubjectKind: .plant,
+                ledgerSubjectId: normalizedUUIDString(resolution.link.trimmedId)
+            )
+        case nil:
+            .household
+        }
+    }
+
+    private static func normalizedPetId(_ raw: String?) -> String? {
+        guard let raw,
+              let petId = DomainEntityLinkRegistry.petIdFromCompoundStockId(raw.trimmingCharacters(in: .whitespacesAndNewlines)) else {
+            return nil
+        }
+        return petId.uuidString
+    }
+
+    private static func normalizedUUIDString(_ raw: String) -> String? {
+        UUID(uuidString: raw.trimmingCharacters(in: .whitespacesAndNewlines))?.uuidString
     }
 
     @MainActor
@@ -220,15 +298,27 @@ enum FamilyTaskService {
               reminderTargetsWritableMember(reminder, context: context) else {
             return nil
         }
+        let assigneeUpdate: AuthorizedReminderAssigneeUpdate?
+        if let event = reminder.event {
+            guard let update = authorizedReminderAssigneeUpdate(
+                event: event,
+                assigneeId: human.id.uuidString,
+                context: context
+            ) else { return nil }
+            assigneeUpdate = update
+        } else {
+            assigneeUpdate = nil
+        }
 
         let existing = activeTask(forReminderId: reminder.id.uuidString, context: context)
+        let subject = taskSubject(for: reminder, context: context)
         let taskTitle = reminderTaskTitle(for: reminder)
         let task = existing
             ?? FamilyCollaborationTask(
                 title: taskTitle,
                 note: note,
                 kind: .careReminder,
-                relatedPetId: reminder.event?.relatedEntityId,
+                relatedPetId: subject.relatedPetId,
                 relatedEventId: reminder.event?.id.uuidString,
                 relatedReminderId: reminder.id.uuidString,
                 createdById: creator?.id.uuidString ?? human.id.uuidString,
@@ -248,7 +338,7 @@ enum FamilyTaskService {
         task.title = taskTitle
         task.note = note
         task.status = .active
-        task.relatedPetId = reminder.event?.relatedEntityId
+        task.relatedPetId = subject.relatedPetId
         task.relatedEventId = reminder.event?.id.uuidString
         task.relatedReminderId = reminder.id.uuidString
         task.assignedToId = human.id.uuidString
@@ -260,9 +350,39 @@ enum FamilyTaskService {
         task.completedByName = nil
         task.touch()
 
-        reminder.event?.assigneeId = human.id.uuidString
+        if let assigneeUpdate {
+            guard DomainScheduleWriter.updateEvent(
+                assigneeUpdate.event,
+                intent: assigneeUpdate.intent,
+                mutation: assigneeUpdate.mutation
+            ) else { return nil }
+        }
         context.safeSave()
         return task
+    }
+
+    private static func authorizedReminderAssigneeUpdate(
+        event: Event,
+        assigneeId: String,
+        context: ModelContext
+    ) -> AuthorizedReminderAssigneeUpdate? {
+        let intent = DomainScheduleCreateIntent(
+            event: event,
+            assigneeOverride: .set(assigneeId),
+            writeKind: .collaboration,
+            source: .domainService
+        )
+        guard let mutation = DomainScheduleWriteAuthorizer.authorizeExistingEventUpdate(
+            event: event,
+            intent: intent,
+            writeKind: .collaboration,
+            context: context
+        ) else { return nil }
+        return AuthorizedReminderAssigneeUpdate(
+            event: event,
+            intent: intent,
+            mutation: mutation
+        )
     }
 
     @MainActor
@@ -443,12 +563,13 @@ enum FamilyTaskService {
             )
         }
 
+        let subject = taskSubject(for: task, context: context)
         careLedger.record(
             occurredAt: Date(),
             actorKind: human == nil ? .unknown : .human,
             actorId: human?.id.uuidString,
-            subjectKind: task.relatedPetId == nil ? .household : .pet,
-            subjectId: task.relatedPetId,
+            subjectKind: subject.ledgerSubjectKind,
+            subjectId: subject.ledgerSubjectId,
             eventKind: .reminder,
             actionType: "familyTaskSubmitReview",
             amountValue: 0,
@@ -555,12 +676,13 @@ enum FamilyTaskService {
             )
         }
 
+        let subject = taskSubject(for: task, context: context)
         careLedger.record(
             occurredAt: Date(),
             actorKind: reviewer == nil ? .unknown : .human,
             actorId: reviewer?.id.uuidString,
-            subjectKind: task.relatedPetId == nil ? .household : .pet,
-            subjectId: task.relatedPetId,
+            subjectKind: subject.ledgerSubjectKind,
+            subjectId: subject.ledgerSubjectId,
             eventKind: .reminder,
             actionType: "familyTaskReviewRejected",
             amountValue: 0,
@@ -756,6 +878,7 @@ enum FamilyTaskService {
         let receiverTransactionKey = "\(marker):receiver"
         guard !hasWalletTransaction(payerTransactionKey, context: context),
               !hasWalletTransaction(receiverTransactionKey, context: context) else { return true }
+        let subject = taskSubject(for: task, context: context)
 
         let payerLedger = careLedger.record(
             occurredAt: Date(),
@@ -784,8 +907,8 @@ enum FamilyTaskService {
             occurredAt: Date(),
             actorKind: .human,
             actorId: receiver.id.uuidString,
-            subjectKind: task.relatedPetId == nil ? .household : .pet,
-            subjectId: task.relatedPetId,
+            subjectKind: subject.ledgerSubjectKind,
+            subjectId: subject.ledgerSubjectId,
             eventKind: .coconut,
             actionType: "familyTaskRewardReceived",
             amountValue: 0,
@@ -832,8 +955,8 @@ enum FamilyTaskService {
                         emoji: "🎯",
                         actorId: receiver.id.uuidString,
                         actorName: receiver.name,
-                        subjectKind: task.relatedPetId == nil ? .household : .pet,
-                        subjectId: task.relatedPetId,
+                        subjectKind: subject.ledgerSubjectKind,
+                        subjectId: subject.ledgerSubjectId,
                         sourceModelName: "FamilyCollaborationTask",
                         sourceModelId: task.id.uuidString,
                         careLedgerEventId: receiverLedger.id.uuidString,

@@ -12,7 +12,7 @@ struct FeedingPlanWriteResult {
 }
 
 enum FeedingPlanWriter {
-    nonisolated static let stockReminderEntityType = "pet_food_stock"
+    nonisolated static let stockReminderEntityType = DomainEntityLinkRegistry.petFoodStock
     private static let manualReminderWindowDays = 14
 
     @MainActor
@@ -367,8 +367,8 @@ enum FeedingPlanWriter {
 
     nonisolated static func stockReminderEvents(pet: Pet, allEvents: [Event]) -> [Event] {
         allEvents.filter {
-            $0.relatedEntityType == stockReminderEntityType &&
-                ($0.relatedEntityId == pet.id.uuidString || $0.relatedEntityId.hasPrefix("\(pet.id.uuidString):"))
+            DomainEntityLinkRegistry.role(for: $0) == .petFoodStock &&
+                MemberLifecycleActiveScheduleResolver.eventBelongsToPet($0, petId: pet.id.uuidString)
         }
     }
 
@@ -382,12 +382,7 @@ enum FeedingPlanWriter {
             eventsById[event.id] = event
         }
 
-        let stockType = stockReminderEntityType
-        let descriptor = FetchDescriptor<Event>(
-            predicate: #Predicate<Event> { event in
-                event.relatedEntityType == stockType
-            }
-        )
+        let descriptor = FetchDescriptor<Event>()
         do {
             let fetched = try context.fetch(descriptor)
             for event in stockReminderEvents(pet: pet, allEvents: fetched) {

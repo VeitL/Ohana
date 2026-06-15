@@ -7,8 +7,6 @@ import Foundation
 import SwiftData
 
 enum HumanMedicationPlanCommandService {
-    private static let humanMedicationEntityType = MedicationEventLink.humanMedicationPlan
-
     @discardableResult
     @MainActor
     static func savePlan(
@@ -260,18 +258,12 @@ enum HumanMedicationPlanCommandService {
 
     @MainActor
     private static func removeCalendarEvents(for medicationID: UUID, context: ModelContext) -> [UUID] {
-        let medicationIDString = medicationID.uuidString
-        let entityType = humanMedicationEntityType
-        let descriptor = FetchDescriptor<Event>(
-            predicate: #Predicate<Event> { event in
-                event.relatedEntityType == entityType && event.relatedEntityId == medicationIDString
-            }
-        )
+        let descriptor = FetchDescriptor<Event>()
         let events = fetchMedicationCommandModelsOrLog(
             descriptor,
             context: context,
             operation: "fetch human medication calendar events"
-        )
+        ).filter { isMedicationPlanEvent($0, medicationID: medicationID) }
         let removedEventIDs = events.map(\.id)
         for event in events {
             for reminder in event.reminders {
@@ -281,6 +273,14 @@ enum HumanMedicationPlanCommandService {
             context.delete(event)
         }
         return removedEventIDs
+    }
+
+    private static func isMedicationPlanEvent(_ event: Event, medicationID: UUID) -> Bool {
+        DomainEntityLinkRegistry.link(
+            DomainEntityLink(event: event),
+            matches: .humanMedicationPlan,
+            id: medicationID
+        )
     }
 
     @MainActor

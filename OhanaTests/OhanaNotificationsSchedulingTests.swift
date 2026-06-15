@@ -43,7 +43,7 @@ struct OhanaNotificationsSchedulingTests {
         func scheduleRollingWindow(reminders _: [Reminder]) {}
         func refillWindowIfNeeded(allReminders _: [Reminder]) {}
         func cancel(notificationId: String) { cancelledIds.append(notificationId) }
-        func cancelAll(for _: String, reminders _: [Reminder]) {}
+        func cancelAll(for _: Pet, reminders _: [Reminder]) {}
         func compensate(reminders _: [Reminder]) {}
     }
 
@@ -267,6 +267,54 @@ struct OhanaNotificationsSchedulingTests {
         let ledgerEvents = try context.fetch(FetchDescriptor<CareLedgerEvent>())
         #expect(ledgerEvents.map(\.actionType) == ["scheduleUserDisabled"])
         #expect(ledgerEvents.first?.metadataJSON.contains("\"reason\":\"userDisabled\"") == true)
+    }
+
+    @Test func petNotificationCancellationUsesDomainSubjectResolution() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let pet = Pet(name: "Momo", species: "cat")
+        let otherPet = Pet(name: "Nori", species: "cat")
+        let medication = PetMedication(name: "Drops", pet: pet)
+        let scheduledAt = futureDate(dayOffset: 2, hour: 13, minute: 0)
+
+        let direct = makeReminder(
+            title: "Groom",
+            eventType: .grooming,
+            relatedEntityType: EntityKind.pet.rawValue,
+            relatedEntityId: pet.id.uuidString,
+            scheduledAt: scheduledAt,
+            context: context
+        )
+        direct.notificationId = "direct-pet"
+        let indirectMedication = makeReminder(
+            title: "Drops",
+            eventType: .medication,
+            relatedEntityType: DomainEntityLinkRegistry.petMedicationPlan,
+            relatedEntityId: medication.id.uuidString,
+            scheduledAt: scheduledAt.addingTimeInterval(1800),
+            context: context
+        )
+        indirectMedication.notificationId = "indirect-medication"
+        let other = makeReminder(
+            title: "Other",
+            eventType: .grooming,
+            relatedEntityType: EntityKind.pet.rawValue,
+            relatedEntityId: otherPet.id.uuidString,
+            scheduledAt: scheduledAt.addingTimeInterval(3600),
+            context: context
+        )
+        other.notificationId = "other-pet"
+        context.insert(pet)
+        context.insert(otherPet)
+        context.insert(medication)
+        try context.save()
+
+        let ids = NotificationManager.cancellableNotificationIds(
+            for: pet,
+            reminders: [direct, indirectMedication, other]
+        )
+
+        #expect(ids == ["direct-pet", "indirect-medication"])
     }
 
     @Test func weeklyReportNotificationIsAmbientCareCopy() {

@@ -684,9 +684,10 @@ final class OasisTreeManager {
         let plantEventCount: Int
         if PlantFeatureGate.allows(.plants) {
             do {
-                plantEventCount = try modelContext.fetchCount(
-                    FetchDescriptor<Event>(predicate: #Predicate { $0.relatedEntityType == "Plant" })
-                )
+                let events = try modelContext.fetch(FetchDescriptor<Event>())
+                plantEventCount = events.count {
+                    DomainEntityLinkRegistry.role(for: $0).isPlantScoped
+                }
             } catch {
                 OhanaLog.warning(
                     "[OasisTreeManager] failed to fetch legacy plant event count: \(error.localizedDescription)",

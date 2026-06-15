@@ -63,8 +63,8 @@ extension HumanDetailView {
                     .foregroundStyle(Color(hex: "6B82C4"))
             }
             Spacer()
-            if let assigneeId = reminder.event?.assigneeId,
-               let assignee = allHumans.first(where: { $0.id.uuidString == assigneeId }),
+            if let event = reminder.event,
+               let assignee = MemberLifecycleActiveScheduleResolver.humanAssignee(for: event, humans: allHumans),
                assignee.id != human.id {
                 NudgeButton(targetHuman: assignee)
             }

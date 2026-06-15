@@ -119,7 +119,8 @@ struct WaterRuleState {
 
 nonisolated enum WaterRuleMetadata {
     static func localizedTitle(for event: Event, l: L10n = L10n()) -> String? {
-        if event.relatedEntityType == WaterPlanWriter.entityType {
+        let role = DomainEntityLinkRegistry.role(for: event)
+        if role == .petWaterPlan {
             return localizedWaterPlanTitle(for: event, l: l)
         }
 
@@ -184,7 +185,7 @@ nonisolated enum WaterRuleMetadata {
 }
 
 enum WaterPlanWriter {
-    nonisolated static let entityType = "pet_water_plan"
+    nonisolated static let entityType = DomainEntityLinkRegistry.petWaterPlan
     private static let reminderWindowDays = 14
 
     static func suggestedTimes(count: Int, now: Date = Date(), calendar: Calendar = .current) -> [Date] {
@@ -323,8 +324,9 @@ enum WaterPlanWriter {
     }
 
     static func isPlanEvent(_ event: Event, pet: Pet) -> Bool {
-        event.relatedEntityType == entityType &&
-            event.relatedEntityId == pet.id.uuidString &&
+        let role = DomainEntityLinkRegistry.role(for: event)
+        return role == .petWaterPlan &&
+            MemberLifecycleActiveScheduleResolver.eventBelongsToPet(event, petId: pet.id.uuidString) &&
             event.eventType == EventType.daily.rawValue
     }
 

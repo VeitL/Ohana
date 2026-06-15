@@ -222,12 +222,13 @@ extension CareLedgerService: CareLedgerRecording {
         occurredAt: Date,
         context: ModelContext
     ) -> CareLedgerEvent {
-        CareLedgerService.record(
+        let subject = CareLedgerService.subjectInfo(from: event, context: context)
+        return CareLedgerService.record(
             occurredAt: occurredAt,
             actorKind: actorId == nil ? .unknown : .human,
             actorId: actorId,
-            subjectKind: subjectKind(for: event),
-            subjectId: event.relatedEntityId.isEmpty ? nil : event.relatedEntityId,
+            subjectKind: subject.kind,
+            subjectId: subject.id,
             eventKind: .coconut,
             actionType: "eventCompletionReward",
             note: event.title,
@@ -259,18 +260,5 @@ extension CareLedgerService: CareLedgerRecording {
             coconutDelta: delta,
             context: context
         )
-    }
-
-    private func subjectKind(for event: Event) -> CareLedgerSubjectKind {
-        switch event.relatedEntityType {
-        case EntityKind.pet.rawValue, "pet":
-            .pet
-        case EntityKind.human.rawValue, "human":
-            .human
-        case EntityKind.plant.rawValue, "plant":
-            .plant
-        default:
-            event.relatedEntityId.isEmpty ? .system : .unknown
-        }
     }
 }

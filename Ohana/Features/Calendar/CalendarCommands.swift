@@ -34,6 +34,7 @@ struct CalendarEventPlanCommandInput: Equatable {
 struct CalendarEventPlanCommandResult: Equatable {
     let eventID: UUID
     let reminderIDs: [UUID]
+    let affectedSubjectIDs: Set<UUID>
     let scheduledReminderSync: Bool
 }
 
@@ -91,6 +92,7 @@ enum CalendarEventPlanCommandService {
         return CalendarEventPlanCommandResult(
             eventID: event.id,
             reminderIDs: createdReminders.map(\.id),
+            affectedSubjectIDs: plan.resolution.affectedEntityIDs,
             scheduledReminderSync: shouldScheduleReminders
         )
     }
@@ -206,6 +208,7 @@ struct CalendarEventCompletionResult: Equatable {
     let eventID: UUID
     let isCompleted: Bool
     let syncedReminderCount: Int
+    let affectedSubjectIDs: Set<UUID>
     let didChange: Bool
     let didWriteFact: Bool
     let allowsDerivedEffects: Bool
@@ -216,6 +219,7 @@ struct CalendarEventCompletionResult: Equatable {
         eventID: UUID,
         isCompleted: Bool,
         syncedReminderCount: Int,
+        affectedSubjectIDs: Set<UUID> = [],
         didChange: Bool = true,
         didWriteFact: Bool? = nil,
         allowsDerivedEffects: Bool? = nil,
@@ -225,11 +229,18 @@ struct CalendarEventCompletionResult: Equatable {
         self.eventID = eventID
         self.isCompleted = isCompleted
         self.syncedReminderCount = syncedReminderCount
+        self.affectedSubjectIDs = affectedSubjectIDs
         self.didChange = didChange
         self.didWriteFact = didWriteFact ?? didChange
         self.allowsDerivedEffects = allowsDerivedEffects ?? didChange
         self.factDate = factDate
         self.operationDate = operationDate
+    }
+
+    var revisionAffectedEntityIDs: Set<UUID> {
+        var affected = affectedSubjectIDs
+        affected.insert(eventID)
+        return affected
     }
 }
 
@@ -289,6 +300,7 @@ enum CalendarEventCommandService {
     ) -> CalendarEventCompletionResult {
         let reminderCompletion = providedReminderCompletion ?? ReminderCompletionService()
         let shouldComplete = !event.isOccurrenceMarkedComplete(on: occurrenceDate)
+        let affectedSubjectIDs = affectedSubjectIDs(for: event, context: context)
         var petTaskSyncResult: CalendarTaskCompletionSyncService.PetTaskSyncResult?
         if CalendarTaskCompletionSyncService.isPetTask(event: event) {
             let syncResult = CalendarTaskCompletionSyncService.syncPetTask(
@@ -306,6 +318,7 @@ enum CalendarEventCommandService {
                     eventID: event.id,
                     isCompleted: event.recurrenceDays <= 0 ? event.isCompleted : event.isOccurrenceMarkedComplete(on: occurrenceDate),
                     syncedReminderCount: 0,
+                    affectedSubjectIDs: affectedSubjectIDs,
                     didChange: false,
                     didWriteFact: false,
                     allowsDerivedEffects: false,
@@ -318,6 +331,7 @@ enum CalendarEventCommandService {
                     eventID: event.id,
                     isCompleted: event.recurrenceDays <= 0 ? event.isCompleted : event.isOccurrenceMarkedComplete(on: occurrenceDate),
                     syncedReminderCount: 0,
+                    affectedSubjectIDs: affectedSubjectIDs,
                     didChange: false,
                     didWriteFact: syncResult.didWriteFact,
                     allowsDerivedEffects: syncResult.allowsDerivedEffects,
@@ -347,6 +361,7 @@ enum CalendarEventCommandService {
             eventID: event.id,
             isCompleted: shouldComplete,
             syncedReminderCount: remindersToSync.count,
+            affectedSubjectIDs: affectedSubjectIDs,
             didChange: true,
             didWriteFact: petTaskSyncResult?.didWriteFact ?? true,
             allowsDerivedEffects: petTaskSyncResult?.allowsDerivedEffects ?? true,
@@ -363,6 +378,13 @@ enum CalendarEventCommandService {
         return event.reminders.filter { reminder in
             reminder.scheduledAt >= today && reminder.scheduledAt < tomorrow
         }
+    }
+
+    private static func affectedSubjectIDs(for event: Event, context: ModelContext) -> Set<UUID> {
+        DomainSubjectResolver.resolve(
+            request: DomainSubjectResolutionRequest(event: event),
+            context: context
+        ).affectedEntityIDs
     }
 
     @discardableResult
@@ -417,16 +439,8 @@ enum CalendarEventCommandService {
 
         if hasAfter {
             let splitIntent = DomainScheduleCreateIntent(
-                title: event.title,
+                event: event,
                 startDate: nextOccurrence,
-                endDate: event.endDate,
-                isAllDay: event.isAllDay,
-                eventType: event.eventType,
-                relatedEntityType: event.relatedEntityType,
-                relatedEntityId: event.relatedEntityId,
-                recurrenceDays: event.recurrenceDays,
-                recurrenceEndDate: event.recurrenceEndDate,
-                assigneeId: event.assigneeId,
                 writeKind: writeKind(for: event),
                 source: .domainService
             )
@@ -551,7 +565,6 @@ struct CalendarCommandExecutor {
 
         revisions.publishCalendarEventPlan(
             result,
-            relatedEntityId: input.relatedEntityId,
             note: result.scheduledReminderSync ? "calendar.event.created.reminders" : "calendar.event.created"
         )
         return result
@@ -605,7 +618,7 @@ struct CalendarCommandExecutor {
             return derivations.derive(
                 .noOp(
                     command: command,
-                    affectedEntityIDs: [result.eventID],
+                    affectedEntityIDs: result.revisionAffectedEntityIDs,
                     note: note
                 )
             )
@@ -622,7 +635,7 @@ struct CalendarCommandExecutor {
                 ),
                 revision: CareWriteOutcome.RevisionPayload(
                     command: command,
-                    affectedEntityIDs: [result.eventID],
+                    affectedEntityIDs: result.revisionAffectedEntityIDs,
                     note: note
                 ),
                 noopNote: note
@@ -634,7 +647,17 @@ struct CalendarCommandExecutor {
 struct ReminderCommandResult: Equatable {
     let reminderID: UUID
     let eventID: UUID?
+    let affectedSubjectIDs: Set<UUID>
     let action: String
+
+    var revisionAffectedEntityIDs: Set<UUID> {
+        var affected = affectedSubjectIDs
+        affected.insert(reminderID)
+        if let eventID {
+            affected.insert(eventID)
+        }
+        return affected
+    }
 }
 
 @MainActor
@@ -775,9 +798,18 @@ struct ReminderCommandExecutor {
         let result = ReminderCommandResult(
             reminderID: reminder.id,
             eventID: reminder.event?.id,
+            affectedSubjectIDs: Self.affectedSubjectIDs(for: reminder.event, context: context),
             action: action
         )
         revisions.publishReminderCommand(result, note: note)
         return result
+    }
+
+    private static func affectedSubjectIDs(for event: Event?, context: ModelContext) -> Set<UUID> {
+        guard let event else { return [] }
+        return DomainSubjectResolver.resolve(
+            request: DomainSubjectResolutionRequest(event: event),
+            context: context
+        ).affectedEntityIDs
     }
 }

@@ -149,7 +149,8 @@ extension CalendarView {
                                     seen.append(hex)
                                     colors.append(Color(hex: hex))
                                 }
-                            } else if let plant = plants.first(where: { $0.id.uuidString == ev.relatedEntityId }) {
+                            } else if let plantId = DomainEntityLinkRegistry.plantId(for: ev),
+                                let plant = plants.first(where: { $0.id == plantId }) {
                                 let hex = plant.themeColorHex
                                 if !seen.contains(hex) {
                                     seen.append(hex)

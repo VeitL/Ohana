@@ -237,6 +237,24 @@ DIRECT_SCHEDULE_INSERT_RE = re.compile(r"\b(?:context|modelContext)\.insert\s*\(
 AUTHORIZED_SCHEDULE_WRITER_RE = re.compile(
     r"DomainScheduleWriteAuthorizer\.authorizeCreate|DomainScheduleWriter\.createEvent"
 )
+REHYDRATE_ENTRY_PATHS = {
+    "Ohana/Domain/Services/DataBackupManager.swift",
+    "Ohana/Domain/Services/DataBackupManager+Decode.swift",
+    "Ohana/Domain/Services/DataBackupManager+Encode.swift",
+    "Ohana/Domain/Services/CloudSyncRecordApplier.swift",
+}
+REHYDRATE_ENTRY_FUNCTION_RE = re.compile(
+    r"^(?:apply|apply[A-Za-z0-9_]*|decode[A-Za-z0-9_]*|insertLegacy[A-Za-z0-9_]*|upsertState)$"
+)
+REHYDRATE_DIRECT_INSERT_RE = re.compile(r"\b(?:context|modelContext)\.insert\s*\(")
+REHYDRATE_DIRECT_MODEL_CONSTRUCTOR_RE = re.compile(
+    r"\b(?:"
+    r"Pet|Human|Household|Plant|WaterLog|WishlistItem|"
+    r"CoconutAccount|CoconutLedgerEntry|FamilyCollaborationTask|CoconutExchangeRequest|"
+    r"OasisUpgradeCoconut|OasisElectronicPet|OasisCritterFragmentBalance|OasisUnlock|OasisCritterActionLog|"
+    r"GachaOwnedItem|GachaDrawLog|ShopPurchaseRecord|CloudSyncRecordState"
+    r")\s*\("
+)
 ALLOWED_RAW_SCHEDULE_CONSTRUCTOR_FUNCTIONS = {
     "Ohana/Domain/Services/DomainScheduleWriteKernel.swift": {
         "makeUnpersistedReminder",
@@ -244,12 +262,12 @@ ALLOWED_RAW_SCHEDULE_CONSTRUCTOR_FUNCTIONS = {
         "createReminder",
         "createReminders",
     },
-    "Ohana/Domain/Services/CloudSyncRecordApplier.swift": {"applyEvent"},
-    "Ohana/Domain/Services/DataBackupManager+Decode.swift": {"decodeEvent", "decodeReminder"},
+    "Ohana/Domain/Services/DomainRehydrateWriteKernel.swift": {
+        "upsertEvent",
+        "upsertReminder",
+    },
 }
-LEGACY_DIRECT_SCHEDULE_WRITER_FUNCTIONS = {
-    "Ohana/Domain/Services/CloudSyncRecordApplier.swift": {"applyEvent"},
-}
+LEGACY_DIRECT_SCHEDULE_WRITER_FUNCTIONS = {}
 CRITICAL_GATE_FUNCTIONS = {
     "Ohana/Domain/Services/CarePlanCalendarSync.swift": {
         "reconcileDefaultPlanOverrides",
@@ -333,10 +351,29 @@ def requires_lifecycle_gate(path: str, func_name: str, body: str, is_private: bo
 
 warnings: list[WarningItem] = []
 domain_ownership_warnings: list[WarningItem] = []
+rehydrate_bypass_warnings: list[WarningItem] = []
 files = collect_files()
 for path in files:
     path_str = rel(path)
     lines = path.read_text(encoding="utf-8", errors="ignore").splitlines()
+    checks_rehydrate_bypass = path_str in REHYDRATE_ENTRY_PATHS or (
+        targets and path_str.startswith("scripts/tests/fixtures/")
+    )
+    if checks_rehydrate_bypass:
+        for func_name, start_line, body, _ in function_blocks(lines):
+            if "member-lifecycle-gate: allow" in body:
+                continue
+            if not REHYDRATE_ENTRY_FUNCTION_RE.search(func_name):
+                continue
+            if REHYDRATE_DIRECT_INSERT_RE.search(body) or REHYDRATE_DIRECT_MODEL_CONSTRUCTOR_RE.search(body):
+                rehydrate_bypass_warnings.append(
+                    WarningItem(
+                        path_str,
+                        start_line,
+                        f"func {func_name} constructs or inserts restore/apply models outside a rehydrate writer",
+                    )
+                )
+
     for func_name, start_line, body, _ in function_blocks(lines):
         if "member-lifecycle-gate: allow" in body:
             continue
@@ -419,6 +456,10 @@ for item in domain_ownership_warnings:
     print(f"[member-lifecycle-domain-ownership-matcher] {item.path}:{item.line}: Domain Event/Reminder -> Pet/Human ownership must use MemberLifecycleActiveScheduleResolver.")
     print(f"    {item.snippet}")
 
+for item in rehydrate_bypass_warnings:
+    print(f"[member-lifecycle-rehydrate-bypass] {item.path}:{item.line}: restore/sync/apply entrypoints must submit snapshots to a rehydrate writer instead of constructing or inserting persistence models directly.")
+    print(f"    {item.snippet}")
+
 for item in warnings:
     rule = "member-lifecycle-direct-write-gate"
     message = "write paths must use MemberLifecycleGate/MemberWritePolicy instead of hand-rolled deceased-member gates."
@@ -434,7 +475,7 @@ for item in warnings:
     print(f"[{rule}] {item.path}:{item.line}: {message}")
     print(f"    {item.snippet}")
 
-total_warnings = len(warnings) + len(domain_ownership_warnings)
+total_warnings = len(warnings) + len(domain_ownership_warnings) + len(rehydrate_bypass_warnings)
 print(f"member lifecycle gate audit: scanned {len(files)} file(s); warnings={total_warnings}")
 if total_warnings and strict:
     sys.exit(1)

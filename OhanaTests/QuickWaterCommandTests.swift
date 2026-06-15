@@ -128,6 +128,7 @@ struct QuickWaterCommandTests {
 
         #expect(matched.map(\.id) == [event.id])
         #expect(CarePlanCalendarSync.waterMaintenanceKind(for: event) == "waterChange")
+        #expect(CarePlanCalendarSync.waterMaintenanceKind(for: event, pet: pet) == "waterChange")
     }
 
     @Test func waterNotificationTitlesLocalizeFromStructuredWaterKinds() throws {

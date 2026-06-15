@@ -125,8 +125,12 @@ extension PetHealthDetailContentView {
             }
 
             overviewSectionTitle(l.tr(zh: "最近服药", en: "Recent doses", de: "Letzte Dosen"))
+            let medicationIds = Set((activeMedications + pet.medications).map(\.id))
             let recentEvents = medicationDoseEvents
-                .filter { event in activeMedications.contains { $0.id.uuidString == event.relatedEntityId } || pet.medications.contains { $0.id.uuidString == event.relatedEntityId } }
+                .filter { event in
+                    PetMedicationDoseLogging.doseMedicationId(for: event)
+                        .map { medicationIds.contains($0) } == true
+                }
                 .sorted { $0.startDate > $1.startDate }
                 .prefix(8)
             if recentEvents.isEmpty {
@@ -437,7 +441,10 @@ extension PetHealthDetailContentView {
     }
 
     func medicationName(for event: Event) -> String {
-        pet.medications.first { $0.id.uuidString == event.relatedEntityId }?.name
+        guard let medicationId = PetMedicationDoseLogging.doseMedicationId(for: event) else {
+            return l.tr(zh: "服药记录", en: "Medication dose", de: "Medikamenteneinnahme")
+        }
+        return (activeMedications + pet.medications).first { $0.id == medicationId }?.name
             ?? l.tr(zh: "服药记录", en: "Medication dose", de: "Medikamenteneinnahme")
     }
 }

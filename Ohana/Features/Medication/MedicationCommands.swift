@@ -565,18 +565,12 @@ enum PetMedicationPlanCommandService {
 
     @MainActor
     private static func removeCalendarEvents(for medicationID: UUID, context: ModelContext) -> [UUID] {
-        let medicationIDString = medicationID.uuidString
-        let entityType = MedicationEventLink.petMedicationPlan
-        let descriptor = FetchDescriptor<Event>(
-            predicate: #Predicate<Event> { event in
-                event.relatedEntityType == entityType && event.relatedEntityId == medicationIDString
-            }
-        )
+        let descriptor = FetchDescriptor<Event>()
         let events = fetchMedicationCommandModelsOrLog(
             descriptor,
             context: context,
             operation: "fetch pet medication calendar events"
-        )
+        ).filter { isMedicationPlanEvent($0, medicationID: medicationID) }
         let removedEventIDs = events.map(\.id)
         for event in events {
             for reminder in event.reminders {
@@ -586,6 +580,14 @@ enum PetMedicationPlanCommandService {
             context.delete(event)
         }
         return removedEventIDs
+    }
+
+    private static func isMedicationPlanEvent(_ event: Event, medicationID: UUID) -> Bool {
+        DomainEntityLinkRegistry.link(
+            DomainEntityLink(event: event),
+            matches: .petMedicationPlan,
+            id: medicationID
+        )
     }
 }
 

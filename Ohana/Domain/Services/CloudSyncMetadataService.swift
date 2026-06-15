@@ -18,7 +18,75 @@ nonisolated enum CloudSyncMergePolicy {
     }
 }
 
+nonisolated struct CloudSyncAppliedRecordStateSnapshot: Equatable {
+    let recordKey: String
+    let entityName: String
+    let localRecordId: UUID
+    let householdId: UUID?
+    let ckZoneName: String
+    let ckRecordName: String
+    let ckChangeTag: String
+    let conflictPolicy: CloudSyncConflictPolicy
+    let isDeleted: Bool
+    let isDeletionTombstone: Bool
+    let deletedAt: Date?
+    let deletedByHumanId: String
+    let lastModifiedAt: Date
+    let lastSyncedAt: Date?
+    let createdAt: Date
+    let updatedAt: Date
+}
+
 nonisolated enum CloudSyncMetadataService {
+    @discardableResult
+    static func upsertAppliedRemoteState(
+        snapshot: CloudSyncAppliedRecordStateSnapshot,
+        context: ModelContext
+    ) throws -> CloudSyncRecordState {
+        let state: CloudSyncRecordState
+        if let existing = try self.state(recordKey: snapshot.recordKey, context: context) {
+            state = existing
+        } else {
+            state = CloudSyncRecordState(
+                entityName: snapshot.entityName,
+                localRecordId: snapshot.localRecordId,
+                householdId: snapshot.householdId,
+                ckZoneName: snapshot.ckZoneName,
+                ckRecordName: snapshot.ckRecordName,
+                ckChangeTag: snapshot.ckChangeTag,
+                conflictPolicy: snapshot.conflictPolicy,
+                isDeleted: snapshot.isDeleted,
+                isDeletionTombstone: snapshot.isDeletionTombstone,
+                deletedAt: snapshot.deletedAt,
+                deletedByHumanId: UUID(uuidString: snapshot.deletedByHumanId),
+                hasPendingLocalChanges: false,
+                lastModifiedAt: snapshot.lastModifiedAt,
+                lastSyncedAt: snapshot.lastSyncedAt,
+                createdAt: snapshot.createdAt,
+                updatedAt: snapshot.updatedAt
+            )
+            context.insert(state)
+        }
+        state.recordKey = snapshot.recordKey
+        state.entityName = CloudSyncRecordState.normalizedEntityName(snapshot.entityName)
+        state.localRecordId = CloudSyncRecordState.normalizedRecordId(snapshot.localRecordId)
+        state.householdId = snapshot.householdId.map(CloudSyncRecordState.normalizedRecordId) ?? state.householdId
+        state.ckZoneName = snapshot.ckZoneName
+        state.ckRecordName = snapshot.ckRecordName
+        state.ckChangeTag = snapshot.ckChangeTag
+        state.conflictPolicy = snapshot.conflictPolicy
+        state.isDeleted = snapshot.isDeleted
+        state.isDeletionTombstone = snapshot.isDeletionTombstone
+        state.deletedAt = snapshot.deletedAt
+        state.deletedByHumanId = CloudSyncRecordState.normalizedRecordId(snapshot.deletedByHumanId)
+        state.hasPendingLocalChanges = false
+        state.lastModifiedAt = snapshot.lastModifiedAt
+        state.lastSyncedAt = snapshot.lastSyncedAt
+        state.createdAt = snapshot.createdAt
+        state.updatedAt = snapshot.updatedAt
+        return state
+    }
+
     static func state(
         entityName: String,
         localRecordId: UUID,

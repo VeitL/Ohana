@@ -132,8 +132,6 @@ enum FocusHomeReminderDeepLinkRouter {
         plants _: [Plant],
         humanMedications: [HumanMedication]
     ) -> FocusHomeReminderDestination {
-        let entityType = event.relatedEntityType.lowercased()
-
         if let human = MemberLifecycleActiveScheduleResolver.humanOwner(
             for: event,
             humans: humans,
@@ -142,7 +140,7 @@ enum FocusHomeReminderDeepLinkRouter {
             return humanDestination(for: event, human: human)
         }
 
-        if isPlantEntity(entityType) {
+        if linkRole(for: event) == .directPlant {
             AppFeatureRouteGuard.recordIntercept("reminderPlant")
             return .functionMenu(.growthRoadmap)
         }
@@ -193,19 +191,26 @@ enum FocusHomeReminderDeepLinkRouter {
             return .petFeature(.medications, pet)
         }
 
-        let entityType = payload.relatedEntityType?.lowercased() ?? ""
-        guard let id = payload.relatedEntityId else { return nil }
+        guard let relatedEntityType = payload.relatedEntityType,
+              let relatedEntityId = payload.relatedEntityId else { return nil }
+        let resolution = DomainSubjectResolver.resolve(
+            request: DomainSubjectResolutionRequest(
+                relatedEntityType: relatedEntityType,
+                relatedEntityId: relatedEntityId
+            ),
+            catalog: subjectCatalog(pets: pets, humans: humans, humanMedications: humanMedications)
+        )
 
-        if isHumanEntity(entityType),
-           let human = humans.first(where: { $0.id.uuidString == id }) {
+        if case let .human(humanId) = resolution.owner,
+           let human = humans.first(where: { $0.id == humanId }) {
             return .humanDetail(human)
         }
-        if isPlantEntity(entityType) {
+        if resolution.role == .directPlant {
             AppFeatureRouteGuard.recordIntercept("reminderPlantFallback")
             return .functionMenu(.growthRoadmap)
         }
-        if isPetEntity(entityType),
-           let pet = pets.first(where: { $0.id.uuidString == id }) {
+        if case let .pet(petId) = resolution.owner,
+           let pet = pets.first(where: { $0.id == petId }) {
             return .petFeature(.basicInfo, pet)
         }
         return nil
@@ -213,14 +218,14 @@ enum FocusHomeReminderDeepLinkRouter {
 
     private static func petDestination(for event: Event, pet: Pet) -> FocusHomeReminderDestination {
         let eventType = EventType(rawValue: event.eventType)
-        let entityType = event.relatedEntityType.lowercased()
+        let role = linkRole(for: event)
         let text = normalizedText(for: event)
 
-        if entityType == "pet_insurance" || eventType == .insurancePremium {
+        if role == .petInsurance || eventType == .insurancePremium {
             return .functionMenu(.petInsurance(pet.persistentModelID))
         }
-        if entityType == PetMedicationDoseLogging.relatedEntityTypeMedication ||
-            entityType == MedicationEventLink.petMedicationPlan ||
+        if role == .petMedicationDose ||
+            role == .petMedicationPlan ||
             eventType == .petMedication ||
             eventType == .petMedicationDose {
             return .petFeature(.medications, pet)
@@ -244,12 +249,12 @@ enum FocusHomeReminderDeepLinkRouter {
             matchesAny(text, ["疫苗", "驱虫", "就医", "体检", "健康", "温湿度", "水温", "vaccine", "deworm", "vet", "health", "check"]) {
             return .petHealth(pet, .preventive)
         }
-        if entityType == WaterPlanWriter.entityType.lowercased() ||
+        if role == .petWaterPlan ||
             matchesAny(text, ["喝水", "饮水", "补充饮水", "喂水", "换水", "water", "drink", "wasser"]) {
             return .petQuick("water", pet)
         }
-        if entityType == FeedingPlanWriter.stockReminderEntityType ||
-            entityType == FeedRuleMetadata.autoFeederEntityType ||
+        if role == .petFoodStock ||
+            role == .petAutoFeeder ||
             eventType == .foodChange ||
             matchesAny(text, ["喂", "吃饭", "粮", "feed", "food", "meal", "futter"]) {
             return .petQuick("feed", pet)
@@ -286,12 +291,18 @@ enum FocusHomeReminderDeepLinkRouter {
     }
 
     private static func calendarDestination(for event: Event) -> FocusHomeReminderDestination {
-        let entityType = event.relatedEntityType.lowercased()
-        if isHumanEntity(entityType) {
-            return .calendar(entityId: nil, humanId: event.relatedEntityId)
+        let link = DomainEntityLink(event: event)
+        let role = DomainEntityLinkRegistry.role(for: link)
+        if let humanId = DomainEntityLinkRegistry.resolvedId(for: link, role: .directHuman)
+            ?? DomainEntityLinkRegistry.resolvedId(for: link, role: .humanNote) {
+            return .calendar(entityId: nil, humanId: humanId.uuidString)
         }
-        if isPetEntity(entityType) || isPlantEntity(entityType) {
-            return .calendar(entityId: event.relatedEntityId, humanId: nil)
+        if let petId = DomainEntityLinkRegistry.resolvedId(for: link, role: .directPet) {
+            return .calendar(entityId: petId.uuidString, humanId: nil)
+        }
+        if role.isPlantScoped,
+           let plantId = DomainEntityLinkRegistry.plantId(for: link) {
+            return .calendar(entityId: plantId.uuidString, humanId: nil)
         }
         return .calendar(entityId: nil, humanId: nil)
     }
@@ -301,22 +312,28 @@ enum FocusHomeReminderDeepLinkRouter {
     }
 
     private static func normalizedText(for event: Event) -> String {
-        "\(event.title) \(event.eventType) \(event.relatedEntityType)".lowercased()
+        "\(event.title) \(event.eventType)".lowercased()
     }
 
     private static func matchesAny(_ text: String, _ needles: [String]) -> Bool {
         needles.contains { text.contains($0.lowercased()) }
     }
 
-    private static func isPetEntity(_ raw: String) -> Bool {
-        raw == EntityKind.pet.rawValue.lowercased() || raw == "pet"
+    private static func linkRole(for event: Event) -> DomainEntityLinkRole {
+        DomainEntityLinkRegistry.role(for: event)
     }
 
-    private static func isHumanEntity(_ raw: String) -> Bool {
-        raw == EntityKind.human.rawValue.lowercased() || raw == "human"
-    }
-
-    private static func isPlantEntity(_ raw: String) -> Bool {
-        raw == EntityKind.plant.rawValue.lowercased() || raw == "plant"
+    private static func subjectCatalog(
+        pets: [Pet],
+        humans: [Human],
+        humanMedications: [HumanMedication]
+    ) -> DomainSubjectResolutionCatalog {
+        DomainSubjectResolutionCatalog(
+            pets: pets,
+            petMedications: pets.flatMap(\.medications),
+            humanMedications: humanMedications,
+            insurances: pets.flatMap(\.insurances),
+            humans: humans
+        )
     }
 }

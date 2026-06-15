@@ -251,7 +251,7 @@ nonisolated enum CareLedgerBackfillService {
             operation: "fetch reminders"
         ) { reminder in
             guard try shouldBackfill("Reminder", reminder.id.uuidString) else { return }
-            let subject = CareLedgerService.subjectInfo(from: reminder.event)
+            let subject = CareLedgerService.subjectInfo(from: reminder.event, context: context)
             CareLedgerService.record(
                 occurredAt: reminder.completedAt ?? reminder.scheduledAt,
                 actorKind: reminder.completedBy.isEmpty ? .unknown : .human,

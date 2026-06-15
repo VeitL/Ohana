@@ -31,7 +31,7 @@ protocol DomainRevisionPublishing {
     func publishPetWalkGoal(_ result: PetWalkGoalCommandResult, note: String)
     func publishPetWalkSummary(_ result: PetWalkSummaryCommandResult, note: String)
     func publishPlantCare(_ result: PlantCareCommandResult, note: String)
-    func publishCalendarEventPlan(_ result: CalendarEventPlanCommandResult, relatedEntityId: String, note: String)
+    func publishCalendarEventPlan(_ result: CalendarEventPlanCommandResult, note: String)
     func publishCalendarEventCompletion(_ result: CalendarEventCompletionResult, note: String)
     func publishEventCompletionReward(_ result: EventCompletionRewardResult, eventID: UUID, note: String)
     func publishCalendarEventDeletion(
@@ -211,8 +211,8 @@ final class SharedDomainRevisionPublisher: DomainRevisionPublishing {
         center.publishPlantCare(result, note: note)
     }
 
-    func publishCalendarEventPlan(_ result: CalendarEventPlanCommandResult, relatedEntityId: String, note: String) {
-        center.publishCalendarEventPlan(result, relatedEntityId: relatedEntityId, note: note)
+    func publishCalendarEventPlan(_ result: CalendarEventPlanCommandResult, note: String) {
+        center.publishCalendarEventPlan(result, note: note)
     }
 
     func publishCalendarEventCompletion(_ result: CalendarEventCompletionResult, note: String) {

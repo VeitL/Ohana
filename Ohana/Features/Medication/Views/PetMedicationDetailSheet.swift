@@ -27,11 +27,8 @@ struct PetMedicationDetailContentSheet: View {
     private var l: L10n { L10n(appLanguage) }
 
     private var medEvents: [Event] {
-        let idStr = medication.id.uuidString
-        return allEvents.filter {
-            $0.eventType == EventType.petMedicationDose.rawValue
-                && $0.relatedEntityType == PetMedicationDoseLogging.relatedEntityTypeMedication
-                && $0.relatedEntityId == idStr
+        allEvents.filter {
+            PetMedicationDoseLogging.isDoseEvent($0, medicationId: medication.id)
         }
     }
 

@@ -164,10 +164,12 @@ enum ExpandedQuickActionLogic {
     }
 
     static func playPlanEvent(for pet: Pet, allEvents: [Event]) -> Event? {
-        let key = pet.id.uuidString
         let title = "\(pet.name) 陪玩计划"
         return allEvents
-            .filter { $0.relatedEntityId == key && $0.title == title }
+            .filter {
+                MemberLifecycleActiveScheduleResolver.eventBelongsToPet($0, petId: pet.id.uuidString) &&
+                    $0.title == title
+            }
             .sorted { $0.startDate < $1.startDate }
             .first
     }

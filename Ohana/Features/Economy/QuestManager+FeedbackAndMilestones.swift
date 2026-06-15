@@ -216,7 +216,6 @@ extension QuestManager {
     ///   - careType: 打卡类型关键词（如 "喂食" "喂水" "铲屎" "遛"）
     ///   - context: SwiftData ModelContext
     func autoCompleteReminders(petId: UUID, careKeyword: String, context: ModelContext) {
-        let petIdStr = petId.uuidString
         let today = Calendar.current.startOfDay(for: Date())
         let tomorrow = Calendar.current.date(byAdding: .day, value: 1, to: today)!
         // 查找今日所有 Reminder
@@ -240,8 +239,7 @@ extension QuestManager {
         // 找到关联该宠物且标题包含关键词的 Event -> Reminder
         for reminder in reminders {
             guard let event = reminder.event,
-                  event.relatedEntityId == petIdStr,
-                  event.relatedEntityType == EntityKind.pet.rawValue || event.relatedEntityType == "pet" else { continue }
+                  eventBelongsToPet(event, petId: petId, context: context) else { continue }
             let title = event.title
             let keyword = careKeyword
             guard title.contains(keyword) else { continue }
@@ -256,6 +254,15 @@ extension QuestManager {
                 category: "Economy"
             )
         }
+    }
+
+    private func eventBelongsToPet(_ event: Event, petId: UUID, context: ModelContext) -> Bool {
+        let resolution = DomainSubjectResolver.resolve(
+            request: DomainSubjectResolutionRequest(event: event),
+            context: context
+        )
+        guard case let .pet(resolvedPetId) = resolution.owner else { return false }
+        return resolvedPetId == petId
     }
 
     /// 查询今日步数奖励是否已领取

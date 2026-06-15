@@ -17,6 +17,20 @@ nonisolated enum DomainScheduleSourceKind: Equatable {
     case system
 }
 
+nonisolated enum DomainScheduleAssigneeOverride: Equatable {
+    case keepExisting
+    case set(String?)
+
+    func resolved(existing: String?) -> String? {
+        switch self {
+        case .keepExisting:
+            existing
+        case let .set(assigneeId):
+            assigneeId
+        }
+    }
+}
+
 nonisolated struct DomainScheduleCreateIntent: Equatable {
     let title: String
     let startDate: Date
@@ -63,6 +77,30 @@ nonisolated struct DomainScheduleCreateIntent: Equatable {
         self.source = source
     }
 
+    init(
+        event: Event,
+        startDate: Date? = nil,
+        recurrenceEndDate: Date? = nil,
+        assigneeOverride: DomainScheduleAssigneeOverride = .keepExisting,
+        writeKind: MemberWriteKind,
+        source: DomainScheduleSourceKind = .domainService
+    ) {
+        self.init(
+            title: event.title,
+            startDate: startDate ?? event.startDate,
+            endDate: event.endDate,
+            isAllDay: event.isAllDay,
+            eventType: event.eventType,
+            relatedEntityType: event.relatedEntityType,
+            relatedEntityId: event.relatedEntityId,
+            recurrenceDays: event.recurrenceDays,
+            recurrenceEndDate: recurrenceEndDate ?? event.recurrenceEndDate,
+            assigneeId: assigneeOverride.resolved(existing: event.assigneeId),
+            writeKind: writeKind,
+            source: source
+        )
+    }
+
     func withAssigneeId(_ assigneeId: String?) -> DomainScheduleCreateIntent {
         DomainScheduleCreateIntent(
             title: title,
@@ -83,22 +121,7 @@ nonisolated struct DomainScheduleCreateIntent: Equatable {
     }
 }
 
-nonisolated struct DomainScheduleResolution: Equatable {
-    let link: DomainEntityLink
-    let role: DomainEntityLinkRole
-    let owner: DomainMemberReference?
-    let assignee: DomainMemberReference?
-    let displayTarget: DomainMemberReference?
-    let unresolvedOwner: Bool
-    let unresolvedAssignee: Bool
-
-    var lifecycleTargets: [DomainMemberReference] {
-        var targets: [DomainMemberReference] = []
-        if let owner { targets.append(owner) }
-        if let assignee, assignee != owner { targets.append(assignee) }
-        return targets
-    }
-}
+typealias DomainScheduleResolution = DomainSubjectResolution
 
 nonisolated struct DomainScheduleWriteToken {
     fileprivate init() {}
@@ -106,16 +129,19 @@ nonisolated struct DomainScheduleWriteToken {
 
 nonisolated struct AuthorizedDomainScheduleWrite {
     fileprivate let token: DomainScheduleWriteToken
+    let mutationPlan: AuthorizedMutationPlan
     let intent: DomainScheduleCreateIntent
     let resolution: DomainScheduleResolution
     let disposition: MemberWriteDisposition
 
     fileprivate init(
+        mutationPlan: AuthorizedMutationPlan,
         intent: DomainScheduleCreateIntent,
         resolution: DomainScheduleResolution,
         disposition: MemberWriteDisposition
     ) {
         self.token = DomainScheduleWriteToken()
+        self.mutationPlan = mutationPlan
         self.intent = intent
         self.resolution = resolution
         self.disposition = disposition
@@ -141,18 +167,21 @@ nonisolated struct DomainScheduleMutationToken {
 
 nonisolated struct AuthorizedDomainScheduleMutation {
     fileprivate let token: DomainScheduleMutationToken
+    let mutationPlan: AuthorizedMutationPlan
     let resolution: DomainScheduleResolution
     let disposition: MemberWriteDisposition
     let writeKind: MemberWriteKind
     let source: DomainScheduleSourceKind
 
     fileprivate init(
+        mutationPlan: AuthorizedMutationPlan,
         resolution: DomainScheduleResolution,
         disposition: MemberWriteDisposition,
         writeKind: MemberWriteKind,
         source: DomainScheduleSourceKind
     ) {
         self.token = DomainScheduleMutationToken()
+        self.mutationPlan = mutationPlan
         self.resolution = resolution
         self.disposition = disposition
         self.writeKind = writeKind
@@ -170,95 +199,10 @@ nonisolated struct AuthorizedDomainScheduleMutation {
 
 nonisolated enum DomainScheduleSubjectResolver {
     static func resolve(intent: DomainScheduleCreateIntent, context: ModelContext) -> DomainScheduleResolution {
-        let link = intent.relatedLink
-        let role = DomainEntityLinkRegistry.role(for: link)
-        let owner = ownerReference(for: link, role: role, context: context)
-        let assignee = assigneeReference(assigneeId: intent.assigneeId)
-        return DomainScheduleResolution(
-            link: link,
-            role: role,
-            owner: owner,
-            assignee: assignee,
-            displayTarget: owner ?? assignee,
-            unresolvedOwner: role.isMemberScoped && owner == nil,
-            unresolvedAssignee: hasExplicitAssignee(intent.assigneeId) && assignee == nil
+        DomainSubjectResolver.resolve(
+            request: DomainSubjectResolutionRequest(link: intent.relatedLink, assigneeId: intent.assigneeId),
+            context: context
         )
-    }
-
-    private static func ownerReference(
-        for link: DomainEntityLink,
-        role: DomainEntityLinkRole,
-        context: ModelContext
-    ) -> DomainMemberReference? {
-        switch role {
-        case .directPet, .petAutoFeeder, .petWaterPlan:
-            return UUID(uuidString: link.trimmedId).map(DomainMemberReference.pet)
-        case .petFoodStock:
-            return DomainEntityLinkRegistry.petIdFromCompoundStockId(link.trimmedId).map(DomainMemberReference.pet)
-        case .petInsurance:
-            guard let insuranceId = UUID(uuidString: link.trimmedId),
-                  let insurance = fetchPetInsurance(id: insuranceId, context: context),
-                  let petId = insurance.pet?.id else {
-                return nil
-            }
-            return .pet(petId)
-        case .petMedicationPlan, .petMedicationDose:
-            guard let medicationId = UUID(uuidString: link.trimmedId),
-                  let medication = fetchPetMedication(id: medicationId, context: context),
-                  let petId = medication.pet?.id else {
-                return nil
-            }
-            return .pet(petId)
-        case .directHuman, .humanNote:
-            return UUID(uuidString: link.trimmedId).map(DomainMemberReference.human)
-        case .humanMedicationPlan:
-            guard let medicationId = UUID(uuidString: link.trimmedId),
-                  let medication = fetchHumanMedication(id: medicationId, context: context),
-                  let humanId = UUID(uuidString: medication.humanId) else {
-                return nil
-            }
-            return .human(humanId)
-        case .directPlant, .unscoped, .unknown:
-            return nil
-        }
-    }
-
-    private static func assigneeReference(assigneeId: String?) -> DomainMemberReference? {
-        guard let assigneeId,
-              !assigneeId.isEmpty,
-              let id = UUID(uuidString: assigneeId) else {
-            return nil
-        }
-        return .human(id)
-    }
-
-    private static func hasExplicitAssignee(_ assigneeId: String?) -> Bool {
-        guard let assigneeId else { return false }
-        return !assigneeId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-    }
-
-    private static func fetchPetMedication(id: UUID, context: ModelContext) -> PetMedication? {
-        var descriptor = FetchDescriptor<PetMedication>(
-            predicate: #Predicate<PetMedication> { $0.id == id }
-        )
-        descriptor.fetchLimit = 1
-        return try? context.fetch(descriptor).first
-    }
-
-    private static func fetchHumanMedication(id: UUID, context: ModelContext) -> HumanMedication? {
-        var descriptor = FetchDescriptor<HumanMedication>(
-            predicate: #Predicate<HumanMedication> { $0.id == id }
-        )
-        descriptor.fetchLimit = 1
-        return try? context.fetch(descriptor).first
-    }
-
-    private static func fetchPetInsurance(id: UUID, context: ModelContext) -> PetInsurance? {
-        var descriptor = FetchDescriptor<PetInsurance>(
-            predicate: #Predicate<PetInsurance> { $0.id == id }
-        )
-        descriptor.fetchLimit = 1
-        return try? context.fetch(descriptor).first
     }
 }
 
@@ -267,17 +211,16 @@ nonisolated enum DomainScheduleWriteAuthorizer {
         intent: DomainScheduleCreateIntent,
         context: ModelContext
     ) -> AuthorizedDomainScheduleWrite? {
-        let authorizationInput = normalizedAuthorizationInput(intent: intent, context: context)
-        guard let disposition = authorizedDisposition(
-            resolution: authorizationInput.resolution,
-            writeKind: authorizationInput.intent.writeKind,
-            context: context
-        ) else { return nil }
+        guard let mutationPlan = authorizedMutationPlan(intent: intent, context: context) else { return nil }
+        let authorizedIntent = mutationPlan.subjectRequest.assigneeId == intent.assigneeId
+            ? intent
+            : intent.withAssigneeId(mutationPlan.subjectRequest.assigneeId)
 
         return AuthorizedDomainScheduleWrite(
-            intent: authorizationInput.intent,
-            resolution: authorizationInput.resolution,
-            disposition: disposition
+            mutationPlan: mutationPlan,
+            intent: authorizedIntent,
+            resolution: mutationPlan.subject,
+            disposition: mutationPlan.disposition
         )
     }
 
@@ -288,100 +231,79 @@ nonisolated enum DomainScheduleWriteAuthorizer {
         context: ModelContext
     ) -> AuthorizedDomainScheduleMutation? {
         let intent = DomainScheduleCreateIntent(
-            title: event.title,
-            startDate: event.startDate,
-            endDate: event.endDate,
-            isAllDay: event.isAllDay,
-            eventType: event.eventType,
-            relatedEntityType: event.relatedEntityType,
-            relatedEntityId: event.relatedEntityId,
-            recurrenceDays: event.recurrenceDays,
-            recurrenceEndDate: event.recurrenceEndDate,
-            assigneeId: event.assigneeId,
+            event: event,
             writeKind: writeKind,
             source: source
         )
-        let resolution = normalizedAuthorizationInput(intent: intent, context: context).resolution
-        guard let disposition = authorizedDisposition(
-            resolution: resolution,
-            writeKind: writeKind,
-            context: context
-        ) else { return nil }
+        guard let mutationPlan = authorizedMutationPlan(intent: intent, context: context) else { return nil }
 
         return AuthorizedDomainScheduleMutation(
-            resolution: resolution,
-            disposition: disposition,
+            mutationPlan: mutationPlan,
+            resolution: mutationPlan.subject,
+            disposition: mutationPlan.disposition,
             writeKind: writeKind,
             source: source
         )
     }
 
-    private static func normalizedAuthorizationInput(
+    static func authorizeExistingEventUpdate(
+        event: Event,
+        intent: DomainScheduleCreateIntent,
+        writeKind: MemberWriteKind,
+        source: DomainScheduleSourceKind = .domainService,
+        context: ModelContext
+    ) -> AuthorizedDomainScheduleMutation? {
+        guard authorizeExistingEventMutation(
+            event: event,
+            writeKind: writeKind,
+            source: source,
+            context: context
+        ) != nil else { return nil }
+
+        guard let mutationPlan = authorizedMutationPlan(intent: intent, context: context) else { return nil }
+        return AuthorizedDomainScheduleMutation(
+            mutationPlan: mutationPlan,
+            resolution: mutationPlan.subject,
+            disposition: mutationPlan.disposition,
+            writeKind: writeKind,
+            source: source
+        )
+    }
+
+    private static func authorizedMutationPlan(
         intent: DomainScheduleCreateIntent,
         context: ModelContext
-    ) -> (intent: DomainScheduleCreateIntent, resolution: DomainScheduleResolution) {
-        let resolution = DomainScheduleSubjectResolver.resolve(intent: intent, context: context)
-        guard resolution.unresolvedAssignee else {
-            return (intent, resolution)
-        }
-        let unassignedIntent = intent.withAssigneeId(nil)
-        return (
-            unassignedIntent,
-            DomainScheduleSubjectResolver.resolve(intent: unassignedIntent, context: context)
+    ) -> AuthorizedMutationPlan? {
+        DomainPolicyAuthorizer.authorize(
+            DomainMutationAuthorizationRequest(
+                scope: .schedule,
+                source: DomainMutationSourceKind(scheduleSource: intent.source),
+                subjectRequest: DomainSubjectResolutionRequest(
+                    link: intent.relatedLink,
+                    assigneeId: intent.assigneeId
+                ),
+                writeKind: intent.writeKind,
+                unresolvedAssigneePolicy: .drop
+            ),
+            context: context
         )
     }
+}
 
-    private static func authorizedDisposition(
-        resolution: DomainScheduleResolution,
-        writeKind: MemberWriteKind,
-        context: ModelContext
-    ) -> MemberWriteDisposition? {
-        guard !resolution.unresolvedOwner else { return nil }
-        guard !resolution.unresolvedAssignee else { return nil }
-
-        var disposition: MemberWriteDisposition = .activeWritable
-        if let ownerDisposition = memberDisposition(for: resolution.owner, writeKind: writeKind, context: context) {
-            disposition = ownerDisposition
+private extension DomainMutationSourceKind {
+    nonisolated init(scheduleSource: DomainScheduleSourceKind) {
+        switch scheduleSource {
+        case .userCommand:
+            self = .userCommand
+        case .domainService:
+            self = .domainService
+        case .restore:
+            self = .restore
+        case .cloudApply:
+            self = .cloudApply
+        case .system:
+            self = .system
         }
-        guard disposition.writesContent else { return nil }
-
-        if let assigneeDisposition = memberDisposition(for: resolution.assignee, writeKind: .care, context: context),
-           !assigneeDisposition.allowsDerivedEffects {
-            return nil
-        }
-        return disposition
-    }
-
-    private static func memberDisposition(
-        for reference: DomainMemberReference?,
-        writeKind: MemberWriteKind,
-        context: ModelContext
-    ) -> MemberWriteDisposition? {
-        guard let reference else { return nil }
-        switch reference {
-        case let .pet(id):
-            guard let pet = fetchPet(id: id, context: context) else { return .missingMemberTarget }
-            return MemberLifecycleGate.disposition(pet: pet, writeKind: writeKind)
-        case let .human(id):
-            guard let human = fetchHuman(id: id, context: context) else { return .missingMemberTarget }
-            return MemberLifecycleGate.disposition(human: human, writeKind: writeKind)
-        }
-    }
-
-    private static func fetchPet(id: UUID, context: ModelContext) -> Pet? {
-        var descriptor = FetchDescriptor<Pet>(
-            predicate: #Predicate<Pet> { $0.id == id }
-        )
-        descriptor.fetchLimit = 1
-        return try? context.fetch(descriptor).first
-    }
-
-    private static func fetchHuman(id: UUID, context: ModelContext) -> Human? {
-        var descriptor = FetchDescriptor<Human>(
-            predicate: #Predicate<Human> { $0.id == id }
-        )
-        descriptor.fetchLimit = 1
-        return try? context.fetch(descriptor).first
     }
 }
 
@@ -402,6 +324,7 @@ nonisolated enum DomainScheduleWriter {
         maxReminderOccurrences: Int = 500
     ) -> DomainScheduleWriteResult {
         _ = plan.token
+        plan.mutationPlan.consumeAuthorization()
         let intent = plan.intent
         let event = constructEvent(intent: intent)
         context.insert(event)
@@ -435,6 +358,29 @@ nonisolated enum DomainScheduleWriter {
     }
 
     @discardableResult
+    static func updateEvent(
+        _ event: Event,
+        intent: DomainScheduleCreateIntent,
+        mutation: AuthorizedDomainScheduleMutation
+    ) -> Bool {
+        _ = mutation.token
+        mutation.mutationPlan.consumeAuthorization()
+        guard mutation.writesContent else { return false }
+        let authorizedIntent = intent.withAssigneeId(mutation.mutationPlan.subjectRequest.assigneeId)
+        event.title = authorizedIntent.title
+        event.startDate = authorizedIntent.startDate
+        event.endDate = authorizedIntent.endDate
+        event.recurrenceDays = authorizedIntent.recurrenceDays
+        event.recurrenceEndDate = authorizedIntent.recurrenceEndDate
+        event.relatedEntityType = authorizedIntent.relatedLink.rawType
+        event.relatedEntityId = authorizedIntent.relatedLink.rawId
+        event.eventType = authorizedIntent.eventType
+        event.isAllDay = authorizedIntent.isAllDay
+        event.assigneeId = authorizedIntent.assigneeId
+        return true
+    }
+
+    @discardableResult
     static func createReminder(
         for event: Event,
         scheduledAt: Date,
@@ -442,6 +388,7 @@ nonisolated enum DomainScheduleWriter {
         context: ModelContext
     ) -> Reminder? {
         _ = mutation.token
+        mutation.mutationPlan.consumeAuthorization()
         guard mutation.allowsDerivedEffects else { return nil }
         let reminder = Reminder(event: event, scheduledAt: scheduledAt)
         context.insert(reminder)

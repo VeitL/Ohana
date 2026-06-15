@@ -186,7 +186,7 @@ enum ReminderSchedulingService {
         save: Bool = true,
         careLedger: CareLedgerRecording
     ) {
-        let subject = subjectInfo(from: reminder.event)
+        let subject = CareLedgerService.subjectInfo(from: reminder.event, context: context)
         careLedger.record(
             occurredAt: Date(),
             actorKind: .unknown,
@@ -269,20 +269,6 @@ enum ReminderSchedulingService {
         case .skippedMerged: return "refillMerged"
         case .skippedUserDisabled: return "refillUserDisabled"
         case .failed: return "refillFailed"
-        }
-    }
-
-    private static func subjectInfo(from event: Event?) -> (kind: CareLedgerSubjectKind, id: String?) {
-        guard let event else { return (.system, nil) }
-        switch event.relatedEntityType.lowercased() {
-        case "pet":
-            return (.pet, event.relatedEntityId)
-        case "human":
-            return (.human, event.relatedEntityId)
-        case "plant":
-            return (.plant, event.relatedEntityId)
-        default:
-            return (.unknown, event.relatedEntityId.isEmpty ? nil : event.relatedEntityId)
         }
     }
 }

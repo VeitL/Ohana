@@ -129,12 +129,13 @@ assert_good scripts/audit-economy-boundaries.sh "$fixtures/RecurringEconomyBound
 
 assert_bad scripts/audit-member-lifecycle-gate.sh "$fixtures/MemberLifecycleGateBadCommands.swift" \
   member-lifecycle-direct-write-gate member-lifecycle-missing-disposition \
-  member-lifecycle-domain-ownership-matcher member-lifecycle-direct-schedule-writer
+  member-lifecycle-domain-ownership-matcher member-lifecycle-direct-schedule-writer \
+  member-lifecycle-rehydrate-bypass
 run_audit scripts/audit-member-lifecycle-gate.sh --all "$fixtures/MemberLifecycleGateBadCommands.swift"
 if [[ "$status" -ne 1 ]]; then
   fail "scripts/audit-member-lifecycle-gate.sh --all MemberLifecycleGateBadCommands.swift: expected strict exit 1, got $status"
 else
-  for rule in member-lifecycle-direct-write-gate member-lifecycle-missing-disposition member-lifecycle-domain-ownership-matcher member-lifecycle-direct-schedule-writer; do
+  for rule in member-lifecycle-direct-write-gate member-lifecycle-missing-disposition member-lifecycle-domain-ownership-matcher member-lifecycle-direct-schedule-writer member-lifecycle-rehydrate-bypass; do
     if ! grep -qF "[$rule]" <<<"$output"; then
       fail "scripts/audit-member-lifecycle-gate.sh --all MemberLifecycleGateBadCommands.swift: rule [$rule] no longer fires"
     fi

@@ -209,17 +209,27 @@ enum CarePlanCalendarSync {
         return false
     }
 
+    nonisolated static func waterMaintenanceKind(for event: Event, pet: Pet) -> String? {
+        let petKey = pet.id.uuidString
+        guard MemberLifecycleActiveScheduleResolver.eventBelongsToPet(event, petId: petKey) else { return nil }
+        return waterMaintenanceKind(for: event, petKey: petKey)
+    }
+
     nonisolated static func waterMaintenanceKind(for event: Event) -> String? {
-        let petKey = event.relatedEntityId
-        guard !petKey.isEmpty else { return nil }
-        return waterMaintenanceKinds.first { kind in
+        guard let petId = DomainEntityLinkRegistry.resolvedId(for: DomainEntityLink(event: event), role: .directPet) else {
+            return nil
+        }
+        return waterMaintenanceKind(for: event, petKey: petId.uuidString)
+    }
+
+    private nonisolated static func waterMaintenanceKind(for event: Event, petKey: String) -> String? {
+        waterMaintenanceKinds.first { kind in
             UserDefaults.standard.string(forKey: eventStorageKey(kind: kind, petKey: petKey)) == event.id.uuidString
         }
     }
 
     static func isWaterMaintenancePlan(_ event: Event, pet: Pet, kinds: Set<String>) -> Bool {
-        guard MemberLifecycleActiveScheduleResolver.eventBelongsToPet(event, petId: pet.id.uuidString) else { return false }
-        guard let kind = waterMaintenanceKind(for: event) else { return false }
+        guard let kind = waterMaintenanceKind(for: event, pet: pet) else { return false }
         return kinds.contains(kind)
     }
 
@@ -230,24 +240,19 @@ enum CarePlanCalendarSync {
     }
 
     private static func hasCustomFeedPlan(petKey: String, context: ModelContext) -> Bool {
-        var descriptor = FetchDescriptor<Event>(
-            predicate: #Predicate<Event> {
-                $0.relatedEntityId == petKey && $0.feedRuleKindRaw != ""
-            }
-        )
-        descriptor.fetchLimit = 1
-        return !fetchOrLog(descriptor, context: context, operation: "fetch custom feed plan").isEmpty
+        let descriptor = FetchDescriptor<Event>()
+        return fetchOrLog(descriptor, context: context, operation: "fetch custom feed plan").contains {
+            MemberLifecycleActiveScheduleResolver.eventBelongsToPet($0, petId: petKey) &&
+                !$0.feedRuleKindRaw.isEmpty
+        }
     }
 
     private static func hasCustomWaterPlan(petKey: String, context: ModelContext) -> Bool {
-        let entityType = WaterPlanWriter.entityType
-        var descriptor = FetchDescriptor<Event>(
-            predicate: #Predicate<Event> {
-                $0.relatedEntityId == petKey && $0.relatedEntityType == entityType
-            }
-        )
-        descriptor.fetchLimit = 1
-        return !fetchOrLog(descriptor, context: context, operation: "fetch custom water plan").isEmpty
+        let descriptor = FetchDescriptor<Event>()
+        return fetchOrLog(descriptor, context: context, operation: "fetch custom water plan").contains {
+            DomainEntityLinkRegistry.role(for: $0) == .petWaterPlan &&
+                MemberLifecycleActiveScheduleResolver.eventBelongsToPet($0, petId: petKey)
+        }
     }
 
     private static func removeLegacyDefaultPlanEvents(kind: String, pet: Pet, context: ModelContext) {
@@ -317,13 +322,13 @@ enum CarePlanCalendarSync {
         if let idStr = UserDefaults.standard.string(forKey: key),
            let uuid = UUID(uuidString: idStr),
            let ev = existingEvent(uuid: uuid, context: context) {
-            ev.title = title
-            ev.startDate = startDate
-            ev.recurrenceDays = max(1, recurrenceDays)
-            ev.relatedEntityType = EntityKind.pet.rawValue
-            ev.relatedEntityId = petKey
-            ev.eventType = eventType.rawValue
-            ev.isAllDay = true
+            guard let mutation = DomainScheduleWriteAuthorizer.authorizeExistingEventUpdate(
+                event: ev,
+                intent: createIntent,
+                writeKind: .care,
+                context: context
+            ) else { return }
+            DomainScheduleWriter.updateEvent(ev, intent: createIntent, mutation: mutation)
             context.safeSave()
             return
         }
@@ -336,6 +341,7 @@ enum CarePlanCalendarSync {
         context.safeSave()
     }
 
+    @discardableResult
     private static func upsertWithSingleReminder(
         pet: Pet,
         kind: String,
@@ -344,11 +350,11 @@ enum CarePlanCalendarSync {
         recurrenceDays: Int,
         eventType: EventType = .daily,
         context: ModelContext
-    ) {
+    ) -> Event? {
         let petKey = pet.id.uuidString
         guard canWriteActiveCarePlan(for: pet) else {
             removeCalendarPlan(kind: kind, petKey: petKey, context: context)
-            return
+            return nil
         }
         let key = eventStorageKey(kind: kind, petKey: petKey)
         let reminderDate = morningReminderDate(on: startDate)
@@ -368,13 +374,13 @@ enum CarePlanCalendarSync {
         if let idStr = UserDefaults.standard.string(forKey: key),
            let uuid = UUID(uuidString: idStr),
            let ev = existingEvent(uuid: uuid, context: context) {
-            ev.title = title
-            ev.startDate = startDate
-            ev.recurrenceDays = max(1, recurrenceDays)
-            ev.relatedEntityType = EntityKind.pet.rawValue
-            ev.relatedEntityId = petKey
-            ev.eventType = eventType.rawValue
-            ev.isAllDay = true
+            guard let mutation = DomainScheduleWriteAuthorizer.authorizeExistingEventUpdate(
+                event: ev,
+                intent: createIntent,
+                writeKind: .care,
+                context: context
+            ) else { return nil }
+            DomainScheduleWriter.updateEvent(ev, intent: createIntent, mutation: mutation)
 
             if let reminder = ev.reminders.first {
                 reminder.scheduledAt = reminderDate
@@ -385,30 +391,25 @@ enum CarePlanCalendarSync {
                     tombstoneAndDelete(extra, context: context)
                 }
             } else {
-                if let mutation = DomainScheduleWriteAuthorizer.authorizeExistingEventMutation(
-                    event: ev,
-                    writeKind: .care,
+                DomainScheduleWriter.createReminder(
+                    for: ev,
+                    scheduledAt: reminderDate,
+                    mutation: mutation,
                     context: context
-                ) {
-                    DomainScheduleWriter.createReminder(
-                        for: ev,
-                        scheduledAt: reminderDate,
-                        mutation: mutation,
-                        context: context
-                    )
-                }
+                )
             }
             context.safeSave()
-            return
+            return ev
         }
 
         guard let plan = DomainScheduleWriteAuthorizer.authorizeCreate(
             intent: createIntent,
             context: context
-        ) else { return }
+        ) else { return nil }
         let ev = DomainScheduleWriter.createEvent(plan: plan, context: context).event
         UserDefaults.standard.set(ev.id.uuidString, forKey: key)
         context.safeSave()
+        return ev
     }
 
     private static func morningReminderDate(on date: Date) -> Date {
@@ -718,15 +719,16 @@ enum CarePlanCalendarSync {
         )
     }
 
-    static func syncLitterFullChangePlan(pet: Pet, context: ModelContext, intervalDays: Int, enabled: Bool, cycleAnchor: Date) {
+    @discardableResult
+    static func syncLitterFullChangePlan(pet: Pet, context: ModelContext, intervalDays: Int, enabled: Bool, cycleAnchor: Date) -> Event? {
         let petKey = pet.id.uuidString
         guard canWriteActiveCarePlan(for: pet) else {
             removeActiveCalendarPlans(for: pet, context: context)
-            return
+            return nil
         }
         guard enabled, intervalDays > 0 else {
             removeCalendarPlan(kind: "litterFull", petKey: petKey, context: context)
-            return
+            return nil
         }
         let cal = Calendar.current
         let today = cal.startOfDay(for: Date())
@@ -747,21 +749,22 @@ enum CarePlanCalendarSync {
             }
             next = d
         }
-        upsertWithSingleReminder(pet: pet, kind: "litterFull", title: "\(pet.name) 换猫砂", startDate: next, recurrenceDays: intervalDays, context: context)
+        return upsertWithSingleReminder(pet: pet, kind: "litterFull", title: "\(pet.name) 换猫砂", startDate: next, recurrenceDays: intervalDays, context: context)
     }
 
-    static func syncScoopPlan(pet: Pet, context: ModelContext, intervalDays: Int, enabled: Bool, anchor: Date) {
+    @discardableResult
+    static func syncScoopPlan(pet: Pet, context: ModelContext, intervalDays: Int, enabled: Bool, anchor: Date) -> Event? {
         let petKey = pet.id.uuidString
         guard canWriteActiveCarePlan(for: pet) else {
             removeActiveCalendarPlans(for: pet, context: context)
-            return
+            return nil
         }
         if intervalDays > 0 {
             suppressDefaultPlan(kind: "litter", pet: pet, context: context)
         }
         guard enabled, intervalDays > 0 else {
             removeCalendarPlan(kind: "scoop", petKey: petKey, context: context)
-            return
+            return nil
         }
         let cal = Calendar.current
         let today = cal.startOfDay(for: Date())
@@ -773,21 +776,22 @@ enum CarePlanCalendarSync {
         while next < today {
             next = cal.date(byAdding: .day, value: intervalDays, to: next) ?? next
         }
-        upsertWithSingleReminder(pet: pet, kind: "scoop", title: "\(pet.name) 铲屎计划", startDate: next, recurrenceDays: intervalDays, context: context)
+        return upsertWithSingleReminder(pet: pet, kind: "scoop", title: "\(pet.name) 铲屎计划", startDate: next, recurrenceDays: intervalDays, context: context)
     }
 
-    static func syncPlayPlan(pet: Pet, context: ModelContext, intervalDays: Int, enabled: Bool, anchor: Date) {
+    @discardableResult
+    static func syncPlayPlan(pet: Pet, context: ModelContext, intervalDays: Int, enabled: Bool, anchor: Date) -> Event? {
         let petKey = pet.id.uuidString
         guard canWriteActiveCarePlan(for: pet) else {
             removeActiveCalendarPlans(for: pet, context: context)
-            return
+            return nil
         }
         if intervalDays > 0 {
             suppressDefaultPlan(kind: "play", pet: pet, context: context)
         }
         guard enabled, intervalDays > 0 else {
             removeCalendarPlan(kind: "play", petKey: petKey, context: context)
-            return
+            return nil
         }
         let cal = Calendar.current
         let today = cal.startOfDay(for: Date())
@@ -799,6 +803,6 @@ enum CarePlanCalendarSync {
         while next < today {
             next = cal.date(byAdding: .day, value: intervalDays, to: next) ?? next
         }
-        upsertWithSingleReminder(pet: pet, kind: "play", title: "\(pet.name) 陪玩计划", startDate: next, recurrenceDays: intervalDays, context: context)
+        return upsertWithSingleReminder(pet: pet, kind: "play", title: "\(pet.name) 陪玩计划", startDate: next, recurrenceDays: intervalDays, context: context)
     }
 }

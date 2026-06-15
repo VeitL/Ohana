@@ -91,8 +91,7 @@ struct PetHygieneDetailContentView: View {
             guard r.statusEnum == .pending,
                   let ev = r.event,
                   ev.eventType == EventType.grooming.rawValue,
-                  ev.relatedEntityType == EntityKind.pet.rawValue,
-                  ev.relatedEntityId == pid else { return false }
+                  MemberLifecycleActiveScheduleResolver.eventBelongsToPet(ev, petId: pid) else { return false }
             return ev.title.hasPrefix(prefix)
         }
         .sorted { $0.scheduledAt < $1.scheduledAt }

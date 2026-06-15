@@ -297,11 +297,29 @@ final class NotificationManager: NSObject, @unchecked Sendable {
         center.removePendingNotificationRequests(withIdentifiers: [notificationId])
     }
 
-    func cancelAll(for petId: String, reminders: [Reminder]) {
-        let ids = reminders
-            .filter { $0.event?.relatedEntityId == petId }
-            .map(\.notificationId)
+    func cancelAll(for pet: Pet, reminders: [Reminder]) {
+        let disposition = MemberLifecycleGate.disposition(
+            pet: pet,
+            writeKind: .lifecycle(.cleanupActiveSchedules)
+        )
+        guard disposition.allowsDerivedEffects else { return }
+
+        let ids = Self.cancellableNotificationIds(for: pet, reminders: reminders)
         center.removePendingNotificationRequests(withIdentifiers: ids)
+    }
+
+    static func cancellableNotificationIds(for pet: Pet, reminders: [Reminder]) -> [String] {
+        let petId = pet.id.uuidString
+        return reminders.compactMap { reminder in
+            guard let event = reminder.event,
+                  MemberLifecycleActiveScheduleResolver.eventBelongsToPet(
+                      event,
+                      petId: petId,
+                      petMedications: pet.medications,
+                      insurances: pet.insurances
+                  ) else { return nil }
+            return reminder.notificationId
+        }
     }
 
     // MARK: - Compensate（过期 pending：计划喂食标失败；其它待办标跳过，避免误报已完成）

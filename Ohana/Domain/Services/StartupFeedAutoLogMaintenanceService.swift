@@ -35,14 +35,14 @@ enum StartupFeedAutoLogMaintenanceService {
     ) -> Int {
         let events = autoFeederEvents(context: context)
         guard !events.isEmpty else { return 0 }
+        let pets = pets(context: context)
+        guard !pets.isEmpty else { return 0 }
 
-        let eventsByPetId = Dictionary(grouping: events, by: \.relatedEntityId)
         var inserted = 0
 
-        for (petIdRaw, petEvents) in eventsByPetId {
-            guard let petID = UUID(uuidString: petIdRaw),
-                  let pet = pet(id: petID, context: context)
-            else { continue }
+        for pet in pets {
+            let petEvents = events.filter { FeedRuleMetadata.isAutoFeederEvent($0, pet: pet) }
+            guard !petEvents.isEmpty else { continue }
 
             inserted += FeedAutoLogMaterializer.materializeDueLogs(
                 pet: pet,
@@ -58,15 +58,13 @@ enum StartupFeedAutoLogMaintenanceService {
 
     @MainActor
     private static func autoFeederEvents(context: ModelContext) -> [Event] {
-        let autoEntityType = FeedRuleMetadata.autoFeederEntityType
         let foodChangeType = EventType.foodChange.rawValue
         let autoKind = FeedRuleKind.autoFeeder.rawValue
         let legacyKind = ""
 
         let descriptor = FetchDescriptor<Event>(
             predicate: #Predicate<Event> { event in
-                event.relatedEntityType == autoEntityType &&
-                    event.eventType == foodChangeType &&
+                event.eventType == foodChangeType &&
                     (event.feedRuleKindRaw == autoKind || event.feedRuleKindRaw == legacyKind)
             },
             sortBy: [SortDescriptor(\Event.startDate, order: .forward)]
@@ -75,13 +73,7 @@ enum StartupFeedAutoLogMaintenanceService {
     }
 
     @MainActor
-    private static func pet(id: UUID, context: ModelContext) -> Pet? {
-        var descriptor = FetchDescriptor<Pet>(
-            predicate: #Predicate<Pet> { pet in
-                pet.id == id
-            }
-        )
-        descriptor.fetchLimit = 1
-        return fetchOrLog(descriptor, context: context, operation: "fetch pet").first
+    private static func pets(context: ModelContext) -> [Pet] {
+        fetchOrLog(FetchDescriptor<Pet>(), context: context, operation: "fetch pets")
     }
 }

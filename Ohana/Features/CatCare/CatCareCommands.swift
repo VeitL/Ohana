@@ -184,17 +184,18 @@ enum CatCareCommandService {
 
     @MainActor
     private static func fetchEvent(id: UUID, petID: UUID, context: ModelContext) -> Event? {
-        let idString = petID.uuidString
         let eventType = EventType.litterBox.rawValue
         var descriptor = FetchDescriptor<Event>(
             predicate: #Predicate<Event> { event in
                 event.id == id &&
-                    event.relatedEntityId == idString &&
                     event.eventType == eventType
             }
         )
         descriptor.fetchLimit = 1
-        return fetchCatCareModelsOrLog(descriptor, context: context, operation: "fetch cat care event").first
+        return fetchCatCareModelsOrLog(descriptor, context: context, operation: "fetch cat care event")
+            .first {
+                MemberLifecycleActiveScheduleResolver.eventBelongsToPet($0, petId: petID.uuidString)
+            }
     }
 
     @MainActor

@@ -8,6 +8,11 @@
 import Foundation
 import SwiftData
 
+nonisolated struct CareLedgerSubjectInfo: Equatable {
+    let kind: CareLedgerSubjectKind
+    let id: String?
+}
+
 final nonisolated class CareLedgerService {
     init() {}
 
@@ -196,7 +201,7 @@ final nonisolated class CareLedgerService {
         context: ModelContext,
         save: Bool = true
     ) {
-        let subject = subjectInfo(from: reminder.event)
+        let subject = subjectInfo(from: reminder.event, context: context)
         record(
             occurredAt: Date(),
             actorKind: actorId == nil ? .unknown : .human,
@@ -239,18 +244,41 @@ final nonisolated class CareLedgerService {
         )
     }
 
-    static func subjectInfo(from event: Event?) -> (kind: CareLedgerSubjectKind, id: String?) {
-        guard let event else { return (.system, nil) }
-        switch event.relatedEntityType.lowercased() {
-        case "pet":
-            return (.pet, event.relatedEntityId)
-        case "human":
-            return (.human, event.relatedEntityId)
-        case "plant":
-            return (.plant, event.relatedEntityId)
-        default:
-            return (.unknown, event.relatedEntityId.isEmpty ? nil : event.relatedEntityId)
+    static func subjectInfo(from event: Event?, context: ModelContext) -> CareLedgerSubjectInfo {
+        guard let event else { return CareLedgerSubjectInfo(kind: .system, id: nil) }
+        let link = DomainEntityLink(event: event)
+        let resolution = DomainSubjectResolver.resolve(
+            request: DomainSubjectResolutionRequest(event: event),
+            context: context
+        )
+        if let target = resolution.displayTarget {
+            return subjectInfo(for: target)
         }
+        switch resolution.role {
+        case .directPlant, .plantScoped:
+            return CareLedgerSubjectInfo(
+                kind: .plant,
+                id: DomainEntityLinkRegistry.plantId(for: link)?.uuidString ?? nonEmptyId(link.trimmedId)
+            )
+        case .unscoped where link.trimmedId.isEmpty:
+            return CareLedgerSubjectInfo(kind: .system, id: nil)
+        default:
+            return CareLedgerSubjectInfo(kind: .unknown, id: nonEmptyId(link.trimmedId))
+        }
+    }
+
+    private static func subjectInfo(for reference: DomainMemberReference) -> CareLedgerSubjectInfo {
+        switch reference {
+        case let .pet(id):
+            CareLedgerSubjectInfo(kind: .pet, id: id.uuidString)
+        case let .human(id):
+            CareLedgerSubjectInfo(kind: .human, id: id.uuidString)
+        }
+    }
+
+    private static func nonEmptyId(_ rawId: String) -> String? {
+        let trimmed = rawId.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
     }
 
     static func rewardDelta(_ reward: (humanGot: Int, petGot: Int)?) -> Int {

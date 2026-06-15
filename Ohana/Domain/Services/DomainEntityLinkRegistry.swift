@@ -17,6 +17,10 @@ nonisolated struct DomainEntityLink: Equatable, Hashable {
         self.rawId = rawId
     }
 
+    init(event: Event) {
+        self.init(rawType: event.relatedEntityType, rawId: event.relatedEntityId)
+    }
+
     var normalizedType: String {
         rawType.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
     }
@@ -51,6 +55,7 @@ nonisolated enum DomainEntityLinkRole: Equatable {
     case directPet
     case directHuman
     case directPlant
+    case plantScoped
     case petFoodStock
     case petAutoFeeder
     case petWaterPlan
@@ -67,7 +72,7 @@ nonisolated enum DomainEntityLinkRole: Equatable {
         case .directPet, .directHuman, .petFoodStock, .petAutoFeeder, .petWaterPlan,
              .petInsurance, .petMedicationPlan, .petMedicationDose, .humanNote, .humanMedicationPlan:
             true
-        case .directPlant, .unscoped, .unknown:
+        case .directPlant, .plantScoped, .unscoped, .unknown:
             false
         }
     }
@@ -77,7 +82,7 @@ nonisolated enum DomainEntityLinkRole: Equatable {
         case .directPet, .petFoodStock, .petAutoFeeder, .petWaterPlan, .petInsurance,
              .petMedicationPlan, .petMedicationDose:
             true
-        case .directHuman, .directPlant, .humanNote, .humanMedicationPlan, .unscoped, .unknown:
+        case .directHuman, .directPlant, .plantScoped, .humanNote, .humanMedicationPlan, .unscoped, .unknown:
             false
         }
     }
@@ -86,10 +91,26 @@ nonisolated enum DomainEntityLinkRole: Equatable {
         switch self {
         case .directHuman, .humanNote, .humanMedicationPlan:
             true
-        case .directPet, .directPlant, .petFoodStock, .petAutoFeeder, .petWaterPlan,
+        case .directPet, .directPlant, .plantScoped, .petFoodStock, .petAutoFeeder, .petWaterPlan,
              .petInsurance, .petMedicationPlan, .petMedicationDose, .unscoped, .unknown:
             false
         }
+    }
+
+    var isPlantScoped: Bool {
+        switch self {
+        case .directPlant, .plantScoped:
+            true
+        case .directPet, .directHuman, .petFoodStock, .petAutoFeeder, .petWaterPlan,
+             .petInsurance, .petMedicationPlan, .petMedicationDose, .humanNote,
+             .humanMedicationPlan, .unscoped, .unknown:
+            false
+        }
+    }
+
+    var unregisteredType: String? {
+        if case let .unknown(rawType) = self { return rawType }
+        return nil
     }
 }
 
@@ -98,9 +119,9 @@ enum DomainEntityLinkRegistry {
     nonisolated static let petAutoFeeder = "pet_auto_feeder"
     nonisolated static let petWaterPlan = "pet_water_plan"
     nonisolated static let petInsurance = "pet_insurance"
-    nonisolated static let petMedicationPlan = "pet_medication_plan"
-    nonisolated static let petMedicationDose = "pet_medication"
-    nonisolated static let humanMedicationPlan = "human_medication"
+    nonisolated static let petMedicationPlan = MedicationEventLink.petMedicationPlan
+    nonisolated static let petMedicationDose = MedicationEventLink.petMedicationDose
+    nonisolated static let humanMedicationPlan = MedicationEventLink.humanMedicationPlan
     nonisolated static let humanNote = "human_note"
 
     nonisolated static func role(for link: DomainEntityLink) -> DomainEntityLinkRole {
@@ -113,6 +134,8 @@ enum DomainEntityLinkRegistry {
             .directHuman
         case EntityKind.plant.rawValue.lowercased(), "plant":
             .directPlant
+        case let rawType where rawType.hasPrefix("plant_"):
+            .plantScoped
         case petFoodStock:
             .petFoodStock
         case petAutoFeeder:
@@ -134,7 +157,50 @@ enum DomainEntityLinkRegistry {
         }
     }
 
+    nonisolated static func role(for event: Event) -> DomainEntityLinkRole {
+        role(for: DomainEntityLink(event: event))
+    }
+
     nonisolated static func petIdFromCompoundStockId(_ rawId: String) -> UUID? {
         UUID(uuidString: rawId.split(separator: ":", maxSplits: 1).first.map(String.init) ?? rawId)
+    }
+
+    nonisolated static func plantId(for link: DomainEntityLink) -> UUID? {
+        switch role(for: link) {
+        case .directPlant, .plantScoped:
+            UUID(uuidString: link.trimmedId)
+        case .unscoped where !link.trimmedId.isEmpty:
+            UUID(uuidString: link.trimmedId)
+        case .directPet, .directHuman, .petFoodStock, .petAutoFeeder, .petWaterPlan,
+             .petInsurance, .petMedicationPlan, .petMedicationDose, .humanNote,
+             .humanMedicationPlan, .unscoped, .unknown:
+            nil
+        }
+    }
+
+    nonisolated static func plantId(for event: Event) -> UUID? {
+        plantId(for: DomainEntityLink(event: event))
+    }
+
+    nonisolated static func resolvedId(for link: DomainEntityLink, role expectedRole: DomainEntityLinkRole) -> UUID? {
+        guard role(for: link) == expectedRole else { return nil }
+        return UUID(uuidString: link.trimmedId)
+    }
+
+    nonisolated static func affectedEntityId(for link: DomainEntityLink, role: DomainEntityLinkRole? = nil) -> UUID? {
+        let resolvedRole = role ?? self.role(for: link)
+        switch resolvedRole {
+        case .petFoodStock:
+            return petIdFromCompoundStockId(link.trimmedId)
+        case .directPet, .directHuman, .directPlant, .plantScoped, .petAutoFeeder, .petWaterPlan,
+             .petInsurance, .petMedicationPlan, .petMedicationDose, .humanNote, .humanMedicationPlan:
+            return UUID(uuidString: link.trimmedId)
+        case .unscoped, .unknown:
+            return nil
+        }
+    }
+
+    nonisolated static func link(_ link: DomainEntityLink, matches role: DomainEntityLinkRole, id: UUID) -> Bool {
+        resolvedId(for: link, role: role) == id
     }
 }

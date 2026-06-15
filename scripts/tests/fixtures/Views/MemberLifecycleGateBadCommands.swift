@@ -23,4 +23,8 @@ enum MemberLifecycleGateBadCommandService {
         )
         context.insert(event)
     }
+
+    static func applyBackup(context: ModelContext) {
+        context.insert(Pet(name: "Bypass"))
+    }
 }

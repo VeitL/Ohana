@@ -86,18 +86,21 @@ extension QuickPottyDetailSheet {
     }
 
     func syncScoopPlan(for targets: [Pet], showToast: Bool) {
+        var scheduledReminders: [Reminder] = []
         for target in targets {
             persistScoopSettings(for: target)
-            CarePlanCalendarSync.syncScoopPlan(
+            if let event = CarePlanCalendarSync.syncScoopPlan(
                 pet: target,
                 context: modelContext,
                 intervalDays: scoopIntervalDays,
                 enabled: scoopReminderOn,
                 anchor: scoopAnchorDate
-            )
+            ) {
+                scheduledReminders.append(contentsOf: event.reminders)
+            }
         }
         if scoopReminderOn {
-            scheduleCarePlanReminders(titleContains: "铲屎")
+            scheduleCarePlanReminders(scheduledReminders)
         }
         if showToast {
             UINotificationFeedbackGenerator().notificationOccurred(.success)
@@ -110,18 +113,21 @@ extension QuickPottyDetailSheet {
     }
 
     func syncLitterChangePlan(for targets: [Pet], showToast: Bool) {
+        var scheduledReminders: [Reminder] = []
         for target in targets {
             persistLitterChangeSettings(for: target)
-            CarePlanCalendarSync.syncLitterFullChangePlan(
+            if let event = CarePlanCalendarSync.syncLitterFullChangePlan(
                 pet: target,
                 context: modelContext,
                 intervalDays: litterChangeIntervalDays,
                 enabled: litterReminderOn,
                 cycleAnchor: litterCycleAnchorDate
-            )
+            ) {
+                scheduledReminders.append(contentsOf: event.reminders)
+            }
         }
         if litterReminderOn {
-            scheduleCarePlanReminders(titleContains: "猫砂")
+            scheduleCarePlanReminders(scheduledReminders)
         }
         if showToast {
             UINotificationFeedbackGenerator().notificationOccurred(.success)
@@ -421,33 +427,7 @@ extension QuickPottyDetailSheet {
         SharedPetTargetResolver.normalizedSpecies(value)
     }
 
-    func latestAllEvents() -> [Event] {
-        let petKey = pet.id.uuidString
-        let descriptor = FetchDescriptor<Event>(
-            predicate: #Predicate<Event> { event in
-                event.relatedEntityId == petKey
-            },
-            sortBy: [SortDescriptor(\.startDate)]
-        )
-        do {
-            return try modelContext.fetch(descriptor) // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
-        } catch {
-            OhanaLog.warning(
-                "QuickPottyDetailSheet failed to fetch latest events: \(error.localizedDescription)",
-                category: "Care"
-            )
-            return allEvents
-        }
-    }
-
-    func scheduleCarePlanReminders(titleContains text: String) {
-        let reminders = latestAllEvents()
-            .filter { event in
-                event.relatedEntityId == pet.id.uuidString &&
-                    event.title.contains(text)
-            }
-            .flatMap(\.reminders)
-
+    func scheduleCarePlanReminders(_ reminders: [Reminder]) {
         guard !reminders.isEmpty else { return }
 
         Task { @MainActor in

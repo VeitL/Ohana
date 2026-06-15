@@ -102,20 +102,21 @@ nonisolated extension DataBackupManager {
         )
     }
 
-    func decodePlant(_ dto: PlantBackup) -> Plant {
-        let p = Plant(
-            name: dto.name, species: dto.species, location: dto.location,
+    func decodePlantSnapshot(_ dto: PlantBackup) -> DomainPlantRehydrateSnapshot {
+        DomainPlantRehydrateSnapshot(
+            id: UUID(uuidString: dto.id) ?? UUID(),
+            name: dto.name,
+            species: dto.species,
             avatarEmoji: dto.avatarEmoji,
+            location: dto.location,
+            notes: dto.notes,
+            createdAt: iso.date(from: dto.createdAt) ?? Date(),
+            lastWateredDate: dto.lastWateredDate.flatMap { iso.date(from: $0) },
             wateringIntervalDays: dto.wateringIntervalDays,
+            lastFertilizedDate: dto.lastFertilizedDate.flatMap { iso.date(from: $0) },
             fertilizingIntervalDays: dto.fertilizingIntervalDays,
             themeColorHex: dto.themeColorHex ?? "4CAF50"
         )
-        p.id = UUID(uuidString: dto.id) ?? UUID()
-        p.notes = dto.notes
-        p.createdAt = iso.date(from: dto.createdAt) ?? Date()
-        p.lastWateredDate = dto.lastWateredDate.flatMap { iso.date(from: $0) }
-        p.lastFertilizedDate = dto.lastFertilizedDate.flatMap { iso.date(from: $0) }
-        return p
     }
 
     func encodeCareLog(_ l: PetCareLog) -> PetCareLogBackup {

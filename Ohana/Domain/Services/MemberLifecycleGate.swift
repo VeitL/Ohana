@@ -22,6 +22,7 @@ nonisolated enum MemberLifecycleAction: Equatable {
     case markPassedAway
     case undoPassedAway
     case clearActivityRecords
+    case cleanupActiveSchedules
 }
 
 nonisolated enum MemberWriteDenialReason: Equatable {
@@ -106,6 +107,10 @@ nonisolated enum MemberWriteDisposition: Equatable {
 }
 
 enum MemberLifecycleGate {
+    nonisolated static func activeDisposition(writeKind: MemberWriteKind) -> MemberWriteDisposition {
+        disposition(hasPassedAway: false, writeKind: writeKind)
+    }
+
     nonisolated static func disposition(pet: Pet, writeKind: MemberWriteKind) -> MemberWriteDisposition {
         disposition(hasPassedAway: pet.hasPassedAway, writeKind: writeKind)
     }
@@ -175,6 +180,17 @@ enum MemberLifecycleGate {
                     allowsDerivedEffects: true,
                     allowsEconomyDerivation: true,
                     allowsRevisionPublish: true
+                )
+            )
+        case .lifecycle(.cleanupActiveSchedules):
+            return .allow(
+                MemberWriteAllowance(
+                    writeKind: writeKind,
+                    allowsContentWrite: false,
+                    allowsCareFactWrite: false,
+                    allowsDerivedEffects: true,
+                    allowsEconomyDerivation: false,
+                    allowsRevisionPublish: false
                 )
             )
         case let .lifecycle(action):

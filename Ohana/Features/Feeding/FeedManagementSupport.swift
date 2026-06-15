@@ -323,11 +323,12 @@ nonisolated enum FeedOperatingMode: String, CaseIterable, Identifiable, Equatabl
 }
 
 nonisolated enum FeedRuleMetadata {
-    static let autoFeederEntityType = "pet_auto_feeder"
+    static let autoFeederEntityType = DomainEntityLinkRegistry.petAutoFeeder
 
     static func isManualReminderEvent(_ event: Event, pet: Pet) -> Bool {
-        guard event.relatedEntityType == EntityKind.pet.rawValue || event.relatedEntityType == "pet",
-              event.relatedEntityId == pet.id.uuidString,
+        let role = DomainEntityLinkRegistry.role(for: event)
+        guard role == .directPet,
+              MemberLifecycleActiveScheduleResolver.eventBelongsToPet(event, petId: pet.id.uuidString),
               event.eventType == EventType.foodChange.rawValue
         else { return false }
         if event.feedRuleKindRaw == FeedRuleKind.manualReminder.rawValue {
@@ -337,9 +338,10 @@ nonisolated enum FeedRuleMetadata {
     }
 
     static func isAutoFeederEvent(_ event: Event, pet: Pet) -> Bool {
-        (event.feedRuleKindRaw == FeedRuleKind.autoFeeder.rawValue || event.feedRuleKindRaw.isEmpty) &&
-            event.relatedEntityType == autoFeederEntityType &&
-            event.relatedEntityId == pet.id.uuidString &&
+        let role = DomainEntityLinkRegistry.role(for: event)
+        return (event.feedRuleKindRaw == FeedRuleKind.autoFeeder.rawValue || event.feedRuleKindRaw.isEmpty) &&
+            role == .petAutoFeeder &&
+            MemberLifecycleActiveScheduleResolver.eventBelongsToPet(event, petId: pet.id.uuidString) &&
             event.eventType == EventType.foodChange.rawValue
     }
 
@@ -383,7 +385,8 @@ nonisolated enum FeedRuleMetadata {
         l: L10n = L10n(),
         calendar: Calendar = .current
     ) -> String {
-        if event.relatedEntityType == FeedingPlanWriter.stockReminderEntityType {
+        let role = DomainEntityLinkRegistry.role(for: event)
+        if role == .petFoodStock {
             return localizedStockReminderTitle(for: event, l: l)
         }
 
@@ -402,7 +405,7 @@ nonisolated enum FeedRuleMetadata {
             )
         }
 
-        if event.relatedEntityType == autoFeederEntityType {
+        if role == .petAutoFeeder {
             return localizedTitle(
                 kind: .autoFeeder,
                 date: event.startDate,
@@ -413,8 +416,7 @@ nonisolated enum FeedRuleMetadata {
             )
         }
 
-        if event.relatedEntityType == EntityKind.pet.rawValue || event.relatedEntityType == "pet",
-           hasLegacyManualReminderTitle(event.title) {
+        if role == .directPet, hasLegacyManualReminderTitle(event.title) {
             return localizedTitle(
                 kind: .manualReminder,
                 date: event.startDate,

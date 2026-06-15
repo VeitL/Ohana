@@ -29,12 +29,7 @@ struct QuickPlayDetailRouteContainer: View {
         _pets = Query(filter: #Predicate<Pet> { pet in
             pet.id == id
         })
-        _allEvents = Query(
-            filter: #Predicate<Event> { event in
-                event.relatedEntityId == petKey
-            },
-            sort: \.startDate
-        )
+        _allEvents = Query(sort: \.startDate)
         _playLedgerEvents = Query(
             filter: #Predicate<CareLedgerEvent> { event in
                 event.subjectKind == petSubject &&
@@ -99,8 +94,6 @@ struct QuickFeedDetailRouteContainer: View {
         opensManualSheetOnAppear: Bool = false
     ) {
         let petKey = id.uuidString
-        let dryStockKey = "\(petKey):\(FeedFoodKind.dry.rawValue)"
-        let wetStockKey = "\(petKey):\(FeedFoodKind.wet.rawValue)"
         let petSubject = CareLedgerSubjectKind.pet.rawValue
         let careKind = CareLedgerEventKind.care.rawValue
         let feedingType = CareType.feeding.rawValue
@@ -116,14 +109,7 @@ struct QuickFeedDetailRouteContainer: View {
         })
         _allHumans = Query(sort: \.createdAt)
         _allPets = Query(sort: \.createdAt)
-        _allEvents = Query(
-            filter: #Predicate<Event> { event in
-                event.relatedEntityId == petKey ||
-                    event.relatedEntityId == dryStockKey ||
-                    event.relatedEntityId == wetStockKey
-            },
-            sort: \.startDate
-        )
+        _allEvents = Query(sort: \.startDate)
         _feedingLedgerEvents = Query(
             filter: #Predicate<CareLedgerEvent> { event in
                 event.subjectKind == petSubject &&
@@ -216,12 +202,7 @@ struct QuickWaterDetailRouteContainer: View {
             pet.id == id
         })
         _allPets = Query(sort: \.createdAt)
-        _allEvents = Query(
-            filter: #Predicate<Event> { event in
-                event.relatedEntityId == petKey
-            },
-            sort: \.startDate
-        )
+        _allEvents = Query(sort: \.startDate)
         _waterLedgerEvents = Query(
             filter: #Predicate<CareLedgerEvent> { event in
                 event.subjectKind == petSubject &&
@@ -288,12 +269,7 @@ struct QuickPottyDetailRouteContainer: View {
             pet.id == id
         })
         _allPets = Query(sort: \.createdAt)
-        _allEvents = Query(
-            filter: #Predicate<Event> { event in
-                event.relatedEntityId == petKey
-            },
-            sort: \.startDate
-        )
+        _allEvents = Query(sort: \.startDate)
         _pottyLedgerEvents = Query(
             filter: #Predicate<CareLedgerEvent> { event in
                 event.subjectKind == petSubject &&

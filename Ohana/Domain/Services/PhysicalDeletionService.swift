@@ -868,11 +868,35 @@ nonisolated enum PhysicalDeletionService {
             deletedByHumanId: deletedByHumanId
         )
         let uniqueRetainedAssignedEvents = unique(retainedAssignedEvents, by: \.id)
+        var retainedUpdateCount = 0
         for event in uniqueRetainedAssignedEvents {
-            event.assigneeId = nil
-            CloudSyncMutationRecorder.markModified(event, context: context, modifiedAt: deletedAt)
+            if clearDeletedAssignee(from: event, context: context, modifiedAt: deletedAt) {
+                retainedUpdateCount += 1
+            }
         }
-        return deletedCount + uniqueRetainedAssignedEvents.count
+        return deletedCount + retainedUpdateCount
+    }
+
+    private static func clearDeletedAssignee(
+        from event: Event,
+        context: ModelContext,
+        modifiedAt: Date
+    ) -> Bool {
+        let updateIntent = DomainScheduleCreateIntent(
+            event: event,
+            assigneeOverride: .set(nil),
+            writeKind: .care,
+            source: .domainService
+        )
+        guard let mutation = DomainScheduleWriteAuthorizer.authorizeExistingEventUpdate(
+            event: event,
+            intent: updateIntent,
+            writeKind: .care,
+            context: context
+        ) else { return false }
+        guard DomainScheduleWriter.updateEvent(event, intent: updateIntent, mutation: mutation) else { return false }
+        CloudSyncMutationRecorder.markModified(event, context: context, modifiedAt: modifiedAt)
+        return true
     }
 
     @discardableResult
