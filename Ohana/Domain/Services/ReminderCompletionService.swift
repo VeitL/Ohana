@@ -26,8 +26,8 @@ final class ReminderCompletionService: ReminderCompleting {
         reminderScheduling: ReminderSchedulingManaging? = nil
     ) {
         self.careLedger = careLedger
-        self.familyTasks = providedFamilyTasks ?? StaticFamilyTaskManager()
-        self.reminderScheduling = reminderScheduling ?? ReminderSchedulingManager(careLedger: careLedger)
+        self.familyTasks = providedFamilyTasks ?? DomainServiceDependencyRegistry.familyTasks()
+        self.reminderScheduling = reminderScheduling ?? DomainServiceDependencyRegistry.reminderScheduling(careLedger: careLedger)
     }
 
     func complete(_ reminder: Reminder, by humanId: String?, context: ModelContext) {
@@ -69,7 +69,7 @@ final class ReminderCompletionService: ReminderCompleting {
         careLedger: CareLedgerRecording = CareLedgerService(),
         familyTasks providedFamilyTasks: FamilyTaskManaging? = nil
     ) {
-        let familyTasks = providedFamilyTasks ?? StaticFamilyTaskManager()
+        let familyTasks = providedFamilyTasks ?? DomainServiceDependencyRegistry.familyTasks()
         reminder.statusEnum = .completed
         reminder.completedAt = Date()
         reminder.completedBy = humanId ?? ""
@@ -105,8 +105,8 @@ final class ReminderCompletionService: ReminderCompleting {
         familyTasks providedFamilyTasks: FamilyTaskManaging? = nil,
         reminderScheduling providedReminderScheduling: ReminderSchedulingManaging? = nil
     ) {
-        let familyTasks = providedFamilyTasks ?? StaticFamilyTaskManager()
-        let reminderScheduling = providedReminderScheduling ?? ReminderSchedulingManager(careLedger: careLedger)
+        let familyTasks = providedFamilyTasks ?? DomainServiceDependencyRegistry.familyTasks()
+        let reminderScheduling = providedReminderScheduling ?? DomainServiceDependencyRegistry.reminderScheduling(careLedger: careLedger)
         reminder.statusEnum = .pending
         reminder.completedAt = nil
         reminder.completedBy = humanId ?? ""
@@ -137,7 +137,7 @@ final class ReminderCompletionService: ReminderCompleting {
         careLedger: CareLedgerRecording = CareLedgerService(),
         reminderScheduling providedReminderScheduling: ReminderSchedulingManaging? = nil
     ) {
-        let reminderScheduling = providedReminderScheduling ?? ReminderSchedulingManager(careLedger: careLedger)
+        let reminderScheduling = providedReminderScheduling ?? DomainServiceDependencyRegistry.reminderScheduling(careLedger: careLedger)
         reminder.statusEnum = .pending
         reminder.completedAt = nil
         reminder.completedBy = humanId ?? ""

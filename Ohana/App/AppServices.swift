@@ -77,7 +77,13 @@ final class AppServices {
             oasisRewards: oasisRewardManager
         )
         let familyTasks = StaticFamilyTaskManager(wallet: coconutWallet, careLedger: careLedger, questManager: questManager)
-        let reminderCompletion = ReminderCompletionService(careLedger: careLedger, familyTasks: familyTasks)
+        let reminderScheduling = ReminderSchedulingManager(careLedger: careLedger)
+        let medicationReminders = SharedMedicationReminderManager(careLedger: careLedger)
+        let reminderCompletion = ReminderCompletionService(
+            careLedger: careLedger,
+            familyTasks: familyTasks,
+            reminderScheduling: reminderScheduling
+        )
         let quickActionReminderCompletion = QuickActionReminderCompletionSyncService(reminderCompletion: reminderCompletion)
         let careEventDependencies = CareEventServiceDependencies(
             economy: careEventEconomy,
@@ -86,6 +92,14 @@ final class AppServices {
             quickActionReminderCompletion: quickActionReminderCompletion,
             familyTasks: familyTasks,
             revisions: domainRevisions
+        )
+        DomainServiceDependencyRegistry.register(
+            careEventDependencies: { careEventDependencies },
+            careEventEconomy: { careEventEconomy },
+            familyTasks: { familyTasks },
+            reminderScheduling: { _ in reminderScheduling },
+            medicationReminders: { _ in medicationReminders },
+            reminderCompletion: { _ in reminderCompletion }
         )
         let walkingManager = PetWalkingManager(
             locationManager: locationManager,
@@ -121,11 +135,11 @@ final class AppServices {
             backups: SharedDataBackupManagerAdapter(projectionManager: questManager),
             automaticBackups: automaticBackups,
             appReset: StaticAppResetter(questManager: questManager),
-            medicationReminders: SharedMedicationReminderManager(careLedger: careLedger),
+            medicationReminders: medicationReminders,
             userNotifications: SharedUserNotificationManager(manager: notificationManager),
             notificationRoutes: SharedNotificationRoutePublisher(center: notificationRouteCenter),
             reminderActions: LiveReminderActionHandler(),
-            reminderScheduling: ReminderSchedulingManager(careLedger: careLedger),
+            reminderScheduling: reminderScheduling,
             reminderCompletion: reminderCompletion,
             onboardingJourney: LiveOnboardingJourneyCoordinator(),
             humanRequirements: LiveHumanRequirementResolver(),
@@ -149,6 +163,7 @@ final class AppServices {
         )
         OasisTreeManagerRegistry.current = oasisTreeManager
         AvatarPipelineRegistry.current = avatarPipeline
+        OhanaNotifications.registerLiveSchedulerFactory { notificationManager }
         OhanaNotifications.current = notificationManager
     }
 

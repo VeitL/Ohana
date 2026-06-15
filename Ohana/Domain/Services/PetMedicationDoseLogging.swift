@@ -106,7 +106,7 @@ nonisolated enum PetMedicationDoseLogging {
         medicationReminders providedMedicationReminders: MedicationReminderManaging? = nil
     ) -> RecordDoseResult {
         let careLedger = providedCareLedger ?? CareLedgerService()
-        let medicationReminders = providedMedicationReminders ?? SharedMedicationReminderManager()
+        let medicationReminders = providedMedicationReminders ?? DomainServiceDependencyRegistry.medicationReminders(careLedger: careLedger)
         let now = Date()
         let requestedAssigneeId = activeHumanSelection.currentHumanId
         let previewIntent = DomainScheduleCreateIntent(

@@ -73,7 +73,7 @@ extension CareEventService {
         source: CareLedgerSource = .quickAction,
         dependencies providedDependencies: CareEventServiceDependencies? = nil
     ) -> (result: CareRecordResult, reward: (humanGot: Int, petGot: Int), log: PetCareLog) {
-        let dependencies = providedDependencies ?? .live()
+        let dependencies = providedDependencies ?? DomainServiceDependencyRegistry.careEventDependencies()
         let intent = DomainCareFactCreateIntent(
             kind: .care(
                 type: .feeding,
@@ -181,7 +181,7 @@ extension CareEventService {
         treatKind: FeedTreatKind = .other,
         dependencies providedDependencies: CareEventServiceDependencies? = nil
     ) -> (result: TreatFeedRecordResult, log: PetCareLog) {
-        let dependencies = providedDependencies ?? .live()
+        let dependencies = providedDependencies ?? DomainServiceDependencyRegistry.careEventDependencies()
         let intent = DomainCareFactCreateIntent(
             kind: .care(
                 type: .feeding,
@@ -283,7 +283,7 @@ extension CareEventService {
         operationDate: Date = Date(),
         dependencies providedDependencies: CareEventServiceDependencies? = nil
     ) -> PlannedCareCompletionResult {
-        let dependencies = providedDependencies ?? .live()
+        let dependencies = providedDependencies ?? DomainServiceDependencyRegistry.careEventDependencies()
         guard let event = reminder.event else { return .noOp(operationDate: operationDate) }
         let occurredAt = providedOccurredAt ?? CareFactWritePolicy.plannedFactDate(
             scheduledAt: reminder.scheduledAt,
@@ -418,7 +418,7 @@ extension CareEventService {
         operationDate: Date = Date(),
         dependencies providedDependencies: CareEventServiceDependencies? = nil
     ) -> PlannedCareCompletionResult {
-        let dependencies = providedDependencies ?? .live()
+        let dependencies = providedDependencies ?? DomainServiceDependencyRegistry.careEventDependencies()
         guard let event = reminder.event else { return .noOp(operationDate: operationDate) }
         let occurredAt = providedOccurredAt ?? CareFactWritePolicy.plannedFactDate(
             scheduledAt: reminder.scheduledAt,

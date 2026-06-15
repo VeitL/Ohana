@@ -39,7 +39,7 @@ enum ReminderMaintenanceService {
         context: ModelContext,
         reminderScheduling providedReminderScheduling: ReminderSchedulingManaging? = nil
     ) async -> ReminderMaintenanceRunResult {
-        let reminderScheduling = providedReminderScheduling ?? ReminderSchedulingManager()
+        let reminderScheduling = providedReminderScheduling ?? DomainServiceDependencyRegistry.reminderScheduling(careLedger: CareLedgerService())
         let reminders = pendingReminders(context: context)
         guard !Task.isCancelled else {
             return ReminderMaintenanceRunResult(pendingCount: reminders.count, completed: false)

@@ -217,7 +217,7 @@ enum SharedPetActionRecorder {
         context: ModelContext,
         dependencies providedDependencies: CareEventServiceDependencies? = nil
     ) -> SharedPetActionResult {
-        let dependencies = providedDependencies ?? .live()
+        let dependencies = providedDependencies ?? DomainServiceDependencyRegistry.careEventDependencies()
         let targets = SharedPetTargetResolver.normalizedTargets(descriptor.targets, fallback: descriptor.sourcePet)
         guard !targets.isEmpty else {
             return .noOp()

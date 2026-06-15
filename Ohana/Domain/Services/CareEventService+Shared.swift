@@ -46,7 +46,7 @@ extension CareEventService {
         date: Date = Date(),
         dependencies providedDependencies: CareEventServiceDependencies? = nil
     ) -> SharedPetActionResult {
-        let dependencies = providedDependencies ?? .live()
+        let dependencies = providedDependencies ?? DomainServiceDependencyRegistry.careEventDependencies()
         let liveTargets = SharedPetTargetResolver.normalizedTargets(targets, fallback: sourcePet)
         guard !liveTargets.isEmpty else { return .noOp() }
         guard liveTargets.count > 1 else {
@@ -129,7 +129,7 @@ extension CareEventService {
         date: Date = Date(),
         dependencies providedDependencies: CareEventServiceDependencies? = nil
     ) -> SharedPetActionResult {
-        let dependencies = providedDependencies ?? .live()
+        let dependencies = providedDependencies ?? DomainServiceDependencyRegistry.careEventDependencies()
         let liveTargets = SharedPetTargetResolver.normalizedTargets(targets, fallback: sourcePet)
         guard !liveTargets.isEmpty else { return .noOp() }
         guard liveTargets.count > 1 else {
@@ -205,7 +205,7 @@ extension CareEventService {
         isFullChange: Bool = false,
         dependencies providedDependencies: CareEventServiceDependencies? = nil
     ) -> SharedPetActionResult {
-        let dependencies = providedDependencies ?? .live()
+        let dependencies = providedDependencies ?? DomainServiceDependencyRegistry.careEventDependencies()
         let liveTargets = SharedPetTargetResolver.normalizedTargets(targets, fallback: sourcePet)
         guard !liveTargets.isEmpty else { return .noOp() }
         guard liveTargets.count > 1 else {
@@ -294,7 +294,7 @@ extension CareEventService {
         source: CareLedgerSource = .quickAction,
         dependencies providedDependencies: CareEventServiceDependencies? = nil
     ) -> SharedPetActionResult {
-        let dependencies = providedDependencies ?? .live()
+        let dependencies = providedDependencies ?? DomainServiceDependencyRegistry.careEventDependencies()
         let liveTargets = SharedPetTargetResolver.normalizedTargets(targets, fallback: sourcePet)
         guard !liveTargets.isEmpty else { return .noOp() }
         guard liveTargets.count > 1 else {

@@ -262,7 +262,10 @@ static_service_calls_outside_facades() {
     | rg -v '^\s*Ohana/Features/CareLedger/CareLedgerRecording\.swift:' \
     | rg -v '^\s*Ohana/Features/Economy/CoconutExchangeManaging\.swift:' \
     | rg -v '^\s*Ohana/Features/FamilyTasks/FamilyTaskManaging\.swift:' \
+    | rg -v '^\s*Ohana/Features/Medication/SharedMedicationReminderManager\.swift:' \
+    | rg -v '^\s*Ohana/Features/Notifications/ReminderSchedulingManager\.swift:' \
     | rg -v '^\s*Ohana/Features/Oasis/OasisRewardServices\.swift:' \
+    | rg -v '^\s*Ohana/Features/Walks/StaticWalkCareEventManager\.swift:' \
     | rg -v ':\s*// ' || true
 }
 
@@ -305,6 +308,15 @@ domain_feature_implementation_dependencies() {
   done < <(domain_or_models_scope)
   [[ ${#scoped_files[@]} -eq 0 ]] && return 0
   rg -n --with-filename --pcre2 '\b(CoconutEconomyPolicyV2|EconomyRewardDiscipline|OasisTreeManagerRegistry|OasisTreeManager|OasisRewardManaging|StaticOasisRewardManager|StaticCareEventEconomyAwarder)\b' "${scoped_files[@]}" || true
+}
+
+domain_feature_live_default_dependencies() {
+  local scoped_files=()
+  while IFS= read -r file; do
+    [[ -n "$file" ]] && scoped_files+=("$file")
+  done < <(domain_or_models_scope)
+  [[ ${#scoped_files[@]} -eq 0 ]] && return 0
+  rg -n --with-filename --pcre2 'CareEventServiceDependencies\.(live|liveEconomy)\s*\(|providedDependencies\s*\?\?\s*\.live\s*\(|dependencies:\s*\.live\s*\(|\b(StaticFamilyTaskManager|StaticWalkCareEventManager|SharedMedicationReminderManager|ReminderSchedulingManager|MedicationReminderService|ReminderSchedulingService|NotificationManager|OhanaNotificationRouteCenter)\b' "${scoped_files[@]}" || true
 }
 
 domain_feature_taxonomy_literals() {
@@ -401,6 +413,11 @@ record_matches \
   "domain-feature-implementation-dependency" \
   "Domain/Models must not reference concrete economy/Oasis feature implementations; use Domain protocols and feature/app adapters." \
   domain_feature_implementation_dependencies
+
+record_matches \
+  "domain-feature-live-default-dependency" \
+  "Domain/Models must not construct feature live/default service dependencies; register production adapters at App/Feature boundaries and consume Domain protocols." \
+  domain_feature_live_default_dependencies
 
 record_matches \
   "domain-feature-taxonomy-literal" \

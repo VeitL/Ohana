@@ -57,7 +57,7 @@ final class QuickActionReminderCompletionSyncService: QuickActionReminderComplet
     private let reminderCompletion: ReminderCompleting
 
     init(reminderCompletion: ReminderCompleting? = nil) {
-        self.reminderCompletion = reminderCompletion ?? ReminderCompletionService()
+        self.reminderCompletion = reminderCompletion ?? DomainServiceDependencyRegistry.reminderCompletion(careLedger: CareLedgerService())
     }
 
     @discardableResult
@@ -219,7 +219,7 @@ final class QuickActionReminderCompletionSyncService: QuickActionReminderComplet
         let selected = due.max { $0.scheduledAt < $1.scheduledAt }
             ?? matched.min { $0.scheduledAt < $1.scheduledAt }
         guard let selected else { return nil }
-        let reminderCompletion = providedReminderCompletion ?? ReminderCompletionService()
+        let reminderCompletion = providedReminderCompletion ?? DomainServiceDependencyRegistry.reminderCompletion(careLedger: CareLedgerService())
         reminderCompletion.complete(selected, by: executorId, context: context)
         return selected
     }

@@ -148,10 +148,6 @@ enum CareFactWritePolicy {
 final class CareEventService: CareEventRecording {
     let dependencies: CareEventServiceDependencies
 
-    convenience init() {
-        self.init(dependencies: .live())
-    }
-
     init(dependencies: CareEventServiceDependencies) {
         self.dependencies = dependencies
     }

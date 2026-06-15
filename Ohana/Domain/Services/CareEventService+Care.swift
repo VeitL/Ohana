@@ -72,7 +72,7 @@ extension CareEventService {
         createsLinkedPottyLog: Bool = false,
         dependencies providedDependencies: CareEventServiceDependencies? = nil
     ) -> (result: CareRecordResult, reward: (humanGot: Int, petGot: Int), log: PetCareLog, pottyLog: PetPottyLog?) {
-        let dependencies = providedDependencies ?? .live()
+        let dependencies = providedDependencies ?? DomainServiceDependencyRegistry.careEventDependencies()
         let intent = DomainCareFactCreateIntent(
             kind: .care(
                 type: type,
@@ -195,7 +195,7 @@ extension CareEventService {
         date: Date = Date(),
         dependencies providedDependencies: CareEventServiceDependencies? = nil
     ) -> (result: PottyRecordResult, reward: (humanGot: Int, petGot: Int), log: PetPottyLog?) {
-        let dependencies = providedDependencies ?? .live()
+        let dependencies = providedDependencies ?? DomainServiceDependencyRegistry.careEventDependencies()
         let intent = DomainCareFactCreateIntent(
             kind: .potty(type: type, sharedSessionId: ""),
             occurredAt: date,
@@ -319,7 +319,7 @@ extension CareEventService {
         date: Date = Date(),
         dependencies providedDependencies: CareEventServiceDependencies? = nil
     ) -> (result: HygieneRecordResult, reward: (humanGot: Int, petGot: Int), log: PetHygieneLog) {
-        let dependencies = providedDependencies ?? .live()
+        let dependencies = providedDependencies ?? DomainServiceDependencyRegistry.careEventDependencies()
         let intent = DomainCareFactCreateIntent(
             kind: .hygiene(type: type, sharedSessionId: ""),
             occurredAt: date,
@@ -432,7 +432,7 @@ extension CareEventService {
         date: Date = Date(),
         dependencies providedDependencies: CareEventServiceDependencies? = nil
     ) -> (result: HealthRecordResult, reward: (humanGot: Int, petGot: Int), log: PetHealthLog?) {
-        let dependencies = providedDependencies ?? .live()
+        let dependencies = providedDependencies ?? DomainServiceDependencyRegistry.careEventDependencies()
         let intent = DomainCareFactCreateIntent(
             kind: .health(type: type, note: note),
             occurredAt: date,

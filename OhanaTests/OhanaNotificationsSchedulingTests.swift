@@ -66,6 +66,9 @@ struct OhanaNotificationsSchedulingTests {
     }
 
     @Test func defaultSchedulerIsLiveNotificationManager() {
+        OhanaNotifications.registerLiveSchedulerFactory {
+            NotificationManager(routeCenter: OhanaNotificationRouteCenter())
+        }
         OhanaNotifications.useLive()
         #expect(OhanaNotifications.current is NotificationManager)
     }

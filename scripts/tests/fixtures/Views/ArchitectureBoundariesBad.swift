@@ -8,6 +8,8 @@ struct ArchitectureBoundariesBad {
     let presentationLeak: Color = .goPrimary
 
     func run() {
+        _ = CareEventServiceDependencies.live()
+        _ = ReminderSchedulingManager.self
         _ = PetMedicationCommandExecutor.self
         _ = QuestManager.QualityBonus.none
         _ = OasisTreeManagerRegistry.current

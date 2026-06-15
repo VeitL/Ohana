@@ -110,7 +110,7 @@ enum CalendarTaskCompletionSyncService {
         economy providedEconomy: CareEventEconomyAwarding? = nil
     ) -> PetTaskSyncResult {
         let careLedger = providedCareLedger ?? CareLedgerService()
-        let economy = providedEconomy ?? CareEventServiceDependencies.liveEconomy()
+        let economy = providedEconomy ?? DomainServiceDependencyRegistry.careEventEconomy()
         guard isPetTask(event: event),
               let pet = MemberLifecycleActiveScheduleResolver.petTarget(for: event, pets: pets) else { return .noOp }
 

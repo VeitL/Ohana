@@ -2,17 +2,15 @@
 //  ReminderNotificationScheduling.swift
 //  Ohana
 //
-//  Injectable dependency seam for reminder notification scheduling.
+//  Injectable dependency boundary for reminder notification scheduling.
 //
-//  Domain/model services (CareEventService, ReminderSchedulingService,
-//  FamilyTaskService, FeedManagementSupport, etc.) schedule and cancel local
-//  notifications as a side effect of writing business facts. Routing those
-//  calls through this protocol (instead of NotificationManager.shared directly)
+//  Domain/model services schedule and cancel local notifications as a side
+//  effect of writing business facts. Routing those calls through this protocol
 //  lets unit tests substitute an in-memory fake, so reminder/care write paths
 //  become testable without touching the real UNUserNotificationCenter.
 //
-//  AppServices installs the production NotificationManager instance at startup;
-//  tests can still override the scheduler directly.
+//  AppServices installs the production scheduler at startup; tests can still
+//  override the scheduler directly.
 //
 
 import Foundation
@@ -39,20 +37,47 @@ nonisolated protocol ReminderNotificationScheduling: Sendable {
     func compensate(reminders: [Reminder])
 }
 
-extension NotificationManager: ReminderNotificationScheduling {}
-
-/// Injectable accessor for the notification scheduler. Defaults to a live
-/// instance until AppServices installs the app-owned scheduler; tests can
-/// override `current` with a fake and restore it via `useLive()`.
+/// Injectable accessor for the notification scheduler. Defaults to a no-op until
+/// AppServices installs the app-owned scheduler; tests can override
+/// `current` with a fake and restore it via `useLive()`.
 enum OhanaNotifications {
-    nonisolated(unsafe) static var current: ReminderNotificationScheduling = makeLiveScheduler()
+    private nonisolated(unsafe) static var makeLiveScheduler: (() -> ReminderNotificationScheduling)?
+    nonisolated(unsafe) static var current: ReminderNotificationScheduling = DomainNoOpReminderNotificationScheduler()
 
-    /// Restores the live notification scheduler. Call in test teardown.
+    static func registerLiveSchedulerFactory(_ factory: @escaping () -> ReminderNotificationScheduling) {
+        makeLiveScheduler = factory
+    }
+
+    /// Restores the app-registered notification scheduler. Call in test teardown.
     static func useLive() {
-        current = makeLiveScheduler()
+        current = makeLiveScheduler?() ?? DomainNoOpReminderNotificationScheduler()
+    }
+}
+
+private final class DomainNoOpReminderNotificationScheduler: ReminderNotificationScheduling, @unchecked Sendable {
+    func schedule(reminder _: Reminder) {}
+
+    func schedule(
+        reminder _: Reminder,
+        existingNotificationIds _: Set<String>?,
+        completion: ((ReminderNotificationScheduleResult) -> Void)?
+    ) {
+        completion?(.skippedUserDisabled(""))
     }
 
-    private static func makeLiveScheduler() -> ReminderNotificationScheduling {
-        NotificationManager(routeCenter: OhanaNotificationRouteCenter())
+    func schedule(
+        reminder _: Reminder,
+        deliveryDate _: Date?,
+        existingNotificationIds _: Set<String>?,
+        completion: ((ReminderNotificationScheduleResult) -> Void)?
+    ) {
+        completion?(.skippedUserDisabled(""))
     }
+
+    func pendingNotificationIds() async -> Set<String> { [] }
+    func scheduleRollingWindow(reminders _: [Reminder]) {}
+    func refillWindowIfNeeded(allReminders _: [Reminder]) {}
+    func cancel(notificationId _: String) {}
+    func cancelAll(for _: Pet, reminders _: [Reminder]) {}
+    func compensate(reminders _: [Reminder]) {}
 }
