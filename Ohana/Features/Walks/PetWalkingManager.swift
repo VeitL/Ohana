@@ -283,7 +283,7 @@ final class PetWalkingManager {
                     save: false
                 )
                 CloudSyncMutationRecorder.markModified(ledgerEvent, context: modelContext, modifiedAt: endedAt)
-                careLedger.syncOasisTreeEnergyIfNeeded(metadataJSON: metadataJSON, context: modelContext)
+                careLedger.syncLedgerEnergyIfNeeded(metadataJSON: metadataJSON, context: modelContext)
                 let earnedCoconuts = reward.map { $0.humanGot + $0.petGot } ?? 0
                 walkLog.coconutsEarned = earnedCoconuts
             }
@@ -366,7 +366,7 @@ final class PetWalkingManager {
                         save: false
                     )
                     CloudSyncMutationRecorder.markModified(ledgerEvent, context: modelContext, modifiedAt: endedAt)
-                    careLedger.syncOasisTreeEnergyIfNeeded(metadataJSON: metadataJSON, context: modelContext)
+                    careLedger.syncLedgerEnergyIfNeeded(metadataJSON: metadataJSON, context: modelContext)
                 }
             }
         }

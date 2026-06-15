@@ -15,7 +15,6 @@
 //
 
 import Foundation
-import SwiftUI
 
 // MARK: - 分类
 
@@ -60,17 +59,17 @@ enum HealthMetricCategory: String, CaseIterable, Identifiable {
         }
     }
 
-    var color: Color {
+    var colorToken: DomainColorToken {
         switch self {
-        case .thyroid: Color.goPurple
-        case .glucose: Color.goOrange
-        case .lipid: Color.goYellow
-        case .liver: Color.goRed
-        case .kidney: Color(hex: "64748B")
-        case .bloodCount: Color(hex: "E11D48")
-        case .inflammationVitamin: Color.goTeal
-        case .electrolyte: Color.goMint
-        case .vitals: Color(hex: "F43F5E")
+        case .thyroid: .goPurple
+        case .glucose: .goOrange
+        case .lipid: .goYellow
+        case .liver: .goRed
+        case .kidney: .hex("64748B")
+        case .bloodCount: .hex("E11D48")
+        case .inflammationVitamin: .goTeal
+        case .electrolyte: .goMint
+        case .vitals: .hex("F43F5E")
         }
     }
 }
@@ -130,12 +129,12 @@ struct HealthMetricUnit: Identifiable, Hashable {
 enum HealthMetricStatus {
     case low, normal, high, unknown
 
-    var color: Color {
+    var colorToken: DomainColorToken {
         switch self {
-        case .low: Color(hex: "06B6D4")
-        case .normal: Color.goTeal
-        case .high: Color.goOrange
-        case .unknown: Color.ohanaSecondaryText
+        case .low: .hex("06B6D4")
+        case .normal: .goTeal
+        case .high: .goOrange
+        case .unknown: .secondaryText
         }
     }
 

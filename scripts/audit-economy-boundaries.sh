@@ -400,7 +400,7 @@ def scan_direct_reward_chokepoint(path: pathlib.Path, lines: list[str], warnings
 
 
 ALLOWED_CARE_DISCIPLINE_CONTEXTS: dict[str, set[str]] = {
-    "Ohana/Domain/Services/CareEventEconomyAwarder.swift": {
+    "Ohana/Features/Economy/CareEventEconomyAwarder.swift": {
         "awardCareAction",
         "awardSharedCareAction",
     },

@@ -1,5 +1,5 @@
 //
-//  ReadModelRevisionCenter+FeaturePublishing.swift
+//  DomainRevisionPublishing+FeaturePublishing.swift
 //  Ohana
 //
 //  Feature-specific revision publishing helpers.
@@ -7,7 +7,7 @@
 
 import Foundation
 
-extension ReadModelRevisionCenter {
+extension DomainRevisionPublishing {
     func publishQuickMoment(_ result: MomentCommandResult, petID: UUID?, note: String) {
         var affected = Set(result.savedLogIDs)
         if let petID {
@@ -18,6 +18,17 @@ extension ReadModelRevisionCenter {
                 command: .quickMoment(petID: petID),
                 affectedEntityIDs: affected,
                 wroteBusinessFact: !result.savedLogIDs.isEmpty,
+                note: note
+            )
+        )
+    }
+
+    func publishTodayFocusDailyCompletion(note: String) {
+        publish(
+            DomainMutationResult(
+                command: .todayFocus(entityID: UUID(), action: "dailyCompletionReward"),
+                affectedEntityIDs: [],
+                wroteBusinessFact: true,
                 note: note
             )
         )

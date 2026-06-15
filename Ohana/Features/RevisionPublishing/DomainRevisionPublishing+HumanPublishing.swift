@@ -1,5 +1,5 @@
 //
-//  ReadModelRevisionCenter+HumanPublishing.swift
+//  DomainRevisionPublishing+HumanPublishing.swift
 //  Ohana
 //
 //  Revision publishing helpers for human health, medication, workout, notes, and wishlist flows.
@@ -7,7 +7,7 @@
 
 import Foundation
 
-extension ReadModelRevisionCenter {
+extension DomainRevisionPublishing {
     func publishHumanWorkout(_ result: WorkoutCommandResult, command: DomainCommand, note: String) {
         var affected: Set<UUID> = [result.logID]
         if let subjectID = result.subjectID {

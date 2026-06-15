@@ -12,7 +12,7 @@ extension CareEventService {
         amountGrams: Double,
         context: ModelContext,
         executorId: String?,
-        quality: QuestManager.QualityBonus,
+        quality: DomainCareRewardQuality,
         date: Date,
         foodKind: FeedFoodKind
     ) -> (humanGot: Int, petGot: Int) {
@@ -35,7 +35,7 @@ extension CareEventService {
         foodKind: FeedFoodKind,
         context: ModelContext,
         executorId: String?,
-        quality: QuestManager.QualityBonus,
+        quality: DomainCareRewardQuality,
         date: Date
     ) -> SharedPetActionResult {
         CareEventService.recordSharedManualFeedFact(
@@ -56,7 +56,7 @@ extension CareEventService {
         amountGrams: Double,
         context: ModelContext,
         executorId: String?,
-        quality: QuestManager.QualityBonus,
+        quality: DomainCareRewardQuality,
         date: Date,
         foodKind: FeedFoodKind,
         source: CareLedgerSource
@@ -81,7 +81,7 @@ extension CareEventService {
         foodKind: FeedFoodKind,
         context: ModelContext,
         executorId: String?,
-        quality: QuestManager.QualityBonus,
+        quality: DomainCareRewardQuality,
         date: Date
     ) -> (humanGot: Int, petGot: Int) {
         CareEventService.recordSharedManualFeed(
@@ -139,7 +139,7 @@ extension CareEventService {
         pet: Pet,
         reminder: Reminder,
         context: ModelContext,
-        quality: QuestManager.QualityBonus,
+        quality: DomainCareRewardQuality,
         executorId: String?,
         date: Date
     ) -> (humanGot: Int, petGot: Int)? {
@@ -158,7 +158,7 @@ extension CareEventService {
         pet: Pet,
         reminder: Reminder,
         context: ModelContext,
-        quality: QuestManager.QualityBonus,
+        quality: DomainCareRewardQuality,
         executorId: String?,
         occurredAt: Date?,
         operationDate: Date
@@ -221,8 +221,8 @@ extension CareEventService {
         amountMl: Double,
         context: ModelContext,
         executorId: String?,
-        reward: QuestManager.OhanaActionType,
-        quality: QuestManager.QualityBonus,
+        reward: DomainCareRewardAction,
+        quality: DomainCareRewardQuality,
         date: Date
     ) -> (humanGot: Int, petGot: Int) {
         CareEventService.recordCare(
@@ -244,8 +244,8 @@ extension CareEventService {
         amountMl: Double,
         context: ModelContext,
         executorId: String?,
-        reward: QuestManager.OhanaActionType,
-        quality: QuestManager.QualityBonus,
+        reward: DomainCareRewardAction,
+        quality: DomainCareRewardQuality,
         date: Date,
         source: CareLedgerSource,
         createsLinkedPottyLog: Bool
@@ -310,9 +310,9 @@ extension CareEventService {
         actionKind: SharedCareActionKind,
         context: ModelContext,
         executorId: String?,
-        reward: QuestManager.OhanaActionType,
+        reward: DomainCareRewardAction,
         rewardTitle: String?,
-        quality: QuestManager.QualityBonus,
+        quality: DomainCareRewardQuality,
         date: Date,
         source: CareLedgerSource
     ) -> (humanGot: Int, petGot: Int) {
@@ -339,9 +339,9 @@ extension CareEventService {
         actionKind: SharedCareActionKind,
         context: ModelContext,
         executorId: String?,
-        reward: QuestManager.OhanaActionType,
+        reward: DomainCareRewardAction,
         rewardTitle: String?,
-        quality: QuestManager.QualityBonus,
+        quality: DomainCareRewardQuality,
         date: Date,
         source: CareLedgerSource
     ) -> SharedPetActionResult {

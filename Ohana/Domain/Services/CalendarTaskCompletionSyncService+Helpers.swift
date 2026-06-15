@@ -98,7 +98,7 @@ extension CalendarTaskCompletionSyncService {
         return json
     }
 
-    static func rewardAction(for careType: CareType, pet: Pet) -> QuestManager.OhanaActionType {
+    static func rewardAction(for careType: CareType, pet: Pet) -> DomainCareRewardAction {
         rewardAction(for: careType, petName: pet.name)
     }
 
@@ -106,7 +106,7 @@ extension CalendarTaskCompletionSyncService {
         legacyModelName: String?,
         actionType: String,
         petName: String?
-    ) -> QuestManager.OhanaActionType? {
+    ) -> DomainCareRewardAction? {
         switch legacyModelName {
         case "PetCareLog":
             guard let careType = CareType(rawValue: actionType) else { return nil }
@@ -121,7 +121,7 @@ extension CalendarTaskCompletionSyncService {
         }
     }
 
-    static func rewardAction(for careType: CareType, petName: String) -> QuestManager.OhanaActionType {
+    static func rewardAction(for careType: CareType, petName: String) -> DomainCareRewardAction {
         switch careType {
         case .feeding:
             .feed

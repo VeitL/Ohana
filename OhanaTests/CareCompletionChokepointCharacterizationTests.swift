@@ -31,7 +31,7 @@ struct CareCompletionChokepointCharacterizationTests {
             pet: pet,
             modelContext: context,
             awardCoconut: true,
-            questManager: questManager,
+            economy: StaticCareEventEconomyAwarder(questManager: questManager),
             activeHumanSelection: FixedActiveHumanSelection(id: executor.id.uuidString),
             medicationReminders: medicationReminders
         )
@@ -83,7 +83,7 @@ struct CareCompletionChokepointCharacterizationTests {
             pet: pet,
             modelContext: context,
             awardCoconut: true,
-            questManager: makeQuestManager(),
+            economy: StaticCareEventEconomyAwarder(questManager: makeQuestManager()),
             activeHumanSelection: FixedActiveHumanSelection(id: executor.id.uuidString),
             medicationReminders: medicationReminders
         )
@@ -716,7 +716,7 @@ struct CareCompletionChokepointCharacterizationTests {
             pet: pet,
             modelContext: context,
             awardCoconut: true,
-            questManager: makeQuestManager(),
+            economy: StaticCareEventEconomyAwarder(questManager: makeQuestManager()),
             activeHumanSelection: FixedActiveHumanSelection(id: missingExecutorID),
             medicationReminders: medicationReminders
         )
@@ -1183,7 +1183,7 @@ private final class WalkFactOrderAssertingWallet: CoconutWalletManaging {
         save: Bool,
         postsRewardFeedback: Bool,
         updatesProjection: Bool,
-        projectionManager: QuestManager?
+        projectionManager: CoconutProjectionManaging?
     ) throws -> [CoconutLedgerEntry] {
         factCountSeenDuringReward = try context.fetch(FetchDescriptor<PetWalkLog>()).count
         return try base.apply(
@@ -1207,7 +1207,7 @@ private final class WalkFactOrderAssertingWallet: CoconutWalletManaging {
         context: ModelContext,
         save: Bool,
         postsRewardFeedback: Bool,
-        projectionManager: QuestManager?
+        projectionManager: CoconutProjectionManaging?
     ) throws -> [CoconutLedgerEntry] {
         try base.applyActorDelta(
             amount: amount,
@@ -1232,10 +1232,10 @@ private final class WalkFactOrderAssertingWallet: CoconutWalletManaging {
     func setDeveloperOverrideBalance(amount: Int, for human: Human?, displayName: String, context: ModelContext) {
         base.setDeveloperOverrideBalance(amount: amount, for: human, displayName: displayName, context: context)
     }
-    func refreshQuestProjection(context: ModelContext, manager: QuestManager?) {
+    func refreshQuestProjection(context: ModelContext, manager: CoconutProjectionManaging?) {
         base.refreshQuestProjection(context: context, manager: manager)
     }
-    func bootstrapIfNeeded(context: ModelContext, projectionManager: QuestManager?) throws {
+    func bootstrapIfNeeded(context: ModelContext, projectionManager: CoconutProjectionManaging?) throws {
         try base.bootstrapIfNeeded(context: context, projectionManager: projectionManager)
     }
 }

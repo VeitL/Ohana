@@ -12,7 +12,7 @@ extension CareEventService {
         type: CareType,
         amountMl: Double,
         executorId: String?,
-        reward _: QuestManager.OhanaActionType,
+        reward _: DomainCareRewardAction,
         date: Date
     ) -> (result: CareRecordResult, reward: (humanGot: Int, petGot: Int), log: PetCareLog, pottyLog: PetPottyLog?) {
         let log = PetCareLog(date: date, type: type, amountMl: amountMl, pet: nil, executorId: executorId)
@@ -39,8 +39,8 @@ extension CareEventService {
         amountMl: Double = 0,
         context: ModelContext,
         executorId: String? = nil,
-        reward: QuestManager.OhanaActionType,
-        quality: QuestManager.QualityBonus = .none,
+        reward: DomainCareRewardAction,
+        quality: DomainCareRewardQuality = .none,
         date: Date = Date(),
         dependencies: CareEventServiceDependencies? = nil
     ) -> (humanGot: Int, petGot: Int) {
@@ -65,8 +65,8 @@ extension CareEventService {
         amountMl: Double = 0,
         context: ModelContext,
         executorId: String? = nil,
-        reward: QuestManager.OhanaActionType,
-        quality: QuestManager.QualityBonus = .none,
+        reward: DomainCareRewardAction,
+        quality: DomainCareRewardQuality = .none,
         date: Date = Date(),
         source: CareLedgerSource = .quickAction,
         createsLinkedPottyLog: Bool = false,
@@ -127,7 +127,7 @@ extension CareEventService {
                 sourceEventId: nil,
                 sourceReminderId: nil,
                 coconutDelta: dependencies.careLedger.rewardDelta(award),
-                metadataJSON: dependencies.careLedger.rewardMetadata(award, questManager: dependencies.questManager),
+                metadataJSON: dependencies.economy.rewardMetadata(for: award),
                 context: context,
                 save: true
             )
@@ -237,7 +237,7 @@ extension CareEventService {
                 pet: pet,
                 source: .quickAction,
                 coconutDelta: dependencies.careLedger.rewardDelta(reward),
-                metadataJSON: dependencies.careLedger.rewardMetadata(reward, questManager: dependencies.questManager),
+                metadataJSON: dependencies.economy.rewardMetadata(for: reward),
                 context: context,
                 save: true
             )
@@ -356,7 +356,7 @@ extension CareEventService {
                 date: Date(),
                 executorId: actor.rewardExecutorId
             )
-            let metadataJSON = dependencies.careLedger.rewardMetadata(reward, questManager: dependencies.questManager)
+            let metadataJSON = dependencies.economy.rewardMetadata(for: reward)
             dependencies.careLedger.record(
                 occurredAt: log.date,
                 actorKind: actor.effectiveExecutorId == nil ? .unknown : .human,
@@ -380,7 +380,7 @@ extension CareEventService {
                 context: context,
                 save: true
             )
-            dependencies.careLedger.syncOasisTreeEnergyIfNeeded(metadataJSON: metadataJSON, context: context)
+            dependencies.careLedger.syncLedgerEnergyIfNeeded(metadataJSON: metadataJSON, context: context)
             dependencies.quickActionReminderCompletion.completeNearestPetHygieneReminder(
                 pet: pet,
                 type: type,
@@ -469,7 +469,7 @@ extension CareEventService {
                 date: Date(),
                 executorId: actor.rewardExecutorId
             )
-            let metadataJSON = dependencies.careLedger.rewardMetadata(reward, questManager: dependencies.questManager)
+            let metadataJSON = dependencies.economy.rewardMetadata(for: reward)
             dependencies.careLedger.record(
                 occurredAt: log.date,
                 actorKind: actor.effectiveExecutorId == nil ? .unknown : .human,
@@ -493,7 +493,7 @@ extension CareEventService {
                 context: context,
                 save: true
             )
-            dependencies.careLedger.syncOasisTreeEnergyIfNeeded(metadataJSON: metadataJSON, context: context)
+            dependencies.careLedger.syncLedgerEnergyIfNeeded(metadataJSON: metadataJSON, context: context)
             return reward
         }
         let result = HealthRecordResult(

@@ -43,7 +43,7 @@ extension CareEventService {
         amountGrams: Double,
         context: ModelContext,
         executorId: String? = nil,
-        quality: QuestManager.QualityBonus = .none,
+        quality: DomainCareRewardQuality = .none,
         date: Date = Date(),
         foodKind: FeedFoodKind = .dry,
         dependencies: CareEventServiceDependencies? = nil
@@ -67,7 +67,7 @@ extension CareEventService {
         amountGrams: Double,
         context: ModelContext,
         executorId: String? = nil,
-        quality: QuestManager.QualityBonus = .none,
+        quality: DomainCareRewardQuality = .none,
         date: Date = Date(),
         foodKind: FeedFoodKind = .dry,
         source: CareLedgerSource = .quickAction,
@@ -106,7 +106,7 @@ extension CareEventService {
         context.safeSave()
 
         let reward = DomainCareFactEffectsDispatcher.map(plan: write, default: (0, 0)) { actor in
-            dependencies.questManager.recordFirstMeal(actorId: actor.rewardExecutorId, context: context)
+            dependencies.economy.recordFirstMeal(actorId: actor.rewardExecutorId, context: context)
             let reward = dependencies.economy.awardCareAction(
                 type: .feed,
                 pet: pet,
@@ -122,7 +122,7 @@ extension CareEventService {
                 sourceEventId: nil,
                 sourceReminderId: nil,
                 coconutDelta: dependencies.careLedger.rewardDelta(reward),
-                metadataJSON: dependencies.careLedger.rewardMetadata(reward, questManager: dependencies.questManager),
+                metadataJSON: dependencies.economy.rewardMetadata(for: reward),
                 context: context,
                 save: true
             )
@@ -254,7 +254,7 @@ extension CareEventService {
         pet: Pet,
         reminder: Reminder,
         context: ModelContext,
-        quality: QuestManager.QualityBonus = .precise,
+        quality: DomainCareRewardQuality = .precise,
         executorId: String? = nil,
         date: Date = Date(),
         dependencies providedDependencies: CareEventServiceDependencies? = nil
@@ -277,7 +277,7 @@ extension CareEventService {
         pet: Pet,
         reminder: Reminder,
         context: ModelContext,
-        quality: QuestManager.QualityBonus = .precise,
+        quality: DomainCareRewardQuality = .precise,
         executorId: String? = nil,
         occurredAt providedOccurredAt: Date? = nil,
         operationDate: Date = Date(),
@@ -351,7 +351,7 @@ extension CareEventService {
             )
             dependencies.familyTasks.syncCompletedReminder(reminder, completedBy: actor.effectiveExecutorId, context: context)
 
-            dependencies.questManager.recordFirstMeal(actorId: actor.rewardExecutorId, context: context)
+            dependencies.economy.recordFirstMeal(actorId: actor.rewardExecutorId, context: context)
             let reward = dependencies.economy.awardCareAction(
                 type: .feed,
                 pet: pet,
@@ -367,7 +367,7 @@ extension CareEventService {
                 sourceEventId: event.id.uuidString,
                 sourceReminderId: reminder.id.uuidString,
                 coconutDelta: dependencies.careLedger.rewardDelta(reward),
-                metadataJSON: dependencies.careLedger.rewardMetadata(reward, questManager: dependencies.questManager),
+                metadataJSON: dependencies.economy.rewardMetadata(for: reward),
                 context: context,
                 save: true
             )
@@ -501,7 +501,7 @@ extension CareEventService {
                 sourceEventId: event.id.uuidString,
                 sourceReminderId: reminder.id.uuidString,
                 coconutDelta: dependencies.careLedger.rewardDelta(reward),
-                metadataJSON: dependencies.careLedger.rewardMetadata(reward, questManager: dependencies.questManager),
+                metadataJSON: dependencies.economy.rewardMetadata(for: reward),
                 context: context,
                 save: true
             )

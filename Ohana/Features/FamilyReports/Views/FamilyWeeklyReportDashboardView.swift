@@ -515,25 +515,25 @@ struct FamilyWeeklyReportDashboardContentView: View {
         // Fallback keeps older local data visible before ledger backfill has run.
         var entries: [ReportEntry] = []
         for log in pet.careLogs where interval.contains(log.date) {
-            entries.append(entry(date: log.date, actorId: log.executorId, pet: pet, title: log.careType.rawValue, icon: log.careType.systemIconName, color: Color(hex: log.careType.accentColorHex), coconuts: 1))
+            entries.append(entry(date: log.date, actorId: log.executorId, pet: pet, title: log.careType.rawValue, icon: log.careType.systemIconName, colorToken: .hex(log.careType.accentColorHex), coconuts: 1))
         }
         for log in pet.pottyLogs where interval.contains(log.date) {
-            entries.append(entry(date: log.date, actorId: log.executorId, pet: pet, title: log.pottyType.rawValue, icon: log.pottyType.systemIconName, color: .goOrange, coconuts: 1))
+            entries.append(entry(date: log.date, actorId: log.executorId, pet: pet, title: log.pottyType.rawValue, icon: log.pottyType.systemIconName, colorToken: .goOrange, coconuts: 1))
         }
         for log in pet.walkLogs where interval.contains(log.startDate) {
             for executorId in log.executorIds {
-                entries.append(entry(date: log.startDate, actorId: executorId, pet: pet, title: "遛狗", icon: "figure.walk", color: .goTeal, coconuts: log.coconutsEarned))
+                entries.append(entry(date: log.startDate, actorId: executorId, pet: pet, title: "遛狗", icon: "figure.walk", colorToken: .goTeal, coconuts: log.coconutsEarned))
             }
         }
         for log in pet.expenseLogs where interval.contains(log.date) {
-            entries.append(entry(date: log.date, actorId: log.executorId, pet: pet, title: log.expenseCategory.rawValue, icon: log.expenseCategory.systemIconName, color: .goYellow, coconuts: 0))
+            entries.append(entry(date: log.date, actorId: log.executorId, pet: pet, title: log.expenseCategory.rawValue, icon: log.expenseCategory.systemIconName, colorToken: .goYellow, coconuts: 0))
         }
         return entries
     }
 
-    private func entry(date: Date, actorId: String?, pet: Pet, title: String, icon: String, color: Color, coconuts: Int) -> ReportEntry {
+    private func entry(date: Date, actorId: String?, pet: Pet, title: String, icon: String, colorToken: DomainColorToken, coconuts: Int) -> ReportEntry {
         let human = actorId.flatMap { id in humans.first { $0.id.uuidString == id } }
-        return ReportEntry(date: date, actorId: actorId, actorName: human?.name ?? "未指定", petName: pet.name, title: title, icon: icon, color: color, coconuts: max(coconuts, 0))
+        return ReportEntry(date: date, actorId: actorId, actorName: human?.name ?? "未指定", petName: pet.name, title: title, icon: icon, colorToken: colorToken, coconuts: max(coconuts, 0))
     }
 
     private func lastFourWeeks() -> [(label: String, count: Int)] {

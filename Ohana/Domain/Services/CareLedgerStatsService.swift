@@ -5,7 +5,7 @@
 //  Read helpers for analytics built on the canonical care ledger.
 //
 
-import SwiftUI
+import Foundation
 
 struct CareLedgerStatsService {
     struct ReportEntry: Identifiable {
@@ -16,7 +16,7 @@ struct CareLedgerStatsService {
         let petName: String
         let title: String
         let icon: String
-        let color: Color
+        let colorToken: DomainColorToken
         let coconuts: Int
 
         init(
@@ -27,7 +27,7 @@ struct CareLedgerStatsService {
             petName: String,
             title: String,
             icon: String,
-            color: Color,
+            colorToken: DomainColorToken,
             coconuts: Int
         ) {
             self.id = id
@@ -37,7 +37,7 @@ struct CareLedgerStatsService {
             self.petName = petName
             self.title = title
             self.icon = icon
-            self.color = color
+            self.colorToken = colorToken
             self.coconuts = coconuts
         }
     }
@@ -68,7 +68,7 @@ struct CareLedgerStatsService {
                     petName: petName,
                     title: title(for: event),
                     icon: icon(for: event),
-                    color: color(for: event),
+                    colorToken: colorToken(for: event),
                     coconuts: max(event.coconutDelta, 0)
                 )
             }
@@ -144,10 +144,10 @@ struct CareLedgerStatsService {
         }
     }
 
-    private func color(for event: CareLedgerEvent) -> Color {
+    private func colorToken(for event: CareLedgerEvent) -> DomainColorToken {
         switch event.eventKindEnum {
         case .care:
-            Color(hex: CareType(rawValue: event.actionType)?.accentColorHex ?? OhanaThemeColorPolicy.petFallbackHex)
+            .hex(CareType(rawValue: event.actionType)?.accentColorHex ?? OhanaThemeColorPolicy.petFallbackHex)
         case .potty:
             .goOrange
         case .walk:
@@ -159,9 +159,9 @@ struct CareLedgerStatsService {
         case .health:
             .goRed
         case .weight:
-            Color(hex: "80FFEA")
+            .hex("80FFEA")
         case .medication:
-            Color(hex: "A78BFA")
+            .hex("A78BFA")
         case .reminder, .plantCare, .coconut, .workout, .milestone, .unknown:
             .goPrimary
         }

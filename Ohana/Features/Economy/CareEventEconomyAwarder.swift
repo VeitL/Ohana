@@ -21,10 +21,10 @@ final class StaticCareEventEconomyAwarder: CareEventEconomyAwarding {
     }
 
     func awardCareAction(
-        type: QuestManager.OhanaActionType,
+        type: DomainCareRewardAction,
         pet: Pet?,
         context: ModelContext,
-        quality: QuestManager.QualityBonus,
+        quality: DomainCareRewardQuality,
         date: Date,
         executorId: String?
     ) -> (humanGot: Int, petGot: Int) {
@@ -42,10 +42,10 @@ final class StaticCareEventEconomyAwarder: CareEventEconomyAwarding {
     }
 
     func awardSharedCareAction(
-        type: QuestManager.OhanaActionType,
+        type: DomainCareRewardAction,
         pets: [Pet],
         context: ModelContext,
-        quality: QuestManager.QualityBonus,
+        quality: DomainCareRewardQuality,
         title: String?,
         executorId: String?
     ) -> (humanGot: Int, petGot: Int) {
@@ -60,5 +60,27 @@ final class StaticCareEventEconomyAwarder: CareEventEconomyAwarding {
         )
         oasisRewards.rewardFeaturedCritterFromCare(type: type, context: context)
         return reward
+    }
+
+    func rewardMetadata(for reward: (humanGot: Int, petGot: Int)?) -> String {
+        guard let reward else { return "" }
+        if let result = questManager.lastEconomyRewardResult,
+           result.humanCoconuts == max(0, reward.humanGot),
+           result.petCoconuts == max(0, reward.petGot) {
+            return result.metadataJSON
+        }
+        return ""
+    }
+
+    func recordFirstMeal(actorId: String?, context: ModelContext) {
+        questManager.recordFirstMeal(actorId: actorId, context: context)
+    }
+
+    func clearCooldown(petId: UUID?, type: DomainCareRewardAction) {
+        questManager.clearCooldown(petId: petId, type: type)
+    }
+
+    func refreshProjectionAfterRollback(context: ModelContext) {
+        questManager.wallet.refreshQuestProjection(context: context, manager: questManager)
     }
 }

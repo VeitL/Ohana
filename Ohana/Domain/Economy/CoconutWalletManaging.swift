@@ -9,7 +9,7 @@ protocol CoconutWalletManaging {
         save: Bool,
         postsRewardFeedback: Bool,
         updatesProjection: Bool,
-        projectionManager: QuestManager?
+        projectionManager: CoconutProjectionManaging?
     ) throws -> [CoconutLedgerEntry]
 
     @discardableResult
@@ -24,7 +24,7 @@ protocol CoconutWalletManaging {
         context: ModelContext,
         save: Bool,
         postsRewardFeedback: Bool,
-        projectionManager: QuestManager?
+        projectionManager: CoconutProjectionManaging?
     ) throws -> [CoconutLedgerEntry]
 
     func totalBalance(context: ModelContext) -> Int
@@ -33,8 +33,8 @@ protocol CoconutWalletManaging {
     func balance(for pet: Pet, context: ModelContext) -> Int
     func legacySystemBalance(context: ModelContext, fallback: Int) -> Int
     func setDeveloperOverrideBalance(amount: Int, for human: Human?, displayName: String, context: ModelContext)
-    func refreshQuestProjection(context: ModelContext, manager: QuestManager?)
-    func bootstrapIfNeeded(context: ModelContext, projectionManager: QuestManager?) throws
+    func refreshQuestProjection(context: ModelContext, manager: CoconutProjectionManaging?)
+    func bootstrapIfNeeded(context: ModelContext, projectionManager: CoconutProjectionManaging?) throws
 }
 
 extension CoconutWalletManaging {
@@ -91,7 +91,7 @@ final class SwiftDataCoconutWalletManager: CoconutWalletManaging {
         save: Bool,
         postsRewardFeedback: Bool,
         updatesProjection: Bool,
-        projectionManager: QuestManager?
+        projectionManager: CoconutProjectionManaging?
     ) throws -> [CoconutLedgerEntry] {
         try CoconutWalletService.apply(
             deltas: deltas,
@@ -114,7 +114,7 @@ final class SwiftDataCoconutWalletManager: CoconutWalletManaging {
         context: ModelContext,
         save: Bool,
         postsRewardFeedback: Bool,
-        projectionManager: QuestManager?
+        projectionManager: CoconutProjectionManaging?
     ) throws -> [CoconutLedgerEntry] {
         try CoconutWalletService.applyActorDelta(
             amount: amount,
@@ -160,11 +160,11 @@ final class SwiftDataCoconutWalletManager: CoconutWalletManaging {
         )
     }
 
-    func refreshQuestProjection(context: ModelContext, manager: QuestManager?) {
+    func refreshQuestProjection(context: ModelContext, manager: CoconutProjectionManaging?) {
         CoconutWalletService.refreshQuestProjection(context: context, manager: manager)
     }
 
-    func bootstrapIfNeeded(context: ModelContext, projectionManager: QuestManager?) throws {
+    func bootstrapIfNeeded(context: ModelContext, projectionManager: CoconutProjectionManaging?) throws {
         try CoconutEconomyBootstrapService.bootstrapIfNeeded(
             context: context,
             projectionManager: projectionManager

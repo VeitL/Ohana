@@ -32,11 +32,11 @@ enum EventType: String, Codable, CaseIterable, Identifiable {
     case fertilizing = "施肥"
     // 人类专用
     case medication = "吃药"
-    /// 宠物用药计划（关联 `relatedEntityType == "pet_medication_plan"` + medication UUID）
+    /// 宠物用药计划（关联类型由 `DomainEntityLinkRegistry` 统一注册）
     case petMedication = "宠物用药"
-    /// 宠物用药单次打卡（关联 `relatedEntityType == "pet_medication"` + medication UUID）
+    /// 宠物用药单次打卡（关联类型由 `DomainEntityLinkRegistry` 统一注册）
     case petMedicationDose = "宠物喂药打卡"
-    /// 保险缴费提醒（关联 `relatedEntityType == "pet_insurance"` + insurance UUID）
+    /// 保险缴费提醒（关联类型由 `DomainEntityLinkRegistry` 统一注册）
     case insurancePremium = "保险缴费"
 
     var id: String { rawValue }

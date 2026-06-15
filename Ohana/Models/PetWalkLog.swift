@@ -54,7 +54,7 @@ final class PetWalkLog {
         self.moodRating = 0
     }
 
-    /// Mirrors CoconutEconomyPolicyV2 walk reward display storage.
+    /// Mirrors domain walk reward display storage.
     static func coconuts(for distanceMeters: Double) -> Int {
         CoconutWalkRewardPolicy.earnedCoconuts(for: distanceMeters)
     }

@@ -263,7 +263,7 @@ enum CoconutWalletService {
         save: Bool = false,
         postsRewardFeedback: Bool = true,
         updatesProjection: Bool = true,
-        projectionManager: QuestManager? = nil
+        projectionManager: CoconutProjectionManaging? = nil
     ) throws -> [CoconutLedgerEntry] {
         let meaningfulDeltas = deltas.filter { $0.delta != 0 || $0.entryKind == .openingBalance || $0.entryKind == .legacyHistory }
         guard !meaningfulDeltas.isEmpty else { return [] }
@@ -371,7 +371,7 @@ enum CoconutWalletService {
         context: ModelContext,
         save: Bool,
         postsRewardFeedback: Bool = true,
-        projectionManager: QuestManager? = nil
+        projectionManager: CoconutProjectionManaging? = nil
     ) throws -> [CoconutLedgerEntry] {
         let delta = try makeActorDelta(
             amount: amount,
@@ -456,7 +456,7 @@ enum CoconutWalletService {
         .map { $0.asCoconutLogEntry() }
     }
 
-    static func refreshQuestProjection(context: ModelContext, manager: QuestManager? = nil) {
+    static func refreshQuestProjection(context: ModelContext, manager: CoconutProjectionManaging? = nil) {
         _ = reconcileFormalAccountBalancesWithLedger(context: context)
         manager?.replaceCoconutProjection(
             count: totalBalance(context: context),
@@ -811,7 +811,7 @@ enum CoconutEconomyBootstrapService {
     static func bootstrapIfNeeded(
         context: ModelContext,
         defaults: UserDefaults = .standard,
-        projectionManager: QuestManager? = nil
+        projectionManager: CoconutProjectionManaging? = nil
     ) throws {
         try bootstrapIfNeeded(
             context: context,
@@ -825,7 +825,7 @@ enum CoconutEconomyBootstrapService {
         context: ModelContext,
         legacyIslandCount: Int,
         legacyLogsJSON: String,
-        projectionManager: QuestManager? = nil
+        projectionManager: CoconutProjectionManaging? = nil
     ) throws {
         try bootstrapIfNeeded(
             context: context,
@@ -839,7 +839,7 @@ enum CoconutEconomyBootstrapService {
         context: ModelContext,
         legacyIslandCount: Int,
         legacyLogs: [CoconutLogEntry],
-        projectionManager: QuestManager?
+        projectionManager: CoconutProjectionManaging?
     ) throws {
         let legacyAccountKey = CoconutAccountKey.legacySystem
         var legacyDescriptor = FetchDescriptor<CoconutAccount>(

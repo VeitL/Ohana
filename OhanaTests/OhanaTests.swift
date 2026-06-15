@@ -1027,7 +1027,6 @@ struct OhanaTests {
         let economy = CareEventEconomyAwarderSpy(reward: (humanGot: 2, petGot: 1))
         let quickReminders = QuickActionReminderCompleterSpy()
         let dependencies = CareEventServiceDependencies(
-            questManager: QuestManager(),
             economy: economy,
             careLedger: CareLedgerService(),
             reminderCompletion: NoopReminderCompleter(),
@@ -1098,7 +1097,6 @@ struct OhanaTests {
         let economy = CareEventEconomyAwarderSpy(reward: (humanGot: 5, petGot: 2))
         let quickReminders = QuickActionReminderCompleterSpy()
         let dependencies = CareEventServiceDependencies(
-            questManager: QuestManager(),
             economy: economy,
             careLedger: CareLedgerService(),
             reminderCompletion: NoopReminderCompleter(),
@@ -1160,7 +1158,6 @@ struct OhanaTests {
         let economy = CareEventEconomyAwarderSpy(reward: (humanGot: 3, petGot: 1))
         let quickReminders = QuickActionReminderCompleterSpy()
         let dependencies = CareEventServiceDependencies(
-            questManager: QuestManager(),
             economy: economy,
             careLedger: CareLedgerService(),
             reminderCompletion: NoopReminderCompleter(),
@@ -1227,7 +1224,6 @@ struct OhanaTests {
         let economy = CareEventEconomyAwarderSpy(reward: (humanGot: 9, petGot: 9))
         let familyTasks = FamilyTaskManagerSpy()
         let dependencies = CareEventServiceDependencies(
-            questManager: QuestManager(),
             economy: economy,
             careLedger: CareLedgerService(),
             reminderCompletion: NoopReminderCompleter(),
@@ -1403,7 +1399,8 @@ struct OhanaTests {
         let context = container.mainContext
         let scheduledAt = dateForTest(year: 2026, month: 6, day: 12, hour: 9)
         let completedAt = dateForTest(year: 2026, month: 6, day: 12, hour: 9, minute: 30)
-        let event = Event(title: "Feed Momo", relatedEntityType: EntityKind.pet.rawValue, relatedEntityId: UUID().uuidString)
+        let pet = Pet(name: "Momo", species: "猫")
+        let event = Event(title: "Feed Momo", relatedEntityType: EntityKind.pet.rawValue, relatedEntityId: pet.id.uuidString)
         let reminder = Reminder(event: event, scheduledAt: scheduledAt)
         let completedTask = FamilyCollaborationTask(
             title: "Feed Momo",
@@ -1421,7 +1418,8 @@ struct OhanaTests {
         completedTask.completedById = "human-1"
         completedTask.completedByName = "Kid"
 
-        let reviewEvent = Event(title: "Bounty", relatedEntityType: EntityKind.pet.rawValue, relatedEntityId: UUID().uuidString)
+        let reviewPet = Pet(name: "Luna", species: "猫")
+        let reviewEvent = Event(title: "Bounty", relatedEntityType: EntityKind.pet.rawValue, relatedEntityId: reviewPet.id.uuidString)
         let reviewReminder = Reminder(event: reviewEvent, scheduledAt: scheduledAt)
         let pendingReviewTask = FamilyCollaborationTask(
             title: "Bounty",
@@ -1439,9 +1437,11 @@ struct OhanaTests {
         pendingReviewTask.completedAt = completedAt
         pendingReviewTask.completedById = "human-1"
         pendingReviewTask.completedByName = "Kid"
+        context.insert(pet)
         context.insert(event)
         context.insert(reminder)
         context.insert(completedTask)
+        context.insert(reviewPet)
         context.insert(reviewEvent)
         context.insert(reviewReminder)
         context.insert(pendingReviewTask)
@@ -1519,7 +1519,6 @@ struct OhanaTests {
         let questManager = QuestManager()
         questManager.isFirstMealRecorded = true
         let dependencies = CareEventServiceDependencies(
-            questManager: questManager,
             economy: economy,
             careLedger: CareLedgerService(),
             reminderCompletion: NoopReminderCompleter(),
@@ -1603,7 +1602,6 @@ struct OhanaTests {
         let questManager = QuestManager()
         questManager.isFirstMealRecorded = true
         let dependencies = CareEventServiceDependencies(
-            questManager: questManager,
             economy: economy,
             careLedger: CareLedgerService(),
             reminderCompletion: NoopReminderCompleter(),
@@ -2320,7 +2318,6 @@ struct OhanaTests {
         let economy = CareEventEconomyAwarderSpy(reward: (humanGot: 3, petGot: 1))
         let familyTasks = FamilyTaskManagerSpy()
         let dependencies = CareEventServiceDependencies(
-            questManager: QuestManager(),
             economy: economy,
             careLedger: CareLedgerService(),
             reminderCompletion: NoopReminderCompleter(),
@@ -2402,7 +2399,6 @@ struct OhanaTests {
         let economy = CareEventEconomyAwarderSpy(reward: (humanGot: 7, petGot: 3))
         let familyTasks = FamilyTaskManagerSpy()
         let dependencies = CareEventServiceDependencies(
-            questManager: QuestManager(),
             economy: economy,
             careLedger: CareLedgerService(),
             reminderCompletion: NoopReminderCompleter(),
@@ -4851,16 +4847,17 @@ struct OhanaTests {
     private final class CareEventEconomyAwarderSpy: CareEventEconomyAwarding {
         let reward: (humanGot: Int, petGot: Int)
         private(set) var careAwardCalls: [CareAwardCall] = []
+        private(set) var firstMealActorIds: [String?] = []
 
         init(reward: (humanGot: Int, petGot: Int)) {
             self.reward = reward
         }
 
         func awardCareAction(
-            type: QuestManager.OhanaActionType,
+            type: DomainCareRewardAction,
             pet: Pet?,
             context _: ModelContext,
-            quality: QuestManager.QualityBonus,
+            quality: DomainCareRewardQuality,
             date: Date,
             executorId _: String?
         ) -> (humanGot: Int, petGot: Int) {
@@ -4876,17 +4873,30 @@ struct OhanaTests {
         }
 
         func awardSharedCareAction(
-            type _: QuestManager.OhanaActionType,
+            type _: DomainCareRewardAction,
             pets _: [Pet],
             context _: ModelContext,
-            quality _: QuestManager.QualityBonus,
+            quality _: DomainCareRewardQuality,
             title _: String?,
             executorId _: String?
         ) -> (humanGot: Int, petGot: Int) {
             reward
         }
 
-        private func actionName(_ type: QuestManager.OhanaActionType) -> String {
+        func rewardMetadata(for reward: (humanGot: Int, petGot: Int)?) -> String {
+            guard let reward else { return "" }
+            return "{\"humanCoconuts\":\(max(0, reward.humanGot)),\"petCoconuts\":\(max(0, reward.petGot))}"
+        }
+
+        func recordFirstMeal(actorId: String?, context _: ModelContext) {
+            firstMealActorIds.append(actorId)
+        }
+
+        func clearCooldown(petId _: UUID?, type _: DomainCareRewardAction) {}
+
+        func refreshProjectionAfterRollback(context _: ModelContext) {}
+
+        private func actionName(_ type: DomainCareRewardAction) -> String {
             switch type {
             case .feed: "feed"
             case .water: "water"
@@ -4902,7 +4912,7 @@ struct OhanaTests {
             }
         }
 
-        private func qualityName(_ quality: QuestManager.QualityBonus) -> String {
+        private func qualityName(_ quality: DomainCareRewardQuality) -> String {
             switch quality {
             case .none: "none"
             case .precise: "precise"

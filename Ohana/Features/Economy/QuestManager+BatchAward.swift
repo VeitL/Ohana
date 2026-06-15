@@ -242,7 +242,6 @@ extension QuestManager {
         let familyTasks = StaticFamilyTaskManager(wallet: wallet, careLedger: careLedger, questManager: self)
         let reminderCompletion = ReminderCompletionService(careLedger: careLedger, familyTasks: familyTasks)
         return CareEventServiceDependencies(
-            questManager: self,
             economy: StaticCareEventEconomyAwarder(questManager: self),
             careLedger: careLedger,
             reminderCompletion: reminderCompletion,

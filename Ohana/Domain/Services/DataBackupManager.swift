@@ -128,7 +128,7 @@ final nonisolated class DataBackupManager: @unchecked Sendable {
     func importJSON(
         from url: URL,
         context: ModelContext,
-        projectionManager: QuestManager? = nil,
+        projectionManager: CoconutProjectionManaging? = nil,
         password: String? = nil
     ) async throws {
         let fileData = try Data(contentsOf: url) // smoothness: allow legacy prepared-avatar decode path; media service migration tracked after P1 baseline
@@ -294,7 +294,7 @@ final nonisolated class DataBackupManager: @unchecked Sendable {
     }
 
     @MainActor
-    func applyBackup(_ backup: OhanaBackup, context: ModelContext, projectionManager: QuestManager?) throws {
+    func applyBackup(_ backup: OhanaBackup, context: ModelContext, projectionManager: CoconutProjectionManaging?) throws {
         // 以 UUID 为主键去重：先构建现有 ID 集合，再 upsert。
         // Event/Reminder 不能在 writer 前过滤；rehydrate writer 必须重新解析已有 schedule aggregate。
         var rehydrateNotificationIdsToCancel: [String] = []

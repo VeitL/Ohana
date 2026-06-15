@@ -1938,8 +1938,8 @@ actionable; long-term product ideas belong in planning docs instead.
   than the P0 activity-cleanup/blocking-build repair. Fixing them cleanly should
   happen as a dedicated pass so adapters can move without disturbing service
   behavior.
-- Next step: Move app/feature infrastructure adapters out of
-  `Ohana/Domain/Services/AppInfrastructureAdapters.swift` or invert them behind
+- Next step: Finish moving app/feature infrastructure adapters out of Domain
+  service files or invert them behind
   Domain-owned protocols; replace Domain `SwiftUI.Color` outputs in
   `CareLedgerStatsService` and `HealthMetricCatalog` with semantic tokens; move
   user-visible generated titles/status text onto the localization path; and
@@ -1947,8 +1947,10 @@ actionable; long-term product ideas belong in planning docs instead.
   on the mutable `OhanaNotifications.current` global from static service paths.
 - Current task disposition: Accepted P1 follow-up for Domain Phase 2. The P0
   production path violations were removed or moved behind a Domain service; the
-  remaining items do not block the current module exit gate but should be
-  resolved before release-hardening freeze.
+  app/runtime adapters and Domain service SwiftUI `Color` leaks were partially
+  addressed in the 2026-06-15 Domain write-kernel Phase 7 pass. The remaining
+  items do not block the current module exit gate but should be resolved before
+  release-hardening freeze.
 - Close when: Domain app-code contains no `import SwiftUI`, Domain services no
   longer instantiate App/Feature infrastructure concrete types directly, generated
   user-visible Domain strings are localized, and notification side effects in

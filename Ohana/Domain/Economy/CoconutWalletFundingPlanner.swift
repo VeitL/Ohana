@@ -113,7 +113,7 @@ enum CoconutWalletMutationWriter {
         save: Bool,
         postsRewardFeedback: Bool,
         updatesProjection: Bool,
-        projectionManager: QuestManager?
+        projectionManager: CoconutProjectionManaging?
     ) throws -> [CoconutLedgerEntry] {
         try wallet.apply(
             deltas: mutations.map { $0.walletDelta() },

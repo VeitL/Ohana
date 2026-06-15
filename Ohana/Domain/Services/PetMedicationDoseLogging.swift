@@ -74,7 +74,7 @@ nonisolated enum PetMedicationDoseLogging {
         modelContext: ModelContext,
         decrementRemaining: Bool = true,
         awardCoconut: Bool = false,
-        questManager: QuestManager,
+        economy: CareEventEconomyAwarding,
         activeHumanSelection: ActiveHumanSelecting = UserDefaultsActiveHumanSelection(),
         careLedger providedCareLedger: CareLedgerRecording? = nil,
         medicationReminders providedMedicationReminders: MedicationReminderManaging? = nil
@@ -85,7 +85,7 @@ nonisolated enum PetMedicationDoseLogging {
             modelContext: modelContext,
             decrementRemaining: decrementRemaining,
             awardCoconut: awardCoconut,
-            questManager: questManager,
+            economy: economy,
             activeHumanSelection: activeHumanSelection,
             careLedger: providedCareLedger,
             medicationReminders: providedMedicationReminders
@@ -100,7 +100,7 @@ nonisolated enum PetMedicationDoseLogging {
         modelContext: ModelContext,
         decrementRemaining: Bool = true,
         awardCoconut: Bool = false,
-        questManager: QuestManager,
+        economy: CareEventEconomyAwarding,
         activeHumanSelection: ActiveHumanSelecting = UserDefaultsActiveHumanSelection(),
         careLedger providedCareLedger: CareLedgerRecording? = nil,
         medicationReminders providedMedicationReminders: MedicationReminderManaging? = nil
@@ -166,12 +166,13 @@ nonisolated enum PetMedicationDoseLogging {
             if let effectsPlan {
                 DomainEffectDispatcher.run(plan: effectsPlan) { actor in
                     if awardCoconut, effectsPlan.allowsEconomyDerivation {
-                        let reward = EconomyRewardDiscipline.awardCareAction(
+                        let reward = economy.awardCareAction(
                             type: .general(humanReward: 1, petReward: 0, emoji: "💊", title: "记录喂药 +1🥥"),
                             pet: pet,
                             context: modelContext,
-                            executorId: actor.rewardExecutorId,
-                            questManager: questManager
+                            quality: .none,
+                            date: now,
+                            executorId: actor.rewardExecutorId
                         )
                         coconutDelta = reward.humanGot + reward.petGot
                     }
@@ -208,7 +209,7 @@ nonisolated enum PetMedicationDoseLogging {
             try modelContext.save()
         } catch {
             modelContext.rollback()
-            questManager.wallet.refreshQuestProjection(context: modelContext, manager: questManager)
+            economy.refreshProjectionAfterRollback(context: modelContext)
             #if DEBUG
                 OhanaLog.error("[PetMedicationDoseLogging] dose save failed: \(error.localizedDescription)", category: "Economy")
             #endif

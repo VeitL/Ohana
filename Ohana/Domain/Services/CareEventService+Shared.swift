@@ -16,7 +16,7 @@ extension CareEventService {
         foodKind: FeedFoodKind,
         context: ModelContext,
         executorId: String? = nil,
-        quality: QuestManager.QualityBonus = .none,
+        quality: DomainCareRewardQuality = .none,
         date: Date = Date(),
         dependencies providedDependencies: CareEventServiceDependencies? = nil
     ) -> (humanGot: Int, petGot: Int) {
@@ -42,7 +42,7 @@ extension CareEventService {
         foodKind: FeedFoodKind,
         context: ModelContext,
         executorId: String? = nil,
-        quality: QuestManager.QualityBonus = .none,
+        quality: DomainCareRewardQuality = .none,
         date: Date = Date(),
         dependencies providedDependencies: CareEventServiceDependencies? = nil
     ) -> SharedPetActionResult {
@@ -91,7 +91,7 @@ extension CareEventService {
             dependencies: dependencies
         )
         if result.allowsDerivedEffects {
-            dependencies.questManager.recordFirstMeal(actorId: executorId, context: context)
+            dependencies.economy.recordFirstMeal(actorId: executorId, context: context)
         }
         return result
     }
@@ -255,9 +255,9 @@ extension CareEventService {
         actionKind: SharedCareActionKind,
         context: ModelContext,
         executorId: String? = nil,
-        reward: QuestManager.OhanaActionType,
+        reward: DomainCareRewardAction,
         rewardTitle: String? = nil,
-        quality: QuestManager.QualityBonus = .none,
+        quality: DomainCareRewardQuality = .none,
         date: Date = Date(),
         source: CareLedgerSource = .quickAction,
         dependencies providedDependencies: CareEventServiceDependencies? = nil
@@ -287,9 +287,9 @@ extension CareEventService {
         actionKind: SharedCareActionKind,
         context: ModelContext,
         executorId: String? = nil,
-        reward: QuestManager.OhanaActionType,
+        reward: DomainCareRewardAction,
         rewardTitle: String? = nil,
-        quality: QuestManager.QualityBonus = .none,
+        quality: DomainCareRewardQuality = .none,
         date: Date = Date(),
         source: CareLedgerSource = .quickAction,
         dependencies providedDependencies: CareEventServiceDependencies? = nil
@@ -410,7 +410,7 @@ extension CareEventService {
         source: CareLedgerSource = .quickAction,
         dependencies: CareEventServiceDependencies? = nil
     ) -> SharedPetActionResult {
-        let reward: QuestManager.OhanaActionType? = CoconutWalkRewardPolicy.isRewardable(distanceMeters: distanceMeters)
+        let reward: DomainCareRewardAction? = CoconutWalkRewardPolicy.isRewardable(distanceMeters: distanceMeters)
             ? .walk(distanceMeters: distanceMeters)
             : nil
         let coconutsEarned = PetWalkLog.coconuts(for: distanceMeters)

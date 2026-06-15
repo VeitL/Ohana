@@ -1615,8 +1615,9 @@ struct MemberLifecycleGateTests {
             scheduleNotifications: false
         ))
         let center = ReadModelRevisionCenter()
+        let revisions = SharedDomainRevisionPublisher(center: center)
 
-        center.publishCalendarEventPlan(result, note: "test.calendar.indirect")
+        revisions.publishCalendarEventPlan(result, note: "test.calendar.indirect")
 
         let mutation = try #require(center.lastMutation)
         #expect(result.affectedSubjectIDs.contains(pet.id))
@@ -1656,7 +1657,8 @@ struct MemberLifecycleGateTests {
             executorId: nil
         )
         let center = ReadModelRevisionCenter()
-        center.publishCalendarEventCompletion(completion, note: "test.calendar.complete")
+        let revisions = SharedDomainRevisionPublisher(center: center)
+        revisions.publishCalendarEventCompletion(completion, note: "test.calendar.complete")
         var mutation = try #require(center.lastMutation)
 
         #expect(completion.affectedSubjectIDs.contains(pet.id))

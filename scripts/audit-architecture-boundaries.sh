@@ -25,6 +25,12 @@ Purpose:
     or backup import projection.
   - Removed singleton registries and NotificationCenter string bus do not return.
   - QuestManager does not write legacy coconut UserDefaults storage.
+  - Domain/Models expose domain-neutral reward payloads instead of QuestManager
+    feature reward types.
+  - Domain/Models do not reference concrete economy/Oasis feature
+    implementations; adapters live at feature/app boundaries.
+  - Domain services return semantic presentation tokens instead of SwiftUI
+    Color/View types.
 USAGE
 }
 
@@ -248,7 +254,8 @@ static_service_calls_outside_facades() {
   )"
   [[ -z "$input" ]] && return 0
   printf '%s\n' "$input" \
-    | rg -v '^\s*Ohana/Domain/Services/AppInfrastructureAdapters\.swift:' \
+    | rg -v '^\s*Ohana/App/AppRuntimeAdapters\.swift:' \
+    | rg -v '^\s*Ohana/Domain/Services/DomainServiceAdapters\.swift:' \
     | rg -v '^\s*Ohana/Domain/Services/CareLedgerBackfillService\.swift:' \
     | rg -v '^\s*Ohana/Domain/Services/CareEventRecording\.swift:' \
     | rg -v '^\s*Ohana/Domain/Services/CareEventService\+RecordingAdapter\.swift:' \
@@ -257,6 +264,72 @@ static_service_calls_outside_facades() {
     | rg -v '^\s*Ohana/Features/FamilyTasks/FamilyTaskManaging\.swift:' \
     | rg -v '^\s*Ohana/Features/Oasis/OasisRewardServices\.swift:' \
     | rg -v ':\s*// ' || true
+}
+
+domain_or_models_scope() {
+  if [[ "$mode" == "all" ]]; then
+    find Ohana/Domain Ohana/Models -type f -name '*.swift' | sort
+  else
+    for file in "${files[@]}"; do
+      case "$file" in
+        Ohana/Domain/*.swift|Ohana/Domain/*/*.swift|Ohana/Models/*.swift)
+          [[ -f "$file" ]] && printf '%s\n' "$file"
+          ;;
+      esac
+    done
+  fi
+}
+
+domain_feature_command_dependencies() {
+  local scoped_files=()
+  while IFS= read -r file; do
+    [[ -n "$file" ]] && scoped_files+=("$file")
+  done < <(domain_or_models_scope)
+  [[ ${#scoped_files[@]} -eq 0 ]] && return 0
+  rg -n --with-filename --pcre2 '\b[A-Za-z][A-Za-z0-9_]*(CommandResult|CommandExecutor|CommandService)\b' "${scoped_files[@]}" || true
+}
+
+domain_feature_reward_type_dependencies() {
+  local scoped_files=()
+  while IFS= read -r file; do
+    [[ -n "$file" ]] && scoped_files+=("$file")
+  done < <(domain_or_models_scope)
+  [[ ${#scoped_files[@]} -eq 0 ]] && return 0
+  rg -n --with-filename --pcre2 '\bQuestManager\.(OhanaActionType|QualityBonus)\b' "${scoped_files[@]}" || true
+}
+
+domain_feature_implementation_dependencies() {
+  local scoped_files=()
+  while IFS= read -r file; do
+    [[ -n "$file" ]] && scoped_files+=("$file")
+  done < <(domain_or_models_scope)
+  [[ ${#scoped_files[@]} -eq 0 ]] && return 0
+  rg -n --with-filename --pcre2 '\b(CoconutEconomyPolicyV2|EconomyRewardDiscipline|OasisTreeManagerRegistry|OasisTreeManager|OasisRewardManaging|StaticOasisRewardManager|StaticCareEventEconomyAwarder)\b' "${scoped_files[@]}" || true
+}
+
+domain_feature_taxonomy_literals() {
+  local scoped_files=()
+  local input
+  while IFS= read -r file; do
+    [[ -n "$file" ]] && scoped_files+=("$file")
+  done < <(domain_or_models_scope)
+  [[ ${#scoped_files[@]} -eq 0 ]] && return 0
+  input="$(
+    rg -n --with-filename --pcre2 '"(pet_food_stock|pet_auto_feeder|pet_water_plan|pet_insurance|pet_medication_plan|pet_medication|human_medication|human_note|plant_[^"]*)"' "${scoped_files[@]}" || true
+  )"
+  [[ -z "$input" ]] && return 0
+  printf '%s\n' "$input" \
+    | rg -v '^\s*Ohana/Domain/Services/DomainEntityLinkRegistry\.swift:' || true
+}
+
+domain_presentation_framework_dependencies() {
+  local scoped_files=()
+  while IFS= read -r file; do
+    [[ -n "$file" ]] && scoped_files+=("$file")
+  done < <(domain_or_models_scope)
+  [[ ${#scoped_files[@]} -eq 0 ]] && return 0
+  rg -n --with-filename --pcre2 '^\s*import\s+SwiftUI\b|\b(Color|View|LinearGradient|Image)\b' "${scoped_files[@]}" \
+    | rg -v '^Ohana/Models/' || true
 }
 
 record_matches \
@@ -313,6 +386,31 @@ record_matches \
   "static-service-business-call" \
   "Business code must use AppServices/protocol instances; legacy static service calls are allowed only inside adapter/facade/backfill boundaries." \
   static_service_calls_outside_facades
+
+record_matches \
+  "domain-feature-command-dependency" \
+  "Domain/Models must not depend on feature command result/executor/service types; translate feature results into DomainMutationResult at the feature boundary." \
+  domain_feature_command_dependencies
+
+record_matches \
+  "domain-feature-reward-type-dependency" \
+  "Domain/Models must expose DomainCareRewardAction/DomainCareRewardQuality instead of QuestManager feature reward types." \
+  domain_feature_reward_type_dependencies
+
+record_matches \
+  "domain-feature-implementation-dependency" \
+  "Domain/Models must not reference concrete economy/Oasis feature implementations; use Domain protocols and feature/app adapters." \
+  domain_feature_implementation_dependencies
+
+record_matches \
+  "domain-feature-taxonomy-literal" \
+  "Feature-owned persisted taxonomy strings may only live in DomainEntityLinkRegistry; Domain/Models consumers must reference typed registry constants." \
+  domain_feature_taxonomy_literals
+
+record_matches \
+  "domain-presentation-framework-dependency" \
+  "Domain services must expose semantic presentation tokens instead of SwiftUI Color/View types; map tokens to SwiftUI at feature/shared presentation boundaries." \
+  domain_presentation_framework_dependencies
 
 if [[ ! -s "$warnings_file" ]]; then
   echo "Architecture boundaries: passed (${mode})."

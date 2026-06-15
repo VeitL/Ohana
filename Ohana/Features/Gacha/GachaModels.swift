@@ -474,7 +474,7 @@ final class GachaDrawLog {
         isNew: Bool = false,
         outcomeKind: GachaOutcomeKind = .collectible,
         instantResult: GachaInstantResultEntry? = nil,
-        costCoconuts: Int = GachaDrawService.costPerDraw,
+        costCoconuts: Int = DomainGachaDrawDefaults.costPerDraw,
         dailySequence: Int = 1,
         drawDate: Date = Date()
     ) {
@@ -548,7 +548,7 @@ struct GachaRollResult: Equatable {
 }
 
 enum GachaDrawService {
-    static let costPerDraw = 80
+    static let costPerDraw = DomainGachaDrawDefaults.costPerDraw
 
     static func dailyDrawCount(
         for humanId: String,

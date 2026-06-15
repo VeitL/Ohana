@@ -24,33 +24,35 @@ struct EconomyBackdateSettlementTests {
         let oldActiveHumanID = defaults.object(forKey: "currentActiveHumanId")
         let oldCooldownLogs = defaults.object(forKey: QuestManager.Keys.cooldownLogs)
         let oldBoostDouble = defaults.object(forKey: "shop_boostDoubleActive")
-        let dependencies = makeDependencies()
-        let oldFirstMeal = dependencies.questManager.isFirstMealRecorded
-        let oldCoconutCount = dependencies.questManager.coconutCount
-        let oldCoconutLogs = dependencies.questManager.coconutLogs
-        let oldLastReward = dependencies.questManager.lastEconomyRewardResult
+        let setup = makeDependencies()
+        let dependencies = setup.dependencies
+        let questManager = setup.questManager
+        let oldFirstMeal = questManager.isFirstMealRecorded
+        let oldCoconutCount = questManager.coconutCount
+        let oldCoconutLogs = questManager.coconutLogs
+        let oldLastReward = questManager.lastEconomyRewardResult
         defer {
             restoreDefaults(
                 activeHumanID: oldActiveHumanID,
                 cooldownLogs: oldCooldownLogs,
                 boostDouble: oldBoostDouble
             )
-            dependencies.questManager.isFirstMealRecorded = oldFirstMeal
-            dependencies.questManager.coconutCount = oldCoconutCount
-            dependencies.questManager.coconutLogs = oldCoconutLogs
-            dependencies.questManager.lastEconomyRewardResult = oldLastReward
-            dependencies.questManager.persistQuestFlags()
+            questManager.isFirstMealRecorded = oldFirstMeal
+            questManager.coconutCount = oldCoconutCount
+            questManager.coconutLogs = oldCoconutLogs
+            questManager.lastEconomyRewardResult = oldLastReward
+            questManager.persistQuestFlags()
             resetBudget(memberKey: human.id.uuidString, careObjectKeys: objectKeys, date: operationBefore)
             resetBudget(memberKey: human.id.uuidString, careObjectKeys: objectKeys, date: historicalDate)
         }
         defaults.set(human.id.uuidString, forKey: "currentActiveHumanId")
         defaults.removeObject(forKey: QuestManager.Keys.cooldownLogs)
         defaults.removeObject(forKey: "shop_boostDoubleActive")
-        dependencies.questManager.isFirstMealRecorded = true
-        dependencies.questManager.coconutCount = 0
-        dependencies.questManager.coconutLogs = []
-        dependencies.questManager.lastEconomyRewardResult = nil
-        dependencies.questManager.persistQuestFlags()
+        questManager.isFirstMealRecorded = true
+        questManager.coconutCount = 0
+        questManager.coconutLogs = []
+        questManager.lastEconomyRewardResult = nil
+        questManager.persistQuestFlags()
         resetBudget(memberKey: human.id.uuidString, careObjectKeys: objectKeys, date: operationBefore)
         resetBudget(memberKey: human.id.uuidString, careObjectKeys: objectKeys, date: historicalDate)
         fillBudgetToRecordOnly(
@@ -81,7 +83,7 @@ struct EconomyBackdateSettlementTests {
 
         #expect(record.log.date == historicalDate)
         #expect(record.reward.humanGot + record.reward.petGot > 0)
-        #expect(dependencies.questManager.lastEconomyRewardResult?.budgetStage != .recordOnly)
+        #expect(questManager.lastEconomyRewardResult?.budgetStage != .recordOnly)
         #expect(usageEvents(context: context, dayKey: historicalDayKey, actionKey: "feed").count == historicalUsageCountBefore)
         #expect(usageEvents(context: context, dayKeys: operationDayKeys, actionKey: "feed").isEmpty == false)
 
@@ -113,32 +115,34 @@ struct EconomyBackdateSettlementTests {
         let oldActiveHumanID = defaults.object(forKey: "currentActiveHumanId")
         let oldCooldownLogs = defaults.object(forKey: QuestManager.Keys.cooldownLogs)
         let oldBoostDouble = defaults.object(forKey: "shop_boostDoubleActive")
-        let dependencies = makeDependencies()
-        let oldFirstMeal = dependencies.questManager.isFirstMealRecorded
-        let oldCoconutCount = dependencies.questManager.coconutCount
-        let oldCoconutLogs = dependencies.questManager.coconutLogs
-        let oldLastReward = dependencies.questManager.lastEconomyRewardResult
+        let setup = makeDependencies()
+        let dependencies = setup.dependencies
+        let questManager = setup.questManager
+        let oldFirstMeal = questManager.isFirstMealRecorded
+        let oldCoconutCount = questManager.coconutCount
+        let oldCoconutLogs = questManager.coconutLogs
+        let oldLastReward = questManager.lastEconomyRewardResult
         defer {
             restoreDefaults(
                 activeHumanID: oldActiveHumanID,
                 cooldownLogs: oldCooldownLogs,
                 boostDouble: oldBoostDouble
             )
-            dependencies.questManager.isFirstMealRecorded = oldFirstMeal
-            dependencies.questManager.coconutCount = oldCoconutCount
-            dependencies.questManager.coconutLogs = oldCoconutLogs
-            dependencies.questManager.lastEconomyRewardResult = oldLastReward
-            dependencies.questManager.persistQuestFlags()
+            questManager.isFirstMealRecorded = oldFirstMeal
+            questManager.coconutCount = oldCoconutCount
+            questManager.coconutLogs = oldCoconutLogs
+            questManager.lastEconomyRewardResult = oldLastReward
+            questManager.persistQuestFlags()
             resetBudget(memberKey: human.id.uuidString, careObjectKeys: objectKeys, date: operationDate)
         }
         defaults.set(human.id.uuidString, forKey: "currentActiveHumanId")
         defaults.removeObject(forKey: QuestManager.Keys.cooldownLogs)
         defaults.removeObject(forKey: "shop_boostDoubleActive")
-        dependencies.questManager.isFirstMealRecorded = true
-        dependencies.questManager.coconutCount = 0
-        dependencies.questManager.coconutLogs = []
-        dependencies.questManager.lastEconomyRewardResult = nil
-        dependencies.questManager.persistQuestFlags()
+        questManager.isFirstMealRecorded = true
+        questManager.coconutCount = 0
+        questManager.coconutLogs = []
+        questManager.lastEconomyRewardResult = nil
+        questManager.persistQuestFlags()
         resetBudget(memberKey: human.id.uuidString, careObjectKeys: objectKeys, date: operationDate)
 
         let first = CareEventService.recordManualFeedFact(
@@ -149,7 +153,7 @@ struct EconomyBackdateSettlementTests {
             date: firstHistoricalDate,
             dependencies: dependencies
         )
-        let firstReward = dependencies.questManager.lastEconomyRewardResult
+        let firstReward = questManager.lastEconomyRewardResult
         let second = CareEventService.recordManualFeedFact(
             pet: pet,
             amountGrams: 90,
@@ -158,7 +162,7 @@ struct EconomyBackdateSettlementTests {
             date: secondHistoricalDate,
             dependencies: dependencies
         )
-        let secondReward = dependencies.questManager.lastEconomyRewardResult
+        let secondReward = questManager.lastEconomyRewardResult
 
         #expect(first.reward.humanGot + first.reward.petGot > 0)
         #expect(firstReward?.isOnCooldown == false)
@@ -248,15 +252,14 @@ struct EconomyBackdateSettlementTests {
         return try ModelContainer(for: schema, configurations: [config])
     }
 
-    private func makeDependencies() -> CareEventServiceDependencies {
+    private func makeDependencies() -> (dependencies: CareEventServiceDependencies, questManager: QuestManager) {
         let wallet = SwiftDataCoconutWalletManager()
         let revisions = SharedDomainRevisionPublisher()
         let questManager = QuestManager(wallet: wallet, revisions: revisions)
         let careLedger = CareLedgerService()
         let familyTasks = StaticFamilyTaskManager(wallet: wallet, careLedger: careLedger, questManager: questManager)
         let reminderCompletion = ReminderCompletionService(careLedger: careLedger, familyTasks: familyTasks)
-        return CareEventServiceDependencies(
-            questManager: questManager,
+        let dependencies = CareEventServiceDependencies(
             economy: StaticCareEventEconomyAwarder(questManager: questManager),
             careLedger: careLedger,
             reminderCompletion: reminderCompletion,
@@ -264,6 +267,7 @@ struct EconomyBackdateSettlementTests {
             familyTasks: familyTasks,
             revisions: revisions
         )
+        return (dependencies, questManager)
     }
 
     private func fillBudgetToRecordOnly(

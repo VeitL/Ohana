@@ -90,6 +90,13 @@ assert_scope_floor() {
 
 fixtures="scripts/tests/fixtures/Views"
 agent_skill_fixtures="scripts/tests/fixtures/AgentSkills"
+architecture_fixture_path="Ohana/Domain/__ArchitectureBoundaryFixture.swift"
+
+cleanup_architecture_fixture() {
+  rm -f "$architecture_fixture_path"
+}
+
+trap cleanup_architecture_fixture EXIT
 
 assert_bad scripts/audit-ui-v4.sh "$fixtures/UiV4Bad.swift" \
   background system-text-color hardcoded-white-black material shadow \
@@ -111,6 +118,27 @@ assert_bad scripts/audit-runtime-guardrails.sh "$fixtures/RuntimeBad.swift" \
   location-manager background-location always-location-request idle-timer \
   raw-timer-publisher repeat-forever timeline-animation
 assert_good scripts/audit-runtime-guardrails.sh "$fixtures/RuntimeGood.swift"
+
+cp "$fixtures/ArchitectureBoundariesBad.swift" "$architecture_fixture_path"
+run_audit scripts/audit-architecture-boundaries.sh --changed
+if [[ "$status" -ne 1 ]]; then
+  fail "scripts/audit-architecture-boundaries.sh ArchitectureBoundariesBad.swift: expected strict exit 1, got $status"
+else
+  for rule in domain-feature-command-dependency domain-feature-reward-type-dependency domain-feature-implementation-dependency domain-feature-taxonomy-literal domain-presentation-framework-dependency; do
+    if ! grep -qF "[$rule]" <<<"$output"; then
+      fail "scripts/audit-architecture-boundaries.sh ArchitectureBoundariesBad.swift: rule [$rule] no longer fires"
+    fi
+  done
+  echo "ok  scripts/audit-architecture-boundaries.sh catches Domain feature dependency rules"
+fi
+cp "$fixtures/ArchitectureBoundariesGood.swift" "$architecture_fixture_path"
+run_audit scripts/audit-architecture-boundaries.sh --changed
+if [[ "$status" -ne 0 ]]; then
+  fail "scripts/audit-architecture-boundaries.sh ArchitectureBoundariesGood.swift: expected clean exit 0, got $status: $output"
+else
+  echo "ok  scripts/audit-architecture-boundaries.sh passes ArchitectureBoundariesGood.swift"
+fi
+cleanup_architecture_fixture
 
 assert_bad scripts/audit-shared-care-note-metadata.sh "$fixtures/SharedCareNoteMetadataBad.swift" \
   shared-care-note-metadata

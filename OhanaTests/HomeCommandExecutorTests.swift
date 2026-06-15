@@ -208,7 +208,7 @@ struct HomeCommandExecutorTests {
             pet: pet,
             modelContext: context,
             awardCoconut: true,
-            questManager: questManager,
+            economy: StaticCareEventEconomyAwarder(questManager: questManager),
             activeHumanSelection: FixedActiveHumanSelection(currentHumanId: executor.id.uuidString),
             medicationReminders: medicationReminders
         )
@@ -217,7 +217,7 @@ struct HomeCommandExecutorTests {
             pet: pet,
             modelContext: context,
             awardCoconut: true,
-            questManager: questManager,
+            economy: StaticCareEventEconomyAwarder(questManager: questManager),
             activeHumanSelection: FixedActiveHumanSelection(currentHumanId: executor.id.uuidString),
             medicationReminders: medicationReminders
         )
@@ -2732,8 +2732,9 @@ struct HomeCommandExecutorTests {
             clearsActiveHumanID: false
         )
         let beforeRevision = revisionCenter.homeRevision.value
+        let revisions = SharedDomainRevisionPublisher(center: revisionCenter)
 
-        revisionCenter.publishMemberDeletion(result, note: "test.member.delete")
+        revisions.publishMemberDeletion(result, note: "test.member.delete")
 
         let mutation = try #require(revisionCenter.lastMutation)
         #expect(revisionCenter.homeRevision.value == beforeRevision + 1)
@@ -2758,8 +2759,9 @@ struct HomeCommandExecutorTests {
             didDelete: true
         )
         let beforeRevision = revisionCenter.homeRevision.value
+        let revisions = SharedDomainRevisionPublisher(center: revisionCenter)
 
-        revisionCenter.publishPetCareDelete(result, note: "test.care.delete")
+        revisions.publishPetCareDelete(result, note: "test.care.delete")
 
         let mutation = try #require(revisionCenter.lastMutation)
         #expect(revisionCenter.homeRevision.value == beforeRevision + 1)
@@ -9135,7 +9137,7 @@ struct HomeCommandExecutorTests {
             save _: Bool,
             postsRewardFeedback _: Bool,
             updatesProjection _: Bool,
-            projectionManager _: QuestManager?
+            projectionManager _: CoconutProjectionManaging?
         ) throws -> [CoconutLedgerEntry] {
             throw Failure.forced
         }
@@ -9151,7 +9153,7 @@ struct HomeCommandExecutorTests {
             context _: ModelContext,
             save _: Bool,
             postsRewardFeedback _: Bool,
-            projectionManager _: QuestManager?
+            projectionManager _: CoconutProjectionManaging?
         ) throws -> [CoconutLedgerEntry] {
             throw Failure.forced
         }
@@ -9178,9 +9180,9 @@ struct HomeCommandExecutorTests {
 
         func setDeveloperOverrideBalance(amount _: Int, for _: Human?, displayName _: String, context _: ModelContext) {}
 
-        func refreshQuestProjection(context _: ModelContext, manager _: QuestManager?) {}
+        func refreshQuestProjection(context _: ModelContext, manager _: CoconutProjectionManaging?) {}
 
-        func bootstrapIfNeeded(context _: ModelContext, projectionManager _: QuestManager?) throws {}
+        func bootstrapIfNeeded(context _: ModelContext, projectionManager _: CoconutProjectionManaging?) throws {}
     }
 
     private func makeDate(year: Int, month: Int, day: Int) -> Date {

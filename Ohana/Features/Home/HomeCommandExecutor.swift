@@ -407,7 +407,7 @@ struct HomeCommandExecutor {
             pet: pet,
             modelContext: modelContext,
             awardCoconut: true,
-            questManager: questManager,
+            economy: StaticCareEventEconomyAwarder(questManager: questManager),
             medicationReminders: medicationReminders
         )
         guard result.didRecord, result.allowsDerivedEffects else {

@@ -106,9 +106,11 @@ enum CalendarTaskCompletionSyncService {
         executorId: String?,
         operationDate: Date = Date(),
         sourceReminderId: String? = nil,
-        careLedger providedCareLedger: CareLedgerRecording? = nil
+        careLedger providedCareLedger: CareLedgerRecording? = nil,
+        economy providedEconomy: CareEventEconomyAwarding? = nil
     ) -> PetTaskSyncResult {
         let careLedger = providedCareLedger ?? CareLedgerService()
+        let economy = providedEconomy ?? CareEventServiceDependencies.liveEconomy()
         guard isPetTask(event: event),
               let pet = MemberLifecycleActiveScheduleResolver.petTarget(for: event, pets: pets) else { return .noOp }
 
@@ -129,7 +131,8 @@ enum CalendarTaskCompletionSyncService {
                 occurrenceDate: occurrenceDate,
                 pet: pet,
                 isCompleted: isCompleted,
-                context: context
+                context: context,
+                economy: economy
             ).result { return result }
             guard insertCareLog(
                 write: write,
@@ -141,7 +144,8 @@ enum CalendarTaskCompletionSyncService {
                 rewardDate: operationDate,
                 sourceReminderId: sourceReminderId,
                 context: context,
-                careLedger: careLedger
+                careLedger: careLedger,
+                economy: economy
             ) else { return .noOp }
             return write.allowsDerivedEffects ? .activeCompleted : .noOp
         }
@@ -162,7 +166,8 @@ enum CalendarTaskCompletionSyncService {
                 occurrenceDate: occurrenceDate,
                 pet: pet,
                 isCompleted: isCompleted,
-                context: context
+                context: context,
+                economy: economy
             ).result { return result }
             guard insertPottyLog(
                 write: write,
@@ -174,7 +179,8 @@ enum CalendarTaskCompletionSyncService {
                 rewardDate: operationDate,
                 sourceReminderId: sourceReminderId,
                 context: context,
-                careLedger: careLedger
+                careLedger: careLedger,
+                economy: economy
             ) else { return .noOp }
             return write.allowsDerivedEffects ? .activeCompleted : .noOp
         }
@@ -192,7 +198,8 @@ enum CalendarTaskCompletionSyncService {
                 occurrenceDate: occurrenceDate,
                 pet: pet,
                 isCompleted: isCompleted,
-                context: context
+                context: context,
+                economy: economy
             ).result { return result }
             guard insertHygieneLog(
                 write: write,
@@ -204,7 +211,8 @@ enum CalendarTaskCompletionSyncService {
                 rewardDate: operationDate,
                 sourceReminderId: sourceReminderId,
                 context: context,
-                careLedger: careLedger
+                careLedger: careLedger,
+                economy: economy
             ) else { return .noOp }
             return write.allowsDerivedEffects ? .activeCompleted : .noOp
         }
@@ -259,10 +267,11 @@ enum CalendarTaskCompletionSyncService {
         occurrenceDate: Date,
         pet: Pet,
         isCompleted: Bool,
-        context: ModelContext
+        context: ModelContext,
+        economy: CareEventEconomyAwarding
     ) -> CalendarFactInsertDecision {
         if !isCompleted {
-            deleteCalendarGeneratedRecords(event: event, occurrenceDate: occurrenceDate, context: context)
+            deleteCalendarGeneratedRecords(event: event, occurrenceDate: occurrenceDate, context: context, economy: economy)
             deleteCalendarGeneratedFactOnlyRecords(event: event, occurrenceDate: occurrenceDate, pet: pet, context: context)
             return .reopened
         }
@@ -370,7 +379,8 @@ enum CalendarTaskCompletionSyncService {
         rewardDate: Date,
         sourceReminderId: String?,
         context: ModelContext,
-        careLedger: CareLedgerRecording
+        careLedger: CareLedgerRecording,
+        economy: CareEventEconomyAwarding
     ) -> Bool {
         let log = DomainCareFactWriter.createCareLog(plan: write, context: context).log
         context.safeSave()
@@ -381,7 +391,7 @@ enum CalendarTaskCompletionSyncService {
             occurrenceDate: occurrenceDate,
             rewardDate: rewardDate,
             context: context,
-            careLedger: careLedger
+            economy: economy
         )
         DomainCareFactEffectsDispatcher.run(plan: write) { actor in
             recordCalendarLedger(
@@ -417,7 +427,8 @@ enum CalendarTaskCompletionSyncService {
         rewardDate: Date,
         sourceReminderId: String?,
         context: ModelContext,
-        careLedger: CareLedgerRecording
+        careLedger: CareLedgerRecording,
+        economy: CareEventEconomyAwarding
     ) -> Bool {
         let log = DomainCareFactWriter.createPottyLog(plan: write, context: context)
         context.safeSave()
@@ -428,7 +439,7 @@ enum CalendarTaskCompletionSyncService {
             occurrenceDate: occurrenceDate,
             rewardDate: rewardDate,
             context: context,
-            careLedger: careLedger
+            economy: economy
         )
         DomainCareFactEffectsDispatcher.run(plan: write) { actor in
             recordCalendarLedger(
@@ -462,7 +473,8 @@ enum CalendarTaskCompletionSyncService {
         rewardDate: Date,
         sourceReminderId: String?,
         context: ModelContext,
-        careLedger: CareLedgerRecording
+        careLedger: CareLedgerRecording,
+        economy: CareEventEconomyAwarding
     ) -> Bool {
         let log = DomainCareFactWriter.createHygieneLog(plan: write, context: context)
         context.safeSave()
@@ -473,7 +485,7 @@ enum CalendarTaskCompletionSyncService {
             occurrenceDate: occurrenceDate,
             rewardDate: rewardDate,
             context: context,
-            careLedger: careLedger
+            economy: economy
         )
         DomainCareFactEffectsDispatcher.run(plan: write) { actor in
             recordCalendarLedger(
@@ -541,7 +553,12 @@ enum CalendarTaskCompletionSyncService {
     }
 
     @MainActor
-    private static func deleteCalendarGeneratedRecords(event: Event, occurrenceDate: Date, context: ModelContext) {
+    private static func deleteCalendarGeneratedRecords(
+        event: Event,
+        occurrenceDate: Date,
+        context: ModelContext,
+        economy: CareEventEconomyAwarding
+    ) {
         let ledgers = calendarLedgerEntries(event: event, occurrenceDate: occurrenceDate, context: context)
         for ledger in ledgers {
             reverseWalletEntries(
@@ -555,7 +572,7 @@ enum CalendarTaskCompletionSyncService {
                 deletedAt: Date(),
                 deletedByHumanId: ledger.actorId
             )
-            clearCooldown(for: ledger, context: context)
+            clearCooldown(for: ledger, context: context, economy: economy)
             deleteLegacyModel(name: ledger.legacyModelName, idString: ledger.legacyModelId, context: context)
             CloudSyncMutationRecorder.markDeleted(ledger, context: context)
             context.delete(ledger)
@@ -691,12 +708,12 @@ enum CalendarTaskCompletionSyncService {
     @MainActor
     private static func awardGeneratedCare(
         plan: AuthorizedDomainCareFactWrite,
-        action: QuestManager.OhanaActionType,
+        action: DomainCareRewardAction,
         pet: Pet,
         occurrenceDate: Date,
         rewardDate: Date,
         context: ModelContext,
-        careLedger: CareLedgerRecording
+        economy: CareEventEconomyAwarding
     ) -> GeneratedRewardTrace {
         DomainCareFactEffectsDispatcher.map(
             plan: plan,
@@ -709,14 +726,13 @@ enum CalendarTaskCompletionSyncService {
         ) { actor in
             let walletBefore = Set(fetchOrLog(FetchDescriptor<CoconutLedgerEntry>(), context: context, operation: "fetch wallet entries before calendar reward").map(\.id))
             let budgetBefore = Set(fetchOrLog(FetchDescriptor<EconomyBudgetUsageEvent>(), context: context, operation: "fetch budget events before calendar reward").map(\.id))
-            let questManager = QuestManager()
-            let reward = EconomyRewardDiscipline.awardCareAction(
+            let reward = economy.awardCareAction(
                 type: action,
                 pet: pet,
                 context: context,
+                quality: .none,
                 date: rewardDate,
-                executorId: actor.rewardExecutorId,
-                questManager: questManager
+                executorId: actor.rewardExecutorId
             )
             let walletEntries = fetchOrLog(FetchDescriptor<CoconutLedgerEntry>(), context: context, operation: "fetch wallet entries after calendar reward")
                 .filter { !walletBefore.contains($0.id) }
@@ -724,7 +740,7 @@ enum CalendarTaskCompletionSyncService {
                 .filter { !budgetBefore.contains($0.id) }
             let metadataJSON = generatedMetadata(
                 occurrenceDate: occurrenceDate,
-                rewardMetadata: careLedger.rewardMetadata(reward, questManager: questManager),
+                rewardMetadata: economy.rewardMetadata(for: reward),
                 walletEntries: walletEntries,
                 budgetEvents: budgetEvents
             )
@@ -790,11 +806,11 @@ enum CalendarTaskCompletionSyncService {
     }
 
     @MainActor
-    private static func clearCooldown(for ledger: CareLedgerEvent, context: ModelContext) {
+    private static func clearCooldown(for ledger: CareLedgerEvent, context: ModelContext, economy: CareEventEconomyAwarding) {
         guard let petId = ledger.subjectId.flatMap(UUID.init(uuidString:)),
               let action = rewardAction(legacyModelName: ledger.legacyModelName, actionType: ledger.actionType, petName: pet(id: petId, context: context)?.name) else {
             return
         }
-        QuestManager().clearCooldown(petId: petId, type: action)
+        economy.clearCooldown(petId: petId, type: action)
     }
 }

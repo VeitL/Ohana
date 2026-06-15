@@ -12,52 +12,38 @@ import SwiftData
 protocol CareEventEconomyAwarding {
     @discardableResult
     func awardCareAction(
-        type: QuestManager.OhanaActionType,
+        type: DomainCareRewardAction,
         pet: Pet?,
         context: ModelContext,
-        quality: QuestManager.QualityBonus,
+        quality: DomainCareRewardQuality,
         date: Date,
         executorId: String?
     ) -> (humanGot: Int, petGot: Int)
 
     @discardableResult
     func awardSharedCareAction(
-        type: QuestManager.OhanaActionType,
+        type: DomainCareRewardAction,
         pets: [Pet],
         context: ModelContext,
-        quality: QuestManager.QualityBonus,
+        quality: DomainCareRewardQuality,
         title: String?,
         executorId: String?
     ) -> (humanGot: Int, petGot: Int)
+
+    func rewardMetadata(for reward: (humanGot: Int, petGot: Int)?) -> String
+    func recordFirstMeal(actorId: String?, context: ModelContext)
+    func clearCooldown(petId: UUID?, type: DomainCareRewardAction)
+    func refreshProjectionAfterRollback(context: ModelContext)
 }
 
 @MainActor
 struct CareEventServiceDependencies {
-    let questManager: QuestManager
     let economy: CareEventEconomyAwarding
     let careLedger: CareLedgerRecording
     let reminderCompletion: ReminderCompleting
     let quickActionReminderCompletion: QuickActionReminderCompleting
     let familyTasks: FamilyTaskManaging
     let revisions: DomainRevisionPublishing
-
-    static func live() -> CareEventServiceDependencies {
-        let wallet = SwiftDataCoconutWalletManager()
-        let revisions = SharedDomainRevisionPublisher()
-        let questManager = QuestManager(wallet: wallet, revisions: revisions)
-        let careLedger = CareLedgerService()
-        let familyTasks = StaticFamilyTaskManager(wallet: wallet, careLedger: careLedger, questManager: questManager)
-        let reminderCompletion = ReminderCompletionService(careLedger: careLedger, familyTasks: familyTasks)
-        return CareEventServiceDependencies(
-            questManager: questManager,
-            economy: StaticCareEventEconomyAwarder(questManager: questManager),
-            careLedger: careLedger,
-            reminderCompletion: reminderCompletion,
-            quickActionReminderCompletion: QuickActionReminderCompletionSyncService(reminderCompletion: reminderCompletion),
-            familyTasks: familyTasks,
-            revisions: revisions
-        )
-    }
 }
 
 nonisolated enum CareFactWriteDisposition: Equatable {

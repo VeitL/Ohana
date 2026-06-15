@@ -80,7 +80,6 @@ final class AppServices {
         let reminderCompletion = ReminderCompletionService(careLedger: careLedger, familyTasks: familyTasks)
         let quickActionReminderCompletion = QuickActionReminderCompletionSyncService(reminderCompletion: reminderCompletion)
         let careEventDependencies = CareEventServiceDependencies(
-            questManager: questManager,
             economy: careEventEconomy,
             careLedger: careLedger,
             reminderCompletion: reminderCompletion,
@@ -119,7 +118,7 @@ final class AppServices {
             shopPurchaseFulfillment: ShopPurchaseFulfillmentService(),
             islandToasts: IslandToastManager(),
             metricKit: MetricKitObserver(),
-            backups: SharedDataBackupManagerAdapter(questManager: questManager),
+            backups: SharedDataBackupManagerAdapter(projectionManager: questManager),
             automaticBackups: automaticBackups,
             appReset: StaticAppResetter(questManager: questManager),
             medicationReminders: SharedMedicationReminderManager(careLedger: careLedger),

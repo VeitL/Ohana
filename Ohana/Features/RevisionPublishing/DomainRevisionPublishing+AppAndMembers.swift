@@ -1,5 +1,5 @@
 //
-//  ReadModelRevisionCenter+AppAndMembers.swift
+//  DomainRevisionPublishing+AppAndMembers.swift
 //  Ohana
 //
 //  Revision publishing helpers for app, settings, privacy, and member flows.
@@ -7,7 +7,7 @@
 
 import Foundation
 
-extension ReadModelRevisionCenter {
+extension DomainRevisionPublishing {
     func publishMemberDeletion(_ result: MemberDeletionCommandResult, note: String) {
         var affected = Set(result.removedRelatedEventIDs)
         affected.insert(result.entityID)

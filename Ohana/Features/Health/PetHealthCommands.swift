@@ -243,7 +243,7 @@ enum PetHealthCommandService {
                 }
             }
 
-            careLedger.syncOasisTreeEnergyIfNeeded(metadataJSON: rewardMetadataJSON, context: context)
+            careLedger.syncLedgerEnergyIfNeeded(metadataJSON: rewardMetadataJSON, context: context)
             if schedulesReminderNotification, let reminder {
                 Task { @MainActor in
                     await reminderScheduling.scheduleIfNeeded(

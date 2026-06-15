@@ -162,7 +162,6 @@ final nonisolated class CareLedgerService {
             metadataJSON: metadataJSON,
             context: context
         )
-        syncOasisTreeEnergyIfNeeded(metadataJSON: metadataJSON, context: context)
     }
 
     @MainActor
@@ -189,7 +188,6 @@ final nonisolated class CareLedgerService {
             metadataJSON: metadataJSON,
             context: context
         )
-        syncOasisTreeEnergyIfNeeded(metadataJSON: metadataJSON, context: context)
     }
 
     @MainActor
@@ -292,11 +290,5 @@ final nonisolated class CareLedgerService {
         return """
         {"humanCoconuts":\(max(0, reward.humanGot)),"petCoconuts":\(max(0, reward.petGot)),"economy":"humanWallet_petBond"}
         """
-    }
-
-    @MainActor
-    static func syncOasisTreeEnergyIfNeeded(metadataJSON: String, context: ModelContext) {
-        guard CoconutEconomyPolicyV2.metadataValue(named: "growthXP", in: metadataJSON) > 0 else { return }
-        OasisTreeManagerRegistry.current.refreshLedgerEnergy(modelContext: context)
     }
 }

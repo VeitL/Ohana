@@ -798,7 +798,7 @@ struct PetMedicationCommandExecutor {
             modelContext: context,
             decrementRemaining: decrementRemaining,
             awardCoconut: awardCoconut,
-            questManager: questManager,
+            economy: StaticCareEventEconomyAwarder(questManager: questManager),
             activeHumanSelection: activeHumanSelection,
             medicationReminders: medicationReminders
         )

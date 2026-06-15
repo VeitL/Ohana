@@ -676,7 +676,7 @@ struct OasisCritterDailyWishTests {
             save: Bool,
             postsRewardFeedback: Bool,
             updatesProjection: Bool,
-            projectionManager: QuestManager?
+            projectionManager: CoconutProjectionManaging?
         ) throws -> [CoconutLedgerEntry] {
             applyUpdatesProjection.append(updatesProjection)
             return try wrapped.apply(
@@ -700,7 +700,7 @@ struct OasisCritterDailyWishTests {
             context: ModelContext,
             save: Bool,
             postsRewardFeedback: Bool,
-            projectionManager: QuestManager?
+            projectionManager: CoconutProjectionManaging?
         ) throws -> [CoconutLedgerEntry] {
             try wrapped.applyActorDelta(
                 amount: amount,
@@ -746,12 +746,12 @@ struct OasisCritterDailyWishTests {
             )
         }
 
-        func refreshQuestProjection(context: ModelContext, manager: QuestManager?) {
+        func refreshQuestProjection(context: ModelContext, manager: CoconutProjectionManaging?) {
             refreshCount += 1
             wrapped.refreshQuestProjection(context: context, manager: manager)
         }
 
-        func bootstrapIfNeeded(context: ModelContext, projectionManager: QuestManager?) throws {
+        func bootstrapIfNeeded(context: ModelContext, projectionManager: CoconutProjectionManaging?) throws {
             try wrapped.bootstrapIfNeeded(context: context, projectionManager: projectionManager)
         }
     }

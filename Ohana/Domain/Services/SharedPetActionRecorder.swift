@@ -89,8 +89,8 @@ struct SharedPetActionDescriptor {
     let currencyCode: String
     let note: String
     let childLogStrategy: SharedPetChildLogStrategy
-    let reward: QuestManager.OhanaActionType?
-    let rewardQuality: QuestManager.QualityBonus
+    let reward: DomainCareRewardAction?
+    let rewardQuality: DomainCareRewardQuality
     let rewardTitle: String?
     let reminderCareType: CareType?
     let source: CareLedgerSource
@@ -111,8 +111,8 @@ struct SharedPetActionDescriptor {
         currencyCode: String = "",
         note: String = "",
         childLogStrategy: SharedPetChildLogStrategy,
-        reward: QuestManager.OhanaActionType? = nil,
-        rewardQuality: QuestManager.QualityBonus = .none,
+        reward: DomainCareRewardAction? = nil,
+        rewardQuality: DomainCareRewardQuality = .none,
         rewardTitle: String? = nil,
         reminderCareType: CareType? = nil,
         source: CareLedgerSource = .quickAction
@@ -470,8 +470,8 @@ enum SharedPetActionRecorder {
                 context: context,
                 dependencies: dependencies
             )
-            dependencies.careLedger.syncOasisTreeEnergyIfNeeded(
-                metadataJSON: dependencies.careLedger.rewardMetadata(reward, questManager: dependencies.questManager),
+            dependencies.careLedger.syncLedgerEnergyIfNeeded(
+                metadataJSON: dependencies.economy.rewardMetadata(for: reward),
                 context: context
             )
 
@@ -670,8 +670,7 @@ enum SharedPetActionRecorder {
             sessionID: session.id,
             targetCount: targets.count,
             executorIds: descriptor.executorIds,
-            careLedger: dependencies.careLedger,
-            questManager: dependencies.questManager
+            economy: dependencies.economy
         )
         for (index, pair) in careLogs.enumerated() {
             dependencies.careLedger.recordPetCare(
@@ -833,10 +832,9 @@ enum SharedPetActionRecorder {
         sessionID: UUID,
         targetCount: Int,
         executorIds: [String],
-        careLedger: CareLedgerRecording,
-        questManager: QuestManager
+        economy: CareEventEconomyAwarding
     ) -> String {
-        let rewardJSON = careLedger.rewardMetadata(reward, questManager: questManager)
+        let rewardJSON = economy.rewardMetadata(for: reward)
         guard !rewardJSON.isEmpty,
               var object = try? JSONSerialization.jsonObject(with: Data(rewardJSON.utf8)) as? [String: Any] else {
             return sharedMetadata(sessionID: sessionID, targetCount: targetCount, executorIds: executorIds)
