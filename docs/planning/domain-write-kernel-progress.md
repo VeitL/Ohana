@@ -11,10 +11,10 @@
 | 0 | 冻结点补丁 + 全 app 写入矩阵 | 🟢 | 写入矩阵完成；文档/脚本级本地验证 PASS | PASS | Phase 0 commit `c41e7d2be` pushed；CI run `27546879625` 全绿。 |
 | 1 | Typed subject taxonomy | 🟡 | `DomainSubjectResolution` 基础落地；schedule + active schedule resolver + ledger/reminder/reward/deep-link/notification/overdue/task/delete/quick-care filters 已委托通用 resolver；全 app 消费继续扩展 | pending | Phase 1/2 并行推进：typed subject 先覆盖 schedule downstream consumers，restore/sync/effects 仍待扩展。 |
 | 2 | Capability authorizer | 🟡 | `AuthorizedMutationPlan` 基础落地；schedule writer 已消费通用 plan/token；care-plan sync 返回授权写入结果供 effects 消费；其它 writer 待扩展 | pending | AuthorizedMutationPlan 作为全 app 写入能力雏形；当前仍是 foundation + characterization，未到 Phase-end CI。 |
-| 3 | Schedule writer 首批收口 | 🟢 | `scripts/module-exit-gate.sh` PASS；raw Event/Reminder scan 收口 | required | Event/Reminder 写入已收进 writer；下一步是本 Phase 唯一一次 commit/push + CI |
+| 3 | Schedule writer 首批收口 | 🟢* | `scripts/module-exit-gate.sh` PASS；raw Event/Reminder scan 收口 | PASS: `27558005993` | CI 已随 `b89d04fa2` 全绿；纯复审 pending。 |
 | 4 | Fact / ledger / economy 收口 | ⬜ | pending | pending | care fact、expense、wallet ledger、reward、family task completion 改为 plan 驱动 |
-| 5 | Restore / sync / import 收口 | 🟢 | Rehydrate batch 1-7 local PASS：backup/cloud schedule+ledger、care facts、member content、root/remaining restore、economy/task/Oasis/gacha/shop/import、CloudSync metadata/apply 已改走集中 writer/service；restore/apply bypass audit + fixtures PASS | required | Phase 5 本地收口完成；下一步是本 Phase 唯一一次 commit/push + CI + 纯复审。 |
-| 6 | R8/R9 审计升级 | 🟢 | R8/R9 fixture + audit PASS；raw effect subject、feature taxonomy string、restore/apply bypass、direct constructor 已覆盖 | required | 本地完成；下一步 commit/push 一次并查一次 CI。 |
+| 5 | Restore / sync / import 收口 | 🟢* | Rehydrate batch 1-7 local PASS：backup/cloud schedule+ledger、care facts、member content、root/remaining restore、economy/task/Oasis/gacha/shop/import、CloudSync metadata/apply 已改走集中 writer/service；restore/apply bypass audit + fixtures PASS | PASS: `27558005993` | CI 已随 `b89d04fa2` 全绿；纯复审 pending。 |
+| 6 | R8/R9 审计升级 | 🟢* | R8/R9 fixture + audit PASS；raw effect subject、feature taxonomy string、restore/apply bypass、direct constructor 已覆盖 | PASS: `27558005993` | CI 已随 `b89d04fa2` 全绿；纯复审 pending。 |
 | 7 | 依赖倒挂收缩 | ⬜ | pending | pending | taxonomy、policy result、mutation plan 保持 feature-neutral；Domain/Models 不新增 feature command result/string |
 
 ## Phase 明细
@@ -85,6 +85,8 @@ Raw Intent / DTO / Restore Record
 ## 更新日志
 
 - 2026-06-15 Phase 3 local complete：Schedule writer 首批收口完成，本地 module-exit gate 通过；Phase-end CI pending。
+
+- 2026-06-15 17:58:00 +0200 Phase 3/5/6 CI checkpoint：commit `b89d04fa2` / GitHub Actions run `27558005993` 全绿（`audits` PASS、`lint` PASS、`build-test` PASS）。Phase 3 schedule writer、Phase 5 rehydrate writer、Phase 6 R8/R9 audit upgrade 均已获得 CI 覆盖；仍未标 🏁，因为结尾纯复审 pending。
 
 - 2026-06-15 14:34:57 +0200 Phase 0 start：Phase 0 开始：只做全 app 写入矩阵和扫描，本阶段内不触发 CI。
 
