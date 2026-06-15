@@ -85,14 +85,25 @@ enum HumanWishlistCommandService {
         let title = input.title.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !title.isEmpty else { throw HumanWishlistCommandError.emptyTitle }
         guard input.cost > 0 else { throw HumanWishlistCommandError.invalidCost }
-        guard MemberWritePolicy.disposition(human: human, intent: .activeOnly).allowsDerivedEffects else {
+        guard let write = DomainMemberFactWriteAuthorizer.authorizeHumanFact(
+            human: human,
+            occurredAt: input.createdAt,
+            writeKind: .collaboration,
+            source: .userCommand,
+            context: context,
+            logPrefix: "HumanWishlistCommandService"
+        ) else {
             throw HumanWishlistCommandError.itemOwnershipMismatch
         }
 
-        let item = WishlistItem(title: title, cost: input.cost, creatorId: human.id.uuidString)
-        item.createdAt = input.createdAt
-        context.insert(item)
-        CloudSyncMutationRecorder.markModified(item, context: context, modifiedAt: input.createdAt)
+        let item = DomainMemberFactWriter.createWishlistItem(
+            plan: write,
+            title: title,
+            cost: input.cost,
+            human: human,
+            createdAt: input.createdAt,
+            context: context
+        )
         context.safeSave()
         return HumanWishlistCommandResult(
             humanID: human.id,
@@ -117,7 +128,15 @@ enum HumanWishlistCommandService {
         let questManager = providedQuestManager ?? QuestManager()
         let careLedger: CareLedgerRecording = providedCareLedger ?? CareLedgerService()
         let wallet: CoconutWalletManaging = providedWallet ?? SwiftDataCoconutWalletManager()
-        guard MemberWritePolicy.disposition(human: human, intent: .activeOnly).allowsDerivedEffects else {
+        let now = Date()
+        guard let write = DomainMemberFactWriteAuthorizer.authorizeHumanFact(
+            human: human,
+            occurredAt: now,
+            writeKind: .collaboration,
+            source: .userCommand,
+            context: context,
+            logPrefix: "HumanWishlistCommandService"
+        ) else {
             throw HumanWishlistCommandError.itemOwnershipMismatch
         }
         guard item.creatorId == human.id.uuidString else {
@@ -130,60 +149,78 @@ enum HumanWishlistCommandService {
             throw HumanWishlistCommandError.insufficientCoconuts(missing: item.cost - humanBalance)
         }
 
-        item.isRedeemed = true
-        item.redeemedById = normalizedId(redeemedById)
-        CloudSyncMutationRecorder.markModified(item, context: context)
-
-        let ledger = careLedger.record(
-            occurredAt: Date(),
-            actorKind: .human,
-            actorId: item.redeemedById ?? human.id.uuidString,
-            subjectKind: .human,
-            subjectId: human.id.uuidString,
-            eventKind: .coconut,
-            actionType: "humanWishlistRedeem",
-            amountValue: Double(item.cost),
-            amountUnit: "coconut",
-            note: item.title,
-            source: .economy,
-            sourceEventId: nil,
-            sourceReminderId: nil,
-            legacyModelName: "WishlistItem",
-            legacyModelId: item.id.uuidString,
-            coconutDelta: -item.cost,
-            rewardLogId: nil,
-            privacyFieldRaw: HumanPrivateField.wishlist.rawValue,
-            metadataJSON: "{\"wishlistItemId\":\"\(item.id.uuidString)\"}",
-            context: context,
-            save: false
+        DomainMemberFactWriter.redeemWishlistItem(
+            plan: write,
+            item: item,
+            redeemedById: normalizedId(redeemedById),
+            context: context
         )
-        do {
-            try wallet.apply(
-                deltas: [
-                    .human(
-                        human,
-                        delta: -item.cost,
-                        entryKind: .spend,
-                        source: .shop,
-                        title: "兑换「\(item.title)」",
-                        emoji: "🎁",
-                        actorId: human.id.uuidString,
-                        actorName: human.name,
-                        subjectKind: .human,
-                        subjectId: human.id.uuidString,
-                        sourceModelName: "WishlistItem",
-                        sourceModelId: item.id.uuidString,
-                        careLedgerEventId: ledger.id.uuidString,
-                        metadataJSON: "{\"wishlistItemId\":\"\(item.id.uuidString)\"}",
-                        transactionKey: "wishlist:\(item.id.uuidString):redeem"
-                    )
-                ],
+
+        let ledger = DomainMemberFactEffectsDispatcher.map(plan: write, default: nil as CareLedgerEvent?) { _ in
+            careLedger.record(
+                occurredAt: now,
+                actorKind: .human,
+                actorId: item.redeemedById ?? human.id.uuidString,
+                subjectKind: .human,
+                subjectId: human.id.uuidString,
+                eventKind: .coconut,
+                actionType: "humanWishlistRedeem",
+                amountValue: Double(item.cost),
+                amountUnit: "coconut",
+                note: item.title,
+                source: .economy,
+                sourceEventId: nil,
+                sourceReminderId: nil,
+                legacyModelName: "WishlistItem",
+                legacyModelId: item.id.uuidString,
+                coconutDelta: -item.cost,
+                rewardLogId: nil,
+                privacyFieldRaw: HumanPrivateField.wishlist.rawValue,
+                metadataJSON: "{\"wishlistItemId\":\"\(item.id.uuidString)\"}",
                 context: context,
-                save: false,
-                postsRewardFeedback: true,
-                updatesProjection: true,
-                projectionManager: questManager
+                save: false
             )
+        }
+        guard let ledger else {
+            throw HumanWishlistCommandError.itemOwnershipMismatch
+        }
+        do {
+            var walletApplyError: Error?
+            DomainMemberFactEffectsDispatcher.run(plan: write) { _ in
+                do {
+                    try wallet.apply(
+                        deltas: [
+                            .human(
+                                human,
+                                delta: -item.cost,
+                                entryKind: .spend,
+                                source: .shop,
+                                title: "兑换「\(item.title)」",
+                                emoji: "🎁",
+                                actorId: human.id.uuidString,
+                                actorName: human.name,
+                                subjectKind: .human,
+                                subjectId: human.id.uuidString,
+                                sourceModelName: "WishlistItem",
+                                sourceModelId: item.id.uuidString,
+                                careLedgerEventId: ledger.id.uuidString,
+                                metadataJSON: "{\"wishlistItemId\":\"\(item.id.uuidString)\"}",
+                                transactionKey: "wishlist:\(item.id.uuidString):redeem"
+                            )
+                        ],
+                        context: context,
+                        save: false,
+                        postsRewardFeedback: true,
+                        updatesProjection: true,
+                        projectionManager: questManager
+                    )
+                } catch {
+                    walletApplyError = error
+                }
+            }
+            if let walletApplyError {
+                throw walletApplyError
+            }
             try context.save()
         } catch {
             context.rollback()
@@ -207,20 +244,28 @@ enum HumanWishlistCommandService {
         for human: Human,
         context: ModelContext
     ) throws -> HumanWishlistDeleteCommandResult {
-        guard MemberWritePolicy.disposition(human: human, intent: .activeOnly).allowsDerivedEffects else {
+        guard let write = DomainMemberFactWriteAuthorizer.authorizeHumanFact(
+            human: human,
+            occurredAt: Date(),
+            writeKind: .collaboration,
+            source: .userCommand,
+            context: context,
+            logPrefix: "HumanWishlistCommandService"
+        ) else {
             throw HumanWishlistCommandError.itemOwnershipMismatch
         }
         guard item.creatorId == human.id.uuidString else {
             throw HumanWishlistCommandError.itemOwnershipMismatch
         }
         let ledgerEvents = ledgerEvents(for: item, context: context)
-        for event in ledgerEvents {
-            CloudSyncMutationRecorder.markDeleted(event, context: context)
-            context.delete(event)
+        DomainMemberFactEffectsDispatcher.run(plan: write) { _ in
+            for ledgerEvent in ledgerEvents {
+                CloudSyncMutationRecorder.markDeleted(ledgerEvent, context: context)
+                context.delete(ledgerEvent)
+            }
         }
         let itemID = item.id
-        CloudSyncMutationRecorder.markDeleted(item, context: context)
-        context.delete(item)
+        DomainMemberFactWriter.deleteWishlistItem(plan: write, item: item, context: context)
         context.safeSave()
         return HumanWishlistDeleteCommandResult(
             humanID: human.id,

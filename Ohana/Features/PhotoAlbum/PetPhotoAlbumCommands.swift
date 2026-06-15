@@ -36,19 +36,27 @@ enum PetPhotoAlbumCommandService {
         guard !payloads.isEmpty else {
             return PetPhotoAlbumCreateResult(petID: pet.id, photoIDs: [])
         }
-        guard MemberLifecycleGate.disposition(pet: pet, writeKind: .memorial).writesContent else {
-            return PetPhotoAlbumCreateResult(petID: pet.id, photoIDs: [])
-        }
-
         var logs: [PetPhotoLog] = []
         for (index, data) in payloads.enumerated() {
-            let log = PetPhotoLog(
+            let logDate = date.addingTimeInterval(Double(index) * 0.01)
+            guard let write = DomainMemberFactWriteAuthorizer.authorizePetFact(
+                pet: pet,
+                occurredAt: logDate,
+                writeKind: .memorial,
+                context: context,
+                logPrefix: "PetPhotoAlbumCommandService.createPhotos"
+            ) else { continue }
+            let log = DomainMemberFactWriter.createPetPhotoLog(
+                plan: write,
                 imageData: data,
-                date: date.addingTimeInterval(Double(index) * 0.01),
-                pet: pet
+                date: logDate,
+                pet: pet,
+                context: context
             )
-            context.insert(log)
             logs.append(log)
+        }
+        guard !logs.isEmpty else {
+            return PetPhotoAlbumCreateResult(petID: pet.id, photoIDs: [])
         }
         context.safeSave()
         return PetPhotoAlbumCreateResult(petID: pet.id, photoIDs: logs.map(\.id))

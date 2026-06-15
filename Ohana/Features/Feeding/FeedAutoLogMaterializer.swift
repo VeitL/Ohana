@@ -35,25 +35,28 @@ enum FeedAutoLogMaterializer {
             for dueDate in FeedRuleMetadata.dueOccurrences(for: event, through: now, calendar: calendar) {
                 let key = FeedLogMetadata.autoDedupKey(eventId: event.id, scheduledAt: dueDate)
                 guard !existingKeys.contains(key) else { continue }
-                let disposition = CareFactWritePolicy.disposition(
-                    pet: pet,
-                    date: dueDate,
-                    executorId: nil,
-                    context: context
+                let intent = DomainCareFactCreateIntent(
+                    kind: .care(
+                        type: .feeding,
+                        amountGrams: grams,
+                        amountMl: 0,
+                        note: "",
+                        foodKind: event.foodKind,
+                        treatKind: nil,
+                        autoFeedDedupKey: key,
+                        sharedSessionId: ""
+                    ),
+                    occurredAt: dueDate,
+                    source: .domainService
                 )
-                guard disposition.didWriteFact else { continue }
-                let log = PetCareLog(
-                    date: dueDate,
-                    type: .feeding,
-                    amountGrams: grams,
-                    foodKind: event.foodKind,
-                    autoFeedDedupKey: key,
+                guard let write = DomainCareFactWriteAuthorizer.authorizePetFact(
                     pet: pet,
-                    executorId: nil
-                )
-                context.insert(log)
-                CloudSyncMutationRecorder.markModified(log, context: context, modifiedAt: dueDate)
-                if disposition.allowsDerivedEffects {
+                    intent: intent,
+                    context: context,
+                    logPrefix: "FeedAutoLogMaterializer.materializeDueLogs"
+                ) else { continue }
+                let log = DomainCareFactWriter.createCareLog(plan: write, context: context).log
+                DomainCareFactEffectsDispatcher.run(plan: write) { _ in
                     careLedger.recordPetCare(
                         log: log,
                         pet: pet,

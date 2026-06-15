@@ -164,31 +164,40 @@ enum HumanMedicationCommandService {
     ) -> HumanMedicationCommandResult? {
         let cleanName = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !cleanName.isEmpty else { return nil }
-        guard MemberWritePolicy.disposition(human: human, intent: .activeOnly).allowsDerivedEffects else { return nil }
+        guard let write = DomainMemberFactWriteAuthorizer.authorizeHumanFact(
+            human: human,
+            occurredAt: startDate,
+            writeKind: .care,
+            source: .userCommand,
+            context: context,
+            logPrefix: "HumanMedicationCommandService"
+        ) else { return nil }
 
-        let medication = HumanMedication(
-            humanId: human.id.uuidString,
+        let medication = DomainMemberFactWriter.createHumanMedicationPlan(
+            plan: write,
+            human: human,
             name: cleanName,
             dosage: dosage.trimmingCharacters(in: .whitespacesAndNewlines),
             frequency: frequency,
             firstDoseTime: firstDoseTime,
             startDate: startDate,
             colorHex: colorHex,
-            notes: notes
+            notes: notes,
+            isActive: true,
+            context: context
         )
-        medication.isActive = true
-        context.insert(medication)
-        CloudSyncMutationRecorder.markModified(medication, context: context, modifiedAt: startDate)
         context.safeSave()
 
         if reminderEnabled {
-            let meds = fetchHumanMedications(humanID: human.id.uuidString, context: context)
-            let medicationReminders = providedMedicationReminders ?? SharedMedicationReminderManager()
-            medicationReminders.scheduleHumanMedicationReminders(
-                for: human,
-                meds: meds,
-                context: context
-            )
+            DomainMemberFactEffectsDispatcher.run(plan: write) { _ in
+                let meds = fetchHumanMedications(humanID: human.id.uuidString, context: context)
+                let medicationReminders = providedMedicationReminders ?? SharedMedicationReminderManager()
+                medicationReminders.scheduleHumanMedicationReminders(
+                    for: human,
+                    meds: meds,
+                    context: context
+                )
+            }
         }
 
         return HumanMedicationCommandResult(
@@ -322,30 +331,55 @@ enum PetMedicationPlanCommandService {
         medicationReminders providedMedicationReminders: MedicationReminderManaging? = nil
     ) -> PetMedicationPlanCommandResult? {
         guard !input.cleanName.isEmpty else { return nil }
-        guard MemberWritePolicy.disposition(pet: pet, intent: .activeOnly).allowsDerivedEffects else { return nil }
+        guard let write = DomainMemberFactWriteAuthorizer.authorizePetFact(
+            pet: pet,
+            occurredAt: input.startDate,
+            writeKind: .care,
+            source: .userCommand,
+            context: context,
+            logPrefix: "PetMedicationPlanCommandService"
+        ) else { return nil }
 
         let medication: PetMedication
         let created: Bool
         if let existing = existingMedication {
             medication = existing
             created = false
-        } else {
-            medication = PetMedication(
+            DomainMemberFactWriter.updatePetMedicationPlan(
+                plan: write,
+                medication: medication,
+                pet: pet,
                 name: input.cleanName,
                 dosage: input.cleanDosage,
                 frequency: input.frequency,
+                customFrequencyNote: input.savedCustomFrequencyNote,
                 startDate: input.startDate,
                 endDate: input.endDate,
                 colorHex: input.colorHex,
                 notes: input.cleanNotes,
-                pet: pet
+                isActive: input.isActive,
+                remainingAmount: max(0, input.remainingAmount ?? medication.remainingAmount),
+                context: context
             )
-            context.insert(medication)
+        } else {
+            medication = DomainMemberFactWriter.createPetMedicationPlan(
+                plan: write,
+                pet: pet,
+                name: input.cleanName,
+                dosage: input.cleanDosage,
+                frequency: input.frequency,
+                customFrequencyNote: input.savedCustomFrequencyNote,
+                startDate: input.startDate,
+                endDate: input.endDate,
+                colorHex: input.colorHex,
+                notes: input.cleanNotes,
+                isActive: input.isActive,
+                remainingAmount: max(0, input.remainingAmount ?? 0),
+                context: context
+            )
             created = true
         }
 
-        apply(input, to: medication, pet: pet)
-        CloudSyncMutationRecorder.markModified(medication, context: context, modifiedAt: input.startDate)
         let calendarSync = syncCalendarEvents(
             for: medication,
             pet: pet,
@@ -355,8 +389,10 @@ enum PetMedicationPlanCommandService {
         context.safeSave()
 
         if scheduleReminders {
-            let medicationReminders = providedMedicationReminders ?? SharedMedicationReminderManager()
-            medicationReminders.scheduleMedicationReminders(for: pet, context: context)
+            DomainMemberFactEffectsDispatcher.run(plan: write) { _ in
+                let medicationReminders = providedMedicationReminders ?? SharedMedicationReminderManager()
+                medicationReminders.scheduleMedicationReminders(for: pet, context: context)
+            }
         }
 
         return PetMedicationPlanCommandResult(
@@ -379,7 +415,14 @@ enum PetMedicationPlanCommandService {
         scheduleReminders: Bool = true,
         medicationReminders providedMedicationReminders: MedicationReminderManaging? = nil
     ) -> PetMedicationPlanDeleteCommandResult {
-        guard MemberWritePolicy.disposition(pet: pet, intent: .activeOnly).allowsDerivedEffects else {
+        guard let write = DomainMemberFactWriteAuthorizer.authorizePetFact(
+            pet: pet,
+            occurredAt: Date(),
+            writeKind: .care,
+            source: .userCommand,
+            context: context,
+            logPrefix: "PetMedicationPlanCommandService"
+        ) else {
             return PetMedicationPlanDeleteCommandResult(
                 subjectID: pet.id,
                 medicationID: medication.id,
@@ -390,14 +433,20 @@ enum PetMedicationPlanCommandService {
         }
         let medicationID = medication.id
         let removedEventIDs = removeCalendarEvents(for: medicationID, context: context)
-        CloudSyncMutationRecorder.markDeleted(medication, pet: pet, context: context)
-        context.delete(medication)
+        DomainMemberFactWriter.deletePetMedicationPlan(
+            plan: write,
+            medication: medication,
+            pet: pet,
+            context: context
+        )
         context.safeSave()
         userDefaults.removeObject(forKey: PetMedicationPlanStorageKeys.remainingAmount(medicationID: medicationID))
 
         if scheduleReminders {
-            let medicationReminders = providedMedicationReminders ?? SharedMedicationReminderManager()
-            medicationReminders.scheduleMedicationReminders(for: pet, context: context)
+            DomainMemberFactEffectsDispatcher.run(plan: write) { _ in
+                let medicationReminders = providedMedicationReminders ?? SharedMedicationReminderManager()
+                medicationReminders.scheduleMedicationReminders(for: pet, context: context)
+            }
         }
 
         return PetMedicationPlanDeleteCommandResult(
@@ -419,7 +468,14 @@ enum PetMedicationPlanCommandService {
         scheduleReminders: Bool = true,
         medicationReminders providedMedicationReminders: MedicationReminderManaging? = nil
     ) -> PetMedicationPlanActivationCommandResult {
-        guard MemberWritePolicy.disposition(pet: pet, intent: .activeOnly).allowsDerivedEffects else {
+        guard let write = DomainMemberFactWriteAuthorizer.authorizePetFact(
+            pet: pet,
+            occurredAt: Date(),
+            writeKind: .care,
+            source: .userCommand,
+            context: context,
+            logPrefix: "PetMedicationPlanCommandService"
+        ) else {
             return PetMedicationPlanActivationCommandResult(
                 subjectID: pet.id,
                 medicationID: medication.id,
@@ -431,9 +487,13 @@ enum PetMedicationPlanCommandService {
             )
         }
         let didChange = medication.isActive != isActive
-        medication.isActive = isActive
         if didChange {
-            CloudSyncMutationRecorder.markModified(medication, context: context)
+            DomainMemberFactWriter.updatePetMedicationPlanActive(
+                plan: write,
+                medication: medication,
+                isActive: isActive,
+                context: context
+            )
         }
         let calendarSync = syncCalendarEvents(
             for: medication,
@@ -443,8 +503,10 @@ enum PetMedicationPlanCommandService {
         context.safeSave()
 
         if scheduleReminders {
-            let medicationReminders = providedMedicationReminders ?? SharedMedicationReminderManager()
-            medicationReminders.scheduleMedicationReminders(for: pet, context: context)
+            DomainMemberFactEffectsDispatcher.run(plan: write) { _ in
+                let medicationReminders = providedMedicationReminders ?? SharedMedicationReminderManager()
+                medicationReminders.scheduleMedicationReminders(for: pet, context: context)
+            }
         }
 
         return PetMedicationPlanActivationCommandResult(
@@ -571,13 +633,19 @@ enum PetMedicationPlanCommandService {
             context: context,
             operation: "fetch pet medication calendar events"
         ).filter { isMedicationPlanEvent($0, medicationID: medicationID) }
-        let removedEventIDs = events.map(\.id)
+        var removedEventIDs: [UUID] = []
         for event in events {
-            for reminder in event.reminders {
-                CloudSyncMutationRecorder.markDeleted(reminder, context: context)
+            guard let mutation = DomainScheduleWriteAuthorizer.authorizeExistingEventMutation(
+                event: event,
+                writeKind: .care,
+                source: .domainService,
+                context: context
+            ) else {
+                continue
             }
-            CloudSyncMutationRecorder.markDeleted(event, context: context)
-            context.delete(event)
+            if DomainScheduleWriter.deleteEvent(event, mutation: mutation, context: context) {
+                removedEventIDs.append(event.id)
+            }
         }
         return removedEventIDs
     }

@@ -251,7 +251,6 @@ enum SharedPetActionRecorder {
             stockOwnerPetId: descriptor.stockOwnerPet?.id.uuidString ?? "",
             note: visibleDescriptorNote
         )
-        context.insert(session)
 
         var careLogs: [(Pet, PetCareLog)] = []
         var pottyLogs: [(Pet, PetPottyLog)] = []
@@ -259,94 +258,166 @@ enum SharedPetActionRecorder {
         var expenseLogs: [(Pet, PetExpenseLog)] = []
         var walkLogs: [(Pet, PetWalkLog)] = []
         var pottyLog: PetPottyLog?
+        var effectPlans: [AuthorizedDomainCareFactWrite] = []
 
         switch descriptor.childLogStrategy {
         case let .care(type):
             let perPetGrams = distributedAmount(descriptor.totalAmountGrams, count: allocationTargetCount, fractionDigits: 0)
             let perPetMl = distributedAmount(descriptor.totalAmountMl, count: allocationTargetCount, fractionDigits: 0)
             for (index, target) in targets.enumerated() {
-                let log = PetCareLog(
-                    date: descriptor.date,
-                    type: type,
-                    amountGrams: type == .feeding ? perPetGrams[index] : 0,
-                    amountMl: type == .watering ? perPetMl[index] : 0,
-                    note: visibleDescriptorNote,
-                    foodKind: descriptor.foodKind,
-                    sharedSessionId: session.id.uuidString,
-                    pet: target,
-                    executorId: actor.effectiveExecutorId
+                let intent = DomainCareFactCreateIntent(
+                    kind: .care(
+                        type: type,
+                        amountGrams: type == .feeding ? perPetGrams[index] : 0,
+                        amountMl: type == .watering ? perPetMl[index] : 0,
+                        note: visibleDescriptorNote,
+                        foodKind: descriptor.foodKind,
+                        treatKind: nil,
+                        autoFeedDedupKey: "",
+                        sharedSessionId: session.id.uuidString
+                    ),
+                    occurredAt: descriptor.date,
+                    executorId: descriptor.executorId
                 )
-                context.insert(log)
+                guard let write = DomainCareFactWriteAuthorizer.authorizePetFact(
+                    pet: target,
+                    intent: intent,
+                    context: context,
+                    logPrefix: "SharedPetActionRecorder.record",
+                    actorOverride: actor
+                ) else { continue }
+                let log = DomainCareFactWriter.createCareLog(plan: write, context: context).log
                 careLogs.append((target, log))
+                effectPlans.append(write)
             }
         case let .potty(type):
             for target in targets {
-                let log = PetPottyLog(
-                    date: descriptor.date,
-                    type: type,
-                    pet: target,
-                    executorId: actor.effectiveExecutorId,
-                    sharedSessionId: session.id.uuidString
+                let intent = DomainCareFactCreateIntent(
+                    kind: .potty(type: type, sharedSessionId: session.id.uuidString),
+                    occurredAt: descriptor.date,
+                    executorId: descriptor.executorId
                 )
-                context.insert(log)
+                guard let write = DomainCareFactWriteAuthorizer.authorizePetFact(
+                    pet: target,
+                    intent: intent,
+                    context: context,
+                    logPrefix: "SharedPetActionRecorder.record",
+                    actorOverride: actor
+                ) else { continue }
+                let log = DomainCareFactWriter.createPottyLog(plan: write, context: context)
                 pottyLogs.append((target, log))
+                effectPlans.append(write)
             }
         case let .unknownPotty(type):
-            let log = PetPottyLog(
-                date: descriptor.date,
-                type: type,
-                pet: nil,
-                executorId: actor.effectiveExecutorId,
-                sharedSessionId: session.id.uuidString
+            let intent = DomainCareFactCreateIntent(
+                kind: .unknownPotty(type: type, sharedSessionId: session.id.uuidString),
+                occurredAt: descriptor.date,
+                executorId: descriptor.executorId
             )
-            context.insert(log)
-            pottyLog = log
+            if let write = DomainCareFactWriteAuthorizer.authorizePetFact(
+                pet: descriptor.sourcePet,
+                intent: intent,
+                context: context,
+                logPrefix: "SharedPetActionRecorder.record",
+                actorOverride: actor
+            ) {
+                pottyLog = DomainCareFactWriter.createUnknownPottyLog(plan: write, context: context)
+                effectPlans.append(write)
+            }
         case let .hygiene(type):
             for target in targets {
-                let log = PetHygieneLog(
-                    date: descriptor.date,
-                    type: type,
-                    pet: target,
-                    executorId: actor.effectiveExecutorId,
-                    sharedSessionId: session.id.uuidString
+                let intent = DomainCareFactCreateIntent(
+                    kind: .hygiene(type: type, sharedSessionId: session.id.uuidString),
+                    occurredAt: descriptor.date,
+                    executorId: descriptor.executorId
                 )
-                context.insert(log)
+                guard let write = DomainCareFactWriteAuthorizer.authorizePetFact(
+                    pet: target,
+                    intent: intent,
+                    context: context,
+                    logPrefix: "SharedPetActionRecorder.record",
+                    actorOverride: actor
+                ) else { continue }
+                let log = DomainCareFactWriter.createHygieneLog(plan: write, context: context)
                 hygieneLogs.append((target, log))
+                effectPlans.append(write)
             }
         case let .expense(category, note):
             let visibleExpenseNote = SharedCareMetadata.userNoteForStorage(note)
             let perPetAmounts = distributedAmount(descriptor.totalExpenseAmount, count: allocationTargetCount, fractionDigits: 2)
             for (index, target) in targets.enumerated() {
-                let log = PetExpenseLog(
-                    date: descriptor.date,
-                    amount: perPetAmounts[index],
-                    category: category,
-                    note: visibleExpenseNote,
-                    pet: target,
-                    executorId: actor.effectiveExecutorId,
-                    sharedSessionId: session.id.uuidString
+                let intent = DomainCareFactCreateIntent(
+                    kind: .expense(
+                        amount: perPetAmounts[index],
+                        category: category,
+                        note: visibleExpenseNote,
+                        sharedSessionId: session.id.uuidString
+                    ),
+                    occurredAt: descriptor.date,
+                    executorId: descriptor.executorId
                 )
-                context.insert(log)
+                guard let write = DomainCareFactWriteAuthorizer.authorizePetFact(
+                    pet: target,
+                    intent: intent,
+                    context: context,
+                    logPrefix: "SharedPetActionRecorder.record",
+                    actorOverride: actor
+                ) else { continue }
+                let log = DomainCareFactWriter.createExpenseLog(plan: write, context: context)
                 expenseLogs.append((target, log))
+                effectPlans.append(write)
             }
         case let .walk(distanceMeters, endDate, coconutsEarned, behaviorNotes, moodRating):
             for target in targets {
-                let log = PetWalkLog(
-                    startDate: descriptor.date,
-                    pet: target,
-                    executorId: actor.effectiveExecutorId,
-                    executorIds: effectiveExecutorIds,
-                    sharedSessionId: session.id.uuidString
+                let intent = DomainCareFactCreateIntent(
+                    kind: .walk(
+                        distanceMeters: distanceMeters,
+                        endDate: endDate,
+                        coconutsEarned: coconutsEarned,
+                        behaviorNotes: behaviorNotes,
+                        moodRating: moodRating,
+                        executorIds: effectiveExecutorIds,
+                        sharedSessionId: session.id.uuidString
+                    ),
+                    occurredAt: descriptor.date,
+                    executorId: descriptor.executorId
                 )
-                log.endDate = endDate
-                log.distanceMeters = max(0, distanceMeters)
-                log.coconutsEarned = max(0, coconutsEarned)
-                log.behaviorNotes = behaviorNotes
-                log.moodRating = moodRating
-                context.insert(log)
+                guard let write = DomainCareFactWriteAuthorizer.authorizePetFact(
+                    pet: target,
+                    intent: intent,
+                    context: context,
+                    logPrefix: "SharedPetActionRecorder.record",
+                    actorOverride: actor
+                ) else { continue }
+                let log = DomainCareFactWriter.createWalkLog(plan: write, context: context)
                 walkLogs.append((target, log))
+                effectPlans.append(write)
             }
         }
+
+        guard !careLogs.isEmpty || !pottyLogs.isEmpty || pottyLog != nil || !hygieneLogs.isEmpty || !expenseLogs.isEmpty || !walkLogs.isEmpty else {
+            return .noOp()
+        }
+        let writtenTargets = writtenTargets(
+            sourcePet: descriptor.sourcePet,
+            careLogs: careLogs,
+            pottyLogs: pottyLogs,
+            pottyLog: pottyLog,
+            hygieneLogs: hygieneLogs,
+            expenseLogs: expenseLogs,
+            walkLogs: walkLogs
+        )
+        let sessionTargets: [Pet] = if case .unknownPotty = descriptor.childLogStrategy {
+            targets
+        } else {
+            writtenTargets
+        }
+        session.sourcePetId = writtenTargets.first(where: { $0.id == descriptor.sourcePet.id })?.id.uuidString
+            ?? writtenTargets.first?.id.uuidString
+            ?? descriptor.sourcePet.id.uuidString
+        session.targetPetIdsRaw = sessionTargets.map(\.id.uuidString).joined(separator: "|")
+        session.speciesRaw = sessionTargets.first?.species ?? descriptor.sourcePet.species
+        context.insert(session)
 
         if let primary = primaryLegacyModel(
             careLogs: careLogs,
@@ -360,104 +431,101 @@ enum SharedPetActionRecorder {
             session.primaryLegacyModelId = primary.id
         }
         CloudSyncMutationRecorder.markModified(session, context: context, modifiedAt: descriptor.date)
-        CloudSyncMutationRecorder.markModified(careLogs.map(\.1), context: context, modifiedAt: descriptor.date)
-        CloudSyncMutationRecorder.markModified(pottyLogs.map(\.1), context: context, modifiedAt: descriptor.date)
-        if let pottyLog {
-            CloudSyncMutationRecorder.markModified(pottyLog, context: context, modifiedAt: descriptor.date)
-        }
-        CloudSyncMutationRecorder.markModified(hygieneLogs.map(\.1), context: context, modifiedAt: descriptor.date)
-        CloudSyncMutationRecorder.markModified(expenseLogs.map(\.1), context: context, modifiedAt: descriptor.date)
         context.safeSave()
 
-        let reward: (humanGot: Int, petGot: Int) = if let rewardType = descriptor.reward {
-            dependencies.economy.awardSharedCareAction(
-                type: rewardType,
-                pets: targets,
+        let reward: (humanGot: Int, petGot: Int) = DomainCareFactEffectsDispatcher.map(plans: effectPlans, default: (humanGot: 0, petGot: 0)) { actor in
+            if let rewardType = descriptor.reward {
+                return dependencies.economy.awardSharedCareAction(
+                    type: rewardType,
+                    pets: writtenTargets,
+                    context: context,
+                    quality: descriptor.rewardQuality,
+                    title: descriptor.rewardTitle,
+                    executorId: actor.rewardExecutorId
+                )
+            }
+            return (humanGot: 0, petGot: 0)
+        }
+
+        DomainCareFactEffectsDispatcher.run(plans: effectPlans) { actor in
+            if !walkLogs.isEmpty {
+                let actualWalkCoconuts = max(0, reward.humanGot + reward.petGot)
+                for (index, pair) in walkLogs.enumerated() {
+                    pair.1.coconutsEarned = index == 0 ? actualWalkCoconuts : 0
+                }
+                CloudSyncMutationRecorder.markModified(walkLogs.map(\.1), context: context, modifiedAt: descriptor.date)
+            }
+
+            recordLedger(
+                descriptor: descriptor,
+                session: session,
+                targets: sessionTargets,
+                careLogs: careLogs,
+                pottyLogs: pottyLogs,
+                pottyLog: pottyLog,
+                hygieneLogs: hygieneLogs,
+                expenseLogs: expenseLogs,
+                walkLogs: walkLogs,
+                reward: reward,
                 context: context,
-                quality: descriptor.rewardQuality,
-                title: descriptor.rewardTitle,
-                executorId: actor.rewardExecutorId
+                dependencies: dependencies
             )
-        } else {
-            (0, 0)
-        }
-        if !walkLogs.isEmpty {
-            let actualWalkCoconuts = max(0, reward.humanGot + reward.petGot)
-            for (index, pair) in walkLogs.enumerated() {
-                pair.1.coconutsEarned = index == 0 ? actualWalkCoconuts : 0
-            }
-            CloudSyncMutationRecorder.markModified(walkLogs.map(\.1), context: context, modifiedAt: descriptor.date)
-        }
+            dependencies.careLedger.syncOasisTreeEnergyIfNeeded(
+                metadataJSON: dependencies.careLedger.rewardMetadata(reward, questManager: dependencies.questManager),
+                context: context
+            )
 
-        recordLedger(
-            descriptor: descriptor,
-            session: session,
-            targets: targets,
-            careLogs: careLogs,
-            pottyLogs: pottyLogs,
-            pottyLog: pottyLog,
-            hygieneLogs: hygieneLogs,
-            expenseLogs: expenseLogs,
-            walkLogs: walkLogs,
-            reward: reward,
-            context: context,
-            dependencies: dependencies
-        )
-        dependencies.careLedger.syncOasisTreeEnergyIfNeeded(
-            metadataJSON: dependencies.careLedger.rewardMetadata(reward, questManager: dependencies.questManager),
-            context: context
-        )
+            if let careType = descriptor.reminderCareType {
+                for target in writtenTargets {
+                    dependencies.quickActionReminderCompletion.completeNearestPetCareReminder(
+                        pet: target,
+                        type: careType,
+                        context: context,
+                        executorId: actor.effectiveExecutorId,
+                        now: descriptor.date
+                    )
+                }
+            }
+            if !pottyLogs.isEmpty {
+                for pair in pottyLogs {
+                    dependencies.quickActionReminderCompletion.completeNearestPetPottyReminder(
+                        pet: pair.0,
+                        context: context,
+                        executorId: actor.effectiveExecutorId,
+                        now: descriptor.date
+                    )
+                }
+            }
+            if case let .hygiene(type) = descriptor.childLogStrategy {
+                for pair in hygieneLogs {
+                    dependencies.quickActionReminderCompletion.completeNearestPetHygieneReminder(
+                        pet: pair.0,
+                        type: type,
+                        context: context,
+                        executorId: actor.effectiveExecutorId,
+                        now: descriptor.date
+                    )
+                }
+            }
 
-        if let careType = descriptor.reminderCareType {
-            for target in targets {
-                dependencies.quickActionReminderCompletion.completeNearestPetCareReminder(
-                    pet: target,
-                    type: careType,
-                    context: context,
-                    executorId: actor.effectiveExecutorId,
-                    now: descriptor.date
-                )
-            }
+            deriveRevision(
+                descriptor: descriptor,
+                session: session,
+                targets: sessionTargets,
+                careLogs: careLogs.map(\.1),
+                pottyLogs: pottyLogs.map(\.1),
+                pottyLog: pottyLog,
+                hygieneLogs: hygieneLogs.map(\.1),
+                expenseLogs: expenseLogs.map(\.1),
+                walkLogs: walkLogs.map(\.1),
+                reward: reward,
+                derivations: CareDerivationExecutor(revisions: dependencies.revisions)
+            )
         }
-        if !pottyLogs.isEmpty {
-            for pair in pottyLogs {
-                dependencies.quickActionReminderCompletion.completeNearestPetPottyReminder(
-                    pet: pair.0,
-                    context: context,
-                    executorId: actor.effectiveExecutorId,
-                    now: descriptor.date
-                )
-            }
-        }
-        if case let .hygiene(type) = descriptor.childLogStrategy {
-            for pair in hygieneLogs {
-                dependencies.quickActionReminderCompletion.completeNearestPetHygieneReminder(
-                    pet: pair.0,
-                    type: type,
-                    context: context,
-                    executorId: actor.effectiveExecutorId,
-                    now: descriptor.date
-                )
-            }
-        }
-
-        deriveRevision(
-            descriptor: descriptor,
-            session: session,
-            targets: targets,
-            careLogs: careLogs.map(\.1),
-            pottyLogs: pottyLogs.map(\.1),
-            pottyLog: pottyLog,
-            hygieneLogs: hygieneLogs.map(\.1),
-            expenseLogs: expenseLogs.map(\.1),
-            walkLogs: walkLogs.map(\.1),
-            reward: reward,
-            derivations: CareDerivationExecutor(revisions: dependencies.revisions)
-        )
 
         return SharedPetActionResult(
             sessionID: session.id,
-            targetPetIDs: targets.map(\.id),
+            targetPetIDs: sessionTargets.map(\.id),
             careLogIDs: careLogs.map(\.1.id),
             pottyLogIDs: pottyLogs.map(\.1.id),
             pottyLogID: pottyLog?.id,
@@ -469,6 +537,32 @@ enum SharedPetActionRecorder {
             reward: reward,
             disposition: .active
         )
+    }
+
+    private static func writtenTargets(
+        sourcePet: Pet,
+        careLogs: [(Pet, PetCareLog)],
+        pottyLogs: [(Pet, PetPottyLog)],
+        pottyLog: PetPottyLog?,
+        hygieneLogs: [(Pet, PetHygieneLog)],
+        expenseLogs: [(Pet, PetExpenseLog)],
+        walkLogs: [(Pet, PetWalkLog)]
+    ) -> [Pet] {
+        var result: [Pet] = []
+        func append(_ pet: Pet) {
+            guard !result.contains(where: { $0.id == pet.id }) else { return }
+            result.append(pet)
+        }
+
+        careLogs.map(\.0).forEach(append)
+        pottyLogs.map(\.0).forEach(append)
+        hygieneLogs.map(\.0).forEach(append)
+        expenseLogs.map(\.0).forEach(append)
+        walkLogs.map(\.0).forEach(append)
+        if pottyLog != nil {
+            append(sourcePet)
+        }
+        return result
     }
 
     @MainActor

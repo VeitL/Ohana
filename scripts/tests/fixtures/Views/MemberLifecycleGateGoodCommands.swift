@@ -24,6 +24,72 @@ enum MemberLifecycleGateGoodCommandService {
         )
     }
 
+    @MainActor
+    static func recordLedgerWithDispatcher(
+        pet: Pet,
+        plan: AuthorizedDomainMemberFactWrite,
+        careLedger: CareLedgerRecording,
+        context: ModelContext
+    ) {
+        DomainMemberFactEffectsDispatcher.run(plan: plan) { _ in
+            careLedger.record(
+                occurredAt: Date(),
+                actorKind: .unknown,
+                actorId: nil,
+                subjectKind: .pet,
+                subjectId: pet.id.uuidString,
+                eventKind: .care,
+                actionType: "goodEffectPlan",
+                amountValue: 0,
+                amountUnit: "",
+                note: "",
+                source: .service,
+                sourceEventId: nil,
+                sourceReminderId: nil,
+                legacyModelName: nil,
+                legacyModelId: nil,
+                coconutDelta: 0,
+                rewardLogId: nil,
+                privacyFieldRaw: nil,
+                metadataJSON: nil,
+                context: context,
+                save: false
+            )
+        }
+    }
+
+    @MainActor
+    static func stageRewardWithDispatcher(
+        plan: AuthorizedDomainEffectWrite,
+        questManager: QuestManager,
+        human: Human,
+        context: ModelContext
+    ) throws {
+        var rewardError: Error?
+        DomainEffectDispatcher.runEconomy(plan: plan) { _ in
+            do {
+                try questManager.stageSpecialCoconutReward(
+                    amount: 1,
+                    emoji: "🎯",
+                    title: "Good reward",
+                    actorId: human.id.uuidString,
+                    actorName: human.name,
+                    source: .familyTask,
+                    sourceModelName: "GoodFixture",
+                    sourceModelId: human.id.uuidString,
+                    metadataJSON: nil,
+                    transactionKey: "good:\(human.id.uuidString)",
+                    context: context
+                )
+            } catch {
+                rewardError = error
+            }
+        }
+        if let rewardError {
+            throw rewardError
+        }
+    }
+
     static func registryFeatureTaxonomyString() -> String {
         DomainEntityLinkRegistry.petFoodStock
     }
@@ -42,6 +108,10 @@ enum MemberLifecycleGateGoodCommandService {
             return
         }
         _ = DomainScheduleWriter.createEvent(plan: plan, context: context)
+    }
+
+    static func deletePetReminder(event: Event, mutation: AuthorizedDomainScheduleMutation, context: ModelContext) {
+        DomainScheduleWriter.deleteEvent(event, mutation: mutation, context: context)
     }
 
     static func applyBackup(snapshot: DomainPetRehydrateSnapshot, context: ModelContext) throws {

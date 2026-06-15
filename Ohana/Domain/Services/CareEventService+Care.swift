@@ -73,13 +73,26 @@ extension CareEventService {
         dependencies providedDependencies: CareEventServiceDependencies? = nil
     ) -> (result: CareRecordResult, reward: (humanGot: Int, petGot: Int), log: PetCareLog, pottyLog: PetPottyLog?) {
         let dependencies = providedDependencies ?? .live()
-        let disposition = CareFactWritePolicy.disposition(
-            pet: pet,
-            date: date,
-            executorId: executorId,
-            context: context
+        let intent = DomainCareFactCreateIntent(
+            kind: .care(
+                type: type,
+                amountGrams: 0,
+                amountMl: amountMl,
+                note: "",
+                foodKind: .dry,
+                treatKind: nil,
+                autoFeedDedupKey: "",
+                sharedSessionId: ""
+            ),
+            occurredAt: date,
+            executorId: executorId
         )
-        guard disposition.writesFact else {
+        guard let write = DomainCareFactWriteAuthorizer.authorizePetFact(
+            pet: pet,
+            intent: intent,
+            context: context,
+            logPrefix: "CareEventService recordCareFact"
+        ) else {
             return noOpCareFactResult(
                 pet: pet,
                 type: type,
@@ -89,84 +102,55 @@ extension CareEventService {
                 date: date
             )
         }
-        let actor = CareFactWritePolicy.executorResolution(
-            requestedExecutorId: executorId,
-            context: context,
-            logPrefix: "CareEventService recordCareFact"
+        let careWrite = DomainCareFactWriter.createCareLog(
+            plan: write,
+            linkedPottyType: createsLinkedPottyLog && type == .litter ? .perfectPoop : nil,
+            context: context
         )
-        let log = PetCareLog(
-            date: date,
-            type: type,
-            amountMl: amountMl,
-            pet: pet,
-            executorId: actor.effectiveExecutorId
-        )
-        context.insert(log)
-        CloudSyncMutationRecorder.markModified(log, context: context, modifiedAt: date)
-        let pottyLog: PetPottyLog?
-        if disposition.allowsDerivedEffects, createsLinkedPottyLog, type == .litter {
-            let linked = PetPottyLog(date: date, type: .perfectPoop, pet: pet, executorId: actor.effectiveExecutorId)
-            context.insert(linked)
-            CloudSyncMutationRecorder.markModified(linked, context: context, modifiedAt: date)
-            pottyLog = linked
-        } else {
-            pottyLog = nil
-        }
+        let log = careWrite.log
+        let pottyLog = careWrite.linkedPottyLog
         context.safeSave()
 
-        guard disposition.allowsDerivedEffects else {
-            return (
-                CareRecordResult(
-                    logID: log.id,
-                    subjectID: pet.id,
-                    careType: type,
-                    linkedPottyLogID: nil,
-                    coconutDelta: 0,
-                    disposition: disposition
-                ),
-                (0, 0),
-                log,
-                nil
+        let award = DomainCareFactEffectsDispatcher.map(plan: write, default: (0, 0)) { actor in
+            let award = dependencies.economy.awardCareAction(
+                type: reward,
+                pet: pet,
+                context: context,
+                quality: quality,
+                date: Date(),
+                executorId: actor.rewardExecutorId
             )
-        }
-
-        let award = dependencies.economy.awardCareAction(
-            type: reward,
-            pet: pet,
-            context: context,
-            quality: quality,
-            date: Date(),
-            executorId: actor.rewardExecutorId
-        )
-        dependencies.careLedger.recordPetCare(
-            log: log,
-            pet: pet,
-            source: source,
-            sourceEventId: nil,
-            sourceReminderId: nil,
-            coconutDelta: dependencies.careLedger.rewardDelta(award),
-            metadataJSON: dependencies.careLedger.rewardMetadata(award, questManager: dependencies.questManager),
-            context: context,
-            save: true
-        )
-        if let pottyLog {
-            dependencies.careLedger.recordPetPotty(
-                log: pottyLog,
+            dependencies.careLedger.recordPetCare(
+                log: log,
                 pet: pet,
                 source: source,
-                coconutDelta: 0,
-                metadataJSON: "",
+                sourceEventId: nil,
+                sourceReminderId: nil,
+                coconutDelta: dependencies.careLedger.rewardDelta(award),
+                metadataJSON: dependencies.careLedger.rewardMetadata(award, questManager: dependencies.questManager),
                 context: context,
                 save: true
             )
+            if let pottyLog {
+                dependencies.careLedger.recordPetPotty(
+                    log: pottyLog,
+                    pet: pet,
+                    source: source,
+                    coconutDelta: 0,
+                    metadataJSON: "",
+                    context: context,
+                    save: true
+                )
+            }
+            dependencies.quickActionReminderCompletion.completeNearestPetCareReminder(
+                pet: pet,
+                type: type,
+                context: context,
+                executorId: actor.effectiveExecutorId,
+                now: date
+            )
+            return award
         }
-        dependencies.quickActionReminderCompletion.completeNearestPetCareReminder(
-            pet: pet,
-            type: type,
-            context: context,
-            executorId: actor.effectiveExecutorId,
-            now: date
-        )
         return (
             CareRecordResult(
                 logID: log.id,
@@ -212,13 +196,17 @@ extension CareEventService {
         dependencies providedDependencies: CareEventServiceDependencies? = nil
     ) -> (result: PottyRecordResult, reward: (humanGot: Int, petGot: Int), log: PetPottyLog?) {
         let dependencies = providedDependencies ?? .live()
-        let disposition = CareFactWritePolicy.disposition(
-            pet: pet,
-            date: date,
-            executorId: executorId,
-            context: context
+        let intent = DomainCareFactCreateIntent(
+            kind: .potty(type: type, sharedSessionId: ""),
+            occurredAt: date,
+            executorId: executorId
         )
-        guard disposition.writesFact else {
+        guard let write = DomainCareFactWriteAuthorizer.authorizePetFact(
+            pet: pet,
+            intent: intent,
+            context: context,
+            logPrefix: "CareEventService recordPottyFact"
+        ) else {
             return (
                 PottyRecordResult(
                     logID: nil,
@@ -231,52 +219,36 @@ extension CareEventService {
                 nil
             )
         }
-        let actor = CareFactWritePolicy.executorResolution(
-            requestedExecutorId: executorId,
-            context: context,
-            logPrefix: "CareEventService recordPottyFact"
-        )
-        let log = PetPottyLog(date: date, type: type, pet: pet, executorId: actor.effectiveExecutorId)
-        context.insert(log)
-        CloudSyncMutationRecorder.markModified(log, context: context, modifiedAt: date)
+        let disposition = write.disposition
+        let log = DomainCareFactWriter.createPottyLog(plan: write, context: context)
         context.safeSave()
 
-        guard disposition.allowsDerivedEffects else {
-            return (
-                PottyRecordResult(
-                    logID: log.id,
-                    subjectID: pet.id,
-                    pottyType: type,
-                    coconutDelta: 0,
-                    disposition: disposition
-                ),
-                (0, 0),
-                log
+        let reward = DomainCareFactEffectsDispatcher.map(plan: write, default: (0, 0)) { actor in
+            let reward = dependencies.economy.awardCareAction(
+                type: .potty(isLitter: false),
+                pet: pet,
+                context: context,
+                quality: .none,
+                date: Date(),
+                executorId: actor.rewardExecutorId
             )
+            dependencies.careLedger.recordPetPotty(
+                log: log,
+                pet: pet,
+                source: .quickAction,
+                coconutDelta: dependencies.careLedger.rewardDelta(reward),
+                metadataJSON: dependencies.careLedger.rewardMetadata(reward, questManager: dependencies.questManager),
+                context: context,
+                save: true
+            )
+            dependencies.quickActionReminderCompletion.completeNearestPetPottyReminder(
+                pet: pet,
+                context: context,
+                executorId: actor.effectiveExecutorId,
+                now: date
+            )
+            return reward
         }
-        let reward = dependencies.economy.awardCareAction(
-            type: .potty(isLitter: false),
-            pet: pet,
-            context: context,
-            quality: .none,
-            date: Date(),
-            executorId: actor.rewardExecutorId
-        )
-        dependencies.careLedger.recordPetPotty(
-            log: log,
-            pet: pet,
-            source: .quickAction,
-            coconutDelta: dependencies.careLedger.rewardDelta(reward),
-            metadataJSON: dependencies.careLedger.rewardMetadata(reward, questManager: dependencies.questManager),
-            context: context,
-            save: true
-        )
-        dependencies.quickActionReminderCompletion.completeNearestPetPottyReminder(
-            pet: pet,
-            context: context,
-            executorId: actor.effectiveExecutorId,
-            now: date
-        )
         let result = PottyRecordResult(
             logID: log.id,
             subjectID: pet.id,
@@ -348,13 +320,17 @@ extension CareEventService {
         dependencies providedDependencies: CareEventServiceDependencies? = nil
     ) -> (result: HygieneRecordResult, reward: (humanGot: Int, petGot: Int), log: PetHygieneLog) {
         let dependencies = providedDependencies ?? .live()
-        let disposition = CareFactWritePolicy.disposition(
-            pet: pet,
-            date: date,
-            executorId: executorId,
-            context: context
+        let intent = DomainCareFactCreateIntent(
+            kind: .hygiene(type: type, sharedSessionId: ""),
+            occurredAt: date,
+            executorId: executorId
         )
-        guard disposition.writesFact else {
+        guard let write = DomainCareFactWriteAuthorizer.authorizePetFact(
+            pet: pet,
+            intent: intent,
+            context: context,
+            logPrefix: "CareEventService recordHygieneFact"
+        ) else {
             let log = PetHygieneLog(date: date, type: type, pet: nil, executorId: executorId)
             return (
                 HygieneRecordResult(
@@ -368,69 +344,52 @@ extension CareEventService {
                 log
             )
         }
-        let actor = CareFactWritePolicy.executorResolution(
-            requestedExecutorId: executorId,
-            context: context,
-            logPrefix: "CareEventService recordHygieneFact"
-        )
-        let log = PetHygieneLog(date: date, type: type, pet: pet, executorId: actor.effectiveExecutorId)
-        context.insert(log)
-        CloudSyncMutationRecorder.markModified(log, context: context, modifiedAt: date)
+        let log = DomainCareFactWriter.createHygieneLog(plan: write, context: context)
         context.safeSave()
 
-        guard disposition.allowsDerivedEffects else {
-            return (
-                HygieneRecordResult(
-                    logID: log.id,
-                    subjectID: pet.id,
-                    hygieneType: type,
-                    coconutDelta: 0,
-                    disposition: disposition
-                ),
-                (0, 0),
-                log
+        let reward = DomainCareFactEffectsDispatcher.map(plan: write, default: (0, 0)) { actor in
+            let reward = dependencies.economy.awardCareAction(
+                type: .care(type: type),
+                pet: pet,
+                context: context,
+                quality: .none,
+                date: Date(),
+                executorId: actor.rewardExecutorId
             )
+            let metadataJSON = dependencies.careLedger.rewardMetadata(reward, questManager: dependencies.questManager)
+            dependencies.careLedger.record(
+                occurredAt: log.date,
+                actorKind: actor.effectiveExecutorId == nil ? .unknown : .human,
+                actorId: actor.effectiveExecutorId,
+                subjectKind: .pet,
+                subjectId: pet.id.uuidString,
+                eventKind: .hygiene,
+                actionType: type.rawValue,
+                amountValue: 0,
+                amountUnit: "",
+                note: "",
+                source: .quickAction,
+                sourceEventId: nil,
+                sourceReminderId: nil,
+                legacyModelName: "PetHygieneLog",
+                legacyModelId: log.id.uuidString,
+                coconutDelta: dependencies.careLedger.rewardDelta(reward),
+                rewardLogId: nil,
+                privacyFieldRaw: nil,
+                metadataJSON: metadataJSON,
+                context: context,
+                save: true
+            )
+            dependencies.careLedger.syncOasisTreeEnergyIfNeeded(metadataJSON: metadataJSON, context: context)
+            dependencies.quickActionReminderCompletion.completeNearestPetHygieneReminder(
+                pet: pet,
+                type: type,
+                context: context,
+                executorId: actor.effectiveExecutorId,
+                now: date
+            )
+            return reward
         }
-        let reward = dependencies.economy.awardCareAction(
-            type: .care(type: type),
-            pet: pet,
-            context: context,
-            quality: .none,
-            date: Date(),
-            executorId: actor.rewardExecutorId
-        )
-        let metadataJSON = dependencies.careLedger.rewardMetadata(reward, questManager: dependencies.questManager)
-        dependencies.careLedger.record(
-            occurredAt: log.date,
-            actorKind: actor.effectiveExecutorId == nil ? .unknown : .human,
-            actorId: actor.effectiveExecutorId,
-            subjectKind: .pet,
-            subjectId: pet.id.uuidString,
-            eventKind: .hygiene,
-            actionType: type.rawValue,
-            amountValue: 0,
-            amountUnit: "",
-            note: "",
-            source: .quickAction,
-            sourceEventId: nil,
-            sourceReminderId: nil,
-            legacyModelName: "PetHygieneLog",
-            legacyModelId: log.id.uuidString,
-            coconutDelta: dependencies.careLedger.rewardDelta(reward),
-            rewardLogId: nil,
-            privacyFieldRaw: nil,
-            metadataJSON: metadataJSON,
-            context: context,
-            save: true
-        )
-        dependencies.careLedger.syncOasisTreeEnergyIfNeeded(metadataJSON: metadataJSON, context: context)
-        dependencies.quickActionReminderCompletion.completeNearestPetHygieneReminder(
-            pet: pet,
-            type: type,
-            context: context,
-            executorId: actor.effectiveExecutorId,
-            now: date
-        )
         let result = HygieneRecordResult(
             logID: log.id,
             subjectID: pet.id,
@@ -474,13 +433,17 @@ extension CareEventService {
         dependencies providedDependencies: CareEventServiceDependencies? = nil
     ) -> (result: HealthRecordResult, reward: (humanGot: Int, petGot: Int), log: PetHealthLog?) {
         let dependencies = providedDependencies ?? .live()
-        let disposition = CareFactWritePolicy.disposition(
-            pet: pet,
-            date: date,
-            executorId: executorId,
-            context: context
+        let intent = DomainCareFactCreateIntent(
+            kind: .health(type: type, note: note),
+            occurredAt: date,
+            executorId: executorId
         )
-        guard disposition.writesFact else {
+        guard let write = DomainCareFactWriteAuthorizer.authorizePetFact(
+            pet: pet,
+            intent: intent,
+            context: context,
+            logPrefix: "CareEventService recordHealthFact"
+        ) else {
             return (
                 HealthRecordResult(
                     logID: nil,
@@ -493,62 +456,46 @@ extension CareEventService {
                 nil
             )
         }
-        let actor = CareFactWritePolicy.executorResolution(
-            requestedExecutorId: executorId,
-            context: context,
-            logPrefix: "CareEventService recordHealthFact"
-        )
-        let log = PetHealthLog(date: date, type: type, note: note, pet: pet, executorId: actor.effectiveExecutorId)
-        context.insert(log)
-        CloudSyncMutationRecorder.markModified(log, context: context, modifiedAt: date)
+        let disposition = write.disposition
+        let log = DomainCareFactWriter.createHealthLog(plan: write, context: context)
         context.safeSave()
 
-        guard disposition.allowsDerivedEffects else {
-            return (
-                HealthRecordResult(
-                    logID: log.id,
-                    subjectID: pet.id,
-                    healthType: type,
-                    coconutDelta: 0,
-                    disposition: disposition
-                ),
-                (0, 0),
-                log
+        let reward = DomainCareFactEffectsDispatcher.map(plan: write, default: (0, 0)) { actor in
+            let reward = dependencies.economy.awardCareAction(
+                type: .health,
+                pet: pet,
+                context: context,
+                quality: .none,
+                date: Date(),
+                executorId: actor.rewardExecutorId
             )
+            let metadataJSON = dependencies.careLedger.rewardMetadata(reward, questManager: dependencies.questManager)
+            dependencies.careLedger.record(
+                occurredAt: log.date,
+                actorKind: actor.effectiveExecutorId == nil ? .unknown : .human,
+                actorId: actor.effectiveExecutorId,
+                subjectKind: .pet,
+                subjectId: pet.id.uuidString,
+                eventKind: .health,
+                actionType: type.rawValue,
+                amountValue: 0,
+                amountUnit: "",
+                note: note,
+                source: .quickAction,
+                sourceEventId: nil,
+                sourceReminderId: nil,
+                legacyModelName: "PetHealthLog",
+                legacyModelId: log.id.uuidString,
+                coconutDelta: dependencies.careLedger.rewardDelta(reward),
+                rewardLogId: nil,
+                privacyFieldRaw: nil,
+                metadataJSON: metadataJSON,
+                context: context,
+                save: true
+            )
+            dependencies.careLedger.syncOasisTreeEnergyIfNeeded(metadataJSON: metadataJSON, context: context)
+            return reward
         }
-        let reward = dependencies.economy.awardCareAction(
-            type: .health,
-            pet: pet,
-            context: context,
-            quality: .none,
-            date: Date(),
-            executorId: actor.rewardExecutorId
-        )
-        let metadataJSON = dependencies.careLedger.rewardMetadata(reward, questManager: dependencies.questManager)
-        dependencies.careLedger.record(
-            occurredAt: log.date,
-            actorKind: actor.effectiveExecutorId == nil ? .unknown : .human,
-            actorId: actor.effectiveExecutorId,
-            subjectKind: .pet,
-            subjectId: pet.id.uuidString,
-            eventKind: .health,
-            actionType: type.rawValue,
-            amountValue: 0,
-            amountUnit: "",
-            note: note,
-            source: .quickAction,
-            sourceEventId: nil,
-            sourceReminderId: nil,
-            legacyModelName: "PetHealthLog",
-            legacyModelId: log.id.uuidString,
-            coconutDelta: dependencies.careLedger.rewardDelta(reward),
-            rewardLogId: nil,
-            privacyFieldRaw: nil,
-            metadataJSON: metadataJSON,
-            context: context,
-            save: true
-        )
-        dependencies.careLedger.syncOasisTreeEnergyIfNeeded(metadataJSON: metadataJSON, context: context)
         let result = HealthRecordResult(
             logID: log.id,
             subjectID: pet.id,

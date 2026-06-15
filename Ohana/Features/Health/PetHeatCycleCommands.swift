@@ -31,18 +31,23 @@ enum PetHeatCycleCommandService {
         input: PetHeatCycleCommandInput,
         context: ModelContext
     ) -> PetHeatCycleCommandResult? {
-        guard pet.canWriteHealthFacts else { return nil }
-        let log = HeatCycleLog(
-            startDate: input.startDate,
+        guard let write = DomainMemberFactWriteAuthorizer.authorizePetFact(
+            pet: pet,
+            occurredAt: input.startDate,
+            writeKind: .care,
+            context: context,
+            logPrefix: "PetHeatCycleCommandService.recordHeatCycle"
+        ) else { return nil }
+        let log = DomainMemberFactWriter.createHeatCycleLog(
+            plan: write,
+            pet: pet,
             endDate: input.endDate,
             status: input.status,
             note: input.note.trimmingCharacters(in: .whitespacesAndNewlines),
             isMated: input.isMated,
             expectedDeliveryDate: input.expectedDeliveryDate,
-            pet: pet
+            context: context
         )
-        context.insert(log)
-        CloudSyncMutationRecorder.markModified(log, context: context, modifiedAt: input.startDate)
         context.safeSave()
 
         return PetHeatCycleCommandResult(

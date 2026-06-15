@@ -310,8 +310,23 @@ final class MemberCreationService: MemberCreating {
         CloudSyncMutationRecorder.markModified(human, context: context)
         if let weight = CountryDecimalInput.parse(draft.weightText, countryCode: countryCode), weight > 0 {
             let executorId = activeHumanSelection.currentHumanId
-            context.insert(HumanWeightLog(date: Date(), weight: weight, human: human, executorId: executorId))
-            IslandQuestEngine.markInitialHumanWeightRecorded(humanId: human.id)
+            let now = Date()
+            if let write = DomainMemberFactWriteAuthorizer.authorizeHumanFact(
+                human: human,
+                occurredAt: now,
+                writeKind: .care,
+                executorId: executorId,
+                context: context,
+                logPrefix: "MemberCreationService.saveHuman.weight"
+            ) {
+                _ = DomainMemberFactWriter.createHumanWeightLog(
+                    plan: write,
+                    human: human,
+                    weight: weight,
+                    context: context
+                )
+                IslandQuestEngine.markInitialHumanWeightRecorded(humanId: human.id)
+            }
         }
         if draft.hasBirthday {
             createMemberSchedule(
@@ -393,12 +408,22 @@ final class MemberCreationService: MemberCreating {
             let milestones = [100, 365, 500, 730, 1000, 1095]
             for days in milestones {
                 if let date = Calendar.current.date(byAdding: .day, value: days, to: draft.homeDate) {
-                    context.insert(PetMilestone(
+                    guard let write = DomainMemberFactWriteAuthorizer.authorizePetFact(
+                        pet: pet,
+                        occurredAt: date,
+                        writeKind: .memorial,
+                        context: context,
+                        logPrefix: "MemberCreationService.insertPetRelatedRecords.milestone"
+                    ) else { continue }
+                    _ = DomainMemberFactWriter.createPetMilestone(
+                        plan: write,
                         date: date,
                         title: L10n.current.petWizMilestoneTogether(days),
                         emoji: days >= 1000 ? "🏆" : "🎉",
-                        pet: pet
-                    ))
+                        notes: "",
+                        pet: pet,
+                        context: context
+                    )
                 }
             }
         }

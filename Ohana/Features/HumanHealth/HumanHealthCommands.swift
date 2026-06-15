@@ -35,19 +35,23 @@ enum HumanHealthMetricCommandService {
         context: ModelContext
     ) -> HumanHealthMetricCommandResult? {
         guard value > 0, value.isFinite else { return nil }
-        guard MemberWritePolicy.disposition(human: human, intent: .activeOnly).allowsDerivedEffects else { return nil }
+        guard let write = DomainMemberFactWriteAuthorizer.authorizeHumanFact(
+            human: human,
+            occurredAt: date,
+            writeKind: .care,
+            context: context,
+            logPrefix: "HumanHealthMetricCommandService.recordMetric"
+        ) else { return nil }
         let cleanNotes = notes.trimmingCharacters(in: .whitespacesAndNewlines)
-        let log = HumanHealthMetricLog(
+        let log = DomainMemberFactWriter.createHumanHealthMetricLog(
+            plan: write,
+            human: human,
             metricKey: metricKey,
             unitCode: unitCode,
             value: value,
-            date: date,
             notes: cleanNotes,
-            human: human
+            context: context
         )
-        context.insert(log)
-        human.healthMetricLogs.append(log)
-        CloudSyncMutationRecorder.markModified(log, context: context, modifiedAt: date)
         context.safeSave()
         return HumanHealthMetricCommandResult(
             log: log,
@@ -113,7 +117,13 @@ enum HumanHealthReportCommandService {
         input: HumanHealthReportCommandInput,
         context: ModelContext
     ) -> HumanHealthReportCommandResult {
-        guard MemberWritePolicy.disposition(human: human, intent: .activeOnly).allowsDerivedEffects else {
+        guard let write = DomainMemberFactWriteAuthorizer.authorizeHumanFact(
+            human: human,
+            occurredAt: input.reportDate,
+            writeKind: .care,
+            context: context,
+            logPrefix: "HumanHealthReportCommandService.createReport"
+        ) else {
             return HumanHealthReportCommandResult(
                 humanID: human.id,
                 reportID: UUID(),
@@ -121,8 +131,9 @@ enum HumanHealthReportCommandService {
                 didChange: false
             )
         }
-        let report = HumanHealthReport(
-            humanId: human.id.uuidString,
+        let report = DomainMemberFactWriter.createHumanHealthReport(
+            plan: write,
+            human: human,
             reportType: input.reportType,
             conclusion: input.conclusion,
             hospitalName: input.hospitalName.trimmingCharacters(in: .whitespacesAndNewlines),
@@ -130,10 +141,9 @@ enum HumanHealthReportCommandService {
             reportDate: input.reportDate,
             nextCheckDate: input.nextCheckDate,
             summary: input.summary.trimmingCharacters(in: .whitespacesAndNewlines),
-            notes: input.notes.trimmingCharacters(in: .whitespacesAndNewlines)
+            notes: input.notes.trimmingCharacters(in: .whitespacesAndNewlines),
+            context: context
         )
-        context.insert(report)
-        CloudSyncMutationRecorder.markModified(report, context: context, modifiedAt: input.reportDate)
         context.safeSave()
         return HumanHealthReportCommandResult(
             humanID: human.id,

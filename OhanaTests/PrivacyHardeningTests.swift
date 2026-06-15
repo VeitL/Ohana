@@ -33,13 +33,11 @@ struct PrivacyHardeningTests {
         ) == malformedImage)
     }
 
-    @MainActor
     @Test func receiptDocumentBuilderSanitizesImageAttachmentsBeforePersistence() throws {
-        let pet = Pet(name: "Momo", species: "猫")
         let jpegWithGPS = try makeJPEGWithGPSMetadata()
         let pdf = Data("%PDF-1.7\n%%EOF".utf8)
 
-        let document = ExpenseReceiptDocumentBuilder.makeDocument(
+        let draft = ExpenseReceiptDocumentBuilder.makeDraft(
             title: "Vet receipt",
             category: .medical,
             cost: 88,
@@ -49,13 +47,12 @@ struct PrivacyHardeningTests {
             attachments: [
                 ExpenseReceiptAttachmentDraft(data: jpegWithGPS, filename: "receipt.jpg", isImage: true),
                 ExpenseReceiptAttachmentDraft(data: pdf, filename: "invoice.pdf", isImage: false)
-            ],
-            pet: pet
+            ]
         )
 
-        let imageAttachment = try #require(document.attachments.first)
-        let pdfAttachment = try #require(document.attachments.dropFirst().first)
-        let legacyAttachmentData = try #require(document.attachmentData)
+        let imageAttachment = try #require(draft.attachments.first)
+        let pdfAttachment = try #require(draft.attachments.dropFirst().first)
+        let legacyAttachmentData = try #require(draft.attachmentData)
         #expect(!hasGPSMetadata(legacyAttachmentData))
         #expect(!hasGPSMetadata(imageAttachment.data))
         #expect(pdfAttachment.data == pdf)

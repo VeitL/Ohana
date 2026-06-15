@@ -261,35 +261,44 @@ enum SaveFoodStockCommand {
     ) {
         if let amount, amount > 0 {
             let existingExpense = previousExpenseId.flatMap { FeedStockExpenseLink.fetchExpense(id: $0, context: context) }
-            let createdExpense = existingExpense == nil
-            let expense = existingExpense ?? PetExpenseLog(
-                date: date,
-                amount: amount,
-                category: .food,
-                note: note,
-                pet: pet,
-                executorId: payerId
+            let actor = CareFactWritePolicy.executorResolution(
+                requestedExecutorId: payerId,
+                context: context,
+                logPrefix: "SaveFoodStockCommand.syncExpenseIfNeeded"
             )
-            if createdExpense {
-                context.insert(expense)
-            }
-            expense.date = date
-            expense.amount = amount
-            expense.category = ExpenseCategory.food.rawValue
-            expense.note = note
-            expense.executorId = payerId
-            expense.pet = pet
+            let intent = DomainCareFactCreateIntent(
+                kind: .expense(
+                    amount: amount,
+                    category: .food,
+                    note: note,
+                    sharedSessionId: ""
+                ),
+                occurredAt: date,
+                executorId: payerId,
+                source: .userCommand
+            )
+            guard let write = DomainCareFactWriteAuthorizer.authorizePetFact(
+                pet: pet,
+                intent: intent,
+                context: context,
+                logPrefix: "SaveFoodStockCommand.syncExpenseIfNeeded",
+                actorOverride: actor
+            ) else { return }
+            let expense = DomainCareFactWriter.upsertExpenseLog(
+                plan: write,
+                existing: existingExpense,
+                context: context
+            )
             FeedStockExpenseLink.applyExpenseLink(to: record, expenseId: expense.id)
-            CloudSyncMutationRecorder.markModified(expense, context: context, modifiedAt: date)
             CloudSyncMutationRecorder.markModified(record, context: context, modifiedAt: date)
             context.safeSave()
             syncExpenseLedger(
                 expense: expense,
                 pet: pet,
-                payerId: payerId,
                 note: note,
                 context: context,
-                careLedger: careLedger
+                careLedger: careLedger,
+                write: write
             )
         } else if let previousExpenseId {
             FeedStockExpenseLink.applyExpenseLink(to: record, expenseId: previousExpenseId)
@@ -302,59 +311,61 @@ enum SaveFoodStockCommand {
     private static func syncExpenseLedger(
         expense: PetExpenseLog,
         pet: Pet,
-        payerId: String?,
         note: String,
         context: ModelContext,
-        careLedger: CareLedgerRecording
+        careLedger: CareLedgerRecording,
+        write: AuthorizedDomainCareFactWrite
     ) {
-        if let ledger = existingExpenseLedger(expenseID: expense.id, context: context) {
-            ledger.occurredAt = expense.date
-            ledger.actorKind = payerId == nil ? CareLedgerActorKind.unknown.rawValue : CareLedgerActorKind.human.rawValue
-            ledger.actorId = payerId
-            ledger.subjectKind = CareLedgerSubjectKind.pet.rawValue
-            ledger.subjectId = pet.id.uuidString
-            ledger.eventKind = CareLedgerEventKind.expense.rawValue
-            ledger.actionType = ExpenseCategory.food.rawValue
-            ledger.amountValue = expense.amount
-            ledger.amountUnit = "currency"
-            ledger.note = note
-            ledger.source = CareLedgerSource.detail.rawValue
-            ledger.sourceEventId = nil
-            ledger.sourceReminderId = nil
-            ledger.legacyModelName = "PetExpenseLog"
-            ledger.legacyModelId = expense.id.uuidString
-            ledger.coconutDelta = 0
-            ledger.rewardLogId = nil
-            ledger.privacyFieldRaw = nil
-            ledger.metadataJSON = ""
-            CloudSyncMutationRecorder.markModified(ledger, context: context, modifiedAt: expense.date)
-            context.safeSave()
-            return
-        }
+        DomainCareFactEffectsDispatcher.run(plan: write) { actor in
+            if let ledger = existingExpenseLedger(expenseID: expense.id, context: context) {
+                ledger.occurredAt = expense.date
+                ledger.actorKind = actor.effectiveExecutorId == nil ? CareLedgerActorKind.unknown.rawValue : CareLedgerActorKind.human.rawValue
+                ledger.actorId = actor.effectiveExecutorId
+                ledger.subjectKind = CareLedgerSubjectKind.pet.rawValue
+                ledger.subjectId = pet.id.uuidString
+                ledger.eventKind = CareLedgerEventKind.expense.rawValue
+                ledger.actionType = ExpenseCategory.food.rawValue
+                ledger.amountValue = expense.amount
+                ledger.amountUnit = "currency"
+                ledger.note = note
+                ledger.source = CareLedgerSource.detail.rawValue
+                ledger.sourceEventId = nil
+                ledger.sourceReminderId = nil
+                ledger.legacyModelName = "PetExpenseLog"
+                ledger.legacyModelId = expense.id.uuidString
+                ledger.coconutDelta = 0
+                ledger.rewardLogId = nil
+                ledger.privacyFieldRaw = nil
+                ledger.metadataJSON = ""
+                CloudSyncMutationRecorder.markModified(ledger, context: context, modifiedAt: expense.date)
+                context.safeSave()
+                return
+            }
 
-        careLedger.record(
-            occurredAt: expense.date,
-            actorKind: payerId == nil ? .unknown : .human,
-            actorId: payerId,
-            subjectKind: .pet,
-            subjectId: pet.id.uuidString,
-            eventKind: .expense,
-            actionType: ExpenseCategory.food.rawValue,
-            amountValue: expense.amount,
-            amountUnit: "currency",
-            note: note,
-            source: .detail,
-            sourceEventId: nil,
-            sourceReminderId: nil,
-            legacyModelName: "PetExpenseLog",
-            legacyModelId: expense.id.uuidString,
-            coconutDelta: 0,
-            rewardLogId: nil,
-            privacyFieldRaw: nil,
-            metadataJSON: "",
-            context: context,
-            save: true
-        )
+            careLedger.record(
+                occurredAt: expense.date,
+                actorKind: actor.effectiveExecutorId == nil ? .unknown : .human,
+                actorId: actor.effectiveExecutorId,
+                subjectKind: .pet,
+                subjectId: pet.id.uuidString,
+                eventKind: .expense,
+                actionType: ExpenseCategory.food.rawValue,
+                amountValue: expense.amount,
+                amountUnit: "currency",
+                note: note,
+                source: .detail,
+                sourceEventId: nil,
+                sourceReminderId: nil,
+                legacyModelName: "PetExpenseLog",
+                legacyModelId: expense.id.uuidString,
+                coconutDelta: 0,
+                rewardLogId: nil,
+                privacyFieldRaw: nil,
+                metadataJSON: "",
+                context: context,
+                save: true
+            )
+        }
     }
 
     @MainActor

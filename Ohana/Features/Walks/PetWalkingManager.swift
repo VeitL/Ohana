@@ -194,12 +194,6 @@ final class PetWalkingManager {
         let startedAt = startTime ?? Date()
         let endedAt = Date()
         let distanceMeters = locationManager.totalDistance
-        let disposition = CareFactWritePolicy.disposition(
-            pet: pet,
-            date: startedAt,
-            executorId: executorId,
-            context: modelContext
-        )
 
         let routeLocations = locationManager.routeLocationsForPersistence()
         let routeCoordinates = routeLocations.map(\.coordinate)
@@ -225,50 +219,74 @@ final class PetWalkingManager {
             )
             walkLogs = result.walkLogs
         } else {
-            let walkLog = PetWalkLog(startDate: startedAt, pet: pet, executorId: executorId, executorIds: executorIds)
-            walkLog.endDate = endedAt
-            walkLog.distanceMeters = distanceMeters
-            modelContext.insert(walkLog)
+            let intent = DomainCareFactCreateIntent(
+                kind: .walk(
+                    distanceMeters: distanceMeters,
+                    endDate: endedAt,
+                    coconutsEarned: PetWalkLog.coconuts(for: distanceMeters),
+                    behaviorNotes: nil,
+                    moodRating: 0,
+                    executorIds: executorIds,
+                    sharedSessionId: ""
+                ),
+                occurredAt: startedAt,
+                modifiedAt: endedAt,
+                executorId: executorId,
+                source: .userCommand
+            )
+            guard let write = DomainCareFactWriteAuthorizer.authorizePetFact(
+                pet: pet,
+                intent: intent,
+                context: modelContext,
+                logPrefix: "PetWalkingManager.stop.walk"
+            ) else {
+                reset()
+                walkStopStartedAt = nil
+                return
+            }
+            let walkLog = DomainCareFactWriter.createWalkLog(plan: write, context: modelContext)
             modelContext.safeSave()
 
             var reward: (humanGot: Int, petGot: Int)?
-            if !isTooShortForReward, disposition.allowsDerivedEffects {
-                reward = EconomyRewardDiscipline.awardCareAction(
-                    type: .walk(distanceMeters: distanceMeters),
-                    pet: pet,
+            DomainCareFactEffectsDispatcher.run(plan: write) { actor in
+                if !isTooShortForReward {
+                    reward = EconomyRewardDiscipline.awardCareAction(
+                        type: .walk(distanceMeters: distanceMeters),
+                        pet: pet,
+                        context: modelContext,
+                        executorId: actor.rewardExecutorId,
+                        questManager: questManager
+                    )
+                }
+                let metadataJSON = careLedger.rewardMetadata(reward, questManager: questManager)
+                let ledgerEvent = careLedger.record(
+                    occurredAt: startedAt,
+                    actorKind: actor.effectiveExecutorId == nil ? .unknown : .human,
+                    actorId: actor.effectiveExecutorId,
+                    subjectKind: .pet,
+                    subjectId: pet.id.uuidString,
+                    eventKind: .walk,
+                    actionType: "walk",
+                    amountValue: distanceMeters,
+                    amountUnit: "m",
+                    note: walkLog.behaviorNotes ?? "",
+                    source: .quickAction,
+                    sourceEventId: nil,
+                    sourceReminderId: nil,
+                    legacyModelName: String(describing: PetWalkLog.self),
+                    legacyModelId: walkLog.id.uuidString,
+                    coconutDelta: careLedger.rewardDelta(reward),
+                    rewardLogId: nil,
+                    privacyFieldRaw: nil,
+                    metadataJSON: metadataJSON,
                     context: modelContext,
-                    executorId: executorId,
-                    questManager: questManager
+                    save: false
                 )
+                CloudSyncMutationRecorder.markModified(ledgerEvent, context: modelContext, modifiedAt: endedAt)
+                careLedger.syncOasisTreeEnergyIfNeeded(metadataJSON: metadataJSON, context: modelContext)
+                let earnedCoconuts = reward.map { $0.humanGot + $0.petGot } ?? 0
+                walkLog.coconutsEarned = earnedCoconuts
             }
-            let metadataJSON = careLedger.rewardMetadata(reward, questManager: questManager)
-            let ledgerEvent = careLedger.record(
-                occurredAt: startedAt,
-                actorKind: executorId == nil ? .unknown : .human,
-                actorId: executorId,
-                subjectKind: .pet,
-                subjectId: pet.id.uuidString,
-                eventKind: .walk,
-                actionType: "walk",
-                amountValue: distanceMeters,
-                amountUnit: "m",
-                note: walkLog.behaviorNotes ?? "",
-                source: .quickAction,
-                sourceEventId: nil,
-                sourceReminderId: nil,
-                legacyModelName: String(describing: PetWalkLog.self),
-                legacyModelId: walkLog.id.uuidString,
-                coconutDelta: careLedger.rewardDelta(reward),
-                rewardLogId: nil,
-                privacyFieldRaw: nil,
-                metadataJSON: metadataJSON,
-                context: modelContext,
-                save: false
-            )
-            CloudSyncMutationRecorder.markModified(ledgerEvent, context: modelContext, modifiedAt: endedAt)
-            careLedger.syncOasisTreeEnergyIfNeeded(metadataJSON: metadataJSON, context: modelContext)
-            let earnedCoconuts = reward.map { $0.humanGot + $0.petGot } ?? 0
-            walkLog.coconutsEarned = earnedCoconuts
             walkLogs = [walkLog]
         }
 
@@ -288,57 +306,68 @@ final class PetWalkingManager {
             ? (0 ..< poop).map { _ in WalkPoopMarker(date: Date(), location: nil) }
             : poopMarkers
         var pottyLogs: [PetPottyLog] = []
+        var pottyWrites: [(PetPottyLog, AuthorizedDomainCareFactWrite)] = []
         for marker in persistedMarkers {
-            let pottyLog = PetPottyLog(
-                date: marker.date,
-                type: marker.type,
-                pet: pet,
+            let intent = DomainCareFactCreateIntent(
+                kind: .potty(type: marker.type, sharedSessionId: ""),
+                occurredAt: marker.date,
+                modifiedAt: endedAt,
                 executorId: executorId,
-                latitude: marker.latitude,
-                longitude: marker.longitude,
-                locationAccuracyMeters: marker.accuracyMeters,
-                walkLogId: sourceWalkLog?.id.uuidString
+                source: .userCommand
             )
-            modelContext.insert(pottyLog)
+            guard let write = DomainCareFactWriteAuthorizer.authorizePetFact(
+                pet: pet,
+                intent: intent,
+                context: modelContext,
+                logPrefix: "PetWalkingManager.stop.potty"
+            ) else { continue }
+            let pottyLog = DomainCareFactWriter.createPottyLog(plan: write, context: modelContext)
+            pottyLog.latitude = marker.latitude
+            pottyLog.longitude = marker.longitude
+            pottyLog.locationAccuracyMeters = marker.accuracyMeters
+            pottyLog.walkLogId = sourceWalkLog?.id.uuidString
             pottyLogs.append(pottyLog)
+            pottyWrites.append((pottyLog, write))
         }
 
         // 遛狗中每次便便：人+2, 宠物+5（OhanaActionType.potty(isLitter:false)）
-        if poop > 0, disposition.allowsDerivedEffects {
-            for pottyLog in pottyLogs {
-                let reward = EconomyRewardDiscipline.awardCareAction(
-                    type: .potty(isLitter: false),
-                    pet: pet,
-                    context: modelContext,
-                    executorId: executorId,
-                    questManager: questManager
-                )
-                let metadataJSON = careLedger.rewardMetadata(reward, questManager: questManager)
-                let ledgerEvent = careLedger.record(
-                    occurredAt: pottyLog.date,
-                    actorKind: executorId == nil ? .unknown : .human,
-                    actorId: executorId,
-                    subjectKind: .pet,
-                    subjectId: pet.id.uuidString,
-                    eventKind: .potty,
-                    actionType: pottyLog.pottyType.rawValue,
-                    amountValue: 0,
-                    amountUnit: "",
-                    note: "walk.poop",
-                    source: .quickAction,
-                    sourceEventId: nil,
-                    sourceReminderId: nil,
-                    legacyModelName: String(describing: PetPottyLog.self),
-                    legacyModelId: pottyLog.id.uuidString,
-                    coconutDelta: careLedger.rewardDelta(reward),
-                    rewardLogId: nil,
-                    privacyFieldRaw: nil,
-                    metadataJSON: metadataJSON,
-                    context: modelContext,
-                    save: false
-                )
-                CloudSyncMutationRecorder.markModified(ledgerEvent, context: modelContext, modifiedAt: endedAt)
-                careLedger.syncOasisTreeEnergyIfNeeded(metadataJSON: metadataJSON, context: modelContext)
+        if poop > 0 {
+            for (pottyLog, write) in pottyWrites {
+                DomainCareFactEffectsDispatcher.run(plan: write) { actor in
+                    let reward = EconomyRewardDiscipline.awardCareAction(
+                        type: .potty(isLitter: false),
+                        pet: pet,
+                        context: modelContext,
+                        executorId: actor.rewardExecutorId,
+                        questManager: questManager
+                    )
+                    let metadataJSON = careLedger.rewardMetadata(reward, questManager: questManager)
+                    let ledgerEvent = careLedger.record(
+                        occurredAt: pottyLog.date,
+                        actorKind: actor.effectiveExecutorId == nil ? .unknown : .human,
+                        actorId: actor.effectiveExecutorId,
+                        subjectKind: .pet,
+                        subjectId: pet.id.uuidString,
+                        eventKind: .potty,
+                        actionType: pottyLog.pottyType.rawValue,
+                        amountValue: 0,
+                        amountUnit: "",
+                        note: "walk.poop",
+                        source: .quickAction,
+                        sourceEventId: nil,
+                        sourceReminderId: nil,
+                        legacyModelName: String(describing: PetPottyLog.self),
+                        legacyModelId: pottyLog.id.uuidString,
+                        coconutDelta: careLedger.rewardDelta(reward),
+                        rewardLogId: nil,
+                        privacyFieldRaw: nil,
+                        metadataJSON: metadataJSON,
+                        context: modelContext,
+                        save: false
+                    )
+                    CloudSyncMutationRecorder.markModified(ledgerEvent, context: modelContext, modifiedAt: endedAt)
+                    careLedger.syncOasisTreeEnergyIfNeeded(metadataJSON: metadataJSON, context: modelContext)
+                }
             }
         }
 

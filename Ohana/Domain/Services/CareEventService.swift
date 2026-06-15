@@ -60,7 +60,7 @@ struct CareEventServiceDependencies {
     }
 }
 
-enum CareFactWriteDisposition: Equatable {
+nonisolated enum CareFactWriteDisposition: Equatable {
     case active
     case noOp
 

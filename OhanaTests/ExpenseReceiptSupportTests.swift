@@ -124,10 +124,8 @@ struct ExpenseReceiptSupportTests {
         #expect(abs((categories.first?.pct ?? 0) - 0.7) < 0.001)
     }
 
-    @MainActor
     @Test func receiptDocumentStoresAttachmentsAndHidesMetadata() {
-        let pet = Pet(name: "Momo", species: "猫")
-        let document = ExpenseReceiptDocumentBuilder.makeDocument(
+        let draft = ExpenseReceiptDocumentBuilder.makeDraft(
             title: "Vet receipt",
             category: .medical,
             cost: 300,
@@ -136,17 +134,16 @@ struct ExpenseReceiptSupportTests {
             linkedExpenseLogId: "expense-1",
             attachments: [
                 ExpenseReceiptAttachmentDraft(data: Data([1, 2, 3]), filename: "receipt.jpg", isImage: true)
-            ],
-            pet: pet
+            ]
         )
 
-        #expect(document.cost == 300)
-        #expect(document.issueDate == date(2026, 3, 1))
-        #expect(document.attachments.count == 1)
-        #expect(document.attachments.first?.data == Data([1, 2, 3]))
-        #expect(document.attachmentFilename == "receipt.jpg")
-        #expect(ExpenseReceiptMetadata.expenseLogId(from: document.notes) == "expense-1")
-        #expect(ExpenseReceiptMetadata.visibleNotes(from: document.notes) == "复诊")
+        #expect(draft.cost == 300)
+        #expect(draft.issueDate == date(2026, 3, 1))
+        #expect(draft.attachments.count == 1)
+        #expect(draft.attachments.first?.data == Data([1, 2, 3]))
+        #expect(draft.attachmentFilename == "receipt.jpg")
+        #expect(ExpenseReceiptMetadata.expenseLogId(from: draft.notes) == "expense-1")
+        #expect(ExpenseReceiptMetadata.visibleNotes(from: draft.notes) == "复诊")
     }
 
     @Test func addExpenseLocalizationHasChineseEnglishAndGermanText() {

@@ -120,21 +120,6 @@ nonisolated enum PetMedicationDoseLogging {
             writeKind: .care,
             source: .domainService
         )
-        let disposition = CareFactWritePolicy.disposition(
-            pet: pet,
-            date: now,
-            executorId: requestedAssigneeId,
-            context: modelContext
-        )
-        guard disposition.didWriteFact else {
-            let event = DomainScheduleWriter.makeUnpersistedEvent(intent: previewIntent)
-            return RecordDoseResult(
-                event: event,
-                didRecord: false,
-                coconutDelta: 0,
-                allowsDerivedEffects: false
-            )
-        }
         let actor = CareFactWritePolicy.executorResolution(
             requestedExecutorId: requestedAssigneeId,
             context: modelContext,
@@ -165,20 +150,32 @@ nonisolated enum PetMedicationDoseLogging {
         }
         let event = DomainScheduleWriter.createEvent(plan: plan, context: modelContext).event
         CloudSyncMutationRecorder.markModified(event, context: modelContext, modifiedAt: now)
+        let effectsPlan = DomainEffectWriteAuthorizer.authorizePetEffect(
+            pet: pet,
+            occurredAt: now,
+            writeKind: .care,
+            source: .domainService,
+            executorId: actor.effectiveExecutorId,
+            context: modelContext,
+            logPrefix: "PetMedicationDoseLogging",
+            actorOverride: actor
+        )
 
         var coconutDelta = 0
         do {
-            if awardCoconut, disposition.allowsDerivedEffects {
-                let reward = EconomyRewardDiscipline.awardCareAction(
-                    type: .general(humanReward: 1, petReward: 0, emoji: "💊", title: "记录喂药 +1🥥"),
-                    pet: pet,
-                    context: modelContext,
-                    executorId: actor.rewardExecutorId,
-                    questManager: questManager
-                )
-                coconutDelta = reward.humanGot + reward.petGot
-            }
-            if disposition.allowsDerivedEffects {
+            if let effectsPlan {
+                DomainEffectDispatcher.run(plan: effectsPlan) { actor in
+                    if awardCoconut, effectsPlan.allowsEconomyDerivation {
+                        let reward = EconomyRewardDiscipline.awardCareAction(
+                            type: .general(humanReward: 1, petReward: 0, emoji: "💊", title: "记录喂药 +1🥥"),
+                            pet: pet,
+                            context: modelContext,
+                            executorId: actor.rewardExecutorId,
+                            questManager: questManager
+                        )
+                        coconutDelta = reward.humanGot + reward.petGot
+                    }
+
                 careLedger.record(
                     occurredAt: event.startDate,
                     actorKind: actor.effectiveExecutorId == nil ? .unknown : .human,
@@ -202,12 +199,11 @@ nonisolated enum PetMedicationDoseLogging {
                     context: modelContext,
                     save: false
                 )
-            }
-            if decrementRemaining, disposition.allowsDerivedEffects {
-                PetMedicationPlanStorageKeys.decrementRemainingAmount(medication: medication)
-            }
-            if disposition.allowsDerivedEffects {
-                medicationReminders.recordDose(for: medication.id)
+                    if decrementRemaining {
+                        PetMedicationPlanStorageKeys.decrementRemainingAmount(medication: medication)
+                    }
+                    medicationReminders.recordDose(for: medication.id)
+                }
             }
             try modelContext.save()
         } catch {
@@ -222,7 +218,7 @@ nonisolated enum PetMedicationDoseLogging {
             event: event,
             didRecord: true,
             coconutDelta: coconutDelta,
-            allowsDerivedEffects: disposition.allowsDerivedEffects
+            allowsDerivedEffects: effectsPlan?.allowsDerivedEffects == true
         )
     }
 }

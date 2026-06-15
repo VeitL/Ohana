@@ -12,7 +12,7 @@ Usage:
 Purpose:
   R8: member write commands/services must not hand-roll deceased-member write
   gates with hasPassedAway/passedAwayDate. Write paths must consume
-  MemberLifecycleGate or a compatibility shim that delegates to it.
+  MemberLifecycleGate or a capability authorizer that delegates to it.
 
 Allowlist:
   Add "member-lifecycle-gate: allow <reason>" on an approved line/block for
@@ -164,6 +164,15 @@ WRITE_EFFECT_RE = re.compile(
 GATE_CONSUMPTION_RE = re.compile(
     r"MemberLifecycleGate\.disposition"
     r"|MemberWritePolicy\.disposition"
+    r"|DomainCareFactWriteAuthorizer\.authorizePetFact"
+    r"|DomainCareFactWriteAuthorizer\.authorizeHumanExpense"
+    r"|DomainMemberFactWriteAuthorizer\.authorizePetFact"
+    r"|DomainMemberFactWriteAuthorizer\.authorizeHumanFact"
+    r"|DomainMemberFactWriteAuthorizer\.authorizeUnscopedFact"
+    r"|DomainMemberFactWriteAuthorizer\.authorizeSubjectFact"
+    r"|DomainEffectWriteAuthorizer\.authorizePetEffect"
+    r"|DomainEffectWriteAuthorizer\.authorizeHumanEffect"
+    r"|DomainEffectWriteAuthorizer\.authorizeSubjectEffect"
     r"|CareFactWritePolicy\.disposition"
     r"|EconomyWalletWritePolicy\.canWrite"
     r"|SharedPetTargetResolver\.normalizedTargets"
@@ -253,6 +262,26 @@ EFFECT_EMISSION_RE = re.compile(
     r"|CareLedgerService\s*\("
     r"|\bcareLedger\.record\s*\("
 )
+MEMBER_EFFECT_DISPATCHER_SCOPE_PATHS = {
+    "Ohana/Domain/Services/PetMedicationDoseLogging.swift",
+    "Ohana/Features/FamilyTasks/LegacyBountyTask.swift",
+    "Ohana/Features/FamilyTasks/FamilyTaskService.swift",
+    "Ohana/Features/Medication/HumanMedicationCommands.swift",
+    "Ohana/Features/Medication/MedicationReminderService.swift",
+    "Ohana/Features/Wishlist/HumanWishlistCommands.swift",
+}
+MEMBER_EFFECT_WRITE_RE = re.compile(
+    r"\bcareLedger\.record\s*\("
+    r"|\bcareLedger\.recordReminderState\s*\("
+    r"|\bself\.careLedger\.record\s*\("
+    r"|\bEconomyRewardDiscipline\.(?:awardCareAction|awardSharedCareAction|awardNonCareReward)\s*\("
+    r"|\bstageSpecialCoconutReward\s*\("
+    r"|\bCoconutWalletMutationWriter\.applyHumanMutations\s*\("
+    r"|\bwallet\.apply\s*\("
+)
+MEMBER_EFFECT_DISPATCHER_RE = re.compile(
+    r"\bDomain(?:CareFactEffectsDispatcher|MemberFactEffectsDispatcher|EffectDispatcher)\."
+)
 RAW_EFFECT_OWNER_TYPE_RE = re.compile(
     r"\b(?:event\.)?relatedEntityType\s*(?:==|!=)"
 )
@@ -276,6 +305,18 @@ DIRECT_SCHEDULE_CONSTRUCTOR_RE = re.compile(r"\b(?:Event|Reminder)\s*\(")
 DIRECT_SCHEDULE_INSERT_RE = re.compile(r"\b(?:context|modelContext)\.insert\s*\(")
 AUTHORIZED_SCHEDULE_WRITER_RE = re.compile(
     r"DomainScheduleWriteAuthorizer\.authorizeCreate|DomainScheduleWriter\.createEvent"
+)
+MEMBER_SCHEDULE_DELETE_SCOPE_PATHS = {
+    "Ohana/Features/Medication/HumanMedicationCommands.swift",
+    "Ohana/Features/Medication/MedicationCommands.swift",
+}
+DIRECT_SCHEDULE_DELETE_RE = re.compile(
+    r"\b(?:context|modelContext)\.delete\s*\(\s*(?:event|reminder)\s*\)"
+)
+AUTHORIZED_SCHEDULE_DELETE_RE = re.compile(
+    r"DomainScheduleWriteAuthorizer\.authorizeExistingEventMutation"
+    r"|DomainScheduleWriter\.deleteEvent"
+    r"|PhysicalDeletionService\.deleteEvent"
 )
 REHYDRATE_ENTRY_PATHS = {
     "Ohana/Domain/Services/DataBackupManager.swift",
@@ -409,6 +450,8 @@ def requires_lifecycle_gate(path: str, func_name: str, body: str, is_private: bo
 warnings: list[WarningItem] = []
 domain_ownership_warnings: list[WarningItem] = []
 effect_subject_warnings: list[WarningItem] = []
+member_effect_warnings: list[WarningItem] = []
+schedule_delete_warnings: list[WarningItem] = []
 feature_taxonomy_warnings: list[WarningItem] = []
 rehydrate_bypass_warnings: list[WarningItem] = []
 files = collect_files()
@@ -580,6 +623,38 @@ for path in files:
                     )
                 )
 
+    checks_member_effect_dispatcher = path_str in MEMBER_EFFECT_DISPATCHER_SCOPE_PATHS or (
+        targets and path_str.startswith("scripts/tests/fixtures/")
+    )
+    if checks_member_effect_dispatcher:
+        for func_name, start_line, body, _ in function_blocks(lines):
+            if "member-lifecycle-gate: allow" in body:
+                continue
+            if MEMBER_EFFECT_WRITE_RE.search(body) and not MEMBER_EFFECT_DISPATCHER_RE.search(body):
+                member_effect_warnings.append(
+                    WarningItem(
+                        path_str,
+                        start_line,
+                        f"func {func_name} writes ledger/wallet/reward effects without consuming an authorized effects dispatcher",
+                    )
+                )
+
+    checks_schedule_delete = path_str in MEMBER_SCHEDULE_DELETE_SCOPE_PATHS or (
+        targets and path_str.startswith("scripts/tests/fixtures/")
+    )
+    if checks_schedule_delete:
+        for func_name, start_line, body, _ in function_blocks(lines):
+            if "member-lifecycle-gate: allow" in body:
+                continue
+            if DIRECT_SCHEDULE_DELETE_RE.search(body) and not AUTHORIZED_SCHEDULE_DELETE_RE.search(body):
+                schedule_delete_warnings.append(
+                    WarningItem(
+                        path_str,
+                        start_line,
+                        f"func {func_name} deletes Event/Reminder rows without consuming an authorized schedule mutation writer",
+                    )
+                )
+
     if allowed_path(path_str) or not is_write_path(path_str):
         continue
     for idx, line in enumerate(lines, start=1):
@@ -608,7 +683,7 @@ for path in files:
                 WarningItem(
                     path_str,
                     start_line,
-                    f"func {func_name} writes member-scoped data without MemberLifecycleGate/MemberWritePolicy",
+                        f"func {func_name} writes member-scoped data without MemberLifecycleGate/MemberWritePolicy/capability authorizer",
                 )
             )
 
@@ -627,6 +702,14 @@ for item in effect_subject_warnings:
     print(f"[member-lifecycle-raw-effect-subject] {item.path}:{item.line}: effects, revisions, notifications, routes, and ledgers must consume typed DomainSubjectResolution/DomainResolvedSubjectKey instead of guessing from raw relatedEntity/assignee fields.")
     print(f"    {item.snippet}")
 
+for item in member_effect_warnings:
+    print(f"[member-lifecycle-effect-dispatcher-bypass] {item.path}:{item.line}: member-scoped ledger, wallet, reminder, and reward effects must consume an authorized Domain*EffectsDispatcher plan.")
+    print(f"    {item.snippet}")
+
+for item in schedule_delete_warnings:
+    print(f"[member-lifecycle-schedule-delete-bypass] {item.path}:{item.line}: member-scoped Event/Reminder deletes must consume DomainScheduleWriteAuthorizer and DomainScheduleWriter.")
+    print(f"    {item.snippet}")
+
 for item in feature_taxonomy_warnings:
     print(f"[member-lifecycle-feature-taxonomy-string] {item.path}:{item.line}: persisted member schedule link taxonomy strings must live in DomainEntityLinkRegistry and be referenced through typed registry constants.")
     print(f"    {item.snippet}")
@@ -636,7 +719,7 @@ for item in warnings:
     message = "write paths must use MemberLifecycleGate/MemberWritePolicy instead of hand-rolled deceased-member gates."
     if item.snippet.startswith("func ") and "without MemberLifecycleGate" in item.snippet:
         rule = "member-lifecycle-missing-disposition"
-        message = "member-scoped write paths must consume MemberLifecycleGate/MemberWritePolicy before mutating."
+        message = "member-scoped write paths must consume MemberLifecycleGate/MemberWritePolicy or a lifecycle capability authorizer before mutating."
     elif item.snippet.startswith("func ") and "DomainScheduleWriter" in item.snippet:
         rule = "member-lifecycle-direct-schedule-writer"
         message = "member-scoped Event/Reminder writes must go through DomainScheduleWriteAuthorizer and DomainScheduleWriter."
@@ -646,7 +729,7 @@ for item in warnings:
     print(f"[{rule}] {item.path}:{item.line}: {message}")
     print(f"    {item.snippet}")
 
-total_warnings = len(warnings) + len(domain_ownership_warnings) + len(effect_subject_warnings) + len(feature_taxonomy_warnings) + len(rehydrate_bypass_warnings)
+total_warnings = len(warnings) + len(domain_ownership_warnings) + len(effect_subject_warnings) + len(member_effect_warnings) + len(schedule_delete_warnings) + len(feature_taxonomy_warnings) + len(rehydrate_bypass_warnings)
 print(f"member lifecycle gate audit: scanned {len(files)} file(s); warnings={total_warnings}")
 if total_warnings and strict:
     sys.exit(1)

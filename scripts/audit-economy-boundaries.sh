@@ -315,7 +315,7 @@ CARE_FACT_DISPOSITION_CONSUME_RE = re.compile(
     r"\b(?:didWriteFact|didRecord|allowsDerivedEffects|disposition|writesFact)\b"
 )
 CARE_FACT_WRITE_POLICY_CONSUME_RE = re.compile(
-    r"\b(?:CareFactWritePolicy\.disposition|didWriteFact|allowsDerivedEffects|disposition)\b"
+    r"\b(?:CareFactWritePolicy\.disposition|DomainCareFactEffectsDispatcher|didWriteFact|allowsDerivedEffects|disposition)\b"
 )
 PET_MEDICATION_DOSE_RESULT_CONSUME_RE = re.compile(r"\bdidRecord\b")
 CARE_COMMAND_RESULT_CALL_RE = re.compile(

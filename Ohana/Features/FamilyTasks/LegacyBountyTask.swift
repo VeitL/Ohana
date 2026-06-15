@@ -142,28 +142,48 @@ struct LegacyBountyCommandExecutor {
         task.assigneeName = currentHuman?.name
         current[idx] = task
 
-        do {
-            _ = try questManager.stageSpecialCoconutReward(
-                amount: task.reward,
-                emoji: "📋",
-                title: "完成家庭任务",
-                actorId: activeHumanId.isEmpty ? nil : activeHumanId,
-                actorName: currentHuman?.name,
-                source: .familyTask,
-                sourceModelName: "LegacyBountyTask",
-                sourceModelId: task.id.uuidString,
-                metadataJSON: "{\"kind\":\"legacyBounty\",\"taskId\":\"\(task.id.uuidString)\"}",
-                transactionKey: "legacyBounty:\(task.id.uuidString):complete:\(activeHumanId)",
-                context: context,
-                occurredAt: task.completedAt ?? Date()
-            )
-            try context.save()
-        } catch {
+        let occurredAt = task.completedAt ?? Date()
+        guard let write = DomainEffectWriteAuthorizer.authorizeSubjectEffect(
+            subjectRequest: DomainSubjectResolutionRequest(assigneeId: activeHumanId),
+            occurredAt: occurredAt,
+            writeKind: .collaboration,
+            source: .domainService,
+            executorId: activeHumanId.isEmpty ? nil : activeHumanId,
+            unresolvedAssigneePolicy: .deny,
+            context: context,
+            logPrefix: "legacy-bounty.complete"
+        ) else { return nil }
+
+        var rewardError: Error?
+        let didWriteReward = DomainEffectDispatcher.runEconomy(plan: write) { _ in
+            do {
+                _ = try questManager.stageSpecialCoconutReward(
+                    amount: task.reward,
+                    emoji: "📋",
+                    title: "完成家庭任务",
+                    actorId: activeHumanId.isEmpty ? nil : activeHumanId,
+                    actorName: currentHuman?.name,
+                    source: .familyTask,
+                    sourceModelName: "LegacyBountyTask",
+                    sourceModelId: task.id.uuidString,
+                    metadataJSON: "{\"kind\":\"legacyBounty\",\"taskId\":\"\(task.id.uuidString)\"}",
+                    transactionKey: "legacyBounty:\(task.id.uuidString):complete:\(activeHumanId)",
+                    context: context,
+                    occurredAt: occurredAt
+                )
+                try context.save()
+            } catch {
+                rewardError = error
+            }
+        }
+        guard didWriteReward, rewardError == nil else {
             context.rollback()
             questManager.wallet.refreshQuestProjection(context: context, manager: questManager)
-            #if DEBUG
-                OhanaLog.error("[LegacyBountyCommandExecutor] bounty reward save failed: \(error.localizedDescription)", category: "Economy")
-            #endif
+            if let rewardError {
+                #if DEBUG
+                    OhanaLog.error("[LegacyBountyCommandExecutor] bounty reward save failed: \(rewardError.localizedDescription)", category: "Economy")
+                #endif
+            }
             return nil
         }
 

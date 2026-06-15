@@ -53,20 +53,29 @@ enum PetMilestoneCommandService {
         for pet: Pet,
         context: ModelContext
     ) -> PetMilestoneCommandResult {
-        let disposition = MemberWritePolicy.disposition(pet: pet, intent: .memorialContent)
-        guard disposition.writesContent else {
-            return PetMilestoneCommandResult(petID: pet.id, milestoneIDs: [], coconutDelta: 0)
-        }
         var existingTitles = Set(pet.milestones.map(\.title))
-        var created: [(milestone: PetMilestone, actionType: String)] = []
+        var created: [(milestone: PetMilestone, actionType: String, write: AuthorizedDomainMemberFactWrite)] = []
 
         func appendIfNeeded(date: Date?, title: String, emoji: String, notes: String, actionType: String) {
             guard let date, !existingTitles.contains(title) else { return }
-            let milestone = PetMilestone(date: date, title: title, emoji: emoji, notes: notes, pet: pet)
-            context.insert(milestone)
-            CloudSyncMutationRecorder.markModified(milestone, context: context, modifiedAt: date)
+            guard let write = DomainMemberFactWriteAuthorizer.authorizePetFact(
+                pet: pet,
+                occurredAt: date,
+                writeKind: .memorial,
+                context: context,
+                logPrefix: "PetMilestoneCommandService.seedSystemMilestones"
+            ) else { return }
+            let milestone = DomainMemberFactWriter.createPetMilestone(
+                plan: write,
+                date: date,
+                title: title,
+                emoji: emoji,
+                notes: notes,
+                pet: pet,
+                context: context
+            )
             existingTitles.insert(title)
-            created.append((milestone, actionType))
+            created.append((milestone, actionType, write))
         }
 
         appendIfNeeded(
@@ -93,8 +102,8 @@ enum PetMilestoneCommandService {
             )
         }
 
-        if disposition.allowsDerivedEffects {
-            for entry in created {
+        for entry in created where entry.write.allowsDerivedEffects {
+            DomainMemberFactEffectsDispatcher.run(plan: entry.write) { _ in
                 recordLedger(
                     milestone: entry.milestone,
                     pet: pet,
@@ -125,31 +134,36 @@ enum PetMilestoneCommandService {
         questManager providedQuestManager: QuestManager? = nil,
         careLedger providedCareLedger: CareLedgerRecording? = nil
     ) -> PetMilestoneCommandResult {
-        let disposition = MemberWritePolicy.disposition(pet: pet, intent: .memorialContent)
-        guard disposition.writesContent else {
-            return PetMilestoneCommandResult(petID: pet.id, milestoneIDs: [], coconutDelta: 0)
-        }
         let questManager = providedQuestManager ?? QuestManager()
         let careLedger = providedCareLedger ?? CareLedgerService()
         let title = input.title.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !title.isEmpty else {
             return PetMilestoneCommandResult(petID: pet.id, milestoneIDs: [], coconutDelta: 0)
         }
+        guard let write = DomainMemberFactWriteAuthorizer.authorizePetFact(
+            pet: pet,
+            occurredAt: input.date,
+            writeKind: .memorial,
+            context: context,
+            logPrefix: "PetMilestoneCommandService.createMilestone"
+        ) else {
+            return PetMilestoneCommandResult(petID: pet.id, milestoneIDs: [], coconutDelta: 0)
+        }
 
-        let milestone = PetMilestone(
+        let milestone = DomainMemberFactWriter.createPetMilestone(
+            plan: write,
             date: input.date,
             title: title,
             emoji: input.emoji.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "🎉" : input.emoji,
             notes: input.notes,
             pet: pet,
             photoData: input.photoData,
-            location: input.location
+            location: input.location,
+            context: context
         )
-        context.insert(milestone)
-        CloudSyncMutationRecorder.markModified(milestone, context: context, modifiedAt: input.date)
         context.safeSave()
 
-        guard disposition.allowsDerivedEffects else {
+        guard write.allowsDerivedEffects else {
             return PetMilestoneCommandResult(
                 petID: pet.id,
                 milestoneIDs: [milestone.id],
@@ -164,24 +178,27 @@ enum PetMilestoneCommandService {
             logPrefix: "PetMilestoneCommandService"
         )
         let executorId = rewardHuman?.id.uuidString
-        let reward = EconomyRewardDiscipline.awardNonCareReward(
-            type: .milestone,
-            pet: pet,
-            context: context,
-            executorId: executorId,
-            questManager: questManager
-        )
-        let coconutDelta = max(0, reward.humanGot + reward.petGot)
-        recordLedger(
-            milestone: milestone,
-            pet: pet,
-            actionType: "manual",
-            source: .detail,
-            coconutDelta: coconutDelta,
-            executorId: executorId,
-            context: context,
-            careLedger: careLedger
-        )
+        var coconutDelta = 0
+        DomainMemberFactEffectsDispatcher.run(plan: write) { _ in
+            let reward = EconomyRewardDiscipline.awardNonCareReward(
+                type: .milestone,
+                pet: pet,
+                context: context,
+                executorId: executorId,
+                questManager: questManager
+            )
+            coconutDelta = max(0, reward.humanGot + reward.petGot)
+            recordLedger(
+                milestone: milestone,
+                pet: pet,
+                actionType: "manual",
+                source: .detail,
+                coconutDelta: coconutDelta,
+                executorId: executorId,
+                context: context,
+                careLedger: careLedger
+            )
+        }
 
         return PetMilestoneCommandResult(
             petID: pet.id,

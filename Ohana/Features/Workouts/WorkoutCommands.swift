@@ -53,13 +53,20 @@ enum WorkoutCommandService {
         source: CareLedgerSource = .quickAction,
         careLedger providedCareLedger: CareLedgerRecording? = nil
     ) -> WorkoutCommandResult {
-        guard MemberWritePolicy.disposition(human: human, intent: .activeOnly).allowsDerivedEffects else {
+        guard let write = DomainMemberFactWriteAuthorizer.authorizeHumanFact(
+            human: human,
+            occurredAt: date,
+            writeKind: .care,
+            context: context,
+            logPrefix: "WorkoutCommandService.recordHumanWorkout"
+        ) else {
             return WorkoutCommandResult(logID: UUID(), subjectID: human.id, ledgerEventID: nil)
         }
         let careLedger = providedCareLedger ?? CareLedgerService()
         let cleanNotes = notes.trimmingCharacters(in: .whitespacesAndNewlines)
-        let log = HumanWorkoutLog(
-            date: date,
+        let log = DomainMemberFactWriter.createHumanWorkoutLog(
+            plan: write,
+            human: human,
             type: type,
             durationMinutes: durationMinutes,
             distanceKm: max(0, distanceKm.isFinite ? distanceKm : 0),
@@ -67,35 +74,36 @@ enum WorkoutCommandService {
             steps: 0,
             notes: cleanNotes,
             sourceHealthKit: false,
-            human: human
+            context: context
         )
-        context.insert(log)
-        CloudSyncMutationRecorder.markModified(log, context: context, modifiedAt: date)
-        let ledgerEvent = careLedger.record(
-            occurredAt: log.date,
-            actorKind: .human,
-            actorId: human.id.uuidString,
-            subjectKind: .human,
-            subjectId: human.id.uuidString,
-            eventKind: .workout,
-            actionType: log.typeRaw,
-            amountValue: Double(log.durationMinutes),
-            amountUnit: "min",
-            note: log.notes,
-            source: source,
-            sourceEventId: nil,
-            sourceReminderId: nil,
-            legacyModelName: "HumanWorkoutLog",
-            legacyModelId: log.id.uuidString,
-            coconutDelta: 0,
-            rewardLogId: nil,
-            privacyFieldRaw: nil,
-            metadataJSON: "{\"distanceKm\":\(log.distanceKm),\"calories\":\(log.calories),\"steps\":\(log.steps)}",
-            context: context,
-            save: false
-        )
+        var ledgerEvent: CareLedgerEvent?
+        DomainMemberFactEffectsDispatcher.run(plan: write) { actor in
+            ledgerEvent = careLedger.record(
+                occurredAt: log.date,
+                actorKind: .human,
+                actorId: actor.effectiveExecutorId,
+                subjectKind: .human,
+                subjectId: human.id.uuidString,
+                eventKind: .workout,
+                actionType: log.typeRaw,
+                amountValue: Double(log.durationMinutes),
+                amountUnit: "min",
+                note: log.notes,
+                source: source,
+                sourceEventId: nil,
+                sourceReminderId: nil,
+                legacyModelName: "HumanWorkoutLog",
+                legacyModelId: log.id.uuidString,
+                coconutDelta: 0,
+                rewardLogId: nil,
+                privacyFieldRaw: nil,
+                metadataJSON: "{\"distanceKm\":\(log.distanceKm),\"calories\":\(log.calories),\"steps\":\(log.steps)}",
+                context: context,
+                save: false
+            )
+        }
         context.safeSave()
-        return WorkoutCommandResult(logID: log.id, subjectID: human.id, ledgerEventID: ledgerEvent.id)
+        return WorkoutCommandResult(logID: log.id, subjectID: human.id, ledgerEventID: ledgerEvent?.id)
     }
 
     @discardableResult

@@ -106,23 +106,34 @@ enum PetDocumentCommandService {
         now: Date = Date(),
         careLedger providedCareLedger: CareLedgerRecording? = nil
     ) -> PetDocumentCommandResult {
-        let disposition = MemberLifecycleGate.disposition(pet: pet, writeKind: writeKind(for: input))
-        guard disposition.writesContent else {
+        guard let write = DomainMemberFactWriteAuthorizer.authorizePetFact(
+            pet: pet,
+            occurredAt: now,
+            writeKind: writeKind(for: input),
+            context: context,
+            logPrefix: "PetDocumentCommandService.createDocument"
+        ) else {
             return PetDocumentCommandResult(petID: pet.id, documentID: UUID(), expenseLogIDs: [], ledgerEventIDs: [], didChange: false)
         }
         let careLedger = providedCareLedger ?? CareLedgerService()
         let finalTitle = input.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             ? "\(pet.name)\(input.category.rawValue)"
             : input.title.trimmingCharacters(in: .whitespacesAndNewlines)
-        let document = PetDocument(title: finalTitle, category: input.category, pet: pet)
+        let document = DomainMemberFactWriter.createPetDocument(
+            plan: write,
+            title: finalTitle,
+            category: input.category,
+            pet: pet,
+            context: context
+        )
         document.issuingAuthority = input.issuingAuthority
         document.notes = input.notes
         document.issueDate = input.issueDate
         document.expiryDate = input.expiryDate
         document.cost = max(0, input.cost)
-        applyAttachments(input.attachments, to: document, context: context)
+        applyAttachments(input.attachments, to: document, write: write, context: context)
 
-        let expenseLogs = disposition.allowsDerivedEffects
+        let expenseWrites = write.allowsDerivedEffects
             ? makeExpensesIfNeeded(
                 pet: pet,
                 document: document,
@@ -135,52 +146,52 @@ enum PetDocumentCommandService {
             )
             : []
 
-        context.insert(document)
         CloudSyncMutationRecorder.markModified(document, context: context, modifiedAt: now)
-        if disposition.allowsDerivedEffects,
+        if write.allowsDerivedEffects,
            !input.documentNumber.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
            input.category == .passport {
             pet.passportNumber = input.documentNumber.trimmingCharacters(in: .whitespacesAndNewlines)
         }
 
-        let ledgerEvents = expenseLogs.map { expense in
-            let actor = CareFactWritePolicy.executorResolution(
-                requestedExecutorId: expense.executorId,
-                context: context,
-                logPrefix: "PetDocumentCommandService.createDocument"
-            )
-            expense.executorId = actor.effectiveExecutorId
-            CloudSyncMutationRecorder.markModified(expense, context: context, modifiedAt: expense.date)
-            return careLedger.record(
-                occurredAt: expense.date,
-                actorKind: actor.effectiveExecutorId == nil ? .unknown : .human,
-                actorId: actor.effectiveExecutorId,
-                subjectKind: .pet,
-                subjectId: pet.id.uuidString,
-                eventKind: .expense,
-                actionType: expense.expenseCategory.rawValue,
-                amountValue: expense.amount,
-                amountUnit: "currency",
-                note: expense.note,
-                source: .detail,
-                sourceEventId: nil,
-                sourceReminderId: nil,
-                legacyModelName: "PetExpenseLog",
-                legacyModelId: expense.id.uuidString,
-                coconutDelta: 0,
-                rewardLogId: nil,
-                privacyFieldRaw: nil,
-                metadataJSON: "",
-                context: context,
-                save: false
-            )
+        let ledgerEvents = expenseWrites.compactMap { expenseWrite in
+            let expense = expenseWrite.expense
+            let write = expenseWrite.write
+            var ledgerEvent: CareLedgerEvent?
+            DomainCareFactEffectsDispatcher.run(plan: write) { actor in
+                expense.executorId = actor.effectiveExecutorId
+                CloudSyncMutationRecorder.markModified(expense, context: context, modifiedAt: expense.date)
+                ledgerEvent = careLedger.record(
+                    occurredAt: expense.date,
+                    actorKind: actor.effectiveExecutorId == nil ? .unknown : .human,
+                    actorId: actor.effectiveExecutorId,
+                    subjectKind: .pet,
+                    subjectId: pet.id.uuidString,
+                    eventKind: .expense,
+                    actionType: expense.expenseCategory.rawValue,
+                    amountValue: expense.amount,
+                    amountUnit: "currency",
+                    note: expense.note,
+                    source: .detail,
+                    sourceEventId: nil,
+                    sourceReminderId: nil,
+                    legacyModelName: "PetExpenseLog",
+                    legacyModelId: expense.id.uuidString,
+                    coconutDelta: 0,
+                    rewardLogId: nil,
+                    privacyFieldRaw: nil,
+                    metadataJSON: "",
+                    context: context,
+                    save: false
+                )
+            }
+            return ledgerEvent
         }
 
         context.safeSave()
         return PetDocumentCommandResult(
             petID: pet.id,
             documentID: document.id,
-            expenseLogIDs: expenseLogs.map(\.id),
+            expenseLogIDs: expenseWrites.map { expenseWrite in expenseWrite.expense.id },
             ledgerEventIDs: ledgerEvents.map(\.id),
             didChange: true
         )
@@ -194,8 +205,13 @@ enum PetDocumentCommandService {
         input: PetDocumentUpdateCommandInput,
         context: ModelContext
     ) -> PetDocumentCommandResult {
-        let disposition = MemberLifecycleGate.disposition(pet: pet, writeKind: writeKind(for: input))
-        guard disposition.writesContent else {
+        guard let write = DomainMemberFactWriteAuthorizer.authorizePetFact(
+            pet: pet,
+            occurredAt: Date(),
+            writeKind: writeKind(for: input),
+            context: context,
+            logPrefix: "PetDocumentCommandService.updateDocument"
+        ) else {
             return PetDocumentCommandResult(petID: pet.id, documentID: document.id, expenseLogIDs: [], ledgerEventIDs: [], didChange: false)
         }
         document.title = input.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
@@ -212,7 +228,7 @@ enum PetDocumentCommandService {
             document.attachmentFilename = ""
             document.attachments.removeAll()
         } else if !input.attachments.isEmpty {
-            applyAttachments(input.attachments, to: document, context: context)
+            applyAttachments(input.attachments, to: document, write: write, context: context)
         } else if let data = input.attachmentData {
             let filename = document.attachmentFilename.isEmpty ? "image.jpg" : document.attachmentFilename
             document.attachmentData = AttachmentPrivacySanitizer.sanitizedData(
@@ -259,6 +275,7 @@ enum PetDocumentCommandService {
     private static func applyAttachments(
         _ attachments: [PetDocumentAttachmentCommandInput],
         to document: PetDocument,
+        write: AuthorizedDomainMemberFactWrite,
         context: ModelContext
     ) {
         guard let first = attachments.first else { return }
@@ -268,15 +285,16 @@ enum PetDocumentCommandService {
         document.attachmentFilename = first.filename.isEmpty
             ? (first.isImage ? "image.jpg" : "attachment")
             : first.filename
-        document.attachments = sanitizedAttachments.map { input in
-            PetDocumentAttachment(
+        document.attachments.removeAll()
+        for input in sanitizedAttachments {
+            _ = DomainMemberFactWriter.createPetDocumentAttachment(
+                plan: write,
                 data: input.data,
                 filename: input.filename.isEmpty ? (input.isImage ? "image.jpg" : "attachment") : input.filename,
-                isImage: input.isImage
+                isImage: input.isImage,
+                document: document,
+                context: context
             )
-        }
-        for attachment in document.attachments {
-            context.insert(attachment)
         }
     }
 
@@ -328,7 +346,7 @@ enum PetDocumentCommandService {
         payerId: String?,
         now: Date,
         context: ModelContext
-    ) -> [PetExpenseLog] {
+    ) -> [(expense: PetExpenseLog, write: AuthorizedDomainCareFactWrite)] {
         guard amount > 0 else { return [] }
         let expenseDate: Date = {
             guard let issueDate else { return now }
@@ -341,18 +359,28 @@ enum PetDocumentCommandService {
             note: document.title,
             payerId: payerId
         )
-        return plans.map { plan in
-            let expense = PetExpenseLog(
-                date: plan.date,
-                amount: plan.amount,
-                category: plan.category,
-                note: plan.note,
-                pet: pet,
-                executorId: plan.payerId
+        return plans.compactMap { plan in
+            let intent = DomainCareFactCreateIntent(
+                kind: .expense(
+                    amount: plan.amount,
+                    category: plan.category,
+                    note: plan.note,
+                    sharedSessionId: ""
+                ),
+                occurredAt: plan.date,
+                executorId: plan.payerId,
+                source: .userCommand
             )
-            context.insert(expense)
-            CloudSyncMutationRecorder.markModified(expense, context: context, modifiedAt: expense.date)
-            return expense
+            guard let write = DomainCareFactWriteAuthorizer.authorizePetFact(
+                pet: pet,
+                intent: intent,
+                context: context,
+                logPrefix: "PetDocumentCommandService.makeExpensesIfNeeded"
+            ) else { return nil }
+            return (
+                expense: DomainCareFactWriter.createExpenseLog(plan: write, context: context),
+                write: write
+            )
         }
     }
 

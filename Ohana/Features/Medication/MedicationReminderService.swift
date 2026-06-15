@@ -116,7 +116,16 @@ final class MedicationReminderService {
     // MARK: - 调度单个宠物的用药通知（覆盖替换）
 
     func scheduleMedicationReminders(for pet: Pet, context: ModelContext? = nil) {
-        guard MemberWritePolicy.disposition(pet: pet, intent: .activeOnly).allowsDerivedEffects else {
+        let write = context.flatMap { context in
+            DomainEffectWriteAuthorizer.authorizePetEffect(
+                pet: pet,
+                writeKind: .care,
+                source: .domainService,
+                context: context,
+                logPrefix: "MedicationReminderService"
+            )
+        }
+        guard context == nil || write != nil else {
             cancelMedicationReminders(for: pet.id)
             return
         }
@@ -132,14 +141,19 @@ final class MedicationReminderService {
 
             // 重新调度
             for med in meds {
-                self.scheduleRemindersForMedication(med, pet: pet, context: context)
+                self.scheduleRemindersForMedication(med, pet: pet, write: write, context: context)
             }
         }
     }
 
     // MARK: - 调度单个药物的通知（未来14天窗口）
 
-    private func scheduleRemindersForMedication(_ med: PetMedication, pet: Pet, context: ModelContext?) {
+    private func scheduleRemindersForMedication(
+        _ med: PetMedication,
+        pet: Pet,
+        write: AuthorizedDomainEffectWrite?,
+        context: ModelContext?
+    ) {
         let dosesPerDay = med.frequency.dosesPerDay
         guard dosesPerDay > 0 else { return } // asNeeded / custom 不推送
 
@@ -204,6 +218,7 @@ final class MedicationReminderService {
                 center.add(request) { error in
                     self.recordMedicationScheduleResult(
                         contextBox: contextBox,
+                        write: write,
                         subjectKind: .pet,
                         subjectId: petId,
                         medicationId: medicationId,
@@ -218,12 +233,17 @@ final class MedicationReminderService {
         }
 
         // 疗程结束前3天提醒
-        scheduleEndReminder(for: med, pet: pet, context: context)
+        scheduleEndReminder(for: med, pet: pet, write: write, context: context)
     }
 
     // MARK: - 疗程结束前3天提醒
 
-    private func scheduleEndReminder(for med: PetMedication, pet: Pet, context: ModelContext?) {
+    private func scheduleEndReminder(
+        for med: PetMedication,
+        pet: Pet,
+        write: AuthorizedDomainEffectWrite?,
+        context: ModelContext?
+    ) {
         guard let endDate = med.endDate else { return }
         guard let alertDate = Calendar.current.date(byAdding: .day, value: -3, to: endDate) else { return }
         guard alertDate > Date() else { return }
@@ -259,6 +279,7 @@ final class MedicationReminderService {
         center.add(request) { error in
             self.recordMedicationScheduleResult(
                 contextBox: contextBox,
+                write: write,
                 subjectKind: .pet,
                 subjectId: petId,
                 medicationId: medicationId,
@@ -287,7 +308,16 @@ final class MedicationReminderService {
     // MARK: - 调度单个人的用药通知
 
     func scheduleHumanMedicationReminders(for human: Human, meds: [HumanMedication], context: ModelContext? = nil) {
-        guard MemberWritePolicy.disposition(human: human, intent: .activeOnly).allowsDerivedEffects else {
+        let write = context.flatMap { context in
+            DomainEffectWriteAuthorizer.authorizeHumanEffect(
+                human: human,
+                writeKind: .care,
+                source: .domainService,
+                context: context,
+                logPrefix: "MedicationReminderService"
+            )
+        }
+        guard context == nil || write != nil else {
             cancelHumanMedicationReminders(for: human.id)
             return
         }
@@ -299,12 +329,17 @@ final class MedicationReminderService {
             self.center.removePendingNotificationRequests(withIdentifiers: ids)
 
             for med in meds {
-                self.scheduleRemindersForHumanMedication(med, human: human, context: context)
+                self.scheduleRemindersForHumanMedication(med, human: human, write: write, context: context)
             }
         }
     }
 
-    private func scheduleRemindersForHumanMedication(_ med: HumanMedication, human: Human, context: ModelContext?) {
+    private func scheduleRemindersForHumanMedication(
+        _ med: HumanMedication,
+        human: Human,
+        write: AuthorizedDomainEffectWrite?,
+        context: ModelContext?
+    ) {
         let now = Date()
         let doses = HumanMedicationSchedulePlan.futureDoses(for: med, from: now, days: 14)
         guard !doses.isEmpty else { return }
@@ -347,6 +382,7 @@ final class MedicationReminderService {
             center.add(request) { error in
                 self.recordMedicationScheduleResult(
                     contextBox: contextBox,
+                    write: write,
                     subjectKind: .human,
                     subjectId: humanId,
                     medicationId: medicationId,
@@ -360,6 +396,7 @@ final class MedicationReminderService {
 
     private nonisolated func recordMedicationScheduleResult(
         contextBox: MedicationReminderContextBox,
+        write: AuthorizedDomainEffectWrite?,
         subjectKind: CareLedgerSubjectKind,
         subjectId: String,
         medicationId: String,
@@ -369,30 +406,32 @@ final class MedicationReminderService {
     ) {
         DispatchQueue.main.async {
             MainActor.assumeIsolated {
-                guard let context = contextBox.context else { return }
-                _ = self.careLedger.record(
-                    occurredAt: Date(),
-                    actorKind: .unknown,
-                    actorId: nil,
-                    subjectKind: subjectKind,
-                    subjectId: subjectId,
-                    eventKind: .reminder,
-                    actionType: actionType,
-                    amountValue: 0,
-                    amountUnit: "",
-                    note: medicationName,
-                    source: .notification,
-                    sourceEventId: nil,
-                    sourceReminderId: nil,
-                    legacyModelName: "MedicationReminder",
-                    legacyModelId: medicationId,
-                    coconutDelta: 0,
-                    rewardLogId: nil,
-                    privacyFieldRaw: nil,
-                    metadataJSON: metadataJSON,
-                    context: context,
-                    save: true
-                )
+                guard let context = contextBox.context, let write else { return }
+                DomainEffectDispatcher.run(plan: write) { _ in
+                    _ = self.careLedger.record(
+                        occurredAt: Date(),
+                        actorKind: .unknown,
+                        actorId: nil,
+                        subjectKind: subjectKind,
+                        subjectId: subjectId,
+                        eventKind: .reminder,
+                        actionType: actionType,
+                        amountValue: 0,
+                        amountUnit: "",
+                        note: medicationName,
+                        source: .notification,
+                        sourceEventId: nil,
+                        sourceReminderId: nil,
+                        legacyModelName: "MedicationReminder",
+                        legacyModelId: medicationId,
+                        coconutDelta: 0,
+                        rewardLogId: nil,
+                        privacyFieldRaw: nil,
+                        metadataJSON: metadataJSON,
+                        context: context,
+                        save: true
+                    )
+                }
             }
         }
     }

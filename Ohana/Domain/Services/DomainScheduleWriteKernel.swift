@@ -381,6 +381,23 @@ nonisolated enum DomainScheduleWriter {
     }
 
     @discardableResult
+    static func deleteEvent(
+        _ event: Event,
+        mutation: AuthorizedDomainScheduleMutation,
+        context: ModelContext
+    ) -> Bool {
+        _ = mutation.token
+        mutation.mutationPlan.consumeAuthorization()
+        guard mutation.writesContent else { return false }
+        for reminder in event.reminders {
+            CloudSyncMutationRecorder.markDeleted(reminder, context: context)
+        }
+        CloudSyncMutationRecorder.markDeleted(event, context: context)
+        context.delete(event)
+        return true
+    }
+
+    @discardableResult
     static func createReminder(
         for event: Event,
         scheduledAt: Date,

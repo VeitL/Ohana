@@ -13,6 +13,17 @@ struct ExpenseReceiptAttachmentDraft: Equatable {
     var isImage: Bool
 }
 
+struct ExpenseReceiptDocumentDraft: Equatable {
+    var title: String
+    var category: DocumentCategory
+    var cost: Double
+    var issueDate: Date
+    var notes: String
+    var attachmentData: Data?
+    var attachmentFilename: String
+    var attachments: [ExpenseReceiptAttachmentDraft]
+}
+
 enum InsurancePaymentSchedule {
     static func dates(
         startDate: Date,
@@ -220,39 +231,36 @@ enum ExpenseReceiptMetadata {
 }
 
 enum ExpenseReceiptDocumentBuilder {
-    static func makeDocument(
+    static func makeDraft(
         title: String,
         category: DocumentCategory,
         cost: Double,
         date: Date,
         visibleNote: String,
         linkedExpenseLogId: String,
-        attachments: [ExpenseReceiptAttachmentDraft],
-        pet: Pet
-    ) -> PetDocument {
-        let document = PetDocument(title: title, category: category, pet: pet)
+        attachments: [ExpenseReceiptAttachmentDraft]
+    ) -> ExpenseReceiptDocumentDraft {
         let sanitizedAttachments = attachments.map(sanitizedAttachment)
-        document.issueDate = date
-        document.cost = cost
-        document.notes = ExpenseReceiptMetadata.notes(
-            visibleNote: visibleNote,
-            expenseLogId: linkedExpenseLogId
+        let firstAttachment = sanitizedAttachments.first
+        return ExpenseReceiptDocumentDraft(
+            title: title,
+            category: category,
+            cost: cost,
+            issueDate: date,
+            notes: ExpenseReceiptMetadata.notes(
+                visibleNote: visibleNote,
+                expenseLogId: linkedExpenseLogId
+            ),
+            attachmentData: firstAttachment?.data,
+            attachmentFilename: firstAttachment.map { normalizedFilename($0, index: 1) } ?? "",
+            attachments: sanitizedAttachments.enumerated().map { index, attachment in
+                ExpenseReceiptAttachmentDraft(
+                    data: attachment.data,
+                    filename: normalizedFilename(attachment, index: index + 1),
+                    isImage: attachment.isImage
+                )
+            }
         )
-
-        if let first = sanitizedAttachments.first {
-            document.attachmentData = first.data
-            document.attachmentFilename = normalizedFilename(first, index: 1)
-        }
-
-        document.attachments = sanitizedAttachments.enumerated().map { index, attachment in
-            PetDocumentAttachment(
-                data: attachment.data,
-                filename: normalizedFilename(attachment, index: index + 1),
-                isImage: attachment.isImage
-            )
-        }
-
-        return document
     }
 
     private nonisolated static func sanitizedAttachment(_ attachment: ExpenseReceiptAttachmentDraft) -> ExpenseReceiptAttachmentDraft {

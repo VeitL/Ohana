@@ -114,18 +114,18 @@ enum PetHealthCommandService {
         reminderScheduling providedReminderScheduling: ReminderSchedulingManaging? = nil,
         oasisRewards providedOasisRewards: OasisRewardManaging? = nil
     ) -> PetHealthCommandResult? {
-        let disposition = CareFactWritePolicy.disposition(
-            pet: pet,
-            date: input.date,
+        let intent = DomainCareFactCreateIntent(
+            kind: .health(type: input.type, note: input.composedNote),
+            occurredAt: input.date,
             executorId: input.executorId,
-            context: context
+            source: .userCommand
         )
-        guard disposition.didWriteFact else { return nil }
-        let actor = CareFactWritePolicy.executorResolution(
-            requestedExecutorId: input.executorId,
+        guard let write = DomainCareFactWriteAuthorizer.authorizePetFact(
+            pet: pet,
+            intent: intent,
             context: context,
             logPrefix: "PetHealthCommandService.recordHealth"
-        )
+        ) else { return nil }
         let careLedger = providedCareLedger ?? CareLedgerService()
         let reminderScheduling = providedReminderScheduling ?? ReminderSchedulingManager()
         let oasisRewards = providedOasisRewards ?? StaticOasisRewardManager(
@@ -133,22 +133,14 @@ enum PetHealthCommandService {
             wallet: SwiftDataCoconutWalletManager(),
             questManager: questManager
         )
-        let log = PetHealthLog(
-            date: input.date,
-            type: input.type,
-            note: input.composedNote,
-            pet: pet,
-            executorId: actor.effectiveExecutorId
-        )
+        let log = DomainCareFactWriter.createHealthLog(plan: write, context: context)
         log.vetName = input.vetName.trimmingCharacters(in: .whitespacesAndNewlines)
         log.cost = input.cost
         log.expirationDate = input.expirationDate
         log.nextCheckupDate = input.nextCheckupDate
-        context.insert(log)
         CloudSyncMutationRecorder.markModified(log, context: context, modifiedAt: input.date)
 
-        let allowsDerivedEffects = disposition.allowsDerivedEffects
-        guard allowsDerivedEffects else {
+        guard write.allowsDerivedEffects else {
             context.safeSave()
             return PetHealthCommandResult(
                 logID: log.id,
@@ -161,104 +153,116 @@ enum PetHealthCommandService {
             )
         }
 
-        let expense = makeExpenseIfNeeded(
-            pet: pet,
-            input: input,
-            executorId: actor.effectiveExecutorId,
-            context: context
-        )
-        let expirationSchedule = makeExpirationScheduleIfNeeded(
-            pet: pet,
-            input: input,
-            context: context
-        )
-        let event = expirationSchedule?.event
-        let reminder = expirationSchedule?.reminder
+        var expenseWrite: (expense: PetExpenseLog, write: AuthorizedDomainCareFactWrite)?
+        var event: Event?
+        var reminder: Reminder?
+        var coconutDelta = 0
+        var rewardMetadataJSON = ""
 
-        let reward: (humanGot: Int, petGot: Int)
-        if awardsReward {
-            reward = EconomyRewardDiscipline.awardCareAction(
-                type: .health,
+        DomainCareFactEffectsDispatcher.run(plan: write) { actor in
+            expenseWrite = makeExpenseIfNeeded(
                 pet: pet,
-                context: context,
-                executorId: actor.rewardExecutorId,
-                questManager: questManager
+                input: input,
+                actor: actor,
+                context: context
             )
-            oasisRewards.rewardFeaturedCritterFromCare(type: .health, context: context)
-        } else {
-            reward = (humanGot: 0, petGot: 0)
-        }
-        let coconutDelta = careLedger.rewardDelta(reward)
-        let rewardMetadataJSON = careLedger.rewardMetadata(reward, questManager: questManager)
+            let expirationSchedule = makeExpirationScheduleIfNeeded(
+                pet: pet,
+                input: input,
+                context: context
+            )
+            event = expirationSchedule?.event
+            reminder = expirationSchedule?.reminder
 
-        careLedger.record(
-            occurredAt: log.date,
-            actorKind: actor.effectiveExecutorId == nil ? .unknown : .human,
-            actorId: actor.effectiveExecutorId,
-            subjectKind: .pet,
-            subjectId: pet.id.uuidString,
-            eventKind: .health,
-            actionType: input.type.rawValue,
-            amountValue: input.cost,
-            amountUnit: input.cost > 0 ? "currency" : "",
-            note: log.note,
-            source: input.source,
-            sourceEventId: event?.id.uuidString,
-            sourceReminderId: nil,
-            legacyModelName: "PetHealthLog",
-            legacyModelId: log.id.uuidString,
-            coconutDelta: coconutDelta,
-            rewardLogId: nil,
-            privacyFieldRaw: nil,
-            metadataJSON: rewardMetadataJSON,
-            context: context,
-            save: false
-        )
+            let reward: (humanGot: Int, petGot: Int)
+            if awardsReward {
+                reward = EconomyRewardDiscipline.awardCareAction(
+                    type: .health,
+                    pet: pet,
+                    context: context,
+                    executorId: actor.rewardExecutorId,
+                    questManager: questManager
+                )
+                oasisRewards.rewardFeaturedCritterFromCare(type: .health, context: context)
+            } else {
+                reward = (humanGot: 0, petGot: 0)
+            }
+            coconutDelta = careLedger.rewardDelta(reward)
+            rewardMetadataJSON = careLedger.rewardMetadata(reward, questManager: questManager)
 
-        if let expense {
             careLedger.record(
-                occurredAt: expense.date,
+                occurredAt: log.date,
                 actorKind: actor.effectiveExecutorId == nil ? .unknown : .human,
                 actorId: actor.effectiveExecutorId,
                 subjectKind: .pet,
                 subjectId: pet.id.uuidString,
-                eventKind: .expense,
-                actionType: ExpenseCategory.medical.rawValue,
-                amountValue: expense.amount,
-                amountUnit: "currency",
-                note: expense.note,
+                eventKind: .health,
+                actionType: input.type.rawValue,
+                amountValue: input.cost,
+                amountUnit: input.cost > 0 ? "currency" : "",
+                note: log.note,
                 source: input.source,
-                sourceEventId: nil,
+                sourceEventId: event?.id.uuidString,
                 sourceReminderId: nil,
-                legacyModelName: "PetExpenseLog",
-                legacyModelId: expense.id.uuidString,
-                coconutDelta: 0,
+                legacyModelName: "PetHealthLog",
+                legacyModelId: log.id.uuidString,
+                coconutDelta: coconutDelta,
                 rewardLogId: nil,
                 privacyFieldRaw: nil,
-                metadataJSON: "",
+                metadataJSON: rewardMetadataJSON,
                 context: context,
                 save: false
             )
+
+            if let expenseWrite {
+                let expense = expenseWrite.expense
+                DomainCareFactEffectsDispatcher.run(plan: expenseWrite.write) { expenseActor in
+                    careLedger.record(
+                        occurredAt: expense.date,
+                        actorKind: expenseActor.effectiveExecutorId == nil ? .unknown : .human,
+                        actorId: expenseActor.effectiveExecutorId,
+                        subjectKind: .pet,
+                        subjectId: pet.id.uuidString,
+                        eventKind: .expense,
+                        actionType: ExpenseCategory.medical.rawValue,
+                        amountValue: expense.amount,
+                        amountUnit: "currency",
+                        note: expense.note,
+                        source: input.source,
+                        sourceEventId: nil,
+                        sourceReminderId: nil,
+                        legacyModelName: "PetExpenseLog",
+                        legacyModelId: expense.id.uuidString,
+                        coconutDelta: 0,
+                        rewardLogId: nil,
+                        privacyFieldRaw: nil,
+                        metadataJSON: "",
+                        context: context,
+                        save: false
+                    )
+                }
+            }
+
+            careLedger.syncOasisTreeEnergyIfNeeded(metadataJSON: rewardMetadataJSON, context: context)
+            if schedulesReminderNotification, let reminder {
+                Task { @MainActor in
+                    await reminderScheduling.scheduleIfNeeded(
+                        reminder: reminder,
+                        context: context,
+                        source: input.source,
+                        existingNotificationIds: nil,
+                        operation: "schedule",
+                        saveLedger: true
+                    )
+                }
+            }
         }
 
         context.safeSave()
-        careLedger.syncOasisTreeEnergyIfNeeded(metadataJSON: rewardMetadataJSON, context: context)
-        if schedulesReminderNotification, let reminder {
-            Task { @MainActor in
-                await reminderScheduling.scheduleIfNeeded(
-                    reminder: reminder,
-                    context: context,
-                    source: input.source,
-                    existingNotificationIds: nil,
-                    operation: "schedule",
-                    saveLedger: true
-                )
-            }
-        }
         return PetHealthCommandResult(
             logID: log.id,
             subjectID: pet.id,
-            expenseLogID: expense?.id,
+            expenseLogID: expenseWrite?.expense.id,
             eventID: event?.id,
             reminderID: reminder?.id,
             coconutDelta: coconutDelta,
@@ -270,21 +274,32 @@ enum PetHealthCommandService {
     private static func makeExpenseIfNeeded(
         pet: Pet,
         input: PetHealthRecordCommandInput,
-        executorId: String?,
+        actor: EconomyRewardOwnerResolution,
         context: ModelContext
-    ) -> PetExpenseLog? {
+    ) -> (expense: PetExpenseLog, write: AuthorizedDomainCareFactWrite)? {
         guard input.cost > 0 else { return nil }
-        let expense = PetExpenseLog(
-            date: input.date,
-            amount: input.cost,
-            category: .medical,
-            note: input.recordName,
-            pet: pet,
-            executorId: executorId
+        let intent = DomainCareFactCreateIntent(
+            kind: .expense(
+                amount: input.cost,
+                category: .medical,
+                note: input.recordName,
+                sharedSessionId: ""
+            ),
+            occurredAt: input.date,
+            executorId: input.executorId,
+            source: .userCommand
         )
-        context.insert(expense)
-        CloudSyncMutationRecorder.markModified(expense, context: context, modifiedAt: input.date)
-        return expense
+        guard let write = DomainCareFactWriteAuthorizer.authorizePetFact(
+            pet: pet,
+            intent: intent,
+            context: context,
+            logPrefix: "PetHealthCommandService.recordHealth.expense",
+            actorOverride: actor
+        ) else { return nil }
+        return (
+            expense: DomainCareFactWriter.createExpenseLog(plan: write, context: context),
+            write: write
+        )
     }
 
     @MainActor
@@ -380,46 +395,56 @@ enum PetSymptomCommandService {
         context: ModelContext,
         careLedger providedCareLedger: CareLedgerRecording? = nil
     ) -> PetSymptomCommandResult? {
-        guard pet.canWriteHealthFacts, !input.cleanSymptomName.isEmpty else { return nil }
+        guard !input.cleanSymptomName.isEmpty,
+              let write = DomainMemberFactWriteAuthorizer.authorizePetFact(
+                  pet: pet,
+                  occurredAt: input.date,
+                  writeKind: .care,
+                  context: context,
+                  logPrefix: "PetSymptomCommandService.recordSymptom"
+              ) else { return nil }
         let careLedger = providedCareLedger ?? CareLedgerService()
 
-        let log = SymptomLog(
-            date: input.date,
+        let log = DomainMemberFactWriter.createSymptomLog(
+            plan: write,
+            pet: pet,
             category: input.category,
             symptomName: input.cleanSymptomName,
             severity: input.severity,
             note: input.cleanNote,
             photoData: input.photoData,
-            pet: pet
+            context: context
         )
-        context.insert(log)
-        CloudSyncMutationRecorder.markModified(log, context: context, modifiedAt: input.date)
 
-        let ledgerEvent = careLedger.record(
-            occurredAt: log.date,
-            actorKind: .unknown,
-            actorId: nil,
-            subjectKind: .pet,
-            subjectId: pet.id.uuidString,
-            eventKind: .health,
-            actionType: "symptom",
-            amountValue: 0,
-            amountUnit: "",
-            note: log.symptomName,
-            source: .detail,
-            sourceEventId: nil,
-            sourceReminderId: nil,
-            legacyModelName: "SymptomLog",
-            legacyModelId: log.id.uuidString,
-            coconutDelta: 0,
-            rewardLogId: nil,
-            privacyFieldRaw: nil,
-            metadataJSON: "",
-            context: context,
-            save: false
-        )
+        var ledgerEvent: CareLedgerEvent?
+        DomainMemberFactEffectsDispatcher.run(plan: write) { _ in
+            ledgerEvent = careLedger.record(
+                occurredAt: log.date,
+                actorKind: .unknown,
+                actorId: nil,
+                subjectKind: .pet,
+                subjectId: pet.id.uuidString,
+                eventKind: .health,
+                actionType: "symptom",
+                amountValue: 0,
+                amountUnit: "",
+                note: log.symptomName,
+                source: .detail,
+                sourceEventId: nil,
+                sourceReminderId: nil,
+                legacyModelName: "SymptomLog",
+                legacyModelId: log.id.uuidString,
+                coconutDelta: 0,
+                rewardLogId: nil,
+                privacyFieldRaw: nil,
+                metadataJSON: "",
+                context: context,
+                save: false
+            )
+        }
         context.safeSave()
 
+        guard let ledgerEvent else { return nil }
         return PetSymptomCommandResult(
             logID: log.id,
             subjectID: pet.id,

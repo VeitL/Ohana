@@ -77,13 +77,14 @@ enum WeightCommandService {
     ) -> WeightCommandResult {
         let questManager = providedQuestManager ?? QuestManager()
         let careLedger: CareLedgerRecording = providedCareLedger ?? CareLedgerService()
-        let disposition = CareFactWritePolicy.disposition(
+        guard let write = DomainMemberFactWriteAuthorizer.authorizePetFact(
             pet: pet,
-            date: date,
+            occurredAt: date,
+            writeKind: .care,
             executorId: executorId,
-            context: context
-        )
-        guard disposition.didWriteFact else {
+            context: context,
+            logPrefix: "WeightCommandService.recordPetWeight"
+        ) else {
             return WeightCommandResult(
                 logID: UUID(),
                 subjectID: pet.id,
@@ -92,70 +93,61 @@ enum WeightCommandService {
                 allowsDerivedEffects: false
             )
         }
-        let actor = CareFactWritePolicy.executorResolution(
-            requestedExecutorId: executorId,
-            context: context,
-            logPrefix: "WeightCommandService.recordPetWeight"
-        )
-        let log = PetWeightLog(
-            date: date,
+        let log = DomainMemberFactWriter.createPetWeightLog(
+            plan: write,
+            pet: pet,
             weight: weight,
             weightUnit: weightUnit,
             bcsScore: bcsScore,
-            pet: pet,
-            executorId: actor.effectiveExecutorId
+            context: context
         )
-        context.insert(log)
-        CloudSyncMutationRecorder.markModified(log, context: context, modifiedAt: date)
-        let allowsDerivedEffects = disposition.allowsDerivedEffects
-        let reward: (humanGot: Int, petGot: Int)? = if awardsReward, allowsDerivedEffects {
-            EconomyRewardDiscipline.awardCareAction(
-                type: .weight,
-                pet: pet,
-                context: context,
-                executorId: actor.rewardExecutorId,
-                questManager: questManager
-            )
-        } else {
-            nil
+        var reward: (humanGot: Int, petGot: Int)?
+        var ledgerEvent: CareLedgerEvent?
+        DomainMemberFactEffectsDispatcher.run(plan: write) { actor in
+            if awardsReward {
+                reward = EconomyRewardDiscipline.awardCareAction(
+                    type: .weight,
+                    pet: pet,
+                    context: context,
+                    executorId: actor.rewardExecutorId,
+                    questManager: questManager
+                )
+            }
+            ledgerEvent = ledgerSource.map { source in
+                careLedger.record(
+                    occurredAt: log.date,
+                    actorKind: actor.effectiveExecutorId == nil ? .unknown : .human,
+                    actorId: actor.effectiveExecutorId,
+                    subjectKind: .pet,
+                    subjectId: pet.id.uuidString,
+                    eventKind: .weight,
+                    actionType: "petWeight",
+                    amountValue: log.weightInKg,
+                    amountUnit: "kg",
+                    note: "",
+                    source: source,
+                    sourceEventId: nil,
+                    sourceReminderId: nil,
+                    legacyModelName: "PetWeightLog",
+                    legacyModelId: log.id.uuidString,
+                    coconutDelta: careLedger.rewardDelta(reward),
+                    rewardLogId: nil,
+                    privacyFieldRaw: nil,
+                    metadataJSON: careLedger.rewardMetadata(reward, questManager: questManager),
+                    context: context,
+                    save: false
+                )
+            }
         }
 
-        let ledgerEvent = allowsDerivedEffects ? ledgerSource.map { source in
-            careLedger.record(
-                occurredAt: log.date,
-                actorKind: actor.effectiveExecutorId == nil ? .unknown : .human,
-                actorId: actor.effectiveExecutorId,
-                subjectKind: .pet,
-                subjectId: pet.id.uuidString,
-                eventKind: .weight,
-                actionType: "petWeight",
-                amountValue: log.weightInKg,
-                amountUnit: "kg",
-                note: "",
-                source: source,
-                sourceEventId: nil,
-                sourceReminderId: nil,
-                legacyModelName: "PetWeightLog",
-                legacyModelId: log.id.uuidString,
-                coconutDelta: careLedger.rewardDelta(reward),
-                rewardLogId: nil,
-                privacyFieldRaw: nil,
-                metadataJSON: careLedger.rewardMetadata(reward, questManager: questManager),
-                context: context,
-                save: false
-            )
-        } : nil
-
-        if !awardsReward || !allowsDerivedEffects || ledgerEvent != nil {
-            context.safeSave()
-        }
+        context.safeSave()
         return WeightCommandResult(
             logID: log.id,
             subjectID: pet.id,
             coconutDelta: careLedger.rewardDelta(reward),
             ledgerEventID: ledgerEvent?.id,
             didRecord: true,
-            allowsDerivedEffects: allowsDerivedEffects
+            allowsDerivedEffects: write.allowsDerivedEffects
         )
     }
 
@@ -168,7 +160,14 @@ enum WeightCommandService {
         context: ModelContext,
         executorId: String? = nil
     ) -> WeightCommandResult {
-        guard MemberWritePolicy.disposition(human: human, intent: .activeOnly).allowsDerivedEffects else {
+        guard let write = DomainMemberFactWriteAuthorizer.authorizeHumanFact(
+            human: human,
+            occurredAt: date,
+            writeKind: .care,
+            executorId: executorId,
+            context: context,
+            logPrefix: "WeightCommandService.recordHumanWeight"
+        ) else {
             return WeightCommandResult(
                 logID: UUID(),
                 subjectID: human.id,
@@ -177,15 +176,12 @@ enum WeightCommandService {
                 allowsDerivedEffects: false
             )
         }
-        let log = HumanWeightLog(
-            date: date,
-            weight: weight,
+        let log = DomainMemberFactWriter.createHumanWeightLog(
+            plan: write,
             human: human,
-            executorId: executorId
+            weight: weight,
+            context: context
         )
-        context.insert(log)
-        human.weightLogs.append(log)
-        CloudSyncMutationRecorder.markModified(log, context: context, modifiedAt: date)
         context.safeSave()
         return WeightCommandResult(logID: log.id, subjectID: human.id, coconutDelta: 0)
     }

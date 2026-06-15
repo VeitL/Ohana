@@ -23,6 +23,50 @@ enum MemberLifecycleGateBadCommandService {
         }
     }
 
+    @MainActor
+    static func recordLedgerWithoutDispatcher(pet: Pet, careLedger: CareLedgerRecording, context: ModelContext) {
+        careLedger.record(
+            occurredAt: Date(),
+            actorKind: .unknown,
+            actorId: nil,
+            subjectKind: .pet,
+            subjectId: pet.id.uuidString,
+            eventKind: .care,
+            actionType: "badEffectBypass",
+            amountValue: 0,
+            amountUnit: "",
+            note: "",
+            source: .service,
+            sourceEventId: nil,
+            sourceReminderId: nil,
+            legacyModelName: nil,
+            legacyModelId: nil,
+            coconutDelta: 0,
+            rewardLogId: nil,
+            privacyFieldRaw: nil,
+            metadataJSON: nil,
+            context: context,
+            save: false
+        )
+    }
+
+    @MainActor
+    static func stageRewardWithoutDispatcher(questManager: QuestManager, human: Human, context: ModelContext) throws {
+        try questManager.stageSpecialCoconutReward(
+            amount: 1,
+            emoji: "🎯",
+            title: "Bad reward",
+            actorId: human.id.uuidString,
+            actorName: human.name,
+            source: .familyTask,
+            sourceModelName: "BadFixture",
+            sourceModelId: human.id.uuidString,
+            metadataJSON: nil,
+            transactionKey: "bad:\(human.id.uuidString)",
+            context: context
+        )
+    }
+
     static func rawFeatureTaxonomyString() -> String {
         "pet_food_stock"
     }
@@ -37,6 +81,10 @@ enum MemberLifecycleGateBadCommandService {
             relatedEntityId: pet.id.uuidString
         )
         context.insert(event)
+    }
+
+    static func deletePetReminderBypass(event: Event, context: ModelContext) {
+        context.delete(event)
     }
 
     static func applyBackup(context: ModelContext) {
