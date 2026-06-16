@@ -97,6 +97,7 @@ final class ReminderCompletionService: ReminderCompleting {
             return false
         }
         context.safeSave()
+        cancelNotification(for: reminder)
         runReminderEffects(
             reminder,
             actionType: "complete",
@@ -105,7 +106,6 @@ final class ReminderCompletionService: ReminderCompleting {
             context: context,
             careLedger: careLedger
         ) {
-            OhanaNotifications.current.cancel(notificationId: reminder.notificationId)
             familyTasks.syncCompletedReminder(reminder, completedBy: humanId, context: context)
         }
         return true
@@ -137,6 +137,7 @@ final class ReminderCompletionService: ReminderCompleting {
             return false
         }
         context.safeSave()
+        cancelNotification(for: reminder)
         runReminderEffects(
             reminder,
             actionType: "skip",
@@ -144,9 +145,7 @@ final class ReminderCompletionService: ReminderCompleting {
             occurredAt: now,
             context: context,
             careLedger: careLedger
-        ) {
-            OhanaNotifications.current.cancel(notificationId: reminder.notificationId)
-        }
+        ) {}
         return true
     }
 
@@ -181,6 +180,18 @@ final class ReminderCompletionService: ReminderCompleting {
             return false
         }
         context.safeSave()
+        if reschedule {
+            Task { @MainActor in
+                await reminderScheduling.scheduleIfNeeded(
+                    reminder: reminder,
+                    context: context,
+                    source: .service,
+                    existingNotificationIds: nil,
+                    operation: "schedule",
+                    saveLedger: true
+                )
+            }
+        }
         runReminderEffects(
             reminder,
             actionType: "reopen",
@@ -189,18 +200,6 @@ final class ReminderCompletionService: ReminderCompleting {
             context: context,
             careLedger: careLedger
         ) {
-            if reschedule {
-                Task { @MainActor in
-                    await reminderScheduling.scheduleIfNeeded(
-                        reminder: reminder,
-                        context: context,
-                        source: .service,
-                        existingNotificationIds: nil,
-                        operation: "schedule",
-                        saveLedger: true
-                    )
-                }
-            }
             familyTasks.syncReopenedReminder(reminder, context: context)
         }
         return true
@@ -235,6 +234,11 @@ final class ReminderCompletionService: ReminderCompleting {
             return false
         }
         context.safeSave()
+        if reschedule {
+            Task { @MainActor in
+                await reminderScheduling.cancelAndReschedule(reminder: reminder, context: context, source: .service)
+            }
+        }
         runReminderEffects(
             reminder,
             actionType: "snoozeOneDay",
@@ -242,14 +246,14 @@ final class ReminderCompletionService: ReminderCompleting {
             occurredAt: now,
             context: context,
             careLedger: careLedger
-        ) {
-            if reschedule {
-                Task { @MainActor in
-                    await reminderScheduling.cancelAndReschedule(reminder: reminder, context: context, source: .service)
-                }
-            }
-        }
+        ) {}
         return true
+    }
+
+    private static func cancelNotification(for reminder: Reminder) {
+        let notificationId = reminder.notificationId.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !notificationId.isEmpty else { return }
+        OhanaNotifications.current.cancel(notificationId: notificationId)
     }
 
     private static func runReminderEffects(

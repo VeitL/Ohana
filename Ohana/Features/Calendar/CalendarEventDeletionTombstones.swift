@@ -6,7 +6,7 @@ extension CalendarEventCommandService {
     static func tombstoneAndDeleteEvent(_ event: Event, context: ModelContext) -> DomainScheduleDeleteResult {
         guard let mutation = DomainScheduleWriteAuthorizer.authorizeExistingEventMutation(
             event: event,
-            writeKind: .care,
+            writeKind: .lifecycle(.cleanupActiveSchedules),
             source: .userCommand,
             context: context
         ) else { return .notDeleted }
