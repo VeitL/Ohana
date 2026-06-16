@@ -43,6 +43,23 @@ enum MemberLifecycleGateGoodCommandService {
     }
 
     @MainActor
+    static func publishDerivedMutationWithPlan(pet: Pet, derivations: CareDerivationExecutor, context: ModelContext) {
+        guard let plan = DomainEffectWriteAuthorizer.authorizePetEffect(
+            pet: pet,
+            writeKind: .care,
+            context: context,
+            logPrefix: "good.fixture.derived"
+        ) else { return }
+        derivations.derive(
+            .derivedMutation(
+                command: .quickCare(entityID: pet.id, action: "goodDerivedSubject"),
+                effectPlan: plan,
+                note: "good.typed.derived.subject"
+            )
+        )
+    }
+
+    @MainActor
     static func recordLedgerWithDispatcher(
         pet: Pet,
         plan: AuthorizedDomainMemberFactWrite,
@@ -129,7 +146,22 @@ enum MemberLifecycleGateGoodCommandService {
     }
 
     static func deletePetReminder(event: Event, mutation: AuthorizedDomainScheduleMutation, context: ModelContext) {
-        DomainScheduleWriter.deleteEvent(event, mutation: mutation, context: context)
+        let result = DomainScheduleWriter.deleteEvent(event, mutation: mutation, context: context)
+        DomainScheduleEffectsDispatcher.dispatch(delete: result)
+    }
+
+    static func completeReminder(
+        reminder: Reminder,
+        mutation: AuthorizedDomainScheduleMutation,
+        context: ModelContext
+    ) {
+        DomainScheduleWriter.completeReminder(
+            reminder,
+            mutation: mutation,
+            completedBy: nil,
+            completedAt: Date(),
+            context: context
+        )
     }
 
     static func applyBackup(snapshot: DomainPetRehydrateSnapshot, context: ModelContext) throws {

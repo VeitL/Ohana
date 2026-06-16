@@ -247,7 +247,7 @@ struct HomeCommandExecutor {
             }
             return false
         }
-        publishMutation(QuickCareCommand.action(petID: pet.id, action: actionType))
+        publishMutation(QuickCareCommand.action(petID: pet.id, action: actionType), pet: pet)
         if let flowStartedAt {
             AppFlowPerformance.mark(
                 AppPerformanceFlows.quickCareCommand,
@@ -278,7 +278,7 @@ struct HomeCommandExecutor {
             date: now
         )
         if result.didRecord && result.allowsDerivedEffects {
-            publishMutation(QuickCareCommand.plannedFeed(petID: pet.id, reminderID: reminder.id))
+            publishMutation(QuickCareCommand.plannedFeed(petID: pet.id, reminderID: reminder.id), pet: pet)
         }
         return result
     }
@@ -298,7 +298,7 @@ struct HomeCommandExecutor {
             careEvents: careEvents
         )
         if didRecord {
-            publishMutation(QuickCareCommand.potty(petID: pet.id, type: raw))
+            publishMutation(QuickCareCommand.potty(petID: pet.id, type: raw), pet: pet)
         }
     }
 
@@ -333,7 +333,7 @@ struct HomeCommandExecutor {
             careEvents: careEvents
         )
         if didRecord {
-            publishMutation(QuickCareCommand.grooming(petID: pet.id, type: raw))
+            publishMutation(QuickCareCommand.grooming(petID: pet.id, type: raw), pet: pet)
         }
     }
 
@@ -375,7 +375,7 @@ struct HomeCommandExecutor {
             careEvents: careEvents
         )
         if didRecord {
-            publishMutation(QuickCareCommand.health(petID: pet.id, type: raw))
+            publishMutation(QuickCareCommand.health(petID: pet.id, type: raw), pet: pet)
         }
     }
 
@@ -415,7 +415,7 @@ struct HomeCommandExecutor {
             return false
         }
         scheduleMedicationReminders(for: pet)
-        publishMutation(QuickCareCommand.medicationDose(petID: pet.id, medicationID: medication.id))
+        publishMutation(QuickCareCommand.medicationDose(petID: pet.id, medicationID: medication.id), pet: pet)
         return true
     }
 
@@ -441,7 +441,7 @@ struct HomeCommandExecutor {
         }
         publishMutation(
             .todayFocus(entityID: result.eventID, action: "eventComplete"),
-            affected: [result.eventID],
+            event: event,
             note: "home.todayFocusEvent"
         )
         return true
@@ -680,10 +680,40 @@ struct HomeCommandExecutor {
         affected: Set<UUID>,
         note: String
     ) {
+        revisions.publish(
+            DomainMutationResult(
+                command: command,
+                affectedEntityIDs: affected,
+                wroteBusinessFact: true,
+                note: note
+            )
+        )
+    }
+
+    private func publishMutation(
+        _ command: DomainCommand,
+        event: Event,
+        note: String
+    ) {
+        let request = DomainSubjectResolutionRequest(event: event)
+        let resolution = DomainSubjectResolver.resolve(request: request, context: modelContext)
+        guard resolution.role.isMemberScoped else {
+            publishMutation(command, affected: resolution.affectedEntityIDs, note: note)
+            return
+        }
+        guard let effectPlan = DomainEffectWriteAuthorizer.authorizeSubjectEffect(
+            subjectRequest: request,
+            writeKind: .care,
+            context: modelContext,
+            logPrefix: "HomeCommandExecutor.eventMutation"
+        ) else {
+            publishNoop(command, note: "\(note).unauthorized")
+            return
+        }
         derivations.derive(
             .derivedMutation(
                 command: command,
-                affectedEntityIDs: affected,
+                effectPlan: effectPlan,
                 note: note
             )
         )
@@ -697,11 +727,22 @@ struct HomeCommandExecutor {
         publishMutation(command.domainCommand, affected: affected, note: note)
     }
 
-    private func publishMutation(_ command: QuickCareCommand) {
-        publishMutation(
-            command.domainCommand,
-            affected: command.affectedEntityIDs,
-            note: command.revisionNote
+    private func publishMutation(_ command: QuickCareCommand, pet: Pet) {
+        guard let effectPlan = DomainEffectWriteAuthorizer.authorizePetEffect(
+            pet: pet,
+            writeKind: .care,
+            context: modelContext,
+            logPrefix: "HomeCommandExecutor.quickCareMutation"
+        ) else {
+            publishNoop(command.domainCommand, note: "\(command.revisionNote).unauthorized")
+            return
+        }
+        derivations.derive(
+            .derivedMutation(
+                command: command.domainCommand,
+                effectPlan: effectPlan,
+                note: command.revisionNote
+            )
         )
     }
 

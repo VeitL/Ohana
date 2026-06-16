@@ -122,14 +122,32 @@ enum ReminderSchedulingService {
         for reminder in reminders {
             guard reminder.isPending, reminder.scheduledAt < now else { continue }
             let actionType: String
+            guard let mutation = DomainScheduleWriteAuthorizer.authorizeExistingReminderMutation(
+                reminder: reminder,
+                writeKind: .care,
+                source: .system,
+                context: context
+            ) else { continue }
+            let didMutate: Bool
             if reminder.event?.eventType == EventType.foodChange.rawValue {
-                reminder.statusEnum = .failed
+                didMutate = DomainScheduleWriter.failReminder(
+                    reminder,
+                    mutation: mutation,
+                    failedAt: now,
+                    context: context
+                )
                 actionType = "compensateFailed"
             } else {
-                reminder.statusEnum = .skipped
+                didMutate = DomainScheduleWriter.skipReminder(
+                    reminder,
+                    mutation: mutation,
+                    skippedBy: nil,
+                    skippedAt: now,
+                    context: context
+                )
                 actionType = "compensateSkipped"
             }
-            reminder.completedAt = nil
+            guard didMutate else { continue }
             OhanaNotifications.current.cancel(notificationId: reminder.notificationId)
             careLedger.recordReminderState(
                 reminder: reminder,
@@ -153,7 +171,6 @@ enum ReminderSchedulingService {
         for reminder in reminders.sorted(by: { $0.createdAt < $1.createdAt }) {
             let key = dedupeKey(for: reminder)
             if seen.contains(key) {
-                OhanaNotifications.current.cancel(notificationId: reminder.notificationId)
                 careLedger.recordReminderState(
                     reminder: reminder,
                     actionType: "dedupeRemoved",
@@ -162,9 +179,15 @@ enum ReminderSchedulingService {
                     context: context,
                     save: false
                 )
-                CloudSyncMutationRecorder.markDeleted(reminder, context: context, deletedAt: now)
-                context.delete(reminder)
-                didChange = true
+                guard let mutation = DomainScheduleWriteAuthorizer.authorizeExistingReminderMutation(
+                    reminder: reminder,
+                    writeKind: .lifecycle(.cleanupActiveSchedules),
+                    source: .domainService,
+                    context: context
+                ) else { continue }
+                let result = DomainScheduleWriter.deleteReminder(reminder, mutation: mutation, context: context, deletedAt: now)
+                DomainScheduleEffectsDispatcher.dispatch(delete: result)
+                didChange = result.didDelete || didChange
             } else {
                 seen.insert(key)
                 kept.append(reminder)

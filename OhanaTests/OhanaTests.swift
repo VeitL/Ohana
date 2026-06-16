@@ -1327,7 +1327,9 @@ struct OhanaTests {
     @Test func reminderSchedulingServiceCompensatesOverdueReminders() async throws {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
-        let petId = UUID().uuidString
+        let pet = Pet(name: "Milo")
+        context.insert(pet)
+        let petId = pet.id.uuidString
         let foodEvent = Event(title: "早餐", eventType: EventType.foodChange.rawValue, relatedEntityType: EntityKind.pet.rawValue, relatedEntityId: petId)
         let taskEvent = Event(title: "清洁", eventType: EventType.grooming.rawValue, relatedEntityType: EntityKind.pet.rawValue, relatedEntityId: petId)
         let foodReminder = Reminder(event: foodEvent, scheduledAt: Date().addingTimeInterval(-3600))

@@ -262,8 +262,9 @@ enum WaterPlanWriter {
     ) {
         var didDelete = false
         for event in planEvents(pet: pet, allEvents: allEvents) {
-            deleteEvent(event, context: context)
-            didDelete = true
+            if deleteEvent(event, context: context).didDelete {
+                didDelete = true
+            }
         }
         if save, didDelete {
             context.safeSave()
@@ -281,11 +282,18 @@ enum WaterPlanWriter {
         for event in planEvents(pet: pet, allEvents: allEvents) {
             let pendingReminders = event.reminders.filter(\.isPending)
             for reminder in pendingReminders {
-                OhanaNotifications.current.cancel(notificationId: reminder.notificationId)
                 if reminder.scheduledAt > now {
-                    CloudSyncMutationRecorder.markDeleted(reminder, context: context)
-                    context.delete(reminder)
-                    didChange = true
+                    guard let mutation = DomainScheduleWriteAuthorizer.authorizeExistingReminderMutation(
+                        reminder: reminder,
+                        writeKind: .care,
+                        source: .domainService,
+                        context: context
+                    ) else { continue }
+                    let result = DomainScheduleWriter.deleteReminder(reminder, mutation: mutation, context: context)
+                    DomainScheduleEffectsDispatcher.dispatch(delete: result)
+                    didChange = result.didDelete || didChange
+                } else {
+                    OhanaNotifications.current.cancel(notificationId: reminder.notificationId)
                 }
             }
         }
@@ -331,14 +339,16 @@ enum WaterPlanWriter {
     }
 
     @MainActor
-    private static func deleteEvent(_ event: Event, context: ModelContext) {
-        for reminder in event.reminders {
-            OhanaNotifications.current.cancel(notificationId: reminder.notificationId)
-            CloudSyncMutationRecorder.markDeleted(reminder, context: context)
-            context.delete(reminder)
-        }
-        CloudSyncMutationRecorder.markDeleted(event, context: context)
-        context.delete(event)
+    private static func deleteEvent(_ event: Event, context: ModelContext) -> DomainScheduleDeleteResult {
+        guard let mutation = DomainScheduleWriteAuthorizer.authorizeExistingEventMutation(
+            event: event,
+            writeKind: .care,
+            source: .domainService,
+            context: context
+        ) else { return .notDeleted }
+        let result = DomainScheduleWriter.deleteEvent(event, mutation: mutation, context: context)
+        DomainScheduleEffectsDispatcher.dispatch(delete: result)
+        return result
     }
 
     private static func canWriteActiveWaterPlan(for pet: Pet) -> Bool {

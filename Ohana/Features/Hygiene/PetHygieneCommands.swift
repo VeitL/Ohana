@@ -268,7 +268,15 @@ enum PetHygieneCommandService {
         let result = DomainScheduleWriter.createEvent(plan: plan, context: context)
         let event = result.event
         guard let reminder = result.reminders.first else {
-            context.delete(event)
+            if let mutation = DomainScheduleWriteAuthorizer.authorizeExistingEventMutation(
+                event: event,
+                writeKind: .care,
+                source: .userCommand,
+                context: context
+            ) {
+                let result = DomainScheduleWriter.deleteEvent(event, mutation: mutation, context: context)
+                DomainScheduleEffectsDispatcher.dispatch(delete: result)
+            }
             return PetHygienePlanCommandResult(
                 eventID: UUID(),
                 reminderID: UUID(),
@@ -277,7 +285,6 @@ enum PetHygieneCommandService {
                 didCreate: false
             )
         }
-        reminder.statusEnum = .pending
         context.safeSave()
 
         if scheduleNotification {

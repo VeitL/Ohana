@@ -42,18 +42,38 @@ enum CarePlanCalendarSync {
         return fetchOrLog(d, context: context, operation: "fetch existing event").first
     }
 
-    private static func tombstoneAndDelete(_ event: Event, context: ModelContext, deletedAt: Date = Date()) {
-        for reminder in event.reminders {
-            tombstoneAndDelete(reminder, context: context, deletedAt: deletedAt)
-        }
-        CloudSyncMutationRecorder.markDeleted(event, context: context, deletedAt: deletedAt)
-        context.delete(event)
+    @discardableResult
+    private static func tombstoneAndDelete(
+        _ event: Event,
+        context: ModelContext,
+        deletedAt: Date = Date()
+    ) -> DomainScheduleDeleteResult {
+        guard let mutation = DomainScheduleWriteAuthorizer.authorizeExistingEventMutation(
+            event: event,
+            writeKind: .care,
+            source: .domainService,
+            context: context
+        ) else { return .notDeleted }
+        let result = DomainScheduleWriter.deleteEvent(event, mutation: mutation, context: context, deletedAt: deletedAt)
+        DomainScheduleEffectsDispatcher.dispatch(delete: result)
+        return result
     }
 
-    private static func tombstoneAndDelete(_ reminder: Reminder, context: ModelContext, deletedAt: Date = Date()) {
-        OhanaNotifications.current.cancel(notificationId: reminder.notificationId)
-        CloudSyncMutationRecorder.markDeleted(reminder, context: context, deletedAt: deletedAt)
-        context.delete(reminder)
+    @discardableResult
+    private static func tombstoneAndDelete(
+        _ reminder: Reminder,
+        context: ModelContext,
+        deletedAt: Date = Date()
+    ) -> DomainScheduleDeleteResult {
+        guard let mutation = DomainScheduleWriteAuthorizer.authorizeExistingReminderMutation(
+            reminder: reminder,
+            writeKind: .care,
+            source: .domainService,
+            context: context
+        ) else { return .notDeleted }
+        let result = DomainScheduleWriter.deleteReminder(reminder, mutation: mutation, context: context, deletedAt: deletedAt)
+        DomainScheduleEffectsDispatcher.dispatch(delete: result)
+        return result
     }
 
     private static func canWriteActiveCarePlan(for pet: Pet) -> Bool {
@@ -264,8 +284,9 @@ enum CarePlanCalendarSync {
         let events = fetchOrLog(descriptor, context: context, operation: "fetch legacy default plan events")
         var didDelete = false
         for event in events where MemberLifecycleActiveScheduleResolver.eventBelongsToPet(event, petId: petKey) && titles.contains(event.title) {
-            tombstoneAndDelete(event, context: context)
-            didDelete = true
+            if tombstoneAndDelete(event, context: context).didDelete {
+                didDelete = true
+            }
         }
         if didDelete {
             context.safeSave()
@@ -383,10 +404,13 @@ enum CarePlanCalendarSync {
             DomainScheduleWriter.updateEvent(ev, intent: createIntent, mutation: mutation)
 
             if let reminder = ev.reminders.first {
-                reminder.scheduledAt = reminderDate
-                reminder.statusEnum = .pending
-                reminder.completedAt = nil
-                reminder.completedBy = ""
+                DomainScheduleWriter.resetReminderToPending(
+                    reminder,
+                    scheduledAt: reminderDate,
+                    mutation: mutation,
+                    resetAt: Date(),
+                    context: context
+                )
                 for extra in ev.reminders.dropFirst() {
                     tombstoneAndDelete(extra, context: context)
                 }

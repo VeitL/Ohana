@@ -343,7 +343,6 @@ enum PetHealthCommandService {
         CloudSyncMutationRecorder.markModified(event, context: context, modifiedAt: dueDate)
         let reminder = result.reminders.first
         if let reminder {
-            reminder.statusEnum = .pending
             CloudSyncMutationRecorder.markModified(reminder, context: context, modifiedAt: reminder.scheduledAt)
         }
         return (event, reminder)

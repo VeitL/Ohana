@@ -435,7 +435,7 @@ struct PetCareCommandExecutor {
         note: String
     ) -> PetCareTrackingDeleteCommandResult {
         let result = PetCareTrackingCommandService.deleteCareLog(log, pet: pet, context: context)
-        deriveCareDelete(result, note: note)
+        deriveCareDelete(result, pet: pet, note: note)
         return result
     }
 
@@ -446,7 +446,7 @@ struct PetCareCommandExecutor {
         note: String
     ) -> PetPottyDeleteCommandResult {
         let result = PetPottyCommandService.deletePottyLog(log, pet: pet, context: context)
-        derivePottyDelete(result, note: note)
+        derivePottyDelete(result, pet: pet, note: note)
         return result
     }
 
@@ -457,12 +457,11 @@ struct PetCareCommandExecutor {
         note: String
     ) -> PetPottyClaimCommandResult {
         let result = PetPottyCommandService.claimUnknownPottyLog(log, pet: pet, context: context)
-        derivations.derive(
-            .derivedMutation(
-                command: .quickCare(entityID: pet.id, action: "claimUnknownPotty"),
-                affectedEntityIDs: [pet.id, log.id],
-                note: note
-            )
+        deriveAuthorizedPetMutation(
+            .quickCare(entityID: pet.id, action: "claimUnknownPotty"),
+            pets: [pet],
+            fallbackAffectedEntityIDs: [pet.id, log.id],
+            note: note
         )
         return result
     }
@@ -491,7 +490,7 @@ struct PetCareCommandExecutor {
             hygieneLogID: hygieneLogID,
             context: context
         )
-        deriveCatCareUndo(result, note: note)
+        deriveCatCareUndo(result, pet: pet, note: note)
         return result
     }
 
@@ -541,7 +540,7 @@ struct PetCareCommandExecutor {
         )
     }
 
-    private func deriveCareDelete(_ result: PetCareTrackingDeleteCommandResult, note: String) {
+    private func deriveCareDelete(_ result: PetCareTrackingDeleteCommandResult, pet: Pet, note: String) {
         let command = DomainCommand.petCareDelete(petID: result.petID, logID: result.careLogID)
         var affected = Set(result.removedLedgerEventIDs)
         affected.insert(result.petID)
@@ -561,16 +560,15 @@ struct PetCareCommandExecutor {
             return
         }
 
-        derivations.derive(
-            .derivedMutation(
-                command: command,
-                affectedEntityIDs: affected,
-                note: note
-            )
+        deriveAuthorizedPetMutation(
+            command,
+            pets: [pet],
+            fallbackAffectedEntityIDs: affected,
+            note: note
         )
     }
 
-    private func derivePottyDelete(_ result: PetPottyDeleteCommandResult, note: String) {
+    private func derivePottyDelete(_ result: PetPottyDeleteCommandResult, pet: Pet, note: String) {
         let command = DomainCommand.petPottyDelete(petID: result.petID, logID: result.logID)
         var affected = Set(result.removedLedgerEventIDs)
         affected.insert(result.petID)
@@ -587,12 +585,11 @@ struct PetCareCommandExecutor {
             return
         }
 
-        derivations.derive(
-            .derivedMutation(
-                command: command,
-                affectedEntityIDs: affected,
-                note: note
-            )
+        deriveAuthorizedPetMutation(
+            command,
+            pets: [pet],
+            fallbackAffectedEntityIDs: affected,
+            note: note
         )
     }
 
@@ -631,7 +628,7 @@ struct PetCareCommandExecutor {
         )
     }
 
-    private func deriveCatCareUndo(_ result: CatCareUndoCommandResult, note: String) {
+    private func deriveCatCareUndo(_ result: CatCareUndoCommandResult, pet: Pet, note: String) {
         let command = DomainCommand.catCareUndo(petID: result.petID, eventID: result.eventID)
         var affected: Set<UUID> = [result.petID, result.eventID]
         if let hygieneLogID = result.hygieneLogID {
@@ -650,10 +647,41 @@ struct PetCareCommandExecutor {
             return
         }
 
+        deriveAuthorizedPetMutation(
+            command,
+            pets: [pet],
+            fallbackAffectedEntityIDs: affected,
+            note: note
+        )
+    }
+
+    private func deriveAuthorizedPetMutation(
+        _ command: DomainCommand,
+        pets: [Pet],
+        fallbackAffectedEntityIDs: Set<UUID>,
+        note: String
+    ) {
+        let effectPlans = DomainEffectWriteAuthorizer.authorizePetEffects(
+            pets: pets,
+            writeKind: .care,
+            context: context,
+            logPrefix: "PetCareCommandExecutor.derive"
+        )
+        guard !effectPlans.isEmpty else {
+            derivations.derive(
+                .noOp(
+                    command: command,
+                    affectedEntityIDs: fallbackAffectedEntityIDs,
+                    note: "\(note).unauthorized"
+                )
+            )
+            return
+        }
         derivations.derive(
             .derivedMutation(
                 command: command,
-                affectedEntityIDs: affected,
+                effectPlans: effectPlans,
+                additionalRevisionEntityIDs: fallbackAffectedEntityIDs,
                 note: note
             )
         )

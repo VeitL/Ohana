@@ -1,3 +1,4 @@
+import Foundation
 import SwiftData
 
 enum MemberLifecycleGateBadCommandService {
@@ -21,6 +22,17 @@ enum MemberLifecycleGateBadCommandService {
                 note: "bad.raw.effect.subject"
             )
         }
+    }
+
+    @MainActor
+    static func publishDerivedMutationWithRawSubject(pet: Pet, derivations: CareDerivationExecutor) {
+        derivations.derive(
+            .derivedMutation(
+                command: .quickCare(entityID: pet.id, action: "badRawDerivedSubject"),
+                affectedEntityIDs: [pet.id],
+                note: "bad.raw.derived.subject"
+            )
+        )
     }
 
     @MainActor
@@ -85,6 +97,21 @@ enum MemberLifecycleGateBadCommandService {
 
     static func deletePetReminderBypass(event: Event, context: ModelContext) {
         context.delete(event)
+    }
+
+    static func deletePetReminderWithoutEffects(
+        event: Event,
+        mutation: AuthorizedDomainScheduleMutation,
+        context: ModelContext
+    ) {
+        DomainScheduleWriter.deleteEvent(event, mutation: mutation, context: context)
+    }
+
+    static func completeReminderBypass(reminder: Reminder) {
+        reminder.statusEnum = .completed
+        reminder.completedAt = Date()
+        reminder.completedBy = "bad"
+        reminder.event?.setOccurrenceMarkedComplete(true, on: reminder.scheduledAt)
     }
 
     static func applyBackup(context: ModelContext) {

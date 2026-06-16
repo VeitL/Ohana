@@ -167,7 +167,7 @@ struct QuickWaterCommandExecutor {
             CarePlanCalendarSync.removeActiveCalendarPlans(for: pet, context: context)
             deriveWaterMutation(
                 .waterPlan(petID: pet.id, action: "save_water_change"),
-                affectedEntityIDs: [pet.id],
+                pets: [pet],
                 wroteBusinessFact: false,
                 note: "water_change_plan_noop"
             )
@@ -186,7 +186,7 @@ struct QuickWaterCommandExecutor {
             enabled: reminderOn,
             cycleAnchor: cycleAnchor
         )
-        deriveWaterMutation(.waterPlan(petID: pet.id, action: "save_water_change"), affectedEntityIDs: [pet.id])
+        deriveWaterMutation(.waterPlan(petID: pet.id, action: "save_water_change"), pets: [pet])
         return carePlanReminders(pet: pet, allEvents: allEvents, kinds: ["waterChange"])
     }
 
@@ -201,7 +201,7 @@ struct QuickWaterCommandExecutor {
             CarePlanCalendarSync.removeActiveCalendarPlans(for: pet, context: context)
             deriveWaterMutation(
                 .waterPlan(petID: pet.id, action: "save_filter"),
-                affectedEntityIDs: [pet.id],
+                pets: [pet],
                 wroteBusinessFact: false,
                 note: "filter_plan_noop"
             )
@@ -220,7 +220,7 @@ struct QuickWaterCommandExecutor {
             replaceIntervalDays: replaceIntervalDays,
             enabled: reminderOn
         )
-        deriveWaterMutation(.waterPlan(petID: pet.id, action: "save_filter"), affectedEntityIDs: [pet.id])
+        deriveWaterMutation(.waterPlan(petID: pet.id, action: "save_filter"), pets: [pet])
         return carePlanReminders(pet: pet, allEvents: allEvents, kinds: ["filterClean", "filterReplace"])
     }
 
@@ -254,7 +254,7 @@ struct QuickWaterCommandExecutor {
         }
         deriveWaterMutation(
             .waterPlan(petID: pet.id, action: "save_drink"),
-            affectedEntityIDs: targetIDs(pet: pet, targets: targets),
+            pets: writableTargets.isEmpty ? [pet] : writableTargets,
             wroteBusinessFact: !writableTargets.isEmpty,
             note: "targets:\(writableTargets.count)"
         )
@@ -270,7 +270,7 @@ struct QuickWaterCommandExecutor {
         guard canWriteActiveWaterData(for: pet) else {
             deriveWaterMutation(
                 .waterMode(petID: pet.id, mode: mode.rawValue),
-                affectedEntityIDs: [pet.id],
+                pets: [pet],
                 wroteBusinessFact: false,
                 note: "water_mode_noop"
             )
@@ -280,7 +280,7 @@ struct QuickWaterCommandExecutor {
         WaterOperatingMode.set(pet.id, mode: mode)
         deriveWaterMutation(
             .waterMode(petID: pet.id, mode: mode.rawValue),
-            affectedEntityIDs: [pet.id],
+            pets: [pet],
             wroteBusinessFact: previousMode != mode,
             note: "optimistic_mode"
         )
@@ -296,7 +296,7 @@ struct QuickWaterCommandExecutor {
 
     func deleteWaterPlan(pet: Pet, allEvents: [Event]) {
         WaterPlanWriter.deletePlan(pet: pet, allEvents: allEvents, context: context)
-        deriveWaterMutation(.waterPlan(petID: pet.id, action: "delete_drink"), affectedEntityIDs: [pet.id])
+        deriveWaterMutation(.waterPlan(petID: pet.id, action: "delete_drink"), pets: [pet])
     }
 
     func ensureUpcomingWaterPlanReminders(pet: Pet, allEvents: [Event]) -> [Reminder] {
@@ -337,7 +337,7 @@ struct QuickWaterCommandExecutor {
         )
         deriveWaterMutation(
             .waterLog(petID: pet.id, source: "planned"),
-            affectedEntityIDs: [pet.id],
+            pets: [pet],
             wroteBusinessFact: completed.didRecord && completed.allowsDerivedEffects,
             note: completed.didRecord && completed.allowsDerivedEffects ? "planned_water_completed" : "planned_water_noop"
         )
@@ -358,7 +358,7 @@ struct QuickWaterCommandExecutor {
         guard EconomyWalletWritePolicy.canWrite(pet) else {
             deriveWaterMutation(
                 .waterLog(petID: pet.id, source: "manual"),
-                affectedEntityIDs: [pet.id],
+                pets: [pet],
                 wroteBusinessFact: false,
                 note: "manual_water_noop"
             )
@@ -368,7 +368,7 @@ struct QuickWaterCommandExecutor {
         guard !liveTargets.isEmpty else {
             deriveWaterMutation(
                 .waterLog(petID: pet.id, source: "manual"),
-                affectedEntityIDs: [pet.id],
+                pets: [pet],
                 wroteBusinessFact: false,
                 note: "manual_water_noop"
             )
@@ -400,7 +400,7 @@ struct QuickWaterCommandExecutor {
         guard recorded.didWriteFact else {
             deriveWaterMutation(
                 .waterLog(petID: pet.id, source: "manual"),
-                affectedEntityIDs: [pet.id],
+                pets: [pet],
                 wroteBusinessFact: false,
                 note: "manual_water_noop"
             )
@@ -408,7 +408,7 @@ struct QuickWaterCommandExecutor {
         }
         deriveWaterMutation(
             .waterLog(petID: pet.id, source: liveTargets.count > 1 ? "shared_manual" : "manual"),
-            affectedEntityIDs: targetIDs(pet: pet, targets: liveTargets),
+            pets: liveTargets,
             wroteBusinessFact: recorded.allowsDerivedEffects,
             note: liveTargets.count > 1 ? "shared_water" : "manual_water"
         )
@@ -432,7 +432,7 @@ struct QuickWaterCommandExecutor {
         guard EconomyWalletWritePolicy.canWrite(pet) else {
             deriveWaterMutation(
                 .waterLog(petID: pet.id, source: "water_change"),
-                affectedEntityIDs: [pet.id],
+                pets: [pet],
                 wroteBusinessFact: false,
                 note: "water_change_noop"
             )
@@ -442,7 +442,7 @@ struct QuickWaterCommandExecutor {
         guard !liveTargets.isEmpty else {
             deriveWaterMutation(
                 .waterLog(petID: pet.id, source: "water_change"),
-                affectedEntityIDs: [pet.id],
+                pets: [pet],
                 wroteBusinessFact: false,
                 note: "water_change_noop"
             )
@@ -470,7 +470,7 @@ struct QuickWaterCommandExecutor {
         guard recorded.didWriteFact, recorded.allowsDerivedEffects else {
             deriveWaterMutation(
                 .waterLog(petID: pet.id, source: "water_change"),
-                affectedEntityIDs: [pet.id],
+                pets: [pet],
                 wroteBusinessFact: false,
                 note: "water_change_noop"
             )
@@ -478,7 +478,7 @@ struct QuickWaterCommandExecutor {
         }
         deriveWaterMutation(
             .waterLog(petID: pet.id, source: liveTargets.count > 1 ? "shared_water_change" : "water_change"),
-            affectedEntityIDs: targetIDs(pet: pet, targets: liveTargets),
+            pets: liveTargets,
             note: "water_change"
         )
         let reminders = liveTargets.flatMap {
@@ -505,7 +505,7 @@ struct QuickWaterCommandExecutor {
         guard EconomyWalletWritePolicy.canWrite(pet) else {
             deriveWaterMutation(
                 .waterLog(petID: pet.id, source: "filter_clean"),
-                affectedEntityIDs: [pet.id],
+                pets: [pet],
                 wroteBusinessFact: false,
                 note: "filter_clean_noop"
             )
@@ -515,7 +515,7 @@ struct QuickWaterCommandExecutor {
         guard !liveTargets.isEmpty else {
             deriveWaterMutation(
                 .waterLog(petID: pet.id, source: "filter_clean"),
-                affectedEntityIDs: [pet.id],
+                pets: [pet],
                 wroteBusinessFact: false,
                 note: "filter_clean_noop"
             )
@@ -543,7 +543,7 @@ struct QuickWaterCommandExecutor {
         guard recorded.didWriteFact, recorded.allowsDerivedEffects else {
             deriveWaterMutation(
                 .waterLog(petID: pet.id, source: "filter_clean"),
-                affectedEntityIDs: [pet.id],
+                pets: [pet],
                 wroteBusinessFact: false,
                 note: "filter_clean_noop"
             )
@@ -551,7 +551,7 @@ struct QuickWaterCommandExecutor {
         }
         deriveWaterMutation(
             .waterLog(petID: pet.id, source: liveTargets.count > 1 ? "shared_filter_clean" : "filter_clean"),
-            affectedEntityIDs: targetIDs(pet: pet, targets: liveTargets),
+            pets: liveTargets,
             note: "filter_clean"
         )
         let reminders = liveTargets.flatMap {
@@ -574,12 +574,12 @@ struct QuickWaterCommandExecutor {
         } else {
             .other
         }
-        let petID = log.pet?.id
+        let pet = log.pet
         CloudSyncMutationRecorder.markDeleted(log, pet: log.pet, context: context)
         context.delete(log)
         context.safeSave()
-        if let petID {
-            deriveWaterMutation(.waterLog(petID: petID, source: "delete"), affectedEntityIDs: [petID], note: "\(kind)")
+        if let pet {
+            deriveWaterMutation(.waterLog(petID: pet.id, source: "delete"), pets: [pet], note: "\(kind)")
         }
         return kind
     }
@@ -599,10 +599,11 @@ struct QuickWaterCommandExecutor {
 
     private func deriveWaterMutation(
         _ command: DomainCommand,
-        affectedEntityIDs: Set<UUID>,
+        pets: [Pet],
         wroteBusinessFact: Bool = true,
         note: String? = nil
     ) {
+        let affectedEntityIDs = Set(pets.map(\.id))
         guard wroteBusinessFact else {
             derivations.derive(
                 .noOp(
@@ -613,10 +614,26 @@ struct QuickWaterCommandExecutor {
             )
             return
         }
+        let effectPlans = DomainEffectWriteAuthorizer.authorizePetEffects(
+            pets: pets,
+            writeKind: .care,
+            context: context,
+            logPrefix: "QuickWaterCommandExecutor.derive"
+        )
+        guard !effectPlans.isEmpty else {
+            derivations.derive(
+                .noOp(
+                    command: command,
+                    affectedEntityIDs: affectedEntityIDs,
+                    note: note ?? "\(command).unauthorized"
+                )
+            )
+            return
+        }
         derivations.derive(
             .derivedMutation(
                 command: command,
-                affectedEntityIDs: affectedEntityIDs,
+                effectPlans: effectPlans,
                 note: note
             )
         )
@@ -624,11 +641,6 @@ struct QuickWaterCommandExecutor {
 
     private func canWriteActiveWaterData(for pet: Pet) -> Bool {
         MemberWritePolicy.disposition(pet: pet, intent: .activeOnly).allowsDerivedEffects
-    }
-
-    private func targetIDs(pet: Pet, targets: [Pet]) -> Set<UUID> {
-        let ids = targets.isEmpty ? [pet.id] : targets.map(\.id)
-        return Set(ids)
     }
 
     private func singleCareResult(

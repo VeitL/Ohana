@@ -325,7 +325,9 @@ enum HumanMedicationPlanCommandService {
             ) else {
                 continue
             }
-            if DomainScheduleWriter.deleteEvent(event, mutation: mutation, context: context) {
+            let result = DomainScheduleWriter.deleteEvent(event, mutation: mutation, context: context)
+            DomainScheduleEffectsDispatcher.dispatch(delete: result)
+            if result.didDelete {
                 removedEventIDs.append(event.id)
             }
         }

@@ -1,5 +1,14 @@
 # Task Follow-ups
 
+> **Release-bar role (2026-06-15)**: This file is the **post-launch fix backlog**.
+> Per the playbook "发布门槛 (Release Bar)", the only thing that blocks first
+> release is **"P0 AND first-release-reachable"** cleared to zero. Everything else
+> — P1, P2, first-release-unreachable (CloudSync `.none` / online / behind a
+> feature gate / 0.01% edge paths) — is logged here, ships with the app, and is
+> scheduled by severity across post-launch versions (1.0.1, 1.1, 1.x). Tag each
+> entry with severity (P0/P1/P2) and reachability (reachable / unreachable) so the
+> release-bar scan can filter the one blocking quadrant quickly.
+
 This document tracks concrete follow-ups discovered while finishing a task when
 they cannot or should not be completed in the same turn. Keep it short and
 actionable; long-term product ideas belong in planning docs instead.

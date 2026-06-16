@@ -2,7 +2,8 @@
 
 > 工作协议见 `docs/ai-module-test-playbook.md`。任何会话开工前先读本文件；收工前**必须**更新本文件对应行，否则视为未完成。
 > 状态图例：⬜ 未开始 ｜ 🔵 分析完成待修 ｜ 🟡 修复中 ｜ 🟢 已过门禁并提交 ｜ 🟢\* 已过门禁但带人工验收债（见 track list） ｜ 🏁 对抗复审通过（成熟） ｜ ⛔ 阻塞（备注写明阻塞原因）
-> 🏁 准则见手册「模块成熟度准则」：核心模块（Domain、Economy、Feeding、Members、Home）必须 🏁 才能进 Phase 8；外围小模块 🟢 即可。
+> **首发门槛（2026-06-15 立，取代"逐模块 🏁 才能发"）**：首发唯一停止条件是**全局「P0 且首发可达」清零**（崩溃/数据丢失/隐私/核心流程断/经济算错，且单机核心流程会触发）。其余一切（P1/P2、首发不可达、边角）登记进 `docs/task-follow-ups.md`（上线后修复 backlog），带着上线。详见手册「发布门槛（Release Bar）」。
+> **🏁 已降级**为上线后长期成熟度目标，**不再是首发/Phase 8 阻塞**。原"核心五模块必须 🏁 才能进 Phase 8"作废——它把"复审零发现"这个无限过程当终点，是复审-修复怪圈的制度根源。审计（member-gate/economy/derived-state）继续跑以防新债反弹。
 
 ## 阶段总览
 
@@ -16,10 +17,33 @@
 | 5 | Home + TodayFocus + QuickCare | 🟢 | 门禁通过并提交：`b8e8710e`；TFU-20260612-015 已关闭，无 P1/P2 余留 |
 | 6 | 大模块（Feeding/Members/Oasis/Settings/Health/Economy） | 🟢 | Feeding 门禁通过并提交：`b49134977`；Members 门禁通过并提交：`ead1e5fe4`；Oasis 门禁通过并提交：`87423afd8`；Settings/Health 门禁通过并提交：`5d4e71928`；Economy 原门禁：`662852a01`，复审修复轮门禁：`1679ddd66` |
 | 6.5 | 宪法差距建设（联机门/删除模型/自动备份/植物门） | 🟢* | GAP-1、GAP-3~9 与 GAP-12 已过门禁并提交；GAP-2 用户可见回收站按 2026-06-14 产品决策退役，删除模型改为不可恢复物理删除 + 不可见 sync tombstone；*带验收债：人工/真机验收项见 `docs/planning/gap-acceptance-track-list.md`，必须在 🏁 复审与 Phase 9B 前清完 |
-| 7 | 中小模块批量 | 🟡 | Walks 门禁通过（2026-06-13，`e0c1d69d3`）；按第一批高风险模块继续推进，注入复审模式预检清单 |
-| 8 | 横向集成与全量回归 | ⬜ | 需总览会话主持 |
-| 8.5 | 演进就绪审查（联网/订阅/账户地基） | ⬜ | 需总览会话主持；产出审查报告与少量铺垫，非新功能 |
-| 9 | 上架工程（9A 前置/9B RC/9C 提审上线后） | ⬜ | 9A 前置项**现在就可并行启动**（开发者账号为最长前置）；详见手册 Phase 9 |
+| 7 | 中小模块批量 | ⏸️ | **2026-06-15 发布门槛框架下"逐模块复审到 🏁"作废**——剩余 ⬜ 模块不再逐个走六步循环+🏁，并入 Phase 8 首发门槛扫描，只确认无 P0+可达即可。Walks 等已做的工作保留为已收敛资产 |
+| 8 | **首发门槛扫描 + 横向回归** | ⬜ | **新框架下的首发核心动作**：全局扫「P0 且首发可达」（崩溃/数据丢失/隐私/核心流程断/经济算错 × 单机核心流程会触发）+ 端到端核心流程回归。吸收 Phase 7 剩余模块。**最高优先区 = write kernel（2026-06-14/15 全局重写）动过的 15+ 已🟢模块**（Economy/Feeding/Members/Home/Health/Calendar/TodayFocus/Walks 等核心写入被 kernel 重写，回归风险最高）——先决条件是 build-test 修绿（全量单测套件绿=行为等价第一层证据），再人工核这些模块的 P0+可达。清零即冻结首发；其余进 backlog。需总览会话主持 |
+| 8.5 | 演进就绪审查（联网/订阅/账户地基） | ⏭️ 1.x | 首发不可达（CloudSync `.none`/联机/订阅未启用），**推 1.x，不挡首发**。地基保留 |
+| 9 | 上架工程（9A 前置/9B RC/9C 提审上线后） | ⬜ | 完全保留，与门槛框架正交。9A 前置项（开发者账号/真机签名/dogfooding）**现在就可并行启动**；首发门槛扫描清零后接 9A 真机过核心流程→9B RC→9C 提审 |
+
+> **首发路径（2026-06-15 塌缩）**：旧路径"Phase 7 逐模块×N 轮 → 🏁 → Phase 8 → Phase 9"已被发布门槛框架压成 **首发门槛扫描（Phase 8，吸收 Phase 7 剩余）→ 修 P0+可达 → Phase 9（真机/RC/提审）**。Phase 8.5 与所有 🏁/P1/P2/不可达项推上线后。
+
+## 快速测试协议（Domain/Economy Kernel）
+
+> 目标：停止把人工深复审当主测试系统。人工复审只负责发现新 bug 形状；一旦发现，必须固化为 audit / fixture / targeted test。日常修复批次优先跑快速 lane，phase 结束才跑完整门禁与 CI。
+
+| Lane | 命令 | 触发时机 | 状态 | 备注 |
+|---|---|---|---|---|
+| K0 | `scripts/domain-kernel-fast-gate.sh --audit-only` | 每个 domain/economy 修复批次后；只读复审前 | 🏁 | 2026-06-16 验证通过：critical audits + audit fixtures，约 10s；`derived-state lifecycle` 仍打印既有 checklist warnings 但退出码为 0 |
+| K1 | `scripts/domain-kernel-fast-gate.sh --changed` | 代码改动后、交接前；允许 SwiftFormat | 🏁 | 2026-06-16 验证通过：changed gate + critical audits + fixtures，约 11s；会调用 `scripts/dev-check-changed.sh` |
+| K2 | `scripts/domain-kernel-fast-gate.sh --tests` | P0/P1 修复批次完成、需要行为信心时 | 🏁 | 2026-06-16 验证通过：449 tests / 12 suites，约 37s；首跑红转绿记录见本节日志 |
+| K3 | `scripts/domain-kernel-fast-gate.sh --build` | Swift API / compiler-surface 改动后 | 🏁 | 2026-06-16 验证通过：`iPhone 17` simulator Debug build，约 26s；只在编译面变化时加 |
+| K4 | `scripts/module-exit-gate.sh [--full]` + phase-end CI | phase 结束、commit/push 前后 | ⬜ | 仍是最终门禁；CI 不再作为心跳或每个小 patch 的验证方式 |
+
+复审停止规则：K0/K1/K2/K3 中与本批风险匹配的 lane 通过，且新增 P0/P1 形状已固化进 fixture 或 targeted test 后，本轮复审停止；P2 进入 `docs/task-follow-ups.md` 或模块备注，不继续拖住当前修复轮。
+
+本节日志：
+- 2026-06-16：新增 `scripts/domain-kernel-fast-gate.sh`。验证：`bash -n scripts/domain-kernel-fast-gate.sh` PASS；`scripts/domain-kernel-fast-gate.sh --tests --build --dry-run` PASS；`scripts/domain-kernel-fast-gate.sh --audit-only` PASS（architecture、economy --all、member lifecycle --all、derived-state --all、audit fixture self-tests）。
+- 2026-06-16：K1 changed lane 验证通过：`scripts/domain-kernel-fast-gate.sh --changed` PASS；同批次 root-cause 修复后复跑仍 PASS。`derived-state lifecycle` 仍只打印既有 checklist warnings，退出码为 0。
+- 2026-06-16：K2 tests lane 首跑 FAIL，抓到 2 个 `HomeCommandExecutorTests` 回归：typed effect plan 收窄 revision `affectedEntityIDs` 后，event/log/ledger read-model refresh id 丢失。修复方式不是恢复 raw effects 写权，而是在 `CareWriteOutcome.derivedMutation` 中要求 `AuthorizedDomainEffectWrite`，同时允许 `additionalRevisionEntityIDs` 只补 revision payload。
+- 2026-06-16：K2 红转绿：窄复测 `DOMAIN_KERNEL_TEST_TARGETS="OhanaTests/HomeCommandExecutorTests" scripts/domain-kernel-fast-gate.sh --tests --no-audits --no-fixtures` PASS（182 tests / 1 suite）；全量 targeted kernel suite `scripts/domain-kernel-fast-gate.sh --tests --no-audits --no-fixtures` PASS（449 tests / 12 suites，约 37s）。
+- 2026-06-16：K3 build lane 验证通过：`scripts/domain-kernel-fast-gate.sh --build --no-audits --no-fixtures` PASS（`** BUILD SUCCEEDED **`，`iPhone 17` simulator，约 26s）。
 
 ## 模块明细
 
@@ -321,3 +345,5 @@
 | 2026-06-15 | Domain 第二横切根因熔断裁定（总览） | **总览自纠 + 熔断**：前一条根因分析（"首发可达面接近收口、80% 是 CloudSync"）基于只读 TFU-009~014 片段，错。完整对账日志显示：CloudSync 推迟后首发可达面**自身**持续发现 TFU-015~019 + 20260615-001 至少 6 个本地 P1，当前门禁仍红（TFU-20260615-002）。聚类后这些是**第二个横切根因**：成员状态变化（删除/离世）后的**引用完整性 + 写入门**靠各 command 约定判断、无统一服务层硬门（TFU-019 明示"D7 只读未落服务层，各 feature command 可对去世成员写入"）。与删除级联（已用注册矩阵封死）、care-executor 同构。**熔断失效根因**：归因责任悬空——无记忆复审只看本轮、修复只管修、总览（我）该跨轮聚类却读片段没做；line 319 单轮 017/018/019 三表现本应触发"单轮≥3"但因表面不同未被抽象为同根因。**裁定**：① 立即熔断，停止 015→001 逐条修复，转架构——建统一「成员生命周期门」（active/deceased/deleted 服务层硬门），所有 feature command 对成员写入/派生强制过它，配审计禁绕过；② 新增手册「跨轮强制归因」铁律（复审出 P1 前须读总账历史、按根因层聚类、历史根因第3次复现即熔断）。Domain 🏁 前必须做完此架构封死 |
 | 2026-06-15 | Domain Feeding plan/stock P1 修复 + 修复会话复审 | Codex repair session 修复 TFU-20260615-001：Feeding 计划/粮仓/断粮提醒/自动投喂维护命令族接入 active-only lifecycle 门，粮仓费用 payer 写入 effective actor，QuickFeed revision 发布消费 no-op/didChange，UI payer menu 过滤已故 human；修复会话复审未在 Feeding 首发可达面发现新的 P0/P1。验证通过：ManualFeedCommandTests 17、HomeCommandExecutorTests 182、Domain 聚焦组 58、dev-check、fixture tests、economy --all、derived --all（仅既有全库 review warnings）、git diff --check。`scripts/module-exit-gate.sh` 仍因 SharedPetActionRecorder shared walk secondary executor / backup round-trip 测试失败而红，已登记 TFU-20260615-002；本会话不是纯复审且门禁/CI 未全绿，Domain 保持 🟢，不得 🏁。 |
 | 2026-06-15 | Domain TFU-20260615-002 shared walk secondary executor 修复 | Codex repair session 修复 module gate blocker：`SharedPetActionRecorder` 的 shared walk 写入现在保留 participant `executorIds` 到 `SharedCareSession` 与 `PetWalkLog`，同时继续以 resolved effective actor 写 primary `executorId`、ledger actor 与 reward owner；备份 DTO 原有 `executorIdsRaw` round-trip 随上游存储恢复。同步修正旧 CareEventService happy-path 测试，插入真实 Human executor，避免测试继续保护无效 `"human-1"` actor。验证 PASS：`scripts/test-simulator.sh -only-testing:OhanaTests/SharedPetActionRecorderTests`（25 tests）；`scripts/module-exit-gate.sh`（changed audits、runtime/economy/derived/localization、876 unit tests + 3 UI template tests）。Domain 本地门禁恢复绿；仍未 push/CI，且本会话不是全新纯复审，不能授 🏁。 |
+| 2026-06-15 | 立发布门槛、🏁 降级（破复审怪圈） | 产品主人拍板：诊断"一直能扫出问题"是数学必然（bug 空间组合爆炸 + 对抗复审设计目标就是无限发现），把无限过程（复审零发现/🏁）当首发门槛=怪圈制度根源。**改首发门槛为：全局「P0 且首发可达」清零**（崩溃/数据丢失/隐私/核心流程断/经济算错 × 单机核心流程会触发），其余（P1/P2/不可达/边角）登记 backlog 带上线、按版本排期。**🏁 降级**为上线后长期成熟度目标，"核心五模块必须 🏁 才进 Phase 8"作废。已落地：手册新增「发布门槛（Release Bar）」章节 + 改成熟度准则标题、总账头部准则、`task-follow-ups.md` 重定位为上线后 backlog（要求标 severity + reachability）。这同时化解了 write kernel 切片/时机、是否重写等纠结——均同一病（用完美做门槛）。下一步：开"首发门槛扫描"全局列 P0+可达有限清单，清零即冻结首发 |
+| 2026-06-15 | write kernel 回归风险 + 重验顺序 | 产品主人问"Phase 0-6.5 是否因 write kernel 重过"。核实：write kernel + member gate（全局重写 ~9600 行）动了 **15+ 已🟢模块**（Economy/Feeding/Members/Home/Health/Calendar/TodayFocus/Walks 等），把逐模块已收敛状态整个推回待验证——这是 big bang 重写"重新打开所有模块"代价的兑现。**当前 main `build-test` CI 红**（编译或单测失败，lint/audits 绿），是回归未收尾的铁证。**裁定**：① 第一步紧急修绿 build-test+推送（全量单测套件绿=行为等价第一层机器证据，Phase1-6.5 测试套件守住表征）；② 重验用**门槛标准**（P0+可达扫描），不是逐模块重新🏁（那回怪圈）；③ kernel 动过的 15 模块列为 Phase 8 首发门槛扫描最高优先区。教训：增量绞杀本可只验成员照护一小块，big bang 让 15 模块全要重验——既成事实，现在收拾 |

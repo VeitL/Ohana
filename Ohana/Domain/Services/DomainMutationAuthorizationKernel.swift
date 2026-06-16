@@ -493,14 +493,14 @@ nonisolated enum DomainPolicyAuthorizer {
         context: ModelContext
     ) -> MemberWriteDisposition? {
         guard !subject.hasUnregisteredLinkType else { return nil }
-        guard !subject.unresolvedOwner else { return nil }
-        guard !subject.unresolvedAssignee else { return nil }
+        guard !subject.unresolvedOwner || writeKind.allowsUnresolvedScheduleCleanup else { return nil }
+        guard !subject.unresolvedAssignee || writeKind.allowsUnresolvedScheduleCleanup else { return nil }
 
         var disposition = MemberLifecycleGate.activeDisposition(writeKind: writeKind)
         if let ownerDisposition = memberDisposition(for: subject.owner, writeKind: writeKind, context: context) {
             disposition = ownerDisposition
         }
-        guard disposition.writesContent else { return nil }
+        guard disposition.writesContent || disposition.allowsAuthorizedEffectsOnlyMutation(for: writeKind) else { return nil }
 
         if let assigneeDisposition = memberDisposition(for: subject.assignee, writeKind: assigneeWriteKind, context: context),
            !assigneeDisposition.allowsDerivedEffects {
@@ -539,5 +539,30 @@ nonisolated enum DomainPolicyAuthorizer {
         )
         descriptor.fetchLimit = 1
         return try? context.fetch(descriptor).first
+    }
+}
+
+private nonisolated extension MemberWriteDisposition {
+    func allowsAuthorizedEffectsOnlyMutation(for writeKind: MemberWriteKind) -> Bool {
+        guard allowsDerivedEffects else { return false }
+        switch writeKind {
+        case .lifecycle(.cleanupActiveSchedules):
+            return true
+        case .care, .memorial, .memorialContentWithOptionalDerivations, .profileEdit,
+             .presentationPreference, .accountSecurity, .collaboration, .lifecycle:
+            return false
+        }
+    }
+}
+
+private nonisolated extension MemberWriteKind {
+    var allowsUnresolvedScheduleCleanup: Bool {
+        switch self {
+        case .lifecycle(.cleanupActiveSchedules):
+            true
+        case .care, .memorial, .memorialContentWithOptionalDerivations, .profileEdit,
+             .presentationPreference, .accountSecurity, .collaboration, .lifecycle:
+            false
+        }
     }
 }

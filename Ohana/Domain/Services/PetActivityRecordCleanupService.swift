@@ -51,18 +51,24 @@ struct PetActivityRecordCleanupService {
         do {
             let events = try context.fetch(descriptor)
             for event in events where MemberLifecycleActiveScheduleResolver.eventBelongsToPet(event, petId: petId.uuidString) {
-                for reminder in event.reminders {
-                    notifications.cancel(notificationId: reminder.notificationId)
-                    cancelledNotificationIDs.append(reminder.notificationId)
-                }
-                PhysicalDeletionService.deleteEvent(
+                guard let mutation = DomainScheduleWriteAuthorizer.authorizeExistingEventMutation(
+                    event: event,
+                    writeKind: .lifecycle(.clearActivityRecords),
+                    source: .domainService,
+                    context: context
+                ) else { continue }
+                let result = DomainScheduleWriter.deleteEvent(
                     event,
+                    mutation: mutation,
                     context: context,
                     deletedAt: now,
-                    deletedByHumanId: deletedByHumanId,
-                    cancelNotifications: false
+                    deletedByHumanId: deletedByHumanId
                 )
-                deletedEventCount += 1
+                DomainScheduleEffectsDispatcher.dispatch(delete: result, notifications: notifications)
+                cancelledNotificationIDs.append(contentsOf: result.notificationIdsToCancel)
+                if result.didDelete {
+                    deletedEventCount += 1
+                }
             }
         } catch {
             OhanaLog.warning(

@@ -93,6 +93,7 @@ struct CareWriteOutcome {
     let sharedSession: SharedSessionPayload?
     let selectionMemory: SelectionMemoryPayload?
     let noopNote: String?
+    let effectPlans: [AuthorizedDomainEffectWrite]
 
     init(
         kind: Kind,
@@ -106,7 +107,8 @@ struct CareWriteOutcome {
         feedback: FeedbackPayload? = nil,
         sharedSession: SharedSessionPayload? = nil,
         selectionMemory: SelectionMemoryPayload? = nil,
-        noopNote: String? = nil
+        noopNote: String? = nil,
+        effectPlans: [AuthorizedDomainEffectWrite] = []
     ) {
         self.kind = kind
         self.disposition = disposition
@@ -120,6 +122,7 @@ struct CareWriteOutcome {
         self.sharedSession = sharedSession
         self.selectionMemory = selectionMemory
         self.noopNote = noopNote
+        self.effectPlans = effectPlans
     }
 
     var didWriteFact: Bool {
@@ -170,10 +173,29 @@ struct CareWriteOutcome {
 
     static func derivedMutation(
         command: DomainCommand,
-        affectedEntityIDs: Set<UUID>,
+        effectPlan: AuthorizedDomainEffectWrite,
+        additionalRevisionEntityIDs: Set<UUID> = [],
         note: String? = nil
     ) -> CareWriteOutcome {
-        CareWriteOutcome(
+        derivedMutation(
+            command: command,
+            effectPlans: [effectPlan],
+            additionalRevisionEntityIDs: additionalRevisionEntityIDs,
+            note: note
+        )
+    }
+
+    static func derivedMutation(
+        command: DomainCommand,
+        effectPlans: [AuthorizedDomainEffectWrite],
+        additionalRevisionEntityIDs: Set<UUID> = [],
+        note: String? = nil
+    ) -> CareWriteOutcome {
+        var affectedEntityIDs = additionalRevisionEntityIDs
+        affectedEntityIDs = effectPlans.reduce(into: affectedEntityIDs) { ids, plan in
+            ids.formUnion(plan.mutationPlan.subject.affectedEntityIDs)
+        }
+        return CareWriteOutcome(
             kind: .active,
             disposition: .active,
             revision: RevisionPayload(
@@ -181,7 +203,8 @@ struct CareWriteOutcome {
                 affectedEntityIDs: affectedEntityIDs,
                 note: note
             ),
-            noopNote: note
+            noopNote: note,
+            effectPlans: effectPlans
         )
     }
 }
@@ -220,6 +243,22 @@ struct CareDerivationExecutor {
                 didPublishRevision: false,
                 coconutDelta: 0
             )
+        }
+        if !outcome.effectPlans.isEmpty {
+            var didAuthorizeEffects = true
+            for effectPlan in outcome.effectPlans {
+                let didRun = DomainEffectDispatcher.run(plan: effectPlan) { _ in }
+                didAuthorizeEffects = didAuthorizeEffects && didRun
+            }
+            guard didAuthorizeEffects else {
+                recordNoop(outcome, token: token)
+                return CareDerivationResult(
+                    didWriteFact: outcome.didWriteFact,
+                    allowsDerivedEffects: false,
+                    didPublishRevision: false,
+                    coconutDelta: 0
+                )
+            }
         }
 
         let didPublishRevision = publishRevisionIfNeeded(outcome.revision, token: token)

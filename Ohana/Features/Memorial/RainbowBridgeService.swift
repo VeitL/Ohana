@@ -69,8 +69,9 @@ enum MemberLifecycleActiveScheduleCleanup {
                     didDelete = true
                 }
             } else {
-                tombstoneAndDelete(event, context: context, deletedAt: date)
-                didDelete = true
+                if tombstoneAndDelete(event, context: context, deletedAt: date).didDelete {
+                    didDelete = true
+                }
             }
         }
         if didDelete {
@@ -80,16 +81,31 @@ enum MemberLifecycleActiveScheduleCleanup {
 
     @MainActor
     private static func pruneFutureSchedule(from event: Event, context: ModelContext, deletedAt: Date) -> Bool {
+        guard let mutation = DomainScheduleWriteAuthorizer.authorizeExistingEventMutation(
+            event: event,
+            writeKind: .lifecycle(.cleanupActiveSchedules),
+            source: .domainService,
+            context: context
+        ) else { return false }
         var didChange = false
         for reminder in MemberLifecycleActiveScheduleResolver.futureActionableReminders(in: event, cutoff: deletedAt) {
-            tombstoneAndDelete(reminder, context: context, deletedAt: deletedAt)
-            didChange = true
+            let result = DomainScheduleWriter.deleteReminder(
+                reminder,
+                mutation: mutation,
+                context: context,
+                deletedAt: deletedAt
+            )
+            DomainScheduleEffectsDispatcher.dispatch(delete: result)
+            didChange = result.didDelete || didChange
         }
         if event.recurrenceDays > 0 {
-            event.recurrenceDays = 0
-            event.recurrenceEndDate = deletedAt
-            CloudSyncMutationRecorder.markModified(event, context: context, modifiedAt: deletedAt)
-            didChange = true
+            didChange = DomainScheduleWriter.truncateRecurringEvent(
+                event,
+                recurrenceEndDate: deletedAt,
+                mutation: mutation,
+                context: context,
+                modifiedAt: deletedAt
+            ) || didChange
         }
         return didChange
     }
@@ -105,18 +121,19 @@ enum MemberLifecycleActiveScheduleCleanup {
     }
 
     @MainActor
-    private static func tombstoneAndDelete(_ event: Event, context: ModelContext, deletedAt: Date) {
-        for reminder in event.reminders {
-            tombstoneAndDelete(reminder, context: context, deletedAt: deletedAt)
-        }
-        CloudSyncMutationRecorder.markDeleted(event, context: context, deletedAt: deletedAt)
-        context.delete(event)
-    }
-
-    @MainActor
-    private static func tombstoneAndDelete(_ reminder: Reminder, context: ModelContext, deletedAt: Date) {
-        OhanaNotifications.current.cancel(notificationId: reminder.notificationId)
-        CloudSyncMutationRecorder.markDeleted(reminder, context: context, deletedAt: deletedAt)
-        context.delete(reminder)
+    private static func tombstoneAndDelete(
+        _ event: Event,
+        context: ModelContext,
+        deletedAt: Date
+    ) -> DomainScheduleDeleteResult {
+        guard let mutation = DomainScheduleWriteAuthorizer.authorizeExistingEventMutation(
+            event: event,
+            writeKind: .lifecycle(.cleanupActiveSchedules),
+            source: .domainService,
+            context: context
+        ) else { return .notDeleted }
+        let result = DomainScheduleWriter.deleteEvent(event, mutation: mutation, context: context, deletedAt: deletedAt)
+        DomainScheduleEffectsDispatcher.dispatch(delete: result)
+        return result
     }
 }

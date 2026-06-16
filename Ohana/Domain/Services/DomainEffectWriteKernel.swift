@@ -71,6 +71,36 @@ enum DomainEffectWriteAuthorizer {
         )
     }
 
+    static func authorizePetEffects(
+        pets: [Pet],
+        occurredAt: Date = Date(),
+        writeKind: MemberWriteKind,
+        source: DomainMutationSourceKind = .domainService,
+        executorId: String? = nil,
+        context: ModelContext,
+        logPrefix: String,
+        actorOverride: EconomyRewardOwnerResolution? = nil
+    ) -> [AuthorizedDomainEffectWrite] {
+        var seen = Set<UUID>()
+        var plans: [AuthorizedDomainEffectWrite] = []
+        for pet in pets where seen.insert(pet.id).inserted {
+            guard let plan = authorizePetEffect(
+                pet: pet,
+                occurredAt: occurredAt,
+                writeKind: writeKind,
+                source: source,
+                executorId: executorId,
+                context: context,
+                logPrefix: logPrefix,
+                actorOverride: actorOverride
+            ) else {
+                continue
+            }
+            plans.append(plan)
+        }
+        return plans
+    }
+
     static func authorizeHumanEffect(
         human: Human,
         occurredAt: Date = Date(),

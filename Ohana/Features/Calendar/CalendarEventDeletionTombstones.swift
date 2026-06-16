@@ -2,12 +2,16 @@ import SwiftData
 
 extension CalendarEventCommandService {
     @MainActor
-    static func tombstoneAndDeleteEvent(_ event: Event, context: ModelContext) {
-        let reminders = event.reminders
-        CloudSyncMutationRecorder.markDeleted(event, context: context)
-        for reminder in reminders {
-            CloudSyncMutationRecorder.markDeleted(reminder, context: context)
-        }
-        context.delete(event)
+    @discardableResult
+    static func tombstoneAndDeleteEvent(_ event: Event, context: ModelContext) -> DomainScheduleDeleteResult {
+        guard let mutation = DomainScheduleWriteAuthorizer.authorizeExistingEventMutation(
+            event: event,
+            writeKind: .care,
+            source: .userCommand,
+            context: context
+        ) else { return .notDeleted }
+        let result = DomainScheduleWriter.deleteEvent(event, mutation: mutation, context: context)
+        DomainScheduleEffectsDispatcher.dispatch(delete: result)
+        return result
     }
 }

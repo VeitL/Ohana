@@ -278,13 +278,6 @@ final class NotificationManager: NSObject, @unchecked Sendable {
         let now = Date()
         for reminder in reminders {
             guard reminder.isPending, reminder.scheduledAt < now else { continue }
-            if reminder.event?.eventType == EventType.foodChange.rawValue {
-                reminder.statusEnum = .failed
-                reminder.completedAt = nil
-            } else {
-                reminder.statusEnum = .skipped
-                reminder.completedAt = nil
-            }
             cancel(notificationId: reminder.notificationId)
         }
     }

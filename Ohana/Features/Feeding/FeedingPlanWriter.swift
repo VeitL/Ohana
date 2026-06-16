@@ -85,8 +85,9 @@ enum FeedingPlanWriter {
         guard canWriteActiveFeedData(for: pet) else { return }
         var didDelete = false
         for event in planEvents(pet: pet, kind: kind, allEvents: allEvents) {
-            deleteEvent(event, context: context)
-            didDelete = true
+            if deleteEvent(event, context: context).didDelete {
+                didDelete = true
+            }
         }
         if save, didDelete {
             context.safeSave()
@@ -105,11 +106,18 @@ enum FeedingPlanWriter {
         for event in planEvents(pet: pet, kind: .manualReminder, allEvents: allEvents) {
             let pendingReminders = event.reminders.filter(\.isPending)
             for reminder in pendingReminders {
-                OhanaNotifications.current.cancel(notificationId: reminder.notificationId)
                 if reminder.scheduledAt > now {
-                    CloudSyncMutationRecorder.markDeleted(reminder, context: context)
-                    context.delete(reminder)
-                    didChange = true
+                    guard let mutation = DomainScheduleWriteAuthorizer.authorizeExistingReminderMutation(
+                        reminder: reminder,
+                        writeKind: .care,
+                        source: .domainService,
+                        context: context
+                    ) else { continue }
+                    let result = DomainScheduleWriter.deleteReminder(reminder, mutation: mutation, context: context)
+                    DomainScheduleEffectsDispatcher.dispatch(delete: result)
+                    didChange = result.didDelete || didChange
+                } else {
+                    OhanaNotifications.current.cancel(notificationId: reminder.notificationId)
                 }
             }
         }
@@ -316,7 +324,7 @@ enum FeedingPlanWriter {
     ) -> [Reminder] {
         guard canWriteActiveFeedData(for: pet) else { return [] }
         for event in currentStockReminderEvents(pet: pet, allEvents: allEvents, context: context) {
-            deleteEvent(event, context: context)
+            _ = deleteEvent(event, context: context)
         }
 
         guard pet.foodReminderEnabled else {
@@ -411,14 +419,16 @@ enum FeedingPlanWriter {
         return calendar.date(bySettingHour: 9, minute: 0, second: 0, of: raw) ?? raw
     }
 
-    private nonisolated static func deleteEvent(_ event: Event, context: ModelContext) {
-        CloudSyncMutationRecorder.markDeleted(event, context: context)
-        for reminder in event.reminders {
-            OhanaNotifications.current.cancel(notificationId: reminder.notificationId)
-            CloudSyncMutationRecorder.markDeleted(reminder, context: context)
-            context.delete(reminder)
-        }
-        context.delete(event)
+    private nonisolated static func deleteEvent(_ event: Event, context: ModelContext) -> DomainScheduleDeleteResult {
+        guard let mutation = DomainScheduleWriteAuthorizer.authorizeExistingEventMutation(
+            event: event,
+            writeKind: .care,
+            source: .domainService,
+            context: context
+        ) else { return .notDeleted }
+        let result = DomainScheduleWriter.deleteEvent(event, mutation: mutation, context: context)
+        DomainScheduleEffectsDispatcher.dispatch(delete: result)
+        return result
     }
 
     private nonisolated static func allEventsForStockReminderRebuild(context: ModelContext) -> [Event] {

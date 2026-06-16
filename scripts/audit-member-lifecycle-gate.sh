@@ -262,6 +262,9 @@ EFFECT_EMISSION_RE = re.compile(
     r"|CareLedgerService\s*\("
     r"|\bcareLedger\.record\s*\("
 )
+DERIVED_MUTATION_RAW_SUBJECT_RE = re.compile(
+    r"\.derivedMutation\s*\([\s\S]*?\baffectedEntityIDs\s*:"
+)
 MEMBER_EFFECT_DISPATCHER_SCOPE_PATHS = {
     "Ohana/Domain/Services/PetMedicationDoseLogging.swift",
     "Ohana/Features/FamilyTasks/LegacyBountyTask.swift",
@@ -293,7 +296,15 @@ WRITER_TOKEN_REQUIRED_MODEL_RE = re.compile(
     r"|\b(?:PetInsurance|InsuranceClaim)\s*\("
 )
 WRITER_TOKEN_REQUIRED_REMINDER_STATE_RE = re.compile(
-    r"\breminder\.(?:statusEnum|completedAt|completedBy|scheduledAt)\s*="
+    r"\breminder\.(?:statusEnum|completedAt|completedBy|scheduledAt)\s*=(?!=)"
+    r"|\bsetOccurrenceMarkedComplete\s*\("
+)
+SCHEDULE_STATE_WRITER_ALLOWLIST = {
+    "Ohana/Domain/Services/DomainScheduleWriteKernel.swift",
+    "Ohana/Domain/Services/DomainRehydrateWriteKernel.swift",
+}
+SCHEDULE_STATE_MUTATION_RE = re.compile(
+    r"\breminder\.(?:statusEnum|completedAt|completedBy|scheduledAt)\s*=(?!=)"
     r"|\bsetOccurrenceMarkedComplete\s*\("
 )
 WRITER_TOKEN_REQUIRED_EFFECT_RE = re.compile(
@@ -328,17 +339,34 @@ DIRECT_SCHEDULE_INSERT_RE = re.compile(r"\b(?:context|modelContext)\.insert\s*\(
 AUTHORIZED_SCHEDULE_WRITER_RE = re.compile(
     r"DomainScheduleWriteAuthorizer\.authorizeCreate|DomainScheduleWriter\.createEvent"
 )
-MEMBER_SCHEDULE_DELETE_SCOPE_PATHS = {
-    "Ohana/Features/Medication/HumanMedicationCommands.swift",
-    "Ohana/Features/Medication/MedicationCommands.swift",
+SCHEDULE_DELETE_RAW_ALLOWLIST = {
+    "Ohana/Domain/Services/DomainScheduleWriteKernel.swift",
+    "Ohana/Domain/Services/PhysicalDeletionService.swift",
 }
 DIRECT_SCHEDULE_DELETE_RE = re.compile(
     r"\b(?:context|modelContext)\.delete\s*\(\s*(?:event|reminder)\s*\)"
+    r"|CloudSyncMutationRecorder\.markDeleted\(\s*(?:event|reminder)\b"
 )
 AUTHORIZED_SCHEDULE_DELETE_RE = re.compile(
     r"DomainScheduleWriteAuthorizer\.authorizeExistingEventMutation"
+    r"|DomainScheduleWriteAuthorizer\.authorizeExistingReminderMutation"
     r"|DomainScheduleWriter\.deleteEvent"
-    r"|PhysicalDeletionService\.deleteEvent"
+    r"|DomainScheduleWriter\.deleteReminder"
+)
+SCHEDULE_DELETE_CONTEXT_RE = re.compile(
+    r"\bEvent\b"
+    r"|FetchDescriptor<Event>"
+    r"|fetchAll\(Event\.self"
+    r"|\bevent\.reminders\b"
+    r"|\breminder\.event\b"
+    r"|MemberLifecycleActiveScheduleResolver\."
+    r"|DomainSchedule"
+)
+AUTHORIZED_SCHEDULE_DELETE_CALL_RE = re.compile(
+    r"DomainScheduleWriter\.delete(?:Event|Reminder)\s*\("
+)
+AUTHORIZED_SCHEDULE_DELETE_EFFECTS_RE = re.compile(
+    r"DomainScheduleEffectsDispatcher\.dispatch\s*\(\s*delete:"
 )
 REHYDRATE_ENTRY_PATHS = {
     "Ohana/Domain/Services/DataBackupManager.swift",
@@ -475,8 +503,10 @@ def requires_lifecycle_gate(path: str, func_name: str, body: str, is_private: bo
 warnings: list[WarningItem] = []
 domain_ownership_warnings: list[WarningItem] = []
 effect_subject_warnings: list[WarningItem] = []
+derived_mutation_subject_warnings: list[WarningItem] = []
 member_effect_warnings: list[WarningItem] = []
 writer_token_bypass_warnings: list[WarningItem] = []
+schedule_state_writer_warnings: list[WarningItem] = []
 schedule_delete_warnings: list[WarningItem] = []
 feature_taxonomy_warnings: list[WarningItem] = []
 rehydrate_bypass_warnings: list[WarningItem] = []
@@ -491,6 +521,24 @@ for path in files:
                 continue
             if FEATURE_TAXONOMY_STRING_RE.search(line):
                 feature_taxonomy_warnings.append(
+                    WarningItem(
+                        path_str,
+                        idx,
+                        line.strip(),
+                    )
+                )
+    checks_schedule_state_writer = (
+        path_str.startswith("Ohana/Domain/")
+        or path_str.startswith("Ohana/Features/")
+        or (targets and path_str.startswith("scripts/tests/fixtures/"))
+    )
+    if checks_schedule_state_writer and path_str not in SCHEDULE_STATE_WRITER_ALLOWLIST:
+        for idx, line in enumerate(lines, start=1):
+            stripped = line.lstrip()
+            if allowed_line(line) or stripped.startswith("//") or stripped.startswith("///"):
+                continue
+            if SCHEDULE_STATE_MUTATION_RE.search(line):
+                schedule_state_writer_warnings.append(
                     WarningItem(
                         path_str,
                         idx,
@@ -642,6 +690,14 @@ for path in files:
         for func_name, start_line, body, _ in function_blocks(lines):
             if "member-lifecycle-gate: allow" in body:
                 continue
+            if DERIVED_MUTATION_RAW_SUBJECT_RE.search(body):
+                derived_mutation_subject_warnings.append(
+                    WarningItem(
+                        path_str,
+                        start_line,
+                        f"func {func_name} publishes CareWriteOutcome.derivedMutation with raw affectedEntityIDs",
+                    )
+                )
             if EFFECT_SUBJECT_RESOLUTION_RE.search(body):
                 continue
             if not EFFECT_EMISSION_RE.search(body):
@@ -694,19 +750,37 @@ for path in files:
                     )
                 )
 
-    checks_schedule_delete = path_str in MEMBER_SCHEDULE_DELETE_SCOPE_PATHS or (
-        targets and path_str.startswith("scripts/tests/fixtures/")
-    )
+    checks_schedule_delete = (
+        path_str.startswith("Ohana/Domain/")
+        or path_str.startswith("Ohana/Features/")
+        or (targets and path_str.startswith("scripts/tests/fixtures/"))
+    ) and path_str not in SCHEDULE_DELETE_RAW_ALLOWLIST
     if checks_schedule_delete:
         for func_name, start_line, body, _ in function_blocks(lines):
             if "member-lifecycle-gate: allow" in body:
                 continue
-            if DIRECT_SCHEDULE_DELETE_RE.search(body) and not AUTHORIZED_SCHEDULE_DELETE_RE.search(body):
+            direct_schedule_delete = (
+                DIRECT_SCHEDULE_DELETE_RE.search(body)
+                and SCHEDULE_DELETE_CONTEXT_RE.search(body)
+                and not AUTHORIZED_SCHEDULE_DELETE_RE.search(body)
+            )
+            if direct_schedule_delete:
                 schedule_delete_warnings.append(
                     WarningItem(
                         path_str,
                         start_line,
                         f"func {func_name} deletes Event/Reminder rows without consuming an authorized schedule mutation writer",
+                    )
+                )
+            if (
+                AUTHORIZED_SCHEDULE_DELETE_CALL_RE.search(body)
+                and not AUTHORIZED_SCHEDULE_DELETE_EFFECTS_RE.search(body)
+            ):
+                schedule_delete_warnings.append(
+                    WarningItem(
+                        path_str,
+                        start_line,
+                        f"func {func_name} deletes Event/Reminder rows without dispatching schedule delete effects",
                     )
                 )
 
@@ -757,12 +831,20 @@ for item in effect_subject_warnings:
     print(f"[member-lifecycle-raw-effect-subject] {item.path}:{item.line}: effects, revisions, notifications, routes, and ledgers must consume typed DomainSubjectResolution/DomainResolvedSubjectKey instead of guessing from raw relatedEntity/assignee fields.")
     print(f"    {item.snippet}")
 
+for item in derived_mutation_subject_warnings:
+    print(f"[member-lifecycle-derived-mutation-subject-bypass] {item.path}:{item.line}: CareWriteOutcome.derivedMutation must consume AuthorizedDomainEffectWrite/plan; callers must not inject raw affectedEntityIDs.")
+    print(f"    {item.snippet}")
+
 for item in member_effect_warnings:
     print(f"[member-lifecycle-effect-dispatcher-bypass] {item.path}:{item.line}: member-scoped ledger, wallet, reminder, and reward effects must consume an authorized Domain*EffectsDispatcher plan.")
     print(f"    {item.snippet}")
 
 for item in writer_token_bypass_warnings:
     print(f"[member-lifecycle-writer-token-bypass] {item.path}:{item.line}: member-scoped active writes must consume a typed writer token or effects dispatcher, not only a lifecycle guard.")
+    print(f"    {item.snippet}")
+
+for item in schedule_state_writer_warnings:
+    print(f"[member-lifecycle-schedule-state-writer-bypass] {item.path}:{item.line}: Reminder/Event schedule state mutations must be centralized in DomainScheduleWriter or explicit rehydrate writers.")
     print(f"    {item.snippet}")
 
 for item in schedule_delete_warnings:
@@ -788,7 +870,7 @@ for item in warnings:
     print(f"[{rule}] {item.path}:{item.line}: {message}")
     print(f"    {item.snippet}")
 
-total_warnings = len(warnings) + len(domain_ownership_warnings) + len(effect_subject_warnings) + len(member_effect_warnings) + len(writer_token_bypass_warnings) + len(schedule_delete_warnings) + len(feature_taxonomy_warnings) + len(rehydrate_bypass_warnings)
+total_warnings = len(warnings) + len(domain_ownership_warnings) + len(effect_subject_warnings) + len(derived_mutation_subject_warnings) + len(member_effect_warnings) + len(writer_token_bypass_warnings) + len(schedule_state_writer_warnings) + len(schedule_delete_warnings) + len(feature_taxonomy_warnings) + len(rehydrate_bypass_warnings)
 print(f"member lifecycle gate audit: scanned {len(files)} file(s); warnings={total_warnings}")
 if total_warnings and strict:
     sys.exit(1)

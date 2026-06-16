@@ -216,6 +216,7 @@ extension QuestManager {
     ///   - careType: 打卡类型关键词（如 "喂食" "喂水" "铲屎" "遛"）
     ///   - context: SwiftData ModelContext
     func autoCompleteReminders(petId: UUID, careKeyword: String, context: ModelContext) {
+        let now = Date()
         let today = Calendar.current.startOfDay(for: Date())
         let tomorrow = Calendar.current.date(byAdding: .day, value: 1, to: today)!
         // 查找今日所有 Reminder
@@ -243,8 +244,19 @@ extension QuestManager {
             let title = event.title
             let keyword = careKeyword
             guard title.contains(keyword) else { continue }
-            reminder.statusEnum = .completed
-            reminder.completedAt = Date()
+            guard let mutation = DomainScheduleWriteAuthorizer.authorizeExistingReminderMutation(
+                reminder: reminder,
+                writeKind: .care,
+                source: .domainService,
+                context: context
+            ) else { continue }
+            DomainScheduleWriter.completeReminder(
+                reminder,
+                mutation: mutation,
+                completedBy: nil,
+                completedAt: now,
+                context: context
+            )
         }
         do {
             try context.save()

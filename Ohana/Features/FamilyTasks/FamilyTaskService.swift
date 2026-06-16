@@ -562,22 +562,20 @@ enum FamilyTaskService {
             task.touch()
         }
 
-        DomainMemberFactEffectsDispatcher.run(plan: write) { _ in
-            if let reminder = reminder(for: task, context: context), !reminder.isCompleted {
-                reminder.statusEnum = .completed
-                reminder.completedAt = task.completedAt
-                reminder.completedBy = human?.id.uuidString ?? ""
-                OhanaNotifications.current.cancel(notificationId: reminder.notificationId)
-                careLedger.recordReminderState(
-                    reminder: reminder,
-                    actionType: "submitReview",
-                    actorId: human?.id.uuidString,
-                    source: .service,
-                    context: context,
-                    save: true
-                )
-            }
+        if let reminder = reminder(for: task, context: context), !reminder.isCompleted {
+            markRelatedReminderCompleted(
+                reminder,
+                by: human?.id.uuidString,
+                completedAt: task.completedAt ?? Date(),
+                actionType: "submitReview",
+                plan: write,
+                context: context,
+                careLedger: careLedger,
+                saveLedger: true
+            )
+        }
 
+        DomainMemberFactEffectsDispatcher.run(plan: write) { _ in
             let subject = taskSubject(for: task, context: context)
             careLedger.record(
                 occurredAt: Date(),
@@ -646,12 +644,16 @@ enum FamilyTaskService {
         }
 
         if let reminder = reminder(for: task, context: context), !reminder.isCompleted {
-            DomainMemberFactEffectsDispatcher.run(plan: write) { _ in
-                reminder.statusEnum = .completed
-                reminder.completedAt = task.completedAt
-                reminder.completedBy = task.completedById ?? ""
-                OhanaNotifications.current.cancel(notificationId: reminder.notificationId)
-            }
+            markRelatedReminderCompleted(
+                reminder,
+                by: task.completedById,
+                completedAt: task.completedAt ?? Date(),
+                actionType: "familyTaskConfirmReminder",
+                plan: write,
+                context: context,
+                careLedger: careLedger,
+                recordsLedgerState: false
+            )
         }
 
         guard transferRewardIfNeeded(
@@ -1053,25 +1055,42 @@ enum FamilyTaskService {
     private static func markRelatedReminderCompleted(
         _ reminder: Reminder,
         by humanId: String?,
+        completedAt: Date = Date(),
         actionType: String,
         plan: AuthorizedDomainMemberFactWrite,
         context: ModelContext,
-        careLedger: CareLedgerRecording
+        careLedger: CareLedgerRecording,
+        recordsLedgerState: Bool = true,
+        saveLedger: Bool = false
     ) {
-        DomainMemberFactEffectsDispatcher.run(plan: plan) { _ in
-            reminder.statusEnum = .completed
-            reminder.completedAt = Date()
-            reminder.completedBy = humanId ?? ""
-            reminder.event?.setOccurrenceMarkedComplete(true, on: reminder.scheduledAt)
-            OhanaNotifications.current.cancel(notificationId: reminder.notificationId)
-            careLedger.recordReminderState(
-                reminder: reminder,
-                actionType: actionType,
-                actorId: humanId,
-                source: .service,
-                context: context,
-                save: false
+        guard let mutation = DomainScheduleWriteAuthorizer.authorizeExistingReminderMutation(
+            reminder: reminder,
+            writeKind: .collaboration,
+            source: .domainService,
+            context: context
+        ),
+            DomainScheduleWriter.completeReminder(
+                reminder,
+                mutation: mutation,
+                completedBy: humanId,
+                completedAt: completedAt,
+                context: context
             )
+        else {
+            return
+        }
+        DomainMemberFactEffectsDispatcher.run(plan: plan) { _ in
+            OhanaNotifications.current.cancel(notificationId: reminder.notificationId)
+            if recordsLedgerState {
+                careLedger.recordReminderState(
+                    reminder: reminder,
+                    actionType: actionType,
+                    actorId: humanId,
+                    source: .service,
+                    context: context,
+                    save: saveLedger
+                )
+            }
         }
     }
 
@@ -1083,11 +1102,23 @@ enum FamilyTaskService {
         context: ModelContext,
         careLedger: CareLedgerRecording
     ) {
+        guard let mutation = DomainScheduleWriteAuthorizer.authorizeExistingReminderMutation(
+            reminder: reminder,
+            writeKind: .collaboration,
+            source: .domainService,
+            context: context
+        ),
+            DomainScheduleWriter.reopenReminder(
+                reminder,
+                mutation: mutation,
+                reopenedBy: humanId,
+                reopenedAt: Date(),
+                context: context
+            )
+        else {
+            return
+        }
         DomainMemberFactEffectsDispatcher.run(plan: plan) { _ in
-            reminder.statusEnum = .pending
-            reminder.completedAt = nil
-            reminder.completedBy = humanId ?? ""
-            reminder.event?.setOccurrenceMarkedComplete(false, on: reminder.scheduledAt)
             careLedger.recordReminderState(
                 reminder: reminder,
                 actionType: "familyTaskReopenReminder",

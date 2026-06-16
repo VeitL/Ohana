@@ -317,6 +317,14 @@ extension CareEventService {
         guard !disposition.allowsDerivedEffects || !isCatchUp || FeedPlanCatchUpPolicy.isCatchUpEligible(reminder, now: operationDate) else {
             return .noOp(operationDate: operationDate)
         }
+        guard let scheduleMutation = DomainScheduleWriteAuthorizer.authorizeExistingReminderMutation(
+            reminder: reminder,
+            writeKind: .care,
+            source: .domainService,
+            context: context
+        ) else {
+            return .noOp(operationDate: operationDate)
+        }
 
         let log = DomainCareFactWriter.createCareLog(plan: write, context: context).log
 
@@ -333,12 +341,15 @@ extension CareEventService {
         }
 
         let reward = DomainCareFactEffectsDispatcher.map(plan: write, default: (0, 0)) { actor in
-            reminder.statusEnum = .completed
-            reminder.completedAt = operationDate
-            if let effectiveExecutorId = actor.effectiveExecutorId {
-                reminder.completedBy = effectiveExecutorId
+            guard DomainScheduleWriter.completeReminder(
+                reminder,
+                mutation: scheduleMutation,
+                completedBy: actor.effectiveExecutorId,
+                completedAt: operationDate,
+                context: context
+            ) else {
+                return (0, 0)
             }
-            event.setOccurrenceMarkedComplete(true, on: reminder.scheduledAt)
             OhanaNotifications.current.cancel(notificationId: reminder.notificationId)
             context.safeSave()
             dependencies.careLedger.recordReminderState(
@@ -452,6 +463,14 @@ extension CareEventService {
         guard !disposition.allowsDerivedEffects || !isCatchUp || WaterPlanCatchUpPolicy.isCatchUpEligible(reminder, now: operationDate) else {
             return .noOp(operationDate: operationDate)
         }
+        guard let scheduleMutation = DomainScheduleWriteAuthorizer.authorizeExistingReminderMutation(
+            reminder: reminder,
+            writeKind: .care,
+            source: .domainService,
+            context: context
+        ) else {
+            return .noOp(operationDate: operationDate)
+        }
 
         let log = DomainCareFactWriter.createCareLog(plan: write, context: context).log
 
@@ -468,12 +487,15 @@ extension CareEventService {
         }
 
         let reward = DomainCareFactEffectsDispatcher.map(plan: write, default: (0, 0)) { actor in
-            reminder.statusEnum = .completed
-            reminder.completedAt = operationDate
-            if let effectiveExecutorId = actor.effectiveExecutorId {
-                reminder.completedBy = effectiveExecutorId
+            guard DomainScheduleWriter.completeReminder(
+                reminder,
+                mutation: scheduleMutation,
+                completedBy: actor.effectiveExecutorId,
+                completedAt: operationDate,
+                context: context
+            ) else {
+                return (0, 0)
             }
-            event.setOccurrenceMarkedComplete(true, on: reminder.scheduledAt)
             OhanaNotifications.current.cancel(notificationId: reminder.notificationId)
             context.safeSave()
             dependencies.careLedger.recordReminderState(

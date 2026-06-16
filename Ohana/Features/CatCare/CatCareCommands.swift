@@ -156,9 +156,16 @@ enum CatCareCommandService {
         var removedLedgerEventIDs: [UUID] = []
         var didDelete = false
         if let event = fetchEvent(id: eventID, petID: pet.id, context: context) {
-            CloudSyncMutationRecorder.markDeleted(event, context: context)
-            context.delete(event)
-            didDelete = true
+            if let mutation = DomainScheduleWriteAuthorizer.authorizeExistingEventMutation(
+                event: event,
+                writeKind: .care,
+                source: .userCommand,
+                context: context
+            ) {
+                let result = DomainScheduleWriter.deleteEvent(event, mutation: mutation, context: context)
+                DomainScheduleEffectsDispatcher.dispatch(delete: result)
+                didDelete = result.didDelete
+            }
         }
         if let hygieneLogID,
            let log = fetchHygieneLog(id: hygieneLogID, petID: pet.id, context: context) {
