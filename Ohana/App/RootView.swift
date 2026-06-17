@@ -19,7 +19,7 @@ struct RootView: View {
     // F3: 数据库降级警告
     @State private var showDBFallbackAlert = DatabaseFallbackPreferenceStore.isFallbackActive()
     @State private var appSwitcherSnapshotCoverRequested = false
-    @State private var isOnboardingHomePreflightActive = false
+    @State private var onboardingPrimaryHumanID: String?
     @State private var onlineGateNoticeReason: OnlineFeatureGateNoticeReason?
     @StateObject private var startupMaintenance = StartupMaintenanceCoordinator()
     @Environment(\.modelContext) private var modelContext
@@ -27,13 +27,18 @@ struct RootView: View {
 
     var body: some View {
         ZStack {
-            if hasOnboarded || isOnboardingHomePreflightActive {
-                ContentView(showsEmbeddedOnboarding: false)
-                    .allowsHitTesting(hasOnboarded)
+            if hasOnboarded {
+                ContentView(
+                    showsEmbeddedOnboarding: false,
+                    onboardingPrimaryHumanID: onboardingPrimaryHumanID
+                )
             }
 
             if !hasOnboarded {
                 OnboardingView(
+                    onPrimaryHumanSaved: { human in
+                        onboardingPrimaryHumanID = human.id.uuidString
+                    },
                     onHomeJoinHandoffPreflight: beginOnboardingHomePreflight
                 )
                 .zIndex(100)
@@ -52,10 +57,6 @@ struct RootView: View {
         }
         .onDisappear {
             startupMaintenance.cancel()
-        }
-        .onChange(of: hasOnboarded) { _, hasOnboarded in
-            guard hasOnboarded else { return }
-            isOnboardingHomePreflightActive = false
         }
         .onReceive(appServices.notificationRoutes.reminderActionEvents) { event in
             appServices.reminderActions.handle(
@@ -108,12 +109,9 @@ struct RootView: View {
     }
 
     private func beginOnboardingHomePreflight() {
-        guard !hasOnboarded, !isOnboardingHomePreflightActive else { return }
-        var transaction = Transaction(animation: nil)
-        transaction.disablesAnimations = true
-        withTransaction(transaction) {
-            isOnboardingHomePreflightActive = true
-        }
+        // Onboarding owns the visual handoff. Mounting the full Home stack before
+        // the member save commits pulls navigation and read-model work into the
+        // tap frame on real devices with retained data.
     }
 
     private var l: L10n {

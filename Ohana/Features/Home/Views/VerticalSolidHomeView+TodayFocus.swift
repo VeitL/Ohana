@@ -27,6 +27,14 @@ extension VerticalSolidHomeView {
         }
     }
 
+    func handleCreatedEntitySignalIfNeeded(_ signal: HomeCreatedEntitySignal?) {
+        guard let signal,
+              handledCreatedEntityToken != signal.token else { return }
+        handledCreatedEntityToken = signal.token
+        handleNewHomeMemberSaved(id: signal.entityID)
+        onCreatedEntitySignalHandled(signal)
+    }
+
     var newMemberArrivalStartDelayMilliseconds: UInt64 {
         AppWorkloadPolicy.shared.interactionMotionBudget(isVisible: true).allowsMotion ? 560 : 120
     }
@@ -376,17 +384,17 @@ extension VerticalSolidHomeView {
         )
     }
 
-    func tryAwardTodayFocusDailyCompletion(afterCompleting entityId: UUID) {
+    func scheduleTodayFocusDailyCompletion(afterCompleting entityId: UUID) {
         let visibleQuests = controller.snapshot.todayFocus.refreshedQuests
         let pending = visibleQuests.filter { !$0.isCompleted }
         if pending.count == 1,
            let finalQuest = pending.first,
            appServices.todayFocus.quest(finalQuest, matchesCompletedEntity: entityId) {
-            awardTodayFocusDailyCompletion(visibleQuests: visibleQuests)
+            scheduleTodayFocusDailyCompletion(visibleQuests: visibleQuests, visibleSnapshot: controller.snapshot.todayFocus)
         }
     }
 
-    func awardTodayFocusDailyCompletionIfCleared(previousQuests: [IslandQuest], currentQuests: [IslandQuest]) {
+    func scheduleTodayFocusDailyCompletionIfCleared(previousQuests: [IslandQuest], currentQuests: [IslandQuest]) {
         let pending = previousQuests.filter { !$0.isCompleted }
         guard pending.count == 1 else { return }
 
@@ -396,16 +404,20 @@ extension VerticalSolidHomeView {
         }
         guard !hasSamePendingQuest else { return }
 
-        awardTodayFocusDailyCompletion(visibleQuests: previousQuests)
+        scheduleTodayFocusDailyCompletion(visibleQuests: previousQuests, visibleSnapshot: controller.snapshot.todayFocus)
     }
 
-    func awardTodayFocusDailyCompletion(visibleQuests: [IslandQuest]) {
+    func scheduleTodayFocusDailyCompletion(visibleQuests: [IslandQuest], visibleSnapshot: TodayFocusSnapshot) {
         guard !visibleQuests.isEmpty else { return }
-        _ = appServices.todayFocus.awardDailyCompletionIfNeeded(
-            context: modelContext,
-            executorId: currentExecutorId(),
-            visibleQuests: visibleQuests,
-            visibleSnapshot: controller.snapshot.todayFocus
-        )
+        todayFocusDailyCompletionTask?.cancel()
+        todayFocusDailyCompletionTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: 420) {
+            _ = appServices.todayFocus.awardDailyCompletionIfNeeded(
+                context: modelContext,
+                executorId: currentExecutorId(),
+                visibleQuests: visibleQuests,
+                visibleSnapshot: visibleSnapshot
+            )
+            todayFocusDailyCompletionTask = nil
+        }
     }
 }

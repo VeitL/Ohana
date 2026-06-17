@@ -289,6 +289,15 @@ struct PetAllFeaturesSheet: View {
     private var archiveItems: [FeatureHubDestinationItem<PetAllFeatureDestination>] {
         [
             item(
+                id: "basicInfo",
+                title: l.tr(zh: "基础资料", en: "Profile", de: "Profil"),
+                value: basicInfoStatusText,
+                subtitle: basicInfoSub,
+                icon: "pawprint.circle.fill",
+                tint: Color(hex: pet.safeThemeColorHex),
+                destination: .basicInfo
+            ),
+            item(
                 id: "retention",
                 title: l.tr(zh: "成长档案", en: "Growth", de: "Entwicklung"),
                 value: "\(archiveSnapshot.score)/\(archiveSnapshot.total)",
@@ -446,6 +455,20 @@ struct PetAllFeaturesSheet: View {
         if !pet.breed.isEmpty { return l.tr(zh: "品种已设置", en: "Breed set", de: "Rasse gesetzt") }
         if !pet.species.isEmpty { return l.tr(zh: "补充品种/日期", en: "Add breed or dates", de: "Rasse oder Daten ergänzen") }
         return l.tr(zh: "完善基本信息", en: "Complete profile", de: "Profil ergänzen")
+    }
+
+    private var basicInfoStatusText: String {
+        hasCompleteBasicInfo
+            ? l.tr(zh: "已完成", en: "Done", de: "Fertig")
+            : l.tr(zh: "待补充", en: "To do", de: "Offen")
+    }
+
+    private var hasCompleteBasicInfo: Bool {
+        !pet.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+            !pet.species.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+            !pet.breed.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+            pet.birthday != nil &&
+            pet.homeDate != nil
     }
 
     private var documentsSub: String {

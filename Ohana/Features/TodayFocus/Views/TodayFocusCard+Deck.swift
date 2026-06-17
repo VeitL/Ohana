@@ -90,12 +90,25 @@ extension TodayFocusCard {
         } else {
             let cards = focusCards
             if presentation == .compactStack {
-                physicalStackCard(cards: cards.map { FocusDeckCard(id: contentKey($0), content: $0) })
+                compactStackCard(cards: cards)
             } else if cards.count > 1 {
                 legacySwitchingCard(cards: cards, showsPageIndicator: showsPageIndicator)
             } else {
                 cardContent(cards.first ?? .welcome)
             }
+        }
+    }
+
+    @ViewBuilder
+    func compactStackCard(cards: [TodayFocusContent]) -> some View {
+        if surfaceGate.allowsAmbientMotion {
+            physicalStackCard(cards: cards.map { FocusDeckCard(id: contentKey($0), content: $0) })
+        } else {
+            let frontContent = cards.isEmpty ? TodayFocusContent.welcome : cards[min(selectedFocusIndex, cards.count - 1)]
+            frozenCompactStackCard(
+                content: frontContent,
+                backCardCount: min(TodayFocusLimits.maxVisibleBackCards, max(cards.count - 1, 0))
+            )
         }
     }
 

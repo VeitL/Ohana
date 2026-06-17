@@ -365,7 +365,7 @@ struct OasisRewardView: View {
     var matBg: Color { colorScheme == .light ? Color(hex: "F5F5F7") : Color(hex: "0A0A0C") }
     var matSurface: Color { colorScheme == .light ? .white : Color(hex: "1C1C1E") }
     var matAccent: Color { Color(hex: "FF5A00") }
-    @State var lastLevel: TreeLevel = .lv1
+    @State var lastLevel: TreeLevel = .lv0
     @State var isInjecting: Bool = false
     @State var treeInjectionLocked = false
     @State var treeInjectionProgress: CGFloat = 0
@@ -527,11 +527,13 @@ struct OasisRewardView: View {
     }
 
     var hasAvailableTreeInjection: Bool {
-        hasEnoughCoconutsForTreeInjection && treeMgr.canUseInjectionPackage(cost: 80)
+        hasEnoughCoconutsForTreeInjection &&
+            treeMgr.canUseInjectionPackage(cost: OasisTreeEnergyInjectionPolicy.starterPackageCost)
     }
 
     var hasEnoughCoconutsForTreeInjection: Bool {
-        actionSnapshot.canInjectCoconuts ?? (activeHumanCoconutBalance >= 80)
+        actionSnapshot.canInjectCoconuts ??
+            (activeHumanCoconutBalance >= OasisTreeEnergyInjectionPolicy.starterPackageCost)
     }
 
     var treeInjectionUnavailableReason: String? {

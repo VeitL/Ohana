@@ -70,15 +70,28 @@ enum OnboardingJourneyCoordinator {
         context _: ModelContext,
         defaults: UserDefaults = .standard
     ) -> OnboardingJourneyPhase {
-        if activeHumanID?.isEmpty != false {
-            return defaults.bool(forKey: StarterGiftService.Key.pending) ? .starterGiftPending : .needsPrimaryHuman
-        }
-
         if StarterGiftService.shouldShowCeremony(defaults: defaults) {
             return .starterGiftReadyForCeremony(amount: StarterGiftService.giftAmount)
         }
 
+        if activeHumanID?.isEmpty != false {
+            return defaults.bool(forKey: StarterGiftService.Key.pending) ? .starterGiftPending : .needsPrimaryHuman
+        }
+
         return .complete
+    }
+
+    @MainActor
+    static func interruptedOnboardingPrimaryHumanID(context: ModelContext) -> String? {
+        var descriptor = FetchDescriptor<Human>(
+            sortBy: [SortDescriptor(\Human.createdAt, order: .forward)]
+        )
+        descriptor.fetchLimit = 1
+        return fetchModelsOrLog(
+            descriptor,
+            context: context,
+            operation: "recover interrupted onboarding primary human"
+        ).first?.id.uuidString
     }
 
     @MainActor
@@ -150,6 +163,7 @@ protocol OnboardingJourneyCoordinating {
         context: ModelContext,
         projectionManager: QuestManager?
     ) -> OnboardingJourneyEvaluation
+    func interruptedOnboardingPrimaryHumanID(context: ModelContext) -> String?
     func markStarterCeremonySeen()
     func markFirstCareCompleted()
     func markRoadmapPromptSeen()
@@ -168,6 +182,10 @@ struct LiveOnboardingJourneyCoordinator: OnboardingJourneyCoordinating {
             context: context,
             projectionManager: projectionManager
         )
+    }
+
+    func interruptedOnboardingPrimaryHumanID(context: ModelContext) -> String? {
+        OnboardingJourneyCoordinator.interruptedOnboardingPrimaryHumanID(context: context)
     }
 
     func markStarterCeremonySeen() {

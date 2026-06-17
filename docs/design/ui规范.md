@@ -33,17 +33,21 @@
 
 以 `ui规范.selection.json` 为准，当前已确认的 V4 token：
 
-- **导出版本**：Ohana UI 规范选择 V4，Generated `2026-05-13T00:00:00Z`。
+- **导出版本**：Ohana UI 规范选择 V4，Generated `2026-06-16T00:00:00Z`。
 - **颜色与背景**：深色预览使用 `deep` 背景；主色为 adaptive primary，深色解析为 `goLime`，浅色解析为清爽蓝 `goBlue`。全局背景必须以“浅色/深色成对”的官方背景包选择，一次选择同时决定两种模式；浅色背景必须比浅色卡片更深一档，让白色/浅色卡片保持层次。当前官方背景对为 `goIsland`、`cleanBlueGray`、`paperCream`、`forestGlade`、`deepAmbient`；自定义照片使用同一张图片叠加深/浅色可读性遮罩。
+- **主操作颜色纪律**：`goPrimary` / `adaptivePrimary` 是唯一全局“可点击/可确认/可选中”的主操作颜色。主 CTA、确认、关键入口、功能 icon、焦点和系统级选中态使用它；喂食、提醒、危险、成功、奖励和图表只在表达业务语义时使用各自语义色，不能为每个功能另造一套漂亮主色。
 - **食物语义色**：喂食页只保留三种喂食模式色和干/湿粮食物色。干粮全局使用 `foodDry` 琥珀色，湿粮全局使用 `foodWet` rose；余粮、库存、零食在喂食模块内统一使用 `goPrimary`，低余粮/异常只在局部状态上使用 `goYellow/goRed`。
 - **卡片与输入**：卡片使用 `solidFlat`，输入框使用 `flat`。业务卡片默认是实色 token surface 或实色语义色块，不使用低透明度磨砂/半透明填充；整体密度使用 `compact`。
+- **表面节奏与阴影预算**：默认靠背景层级、间距、分组标题和轻 hairline 建立结构，而不是不断增加边框、玻璃、阴影或卡片套卡片。普通卡片、按钮、文字、chip 和列表行不使用装饰阴影；阴影只留给 sheet/popup、toast elevation、关键浮层、重要角色/头像/产品视觉和明确 allowlist 的预览。
 - **控件**：按钮 `pill`，chip `pill`，segment `capsule`，toggle `pill`，进度条 `bar`，列表行 `filled`，角标 `solid`。
 - **实色控件**：高频按钮、chip、快捷金额/克数、内嵌数字键盘优先使用实色填充，减少低透明度和磨砂表面。选中态使用实色 `goPrimary` / 业务 tint + `Color.arkInk` 文本；未选态使用实色 elevated surface，不使用低透明度 tint。
+- **按钮语法**：一个页面只保留一个主 pill；次级操作视觉降噪；危险操作使用语义红并二次确认；icon-only 控件必须有 44pt 实际触控区和本地化 accessibility label。
 - **功能 Icon**：全局功能 icon 使用 `monochromePrimary`。导航、按钮、设置行、快捷操作、列表和状态入口里的 icon 必须是 SF Symbol 或 template vector，统一使用 `goPrimary`，不使用彩色仿真 icon、emoji、多色插画或拟物图标。
 - **导航与设置行**：设置项左 icon 使用 `plainGlyph`，不加彩色底块；非弹窗页面返回使用 `floatingCircle`；非弹窗页面关闭使用 `iconOnly`；弹窗关闭继续使用独立 `sheetChrome=iconOnly`。
 - **弹窗**：sheet 使用独立 token，当前为 `compact` 布局、`nativeRegular` 背景、`flat` 卡片、`flat` 输入框、`pill` 按钮、`iconOnly` 关闭。短记录/确认弹窗使用 `inlineOverlay`，底部贴近安全区、左右 `6pt`、连续圆角 `52pt`、自适应内容高度、`liftedAlert` 阴影、`scrimGradient` 背后遮罩、`bottomSpringScaleFade` 出入场；长表单底部 CTA 固定可见；下滑关闭只允许从顶部 drag handle 触发。弹窗 token 不跟随普通卡片/输入/按钮选择变化。
 - **图表与日历**：图表使用 `area` 趋势 + `quiet` 坐标；日历使用 `agendaHybrid`、`minimalNumber` 日期格、`dots` 事件标记、`timeRail` 日程列表。
 - **反馈与动效**：toast 使用 `icon`，banner 使用 `inline`，触感 `soft`，主运动 `spring`，FAB `rotate`，转场 `scale`，奖励 `bouncy`。
+- **第一帧反馈**：手指触发的第一帧只做本地视觉反馈，例如轻 scale、opacity/brightness 和 soft haptic。SwiftData 读写、奖励同步、提醒同步、路由重活和跨模块刷新必须在视觉 handoff 之后进行。
 - **双模式省电**：省电模式默认关闭。普通模式与省电模式都必须保持当前可见核心交互动效顺滑；省电模式只减少后台刷新、动态背景、粒子、彩虹流动、环境光等装饰/重复工作。
 - **已接受的风险约束**：`compact` 密度仍必须保留 44pt 实际触控区；`clear` 玻璃必须有足够遮罩和描边，避免文字浮在复杂背景上。
 
@@ -65,7 +69,10 @@
 - **圆润但克制**：使用圆体、胶囊按钮和柔和卡片，但不要卡片套卡片，不要堆过多装饰。
 - **状态可读**：任何状态都必须靠文字、icon、颜色共同表达，不能只靠颜色；状态背景、badge、文字可以使用语义色，但功能 icon glyph 本身保持全局 `goPrimary` 单色。
 - **状态优先于说明**：高频页面只展示当前状态和下一步动作，避免常驻“点击/长按/拖动/如何使用”式教程文案。
+- **一个主色贯穿到底**：主操作、确认、关键入口、功能 icon、焦点和系统级选中态统一使用 `goPrimary`。业务色只表达业务含义，不承担全局“点我”的职责。
+- **表面节奏优先于 chrome**：需要分区时，先调整背景层级、间距、标题、轻分隔线和内容密度；不要先加新的外框、玻璃、阴影或第二层卡片。
 - **卡片只给可操作表面**：卡片 UI 只用于可点击、可进入、可展开或可操作的区域；纯信息总览、静态指标和标题说明使用无框布局、行内数字或轻量分隔，不为了分组而套卡片背景。
+- **阴影有预算**：普通业务卡片、按钮、chip、文本和列表行默认无阴影。阴影是“浮在内容之上”或“重要视觉对象有重量”的信号，只给 sheet、popup、toast、关键浮层、角色/头像/奖励等少数对象。
 - **深浅色同步**：页面切换浅色/深色时，背景、卡片、描边、文字、图表和控件都必须同步变化。
 - **顺滑过渡，不硬切**：所有用户能看到的 UI 状态变化都要用项目动效 token 过渡。即使是轻量变化，也应有短促的 fade/scale/slide/spring，让界面像“滑过去、浮出来、收回去”，而不是突然换帧。
 - **核心交互满质量，装饰动效按预算降级**：按钮、FAB、弹窗、卡片展开、奖励反馈、数字和图表切换属于 interaction motion，省电模式不应让它们变钝；背景呼吸、粒子、常驻发光、彩虹流动、环境循环属于 ambient motion，省电模式应静态化或停止。
@@ -88,6 +95,7 @@
 ### 颜色
 
 - `goPrimary`：全局主操作、品牌强调、系统级选中状态；深色模式解析为 `goLime`，浅色模式解析为清爽蓝 `goBlue`。
+- `goPrimary` 适用范围：主 CTA、确认、关键入口、导航/设置/快捷操作功能 icon、焦点环、选中态和 feeding stock/treat 的既定业务入口。
 - `goLime` / `goBlue`：保留主色，只能作为 `goPrimary` 的深/浅色解析或系统级强调；宠物/人类主题色、业务模式色、图表系列色、计划等专有色不能直接复用这两个颜色。喂食模块中的余粮/库存/零食按业务决策使用 `goPrimary`。
 - `goTeal`：完成、健康、成功。
 - `goYellow`：进行中、注意、隐私。
@@ -113,7 +121,7 @@
 默认实现规则：
 
 - 全局 motion 配方：默认采用 **Capsule** 体系，数字、进度、选中/切换、Sheet 和常规反馈都走克制轻弹；**Chart 是例外**，采用 **Flow** 体系，线条用约 `0.72s` 的 `trim` 慢慢延长，面积只轻淡入，点位轻显，不做点位弹跳主导。
-- 点击：使用 `ScaleButtonStyle()`，只做 `0.965` 左右的短促按压、轻微暗化和 soft haptic；不要给普通按钮加夸张 bounce。
+- 点击：使用 `ScaleButtonStyle()`，只做约 `0.972` 的短促按压、轻微位移、轻微透明度/暗化和 soft haptic；普通按钮默认不加阴影，不做夸张 bounce。
 - 选中：使用共享 selection motion 或 matched transition，选中块应“滑过去/长出来”，不要瞬移。
 - 数字：余额、次数、克数、完成率、排行榜数字使用 `contentTransition(.numericText())` 或 `ohanaNumericMotion`。
 - 列表/菜单：功能入口、FAB 子菜单、添加菜单使用 35ms 左右的 stagger 入场，上限约 240ms，保证高级但不拖沓。
@@ -155,24 +163,28 @@
 - 背景选择是全局页面底，不等同于卡片、弹窗或玻璃 token；省电模式只能降低动画，不能覆盖用户选择的背景。
 - 纯信息显示区域不使用卡片背景；只有可点击、可导航、可展开、可编辑的区域才使用卡片样式。
 - 业务卡片必须使用实色填充：优先 `Color.ohanaCardSurface`、`Color.ohanaCardSurfaceElevated` 或明确的实色语义色。避免 `tint.opacity(...)`、厚磨砂、低透明 material 作为主卡片背景。
+- 分区优先级：先用页面背景与卡片 surface 的明度差，再用空白、标题和轻 hairline；只有内容本身需要可点击、可进入、可展开或可编辑时才增加卡片 surface。
 - 大面积内容使用 `sectionCard`，但仍保持实色 surface，不做半透明磨砂卡片。
 - 卡片内子区域使用 `cardSurface`。
 - 原生 `.glassEffect()` 和自定义磨砂只用于明确的 Liquid Glass 展示、底部导航、系统级 chrome 或弹窗/短 popup 背景；普通业务卡片、成就卡、列表行、快捷操作容器不使用玻璃/磨砂主背景。
 - 普通页面和业务详情页不要新增长驻 `.glassEffect()` 卡片。短 popup / sheet 背景允许一层 `nativeRegular` 玻璃，并按 `sheet*` token 加遮罩、描边和可读性承托；内部表单块仍使用 flat 实色 surface。
 - 状态提示使用 `tint.opacity(0.10)` 背景 + `tint.opacity(0.25-0.30)` 描边。
 - 卡片圆角默认 22；内嵌格圆角 12-14；列表行圆角 14。
+- 普通卡片不加 decorative shadow；如果需要阴影，必须属于 sheet/popup/toast/关键浮层/重要角色视觉，或用 `// ui-v4: allow <reason>` 明确说明。
 
 ## 3. Components
 
 ### 按钮
 
-- Primary CTA：实色 `goPrimary` 胶囊，每屏最多一个，文字用 `Color.arkInk`。
+- Primary CTA：实色 `goPrimary` 胶囊，每屏最多一个，文字用 `Color.ohanaPrimaryActionText`。
 - Secondary：`primaryText.opacity(0.08)` 背景，适合取消、稍后、查看详情。
 - Destructive：红色文字、浅红背景、红色描边，必须配二次确认。
 - Ghost：无背景或轻背景，只用于卡片内轻量动作。
 - Quick Action Circle：40x40 圆形 icon 按钮，功能 icon 统一使用 `goPrimary` 单色；通过按钮背景、badge 或文字表达业务状态。
 - 高频选择按钮：选中态必须是实色主色/业务色，未选态必须是实色 surface；避免 `tint.opacity(0.10-0.20)` 作为可点击按钮主体。
 - 内嵌数字键盘：数字、删除、小数点键统一使用实色 elevated surface；不要用半透明磨砂键帽。
+- 按钮层级固定：主 pill 表示“现在做”；secondary 表示“稍后/替代路径”；ghost 只用于轻量辅助；icon-only 只用于关闭、返回、工具和导航类动作。
+- 按压反馈固定：所有按钮默认走 `ScaleButtonStyle()` 的轻反馈；需要额外阴影深度时必须显式 opt in，而不是把阴影做成普通按钮默认行为。
 
 ### 关闭按钮
 

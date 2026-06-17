@@ -321,6 +321,39 @@ struct VerticalSolidHomeBottomBar: View {
     }
 }
 
+struct StarterOasisTabPromptView: View {
+    let localization: L10n
+
+    var body: some View {
+        HStack(spacing: 9) {
+            Image(systemName: "arrow.down.circle.fill") // a11y: allow decorative onboarding prompt arrow; parent prompt text owns accessibility.
+                .accessibilityHidden(true)
+                .font(OhanaFont.adaptive(size: 15, weight: .black))
+                .foregroundStyle(Color.goPrimary)
+
+            Text(localization.tr(
+                zh: "椰子树已解锁，点击底部椰子树进入 Oasis",
+                en: "Coconut Tree unlocked. Tap the tree tab to enter Oasis.",
+                de: "Kokosbaum freigeschaltet. Tippe unten auf den Baum."
+            ))
+            .font(OhanaFont.caption(.black))
+            .foregroundStyle(Color.ohanaPrimaryText)
+            .lineLimit(2)
+            .multilineTextAlignment(.leading)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .background(Color.ohanaCardSurface, in: Capsule())
+        .overlay {
+            Capsule()
+                .strokeBorder(Color.goPrimary.opacity(0.26), lineWidth: 1)
+        }
+        .shadow(color: Color.arkInk.opacity(0.16), radius: 16, x: 0, y: 8) // ui-v4: allow one-time onboarding nudge depth.
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("starter-oasis-tab-prompt")
+    }
+}
+
 private struct HomeBottomNavigationTabButton: View {
     let tab: VerticalSolidHomeTab
     let isSelected: Bool
@@ -358,6 +391,7 @@ private struct HomeBottomNavigationTabButton: View {
         }
         .buttonStyle(ScaleButtonStyle())
         .accessibilityLabel(accessibilityLabel)
+        .accessibilityIdentifier("home-tab-\(tab.rawValue)")
         .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 
@@ -579,6 +613,7 @@ private struct HomeBottomNavigationPrimaryAction: View {
         .frame(width: hitSize, height: hitSize)
         .contentShape(Circle())
         .accessibilityLabel(accessibilityLabel)
+        .accessibilityIdentifier("home-primary-action")
     }
 
     private var primaryActionBackground: some View {
@@ -650,6 +685,7 @@ private struct VerticalSolidHomeFabShortcutButton: View {
         }
         .buttonStyle(ScaleButtonStyle())
         .accessibilityLabel(shortcut.label)
+        .accessibilityIdentifier("home-expanded-shortcut-\(shortcut.action.accessibilityIdentifierFragment)")
     }
 
     private var iconActionType: String {
@@ -660,6 +696,23 @@ private struct VerticalSolidHomeFabShortcutButton: View {
             feature.rawValue
         case .allFeatures, .humanAllFeatures:
             shortcut.id
+        }
+    }
+}
+
+private extension ExpandedCardFabAction {
+    var accessibilityIdentifierFragment: String {
+        switch self {
+        case let .quick(actionType):
+            "quick-\(actionType)"
+        case let .detail(feature):
+            "detail-\(feature.rawValue)"
+        case .allFeatures:
+            "allFeatures"
+        case let .humanQuick(actionType):
+            "humanQuick-\(actionType)"
+        case .humanAllFeatures:
+            "humanAllFeatures"
         }
     }
 }

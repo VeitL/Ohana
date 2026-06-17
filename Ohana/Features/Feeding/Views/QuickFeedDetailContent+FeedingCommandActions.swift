@@ -26,7 +26,7 @@ extension QuickFeedDetailContent {
             defaultEnabled: draftStore.manualDefaultEnabled
         )
         defaultFeedGrams = draftStore.manualDefaultEnabled ? grams : 0
-        reloadFeedSnapshots()
+        reloadFeedSnapshots(forceSnapshot: true)
         collapseEmbeddedPanel()
         dismissInlineFeedSheet()
         triggerToast(

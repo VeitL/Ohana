@@ -95,7 +95,9 @@ struct VerticalSolidHomePageDeck<HomePage: View, CalendarPage: View, OasisPage: 
     private func page(for tab: VerticalSolidHomeTab) -> some View {
         let lifecycle = lifecycle(for: tab)
 
-        if lifecycle.isPreparingForDisplay {
+        if !isMounted(tab) {
+            VerticalSolidHomePreparedPlaceholder()
+        } else if lifecycle.isPreparingForDisplay {
             switch tab {
             case .oasis:
                 oasis(lifecycle)
@@ -153,6 +155,7 @@ struct VerticalSolidHomeDashboardPage: View {
     let expenseEntries: [HomeExpensePreviewEntry]
     let avatarCacheRevision: Int
     let isLive: Bool
+    let walkPresentationRevision: Int
     let collapsedTopInset: CGFloat
     let localization: L10n
     let activeHumanID: UUID?
@@ -195,6 +198,7 @@ struct VerticalSolidHomeDashboardPage: View {
                         localization: localization,
                         allowsAmbientFloat: allowsAmbientFloat,
                         isVisible: isLive,
+                        walkPresentationRevision: walkPresentationRevision,
                         embedsQuickActionsInCard: true,
                         collapsedTopInset: collapsedTopInset,
                         quickActions: { card in
@@ -600,7 +604,7 @@ struct OasisTreeRenderSnapshot: Equatable {
         crittersLockedLevel: Int? = nil,
         gachaLockedLevel: Int? = nil
     ) {
-        self.level = min(max(level, 1), 10)
+        self.level = min(max(level, 0), 10)
         self.progressToNextLevel = Self.clampedProgress(progressToNextLevel)
         self.totalEnergy = max(0, totalEnergy)
         self.nextLevelThreshold = max(0, nextLevelThreshold)
@@ -638,8 +642,8 @@ struct VerticalSolidHomeOasisFrozenTreeStage: View {
             .padding(.bottom, metrics.bottomPadding)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         }
-        .allowsHitTesting(false)
-        .accessibilityHidden(true)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("oasis-screen")
     }
 
     private func frozenTreeCard(metrics: OasisEmbeddedLayoutMetrics) -> some View {
@@ -686,6 +690,9 @@ struct VerticalSolidHomeOasisFrozenTreeStage: View {
         .clipShape(stageShape)
         .overlay(stageShape.strokeBorder(Color.goPrimary.opacity(0.22), lineWidth: 1))
         .contentShape(stageShape)
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("level \(snapshot.level)")
+        .accessibilityIdentifier("oasis-tree-level-control")
     }
 
     private var frozenBentoGrid: some View {
@@ -763,9 +770,11 @@ struct VerticalSolidHomeOasisFrozenTreeStage: View {
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .monospacedDigit()
                 Spacer()
-                Text("Lv.5 🥥")
-                    .font(OhanaFont.caption2(.black))
-                    .foregroundStyle(Color.goPrimary)
+                if passiveIncomeAmount > 0 {
+                    Text("+\(passiveIncomeAmount)🥥/d")
+                        .font(OhanaFont.caption2(.black))
+                        .foregroundStyle(Color.goPrimary)
+                }
             }
 
             GeometryReader { proxy in
@@ -803,6 +812,18 @@ struct VerticalSolidHomeOasisFrozenTreeStage: View {
                         )
                     )
             }
+    }
+
+    private var passiveIncomeAmount: Int {
+        switch snapshot.level {
+        case 5: 3
+        case 6: 4
+        case 7: 6
+        case 8: 8
+        case 9: 10
+        case 10...: 15
+        default: 0
+        }
     }
 
     private var frozenStageStars: some View {
@@ -897,6 +918,8 @@ struct VerticalSolidHomeOasisFrozenTreeStage: View {
             .padding(.vertical, 9)
             .background(Color.goPrimary, in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
             .frame(minWidth: 44, minHeight: 44, alignment: .leading)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("level \(snapshot.level)")
 
             Spacer(minLength: 4)
         }

@@ -30,6 +30,7 @@ struct TreeLevelConfig {
 }
 
 private let treeLevelConfigs: [TreeLevelConfig] = [
+    .init(level: 0, name: "沉睡种子", scale: 0.42, leafCount: 0, coconutCount: 0, flowerCount: 0, trunkHeight: 28, trunkWidth: 9, leafWidth: 34, leafHeight: 24, crownOffset: 10, auraTier: 0, rootCount: 0),
     .init(level: 1, name: "破土新芽", scale: 0.54, leafCount: 2, coconutCount: 0, flowerCount: 0, trunkHeight: 54, trunkWidth: 14, leafWidth: 50, leafHeight: 34, crownOffset: 7, auraTier: 0, rootCount: 0),
     .init(level: 2, name: "稚嫩幼苗", scale: 0.60, leafCount: 4, coconutCount: 0, flowerCount: 0, trunkHeight: 86, trunkWidth: 16, leafWidth: 64, leafHeight: 40, crownOffset: 5, auraTier: 0, rootCount: 1),
     .init(level: 3, name: "茁壮小树", scale: 0.68, leafCount: 6, coconutCount: 0, flowerCount: 3, trunkHeight: 114, trunkWidth: 20, leafWidth: 76, leafHeight: 48, crownOffset: 2, auraTier: 0, rootCount: 2),
@@ -70,7 +71,7 @@ private func treeLeafColor(index i: Int, isMax: Bool, level: Int) -> Color {
 // MARK: - BeautifulCoconutTree
 
 struct BeautifulCoconutTree: View {
-    var level: Int // 1-10
+    var level: Int // 0-10
     var isInjecting: Bool // 注入能量脉冲
     var growthProgress: Double = 0
     var injectionPulseToken: Int = 0
@@ -86,34 +87,38 @@ struct BeautifulCoconutTree: View {
     @State private var shockwaveOpacity: Double = 0
     @State private var vineProgress: CGFloat = 0
 
-    private var cfg: TreeLevelConfig {
-        treeLevelConfigs[max(0, min(level - 1, 9))]
+    private var visualLevel: Int {
+        max(0, min(level, 10))
     }
 
-    private var isMax: Bool { level >= 10 }
+    private var cfg: TreeLevelConfig {
+        treeLevelConfigs[visualLevel]
+    }
+
+    private var isMax: Bool { visualLevel >= 10 }
     private var glowColor: Color { isMax ? Color(hex: "FBBF24") : Color.goPrimary }
-    private var sproutCount: Int { max(1, min(level, 4)) }
+    private var sproutCount: Int { max(1, min(visualLevel, 4)) }
     private var displayedCoconutCount: Int {
         min(cfg.coconutCount, max(0, dailyCoconutCount ?? cfg.coconutCount))
     }
 
     private var trunkH: CGFloat { cfg.trunkHeight }
     private var trunkW: CGFloat { cfg.trunkWidth }
-    private var bend: CGFloat { CGFloat(12 + min(level, 9) * 3) }
+    private var bend: CGFloat { CGFloat(12 + min(visualLevel, 9) * 3) }
 
     static func coconutCapacity(for level: Int) -> Int {
-        treeLevelConfigs[max(0, min(level - 1, 9))].coconutCount
+        treeLevelConfigs[max(0, min(level, 10))].coconutCount
     }
 
     private func leafColor(index i: Int) -> Color {
-        treeLeafColor(index: i, isMax: isMax, level: level)
+        treeLeafColor(index: i, isMax: isMax, level: visualLevel)
     }
 
     var body: some View {
         ZStack(alignment: .bottom) {
 
             // ── 背景光效（Sunbeams, Lv9+)
-            if level >= 9 {
+            if visualLevel >= 9 {
                 SunbeamsView(allowsAmbientMotion: allowsAmbientMotion)
                     .offset(y: -100)
             }
@@ -131,7 +136,7 @@ struct BeautifulCoconutTree: View {
             }
 
             // ── 底部光环与阴影（绿洲神池）
-            if level >= 7 {
+            if visualLevel >= 7 {
                 Ellipse()
                     .fill(Color(hex: "0EA5E9").opacity(0.6))
                     .frame(width: max(CGFloat(130), trunkW * 6.2), height: trunkW * 2)
@@ -155,7 +160,7 @@ struct BeautifulCoconutTree: View {
                 .offset(x: bend * 0.18, y: 2)
                 .allowsHitTesting(false)
 
-            if level <= 4 {
+            if visualLevel <= 4 {
                 ForEach(0 ..< sproutCount, id: \.self) { i in
                     GroundSproutView(color: leafColor(index: i))
                         .scaleEffect(0.58 + CGFloat(i) * 0.14)
@@ -182,7 +187,7 @@ struct BeautifulCoconutTree: View {
                 .animation(GoMotion.hero, value: level)
 
             // ── 藤蔓（Lv5+，trim 生长动画）
-            if level >= 5 {
+            if visualLevel >= 5 {
                 VineShape(trunkWidth: Double(trunkW), trunkHeight: Double(trunkH), bend: Double(bend))
                     .trim(from: 0, to: vineProgress)
                     .stroke(
@@ -196,7 +201,7 @@ struct BeautifulCoconutTree: View {
             }
 
             // ── 神圣光环 (Divine Halo, Lv6+)
-            if level >= 6 {
+            if visualLevel >= 6 {
                 DivineHaloView(
                     isSwaying: isSwaying,
                     tier: cfg.auraTier,
@@ -209,7 +214,7 @@ struct BeautifulCoconutTree: View {
             // ── 树冠（树叶 + 椰子，摇摆）
             ZStack {
                 // 后层树叶让高等级树冠更饱满
-                if level >= 6 {
+                if visualLevel >= 6 {
                     ForEach(0 ..< maxLeafSlots, id: \.self) { i in
                         let isActive = i < cfg.leafCount && i % 2 == 1
                         let angle: Double = cfg.leafCount > 1
@@ -258,7 +263,7 @@ struct BeautifulCoconutTree: View {
                         let bloomScale = min(CGFloat(1.18), max(CGFloat(0.62), cfg.leafWidth / 120))
                         BlossomView(index: i, isMax: isMax)
                             .offset(x: pos.x * bloomScale, y: pos.y * bloomScale)
-                            .scaleEffect(level >= 8 ? 1.0 : 0.82)
+                            .scaleEffect(visualLevel >= 8 ? 1.0 : 0.82)
                             .transition(.scale.combined(with: .opacity))
                             .animation(
                                 GoMotion.fab.delay(0.25 + Double(i) * 0.035),
@@ -296,7 +301,7 @@ struct BeautifulCoconutTree: View {
                 }
 
                 // ── 星尘 (Stardust, Lv8+)
-                if level >= 8 {
+                if visualLevel >= 8 {
                     StardustView(allowsAmbientMotion: allowsAmbientMotion)
                 }
             }
@@ -318,7 +323,7 @@ struct BeautifulCoconutTree: View {
         .frame(width: 300, height: 348)
         .onAppear {
             isSwaying = allowsAmbientMotion
-            if level >= 5 {
+            if visualLevel >= 5 {
                 if allowsAmbientMotion {
                     OhanaFrameScheduler.runAfterNextFrame(milliseconds: 300) {
                         vineProgress = 1.0
@@ -330,7 +335,7 @@ struct BeautifulCoconutTree: View {
         }
         .onChange(of: allowsAmbientMotion) { _, shouldAnimate in
             isSwaying = shouldAnimate
-            if !shouldAnimate, level >= 5 {
+            if !shouldAnimate, visualLevel >= 5 {
                 vineProgress = 1.0
             }
         }

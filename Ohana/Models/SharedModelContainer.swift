@@ -949,6 +949,7 @@ enum SharedModelContainer {
     }
 
     private static func createPersistentContainer() -> ModelContainer {
+        ensureApplicationSupportDirectory()
         let schema = Schema(ArkSchemaV72.models)
         let defaultConfig = ModelConfiguration(
             isStoredInMemoryOnly: false,
@@ -1041,6 +1042,23 @@ enum SharedModelContainer {
             DatabaseFallbackPreferenceStore.markFallbackActive()
         } else {
             DatabaseFallbackPreferenceStore.clearFallbackActive()
+        }
+    }
+
+    private static func ensureApplicationSupportDirectory() {
+        guard let url = FileManager.default.urls(
+            for: .applicationSupportDirectory,
+            in: .userDomainMask
+        ).first else { return }
+        do {
+            try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+        } catch {
+            #if DEBUG
+                OhanaLog.warning(
+                    "SwiftData: could not prepare Application Support directory - \(error.localizedDescription)",
+                    category: "SwiftData"
+                )
+            #endif
         }
     }
 }

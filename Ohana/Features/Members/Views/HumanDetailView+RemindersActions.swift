@@ -178,12 +178,14 @@ extension HumanDetailView {
     }
 
     func deleteHumanAndReturnHome() {
+        let activeHumanID = activeHumanIdStr
         let command = DomainCommand.memberDeletion(entityID: human.id, kind: EntityKind.human.rawValue)
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-        commandQueue.enqueue(command) {
+        dismiss()
+        commandQueue.enqueue(command, delayMilliseconds: DeferredDomainCommandQueue.destructiveRouteDismissDelayMilliseconds) {
             let result = MemberCommandExecutor(context: modelContext, services: appServices).deleteHuman(
                 human,
-                activeHumanID: activeHumanIdStr,
+                activeHumanID: activeHumanID,
                 note: "human.detail.delete"
             )
             if result.clearsActiveHumanID {
@@ -195,7 +197,6 @@ extension HumanDetailView {
                     requiresAccountSwitch: result.requiresAccountSwitch
                 )
             )
-            dismiss()
         }
     }
 }

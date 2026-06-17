@@ -12,6 +12,7 @@ import UIKit
 
 struct ContentView: View {
     var showsEmbeddedOnboarding = true
+    var onboardingPrimaryHumanID: String?
 
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.modelContext) private var modelContext
@@ -21,7 +22,11 @@ struct ContentView: View {
     @State private var rootAppearHandoffTask: Task<Void, Never>?
     @State private var onboardingJourneyEvaluationTask: Task<Void, Never>?
     @State private var coconutWalletBootstrapTask: Task<Void, Never>?
+    @State private var activeHumanReactionTask: Task<Void, Never>?
+    @State private var onboardingCreatedEntitySignalTask: Task<Void, Never>?
     @State private var onboardingJourneyPhase: OnboardingJourneyPhase = .preOnboarding
+    @State private var handledOnboardingPrimaryHumanID: String?
+    @State private var signaledOnboardingPrimaryHumanID: String?
     @AppStorage("ohana_has_onboarded") private var hasOnboarded: Bool = false
     @AppStorage("currentActiveHumanId") private var currentActiveHumanId: String = ""
     @AppStorage("appLanguage") private var appLanguage: String = AppLanguage.code
@@ -73,7 +78,7 @@ struct ContentView: View {
                     .zIndex(80)
             }
 
-            if !Self.isRunningTests {
+            if !Self.shouldHideGlobalRewardFeedbackOverlay {
                 CoconutRewardFeedbackOverlay()
                     .zIndex(120)
             }
@@ -91,14 +96,23 @@ struct ContentView: View {
         .animation(GoMotion.sheetEnter, value: onboardingJourneyPhase)
         .onAppear {
             scheduleRootAppearHandoff()
+            applyOnboardingPrimaryHumanIDIfNeeded()
         }
         .onDisappear {
             rootAppearHandoffTask?.cancel()
             rootAppearHandoffTask = nil
+            activeHumanReactionTask?.cancel()
+            activeHumanReactionTask = nil
+            onboardingCreatedEntitySignalTask?.cancel()
+            onboardingCreatedEntitySignalTask = nil
         }
         .onChange(of: hasOnboarded) { _, hasOnboarded in
             guard hasOnboarded else { return }
             scheduleRootAppearHandoff()
+            applyOnboardingPrimaryHumanIDIfNeeded()
+        }
+        .onChange(of: onboardingPrimaryHumanID) { _, _ in
+            applyOnboardingPrimaryHumanIDIfNeeded()
         }
         .onReceive(appServices.notificationRoutes.routeEvents) { published in
             handleRouteNotificationOutcome(
@@ -127,11 +141,7 @@ struct ContentView: View {
             }
         )
         .onChange(of: currentActiveHumanId) { _, newValue in
-            if !newValue.isEmpty {
-                appRoutes.dismissSheet(.requiredAccountSwitch)
-                reconcileHumanProfileRequirement()
-                scheduleOnboardingJourneyEvaluation()
-            }
+            scheduleActiveHumanReaction(newValue)
         }
         .onChange(of: scenePhase) { _, newPhase in
             appServices.lifecycle.handle(.scenePhaseChanged(newPhase))
@@ -155,6 +165,10 @@ struct ContentView: View {
                 appRoutes.openPlant(id)
             },
             createdEntitySignal: createdEntitySignal,
+            onCreatedEntitySignalHandled: { handledSignal in
+                guard createdEntitySignal == handledSignal else { return }
+                createdEntitySignal = nil
+            },
             onPresentAccountSwitcher: {
                 appRoutes.presentAccountSwitcher()
             },
@@ -268,17 +282,97 @@ struct ContentView: View {
         scheduleOnboardingJourneyEvaluation()
     }
 
-    private func scheduleOnboardingJourneyEvaluation() {
+    private func scheduleOnboardingJourneyEvaluation(
+        delayMilliseconds: UInt64 = 480,
+        activeHumanIDOverride: String? = nil
+    ) {
         onboardingJourneyEvaluationTask?.cancel()
-        onboardingJourneyEvaluationTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: 480) {
+        onboardingJourneyEvaluationTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: delayMilliseconds) {
+            let activeHumanID = resolvedOnboardingEvaluationActiveHumanID(override: activeHumanIDOverride)
+            if currentActiveHumanId.isEmpty, let activeHumanID {
+                currentActiveHumanId = activeHumanID
+            }
             let evaluation = appServices.onboardingJourney.evaluate(
                 hasOnboarded: hasOnboarded,
-                activeHumanID: currentActiveHumanId.isEmpty ? nil : currentActiveHumanId,
+                activeHumanID: activeHumanID,
                 context: modelContext,
                 projectionManager: appServices.questManager
             )
             onboardingJourneyPhase = evaluation.phase
             onboardingJourneyEvaluationTask = nil
+        }
+    }
+
+    private func resolvedOnboardingEvaluationActiveHumanID(override: String?) -> String? {
+        if let override, !override.isEmpty {
+            return override
+        }
+        if !currentActiveHumanId.isEmpty {
+            return currentActiveHumanId
+        }
+        if let onboardingPrimaryHumanID, !onboardingPrimaryHumanID.isEmpty {
+            return onboardingPrimaryHumanID
+        }
+        return appServices.onboardingJourney.interruptedOnboardingPrimaryHumanID(context: modelContext)
+    }
+
+    private func scheduleOnboardingJourneyEvaluationForActiveHumanChange(_ humanID: String) {
+        guard hasOnboarded else { return }
+        if onboardingPrimaryHumanID == humanID {
+            let handoffDelay = OnboardingHomeJoinHandoffGate.remainingPostHomeEffectDelayMilliseconds(
+                defaultDelayMilliseconds: 480
+            )
+            scheduleOnboardingJourneyEvaluation(delayMilliseconds: handoffDelay, activeHumanIDOverride: humanID)
+        } else {
+            scheduleOnboardingJourneyEvaluation()
+        }
+    }
+
+    private func scheduleActiveHumanReaction(_ humanID: String) {
+        activeHumanReactionTask?.cancel()
+        guard !humanID.isEmpty else {
+            activeHumanReactionTask = nil
+            return
+        }
+        activeHumanReactionTask = OhanaFrameScheduler.runAfterNextFrame {
+            guard currentActiveHumanId == humanID else { return }
+            appRoutes.dismissSheet(.requiredAccountSwitch)
+            reconcileHumanProfileRequirement()
+            scheduleOnboardingJourneyEvaluationForActiveHumanChange(humanID)
+            activeHumanReactionTask = nil
+        }
+    }
+
+    private func applyOnboardingPrimaryHumanIDIfNeeded() {
+        guard let humanID = onboardingPrimaryHumanID, !humanID.isEmpty else { return }
+        if currentActiveHumanId != humanID {
+            currentActiveHumanId = humanID
+        }
+        if let id = UUID(uuidString: humanID),
+           signaledOnboardingPrimaryHumanID != humanID {
+            signaledOnboardingPrimaryHumanID = humanID
+            scheduleOnboardingCreatedEntitySignal(id)
+        }
+        guard hasOnboarded, handledOnboardingPrimaryHumanID != humanID else { return }
+        handledOnboardingPrimaryHumanID = humanID
+        let handoffDelay = OnboardingHomeJoinHandoffGate.remainingPostHomeEffectDelayMilliseconds(
+            defaultDelayMilliseconds: 480
+        )
+        scheduleOnboardingJourneyEvaluation(delayMilliseconds: handoffDelay, activeHumanIDOverride: humanID)
+    }
+
+    private func scheduleOnboardingCreatedEntitySignal(_ id: UUID) {
+        onboardingCreatedEntitySignalTask?.cancel()
+        let delay = OnboardingHomeJoinHandoffGate.remainingHomeVisualEffectDelayMilliseconds(
+            defaultDelayMilliseconds: 240
+        )
+        onboardingCreatedEntitySignalTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: delay) {
+            var transaction = Transaction(animation: nil)
+            transaction.disablesAnimations = true
+            withTransaction(transaction) {
+                createdEntitySignal = HomeCreatedEntitySignal(entityID: id)
+            }
+            onboardingCreatedEntitySignalTask = nil
         }
     }
 
@@ -312,11 +406,21 @@ struct ContentView: View {
 }
 
 private extension ContentView {
+    static var shouldHideGlobalRewardFeedbackOverlay: Bool {
+        let arguments = ProcessInfo.processInfo.arguments
+        if arguments.contains("-OHANA_ENABLE_PRODUCTION_OVERLAYS_IN_UI_TESTS") {
+            return false
+        }
+        return isRunningTests
+    }
+
     static var isRunningTests: Bool {
         let environment = ProcessInfo.processInfo.environment
+        let arguments = ProcessInfo.processInfo.arguments
         return environment["XCTestConfigurationFilePath"] != nil
             || environment["XCTestBundlePath"] != nil
             || environment["XCTestSessionIdentifier"] != nil
+            || arguments.contains("-OHANA_UI_TESTS")
     }
 }
 

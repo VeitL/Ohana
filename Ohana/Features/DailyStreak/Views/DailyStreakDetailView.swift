@@ -114,12 +114,11 @@ struct DailyStreakDetailView: View {
                     .background(Color.ohanaControlFill, in: Circle())
             },
             trailing: {
-                CoconutBalanceCapsule(balance: activeHuman?.coconutBalance ?? 0) {
-                    presentCoconutLog()
-                }
+                EmptyView()
             },
             content: {
                 VStack(spacing: 16) {
+                    coconutLogShortcut
                     myStreakCard
                     if humans.count > 1 {
                         familyCompetitionSection
@@ -132,6 +131,7 @@ struct DailyStreakDetailView: View {
                 EmptyView()
             }
         )
+        .accessibilityIdentifier("daily-streak-screen")
         .onAppear {
             selectedMonth = Date()
             loadCheckInData()
@@ -170,8 +170,8 @@ struct DailyStreakDetailView: View {
     }
 
     private func closePage() {
-        onClose?()
         dismiss()
+        onClose?()
     }
 
     private func presentCoconutLog() {
@@ -190,6 +190,54 @@ struct DailyStreakDetailView: View {
     }
 
     // MARK: - 我的连击卡片
+    private var coconutLogShortcut: some View {
+        let balance = activeHuman?.coconutBalance ?? 0
+        return Button(action: presentCoconutLog) {
+            HStack(spacing: 12) {
+                Image(systemName: "clock.arrow.circlepath") // a11y: allow leading icon; button label describes action.
+                    .font(OhanaFont.adaptive(size: 17, weight: .black))
+                    .foregroundStyle(Color.goPrimary)
+                    .frame(width: 44, height: 44)
+                    .background(Color.ohanaControlFill, in: Circle())
+                    .accessibilityHidden(true)
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("椰子账本")
+                        .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
+                        .foregroundStyle(Color.ohanaPrimaryText)
+                    Text("查看连击和奖励记录")
+                        .font(OhanaFont.adaptive(size: 11, weight: .semibold, design: .rounded))
+                        .foregroundStyle(Color.ohanaSecondaryText)
+                }
+
+                Spacer(minLength: 10)
+
+                HStack(spacing: 3) {
+                    Text("🥥")
+                        .font(OhanaFont.metric(size: 10, .medium))
+                    Text("\(balance)")
+                        .font(OhanaFont.caption(.black))
+                        .monospacedDigit()
+                }
+                .foregroundStyle(Color.ohanaPrimaryActionText)
+                .padding(.horizontal, 9)
+                .padding(.vertical, 6)
+                .background(Color.goPrimary, in: Capsule())
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            .frame(minHeight: 56)
+            .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous)
+                    .strokeBorder(Color.ohanaPrimaryText.opacity(0.08), lineWidth: 1)
+            }
+            .contentShape(RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous))
+        }
+        .buttonStyle(ScaleButtonStyle())
+        .accessibilityLabel("查看椰子账本，当前 \(balance) 个椰子")
+    }
+
     private var myStreakCard: some View {
         VStack(spacing: 16) {
             HStack(spacing: 14) {
@@ -824,7 +872,8 @@ struct DailyStreakDetailView: View {
     private func triggerTodayCheckIn() {
         guard let updatedDates = commandExecutor.triggerTodayCheckIn(
             currentActiveHumanId: activeHumanIdForStreak,
-            checkedInDates: checkedInDates
+            checkedInDates: checkedInDates,
+            postsRewardFeedback: false
         ) else { return }
         checkedInDates = updatedDates
     }

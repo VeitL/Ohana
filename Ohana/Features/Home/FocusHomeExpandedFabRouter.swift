@@ -14,6 +14,7 @@ enum FocusHomeExpandedFabRouter {
         let openFeed: (Pet) -> Void
         let openWater: (Pet) -> Void
         let openWalk: (Pet) -> Void
+        let openWalkSummary: (Pet) -> Void
         let openPotty: (Pet) -> Void
         let openPlay: (Pet) -> Void
         let openMedication: (Pet) -> Void
@@ -95,7 +96,7 @@ enum FocusHomeExpandedFabRouter {
         case .hygiene:
             actions.openHygiene(pet)
         case .walks:
-            actions.openWalk(pet)
+            actions.openWalkSummary(pet)
         case .potty:
             actions.openPotty(pet)
         case .weight:

@@ -141,13 +141,13 @@ extension PetBasicInfoDetailView {
     func deletePetWithCascade(_ p: Pet) {
         let command = DomainCommand.memberDeletion(entityID: p.id, kind: EntityKind.pet.rawValue)
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-        commandQueue.enqueue(command) {
+        dismiss()
+        commandQueue.enqueue(command, delayMilliseconds: DeferredDomainCommandQueue.destructiveRouteDismissDelayMilliseconds) {
             MemberCommandExecutor(context: modelContext, services: appServices).deletePet(
                 p,
                 note: "petBasicInfo.delete"
             )
             UINotificationFeedbackGenerator().notificationOccurred(.success)
-            dismiss()
         }
     }
 

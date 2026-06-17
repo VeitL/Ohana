@@ -51,6 +51,12 @@ enum OhanaFrameScheduler {
     static func waitAfterNextFrame(milliseconds: UInt64 = 0) async {
         await Task.yield()
         guard !Task.isCancelled else { return }
+        await withCheckedContinuation { continuation in
+            DispatchQueue.main.async {
+                continuation.resume()
+            }
+        }
+        guard !Task.isCancelled else { return }
         if milliseconds > 0 {
             try? await Task.sleep(nanoseconds: milliseconds * 1_000_000)
         }
@@ -61,8 +67,10 @@ enum OnboardingHomeJoinHandoffGate {
     private static let completedAtKey = "ohana_onboarding_home_join_handoff_completed_at"
     private static let recentWindowSeconds: TimeInterval = 6
     private static let rootBootstrapDelayMilliseconds: UInt64 = 900
-    private static let homeReadModelDelayMilliseconds: UInt64 = 0
-    private static let homeAppearDelayMilliseconds: UInt64 = 0
+    private static let homeReadModelDelayMilliseconds: UInt64 = 240
+    private static let homeAppearDelayMilliseconds: UInt64 = 180
+    private static let homeVisualEffectDelayMilliseconds: UInt64 = 360
+    private static let postHomeEffectDelayMilliseconds: UInt64 = 1320
 
     static func markCompleted(now: Date = Date(), defaults: UserDefaults = .standard) {
         defaults.set(now.timeIntervalSince1970, forKey: completedAtKey)
@@ -91,6 +99,28 @@ enum OnboardingHomeJoinHandoffGate {
         defaults: UserDefaults = .standard
     ) -> UInt64 {
         remainingDelay(milliseconds: homeAppearDelayMilliseconds, now: now, defaults: defaults)
+    }
+
+    static func remainingHomeVisualEffectDelayMilliseconds(
+        defaultDelayMilliseconds: UInt64 = 0,
+        now: Date = Date(),
+        defaults: UserDefaults = .standard
+    ) -> UInt64 {
+        max(
+            defaultDelayMilliseconds,
+            remainingDelay(milliseconds: homeVisualEffectDelayMilliseconds, now: now, defaults: defaults)
+        )
+    }
+
+    static func remainingPostHomeEffectDelayMilliseconds(
+        defaultDelayMilliseconds: UInt64 = 0,
+        now: Date = Date(),
+        defaults: UserDefaults = .standard
+    ) -> UInt64 {
+        max(
+            defaultDelayMilliseconds,
+            remainingDelay(milliseconds: postHomeEffectDelayMilliseconds, now: now, defaults: defaults)
+        )
     }
 
     static func consume(defaults: UserDefaults = .standard) {

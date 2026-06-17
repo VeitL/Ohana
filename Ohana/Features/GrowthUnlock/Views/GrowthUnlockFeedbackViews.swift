@@ -32,18 +32,18 @@ struct StarterGiftCeremonyOverlay: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
 
                     HStack(spacing: 9) {
-                        levelBadge("Lv0", isActive: false)
-                        Image(systemName: "arrow.right").accessibilityHidden(true)
+                        levelBadge("Lv0", isActive: true)
+                        Image(systemName: "plus").accessibilityHidden(true)
                             .font(OhanaFont.adaptive(size: 12, weight: .black))
                             .foregroundStyle(Color.ohanaSecondaryText)
-                        levelBadge("Lv1", isActive: true)
+                        levelBadge("+\(amount)🥥", isActive: false)
                     }
                     .frame(maxWidth: .infinity)
 
                     Text(localized(
-                        zh: "椰子树丛已经发芽。基础照护、档案和日历先开放，后续功能会随着椰子树升级逐步出现。",
-                        en: "Your coconut grove has sprouted. Essentials, profiles, and calendar open first; more tools appear as the tree levels up.",
-                        de: "Dein Kokoshain sprießt. Pflege, Profile und Kalender starten zuerst; weitere Werkzeuge erscheinen mit höheren Baumstufen."
+                        zh: "新人礼包已到账。先解锁底部的椰子树入口；每次注入 \(OasisTreeEnergyInjectionPolicy.starterPackageXP) 能量，注入 5 次会升到 Lv1。",
+                        en: "Your starter gift is ready. Unlock the Coconut Tree tab first; each injection adds \(OasisTreeEnergyInjectionPolicy.starterPackageXP) energy, and 5 injections reach Lv1.",
+                        de: "Dein Startergeschenk ist bereit. Schalte zuerst den Kokosbaum-Tab frei; jede Einspeisung gibt \(OasisTreeEnergyInjectionPolicy.starterPackageXP) Energie, 5 Einspeisungen erreichen Lv1."
                     ))
                     .font(OhanaFont.callout(.semibold))
                     .foregroundStyle(Color.ohanaSecondaryText)
@@ -51,14 +51,15 @@ struct StarterGiftCeremonyOverlay: View {
                     .fixedSize(horizontal: false, vertical: true)
 
                     Button(action: onFinish) {
-                        Text(localized(zh: "开始使用", en: "Start using Ohana", de: "Ohana starten"))
+                        Text(localized(zh: "解锁椰子树", en: "Unlock Coconut Tree", de: "Kokosbaum freischalten"))
                             .font(OhanaFont.callout(.black))
                             .foregroundStyle(Color.arkInk)
                             .frame(maxWidth: .infinity, minHeight: 44)
                             .background(Color.goPrimary, in: Capsule())
                     }
                     .buttonStyle(ScaleButtonStyle())
-                    .accessibilityLabel(localized(zh: "完成新人礼包仪式", en: "Finish starter gift ceremony", de: "Startergeschenk abschließen"))
+                    .accessibilityIdentifier("starter-gift-finish-action")
+                    .accessibilityLabel(localized(zh: "解锁椰子树入口", en: "Unlock the Coconut Tree tab", de: "Kokosbaum-Tab freischalten"))
                 }
                 .padding(18)
                 .frame(maxWidth: 340)

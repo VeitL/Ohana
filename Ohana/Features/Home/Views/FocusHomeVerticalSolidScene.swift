@@ -128,6 +128,7 @@ struct FocusHomeVerticalSolidScene<QuickActions: View, ContextMenuContent: View>
     let localization: L10n
     let allowsAmbientFloat: Bool
     var isVisible: Bool = true
+    var walkPresentationRevision: Int = 0
     var embedsQuickActionsInCard: Bool = false
     var collapsedTopInset: CGFloat = 0
     let quickActions: (FocusCard) -> QuickActions

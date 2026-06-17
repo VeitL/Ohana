@@ -21,7 +21,8 @@ extension View {
         onCrewPetSelected: @escaping (Pet) -> Void,
         onCrewHumanSelected: @escaping (Human) -> Void,
         onFirstSuccessMomentCompleted: @escaping (Pet) -> Void,
-        onHumanDoseTaken: @escaping (UUID) -> Void
+        onHumanDoseTaken: @escaping (UUID) -> Void,
+        onStartWalkFromQuickAction: @escaping (UUID) -> Void
     ) -> some View {
         modifier(FocusHomeRouteSheetModifier(
             pets: pets,
@@ -36,7 +37,8 @@ extension View {
             onCrewPetSelected: onCrewPetSelected,
             onCrewHumanSelected: onCrewHumanSelected,
             onFirstSuccessMomentCompleted: onFirstSuccessMomentCompleted,
-            onHumanDoseTaken: onHumanDoseTaken
+            onHumanDoseTaken: onHumanDoseTaken,
+            onStartWalkFromQuickAction: onStartWalkFromQuickAction
         ))
     }
 }

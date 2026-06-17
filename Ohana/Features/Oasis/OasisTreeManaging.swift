@@ -5,7 +5,7 @@ import SwiftData
 protocol OasisTreeManaging {
     var treeLevel: TreeLevel { get }
     var progressToNextLevel: Double { get }
-    var injectedEnergy: Int { get set }
+    var injectedEnergy: Int { get }
     var totalEnergy: Int { get }
     var nextLevelThreshold: Int { get }
     var passiveIncomeAmount: Int { get }
@@ -78,8 +78,7 @@ final class SharedOasisTreeManager: OasisTreeManaging {
     }
 
     var injectedEnergy: Int {
-        get { manager.injectedEnergy }
-        set { manager.injectedEnergy = newValue }
+        manager.injectedEnergy
     }
 
     func treeLevel(forTotalEnergy totalEnergy: Int) -> TreeLevel {

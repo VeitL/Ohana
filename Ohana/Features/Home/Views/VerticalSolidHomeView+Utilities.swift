@@ -45,6 +45,59 @@ extension VerticalSolidHomeView {
         }
     }
 
+    func injectEmbeddedOasisEnergy() {
+        pendingOasisEnergyInjectionCount = min(pendingOasisEnergyInjectionCount + 1, 10)
+        schedulePendingEmbeddedOasisEnergyInjection()
+    }
+
+    private func schedulePendingEmbeddedOasisEnergyInjection() {
+        guard oasisEnergyInjectionTask == nil, pendingOasisEnergyInjectionCount > 0 else { return }
+        let startedAt = AppFlowPerformance.start(
+            AppPerformanceFlows.oasisOpen,
+            note: ["source": "home_tab_fab_inject"]
+        )
+        oasisEnergyInjectionTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: 40) {
+            pendingOasisEnergyInjectionCount = max(0, pendingOasisEnergyInjectionCount - 1)
+            defer {
+                oasisEnergyInjectionTask = nil
+                schedulePendingEmbeddedOasisEnergyInjection()
+            }
+            let previousLevel = treeManager.treeLevel.rawValue
+            guard treeManager.injectEnergy(
+                cost: OasisTreeEnergyInjectionPolicy.starterPackageCost,
+                modelContext: modelContext
+            ) else {
+                pendingOasisEnergyInjectionCount = 0
+                AppFlowPerformance.mark(
+                    AppPerformanceFlows.oasisOpen,
+                    AppPerformancePhases.writeFailure,
+                    startedAt: startedAt,
+                    note: [
+                        "action": "injectEnergy",
+                        "source": "home_tab"
+                    ]
+                )
+                OhanaFeedback.error()
+                return
+            }
+
+            oasisInjectEnergyTrigger += 1
+            AppFlowPerformance.mark(
+                AppPerformanceFlows.oasisOpen,
+                AppPerformancePhases.writeSuccess,
+                startedAt: startedAt,
+                note: [
+                    "action": "injectEnergy",
+                    "source": "home_tab"
+                ]
+            )
+            requestHomeSnapshotRefresh()
+            if treeManager.treeLevel.rawValue > previousLevel {
+                scheduleGrowthUnlockFeedbackIfNeeded()
+            }
+        }
+    }
+
     func refreshHeaderStreak() {
         headerStreak = appServices.todayFocus.currentStreak(activeHumanId: activeHumanIdRaw)
     }

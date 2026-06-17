@@ -35,10 +35,13 @@ struct HomeCreatedEntitySignal: Equatable {
 }
 
 struct VerticalSolidHomeDataContainer: View {
+    private static let postRevisionRefreshDelayMilliseconds: UInt64 = 260
+
     let onOpenPet: (UUID, PetDetailTab) -> Void
     let onOpenHuman: (UUID) -> Void
     let onOpenPlant: (UUID) -> Void
     let createdEntitySignal: HomeCreatedEntitySignal?
+    let onCreatedEntitySignalHandled: (HomeCreatedEntitySignal) -> Void
     let onPresentAccountSwitcher: () -> Void
     let onPresentAddEntity: (EntityType) -> Void
     let onPresentAppSheet: (AppSheetRoute) -> Void
@@ -64,12 +67,16 @@ struct VerticalSolidHomeDataContainer: View {
     @AppStorage("shop_equipped_title") private var equippedTitleRaw = ""
     @State private var observedHomeRevision = HomeRevision()
     @State private var currentDayToken = HomeReadModelRefreshKey.dayToken(for: Date())
+    @State private var refreshKeyStateTask: Task<Void, Never>?
+    @State private var pendingObservedHomeRevision: HomeRevision?
+    @State private var pendingDayTokenRefresh = false
 
     init(
         onOpenPet: @escaping (UUID, PetDetailTab) -> Void,
         onOpenHuman: @escaping (UUID) -> Void,
         onOpenPlant: @escaping (UUID) -> Void,
         createdEntitySignal: HomeCreatedEntitySignal?,
+        onCreatedEntitySignalHandled: @escaping (HomeCreatedEntitySignal) -> Void = { _ in },
         onPresentAccountSwitcher: @escaping () -> Void,
         onPresentAddEntity: @escaping (EntityType) -> Void,
         onPresentAppSheet: @escaping (AppSheetRoute) -> Void,
@@ -86,6 +93,7 @@ struct VerticalSolidHomeDataContainer: View {
         self.onOpenHuman = onOpenHuman
         self.onOpenPlant = onOpenPlant
         self.createdEntitySignal = createdEntitySignal
+        self.onCreatedEntitySignalHandled = onCreatedEntitySignalHandled
         self.onPresentAccountSwitcher = onPresentAccountSwitcher
         self.onPresentAddEntity = onPresentAddEntity
         self.onPresentAppSheet = onPresentAppSheet
@@ -106,6 +114,7 @@ struct VerticalSolidHomeDataContainer: View {
             onOpenHuman: onOpenHuman,
             onOpenPlant: onOpenPlant,
             createdEntitySignal: createdEntitySignal,
+            onCreatedEntitySignalHandled: onCreatedEntitySignalHandled,
             onPresentAccountSwitcher: onPresentAccountSwitcher,
             onPresentAddEntity: onPresentAddEntity,
             onPresentAppSheet: onPresentAppSheet,
@@ -134,24 +143,30 @@ struct VerticalSolidHomeDataContainer: View {
             )
         }
         .onAppear {
-            observedHomeRevision = appServices.domainRevisions.homeRevision
-            refreshCurrentDayToken()
+            scheduleRefreshKeyStateSync(
+                revision: appServices.domainRevisions.homeRevision,
+                refreshDayToken: true
+            )
         }
         .onReceive(appServices.domainRevisions.homeRevisionUpdates) { revision in
-            observedHomeRevision = revision
+            scheduleRefreshKeyStateSync(revision: revision, refreshDayToken: false)
         }
         .onChange(of: scenePhase) { _, phase in
             guard phase == .active else { return }
-            observedHomeRevision = appServices.domainRevisions.homeRevision
-            refreshCurrentDayToken()
+            scheduleRefreshKeyStateSync(
+                revision: appServices.domainRevisions.homeRevision,
+                refreshDayToken: true
+            )
         }
         .onReceive(NotificationCenter.default.publisher(for: .NSCalendarDayChanged)) { _ in
-            refreshCurrentDayToken()
+            scheduleRefreshKeyStateSync(revision: nil, refreshDayToken: true)
         }
         .task(id: currentDayToken) {
             await updateDayTokenAfterNextMidnight()
         }
         .onDisappear {
+            refreshKeyStateTask?.cancel()
+            refreshKeyStateTask = nil
             readModelStore.cancel()
         }
     }
@@ -171,7 +186,40 @@ struct VerticalSolidHomeDataContainer: View {
     }
 
     private func refreshCurrentDayToken() {
-        currentDayToken = HomeReadModelRefreshKey.dayToken(for: Date())
+        let token = HomeReadModelRefreshKey.dayToken(for: Date())
+        guard currentDayToken != token else { return }
+        currentDayToken = token
+    }
+
+    private func setObservedHomeRevision(_ revision: HomeRevision) {
+        guard observedHomeRevision != revision else { return }
+        observedHomeRevision = revision
+    }
+
+    private func scheduleRefreshKeyStateSync(
+        revision: HomeRevision?,
+        refreshDayToken: Bool
+    ) {
+        if let revision {
+            pendingObservedHomeRevision = revision
+        }
+        pendingDayTokenRefresh = pendingDayTokenRefresh || refreshDayToken
+        guard refreshKeyStateTask == nil else { return }
+        let delayMilliseconds: UInt64 = pendingObservedHomeRevision == nil ? 0 : Self.postRevisionRefreshDelayMilliseconds
+        refreshKeyStateTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: delayMilliseconds) {
+            let revision = pendingObservedHomeRevision
+            let shouldRefreshDayToken = pendingDayTokenRefresh
+            pendingObservedHomeRevision = nil
+            pendingDayTokenRefresh = false
+
+            if let revision {
+                setObservedHomeRevision(revision)
+            }
+            if shouldRefreshDayToken {
+                refreshCurrentDayToken()
+            }
+            refreshKeyStateTask = nil
+        }
     }
 
     private func updateDayTokenAfterNextMidnight() async {

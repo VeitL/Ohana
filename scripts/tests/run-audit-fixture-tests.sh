@@ -116,6 +116,10 @@ assert_bad scripts/audit-smoothness-risk.sh "$fixtures/SmoothnessBadSnapshotBuil
   main-actor-aggregation view-imperative-fetch detached-task-in-view
 assert_good scripts/audit-smoothness-risk.sh "$fixtures/SmoothnessGood.swift"
 
+assert_bad scripts/audit-route-first-frame.sh "$fixtures/RouteFirstFrameBadRouteContainer.swift" \
+  route-first-frame-query route-first-frame-sync-fetch route-first-frame-service-fetch
+assert_good scripts/audit-route-first-frame.sh "$fixtures/RouteFirstFrameGoodRouteContainer.swift"
+
 assert_bad scripts/audit-runtime-guardrails.sh "$fixtures/RuntimeBad.swift" \
   location-manager background-location always-location-request idle-timer \
   raw-timer-publisher repeat-forever timeline-animation
@@ -211,6 +215,7 @@ assert_good scripts/audit-derived-state-lifecycle.sh "$fixtures/DerivedStateLife
 assert_scope_floor scripts/audit-ui-v4.sh
 assert_scope_floor scripts/audit-accessibility.sh
 assert_scope_floor scripts/audit-smoothness-risk.sh
+assert_scope_floor scripts/audit-route-first-frame.sh
 assert_scope_floor scripts/audit-runtime-guardrails.sh
 assert_scope_floor scripts/audit-economy-boundaries.sh
 assert_scope_floor scripts/audit-member-lifecycle-gate.sh

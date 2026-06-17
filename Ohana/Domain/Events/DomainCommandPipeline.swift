@@ -74,7 +74,9 @@ nonisolated struct HomeRevision: Equatable, Hashable, Sendable {
 final class ReadModelRevisionCenter: ObservableObject {
     @Published private(set) var homeRevision = HomeRevision()
     @Published private(set) var lastMutation: DomainMutationResult?
-    @Published private(set) var lastCoconutRewardEvent: OhanaCoconutRewardEvent?
+    private(set) var lastCoconutRewardEvent: OhanaCoconutRewardEvent?
+
+    private let coconutRewardSubject = PassthroughSubject<OhanaCoconutRewardEvent, Never>()
 
     init() {}
 
@@ -83,7 +85,7 @@ final class ReadModelRevisionCenter: ObservableObject {
     }
 
     var coconutRewardEvents: AnyPublisher<OhanaCoconutRewardEvent, Never> {
-        $lastCoconutRewardEvent.compactMap(\.self).eraseToAnyPublisher()
+        coconutRewardSubject.eraseToAnyPublisher()
     }
 
     func publish(_ result: DomainMutationResult) {
@@ -122,11 +124,14 @@ final class ReadModelRevisionCenter: ObservableObject {
 
     func publishCoconutRewardFeedback(_ event: OhanaCoconutRewardEvent) {
         lastCoconutRewardEvent = event
+        coconutRewardSubject.send(event)
     }
 }
 
 @MainActor
 final class DeferredDomainCommandQueue: ObservableObject {
+    static let destructiveRouteDismissDelayMilliseconds: UInt64 = 520
+
     @Published private(set) var pendingCount = 0
 
     private var tasks: [UUID: Task<Void, Never>] = [:]

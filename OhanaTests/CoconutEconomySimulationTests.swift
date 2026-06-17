@@ -31,8 +31,8 @@ struct CoconutEconomySimulationTests {
         #expect((4 ... 5).contains(light.levelAtDay(30).rawValue))
         #expect(light.levelAtDay(90).rawValue >= TreeLevel.lv7.rawValue)
 
-        #expect((28 ... 42).contains(normal.daysToLevel[.lv7] ?? 0))
-        #expect(normal.levelAtDay(60).rawValue >= TreeLevel.lv8.rawValue)
+        #expect((42 ... 50).contains(normal.daysToLevel[.lv7] ?? 0))
+        #expect(normal.levelAtDay(60).rawValue >= TreeLevel.lv7.rawValue)
         #expect(normal.levelAtDay(90).rawValue >= TreeLevel.lv9.rawValue)
         #expect(normal.injectedXP * 100 <= normal.totalXP * 15)
         #expect(normal.weeklySpendRate > 0.15)
@@ -43,14 +43,14 @@ struct CoconutEconomySimulationTests {
         #expect(family.coconutsEarned <= normal.coconutsEarned * 2)
         #expect(family.careCoconutsEarned < normal.careCoconutsEarned * 2)
 
-        #expect(focusOnly.levelAtDay(30) == .lv5)
-        #expect(focusOnly.levelAtDay(60) == .lv6)
-        #expect(focusOnly.levelAtDay(90) == .lv7)
+        #expect(focusOnly.levelAtDay(30) == .lv4)
+        #expect(focusOnly.levelAtDay(60) == .lv5)
+        #expect(focusOnly.levelAtDay(90) == .lv6)
         #expect(focusOnly.dailyGoalCoverage == 1.0)
 
-        #expect((5 ... 6).contains(healthOnly.levelAtDay(90).rawValue))
+        #expect((4 ... 5).contains(healthOnly.levelAtDay(90).rawValue))
 
-        #expect((1 ... 24).contains(returning.daysToLevel[.lv7] ?? 0))
+        #expect((1 ... 30).contains(returning.daysToLevel[.lv7] ?? 0))
         #expect(returning.levelAtDay(30).rawValue >= TreeLevel.lv7.rawValue)
         #expect((returning.daysToLevel[.lv8] ?? 31) > 30)
     }
@@ -124,7 +124,7 @@ private struct EconomyCohortReport {
     }
 
     func levelAtDay(_ day: Int) -> TreeLevel {
-        guard day > 0 else { return levelsByDay.first ?? .lv1 }
+        guard day > 0 else { return levelsByDay.first ?? .lv0 }
         return levelsByDay[min(day - 1, max(0, levelsByDay.count - 1))]
     }
 
@@ -193,7 +193,7 @@ private struct EconomyCohortSimulator {
     private var legacyBaselineXP: Int {
         switch preset {
         case .returningLegacyNormal:
-            500
+            OasisTreeManager.legacyCompatibleXP(forLegacyTreeEnergy: 500)
         default:
             0
         }

@@ -59,6 +59,43 @@ struct OnboardingJourneyCoordinatorTests {
         #expect(complete == .complete)
     }
 
+    @Test func starterGiftCeremonyDoesNotWaitForActiveHumanPropagation() throws {
+        let container = try makeContainer()
+        let context = ModelContext(container)
+        let suiteName = makeDefaultsSuiteName()
+        let defaults = try makeDefaults(suiteName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let pending = OnboardingJourneyCoordinator.evaluate(
+            hasOnboarded: true,
+            activeHumanID: nil,
+            context: context,
+            defaults: defaults
+        )
+        #expect(pending.phase == .starterGiftPending)
+
+        let human = Human(name: "First")
+        context.insert(human)
+        context.safeSave()
+
+        let claimedBeforeActiveHumanPropagates = OnboardingJourneyCoordinator.evaluate(
+            hasOnboarded: true,
+            activeHumanID: nil,
+            context: context,
+            defaults: defaults
+        )
+
+        #expect(claimedBeforeActiveHumanPropagates.starterGiftResult == .claimed(
+            humanID: human.id,
+            amount: StarterGiftService.giftAmount
+        ))
+        #expect(
+            claimedBeforeActiveHumanPropagates.phase == .starterGiftReadyForCeremony(
+                amount: StarterGiftService.giftAmount
+            )
+        )
+    }
+
     @Test func existingUserIsMarkedCompleteWithoutStarterCeremony() throws {
         let container = try makeContainer()
         let context = ModelContext(container)
@@ -84,6 +121,22 @@ struct OnboardingJourneyCoordinatorTests {
         #expect(defaults.bool(forKey: StarterGiftService.Key.ceremonySeen))
         #expect(defaults.bool(forKey: OnboardingJourneyCoordinator.Key.firstCareCompleted))
         #expect(defaults.bool(forKey: OnboardingJourneyCoordinator.Key.roadmapPromptSeen))
+    }
+
+    @Test func interruptedOnboardingRecoversPersistedPrimaryHuman() throws {
+        let container = try makeContainer()
+        let context = ModelContext(container)
+        let first = Human(name: "First")
+        first.createdAt = Date(timeIntervalSince1970: 100)
+        let second = Human(name: "Second")
+        second.createdAt = Date(timeIntervalSince1970: 200)
+        context.insert(second)
+        context.insert(first)
+        context.safeSave()
+
+        let recoveredID = OnboardingJourneyCoordinator.interruptedOnboardingPrimaryHumanID(context: context)
+
+        #expect(recoveredID == first.id.uuidString)
     }
 
     private func makeDefaultsSuiteName() -> String {

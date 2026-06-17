@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 @testable import Ohana
 
@@ -77,7 +78,16 @@ struct GrowthUnlockPolicyTests {
     }
 
     @Test func featureRouteGuardOwnsGlobalVisibilityDecisions() {
-        #expect(AppFeatureRouteGuard.visibleHomeTabs == [.home, .calendar, .oasis])
+        let suiteName = "GrowthUnlockPolicyTests.featureRouteGuardOwnsGlobalVisibilityDecisions.\(UUID().uuidString)"
+        guard let defaults = UserDefaults(suiteName: suiteName) else {
+            Issue.record("Expected isolated defaults suite")
+            return
+        }
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        defaults.set(true, forKey: StarterGiftService.Key.claimed)
+        defaults.set(true, forKey: StarterGiftService.Key.ceremonySeen)
+
+        #expect(AppFeatureRouteGuard.visibleHomeTabs(starterGiftDefaults: defaults) == [.home, .calendar, .oasis])
         #expect(!AppFeatureRouteGuard.shouldLoadPlantData)
 
         let levelOneGroups = AppFeatureRouteGuard.visibleFeatureGroups(

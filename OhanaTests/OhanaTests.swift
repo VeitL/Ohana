@@ -10,6 +10,7 @@ import SwiftData
 import Testing
 @testable import Ohana
 
+@Suite(.serialized)
 struct OhanaTests {
 
     @MainActor
@@ -345,11 +346,13 @@ struct OhanaTests {
     }
 
     @MainActor
-    @Test func oasisTreeEnergyReadsGrowthXPFromLedgerMetadata() async throws {
+    @Test func oasisTreeIgnoresCareGrowthXPFromLedgerMetadata() async throws {
         UserDefaults.standard.removeObject(forKey: "oasis_v2LegacyBaselineXP")
+        UserDefaults.standard.removeObject(forKey: "oasis_v2LegacyBaselineXPScaleVersion")
         OasisTreePreferenceStore.clearLedgerEnergyCache()
         defer {
             UserDefaults.standard.removeObject(forKey: "oasis_v2LegacyBaselineXP")
+            UserDefaults.standard.removeObject(forKey: "oasis_v2LegacyBaselineXPScaleVersion")
             OasisTreePreferenceStore.clearLedgerEnergyCache()
         }
         let container = try makeInMemoryContainer()
@@ -359,26 +362,63 @@ struct OhanaTests {
             actorId: "human-1",
             subjectKind: .pet,
             subjectId: "pet-1",
-            eventKind: .care,
-            actionType: "feeding",
-            metadataJSON: "{\"economyVersion\":2,\"growthXP\":120}"
+            eventKind: .walk,
+            actionType: "walk",
+            metadataJSON: "{\"economyVersion\":2,\"growthXP\":500}"
         ))
         try context.save()
 
         TestOasisTreeManagerProjection.manager.refreshPreviewEnergy(modelContext: context, pets: [], humans: [])
 
-        #expect(TestOasisTreeManagerProjection.manager.islandEnergy == 120)
-        #expect(OasisTreeManager.treeLevel(forTotalEnergy: 120) == .lv2)
+        #expect(TestOasisTreeManagerProjection.manager.islandEnergy == 0)
+        #expect(TestOasisTreeManagerProjection.manager.injectedEnergy == 0)
+        #expect(TestOasisTreeManagerProjection.manager.totalEnergy == 0)
+        #expect(TestOasisTreeManagerProjection.manager.treeLevel == .lv0)
+    }
+
+    @MainActor
+    @Test func oasisLegacyActivityBaselineDoesNotAdvanceTreeLevel() async throws {
+        UserDefaults.standard.removeObject(forKey: "oasis_v2LegacyBaselineXP")
+        UserDefaults.standard.removeObject(forKey: "oasis_v2LegacyBaselineXPScaleVersion")
+        OasisTreePreferenceStore.clearLedgerEnergyCache()
+        defer {
+            UserDefaults.standard.removeObject(forKey: "oasis_v2LegacyBaselineXP")
+            UserDefaults.standard.removeObject(forKey: "oasis_v2LegacyBaselineXPScaleVersion")
+            OasisTreePreferenceStore.clearLedgerEnergyCache()
+        }
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let pet = Pet(name: "Legacy", species: "Dog")
+        context.insert(pet)
+        for index in 0 ..< 125 {
+            let log = PetCareLog(
+                date: Date(timeIntervalSince1970: TimeInterval(1_800_000_000 + index)),
+                type: .feeding,
+                pet: pet
+            )
+            pet.careLogs.append(log)
+            context.insert(log)
+        }
+        try context.save()
+
+        let manager = OasisTreeManager()
+        manager.refreshPreviewEnergy(modelContext: context, pets: [pet], humans: [])
+
+        #expect(manager.islandEnergy == 0)
+        #expect(manager.totalEnergy == 0)
+        #expect(manager.treeLevel == .lv0)
     }
 
     @MainActor
     @Test func oasisTreeInjectedEnergyCanBeRecoveredFromLedgerMetadata() async throws {
         UserDefaults.standard.removeObject(forKey: "oasis_injectedEnergy")
         UserDefaults.standard.removeObject(forKey: "oasis_v2LegacyBaselineXP")
+        UserDefaults.standard.removeObject(forKey: "oasis_v2LegacyBaselineXPScaleVersion")
         OasisTreePreferenceStore.clearLedgerEnergyCache()
         defer {
             UserDefaults.standard.removeObject(forKey: "oasis_injectedEnergy")
             UserDefaults.standard.removeObject(forKey: "oasis_v2LegacyBaselineXP")
+            UserDefaults.standard.removeObject(forKey: "oasis_v2LegacyBaselineXPScaleVersion")
             OasisTreePreferenceStore.clearLedgerEnergyCache()
         }
 
@@ -404,13 +444,183 @@ struct OhanaTests {
     }
 
     @MainActor
-    @Test func oasisTreeEnergyCacheInvalidatesAcrossLedgerStoresWithSameCount() async throws {
+    @Test func oasisTreeIgnoresInjectedXPOutsideManualTreeInjectionLedger() async throws {
         UserDefaults.standard.removeObject(forKey: "oasis_injectedEnergy")
         UserDefaults.standard.removeObject(forKey: "oasis_v2LegacyBaselineXP")
+        UserDefaults.standard.removeObject(forKey: "oasis_v2LegacyBaselineXPScaleVersion")
         OasisTreePreferenceStore.clearLedgerEnergyCache()
         defer {
             UserDefaults.standard.removeObject(forKey: "oasis_injectedEnergy")
             UserDefaults.standard.removeObject(forKey: "oasis_v2LegacyBaselineXP")
+            UserDefaults.standard.removeObject(forKey: "oasis_v2LegacyBaselineXPScaleVersion")
+            OasisTreePreferenceStore.clearLedgerEnergyCache()
+        }
+
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        context.insert(CareLedgerEvent(
+            actorKind: .human,
+            actorId: "human-1",
+            subjectKind: .pet,
+            subjectId: "pet-1",
+            eventKind: .walk,
+            actionType: "walk",
+            metadataJSON: "{\"economyVersion\":2,\"growthXP\":50,\"injectedXP\":500}"
+        ))
+        context.insert(CareLedgerEvent(
+            actorKind: .human,
+            actorId: "human-1",
+            subjectKind: .system,
+            subjectId: nil,
+            eventKind: .coconut,
+            actionType: "upgradeCoconut",
+            metadataJSON: "{\"economyVersion\":2,\"injectedXP\":500,\"reason\":\"upgradeCoconut\"}"
+        ))
+        try context.save()
+
+        let manager = OasisTreeManager()
+        manager.refreshPreviewEnergy(modelContext: context, pets: [], humans: [])
+
+        #expect(manager.injectedEnergy == 0)
+        #expect(manager.totalEnergy == 0)
+        #expect(manager.treeLevel == .lv0)
+    }
+
+    @MainActor
+    @Test func openingLegacyUpgradeCoconutDoesNotInjectTreeEnergy() throws {
+        let defaults = UserDefaults.standard
+        let oldActiveHumanId = defaults.object(forKey: "currentActiveHumanId")
+        let oldInjectedEnergy = OasisTreePreferenceStore.injectedEnergy
+        let oldRewardedLevel = OasisTreePreferenceStore.lastRewardedLevel
+        let oldTreeManager = OasisTreeManagerRegistry.current
+        defer {
+            if let oldActiveHumanId {
+                defaults.set(oldActiveHumanId, forKey: "currentActiveHumanId")
+            } else {
+                defaults.removeObject(forKey: "currentActiveHumanId")
+            }
+            OasisTreePreferenceStore.injectedEnergy = oldInjectedEnergy
+            OasisTreePreferenceStore.lastRewardedLevel = oldRewardedLevel
+            OasisTreePreferenceStore.clearLedgerEnergyCache()
+            OasisTreeManagerRegistry.current = oldTreeManager
+        }
+
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let human = Human(name: "Starter")
+        context.insert(human)
+        let coconut = OasisUpgradeCoconut(
+            level: 5,
+            rewardKind: .treeEnergy,
+            rewardCatalogId: "legacy_tree_energy",
+            coconutAmount: 0,
+            treeEnergyAmount: 500,
+            fragmentAmount: 0,
+            titleZh: "旧树能量",
+            titleEn: "Legacy Tree Energy",
+            titleDe: "Legacy-Baumenergie",
+            descriptionZh: "旧记录不应再推进树等级。",
+            descriptionEn: "Legacy records must not advance the tree.",
+            descriptionDe: "Legacy-Datensätze dürfen den Baum nicht verbessern."
+        )
+        context.insert(coconut)
+        try context.save()
+
+        defaults.set(human.id.uuidString, forKey: "currentActiveHumanId")
+        OasisTreePreferenceStore.injectedEnergy = 0
+        OasisTreePreferenceStore.lastRewardedLevel = 0
+        OasisTreePreferenceStore.clearLedgerEnergyCache()
+        let manager = OasisTreeManager()
+        OasisTreeManagerRegistry.current = manager
+
+        _ = try OasisUpgradeRewardService.open(coconut, context: context)
+
+        #expect(coconut.isOpened)
+        #expect(coconut.rewardKind == .temporaryEffect)
+        #expect(coconut.treeEnergyAmount == 0)
+        #expect(manager.injectedEnergy == 0)
+        #expect(manager.totalEnergy == 0)
+        #expect(manager.treeLevel == .lv0)
+    }
+
+    @MainActor
+    @Test func staleInjectedEnergyPreferenceCannotAdvanceTreeWithoutInjectionLedger() async throws {
+        UserDefaults.standard.removeObject(forKey: "oasis_v2LegacyBaselineXP")
+        UserDefaults.standard.removeObject(forKey: "oasis_v2LegacyBaselineXPScaleVersion")
+        let oldInjectedEnergy = OasisTreePreferenceStore.injectedEnergy
+        defer {
+            OasisTreePreferenceStore.injectedEnergy = oldInjectedEnergy
+            UserDefaults.standard.removeObject(forKey: "oasis_v2LegacyBaselineXP")
+            UserDefaults.standard.removeObject(forKey: "oasis_v2LegacyBaselineXPScaleVersion")
+            OasisTreePreferenceStore.clearLedgerEnergyCache()
+        }
+
+        OasisTreePreferenceStore.injectedEnergy = 500
+        OasisTreePreferenceStore.clearLedgerEnergyCache()
+        let container = try makeInMemoryContainer()
+        let manager = OasisTreeManager()
+
+        manager.refreshPreviewEnergy(modelContext: container.mainContext, pets: [], humans: [])
+
+        #expect(manager.injectedEnergy == 0)
+        #expect(manager.totalEnergy == 0)
+        #expect(manager.treeLevel == .lv0)
+    }
+
+    @MainActor
+    @Test func starterGiftBalanceFundsFiveTreeInjectionsToLevelOne() throws {
+        let defaults = UserDefaults.standard
+        let oldActiveHumanId = defaults.object(forKey: "currentActiveHumanId")
+        let oldInjectedEnergy = OasisTreePreferenceStore.injectedEnergy
+        let oldRewardedLevel = OasisTreePreferenceStore.lastRewardedLevel
+        defer {
+            if let oldActiveHumanId {
+                defaults.set(oldActiveHumanId, forKey: "currentActiveHumanId")
+            } else {
+                defaults.removeObject(forKey: "currentActiveHumanId")
+            }
+            OasisTreePreferenceStore.injectedEnergy = oldInjectedEnergy
+            OasisTreePreferenceStore.lastRewardedLevel = oldRewardedLevel
+            OasisTreePreferenceStore.clearLedgerEnergyCache()
+        }
+
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let human = Human(name: "Starter")
+        human.coconutBalance = StarterGiftPolicy.giftAmount
+        context.insert(human)
+        try context.save()
+
+        defaults.set(human.id.uuidString, forKey: "currentActiveHumanId")
+        OasisTreePreferenceStore.injectedEnergy = 0
+        OasisTreePreferenceStore.lastRewardedLevel = 0
+        OasisTreePreferenceStore.clearLedgerEnergyCache()
+
+        let manager = OasisTreeManager()
+        manager.setEnergyForTesting(islandEnergy: 0, injectedEnergy: 0)
+
+        for _ in 0 ..< 5 {
+            #expect(manager.injectEnergy(
+                cost: OasisTreeEnergyInjectionPolicy.starterPackageCost,
+                modelContext: context
+            ))
+        }
+
+        #expect(manager.totalEnergy == 5 * OasisTreeEnergyInjectionPolicy.starterPackageXP)
+        #expect(manager.treeLevel == .lv1)
+        #expect(CoconutWalletService.balance(for: human, context: context) == 0)
+    }
+
+    @MainActor
+    @Test func oasisTreeCareGrowthXPCannotRestoreEnergyAcrossLedgerStoresWithSameCount() async throws {
+        UserDefaults.standard.removeObject(forKey: "oasis_injectedEnergy")
+        UserDefaults.standard.removeObject(forKey: "oasis_v2LegacyBaselineXP")
+        UserDefaults.standard.removeObject(forKey: "oasis_v2LegacyBaselineXPScaleVersion")
+        OasisTreePreferenceStore.clearLedgerEnergyCache()
+        defer {
+            UserDefaults.standard.removeObject(forKey: "oasis_injectedEnergy")
+            UserDefaults.standard.removeObject(forKey: "oasis_v2LegacyBaselineXP")
+            UserDefaults.standard.removeObject(forKey: "oasis_v2LegacyBaselineXPScaleVersion")
             OasisTreePreferenceStore.clearLedgerEnergyCache()
         }
 
@@ -431,9 +641,10 @@ struct OhanaTests {
 
         let firstManager = OasisTreeManager()
         firstManager.refreshPreviewEnergy(modelContext: firstContainer.mainContext, pets: [], humans: [])
-        #expect(firstManager.islandEnergy == 120)
+        #expect(firstManager.islandEnergy == 0)
 
         UserDefaults.standard.removeObject(forKey: "oasis_v2LegacyBaselineXP")
+        UserDefaults.standard.removeObject(forKey: "oasis_v2LegacyBaselineXPScaleVersion")
         let secondContainer = try makeInMemoryContainer()
         secondContainer.mainContext.insert(CareLedgerEvent(
             id: UUID(uuidString: "00000000-0000-0000-0000-000000000202") ?? UUID(),
@@ -450,17 +661,19 @@ struct OhanaTests {
 
         let secondManager = OasisTreeManager()
         secondManager.refreshPreviewEnergy(modelContext: secondContainer.mainContext, pets: [], humans: [])
-        #expect(secondManager.islandEnergy == 40)
+        #expect(secondManager.islandEnergy == 0)
     }
 
     @MainActor
-    @Test func oasisTreeEnergyCacheAccumulatesNewLedgerEvents() async throws {
+    @Test func oasisTreeEnergyCacheRecoversOnlyInjectedXPFromNewLedgerEvents() async throws {
         UserDefaults.standard.removeObject(forKey: "oasis_injectedEnergy")
         UserDefaults.standard.removeObject(forKey: "oasis_v2LegacyBaselineXP")
+        UserDefaults.standard.removeObject(forKey: "oasis_v2LegacyBaselineXPScaleVersion")
         OasisTreePreferenceStore.clearLedgerEnergyCache()
         defer {
             UserDefaults.standard.removeObject(forKey: "oasis_injectedEnergy")
             UserDefaults.standard.removeObject(forKey: "oasis_v2LegacyBaselineXP")
+            UserDefaults.standard.removeObject(forKey: "oasis_v2LegacyBaselineXPScaleVersion")
             OasisTreePreferenceStore.clearLedgerEnergyCache()
         }
 
@@ -480,7 +693,7 @@ struct OhanaTests {
 
         let manager = OasisTreeManager()
         manager.refreshPreviewEnergy(modelContext: context, pets: [], humans: [])
-        #expect(manager.islandEnergy == 30)
+        #expect(manager.islandEnergy == 0)
         #expect(manager.injectedEnergy == 0)
 
         context.insert(CareLedgerEvent(
@@ -491,12 +704,12 @@ struct OhanaTests {
             subjectId: nil,
             eventKind: .coconut,
             actionType: "treeInjection",
-            metadataJSON: "{\"economyVersion\":2,\"growthXP\":12,\"injectedXP\":5}"
+            metadataJSON: "{\"economyVersion\":2,\"growthXP\":12,\"injectedXP\":5,\"reason\":\"treeInjection\"}"
         ))
         try context.save()
 
         manager.refreshPreviewEnergy(modelContext: context, pets: [], humans: [])
-        #expect(manager.islandEnergy == 42)
+        #expect(manager.islandEnergy == 0)
         #expect(manager.injectedEnergy == 5)
     }
 

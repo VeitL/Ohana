@@ -819,6 +819,38 @@ struct ManualFeedCommandTests {
         }
     }
 
+    @Test func savedPlanResultCarriesFreshEventsBeforeRouteQueryCatchesUp() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let now = date(year: 2026, month: 5, day: 1, hour: 9)
+        let pet = Pet(name: "Momo", species: "猫")
+        context.insert(pet)
+        try context.save()
+
+        let draft = FeedPlanDraft(
+            kind: .manualReminder,
+            meals: [
+                FeedPlanMealDraft(time: date(year: 2026, month: 5, day: 1, hour: 8), foodKind: .dry, grams: 45),
+                FeedPlanMealDraft(time: date(year: 2026, month: 5, day: 1, hour: 18), foodKind: .wet, grams: 30)
+            ],
+            now: now
+        )
+
+        let staleRouteEvents: [Event] = []
+        let result = SaveFeedPlanCommand.run(
+            pet: pet,
+            targets: [pet],
+            kind: .manualReminder,
+            draft: draft,
+            allEvents: staleRouteEvents,
+            context: context
+        )
+
+        #expect(FeedOperatingMode.resolved(pet: pet, allEvents: staleRouteEvents, now: now) == .manual)
+        #expect(FeedOperatingMode.resolved(pet: pet, allEvents: result.events, now: now) == .manualReminder)
+        #expect(result.events.count(where: { FeedRuleMetadata.isManualReminderEvent($0, pet: pet) }) == 2)
+    }
+
     @Test func switchFeedModeToAutoFeederDeactivatesManualReminders() throws {
         let container = try makeContainer()
         let context = container.mainContext

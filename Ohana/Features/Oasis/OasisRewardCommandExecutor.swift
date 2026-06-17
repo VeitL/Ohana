@@ -17,13 +17,16 @@ struct OasisRewardCommandExecutor {
         self.shopInventory = shopInventory
     }
 
-    func currentHumanCoconutBalance(humans: [Human], currentActiveHumanId: String) -> Int {
-        guard let human = humans.first(where: {
+    private func activeWritableHuman(humans: [Human], currentActiveHumanId: String) -> Human? {
+        guard !currentActiveHumanId.isEmpty else { return nil }
+        return humans.first(where: {
             $0.id.uuidString == currentActiveHumanId &&
                 MemberLifecycleGate.disposition(human: $0, writeKind: .care).allowsEconomyDerivation
-        }) else {
-            return rewards.currentHumanBalance(context: context)
-        }
+        })
+    }
+
+    func currentHumanCoconutBalance(humans: [Human], currentActiveHumanId: String) -> Int {
+        guard let human = activeWritableHuman(humans: humans, currentActiveHumanId: currentActiveHumanId) else { return 0 }
         return CoconutWalletService.balance(for: human, context: context)
     }
 
@@ -32,12 +35,13 @@ struct OasisRewardCommandExecutor {
         currentActiveHumanId: String,
         critterFragments: [OasisCritterFragmentBalance]
     ) -> OasisRewardActionSnapshot {
-        OasisRewardActionSnapshot(
-            canInjectCoconuts: rewards.canSpendCurrentHumanCoconuts(80, context: context),
-            activeCoconutBalance: currentHumanCoconutBalance(
-                humans: humans,
-                currentActiveHumanId: currentActiveHumanId
-            ),
+        let activeBalance = currentHumanCoconutBalance(
+            humans: humans,
+            currentActiveHumanId: currentActiveHumanId
+        )
+        return OasisRewardActionSnapshot(
+            canInjectCoconuts: activeBalance >= OasisTreeEnergyInjectionPolicy.starterPackageCost,
+            activeCoconutBalance: activeBalance,
             critterFragmentTotal: critterFragments.reduce(0) { $0 + $1.amount }
         )
     }
@@ -64,7 +68,8 @@ struct OasisRewardCommandExecutor {
 
     func makeCritterSnapshots(
         electronicPets: [OasisElectronicPet],
-        fragments: [OasisCritterFragmentBalance] = []
+        fragments: [OasisCritterFragmentBalance] = [],
+        activeCoconutBalance: Int
     ) -> [UUID: OasisCritterRenderSnapshot] {
         var snapshots: [UUID: OasisCritterRenderSnapshot] = [:]
         for critter in electronicPets where !critter.isArchived {
@@ -74,7 +79,6 @@ struct OasisRewardCommandExecutor {
             let feedCost = rewards.interactionCost(for: critter, action: .feed, context: context)
             let playCost = rewards.interactionCost(for: critter, action: .play, context: context)
             let restCost = rewards.interactionCost(for: critter, action: .rest, context: context)
-            let activeBalance = rewards.currentHumanBalance(context: context)
             let fragmentCount = fragments.first(where: { $0.catalogId == critter.catalogId })?.amount ?? 0
             let xpProgress = rewards.xpProgress(for: critter)
             let canUseActions = lifecycle.state != .dead
@@ -98,15 +102,15 @@ struct OasisRewardCommandExecutor {
                 todayInteractionCount: rewards.todayInteractionCount(for: critter, context: context),
                 canUpgradeLevel: rewards.canUpgradeLevel(for: critter),
                 xpNeededForNextLevel: max(0, rewards.critterXPPerLevel - xpProgress),
-                canFeed: canUseActions && activeBalance >= feedCost,
-                canPlay: canUseActions && activeBalance >= playCost,
-                canRest: canUseActions && activeBalance >= restCost,
+                canFeed: canUseActions && activeCoconutBalance >= feedCost,
+                canPlay: canUseActions && activeCoconutBalance >= playCost,
+                canRest: canUseActions && activeCoconutBalance >= restCost,
                 feedCost: feedCost,
                 playCost: playCost,
                 restCost: restCost,
                 starFragmentsCost: starCost.fragments,
                 starCoconutsCost: starCost.coconuts,
-                canUpgradeStar: canUseActions && fragmentCount >= starCost.fragments && activeBalance >= starCost.coconuts
+                canUpgradeStar: canUseActions && fragmentCount >= starCost.fragments && activeCoconutBalance >= starCost.coconuts
             )
         }
         return snapshots
@@ -167,7 +171,10 @@ struct OasisRewardCommandExecutor {
         return true
     }
 
-    func injectTreeEnergy(treeManager: OasisTreeManaging, cost: Int = 80) -> Bool {
+    func injectTreeEnergy(
+        treeManager: OasisTreeManaging,
+        cost: Int = OasisTreeEnergyInjectionPolicy.starterPackageCost
+    ) -> Bool {
         treeManager.injectEnergy(cost: cost, modelContext: context)
     }
 
@@ -223,7 +230,8 @@ struct OasisRewardCommandExecutor {
 
     func triggerTodayCheckIn(
         currentActiveHumanId: String,
-        checkedInDates: Set<String>
+        checkedInDates: Set<String>,
+        postsRewardFeedback: Bool = true
     ) -> Set<String>? {
         let today = CheckInStreakStore.dateString()
         guard !checkedInDates.contains(today) else { return nil }
@@ -234,7 +242,7 @@ struct OasisRewardCommandExecutor {
             emoji: "📅",
             title: "每日打卡奖励",
             context: context,
-            postsRewardFeedback: true,
+            postsRewardFeedback: postsRewardFeedback,
             date: Date()
         ) != nil else {
             context.rollback()

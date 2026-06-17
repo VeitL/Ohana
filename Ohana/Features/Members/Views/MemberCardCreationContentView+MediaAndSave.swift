@@ -379,11 +379,15 @@ extension MemberCardCreationContentView {
     }
 
     var homeJoinHandoffSaveDelayMilliseconds: UInt64 {
-        reduceMotion ? 140 : 820
+        reduceMotion ? 70 : 140
     }
 
     var homeJoinHandoffResetDelayMilliseconds: UInt64 {
-        reduceMotion ? 80 : 240
+        reduceMotion ? 60 : 160
+    }
+
+    var standardSaveSuccessDelayMilliseconds: UInt64 {
+        reduceMotion ? 120 : 280
     }
 
     func scheduleHomeJoinHandoffPreflightIfNeeded() {
@@ -472,7 +476,7 @@ extension MemberCardCreationContentView {
             withAnimation(GoMotion.sheet) {
                 didShowSuccess = true
             }
-            joinSaveTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: 780) {
+            joinSaveTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: standardSaveSuccessDelayMilliseconds) {
                 didShowSuccess = false
                 isSaving = false
                 clearMediaReturnStepStorage()
@@ -495,16 +499,14 @@ extension MemberCardCreationContentView {
     func finishSaveAfterHomeJoinHandoff(pet: Pet?, human: Human?) {
         guard isJoinHandoffRunning else { return }
         clearMediaReturnStepStorage()
+        notifySavedMembers(pet: pet, human: human)
         joinSaveTask = OhanaFrameScheduler.runAfterNextFrame {
-            notifySavedMembers(pet: pet, human: human)
-            joinSaveTask = OhanaFrameScheduler.runAfterNextFrame {
-                if presentationStyle == .onboarding {
-                    OnboardingHomeJoinHandoffGate.markCompleted()
-                }
-                onComplete()
-                joinSaveTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: homeJoinHandoffResetDelayMilliseconds) {
-                    resetHomeJoinHandoffState()
-                }
+            if presentationStyle == .onboarding {
+                OnboardingHomeJoinHandoffGate.markCompleted()
+            }
+            onComplete()
+            joinSaveTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: homeJoinHandoffResetDelayMilliseconds) {
+                resetHomeJoinHandoffState()
             }
         }
     }

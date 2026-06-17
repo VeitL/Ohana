@@ -377,15 +377,16 @@ struct OhanaSheetPageScaffold<Leading: View, Trailing: View, Content: View, Floa
 
             if showsCloseButton {
                 Button(action: onClose) {
-                    Image(systemName: "xmark") // a11y: allow close button has localized label; icon hidden below
+                    Image(systemName: "xmark") // a11y: allow parent Button owns the localized close label and stable identifier.
                         .font(OhanaFont.body(.black))
                         .foregroundStyle(Color.ohanaPrimaryText)
                         .frame(width: 44, height: 44)
                         .contentShape(Rectangle())
-                        .accessibilityHidden(true)
                 }
                 .buttonStyle(ScaleButtonStyle())
+                .accessibilityElement(children: .ignore)
                 .accessibilityLabel(L10n(AppLanguage.code).tr(zh: "关闭", en: "Close", de: "Schließen"))
+                .accessibilityIdentifier("ohana-sheet-close-action")
             }
         }
     }

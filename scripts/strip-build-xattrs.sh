@@ -78,6 +78,14 @@ for path in "${candidates[@]}"; do
     strip_failures=$((strip_failures + 1))
   fi
 
+  # Some File Provider-backed workspaces can attach FinderInfo through the
+  # directory's hidden/invisible flag. xattr -cr may report success while
+  # codesign still rejects the bundle root, so clear the Finder flags directly.
+  if command -v SetFile >/dev/null 2>&1; then
+    SetFile -a v "${path}" 2>/dev/null || true
+  fi
+  chflags nohidden "${path}" 2>/dev/null || true
+
   # xattr -cr is recursive, but explicitly clear common root-level signing
   # blockers because File Provider can attach them to bundle directories.
   /usr/bin/xattr -d com.apple.FinderInfo "${path}" 2>/dev/null || true

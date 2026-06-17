@@ -176,14 +176,15 @@ struct PetCardBackSettingsSheet: View {
 
         let command = DomainCommand.memberDeletion(entityID: pet.id, kind: EntityKind.pet.rawValue)
         deleteNameInput = ""
+        showDeleteConfirm = false
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-        commandQueue.enqueue(command) {
+        dismiss()
+        commandQueue.enqueue(command, delayMilliseconds: DeferredDomainCommandQueue.destructiveRouteDismissDelayMilliseconds) {
             MemberCommandExecutor(context: modelContext, services: appServices).deletePet(
                 pet,
                 note: "pet.cardBack.delete"
             )
             UINotificationFeedbackGenerator().notificationOccurred(.success)
-            dismiss()
         }
     }
 }

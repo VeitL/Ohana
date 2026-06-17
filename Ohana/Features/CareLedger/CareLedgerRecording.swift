@@ -119,8 +119,10 @@ extension CareLedgerService: CareLedgerRecording {
     }
 
     func syncLedgerEnergyIfNeeded(metadataJSON: String, context: ModelContext) {
-        guard CoconutEconomyPolicyV2.metadataValue(named: "growthXP", in: metadataJSON) > 0 else { return }
-        OasisTreeManagerRegistry.current.refreshLedgerEnergy(modelContext: context)
+        _ = metadataJSON
+        _ = context
+        // Tree level changes are owned by OasisTreeManager.injectEnergy/applyPurchasedEnergyBoost.
+        // Care/health/walk ledger writes may carry growth metadata, but must not refresh tree energy.
     }
 
     func subjectInfo(from event: Event?, context: ModelContext) -> CareLedgerSubjectInfo {

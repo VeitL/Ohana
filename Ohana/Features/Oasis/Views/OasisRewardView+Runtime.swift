@@ -328,8 +328,12 @@ extension OasisRewardView {
         stopAmbientMotion()
     }
 
-    func refreshLiveDataSnapshot() {
-        liveDataStore.refresh(context: modelContext)
+    func refreshLiveDataSnapshot(delayMilliseconds: UInt64 = 96, force: Bool = false) {
+        liveDataStore.refresh(
+            context: modelContext,
+            delayMilliseconds: delayMilliseconds,
+            force: force
+        )
     }
 
     func refreshOasisEnergyIfActive() {
@@ -370,7 +374,7 @@ extension OasisRewardView {
                 preparedWorkTask = nil
                 return
             }
-            refreshLiveDataSnapshot()
+            refreshLiveDataSnapshot(delayMilliseconds: 0)
             commandExecutor.refreshPreviewEnergy(treeManager: treeMgr, pets: pets, humans: humans, plants: plants)
             lastLevel = treeMgr.treeLevel
             loadCheckInData()
@@ -381,7 +385,7 @@ extension OasisRewardView {
     }
 
     func refreshVisibleState() {
-        refreshLiveDataSnapshot()
+        refreshLiveDataSnapshot(delayMilliseconds: 0)
         commandExecutor.refreshEnergy(treeManager: treeMgr, pets: pets, humans: humans, plants: plants)
         commandExecutor.refreshFeaturedCritterLifecycle(electronicPets)
         lastLevel = treeMgr.treeLevel
@@ -437,7 +441,8 @@ extension OasisRewardView {
         )
         critterRenderSnapshots = commandExecutor.makeCritterSnapshots(
             electronicPets: electronicPets,
-            fragments: critterFragments
+            fragments: critterFragments,
+            activeCoconutBalance: nextActionSnapshot.activeCoconutBalance
         )
     }
 

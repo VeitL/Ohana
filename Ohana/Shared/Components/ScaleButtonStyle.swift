@@ -6,6 +6,7 @@ import SwiftUI
 struct ScaleButtonStyle: ButtonStyle {
     @Environment(\.isEnabled) private var isEnabled
     var triggersHaptic = true
+    var addsDepth = false
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
@@ -13,6 +14,7 @@ struct ScaleButtonStyle: ButtonStyle {
                 OhanaButtonPressFeedbackModifier(
                     isPressed: configuration.isPressed,
                     isEnabled: isEnabled,
+                    addsDepth: addsDepth,
                     triggersHaptic: triggersHaptic
                 )
             )
@@ -27,7 +29,7 @@ struct OhanaButtonPressFeedbackModifier: ViewModifier {
     var pressedScale: CGFloat = 0.972
     var pressedOffset: CGFloat = 0.7
     var pressedOpacity: Double = 0.985
-    var addsDepth: Bool = true
+    var addsDepth: Bool = false
     var triggersHaptic: Bool = true
     @State private var wasPressed = false
 

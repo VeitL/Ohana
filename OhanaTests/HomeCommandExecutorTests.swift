@@ -43,6 +43,85 @@ struct HomeCommandExecutorTests {
     }
 
     @MainActor
+    @Test func homeFeedQuickActionCompletesFreshPlanWhenCardSnapshotIsStale() throws {
+        let revisionCenter = ReadModelRevisionCenter()
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let now = makeDate(year: 2026, month: 6, day: 17, hour: 9, minute: 0)
+        let scheduledAt = makeDate(year: 2026, month: 6, day: 17, hour: 10, minute: 0)
+        let pet = Pet(name: "Momo", species: "猫")
+        pet.dailyPortionGrams = 45
+        pet.mainFoodKind = .dry
+        let executorHuman = insertExecutorHuman(in: context)
+        let planEvent = Event(
+            title: "Breakfast dry 45g",
+            startDate: scheduledAt,
+            eventType: EventType.foodChange.rawValue,
+            relatedEntityType: EntityKind.pet.rawValue,
+            relatedEntityId: pet.id.uuidString
+        )
+        planEvent.feedRuleKindRaw = FeedRuleKind.manualReminder.rawValue
+        planEvent.feedAmountGrams = 45
+        planEvent.foodKindRaw = FeedFoodKind.dry.rawValue
+        let reminder = Reminder(event: planEvent, scheduledAt: scheduledAt)
+        context.insert(pet)
+        context.insert(planEvent)
+        context.insert(reminder)
+        try context.save()
+
+        let defaults = UserDefaults.standard
+        let oldActiveHumanID = defaults.object(forKey: "currentActiveHumanId")
+        defer {
+            if let oldActiveHumanID {
+                defaults.set(oldActiveHumanID, forKey: "currentActiveHumanId")
+            } else {
+                defaults.removeObject(forKey: "currentActiveHumanId")
+            }
+            EconomyDailyBudgetStore.resetAll()
+        }
+        defaults.set(executorHuman.id.uuidString, forKey: "currentActiveHumanId")
+        EconomyDailyBudgetStore.resetAll()
+
+        let medicationReminders = MedicationReminderManagerSpy()
+        let revisions = SharedDomainRevisionPublisher(center: revisionCenter)
+        let executor = HomeCommandExecutor(
+            modelContext: context,
+            careEvents: CareEventService(),
+            coconutExchange: StaticCoconutExchangeManager(),
+            revisions: revisions,
+            questManager: QuestManager(wallet: SwiftDataCoconutWalletManager(), revisions: revisions),
+            medicationReminders: medicationReminders,
+            todayFocus: StaticTodayFocusManager()
+        )
+        var openedFeedDetail: Bool?
+        var feedbacks: [ExpandedQuickActionExecutor.Feedback] = []
+
+        let didRecord = executor.performActionType(
+            "feed",
+            petID: pet.id,
+            executorId: executorHuman.id.uuidString,
+            now: now,
+            antiRepeatTitle: "Already logged",
+            antiRepeatMessage: { "\($0.executorName) \($0.minutesAgo)" },
+            openFeedDetail: { _, opensManualSheet in openedFeedDetail = opensManualSheet },
+            showAntiRepeat: { _, _, pendingAction in pendingAction() },
+            startWalk: { _ in },
+            openWaterManagement: { _ in },
+            openMedication: { _ in },
+            feedback: { feedbacks.append($0) }
+        )
+
+        let logs = try context.fetch(FetchDescriptor<PetCareLog>())
+        #expect(didRecord == true)
+        #expect(openedFeedDetail == nil)
+        #expect(reminder.isCompleted)
+        #expect(logs.count == 1)
+        #expect(logs.first?.note.hasPrefix(PetCareLog.plannedFeedNotePrefix) == true)
+        #expect(feedbacks.map(\.cardId) == [pet.id])
+        #expect(medicationReminders.scheduledPetIDs.isEmpty)
+    }
+
+    @MainActor
     @Test func plannedFeedForDeceasedPetNoopsWithoutHomeRevision() throws {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
@@ -235,6 +314,7 @@ struct HomeCommandExecutorTests {
 
     @MainActor
     @Test func quickFeedByIdDoesNotDuplicateFoodStockReminderEvents() throws {
+        let revisionCenter = ReadModelRevisionCenter()
         let container = try makeInMemoryContainer()
         let context = container.mainContext
         let now = makeDate(year: 2026, month: 6, day: 8, hour: 9, minute: 0)
@@ -257,8 +337,18 @@ struct HomeCommandExecutorTests {
         context.insert(foodRecord)
         try context.save()
 
-        let executor = HomeCommandExecutor(modelContext: context)
+        let revisions = SharedDomainRevisionPublisher(center: revisionCenter)
+        let executor = HomeCommandExecutor(
+            modelContext: context,
+            careEvents: CareEventService(),
+            coconutExchange: StaticCoconutExchangeManager(),
+            revisions: revisions,
+            questManager: QuestManager(wallet: SwiftDataCoconutWalletManager(), revisions: revisions),
+            medicationReminders: MedicationReminderManagerSpy(),
+            todayFocus: StaticTodayFocusManager()
+        )
         var feedbacks: [ExpandedQuickActionExecutor.Feedback] = []
+        let beforeRevision = revisionCenter.homeRevision.value
 
         func performQuickFeed(at date: Date) {
             executor.performActionType(
@@ -288,6 +378,7 @@ struct HomeCommandExecutorTests {
         #expect(feedingLogs.count == 2)
         #expect(stockReminderEvents(for: pet, context: context).count == 1)
         #expect(feedbacks.map(\.cardId) == [pet.id, pet.id])
+        #expect(revisionCenter.homeRevision.value == beforeRevision + 2)
     }
 
     @MainActor
@@ -9057,6 +9148,7 @@ struct HomeCommandExecutorTests {
 
     private final class MedicationReminderManagerSpy: MedicationReminderManaging {
         private(set) var recordedMedicationIDs: [UUID] = []
+        private(set) var scheduledPetIDs: [UUID] = []
 
         func dosesTakenToday(for _: UUID) -> Int {
             0
@@ -9068,7 +9160,9 @@ struct HomeCommandExecutorTests {
 
         func undoDose(for _: UUID) {}
 
-        func scheduleMedicationReminders(for _: Pet, context _: ModelContext?) {}
+        func scheduleMedicationReminders(for pet: Pet, context _: ModelContext?) {
+            scheduledPetIDs.append(pet.id)
+        }
 
         func scheduleHumanMedicationReminders(for _: Human, meds _: [HumanMedication], context _: ModelContext?) {}
     }

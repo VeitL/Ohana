@@ -69,7 +69,7 @@ extension QuickFeedDetailContent {
 
     func syncDisplayedFeedMode(animated: Bool = false, force: Bool = false) {
         guard force || feedHomeController.modeTransition == nil else { return }
-        let resolvedMode = FeedOperatingMode.resolved(pet: pet, allEvents: allEvents, now: clockTick)
+        let resolvedMode = FeedOperatingMode.resolved(pet: pet, allEvents: currentAllEvents, now: clockTick)
         feedHomeController.syncDisplayedMode(resolvedMode, pet: pet, animated: animated, force: force)
     }
 
@@ -137,7 +137,8 @@ extension QuickFeedDetailContent {
         } else {
             draftStore.manualGramsText = "50"
         }
-        draftStore.manualDefaultEnabled = pet.dailyPortionGrams > 0 || !settingsOnly
+        // The settings-only sheet hides the default toggle, so it must save the visible grams.
+        draftStore.manualDefaultEnabled = true
         draftStore.saveManualAsDefault = !settingsOnly
     }
 
@@ -202,7 +203,7 @@ extension QuickFeedDetailContent {
     }
 
     func preparePlanEditorDraft(_ kind: FeedRuleKind) {
-        let events = FeedingPlanWriter.planEvents(pet: pet, kind: kind, allEvents: allEvents)
+        let events = FeedingPlanWriter.planEvents(pet: pet, kind: kind, allEvents: currentAllEvents)
         draftStore.selectedSharedPlanPetIds = SharedPetSelectionMemory.restoredSelection(
             sourcePet: pet,
             scope: "feeding.plan.\(kind.rawValue)",

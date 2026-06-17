@@ -111,6 +111,7 @@ struct PetBasicInfoDetailView: View {
                 isEditing = false
             }
         }
+        .accessibilityIdentifier("pet-basic-info-screen")
     }
 
     // MARK: - Read View

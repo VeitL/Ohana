@@ -185,6 +185,7 @@ fi
 
 if [[ ${#app_swift_files[@]} -gt 0 ]]; then
   run "Smoothness audit for touched app Swift" scripts/audit-smoothness-risk.sh ${audit_mode[@]+"${audit_mode[@]}"} "${app_swift_files[@]}"
+  run "Route first-frame audit for touched app Swift" scripts/audit-route-first-frame.sh ${audit_mode[@]+"${audit_mode[@]}"} "${app_swift_files[@]}"
   run "Runtime guardrails for touched app Swift" scripts/audit-runtime-guardrails.sh ${audit_mode[@]+"${audit_mode[@]}"} "${app_swift_files[@]}"
   run "Shared-care note metadata audit for touched app Swift" scripts/audit-shared-care-note-metadata.sh ${audit_mode[@]+"${audit_mode[@]}"} "${app_swift_files[@]}"
   run "Economy boundaries audit for touched app Swift" scripts/audit-economy-boundaries.sh ${audit_mode[@]+"${audit_mode[@]}"} "${app_swift_files[@]}"

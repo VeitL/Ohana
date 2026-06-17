@@ -68,6 +68,8 @@ final class SharedDataBackupManagerAdapter: DataBackupManaging {
 @MainActor
 protocol AppResetting {
     func reset(context: ModelContext) throws
+    func reset(context: ModelContext, options: AppResetService.Options) throws
+    func resetForUITests(context: ModelContext) throws
 }
 
 @MainActor
@@ -83,6 +85,27 @@ final class StaticAppResetter: AppResetting {
             context: context,
             options: AppResetService.Options(),
             questManager: questManager
+        )
+    }
+
+    func reset(context: ModelContext, options: AppResetService.Options) throws {
+        try AppResetService.reset(
+            context: context,
+            options: options,
+            questManager: questManager
+        )
+    }
+
+    func resetForUITests(context: ModelContext) throws {
+        try reset(
+            context: context,
+            options: AppResetService.Options(
+                preserveLocalePreferences: false,
+                cancelPendingNotifications: false,
+                deleteCustomBackground: true,
+                resetSharedRuntimeState: true,
+                cleanUpAutomaticBackups: false
+            )
         )
     }
 }

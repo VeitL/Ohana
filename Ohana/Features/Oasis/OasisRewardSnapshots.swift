@@ -14,12 +14,24 @@ struct OasisRewardLiveDataSnapshot {
 @MainActor
 final class OasisRewardLiveDataStore: ObservableObject {
     @Published private(set) var snapshot = OasisRewardLiveDataSnapshot()
+    private var refreshTask: Task<Void, Never>?
 
-    func refresh(context: ModelContext) {
-        snapshot = Self.fetchSnapshot(context: context)
+    func refresh(context: ModelContext, delayMilliseconds: UInt64 = 96, force: Bool = false) {
+        if force {
+            refreshTask?.cancel()
+            refreshTask = nil
+        }
+        guard refreshTask == nil else { return }
+        refreshTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: delayMilliseconds) { [weak self] in
+            guard let self else { return }
+            snapshot = Self.fetchSnapshot(context: context)
+            refreshTask = nil
+        }
     }
 
     func reset() {
+        refreshTask?.cancel()
+        refreshTask = nil
         snapshot = OasisRewardLiveDataSnapshot()
     }
 

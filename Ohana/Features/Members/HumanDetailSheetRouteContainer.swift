@@ -33,11 +33,12 @@ extension AppHumanDetailSheetDestination {
 }
 
 struct HumanAllFeaturesRouteContainer: View {
-    @Query private var humans: [Human]
-    @Query private var allMeds: [HumanMedication]
-    @Query private var allReports: [HumanHealthReport]
-    @Query private var allExpenses: [PetExpenseLog]
+    @Environment(\.modelContext) private var modelContext
+    @Environment(AppServices.self) private var appServices
+    @State private var routeData = HumanAllFeaturesRouteData()
+    @State private var dataLoadTask: Task<Void, Never>?
 
+    let id: UUID
     let onMissing: () -> Void
     let onOpenDestination: (UUID, HumanAllFeatureDestination) -> Void
 
@@ -46,41 +47,18 @@ struct HumanAllFeaturesRouteContainer: View {
         onMissing: @escaping () -> Void,
         onOpenDestination: @escaping (UUID, HumanAllFeatureDestination) -> Void
     ) {
-        let humanKey = id.uuidString
-        _humans = Query(filter: #Predicate<Human> { human in
-            human.id == id
-        })
-        _allMeds = Query(
-            filter: #Predicate<HumanMedication> { med in
-                med.humanId == humanKey
-            },
-            sort: \.createdAt
-        )
-        _allReports = Query(
-            filter: #Predicate<HumanHealthReport> { report in
-                report.humanId == humanKey
-            },
-            sort: \.reportDate,
-            order: .reverse
-        )
-        _allExpenses = Query(
-            filter: #Predicate<PetExpenseLog> { expense in
-                expense.executorId == humanKey
-            },
-            sort: \.date,
-            order: .reverse
-        )
+        self.id = id
         self.onMissing = onMissing
         self.onOpenDestination = onOpenDestination
     }
 
     var body: some View {
-        if let human = humans.first {
+        if let human = routeData.human {
             HumanAllFeaturesSheet(
                 human: human,
-                allMeds: allMeds,
-                allReports: allReports,
-                allExpenses: allExpenses,
+                allMeds: routeData.allMeds,
+                allReports: routeData.allReports,
+                allExpenses: routeData.allExpenses,
                 onOpenDestination: { destination in
                     guard !human.hasPassedAway || destination.isAvailableInMemorialMode else {
                         return
@@ -88,15 +66,48 @@ struct HumanAllFeaturesRouteContainer: View {
                     onOpenDestination(human.id, destination)
                 }
             )
-        } else {
+            .onAppear {
+                scheduleRouteDataLoad()
+            }
+            .onReceive(appServices.domainRevisions.homeRevisionUpdates) { _ in
+                scheduleRouteDataLoad(delayMilliseconds: 120, force: true)
+            }
+            .onDisappear {
+                dataLoadTask?.cancel()
+                dataLoadTask = nil
+            }
+        } else if routeData.hasLoaded {
             HumanRouteMissingEntityView(kind: "human")
                 .onAppear(perform: onMissing)
+        } else {
+            HumanRouteLoadingEntityView(kind: "human")
+                .onAppear {
+                    scheduleRouteDataLoad()
+                }
+                .onDisappear {
+                    dataLoadTask?.cancel()
+                    dataLoadTask = nil
+                }
+        }
+    }
+
+    private func scheduleRouteDataLoad(delayMilliseconds: UInt64 = 120, force: Bool = false) {
+        guard force || !routeData.hasLoaded else { return }
+        guard dataLoadTask == nil else { return }
+        dataLoadTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: delayMilliseconds) {
+            routeData = HumanAllFeaturesRouteData.load(id: id, from: modelContext)
+            dataLoadTask = nil
         }
     }
 }
 
 struct AppHumanDetailSheetRouteContainer: View {
-    @Query private var humans: [Human]
+    @Environment(\.modelContext) private var modelContext
+    @Environment(AppServices.self) private var appServices
+    @State private var routeData = HumanDetailRouteData()
+    @State private var dataLoadTask: Task<Void, Never>?
+
+    let id: UUID
     let destination: AppHumanDetailSheetDestination
     let onMissing: () -> Void
     let onHumanDoseTaken: (UUID) -> Void
@@ -107,20 +118,37 @@ struct AppHumanDetailSheetRouteContainer: View {
         onMissing: @escaping () -> Void,
         onHumanDoseTaken: @escaping (UUID) -> Void = { _ in }
     ) {
-        _humans = Query(filter: #Predicate<Human> { human in
-            human.id == id
-        })
+        self.id = id
         self.destination = destination
         self.onMissing = onMissing
         self.onHumanDoseTaken = onHumanDoseTaken
     }
 
     var body: some View {
-        if let human = humans.first {
+        if let human = routeData.human {
             humanDestination(for: human)
-        } else {
+                .onAppear {
+                    scheduleRouteDataLoad()
+                }
+                .onReceive(appServices.domainRevisions.homeRevisionUpdates) { _ in
+                    scheduleRouteDataLoad(delayMilliseconds: 120, force: true)
+                }
+                .onDisappear {
+                    dataLoadTask?.cancel()
+                    dataLoadTask = nil
+                }
+        } else if routeData.hasLoaded {
             HumanRouteMissingEntityView(kind: "human")
                 .onAppear(perform: onMissing)
+        } else {
+            HumanRouteLoadingEntityView(kind: "human")
+                .onAppear {
+                    scheduleRouteDataLoad()
+                }
+                .onDisappear {
+                    dataLoadTask?.cancel()
+                    dataLoadTask = nil
+                }
         }
     }
 
@@ -161,6 +189,103 @@ struct AppHumanDetailSheetRouteContainer: View {
             }
         }
     }
+
+    private func scheduleRouteDataLoad(delayMilliseconds: UInt64 = 120, force: Bool = false) {
+        guard force || !routeData.hasLoaded else { return }
+        guard dataLoadTask == nil else { return }
+        dataLoadTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: delayMilliseconds) {
+            routeData = HumanDetailRouteData.load(id: id, from: modelContext)
+            dataLoadTask = nil
+        }
+    }
+}
+
+private struct HumanAllFeaturesRouteData {
+    var human: Human?
+    var allMeds: [HumanMedication] = []
+    var allReports: [HumanHealthReport] = []
+    var allExpenses: [PetExpenseLog] = []
+    var hasLoaded = false
+
+    static func load(id: UUID, from context: ModelContext) -> HumanAllFeaturesRouteData {
+        let humanKey = id.uuidString
+        return HumanAllFeaturesRouteData(
+            human: fetchOne(
+                FetchDescriptor<Human>(
+                    predicate: #Predicate<Human> { $0.id == id }
+                ),
+                context: context,
+                name: "Human"
+            ),
+            allMeds: fetch(
+                FetchDescriptor<HumanMedication>(
+                    predicate: #Predicate<HumanMedication> { $0.humanId == humanKey },
+                    sortBy: [SortDescriptor(\.createdAt)]
+                ),
+                context: context,
+                name: "HumanMedication"
+            ),
+            allReports: fetch(
+                FetchDescriptor<HumanHealthReport>(
+                    predicate: #Predicate<HumanHealthReport> { $0.humanId == humanKey },
+                    sortBy: [SortDescriptor(\.reportDate, order: .reverse)]
+                ),
+                context: context,
+                name: "HumanHealthReport"
+            ),
+            allExpenses: fetch(
+                FetchDescriptor<PetExpenseLog>(
+                    predicate: #Predicate<PetExpenseLog> { $0.executorId == humanKey },
+                    sortBy: [SortDescriptor(\.date, order: .reverse)]
+                ),
+                context: context,
+                name: "PetExpenseLog"
+            ),
+            hasLoaded: true
+        )
+    }
+}
+
+private struct HumanDetailRouteData {
+    var human: Human?
+    var hasLoaded = false
+
+    static func load(id: UUID, from context: ModelContext) -> HumanDetailRouteData {
+        HumanDetailRouteData(
+            human: fetchOne(
+                FetchDescriptor<Human>(
+                    predicate: #Predicate<Human> { $0.id == id }
+                ),
+                context: context,
+                name: "Human"
+            ),
+            hasLoaded: true
+        )
+    }
+}
+
+private func fetchOne<T: PersistentModel>(
+    _ descriptor: FetchDescriptor<T>,
+    context: ModelContext,
+    name: String
+) -> T? {
+    fetch(descriptor, context: context, name: name).first
+}
+
+private func fetch<T: PersistentModel>(
+    _ descriptor: FetchDescriptor<T>,
+    context: ModelContext,
+    name: String
+) -> [T] {
+    do {
+        return try context.fetch(descriptor) // route-first-frame: allow deferred-fetch
+    } catch {
+        OhanaLog.warning(
+            "Human detail route data fetch failed for \(name): \(error.localizedDescription)",
+            category: "Members"
+        )
+        return []
+    }
 }
 
 private struct HumanRouteMissingEntityView: View {
@@ -175,6 +300,22 @@ private struct HumanRouteMissingEntityView: View {
             Text("内容已不可用")
                 .font(OhanaFont.title3(.black))
                 .foregroundStyle(Color.ohanaPrimaryText)
+            Text(kind)
+                .font(OhanaFont.caption(.semibold))
+                .foregroundStyle(Color.ohanaSecondaryText)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(OhanaAppBackground().ignoresSafeArea())
+    }
+}
+
+private struct HumanRouteLoadingEntityView: View {
+    let kind: String
+
+    var body: some View {
+        VStack(spacing: 12) {
+            ProgressView()
+                .controlSize(.regular)
             Text(kind)
                 .font(OhanaFont.caption(.semibold))
                 .foregroundStyle(Color.ohanaSecondaryText)

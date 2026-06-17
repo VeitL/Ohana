@@ -13,6 +13,7 @@ struct VerticalSolidHomeView: View {
     let onOpenHuman: (UUID) -> Void
     let onOpenPlant: (UUID) -> Void
     let createdEntitySignal: HomeCreatedEntitySignal?
+    let onCreatedEntitySignalHandled: (HomeCreatedEntitySignal) -> Void
     let onPresentAccountSwitcher: () -> Void
     let onPresentAddEntity: (EntityType) -> Void
     let onPresentAppSheet: (AppSheetRoute) -> Void
@@ -39,6 +40,8 @@ struct VerticalSolidHomeView: View {
     @AppStorage("goFocusHomeCardOrder.v1") var homeCardOrderRaw = ""
     @AppStorage("debugShowDummyCards") var showDummyCards = false
     @AppStorage("ohana_has_onboarded") var hasOnboarded = false
+    @AppStorage(StarterGiftService.Key.ceremonySeen) var starterGiftCeremonySeen = false
+    @AppStorage(StarterGiftService.Key.oasisTabPromptPending) var starterOasisTabPromptPending = false
     @AppStorage("ohanaGrowthOnboardingCompletedV1") var growthOnboardingCompleted = false
     @AppStorage("ohanaGrowthLastSeenTreeLevelV1") var growthLastSeenTreeLevel = 0
     @AppStorage("quickActionItems_v2") var quickActionItemsRaw = ""
@@ -62,6 +65,8 @@ struct VerticalSolidHomeView: View {
     @State var calendarAddEventPresentationTask: Task<Void, Never>?
     @State var calendarAddEventContentMountTask: Task<Void, Never>?
     @State var oasisInjectEnergyTrigger = 0
+    @State var oasisEnergyInjectionTask: Task<Void, Never>?
+    @State var pendingOasisEnergyInjectionCount = 0
     @State var avatarCacheRevision = 0
     @State var headerStreak = 0
     @State var isHomeCardExpandedOrTransitioning = false
@@ -78,14 +83,18 @@ struct VerticalSolidHomeView: View {
     @State var growthLoopPulseStatus: GrowthLoopPulseStatus?
     @State var growthLoopSyncTask: Task<Void, Never>?
     @State var growthLoopPulseDismissTask: Task<Void, Never>?
+    @State var todayFocusDailyCompletionTask: Task<Void, Never>?
     @State var snapshotRefreshGate = HomeSnapshotRefreshGate()
     @State var homeAppearHandoffTask: Task<Void, Never>?
+    @State var handledCreatedEntityToken: UUID?
+    @State var walkCardPresentationRevision = 0
 
     init(
         onOpenPet: @escaping (UUID, PetDetailTab) -> Void,
         onOpenHuman: @escaping (UUID) -> Void,
         onOpenPlant: @escaping (UUID) -> Void,
         createdEntitySignal: HomeCreatedEntitySignal?,
+        onCreatedEntitySignalHandled: @escaping (HomeCreatedEntitySignal) -> Void = { _ in },
         onPresentAccountSwitcher: @escaping () -> Void,
         onPresentAddEntity: @escaping (EntityType) -> Void,
         onPresentAppSheet: @escaping (AppSheetRoute) -> Void,
@@ -103,6 +112,7 @@ struct VerticalSolidHomeView: View {
         self.onOpenHuman = onOpenHuman
         self.onOpenPlant = onOpenPlant
         self.createdEntitySignal = createdEntitySignal
+        self.onCreatedEntitySignalHandled = onCreatedEntitySignalHandled
         self.onPresentAccountSwitcher = onPresentAccountSwitcher
         self.onPresentAddEntity = onPresentAddEntity
         self.onPresentAppSheet = onPresentAppSheet
@@ -324,6 +334,7 @@ struct VerticalSolidHomeView: View {
                         expenseEntries: expenseEntries,
                         avatarCacheRevision: avatarCacheRevision + avatarPipeline.revision,
                         isLive: lifecycle.isLive,
+                        walkPresentationRevision: walkCardPresentationRevision,
                         collapsedTopInset: homeCollapsedTopInset,
                         localization: l,
                         activeHumanID: activeHumanID,
@@ -454,6 +465,15 @@ struct VerticalSolidHomeView: View {
                 .frame(maxHeight: .infinity, alignment: .bottom)
                 .zIndex(9)
 
+                if shouldShowStarterOasisTabPrompt {
+                    StarterOasisTabPromptView(localization: l)
+                        .padding(.horizontal, 18)
+                        .padding(.bottom, max(146, safeBottom + 128))
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                        .zIndex(12)
+                }
+
                 if isCalendarAddEventPresented || calendarAddEventProgress > 0.001 {
                     OhanaDeferredInlinePageCover(
                         progress: calendarAddEventProgress,
@@ -509,6 +529,7 @@ struct VerticalSolidHomeView: View {
         .toolbar(.hidden, for: .navigationBar)
         .onAppear {
             scheduleHomeAppearHandoff()
+            handleCreatedEntitySignalIfNeeded(createdEntitySignal)
         }
         .onChange(of: dataSignature) { _, _ in
             if !pets.isEmpty || !humans.isEmpty {
@@ -517,7 +538,7 @@ struct VerticalSolidHomeView: View {
             requestHomeSnapshotRefresh()
         }
         .onChange(of: controller.snapshot.todayFocus.refreshedQuests) { previous, current in
-            awardTodayFocusDailyCompletionIfCleared(previousQuests: previous, currentQuests: current)
+            scheduleTodayFocusDailyCompletionIfCleared(previousQuests: previous, currentQuests: current)
         }
         .onChange(of: isHomeCardHeroAnimating) { _, isAnimating in
             flushDeferredHomeSnapshotRefreshIfNeeded(isAnimating: isAnimating)
@@ -537,6 +558,10 @@ struct VerticalSolidHomeView: View {
             growthUnlockToastDismissTask?.cancel()
             growthLoopSyncTask?.cancel()
             growthLoopPulseDismissTask?.cancel()
+            todayFocusDailyCompletionTask?.cancel()
+            oasisEnergyInjectionTask?.cancel()
+            pendingOasisEnergyInjectionCount = 0
+            todayFocusDailyCompletionTask = nil
             growthLoopPulseStatus = nil
             avatarPipeline.cancel(key: avatarPreloadSignature)
             commandQueue.cancelAll()
@@ -551,8 +576,7 @@ struct VerticalSolidHomeView: View {
             }
         }
         .onChange(of: createdEntitySignal) { _, signal in
-            guard let signal else { return }
-            handleNewHomeMemberSaved(id: signal.entityID)
+            handleCreatedEntitySignalIfNeeded(signal)
         }
         .focusHomeRouteSheets(
             pets: pets,
@@ -575,12 +599,18 @@ struct VerticalSolidHomeView: View {
                 onOpenHuman(human.id)
             },
             onFirstSuccessMomentCompleted: { _ in },
-            onHumanDoseTaken: { _ in }
+            onHumanDoseTaken: { _ in },
+            onStartWalkFromQuickAction: { petID in
+                startWalkFromQuickAction(petID: petID)
+            }
         )
         .onChange(of: activeHumanIdRaw) { _, _ in
             refreshHeaderStreak()
         }
         .onChange(of: controller.selectedTab) { _, _ in
+            closeVerticalFabMenu(immediate: true)
+        }
+        .onChange(of: starterGiftCeremonySeen) { _, _ in
             closeVerticalFabMenu(immediate: true)
         }
         .onChange(of: expandedBottomBarCard?.id) { _, _ in
@@ -590,5 +620,12 @@ struct VerticalSolidHomeView: View {
         .onChange(of: treeManager.treeLevel.rawValue) { _, _ in
             scheduleGrowthUnlockFeedbackIfNeeded()
         }
+    }
+
+    private var shouldShowStarterOasisTabPrompt: Bool {
+        starterOasisTabPromptPending &&
+            starterGiftCeremonySeen &&
+            controller.selectedTab == .home &&
+            AppFeatureRouteGuard.allowsHomeTab(.oasis)
     }
 }

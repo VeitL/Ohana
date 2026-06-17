@@ -42,6 +42,7 @@ extension TodayFocusCard {
                 .contentShape(Rectangle())
             }
             .buttonStyle(ScaleButtonStyle())
+            .accessibilityIdentifier(questCardAccessibilityIdentifier(for: q))
             .frame(maxWidth: .infinity, alignment: .leading)
 
             focusActionButton(
@@ -52,6 +53,7 @@ extension TodayFocusCard {
                 OhanaFeedback.medium()
                 onCompleteQuest(q)
             }
+            .accessibilityIdentifier(questActionAccessibilityIdentifier(for: q))
         }
         .padding(.horizontal, TodayFocusCardLayout.contentHorizontalPadding)
         .padding(.vertical, TodayFocusCardLayout.contentVerticalPadding)
@@ -352,6 +354,7 @@ extension TodayFocusCard {
                 .contentShape(Rectangle())
             }
             .buttonStyle(ScaleButtonStyle())
+            .accessibilityIdentifier("home-add-first-pet-card")
             .frame(maxWidth: .infinity, alignment: .leading)
 
             focusActionButton(
@@ -362,6 +365,7 @@ extension TodayFocusCard {
                 OhanaFeedback.medium()
                 onTapOasis()
             }
+            .accessibilityIdentifier("home-add-first-pet-action")
         }
         .padding(.horizontal, TodayFocusCardLayout.contentHorizontalPadding)
         .padding(.vertical, TodayFocusCardLayout.contentVerticalPadding)
@@ -437,6 +441,20 @@ extension TodayFocusCard {
             return l.tr(zh: "完成", en: "Done", de: "Fertig")
         }
         return l.tr(zh: "打卡", en: "Check in", de: "Abhaken")
+    }
+
+    func questCardAccessibilityIdentifier(for quest: IslandQuest) -> String {
+        if quest.id == IslandQuestEngine.oasisPetWizardQuestId {
+            return "home-add-first-pet-card"
+        }
+        return "today-focus-quest-card-\(quest.id)"
+    }
+
+    func questActionAccessibilityIdentifier(for quest: IslandQuest) -> String {
+        if quest.id == IslandQuestEngine.oasisPetWizardQuestId {
+            return "home-add-first-pet-action"
+        }
+        return "today-focus-quest-action-\(quest.id)"
     }
 
     func negativeActionIcon(for signal: IslandNegativeSignal) -> String {

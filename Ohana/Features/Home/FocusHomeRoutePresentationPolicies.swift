@@ -21,7 +21,13 @@ extension AppPresentationPolicyProvider {
         case .functionMenu:
             homeSheetPagePolicy("home.functionMenu")
         case .streakDetail:
-            homeSheetPagePolicy("home.streakDetail")
+            AppPresentationPolicy(
+                surface: .sheetPage,
+                loading: .immediate,
+                instrumentationName: "home.streakDetail",
+                detents: [.large],
+                cornerRadius: OhanaRadius.sheetPage
+            )
         case .addEntity:
             homeSheetPagePolicy("home.addEntity")
         case .coconutLog:

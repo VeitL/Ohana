@@ -41,7 +41,7 @@ extension OasisUpgradeRewardService {
             do {
                 try context.save()
             } catch {
-                insertedCoconuts.forEach { context.delete($0) }
+                insertedCoconuts.forEach { context.delete($0) } // derived-state: allow rollback of unsaved local upgrade coconuts before persistence
                 throw error
             }
         }
@@ -62,8 +62,8 @@ extension OasisUpgradeRewardService {
         }
 
         var duplicateCritter = false
-        let treeManager = OasisTreeManagerRegistry.current
-        let previousInjectedEnergy = treeManager.injectedEnergy
+
+        normalizeManualOnlyTreeEnergyReward(coconut)
 
         if coconut.rewardKind == .electronicPet,
            let critterId = coconut.guaranteedCritterId,
@@ -101,10 +101,6 @@ extension OasisUpgradeRewardService {
         }
 
         coconut.openedAt = Date()
-
-        if coconut.treeEnergyAmount > 0 {
-            treeManager.injectedEnergy += coconut.treeEnergyAmount
-        }
 
         if coconut.fragmentAmount > 0 {
             let critterId = coconut.guaranteedCritterId ?? OasisUpgradeRewardCatalog.firstCritterId
@@ -162,14 +158,27 @@ extension OasisUpgradeRewardService {
             try context.save()
         } catch {
             context.rollback()
-            treeManager.injectedEnergy = previousInjectedEnergy
             wallet.refreshQuestProjection(context: context, manager: questManager)
             throw error
         }
 
-        if coconut.treeEnergyAmount > 0 {
-            _ = treeManager.checkAndRewardLevelUp(modelContext: context)
-        }
         return openedResult(for: coconut, duplicate: duplicateCritter)
+    }
+
+    private static func normalizeManualOnlyTreeEnergyReward(_ coconut: OasisUpgradeCoconut) {
+        if coconut.treeEnergyAmount > 0 {
+            coconut.treeEnergyAmount = 0
+        }
+        guard coconut.rewardKind == .treeEnergy else { return }
+        coconut.rewardKind = .temporaryEffect
+        coconut.titleZh = "树冠火花"
+        coconut.titleEn = "Canopy Spark"
+        coconut.titleDe = "Baumfunke"
+        coconut.descriptionZh = "这颗旧升级椰子已转换为临时光效；生命树等级只通过手动注入能量提升。"
+        coconut.descriptionEn = "This legacy upgrade coconut now grants a temporary effect; Life Tree levels only grow from manual energy injection."
+        coconut.descriptionDe = "Diese alte Upgrade-Kokosnuss gibt nun einen temporären Effekt; Lebensbaum-Level steigen nur durch manuelle Energiezufuhr."
+        if coconut.temporaryEffectId == nil {
+            coconut.temporaryEffectId = "tree_spark_\(coconut.level)"
+        }
     }
 }

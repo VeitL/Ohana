@@ -245,6 +245,58 @@ struct HomeRouteCoordinatorTests {
         #expect(coordinator.fullScreen == nil)
     }
 
+    @Test func expandedFabRouterKeepsQuickWalkOnCardAndDetailWalkInSummary() {
+        let pet = Pet(name: "Lilo", species: "Dog")
+        let card = FocusCard.from(pet)
+        var quickWalkIDs: [UUID] = []
+        var summaryWalkIDs: [UUID] = []
+
+        let actions = FocusHomeExpandedFabRouter.Actions(
+            showPetAllFeatures: { _ in },
+            showHumanAllFeatures: { _ in },
+            openFeed: { _ in },
+            openWater: { _ in },
+            openWalk: { quickWalkIDs.append($0.id) },
+            openWalkSummary: { summaryWalkIDs.append($0.id) },
+            openPotty: { _ in },
+            openPlay: { _ in },
+            openMedication: { _ in },
+            openHygiene: { _ in },
+            openMoment: { _ in },
+            openHealth: { _ in },
+            openWeight: { _ in },
+            openExpense: { _ in },
+            showHumanWeight: { _ in },
+            showHumanWorkout: { _ in },
+            showHumanMedication: { _ in },
+            showHumanNote: { _ in },
+            quickHumanExpense: { _ in },
+            showPrivacyAlert: {}
+        )
+
+        FocusHomeExpandedFabRouter.open(
+            ExpandedCardFabShortcut(label: "Walk", icon: "figure.walk", action: .quick("walk")),
+            card: card,
+            pets: [pet],
+            humans: [],
+            activeHumanId: nil,
+            privacy: StaticHumanPrivacyManager(),
+            actions: actions
+        )
+        FocusHomeExpandedFabRouter.open(
+            ExpandedCardFabShortcut(label: "Walks", icon: "figure.walk", action: .detail(.walks)),
+            card: card,
+            pets: [pet],
+            humans: [],
+            activeHumanId: nil,
+            privacy: StaticHumanPrivacyManager(),
+            actions: actions
+        )
+
+        #expect(quickWalkIDs == [pet.id])
+        #expect(summaryWalkIDs == [pet.id])
+    }
+
     @Test func accountSwitcherFallsBackToLocalModalWithoutAppSheetSink() {
         let coordinator = HomeRouteCoordinator()
 
@@ -485,7 +537,7 @@ struct HomeRouteCoordinatorTests {
         #expect(petID == pet.id)
     }
 
-    @Test func antiRepeatAlertOwnsPendingActionUntilConfirmedOrDismissed() {
+    @Test func antiRepeatAlertOwnsPendingActionUntilConfirmedOrDismissed() async {
         let coordinator = HomeRouteCoordinator()
         var didRun = false
 
@@ -503,8 +555,13 @@ struct HomeRouteCoordinatorTests {
 
         coordinator.confirmAntiRepeatAction()
 
-        #expect(didRun)
+        #expect(!didRun)
         #expect(coordinator.alert == nil)
         #expect(coordinator.pendingRepeatAction == nil)
+
+        for _ in 0 ..< 8 where !didRun {
+            await OhanaFrameScheduler.waitAfterNextFrame(milliseconds: 30)
+        }
+        #expect(didRun)
     }
 }

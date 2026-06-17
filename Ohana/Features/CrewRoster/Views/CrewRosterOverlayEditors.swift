@@ -881,31 +881,38 @@ struct CrewRosterProfilePanel: View {
 
     private func deletePetWithCascade() {
         guard let pet else { return }
-        MemberCommandExecutor(context: modelContext, services: appServices).deletePet(
-            pet,
-            note: "crew.member.deleted.pet"
-        )
+        let command = DomainCommand.memberDeletion(entityID: pet.id, kind: EntityKind.pet.rawValue)
         showingPetDeleteSheet = false
         onDeleted()
+        commandQueue.enqueue(command, delayMilliseconds: DeferredDomainCommandQueue.destructiveRouteDismissDelayMilliseconds) {
+            MemberCommandExecutor(context: modelContext, services: appServices).deletePet(
+                pet,
+                note: "crew.member.deleted.pet"
+            )
+        }
     }
 
     private func deleteHumanAndReturnHome() {
         guard let human else { return }
-        let result = MemberCommandExecutor(context: modelContext, services: appServices).deleteHuman(
-            human,
-            activeHumanID: activeHumanIdStr,
-            note: "crew.member.deleted.human"
-        )
-        if result.clearsActiveHumanID {
-            activeHumanIdStr = ""
-        }
-        appServices.notificationRoutes.publishRouteEvent(
-            .humanDeleted(
-                requiresReplacementHuman: result.requiresReplacementHuman,
-                requiresAccountSwitch: result.requiresAccountSwitch
-            )
-        )
+        let activeHumanID = activeHumanIdStr
+        let command = DomainCommand.memberDeletion(entityID: human.id, kind: EntityKind.human.rawValue)
         showingHumanDeleteSheet = false
         onDeleted()
+        commandQueue.enqueue(command, delayMilliseconds: DeferredDomainCommandQueue.destructiveRouteDismissDelayMilliseconds) {
+            let result = MemberCommandExecutor(context: modelContext, services: appServices).deleteHuman(
+                human,
+                activeHumanID: activeHumanID,
+                note: "crew.member.deleted.human"
+            )
+            if result.clearsActiveHumanID {
+                activeHumanIdStr = ""
+            }
+            appServices.notificationRoutes.publishRouteEvent(
+                .humanDeleted(
+                    requiresReplacementHuman: result.requiresReplacementHuman,
+                    requiresAccountSwitch: result.requiresAccountSwitch
+                )
+            )
+        }
     }
 }

@@ -301,6 +301,7 @@ struct VerticalHomeEmbeddedQuickActions: View {
             .buttonStyle(ScaleButtonStyle())
             .allowsHitTesting(!isEditMode)
             .accessibilityLabel(accessibilityLabel(for: item, statusText: statusText(for: item)))
+            .accessibilityIdentifier("home-quick-action-\(item.actionType)")
 
             if openActionId == item.id {
                 inlineMenu(item: item, detailAction: item.detailAction, index: index)
@@ -379,7 +380,7 @@ struct VerticalHomeEmbeddedQuickActions: View {
 
             if let detailAction {
                 inlineMenuButton(
-                    actionType: detailActionType(for: item),
+                    actionType: "\(item.actionType)-detail",
                     icon: item.detailIcon,
                     tint: Color.goCardWhite.opacity(0.16),
                     foreground: Color.goCardWhite,
@@ -465,16 +466,7 @@ struct VerticalHomeEmbeddedQuickActions: View {
         .buttonStyle(ScaleButtonStyle())
         .disabled(isDisabled)
         .accessibilityLabel(accessibility)
-    }
-
-    private func detailActionType(for item: VerticalHomeEmbeddedAction) -> String {
-        let action = item.actionType.lowercased()
-        if ["water", "waterchange", "filterclean"].contains(action) { return "water" }
-        if item.detailIcon.contains("credit") { return "expense" }
-        if item.detailIcon.contains("chart") { return action.contains("weight") ? "weight" : "document" }
-        if item.detailIcon.contains("sparkles") { return "moment" }
-        if item.detailIcon.contains("list") { return "document" }
-        return item.actionType
+        .accessibilityIdentifier("home-quick-action-menu-\(actionType)")
     }
 
     private var addLauncherCell: some View {

@@ -121,6 +121,34 @@ struct MemberCreationServiceTests {
         #expect(Avatar2DAccess.extraPassCount == 0)
     }
 
+    @Test func duplicateHumanNameIsRejectedWhenViewSnapshotIsStale() throws {
+        resetGlobalState()
+        let container = try makeContainer()
+        let context = container.mainContext
+        let existing = Human(name: "Ava")
+        context.insert(existing)
+        try context.save()
+
+        do {
+            _ = try saveMember(
+                draft: humanDraft(name: " ava ", source: .placeholder),
+                existingPets: [],
+                existingHumans: [],
+                context: context,
+                countryCode: "CN"
+            )
+            Issue.record("Expected duplicate name rejection from context-backed member snapshot")
+        } catch let error as MemberCreationService.ServiceError {
+            if case .duplicateName = error {
+                // Expected: the service must not trust a stale view snapshot.
+            } else {
+                Issue.record("Expected duplicate name rejection")
+            }
+        }
+
+        #expect(try context.fetch(FetchDescriptor<Human>()).count == 1)
+    }
+
     @Test func cardPurchaseDeductsCoconutsRecordsLedgerAndSaveConsumesPass() throws {
         resetGlobalState()
         let container = try makeContainer()

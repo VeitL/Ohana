@@ -61,6 +61,7 @@ struct PetBasicInfoDangerZone: View {
                     .strokeBorder(Color.goRed.opacity(0.3), lineWidth: 1))
             }
             .buttonStyle(ScaleButtonStyle())
+            .accessibilityIdentifier("pet-danger-delete-action")
         }
         .padding(.top, 8)
         .alert("仅清空所有记录", isPresented: $showingClearConfirm) {
@@ -145,6 +146,7 @@ private struct PetDeleteConfirmationSheet: View {
                     .background(Color.primary.opacity(0.08), in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
                     .overlay(RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous)
                         .strokeBorder(canDelete ? Color.goRed.opacity(0.7) : Color.primary.opacity(0.12), lineWidth: 1))
+                    .accessibilityIdentifier("pet-delete-confirm-name-input")
 
                 HStack(spacing: 10) {
                     Button(action: onCancel) {
@@ -156,6 +158,7 @@ private struct PetDeleteConfirmationSheet: View {
                             .background(Color.primary.opacity(0.08), in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
                     }
                     .buttonStyle(ScaleButtonStyle())
+                    .accessibilityIdentifier("pet-delete-confirm-cancel")
 
                     Button(action: attemptDelete) {
                         Text("删除")
@@ -167,14 +170,10 @@ private struct PetDeleteConfirmationSheet: View {
                     }
                     .buttonStyle(ScaleButtonStyle())
                     .disabled(!canDelete)
+                    .accessibilityIdentifier("pet-delete-confirm-delete")
                 }
             }
             .padding(20)
-        }
-        .onAppear {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
-                confirmNameFocused = true
-            }
         }
     }
 

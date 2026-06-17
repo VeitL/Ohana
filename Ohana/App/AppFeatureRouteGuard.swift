@@ -102,17 +102,26 @@ enum AppFeatureRouteGuard {
         }
     }
 
-    static func allowsHomeTab(_ tab: VerticalSolidHomeTab) -> Bool {
+    static func allowsHomeTab(
+        _ tab: VerticalSolidHomeTab,
+        starterGiftDefaults: UserDefaults = .standard
+    ) -> Bool {
         switch tab {
         case .plants:
             PlantFeatureGate.allows(.plants)
-        case .home, .calendar, .oasis:
+        case .oasis:
+            StarterGiftService.isOasisHomeTabUnlocked(defaults: starterGiftDefaults)
+        case .home, .calendar:
             true
         }
     }
 
+    static func visibleHomeTabs(starterGiftDefaults: UserDefaults = .standard) -> [VerticalSolidHomeTab] {
+        VerticalSolidHomeTab.allCases.filter { allowsHomeTab($0, starterGiftDefaults: starterGiftDefaults) }
+    }
+
     static var visibleHomeTabs: [VerticalSolidHomeTab] {
-        VerticalSolidHomeTab.allCases.filter { allowsHomeTab($0) }
+        visibleHomeTabs()
     }
 
     static var shouldLoadPlantData: Bool {

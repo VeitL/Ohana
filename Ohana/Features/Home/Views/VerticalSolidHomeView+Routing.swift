@@ -103,6 +103,9 @@ extension VerticalSolidHomeView {
         guard controller.selectedTab != tab else { return }
         OhanaFeedback.selection()
         closeVerticalFabMenu(immediate: true)
+        if tab == .oasis {
+            starterOasisTabPromptPending = false
+        }
         if tab == .calendar {
             prepareEmbeddedCalendarFilterForCurrentContext()
         }
@@ -140,7 +143,7 @@ extension VerticalSolidHomeView {
         case .calendar:
             openCalendarAddEvent()
         case .oasis:
-            oasisInjectEnergyTrigger += 1
+            injectEmbeddedOasisEnergy()
         case .plants:
             routeCoordinator.openAddEntity(.plant)
         }

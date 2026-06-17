@@ -341,6 +341,7 @@ struct GrowthUnlockRoadmapView: View {
                             progressToNextLevel: progressToNextLevel,
                             appLanguage: appLanguage
                         )
+                        levelRulesCard
                         roadmapCard
                     }
                     .padding(.horizontal, 16)
@@ -428,9 +429,9 @@ struct GrowthUnlockRoadmapView: View {
                     .font(OhanaFont.callout(.black))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Text(localized(
-                    zh: "首次建立家庭后获得 50🥥，播放 Lv0 到 Lv1 的欢迎仪式；它不会直接购买等级。",
-                    en: "After the first family setup, you receive 50🥥 and a Lv0 to Lv1 welcome ceremony; it does not buy levels.",
-                    de: "Nach dem ersten Zuhause gibt es 50🥥 und eine Lv0-zu-Lv1-Begrüßung; es kauft keine Level."
+                    zh: "首次建立家庭后获得 \(StarterGiftPolicy.giftAmount)🥥；椰子树保持 Lv0。每次注入 \(OasisTreeEnergyInjectionPolicy.starterPackageXP) 能量，注入 5 次后升到 Lv1。",
+                    en: "After the first family setup, you receive \(StarterGiftPolicy.giftAmount)🥥; the tree stays Lv0. Each injection adds \(OasisTreeEnergyInjectionPolicy.starterPackageXP) energy, and 5 injections reach Lv1.",
+                    de: "Nach dem ersten Zuhause gibt es \(StarterGiftPolicy.giftAmount)🥥; der Baum bleibt Lv0. Jede Einspeisung gibt \(OasisTreeEnergyInjectionPolicy.starterPackageXP) Energie, 5 Einspeisungen erreichen Lv1."
                 ))
                 .font(OhanaFont.caption(.semibold))
                 .foregroundStyle(Color.ohanaSecondaryText)
@@ -440,6 +441,57 @@ struct GrowthUnlockRoadmapView: View {
         .frame(minHeight: 76)
         .padding(16)
         .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous))
+    }
+
+    private var levelRulesCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(localized(zh: "等级说明", en: "Level guide", de: "Level-Hinweise"))
+                .font(OhanaFont.callout(.black))
+                .foregroundStyle(Color.ohanaPrimaryText)
+
+            levelRuleLine(
+                icon: "bolt.fill",
+                text: localized(
+                    zh: "注入能量会消耗当前主人的椰子：\(OasisTreeEnergyInjectionPolicy.starterPackageCost)🥥 -> \(OasisTreeEnergyInjectionPolicy.starterPackageXP) 能量。",
+                    en: "Injecting energy spends the active human's coconuts: \(OasisTreeEnergyInjectionPolicy.starterPackageCost)🥥 -> \(OasisTreeEnergyInjectionPolicy.starterPackageXP) energy.",
+                    de: "Energieeinspeisung nutzt Kokosnüsse der aktiven Person: \(OasisTreeEnergyInjectionPolicy.starterPackageCost)🥥 -> \(OasisTreeEnergyInjectionPolicy.starterPackageXP) Energie."
+                )
+            )
+            levelRuleLine(
+                icon: "tree.fill",
+                text: localized(
+                    zh: "Lv1 需要 50 总能量，所以新手礼包足够完成 5 次注入。",
+                    en: "Lv1 needs 50 total energy, so the starter gift covers 5 injections.",
+                    de: "Lv1 braucht 50 Gesamtenergie; das Startergeschenk reicht fuer 5 Einspeisungen."
+                )
+            )
+            levelRuleLine(
+                icon: "circle.hexagongrid.fill",
+                text: localized(
+                    zh: "Lv5 开始解锁每日椰子收益；到达后这里会显示每天可领取的椰子数。",
+                    en: "Lv5 unlocks daily coconut yield; after reaching it, this guide shows the daily amount you can collect.",
+                    de: "Ab Lv5 gibt es taegliche Kokos-Ertraege; danach zeigt diese Hilfe die taegliche Menge."
+                )
+            )
+        }
+        .padding(16)
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous))
+    }
+
+    private func levelRuleLine(icon: String, text: String) -> some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: icon)
+                .font(OhanaFont.adaptive(size: 12, weight: .black))
+                .foregroundStyle(Color.goPrimary)
+                .frame(width: 24, height: 24) // a11y: allow non-interactive level guide glyph; row text carries the content.
+                .background(Color.ohanaControlFill, in: Circle())
+                .accessibilityHidden(true)
+
+            Text(text)
+                .font(OhanaFont.caption(.semibold))
+                .foregroundStyle(Color.ohanaSecondaryText)
+                .fixedSize(horizontal: false, vertical: true)
+        }
     }
 
     private var roadmapCard: some View {

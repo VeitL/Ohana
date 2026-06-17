@@ -33,6 +33,7 @@ struct MemberNameInputField: UIViewRepresentable {
         textField.backgroundColor = .clear
         textField.borderStyle = .none
         textField.clearButtonMode = .whileEditing
+        textField.accessibilityIdentifier = "member-name-input"
         textField.font = .systemFont(ofSize: 17, weight: .bold)
         textField.adjustsFontForContentSizeCategory = true
         return textField

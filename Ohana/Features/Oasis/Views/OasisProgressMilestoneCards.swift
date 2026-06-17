@@ -53,7 +53,7 @@ struct OasisProgressCard: View {
                 progressStatCell(
                     value: passiveIncomeAmount > 0
                         ? localization.tr(zh: "+\(passiveIncomeAmount)🥥/日", en: "+\(passiveIncomeAmount)🥥/day", de: "+\(passiveIncomeAmount)🥥/Tag")
-                        : localization.tr(zh: "Lv.5 解锁", en: "Unlocks at Lv.5", de: "Ab Lv.5"),
+                        : "—",
                     label: localization.tr(zh: "被动收入", en: "Passive income", de: "Passives Einkommen"),
                     color: passiveIncomeAmount > 0 ? Color.goPrimary : Color.ohanaSecondaryText.opacity(0.6)
                 )
@@ -160,6 +160,7 @@ struct OasisMilestoneCard: View {
 
     private func passiveIncomeForLevel(_ lv: TreeLevel) -> Int {
         switch lv {
+        case .lv0: 0
         case .lv1: 1
         case .lv2: 2
         case .lv3: 3

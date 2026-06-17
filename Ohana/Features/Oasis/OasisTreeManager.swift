@@ -9,26 +9,35 @@ import Observation
 import SwiftData
 import SwiftUI
 
-// MARK: - Tree Level（10 级系统）
+// MARK: - Tree Level（Lv0 + 10 级系统）
 
-/// 椰子树等级，rawValue 对应 1-10 级（显示级别）
+nonisolated enum OasisTreeEnergyInjectionPolicy {
+    static let starterPackageCost = 10
+    static let starterPackageXP = 10
+    static let largePackageCost = 220
+    static let largePackageXP = 60
+}
+
+/// 椰子树等级，rawValue 对应显示级别；首装无能量时保持 Lv0。
 enum TreeLevel: Int, CaseIterable, Comparable {
     static func < (lhs: TreeLevel, rhs: TreeLevel) -> Bool { lhs.rawValue < rhs.rawValue }
     static var maxSupportedLevel: Int { allCases.map(\.rawValue).max() ?? 10 }
 
-    case lv1 = 1 // 希望之种   0–49
-    case lv2 = 2 // 破土嫩芽  50–149
-    case lv3 = 3 // 茁壮成长 150–299
-    case lv4 = 4 // 初现树形 300–499
-    case lv5 = 5 // 椰影婆娑 500–799
-    case lv6 = 6 // 果实初挂 800–1199
-    case lv7 = 7 // 硕果累累1200–1799
-    case lv8 = 8 // 参天古木1800–2599
-    case lv9 = 9 // 灵树觉醒2600–3599
+    case lv0 = 0 // 未唤醒种子 0–49
+    case lv1 = 1 // 希望之种   50–149
+    case lv2 = 2 // 破土嫩芽  150–299
+    case lv3 = 3 // 茁壮成长 300–499
+    case lv4 = 4 // 初现树形 500–799
+    case lv5 = 5 // 椰影婆娑 800–1199
+    case lv6 = 6 // 果实初挂 1200–1799
+    case lv7 = 7 // 硕果累累1800–2599
+    case lv8 = 8 // 参天古木2600–3199
+    case lv9 = 9 // 灵树觉醒3200–3599
     case lv10 = 10 // 生命之树3600+
 
     var displayName: String {
         switch self {
+        case .lv0: "未唤醒种子"
         case .lv1: "希望之种"
         case .lv2: "破土嫩芽"
         case .lv3: "茁壮成长"
@@ -44,12 +53,13 @@ enum TreeLevel: Int, CaseIterable, Comparable {
 
     /// 升级奖励椰子数（升到该级时获得）
     var levelUpReward: Int {
-        guard self != .lv1 else { return 0 }
+        guard rawValue >= 2 else { return 0 }
         return OasisUpgradeRewardCatalog.rule(for: rawValue).coconutAmount
     }
 
     var glowColor: Color {
         switch self {
+        case .lv0: Color.ohanaSecondaryText
         case .lv1, .lv2: Color.goYellow
         case .lv3, .lv4: Color(hex: "A3E635")
         case .lv5, .lv6: Color(hex: "84CC16")
@@ -65,12 +75,13 @@ enum TreeLevel: Int, CaseIterable, Comparable {
 
     /// 0.0 ~ 1.0，用于树的视觉生长进度
     var growthProgress: Double {
-        Double(rawValue - 1) / 9.0
+        Double(rawValue) / 10.0
     }
 }
 
 // MARK: - 能量阈值表
-private let energyThresholds: [Int] = [0, 50, 150, 300, 500, 800, 1200, 1800, 2600, 3600, Int.max]
+private let energyThresholds: [Int] = [0, 50, 150, 300, 500, 800, 1200, 1800, 2600, 3200, 3600]
+private let legacyEnergyThresholds: [Int] = [0, 0, 50, 150, 300, 500, 800, 1200, 1800, 2600, 3600]
 
 // MARK: - OasisTreeManager
 
@@ -86,14 +97,15 @@ struct OasisDailyTreeCoconutSnapshot: Equatable {
 
 @Observable
 final class OasisTreeManager {
-    // 基础繁荣度（来自数据库活动）
-    var islandEnergy: Int = 0
+    // Current tree levels are driven only by explicit energy injection.
+    // Legacy/activity growth is kept out of totalEnergy so care actions cannot level the tree.
+    private(set) var islandEnergy: Int = 0
     // 额外注入经验（消耗椰子所得）
-    var injectedEnergy: Int = 0 {
+    private(set) var injectedEnergy: Int = 0 {
         didSet { OasisTreePreferenceStore.injectedEnergy = injectedEnergy }
     }
 
-    var totalEnergy: Int { islandEnergy + injectedEnergy }
+    var totalEnergy: Int { injectedEnergy }
     private let questManager: QuestManager
     private let careLedger: CareLedgerRecording
     private let oasisRewards: OasisRewardManaging
@@ -103,34 +115,61 @@ final class OasisTreeManager {
     }
 
     /// 当前级别起始能量
-    private var currentLevelStart: Int { energyThresholds[treeLevel.rawValue - 1] }
+    private var currentLevelStart: Int { Self.levelStartThreshold(for: treeLevel) }
     /// 下一级所需总能量（满级时返回当前阈值）
-    var nextLevelThreshold: Int { energyThresholds[min(treeLevel.rawValue, 9)] }
+    var nextLevelThreshold: Int { Self.nextThreshold(after: treeLevel) }
 
     var progressToNextLevel: Double {
         Self.progressToNextLevel(forTotalEnergy: totalEnergy)
     }
 
     static func treeLevel(forTotalEnergy totalEnergy: Int) -> TreeLevel {
+        let safeEnergy = max(0, totalEnergy)
         for lv in TreeLevel.allCases.reversed() {
-            if totalEnergy >= energyThresholds[lv.rawValue - 1] { return lv }
+            if safeEnergy >= levelStartThreshold(for: lv) { return lv }
         }
-        return .lv1
+        return .lv0
+    }
+
+    static func legacyCompatibleXP(forLegacyTreeEnergy legacyEnergy: Int) -> Int {
+        let safeEnergy = max(0, legacyEnergy)
+        guard safeEnergy > 0 else { return 0 }
+        let oldLevelRaw = (1 ... TreeLevel.lv10.rawValue)
+            .reversed()
+            .first { safeEnergy >= legacyEnergyThresholds[$0] } ?? TreeLevel.lv1.rawValue
+        let oldStart = legacyEnergyThresholds[oldLevelRaw]
+        let oldNext = legacyEnergyThresholds[min(oldLevelRaw + 1, TreeLevel.lv10.rawValue)]
+        let newStart = energyThresholds[oldLevelRaw]
+        let newNext = energyThresholds[min(oldLevelRaw + 1, TreeLevel.lv10.rawValue)]
+        guard oldNext > oldStart, newNext > newStart else {
+            return max(safeEnergy, newStart)
+        }
+        let progress = Double(safeEnergy - oldStart) / Double(oldNext - oldStart)
+        return newStart + Int((Double(newNext - newStart) * progress).rounded(.down))
     }
 
     static func nextLevelThreshold(forTotalEnergy totalEnergy: Int) -> Int {
         let level = treeLevel(forTotalEnergy: totalEnergy)
-        return energyThresholds[min(level.rawValue, 9)]
+        return nextThreshold(after: level)
     }
 
     static func progressToNextLevel(forTotalEnergy totalEnergy: Int) -> Double {
         let level = treeLevel(forTotalEnergy: totalEnergy)
         guard level < .lv10 else { return 1.0 }
-        let currentStart = energyThresholds[level.rawValue - 1]
-        let nextThreshold = energyThresholds[min(level.rawValue, 9)]
+        let currentStart = levelStartThreshold(for: level)
+        let nextThreshold = nextThreshold(after: level)
         let span = nextThreshold - currentStart
         guard span > 0 else { return 1.0 }
-        return min(1.0, Double(totalEnergy - currentStart) / Double(span))
+        return min(1.0, Double(max(0, totalEnergy) - currentStart) / Double(span))
+    }
+
+    private static func levelStartThreshold(for level: TreeLevel) -> Int {
+        energyThresholds[min(max(level.rawValue, 0), TreeLevel.lv10.rawValue)]
+    }
+
+    private static func nextThreshold(after level: TreeLevel) -> Int {
+        guard level < .lv10 else { return levelStartThreshold(for: .lv10) }
+        return energyThresholds[min(level.rawValue + 1, TreeLevel.lv10.rawValue)]
     }
 
     // MARK: - 升级追踪（防止重复奖励）
@@ -269,7 +308,6 @@ final class OasisTreeManager {
             questManager: questManager
         )
         injectedEnergy = OasisTreePreferenceStore.injectedEnergy
-        if lastRewardedLevel == 0 { lastRewardedLevel = 1 }
     }
 
     private static func dailyTreeCoconutSnapshot(
@@ -346,7 +384,7 @@ final class OasisTreeManager {
             pets: pets,
             humans: humans
         )
-        islandEnergy = snapshot.legacyXP + snapshot.growthXP
+        islandEnergy = 0
         refreshInjectedEnergy(ledgerInjectedXP: snapshot.injectedXP)
     }
 
@@ -357,7 +395,7 @@ final class OasisTreeManager {
             pets: pets,
             humans: humans
         )
-        islandEnergy = snapshot.legacyXP + snapshot.growthXP
+        islandEnergy = 0
         refreshInjectedEnergy(ledgerInjectedXP: snapshot.injectedXP)
         checkAndRewardLevelUp(modelContext: modelContext)
     }
@@ -370,7 +408,7 @@ final class OasisTreeManager {
             pets: [],
             humans: []
         )
-        islandEnergy = snapshot.legacyXP + snapshot.growthXP
+        islandEnergy = 0
         refreshInjectedEnergy(ledgerInjectedXP: snapshot.injectedXP)
         checkAndRewardLevelUp(modelContext: modelContext)
         return treeLevel
@@ -545,12 +583,19 @@ final class OasisTreeManager {
     private static func ledgerEnergyDelta(from events: [CareLedgerEvent]) -> (growthXP: Int, injectedXP: Int) {
         events.reduce(into: (growthXP: 0, injectedXP: 0)) { partial, event in
             partial.growthXP += CoconutEconomyPolicyV2.metadataValue(named: "growthXP", in: event.metadataJSON)
+            guard isManualTreeInjectionLedger(event) else { return }
             partial.injectedXP += CoconutEconomyPolicyV2.metadataValue(named: "injectedXP", in: event.metadataJSON)
         }
     }
 
+    private static func isManualTreeInjectionLedger(_ event: CareLedgerEvent) -> Bool {
+        guard event.eventKindEnum == .coconut else { return false }
+        guard event.actionType == "treeInjection" || event.actionType == "treeInjectionLarge" else { return false }
+        return event.metadataJSON.contains("\"reason\":\"treeInjection\"")
+    }
+
     private func refreshInjectedEnergy(ledgerInjectedXP: Int) {
-        let recoveredXP = max(OasisTreePreferenceStore.injectedEnergy, ledgerInjectedXP)
+        let recoveredXP = max(0, ledgerInjectedXP)
         if injectedEnergy != recoveredXP {
             injectedEnergy = recoveredXP
         }
@@ -558,7 +603,10 @@ final class OasisTreeManager {
 
     // MARK: - Inject Energy（消耗椰子，增加树经验）
 
-    func canUseInjectionPackage(cost: Int = 80, date: Date = Date()) -> Bool {
+    func canUseInjectionPackage(
+        cost: Int = OasisTreeEnergyInjectionPolicy.starterPackageCost,
+        date: Date = Date()
+    ) -> Bool {
         let package = Self.injectionPackage(forRequestedCost: cost, currentLevel: treeLevel)
         guard package.isAvailable else { return false }
         return Self.canUseInjectionPackage(package, date: date)
@@ -566,7 +614,10 @@ final class OasisTreeManager {
 
     @discardableResult
     @MainActor
-    func injectEnergy(cost: Int = 80, modelContext: ModelContext) -> Bool {
+    func injectEnergy(
+        cost: Int = OasisTreeEnergyInjectionPolicy.starterPackageCost,
+        modelContext: ModelContext
+    ) -> Bool {
         let package = Self.injectionPackage(forRequestedCost: cost, currentLevel: treeLevel)
         guard package.isAvailable else { return false }
         guard Self.canUseInjectionPackage(package) else { return false }
@@ -587,6 +638,18 @@ final class OasisTreeManager {
         guard Self.canUseInjectionPackage(package) else { return false }
         return applyEnergyPackage(package, recordsCost: false, modelContext: modelContext)
     }
+
+    #if DEBUG
+        @MainActor
+        func setEnergyForTesting(islandEnergy: Int? = nil, injectedEnergy: Int? = nil) {
+            if let islandEnergy {
+                self.islandEnergy = max(0, islandEnergy)
+            }
+            if let injectedEnergy {
+                self.injectedEnergy = max(0, injectedEnergy)
+            }
+        }
+    #endif
 
     @discardableResult
     @MainActor
@@ -649,8 +712,19 @@ final class OasisTreeManager {
         pets: [Pet],
         humans: [Human]
     ) -> Int {
-        if PlantFeatureGate.allows(.plants), let legacyBaseline = OasisTreePreferenceStore.legacyBaselineXP() {
-            return legacyBaseline
+        if PlantFeatureGate.allows(.plants), let legacyBaseline = OasisTreePreferenceStore.legacyBaselineXPRecord() {
+            let compatibleBaseline = legacyBaseline.isCurrentScale
+                ? legacyBaseline.xp
+                : Self.legacyCompatibleXP(forLegacyTreeEnergy: legacyBaseline.xp)
+            if !legacyBaseline.isCurrentScale {
+                OasisTreePreferenceStore.storeLegacyBaselineXP(compatibleBaseline)
+            }
+            return compatibleBaseline
+        }
+
+        guard !ledgerEvents.contains(where: { $0.metadataJSON.contains("\"economyVersion\":2") }) else {
+            OasisTreePreferenceStore.storeLegacyBaselineXP(0)
+            return 0
         }
 
         let legacyLedgerCount = ledgerEvents.count(where: {
@@ -661,7 +735,7 @@ final class OasisTreeManager {
         let fallbackCount = legacyLedgerCount > 0
             ? legacyLedgerCount
             : legacyActivityCount(modelContext: modelContext, pets: pets, humans: humans)
-        let baseline = min(1200, fallbackCount * 4)
+        let baseline = Self.legacyCompatibleXP(forLegacyTreeEnergy: min(1200, fallbackCount * 4))
         OasisTreePreferenceStore.storeLegacyBaselineXP(baseline)
         return baseline
     }
@@ -712,22 +786,22 @@ final class OasisTreeManager {
     }
 
     private static func injectionPackage(forRequestedCost cost: Int, currentLevel: TreeLevel) -> InjectionPackage {
-        if cost >= 220 {
+        if cost >= OasisTreeEnergyInjectionPolicy.largePackageCost {
             return InjectionPackage(
-                cost: 220,
-                xp: 60,
+                cost: OasisTreeEnergyInjectionPolicy.largePackageCost,
+                xp: OasisTreeEnergyInjectionPolicy.largePackageXP,
                 actionType: "treeInjectionLarge",
-                title: "生命之树能量包 +60XP",
+                title: "生命之树能量包 +\(OasisTreeEnergyInjectionPolicy.largePackageXP)XP",
                 limitKey: OasisTreePreferenceStore.weeklyInjectionWeekKey,
                 isAvailable: currentLevel >= .lv5,
                 enforcesPeriodLimit: false
             )
         }
         return InjectionPackage(
-            cost: 80,
-            xp: 20,
+            cost: OasisTreeEnergyInjectionPolicy.starterPackageCost,
+            xp: OasisTreeEnergyInjectionPolicy.starterPackageXP,
             actionType: "treeInjection",
-            title: "注入生命之树能量 +20XP",
+            title: "注入生命之树能量 +\(OasisTreeEnergyInjectionPolicy.starterPackageXP)XP",
             limitKey: OasisTreePreferenceStore.dailyInjectionDayKey,
             isAvailable: true,
             enforcesPeriodLimit: false

@@ -96,7 +96,7 @@ extension QuickFeedDetailContent {
     func refreshStockSnapshot(force: Bool = false) {
         stockSnapshotStore.rebuild(
             pet: pet,
-            allEvents: allEvents,
+            allEvents: currentAllEvents,
             careLogs: observedCareLogs,
             foodRecords: observedFoodRecords,
             sharedCareSessions: allSharedCareSessions,

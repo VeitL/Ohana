@@ -13,6 +13,19 @@ struct MemberCreationSaveResult {
     let human: Human?
 }
 
+private struct MemberCreationExistingMembers {
+    let pets: [Pet]
+    let humans: [Human]
+
+    var normalizedNames: Set<String> {
+        Set((pets.map(\.name) + humans.map(\.name)).map(Self.normalizedName))
+    }
+
+    private nonisolated static func normalizedName(_ name: String) -> String {
+        name.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    }
+}
+
 enum MemberCreationError: LocalizedError {
     case emptyName
     case duplicateName
@@ -125,27 +138,66 @@ final class MemberCreationService: MemberCreating {
         let trimmed = draft.trimmedName
         guard !trimmed.isEmpty else { throw ServiceError.emptyName }
         let candidate = trimmed.lowercased()
-        let names = existingPets.map { $0.name.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }
-            + existingHumans.map { $0.name.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }
-        guard !names.contains(candidate) else { throw ServiceError.duplicateName }
+        let currentMembers = try existingMembers(
+            existingPets: existingPets,
+            existingHumans: existingHumans,
+            context: context
+        )
+        guard !currentMembers.normalizedNames.contains(candidate) else { throw ServiceError.duplicateName }
 
         switch draft.kind {
         case .pet:
             return try savePet(
                 draft: draft,
-                existingPets: existingPets,
-                existingHumans: existingHumans,
+                existingPets: currentMembers.pets,
+                existingHumans: currentMembers.humans,
                 context: context
             )
         case .human:
             return try saveHuman(
                 draft: draft,
-                existingPets: existingPets,
-                existingHumans: existingHumans,
+                existingPets: currentMembers.pets,
+                existingHumans: currentMembers.humans,
                 context: context,
                 countryCode: countryCode
             )
         }
+    }
+
+    private func existingMembers(
+        existingPets: [Pet],
+        existingHumans: [Human],
+        context: ModelContext
+    ) throws -> MemberCreationExistingMembers {
+        do {
+            let fetchedPets = try context.fetch(FetchDescriptor<Pet>())
+            let fetchedHumans = try context.fetch(FetchDescriptor<Human>())
+            let pets = mergePetsByID(existingPets + fetchedPets)
+            let humans = mergeHumansByID(existingHumans + fetchedHumans)
+            return MemberCreationExistingMembers(pets: pets, humans: humans)
+        } catch {
+            throw ServiceError.saveFailed("Could not verify existing member names: \(error.localizedDescription)")
+        }
+    }
+
+    private func mergePetsByID(_ pets: [Pet]) -> [Pet] {
+        var seen = Set<UUID>()
+        var merged: [Pet] = []
+        for pet in pets {
+            guard seen.insert(pet.id).inserted else { continue }
+            merged.append(pet)
+        }
+        return merged
+    }
+
+    private func mergeHumansByID(_ humans: [Human]) -> [Human] {
+        var seen = Set<UUID>()
+        var merged: [Human] = []
+        for human in humans {
+            guard seen.insert(human.id).inserted else { continue }
+            merged.append(human)
+        }
+        return merged
     }
 
     private func savePet(
@@ -230,7 +282,9 @@ final class MemberCreationService: MemberCreating {
                         source: .onboarding,
                         context: context,
                         save: false,
-                        postsRewardFeedback: true,
+                        // The member creation card already owns the visible handoff; a global
+                        // reward overlay here competes with sheet dismissal on the same frame.
+                        postsRewardFeedback: false,
                         projectionManager: questManager
                     )
                     careLedger.recordCoconut(

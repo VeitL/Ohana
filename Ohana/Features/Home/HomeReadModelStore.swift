@@ -114,9 +114,9 @@ nonisolated struct HomeReadModelActorResult: Sendable {
 
 @MainActor
 final class HomeReadModelStore: ObservableObject {
-    @Published private(set) var snapshot: HomeSnapshot = .empty
-    @Published private(set) var revision = HomeRevision()
-    @Published private(set) var preparedTabs: [VerticalSolidHomeTab: PreparedTabSnapshot] = [
+    private(set) var snapshot: HomeSnapshot = .empty
+    private(set) var revision = HomeRevision()
+    private(set) var preparedTabs: [VerticalSolidHomeTab: PreparedTabSnapshot] = [
         .home: PreparedTabSnapshot(
             id: .home,
             revision: HomeRevision(),

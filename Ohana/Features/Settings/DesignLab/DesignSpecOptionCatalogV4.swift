@@ -14,17 +14,17 @@ enum DesignSpecOptionCatalogV4 {
     ]
 
     static let accents = [
-        DesignSpecOptionV4("lime", "模式自适应", "Adaptive", "深色使用荧光绿，浅色自动解析为清爽蓝。", "Lime in dark mode, blue in light mode.", "sparkles", Color.goPrimary, recommended: true, goodFor: ["主 CTA", "选中态", "深浅色一致体验"]),
+        DesignSpecOptionV4("lime", "模式自适应", "Adaptive", "全局唯一主操作色：深色使用荧光绿，浅色自动解析为清爽蓝。", "The single global action color: lime in dark mode, blue in light mode.", "sparkles", Color.goPrimary, recommended: true, goodFor: ["主 CTA", "确认", "选中态", "功能入口"]),
         DesignSpecOptionV4("blue", "清爽蓝", "Blue", "适合信息和水相关功能。", "Good for information and water flows.", "drop.fill", Color.goBlue, goodFor: ["喂水", "设置"]),
         DesignSpecOptionV4("coral", "暖珊瑚", "Coral", "更亲近，适合奖励反馈。", "Warm and reward-friendly.", "heart.fill", Color.goOrange, goodFor: ["零食", "奖励"], avoidFor: ["错误状态"]),
         DesignSpecOptionV4("violet", "柔紫", "Violet", "有高级感，但需注意对比度。", "Premium, but needs contrast checks.", "moon.fill", Color.goPurple, goodFor: ["夜间", "图表"])
     ]
 
     static let cards = [
-        DesignSpecOptionV4("glass", "透明玻璃", "Glass", "能隐隐看到背景，Ohana 默认。", "Transparent enough to reveal context.", "square.stack.3d.up.fill", Color.goPrimary, recommended: true, goodFor: ["弹窗", "首页卡片"], avoidFor: ["低对比背景"]),
+        DesignSpecOptionV4("glass", "透明玻璃", "Glass", "只用于明确的弹窗、系统 chrome 或 Liquid Glass 展示。", "Only for explicit sheets, system chrome, or Liquid Glass showcases.", "square.stack.3d.up.fill", Color.goPrimary, goodFor: ["弹窗", "设计实验"], avoidFor: ["普通业务卡片", "长列表", "低对比背景"]),
         DesignSpecOptionV4("solid", "实色", "Solid", "可读性最稳。", "Most readable and predictable.", "rectangle.fill", Color.goBlue, goodFor: ["表单", "长列表"]),
-        DesignSpecOptionV4("flat", "纯色无边框", "Flat Block", "纯色块、无描边、无阴影。", "Solid color block with no stroke or shadow.", "rectangle.inset.filled", Color.goTeal, goodFor: ["极简表单", "密集工具页"]),
-        DesignSpecOptionV4("elevated", "浮层", "Elevated", "层级感明显。", "Strong depth hierarchy.", "rectangle.on.rectangle.angled.fill", Color.goPurple, goodFor: ["overview"], avoidFor: ["密集列表"]),
+        DesignSpecOptionV4("flat", "纯色无边框", "Flat Block", "默认业务表面：纯色块、无描边、无阴影，靠背景层级和间距分组。", "Default business surface: solid block, no stroke or shadow; grouping comes from surface rhythm and spacing.", "rectangle.inset.filled", Color.goTeal, recommended: true, goodFor: ["极简表单", "密集工具页", "高频卡片"]),
+        DesignSpecOptionV4("elevated", "浮层", "Elevated", "只给需要浮在内容上的关键层级。", "Only for critical layers that truly float above content.", "rectangle.on.rectangle.angled.fill", Color.goPurple, goodFor: ["弹窗", "关键浮层"], avoidFor: ["普通卡片", "密集列表"]),
         DesignSpecOptionV4("tinted", "轻彩色", "Tinted", "有情绪但不抢内容。", "Expressive without overpowering content.", "paintbrush.pointed.fill", Color.goTeal, goodFor: ["状态卡"])
     ]
 
@@ -43,16 +43,16 @@ enum DesignSpecOptionCatalogV4 {
     ]
 
     static let buttons = [
-        DesignSpecOptionV4("pill", "胶囊", "Pill", "最符合当前 Ohana。", "Best match for Ohana.", "capsule.fill", Color.goPrimary, recommended: true, goodFor: ["主 CTA"]),
+        DesignSpecOptionV4("pill", "胶囊", "Pill", "主操作语法：全局主 CTA、确认和关键入口。", "Primary action grammar for global CTAs, confirmations, and key entry points.", "capsule.fill", Color.goPrimary, recommended: true, goodFor: ["主 CTA", "确认", "关键入口"]),
         DesignSpecOptionV4("round", "圆角矩形", "Rounded", "适合表单和管理页。", "Good for forms and management.", "rectangle.roundedtop.fill", Color.goBlue, goodFor: ["设置"]),
         DesignSpecOptionV4("compact", "紧凑", "Compact", "节省空间但触控风险高。", "Space-saving but touch-risky.", "minus.rectangle.fill", Color.goTeal, goodFor: ["工具栏"], avoidFor: ["主操作"]),
         DesignSpecOptionV4("square", "柔方", "Soft Square", "更像专业工具。", "More operational and tool-like.", "square.fill", Color.goOrange, goodFor: ["开发者页"])
     ]
 
     static let taps = [
-        DesignSpecOptionV4("spring", "弹性", "Spring", "有生命感，默认。", "Responsive and lively.", "hand.tap.fill", Color.goPrimary, recommended: true, goodFor: ["主操作"]),
+        DesignSpecOptionV4("spring", "弹性", "Spring", "轻 scale/opacity + soft haptic，默认。", "Light scale/opacity plus soft haptic by default.", "hand.tap.fill", Color.goPrimary, recommended: true, goodFor: ["主操作", "高频按钮"]),
         DesignSpecOptionV4("tiny", "轻按", "Tiny", "最克制。", "Subtle and restrained.", "circle", Color.goBlue, goodFor: ["列表"]),
-        DesignSpecOptionV4("deep", "深按", "Deep", "明确但可能偏重。", "Clear, but can feel heavy.", "arrow.down.circle.fill", Color.goOrange, goodFor: ["危险确认"]),
+        DesignSpecOptionV4("deep", "深按", "Deep", "明确但可能偏重。", "Clear, but can feel heavy.", "arrow.down.circle.fill", Color.goOrange, goodFor: ["危险确认"], avoidFor: ["高频按钮", "列表行"]),
         DesignSpecOptionV4("bright", "亮度", "Bright", "适合奖励，不适合常规表单。", "Rewarding, not for routine forms.", "sun.max.fill", Color.goYellow, goodFor: ["奖励"], avoidFor: ["高频输入"])
     ]
 

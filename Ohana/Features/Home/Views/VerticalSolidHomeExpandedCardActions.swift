@@ -8,6 +8,8 @@
 import SwiftUI
 
 struct VerticalSolidHomeExpandedCardActions: View {
+    private static let postRevisionRefreshDelayMilliseconds: UInt64 = 260
+
     let card: FocusCard
     let pets: [Pet]
     let humans: [Human]
@@ -40,6 +42,9 @@ struct VerticalSolidHomeExpandedCardActions: View {
     @State private var jiggleTask: Task<Void, Never>?
     @State private var observedHomeRevision = HomeRevision()
     @State private var currentDayToken = HomeReadModelRefreshKey.dayToken(for: Date())
+    @State private var refreshKeyStateTask: Task<Void, Never>?
+    @State private var pendingObservedHomeRevision: HomeRevision?
+    @State private var pendingDayTokenRefresh = false
 
     private var l: L10n { localization }
 
@@ -62,15 +67,17 @@ struct VerticalSolidHomeExpandedCardActions: View {
             onAdd: addAction
         )
         .onAppear {
-            observedHomeRevision = appServices.domainRevisions.homeRevision
-            currentDayToken = HomeReadModelRefreshKey.dayToken(for: Date())
+            scheduleRefreshKeyStateSync(
+                revision: appServices.domainRevisions.homeRevision,
+                refreshDayToken: true
+            )
             scheduleRenderModelRefresh(normalizesStoredItems: true)
         }
         .onReceive(appServices.domainRevisions.homeRevisionUpdates) { revision in
-            observedHomeRevision = revision
+            scheduleRefreshKeyStateSync(revision: revision, refreshDayToken: false)
         }
         .onReceive(NotificationCenter.default.publisher(for: .NSCalendarDayChanged)) { _ in
-            currentDayToken = HomeReadModelRefreshKey.dayToken(for: Date())
+            scheduleRefreshKeyStateSync(revision: nil, refreshDayToken: true)
         }
         .onChange(of: card.id) { _, _ in
             exitEditMode(persists: false)
@@ -83,6 +90,8 @@ struct VerticalSolidHomeExpandedCardActions: View {
             scheduleRenderModelRefresh(normalizesStoredItems: false)
         }
         .onDisappear {
+            refreshKeyStateTask?.cancel()
+            refreshKeyStateTask = nil
             renderModelTask?.cancel()
             renderModelTask = nil
             jiggleTask?.cancel()
@@ -126,6 +135,35 @@ struct VerticalSolidHomeExpandedCardActions: View {
                 "\(Int(entry.date.timeIntervalSince1970))"
             ].joined(separator: ":")
         }.joined(separator: ";")
+    }
+
+    private func scheduleRefreshKeyStateSync(
+        revision: HomeRevision?,
+        refreshDayToken: Bool
+    ) {
+        if let revision {
+            pendingObservedHomeRevision = revision
+        }
+        pendingDayTokenRefresh = pendingDayTokenRefresh || refreshDayToken
+        guard refreshKeyStateTask == nil else { return }
+        let delayMilliseconds: UInt64 = pendingObservedHomeRevision == nil ? 0 : Self.postRevisionRefreshDelayMilliseconds
+        refreshKeyStateTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: delayMilliseconds) {
+            let revision = pendingObservedHomeRevision
+            let shouldRefreshDayToken = pendingDayTokenRefresh
+            pendingObservedHomeRevision = nil
+            pendingDayTokenRefresh = false
+
+            if let revision, observedHomeRevision != revision {
+                observedHomeRevision = revision
+            }
+            if shouldRefreshDayToken {
+                let token = HomeReadModelRefreshKey.dayToken(for: Date())
+                if currentDayToken != token {
+                    currentDayToken = token
+                }
+            }
+            refreshKeyStateTask = nil
+        }
     }
 
     private var careLedgerRevisionKey: String {

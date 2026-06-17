@@ -426,7 +426,9 @@ final class HomeRouteCoordinator: ObservableObject {
         let action = pendingRepeatAction
         pendingRepeatAction = nil
         alert = nil
-        action?()
+        OhanaFrameScheduler.runAfterNextFrame(milliseconds: 35) {
+            action?()
+        }
     }
 
     func showSingleUseNotice(title: String, message: String) {

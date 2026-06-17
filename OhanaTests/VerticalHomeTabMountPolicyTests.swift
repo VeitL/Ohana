@@ -129,7 +129,7 @@ struct VerticalHomeTabMountPolicyTests {
         #expect(!OasisHomeTabContentPolicy.shouldRunActiveWork(for: lifecycle))
     }
 
-    @Test func oasisTabStartsActiveWorkOnlyAfterTransitionSettles() {
+    @Test func oasisTabStaysFrozenAfterTransitionSettles() {
         let lifecycle = VerticalHomeTabMountPolicy.lifecycle(
             for: .oasis,
             active: .oasis,
@@ -137,8 +137,9 @@ struct VerticalHomeTabMountPolicyTests {
             selected: .oasis
         )
 
-        #expect(OasisHomeTabContentPolicy.shouldRenderTreeContent(for: lifecycle))
-        #expect(OasisHomeTabContentPolicy.shouldRunActiveWork(for: lifecycle))
+        #expect(OasisHomeTabContentPolicy.shouldRenderFrozenTree(for: lifecycle))
+        #expect(!OasisHomeTabContentPolicy.shouldRenderTreeContent(for: lifecycle))
+        #expect(!OasisHomeTabContentPolicy.shouldRunActiveWork(for: lifecycle))
     }
 
     @Test func oasisTreeRenderSnapshotClampsUnsafeValues() {
@@ -151,7 +152,7 @@ struct VerticalHomeTabMountPolicyTests {
             nextLevelThreshold: -100
         )
 
-        #expect(low.level == 1)
+        #expect(low.level == 0)
         #expect(low.progressToNextLevel == 0)
         #expect(high.level == 10)
         #expect(high.progressToNextLevel == 1)
@@ -159,6 +160,12 @@ struct VerticalHomeTabMountPolicyTests {
         #expect(invalid.progressToNextLevel == 0)
         #expect(invalid.totalEnergy == 0)
         #expect(invalid.nextLevelThreshold == 0)
+    }
+
+    @Test func beautifulCoconutTreeSupportsLevelZeroVisualState() {
+        #expect(BeautifulCoconutTree.coconutCapacity(for: -4) == 0)
+        #expect(BeautifulCoconutTree.coconutCapacity(for: 0) == 0)
+        #expect(BeautifulCoconutTree.coconutCapacity(for: 1) == 0)
     }
 
     @Test func oasisEmbeddedLayoutFitsAvailableHeightWithoutVerticalScroll() {
@@ -305,6 +312,26 @@ struct VerticalHomeTabMountPolicyTests {
         #expect(HomeBottomNavigationTreePresentation.levelText(-1) == "Lv.0")
     }
 
+    @Test func oasisTabIsHiddenUntilStarterGiftUnlocksTree() {
+        let suiteName = "VerticalHomeTabMountPolicyTests.oasisTabIsHiddenUntilStarterGiftUnlocksTree.\(UUID().uuidString)"
+        guard let defaults = UserDefaults(suiteName: suiteName) else {
+            Issue.record("Expected isolated defaults suite")
+            return
+        }
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        defaults.set(true, forKey: StarterGiftService.Key.claimed)
+        defaults.set(false, forKey: StarterGiftService.Key.ceremonySeen)
+        defaults.set(false, forKey: StarterGiftService.Key.oasisTabPromptPending)
+        #expect(!AppFeatureRouteGuard.allowsHomeTab(.oasis, starterGiftDefaults: defaults))
+        #expect(!AppFeatureRouteGuard.visibleHomeTabs(starterGiftDefaults: defaults).contains(.oasis))
+
+        defaults.set(true, forKey: StarterGiftService.Key.ceremonySeen)
+        defaults.set(true, forKey: StarterGiftService.Key.oasisTabPromptPending)
+        #expect(AppFeatureRouteGuard.allowsHomeTab(.oasis, starterGiftDefaults: defaults))
+        #expect(AppFeatureRouteGuard.visibleHomeTabs(starterGiftDefaults: defaults).contains(.oasis))
+    }
+
     @Test func bottomNavigationTreeProgressIsClamped() {
         #expect(HomeBottomNavigationTreePresentation.progressFill(-0.4) == CGFloat(0))
         #expect(HomeBottomNavigationTreePresentation.progressFill(0.42) == CGFloat(0.42))
@@ -326,12 +353,34 @@ struct VerticalHomeTabMountPolicyTests {
 
         let date = Date(timeIntervalSince1970: 1_765_065_600)
         defaults.removeObject(forKey: OasisTreePreferenceStore.dailyInjectionDayKey)
-        #expect(TestOasisTreeManagerProjection.manager.canUseInjectionPackage(cost: 80, date: date))
+        #expect(TestOasisTreeManagerProjection.manager.canUseInjectionPackage(
+            cost: OasisTreeEnergyInjectionPolicy.starterPackageCost,
+            date: date
+        ))
 
         OasisTreePreferenceStore.markInjectionUsed(
             limitKey: OasisTreePreferenceStore.dailyInjectionDayKey,
             periodKey: EconomyDailyBudgetStore.dayKey(for: date)
         )
-        #expect(TestOasisTreeManagerProjection.manager.canUseInjectionPackage(cost: 80, date: date))
+        #expect(TestOasisTreeManagerProjection.manager.canUseInjectionPackage(
+            cost: OasisTreeEnergyInjectionPolicy.starterPackageCost,
+            date: date
+        ))
+    }
+
+    @Test func starterTreeInjectionNeedsFiveStarterPacksForLevelOne() {
+        #expect(OasisTreeEnergyInjectionPolicy.starterPackageCost == 10)
+        #expect(OasisTreeEnergyInjectionPolicy.starterPackageXP == 10)
+        #expect(StarterGiftPolicy.giftAmount / OasisTreeEnergyInjectionPolicy.starterPackageCost == 5)
+        #expect(OasisTreeManager.treeLevel(forTotalEnergy: 4 * OasisTreeEnergyInjectionPolicy.starterPackageXP) == .lv0)
+        #expect(OasisTreeManager.treeLevel(forTotalEnergy: 5 * OasisTreeEnergyInjectionPolicy.starterPackageXP) == .lv1)
+    }
+
+    private func restore(_ defaults: UserDefaults, key: String, value: Any?) {
+        if let value {
+            defaults.set(value, forKey: key)
+        } else {
+            defaults.removeObject(forKey: key)
+        }
     }
 }

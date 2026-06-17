@@ -34,6 +34,70 @@ actionable; long-term product ideas belong in planning docs instead.
 
 ## Open Items
 
+### TFU-20260617-001 - Add a LocalDevice UI-test scheme for first-release smoke
+
+- Status: Done
+- Priority: P1 (release-process validation gap; not an app runtime P0)
+- Area: Release / Phase 9A / Real Device UI Smoke / Signing
+- Source task: Complete first-release P0 startup/Home/Oasis/Settings closure;
+  Codex, 2026-06-17.
+- Blocker: The first-release UI smoke is green on the fixed iPhone 17 simulator
+  and `Ohana Local Device` now builds, installs, launches, and reaches
+  `bootstrap.payload-set` on `Guanchen’s iPhone`, but the same smoke cannot yet
+  run as physical XCTest automation. The normal `Ohana` Debug scheme requires a
+  provisioning profile for `com.guanchen.li.Ohana` with Push Notifications and
+  iCloud capabilities, which the current personal development team cannot
+  create. The `LocalDeviceDebug` configuration uses the safe local bundle id and
+  empty local entitlements, but test targets are not configured for that
+  configuration (`PRODUCT_BUNDLE_IDENTIFIER`, `SWIFT_VERSION`, and test
+  `Info.plist`/generated plist settings are missing).
+- Next step: Add a dedicated shared `Ohana Local Device UI Tests` scheme or
+  configure `LocalDeviceDebug` for `OhanaTests` / `OhanaUITests`, with signed
+  xctrunner bundle ids that do not require unavailable app capabilities. Then
+  run:
+  `xcodebuild test -project Ohana.xcodeproj -scheme '<local-device-ui-test-scheme>' -destination 'id=00008150-001270342EA3401C' -only-testing:OhanaUITests/OhanaUITests/testFirstReleaseReachableHomeOasisAndSettingsSmoke CODE_SIGNING_ALLOWED=YES`.
+- Close condition: The physical-device UI smoke runs on `Guanchen’s iPhone` and
+  proves the full first-release path: launch / reset, create first human,
+  starter gift, create first pet from Today Focus, switch to Home Oasis, inject
+  energy Lv0 -> Lv1, and open Settings without hang or crash.
+- Closed: 2026-06-17. `LocalDeviceDebug` test targets were configured for signed
+  physical XCTest, and the smoke passed on `Guanchen’s iPhone` with:
+  `xcodebuild test -allowProvisioningUpdates -project Ohana.xcodeproj -scheme Ohana -configuration LocalDeviceDebug -destination 'id=00008150-001270342EA3401C' -derivedDataPath /tmp/ohana-device-ui-p0-localconfig -only-testing:OhanaUITests/OhanaUITests/testFirstReleaseReachableHomeOasisAndSettingsSmoke CODE_SIGNING_ALLOWED=YES`.
+  Result: `TEST SUCCEEDED`, 1 UI test, 46.921s, xcresult
+  `/tmp/ohana-device-ui-p0-localconfig/Logs/Test/Test-Ohana-2026.06.17_13-20-42-+0200.xcresult`.
+
+### TFU-20260616-001 - Trust Local Device profile and start dogfooding install
+
+- Status: Done
+- Priority: P1 (release-process external blocker; not an app runtime P0)
+- Area: Release / Phase 9A / Local Device Signing / Dogfooding
+- Source task: Phase 9A start, Codex, 2026-06-16.
+- Blocker: `Ohana Local Device` builds and installs on `Guanchen’s iPhone`
+  (iOS 27.0) with Team `567SK733UN` and bundle id
+  `com.guanchen.li.Ohana.LocalDevice`, but device launch is denied by iOS:
+  the development profile/signature has not been explicitly trusted by the
+  user. Build/install evidence:
+  `xcodebuild -project Ohana.xcodeproj -scheme 'Ohana Local Device' -configuration LocalDeviceDebug -destination 'id=00008150-001270342EA3401C' -derivedDataPath .build/DerivedData/phase9a-local-device build CODE_SIGNING_ALLOWED=YES`
+  PASS, and
+  `xcrun devicectl device install app --device 00008150-001270342EA3401C .build/DerivedData/phase9a-local-device/Build/Products/LocalDeviceDebug-iphoneos/Ohana.app`
+  installed the app. Launch failed with `RequestDenied` / `Security` /
+  "profile has not been explicitly trusted by the user".
+- Next step: On the iPhone, trust the developer profile for
+  `Apple Development: guanchen.li.119@gmail.com` in Settings, then rerun
+  `xcrun devicectl device process launch --device 00008150-001270342EA3401C com.guanchen.li.Ohana.LocalDevice`.
+  Once launch succeeds, begin dogfooding only from the installed main build and
+  burn down the 91 unchecked real-device/manual items in
+  `docs/planning/gap-acceptance-track-list.md`.
+- Close condition: The local-device app launches successfully on the iPhone,
+  the first dogfooding session is recorded in `docs/testing-progress.md`, and
+  at least one Phase 9A real-device checklist pass starts reducing the 91-item
+  acceptance debt.
+- Closed: 2026-06-16. After the developer profile was trusted on the iPhone,
+  `xcrun devicectl device process launch --device 00008150-001270342EA3401C com.guanchen.li.Ohana.LocalDevice`
+  succeeded and launched the installed local-device app. The remaining
+  real-device/manual acceptance debt is tracked separately in
+  `docs/planning/gap-acceptance-track-list.md`.
+
 ### TFU-20260615-001 - Close Feeding plan/stock lifecycle and actor-policy gaps
 
 - Status: Open - local repair and module gate verified; closure blocked by
@@ -1585,7 +1649,7 @@ actionable; long-term product ideas belong in planning docs instead.
 ### TFU-20260612-006 - Finish CareLedger read-model migration for care surfaces
 
 - Status: Open
-- Priority: P0
+- Priority: P1 (release-bar reclassified from legacy P0 on 2026-06-16; first-release reachable but not P0-blocking)
 - Area: Care / QuickCare / Hygiene / Read Models
 - Source task: Care maturity remediation, 2026-06-12
 - Blocker: This crosses QuickCare, Home snapshots, expanded quick-action state,
@@ -1658,6 +1722,12 @@ actionable; long-term product ideas belong in planning docs instead.
   current care-maturity remediation is complete because remaining direct legacy
   reads are either explicit compatibility bridges or cross-surface migrations
   documented here with exact next steps and close conditions.
+- Release-bar disposition: Does not block first release. Current evidence from
+  ledger-backed QuickCare/Home/Feeding/Hygiene/TodayFocus read-model tests,
+  `scripts/module-exit-gate.sh --full`, release-hardening audits, and CI run
+  `27607807044` shows no crash, data loss, privacy leak, complete core-flow
+  break, or economy miscalculation. Remaining work is consistency/performance
+  hardening and removal of legacy compatibility reads.
 - Close when: QuickCare and Hygiene user-facing read models no longer directly
   query the four legacy pet log models except for explicit backup/migration
   compatibility paths.

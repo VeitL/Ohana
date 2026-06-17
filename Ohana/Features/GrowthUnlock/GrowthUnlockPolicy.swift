@@ -137,9 +137,9 @@ enum GrowthUnlockCatalog {
             titleZh: "绿洲收益",
             titleEn: "Oasis Yield",
             titleDe: "Oasis-Ertrag",
-            detailZh: "生命之树从 Lv.1 开始可见；Lv.5 后开放树上椰子收益，让成长开始反哺日常管理。",
-            detailEn: "The Life Tree is visible from Lv.1; Lv.5 opens tree coconut yield so growth feeds back into daily utility.",
-            detailDe: "Der Lebensbaum ist ab Lv.1 sichtbar; ab Lv.5 öffnen sich Baum-Erträge.",
+            detailZh: "椰子树入口从新人礼包后开放；Lv.5 后开放每日椰子收益，让成长开始反哺日常管理。",
+            detailEn: "The Coconut Tree opens after the starter gift; Lv.5 opens daily coconut yield so growth feeds back into daily utility.",
+            detailDe: "Der Kokosbaum öffnet sich nach dem Startergeschenk; ab Lv.5 gibt es tägliche Kokos-Erträge.",
             icon: "tree.fill",
             tintHex: "84CC16"
         ),

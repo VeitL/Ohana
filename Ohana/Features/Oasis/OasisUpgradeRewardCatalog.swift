@@ -233,21 +233,21 @@ nonisolated enum OasisUpgradeRewardCatalog {
         default:
             return .init(
                 level: level,
-                rewardKind: .treeEnergy,
+                rewardKind: .temporaryEffect,
                 rewardCatalogId: "level_\(level)_tree_spark",
                 guaranteedCritterId: nil,
                 coconutAmount: max(10, level * 5),
-                treeEnergyAmount: max(20, level * 10),
+                treeEnergyAmount: 0,
                 fragmentAmount: 6,
                 decorUnlockId: nil,
                 storyStyleUnlockId: nil,
                 temporaryEffectId: "tree_spark_\(level)",
-                titleZh: "树能量火花",
-                titleEn: "Tree Spark",
+                titleZh: "树冠火花",
+                titleEn: "Canopy Spark",
                 titleDe: "Baumfunke",
-                descriptionZh: "补充树能量，并留下一点电子宠物碎片。",
-                descriptionEn: "Adds tree energy and a few critter fragments.",
-                descriptionDe: "Gibt Baumenergie und ein paar Critter-Fragmente."
+                descriptionZh: "点亮一段临时光效，并留下一点电子宠物碎片。",
+                descriptionEn: "Lights a temporary effect and leaves a few critter fragments.",
+                descriptionDe: "Entzündet einen temporären Effekt und gibt ein paar Critter-Fragmente."
             )
         }
     }

@@ -15,6 +15,15 @@ Ohana UI changes must map to one of these layers:
 
 Do not solve a token problem inside a product surface. Do not solve a product-specific problem by changing a global token.
 
+## Discipline Rules
+
+- Global action color discipline lives at the Token and Primitive layers: `goPrimary` / adaptive primary is the only global primary action, confirmation, focus, functional icon, and selected-system color. Domain colors explain domain meaning; they do not become alternate primary CTA systems.
+- Surface rhythm comes before extra chrome. Prefer token surface contrast, spacing, grouping headers, and light hairlines before introducing borders, glass, nested cards, or shadows.
+- Shadow is budgeted. Ordinary cards, buttons, text, chips, and rows stay flat; shadows require a clear overlay, toast, floating-control, role/avatar, reward, or preview reason.
+- Button grammar must be stable across products: one primary pill per screen, quieter secondary actions, semantic destructive actions, and icon-only controls with 44pt hit areas plus labels.
+- Press feedback belongs in the primitive. New product surfaces should use the shared light press feedback first, then hand off business writes, persistence, routing, or reward sync after the visual response.
+- Converge one component or variant at a time. When a local visual treatment appears useful across surfaces, promote it to the shared primitive/component layer before copying it again.
+
 ## Component Promotion Rule
 
 A local UI helper should be promoted to a shared component when:
@@ -47,4 +56,3 @@ Do not leave two visually similar components with different behavior. When repla
 - Name the replacement.
 - Migrate high-traffic usages first.
 - Add audit warnings if the old component should not be used in new code.
-

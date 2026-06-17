@@ -2,6 +2,11 @@ import SwiftData
 import SwiftUI
 
 struct CrewRosterOverlayRouteContainer: View {
+    @Environment(\.modelContext) private var modelContext
+    @Environment(AppServices.self) private var appServices
+    @State private var routeData = CrewRosterRouteData()
+    @State private var dataLoadTask: Task<Void, Never>?
+
     let initialMode: CrewRosterMode
     let onSelectPet: (Pet) -> Void
     let onSelectHuman: (Human) -> Void
@@ -14,76 +19,14 @@ struct CrewRosterOverlayRouteContainer: View {
     var safeBottomInset: CGFloat = 0
     var onPresentCoconutLog: ((CoconutLogSubject?) -> Void)?
 
-    @Query(sort: \Pet.createdAt) private var pets: [Pet]
-    @Query(sort: \Human.createdAt) private var humans: [Human]
-
-    var body: some View {
-        if OnlineFeatureGate.allows(.onlineCollaboration) {
-            CrewRosterCollaborationRouteDataContainer(
-                initialMode: initialMode,
-                pets: pets,
-                humans: humans,
-                onSelectPet: onSelectPet,
-                onSelectHuman: onSelectHuman,
-                onAddEntity: onAddEntity,
-                onClose: onClose,
-                hideToolbar: hideToolbar,
-                searchTrigger: searchTrigger,
-                addMemberTrigger: addMemberTrigger,
-                safeTopInset: safeTopInset,
-                safeBottomInset: safeBottomInset,
-                onPresentCoconutLog: onPresentCoconutLog
-            )
-        } else {
-            CrewRosterOverlay(
-                initialMode: .members,
-                pets: pets,
-                humans: humans,
-                plants: [],
-                pendingReminders: [],
-                familyTasks: [],
-                onSelectPet: onSelectPet,
-                onSelectHuman: onSelectHuman,
-                onAddEntity: onAddEntity,
-                onClose: onClose,
-                hideToolbar: hideToolbar,
-                searchTrigger: searchTrigger,
-                addMemberTrigger: addMemberTrigger,
-                safeTopInset: safeTopInset,
-                safeBottomInset: safeBottomInset,
-                onPresentCoconutLog: onPresentCoconutLog
-            )
-        }
-    }
-}
-
-private struct CrewRosterCollaborationRouteDataContainer: View {
-    let initialMode: CrewRosterMode
-    let pets: [Pet]
-    let humans: [Human]
-    let onSelectPet: (Pet) -> Void
-    let onSelectHuman: (Human) -> Void
-    var onAddEntity: ((EntityType) -> Void)?
-    var onClose: (() -> Void)?
-    var hideToolbar: Bool
-    var searchTrigger: Bool
-    var addMemberTrigger: Bool
-    var safeTopInset: CGFloat
-    var safeBottomInset: CGFloat
-    var onPresentCoconutLog: ((CoconutLogSubject?) -> Void)?
-
-    @Query(filter: #Predicate<Reminder> { $0.status == "pending" },
-           sort: \Reminder.scheduledAt) private var pendingReminders: [Reminder]
-    @Query(sort: \FamilyCollaborationTask.updatedAt, order: .reverse) private var familyTasks: [FamilyCollaborationTask]
-
     var body: some View {
         CrewRosterOverlay(
-            initialMode: initialMode,
-            pets: pets,
-            humans: humans,
+            initialMode: OnlineFeatureGate.allows(.onlineCollaboration) ? initialMode : .members,
+            pets: routeData.pets,
+            humans: routeData.humans,
             plants: [],
-            pendingReminders: pendingReminders,
-            familyTasks: familyTasks,
+            pendingReminders: routeData.pendingReminders,
+            familyTasks: routeData.familyTasks,
             onSelectPet: onSelectPet,
             onSelectHuman: onSelectHuman,
             onAddEntity: onAddEntity,
@@ -95,5 +38,80 @@ private struct CrewRosterCollaborationRouteDataContainer: View {
             safeBottomInset: safeBottomInset,
             onPresentCoconutLog: onPresentCoconutLog
         )
+        .onAppear {
+            scheduleRouteDataLoad()
+        }
+        .onReceive(appServices.domainRevisions.homeRevisionUpdates) { _ in
+            scheduleRouteDataLoad(delayMilliseconds: 120, force: true)
+        }
+        .onDisappear {
+            dataLoadTask?.cancel()
+            dataLoadTask = nil
+        }
+    }
+
+    private func scheduleRouteDataLoad(delayMilliseconds: UInt64 = 120, force: Bool = false) {
+        guard force || !routeData.hasLoaded else { return }
+        guard dataLoadTask == nil else { return }
+        dataLoadTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: delayMilliseconds) {
+            routeData = CrewRosterRouteData.load(from: modelContext)
+            dataLoadTask = nil
+        }
+    }
+}
+
+private struct CrewRosterRouteData {
+    var pets: [Pet] = []
+    var humans: [Human] = []
+    var pendingReminders: [Reminder] = []
+    var familyTasks: [FamilyCollaborationTask] = []
+    var hasLoaded = false
+
+    static func load(from context: ModelContext) -> CrewRosterRouteData {
+        let isCollaborationEnabled = OnlineFeatureGate.allows(.onlineCollaboration)
+        return CrewRosterRouteData(
+            pets: fetch(
+                FetchDescriptor<Pet>(sortBy: [SortDescriptor(\.createdAt)]),
+                context: context,
+                name: "Pet"
+            ),
+            humans: fetch(
+                FetchDescriptor<Human>(sortBy: [SortDescriptor(\.createdAt)]),
+                context: context,
+                name: "Human"
+            ),
+            pendingReminders: isCollaborationEnabled ? fetch(
+                FetchDescriptor<Reminder>(
+                    predicate: #Predicate<Reminder> { $0.status == "pending" },
+                    sortBy: [SortDescriptor(\.scheduledAt)]
+                ),
+                context: context,
+                name: "Reminder"
+            ) : [],
+            familyTasks: isCollaborationEnabled ? fetch(
+                FetchDescriptor<FamilyCollaborationTask>(
+                    sortBy: [SortDescriptor(\.updatedAt, order: .reverse)]
+                ),
+                context: context,
+                name: "FamilyCollaborationTask"
+            ) : [],
+            hasLoaded: true
+        )
+    }
+
+    private static func fetch<T: PersistentModel>(
+        _ descriptor: FetchDescriptor<T>,
+        context: ModelContext,
+        name: String
+    ) -> [T] {
+        do {
+            return try context.fetch(descriptor) // route-first-frame: allow deferred-fetch
+        } catch {
+            OhanaLog.warning(
+                "Crew roster route data fetch failed for \(name): \(error.localizedDescription)",
+                category: "CrewRoster"
+            )
+            return []
+        }
     }
 }

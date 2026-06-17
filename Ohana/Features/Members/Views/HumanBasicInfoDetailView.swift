@@ -669,7 +669,7 @@ struct HumanBasicInfoDetailContentView: View {
 
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         dismiss()
-        commandQueue.enqueue(command) {
+        commandQueue.enqueue(command, delayMilliseconds: DeferredDomainCommandQueue.destructiveRouteDismissDelayMilliseconds) {
             let result = MemberCommandExecutor(context: modelContext, services: appServices).deleteHuman(
                 target,
                 activeHumanID: activeHumanID,

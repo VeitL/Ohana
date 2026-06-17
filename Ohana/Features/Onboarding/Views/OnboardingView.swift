@@ -81,8 +81,11 @@ struct OnboardingView: View {
     @AppStorage("appLanguage") private var appLanguage: String = AppLanguage.detectedCode
     @AppStorage(AppPerformanceMode.powerSavingKey) private var powerSavingMode = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.modelContext) private var modelContext
+    @Environment(AppServices.self) private var appServices
     var isReplay: Bool = false
     var onReplayFinished: (() -> Void)?
+    var onPrimaryHumanSaved: ((Human) -> Void)?
     var onHomeJoinHandoffPreflight: (() -> Void)?
 
     private enum FlowStep: Equatable {
@@ -162,9 +165,7 @@ struct OnboardingView: View {
             } else {
                 withAnimation(.easeInOut(duration: 2.2).repeatForever(autoreverses: true)) { iconPulse = true } // ui-v4: allow gated onboarding icon pulse; smoothness: allow reduce-work gated onboarding pulse.
             }
-            if !isReplay, !currentActiveHumanId.isEmpty, !hasOnboarded {
-                finishOnboarding(playsFeedback: false)
-            }
+            recoverInterruptedOnboardingIfNeeded()
         }
         .onDisappear {
             flipTask?.cancel()
@@ -194,13 +195,13 @@ struct OnboardingView: View {
     private var humanOnboardingWizard: some View {
         AddHumanWizardView(
             onComplete: {
-                finishOnboarding()
+                finishOnboarding(playsFeedback: false)
             },
             onCancel: {
                 returnToIntro()
             },
             onHumanSaved: { human in
-                currentActiveHumanId = human.id.uuidString
+                recordOnboardingHumanSaved(human)
             },
             presentationStyle: .onboarding,
             onHomeJoinHandoffPreflight: beginHomeJoinHandoffPreflight,
@@ -337,6 +338,7 @@ struct OnboardingView: View {
                 .background(Color.goLime, in: Capsule())
             }
             .buttonStyle(ScaleButtonStyle())
+            .accessibilityIdentifier("onboarding-intro-primary-action")
             .disabled(isFlippingToProfile)
         }
         .frame(width: width)
@@ -640,13 +642,45 @@ struct OnboardingView: View {
         }
     }
 
-    private func finishOnboarding(playsFeedback: Bool = true) {
-        if playsFeedback {
-            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+    private func recordOnboardingHumanSaved(_ human: Human) {
+        guard !isReplay else { return }
+        persistActiveHumanId(human.id.uuidString)
+        OnboardingHomeJoinHandoffGate.markCompleted()
+        onPrimaryHumanSaved?(human)
+    }
+
+    private func recoverInterruptedOnboardingIfNeeded() {
+        guard !isReplay, !hasOnboarded else { return }
+        if !currentActiveHumanId.isEmpty {
+            OnboardingHomeJoinHandoffGate.markCompleted()
+            finishOnboarding(playsFeedback: false)
+            return
         }
+        guard let recoveredHumanID = appServices.onboardingJourney.interruptedOnboardingPrimaryHumanID(
+            context: modelContext
+        ) else {
+            return
+        }
+        persistActiveHumanId(recoveredHumanID)
+        OnboardingHomeJoinHandoffGate.markCompleted()
+        finishOnboarding(playsFeedback: false)
+    }
+
+    private func persistActiveHumanId(_ id: String) {
+        currentActiveHumanId = id
+    }
+
+    private func finishOnboarding(playsFeedback: Bool = true) {
         if isReplay {
+            if playsFeedback {
+                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+            }
             onReplayFinished?()
             return
+        }
+        guard !hasOnboarded else { return }
+        if playsFeedback {
+            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         }
         firstQuickCheckInCompleted = false
         showFirstSuccessCard = true

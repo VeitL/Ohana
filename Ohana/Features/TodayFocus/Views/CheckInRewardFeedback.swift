@@ -44,13 +44,15 @@ struct CoconutRewardFeedbackOverlay: View {
     @ObservedObject private var workloadPolicy = AppWorkloadPolicy.shared
     @Environment(AppServices.self) private var appServices
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var burstPhase = false
+    @State private var lastHandledEventID: UUID?
+    @State private var hapticTask: Task<Void, Never>?
 
     private var shouldAnimate: Bool {
         !reduceMotion && workloadPolicy.shouldRunInteractionAnimation(isVisible: true)
     }
 
     var body: some View {
+        let animate = shouldAnimate
         VStack {
             if let event = center.activeEvent {
                 rewardPill(event)
@@ -65,44 +67,45 @@ struct CoconutRewardFeedbackOverlay: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .allowsHitTesting(false)
         .onReceive(appServices.domainRevisions.coconutRewardEvents) { event in
+            guard lastHandledEventID != event.id else { return }
+            lastHandledEventID = event.id
             center.enqueue(event)
-            if shouldAnimate {
-                UINotificationFeedbackGenerator().notificationOccurred(.success)
-                burstPhase.toggle()
+            if animate {
+                hapticTask?.cancel()
+                hapticTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: 80) {
+                    UINotificationFeedbackGenerator().notificationOccurred(.success)
+                    hapticTask = nil
+                }
             }
         }
-        .animation(shouldAnimate ? GoMotion.feedback : GoMotion.reduced, value: center.activeEvent?.id)
+        .onDisappear {
+            hapticTask?.cancel()
+            hapticTask = nil
+        }
+        .animation(animate ? GoMotion.feedback : GoMotion.reduced, value: center.activeEvent?.id)
     }
 
     private func rewardPill(_ event: OhanaCoconutRewardEvent) -> some View {
-        ZStack {
-            if shouldAnimate {
-                RewardBurstDots(trigger: burstPhase)
-                    .offset(y: 2)
-            }
-
-            HStack(spacing: 8) {
-                Text(event.emoji)
-                    .font(OhanaFont.adaptive(size: 20))
-                Text(rewardAmountText)
-                    .font(OhanaFont.adaptive(size: 20, weight: .black, design: .rounded))
-                    .contentTransition(.numericText())
-                Text(event.title)
-                    .font(OhanaFont.adaptive(size: 11, weight: .black, design: .rounded))
-                    .lineLimit(2)
-                    .minimumScaleFactor(0.86)
-                    .multilineTextAlignment(.leading)
-                    .foregroundStyle(Color.ohanaSecondaryText)
-            }
-            .foregroundStyle(Color.ohanaPrimaryText)
-            .padding(.horizontal, 16)
-            .padding(.vertical, 10)
-            .background(Color.ohanaCardSurfaceElevated, in: Capsule())
-            .overlay(
-                Capsule()
-                    .strokeBorder(Color.goYellow.opacity(0.35), lineWidth: 1)
-            )
+        HStack(spacing: 8) {
+            Text(event.emoji)
+                .font(OhanaFont.adaptive(size: 20))
+            Text(rewardAmountText)
+                .font(OhanaFont.adaptive(size: 20, weight: .black, design: .rounded))
+            Text(event.title)
+                .font(OhanaFont.adaptive(size: 11, weight: .black, design: .rounded))
+                .lineLimit(2)
+                .minimumScaleFactor(0.86)
+                .multilineTextAlignment(.leading)
+                .foregroundStyle(Color.ohanaSecondaryText)
         }
+        .foregroundStyle(Color.ohanaPrimaryText)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+        .background(Color.ohanaCardSurfaceElevated, in: Capsule())
+        .overlay(
+            Capsule()
+                .strokeBorder(Color.goYellow.opacity(0.35), lineWidth: 1)
+        )
         .padding(.horizontal, 18)
     }
 
@@ -110,24 +113,6 @@ struct CoconutRewardFeedbackOverlay: View {
         let coconutText = center.coalescedAmount > 0 ? "+\(center.coalescedAmount)🥥" : nil
         let xpText = center.coalescedGrowthXP > 0 ? "+\(center.coalescedGrowthXP)XP" : nil
         return [coconutText, xpText].compactMap(\.self).joined(separator: " · ")
-    }
-}
-
-private struct RewardBurstDots: View {
-    let trigger: Bool
-
-    var body: some View {
-        ZStack {
-            ForEach(0 ..< 7, id: \.self) { index in
-                Circle()
-                    .fill(index.isMultiple(of: 2) ? Color.goYellow : Color.goPrimary)
-                    .frame(width: CGFloat(4 + index % 3), height: CGFloat(4 + index % 3))
-                    .offset(x: trigger ? CGFloat([-58, -38, -16, 0, 18, 40, 60][index]) : 0,
-                            y: trigger ? CGFloat([-8, -22, -14, -28, -13, -24, -10][index]) : 0)
-                    .opacity(trigger ? 0 : 0.8)
-                    .animation(GoMotion.feedback.delay(Double(index) * 0.018), value: trigger)
-            }
-        }
     }
 }
 

@@ -2,15 +2,16 @@
 //  OasisHomeTabHost.swift
 //  Ohana
 //
-//  Keeps the vertical home tab transition light by mounting the real Oasis
-//  shell for visible motion while deferring active work until the page is live.
+//  Keeps the vertical home tab transition light by rendering a snapshot-only
+//  Oasis shell. The full Oasis feature mounts from its own route, not Home.
 //
 
 import SwiftUI
 
 enum OasisHomeTabContentPolicy {
     static func shouldRenderTreeContent(for lifecycle: VerticalSolidHomePageLifecycle) -> Bool {
-        lifecycle.isLive
+        _ = lifecycle
+        return false
     }
 
     static func shouldRenderFrozenTree(for lifecycle: VerticalSolidHomePageLifecycle) -> Bool {
@@ -18,7 +19,8 @@ enum OasisHomeTabContentPolicy {
     }
 
     static func shouldRunActiveWork(for lifecycle: VerticalSolidHomePageLifecycle) -> Bool {
-        lifecycle.isLive
+        _ = lifecycle
+        return false
     }
 }
 
@@ -63,6 +65,8 @@ struct OasisHomeTabHost: View {
         .clipShape(RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous))
         .padding(.horizontal, 10)
         .padding(.top, 4)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("oasis-screen")
         .onAppear {
             scheduleLifecycleHandoff()
         }

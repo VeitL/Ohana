@@ -54,6 +54,7 @@ struct QuickFeedModeSelector: View {
             .scaleEffect(selected ? 1.02 : 1)
         }
         .buttonStyle(ScaleButtonStyle())
+        .accessibilityIdentifier("quick-feed-sheet-mode-\(mode.rawValue)")
         .zIndex(selected ? 1 : 0)
     }
 }

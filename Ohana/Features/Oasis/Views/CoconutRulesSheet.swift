@@ -14,6 +14,10 @@ struct CoconutRulesSheet: View {
 
     private var l: L10n { L10n(appLanguage) }
 
+    private var treeInjectionRewardText: String {
+        "\(OasisTreeEnergyInjectionPolicy.starterPackageCost)🥥 -> \(OasisTreeEnergyInjectionPolicy.starterPackageXP)XP"
+    }
+
     private struct RuleCard: Identifiable {
         let id = UUID()
         let icon: String
@@ -123,7 +127,7 @@ struct CoconutRulesSheet: View {
                 title: l.tr(zh: "注入生命之树", en: "Inject energy", de: "Energie geben"),
                 desc: l.tr(zh: "轻度加速，不能直接买穿等级", en: "Light acceleration without buying through levels", de: "Leichte Beschleunigung ohne Levelkauf"),
                 glowColor: Color(hex: "F59E0B"),
-                reward: l.tr(zh: "80🥥 -> 20XP", en: "80🥥 -> 20XP", de: "80🥥 -> 20XP")
+                reward: treeInjectionRewardText
             ),
             RuleCard(
                 icon: "bag.fill",

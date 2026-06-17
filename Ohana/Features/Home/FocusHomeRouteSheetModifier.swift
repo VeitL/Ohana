@@ -27,6 +27,7 @@ struct FocusHomeRouteSheetModifier: ViewModifier {
     let onCrewHumanSelected: (Human) -> Void
     let onFirstSuccessMomentCompleted: (Pet) -> Void
     let onHumanDoseTaken: (UUID) -> Void
+    let onStartWalkFromQuickAction: (UUID) -> Void
 
     func body(content: Content) -> some View {
         content
@@ -267,7 +268,7 @@ struct FocusHomeRouteSheetModifier: ViewModifier {
         case "litter":
             routes.openSheet(.petLitter(pet.id))
         case "walk":
-            routes.openSheet(.petWalkSummary(pet.id))
+            onStartWalkFromQuickAction(pet.id)
         case "play":
             routes.openSheet(.petPlay(pet.id))
         case "health":

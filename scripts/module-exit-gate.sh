@@ -48,6 +48,7 @@ if [[ "${MODE}" == "all" ]]; then
   run_step "ui-v4 audit (all)" scripts/audit-ui-v4.sh --all
   run_step "accessibility audit (all)" scripts/audit-accessibility.sh --all
   run_step "smoothness audit (all)" scripts/audit-smoothness-risk.sh --all
+  run_step "route first-frame audit (all)" scripts/audit-route-first-frame.sh --all
   run_step "runtime guardrails (all)" scripts/audit-runtime-guardrails.sh --all
   run_step "architecture boundaries" scripts/audit-architecture-boundaries.sh
   run_step "economy boundaries (all)" scripts/audit-economy-boundaries.sh --all
@@ -55,6 +56,7 @@ if [[ "${MODE}" == "all" ]]; then
   run_step "agent skill governance" scripts/audit-agent-skill-governance.sh
   run_step "derived-state lifecycle (all)" scripts/audit-derived-state-lifecycle.sh --all
 else
+  run_step "route first-frame audit (changed)" scripts/audit-route-first-frame.sh --changed
   run_step "runtime guardrails (changed)" scripts/audit-runtime-guardrails.sh --changed
   run_step "economy boundaries (changed)" scripts/audit-economy-boundaries.sh --changed
   run_step "member lifecycle gate (changed)" scripts/audit-member-lifecycle-gate.sh --changed

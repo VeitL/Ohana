@@ -163,8 +163,8 @@ struct QuickFeedDetailContent: View {
         self.appLanguage = appLanguage
         _defaultFeedGrams = defaultFeedGrams
         let initialNow = Date()
-        let initialFeedMode = FeedOperatingMode.stored(for: pet.id) ?? .manual
         let initialRules = FeedRuleState(pet: pet, allEvents: allEvents, now: initialNow)
+        let initialFeedMode = FeedOperatingMode.resolved(pet: pet, allEvents: allEvents, now: initialNow)
         _feedHomeController = StateObject(wrappedValue: FeedHomeController(initialMode: initialFeedMode))
         _stockSnapshotStore = StateObject(wrappedValue: QuickFeedStockSnapshotStore(
             initial: QuickFeedStockSnapshot.build(
@@ -268,13 +268,17 @@ struct QuickFeedDetailContent: View {
     var feedHomeSnapshotInput: FeedHomeSnapshotInput {
         FeedHomeSnapshotInput(
             pet: pet,
-            allEvents: allEvents,
+            allEvents: currentAllEvents,
             careLogs: allCareLogs,
             foodRecords: allFoodRecords,
             sharedCareSessions: allSharedCareSessions,
             now: clockTick,
             todayLabel: l.tr(zh: "今", en: "T", de: "H")
         )
+    }
+
+    var currentAllEvents: [Event] {
+        runtimeState.latestAllEventsOverride ?? allEvents
     }
 
     var currentUserId: String? {
@@ -470,6 +474,7 @@ struct QuickFeedDetailContent: View {
                 scheduleDeferredFeedRefresh([.refreshPlanCalendarSnapshot])
             },
             onEventCountChange: {
+                runtimeState.latestAllEventsOverride = nil
                 scheduleDeferredFeedRefresh([.reloadSnapshots, .syncDisplayedMode, .ensurePlanReminders])
             },
             onFeedingLedgerEventCountChange: {
@@ -759,6 +764,8 @@ struct QuickFeedDetailContent: View {
                         .frame(width: 36, height: 36) // a11y: allow decorative non-interactive frame; hit area handled by parent
                         .contentShape(Rectangle())
                 }
+                .accessibilityLabel(l.tr(zh: "关闭", en: "Close", de: "Schließen"))
+                .accessibilityIdentifier("quick-feed-detail-close-action")
                 .frame(width: 44, height: 44)
                 .buttonStyle(ScaleButtonStyle())
             }

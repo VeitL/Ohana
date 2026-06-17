@@ -19,12 +19,14 @@ enum OasisTreePreferenceStore {
     private static let dailyTreeCoconutCountKey = "oasis_dailyTreeCoconutCount"
     private static let dailyTreeCoconutHarvestedKey = "oasis_dailyTreeCoconutHarvestedIndices"
     private static let v2LegacyBaselineXPKey = "oasis_v2LegacyBaselineXP"
+    private static let v2LegacyBaselineXPScaleVersionKey = "oasis_v2LegacyBaselineXPScaleVersion"
     private static let ledgerEnergyCacheVersionKey = "oasis_ledgerEnergyCacheVersion"
     private static let ledgerEnergyProcessedCountKey = "oasis_ledgerEnergyProcessedCount"
     private static let ledgerEnergyLatestEventIdKey = "oasis_ledgerEnergyLatestEventId"
     private static let ledgerEnergyLatestOccurredAtKey = "oasis_ledgerEnergyLatestOccurredAt"
     private static let ledgerEnergyGrowthXPKey = "oasis_ledgerEnergyGrowthXP"
     private static let ledgerEnergyInjectedXPKey = "oasis_ledgerEnergyInjectedXP"
+    private static let legacyBaselineXPScaleVersion = 2
     private static let ledgerEnergyCacheVersion = 1
     private static let defaults = UserDefaults.standard
 
@@ -65,13 +67,21 @@ enum OasisTreePreferenceStore {
     }
 
     static func legacyBaselineXP() -> Int? {
+        legacyBaselineXPRecord()?.xp
+    }
+
+    static func legacyBaselineXPRecord() -> (xp: Int, isCurrentScale: Bool)? {
         defaults.object(forKey: v2LegacyBaselineXPKey) == nil
             ? nil
-            : defaults.integer(forKey: v2LegacyBaselineXPKey)
+            : (
+                defaults.integer(forKey: v2LegacyBaselineXPKey),
+                defaults.integer(forKey: v2LegacyBaselineXPScaleVersionKey) == legacyBaselineXPScaleVersion
+            )
     }
 
     static func storeLegacyBaselineXP(_ xp: Int) {
         defaults.set(xp, forKey: v2LegacyBaselineXPKey)
+        defaults.set(legacyBaselineXPScaleVersion, forKey: v2LegacyBaselineXPScaleVersionKey)
     }
 
     static func ledgerEnergyCache() -> OasisLedgerEnergyCache? {

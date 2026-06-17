@@ -42,6 +42,7 @@ final class QuickFeedRuntimeState: ObservableObject {
     var feedPlanReminderSchedulingTask: Task<Void, Never>?
     var feedStockReminderSchedulingTask: Task<Void, Never>?
     var pendingFeedRefreshRequest = QuickFeedRefreshRequest()
+    var latestAllEventsOverride: [Event]?
     var lastFeedClockMinute = -1
 
     func cancelTasks() {
@@ -61,5 +62,6 @@ final class QuickFeedRuntimeState: ObservableObject {
         feedPlanReminderSchedulingTask = nil
         feedStockReminderSchedulingTask = nil
         pendingFeedRefreshRequest = QuickFeedRefreshRequest()
+        latestAllEventsOverride = nil
     }
 }

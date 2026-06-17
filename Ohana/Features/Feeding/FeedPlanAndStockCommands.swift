@@ -42,6 +42,7 @@ enum TreatFeedCommand {
 struct SaveFeedPlanCommandResult {
     let mode: FeedOperatingMode
     let targetCount: Int
+    let events: [Event]
     let planReminders: [Reminder]
     let stockReminders: [Reminder]
     let didChange: Bool
@@ -62,6 +63,7 @@ enum SaveFeedPlanCommand {
             return SaveFeedPlanCommandResult(
                 mode: FeedOperatingMode.resolved(pet: pet, allEvents: allEvents),
                 targetCount: 0,
+                events: allEvents,
                 planReminders: [],
                 stockReminders: [],
                 didChange: false
@@ -124,9 +126,11 @@ enum SaveFeedPlanCommand {
             ))
         }
 
+        latestEvents = FeedCommandFetch.latestEvents(context: context, fallback: latestEvents)
         return SaveFeedPlanCommandResult(
             mode: targetMode,
             targetCount: normalizedTargets.count,
+            events: latestEvents,
             planReminders: planReminders,
             stockReminders: stockReminders,
             didChange: true

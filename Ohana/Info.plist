@@ -36,6 +36,11 @@
 				<key>CFBundleIconName</key>
 				<string>AppIconMinimalO</string>
 			</dict>
+			<key>AppIconNeonSmile</key>
+			<dict>
+				<key>CFBundleIconName</key>
+				<string>AppIconNeonSmile</string>
+			</dict>
 		</dict>
 	</dict>
 	<key>CFBundleLocalizations</key>

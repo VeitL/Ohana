@@ -103,12 +103,10 @@ struct AppRouteCoordinatorTests {
         let oldInjectedEnergy = treeManager.injectedEnergy
         OasisTreeManagerRegistry.current = treeManager
         defer {
-            treeManager.islandEnergy = oldIslandEnergy
-            treeManager.injectedEnergy = oldInjectedEnergy
+            treeManager.setEnergyForTesting(islandEnergy: oldIslandEnergy, injectedEnergy: oldInjectedEnergy)
             OasisTreeManagerRegistry.current = oldTreeManager
         }
-        treeManager.islandEnergy = 0
-        treeManager.injectedEnergy = 800
+        treeManager.setEnergyForTesting(islandEnergy: 0, injectedEnergy: 800)
 
         coordinator.presentSettings()
         coordinator.presentCoconutShop(category: .boost)
@@ -127,12 +125,10 @@ struct AppRouteCoordinatorTests {
         let oldInjectedEnergy = treeManager.injectedEnergy
         OasisTreeManagerRegistry.current = treeManager
         defer {
-            treeManager.islandEnergy = oldIslandEnergy
-            treeManager.injectedEnergy = oldInjectedEnergy
+            treeManager.setEnergyForTesting(islandEnergy: oldIslandEnergy, injectedEnergy: oldInjectedEnergy)
             OasisTreeManagerRegistry.current = oldTreeManager
         }
-        treeManager.islandEnergy = 0
-        treeManager.injectedEnergy = 0
+        treeManager.setEnergyForTesting(islandEnergy: 0, injectedEnergy: 0)
 
         coordinator.presentSettings()
         coordinator.presentCoconutShop(category: .boost)

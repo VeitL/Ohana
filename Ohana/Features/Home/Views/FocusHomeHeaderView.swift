@@ -75,6 +75,7 @@ struct FocusHomeHeaderView: View {
                 }
                 .buttonStyle(ScaleButtonStyle())
                 .accessibilityLabel("连续打卡 \(streak) 天")
+                .accessibilityIdentifier("home-streak-action")
 
                 CoconutBalanceCapsule(
                     balance: coconutBalance,
@@ -116,6 +117,7 @@ struct FocusHomeHeaderView: View {
                 .background(headerHitSlop)
                 .contentShape(Rectangle())
                 .accessibilityLabel("设置，当前用户 \(activeHumanDisplayName)")
+                .accessibilityIdentifier("home-settings-action")
             }
         }
         .padding(.horizontal, K.hPad)

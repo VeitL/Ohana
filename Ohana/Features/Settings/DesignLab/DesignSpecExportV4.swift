@@ -194,8 +194,12 @@ enum DesignSpecExporterV4 {
 
     private static func componentRules(_ selection: DesignSpecSelectionV4) -> [String: String] {
         [
-            "button": "Primary CTA uses \(selection.button); one primary action per screen.",
-            "card": "Business surfaces use \(selection.card); sheet glass choices must not override the selected card style.",
+            "button": "Primary CTA uses \(selection.button) with goPrimary/adaptivePrimary; keep one primary action per screen and make secondary actions visibly quieter.",
+            "buttonGrammar": "Use stable button roles: primary pill for the main command, muted secondary for alternate commands, semantic destructive for danger, and icon-only controls only with a 44pt hit area and accessibility label.",
+            "actionColorDiscipline": "goPrimary/adaptivePrimary is the only global click-me color for primary CTAs, confirmations, key navigation, functional icons, focus, and selected system states. Feeding, reminders, danger, success, rewards, and charts may use semantic colors only for domain meaning.",
+            "card": "Business surfaces use \(selection.card) solid token fills by default; sheet glass choices must not override the selected card style.",
+            "surfaceRhythm": "Prefer surface rhythm, spacing, grouping headers, and light hairlines over extra card chrome. Do not add nested cards, decorative borders, or shadows just to create separation.",
+            "shadowBudget": "Ordinary cards, buttons, text, chips, and list rows do not use decorative shadows. Reserve shadows for sheets/popups, toast elevation, critical floating controls, major role/avatar/product visuals, and explicitly allowlisted previews.",
             "sheet": "Sheets use independent tokens: \(selection.sheet) layout, \(selection.sheetGlass) background, \(selection.sheetCard) card, \(selection.sheetInput) input, \(selection.sheetButton) button, and \(selection.sheetChrome) chrome.",
             "icon": "Functional icons use \(selection.icon): SF Symbol or template vector glyphs in goPrimary only; no multicolor, skeuomorphic, emoji, or illustration-style glyphs for app controls.",
             "settingsIcon": "Settings rows use \(selection.settingIcon) leading icon treatment without colored tile backgrounds.",
@@ -204,7 +208,9 @@ enum DesignSpecExporterV4 {
             "chart": "Charts use \(selection.chartLine) trend style and \(selection.chartAxis) axis treatment.",
             "calendar": "Calendar uses \(selection.calendarLayout) layout, \(selection.calendarDay) day cells, \(selection.calendarEvent) event markers, and \(selection.calendarAgenda) agenda rows.",
             "motion": "Motion uses \(selection.motion), FAB uses \(selection.fabMotion), transition uses \(selection.transition).",
+            "pressFeedback": "Tap feedback must appear on the finger-first frame through local visual state only: light scale, opacity/brightness, and optional soft haptic. Business writes, SwiftData reads, rewards, reminder sync, and route-heavy work run after the visual handoff.",
             "motionContinuity": "All visible state changes must transition smoothly with the selected motion token; no hard cuts for controls, toggles, sheets, lists, charts, calendar, or theme changes.",
+            "componentConvergence": "Refine one component or variant at a time, store decisions in tokens/rules, and update shared primitives before copying a local visual treatment into multiple feature screens.",
             "privacy": "Locked/private states must show icon + text placeholder and never leak values."
         ]
     }

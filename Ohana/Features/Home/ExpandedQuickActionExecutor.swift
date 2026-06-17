@@ -32,7 +32,7 @@ enum ExpandedQuickActionExecutor {
         antiRepeatMessage: @escaping ((executorName: String, minutesAgo: Int)) -> String,
         openFeedDetail: @escaping (_ opensManualSheet: Bool) -> Void,
         completePlannedFeed: @escaping (Pet) -> Bool,
-        showAntiRepeat: @escaping (_ title: String, _ message: String, _ pendingAction: @escaping () -> Void) -> Void,
+        showAntiRepeat: @escaping (_ title: String, _ message: String, _ pendingAction: @escaping () -> Bool) -> Void,
         feedback: @escaping (Feedback) -> Void,
         careEvents: CareEventRecording
     ) -> Bool {
@@ -103,7 +103,7 @@ enum ExpandedQuickActionExecutor {
                in: humans,
                now: now
            ) {
-            showAntiRepeat(antiRepeatTitle, antiRepeatMessage(warning)) { _ = performFeed() }
+            showAntiRepeat(antiRepeatTitle, antiRepeatMessage(warning), performFeed)
             return false
         } else {
             return performFeed()
@@ -226,7 +226,7 @@ enum ExpandedQuickActionExecutor {
         antiRepeatMessage: @escaping ((executorName: String, minutesAgo: Int)) -> String,
         openFeedDetail: @escaping (_ opensManualSheet: Bool) -> Void,
         completePlannedFeed: @escaping (Pet) -> Bool,
-        showAntiRepeat: @escaping (_ title: String, _ message: String, _ pendingAction: @escaping () -> Void) -> Void,
+        showAntiRepeat: @escaping (_ title: String, _ message: String, _ pendingAction: @escaping () -> Bool) -> Void,
         startWalk: (Pet) -> Void,
         openWaterManagement: (Pet) -> Void,
         openMedication: (Pet) -> Void,

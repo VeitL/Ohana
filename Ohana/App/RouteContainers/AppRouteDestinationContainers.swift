@@ -584,10 +584,16 @@ private struct AppSheetRouteDestination: View {
             AppStreakDetailRouteContainer(
                 onClose: onDismiss,
                 onPresentCoconutLog: { subject in
-                    coordinator.presentCoconutLog(subject)
+                    coordinator.dismissSheet(.streakDetail)
+                    OhanaFrameScheduler.runAfterNextFrame {
+                        coordinator.presentCoconutLog(subject)
+                    }
                 },
                 onPresentCoconutShop: { category in
-                    coordinator.presentCoconutShop(category: category)
+                    coordinator.dismissSheet(.streakDetail)
+                    OhanaFrameScheduler.runAfterNextFrame {
+                        coordinator.presentCoconutShop(category: category)
+                    }
                 }
             )
             .ohanaSheetPagePresentation()

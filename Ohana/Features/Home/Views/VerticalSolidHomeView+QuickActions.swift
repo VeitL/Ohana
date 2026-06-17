@@ -154,11 +154,14 @@ extension VerticalSolidHomeView {
                 showAntiRepeat: { title, message, pendingAction in
                     routeCoordinator.showAntiRepeat(
                         title: title,
-                        message: message,
-                        pendingAction: pendingAction
-                    )
+                        message: message
+                    ) {
+                        enqueueHomeCommand(.quickCare(entityID: petID, action: "\(actionType):confirmed")) {
+                            pendingAction()
+                        }
+                    }
                 },
-                startWalk: { routeCoordinator.openFullScreen(.walk($0)) },
+                startWalk: { startWalkFromQuickAction(petID: $0) },
                 openWaterManagement: { routeCoordinator.openSheet(.petWater($0)) },
                 openMedication: { routeCoordinator.openSheet(.petMedication($0)) },
                 feedback: applyQuickActionExecutorFeedback
@@ -171,7 +174,7 @@ extension VerticalSolidHomeView {
         if feedback.coconutDelta > 0 {
             OhanaFeedback.success()
         }
-        tryAwardTodayFocusDailyCompletion(afterCompleting: feedback.cardId)
+        scheduleTodayFocusDailyCompletion(afterCompleting: feedback.cardId)
     }
 
     func currentExecutorId() -> String? {
@@ -303,7 +306,8 @@ extension VerticalSolidHomeView {
                 showHumanAllFeatures: { routeCoordinator.openSheet(.humanAllFeatures($0.id)) },
                 openFeed: { routeCoordinator.openSheet(.petFeed($0.id, opensManualSheet: false)) },
                 openWater: { routeCoordinator.openSheet(.petWater($0.id)) },
-                openWalk: { routeCoordinator.openSheet(.petWalkSummary($0.id)) },
+                openWalk: { startWalkFromQuickAction(petID: $0.id) },
+                openWalkSummary: { routeCoordinator.openSheet(.petWalkSummary($0.id)) },
                 openPotty: { routeCoordinator.openSheet(.petPotty($0.id)) },
                 openPlay: { routeCoordinator.openSheet(.petPlay($0.id)) },
                 openMedication: { routeCoordinator.openSheet(.petMedication($0.id)) },
@@ -322,6 +326,16 @@ extension VerticalSolidHomeView {
         )
     }
 
+    func startWalkFromQuickAction(petID: UUID) {
+        guard let pet = pets.first(where: { $0.id == petID && !$0.hasPassedAway }) else {
+            return
+        }
+        OhanaFeedback.medium()
+        appServices.walking.start(pet: pet)
+        appServices.walking.isWalkCardExpandedSurfaceVisible = true
+        walkCardPresentationRevision &+= 1
+    }
+
     func openPetQuickKey(_ key: String, pet: Pet) {
         GrowthNewFeatureStore.markVisited(quickActionType: key)
         switch key {
@@ -334,7 +348,7 @@ extension VerticalSolidHomeView {
         case "litter":
             routeCoordinator.openSheet(.petLitter(pet.id))
         case "walk":
-            routeCoordinator.openSheet(.petWalkSummary(pet.id))
+            startWalkFromQuickAction(petID: pet.id)
         case "play":
             routeCoordinator.openSheet(.petPlay(pet.id))
         case "health":

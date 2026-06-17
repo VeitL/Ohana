@@ -127,6 +127,7 @@ extension QuickFeedDetailContent {
             ) {
                 saveManualFeedSettings()
             }
+            .accessibilityIdentifier("quick-feed-manual-settings-save")
         }
         .padding(16)
         .feedFlatBlockSurface(cornerRadius: OhanaRadius.cardLarge)
@@ -194,6 +195,7 @@ extension QuickFeedDetailContent {
             ) {
                 savePlan(kind)
             }
+            .accessibilityIdentifier(kind == .manualReminder ? "quick-feed-plan-save" : "quick-feed-auto-save")
             .disabled(draftStore.isSavingFeedPlan)
             .opacity(draftStore.isSavingFeedPlan ? 0.72 : 1)
             if hasExistingPlan {
@@ -208,6 +210,7 @@ extension QuickFeedDetailContent {
                         .feedFlatBlockSurface(cornerRadius: OhanaRadius.control)
                 }
                 .buttonStyle(ScaleButtonStyle())
+                .accessibilityIdentifier(kind == .manualReminder ? "quick-feed-plan-delete" : "quick-feed-auto-delete")
                 .disabled(draftStore.isSavingFeedPlan)
                 .opacity(draftStore.isSavingFeedPlan ? 0.72 : 1)
             }
@@ -309,6 +312,7 @@ extension QuickFeedDetailContent {
             }
             .buttonStyle(ScaleButtonStyle())
             .accessibilityLabel(l.tr(zh: "关闭", en: "Close", de: "Schließen"))
+            .accessibilityIdentifier("quick-feed-embedded-panel-close")
         }
     }
 }

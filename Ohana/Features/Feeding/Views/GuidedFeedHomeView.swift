@@ -141,6 +141,7 @@ private struct FeedGuidedModeStrip: View {
                         .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
                         .foregroundStyle(selected.tint)
                         .contentTransition(.opacity)
+                        .accessibilityIdentifier("quick-feed-current-mode-title")
                 }
             }
 
@@ -178,6 +179,7 @@ private struct FeedGuidedModeStrip: View {
                         .scaleEffect(option.isSelected ? 1.015 : 1)
                     }
                     .buttonStyle(ScaleButtonStyle())
+                    .accessibilityIdentifier("quick-feed-mode-\(option.id)")
                     .zIndex(option.isSelected ? 1 : 0)
                 }
             }
@@ -272,6 +274,7 @@ private struct FeedPrimaryTaskSurface: View {
                     }
                     .buttonStyle(ScaleButtonStyle())
                     .accessibilityLabel(Text("Settings"))
+                    .accessibilityIdentifier("quick-feed-settings-action")
                 }
 
                 HStack(alignment: .bottom, spacing: 14) {
@@ -320,6 +323,7 @@ private struct FeedPrimaryTaskSurface: View {
                         .contentTransition(.opacity)
                 }
                 .buttonStyle(ScaleButtonStyle())
+                .accessibilityIdentifier("quick-feed-primary-action")
                 .disabled(!task.isPrimaryEnabled)
                 .opacity(task.isPrimaryEnabled ? 1 : 0.58)
             }
@@ -481,6 +485,7 @@ private struct FeedDiscoveryLargeDockCard: View {
                     .contentShape(RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous))
                 }
                 .buttonStyle(ScaleButtonStyle())
+                .accessibilityIdentifier("quick-feed-dock-\(item.id)")
 
                 if let secondaryIcon = item.secondaryIcon, let secondaryAction = item.secondaryAction {
                     Button {
@@ -496,6 +501,7 @@ private struct FeedDiscoveryLargeDockCard: View {
                     }
                     .buttonStyle(ScaleButtonStyle())
                     .accessibilityLabel(Text(item.secondaryAccessibilityLabel ?? item.title))
+                    .accessibilityIdentifier("quick-feed-dock-\(item.id)-secondary")
                     .padding(8)
                     .zIndex(2)
                 }
@@ -543,5 +549,6 @@ private struct FeedDiscoveryCompactDockCard: View {
             .contentShape(RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous))
         }
         .buttonStyle(ScaleButtonStyle())
+        .accessibilityIdentifier("quick-feed-dock-\(item.id)")
     }
 }

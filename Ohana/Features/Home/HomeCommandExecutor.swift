@@ -123,7 +123,7 @@ struct HomeCommandExecutor {
             return false
         }
 
-        let events = fetchQuickCareEvents(petID: petID, now: now)
+        let events = fetchQuickCareEvents(pet: pet, now: now)
         let feedLogs = fetchRecentCareLogs(petID: petID, now: now)
         let foodRecords = fetchFoodRecords(petID: petID)
         let humans = fetchHumans()
@@ -226,7 +226,21 @@ struct HomeCommandExecutor {
             antiRepeatMessage: antiRepeatMessage,
             openFeedDetail: openFeedDetail,
             completePlannedFeed: completePlannedFeed,
-            showAntiRepeat: showAntiRepeat,
+            showAntiRepeat: { title, message, pendingAction in
+                showAntiRepeat(title, message) {
+                    let confirmedDidRecord = pendingAction()
+                    guard confirmedDidRecord,
+                          shouldPublishConfirmedAntiRepeatMutation(
+                              actionType: actionType,
+                              pet: pet,
+                              allEvents: allEvents,
+                              allFeedCareLogs: allFeedCareLogs,
+                              now: now
+                          )
+                    else { return }
+                    publishMutation(QuickCareCommand.action(petID: pet.id, action: actionType), pet: pet)
+                }
+            },
             startWalk: startWalk,
             openWaterManagement: openWaterManagement,
             openMedication: openMedication,
@@ -257,6 +271,22 @@ struct HomeCommandExecutor {
             )
         }
         return true
+    }
+
+    private func shouldPublishConfirmedAntiRepeatMutation(
+        actionType: String,
+        pet: Pet,
+        allEvents: [Event],
+        allFeedCareLogs: [PetCareLog],
+        now: Date
+    ) -> Bool {
+        guard actionType == "feed" else { return true }
+        return ExpandedQuickActionLogic.feedDashboard(
+            for: pet,
+            allEvents: allEvents,
+            allFeedCareLogs: allFeedCareLogs,
+            now: now
+        ).operatingMode == .manual
     }
 
     func completePlannedFeed(
@@ -631,15 +661,48 @@ struct HomeCommandExecutor {
         ).first
     }
 
-    private func fetchQuickCareEvents(petID _: UUID, now _: Date) -> [Event] {
-        let descriptor = FetchDescriptor<Event>(
-            sortBy: [SortDescriptor(\.startDate, order: .forward)]
-        )
-        return fetchHomeCommandModelsOrLog(
-            descriptor,
+    private func fetchQuickCareEvents(pet: Pet, now: Date) -> [Event] {
+        let petIDRaw = pet.id.uuidString
+        let petEvents = fetchHomeCommandModelsOrLog(
+            FetchDescriptor<Event>(
+                predicate: #Predicate<Event> { event in
+                    event.relatedEntityId == petIDRaw
+                },
+                sortBy: [SortDescriptor(\.startDate, order: .forward)]
+            ),
             context: modelContext,
-            operation: "fetch quick care events"
+            operation: "fetch quick care pet events"
         )
+
+        let medicationDoseEvents = fetchTodayMedicationDoseEvents(pet: pet, now: now)
+        let uniqueEvents = Dictionary(
+            grouping: petEvents + medicationDoseEvents,
+            by: \.id
+        ).compactMap(\.value.first)
+        return uniqueEvents.sorted { $0.startDate < $1.startDate }
+    }
+
+    private func fetchTodayMedicationDoseEvents(pet: Pet, now: Date) -> [Event] {
+        let medicationIDs = Set(pet.medications.map(\.id.uuidString))
+        guard !medicationIDs.isEmpty else { return [] }
+
+        let calendar = Calendar.current
+        let start = calendar.startOfDay(for: now)
+        let end = calendar.date(byAdding: .day, value: 1, to: start) ?? now
+        let medicationDoseType = EventType.petMedicationDose.rawValue
+        let doseEvents = fetchHomeCommandModelsOrLog(
+            FetchDescriptor<Event>(
+                predicate: #Predicate<Event> { event in
+                    event.eventType == medicationDoseType &&
+                        event.startDate >= start &&
+                        event.startDate < end
+                },
+                sortBy: [SortDescriptor(\.startDate, order: .forward)]
+            ),
+            context: modelContext,
+            operation: "fetch quick care medication dose events"
+        )
+        return doseEvents.filter { medicationIDs.contains($0.relatedEntityId) }
     }
 
     private func fetchRecentCareLogs(petID: UUID, now: Date) -> [PetCareLog] {

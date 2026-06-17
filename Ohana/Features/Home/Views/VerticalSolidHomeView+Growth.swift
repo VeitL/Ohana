@@ -161,14 +161,14 @@ extension VerticalSolidHomeView {
 
     func scheduleGrowthLoopSync(after mutation: DomainMutationResult) {
         guard mutation.wroteBusinessFact else { return }
-        appServices.onboardingJourney.markFirstCareCompleted()
         let previousLevel = treeManager.treeLevel.rawValue
         let previousEnergy = treeManager.totalEnergy
         let previousProgress = treeManager.progressToNextLevel
 
         growthLoopSyncTask?.cancel()
-        growthLoopSyncTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: 160) {
+        growthLoopSyncTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: 720) {
             let startedAt = CFAbsoluteTimeGetCurrent()
+            appServices.onboardingJourney.markFirstCareCompleted()
             treeManager.refreshEnergy(
                 modelContext: modelContext,
                 pets: pets,

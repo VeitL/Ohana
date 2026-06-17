@@ -87,9 +87,15 @@ struct OasisRewardPresentationModifier: ViewModifier {
         case .checkInDetail:
             DailyStreakDetailRouteContainer(
                 onClose: { sheetRoute = nil },
-                onPresentCoconutLog: onPresentCoconutLog,
+                onPresentCoconutLog: { subject in
+                    dismissCheckInDetailThen {
+                        onPresentCoconutLog?(subject)
+                    }
+                },
                 onPresentCoconutShop: { category in
-                    presentOasisSheet(.coconutShop(category))
+                    dismissCheckInDetailThen {
+                        presentOasisSheet(.coconutShop(category))
+                    }
                 }
             )
             .ohanaSheetPagePresentation() // ui-v4: allow long streak overview
@@ -125,6 +131,11 @@ struct OasisRewardPresentationModifier: ViewModifier {
             return
         }
         sheetRoute = route
+    }
+
+    private func dismissCheckInDetailThen(_ action: @escaping @MainActor () -> Void) {
+        sheetRoute = nil
+        OhanaFrameScheduler.runAfterNextFrame(action)
     }
 
     private func lockedOasisRoute(_ route: OasisSheetRoute) -> some View {

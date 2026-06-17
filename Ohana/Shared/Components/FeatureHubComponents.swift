@@ -184,6 +184,7 @@ struct FeatureHubSectionActionView<Destination: Hashable>: View {
                     }
                     .buttonStyle(ScaleButtonStyle())
                     .ohanaSmoothAppear(index: index)
+                    .accessibilityIdentifier("feature-hub-\(section.id)-\(item.id)")
                 }
             }
         }

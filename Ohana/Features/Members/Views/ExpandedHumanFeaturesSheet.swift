@@ -620,12 +620,14 @@ struct ExpandedHumanFeaturesContentSheet: View {
     }
 
     private func deleteHumanAndDismiss() {
+        let activeHumanID = activeHumanIdStr
         let command = DomainCommand.memberDeletion(entityID: human.id, kind: EntityKind.human.rawValue)
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-        commandQueue.enqueue(command) {
+        dismiss()
+        commandQueue.enqueue(command, delayMilliseconds: DeferredDomainCommandQueue.destructiveRouteDismissDelayMilliseconds) {
             let result = MemberCommandExecutor(context: modelContext, services: appServices).deleteHuman(
                 human,
-                activeHumanID: activeHumanIdStr,
+                activeHumanID: activeHumanID,
                 note: "expandedHumanFeatures.delete"
             )
             if result.clearsActiveHumanID {
@@ -637,7 +639,6 @@ struct ExpandedHumanFeaturesContentSheet: View {
                     requiresAccountSwitch: result.requiresAccountSwitch
                 )
             )
-            dismiss()
         }
     }
 

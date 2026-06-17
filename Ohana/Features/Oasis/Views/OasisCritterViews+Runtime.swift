@@ -28,7 +28,8 @@ extension OasisCritterCodexView {
         renderSnapshotTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: milliseconds) {
             renderSnapshots = commandExecutor.makeCritterSnapshots(
                 electronicPets: electronicPets,
-                fragments: fragments
+                fragments: fragments,
+                activeCoconutBalance: currentCoconutBalance
             )
             renderSnapshotTask = nil
         }

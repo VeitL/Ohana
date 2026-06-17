@@ -28,6 +28,11 @@ final class AppResetServiceTests: XCTestCase {
         defaults.set("{}", forKey: "quickActionItems_v2")
         defaults.set(12, forKey: "quest_coconutCount")
         defaults.set(AppBackgroundStyle.customPhoto.rawValue, forKey: "appBackgroundStyle")
+        defaults.set(true, forKey: StarterGiftService.Key.claimed)
+        defaults.set(true, forKey: StarterGiftService.Key.ceremonySeen)
+        defaults.set(true, forKey: StarterGiftService.Key.oasisTabPromptPending)
+        defaults.set(true, forKey: OnboardingJourneyCoordinator.Key.firstCareCompleted)
+        defaults.set(true, forKey: "ohanaGrowthOnboardingCompletedV1")
 
         try AppResetService.reset(
             context: context,
@@ -47,6 +52,11 @@ final class AppResetServiceTests: XCTestCase {
         XCTAssertNil(defaults.object(forKey: "quickActionItems_v2"))
         XCTAssertNil(defaults.object(forKey: "quest_coconutCount"))
         XCTAssertNil(defaults.object(forKey: "appBackgroundStyle"))
+        XCTAssertNil(defaults.object(forKey: StarterGiftService.Key.claimed))
+        XCTAssertNil(defaults.object(forKey: StarterGiftService.Key.ceremonySeen))
+        XCTAssertNil(defaults.object(forKey: StarterGiftService.Key.oasisTabPromptPending))
+        XCTAssertNil(defaults.object(forKey: OnboardingJourneyCoordinator.Key.firstCareCompleted))
+        XCTAssertNil(defaults.object(forKey: "ohanaGrowthOnboardingCompletedV1"))
         XCTAssertEqual(defaults.string(forKey: "appLanguage"), "en")
         XCTAssertEqual(defaults.string(forKey: AppCountry.storageKey), "DE")
     }

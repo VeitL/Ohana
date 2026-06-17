@@ -271,6 +271,7 @@ extension OasisRewardView {
                 en: "Coconut Tree level \(treeVisualLevel.rawValue)",
                 de: "Kokosbaum Stufe \(treeVisualLevel.rawValue)"
             ))
+            .accessibilityIdentifier("oasis-tree-level-control")
             .accessibilityHint(l.tr(
                 zh: "打开升级路线和解锁规则",
                 en: "Open upgrade roadmap and unlock rules",
@@ -500,9 +501,11 @@ extension OasisRewardView {
                     .monospacedDigit()
                     .contentTransition(.numericText())
                 Spacer()
-                Text(treePassiveIncomeAmount > 0 ? "+\(treePassiveIncomeAmount)🥥/d" : "Lv.5 🥥")
-                    .font(OhanaFont.caption2(.black))
-                    .foregroundStyle(Color.goPrimary)
+                if treePassiveIncomeAmount > 0 {
+                    Text("+\(treePassiveIncomeAmount)🥥/d")
+                        .font(OhanaFont.caption2(.black))
+                        .foregroundStyle(Color.goPrimary)
+                }
             }
 
             GeometryReader { geo in
@@ -618,7 +621,7 @@ extension OasisRewardView {
         withAnimation(GoMotion.feedback) {
             coconutBalanceVisualOverride = targetBalance
             actionSnapshot.activeCoconutBalance = targetBalance
-            actionSnapshot.canInjectCoconuts = targetBalance >= 80
+            actionSnapshot.canInjectCoconuts = targetBalance >= OasisTreeEnergyInjectionPolicy.starterPackageCost
             bentoSnapshot.shopMetric = "\(targetBalance)"
         }
     }
@@ -665,8 +668,8 @@ extension OasisRewardView {
         let thawDelay: UInt64 = motionBudget.usesFullMotion ? 120 : 48
         let beforeLevel = treeVisualLevel
         let beforeBalance = activeHumanCoconutBalance
-        let targetBalance = max(0, beforeBalance - 80)
-        let targetEnergy = treeMgr.totalEnergy + 20
+        let targetBalance = max(0, beforeBalance - OasisTreeEnergyInjectionPolicy.starterPackageCost)
+        let targetEnergy = treeMgr.totalEnergy + OasisTreeEnergyInjectionPolicy.starterPackageXP
         let targetLevel = treeMgr.treeLevel(forTotalEnergy: targetEnergy)
         let isLevelUp = targetLevel.rawValue > beforeLevel.rawValue
         let pulseBoost: CGFloat = motionBudget.usesFullMotion ? (isLevelUp ? 0.045 : 0.026) : 0.01
@@ -677,7 +680,7 @@ extension OasisRewardView {
         withAnimation(visualAnimation) {
             coconutBalanceVisualOverride = targetBalance
             actionSnapshot.activeCoconutBalance = targetBalance
-            actionSnapshot.canInjectCoconuts = targetBalance >= 80
+            actionSnapshot.canInjectCoconuts = targetBalance >= OasisTreeEnergyInjectionPolicy.starterPackageCost
             bentoSnapshot.shopMetric = "\(targetBalance)"
             treeVisualEnergyOverride = targetEnergy
             isInjecting = true

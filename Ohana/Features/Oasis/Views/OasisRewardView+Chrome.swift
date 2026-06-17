@@ -75,6 +75,7 @@ extension OasisRewardView {
             Spacer()
             headerCoconutBalanceButton
         }
+        .accessibilityIdentifier("oasis-screen")
     }
 
     var headerCoconutBalanceButton: some View {

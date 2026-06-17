@@ -32,7 +32,7 @@ extension QuickFeedDetailContent {
         UISelectionFeedbackGenerator().selectionChanged()
 
         feedPlanSaveTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: feedPlanSaveDelayMilliseconds) {
-            let sourceEvents = targets.count > 1 ? latestAllEvents() : allEvents
+            let sourceEvents = latestAllEvents()
             let result = FeedHomePerformance.measure("plan.save") {
                 commandExecutor.savePlan(
                     pet: pet,
@@ -42,6 +42,7 @@ extension QuickFeedDetailContent {
                     allEvents: sourceEvents
                 )
             }
+            runtimeState.latestAllEventsOverride = result.events
 
             if kind == .manualReminder {
                 scheduleReminders(result.planReminders)
@@ -256,7 +257,9 @@ extension QuickFeedDetailContent {
     }
 
     func latestAllEvents() -> [Event] {
-        commandExecutor.latestAllEvents(fallback: allEvents)
+        let events = commandExecutor.latestAllEvents(fallback: currentAllEvents)
+        runtimeState.latestAllEventsOverride = events
+        return events
     }
 
     func deletePlan(_ kind: FeedRuleKind) {
@@ -273,9 +276,10 @@ extension QuickFeedDetailContent {
                     pet: pet,
                     kind: kind,
                     activeMode: activeFeedingMode,
-                    allEvents: allEvents
+                    allEvents: latestAllEvents()
                 )
             }
+            runtimeState.latestAllEventsOverride = latestAllEvents()
             scheduleStockReminders(result.stockReminders)
             if result.shouldSwitchToManual {
                 setActiveFeedMode(.manual)

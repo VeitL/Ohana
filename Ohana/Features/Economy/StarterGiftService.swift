@@ -2,7 +2,7 @@
 //  StarterGiftService.swift
 //  Ohana
 //
-//  First-run coconut gift and Lv0 -> Lv1 ceremony state.
+//  First-run coconut gift and Lv0 starter ceremony state.
 //
 
 import Foundation
@@ -19,6 +19,7 @@ enum StarterGiftService {
         static let claimed = "ohanaStarterGiftClaimedV1"
         static let pending = "ohanaStarterGiftPendingV1"
         static let ceremonySeen = "ohanaStarterLv0CeremonySeenV1"
+        static let oasisTabPromptPending = "ohanaStarterOasisTabPromptPendingV1"
     }
 
     enum Result: Equatable {
@@ -61,6 +62,21 @@ enum StarterGiftService {
             return .markedExistingUser
         }
 
+        if counts.humans == 1,
+           counts.pets == 0,
+           counts.ledger == 0,
+           let human = activeHuman(matching: activeHumanID ?? "", context: context) {
+            defaults.set(true, forKey: Key.pending)
+            return claim(
+                for: human,
+                context: context,
+                defaults: defaults,
+                careLedger: careLedger,
+                wallet: wallet,
+                projectionManager: projectionManager
+            )
+        }
+
         if counts.humans == 0, counts.pets == 0, counts.ledger == 0 {
             defaults.set(true, forKey: Key.pending)
             AppPerformanceMonitor.shared.record("starter_gift_pending", valueMS: 0)
@@ -78,6 +94,7 @@ enum StarterGiftService {
     @MainActor
     static func markCeremonySeen(defaults: UserDefaults = .standard) {
         defaults.set(true, forKey: Key.ceremonySeen)
+        defaults.set(true, forKey: Key.oasisTabPromptPending)
         AppPerformanceMonitor.shared.record("starter_ceremony_seen", valueMS: 0)
     }
 
@@ -86,11 +103,16 @@ enum StarterGiftService {
         defaults.bool(forKey: Key.claimed) && !defaults.bool(forKey: Key.ceremonySeen)
     }
 
+    static func isOasisHomeTabUnlocked(defaults: UserDefaults = .standard) -> Bool {
+        !(defaults.bool(forKey: Key.claimed) && !defaults.bool(forKey: Key.ceremonySeen))
+    }
+
     @MainActor
     static func resetForDebug(defaults: UserDefaults = .standard) {
         defaults.removeObject(forKey: Key.claimed)
         defaults.removeObject(forKey: Key.pending)
         defaults.removeObject(forKey: Key.ceremonySeen)
+        defaults.removeObject(forKey: Key.oasisTabPromptPending)
     }
 
     @MainActor
@@ -148,7 +170,7 @@ enum StarterGiftService {
                 ],
                 context: context,
                 save: false,
-                postsRewardFeedback: true,
+                postsRewardFeedback: false,
                 updatesProjection: true,
                 projectionManager: projectionManager
             )
@@ -172,6 +194,7 @@ enum StarterGiftService {
     private static func markExistingUser(defaults: UserDefaults) {
         defaults.set(true, forKey: Key.claimed)
         defaults.set(true, forKey: Key.ceremonySeen)
+        defaults.set(false, forKey: Key.oasisTabPromptPending)
     }
 
     @MainActor

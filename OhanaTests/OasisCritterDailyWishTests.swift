@@ -405,7 +405,7 @@ struct OasisCritterDailyWishTests {
         let oldTreeManager = OasisTreeManagerRegistry.current
         let treeManager = OasisTreeManager()
         OasisTreeManagerRegistry.current = treeManager
-        treeManager.injectedEnergy = 3600
+        treeManager.setEnergyForTesting(injectedEnergy: 3600)
         defer {
             OasisTreeManagerRegistry.current = oldTreeManager
             if let oldActiveHumanID {

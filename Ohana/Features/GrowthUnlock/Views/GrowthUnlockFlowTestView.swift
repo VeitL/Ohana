@@ -360,8 +360,8 @@ struct GrowthUnlockFlowTestView: View {
             } label: {
                 previewActionRow(
                     icon: "gift.fill",
-                    title: localized(zh: "播放新人礼包 Lv0 → Lv1", en: "Play starter gift Lv0 → Lv1", de: "Startergeschenk Lv0 → Lv1"),
-                    detail: localized(zh: "+50🥥，不增加 Growth XP", en: "+50🥥, no Growth XP", de: "+50🥥, keine Growth XP")
+                    title: localized(zh: "播放新人礼包 Lv0", en: "Play starter gift Lv0", de: "Startergeschenk Lv0"),
+                    detail: localized(zh: "+50🥥，去 Oasis 注入后升 Lv1", en: "+50🥥, inject in Oasis to reach Lv1", de: "+50🥥, in Oasis für Lv1 einspeisen")
                 )
             }
             .buttonStyle(ScaleButtonStyle())

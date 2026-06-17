@@ -57,6 +57,9 @@ extension QuickFeedDetailContent {
                         completeNextPlannedFeed()
                     }
                 }
+                .accessibilityIdentifier(isSettingsOnly
+                    ? "quick-feed-manual-settings-save"
+                    : (isPlannedCompletion ? "quick-feed-planned-complete" : "quick-feed-manual-log-save"))
             }
             .padding(.horizontal, 20)
             .padding(.top, 18)

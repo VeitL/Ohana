@@ -82,10 +82,11 @@ scripts/audit-governance-manifests.sh
 section "Resource integrity"
 scripts/audit-resource-integrity.sh
 
-section "UI/accessibility/smoothness strict audits"
+section "UI/accessibility/smoothness/route strict audits"
 scripts/audit-ui-v4.sh --all
 scripts/audit-accessibility.sh --all
 scripts/audit-smoothness-risk.sh --all
+scripts/audit-route-first-frame.sh --all
 
 section "Secret scan (working tree)"
 if command -v gitleaks >/dev/null 2>&1; then

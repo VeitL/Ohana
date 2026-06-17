@@ -282,14 +282,10 @@ final class AppRouteCoordinator: ObservableObject {
             AppFeatureRouteGuard.recordIntercept(
                 AppFeatureRouteGuard.lockedRouteNote(for: route, currentLevel: currentFeatureLevel)
             )
-            fullScreen = nil
-            overlay = nil
-            sheet = .functionMenu(destination: .growthRoadmap)
+            setSheet(.functionMenu(destination: .growthRoadmap))
             return
         }
-        fullScreen = nil
-        overlay = nil
-        sheet = route
+        setSheet(route)
     }
 
     func presentCrewRoster(mode: CrewRosterMode = .members) {
@@ -308,8 +304,12 @@ final class AppRouteCoordinator: ObservableObject {
     }
 
     func presentQuickMoment(petID: UUID) {
-        sheet = nil
-        fullScreen = nil
+        if sheet != nil {
+            sheet = nil
+        }
+        if fullScreen != nil {
+            fullScreen = nil
+        }
         overlay = .quickMoment(petID: petID)
     }
 
@@ -322,27 +322,19 @@ final class AppRouteCoordinator: ObservableObject {
     }
 
     func presentOasisReward() {
-        sheet = nil
-        overlay = nil
-        fullScreen = .oasisReward
+        setFullScreen(.oasisReward)
     }
 
     func presentRequiredHumanProfile() {
-        sheet = nil
-        overlay = nil
-        fullScreen = .requiredHumanProfile
+        setFullScreen(.requiredHumanProfile)
     }
 
     func presentWalk(petID: UUID) {
-        sheet = nil
-        overlay = nil
-        fullScreen = .walk(petID: petID)
+        setFullScreen(.walk(petID: petID))
     }
 
     func presentRequiredAccountSwitch() {
-        fullScreen = nil
-        overlay = nil
-        sheet = .requiredAccountSwitch
+        setSheet(.requiredAccountSwitch)
     }
 
     func push(_ route: AppRoute) {
@@ -350,6 +342,7 @@ final class AppRouteCoordinator: ObservableObject {
             AppFeatureRouteGuard.recordIntercept(route.id)
             return
         }
+        guard path.last != route else { return }
         path.append(route)
     }
 
@@ -360,16 +353,19 @@ final class AppRouteCoordinator: ObservableObject {
 
     func dismissSheet(_ route: AppSheetRoute? = nil) {
         guard route == nil || sheet == route else { return }
+        guard sheet != nil else { return }
         sheet = nil
     }
 
     func dismissFullScreen(_ route: AppFullScreenRoute? = nil) {
         guard route == nil || fullScreen == route else { return }
+        guard fullScreen != nil else { return }
         fullScreen = nil
     }
 
     func dismissOverlay(_ route: AppOverlayRoute? = nil) {
         guard route == nil || overlay == route else { return }
+        guard overlay != nil else { return }
         overlay = nil
     }
 
@@ -393,10 +389,18 @@ final class AppRouteCoordinator: ObservableObject {
     }
 
     func resetToHome(rebuildRoot: Bool = false) {
-        path.removeAll()
-        sheet = nil
-        fullScreen = nil
-        overlay = nil
+        if !path.isEmpty {
+            path.removeAll()
+        }
+        if sheet != nil {
+            sheet = nil
+        }
+        if fullScreen != nil {
+            fullScreen = nil
+        }
+        if overlay != nil {
+            overlay = nil
+        }
         if rebuildRoot {
             rootIdentity = UUID()
         }
@@ -404,6 +408,32 @@ final class AppRouteCoordinator: ObservableObject {
 }
 
 private extension AppRouteCoordinator {
+    func setSheet(_ route: AppSheetRoute) {
+        guard sheet != route || fullScreen != nil || overlay != nil else { return }
+        if fullScreen != nil {
+            fullScreen = nil
+        }
+        if overlay != nil {
+            overlay = nil
+        }
+        if sheet != route {
+            sheet = route
+        }
+    }
+
+    func setFullScreen(_ route: AppFullScreenRoute) {
+        guard fullScreen != route || sheet != nil || overlay != nil else { return }
+        if sheet != nil {
+            sheet = nil
+        }
+        if overlay != nil {
+            overlay = nil
+        }
+        if fullScreen != route {
+            fullScreen = route
+        }
+    }
+
     var currentFeatureLevel: Int {
         OasisTreeManagerRegistry.current.treeLevel.rawValue
     }
