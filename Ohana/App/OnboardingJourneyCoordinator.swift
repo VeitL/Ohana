@@ -75,7 +75,7 @@ enum OnboardingJourneyCoordinator {
         }
 
         if activeHumanID?.isEmpty != false {
-            return defaults.bool(forKey: StarterGiftService.Key.pending) ? .starterGiftPending : .needsPrimaryHuman
+            return defaults.bool(forKey: StarterGiftStorageKey.pending) ? .starterGiftPending : .needsPrimaryHuman
         }
 
         return .complete

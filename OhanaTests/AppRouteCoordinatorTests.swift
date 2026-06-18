@@ -74,6 +74,16 @@ struct AppRouteCoordinatorTests {
 
     @Test func functionMenuUsesGlobalSheetRoute() {
         let coordinator = AppRouteCoordinator()
+        let treeManager = TestOasisTreeManagerProjection.manager
+        let oldTreeManager = OasisTreeManagerRegistry.current
+        let oldIslandEnergy = treeManager.islandEnergy
+        let oldInjectedEnergy = treeManager.injectedEnergy
+        OasisTreeManagerRegistry.current = treeManager
+        defer {
+            treeManager.setEnergyForTesting(islandEnergy: oldIslandEnergy, injectedEnergy: oldInjectedEnergy)
+            OasisTreeManagerRegistry.current = oldTreeManager
+        }
+        treeManager.setEnergyForTesting(islandEnergy: 0, injectedEnergy: 50)
 
         coordinator.presentSettings()
         coordinator.presentFunctionMenu(destination: .featureGroup(.dailyCare))
@@ -81,6 +91,22 @@ struct AppRouteCoordinatorTests {
         #expect(coordinator.overlay == nil)
         #expect(coordinator.fullScreen == nil)
         #expect(coordinator.sheet == .functionMenu(destination: .featureGroup(.dailyCare)))
+    }
+
+    @Test func functionMenuDecisionRedirectsLockedDestinations() {
+        let coordinator = AppRouteCoordinator()
+        let decision = coordinator.functionMenuPresentationDecision(
+            destination: .featureGroup(.dailyCare),
+            currentLevel: 0
+        )
+
+        guard case let .redirected(from, to, reason) = decision else {
+            Issue.record("Expected locked daily care to redirect to the growth roadmap")
+            return
+        }
+        #expect(from == .functionMenu(destination: .featureGroup(.dailyCare)))
+        #expect(to == .functionMenu(destination: .growthRoadmap))
+        #expect(reason.hasPrefix("locked:"))
     }
 
     @Test func calendarUsesGlobalSheetRoute() {
@@ -106,7 +132,7 @@ struct AppRouteCoordinatorTests {
             treeManager.setEnergyForTesting(islandEnergy: oldIslandEnergy, injectedEnergy: oldInjectedEnergy)
             OasisTreeManagerRegistry.current = oldTreeManager
         }
-        treeManager.setEnergyForTesting(islandEnergy: 0, injectedEnergy: 800)
+        treeManager.setEnergyForTesting(islandEnergy: 0, injectedEnergy: 1200)
 
         coordinator.presentSettings()
         coordinator.presentCoconutShop(category: .boost)
@@ -115,6 +141,22 @@ struct AppRouteCoordinatorTests {
         #expect(coordinator.fullScreen == nil)
         #expect(coordinator.sheet == .coconutShop(.boost))
         #expect(coordinator.sheet?.id == "coconut-shop-boost")
+    }
+
+    @Test func sheetDecisionRedirectsLockedCoconutShop() {
+        let coordinator = AppRouteCoordinator()
+        let decision = coordinator.sheetPresentationDecision(
+            for: .coconutShop(.boost),
+            currentLevel: 0
+        )
+
+        guard case let .redirected(from, to, reason) = decision else {
+            Issue.record("Expected locked coconut shop to redirect to the growth roadmap")
+            return
+        }
+        #expect(from == .coconutShop(.boost))
+        #expect(to == .functionMenu(destination: .growthRoadmap))
+        #expect(reason.contains("requires6"))
     }
 
     @Test func lockedCoconutShopRedirectsToGrowthRoadmap() {

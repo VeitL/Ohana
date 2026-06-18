@@ -208,6 +208,22 @@ struct AppRoutePublishedEvent: Identifiable, Equatable {
     let event: AppRouteNotificationEvent
 }
 
+enum AppRoutePresentationDecision<Route: Equatable>: Equatable {
+    case allowed(Route)
+    case redirected(from: Route?, to: Route, reason: String)
+    case suppressed(reason: String)
+
+    var presentedRoute: Route? {
+        switch self {
+        case let .allowed(route),
+             let .redirected(_, route, _):
+            route
+        case .suppressed:
+            nil
+        }
+    }
+}
+
 @MainActor
 final class AppRouteCoordinator: ObservableObject {
     @Published var path: [AppRoute] = []
@@ -236,19 +252,56 @@ final class AppRouteCoordinator: ObservableObject {
         presentSheet(.accountSwitcher)
     }
 
-    func presentFunctionMenu(destination: FMDest? = nil) {
-        switch AppFeatureRouteGuard.functionDestinationDecision(destination, currentLevel: currentFeatureLevel) {
+    func functionMenuPresentationDecision(
+        destination: FMDest? = nil,
+        currentLevel: Int? = nil
+    ) -> AppRoutePresentationDecision<AppSheetRoute> {
+        let requestedRoute = AppSheetRoute.functionMenu(destination: destination)
+        switch AppFeatureRouteGuard.functionDestinationDecision(destination, currentLevel: currentLevel ?? self.currentFeatureLevel) {
         case .rootMenu:
-            presentSheet(.functionMenu(destination: nil))
+            return .allowed(.functionMenu(destination: nil))
         case let .allow(destination):
-            presentSheet(.functionMenu(destination: destination))
+            return .allowed(.functionMenu(destination: destination))
         case let .redirectToRoadmap(note):
-            AppFeatureRouteGuard.recordIntercept(note)
-            presentSheet(.functionMenu(destination: .growthRoadmap))
+            return .redirected(
+                from: requestedRoute,
+                to: .functionMenu(destination: .growthRoadmap),
+                reason: note
+            )
         case let .suppress(note):
-            AppFeatureRouteGuard.recordIntercept(note)
-            presentSheet(.functionMenu(destination: nil))
+            return .redirected(
+                from: requestedRoute,
+                to: .functionMenu(destination: nil),
+                reason: note
+            )
         }
+    }
+
+    func sheetPresentationDecision(
+        for route: AppSheetRoute,
+        currentLevel: Int? = nil
+    ) -> AppRoutePresentationDecision<AppSheetRoute> {
+        let level = currentLevel ?? self.currentFeatureLevel
+        guard AppFeatureRouteGuard.allowsSheetRoute(route, currentLevel: level) else {
+            return .redirected(
+                from: route,
+                to: .functionMenu(destination: .growthRoadmap),
+                reason: AppFeatureRouteGuard.lockedRouteNote(for: route, currentLevel: level)
+            )
+        }
+        return .allowed(route)
+    }
+
+    func addEntityPresentationDecision(_ type: EntityType) -> AppRoutePresentationDecision<AppSheetRoute> {
+        let route = AppSheetRoute.addEntity(type)
+        guard AppFeatureRouteGuard.allowsAddEntity(type) else {
+            return .suppressed(reason: "addEntity:\(type.rawValue)")
+        }
+        return .allowed(route)
+    }
+
+    func presentFunctionMenu(destination: FMDest? = nil) {
+        applySheetDecision(functionMenuPresentationDecision(destination: destination))
     }
 
     func presentCalendar(entityID: String? = nil, humanID: String? = nil) {
@@ -256,36 +309,15 @@ final class AppRouteCoordinator: ObservableObject {
     }
 
     func presentCoconutShop(category: ShopItem.ShopCategory = .appIcon) {
-        guard AppFeatureRouteGuard.allowsSheetRoute(.coconutShop(category), currentLevel: currentFeatureLevel) else {
-            AppFeatureRouteGuard.recordIntercept(
-                AppFeatureRouteGuard.lockedRouteNote(
-                    for: AppSheetRoute.coconutShop(category),
-                    currentLevel: currentFeatureLevel
-                )
-            )
-            presentFunctionMenu(destination: .growthRoadmap)
-            return
-        }
-        presentSheet(.coconutShop(category))
+        applySheetDecision(sheetPresentationDecision(for: .coconutShop(category)))
     }
 
     func presentAddEntity(_ type: EntityType) {
-        guard AppFeatureRouteGuard.allowsAddEntity(type) else {
-            AppFeatureRouteGuard.recordIntercept("addEntity:\(type.rawValue)")
-            return
-        }
-        presentSheet(.addEntity(type))
+        applySheetDecision(addEntityPresentationDecision(type))
     }
 
     func presentSheet(_ route: AppSheetRoute) {
-        guard AppFeatureRouteGuard.allowsSheetRoute(route, currentLevel: currentFeatureLevel) else {
-            AppFeatureRouteGuard.recordIntercept(
-                AppFeatureRouteGuard.lockedRouteNote(for: route, currentLevel: currentFeatureLevel)
-            )
-            setSheet(.functionMenu(destination: .growthRoadmap))
-            return
-        }
-        setSheet(route)
+        applySheetDecision(sheetPresentationDecision(for: route))
     }
 
     func presentCrewRoster(mode: CrewRosterMode = .members) {
@@ -408,6 +440,18 @@ final class AppRouteCoordinator: ObservableObject {
 }
 
 private extension AppRouteCoordinator {
+    func applySheetDecision(_ decision: AppRoutePresentationDecision<AppSheetRoute>) {
+        switch decision {
+        case let .allowed(route):
+            setSheet(route)
+        case let .redirected(_, route, reason):
+            AppFeatureRouteGuard.recordIntercept(reason)
+            setSheet(route)
+        case let .suppressed(reason):
+            AppFeatureRouteGuard.recordIntercept(reason)
+        }
+    }
+
     func setSheet(_ route: AppSheetRoute) {
         guard sheet != route || fullScreen != nil || overlay != nil else { return }
         if fullScreen != nil {

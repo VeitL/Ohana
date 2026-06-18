@@ -117,8 +117,8 @@ struct OnboardingJourneyCoordinatorTests {
         )
 
         #expect(evaluation.phase == .existingUser)
-        #expect(defaults.bool(forKey: StarterGiftService.Key.claimed))
-        #expect(defaults.bool(forKey: StarterGiftService.Key.ceremonySeen))
+        #expect(defaults.bool(forKey: StarterGiftStorageKey.claimed))
+        #expect(defaults.bool(forKey: StarterGiftStorageKey.ceremonySeen))
         #expect(defaults.bool(forKey: OnboardingJourneyCoordinator.Key.firstCareCompleted))
         #expect(defaults.bool(forKey: OnboardingJourneyCoordinator.Key.roadmapPromptSeen))
     }

@@ -40,8 +40,8 @@ struct VerticalSolidHomeView: View {
     @AppStorage("goFocusHomeCardOrder.v1") var homeCardOrderRaw = ""
     @AppStorage("debugShowDummyCards") var showDummyCards = false
     @AppStorage("ohana_has_onboarded") var hasOnboarded = false
-    @AppStorage(StarterGiftService.Key.ceremonySeen) var starterGiftCeremonySeen = false
-    @AppStorage(StarterGiftService.Key.oasisTabPromptPending) var starterOasisTabPromptPending = false
+    @AppStorage(StarterGiftStorageKey.ceremonySeen) var starterGiftCeremonySeen = false
+    @AppStorage(StarterGiftStorageKey.oasisTabPromptPending) var starterOasisTabPromptPending = false
     @AppStorage("ohanaGrowthOnboardingCompletedV1") var growthOnboardingCompleted = false
     @AppStorage("ohanaGrowthLastSeenTreeLevelV1") var growthLastSeenTreeLevel = 0
     @AppStorage("quickActionItems_v2") var quickActionItemsRaw = ""

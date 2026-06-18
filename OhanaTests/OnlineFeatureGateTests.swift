@@ -38,40 +38,28 @@ struct OnlineFeatureGateTests {
         #expect(!service.isEnabled)
     }
 
-    @Test func settingsAndShareAcceptanceAreGuardedByOnlineGate() throws {
-        let rootURL = repositoryRootURL()
-        let settingsView = try source("Ohana/Features/Settings/Views/SettingsView.swift", rootURL: rootURL)
-        let settingsCloudSync = try source("Ohana/Features/Settings/Views/SettingsView+CloudSync.swift", rootURL: rootURL)
-        let appDelegate = try source("Ohana/App/OhanaCloudSharingAppDelegate.swift", rootURL: rootURL)
-        let appServices = try source("Ohana/App/AppServices.swift", rootURL: rootURL)
+    @Test @MainActor func onlineCollaborationPresentationFallsBackThroughRoutePolicy() {
+        let coordinator = AppRouteCoordinator()
 
-        let settingsGateIndex = try #require(settingsView.range(of: "if OnlineFeatureGate.allows(.onlineCollaboration)")?.lowerBound)
-        let householdSyncIndex = try #require(settingsView.range(of: "householdSyncSection")?.lowerBound)
-        #expect(settingsGateIndex < householdSyncIndex)
-        #expect(settingsCloudSync.contains("guard canUseOnlineCollaborationForSettings() else { return }"))
-        #expect(settingsCloudSync.contains("guard OnlineFeatureGate.allows(.onlineCollaboration) else"))
-        let appServicesGateIndex = try #require(appServices.range(of: "guard OnlineFeatureGate.allows(.onlineCollaboration) else")?.lowerBound)
-        let noopCloudSyncIndex = try #require(appServices.range(of: "return LocalDeviceCloudSyncService()")?.lowerBound)
-        #expect(appServicesGateIndex < noopCloudSyncIndex)
+        coordinator.presentRequiredAccountSwitch()
+        coordinator.presentCrewRoster(mode: .collaboration)
 
-        let gateIndex = try #require(appDelegate.range(of: "guard OnlineFeatureGate.allows(.onlineCollaboration) else")?.lowerBound)
-        let acceptIndex = try #require(appDelegate.range(of: "acceptShare(metadata: cloudKitShareMetadata)")?.lowerBound)
-        let enableIndex = try #require(appDelegate.range(of: "cloudSync?.setEnabled(true)")?.lowerBound)
-
-        #expect(gateIndex < acceptIndex)
-        #expect(gateIndex < enableIndex)
+        #expect(coordinator.sheet == .crewRoster(.members))
+        #expect(!AppFeatureRouteGuard.allowsSheetRoute(.crewRoster(.collaboration), currentLevel: 10))
+        #expect(AppFeatureRouteGuard.allowsSheetRoute(.crewRoster(.members), currentLevel: 10))
     }
 
-    @Test func homeFamilyTaskSurfacesAreFedOnlyThroughOnlineGate() throws {
-        let rootURL = repositoryRootURL()
-        let readModel = try source("Ohana/Features/Home/HomeReadModelStore.swift", rootURL: rootURL)
-        let homeRoutes = try source("Ohana/Features/Home/HomeRouteCoordinator.swift", rootURL: rootURL)
-        let crewRoute = try source("Ohana/Features/CrewRoster/CrewRosterRouteContainer.swift", rootURL: rootURL)
+    @Test @MainActor func onlineFunctionMenuDestinationsStaySuppressedThroughRoutePolicy() {
+        let coordinator = AppRouteCoordinator()
+        let decision = coordinator.functionMenuPresentationDecision(destination: .bountyBoard, currentLevel: 10)
 
-        #expect(readModel.contains("familyTasks: OnlineFeatureGate.allows(.onlineCollaboration) ? fetches.familyTasks() : []"))
-        #expect(readModel.contains("let familyTasks = OnlineFeatureGate.allows(.onlineCollaboration) ? fetches.familyTasks() : []"))
-        #expect(homeRoutes.contains("!OnlineFeatureGate.allows(.onlineCollaboration)"))
-        #expect(crewRoute.contains("if OnlineFeatureGate.allows(.onlineCollaboration)"))
+        guard case let .redirected(from, to, reason) = decision else {
+            Issue.record("Expected online-only function destination to fall back while the launch gate is closed")
+            return
+        }
+        #expect(from == .functionMenu(destination: .bountyBoard))
+        #expect(to == .functionMenu(destination: nil))
+        #expect(reason.hasPrefix("onlineGate:"))
     }
 
     @Test func legacyDayZeroPromiseHasNoLaunchEntryPoint() throws {

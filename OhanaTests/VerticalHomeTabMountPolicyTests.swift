@@ -320,14 +320,14 @@ struct VerticalHomeTabMountPolicyTests {
         }
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
-        defaults.set(true, forKey: StarterGiftService.Key.claimed)
-        defaults.set(false, forKey: StarterGiftService.Key.ceremonySeen)
-        defaults.set(false, forKey: StarterGiftService.Key.oasisTabPromptPending)
+        defaults.set(true, forKey: StarterGiftStorageKey.claimed)
+        defaults.set(false, forKey: StarterGiftStorageKey.ceremonySeen)
+        defaults.set(false, forKey: StarterGiftStorageKey.oasisTabPromptPending)
         #expect(!AppFeatureRouteGuard.allowsHomeTab(.oasis, starterGiftDefaults: defaults))
         #expect(!AppFeatureRouteGuard.visibleHomeTabs(starterGiftDefaults: defaults).contains(.oasis))
 
-        defaults.set(true, forKey: StarterGiftService.Key.ceremonySeen)
-        defaults.set(true, forKey: StarterGiftService.Key.oasisTabPromptPending)
+        defaults.set(true, forKey: StarterGiftStorageKey.ceremonySeen)
+        defaults.set(true, forKey: StarterGiftStorageKey.oasisTabPromptPending)
         #expect(AppFeatureRouteGuard.allowsHomeTab(.oasis, starterGiftDefaults: defaults))
         #expect(AppFeatureRouteGuard.visibleHomeTabs(starterGiftDefaults: defaults).contains(.oasis))
     }

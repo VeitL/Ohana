@@ -84,8 +84,8 @@ struct GrowthUnlockPolicyTests {
             return
         }
         defer { defaults.removePersistentDomain(forName: suiteName) }
-        defaults.set(true, forKey: StarterGiftService.Key.claimed)
-        defaults.set(true, forKey: StarterGiftService.Key.ceremonySeen)
+        defaults.set(true, forKey: StarterGiftStorageKey.claimed)
+        defaults.set(true, forKey: StarterGiftStorageKey.ceremonySeen)
 
         #expect(AppFeatureRouteGuard.visibleHomeTabs(starterGiftDefaults: defaults) == [.home, .calendar, .oasis])
         #expect(!AppFeatureRouteGuard.shouldLoadPlantData)

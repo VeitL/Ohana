@@ -19,8 +19,8 @@ struct StarterGiftServiceTests {
         )
 
         #expect(result == .pendingHuman)
-        #expect(defaults.bool(forKey: StarterGiftService.Key.pending))
-        #expect(!defaults.bool(forKey: StarterGiftService.Key.claimed))
+        #expect(defaults.bool(forKey: StarterGiftStorageKey.pending))
+        #expect(!defaults.bool(forKey: StarterGiftStorageKey.claimed))
     }
 
     @Test func pendingGiftClaimsOnceForFirstHuman() throws {
@@ -55,8 +55,8 @@ struct StarterGiftServiceTests {
         #expect(result == .claimed(humanID: human.id, amount: StarterGiftService.giftAmount))
         #expect(human.coconutBalance == StarterGiftService.giftAmount)
         #expect(TestQuestManagerProjection.manager.coconutCount == StarterGiftService.giftAmount)
-        #expect(defaults.bool(forKey: StarterGiftService.Key.claimed))
-        #expect(!defaults.bool(forKey: StarterGiftService.Key.pending))
+        #expect(defaults.bool(forKey: StarterGiftStorageKey.claimed))
+        #expect(!defaults.bool(forKey: StarterGiftStorageKey.pending))
 
         let ledger = try context.fetch(FetchDescriptor<CareLedgerEvent>())
         #expect(ledger.count == 1)
@@ -94,8 +94,8 @@ struct StarterGiftServiceTests {
 
         #expect(result == .claimed(humanID: human.id, amount: StarterGiftService.giftAmount))
         #expect(human.coconutBalance == StarterGiftService.giftAmount)
-        #expect(defaults.bool(forKey: StarterGiftService.Key.claimed))
-        #expect(!defaults.bool(forKey: StarterGiftService.Key.ceremonySeen))
+        #expect(defaults.bool(forKey: StarterGiftStorageKey.claimed))
+        #expect(!defaults.bool(forKey: StarterGiftStorageKey.ceremonySeen))
         #expect(StarterGiftService.shouldShowCeremony(defaults: defaults))
     }
 
@@ -118,8 +118,8 @@ struct StarterGiftServiceTests {
         )
 
         #expect(result == .markedExistingUser)
-        #expect(defaults.bool(forKey: StarterGiftService.Key.claimed))
-        #expect(defaults.bool(forKey: StarterGiftService.Key.ceremonySeen))
+        #expect(defaults.bool(forKey: StarterGiftStorageKey.claimed))
+        #expect(defaults.bool(forKey: StarterGiftStorageKey.ceremonySeen))
         #expect(human.coconutBalance == 0)
         #expect(try context.fetch(FetchDescriptor<CareLedgerEvent>()).isEmpty)
     }

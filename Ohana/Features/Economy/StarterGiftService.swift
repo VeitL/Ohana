@@ -12,15 +12,15 @@ enum StarterGiftPolicy {
     static let giftAmount = 50
 }
 
+enum StarterGiftStorageKey {
+    static let claimed = "ohanaStarterGiftClaimedV1"
+    static let pending = "ohanaStarterGiftPendingV1"
+    static let ceremonySeen = "ohanaStarterLv0CeremonySeenV1"
+    static let oasisTabPromptPending = "ohanaStarterOasisTabPromptPendingV1"
+}
+
 enum StarterGiftService {
     static let giftAmount = StarterGiftPolicy.giftAmount
-
-    enum Key {
-        static let claimed = "ohanaStarterGiftClaimedV1"
-        static let pending = "ohanaStarterGiftPendingV1"
-        static let ceremonySeen = "ohanaStarterLv0CeremonySeenV1"
-        static let oasisTabPromptPending = "ohanaStarterOasisTabPromptPendingV1"
-    }
 
     enum Result: Equatable {
         case alreadyHandled
@@ -41,11 +41,11 @@ enum StarterGiftService {
     ) -> Result {
         let careLedger: CareLedgerRecording = providedCareLedger ?? CareLedgerService()
         let wallet: CoconutWalletManaging = providedWallet ?? SwiftDataCoconutWalletManager()
-        if defaults.bool(forKey: Key.claimed) {
+        if defaults.bool(forKey: StarterGiftStorageKey.claimed) {
             return .alreadyHandled
         }
 
-        let hasPendingGift = defaults.bool(forKey: Key.pending)
+        let hasPendingGift = defaults.bool(forKey: StarterGiftStorageKey.pending)
         let counts = dataCounts(context: context)
 
         if let activeHumanID, let human = activeHuman(matching: activeHumanID, context: context) {
@@ -54,7 +54,7 @@ enum StarterGiftService {
             }
 
             if counts.humans == 1, counts.pets == 0, counts.ledger == 0 {
-                defaults.set(true, forKey: Key.pending)
+                defaults.set(true, forKey: StarterGiftStorageKey.pending)
                 return claim(for: human, context: context, defaults: defaults, careLedger: careLedger, wallet: wallet, projectionManager: projectionManager)
             }
 
@@ -66,7 +66,7 @@ enum StarterGiftService {
            counts.pets == 0,
            counts.ledger == 0,
            let human = activeHuman(matching: activeHumanID ?? "", context: context) {
-            defaults.set(true, forKey: Key.pending)
+            defaults.set(true, forKey: StarterGiftStorageKey.pending)
             return claim(
                 for: human,
                 context: context,
@@ -78,7 +78,7 @@ enum StarterGiftService {
         }
 
         if counts.humans == 0, counts.pets == 0, counts.ledger == 0 {
-            defaults.set(true, forKey: Key.pending)
+            defaults.set(true, forKey: StarterGiftStorageKey.pending)
             AppPerformanceMonitor.shared.record("starter_gift_pending", valueMS: 0)
             return .pendingHuman
         }
@@ -93,26 +93,26 @@ enum StarterGiftService {
 
     @MainActor
     static func markCeremonySeen(defaults: UserDefaults = .standard) {
-        defaults.set(true, forKey: Key.ceremonySeen)
-        defaults.set(true, forKey: Key.oasisTabPromptPending)
+        defaults.set(true, forKey: StarterGiftStorageKey.ceremonySeen)
+        defaults.set(true, forKey: StarterGiftStorageKey.oasisTabPromptPending)
         AppPerformanceMonitor.shared.record("starter_ceremony_seen", valueMS: 0)
     }
 
     @MainActor
     static func shouldShowCeremony(defaults: UserDefaults = .standard) -> Bool {
-        defaults.bool(forKey: Key.claimed) && !defaults.bool(forKey: Key.ceremonySeen)
+        defaults.bool(forKey: StarterGiftStorageKey.claimed) && !defaults.bool(forKey: StarterGiftStorageKey.ceremonySeen)
     }
 
     static func isOasisHomeTabUnlocked(defaults: UserDefaults = .standard) -> Bool {
-        !(defaults.bool(forKey: Key.claimed) && !defaults.bool(forKey: Key.ceremonySeen))
+        !(defaults.bool(forKey: StarterGiftStorageKey.claimed) && !defaults.bool(forKey: StarterGiftStorageKey.ceremonySeen))
     }
 
     @MainActor
     static func resetForDebug(defaults: UserDefaults = .standard) {
-        defaults.removeObject(forKey: Key.claimed)
-        defaults.removeObject(forKey: Key.pending)
-        defaults.removeObject(forKey: Key.ceremonySeen)
-        defaults.removeObject(forKey: Key.oasisTabPromptPending)
+        defaults.removeObject(forKey: StarterGiftStorageKey.claimed)
+        defaults.removeObject(forKey: StarterGiftStorageKey.pending)
+        defaults.removeObject(forKey: StarterGiftStorageKey.ceremonySeen)
+        defaults.removeObject(forKey: StarterGiftStorageKey.oasisTabPromptPending)
     }
 
     @MainActor
@@ -184,17 +184,17 @@ enum StarterGiftService {
             return .missingHuman
         }
 
-        defaults.set(true, forKey: Key.claimed)
-        defaults.set(false, forKey: Key.pending)
+        defaults.set(true, forKey: StarterGiftStorageKey.claimed)
+        defaults.set(false, forKey: StarterGiftStorageKey.pending)
         AppPerformanceMonitor.shared.record("starter_gift_claimed", valueMS: 0, note: "amount=\(giftAmount)")
         return .claimed(humanID: human.id, amount: giftAmount)
     }
 
     @MainActor
     private static func markExistingUser(defaults: UserDefaults) {
-        defaults.set(true, forKey: Key.claimed)
-        defaults.set(true, forKey: Key.ceremonySeen)
-        defaults.set(false, forKey: Key.oasisTabPromptPending)
+        defaults.set(true, forKey: StarterGiftStorageKey.claimed)
+        defaults.set(true, forKey: StarterGiftStorageKey.ceremonySeen)
+        defaults.set(false, forKey: StarterGiftStorageKey.oasisTabPromptPending)
     }
 
     @MainActor
