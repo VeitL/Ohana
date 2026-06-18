@@ -216,14 +216,14 @@ private struct OhanaBootstrapShell: View {
             VStack(spacing: 14) {
                 Text("Ohana")
                     .font(.system(size: 34, weight: .heavy, design: .rounded))
-                    .foregroundStyle(Color.white.opacity(0.96))
+                    .foregroundStyle(Color.white.opacity(0.96)) // ui-v4: allow bootstrap shell ink on dark gradient
                 ProgressView()
-                    .tint(Color.white.opacity(0.86))
+                    .tint(Color.white.opacity(0.86)) // ui-v4: allow bootstrap shell ink on dark gradient
                     .scaleEffect(0.86)
                     .accessibilityLabel(l.tr(zh: "正在准备 Ohana", en: "Preparing Ohana", de: "Ohana wird vorbereitet"))
                 Text(statusMessage)
                     .font(.system(size: 12, weight: .bold, design: .rounded))
-                    .foregroundStyle(Color.white.opacity(0.68))
+                    .foregroundStyle(Color.white.opacity(0.68)) // ui-v4: allow bootstrap shell ink on dark gradient
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 32)
                 if case .slowOpeningStore = status {
@@ -233,7 +233,7 @@ private struct OhanaBootstrapShell: View {
                             .foregroundStyle(Color(red: 0.05, green: 0.09, blue: 0.25))
                             .padding(.horizontal, 14)
                             .padding(.vertical, 8)
-                            .background(Color.white.opacity(0.88), in: Capsule())
+                            .background(Color.white.opacity(0.88), in: Capsule()) // ui-v4: allow bootstrap retry pill on dark gradient
                     }
                 }
             }
