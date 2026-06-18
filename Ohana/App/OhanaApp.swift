@@ -215,21 +215,21 @@ private struct OhanaBootstrapShell: View {
             .ignoresSafeArea()
             VStack(spacing: 14) {
                 Text("Ohana")
-                    .font(.system(size: 34, weight: .heavy, design: .rounded))
+                    .font(OhanaFont.largeTitle(.heavy))
                     .foregroundStyle(Color.white.opacity(0.96)) // ui-v4: allow bootstrap shell ink on dark gradient
                 ProgressView()
                     .tint(Color.white.opacity(0.86)) // ui-v4: allow bootstrap shell ink on dark gradient
                     .scaleEffect(0.86)
                     .accessibilityLabel(l.tr(zh: "正在准备 Ohana", en: "Preparing Ohana", de: "Ohana wird vorbereitet"))
                 Text(statusMessage)
-                    .font(.system(size: 12, weight: .bold, design: .rounded))
+                    .font(OhanaFont.footnote(.bold))
                     .foregroundStyle(Color.white.opacity(0.68)) // ui-v4: allow bootstrap shell ink on dark gradient
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 32)
                 if case .slowOpeningStore = status {
                     Button(action: onRetry) {
                         Text(l.tr(zh: "重试启动", en: "Retry startup", de: "Start erneut versuchen"))
-                            .font(.system(size: 12, weight: .black, design: .rounded))
+                            .font(OhanaFont.footnote(.black))
                             .foregroundStyle(Color(red: 0.05, green: 0.09, blue: 0.25))
                             .padding(.horizontal, 14)
                             .padding(.vertical, 8)
