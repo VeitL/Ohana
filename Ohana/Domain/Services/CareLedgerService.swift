@@ -8,6 +8,55 @@
 import Foundation
 import SwiftData
 
+nonisolated enum CareLedgerMetadata {
+    static let autoFeedDedupKey = "autoFeedDedupKey"
+    static let feedFoodKind = "feedFoodKind"
+    static let feedTreatKind = "feedTreatKind"
+    static let sharedSessionId = "sharedSessionId"
+    private static let legacyMetadataKey = "legacyMetadata"
+
+    static func stringValue(named name: String, in metadataJSON: String) -> String? {
+        let trimmed = metadataJSON.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty,
+              let data = trimmed.data(using: .utf8),
+              let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let value = object[name] as? String
+        else { return nil }
+        let normalized = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        return normalized.isEmpty ? nil : normalized
+    }
+
+    static func addingString(_ name: String, value: String?, to metadataJSON: String) -> String {
+        guard let value = value?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !value.isEmpty
+        else { return metadataJSON }
+
+        let trimmed = metadataJSON.trimmingCharacters(in: .whitespacesAndNewlines)
+        var object: [String: Any] = [:]
+        if !trimmed.isEmpty,
+           let data = trimmed.data(using: .utf8),
+           let decoded = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+            object = decoded
+        } else if !trimmed.isEmpty {
+            object[legacyMetadataKey] = metadataJSON
+        }
+
+        object[name] = value
+        guard JSONSerialization.isValidJSONObject(object),
+              let data = try? JSONSerialization.data(withJSONObject: object, options: [.sortedKeys]),
+              let encoded = String(data: data, encoding: .utf8)
+        else { return metadataJSON }
+        return encoded
+    }
+
+    static func addingFeedingLogMetadata(from log: PetCareLog, to metadataJSON: String) -> String {
+        guard log.careType == .feeding else { return metadataJSON }
+        let withFoodKind = addingString(feedFoodKind, value: log.foodKind.rawValue, to: metadataJSON)
+        let withTreatKind = addingString(feedTreatKind, value: log.treatKind?.rawValue, to: withFoodKind)
+        return addingString(sharedSessionId, value: log.sharedSessionId, to: withTreatKind)
+    }
+}
+
 nonisolated struct CareLedgerSubjectInfo: Equatable {
     let kind: CareLedgerSubjectKind
     let id: String?
@@ -142,6 +191,12 @@ final nonisolated class CareLedgerService {
             if log.careType == .watering { return (log.amountMl, "ml") }
             return (0, "")
         }()
+        let feedMetadataJSON = CareLedgerMetadata.addingFeedingLogMetadata(from: log, to: metadataJSON)
+        let ledgerMetadataJSON = CareLedgerMetadata.addingString(
+            CareLedgerMetadata.autoFeedDedupKey,
+            value: log.autoFeedDedupKey,
+            to: feedMetadataJSON
+        )
         record(
             occurredAt: log.date,
             actorKind: log.executorId == nil ? .unknown : .human,
@@ -159,7 +214,7 @@ final nonisolated class CareLedgerService {
             legacyModelName: "PetCareLog",
             legacyModelId: log.id.uuidString,
             coconutDelta: coconutDelta,
-            metadataJSON: metadataJSON,
+            metadataJSON: ledgerMetadataJSON,
             context: context
         )
     }

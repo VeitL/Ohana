@@ -51,7 +51,7 @@ final class QuickFeedDraftStore: ObservableObject {
     @Published var stockCorrectionText = ""
 
     @Published var inputError: String?
-    @Published var editingFeedLog: PetCareLog?
+    @Published var editingFeedLogId: UUID?
     @Published var editFeedLogGrams = ""
     @Published var editFeedLogDate = Date()
 

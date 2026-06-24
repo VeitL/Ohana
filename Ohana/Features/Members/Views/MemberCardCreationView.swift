@@ -36,6 +36,8 @@ struct MemberCardCreationContentView: View {
     @AppStorage(AppCountry.storageKey) var appCountry = AppCountry.detectedCode
     @AppStorage(Avatar2DAccess.extraPassInventoryKey) var avatarPassCount = 0
     @AppStorage(HomeCardVisibility.hiddenPetIDsKey) var hiddenHomePetIDsRaw = ""
+    @AppStorage(StarterGiftStorageKey.pending) var starterGiftPending = false
+    @AppStorage(StarterGiftStorageKey.claimed) var starterGiftClaimed = false
     @SceneStorage("memberCreation.pet.mediaReturnStep") var petMediaReturnStepRaw = ""
     @SceneStorage("memberCreation.human.mediaReturnStep") var humanMediaReturnStepRaw = ""
     @SceneStorage("memberCreation.pet.mediaReturnSession") var petMediaReturnSessionRaw = ""
@@ -120,7 +122,11 @@ struct MemberCardCreationContentView: View {
     }
 
     var canSave: Bool {
-        !isSaving && !isJoinHandoffRunning && !draft.trimmedName.isEmpty && !duplicateName
+        !isSaving
+            && !isJoinHandoffRunning
+            && !draft.trimmedName.isEmpty
+            && !duplicateName
+            && (!requiresStarterPetWeight || hasValidInitialPetWeight)
     }
 
     var creationSteps: [MemberCreationStep] { MemberCreationStep.steps(for: kind) }
@@ -131,7 +137,21 @@ struct MemberCardCreationContentView: View {
         if currentStep == .basicInfo {
             return !draft.trimmedName.isEmpty && !duplicateName
         }
+        if currentStep == .petProfile, requiresStarterPetWeight {
+            return hasValidInitialPetWeight
+        }
         return true
+    }
+
+    var requiresStarterPetWeight: Bool {
+        kind == .pet && existingPets.isEmpty && starterGiftPending && !starterGiftClaimed
+    }
+
+    var hasValidInitialPetWeight: Bool {
+        guard let weight = CountryDecimalInput.parse(draft.weightText, countryCode: appCountry) else {
+            return false
+        }
+        return weight > 0
     }
 
     var canRunHomeJoinHandoff: Bool {

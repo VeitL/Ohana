@@ -181,6 +181,7 @@ struct FeedHomeViewState {
 
 struct FeedHomeSnapshotRevision: Equatable {
     let careLogRevision: Int
+    let feedingLedgerRevision: Int?
     let foodRecordRevision: Int
     let sharedSessionRevision: Int
     let eventRevision: Int
@@ -192,6 +193,7 @@ struct FeedHomeSnapshotRevision: Equatable {
         pet: Pet,
         events: [Event],
         careLogs: [PetCareLog],
+        feedingLedgerEntries: [QuickFeedLedgerEntry]?,
         foodRecords: [PetFoodRecord],
         sharedCareSessions: [SharedCareSession],
         mode: FeedOperatingMode,
@@ -199,6 +201,7 @@ struct FeedHomeSnapshotRevision: Equatable {
     ) -> FeedHomeSnapshotRevision {
         FeedHomeSnapshotRevision(
             careLogRevision: hashCareLogs(careLogs),
+            feedingLedgerRevision: hashFeedingLedgerEntries(feedingLedgerEntries),
             foodRecordRevision: hashFoodRecords(foodRecords),
             sharedSessionRevision: hashSharedSessions(sharedCareSessions),
             eventRevision: hashEvents(events),
@@ -219,6 +222,26 @@ struct FeedHomeSnapshotRevision: Equatable {
                 hasher.combine(log.foodKindRaw)
                 hasher.combine(log.treatKindRaw)
                 hasher.combine(log.note)
+            }
+        }
+    }
+
+    private static func hashFeedingLedgerEntries(_ entries: [QuickFeedLedgerEntry]?) -> Int? {
+        guard let entries else { return nil }
+        return hash { hasher in
+            hasher.combine(entries.count)
+            for entry in entries.prefix(180) {
+                hasher.combine(entry.id)
+                hasher.combine(entry.petId)
+                hasher.combine(entry.date.timeIntervalSince1970)
+                hasher.combine(entry.amountGrams)
+                hasher.combine(entry.source.rawValue)
+                hasher.combine(entry.foodKind.rawValue)
+                hasher.combine(entry.treatKind?.rawValue)
+                hasher.combine(entry.legacyModelId)
+                hasher.combine(entry.sharedSessionId)
+                hasher.combine(entry.sourceEventId)
+                hasher.combine(entry.sourceReminderId)
             }
         }
     }
@@ -361,6 +384,7 @@ final class FeedHomeController: ObservableObject {
             pet: input.pet,
             events: input.allEvents,
             careLogs: input.careLogs,
+            feedingLedgerEntries: input.feedingLedgerEntries,
             foodRecords: input.foodRecords,
             sharedCareSessions: input.sharedCareSessions,
             mode: targetMode,

@@ -83,6 +83,20 @@ struct QuickFeedCommandExecutor {
         )
     }
 
+    func feedLog(id: UUID) -> PetCareLog? {
+        var descriptor = FetchDescriptor<PetCareLog>(
+            predicate: #Predicate<PetCareLog> { log in
+                log.id == id
+            }
+        )
+        descriptor.fetchLimit = 1
+        return fetchQuickFeedModelsOrLog(
+            descriptor,
+            context: context,
+            operation: "fetch feed log by id"
+        ).first
+    }
+
     func fullFeedingLedgerEvents(petID: UUID, fallback: [CareLedgerEvent]) -> [CareLedgerEvent] {
         let petKey = petID.uuidString
         let petSubject = CareLedgerSubjectKind.pet.rawValue
@@ -104,6 +118,45 @@ struct QuickFeedCommandExecutor {
             operation: "fetch full feeding ledger events",
             fallback: fallback
         )
+    }
+
+    func fullFeedingLedgerEntries(
+        pet: Pet,
+        legacyCareLogs: [PetCareLog],
+        manualPlanEvents: [Event],
+        autoFeederEvents: [Event],
+        fallback: [QuickFeedLedgerEntry]
+    ) -> [QuickFeedLedgerEntry] {
+        let petKey = pet.id.uuidString
+        let petSubject = CareLedgerSubjectKind.pet.rawValue
+        let careKind = CareLedgerEventKind.care.rawValue
+        let feedingType = CareType.feeding.rawValue
+        var descriptor = FetchDescriptor<CareLedgerEvent>(
+            predicate: #Predicate<CareLedgerEvent> { event in
+                event.subjectKind == petSubject &&
+                    event.subjectId == petKey &&
+                    event.eventKind == careKind &&
+                    event.actionType == feedingType
+            },
+            sortBy: [SortDescriptor(\.occurredAt, order: .reverse)]
+        )
+        descriptor.fetchLimit = Self.fullCareLogsFetchCap
+        do {
+            let events = try context.fetch(descriptor)
+            return QuickFeedLedgerEntry.entries(
+                pet: pet,
+                feedingLedgerEvents: events,
+                legacyCareLogs: legacyCareLogs,
+                manualPlanEvents: manualPlanEvents,
+                autoFeederEvents: autoFeederEvents
+            )
+        } catch {
+            OhanaLog.warning(
+                "QuickFeedCommandExecutor failed to fetch full feeding ledger entries: \(error.localizedDescription)",
+                category: "Care"
+            )
+            return fallback
+        }
     }
 
     func fullFoodRecords(petID: UUID, fallback: [PetFoodRecord]) -> [PetFoodRecord] {

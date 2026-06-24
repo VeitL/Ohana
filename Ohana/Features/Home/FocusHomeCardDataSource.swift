@@ -81,6 +81,18 @@ nonisolated enum FocusHomeCardDataSource {
         return ids.joined(separator: ",")
     }
 
+    static func selectionReconciliation(
+        cards: [FocusCard],
+        selectedCardId: UUID?,
+        headerContextCardId: UUID?
+    ) -> FocusHomeCardSelectionReconciliation {
+        let cardIds = Set(cards.map(\.id))
+        return FocusHomeCardSelectionReconciliation(
+            clearsSelectedCard: selectedCardId.map { !cardIds.contains($0) } ?? false,
+            clearsHeaderContext: headerContextCardId.map { !cardIds.contains($0) } ?? false
+        )
+    }
+
     static func seedAvatarData(
         from source: [FocusCard],
         pets: [Pet],
@@ -183,4 +195,9 @@ nonisolated enum FocusHomeCardDataSource {
         let remaining = source.filter { !orderedIds.contains($0.id) }
         return ordered + remaining
     }
+}
+
+nonisolated struct FocusHomeCardSelectionReconciliation: Equatable {
+    let clearsSelectedCard: Bool
+    let clearsHeaderContext: Bool
 }

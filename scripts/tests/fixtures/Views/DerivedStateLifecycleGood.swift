@@ -9,6 +9,44 @@ struct DerivedStateLifecycleGoodService {
     }
 }
 
+struct DerivedStateLifecycleDelegatingFamilyTaskCommand {
+    let familyTasks: FamilyTaskManaging
+
+    func deleteTask(_ task: FamilyCollaborationTask, modelContext: ModelContext) {
+        familyTasks.delete(task, context: modelContext)
+    }
+}
+
+struct DerivedStateLifecycleDelegatingFamilyTaskManager {
+    func deleteTask(_ task: FamilyCollaborationTask, context: ModelContext) {
+        FamilyTaskService.delete(task, context: context)
+    }
+}
+
+struct DerivedStateLifecycleDelegatingCommandExecutorView {
+    let modelContext: ModelContext
+    let appServices: AppServices
+
+    func deleteHygieneLog(_ log: PetHygieneLog, pet: Pet) {
+        PetHygieneCommandExecutor(context: modelContext, services: appServices).delete(
+            log,
+            pet: pet,
+            note: "fixture.delegated.delete"
+        )
+    }
+}
+
+enum DerivedStateLifecycleCommandCase {
+    case delete(taskID: Int)
+
+    var affectedID: Int {
+        switch self {
+        case let .delete(taskID):
+            return taskID
+        }
+    }
+}
+
 enum DerivedStateLifecycleGoodRegistry {
     static let uploadPipelineEntityNames: Set<String> = [
         String(describing: Household.self),

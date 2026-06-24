@@ -9,9 +9,6 @@
 import SwiftUI
 
 struct FocusHomeRouteSheetModifier: ViewModifier {
-    let pets: [Pet]
-    let humans: [Human]
-    let electronicPets: [OasisElectronicPet]
     let l: L10n
 
     @Environment(AppServices.self) private var appServices
@@ -152,7 +149,10 @@ struct FocusHomeRouteSheetModifier: ViewModifier {
                 onComplete: { routes.dismissModal() },
                 onPetSaved: onPetSavedFromAddEntity,
                 onHumanSaved: { human in
-                    activeHumanIdStr = human.id.uuidString
+                    activeHumanIdStr = ActiveHumanSelectionPolicy.activeHumanIdAfterCreatingHuman(
+                        currentHumanIdRaw: activeHumanIdStr,
+                        createdHumanId: human.id
+                    )
                     onHumanSavedFromAddEntity(human)
                 }
             )
@@ -176,6 +176,14 @@ struct FocusHomeRouteSheetModifier: ViewModifier {
                         routes.dismissModal()
                         onCrewHumanSelected(human)
                     },
+                    onInlinePetSaved: { pet in
+                        routes.dismissModal()
+                        onPetSavedFromAddEntity(pet)
+                    },
+                    onInlineHumanSaved: { human in
+                        routes.dismissModal()
+                        onHumanSavedFromAddEntity(human)
+                    },
                     onClose: { routes.dismissModal() },
                     onPresentCoconutLog: { subject in
                         routes.openCoconutLog(subject)
@@ -192,12 +200,7 @@ struct FocusHomeRouteSheetModifier: ViewModifier {
             }
             .ohanaSheetPagePresentation() // ui-v4: allow family collaboration/member hub
         case .accountSwitcher:
-            HumanAccountSwitcherSheet(
-                humans: humans,
-                homePets: pets,
-                homeHumans: humans,
-                homeElectronicPets: electronicPets
-            )
+            AppAccountSwitcherRouteContainer(onSwitched: { routes.dismissModal() })
             .ohanaCompactSheetPresentation(detents: [.medium, .large])
         case let .calendar(entityID, humanID):
             CalendarRouteContainer(
@@ -210,12 +213,7 @@ struct FocusHomeRouteSheetModifier: ViewModifier {
             )
             .ohanaSheetPagePresentation() // ui-v4: allow calendar as long sheet
         case .settings:
-            SettingsView(
-                homePets: pets,
-                homeHumans: humans,
-                homeElectronicPets: electronicPets,
-                onClose: { routes.dismissModal() }
-            )
+            AppSettingsSheetRouteContainer(onClose: { routes.dismissModal() })
             .ohanaSheetPagePresentation() // ui-v4: allow settings as long sheet
         }
     }
@@ -230,13 +228,13 @@ struct FocusHomeRouteSheetModifier: ViewModifier {
     private func openCalendarEventDestinationAfterDismiss(_ destination: FocusHomeReminderDestination) {
         switch destination {
         case let .petQuick(key, pet):
-            openPetQuickKey(key, pet: pet)
+            openPetQuickKey(key, petID: pet.id)
         case let .petFeature(feature, pet):
-            openPetFeature(feature, pet: pet)
+            openPetFeature(feature, petID: pet.id)
         case let .petHealth(pet, section):
             routes.openSheet(.petHealth(pet.id, initialSection: section))
         case let .humanQuick(key, human):
-            openHumanQuickKey(key, human: human)
+            openHumanQuickKey(key, humanID: human.id)
         case let .humanDetail(human):
             routes.openSheet(.humanBasicInfo(human.id))
         case .plant:
@@ -256,80 +254,80 @@ struct FocusHomeRouteSheetModifier: ViewModifier {
         )
     }
 
-    private func openPetQuickKey(_ key: String, pet: Pet) {
+    private func openPetQuickKey(_ key: String, petID: UUID) {
         GrowthNewFeatureStore.markVisited(quickActionType: key)
         switch key {
         case "feed":
-            routes.openSheet(.petFeed(pet.id, opensManualSheet: false))
+            routes.openSheet(.petFeed(petID, opensManualSheet: false))
         case "water", "waterChange", "filterClean":
-            routes.openSheet(.petWater(pet.id))
+            routes.openSheet(.petWater(petID))
         case "potty":
-            routes.openSheet(.petPotty(pet.id))
+            routes.openSheet(.petPotty(petID))
         case "litter":
-            routes.openSheet(.petLitter(pet.id))
+            routes.openSheet(.petLitter(petID))
         case "walk":
-            onStartWalkFromQuickAction(pet.id)
+            onStartWalkFromQuickAction(petID)
         case "play":
-            routes.openSheet(.petPlay(pet.id))
+            routes.openSheet(.petPlay(petID))
         case "health":
-            routes.openSheet(.petHealth(pet.id, initialSection: nil))
+            routes.openSheet(.petHealth(petID, initialSection: nil))
         case "medication":
-            routes.openSheet(.petMedication(pet.id))
+            routes.openSheet(.petMedication(petID))
         case "groom", "cageCleaning", "freeFlight", "misting", "substrateChange":
-            routes.openSheet(.petHygiene(pet.id))
+            routes.openSheet(.petHygiene(petID))
         case "weight":
-            routes.openSheet(.petWeight(pet.id))
+            routes.openSheet(.petWeight(petID))
         case "expense":
-            routes.openSheet(.petExpense(pet.id))
+            routes.openSheet(.petExpense(petID))
         case "moment":
-            routes.openQuickMoment(pet)
+            routes.openQuickMoment(petID)
         default:
-            routes.openSheet(.petAllFeatures(pet.id))
+            routes.openSheet(.petAllFeatures(petID))
         }
     }
 
-    private func openPetFeature(_ feature: PetFeature, pet: Pet) {
+    private func openPetFeature(_ feature: PetFeature, petID: UUID) {
         GrowthNewFeatureStore.markVisited(feature: feature)
         switch feature {
         case .health:
-            routes.openSheet(.petHealth(pet.id, initialSection: nil))
+            routes.openSheet(.petHealth(petID, initialSection: nil))
         case .medications:
-            routes.openSheet(.petMedication(pet.id))
+            routes.openSheet(.petMedication(petID))
         case .food:
-            routes.openSheet(.petFeed(pet.id, opensManualSheet: false))
+            routes.openSheet(.petFeed(petID, opensManualSheet: false))
         case .hygiene:
-            routes.openSheet(.petHygiene(pet.id))
+            routes.openSheet(.petHygiene(petID))
         case .walks:
-            routes.openSheet(.petWalkSummary(pet.id))
+            routes.openSheet(.petWalkSummary(petID))
         case .potty:
-            routes.openSheet(.petPotty(pet.id))
+            routes.openSheet(.petPotty(petID))
         case .basicInfo:
-            routes.openSheet(.petBasicInfo(pet.id))
+            routes.openSheet(.petBasicInfo(petID))
         case .moments:
-            routes.openSheet(.petMomentHistory(pet.id))
+            routes.openSheet(.petMomentHistory(petID))
         case .weight:
-            routes.openSheet(.petWeight(pet.id))
+            routes.openSheet(.petWeight(petID))
         case .expense:
-            routes.openSheet(.petExpense(pet.id))
+            routes.openSheet(.petExpense(petID))
         case .retention, .documents, .achievements:
-            routes.openSheet(.petAllFeatures(pet.id))
+            routes.openSheet(.petAllFeatures(petID))
         }
     }
 
-    private func openHumanQuickKey(_ key: String, human: Human) {
+    private func openHumanQuickKey(_ key: String, humanID: UUID) {
         switch key {
         case "humanWeight":
-            routes.openSheet(.humanWeight(human.id))
+            routes.openSheet(.humanWeight(humanID))
         case "humanWorkout":
-            routes.openSheet(.humanWorkout(human.id))
+            routes.openSheet(.humanWorkout(humanID))
         case "humanMedication":
-            routes.openSheet(.humanMedication(human.id))
+            routes.openSheet(.humanMedication(humanID))
         case "humanExpense":
-            routes.openSheet(.humanExpense(human.id))
+            routes.openSheet(.humanExpense(humanID))
         case "humanNote":
-            routes.openSheet(.humanNote(human.id))
+            routes.openSheet(.humanNote(humanID))
         default:
-            routes.openSheet(.humanAllFeatures(human.id))
+            routes.openSheet(.humanAllFeatures(humanID))
         }
     }
 
@@ -337,11 +335,7 @@ struct FocusHomeRouteSheetModifier: ViewModifier {
     private func homeFullScreenDestination(for route: HomeFullScreenRoute) -> some View {
         switch route {
         case let .walk(id):
-            if let pet = pet(id) {
-                WalkTrackingFullScreen(pet: pet)
-            } else {
-                missingFullScreenDismissView()
-            }
+            AppWalkRouteContainer(id: id, onDismiss: { routes.dismissFullScreen() })
         case .oasisReward:
             OasisRewardView()
         }
@@ -361,24 +355,14 @@ struct FocusHomeRouteSheetModifier: ViewModifier {
             ) {
                 switch route {
                 case let .quickMoment(routeID, petID):
-                    if let pet = pet(petID) {
-                        OhanaInlinePageRouteHost(routeID: routeID.uuidString, onClose: {
-                            routes.dismissOverlay(routeID: routeID)
-                        }) { requestClose in
-                            QuickMomentSheet(
-                                pet: pet,
-                                onRemove: nil,
-                                onSaved: {
-                                    onFirstSuccessMomentCompleted(pet)
-                                },
-                                onClose: requestClose
-                            )
-                        }
-                    } else {
-                        Color.clear
-                            .onAppear {
-                                routes.dismissOverlay(routeID: routeID)
-                            }
+                    OhanaInlinePageRouteHost(routeID: routeID.uuidString, onClose: {
+                        routes.dismissOverlay(routeID: routeID)
+                    }) { requestClose in
+                        AppQuickMomentOverlayRouteContainer(
+                            id: petID,
+                            onSaved: onFirstSuccessMomentCompleted,
+                            onDismiss: requestClose
+                        )
                     }
                 }
             }
@@ -498,17 +482,18 @@ struct FocusHomeRouteSheetModifier: ViewModifier {
     private func homeSheetDestination(for route: HomeSheetRoute) -> some View {
         switch route {
         case let .petAllFeatures(id):
-            if let pet = pet(id) {
-                PetAllFeaturesSheet(
-                    pet: pet,
-                    onOpenDestination: { destination in
-                        routes.openSheet(homePetFeatureRoute(petID: pet.id, destination: destination))
-                    }
-                )
-                .ohanaSheetPagePresentation() // ui-v4: allow long feature hub sheet
-            } else {
-                missingRouteDismissView()
-            }
+            AppPetDetailSheetRouteContainer(
+                id: id,
+                destination: .allFeatures,
+                onMissing: { routes.dismissSheet() },
+                onOpenFeatureDestination: { petID, destination in
+                    routes.openSheet(homePetFeatureRoute(petID: petID, destination: destination))
+                },
+                onPresentCoconutLog: { subject in
+                    routes.openCoconutLog(subject)
+                }
+            )
+            .ohanaSheetPagePresentation() // ui-v4: allow long feature hub sheet
         case let .humanAllFeatures(id):
             HumanAllFeaturesRouteContainer(
                 id: id,
@@ -519,299 +504,132 @@ struct FocusHomeRouteSheetModifier: ViewModifier {
             )
             .ohanaSheetPagePresentation() // ui-v4: allow long feature hub sheet
         case let .petBasicInfo(id):
-            if let pet = pet(id) {
-                NavigationStack { PetBasicInfoDetailView(pet: pet) }
-                    .ohanaSheetPagePresentation() // ui-v4: allow long overview/detail sheet
-            } else {
-                missingRouteDismissView()
-            }
-        case let .humanBasicInfo(id):
-            if let human = human(id) {
-                NavigationStack { HumanBasicInfoDetailView(human: human) }
-                    .ohanaSheetPagePresentation() // ui-v4: allow long overview/detail sheet
-            } else {
-                missingRouteDismissView()
-            }
-        case let .petFood(id):
-            if let pet = pet(id) {
-                NavigationStack { PetFoodManagementView(pet: pet) }
-                    .ohanaSheetPagePresentation() // ui-v4: allow long overview/detail sheet
-            } else {
-                missingRouteDismissView()
-            }
-        case let .petWeightQuick(id):
-            if let pet = pet(id) {
-                GenericWeightEntrySheet(
-                    target: .pet(pet),
-                    onDismiss: { routes.dismissSheet() }
-                )
-            } else {
-                missingRouteDismissView()
-            }
-        case let .petWeight(id):
-            if let pet = pet(id) {
-                NavigationStack { WeightHistoryView(pet: pet) }
-                    .ohanaSheetPagePresentation() // ui-v4: allow long overview/detail sheet
-            } else {
-                missingRouteDismissView()
-            }
-        case let .petExpenseQuick(id):
-            if let pet = pet(id) {
-                AddExpenseSheet(
-                    pet: pet,
-                    humans: humans,
-                    allPets: pets,
-                    preselectedPayerId: activeHumanIdStr.isEmpty ? nil : activeHumanIdStr,
-                    onDismiss: { routes.dismissSheet() }
-                )
-            } else {
-                missingRouteDismissView()
-            }
-        case let .petExpense(id):
-            if let pet = pet(id) {
-                NavigationStack { ExpenseHistoryView(pet: pet) }
-                    .ohanaSheetPagePresentation() // ui-v4: allow long overview/detail sheet
-            } else {
-                missingRouteDismissView()
-            }
-        case let .petFeed(id, opensManualSheet):
-            if let pet = pet(id) {
-                QuickFeedDetailRouteContainer(
-                    id: pet.id,
-                    onRemove: { routes.dismissSheet() },
-                    onClose: { routes.dismissSheet() },
-                    opensManualSheetOnAppear: opensManualSheet
-                )
+            petRouteContainer(id: id, destination: .basicInfo)
                 .ohanaSheetPagePresentation() // ui-v4: allow long overview/detail sheet
-            } else {
-                missingRouteDismissView()
-            }
+        case let .humanBasicInfo(id):
+            humanRouteContainer(id: id, destination: .basicInfo)
+                .ohanaSheetPagePresentation() // ui-v4: allow long overview/detail sheet
+        case let .petFood(id):
+            petRouteContainer(id: id, destination: .food)
+                .ohanaSheetPagePresentation() // ui-v4: allow long overview/detail sheet
+        case let .petWeightQuick(id):
+            petRouteContainer(id: id, destination: .weightQuick)
+        case let .petWeight(id):
+            petRouteContainer(id: id, destination: .weight)
+                .ohanaSheetPagePresentation() // ui-v4: allow long overview/detail sheet
+        case let .petExpenseQuick(id):
+            petRouteContainer(id: id, destination: .expenseQuick)
+        case let .petExpense(id):
+            petRouteContainer(id: id, destination: .expense)
+                .ohanaSheetPagePresentation() // ui-v4: allow long overview/detail sheet
+        case let .petFeed(id, opensManualSheet):
+            petRouteContainer(id: id, destination: .feed(opensManualSheet))
+                .ohanaSheetPagePresentation() // ui-v4: allow long overview/detail sheet
         case let .petWater(id):
-            if let pet = pet(id) {
-                QuickWaterDetailRouteContainer(id: pet.id, onRemove: { routes.dismissSheet() }, onClose: { routes.dismissSheet() })
-                    .ohanaSheetPagePresentation() // ui-v4: allow long overview/detail sheet
-            } else {
-                missingRouteDismissView()
-            }
+            petRouteContainer(id: id, destination: .water)
+                .ohanaSheetPagePresentation() // ui-v4: allow long overview/detail sheet
         case let .petPotty(id):
-            if let pet = pet(id) {
-                QuickPottyDetailRouteContainer(id: pet.id, onRemove: { routes.dismissSheet() }, onClose: { routes.dismissSheet() })
-                    .ohanaSheetPagePresentation() // ui-v4: allow long overview/detail sheet
-            } else {
-                missingRouteDismissView()
-            }
+            petRouteContainer(id: id, destination: .potty)
+                .ohanaSheetPagePresentation() // ui-v4: allow long overview/detail sheet
         case let .petLitter(id):
-            if let pet = pet(id) {
-                QuickPottyDetailRouteContainer(id: pet.id, onRemove: { routes.dismissSheet() }, onClose: { routes.dismissSheet() })
-                    .ohanaSheetPagePresentation() // ui-v4: allow long overview/detail sheet
-            } else {
-                missingRouteDismissView()
-            }
+            petRouteContainer(id: id, destination: .litter)
+                .ohanaSheetPagePresentation() // ui-v4: allow long overview/detail sheet
         case let .petPlay(id):
-            QuickPlayDetailRouteContainer(id: id, onRemove: { routes.dismissSheet() })
+            petRouteContainer(id: id, destination: .play)
                 .ohanaSheetPagePresentation() // ui-v4: allow long overview/detail sheet
         case let .petHygiene(id):
-            if let pet = pet(id) {
-                NavigationStack { PetHygieneDetailView(pet: pet) }
-                    .ohanaSheetPagePresentation() // ui-v4: allow long overview/detail sheet
-            } else {
-                missingRouteDismissView()
-            }
+            petRouteContainer(id: id, destination: .hygiene)
+                .ohanaSheetPagePresentation() // ui-v4: allow long overview/detail sheet
         case let .petWalkSummary(id):
-            if let pet = pet(id) {
-                NavigationStack { WalkSummarySheet(pet: pet) }
-                    .ohanaSheetPagePresentation() // ui-v4: allow long overview/detail sheet
-            } else {
-                missingRouteDismissView()
-            }
+            petRouteContainer(id: id, destination: .walkSummary)
+                .ohanaSheetPagePresentation() // ui-v4: allow long overview/detail sheet
         case let .petHealth(id, initialSection):
-            if let pet = pet(id) {
-                NavigationStack {
-                    PetHealthDetailView(
-                        pet: pet,
-                        isModal: true,
-                        initialSection: initialSection
-                    )
-                }
+            petRouteContainer(id: id, destination: .health(initialSection))
                 .ohanaSheetPagePresentation() // ui-v4: allow long overview/detail sheet
-            } else {
-                missingRouteDismissView()
-            }
         case let .petMedication(id):
-            if let pet = pet(id) {
-                NavigationStack { PetMedicationView(pet: pet) }
-                    .ohanaSheetPagePresentation() // ui-v4: allow long overview/detail sheet
-            } else {
-                missingRouteDismissView()
-            }
+            petRouteContainer(id: id, destination: .medication)
+                .ohanaSheetPagePresentation() // ui-v4: allow long overview/detail sheet
         case let .petMomentHistory(id):
-            if let pet = pet(id) {
-                PetMomentsHubRouteContainer(pet: pet)
-                    .ohanaSheetPagePresentation() // ui-v4: allow long overview/detail sheet
-            } else {
-                missingRouteDismissView()
-            }
+            petRouteContainer(id: id, destination: .momentHistory)
+                .ohanaSheetPagePresentation() // ui-v4: allow long overview/detail sheet
         case let .petDocuments(id):
-            if let pet = pet(id) {
-                DocumentsListView(pet: pet, showsCloseButton: true)
-                    .ohanaSheetPagePresentation() // ui-v4: allow long overview/detail sheet
-            } else {
-                missingRouteDismissView()
-            }
+            petRouteContainer(id: id, destination: .documents)
+                .ohanaSheetPagePresentation() // ui-v4: allow long overview/detail sheet
         case let .petAchievements(id):
-            if let pet = pet(id) {
-                NavigationStack {
-                    AchievementWallView(
-                        pet: pet,
-                        onPresentCoconutLog: { subject in
-                            routes.openCoconutLog(subject)
-                        }
-                    )
-                }
+            petRouteContainer(id: id, destination: .achievements)
                 .ohanaSheetPagePresentation() // ui-v4: allow long overview/detail sheet
-            } else {
-                missingRouteDismissView()
-            }
         case let .petRetention(id):
-            if let pet = pet(id) {
-                PetRetentionHubView(pet: pet, showsCloseButton: true)
-                    .ohanaSheetPagePresentation() // ui-v4: allow long overview/detail sheet
-            } else {
-                missingRouteDismissView()
-            }
-        case let .petBondVault(id):
-            if let pet = pet(id) {
-                NavigationStack { PetBondVaultView(pet: pet) }
-                    .ohanaSheetPagePresentation() // ui-v4: allow long overview/detail sheet
-            } else {
-                missingRouteDismissView()
-            }
-        case let .humanMedicationQuick(id):
-            if let human = human(id) {
-                QuickHumanMedicationSheet(
-                    human: human,
-                    onManage: { routes.openSheet(.humanMedication(human.id)) },
-                    onDismiss: { routes.dismissSheet() }
-                )
-            } else {
-                missingRouteDismissView()
-            }
-        case let .humanMedication(id):
-            if let human = human(id) {
-                NavigationStack {
-                    HumanMedicationView(
-                        human: human,
-                        showsDoneButton: true,
-                        onDoseTaken: {
-                            onHumanDoseTaken(human.id)
-                        }
-                    )
-                }
+            petRouteContainer(id: id, destination: .retention)
                 .ohanaSheetPagePresentation() // ui-v4: allow long overview/detail sheet
-            } else {
-                missingRouteDismissView()
-            }
+        case let .petBondVault(id):
+            petRouteContainer(id: id, destination: .bondVault)
+                .ohanaSheetPagePresentation() // ui-v4: allow long overview/detail sheet
+        case let .humanMedicationQuick(id):
+            humanRouteContainer(id: id, destination: .medicationQuick)
+        case let .humanMedication(id):
+            humanRouteContainer(id: id, destination: .medication)
+                .ohanaSheetPagePresentation() // ui-v4: allow long overview/detail sheet
         case let .humanWeightQuick(id):
-            if let human = human(id) {
-                GenericWeightEntrySheet(
-                    target: .human(human),
-                    onDismiss: { routes.dismissSheet() }
-                )
-            } else {
-                missingRouteDismissView()
-            }
+            humanRouteContainer(id: id, destination: .weightQuick)
         case let .humanWeight(id):
-            if let human = human(id) {
-                NavigationStack { HumanWeightHistoryView(human: human) }
-                    .ohanaSheetPagePresentation() // ui-v4: allow long overview/detail sheet
-            } else {
-                missingRouteDismissView()
-            }
+            humanRouteContainer(id: id, destination: .weight)
+                .ohanaSheetPagePresentation() // ui-v4: allow long overview/detail sheet
         case let .humanWorkoutQuick(id):
-            if let human = human(id) {
-                QuickHumanWorkoutSheet(
-                    human: human,
-                    onDismiss: { routes.dismissSheet() }
-                )
-            } else {
-                missingRouteDismissView()
-            }
+            humanRouteContainer(id: id, destination: .workoutQuick)
         case let .humanWorkout(id):
-            if let human = human(id) {
-                HumanWorkoutHistoryView(human: human)
-                    .ohanaSheetPagePresentation() // ui-v4: allow long overview/detail sheet
-            } else {
-                missingRouteDismissView()
-            }
+            humanRouteContainer(id: id, destination: .workout)
+                .ohanaSheetPagePresentation() // ui-v4: allow long overview/detail sheet
         case let .humanWorkoutDashboard(id):
-            if let human = human(id) {
-                CoHealthDashboardFullView(human: human)
-                    .ohanaSheetPagePresentation() // ui-v4: allow long overview/detail sheet
-            } else {
-                missingRouteDismissView()
-            }
+            humanRouteContainer(id: id, destination: .workoutDashboard)
+                .ohanaSheetPagePresentation() // ui-v4: allow long overview/detail sheet
         case let .humanMetrics(id):
-            if let human = human(id) {
-                HumanHealthCheckupView(human: human)
-                    .ohanaSheetPagePresentation() // ui-v4: allow long overview/detail sheet
-            } else {
-                missingRouteDismissView()
-            }
+            humanRouteContainer(id: id, destination: .metrics)
+                .ohanaSheetPagePresentation() // ui-v4: allow long overview/detail sheet
         case let .humanReport(id):
-            if let human = human(id) {
-                HumanHealthReportView(human: human)
-                    .ohanaSheetPagePresentation() // ui-v4: allow long overview/detail sheet
-            } else {
-                missingRouteDismissView()
-            }
+            humanRouteContainer(id: id, destination: .report)
+                .ohanaSheetPagePresentation() // ui-v4: allow long overview/detail sheet
         case let .humanExpenseQuick(id):
-            if let human = human(id) {
-                QuickHumanExpenseSheet(
-                    human: human,
-                    onDismiss: { routes.dismissSheet() }
-                )
-            } else {
-                missingRouteDismissView()
-            }
+            humanRouteContainer(id: id, destination: .expenseQuick)
         case let .humanExpense(id):
-            if let human = human(id) {
-                NavigationStack { HumanExpenseDetailView(human: human) }
-                    .ohanaSheetPagePresentation() // ui-v4: allow long overview/detail sheet
-            } else {
-                missingRouteDismissView()
-            }
+            humanRouteContainer(id: id, destination: .expense)
+                .ohanaSheetPagePresentation() // ui-v4: allow long overview/detail sheet
         case let .humanWishlist(id):
-            if let human = human(id) {
-                HumanWishlistView(human: human)
-                    .ohanaSheetPagePresentation() // ui-v4: allow long overview/detail sheet
-            } else {
-                missingRouteDismissView()
-            }
+            humanRouteContainer(id: id, destination: .wishlist)
+                .ohanaSheetPagePresentation() // ui-v4: allow long overview/detail sheet
         case let .humanNoteQuick(id):
-            if let human = human(id) {
-                QuickHumanNoteSheet(
-                    human: human,
-                    onDismiss: { routes.dismissSheet() }
-                )
-            } else {
-                missingRouteDismissView()
-            }
+            humanRouteContainer(id: id, destination: .noteQuick)
         case let .humanNote(id):
-            if let human = human(id) {
-                HumanNoteHistorySheet(human: human)
-                    .ohanaSheetPagePresentation() // ui-v4: allow long overview/detail sheet
-            } else {
-                missingRouteDismissView()
-            }
+            humanRouteContainer(id: id, destination: .note)
+                .ohanaSheetPagePresentation() // ui-v4: allow long overview/detail sheet
         }
     }
 
-    private func pet(_ id: UUID) -> Pet? {
-        pets.first { $0.id == id }
+    private func petRouteContainer(id: UUID, destination: AppPetDetailSheetDestination) -> some View {
+        AppPetDetailSheetRouteContainer(
+            id: id,
+            destination: destination,
+            onMissing: { routes.dismissSheet() },
+            onDismiss: { routes.dismissSheet() },
+            onOpenFeatureDestination: { petID, destination in
+                routes.openSheet(homePetFeatureRoute(petID: petID, destination: destination))
+            },
+            onPresentCoconutLog: { subject in
+                routes.openCoconutLog(subject)
+            }
+        )
     }
 
-    private func human(_ id: UUID) -> Human? {
-        humans.first { $0.id == id }
+    private func humanRouteContainer(id: UUID, destination: AppHumanDetailSheetDestination) -> some View {
+        AppHumanDetailSheetRouteContainer(
+            id: id,
+            destination: destination,
+            onMissing: { routes.dismissSheet() },
+            onDismiss: { routes.dismissSheet() },
+            onOpenDestination: { humanID, destination in
+                routes.openSheet(homeHumanDetailRoute(humanID: humanID, destination: destination))
+            },
+            onHumanDoseTaken: onHumanDoseTaken
+        )
     }
 
     private func homePetFeatureRoute(
@@ -876,17 +694,41 @@ struct FocusHomeRouteSheetModifier: ViewModifier {
         }
     }
 
-    private func missingRouteDismissView() -> some View {
-        Color.clear
-            .onAppear {
-                routes.dismissSheet()
-            }
-    }
-
-    private func missingFullScreenDismissView() -> some View {
-        Color.clear
-            .onAppear {
-                routes.dismissFullScreen()
-            }
+    private func homeHumanDetailRoute(
+        humanID: UUID,
+        destination: AppHumanDetailSheetDestination
+    ) -> HomeSheetRoute {
+        switch destination {
+        case .basicInfo:
+            .humanBasicInfo(humanID)
+        case .medicationQuick:
+            .humanMedicationQuick(humanID)
+        case .medication:
+            .humanMedication(humanID)
+        case .weightQuick:
+            .humanWeightQuick(humanID)
+        case .weight:
+            .humanWeight(humanID)
+        case .workoutQuick:
+            .humanWorkoutQuick(humanID)
+        case .workout:
+            .humanWorkout(humanID)
+        case .workoutDashboard:
+            .humanWorkoutDashboard(humanID)
+        case .metrics:
+            .humanMetrics(humanID)
+        case .report:
+            .humanReport(humanID)
+        case .expenseQuick:
+            .humanExpenseQuick(humanID)
+        case .expense:
+            .humanExpense(humanID)
+        case .wishlist:
+            .humanWishlist(humanID)
+        case .noteQuick:
+            .humanNoteQuick(humanID)
+        case .note:
+            .humanNote(humanID)
+        }
     }
 }

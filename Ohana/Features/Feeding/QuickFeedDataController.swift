@@ -11,18 +11,18 @@ import Foundation
 @MainActor
 final class QuickFeedDataController: ObservableObject {
     @Published var loadedCareLogs: [PetCareLog] = []
-    @Published var loadedFeedingLedgerEvents: [CareLedgerEvent] = []
+    @Published var loadedFeedingLedgerEntries: [QuickFeedLedgerEntry] = []
     @Published var loadedFoodRecords: [PetFoodRecord] = []
     @Published var hasLoadedFullCareLogs = false
-    @Published var hasLoadedFullFeedingLedgerEvents = false
+    @Published var hasLoadedFullFeedingLedgerEntries = false
     @Published var hasLoadedFullFoodRecords = false
 
     func observedCareLogs(fallback: [PetCareLog]) -> [PetCareLog] {
         hasLoadedFullCareLogs ? loadedCareLogs : fallback
     }
 
-    func observedFeedingLedgerEvents(fallback: [CareLedgerEvent]) -> [CareLedgerEvent] {
-        hasLoadedFullFeedingLedgerEvents ? loadedFeedingLedgerEvents : fallback
+    func observedFeedingLedgerEntries(fallback: [QuickFeedLedgerEntry]) -> [QuickFeedLedgerEntry] {
+        hasLoadedFullFeedingLedgerEntries ? loadedFeedingLedgerEntries : fallback
     }
 
     func observedFoodRecords(fallback: [PetFoodRecord]) -> [PetFoodRecord] {
@@ -41,15 +41,15 @@ final class QuickFeedDataController: ObservableObject {
         hasLoadedFullCareLogs = true
     }
 
-    func loadFullFeedingLedgerEvents(
+    func loadFullFeedingLedgerEntries(
         petID: UUID,
-        fallback: [CareLedgerEvent],
+        fallback: [QuickFeedLedgerEntry],
         force: Bool = false,
-        fetcher: (UUID, [CareLedgerEvent]) -> [CareLedgerEvent]
+        fetcher: (UUID, [QuickFeedLedgerEntry]) -> [QuickFeedLedgerEntry]
     ) {
-        guard force || !hasLoadedFullFeedingLedgerEvents else { return }
-        loadedFeedingLedgerEvents = fetcher(petID, fallback)
-        hasLoadedFullFeedingLedgerEvents = true
+        guard force || !hasLoadedFullFeedingLedgerEntries else { return }
+        loadedFeedingLedgerEntries = fetcher(petID, fallback)
+        hasLoadedFullFeedingLedgerEntries = true
     }
 
     func loadFullFoodRecords(

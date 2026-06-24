@@ -11,6 +11,24 @@ import UIKit
 
 // MARK: - Ohana 图鉴主视图
 
+enum CrewRosterInlineAddTarget: Equatable {
+    case pet(UUID)
+    case human(UUID)
+}
+
+@MainActor
+enum CrewRosterInlineAddCompletion {
+    static func target(savedPet: Pet?, savedHuman: Human?) -> CrewRosterInlineAddTarget? {
+        if let savedPet {
+            return .pet(savedPet.id)
+        }
+        if let savedHuman {
+            return .human(savedHuman.id)
+        }
+        return nil
+    }
+}
+
 struct CrewRosterOverlay: View {
     var initialMode: CrewRosterMode = .members
     var pets: [Pet] = []
@@ -20,6 +38,8 @@ struct CrewRosterOverlay: View {
     var familyTasks: [FamilyCollaborationTask] = []
     let onSelectPet: (Pet) -> Void
     let onSelectHuman: (Human) -> Void
+    var onInlinePetSaved: (Pet) -> Void = { _ in }
+    var onInlineHumanSaved: (Human) -> Void = { _ in }
     var onAddEntity: ((EntityType) -> Void)?
     var onClose: (() -> Void)?
     var hideToolbar: Bool = false
@@ -358,6 +378,7 @@ struct CrewRosterOverlay: View {
     private func completeInlineAddEntity() {
         let savedPet = pendingInlineSavedPet
         let savedHuman = pendingInlineSavedHuman
+        let savedTarget = CrewRosterInlineAddCompletion.target(savedPet: savedPet, savedHuman: savedHuman)
         pendingInlineSavedPet = nil
         pendingInlineSavedHuman = nil
 
@@ -366,10 +387,15 @@ struct CrewRosterOverlay: View {
         }
 
         OhanaFrameScheduler.runAfterNextFrame(milliseconds: 120) {
-            if let savedPet {
-                onSelectPet(savedPet)
-            } else if let savedHuman {
-                onSelectHuman(savedHuman)
+            switch savedTarget {
+            case .pet:
+                guard let savedPet else { return }
+                onInlinePetSaved(savedPet)
+            case .human:
+                guard let savedHuman else { return }
+                onInlineHumanSaved(savedHuman)
+            case nil:
+                break
             }
         }
     }

@@ -18,7 +18,7 @@ struct QuickFeedAlertHost: ViewModifier {
     let deleteFoodRecordMessage: String
     @Binding var activeAlert: QuickFeedAlertRoute?
     @Binding var pendingRepeatAction: (() -> Void)?
-    let onDeleteFeedLog: (PetCareLog) -> Void
+    let onDeleteFeedLog: (UUID) -> Void
     let onDeleteFoodRecord: (PetFoodRecord) -> Void
 
     func body(content: Content) -> some View {
@@ -38,8 +38,8 @@ struct QuickFeedAlertHost: ViewModifier {
             }
             .alert(deleteFeedLogTitle, isPresented: deleteFeedLogBinding) {
                 Button(deleteFeedLogConfirmTitle, role: .destructive) {
-                    if let log = activeAlert?.feedLogPendingDelete {
-                        onDeleteFeedLog(log)
+                    if let id = activeAlert?.feedLogPendingDeleteId {
+                        onDeleteFeedLog(id)
                     }
                     activeAlert = nil
                 }
@@ -82,9 +82,9 @@ struct QuickFeedAlertHost: ViewModifier {
 
     private var deleteFeedLogBinding: Binding<Bool> {
         Binding(
-            get: { activeAlert?.feedLogPendingDelete != nil },
+            get: { activeAlert?.feedLogPendingDeleteId != nil },
             set: { isPresented in
-                if !isPresented, activeAlert?.feedLogPendingDelete != nil {
+                if !isPresented, activeAlert?.feedLogPendingDeleteId != nil {
                     activeAlert = nil
                 }
             }

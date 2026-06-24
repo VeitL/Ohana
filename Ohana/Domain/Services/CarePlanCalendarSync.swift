@@ -145,7 +145,7 @@ enum CarePlanCalendarSync {
             return false
         }
 
-        let generatedTitles = Set(defaultPlanItems(for: pet).map { "\(pet.name) \($0.title)" })
+        let generatedTitles = Set(defaultPlanItems(for: pet).map { eventTitle(pet: pet, title: $0.title) })
         return generatedTitles.contains(event.title)
     }
 
@@ -294,24 +294,37 @@ enum CarePlanCalendarSync {
     }
 
     private static func defaultPlanTitleCandidates(kind: String, pet: Pet) -> Set<String> {
-        switch kind {
+        let tokens: [CarePlanTitleToken] = switch kind {
         case "feed":
-            ["\(pet.name) 喂食"]
+            [.feed]
         case "drink":
-            ["\(pet.name) 补充饮水", "\(pet.name) 喂水"]
+            [.drink]
         case "litter":
-            ["\(pet.name) 铲屎", "\(pet.name) 清理厕所"]
+            [.litter]
         case "waterChange":
-            ["\(pet.name) 换水"]
+            [.waterChange]
         case "filter":
-            ["\(pet.name) 过滤检查"]
+            [.filterCheck]
         case "groom":
-            ["\(pet.name) 毛发护理", "\(pet.name) 毛球/毛发护理"]
+            [.groom, .hairballGroom]
         case "play":
-            ["\(pet.name) 陪玩", "\(pet.name) 互动", "\(pet.name) 放飞互动"]
+            [.play]
         default:
             []
         }
+        var candidates = Set(tokens.flatMap { localizedPlanTitleCandidates($0).map { eventTitle(pet: pet, title: $0) } })
+        switch kind {
+        case "drink":
+            candidates.insert("\(pet.name) 喂水")
+        case "litter":
+            candidates.insert("\(pet.name) 清理厕所")
+        case "play":
+            candidates.insert("\(pet.name) 互动")
+            candidates.insert("\(pet.name) 放飞互动")
+        default:
+            break
+        }
+        return candidates
     }
 
     private static func upsert(
@@ -457,6 +470,127 @@ enum CarePlanCalendarSync {
         let eventType: EventType
     }
 
+    private enum CarePlanTitleToken {
+        case feed
+        case drink
+        case walk
+        case dogHighEnergyExercise
+        case dogShortNoseWalk
+        case dogLightWalk
+        case externalDeworm
+        case internalDeworm
+        case vaccine
+        case groom
+        case hairballGroom
+        case litter
+        case weight
+        case waterChange
+        case filterCheck
+        case temperature
+        case cage
+        case misting
+        case substrate
+        case shed
+        case breedRiskJointWeight
+        case breedRiskBreathingSkin
+        case breedRiskDental
+        case breedRiskWeightUrine
+        case breedRiskHairball
+        case breedRiskTeethAppetite
+        case breedRiskFeatherBreathing
+        case breedRiskHabitat
+        case breedRiskWaterQuality
+        case filterClean
+        case filterReplace
+        case litterFullChange
+        case scoopPlan
+        case play
+        case playPlan
+    }
+
+    private static func eventTitle(pet: Pet, title: String) -> String {
+        "\(pet.name) \(title)"
+    }
+
+    private static func localizedPlanTitleCandidates(_ token: CarePlanTitleToken) -> Set<String> {
+        Set(AppLanguage.supported.map { localizedPlanTitle(token, l: L10n($0.code)) })
+    }
+
+    private static func localizedPlanTitle(_ token: CarePlanTitleToken, l: L10n = .current) -> String {
+        switch token {
+        case .feed:
+            l.tr(zh: "喂食", en: "Feeding", de: "Fütterung")
+        case .drink:
+            l.tr(zh: "补充饮水", en: "Water refill", de: "Wasser auffüllen")
+        case .walk:
+            l.tr(zh: "遛狗", en: "Walk", de: "Spaziergang")
+        case .dogHighEnergyExercise:
+            l.tr(zh: "高强度运动/嗅闻训练", en: "High-energy walk/sniff training", de: "Auslastung/Schnüffeltraining")
+        case .dogShortNoseWalk:
+            l.tr(zh: "短鼻犬温和散步", en: "Gentle short-nose walk", de: "Sanfter Kurzschnauzen-Spaziergang")
+        case .dogLightWalk:
+            l.tr(zh: "轻量散步", en: "Light walk", de: "Leichter Spaziergang")
+        case .externalDeworm:
+            l.tr(zh: "体外驱虫", en: "External deworming", de: "Äußere Entwurmung")
+        case .internalDeworm:
+            l.tr(zh: "体内驱虫", en: "Internal deworming", de: "Innere Entwurmung")
+        case .vaccine:
+            l.tr(zh: "疫苗复查", en: "Vaccine check", de: "Impfcheck")
+        case .groom:
+            l.tr(zh: "毛发护理", en: "Grooming", de: "Fellpflege")
+        case .hairballGroom:
+            l.tr(zh: "毛球/毛发护理", en: "Hairball/grooming care", de: "Haarballen/Fellpflege")
+        case .litter:
+            l.tr(zh: "铲屎", en: "Litter scoop", de: "Klo säubern")
+        case .weight:
+            l.tr(zh: "体重记录", en: "Weight log", de: "Gewicht erfassen")
+        case .waterChange:
+            l.tr(zh: "换水", en: "Water change", de: "Wasserwechsel")
+        case .filterCheck:
+            l.tr(zh: "过滤检查", en: "Filter check", de: "Filtercheck")
+        case .temperature:
+            l.tr(zh: "水温检查", en: "Temperature check", de: "Temperaturcheck")
+        case .cage:
+            l.tr(zh: "清理鸟笼", en: "Cage cleaning", de: "Käfig reinigen")
+        case .misting:
+            l.tr(zh: "补水/保湿", en: "Hydration/misting", de: "Befeuchten/Sprühen")
+        case .substrate:
+            l.tr(zh: "环境清洁", en: "Habitat cleaning", de: "Terrarium reinigen")
+        case .shed:
+            l.tr(zh: "蜕皮观察", en: "Shedding check", de: "Häutungscheck")
+        case .breedRiskJointWeight:
+            l.tr(zh: "关节/体重观察", en: "Joint/weight check", de: "Gelenk-/Gewichtscheck")
+        case .breedRiskBreathingSkin:
+            l.tr(zh: "呼吸/皮肤褶皱检查", en: "Breathing/skin-fold check", de: "Atem-/Hautfaltencheck")
+        case .breedRiskDental:
+            l.tr(zh: "牙齿检查", en: "Dental check", de: "Zahncheck")
+        case .breedRiskWeightUrine:
+            l.tr(zh: "体重/尿量观察", en: "Weight/urine check", de: "Gewicht-/Urincheck")
+        case .breedRiskHairball:
+            l.tr(zh: "毛球/皮肤观察", en: "Hairball/skin check", de: "Haarballen-/Hautcheck")
+        case .breedRiskTeethAppetite:
+            l.tr(zh: "牙齿/食欲观察", en: "Teeth/appetite check", de: "Zähne-/Appetitcheck")
+        case .breedRiskFeatherBreathing:
+            l.tr(zh: "羽毛/呼吸观察", en: "Feather/breathing check", de: "Feder-/Atemcheck")
+        case .breedRiskHabitat:
+            l.tr(zh: "环境/进食观察", en: "Habitat/feeding check", de: "Habitat-/Fütterungscheck")
+        case .breedRiskWaterQuality:
+            l.tr(zh: "水质/食欲观察", en: "Water-quality/appetite check", de: "Wasserqualität-/Appetitcheck")
+        case .filterClean:
+            l.tr(zh: "清洗滤芯", en: "Clean filter", de: "Filter reinigen")
+        case .filterReplace:
+            l.tr(zh: "更换滤芯", en: "Replace filter", de: "Filter wechseln")
+        case .litterFullChange:
+            l.tr(zh: "换猫砂", en: "Litter change", de: "Streu wechseln")
+        case .scoopPlan:
+            l.tr(zh: "铲屎计划", en: "Scoop plan", de: "Klo-Plan")
+        case .play:
+            l.tr(zh: "陪玩", en: "Play time", de: "Spielzeit")
+        case .playPlan:
+            l.tr(zh: "陪玩计划", en: "Play plan", de: "Spielplan")
+        }
+    }
+
     static func ensureDefaultPlans(for pet: Pet, context: ModelContext, startDate: Date = Date()) {
         guard canWriteActiveCarePlan(for: pet) else {
             removeActiveCalendarPlans(for: pet, context: context)
@@ -484,7 +618,7 @@ enum CarePlanCalendarSync {
             upsert(
                 pet: pet,
                 kind: "default_\(item.kind)",
-                title: "\(pet.name) \(item.title)",
+                title: eventTitle(pet: pet, title: item.title),
                 startDate: firstDueDate,
                 recurrenceDays: item.recurrenceDays,
                 eventType: item.eventType,
@@ -527,57 +661,57 @@ enum CarePlanCalendarSync {
         case "dog":
             let exercise = dogExercisePlan(for: pet)
             return [
-                .init(kind: "feed", title: "喂食", recurrenceDays: 1, eventType: .daily),
-                .init(kind: "drink", title: "补充饮水", recurrenceDays: 1, eventType: .daily),
+                .init(kind: "feed", title: localizedPlanTitle(.feed), recurrenceDays: 1, eventType: .daily),
+                .init(kind: "drink", title: localizedPlanTitle(.drink), recurrenceDays: 1, eventType: .daily),
                 .init(kind: "walk", title: exercise.title, recurrenceDays: exercise.recurrenceDays, eventType: .daily),
-                .init(kind: "externalDeworm", title: "体外驱虫", recurrenceDays: 30, eventType: .externalDeworming),
-                .init(kind: "internalDeworm", title: "体内驱虫", recurrenceDays: 90, eventType: .internalDeworming),
-                .init(kind: "vaccine", title: "疫苗复查", recurrenceDays: 365, eventType: .vaccine),
-                .init(kind: "groom", title: "毛发护理", recurrenceDays: groomingInterval(for: pet, fallback: 30), eventType: .grooming)
+                .init(kind: "externalDeworm", title: localizedPlanTitle(.externalDeworm), recurrenceDays: 30, eventType: .externalDeworming),
+                .init(kind: "internalDeworm", title: localizedPlanTitle(.internalDeworm), recurrenceDays: 90, eventType: .internalDeworming),
+                .init(kind: "vaccine", title: localizedPlanTitle(.vaccine), recurrenceDays: 365, eventType: .vaccine),
+                .init(kind: "groom", title: localizedPlanTitle(.groom), recurrenceDays: groomingInterval(for: pet, fallback: 30), eventType: .grooming)
             ] + breedRiskPlanItems(for: pet)
         case "cat":
             return [
-                .init(kind: "feed", title: "喂食", recurrenceDays: 1, eventType: .daily),
-                .init(kind: "drink", title: "补充饮水", recurrenceDays: 1, eventType: .daily),
-                .init(kind: "litter", title: "铲屎", recurrenceDays: 1, eventType: .litterBox),
-                .init(kind: "weight", title: "体重记录", recurrenceDays: 30, eventType: .health),
-                .init(kind: "groom", title: "毛球/毛发护理", recurrenceDays: groomingInterval(for: pet, fallback: 14), eventType: .grooming)
+                .init(kind: "feed", title: localizedPlanTitle(.feed), recurrenceDays: 1, eventType: .daily),
+                .init(kind: "drink", title: localizedPlanTitle(.drink), recurrenceDays: 1, eventType: .daily),
+                .init(kind: "litter", title: localizedPlanTitle(.litter), recurrenceDays: 1, eventType: .litterBox),
+                .init(kind: "weight", title: localizedPlanTitle(.weight), recurrenceDays: 30, eventType: .health),
+                .init(kind: "groom", title: localizedPlanTitle(.hairballGroom), recurrenceDays: groomingInterval(for: pet, fallback: 14), eventType: .grooming)
             ] + breedRiskPlanItems(for: pet)
         case "fish":
             return [
-                .init(kind: "feed", title: "喂食", recurrenceDays: 1, eventType: .daily),
-                .init(kind: "waterChange", title: "换水", recurrenceDays: fishWaterChangeInterval(for: pet), eventType: .daily),
-                .init(kind: "filter", title: "过滤检查", recurrenceDays: 14, eventType: .daily),
-                .init(kind: "temperature", title: "水温检查", recurrenceDays: 1, eventType: .health)
+                .init(kind: "feed", title: localizedPlanTitle(.feed), recurrenceDays: 1, eventType: .daily),
+                .init(kind: "waterChange", title: localizedPlanTitle(.waterChange), recurrenceDays: fishWaterChangeInterval(for: pet), eventType: .daily),
+                .init(kind: "filter", title: localizedPlanTitle(.filterCheck), recurrenceDays: 14, eventType: .daily),
+                .init(kind: "temperature", title: localizedPlanTitle(.temperature), recurrenceDays: 1, eventType: .health)
             ] + breedRiskPlanItems(for: pet)
         case "bird":
             return [
-                .init(kind: "feed", title: "喂食", recurrenceDays: 1, eventType: .daily),
-                .init(kind: "drink", title: "补充饮水", recurrenceDays: 1, eventType: .daily),
-                .init(kind: "cage", title: "清理鸟笼", recurrenceDays: 7, eventType: .daily),
-                .init(kind: "weight", title: "体重记录", recurrenceDays: 14, eventType: .health)
+                .init(kind: "feed", title: localizedPlanTitle(.feed), recurrenceDays: 1, eventType: .daily),
+                .init(kind: "drink", title: localizedPlanTitle(.drink), recurrenceDays: 1, eventType: .daily),
+                .init(kind: "cage", title: localizedPlanTitle(.cage), recurrenceDays: 7, eventType: .daily),
+                .init(kind: "weight", title: localizedPlanTitle(.weight), recurrenceDays: 14, eventType: .health)
             ] + breedRiskPlanItems(for: pet)
         case "rabbit":
             return [
-                .init(kind: "feed", title: "喂食", recurrenceDays: 1, eventType: .daily),
-                .init(kind: "drink", title: "补充饮水", recurrenceDays: 1, eventType: .daily),
-                .init(kind: "litter", title: "清理厕所", recurrenceDays: 1, eventType: .litterBox),
-                .init(kind: "groom", title: "毛发护理", recurrenceDays: groomingInterval(for: pet, fallback: 7), eventType: .grooming),
-                .init(kind: "weight", title: "体重记录", recurrenceDays: 14, eventType: .health)
+                .init(kind: "feed", title: localizedPlanTitle(.feed), recurrenceDays: 1, eventType: .daily),
+                .init(kind: "drink", title: localizedPlanTitle(.drink), recurrenceDays: 1, eventType: .daily),
+                .init(kind: "litter", title: localizedPlanTitle(.litter), recurrenceDays: 1, eventType: .litterBox),
+                .init(kind: "groom", title: localizedPlanTitle(.groom), recurrenceDays: groomingInterval(for: pet, fallback: 7), eventType: .grooming),
+                .init(kind: "weight", title: localizedPlanTitle(.weight), recurrenceDays: 14, eventType: .health)
             ] + breedRiskPlanItems(for: pet)
         case "reptile":
             return [
-                .init(kind: "feed", title: "喂食", recurrenceDays: reptileFeedingInterval(for: pet), eventType: .daily),
-                .init(kind: "misting", title: "补水/保湿", recurrenceDays: 1, eventType: .daily),
-                .init(kind: "temperature", title: "温湿度检查", recurrenceDays: 1, eventType: .health),
-                .init(kind: "substrate", title: "环境清洁", recurrenceDays: 7, eventType: .daily),
-                .init(kind: "shed", title: "蜕皮观察", recurrenceDays: 14, eventType: .health)
+                .init(kind: "feed", title: localizedPlanTitle(.feed), recurrenceDays: reptileFeedingInterval(for: pet), eventType: .daily),
+                .init(kind: "misting", title: localizedPlanTitle(.misting), recurrenceDays: 1, eventType: .daily),
+                .init(kind: "temperature", title: localizedPlanTitle(.temperature), recurrenceDays: 1, eventType: .health),
+                .init(kind: "substrate", title: localizedPlanTitle(.substrate), recurrenceDays: 7, eventType: .daily),
+                .init(kind: "shed", title: localizedPlanTitle(.shed), recurrenceDays: 14, eventType: .health)
             ] + breedRiskPlanItems(for: pet)
         default:
             return [
-                .init(kind: "feed", title: "喂食", recurrenceDays: 1, eventType: .daily),
-                .init(kind: "drink", title: "补充饮水", recurrenceDays: 1, eventType: .daily),
-                .init(kind: "weight", title: "体重记录", recurrenceDays: 30, eventType: .health)
+                .init(kind: "feed", title: localizedPlanTitle(.feed), recurrenceDays: 1, eventType: .daily),
+                .init(kind: "drink", title: localizedPlanTitle(.drink), recurrenceDays: 1, eventType: .daily),
+                .init(kind: "weight", title: localizedPlanTitle(.weight), recurrenceDays: 30, eventType: .health)
             ]
         }
     }
@@ -596,15 +730,15 @@ enum CarePlanCalendarSync {
     private static func dogExercisePlan(for pet: Pet) -> (title: String, recurrenceDays: Int) {
         let text = pet.breed.lowercased()
         if containsAny(text, ["边境牧羊", "哈士奇", "阿拉斯加", "澳大利亚牧羊", "拉布拉多", "金毛", "牧羊犬", "working", "husky", "retriever", "collie"]) {
-            return ("高强度运动/嗅闻训练", 1)
+            return (localizedPlanTitle(.dogHighEnergyExercise), 1)
         }
         if containsAny(text, ["法国斗牛", "英国斗牛", "巴哥", "bulldog", "pug"]) {
-            return ("短鼻犬温和散步", 1)
+            return (localizedPlanTitle(.dogShortNoseWalk), 1)
         }
         if containsAny(text, ["吉娃娃", "博美", "马尔济斯", "约克夏", "小型", "chihuahua", "pomeranian", "maltese", "yorkshire"]) {
-            return ("轻量散步", 1)
+            return (localizedPlanTitle(.dogLightWalk), 1)
         }
-        return ("遛狗", 1)
+        return (localizedPlanTitle(.walk), 1)
     }
 
     private static func groomingInterval(for pet: Pet, fallback: Int) -> Int {
@@ -636,31 +770,31 @@ enum CarePlanCalendarSync {
         var items: [DefaultPlanItem] = []
 
         if containsAny(text, ["金毛", "拉布拉多", "德国牧羊", "柯基", "腊肠", "retriever", "labrador", "corgi", "dachshund", "shepherd"]) {
-            items.append(.init(kind: "breedRiskJointWeight", title: "关节/体重观察", recurrenceDays: 30, eventType: .health))
+            items.append(.init(kind: "breedRiskJointWeight", title: localizedPlanTitle(.breedRiskJointWeight), recurrenceDays: 30, eventType: .health))
         }
         if containsAny(text, ["法国斗牛", "英国斗牛", "巴哥", "bulldog", "pug"]) {
-            items.append(.init(kind: "breedRiskBreathingSkin", title: "呼吸/皮肤褶皱检查", recurrenceDays: 14, eventType: .health))
+            items.append(.init(kind: "breedRiskBreathingSkin", title: localizedPlanTitle(.breedRiskBreathingSkin), recurrenceDays: 14, eventType: .health))
         }
         if containsAny(text, ["泰迪", "贵宾", "比熊", "马尔济斯", "约克夏", "吉娃娃", "poodle", "bichon", "maltese", "yorkshire", "chihuahua"]) {
-            items.append(.init(kind: "breedRiskDental", title: "牙齿检查", recurrenceDays: 7, eventType: .health))
+            items.append(.init(kind: "breedRiskDental", title: localizedPlanTitle(.breedRiskDental), recurrenceDays: 7, eventType: .health))
         }
         if containsAny(text, ["英国短毛", "美国短毛", "橘猫", "金渐层", "british shorthair", "american shorthair"]) {
-            items.append(.init(kind: "breedRiskWeightUrine", title: "体重/尿量观察", recurrenceDays: 30, eventType: .health))
+            items.append(.init(kind: "breedRiskWeightUrine", title: localizedPlanTitle(.breedRiskWeightUrine), recurrenceDays: 30, eventType: .health))
         }
         if containsAny(text, ["布偶", "缅因", "波斯", "挪威森林", "ragdoll", "maine", "persian"]) {
-            items.append(.init(kind: "breedRiskHairball", title: "毛球/皮肤观察", recurrenceDays: 7, eventType: .health))
+            items.append(.init(kind: "breedRiskHairball", title: localizedPlanTitle(.breedRiskHairball), recurrenceDays: 7, eventType: .health))
         }
         if containsAny(text, ["兔", "rabbit"]) {
-            items.append(.init(kind: "breedRiskTeethAppetite", title: "牙齿/食欲观察", recurrenceDays: 14, eventType: .health))
+            items.append(.init(kind: "breedRiskTeethAppetite", title: localizedPlanTitle(.breedRiskTeethAppetite), recurrenceDays: 14, eventType: .health))
         }
         if containsAny(text, ["鸟", "鹦鹉", "文鸟", "bird", "parrot"]) {
-            items.append(.init(kind: "breedRiskFeatherBreathing", title: "羽毛/呼吸观察", recurrenceDays: 14, eventType: .health))
+            items.append(.init(kind: "breedRiskFeatherBreathing", title: localizedPlanTitle(.breedRiskFeatherBreathing), recurrenceDays: 14, eventType: .health))
         }
         if containsAny(text, ["爬", "龟", "蛇", "蜥", "守宫", "reptile", "turtle", "snake", "gecko"]) {
-            items.append(.init(kind: "breedRiskHabitat", title: "环境/进食观察", recurrenceDays: 7, eventType: .health))
+            items.append(.init(kind: "breedRiskHabitat", title: localizedPlanTitle(.breedRiskHabitat), recurrenceDays: 7, eventType: .health))
         }
         if containsAny(text, ["鱼", "金鱼", "锦鲤", "fish", "koi"]) {
-            items.append(.init(kind: "breedRiskWaterQuality", title: "水质/食欲观察", recurrenceDays: 7, eventType: .health))
+            items.append(.init(kind: "breedRiskWaterQuality", title: localizedPlanTitle(.breedRiskWaterQuality), recurrenceDays: 7, eventType: .health))
         }
 
         return items
@@ -694,7 +828,14 @@ enum CarePlanCalendarSync {
         while next < today {
             next = cal.date(byAdding: .day, value: intervalDays, to: next) ?? next
         }
-        upsertWithSingleReminder(pet: pet, kind: "waterChange", title: "\(pet.name) 换水", startDate: next, recurrenceDays: intervalDays, context: context)
+        upsertWithSingleReminder(
+            pet: pet,
+            kind: "waterChange",
+            title: eventTitle(pet: pet, title: localizedPlanTitle(.waterChange)),
+            startDate: next,
+            recurrenceDays: intervalDays,
+            context: context
+        )
     }
 
     static func syncFilterPlan(
@@ -728,7 +869,7 @@ enum CarePlanCalendarSync {
         upsertWithSingleReminder(
             pet: pet,
             kind: "filterClean",
-            title: "\(pet.name) 清洗滤芯",
+            title: eventTitle(pet: pet, title: localizedPlanTitle(.filterClean)),
             startDate: nextClean,
             recurrenceDays: cleanIntervalDays,
             context: context
@@ -736,7 +877,7 @@ enum CarePlanCalendarSync {
         upsertWithSingleReminder(
             pet: pet,
             kind: "filterReplace",
-            title: "\(pet.name) 更换滤芯",
+            title: eventTitle(pet: pet, title: localizedPlanTitle(.filterReplace)),
             startDate: nextReplace,
             recurrenceDays: replaceIntervalDays,
             context: context
@@ -773,7 +914,14 @@ enum CarePlanCalendarSync {
             }
             next = d
         }
-        return upsertWithSingleReminder(pet: pet, kind: "litterFull", title: "\(pet.name) 换猫砂", startDate: next, recurrenceDays: intervalDays, context: context)
+        return upsertWithSingleReminder(
+            pet: pet,
+            kind: "litterFull",
+            title: eventTitle(pet: pet, title: localizedPlanTitle(.litterFullChange)),
+            startDate: next,
+            recurrenceDays: intervalDays,
+            context: context
+        )
     }
 
     @discardableResult
@@ -800,7 +948,14 @@ enum CarePlanCalendarSync {
         while next < today {
             next = cal.date(byAdding: .day, value: intervalDays, to: next) ?? next
         }
-        return upsertWithSingleReminder(pet: pet, kind: "scoop", title: "\(pet.name) 铲屎计划", startDate: next, recurrenceDays: intervalDays, context: context)
+        return upsertWithSingleReminder(
+            pet: pet,
+            kind: "scoop",
+            title: eventTitle(pet: pet, title: localizedPlanTitle(.scoopPlan)),
+            startDate: next,
+            recurrenceDays: intervalDays,
+            context: context
+        )
     }
 
     @discardableResult
@@ -827,6 +982,13 @@ enum CarePlanCalendarSync {
         while next < today {
             next = cal.date(byAdding: .day, value: intervalDays, to: next) ?? next
         }
-        return upsertWithSingleReminder(pet: pet, kind: "play", title: "\(pet.name) 陪玩计划", startDate: next, recurrenceDays: intervalDays, context: context)
+        return upsertWithSingleReminder(
+            pet: pet,
+            kind: "play",
+            title: eventTitle(pet: pet, title: localizedPlanTitle(.playPlan)),
+            startDate: next,
+            recurrenceDays: intervalDays,
+            context: context
+        )
     }
 }

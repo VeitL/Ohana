@@ -48,7 +48,6 @@ struct HumanDetailView: View {
     @StateObject var commandQueue = DeferredDomainCommandQueue()
     @ObservedObject var avatarPipeline = AvatarPipelineRegistry.current
     @State var showingEditSheet = false
-    @State var showingDeleteConfirm = false
     @State var showWeightHistory = false
     @State var showingWishlist = false
     @State var showingCoHealth = false
@@ -190,10 +189,8 @@ struct HumanDetailView: View {
                             remindersSection
                         }
                         notesSection
-                        if isViewingOwnProfile {
-                            deleteSection
-                        }
                     }
+                    humanLifecycleDangerZone
                     Spacer(minLength: 40)
                 }
                 .padding(.top, 8)
@@ -231,14 +228,6 @@ struct HumanDetailView: View {
         }
         .navigationDestination(isPresented: $showingHealthReport) { HumanHealthReportView(human: human) }
         .navigationDestination(isPresented: $showingHealthMetrics) { HumanHealthCheckupView(human: human) }
-        .alert("确认删除", isPresented: $showingDeleteConfirm) {
-            Button("取消", role: .cancel) {}
-            Button("删除", role: .destructive) {
-                deleteHumanAndReturnHome()
-            }
-        } message: {
-            Text("确定要删除 \(human.name) 吗？此操作不可撤销。")
-        }
         .alert("首页卡片堆已满", isPresented: $showingHomeStackFullAlert) {
             Button("知道了", role: .cancel) {}
         } message: {

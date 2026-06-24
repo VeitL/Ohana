@@ -25,6 +25,7 @@ nonisolated struct VerticalSolidHomeSourceState {
     let pottyLedgerEntries: [HomePottyQuickActionEntry]
     let petExpenseLedgerEntries: [HomePetExpenseQuickActionEntry]
     let petWeightLedgerEntries: [HomePetWeightQuickActionEntry]
+    let petMomentEntries: [HomePetMomentQuickActionEntry]
     let humanWeightLogs: [HumanWeightLog]
     let familyTasks: [FamilyCollaborationTask]
     let exchangeRequests: [CoconutExchangeRequest]
@@ -53,6 +54,7 @@ nonisolated struct VerticalSolidHomeSourceState {
         pottyLedgerEntries: [HomePottyQuickActionEntry],
         petExpenseLedgerEntries: [HomePetExpenseQuickActionEntry] = [],
         petWeightLedgerEntries: [HomePetWeightQuickActionEntry] = [],
+        petMomentEntries: [HomePetMomentQuickActionEntry] = [],
         humanWeightLogs: [HumanWeightLog],
         familyTasks: [FamilyCollaborationTask],
         exchangeRequests: [CoconutExchangeRequest],
@@ -80,6 +82,7 @@ nonisolated struct VerticalSolidHomeSourceState {
         self.pottyLedgerEntries = pottyLedgerEntries
         self.petExpenseLedgerEntries = petExpenseLedgerEntries
         self.petWeightLedgerEntries = petWeightLedgerEntries
+        self.petMomentEntries = petMomentEntries
         self.humanWeightLogs = humanWeightLogs
         self.familyTasks = familyTasks
         self.exchangeRequests = exchangeRequests
@@ -189,6 +192,8 @@ nonisolated enum VerticalSolidHomeSnapshotBuilder {
         ) -> TodayFocusSnapshot
     ) -> VerticalSolidHomeSnapshot {
         let l = L10n(source.language)
+        let activePets = source.pets.filter { !$0.hasPassedAway }
+        let activeHumans = source.humans.filter { !$0.hasPassedAway }
         let cards = enrichCardsWithAvatarData(
             HomeSnapshotBuilder.buildCards(
                 pets: source.pets,
@@ -197,6 +202,7 @@ nonisolated enum VerticalSolidHomeSnapshotBuilder {
                 events: source.events,
                 humanMedications: source.humanMedications,
                 humanMedicationLogs: source.humanMedicationLogs,
+                careLedgerEntries: source.careLedgerEntries,
                 hiddenPetIDsRaw: source.hiddenPetIDsRaw,
                 homeCardOrderRaw: source.homeCardOrderRaw,
                 showDummyCards: source.showDummyCards,
@@ -211,7 +217,7 @@ nonisolated enum VerticalSolidHomeSnapshotBuilder {
         )
         let visiblePlants = PlantFeatureGate.allows(.plants) ? source.plants : []
         let todayFocus = makeTodayFocus(
-            source.pets.filter { !$0.hasPassedAway },
+            activePets,
             visiblePlants,
             source.pendingReminders,
             source.events,
@@ -230,6 +236,7 @@ nonisolated enum VerticalSolidHomeSnapshotBuilder {
             coconutText: "\(source.pets.reduce(0) { $0 + $1.coconutBalance } + source.humans.reduce(0) { $0 + $1.coconutBalance })",
             todayFocus: todayFocus,
             cards: cards,
+            firstPetEmptyState: firstPetEmptyState(activePets: activePets, activeHumans: activeHumans, l: l),
             plants: visiblePlants.sorted { $0.createdAt > $1.createdAt }.map { plant in
                 VerticalSolidHomePlantSnapshot(
                     id: plant.id,
@@ -241,6 +248,29 @@ nonisolated enum VerticalSolidHomeSnapshotBuilder {
                 )
             },
             heroPreparationRevision: heroPreparationRevision(for: cards)
+        )
+    }
+
+    private static func firstPetEmptyState(
+        activePets: [Pet],
+        activeHumans: [Human],
+        l: L10n
+    ) -> VerticalSolidHomeFirstPetEmptyState? {
+        guard activePets.isEmpty, !activeHumans.isEmpty else { return nil }
+        return VerticalSolidHomeFirstPetEmptyState(
+            eyebrow: l.tr(zh: "首日进度 1/3", en: "First day 1/3", de: "Erster Tag 1/3"),
+            title: l.tr(zh: "添加第一只宠物", en: "Add your first pet", de: "Erstes Haustier hinzufügen"),
+            subtitle: l.tr(
+                zh: "身份已准备好。添加宠物后记录首次体重照护，就能领取 50 椰子新人礼包。",
+                en: "Your identity is ready. Add a pet, log the first weight care, then claim the 50-coconut starter gift.",
+                de: "Dein Profil ist bereit. Füge ein Haustier hinzu, erfasse das erste Gewicht und erhalte das Startergeschenk mit 50 Kokosnüssen."
+            ),
+            progressText: l.tr(
+                zh: "下一步：宠物档案",
+                en: "Next: pet profile",
+                de: "Weiter: Haustierprofil"
+            ),
+            primaryActionTitle: l.tr(zh: "添加宠物", en: "Add pet", de: "Haustier hinzufügen")
         )
     }
 
@@ -264,6 +294,7 @@ nonisolated enum VerticalSolidHomeSnapshotBuilder {
             pottyLedgerSignature(source.pottyLedgerEntries),
             petExpenseLedgerSignature(source.petExpenseLedgerEntries),
             petWeightLedgerSignature(source.petWeightLedgerEntries),
+            petMomentSignature(source.petMomentEntries),
             humanWeightSignature(source.humanWeightLogs),
             familyTaskSignature(source.familyTasks),
             exchangeSignature(source.exchangeRequests),
@@ -552,6 +583,16 @@ nonisolated enum VerticalSolidHomeSnapshotBuilder {
                 entry.petId.uuidString,
                 String(Int(entry.date.timeIntervalSince1970)),
                 String(Int((entry.weightKg * 1000).rounded()))
+            ].joined(separator: ":")
+        }.joined(separator: "|")
+    }
+
+    private static func petMomentSignature(_ entries: [HomePetMomentQuickActionEntry]) -> String {
+        entries.map { entry in
+            [
+                entry.id.uuidString,
+                entry.petId.uuidString,
+                String(Int(entry.date.timeIntervalSince1970))
             ].joined(separator: ":")
         }.joined(separator: "|")
     }

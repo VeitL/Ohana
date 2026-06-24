@@ -98,19 +98,20 @@ extension CalendarTaskCompletionSyncService {
         return json
     }
 
-    static func rewardAction(for careType: CareType, pet: Pet) -> DomainCareRewardAction {
-        rewardAction(for: careType, petName: pet.name)
+    static func rewardAction(for careType: CareType, pet: Pet, l: L10n = .current) -> DomainCareRewardAction {
+        rewardAction(for: careType, petName: pet.name, l: l)
     }
 
     static func rewardAction(
         legacyModelName: String?,
         actionType: String,
-        petName: String?
+        petName: String?,
+        l: L10n = .current
     ) -> DomainCareRewardAction? {
         switch legacyModelName {
         case "PetCareLog":
             guard let careType = CareType(rawValue: actionType) else { return nil }
-            return rewardAction(for: careType, petName: petName ?? "宠物")
+            return rewardAction(for: careType, petName: petName ?? fallbackPetName(l: l), l: l)
         case "PetPottyLog":
             return .potty(isLitter: false)
         case "PetHygieneLog":
@@ -121,7 +122,7 @@ extension CalendarTaskCompletionSyncService {
         }
     }
 
-    static func rewardAction(for careType: CareType, petName: String) -> DomainCareRewardAction {
+    static func rewardAction(for careType: CareType, petName: String, l: L10n = .current) -> DomainCareRewardAction {
         switch careType {
         case .feeding:
             .feed
@@ -130,20 +131,49 @@ extension CalendarTaskCompletionSyncService {
         case .litter:
             .potty(isLitter: true)
         case .play:
-            .general(humanReward: 3, petReward: 2, emoji: careType.emoji, title: "\(petName) 互动奖励")
+            .general(humanReward: 3, petReward: 2, emoji: careType.emoji, title: calendarRewardTitle(for: careType, petName: petName, l: l))
         case .filterClean:
-            .general(humanReward: 25, petReward: 2, emoji: careType.emoji, title: "\(petName) 清理滤材报酬")
+            .general(humanReward: 25, petReward: 2, emoji: careType.emoji, title: calendarRewardTitle(for: careType, petName: petName, l: l))
         case .cageCleaning:
-            .general(humanReward: 10, petReward: 2, emoji: careType.emoji, title: "\(petName) 清理鸟笼奖励")
+            .general(humanReward: 10, petReward: 2, emoji: careType.emoji, title: calendarRewardTitle(for: careType, petName: petName, l: l))
         case .freeFlight:
-            .general(humanReward: 10, petReward: 2, emoji: careType.emoji, title: "\(petName) 放飞互动奖励")
+            .general(humanReward: 10, petReward: 2, emoji: careType.emoji, title: calendarRewardTitle(for: careType, petName: petName, l: l))
         case .misting:
-            .general(humanReward: 3, petReward: 2, emoji: careType.emoji, title: "\(petName) 保湿打卡奖励")
+            .general(humanReward: 3, petReward: 2, emoji: careType.emoji, title: calendarRewardTitle(for: careType, petName: petName, l: l))
         case .substrateChange:
-            .general(humanReward: 10, petReward: 2, emoji: careType.emoji, title: "\(petName) 环境清洁奖励")
+            .general(humanReward: 10, petReward: 2, emoji: careType.emoji, title: calendarRewardTitle(for: careType, petName: petName, l: l))
         case .waterChange:
-            .general(humanReward: 10, petReward: 2, emoji: careType.emoji, title: "\(petName) 换水奖励")
+            .general(humanReward: 10, petReward: 2, emoji: careType.emoji, title: calendarRewardTitle(for: careType, petName: petName, l: l))
         }
+    }
+
+    static func calendarRewardTitle(for careType: CareType, petName: String, l: L10n = .current) -> String {
+        switch careType {
+        case .play:
+            l.tr(zh: "\(petName) 互动奖励", en: "\(petName) play reward", de: "\(petName) Spiel-Bonus")
+        case .filterClean:
+            l.tr(zh: "\(petName) 清理滤材报酬", en: "\(petName) filter cleaning reward", de: "\(petName) Filterreinigungs-Bonus")
+        case .cageCleaning:
+            l.tr(zh: "\(petName) 清理鸟笼奖励", en: "\(petName) cage cleaning reward", de: "\(petName) Käfigreinigungs-Bonus")
+        case .freeFlight:
+            l.tr(zh: "\(petName) 放飞互动奖励", en: "\(petName) free-flight reward", de: "\(petName) Freiflug-Bonus")
+        case .misting:
+            l.tr(zh: "\(petName) 保湿打卡奖励", en: "\(petName) misting reward", de: "\(petName) Befeuchtungs-Bonus")
+        case .substrateChange:
+            l.tr(zh: "\(petName) 环境清洁奖励", en: "\(petName) habitat cleaning reward", de: "\(petName) Habitatpflege-Bonus")
+        case .waterChange:
+            l.tr(zh: "\(petName) 换水奖励", en: "\(petName) water-change reward", de: "\(petName) Wasserwechsel-Bonus")
+        case .feeding, .watering, .litter:
+            l.tr(zh: "\(petName) 照护奖励", en: "\(petName) care reward", de: "\(petName) Pflege-Bonus")
+        }
+    }
+
+    static func reversalTitle(for entry: CoconutLedgerEntry, l: L10n = .current) -> String {
+        l.tr(zh: "撤销 \(entry.title)", en: "Undo \(entry.title)", de: "\(entry.title) rückgängig")
+    }
+
+    private static func fallbackPetName(l: L10n) -> String {
+        l.tr(zh: "宠物", en: "Pet", de: "Haustier")
     }
 
     static func occurrenceTimestamp(for event: Event, occurrenceDate: Date) -> Date {

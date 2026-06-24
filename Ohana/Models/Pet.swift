@@ -312,15 +312,15 @@ final class Pet {
     }
 
     var remainingFoodGrams: Double {
-        feedStockSnapshotWithSharedSessions.remainingGrams
+        feedStockSnapshot.remainingGrams
     }
 
     var foodConsumedSinceRestock: Double {
-        FeedStockCalculator.mainConsumedSinceRestock(for: self, sharedCareSessions: feedStockSharedSessions)
+        FeedStockCalculator.mainConsumedSinceRestock(for: self)
     }
 
     var remainingFoodDays: Int {
-        feedStockSnapshotWithSharedSessions.remainingDays
+        feedStockSnapshot.remainingDays
     }
 
     var remainingFoodPercent: Double {
@@ -329,36 +329,11 @@ final class Pet {
     }
 
     var estimatedRunOutDate: Date? {
-        feedStockSnapshotWithSharedSessions.runOutDate
+        feedStockSnapshot.runOutDate
     }
 
-    private var feedStockSnapshotWithSharedSessions: FeedStockSnapshot {
-        FeedStockCalculator.snapshot(for: self, sharedCareSessions: feedStockSharedSessions)
-    }
-
-    private var feedStockSharedSessions: [SharedCareSession]? {
-        guard let context = modelContext else { return nil }
-        let sessionIDs = Set(careLogs.compactMap { log -> UUID? in
-            guard log.careType == .feeding else { return nil }
-            return UUID(uuidString: log.sharedSessionId)
-        })
-        guard !sessionIDs.isEmpty else { return [] }
-
-        let ids = Array(sessionIDs)
-        let descriptor = FetchDescriptor<SharedCareSession>(
-            predicate: #Predicate<SharedCareSession> { session in
-                ids.contains(session.id)
-            }
-        )
-        do {
-            return try context.fetch(descriptor)
-        } catch {
-            OhanaLog.warning(
-                "[Pet] failed to fetch shared feed sessions for petId=\(id.uuidString): \(error.localizedDescription)",
-                category: "Care"
-            )
-            return nil
-        }
+    private var feedStockSnapshot: FeedStockSnapshot {
+        FeedStockCalculator.snapshot(for: self)
     }
 
     var genderSymbol: String {

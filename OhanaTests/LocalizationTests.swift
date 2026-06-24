@@ -126,6 +126,42 @@ struct LocalizationTests {
         #expect(PetAgeConverter.humanAge(birthday: date, species: "狗", l: de).contains("Menschenalter"))
     }
 
+    @Test func day0PromiseCopyResolvesChineseAndEnglish() {
+        let zh = Day0PromiseCopy(L10n("zh"))
+        let en = Day0PromiseCopy(L10n("en"))
+
+        #expect(zh.navigationTitle(petEmoji: "🐶") == "🐶 首日承诺")
+        #expect(en.navigationTitle(petEmoji: "🐶") == "🐶 Day 0 Promise")
+        #expect(zh.welcomeTitle(petName: "Momo") == "欢迎 Momo 🎉")
+        #expect(en.welcomeTitle(petName: "Momo") == "Welcome, Momo 🎉")
+        #expect(zh.sendPromisesTitle(count: 2) == "把 2 条承诺发给家人")
+        #expect(en.sendPromisesTitle(count: 1) == "Send 1 promise to family")
+        #expect(en.sendPromisesTitle(count: 2) == "Send 2 promises to family")
+        #expect(zh.taskDescription(petName: "Momo") == "首日承诺 · 让家人一起帮 Momo 开启第一天")
+        #expect(en.taskDescription(petName: "Momo") == "Day 0 Promise · Let your family help Momo start day one")
+    }
+
+    @Test func day0PromisePromisesLocalizeSpeciesSpecificActions() {
+        let zh = Day0PromiseCopy(L10n("zh"))
+        let en = Day0PromiseCopy(L10n("en"))
+
+        let zhDogTitles = zh.promises(petName: "Momo", species: "狗").map(\.title)
+        let enDogTitles = en.promises(petName: "Momo", species: "dog").map(\.title)
+        let enCatTitles = en.promises(petName: "Luna", species: "cat").map(\.title)
+
+        #expect(zhDogTitles.contains("明天带 Momo 出去走 15 分钟"))
+        #expect(enDogTitles.contains("Take Momo for a 15-minute walk tomorrow"))
+        #expect(enCatTitles.contains("Brush Luna tonight for a little wind-down"))
+    }
+
+    @Test func day0PromiseCopyFallsBackToEnglishForOtherRegisteredLanguages() {
+        let de = Day0PromiseCopy(L10n("de"))
+
+        #expect(de.skipTitle == "Skip")
+        #expect(de.skipForNowTitle == "Skip for now")
+        #expect(de.sendPromisesTitle(count: 2) == "Send 2 promises to family")
+    }
+
     @Test func countryDefaultsMapToLanguageUnitsAndCurrency() {
         let us = AppCountry.option(for: "US")
         let germany = AppCountry.option(for: "DE")
@@ -161,6 +197,132 @@ struct LocalizationTests {
         #expect(defaults.string(forKey: "appLanguage") == "en")
         #expect(defaults.string(forKey: AppCurrency.storageKey) == "GBP")
         #expect(defaults.string(forKey: AppMeasurementSystem.storageKey) == "imperial")
+    }
+
+    @Test func domainBackupErrorsResolveLocalizedCopy() {
+        let zh = L10n("zh")
+        let en = L10n("en")
+        let de = L10n("de")
+
+        #expect(BackupError.missingPassword.localizedMessage(l: zh) == "请输入备份密码后重试。")
+        #expect(BackupError.missingPassword.localizedMessage(l: en) == "Enter a backup password and try again.")
+        #expect(BackupError.weakPassword(minimum: 8).localizedMessage(l: en) == "Backup password must be at least 8 characters.")
+        #expect(BackupError.passwordMismatch.localizedMessage(l: de) == "Die beiden Backup-Passwörter stimmen nicht überein.")
+        #expect(BackupError.unsupportedVersion(72).localizedMessage(l: en).contains("v72"))
+        #expect(BackupError.invalidEncryptedBackup.localizedMessage(l: en).contains("encrypted backup"))
+    }
+
+    @Test func automaticBackupErrorsResolveLocalizedCopy() {
+        let zh = L10n("zh")
+        let en = L10n("en")
+        let de = L10n("de")
+
+        #expect(AutomaticBackupFileStoreError.iCloudUnavailable.localizedMessage(l: zh).contains("iCloud Drive 暂时不可用"))
+        #expect(AutomaticBackupFileStoreError.iCloudUnavailable.localizedMessage(l: en).contains("iCloud Drive is temporarily unavailable"))
+        #expect(AutomaticBackupFileStoreError.writeFailed("disk full").localizedMessage(l: en) == "Automatic backup failed to write: disk full")
+        #expect(AutomaticBackupFileStoreError.cleanupFailed("locked").localizedMessage(l: de) == "Automatische Backup-Bereinigung fehlgeschlagen: locked")
+    }
+
+    @Test func domainCareRewardCopyResolvesLocalizedTitles() {
+        let pet = Pet(name: "Momo", species: "猫")
+        let zh = L10n("zh")
+        let en = L10n("en")
+        let de = L10n("de")
+
+        #expect(DomainCareRewardAction.feed.title(pet: pet, l: zh) == "Momo 喂食奖励")
+        #expect(DomainCareRewardAction.feed.title(pet: pet, l: en) == "Momo feeding reward")
+        #expect(DomainCareRewardAction.walk(distanceMeters: 1200).title(pet: pet, l: de) == "Momo Spaziergang-Bonus")
+        #expect(DomainCareRewardAction.care(type: .bath).title(pet: pet, l: en) == "Momo bath reward")
+        #expect(DomainCareRewardAction.expense.title(pet: nil, l: en) == "Expense reward")
+        #expect(DomainCareRewardAction.dailyFocusCompletion.title(pet: nil, l: de) == "Today Focus abgeschlossen")
+        #expect(DomainCareRewardQuality.precise.badgeLabel(l: en) == "🎯 Precise XP+10%")
+        #expect(DomainCareRewardQuality.preciseNotePhoto.badgeLabel(l: de) == "✨ Vollständiger Eintrag XP+30%")
+    }
+
+    @Test func carePlanOverdueCopyResolvesLocalizedStatus() {
+        let status = CarePlanOverdueStatus(
+            title: "喂食",
+            actionType: "feed",
+            scheduledAt: Date(timeIntervalSince1970: 1000),
+            daysOverdue: 2,
+            reminderId: nil,
+            eventId: nil
+        )
+        let waterStatus = WaterCareCycleStatus(elapsedDays: 5, intervalDays: 3)
+        let dueToday = WaterCareCycleStatus(elapsedDays: 3, intervalDays: 3)
+
+        #expect(status.localizedTitle(l: L10n("en")) == "Feeding")
+        #expect(status.compactText(l: L10n("en")) == "2d overdue")
+        #expect(status.localizedOverdueText(l: L10n("de")) == "Fütterung 2 T. überfällig")
+        #expect(waterStatus.compactDueText(l: L10n("zh")) == "逾期2天")
+        #expect(waterStatus.compactDueText(l: L10n("en")) == "2d overdue")
+        #expect(dueToday.compactDueText(l: L10n("de")) == "Heute")
+    }
+
+    @Test @MainActor func domainGeneratedStatusAndRewardCopyResolvesLocalizedTitles() throws {
+        let zh = L10n("zh")
+        let en = L10n("en")
+        let de = L10n("de")
+
+        #expect(CareEventService.sharedCareRewardTitle(.feeding, targetCount: 2, l: zh) == "共同喂食 · 2只")
+        #expect(CareEventService.sharedCareRewardTitle(.feeding, targetCount: 2, l: en) == "Shared feeding · 2 pets")
+        #expect(CareEventService.sharedCareRewardTitle(.walk, targetCount: 1, l: de) == "Gemeinsamer Spaziergang · 1 Haustier")
+        #expect(CareEventService.sharedCareRewardTitle(.expense, targetCount: 2, category: .medical, l: en) == "Shared expense · Medical")
+        #expect(EntityKind.human.displayName(l: en) == "Human")
+        #expect(EntityKind.plant.displayName(l: de) == "Pflanze")
+
+        #expect(CalendarTaskCompletionSyncService.calendarRewardTitle(for: .play, petName: "Momo", l: en) == "Momo play reward")
+        #expect(CalendarTaskCompletionSyncService.calendarRewardTitle(for: .filterClean, petName: "Bubbles", l: de) == "Bubbles Filterreinigungs-Bonus")
+        if case let .general(_, _, _, title) = CalendarTaskCompletionSyncService.rewardAction(for: .waterChange, petName: "Bubbles", l: en) {
+            #expect(title == "Bubbles water-change reward")
+        } else {
+            Issue.record("Expected water-change calendar reward to use a general reward action")
+        }
+
+        let pet = Pet(name: "Momo", species: "猫")
+        let event = CareLedgerEvent(
+            occurredAt: Date(timeIntervalSince1970: 1000),
+            actorKind: .human,
+            actorId: nil,
+            subjectKind: .pet,
+            subjectId: pet.id.uuidString,
+            eventKind: .medication,
+            actionType: "medication",
+            coconutDelta: 3
+        )
+        let entry = try #require(CareLedgerStatsService().reportEntries(
+            events: [event],
+            pets: [pet],
+            humans: [],
+            interval: DateInterval(
+                start: Date(timeIntervalSince1970: 900),
+                end: Date(timeIntervalSince1970: 1100)
+            ),
+            l: en
+        ).first)
+        #expect(entry.title == "Medication")
+        #expect(entry.actorName == "Unassigned")
+
+        let recent = AntiRepeatCareManager.checkRecentCareLedger(
+            for: pet,
+            type: .feeding,
+            ledgerEvents: [
+                CareLedgerEvent(
+                    occurredAt: Date(timeIntervalSince1970: 1000),
+                    actorKind: .human,
+                    actorId: pet.id.uuidString,
+                    subjectKind: .pet,
+                    subjectId: pet.id.uuidString,
+                    eventKind: .care,
+                    actionType: CareType.feeding.rawValue
+                )
+            ],
+            currentUserId: pet.id.uuidString,
+            in: [],
+            now: Date(timeIntervalSince1970: 1060),
+            l: de
+        )
+        #expect(recent?.executorName == "Du")
     }
 
     @Test func measurementSystemNormalizesUnknownValues() {

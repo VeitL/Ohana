@@ -89,6 +89,18 @@ struct VerticalHomeEmbeddedActionOption: Identifiable {
     let tint: Color
 }
 
+nonisolated enum VerticalHomeEmbeddedQuickActionHitAreaPolicy {
+    static let minimumHitSize: CGFloat = 44
+    static let cellHeight: CGFloat = 72
+    static let iconSize: CGFloat = 29
+    static let inlineMenuVisualSize: CGFloat = 38
+    static let addOptionCellHeight: CGFloat = 55
+
+    static func inlineMenuButtonWidth(buttonCount _: Int) -> CGFloat {
+        minimumHitSize
+    }
+}
+
 struct VerticalHomeEmbeddedQuickActions: View {
     let title: String
     let items: [VerticalHomeEmbeddedAction]
@@ -113,8 +125,8 @@ struct VerticalHomeEmbeddedQuickActions: View {
 
     private var l: L10n { localization }
     private let maxItems = QuickActionLimit.maxItemsPerEntity
-    private let cellHeight: CGFloat = 72
-    private let iconSize: CGFloat = 29
+    private let cellHeight = VerticalHomeEmbeddedQuickActionHitAreaPolicy.cellHeight
+    private let iconSize = VerticalHomeEmbeddedQuickActionHitAreaPolicy.iconSize
 
     private var visibleItems: [VerticalHomeEmbeddedAction] {
         Array(items.prefix(maxItems))
@@ -231,7 +243,10 @@ struct VerticalHomeEmbeddedQuickActions: View {
                         .font(OhanaFont.adaptive(size: 13, weight: .black))
                         .symbolRenderingMode(.monochrome)
                         .foregroundStyle(isEditMode ? Color.goPrimary : Color.goCardWhite)
-                        .frame(width: 44, height: 32)
+                        .frame(
+                            width: VerticalHomeEmbeddedQuickActionHitAreaPolicy.minimumHitSize,
+                            height: VerticalHomeEmbeddedQuickActionHitAreaPolicy.minimumHitSize
+                        )
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(ScaleButtonStyle())
@@ -459,8 +474,15 @@ struct VerticalHomeEmbeddedQuickActions: View {
                 color: foreground,
                 animatesStateChanges: false
             )
-            .frame(width: buttonWidth, height: 38)
+            .frame(
+                width: VerticalHomeEmbeddedQuickActionHitAreaPolicy.inlineMenuVisualSize,
+                height: VerticalHomeEmbeddedQuickActionHitAreaPolicy.inlineMenuVisualSize
+            )
             .background(tint, in: Circle())
+            .frame(
+                width: buttonWidth,
+                height: VerticalHomeEmbeddedQuickActionHitAreaPolicy.minimumHitSize
+            )
             .contentShape(Rectangle())
         }
         .buttonStyle(ScaleButtonStyle())
@@ -482,7 +504,7 @@ struct VerticalHomeEmbeddedQuickActions: View {
                     .font(OhanaFont.adaptive(size: 20, weight: .black))
                     .symbolRenderingMode(.monochrome)
                     .foregroundStyle(Color.goPrimary)
-                    .frame(width: 38, height: 38) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
+                    .frame(width: 38, height: 38) // a11y: allow visual glyph frame; parent button owns the 72pt quick-action hit target.
                     .background(Color.goCardWhite.opacity(0.12), in: Circle())
                 Text(l.tr(zh: "添加", en: "Add", de: "Hinzufügen"))
                     .font(OhanaFont.adaptive(size: 10.5, weight: .black, design: .rounded))
@@ -521,8 +543,13 @@ struct VerticalHomeEmbeddedQuickActions: View {
                     Image(systemName: "xmark").accessibilityHidden(true)
                         .font(OhanaFont.adaptive(size: 10, weight: .black))
                         .foregroundStyle(Color.ohanaPrimaryText)
-                        .frame(width: 28, height: 28) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
+                        .frame(width: 28, height: 28) // a11y: allow visual glyph frame; parent button owns the 44pt hit target.
                         .background(Color.ohanaControlFill, in: Circle())
+                        .frame(
+                            width: VerticalHomeEmbeddedQuickActionHitAreaPolicy.minimumHitSize,
+                            height: VerticalHomeEmbeddedQuickActionHitAreaPolicy.minimumHitSize
+                        )
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(ScaleButtonStyle())
             }
@@ -572,7 +599,7 @@ struct VerticalHomeEmbeddedQuickActions: View {
                     .minimumScaleFactor(0.58)
             }
             .frame(maxWidth: .infinity)
-            .frame(height: 55)
+            .frame(height: VerticalHomeEmbeddedQuickActionHitAreaPolicy.addOptionCellHeight)
 
             if item.isAddDisabled {
                 Image(systemName: "checkmark.circle.fill").accessibilityHidden(true)
@@ -625,7 +652,7 @@ struct VerticalHomeEmbeddedQuickActions: View {
             ZStack {
                 Circle()
                     .fill(Color.goRed)
-                    .frame(width: 20, height: 20) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
+                    .frame(width: 20, height: 20) // a11y: allow visual glyph frame; parent button owns the 44pt hit target.
                 Image(systemName: "minus").accessibilityHidden(true)
                     .font(OhanaFont.adaptive(size: 9, weight: .black))
                     .symbolRenderingMode(.monochrome)
@@ -663,9 +690,7 @@ struct VerticalHomeEmbeddedQuickActions: View {
     }
 
     private func inlineMenuButtonWidth(buttonCount: Int) -> CGFloat {
-        if buttonCount >= 6 { return 38 }
-        if buttonCount >= 5 { return 40 }
-        return 44
+        VerticalHomeEmbeddedQuickActionHitAreaPolicy.inlineMenuButtonWidth(buttonCount: buttonCount)
     }
 
     private func inlineMenuSpacing(buttonCount: Int) -> CGFloat {

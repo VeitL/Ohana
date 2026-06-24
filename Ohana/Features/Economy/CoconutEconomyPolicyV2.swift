@@ -485,6 +485,7 @@ enum EconomyDailyBudgetStore {
         do {
             let oldEvents = try context.fetch(descriptor)
             for event in oldEvents {
+                CloudSyncMutationRecorder.markDeleted(event, context: context, deletedAt: now)
                 context.delete(event)
             }
             if !oldEvents.isEmpty {

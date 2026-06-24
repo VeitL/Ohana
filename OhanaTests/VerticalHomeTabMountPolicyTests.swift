@@ -307,6 +307,17 @@ struct VerticalHomeTabMountPolicyTests {
         #expect(fiveTabWidth >= 44)
     }
 
+    @Test func homeQuickActionsAndFabShortcutsExposeMinimumHitAreas() {
+        let minimumHitSize = VerticalHomeEmbeddedQuickActionHitAreaPolicy.minimumHitSize
+
+        #expect(minimumHitSize >= 44)
+        #expect(VerticalHomeEmbeddedQuickActionHitAreaPolicy.cellHeight >= minimumHitSize)
+        #expect(VerticalHomeEmbeddedQuickActionHitAreaPolicy.addOptionCellHeight >= minimumHitSize)
+        #expect(VerticalHomeEmbeddedQuickActionHitAreaPolicy.inlineMenuButtonWidth(buttonCount: 1) >= minimumHitSize)
+        #expect(VerticalHomeEmbeddedQuickActionHitAreaPolicy.inlineMenuButtonWidth(buttonCount: 6) >= minimumHitSize)
+        #expect(HomeFabShortcutHitAreaPolicy.minimumHitSize >= 44)
+    }
+
     @Test func bottomNavigationOasisUsesLevelText() {
         #expect(HomeBottomNavigationTreePresentation.levelText(8) == "Lv.8")
         #expect(HomeBottomNavigationTreePresentation.levelText(-1) == "Lv.0")

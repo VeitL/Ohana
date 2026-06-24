@@ -79,10 +79,12 @@ nonisolated enum IslandQuestEngine {
         humans: [Human] = [],
         humanMedications: [HumanMedication] = [],
         careLedgerEntries: [TodayFocusCareLedgerEntry] = [],
+        careLedgerSnapshotAvailable: Bool = false,
         now: Date = Date(),
         questProgress: TodayFocusQuestProgress = .fromDefaults()
     ) -> [IslandQuest] {
         let cal = Calendar.current
+        let useCareLedgerSnapshot = careLedgerSnapshotAvailable || !careLedgerEntries.isEmpty
         TodayFocusDailyPreferenceCleanupStore.cleanupIfNeeded(date: now, calendar: cal)
         var quests: [IslandQuest] = []
         let activePets = pets.filter { !$0.hasPassedAway }
@@ -123,6 +125,7 @@ nonisolated enum IslandQuestEngine {
             pets: activePets,
             humans: humans,
             careLedgerEntries: careLedgerEntries,
+            careLedgerSnapshotAvailable: useCareLedgerSnapshot,
             calendar: cal,
             now: now
         ) {
@@ -159,6 +162,7 @@ nonisolated enum IslandQuestEngine {
         let playEquivalentDoneToday = hasAnyPlayEquivalentToday(
             pets: activePets,
             careLedgerEntries: careLedgerEntries,
+            careLedgerSnapshotAvailable: useCareLedgerSnapshot,
             calendar: cal,
             now: now
         )
@@ -293,6 +297,7 @@ nonisolated enum IslandQuestEngine {
         humans: [Human] = [],
         humanMedications: [HumanMedication] = [],
         careLedgerEntries: [TodayFocusCareLedgerEntry] = [],
+        careLedgerSnapshotAvailable: Bool = false,
         now: Date = Date(),
         questManager: QuestManager
     ) -> [IslandQuest] {
@@ -304,6 +309,7 @@ nonisolated enum IslandQuestEngine {
             humans: humans,
             humanMedications: humanMedications,
             careLedgerEntries: careLedgerEntries,
+            careLedgerSnapshotAvailable: careLedgerSnapshotAvailable,
             now: now,
             questProgress: TodayFocusQuestProgress(questManager: questManager)
         )
@@ -421,18 +427,21 @@ nonisolated enum IslandQuestEngine {
     private static func oasisBuildQuests(activePets: [Pet], humans: [Human], questProgress: TodayFocusQuestProgress) -> [IslandQuest] {
         var quests: [IslandQuest] = []
         let hasAnyMember = !activePets.isEmpty || !humans.isEmpty
+        let hasSeenStarterCeremony = UserDefaults.standard.bool(forKey: StarterGiftStorageKey.ceremonySeen)
 
         if activePets.isEmpty {
             quests.append(IslandQuest(
                 id: oasisPetWizardQuestId,
                 emoji: "🐾",
                 title: localized(zh: "添加第一只宠物", en: "Add your first pet"),
-                subtitle: localized(zh: "先让一位伙伴住进岛屿，Today Focus 才能开始照护 · +50🥥", en: "Bring a companion home first so Today Focus can start care · +50🥥"),
+                subtitle: localized(zh: "添加伙伴后记录初始体重，领取新人礼包 · +50🥥", en: "Add a companion, log starting weight, and claim the starter gift · +50🥥"),
                 isCompleted: false,
                 targetPetId: nil,
                 targetPlantId: nil
             ))
         }
+
+        guard hasSeenStarterCeremony else { return quests }
 
         if !questProgress.isFirstMealRecorded, !activePets.isEmpty {
             quests.append(IslandQuest(
@@ -534,6 +543,7 @@ nonisolated enum IslandQuestEngine {
         pets: [Pet],
         humans: [Human],
         careLedgerEntries: [TodayFocusCareLedgerEntry],
+        careLedgerSnapshotAvailable: Bool,
         calendar: Calendar,
         now: Date
     ) -> [IslandQuest] {
@@ -554,6 +564,7 @@ nonisolated enum IslandQuestEngine {
                     event: event,
                     pet: pet,
                     careLedgerEntries: careLedgerEntries,
+                    careLedgerSnapshotAvailable: careLedgerSnapshotAvailable,
                     calendar: calendar,
                     now: now
                 ) {
@@ -569,6 +580,7 @@ nonisolated enum IslandQuestEngine {
                         pet: pet,
                         humans: humans,
                         careLedgerEntries: careLedgerEntries,
+                        careLedgerSnapshotAvailable: careLedgerSnapshotAvailable,
                         calendar: calendar,
                         now: now
                     ),
@@ -690,13 +702,14 @@ nonisolated enum IslandQuestEngine {
         event: Event,
         pet: Pet,
         careLedgerEntries: [TodayFocusCareLedgerEntry],
+        careLedgerSnapshotAvailable: Bool,
         calendar: Calendar,
         now: Date
     ) -> Bool {
         if event.isOccurrenceMarkedComplete(on: now) {
             return true
         }
-        let hasLedgerInput = !careLedgerEntries.isEmpty
+        let hasLedgerInput = careLedgerSnapshotAvailable || !careLedgerEntries.isEmpty
         switch kind {
         case .feeding:
             if hasLedgerInput {
@@ -792,10 +805,11 @@ nonisolated enum IslandQuestEngine {
     private static func hasAnyPlayEquivalentToday(
         pets: [Pet],
         careLedgerEntries: [TodayFocusCareLedgerEntry],
+        careLedgerSnapshotAvailable: Bool,
         calendar: Calendar,
         now: Date
     ) -> Bool {
-        if !careLedgerEntries.isEmpty {
+        if careLedgerSnapshotAvailable || !careLedgerEntries.isEmpty {
             let activePetIds = Set(pets.map(\.id))
             return careLedgerEntries.contains { entry in
                 activePetIds.contains(entry.petId) &&
@@ -895,6 +909,7 @@ nonisolated enum IslandQuestEngine {
         pet: Pet,
         humans: [Human],
         careLedgerEntries: [TodayFocusCareLedgerEntry],
+        careLedgerSnapshotAvailable: Bool,
         calendar: Calendar,
         now: Date
     ) -> String {
@@ -908,7 +923,12 @@ nonisolated enum IslandQuestEngine {
         case .generic: localized(zh: "按计划完成后，家人都能看到状态", en: "Complete the plan so the family can see the status")
         }
 
-        guard let last = lastRoutineActor(for: kind, pet: pet, careLedgerEntries: careLedgerEntries) else { return fallback }
+        guard let last = lastRoutineActor(
+            for: kind,
+            pet: pet,
+            careLedgerEntries: careLedgerEntries,
+            careLedgerSnapshotAvailable: careLedgerSnapshotAvailable
+        ) else { return fallback }
         let actor = humanDisplayName(id: last.executorId, humans: humans)
         return localized(
             zh: "上次由 \(actor) · \(relativeTime(from: last.date, to: now, calendar: calendar))",
@@ -919,10 +939,14 @@ nonisolated enum IslandQuestEngine {
     private static func lastRoutineActor(
         for kind: RoutineKind,
         pet: Pet,
-        careLedgerEntries: [TodayFocusCareLedgerEntry]
+        careLedgerEntries: [TodayFocusCareLedgerEntry],
+        careLedgerSnapshotAvailable: Bool
     ) -> (date: Date, executorId: String?)? {
         if let ledgerActor = lastLedgerRoutineActor(for: kind, pet: pet, careLedgerEntries: careLedgerEntries) {
             return ledgerActor
+        }
+        if careLedgerSnapshotAvailable || !careLedgerEntries.isEmpty {
+            return nil
         }
         switch kind {
         case .feeding:

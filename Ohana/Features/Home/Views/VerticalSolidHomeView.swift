@@ -25,6 +25,7 @@ struct VerticalSolidHomeView: View {
     let onPresentSettings: () -> Void
     let onPresentStreakDetail: () -> Void
     let onPresentWalk: (UUID) -> Void
+    let cardStateResetToken: UUID
 
     let payload: HomeReadModelPayload
 
@@ -32,7 +33,6 @@ struct VerticalSolidHomeView: View {
     @StateObject var safeAreaController = FocusHomeSafeAreaController()
     @StateObject var routeCoordinator = HomeRouteCoordinator()
     @StateObject var commandQueue = DeferredDomainCommandQueue()
-    @StateObject var expensePreviewStore = HomeExpensePreviewStore()
 
     @AppStorage("appLanguage") var appLanguage = AppLanguage.code
     @AppStorage("currentActiveHumanId") var activeHumanIdRaw = ""
@@ -106,6 +106,7 @@ struct VerticalSolidHomeView: View {
         onPresentSettings: @escaping () -> Void,
         onPresentStreakDetail: @escaping () -> Void,
         onPresentWalk: @escaping (UUID) -> Void,
+        cardStateResetToken: UUID,
         payload: HomeReadModelPayload
     ) {
         self.onOpenPet = onOpenPet
@@ -124,6 +125,7 @@ struct VerticalSolidHomeView: View {
         self.onPresentSettings = onPresentSettings
         self.onPresentStreakDetail = onPresentStreakDetail
         self.onPresentWalk = onPresentWalk
+        self.cardStateResetToken = cardStateResetToken
         self.payload = payload
         _controller = StateObject(
             wrappedValue: VerticalSolidHomeController(
@@ -156,68 +158,8 @@ struct VerticalSolidHomeView: View {
         "\(payload.signature)#revision:\(payload.revision.value)#today:\(payload.snapshot.todayFocus.dayToken)"
     }
 
-    var sourceState: VerticalSolidHomeSourceState {
-        payload.source
-    }
-
-    var pets: [Pet] {
-        sourceState.pets
-    }
-
-    var humans: [Human] {
-        sourceState.humans
-    }
-
-    var plants: [Plant] {
-        sourceState.plants
-    }
-
-    var electronicPets: [OasisElectronicPet] {
-        sourceState.electronicPets
-    }
-
-    var allEvents: [Event] {
-        sourceState.events
-    }
-
-    var humanMedications: [HumanMedication] {
-        sourceState.humanMedications
-    }
-
-    var humanMedicationLogs: [HumanMedicationLog] {
-        sourceState.humanMedicationLogs
-    }
-
-    var feedingLedgerEntries: [HomeFeedQuickActionEntry] {
-        sourceState.feedingLedgerEntries
-    }
-
-    var careLedgerEntries: [HomeCareQuickActionEntry] {
-        sourceState.careLedgerEntries
-    }
-
-    var hygieneLedgerEntries: [HomeHygieneQuickActionEntry] {
-        sourceState.hygieneLedgerEntries
-    }
-
-    var walkLedgerEntries: [HomeWalkQuickActionEntry] {
-        sourceState.walkLedgerEntries
-    }
-
-    var pottyLedgerEntries: [HomePottyQuickActionEntry] {
-        sourceState.pottyLedgerEntries
-    }
-
-    var petExpenseLedgerEntries: [HomePetExpenseQuickActionEntry] {
-        sourceState.petExpenseLedgerEntries
-    }
-
-    var petWeightLedgerEntries: [HomePetWeightQuickActionEntry] {
-        sourceState.petWeightLedgerEntries
-    }
-
-    var expenseEntries: [HomeExpensePreviewEntry] {
-        expensePreviewStore.expenseEntries
+    var interaction: HomeInteractionSnapshot {
+        payload.interaction
     }
 
     var avatarPreloadSignature: String {
@@ -227,14 +169,16 @@ struct VerticalSolidHomeView: View {
         ].joined(separator: "||popout:")
     }
 
-    var activeHuman: Human? {
-        sourceState.activeHuman
+    var activeHumanDisplayName: String {
+        interaction.activeHuman?.name ?? controller.snapshot.activeName
     }
 
-    var currentCoconutBalance: Int {
-        activeHuman?.coconutBalance
-            ?? sourceState.humans.reduce(0) { $0 + $1.coconutBalance }
-            + sourceState.pets.reduce(0) { $0 + $1.coconutBalance }
+    var activeHumanAvatarEmoji: String? {
+        interaction.activeHuman?.avatarEmoji
+    }
+
+    var islandCoconutBalance: Int {
+        interaction.islandCoconutBalance
     }
 
     var headerContextCard: FocusCard? {
@@ -261,14 +205,14 @@ struct VerticalSolidHomeView: View {
     }
 
     var headerCoconutBalance: Int {
-        headerContextCard?.coconutBalance ?? currentCoconutBalance
+        headerContextCard?.coconutBalance ?? islandCoconutBalance
     }
 
     var headerCoconutDeltaContext: String {
         if let card = headerContextCard {
             return "card-\(card.id.uuidString)"
         }
-        return "current-human-\(activeHuman?.id.uuidString ?? "global")"
+        return "island"
     }
 
     var activeHumanAvatarImage: UIImage? {
@@ -319,19 +263,7 @@ struct VerticalSolidHomeView: View {
                 ) { lifecycle in
                     VerticalSolidHomeDashboardPage(
                         snapshot: controller.snapshot,
-                        pets: pets,
-                        humans: humans,
-                        allEvents: allEvents,
-                        humanMedications: humanMedications,
-                        humanMedicationLogs: humanMedicationLogs,
-                        feedingLedgerEntries: feedingLedgerEntries,
-                        careLedgerEntries: careLedgerEntries,
-                        hygieneLedgerEntries: hygieneLedgerEntries,
-                        walkLedgerEntries: walkLedgerEntries,
-                        pottyLedgerEntries: pottyLedgerEntries,
-                        petExpenseLedgerEntries: petExpenseLedgerEntries,
-                        petWeightLedgerEntries: petWeightLedgerEntries,
-                        expenseEntries: expenseEntries,
+                        interaction: interaction,
                         avatarCacheRevision: avatarCacheRevision + avatarPipeline.revision,
                         isLive: lifecycle.isLive,
                         walkPresentationRevision: walkCardPresentationRevision,
@@ -345,10 +277,12 @@ struct VerticalSolidHomeView: View {
                         isCardHeroAnimating: $isHomeCardHeroAnimating,
                         cardHeroProgress: $homeCardHeroProgress,
                         arrivingCardId: arrivingHomeCardId,
-                        onOpenCard: openCard,
+                        cardStateResetToken: cardStateResetToken,
+                        onOpenCardDetails: openCard,
                         onQuickActionForCard: openQuickActionItem,
                         onQuickActionOptionForCard: openQuickActionOption,
-                        onQuickActionLimitReached: { routeCoordinator.showQuickActionLimit() }
+                        onQuickActionLimitReached: { routeCoordinator.showQuickActionLimit() },
+                        onAddFirstPet: { routeCoordinator.openAddEntity(.pet) }
                     )
                 } calendar: { lifecycle in
                     CalendarRouteContainer(
@@ -432,9 +366,9 @@ struct VerticalSolidHomeView: View {
                     streak: headerStreak,
                     coconutBalance: headerCoconutBalance,
                     coconutDeltaContext: headerCoconutDeltaContext,
-                    activeHumanDisplayName: activeHuman?.name ?? controller.snapshot.activeName,
+                    activeHumanDisplayName: activeHumanDisplayName,
                     activeHumanAvatarImage: activeHumanAvatarImage,
-                    activeHumanAvatarEmoji: activeHuman?.avatarEmoji,
+                    activeHumanAvatarEmoji: activeHumanAvatarEmoji,
                     onStreak: { routeCoordinator.openStreakDetail() },
                     onCoconut: openHeaderCoconutDestination,
                     onCrew: { routeCoordinator.openCrewRoster() },
@@ -532,7 +466,7 @@ struct VerticalSolidHomeView: View {
             handleCreatedEntitySignalIfNeeded(createdEntitySignal)
         }
         .onChange(of: dataSignature) { _, _ in
-            if !pets.isEmpty || !humans.isEmpty {
+            if !interaction.petsByID.isEmpty || !interaction.humansByID.isEmpty {
                 cancelGrowthOnboardingPrompt()
             }
             requestHomeSnapshotRefresh()
@@ -550,7 +484,6 @@ struct VerticalSolidHomeView: View {
             homeAppearHandoffTask?.cancel()
             homeAppearHandoffTask = nil
             clearArrivalState()
-            expensePreviewStore.cancel()
             calendarAddEventPresentationTask?.cancel()
             calendarAddEventContentMountTask?.cancel()
             growthOnboardingTask?.cancel()
@@ -579,9 +512,6 @@ struct VerticalSolidHomeView: View {
             handleCreatedEntitySignalIfNeeded(signal)
         }
         .focusHomeRouteSheets(
-            pets: pets,
-            humans: humans,
-            electronicPets: electronicPets,
             l: l,
             routes: routeCoordinator,
             activeHumanIdStr: $activeHumanIdRaw,
@@ -615,7 +545,6 @@ struct VerticalSolidHomeView: View {
         }
         .onChange(of: expandedBottomBarCard?.id) { _, _ in
             closeVerticalFabMenu(immediate: true)
-            requestExpandedExpensePreview()
         }
         .onChange(of: treeManager.treeLevel.rawValue) { _, _ in
             scheduleGrowthUnlockFeedbackIfNeeded()

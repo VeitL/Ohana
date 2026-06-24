@@ -9,135 +9,121 @@ import Foundation
 
 enum FocusHomeExpandedFabRouter {
     struct Actions {
-        let showPetAllFeatures: (Pet) -> Void
-        let showHumanAllFeatures: (Human) -> Void
-        let openFeed: (Pet) -> Void
-        let openWater: (Pet) -> Void
-        let openWalk: (Pet) -> Void
-        let openWalkSummary: (Pet) -> Void
-        let openPotty: (Pet) -> Void
-        let openPlay: (Pet) -> Void
-        let openMedication: (Pet) -> Void
-        let openHygiene: (Pet) -> Void
-        let openMoment: (Pet) -> Void
-        let openHealth: (Pet) -> Void
-        let openWeight: (Pet) -> Void
-        let openExpense: (Pet) -> Void
-        let showHumanWeight: (Human) -> Void
-        let showHumanWorkout: (Human) -> Void
-        let showHumanMedication: (Human) -> Void
-        let showHumanNote: (Human) -> Void
-        let quickHumanExpense: (Human) -> Void
+        let showPetAllFeatures: (UUID) -> Void
+        let showHumanAllFeatures: (UUID) -> Void
+        let openFeed: (UUID) -> Void
+        let openWater: (UUID) -> Void
+        let openWalk: (UUID) -> Void
+        let openWalkSummary: (UUID) -> Void
+        let openPotty: (UUID) -> Void
+        let openPlay: (UUID) -> Void
+        let openMedication: (UUID) -> Void
+        let openHygiene: (UUID) -> Void
+        let openMoment: (UUID) -> Void
+        let openHealth: (UUID) -> Void
+        let openWeight: (UUID) -> Void
+        let openExpense: (UUID) -> Void
+        let showHumanWeight: (UUID) -> Void
+        let showHumanWorkout: (UUID) -> Void
+        let showHumanMedication: (UUID) -> Void
+        let showHumanNote: (UUID) -> Void
+        let quickHumanExpense: (UUID) -> Void
         let showPrivacyAlert: () -> Void
     }
 
     static func open(
         _ item: ExpandedCardFabShortcut,
         card: FocusCard,
-        pets: [Pet],
-        humans: [Human],
-        activeHumanId: UUID?,
-        privacy: HumanPrivacyManaging,
+        interaction: HomeInteractionSnapshot,
         actions: Actions
     ) {
         switch item.action {
         case .allFeatures:
-            if let pet = pet(for: card, in: pets) {
-                actions.showPetAllFeatures(pet)
+            if card.isHuman, interaction.containsHuman(card.id) {
+                actions.showHumanAllFeatures(card.id)
+            } else if interaction.pet(id: card.id) != nil {
+                actions.showPetAllFeatures(card.id)
             }
         case .humanAllFeatures:
-            if card.isHuman, let human = humans.first(where: { $0.id == card.id }) {
-                actions.showHumanAllFeatures(human)
+            if interaction.containsHuman(card.id) {
+                actions.showHumanAllFeatures(card.id)
             }
         case let .quick(actionType):
-            if let pet = pet(for: card, in: pets) {
-                openPetShortcut(actionType, pet: pet, actions: actions)
+            if interaction.activePet(id: card.id) != nil {
+                openPetShortcut(actionType, petID: card.id, actions: actions)
             }
         case let .detail(feature):
-            if let pet = pet(for: card, in: pets) {
-                openPetDetail(feature, pet: pet, actions: actions)
+            if interaction.activePet(id: card.id) != nil {
+                openPetDetail(feature, petID: card.id, actions: actions)
             }
         case let .humanQuick(actionType):
-            if let human = humans.first(where: { $0.id == card.id }) {
-                openHumanShortcut(actionType, human: human, activeHumanId: activeHumanId, privacy: privacy, actions: actions)
+            guard interaction.containsHuman(card.id) else { return }
+            if interaction.expandedActions(for: card.id).statesByActionType[actionType]?.isLocked == true {
+                actions.showPrivacyAlert()
+                return
             }
+            openHumanShortcut(actionType, humanID: card.id, actions: actions)
         }
     }
 
-    static func openPetShortcut(_ actionType: String, pet: Pet, actions: Actions) {
+    static func openPetShortcut(_ actionType: String, petID: UUID, actions: Actions) {
         switch actionType {
         case "feed":
-            actions.openFeed(pet)
+            actions.openFeed(petID)
         case "water", "waterChange", "filterClean":
-            actions.openWater(pet)
+            actions.openWater(petID)
         case "walk":
-            actions.openWalk(pet)
+            actions.openWalk(petID)
         case "potty", "litter":
-            actions.openPotty(pet)
+            actions.openPotty(petID)
         case "play":
-            actions.openPlay(pet)
+            actions.openPlay(petID)
         case "medication":
-            actions.openMedication(pet)
+            actions.openMedication(petID)
         case "groom":
-            actions.openHygiene(pet)
+            actions.openHygiene(petID)
         case "moment":
-            actions.openMoment(pet)
+            actions.openMoment(petID)
         default:
             break
         }
     }
 
-    static func openPetDetail(_ feature: PetFeature, pet: Pet, actions: Actions) {
+    static func openPetDetail(_ feature: PetFeature, petID: UUID, actions: Actions) {
         switch feature {
         case .health:
-            actions.openHealth(pet)
+            actions.openHealth(petID)
         case .food:
-            actions.openFeed(pet)
+            actions.openFeed(petID)
         case .hygiene:
-            actions.openHygiene(pet)
+            actions.openHygiene(petID)
         case .walks:
-            actions.openWalkSummary(pet)
+            actions.openWalkSummary(petID)
         case .potty:
-            actions.openPotty(pet)
+            actions.openPotty(petID)
         case .weight:
-            actions.openWeight(pet)
+            actions.openWeight(petID)
         case .expense:
-            actions.openExpense(pet)
+            actions.openExpense(petID)
         case .retention, .basicInfo, .documents, .moments, .achievements, .medications:
-            actions.showPetAllFeatures(pet)
+            actions.showPetAllFeatures(petID)
         }
     }
 
-    static func openHumanShortcut(
-        _ actionType: String,
-        human: Human,
-        activeHumanId: UUID?,
-        privacy: HumanPrivacyManaging,
-        actions: Actions
-    ) {
-        if let field = privacy.field(forHumanAction: actionType),
-           privacy.isLocked(field, for: human, viewedBy: activeHumanId) {
-            actions.showPrivacyAlert()
-            return
-        }
-
+    static func openHumanShortcut(_ actionType: String, humanID: UUID, actions: Actions) {
         switch actionType {
         case "humanWeight":
-            actions.showHumanWeight(human)
+            actions.showHumanWeight(humanID)
         case "humanWorkout":
-            actions.showHumanWorkout(human)
+            actions.showHumanWorkout(humanID)
         case "humanMedication":
-            actions.showHumanMedication(human)
+            actions.showHumanMedication(humanID)
         case "humanNote":
-            actions.showHumanNote(human)
+            actions.showHumanNote(humanID)
         case "humanExpense":
-            actions.quickHumanExpense(human)
+            actions.quickHumanExpense(humanID)
         default:
-            actions.showHumanAllFeatures(human)
+            actions.showHumanAllFeatures(humanID)
         }
-    }
-
-    private static func pet(for card: FocusCard, in pets: [Pet]) -> Pet? {
-        pets.first { $0.id == card.id && !$0.hasPassedAway }
     }
 }

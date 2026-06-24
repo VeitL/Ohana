@@ -10,6 +10,7 @@ import SwiftUI
 
 struct HomeReadModelRefreshKey: Hashable {
     let revisionValue: Int
+    let walletProjectionRevisionValue: Int
     let dayToken: Int
     let activeHumanIdRaw: String
     let hiddenPetIDsRaw: String
@@ -17,6 +18,7 @@ struct HomeReadModelRefreshKey: Hashable {
     let showDummyCards: Bool
     let petBondVaultRevision: Int
     let equippedTitleRaw: String
+    let quickActionItemsRaw: String
     let language: String
 
     static func dayToken(for date: Date, calendar: Calendar = .current) -> Int {
@@ -53,6 +55,7 @@ struct VerticalSolidHomeDataContainer: View {
     let onPresentSettings: () -> Void
     let onPresentStreakDetail: () -> Void
     let onPresentWalk: (UUID) -> Void
+    let cardStateResetToken: UUID
 
     @StateObject private var readModelStore = HomeReadModelStore()
     @Environment(\.modelContext) private var modelContext
@@ -65,10 +68,13 @@ struct VerticalSolidHomeDataContainer: View {
     @AppStorage("debugShowDummyCards") private var showDummyCards = false
     @AppStorage(PetBondVaultStore.revisionKey) private var petBondVaultRevision = 0
     @AppStorage("shop_equipped_title") private var equippedTitleRaw = ""
+    @AppStorage("quickActionItems_v2") private var quickActionItemsRaw = ""
     @State private var observedHomeRevision = HomeRevision()
+    @State private var observedWalletProjectionRevision = HomeRevision()
     @State private var currentDayToken = HomeReadModelRefreshKey.dayToken(for: Date())
     @State private var refreshKeyStateTask: Task<Void, Never>?
     @State private var pendingObservedHomeRevision: HomeRevision?
+    @State private var pendingObservedWalletProjectionRevision: HomeRevision?
     @State private var pendingDayTokenRefresh = false
 
     init(
@@ -87,7 +93,8 @@ struct VerticalSolidHomeDataContainer: View {
         onPresentQuickMoment: @escaping (UUID) -> Void,
         onPresentSettings: @escaping () -> Void,
         onPresentStreakDetail: @escaping () -> Void,
-        onPresentWalk: @escaping (UUID) -> Void
+        onPresentWalk: @escaping (UUID) -> Void,
+        cardStateResetToken: UUID
     ) {
         self.onOpenPet = onOpenPet
         self.onOpenHuman = onOpenHuman
@@ -105,6 +112,7 @@ struct VerticalSolidHomeDataContainer: View {
         self.onPresentSettings = onPresentSettings
         self.onPresentStreakDetail = onPresentStreakDetail
         self.onPresentWalk = onPresentWalk
+        self.cardStateResetToken = cardStateResetToken
     }
 
     var body: some View {
@@ -126,6 +134,7 @@ struct VerticalSolidHomeDataContainer: View {
             onPresentSettings: onPresentSettings,
             onPresentStreakDetail: onPresentStreakDetail,
             onPresentWalk: onPresentWalk,
+            cardStateResetToken: cardStateResetToken,
             payload: payload
         )
         .task(id: refreshKey) {
@@ -137,6 +146,7 @@ struct VerticalSolidHomeDataContainer: View {
                 showDummyCards: showDummyCards,
                 petBondVaultRevision: petBondVaultRevision,
                 equippedTitleRaw: equippedTitleRaw,
+                quickActionItemsRaw: quickActionItemsRaw,
                 language: appLanguage,
                 externalRevision: observedHomeRevision,
                 force: !payload.snapshot.isReady
@@ -145,21 +155,26 @@ struct VerticalSolidHomeDataContainer: View {
         .onAppear {
             scheduleRefreshKeyStateSync(
                 revision: appServices.domainRevisions.homeRevision,
+                walletProjectionRevision: appServices.domainRevisions.walletProjectionRevision,
                 refreshDayToken: true
             )
         }
         .onReceive(appServices.domainRevisions.homeRevisionUpdates) { revision in
-            scheduleRefreshKeyStateSync(revision: revision, refreshDayToken: false)
+            scheduleRefreshKeyStateSync(revision: revision, walletProjectionRevision: nil, refreshDayToken: false)
+        }
+        .onReceive(appServices.domainRevisions.walletProjectionUpdates) { revision in
+            scheduleRefreshKeyStateSync(revision: nil, walletProjectionRevision: revision, refreshDayToken: false)
         }
         .onChange(of: scenePhase) { _, phase in
             guard phase == .active else { return }
             scheduleRefreshKeyStateSync(
                 revision: appServices.domainRevisions.homeRevision,
+                walletProjectionRevision: appServices.domainRevisions.walletProjectionRevision,
                 refreshDayToken: true
             )
         }
         .onReceive(NotificationCenter.default.publisher(for: .NSCalendarDayChanged)) { _ in
-            scheduleRefreshKeyStateSync(revision: nil, refreshDayToken: true)
+            scheduleRefreshKeyStateSync(revision: nil, walletProjectionRevision: nil, refreshDayToken: true)
         }
         .task(id: currentDayToken) {
             await updateDayTokenAfterNextMidnight()
@@ -174,6 +189,7 @@ struct VerticalSolidHomeDataContainer: View {
     private var refreshKey: HomeReadModelRefreshKey {
         HomeReadModelRefreshKey(
             revisionValue: observedHomeRevision.value,
+            walletProjectionRevisionValue: observedWalletProjectionRevision.value,
             dayToken: currentDayToken,
             activeHumanIdRaw: activeHumanIdRaw,
             hiddenPetIDsRaw: hiddenPetIDsRaw,
@@ -181,6 +197,7 @@ struct VerticalSolidHomeDataContainer: View {
             showDummyCards: showDummyCards,
             petBondVaultRevision: petBondVaultRevision,
             equippedTitleRaw: equippedTitleRaw,
+            quickActionItemsRaw: quickActionItemsRaw,
             language: appLanguage
         )
     }
@@ -196,24 +213,40 @@ struct VerticalSolidHomeDataContainer: View {
         observedHomeRevision = revision
     }
 
+    private func setObservedWalletProjectionRevision(_ revision: HomeRevision) {
+        guard observedWalletProjectionRevision != revision else { return }
+        observedWalletProjectionRevision = revision
+    }
+
     private func scheduleRefreshKeyStateSync(
         revision: HomeRevision?,
+        walletProjectionRevision: HomeRevision?,
         refreshDayToken: Bool
     ) {
         if let revision {
             pendingObservedHomeRevision = revision
         }
+        if let walletProjectionRevision {
+            pendingObservedWalletProjectionRevision = walletProjectionRevision
+        }
         pendingDayTokenRefresh = pendingDayTokenRefresh || refreshDayToken
         guard refreshKeyStateTask == nil else { return }
-        let delayMilliseconds: UInt64 = pendingObservedHomeRevision == nil ? 0 : Self.postRevisionRefreshDelayMilliseconds
+        let delayMilliseconds: UInt64 = pendingObservedHomeRevision == nil && pendingObservedWalletProjectionRevision == nil
+            ? 0
+            : Self.postRevisionRefreshDelayMilliseconds
         refreshKeyStateTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: delayMilliseconds) {
             let revision = pendingObservedHomeRevision
+            let walletProjectionRevision = pendingObservedWalletProjectionRevision
             let shouldRefreshDayToken = pendingDayTokenRefresh
             pendingObservedHomeRevision = nil
+            pendingObservedWalletProjectionRevision = nil
             pendingDayTokenRefresh = false
 
             if let revision {
                 setObservedHomeRevision(revision)
+            }
+            if let walletProjectionRevision {
+                setObservedWalletProjectionRevision(walletProjectionRevision)
             }
             if shouldRefreshDayToken {
                 refreshCurrentDayToken()

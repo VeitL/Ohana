@@ -59,6 +59,11 @@ enum HomeBottomNavigationLayoutPolicy {
     }
 }
 
+nonisolated enum HomeFabShortcutHitAreaPolicy {
+    static let minimumHitSize: CGFloat = 44
+    static let visualDiameter: CGFloat = 42
+}
+
 struct VerticalSolidHomeBottomBar: View {
     let selectedTab: VerticalSolidHomeTab
     @Binding var isFabExpanded: Bool
@@ -648,14 +653,14 @@ private struct VerticalSolidHomeFabShortcutButton: View {
                 ZStack(alignment: .topTrailing) {
                     Circle()
                         .fill(Color.goPrimary.opacity(shortcut.isAvailable ? 1 : 0.36))
-                        .frame(width: 42, height: 42) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
+                        .frame(width: HomeFabShortcutHitAreaPolicy.visualDiameter, height: HomeFabShortcutHitAreaPolicy.visualDiameter) // a11y: allow visual glyph frame; parent button owns the 44pt hit target.
                     OhanaQuickActionIcon(
                         actionType: iconActionType,
                         fallbackSystemName: shortcut.icon,
                         size: 24,
                         color: Color.ohanaPrimaryActionText.opacity(shortcut.isAvailable ? 1 : 0.54)
                     )
-                    .frame(width: 42, height: 42) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
+                    .frame(width: HomeFabShortcutHitAreaPolicy.visualDiameter, height: HomeFabShortcutHitAreaPolicy.visualDiameter) // a11y: allow visual glyph frame; parent button owns the 44pt hit target.
 
                     if showsNewFeature {
                         GrowthNewFeatureDot(size: 9)
@@ -681,6 +686,10 @@ private struct VerticalSolidHomeFabShortcutButton: View {
                     .frame(width: 44)
             }
             .opacity(shortcut.isAvailable ? 1 : 0.55)
+            .frame(
+                minWidth: HomeFabShortcutHitAreaPolicy.minimumHitSize,
+                minHeight: HomeFabShortcutHitAreaPolicy.minimumHitSize
+            )
             .contentShape(Rectangle())
         }
         .buttonStyle(ScaleButtonStyle())
@@ -733,7 +742,7 @@ private struct VerticalSolidHomeHomeFabShortcutButton: View {
                 ZStack(alignment: .topTrailing) {
                     Circle()
                         .fill(Color.goPrimary.opacity(shortcut.isAvailable ? 1 : 0.36))
-                        .frame(width: 42, height: 42) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
+                        .frame(width: HomeFabShortcutHitAreaPolicy.visualDiameter, height: HomeFabShortcutHitAreaPolicy.visualDiameter) // a11y: allow visual glyph frame; parent button owns the 44pt hit target.
                     OhanaQuickActionIcon(
                         actionType: iconActionType,
                         fallbackSystemName: shortcut.icon,
@@ -741,7 +750,7 @@ private struct VerticalSolidHomeHomeFabShortcutButton: View {
                         color: Color.ohanaPrimaryActionText.opacity(shortcut.isAvailable ? 1 : 0.54),
                         animatesStateChanges: false
                     )
-                    .frame(width: 42, height: 42) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
+                    .frame(width: HomeFabShortcutHitAreaPolicy.visualDiameter, height: HomeFabShortcutHitAreaPolicy.visualDiameter) // a11y: allow visual glyph frame; parent button owns the 44pt hit target.
 
                     if showsNewFeature {
                         GrowthNewFeatureDot(size: 9)
@@ -767,6 +776,10 @@ private struct VerticalSolidHomeHomeFabShortcutButton: View {
                     .frame(width: 46)
             }
             .opacity(shortcut.isAvailable ? 1 : 0.55)
+            .frame(
+                minWidth: HomeFabShortcutHitAreaPolicy.minimumHitSize,
+                minHeight: HomeFabShortcutHitAreaPolicy.minimumHitSize
+            )
             .contentShape(Rectangle())
         }
         .buttonStyle(ScaleButtonStyle())

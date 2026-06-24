@@ -28,11 +28,10 @@ nonisolated enum FeedStockCalculator {
         for pet: Pet,
         foodKind: FeedFoodKind? = nil,
         since startDate: Date? = nil,
-        careLogs: [PetCareLog]? = nil
+        careLogs: [PetCareLog] = []
     ) -> [PetCareLog] {
-        let source = careLogs ?? pet.careLogs
-        return source.filter { log in
-            (careLogs == nil || log.pet?.id == pet.id) &&
+        careLogs.filter { log in
+            log.pet?.id == pet.id &&
                 log.careType == .feeding &&
                 FeedLogMetadata.isMainFoodLog(log) &&
                 (foodKind.map { log.foodKind == $0 } ?? true) &&
@@ -40,10 +39,9 @@ nonisolated enum FeedStockCalculator {
         }
     }
 
-    static func treatLogs(for pet: Pet, since startDate: Date? = nil, careLogs: [PetCareLog]? = nil) -> [PetCareLog] {
-        let source = careLogs ?? pet.careLogs
-        return source.filter { log in
-            (careLogs == nil || log.pet?.id == pet.id) &&
+    static func treatLogs(for pet: Pet, since startDate: Date? = nil, careLogs: [PetCareLog] = []) -> [PetCareLog] {
+        careLogs.filter { log in
+            log.pet?.id == pet.id &&
                 log.careType == .feeding &&
                 FeedLogMetadata.isTreatLog(log) &&
                 (startDate.map { log.date >= $0 } ?? true)
@@ -52,7 +50,7 @@ nonisolated enum FeedStockCalculator {
 
     static func mainConsumedSinceRestock(
         for pet: Pet,
-        careLogs: [PetCareLog]? = nil,
+        careLogs: [PetCareLog] = [],
         foodRecords: [PetFoodRecord]? = nil,
         sharedCareSessions: [SharedCareSession]? = nil,
         now: Date = Date()
@@ -65,7 +63,7 @@ nonisolated enum FeedStockCalculator {
     static func mainConsumedSinceRestock(
         for pet: Pet,
         foodKind: FeedFoodKind,
-        careLogs: [PetCareLog]? = nil,
+        careLogs: [PetCareLog] = [],
         foodRecords: [PetFoodRecord]? = nil,
         sharedCareSessions: [SharedCareSession]? = nil,
         now: Date = Date(),
@@ -104,7 +102,7 @@ nonisolated enum FeedStockCalculator {
     static func recentDailyAverageGrams(
         for pet: Pet,
         foodKind: FeedFoodKind? = nil,
-        careLogs: [PetCareLog]? = nil,
+        careLogs: [PetCareLog] = [],
         foodRecords: [PetFoodRecord]? = nil,
         now: Date = Date(),
         calendar: Calendar = .current,
@@ -178,7 +176,7 @@ nonisolated enum FeedStockCalculator {
         for pet: Pet,
         events: [Event] = [],
         foodKind: FeedFoodKind? = nil,
-        careLogs: [PetCareLog]? = nil,
+        careLogs: [PetCareLog] = [],
         foodRecords: [PetFoodRecord]? = nil,
         now: Date = Date(),
         calendar: Calendar = .current,
@@ -210,7 +208,7 @@ nonisolated enum FeedStockCalculator {
     static func snapshot(
         for pet: Pet,
         events: [Event] = [],
-        careLogs: [PetCareLog]? = nil,
+        careLogs: [PetCareLog] = [],
         foodRecords: [PetFoodRecord]? = nil,
         sharedCareSessions: [SharedCareSession]? = nil,
         now: Date = Date(),
@@ -223,7 +221,7 @@ nonisolated enum FeedStockCalculator {
         for pet: Pet,
         foodKind: FeedFoodKind,
         events: [Event] = [],
-        careLogs: [PetCareLog]? = nil,
+        careLogs: [PetCareLog] = [],
         foodRecords: [PetFoodRecord]? = nil,
         sharedCareSessions: [SharedCareSession]? = nil,
         now: Date = Date(),
@@ -273,7 +271,7 @@ nonisolated enum FeedStockCalculator {
         for pet: Pet,
         foodKind: FeedFoodKind? = nil,
         since startDate: Date? = nil,
-        careLogs: [PetCareLog]? = nil,
+        careLogs: [PetCareLog] = [],
         calculationMode: FeedStockCalculationMode?
     ) -> [PetCareLog] {
         let logs = mainFoodLogs(for: pet, foodKind: foodKind, since: startDate, careLogs: careLogs)

@@ -91,8 +91,13 @@ extension QuickFeedDetailContent {
         triggerToast(l.tr(zh: "余量已修正", en: "Stock corrected", de: "Vorrat korrigiert"), tint: stockTint)
     }
 
-    func beginEditingFeedLog(_ log: PetCareLog) {
-        draftStore.editingFeedLog = log
+    func beginEditingFeedLog(id: UUID) {
+        guard let log = commandExecutor.feedLog(id: id) else {
+            draftStore.editingFeedLogId = nil
+            triggerToast(l.tr(zh: "记录已不存在", en: "Log no longer exists", de: "Eintrag existiert nicht mehr"), tint: Color.goYellow)
+            return
+        }
+        draftStore.editingFeedLogId = log.id
         draftStore.editFeedLogDate = log.date
         draftStore.editFeedLogGrams = String(format: "%.0f", feedLogDisplayGrams(for: log))
         draftStore.inputError = nil
@@ -101,12 +106,18 @@ extension QuickFeedDetailContent {
 
     func saveFeedLogEdit() {
         dismissFeedKeyboard()
-        guard let log = draftStore.editingFeedLog else {
+        guard let logId = draftStore.editingFeedLogId else {
             closeActiveFeedSheet()
             return
         }
         guard let grams = parsePositiveDouble(draftStore.editFeedLogGrams), grams >= 0 else {
             draftStore.inputError = l.tr(zh: "请输入有效克数。", en: "Enter valid grams.", de: "Bitte gültige Gramm eingeben.")
+            return
+        }
+        guard let log = commandExecutor.feedLog(id: logId) else {
+            draftStore.editingFeedLogId = nil
+            closeActiveFeedSheet()
+            triggerToast(l.tr(zh: "记录已不存在", en: "Log no longer exists", de: "Eintrag existiert nicht mehr"), tint: Color.goYellow)
             return
         }
         let result = commandExecutor.updateLog(
@@ -118,12 +129,17 @@ extension QuickFeedDetailContent {
         )
         reloadFeedSnapshots()
         scheduleStockReminders(result.stockReminders)
+        draftStore.editingFeedLogId = nil
         closeActiveFeedSheet()
         triggerToast(l.tr(zh: "记录已更新", en: "Log updated", de: "Eintrag aktualisiert"), tint: mainFoodTint)
     }
 
-    func deleteFeedLog(_ log: PetCareLog) {
-        if draftStore.editingFeedLog?.id == log.id { draftStore.editingFeedLog = nil }
+    func deleteFeedLog(id: UUID) {
+        if draftStore.editingFeedLogId == id { draftStore.editingFeedLogId = nil }
+        guard let log = commandExecutor.feedLog(id: id) else {
+            triggerToast(l.tr(zh: "记录已不存在", en: "Log no longer exists", de: "Eintrag existiert nicht mehr"), tint: Color.goYellow)
+            return
+        }
         let result = commandExecutor.deleteLog(
             log,
             pet: pet,

@@ -350,7 +350,7 @@ extension CareEventService {
             ) else {
                 return (0, 0)
             }
-            OhanaNotifications.current.cancel(notificationId: reminder.notificationId)
+            dependencies.notifications.cancel(notificationId: reminder.notificationId)
             context.safeSave()
             dependencies.careLedger.recordReminderState(
                 reminder: reminder,
@@ -496,7 +496,7 @@ extension CareEventService {
             ) else {
                 return (0, 0)
             }
-            OhanaNotifications.current.cancel(notificationId: reminder.notificationId)
+            dependencies.notifications.cancel(notificationId: reminder.notificationId)
             context.safeSave()
             dependencies.careLedger.recordReminderState(
                 reminder: reminder,

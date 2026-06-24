@@ -22,7 +22,6 @@ struct HumanBasicInfoDetailContentView: View {
     private var isViewingOwnProfile: Bool { activeHumanId == human.id }
 
     @State private var isEditing = false
-    @State private var showingDeleteSheet = false
     @State private var isDeleting = false
     @State private var showingHomeStackFullAlert = false
 
@@ -113,17 +112,6 @@ struct HumanBasicInfoDetailContentView: View {
             Button("知道了", role: .cancel) {}
         } message: {
             Text("首页最多显示 \(HomeCardVisibility.maxVisibleCards) 张卡片。请先从首页移除一张宠物或人类卡片，再添加 \(human.name)。")
-        }
-        .sheet(isPresented: $showingDeleteSheet) {
-            HumanDeleteConfirmationSheet(
-                humanName: human.name,
-                onCancel: { showingDeleteSheet = false },
-                onDelete: {
-                    showingDeleteSheet = false
-                    deleteHumanAndReturnHome()
-                }
-            )
-            .ohanaCompactSheetPresentation(detents: [.height(360), .medium])
         }
     }
 
@@ -252,9 +240,7 @@ struct HumanBasicInfoDetailContentView: View {
                 }
             }
 
-            if isViewingOwnProfile {
-                deleteDangerZone
-            }
+            humanLifecycleDangerZone
         }
     }
 
@@ -366,24 +352,14 @@ struct HumanBasicInfoDetailContentView: View {
         }
     }
 
-    private var deleteDangerZone: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("危险操作")
-                .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                .foregroundStyle(Color.goRed)
-            Button(role: .destructive) { showingDeleteSheet = true } label: {
-                Label("删除成员", systemImage: "trash")
-                    .font(OhanaFont.adaptive(size: 14, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                    .foregroundStyle(Color.goRed)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 12)
-                    .background(Color.goRed.opacity(0.08), in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
-            }
-            .disabled(isDeleting)
-            .buttonStyle(ScaleButtonStyle())
-        }
-        .padding(14)
-        .goTranslucentCard(cornerRadius: OhanaRadius.control)
+    private var humanLifecycleDangerZone: some View {
+        HumanLifecycleDangerZone(
+            human: human,
+            onMarkPassedAway: markHumanPassedAway,
+            onUndoPassedAway: undoHumanPassedAway,
+            onDelete: deleteHumanAndReturnHome
+        )
+        .disabled(isDeleting)
     }
 
     private func infoSection(title: String, icon: String, iconColor: Color, @ViewBuilder content: () -> some View) -> some View {
@@ -686,6 +662,180 @@ struct HumanBasicInfoDetailContentView: View {
             )
         }
     }
+
+    private func markHumanPassedAway(date: Date) {
+        let command = DomainCommand.memberLifecycle(
+            entityID: human.id,
+            kind: EntityKind.human.rawValue,
+            action: "passed.mark"
+        )
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        commandQueue.enqueue(command) {
+            _ = MemberCommandExecutor(context: modelContext, services: appServices).markHumanPassedAway(
+                human,
+                date: date,
+                note: "humanBasicInfo.passed.mark"
+            )
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+        }
+    }
+
+    private func undoHumanPassedAway() {
+        let command = DomainCommand.memberLifecycle(
+            entityID: human.id,
+            kind: EntityKind.human.rawValue,
+            action: "passed.undo"
+        )
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        commandQueue.enqueue(command) {
+            _ = MemberCommandExecutor(context: modelContext, services: appServices).undoHumanPassedAway(
+                human,
+                note: "humanBasicInfo.passed.undo"
+            )
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+        }
+    }
+}
+
+struct HumanLifecycleDangerZone: View {
+    private static let deleteAfterSheetDismissDelayMilliseconds: UInt64 = 180
+
+    let human: Human
+    let onMarkPassedAway: (Date) -> Void
+    let onUndoPassedAway: () -> Void
+    let onDelete: () -> Void
+
+    @State private var passedDate = Date()
+    @State private var showingPassedAlert = false
+    @State private var showingUndoPassedAlert = false
+    @State private var showingDeleteSheet = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 8) {
+                Image(systemName: "exclamationmark.triangle.fill") // a11y: allow decorative icon covered by surrounding text or control
+                    .font(OhanaFont.adaptive(size: 12, weight: .black))
+                    .foregroundStyle(Color.goRed.opacity(0.72))
+                Text("生命与危险操作")
+                    .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                    .foregroundStyle(Color.goRed.opacity(0.78))
+                    .tracking(1.2)
+                Spacer(minLength: 0)
+            }
+
+            if human.hasPassedAway {
+                passedAwaySummary
+                lifecycleButton(
+                    title: "撤销离世标记",
+                    icon: "arrow.uturn.backward",
+                    color: Color.goYellow
+                ) {
+                    showingUndoPassedAlert = true
+                }
+            } else {
+                DatePicker("离世日期", selection: $passedDate, in: ...Date(), displayedComponents: .date)
+                    .datePickerStyle(.compact)
+                    .tint(Color.goPrimary)
+                lifecycleButton(
+                    title: "标记 \(human.name) 已离世",
+                    icon: "rainbow",
+                    color: Color.goPurple
+                ) {
+                    showingPassedAlert = true
+                }
+            }
+
+            lifecycleButton(
+                title: "彻底删除 \(human.name)",
+                icon: "trash.fill",
+                color: Color.goRed
+            ) {
+                showingDeleteSheet = true
+            }
+        }
+        .padding(14)
+        .goTranslucentCard(cornerRadius: OhanaRadius.control)
+        .onAppear {
+            passedDate = human.passedAwayDate ?? Date()
+        }
+        .onChange(of: human.passedAwayDate) { _, date in
+            passedDate = date ?? Date()
+        }
+        .alert("确认标记离世", isPresented: $showingPassedAlert) {
+            Button("确认", role: .destructive) {
+                onMarkPassedAway(passedDate)
+            }
+            Button("取消", role: .cancel) {}
+        } message: {
+            Text("将标记 \(human.name) 为离世，并让未来安排退出活跃提醒。原有数据会保留，此操作可撤销。")
+        }
+        .alert("撤销离世标记", isPresented: $showingUndoPassedAlert) {
+            Button("撤销", role: .destructive) {
+                onUndoPassedAway()
+            }
+            Button("取消", role: .cancel) {}
+        } message: {
+            Text("将清除 \(human.name) 的离世记录，恢复为在世状态。")
+        }
+        .sheet(isPresented: $showingDeleteSheet) {
+            HumanDeleteConfirmationSheet(
+                humanName: human.name,
+                onCancel: { showingDeleteSheet = false },
+                onDelete: {
+                    showingDeleteSheet = false
+                    OhanaFrameScheduler.runAfterNextFrame(
+                        milliseconds: Self.deleteAfterSheetDismissDelayMilliseconds
+                    ) {
+                        onDelete()
+                    }
+                }
+            )
+            .ohanaCompactSheetPresentation(detents: [.height(360), .medium])
+        }
+    }
+
+    private var passedAwaySummary: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            if let date = human.passedAwayDate {
+                Text("离世日期：\(date.formatted(.dateTime.year().month().day()))")
+                    .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.72))
+            }
+            Text("相伴 \(human.daysTogetherAtPassing) 天 · \(human.ageAtPassingText)")
+                .font(OhanaFont.adaptive(size: 12, weight: .medium, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                .foregroundStyle(Color.ohanaSecondaryText)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(12)
+        .background(Color.goPurple.opacity(0.08), in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous)
+            .strokeBorder(Color.goPurple.opacity(0.22), lineWidth: 1))
+    }
+
+    private func lifecycleButton(
+        title: String,
+        icon: String,
+        color: Color,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            HStack(spacing: 8) {
+                Image(systemName: icon) // a11y: allow decorative icon covered by surrounding text or control
+                    .font(OhanaFont.adaptive(size: 14, weight: .bold))
+                Text(title)
+                    .font(OhanaFont.adaptive(size: 14, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.76)
+            }
+            .foregroundStyle(color)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 12)
+            .background(color.opacity(0.09), in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous)
+                .strokeBorder(color.opacity(0.26), lineWidth: 1))
+        }
+        .buttonStyle(ScaleButtonStyle())
+    }
 }
 
 private struct HumanDeleteConfirmationSheet: View {
@@ -694,9 +844,10 @@ private struct HumanDeleteConfirmationSheet: View {
     let onDelete: () -> Void
 
     @State private var confirmName = ""
+    @FocusState private var confirmNameFocused: Bool
 
     private var canDelete: Bool {
-        confirmName.trimmingCharacters(in: .whitespacesAndNewlines) == humanName
+        ConfirmationNameMatcher.matches(confirmName, expectedName: humanName)
     }
 
     var body: some View {
@@ -718,7 +869,7 @@ private struct HumanDeleteConfirmationSheet: View {
                             .foregroundStyle(Color.ohanaSecondaryText)
                     }
                     Spacer()
-                    Button(action: onCancel) {
+                    Button(action: cancelAfterResigningKeyboard) {
                         Image(systemName: "xmark") // a11y: allow decorative icon covered by surrounding text or control
                             .font(OhanaFont.adaptive(size: 12, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(Color.ohanaSecondaryText)
@@ -742,6 +893,8 @@ private struct HumanDeleteConfirmationSheet: View {
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
                     .submitLabel(.done)
+                    .focused($confirmNameFocused)
+                    .onSubmit { attemptDelete() }
                     .padding(.horizontal, 14)
                     .padding(.vertical, 13)
                     .background(Color.primary.opacity(0.08), in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
@@ -749,7 +902,7 @@ private struct HumanDeleteConfirmationSheet: View {
                         .strokeBorder(canDelete ? Color.goRed.opacity(0.7) : Color.primary.opacity(0.12), lineWidth: 1))
 
                 HStack(spacing: 10) {
-                    Button(action: onCancel) {
+                    Button(action: cancelAfterResigningKeyboard) {
                         Text("取消")
                             .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(Color.ohanaPrimaryText.opacity(0.72))
@@ -759,7 +912,7 @@ private struct HumanDeleteConfirmationSheet: View {
                     }
                     .buttonStyle(ScaleButtonStyle())
 
-                    Button(action: onDelete) {
+                    Button(action: attemptDelete) {
                         Text("删除")
                             .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(canDelete ? Color.white : Color.ohanaTertiaryText) // ui-v4: allow destructive red button needs white contrast
@@ -773,5 +926,16 @@ private struct HumanDeleteConfirmationSheet: View {
             }
             .padding(20)
         }
+    }
+
+    private func cancelAfterResigningKeyboard() {
+        confirmNameFocused = false
+        onCancel()
+    }
+
+    private func attemptDelete() {
+        guard canDelete else { return }
+        confirmNameFocused = false
+        onDelete()
     }
 }

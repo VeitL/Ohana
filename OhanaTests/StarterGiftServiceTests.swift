@@ -23,7 +23,7 @@ struct StarterGiftServiceTests {
         #expect(!defaults.bool(forKey: StarterGiftStorageKey.claimed))
     }
 
-    @Test func pendingGiftClaimsOnceForFirstHuman() throws {
+    @Test func pendingGiftClaimsAfterFirstPetWeight() throws {
         let container = try makeContainer()
         let context = ModelContext(container)
         let suiteName = makeDefaultsSuiteName()
@@ -45,6 +45,23 @@ struct StarterGiftServiceTests {
         TestQuestManagerProjection.manager.coconutCount = 0
         TestQuestManagerProjection.manager.coconutLogs = []
 
+        let waitingForCare = StarterGiftService.prepareOrClaim(
+            activeHumanID: human.id.uuidString,
+            context: context,
+            defaults: defaults,
+            projectionManager: TestQuestManagerProjection.manager
+        )
+
+        #expect(waitingForCare == .pendingFirstCare(humanID: human.id))
+        #expect(human.coconutBalance == 0)
+        #expect(defaults.bool(forKey: StarterGiftStorageKey.pending))
+        #expect(!defaults.bool(forKey: StarterGiftStorageKey.claimed))
+
+        let pet = Pet(name: "Momo", species: "cat")
+        context.insert(pet)
+        context.insert(PetWeightLog(weight: 4.2, pet: pet))
+        context.safeSave()
+
         let result = StarterGiftService.prepareOrClaim(
             activeHumanID: human.id.uuidString,
             context: context,
@@ -65,7 +82,7 @@ struct StarterGiftServiceTests {
         #expect(ledger.first?.metadataJSON.contains("\"growthXP\":0") == true)
     }
 
-    @Test func firstHumanClaimsGiftEvenBeforeActiveHumanIDPropagates() throws {
+    @Test func firstPetWeightClaimsGiftEvenBeforeActiveHumanIDPropagates() throws {
         let container = try makeContainer()
         let context = ModelContext(container)
         let suiteName = makeDefaultsSuiteName()
@@ -79,8 +96,13 @@ struct StarterGiftServiceTests {
             defaults.removePersistentDomain(forName: suiteName)
         }
 
+        _ = StarterGiftService.prepareOrClaim(activeHumanID: nil, context: context, defaults: defaults)
+
         let human = Human(name: "Fresh")
+        let pet = Pet(name: "Momo", species: "cat")
         context.insert(human)
+        context.insert(pet)
+        context.insert(PetWeightLog(weight: 4.2, pet: pet))
         context.safeSave()
         TestQuestManagerProjection.manager.coconutCount = 0
         TestQuestManagerProjection.manager.coconutLogs = []

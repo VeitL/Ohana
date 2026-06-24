@@ -76,11 +76,12 @@ nonisolated enum PhysicalDeletionService {
         context: ModelContext,
         deletedAt: Date = Date(),
         deletedByHumanId: String? = nil,
-        cancelNotifications: Bool = true
+        cancelNotifications: Bool = true,
+        notifications: ReminderNotificationScheduling = ReminderNotificationSchedulerRegistry.current
     ) -> Int {
         for reminder in event.reminders {
             if cancelNotifications {
-                OhanaNotifications.current.cancel(notificationId: reminder.notificationId)
+                notifications.cancel(notificationId: reminder.notificationId)
             }
             CloudSyncMutationRecorder.markDeleted(
                 reminder,
@@ -105,7 +106,8 @@ nonisolated enum PhysicalDeletionService {
         _ pet: Pet,
         context: ModelContext,
         deletedAt: Date = Date(),
-        deletedByHumanId: String? = nil
+        deletedByHumanId: String? = nil,
+        notifications: ReminderNotificationScheduling = ReminderNotificationSchedulerRegistry.current
     ) {
         // member-lifecycle-gate: allow physical deletion is an explicit data-removal boundary, not an active member write.
         let petId = pet.id.uuidString
@@ -114,7 +116,8 @@ nonisolated enum PhysicalDeletionService {
             pet,
             context: context,
             deletedAt: deletedAt,
-            deletedByHumanId: deletedByHumanId
+            deletedByHumanId: deletedByHumanId,
+            notifications: notifications
         )
         deletePetRelationships(
             petId: pet.id,
@@ -156,7 +159,8 @@ nonisolated enum PhysicalDeletionService {
         _ human: Human,
         context: ModelContext,
         deletedAt: Date = Date(),
-        deletedByHumanId: String? = nil
+        deletedByHumanId: String? = nil,
+        notifications: ReminderNotificationScheduling = ReminderNotificationSchedulerRegistry.current
     ) -> Int {
         // member-lifecycle-gate: allow physical deletion is an explicit data-removal boundary, not an active member write.
         let humanId = human.id.uuidString
@@ -166,7 +170,8 @@ nonisolated enum PhysicalDeletionService {
             humanMedications: humanMedications,
             context: context,
             deletedAt: deletedAt,
-            deletedByHumanId: deletedByHumanId
+            deletedByHumanId: deletedByHumanId,
+            notifications: notifications
         )
         let childCount = relatedEventCount + deleteHumanScopedRows(
             for: human,
@@ -205,7 +210,8 @@ nonisolated enum PhysicalDeletionService {
         pet: Pet?,
         context: ModelContext,
         deletedAt: Date = Date(),
-        deletedByHumanId: String? = nil
+        deletedByHumanId: String? = nil,
+        notifications: ReminderNotificationScheduling = ReminderNotificationSchedulerRegistry.current
     ) -> Bool {
         // member-lifecycle-gate: allow physical deletion is an explicit data-removal boundary, not an active member write.
         let sharedSessionIds = sharedSessionIds(for: record)
@@ -215,7 +221,8 @@ nonisolated enum PhysicalDeletionService {
                 pet: pet,
                 context: context,
                 deletedAt: deletedAt,
-                deletedByHumanId: deletedByHumanId
+                deletedByHumanId: deletedByHumanId,
+                notifications: notifications
             )
         }
         if let legacy = petScopedLegacyReference(for: record) {
@@ -629,7 +636,8 @@ nonisolated enum PhysicalDeletionService {
         pet providedPet: Pet?,
         context: ModelContext,
         deletedAt: Date,
-        deletedByHumanId: String?
+        deletedByHumanId: String?,
+        notifications: ReminderNotificationScheduling
     ) {
         guard let pet = providedPet ?? log.pet else { return }
         let allLedger = fetchAll(CareLedgerEvent.self, context: context)
@@ -681,7 +689,7 @@ nonisolated enum PhysicalDeletionService {
         }, by: \.id)
 
         for reminder in reminders {
-            OhanaNotifications.current.cancel(notificationId: reminder.notificationId)
+            notifications.cancel(notificationId: reminder.notificationId)
             CloudSyncMutationRecorder.markDeleted(
                 reminder,
                 context: context,
@@ -811,7 +819,8 @@ nonisolated enum PhysicalDeletionService {
         _ pet: Pet,
         context: ModelContext,
         deletedAt: Date,
-        deletedByHumanId: String?
+        deletedByHumanId: String?,
+        notifications: ReminderNotificationScheduling
     ) -> Int {
         let events = fetchAll(Event.self, context: context).filter { event in
             MemberLifecycleActiveScheduleResolver.eventBelongsToPet(
@@ -821,7 +830,13 @@ nonisolated enum PhysicalDeletionService {
                 insurances: pet.insurances
             )
         }
-        return deleteEvents(events, context: context, deletedAt: deletedAt, deletedByHumanId: deletedByHumanId)
+        return deleteEvents(
+            events,
+            context: context,
+            deletedAt: deletedAt,
+            deletedByHumanId: deletedByHumanId,
+            notifications: notifications
+        )
     }
 
     @discardableResult
@@ -830,7 +845,8 @@ nonisolated enum PhysicalDeletionService {
         humanMedications: [HumanMedication],
         context: ModelContext,
         deletedAt: Date,
-        deletedByHumanId: String?
+        deletedByHumanId: String?,
+        notifications: ReminderNotificationScheduling
     ) -> Int {
         let pets = fetchAll(Pet.self, context: context)
         let petMedications = pets.flatMap(\.medications)
@@ -865,7 +881,8 @@ nonisolated enum PhysicalDeletionService {
             eventsToDelete,
             context: context,
             deletedAt: deletedAt,
-            deletedByHumanId: deletedByHumanId
+            deletedByHumanId: deletedByHumanId,
+            notifications: notifications
         )
         let uniqueRetainedAssignedEvents = unique(retainedAssignedEvents, by: \.id)
         var retainedUpdateCount = 0
@@ -904,7 +921,8 @@ nonisolated enum PhysicalDeletionService {
         _ events: [Event],
         context: ModelContext,
         deletedAt: Date,
-        deletedByHumanId: String?
+        deletedByHumanId: String?,
+        notifications: ReminderNotificationScheduling
     ) -> Int {
         let uniqueEvents = unique(events, by: \.id)
         for event in uniqueEvents {
@@ -912,7 +930,8 @@ nonisolated enum PhysicalDeletionService {
                 event,
                 context: context,
                 deletedAt: deletedAt,
-                deletedByHumanId: deletedByHumanId
+                deletedByHumanId: deletedByHumanId,
+                notifications: notifications
             )
         }
         return uniqueEvents.count

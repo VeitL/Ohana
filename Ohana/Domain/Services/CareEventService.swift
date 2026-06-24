@@ -44,6 +44,25 @@ struct CareEventServiceDependencies {
     let quickActionReminderCompletion: QuickActionReminderCompleting
     let familyTasks: FamilyTaskManaging
     let revisions: DomainRevisionPublishing
+    let notifications: ReminderNotificationScheduling
+
+    init(
+        economy: CareEventEconomyAwarding,
+        careLedger: CareLedgerRecording,
+        reminderCompletion: ReminderCompleting,
+        quickActionReminderCompletion: QuickActionReminderCompleting,
+        familyTasks: FamilyTaskManaging,
+        revisions: DomainRevisionPublishing,
+        notifications: ReminderNotificationScheduling = ReminderNotificationSchedulerRegistry.current
+    ) {
+        self.economy = economy
+        self.careLedger = careLedger
+        self.reminderCompletion = reminderCompletion
+        self.quickActionReminderCompletion = quickActionReminderCompletion
+        self.familyTasks = familyTasks
+        self.revisions = revisions
+        self.notifications = notifications
+    }
 }
 
 nonisolated enum CareFactWriteDisposition: Equatable {

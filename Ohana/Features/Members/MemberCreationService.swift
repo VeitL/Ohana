@@ -151,7 +151,8 @@ final class MemberCreationService: MemberCreating {
                 draft: draft,
                 existingPets: currentMembers.pets,
                 existingHumans: currentMembers.humans,
-                context: context
+                context: context,
+                countryCode: countryCode
             )
         case .human:
             return try saveHuman(
@@ -204,7 +205,8 @@ final class MemberCreationService: MemberCreating {
         draft: MemberCreationDraft,
         existingPets: [Pet],
         existingHumans: [Human],
-        context: ModelContext
+        context: ModelContext,
+        countryCode: String
     ) throws -> SaveResult {
         let existingCount = existingPets.count
         let shouldUse2D = draft.avatarSource == .avatar2D && draft.avatarImageData != nil
@@ -242,6 +244,12 @@ final class MemberCreationService: MemberCreating {
         }
         context.insert(pet)
         CloudSyncMutationRecorder.markModified(pet, context: context)
+        insertInitialPetWeightIfNeeded(
+            pet: pet,
+            draft: draft,
+            context: context,
+            countryCode: countryCode
+        )
         do {
             try context.save()
         } catch {
@@ -270,45 +278,6 @@ final class MemberCreationService: MemberCreating {
         if isFirstPet {
             questManager.isPetWizardCompleted = true
             questManager.persistQuestFlags()
-            if let welcomeHuman = activeHumanForWelcomeReward(existingHumans: existingHumans, context: context) {
-                do {
-                    try wallet.applyActorDelta(
-                        amount: 50,
-                        emoji: "🎉",
-                        title: "新家人入住欢迎奖励",
-                        actorId: welcomeHuman.id.uuidString,
-                        actorName: welcomeHuman.name,
-                        entryKind: .reward,
-                        source: .onboarding,
-                        context: context,
-                        save: false,
-                        // The member creation card already owns the visible handoff; a global
-                        // reward overlay here competes with sheet dismissal on the same frame.
-                        postsRewardFeedback: false,
-                        projectionManager: questManager
-                    )
-                    careLedger.recordCoconut(
-                        delta: 50,
-                        title: "新家人入住欢迎奖励",
-                        actorId: welcomeHuman.id.uuidString,
-                        actorName: welcomeHuman.name,
-                        source: .economy,
-                        context: context
-                    )
-                } catch {
-                    AppPerformanceMonitor.shared.record(
-                        "memberCreation.welcomeReward.walletFailed",
-                        valueMS: 0,
-                        note: error.localizedDescription
-                    )
-                }
-            } else {
-                AppPerformanceMonitor.shared.record(
-                    "memberCreation.welcomeReward.noActiveHuman",
-                    valueMS: 0,
-                    note: "Skipped first-pet welcome wallet reward because no active human wallet is available."
-                )
-            }
         }
         revisions.publishMemberProfileChange(
             entityID: pet.id,
@@ -317,6 +286,58 @@ final class MemberCreationService: MemberCreating {
         )
         publishMemberCreation(id: pet.id, kind: "pet", revisions: revisions)
         return SaveResult(pet: pet, human: nil)
+    }
+
+    private func insertInitialPetWeightIfNeeded(
+        pet: Pet,
+        draft: MemberCreationDraft,
+        context: ModelContext,
+        countryCode: String
+    ) {
+        guard let weight = CountryDecimalInput.parse(draft.weightText, countryCode: countryCode),
+              weight > 0 else { return }
+        let now = Date()
+        let executorId = activeHumanSelection.currentHumanId
+        guard let write = DomainMemberFactWriteAuthorizer.authorizePetFact(
+            pet: pet,
+            occurredAt: now,
+            writeKind: .care,
+            executorId: executorId,
+            context: context,
+            logPrefix: "MemberCreationService.savePet.initialWeight"
+        ) else { return }
+        let bcsScore = PetBodyConditionEstimator.suggestedBCS(for: pet, weightKg: weight)
+        let log = DomainMemberFactWriter.createPetWeightLog(
+            plan: write,
+            pet: pet,
+            weight: weight,
+            weightUnit: "kg",
+            bcsScore: bcsScore,
+            context: context
+        )
+        careLedger.record(
+            occurredAt: log.date,
+            actorKind: write.actor.effectiveExecutorId == nil ? .unknown : .human,
+            actorId: write.actor.effectiveExecutorId,
+            subjectKind: .pet,
+            subjectId: pet.id.uuidString,
+            eventKind: .weight,
+            actionType: "petWeight",
+            amountValue: log.weightInKg,
+            amountUnit: "kg",
+            note: "",
+            source: .detail,
+            sourceEventId: nil,
+            sourceReminderId: nil,
+            legacyModelName: "PetWeightLog",
+            legacyModelId: log.id.uuidString,
+            coconutDelta: 0,
+            rewardLogId: nil,
+            privacyFieldRaw: nil,
+            metadataJSON: "{\"starterFirstCare\":true}",
+            context: context,
+            save: false
+        )
     }
 
     private func saveHuman(
@@ -527,35 +548,6 @@ final class MemberCreationService: MemberCreating {
     ) {
         guard draft.normalizedThemeHex != draft.kind.fallbackThemeHex else { return }
         questManager.recordThemeColorSet(actorId: actorId, actorName: actorName, context: context)
-    }
-
-    private func activeHumanForWelcomeReward(existingHumans: [Human], context: ModelContext) -> Human? {
-        guard let activeId = activeHumanSelection.currentHumanId,
-              let uuid = UUID(uuidString: activeId) else {
-            return nil
-        }
-        if let existing = existingHumans.first(where: { $0.id == uuid }) {
-            return EconomyWalletWritePolicy.canWrite(existing) ? existing : nil
-        }
-        var descriptor = FetchDescriptor<Human>(
-            predicate: #Predicate<Human> { human in
-                human.id == uuid
-            }
-        )
-        descriptor.fetchLimit = 1
-        do {
-            guard let human = try context.fetch(descriptor).first,
-                  EconomyWalletWritePolicy.canWrite(human) else {
-                return nil
-            }
-            return human
-        } catch {
-            OhanaLog.warning(
-                "[MemberCreationService] failed to fetch active human for welcome reward: \(error.localizedDescription)",
-                category: "Economy"
-            )
-            return nil
-        }
     }
 
     private func publishMemberCreation(id: UUID, kind: String, revisions: DomainRevisionPublishing) {

@@ -17,17 +17,10 @@ private struct HygieneChartPoint: Identifiable {
     let label: String
 }
 
-private struct HygieneLedgerEntry: Identifiable {
-    let id: UUID
-    let date: Date
-    let type: HygieneType
-    let legacyLogId: UUID?
-}
-
 struct PetHygieneDetailContentView: View {
     let pet: Pet
     let allReminders: [Reminder]
-    let hygieneLedgerEvents: [CareLedgerEvent]
+    let hygieneEntries: [PetHygieneLedgerEntry]
     let legacyDeleteLogs: [PetHygieneLog]
 
     @Environment(\.modelContext) private var modelContext
@@ -45,26 +38,6 @@ struct PetHygieneDetailContentView: View {
 
     private var isDark: Bool { colorScheme == .dark }
     private var chromeAccent: Color { isDark ? Color.goPrimary : Color.goBlue }
-
-    private var hygieneEntries: [HygieneLedgerEntry] {
-        let petId = pet.id.uuidString
-        return hygieneLedgerEvents.compactMap { event in
-            guard event.eventKindEnum == .hygiene,
-                  event.subjectKind == CareLedgerSubjectKind.pet.rawValue,
-                  event.subjectId == petId,
-                  let type = HygieneType(rawValue: event.actionType) else { return nil }
-            let legacyLogId = event.legacyModelName == "PetHygieneLog"
-                ? event.legacyModelId.flatMap(UUID.init(uuidString:))
-                : nil
-            return HygieneLedgerEntry(
-                id: event.id,
-                date: event.occurredAt,
-                type: type,
-                legacyLogId: legacyLogId
-            )
-        }
-        .sorted { $0.date > $1.date }
-    }
 
     private func daysSince(_ type: HygieneType) -> Int? {
         guard let last = hygieneEntries.first(where: { $0.type == type }) else { return nil }
@@ -510,7 +483,7 @@ struct PetHygieneDetailContentView: View {
         }
     }
 
-    private func deleteHygieneEntry(_ entry: HygieneLedgerEntry) {
+    private func deleteHygieneEntry(_ entry: PetHygieneLedgerEntry) {
         guard let logId = entry.legacyLogId,
               let log = legacyDeleteLogs.first(where: { $0.id == logId }) else {
             OhanaLog.warning(

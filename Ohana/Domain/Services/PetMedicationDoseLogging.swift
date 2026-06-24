@@ -66,6 +66,22 @@ nonisolated enum PetMedicationDoseLogging {
         doseCount(on: Date(), events: events, medicationId: medicationId)
     }
 
+    static func doseEventTitle(petName: String, medicationName: String, l: L10n = .current) -> String {
+        l.tr(
+            zh: "💊 \(petName) 服用 \(medicationName)",
+            en: "💊 \(petName) took \(medicationName)",
+            de: "💊 \(petName) hat \(medicationName) bekommen"
+        )
+    }
+
+    static func doseRewardTitle(l: L10n = .current) -> String {
+        l.tr(
+            zh: "记录喂药 +1🥥",
+            en: "Medication dose logged +1🥥",
+            de: "Medikamentengabe erfasst +1🥥"
+        )
+    }
+
     @discardableResult
     @MainActor
     static func recordDose(
@@ -110,7 +126,7 @@ nonisolated enum PetMedicationDoseLogging {
         let now = Date()
         let requestedAssigneeId = activeHumanSelection.currentHumanId
         let previewIntent = DomainScheduleCreateIntent(
-            title: "💊 \(pet.name) 服用 \(medication.name)",
+            title: doseEventTitle(petName: pet.name, medicationName: medication.name),
             startDate: now,
             isAllDay: false,
             eventType: EventType.petMedicationDose.rawValue,
@@ -167,7 +183,12 @@ nonisolated enum PetMedicationDoseLogging {
                 DomainEffectDispatcher.run(plan: effectsPlan) { actor in
                     if awardCoconut, effectsPlan.allowsEconomyDerivation {
                         let reward = economy.awardCareAction(
-                            type: .general(humanReward: 1, petReward: 0, emoji: "💊", title: "记录喂药 +1🥥"),
+                            type: .general(
+                                humanReward: 1,
+                                petReward: 0,
+                                emoji: "💊",
+                                title: doseRewardTitle()
+                            ),
                             pet: pet,
                             context: modelContext,
                             quality: .none,

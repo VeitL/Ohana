@@ -168,6 +168,7 @@ nonisolated struct TodayFocusSnapshot: Equatable, Sendable {
             humans: humans,
             humanMedications: humanMedications,
             careLedgerEntries: careLedgerEntries,
+            careLedgerSnapshotAvailable: true,
             now: now
         )
         let refreshedQuests = todayFocus.refreshedQuests(
@@ -239,6 +240,7 @@ nonisolated struct TodayFocusSnapshot: Equatable, Sendable {
             humans: humans,
             humanMedications: humanMedications,
             careLedgerEntries: careLedgerEntries,
+            careLedgerSnapshotAvailable: true,
             now: now,
             questProgress: questProgress
         )

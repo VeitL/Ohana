@@ -54,9 +54,9 @@ enum PetMilestoneCommandService {
         context: ModelContext
     ) -> PetMilestoneCommandResult {
         var existingTitles = Set(pet.milestones.map(\.title))
-        var created: [(milestone: PetMilestone, actionType: String, write: AuthorizedDomainMemberFactWrite)] = []
+        var created: [PetMilestone] = []
 
-        func appendIfNeeded(date: Date?, title: String, emoji: String, notes: String, actionType: String) {
+        func appendIfNeeded(date: Date?, title: String, emoji: String, notes: String) {
             guard let date, !existingTitles.contains(title) else { return }
             guard let write = DomainMemberFactWriteAuthorizer.authorizePetFact(
                 pet: pet,
@@ -75,52 +75,36 @@ enum PetMilestoneCommandService {
                 context: context
             )
             existingTitles.insert(title)
-            created.append((milestone, actionType, write))
+            created.append(milestone)
         }
 
         appendIfNeeded(
             date: pet.birthday,
             title: "\(pet.name)的生日 🎂",
             emoji: "🎂",
-            notes: "出生啦！",
-            actionType: "autoBirthday"
+            notes: "出生啦！"
         )
         appendIfNeeded(
             date: pet.homeDate,
             title: "\(pet.name)到家了 🏠",
             emoji: "🏠",
-            notes: "第一天回家!",
-            actionType: "autoHomeDate"
+            notes: "第一天回家!"
         )
         if let heaviest = pet.weightLogs.max(by: { $0.weight < $1.weight }) {
             appendIfNeeded(
                 date: heaviest.date,
                 title: "最重记录：\(String(format: "%.1f", heaviest.weight))kg",
                 emoji: "⚖️",
-                notes: "历史最高体重记录",
-                actionType: "autoHeaviestWeight"
+                notes: "历史最高体重记录"
             )
         }
 
-        for entry in created where entry.write.allowsDerivedEffects {
-            DomainMemberFactEffectsDispatcher.run(plan: entry.write) { _ in
-                recordLedger(
-                    milestone: entry.milestone,
-                    pet: pet,
-                    actionType: entry.actionType,
-                    source: .service,
-                    coconutDelta: 0,
-                    context: context,
-                    save: false
-                )
-            }
-        }
         if !created.isEmpty {
             context.safeSave()
         }
         return PetMilestoneCommandResult(
             petID: pet.id,
-            milestoneIDs: created.map(\.milestone.id),
+            milestoneIDs: created.map(\.id),
             coconutDelta: 0
         )
     }
@@ -131,11 +115,9 @@ enum PetMilestoneCommandService {
         input: PetMilestoneCommandInput,
         pet: Pet,
         context: ModelContext,
-        questManager providedQuestManager: QuestManager? = nil,
-        careLedger providedCareLedger: CareLedgerRecording? = nil
+        questManager providedQuestManager: QuestManager? = nil
     ) -> PetMilestoneCommandResult {
         let questManager = providedQuestManager ?? QuestManager()
-        let careLedger = providedCareLedger ?? CareLedgerService()
         let title = input.title.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !title.isEmpty else {
             return PetMilestoneCommandResult(petID: pet.id, milestoneIDs: [], coconutDelta: 0)
@@ -188,16 +170,6 @@ enum PetMilestoneCommandService {
                 questManager: questManager
             )
             coconutDelta = max(0, reward.humanGot + reward.petGot)
-            recordLedger(
-                milestone: milestone,
-                pet: pet,
-                actionType: "manual",
-                source: .detail,
-                coconutDelta: coconutDelta,
-                executorId: executorId,
-                context: context,
-                careLedger: careLedger
-            )
         }
 
         return PetMilestoneCommandResult(
@@ -225,44 +197,6 @@ enum PetMilestoneCommandService {
             petID: pet.id,
             milestoneID: milestoneID,
             removedLedgerEventIDs: removedLedgerEventIDs
-        )
-    }
-
-    @discardableResult
-    @MainActor
-    private static func recordLedger(
-        milestone: PetMilestone,
-        pet: Pet,
-        actionType: String,
-        source: CareLedgerSource,
-        coconutDelta: Int,
-        executorId: String? = nil,
-        context: ModelContext,
-        save: Bool = true,
-        careLedger: CareLedgerRecording = CareLedgerService()
-    ) -> CareLedgerEvent {
-        careLedger.record(
-            occurredAt: milestone.date,
-            actorKind: executorId == nil ? .unknown : .human,
-            actorId: executorId,
-            subjectKind: .pet,
-            subjectId: pet.id.uuidString,
-            eventKind: .milestone,
-            actionType: actionType,
-            amountValue: 0,
-            amountUnit: "",
-            note: milestone.title,
-            source: source,
-            sourceEventId: nil,
-            sourceReminderId: nil,
-            legacyModelName: "PetMilestone",
-            legacyModelId: milestone.id.uuidString,
-            coconutDelta: coconutDelta,
-            rewardLogId: nil,
-            privacyFieldRaw: nil,
-            metadataJSON: "",
-            context: context,
-            save: save
         )
     }
 

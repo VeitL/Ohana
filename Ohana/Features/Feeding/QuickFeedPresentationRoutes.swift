@@ -10,15 +10,15 @@ import SwiftUI
 
 enum QuickFeedAlertRoute: Identifiable {
     case antiRepeat(id: UUID = UUID(), title: String, message: String)
-    case deleteFeedLog(PetCareLog)
+    case deleteFeedLog(id: UUID)
     case deleteFoodRecord(PetFoodRecord)
 
     var id: String {
         switch self {
         case let .antiRepeat(id, _, _):
             "anti-repeat-\(id.uuidString)"
-        case let .deleteFeedLog(log):
-            "delete-feed-log-\(log.id.uuidString)"
+        case let .deleteFeedLog(id):
+            "delete-feed-log-\(id.uuidString)"
         case let .deleteFoodRecord(record):
             "delete-food-record-\(record.id.uuidString)"
         }
@@ -34,9 +34,9 @@ enum QuickFeedAlertRoute: Identifiable {
         return (title, message)
     }
 
-    var feedLogPendingDelete: PetCareLog? {
-        guard case let .deleteFeedLog(log) = self else { return nil }
-        return log
+    var feedLogPendingDeleteId: UUID? {
+        guard case let .deleteFeedLog(id) = self else { return nil }
+        return id
     }
 
     var foodRecordPendingDelete: PetFoodRecord? {

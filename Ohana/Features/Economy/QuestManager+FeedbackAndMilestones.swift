@@ -36,7 +36,7 @@ extension QuestManager {
         if entry.amount > 0 || (entry.growthXP ?? 0) > 0, postsRewardFeedback {
             publishCoconutRewardFeedback(for: entry)
         }
-        publishCoconutProjectionRevision(note: "questManager.coconutLog.append")
+        publishCoconutProjectionRevision(note: "questManager.coconutLog.append", affectedEntityIDs: [])
         // Wallet history persistence is handled by CoconutLedgerEntry.
     }
 
@@ -44,7 +44,8 @@ extension QuestManager {
         revisions.publishCoconutRewardFeedback(OhanaCoconutRewardEvent(entry: entry))
     }
 
-    func publishCoconutProjectionRevision(note: String) {
+    func publishCoconutProjectionRevision(note: String, affectedEntityIDs: Set<UUID>) {
+        revisions.publishWalletProjection(affectedEntityIDs: affectedEntityIDs, note: note)
         AppPerformanceMonitor.shared.record(
             "domain_command_noop",
             valueMS: 0,

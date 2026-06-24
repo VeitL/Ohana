@@ -61,7 +61,8 @@ struct FocusHomeVerticalSolidHeroSnapshot {
 }
 
 enum FocusHomeEmbeddedQuickActionThawPolicy {
-    static let openingMountProgress: CGFloat = 0.985
+    static let openingMountProgress: CGFloat = 0.98
+    static let openingFullyVisibleProgress: CGFloat = 0.995
     static let reducedMotionMountProgress: CGFloat = 0.5
     static let closingKeepAliveProgress: CGFloat = 0.82
 
@@ -81,7 +82,7 @@ enum FocusHomeEmbeddedQuickActionThawPolicy {
         if heroDirection < 0 {
             return WalletHeroTimeline.smooth(progress, closingKeepAliveProgress, 0.92)
         }
-        return WalletHeroTimeline.smooth(progress, openingMountProgress, 1)
+        return WalletHeroTimeline.smooth(progress, openingMountProgress, openingFullyVisibleProgress)
     }
 }
 
@@ -112,10 +113,7 @@ enum FocusHomeAmbientFloatPolicy {
 }
 
 struct FocusHomeVerticalSolidScene<QuickActions: View, ContextMenuContent: View>: View {
-    @Environment(AppServices.self) private var appServices
-
     let cards: [FocusCard]
-    let pets: [Pet]
     let safeTop: CGFloat
     let safeBottom: CGFloat
     let selectedCardId: UUID?
@@ -135,7 +133,7 @@ struct FocusHomeVerticalSolidScene<QuickActions: View, ContextMenuContent: View>
     let contextMenu: (FocusCard) -> ContextMenuContent
     let onSelect: (FocusHomeVerticalSolidHeroSnapshot) -> Void
     let onCollapse: () -> Void
-    let onLongPress: (FocusCard) -> Void
+    let onOpenDetails: (FocusCard) -> Void
 
     @ObservedObject private var workloadPolicy = AppWorkloadPolicy.shared
     @State private var floatingResumeStartTime: TimeInterval?
@@ -374,6 +372,11 @@ struct FocusHomeVerticalSolidScene<QuickActions: View, ContextMenuContent: View>
                 if showsEmbeddedQuickActions {
                     embeddedQuickActionLayer(for: renderCard, frame: frame, reveal: embeddedQuickActionReveal)
                 }
+
+                if showsDetailButton(for: renderCard, isExpandedSurface: isExpandedSurface, walkTrackingPet: walkTrackingPet) {
+                    expandedDetailButton(for: renderCard, frame: frame)
+                        .zIndex(16)
+                }
             }
         }
         .frame(width: frame.width, height: frame.height)
@@ -390,30 +393,17 @@ struct FocusHomeVerticalSolidScene<QuickActions: View, ContextMenuContent: View>
             guard walkTrackingPet == nil else { return }
             handleCardTap(isSelected: isExpandedSurface)
         }
-        .onLongPressGesture {
-            handleCardLongPress(renderCard, isSelected: isExpandedSurface)
-        }
         .simultaneousGesture(collapseDragGesture(isEnabled: isExpandedSurface && isExpandedCollapseReady && walkTrackingPet == nil))
         .allowsHitTesting(isExpandedSurface)
     }
 
-    private func walkTrackingPet(for card: FocusCard, isSelected: Bool) -> Pet? {
-        FocusHomeWalletCardContent.walkTrackingPet(
-            for: card,
-            isHero: isSelected,
-            pets: pets,
-            walking: appServices.walking
-        )
+    private func walkTrackingPet(for _: FocusCard, isSelected _: Bool) -> Pet? {
+        nil
     }
 
     private func handleCardTap(isSelected: Bool) {
         guard isSelected else { return }
         onCollapse()
-    }
-
-    private func handleCardLongPress(_ card: FocusCard, isSelected: Bool) {
-        guard isSelected else { return }
-        onLongPress(card)
     }
 
     private var canFloatCards: Bool {
@@ -493,10 +483,6 @@ struct FocusHomeVerticalSolidScene<QuickActions: View, ContextMenuContent: View>
                     OhanaFeedback.light()
                     onCollapse()
                 }
-                .onLongPressGesture(minimumDuration: 0.45) {
-                    OhanaFeedback.medium()
-                    onLongPress(card)
-                }
                 .accessibilityLabel(card.name)
                 .accessibilityHint(l.tr(
                     zh: "点击返回首页",
@@ -508,6 +494,70 @@ struct FocusHomeVerticalSolidScene<QuickActions: View, ContextMenuContent: View>
             Spacer(minLength: 0)
         }
         .frame(width: frame.width, height: frame.height, alignment: .top)
+    }
+
+    private func showsDetailButton(
+        for card: FocusCard,
+        isExpandedSurface: Bool,
+        walkTrackingPet: Pet?
+    ) -> Bool {
+        let isMounted = reduceMotion ? progress > 0.5 : progress > 0.58
+        return isExpandedSurface
+            && isMounted
+            && walkTrackingPet == nil
+            && !card.isElectronicPet
+    }
+
+    private func expandedDetailButton(for card: FocusCard, frame: CGRect) -> some View {
+        let reveal = reduceMotion ? 1 : smooth(progress, 0.58, 0.78)
+        return VStack {
+            HStack {
+                Spacer(minLength: 0)
+                Button {
+                    OhanaFeedback.light()
+                    onOpenDetails(card)
+                } label: {
+                    Image(systemName: detailButtonIcon(for: card))
+                        .font(OhanaFont.adaptive(size: 17, weight: .black))
+                        .symbolRenderingMode(.monochrome)
+                        .foregroundStyle(Color.ohanaPrimaryActionText)
+                        .frame(width: 44, height: 44)
+                        .background(
+                            Circle()
+                                .fill(Color.arkInk.opacity(0.42))
+                                .overlay {
+                                    Circle()
+                                        .strokeBorder(Color.goCardWhite.opacity(0.28), lineWidth: 1)
+                                }
+                        )
+                        .shadow(color: Color.arkInk.opacity(0.24), radius: 10, x: 0, y: 6) // ui-v4: allow floating detail button depth over saturated member card
+                }
+                .buttonStyle(ScaleButtonStyle())
+                .accessibilityLabel(detailButtonAccessibilityLabel(for: card))
+                .accessibilityHint(l.tr(
+                    zh: "打开这张卡片的资料页",
+                    en: "Open this card's detail page",
+                    de: "Detailseite dieser Karte öffnen"
+                ))
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.top, 14)
+        .padding(.trailing, 14)
+        .frame(width: frame.width, height: frame.height, alignment: .topTrailing)
+        .opacity(Double(reveal))
+        .allowsHitTesting(isExpandedCollapseReady)
+    }
+
+    private func detailButtonIcon(for card: FocusCard) -> String {
+        card.isHuman ? "person.crop.circle.fill" : "pawprint.circle.fill"
+    }
+
+    private func detailButtonAccessibilityLabel(for card: FocusCard) -> String {
+        if card.isHuman {
+            return l.tr(zh: "打开人类详情", en: "Open human details", de: "Menschendetails öffnen")
+        }
+        return l.tr(zh: "打开宠物详情", en: "Open pet details", de: "Haustierdetails öffnen")
     }
 
     private func embeddedQuickActionDockHeight(for frame: CGRect) -> CGFloat {

@@ -15,10 +15,12 @@ nonisolated enum HomeSnapshotBuilder {
         events: [Event],
         humanMedications: [HumanMedication],
         humanMedicationLogs: [HumanMedicationLog],
+        careLedgerEntries: [HomeCareQuickActionEntry]? = nil,
         hiddenPetIDsRaw: String,
         homeCardOrderRaw: String,
         showDummyCards: Bool,
-        now: Date = Date()
+        now: Date = Date(),
+        l: L10n = .current
     ) -> [FocusCard] {
         let statusEvents = actionableOverdueEvents(from: events, now: now)
         let medicationLogs = recentHumanMedicationLogs(from: humanMedicationLogs, now: now)
@@ -38,7 +40,9 @@ nonisolated enum HomeSnapshotBuilder {
                 events: statusEvents,
                 humanMedications: humanMedications,
                 humanMedicationLogs: medicationLogs,
-                now: now
+                careLedgerEntries: careLedgerEntries,
+                now: now,
+                l: l
             )
         }
     }
@@ -68,7 +72,9 @@ nonisolated enum HomeSnapshotBuilder {
         events: [Event],
         humanMedications: [HumanMedication],
         humanMedicationLogs: [HumanMedicationLog],
-        now: Date = Date()
+        careLedgerEntries: [HomeCareQuickActionEntry]? = nil,
+        now: Date = Date(),
+        l: L10n = .current
     ) -> FocusCard {
         guard !card.isElectronicPet else {
             return card
@@ -83,15 +89,41 @@ nonisolated enum HomeSnapshotBuilder {
                 now: now
             )
         } else if let pet = pets.first(where: { $0.id == card.id }) {
-            CarePlanOverdueStatusCalculator.petWarning(for: pet, events: events, now: now)
+            CarePlanOverdueStatusCalculator.petWarning(
+                for: pet,
+                events: events,
+                now: now,
+                waterCycleLogSnapshot: careLedgerEntries.map { waterCycleLogSnapshot(for: pet, careLedgerEntries: $0) }
+            )
         } else {
             nil
         }
 
         guard let warning else { return card }
         var copy = card
-        copy.statusBadgeText = warning.title
+        copy.statusBadgeText = warning.localizedTitle(l: l)
         copy.statusBadgeIsWarning = true
         return copy
+    }
+
+    private static func waterCycleLogSnapshot(
+        for pet: Pet,
+        careLedgerEntries: [HomeCareQuickActionEntry]
+    ) -> WaterCareCycleLogSnapshot {
+        WaterCareCycleLogSnapshot(
+            latestWaterChangeDate: latestCareEntryDate(.waterChange, pet: pet, careLedgerEntries: careLedgerEntries),
+            latestFilterCleanDate: latestCareEntryDate(.filterClean, pet: pet, careLedgerEntries: careLedgerEntries)
+        )
+    }
+
+    private static func latestCareEntryDate(
+        _ type: CareType,
+        pet: Pet,
+        careLedgerEntries: [HomeCareQuickActionEntry]
+    ) -> Date? {
+        careLedgerEntries
+            .filter { $0.petId == pet.id && $0.actionType == type.rawValue }
+            .map(\.date)
+            .max()
     }
 }

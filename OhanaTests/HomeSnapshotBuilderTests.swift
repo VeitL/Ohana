@@ -230,11 +230,83 @@ struct HomeSnapshotBuilderTests {
             hiddenPetIDsRaw: "",
             homeCardOrderRaw: "",
             showDummyCards: false,
-            now: now
+            now: now,
+            l: L10n("zh")
         ).first)
 
         #expect(card.statusBadgeText == "喂食")
         #expect(card.statusBadgeIsWarning)
+
+        let englishCard = try #require(HomeSnapshotBuilder.buildCards(
+            pets: [pet],
+            humans: [],
+            electronicPets: [],
+            events: [event],
+            humanMedications: [],
+            humanMedicationLogs: [],
+            hiddenPetIDsRaw: "",
+            homeCardOrderRaw: "",
+            showDummyCards: false,
+            now: now,
+            l: L10n("en")
+        ).first)
+        #expect(englishCard.statusBadgeText == "Feeding")
+        #expect(englishCard.statusBadgeIsWarning)
+    }
+
+    @Test func snapshotWaterCycleStatusUsesReadModelEntriesInsteadOfPetCareLogRelationship() throws {
+        let calendar = Calendar(identifier: .gregorian)
+        let now = try #require(calendar.date(from: DateComponents(year: 2026, month: 6, day: 8, hour: 14)))
+        let oldWaterChange = try #require(calendar.date(from: DateComponents(year: 2026, month: 6, day: 3, hour: 9)))
+        let pet = Pet(name: "Nemo", species: "鱼")
+        WaterCareSettingsStore.saveWaterSettings(
+            petKey: pet.id.uuidString,
+            intervalDays: 3,
+            reminderOn: true,
+            cycleAnchor: now
+        )
+        pet.careLogs.append(PetCareLog(date: oldWaterChange, type: .waterChange, pet: pet))
+        let readModelEntry = HomeCareQuickActionEntry(
+            id: UUID(),
+            petId: pet.id,
+            actionType: CareType.waterChange.rawValue,
+            date: oldWaterChange,
+            amountValue: 0
+        )
+
+        let emptyCard = try #require(HomeSnapshotBuilder.buildCards(
+            pets: [pet],
+            humans: [],
+            electronicPets: [],
+            events: [],
+            humanMedications: [],
+            humanMedicationLogs: [],
+            careLedgerEntries: [],
+            hiddenPetIDsRaw: "",
+            homeCardOrderRaw: "",
+            showDummyCards: false,
+            now: now,
+            l: L10n("zh")
+        ).first)
+        let readModelCard = try #require(HomeSnapshotBuilder.buildCards(
+            pets: [pet],
+            humans: [],
+            electronicPets: [],
+            events: [],
+            humanMedications: [],
+            humanMedicationLogs: [],
+            careLedgerEntries: [readModelEntry],
+            hiddenPetIDsRaw: "",
+            homeCardOrderRaw: "",
+            showDummyCards: false,
+            now: now,
+            l: L10n("zh")
+        ).first)
+
+        #expect(emptyCard.statusBadgeText == nil)
+        #expect(emptyCard.statusBadgeIsWarning == false)
+        #expect(readModelCard.statusBadgeText == "换水")
+        #expect(readModelCard.statusBadgeIsWarning == true)
     }
 
     @Test func verticalSnapshotPrecomputesHeroPreparationRevision() {
@@ -368,6 +440,72 @@ struct HomeSnapshotBuilderTests {
         #expect(card.equippedTitleBadgeText == "🛡️ 守护者")
     }
 
+    @Test func verticalSnapshotShowsFirstPetEmptyStateForHumanOnlyHome() {
+        let human = Human(name: "Owner")
+
+        let snapshot = makeVerticalSnapshot(
+            from: makeVerticalSource(humans: [human], activeHumanIdRaw: human.id.uuidString)
+        )
+
+        #expect(snapshot.firstPetEmptyState?.title.isEmpty == false)
+        #expect(snapshot.firstPetEmptyState?.subtitle.contains("50") == true)
+        #expect(snapshot.firstPetEmptyState?.primaryActionTitle.isEmpty == false)
+    }
+
+    @Test func verticalSnapshotHidesFirstPetEmptyStateWhenPetExists() {
+        let human = Human(name: "Owner")
+        let pet = Pet(name: "Momo", species: "猫")
+
+        let snapshot = makeVerticalSnapshot(
+            from: makeVerticalSource(pets: [pet], humans: [human], activeHumanIdRaw: human.id.uuidString)
+        )
+
+        #expect(snapshot.firstPetEmptyState == nil)
+    }
+
+    @Test func verticalSnapshotHidesFirstPetEmptyStateBeforeHumanExists() {
+        let snapshot = makeVerticalSnapshot(from: makeVerticalSource())
+
+        #expect(snapshot.firstPetEmptyState == nil)
+    }
+
+    @Test func interactionSnapshotCarriesCatalogsAndRouteHints() throws {
+        let now = Date(timeIntervalSince1970: 30000)
+        let human = Human(name: "Owner")
+        let pet = Pet(name: "Momo", species: "猫")
+        let event = Event(
+            title: "喂食",
+            startDate: now,
+            eventType: EventType.foodChange.rawValue,
+            relatedEntityType: "pet",
+            relatedEntityId: pet.id.uuidString
+        )
+        let source = makeVerticalSource(
+            pets: [pet],
+            humans: [human],
+            events: [event],
+            activeHumanIdRaw: human.id.uuidString
+        )
+
+        let interaction = HomeInteractionSnapshotBuilder.build(
+            from: source,
+            quickActionItemsRaw: "",
+            now: now
+        )
+
+        #expect(interaction.activeHuman?.id == human.id)
+        #expect(interaction.petsByID[pet.id]?.id == pet.id)
+        #expect(interaction.humansByID[human.id]?.id == human.id)
+        #expect(!interaction.expandedActions(for: pet.id).currentItems.isEmpty)
+
+        guard case let .petQuick(key, routePetID) = interaction.eventRoutesByEventID[event.id] else {
+            Issue.record("Expected pet quick route hint")
+            return
+        }
+        #expect(key == "feed")
+        #expect(routePetID == pet.id)
+    }
+
     @Test func focusCardCarriesTogetherHeadlineText() {
         let pet = Pet(name: "Momo", species: "猫")
         pet.createdAt = Date(timeIntervalSince1970: 1000)
@@ -394,6 +532,7 @@ struct HomeSnapshotBuilderTests {
         humans: [Human] = [],
         plants: [Plant] = [],
         electronicPets: [OasisElectronicPet] = [],
+        events: [Event] = [],
         hiddenPetIDsRaw: String = "",
         activeHumanIdRaw: String = "",
         petBondVaultRevision: Int = 0,
@@ -404,7 +543,7 @@ struct HomeSnapshotBuilderTests {
             humans: humans,
             plants: plants,
             electronicPets: electronicPets,
-            events: [],
+            events: events,
             pendingReminders: [],
             humanMedications: [],
             humanMedicationLogs: [],

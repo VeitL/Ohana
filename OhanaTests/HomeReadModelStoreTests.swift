@@ -26,7 +26,7 @@ struct HomeReadModelStoreTests {
         try await Task.sleep(nanoseconds: 90_000_000)
 
         #expect(store.payload.signature.isEmpty)
-        #expect(store.payload.source.humans.isEmpty)
+        #expect(store.payload.interaction.humansByID.isEmpty)
     }
 
     @Test func forcedRefreshPublishesPayloadSnapshot() async throws {
@@ -48,7 +48,8 @@ struct HomeReadModelStoreTests {
         )
 
         #expect(!store.payload.signature.isEmpty)
-        #expect(store.payload.source.humans.map(\.id) == [human.id])
+        #expect(Set(store.payload.interaction.humansByID.keys) == [human.id])
+        #expect(store.payload.interaction.activeHuman?.id == human.id)
     }
 
     @Test func eventFetchKeepsTodayWindowWhenHistoryHasManyEndedRecurringEvents() async throws {
@@ -82,8 +83,8 @@ struct HomeReadModelStoreTests {
             force: true
         )
 
-        #expect(store.payload.source.events.contains { $0.id == todayEvent.id })
-        #expect(!store.payload.source.events.contains { $0.title.hasPrefix("Ended recurring") })
+        #expect(store.payload.interaction.eventRoutesByEventID[todayEvent.id] != nil)
+        #expect(store.payload.interaction.eventRoutesByEventID.count == 1)
     }
 
     @Test func forcedRefreshPublishesAvatarPreloadSignature() async throws {
@@ -108,6 +109,42 @@ struct HomeReadModelStoreTests {
         #expect(store.payload.avatarPreloadSignature.contains(human.id.uuidString))
         #expect(store.payload.avatarPreloadSignature.contains("8-"))
         #expect(store.payload.avatarPreloadPayloads.map(\.id) == [human.id])
+    }
+
+    @Test func forcedRefreshProjectsPetPhotoLogsIntoMomentInteractionState() async throws {
+        let container = try makeContainer()
+        let store = HomeReadModelStore()
+        let pet = Pet(name: "Mochi", species: "Cat")
+        let photo = PetPhotoLog(imageData: Data([1, 2, 3]), date: Date(), pet: pet)
+        container.mainContext.insert(pet)
+        container.mainContext.insert(photo)
+        try container.mainContext.save()
+
+        await store.refreshImmediately(
+            context: container.mainContext,
+            activeHumanIdRaw: "",
+            hiddenPetIDsRaw: "",
+            homeCardOrderRaw: "",
+            showDummyCards: false,
+            quickActionItemsRaw: "",
+            language: "zh",
+            externalRevision: HomeRevision(),
+            force: true
+        )
+
+        let item = QuickActionItem(
+            label: "记录",
+            icon: "camera.circle.fill",
+            colorHex: "FF6B9D",
+            petId: pet.id,
+            actionType: "moment",
+            entityId: pet.id,
+            entityKind: .pet
+        )
+        let state = store.payload.interaction.expandedActions(for: pet.id).state(for: item)
+
+        #expect(state.status == "今天 1 条")
+        #expect(store.payload.signature.contains(photo.id.uuidString))
     }
 
     @Test func activeHumanHeaderAvatarPreloadsWhenHumanIsNotAHomeCard() async throws {
@@ -152,6 +189,7 @@ struct HomeReadModelStoreTests {
             showDummyCards: false,
             petBondVaultRevision: 0,
             equippedTitleRaw: "",
+            quickActionItemsRaw: "",
             language: AppLanguage.code,
             loadPlants: true
         )
@@ -199,12 +237,40 @@ struct HomeReadModelStoreTests {
 
         #expect(actorPayload.signature == VerticalSolidHomeSnapshotBuilder.signature(for: source))
         #expect(actorPayload.snapshot.cards.map(\.id) == mainSnapshot.cards.map(\.id))
+        #expect(actorPayload.interaction.petsByID[pet.id]?.id == pet.id)
+        #expect(actorPayload.interaction.humansByID[human.id]?.id == human.id)
         #expect(actorPayload.snapshot.todayFocus.refreshedQuests.map(\.id) == mainSnapshot.todayFocus.refreshedQuests.map(\.id))
+    }
+
+    @Test func storeSourceDoesNotReintroduceMainContextCompatibilityFetch() throws {
+        let file = try sourceFile(named: "HomeReadModelStore.swift")
+        let source = try String(contentsOf: file, encoding: .utf8)
+
+        #expect(!source.contains("compatibilitySource"))
+        #expect(!source.contains("payload.source"))
+        #expect(!source.contains("container.mainContext"))
     }
 
     private func makeContainer() throws -> ModelContainer {
         let schema = Schema(ArkSchemaV64.models)
         let config = ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)
         return try ModelContainer(for: schema, configurations: [config])
+    }
+
+    private func sourceFile(named fileName: String) throws -> URL {
+        var directory = URL(fileURLWithPath: #filePath)
+        while directory.lastPathComponent != "OhanaTests" {
+            let parent = directory.deletingLastPathComponent()
+            if parent.path == directory.path { break }
+            directory = parent
+        }
+        let repoRoot = directory.deletingLastPathComponent()
+        let file = repoRoot
+            .appendingPathComponent("Ohana")
+            .appendingPathComponent("Features")
+            .appendingPathComponent("Home")
+            .appendingPathComponent(fileName)
+        #expect(FileManager.default.fileExists(atPath: file.path))
+        return file
     }
 }

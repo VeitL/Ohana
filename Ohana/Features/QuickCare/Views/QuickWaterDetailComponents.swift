@@ -51,6 +51,30 @@ struct QuickWaterLedgerEntry: Identifiable, Hashable {
     var canDelete: Bool {
         legacyLogId != nil
     }
+
+    static func entries(from events: [CareLedgerEvent], petID: UUID) -> [QuickWaterLedgerEntry] {
+        let petKey = petID.uuidString
+        return events.compactMap { event in
+            guard event.eventKindEnum == .care,
+                  event.subjectKind == CareLedgerSubjectKind.pet.rawValue,
+                  event.subjectId == petKey,
+                  let careType = CareType(rawValue: event.actionType),
+                  careType == .watering || careType == .waterChange || careType == .filterClean
+            else { return nil }
+
+            let legacyLogId = event.legacyModelName == "PetCareLog"
+                ? event.legacyModelId.flatMap(UUID.init(uuidString:))
+                : nil
+            return QuickWaterLedgerEntry(
+                id: event.id,
+                date: event.occurredAt,
+                careType: careType,
+                amountMl: careType == .watering ? max(0, event.amountValue) : 0,
+                legacyLogId: legacyLogId
+            )
+        }
+        .sorted { $0.date > $1.date }
+    }
 }
 
 struct QuickWaterRuleSnapshot {
@@ -139,31 +163,11 @@ struct QuickWaterRenderSnapshot {
     static func build(
         pet: Pet,
         allEvents: [Event],
-        waterLedgerEvents: [CareLedgerEvent],
+        waterEntries unsortedWaterEntries: [QuickWaterLedgerEntry],
         now: Date = Date(),
         calendar: Calendar = .current
     ) -> QuickWaterRenderSnapshot {
-        let petKey = pet.id.uuidString
-        let waterEntries = waterLedgerEvents.compactMap { event -> QuickWaterLedgerEntry? in
-            guard event.eventKindEnum == .care,
-                  event.subjectKind == CareLedgerSubjectKind.pet.rawValue,
-                  event.subjectId == petKey,
-                  let careType = CareType(rawValue: event.actionType),
-                  careType == .watering || careType == .waterChange || careType == .filterClean
-            else { return nil }
-
-            let legacyLogId = event.legacyModelName == "PetCareLog"
-                ? event.legacyModelId.flatMap(UUID.init(uuidString:))
-                : nil
-            return QuickWaterLedgerEntry(
-                id: event.id,
-                date: event.occurredAt,
-                careType: careType,
-                amountMl: careType == .watering ? max(0, event.amountValue) : 0,
-                legacyLogId: legacyLogId
-            )
-        }
-        .sorted { $0.date > $1.date }
+        let waterEntries = unsortedWaterEntries.sorted { $0.date > $1.date }
         let todayWaterLogs = waterEntries.filter {
             $0.careType == .watering &&
                 calendar.isDate($0.date, inSameDayAs: now)

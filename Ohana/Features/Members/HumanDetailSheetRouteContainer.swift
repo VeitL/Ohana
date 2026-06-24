@@ -10,23 +10,29 @@ import SwiftUI
 
 enum AppHumanDetailSheetDestination: Hashable {
     case basicInfo
+    case medicationQuick
     case medication
+    case weightQuick
     case weight
+    case workoutQuick
     case workout
     case workoutDashboard
     case metrics
     case report
+    case expenseQuick
     case expense
     case wishlist
+    case noteQuick
     case note
 }
 
 extension AppHumanDetailSheetDestination {
     var isAvailableInMemorialMode: Bool {
         switch self {
-        case .basicInfo, .note:
+        case .basicInfo, .noteQuick, .note:
             true
-        case .medication, .weight, .workout, .workoutDashboard, .metrics, .report, .expense, .wishlist:
+        case .medicationQuick, .medication, .weightQuick, .weight, .workoutQuick, .workout,
+             .workoutDashboard, .metrics, .report, .expenseQuick, .expense, .wishlist:
             false
         }
     }
@@ -110,17 +116,23 @@ struct AppHumanDetailSheetRouteContainer: View {
     let id: UUID
     let destination: AppHumanDetailSheetDestination
     let onMissing: () -> Void
+    let onDismiss: () -> Void
+    let onOpenDestination: ((UUID, AppHumanDetailSheetDestination) -> Void)?
     let onHumanDoseTaken: (UUID) -> Void
 
     init(
         id: UUID,
         destination: AppHumanDetailSheetDestination,
         onMissing: @escaping () -> Void,
+        onDismiss: @escaping () -> Void = {},
+        onOpenDestination: ((UUID, AppHumanDetailSheetDestination) -> Void)? = nil,
         onHumanDoseTaken: @escaping (UUID) -> Void = { _ in }
     ) {
         self.id = id
         self.destination = destination
         self.onMissing = onMissing
+        self.onDismiss = onDismiss
+        self.onOpenDestination = onOpenDestination
         self.onHumanDoseTaken = onHumanDoseTaken
     }
 
@@ -160,6 +172,14 @@ struct AppHumanDetailSheetRouteContainer: View {
             switch destination {
             case .basicInfo:
                 NavigationStack { HumanBasicInfoDetailView(human: human) }
+            case .medicationQuick:
+                QuickHumanMedicationSheet(
+                    human: human,
+                    onManage: {
+                        onOpenDestination?(human.id, .medication)
+                    },
+                    onDismiss: onDismiss
+                )
             case .medication:
                 NavigationStack {
                     HumanMedicationView(
@@ -170,8 +190,18 @@ struct AppHumanDetailSheetRouteContainer: View {
                         }
                     )
                 }
+            case .weightQuick:
+                GenericWeightEntrySheet(
+                    target: .human(human),
+                    onDismiss: onDismiss
+                )
             case .weight:
                 NavigationStack { HumanWeightHistoryView(human: human) }
+            case .workoutQuick:
+                QuickHumanWorkoutSheet(
+                    human: human,
+                    onDismiss: onDismiss
+                )
             case .workout:
                 HumanWorkoutHistoryView(human: human)
             case .workoutDashboard:
@@ -180,10 +210,20 @@ struct AppHumanDetailSheetRouteContainer: View {
                 HumanHealthCheckupView(human: human)
             case .report:
                 HumanHealthReportView(human: human)
+            case .expenseQuick:
+                QuickHumanExpenseSheet(
+                    human: human,
+                    onDismiss: onDismiss
+                )
             case .expense:
                 NavigationStack { HumanExpenseDetailView(human: human) }
             case .wishlist:
                 HumanWishlistView(human: human)
+            case .noteQuick:
+                QuickHumanNoteSheet(
+                    human: human,
+                    onDismiss: onDismiss
+                )
             case .note:
                 HumanNoteHistorySheet(human: human)
             }

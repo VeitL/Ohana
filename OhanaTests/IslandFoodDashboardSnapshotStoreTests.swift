@@ -16,6 +16,7 @@ struct IslandFoodDashboardSnapshotStoreTests {
         let noriLog = PetCareLog(date: today.addingTimeInterval(7200), amountGrams: 60, foodKind: .dry, pet: nori)
         let momoLedger = feedingLedgerEvent(pet: momo, date: momoLog.date, grams: 40)
         let noriLedger = feedingLedgerEvent(pet: nori, date: noriLog.date, grams: 60)
+        let ledgerEntries = FoodLedgerEntry.entries(from: [momoLedger, noriLedger])
         let momoStock = PetFoodRecord(
             brand: "Dry",
             totalGrams: 1000,
@@ -28,7 +29,7 @@ struct IslandFoodDashboardSnapshotStoreTests {
             pets: [nori, momo],
             selectedPetId: nil,
             allEvents: [],
-            allFeedingLedgerEvents: [momoLedger, noriLedger],
+            allFeedingLedgerEntries: ledgerEntries,
             legacyStockCareLogs: [momoLog, noriLog],
             allFoodRecords: [momoStock],
             now: now,
@@ -47,7 +48,7 @@ struct IslandFoodDashboardSnapshotStoreTests {
             pets: [nori, momo],
             selectedPetId: momo.id,
             allEvents: [],
-            allFeedingLedgerEvents: [momoLedger, noriLedger],
+            allFeedingLedgerEntries: ledgerEntries,
             legacyStockCareLogs: [momoLog, noriLog],
             allFoodRecords: [momoStock],
             now: now,
@@ -64,6 +65,7 @@ struct IslandFoodDashboardSnapshotStoreTests {
         let now = fixedDate()
         let pet = Pet(name: "Momo", species: "猫")
         let ledger = feedingLedgerEvent(pet: pet, date: now, grams: 40)
+        let originalEntries = FoodLedgerEntry.entries(from: [ledger])
         let foodRecord = PetFoodRecord(
             brand: "Dry",
             totalGrams: 1000,
@@ -75,18 +77,19 @@ struct IslandFoodDashboardSnapshotStoreTests {
             pets: [pet],
             selectedPetId: nil,
             allEvents: [],
-            allFeedingLedgerEvents: [ledger],
+            allFeedingLedgerEntries: originalEntries,
             legacyStockCareLogs: [],
             allFoodRecords: [foodRecord],
             allSharedCareSessions: []
         )
 
         ledger.amountValue = 55
+        let changedEntries = FoodLedgerEntry.entries(from: [ledger])
         let changedLedger = IslandFoodDashboardInputRevision.make(
             pets: [pet],
             selectedPetId: nil,
             allEvents: [],
-            allFeedingLedgerEvents: [ledger],
+            allFeedingLedgerEntries: changedEntries,
             legacyStockCareLogs: [],
             allFoodRecords: [foodRecord],
             allSharedCareSessions: []
@@ -96,7 +99,7 @@ struct IslandFoodDashboardSnapshotStoreTests {
             pets: [pet],
             selectedPetId: nil,
             allEvents: [],
-            allFeedingLedgerEvents: [ledger],
+            allFeedingLedgerEntries: changedEntries,
             legacyStockCareLogs: [],
             allFoodRecords: [foodRecord],
             allSharedCareSessions: []
@@ -106,6 +109,34 @@ struct IslandFoodDashboardSnapshotStoreTests {
         #expect(changedStock != changedLedger)
         #expect(changedLedger.shouldReplayChart(comparedTo: original))
         #expect(!changedStock.shouldReplayChart(comparedTo: changedLedger))
+    }
+
+    @Test func foodLedgerEntriesFilterSortAndClampInvalidRows() {
+        let now = fixedDate()
+        let pet = Pet(name: "Momo", species: "猫")
+        let otherPet = Pet(name: "Nori", species: "猫")
+        let older = feedingLedgerEvent(pet: pet, date: now.addingTimeInterval(-3600), grams: -12)
+        let newer = feedingLedgerEvent(pet: otherPet, date: now, grams: 30)
+        let wrongKind = CareLedgerEvent(
+            occurredAt: now,
+            subjectKind: .pet,
+            subjectId: pet.id.uuidString,
+            eventKind: .potty,
+            actionType: CareType.feeding.rawValue
+        )
+        let wrongAction = CareLedgerEvent(
+            occurredAt: now,
+            subjectKind: .pet,
+            subjectId: pet.id.uuidString,
+            eventKind: .care,
+            actionType: CareType.watering.rawValue
+        )
+
+        let entries = FoodLedgerEntry.entries(from: [older, wrongKind, wrongAction, newer])
+
+        #expect(entries.map(\.id) == [newer.id, older.id])
+        #expect(entries.map(\.petId) == [otherPet.id, pet.id])
+        #expect(entries[1].amountGrams == 0)
     }
 
     private func fixedDate() -> Date {

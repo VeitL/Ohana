@@ -1,6 +1,6 @@
 {
   "schema": "ohana.governance.release-resource-ownership.v1",
-  "updated": "2026-06-08",
+  "updated": "2026-06-23",
   "policyDocuments": [
     "AGENTS.md",
     "docs/release-quality-gates.md",
@@ -12,7 +12,7 @@
       "id": "all-bundled-resources",
       "owner": "Release owner",
       "path": "Resources",
-      "limitMiB": 230,
+      "limitMiB": 110,
       "rationale": "Top-level bundled resources must stay below an intentional pre-sign budget so app size regressions are visible before archive.",
       "releaseGate": "scripts/audit-resource-integrity.sh",
       "evidence": "Current local size is reported by release hardening; CI fails if the budget is exceeded."
@@ -21,7 +21,7 @@
       "id": "pet-avatar-assets",
       "owner": "Avatar asset owner",
       "path": "Resources/Avatars/PetAvatarAssets",
-      "limitMiB": 210,
+      "limitMiB": 105,
       "rationale": "Pet avatars are the largest bundled resource family and need an explicit owner before more variants are added.",
       "releaseGate": "scripts/audit-resource-integrity.sh",
       "evidence": "Resource integrity audit prints the current directory size and blocks over-budget growth."

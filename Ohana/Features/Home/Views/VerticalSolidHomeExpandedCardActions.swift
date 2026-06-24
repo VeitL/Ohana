@@ -8,22 +8,8 @@
 import SwiftUI
 
 struct VerticalSolidHomeExpandedCardActions: View {
-    private static let postRevisionRefreshDelayMilliseconds: UInt64 = 260
-
     let card: FocusCard
-    let pets: [Pet]
-    let humans: [Human]
-    let allEvents: [Event]
-    let humanMedications: [HumanMedication]
-    let humanMedicationLogs: [HumanMedicationLog]
-    let feedingLedgerEntries: [HomeFeedQuickActionEntry]
-    let careLedgerEntries: [HomeCareQuickActionEntry]
-    let hygieneLedgerEntries: [HomeHygieneQuickActionEntry]
-    let walkLedgerEntries: [HomeWalkQuickActionEntry]
-    let pottyLedgerEntries: [HomePottyQuickActionEntry]
-    let petExpenseLedgerEntries: [HomePetExpenseQuickActionEntry]
-    let petWeightLedgerEntries: [HomePetWeightQuickActionEntry]
-    let expenseEntries: [HomeExpensePreviewEntry]
+    let actionSnapshot: HomeExpandedActionSnapshot
     let localization: L10n
     let activeHumanID: UUID?
     @Binding var quickActionItemsRaw: String
@@ -32,7 +18,6 @@ struct VerticalSolidHomeExpandedCardActions: View {
     let onLimitReached: () -> Void
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @Environment(AppServices.self) private var appServices
     @ObservedObject private var workloadPolicy = AppWorkloadPolicy.shared
     @State private var isEditMode = false
     @State private var jiggle = false
@@ -40,11 +25,6 @@ struct VerticalSolidHomeExpandedCardActions: View {
     @State private var renderModel = VerticalSolidHomeExpandedActionRenderModel.empty
     @State private var renderModelTask: Task<Void, Never>?
     @State private var jiggleTask: Task<Void, Never>?
-    @State private var observedHomeRevision = HomeRevision()
-    @State private var currentDayToken = HomeReadModelRefreshKey.dayToken(for: Date())
-    @State private var refreshKeyStateTask: Task<Void, Never>?
-    @State private var pendingObservedHomeRevision: HomeRevision?
-    @State private var pendingDayTokenRefresh = false
 
     private var l: L10n { localization }
 
@@ -67,31 +47,19 @@ struct VerticalSolidHomeExpandedCardActions: View {
             onAdd: addAction
         )
         .onAppear {
-            scheduleRefreshKeyStateSync(
-                revision: appServices.domainRevisions.homeRevision,
-                refreshDayToken: true
-            )
-            scheduleRenderModelRefresh(normalizesStoredItems: true)
-        }
-        .onReceive(appServices.domainRevisions.homeRevisionUpdates) { revision in
-            scheduleRefreshKeyStateSync(revision: revision, refreshDayToken: false)
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .NSCalendarDayChanged)) { _ in
-            scheduleRefreshKeyStateSync(revision: nil, refreshDayToken: true)
+            scheduleRenderModelRefresh()
         }
         .onChange(of: card.id) { _, _ in
             exitEditMode(persists: false)
-            scheduleRenderModelRefresh(normalizesStoredItems: true)
+            scheduleRenderModelRefresh()
         }
         .onChange(of: renderRefreshKey) { _, _ in
-            scheduleRenderModelRefresh(normalizesStoredItems: true)
+            scheduleRenderModelRefresh()
         }
         .onChange(of: isEditMode) { _, _ in
-            scheduleRenderModelRefresh(normalizesStoredItems: false)
+            scheduleRenderModelRefresh()
         }
         .onDisappear {
-            refreshKeyStateTask?.cancel()
-            refreshKeyStateTask = nil
             renderModelTask?.cancel()
             renderModelTask = nil
             jiggleTask?.cancel()
@@ -108,141 +76,39 @@ struct VerticalSolidHomeExpandedCardActions: View {
             quickActionItemsRaw,
             localization.languageCode,
             activeHumanID?.uuidString ?? "",
-            "\(observedHomeRevision.value)",
-            "\(currentDayToken)",
-            "\(allEvents.count)",
-            "\(humanMedications.count)",
-            "\(humanMedicationLogs.count)",
-            feedingLedgerRevisionKey,
-            careLedgerRevisionKey,
-            hygieneLedgerRevisionKey,
-            walkLedgerRevisionKey,
-            pottyLedgerRevisionKey,
-            petExpenseLedgerRevisionKey,
-            petWeightLedgerRevisionKey,
-            "\(expenseEntries.count)",
+            actionSnapshotRevisionKey,
             card.homePrimaryMetricValue,
             card.statusBadgeText ?? ""
         ].joined(separator: "|")
     }
 
-    private var feedingLedgerRevisionKey: String {
-        feedingLedgerEntries.prefix(120).map { entry in
-            [
-                entry.id.uuidString,
-                entry.petId.uuidString,
-                entry.source.rawValue,
-                "\(Int(entry.date.timeIntervalSince1970))"
-            ].joined(separator: ":")
-        }.joined(separator: ";")
-    }
-
-    private func scheduleRefreshKeyStateSync(
-        revision: HomeRevision?,
-        refreshDayToken: Bool
-    ) {
-        if let revision {
-            pendingObservedHomeRevision = revision
-        }
-        pendingDayTokenRefresh = pendingDayTokenRefresh || refreshDayToken
-        guard refreshKeyStateTask == nil else { return }
-        let delayMilliseconds: UInt64 = pendingObservedHomeRevision == nil ? 0 : Self.postRevisionRefreshDelayMilliseconds
-        refreshKeyStateTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: delayMilliseconds) {
-            let revision = pendingObservedHomeRevision
-            let shouldRefreshDayToken = pendingDayTokenRefresh
-            pendingObservedHomeRevision = nil
-            pendingDayTokenRefresh = false
-
-            if let revision, observedHomeRevision != revision {
-                observedHomeRevision = revision
+    private var actionSnapshotRevisionKey: String {
+        let items = actionSnapshot.currentItems.map { "\($0.id):\($0.actionType)" }.joined(separator: ",")
+        let candidates = actionSnapshot.candidateItems.map(\.id).joined(separator: ",")
+        let states = actionSnapshot.statesByActionType
+            .sorted { $0.key < $1.key }
+            .map { key, state in
+                [
+                    key,
+                    state.status ?? "",
+                    "\(state.isCompleted)",
+                    "\(state.showsAttention)",
+                    "\(state.isLocked)",
+                    "\(state.menuPolicy.showsMenu)",
+                    "\(state.menuPolicy.showsQuickButton)"
+                ].joined(separator: ":")
             }
-            if shouldRefreshDayToken {
-                let token = HomeReadModelRefreshKey.dayToken(for: Date())
-                if currentDayToken != token {
-                    currentDayToken = token
-                }
-            }
-            refreshKeyStateTask = nil
-        }
+            .joined(separator: ";")
+        return [items, candidates, states].joined(separator: "|")
     }
 
-    private var careLedgerRevisionKey: String {
-        careLedgerEntries.prefix(180).map { entry in
-            [
-                entry.id.uuidString,
-                entry.petId.uuidString,
-                entry.actionType,
-                "\(Int(entry.date.timeIntervalSince1970))",
-                "\(Int(entry.amountValue.rounded()))"
-            ].joined(separator: ":")
-        }.joined(separator: ";")
-    }
-
-    private var hygieneLedgerRevisionKey: String {
-        hygieneLedgerEntries.prefix(160).map { entry in
-            [
-                entry.id.uuidString,
-                entry.petId.uuidString,
-                entry.hygieneType.rawValue,
-                "\(Int(entry.date.timeIntervalSince1970))"
-            ].joined(separator: ":")
-        }.joined(separator: ";")
-    }
-
-    private var walkLedgerRevisionKey: String {
-        walkLedgerEntries.prefix(80).map { entry in
-            [
-                entry.id.uuidString,
-                entry.petId.uuidString,
-                "\(Int(entry.startDate.timeIntervalSince1970))",
-                "\(Int(entry.distanceMeters.rounded()))"
-            ].joined(separator: ":")
-        }.joined(separator: ";")
-    }
-
-    private var pottyLedgerRevisionKey: String {
-        pottyLedgerEntries.prefix(120).map { entry in
-            [
-                entry.id.uuidString,
-                entry.petId.uuidString,
-                entry.pottyType.rawValue,
-                "\(Int(entry.date.timeIntervalSince1970))"
-            ].joined(separator: ":")
-        }.joined(separator: ";")
-    }
-
-    private var petExpenseLedgerRevisionKey: String {
-        petExpenseLedgerEntries.prefix(160).map { entry in
-            [
-                entry.id.uuidString,
-                entry.petId.uuidString,
-                "\(Int(entry.date.timeIntervalSince1970))",
-                "\(Int(entry.amount.rounded()))"
-            ].joined(separator: ":")
-        }.joined(separator: ";")
-    }
-
-    private var petWeightLedgerRevisionKey: String {
-        petWeightLedgerEntries.prefix(160).map { entry in
-            [
-                entry.id.uuidString,
-                entry.petId.uuidString,
-                "\(Int(entry.date.timeIntervalSince1970))",
-                "\(Int((entry.weightKg * 1000).rounded()))"
-            ].joined(separator: ":")
-        }.joined(separator: ";")
-    }
-
-    private func scheduleRenderModelRefresh(normalizesStoredItems: Bool) {
+    private func scheduleRenderModelRefresh() {
         renderModelTask?.cancel()
         renderModelTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: 24) {
             let nextModel = buildRenderModel()
             guard !Task.isCancelled else { return }
             withTransaction(Transaction(animation: nil)) {
                 renderModel = nextModel
-            }
-            if normalizesStoredItems {
-                normalizeStoredItemsIfNeeded(using: nextModel)
             }
             renderModelTask = nil
         }
@@ -251,7 +117,7 @@ struct VerticalSolidHomeExpandedCardActions: View {
     private func buildRenderModel() -> VerticalSolidHomeExpandedActionRenderModel {
         let currentItems = buildCurrentItems()
         let visibleItems = Array(currentItems.prefix(QuickActionLimit.maxItemsPerEntity))
-        let candidateItems = buildCandidateItems()
+        let candidateItems = isEditMode ? buildCandidateItems() : []
         let existingActionTypes = Set(currentItems.map { normalizedActionType($0.actionType) })
         return VerticalSolidHomeExpandedActionRenderModel(
             currentItems: currentItems,
@@ -267,75 +133,11 @@ struct VerticalSolidHomeExpandedCardActions: View {
     }
 
     private func buildCurrentItems() -> [QuickActionItem] {
-        if let pet = currentPet {
-            return stableItems(
-                ExpandedQuickActionStore.petItems(
-                    raw: quickActionItemsRaw,
-                    pet: pet,
-                    localization: l,
-                    waterLabel: l.homeQAWater,
-                    managementLabel: waterManagementLabel
-                ),
-                entityID: pet.id,
-                kind: .pet
-            )
-        }
-        if let human = currentHuman {
-            return stableItems(
-                ExpandedQuickActionStore.humanItems(
-                    raw: quickActionItemsRaw,
-                    human: human,
-                    localization: l
-                ),
-                entityID: human.id,
-                kind: .human
-            )
-        }
-        return fallbackItems
+        actionSnapshot.currentItems.isEmpty ? fallbackItems : actionSnapshot.currentItems
     }
 
     private func buildCandidateItems() -> [QuickActionItem] {
-        guard isEditMode else { return [] }
-        if let pet = currentPet {
-            return stableItems(
-                QuickActionPickerCatalog.options(for: pet).map { option in
-                    QuickActionItem(
-                        id: "\(EntityKind.pet.rawValue)-\(pet.id.uuidString)-\(option.id)",
-                        label: option.label,
-                        icon: option.icon,
-                        colorHex: option.colorHex,
-                        petId: pet.id,
-                        actionType: option.id,
-                        entityId: pet.id,
-                        entityKind: .pet
-                    )
-                },
-                entityID: pet.id,
-                kind: .pet
-            )
-        }
-        if let human = currentHuman {
-            return stableItems(
-                ExpandedQuickActionDefaults.humanItems(for: human, localization: l),
-                entityID: human.id,
-                kind: .human
-            )
-        }
-        return []
-    }
-
-    private var currentPet: Pet? {
-        guard !card.isHuman, !card.isElectronicPet else { return nil }
-        return pets.first { $0.id == card.id && !$0.hasPassedAway }
-    }
-
-    private var currentHuman: Human? {
-        guard card.isHuman else { return nil }
-        return humans.first { $0.id == card.id }
-    }
-
-    private var waterManagementLabel: String {
-        l.tr(zh: "管理", en: "Manage", de: "Verwalten")
+        actionSnapshot.candidateItems
     }
 
     private var fallbackItems: [QuickActionItem] {
@@ -355,9 +157,9 @@ struct VerticalSolidHomeExpandedCardActions: View {
     }
 
     private func makeEmbeddedAction(_ item: QuickActionItem) -> VerticalHomeEmbeddedAction {
-        let state = quickActionState(for: item)
+        let state = actionSnapshot.state(for: item)
         let options = menuOptions(for: item)
-        let menuPolicy = state.isLocked ? .none : embeddedMenuPolicy(for: item, options: options)
+        let menuPolicy = state.isLocked ? .none : state.menuPolicy.expandedPolicy
         let directActionUsesQuickPath = menuPolicy.showsQuickButton
         return VerticalHomeEmbeddedAction(
             id: item.id,
@@ -490,6 +292,26 @@ struct VerticalSolidHomeExpandedCardActions: View {
         renderModel.currentItems.isEmpty ? buildCurrentItems() : renderModel.currentItems
     }
 
+    private func persistItems(_ items: [QuickActionItem]) {
+        let kind: EntityKind = card.isHuman ? .human : .pet
+        let stable = stableItems(items, entityID: card.id, kind: kind)
+        if card.isHuman {
+            quickActionItemsRaw = ExpandedQuickActionStore.savingHumanItems(
+                stable,
+                humanID: card.id,
+                currentItems: currentItemsForMutation(),
+                raw: quickActionItemsRaw
+            )
+        } else {
+            quickActionItemsRaw = ExpandedQuickActionStore.savingPetItems(
+                stable,
+                petID: card.id,
+                currentItems: currentItemsForMutation(),
+                raw: quickActionItemsRaw
+            )
+        }
+    }
+
     private func stableItems(_ items: [QuickActionItem], entityID: UUID, kind: EntityKind) -> [QuickActionItem] {
         items.map { item in
             var stableItem = item
@@ -500,94 +322,6 @@ struct VerticalSolidHomeExpandedCardActions: View {
 
     private func actionRevisionKey(for items: [QuickActionItem]) -> String {
         items.map(\.id).joined(separator: "|")
-    }
-
-    private func quickActionState(for item: QuickActionItem) -> QuickActionRenderState {
-        if let pet = currentPet {
-            let now = Date()
-            return QuickActionRenderState(
-                status: ExpandedQuickActionLogic.countText(
-                    item: item,
-                    pet: pet,
-                    allEvents: allEvents,
-                    feedingLedgerEntries: feedingLedgerEntries,
-                    careLedgerEntries: careLedgerEntries,
-                    hygieneLedgerEntries: hygieneLedgerEntries,
-                    walkLedgerEntries: walkLedgerEntries,
-                    pottyLedgerEntries: pottyLedgerEntries,
-                    petExpenseLedgerEntries: petExpenseLedgerEntries,
-                    petWeightLedgerEntries: petWeightLedgerEntries,
-                    now: now
-                ),
-                isCompleted: ExpandedQuickActionLogic.isCompleted(
-                    item: item,
-                    pet: pet,
-                    allEvents: allEvents,
-                    feedingLedgerEntries: feedingLedgerEntries,
-                    careLedgerEntries: careLedgerEntries,
-                    hygieneLedgerEntries: hygieneLedgerEntries,
-                    walkLedgerEntries: walkLedgerEntries,
-                    pottyLedgerEntries: pottyLedgerEntries,
-                    petWeightLedgerEntries: petWeightLedgerEntries,
-                    now: now
-                ),
-                showsAttention: ExpandedQuickActionLogic.showsAttentionDot(
-                    item: item,
-                    pet: pet,
-                    allEvents: allEvents,
-                    feedingLedgerEntries: feedingLedgerEntries,
-                    careLedgerEntries: careLedgerEntries,
-                    walkLedgerEntries: walkLedgerEntries,
-                    pottyLedgerEntries: pottyLedgerEntries,
-                    now: now
-                ),
-                isLocked: false
-            )
-        }
-
-        if let human = currentHuman {
-            let viewedBy = activeHumanID
-            let isLocked = ExpandedHumanQuickActionStateProvider.isPrivate(
-                item,
-                human: human,
-                viewedBy: viewedBy,
-                privacy: appServices.privacy
-            )
-            let medicationWarning = item.actionType == "humanMedication"
-                ? CarePlanOverdueStatusCalculator.humanMedicationWarning(
-                    for: human,
-                    medications: humanMedications,
-                    logs: humanMedicationLogs
-                )
-                : nil
-            let status = medicationWarning?.compactText ?? humanStatusText(for: item, human: human, viewedBy: viewedBy)
-            return QuickActionRenderState(
-                status: status,
-                isCompleted: ExpandedHumanQuickActionStateProvider.completed(
-                    item: item,
-                    human: human,
-                    viewedBy: viewedBy,
-                    privacy: appServices.privacy,
-                    todayMedicationLogs: humanMedicationLogs
-                ),
-                showsAttention: medicationWarning != nil,
-                isLocked: isLocked
-            )
-        }
-
-        return QuickActionRenderState(status: nil, isCompleted: false, showsAttention: false, isLocked: false)
-    }
-
-    private func humanStatusText(for item: QuickActionItem, human: Human, viewedBy: UUID?) -> String? {
-        ExpandedHumanQuickActionStateProvider.countText(
-            item: item,
-            human: human,
-            viewedBy: viewedBy,
-            privacy: appServices.privacy,
-            activeMedications: humanMedications,
-            todayMedicationLogs: humanMedicationLogs,
-            recentExpenses: expenseEntries
-        )
     }
 
     private func primaryIcon(for item: QuickActionItem) -> String {
@@ -605,32 +339,8 @@ struct VerticalSolidHomeExpandedCardActions: View {
         }
     }
 
-    private func isPrimaryDisabled(item: QuickActionItem, state: QuickActionRenderState) -> Bool {
+    private func isPrimaryDisabled(item: QuickActionItem, state: HomeQuickActionRenderSnapshot) -> Bool {
         ExpandedQuickActionLogic.singleUseLabel(for: item.actionType) != nil && state.isCompleted
-    }
-
-    private func embeddedMenuPolicy(
-        for item: QuickActionItem,
-        options: [VerticalHomeEmbeddedActionOption]
-    ) -> ExpandedQuickMenuPolicy {
-        if let pet = currentPet {
-            let policy = ExpandedQuickActionLogic.petMenuPolicy(
-                for: item,
-                pet: pet,
-                allEvents: allEvents,
-                feedingLedgerEntries: feedingLedgerEntries,
-                now: Date()
-            )
-            guard !options.isEmpty else { return policy }
-            return ExpandedQuickMenuPolicy(
-                showsMenu: policy.showsMenu || !options.isEmpty,
-                showsQuickButton: false
-            )
-        }
-        if currentHuman != nil {
-            return ExpandedQuickActionLogic.humanMenuPolicy(actionType: item.actionType)
-        }
-        return .none
     }
 
     private func menuOptions(for item: QuickActionItem) -> [VerticalHomeEmbeddedActionOption] {
@@ -661,38 +371,6 @@ struct VerticalSolidHomeExpandedCardActions: View {
         }
     }
 
-    private func normalizeStoredItemsIfNeeded(using model: VerticalSolidHomeExpandedActionRenderModel) {
-        guard !model.currentItems.isEmpty else { return }
-        let stableIds = model.currentItems.map(\.id).joined(separator: "|")
-        let rawIds = model.visibleItems.map(\.id).joined(separator: "|")
-        guard stableIds != rawIds else { return }
-        var transaction = Transaction(animation: nil)
-        transaction.disablesAnimations = true
-        withTransaction(transaction) {
-            persistItems(model.currentItems)
-        }
-    }
-
-    private func persistItems(_ items: [QuickActionItem]) {
-        if let pet = currentPet {
-            quickActionItemsRaw = ExpandedQuickActionStore.savingPetItems(
-                stableItems(items, entityID: pet.id, kind: .pet),
-                pet: pet,
-                currentItems: currentItemsForMutation(),
-                raw: quickActionItemsRaw
-            )
-            return
-        }
-        if let human = currentHuman {
-            quickActionItemsRaw = ExpandedQuickActionStore.savingHumanItems(
-                stableItems(items, entityID: human.id, kind: .human),
-                human: human,
-                currentItems: currentItemsForMutation(),
-                raw: quickActionItemsRaw
-            )
-        }
-    }
-
     private func detailIcon(for actionType: String, isHuman: Bool) -> String {
         let normalized = actionType.lowercased()
         if normalized.contains("medication") { return "list.bullet.rectangle.fill" }
@@ -702,13 +380,6 @@ struct VerticalSolidHomeExpandedCardActions: View {
         if normalized.contains("weight") { return "chart.line.uptrend.xyaxis" }
         if isHuman { return "rectangle.stack.fill" }
         return "chart.line.uptrend.xyaxis"
-    }
-
-    private struct QuickActionRenderState {
-        let status: String?
-        let isCompleted: Bool
-        let showsAttention: Bool
-        let isLocked: Bool
     }
 }
 

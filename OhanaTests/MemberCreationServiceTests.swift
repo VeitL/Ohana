@@ -25,7 +25,7 @@ struct MemberCreationServiceTests {
         #expect(try context.fetch(FetchDescriptor<Pet>()).count == 1)
     }
 
-    @Test func firstPetWelcomeRewardUsesActiveHumanWallet() throws {
+    @Test func firstPetDoesNotAwardStarterGiftBeforeFirstCare() throws {
         resetGlobalState()
         let container = try makeContainer()
         let context = container.mainContext
@@ -46,11 +46,42 @@ struct MemberCreationServiceTests {
         let accounts = try context.fetch(FetchDescriptor<CoconutAccount>())
         let walletEntries = try context.fetch(FetchDescriptor<CoconutLedgerEntry>())
         let ledgerEvents = try context.fetch(FetchDescriptor<CareLedgerEvent>())
-        #expect(human.coconutBalance == 50)
-        #expect(accounts.contains { $0.ownerKind == .human && $0.ownerId == human.id.uuidString && $0.balance == 50 })
+        #expect(human.coconutBalance == 0)
+        #expect(accounts.isEmpty)
         #expect(!accounts.contains { $0.ownerKind == .system })
         #expect(walletEntries.allSatisfy { $0.ownerKind != .system })
-        #expect(ledgerEvents.contains { $0.actorId == human.id.uuidString && $0.coconutDelta == 50 })
+        #expect(ledgerEvents.isEmpty)
+    }
+
+    @Test func firstPetInitialWeightRecordsCareFactWithoutWalletReward() throws {
+        resetGlobalState()
+        let container = try makeContainer()
+        let context = container.mainContext
+        let human = Human(name: "Ava")
+        context.insert(human)
+        try context.save()
+        UserDefaults.standard.set(human.id.uuidString, forKey: "currentActiveHumanId")
+        TestQuestManagerProjection.manager.isPetWizardCompleted = false
+
+        var draft = petDraft(name: "Momo", source: .placeholder)
+        draft.weightText = "4.2"
+        _ = try saveMember(
+            draft: draft,
+            existingPets: [],
+            existingHumans: [human],
+            context: context,
+            countryCode: "CN"
+        )
+
+        let weightLogs = try context.fetch(FetchDescriptor<PetWeightLog>())
+        let ledgerEvents = try context.fetch(FetchDescriptor<CareLedgerEvent>())
+        #expect(weightLogs.count == 1)
+        #expect(weightLogs.first?.weight == 4.2)
+        #expect(ledgerEvents.count == 1)
+        #expect(ledgerEvents.first?.actionType == "petWeight")
+        #expect(ledgerEvents.first?.coconutDelta == 0)
+        #expect(try context.fetch(FetchDescriptor<CoconutAccount>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<CoconutLedgerEntry>()).isEmpty)
     }
 
     @Test func firstPetWelcomeRewardSkipsWalletWhenNoActiveHumanExists() throws {
@@ -360,6 +391,38 @@ struct MemberCreationServiceTests {
         #expect(visible.first?.id == promoted.id)
     }
 
+    @Test func homeCardSelectionReconciliationClearsDeletedSelectedCard() throws {
+        resetGlobalState()
+        let remaining = FocusCard.from(Human(name: "Remaining"))
+        let deletedID = UUID()
+
+        let staleSelection = FocusHomeCardDataSource.selectionReconciliation(
+            cards: [remaining],
+            selectedCardId: deletedID,
+            headerContextCardId: deletedID
+        )
+        let validSelection = FocusHomeCardDataSource.selectionReconciliation(
+            cards: [remaining],
+            selectedCardId: remaining.id,
+            headerContextCardId: remaining.id
+        )
+
+        #expect(staleSelection.clearsSelectedCard)
+        #expect(staleSelection.clearsHeaderContext)
+        #expect(!validSelection.clearsSelectedCard)
+        #expect(!validSelection.clearsHeaderContext)
+    }
+
+    @Test func crewRosterInlineAddCompletionTargetsHomeInsteadOfSelection() throws {
+        resetGlobalState()
+        let pet = Pet(name: "Inline Pet", species: "Dog")
+        let human = Human(name: "Inline Human")
+
+        #expect(CrewRosterInlineAddCompletion.target(savedPet: pet, savedHuman: nil) == .pet(pet.id))
+        #expect(CrewRosterInlineAddCompletion.target(savedPet: nil, savedHuman: human) == .human(human.id))
+        #expect(CrewRosterInlineAddCompletion.target(savedPet: nil, savedHuman: nil) == nil)
+    }
+
     @Test func deceasedHumanDoesNotAppearOnHomeCards() throws {
         resetGlobalState()
         let livingHuman = Human(name: "Living")
@@ -605,6 +668,10 @@ struct MemberCreationServiceTests {
             "quest_isFirstMealRecorded",
             "quest_isThemeColorSet",
             "quest_coconutLogs",
+            StarterGiftStorageKey.claimed,
+            StarterGiftStorageKey.pending,
+            StarterGiftStorageKey.ceremonySeen,
+            StarterGiftStorageKey.oasisTabPromptPending,
             HomeCardVisibility.hiddenPetIDsKey
         ].forEach { UserDefaults.standard.removeObject(forKey: $0) }
 

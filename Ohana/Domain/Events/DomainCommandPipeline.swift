@@ -73,6 +73,7 @@ nonisolated struct HomeRevision: Equatable, Hashable, Sendable {
 @MainActor
 final class ReadModelRevisionCenter: ObservableObject {
     @Published private(set) var homeRevision = HomeRevision()
+    @Published private(set) var walletProjectionRevision = HomeRevision()
     @Published private(set) var lastMutation: DomainMutationResult?
     private(set) var lastCoconutRewardEvent: OhanaCoconutRewardEvent?
 
@@ -82,6 +83,10 @@ final class ReadModelRevisionCenter: ObservableObject {
 
     var homeRevisionUpdates: AnyPublisher<HomeRevision, Never> {
         $homeRevision.eraseToAnyPublisher()
+    }
+
+    var walletProjectionUpdates: AnyPublisher<HomeRevision, Never> {
+        $walletProjectionRevision.eraseToAnyPublisher()
     }
 
     var coconutRewardEvents: AnyPublisher<OhanaCoconutRewardEvent, Never> {
@@ -119,6 +124,21 @@ final class ReadModelRevisionCenter: ObservableObject {
             "domain_command_failure",
             valueMS: 0,
             note: "\(command): \(error.localizedDescription)"
+        )
+    }
+
+    func publishWalletProjection(affectedEntityIDs: Set<UUID>, note: String) {
+        walletProjectionRevision.advance(
+            for: .command(
+                "economy",
+                "walletProjection",
+                ["affected": String(affectedEntityIDs.count)]
+            )
+        )
+        AppPerformanceMonitor.shared.record(
+            "wallet_projection_update",
+            valueMS: 0,
+            note: note
         )
     }
 

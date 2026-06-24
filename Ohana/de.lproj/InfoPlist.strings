@@ -1,6 +1,7 @@
 /* Localized Info.plist strings (German) */
-"NSCameraUsageDescription" = "Wird verwendet, um Mitglieder- oder Haustier-Avatare und Fotos in Moments aufzunehmen.";
-"NSPhotoLibraryUsageDescription" = "Wird verwendet, um Mitglieder- oder Haustier-Avatare und Bildanhänge aus deiner Fotomediathek auszuwählen.";
-"NSLocationWhenInUseUsageDescription" = "Wird verwendet, um deinen aktuellen Standort in Moments hinzuzufügen und nach dem Start eines Spaziergangs eine Route aufzuzeichnen.";
-"NSLocationAlwaysAndWhenInUseUsageDescription" = "Wird nur während eines aktiven Spaziergangs verwendet, damit Ohana die Route im Hintergrund oder bei gesperrtem Bildschirm weiter aufzeichnen kann.";
-"NSLocationAlwaysUsageDescription" = "Wird nur während eines aktiven Spaziergangs verwendet, um die Route im Hintergrund oder bei gesperrtem Bildschirm weiter aufzuzeichnen.";
+"NSCameraUsageDescription" = "Wird verwendet, wenn du einen Mitglieder- oder Haustier-Avatar, ein Moment-Foto oder einen Beleganhang aufnehmen möchtest.";
+"NSPhotoLibraryUsageDescription" = "Wird verwendet, um von dir ausgewählte Avatare, Moment-Bilder oder Beleganhänge zu importieren.";
+"NSLocationWhenInUseUsageDescription" = "Wird verwendet, wenn du einem Moment einen Standort hinzufügst oder einen Spaziergang startest, damit Ohana diese Route aufzeichnen kann.";
+"NSLocationAlwaysAndWhenInUseUsageDescription" = "Wird nur während eines aktiven Spaziergangs verwendet, um die aktuelle Route im Hintergrund oder bei gesperrtem Bildschirm weiter aufzuzeichnen.";
+"NSLocationAlwaysUsageDescription" = "Wird nur während eines aktiven Spaziergangs verwendet, um die aktuelle Route im Hintergrund oder bei gesperrtem Bildschirm weiter aufzuzeichnen.";
+"NSFaceIDUsageDescription" = "Wird verwendet, um geschützte Mitgliederwechsel mit Face ID statt mit der lokalen PIN zu bestätigen.";

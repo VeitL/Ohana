@@ -133,6 +133,7 @@ extension MemberCardCreationContentView {
             foreground: cardForeground
         ) {
             VStack(alignment: .leading, spacing: 12) {
+                petInitialWeightSection
                 compactMenuPicker(
                     title: l.tr(zh: "毛色", en: "Coat", de: "Fell"),
                     value: draft.coatColor.isEmpty ? l.tr(zh: "自动", en: "Auto", de: "Auto") : draft.coatColor
@@ -177,6 +178,44 @@ extension MemberCardCreationContentView {
                     }
                 }
             }
+        }
+    }
+
+    var petInitialWeightSection: some View {
+        VStack(alignment: .leading, spacing: 7) {
+            compactHumanMetricInput(
+                title: requiresStarterPetWeight
+                    ? l.tr(zh: "首次照护体重", en: "First care weight", de: "Erstes Pflegegewicht")
+                    : l.tr(zh: "初始体重", en: "Starting weight", de: "Startgewicht"),
+                text: $draft.weightText,
+                placeholder: petInitialWeightPlaceholder,
+                unit: "kg",
+                maxFractionDigits: 2
+            )
+            if requiresStarterPetWeight {
+                Text(l.tr(
+                    zh: "保存后完成今日首个照护，并领取新人礼包。",
+                    en: "Saving completes today's first care and claims the starter gift.",
+                    de: "Speichern schließt die erste Pflege heute ab und holt das Startergeschenk."
+                ))
+                .font(OhanaFont.caption2(.semibold))
+                .foregroundStyle(cardSecondaryForeground)
+                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
+    var petInitialWeightPlaceholder: String {
+        switch draft.species {
+        case "猫":
+            "4.2"
+        case "兔子", "仓鼠":
+            "1.2"
+        case "鸟":
+            "0.3"
+        default:
+            "12.0"
         }
     }
 

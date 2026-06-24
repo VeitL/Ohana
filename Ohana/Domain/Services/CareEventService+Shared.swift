@@ -69,6 +69,7 @@ extension CareEventService {
             )
         }
 
+        let l = L10n.current
         let stockOwner = stockOwnerPet(for: liveTargets, preferred: sourcePet, foodKind: foodKind, context: context)
         let result = SharedPetActionRecorder.record(
             SharedPetActionDescriptor(
@@ -84,7 +85,7 @@ extension CareEventService {
                 childLogStrategy: .care(type: .feeding),
                 reward: .feed,
                 rewardQuality: quality,
-                rewardTitle: "共同喂食 · \(liveTargets.count)只",
+                rewardTitle: sharedCareRewardTitle(.feeding, targetCount: liveTargets.count, l: l),
                 reminderCareType: .feeding
             ),
             context: context,
@@ -152,6 +153,7 @@ extension CareEventService {
             )
         }
 
+        let l = L10n.current
         let result = SharedPetActionRecorder.record(
             SharedPetActionDescriptor(
                 actionKind: .watering,
@@ -163,7 +165,7 @@ extension CareEventService {
                 totalAmountMl: totalMl,
                 childLogStrategy: .care(type: .watering),
                 reward: .water,
-                rewardTitle: "共同喂水 · \(liveTargets.count)只",
+                rewardTitle: sharedCareRewardTitle(.watering, targetCount: liveTargets.count, l: l),
                 reminderCareType: .watering
             ),
             context: context,
@@ -227,9 +229,11 @@ extension CareEventService {
             )
         }
 
+        let l = L10n.current
+        let actionKind: SharedCareActionKind = isFullChange ? .litterChange : .litterScoop
         let result = SharedPetActionRecorder.record(
             SharedPetActionDescriptor(
-                actionKind: isFullChange ? .litterChange : .litterScoop,
+                actionKind: actionKind,
                 sourcePet: sourcePet,
                 targets: liveTargets,
                 date: date,
@@ -237,7 +241,7 @@ extension CareEventService {
                 allocationMode: .equal,
                 childLogStrategy: .care(type: .litter),
                 reward: .potty(isLitter: true),
-                rewardTitle: isFullChange ? "共同换砂 · \(liveTargets.count)只" : "共同铲砂 · \(liveTargets.count)只",
+                rewardTitle: sharedCareRewardTitle(actionKind, targetCount: liveTargets.count, l: l),
                 reminderCareType: .litter
             ),
             context: context,
@@ -373,7 +377,8 @@ extension CareEventService {
         source: CareLedgerSource = .detail,
         dependencies: CareEventServiceDependencies? = nil
     ) -> SharedPetActionResult {
-        SharedPetActionRecorder.record(
+        let targetCount = SharedPetTargetResolver.normalizedTargets(targets, fallback: sourcePet).count
+        return SharedPetActionRecorder.record(
             SharedPetActionDescriptor(
                 actionKind: .expense,
                 sourcePet: sourcePet,
@@ -386,7 +391,7 @@ extension CareEventService {
                 note: note,
                 childLogStrategy: .expense(category: category, note: note),
                 reward: .expense,
-                rewardTitle: "共享花费 · \(category.rawValue)",
+                rewardTitle: sharedCareRewardTitle(.expense, targetCount: targetCount, category: category, l: .current),
                 source: source
             ),
             context: context,
@@ -410,6 +415,7 @@ extension CareEventService {
         source: CareLedgerSource = .quickAction,
         dependencies: CareEventServiceDependencies? = nil
     ) -> SharedPetActionResult {
+        let targetCount = SharedPetTargetResolver.normalizedTargets(targets, fallback: sourcePet).count
         let reward: DomainCareRewardAction? = CoconutWalkRewardPolicy.isRewardable(distanceMeters: distanceMeters)
             ? .walk(distanceMeters: distanceMeters)
             : nil
@@ -431,7 +437,7 @@ extension CareEventService {
                     moodRating: moodRating
                 ),
                 reward: reward,
-                rewardTitle: "共同散步 · \(SharedPetTargetResolver.normalizedTargets(targets, fallback: sourcePet).count)只",
+                rewardTitle: sharedCareRewardTitle(.walk, targetCount: targetCount, l: .current),
                 source: source
             ),
             context: context,
@@ -468,5 +474,52 @@ extension CareEventService {
             dependencies: dependencies
         )
         return result.pottyLog
+    }
+
+    static func sharedCareRewardTitle(
+        _ actionKind: SharedCareActionKind,
+        targetCount: Int,
+        category: ExpenseCategory? = nil,
+        l: L10n = .current
+    ) -> String {
+        let count = sharedCareTargetCount(targetCount, l: l)
+        switch actionKind {
+        case .feeding:
+            return l.tr(zh: "共同喂食 · \(count)", en: "Shared feeding · \(count)", de: "Gemeinsam füttern · \(count)")
+        case .watering:
+            return l.tr(zh: "共同喂水 · \(count)", en: "Shared watering · \(count)", de: "Gemeinsam Wasser · \(count)")
+        case .litterChange:
+            return l.tr(zh: "共同换砂 · \(count)", en: "Shared litter change · \(count)", de: "Gemeinsamer Streuwechsel · \(count)")
+        case .litterScoop:
+            return l.tr(zh: "共同铲砂 · \(count)", en: "Shared litter scoop · \(count)", de: "Gemeinsam Klo säubern · \(count)")
+        case .expense:
+            let categoryTitle = category.map { l.expenseCategoryTitle($0) } ?? l.tr(zh: "花费", en: "Expense", de: "Ausgabe")
+            return l.tr(zh: "共享花费 · \(categoryTitle)", en: "Shared expense · \(categoryTitle)", de: "Geteilte Ausgabe · \(categoryTitle)")
+        case .walk:
+            return l.tr(zh: "共同散步 · \(count)", en: "Shared walk · \(count)", de: "Gemeinsamer Spaziergang · \(count)")
+        case .play:
+            return l.tr(zh: "共同陪玩 · \(count)", en: "Shared play · \(count)", de: "Gemeinsames Spielen · \(count)")
+        case .waterChange:
+            return l.tr(zh: "共同换水 · \(count)", en: "Shared water change · \(count)", de: "Gemeinsamer Wasserwechsel · \(count)")
+        case .filterClean:
+            return l.tr(zh: "共同清理滤材 · \(count)", en: "Shared filter cleaning · \(count)", de: "Gemeinsam Filter reinigen · \(count)")
+        case .cageCleaning:
+            return l.tr(zh: "共同清笼 · \(count)", en: "Shared cage cleaning · \(count)", de: "Gemeinsam Käfig reinigen · \(count)")
+        case .freeFlight:
+            return l.tr(zh: "共同放飞 · \(count)", en: "Shared free flight · \(count)", de: "Gemeinsamer Freiflug · \(count)")
+        case .misting:
+            return l.tr(zh: "共同保湿 · \(count)", en: "Shared misting · \(count)", de: "Gemeinsam befeuchten · \(count)")
+        case .substrateChange:
+            return l.tr(zh: "共同换垫 · \(count)", en: "Shared substrate change · \(count)", de: "Gemeinsamer Substratwechsel · \(count)")
+        case .potty, .pottyUnknown, .hygiene:
+            return l.tr(zh: "共同照护 · \(count)", en: "Shared care · \(count)", de: "Gemeinsame Pflege · \(count)")
+        }
+    }
+
+    private static func sharedCareTargetCount(_ targetCount: Int, l: L10n) -> String {
+        let count = max(0, targetCount)
+        let enUnit = count == 1 ? "pet" : "pets"
+        let deUnit = count == 1 ? "Haustier" : "Haustiere"
+        return l.tr(zh: "\(count)只", en: "\(count) \(enUnit)", de: "\(count) \(deUnit)")
     }
 }

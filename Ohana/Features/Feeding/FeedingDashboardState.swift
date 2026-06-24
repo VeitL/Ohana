@@ -10,7 +10,7 @@ struct FeedingDashboardState {
     let pet: Pet
     let allEvents: [Event]
     let manualGoalCount: Int
-    let careLogs: [PetCareLog]?
+    let careLogs: [PetCareLog]
     let foodRecords: [PetFoodRecord]?
     let sharedCareSessions: [SharedCareSession]?
     let now: Date
@@ -20,7 +20,7 @@ struct FeedingDashboardState {
         pet: Pet,
         allEvents: [Event],
         manualGoalCount: Int = 1,
-        careLogs: [PetCareLog]? = nil,
+        careLogs: [PetCareLog] = [],
         foodRecords: [PetFoodRecord]? = nil,
         sharedCareSessions: [SharedCareSession]? = nil,
         now: Date = Date(),

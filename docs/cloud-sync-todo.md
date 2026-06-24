@@ -1,11 +1,25 @@
 # Cloud Sync TODO
 
-This file tracks CloudKit and real-device follow-up work that is intentionally deferred until a paid Apple Developer account, provisioning access, and two physical iPhones with separate Apple IDs are available.
+This file tracks CloudKit and real-device follow-up work that is intentionally
+deferred until the required account, provisioning, CloudKit Dashboard, and
+multi-device evidence exist. As of 2026-06-24, the standard `Ohana` Debug app can
+be signed for a paired iPhone with team `567SK733UN`, Push development
+entitlement, and CloudKit/iCloud container `iCloud.com.guanchen.li.Ohana`; real
+CloudKit sync remains deferred because the first-release SwiftData containers
+still use `cloudKitDatabase: .none`.
 
 ## Deferred Until Developer Account
 
-- [ ] Enable and verify production-capable iCloud CloudKit and Remote Notifications provisioning for the Ohana app target.
-- [ ] Confirm the CloudKit container `iCloud.HT.Ohana` exists for the signed team and is attached to the app identifier.
+- [x] Verify development-device iCloud CloudKit and Remote Notifications
+  provisioning for the standard Ohana app target. Evidence: 2026-06-24
+  `xcodebuild -allowProvisioningUpdates -project Ohana.xcodeproj -scheme Ohana
+  -configuration Debug -destination 'id=4CDF4314-5293-5DFE-AD4E-B510473B1367'
+  -derivedDataPath /tmp/ohana-device-capability-debug build
+  CODE_SIGNING_ALLOWED=YES` succeeded; signed entitlements include
+  `aps-environment = development` and
+  `iCloud.com.guanchen.li.Ohana`.
+- [ ] Confirm production/release provisioning and CloudKit Dashboard setup for
+  container `iCloud.com.guanchen.li.Ohana` before enabling CloudKit sync.
 - [ ] Validate CloudKit Dashboard schema after first development-device sync, including custom household zones, uploadable record types, CKAsset-backed fields, and zone-wide `CKShare` records.
 - [ ] Promote the verified CloudKit schema only after the development environment passes real-device sync and share flows.
 
@@ -21,7 +35,7 @@ This file tracks CloudKit and real-device follow-up work that is intentionally d
 
 This checklist closes the care-maturity follow-up for CloudKit-applied
 shared-care legacy metadata. It requires two physical iPhones running the same
-signed build, CloudKit provisioning for `iCloud.HT.Ohana`, CloudKit Dashboard
+signed build, CloudKit provisioning for `iCloud.com.guanchen.li.Ohana`, CloudKit Dashboard
 access, app logs or performance-monitor output, and a way to install or restore
 a legacy fixture containing `ohana_shared_*` note prefixes.
 

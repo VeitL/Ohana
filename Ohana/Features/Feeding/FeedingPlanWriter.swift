@@ -333,8 +333,16 @@ enum FeedingPlanWriter {
         }
 
         var reminders: [Reminder] = []
+        let careLogs = stockCareLogs(petID: pet.id, context: context)
         for foodKind in FeedFoodKind.allCases {
-            let snapshot = FeedStockCalculator.snapshot(for: pet, foodKind: foodKind, events: allEvents, now: now, calendar: calendar)
+            let snapshot = FeedStockCalculator.snapshot(
+                for: pet,
+                foodKind: foodKind,
+                events: allEvents,
+                careLogs: careLogs,
+                now: now,
+                calendar: calendar
+            )
             guard snapshot.totalGrams > 0,
                   let reminderDate = foodReminderDate(pet: pet, snapshot: snapshot, calendar: calendar),
                   reminderDate > now else { continue }
@@ -403,6 +411,26 @@ enum FeedingPlanWriter {
             )
         }
         return eventsById.values.sorted { $0.startDate < $1.startDate }
+    }
+
+    private nonisolated static func stockCareLogs(petID: UUID, context: ModelContext) -> [PetCareLog] {
+        let feedingType = CareType.feeding.rawValue
+        let descriptor = FetchDescriptor<PetCareLog>(
+            predicate: #Predicate<PetCareLog> { log in
+                log.type == feedingType &&
+                    log.pet?.id == petID
+            },
+            sortBy: [SortDescriptor(\.date, order: .reverse)]
+        )
+        do {
+            return try context.fetch(descriptor)
+        } catch {
+            OhanaLog.warning(
+                "FeedingPlanWriter failed to fetch stock care logs: \(error.localizedDescription)",
+                category: "Care"
+            )
+            return []
+        }
     }
 
     private nonisolated static func canWriteActiveFeedData(for pet: Pet) -> Bool {

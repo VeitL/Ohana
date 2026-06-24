@@ -47,7 +47,9 @@ enum AppSheetRoute: Hashable, Identifiable {
     case petAllFeatures(UUID)
     case petBasicInfo(UUID)
     case petFood(UUID)
+    case petWeightQuick(UUID)
     case petWeight(UUID)
+    case petExpenseQuick(UUID)
     case petExpense(UUID)
     case petFeed(UUID, opensManualSheet: Bool)
     case petWater(UUID)
@@ -65,14 +67,19 @@ enum AppSheetRoute: Hashable, Identifiable {
     case petBondVault(UUID)
     case humanAllFeatures(UUID)
     case humanBasicInfo(UUID)
+    case humanMedicationQuick(UUID)
     case humanMedication(UUID)
+    case humanWeightQuick(UUID)
     case humanWeight(UUID)
+    case humanWorkoutQuick(UUID)
     case humanWorkout(UUID)
     case humanWorkoutDashboard(UUID)
     case humanMetrics(UUID)
     case humanReport(UUID)
+    case humanExpenseQuick(UUID)
     case humanExpense(UUID)
     case humanWishlist(UUID)
+    case humanNoteQuick(UUID)
     case humanNote(UUID)
     case requiredAccountSwitch
     case settings
@@ -100,8 +107,12 @@ enum AppSheetRoute: Hashable, Identifiable {
             "pet-basic-\(id.uuidString)"
         case let .petFood(id):
             "pet-food-\(id.uuidString)"
+        case let .petWeightQuick(id):
+            "pet-weight-quick-\(id.uuidString)"
         case let .petWeight(id):
             "pet-weight-\(id.uuidString)"
+        case let .petExpenseQuick(id):
+            "pet-expense-quick-\(id.uuidString)"
         case let .petExpense(id):
             "pet-expense-\(id.uuidString)"
         case let .petFeed(id, opensManualSheet):
@@ -136,10 +147,16 @@ enum AppSheetRoute: Hashable, Identifiable {
             "human-all-\(id.uuidString)"
         case let .humanBasicInfo(id):
             "human-basic-\(id.uuidString)"
+        case let .humanMedicationQuick(id):
+            "human-medication-quick-\(id.uuidString)"
         case let .humanMedication(id):
             "human-medication-\(id.uuidString)"
+        case let .humanWeightQuick(id):
+            "human-weight-quick-\(id.uuidString)"
         case let .humanWeight(id):
             "human-weight-\(id.uuidString)"
+        case let .humanWorkoutQuick(id):
+            "human-workout-quick-\(id.uuidString)"
         case let .humanWorkout(id):
             "human-workout-\(id.uuidString)"
         case let .humanWorkoutDashboard(id):
@@ -148,10 +165,14 @@ enum AppSheetRoute: Hashable, Identifiable {
             "human-metrics-\(id.uuidString)"
         case let .humanReport(id):
             "human-report-\(id.uuidString)"
+        case let .humanExpenseQuick(id):
+            "human-expense-quick-\(id.uuidString)"
         case let .humanExpense(id):
             "human-expense-\(id.uuidString)"
         case let .humanWishlist(id):
             "human-wishlist-\(id.uuidString)"
+        case let .humanNoteQuick(id):
+            "human-note-quick-\(id.uuidString)"
         case let .humanNote(id):
             "human-note-\(id.uuidString)"
         case .requiredAccountSwitch:

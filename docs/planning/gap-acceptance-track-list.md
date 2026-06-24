@@ -1,6 +1,6 @@
 # 人工验收总 Track List
 
-更新日期：2026-06-17
+更新日期：2026-06-19
 
 本文件是 GAP 建设阶段与模块门禁阶段唯一的人工验收 track list。后续不再新增 `gap-*-acceptance-track-list.md` 或模块单独 track list；需要人工目检、真机、真实 iCloud、真实通知或真实数据确认的项目，都追加到本文对应小节。
 
@@ -67,6 +67,7 @@
   - 记录：
   - 记录：2026-06-17 真机手测新增 P0：在宠物基础资料危险区点击“彻底删除 xxx”后卡死。根因按首帧/手指帧模型重判：删除确认 sheet、route dismiss、keyboard focus 和 `PhysicalDeletionService` 级联物理删除同帧竞争，UI 尚未先退回稳定路由就开始重删除；同类风险也存在宠物卡背、人类详情和 CrewRoster 删除入口。处理：新增 `DeferredDomainCommandQueue.destructiveRouteDismissDelayMilliseconds`，所有成员永久删除入口先关闭 sheet/detail/overlay，再延迟提交 `MemberCommandExecutor.deletePet/deleteHuman`；宠物删除确认不再自动拉起键盘；补稳定 UI test identifiers，并在宠物全功能 Archive 区补“基础资料 / Profile”入口，避免测试只能靠不稳定导航。验证：`scripts/test-simulator.sh -only-testing:OhanaUITests/OhanaUITests/testPetPermanentDeleteFromBasicInfoSmoke` PASS（iPhone 17 simulator，52.207s，xcresult `/var/folders/9j/7ldcxzn91d947mg4p_7wxmz40000gn/T/OhanaDerivedData/main-b6cf423d5931-tests/Logs/Test/Test-Ohana-2026.06.17_22-44-42-+0200.xcresult`），覆盖首建主人、starter gift、首建宠、进基础资料、点击彻底删除、输入宠物名确认、回到可响应首页且宠物卡消失。关闭条件：真机同一路径二次确认不卡死。
   - 记录：2026-06-18 Codex 真机自动化二次验收未能关闭该项。第一次运行 `xcodebuild test -allowProvisioningUpdates -project Ohana.xcodeproj -scheme Ohana -configuration LocalDeviceDebug -destination 'id=00008150-001270342EA3401C' -derivedDataPath /tmp/ohana-device-gap2-delete -only-testing:OhanaUITests/OhanaUITests/testPetPermanentDeleteFromBasicInfoSmoke CODE_SIGNING_ALLOWED=YES` 在测试 runner 初始化前失败：`Timed out while enabling automation mode`，xcresult `/tmp/ohana-device-gap2-delete/Logs/Test/Test-Ohana-2026.06.18_09-48-25-+0200.xcresult`。第二次运行同路径、DerivedData `/tmp/ohana-device-gap2-delete-retry` 已进入 Ohana，约 190s 后 CoreDevice/XCTest 才完成 automation session setup；session 建好后 onboarding 元素很快可见，并已输入首个人类名称，但随后 CoreDevice/Mercury 远程连接失效：`An error occurred while communicating with a remote process`，xcresult `/tmp/ohana-device-gap2-delete-retry/Logs/Test/Test-Ohana-2026.06.18_09-52-14-+0200.xcresult`。结论：这不是删除确认行为 PASS；关闭条件仍保持“真机同一路径二次确认不卡死”，并额外记录真实设备 XCTest/无线 CoreDevice 自动化不稳定，需手动或有线自动化复测。
+  - 记录：2026-06-19 用户真机复测确认宠物删除后不再卡死，但返回首页后卡片堆会全部消失，来回切换 tab 后才恢复。根因：删除当前展开 / 上下文宠物卡后，`VerticalSolidHomeWalletStack` 内部 `selectedCardId` 仍指向已删除卡；Home scene 仍处于 expanded hero progress，剩余卡片被当作非选中卡淡到 0，因此看起来全部消失。处理：新增 `FocusHomeCardDataSource.selectionReconciliation`，卡片集合变更时如果 selected/header context id 已不在当前 cards 中，立即无动画清理 selected card、hero snapshot、hero progress、header context 和 expanded 状态；新增 `homeCardSelectionReconciliationClearsDeletedSelectedCard` 测试锁住策略。关闭条件更新：真机删除宠物后应立即回到稳定首页，剩余人类 / 宠物卡不用切 tab 就可见且可点击。
 
 - [ ] 真机允许通知后，删除带未来提醒的成员或事件。
   - 预期：确认删除后对应未来本地通知被取消或不再到达；App 内不保留可恢复 pending 提醒；不会出现删除后通知仍跳回已删除对象。
@@ -148,6 +149,12 @@
   - 预期：顶部“当前椰子余额”与正式成员 / 宠物钱包合计一致，不包含历史系统差额。
   - 记录：
 
+- [x] 首页顶部椰子按钮显示正式岛屿总余额，并随成员钱包变化刷新。
+  - 预期：普通首页顶部椰子按钮显示人类成员 + 宠物钱包总和；创建额外人类只是新增成员卡，不自动切换当前主人，也不让顶部数字跳到新成员个人余额。展开某张成员卡时，顶部可临时显示该卡余额；普通态点击顶部椰子按钮打开全量椰子历史。
+  - 记录：2026-06-18 真机手测新增 P1：建立第二个人类后，首页顶部椰子数按钮显示的椰子数量不对。根因：成员新增成功回调在 `AddEntityDestinationView`、Home sheet wrapper 和根 `ContentView` 三层都可能写 `currentActiveHumanId`，其中根回调会把当前主人强制切到新建人类；同时 Header 普通态仍按 active human 钱包口径显示，而不是正式岛屿总余额。处理：新增 `ActiveHumanSelectionPolicy.activeHumanIdAfterCreatingHuman`，统一规则为“只有当前选择为空时，首个人类创建才设为 active；新增额外人类不切换 active human”，并让上述三层保存回调全部消费同一 policy；Header 普通态改为显示人类 + 宠物钱包总和，普通态点击打开全量椰子历史。自动验证：`scripts/dev-check-changed.sh` PASS；`git diff --check` PASS；`scripts/test-simulator.sh -only-testing:OhanaTests/ActiveHumanSelectionPolicyTests` PASS（iPhone 17 simulator，2 tests）。关闭条件：真机建立第二个人类后，顶部椰子数量仍为正式岛屿总余额；账户切换只改变当前主人上下文，不把顶部普通态改成单人余额。
+  - 记录：2026-06-18 真机手测新增 P1：宠物获得 1 个椰子后，椰子历史能看到流水，但首页顶部椰子按钮和宠物卡片都看不到更新。根因：`CoconutLedgerEntry` 已成功写入，`QuestManager.recordWalletProjection` 也更新了历史投影，但 `publishCoconutProjectionRevision` 只写 performance log，没有发布任何 Home 可监听的 read-model invalidation；因此纯钱包投影变化可能不会触发 Home payload 重取。处理：`ReadModelRevisionCenter` 新增独立 wallet projection revision，`QuestManager` 在钱包投影变化时发布受影响成员 id，Home data container 监听该 revision 并用既有 260ms coalescing 刷新 read model，避免污染 command mutation revision 计数。自动验证：新增 `CoconutWalletServiceTests.testWalletProjectionPublishesWalletRevisionWithoutCommandMutation` 覆盖钱包投影推进 wallet revision、但不推进 Home command revision；`scripts/dev-check-changed.sh` PASS；`git diff --check` PASS；当前本机 `xcodebuild` 环境卡住，`xcodebuild -list -project Ohana.xcodeproj` 也停在 invocation 后无输出，targeted test/build 尚未完成。关闭条件：真机宠物获得 1 个椰子后，椰子历史、首页顶部岛屿总余额、对应宠物卡余额三处一致更新。
+  - 记录：2026-06-19 用户真机复测通过：建立第二个人类后，顶部椰子数仍显示人类 + 宠物岛屿总余额；宠物获得 1 个椰子后，椰子历史、顶部椰子按钮、宠物卡余额三处同步更新；普通态点击顶部椰子按钮打开全量椰子历史，展开成员 / 宠物卡时才进入该卡对应历史。该子项关闭。
+
 - [ ] 正式发布包中开发者余额测试工具不可达。
   - 预期：正式配置构建的设置页不存在“椰子数量测试”等可直接改余额的开发工具入口。
   - 记录：
@@ -175,6 +182,14 @@
 ## GAP-6 通知分级
 
 人工验收目标：真机系统通知符合优先级、预算、合并、夜间免打扰和周报语义。
+
+自动化前置记录：2026-06-24 标准 `Ohana` Debug scheme 已能为真机
+`Guanchen's iPhone` 编译并签名 `Ohana.app` 与 `OhanaUITests-Runner.app`；
+产物 entitlements 包含 development Push 与 `iCloud.com.guanchen.li.Ohana`。
+本次 `testFirstReleaseReachableHomeOasisAndSettingsSmoke` 未进入 UI 自动化：
+Xcode preflight 停在 `Unlock Guanchen's iPhone to Continue`，等待后取消。
+因此该记录只证明 paid-team 标准 scheme 的真机构建/runner 签名阶段可达，
+不证明通知权限、到达、Focus/DND、banner 或 action 行为。
 
 - [ ] 真机允许通知权限后，创建 5 条同一天 routine 提醒。
   - 预期：系统通知最多到达 4 条；第 5 条仍在 App 内待办中可见，不被自动完成、跳过或删除。
@@ -289,6 +304,12 @@
 ## GAP-9 离世退场
 
 人工验收目标：离世不是删除；成员从活跃照护退场，历史和纪念入口保留，误标记可撤销。
+
+自动化前置记录：2026-06-24 标准 `Ohana` Debug scheme 真机 UI smoke 已完成
+iPhoneOS 编译和签名，`Ohana.app` 保留 development Push 与 iCloud entitlements，
+`OhanaUITests-Runner.app` 也成功生成；XCTest 启动被锁屏设备挡住，错误为
+`Unlock Guanchen's iPhone to Continue`，等待后取消。该记录不勾选下列 GAP-9
+人工项；离世标记/撤销、纪念入口、未来通知取消/恢复仍需解锁真机后手动或自动复测。
 
 - [ ] 在真实 UI 中标记一只宠物离世。
   - 预期：确认文案表达“未来照护安排退出活跃提醒、数据保留、可撤销”，不出现“删除未来提醒 / 事件”。
@@ -502,12 +523,13 @@
 
 自动验收已完成（2026-06-16，门禁 commit `8f6c792dc`）：Phase 7 模块明细中的 Medication、FamilyTasks、Expenses、DashboardRecords、Calendar、CrewRoster、Documents、Insurance、GrowthUnlock、Privacy、Achievements、Moments、Hygiene、HumanHealth、HumanNotes、Memorial、Milestones、Notifications、Onboarding、PetCare、PhotoAlbum、Plants、Security、Wishlist、Workouts、CareLedger、CatCare、FamilyReports、FunctionMenu 已经通过全仓 audits、fixture tests、`scripts/module-exit-gate.sh --full` 与 CI run `27607807044`。
 
-- [ ] Feeding / Food Log：创建喂食计划，立即返回 Food Log / feed mode 区域。
+- [x] Feeding / Food Log：创建喂食计划，立即返回 Food Log / feed mode 区域。
   - 预期：保存计划后 feed mode 立即保持 plan mode，不先闪回 manual；计划历史、今日计划和后续提醒使用同一份最新计划事实。
   - 记录：2026-06-17 真机测试发现 P1：宠物建立喂食计划后，Food Log 页 feed mode 会先回到 manual，过很久才回切到正确 plan mode。根因：保存计划 command 已写入 Event 与 `FeedOperatingMode`，但 QuickFeed 页 deferred refresh 仍用父层 `@Query allEvents` 的旧数组解析 mode；旧数组里没有刚创建的 plan event，`FeedOperatingMode.resolved` 因 `manualReminderEvents.isEmpty` 把 UI 强制拉回 manual，直到外层 query 很久后刷新才恢复。处理：`SaveFeedPlanCommandResult` 带回写完后的 authoritative events；QuickFeed route 用 `latestAllEventsOverride/currentAllEvents` 驱动 feed home snapshot、stock snapshot、overview、plan calendar 和 mode sync；保存 / 删除计划后立即更新 route-scoped events，父层事件数量变更后再释放 override。回归：`ManualFeedCommandTests.savedPlanResultCarriesFreshEventsBeforeRouteQueryCatchesUp` 覆盖“route props 仍为空但 command result 已有计划事件”时 mode 立即解析为 `.manualReminder`。验证：`scripts/test-simulator.sh -only-testing:OhanaTests/ManualFeedCommandTests` PASS（18 tests）；`scripts/dev-check-changed.sh` PASS。
   - 记录：2026-06-17 真机继续发现 P1：设置好喂粮计划后，从首页宠物卡片快捷操作点 `feed`，再点二级菜单左侧 quick check-in 按钮会卡死。复查路径：左侧按钮不是 Food Log sheet，而是 `VerticalHomeEmbeddedQuickActions` 延后一帧后调用 `performPetQuickAction("feed", petID:)`；command 入口虽然会重新 fetch 最新数据，但此前读取的是全量 `Event`，刚建计划后的首次点击会在主线程把全局日历/提醒事实、计划解析、喂食写入和 revision 派发压到同一次交互尾部。处理：`HomeCommandExecutor.fetchQuickCareEvents` 改为只读取当前 pet 直接 schedule 事件，并单独补“今日该 pet 用药 dose 事件”，保留 medication 快捷判断所需事实但不再全仓扫 Event；新增 `HomeCommandExecutorTests.homeFeedQuickActionCompletesFreshPlanWhenCardSnapshotIsStale`，覆盖 Home 卡片快照仍旧但 store 已有新计划时，左侧 quick check-in 直接完成 plan reminder、不打开详情、不触发无关 medication reminder 重排。验证：`scripts/test-simulator.sh -only-testing:OhanaTests/HomeCommandExecutorTests` PASS（183 tests）。关闭条件：真机复测“建喂食计划 -> 回首页宠物卡 feed -> 二级菜单左按钮”不卡死，并立即完成计划打卡。
   - 记录：2026-06-17 真机继续发现 P1：喂食手动模式下，从首页宠物卡片点打卡，出现反重复提醒后点 `Check in anyway` 会卡死。根因：`HomeRouteCoordinator.confirmAntiRepeatAction` 在 alert dismiss 的同一帧同步执行 pending business write；而手动喂食确认动作还绕过了 Home command queue，写完 fact 后没有走普通 Home revision / growth sync 手续。处理：确认按钮现在只清 alert 与 pending action，真实 pending action 通过 `OhanaFrameScheduler.runAfterNextFrame` 延后一帧执行；`VerticalSolidHomeView.performPetQuickAction` 把确认动作重新包进 `enqueueHomeCommand`；`ExpandedQuickActionExecutor` 的 anti-repeat pending action 改为返回 `Bool`，`HomeCommandExecutor` 只在确认后的手动 feed 成功写入时补发 Home mutation，计划 feed 已在 schedule completion 路径发 mutation 时不重复发。验证：`scripts/test-simulator.sh -only-testing:OhanaTests/HomeRouteCoordinatorTests -only-testing:OhanaTests/HomeCommandExecutorTests` PASS（212 tests）。关闭条件：真机复测“manual feed -> 最近已打卡提醒 -> Check in anyway”，alert 应立即关闭，随后完成喂食，不再卡住首页。
   - 记录：2026-06-17 本轮按用户要求由 Codex 在模拟器端完整复现喂食链路，不再只等真机逐项发现。首轮 UI smoke 真实复现 `home-quick-action-menu-feed` 点击后主线程 busy 30s；继续抓样本发现另一轮卡死在 `CoconutRewardFeedbackOverlay.body` / `CoconutRewardFeedbackCenter.enqueue` / `UINotificationFeedbackGenerator` 循环。根因补全：① QuickFeed settings-only sheet 隐藏了 manual default toggle，但仍用 `manualDefaultEnabled=false` 保存，导致 UI 显示 50g、实际保存 0g，首页 Feed 长期停在待设置；② 喂食写 fact 后同步串起 Today Focus completion、Home revision、Growth sync、Oasis / reward feedback，仍把业务派生挤进手指帧；③ `coconutRewardEvents` 用 `@Published lastCoconutRewardEvent` 伪装一次性事件，SwiftUI body 重建后重订阅会重放同一 reward event，造成 overlay / haptic / enqueue 循环。处理：settings-only manual default 强制保存可见克数并强制刷新 QuickFeed snapshot；Today Focus completion、Growth sync 与 Home revision 状态同步改为下一帧 / 延迟合并；奖励事件流改为 `PassthroughSubject` one-shot，并在 overlay 用 event id 去重、haptic 延后执行；新增 `testFeedingManualPlanAndHomeQuickActionSmoke` 覆盖 fresh 首建主人、starter gift、Today Focus 建宠、进入 Feed、保存 manual 默认、首页 quick feed、连续打卡确认、切 plan mode、从首页 plan quick feed。验证：`scripts/test-simulator.sh -only-testing:OhanaUITests/OhanaUITests/testFeedingManualPlanAndHomeQuickActionSmoke` PASS（iPhone 17 simulator，1 UI test，70.422s，xcresult `/var/folders/9j/7ldcxzn91d947mg4p_7wxmz40000gn/T/OhanaDerivedData/main-b6cf423d5931-tests/Logs/Test/Test-Ohana-2026.06.17_18-44-33-+0200.xcresult`）。关闭条件更新：上述三条真机喂食复测仍需用户二次确认，但模拟器已覆盖原 P1 卡死形态与 plan/manual 双模式回归。
+  - 记录：2026-06-19 用户真机复测通过：创建喂食计划后立即返回 Food Log，feed mode 仍为 plan mode；首页宠物卡快捷 Feed 的左侧 quick check-in 按钮不卡死；手动模式下打卡并点击 `Check in anyway` 不卡死。该 smoke 子项关闭。
 
 - [ ] Medication / Notifications：创建宠物用药、人类用药、普通提醒和健康关键提醒，并在真机上点通知。
   - 预期：提醒按成员和优先级正确出现；健康关键提醒不被夜间/预算错误延后；通知点击进入 typed route；完成 / 跳过不会重复写账或跳到错误成员。
@@ -538,6 +560,13 @@
   - 记录：2026-06-17 覆盖安装 / 启动层真机复验追加：同 GAP-8，`Ohana Local Device` 在 `Guanchen’s iPhone`（UDID `00008150-001270342EA3401C`）上完成 `/tmp` 派生目录构建、签名、覆盖安装和 `devicectl process launch`；设备容器中的 `ohana-startup-probe.log` 本次记录到 `bootstrap.payload-set`，证明覆盖安装后不再停在系统 icon / bootstrap 之前。物理 UI smoke 自动化仍因标准 Debug profile 与 LocalDeviceDebug test target 配置不可用而未跑；人工继续从“已安装 LocalDevice app”开始，按 Onboarding / 首宠 / Home Oasis / Settings 路径复测。
   - 记录：2026-06-17 首发核心链路物理 UI smoke 已补跑通过：`LocalDeviceDebug` test targets 配置后，`testFirstReleaseReachableHomeOasisAndSettingsSmoke` 在 `Guanchen’s iPhone` PASS（46.921s）。路径包含 launch/reset、创建首个人类、starter gift、从 Today Focus 创建首宠、切 Home Oasis、点击 FAB 让 Lv0 -> Lv1、打开 Settings。Settings 首轮物理 crash 已按 GAP-8 记录通过拆分 / 类型擦除修复。结论：Onboarding / 首宠 / Home Oasis / Settings 的首发 P0 核心链路自动化通过；FunctionMenu / CrewRoster / 其他模块真实 UI 扫描仍继续作为普通验收债。
   - 记录：2026-06-17 route-first-frame 假绿修复后重新跑同一条物理 smoke：`testFirstReleaseReachableHomeOasisAndSettingsSmoke` 在 `Guanchen’s iPhone` 再次 PASS（53.049s，xcresult `/tmp/ohana-device-route-first-frame-p0/Logs/Test/Test-Ohana-2026.06.17_14-07-40-+0200.xcresult`）。本次覆盖的是迁移 `AppAccountSwitcherRouteContainer` / `AppSettingsSheetRouteContainer` 和 Oasis service fetch 收口之后的代码，不再复用上一条旧证据。结论：Onboarding / 首宠 / Home Oasis / Settings 的首发 P0 核心链路在 route-first-frame 审计修正后仍绿。
+  - 记录：2026-06-19 真机继续手测发现 P1：添加非首个人类或宠物后，保存完成会进入详情页，而首个人类 / 宠物是回到首页。根因：CrewRoster inline add 把“新增保存完成”和“选择已有成员”共用 `onSelectPet` / `onSelectHuman` 回调；两个上层 route container 都把 select 语义解释为打开详情，因此新增第二个成员会被当作用户点选已有卡片。处理：新增 `CrewRosterInlineAddCompletion` 与 `onInlinePetSaved` / `onInlineHumanSaved` 回调，inline add 保存完成只关闭新增 route 并走 Home 新成员保存 handoff；选择已有成员仍保留打开详情语义。补充判断：Home 卡片长按路径本身对首个人类和非首个人类相同，均进入同一人类 profile route；用户看到的“详情不一样”来自 CrewRoster / sheet / inline add 等卡片式入口混用不同 route。自动验证：路径审计、UI / a11y / smoothness / route-first-frame / runtime guardrail 通过；targeted simulator test 在本机 `xcodebuild` invocation 后无输出并被中止。关闭条件：真机从 CrewRoster 或首页新增第二个人类 / 宠物后应直接回首页并显示新卡片，不自动打开详情；在首页长按任意人类卡片进入的详情页应一致。
+  - 记录：2026-06-19 产品交互规则更新：人类 / 宠物详情页入口统一改为“首页卡片放大后的右上角按钮”，不再使用长按卡片进入详情。处理：`FocusHomeVerticalSolidScene` 展开态新增右上角详情按钮，人类使用 person 图标、宠物使用 pawprint 图标；展开卡片本体和透明返回层移除长按详情手势，点击非按钮区域仍返回首页；旧 `FocusHomeWalletCardStackItem` 残留的“长按进入基本信息”提示和 hero 长按手势同步清理。验证：UI / a11y / smoothness / route-first-frame / runtime guardrail path audits 与 `git diff --check` 通过；2026-06-19 用户真机确认“点击卡片只放大；长按放大卡片不进入详情；只有右上角按钮进入对应人类 / 宠物详情页”。该交互关闭。
+  - 记录：2026-06-19 真机复测追踪到展开态视觉瑕疵：卡片放大后 quick action 按钮会闪一下，新的右上角详情按钮跟着 quick action 节奏一起出现，同时卡片 surface 自带的旧右上角状态元素（`ok` / 椰子）仍留在展开态。处理：quick action thaw 从最后一刻挂载改为展开后段平滑淡入，避免 ready 时 opacity 跳变；详情按钮显示从 quick action reveal 中解耦，改为随卡片 hero 进度独立淡入，只有展开稳定后才允许点击；旧 status badge 跟随 compact header 在展开时淡出。关闭条件：真机卡片放大后右上角只保留详情按钮，旧 `ok` / 椰子 badge 不显示；详情按钮不再随 quick action 按钮闪动，快捷操作按钮自身不再 late-pop 闪烁。
+  - 记录：2026-06-19 真机复测发现 P1：人类详情页只有第一个 / 当前 active human 显示删除成员按钮，其余人类详情没有删除入口；所有人类详情都没有标记离世按钮，而宠物详情正常。根因：`HumanDetailView` 和 `HumanBasicInfoDetailView` 各自散写危险区，并把删除入口绑在 `isViewingOwnProfile` 上；人类离世 command 已存在，但 full detail / basic info 未接 UI，只有 CrewRoster 编辑器有局部入口。处理：新增共享 `HumanLifecycleDangerZone`，full detail 和 basic info 都消费同一个“标记离世 / 撤销离世 / 彻底删除”组件；删除不再受 active human 限制，仍走输入姓名确认与既有 delayed destructive command；标记 / 撤销离世走 `MemberCommandExecutor.markHumanPassedAway` / `undoHumanPassedAway` 并发布 member lifecycle revision。验证：Members path UI / a11y / smoothness / route-first-frame / runtime guardrail audits 与 `git diff --check` 通过。关闭条件：真机任意人类详情页都显示标记离世和彻底删除；标记后显示离世摘要与撤销离世；删除仍不卡死并正确回到首页 / 账户切换流程。
+  - 记录：2026-06-19 真机继续复测：展开卡片后右上角详情按钮已正常，但 quick action 按钮本身仍闪一下。二次根因：`FocusHomeVerticalSolidQuickActionLayer` 在 `isReady` 临界点从 clipped 分支切到 unclipped 分支，会重建操作层子树；视觉上表现为展开末段闪动。处理：quick action 层改为单一稳定树，始终使用同一个 reveal clip / opacity / disabled-animation 事务，只在 `isReady` 时打开 hit testing，避免 ready 阶段换分支。关闭条件：真机展开卡片后 quick action 不再闪，右上角详情按钮继续保持独立稳定。
+  - 记录：2026-06-19 真机继续复测：删除人类后卡死，console 同时出现 TextInputUI `containerToPush is nil` 和 `Result accumulator timeout`。判断：日志本身更像键盘候选系统噪声，但触发点说明确认 sheet 的输入焦点、sheet dismiss、详情 route dismiss 和 destructive deletion handoff 仍挤在同一交互窗口。处理：人类删除确认 sheet 对齐宠物删除，补 `FocusState`、提交删除前先 resign keyboard、姓名匹配使用共享 `ConfirmationNameMatcher`；确认后先关闭 sheet 并延后 180ms 再进入详情 dismiss + 既有 delayed destructive command。关闭条件：真机删除任意人类不再卡死，删除后回到首页或账户切换状态，剩余卡片刷新不需要手动切 tab。
+  - 记录：2026-06-19 真机继续复测：删除人类后 App 会停在首个人类的放大卡片页面，关闭并重开 App 后恢复正常。根因补充：破坏性删除虽然会发 `humanDeleted` route event 并 reset navigation root，但 Home 卡片栈缺少“外部删除事件强制归零 expanded/hero/header 状态”的显式输入；之前只靠 `onDisappear` 或卡片集合变化间接 reconciliation，真机时序下仍可能把旧 expanded 状态留在 Home。处理：`ContentView` 收到 `humanDeleted` 时刷新 `homeCardStateResetToken`，一路传入 `VerticalSolidHomeDashboardPage`，卡片栈收到 token 后无动画清理 `selectedCardId`、`activeHeroSnapshot`、hero progress、header context、expanded/animating flags；同时补 `cardIdentityKey` 变化时触发 selection reconciliation。关闭条件：真机删除任意人类后不能停在任何放大卡片页；返回 Home 时卡片栈应处于普通折叠态，剩余人类 / 宠物卡即时可见且可点击。
 
 - [ ] PetCare / CatCare / Hygiene / Moments：执行快捷照护、猫砂、护理和 quick moment。
   - 预期：事实保存、奖励反馈、账本、Today Focus 状态和历史记录一致；重复点击不会重复奖励；已故对象只读或 no-op。

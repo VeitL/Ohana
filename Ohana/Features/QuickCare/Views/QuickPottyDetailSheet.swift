@@ -14,7 +14,8 @@ struct QuickPottyDetailSheet: View {
     var onClose: (() -> Void)?
     let allEvents: [Event]
     let allPets: [Pet]
-    let pottyLedgerEvents: [CareLedgerEvent]
+    let pottyEntries: [PoopPottyLedgerEntry]
+    let litterEntries: [PoopLitterLedgerEntry]
     let legacyPottyDeleteLogs: [PetPottyLog]
     let legacyLitterDeleteLogs: [PetCareLog]
 
@@ -59,7 +60,8 @@ struct QuickPottyDetailSheet: View {
         onClose: (() -> Void)? = nil,
         allEvents: [Event] = [],
         allPets: [Pet] = [],
-        pottyLedgerEvents: [CareLedgerEvent] = [],
+        pottyEntries: [PoopPottyLedgerEntry] = [],
+        litterEntries: [PoopLitterLedgerEntry] = [],
         legacyPottyDeleteLogs: [PetPottyLog] = [],
         legacyLitterDeleteLogs: [PetCareLog] = []
     ) {
@@ -68,7 +70,8 @@ struct QuickPottyDetailSheet: View {
         self.onClose = onClose
         self.allEvents = allEvents
         self.allPets = allPets
-        self.pottyLedgerEvents = pottyLedgerEvents
+        self.pottyEntries = pottyEntries
+        self.litterEntries = litterEntries
         self.legacyPottyDeleteLogs = legacyPottyDeleteLogs
         self.legacyLitterDeleteLogs = legacyLitterDeleteLogs
     }
@@ -123,22 +126,7 @@ struct QuickPottyDetailSheet: View {
     }
 
     var pottyLogs: [PoopPottyLedgerEntry] {
-        pottyLedgerEvents.compactMap { event in
-            guard event.eventKindEnum == .potty,
-                  event.subjectKind == CareLedgerSubjectKind.pet.rawValue,
-                  event.subjectId == petKey,
-                  let pottyType = PottyType(rawValue: event.actionType) else { return nil }
-            let legacyLogId = event.legacyModelName == "PetPottyLog"
-                ? event.legacyModelId.flatMap(UUID.init(uuidString:))
-                : nil
-            return PoopPottyLedgerEntry(
-                id: event.id,
-                date: event.occurredAt,
-                pottyType: pottyType,
-                legacyLogId: legacyLogId
-            )
-        }
-        .sorted { $0.date > $1.date }
+        pottyEntries
     }
 
     var unknownSharedPottyItems: [PoopLogItem] {
@@ -151,21 +139,7 @@ struct QuickPottyDetailSheet: View {
     }
 
     var litterLogs: [PoopLitterLedgerEntry] {
-        pottyLedgerEvents.compactMap { event in
-            guard event.eventKindEnum == .care,
-                  event.subjectKind == CareLedgerSubjectKind.pet.rawValue,
-                  event.subjectId == petKey,
-                  event.actionType == CareType.litter.rawValue else { return nil }
-            let legacyLogId = event.legacyModelName == "PetCareLog"
-                ? event.legacyModelId.flatMap(UUID.init(uuidString:))
-                : nil
-            return PoopLitterLedgerEntry(
-                id: event.id,
-                date: event.occurredAt,
-                legacyLogId: legacyLogId
-            )
-        }
-        .sorted { $0.date > $1.date }
+        litterEntries
     }
 
     var todayLitterLogs: [PoopLitterLedgerEntry] {

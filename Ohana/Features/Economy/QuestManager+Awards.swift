@@ -61,13 +61,14 @@ extension QuestManager {
         let finalHuman = result.humanCoconuts
         let finalPet = result.petCoconuts
         // ── 2. 钱包流水（拆分：宠物和人类各生成独立条目）
+        let l = L10n.current
         let logEmoji = result.luck == .golden ? "🎁" : type.emoji
-        var baseTitle = type.title(pet: pet)
-        if let badge = quality.badgeLabel {
+        var baseTitle = type.title(pet: pet, l: l)
+        if let badge = quality.badgeLabel(l: l) {
             baseTitle += " · \(badge)"
         }
-        if result.luck != .none {
-            baseTitle += result.luck == .golden ? " · 金色幸运" : " · 小幸运"
+        if let luckTitle = Self.economyLuckTitle(result.luck, l: l) {
+            baseTitle += " · \(luckTitle)"
         }
 
         var walletDeltas: [CoconutWalletDelta] = []
@@ -209,11 +210,12 @@ extension QuestManager {
         let petTotal = petAwards.reduce(0, +)
         let humanTotal = human == nil ? 0 : result.humanCoconuts
 
+        let l = L10n.current
         let logEmoji = result.luck == .golden ? "🎁" : type.emoji
-        let petNames = livePets.prefix(3).map(\.name).joined(separator: "、") + (livePets.count > 3 ? " 等\(livePets.count)只" : "")
-        var sharedTitle = title ?? "共同照护 · \(petNames)"
-        if result.luck != .none {
-            sharedTitle += result.luck == .golden ? " · 金色幸运" : " · 小幸运"
+        let petNames = Self.sharedCarePetNames(livePets, l: l)
+        var sharedTitle = title ?? Self.sharedCareTitle(petNames: petNames, l: l)
+        if let luckTitle = Self.economyLuckTitle(result.luck, l: l) {
+            sharedTitle += " · \(luckTitle)"
         }
 
         var walletDeltas: [CoconutWalletDelta] = []
@@ -238,7 +240,7 @@ extension QuestManager {
                 delta: humanTotal,
                 entryKind: .reward,
                 source: .careEvent,
-                title: result.luck == .golden ? "金色幸运共同照护奖励" : "共同照护奖励",
+                title: Self.sharedCareHumanTitle(isGolden: result.luck == .golden, l: l),
                 emoji: "🥥",
                 actorId: human.id.uuidString,
                 actorName: human.name,
@@ -302,5 +304,43 @@ extension QuestManager {
         }
 
         return (humanTotal, petTotal)
+    }
+
+    private static func economyLuckTitle(_ luck: EconomyLuckTier, l: L10n) -> String? {
+        switch luck {
+        case .none:
+            nil
+        case .small:
+            l.tr(zh: "小幸运", en: "Lucky boost", de: "Kleiner Glücksbonus")
+        case .golden:
+            l.tr(zh: "金色幸运", en: "Golden luck", de: "Goldglück")
+        }
+    }
+
+    private static func sharedCarePetNames(_ pets: [Pet], l: L10n) -> String {
+        let displayedNames = pets.prefix(3).map(\.name)
+        let head = displayedNames.joined(separator: l.isChinese ? "、" : ", ")
+        let remaining = pets.count - displayedNames.count
+        guard remaining > 0 else { return head }
+        return l.tr(
+            zh: "\(head) 等\(pets.count)只",
+            en: "\(head) + \(remaining) more",
+            de: "\(head) + \(remaining) weitere"
+        )
+    }
+
+    private static func sharedCareTitle(petNames: String, l: L10n) -> String {
+        l.tr(zh: "共同照护 · \(petNames)", en: "Shared care · \(petNames)", de: "Gemeinsame Pflege · \(petNames)")
+    }
+
+    private static func sharedCareHumanTitle(isGolden: Bool, l: L10n) -> String {
+        if isGolden {
+            return l.tr(
+                zh: "金色幸运共同照护奖励",
+                en: "Golden luck shared care reward",
+                de: "Goldglück-Bonus für gemeinsame Pflege"
+            )
+        }
+        return l.tr(zh: "共同照护奖励", en: "Shared care reward", de: "Bonus für gemeinsame Pflege")
     }
 }

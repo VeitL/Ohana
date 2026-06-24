@@ -79,6 +79,7 @@ struct OnboardingView: View {
     @AppStorage("ohana_show_first_success_card") private var showFirstSuccessCard: Bool = false
     @AppStorage("ohana_first_quick_checkin_completed") private var firstQuickCheckInCompleted: Bool = false
     @AppStorage("appLanguage") private var appLanguage: String = AppLanguage.detectedCode
+    @AppStorage(AppCountry.storageKey) private var appCountry = AppCountry.detectedCode
     @AppStorage(AppPerformanceMode.powerSavingKey) private var powerSavingMode = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.modelContext) private var modelContext
@@ -106,6 +107,8 @@ struct OnboardingView: View {
     @State private var isProfilePrepared = false
     @State private var isHomeJoinHandoffPreflightActive = false
     @State private var isHomeJoinHandoffPresentationActive = false
+    @State private var isSkippingProfile = false
+    @State private var skipProfileError = ""
     private let introPageCount = 3
 
     private var languageCode: String { AppLanguage.normalize(appLanguage) }
@@ -304,42 +307,69 @@ struct OnboardingView: View {
     }
 
     private func onboardingIntroActions(width: CGFloat) -> some View {
-        HStack(spacing: 10) {
-            if isReplay {
-                Button {
-                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                    onReplayFinished?()
-                } label: {
-                    Text(localized(zh: "关闭", en: "Close", de: "Schliessen"))
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.72)
-                        .font(OhanaFont.callout(.black))
-                        .foregroundStyle(OnboardingPalette.primaryText.opacity(0.72))
-                        .frame(width: 104, height: 54)
-                        .background(OnboardingPalette.mutedFill, in: Capsule())
-                }
-                .buttonStyle(ScaleButtonStyle())
+        VStack(spacing: 8) {
+            if !skipProfileError.isEmpty {
+                Text(skipProfileError)
+                    .font(OhanaFont.caption(.semibold))
+                    .foregroundStyle(Color.goRed)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
             }
 
-            Button(action: advanceFromWelcome) {
-                HStack(spacing: 8) {
-                    Text(introPageIndex < introPageCount - 1
-                        ? localized(zh: "下一页", en: "Next", de: "Weiter")
-                        : localized(zh: "建立本人档案", en: "Create profile", de: "Profil erstellen"))
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.72)
-                    Image(systemName: introPageIndex < introPageCount - 1 ? "chevron.right" : "arrow.right")
-                        .font(OhanaFont.adaptive(size: 13, weight: .black))
+            HStack(spacing: 10) {
+                if isReplay {
+                    Button {
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        onReplayFinished?()
+                    } label: {
+                        Text(localized(zh: "关闭", en: "Close", de: "Schliessen"))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.72)
+                            .font(OhanaFont.callout(.black))
+                            .foregroundStyle(OnboardingPalette.primaryText.opacity(0.72))
+                            .frame(width: 104, height: 54)
+                            .background(OnboardingPalette.mutedFill, in: Capsule())
+                    }
+                    .buttonStyle(ScaleButtonStyle())
+                } else if introPageIndex == introPageCount - 1 {
+                    Button {
+                        skipProfileSetup()
+                    } label: {
+                        Text(isSkippingProfile
+                            ? localized(zh: "准备中", en: "Preparing", de: "Bereit")
+                            : localized(zh: "跳过身份", en: "Skip identity", de: "Überspringen"))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.72)
+                            .font(OhanaFont.callout(.black))
+                            .foregroundStyle(OnboardingPalette.primaryText.opacity(0.72))
+                            .frame(width: 118, height: 54)
+                            .background(OnboardingPalette.mutedFill, in: Capsule())
+                    }
+                    .buttonStyle(ScaleButtonStyle())
+                    .disabled(isFlippingToProfile || isSkippingProfile)
                 }
-                .font(OhanaFont.callout(.black))
-                .foregroundStyle(OnboardingPalette.selectedText)
-                .frame(maxWidth: .infinity)
-                .frame(height: 54)
-                .background(Color.goLime, in: Capsule())
+
+                Button(action: advanceFromWelcome) {
+                    HStack(spacing: 8) {
+                        Text(introPageIndex < introPageCount - 1
+                            ? localized(zh: "下一页", en: "Next", de: "Weiter")
+                            : localized(zh: "建立本人档案", en: "Create profile", de: "Profil erstellen"))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.72)
+                        Image(systemName: introPageIndex < introPageCount - 1 ? "chevron.right" : "arrow.right")
+                            .font(OhanaFont.adaptive(size: 13, weight: .black))
+                    }
+                    .font(OhanaFont.callout(.black))
+                    .foregroundStyle(OnboardingPalette.selectedText)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 54)
+                    .background(Color.goLime, in: Capsule())
+                }
+                .buttonStyle(ScaleButtonStyle())
+                .accessibilityIdentifier("onboarding-intro-primary-action")
+                .disabled(isFlippingToProfile || isSkippingProfile)
             }
-            .buttonStyle(ScaleButtonStyle())
-            .accessibilityIdentifier("onboarding-intro-primary-action")
-            .disabled(isFlippingToProfile)
         }
         .frame(width: width)
     }
@@ -577,6 +607,7 @@ struct OnboardingView: View {
     private func startProfileSetup() {
         guard !isFlippingToProfile else { return }
         flipTask?.cancel()
+        skipProfileError = ""
         humanWizardSessionId = UUID()
         flipProgress = 0
         isProfilePrepared = true
@@ -647,6 +678,45 @@ struct OnboardingView: View {
         persistActiveHumanId(human.id.uuidString)
         OnboardingHomeJoinHandoffGate.markCompleted()
         onPrimaryHumanSaved?(human)
+    }
+
+    private func skipProfileSetup() {
+        guard !isReplay, !isSkippingProfile else { return }
+        isSkippingProfile = true
+        skipProfileError = ""
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+
+        var draft = MemberCreationDraft(kind: .human)
+        draft.name = skippedProfileName()
+        do {
+            let result = try appServices.memberCreation.save(
+                draft: draft,
+                existingPets: [],
+                existingHumans: [],
+                context: modelContext,
+                countryCode: appCountry
+            )
+            guard let human = result.human else {
+                throw MemberCreationError.saveFailed("Skipped profile did not create a human.")
+            }
+            recordOnboardingHumanSaved(human)
+            finishOnboarding(playsFeedback: false)
+        } catch {
+            isSkippingProfile = false
+            skipProfileError = localized(
+                zh: "暂时无法跳过，请先建立本人档案。",
+                en: "Skip is unavailable right now. Create a profile first.",
+                de: "Überspringen ist gerade nicht verfügbar. Erstelle zuerst ein Profil."
+            )
+            OhanaLog.warning(
+                "Onboarding skip profile failed: \(error.localizedDescription)",
+                category: "Onboarding"
+            )
+        }
+    }
+
+    private func skippedProfileName() -> String {
+        localized(zh: "我", en: "Me", de: "Ich")
     }
 
     private func recoverInterruptedOnboardingIfNeeded() {

@@ -23,25 +23,35 @@ final class ReminderCompletionService: ReminderCompleting {
     private let careLedger: CareLedgerRecording
     private let familyTasks: FamilyTaskManaging
     private let reminderScheduling: ReminderSchedulingManaging
+    private let notifications: ReminderNotificationScheduling
 
     init(
         careLedger: CareLedgerRecording = CareLedgerService(),
         familyTasks providedFamilyTasks: FamilyTaskManaging? = nil,
-        reminderScheduling: ReminderSchedulingManaging? = nil
+        reminderScheduling: ReminderSchedulingManaging? = nil,
+        notifications: ReminderNotificationScheduling = ReminderNotificationSchedulerRegistry.current
     ) {
         self.careLedger = careLedger
         self.familyTasks = providedFamilyTasks ?? DomainServiceDependencyRegistry.familyTasks()
         self.reminderScheduling = reminderScheduling ?? DomainServiceDependencyRegistry.reminderScheduling(careLedger: careLedger)
+        self.notifications = notifications
     }
 
     @discardableResult
     func complete(_ reminder: Reminder, by humanId: String?, context: ModelContext) -> Bool {
-        Self.complete(reminder, by: humanId, context: context, careLedger: careLedger, familyTasks: familyTasks)
+        Self.complete(
+            reminder,
+            by: humanId,
+            context: context,
+            careLedger: careLedger,
+            familyTasks: familyTasks,
+            notifications: notifications
+        )
     }
 
     @discardableResult
     func skip(_ reminder: Reminder, by humanId: String?, context: ModelContext) -> Bool {
-        Self.skip(reminder, by: humanId, context: context, careLedger: careLedger)
+        Self.skip(reminder, by: humanId, context: context, careLedger: careLedger, notifications: notifications)
     }
 
     @discardableResult
@@ -76,7 +86,8 @@ final class ReminderCompletionService: ReminderCompleting {
         by humanId: String?,
         context: ModelContext,
         careLedger: CareLedgerRecording = CareLedgerService(),
-        familyTasks providedFamilyTasks: FamilyTaskManaging? = nil
+        familyTasks providedFamilyTasks: FamilyTaskManaging? = nil,
+        notifications: ReminderNotificationScheduling = ReminderNotificationSchedulerRegistry.current
     ) -> Bool {
         let familyTasks = providedFamilyTasks ?? DomainServiceDependencyRegistry.familyTasks()
         let now = Date()
@@ -97,7 +108,7 @@ final class ReminderCompletionService: ReminderCompleting {
             return false
         }
         context.safeSave()
-        cancelNotification(for: reminder)
+        cancelNotification(for: reminder, notifications: notifications)
         runReminderEffects(
             reminder,
             actionType: "complete",
@@ -117,7 +128,8 @@ final class ReminderCompletionService: ReminderCompleting {
         _ reminder: Reminder,
         by humanId: String?,
         context: ModelContext,
-        careLedger: CareLedgerRecording = CareLedgerService()
+        careLedger: CareLedgerRecording = CareLedgerService(),
+        notifications: ReminderNotificationScheduling = ReminderNotificationSchedulerRegistry.current
     ) -> Bool {
         let now = Date()
         guard let mutation = DomainScheduleWriteAuthorizer.authorizeExistingReminderMutation(
@@ -137,7 +149,7 @@ final class ReminderCompletionService: ReminderCompleting {
             return false
         }
         context.safeSave()
-        cancelNotification(for: reminder)
+        cancelNotification(for: reminder, notifications: notifications)
         runReminderEffects(
             reminder,
             actionType: "skip",
@@ -250,10 +262,10 @@ final class ReminderCompletionService: ReminderCompleting {
         return true
     }
 
-    private static func cancelNotification(for reminder: Reminder) {
+    private static func cancelNotification(for reminder: Reminder, notifications: ReminderNotificationScheduling) {
         let notificationId = reminder.notificationId.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !notificationId.isEmpty else { return }
-        OhanaNotifications.current.cancel(notificationId: notificationId)
+        notifications.cancel(notificationId: notificationId)
     }
 
     private static func runReminderEffects(

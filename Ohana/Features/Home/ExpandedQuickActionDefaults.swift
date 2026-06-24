@@ -7,7 +7,7 @@
 
 import Foundation
 
-enum ExpandedQuickActionDefaults {
+nonisolated enum ExpandedQuickActionDefaults {
     static func humanItems(for human: Human, localization l: L10n) -> [QuickActionItem] {
         [
             QuickActionItem(label: l.homeQAWeight, icon: "scalemass.fill", colorHex: "80FFEA",

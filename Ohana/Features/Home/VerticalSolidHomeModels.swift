@@ -57,6 +57,14 @@ nonisolated struct VerticalSolidHomePlantSnapshot: Identifiable, Equatable, Send
     let needsCare: Bool
 }
 
+nonisolated struct VerticalSolidHomeFirstPetEmptyState: Equatable, Sendable {
+    let eyebrow: String
+    let title: String
+    let subtitle: String
+    let progressText: String
+    let primaryActionTitle: String
+}
+
 nonisolated struct VerticalSolidHomeSnapshot: @unchecked Sendable {
     var isReady = false
     var greeting = ""
@@ -64,6 +72,7 @@ nonisolated struct VerticalSolidHomeSnapshot: @unchecked Sendable {
     var coconutText = "0"
     var todayFocus = TodayFocusSnapshot.empty
     var cards: [FocusCard] = []
+    var firstPetEmptyState: VerticalSolidHomeFirstPetEmptyState?
     var plants: [VerticalSolidHomePlantSnapshot] = []
     var heroPreparationRevision = ""
 

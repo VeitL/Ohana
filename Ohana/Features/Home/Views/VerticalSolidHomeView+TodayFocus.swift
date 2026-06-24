@@ -73,18 +73,18 @@ extension VerticalSolidHomeView {
 
         if let medicationId = IslandQuestEngine.medicationId(fromQuestId: quest.id),
            let target = petMedicationTarget(medicationId) {
-            routeCoordinator.openSheet(.petMedication(target.pet.id))
+            routeCoordinator.openSheet(.petMedication(target))
             return
         }
 
         if let humanId = IslandQuestEngine.humanWeightId(fromQuestId: quest.id),
-           let human = humans.first(where: { $0.id == humanId }) {
-            routeCoordinator.openSheet(.humanWeight(human.id))
+           interaction.containsHuman(humanId) {
+            routeCoordinator.openSheet(.humanWeight(humanId))
             return
         }
 
         if let pet = targetPet(for: quest) {
-            openPetQuickKey(todayFocusPetQuickKey(for: quest, pet: pet), pet: pet)
+            openPetQuickKey(todayFocusPetQuickKey(for: quest, pet: pet), petID: pet.id)
             return
         }
 
@@ -106,8 +106,8 @@ extension VerticalSolidHomeView {
 
         if let medicationId = IslandQuestEngine.medicationId(fromQuestId: quest.id),
            let target = petMedicationTarget(medicationId) {
-            let petID = target.pet.id
-            let medicationID = target.medication.id
+            let petID = target
+            let medicationID = medicationId
             enqueueHomeCommand(.medicationDose(petID: petID, medicationID: medicationID)) {
                 if commandExecutor.recordMedicationDose(petID: petID, medicationID: medicationID) {
                     applyTodayFocusMutationFeedback(entityId: petID)
@@ -118,8 +118,8 @@ extension VerticalSolidHomeView {
         }
 
         if let eventId = IslandQuestEngine.eventId(fromQuestId: quest.id),
-           let event = allEvents.first(where: { $0.id == eventId }) {
-            let eventID = event.id
+           interaction.eventRoutesByEventID[eventId] != nil {
+            let eventID = eventId
             enqueueHomeCommand(.todayFocus(entityID: eventID, action: "eventComplete")) {
                 if commandExecutor.completeTodayFocusEvent(eventID: eventID) {
                     applyTodayFocusMutationFeedback(entityId: eventID)
@@ -154,8 +154,8 @@ extension VerticalSolidHomeView {
         }
 
         if let humanId = IslandQuestEngine.humanWeightId(fromQuestId: quest.id),
-           let human = humans.first(where: { $0.id == humanId }) {
-            routeCoordinator.openSheet(.humanWeight(human.id))
+           interaction.containsHuman(humanId) {
+            routeCoordinator.openSheet(.humanWeight(humanId))
             return
         }
 
@@ -172,7 +172,7 @@ extension VerticalSolidHomeView {
         case "litter":
             performPetQuickAction("litter", petID: pet.id)
         case "weight", "moment":
-            openPetQuickKey(todayFocusPetQuickKey(for: quest, pet: pet), pet: pet)
+            openPetQuickKey(todayFocusPetQuickKey(for: quest, pet: pet), petID: pet.id)
         default:
             openTodayFocusQuest(quest)
         }
@@ -180,33 +180,33 @@ extension VerticalSolidHomeView {
 
     func openTodayFocusNegativeSignal(_ signal: IslandNegativeSignal) {
         if let petId = signal.petId,
-           let pet = pets.first(where: { $0.id == petId && !$0.hasPassedAway }) {
+           interaction.activePet(id: petId) != nil {
             switch todayFocusNegativeRouteHint(for: signal) {
             case .petOverview:
-                onOpenPet(pet.id, .overview)
+                onOpenPet(petId, .overview)
             case .feed:
-                routeCoordinator.openSheet(.petFeed(pet.id, opensManualSheet: false))
+                routeCoordinator.openSheet(.petFeed(petId, opensManualSheet: false))
             case .water:
-                routeCoordinator.openSheet(.petWater(pet.id))
+                routeCoordinator.openSheet(.petWater(petId))
             case .potty:
-                routeCoordinator.openSheet(.petPotty(pet.id))
+                routeCoordinator.openSheet(.petPotty(petId))
             case .walk:
-                routeCoordinator.openSheet(.petWalkSummary(pet.id))
+                routeCoordinator.openSheet(.petWalkSummary(petId))
             case .weight:
-                routeCoordinator.openSheet(.petWeight(pet.id))
+                routeCoordinator.openSheet(.petWeight(petId))
             case .medication:
-                routeCoordinator.openSheet(.petMedication(pet.id))
+                routeCoordinator.openSheet(.petMedication(petId))
             case .allFeatures:
-                routeCoordinator.openSheet(.petAllFeatures(pet.id))
+                routeCoordinator.openSheet(.petAllFeatures(petId))
             case .health, .plant:
-                routeCoordinator.openSheet(.petHealth(pet.id, initialSection: .preventive))
+                routeCoordinator.openSheet(.petHealth(petId, initialSection: .preventive))
             }
             return
         }
 
         if PlantFeatureGate.allows(.plants),
            let plantId = signal.plantId,
-           plants.contains(where: { $0.id == plantId }) {
+           interaction.plantIDs.contains(plantId) {
             onOpenPlant(plantId)
             return
         }
@@ -246,12 +246,12 @@ extension VerticalSolidHomeView {
     func openTodayFocusExchange(_ request: TodayFocusExchangeRequestSnapshot) {
         guard CoconutExchangeFeatureGate.isEnabled else { return }
         if let receiverId = UUID(uuidString: request.receiverId),
-           let receiver = humans.first(where: { $0.id == receiverId }) {
-            routeCoordinator.openCoconutLog(.human(receiver.id))
+           interaction.containsHuman(receiverId) {
+            routeCoordinator.openCoconutLog(.human(receiverId))
             return
         }
 
-        if let receiver = activeHuman {
+        if let receiver = interaction.activeHuman {
             routeCoordinator.openCoconutLog(.human(receiver.id))
             return
         }
@@ -261,7 +261,7 @@ extension VerticalSolidHomeView {
 
     func confirmTodayFocusExchange(_ request: TodayFocusExchangeRequestSnapshot) {
         guard CoconutExchangeFeatureGate.isEnabled else { return }
-        guard let receiver = activeHuman else {
+        guard let receiver = interaction.activeHuman else {
             routeCoordinator.openAccountSwitcher()
             return
         }
@@ -286,8 +286,8 @@ extension VerticalSolidHomeView {
         case IslandQuestEngine.oasisPetWizardQuestId:
             routeCoordinator.openAddEntity(.pet)
         case IslandQuestEngine.oasisFirstMealQuestId:
-            if let pet = pets.first(where: { !$0.hasPassedAway }) {
-                routeCoordinator.openSheet(.petFeed(pet.id, opensManualSheet: false))
+            if let petID = interaction.firstActivePetID {
+                routeCoordinator.openSheet(.petFeed(petID, opensManualSheet: false))
             } else {
                 routeCoordinator.openAddEntity(.pet)
             }
@@ -299,53 +299,39 @@ extension VerticalSolidHomeView {
         return true
     }
 
-    func eventDestination(for quest: IslandQuest) -> FocusHomeReminderDestination? {
+    func eventDestination(for quest: IslandQuest) -> HomeReminderRouteSnapshot? {
         guard let eventId = IslandQuestEngine.eventId(fromQuestId: quest.id)
-            ?? IslandQuestEngine.carePlanEventId(fromQuestId: quest.id),
-            let event = allEvents.first(where: { $0.id == eventId }) else {
+            ?? IslandQuestEngine.carePlanEventId(fromQuestId: quest.id) else {
             return nil
         }
-        return FocusHomeReminderDeepLinkRouter.destination(
-            for: event,
-            pets: pets,
-            humans: humans,
-            plants: plants,
-            humanMedications: humanMedications
-        )
+        return interaction.eventRoutesByEventID[eventId]
     }
 
-    func petMedicationTarget(_ medicationId: UUID) -> (pet: Pet, medication: PetMedication)? {
-        for pet in pets where !pet.hasPassedAway {
-            if let medication = pet.medications.first(where: { $0.id == medicationId }) {
-                return (pet, medication)
-            }
-        }
-        return nil
+    func petMedicationTarget(_ medicationId: UUID) -> UUID? {
+        interaction.petMedicationTargetsByMedicationID[medicationId]
     }
 
-    func targetPet(for quest: IslandQuest) -> Pet? {
+    func targetPet(for quest: IslandQuest) -> HomePetInteractionSnapshot? {
         if let targetPetId = quest.targetPetId,
-           let pet = pets.first(where: { $0.id == targetPetId && !$0.hasPassedAway }) {
+           let pet = interaction.activePet(id: targetPetId) {
             return pet
         }
         if quest.id == "q_walk" || quest.id == "q_potty" || quest.id.hasPrefix("q_walk_") || quest.id.hasPrefix("q_potty_") {
-            return pets.first(where: { !$0.hasPassedAway })
+            return interaction.firstActivePetID.flatMap { interaction.activePet(id: $0) }
         }
         return nil
     }
 
-    func targetPlant(for quest: IslandQuest) -> Plant? {
+    func targetPlant(for quest: IslandQuest) -> VerticalSolidHomePlantSnapshot? {
         guard PlantFeatureGate.allows(.plants) else { return nil }
         if let targetPlantId = quest.targetPlantId {
-            return plants.first(where: { $0.id == targetPlantId })
+            return controller.snapshot.plants.first(where: { $0.id == targetPlantId })
         }
         switch quest.id {
         case "q_water_plant":
-            let focusDate = todayFocusSnapshotDate()
-            return plants.first(where: { $0.needsWatering(on: focusDate) })
+            return controller.snapshot.plants.first(where: { $0.needsCare }) ?? controller.snapshot.plants.first
         case "q_fertilize_plant":
-            let focusDate = todayFocusSnapshotDate()
-            return plants.first(where: { $0.needsFertilizing(on: focusDate) })
+            return controller.snapshot.plants.first(where: { $0.needsCare }) ?? controller.snapshot.plants.first
         default:
             return nil
         }
@@ -357,11 +343,11 @@ extension VerticalSolidHomeView {
         return Date(timeIntervalSince1970: TimeInterval(dayToken))
     }
 
-    func openTodayFocusPlant(_ plant: Plant) {
+    func openTodayFocusPlant(_ plant: VerticalSolidHomePlantSnapshot) {
         onOpenPlant(plant.id)
     }
 
-    func todayFocusPetQuickKey(for quest: IslandQuest, pet: Pet) -> String {
+    func todayFocusPetQuickKey(for quest: IslandQuest, pet: HomePetInteractionSnapshot) -> String {
         if quest.id.hasPrefix("q_feed_") { return "feed" }
         if quest.id.hasPrefix("q_water_") { return "water" }
         if quest.id == "q_walk" || quest.id.hasPrefix("q_walk_") { return "walk" }

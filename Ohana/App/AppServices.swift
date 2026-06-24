@@ -82,7 +82,8 @@ final class AppServices {
         let reminderCompletion = ReminderCompletionService(
             careLedger: careLedger,
             familyTasks: familyTasks,
-            reminderScheduling: reminderScheduling
+            reminderScheduling: reminderScheduling,
+            notifications: notificationManager
         )
         let quickActionReminderCompletion = QuickActionReminderCompletionSyncService(reminderCompletion: reminderCompletion)
         let careEventDependencies = CareEventServiceDependencies(
@@ -91,7 +92,8 @@ final class AppServices {
             reminderCompletion: reminderCompletion,
             quickActionReminderCompletion: quickActionReminderCompletion,
             familyTasks: familyTasks,
-            revisions: domainRevisions
+            revisions: domainRevisions,
+            notifications: notificationManager
         )
         DomainServiceDependencyRegistry.register(
             careEventDependencies: { careEventDependencies },
@@ -163,8 +165,8 @@ final class AppServices {
         )
         OasisTreeManagerRegistry.current = oasisTreeManager
         AvatarPipelineRegistry.current = avatarPipeline
-        OhanaNotifications.registerLiveSchedulerFactory { notificationManager }
-        OhanaNotifications.current = notificationManager
+        ReminderNotificationSchedulerRegistry.registerLiveSchedulerFactory { notificationManager }
+        ReminderNotificationSchedulerRegistry.current = notificationManager
     }
 
     private static func makeCloudSyncService() -> any CloudSyncManaging {

@@ -9,9 +9,6 @@ import SwiftUI
 
 extension View {
     func focusHomeRouteSheets(
-        pets: [Pet],
-        humans: [Human],
-        electronicPets: [OasisElectronicPet],
         l: L10n,
         routes: HomeRouteCoordinator,
         activeHumanIdStr: Binding<String>,
@@ -25,9 +22,6 @@ extension View {
         onStartWalkFromQuickAction: @escaping (UUID) -> Void
     ) -> some View {
         modifier(FocusHomeRouteSheetModifier(
-            pets: pets,
-            humans: humans,
-            electronicPets: electronicPets,
             l: l,
             routes: routes,
             activeHumanIdStr: activeHumanIdStr,

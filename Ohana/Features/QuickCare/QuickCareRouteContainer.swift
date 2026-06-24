@@ -36,7 +36,7 @@ struct QuickPlayDetailRouteContainer: View {
                     onRemove: onRemove,
                     onClose: onClose,
                     allEvents: routeData.allEvents,
-                    playLedgerEvents: routeData.playLedgerEvents,
+                    playEntries: routeData.playEntries,
                     legacyPlayDeleteLogs: routeData.legacyPlayDeleteLogs
                 )
             } else if routeData.hasLoaded {
@@ -110,7 +110,7 @@ struct QuickFeedDetailRouteContainer: View {
                     allEvents: routeData.allEvents,
                     allHumans: routeData.allHumans,
                     allPets: routeData.allPets,
-                    feedingLedgerEvents: routeData.feedingLedgerEvents,
+                    feedingLedgerEntries: routeData.feedingLedgerEntries,
                     allCareLogs: routeData.allCareLogs,
                     allFoodRecords: routeData.allFoodRecords,
                     allSharedCareSessions: routeData.sharedCareSessions
@@ -173,7 +173,7 @@ struct QuickWaterDetailRouteContainer: View {
                     onClose: onClose,
                     allEvents: routeData.allEvents,
                     allPets: routeData.allPets,
-                    waterLedgerEvents: routeData.waterLedgerEvents,
+                    waterEntries: routeData.waterEntries,
                     legacyWaterDeleteLogs: routeData.legacyWaterDeleteLogs
                 )
             } else if routeData.hasLoaded {
@@ -234,7 +234,8 @@ struct QuickPottyDetailRouteContainer: View {
                     onClose: onClose,
                     allEvents: routeData.allEvents,
                     allPets: routeData.allPets,
-                    pottyLedgerEvents: routeData.pottyLedgerEvents,
+                    pottyEntries: routeData.pottyEntries,
+                    litterEntries: routeData.litterEntries,
                     legacyPottyDeleteLogs: routeData.legacyPottyDeleteLogs,
                     legacyLitterDeleteLogs: routeData.legacyLitterDeleteLogs
                 )
@@ -270,7 +271,7 @@ struct QuickPottyDetailRouteContainer: View {
 private struct QuickPlayRouteData {
     var pet: Pet?
     var allEvents: [Event] = []
-    var playLedgerEvents: [CareLedgerEvent] = []
+    var playEntries: [QuickPlayLedgerEntry] = []
     var legacyPlayDeleteLogs: [PetCareLog] = []
     var hasLoaded = false
 
@@ -282,7 +283,7 @@ private struct QuickPlayRouteData {
         return QuickPlayRouteData(
             pet: fetchPet(id: id, context: context),
             allEvents: events(context: context),
-            playLedgerEvents: fetch(
+            playEntries: QuickPlayLedgerEntry.entries(from: fetch(
                 FetchDescriptor<CareLedgerEvent>(
                     predicate: #Predicate<CareLedgerEvent> { event in
                         event.subjectKind == petSubject &&
@@ -294,7 +295,7 @@ private struct QuickPlayRouteData {
                 ),
                 context: context,
                 name: "CareLedgerEvent"
-            ),
+            ), petID: id),
             legacyPlayDeleteLogs: fetch(
                 FetchDescriptor<PetCareLog>(
                     predicate: #Predicate<PetCareLog> { log in
@@ -316,7 +317,7 @@ private struct QuickFeedRouteData {
     var allEvents: [Event] = []
     var allHumans: [Human] = []
     var allPets: [Pet] = []
-    var feedingLedgerEvents: [CareLedgerEvent] = []
+    var feedingLedgerEntries: [QuickFeedLedgerEntry] = []
     var allCareLogs: [PetCareLog] = []
     var allFoodRecords: [PetFoodRecord] = []
     var sharedCareSessions: [SharedCareSession] = []
@@ -333,42 +334,55 @@ private struct QuickFeedRouteData {
             value: -6,
             to: Calendar.current.startOfDay(for: Date())
         ) ?? Date().addingTimeInterval(-6 * 86400)
+        let pet = fetchPet(id: id, context: context)
+        let allEvents = events(context: context)
+        let allCareLogs = fetch(
+            FetchDescriptor<PetCareLog>(
+                predicate: #Predicate<PetCareLog> { log in
+                    log.type == feedingType &&
+                        log.pet?.id == id &&
+                        log.date >= homeLogStartDate
+                },
+                sortBy: [SortDescriptor(\.date, order: .reverse)]
+            ),
+            context: context,
+            name: "PetCareLog"
+        )
+        let feedingLedgerEvents = fetch(
+            FetchDescriptor<CareLedgerEvent>(
+                predicate: #Predicate<CareLedgerEvent> { event in
+                    event.subjectKind == petSubject &&
+                        event.subjectId == petKey &&
+                        event.eventKind == careKind &&
+                        event.actionType == feedingType &&
+                        event.occurredAt >= homeLogStartDate
+                },
+                sortBy: [SortDescriptor(\.occurredAt, order: .reverse)]
+            ),
+            context: context,
+            name: "CareLedgerEvent"
+        )
+        let feedRuleState = pet.map { FeedRuleState(pet: $0, allEvents: allEvents, now: Date()) }
 
         return QuickFeedRouteData(
-            pet: fetchPet(id: id, context: context),
-            allEvents: events(context: context),
+            pet: pet,
+            allEvents: allEvents,
             allHumans: fetch(
                 FetchDescriptor<Human>(sortBy: [SortDescriptor(\.createdAt)]),
                 context: context,
                 name: "Human"
             ),
             allPets: pets(context: context),
-            feedingLedgerEvents: fetch(
-                FetchDescriptor<CareLedgerEvent>(
-                    predicate: #Predicate<CareLedgerEvent> { event in
-                        event.subjectKind == petSubject &&
-                            event.subjectId == petKey &&
-                            event.eventKind == careKind &&
-                            event.actionType == feedingType &&
-                            event.occurredAt >= homeLogStartDate
-                    },
-                    sortBy: [SortDescriptor(\.occurredAt, order: .reverse)]
-                ),
-                context: context,
-                name: "CareLedgerEvent"
-            ),
-            allCareLogs: fetch(
-                FetchDescriptor<PetCareLog>(
-                    predicate: #Predicate<PetCareLog> { log in
-                        log.type == feedingType &&
-                            log.pet?.id == id &&
-                            log.date >= homeLogStartDate
-                    },
-                    sortBy: [SortDescriptor(\.date, order: .reverse)]
-                ),
-                context: context,
-                name: "PetCareLog"
-            ),
+            feedingLedgerEntries: pet.map {
+                QuickFeedLedgerEntry.entries(
+                    pet: $0,
+                    feedingLedgerEvents: feedingLedgerEvents,
+                    legacyCareLogs: allCareLogs,
+                    manualPlanEvents: feedRuleState?.manualReminderEvents ?? [],
+                    autoFeederEvents: feedRuleState?.autoFeederEvents ?? []
+                )
+            } ?? [],
+            allCareLogs: allCareLogs,
             allFoodRecords: fetch(
                 FetchDescriptor<PetFoodRecord>(
                     predicate: #Predicate<PetFoodRecord> { record in
@@ -399,7 +413,7 @@ private struct QuickWaterRouteData {
     var pet: Pet?
     var allEvents: [Event] = []
     var allPets: [Pet] = []
-    var waterLedgerEvents: [CareLedgerEvent] = []
+    var waterEntries: [QuickWaterLedgerEntry] = []
     var legacyWaterDeleteLogs: [PetCareLog] = []
     var hasLoaded = false
 
@@ -415,18 +429,21 @@ private struct QuickWaterRouteData {
             pet: fetchPet(id: id, context: context),
             allEvents: events(context: context),
             allPets: pets(context: context),
-            waterLedgerEvents: fetch(
+            waterEntries: QuickWaterLedgerEntry.entries(from: fetch(
                 FetchDescriptor<CareLedgerEvent>(
                     predicate: #Predicate<CareLedgerEvent> { event in
                         event.subjectKind == petSubject &&
                             event.subjectId == petKey &&
-                            event.eventKind == careKind
+                            event.eventKind == careKind &&
+                            (event.actionType == wateringType ||
+                                event.actionType == waterChangeType ||
+                                event.actionType == filterCleanType)
                     },
                     sortBy: [SortDescriptor(\.occurredAt, order: .reverse)]
                 ),
                 context: context,
                 name: "CareLedgerEvent"
-            ),
+            ), petID: id),
             legacyWaterDeleteLogs: fetch(
                 FetchDescriptor<PetCareLog>(
                     predicate: #Predicate<PetCareLog> { log in
@@ -449,7 +466,8 @@ private struct QuickPottyRouteData {
     var pet: Pet?
     var allEvents: [Event] = []
     var allPets: [Pet] = []
-    var pottyLedgerEvents: [CareLedgerEvent] = []
+    var pottyEntries: [PoopPottyLedgerEntry] = []
+    var litterEntries: [PoopLitterLedgerEntry] = []
     var legacyPottyDeleteLogs: [PetPottyLog] = []
     var legacyLitterDeleteLogs: [PetCareLog] = []
     var hasLoaded = false
@@ -464,19 +482,31 @@ private struct QuickPottyRouteData {
             pet: fetchPet(id: id, context: context),
             allEvents: events(context: context),
             allPets: pets(context: context),
-            pottyLedgerEvents: fetch(
+            pottyEntries: PoopPottyLedgerEntry.entries(from: fetch(
                 FetchDescriptor<CareLedgerEvent>(
                     predicate: #Predicate<CareLedgerEvent> { event in
                         event.subjectKind == petSubject &&
                             event.subjectId == petKey &&
-                            (event.eventKind == pottyKind ||
-                                (event.eventKind == careKind && event.actionType == litterType))
+                            event.eventKind == pottyKind
                     },
                     sortBy: [SortDescriptor(\.occurredAt, order: .reverse)]
                 ),
                 context: context,
                 name: "CareLedgerEvent"
-            ),
+            ), petID: id),
+            litterEntries: PoopLitterLedgerEntry.entries(from: fetch(
+                FetchDescriptor<CareLedgerEvent>(
+                    predicate: #Predicate<CareLedgerEvent> { event in
+                        event.subjectKind == petSubject &&
+                            event.subjectId == petKey &&
+                            event.eventKind == careKind &&
+                            event.actionType == litterType
+                    },
+                    sortBy: [SortDescriptor(\.occurredAt, order: .reverse)]
+                ),
+                context: context,
+                name: "CareLedgerEvent"
+            ), petID: id),
             legacyPottyDeleteLogs: fetch(
                 FetchDescriptor<PetPottyLog>(
                     predicate: #Predicate<PetPottyLog> { log in

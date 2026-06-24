@@ -61,7 +61,7 @@ extension VerticalSolidHomeView {
             cancelGrowthOnboardingPrompt()
             return
         }
-        guard pets.isEmpty, humans.isEmpty else {
+        guard interaction.petsByID.isEmpty, interaction.humansByID.isEmpty else {
             cancelGrowthOnboardingPrompt()
             return
         }
@@ -73,8 +73,8 @@ extension VerticalSolidHomeView {
         growthOnboardingTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: 680) {
             guard !growthOnboardingCompleted,
                   hasOnboarded,
-                  pets.isEmpty,
-                  humans.isEmpty else {
+                  interaction.petsByID.isEmpty,
+                  interaction.humansByID.isEmpty else {
                 growthOnboardingTask = nil
                 return
             }
@@ -169,12 +169,7 @@ extension VerticalSolidHomeView {
         growthLoopSyncTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: 720) {
             let startedAt = CFAbsoluteTimeGetCurrent()
             appServices.onboardingJourney.markFirstCareCompleted()
-            treeManager.refreshEnergy(
-                modelContext: modelContext,
-                pets: pets,
-                humans: humans,
-                plants: plants
-            )
+            treeManager.refreshLedgerEnergy(modelContext: modelContext)
             let currentLevel = treeManager.treeLevel.rawValue
             let currentEnergy = treeManager.totalEnergy
             let currentProgress = treeManager.progressToNextLevel

@@ -47,22 +47,51 @@ struct OhanaNotificationsSchedulingTests {
         func compensate(reminders _: [Reminder]) {}
     }
 
-    @Test func skipRoutesCancelThroughInjectedSeam() throws {
+    @Test func skipRoutesCancelThroughInjectedScheduler() throws {
         let container = try makeContainer()
         let context = container.mainContext
         let fake = FakeScheduler()
-        OhanaNotifications.current = fake
-        defer { OhanaNotifications.useLive() }
 
         let reminder = Reminder(scheduledAt: Date(timeIntervalSince1970: 100))
         reminder.notificationId = "notif-123"
         context.insert(reminder)
         try context.save()
 
-        ReminderCompletionService.skip(reminder, by: nil, context: context)
+        ReminderCompletionService.skip(reminder, by: nil, context: context, notifications: fake)
 
         #expect(fake.cancelledIds == ["notif-123"])
         #expect(reminder.statusEnum == .skipped)
+    }
+
+    @Test func physicalDeletionCancelsThroughInjectedScheduler() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let fake = FakeScheduler()
+        let event = Event(title: "Bath", startDate: Date(timeIntervalSince1970: 200), eventType: EventType.grooming.rawValue)
+        let reminder = Reminder(event: event, scheduledAt: Date(timeIntervalSince1970: 200))
+        reminder.notificationId = "delete-event-notif"
+        context.insert(event)
+        context.insert(reminder)
+        try context.save()
+
+        let deletedCount = PhysicalDeletionService.deleteEvent(event, context: context, notifications: fake)
+
+        #expect(deletedCount == 1)
+        #expect(fake.cancelledIds == ["delete-event-notif"])
+    }
+
+    @Test func scheduleDeleteDispatcherUsesInjectedScheduler() {
+        let fake = FakeScheduler()
+        let result = DomainScheduleDeleteResult(
+            eventID: UUID(),
+            reminderIDs: [],
+            notificationIdsToCancel: [" cancel-me ", "cancel-me", "", "cancel-too"],
+            didDelete: true
+        )
+
+        DomainScheduleEffectsDispatcher.dispatch(delete: result, notifications: fake)
+
+        #expect(fake.cancelledIds == ["cancel-me", "cancel-too"])
     }
 
     @Test func defaultSchedulerIsLiveNotificationManager() {

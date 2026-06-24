@@ -9,7 +9,7 @@ import Foundation
 import SwiftUI
 
 // MARK: - 快捷操作候选（与 QACardType.available 物种规则一致，供添加面板共用）
-enum QuickActionPickerCatalog {
+nonisolated enum QuickActionPickerCatalog {
     struct Option: Identifiable, Hashable {
         let id: String
         let label: String
@@ -81,7 +81,7 @@ enum QuickActionPickerCatalog {
 }
 
 // MARK: - QuickActionItem Data Model
-struct QuickActionItem: Identifiable, Codable, Hashable {
+nonisolated struct QuickActionItem: Identifiable, Codable, Hashable {
     var id: String
     var label: String
     var icon: String
@@ -225,7 +225,7 @@ enum OhanaQuickActionGlyphKind {
     }
 }
 
-enum QuickActionLimit {
+nonisolated enum QuickActionLimit {
     static let maxItemsPerEntity = 8
     static let title = "快捷操作已达上限"
     static let message = "快捷操作区最多只能添加 8 个。更多功能可以在「全部功能」里查看和使用。"
@@ -235,7 +235,7 @@ enum QuickActionLimit {
     }
 }
 
-enum WaterQuickActionPolicy {
+nonisolated enum WaterQuickActionPolicy {
     static let foldedActionTypes: Set<String> = ["waterChange", "filterClean"]
 
     static func isAquatic(species: String) -> Bool {

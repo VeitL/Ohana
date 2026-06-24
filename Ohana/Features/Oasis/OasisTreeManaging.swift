@@ -18,6 +18,8 @@ protocol OasisTreeManaging {
     func applyPurchasedEnergyBoost(cost: Int, modelContext: ModelContext) -> Bool
     func refreshPreviewEnergy(modelContext: ModelContext, pets: [Pet], humans: [Human], plants: [Plant])
     func refreshEnergy(modelContext: ModelContext, pets: [Pet], humans: [Human], plants: [Plant])
+    @discardableResult
+    func refreshLedgerEnergy(modelContext: ModelContext) -> TreeLevel
     func dailyTreeCoconutSnapshot(maxCoconutCount: Int, date: Date) -> OasisDailyTreeCoconutSnapshot
     func markDailyTreeCoconutHarvested(_ index: Int, maxCoconutCount: Int, date: Date) -> OasisDailyTreeCoconutSnapshot
     func markDailyPassiveIncomeHarvested(date: Date)
@@ -107,6 +109,11 @@ final class SharedOasisTreeManager: OasisTreeManaging {
 
     func refreshEnergy(modelContext: ModelContext, pets: [Pet], humans: [Human], plants: [Plant]) {
         manager.refreshEnergy(modelContext: modelContext, pets: pets, humans: humans, plants: plants)
+    }
+
+    @discardableResult
+    func refreshLedgerEnergy(modelContext: ModelContext) -> TreeLevel {
+        manager.refreshLedgerEnergy(modelContext: modelContext)
     }
 
     func dailyTreeCoconutSnapshot(maxCoconutCount: Int, date: Date = Date()) -> OasisDailyTreeCoconutSnapshot {

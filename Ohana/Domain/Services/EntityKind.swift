@@ -23,10 +23,17 @@ enum EntityKind: String, Codable, CaseIterable, Identifiable {
     }
 
     var displayName: String {
+        displayName(l: .current)
+    }
+
+    func displayName(l: L10n = .current) -> String {
         switch self {
-        case .pet: "宠物"
-        case .human: "家人"
-        case .plant: "植物"
+        case .pet:
+            l.tr(zh: "宠物", en: "Pet", de: "Haustier")
+        case .human:
+            l.tr(zh: "家人", en: "Human", de: "Mensch")
+        case .plant:
+            l.tr(zh: "植物", en: "Plant", de: "Pflanze")
         }
     }
 

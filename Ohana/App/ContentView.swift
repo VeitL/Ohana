@@ -27,6 +27,9 @@ struct ContentView: View {
     @State private var onboardingJourneyPhase: OnboardingJourneyPhase = .preOnboarding
     @State private var handledOnboardingPrimaryHumanID: String?
     @State private var signaledOnboardingPrimaryHumanID: String?
+    @State private var homeCardStateResetToken = UUID()
+    @State private var didAutoPresentFirstPetPrompt = false
+    @State private var autoPresentedFirstCarePetID: UUID?
     @AppStorage("ohana_has_onboarded") private var hasOnboarded: Bool = false
     @AppStorage("currentActiveHumanId") private var currentActiveHumanId: String = ""
     @AppStorage("appLanguage") private var appLanguage: String = AppLanguage.code
@@ -115,6 +118,7 @@ struct ContentView: View {
             applyOnboardingPrimaryHumanIDIfNeeded()
         }
         .onReceive(appServices.notificationRoutes.routeEvents) { published in
+            scheduleHomeCardStateResetIfNeeded(for: published.event)
             handleRouteNotificationOutcome(
                 appRoutes.handleNotificationEvent(published.event)
             )
@@ -127,7 +131,10 @@ struct ContentView: View {
                 scheduleOnboardingJourneyEvaluation()
             },
             onHumanSavedFromAddEntity: { human in
-                currentActiveHumanId = human.id.uuidString
+                currentActiveHumanId = ActiveHumanSelectionPolicy.activeHumanIdAfterCreatingHuman(
+                    currentHumanIdRaw: currentActiveHumanId,
+                    createdHumanId: human.id
+                )
                 createdEntitySignal = HomeCreatedEntitySignal(entityID: human.id)
                 scheduleOnboardingJourneyEvaluation()
             },
@@ -201,7 +208,8 @@ struct ContentView: View {
             },
             onPresentWalk: { petID in
                 appRoutes.presentWalk(petID: petID)
-            }
+            },
+            cardStateResetToken: homeCardStateResetToken
         )
     }
 
@@ -298,9 +306,54 @@ struct ContentView: View {
                 context: modelContext,
                 projectionManager: appServices.questManager
             )
-            onboardingJourneyPhase = evaluation.phase
+            applyOnboardingJourneyEvaluation(evaluation)
             onboardingJourneyEvaluationTask = nil
         }
+    }
+
+    private func applyOnboardingJourneyEvaluation(_ evaluation: OnboardingJourneyEvaluation) {
+        onboardingJourneyPhase = evaluation.phase
+        advanceFirstDayFunnelIfNeeded(phase: evaluation.phase)
+    }
+
+    private func advanceFirstDayFunnelIfNeeded(phase: OnboardingJourneyPhase) {
+        guard hasOnboarded,
+              appRoutes.sheet == nil,
+              appRoutes.fullScreen == nil,
+              appRoutes.overlay == nil
+        else { return }
+
+        switch phase {
+        case .needsFirstPet:
+            guard !didAutoPresentFirstPetPrompt else { return }
+            didAutoPresentFirstPetPrompt = true
+            appRoutes.presentAddEntity(.pet)
+        case .firstCarePending:
+            guard let petID = firstActivePetNeedingStarterWeightID(),
+                  autoPresentedFirstCarePetID != petID else { return }
+            autoPresentedFirstCarePetID = petID
+            appRoutes.presentSheet(.petWeight(petID))
+        case .preOnboarding,
+             .needsPrimaryHuman,
+             .starterGiftPending,
+             .starterGiftReadyForCeremony(_),
+             .roadmapPromptPending,
+             .complete,
+             .existingUser:
+            break
+        }
+    }
+
+    private func firstActivePetNeedingStarterWeightID() -> UUID? {
+        var descriptor = FetchDescriptor<Pet>(
+            predicate: #Predicate<Pet> { pet in
+                pet.passedAwayDate == nil
+            },
+            sortBy: [SortDescriptor(\Pet.createdAt, order: .forward)]
+        )
+        descriptor.fetchLimit = 8
+        let pets = fetchModelsOrLog(descriptor, operation: "fetch first-day pet needing weight")
+        return pets.first { $0.weightLogs.isEmpty }?.id ?? pets.first?.id
     }
 
     private func resolvedOnboardingEvaluationActiveHumanID(override: String?) -> String? {
@@ -395,6 +448,15 @@ struct ContentView: View {
         }
     }
 
+    private func scheduleHomeCardStateResetIfNeeded(for event: AppRouteNotificationEvent) {
+        switch event {
+        case .humanDeleted:
+            homeCardStateResetToken = UUID()
+        case .reminderRouteRequested:
+            break
+        }
+    }
+
     private func dismissKeyboard() {
         UIApplication.shared.sendAction(
             #selector(UIResponder.resignFirstResponder),
@@ -402,6 +464,21 @@ struct ContentView: View {
             from: nil,
             for: nil
         )
+    }
+
+    private func fetchModelsOrLog<T: PersistentModel>(
+        _ descriptor: FetchDescriptor<T>,
+        operation: String
+    ) -> [T] {
+        do {
+            return try modelContext.fetch(descriptor)
+        } catch {
+            OhanaLog.warning(
+                "ContentView failed to \(operation): \(error.localizedDescription)",
+                category: "Onboarding"
+            )
+            return []
+        }
     }
 }
 

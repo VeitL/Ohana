@@ -7,7 +7,7 @@
 
 import Foundation
 
-enum QACardType: String, CaseIterable, Codable {
+nonisolated enum QACardType: String, CaseIterable, Codable {
     case walk
     case feed
     case water

@@ -5,7 +5,6 @@
 //  Cross-pet hygiene and cleaning dashboard.
 //
 
-import SwiftData
 import SwiftUI
 
 private enum HygieneDashboardRange: Hashable, CaseIterable {
@@ -56,19 +55,11 @@ private struct HygienePetSummary: Identifiable {
     let latestDate: Date?
 }
 
-private struct HygieneDashboardAction: Identifiable, Hashable {
-    let id: UUID
-    let petId: UUID
-    let date: Date
-    let eventKind: CareLedgerEventKind
-    let actionType: String
-}
-
 struct IslandHygieneDashboardContentView: View {
     var standalone: Bool = true
     var onOpenPet: ((Pet) -> Void)?
     let pets: [Pet]
-    let careLedgerEvents: [CareLedgerEvent]
+    let hygieneLedgerEntries: [HygieneDashboardLedgerEntry]
 
     @Environment(\.dismiss) private var dismiss
     @AppStorage("appLanguage") private var appLanguage = AppLanguage.fallbackCode
@@ -89,39 +80,8 @@ struct IslandHygieneDashboardContentView: View {
         return activePets.filter { $0.id == selectedPetId }
     }
 
-    private var hygieneCareTypes: Set<CareType> {
-        [.litter, .waterChange, .filterClean, .cageCleaning, .misting, .substrateChange]
-    }
-
-    private var hygieneDashboardActions: [HygieneDashboardAction] {
-        careLedgerEvents.compactMap { event in
-            guard event.subjectKind == CareLedgerSubjectKind.pet.rawValue,
-                  let subjectId = event.subjectId,
-                  let petId = UUID(uuidString: subjectId) else { return nil }
-
-            switch event.eventKindEnum {
-            case .hygiene:
-                guard HygieneType(rawValue: event.actionType) != nil else { return nil }
-            case .care:
-                guard let careType = CareType(rawValue: event.actionType),
-                      hygieneCareTypes.contains(careType) else { return nil }
-            default:
-                return nil
-            }
-
-            return HygieneDashboardAction(
-                id: event.id,
-                petId: petId,
-                date: event.occurredAt,
-                eventKind: event.eventKindEnum,
-                actionType: event.actionType
-            )
-        }
-        .sorted { $0.date > $1.date }
-    }
-
-    private var hygieneDashboardActionsByPetId: [UUID: [HygieneDashboardAction]] {
-        Dictionary(grouping: hygieneDashboardActions, by: \.petId)
+    private var hygieneDashboardActionsByPetId: [UUID: [HygieneDashboardLedgerEntry]] {
+        Dictionary(grouping: hygieneLedgerEntries, by: \.petId)
     }
 
     private var todayCount: Int {
@@ -556,11 +516,11 @@ struct IslandHygieneDashboardContentView: View {
         }
     }
 
-    private func hygieneDashboardActions(for pet: Pet) -> [HygieneDashboardAction] {
+    private func hygieneDashboardActions(for pet: Pet) -> [HygieneDashboardLedgerEntry] {
         hygieneDashboardActionsByPetId[pet.id] ?? []
     }
 
-    private func hygieneActionTitle(for action: HygieneDashboardAction) -> String {
+    private func hygieneActionTitle(for action: HygieneDashboardLedgerEntry) -> String {
         switch action.eventKind {
         case .hygiene:
             let type = HygieneType(rawValue: action.actionType)?.rawValue ?? action.actionType

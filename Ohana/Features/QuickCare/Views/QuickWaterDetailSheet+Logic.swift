@@ -99,7 +99,7 @@ extension QuickWaterDetailSheet {
             let snapshot = QuickWaterRenderSnapshot.build(
                 pet: pet,
                 allEvents: allEvents,
-                waterLedgerEvents: waterLedgerEvents
+                waterEntries: waterEntries
             )
             waterSnapshot = snapshot
             if !snapshot.rule.planEvents.isEmpty {

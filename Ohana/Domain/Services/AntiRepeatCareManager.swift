@@ -25,7 +25,8 @@ final class AntiRepeatCareManager {
         thresholdMinutes: Int = 120,
         currentUserId: String? = nil,
         in humans: [Human],
-        now: Date = Date()
+        now: Date = Date(),
+        l: L10n = .current
     ) -> (executorName: String, minutesAgo: Int)? {
         let subjectKind = CareLedgerSubjectKind.pet.rawValue
         let subjectId = pet.id.uuidString
@@ -49,10 +50,10 @@ final class AntiRepeatCareManager {
         let minutesAgo = Int(now.timeIntervalSince(latestEvent.occurredAt) / 60)
 
         // 解析执行者名称
-        var executorName = "某人"
+        var executorName = l.tr(zh: "某人", en: "Someone", de: "Jemand")
         if let executorId = latestEvent.actorId, !executorId.isEmpty {
             if executorId == currentUserId {
-                executorName = "你"
+                executorName = l.tr(zh: "你", en: "You", de: "Du")
             } else if let human = humans.first(where: { $0.id.uuidString == executorId }) {
                 executorName = human.name
             }

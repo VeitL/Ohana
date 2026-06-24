@@ -46,7 +46,8 @@ struct CareLedgerStatsService {
         events: [CareLedgerEvent],
         pets: [Pet],
         humans: [Human],
-        interval: DateInterval
+        interval: DateInterval,
+        l: L10n = .current
     ) -> [ReportEntry] {
         let petById = Dictionary(uniqueKeysWithValues: pets.map { ($0.id.uuidString, $0) })
         let humanById = Dictionary(uniqueKeysWithValues: humans.map { ($0.id.uuidString, $0) })
@@ -58,15 +59,15 @@ struct CareLedgerStatsService {
                     && isReportable(event.eventKindEnum)
             }
             .map { event in
-                let petName = event.subjectId.flatMap { petById[$0]?.name } ?? "未知宠物"
+                let petName = event.subjectId.flatMap { petById[$0]?.name } ?? unknownPetTitle(l: l)
                 let actor = event.actorId.flatMap { humanById[$0] }
                 return ReportEntry(
                     id: event.id,
                     date: event.occurredAt,
                     actorId: event.actorId,
-                    actorName: actor?.name ?? "未指定",
+                    actorName: actor?.name ?? unassignedActorTitle(l: l),
                     petName: petName,
-                    title: title(for: event),
+                    title: title(for: event, l: l),
                     icon: icon(for: event),
                     colorToken: colorToken(for: event),
                     coconuts: max(event.coconutDelta, 0)
@@ -98,26 +99,74 @@ struct CareLedgerStatsService {
         }
     }
 
-    private func title(for event: CareLedgerEvent) -> String {
+    private func title(for event: CareLedgerEvent, l: L10n) -> String {
         switch event.eventKindEnum {
         case .care:
-            CareType(rawValue: event.actionType)?.rawValue ?? event.actionType
+            CareType(rawValue: event.actionType).map { careTitle($0, l: l) } ?? event.actionType
         case .potty:
-            PottyType(rawValue: event.actionType)?.rawValue ?? event.actionType
+            PottyType(rawValue: event.actionType)?.localizedLabel(l) ?? event.actionType
         case .walk:
-            "遛狗"
+            l.tr(zh: "遛狗", en: "Walk", de: "Spaziergang")
         case .expense:
-            ExpenseCategory(rawValue: event.actionType)?.rawValue ?? event.actionType
+            ExpenseCategory(rawValue: event.actionType).map { l.expenseCategoryTitle($0) } ?? event.actionType
         case .hygiene:
-            HygieneType(rawValue: event.actionType)?.rawValue ?? event.actionType
+            HygieneType(rawValue: event.actionType).map { hygieneTitle($0, l: l) } ?? event.actionType
         case .health:
-            "健康"
+            l.tr(zh: "健康", en: "Health", de: "Gesundheit")
         case .weight:
-            "体重"
+            l.tr(zh: "体重", en: "Weight", de: "Gewicht")
         case .medication:
-            "吃药"
+            l.tr(zh: "吃药", en: "Medication", de: "Medikament")
         case .reminder, .plantCare, .coconut, .workout, .milestone, .unknown:
             event.actionType
+        }
+    }
+
+    private func unknownPetTitle(l: L10n) -> String {
+        l.tr(zh: "未知宠物", en: "Unknown pet", de: "Unbekanntes Haustier")
+    }
+
+    private func unassignedActorTitle(l: L10n) -> String {
+        l.tr(zh: "未指定", en: "Unassigned", de: "Nicht zugewiesen")
+    }
+
+    private func careTitle(_ type: CareType, l: L10n) -> String {
+        switch type {
+        case .feeding:
+            l.tr(zh: "喂食", en: "Feeding", de: "Fütterung")
+        case .watering:
+            l.tr(zh: "喂水", en: "Water", de: "Wasser")
+        case .litter:
+            l.tr(zh: "铲屎", en: "Litter", de: "Klo")
+        case .waterChange:
+            l.tr(zh: "换水", en: "Water change", de: "Wasserwechsel")
+        case .filterClean:
+            l.tr(zh: "清理滤材", en: "Filter cleaning", de: "Filterreinigung")
+        case .cageCleaning:
+            l.tr(zh: "清理鸟笼", en: "Cage cleaning", de: "Käfigreinigung")
+        case .freeFlight:
+            l.tr(zh: "放飞互动", en: "Free flight", de: "Freiflug")
+        case .misting:
+            l.tr(zh: "喷水保湿", en: "Misting", de: "Befeuchten")
+        case .substrateChange:
+            l.tr(zh: "换垫材", en: "Substrate change", de: "Substratwechsel")
+        case .play:
+            l.tr(zh: "逗玩", en: "Play", de: "Spielen")
+        }
+    }
+
+    private func hygieneTitle(_ type: HygieneType, l: L10n) -> String {
+        switch type {
+        case .teeth:
+            l.tr(zh: "刷牙", en: "Teeth", de: "Zähne")
+        case .nails:
+            l.tr(zh: "剪甲", en: "Nails", de: "Krallen")
+        case .ears:
+            l.tr(zh: "清耳", en: "Ears", de: "Ohren")
+        case .brushing:
+            l.tr(zh: "梳毛", en: "Brushing", de: "Bürsten")
+        case .bath:
+            l.tr(zh: "洗澡", en: "Bath", de: "Bad")
         }
     }
 

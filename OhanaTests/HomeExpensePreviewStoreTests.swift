@@ -289,6 +289,138 @@ struct HomeExpensePreviewStoreTests {
         #expect(isCompleted == true)
     }
 
+    @Test func expandedMomentQuickActionUsesReadModelEntriesInsteadOfPetRelationshipLogs() throws {
+        let calendar = Calendar(identifier: .gregorian)
+        let now = try #require(calendar.date(from: DateComponents(year: 2026, month: 6, day: 8, hour: 14)))
+        let today = try #require(calendar.date(from: DateComponents(year: 2026, month: 6, day: 8, hour: 9)))
+        let pet = Pet(name: "Milo", species: "猫")
+        let otherPet = Pet(name: "Nori", species: "猫")
+        let relationshipLog = PetPhotoLog(imageData: Data([1, 2, 3]), date: today, pet: pet)
+        pet.photoLogs.append(relationshipLog)
+        let item = QuickActionItem(
+            label: "记录",
+            icon: "camera.circle.fill",
+            colorHex: "FF6B9D",
+            petId: pet.id,
+            actionType: "moment",
+            entityId: pet.id,
+            entityKind: .pet
+        )
+
+        let emptyStatus = ExpandedQuickActionLogic.countText(
+            item: item,
+            pet: pet,
+            allEvents: [],
+            feedingLedgerEntries: [],
+            careLedgerEntries: [],
+            walkLedgerEntries: [],
+            pottyLedgerEntries: [],
+            petMomentEntries: [],
+            now: now,
+            calendar: calendar,
+            l: L10n("zh")
+        )
+        let readModelStatus = ExpandedQuickActionLogic.countText(
+            item: item,
+            pet: pet,
+            allEvents: [],
+            feedingLedgerEntries: [],
+            careLedgerEntries: [],
+            walkLedgerEntries: [],
+            pottyLedgerEntries: [],
+            petMomentEntries: [
+                HomePetMomentQuickActionEntry(id: UUID(), petId: otherPet.id, date: today),
+                HomePetMomentQuickActionEntry(id: UUID(), petId: pet.id, date: today)
+            ],
+            now: now,
+            calendar: calendar,
+            l: L10n("zh")
+        )
+
+        #expect(emptyStatus == "还没有记录")
+        #expect(readModelStatus == "今天 1 条")
+    }
+
+    @Test func expandedWaterCycleUsesReadModelEntriesInsteadOfPetCareLogRelationship() throws {
+        let calendar = Calendar(identifier: .gregorian)
+        let now = try #require(calendar.date(from: DateComponents(year: 2026, month: 6, day: 8, hour: 14)))
+        let oldWaterChange = try #require(calendar.date(from: DateComponents(year: 2026, month: 6, day: 3, hour: 9)))
+        let pet = Pet(name: "Nemo", species: "鱼")
+        WaterCareSettingsStore.saveWaterSettings(
+            petKey: pet.id.uuidString,
+            intervalDays: 3,
+            reminderOn: true,
+            cycleAnchor: now
+        )
+        pet.careLogs.append(PetCareLog(date: oldWaterChange, type: .waterChange, pet: pet))
+        let item = QuickActionItem(
+            label: "换水",
+            icon: "drop.circle.fill",
+            colorHex: "5AC8FA",
+            petId: pet.id,
+            actionType: "waterChange",
+            entityId: pet.id,
+            entityKind: .pet
+        )
+        let readModelEntry = HomeCareQuickActionEntry(
+            id: UUID(),
+            petId: pet.id,
+            actionType: CareType.waterChange.rawValue,
+            date: oldWaterChange,
+            amountValue: 0
+        )
+
+        let emptyStatus = ExpandedQuickActionLogic.countText(
+            item: item,
+            pet: pet,
+            allEvents: [],
+            feedingLedgerEntries: [],
+            careLedgerEntries: [],
+            walkLedgerEntries: [],
+            pottyLedgerEntries: [],
+            now: now,
+            calendar: calendar,
+            l: L10n("zh")
+        )
+        let readModelStatus = ExpandedQuickActionLogic.countText(
+            item: item,
+            pet: pet,
+            allEvents: [],
+            feedingLedgerEntries: [],
+            careLedgerEntries: [readModelEntry],
+            walkLedgerEntries: [],
+            pottyLedgerEntries: [],
+            now: now,
+            calendar: calendar,
+            l: L10n("zh")
+        )
+        let emptyAttention = ExpandedQuickActionLogic.showsAttentionDot(
+            item: item,
+            pet: pet,
+            allEvents: [],
+            feedingLedgerEntries: [],
+            careLedgerEntries: [],
+            walkLedgerEntries: [],
+            pottyLedgerEntries: [],
+            now: now
+        )
+        let readModelAttention = ExpandedQuickActionLogic.showsAttentionDot(
+            item: item,
+            pet: pet,
+            allEvents: [],
+            feedingLedgerEntries: [],
+            careLedgerEntries: [readModelEntry],
+            walkLedgerEntries: [],
+            pottyLedgerEntries: [],
+            now: now
+        )
+
+        #expect(emptyStatus == nil)
+        #expect(readModelStatus == "逾期2天")
+        #expect(emptyAttention == false)
+        #expect(readModelAttention == true)
+    }
+
     @Test func expandedGroomQuickActionUsesHygieneLedgerEntriesForCompletion() throws {
         let calendar = Calendar(identifier: .gregorian)
         let now = try #require(calendar.date(from: DateComponents(year: 2026, month: 6, day: 8, hour: 15)))
@@ -325,6 +457,347 @@ struct HomeExpensePreviewStoreTests {
         )
 
         #expect(isCompleted == true)
+    }
+
+    @Test func petHygieneDetailEntriesFilterSortAndKeepLegacyDeleteId() throws {
+        let calendar = Calendar(identifier: .gregorian)
+        let olderDate = try #require(calendar.date(from: DateComponents(year: 2026, month: 6, day: 7, hour: 9)))
+        let newerDate = try #require(calendar.date(from: DateComponents(year: 2026, month: 6, day: 8, hour: 9)))
+        let pet = Pet(name: "Milo", species: "猫")
+        let otherPet = Pet(name: "Nori", species: "猫")
+        let legacyLogId = UUID()
+        let older = CareLedgerEvent(
+            occurredAt: olderDate,
+            subjectKind: .pet,
+            subjectId: pet.id.uuidString,
+            eventKind: .hygiene,
+            actionType: HygieneType.brushing.rawValue,
+            legacyModelName: "PetHygieneLog",
+            legacyModelId: legacyLogId.uuidString
+        )
+        let newer = CareLedgerEvent(
+            occurredAt: newerDate,
+            subjectKind: .pet,
+            subjectId: pet.id.uuidString,
+            eventKind: .hygiene,
+            actionType: HygieneType.bath.rawValue
+        )
+        let wrongPet = CareLedgerEvent(
+            occurredAt: newerDate,
+            subjectKind: .pet,
+            subjectId: otherPet.id.uuidString,
+            eventKind: .hygiene,
+            actionType: HygieneType.bath.rawValue
+        )
+        let wrongKind = CareLedgerEvent(
+            occurredAt: newerDate,
+            subjectKind: .pet,
+            subjectId: pet.id.uuidString,
+            eventKind: .care,
+            actionType: HygieneType.bath.rawValue
+        )
+        let invalidType = CareLedgerEvent(
+            occurredAt: newerDate,
+            subjectKind: .pet,
+            subjectId: pet.id.uuidString,
+            eventKind: .hygiene,
+            actionType: "not-a-hygiene-type"
+        )
+
+        let entries = PetHygieneLedgerEntry.entries(
+            from: [older, wrongPet, wrongKind, invalidType, newer],
+            petID: pet.id
+        )
+
+        #expect(entries.map(\.id) == [newer.id, older.id])
+        #expect(entries.map(\.type) == [.bath, .brushing])
+        #expect(entries[1].legacyLogId == legacyLogId)
+    }
+
+    @Test func islandHygieneDashboardEntriesFilterSortAndKeepCareMaintenanceRows() throws {
+        let calendar = Calendar(identifier: .gregorian)
+        let olderDate = try #require(calendar.date(from: DateComponents(year: 2026, month: 6, day: 7, hour: 9)))
+        let middleDate = try #require(calendar.date(from: DateComponents(year: 2026, month: 6, day: 8, hour: 9)))
+        let newerDate = try #require(calendar.date(from: DateComponents(year: 2026, month: 6, day: 9, hour: 9)))
+        let pet = Pet(name: "Milo", species: "猫")
+        let otherPet = Pet(name: "Nori", species: "猫")
+        let hygiene = CareLedgerEvent(
+            occurredAt: olderDate,
+            subjectKind: .pet,
+            subjectId: pet.id.uuidString,
+            eventKind: .hygiene,
+            actionType: HygieneType.bath.rawValue
+        )
+        let waterChange = CareLedgerEvent(
+            occurredAt: newerDate,
+            subjectKind: .pet,
+            subjectId: pet.id.uuidString,
+            eventKind: .care,
+            actionType: CareType.waterChange.rawValue
+        )
+        let wrongPet = CareLedgerEvent(
+            occurredAt: middleDate,
+            subjectKind: .pet,
+            subjectId: otherPet.id.uuidString,
+            eventKind: .hygiene,
+            actionType: HygieneType.brushing.rawValue
+        )
+        let nonHygieneCare = CareLedgerEvent(
+            occurredAt: newerDate,
+            subjectKind: .pet,
+            subjectId: pet.id.uuidString,
+            eventKind: .care,
+            actionType: CareType.feeding.rawValue
+        )
+        let wrongSubject = CareLedgerEvent(
+            occurredAt: newerDate,
+            subjectKind: .human,
+            subjectId: pet.id.uuidString,
+            eventKind: .hygiene,
+            actionType: HygieneType.bath.rawValue
+        )
+        let invalidHygiene = CareLedgerEvent(
+            occurredAt: newerDate,
+            subjectKind: .pet,
+            subjectId: pet.id.uuidString,
+            eventKind: .hygiene,
+            actionType: "not-a-hygiene-type"
+        )
+
+        let entries = HygieneDashboardLedgerEntry.entries(
+            from: [hygiene, waterChange, wrongPet, nonHygieneCare, wrongSubject, invalidHygiene]
+        )
+
+        #expect(entries.map(\.id) == [waterChange.id, wrongPet.id, hygiene.id])
+        #expect(entries.map(\.petId) == [pet.id, otherPet.id, pet.id])
+        #expect(entries.map(\.eventKind) == [.care, .hygiene, .hygiene])
+        #expect(entries.map(\.actionType) == [
+            CareType.waterChange.rawValue,
+            HygieneType.brushing.rawValue,
+            HygieneType.bath.rawValue
+        ])
+    }
+
+    @Test func quickPlayDetailEntriesFilterSortAndKeepLegacyDeleteId() throws {
+        let calendar = Calendar(identifier: .gregorian)
+        let olderDate = try #require(calendar.date(from: DateComponents(year: 2026, month: 6, day: 7, hour: 9)))
+        let newerDate = try #require(calendar.date(from: DateComponents(year: 2026, month: 6, day: 8, hour: 9)))
+        let pet = Pet(name: "Milo", species: "猫")
+        let otherPet = Pet(name: "Nori", species: "猫")
+        let legacyLogId = UUID()
+        let older = CareLedgerEvent(
+            occurredAt: olderDate,
+            subjectKind: .pet,
+            subjectId: pet.id.uuidString,
+            eventKind: .care,
+            actionType: CareType.play.rawValue,
+            legacyModelName: "PetCareLog",
+            legacyModelId: legacyLogId.uuidString
+        )
+        let newer = CareLedgerEvent(
+            occurredAt: newerDate,
+            subjectKind: .pet,
+            subjectId: pet.id.uuidString,
+            eventKind: .care,
+            actionType: CareType.play.rawValue
+        )
+        let wrongPet = CareLedgerEvent(
+            occurredAt: newerDate,
+            subjectKind: .pet,
+            subjectId: otherPet.id.uuidString,
+            eventKind: .care,
+            actionType: CareType.play.rawValue
+        )
+        let wrongKind = CareLedgerEvent(
+            occurredAt: newerDate,
+            subjectKind: .pet,
+            subjectId: pet.id.uuidString,
+            eventKind: .hygiene,
+            actionType: CareType.play.rawValue
+        )
+        let wrongAction = CareLedgerEvent(
+            occurredAt: newerDate,
+            subjectKind: .pet,
+            subjectId: pet.id.uuidString,
+            eventKind: .care,
+            actionType: CareType.feeding.rawValue
+        )
+
+        let entries = QuickPlayLedgerEntry.entries(
+            from: [older, wrongPet, wrongKind, wrongAction, newer],
+            petID: pet.id
+        )
+
+        #expect(entries.map(\.id) == [newer.id, older.id])
+        #expect(entries[1].legacyLogId == legacyLogId)
+    }
+
+    @Test func quickWaterDetailEntriesFilterSortClampAndKeepLegacyDeleteId() throws {
+        let calendar = Calendar(identifier: .gregorian)
+        let olderDate = try #require(calendar.date(from: DateComponents(year: 2026, month: 6, day: 7, hour: 9)))
+        let newerDate = try #require(calendar.date(from: DateComponents(year: 2026, month: 6, day: 8, hour: 9)))
+        let pet = Pet(name: "Milo", species: "猫")
+        let otherPet = Pet(name: "Nori", species: "猫")
+        let legacyLogId = UUID()
+        let olderWater = CareLedgerEvent(
+            occurredAt: olderDate,
+            subjectKind: .pet,
+            subjectId: pet.id.uuidString,
+            eventKind: .care,
+            actionType: CareType.watering.rawValue,
+            amountValue: -25,
+            legacyModelName: "PetCareLog",
+            legacyModelId: legacyLogId.uuidString
+        )
+        let newerFilter = CareLedgerEvent(
+            occurredAt: newerDate,
+            subjectKind: .pet,
+            subjectId: pet.id.uuidString,
+            eventKind: .care,
+            actionType: CareType.filterClean.rawValue,
+            amountValue: 90
+        )
+        let wrongPet = CareLedgerEvent(
+            occurredAt: newerDate,
+            subjectKind: .pet,
+            subjectId: otherPet.id.uuidString,
+            eventKind: .care,
+            actionType: CareType.watering.rawValue
+        )
+        let wrongKind = CareLedgerEvent(
+            occurredAt: newerDate,
+            subjectKind: .pet,
+            subjectId: pet.id.uuidString,
+            eventKind: .potty,
+            actionType: CareType.watering.rawValue
+        )
+        let wrongAction = CareLedgerEvent(
+            occurredAt: newerDate,
+            subjectKind: .pet,
+            subjectId: pet.id.uuidString,
+            eventKind: .care,
+            actionType: CareType.play.rawValue
+        )
+
+        let entries = QuickWaterLedgerEntry.entries(
+            from: [olderWater, wrongPet, wrongKind, wrongAction, newerFilter],
+            petID: pet.id
+        )
+
+        #expect(entries.map(\.id) == [newerFilter.id, olderWater.id])
+        #expect(entries.map(\.careType) == [.filterClean, .watering])
+        #expect(entries[0].amountMl == 0)
+        #expect(entries[1].amountMl == 0)
+        #expect(entries[1].legacyLogId == legacyLogId)
+    }
+
+    @Test func quickPottyDetailEntriesFilterSortAndKeepLegacyDeleteId() throws {
+        let calendar = Calendar(identifier: .gregorian)
+        let olderDate = try #require(calendar.date(from: DateComponents(year: 2026, month: 6, day: 7, hour: 9)))
+        let newerDate = try #require(calendar.date(from: DateComponents(year: 2026, month: 6, day: 8, hour: 9)))
+        let pet = Pet(name: "Milo", species: "猫")
+        let otherPet = Pet(name: "Nori", species: "猫")
+        let legacyLogId = UUID()
+        let olderPotty = CareLedgerEvent(
+            occurredAt: olderDate,
+            subjectKind: .pet,
+            subjectId: pet.id.uuidString,
+            eventKind: .potty,
+            actionType: PottyType.perfectPoop.rawValue,
+            legacyModelName: "PetPottyLog",
+            legacyModelId: legacyLogId.uuidString
+        )
+        let newerPotty = CareLedgerEvent(
+            occurredAt: newerDate,
+            subjectKind: .pet,
+            subjectId: pet.id.uuidString,
+            eventKind: .potty,
+            actionType: PottyType.softPoop.rawValue
+        )
+        let wrongPet = CareLedgerEvent(
+            occurredAt: newerDate,
+            subjectKind: .pet,
+            subjectId: otherPet.id.uuidString,
+            eventKind: .potty,
+            actionType: PottyType.perfectPoop.rawValue
+        )
+        let wrongKind = CareLedgerEvent(
+            occurredAt: newerDate,
+            subjectKind: .pet,
+            subjectId: pet.id.uuidString,
+            eventKind: .care,
+            actionType: PottyType.perfectPoop.rawValue
+        )
+        let invalidType = CareLedgerEvent(
+            occurredAt: newerDate,
+            subjectKind: .pet,
+            subjectId: pet.id.uuidString,
+            eventKind: .potty,
+            actionType: "not-a-potty-type"
+        )
+
+        let entries = PoopPottyLedgerEntry.entries(
+            from: [olderPotty, wrongPet, wrongKind, invalidType, newerPotty],
+            petID: pet.id
+        )
+
+        #expect(entries.map(\.id) == [newerPotty.id, olderPotty.id])
+        #expect(entries.map(\.pottyType) == [.softPoop, .perfectPoop])
+        #expect(entries[1].legacyLogId == legacyLogId)
+    }
+
+    @Test func quickPottyLitterEntriesFilterSortAndKeepLegacyDeleteId() throws {
+        let calendar = Calendar(identifier: .gregorian)
+        let olderDate = try #require(calendar.date(from: DateComponents(year: 2026, month: 6, day: 7, hour: 9)))
+        let newerDate = try #require(calendar.date(from: DateComponents(year: 2026, month: 6, day: 8, hour: 9)))
+        let pet = Pet(name: "Milo", species: "猫")
+        let otherPet = Pet(name: "Nori", species: "猫")
+        let legacyLogId = UUID()
+        let olderLitter = CareLedgerEvent(
+            occurredAt: olderDate,
+            subjectKind: .pet,
+            subjectId: pet.id.uuidString,
+            eventKind: .care,
+            actionType: CareType.litter.rawValue,
+            legacyModelName: "PetCareLog",
+            legacyModelId: legacyLogId.uuidString
+        )
+        let newerLitter = CareLedgerEvent(
+            occurredAt: newerDate,
+            subjectKind: .pet,
+            subjectId: pet.id.uuidString,
+            eventKind: .care,
+            actionType: CareType.litter.rawValue
+        )
+        let wrongPet = CareLedgerEvent(
+            occurredAt: newerDate,
+            subjectKind: .pet,
+            subjectId: otherPet.id.uuidString,
+            eventKind: .care,
+            actionType: CareType.litter.rawValue
+        )
+        let wrongKind = CareLedgerEvent(
+            occurredAt: newerDate,
+            subjectKind: .pet,
+            subjectId: pet.id.uuidString,
+            eventKind: .potty,
+            actionType: CareType.litter.rawValue
+        )
+        let wrongAction = CareLedgerEvent(
+            occurredAt: newerDate,
+            subjectKind: .pet,
+            subjectId: pet.id.uuidString,
+            eventKind: .care,
+            actionType: CareType.play.rawValue
+        )
+
+        let entries = PoopLitterLedgerEntry.entries(
+            from: [olderLitter, wrongPet, wrongKind, wrongAction, newerLitter],
+            petID: pet.id
+        )
+
+        #expect(entries.map(\.id) == [newerLitter.id, olderLitter.id])
+        #expect(entries[1].legacyLogId == legacyLogId)
     }
 
     @Test func fetchExpenseEntriesFiltersToCurrentMonthAndActor() throws {

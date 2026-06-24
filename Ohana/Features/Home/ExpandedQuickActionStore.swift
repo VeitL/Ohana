@@ -7,7 +7,7 @@
 
 import Foundation
 
-enum ExpandedQuickActionStore {
+nonisolated enum ExpandedQuickActionStore {
     static func petItems(
         raw: String,
         pet: Pet,
@@ -91,10 +91,24 @@ enum ExpandedQuickActionStore {
         currentItems: [QuickActionItem],
         raw: String
     ) -> String {
+        savingPetItems(
+            edited,
+            petID: pet.id,
+            currentItems: currentItems,
+            raw: raw
+        )
+    }
+
+    static func savingPetItems(
+        _ edited: [QuickActionItem],
+        petID: UUID,
+        currentItems: [QuickActionItem],
+        raw: String
+    ) -> String {
         var saved = decode(raw)
         let currentPetItemIds = Set(currentItems.map(\.id))
         let insertionIdx = saved.firstIndex(where: { currentPetItemIds.contains($0.id) }) ?? saved.count
-        saved.removeAll { $0.petId == pet.id && $0.entityKind != .human }
+        saved.removeAll { ($0.petId == petID || $0.entityId == petID) && $0.entityKind != .human }
         let cleaned = edited.filter { $0.actionType != "litterChange" }
         saved.insert(contentsOf: Array(cleaned.prefix(QuickActionLimit.maxItemsPerEntity)), at: min(insertionIdx, saved.count))
         return encode(saved) ?? raw
@@ -120,10 +134,24 @@ enum ExpandedQuickActionStore {
         currentItems: [QuickActionItem],
         raw: String
     ) -> String {
+        savingHumanItems(
+            edited,
+            humanID: human.id,
+            currentItems: currentItems,
+            raw: raw
+        )
+    }
+
+    static func savingHumanItems(
+        _ edited: [QuickActionItem],
+        humanID: UUID,
+        currentItems: [QuickActionItem],
+        raw: String
+    ) -> String {
         var saved = decode(raw)
         let currentItemIds = Set(currentItems.map(\.id))
         let insertionIdx = saved.firstIndex(where: { currentItemIds.contains($0.id) }) ?? saved.count
-        saved.removeAll { $0.entityId == human.id && $0.entityKind == .human }
+        saved.removeAll { $0.entityId == humanID && $0.entityKind == .human }
         let cleaned = edited.filter { $0.actionType != "humanAllFeatures" }
         saved.insert(contentsOf: Array(cleaned.prefix(QuickActionLimit.maxItemsPerEntity)), at: min(insertionIdx, saved.count))
         return encode(saved) ?? raw

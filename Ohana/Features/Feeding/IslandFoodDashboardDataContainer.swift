@@ -31,7 +31,7 @@ struct IslandFoodDashboard: View {
             onOpenPet: onOpenPet,
             pets: routeData.pets,
             allEvents: routeData.allEvents,
-            allFeedingLedgerEvents: routeData.allFeedingLedgerEvents,
+            allFeedingLedgerEntries: routeData.allFeedingLedgerEntries,
             legacyStockCareLogs: routeData.legacyStockCareLogs,
             allFoodRecords: routeData.allFoodRecords,
             allSharedCareSessions: routeData.allSharedCareSessions
@@ -61,7 +61,7 @@ struct IslandFoodDashboard: View {
 private struct IslandFoodDashboardRouteData {
     var pets: [Pet] = []
     var allEvents: [Event] = []
-    var allFeedingLedgerEvents: [CareLedgerEvent] = []
+    var allFeedingLedgerEntries: [FoodLedgerEntry] = []
     var legacyStockCareLogs: [PetCareLog] = []
     var allFoodRecords: [PetFoodRecord] = []
     var allSharedCareSessions: [SharedCareSession] = []
@@ -73,6 +73,19 @@ private struct IslandFoodDashboardRouteData {
         let feedingCareType = CareType.feeding.rawValue
         let sharedFeedingKind = SharedCareActionKind.feeding.rawValue
         let careLogWindowStart = Calendar.current.date(byAdding: .day, value: -730, to: Date()) ?? .distantPast
+        let feedingLedgerEvents = fetch(
+            FetchDescriptor<CareLedgerEvent>(
+                predicate: #Predicate<CareLedgerEvent> { event in
+                    event.subjectKind == petSubject &&
+                        event.eventKind == careKind &&
+                        event.actionType == feedingCareType &&
+                        event.occurredAt >= careLogWindowStart
+                },
+                sortBy: [SortDescriptor(\.occurredAt, order: .reverse)]
+            ),
+            context: context,
+            name: "CareLedgerEvent"
+        )
 
         return IslandFoodDashboardRouteData(
             pets: fetch(
@@ -88,19 +101,7 @@ private struct IslandFoodDashboardRouteData {
                 context: context,
                 name: "Event"
             ),
-            allFeedingLedgerEvents: fetch(
-                FetchDescriptor<CareLedgerEvent>(
-                    predicate: #Predicate<CareLedgerEvent> { event in
-                        event.subjectKind == petSubject &&
-                            event.eventKind == careKind &&
-                            event.actionType == feedingCareType &&
-                            event.occurredAt >= careLogWindowStart
-                    },
-                    sortBy: [SortDescriptor(\.occurredAt, order: .reverse)]
-                ),
-                context: context,
-                name: "CareLedgerEvent"
-            ),
+            allFeedingLedgerEntries: FoodLedgerEntry.entries(from: feedingLedgerEvents),
             legacyStockCareLogs: fetch(
                 FetchDescriptor<PetCareLog>(
                     predicate: #Predicate<PetCareLog> { log in

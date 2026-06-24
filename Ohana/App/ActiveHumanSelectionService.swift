@@ -20,3 +20,12 @@ final nonisolated class UserDefaultsActiveHumanSelection: ActiveHumanSelecting {
         currentHumanId ?? ""
     }
 }
+
+enum ActiveHumanSelectionPolicy {
+    static func activeHumanIdAfterCreatingHuman(
+        currentHumanIdRaw: String,
+        createdHumanId: UUID
+    ) -> String {
+        currentHumanIdRaw.isEmpty ? createdHumanId.uuidString : currentHumanIdRaw
+    }
+}

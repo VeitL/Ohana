@@ -769,7 +769,7 @@ enum CalendarTaskCompletionSyncService {
                 delta: -entry.delta,
                 entryKind: .adjustment,
                 source: .careEvent,
-                title: "撤销 \(entry.title)",
+                title: reversalTitle(for: entry, l: .current),
                 emoji: "↩️",
                 actorId: entry.actorId,
                 actorName: entry.actorName,

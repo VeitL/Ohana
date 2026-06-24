@@ -26,6 +26,7 @@ enum StarterGiftService {
         case alreadyHandled
         case markedExistingUser
         case pendingHuman
+        case pendingFirstCare(humanID: UUID)
         case claimed(humanID: UUID, amount: Int)
         case missingHuman
     }
@@ -47,14 +48,15 @@ enum StarterGiftService {
 
         let hasPendingGift = defaults.bool(forKey: StarterGiftStorageKey.pending)
         let counts = dataCounts(context: context)
+        let hasFirstPetWeight = hasRecordedPetWeight(context: context)
 
-        if let activeHumanID, let human = activeHuman(matching: activeHumanID, context: context) {
-            if hasPendingGift {
-                return claim(for: human, context: context, defaults: defaults, careLedger: careLedger, wallet: wallet, projectionManager: projectionManager)
-            }
-
-            if counts.humans == 1, counts.pets == 0, counts.ledger == 0 {
+        if let human = activeHuman(matching: activeHumanID ?? "", context: context) {
+            if hasPendingGift || counts.humans == 1 && counts.pets == 0 && counts.ledger == 0 && counts.petWeights == 0 {
                 defaults.set(true, forKey: StarterGiftStorageKey.pending)
+                guard hasFirstPetWeight else {
+                    AppPerformanceMonitor.shared.record("starter_gift_waiting_for_first_pet_weight", valueMS: 0)
+                    return .pendingFirstCare(humanID: human.id)
+                }
                 return claim(for: human, context: context, defaults: defaults, careLedger: careLedger, wallet: wallet, projectionManager: projectionManager)
             }
 
@@ -62,22 +64,7 @@ enum StarterGiftService {
             return .markedExistingUser
         }
 
-        if counts.humans == 1,
-           counts.pets == 0,
-           counts.ledger == 0,
-           let human = activeHuman(matching: activeHumanID ?? "", context: context) {
-            defaults.set(true, forKey: StarterGiftStorageKey.pending)
-            return claim(
-                for: human,
-                context: context,
-                defaults: defaults,
-                careLedger: careLedger,
-                wallet: wallet,
-                projectionManager: projectionManager
-            )
-        }
-
-        if counts.humans == 0, counts.pets == 0, counts.ledger == 0 {
+        if counts.humans == 0, counts.pets == 0, counts.ledger == 0, counts.petWeights == 0 {
             defaults.set(true, forKey: StarterGiftStorageKey.pending)
             AppPerformanceMonitor.shared.record("starter_gift_pending", valueMS: 0)
             return .pendingHuman
@@ -198,11 +185,12 @@ enum StarterGiftService {
     }
 
     @MainActor
-    private static func dataCounts(context: ModelContext) -> (humans: Int, pets: Int, ledger: Int) {
+    private static func dataCounts(context: ModelContext) -> (humans: Int, pets: Int, ledger: Int, petWeights: Int) {
         let humans = fetchCountOrLog(FetchDescriptor<Human>(), context: context, operation: "fetch human count")
         let pets = fetchCountOrLog(FetchDescriptor<Pet>(), context: context, operation: "fetch pet count")
         let ledger = fetchCountOrLog(FetchDescriptor<CareLedgerEvent>(), context: context, operation: "fetch care ledger count")
-        return (humans, pets, ledger)
+        let petWeights = fetchCountOrLog(FetchDescriptor<PetWeightLog>(), context: context, operation: "fetch pet weight count")
+        return (humans, pets, ledger, petWeights)
     }
 
     @MainActor
@@ -226,6 +214,22 @@ enum StarterGiftService {
             )
             return []
         }
+    }
+
+    @MainActor
+    private static func hasRecordedPetWeight(context: ModelContext) -> Bool {
+        var weightDescriptor = FetchDescriptor<PetWeightLog>()
+        weightDescriptor.fetchLimit = 1
+        if fetchModelsOrLog(weightDescriptor, context: context, operation: "fetch starter gift pet weight").isEmpty == false {
+            return true
+        }
+        var ledgerDescriptor = FetchDescriptor<CareLedgerEvent>(
+            predicate: #Predicate<CareLedgerEvent> { event in
+                event.eventKind == "weight" && event.actionType == "petWeight"
+            }
+        )
+        ledgerDescriptor.fetchLimit = 1
+        return fetchModelsOrLog(ledgerDescriptor, context: context, operation: "fetch starter gift pet weight ledger").isEmpty == false
     }
 
     @MainActor

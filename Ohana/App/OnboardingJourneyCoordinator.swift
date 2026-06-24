@@ -13,6 +13,7 @@ import SwiftData
 enum OnboardingJourneyPhase: Equatable {
     case preOnboarding
     case needsPrimaryHuman
+    case needsFirstPet
     case starterGiftPending
     case starterGiftReadyForCeremony(amount: Int)
     case firstCarePending
@@ -67,7 +68,7 @@ enum OnboardingJourneyCoordinator {
     @MainActor
     static func currentPhase(
         activeHumanID: String?,
-        context _: ModelContext,
+        context: ModelContext,
         defaults: UserDefaults = .standard
     ) -> OnboardingJourneyPhase {
         if StarterGiftService.shouldShowCeremony(defaults: defaults) {
@@ -76,6 +77,12 @@ enum OnboardingJourneyCoordinator {
 
         if activeHumanID?.isEmpty != false {
             return defaults.bool(forKey: StarterGiftStorageKey.pending) ? .starterGiftPending : .needsPrimaryHuman
+        }
+
+        if defaults.bool(forKey: StarterGiftStorageKey.pending) {
+            guard hasActivePet(context: context) else { return .needsFirstPet }
+            guard hasRecordedPetWeight(context: context) else { return .firstCarePending }
+            return .starterGiftPending
         }
 
         return .complete
@@ -135,6 +142,33 @@ enum OnboardingJourneyCoordinator {
         )
         descriptor.fetchLimit = 1
         return fetchModelsOrLog(descriptor, context: context, operation: "fetch recorded care business facts").isEmpty == false
+    }
+
+    @MainActor
+    private static func hasActivePet(context: ModelContext) -> Bool {
+        var descriptor = FetchDescriptor<Pet>(
+            predicate: #Predicate<Pet> { pet in
+                pet.passedAwayDate == nil
+            }
+        )
+        descriptor.fetchLimit = 1
+        return fetchModelsOrLog(descriptor, context: context, operation: "fetch starter active pet").isEmpty == false
+    }
+
+    @MainActor
+    private static func hasRecordedPetWeight(context: ModelContext) -> Bool {
+        var weightDescriptor = FetchDescriptor<PetWeightLog>()
+        weightDescriptor.fetchLimit = 1
+        if fetchModelsOrLog(weightDescriptor, context: context, operation: "fetch starter pet weight logs").isEmpty == false {
+            return true
+        }
+        var ledgerDescriptor = FetchDescriptor<CareLedgerEvent>(
+            predicate: #Predicate<CareLedgerEvent> { event in
+                event.eventKind == "weight" && event.actionType == "petWeight"
+            }
+        )
+        ledgerDescriptor.fetchLimit = 1
+        return fetchModelsOrLog(ledgerDescriptor, context: context, operation: "fetch starter pet weight ledger").isEmpty == false
     }
 
     @MainActor

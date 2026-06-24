@@ -112,17 +112,14 @@ extension HumanDetailView {
         }
     }
 
-    // MARK: - Delete Section
-    var deleteSection: some View {
-        Button(role: .destructive) { showingDeleteConfirm = true } label: {
-            Label("删除成员", systemImage: "trash")
-                .font(OhanaFont.callout(.semibold))
-                .foregroundStyle(Color.goRed)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 14)
-                .background(Color.goRed.opacity(0.08), in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
-                .overlay(RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous).strokeBorder(Color.goRed.opacity(0.2), lineWidth: 1))
-        }
+    // MARK: - Lifecycle & Danger Zone
+    var humanLifecycleDangerZone: some View {
+        HumanLifecycleDangerZone(
+            human: human,
+            onMarkPassedAway: markHumanPassedAway,
+            onUndoPassedAway: undoHumanPassedAway,
+            onDelete: deleteHumanAndReturnHome
+        )
         .padding(.horizontal, 16)
     }
 
@@ -197,6 +194,39 @@ extension HumanDetailView {
                     requiresAccountSwitch: result.requiresAccountSwitch
                 )
             )
+        }
+    }
+
+    func markHumanPassedAway(date: Date) {
+        let command = DomainCommand.memberLifecycle(
+            entityID: human.id,
+            kind: EntityKind.human.rawValue,
+            action: "passed.mark"
+        )
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        commandQueue.enqueue(command) {
+            _ = MemberCommandExecutor(context: modelContext, services: appServices).markHumanPassedAway(
+                human,
+                date: date,
+                note: "human.detail.passed.mark"
+            )
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+        }
+    }
+
+    func undoHumanPassedAway() {
+        let command = DomainCommand.memberLifecycle(
+            entityID: human.id,
+            kind: EntityKind.human.rawValue,
+            action: "passed.undo"
+        )
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        commandQueue.enqueue(command) {
+            _ = MemberCommandExecutor(context: modelContext, services: appServices).undoHumanPassedAway(
+                human,
+                note: "human.detail.passed.undo"
+            )
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
         }
     }
 }

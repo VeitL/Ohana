@@ -37,11 +37,15 @@ struct QuickFeedTreatSnapshotStoreTests {
         let jerkyLedger = feedingLedgerEvent(from: jerky)
         let oldTreatLedger = feedingLedgerEvent(from: oldTreat)
         let mainFoodLedger = feedingLedgerEvent(from: mainFood)
+        let entries = QuickFeedLedgerEntry.entries(
+            pet: pet,
+            feedingLedgerEvents: [lickableLedger, jerkyLedger, oldTreatLedger, mainFoodLedger],
+            legacyCareLogs: [lickable, jerky, oldTreat, mainFood]
+        )
 
         let snapshot = QuickFeedTreatSnapshot.build(
             pet: pet,
-            feedingLedgerEvents: [lickableLedger, jerkyLedger, oldTreatLedger, mainFoodLedger],
-            legacyCareLogs: [lickable, jerky, oldTreat, mainFood],
+            feedingLedgerEntries: entries,
             range: .days7,
             selectedKind: .lickable,
             now: now,

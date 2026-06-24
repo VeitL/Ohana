@@ -12,7 +12,9 @@ enum AppPetDetailSheetDestination: Hashable {
     case allFeatures
     case basicInfo
     case food
+    case weightQuick
     case weight
+    case expenseQuick
     case expense
     case feed(Bool)
     case water
@@ -35,7 +37,7 @@ extension AppPetDetailSheetDestination {
         switch self {
         case .allFeatures, .basicInfo, .momentHistory, .documents, .achievements, .retention:
             true
-        case .food, .weight, .expense, .feed, .water, .potty, .litter, .play, .hygiene,
+        case .food, .weightQuick, .weight, .expenseQuick, .expense, .feed, .water, .potty, .litter, .play, .hygiene,
              .walkSummary, .health, .medication, .bondVault:
             false
         }
@@ -43,7 +45,9 @@ extension AppPetDetailSheetDestination {
 }
 
 struct AppPetDetailSheetRouteContainer: View {
+    @Environment(\.modelContext) private var modelContext
     @Query private var pets: [Pet]
+    @AppStorage("currentActiveHumanId") private var activeHumanIdRaw = ""
     let destination: AppPetDetailSheetDestination
     let onMissing: () -> Void
     let onDismiss: () -> Void
@@ -94,8 +98,20 @@ struct AppPetDetailSheetRouteContainer: View {
                 NavigationStack { PetBasicInfoDetailView(pet: pet) }
             case .food:
                 NavigationStack { PetFoodManagementView(pet: pet) }
+            case .weightQuick:
+                GenericWeightEntrySheet(
+                    target: .pet(pet),
+                    onDismiss: onDismiss
+                )
             case .weight:
                 NavigationStack { WeightHistoryView(pet: pet) }
+            case .expenseQuick:
+                PetExpenseQuickRouteContent(
+                    pet: pet,
+                    activeHumanIdRaw: activeHumanIdRaw,
+                    loadData: { PetExpenseQuickRouteData.load(from: modelContext) },
+                    onDismiss: onDismiss
+                )
             case .expense:
                 NavigationStack { ExpenseHistoryView(pet: pet) }
             case let .feed(opensManualSheet):
@@ -147,6 +163,72 @@ struct AppPetDetailSheetRouteContainer: View {
     }
 }
 
+private struct PetExpenseQuickRouteContent: View {
+    let pet: Pet
+    let activeHumanIdRaw: String
+    let loadData: @MainActor () -> PetExpenseQuickRouteData
+    let onDismiss: () -> Void
+
+    var body: some View {
+        RouteFirstFrameDeferredLoad(
+            initialData: PetExpenseQuickRouteData(),
+            loadDelayMilliseconds: 120,
+            shouldLoad: { !$0.hasLoaded },
+            load: loadData
+        ) { data in
+            if data.hasLoaded {
+                AddExpenseSheet(
+                    pet: pet,
+                    humans: data.humans,
+                    allPets: data.allPets.isEmpty ? [pet] : data.allPets,
+                    preselectedPayerId: activeHumanIdRaw.isEmpty ? nil : activeHumanIdRaw,
+                    onDismiss: onDismiss
+                )
+            } else {
+                PetRouteLoadingEntityView(kind: "expense")
+            }
+        }
+    }
+}
+
+private struct PetExpenseQuickRouteData {
+    var humans: [Human] = []
+    var allPets: [Pet] = []
+    var hasLoaded = false
+
+    static func load(from context: ModelContext) -> PetExpenseQuickRouteData {
+        PetExpenseQuickRouteData(
+            humans: fetch(
+                FetchDescriptor<Human>(sortBy: [SortDescriptor(\.createdAt)]),
+                context: context,
+                name: "Human"
+            ),
+            allPets: fetch(
+                FetchDescriptor<Pet>(sortBy: [SortDescriptor(\.createdAt)]),
+                context: context,
+                name: "Pet"
+            ),
+            hasLoaded: true
+        )
+    }
+}
+
+private func fetch<T: PersistentModel>(
+    _ descriptor: FetchDescriptor<T>,
+    context: ModelContext,
+    name: String
+) -> [T] {
+    do {
+        return try context.fetch(descriptor) // route-first-frame: allow deferred-fetch
+    } catch {
+        OhanaLog.warning(
+            "Pet detail route data fetch failed for \(name): \(error.localizedDescription)",
+            category: "Members"
+        )
+        return []
+    }
+}
+
 private struct PetRouteMissingEntityView: View {
     let kind: String
 
@@ -159,6 +241,22 @@ private struct PetRouteMissingEntityView: View {
             Text("内容已不可用")
                 .font(OhanaFont.title3(.black))
                 .foregroundStyle(Color.ohanaPrimaryText)
+            Text(kind)
+                .font(OhanaFont.caption(.semibold))
+                .foregroundStyle(Color.ohanaSecondaryText)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(OhanaAppBackground().ignoresSafeArea())
+    }
+}
+
+private struct PetRouteLoadingEntityView: View {
+    let kind: String
+
+    var body: some View {
+        VStack(spacing: 12) {
+            ProgressView()
+                .controlSize(.regular)
             Text(kind)
                 .font(OhanaFont.caption(.semibold))
                 .foregroundStyle(Color.ohanaSecondaryText)

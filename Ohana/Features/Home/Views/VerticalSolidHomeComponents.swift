@@ -140,19 +140,7 @@ struct VerticalSolidHomePageDeck<HomePage: View, CalendarPage: View, OasisPage: 
 
 struct VerticalSolidHomeDashboardPage: View {
     let snapshot: VerticalSolidHomeSnapshot
-    let pets: [Pet]
-    let humans: [Human]
-    let allEvents: [Event]
-    let humanMedications: [HumanMedication]
-    let humanMedicationLogs: [HumanMedicationLog]
-    let feedingLedgerEntries: [HomeFeedQuickActionEntry]
-    let careLedgerEntries: [HomeCareQuickActionEntry]
-    let hygieneLedgerEntries: [HomeHygieneQuickActionEntry]
-    let walkLedgerEntries: [HomeWalkQuickActionEntry]
-    let pottyLedgerEntries: [HomePottyQuickActionEntry]
-    let petExpenseLedgerEntries: [HomePetExpenseQuickActionEntry]
-    let petWeightLedgerEntries: [HomePetWeightQuickActionEntry]
-    let expenseEntries: [HomeExpensePreviewEntry]
+    let interaction: HomeInteractionSnapshot
     let avatarCacheRevision: Int
     let isLive: Bool
     let walkPresentationRevision: Int
@@ -166,10 +154,12 @@ struct VerticalSolidHomeDashboardPage: View {
     @Binding var isCardHeroAnimating: Bool
     @Binding var cardHeroProgress: CGFloat
     let arrivingCardId: UUID?
-    let onOpenCard: (FocusCard) -> Void
+    let cardStateResetToken: UUID
+    let onOpenCardDetails: (FocusCard) -> Void
     let onQuickActionForCard: (QuickActionItem, FocusCard, Bool) -> Void
     let onQuickActionOptionForCard: (QuickActionItem, FocusCard, String) -> Void
     let onQuickActionLimitReached: () -> Void
+    let onAddFirstPet: () -> Void
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var selectedCardId: UUID?
@@ -182,10 +172,16 @@ struct VerticalSolidHomeDashboardPage: View {
     var body: some View {
         GeometryReader { _ in
             ZStack(alignment: .top) {
-                if !snapshot.cards.isEmpty {
+                if let firstPetEmptyState = snapshot.firstPetEmptyState {
+                    VerticalSolidHomeFirstPetEmptyStateView(
+                        state: firstPetEmptyState,
+                        onAddPet: onAddFirstPet
+                    )
+                    .padding(.horizontal, 22)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+                } else if !snapshot.cards.isEmpty {
                     FocusHomeVerticalSolidScene(
                         cards: snapshot.cards,
-                        pets: pets,
                         safeTop: 0,
                         safeBottom: 0,
                         selectedCardId: selectedCardId,
@@ -204,19 +200,7 @@ struct VerticalSolidHomeDashboardPage: View {
                         quickActions: { card in
                             VerticalSolidHomeExpandedCardActions(
                                 card: card,
-                                pets: pets,
-                                humans: humans,
-                                allEvents: allEvents,
-                                humanMedications: humanMedications,
-                                humanMedicationLogs: humanMedicationLogs,
-                                feedingLedgerEntries: feedingLedgerEntries,
-                                careLedgerEntries: careLedgerEntries,
-                                hygieneLedgerEntries: hygieneLedgerEntries,
-                                walkLedgerEntries: walkLedgerEntries,
-                                pottyLedgerEntries: pottyLedgerEntries,
-                                petExpenseLedgerEntries: petExpenseLedgerEntries,
-                                petWeightLedgerEntries: petWeightLedgerEntries,
-                                expenseEntries: expenseEntries,
+                                actionSnapshot: interaction.expandedActions(for: card.id),
                                 localization: localization,
                                 activeHumanID: activeHumanID,
                                 quickActionItemsRaw: $quickActionItemsRaw,
@@ -232,7 +216,7 @@ struct VerticalSolidHomeDashboardPage: View {
                         contextMenu: { _ in EmptyView() },
                         onSelect: expandCard,
                         onCollapse: collapseCard,
-                        onLongPress: onOpenCard
+                        onOpenDetails: onOpenCardDetails
                     )
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
@@ -250,9 +234,18 @@ struct VerticalSolidHomeDashboardPage: View {
         }
         .onAppear {
             prepareHeroSnapshots()
+            reconcileCardSelectionWithSnapshot()
         }
         .onChange(of: heroSnapshotPreparationKey) { _, _ in
             prepareHeroSnapshots()
+            reconcileCardSelectionWithSnapshot()
+        }
+        .onChange(of: cardIdentityKey) { _, _ in
+            prepareHeroSnapshots()
+            reconcileCardSelectionWithSnapshot()
+        }
+        .onChange(of: cardStateResetToken) { _, _ in
+            resetCardPresentationState()
         }
     }
 
@@ -376,6 +369,49 @@ struct VerticalSolidHomeDashboardPage: View {
         }
     }
 
+    private func reconcileCardSelectionWithSnapshot() {
+        let reconciliation = FocusHomeCardDataSource.selectionReconciliation(
+            cards: snapshot.cards,
+            selectedCardId: selectedCardId,
+            headerContextCardId: headerContextCardId
+        )
+        guard reconciliation.clearsSelectedCard || reconciliation.clearsHeaderContext else { return }
+
+        collapseCleanupTask?.cancel()
+        collapseCleanupTask = nil
+        heroGeneration += 1
+        withoutAnimation {
+            if reconciliation.clearsSelectedCard {
+                selectedCardId = nil
+                activeHeroSnapshot = nil
+                heroProgress = 0
+                heroDirection = 0
+                cardHeroProgress = 0
+                isCardExpandedOrTransitioning = false
+                isCardHeroAnimating = false
+            }
+            if reconciliation.clearsHeaderContext {
+                headerContextCardId = nil
+            }
+        }
+    }
+
+    private func resetCardPresentationState() {
+        collapseCleanupTask?.cancel()
+        collapseCleanupTask = nil
+        heroGeneration += 1
+        withoutAnimation {
+            selectedCardId = nil
+            activeHeroSnapshot = nil
+            heroProgress = 0
+            heroDirection = 0
+            cardHeroProgress = 0
+            headerContextCardId = nil
+            isCardExpandedOrTransitioning = false
+            isCardHeroAnimating = false
+        }
+    }
+
     private var heroAnimation: Animation {
         reduceMotion ? HeroAnim.walletReduced : GoMotion.zStackHero
     }
@@ -399,6 +435,10 @@ struct VerticalSolidHomeDashboardPage: View {
 
     private var heroSnapshotPreparationKey: String {
         "\(avatarCacheRevision)|\(snapshot.heroPreparationRevision)"
+    }
+
+    private var cardIdentityKey: String {
+        snapshot.cards.map(\.id.uuidString).joined(separator: "|")
     }
 
     private func makeHeroSnapshot(for cardId: UUID) -> FocusHomeVerticalSolidHeroSnapshot? {
@@ -431,6 +471,92 @@ struct VerticalSolidHomeDashboardPage: View {
                !isCardHeroAnimating {
                 activeHeroSnapshot = refreshed.preservingCollapsedGeometry(from: activeHeroSnapshot)
             }
+        }
+    }
+}
+
+private struct VerticalSolidHomeFirstPetEmptyStateView: View {
+    let state: VerticalSolidHomeFirstPetEmptyState
+    let onAddPet: () -> Void
+
+    var body: some View {
+        VStack(spacing: 20) {
+            VStack(spacing: 14) {
+                ZStack {
+                    Circle()
+                        .fill(Color.goPrimary.opacity(0.16))
+                    Image(systemName: "pawprint.fill").accessibilityHidden(true)
+                        .font(OhanaFont.adaptive(size: 28, weight: .black, design: .rounded))
+                        .symbolRenderingMode(.monochrome)
+                        .foregroundStyle(Color.goPrimary)
+                }
+                .frame(width: 64, height: 64)
+                .accessibilityHidden(true)
+
+                VStack(spacing: 8) {
+                    Text(state.eyebrow)
+                        .font(OhanaFont.caption(.black))
+                        .foregroundStyle(Color.goPrimary)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(Color.goPrimary.opacity(0.12), in: Capsule())
+
+                    Text(state.title)
+                        .font(OhanaFont.adaptive(size: 24, weight: .black, design: .rounded))
+                        .foregroundStyle(Color.ohanaPrimaryText)
+                        .multilineTextAlignment(.center)
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.82)
+
+                    Text(state.subtitle)
+                        .font(OhanaFont.adaptive(size: 14, weight: .semibold, design: .rounded))
+                        .foregroundStyle(Color.ohanaSecondaryText)
+                        .multilineTextAlignment(.center)
+                        .lineSpacing(3)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+
+            HStack(spacing: 10) {
+                Image(systemName: "checkmark.circle.fill").accessibilityHidden(true)
+                    .font(OhanaFont.adaptive(size: 16, weight: .black))
+                    .symbolRenderingMode(.monochrome)
+                    .foregroundStyle(Color.goTeal)
+                Text(state.progressText)
+                    .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
+                    .foregroundStyle(Color.ohanaPrimaryText)
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.84)
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
+            .background(Color.ohanaCardSurfaceElevated.opacity(0.72), in: RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous))
+
+            Button(action: onAddPet) {
+                HStack(spacing: 10) {
+                    Image(systemName: "plus.circle.fill").accessibilityHidden(true)
+                        .font(OhanaFont.adaptive(size: 18, weight: .black))
+                        .symbolRenderingMode(.monochrome)
+                    Text(state.primaryActionTitle)
+                        .font(OhanaFont.adaptive(size: 16, weight: .black, design: .rounded))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                }
+                .foregroundStyle(Color.ohanaPrimaryActionText)
+                .frame(maxWidth: .infinity)
+                .frame(minHeight: 52)
+                .background(Color.goPrimary, in: Capsule())
+            }
+            .buttonStyle(ScaleButtonStyle())
+            .accessibilityLabel(state.primaryActionTitle)
+        }
+        .padding(22)
+        .frame(maxWidth: 360)
+        .background(Color.ohanaCardSurface.opacity(0.94), in: RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous)
+                .strokeBorder(Color.ohanaCardStroke, lineWidth: 1)
         }
     }
 }

@@ -26,7 +26,7 @@ struct QuickFeedPlanCalendarSnapshotStoreTests {
         let snapshot = QuickFeedPlanCalendarSnapshot.build(
             manualEvents: [event],
             autoEvents: [],
-            feedingLedgerEvents: [],
+            feedingLedgerEntries: [],
             activeMode: .manualReminder,
             month: today,
             selectedDate: today,
@@ -67,11 +67,17 @@ struct QuickFeedPlanCalendarSnapshotStoreTests {
             sourceEventId: event.id.uuidString,
             legacyModelName: "PetCareLog"
         )
+        let entries = QuickFeedLedgerEntry.entries(
+            pet: pet,
+            feedingLedgerEvents: [ledger],
+            legacyCareLogs: [],
+            autoFeederEvents: [event]
+        )
 
         let snapshot = QuickFeedPlanCalendarSnapshot.build(
             manualEvents: [],
             autoEvents: [event],
-            feedingLedgerEvents: [ledger],
+            feedingLedgerEntries: entries,
             activeMode: .autoFeeder,
             month: today,
             selectedDate: today,
@@ -80,7 +86,7 @@ struct QuickFeedPlanCalendarSnapshotStoreTests {
         )
 
         #expect(snapshot.selectedDateOccurrences.count == 1)
-        #expect(snapshot.selectedDateOccurrences.first?.autoLedgerEvent?.id == ledger.id)
+        #expect(snapshot.selectedDateOccurrences.first?.autoLedgerEntry?.id == ledger.id)
         #expect(snapshot.selectedDateOccurrences.first?.isCompleted == true)
     }
 
@@ -110,11 +116,17 @@ struct QuickFeedPlanCalendarSnapshotStoreTests {
             source: .backfill,
             legacyModelName: "PetCareLog"
         )
+        let entries = QuickFeedLedgerEntry.entries(
+            pet: pet,
+            feedingLedgerEvents: [ledger],
+            legacyCareLogs: [],
+            autoFeederEvents: [event]
+        )
 
         let snapshot = QuickFeedPlanCalendarSnapshot.build(
             manualEvents: [],
             autoEvents: [event],
-            feedingLedgerEvents: [ledger],
+            feedingLedgerEntries: entries,
             activeMode: .autoFeeder,
             month: today,
             selectedDate: today,
@@ -122,7 +134,7 @@ struct QuickFeedPlanCalendarSnapshotStoreTests {
             calendar: calendar
         )
 
-        #expect(snapshot.selectedDateOccurrences.first?.autoLedgerEvent?.id == ledger.id)
+        #expect(snapshot.selectedDateOccurrences.first?.autoLedgerEntry?.id == ledger.id)
         #expect(snapshot.selectedDateOccurrences.first?.isCompleted == true)
     }
 
@@ -144,7 +156,7 @@ struct QuickFeedPlanCalendarSnapshotStoreTests {
         let snapshot = QuickFeedPlanCalendarSnapshot.build(
             manualEvents: [],
             autoEvents: [event],
-            feedingLedgerEvents: [],
+            feedingLedgerEntries: [],
             activeMode: .autoFeeder,
             month: today,
             selectedDate: today,

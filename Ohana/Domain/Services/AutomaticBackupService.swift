@@ -37,13 +37,29 @@ enum AutomaticBackupFileStoreError: LocalizedError, Equatable {
     case cleanupFailed(String)
 
     var errorDescription: String? {
+        localizedMessage(l: .current)
+    }
+
+    func localizedMessage(l: L10n) -> String {
         switch self {
         case .iCloudUnavailable:
-            "iCloud Drive 暂时不可用。请确认已登录 iCloud，并允许 Ohana 使用 iCloud Drive。"
+            l.tr(
+                zh: "iCloud Drive 暂时不可用。请确认已登录 iCloud，并允许 Ohana 使用 iCloud Drive。",
+                en: "iCloud Drive is temporarily unavailable. Make sure you are signed in to iCloud and have allowed Ohana to use iCloud Drive.",
+                de: "iCloud Drive ist vorübergehend nicht verfügbar. Stelle sicher, dass du bei iCloud angemeldet bist und Ohana iCloud Drive verwenden darf."
+            )
         case let .writeFailed(message):
-            "自动备份写入失败：\(message)"
+            l.tr(
+                zh: "自动备份写入失败：\(message)",
+                en: "Automatic backup failed to write: \(message)",
+                de: "Automatisches Backup konnte nicht geschrieben werden: \(message)"
+            )
         case let .cleanupFailed(message):
-            "自动备份清理失败：\(message)"
+            l.tr(
+                zh: "自动备份清理失败：\(message)",
+                en: "Automatic backup cleanup failed: \(message)",
+                de: "Automatische Backup-Bereinigung fehlgeschlagen: \(message)"
+            )
         }
     }
 

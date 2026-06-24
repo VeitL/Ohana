@@ -10,30 +10,10 @@ extension QuickFeedDetailContent {
         QuickFeedEmptyInlineState(icon: icon, text: text)
     }
 
-    func feedLogRow(_ log: PetCareLog, compact: Bool, solidSurface _: Bool = false) -> some View {
-        let badge = feedLogBadge(for: log)
-        let grams = feedLogDisplayGrams(for: log)
-        return QuickFeedLogRow(
-            icon: badge.icon,
-            title: badge.title,
-            tint: badge.tint,
-            date: log.date,
-            gramsText: grams > 0 ? formattedFoodWeight(grams) : "--",
-            compact: compact,
-            editTint: mainFoodTint,
-            onEdit: compact ? nil : {
-                beginEditingFeedLog(log)
-            },
-            onDelete: compact ? nil : {
-                activeAlert = .deleteFeedLog(log)
-            }
-        )
-    }
-
     func feedLogRow(_ entry: QuickFeedLedgerEntry, compact: Bool, solidSurface _: Bool = false) -> some View {
         let badge = feedLedgerBadge(for: entry)
         let grams = feedLedgerDisplayGrams(for: entry)
-        let legacyLog = legacyFeedLog(for: entry)
+        let feedLogId = editableFeedLogId(for: entry)
         return QuickFeedLogRow(
             icon: badge.icon,
             title: badge.title,
@@ -42,18 +22,18 @@ extension QuickFeedDetailContent {
             gramsText: grams > 0 ? formattedFoodWeight(grams) : "--",
             compact: compact,
             editTint: mainFoodTint,
-            onEdit: compact ? nil : legacyLog.map { log in
-                { beginEditingFeedLog(log) }
+            onEdit: compact ? nil : feedLogId.map { id in
+                { beginEditingFeedLog(id: id) }
             },
-            onDelete: compact ? nil : legacyLog.map { log in
-                { activeAlert = .deleteFeedLog(log) }
+            onDelete: compact ? nil : feedLogId.map { id in
+                { activeAlert = .deleteFeedLog(id: id) }
             }
         )
     }
 
-    func legacyFeedLog(for entry: QuickFeedLedgerEntry) -> PetCareLog? {
+    func editableFeedLogId(for entry: QuickFeedLedgerEntry) -> UUID? {
         guard let legacyModelId = entry.legacyModelId else { return nil }
-        return observedCareLogs.first { $0.id.uuidString == legacyModelId }
+        return UUID(uuidString: legacyModelId)
     }
 
     func feedLedgerBadge(for entry: QuickFeedLedgerEntry) -> (title: String, tint: Color, icon: String) {

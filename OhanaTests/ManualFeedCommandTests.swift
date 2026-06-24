@@ -262,6 +262,42 @@ struct ManualFeedCommandTests {
         #expect(try context.fetch(FetchDescriptor<CoconutLedgerEntry>()).isEmpty)
     }
 
+    @Test func feedingCareLedgerWritesStructuredKindMetadata() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let pet = Pet(name: "Momo", species: "猫")
+        context.insert(pet)
+        try context.save()
+        let dependencies = CareEventServiceDependencies.live()
+
+        _ = CareEventService.recordManualFeedFact(
+            pet: pet,
+            amountGrams: 42,
+            context: context,
+            date: date(year: 2026, month: 5, day: 1, hour: 9),
+            foodKind: .wet,
+            dependencies: dependencies
+        )
+        _ = CareEventService.recordTreatFeedFact(
+            pet: pet,
+            amountGrams: 8,
+            context: context,
+            date: date(year: 2026, month: 5, day: 1, hour: 10),
+            treatKind: .freezeDried,
+            dependencies: dependencies
+        )
+
+        let ledgers = try context.fetch(FetchDescriptor<CareLedgerEvent>(
+            sortBy: [SortDescriptor(\.occurredAt)]
+        ))
+        let manual = try #require(ledgers.first)
+        let treat = try #require(ledgers.last)
+        #expect(CareLedgerMetadata.stringValue(named: CareLedgerMetadata.feedFoodKind, in: manual.metadataJSON) == FeedFoodKind.wet.rawValue)
+        #expect(CareLedgerMetadata.stringValue(named: CareLedgerMetadata.feedTreatKind, in: manual.metadataJSON) == nil)
+        #expect(CareLedgerMetadata.stringValue(named: CareLedgerMetadata.feedFoodKind, in: treat.metadataJSON) == FeedFoodKind.dry.rawValue)
+        #expect(CareLedgerMetadata.stringValue(named: CareLedgerMetadata.feedTreatKind, in: treat.metadataJSON) == FeedTreatKind.freezeDried.rawValue)
+    }
+
     @Test func rebuildFoodStockRemindersDeletesContextEventsWhenCallerHasNoEvents() throws {
         let container = try makeContainer()
         let context = container.mainContext
@@ -675,12 +711,85 @@ struct ManualFeedCommandTests {
         #expect(log.autoFeedDedupKey == FeedLogMetadata.autoDedupKey(eventId: event.id, scheduledAt: event.startDate))
         #expect(log.isAutoFeedLogEntry)
         #expect(!log.note.contains(FeedLogMetadata.autoFeedNotePrefix))
+        let ledger = try #require(try context.fetch(FetchDescriptor<CareLedgerEvent>()).first)
+        #expect(ledger.sourceEventId == event.id.uuidString)
+        #expect(CareLedgerMetadata.stringValue(named: CareLedgerMetadata.autoFeedDedupKey, in: ledger.metadataJSON) == log.autoFeedDedupKey)
         let state = try #require(try CloudSyncMetadataService.state(
             entityName: String(describing: PetCareLog.self),
             localRecordId: log.id,
             context: context
         ))
         #expect(state.hasPendingLocalChanges)
+    }
+
+    @Test func autoFeedMaterializerUsesLedgerKeysInsteadOfPetCareLogRelationship() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let now = date(year: 2026, month: 5, day: 2, hour: 10)
+        let pet = Pet(name: "Momo", species: "猫")
+        let event = Event(
+            title: "自动喂食器 干粮 35g",
+            startDate: date(year: 2026, month: 5, day: 2, hour: 8),
+            eventType: EventType.foodChange.rawValue,
+            relatedEntityType: FeedRuleMetadata.autoFeederEntityType,
+            relatedEntityId: pet.id.uuidString
+        )
+        event.recurrenceDays = 1
+        event.feedRuleKindRaw = FeedRuleKind.autoFeeder.rawValue
+        event.feedAmountGrams = 35
+        event.foodKindRaw = FeedFoodKind.dry.rawValue
+        let legacyRelationshipLog = PetCareLog(
+            date: event.startDate,
+            type: .feeding,
+            amountGrams: 35,
+            autoFeedDedupKey: FeedLogMetadata.autoDedupKey(eventId: event.id, scheduledAt: event.startDate),
+            pet: pet
+        )
+        context.insert(pet)
+        context.insert(event)
+        context.insert(legacyRelationshipLog)
+        try context.save()
+        FeedOperatingMode.set(pet.id, mode: .autoFeeder)
+
+        let inserted = FeedAutoLogMaterializer.materializeDueLogs(
+            pet: pet,
+            allEvents: [event],
+            context: context,
+            now: now
+        )
+        let logs = try context.fetch(FetchDescriptor<PetCareLog>())
+        let ledgerEvents = try context.fetch(FetchDescriptor<CareLedgerEvent>())
+
+        #expect(inserted == 1)
+        #expect(logs.count == 2)
+        #expect(ledgerEvents.count == 1)
+        #expect(ledgerEvents.first?.sourceEventId == event.id.uuidString)
+    }
+
+    @Test func careLedgerBackfillPreservesStructuredAutoFeedDedupKey() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let pet = Pet(name: "Momo", species: "猫")
+        let eventId = UUID()
+        let scheduledAt = date(year: 2026, month: 5, day: 2, hour: 8)
+        let key = FeedLogMetadata.autoDedupKey(eventId: eventId, scheduledAt: scheduledAt)
+        let legacyLog = PetCareLog(
+            date: scheduledAt,
+            type: .feeding,
+            amountGrams: 35,
+            autoFeedDedupKey: key,
+            pet: pet
+        )
+        context.insert(pet)
+        context.insert(legacyLog)
+        try context.save()
+
+        try CareLedgerBackfillService.backfill(context: context)
+        let ledger = try #require(try context.fetch(FetchDescriptor<CareLedgerEvent>()).first)
+
+        #expect(ledger.source == CareLedgerSource.backfill.rawValue)
+        #expect(ledger.sourceEventId == eventId.uuidString)
+        #expect(CareLedgerMetadata.stringValue(named: CareLedgerMetadata.autoFeedDedupKey, in: ledger.metadataJSON) == key)
     }
 
     @Test func autoFeedMaterializerNoopsForDeceasedPetBeforeFactAndLedger() throws {

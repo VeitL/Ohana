@@ -8,10 +8,29 @@
 import SwiftData
 import SwiftUI
 
-private struct QuickPlayLedgerEntry: Identifiable {
+struct QuickPlayLedgerEntry: Identifiable, Equatable {
     let id: UUID
     let date: Date
     let legacyLogId: UUID?
+
+    static func entries(from events: [CareLedgerEvent], petID: UUID) -> [QuickPlayLedgerEntry] {
+        let petKey = petID.uuidString
+        return events.compactMap { event in
+            guard event.eventKindEnum == .care,
+                  event.subjectKind == CareLedgerSubjectKind.pet.rawValue,
+                  event.subjectId == petKey,
+                  event.actionType == CareType.play.rawValue else { return nil }
+            let legacyLogId = event.legacyModelName == "PetCareLog"
+                ? event.legacyModelId.flatMap(UUID.init(uuidString:))
+                : nil
+            return QuickPlayLedgerEntry(
+                id: event.id,
+                date: event.occurredAt,
+                legacyLogId: legacyLogId
+            )
+        }
+        .sorted { $0.date > $1.date }
+    }
 }
 
 struct QuickPlayDetailSheet: View {
@@ -19,7 +38,7 @@ struct QuickPlayDetailSheet: View {
     let onRemove: () -> Void
     var onClose: (() -> Void)?
     var allEvents: [Event] = []
-    let playLedgerEvents: [CareLedgerEvent]
+    let playEntries: [QuickPlayLedgerEntry]
     let legacyPlayDeleteLogs: [PetCareLog]
 
     @Environment(\.modelContext) private var modelContext
@@ -58,14 +77,14 @@ struct QuickPlayDetailSheet: View {
         onRemove: @escaping () -> Void,
         onClose: (() -> Void)? = nil,
         allEvents: [Event] = [],
-        playLedgerEvents: [CareLedgerEvent] = [],
+        playEntries: [QuickPlayLedgerEntry] = [],
         legacyPlayDeleteLogs: [PetCareLog] = []
     ) {
         self.pet = pet
         self.onRemove = onRemove
         self.onClose = onClose
         self.allEvents = allEvents
-        self.playLedgerEvents = playLedgerEvents
+        self.playEntries = playEntries
         self.legacyPlayDeleteLogs = legacyPlayDeleteLogs
     }
 
@@ -93,24 +112,6 @@ struct QuickPlayDetailSheet: View {
         var id: Date { day }
         let day: Date
         let count: Int
-    }
-
-    private var playEntries: [QuickPlayLedgerEntry] {
-        playLedgerEvents.compactMap { event in
-            guard event.eventKindEnum == .care,
-                  event.subjectKind == CareLedgerSubjectKind.pet.rawValue,
-                  event.subjectId == petKey,
-                  event.actionType == CareType.play.rawValue else { return nil }
-            let legacyLogId = event.legacyModelName == "PetCareLog"
-                ? event.legacyModelId.flatMap(UUID.init(uuidString:))
-                : nil
-            return QuickPlayLedgerEntry(
-                id: event.id,
-                date: event.occurredAt,
-                legacyLogId: legacyLogId
-            )
-        }
-        .sorted { $0.date > $1.date }
     }
 
     private var monthPlayStrip: [DayCount] {

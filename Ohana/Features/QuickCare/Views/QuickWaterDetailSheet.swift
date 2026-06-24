@@ -14,7 +14,7 @@ struct QuickWaterDetailSheet: View {
     var onClose: (() -> Void)?
     let allEvents: [Event]
     let allPets: [Pet]
-    let waterLedgerEvents: [CareLedgerEvent]
+    let waterEntries: [QuickWaterLedgerEntry]
     let legacyWaterDeleteLogs: [PetCareLog]
 
     @Environment(\.modelContext) var modelContext
@@ -77,7 +77,7 @@ struct QuickWaterDetailSheet: View {
         onClose: (() -> Void)? = nil,
         allEvents: [Event] = [],
         allPets: [Pet] = [],
-        waterLedgerEvents: [CareLedgerEvent] = [],
+        waterEntries: [QuickWaterLedgerEntry] = [],
         legacyWaterDeleteLogs: [PetCareLog] = []
     ) {
         self.pet = pet
@@ -85,7 +85,7 @@ struct QuickWaterDetailSheet: View {
         self.onClose = onClose
         self.allEvents = allEvents
         self.allPets = allPets
-        self.waterLedgerEvents = waterLedgerEvents
+        self.waterEntries = waterEntries
         self.legacyWaterDeleteLogs = legacyWaterDeleteLogs
         _displayedWaterMode = State(initialValue: WaterOperatingMode.stored(pet.id) ?? .manual)
     }
@@ -290,7 +290,7 @@ struct QuickWaterDetailSheet: View {
             scheduleWaterSnapshotRefresh(milliseconds: refreshDelay, syncModeAfterRefresh: true)
             scheduleWaterPlanMaintenance(delayMilliseconds: maintenanceDelay)
         }
-        .onChange(of: waterLedgerEvents.count) { _, _ in
+        .onChange(of: waterEntries.count) { _, _ in
             scheduleWaterSnapshotRefresh()
         }
         .onChange(of: activeSheet?.id) { _, _ in

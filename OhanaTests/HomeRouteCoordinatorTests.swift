@@ -90,7 +90,9 @@ struct HomeRouteCoordinatorTests {
 
         coordinator.openSheet(.petAllFeatures(pet.id))
         coordinator.openSheet(.petFood(pet.id))
+        coordinator.openSheet(.petWeightQuick(pet.id))
         coordinator.openSheet(.petFeed(pet.id, opensManualSheet: true))
+        coordinator.openSheet(.petExpenseQuick(pet.id))
         coordinator.openSheet(.petWater(pet.id))
         coordinator.openSheet(.petHealth(pet.id, initialSection: .preventive))
         coordinator.openSheet(.petDocuments(pet.id))
@@ -98,17 +100,24 @@ struct HomeRouteCoordinatorTests {
         coordinator.openSheet(.petRetention(pet.id))
         coordinator.openSheet(.petBondVault(pet.id))
         coordinator.openSheet(.humanAllFeatures(human.id))
+        coordinator.openSheet(.humanMedicationQuick(human.id))
         coordinator.openSheet(.humanMedication(human.id))
+        coordinator.openSheet(.humanWeightQuick(human.id))
         coordinator.openSheet(.humanWeight(human.id))
+        coordinator.openSheet(.humanWorkoutQuick(human.id))
         coordinator.openSheet(.humanWorkoutDashboard(human.id))
         coordinator.openSheet(.humanMetrics(human.id))
         coordinator.openSheet(.humanReport(human.id))
+        coordinator.openSheet(.humanExpenseQuick(human.id))
+        coordinator.openSheet(.humanNoteQuick(human.id))
         coordinator.openSheet(.humanWishlist(human.id))
 
         let expectedRoutes: [HomeAppSheetRoute] = [
             .appSheet(.petAllFeatures(pet.id)),
             .appSheet(.petFood(pet.id)),
+            .appSheet(.petWeightQuick(pet.id)),
             .appSheet(.petFeed(pet.id, opensManualSheet: true)),
+            .appSheet(.petExpenseQuick(pet.id)),
             .appSheet(.petWater(pet.id)),
             .appSheet(.petHealth(pet.id, initialSection: .preventive)),
             .appSheet(.petDocuments(pet.id)),
@@ -116,11 +125,16 @@ struct HomeRouteCoordinatorTests {
             .appSheet(.petRetention(pet.id)),
             .appSheet(.petBondVault(pet.id)),
             .appSheet(.humanAllFeatures(human.id)),
+            .appSheet(.humanMedicationQuick(human.id)),
             .appSheet(.humanMedication(human.id)),
+            .appSheet(.humanWeightQuick(human.id)),
             .appSheet(.humanWeight(human.id)),
+            .appSheet(.humanWorkoutQuick(human.id)),
             .appSheet(.humanWorkoutDashboard(human.id)),
             .appSheet(.humanMetrics(human.id)),
             .appSheet(.humanReport(human.id)),
+            .appSheet(.humanExpenseQuick(human.id)),
+            .appSheet(.humanNoteQuick(human.id)),
             .appSheet(.humanWishlist(human.id))
         ]
         #expect(appSheets.count == expectedRoutes.count)
@@ -250,14 +264,31 @@ struct HomeRouteCoordinatorTests {
         let card = FocusCard.from(pet)
         var quickWalkIDs: [UUID] = []
         var summaryWalkIDs: [UUID] = []
+        let interaction = HomeInteractionSnapshot(
+            activeHuman: nil,
+            islandCoconutBalance: 0,
+            petsByID: [
+                pet.id: HomePetInteractionSnapshot(
+                    id: pet.id,
+                    species: pet.species,
+                    hasPassedAway: pet.hasPassedAway
+                )
+            ],
+            humansByID: [:],
+            plantIDs: [],
+            firstActivePetID: pet.id,
+            petMedicationTargetsByMedicationID: [:],
+            eventRoutesByEventID: [:],
+            expandedActionsByCardID: [:]
+        )
 
         let actions = FocusHomeExpandedFabRouter.Actions(
             showPetAllFeatures: { _ in },
             showHumanAllFeatures: { _ in },
             openFeed: { _ in },
             openWater: { _ in },
-            openWalk: { quickWalkIDs.append($0.id) },
-            openWalkSummary: { summaryWalkIDs.append($0.id) },
+            openWalk: { quickWalkIDs.append($0) },
+            openWalkSummary: { summaryWalkIDs.append($0) },
             openPotty: { _ in },
             openPlay: { _ in },
             openMedication: { _ in },
@@ -277,19 +308,13 @@ struct HomeRouteCoordinatorTests {
         FocusHomeExpandedFabRouter.open(
             ExpandedCardFabShortcut(label: "Walk", icon: "figure.walk", action: .quick("walk")),
             card: card,
-            pets: [pet],
-            humans: [],
-            activeHumanId: nil,
-            privacy: StaticHumanPrivacyManager(),
+            interaction: interaction,
             actions: actions
         )
         FocusHomeExpandedFabRouter.open(
             ExpandedCardFabShortcut(label: "Walks", icon: "figure.walk", action: .detail(.walks)),
             card: card,
-            pets: [pet],
-            humans: [],
-            activeHumanId: nil,
-            privacy: StaticHumanPrivacyManager(),
+            interaction: interaction,
             actions: actions
         )
 

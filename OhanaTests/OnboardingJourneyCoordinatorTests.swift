@@ -5,7 +5,7 @@ import Testing
 
 @MainActor
 struct OnboardingJourneyCoordinatorTests {
-    @Test func freshInstallJourneyCompletesAfterHumanAndStarterGift() throws {
+    @Test func freshInstallJourneyClaimsStarterGiftAfterFirstPetWeight() throws {
         let container = try makeContainer()
         let context = ModelContext(container)
         let suiteName = makeDefaultsSuiteName()
@@ -40,6 +40,31 @@ struct OnboardingJourneyCoordinatorTests {
         context.safeSave()
         TestQuestManagerProjection.manager.coconutCount = 0
         TestQuestManagerProjection.manager.coconutLogs = []
+
+        let needsFirstPet = OnboardingJourneyCoordinator.evaluate(
+            hasOnboarded: true,
+            activeHumanID: human.id.uuidString,
+            context: context,
+            defaults: defaults
+        )
+        #expect(needsFirstPet.starterGiftResult == .pendingFirstCare(humanID: human.id))
+        #expect(needsFirstPet.phase == .needsFirstPet)
+
+        let pet = Pet(name: "Momo", species: "cat")
+        context.insert(pet)
+        context.safeSave()
+
+        let needsFirstCare = OnboardingJourneyCoordinator.evaluate(
+            hasOnboarded: true,
+            activeHumanID: human.id.uuidString,
+            context: context,
+            defaults: defaults
+        )
+        #expect(needsFirstCare.starterGiftResult == .pendingFirstCare(humanID: human.id))
+        #expect(needsFirstCare.phase == .firstCarePending)
+
+        context.insert(PetWeightLog(weight: 4.2, pet: pet))
+        context.safeSave()
 
         let claimed = OnboardingJourneyCoordinator.evaluate(
             hasOnboarded: true,
@@ -76,6 +101,11 @@ struct OnboardingJourneyCoordinatorTests {
 
         let human = Human(name: "First")
         context.insert(human)
+        context.safeSave()
+
+        let pet = Pet(name: "Momo", species: "cat")
+        context.insert(pet)
+        context.insert(PetWeightLog(weight: 4.2, pet: pet))
         context.safeSave()
 
         let claimedBeforeActiveHumanPropagates = OnboardingJourneyCoordinator.evaluate(

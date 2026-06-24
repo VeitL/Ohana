@@ -723,6 +723,15 @@ struct OhanaTests {
         let weightLog = HumanWeightLog(date: date, weight: 68, human: human)
         human.weightLogs.append(weightLog)
         let playLog = PetCareLog(date: date, type: .play, pet: pet)
+        let playLedger = CareLedgerEvent(
+            occurredAt: date,
+            actorKind: .human,
+            actorId: human.id.uuidString,
+            subjectKind: .pet,
+            subjectId: pet.id.uuidString,
+            eventKind: .care,
+            actionType: CareType.play.rawValue
+        )
         let petWeightLog = PetWeightLog(date: date, weight: 4.8, pet: pet)
         let photoLog = PetPhotoLog(imageData: Data([1, 2, 3]), date: date, note: "today", pet: pet)
         pet.careLogs.append(playLog)
@@ -732,6 +741,7 @@ struct OhanaTests {
         context.insert(pet)
         context.insert(weightLog)
         context.insert(playLog)
+        context.insert(playLedger)
         context.insert(petWeightLog)
         context.insert(photoLog)
         try context.save()
@@ -1423,6 +1433,110 @@ struct OhanaTests {
     }
 
     @MainActor
+    @Test func careEventServiceDirectPetFactsDeniedByLifecycleWriteNoDerivedSideEffects() async throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let pet = Pet(name: "Momo", species: "猫")
+        pet.passedAwayDate = dateForTest(year: 2026, month: 6, day: 10)
+        let executor = Human(name: "Guan")
+        let executorId = executor.id.uuidString
+        context.insert(executor)
+        context.insert(pet)
+        try context.save()
+
+        let economy = CareEventEconomyAwarderSpy(reward: (humanGot: 9, petGot: 9))
+        let quickReminders = QuickActionReminderCompleterSpy()
+        let dependencies = CareEventServiceDependencies(
+            economy: economy,
+            careLedger: CareLedgerService(),
+            reminderCompletion: NoopReminderCompleter(),
+            quickActionReminderCompletion: quickReminders,
+            familyTasks: FamilyTaskManagerSpy(),
+            revisions: SharedDomainRevisionPublisher()
+        )
+        let date = dateForTest(year: 2026, month: 6, day: 12, hour: 16)
+
+        let care = CareEventService.recordCareFact(
+            pet: pet,
+            type: .litter,
+            context: context,
+            executorId: executorId,
+            reward: .potty(isLitter: true),
+            date: date,
+            createsLinkedPottyLog: true,
+            dependencies: dependencies
+        )
+        let potty = CareEventService.recordPottyFact(
+            pet: pet,
+            type: .softPoop,
+            context: context,
+            executorId: executorId,
+            date: date,
+            dependencies: dependencies
+        )
+        let hygiene = CareEventService.recordHygieneFact(
+            pet: pet,
+            type: .brushing,
+            context: context,
+            executorId: executorId,
+            date: date,
+            dependencies: dependencies
+        )
+        let health = CareEventService.recordHealthFact(
+            pet: pet,
+            type: .checkup,
+            note: "Annual check",
+            context: context,
+            executorId: executorId,
+            date: date,
+            dependencies: dependencies
+        )
+
+        #expect(care.result.disposition == .noOp)
+        #expect(care.result.didWriteFact == false)
+        #expect(care.result.allowsDerivedEffects == false)
+        #expect(care.result.linkedPottyLogID == nil)
+        #expect(care.reward.humanGot == 0)
+        #expect(care.reward.petGot == 0)
+        #expect(care.log.pet == nil)
+        #expect(care.pottyLog == nil)
+
+        #expect(potty.result.disposition == .noOp)
+        #expect(potty.result.didWriteFact == false)
+        #expect(potty.result.allowsDerivedEffects == false)
+        #expect(potty.result.logID == nil)
+        #expect(potty.reward.humanGot == 0)
+        #expect(potty.reward.petGot == 0)
+        #expect(potty.log == nil)
+
+        #expect(hygiene.result.disposition == .noOp)
+        #expect(hygiene.result.didWriteFact == false)
+        #expect(hygiene.result.allowsDerivedEffects == false)
+        #expect(hygiene.reward.humanGot == 0)
+        #expect(hygiene.reward.petGot == 0)
+        #expect(hygiene.log.pet == nil)
+
+        #expect(health.result.disposition == .noOp)
+        #expect(health.result.didWriteFact == false)
+        #expect(health.result.allowsDerivedEffects == false)
+        #expect(health.result.logID == nil)
+        #expect(health.reward.humanGot == 0)
+        #expect(health.reward.petGot == 0)
+        #expect(health.log == nil)
+
+        #expect(try context.fetch(FetchDescriptor<PetCareLog>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<PetPottyLog>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<PetHygieneLog>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<PetHealthLog>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<CareLedgerEvent>()).isEmpty)
+        #expect(economy.careAwardCalls.isEmpty)
+        #expect(economy.firstMealActorIds.isEmpty)
+        #expect(quickReminders.careCalls.isEmpty)
+        #expect(quickReminders.pottyCalls.isEmpty)
+        #expect(quickReminders.hygieneCalls.isEmpty)
+    }
+
+    @MainActor
     @Test func careEventServicePlannedCareWithoutEventWritesNoFacts() async throws {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
@@ -1471,6 +1585,155 @@ struct OhanaTests {
         #expect(waterReminder.statusEnum == .pending)
         #expect(economy.careAwardCalls.isEmpty)
         #expect(familyTasks.completedReminderIDs.isEmpty)
+    }
+
+    @MainActor
+    @Test func careEventServicePlannedCareDeniedByLifecycleWritesNoDerivedSideEffects() async throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let pet = Pet(name: "Momo", species: "猫")
+        pet.passedAwayDate = dateForTest(year: 2026, month: 6, day: 10)
+        let executor = Human(name: "Guan")
+        let executorId = executor.id.uuidString
+        let feedAt = dateForTest(year: 2026, month: 6, day: 12, hour: 8)
+        let waterAt = dateForTest(year: 2026, month: 6, day: 12, hour: 9)
+        let feedEvent = Event(
+            title: "Momo breakfast",
+            startDate: feedAt,
+            eventType: EventType.foodChange.rawValue,
+            relatedEntityType: EntityKind.pet.rawValue,
+            relatedEntityId: pet.id.uuidString
+        )
+        feedEvent.feedRuleKindRaw = FeedRuleKind.manualReminder.rawValue
+        feedEvent.feedAmountGrams = 42
+        let waterEvent = Event(
+            title: "Momo water",
+            startDate: waterAt,
+            eventType: EventType.daily.rawValue,
+            relatedEntityType: WaterPlanWriter.entityType,
+            relatedEntityId: pet.id.uuidString
+        )
+        let feedReminder = Reminder(event: feedEvent, scheduledAt: feedAt)
+        let waterReminder = Reminder(event: waterEvent, scheduledAt: waterAt)
+        context.insert(executor)
+        context.insert(pet)
+        context.insert(feedEvent)
+        context.insert(waterEvent)
+        context.insert(feedReminder)
+        context.insert(waterReminder)
+        try context.save()
+
+        let economy = CareEventEconomyAwarderSpy(reward: (humanGot: 9, petGot: 9))
+        let familyTasks = FamilyTaskManagerSpy()
+        let notifications = ReminderNotificationSchedulerSpy()
+        let dependencies = CareEventServiceDependencies(
+            economy: economy,
+            careLedger: CareLedgerService(),
+            reminderCompletion: NoopReminderCompleter(),
+            quickActionReminderCompletion: NoopQuickActionReminderCompleter(),
+            familyTasks: familyTasks,
+            revisions: SharedDomainRevisionPublisher(),
+            notifications: notifications
+        )
+
+        let feedReward = CareEventService.completePlannedFeed(
+            pet: pet,
+            reminder: feedReminder,
+            context: context,
+            executorId: executorId,
+            date: feedAt,
+            dependencies: dependencies
+        )
+        let waterReward = CareEventService.completePlannedWater(
+            pet: pet,
+            reminder: waterReminder,
+            amountMl: 120,
+            context: context,
+            executorId: executorId,
+            date: waterAt,
+            dependencies: dependencies
+        )
+
+        #expect(feedReward == nil)
+        #expect(waterReward == nil)
+        #expect(try context.fetch(FetchDescriptor<PetCareLog>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<CareLedgerEvent>()).isEmpty)
+        #expect(feedReminder.statusEnum == .pending)
+        #expect(waterReminder.statusEnum == .pending)
+        #expect(feedReminder.completedAt == nil)
+        #expect(waterReminder.completedAt == nil)
+        #expect(feedReminder.completedBy.isEmpty)
+        #expect(waterReminder.completedBy.isEmpty)
+        #expect(!feedEvent.isOccurrenceMarkedComplete(on: feedAt))
+        #expect(!waterEvent.isOccurrenceMarkedComplete(on: waterAt))
+        #expect(economy.careAwardCalls.isEmpty)
+        #expect(economy.firstMealActorIds.isEmpty)
+        #expect(familyTasks.completedReminderIDs.isEmpty)
+        #expect(notifications.cancelledNotificationIds.isEmpty)
+
+        let activePet = Pet(name: "Luna", species: "狗")
+        let missingHumanId = UUID()
+        let brokenFeedAt = dateForTest(year: 2026, month: 6, day: 12, hour: 10)
+        let brokenWaterAt = dateForTest(year: 2026, month: 6, day: 12, hour: 11)
+        let brokenFeedEvent = Event(
+            title: "Broken breakfast schedule",
+            startDate: brokenFeedAt,
+            eventType: EventType.foodChange.rawValue,
+            relatedEntityType: EntityKind.human.rawValue,
+            relatedEntityId: missingHumanId.uuidString
+        )
+        brokenFeedEvent.feedRuleKindRaw = FeedRuleKind.manualReminder.rawValue
+        brokenFeedEvent.feedAmountGrams = 42
+        let brokenWaterEvent = Event(
+            title: "Broken water schedule",
+            startDate: brokenWaterAt,
+            eventType: EventType.daily.rawValue,
+            relatedEntityType: EntityKind.human.rawValue,
+            relatedEntityId: missingHumanId.uuidString
+        )
+        let brokenFeedReminder = Reminder(event: brokenFeedEvent, scheduledAt: brokenFeedAt)
+        let brokenWaterReminder = Reminder(event: brokenWaterEvent, scheduledAt: brokenWaterAt)
+        context.insert(activePet)
+        context.insert(brokenFeedEvent)
+        context.insert(brokenWaterEvent)
+        context.insert(brokenFeedReminder)
+        context.insert(brokenWaterReminder)
+        try context.save()
+
+        let brokenFeedReward = CareEventService.completePlannedFeed(
+            pet: activePet,
+            reminder: brokenFeedReminder,
+            context: context,
+            executorId: executorId,
+            date: brokenFeedAt,
+            dependencies: dependencies
+        )
+        let brokenWaterReward = CareEventService.completePlannedWater(
+            pet: activePet,
+            reminder: brokenWaterReminder,
+            amountMl: 120,
+            context: context,
+            executorId: executorId,
+            date: brokenWaterAt,
+            dependencies: dependencies
+        )
+
+        #expect(brokenFeedReward == nil)
+        #expect(brokenWaterReward == nil)
+        #expect(try context.fetch(FetchDescriptor<PetCareLog>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<CareLedgerEvent>()).isEmpty)
+        #expect(brokenFeedReminder.statusEnum == .pending)
+        #expect(brokenWaterReminder.statusEnum == .pending)
+        #expect(brokenFeedReminder.completedAt == nil)
+        #expect(brokenWaterReminder.completedAt == nil)
+        #expect(brokenFeedReminder.completedBy.isEmpty)
+        #expect(brokenWaterReminder.completedBy.isEmpty)
+        #expect(!brokenFeedEvent.isOccurrenceMarkedComplete(on: brokenFeedAt))
+        #expect(!brokenWaterEvent.isOccurrenceMarkedComplete(on: brokenWaterAt))
+        #expect(economy.careAwardCalls.isEmpty)
+        #expect(economy.firstMealActorIds.isEmpty)
+        #expect(familyTasks.completedReminderIDs.isEmpty)
+        #expect(notifications.cancelledNotificationIds.isEmpty)
     }
 
     @MainActor
@@ -1907,7 +2170,8 @@ struct OhanaTests {
         context.insert(PetCareLog(date: now.addingTimeInterval(-1800), type: .feeding, amountGrams: 40, note: PetCareLog.manualFeedNoteMarker, pet: pet))
         try context.save()
 
-        let state = FeedTodayState(pet: pet, allEvents: [], manualGoalCount: 3, now: now, calendar: calendar)
+        let logs = try context.fetch(FetchDescriptor<PetCareLog>())
+        let state = FeedTodayState(pet: pet, allEvents: [], manualGoalCount: 3, careLogs: logs, now: now, calendar: calendar)
 
         #expect(!state.hasTodayPlan)
         #expect(state.completedCount == 2)
@@ -1975,7 +2239,8 @@ struct OhanaTests {
         context.insert(PetCareLog(date: now, type: .feeding, amountGrams: 20, note: PetCareLog.manualFeedNoteMarker, pet: pet))
         try context.save()
 
-        let state = FeedTodayState(pet: pet, allEvents: [breakfast, dinner], manualGoalCount: 1, now: now, calendar: calendar)
+        let logs = try context.fetch(FetchDescriptor<PetCareLog>())
+        let state = FeedTodayState(pet: pet, allEvents: [breakfast, dinner], manualGoalCount: 1, careLogs: logs, now: now, calendar: calendar)
 
         #expect(state.hasTodayPlan)
         #expect(state.completedCount == 1)
@@ -2315,6 +2580,7 @@ struct OhanaTests {
 
     @MainActor
     @Test func defaultCarePlansDoNotCreateDailyPlayPlan() async throws {
+        let previousLanguage = setAppLanguageForTest("zh")
         let container = try makeInMemoryContainer()
         let context = container.mainContext
         let startDate = dateForTest(year: 2026, month: 5, day: 10)
@@ -2333,7 +2599,10 @@ struct OhanaTests {
         try context.save()
 
         let petKey = pet.id.uuidString
-        defer { clearCareCalendarDefaults(petKey: petKey, kinds: ["play"]) }
+        defer {
+            clearCareCalendarDefaults(petKey: petKey, kinds: ["play"])
+            restoreAppLanguageForTest(previousLanguage)
+        }
 
         CarePlanCalendarSync.ensureDefaultPlans(for: pet, context: context, startDate: startDate)
 
@@ -2345,6 +2614,7 @@ struct OhanaTests {
 
     @MainActor
     @Test func explicitPlayPlanCanBeAddedFromPlaySettings() async throws {
+        let previousLanguage = setAppLanguageForTest("zh")
         let container = try makeInMemoryContainer()
         let context = container.mainContext
         let startDate = dateForTest(year: 2026, month: 5, day: 10)
@@ -2356,6 +2626,7 @@ struct OhanaTests {
         defer {
             clearCareCalendarDefaults(petKey: petKey, kinds: ["play"])
             UserDefaults.standard.removeObject(forKey: "careCalendarEventId_play_\(petKey)")
+            restoreAppLanguageForTest(previousLanguage)
         }
 
         CarePlanCalendarSync.syncPlayPlan(
@@ -2685,6 +2956,7 @@ struct OhanaTests {
 
     @MainActor
     @Test func filterPlanSyncDeduplicatesCleanAndReplaceEvents() async throws {
+        let previousLanguage = setAppLanguageForTest("zh")
         let container = try makeInMemoryContainer()
         let context = container.mainContext
         let pet = Pet(name: "Bubbles", species: "金鱼")
@@ -2696,6 +2968,7 @@ struct OhanaTests {
         defer {
             UserDefaults.standard.removeObject(forKey: "careCalendarEventId_filterClean_\(petKey)")
             UserDefaults.standard.removeObject(forKey: "careCalendarEventId_filterReplace_\(petKey)")
+            restoreAppLanguageForTest(previousLanguage)
         }
 
         CarePlanCalendarSync.syncFilterPlan(
@@ -2737,6 +3010,7 @@ struct OhanaTests {
 
     @MainActor
     @Test func customScoopPlanSuppressesDefaultDailyLitterPlan() async throws {
+        let previousLanguage = setAppLanguageForTest("zh")
         let container = try makeInMemoryContainer()
         let context = container.mainContext
         let startDate = dateForTest(year: 2026, month: 5, day: 10)
@@ -2748,6 +3022,7 @@ struct OhanaTests {
         defer {
             clearCareCalendarDefaults(petKey: petKey, kinds: ["litter"])
             UserDefaults.standard.removeObject(forKey: "careCalendarEventId_scoop_\(petKey)")
+            restoreAppLanguageForTest(previousLanguage)
         }
 
         CarePlanCalendarSync.ensureDefaultPlans(for: pet, context: context, startDate: startDate)
@@ -2771,6 +3046,7 @@ struct OhanaTests {
 
     @MainActor
     @Test func customWaterAndFilterPlansSuppressDefaultAquaticPlans() async throws {
+        let previousLanguage = setAppLanguageForTest("zh")
         let container = try makeInMemoryContainer()
         let context = container.mainContext
         let startDate = dateForTest(year: 2026, month: 5, day: 10)
@@ -2784,6 +3060,7 @@ struct OhanaTests {
             for kind in ["waterChange", "filterClean", "filterReplace"] {
                 UserDefaults.standard.removeObject(forKey: "careCalendarEventId_\(kind)_\(petKey)")
             }
+            restoreAppLanguageForTest(previousLanguage)
         }
 
         CarePlanCalendarSync.ensureDefaultPlans(for: pet, context: context, startDate: startDate)
@@ -2816,7 +3093,40 @@ struct OhanaTests {
     }
 
     @MainActor
+    @Test func carePlanCalendarSyncGeneratesLocalizedDefaultTitles() async throws {
+        let previousLanguage = setAppLanguageForTest("en")
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let startDate = dateForTest(year: 2026, month: 5, day: 10)
+        let pet = Pet(name: "Bubbles", species: "fish")
+        context.insert(pet)
+        try context.save()
+
+        let petKey = pet.id.uuidString
+        defer {
+            clearCareCalendarDefaults(
+                petKey: petKey,
+                kinds: ["feed", "waterChange", "filter", "temperature", "breedRiskWaterQuality"]
+            )
+            restoreAppLanguageForTest(previousLanguage)
+        }
+
+        CarePlanCalendarSync.ensureDefaultPlans(for: pet, context: context, startDate: startDate)
+        var events = try context.fetch(FetchDescriptor<Event>()).filter { $0.relatedEntityId == petKey }
+        #expect(events.contains { $0.title == "Bubbles Water change" })
+        #expect(events.contains { $0.title == "Bubbles Filter check" })
+        #expect(!events.contains { $0.title == "Bubbles 换水" })
+
+        UserDefaults.standard.set("de", forKey: "appLanguage")
+        CarePlanCalendarSync.ensureDefaultPlans(for: pet, context: context, startDate: startDate)
+        events = try context.fetch(FetchDescriptor<Event>()).filter { $0.relatedEntityId == petKey }
+        #expect(events.contains { $0.title == "Bubbles Wasserwechsel" })
+        #expect(events.contains { $0.title == "Bubbles Filtercheck" })
+    }
+
+    @MainActor
     @Test func customFeedPlanSuppressesDefaultDailyFeedPlan() async throws {
+        let previousLanguage = setAppLanguageForTest("zh")
         let container = try makeInMemoryContainer()
         let context = container.mainContext
         var calendar = Calendar(identifier: .gregorian)
@@ -2829,6 +3139,7 @@ struct OhanaTests {
         let petKey = pet.id.uuidString
         defer {
             clearCareCalendarDefaults(petKey: petKey, kinds: ["feed"])
+            restoreAppLanguageForTest(previousLanguage)
         }
 
         CarePlanCalendarSync.ensureDefaultPlans(for: pet, context: context, startDate: now)
@@ -2874,10 +3185,12 @@ struct OhanaTests {
         context.insert(PetCareLog(date: restock.addingTimeInterval(120), type: .feeding, amountGrams: 0, pet: pet))
         context.insert(PetCareLog(date: restock.addingTimeInterval(180), type: .feeding, amountGrams: 10, note: FeedLogMetadata.treatFeedNoteMarker, pet: pet))
         try context.save()
+        let logs = try context.fetch(FetchDescriptor<PetCareLog>())
+        let snapshot = FeedStockCalculator.snapshot(for: pet, foodKind: .dry, careLogs: logs)
 
-        #expect(pet.foodConsumedSinceRestock == 170)
-        #expect(pet.remainingFoodGrams == 830)
-        #expect(pet.remainingFoodDays == 4)
+        #expect(snapshot.consumedGrams == 170)
+        #expect(snapshot.remainingGrams == 830)
+        #expect(snapshot.remainingDays == 4)
     }
 
     @MainActor
@@ -3013,8 +3326,9 @@ struct OhanaTests {
         )
         context.insert(auto)
         try context.save()
+        let logs = try context.fetch(FetchDescriptor<PetCareLog>())
 
-        let snapshot = FeedStockCalculator.snapshot(for: pet, events: [auto], now: now, calendar: calendar)
+        let snapshot = FeedStockCalculator.snapshot(for: pet, events: [auto], careLogs: logs, now: now, calendar: calendar)
 
         #expect(snapshot.consumedGrams == 150)
         #expect(snapshot.remainingGrams == 1850)
@@ -3740,8 +4054,7 @@ struct OhanaTests {
         let overviewSnapshot = QuickFeedOverviewSnapshot.build(
             pet: pet,
             manualPlanEvents: dashboard.manualPlanEvents,
-            feedingLedgerEvents: [],
-            legacyCareLogs: [],
+            feedingLedgerEntries: [],
             range: .days7,
             activeMode: .manualReminder,
             now: now,
@@ -3805,8 +4118,7 @@ struct OhanaTests {
         let overviewSnapshot = QuickFeedOverviewSnapshot.build(
             pet: pet,
             manualPlanEvents: dashboard.manualPlanEvents,
-            feedingLedgerEvents: [],
-            legacyCareLogs: [],
+            feedingLedgerEntries: [],
             range: .days7,
             activeMode: .manualReminder,
             now: now,
@@ -3886,8 +4198,9 @@ struct OhanaTests {
         )
         CareEventService.recordManualFeed(pet: pet, amountGrams: 120, context: context, executorId: executorId, date: now.addingTimeInterval(60))
         CareEventService.recordTreatFeed(pet: pet, amountGrams: 20, context: context, executorId: executorId, date: now.addingTimeInterval(120))
+        let logs = try context.fetch(FetchDescriptor<PetCareLog>())
 
-        let snapshot = FeedStockCalculator.snapshot(for: pet, now: now.addingTimeInterval(180))
+        let snapshot = FeedStockCalculator.snapshot(for: pet, careLogs: logs, now: now.addingTimeInterval(180))
         let records = try context.fetch(FetchDescriptor<PetFoodRecord>())
 
         #expect(records.count == 1)
@@ -3938,9 +4251,10 @@ struct OhanaTests {
         CareEventService.recordManualFeed(pet: pet, amountGrams: 120, context: context, date: now.addingTimeInterval(60), foodKind: .dry)
         CareEventService.recordManualFeed(pet: pet, amountGrams: 80, context: context, date: now.addingTimeInterval(120), foodKind: .wet)
         CareEventService.recordTreatFeed(pet: pet, amountGrams: 25, context: context, date: now.addingTimeInterval(180), treatKind: .lickable)
+        let logs = try context.fetch(FetchDescriptor<PetCareLog>())
 
-        let dry = FeedStockCalculator.snapshot(for: pet, foodKind: .dry, now: now.addingTimeInterval(240))
-        let wet = FeedStockCalculator.snapshot(for: pet, foodKind: .wet, now: now.addingTimeInterval(240))
+        let dry = FeedStockCalculator.snapshot(for: pet, foodKind: .dry, careLogs: logs, now: now.addingTimeInterval(240))
+        let wet = FeedStockCalculator.snapshot(for: pet, foodKind: .wet, careLogs: logs, now: now.addingTimeInterval(240))
 
         #expect(dry.totalGrams == 1000)
         #expect(dry.consumedGrams == 120)
@@ -3978,8 +4292,9 @@ struct OhanaTests {
         )
         CareEventService.recordManualFeed(pet: pet, amountGrams: 300, context: context, date: dateForTest(year: 2026, month: 5, day: 4, hour: 12), foodKind: .dry)
         CareEventService.recordManualFeed(pet: pet, amountGrams: 120, context: context, date: dateForTest(year: 2026, month: 5, day: 5, hour: 8), foodKind: .dry)
+        let logs = try context.fetch(FetchDescriptor<PetCareLog>())
 
-        let snapshot = FeedStockCalculator.snapshot(for: pet, foodKind: .dry, now: now)
+        let snapshot = FeedStockCalculator.snapshot(for: pet, foodKind: .dry, careLogs: logs, now: now)
         let record = try #require(try context.fetch(FetchDescriptor<PetFoodRecord>()).first)
 
         #expect(record.purchaseDate == dateForTest(year: 2026, month: 5, day: 1))
@@ -4092,8 +4407,9 @@ struct OhanaTests {
         CareEventService.recordManualFeed(pet: pet, amountGrams: 200, context: context, date: dateForTest(year: 2026, month: 5, day: 3, hour: 8), foodKind: .dry)
         FeedingPlanWriter.correctFoodStock(record: record, remainingGrams: 700, allEvents: [], context: context, now: correctionTime)
         CareEventService.recordManualFeed(pet: pet, amountGrams: 50, context: context, date: dateForTest(year: 2026, month: 5, day: 3, hour: 18), foodKind: .dry)
+        let logs = try context.fetch(FetchDescriptor<PetCareLog>())
 
-        let snapshot = FeedStockCalculator.snapshot(for: pet, foodKind: .dry, now: now)
+        let snapshot = FeedStockCalculator.snapshot(for: pet, foodKind: .dry, careLogs: logs, now: now)
 
         #expect(record.remainingCorrectionGrams == 700)
         #expect(record.remainingCorrectionDate == correctionTime)
@@ -4222,7 +4538,8 @@ struct OhanaTests {
         let noGramTreat = CareEventService.recordTreatFeed(pet: pet, amountGrams: 0, context: context, date: now, treatKind: .dentalNeck)
         let gramTreat = CareEventService.recordTreatFeed(pet: pet, amountGrams: 14, context: context, date: now.addingTimeInterval(60), treatKind: .freezeDried)
 
-        let state = FeedTodayState(pet: pet, allEvents: [], manualGoalCount: 1, now: now, calendar: calendar)
+        let logs = try context.fetch(FetchDescriptor<PetCareLog>())
+        let state = FeedTodayState(pet: pet, allEvents: [], manualGoalCount: 1, careLogs: logs, now: now, calendar: calendar)
 
         #expect(noGramTreat.treatKind == .dentalNeck)
         #expect(gramTreat.treatKind == .freezeDried)
@@ -4494,6 +4811,32 @@ struct OhanaTests {
         let quests = IslandQuestEngine.todayQuests(pets: [momo, lilo], reminders: [])
 
         #expect(!quests.contains { $0.id.hasPrefix("q_play_") })
+    }
+
+    @MainActor
+    @Test func islandQuestEngineTreatsEmptyReadModelLedgerAsAuthoritative() async throws {
+        let date = dateForTest(year: 2026, month: 6, day: 11, hour: 8)
+        let momo = Pet(name: "Momo", species: "狗")
+        momo.walkLogs.append(PetWalkLog(startDate: date, pet: momo))
+        let walk = Event(
+            title: "遛狗",
+            startDate: date,
+            eventType: EventType.daily.rawValue,
+            relatedEntityType: EntityKind.pet.rawValue,
+            relatedEntityId: momo.id.uuidString
+        )
+
+        let quests = IslandQuestEngine.todayQuests(
+            pets: [momo],
+            reminders: [],
+            events: [walk],
+            careLedgerEntries: [],
+            careLedgerSnapshotAvailable: true,
+            now: date
+        )
+
+        #expect(quests.contains { IslandQuestEngine.carePlanEventId(fromQuestId: $0.id) == walk.id })
+        #expect(quests.contains { $0.id.hasPrefix("q_play_") })
     }
 
     @MainActor
@@ -5186,6 +5529,40 @@ struct OhanaTests {
         }
     }
 
+    private final class ReminderNotificationSchedulerSpy: ReminderNotificationScheduling, @unchecked Sendable {
+        private(set) var cancelledNotificationIds: [String] = []
+
+        func schedule(reminder _: Reminder) {}
+
+        func schedule(
+            reminder _: Reminder,
+            existingNotificationIds _: Set<String>?,
+            completion: ((ReminderNotificationScheduleResult) -> Void)?
+        ) {
+            completion?(.scheduled)
+        }
+
+        func schedule(
+            reminder _: Reminder,
+            deliveryDate _: Date?,
+            existingNotificationIds _: Set<String>?,
+            completion: ((ReminderNotificationScheduleResult) -> Void)?
+        ) {
+            completion?(.scheduled)
+        }
+
+        func pendingNotificationIds() async -> Set<String> { [] }
+        func scheduleRollingWindow(reminders _: [Reminder]) {}
+        func refillWindowIfNeeded(allReminders _: [Reminder]) {}
+
+        func cancel(notificationId: String) {
+            cancelledNotificationIds.append(notificationId)
+        }
+
+        func cancelAll(for _: Pet, reminders _: [Reminder]) {}
+        func compensate(reminders _: [Reminder]) {}
+    }
+
     @MainActor
     private final class QuickActionReminderCompleterSpy: QuickActionReminderCompleting {
         private(set) var careCalls: [QuickActionCareCall] = []
@@ -5319,6 +5696,20 @@ struct OhanaTests {
         for kind in kinds {
             UserDefaults.standard.removeObject(forKey: "careCalendarEventId_default_\(kind)_\(petKey)")
             UserDefaults.standard.removeObject(forKey: "careCalendarDefaultSuppressed_\(kind)_\(petKey)")
+        }
+    }
+
+    private func setAppLanguageForTest(_ languageCode: String) -> String? {
+        let previousLanguage = UserDefaults.standard.string(forKey: "appLanguage")
+        UserDefaults.standard.set(languageCode, forKey: "appLanguage")
+        return previousLanguage
+    }
+
+    private func restoreAppLanguageForTest(_ previousLanguage: String?) {
+        if let previousLanguage {
+            UserDefaults.standard.set(previousLanguage, forKey: "appLanguage")
+        } else {
+            UserDefaults.standard.removeObject(forKey: "appLanguage")
         }
     }
 

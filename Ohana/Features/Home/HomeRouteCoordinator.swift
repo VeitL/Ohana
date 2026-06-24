@@ -361,6 +361,10 @@ final class HomeRouteCoordinator: ObservableObject {
         openFullScreen(.walk(pet.id))
     }
 
+    func openWalk(_ petID: UUID) {
+        openFullScreen(.walk(petID))
+    }
+
     func openOasisReward() {
         openFullScreen(.oasisReward)
     }
@@ -403,13 +407,17 @@ final class HomeRouteCoordinator: ObservableObject {
         modal = .functionMenu(destination: .coconutShop)
     }
 
-    func openQuickMoment(_ pet: Pet) {
+    func openQuickMoment(_ petID: UUID) {
         if let appOverlayRouteSink {
-            appOverlayRouteSink(.quickMoment(petID: pet.id))
+            appOverlayRouteSink(.quickMoment(petID: petID))
             overlay = nil
             return
         }
-        overlay = .quickMoment(petID: pet.id)
+        overlay = .quickMoment(petID: petID)
+    }
+
+    func openQuickMoment(_ pet: Pet) {
+        openQuickMoment(pet.id)
     }
 
     func dismissOverlay(routeID: UUID) {
@@ -582,8 +590,12 @@ private extension HomeSheetRoute {
             .petAllFeatures(id)
         case let .petFood(id):
             .petFood(id)
+        case let .petWeightQuick(id):
+            .petWeightQuick(id)
         case let .petWeight(id):
             .petWeight(id)
+        case let .petExpenseQuick(id):
+            .petExpenseQuick(id)
         case let .petExpense(id):
             .petExpense(id)
         case let .petFeed(id, opensManualSheet):
@@ -616,10 +628,16 @@ private extension HomeSheetRoute {
             .petBondVault(id)
         case let .humanAllFeatures(id):
             .humanAllFeatures(id)
+        case let .humanMedicationQuick(id):
+            .humanMedicationQuick(id)
         case let .humanMedication(id):
             .humanMedication(id)
+        case let .humanWeightQuick(id):
+            .humanWeightQuick(id)
         case let .humanWeight(id):
             .humanWeight(id)
+        case let .humanWorkoutQuick(id):
+            .humanWorkoutQuick(id)
         case let .humanWorkout(id):
             .humanWorkout(id)
         case let .humanWorkoutDashboard(id):
@@ -628,20 +646,17 @@ private extension HomeSheetRoute {
             .humanMetrics(id)
         case let .humanReport(id):
             .humanReport(id)
+        case let .humanExpenseQuick(id):
+            .humanExpenseQuick(id)
         case let .humanExpense(id):
             .humanExpense(id)
         case let .humanWishlist(id):
             .humanWishlist(id)
+        case let .humanNoteQuick(id):
+            .humanNoteQuick(id)
         case let .humanNote(id):
             .humanNote(id)
         case .petBasicInfo,
-             .petWeightQuick,
-             .petExpenseQuick,
-             .humanMedicationQuick,
-             .humanWeightQuick,
-             .humanWorkoutQuick,
-             .humanExpenseQuick,
-             .humanNoteQuick,
              .humanBasicInfo:
             nil
         }

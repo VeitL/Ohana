@@ -123,6 +123,7 @@ enum TodayFocusEconomyService {
             humans: data.humans,
             humanMedications: data.humanMedications,
             careLedgerEntries: data.careLedgerEntries,
+            careLedgerSnapshotAvailable: true,
             now: now,
             questProgress: questProgress
         )

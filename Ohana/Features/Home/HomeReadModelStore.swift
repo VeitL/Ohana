@@ -40,8 +40,8 @@ nonisolated struct HomeHeaderAvatarSnapshot: Equatable, Sendable {
 }
 
 struct HomeReadModelPayload {
-    let source: VerticalSolidHomeSourceState
     let snapshot: HomeSnapshot
+    let interaction: HomeInteractionSnapshot
     let revision: HomeRevision
     let signature: String
     let activeHumanAvatar: HomeHeaderAvatarSnapshot
@@ -51,33 +51,8 @@ struct HomeReadModelPayload {
     let popoutPreloadPayloads: [FocusWalletAvatarCache.Payload]
 
     static let empty = HomeReadModelPayload(
-        source: VerticalSolidHomeSourceState(
-            pets: [],
-            humans: [],
-            plants: [],
-            electronicPets: [],
-            events: [],
-            pendingReminders: [],
-            humanMedications: [],
-            humanMedicationLogs: [],
-            todayFocusCareLedgerEntries: [],
-            feedingLedgerEntries: [],
-            careLedgerEntries: [],
-            hygieneLedgerEntries: [],
-            walkLedgerEntries: [],
-            pottyLedgerEntries: [],
-            humanWeightLogs: [],
-            familyTasks: [],
-            exchangeRequests: [],
-            activeHumanIdRaw: "",
-            hiddenPetIDsRaw: "",
-            homeCardOrderRaw: "",
-            showDummyCards: false,
-            petBondVaultRevision: 0,
-            equippedTitleRaw: "",
-            language: AppLanguage.code
-        ),
         snapshot: .empty,
+        interaction: .empty,
         revision: HomeRevision(),
         signature: "",
         activeHumanAvatar: .empty,
@@ -95,12 +70,14 @@ nonisolated struct HomeReadModelActorInput: Sendable {
     let showDummyCards: Bool
     let petBondVaultRevision: Int
     let equippedTitleRaw: String
+    let quickActionItemsRaw: String
     let language: String
     let loadPlants: Bool
 }
 
 nonisolated struct HomeReadModelActorResult: Sendable {
     let snapshot: HomeSnapshot
+    let interaction: HomeInteractionSnapshot
     let signature: String
     let activeHumanAvatar: HomeHeaderAvatarSnapshot
     let avatarPreloadSignature: String
@@ -151,6 +128,7 @@ final class HomeReadModelStore: ObservableObject {
         showDummyCards: Bool,
         petBondVaultRevision: Int = 0,
         equippedTitleRaw: String = "",
+        quickActionItemsRaw: String = "",
         language: String,
         externalRevision: HomeRevision,
         force: Bool = false
@@ -176,6 +154,7 @@ final class HomeReadModelStore: ObservableObject {
                 showDummyCards: showDummyCards,
                 petBondVaultRevision: petBondVaultRevision,
                 equippedTitleRaw: equippedTitleRaw,
+                quickActionItemsRaw: quickActionItemsRaw,
                 language: language,
                 externalRevision: externalRevision,
                 generation: generation,
@@ -193,6 +172,7 @@ final class HomeReadModelStore: ObservableObject {
         showDummyCards: Bool,
         petBondVaultRevision: Int = 0,
         equippedTitleRaw: String = "",
+        quickActionItemsRaw: String = "",
         language: String,
         externalRevision: HomeRevision,
         force: Bool = true
@@ -209,6 +189,7 @@ final class HomeReadModelStore: ObservableObject {
             showDummyCards: showDummyCards,
             petBondVaultRevision: petBondVaultRevision,
             equippedTitleRaw: equippedTitleRaw,
+            quickActionItemsRaw: quickActionItemsRaw,
             language: language,
             externalRevision: externalRevision,
             generation: generation,
@@ -235,6 +216,7 @@ final class HomeReadModelStore: ObservableObject {
         showDummyCards: Bool,
         petBondVaultRevision: Int,
         equippedTitleRaw: String,
+        quickActionItemsRaw: String,
         language: String,
         externalRevision: HomeRevision,
         generation: Int,
@@ -248,6 +230,7 @@ final class HomeReadModelStore: ObservableObject {
             showDummyCards: showDummyCards,
             petBondVaultRevision: petBondVaultRevision,
             equippedTitleRaw: equippedTitleRaw,
+            quickActionItemsRaw: quickActionItemsRaw,
             language: language,
             loadPlants: AppFeatureRouteGuard.shouldLoadPlantData
         )
@@ -276,17 +259,14 @@ final class HomeReadModelStore: ObservableObject {
         guard let actorResult else { return }
         guard await checkpoint(generation: generation, stage: "actorPayload", startedAt: startedAt) else { return }
 
-        let source = compatibilitySource(container: container, input: input)
-        guard await checkpoint(generation: generation, stage: "compatibilitySource", startedAt: startedAt) else { return }
-
         var nextRevision = externalRevision
         nextRevision.advance(for: externalRevision.lastCommand ?? .unknown(action: "homeReadModelRefresh"))
 
         snapshot = actorResult.snapshot
         revision = nextRevision
         payload = HomeReadModelPayload(
-            source: source,
             snapshot: actorResult.snapshot,
+            interaction: actorResult.interaction,
             revision: nextRevision,
             signature: actorResult.signature,
             activeHumanAvatar: actorResult.activeHumanAvatar,
@@ -321,41 +301,6 @@ final class HomeReadModelStore: ObservableObject {
             return false
         }
         return true
-    }
-
-    private func compatibilitySource(
-        container: ModelContainer,
-        input: HomeReadModelActorInput
-    ) -> VerticalSolidHomeSourceState {
-        let fetches = HomeReadModelFetches(context: container.mainContext, now: Date())
-        return VerticalSolidHomeSourceState(
-            pets: fetches.pets(),
-            humans: fetches.humans(),
-            plants: input.loadPlants ? fetches.plants() : [],
-            electronicPets: fetches.electronicPets(),
-            events: fetches.events(),
-            pendingReminders: fetches.pendingReminders(),
-            humanMedications: fetches.humanMedications(),
-            humanMedicationLogs: fetches.humanMedicationLogs(),
-            todayFocusCareLedgerEntries: fetches.todayFocusCareLedgerEntries(),
-            feedingLedgerEntries: fetches.feedingLedgerEntries(),
-            careLedgerEntries: fetches.careQuickActionEntries(),
-            hygieneLedgerEntries: fetches.hygieneQuickActionEntries(),
-            walkLedgerEntries: fetches.walkQuickActionEntries(),
-            pottyLedgerEntries: fetches.pottyQuickActionEntries(),
-            petExpenseLedgerEntries: fetches.petExpenseQuickActionEntries(),
-            petWeightLedgerEntries: fetches.petWeightQuickActionEntries(),
-            humanWeightLogs: fetches.humanWeightLogs(),
-            familyTasks: OnlineFeatureGate.allows(.onlineCollaboration) ? fetches.familyTasks() : [],
-            exchangeRequests: fetches.exchangeRequests(),
-            activeHumanIdRaw: input.activeHumanIdRaw,
-            hiddenPetIDsRaw: input.hiddenPetIDsRaw,
-            homeCardOrderRaw: input.homeCardOrderRaw,
-            showDummyCards: input.showDummyCards,
-            petBondVaultRevision: input.petBondVaultRevision,
-            equippedTitleRaw: input.equippedTitleRaw,
-            language: input.language
-        )
     }
 
     private func avatarPayloads(
@@ -415,6 +360,7 @@ actor HomeReadModelActor {
         let pottyLedgerEntries = fetches.pottyQuickActionEntries()
         let petExpenseLedgerEntries = fetches.petExpenseQuickActionEntries()
         let petWeightLedgerEntries = fetches.petWeightQuickActionEntries()
+        let petMomentEntries = fetches.petMomentQuickActionEntries()
         let humanWeightLogs = fetches.humanWeightLogs()
         try Task.checkCancellation()
 
@@ -439,6 +385,7 @@ actor HomeReadModelActor {
             pottyLedgerEntries: pottyLedgerEntries,
             petExpenseLedgerEntries: petExpenseLedgerEntries,
             petWeightLedgerEntries: petWeightLedgerEntries,
+            petMomentEntries: petMomentEntries,
             humanWeightLogs: humanWeightLogs,
             familyTasks: familyTasks,
             exchangeRequests: exchangeRequests,
@@ -454,6 +401,11 @@ actor HomeReadModelActor {
         guard force || signature != previousSignature || externalRevision != currentRevision else { return nil }
 
         let snapshot = VerticalSolidHomeSnapshotBuilder.buildForReadModelActor(from: source, now: now)
+        let interaction = HomeInteractionSnapshotBuilder.build(
+            from: source,
+            quickActionItemsRaw: input.quickActionItemsRaw,
+            now: now
+        )
         try Task.checkCancellation()
 
         let activeHumanAvatar = HomeHeaderAvatarSnapshot(human: source.activeHuman)
@@ -467,6 +419,7 @@ actor HomeReadModelActor {
 
         return HomeReadModelActorResult(
             snapshot: snapshot,
+            interaction: interaction,
             signature: signature,
             activeHumanAvatar: activeHumanAvatar,
             avatarPreloadSignature: avatarPreloadSignature,
@@ -796,6 +749,22 @@ private nonisolated struct HomeReadModelFetches {
         }
     }
 
+    func petMomentQuickActionEntries() -> [HomePetMomentQuickActionEntry] {
+        var descriptor = FetchDescriptor<PetPhotoLog>(
+            sortBy: [SortDescriptor(\PetPhotoLog.date, order: .reverse)]
+        )
+        descriptor.fetchLimit = 240
+        do {
+            return try context.fetch(descriptor).compactMap(Self.petMomentQuickActionEntry(from:))
+        } catch {
+            OhanaLog.warning(
+                "Home read model pet moment fetch failed: \(error.localizedDescription)",
+                category: "Home"
+            )
+            return []
+        }
+    }
+
     func humanWeightLogs() -> [HumanWeightLog] {
         let today = calendar.startOfDay(for: now)
         var descriptor = FetchDescriptor<HumanWeightLog>(
@@ -898,6 +867,11 @@ private nonisolated struct HomeReadModelFetches {
             date: event.occurredAt,
             weightKg: event.amountValue
         )
+    }
+
+    private static func petMomentQuickActionEntry(from log: PetPhotoLog) -> HomePetMomentQuickActionEntry? {
+        guard let petId = log.pet?.id else { return nil }
+        return HomePetMomentQuickActionEntry(id: log.id, petId: petId, date: log.date)
     }
 
     private static func feedSource(

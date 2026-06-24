@@ -333,21 +333,21 @@ nonisolated struct DomainScheduleRehydrateReminderResult {
 nonisolated enum DomainRehydrateEffectsDispatcher {
     static func dispatch(
         event result: DomainScheduleRehydrateEventResult,
-        notifications: ReminderNotificationScheduling = OhanaNotifications.current
+        notifications: ReminderNotificationScheduling = ReminderNotificationSchedulerRegistry.current
     ) {
         cancelNotifications(result.notificationIdsToCancel, notifications: notifications)
     }
 
     static func dispatch(
         reminder result: DomainScheduleRehydrateReminderResult,
-        notifications: ReminderNotificationScheduling = OhanaNotifications.current
+        notifications: ReminderNotificationScheduling = ReminderNotificationSchedulerRegistry.current
     ) {
         cancelNotifications(result.notificationIdsToCancel, notifications: notifications)
     }
 
     static func cancelNotifications(
         _ notificationIds: [String],
-        notifications: ReminderNotificationScheduling = OhanaNotifications.current
+        notifications: ReminderNotificationScheduling = ReminderNotificationSchedulerRegistry.current
     ) {
         var seen: Set<String> = []
         for notificationId in notificationIds {

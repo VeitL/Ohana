@@ -178,7 +178,7 @@ nonisolated struct DomainScheduleDeleteResult: Equatable {
 nonisolated enum DomainScheduleEffectsDispatcher {
     static func dispatch(
         delete result: DomainScheduleDeleteResult,
-        notifications: ReminderNotificationScheduling = OhanaNotifications.current
+        notifications: ReminderNotificationScheduling = ReminderNotificationSchedulerRegistry.current
     ) {
         DomainRehydrateEffectsDispatcher.cancelNotifications(result.notificationIdsToCancel, notifications: notifications)
     }

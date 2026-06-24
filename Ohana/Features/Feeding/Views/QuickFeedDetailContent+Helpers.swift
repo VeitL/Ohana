@@ -362,42 +362,13 @@ extension QuickFeedDetailContent {
     }
 
     var allFeedLedgerEntries: [QuickFeedLedgerEntry] {
-        QuickFeedOverviewSnapshot.feedingEntries(
-            pet: pet,
-            feedingLedgerEvents: observedFeedingLedgerEvents,
-            legacyCareLogs: observedCareLogs,
-            manualPlanEvents: feedScheduleEvents,
-            autoFeederEvents: autoFeederEvents
-        )
+        observedFeedingLedgerEntries
     }
 
     func setMainFoodKind(_ foodKind: FeedFoodKind) {
         guard pet.mainFoodKind != foodKind else { return }
         commandExecutor.setMainFoodKind(pet: pet, foodKind: foodKind)
         UISelectionFeedbackGenerator().selectionChanged()
-    }
-
-    func feedLogBadge(for log: PetCareLog) -> (title: String, tint: Color, icon: String) {
-        if !log.sharedSessionId.isEmpty {
-            let session = sharedCareSession(for: log.sharedSessionId)
-            let countSuffix = SharedCareMetadata.targetCount(session: session, legacyNote: log.note).map { " · \($0)只" } ?? ""
-            return ("\(l.tr(zh: "共同喂食", en: "Shared", de: "Gemeinsam"))\(countSuffix) · \(log.foodKind.title(l))", foodKindTint(log.foodKind), "person.2.fill")
-        }
-        return switch FeedLogMetadata.source(for: log) ?? .manualMain {
-        case .manualMain:
-            ("\(l.tr(zh: "手动", en: "Manual", de: "Manuell")) · \(log.foodKind.title(l))", foodKindTint(log.foodKind), "hand.tap.fill")
-        case .manualReminder:
-            ("\(l.tr(zh: "计划", en: "Plan", de: "Plan")) · \(log.foodKind.title(l))", Color.goPurple, FeedRuleKind.manualReminder.iconName)
-        case .autoMain:
-            ("\(l.tr(zh: "自动", en: "Auto", de: "Auto")) · \(log.foodKind.title(l))", Color.goTeal, FeedRuleKind.autoFeeder.iconName)
-        case .treat:
-            (log.treatKind?.title(l) ?? l.tr(zh: "零食", en: "Treat", de: "Snack"), treatTint, log.treatKind?.systemIconName ?? "birthday.cake.fill")
-        }
-    }
-
-    private func sharedCareSession(for id: String) -> SharedCareSession? {
-        guard !id.isEmpty else { return nil }
-        return allSharedCareSessions.first { $0.id.uuidString == id }
     }
 
     func feedLogDisplayGrams(for log: PetCareLog) -> Double {

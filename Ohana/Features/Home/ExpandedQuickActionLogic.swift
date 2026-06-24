@@ -110,6 +110,12 @@ struct HomePetWeightQuickActionEntry: Equatable, Identifiable {
     let weightKg: Double
 }
 
+struct HomePetMomentQuickActionEntry: Equatable, Identifiable {
+    let id: UUID
+    let petId: UUID
+    let date: Date
+}
+
 private struct HomeFeedQuickActionState {
     let rules: FeedRuleState
     let todayEntries: [HomeFeedQuickActionEntry]
@@ -151,12 +157,10 @@ enum ExpandedQuickActionLogic {
     static func feedDashboard(
         for pet: Pet,
         allEvents: [Event],
-        allFeedCareLogs: [PetCareLog],
         now: Date
     ) -> FeedingDashboardState {
         let goal = FeedGoalPreferences.manualGoalCount(for: pet.id, default: 3)
-        let feedLogs = allFeedCareLogs.filter { $0.pet?.id == pet.id }
-        return FeedingDashboardState(pet: pet, allEvents: allEvents, manualGoalCount: goal, careLogs: feedLogs, now: now)
+        return FeedingDashboardState(pet: pet, allEvents: allEvents, manualGoalCount: goal, careLogs: [], now: now)
     }
 
     static func waterRuleState(for pet: Pet, allEvents: [Event], now: Date = Date()) -> WaterRuleState {
@@ -183,10 +187,9 @@ enum ExpandedQuickActionLogic {
     static func pendingFeedReminder(
         for pet: Pet,
         allEvents: [Event],
-        allFeedCareLogs: [PetCareLog],
         now: Date
     ) -> Reminder? {
-        feedDashboard(for: pet, allEvents: allEvents, allFeedCareLogs: allFeedCareLogs, now: now).nextManualReminder
+        feedDashboard(for: pet, allEvents: allEvents, now: now).nextManualReminder
     }
 
     static func feedAppearsComplete(
@@ -223,18 +226,19 @@ enum ExpandedQuickActionLogic {
         pottyLedgerEntries _: [HomePottyQuickActionEntry],
         now: Date
     ) -> Bool {
+        let waterCycleSnapshot = waterCycleLogSnapshot(for: pet, careLedgerEntries: careLedgerEntries)
         switch item.actionType {
         case "waterChange":
-            if WaterCareCycleStatusCalculator.waterChangeStatus(for: pet, now: now)?.isOverdue == true {
+            if WaterCareCycleStatusCalculator.waterChangeStatus(for: pet, now: now, logSnapshot: waterCycleSnapshot)?.isOverdue == true {
                 return true
             }
         case "filterClean":
-            if WaterCareCycleStatusCalculator.filterCleanStatus(for: pet, now: now)?.isOverdue == true ||
-                WaterCareCycleStatusCalculator.filterReplaceStatus(for: pet, now: now)?.isOverdue == true {
+            if WaterCareCycleStatusCalculator.filterCleanStatus(for: pet, now: now, logSnapshot: waterCycleSnapshot)?.isOverdue == true ||
+                WaterCareCycleStatusCalculator.filterReplaceStatus(for: pet, now: now, logSnapshot: waterCycleSnapshot)?.isOverdue == true {
                 return true
             }
         case "water" where WaterQuickActionPolicy.isAquatic(species: pet.species):
-            if WaterCareCycleStatusCalculator.mostUrgentWaterWarning(for: pet, now: now) != nil {
+            if WaterCareCycleStatusCalculator.mostUrgentWaterWarning(for: pet, now: now, logSnapshot: waterCycleSnapshot) != nil {
                 return true
             }
         case "feed":
@@ -250,7 +254,13 @@ enum ExpandedQuickActionLogic {
             break
         }
 
-        if CarePlanOverdueStatusCalculator.warning(for: item.actionType, pet: pet, events: allEvents, now: now) != nil {
+        if CarePlanOverdueStatusCalculator.warning(
+            for: item.actionType,
+            pet: pet,
+            events: allEvents,
+            now: now,
+            waterCycleLogSnapshot: waterCycleSnapshot
+        ) != nil {
             return true
         }
 
@@ -346,9 +356,12 @@ enum ExpandedQuickActionLogic {
         pottyLedgerEntries: [HomePottyQuickActionEntry],
         petExpenseLedgerEntries: [HomePetExpenseQuickActionEntry] = [],
         petWeightLedgerEntries: [HomePetWeightQuickActionEntry] = [],
+        petMomentEntries: [HomePetMomentQuickActionEntry] = [],
         now: Date,
-        calendar cal: Calendar = .current
+        calendar cal: Calendar = .current,
+        l: L10n = .current
     ) -> String? {
+        let waterCycleSnapshot = waterCycleLogSnapshot(for: pet, careLedgerEntries: careLedgerEntries)
         switch item.actionType {
         case "feed":
             let state = HomeFeedQuickActionState(
@@ -368,9 +381,10 @@ enum ExpandedQuickActionLogic {
                     return "未打卡 \(state.todayManualPlanMissedCount)餐"
                 }
                 if let lastExpired = state.lastExpiredManualPlanDate {
-                    return "最后逾期 \(quickPlanTimeText(lastExpired, now: now, calendar: cal))"
+                    let time = quickPlanTimeText(lastExpired, now: now, calendar: cal)
+                    return l.tr(zh: "最后逾期 \(time)", en: "Last missed \(time)", de: "Zuletzt überfällig \(time)")
                 }
-                if let overdue = overdueQuickStatusText(for: item.actionType, pet: pet, allEvents: allEvents, now: now, calendar: cal) {
+                if let overdue = overdueQuickStatusText(for: item.actionType, pet: pet, allEvents: allEvents, careLedgerEntries: careLedgerEntries, now: now, calendar: cal, l: l) {
                     return overdue
                 }
                 return "计划 \(state.completedTodayPlanCount)/\(state.todayManualPlanTotalCount)"
@@ -379,12 +393,12 @@ enum ExpandedQuickActionLogic {
             }
         case "water":
             if WaterQuickActionPolicy.isAquatic(species: pet.species) {
-                if let warning = WaterCareCycleStatusCalculator.mostUrgentWaterWarning(for: pet, now: now, calendar: cal) {
-                    return "\(warning.title)逾期\(warning.status.overdueDays)天"
+                if let warning = WaterCareCycleStatusCalculator.mostUrgentWaterWarning(for: pet, now: now, calendar: cal, logSnapshot: waterCycleSnapshot) {
+                    return waterCycleOverdueText(title: warning.title, days: warning.status.overdueDays, l: l)
                 }
                 return aquaticWaterStatusText(for: pet, careLedgerEntries: careLedgerEntries, calendar: cal, now: now)
             }
-            if let overdue = overdueQuickStatusText(for: item.actionType, pet: pet, allEvents: allEvents, now: now, calendar: cal) {
+            if let overdue = overdueQuickStatusText(for: item.actionType, pet: pet, allEvents: allEvents, careLedgerEntries: careLedgerEntries, now: now, calendar: cal, l: l) {
                 return overdue
             }
             let waterState = waterRuleState(for: pet, allEvents: allEvents)
@@ -401,11 +415,11 @@ enum ExpandedQuickActionLogic {
             }
             return "只记录次数"
         case "waterChange":
-            if let status = WaterCareCycleStatusCalculator.waterChangeStatus(for: pet, now: now, calendar: cal) {
-                if status.isOverdue { return "逾期\(status.overdueDays)天" }
-                if status.isDueToday { return "今天应换" }
+            if let status = WaterCareCycleStatusCalculator.waterChangeStatus(for: pet, now: now, calendar: cal, logSnapshot: waterCycleSnapshot) {
+                if status.isOverdue { return status.compactDueText(l: l) }
+                if status.isDueToday { return l.tr(zh: "今天应换", en: "Due today", de: "Heute fällig") }
             }
-            if let overdue = overdueQuickStatusText(for: item.actionType, pet: pet, allEvents: allEvents, now: now, calendar: cal) {
+            if let overdue = overdueQuickStatusText(for: item.actionType, pet: pet, allEvents: allEvents, careLedgerEntries: careLedgerEntries, now: now, calendar: cal, l: l) {
                 return overdue
             }
             if let last = latestCareEntry(.waterChange, pet: pet, careLedgerEntries: careLedgerEntries) {
@@ -428,14 +442,14 @@ enum ExpandedQuickActionLogic {
             }
             return nil
         case "litter":
-            if let overdue = overdueQuickStatusText(for: item.actionType, pet: pet, allEvents: allEvents, now: now, calendar: cal) {
+            if let overdue = overdueQuickStatusText(for: item.actionType, pet: pet, allEvents: allEvents, careLedgerEntries: careLedgerEntries, now: now, calendar: cal, l: l) {
                 return overdue
             }
             let count = todayCareEntryCount(.litter, pet: pet, careLedgerEntries: careLedgerEntries, now: now, calendar: cal)
             if count > 0 { return "今日已铲" }
-            return scoopQuickStatusText(for: pet, careLedgerEntries: careLedgerEntries, calendar: cal, now: now)
+            return scoopQuickStatusText(for: pet, careLedgerEntries: careLedgerEntries, calendar: cal, now: now, l: l)
         case "play":
-            if let overdue = overdueQuickStatusText(for: item.actionType, pet: pet, allEvents: allEvents, now: now, calendar: cal) {
+            if let overdue = overdueQuickStatusText(for: item.actionType, pet: pet, allEvents: allEvents, careLedgerEntries: careLedgerEntries, now: now, calendar: cal, l: l) {
                 return overdue
             }
             let count = todayCareEntryCount(.play, pet: pet, careLedgerEntries: careLedgerEntries, now: now, calendar: cal)
@@ -457,7 +471,7 @@ enum ExpandedQuickActionLogic {
             guard !activeMeds.isEmpty else { return "待设置" }
             let planned = activeMeds.reduce(0) { $0 + PetMedicationDoseLogging.requiredDoses(on: now, for: $1) }
             let done = activeMeds.reduce(0) { $0 + PetMedicationDoseLogging.todayDoseCount(events: allEvents, medicationId: $1.id) }
-            if let overdue = overdueQuickStatusText(for: item.actionType, pet: pet, allEvents: allEvents, now: now, calendar: cal) {
+            if let overdue = overdueQuickStatusText(for: item.actionType, pet: pet, allEvents: allEvents, careLedgerEntries: careLedgerEntries, now: now, calendar: cal, l: l) {
                 return overdue
             }
             return planned > 0 ? "今日 \(min(done, planned))/\(planned)" : "\(activeMeds.count)种药"
@@ -470,22 +484,33 @@ enum ExpandedQuickActionLogic {
                 .reduce(0.0) { $0 + $1.amount }
             return total > 0 ? "本月 \(AppCurrency.format(total, fractionDigits: 0))" : nil
         case "moment":
-            let todayCount = pet.photoLogs.count(where: { cal.isDateInToday($0.date) })
-            if todayCount > 0 { return "今天 \(todayCount) 条" }
-            if let last = pet.photoLogs.max(by: { $0.date < $1.date }) {
-                return "最近：\(relativeDayText(for: last.date, calendar: cal))"
+            let todayCount = todayMomentEntries(
+                for: pet,
+                momentEntries: petMomentEntries,
+                now: now,
+                calendar: cal
+            ).count
+            if todayCount > 0 {
+                return l.tr(zh: "今天 \(todayCount) 条", en: "Today \(todayCount)", de: "Heute \(todayCount)")
             }
-            return "还没有记录"
+            if let last = latestMomentEntry(for: pet, momentEntries: petMomentEntries) {
+                return l.tr(
+                    zh: "最近：\(momentAgeText(for: last.date, now: now, calendar: cal, l: l))",
+                    en: "Last: \(momentAgeText(for: last.date, now: now, calendar: cal, l: l))",
+                    de: "Zuletzt: \(momentAgeText(for: last.date, now: now, calendar: cal, l: l))"
+                )
+            }
+            return l.tr(zh: "还没有记录", en: "No moments yet", de: "Noch keine Momente")
         case "filterClean":
-            if let replaceStatus = WaterCareCycleStatusCalculator.filterReplaceStatus(for: pet, now: now, calendar: cal),
+            if let replaceStatus = WaterCareCycleStatusCalculator.filterReplaceStatus(for: pet, now: now, calendar: cal, logSnapshot: waterCycleSnapshot),
                replaceStatus.isOverdue {
-                return "更换逾期\(replaceStatus.overdueDays)天"
+                return waterCycleOverdueText(title: "更换", days: replaceStatus.overdueDays, l: l)
             }
-            if let status = WaterCareCycleStatusCalculator.filterCleanStatus(for: pet, now: now, calendar: cal) {
-                if status.isOverdue { return "清洗逾期\(status.overdueDays)天" }
-                if status.isDueToday { return "今天应清" }
+            if let status = WaterCareCycleStatusCalculator.filterCleanStatus(for: pet, now: now, calendar: cal, logSnapshot: waterCycleSnapshot) {
+                if status.isOverdue { return waterCycleOverdueText(title: "清洗", days: status.overdueDays, l: l) }
+                if status.isDueToday { return l.tr(zh: "今天应清", en: "Due today", de: "Heute fällig") }
             }
-            if let overdue = overdueQuickStatusText(for: item.actionType, pet: pet, allEvents: allEvents, now: now, calendar: cal) {
+            if let overdue = overdueQuickStatusText(for: item.actionType, pet: pet, allEvents: allEvents, careLedgerEntries: careLedgerEntries, now: now, calendar: cal, l: l) {
                 return overdue
             }
             if let last = latestCareEntry(.filterClean, pet: pet, careLedgerEntries: careLedgerEntries) {
@@ -494,7 +519,7 @@ enum ExpandedQuickActionLogic {
             }
             return nil
         case "cageCleaning":
-            if let overdue = overdueQuickStatusText(for: item.actionType, pet: pet, allEvents: allEvents, now: now, calendar: cal) {
+            if let overdue = overdueQuickStatusText(for: item.actionType, pet: pet, allEvents: allEvents, careLedgerEntries: careLedgerEntries, now: now, calendar: cal, l: l) {
                 return overdue
             }
             return latestCareAgeText(
@@ -506,19 +531,19 @@ enum ExpandedQuickActionLogic {
                 todayDone: "今天已清"
             )
         case "freeFlight":
-            if let overdue = overdueQuickStatusText(for: item.actionType, pet: pet, allEvents: allEvents, now: now, calendar: cal) {
+            if let overdue = overdueQuickStatusText(for: item.actionType, pet: pet, allEvents: allEvents, careLedgerEntries: careLedgerEntries, now: now, calendar: cal, l: l) {
                 return overdue
             }
             let count = todayCareEntryCount(.freeFlight, pet: pet, careLedgerEntries: careLedgerEntries, now: now, calendar: cal)
             return count > 0 ? "今日 \(count)次" : nil
         case "misting":
-            if let overdue = overdueQuickStatusText(for: item.actionType, pet: pet, allEvents: allEvents, now: now, calendar: cal) {
+            if let overdue = overdueQuickStatusText(for: item.actionType, pet: pet, allEvents: allEvents, careLedgerEntries: careLedgerEntries, now: now, calendar: cal, l: l) {
                 return overdue
             }
             let count = todayCareEntryCount(.misting, pet: pet, careLedgerEntries: careLedgerEntries, now: now, calendar: cal)
             return count > 0 ? "今日 \(count)次" : nil
         case "substrateChange":
-            if let overdue = overdueQuickStatusText(for: item.actionType, pet: pet, allEvents: allEvents, now: now, calendar: cal) {
+            if let overdue = overdueQuickStatusText(for: item.actionType, pet: pet, allEvents: allEvents, careLedgerEntries: careLedgerEntries, now: now, calendar: cal, l: l) {
                 return overdue
             }
             return latestCareAgeText(
@@ -530,7 +555,7 @@ enum ExpandedQuickActionLogic {
                 todayDone: "今天已换"
             )
         case "groom", "health":
-            return overdueQuickStatusText(for: item.actionType, pet: pet, allEvents: allEvents, now: now, calendar: cal)
+            return overdueQuickStatusText(for: item.actionType, pet: pet, allEvents: allEvents, careLedgerEntries: careLedgerEntries, now: now, calendar: cal, l: l)
         default:
             return nil
         }
@@ -852,7 +877,8 @@ enum ExpandedQuickActionLogic {
         for pet: Pet,
         careLedgerEntries: [HomeCareQuickActionEntry],
         calendar: Calendar,
-        now: Date
+        now: Date,
+        l: L10n = .current
     ) -> String? {
         let key = pet.id.uuidString
         let settings = LitterCareSettingsStore.snapshot(petKey: key, calendar: calendar)
@@ -865,31 +891,58 @@ enum ExpandedQuickActionLogic {
         let daysUntil = calendar.dateComponents([.day], from: today, to: calendar.startOfDay(for: next)).day ?? 0
 
         if daysUntil < 0 {
-            return "逾期 \(abs(daysUntil))天"
+            return l.tr(zh: "逾期 \(abs(daysUntil))天", en: "\(abs(daysUntil))d overdue", de: "\(abs(daysUntil)) T. überfällig")
         }
         if daysUntil == 0 {
-            return "今天应铲"
+            return l.tr(zh: "今天应铲", en: "Due today", de: "Heute fällig")
         }
-        return "每\(interval)天"
+        return l.tr(zh: "每\(interval)天", en: "Every \(interval)d", de: "Alle \(interval) T.")
     }
 
     private static func overdueQuickStatusText(
         for actionType: String,
         pet: Pet,
         allEvents: [Event],
+        careLedgerEntries: [HomeCareQuickActionEntry],
         now: Date,
-        calendar cal: Calendar
+        calendar cal: Calendar,
+        l: L10n = .current
     ) -> String? {
         guard let warning = CarePlanOverdueStatusCalculator.warning(
             for: actionType,
             pet: pet,
             events: allEvents,
             now: now,
-            calendar: cal
+            calendar: cal,
+            waterCycleLogSnapshot: waterCycleLogSnapshot(for: pet, careLedgerEntries: careLedgerEntries)
         ) else {
             return nil
         }
-        return warning.compactText
+        return warning.compactText(l: l)
+    }
+
+    private static func waterCycleOverdueText(title: String, days: Int, l: L10n) -> String {
+        let localizedTitle = waterCycleTitle(title, l: l)
+        return l.tr(
+            zh: "\(localizedTitle)逾期\(days)天",
+            en: "\(localizedTitle) \(days)d overdue",
+            de: "\(localizedTitle) \(days) T. überfällig"
+        )
+    }
+
+    private static func waterCycleTitle(_ title: String, l: L10n) -> String {
+        switch title {
+        case "换水":
+            l.tr(zh: "换水", en: "Water change", de: "Wasserwechsel")
+        case "滤芯":
+            l.tr(zh: "滤芯", en: "Filter", de: "Filter")
+        case "更换":
+            l.tr(zh: "更换", en: "Replacement", de: "Wechsel")
+        case "清洗":
+            l.tr(zh: "清洗", en: "Cleaning", de: "Reinigung")
+        default:
+            title
+        }
     }
 
     private static func quickPlanTimeText(_ date: Date, now: Date, calendar: Calendar) -> String {
@@ -932,6 +985,16 @@ enum ExpandedQuickActionLogic {
             return days == 0 ? "今天已换水" : "\(days)天前换水"
         }
         return "长按管理"
+    }
+
+    private static func waterCycleLogSnapshot(
+        for pet: Pet,
+        careLedgerEntries: [HomeCareQuickActionEntry]
+    ) -> WaterCareCycleLogSnapshot {
+        WaterCareCycleLogSnapshot(
+            latestWaterChangeDate: latestCareEntry(.waterChange, pet: pet, careLedgerEntries: careLedgerEntries)?.date,
+            latestFilterCleanDate: latestCareEntry(.filterClean, pet: pet, careLedgerEntries: careLedgerEntries)?.date
+        )
     }
 
     private static func todayCareEntryCount(
@@ -1024,6 +1087,33 @@ enum ExpandedQuickActionLogic {
         weightLedgerEntries
             .filter { $0.petId == pet.id }
             .max(by: { $0.date < $1.date })
+    }
+
+    private static func todayMomentEntries(
+        for pet: Pet,
+        momentEntries: [HomePetMomentQuickActionEntry],
+        now: Date,
+        calendar cal: Calendar
+    ) -> [HomePetMomentQuickActionEntry] {
+        momentEntries.filter { entry in
+            entry.petId == pet.id && cal.isDate(entry.date, inSameDayAs: now)
+        }
+    }
+
+    private static func latestMomentEntry(
+        for pet: Pet,
+        momentEntries: [HomePetMomentQuickActionEntry]
+    ) -> HomePetMomentQuickActionEntry? {
+        momentEntries
+            .filter { $0.petId == pet.id }
+            .max(by: { $0.date < $1.date })
+    }
+
+    private static func momentAgeText(for date: Date, now: Date, calendar: Calendar, l: L10n) -> String {
+        let days = calendar.dateComponents([.day], from: calendar.startOfDay(for: date), to: calendar.startOfDay(for: now)).day ?? 0
+        if days <= 0 { return l.tr(zh: "今天", en: "today", de: "heute") }
+        if days == 1 { return l.tr(zh: "昨天", en: "yesterday", de: "gestern") }
+        return l.tr(zh: "\(days)天前", en: "\(days)d ago", de: "vor \(days) T.")
     }
 
     private static func latestHumanNoteDate(for human: Human) -> Date? {

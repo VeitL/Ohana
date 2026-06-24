@@ -151,6 +151,7 @@ struct FocusHomeVerticalSolidCardSurface: View {
                 .padding(.vertical, lerp(5, 7, p))
                 .background(statusBadgeBackground, in: Capsule())
                 .shadow(color: Color.arkInk.opacity(0.58), radius: 5, x: 0, y: 2) // ui-v4: allow requested legibility shadow on card text
+                .opacity(compactHeaderOpacity)
         }
     }
 

@@ -1,6 +1,33 @@
 import SwiftData
 import SwiftUI
 
+struct PetHygieneLedgerEntry: Identifiable, Equatable {
+    let id: UUID
+    let date: Date
+    let type: HygieneType
+    let legacyLogId: UUID?
+
+    static func entries(from events: [CareLedgerEvent], petID: UUID) -> [PetHygieneLedgerEntry] {
+        let petId = petID.uuidString
+        return events.compactMap { event in
+            guard event.eventKindEnum == .hygiene,
+                  event.subjectKind == CareLedgerSubjectKind.pet.rawValue,
+                  event.subjectId == petId,
+                  let type = HygieneType(rawValue: event.actionType) else { return nil }
+            let legacyLogId = event.legacyModelName == "PetHygieneLog"
+                ? event.legacyModelId.flatMap(UUID.init(uuidString:))
+                : nil
+            return PetHygieneLedgerEntry(
+                id: event.id,
+                date: event.occurredAt,
+                type: type,
+                legacyLogId: legacyLogId
+            )
+        }
+        .sorted { $0.date > $1.date }
+    }
+}
+
 struct PetHygieneDetailView: View {
     let pet: Pet
 
@@ -36,7 +63,7 @@ struct PetHygieneDetailView: View {
         PetHygieneDetailContentView(
             pet: pet,
             allReminders: allReminders,
-            hygieneLedgerEvents: hygieneLedgerEvents,
+            hygieneEntries: PetHygieneLedgerEntry.entries(from: hygieneLedgerEvents, petID: pet.id),
             legacyDeleteLogs: legacyDeleteLogs
         )
     }

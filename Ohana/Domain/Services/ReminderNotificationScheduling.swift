@@ -40,7 +40,7 @@ nonisolated protocol ReminderNotificationScheduling: Sendable {
 /// Injectable accessor for the notification scheduler. Defaults to a no-op until
 /// AppServices installs the app-owned scheduler; tests can override
 /// `current` with a fake and restore it via `useLive()`.
-enum OhanaNotifications {
+enum ReminderNotificationSchedulerRegistry {
     private nonisolated(unsafe) static var makeLiveScheduler: (() -> ReminderNotificationScheduling)?
     nonisolated(unsafe) static var current: ReminderNotificationScheduling = DomainNoOpReminderNotificationScheduler()
 
@@ -51,6 +51,21 @@ enum OhanaNotifications {
     /// Restores the app-registered notification scheduler. Call in test teardown.
     static func useLive() {
         current = makeLiveScheduler?() ?? DomainNoOpReminderNotificationScheduler()
+    }
+}
+
+enum OhanaNotifications {
+    static var current: ReminderNotificationScheduling {
+        get { ReminderNotificationSchedulerRegistry.current }
+        set { ReminderNotificationSchedulerRegistry.current = newValue }
+    }
+
+    static func registerLiveSchedulerFactory(_ factory: @escaping () -> ReminderNotificationScheduling) {
+        ReminderNotificationSchedulerRegistry.registerLiveSchedulerFactory(factory)
+    }
+
+    static func useLive() {
+        ReminderNotificationSchedulerRegistry.useLive()
     }
 }
 

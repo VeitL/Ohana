@@ -60,12 +60,51 @@ struct PoopPottyLedgerEntry: Identifiable, Hashable {
     let date: Date
     let pottyType: PottyType
     let legacyLogId: UUID?
+
+    static func entries(from events: [CareLedgerEvent], petID: UUID) -> [PoopPottyLedgerEntry] {
+        let petKey = petID.uuidString
+        return events.compactMap { event in
+            guard event.eventKindEnum == .potty,
+                  event.subjectKind == CareLedgerSubjectKind.pet.rawValue,
+                  event.subjectId == petKey,
+                  let pottyType = PottyType(rawValue: event.actionType) else { return nil }
+            let legacyLogId = event.legacyModelName == "PetPottyLog"
+                ? event.legacyModelId.flatMap(UUID.init(uuidString:))
+                : nil
+            return PoopPottyLedgerEntry(
+                id: event.id,
+                date: event.occurredAt,
+                pottyType: pottyType,
+                legacyLogId: legacyLogId
+            )
+        }
+        .sorted { $0.date > $1.date }
+    }
 }
 
 struct PoopLitterLedgerEntry: Identifiable, Hashable {
     let id: UUID
     let date: Date
     let legacyLogId: UUID?
+
+    static func entries(from events: [CareLedgerEvent], petID: UUID) -> [PoopLitterLedgerEntry] {
+        let petKey = petID.uuidString
+        return events.compactMap { event in
+            guard event.eventKindEnum == .care,
+                  event.subjectKind == CareLedgerSubjectKind.pet.rawValue,
+                  event.subjectId == petKey,
+                  event.actionType == CareType.litter.rawValue else { return nil }
+            let legacyLogId = event.legacyModelName == "PetCareLog"
+                ? event.legacyModelId.flatMap(UUID.init(uuidString:))
+                : nil
+            return PoopLitterLedgerEntry(
+                id: event.id,
+                date: event.occurredAt,
+                legacyLogId: legacyLogId
+            )
+        }
+        .sorted { $0.date > $1.date }
+    }
 }
 
 struct PoopInlineSheetGlassSurface: View {

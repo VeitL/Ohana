@@ -44,7 +44,7 @@ extension QuickFeedDetailContent {
             pet: pet,
             currentUserId: currentUserId,
             humans: allHumans,
-            feedingLedgerEvents: feedingLedgerEvents,
+            feedingLedgerEntries: observedFeedingLedgerEntries,
             now: Date()
         )
         if let warning = antiRepeatModel.recentFeedingWarning() {
@@ -79,8 +79,8 @@ extension QuickFeedDetailContent {
             if visibleSheet.needsFullCareLogs, dataController.hasLoadedFullCareLogs {
                 loadFullCareLogs(force: true)
             }
-            if visibleSheet.needsFullCareLogs, dataController.hasLoadedFullFeedingLedgerEvents {
-                loadFullFeedingLedgerEvents(force: true)
+            if visibleSheet.needsFullCareLogs, dataController.hasLoadedFullFeedingLedgerEntries {
+                loadFullFeedingLedgerEntries(force: true)
             }
             if visibleSheet.needsFullFoodRecords, dataController.hasLoadedFullFoodRecords {
                 loadFullFoodRecords(force: true)
@@ -110,8 +110,7 @@ extension QuickFeedDetailContent {
             pet: pet,
             manualPlanEvents: feedScheduleEvents,
             autoFeederEvents: autoFeederEvents,
-            feedingLedgerEvents: observedFeedingLedgerEvents,
-            legacyCareLogs: observedCareLogs,
+            feedingLedgerEntries: observedFeedingLedgerEntries,
             range: draftStore.overviewRange,
             activeMode: activeFeedingMode,
             defaultFeedGrams: defaultFeedGrams,
@@ -124,7 +123,7 @@ extension QuickFeedDetailContent {
         planCalendarSnapshotStore.rebuild(
             manualEvents: feedScheduleEvents,
             autoEvents: autoFeederEvents,
-            feedingLedgerEvents: observedFeedingLedgerEvents,
+            feedingLedgerEntries: observedFeedingLedgerEntries,
             activeMode: activeFeedingMode,
             month: draftStore.feedPlanCalendarMonth,
             selectedDate: draftStore.feedPlanCalendarSelectedDate,
@@ -136,8 +135,7 @@ extension QuickFeedDetailContent {
     func refreshTreatSnapshot(force: Bool = false) {
         treatSnapshotStore.rebuild(
             pet: pet,
-            feedingLedgerEvents: observedFeedingLedgerEvents,
-            legacyCareLogs: observedCareLogs,
+            feedingLedgerEntries: observedFeedingLedgerEntries,
             range: draftStore.overviewRange,
             selectedKind: draftStore.selectedTreatOverviewKind,
             now: clockTick,

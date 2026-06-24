@@ -13,7 +13,7 @@ struct IslandFoodDashboardContentView: View {
     var onOpenPet: ((Pet) -> Void)?
     let pets: [Pet]
     let allEvents: [Event]
-    let allFeedingLedgerEvents: [CareLedgerEvent]
+    let allFeedingLedgerEntries: [FoodLedgerEntry]
     let legacyStockCareLogs: [PetCareLog]
     let allFoodRecords: [PetFoodRecord]
     let allSharedCareSessions: [SharedCareSession]
@@ -57,7 +57,7 @@ struct IslandFoodDashboardContentView: View {
             pets: pets,
             selectedPetId: selectedPetId,
             allEvents: allEvents,
-            allFeedingLedgerEvents: allFeedingLedgerEvents,
+            allFeedingLedgerEntries: allFeedingLedgerEntries,
             legacyStockCareLogs: legacyStockCareLogs,
             allFoodRecords: allFoodRecords,
             allSharedCareSessions: allSharedCareSessions
@@ -479,7 +479,7 @@ struct IslandFoodDashboardContentView: View {
             pets: pets,
             selectedPetId: selectedPetId,
             allEvents: allEvents,
-            allFeedingLedgerEvents: allFeedingLedgerEvents,
+            allFeedingLedgerEntries: allFeedingLedgerEntries,
             legacyStockCareLogs: legacyStockCareLogs,
             allFoodRecords: allFoodRecords,
             allSharedCareSessions: allSharedCareSessions,

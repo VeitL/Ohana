@@ -20,7 +20,7 @@ struct PetActivityRecordCleanupResult: Equatable {
 struct PetActivityRecordCleanupService {
     private let notifications: ReminderNotificationScheduling
 
-    init(notifications: ReminderNotificationScheduling = OhanaNotifications.current) {
+    init(notifications: ReminderNotificationScheduling = ReminderNotificationSchedulerRegistry.current) {
         self.notifications = notifications
     }
 

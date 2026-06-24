@@ -148,24 +148,44 @@ def add(warnings: list[WarningItem], rule: str, path: str, line: int, snippet: s
     )
 
 
+SWIFT_DELETE_CALL_PATTERN = r"(?:\b(?:context|modelContext)\.delete\s*\(|(?:\)|\b[A-Za-z_][A-Za-z0-9_]*)\.delete\s*\()"
 DELETE_MARKER_RE = re.compile(
-    r"\b(?:tombstone|isDeletionTombstone|isDeleted|markDeleted|recordDeletion|context\.delete|\.delete\s*\()",
+    rf"\b(?:tombstone|isDeletionTombstone|isDeleted|markDeleted|recordDeletion)|{SWIFT_DELETE_CALL_PATTERN}",
     re.IGNORECASE,
 )
 SYMMETRY_RE = re.compile(
     r"\b(?:cancel|reschedule|scheduleManyIfNeeded|cascade|child|children|recordDeletion|markDeleted|tombstone|isDeletionTombstone|rebuild|pending|quick\s*access)",
     re.IGNORECASE,
 )
-PHYSICAL_DELETE_RE = re.compile(r"\b(?:context|modelContext)\.delete\s*\(|\.delete\s*\(")
+PHYSICAL_DELETE_RE = re.compile(SWIFT_DELETE_CALL_PATTERN)
 TOMBSTONE_HINT_RE = re.compile(
     r"\b(?:tombstone|isDeletionTombstone|recordDeletion|markDeleted|CloudSyncMutationRecorder|markDirty|sync metadata)",
     re.IGNORECASE,
 )
+ENUM_DELETE_CASE_RE = re.compile(r"^\s*case\s+(?:let\s+)?\.delete\b")
+DELEGATED_DELETE_BOUNDARY_RE = re.compile(
+    r"\b(?:FamilyTaskService|familyTasks)\.delete\s*\("
+    r"|\b[A-Za-z_][A-Za-z0-9_]*CommandExecutor\s*\([^)]*\)\.delete\s*\(",
+)
 
 
-def first_match(lines: list[str], pattern: re.Pattern[str]) -> tuple[int, str] | None:
+def is_non_physical_delete_marker(line: str) -> bool:
+    if ENUM_DELETE_CASE_RE.search(line):
+        return True
+    if DELEGATED_DELETE_BOUNDARY_RE.search(line):
+        return True
+    return False
+
+
+def first_match(
+    lines: list[str],
+    pattern: re.Pattern[str],
+    ignore: re.Pattern[str] | None = None,
+) -> tuple[int, str] | None:
     for idx, line in enumerate(lines, start=1):
         if "derived-state: allow" in line:
+            continue
+        if ignore is not None and ignore.search(line):
             continue
         if pattern.search(line):
             return idx, line
@@ -323,6 +343,11 @@ def scan_file(path: pathlib.Path, warnings: list[WarningItem]) -> None:
     lines = text.splitlines()
 
     marker = first_match(lines, DELETE_MARKER_RE)
+    while marker is not None and is_non_physical_delete_marker(marker[1]):
+        line_number, _ = marker
+        marker = first_match(lines[line_number:], DELETE_MARKER_RE)
+        if marker is not None:
+            marker = (marker[0] + line_number, marker[1])
     if marker is not None and not SYMMETRY_RE.search(text):
         line, snippet = marker
         add(
@@ -335,6 +360,11 @@ def scan_file(path: pathlib.Path, warnings: list[WarningItem]) -> None:
         )
 
     physical_delete = first_match(lines, PHYSICAL_DELETE_RE)
+    while physical_delete is not None and is_non_physical_delete_marker(physical_delete[1]):
+        line_number, _ = physical_delete
+        physical_delete = first_match(lines[line_number:], PHYSICAL_DELETE_RE)
+        if physical_delete is not None:
+            physical_delete = (physical_delete[0] + line_number, physical_delete[1])
     if physical_delete is not None and not TOMBSTONE_HINT_RE.search(text):
         line, snippet = physical_delete
         add(

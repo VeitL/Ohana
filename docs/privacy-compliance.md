@@ -14,25 +14,31 @@ in-app member-privacy/PIN rules in `docs/app-architecture-governance.md`.
   Re-audit it whenever another required-reason API (disk space, system boot time,
   active keyboards, etc.) or any data collection/network call is added.
 - **App Store privacy "nutrition label":** Keep the App Store Connect privacy
-  questionnaire in sync with reality. For the current zero-upload build, answer
-  "No, we do not collect data from this app"; the App Store label should read
-  **Data Not Collected**. User-initiated exports, backups, or shared files remain
-  under the user's control and are not developer collection unless Ohana, a
-  backend, or a third-party partner can access the transmitted data beyond the
-  user's chosen share action. If that ever changes (analytics, accounts, cloud
-  sync, support uploads, third-party SDKs), update the label in the same change.
+  questionnaire in sync with reality. For the current no-developer-collection
+  build, answer "No, we do not collect data from this app"; the App Store label
+  should read **Data Not Collected**. User-initiated exports, iCloud Drive
+  backups, or shared files remain under the user's control and are not developer
+  collection unless Ohana, a backend, or a third-party partner can access the
+  transmitted data beyond the user's chosen share action. If that ever changes
+  (analytics, accounts, CloudKit family sync, support uploads, third-party SDKs),
+  update the label in the same change.
 - **Privacy policy URL:** App Store Connect requires a public privacy policy URL
-  for iOS. The published policy for the current build must state that Ohana is
-  local-first, does not track users, does not run analytics, does not create an
-  account, and does not transmit app data to the developer. It must also disclose
-  that user-initiated exports/backups may contain sensitive pet, family, health,
-  medication, document, photo, and location data; users choose where to store or
-  share those files; and deleting/resetting app data removes local records under
-  the app's control.
-- **Permission strings:** Camera / Photo / Location usage descriptions live only
-  in `Ohana/Info.plist` + `en.lproj`/`de.lproj` `InfoPlist.strings` (zh/en/de).
-  Do not reintroduce duplicate `INFOPLIST_KEY_*` permission strings in build
-  settings — they override the localized strings.
+  for iOS. Draft copy lives in `docs/privacy-policy-draft.md`; do not treat it
+  as the final published URL until owner/legal review and support contact are
+  filled in. The published policy for the current build must state that Ohana is
+  local-first, does not track users, does not run analytics, does not create a
+  developer account, and does not transmit app data to the developer. It must
+  also disclose that automatic iCloud Drive backups are currently on by default
+  and user-controlled exports/backups may contain sensitive pet, family, health,
+  medication, document, photo, expense, and location data; users choose where to
+  store or share those files; and deleting/resetting app data removes local
+  records under the app's control but not external copies the user created.
+- **Permission strings:** Camera / Photo / Location / Face ID usage descriptions
+  live only in `Ohana/Info.plist` plus `en.lproj`/`de.lproj`
+  `InfoPlist.strings`; the default `Info.plist` strings are Chinese. Do not
+  reintroduce duplicate `INFOPLIST_KEY_*` permission strings in build settings —
+  they override the localized strings. Draft review copy and in-app rationale
+  live in `docs/permission-rationale-draft.md`.
 - **No unused permissions/capabilities:** Do not declare a permission, entitlement,
   or background mode that the code does not actually use (e.g., HealthKit strings
   with no HealthKit integration). Remove or implement.

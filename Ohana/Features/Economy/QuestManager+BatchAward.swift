@@ -240,14 +240,20 @@ extension QuestManager {
     private func batchAwardDependencies() -> CareEventServiceDependencies {
         let careLedger = CareLedgerService()
         let familyTasks = StaticFamilyTaskManager(wallet: wallet, careLedger: careLedger, questManager: self)
-        let reminderCompletion = ReminderCompletionService(careLedger: careLedger, familyTasks: familyTasks)
+        let notifications = ReminderNotificationSchedulerRegistry.current
+        let reminderCompletion = ReminderCompletionService(
+            careLedger: careLedger,
+            familyTasks: familyTasks,
+            notifications: notifications
+        )
         return CareEventServiceDependencies(
             economy: StaticCareEventEconomyAwarder(questManager: self),
             careLedger: careLedger,
             reminderCompletion: reminderCompletion,
             quickActionReminderCompletion: QuickActionReminderCompletionSyncService(reminderCompletion: reminderCompletion),
             familyTasks: familyTasks,
-            revisions: revisions
+            revisions: revisions,
+            notifications: notifications
         )
     }
 

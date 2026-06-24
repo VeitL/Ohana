@@ -34,6 +34,32 @@ actionable; long-term product ideas belong in planning docs instead.
 
 ## Open Items
 
+### TFU-20260623-001 - Split Home quick-action pure state helpers from MainActor defaults
+
+- Status: Open - local legacy-ledger guard verified; pending broader gate,
+  push/CI, and fresh pure review before Domain maturity closure.
+- Priority: P2 (compiler-migration risk; first-release-unreachable runtime)
+- Area: Home / Read Model / Quick Actions / Swift actor isolation
+- Source task: Home read-model refactor to remove main-thread compatibility
+  reads; Codex, 2026-06-23.
+- Blocker: The Home read-model payload no longer carries SwiftData object arrays
+  or performs `mainContext` compatibility fetches after actor refresh, and the
+  Home targeted tests pass. However the compiler still warns that
+  `HomeInteractionSnapshotBuilder` calls legacy default-MainActor static helpers
+  in `FocusHomeReminderDeepLinkRouter`, `ExpandedQuickActionLogic`, and
+  `PrivacyService` while shaping pure interaction status. These are not broad
+  main-context fetches, but they will become harder blockers under stricter Swift
+  isolation.
+- Next step: Extract actor-safe, nonisolated pure route/status calculators for
+  Home read-model use, or mark the existing pure helper subset nonisolated only
+  after its feed/water/privacy dependencies have matching nonisolated value
+  APIs. Do not move actor refresh work back through `MainActor`.
+- Close condition: The same targeted command
+  `scripts/test-simulator.sh -only-testing:OhanaTests/HomeReadModelStoreTests -only-testing:OhanaTests/HomeSnapshotBuilderTests -only-testing:OhanaTests/HomeRouteCoordinatorTests`
+  passes with no `HomeInteractionSnapshot.swift` actor-isolation warnings, and
+  the Home read-model source guard still rejects `compatibilitySource`,
+  `payload.source`, and `container.mainContext`.
+
 ### TFU-20260617-001 - Add a LocalDevice UI-test scheme for first-release smoke
 
 - Status: Done
@@ -197,7 +223,8 @@ actionable; long-term product ideas belong in planning docs instead.
 
 ### TFU-20260614-019 - Split memorial-safe content from active-only command writes
 
-- Status: Open
+- Status: Open - local command/UI membrane evidence verified; pending broader
+  gate, push/CI, and fresh pure review before close.
 - Priority: P1
 - Area: Domain / Memorial / Member Lifecycle / Feature Commands / UI Routes
 - Source task: Domain first-release reachable-surface pure adversarial review;
@@ -233,10 +260,23 @@ actionable; long-term product ideas belong in planning docs instead.
   typed policy/result，不能靠单个 view 判断；相关 command / route / revision
   入口族测试、derived/economy audits、fixture tests、module exit gate、push 和 CI
   全绿；随后另开首发可达面纯复审，P0/P1=0 才能把 Domain 标 🏁。
+- Progress: 2026-06-24 本地证据复核。`MemberLifecycleGateTests` 当前覆盖
+  `deceasedFeatureHubsExposeOnlyMemorialSafeDestinations`、deceased pet feed/
+  stock/water/care-plan/walk/derived wrapper no-op、deceased human note with
+  reminder memorial-content-only、deceased pet memorial calendar/photo allowed
+  without care/economy derivation；`RecurringFindingsRepairTests` 当前覆盖
+  active-only pet/human commands no-op、deceased pet memorial moment writes photo
+  only、human medication active-only no-op。验证：
+  `scripts/test-simulator.sh -only-testing:OhanaTests/MemberLifecycleGateTests`
+  PASS（50 tests，iPhone 17 simulator）；
+  `scripts/test-simulator.sh -only-testing:OhanaTests/CareCompletionChokepointCharacterizationTests -only-testing:OhanaTests/CareDerivationExecutorSuccessCharacterizationTests -only-testing:OhanaTests/RecurringFindingsRepairTests -only-testing:OhanaTests/ReminderActionCoordinatorTests -only-testing:OhanaTests/CatCareCommandTests`
+  PASS（58 tests，iPhone 17 simulator）。尚未跑 broader gate、push/CI 与 fresh
+  pure review，所以保持 Open。
 
 ### TFU-20260614-018 - Resolve unwritable executors consistently across fact, ledger, and reward
 
-- Status: Open
+- Status: Open - Home and non-Home actor consistency guards locally verified;
+  module exit, push, CI, and fresh review still pending.
 - Priority: P1
 - Area: Domain / Economy / CareFactWritePolicy / Reward Owner Resolution / Tests
 - Source task: Domain first-release reachable-surface pure adversarial review;
@@ -254,25 +294,48 @@ actionable; long-term product ideas belong in planning docs instead.
   active human wallet 获得奖励、deceased wallet 未写，没有断言 care fact / ledger /
   wallet / budget / feedback 的 effective actor 一致性，等于漏掉 G4.1 "fallback 归属必须
   明确、不得伪装为原 executor 发奖"。
-- Next step: 先补入口族红测覆盖 direct care、shared care、pet medication dose、
-  walk、weight/health、Calendar/notification 代表路径：active target + deceased/
-  missing/physically-deleted executor 必须写 fact，但 `CareLedgerEvent`、wallet entry、
-  budget event、Oasis/feedback/revision metadata 的 effective actor 必须一致地指向
-  fallback active human；没有可用 owner 时 fact-only、ledger coconutDelta=0、无 wallet/
-  budget/Oasis。实现上把 executor resolution 改为 typed result：
-  `.none` / `.missingOrDeleted` / `.unwritableHuman` / `.activeHuman`，禁止用 optional
-  nil 猜状态；必要时区分 `requestedExecutorId` 与 `effectiveActorId`，旧表征测试不得只用
-  "wallet 没写 deceased" 当通过条件。
+- Next step: 在已补强的 Home quick-action 代表路径之外，继续覆盖 direct care、
+  shared care、pet medication dose、walk、weight/health、Calendar/notification
+  代表路径：active target + deceased/missing/physically-deleted executor 必须写
+  fact，但 `CareLedgerEvent`、wallet entry、budget event、Oasis/feedback/revision
+  metadata 的 effective actor 必须一致地指向 fallback active human；没有可用 owner
+  时 fact-only、ledger coconutDelta=0、无 wallet/budget/Oasis。实现上继续审计 typed
+  executor resolution，区分 `requestedExecutorId`、`effectiveExecutorId` 与
+  `rewardExecutorId`，旧表征测试不得只用"wallet 没写 deceased"当通过条件。
 - Close condition: 新红测先失败后修绿；所有 care-family 入口的 fact、care ledger、
   reward wallet、budget、Oasis/feedback 与 revision 对同一动作的 actor 归属一致；
   missing/physically-deleted executor 的 active target fact 语义仍保留；
   `CareCompletionChokepointCharacterizationTests`、Home/Reminder/Walk/Health/Medication
   相关入口族测试、economy audits、fixture tests、module exit gate、push 和 CI 全绿；
   随后另开首发可达面纯复审，P0/P1=0 才能把 Domain 标 🏁。
+- Progress: 2026-06-24 本地补强 Home command executor actor fallback guard。
+  `quickPlayCommandExecutorWritesForMissingExecutorThroughFallbackOwner`、
+  `quickPlayCommandExecutorWritesForPassedAwayExecutorThroughFallbackOwner`、
+  `homeQuickCareWritesForDeceasedExecutorThroughFallbackOwner` 与
+  `quickPottyCommandExecutorWritesForDeceasedExecutorThroughFallbackOwner` 现在
+  不只断言 active human wallet 获得奖励，还 fetch 对应 `PetCareLog` /
+  `PetPottyLog` 与 `CareLedgerEvent`，断言 fact `executorId` 和 ledger `actorId`
+  都等于 fallback active human id。验证：`scripts/test-simulator.sh
+  -only-testing:OhanaTests/HomeCommandExecutorTests` PASS（183 tests，iPhone 17
+  simulator）。
+- Progress: 2026-06-24 refreshed non-Home chokepoint evidence on the current
+  worktree. `CareCompletionChokepointCharacterizationTests` now covers direct
+  manual feed, shared watering, medication dose, calendar completion, walk,
+  pet weight, and pet health fallback paths where missing/deceased explicit
+  executors write the active target fact but converge fact `executorId`,
+  `CareLedgerEvent.actorId`, wallet, budget, Oasis/feedback, and reminder/event
+  metadata onto the fallback active human, plus deceased-target no-op paths.
+  Validation: `scripts/test-simulator.sh
+  -only-testing:OhanaTests/CareCompletionChokepointCharacterizationTests`
+  PASS (24 Swift Testing tests, iPhone 17 simulator; xcresult
+  `/var/folders/9j/7ldcxzn91d947mg4p_7wxmz40000gn/T/OhanaDerivedData/main-b6cf423d5931-tests/Logs/Test/Test-Ohana-2026.06.24_02-11-00-+0200.xcresult`).
+  This item remains Open because module exit, push/CI, and a fresh pure review
+  are still part of the close condition.
 
 ### TFU-20260614-017 - Delete PetMilestone ledger with the milestone fact
 
-- Status: Open
+- Status: Open - local creation/write cleanup and legacy-ledger delete guard
+  verified; pending module exit, push/CI, and fresh pure review before close.
 - Priority: P1
 - Area: Domain / Pet Milestones / Physical Deletion / CareLedger / Tests
 - Source task: Domain first-release reachable-surface pure adversarial review;
@@ -304,11 +367,52 @@ actionable; long-term product ideas belong in planning docs instead.
   command 漏接；`HomeCommandExecutorTests`、相关 physical deletion / economy
   audits、fixture tests、module exit gate、push 和 CI 全绿；随后另开首发可达面
   纯复审，P0/P1=0 才能把 Domain 标 🏁。
+- Progress: 2026-06-24 本地补强旧数据 guard。当前代码的新建
+  `PetMilestoneCommandService.createMilestone` 不再写 `CareLedgerEvent`，但测试
+  额外构造 legacy matching `CareLedgerEvent(legacyModelName: "PetMilestone",
+  legacyModelId: createdMilestone.id)`；删除里程碑后断言返回
+  `removedLedgerEventIDs == [matchingLegacyLedger.id]`、`PetMilestone` 与
+  matching `CareLedgerEvent` 均写 deletion tombstone，unrelated milestone
+  ledger 仍保留。验证：`scripts/test-simulator.sh
+  -only-testing:OhanaTests/HomeCommandExecutorTests` PASS（183 tests）；
+  `scripts/test-simulator.sh -only-testing:OhanaTests/PhysicalDeletionServiceTests`
+  PASS（12 tests）；`scripts/audit-economy-boundaries.sh --all` PASS（846
+	  files）；`scripts/audit-derived-state-lifecycle.sh --all` exit 0（846 files，
+	  仅既有 review warnings）；`scripts/tests/run-audit-fixture-tests.sh` PASS。
+	  尚未跑 module exit gate / push / CI / fresh pure review，所以保持 Open。
+- Progress: 2026-06-24 refreshed local evidence on current worktree:
+  `scripts/test-simulator.sh -only-testing:OhanaTests/HomeCommandExecutorTests`
+  PASS (183 tests, xcresult
+  `/var/folders/9j/7ldcxzn91d947mg4p_7wxmz40000gn/T/OhanaDerivedData/main-b6cf423d5931-tests/Logs/Test/Test-Ohana-2026.06.24_01-38-55-+0200.xcresult`);
+  `scripts/test-simulator.sh -only-testing:OhanaTests/PhysicalDeletionServiceTests`
+  PASS (12 tests, xcresult
+  `/var/folders/9j/7ldcxzn91d947mg4p_7wxmz40000gn/T/OhanaDerivedData/main-b6cf423d5931-tests/Logs/Test/Test-Ohana-2026.06.24_01-39-49-+0200.xcresult`);
+  `scripts/audit-economy-boundaries.sh --all` PASS; `scripts/audit-derived-state-lifecycle.sh
+  --all` reported only the existing non-PetMilestone review warnings.
+- Progress: 2026-06-25 Codex re-audited the current worktree and found the
+  2026-06-24 note was stale: `PetMilestoneCommandService.createMilestone` and
+  `seedSystemMilestones` still called the private legacy `recordLedger(...)`
+  helper. Removed that write path and the unused `careLedger` parameter, keeping
+  only the deletion-time `ledgerEvents(for:)` narrow query for historical
+  `legacyModelName == "PetMilestone"` cleanup. Added
+  `HomeCommandExecutorTests.petMilestoneCommandsDoNotCreateLegacyCareLedgerEvents`
+  as a source guard against reintroducing `recordLedger(` /
+  `careLedger.record(` in `PetMilestoneCommands.swift`; existing behavior tests
+  still verify new milestones create no `CareLedgerEvent`, while manually
+  inserted matching legacy ledgers are tombstoned with the milestone and
+  unrelated legacy ledgers remain. Validation:
+  `scripts/test-simulator.sh -only-testing:OhanaTests/HomeCommandExecutorTests
+  -only-testing:OhanaTests/RecurringFindingsRepairTests` PASS (201 tests,
+  iPhone 17 simulator, xcresult
+  `/var/folders/9j/7ldcxzn91d947mg4p_7wxmz40000gn/T/OhanaDerivedData/main-b6cf423d5931-tests/Logs/Test/Test-Ohana-2026.06.25_00-13-14-+0200.xcresult`);
+  `git diff --check` PASS; `scripts/dev-check-changed.sh` PASS (current large
+  dirty worktree still recommends build/targeted tests for broad compiler
+  surface; this slice is covered by the targeted simulator tests above).
 
 ### TFU-20260614-016 - Scrub deleted human executors from retained active pet facts
 
-- Status: Open - local repair implemented; pending push/CI and final pure
-  review before close.
+- Status: Open - local repair and refreshed validation verified; pending push/CI
+  and final pure review before close.
 - Priority: P1
 - Area: Domain / Physical Deletion / Member Lifecycle / Care Facts / CareLedger
 - Source task: Domain first-release reachable-surface pure adversarial review;
@@ -348,11 +452,18 @@ actionable; long-term product ideas belong in planning docs instead.
   ledger、backfill 和 backup 不回灌 deleted human id。验证见
   `docs/testing-progress.md` 2026-06-14 Domain TFU-20260614-016 no-CI
   修复记录；按用户要求未跑 CI、未推送、未最终纯复审。
+- Progress: 2026-06-24 refreshed local validation:
+  `scripts/test-simulator.sh -only-testing:OhanaTests/PhysicalDeletionServiceTests`
+  PASS（12 tests，iPhone 17 simulator）。本次覆盖
+  `deleteHumanScrubsExecutorFromRetainedPetFactsAndLedgers`，包括 retained active
+  pet facts、matching care/coconut ledger、`CareLedgerBackfillService.backfill`
+  和 backup projection 均不得回灌 deleted human id。仍未 push/CI/fresh pure
+  review，所以保持 Open。
 
 ### TFU-20260614-015 - Clear shared-care child references when deleting a human executor
 
-- Status: Open - local repair implemented; pending no-CI follow-up validation,
-  push/CI, and final pure review before close.
+- Status: Open - local repair and refreshed validation verified; pending push/CI
+  and final pure review before close.
 - Priority: P1
 - Area: Domain / Physical Deletion / Shared Care / Member Lifecycle
 - Source task: Domain first-release local physical deletion cascade pure
@@ -381,6 +492,14 @@ actionable; long-term product ideas belong in planning docs instead.
   child executor metadata 收敛到 survivor。实现拆入
   `PhysicalDeletionService+SharedCareScrubbing.swift`，避免增长 oversized
   baseline 文件。按用户要求未跑/触发 CI，Domain 不得标 🏁。
+- Progress: 2026-06-24 refreshed local validation:
+  `scripts/test-simulator.sh -only-testing:OhanaTests/PhysicalDeletionServiceTests`
+  PASS（12 tests，iPhone 17 simulator）。本次覆盖
+  `deleteHumanDetachesSharedCareChildrenWhenOnlyExecutorSessionIsRemoved` 与
+  `deleteHumanScrubsSharedCareChildrenWhenSessionKeepsOtherExecutors`：唯一
+  executor session 删除时 child facts 保留但清 `sharedSessionId` / executor；
+  多 executor session 保留时 child facts 与 session executor set 一致收敛到
+  survivor。仍未 push/CI/fresh pure review，所以保持 Open。
 - Close condition: 新红测先失败后修绿；`PhysicalDeletionServiceTests`、
   `SharedPetActionRecorderTests`、`HomeCommandExecutorTests`、derived-state
   lifecycle audit、fixture tests、module exit gate、push 和 CI 全绿；随后
@@ -487,8 +606,8 @@ actionable; long-term product ideas belong in planning docs instead.
 
 ### TFU-20260614-012 - Rebuild feeding stock reminders on CloudSync remote deletes
 
-- Status: Open (repair implemented locally; superseded by TFU-20260614-013 for
-  remaining review P1)
+- Status: Done (original gap repaired locally; later review P1 is tracked by
+  TFU-20260614-013)
 - Priority: P1
 - Area: Domain / CloudSync / Feeding / Stock Reminders / Delete Dispatch
 - Source task: Domain CloudSync delete-dispatch repair follow-up pure
@@ -523,11 +642,14 @@ actionable; long-term product ideas belong in planning docs instead.
   CloudSync tests and changed-file gates passed. Follow-up pure adversarial
   review found two remaining Gacha/Shop CloudSync/delete lifecycle P1s, now
   tracked separately in TFU-20260614-013. Domain remains 🟢.
+- Closed: 2026-06-24 stale tracker correction. The original TFU-012 behavior is
+  fixed and covered by the recorded CloudSync tests; the remaining active
+  CloudSync/Gacha/Shop P1 is intentionally counted once under TFU-20260614-013.
 
 ### TFU-20260614-011 - Close remaining Domain CloudSync delete dispatch gaps
 
-- Status: Open (repair implemented locally; superseded by TFU-20260614-012 for
-  remaining review P1)
+- Status: Done (original gap repaired locally; later review P1 is tracked by
+  TFU-20260614-012/013)
 - Priority: P1
 - Area: Domain / CloudSync / Delete Dispatch / Notifications / SharedCare /
   CareLedger
@@ -567,10 +689,14 @@ actionable; long-term product ideas belong in planning docs instead.
   ledger and reconciling shared sessions. Follow-up pure adversarial review found
   one remaining CloudSync feeding stock-reminder derived-state gap, now tracked
   separately in TFU-20260614-012. Domain remains 🟢.
+- Closed: 2026-06-24 stale tracker correction. The original TFU-011 behavior is
+  fixed and covered by the recorded CloudSync / PhysicalDeletion /
+  SharedCare / notification / CareLedger tests; the successor risks are counted
+  under TFU-20260614-012/013 rather than duplicated here.
 
 ### TFU-20260614-010 - Close Domain CloudSync remote-delete side effects
 
-- Status: Open
+- Status: Done
 - Priority: P1
 - Area: Domain / CloudSync / Physical Deletion / Wallet / CareLedger
 - Source task: Domain fresh pure adversarial review after `f5cc637c8`; Codex
@@ -610,7 +736,8 @@ actionable; long-term product ideas belong in planning docs instead.
 
 ### TFU-20260614-009 - Close Domain current-code pure-review P1s before maturity
 
-- Status: Open (repair implemented locally; awaiting CI and fresh pure review)
+- Status: Done (original repair verified locally; successor risks are tracked
+  by TFU-20260614-010 through TFU-20260614-014)
 - Priority: P1
 - Area: Domain / Care Derivation / Physical Deletion / Wallet / CloudSync /
   CareLedger
@@ -668,6 +795,11 @@ actionable; long-term product ideas belong in planning docs instead.
   confirmed the local care chokepoint / shared / reminder / physical-deletion /
   wallet targeted suites pass, but found new CloudSync remote-delete P1s tracked
   separately in TFU-20260614-010. Domain remains 🟢 and cannot be marked 🏁.
+- Closed: 2026-06-24 stale tracker correction. The original TFU-009 P1/P2
+  repair set was implemented and locally validated; the later pure-review
+  findings are successor risks and are already counted by TFU-20260614-010
+  through TFU-20260614-014. This item is closed to avoid double-counting the
+  same Domain maturity chain while the active successor P1s remain visible.
 
 ### TFU-20260614-008 - Repair pre-existing CI architecture-boundary gate
 
@@ -703,7 +835,7 @@ actionable; long-term product ideas belong in planning docs instead.
 
 ### TFU-20260614-006 - Close Economy pure-review P1 leftovers before maturity
 
-- Status: Open
+- Status: Done
 - Priority: P1
 - Area: Economy / Shared Feed / Planned Catch-up / Insurance Expense Ledger /
   Test Gate
@@ -753,6 +885,17 @@ actionable; long-term product ideas belong in planning docs instead.
   `scripts/tests/run-audit-fixture-tests.sh`、相关 targeted simulator suite、
   `git diff --check` 与 module exit gate 通过；再开全新纯对抗复审，P0/P1=0 后
   Economy 才可标 🏁。
+- Closed: 2026-06-24 stale tracker correction. Current implementation routes
+  Insurance auto-payment and reimbursement expense creation through
+  `ExpenseCommandService.recordPetExpense(... awardsReward: false)` rather than
+  naked `PetExpenseLog` writes; `InsuranceExpenseLedgerTests` directly cover
+  auto payments, approved claim creation, and claim-status approval idempotency.
+  Verification refreshed with
+  `scripts/test-simulator.sh -only-testing:OhanaTests/InsuranceExpenseLedgerTests`
+  PASS（3 tests，iPhone 17 simulator）。Historical closure evidence remains in
+  `docs/testing-progress.md`: Economy final pure review after `92133da2a` found
+  P0=0 / P1=0 / P2=0, `scripts/module-exit-gate.sh` PASS, and CI run
+  `27505314629` green.
 
 ### TFU-20260614-005 - Split planned catch-up fact date from reward operation date
 
@@ -1057,7 +1200,7 @@ actionable; long-term product ideas belong in planning docs instead.
 
 ### TFU-20260613-014 - Close remaining Economy no-op leaks after TFU-013
 
-- Status: Open
+- Status: Done
 - Priority: P1
 - Area: Economy / Feeding / Calendar / Today Focus / Walks / Health / Medication /
   DashboardRecords / Audit Guardrails
@@ -1113,10 +1256,16 @@ actionable; long-term product ideas belong in planning docs instead.
   `scripts/tests/run-audit-fixture-tests.sh` PASS,
   `scripts/dev-check-changed.sh` PASS, `git diff --check` PASS. This was not the
   required fresh pure adversarial review; TFU remains Open and Economy stays 🟢.
+- Closed: 2026-06-24 stale tracker correction. Later Economy final review and
+  CI evidence in `docs/testing-progress.md` show this no-op leak family was
+  superseded by the 2026-06-14 Economy P0=0 / P1=0 / P2=0 closure. Refreshed
+  local validation:
+  `scripts/test-simulator.sh -only-testing:OhanaTests/CareCompletionChokepointCharacterizationTests -only-testing:OhanaTests/CareDerivationExecutorSuccessCharacterizationTests -only-testing:OhanaTests/RecurringFindingsRepairTests -only-testing:OhanaTests/ReminderActionCoordinatorTests -only-testing:OhanaTests/CatCareCommandTests`
+  PASS（58 tests，iPhone 17 simulator）。
 
 ### TFU-20260613-013 - Propagate Economy fact no-op to care command layers
 
-- Status: Open
+- Status: Done
 - Priority: P1
 - Area: Economy / QuickCare / Feeding / Frozen Lifecycle / Command Side Effects
 - Source task: Economy repair follow-up re-review after TFU-20260613-012 implementation,
@@ -1154,10 +1303,16 @@ actionable; long-term product ideas belong in planning docs instead.
   `scripts/tests/run-audit-fixture-tests.sh`, `scripts/dev-check-changed.sh`,
   `git diff --check`, and `scripts/module-exit-gate.sh` PASS. Still requires a
   fresh pure adversarial re-review before this TFU can close / Economy can be 🏁.
+- Closed: 2026-06-24 stale tracker correction. Later Economy final review and
+  CI evidence in `docs/testing-progress.md` show this command-layer no-op family
+  was superseded by the 2026-06-14 Economy P0=0 / P1=0 / P2=0 closure.
+  Refreshed local validation:
+  `scripts/test-simulator.sh -only-testing:OhanaTests/CareCompletionChokepointCharacterizationTests -only-testing:OhanaTests/CareDerivationExecutorSuccessCharacterizationTests -only-testing:OhanaTests/RecurringFindingsRepairTests -only-testing:OhanaTests/ReminderActionCoordinatorTests -only-testing:OhanaTests/CatCareCommandTests`
+  PASS（58 tests，iPhone 17 simulator）。
 
 ### TFU-20260613-012 - Repair post-7845db4c7 Economy hard-gate review findings
 
-- Status: Open
+- Status: Done
 - Priority: P1
 - Area: Economy / Care Completion / Frozen Lifecycle / Audit Guardrails
 - Source task: Economy pure adversarial re-review after `7845db4c7`, 2026-06-13
@@ -1193,6 +1348,12 @@ actionable; long-term product ideas belong in planning docs instead.
   CoreSimulatorService `connection refused` after targeted simulator suites had passed;
   rerun module gate when CoreSimulator is available, then open a fresh pure re-review
   before closing this TFU / marking Economy 🏁.
+- Closed: 2026-06-24 stale tracker correction. Later Economy final review and
+  CI evidence in `docs/testing-progress.md` show this hard-gate family was
+  superseded by the 2026-06-14 Economy P0=0 / P1=0 / P2=0 closure. Refreshed
+  local validation:
+  `scripts/test-simulator.sh -only-testing:OhanaTests/CareCompletionChokepointCharacterizationTests -only-testing:OhanaTests/CareDerivationExecutorSuccessCharacterizationTests -only-testing:OhanaTests/RecurringFindingsRepairTests -only-testing:OhanaTests/ReminderActionCoordinatorTests -only-testing:OhanaTests/CatCareCommandTests`
+  PASS（58 tests，iPhone 17 simulator）。
 
 ### TFU-20260613-011 - Repair post-chokepoint Economy P1 findings
 
@@ -1228,7 +1389,7 @@ actionable; long-term product ideas belong in planning docs instead.
 
 ### TFU-20260613-010 - Re-audit expense-logging coconut reward (farm-risk)
 
-- Status: Open
+- Status: Done
 - Priority: P2
 - Area: Economy / Reward Policy
 - Source task: Care-completion chokepoint plan review, 2026-06-13
@@ -1242,38 +1403,42 @@ actionable; long-term product ideas belong in planning docs instead.
 
 ### TFU-20260613-009 - Burn down recurring-findings audit baseline debt
 
-- Status: Open
+- Status: Done
 - Priority: P1
 - Area: Governance / Economy Boundaries / Derived State Lifecycle
 - Source task: Recurring findings audit mechanization, 2026-06-13
-- Blocker: `docs/governance/manifests/recurring-findings-audit-baseline.json`
-  intentionally registers existing full-repo recurring-findings debt so the new
-  audits can enter CI without blocking unrelated work. Current baseline:
-  `economy-boundaries` has 0 warnings;
-  `derived-state-lifecycle` has 63 warnings across 56 files
-  (`derived-state-lifecycle-checklist`: 50,
-  `physical-delete-without-tombstone`: 13). The ratchet blocks new or increased
-  debt but does not by itself fix the existing files.
+- Blocker: Resolved. `docs/governance/manifests/recurring-findings-audit-baseline.json`
+  now records a zero-warning baseline for both recurring-findings audits.
 - Progress: 2026-06-13 TFU repair round burned down the Economy executor
   baseline from 5 to 0, removed the owned Calendar / CatCare physical-delete
   baseline warnings, and added service-layer tombstones for the PetCare /
-  Hygiene / DashboardRecords `CareLedgerEvent` delete paths. The remaining 63
-  derived-state warnings are still unowned baseline debt and require future
-  module repair or explicitly approved allow comments before this TFU can close.
+  Hygiene / DashboardRecords `CareLedgerEvent` delete paths. At that point, the
+  remaining 63 derived-state warnings were still unowned baseline debt and
+  required future module repair or explicitly approved allow comments before
+  this TFU could close.
   Second 2026-06-13 repair round closed the owned Economy / GAP-2 P1 findings
   from the second adversarial review: Calendar / Today Focus / notification care
   completion now enters the care fact + reward pipeline, Calendar occurrence
   undo writes reversal / tombstone facts, CarePlan / Feeding / Water plan deletes
   write upload-pipeline tombstones, and SymptomLog / HeatCycleLog now direct
   delete with tombstones while PetHealthLog remains recoverable.
-- Next step: During Economy, RecycleBin, and Phase 7 module repair/review rounds,
-  resolve the owned baseline warnings as real behavior fixes or approved local
-  exceptions, then refresh the baseline downward with the matching audit command
-  only after review.
-- Close when: Both `scripts/audit-economy-boundaries.sh --all` and
-  `scripts/audit-derived-state-lifecycle.sh --all` pass with a zero baseline, or
-  every remaining warning has an explicit approved allow comment and the
-  manifest records no unowned recurring-findings debt.
+- Progress: 2026-06-24 final cleanup removed the remaining derived-state
+  baseline debt without approved allow comments: the audit no longer misclassifies
+  pure `delete` command enum cases or route/UI command-executor triggers as
+  physical deletes, FamilyTasks delegated deletes remain covered by
+  `DomainMemberFactWriter.deleteFamilyTask`, Hygiene / Calendar physical deletes
+  remain covered inside their command/service boundaries, and
+  `EconomyDailyBudgetStore.pruneOldUsageEvents` now writes a
+  `EconomyBudgetUsageEvent` CloudSync tombstone before pruning old rows.
+- Closed: 2026-06-24. Verification: `scripts/tests/run-audit-fixture-tests.sh`
+  PASS; `scripts/audit-derived-state-lifecycle.sh --all` PASS (846 files);
+  `scripts/audit-economy-boundaries.sh --all` PASS (846 files);
+  `scripts/audit-derived-state-lifecycle.sh --update-baseline` refreshed
+  `docs/governance/manifests/recurring-findings-audit-baseline.json` to
+  `economy-boundaries = 0` and `derived-state-lifecycle = 0`;
+  `scripts/test-simulator.sh -only-testing:OhanaTests/HomeCommandExecutorTests`
+  PASS (183 tests, iPhone 17 simulator, xcresult
+  `/var/folders/9j/7ldcxzn91d947mg4p_7wxmz40000gn/T/OhanaDerivedData/main-b6cf423d5931-tests/Logs/Test/Test-Ohana-2026.06.24_01-58-46-+0200.xcresult`).
 
 ### TFU-20260613-008 - Green architecture boundary audit or refresh ratchet baseline
 
@@ -1358,7 +1523,7 @@ actionable; long-term product ideas belong in planning docs instead.
 
 ### TFU-20260613-005 - Add V68/V69 recycle-bin migration coverage
 
-- Status: Open
+- Status: Done
 - Priority: P2
 - Area: Models / Migration / Recycle Bin
 - Source task: RecycleBin adversarial P1 remediation, 2026-06-13
@@ -1502,7 +1667,8 @@ actionable; long-term product ideas belong in planning docs instead.
 
 ### TFU-20260612-019 - Enforce human memorial read-only boundaries
 
-- Status: Open
+- Status: Open - local command/UI boundary evidence verified; pending broader
+  gate, push/CI, and fresh pure review before close.
 - Priority: P1
 - Area: Members / Memorial / Command Boundaries
 - Source task: Members Phase 6 remediation, 2026-06-12
@@ -1512,6 +1678,20 @@ actionable; long-term product ideas belong in planning docs instead.
   focused route/command pass to avoid changing memorial behavior by accident.
 - Next step: Define the allowed actions for deceased humans, then enforce the
   read-only boundary in Members routes and command services with focused tests.
+- Progress: 2026-06-24 current worktree shows the Members side of this boundary
+  has been implemented locally: `HumanLifecycleDangerZone` is shared by full
+  detail and basic-info surfaces, human mark/undo passed-away actions route
+  through `MemberLifecycleCommandService`, profile edits route through
+  `MemberProfileCommandService.updateHuman` and `MemberLifecycleGate`, and
+  privacy/passcode/settings/presentation/economy writes are denied for deceased
+  humans. Verification: `scripts/test-simulator.sh
+  -only-testing:OhanaTests/MemberLifecycleGateTests` PASS (50 tests, iPhone 17
+  simulator), including `deceasedCareAndProfileEditDenyWrites`,
+  `deceasedHumanNoteWithReminderWritesMemorialContentOnly`, and
+  `deceasedMembersRejectPresentationSecurityEconomyAndSettingsWrites`.
+  Destructive deletion remains an explicit lifecycle/data-removal action rather
+  than a profile/privacy mutation, so this TFU still waits for the broader close
+  gates below.
 - Close when: Deceased human profiles cannot be mutated through Members edit /
   privacy / destructive paths unless the action is explicitly allowed, and the
   UI copy matches the command behavior.
@@ -1533,14 +1713,16 @@ actionable; long-term product ideas belong in planning docs instead.
 
 ### TFU-20260612-017 - Validate GAP-9 memorial mode on real UI and device notifications
 
-- Status: Open
+- Status: Open - standard Ohana device signing with Push/iCloud entitlements verified; real-device memorial notification/UI behavior still unverified
 - Priority: P1
 - Area: Memorial / Notifications / Release Validation
 - Source task: GAP-9 memorial exit, 2026-06-12
 - Blocker: Repository tests prove data retention, active-flow filtering, undo
-  restoration, and reward freeze invariants, but they cannot fully prove real
-  iOS notification cancellation / rescheduling behavior or the final visible
-  memorial experience across a real device data set.
+  restoration, and reward freeze invariants, and 2026-06-24 standard `Ohana`
+  Debug device signing now proves the paid-team Push/iCloud entitlement path
+  builds for `Guanchen's iPhone`. It still cannot prove real iOS notification
+  cancellation / rescheduling behavior or the final visible memorial experience
+  across a real device data set.
 - Next step: Run the GAP-9 manual checklist in
   `docs/planning/gap-acceptance-track-list.md#gap-9-离世退场`, especially
   marking/undoing a pet, checking notification cancellation and restoration,
@@ -1549,17 +1731,28 @@ actionable; long-term product ideas belong in planning docs instead.
 - Close when: The GAP-9 track list's manual section is checked off on a real
   device and any device-specific notification or UI defect is fixed or split
   into its own scoped follow-up.
+- Progress: 2026-06-24 standard `Ohana` Debug physical UI smoke moved past the
+  old Personal Team blocker: `Ohana.app` and `OhanaUITests-Runner.app` both
+  built/signed for iPhoneOS under `Apple Development: guanchen.li.119@gmail.com
+  (62Y338Q9SK)`, and the app entitlements still contain `aps-environment =
+  development` plus `iCloud.com.guanchen.li.Ohana`. XCTest launch did not start
+  because Xcode preflight reported `Unlock Guanchen's iPhone to Continue`; the
+  run was cancelled after waiting. This proves the paid-team standard scheme can
+  reach the physical UI-test runner build/sign stage, but leaves GAP-9 real UI
+  and notification cancellation/restoration unverified.
 
 ### TFU-20260612-016 - Validate GAP-6 notification delivery on real devices
 
-- Status: Open
+- Status: Open - standard Ohana device signing with Push/iCloud entitlements verified; real notification delivery still unverified
 - Priority: P1
 - Area: Notifications / Release Validation
 - Source task: GAP-6 notification classification, 2026-06-12
 - Blocker: Repository tests and simulator UI tests can prove scheduling policy,
-  ledger visibility, and routing compile paths, but they cannot prove real iOS
-  notification delivery, banners, permission prompts, Focus/DND interaction, or
-  notification action behavior on physical devices.
+  ledger visibility, and routing compile paths, and 2026-06-24 standard `Ohana`
+  Debug device signing now proves the paid-team Push/iCloud entitlement path
+  builds for `Guanchen's iPhone`. They still cannot prove real iOS notification
+  delivery, banners, permission prompts, Focus/DND interaction, or notification
+  action behavior on physical devices.
 - Next step: Run the GAP-6 manual checklist in
   `docs/planning/gap-acceptance-track-list.md#gap-6-通知分级` on a real device
   with notification permission enabled, including routine budget, quiet-hours
@@ -1568,6 +1761,14 @@ actionable; long-term product ideas belong in planning docs instead.
 - Close when: The GAP-6 track list's manual section is checked off on a real
   device and any device-specific delivery or routing defect is either fixed or
   recorded as its own scoped follow-up.
+- Progress: 2026-06-24 standard `Ohana` Debug physical UI smoke moved past the
+  old Personal Team blocker: `Ohana.app` and `OhanaUITests-Runner.app` both
+  built/signed for iPhoneOS, with app entitlements containing
+  `aps-environment = development` and `iCloud.com.guanchen.li.Ohana`. XCTest
+  launch did not start because Xcode preflight reported `Unlock Guanchen's
+  iPhone to Continue`; the run was cancelled after waiting. This does not prove
+  notification permission prompts, delivery, Focus/DND, banners, or notification
+  actions, so GAP-6 stays Open.
 
 ### TFU-20260611-001 - App Store Connect privacy setup
 
@@ -1658,13 +1859,14 @@ actionable; long-term product ideas belong in planning docs instead.
   history, `QuickPottyDetailSheet` owned potty/litter history, and
   `QuickWaterDetailSheet` water/change/filter history now read from
   `CareLedgerEvent` snapshots. `IslandFoodDashboard` feeding summaries and
-  trends also read from `CareLedgerEvent`; its old `PetCareLog` input remains a
-  stock-calculator compatibility source because food-kind/stock consumption
-  semantics have not yet moved fully into ledger metadata. QuickFeed full
+  trends now receive pure `FoodLedgerEntry` values after the route container
+  immediately projects bounded `CareLedgerEvent` rows; its old `PetCareLog`
+  input remains a stock-calculator compatibility source because food-kind/stock
+  consumption semantics have not yet moved fully into ledger metadata. QuickFeed full
   history, plan-calendar auto occurrence state, overview, mode-history, and
-  treat overview snapshots now aggregate `CareLedgerEvent` entries, with
-  `PetCareLog` retained only as a legacy bridge for food-kind/treat-kind
-  enrichment and edit/delete affordances. Home expanded human expense preview
+  treat overview snapshots now receive pure `QuickFeedLedgerEntry` values;
+  route-scoped/event-fetch helpers still use `PetCareLog` only as a legacy
+  bridge for food-kind/treat-kind enrichment and edit/delete affordances. Home expanded human expense preview
   now reads lightweight `CareLedgerEvent` snapshots instead of direct
   `PetExpenseLog` rows, and Home expanded pet feed quick-action completion,
   count, attention, and menu policy now read lightweight feeding ledger
@@ -1687,9 +1889,10 @@ actionable; long-term product ideas belong in planning docs instead.
   snapshots instead of `pet.hygieneLogs`; Home groom command duplicate
   prevention also reads bounded `CareLedgerEvent` hygiene rows and only
   publishes a home mutation when a new hygiene fact is recorded. Feed
-  anti-repeat checks in Home and QuickFeed detail now use feeding
-  `CareLedgerEvent` snapshots instead of `pet.careLogs`, preserving actor-name
-  warnings without depending on the legacy relationship array.
+  anti-repeat checks in Home use feeding `CareLedgerEvent` snapshots, while
+  QuickFeed detail uses `QuickFeedLedgerEntry` values instead of `pet.careLogs`,
+  preserving actor-name warnings without depending on the legacy relationship
+  array.
   `IslandPottyDashboard` now aggregates potty rhythm, type counts, 10-day pulse,
   and per-pet summaries from potty `CareLedgerEvent` entries instead of
   `pet.pottyLogs`. Home `VerticalSolidHomeSourceState`, `HomeReadModelStore`,
@@ -1702,26 +1905,303 @@ actionable; long-term product ideas belong in planning docs instead.
   generating care-plan and family-level play quests, including event-scoped
   feed/water completion checks and actor-aware routine subtitles when ledger
   actor data is available.
-  Legacy logs remain only as delete/claim/stock/typed-metric compatibility
-  bridges where old commands or calculators still require the original model.
+  Legacy logs remain only as action-time single-id edit/delete,
+  claim/stock/typed-metric compatibility bridges where old commands or
+  calculators still require the original model.
   Remaining fallback branches in Today Focus still read legacy relationship
   arrays only when no ledger-entry snapshot has been supplied.
-- Next step: Move remaining moment expanded quick-action consumers, feeding
-  stock calculators, and command/delete/claim compatibility paths off direct
+- Next step: Move remaining feeding stock historical bridges and
+  claim/typed-metric compatibility paths off direct
   `PetCareLog`, `PetPottyLog`, `PetWalkLog`, and `PetExpenseLog` queries where
   `CareLedgerEvent` has enough structured metadata, then cover each migrated
   surface with targeted tests. Reason not completed in the same round: feeding
-  stock calculators still need legacy food-kind/stock metadata until that data
+  stock calculators still need historical stock semantics until that data
   is represented structurally in ledger metadata; Today Focus still retains
   legacy relationship-array fallbacks for compatibility when a caller has not
   supplied ledger snapshots; hygiene delete/detail compatibility still needs
-  the original `PetHygieneLog` record for explicit user deletion; moment/photo
-  status is a separate media-history read path rather than a CareLedgerEvent
-  surface, so it needs its own scoped migration and tests.
+  the original `PetHygieneLog` record for explicit user deletion.
 - Current task disposition: Accepted follow-up for future migration scope. The
   current care-maturity remediation is complete because remaining direct legacy
   reads are either explicit compatibility bridges or cross-surface migrations
   documented here with exact next steps and close conditions.
+- Progress: 2026-06-24 tightened the Hygiene detail render path. Added
+  `PetHygieneLedgerEntry` as the route-local value projection for hygiene
+  ledger rows; `PetHygieneDetailView` now maps `CareLedgerEvent` objects in the
+  data container and passes `[PetHygieneLedgerEntry]` into
+  `PetHygieneDetailContentView`, so the content body no longer filters
+  SwiftData ledger objects while rendering. The remaining `PetHygieneLog`
+  input is still limited to explicit delete compatibility when a ledger entry
+  carries a legacy log id. Guard added:
+  `HomeExpensePreviewStoreTests.petHygieneDetailEntriesFilterSortAndKeepLegacyDeleteId`.
+  Validation: `scripts/test-simulator.sh
+  -only-testing:OhanaTests/HomeExpensePreviewStoreTests` PASS (9 tests, iPhone
+  17 simulator).
+- Progress: 2026-06-24 tightened the QuickPlay detail render path. Added
+  `QuickPlayLedgerEntry` as the route-local value projection for play care
+  ledger rows; `QuickPlayRouteData` now maps `CareLedgerEvent` objects during
+  route-scoped load and passes `[QuickPlayLedgerEntry]` into
+  `QuickPlayDetailSheet`, so the sheet no longer filters SwiftData ledger
+  objects during body evaluation. The remaining `PetCareLog` input is still
+  limited to explicit delete compatibility when a ledger entry carries a
+  legacy log id. Guard added:
+  `HomeExpensePreviewStoreTests.quickPlayDetailEntriesFilterSortAndKeepLegacyDeleteId`.
+  Validation: `scripts/test-simulator.sh
+  -only-testing:OhanaTests/HomeExpensePreviewStoreTests` PASS (10 tests,
+  iPhone 17 simulator).
+- Progress: 2026-06-24 tightened the QuickWater detail render path. Added
+  `QuickWaterLedgerEntry.entries(from:petID:)` and moved watering/change/filter
+  ledger projection into `QuickWaterRouteData`; `QuickWaterDetailSheet` and
+  `QuickWaterRenderSnapshot` now receive `[QuickWaterLedgerEntry]` instead of
+  `[CareLedgerEvent]`, so the sheet render/refresh path no longer filters
+  SwiftData ledger objects. The remaining `PetCareLog` input is still limited
+  to explicit delete compatibility when a ledger entry carries a legacy log id.
+  Guard added:
+  `HomeExpensePreviewStoreTests.quickWaterDetailEntriesFilterSortClampAndKeepLegacyDeleteId`.
+  Validation: `scripts/test-simulator.sh
+  -only-testing:OhanaTests/HomeExpensePreviewStoreTests` PASS (11 tests,
+  iPhone 17 simulator).
+- Progress: 2026-06-24 tightened the QuickPotty detail render path. Added
+  `PoopPottyLedgerEntry.entries(from:petID:)` and
+  `PoopLitterLedgerEntry.entries(from:petID:)`; `QuickPottyRouteData` now maps
+  potty and litter `CareLedgerEvent` rows during route-scoped load and passes
+  `[PoopPottyLedgerEntry]` / `[PoopLitterLedgerEntry]` into
+  `QuickPottyDetailSheet`, so the sheet no longer filters SwiftData ledger
+  objects during body evaluation. Unknown shared potty claim remains a
+  route/action compatibility bridge through `PetPottyLog`; explicit delete
+  still uses `PetPottyLog` / `PetCareLog` only when a ledger entry carries a
+  legacy log id. Guards added:
+  `HomeExpensePreviewStoreTests.quickPottyDetailEntriesFilterSortAndKeepLegacyDeleteId`
+  and `quickPottyLitterEntriesFilterSortAndKeepLegacyDeleteId`. Validation:
+	  `scripts/test-simulator.sh -only-testing:OhanaTests/HomeExpensePreviewStoreTests`
+	  PASS (13 tests, iPhone 17 simulator).
+- Progress: 2026-06-24 tightened the QuickFeed detail snapshot path. Added
+  source/actor metadata to `QuickFeedLedgerEntry`, moved route-scoped
+  `CareLedgerEvent` projection into `QuickFeedRouteData` /
+  `QuickFeedCommandExecutor.fullFeedingLedgerEntries`, and changed
+  `QuickFeedDetailSheet`, `QuickFeedDataController`,
+  `QuickFeedOverviewSnapshotStore`, `QuickFeedTreatSnapshotStore`, and
+  `QuickFeedPlanCalendarSnapshotStore` to receive `[QuickFeedLedgerEntry]`
+  instead of `[CareLedgerEvent]`. The plan-calendar auto completion marker now
+  carries `autoLedgerEntry` rather than a SwiftData event object, and QuickFeed
+  anti-repeat uses entry actor IDs. Remaining `PetCareLog` inputs are still
+  limited to food-kind/treat-kind enrichment, stock calculators, and explicit
+  edit/delete compatibility. Guards updated:
+  `QuickFeedOverviewSnapshotStoreTests`,
+  `QuickFeedPlanCalendarSnapshotStoreTests`,
+  `QuickFeedTreatSnapshotStoreTests`, and `QuickFeedDataControllerTests`.
+  Validation: `scripts/test-simulator.sh
+  -only-testing:OhanaTests/QuickFeedOverviewSnapshotStoreTests
+  -only-testing:OhanaTests/QuickFeedPlanCalendarSnapshotStoreTests
+  -only-testing:OhanaTests/QuickFeedTreatSnapshotStoreTests
+  -only-testing:OhanaTests/QuickFeedDataControllerTests` PASS (9 tests, iPhone
+  17 simulator).
+- Progress: 2026-06-24 tightened the IslandFoodDashboard feeding summary path.
+  Added `FoodLedgerEntry.entries(from:)`, moved feeding `CareLedgerEvent`
+  projection into `IslandFoodDashboardRouteData`, and changed
+  `IslandFoodDashboardSnapshot.build`, snapshot revisions, and
+  `IslandFoodDashboardContentView` to receive `[FoodLedgerEntry]` instead of
+  `[CareLedgerEvent]`. The route container may still fetch bounded ledger events
+  to build the value list, and `PetCareLog` remains a stock-calculator
+  compatibility input. Guard added:
+  `IslandFoodDashboardSnapshotStoreTests.foodLedgerEntriesFilterSortAndClampInvalidRows`.
+  Validation: `scripts/test-simulator.sh
+  -only-testing:OhanaTests/IslandFoodDashboardSnapshotStoreTests` PASS (3 tests,
+  iPhone 17 simulator, xcresult
+  `/var/folders/9j/7ldcxzn91d947mg4p_7wxmz40000gn/T/OhanaDerivedData/main-b6cf423d5931-tests/Logs/Test/Test-Ohana-2026.06.24_02-44-22-+0200.xcresult`).
+- Progress: 2026-06-24 tightened the IslandHygieneDashboard render path. Added
+  `HygieneDashboardLedgerEntry.entries(from:)`, moved hygiene/maintenance
+  `CareLedgerEvent` projection into `IslandHygieneDashboard`, and changed
+  `IslandHygieneDashboardContentView` to receive `[HygieneDashboardLedgerEntry]`
+  instead of `[CareLedgerEvent]`. The content view no longer imports SwiftData
+  or filters SwiftData ledger objects while rendering cross-pet hygiene counts,
+  trend points, and recent action titles. Guard added:
+  `HomeExpensePreviewStoreTests.islandHygieneDashboardEntriesFilterSortAndKeepCareMaintenanceRows`.
+  Validation: `scripts/test-simulator.sh
+  -only-testing:OhanaTests/HomeExpensePreviewStoreTests` PASS (14 Swift Testing
+  tests, iPhone 17 simulator; xcresult
+  `/var/folders/9j/7ldcxzn91d947mg4p_7wxmz40000gn/T/OhanaDerivedData/main-b6cf423d5931-tests/Logs/Test/Test-Ohana-2026.06.24_03-31-38-+0200.xcresult`).
+- Progress: 2026-06-24 tightened the Home expanded moment quick-action status
+  path. Added `HomePetMomentQuickActionEntry`, actor-side bounded
+  `PetPhotoLog` projection, and `VerticalSolidHomeSourceState.petMomentEntries`;
+  `ExpandedQuickActionLogic.countText` now renders moment status from read-model
+  values and no longer reads `pet.photoLogs` while building Home interaction
+  state. The photo/moment quick action and history sheets remain user-click
+  route paths. Guard added:
+  `HomeExpensePreviewStoreTests.expandedMomentQuickActionUsesReadModelEntriesInsteadOfPetRelationshipLogs`.
+  Validation: `scripts/test-simulator.sh
+  -only-testing:OhanaTests/HomeExpensePreviewStoreTests` PASS (15 Swift Testing
+  tests, iPhone 17 simulator; xcresult
+	  `/var/folders/9j/7ldcxzn91d947mg4p_7wxmz40000gn/T/OhanaDerivedData/main-b6cf423d5931-tests/Logs/Test/Test-Ohana-2026.06.24_03-38-08-+0200.xcresult`);
+	  `scripts/test-simulator.sh -only-testing:OhanaTests/HomeReadModelStoreTests`
+	  PASS (8 Swift Testing tests, iPhone 17 simulator; xcresult
+	  `/var/folders/9j/7ldcxzn91d947mg4p_7wxmz40000gn/T/OhanaDerivedData/main-b6cf423d5931-tests/Logs/Test/Test-Ohana-2026.06.24_03-41-10-+0200.xcresult`).
+- Progress: 2026-06-24 tightened the Today Focus read-model fallback boundary.
+  `IslandQuestEngine.todayQuests` now distinguishes "no ledger snapshot supplied"
+  from "an empty ledger snapshot was supplied"; Home `TodayFocusSnapshot` and
+  `TodayFocusEconomyService` mark their `careLedgerEntries` as authoritative, so
+  empty read-model snapshots no longer fall back to `pet.careLogs`,
+  `pet.walkLogs`, or `pet.pottyLogs` for care-plan completion, family-level play
+  suppression, or routine actor subtitles. The legacy default remains available
+  for direct compatibility calls that do not supply a ledger snapshot. Guard
+  added: `OhanaTests.islandQuestEngineTreatsEmptyReadModelLedgerAsAuthoritative`.
+  Validation: first `scripts/test-simulator.sh -only-testing:OhanaTests/OhanaTests`
+  run exposed an outdated daily-completion fixture that inserted only
+  `PetCareLog`; the fixture now inserts matching `CareLedgerEvent`, and the
+  rerun PASSed (138 Swift Testing tests, iPhone 17 simulator; xcresult
+  `/var/folders/9j/7ldcxzn91d947mg4p_7wxmz40000gn/T/OhanaDerivedData/main-b6cf423d5931-tests/Logs/Test/Test-Ohana-2026.06.24_03-49-41-+0200.xcresult`).
+- Progress: 2026-06-24 tightened the QuickFeed detail row render boundary.
+  `QuickFeedDetailContent+FeedRows` no longer exposes a
+  `feedLogRow(_ log: PetCareLog, ...)` overload, and the old
+  `feedLogBadge(for log: PetCareLog)` helper was removed. QuickFeed history,
+  mode-history, overview, auto-feed, and treat rows therefore render through
+  `QuickFeedLedgerEntry`; legacy `PetCareLog` remains only for explicit
+  edit/delete compatibility and stock-calculator logic. Guard added:
+  `QuickFeedDataControllerTests.quickFeedRenderRowsDoNotAcceptLegacyCareLogModels`.
+  Validation: first targeted run exposed a test helper variable shadowing issue;
+  after renaming it, `scripts/test-simulator.sh
+  -only-testing:OhanaTests/QuickFeedDataControllerTests` PASSed (3 Swift
+  Testing tests, iPhone 17 simulator; xcresult
+  `/var/folders/9j/7ldcxzn91d947mg4p_7wxmz40000gn/T/OhanaDerivedData/main-b6cf423d5931-tests/Logs/Test/Test-Ohana-2026.06.24_03-56-55-+0200.xcresult`).
+- Progress: 2026-06-24 tightened the QuickFeed Home visible-progress read
+  model. `FeedHomeSnapshotInput` now accepts authoritative
+  `[QuickFeedLedgerEntry]` values; `FeedHomeSnapshotBuilder` uses those entries
+  for today's dry/wet/treat totals, treat count, auto-feed count/latest date,
+  and the guided seven-day main-food chart, while retaining `PetCareLog` only for
+  stock-calculator compatibility and legacy callers that do not provide ledger
+  entries. QuickFeed passes `observedFeedingLedgerEntries` into this input, and
+  the feed-home snapshot revision now tracks ledger-entry changes separately
+  from legacy stock logs. Guards added:
+  `QuickFeedOverviewSnapshotStoreTests.feedHomeSnapshotUsesLedgerEntriesForVisibleProgress`
+  and `feedHomeSnapshotTreatsEmptyLedgerEntriesAsAuthoritative`. Validation:
+  first targeted run exposed an accidental `feedingLedgerEntries` argument on the
+  stock snapshot builder; after removing that miswire,
+  `scripts/test-simulator.sh
+  -only-testing:OhanaTests/QuickFeedOverviewSnapshotStoreTests` PASSed (4 Swift
+  Testing tests, iPhone 17 simulator; xcresult
+  `/var/folders/9j/7ldcxzn91d947mg4p_7wxmz40000gn/T/OhanaDerivedData/main-b6cf423d5931-tests/Logs/Test/Test-Ohana-2026.06.24_04-00-23-+0200.xcresult`).
+  Post-check: `git diff --check` PASS; `scripts/dev-check-changed.sh` PASS;
+  combined `scripts/test-simulator.sh
+  -only-testing:OhanaTests/QuickFeedDataControllerTests
+  -only-testing:OhanaTests/QuickFeedOverviewSnapshotStoreTests` PASSed (7 Swift
+  Testing tests, iPhone 17 simulator; xcresult
+  `/var/folders/9j/7ldcxzn91d947mg4p_7wxmz40000gn/T/OhanaDerivedData/main-b6cf423d5931-tests/Logs/Test/Test-Ohana-2026.06.24_04-02-59-+0200.xcresult`).
+- Progress: 2026-06-24 removed Home feed quick-command routing's legacy
+  `PetCareLog` fetch. `HomeCommandExecutor` no longer fetches recent
+  `PetCareLog` rows before every quick-care command, and
+  `ExpandedQuickActionExecutor` / `ExpandedQuickActionLogic` no longer pass
+  `allFeedCareLogs` just to decide manual/manual-reminder/auto feed behavior.
+  The command path now uses feed rules and reminder state for routing while
+  keeping food records for actual stock-affecting writes and CareLedger for
+  anti-repeat checks. Guard added:
+  `HomeCommandExecutorTests.homeFeedQuickCommandDoesNotFetchLegacyCareLogsForRouting`.
+  Validation: `scripts/test-simulator.sh
+  -only-testing:OhanaTests/HomeCommandExecutorTests` PASSed (184 Swift Testing
+  tests, iPhone 17 simulator; xcresult
+  `/var/folders/9j/7ldcxzn91d947mg4p_7wxmz40000gn/T/OhanaDerivedData/main-b6cf423d5931-tests/Logs/Test/Test-Ohana-2026.06.24_04-06-24-+0200.xcresult`).
+- Progress: 2026-06-24 removed the default `pet.careLogs` relationship fallback
+  from `FeedTodayState` and `FeedingDashboardState`. `careLogs` is now an
+  explicit array that defaults to empty, and tests that intentionally exercise
+  legacy log compatibility must pass fetched logs themselves. This keeps default
+  feed state construction from touching SwiftData relationship arrays while
+  retaining narrow compatibility for stock and legacy assertions. Guard added:
+  `QuickFeedDataControllerTests.feedTodayStateDoesNotFallbackToPetCareLogRelationship`.
+  Validation: `scripts/test-simulator.sh
+  -only-testing:OhanaTests/QuickFeedDataControllerTests
+  -only-testing:OhanaTests/OhanaTests` PASSed (142 Swift Testing tests, iPhone
+  17 simulator; xcresult
+  `/var/folders/9j/7ldcxzn91d947mg4p_7wxmz40000gn/T/OhanaDerivedData/main-b6cf423d5931-tests/Logs/Test/Test-Ohana-2026.06.24_23-34-03-+0200.xcresult`).
+- Progress: 2026-06-24 tightened Home water-cycle read-model boundaries.
+  `WaterCareCycleStatusCalculator` and `CarePlanOverdueStatusCalculator` now
+  accept an explicit `WaterCareCycleLogSnapshot`; Home card badges and expanded
+  quick-action attention/count text build that snapshot from
+  `HomeCareQuickActionEntry` values. Empty Home read-model entries are therefore
+  authoritative and no longer fall back to `pet.careLogs` for water-change /
+  filter-cycle status while rendering Home. Guards added:
+  `HomeExpensePreviewStoreTests.expandedWaterCycleUsesReadModelEntriesInsteadOfPetCareLogRelationship`
+  and
+  `HomeSnapshotBuilderTests.snapshotWaterCycleStatusUsesReadModelEntriesInsteadOfPetCareLogRelationship`.
+  Validation: `scripts/test-simulator.sh
+  -only-testing:OhanaTests/HomeExpensePreviewStoreTests
+  -only-testing:OhanaTests/HomeSnapshotBuilderTests` PASSed (37 Swift Testing
+  tests, iPhone 17 simulator; xcresult
+  `/var/folders/9j/7ldcxzn91d947mg4p_7wxmz40000gn/T/OhanaDerivedData/main-b6cf423d5931-tests/Logs/Test/Test-Ohana-2026.06.24_23-44-26-+0200.xcresult`).
+- Progress: 2026-06-24 moved auto-feeder materialization dedup off the
+  `pet.careLogs` relationship. `FeedAutoLogMaterializer` now builds existing
+  auto-feed keys from a pet-scoped `CareLedgerEvent` fetch; new and backfilled
+  ledger rows preserve `autoFeedDedupKey` in metadata, and backfill restores
+  `sourceEventId` from structured legacy keys so startup backfill can protect
+  old logs before auto materialization runs. Guards added:
+  `ManualFeedCommandTests.autoFeedMaterializerUsesLedgerKeysInsteadOfPetCareLogRelationship`,
+  `ManualFeedCommandTests.careLedgerBackfillPreservesStructuredAutoFeedDedupKey`,
+  and the existing auto-feed idempotency test now asserts ledger metadata.
+  Validation: `scripts/test-simulator.sh
+  -only-testing:OhanaTests/ManualFeedCommandTests
+  -only-testing:OhanaTests/QuickFeedOverviewSnapshotStoreTests
+  -only-testing:OhanaTests/QuickFeedDataControllerTests
+  -only-testing:OhanaTests/QuickFeedPlanCalendarSnapshotStoreTests` PASSed
+  (32 Swift Testing tests, iPhone 17 simulator; xcresult
+  `/var/folders/9j/7ldcxzn91d947mg4p_7wxmz40000gn/T/OhanaDerivedData/main-b6cf423d5931-tests/Logs/Test/Test-Ohana-2026.06.24_23-52-10-+0200.xcresult`).
+- Progress: 2026-06-25 removed the remaining implicit `pet.careLogs`
+  fallback from the feeding stock calculator boundary. `FeedStockCalculator`
+  now treats `careLogs` as an explicit value input, `FeedingPlanWriter`
+  performs a pet-scoped stock-log fetch before rebuilding stock reminders, and
+  `Pet` stock convenience properties no longer scan `careLogs` to discover
+  shared feeding sessions. `IslandFoodDashboardSnapshotStore` also computes
+  legacy precise-stock fallback from its explicit `legacyStockCareLogs` input
+  instead of `pet.remainingFoodGrams`. Guard extended:
+  `QuickFeedDataControllerTests.feedTodayStateDoesNotFallbackToPetCareLogRelationship`.
+  The shared-care stock tests now assert structured shared-session deduction via
+  explicit stock snapshots; the shared litter reward fixture was also made to
+  pass live care-event dependencies so the suite no longer depends on a global
+  AppServices registry side effect. Validation: `scripts/test-simulator.sh
+  -only-testing:OhanaTests/QuickFeedDataControllerTests
+  -only-testing:OhanaTests/OhanaTests` PASSed (142 Swift Testing tests, iPhone
+  17 simulator; xcresult
+  `/var/folders/9j/7ldcxzn91d947mg4p_7wxmz40000gn/T/OhanaDerivedData/main-b6cf423d5931-tests/Logs/Test/Test-Ohana-2026.06.25_00-02-03-+0200.xcresult`);
+  `scripts/test-simulator.sh
+  -only-testing:OhanaTests/SharedPetActionRecorderTests` PASSed (25 Swift
+  Testing tests, iPhone 17 simulator; xcresult
+  `/var/folders/9j/7ldcxzn91d947mg4p_7wxmz40000gn/T/OhanaDerivedData/main-b6cf423d5931-tests/Logs/Test/Test-Ohana-2026.06.25_00-06-17-+0200.xcresult`);
+  `git diff --check` PASS; `scripts/dev-check-changed.sh` PASS (large dirty
+  worktree still reports build/targeted-test recommendations; this slice's
+  compiler surface was covered by the simulator tests above).
+- Progress: 2026-06-25 moved QuickFeed food-kind/treat-kind enrichment toward
+  structured ledger metadata. `CareLedgerMetadata` now defines
+  `feedFoodKind`, `feedTreatKind`, and `sharedSessionId`; `CareLedgerService.recordPetCare`
+  writes these fields for feeding `PetCareLog` rows without changing SwiftData
+  schema, while preserving existing reward/auto-feed metadata. `QuickFeedLedgerEntry.entries`
+  now prefers the ledger metadata for `foodKind`, `treatKind`, and
+  `sharedSessionId`, falling back to legacy `PetCareLog` or event-derived
+  food kind only for historical rows that lack metadata. Guards added:
+  `ManualFeedCommandTests.feedingCareLedgerWritesStructuredKindMetadata` and
+  `QuickFeedOverviewSnapshotStoreTests.feedingEntriesPreferLedgerMetadataForKindAndSession`.
+  Validation: `scripts/test-simulator.sh
+  -only-testing:OhanaTests/ManualFeedCommandTests
+  -only-testing:OhanaTests/QuickFeedOverviewSnapshotStoreTests
+  -only-testing:OhanaTests/QuickFeedDataControllerTests
+  -only-testing:OhanaTests/QuickFeedTreatSnapshotStoreTests
+  -only-testing:OhanaTests/QuickFeedPlanCalendarSnapshotStoreTests` PASSed (35
+  Swift Testing tests, iPhone 17 simulator; xcresult
+  `/var/folders/9j/7ldcxzn91d947mg4p_7wxmz40000gn/T/OhanaDerivedData/main-b6cf423d5931-tests/Logs/Test/Test-Ohana-2026.06.25_00-19-33-+0200.xcresult`);
+  `git diff --check` PASS; `scripts/dev-check-changed.sh` PASS (large dirty
+  worktree still reports build/targeted-test recommendations; this slice's
+  compiler surface was covered by the simulator tests above).
+- Progress: 2026-06-25 tightened QuickFeed explicit edit/delete UI state.
+  `QuickFeedAlertRoute.deleteFeedLog` and `QuickFeedDraftStore` now store only a
+  `UUID` for pending feed-log delete/edit state, and
+  `QuickFeedDetailContent+FeedRows` no longer scans `observedCareLogs` while
+  rendering each ledger row. Rows parse the ledger `legacyModelId` into an edit
+  affordance id; the actual `PetCareLog` is fetched only after the user taps
+  edit/delete via `QuickFeedCommandExecutor.feedLog(id:)`, with a missing-row
+  fallback toast. Guard extended:
+  `QuickFeedDataControllerTests.quickFeedRenderRowsDoNotAcceptLegacyCareLogModels`.
+  Validation: `git diff --check` PASS; `scripts/test-simulator.sh
+  -only-testing:OhanaTests/QuickFeedDataControllerTests
+  -only-testing:OhanaTests/QuickFeedDraftStoreTests
+  -only-testing:OhanaTests/QuickFeedOverviewSnapshotStoreTests
+  -only-testing:OhanaTests/ManualFeedCommandTests` PASSed (33 Swift Testing
+  tests, iPhone 17 simulator; xcresult
+  `/var/folders/9j/7ldcxzn91d947mg4p_7wxmz40000gn/T/OhanaDerivedData/main-b6cf423d5931-tests/Logs/Test/Test-Ohana-2026.06.25_00-26-18-+0200.xcresult`).
 - Release-bar disposition: Does not block first release. Current evidence from
   ledger-backed QuickCare/Home/Feeding/Hygiene/TodayFocus read-model tests,
   `scripts/module-exit-gate.sh --full`, release-hardening audits, and CI run
@@ -1753,7 +2233,7 @@ actionable; long-term product ideas belong in planning docs instead.
 
 ### TFU-20260612-008 - Add missing CareEventService and care command tests
 
-- Status: Open
+- Status: Done
 - Priority: P1
 - Area: Care / Tests
 - Source task: Care maturity remediation, 2026-06-12
@@ -1775,26 +2255,58 @@ actionable; long-term product ideas belong in planning docs instead.
   actor/type/date. Direct potty service coverage now proves
   `CareEventService.recordPotty` writes a `PetPottyLog`, potty ledger event,
   reward metadata, and quick-action reminder handoff with the expected
-  actor/type/date.
-- Next step: Add focused tests for the remaining `CareEventService` error and
-  service failure paths not covered by the planned-feed/planned-water chains,
-  the hygiene and potty service tests, the reopen tests, no-event tests, or the
-  existing catch-up/rejected planned-care tests.
+  actor/type/date. Planned-care lifecycle denial now directly proves a
+  passed-away pet's feed/water reminder completion returns nil and leaves care
+  facts, ledgers, reminder status/completion markers, family-task completion,
+  notification cancellation, first-meal state, and economy awards untouched.
+  Planned-care schedule-boundary denial now also directly proves an active pet
+  with a reminder/event whose schedule subject resolves to a missing human
+  returns nil and leaves care facts, ledgers, reminder status/completion
+  markers, occurrence completion, family-task completion, notification
+  cancellation, first-meal state, and economy awards untouched. Direct service
+  lifecycle denial now also covers `recordCareFact`, `recordPottyFact`,
+  `recordHygieneFact`, and `recordHealthFact` on a passed-away pet: each returns
+  no-op/zero reward and leaves care, potty, hygiene, health, ledger, economy, and
+  quick-reminder side effects empty.
+- Next step: Closed. Future care negative-path expansion should be logged as a
+  new narrower follow-up only if a concrete untested failure mode is found.
   `PetHygieneCommandService` record/delete/plan/executor coverage exists in
   `HomeCommandExecutorTests`, and the grooming overdue warning path is now
   covered in `OhanaTests`. `CatCareCommandService` now has dedicated command
   coverage for non-hygiene records and wrong-pet undo isolation.
   `QuickPottyCommandExecutor` and `QuickPottyUnknownClaimStore` now cover the
   unknown shared potty claim flow in `HomeCommandExecutorTests`.
-- Current task disposition: Accepted follow-up for future negative-path
-  expansion. The current remediation has direct coverage for the high-risk
-  success chains, no-write guard paths, catch-up rejection, reopen syncing,
-  hygiene, potty, command services, and unknown-potty claim flow; the remaining
-  tests are incremental edge/failure coverage rather than a blocker for this
-  closeout.
-- Close when: The listed services have direct behavior tests covering success,
-  edge, and migration/recovery paths instead of relying only on indirect shared
-  care tests.
+- Progress: 2026-06-24 expanded
+  `careEventServicePlannedCareDeniedByLifecycleWritesNoDerivedSideEffects` to
+  cover a second no-write failure path: active pet care fact authorization
+  succeeds, but the planned reminder's schedule subject points at a missing
+  human so schedule mutation authorization fails before any fact write. The
+  same test now asserts feed/water return nil and no `PetCareLog`,
+  `CareLedgerEvent`, reminder completion/status, event occurrence completion,
+  family-task completion, notification cancellation, first-meal state, or
+  economy award is written. Validation: `scripts/test-simulator.sh
+  -only-testing:OhanaTests/OhanaTests` PASS (135 Swift Testing tests, iPhone 17
+  simulator; xcresult
+  `/var/folders/9j/7ldcxzn91d947mg4p_7wxmz40000gn/T/OhanaDerivedData/main-b6cf423d5931-tests/Logs/Test/Test-Ohana-2026.06.24_01-49-42-+0200.xcresult`).
+- Progress: 2026-06-24 added
+  `careEventServiceDirectPetFactsDeniedByLifecycleWriteNoDerivedSideEffects`.
+  It constructs a passed-away pet with a valid executor and calls direct
+  `CareEventService` pet-fact entry points for care/litter with linked potty,
+  potty, hygiene, and health. Each path now directly proves no fact is persisted,
+  no ledger is recorded, no reward or first-meal state is produced, and no
+  quick-action reminder handoff runs. Validation: `scripts/test-simulator.sh
+  -only-testing:OhanaTests/OhanaTests` PASS (136 Swift Testing tests, iPhone 17
+  simulator; xcresult
+  `/var/folders/9j/7ldcxzn91d947mg4p_7wxmz40000gn/T/OhanaDerivedData/main-b6cf423d5931-tests/Logs/Test/Test-Ohana-2026.06.24_02-05-24-+0200.xcresult`).
+- Current task disposition: Closed. The current remediation has direct coverage for the high-risk
+  success chains, no-write guard paths, lifecycle denial, catch-up rejection,
+  schedule-boundary denial, reopen syncing, hygiene, potty, command services,
+  and unknown-potty claim flow; the remaining tests are incremental edge/failure
+  coverage rather than a blocker for this closeout.
+- Closed: 2026-06-24. The listed services now have direct behavior tests covering
+  success, edge, lifecycle-denied, schedule-boundary, catch-up rejection, command,
+  and recovery handoff paths instead of relying only on indirect shared-care
+  tests.
 
 ### TFU-20260612-009 - Harden care fetch failures and large-data reconciliation
 
@@ -2009,7 +2521,9 @@ actionable; long-term product ideas belong in planning docs instead.
 
 ### TFU-20260612-014 - Finish Domain presentation and infrastructure boundary cleanup
 
-- Status: Open
+- Status: Open - notification scheduling, generated-copy, and local
+  concrete-adapter hard gates are fixed/tested; push/CI/fresh pure review still
+  open.
 - Priority: P1
 - Area: Domain / Architecture / Localization / Notifications
 - Source task: Domain Phase 2 analysis, 2026-06-12
@@ -2017,19 +2531,130 @@ actionable; long-term product ideas belong in planning docs instead.
   than the P0 activity-cleanup/blocking-build repair. Fixing them cleanly should
   happen as a dedicated pass so adapters can move without disturbing service
   behavior.
-- Next step: Finish moving app/feature infrastructure adapters out of Domain
-  service files or invert them behind
-  Domain-owned protocols; replace Domain `SwiftUI.Color` outputs in
-  `CareLedgerStatsService` and `HealthMetricCatalog` with semantic tokens; move
-  user-visible generated titles/status text onto the localization path; and
-  make reminder notification scheduling dependency-injected instead of relying
-  on the mutable `OhanaNotifications.current` global from static service paths.
+- Next step: Push a coherent batch, inspect CI once, and run a fresh pure review
+  of the Domain architecture/localization surface. Keep notification scheduling
+  on the injected `ReminderNotificationScheduling` boundary added in the
+  2026-06-24 repair.
 - Current task disposition: Accepted P1 follow-up for Domain Phase 2. The P0
   production path violations were removed or moved behind a Domain service; the
   app/runtime adapters and Domain service SwiftUI `Color` leaks were partially
   addressed in the 2026-06-15 Domain write-kernel Phase 7 pass. The remaining
   items do not block the current module exit gate but should be resolved before
   release-hardening freeze.
+- Progress: 2026-06-24 Domain notification side-effect paths were moved off
+  direct mutable `OhanaNotifications.current` reads. Added
+  `ReminderNotificationSchedulerRegistry`, kept `OhanaNotifications` as a
+  compatibility wrapper, injected `ReminderNotificationScheduling` through
+  `ReminderCompletionService`, `CareEventServiceDependencies`,
+  `PhysicalDeletionService`, `PetActivityRecordCleanupService`, and schedule
+  dispatchers, and registered the live `NotificationManager` through
+  `AppServices`. Guard evidence: `rg -n "OhanaNotifications\\.current"
+  Ohana/Domain` found no matches; `scripts/audit-architecture-boundaries.sh
+  --all` PASS; `scripts/test-simulator.sh
+  -only-testing:OhanaTests/OhanaNotificationsSchedulingTests` PASS (12 tests,
+  iPhone 17 simulator); `git diff --check` PASS. Remaining close conditions are
+  broader than this subitem, so the TFU stays Open.
+- Progress: 2026-06-24 refreshed local architecture/localization evidence on
+  the current worktree. `rg -n "^import SwiftUI" Ohana/Domain -g '*.swift'`
+  found no Domain SwiftUI imports; `rg -n "OhanaNotifications\\.current"
+  Ohana/Domain -g '*.swift'` found no Domain direct notification singleton
+  reads; `scripts/audit-architecture-boundaries.sh --all` PASS; and
+  `scripts/audit-localization-coverage.sh` PASS. This supports the local
+  cleanup evidence but does not satisfy the remaining push/CI/fresh pure review
+  close condition, so the TFU stays Open.
+- Progress: 2026-06-24 localized the Domain backup error slice. `BackupError`
+  and `AutomaticBackupFileStoreError` now expose `localizedMessage(l:)` and use
+  `L10n.current.tr` for user-visible error descriptions instead of returning
+  hardcoded Chinese copy. Added `LocalizationTests` coverage for zh/en/de
+  backup and automatic-backup error messages. Validation:
+  `scripts/test-simulator.sh -only-testing:OhanaTests/LocalizationTests` PASS
+  (13 tests, iPhone 17 simulator). Remaining generated Domain strings such as
+  medication dose titles, overdue labels, and shared care reward titles still
+  need localization cleanup before this TFU can close.
+- Progress: 2026-06-24 localized the CarePlan calendar title slice.
+  `CarePlanCalendarSync` now generates default care-plan, breed-risk, water,
+  filter, litter, and play calendar `Event.title` values through `L10n.current`
+  instead of hardcoded Chinese title strings, while legacy cleanup still matches
+  the old Chinese aliases for existing stored events. Added
+  `OhanaTests.carePlanCalendarSyncGeneratesLocalizedDefaultTitles` to assert
+  English and German generated event titles, and pinned existing Chinese
+  care-plan assertions to `appLanguage = zh` so they no longer depend on test
+  environment language state. Validation: `scripts/test-simulator.sh
+  -only-testing:OhanaTests/OhanaTests` PASS (137 Swift Testing tests, iPhone 17
+  simulator; xcresult
+  `/var/folders/9j/7ldcxzn91d947mg4p_7wxmz40000gn/T/OhanaDerivedData/main-b6cf423d5931-tests/Logs/Test/Test-Ohana-2026.06.24_02-52-44-+0200.xcresult`).
+  Remaining generated Domain strings include overdue labels and shared-care
+  reward titles.
+- Progress: 2026-06-24 localized the PetMedicationDoseLogging generated-title
+  slice. Medication dose `Event.title`, care ledger notes that mirror the event
+  title, and the general reward title now come from `L10n.current` instead of
+  hardcoded Chinese strings. Updated
+  `HomeCommandExecutorTests.petMedicationDoseRewardUsesExecutorBudgetAndCooldownPipeline`
+  to pin `appLanguage = en` and assert the event title, ledger note, and budget
+  action key no longer use the old Chinese reward label. Validation:
+  `scripts/test-simulator.sh
+  -only-testing:OhanaTests/HomeCommandExecutorTests/petMedicationDoseRewardUsesExecutorBudgetAndCooldownPipeline()`
+  PASS (1 Swift Testing test, iPhone 17 simulator; xcresult
+  `/var/folders/9j/7ldcxzn91d947mg4p_7wxmz40000gn/T/OhanaDerivedData/main-b6cf423d5931-tests/Logs/Test/Test-Ohana-2026.06.24_03-00-31-+0200.xcresult`);
+  `scripts/audit-localization-coverage.sh` PASS; `git diff --check` PASS;
+  `scripts/dev-check-changed.sh` PASS (the build recommendation reflects the
+  broader dirty worktree; the targeted simulator test above compiled this
+  slice). Remaining generated Domain strings include overdue labels and the
+  broader infrastructure adapter cleanup.
+- Progress: 2026-06-24 localized the shared-care/reward-title slice.
+  `DomainCareRewardAction.title(pet:)` now accepts a `L10n` snapshot and routes
+  feed, water, walk, hygiene, health, expense, weight, milestone, Today Focus,
+  potty, luck suffixes, and reward quality badges through localized copy instead
+  of hardcoded Chinese strings. `QuestManager.awardAction` and
+  `awardSharedCareAction` reuse the same language snapshot when composing
+  wallet titles, shared-care pet-name lists, and human shared-care reward titles.
+  Added `LocalizationTests.domainCareRewardCopyResolvesLocalizedTitles` for
+  zh/en/de reward-title and badge coverage. Validation:
+  `scripts/test-simulator.sh -only-testing:OhanaTests/LocalizationTests` PASS
+  (14 Swift Testing tests, iPhone 17 simulator; xcresult
+  `/var/folders/9j/7ldcxzn91d947mg4p_7wxmz40000gn/T/OhanaDerivedData/main-b6cf423d5931-tests/Logs/Test/Test-Ohana-2026.06.24_03-08-35-+0200.xcresult`);
+  `scripts/audit-localization-coverage.sh` PASS; `git diff --check` PASS;
+  `scripts/dev-check-changed.sh` PASS (the build recommendation reflects the
+  broader dirty worktree; the targeted simulator test above compiled this
+  slice). Remaining generated Domain strings include overdue labels and the
+  broader infrastructure adapter cleanup.
+- Progress: 2026-06-24 localized the overdue/status generated-copy slice.
+  `CarePlanOverdueStatus` now exposes `compactText(l:)`,
+  `localizedTitle(l:)`, and `localizedOverdueText(l:)`; `WaterCareCycleStatus`
+  now exposes `compactDueText(l:)`; Home status badges, interaction snapshots,
+  and expanded quick-action overdue/due strings consume those pure localized
+  helpers instead of reading raw Chinese fallback text. Added
+  `LocalizationTests.carePlanOverdueCopyResolvesLocalizedStatus` for zh/en/de
+  overdue and water-cycle copy, and extended
+  `HomeSnapshotBuilderTests.snapshotDecoratesOverduePetStatus` to assert the
+  same Home card status can render Chinese and English from an explicit `L10n`
+  snapshot. Validation: `scripts/test-simulator.sh
+  -only-testing:OhanaTests/LocalizationTests
+  -only-testing:OhanaTests/HomeSnapshotBuilderTests` PASS (35 Swift Testing
+  tests, iPhone 17 simulator; xcresult
+  `/var/folders/9j/7ldcxzn91d947mg4p_7wxmz40000gn/T/OhanaDerivedData/main-b6cf423d5931-tests/Logs/Test/Test-Ohana-2026.06.24_03-14-26-+0200.xcresult`).
+  TFU-014 remains Open for concrete-adapter cleanup, broader generated-copy
+  review, push/CI, and fresh pure review.
+- Progress: 2026-06-24 localized the remaining Domain generated-copy slice
+  found by the broad CJK audit. Shared multi-pet reward titles, calendar
+  completion general reward titles, calendar undo wallet titles, care-ledger
+  report fallback/category titles, anti-repeat executor labels, and `EntityKind`
+  display names now resolve through explicit `L10n` helpers instead of
+  hardcoded Chinese display strings. Refreshed local adapter hard gates also
+  found no Domain/App/Feature concrete dependency violations:
+  `scripts/audit-architecture-boundaries.sh --all` PASS. Validation:
+  `scripts/test-simulator.sh -only-testing:OhanaTests/LocalizationTests` PASS
+  (16 Swift Testing tests, iPhone 17 simulator; xcresult
+  `/var/folders/9j/7ldcxzn91d947mg4p_7wxmz40000gn/T/OhanaDerivedData/main-b6cf423d5931-tests/Logs/Test/Test-Ohana-2026.06.24_03-24-53-+0200.xcresult`);
+  `scripts/test-simulator.sh
+  -only-testing:OhanaTests/SharedPetActionRecorderTests
+  -only-testing:OhanaTests/QuestManagerBatchAwardTests` PASS (34 Swift
+  Testing tests, iPhone 17 simulator; xcresult
+  `/var/folders/9j/7ldcxzn91d947mg4p_7wxmz40000gn/T/OhanaDerivedData/main-b6cf423d5931-tests/Logs/Test/Test-Ohana-2026.06.24_03-23-26-+0200.xcresult`);
+  `scripts/audit-localization-coverage.sh` PASS; `git diff --check` PASS.
+  The remaining Domain CJK hits are parser/legacy cleanup matchers or internal
+  fallback titles whose Home/status render paths now consume localized helpers.
+  TFU-014 remains Open for push/CI and fresh pure review.
 - Close when: Domain app-code contains no `import SwiftUI`, Domain services no
   longer instantiate App/Feature infrastructure concrete types directly, generated
   user-visible Domain strings are localized, and notification side effects in

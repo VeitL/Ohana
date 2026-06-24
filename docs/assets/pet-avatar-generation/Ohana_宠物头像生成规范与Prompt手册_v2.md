@@ -293,8 +293,8 @@ teal neckerchief
 | 项目 | 规范 |
 |---|---|
 | 文件格式 | PNG with alpha |
-| 正式入库画布尺寸 | `600x800` |
-| 源图目标尺寸 | 直接生成 `600x800` 竖版源图；若生成器返回尺寸略有偏差，后处理仅校正到 `600x800` |
+| 正式入库画布尺寸 | `450x600` |
+| 源图目标尺寸 | 可直接生成 `600x800` 竖版源图；正式入库前必须通过 `scripts/optimize-pet-avatar-assets.py` 校正并压缩到 `450x600` |
 | 背景 | 最终文件必须为真透明 alpha，不要纯色底、阴影底、渐变底 |
 | 主体 | 全身完整可见，头顶、耳朵、尾巴、脚掌不能裁切 |
 | 脚部 | 禁止鞋子和袜子，脚部必须是符合物种的裸露圆润毛绒脚掌 / 爪爪 |
@@ -314,7 +314,7 @@ teal neckerchief
 3. 将源图保存到 `tmp/imagegen/<breed>_sources/`，文件名后缀使用 `_chroma.png`。
 4. 用本地透明处理脚本移除色键，输出到 `tmp/imagegen/<breed>_alpha/`。
 5. 验证 alpha 源图必须为 `RGBA`，四角 alpha 为 `0`，主体 alpha bbox 高度约占画布 `92% - 98%`，且边缘没有明显色键残留。
-6. 将通过验证的 alpha 源图校正为 `600x800` RGBA PNG 后，才能复制到 `Resources/Avatars/PetAvatarAssets/`，并使用正式文件名替换旧图。禁止把 `1200x1600` 作为默认中间产物。
+6. 将通过验证的 alpha 源图先校正为 `600x800` RGBA PNG，再通过 `scripts/optimize-pet-avatar-assets.py --apply` 生成 `450x600` 正式入库文件，并使用正式文件名替换旧图。禁止把 `1200x1600` 作为默认中间产物或正式入库文件。
 7. 禁止用一张或两张底图批量调色生成整套头像；每个 `gender + coat` 组合都必须由生成模型独立渲染。
 
 透明处理建议命令：
@@ -484,9 +484,9 @@ realistic animal photo, hyper-realistic anatomy, ordinary pet photo, scary, aggr
 
 每张图生成后必须检查：
 
-- [ ] 正式入库文件是否为 `600x800` 竖版 PNG。
+- [ ] 正式入库文件是否为 `450x600` 竖版 PNG。
 - [ ] 是否为 `RGBA` 且真透明背景，四角 alpha 为 `0`，不是黑底、灰底、渐变底或棋盘格底。
-- [ ] 是否经过 `600x800` chroma key 源图生成、本地 alpha 移除、透明验证和尺寸校正后再入库。
+- [ ] 是否经过 `600x800` chroma key 源图生成、本地 alpha 移除、透明验证，并通过 `scripts/optimize-pet-avatar-assets.py` 校正到 `450x600` 后再入库。
 - [ ] 主体是否全身完整可见，耳朵、尾巴、脚掌未裁切。
 - [ ] 是否完全没有鞋子、袜子、靴子、拖鞋、凉鞋或鞋底，脚部是否为裸露圆润毛绒动物脚掌 / 爪爪。
 - [ ] 主体是否占画布高度约 `92% - 98%`，没有过多透明边距。
@@ -726,7 +726,7 @@ Keep the whole batch visually consistent, but make details different across gend
 
 | 项目 | 规范 |
 |---|---|
-| 正式入库画布尺寸 | `600x800` PNG |
+| 正式入库画布尺寸 | `450x600` PNG |
 | 背景 | 真透明 alpha，不要纯色底、阴影底、渐变底 |
 | 主体高度 | 主体 alpha bbox 高度约占画布 `92% - 98%` |
 | 上下留白 | 顶部和底部各只留约 `2% - 4%` |

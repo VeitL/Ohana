@@ -23,7 +23,6 @@ enum ExpandedQuickActionExecutor {
         pet: Pet,
         executorId: String?,
         allEvents: [Event],
-        allFeedCareLogs: [PetCareLog],
         allFoodRecords: [PetFoodRecord],
         humans: [Human],
         modelContext: ModelContext,
@@ -40,7 +39,6 @@ enum ExpandedQuickActionExecutor {
             let dashboard = ExpandedQuickActionLogic.feedDashboard(
                 for: pet,
                 allEvents: allEvents,
-                allFeedCareLogs: allFeedCareLogs,
                 now: now
             )
             switch dashboard.operatingMode {
@@ -81,7 +79,6 @@ enum ExpandedQuickActionExecutor {
         let dashboard = ExpandedQuickActionLogic.feedDashboard(
             for: pet,
             allEvents: allEvents,
-            allFeedCareLogs: allFeedCareLogs,
             now: now
         )
         let willWriteFeedLog = (dashboard.operatingMode == .manual && pet.dailyPortionGrams > 0) ||
@@ -217,7 +214,6 @@ enum ExpandedQuickActionExecutor {
         pet: Pet,
         executorId: String?,
         allEvents: [Event],
-        allFeedCareLogs: [PetCareLog],
         allFoodRecords: [PetFoodRecord],
         humans: [Human],
         modelContext: ModelContext,
@@ -242,7 +238,6 @@ enum ExpandedQuickActionExecutor {
                 pet: pet,
                 executorId: executorId,
                 allEvents: allEvents,
-                allFeedCareLogs: allFeedCareLogs,
                 allFoodRecords: allFoodRecords,
                 humans: humans,
                 modelContext: modelContext,

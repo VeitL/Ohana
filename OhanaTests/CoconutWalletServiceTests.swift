@@ -90,6 +90,39 @@ final class CoconutWalletServiceTests: XCTestCase {
         XCTAssertEqual(projection.coconutCount, 15)
     }
 
+    func testWalletProjectionPublishesWalletRevisionWithoutCommandMutation() {
+        let revisionCenter = ReadModelRevisionCenter()
+        let questManager = retainUntilProcessExit(
+            QuestManager(
+                wallet: SwiftDataCoconutWalletManager(),
+                revisions: SharedDomainRevisionPublisher(center: revisionCenter)
+            )
+        )
+        let petID = UUID()
+        let beforeHomeRevision = revisionCenter.homeRevision.value
+        let beforeWalletRevision = revisionCenter.walletProjectionRevision.value
+        let entry = CoconutLedgerEntry(
+            transactionKey: "test-wallet-projection-pet-reward",
+            accountKey: CoconutAccountKey.pet(petID),
+            ownerKind: .pet,
+            ownerId: petID.uuidString,
+            ownerName: "Miso",
+            delta: 1,
+            balanceBefore: 0,
+            balanceAfter: 1,
+            entryKind: .reward,
+            source: .careEvent,
+            title: "Pet reward",
+            emoji: "🥥"
+        )
+
+        questManager.recordWalletProjection(entries: [entry], postsRewardFeedback: false)
+
+        XCTAssertEqual(questManager.coconutCount, 1)
+        XCTAssertEqual(revisionCenter.homeRevision.value, beforeHomeRevision)
+        XCTAssertEqual(revisionCenter.walletProjectionRevision.value, beforeWalletRevision + 1)
+    }
+
     func testBootstrapPreservesMemberBalancesWhenLegacyIslandCountIsLower() throws {
         let container = try makeContainer()
         let context = ModelContext(container)

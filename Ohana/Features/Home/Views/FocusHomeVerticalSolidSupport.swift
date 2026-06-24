@@ -16,20 +16,17 @@ struct FocusHomeVerticalSolidQuickActionLayer<Content: View>: View {
     let isReady: Bool
 
     var body: some View {
-        let base = content
+        content
             .transaction { transaction in
                 transaction.animation = nil
+                transaction.disablesAnimations = true
             }
             .frame(width: width, alignment: .top)
             .frame(height: height, alignment: .top)
-            .opacity(isReady ? 1 : Double(reveal))
+            .clipShape(WalletHeroRevealShape(reveal: reveal))
+            .opacity(Double(reveal))
             .allowsHitTesting(isReady)
-
-        if isReady {
-            base
-        } else {
-            base.clipShape(WalletHeroRevealShape(reveal: reveal))
-        }
+            .accessibilityHidden(!isReady)
     }
 }
 

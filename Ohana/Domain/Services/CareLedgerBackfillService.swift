@@ -33,6 +33,7 @@ nonisolated enum CareLedgerBackfillService {
             operation: "fetch pet care logs"
         ) { log in
             guard try shouldBackfill("PetCareLog", log.id.uuidString) else { return }
+            let autoFeedDedupKey = log.autoFeedDedupKey.trimmingCharacters(in: .whitespacesAndNewlines)
             CareLedgerService.record(
                 occurredAt: log.date,
                 actorKind: log.executorId == nil ? .unknown : .human,
@@ -45,8 +46,14 @@ nonisolated enum CareLedgerBackfillService {
                 amountUnit: log.careType == .feeding ? "g" : (log.careType == .watering ? "ml" : ""),
                 note: log.note,
                 source: .backfill,
+                sourceEventId: autoFeedEventId(fromDedupKey: autoFeedDedupKey),
                 legacyModelName: "PetCareLog",
                 legacyModelId: log.id.uuidString,
+                metadataJSON: CareLedgerMetadata.addingString(
+                    CareLedgerMetadata.autoFeedDedupKey,
+                    value: autoFeedDedupKey,
+                    to: ""
+                ),
                 context: context,
                 save: false
             )
@@ -276,6 +283,14 @@ nonisolated enum CareLedgerBackfillService {
 
     private static func key(_ model: String, _ id: String) -> String {
         "\(model):\(id)"
+    }
+
+    private static func autoFeedEventId(fromDedupKey key: String) -> String? {
+        let trimmed = key.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let eventId = trimmed.split(separator: ":", maxSplits: 1).first,
+              UUID(uuidString: String(eventId)) != nil
+        else { return nil }
+        return String(eventId)
     }
 
     private static func forEachSourceBatch<T: PersistentModel>(

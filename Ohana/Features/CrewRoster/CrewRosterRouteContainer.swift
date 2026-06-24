@@ -10,6 +10,8 @@ struct CrewRosterOverlayRouteContainer: View {
     let initialMode: CrewRosterMode
     let onSelectPet: (Pet) -> Void
     let onSelectHuman: (Human) -> Void
+    var onInlinePetSaved: (Pet) -> Void = { _ in }
+    var onInlineHumanSaved: (Human) -> Void = { _ in }
     var onAddEntity: ((EntityType) -> Void)?
     var onClose: (() -> Void)?
     var hideToolbar: Bool = false
@@ -29,6 +31,8 @@ struct CrewRosterOverlayRouteContainer: View {
             familyTasks: routeData.familyTasks,
             onSelectPet: onSelectPet,
             onSelectHuman: onSelectHuman,
+            onInlinePetSaved: onInlinePetSaved,
+            onInlineHumanSaved: onInlineHumanSaved,
             onAddEntity: onAddEntity,
             onClose: onClose,
             hideToolbar: hideToolbar,

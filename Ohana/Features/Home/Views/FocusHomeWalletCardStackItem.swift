@@ -34,7 +34,6 @@ struct FocusHomeWalletCardStackItem<Content: View, PulseOverlay: View, BurstOver
     let onCollapsedLongPress: (_ currentOffsetY: CGFloat) -> Void
     let onCollapsedDragChanged: (_ translationY: CGFloat) -> Void
     let onCollapsedDragEnded: (_ translationY: CGFloat) -> Void
-    let onHeroLongPress: () -> Void
     @ViewBuilder let content: () -> Content
     @ViewBuilder let pulseOverlay: () -> PulseOverlay
     @ViewBuilder let burstOverlay: () -> BurstOverlay
@@ -71,7 +70,6 @@ struct FocusHomeWalletCardStackItem<Content: View, PulseOverlay: View, BurstOver
                 onCollapsedLongPress: onCollapsedLongPress,
                 onCollapsedDragChanged: onCollapsedDragChanged,
                 onCollapsedDragEnded: onCollapsedDragEnded,
-                onHeroLongPress: onHeroLongPress,
                 contextMenuContent: contextMenuContent
             )
         )
@@ -126,7 +124,7 @@ struct FocusHomeWalletCardStackItem<Content: View, PulseOverlay: View, BurstOver
     }
 
     private var accessibilityHint: String {
-        if isHero { return "点击返回首页，长按进入基本信息" }
+        if isHero { return "点击返回首页" }
         if isExpanded { return "点击返回首页" }
         return isReorderModeActive ? "拖动调整排序，点击退出排序" : "点击展开查看，长按进入排序"
     }
@@ -183,7 +181,6 @@ private struct FocusHomeWalletCardInteractionModifier<MenuContent: View>: ViewMo
     let onCollapsedLongPress: (_ currentOffsetY: CGFloat) -> Void
     let onCollapsedDragChanged: (_ translationY: CGFloat) -> Void
     let onCollapsedDragEnded: (_ translationY: CGFloat) -> Void
-    let onHeroLongPress: () -> Void
     @ViewBuilder let contextMenuContent: () -> MenuContent
 
     func body(content: Content) -> some View {
@@ -202,9 +199,6 @@ private struct FocusHomeWalletCardInteractionModifier<MenuContent: View>: ViewMo
                 view.highPriorityGesture(TapGesture().onEnded { onTap() })
                     .simultaneousGesture(collapsedLongPressGesture)
                     .simultaneousGesture(collapsedDragGesture)
-            }
-            .if(isHero && isExpanded && !isInteractiveWalkCard) { view in
-                view.onLongPressGesture(minimumDuration: 0.45, perform: onHeroLongPress)
             }
     }
 

@@ -42,7 +42,10 @@ final class QuestManager: CoconutProjectionManaging {
     func replaceCoconutProjection(count: Int, logs: [CoconutLogEntry]) {
         coconutCount = max(0, count)
         coconutLogs = Array(logs.prefix(200))
-        publishCoconutProjectionRevision(note: "questManager.coconutProjection.replace")
+        publishCoconutProjectionRevision(
+            note: "questManager.coconutProjection.replace",
+            affectedEntityIDs: []
+        )
     }
 
     func recordWalletProjection(entries: [CoconutLedgerEntry], postsRewardFeedback: Bool) {
@@ -68,7 +71,10 @@ final class QuestManager: CoconutProjectionManaging {
                 publishCoconutRewardFeedback(for: entry)
             }
         }
-        publishCoconutProjectionRevision(note: "questManager.walletProjection")
+        publishCoconutProjectionRevision(
+            note: "questManager.walletProjection",
+            affectedEntityIDs: affectedWalletEntityIDs(from: entries)
+        )
     }
 
     // MARK: - Constants
@@ -242,6 +248,10 @@ final class QuestManager: CoconutProjectionManaging {
 
     var completedCount: Int {
         [isPetWizardCompleted, isFirstMealRecorded, isThemeColorSet].count(where: { $0 })
+    }
+
+    private func affectedWalletEntityIDs(from entries: [CoconutLedgerEntry]) -> Set<UUID> {
+        Set(entries.compactMap { UUID(uuidString: $0.ownerId) })
     }
 
     var totalQuestCount: Int { 3 }

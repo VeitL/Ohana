@@ -24,9 +24,8 @@ struct QuickFeedTreatSnapshot {
     let lastAnyDate: Date?
 
     static func build(
-        pet: Pet,
-        feedingLedgerEvents: [CareLedgerEvent],
-        legacyCareLogs: [PetCareLog],
+        pet _: Pet,
+        feedingLedgerEntries: [QuickFeedLedgerEntry],
         range: FeedOverviewRange,
         selectedKind: FeedTreatKind?,
         now: Date,
@@ -37,12 +36,7 @@ struct QuickFeedTreatSnapshot {
         let dates = (0 ..< range.days).reversed().compactMap { offset in
             calendar.date(byAdding: .day, value: -offset, to: today)
         }
-        let logs = QuickFeedOverviewSnapshot
-            .feedingEntries(
-                pet: pet,
-                feedingLedgerEvents: feedingLedgerEvents,
-                legacyCareLogs: legacyCareLogs
-            )
+        let logs = feedingLedgerEntries
             .filter { $0.source == .treat && $0.date >= startDate }
             .sorted { $0.date > $1.date }
         let filtered = selectedKind.map { kind in
@@ -96,7 +90,6 @@ struct QuickFeedTreatSnapshot {
 
 struct QuickFeedTreatSnapshotRevision: Equatable {
     let feedingLedgerRevision: Int
-    let legacyCareLogBridgeRevision: Int
     let petRevision: Int
     let rangeRawValue: String
     let selectedKindRawValue: String
@@ -104,26 +97,22 @@ struct QuickFeedTreatSnapshotRevision: Equatable {
 
     static func make(
         pet: Pet,
-        feedingLedgerEvents: [CareLedgerEvent],
-        legacyCareLogs: [PetCareLog],
+        feedingLedgerEntries: [QuickFeedLedgerEntry],
         range: FeedOverviewRange,
         selectedKind: FeedTreatKind?,
         now: Date
     ) -> QuickFeedTreatSnapshotRevision {
         QuickFeedTreatSnapshotRevision(
-            feedingLedgerRevision: revisionHash(feedingLedgerEvents.prefix(360)) { hasher, event in
-                hasher.combine(event.id)
-                hasher.combine(event.occurredAt.timeIntervalSince1970)
-                hasher.combine(event.subjectId)
-                hasher.combine(event.actionType)
-                hasher.combine(event.amountValue)
-                hasher.combine(event.note)
-                hasher.combine(event.source)
-                hasher.combine(event.legacyModelId)
-            },
-            legacyCareLogBridgeRevision: revisionHash(legacyCareLogs.prefix(360)) { hasher, log in
-                hasher.combine(log.id)
-                hasher.combine(log.treatKindRaw)
+            feedingLedgerRevision: revisionHash(feedingLedgerEntries.prefix(360)) { hasher, entry in
+                hasher.combine(entry.id)
+                hasher.combine(entry.petId)
+                hasher.combine(entry.date.timeIntervalSince1970)
+                hasher.combine(entry.amountGrams)
+                hasher.combine(entry.note)
+                hasher.combine(entry.source.rawValue)
+                hasher.combine(entry.foodKind.rawValue)
+                hasher.combine(entry.treatKind?.rawValue)
+                hasher.combine(entry.legacyModelId)
             },
             petRevision: revisionHash([pet]) { hasher, pet in
                 hasher.combine(pet.id)
@@ -160,8 +149,7 @@ final class QuickFeedTreatSnapshotStore: ObservableObject {
 
     func rebuild(
         pet: Pet,
-        feedingLedgerEvents: [CareLedgerEvent],
-        legacyCareLogs: [PetCareLog],
+        feedingLedgerEntries: [QuickFeedLedgerEntry],
         range: FeedOverviewRange,
         selectedKind: FeedTreatKind?,
         now: Date,
@@ -169,8 +157,7 @@ final class QuickFeedTreatSnapshotStore: ObservableObject {
     ) {
         let nextRevision = QuickFeedTreatSnapshotRevision.make(
             pet: pet,
-            feedingLedgerEvents: feedingLedgerEvents,
-            legacyCareLogs: legacyCareLogs,
+            feedingLedgerEntries: feedingLedgerEntries,
             range: range,
             selectedKind: selectedKind,
             now: now
@@ -178,8 +165,7 @@ final class QuickFeedTreatSnapshotStore: ObservableObject {
         guard force || nextRevision != revision else { return }
         snapshot = QuickFeedTreatSnapshot.build(
             pet: pet,
-            feedingLedgerEvents: feedingLedgerEvents,
-            legacyCareLogs: legacyCareLogs,
+            feedingLedgerEntries: feedingLedgerEntries,
             range: range,
             selectedKind: selectedKind,
             now: now

@@ -16,7 +16,32 @@ nonisolated struct CarePlanOverdueStatus: Equatable {
     let eventId: UUID?
 
     var compactText: String {
-        daysOverdue > 0 ? "逾期\(daysOverdue)天" : "逾期"
+        compactText(l: .current)
+    }
+
+    func compactText(l: L10n = .current) -> String {
+        daysOverdue > 0
+            ? l.tr(zh: "逾期\(daysOverdue)天", en: "\(daysOverdue)d overdue", de: "\(daysOverdue) T. überfällig")
+            : l.tr(zh: "逾期", en: "Overdue", de: "Überfällig")
+    }
+
+    func localizedTitle(l: L10n = .current) -> String {
+        CarePlanOverdueStatusCopy.title(for: actionType, fallback: title, l: l)
+    }
+
+    func localizedOverdueText(l: L10n = .current) -> String {
+        let localizedTitle = localizedTitle(l: l)
+        return daysOverdue > 0
+            ? l.tr(
+                zh: "\(localizedTitle)逾期\(daysOverdue)天",
+                en: "\(localizedTitle) \(daysOverdue)d overdue",
+                de: "\(localizedTitle) \(daysOverdue) T. überfällig"
+            )
+            : l.tr(
+                zh: "\(localizedTitle)逾期",
+                en: "\(localizedTitle) overdue",
+                de: "\(localizedTitle) überfällig"
+            )
     }
 
     var signature: String {
@@ -26,14 +51,72 @@ nonisolated struct CarePlanOverdueStatus: Equatable {
     }
 }
 
+private enum CarePlanOverdueStatusCopy {
+    static func title(for actionType: String, fallback: String, l: L10n) -> String {
+        switch actionType {
+        case "feed":
+            l.tr(zh: "喂食", en: "Feeding", de: "Fütterung")
+        case "water":
+            l.tr(zh: "喂水", en: "Water", de: "Wasser")
+        case "waterChange":
+            l.tr(zh: "换水", en: "Water change", de: "Wasserwechsel")
+        case "filterClean":
+            l.tr(zh: "滤芯", en: "Filter", de: "Filter")
+        case "litter":
+            l.tr(zh: "铲屎", en: "Scoop", de: "Klo")
+        case "play":
+            l.tr(zh: "陪玩", en: "Play", de: "Spielen")
+        case "groom":
+            l.tr(zh: "护理", en: "Care", de: "Pflege")
+        case "medication", "humanMedication":
+            l.tr(zh: "用药", en: "Medication", de: "Medikament")
+        case "health", "humanHealth":
+            l.tr(zh: "健康", en: "Health", de: "Gesundheit")
+        case "insurance":
+            l.tr(zh: "保险", en: "Insurance", de: "Versicherung")
+        case "cageCleaning":
+            l.tr(zh: "清笼", en: "Cage cleaning", de: "Käfigreinigung")
+        case "freeFlight":
+            l.tr(zh: "放飞", en: "Free flight", de: "Freiflug")
+        case "misting":
+            l.tr(zh: "保湿", en: "Misting", de: "Befeuchten")
+        case "substrateChange":
+            l.tr(zh: "换垫", en: "Substrate", de: "Substrat")
+        case "humanWeight":
+            l.tr(zh: "体重", en: "Weight", de: "Gewicht")
+        case "humanWorkout":
+            l.tr(zh: "运动", en: "Workout", de: "Training")
+        case "humanExpense":
+            l.tr(zh: "花费", en: "Expense", de: "Ausgabe")
+        case "humanTask":
+            l.tr(zh: "任务", en: "Task", de: "Aufgabe")
+        case "plantWatering":
+            l.tr(zh: "浇水", en: "Watering", de: "Gießen")
+        case "plantFertilizing":
+            l.tr(zh: "施肥", en: "Fertilizing", de: "Düngen")
+        case "plantTask":
+            l.tr(zh: "植物", en: "Plant", de: "Pflanze")
+        default:
+            fallback
+        }
+    }
+}
+
 nonisolated enum CarePlanOverdueStatusCalculator {
     static func petWarning(
         for pet: Pet,
         events: [Event],
         now: Date = Date(),
-        calendar: Calendar = .current
+        calendar: Calendar = .current,
+        waterCycleLogSnapshot: WaterCareCycleLogSnapshot? = nil
     ) -> CarePlanOverdueStatus? {
-        allWarnings(for: pet, events: events, now: now, calendar: calendar).first
+        allWarnings(
+            for: pet,
+            events: events,
+            now: now,
+            calendar: calendar,
+            waterCycleLogSnapshot: waterCycleLogSnapshot
+        ).first
     }
 
     static func warning(
@@ -41,10 +124,17 @@ nonisolated enum CarePlanOverdueStatusCalculator {
         pet: Pet,
         events: [Event],
         now: Date = Date(),
-        calendar: Calendar = .current
+        calendar: Calendar = .current,
+        waterCycleLogSnapshot: WaterCareCycleLogSnapshot? = nil
     ) -> CarePlanOverdueStatus? {
         let accepted = acceptedActionTypes(for: actionType)
-        return allWarnings(for: pet, events: events, now: now, calendar: calendar)
+        return allWarnings(
+            for: pet,
+            events: events,
+            now: now,
+            calendar: calendar,
+            waterCycleLogSnapshot: waterCycleLogSnapshot
+        )
             .first { accepted.contains($0.actionType) }
     }
 
@@ -52,9 +142,16 @@ nonisolated enum CarePlanOverdueStatusCalculator {
         for pet: Pet,
         events: [Event],
         now: Date = Date(),
-        calendar: Calendar = .current
+        calendar: Calendar = .current,
+        waterCycleLogSnapshot: WaterCareCycleLogSnapshot? = nil
     ) -> String {
-        petWarning(for: pet, events: events, now: now, calendar: calendar)?.signature ?? "ok"
+        petWarning(
+            for: pet,
+            events: events,
+            now: now,
+            calendar: calendar,
+            waterCycleLogSnapshot: waterCycleLogSnapshot
+        )?.signature ?? "ok"
     }
 
     static func humanWarning(
@@ -125,7 +222,8 @@ nonisolated enum CarePlanOverdueStatusCalculator {
         for pet: Pet,
         events: [Event],
         now: Date,
-        calendar: Calendar
+        calendar: Calendar,
+        waterCycleLogSnapshot: WaterCareCycleLogSnapshot? = nil
     ) -> [CarePlanOverdueStatus] {
         let feedRules = FeedRuleState(pet: pet, allEvents: events, now: now, calendar: calendar)
         let feedMode = feedRules.operatingMode
@@ -168,7 +266,12 @@ nonisolated enum CarePlanOverdueStatusCalculator {
             }
         }
 
-        return (reminderWarnings + waterCycleWarnings(for: pet, now: now, calendar: calendar))
+        return (reminderWarnings + waterCycleWarnings(
+            for: pet,
+            now: now,
+            calendar: calendar,
+            logSnapshot: waterCycleLogSnapshot
+        ))
             .sorted {
                 if $0.scheduledAt == $1.scheduledAt {
                     return $0.actionType < $1.actionType
@@ -301,27 +404,43 @@ nonisolated enum CarePlanOverdueStatusCalculator {
     private static func waterCycleWarnings(
         for pet: Pet,
         now: Date,
-        calendar: Calendar
+        calendar: Calendar,
+        logSnapshot: WaterCareCycleLogSnapshot? = nil
     ) -> [CarePlanOverdueStatus] {
         [
             cycleWarning(
                 title: "换水",
                 actionType: "waterChange",
-                status: WaterCareCycleStatusCalculator.waterChangeStatus(for: pet, now: now, calendar: calendar),
+                status: WaterCareCycleStatusCalculator.waterChangeStatus(
+                    for: pet,
+                    now: now,
+                    calendar: calendar,
+                    logSnapshot: logSnapshot
+                ),
                 now: now,
                 calendar: calendar
             ),
             cycleWarning(
                 title: "滤芯",
                 actionType: "filterClean",
-                status: WaterCareCycleStatusCalculator.filterCleanStatus(for: pet, now: now, calendar: calendar),
+                status: WaterCareCycleStatusCalculator.filterCleanStatus(
+                    for: pet,
+                    now: now,
+                    calendar: calendar,
+                    logSnapshot: logSnapshot
+                ),
                 now: now,
                 calendar: calendar
             ),
             cycleWarning(
                 title: "更换",
                 actionType: "filterClean",
-                status: WaterCareCycleStatusCalculator.filterReplaceStatus(for: pet, now: now, calendar: calendar),
+                status: WaterCareCycleStatusCalculator.filterReplaceStatus(
+                    for: pet,
+                    now: now,
+                    calendar: calendar,
+                    logSnapshot: logSnapshot
+                ),
                 now: now,
                 calendar: calendar
             )

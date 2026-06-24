@@ -335,6 +335,14 @@ private struct AppSheetRouteDestination: View {
                         onDismiss()
                         coordinator.openHuman(human.id)
                     },
+                    onInlinePetSaved: { pet in
+                        onDismiss()
+                        onPetSavedFromAddEntity(pet)
+                    },
+                    onInlineHumanSaved: { human in
+                        onDismiss()
+                        onHumanSavedFromAddEntity(human)
+                    },
                     onClose: onDismiss,
                     onPresentCoconutLog: { subject in
                         coordinator.presentCoconutLog(subject)
@@ -376,6 +384,13 @@ private struct AppSheetRouteDestination: View {
                 onMissing: onDismiss
             )
             .ohanaSheetPagePresentation()
+        case let .petWeightQuick(id):
+            AppPetDetailSheetRouteContainer(
+                id: id,
+                destination: .weightQuick,
+                onMissing: onDismiss,
+                onDismiss: onDismiss
+            )
         case let .petWeight(id):
             AppPetDetailSheetRouteContainer(
                 id: id,
@@ -383,6 +398,13 @@ private struct AppSheetRouteDestination: View {
                 onMissing: onDismiss
             )
             .ohanaSheetPagePresentation()
+        case let .petExpenseQuick(id):
+            AppPetDetailSheetRouteContainer(
+                id: id,
+                destination: .expenseQuick,
+                onMissing: onDismiss,
+                onDismiss: onDismiss
+            )
         case let .petExpense(id):
             AppPetDetailSheetRouteContainer(
                 id: id,
@@ -510,14 +532,30 @@ private struct AppSheetRouteDestination: View {
                 onMissing: onDismiss
             )
             .ohanaSheetPagePresentation()
+        case let .humanMedicationQuick(id):
+            AppHumanDetailSheetRouteContainer(
+                id: id,
+                destination: .medicationQuick,
+                onMissing: onDismiss,
+                onDismiss: onDismiss,
+                onOpenDestination: openHumanDetailDestination
+            )
         case let .humanMedication(id):
             AppHumanDetailSheetRouteContainer(
                 id: id,
                 destination: .medication,
                 onMissing: onDismiss,
+                onDismiss: onDismiss,
                 onHumanDoseTaken: onHumanDoseTaken
             )
             .ohanaSheetPagePresentation()
+        case let .humanWeightQuick(id):
+            AppHumanDetailSheetRouteContainer(
+                id: id,
+                destination: .weightQuick,
+                onMissing: onDismiss,
+                onDismiss: onDismiss
+            )
         case let .humanWeight(id):
             AppHumanDetailSheetRouteContainer(
                 id: id,
@@ -525,6 +563,13 @@ private struct AppSheetRouteDestination: View {
                 onMissing: onDismiss
             )
             .ohanaSheetPagePresentation()
+        case let .humanWorkoutQuick(id):
+            AppHumanDetailSheetRouteContainer(
+                id: id,
+                destination: .workoutQuick,
+                onMissing: onDismiss,
+                onDismiss: onDismiss
+            )
         case let .humanWorkout(id):
             AppHumanDetailSheetRouteContainer(
                 id: id,
@@ -553,6 +598,13 @@ private struct AppSheetRouteDestination: View {
                 onMissing: onDismiss
             )
             .ohanaSheetPagePresentation()
+        case let .humanExpenseQuick(id):
+            AppHumanDetailSheetRouteContainer(
+                id: id,
+                destination: .expenseQuick,
+                onMissing: onDismiss,
+                onDismiss: onDismiss
+            )
         case let .humanExpense(id):
             AppHumanDetailSheetRouteContainer(
                 id: id,
@@ -567,6 +619,13 @@ private struct AppSheetRouteDestination: View {
                 onMissing: onDismiss
             )
             .ohanaSheetPagePresentation()
+        case let .humanNoteQuick(id):
+            AppHumanDetailSheetRouteContainer(
+                id: id,
+                destination: .noteQuick,
+                onMissing: onDismiss,
+                onDismiss: onDismiss
+            )
         case let .humanNote(id):
             AppHumanDetailSheetRouteContainer(
                 id: id,
@@ -657,6 +716,42 @@ private struct AppSheetRouteDestination: View {
         case .wishlist:
             .humanWishlist(humanID)
         case .notes:
+            .humanNote(humanID)
+        }
+        presentFeatureRouteAfterTap(route)
+    }
+
+    private func openHumanDetailDestination(_ humanID: UUID, destination: AppHumanDetailSheetDestination) {
+        let route: AppSheetRoute = switch destination {
+        case .basicInfo:
+            .humanBasicInfo(humanID)
+        case .medicationQuick:
+            .humanMedicationQuick(humanID)
+        case .medication:
+            .humanMedication(humanID)
+        case .weightQuick:
+            .humanWeightQuick(humanID)
+        case .weight:
+            .humanWeight(humanID)
+        case .workoutQuick:
+            .humanWorkoutQuick(humanID)
+        case .workout:
+            .humanWorkout(humanID)
+        case .workoutDashboard:
+            .humanWorkoutDashboard(humanID)
+        case .metrics:
+            .humanMetrics(humanID)
+        case .report:
+            .humanReport(humanID)
+        case .expenseQuick:
+            .humanExpenseQuick(humanID)
+        case .expense:
+            .humanExpense(humanID)
+        case .wishlist:
+            .humanWishlist(humanID)
+        case .noteQuick:
+            .humanNoteQuick(humanID)
+        case .note:
             .humanNote(humanID)
         }
         presentFeatureRouteAfterTap(route)

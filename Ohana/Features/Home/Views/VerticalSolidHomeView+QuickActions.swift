@@ -9,28 +9,26 @@ import SwiftUI
 extension VerticalSolidHomeView {
     func openHeaderCoconutDestination() {
         if let card = headerContextCard {
-            if card.isHuman, humans.contains(where: { $0.id == card.id }) {
+            if card.isHuman, interaction.containsHuman(card.id) {
                 routeCoordinator.openCoconutLog(.human(card.id))
                 return
             }
-            if pets.contains(where: { $0.id == card.id }) {
+            if interaction.pet(id: card.id) != nil {
                 routeCoordinator.openCoconutLog(.pet(card.id))
                 return
             }
         }
-        if let human = activeHuman {
-            routeCoordinator.openCoconutLog(.human(human.id))
-        }
+        routeCoordinator.openCoconutLog(nil)
     }
 
     func openQuickActionItem(_ item: QuickActionItem, card: FocusCard, usesPrimaryAction: Bool) {
         OhanaFeedback.light()
-        if card.isHuman, let human = humans.first(where: { $0.id == card.id }) {
-            openHumanQuickActionItem(item, human: human, usesPrimaryAction: usesPrimaryAction)
+        if card.isHuman, interaction.containsHuman(card.id) {
+            openHumanQuickActionItem(item, humanID: card.id, usesPrimaryAction: usesPrimaryAction)
             return
         }
 
-        guard let pet = pets.first(where: { $0.id == card.id && !$0.hasPassedAway }) else {
+        guard let pet = interaction.activePet(id: card.id) else {
             openCard(card)
             return
         }
@@ -39,14 +37,14 @@ extension VerticalSolidHomeView {
 
     func openQuickActionOption(_ item: QuickActionItem, card: FocusCard, optionId: String) {
         guard !card.isHuman,
-              let pet = pets.first(where: { $0.id == card.id && !$0.hasPassedAway }) else {
+              interaction.activePet(id: card.id) != nil else {
             return
         }
 
         switch item.actionType {
         case "groom":
             OhanaFeedback.light()
-            let petID = pet.id
+            let petID = card.id
             enqueueHomeCommand(.quickCare(entityID: petID, action: "groom:\(optionId)")) {
                 commandExecutor.applyGroomCheckIn(
                     raw: optionId,
@@ -60,7 +58,7 @@ extension VerticalSolidHomeView {
             }
         case "potty":
             OhanaFeedback.light()
-            let petID = pet.id
+            let petID = card.id
             enqueueHomeCommand(.quickCare(entityID: petID, action: "potty:\(optionId)")) {
                 commandExecutor.applyPottyCheckIn(
                     raw: optionId,
@@ -71,7 +69,7 @@ extension VerticalSolidHomeView {
             }
         case "health":
             OhanaFeedback.light()
-            let petID = pet.id
+            let petID = card.id
             enqueueHomeCommand(.quickCare(entityID: petID, action: "health:\(optionId)")) {
                 commandExecutor.applyHealthCheckIn(
                     raw: optionId,
@@ -82,26 +80,38 @@ extension VerticalSolidHomeView {
                 )
             }
         default:
-            openPetQuickActionItem(item, pet: pet, usesPrimaryAction: true)
+            if let pet = interaction.activePet(id: card.id) {
+                openPetQuickActionItem(item, pet: pet, usesPrimaryAction: true)
+            }
         }
     }
 
-    func openPetQuickActionItem(_ item: QuickActionItem, pet: Pet, usesPrimaryAction: Bool) {
+    func openPetQuickActionItem(
+        _ item: QuickActionItem,
+        pet: HomePetInteractionSnapshot,
+        usesPrimaryAction: Bool
+    ) {
         if usesPrimaryAction {
-            switch ExpandedQuickActionLogic.petTapRoute(for: item, pet: pet) {
-            case let .perform(actionType):
-                performPetQuickAction(actionType, petID: pet.id)
-            case .waterManagement:
+            switch item.actionType {
+            case "feed", "walk", "play", "litter", "cageCleaning", "freeFlight", "misting", "substrateChange", "medication":
+                performPetQuickAction(item.actionType, petID: pet.id)
+            case "water":
+                if WaterQuickActionPolicy.isAquatic(species: pet.species) {
+                    routeCoordinator.openSheet(.petWater(pet.id))
+                } else {
+                    performPetQuickAction("water", petID: pet.id)
+                }
+            case "waterChange", "filterClean":
                 routeCoordinator.openSheet(.petWater(pet.id))
-            case .weight:
+            case "weight":
                 routeCoordinator.openSheet(.petWeightQuick(pet.id))
-            case .expense:
+            case "expense":
                 routeCoordinator.openSheet(.petExpenseQuick(pet.id))
-            case .moment:
-                routeCoordinator.openQuickMoment(pet)
-            case .health:
+            case "moment":
+                routeCoordinator.openQuickMoment(pet.id)
+            case "health":
                 routeCoordinator.openSheet(.petHealth(pet.id, initialSection: nil))
-            case .none:
+            default:
                 routeCoordinator.openSheet(.petAllFeatures(pet.id))
             }
             return
@@ -181,36 +191,35 @@ extension VerticalSolidHomeView {
         activeHumanIdRaw.isEmpty ? nil : activeHumanIdRaw
     }
 
-    func openHumanQuickActionItem(_ item: QuickActionItem, human: Human, usesPrimaryAction: Bool) {
-        let viewedBy = UUID(uuidString: activeHumanIdRaw)
-        let isLocked = appServices.privacy.isHumanQuickActionLocked(item, human: human, viewedBy: viewedBy)
+    func openHumanQuickActionItem(_ item: QuickActionItem, humanID: UUID, usesPrimaryAction: Bool) {
+        let isLocked = interaction.expandedActions(for: humanID).state(for: item).isLocked
         let route = usesPrimaryAction
             ? ExpandedQuickActionLogic.humanTapRoute(actionType: item.actionType, isLocked: isLocked)
             : ExpandedQuickActionLogic.humanLongPressRoute(actionType: item.actionType, isLocked: isLocked)
 
         switch route {
         case .weightQuick:
-            routeCoordinator.openSheet(.humanWeightQuick(human.id))
+            routeCoordinator.openSheet(.humanWeightQuick(humanID))
         case .weightDetail:
-            routeCoordinator.openSheet(.humanWeight(human.id))
+            routeCoordinator.openSheet(.humanWeight(humanID))
         case .workoutQuick:
-            routeCoordinator.openSheet(.humanWorkoutQuick(human.id))
+            routeCoordinator.openSheet(.humanWorkoutQuick(humanID))
         case .workoutDetail:
-            routeCoordinator.openSheet(.humanWorkout(human.id))
+            routeCoordinator.openSheet(.humanWorkout(humanID))
         case .medicationAdd:
-            routeCoordinator.openSheet(.humanMedicationQuick(human.id))
+            routeCoordinator.openSheet(.humanMedicationQuick(humanID))
         case .medicationDetail:
-            routeCoordinator.openSheet(.humanMedication(human.id))
+            routeCoordinator.openSheet(.humanMedication(humanID))
         case .noteQuick:
-            routeCoordinator.openSheet(.humanNoteQuick(human.id))
+            routeCoordinator.openSheet(.humanNoteQuick(humanID))
         case .noteDetail:
-            routeCoordinator.openSheet(.humanNote(human.id))
+            routeCoordinator.openSheet(.humanNote(humanID))
         case .expenseQuick:
-            routeCoordinator.openSheet(.humanExpenseQuick(human.id))
+            routeCoordinator.openSheet(.humanExpenseQuick(humanID))
         case .expenseDetail:
-            routeCoordinator.openSheet(.humanExpense(human.id))
+            routeCoordinator.openSheet(.humanExpense(humanID))
         case .allFeatures, .selectHuman:
-            routeCoordinator.openSheet(.humanAllFeatures(human.id))
+            routeCoordinator.openSheet(.humanAllFeatures(humanID))
         case .privacyAlert:
             routeCoordinator.showHumanPrivacy()
         case .none:
@@ -219,18 +228,11 @@ extension VerticalSolidHomeView {
     }
 
     func expandedFabShortcuts(for card: FocusCard) -> [ExpandedCardFabShortcut] {
-        if card.isHuman {
-            guard let human = humans.first(where: { $0.id == card.id }) else {
+        let shortcuts = interaction.expandedActions(for: card.id).fabShortcuts
+        guard !shortcuts.isEmpty else {
+            if card.isHuman {
                 return FocusHomeFabShortcutPolicy.humanShortcuts(localization: l)
             }
-            return FocusHomeFabShortcutPolicy.humanShortcuts(
-                for: human,
-                displayedItems: expandedHumanQuickActionItems(for: human),
-                localization: l
-            )
-        }
-
-        guard let pet = pets.first(where: { $0.id == card.id && !$0.hasPassedAway }) else {
             return [
                 ExpandedCardFabShortcut(
                     label: l.tr(zh: "全部功能", en: "All Features", de: "Alle Funktionen"),
@@ -239,49 +241,7 @@ extension VerticalSolidHomeView {
                 )
             ]
         }
-        return FocusHomeFabShortcutPolicy.petShortcuts(
-            for: pet,
-            displayedItems: expandedQuickActionItems(for: pet),
-            localization: l
-        )
-    }
-
-    func expandedQuickActionItems(for pet: Pet) -> [QuickActionItem] {
-        stableQuickActionItems(
-            ExpandedQuickActionStore.petItems(
-                raw: quickActionItemsRaw,
-                pet: pet,
-                localization: l,
-                waterLabel: l.homeQAWater,
-                managementLabel: waterManagementLabel
-            ),
-            entityID: pet.id,
-            kind: .pet
-        )
-    }
-
-    func expandedHumanQuickActionItems(for human: Human) -> [QuickActionItem] {
-        stableQuickActionItems(
-            ExpandedQuickActionStore.humanItems(
-                raw: quickActionItemsRaw,
-                human: human,
-                localization: l
-            ),
-            entityID: human.id,
-            kind: .human
-        )
-    }
-
-    func stableQuickActionItems(_ items: [QuickActionItem], entityID: UUID, kind: EntityKind) -> [QuickActionItem] {
-        items.map { item in
-            var stableItem = item
-            stableItem.id = "\(kind.rawValue)-\(entityID.uuidString)-\(item.actionType)"
-            return stableItem
-        }
-    }
-
-    var waterManagementLabel: String {
-        l.tr(zh: "管理", en: "Manage", de: "Verwalten")
+        return shortcuts
     }
 
     func openExpandedFabShortcut(_ shortcut: ExpandedCardFabShortcut, card: FocusCard) {
@@ -289,45 +249,34 @@ extension VerticalSolidHomeView {
         switch shortcut.action {
         case let .quick(actionType):
             GrowthNewFeatureStore.markVisited(quickActionType: actionType)
+            guard interaction.activePet(id: card.id) != nil else { return }
+            openPetQuickKey(actionType, petID: card.id)
         case let .detail(feature):
             GrowthNewFeatureStore.markVisited(feature: feature)
-        case .allFeatures, .humanQuick, .humanAllFeatures:
-            break
+            guard interaction.activePet(id: card.id) != nil else { return }
+            openPetFeature(feature, petID: card.id)
+        case .allFeatures:
+            if card.isHuman {
+                routeCoordinator.openSheet(.humanAllFeatures(card.id))
+            } else if interaction.pet(id: card.id) != nil {
+                routeCoordinator.openSheet(.petAllFeatures(card.id))
+            }
+        case let .humanQuick(actionType):
+            guard interaction.containsHuman(card.id) else { return }
+            if interaction.expandedActions(for: card.id).statesByActionType[actionType]?.isLocked == true {
+                routeCoordinator.showHumanPrivacy()
+                return
+            }
+            openHumanQuickKey(actionType, humanID: card.id)
+        case .humanAllFeatures:
+            guard interaction.containsHuman(card.id) else { return }
+            routeCoordinator.openSheet(.humanAllFeatures(card.id))
         }
-        FocusHomeExpandedFabRouter.open(
-            shortcut,
-            card: card,
-            pets: pets,
-            humans: humans,
-            activeHumanId: UUID(uuidString: activeHumanIdRaw),
-            privacy: appServices.privacy,
-            actions: FocusHomeExpandedFabRouter.Actions(
-                showPetAllFeatures: { routeCoordinator.openSheet(.petAllFeatures($0.id)) },
-                showHumanAllFeatures: { routeCoordinator.openSheet(.humanAllFeatures($0.id)) },
-                openFeed: { routeCoordinator.openSheet(.petFeed($0.id, opensManualSheet: false)) },
-                openWater: { routeCoordinator.openSheet(.petWater($0.id)) },
-                openWalk: { startWalkFromQuickAction(petID: $0.id) },
-                openWalkSummary: { routeCoordinator.openSheet(.petWalkSummary($0.id)) },
-                openPotty: { routeCoordinator.openSheet(.petPotty($0.id)) },
-                openPlay: { routeCoordinator.openSheet(.petPlay($0.id)) },
-                openMedication: { routeCoordinator.openSheet(.petMedication($0.id)) },
-                openHygiene: { routeCoordinator.openSheet(.petHygiene($0.id)) },
-                openMoment: { routeCoordinator.openQuickMoment($0) },
-                openHealth: { routeCoordinator.openSheet(.petHealth($0.id, initialSection: nil)) },
-                openWeight: { routeCoordinator.openSheet(.petWeight($0.id)) },
-                openExpense: { routeCoordinator.openSheet(.petExpense($0.id)) },
-                showHumanWeight: { routeCoordinator.openSheet(.humanWeight($0.id)) },
-                showHumanWorkout: { routeCoordinator.openSheet(.humanWorkout($0.id)) },
-                showHumanMedication: { routeCoordinator.openSheet(.humanMedication($0.id)) },
-                showHumanNote: { routeCoordinator.openSheet(.humanNote($0.id)) },
-                quickHumanExpense: { routeCoordinator.openSheet(.humanExpense($0.id)) },
-                showPrivacyAlert: { routeCoordinator.showHumanPrivacy() }
-            )
-        )
     }
 
     func startWalkFromQuickAction(petID: UUID) {
-        guard let pet = pets.first(where: { $0.id == petID && !$0.hasPassedAway }) else {
+        guard let pet = fetchPetForHomeAction(id: petID), !pet.hasPassedAway else {
+            routeCoordinator.openSheet(.petAllFeatures(petID))
             return
         }
         OhanaFeedback.medium()
@@ -336,35 +285,53 @@ extension VerticalSolidHomeView {
         walkCardPresentationRevision &+= 1
     }
 
-    func openPetQuickKey(_ key: String, pet: Pet) {
+    func fetchPetForHomeAction(id: UUID) -> Pet? {
+        var descriptor = FetchDescriptor<Pet>(
+            predicate: #Predicate<Pet> { pet in
+                pet.id == id
+            }
+        )
+        descriptor.fetchLimit = 1
+        do {
+            return try modelContext.fetch(descriptor).first // smoothness: allow action-time single-pet fetch after explicit walk quick action tap.
+        } catch {
+            OhanaLog.warning(
+                "Home action pet fetch failed: \(error.localizedDescription)",
+                category: "Home"
+            )
+            return nil
+        }
+    }
+
+    func openPetQuickKey(_ key: String, petID: UUID) {
         GrowthNewFeatureStore.markVisited(quickActionType: key)
         switch key {
         case "feed":
-            routeCoordinator.openSheet(.petFeed(pet.id, opensManualSheet: false))
+            routeCoordinator.openSheet(.petFeed(petID, opensManualSheet: false))
         case "water", "waterChange", "filterClean":
-            routeCoordinator.openSheet(.petWater(pet.id))
+            routeCoordinator.openSheet(.petWater(petID))
         case "potty":
-            routeCoordinator.openSheet(.petPotty(pet.id))
+            routeCoordinator.openSheet(.petPotty(petID))
         case "litter":
-            routeCoordinator.openSheet(.petLitter(pet.id))
+            routeCoordinator.openSheet(.petLitter(petID))
         case "walk":
-            startWalkFromQuickAction(petID: pet.id)
+            startWalkFromQuickAction(petID: petID)
         case "play":
-            routeCoordinator.openSheet(.petPlay(pet.id))
+            routeCoordinator.openSheet(.petPlay(petID))
         case "health":
-            routeCoordinator.openSheet(.petHealth(pet.id, initialSection: nil))
+            routeCoordinator.openSheet(.petHealth(petID, initialSection: nil))
         case "medication":
-            routeCoordinator.openSheet(.petMedication(pet.id))
+            routeCoordinator.openSheet(.petMedication(petID))
         case "groom", "cageCleaning", "freeFlight", "misting", "substrateChange":
-            routeCoordinator.openSheet(.petHygiene(pet.id))
+            routeCoordinator.openSheet(.petHygiene(petID))
         case "weight":
-            routeCoordinator.openSheet(.petWeight(pet.id))
+            routeCoordinator.openSheet(.petWeight(petID))
         case "expense":
-            routeCoordinator.openSheet(.petExpense(pet.id))
+            routeCoordinator.openSheet(.petExpense(petID))
         case "moment":
-            routeCoordinator.openQuickMoment(pet)
+            routeCoordinator.openQuickMoment(petID)
         default:
-            routeCoordinator.openSheet(.petAllFeatures(pet.id))
+            routeCoordinator.openSheet(.petAllFeatures(petID))
         }
     }
 
@@ -376,13 +343,13 @@ extension VerticalSolidHomeView {
     func openCalendarEventDestinationAfterDismiss(_ destination: FocusHomeReminderDestination) {
         switch destination {
         case let .petQuick(key, pet):
-            openPetQuickKey(key, pet: pet)
+            openPetQuickKey(key, petID: pet.id)
         case let .petFeature(feature, pet):
-            openPetFeature(feature, pet: pet)
+            openPetFeature(feature, petID: pet.id)
         case let .petHealth(pet, section):
             routeCoordinator.openSheet(.petHealth(pet.id, initialSection: section))
         case let .humanQuick(key, human):
-            openHumanQuickKey(key, human: human)
+            openHumanQuickKey(key, humanID: human.id)
         case let .humanDetail(human):
             routeCoordinator.openSheet(.humanBasicInfo(human.id))
         case .plant:
@@ -395,48 +362,70 @@ extension VerticalSolidHomeView {
         }
     }
 
-    func openPetFeature(_ feature: PetFeature, pet: Pet) {
-        GrowthNewFeatureStore.markVisited(feature: feature)
-        switch feature {
-        case .health:
-            routeCoordinator.openSheet(.petHealth(pet.id, initialSection: nil))
-        case .medications:
-            routeCoordinator.openSheet(.petMedication(pet.id))
-        case .food:
-            routeCoordinator.openSheet(.petFeed(pet.id, opensManualSheet: false))
-        case .hygiene:
-            routeCoordinator.openSheet(.petHygiene(pet.id))
-        case .walks:
-            routeCoordinator.openSheet(.petWalkSummary(pet.id))
-        case .potty:
-            routeCoordinator.openSheet(.petPotty(pet.id))
-        case .basicInfo:
-            routeCoordinator.openSheet(.petBasicInfo(pet.id))
-        case .moments:
-            routeCoordinator.openSheet(.petMomentHistory(pet.id))
-        case .weight:
-            routeCoordinator.openSheet(.petWeight(pet.id))
-        case .expense:
-            routeCoordinator.openSheet(.petExpense(pet.id))
-        case .retention, .documents, .achievements:
-            routeCoordinator.openSheet(.petAllFeatures(pet.id))
+    func openCalendarEventDestinationAfterDismiss(_ destination: HomeReminderRouteSnapshot) {
+        switch destination {
+        case let .petQuick(key, petID):
+            openPetQuickKey(key, petID: petID)
+        case let .petFeature(feature, petID):
+            openPetFeature(feature, petID: petID)
+        case let .petHealth(petID, section):
+            routeCoordinator.openSheet(.petHealth(petID, initialSection: section))
+        case let .humanQuick(key, humanID):
+            openHumanQuickKey(key, humanID: humanID)
+        case let .humanDetail(humanID):
+            routeCoordinator.openSheet(.humanBasicInfo(humanID))
+        case .plant:
+            AppFeatureRouteGuard.recordIntercept("homeReminderPlant")
+            openFunctionMenu(destination: .growthRoadmap)
+        case let .functionMenu(destination):
+            openFunctionMenu(destination: destination)
+        case let .calendar(entityId, humanId):
+            routeCoordinator.openCalendar(entityID: entityId, humanID: humanId)
         }
     }
 
-    func openHumanQuickKey(_ key: String, human: Human) {
+    func openPetFeature(_ feature: PetFeature, petID: UUID) {
+        GrowthNewFeatureStore.markVisited(feature: feature)
+        switch feature {
+        case .health:
+            routeCoordinator.openSheet(.petHealth(petID, initialSection: nil))
+        case .medications:
+            routeCoordinator.openSheet(.petMedication(petID))
+        case .food:
+            routeCoordinator.openSheet(.petFeed(petID, opensManualSheet: false))
+        case .hygiene:
+            routeCoordinator.openSheet(.petHygiene(petID))
+        case .walks:
+            routeCoordinator.openSheet(.petWalkSummary(petID))
+        case .potty:
+            routeCoordinator.openSheet(.petPotty(petID))
+        case .basicInfo:
+            routeCoordinator.openSheet(.petBasicInfo(petID))
+        case .moments:
+            routeCoordinator.openSheet(.petMomentHistory(petID))
+        case .weight:
+            routeCoordinator.openSheet(.petWeight(petID))
+        case .expense:
+            routeCoordinator.openSheet(.petExpense(petID))
+        case .retention, .documents, .achievements:
+            routeCoordinator.openSheet(.petAllFeatures(petID))
+        }
+    }
+
+    func openHumanQuickKey(_ key: String, humanID: UUID) {
         switch key {
         case "humanWeight":
-            routeCoordinator.openSheet(.humanWeight(human.id))
+            routeCoordinator.openSheet(.humanWeight(humanID))
         case "humanWorkout":
-            routeCoordinator.openSheet(.humanWorkout(human.id))
+            routeCoordinator.openSheet(.humanWorkout(humanID))
         case "humanMedication":
-            routeCoordinator.openSheet(.humanMedication(human.id))
+            routeCoordinator.openSheet(.humanMedication(humanID))
         case "humanExpense":
-            routeCoordinator.openSheet(.humanExpense(human.id))
+            routeCoordinator.openSheet(.humanExpense(humanID))
         case "humanNote":
-            routeCoordinator.openSheet(.humanNote(human.id))
+            routeCoordinator.openSheet(.humanNote(humanID))
         default:
-            routeCoordinator.openSheet(.humanAllFeatures(human.id))
+            routeCoordinator.openSheet(.humanAllFeatures(humanID))
         }
     }
 }

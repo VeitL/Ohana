@@ -124,7 +124,6 @@ struct HomeCommandExecutor {
         }
 
         let events = fetchQuickCareEvents(pet: pet, now: now)
-        let feedLogs = fetchRecentCareLogs(petID: petID, now: now)
         let foodRecords = fetchFoodRecords(petID: petID)
         let humans = fetchHumans()
         AppFlowPerformance.mark(
@@ -134,7 +133,6 @@ struct HomeCommandExecutor {
             note: [
                 "action": actionType,
                 "events": "\(events.count)",
-                "feedLogs": "\(feedLogs.count)",
                 "foodRecords": "\(foodRecords.count)",
                 "humans": "\(humans.count)"
             ]
@@ -145,7 +143,6 @@ struct HomeCommandExecutor {
             pet: pet,
             executorId: executorId,
             allEvents: events,
-            allFeedCareLogs: feedLogs,
             allFoodRecords: foodRecords,
             humans: humans,
             now: now,
@@ -158,7 +155,6 @@ struct HomeCommandExecutor {
                 completePlannedFeedFromFetchedState(
                     pet: plannedPet,
                     events: events,
-                    feedLogs: feedLogs,
                     foodRecords: foodRecords,
                     executorId: executorId,
                     now: now,
@@ -191,7 +187,6 @@ struct HomeCommandExecutor {
         pet: Pet,
         executorId: String?,
         allEvents: [Event],
-        allFeedCareLogs: [PetCareLog],
         allFoodRecords: [PetFoodRecord],
         humans: [Human],
         now: Date,
@@ -217,7 +212,6 @@ struct HomeCommandExecutor {
             pet: pet,
             executorId: executorId,
             allEvents: allEvents,
-            allFeedCareLogs: allFeedCareLogs,
             allFoodRecords: allFoodRecords,
             humans: humans,
             modelContext: modelContext,
@@ -234,7 +228,6 @@ struct HomeCommandExecutor {
                               actionType: actionType,
                               pet: pet,
                               allEvents: allEvents,
-                              allFeedCareLogs: allFeedCareLogs,
                               now: now
                           )
                     else { return }
@@ -277,14 +270,12 @@ struct HomeCommandExecutor {
         actionType: String,
         pet: Pet,
         allEvents: [Event],
-        allFeedCareLogs: [PetCareLog],
         now: Date
     ) -> Bool {
         guard actionType == "feed" else { return true }
         return ExpandedQuickActionLogic.feedDashboard(
             for: pet,
             allEvents: allEvents,
-            allFeedCareLogs: allFeedCareLogs,
             now: now
         ).operatingMode == .manual
     }
@@ -547,7 +538,6 @@ struct HomeCommandExecutor {
     private func completePlannedFeedFromFetchedState(
         pet: Pet,
         events: [Event],
-        feedLogs: [PetCareLog],
         foodRecords: [PetFoodRecord],
         executorId: String?,
         now: Date,
@@ -556,7 +546,6 @@ struct HomeCommandExecutor {
         guard let reminder = ExpandedQuickActionLogic.pendingFeedReminder(
             for: pet,
             allEvents: events,
-            allFeedCareLogs: feedLogs,
             now: now
         ) else {
             return false
@@ -703,24 +692,6 @@ struct HomeCommandExecutor {
             operation: "fetch quick care medication dose events"
         )
         return doseEvents.filter { medicationIDs.contains($0.relatedEntityId) }
-    }
-
-    private func fetchRecentCareLogs(petID: UUID, now: Date) -> [PetCareLog] {
-        let calendar = Calendar.current
-        let todayStart = calendar.startOfDay(for: now)
-        let since = calendar.date(byAdding: .hour, value: -3, to: todayStart) ?? todayStart
-        var descriptor = FetchDescriptor<PetCareLog>(
-            predicate: #Predicate<PetCareLog> { log in
-                log.pet?.id == petID && log.date >= since
-            },
-            sortBy: [SortDescriptor(\.date, order: .reverse)]
-        )
-        descriptor.fetchLimit = 300
-        return fetchHomeCommandModelsOrLog(
-            descriptor,
-            context: modelContext,
-            operation: "fetch recent care logs"
-        )
     }
 
     private func fetchFoodRecords(petID: UUID) -> [PetFoodRecord] {

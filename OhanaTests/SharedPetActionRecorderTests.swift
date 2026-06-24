@@ -40,13 +40,15 @@ struct SharedPetActionRecorderTests {
 
         let cleanup = isolateEconomy(activeHumanID: human.id.uuidString)
         defer { cleanup() }
+        let dependencies = CareEventServiceDependencies.live()
 
         let reward = CareEventService.recordSharedLitterCare(
             sourcePet: first,
             targets: [first, second],
             context: context,
             executorId: human.id.uuidString,
-            date: Date(timeIntervalSince1970: 1000)
+            date: Date(timeIntervalSince1970: 1000),
+            dependencies: dependencies
         )
 
         let sessions = try context.fetch(FetchDescriptor<SharedCareSession>())
@@ -655,7 +657,7 @@ struct SharedPetActionRecorderTests {
         #expect(ledgerEvents.allSatisfy { $0.note == "Ledger note" })
     }
 
-    @Test func petFoodStockConveniencePropertiesReadStructuredSharedSession() throws {
+    @Test func feedStockSnapshotReadsStructuredSharedSession() throws {
         let container = try makeContainer()
         let context = container.mainContext
         let first = Pet(name: "Milo", species: "猫")
@@ -683,11 +685,25 @@ struct SharedPetActionRecorderTests {
             context: context,
             date: Date(timeIntervalSince1970: 2200)
         )
+        let feedLogs = try context.fetch(FetchDescriptor<PetCareLog>()).filter { $0.careType == .feeding }
+        let sessions = try context.fetch(FetchDescriptor<SharedCareSession>())
+        let firstSnapshot = FeedStockCalculator.snapshot(
+            for: first,
+            careLogs: feedLogs,
+            sharedCareSessions: sessions,
+            now: Date(timeIntervalSince1970: 2300)
+        )
+        let secondSnapshot = FeedStockCalculator.snapshot(
+            for: second,
+            careLogs: feedLogs,
+            sharedCareSessions: sessions,
+            now: Date(timeIntervalSince1970: 2300)
+        )
 
-        #expect(first.remainingFoodGrams == 880)
-        #expect(first.foodConsumedSinceRestock == 120)
-        #expect(second.remainingFoodGrams == 1000)
-        #expect(second.foodConsumedSinceRestock == 0)
+        #expect(firstSnapshot.remainingGrams == 880)
+        #expect(firstSnapshot.consumedGrams == 120)
+        #expect(secondSnapshot.remainingGrams == 1000)
+        #expect(secondSnapshot.consumedGrams == 0)
     }
 
     @Test func sharedSessionFactIsMarkedForCloudSyncAndTimelineUsesSessionTotals() throws {
@@ -900,7 +916,13 @@ struct SharedPetActionRecorderTests {
         #expect(feedLogs.count == 1)
         #expect(visibleLog.pet?.id == second.id)
         #expect(FeedStockCalculator.stockDeductionAmount(for: visibleLog, pet: second, sharedCareSessions: sessions) == 0)
-        #expect(second.remainingFoodGrams == 1000)
+        let secondSnapshot = FeedStockCalculator.snapshot(
+            for: second,
+            careLogs: feedLogs,
+            sharedCareSessions: sessions,
+            now: Date(timeIntervalSince1970: 2300)
+        )
+        #expect(secondSnapshot.remainingGrams == 1000)
         #expect(petState.hasPendingLocalChanges)
         #expect(petState.isDeletionTombstone)
     }

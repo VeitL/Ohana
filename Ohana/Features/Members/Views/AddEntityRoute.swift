@@ -71,7 +71,10 @@ struct AddEntityDestinationView: View {
                 onComplete: onComplete,
                 onCancel: onComplete,
                 onHumanSaved: { human in
-                    currentActiveHumanId = human.id.uuidString
+                    currentActiveHumanId = ActiveHumanSelectionPolicy.activeHumanIdAfterCreatingHuman(
+                        currentHumanIdRaw: currentActiveHumanId,
+                        createdHumanId: human.id
+                    )
                     onHumanSaved?(human)
                 }
             )

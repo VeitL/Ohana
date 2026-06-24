@@ -11,7 +11,7 @@ struct FeedTodayState {
     let pet: Pet
     let allEvents: [Event]
     let manualGoalCount: Int
-    let careLogs: [PetCareLog]?
+    let careLogs: [PetCareLog]
     let now: Date
     let calendar: Calendar
 
@@ -19,7 +19,7 @@ struct FeedTodayState {
         pet: Pet,
         allEvents: [Event],
         manualGoalCount: Int,
-        careLogs: [PetCareLog]? = nil,
+        careLogs: [PetCareLog] = [],
         now: Date = Date(),
         calendar: Calendar = .current
     ) {
@@ -29,10 +29,6 @@ struct FeedTodayState {
         self.careLogs = careLogs
         self.now = now
         self.calendar = calendar
-    }
-
-    private var observedCareLogs: [PetCareLog] {
-        careLogs ?? pet.careLogs
     }
 
     func isPlanReminderSatisfied(_ reminder: Reminder) -> Bool {
@@ -97,9 +93,9 @@ struct FeedTodayState {
     }
 
     var manualTodayLogs: [PetCareLog] {
-        observedCareLogs
+        careLogs
             .filter {
-                (careLogs == nil || $0.pet?.id == pet.id) &&
+                $0.pet?.id == pet.id &&
                     $0.careType == .feeding &&
                     $0.isManualFeedLogEntry &&
                     calendar.isDate($0.date, inSameDayAs: now)
@@ -108,9 +104,9 @@ struct FeedTodayState {
     }
 
     var plannedTodayLogs: [PetCareLog] {
-        observedCareLogs
+        careLogs
             .filter {
-                (careLogs == nil || $0.pet?.id == pet.id) &&
+                $0.pet?.id == pet.id &&
                     $0.careType == .feeding &&
                     $0.isPlannedFeedLogEntry &&
                     calendar.isDate($0.date, inSameDayAs: now)
@@ -119,9 +115,9 @@ struct FeedTodayState {
     }
 
     var allTodayLogs: [PetCareLog] {
-        observedCareLogs
+        careLogs
             .filter {
-                (careLogs == nil || $0.pet?.id == pet.id) &&
+                $0.pet?.id == pet.id &&
                     $0.careType == .feeding &&
                     calendar.isDate($0.date, inSameDayAs: now)
             }

@@ -21,7 +21,7 @@ struct QuickFeedPlanCalendarSnapshot {
     static func build(
         manualEvents: [Event],
         autoEvents: [Event],
-        feedingLedgerEvents: [CareLedgerEvent],
+        feedingLedgerEntries: [QuickFeedLedgerEntry],
         activeMode: FeedOperatingMode,
         month: Date,
         selectedDate: Date,
@@ -39,14 +39,14 @@ struct QuickFeedPlanCalendarSnapshot {
             autoEvents: autoEvents,
             activeMode: activeMode
         )
-        let autoLedgerEventsByKey = Dictionary(
-            grouping: feedingLedgerEvents.compactMap { event -> (String, CareLedgerEvent)? in
-                guard let key = autoLedgerKey(for: event) else { return nil }
-                return (key, event)
+        let autoLedgerEntriesByKey = Dictionary(
+            grouping: feedingLedgerEntries.compactMap { entry -> (String, QuickFeedLedgerEntry)? in
+                guard let key = autoLedgerKey(for: entry) else { return nil }
+                return (key, entry)
             },
             by: \.0
         ).compactMapValues { values in
-            values.map(\.1).max { $0.occurredAt < $1.occurredAt }
+            values.map(\.1).max { $0.date < $1.date }
         }
         let reminderByKey = Dictionary(
             grouping: allReminders,
@@ -61,7 +61,7 @@ struct QuickFeedPlanCalendarSnapshot {
                 activeMode: activeMode,
                 now: now,
                 remindersByKey: reminderByKey,
-                autoLedgerEventsByKey: autoLedgerEventsByKey,
+                autoLedgerEntriesByKey: autoLedgerEntriesByKey,
                 calendar: calendar
             )
         } else {
@@ -76,7 +76,7 @@ struct QuickFeedPlanCalendarSnapshot {
             start: selectedStart,
             end: selectedEnd,
             remindersByKey: reminderByKey,
-            autoLedgerEventsByKey: autoLedgerEventsByKey,
+            autoLedgerEntriesByKey: autoLedgerEntriesByKey,
             calendar: calendar
         )
         .filter { calendar.isDate($0.date, inSameDayAs: selectedDate) }
@@ -102,7 +102,7 @@ struct QuickFeedPlanCalendarSnapshot {
         activeMode: FeedOperatingMode,
         now: Date,
         remindersByKey: [String: Reminder],
-        autoLedgerEventsByKey: [String: CareLedgerEvent],
+        autoLedgerEntriesByKey: [String: QuickFeedLedgerEntry],
         calendar: Calendar
     ) -> [FeedPlanCalendarDaySummary] {
         let monthStart = monthInterval.start
@@ -115,7 +115,7 @@ struct QuickFeedPlanCalendarSnapshot {
             start: monthStart,
             end: monthEnd,
             remindersByKey: remindersByKey,
-            autoLedgerEventsByKey: autoLedgerEventsByKey,
+            autoLedgerEntriesByKey: autoLedgerEntriesByKey,
             calendar: calendar
         )
         let occurrencesByDay = Dictionary(grouping: monthOccurrences) {
@@ -156,7 +156,7 @@ struct QuickFeedPlanCalendarSnapshot {
         start: Date,
         end: Date,
         remindersByKey: [String: Reminder],
-        autoLedgerEventsByKey: [String: CareLedgerEvent],
+        autoLedgerEntriesByKey: [String: QuickFeedLedgerEntry],
         calendar: Calendar
     ) -> [FeedPlanCalendarOccurrence] {
         events.flatMap { event in
@@ -164,10 +164,10 @@ struct QuickFeedPlanCalendarSnapshot {
                 let reminder = activeMode == .manualReminder
                     ? remindersByKey[reminderKey(eventId: event.id, scheduledAt: date)]
                     : nil
-                let autoLedgerEvent = activeMode == .autoFeeder
-                    ? autoLedgerEventsByKey[FeedLogMetadata.autoDedupKey(eventId: event.id, scheduledAt: date)]
+                let autoLedgerEntry = activeMode == .autoFeeder
+                    ? autoLedgerEntriesByKey[FeedLogMetadata.autoDedupKey(eventId: event.id, scheduledAt: date)]
                     : nil
-                return FeedPlanCalendarOccurrence(date: date, event: event, reminder: reminder, autoLedgerEvent: autoLedgerEvent)
+                return FeedPlanCalendarOccurrence(date: date, event: event, reminder: reminder, autoLedgerEntry: autoLedgerEntry)
             }
         }
     }
@@ -243,19 +243,19 @@ struct QuickFeedPlanCalendarSnapshot {
         "\(eventId?.uuidString ?? ""):\(Int(scheduledAt.timeIntervalSince1970 / 60))"
     }
 
-    private static func autoLedgerKey(for event: CareLedgerEvent) -> String? {
-        guard event.eventKindEnum == .care,
-              event.actionType == CareType.feeding.rawValue
-        else { return nil }
-        if let key = FeedLogMetadata.autoDedupKey(from: event.note) {
+    private static func autoLedgerKey(for entry: QuickFeedLedgerEntry) -> String? {
+        guard entry.source == .autoMain else { return nil }
+        if let key = CareLedgerMetadata.stringValue(named: CareLedgerMetadata.autoFeedDedupKey, in: entry.metadataJSON) {
             return key
         }
-        guard event.sourceEnum == .service,
-              event.sourceReminderId == nil,
-              let sourceEventId = event.sourceEventId,
+        if let key = FeedLogMetadata.autoDedupKey(from: entry.note) {
+            return key
+        }
+        guard entry.sourceReminderId == nil,
+              let sourceEventId = entry.sourceEventId,
               let eventId = UUID(uuidString: sourceEventId)
         else { return nil }
-        return FeedLogMetadata.autoDedupKey(eventId: eventId, scheduledAt: event.occurredAt)
+        return FeedLogMetadata.autoDedupKey(eventId: eventId, scheduledAt: entry.date)
     }
 }
 
@@ -271,7 +271,7 @@ struct QuickFeedPlanCalendarSnapshotRevision: Equatable {
     static func make(
         manualEvents: [Event],
         autoEvents: [Event],
-        feedingLedgerEvents: [CareLedgerEvent],
+        feedingLedgerEntries: [QuickFeedLedgerEntry],
         activeMode: FeedOperatingMode,
         month: Date,
         selectedDate: Date,
@@ -282,15 +282,15 @@ struct QuickFeedPlanCalendarSnapshotRevision: Equatable {
         return QuickFeedPlanCalendarSnapshotRevision(
             manualEventRevision: eventRevision(manualEvents),
             autoEventRevision: eventRevision(autoEvents),
-            feedingLedgerRevision: revisionHash(feedingLedgerEvents.prefix(360)) { hasher, event in
-                hasher.combine(event.id)
-                hasher.combine(event.occurredAt.timeIntervalSince1970)
-                hasher.combine(event.subjectId)
-                hasher.combine(event.actionType)
-                hasher.combine(event.note)
-                hasher.combine(event.source)
-                hasher.combine(event.sourceEventId)
-                hasher.combine(event.sourceReminderId)
+            feedingLedgerRevision: revisionHash(feedingLedgerEntries.prefix(360)) { hasher, entry in
+                hasher.combine(entry.id)
+                hasher.combine(entry.petId)
+                hasher.combine(entry.date.timeIntervalSince1970)
+                hasher.combine(entry.note)
+                hasher.combine(entry.source.rawValue)
+                hasher.combine(entry.sourceEventId)
+                hasher.combine(entry.sourceReminderId)
+                hasher.combine(entry.metadataJSON)
             },
             activeModeRawValue: activeMode.rawValue,
             monthRevision: Int(monthStart.timeIntervalSince1970 / 86400),
@@ -344,7 +344,7 @@ final class QuickFeedPlanCalendarSnapshotStore: ObservableObject {
     func rebuild(
         manualEvents: [Event],
         autoEvents: [Event],
-        feedingLedgerEvents: [CareLedgerEvent],
+        feedingLedgerEntries: [QuickFeedLedgerEntry],
         activeMode: FeedOperatingMode,
         month: Date,
         selectedDate: Date,
@@ -354,7 +354,7 @@ final class QuickFeedPlanCalendarSnapshotStore: ObservableObject {
         let nextRevision = QuickFeedPlanCalendarSnapshotRevision.make(
             manualEvents: manualEvents,
             autoEvents: autoEvents,
-            feedingLedgerEvents: feedingLedgerEvents,
+            feedingLedgerEntries: feedingLedgerEntries,
             activeMode: activeMode,
             month: month,
             selectedDate: selectedDate,
@@ -364,7 +364,7 @@ final class QuickFeedPlanCalendarSnapshotStore: ObservableObject {
         snapshot = QuickFeedPlanCalendarSnapshot.build(
             manualEvents: manualEvents,
             autoEvents: autoEvents,
-            feedingLedgerEvents: feedingLedgerEvents,
+            feedingLedgerEntries: feedingLedgerEntries,
             activeMode: activeMode,
             month: month,
             selectedDate: selectedDate,

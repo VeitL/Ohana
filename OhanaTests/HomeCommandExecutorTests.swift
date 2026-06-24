@@ -121,6 +121,19 @@ struct HomeCommandExecutorTests {
         #expect(medicationReminders.scheduledPetIDs.isEmpty)
     }
 
+    @Test func homeFeedQuickCommandDoesNotFetchLegacyCareLogsForRouting() throws {
+        let rootURL = repositoryRootURL()
+        let commandExecutor = try source("Ohana/Features/Home/HomeCommandExecutor.swift", rootURL: rootURL)
+        let quickActionExecutor = try source("Ohana/Features/Home/ExpandedQuickActionExecutor.swift", rootURL: rootURL)
+        let quickActionLogic = try source("Ohana/Features/Home/ExpandedQuickActionLogic.swift", rootURL: rootURL)
+
+        #expect(!commandExecutor.contains("fetchRecentCareLogs"))
+        #expect(!commandExecutor.contains("allFeedCareLogs"))
+        #expect(!quickActionExecutor.contains("allFeedCareLogs"))
+        #expect(!quickActionLogic.contains("allFeedCareLogs"))
+        #expect(commandExecutor.contains("fetchFoodRecords"))
+    }
+
     @MainActor
     @Test func plannedFeedForDeceasedPetNoopsWithoutHomeRevision() throws {
         let container = try makeInMemoryContainer()
@@ -250,6 +263,7 @@ struct HomeCommandExecutorTests {
         let defaults = UserDefaults.standard
         let oldActiveHumanID = defaults.object(forKey: "currentActiveHumanId")
         let oldCooldownLogs = defaults.object(forKey: QuestManager.Keys.cooldownLogs)
+        let oldAppLanguage = defaults.object(forKey: "appLanguage")
         defer {
             if let oldActiveHumanID {
                 defaults.set(oldActiveHumanID, forKey: "currentActiveHumanId")
@@ -261,6 +275,11 @@ struct HomeCommandExecutorTests {
             } else {
                 defaults.removeObject(forKey: QuestManager.Keys.cooldownLogs)
             }
+            if let oldAppLanguage {
+                defaults.set(oldAppLanguage, forKey: "appLanguage")
+            } else {
+                defaults.removeObject(forKey: "appLanguage")
+            }
             EconomyDailyBudgetStore.reset(
                 householdKey: CoconutEconomyPolicyV2.householdBudgetKey(context: context),
                 memberKey: executor.id.uuidString,
@@ -269,6 +288,7 @@ struct HomeCommandExecutorTests {
         }
         defaults.set(activeHuman.id.uuidString, forKey: "currentActiveHumanId")
         defaults.removeObject(forKey: QuestManager.Keys.cooldownLogs)
+        defaults.set("en", forKey: "appLanguage")
         EconomyDailyBudgetStore.reset(
             householdKey: CoconutEconomyPolicyV2.householdBudgetKey(context: context),
             memberKey: executor.id.uuidString,
@@ -303,12 +323,24 @@ struct HomeCommandExecutorTests {
 
         let walletEntries = try context.fetch(FetchDescriptor<CoconutLedgerEntry>())
         let budgetEvents = try context.fetch(FetchDescriptor<EconomyBudgetUsageEvent>())
+        let medicationEvents = try context.fetch(FetchDescriptor<Event>()).filter {
+            $0.eventType == EventType.petMedicationDose.rawValue
+        }
+        let ledgerEvents = try context.fetch(FetchDescriptor<CareLedgerEvent>())
         #expect(first.assigneeId == executor.id.uuidString)
         #expect(second.assigneeId == executor.id.uuidString)
+        #expect(first.title == "💊 Momo took Apoquel")
+        #expect(medicationEvents.count == 2)
+        #expect(medicationEvents.allSatisfy { $0.title == "💊 Momo took Apoquel" })
+        #expect(ledgerEvents.count == 2)
+        #expect(ledgerEvents.allSatisfy { $0.note == "💊 Momo took Apoquel" })
         #expect(executor.coconutBalance > 0)
         #expect(activeHuman.coconutBalance == 0)
         #expect(walletEntries.count(where: { $0.ownerId == executor.id.uuidString && $0.delta > 0 }) == 1)
-        #expect(budgetEvents.contains { $0.memberKey == executor.id.uuidString && $0.actionKey.contains("记录喂药") })
+        #expect(budgetEvents.contains {
+            $0.memberKey == executor.id.uuidString && $0.actionKey.contains("Medication dose")
+        })
+        #expect(!budgetEvents.contains { $0.actionKey.contains("记录喂药") })
         #expect(medicationReminders.recordedMedicationIDs == [medication.id, medication.id])
     }
 
@@ -732,11 +764,13 @@ struct HomeCommandExecutorTests {
             date: makeDate(year: 2026, month: 6, day: 8, hour: 18, minute: 0)
         )
         let walletEntries = try context.fetch(FetchDescriptor<CoconutLedgerEntry>())
+        let careLog = try #require(try context.fetch(FetchDescriptor<PetCareLog>()).first)
+        let ledger = try #require(try context.fetch(FetchDescriptor<CareLedgerEvent>()).first)
 
         #expect(result?.petID == pet.id)
         #expect((result?.coconutDelta ?? 0) > 0)
-        #expect(try context.fetch(FetchDescriptor<PetCareLog>()).count == 1)
-        #expect(!(try context.fetch(FetchDescriptor<CareLedgerEvent>())).isEmpty)
+        #expect(careLog.executorId == activeHuman.id.uuidString)
+        #expect(ledger.actorId == activeHuman.id.uuidString)
         #expect(walletEntries.contains { $0.ownerId == activeHuman.id.uuidString && $0.delta > 0 })
         #expect(walletEntries.allSatisfy { $0.ownerId != missingExecutorID })
         #expect(revisionCenter.homeRevision.value != beforeRevision)
@@ -778,9 +812,11 @@ struct HomeCommandExecutorTests {
         )
 
         let walletEntries = try context.fetch(FetchDescriptor<CoconutLedgerEntry>())
+        let careLog = try #require(try context.fetch(FetchDescriptor<PetCareLog>()).first)
+        let ledger = try #require(try context.fetch(FetchDescriptor<CareLedgerEvent>()).first)
         #expect(result?.petID == pet.id)
-        #expect(try context.fetch(FetchDescriptor<PetCareLog>()).count == 1)
-        #expect(!(try context.fetch(FetchDescriptor<CareLedgerEvent>())).isEmpty)
+        #expect(careLog.executorId == activeHuman.id.uuidString)
+        #expect(ledger.actorId == activeHuman.id.uuidString)
         #expect(walletEntries.contains { $0.ownerId == activeHuman.id.uuidString && $0.delta > 0 })
         #expect(walletEntries.allSatisfy { $0.ownerId != executorHuman.id.uuidString })
         #expect(revisionCenter.homeRevision.value != beforeRevision)
@@ -841,9 +877,11 @@ struct HomeCommandExecutorTests {
         )
 
         let walletEntries = try context.fetch(FetchDescriptor<CoconutLedgerEntry>())
+        let careLog = try #require(try context.fetch(FetchDescriptor<PetCareLog>()).first)
+        let ledger = try #require(try context.fetch(FetchDescriptor<CareLedgerEvent>()).first)
         #expect(!feedbacks.isEmpty)
-        #expect(try context.fetch(FetchDescriptor<PetCareLog>()).count == 1)
-        #expect(!(try context.fetch(FetchDescriptor<CareLedgerEvent>())).isEmpty)
+        #expect(careLog.executorId == activeHuman.id.uuidString)
+        #expect(ledger.actorId == activeHuman.id.uuidString)
         #expect(walletEntries.contains { $0.ownerId == activeHuman.id.uuidString && $0.delta > 0 })
         #expect(walletEntries.allSatisfy { $0.ownerId != executorHuman.id.uuidString })
         #expect(revisionCenter.homeRevision.value != beforeRevision)
@@ -961,10 +999,12 @@ struct HomeCommandExecutorTests {
         )
 
         let walletEntries = try context.fetch(FetchDescriptor<CoconutLedgerEntry>())
+        let pottyLog = try #require(try context.fetch(FetchDescriptor<PetPottyLog>()).first)
+        let ledger = try #require(try context.fetch(FetchDescriptor<CareLedgerEvent>()).first)
         #expect(result?.petID == pet.id)
-        #expect(try context.fetch(FetchDescriptor<PetPottyLog>()).count == 1)
+        #expect(pottyLog.executorId == activeHuman.id.uuidString)
         #expect(try context.fetch(FetchDescriptor<PetCareLog>()).isEmpty)
-        #expect(!(try context.fetch(FetchDescriptor<CareLedgerEvent>())).isEmpty)
+        #expect(ledger.actorId == activeHuman.id.uuidString)
         #expect(walletEntries.contains { $0.ownerId == activeHuman.id.uuidString && $0.delta > 0 })
         #expect(walletEntries.allSatisfy { $0.ownerId != executorHuman.id.uuidString })
         #expect(revisionCenter.homeRevision.value != beforeRevision)
@@ -6739,6 +6779,17 @@ struct HomeCommandExecutorTests {
     }
 
     @MainActor
+    @Test func petMilestoneCommandsDoNotCreateLegacyCareLedgerEvents() throws {
+        let rootURL = repositoryRootURL()
+        let commands = try source("Ohana/Features/Milestones/PetMilestoneCommands.swift", rootURL: rootURL)
+
+        #expect(!commands.contains("recordLedger("))
+        #expect(!commands.contains("careLedger.record("))
+        #expect(commands.contains("ledgerEvents(for: milestone"))
+        #expect(commands.contains("PhysicalDeletionService.deletePetScopedRecord"))
+    }
+
+    @MainActor
     @Test func petMilestoneCommandServiceSeedsSystemMilestonesOnce() throws {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
@@ -6816,6 +6867,15 @@ struct HomeCommandExecutorTests {
         #expect(createdMilestone.emoji == "🎉")
         #expect(createdMilestone.pet?.id == pet.id)
         #expect(ledgerEvents.isEmpty)
+        let matchingLegacyLedger = CareLedgerEvent(
+            occurredAt: createdMilestone.date,
+            subjectKind: .pet,
+            subjectId: pet.id.uuidString,
+            eventKind: .milestone,
+            actionType: "manual",
+            legacyModelName: "PetMilestone",
+            legacyModelId: createdMilestone.id.uuidString
+        )
         let unrelatedLedger = CareLedgerEvent(
             occurredAt: createdMilestone.date,
             subjectKind: .pet,
@@ -6825,6 +6885,7 @@ struct HomeCommandExecutorTests {
             legacyModelName: "PetMilestone",
             legacyModelId: "unrelated-milestone"
         )
+        context.insert(matchingLegacyLedger)
         context.insert(unrelatedLedger)
         try context.save()
 
@@ -6838,9 +6899,10 @@ struct HomeCommandExecutorTests {
         ledgerEvents = try context.fetch(FetchDescriptor<CareLedgerEvent>())
         #expect(deleteResult.petID == pet.id)
         #expect(deleteResult.milestoneID == createdMilestone.id)
-        #expect(deleteResult.removedLedgerEventIDs.isEmpty)
+        #expect(deleteResult.removedLedgerEventIDs == [matchingLegacyLedger.id])
         #expect(milestones.isEmpty)
         #expect(try cloudSyncState(entityName: String(describing: PetMilestone.self), id: createdMilestone.id, context: context)?.isDeletionTombstone == true)
+        #expect(try cloudSyncState(entityName: String(describing: CareLedgerEvent.self), id: matchingLegacyLedger.id, context: context)?.isDeletionTombstone == true)
         #expect(ledgerEvents.map(\.id) == [unrelatedLedger.id])
     }
 
@@ -8544,7 +8606,10 @@ struct HomeCommandExecutorTests {
             }
         }
         defaults.removeObject(forKey: pruneKey)
+        let oldEventID = UUID()
+        let recentEventID = UUID()
         context.insert(EconomyBudgetUsageEvent(
+            id: oldEventID,
             dayKey: EconomyDailyBudgetStore.dayKey(for: oldDate),
             householdKey: "household.local",
             memberKey: "member",
@@ -8556,6 +8621,7 @@ struct HomeCommandExecutorTests {
             source: "test"
         ))
         context.insert(EconomyBudgetUsageEvent(
+            id: recentEventID,
             dayKey: EconomyDailyBudgetStore.dayKey(for: recentDate),
             householdKey: "household.local",
             memberKey: "member",
@@ -8579,6 +8645,8 @@ struct HomeCommandExecutorTests {
         #expect(deleted == 1)
         #expect(remaining.count == 1)
         #expect(remaining.first?.actionKey == "recent")
+        #expect(remaining.first?.id == recentEventID)
+        #expect(try cloudSyncState(entityName: String(describing: EconomyBudgetUsageEvent.self), id: oldEventID, context: context)?.isDeletionTombstone == true)
     }
 
     @MainActor
@@ -9293,5 +9361,15 @@ struct HomeCommandExecutorTests {
         Calendar(identifier: .gregorian).date(
             from: DateComponents(year: year, month: month, day: day, hour: hour, minute: minute)
         ) ?? .distantPast
+    }
+
+    private func repositoryRootURL() -> URL {
+        URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+    }
+
+    private func source(_ path: String, rootURL: URL) throws -> String {
+        try String(contentsOf: rootURL.appendingPathComponent(path), encoding: .utf8)
     }
 }

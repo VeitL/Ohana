@@ -273,8 +273,12 @@ private extension AppSheetRoute {
             "petBasicInfo"
         case .petFood:
             "petFood"
+        case .petWeightQuick:
+            "petWeightQuick"
         case .petWeight:
             "petWeight"
+        case .petExpenseQuick:
+            "petExpenseQuick"
         case .petExpense:
             "petExpense"
         case .petFeed:
@@ -309,10 +313,16 @@ private extension AppSheetRoute {
             "humanAllFeatures"
         case .humanBasicInfo:
             "humanBasicInfo"
+        case .humanMedicationQuick:
+            "humanMedicationQuick"
         case .humanMedication:
             "humanMedication"
+        case .humanWeightQuick:
+            "humanWeightQuick"
         case .humanWeight:
             "humanWeight"
+        case .humanWorkoutQuick:
+            "humanWorkoutQuick"
         case .humanWorkout:
             "humanWorkout"
         case .humanWorkoutDashboard:
@@ -321,10 +331,14 @@ private extension AppSheetRoute {
             "humanMetrics"
         case .humanReport:
             "humanReport"
+        case .humanExpenseQuick:
+            "humanExpenseQuick"
         case .humanExpense:
             "humanExpense"
         case .humanWishlist:
             "humanWishlist"
+        case .humanNoteQuick:
+            "humanNoteQuick"
         case .humanNote:
             "humanNote"
         case .requiredAccountSwitch:

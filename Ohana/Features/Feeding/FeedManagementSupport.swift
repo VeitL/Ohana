@@ -192,13 +192,16 @@ nonisolated enum FeedLogMetadata {
         note: String,
         ledgerSource: CareLedgerSource?,
         sourceEventId: String?,
-        sourceReminderId: String?
+        sourceReminderId: String?,
+        metadataJSON: String = ""
     ) -> FeedLogSource? {
         guard actionType == CareType.feeding.rawValue else { return nil }
         if note.hasPrefix(PetCareLog.plannedFeedNotePrefix) || ledgerSource == .reminder || sourceReminderId != nil {
             return .manualReminder
         }
-        if autoDedupKey(from: note) != nil || (ledgerSource == .service && sourceEventId != nil) {
+        if autoDedupKey(from: note) != nil ||
+            CareLedgerMetadata.stringValue(named: CareLedgerMetadata.autoFeedDedupKey, in: metadataJSON) != nil ||
+            ((ledgerSource == .service || ledgerSource == .backfill) && sourceEventId != nil) {
             return .autoMain
         }
         if note.hasPrefix(treatFeedNoteMarker) { return .treat }

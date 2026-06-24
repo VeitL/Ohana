@@ -7,7 +7,7 @@
 
 import Foundation
 
-enum FocusHomeFabShortcutPolicy {
+nonisolated enum FocusHomeFabShortcutPolicy {
     static func humanShortcuts(
         for human: Human,
         displayedItems: [QuickActionItem],

@@ -11,6 +11,7 @@ struct FeedHomeSnapshotInput {
     let pet: Pet
     let allEvents: [Event]
     let careLogs: [PetCareLog]
+    let feedingLedgerEntries: [QuickFeedLedgerEntry]?
     let foodRecords: [PetFoodRecord]
     let sharedCareSessions: [SharedCareSession]
     let now: Date
@@ -21,6 +22,7 @@ struct FeedHomeSnapshotInput {
         pet: Pet,
         allEvents: [Event],
         careLogs: [PetCareLog],
+        feedingLedgerEntries: [QuickFeedLedgerEntry]? = nil,
         foodRecords: [PetFoodRecord],
         sharedCareSessions: [SharedCareSession] = [],
         now: Date,
@@ -30,6 +32,7 @@ struct FeedHomeSnapshotInput {
         self.pet = pet
         self.allEvents = allEvents
         self.careLogs = careLogs
+        self.feedingLedgerEntries = feedingLedgerEntries
         self.foodRecords = foodRecords
         self.sharedCareSessions = sharedCareSessions
         self.now = now
@@ -43,6 +46,7 @@ enum FeedHomeSnapshotBuilder {
         let pet = input.pet
         let allEvents = input.allEvents
         let careLogs = input.careLogs
+        let feedingLedgerEntries = input.feedingLedgerEntries
         let foodRecords = input.foodRecords
         let sharedCareSessions = input.sharedCareSessions
         let now = input.now
@@ -51,20 +55,19 @@ enum FeedHomeSnapshotBuilder {
         let rules = FeedRuleState(pet: pet, allEvents: allEvents, now: now, calendar: calendar)
         let manualPlanEvents = rules.manualReminderEvents
         let autoFeederEvents = rules.autoFeederEvents
-        let todayLogs = careLogs
+        let legacyTodayLogs = careLogs
             .filter {
                 $0.careType == .feeding &&
                     calendar.isDate($0.date, inSameDayAs: now)
             }
             .sorted { $0.date > $1.date }
-        let mainTodayLogs = todayLogs.filter { FeedLogMetadata.isMainFoodLog($0) }
-        let treatTodayLogs = todayLogs.filter { FeedLogMetadata.isTreatLog($0) }
-        let todayDryFoodGrams = mainTodayLogs
-            .filter { $0.foodKind == .dry }
-            .reduce(0) { $0 + FeedStockCalculator.effectiveMainFoodAmount(for: $1, pet: pet) }
-        let todayWetFoodGrams = mainTodayLogs
-            .filter { $0.foodKind == .wet }
-            .reduce(0) { $0 + FeedStockCalculator.effectiveMainFoodAmount(for: $1, pet: pet) }
+        let todaySummary = todaySummary(
+            pet: pet,
+            ledgerEntries: feedingLedgerEntries,
+            legacyTodayLogs: legacyTodayLogs,
+            now: now,
+            calendar: calendar
+        )
 
         let allPlanReminders = manualPlanEvents
             .flatMap(\.reminders)
@@ -111,16 +114,17 @@ enum FeedHomeSnapshotBuilder {
         let wetStockRemainingGrams = wetStock.totalGrams > 0 ? wetStock.remainingGrams : nil
         let wetStockRemainingDays = wetStock.totalGrams > 0 ? wetStock.remainingDays : nil
 
-        let latestAutoFeedDate = careLogs
-            .filter { FeedLogMetadata.source(for: $0) == .autoMain }
-            .max { $0.date < $1.date }?
-            .date
+        let latestAutoFeedDate = latestAutoFeedDate(
+            ledgerEntries: feedingLedgerEntries,
+            legacyCareLogs: careLogs
+        )
         let nextAutoFeedDate = autoFeederEvents
             .compactMap { nextOccurrence(for: $0, after: now, calendar: calendar) }
             .min()
 
         let sevenDayPoints = makeSevenDayMainFoodPoints(
             pet: pet,
+            ledgerEntries: feedingLedgerEntries,
             careLogs: careLogs,
             now: now,
             todayLabel: input.todayLabel,
@@ -130,12 +134,12 @@ enum FeedHomeSnapshotBuilder {
         return QuickFeedHomeSnapshot(
             manualPlanEvents: manualPlanEvents,
             autoFeederEvents: autoFeederEvents,
-            todayMainFoodGrams: todayDryFoodGrams + todayWetFoodGrams,
-            todayDryFoodGrams: todayDryFoodGrams,
-            todayWetFoodGrams: todayWetFoodGrams,
-            todayTreatGrams: treatTodayLogs.reduce(0) { $0 + max(0, $1.amountGrams) },
-            todayTreatCount: treatTodayLogs.count,
-            todayAutoFeedCount: mainTodayLogs.count(where: { FeedLogMetadata.source(for: $0) == .autoMain }),
+            todayMainFoodGrams: todaySummary.dryFoodGrams + todaySummary.wetFoodGrams,
+            todayDryFoodGrams: todaySummary.dryFoodGrams,
+            todayWetFoodGrams: todaySummary.wetFoodGrams,
+            todayTreatGrams: todaySummary.treatGrams,
+            todayTreatCount: todaySummary.treatCount,
+            todayAutoFeedCount: todaySummary.autoFeedCount,
             hasNextManualReminder: nextActionablePlanReminder != nil,
             hasMissedManualPlan: expiredMissedPlanReminders.isEmpty && !catchUpPlanReminders.isEmpty,
             todayManualPlanMissedCount: expiredMissedPlanReminders.isEmpty ? catchUpPlanReminders.count : 0,
@@ -155,6 +159,7 @@ enum FeedHomeSnapshotBuilder {
 
     private static func makeSevenDayMainFoodPoints(
         pet: Pet,
+        ledgerEntries: [QuickFeedLedgerEntry]?,
         careLogs: [PetCareLog],
         now: Date,
         todayLabel: String,
@@ -162,12 +167,40 @@ enum FeedHomeSnapshotBuilder {
     ) -> [OhanaMinimalChartPoint] {
         let today = calendar.startOfDay(for: now)
         let start = calendar.date(byAdding: .day, value: -6, to: today) ?? today
+        if let ledgerEntries {
+            let entries = ledgerEntries
+                .filter { $0.source != .treat && $0.date >= start }
+            let totalsByDay = Dictionary(grouping: entries) { calendar.startOfDay(for: $0.date) }
+                .mapValues { entries in
+                    entries.reduce(0) { $0 + QuickFeedOverviewSnapshot.effectiveMainFoodAmount(for: $1, pet: pet) }
+                }
+            return sevenDayPoints(
+                totalsByDay: totalsByDay,
+                start: start,
+                todayLabel: todayLabel,
+                calendar: calendar
+            )
+        }
         let logs = FeedStockCalculator.mainFoodLogs(for: pet, since: start, careLogs: careLogs)
         let totalsByDay = Dictionary(grouping: logs) { calendar.startOfDay(for: $0.date) }
             .mapValues { logs in
                 logs.reduce(0) { $0 + FeedStockCalculator.effectiveMainFoodAmount(for: $1, pet: pet) }
             }
-        return (0 ..< 7).map { offset in
+        return sevenDayPoints(
+            totalsByDay: totalsByDay,
+            start: start,
+            todayLabel: todayLabel,
+            calendar: calendar
+        )
+    }
+
+    private static func sevenDayPoints(
+        totalsByDay: [Date: Double],
+        start: Date,
+        todayLabel: String,
+        calendar: Calendar
+    ) -> [OhanaMinimalChartPoint] {
+        (0 ..< 7).map { offset in
             let day = calendar.date(byAdding: .day, value: offset, to: start) ?? start
             let total = totalsByDay[calendar.startOfDay(for: day)] ?? 0
             return OhanaMinimalChartPoint(
@@ -176,6 +209,67 @@ enum FeedHomeSnapshotBuilder {
                 label: calendar.isDateInToday(day) ? todayLabel : day.formatted(.dateTime.weekday(.narrow))
             )
         }
+    }
+
+    private static func todaySummary(
+        pet: Pet,
+        ledgerEntries: [QuickFeedLedgerEntry]?,
+        legacyTodayLogs: [PetCareLog],
+        now: Date,
+        calendar: Calendar
+    ) -> (dryFoodGrams: Double, wetFoodGrams: Double, treatGrams: Double, treatCount: Int, autoFeedCount: Int) {
+        if let ledgerEntries {
+            let todayEntries = ledgerEntries
+                .filter { calendar.isDate($0.date, inSameDayAs: now) }
+                .sorted { $0.date > $1.date }
+            let mainTodayEntries = todayEntries.filter { $0.source != .treat }
+            let treatEntries = todayEntries.filter { $0.source == .treat }
+            let dryFoodGrams = mainTodayEntries
+                .filter { $0.foodKind == .dry }
+                .reduce(0) { $0 + QuickFeedOverviewSnapshot.effectiveMainFoodAmount(for: $1, pet: pet) }
+            let wetFoodGrams = mainTodayEntries
+                .filter { $0.foodKind == .wet }
+                .reduce(0) { $0 + QuickFeedOverviewSnapshot.effectiveMainFoodAmount(for: $1, pet: pet) }
+            return (
+                dryFoodGrams,
+                wetFoodGrams,
+                treatEntries.reduce(0) { $0 + $1.displayAmountGrams },
+                treatEntries.count,
+                mainTodayEntries.count(where: { $0.source == .autoMain })
+            )
+        }
+
+        let mainTodayLogs = legacyTodayLogs.filter { FeedLogMetadata.isMainFoodLog($0) }
+        let treatTodayLogs = legacyTodayLogs.filter { FeedLogMetadata.isTreatLog($0) }
+        let dryFoodGrams = mainTodayLogs
+            .filter { $0.foodKind == .dry }
+            .reduce(0) { $0 + FeedStockCalculator.effectiveMainFoodAmount(for: $1, pet: pet) }
+        let wetFoodGrams = mainTodayLogs
+            .filter { $0.foodKind == .wet }
+            .reduce(0) { $0 + FeedStockCalculator.effectiveMainFoodAmount(for: $1, pet: pet) }
+        return (
+            dryFoodGrams,
+            wetFoodGrams,
+            treatTodayLogs.reduce(0) { $0 + max(0, $1.amountGrams) },
+            treatTodayLogs.count,
+            mainTodayLogs.count(where: { FeedLogMetadata.source(for: $0) == .autoMain })
+        )
+    }
+
+    private static func latestAutoFeedDate(
+        ledgerEntries: [QuickFeedLedgerEntry]?,
+        legacyCareLogs: [PetCareLog]
+    ) -> Date? {
+        if let ledgerEntries {
+            return ledgerEntries
+                .filter { $0.source == .autoMain }
+                .max { $0.date < $1.date }?
+                .date
+        }
+        return legacyCareLogs
+            .filter { FeedLogMetadata.source(for: $0) == .autoMain }
+            .max { $0.date < $1.date }?
+            .date
     }
 
     private static func nextOccurrence(for event: Event, after now: Date, calendar: Calendar) -> Date? {

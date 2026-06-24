@@ -87,14 +87,6 @@ extension VerticalSolidHomeView {
         }
     }
 
-    func requestExpandedExpensePreview() {
-        guard let card = expandedBottomBarCard, card.isHuman else {
-            expensePreviewStore.clear()
-            return
-        }
-        expensePreviewStore.request(context: modelContext, humanID: card.id)
-    }
-
     func selectTab(_ tab: VerticalSolidHomeTab) {
         guard AppFeatureRouteGuard.allowsHomeTab(tab) else {
             AppFeatureRouteGuard.recordIntercept("homeTab:\(tab.rawValue)")

@@ -80,7 +80,8 @@ enum DomainServiceDependencyRegistry {
         return ReminderCompletionService(
             careLedger: careLedger,
             familyTasks: familyTasks(),
-            reminderScheduling: reminderScheduling(careLedger: careLedger)
+            reminderScheduling: reminderScheduling(careLedger: careLedger),
+            notifications: ReminderNotificationSchedulerRegistry.current
         )
     }
 
@@ -99,7 +100,8 @@ enum DomainServiceDependencyRegistry {
                 reminderCompletion: reminderCompletion,
                 quickActionReminderCompletion: DomainNoOpQuickActionReminderCompleter(),
                 familyTasks: DomainNoOpFamilyTaskManager(),
-                revisions: SharedDomainRevisionPublisher()
+                revisions: SharedDomainRevisionPublisher(),
+                notifications: ReminderNotificationSchedulerRegistry.current
             )
         #else
             unregisteredDependency("CareEventServiceDependencies")
