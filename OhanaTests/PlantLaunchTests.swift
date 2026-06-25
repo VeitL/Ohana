@@ -1357,11 +1357,72 @@ struct PlantLaunchTests {
         )
         let oasisLogs = try context.fetch(FetchDescriptor<OasisCritterActionLog>())
         let treeBoost = try #require(ShopCatalog.item(id: "boost_tree"))
+        let plantDecor = try #require(ShopCatalog.item(id: OasisPlantDecorID.greenhouseCorner))
 
         #expect(critter.health > 50)
         #expect(oasisLogs.contains { $0.action == .careEcho })
         #expect(treeBoost.descriptionText.resolve("zh").contains("基础植物照护不靠购买"))
         #expect(treeBoost.isConsumable)
+        #expect(plantDecor.category == .plantDecor)
+        #expect(!plantDecor.isConsumable)
+        #expect(plantDecor.descriptionText.resolve("zh").contains("不影响护理计划"))
+        #expect(ShopItem.ShopCategory.visibleCases.contains(.plantDecor))
+    }
+
+    @Test func plantCareAmbienceUsesLevelFourUnlockAndLevelFiveYieldLayer() {
+        let suiteName = "PlantLaunchTests.plantCareAmbience.\(UUID().uuidString)"
+        guard let defaults = UserDefaults(suiteName: suiteName) else {
+            Issue.record("Expected isolated defaults suite")
+            return
+        }
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        PlantUnlockPolicy.clearExistingPlantData(defaults: defaults)
+
+        let locked = OasisPlantAmbiencePolicy.snapshot(
+            plantCareEventCount: 6,
+            currentLevel: 3,
+            equippedSceneID: OasisPlantDecorID.greenhouseCorner,
+            equippedPotSkinID: OasisPlantDecorID.ceramicPotSkin,
+            defaults: defaults
+        )
+        let household = OasisPlantAmbiencePolicy.snapshot(
+            plantCareEventCount: 6,
+            currentLevel: 4,
+            equippedSceneID: OasisPlantDecorID.greenhouseCorner,
+            equippedPotSkinID: OasisPlantDecorID.ceramicPotSkin,
+            defaults: defaults
+        )
+        let oasisYield = OasisPlantAmbiencePolicy.snapshot(
+            plantCareEventCount: 6,
+            currentLevel: 5,
+            equippedSceneID: OasisPlantDecorID.greenhouseCorner,
+            equippedPotSkinID: OasisPlantDecorID.ceramicPotSkin,
+            defaults: defaults
+        )
+        PlantUnlockPolicy.noteExistingPlantData(defaults: defaults)
+        let grandfathered = OasisPlantAmbiencePolicy.snapshot(
+            plantCareEventCount: 3,
+            currentLevel: 2,
+            equippedSceneID: "unknown",
+            equippedPotSkinID: OasisPlantDecorID.ceramicPotSkin,
+            defaults: defaults
+        )
+
+        #expect(locked.lushnessLevel == 0)
+        #expect(locked.equippedSceneID == OasisPlantDecorID.greenhouseCorner)
+        #expect(locked.equippedPotSkinID == OasisPlantDecorID.ceramicPotSkin)
+        #expect(household.lushnessLevel == 3)
+        #expect(!household.isYieldAmbienceUnlocked)
+        #expect(oasisYield.lushnessLevel == 4)
+        #expect(oasisYield.isYieldAmbienceUnlocked)
+        #expect(grandfathered.lushnessLevel == 2)
+        #expect(grandfathered.equippedSceneID.isEmpty)
+        #expect(grandfathered.equippedPotSkinID == OasisPlantDecorID.ceramicPotSkin)
+        #expect(OasisPlantDecorStore.isEquipped(
+            OasisPlantDecorID.greenhouseCorner,
+            equippedSceneID: OasisPlantDecorID.greenhouseCorner,
+            equippedPotSkinID: ""
+        ))
     }
 
     private func makeInMemoryContainer() throws -> ModelContainer {

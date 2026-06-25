@@ -17,6 +17,7 @@ struct ShopItem: Identifiable, Equatable {
         case avatar2d
         case cashExchange
         case effect
+        case plantDecor
         case title_
         case boost
 
@@ -40,6 +41,8 @@ struct ShopItem: Identifiable, Equatable {
                 l.tr(zh: "货币兑换", en: "Cash Exchange", de: "Geldtausch")
             case .effect:
                 l.tr(zh: "外观特效", en: "Effects", de: "Effekte")
+            case .plantDecor:
+                l.tr(zh: "植物装饰", en: "Plant Decor", de: "Pflanzendeko")
             case .title_:
                 l.tr(zh: "称号", en: "Titles", de: "Titel")
             case .boost:
@@ -53,6 +56,7 @@ struct ShopItem: Identifiable, Equatable {
             case .avatar2d: "person.crop.square.fill"
             case .cashExchange: "banknote.fill"
             case .effect: "sparkles"
+            case .plantDecor: "leaf.fill"
             case .title_: "rosette"
             case .boost: "bolt.fill"
             }
@@ -151,7 +155,7 @@ enum ShopCatalog {
         allItems(purchasedSet: purchasedSet).first { $0.id == id }
     }
 
-    private static let rawItems: [ShopItem] = appIconItems + avatarItems + effectItems + titleItems + boostItems
+    private static let rawItems: [ShopItem] = appIconItems + avatarItems + effectItems + plantDecorItems + titleItems + boostItems
 
     private static let appIconItems: [ShopItem] = [
         ShopItem(
@@ -238,6 +242,57 @@ enum ShopCatalog {
         ShopItem(id: "fx_rainbow_poop", emoji: "💩", nameText: .init(zh: "彩虹便便", en: "Rainbow Poop", de: "Regenbogenkot"), descriptionText: .init(zh: "遛狗便便标记显示流动彩虹光圈。", en: "Adds a flowing rainbow ring to walk poop markers.", de: "Fügt Gassi-Kotmarkierungen einen fließenden Regenbogenring hinzu."), cost: 420, category: .effect),
         ShopItem(id: "fx_stars", emoji: "⭐️", nameText: .init(zh: "星尘落雨", en: "Stardust", de: "Sternenstaub"), descriptionText: .init(zh: "完成每日委托时触发星尘粒子特效。", en: "Adds stardust particles to daily quest completions.", de: "Fügt Tagesaufgaben Sternenstaub-Partikel hinzu."), cost: 350, category: .effect),
         ShopItem(id: "fx_firework", emoji: "🎆", nameText: .init(zh: "烟花庆典", en: "Firework", de: "Feuerwerk"), descriptionText: .init(zh: "达成里程碑时升级烟花动画。", en: "Upgrades milestone celebrations with fireworks.", de: "Erweitert Meilensteinfeiern mit Feuerwerk."), cost: 720, category: .effect)
+    ]
+
+    private static let plantDecorItems: [ShopItem] = [
+        ShopItem(
+            id: OasisPlantDecorID.greenhouseCorner,
+            emoji: "▱",
+            nameText: .init(zh: "温室角落", en: "Greenhouse Corner", de: "Gewächshaus-Ecke"),
+            descriptionText: .init(
+                zh: "让绿洲多一个植物角；只改变氛围，不影响护理计划或提醒。",
+                en: "Adds a plant corner to the Oasis. Cosmetic only; care plans and reminders stay free.",
+                de: "Pflanzenecke für Oasis. Nur Deko; Pflegepläne und Erinnerungen bleiben kostenlos."
+            ),
+            cost: 520,
+            category: .plantDecor
+        ),
+        ShopItem(
+            id: OasisPlantDecorID.balconyPlanters,
+            emoji: "▰",
+            nameText: .init(zh: "阳台花箱", en: "Balcony Planters", de: "Balkonkästen"),
+            descriptionText: .init(
+                zh: "给岛屿边缘放上花箱；不出售植物识别、提醒或护理能力。",
+                en: "Places planters along the island edge. It does not sell recognition, reminders, or care.",
+                de: "Pflanzkästen am Inselrand. Verkauft keine Erkennung, Erinnerung oder Pflege."
+            ),
+            cost: 420,
+            category: .plantDecor
+        ),
+        ShopItem(
+            id: OasisPlantDecorID.seasonalMiniScape,
+            emoji: "✤",
+            nameText: .init(zh: "季节小景观", en: "Seasonal Mini-Scape", de: "Saison-Miniatur"),
+            descriptionText: .init(
+                zh: "把植物照护的成就感变成季节小景观；核心植物管理仍然免费。",
+                en: "Turns plant-care momentum into a seasonal scene. Core plant management remains free.",
+                de: "Macht Pflanzenpflege sichtbar als Saisonbild. Grundpflege bleibt kostenlos."
+            ),
+            cost: 680,
+            category: .plantDecor
+        ),
+        ShopItem(
+            id: OasisPlantDecorID.ceramicPotSkin,
+            emoji: "◍",
+            nameText: .init(zh: "陶盆皮肤", en: "Ceramic Pot Skin", de: "Keramiktopf-Skin"),
+            descriptionText: .init(
+                zh: "给绿洲植物换上陶盆外观；不会改变任何浇水或施肥规则。",
+                en: "Gives Oasis plants a ceramic pot look. Watering and fertilizing rules do not change.",
+                de: "Keramiktopf-Look für Oasis-Pflanzen. Gieß- und Düngepläne bleiben gleich."
+            ),
+            cost: 260,
+            category: .plantDecor
+        )
     ]
 
     private static let titleItems: [ShopItem] = [

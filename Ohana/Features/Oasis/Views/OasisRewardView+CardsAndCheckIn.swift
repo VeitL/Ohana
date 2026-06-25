@@ -159,7 +159,10 @@ extension OasisRewardView {
                 }
             },
             onOpenShop: {
-                openSheet(.coconutShop(.effect))
+                let category: ShopItem.ShopCategory = plantAmbienceSnapshot.isYieldAmbienceUnlocked || plantAmbienceSnapshot.lushnessLevel > 0
+                    ? .plantDecor
+                    : .effect
+                openSheet(.coconutShop(category))
             },
             onOpenAchievements: {
                 openSheet(.achievements)

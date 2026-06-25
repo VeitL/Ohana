@@ -10,6 +10,7 @@ struct OasisRewardLiveDataSnapshot {
     var electronicPets: [OasisElectronicPet] = []
     var critterFragments: [OasisCritterFragmentBalance] = []
     var careLedgerEvents: [CareLedgerEvent] = []
+    var plantCareLedgerEventCount: Int = 0
     var petActivitySummaries: [UUID: AchievementPetActivitySummary] = [:]
 }
 
@@ -46,6 +47,7 @@ final class OasisRewardLiveDataStore: ObservableObject {
             electronicPets: fetchElectronicPets(context: context),
             critterFragments: fetchCritterFragments(context: context),
             careLedgerEvents: fetchCareLedgerEvents(context: context),
+            plantCareLedgerEventCount: AppFeatureRouteGuard.shouldLoadPlantData ? fetchPlantCareLedgerEventCount(context: context) : 0,
             petActivitySummaries: AchievementPetActivityRouteData.loadPetActivitySummaries(from: context)
         )
     }
@@ -119,6 +121,25 @@ final class OasisRewardLiveDataStore: ObservableObject {
             true
         case .workout, .reminder, .plantCare, .coconut, .unknown:
             false
+        }
+    }
+
+    private static func fetchPlantCareLedgerEventCount(context: ModelContext) -> Int {
+        let plantCareKind = CareLedgerEventKind.plantCare.rawValue
+        do {
+            return try context.fetchCount(
+                FetchDescriptor<CareLedgerEvent>(
+                    predicate: #Predicate<CareLedgerEvent> { event in
+                        event.eventKind == plantCareKind
+                    }
+                )
+            )
+        } catch {
+            OhanaLog.warning(
+                "Oasis plant care ledger count failed: \(error.localizedDescription)",
+                category: "Oasis"
+            )
+            return 0
         }
     }
 

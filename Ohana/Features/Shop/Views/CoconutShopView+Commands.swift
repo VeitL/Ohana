@@ -335,6 +335,8 @@ extension CoconutShopView {
             equipFxStars = true
         case "fx_firework":
             equipFxFirework = true
+        case let itemID where OasisPlantDecorID.isPlantDecor(itemID):
+            equipPlantDecor(itemID)
         case "title_guardian", "title_pioneer", "title_chef":
             equippedTitle = item.id
         default:
@@ -360,6 +362,8 @@ extension CoconutShopView {
             equipFxStars.toggle()
         case "fx_firework":
             equipFxFirework.toggle()
+        case let itemID where OasisPlantDecorID.isPlantDecor(itemID):
+            togglePlantDecor(itemID)
         case "title_guardian", "title_pioneer", "title_chef":
             equippedTitle = equippedTitle == item.id ? "" : item.id
         default:
@@ -387,6 +391,10 @@ extension CoconutShopView {
             return equipFxStars ? l.tr(zh: "已启用", en: "On", de: "Aktiv") : l.tr(zh: "未启用", en: "Off", de: "Aus")
         case "fx_firework":
             return equipFxFirework ? l.tr(zh: "已启用", en: "On", de: "Aktiv") : l.tr(zh: "未启用", en: "Off", de: "Aus")
+        case let itemID where OasisPlantDecorID.isPlantDecor(itemID):
+            return isPlantDecorEquipped(itemID)
+                ? l.tr(zh: "已布置", en: "Placed", de: "Platziert")
+                : l.tr(zh: "未布置", en: "Not placed", de: "Nicht platziert")
         case "title_guardian", "title_pioneer", "title_chef":
             return equippedTitle == item.id ? l.tr(zh: "已装备", en: "Equipped", de: "Ausgerüstet") : l.tr(zh: "未装备", en: "Not equipped", de: "Nicht ausgerüstet")
         default:
@@ -402,6 +410,7 @@ extension CoconutShopView {
         case "fx_popout_card": equipFxPopoutCard && activePets.contains { $0.cardStyleRaw == "popout" }
         case "fx_stars": equipFxStars
         case "fx_firework": equipFxFirework
+        case let itemID where OasisPlantDecorID.isPlantDecor(itemID): isPlantDecorEquipped(itemID)
         case "title_guardian", "title_pioneer", "title_chef": equippedTitle == item.id
         default: false
         }
@@ -414,6 +423,9 @@ extension CoconutShopView {
         if item.category == .title_ {
             return item.isPurchased
         }
+        if item.category == .plantDecor {
+            return item.isPurchased
+        }
         return item.isPurchased && isToggleableEffect(item)
     }
 
@@ -424,6 +436,36 @@ extension CoconutShopView {
         default:
             false
         }
+    }
+
+    func equipPlantDecor(_ itemID: String) {
+        switch OasisPlantDecorID.slot(for: itemID) {
+        case .scene:
+            equippedPlantDecorScene = itemID
+        case .potSkin:
+            equippedPlantPotSkin = itemID
+        case nil:
+            break
+        }
+    }
+
+    func togglePlantDecor(_ itemID: String) {
+        switch OasisPlantDecorID.slot(for: itemID) {
+        case .scene:
+            equippedPlantDecorScene = equippedPlantDecorScene == itemID ? "" : itemID
+        case .potSkin:
+            equippedPlantPotSkin = equippedPlantPotSkin == itemID ? "" : itemID
+        case nil:
+            break
+        }
+    }
+
+    func isPlantDecorEquipped(_ itemID: String) -> Bool {
+        OasisPlantDecorStore.isEquipped(
+            itemID,
+            equippedSceneID: equippedPlantDecorScene,
+            equippedPotSkinID: equippedPlantPotSkin
+        )
     }
 
     func shopTogglePill(isOn: Bool) -> some View {

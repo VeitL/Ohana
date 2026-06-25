@@ -37,6 +37,8 @@ extension OasisRewardView {
 
             stageIslandBase
 
+            stagePlantAmbience(snapshot: plantAmbienceSnapshot)
+
             stageTreeGlow
 
             treeEnergyBeam
@@ -181,6 +183,151 @@ extension OasisRewardView {
         .frame(maxHeight: .infinity, alignment: .bottom)
         .padding(.bottom, 110)
         .allowsHitTesting(false)
+    }
+
+    func stagePlantAmbience(snapshot: OasisPlantAmbienceSnapshot) -> some View {
+        ZStack(alignment: .bottom) {
+            if snapshot.lushnessLevel > 0 {
+                stagePlantTufts(level: snapshot.lushnessLevel)
+            }
+
+            stagePlantSceneDecor(id: snapshot.equippedSceneID)
+            stagePlantPotDecor(id: snapshot.equippedPotSkinID)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+        .padding(.bottom, 98)
+        .opacity(snapshot.hasAnyVisual ? 1 : 0)
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+
+    func stagePlantTufts(level: Int) -> some View {
+        let positions: [(x: CGFloat, y: CGFloat, scale: CGFloat)] = [
+            (-128, 0, 0.72), (-96, -7, 0.88), (-58, -3, 0.76),
+            (64, -5, 0.82), (102, -1, 0.72), (132, -9, 0.66),
+            (-18, -12, 0.58)
+        ]
+        let visibleCount = min(positions.count, max(0, level + 2))
+        return ZStack {
+            ForEach(0 ..< visibleCount, id: \.self) { index in
+                plantTuft(index: index, scale: positions[index].scale)
+                    .offset(x: positions[index].x, y: positions[index].y)
+            }
+        }
+    }
+
+    func plantTuft(index: Int, scale: CGFloat) -> some View {
+        HStack(spacing: -2) {
+            Image(systemName: "leaf.fill") // a11y: allow decorative Oasis plant tuft
+                .font(OhanaFont.adaptive(size: 19 * scale, weight: .black))
+                .foregroundStyle(index.isMultiple(of: 2) ? Color.goPrimary : Color.goTeal)
+                .rotationEffect(.degrees(-28))
+            Image(systemName: "leaf.fill") // a11y: allow decorative Oasis plant tuft
+                .font(OhanaFont.adaptive(size: 15 * scale, weight: .black))
+                .foregroundStyle(index.isMultiple(of: 3) ? Color.goYellow : Color.goPrimary.opacity(0.88))
+                .rotationEffect(.degrees(24))
+        }
+    }
+
+    @ViewBuilder
+    func stagePlantSceneDecor(id: String) -> some View {
+        switch id {
+        case OasisPlantDecorID.greenhouseCorner:
+            greenhouseStageDecor
+                .offset(x: -116, y: -14)
+        case OasisPlantDecorID.balconyPlanters:
+            balconyPlantersStageDecor
+                .offset(x: 112, y: -7)
+        case OasisPlantDecorID.seasonalMiniScape:
+            seasonalMiniScapeStageDecor
+                .offset(x: 92, y: -24)
+        default:
+            EmptyView()
+        }
+    }
+
+    @ViewBuilder
+    func stagePlantPotDecor(id: String) -> some View {
+        if id == OasisPlantDecorID.ceramicPotSkin {
+            ceramicPotStageDecor
+                .offset(x: -74, y: -2)
+        }
+    }
+
+    var greenhouseStageDecor: some View {
+        ZStack(alignment: .bottom) {
+            RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous)
+                .fill(Color.ohanaCardSurface.opacity(colorScheme == .light ? 0.78 : 0.28))
+                .frame(width: 72, height: 54)
+                .overlay {
+                    RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous)
+                        .strokeBorder(Color.goTeal.opacity(0.66), lineWidth: 1.5)
+                }
+            HStack(spacing: 6) {
+                ForEach(0 ..< 3, id: \.self) { index in
+                    Image(systemName: "leaf.fill") // a11y: allow decorative greenhouse leaf
+                        .font(OhanaFont.adaptive(size: 12 + CGFloat(index * 2), weight: .black))
+                        .foregroundStyle(index == 1 ? Color.goPrimary : Color.goTeal)
+                }
+            }
+            .padding(.bottom, 8)
+        }
+    }
+
+    var balconyPlantersStageDecor: some View {
+        HStack(alignment: .bottom, spacing: 4) {
+            ForEach(0 ..< 4, id: \.self) { index in
+                VStack(spacing: 0) {
+                    Image(systemName: "leaf.fill") // a11y: allow decorative planter leaf
+                        .font(OhanaFont.adaptive(size: 12, weight: .black))
+                        .foregroundStyle(index.isMultiple(of: 2) ? Color.goPrimary : Color.goTeal)
+                    RoundedRectangle(cornerRadius: OhanaRadius.micro, style: .continuous)
+                        .fill(index.isMultiple(of: 2) ? Color.goOrange.opacity(0.76) : Color.goYellow.opacity(0.62))
+                        .frame(width: 18, height: 14) // a11y: allow decorative planter block; Oasis stage is non-interactive here.
+                }
+            }
+        }
+    }
+
+    var seasonalMiniScapeStageDecor: some View {
+        ZStack {
+            ForEach(0 ..< 8, id: \.self) { index in
+                Circle()
+                    .fill([Color.goPrimary, .goYellow, .goOrange, .goTeal][index % 4])
+                    .frame(width: index.isMultiple(of: 2) ? 7 : 5, height: index.isMultiple(of: 2) ? 7 : 5)
+                    .offset(
+                        x: CGFloat(index * 10 - 36),
+                        y: CGFloat([0, -12, -5, -16, -3, -11, -6, -14][index])
+                    )
+            }
+            Image(systemName: "sun.max.fill") // a11y: allow decorative seasonal scene
+                .font(OhanaFont.adaptive(size: 20, weight: .black))
+                .foregroundStyle(Color.goYellow)
+                .offset(x: 30, y: -24)
+        }
+        .frame(width: 96, height: 58)
+    }
+
+    var ceramicPotStageDecor: some View {
+        HStack(spacing: 7) {
+            ForEach(0 ..< 3, id: \.self) { index in
+                VStack(spacing: 0) {
+                    Image(systemName: "leaf.fill") // a11y: allow decorative pot leaf
+                        .font(OhanaFont.adaptive(size: 12 + CGFloat(index == 1 ? 2 : 0), weight: .black))
+                        .foregroundStyle(index == 1 ? Color.goPrimary : Color.goTeal)
+                    RoundedRectangle(cornerRadius: OhanaRadius.micro, style: .continuous)
+                        .fill(Color(hex: "C87952").opacity(index == 1 ? 0.92 : 0.74))
+                        .frame(width: index == 1 ? 26 : 20, height: index == 1 ? 22 : 17)
+                        .overlay(alignment: .top) {
+                            Capsule()
+                                .fill(Color.ohanaCardSurface.opacity(0.64))
+                                .frame(height: 4)
+                                .padding(.horizontal, 3)
+                                .padding(.top, 3)
+                        }
+                }
+            }
+        }
     }
 
     var stageTreeGlow: some View {
@@ -506,6 +653,21 @@ extension OasisRewardView {
                         .font(OhanaFont.caption2(.black))
                         .foregroundStyle(Color.goPrimary)
                 }
+                if plantAmbienceSnapshot.lushnessLevel > 0 {
+                    HStack(spacing: 3) {
+                        Image(systemName: "leaf.fill") // a11y: allow decorative lushness badge icon
+                            .font(OhanaFont.caption2(.black))
+                            .accessibilityHidden(true)
+                        Text(l.tr(
+                            zh: "绿意 \(plantAmbienceSnapshot.lushnessLevel)",
+                            en: "Lush \(plantAmbienceSnapshot.lushnessLevel)",
+                            de: "Grün \(plantAmbienceSnapshot.lushnessLevel)"
+                        ))
+                        .lineLimit(1)
+                    }
+                    .font(OhanaFont.caption2(.black))
+                    .foregroundStyle(Color.goTeal)
+                }
             }
 
             GeometryReader { geo in
@@ -546,6 +708,13 @@ extension OasisRewardView {
     var nextStageHint: String {
         if treeVisualLevel == .lv10 {
             return l.tr(zh: "树冠已觉醒", en: "Tree awakened", de: "Baum erwacht")
+        }
+        if plantAmbienceSnapshot.lushnessLevel > 0 {
+            return l.tr(
+                zh: "植物照护让岛屿更繁茂",
+                en: "Plant care is making the island lusher",
+                de: "Pflanzenpflege macht die Insel grüner"
+            )
         }
         return l.tr(zh: "下一颗升级椰子在树上成长", en: "Next upgrade coconut is growing", de: "Nächste Upgrade-Kokosnuss wächst")
     }

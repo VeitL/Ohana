@@ -407,6 +407,8 @@ struct OasisRewardView: View {
     @State var treeStageAppearTask: Task<Void, Never>?
     @State var treeHarvestBuffer = OasisTreeHarvestBuffer()
     @AppStorage("appLanguage") var appLanguage = AppLanguage.code
+    @AppStorage(OasisPlantDecorStore.equippedSceneKey) var equippedPlantDecorScene = ""
+    @AppStorage(OasisPlantDecorStore.equippedPotSkinKey) var equippedPlantPotSkin = ""
 
     var treeMgr: OasisTreeManaging { appServices.oasisTree }
     var l: L10n { L10n(appLanguage) }
@@ -417,6 +419,15 @@ struct OasisRewardView: View {
     var upgradeCoconuts: [OasisUpgradeCoconut] { liveData.upgradeCoconuts }
     var electronicPets: [OasisElectronicPet] { liveData.electronicPets }
     var critterFragments: [OasisCritterFragmentBalance] { liveData.critterFragments }
+    var plantAmbienceSnapshot: OasisPlantAmbienceSnapshot {
+        OasisPlantAmbiencePolicy.snapshot(
+            plantCareEventCount: liveData.plantCareLedgerEventCount,
+            currentLevel: treeVisualLevel.rawValue,
+            equippedSceneID: equippedPlantDecorScene,
+            equippedPotSkinID: equippedPlantPotSkin
+        )
+    }
+
     var commandExecutor: OasisRewardCommandExecutor {
         OasisRewardCommandExecutor(
             context: modelContext,

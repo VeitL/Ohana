@@ -21,6 +21,8 @@ struct CoconutShopView: View {
     @AppStorage("shop_equip_fx_popout_card") var equipFxPopoutCard = true
     @AppStorage("shop_equip_fx_stars") var equipFxStars = false
     @AppStorage("shop_equip_fx_firework") var equipFxFirework = false
+    @AppStorage(OasisPlantDecorStore.equippedSceneKey) var equippedPlantDecorScene = ""
+    @AppStorage(OasisPlantDecorStore.equippedPotSkinKey) var equippedPlantPotSkin = ""
     @AppStorage(AppIconCatalog.selectedIconKey) var selectedAppIcon = AppIconCatalog.defaultItemId
 
     @State var selectedCategory: ShopItem.ShopCategory

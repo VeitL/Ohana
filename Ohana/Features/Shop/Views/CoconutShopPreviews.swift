@@ -23,6 +23,7 @@ struct ShopAppliedPreview: View {
         case .avatar2d: Color.goTeal
         case .cashExchange: Color.goYellow
         case .effect: Color.goPurple
+        case .plantDecor: Color.goTeal
         case .title_: Color.goYellow
         case .boost: Color.goOrange
         }
@@ -48,6 +49,8 @@ struct ShopAppliedPreview: View {
                 avatarPassPreview
             case .effect:
                 effectPreview
+            case .plantDecor:
+                plantDecorPreview
             case .title_:
                 titlePreview
             case .boost:
@@ -258,6 +261,115 @@ struct ShopAppliedPreview: View {
                         x: animate ? cos(CGFloat(index) * .pi / 4) * 42 : 0,
                         y: animate ? sin(CGFloat(index) * .pi / 4) * 28 : 0
                     )
+            }
+        }
+    }
+
+    private var plantDecorPreview: some View {
+        ZStack(alignment: .bottom) {
+            Ellipse()
+                .fill(Color(hex: "D4B989").opacity(0.7))
+                .frame(width: 118, height: 25)
+                .offset(y: 16)
+
+            HStack(alignment: .bottom, spacing: 10) {
+                if item.id == OasisPlantDecorID.greenhouseCorner {
+                    greenhousePreview
+                } else if item.id == OasisPlantDecorID.balconyPlanters {
+                    planterPreview
+                } else if item.id == OasisPlantDecorID.seasonalMiniScape {
+                    seasonalPreview
+                } else {
+                    potSkinPreview
+                }
+            }
+            .padding(.bottom, 12)
+
+            Image(systemName: OasisPlantDecorID.symbolName(for: item.id)) // a11y: allow decorative plant decor category mark
+                .font(OhanaFont.adaptive(size: 13, weight: .black))
+                .foregroundStyle(accent)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+                .padding(10)
+                .accessibilityHidden(true)
+        }
+        .padding(.horizontal, 12)
+    }
+
+    private var greenhousePreview: some View {
+        ZStack(alignment: .bottom) {
+            RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous)
+                .fill(Color.ohanaCardSurface.opacity(0.72))
+                .frame(width: 64, height: 50)
+                .overlay {
+                    RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous)
+                        .strokeBorder(accent.opacity(0.64), lineWidth: 1.5)
+                }
+            HStack(spacing: 5) {
+                ForEach(0 ..< 3, id: \.self) { index in
+                    Image(systemName: "leaf.fill") // a11y: allow decorative greenhouse leaves
+                        .font(OhanaFont.adaptive(size: 12 + CGFloat(index), weight: .black))
+                        .foregroundStyle(index == 1 ? Color.goPrimary : Color.goTeal)
+                        .offset(y: animate ? -5 : 1)
+                }
+            }
+            .padding(.bottom, 7)
+        }
+    }
+
+    private var planterPreview: some View {
+        HStack(alignment: .bottom, spacing: 5) {
+            ForEach(0 ..< 3, id: \.self) { index in
+                VStack(spacing: 0) {
+                    Image(systemName: "leaf.fill") // a11y: allow decorative planter leaves
+                        .font(OhanaFont.adaptive(size: 13, weight: .black))
+                        .foregroundStyle(index == 1 ? Color.goPrimary : Color.goTeal)
+                        .offset(y: animate ? 1 : 7)
+                    RoundedRectangle(cornerRadius: OhanaRadius.micro, style: .continuous)
+                        .fill(index == 1 ? Color.goOrange.opacity(0.72) : Color.goYellow.opacity(0.58))
+                        .frame(width: 24, height: 16) // a11y: allow decorative planter block; card owns the hit target.
+                }
+            }
+        }
+    }
+
+    private var seasonalPreview: some View {
+        ZStack {
+            ForEach(0 ..< 7, id: \.self) { index in
+                Circle()
+                    .fill([Color.goPrimary, .goYellow, .goOrange, .goTeal][index % 4])
+                    .frame(width: index.isMultiple(of: 2) ? 7 : 5, height: index.isMultiple(of: 2) ? 7 : 5)
+                    .offset(
+                        x: CGFloat(index * 13 - 38),
+                        y: animate ? CGFloat([0, -13, -5, -17, -3, -12, -6][index]) : 12
+                    )
+            }
+            Image(systemName: "sun.max.fill") // a11y: allow decorative seasonal sun
+                .font(OhanaFont.adaptive(size: 21, weight: .black))
+                .foregroundStyle(Color.goYellow)
+                .offset(x: 32, y: -18)
+        }
+        .frame(width: 100, height: 62)
+    }
+
+    private var potSkinPreview: some View {
+        HStack(spacing: 8) {
+            ForEach(0 ..< 3, id: \.self) { index in
+                VStack(spacing: 0) {
+                    Image(systemName: "leaf.fill") // a11y: allow decorative ceramic pot leaves
+                        .font(OhanaFont.adaptive(size: 13, weight: .black))
+                        .foregroundStyle(index == 1 ? Color.goPrimary : Color.goTeal)
+                        .offset(y: animate ? 1 : 8)
+                    RoundedRectangle(cornerRadius: OhanaRadius.micro, style: .continuous)
+                        .fill(Color(hex: "C87952").opacity(index == 1 ? 0.92 : 0.72))
+                        .frame(width: index == 1 ? 28 : 22, height: index == 1 ? 24 : 19)
+                        .overlay(alignment: .top) {
+                            Capsule()
+                                .fill(Color.ohanaCardSurface.opacity(0.65))
+                                .frame(height: 4)
+                                .padding(.horizontal, 3)
+                                .padding(.top, 3)
+                        }
+                }
             }
         }
     }

@@ -89,7 +89,7 @@ extension CoconutShopView {
         switch item.category {
         case .appIcon:
             108
-        case .avatar2d, .effect, .title_, .boost:
+        case .avatar2d, .effect, .plantDecor, .title_, .boost:
             96
         case .cashExchange:
             92

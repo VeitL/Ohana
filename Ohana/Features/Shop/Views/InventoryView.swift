@@ -26,6 +26,8 @@ struct InventoryContentView: View {
     @AppStorage("shop_equip_fx_popout_card") private var equipFxPopoutCard: Bool = true
     @AppStorage("shop_equip_fx_stars") private var equipFxStars: Bool = false
     @AppStorage("shop_equip_fx_firework") private var equipFxFirework: Bool = false
+    @AppStorage(OasisPlantDecorStore.equippedSceneKey) private var equippedPlantDecorScene = ""
+    @AppStorage(OasisPlantDecorStore.equippedPotSkinKey) private var equippedPlantPotSkin = ""
     @AppStorage(AppIconCatalog.selectedIconKey) private var selectedAppIcon: String = AppIconCatalog.defaultItemId
 
     // Inventory states
@@ -58,6 +60,10 @@ struct InventoryContentView: View {
 
     private var myEffects: [ShopItem] {
         allEffectsAndTitles.filter { $0.category == .effect && purchasedSet.contains($0.id) }
+    }
+
+    private var myPlantDecor: [ShopItem] {
+        allEffectsAndTitles.filter { $0.category == .plantDecor && purchasedSet.contains($0.id) }
     }
 
     private var myTitles: [ShopItem] {
@@ -107,6 +113,14 @@ struct InventoryContentView: View {
                             }
                         }
 
+                        if !myPlantDecor.isEmpty {
+                            inventorySection(title: l.tr(zh: "绿洲植物装饰", en: "Oasis plant decor", de: "Oasis-Pflanzendeko"), icon: "leaf.fill") {
+                                ForEach(myPlantDecor) { item in
+                                    plantDecorRow(item)
+                                }
+                            }
+                        }
+
                         // 3. 消耗区
                         let isShieldActive = streakShieldExpiry.map { Date() < $0 } ?? false
                         if backdatePacks > 0 || isShieldActive || doubleBoostActive {
@@ -123,7 +137,7 @@ struct InventoryContentView: View {
                             }
                         }
 
-                        if myAppIcons.isEmpty, myTitles.isEmpty, myEffects.isEmpty, Avatar2DAccess.extraPassCount == 0, backdatePacks == 0, !isShieldActive, !doubleBoostActive {
+                        if myAppIcons.isEmpty, myTitles.isEmpty, myEffects.isEmpty, myPlantDecor.isEmpty, Avatar2DAccess.extraPassCount == 0, backdatePacks == 0, !isShieldActive, !doubleBoostActive {
                             VStack(spacing: 12) {
                                 Image(systemName: "shippingbox").accessibilityHidden(true)
                                     .font(OhanaFont.adaptive(size: 40))
@@ -366,6 +380,57 @@ struct InventoryContentView: View {
                     .toggleStyle(OhanaPillToggleStyle())
                     .labelsHidden()
             }
+        }
+        .padding(16)
+        .overlay(alignment: .bottom) {
+            Divider().background(Color.ohanaPrimaryText.opacity(0.1)).padding(.leading, 60)
+        }
+    }
+
+    // MARK: - Plant Decor Row
+    private func plantDecorRow(_ item: ShopItem) -> some View {
+        let isActive = Binding<Bool>(
+            get: {
+                OasisPlantDecorStore.isEquipped(
+                    item.id,
+                    equippedSceneID: equippedPlantDecorScene,
+                    equippedPotSkinID: equippedPlantPotSkin
+                )
+            },
+            set: { val in
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                switch OasisPlantDecorID.slot(for: item.id) {
+                case .scene:
+                    equippedPlantDecorScene = val ? item.id : ""
+                case .potSkin:
+                    equippedPlantPotSkin = val ? item.id : ""
+                case nil:
+                    break
+                }
+            }
+        )
+
+        return HStack(spacing: 14) {
+            Image(systemName: OasisPlantDecorID.symbolName(for: item.id))
+                .font(OhanaFont.adaptive(size: 24, weight: .black))
+                .foregroundStyle(Color.goTeal)
+                .frame(width: 42, height: 42) // a11y: allow decorative row symbol; toggle owns the interaction.
+                .background(Color.goTeal.opacity(0.14), in: Circle())
+                .accessibilityHidden(true)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(item.name)
+                    .font(OhanaFont.adaptive(size: 15, weight: .bold, design: .rounded))
+                    .foregroundStyle(Color.ohanaPrimaryText)
+                Text(item.description)
+                    .font(OhanaFont.adaptive(size: 11, weight: .medium, design: .rounded))
+                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
+            }
+            Spacer()
+
+            Toggle("", isOn: isActive)
+                .toggleStyle(OhanaPillToggleStyle())
+                .labelsHidden()
         }
         .padding(16)
         .overlay(alignment: .bottom) {

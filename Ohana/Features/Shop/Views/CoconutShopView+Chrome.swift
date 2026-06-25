@@ -14,7 +14,7 @@ extension CoconutShopView {
                     Text(l.tr(zh: "椰子商店", en: "Coconut Shop", de: "Kokosnuss-Shop"))
                         .font(OhanaFont.title(.black))
                         .foregroundStyle(primaryText)
-                    Text(l.tr(zh: "买断外观、称号和 App Icon。", en: "Unlock looks, titles, and App Icons.", de: "Schalte Looks, Titel und App Icons frei."))
+                    Text(l.tr(zh: "买断外观、植物装饰、称号和 App Icon。", en: "Unlock looks, plant decor, titles, and App Icons.", de: "Schalte Looks, Pflanzendeko, Titel und App Icons frei."))
                         .font(OhanaFont.caption(.semibold))
                         .foregroundStyle(secondaryText)
                 }
