@@ -8,27 +8,6 @@
 import SwiftData
 import SwiftUI
 
-struct AddPlantDataContainer: View {
-    let onComplete: () -> Void
-    @Query(sort: \Plant.createdAt, order: .reverse) private var plants: [Plant] // smoothness: allow route-scoped duplicate scan for explicit add-plant flow; the form receives value snapshots.
-
-    var body: some View {
-        AddPlantView(
-            onComplete: onComplete,
-            existingPlantSnapshots: plants.map {
-                PlantDuplicateScanSnapshot(
-                    id: $0.id,
-                    name: $0.name,
-                    species: $0.species,
-                    roomName: $0.roomNameRaw,
-                    location: $0.location,
-                    catalogSpeciesId: $0.catalogSpeciesId
-                )
-            }
-        )
-    }
-}
-
 struct AddPlantView: View {
     let onComplete: () -> Void
     let existingPlantSnapshots: [PlantDuplicateScanSnapshot]
@@ -74,8 +53,8 @@ struct AddPlantView: View {
         selectedCatalogID.isEmpty ? nil : PlantCatalog.entry(id: selectedCatalogID)
     }
 
-    private var catalogMatches: [PlantCatalogEntry] {
-        Array(PlantCatalog.search(catalogQuery).prefix(5))
+    private var catalogMatches: [PlantCatalogSearchResult] {
+        PlantCatalog.searchResults(catalogQuery, limit: 8)
     }
 
     private var duplicateDraft: PlantDuplicateScanDraft {
@@ -231,10 +210,15 @@ struct AddPlantView: View {
                 .foregroundStyle(Color.ohanaSecondaryText)
                 .textCase(.uppercase)
                 .tracking(0.6)
-            Text("拍照识别当前未配置供应商；请用资料库搜索或手动添加，Ohana 不会伪造识别结果。")
-                .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded))
-                .foregroundStyle(Color.ohanaSecondaryText)
-                .fixedSize(horizontal: false, vertical: true)
+            HStack(spacing: 8) {
+                Image(systemName: "leaf.circle.fill") // a11y: allow decorative catalog status glyph; adjacent text names catalog and AI state.
+                    .foregroundStyle(Color.goLime)
+                    .accessibilityHidden(true)
+                Text("本地资料库 \(PlantCatalog.entries.count) 种 · AI 识别未配置时不生成假候选")
+                    .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded))
+                    .foregroundStyle(Color.ohanaSecondaryText)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
             TextField("搜索绿萝、Monstera、吊兰…", text: $catalogQuery) // ui-v4: allow existing plant launch form input while OhanaTextField migration remains tracked.
                 .textFieldStyle(.plain)
                 .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .rounded))
@@ -242,40 +226,83 @@ struct AddPlantView: View {
                 .background(Color.ohanaControlFill.opacity(0.68), in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
 
             VStack(spacing: 8) {
-                ForEach(catalogMatches) { entry in
-                    Button {
-                        applyCatalog(entry)
-                    } label: {
-                        HStack(spacing: 10) {
-                            Image(systemName: selectedCatalogID == entry.id ? "checkmark.circle.fill" : "leaf.circle")
-                                .foregroundStyle(selectedCatalogID == entry.id ? Color.goLime : Color.ohanaSecondaryText)
-                                .accessibilityHidden(true)
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(entry.commonName)
-                                    .font(OhanaFont.adaptive(size: 14, weight: .bold, design: .rounded))
-                                    .foregroundStyle(Color.ohanaPrimaryText)
-                                Text(entry.latinName)
-                                    .font(OhanaFont.adaptive(size: 12, weight: .medium, design: .rounded))
-                                    .foregroundStyle(Color.ohanaSecondaryText)
-                            }
-                            Spacer()
-                            Text(entry.careDifficulty)
-                                .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded))
-                                .foregroundStyle(Color.arkInk)
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 4)
-                                .background(Color.goLime, in: Capsule())
-                        }
-                        .padding(12)
-                        .background(Color.ohanaControlFill.opacity(0.5), in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
+                if catalogMatches.isEmpty {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("没有找到匹配")
+                            .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
+                            .foregroundStyle(Color.ohanaPrimaryText)
+                        Text("可以继续手动建档；护理计划会使用你填写的光照、盆土和周期。")
+                            .font(OhanaFont.adaptive(size: 12, weight: .medium, design: .rounded))
+                            .foregroundStyle(Color.ohanaSecondaryText)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
-                    .buttonStyle(ScaleButtonStyle())
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(12)
+                    .background(Color.ohanaControlFill.opacity(0.42), in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
+                } else {
+                    ForEach(catalogMatches) { result in
+                        catalogMatchButton(result)
+                    }
                 }
             }
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
         .goTranslucentCard(cornerRadius: OhanaRadius.controlLarge)
+    }
+
+    private func catalogMatchButton(_ result: PlantCatalogSearchResult) -> some View {
+        let entry = result.entry
+        return Button {
+            applyCatalog(entry)
+        } label: {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(spacing: 10) {
+                    Image(systemName: selectedCatalogID == entry.id ? "checkmark.circle.fill" : "leaf.circle")
+                        .foregroundStyle(selectedCatalogID == entry.id ? Color.goLime : Color.ohanaSecondaryText)
+                        .accessibilityHidden(true)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(entry.commonName)
+                            .font(OhanaFont.adaptive(size: 14, weight: .bold, design: .rounded))
+                            .foregroundStyle(Color.ohanaPrimaryText)
+                        Text(entry.latinName)
+                            .font(OhanaFont.adaptive(size: 12, weight: .medium, design: .rounded))
+                            .foregroundStyle(Color.ohanaSecondaryText)
+                    }
+                    Spacer(minLength: 8)
+                    Text(result.matchSummary)
+                        .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded))
+                        .foregroundStyle(Color.goLime)
+                }
+                HStack(spacing: 6) {
+                    catalogChip(entry.careDifficulty, foreground: Color.arkInk, background: Color.goLime)
+                    catalogChip(entry.lightRequirement.displayName, foreground: Color.ohanaPrimaryText, background: Color.ohanaControlFill.opacity(0.78))
+                    catalogChip(
+                        entry.isToxicToCats || entry.isToxicToDogs || entry.isToxicToChildren ? "误食风险" : "宠物低风险",
+                        foreground: Color.ohanaPrimaryText,
+                        background: Color.ohanaControlFill.opacity(0.78)
+                    )
+                }
+                Text("默认计划：浇水 \(entry.defaultWateringDays) 天 · 施肥 \(entry.defaultFertilizingDays) 天")
+                    .font(OhanaFont.adaptive(size: 11, weight: .medium, design: .rounded))
+                    .foregroundStyle(Color.ohanaSecondaryText)
+            }
+            .padding(12)
+            .background(Color.ohanaControlFill.opacity(0.5), in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
+        }
+        .buttonStyle(ScaleButtonStyle())
+        .accessibilityLabel("\(entry.commonName)，\(entry.latinName)，\(result.matchSummary)")
+    }
+
+    private func catalogChip(_ title: String, foreground: Color, background: Color) -> some View {
+        Text(title)
+            .font(OhanaFont.adaptive(size: 10, weight: .bold, design: .rounded))
+            .foregroundStyle(foreground)
+            .lineLimit(1)
+            .minimumScaleFactor(0.78)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(background, in: Capsule())
     }
 
     @ViewBuilder

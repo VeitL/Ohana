@@ -42,6 +42,120 @@ nonisolated struct PlantDiagnosisResult: Equatable, Sendable {
     let causes: [PlantDiagnosisCause]
 }
 
+nonisolated enum PlantRecognitionPolicy {
+    static let requiredCandidateCount = 3
+    static let maximumDisplayedCandidateCount = 3
+
+    static func normalized(_ result: PlantRecognitionResult) -> PlantRecognitionResult {
+        let rawCandidates = ([result.mostLikely].compactMap(\.self) + result.candidates)
+        var seenKeys = Set<String>()
+        let normalizedCandidates = rawCandidates.compactMap { candidate -> PlantRecognitionCandidate? in
+            let enriched = enrichedCandidate(candidate)
+            let key = candidateKey(enriched)
+            guard !key.isEmpty, !seenKeys.contains(key) else { return nil }
+            seenKeys.insert(key)
+            return enriched
+        }
+        .sorted {
+            if $0.confidence != $1.confidence {
+                return $0.confidence > $1.confidence
+            }
+            return $0.speciesName.localizedStandardCompare($1.speciesName) == .orderedAscending
+        }
+        let displayed = Array(normalizedCandidates.prefix(maximumDisplayedCandidateCount))
+        let mostLikely = displayed.first
+        let uncertainty = uncertaintyMessage(
+            raw: result.uncertaintyMessage,
+            candidateCount: displayed.count
+        )
+        return PlantRecognitionResult(
+            mostLikely: mostLikely,
+            candidates: displayed,
+            uncertaintyMessage: uncertainty,
+            manualSearchSuggested: result.manualSearchSuggested || displayed.isEmpty || displayed.count < requiredCandidateCount
+        )
+    }
+
+    static func isConfirmable(_ result: PlantRecognitionResult) -> Bool {
+        let normalized = normalized(result)
+        return normalized.mostLikely != nil &&
+            normalized.candidates.count >= requiredCandidateCount &&
+            !normalized.manualSearchSuggested
+    }
+
+    static func confirmedCatalogEntry(for candidate: PlantRecognitionCandidate) -> PlantCatalogEntry? {
+        if let catalogEntryId = candidate.catalogEntryId,
+           let entry = PlantCatalog.entry(id: catalogEntryId) {
+            return entry
+        }
+        return PlantCatalog.bestMatch(commonName: candidate.speciesName, latinName: candidate.latinName)
+    }
+
+    private static func enrichedCandidate(_ candidate: PlantRecognitionCandidate) -> PlantRecognitionCandidate {
+        let catalogEntry = confirmedCatalogEntry(for: candidate)
+        let speciesName = trimmed(candidate.speciesName).isEmpty
+            ? (catalogEntry?.commonName ?? "未知植物")
+            : trimmed(candidate.speciesName)
+        let latinName = trimmed(candidate.latinName).isEmpty
+            ? (catalogEntry?.latinName ?? "")
+            : trimmed(candidate.latinName)
+        let catalogId = candidate.catalogEntryId ?? catalogEntry?.id
+        let id = trimmed(candidate.id).isEmpty
+            ? [catalogId, latinName, speciesName].compactMap(\.self).joined(separator: "|")
+            : trimmed(candidate.id)
+        return PlantRecognitionCandidate(
+            id: id,
+            speciesName: speciesName,
+            latinName: latinName,
+            confidence: min(1, max(0, candidate.confidence)),
+            catalogEntryId: catalogId,
+            basicCare: trimmed(candidate.basicCare).isEmpty ? basicCare(from: catalogEntry) : trimmed(candidate.basicCare),
+            isToxicToCats: catalogEntry?.isToxicToCats ?? candidate.isToxicToCats,
+            isToxicToDogs: catalogEntry?.isToxicToDogs ?? candidate.isToxicToDogs,
+            isToxicToChildren: catalogEntry?.isToxicToChildren ?? candidate.isToxicToChildren,
+            isIndoorSuitable: catalogEntry?.isIndoorSuitable ?? candidate.isIndoorSuitable
+        )
+    }
+
+    private static func uncertaintyMessage(raw: String, candidateCount: Int) -> String {
+        let message = trimmed(raw)
+        if !message.isEmpty { return message }
+        if candidateCount == 0 {
+            return "没有可确认的候选；请使用资料库搜索或手动添加。"
+        }
+        if candidateCount < requiredCandidateCount {
+            return "候选数量不足，不能直接写入档案；请手动确认或改用资料库搜索。"
+        }
+        return "识别结果仍可能出错；请确认正确物种后再写入植物档案。"
+    }
+
+    private static func basicCare(from entry: PlantCatalogEntry?) -> String {
+        guard let entry else { return "" }
+        return "\(entry.lightRequirement.displayName) · \(entry.wateringPreference)"
+    }
+
+    private static func candidateKey(_ candidate: PlantRecognitionCandidate) -> String {
+        if let catalogEntryId = candidate.catalogEntryId, !catalogEntryId.isEmpty {
+            return catalogEntryId
+        }
+        return [candidate.latinName, candidate.speciesName]
+            .map(normalized)
+            .filter { !$0.isEmpty }
+            .joined(separator: "|")
+    }
+
+    private static func trimmed(_ value: String) -> String {
+        value.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private static func normalized(_ value: String) -> String {
+        value
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .folding(options: [.caseInsensitive, .diacriticInsensitive, .widthInsensitive], locale: .current)
+            .lowercased()
+    }
+}
+
 nonisolated protocol PlantIntelligenceProviding: Sendable {
     func recognizePlant(imageData: Data) async -> PlantRecognitionResult
     func diagnosePlant(imageData: Data?, symptoms: [String]) async -> PlantDiagnosisResult

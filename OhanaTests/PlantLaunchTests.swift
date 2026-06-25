@@ -125,6 +125,49 @@ struct PlantLaunchTests {
         #expect(snakeDefaults.humidityPreference == .dry)
     }
 
+    @Test func plantCatalogCoversCommonIndoorPlantsAndRanksManualSearch() throws {
+        #expect(PlantCatalog.entries.count >= 100)
+        #expect(PlantCatalog.entries.count <= 300)
+
+        let pothos = try #require(PlantCatalog.searchResults("pothos").first)
+        let latin = try #require(PlantCatalog.searchResults("Monstera deliciosa").first)
+        let petSafe = PlantCatalog.searchResults("pet safe")
+        let lowLight = PlantCatalog.searchResults("低光")
+
+        #expect(pothos.entry.id == "epipremnum-aureum")
+        #expect(latin.entry.id == "monstera-deliciosa")
+        #expect(petSafe.contains { !$0.entry.isToxicToCats && !$0.entry.isToxicToDogs })
+        #expect(lowLight.contains { $0.entry.id == "zamioculcas-zamiifolia" })
+    }
+
+    @Test func plantRecognitionPolicyNormalizesProviderCandidatesWithoutFakingResults() async {
+        let fallback = await LocalPlantIntelligenceFallback().recognizePlant(imageData: Data([1, 2, 3]))
+        #expect(fallback.candidates.isEmpty)
+        #expect(fallback.manualSearchSuggested)
+        #expect(!PlantRecognitionPolicy.isConfirmable(fallback))
+
+        let raw = PlantRecognitionResult(
+            mostLikely: nil,
+            candidates: [
+                recognitionCandidate(name: "龟背竹", latin: "Monstera deliciosa", confidence: 1.4),
+                recognitionCandidate(name: "绿萝", latin: "Epipremnum aureum", confidence: 0.81),
+                recognitionCandidate(name: "白掌", latin: "Spathiphyllum wallisii", confidence: 0.7),
+                recognitionCandidate(name: "重复龟背竹", latin: "Monstera deliciosa", confidence: 0.2)
+            ],
+            uncertaintyMessage: "",
+            manualSearchSuggested: false
+        )
+        let normalized = PlantRecognitionPolicy.normalized(raw)
+
+        #expect(normalized.candidates.count == 3)
+        #expect(normalized.mostLikely?.catalogEntryId == "monstera-deliciosa")
+        #expect(normalized.mostLikely?.confidence == 1)
+        #expect(normalized.mostLikely?.isToxicToCats == true)
+        #expect(normalized.candidates.allSatisfy { !$0.basicCare.isEmpty })
+        #expect(!normalized.uncertaintyMessage.isEmpty)
+        #expect(PlantRecognitionPolicy.isConfirmable(normalized))
+    }
+
     @Test func plantProfileRecalculationPolicyExplainsChangedReminders() {
         let old = PlantCarePlanRecalculationSnapshot(
             roomName: "Living room",
@@ -195,6 +238,25 @@ struct PlantLaunchTests {
         #expect(result.causes.count >= 2)
         #expect(result.causes.count <= 3)
         #expect(result.causes.allSatisfy { !$0.steps.isEmpty })
+    }
+
+    private func recognitionCandidate(
+        name: String,
+        latin: String,
+        confidence: Double
+    ) -> PlantRecognitionCandidate {
+        PlantRecognitionCandidate(
+            id: UUID().uuidString,
+            speciesName: name,
+            latinName: latin,
+            confidence: confidence,
+            catalogEntryId: nil,
+            basicCare: "",
+            isToxicToCats: false,
+            isToxicToDogs: false,
+            isToxicToChildren: false,
+            isIndoorSuitable: false
+        )
     }
 
     @Test func plantBackupRoundTripsLaunchProfileFields() throws {

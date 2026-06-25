@@ -22,6 +22,7 @@ enum PlantFeatureGate {
 
 enum PlantUnlockPolicy {
     nonisolated static let requiredLevel = 4
+    nonisolated static let requiredEnergy = 500
     nonisolated static let lockedTitleZh = "家庭树冠 Lv.4 解锁植物照护"
     nonisolated static let lockedDetailZh = "先完成宠物核心照护习惯，岛屿稳定后再把植物也搬进 Ohana。"
     nonisolated static let unlockedToastZh = "你的家庭树冠展开了，现在可以照顾家里的植物。"
@@ -81,7 +82,6 @@ enum PlantLockedPreviewPolicy {
     }
 
     nonisolated static func energyRemainingForUnlock(currentEnergy: Int) -> Int {
-        let targetEnergy = OasisTreeManager.levelStartThreshold(forRawLevel: PlantUnlockPolicy.requiredLevel)
-        return max(0, targetEnergy - max(0, currentEnergy))
+        max(0, PlantUnlockPolicy.requiredEnergy - max(0, currentEnergy))
     }
 }
