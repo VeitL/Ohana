@@ -98,7 +98,21 @@ nonisolated extension DataBackupManager {
             location: p.location, notes: p.notes, createdAt: d(p.createdAt),
             lastWateredDate: d(p.lastWateredDate), wateringIntervalDays: p.wateringIntervalDays,
             lastFertilizedDate: d(p.lastFertilizedDate), fertilizingIntervalDays: p.fertilizingIntervalDays,
-            themeColorHex: p.themeColorHex
+            themeColorHex: p.themeColorHex,
+            lastHealthCheckDate: d(p.lastHealthCheckDate),
+            potDiameterCm: p.potDiameterCm,
+            potMaterialRaw: p.potMaterialRaw,
+            soilTypeRaw: p.soilTypeRaw,
+            isIndoor: p.isIndoor,
+            windowDirectionRaw: p.windowDirectionRaw,
+            lightLevelRaw: p.lightLevelRaw,
+            healthStatusRaw: p.healthStatusRaw,
+            catalogSpeciesId: p.catalogSpeciesId,
+            isToxicToCats: p.isToxicToCats,
+            isToxicToDogs: p.isToxicToDogs,
+            isToxicToChildren: p.isToxicToChildren,
+            isIndoorSuitable: p.isIndoorSuitable,
+            remindersEnabled: p.remindersEnabled
         )
     }
 
@@ -115,7 +129,21 @@ nonisolated extension DataBackupManager {
             wateringIntervalDays: dto.wateringIntervalDays,
             lastFertilizedDate: dto.lastFertilizedDate.flatMap { iso.date(from: $0) },
             fertilizingIntervalDays: dto.fertilizingIntervalDays,
-            themeColorHex: dto.themeColorHex ?? "4CAF50"
+            themeColorHex: dto.themeColorHex ?? "4CAF50",
+            lastHealthCheckDate: dto.lastHealthCheckDate.flatMap { iso.date(from: $0) },
+            potDiameterCm: dto.potDiameterCm ?? 0,
+            potMaterialRaw: dto.potMaterialRaw ?? "",
+            soilTypeRaw: dto.soilTypeRaw ?? "",
+            isIndoor: dto.isIndoor ?? true,
+            windowDirection: PlantWindowDirection(rawValue: dto.windowDirectionRaw ?? "") ?? .unknown,
+            lightLevel: PlantLightLevel(rawValue: dto.lightLevelRaw ?? "") ?? .medium,
+            healthStatus: PlantHealthStatus(rawValue: dto.healthStatusRaw ?? "") ?? .stable,
+            catalogSpeciesId: dto.catalogSpeciesId ?? "",
+            isToxicToCats: dto.isToxicToCats ?? false,
+            isToxicToDogs: dto.isToxicToDogs ?? false,
+            isToxicToChildren: dto.isToxicToChildren ?? false,
+            isIndoorSuitable: dto.isIndoorSuitable ?? true,
+            remindersEnabled: dto.remindersEnabled ?? true
         )
     }
 

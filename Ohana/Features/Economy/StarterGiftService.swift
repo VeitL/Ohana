@@ -12,7 +12,7 @@ enum StarterGiftPolicy {
     static let giftAmount = 50
 }
 
-enum StarterGiftStorageKey {
+nonisolated enum StarterGiftStorageKey {
     static let claimed = "ohanaStarterGiftClaimedV1"
     static let pending = "ohanaStarterGiftPendingV1"
     static let ceremonySeen = "ohanaStarterLv0CeremonySeenV1"

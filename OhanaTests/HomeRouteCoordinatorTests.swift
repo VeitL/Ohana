@@ -3,6 +3,7 @@ import Testing
 @testable import Ohana
 
 @MainActor
+@Suite(.serialized)
 struct HomeRouteCoordinatorTests {
     @Test func quickPetActionMapsToSheetRouteAndDismisses() throws {
         let pet = Pet(name: "Momo", species: "猫")
@@ -172,7 +173,10 @@ struct HomeRouteCoordinatorTests {
         #expect(coordinator.modal == nil)
     }
 
-    @Test func appSheetSinkSuppressesOutOfScopeFunctionMenuDestination() {
+    @Test func appSheetSinkRedirectsPlantFunctionMenuBeforeLevelFour() {
+        PlantUnlockPolicy.clearExistingPlantData()
+        defer { PlantUnlockPolicy.clearExistingPlantData() }
+
         let coordinator = HomeRouteCoordinator()
         var appSheets: [HomeAppSheetRoute] = []
 
@@ -182,7 +186,24 @@ struct HomeRouteCoordinatorTests {
 
         coordinator.openFunctionMenu(destination: .plantsDashboard, currentLevel: 1)
 
-        #expect(appSheets == [.functionMenu(destination: nil)])
+        #expect(appSheets == [.functionMenu(destination: .growthRoadmap)])
+        #expect(coordinator.modal == nil)
+    }
+
+    @Test func appSheetSinkAllowsPlantFunctionMenuAtLevelFour() {
+        PlantUnlockPolicy.clearExistingPlantData()
+        defer { PlantUnlockPolicy.clearExistingPlantData() }
+
+        let coordinator = HomeRouteCoordinator()
+        var appSheets: [HomeAppSheetRoute] = []
+
+        coordinator.bindAppSheetRouteSink { route in
+            appSheets.append(route)
+        }
+
+        coordinator.openFunctionMenu(destination: .plantsDashboard, currentLevel: 4)
+
+        #expect(appSheets == [.functionMenu(destination: .plantsDashboard)])
         #expect(coordinator.modal == nil)
     }
 
@@ -215,7 +236,10 @@ struct HomeRouteCoordinatorTests {
         #expect(coordinator.modal == nil)
     }
 
-    @Test func appSheetSinkRedirectsHiddenPlantAddToGrowthRoadmap() {
+    @Test func appSheetSinkRedirectsPlantAddEntityBeforeLevelFour() {
+        PlantUnlockPolicy.clearExistingPlantData()
+        defer { PlantUnlockPolicy.clearExistingPlantData() }
+
         let coordinator = HomeRouteCoordinator()
         var appSheets: [HomeAppSheetRoute] = []
 
@@ -223,9 +247,26 @@ struct HomeRouteCoordinatorTests {
             appSheets.append(route)
         }
 
-        coordinator.openAddEntity(.plant)
+        coordinator.openAddEntity(.plant, currentLevel: 3)
 
         #expect(appSheets == [.functionMenu(destination: .growthRoadmap)])
+        #expect(coordinator.modal == nil)
+    }
+
+    @Test func appSheetSinkInterceptsPlantAddEntityAtLevelFour() {
+        PlantUnlockPolicy.clearExistingPlantData()
+        defer { PlantUnlockPolicy.clearExistingPlantData() }
+
+        let coordinator = HomeRouteCoordinator()
+        var appSheets: [HomeAppSheetRoute] = []
+
+        coordinator.bindAppSheetRouteSink { route in
+            appSheets.append(route)
+        }
+
+        coordinator.openAddEntity(.plant, currentLevel: 4)
+
+        #expect(appSheets == [.addEntity(.plant)])
         #expect(coordinator.modal == nil)
     }
 
@@ -345,16 +386,34 @@ struct HomeRouteCoordinatorTests {
         #expect(destination == .featureGroup(.dailyCare))
     }
 
-    @Test func addPlantFallsBackToGrowthRoadmapWithoutAppSheetSink() {
+    @Test func addPlantRedirectsToLocalRoadmapBeforeLevelFourWithoutAppSheetSink() {
+        PlantUnlockPolicy.clearExistingPlantData()
+        defer { PlantUnlockPolicy.clearExistingPlantData() }
+
         let coordinator = HomeRouteCoordinator()
 
-        coordinator.openAddEntity(.plant)
+        coordinator.openAddEntity(.plant, currentLevel: 3)
 
         guard case let .functionMenu(destination) = coordinator.modal else {
-            Issue.record("Expected hidden plant add route to fall back to the growth roadmap")
+            Issue.record("Expected plant add route to redirect locally")
             return
         }
         #expect(destination == .growthRoadmap)
+    }
+
+    @Test func addPlantOpensLocalModalAtLevelFourWithoutAppSheetSink() {
+        PlantUnlockPolicy.clearExistingPlantData()
+        defer { PlantUnlockPolicy.clearExistingPlantData() }
+
+        let coordinator = HomeRouteCoordinator()
+
+        coordinator.openAddEntity(.plant, currentLevel: 4)
+
+        guard case let .addEntity(type) = coordinator.modal else {
+            Issue.record("Expected plant add route to open locally")
+            return
+        }
+        #expect(type == .plant)
     }
 
     @Test func streakDetailFallsBackToLocalModalWithoutAppSheetSink() {

@@ -343,6 +343,9 @@ actor HomeReadModelActor {
         try Task.checkCancellation()
 
         let plants = input.loadPlants ? fetches.plants() : []
+        if !plants.isEmpty {
+            PlantUnlockPolicy.noteExistingPlantData()
+        }
         let electronicPets = fetches.electronicPets()
         try Task.checkCancellation()
 

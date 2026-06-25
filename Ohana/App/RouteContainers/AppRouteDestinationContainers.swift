@@ -135,9 +135,8 @@ struct AppRoutePresentationHost: ViewModifier {
             openHumanQuickKey(key, human: human)
         case let .humanDetail(human):
             coordinator.openHuman(human.id)
-        case .plant:
-            AppFeatureRouteGuard.recordIntercept("calendarPlant")
-            coordinator.presentFunctionMenu(destination: .growthRoadmap)
+        case let .plant(plant):
+            coordinator.openPlant(plant.id)
         case let .functionMenu(destination):
             coordinator.presentFunctionMenu(destination: destination)
         case let .calendar(entityID, humanID):
@@ -289,13 +288,18 @@ private struct AppSheetRouteDestination: View {
             AppAccountSwitcherRouteContainer(onSwitched: onDismiss)
                 .ohanaCompactSheetPresentation(detents: [.medium, .large])
         case let .addEntity(type):
-            AddEntityDestinationView(
-                type: type,
-                onComplete: onDismiss,
-                onPetSaved: onPetSavedFromAddEntity,
-                onHumanSaved: onHumanSavedFromAddEntity
-            )
-            .ohanaSheetPagePresentation()
+            if AppFeatureRouteGuard.allowsAddEntity(type, currentLevel: currentFeatureLevel) {
+                AddEntityDestinationView(
+                    type: type,
+                    onComplete: onDismiss,
+                    onPetSaved: onPetSavedFromAddEntity,
+                    onHumanSaved: onHumanSavedFromAddEntity
+                )
+                .ohanaSheetPagePresentation()
+            } else {
+                HiddenRouteInterceptView(note: "addEntity:\(type.rawValue)")
+                    .onAppear(perform: onDismiss)
+            }
         case let .calendar(entityID, humanID):
             CalendarRouteContainer(
                 preselectedPetId: entityID,

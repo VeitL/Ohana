@@ -6,6 +6,8 @@
 > Working protocol remains `docs/ai-module-test-playbook.md`. A task is not
 > complete until this dashboard or `docs/task-follow-ups.md` reflects any durable
 > status movement.
+>
+> Status ownership map: [`docs/status-ledger-map.md`](status-ledger-map.md).
 
 ## Current Release Read
 
@@ -96,6 +98,7 @@ Keep this section short; move older detail to archive during compaction.
 
 | Date | Snapshot | Evidence |
 | --- | --- | --- |
+| 2026-06-25 | Status ledger deep compaction guard | Active status ownership now lives in `docs/status-ledger-map.md`; `docs/task-follow-ups.md` remains the open backlog and `docs/testing-progress.md` remains the release/validation dashboard. Added `scripts/audit-doc-status-ledgers.sh` and wired it into `scripts/dev-check-changed.sh` for active status docs. |
 | 2026-06-25 | TFU-20260623-001 Home quick-action actor-isolation cleanup | `HomeQuickActionRenderStateLogic` now owns pure quick-action render-state projection, `HomeInteractionSnapshotBuilder` no longer directly calls legacy default-MainActor helpers, and the guard still rejects `compatibilitySource`, `payload.source`, and `container.mainContext`. Validation: `git diff --check` PASS; `scripts/dev-check-changed.sh` PASS; CI YAML parse PASS; user-run Terminal targeted `scripts/test-simulator.sh -only-testing:OhanaTests/HomeReadModelStoreTests -only-testing:OhanaTests/HomeExpensePreviewStoreTests -only-testing:OhanaTests/HomeSnapshotBuilderTests` on pinned `iPhone 17` reported `TEST SUCCEEDED`. Codex shell CoreSimulator remains session-isolated and is now diagnosed by `scripts/diagnose-simulator.sh`. |
 | 2026-06-25 | TFU-006 route first-frame correction after closure | Added deferred route containers for expense, insurance, documents, and milestones; `git diff --check`, `scripts/dev-check-changed.sh`, `scripts/audit-architecture-boundaries.sh --all`, `scripts/audit-localization-coverage.sh`, and targeted `scripts/test-simulator.sh '-only-testing:OhanaTests/MemberLifecycleGateTests/expenseHistoryDashboardUsesRouteScopedRowsInsteadOfPetExpenseRelationship()' '-only-testing:OhanaTests/MemberLifecycleGateTests/archiveFeatureViewsUseRouteScopedRowsInsteadOfPetRelationships()'` PASS on `iPhone 17` (2 Swift Testing tests, xcresult `/var/folders/9j/7ldcxzn91d947mg4p_7wxmz40000gn/T/OhanaDerivedData/main-b6cf423d5931-tests/Logs/Test/Test-Ohana-2026.06.25_07-03-31-+0200.xcresult`). |
 | 2026-06-25 | P1 closure review batch | TFU-20260614-017/016/015/018/019, TFU-20260615-001, and TFU-20260614-013 marked Done from current-head guard/test evidence; raw Open P1 = 4. |
@@ -113,6 +116,7 @@ Keep this section short; move older detail to archive during compaction.
 - Do not paste long logs or every targeted test run. Keep one compact row per meaningful batch.
 - Move old validation rows to the archive when the active file becomes hard to scan.
 - Open follow-ups live in `docs/task-follow-ups.md`; this file should only point to them.
+- Status-file consistency is guarded by `scripts/audit-doc-status-ledgers.sh`.
 
 ## Archive
 

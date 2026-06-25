@@ -80,7 +80,7 @@ enum TreeLevel: Int, CaseIterable, Comparable {
 }
 
 // MARK: - 能量阈值表
-private let energyThresholds: [Int] = [0, 50, 150, 300, 500, 800, 1200, 1800, 2600, 3200, 3600]
+private nonisolated let energyThresholds: [Int] = [0, 50, 150, 300, 500, 800, 1200, 1800, 2600, 3200, 3600]
 private let legacyEnergyThresholds: [Int] = [0, 0, 50, 150, 300, 500, 800, 1200, 1800, 2600, 3600]
 
 // MARK: - OasisTreeManager
@@ -121,6 +121,14 @@ final class OasisTreeManager {
 
     var progressToNextLevel: Double {
         Self.progressToNextLevel(forTotalEnergy: totalEnergy)
+    }
+
+    nonisolated static func levelRawValue(forTotalEnergy totalEnergy: Int) -> Int {
+        let safeEnergy = max(0, totalEnergy)
+        for rawLevel in energyThresholds.indices.reversed() where safeEnergy >= energyThresholds[rawLevel] {
+            return rawLevel
+        }
+        return 0
     }
 
     static func treeLevel(forTotalEnergy totalEnergy: Int) -> TreeLevel {
@@ -712,7 +720,8 @@ final class OasisTreeManager {
         pets: [Pet],
         humans: [Human]
     ) -> Int {
-        if PlantFeatureGate.allows(.plants), let legacyBaseline = OasisTreePreferenceStore.legacyBaselineXPRecord() {
+        let includesPlantCare = PlantUnlockPolicy.hasExistingPlantData()
+        if includesPlantCare, let legacyBaseline = OasisTreePreferenceStore.legacyBaselineXPRecord() {
             let compatibleBaseline = legacyBaseline.isCurrentScale
                 ? legacyBaseline.xp
                 : Self.legacyCompatibleXP(forLegacyTreeEnergy: legacyBaseline.xp)
@@ -729,7 +738,7 @@ final class OasisTreeManager {
 
         let legacyLedgerCount = ledgerEvents.count(where: {
             !$0.metadataJSON.contains("\"economyVersion\":2") &&
-                ($0.eventKindEnum != .plantCare || PlantFeatureGate.allows(.plants)) &&
+                ($0.eventKindEnum != .plantCare || includesPlantCare) &&
                 [.care, .potty, .walk, .hygiene, .health, .weight, .medication, .workout, .plantCare, .milestone].contains($0.eventKindEnum)
         })
         let fallbackCount = legacyLedgerCount > 0
@@ -756,7 +765,7 @@ final class OasisTreeManager {
             total += human.workoutLogs.count
         }
         let plantEventCount: Int
-        if PlantFeatureGate.allows(.plants) {
+        if PlantUnlockPolicy.hasExistingPlantData() {
             do {
                 let events = try modelContext.fetch(FetchDescriptor<Event>())
                 plantEventCount = events.count {

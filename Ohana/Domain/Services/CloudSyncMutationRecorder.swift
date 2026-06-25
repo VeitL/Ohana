@@ -58,6 +58,22 @@ nonisolated enum CloudSyncMutationRecorder {
 
     @discardableResult
     static func markModified(
+        _ plant: Plant,
+        context: ModelContext,
+        modifiedAt: Date = Date()
+    ) -> CloudSyncRecordState? {
+        markModified(
+            entityName: String(describing: Plant.self),
+            localRecordId: plant.id,
+            householdId: sharedHouseholdId(context: context, now: modifiedAt),
+            fallbackHouseholdId: plant.id,
+            modifiedAt: modifiedAt,
+            context: context
+        )
+    }
+
+    @discardableResult
+    static func markModified(
         _ event: Event,
         context: ModelContext,
         modifiedAt: Date = Date()

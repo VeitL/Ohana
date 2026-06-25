@@ -900,6 +900,12 @@ enum ArkSchemaV72: VersionedSchema {
     static var models: [any PersistentModel.Type] { ArkSchemaV71.models }
 }
 
+// MARK: - Schema V73（植物首发档案字段与护理日志扩展）
+enum ArkSchemaV73: VersionedSchema {
+    static var versionIdentifier = Schema.Version(73, 0, 0)
+    static var models: [any PersistentModel.Type] { ArkSchemaV72.models }
+}
+
 // MARK: - Migration Plan
 // 只保留有真实 custom logic 的 stage；轻量新增字段/模型不需要显式 stage。
 // 相邻 schema hash 相同时，显式 stage 会触发 iOS 26 "model reference cannot be equal"。
@@ -920,7 +926,7 @@ enum ArkMigrationPlan: SchemaMigrationPlan {
          ArkSchemaV55.self, ArkSchemaV56.self, ArkSchemaV57.self, ArkSchemaV58.self, ArkSchemaV59.self,
          ArkSchemaV60.self, ArkSchemaV61.self, ArkSchemaV62.self, ArkSchemaV63.self, ArkSchemaV64.self,
          ArkSchemaV65.self, ArkSchemaV66.self, ArkSchemaV67.self, ArkSchemaV68.self, ArkSchemaV69.self,
-         ArkSchemaV70.self, ArkSchemaV71.self, ArkSchemaV72.self]
+         ArkSchemaV70.self, ArkSchemaV71.self, ArkSchemaV72.self, ArkSchemaV73.self]
     }
 
     static var stages: [MigrationStage] { [] }
@@ -950,7 +956,7 @@ enum SharedModelContainer {
 
     private static func createPersistentContainer() -> ModelContainer {
         ensureApplicationSupportDirectory()
-        let schema = Schema(ArkSchemaV72.models)
+        let schema = Schema(ArkSchemaV73.models)
         let defaultConfig = ModelConfiguration(
             isStoredInMemoryOnly: false,
             cloudKitDatabase: .none

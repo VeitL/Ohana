@@ -25,14 +25,17 @@ enum PlantCareCommandService {
         executorId: String?,
         context: ModelContext,
         now: Date = Date(),
+        careNote: String = "",
+        photoData: Data? = nil,
+        healthStatus: PlantHealthStatus? = nil,
         careLedger providedCareLedger: CareLedgerRecording? = nil
     ) -> PlantCareCommandResult {
         let careLedger = providedCareLedger ?? CareLedgerService()
         let eventIntent = DomainScheduleCreateIntent(
-            title: "\(type.emoji) 给 \(plant.name)\(type.displayName)",
+            title: "\(type.emoji) 给 \(plant.name)\(type.displayName)\(safetyReminderSuffix(for: plant))",
             startDate: now,
             isAllDay: false,
-            eventType: type == .watering ? EventType.watering.rawValue : EventType.fertilizing.rawValue,
+            eventType: type.eventType.rawValue,
             relatedEntityType: EntityKind.plant.rawValue,
             relatedEntityId: plant.id.uuidString,
             assigneeId: executorId,
@@ -68,11 +71,26 @@ enum PlantCareCommandService {
             plant.lastWateredDate = now
         case .fertilizing:
             plant.lastFertilizedDate = now
+        case .pestCheck, .pestFound, .yellowLeaf, .newLeaf, .photo, .customNote:
+            plant.lastHealthCheckDate = now
+        case .repotting, .pruning, .misting, .rotating, .leafCleaning:
+            break
+        }
+        if let healthStatus {
+            plant.healthStatus = healthStatus
         }
 
-        let log = PlantCareLog(date: now, careType: type, executorId: authorizedExecutorId)
+        let log = PlantCareLog(
+            date: now,
+            careType: type,
+            note: careNote,
+            executorId: authorizedExecutorId,
+            photoData: photoData,
+            healthStatus: healthStatus
+        )
         log.plant = plant
         context.insert(log)
+        CloudSyncMutationRecorder.markModified(plant, context: context, modifiedAt: now)
 
         let event = DomainScheduleWriter.createEvent(plan: plan, context: context).event
 
@@ -109,6 +127,20 @@ enum PlantCareCommandService {
             careType: type
         )
     }
+
+    private static func safetyReminderSuffix(for plant: Plant, defaults: UserDefaults = .standard) -> String {
+        let hasPets = defaults.object(forKey: "ohana_onboarding_has_pets") == nil
+            ? true
+            : defaults.bool(forKey: "ohana_onboarding_has_pets")
+        let hasChildren = defaults.bool(forKey: "ohana_onboarding_has_children")
+        if hasPets, plant.isToxicToCats || plant.isToxicToDogs {
+            return " · 放到宠物够不到处"
+        }
+        if hasChildren, plant.isToxicToChildren {
+            return " · 注意儿童误食"
+        }
+        return ""
+    }
 }
 
 struct PlantCreationCommandInput: Equatable {
@@ -119,6 +151,20 @@ struct PlantCreationCommandInput: Equatable {
     let avatarEmoji: String
     let wateringIntervalDays: Int
     let fertilizingIntervalDays: Int
+    let potDiameterCm: Double
+    let potMaterialRaw: String
+    let soilTypeRaw: String
+    let isIndoor: Bool
+    let windowDirection: PlantWindowDirection
+    let lightLevel: PlantLightLevel
+    let healthStatus: PlantHealthStatus
+    let catalogSpeciesId: String
+    let isToxicToCats: Bool
+    let isToxicToDogs: Bool
+    let isToxicToChildren: Bool
+    let isIndoorSuitable: Bool
+    let remindersEnabled: Bool
+    let notes: String
 
     init(
         id: UUID = UUID(),
@@ -127,7 +173,21 @@ struct PlantCreationCommandInput: Equatable {
         location: String,
         avatarEmoji: String,
         wateringIntervalDays: Int,
-        fertilizingIntervalDays: Int
+        fertilizingIntervalDays: Int,
+        potDiameterCm: Double = 0,
+        potMaterialRaw: String = "",
+        soilTypeRaw: String = "",
+        isIndoor: Bool = true,
+        windowDirection: PlantWindowDirection = .unknown,
+        lightLevel: PlantLightLevel = .medium,
+        healthStatus: PlantHealthStatus = .stable,
+        catalogSpeciesId: String = "",
+        isToxicToCats: Bool = false,
+        isToxicToDogs: Bool = false,
+        isToxicToChildren: Bool = false,
+        isIndoorSuitable: Bool = true,
+        remindersEnabled: Bool = true,
+        notes: String = ""
     ) {
         self.id = id
         self.name = name
@@ -136,6 +196,20 @@ struct PlantCreationCommandInput: Equatable {
         self.avatarEmoji = avatarEmoji
         self.wateringIntervalDays = wateringIntervalDays
         self.fertilizingIntervalDays = fertilizingIntervalDays
+        self.potDiameterCm = potDiameterCm
+        self.potMaterialRaw = potMaterialRaw
+        self.soilTypeRaw = soilTypeRaw
+        self.isIndoor = isIndoor
+        self.windowDirection = windowDirection
+        self.lightLevel = lightLevel
+        self.healthStatus = healthStatus
+        self.catalogSpeciesId = catalogSpeciesId
+        self.isToxicToCats = isToxicToCats
+        self.isToxicToDogs = isToxicToDogs
+        self.isToxicToChildren = isToxicToChildren
+        self.isIndoorSuitable = isIndoorSuitable
+        self.remindersEnabled = remindersEnabled
+        self.notes = notes
     }
 }
 
@@ -160,10 +234,26 @@ enum PlantCreationCommandService {
                 ? "🌱"
                 : input.avatarEmoji.trimmingCharacters(in: .whitespacesAndNewlines),
             wateringIntervalDays: input.wateringIntervalDays,
-            fertilizingIntervalDays: input.fertilizingIntervalDays
+            fertilizingIntervalDays: input.fertilizingIntervalDays,
+            potDiameterCm: input.potDiameterCm,
+            potMaterialRaw: input.potMaterialRaw.trimmingCharacters(in: .whitespacesAndNewlines),
+            soilTypeRaw: input.soilTypeRaw.trimmingCharacters(in: .whitespacesAndNewlines),
+            isIndoor: input.isIndoor,
+            windowDirection: input.windowDirection,
+            lightLevel: input.lightLevel,
+            healthStatus: input.healthStatus,
+            catalogSpeciesId: input.catalogSpeciesId,
+            isToxicToCats: input.isToxicToCats,
+            isToxicToDogs: input.isToxicToDogs,
+            isToxicToChildren: input.isToxicToChildren,
+            isIndoorSuitable: input.isIndoorSuitable,
+            remindersEnabled: input.remindersEnabled
         )
         plant.id = input.id
+        plant.notes = input.notes.trimmingCharacters(in: .whitespacesAndNewlines)
         context.insert(plant)
+        PlantUnlockPolicy.noteExistingPlantData()
+        CloudSyncMutationRecorder.markModified(plant, context: context)
         context.safeSave()
 
         return PlantCreationCommandResult(

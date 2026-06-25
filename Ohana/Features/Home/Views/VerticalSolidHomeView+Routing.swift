@@ -88,7 +88,7 @@ extension VerticalSolidHomeView {
     }
 
     func selectTab(_ tab: VerticalSolidHomeTab) {
-        guard AppFeatureRouteGuard.allowsHomeTab(tab) else {
+        guard AppFeatureRouteGuard.allowsHomeTab(tab, currentLevel: appServices.oasisTree.treeLevel.rawValue) else {
             AppFeatureRouteGuard.recordIntercept("homeTab:\(tab.rawValue)")
             return
         }

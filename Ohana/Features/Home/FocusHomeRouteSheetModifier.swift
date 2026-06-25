@@ -144,19 +144,27 @@ struct FocusHomeRouteSheetModifier: ViewModifier {
             )
             .ohanaSheetPagePresentation() // ui-v4: allow long streak overview
         case let .addEntity(type):
-            AddEntityDestinationView(
-                type: type,
-                onComplete: { routes.dismissModal() },
-                onPetSaved: onPetSavedFromAddEntity,
-                onHumanSaved: { human in
-                    activeHumanIdStr = ActiveHumanSelectionPolicy.activeHumanIdAfterCreatingHuman(
-                        currentHumanIdRaw: activeHumanIdStr,
-                        createdHumanId: human.id
-                    )
-                    onHumanSavedFromAddEntity(human)
-                }
-            )
-            .ohanaSheetPagePresentation() // ui-v4: allow role creation flow as long sheet
+            if AppFeatureRouteGuard.allowsAddEntity(type, currentLevel: appServices.oasisTree.treeLevel.rawValue) {
+                AddEntityDestinationView(
+                    type: type,
+                    onComplete: { routes.dismissModal() },
+                    onPetSaved: onPetSavedFromAddEntity,
+                    onHumanSaved: { human in
+                        activeHumanIdStr = ActiveHumanSelectionPolicy.activeHumanIdAfterCreatingHuman(
+                            currentHumanIdRaw: activeHumanIdStr,
+                            createdHumanId: human.id
+                        )
+                        onHumanSavedFromAddEntity(human)
+                    }
+                )
+                .ohanaSheetPagePresentation() // ui-v4: allow role creation flow as long sheet
+            } else {
+                Color.clear
+                    .onAppear {
+                        AppFeatureRouteGuard.recordIntercept("homeAddEntity:\(type.rawValue)")
+                        routes.dismissModal()
+                    }
+            }
         case let .coconutLog(subject):
             CoconutLogView(
                 subject: subject,
@@ -237,9 +245,8 @@ struct FocusHomeRouteSheetModifier: ViewModifier {
             openHumanQuickKey(key, humanID: human.id)
         case let .humanDetail(human):
             routes.openSheet(.humanBasicInfo(human.id))
-        case .plant:
-            AppFeatureRouteGuard.recordIntercept("sheetReminderPlant")
-            openFunctionMenu(destination: .growthRoadmap)
+        case let .plant(plant):
+            openFunctionMenu(destination: .plantDetail(plant.id))
         case let .functionMenu(destination):
             openFunctionMenu(destination: destination)
         case let .calendar(entityId, humanId):

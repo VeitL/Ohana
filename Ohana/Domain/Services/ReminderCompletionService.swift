@@ -108,6 +108,13 @@ final class ReminderCompletionService: ReminderCompleting {
             return false
         }
         context.safeSave()
+        PlantCareScheduleSyncService.syncCompletedReminder(
+            reminder,
+            executorId: humanId,
+            context: context,
+            now: now,
+            careLedger: careLedger
+        )
         cancelNotification(for: reminder, notifications: notifications)
         runReminderEffects(
             reminder,

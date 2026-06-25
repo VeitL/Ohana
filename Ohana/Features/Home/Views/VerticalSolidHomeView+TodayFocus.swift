@@ -55,8 +55,12 @@ extension VerticalSolidHomeView {
         }
     }
 
+    var isPlantCareUnlockedForHome: Bool {
+        PlantUnlockPolicy.isUnlocked(currentLevel: appServices.oasisTree.treeLevel.rawValue)
+    }
+
     func openPlant(_ plant: VerticalSolidHomePlantSnapshot) {
-        guard PlantFeatureGate.allows(.plants) else {
+        guard isPlantCareUnlockedForHome else {
             AppFeatureRouteGuard.recordIntercept("plantGate:homePlantCard")
             return
         }
@@ -88,7 +92,7 @@ extension VerticalSolidHomeView {
             return
         }
 
-        if PlantFeatureGate.allows(.plants), let plant = targetPlant(for: quest) {
+        if isPlantCareUnlockedForHome, let plant = targetPlant(for: quest) {
             openTodayFocusPlant(plant)
             return
         }
@@ -129,7 +133,7 @@ extension VerticalSolidHomeView {
             return
         }
 
-        if PlantFeatureGate.allows(.plants),
+        if isPlantCareUnlockedForHome,
            quest.id == "q_water_plant" || quest.id.hasPrefix("q_water_plant_"),
            let plant = targetPlant(for: quest) {
             let plantID = plant.id
@@ -141,7 +145,7 @@ extension VerticalSolidHomeView {
             return
         }
 
-        if PlantFeatureGate.allows(.plants),
+        if isPlantCareUnlockedForHome,
            quest.id == "q_fertilize_plant" || quest.id.hasPrefix("q_fertilize_plant_"),
            let plant = targetPlant(for: quest) {
             let plantID = plant.id
@@ -204,7 +208,7 @@ extension VerticalSolidHomeView {
             return
         }
 
-        if PlantFeatureGate.allows(.plants),
+        if isPlantCareUnlockedForHome,
            let plantId = signal.plantId,
            interaction.plantIDs.contains(plantId) {
             onOpenPlant(plantId)
@@ -323,7 +327,7 @@ extension VerticalSolidHomeView {
     }
 
     func targetPlant(for quest: IslandQuest) -> VerticalSolidHomePlantSnapshot? {
-        guard PlantFeatureGate.allows(.plants) else { return nil }
+        guard isPlantCareUnlockedForHome else { return nil }
         if let targetPlantId = quest.targetPlantId {
             return controller.snapshot.plants.first(where: { $0.id == targetPlantId })
         }

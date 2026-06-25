@@ -6,6 +6,8 @@
 > Release bar: first release is blocked only by **P0 and first-release-reachable**
 > issues. P1/P2/P3, CloudKit `.none` work, feature-gated work, and manual device
 > validation remain visible here but do not automatically block shipping.
+>
+> Status ownership map: [`docs/status-ledger-map.md`](status-ledger-map.md).
 
 ## Current Read
 
@@ -26,6 +28,9 @@
 - Long command logs, full review transcripts, and repeated progress bullets do
   not belong here; put the durable evidence in `docs/testing-progress.md` or an
   archive note.
+- After changing this file, run `scripts/audit-doc-status-ledgers.sh` or
+  `scripts/dev-check-changed.sh` so the summary counts and active pointers stay
+  aligned.
 
 ## P1 Triage
 
@@ -138,6 +143,7 @@
 Use the archive for full detail. High-signal closures already reflected in the current open count:
 
 - TFU-20260612-006: CareLedger read-model migration closed; later route-first-frame correction recorded in `docs/testing-progress.md`.
+- TFU-20260613-010: expense reward farm-risk review archived Done; ECO-025 now documents the current rule and says to open a new TFU if the policy changes.
 - TFU-20260614-013, 015, 016, 017, 018, 019 and TFU-20260615-001: current-head closure reviews completed on 2026-06-25; raw Open P1 count reduced to 4.
 - TFU-20260623-001: Home quick-action render-state isolation cleanup closed after Terminal `iPhone 17` targeted suites reported `TEST SUCCEEDED`; Codex shell CoreSimulator remains a session blocker, now diagnosed by `scripts/diagnose-simulator.sh`.
 - TFU-20260612-019: human memorial read-only boundary closed by current guard coverage.

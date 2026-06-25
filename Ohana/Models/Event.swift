@@ -9,7 +9,7 @@ import Foundation
 import SwiftData
 
 // MARK: - Event Types
-enum EventType: String, Codable, CaseIterable, Identifiable {
+enum EventType: String, Codable, CaseIterable, Identifiable, Sendable {
     // 通用
     case birthday = "生日"
     case anniversary = "纪念日"
@@ -29,6 +29,13 @@ enum EventType: String, Codable, CaseIterable, Identifiable {
     // 植物
     case watering = "浇水"
     case fertilizing = "施肥"
+    case plantRepotting = "植物换盆"
+    case plantPruning = "植物修剪"
+    case plantMisting = "植物喷雾"
+    case plantRotation = "植物转盆"
+    case plantLeafCleaning = "清洁叶片"
+    case plantPestCheck = "病虫害检查"
+    case plantHealthCheck = "植物状态记录"
     // 人类专用
     case medication = "吃药"
     /// 宠物用药计划（关联类型由 `DomainEntityLinkRegistry` 统一注册）
@@ -40,7 +47,7 @@ enum EventType: String, Codable, CaseIterable, Identifiable {
 
     var id: String { rawValue }
 
-    var emoji: String {
+    nonisolated var emoji: String {
         switch self {
         case .birthday: "🎂"
         case .anniversary: "💝"
@@ -58,6 +65,13 @@ enum EventType: String, Codable, CaseIterable, Identifiable {
         case .litterBox: "🧹"
         case .watering: "💧"
         case .fertilizing: "🌿"
+        case .plantRepotting: "🪴"
+        case .plantPruning: "✂️"
+        case .plantMisting: "💦"
+        case .plantRotation: "🔄"
+        case .plantLeafCleaning: "🍃"
+        case .plantPestCheck: "🔎"
+        case .plantHealthCheck: "📝"
         case .medication: "💊"
         case .petMedication: "💊"
         case .petMedicationDose: "💊"
@@ -66,7 +80,7 @@ enum EventType: String, Codable, CaseIterable, Identifiable {
     }
 
     /// 日历周条 / 事件行：纯色剪影 SF Symbol
-    var silhouetteSymbol: String {
+    nonisolated var silhouetteSymbol: String {
         switch self {
         case .birthday: "gift.fill"
         case .anniversary: "heart.fill"
@@ -83,6 +97,13 @@ enum EventType: String, Codable, CaseIterable, Identifiable {
         case .litterBox: "trash.fill"
         case .watering: "drop.fill"
         case .fertilizing: "leaf.fill"
+        case .plantRepotting: "tree.fill"
+        case .plantPruning: "scissors"
+        case .plantMisting: "humidity.fill"
+        case .plantRotation: "arrow.triangle.2.circlepath"
+        case .plantLeafCleaning: "leaf.fill"
+        case .plantPestCheck: "magnifyingglass"
+        case .plantHealthCheck: "note.text"
         case .medication, .petMedication, .petMedicationDose: "pill.fill"
         case .insurancePremium: "shield.fill"
         }

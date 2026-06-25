@@ -38,7 +38,7 @@ enum AppFeatureRouteGuard {
             return .suppress(note: "plantGate:\(destination)")
         }
 
-        switch GrowthUnlockPolicy.availability(for: destination, currentLevel: currentLevel) {
+        switch availability(for: destination, currentLevel: currentLevel) {
         case .visible:
             return .allow(destination)
         case .hiddenLocked:
@@ -50,11 +50,19 @@ enum AppFeatureRouteGuard {
 
     static func availability(for destination: FMDest, currentLevel: Int) -> AppFeatureAvailability {
         guard allowsPlantDestination(destination) else { return .outOfScope }
+        if requiresPlantFeature(destination) {
+            let status = GrowthUnlockPolicy.status(for: GrowthUnlockStageID.household, currentLevel: currentLevel)
+            return PlantUnlockPolicy.isUnlocked(currentLevel: currentLevel) ? .visible(status) : .hiddenLocked(status)
+        }
         return GrowthUnlockPolicy.availability(for: destination, currentLevel: currentLevel)
     }
 
     static func availability(for group: FeatureGroup, currentLevel: Int) -> AppFeatureAvailability {
         guard allowsPlantGroup(group) else { return .outOfScope }
+        if requiresPlantFeature(group) {
+            let status = GrowthUnlockPolicy.status(for: GrowthUnlockStageID.household, currentLevel: currentLevel)
+            return PlantUnlockPolicy.isUnlocked(currentLevel: currentLevel) ? .visible(status) : .hiddenLocked(status)
+        }
         return GrowthUnlockPolicy.availability(for: group, currentLevel: currentLevel)
     }
 
@@ -83,8 +91,12 @@ enum AppFeatureRouteGuard {
     }
 
     static func allowsAddEntity(_ type: EntityType) -> Bool {
+        allowsAddEntity(type, currentLevel: currentFeatureLevel)
+    }
+
+    static func allowsAddEntity(_ type: EntityType, currentLevel: Int) -> Bool {
         if type == .plant {
-            return PlantFeatureGate.allows(.plants)
+            return PlantUnlockPolicy.isUnlocked(currentLevel: currentLevel)
         }
         return type.isAvailable
     }
@@ -94,21 +106,37 @@ enum AppFeatureRouteGuard {
     }
 
     static func allowsAppRoute(_ route: AppRoute) -> Bool {
+        allowsAppRoute(route, currentLevel: currentFeatureLevel)
+    }
+
+    static func allowsAppRoute(_ route: AppRoute, currentLevel: Int) -> Bool {
         switch route {
         case .plantProfile:
-            PlantFeatureGate.allows(.plants)
+            PlantUnlockPolicy.isUnlocked(currentLevel: currentLevel)
         case .petProfile, .humanProfile:
             true
         }
     }
 
+    static func allowsHomeTab(_ tab: VerticalSolidHomeTab) -> Bool {
+        allowsHomeTab(tab, currentLevel: currentFeatureLevel)
+    }
+
     static func allowsHomeTab(
         _ tab: VerticalSolidHomeTab,
+        starterGiftDefaults: UserDefaults
+    ) -> Bool {
+        allowsHomeTab(tab, currentLevel: currentFeatureLevel, starterGiftDefaults: starterGiftDefaults)
+    }
+
+    static func allowsHomeTab(
+        _ tab: VerticalSolidHomeTab,
+        currentLevel: Int,
         starterGiftDefaults: UserDefaults = .standard
     ) -> Bool {
         switch tab {
         case .plants:
-            PlantFeatureGate.allows(.plants)
+            PlantUnlockPolicy.isUnlocked(currentLevel: currentLevel)
         case .oasis:
             StarterGiftService.isOasisHomeTabUnlocked(defaults: starterGiftDefaults)
         case .home, .calendar:
@@ -116,8 +144,17 @@ enum AppFeatureRouteGuard {
         }
     }
 
+    static func visibleHomeTabs(
+        currentLevel: Int,
+        starterGiftDefaults: UserDefaults = .standard
+    ) -> [VerticalSolidHomeTab] {
+        VerticalSolidHomeTab.allCases.filter {
+            allowsHomeTab($0, currentLevel: currentLevel, starterGiftDefaults: starterGiftDefaults)
+        }
+    }
+
     static func visibleHomeTabs(starterGiftDefaults: UserDefaults = .standard) -> [VerticalSolidHomeTab] {
-        VerticalSolidHomeTab.allCases.filter { allowsHomeTab($0, starterGiftDefaults: starterGiftDefaults) }
+        visibleHomeTabs(currentLevel: currentFeatureLevel, starterGiftDefaults: starterGiftDefaults)
     }
 
     static var visibleHomeTabs: [VerticalSolidHomeTab] {
@@ -126,6 +163,10 @@ enum AppFeatureRouteGuard {
 
     static var shouldLoadPlantData: Bool {
         PlantFeatureGate.allows(.plants)
+    }
+
+    nonisolated static var currentFeatureLevel: Int {
+        OasisTreeManager.levelRawValue(forTotalEnergy: OasisTreePreferenceStore.injectedEnergy)
     }
 
     static func currentGrowthStep(currentLevel: Int) -> GrowthUnlockStep {

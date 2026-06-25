@@ -2,6 +2,7 @@ import Foundation
 import Testing
 @testable import Ohana
 
+@Suite(.serialized)
 struct GrowthUnlockPolicyTests {
     @Test func dailyCareIsOpenAtLevelOne() {
         #expect(GrowthUnlockPolicy.status(for: FMDest.featureGroup(.dailyCare), currentLevel: 1).isUnlocked)
@@ -41,18 +42,25 @@ struct GrowthUnlockPolicyTests {
         #expect(GrowthUnlockPolicy.roadmapStages().map(\.id).contains(.advancedPlay))
     }
 
-    @Test func plantGateOwnsCurrentScopeWhileGrowthUnlockKeepsFutureSemantics() {
-        #expect(!PlantFeatureGate.allows(.plants))
-        #expect(GrowthUnlockPolicy.availability(for: FMDest.plantsDashboard, currentLevel: 10).isVisibleInApp)
-        #expect(GrowthUnlockPolicy.availability(for: FeatureGroup.plants, currentLevel: 10).isVisibleInApp)
+    @Test func plantGateOwnsBuildScopeAndGrowthUnlockTreatsPlantsAsHousehold() {
+        PlantUnlockPolicy.clearExistingPlantData()
+        defer { PlantUnlockPolicy.clearExistingPlantData() }
 
-        if case .suppress = AppFeatureRouteGuard.functionDestinationDecision(.plantsDashboard, currentLevel: 10) {
+        #expect(PlantFeatureGate.allows(.plants))
+        #expect(!GrowthUnlockPolicy.availability(for: FMDest.plantsDashboard, currentLevel: 3).isVisibleInApp)
+        #expect(!GrowthUnlockPolicy.availability(for: FeatureGroup.plants, currentLevel: 3).isVisibleInApp)
+        #expect(GrowthUnlockPolicy.availability(for: FMDest.plantsDashboard, currentLevel: 4).isVisibleInApp)
+        #expect(GrowthUnlockPolicy.availability(for: FeatureGroup.plants, currentLevel: 4).isVisibleInApp)
+
+        if case .redirectToRoadmap = AppFeatureRouteGuard.functionDestinationDecision(.plantsDashboard, currentLevel: 3) {
             #expect(Bool(true))
         } else {
-            Issue.record("Expected plant dashboard destination to be suppressed by PlantFeatureGate")
+            Issue.record("Expected plant dashboard destination to redirect before Lv4")
         }
-        #expect(!AppFeatureRouteGuard.availability(for: FMDest.plantsDashboard, currentLevel: 10).isVisibleInApp)
-        #expect(!AppFeatureRouteGuard.availability(for: FeatureGroup.plants, currentLevel: 10).isVisibleInApp)
+        #expect(!AppFeatureRouteGuard.availability(for: FMDest.plantsDashboard, currentLevel: 3).isVisibleInApp)
+        #expect(!AppFeatureRouteGuard.availability(for: FeatureGroup.plants, currentLevel: 3).isVisibleInApp)
+        #expect(AppFeatureRouteGuard.availability(for: FMDest.plantsDashboard, currentLevel: 4).isVisibleInApp)
+        #expect(AppFeatureRouteGuard.availability(for: FeatureGroup.plants, currentLevel: 4).isVisibleInApp)
     }
 
     @Test func growthRoadmapIsAlwaysVisible() {
@@ -61,16 +69,24 @@ struct GrowthUnlockPolicyTests {
     }
 
     @Test func featureRouteGuardRedirectsLockedAndSuppressesGatedDestinations() {
+        PlantUnlockPolicy.clearExistingPlantData()
+        defer { PlantUnlockPolicy.clearExistingPlantData() }
+
         if case .redirectToRoadmap = AppFeatureRouteGuard.functionDestinationDecision(.gacha, currentLevel: 3) {
         } else {
             Issue.record("Expected locked gacha destination to redirect to the growth roadmap")
         }
-        if case .suppress = AppFeatureRouteGuard.functionDestinationDecision(.plantsDashboard, currentLevel: 10) {
+        if case .redirectToRoadmap = AppFeatureRouteGuard.functionDestinationDecision(.plantsDashboard, currentLevel: 3) {
         } else {
-            Issue.record("Expected plant dashboard destination to be suppressed")
+            Issue.record("Expected plant dashboard destination to redirect before Lv4")
+        }
+        if case .allow(.plantsDashboard) = AppFeatureRouteGuard.functionDestinationDecision(.plantsDashboard, currentLevel: 4) {
+        } else {
+            Issue.record("Expected plant dashboard destination to be allowed at Lv4")
         }
         #expect(AppFeatureRouteGuard.isVisibleFunctionDestination(.featureGroup(.dailyCare), currentLevel: 1))
-        #expect(!AppFeatureRouteGuard.allowsAddEntity(.plant))
+        #expect(!AppFeatureRouteGuard.allowsAddEntity(.plant, currentLevel: 3))
+        #expect(AppFeatureRouteGuard.allowsAddEntity(.plant, currentLevel: 4))
         #expect(!AppFeatureRouteGuard.allowsSheetRoute(.coconutShop(.boost), currentLevel: 5))
         #expect(AppFeatureRouteGuard.allowsSheetRoute(.coconutShop(.boost), currentLevel: 6))
         #expect(!AppFeatureRouteGuard.allowsOasisSheetRoute(.gacha, currentLevel: 6))
@@ -78,6 +94,9 @@ struct GrowthUnlockPolicyTests {
     }
 
     @Test func featureRouteGuardOwnsGlobalVisibilityDecisions() {
+        PlantUnlockPolicy.clearExistingPlantData()
+        defer { PlantUnlockPolicy.clearExistingPlantData() }
+
         let suiteName = "GrowthUnlockPolicyTests.featureRouteGuardOwnsGlobalVisibilityDecisions.\(UUID().uuidString)"
         guard let defaults = UserDefaults(suiteName: suiteName) else {
             Issue.record("Expected isolated defaults suite")
@@ -87,8 +106,9 @@ struct GrowthUnlockPolicyTests {
         defaults.set(true, forKey: StarterGiftStorageKey.claimed)
         defaults.set(true, forKey: StarterGiftStorageKey.ceremonySeen)
 
-        #expect(AppFeatureRouteGuard.visibleHomeTabs(starterGiftDefaults: defaults) == [.home, .calendar, .oasis])
-        #expect(!AppFeatureRouteGuard.shouldLoadPlantData)
+        #expect(AppFeatureRouteGuard.visibleHomeTabs(currentLevel: 1, starterGiftDefaults: defaults) == [.home, .calendar, .oasis])
+        #expect(AppFeatureRouteGuard.visibleHomeTabs(currentLevel: 4, starterGiftDefaults: defaults) == [.home, .calendar, .oasis, .plants])
+        #expect(AppFeatureRouteGuard.shouldLoadPlantData)
 
         let levelOneGroups = AppFeatureRouteGuard.visibleFeatureGroups(
             from: [.dailyCare, .healthBody, .archiveMemory, .householdHub, .plants],
@@ -100,12 +120,28 @@ struct GrowthUnlockPolicyTests {
             from: [.dailyCare, .healthBody, .archiveMemory, .householdHub, .plants],
             currentLevel: 4
         )
-        #expect(levelFourGroups == [.dailyCare, .healthBody, .archiveMemory, .householdHub])
+        #expect(levelFourGroups == [.dailyCare, .healthBody, .archiveMemory, .householdHub, .plants])
 
         let oasisStep = GrowthUnlockPolicy.status(for: GrowthUnlockStageID.oasisPlants, currentLevel: 5).step
         if case .wealthDashboard = AppFeatureRouteGuard.recommendedDestination(for: oasisStep, currentLevel: 5) {
         } else {
             Issue.record("Expected Oasis stage to recommend the wealth dashboard")
+        }
+    }
+
+    @Test func existingPlantDataGrandfathersPlantAccessBeforeLevelFour() {
+        PlantUnlockPolicy.clearExistingPlantData()
+        defer { PlantUnlockPolicy.clearExistingPlantData() }
+
+        #expect(!AppFeatureRouteGuard.allowsAddEntity(.plant, currentLevel: 3))
+
+        PlantUnlockPolicy.noteExistingPlantData()
+
+        #expect(AppFeatureRouteGuard.allowsAddEntity(.plant, currentLevel: 3))
+        #expect(AppFeatureRouteGuard.visibleHomeTabs(currentLevel: 3).contains(.plants))
+        if case .allow(.plantsDashboard) = AppFeatureRouteGuard.functionDestinationDecision(.plantsDashboard, currentLevel: 3) {
+        } else {
+            Issue.record("Expected existing plant data to keep the plant dashboard reachable")
         }
     }
 }

@@ -17,7 +17,7 @@ struct FunctionMenuDestinationRouteContainer: View {
             pets: routeData.pets,
             humans: routeData.humans,
             petAggregateSummaries: routeData.petAggregateSummaries,
-            plants: []
+            plants: routeData.plants
         )
         .onAppear {
             scheduleRouteDataLoad()
@@ -84,6 +84,7 @@ struct FunctionMenuRootRouteContainer: View {
 private struct FunctionMenuRouteData {
     var pets: [Pet] = []
     var humans: [Human] = []
+    var plants: [Plant] = []
     var petAggregateSummaries: [UUID: FunctionMenuPetAggregateSummary] = [:]
     var hasLoaded = false
 
@@ -98,9 +99,20 @@ private struct FunctionMenuRouteData {
             context: context,
             name: "Human"
         )
+        let plants = PlantFeatureGate.allows(.plants)
+            ? fetch(
+                FetchDescriptor<Plant>(sortBy: [SortDescriptor(\.createdAt)]),
+                context: context,
+                name: "Plant"
+            )
+            : []
+        if !plants.isEmpty {
+            PlantUnlockPolicy.noteExistingPlantData()
+        }
         return FunctionMenuRouteData(
             pets: pets,
             humans: humans,
+            plants: plants,
             petAggregateSummaries: FunctionMenuPetAggregateSummary.load(pets: pets, context: context),
             hasLoaded: true
         )

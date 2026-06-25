@@ -295,7 +295,7 @@ struct VerticalGlassHomeLabView: View {
                     .frame(width: 58, height: 1)
 
                 labTabButton(.oasis)
-                if PlantFeatureGate.allows(.plants) {
+                if AppFeatureRouteGuard.visibleHomeTabs.contains(.plants) {
                     labTabButton(.plants)
                 }
             }

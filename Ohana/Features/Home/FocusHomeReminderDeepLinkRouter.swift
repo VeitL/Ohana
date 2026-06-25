@@ -129,7 +129,7 @@ nonisolated enum FocusHomeReminderDeepLinkRouter {
         for event: Event,
         pets: [Pet],
         humans: [Human],
-        plants _: [Plant],
+        plants: [Plant],
         humanMedications: [HumanMedication]
     ) -> FocusHomeReminderDestination {
         if let human = MemberLifecycleActiveScheduleResolver.humanOwner(
@@ -140,8 +140,9 @@ nonisolated enum FocusHomeReminderDeepLinkRouter {
             return humanDestination(for: event, human: human)
         }
 
-        if linkRole(for: event) == .directPlant {
-            return .functionMenu(.growthRoadmap)
+        if let plantId = DomainEntityLinkRegistry.plantId(for: event),
+           let plant = plants.first(where: { $0.id == plantId }) {
+            return .plant(plant)
         }
 
         if let pet = MemberLifecycleActiveScheduleResolver.petTarget(
@@ -168,7 +169,7 @@ nonisolated enum FocusHomeReminderDeepLinkRouter {
         for payload: OhanaReminderRoutePayload,
         pets: [Pet],
         humans: [Human],
-        plants _: [Plant],
+        plants: [Plant],
         humanMedications: [HumanMedication]
     ) -> FocusHomeReminderDestination? {
         if let humanMedicationId = payload.humanMedicationId,
@@ -204,8 +205,13 @@ nonisolated enum FocusHomeReminderDeepLinkRouter {
            let human = humans.first(where: { $0.id == humanId }) {
             return .humanDetail(human)
         }
-        if resolution.role == .directPlant {
-            return .functionMenu(.growthRoadmap)
+        if resolution.role.isPlantScoped {
+            let plantId = DomainEntityLinkRegistry.plantId(
+                for: DomainEntityLink(rawType: relatedEntityType, rawId: relatedEntityId)
+            )
+            if let plantId, let plant = plants.first(where: { $0.id == plantId }) {
+                return .plant(plant)
+            }
         }
         if case let .pet(petId) = resolution.owner,
            let pet = pets.first(where: { $0.id == petId }) {

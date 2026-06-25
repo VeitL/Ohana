@@ -41,7 +41,7 @@ enum EntityType: String, CaseIterable, Hashable, Identifiable {
     var isAvailable: Bool {
         switch self {
         case .plant:
-            PlantFeatureGate.allows(.plants)
+            PlantUnlockPolicy.isUnlocked(currentLevel: AppFeatureRouteGuard.currentFeatureLevel)
         case .pet, .human:
             true
         }
@@ -55,10 +55,8 @@ struct AddEntityDestinationView: View {
     var onHumanSaved: ((Human) -> Void)?
 
     @AppStorage("currentActiveHumanId") private var currentActiveHumanId = ""
-    @AppStorage("appLanguage") private var appLanguage = "zh"
 
     var body: some View {
-        let l = L10n(appLanguage)
         switch type {
         case .pet:
             AddPetWizardView(
@@ -79,24 +77,7 @@ struct AddEntityDestinationView: View {
                 }
             )
         case .plant:
-            ZStack {
-                OhanaAppBackground()
-                VStack(spacing: 12) {
-                    Image(systemName: "leaf") // a11y: allow decorative/status glyph; surrounding text or control label carries meaning
-                        .font(.system(size: 30, weight: .semibold)) // a11y: allow fixed display glyph/legacy hero typography; Dynamic Type migration tracked by P1 baseline
-                        .foregroundStyle(Color.ohanaSecondaryText)
-                    Text(l.tr(
-                        zh: "植物模块暂不开放",
-                        en: "Plants are hidden in this version.",
-                        de: "Pflanzen sind in dieser Version ausgeblendet."
-                    ))
-                    .font(.headline)
-                    .foregroundStyle(Color.ohanaPrimaryText)
-                    Button(l.tr(zh: "关闭", en: "Close", de: "Schließen"), action: onComplete)
-                        .buttonStyle(.borderedProminent)
-                }
-                .padding(24)
-            }
+            AddPlantView(onComplete: onComplete)
         }
     }
 }

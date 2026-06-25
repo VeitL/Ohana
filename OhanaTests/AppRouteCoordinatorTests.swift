@@ -191,28 +191,73 @@ struct AppRouteCoordinatorTests {
         #expect(coordinator.sheet == .addEntity(.pet))
     }
 
-    @Test func plantRoutesAreSuppressedWhilePlantGateIsClosed() {
+    @Test func plantRoutesRedirectToGrowthRoadmapBeforeLevelFour() {
+        PlantUnlockPolicy.clearExistingPlantData()
+        let treeManager = TestOasisTreeManagerProjection.manager
+        let oldTreeManager = OasisTreeManagerRegistry.current
+        let oldIslandEnergy = treeManager.islandEnergy
+        let oldInjectedEnergy = treeManager.injectedEnergy
+        OasisTreeManagerRegistry.current = treeManager
+        defer {
+            PlantUnlockPolicy.clearExistingPlantData()
+            treeManager.setEnergyForTesting(islandEnergy: oldIslandEnergy, injectedEnergy: oldInjectedEnergy)
+            OasisTreeManagerRegistry.current = oldTreeManager
+        }
+        treeManager.setEnergyForTesting(islandEnergy: 0, injectedEnergy: 300)
+
         let coordinator = AppRouteCoordinator()
         let plantID = UUID()
 
         coordinator.openPlant(plantID)
         #expect(coordinator.path.isEmpty)
+        #expect(coordinator.sheet == .functionMenu(destination: .growthRoadmap))
+
+        coordinator.dismissSheet()
+        coordinator.presentFunctionMenu(destination: .plantsDashboard)
+
+        #expect(coordinator.sheet == .functionMenu(destination: .growthRoadmap))
+
+        coordinator.dismissSheet()
+        coordinator.presentAddEntity(.plant)
+
+        #expect(coordinator.sheet == .functionMenu(destination: .growthRoadmap))
+    }
+
+    @Test func plantRoutesAreAvailableAtLevelFour() {
+        PlantUnlockPolicy.clearExistingPlantData()
+        let treeManager = TestOasisTreeManagerProjection.manager
+        let oldTreeManager = OasisTreeManagerRegistry.current
+        let oldIslandEnergy = treeManager.islandEnergy
+        let oldInjectedEnergy = treeManager.injectedEnergy
+        OasisTreeManagerRegistry.current = treeManager
+        defer {
+            PlantUnlockPolicy.clearExistingPlantData()
+            treeManager.setEnergyForTesting(islandEnergy: oldIslandEnergy, injectedEnergy: oldInjectedEnergy)
+            OasisTreeManagerRegistry.current = oldTreeManager
+        }
+        treeManager.setEnergyForTesting(islandEnergy: 0, injectedEnergy: 500)
+
+        let coordinator = AppRouteCoordinator()
+        let plantID = UUID()
+
+        coordinator.openPlant(plantID)
+        #expect(coordinator.path == [.plantProfile(id: plantID)])
 
         coordinator.push(.plantProfile(id: plantID))
-        #expect(coordinator.path.isEmpty)
+        #expect(coordinator.path == [.plantProfile(id: plantID)])
 
         coordinator.presentSettings()
         coordinator.presentFunctionMenu(destination: .plantsDashboard)
 
         #expect(coordinator.overlay == nil)
-        #expect(coordinator.sheet == .functionMenu(destination: nil))
+        #expect(coordinator.sheet == .functionMenu(destination: .plantsDashboard))
         #expect(coordinator.fullScreen == nil)
 
         coordinator.presentSettings()
         coordinator.presentAddEntity(.plant)
 
         #expect(coordinator.overlay == nil)
-        #expect(coordinator.sheet == .settings)
+        #expect(coordinator.sheet == .addEntity(.plant))
         #expect(coordinator.fullScreen == nil)
     }
 

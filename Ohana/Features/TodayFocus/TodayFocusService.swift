@@ -221,7 +221,7 @@ nonisolated enum TodayFocusService {
         if quest.targetPetId == entityId {
             return true
         }
-        if PlantFeatureGate.allows(.plants), quest.targetPlantId == entityId {
+        if PlantUnlockPolicy.isUnlocked(currentLevel: AppFeatureRouteGuard.currentFeatureLevel), quest.targetPlantId == entityId {
             return true
         }
         if IslandQuestEngine.eventId(fromQuestId: quest.id) == entityId {

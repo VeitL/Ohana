@@ -99,14 +99,15 @@ extension TodayFocusCard {
     }
 
     static func negativeSkipKey(for signal: IslandNegativeSignal) -> String {
-        if !PlantFeatureGate.allows(.plants), signal.plantId != nil || signal.routeHint == .plant {
+        if !PlantUnlockPolicy.isUnlocked(currentLevel: AppFeatureRouteGuard.currentFeatureLevel),
+           signal.plantId != nil || signal.routeHint == .plant {
             return "negative:plantGate"
         }
         return signal.id
     }
 
     static func snapshotDeckDependencyKey(_ snapshot: TodayFocusSnapshot) -> String {
-        let includesPlants = PlantFeatureGate.allows(.plants)
+        let includesPlants = PlantUnlockPolicy.isUnlocked(currentLevel: AppFeatureRouteGuard.currentFeatureLevel)
         let visiblePlants = includesPlants ? snapshot.plants : []
         let questKey = snapshot.refreshedQuests.map { quest in
             [

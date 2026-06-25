@@ -18,11 +18,28 @@ struct AddPlantView: View {
     @State private var species = ""
     @State private var location = ""
     @State private var avatarEmoji = "🌱"
+    @State private var catalogQuery = ""
+    @State private var selectedCatalogID = ""
     @State private var wateringInterval = 7
     @State private var fertilizingInterval = 30
+    @State private var potDiameterCm = 0.0
+    @State private var potMaterial = ""
+    @State private var soilType = ""
+    @State private var isIndoor = true
+    @State private var windowDirection: PlantWindowDirection = .unknown
+    @State private var lightLevel: PlantLightLevel = .medium
+    @State private var healthStatus: PlantHealthStatus = .stable
+    @State private var remindersEnabled = true
     @State private var isSaving = false
 
     private let plantEmojis = ["🌱", "🌿", "🍀", "🌵", "🌻", "🌹", "🌺", "🪴", "🌳", "🎋", "🌾", "💐"]
+    private var selectedCatalog: PlantCatalogEntry? {
+        selectedCatalogID.isEmpty ? nil : PlantCatalog.entry(id: selectedCatalogID)
+    }
+
+    private var catalogMatches: [PlantCatalogEntry] {
+        Array(PlantCatalog.search(catalogQuery).prefix(5))
+    }
 
     var body: some View {
         ScrollView(showsIndicators: false) {
@@ -63,7 +80,11 @@ struct AddPlantView: View {
                 VStack(spacing: 16) {
                     goFormField("名称", text: $name, placeholder: "我的绿萝")
                     goFormField("品种", text: $species, placeholder: "绿萝、多肉…")
+                    catalogSearchSection
                     goFormField("位置", text: $location, placeholder: "客厅、阳台…")
+                    environmentSection
+                    potSection
+                    healthSection
 
                     VStack(alignment: .leading, spacing: 8) {
                         Text("浇水周期")
@@ -92,6 +113,14 @@ struct AddPlantView: View {
                     .padding(16)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .goTranslucentCard(cornerRadius: OhanaRadius.controlLarge)
+
+                    Toggle("植物提醒", isOn: $remindersEnabled)
+                        .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .rounded))
+                        .foregroundStyle(Color.ohanaPrimaryText)
+                        .tint(Color.goLime)
+                        .padding(16)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .goTranslucentCard(cornerRadius: OhanaRadius.controlLarge)
                 }
                 .padding(.horizontal, 20)
 
@@ -121,6 +150,134 @@ struct AddPlantView: View {
         }
     }
 
+    private var catalogSearchSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("资料库匹配")
+                .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
+                .foregroundStyle(Color.ohanaSecondaryText)
+                .textCase(.uppercase)
+                .tracking(0.6)
+            Text("拍照识别当前未配置供应商；请用资料库搜索或手动添加，Ohana 不会伪造识别结果。")
+                .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded))
+                .foregroundStyle(Color.ohanaSecondaryText)
+                .fixedSize(horizontal: false, vertical: true)
+            TextField("搜索绿萝、Monstera、吊兰…", text: $catalogQuery) // ui-v4: allow existing plant launch form input while OhanaTextField migration remains tracked.
+                .textFieldStyle(.plain)
+                .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .rounded))
+                .padding(14)
+                .background(Color.ohanaControlFill.opacity(0.68), in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
+
+            VStack(spacing: 8) {
+                ForEach(catalogMatches) { entry in
+                    Button {
+                        applyCatalog(entry)
+                    } label: {
+                        HStack(spacing: 10) {
+                            Image(systemName: selectedCatalogID == entry.id ? "checkmark.circle.fill" : "leaf.circle")
+                                .foregroundStyle(selectedCatalogID == entry.id ? Color.goLime : Color.ohanaSecondaryText)
+                                .accessibilityHidden(true)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(entry.commonName)
+                                    .font(OhanaFont.adaptive(size: 14, weight: .bold, design: .rounded))
+                                    .foregroundStyle(Color.ohanaPrimaryText)
+                                Text(entry.latinName)
+                                    .font(OhanaFont.adaptive(size: 12, weight: .medium, design: .rounded))
+                                    .foregroundStyle(Color.ohanaSecondaryText)
+                            }
+                            Spacer()
+                            Text(entry.careDifficulty)
+                                .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded))
+                                .foregroundStyle(Color.arkInk)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 4)
+                                .background(Color.goLime, in: Capsule())
+                        }
+                        .padding(12)
+                        .background(Color.ohanaControlFill.opacity(0.5), in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
+                    }
+                    .buttonStyle(ScaleButtonStyle())
+                }
+            }
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .goTranslucentCard(cornerRadius: OhanaRadius.controlLarge)
+    }
+
+    private var environmentSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Toggle("室内植物", isOn: $isIndoor)
+                .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .rounded))
+                .foregroundStyle(Color.ohanaPrimaryText)
+                .tint(Color.goLime)
+            Picker("窗户朝向", selection: $windowDirection) {
+                ForEach(PlantWindowDirection.allCases) { direction in
+                    Text(direction.displayName).tag(direction)
+                }
+            }
+            Picker("光照强度", selection: $lightLevel) {
+                ForEach(PlantLightLevel.allCases) { level in
+                    Text(level.displayName).tag(level)
+                }
+            }
+        }
+        .pickerStyle(.menu)
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .goTranslucentCard(cornerRadius: OhanaRadius.controlLarge)
+    }
+
+    private var potSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("盆土")
+                .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
+                .foregroundStyle(Color.ohanaSecondaryText)
+                .textCase(.uppercase)
+                .tracking(0.6)
+            Stepper("盆径 \(Int(potDiameterCm)) cm", value: $potDiameterCm, in: 0 ... 80, step: 1)
+                .foregroundStyle(Color.ohanaPrimaryText)
+                .tint(Color.goLime)
+            TextField("盆材质，如陶盆、塑料盆", text: $potMaterial) // ui-v4: allow existing plant launch form input while OhanaTextField migration remains tracked.
+                .textFieldStyle(.plain)
+                .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .rounded))
+                .padding(14)
+                .background(Color.ohanaControlFill.opacity(0.68), in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
+            TextField("土壤类型，如疏松排水型通用土", text: $soilType) // ui-v4: allow existing plant launch form input while OhanaTextField migration remains tracked.
+                .textFieldStyle(.plain)
+                .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .rounded))
+                .padding(14)
+                .background(Color.ohanaControlFill.opacity(0.68), in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .goTranslucentCard(cornerRadius: OhanaRadius.controlLarge)
+    }
+
+    private var healthSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Picker("当前状态", selection: $healthStatus) {
+                ForEach(PlantHealthStatus.allCases) { status in
+                    Text(status.displayName).tag(status)
+                }
+            }
+            if let catalog = selectedCatalog,
+               catalog.isToxicToCats || catalog.isToxicToDogs || catalog.isToxicToChildren {
+                HStack(spacing: 8) {
+                    Image(systemName: "exclamationmark.triangle.fill") // a11y: allow decorative warning glyph; adjacent text carries the warning.
+                        .foregroundStyle(Color.goYellow)
+                        .accessibilityHidden(true)
+                    Text("已标记宠物/儿童误食风险，详情页和提醒会优先提示。")
+                        .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded))
+                        .foregroundStyle(Color.ohanaPrimaryText)
+                }
+            }
+        }
+        .pickerStyle(.menu)
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .goTranslucentCard(cornerRadius: OhanaRadius.controlLarge)
+    }
+
     private func goFormField(_ title: String, text: Binding<String>, placeholder: String) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(title)
@@ -144,9 +301,23 @@ struct AddPlantView: View {
         .goTranslucentCard(cornerRadius: OhanaRadius.controlLarge)
     }
 
+    private func applyCatalog(_ entry: PlantCatalogEntry) {
+        selectedCatalogID = entry.id
+        catalogQuery = entry.commonName
+        if species.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            species = entry.commonName
+        }
+        wateringInterval = entry.defaultWateringDays
+        fertilizingInterval = entry.defaultFertilizingDays
+        lightLevel = entry.lightRequirement
+        soilType = entry.soil
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+    }
+
     private func savePlant() {
         let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedName.isEmpty, !isSaving else { return }
+        let catalog = selectedCatalog
 
         let input = PlantCreationCommandInput(
             name: name,
@@ -154,7 +325,20 @@ struct AddPlantView: View {
             location: location,
             avatarEmoji: avatarEmoji,
             wateringIntervalDays: wateringInterval,
-            fertilizingIntervalDays: fertilizingInterval
+            fertilizingIntervalDays: fertilizingInterval,
+            potDiameterCm: potDiameterCm,
+            potMaterialRaw: potMaterial,
+            soilTypeRaw: soilType,
+            isIndoor: isIndoor,
+            windowDirection: windowDirection,
+            lightLevel: lightLevel,
+            healthStatus: healthStatus,
+            catalogSpeciesId: selectedCatalogID,
+            isToxicToCats: catalog?.isToxicToCats ?? false,
+            isToxicToDogs: catalog?.isToxicToDogs ?? false,
+            isToxicToChildren: catalog?.isToxicToChildren ?? false,
+            isIndoorSuitable: catalog?.isIndoorSuitable ?? true,
+            remindersEnabled: remindersEnabled
         )
         let command = DomainCommand.memberCreation(entityID: input.id, kind: EntityKind.plant.rawValue)
 

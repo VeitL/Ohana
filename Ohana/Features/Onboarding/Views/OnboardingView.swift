@@ -81,6 +81,12 @@ struct OnboardingView: View {
     @AppStorage("appLanguage") private var appLanguage: String = AppLanguage.detectedCode
     @AppStorage(AppCountry.storageKey) private var appCountry = AppCountry.detectedCode
     @AppStorage(AppPerformanceMode.powerSavingKey) private var powerSavingMode = false
+    @AppStorage("ohana_onboarding_city") private var onboardingCity = ""
+    @AppStorage("ohana_onboarding_notifications_intent") private var onboardingNotificationsIntent = true
+    @AppStorage("ohana_onboarding_has_pets") private var onboardingHasPets = true
+    @AppStorage("ohana_onboarding_has_children") private var onboardingHasChildren = false
+    @AppStorage("ohana_onboarding_plant_experience") private var onboardingPlantExperience = PlantExperienceLevel.beginner.rawValue
+    @AppStorage("ohana_onboarding_plant_scene") private var onboardingPlantScene = PlantCareScene.indoor.rawValue
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.modelContext) private var modelContext
     @Environment(AppServices.self) private var appServices
@@ -109,7 +115,7 @@ struct OnboardingView: View {
     @State private var isHomeJoinHandoffPresentationActive = false
     @State private var isSkippingProfile = false
     @State private var skipProfileError = ""
-    private let introPageCount = 3
+    private let introPageCount = 4
 
     private var languageCode: String { AppLanguage.normalize(appLanguage) }
     private var shouldReduceWork: Bool {
@@ -442,19 +448,80 @@ struct OnboardingView: View {
                     (icon: "chart.xyaxis.line", title: localized(zh: "趋势", en: "Trends", de: "Trends"))
                 ]
             )
+        case 3:
+            onboardingPlantPreferencePage
         default:
             introPage(
-                title: localized(zh: "家庭成员管理", en: "Family care", de: "Familienpflege"),
-                subtitle: localized(zh: "人类、宠物和提醒，都放在同一个家里管理。", en: "Humans, pets, and reminders live in one shared care home.", de: "Menschen, Tiere und Erinnerungen bleiben in einem Pflegezuhause."),
+                title: localized(zh: "家中所有生命", en: "Every life at home", de: "Alles Leben zu Hause"),
+                subtitle: localized(zh: "人类、宠物、植物和提醒，都放在同一个家里管理。", en: "Humans, pets, plants, and reminders live in one shared care home.", de: "Menschen, Tiere, Pflanzen und Erinnerungen bleiben in einem Pflegezuhause."),
                 heroIcon: "house.fill",
                 tint: Color.goBlue,
                 badges: [
                     (icon: "person.fill", title: localized(zh: "人类", en: "Humans", de: "Menschen")),
                     (icon: "pawprint.fill", title: localized(zh: "宠物", en: "Pets", de: "Tiere")),
-                    (icon: "calendar.badge.checkmark", title: localized(zh: "提醒", en: "Reminders", de: "Erinnerungen"))
+                    (icon: "leaf.fill", title: localized(zh: "植物", en: "Plants", de: "Pflanzen"))
                 ]
             )
         }
+    }
+
+    private var onboardingPlantPreferencePage: some View {
+        VStack(spacing: 16) {
+            VStack(spacing: 8) {
+                Image(systemName: "leaf.circle.fill") // a11y: allow decorative onboarding glyph; heading names the page.
+                    .font(OhanaFont.adaptive(size: 64, weight: .black))
+                    .foregroundStyle(Color.goLime)
+                    .accessibilityHidden(true)
+                Text(localized(zh: "植物照护偏好", en: "Plant care preferences", de: "Pflanzenpflege"))
+                    .font(OhanaFont.title2(.black))
+                    .foregroundStyle(OnboardingPalette.primaryText)
+                Text(localized(
+                    zh: "这些偏好会影响植物安全提示和提醒文案；不授权定位也可以手动填写城市。",
+                    en: "These preferences tune plant safety notes and reminders. You can type a city without location access.",
+                    de: "Diese Angaben steuern Sicherheitshinweise und Erinnerungen. Du kannst die Stadt manuell eintragen."
+                ))
+                .font(OhanaFont.caption(.semibold))
+                .foregroundStyle(OnboardingPalette.secondaryText)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+            }
+
+            VStack(spacing: 10) {
+                TextField(localized(zh: "城市/地区", en: "City or region", de: "Stadt oder Region"), text: $onboardingCity) // ui-v4: allow compact onboarding city input until shared onboarding input token lands.
+                    .textFieldStyle(.plain)
+                    .font(OhanaFont.callout(.semibold))
+                    .foregroundStyle(OnboardingPalette.primaryText)
+                    .padding(.horizontal, 14)
+                    .frame(height: 44)
+                    .background(OnboardingPalette.mutedFill, in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
+
+                Toggle(localized(zh: "愿意接收护理通知", en: "Allow care reminders", de: "Pflege-Erinnerungen erlauben"), isOn: $onboardingNotificationsIntent)
+                    .tint(Color.goLime)
+                Toggle(localized(zh: "家里有宠物", en: "Pets at home", de: "Tiere zu Hause"), isOn: $onboardingHasPets)
+                    .tint(Color.goLime)
+                Toggle(localized(zh: "家里有小孩", en: "Children at home", de: "Kinder zu Hause"), isOn: $onboardingHasChildren)
+                    .tint(Color.goLime)
+
+                Picker(localized(zh: "植物经验", en: "Plant experience", de: "Pflanzenerfahrung"), selection: $onboardingPlantExperience) {
+                    Text(localized(zh: "新手", en: "Beginner", de: "Anfänger")).tag(PlantExperienceLevel.beginner.rawValue)
+                    Text(localized(zh: "熟悉", en: "Comfortable", de: "Vertraut")).tag(PlantExperienceLevel.intermediate.rawValue)
+                    Text(localized(zh: "进阶", en: "Experienced", de: "Erfahren")).tag(PlantExperienceLevel.experienced.rawValue)
+                }
+                .pickerStyle(.segmented)
+
+                Picker(localized(zh: "主要场景", en: "Main plant area", de: "Pflanzenbereich"), selection: $onboardingPlantScene) {
+                    Text(localized(zh: "室内", en: "Indoor", de: "Innen")).tag(PlantCareScene.indoor.rawValue)
+                    Text(localized(zh: "阳台", en: "Balcony", de: "Balkon")).tag(PlantCareScene.balcony.rawValue)
+                    Text(localized(zh: "花园", en: "Garden", de: "Garten")).tag(PlantCareScene.garden.rawValue)
+                }
+                .pickerStyle(.segmented)
+            }
+            .font(OhanaFont.caption(.bold))
+            .foregroundStyle(OnboardingPalette.primaryText)
+        }
+        .padding(.horizontal, 24)
+        .padding(.vertical, 12)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     private func introPage(

@@ -67,6 +67,7 @@ struct VerticalSolidHomePageDeck<HomePage: View, CalendarPage: View, OasisPage: 
     let outgoingTab: VerticalSolidHomeTab?
     let preparingTab: VerticalSolidHomeTab?
     let preparedTabs: Set<VerticalSolidHomeTab>
+    let visibleTabs: [VerticalSolidHomeTab]
     let canAnimate: Bool
     @ViewBuilder var home: (VerticalSolidHomePageLifecycle) -> HomePage
     @ViewBuilder var calendar: (VerticalSolidHomePageLifecycle) -> CalendarPage
@@ -76,7 +77,7 @@ struct VerticalSolidHomePageDeck<HomePage: View, CalendarPage: View, OasisPage: 
     var body: some View {
         GeometryReader { proxy in
             ZStack {
-                ForEach(VerticalSolidHomeTab.visibleTabs) { tab in
+                ForEach(visibleTabs) { tab in
                     page(for: tab)
                         .frame(width: proxy.size.width, height: proxy.size.height)
                         .offset(x: CGFloat(tab.index - selectedTab.index) * proxy.size.width)

@@ -104,6 +104,20 @@ nonisolated struct DomainPlantRehydrateSnapshot: Equatable {
     let lastFertilizedDate: Date?
     let fertilizingIntervalDays: Int
     let themeColorHex: String
+    let lastHealthCheckDate: Date?
+    let potDiameterCm: Double
+    let potMaterialRaw: String
+    let soilTypeRaw: String
+    let isIndoor: Bool
+    let windowDirection: PlantWindowDirection
+    let lightLevel: PlantLightLevel
+    let healthStatus: PlantHealthStatus
+    let catalogSpeciesId: String
+    let isToxicToCats: Bool
+    let isToxicToDogs: Bool
+    let isToxicToChildren: Bool
+    let isIndoorSuitable: Bool
+    let remindersEnabled: Bool
 }
 
 nonisolated struct DomainWaterLogRehydrateSnapshot: Equatable {
@@ -429,6 +443,7 @@ nonisolated enum DomainGeneralRehydrateWriter {
     ) throws -> DomainGeneralRehydrateResult<Plant> {
         let plan = authorizeHousehold(source: source, context: context)
         if let existing = try fetchPlant(id: snapshot.id, context: context) {
+            PlantUnlockPolicy.noteExistingPlantData()
             return DomainGeneralRehydrateResult(model: existing, inserted: false, plan: plan)
         }
         let plant = Plant(
@@ -438,15 +453,30 @@ nonisolated enum DomainGeneralRehydrateWriter {
             avatarEmoji: snapshot.avatarEmoji,
             wateringIntervalDays: snapshot.wateringIntervalDays,
             fertilizingIntervalDays: snapshot.fertilizingIntervalDays,
-            themeColorHex: snapshot.themeColorHex
+            themeColorHex: snapshot.themeColorHex,
+            potDiameterCm: snapshot.potDiameterCm,
+            potMaterialRaw: snapshot.potMaterialRaw,
+            soilTypeRaw: snapshot.soilTypeRaw,
+            isIndoor: snapshot.isIndoor,
+            windowDirection: snapshot.windowDirection,
+            lightLevel: snapshot.lightLevel,
+            healthStatus: snapshot.healthStatus,
+            catalogSpeciesId: snapshot.catalogSpeciesId,
+            isToxicToCats: snapshot.isToxicToCats,
+            isToxicToDogs: snapshot.isToxicToDogs,
+            isToxicToChildren: snapshot.isToxicToChildren,
+            isIndoorSuitable: snapshot.isIndoorSuitable,
+            remindersEnabled: snapshot.remindersEnabled
         )
         plant.id = snapshot.id
         plant.notes = snapshot.notes
         plant.createdAt = snapshot.createdAt
         plant.lastWateredDate = snapshot.lastWateredDate
         plant.lastFertilizedDate = snapshot.lastFertilizedDate
+        plant.lastHealthCheckDate = snapshot.lastHealthCheckDate
         plan.consumeAuthorization()
         context.insert(plant)
+        PlantUnlockPolicy.noteExistingPlantData()
         return DomainGeneralRehydrateResult(model: plant, inserted: true, plan: plan)
     }
 

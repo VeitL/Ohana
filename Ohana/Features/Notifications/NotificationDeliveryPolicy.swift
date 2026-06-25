@@ -30,6 +30,7 @@ nonisolated enum NotificationPreferenceGroup: String, CaseIterable, Equatable {
     case medication
     case feeding
     case hygiene
+    case plantCare
     case checkIn
 
     var storageKey: String {
@@ -37,6 +38,7 @@ nonisolated enum NotificationPreferenceGroup: String, CaseIterable, Equatable {
         case .medication: "notif_medication_enabled"
         case .feeding: "notif_feeding_enabled"
         case .hygiene: "notif_hygiene_enabled"
+        case .plantCare: "notif_plant_care_enabled"
         case .checkIn: "notif_checkin_enabled"
         }
     }
@@ -49,9 +51,11 @@ nonisolated enum NotificationPreferenceGroup: String, CaseIterable, Equatable {
             [.feeding]
         case .hygiene:
             [.hygiene]
+        case .plantCare:
+            [.plantCare]
         case .calendar, .weeklyReport:
             [.checkIn]
-        case .health, .hydration, .plantCare, .insurance:
+        case .health, .hydration, .insurance:
             []
         }
     }
@@ -147,6 +151,10 @@ nonisolated enum NotificationDeliveryPolicy {
             return NotificationDeliveryClassification(tier: .healthCritical, category: .foodStock, mergeAllowed: false)
         }
 
+        if role.isPlantScoped {
+            return NotificationDeliveryClassification(tier: .routine, category: .plantCare, mergeAllowed: true)
+        }
+
         if event.eventType == EventType.foodChange.rawValue || role == .petAutoFeeder {
             return NotificationDeliveryClassification(tier: .routine, category: .feeding, mergeAllowed: true)
         }
@@ -160,7 +168,7 @@ nonisolated enum NotificationDeliveryPolicy {
             return NotificationDeliveryClassification(tier: .routine, category: .hygiene, mergeAllowed: true)
         }
 
-        if event.eventType == EventType.fertilizing.rawValue {
+        if plantCareEventTypes.contains(event.eventType) {
             return NotificationDeliveryClassification(tier: .routine, category: .plantCare, mergeAllowed: true)
         }
 
@@ -179,6 +187,18 @@ nonisolated enum NotificationDeliveryPolicy {
     static func weeklyReportClassification() -> NotificationDeliveryClassification {
         NotificationDeliveryClassification(tier: .ambient, category: .weeklyReport, mergeAllowed: true)
     }
+
+    private static let plantCareEventTypes: Set<String> = [
+        EventType.watering.rawValue,
+        EventType.fertilizing.rawValue,
+        EventType.plantRepotting.rawValue,
+        EventType.plantPruning.rawValue,
+        EventType.plantMisting.rawValue,
+        EventType.plantRotation.rawValue,
+        EventType.plantLeafCleaning.rawValue,
+        EventType.plantPestCheck.rawValue,
+        EventType.plantHealthCheck.rawValue
+    ]
 
     static func plan(reminders: [Reminder], calendar: Calendar = .current) -> [UUID: NotificationDeliveryDecision] {
         var decisions: [UUID: NotificationDeliveryDecision] = [:]

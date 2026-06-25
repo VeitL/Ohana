@@ -13,7 +13,7 @@ enum OasisTreePreferenceStore {
     static let dailyInjectionDayKey = "oasis_v2DailyTreeInjectionDay"
     static let weeklyInjectionWeekKey = "oasis_v2WeeklyTreeInjectionWeek"
 
-    private static let injectedEnergyKey = "oasis_injectedEnergy"
+    private nonisolated static let injectedEnergyKey = "oasis_injectedEnergy"
     private static let lastRewardedLevelKey = "oasis_lastRewardedLevel"
     private static let dailyTreeCoconutDayKey = "oasis_dailyTreeCoconutDay"
     private static let dailyTreeCoconutCountKey = "oasis_dailyTreeCoconutCount"
@@ -30,9 +30,9 @@ enum OasisTreePreferenceStore {
     private static let ledgerEnergyCacheVersion = 1
     private static let defaults = UserDefaults.standard
 
-    static var injectedEnergy: Int {
-        get { defaults.integer(forKey: injectedEnergyKey) }
-        set { defaults.set(newValue, forKey: injectedEnergyKey) }
+    nonisolated static var injectedEnergy: Int {
+        get { UserDefaults.standard.integer(forKey: injectedEnergyKey) }
+        set { UserDefaults.standard.set(newValue, forKey: injectedEnergyKey) }
     }
 
     static var lastRewardedLevel: Int {

@@ -265,8 +265,8 @@ final class AppRouteCoordinator: ObservableObject {
         push(.humanProfile(id: id))
     }
 
-    func openPlant(_: UUID) {
-        AppFeatureRouteGuard.recordIntercept("plantProfile")
+    func openPlant(_ id: UUID) {
+        push(.plantProfile(id: id))
     }
 
     func presentAccountSwitcher() {
@@ -315,7 +315,14 @@ final class AppRouteCoordinator: ObservableObject {
 
     func addEntityPresentationDecision(_ type: EntityType) -> AppRoutePresentationDecision<AppSheetRoute> {
         let route = AppSheetRoute.addEntity(type)
-        guard AppFeatureRouteGuard.allowsAddEntity(type) else {
+        guard AppFeatureRouteGuard.allowsAddEntity(type, currentLevel: currentFeatureLevel) else {
+            if type == .plant {
+                return .redirected(
+                    from: route,
+                    to: .functionMenu(destination: .growthRoadmap),
+                    reason: "addEntity:\(type.rawValue)"
+                )
+            }
             return .suppressed(reason: "addEntity:\(type.rawValue)")
         }
         return .allowed(route)
@@ -391,8 +398,11 @@ final class AppRouteCoordinator: ObservableObject {
     }
 
     func push(_ route: AppRoute) {
-        guard AppFeatureRouteGuard.allowsAppRoute(route) else {
+        guard AppFeatureRouteGuard.allowsAppRoute(route, currentLevel: currentFeatureLevel) else {
             AppFeatureRouteGuard.recordIntercept(route.id)
+            if case .plantProfile = route {
+                sheet = .functionMenu(destination: .growthRoadmap)
+            }
             return
         }
         guard path.last != route else { return }

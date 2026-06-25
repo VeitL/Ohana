@@ -8,6 +8,24 @@
 import SwiftData
 import SwiftUI
 
+private enum PlantDashboardFilter: String, CaseIterable, Identifiable {
+    case all
+    case due
+    case watching
+    case indoor
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .all: "全部"
+        case .due: "7天任务"
+        case .watching: "需观察"
+        case .indoor: "室内"
+        }
+    }
+}
+
 struct PlantDashboardView: View {
     let plants: [Plant]
     let onOpenPlant: (UUID) -> Void
@@ -19,6 +37,7 @@ struct PlantDashboardView: View {
 
     @StateObject private var commandQueue = DeferredDomainCommandQueue()
     @State private var showingAddPlant = false
+    @State private var selectedFilter: PlantDashboardFilter = .all
 
     init(
         plants: [Plant] = [],
@@ -39,6 +58,28 @@ struct PlantDashboardView: View {
         plants.filter(\.needsFertilizing)
     }
 
+    private var upcomingTasks: [PlantCareTaskSnapshot] {
+        PlantCarePlanService.tasks(for: plants, days: 7)
+    }
+
+    private var dueTasks: [PlantCareTaskSnapshot] {
+        upcomingTasks.filter { $0.daysUntilDue <= 0 }
+    }
+
+    private var visiblePlants: [Plant] {
+        switch selectedFilter {
+        case .all:
+            return plants
+        case .due:
+            let ids = Set(upcomingTasks.map(\.plantID))
+            return plants.filter { ids.contains($0.id) }
+        case .watching:
+            return plants.filter { $0.healthStatus == .watching || $0.healthStatus == .stressed }
+        case .indoor:
+            return plants.filter(\.isIndoor)
+        }
+    }
+
     var body: some View {
         ScrollView(.vertical, showsIndicators: false) {
             Spacer().frame(height: 70)
@@ -47,6 +88,9 @@ struct PlantDashboardView: View {
                 emptyState
             } else {
                 VStack(spacing: 20) {
+                    taskSummarySection
+                    filterBar
+
                     if !plantsNeedingWater.isEmpty {
                         urgentSection
                     }
@@ -64,6 +108,108 @@ struct PlantDashboardView: View {
         .onDisappear {
             commandQueue.cancelAll()
         }
+    }
+
+    private var taskSummarySection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 8) {
+                Image(systemName: "calendar.badge.clock") // a11y: allow decorative section glyph; heading names the task window.
+                    .foregroundStyle(Color.goLime)
+                    .accessibilityHidden(true)
+                Text("今日与未来 7 天")
+                    .font(OhanaFont.adaptive(size: 16, weight: .bold, design: .rounded))
+                    .foregroundStyle(Color.ohanaPrimaryText)
+                Spacer()
+            }
+
+            if dueTasks.isEmpty {
+                Text("今天没有到期植物任务")
+                    .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .rounded))
+                    .foregroundStyle(Color.ohanaSecondaryText)
+            } else {
+                VStack(spacing: 8) {
+                    ForEach(dueTasks.prefix(4)) { task in
+                        taskRow(task)
+                    }
+                }
+                HStack(spacing: 10) {
+                    Button("全部完成") {
+                        completeDueTasks()
+                    }
+                    .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
+                    .foregroundStyle(Color.arkInk)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 8)
+                    .background(Color.goLime, in: Capsule())
+
+                    Button("全部延后一天") {
+                        deferDueTasksOneDay()
+                    }
+                    .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
+                    .foregroundStyle(Color.ohanaPrimaryText)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 8)
+                    .background(Color.ohanaControlFill.opacity(0.72), in: Capsule())
+                }
+            }
+        }
+        .padding(16)
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous))
+    }
+
+    private var filterBar: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(PlantDashboardFilter.allCases) { filter in
+                    Button {
+                        selectedFilter = filter
+                    } label: {
+                        Text(filter.title)
+                            .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
+                            .foregroundStyle(selectedFilter == filter ? Color.arkInk : Color.ohanaPrimaryText)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 8)
+                            .background(
+                                selectedFilter == filter ? Color.goLime : Color.ohanaControlFill.opacity(0.62),
+                                in: Capsule()
+                            )
+                    }
+                    .buttonStyle(ScaleButtonStyle())
+                }
+            }
+        }
+    }
+
+    private func taskRow(_ task: PlantCareTaskSnapshot) -> some View {
+        HStack(spacing: 10) {
+            Text(task.careType.emoji)
+                .font(OhanaFont.adaptive(size: 18))
+            VStack(alignment: .leading, spacing: 2) {
+                Text(task.title)
+                    .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
+                    .foregroundStyle(Color.ohanaPrimaryText)
+                    .lineLimit(1)
+                Text(task.subtitle)
+                    .font(OhanaFont.adaptive(size: 11, weight: .medium, design: .rounded))
+                    .foregroundStyle(Color.ohanaSecondaryText)
+                    .lineLimit(1)
+            }
+            Spacer()
+            Button {
+                completeTask(task)
+            } label: {
+                Image(systemName: "checkmark") // a11y: allow decorative icon; button has explicit completion label.
+                    .font(OhanaFont.adaptive(size: 12, weight: .bold))
+                    .foregroundStyle(Color.arkInk)
+                    .frame(width: 44, height: 44)
+                    .background(Color.goLime, in: Circle())
+                    .accessibilityHidden(true)
+            }
+            .accessibilityLabel("完成\(task.careType.displayName)")
+            .buttonStyle(ScaleButtonStyle())
+        }
+        .padding(10)
+        .background(Color.ohanaControlFill.opacity(0.5), in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
     }
 
     // MARK: - Empty State
@@ -200,7 +346,7 @@ struct PlantDashboardView: View {
                 GridItem(.flexible(), spacing: 12),
                 GridItem(.flexible(), spacing: 12)
             ], spacing: 12) {
-                ForEach(plants) { plant in
+                ForEach(visiblePlants) { plant in
                     plantCard(plant)
                 }
 
@@ -233,6 +379,13 @@ struct PlantDashboardView: View {
                     .lineLimit(1)
 
                 statusBadge(for: plant)
+
+                if let task = PlantCarePlanService.nextTask(for: plant) {
+                    Text(task.daysUntilDue <= 0 ? "今天：\(task.careType.displayName)" : "\(task.daysUntilDue)天后：\(task.careType.displayName)")
+                        .font(OhanaFont.adaptive(size: 9, weight: .medium, design: .rounded))
+                        .foregroundStyle(Color.ohanaSecondaryText)
+                        .lineLimit(1)
+                }
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 14)
@@ -323,6 +476,43 @@ struct PlantDashboardView: View {
         for plantID in plantsNeedingWater.map(\.id) {
             commandQueue.enqueue(.plantCare(plantID: plantID, action: PlantCareType.watering.rawValue)) {
                 commandExecutor.recordPlantCare(.watering, plantID: plantID, executorId: currentExecutorId())
+            }
+        }
+    }
+
+    private func completeTask(_ task: PlantCareTaskSnapshot) {
+        guard let plant = plants.first(where: { $0.id == task.plantID }) else { return }
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        commandQueue.enqueue(.plantCare(plantID: plant.id, action: task.careType.rawValue)) {
+            PlantCareCommandService.recordCare(
+                task.careType,
+                plant: plant,
+                executorId: currentExecutorId(),
+                context: modelContext
+            )
+        }
+    }
+
+    private func completeDueTasks() {
+        for task in dueTasks {
+            completeTask(task)
+        }
+    }
+
+    private func deferDueTasksOneDay() {
+        let formatter = ISO8601DateFormatter()
+        let tomorrow = Calendar.current.date(byAdding: .day, value: 1, to: Date()) ?? Date().addingTimeInterval(86400)
+        for task in dueTasks {
+            guard let plant = plants.first(where: { $0.id == task.plantID }) else { continue }
+            let note = "defer:\(task.careType.rawValue):\(formatter.string(from: tomorrow))"
+            commandQueue.enqueue(.plantCare(plantID: plant.id, action: PlantCareType.customNote.rawValue)) {
+                PlantCareCommandService.recordCare(
+                    .customNote,
+                    plant: plant,
+                    executorId: currentExecutorId(),
+                    context: modelContext,
+                    careNote: note
+                )
             }
         }
     }

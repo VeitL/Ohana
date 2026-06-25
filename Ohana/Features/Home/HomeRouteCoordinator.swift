@@ -276,8 +276,8 @@ final class HomeRouteCoordinator: ObservableObject {
         modal = .streakDetail
     }
 
-    func openAddEntity(_ type: EntityType) {
-        guard AppFeatureRouteGuard.allowsAddEntity(type) else {
+    func openAddEntity(_ type: EntityType, currentLevel: Int = AppFeatureRouteGuard.currentFeatureLevel) {
+        guard AppFeatureRouteGuard.allowsAddEntity(type, currentLevel: currentLevel) else {
             AppFeatureRouteGuard.recordIntercept("homeAddEntity:\(type.rawValue)")
             if let appSheetRouteSink {
                 appSheetRouteSink(.functionMenu(destination: .growthRoadmap))

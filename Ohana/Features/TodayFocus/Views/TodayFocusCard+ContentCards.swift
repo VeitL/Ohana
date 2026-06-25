@@ -192,7 +192,7 @@ extension TodayFocusCard {
            let pet = snapshot.pets.first(where: { $0.id == petId }) {
             return pet.name
         }
-        if PlantFeatureGate.allows(.plants),
+        if PlantUnlockPolicy.isUnlocked(currentLevel: AppFeatureRouteGuard.currentFeatureLevel),
            let plantId = quest.targetPlantId,
            let plant = snapshot.plants.first(where: { $0.id == plantId }) {
             return plant.name

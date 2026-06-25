@@ -16,11 +16,18 @@ struct PlantDetailContentView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(AppServices.self) private var appServices
     @AppStorage("currentActiveHumanId") private var activeHumanIdRaw = ""
+    @AppStorage("ohana_onboarding_has_pets") private var onboardingHasPets = true
+    @AppStorage("ohana_onboarding_has_children") private var onboardingHasChildren = false
 
     @StateObject private var commandQueue = DeferredDomainCommandQueue()
     @State private var showingEditSheet = false
     @State private var showingDeleteConfirm = false
-    private var commandExecutor: HomeCommandExecutor { HomeCommandExecutor(modelContext: modelContext, services: appServices) }
+    @State private var diagnosisResult: PlantDiagnosisResult?
+    private var catalogEntry: PlantCatalogEntry? { PlantCatalog.entry(id: plant.catalogSpeciesId) }
+    private var careTasks: [PlantCareTaskSnapshot] { PlantCarePlanService.tasks(for: plant) }
+    private var recentLogs: [PlantCareLog] {
+        plant.careLogs.sorted { $0.date > $1.date }
+    }
 
     var body: some View {
         ZStack {
@@ -29,9 +36,15 @@ struct PlantDetailContentView: View {
             ScrollView(.vertical, showsIndicators: false) {
                 VStack(spacing: 20) {
                     heroCard
+                    nextTaskCard
+                    environmentCard
+                    safetyCard
+                    catalogCard
+                    diagnosisCard
                     wateringCard
                     fertilizingCard
                     quickActions
+                    historyCard
                     notesCard
                     deleteSection
                     Spacer(minLength: 40)
@@ -61,6 +74,180 @@ struct PlantDetailContentView: View {
         }
         .onDisappear {
             commandQueue.cancelAll()
+        }
+        .task(id: plant.healthStatusRaw) {
+            diagnosisResult = await LocalPlantIntelligenceFallback().diagnosePlant(
+                imageData: nil,
+                symptoms: diagnosisSymptoms
+            )
+        }
+    }
+
+    private var nextTaskCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Image(systemName: "sparkles") // a11y: allow decorative section glyph; heading names the next task.
+                    .foregroundStyle(Color.goLime)
+                    .accessibilityHidden(true)
+                Text("下一步")
+                    .font(OhanaFont.adaptive(size: 16, weight: .bold, design: .rounded))
+                Spacer()
+            }
+            if let task = careTasks.first {
+                Text(task.title)
+                    .font(OhanaFont.adaptive(size: 18, weight: .heavy, design: .rounded))
+                    .foregroundStyle(Color.ohanaPrimaryText)
+                Text(task.subtitle)
+                    .font(OhanaFont.adaptive(size: 13, weight: .medium, design: .rounded))
+                    .foregroundStyle(Color.ohanaSecondaryText)
+                HStack(spacing: 10) {
+                    Button("完成") {
+                        recordCare(task.careType)
+                    }
+                    .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
+                    .foregroundStyle(Color.arkInk)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 8)
+                    .background(Color.goLime, in: Capsule())
+
+                    Button("延后一天") {
+                        deferTaskOneDay(task)
+                    }
+                    .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
+                    .foregroundStyle(Color.ohanaPrimaryText)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 8)
+                    .background(Color.ohanaControlFill.opacity(0.72), in: Capsule())
+                }
+            } else {
+                Text("暂无任务")
+                    .font(OhanaFont.adaptive(size: 14, weight: .semibold, design: .rounded))
+                    .foregroundStyle(Color.ohanaSecondaryText)
+            }
+        }
+        .padding(16)
+        .ohanaGlassStyle(cornerRadius: OhanaRadius.input)
+        .padding(.horizontal, 16)
+    }
+
+    private var environmentCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            detailHeader(icon: "sun.max.fill", title: "环境")
+            detailRow("位置", value: plant.location.isEmpty ? "未设置" : plant.location)
+            detailRow("场景", value: plant.isIndoor ? "室内" : "阳台/花园")
+            detailRow("窗向", value: plant.windowDirection.displayName)
+            detailRow("光照", value: plant.lightLevel.displayName)
+            if plant.potDiameterCm > 0 {
+                detailRow("盆径", value: "\(Int(plant.potDiameterCm)) cm")
+            }
+            if !plant.potMaterial.isEmpty {
+                detailRow("盆材质", value: plant.potMaterial)
+            }
+            if !plant.soilType.isEmpty {
+                detailRow("土壤", value: plant.soilType)
+            }
+        }
+        .padding(16)
+        .ohanaGlassStyle(cornerRadius: OhanaRadius.input)
+        .padding(.horizontal, 16)
+    }
+
+    @ViewBuilder
+    private var safetyCard: some View {
+        if plant.isToxicToCats || plant.isToxicToDogs || plant.isToxicToChildren || !plant.isIndoorSuitable {
+            VStack(alignment: .leading, spacing: 10) {
+                detailHeader(icon: "exclamationmark.triangle.fill", title: "安全提示")
+                if onboardingHasPets, plant.isToxicToCats || plant.isToxicToDogs {
+                    Text("对猫/狗有误食风险，请放在宠物够不到的位置。")
+                        .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .rounded))
+                        .foregroundStyle(Color.ohanaPrimaryText)
+                }
+                if onboardingHasChildren, plant.isToxicToChildren {
+                    Text("对儿童有误食刺激风险，提醒文案会优先提示安全摆放。")
+                        .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .rounded))
+                        .foregroundStyle(Color.ohanaPrimaryText)
+                }
+                if (!onboardingHasPets && (plant.isToxicToCats || plant.isToxicToDogs)) ||
+                    (!onboardingHasChildren && plant.isToxicToChildren) {
+                    Text("资料库标记存在误食风险；若家里之后有宠物或儿童，可以在设置/详情中优先关注摆放安全。")
+                        .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .rounded))
+                        .foregroundStyle(Color.ohanaPrimaryText)
+                }
+                if !plant.isIndoorSuitable {
+                    Text("资料库标记为不太适合室内长期养护。")
+                        .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .rounded))
+                        .foregroundStyle(Color.ohanaPrimaryText)
+                }
+            }
+            .padding(16)
+            .ohanaGlassStyle(cornerRadius: OhanaRadius.input)
+            .padding(.horizontal, 16)
+        }
+    }
+
+    @ViewBuilder
+    private var catalogCard: some View {
+        if let catalogEntry {
+            VStack(alignment: .leading, spacing: 12) {
+                detailHeader(icon: "books.vertical.fill", title: "资料库")
+                detailRow("拉丁名", value: catalogEntry.latinName)
+                detailRow("浇水", value: catalogEntry.wateringPreference)
+                detailRow("湿度", value: catalogEntry.humidity)
+                detailRow("温度", value: catalogEntry.temperature)
+                detailRow("常见问题", value: catalogEntry.commonIssues)
+            }
+            .padding(16)
+            .ohanaGlassStyle(cornerRadius: OhanaRadius.input)
+            .padding(.horizontal, 16)
+        }
+    }
+
+    private var diagnosisCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            detailHeader(icon: "stethoscope", title: "病虫害诊断")
+            Text(diagnosisResult?.uncertaintyMessage ?? "当前未连接智能诊断服务，Ohana 会展示不确定性和可执行复查步骤。")
+                .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded))
+                .foregroundStyle(Color.ohanaSecondaryText)
+                .fixedSize(horizontal: false, vertical: true)
+            ForEach((diagnosisResult?.causes ?? []).prefix(3)) { cause in
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack {
+                        Text(cause.title)
+                            .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
+                            .foregroundStyle(Color.ohanaPrimaryText)
+                        Spacer()
+                        Text(cause.severity)
+                            .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded))
+                            .foregroundStyle(Color.arkInk)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(Color.goYellow, in: Capsule())
+                    }
+                    Text(cause.steps.prefix(2).joined(separator: " · "))
+                        .font(OhanaFont.adaptive(size: 12, weight: .medium, design: .rounded))
+                        .foregroundStyle(Color.ohanaSecondaryText)
+                        .lineLimit(3)
+                    Text(cause.shouldIsolate ? "建议先隔离，\(cause.recheckAfterDays) 天后复查" : "\(cause.recheckAfterDays) 天后复查")
+                        .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded))
+                        .foregroundStyle(cause.shouldIsolate ? Color.goRed : Color.ohanaSecondaryText)
+                }
+                .padding(10)
+                .background(Color.ohanaControlFill.opacity(0.42), in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
+            }
+        }
+        .padding(16)
+        .ohanaGlassStyle(cornerRadius: OhanaRadius.input)
+        .padding(.horizontal, 16)
+    }
+
+    private var diagnosisSymptoms: [String] {
+        switch plant.healthStatus {
+        case .thriving, .stable:
+            ["黄叶"]
+        case .watching:
+            ["黄叶", "停止生长"]
+        case .stressed:
+            ["黄叶", "叶片卷曲", "掉叶"]
         }
     }
 
@@ -208,7 +395,7 @@ struct PlantDetailContentView: View {
 
     // MARK: - Quick Actions
     private var quickActions: some View {
-        HStack(spacing: 12) {
+        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
             Button {
                 waterPlant()
             } label: {
@@ -244,6 +431,9 @@ struct PlantDetailContentView: View {
                         .strokeBorder(Color.ohanaCardSurface.opacity(0.24), lineWidth: 1)
                 }
             }
+
+            careActionButton(type: .pestCheck, icon: "ladybug.fill", color: Color.goYellow)
+            careActionButton(type: .leafCleaning, icon: "sparkles", color: Color.goTeal)
         }
         .padding(.horizontal, 16)
     }
@@ -267,6 +457,66 @@ struct PlantDetailContentView: View {
                 .ohanaGlassStyle(cornerRadius: OhanaRadius.input)
                 .padding(.horizontal, 16)
             }
+        }
+    }
+
+    private var historyCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            detailHeader(icon: "clock.arrow.circlepath", title: "护理历史")
+            if recentLogs.isEmpty {
+                Text("还没有护理日志")
+                    .font(OhanaFont.adaptive(size: 14))
+                    .foregroundStyle(Color.ohanaSecondaryText)
+            } else {
+                ForEach(recentLogs.prefix(6)) { log in
+                    HStack(spacing: 10) {
+                        Text(log.careType.emoji)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(log.careType.displayName)
+                                .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
+                                .foregroundStyle(Color.ohanaPrimaryText)
+                            Text(log.date.formatted(date: .abbreviated, time: .shortened))
+                                .font(OhanaFont.adaptive(size: 11, weight: .medium, design: .rounded))
+                                .foregroundStyle(Color.ohanaSecondaryText)
+                            if !log.note.isEmpty, !log.note.hasPrefix("defer:") {
+                                Text(log.note)
+                                    .font(OhanaFont.adaptive(size: 12))
+                                    .foregroundStyle(Color.ohanaSecondaryText)
+                                    .lineLimit(2)
+                            }
+                        }
+                        Spacer()
+                    }
+                    .padding(.vertical, 4)
+                }
+            }
+        }
+        .padding(16)
+        .ohanaGlassStyle(cornerRadius: OhanaRadius.input)
+        .padding(.horizontal, 16)
+    }
+
+    private func detailHeader(icon: String, title: String) -> some View {
+        HStack {
+            Image(systemName: icon)
+                .foregroundStyle(Color.goLime)
+                .accessibilityHidden(true)
+            Text(title)
+                .font(OhanaFont.adaptive(size: 16, weight: .bold, design: .rounded))
+            Spacer()
+        }
+    }
+
+    private func detailRow(_ title: String, value: String) -> some View {
+        HStack(alignment: .top) {
+            Text(title)
+                .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
+                .foregroundStyle(Color.ohanaSecondaryText)
+            Spacer(minLength: 16)
+            Text(value)
+                .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .rounded))
+                .foregroundStyle(Color.ohanaPrimaryText)
+                .multilineTextAlignment(.trailing)
         }
     }
 
@@ -294,21 +544,52 @@ struct PlantDetailContentView: View {
 
     // MARK: - Actions
     private func waterPlant() {
-        let generator = UIImpactFeedbackGenerator(style: .medium)
-        generator.impactOccurred()
-        let plantID = plant.id
-        commandQueue.enqueue(.plantCare(plantID: plantID, action: PlantCareType.watering.rawValue)) {
-            commandExecutor.recordPlantCare(.watering, plantID: plantID, executorId: currentExecutorId())
-        }
+        recordCare(.watering)
     }
 
     private func fertilizePlant() {
+        recordCare(.fertilizing)
+    }
+
+    private func careActionButton(type: PlantCareType, icon: String, color: Color) -> some View {
+        Button {
+            recordCare(type)
+        } label: {
+            HStack(spacing: 8) {
+                Image(systemName: icon).accessibilityHidden(true)
+                Text(type.displayName)
+            }
+            .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .rounded))
+            .foregroundStyle(Color.ohanaPrimaryText)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 14)
+            .background(color.opacity(0.45), in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous)
+                    .strokeBorder(Color.ohanaCardSurface.opacity(0.24), lineWidth: 1)
+            }
+        }
+    }
+
+    private func recordCare(_ type: PlantCareType, careNote: String = "") {
         let generator = UIImpactFeedbackGenerator(style: .medium)
         generator.impactOccurred()
         let plantID = plant.id
-        commandQueue.enqueue(.plantCare(plantID: plantID, action: PlantCareType.fertilizing.rawValue)) {
-            commandExecutor.recordPlantCare(.fertilizing, plantID: plantID, executorId: currentExecutorId())
+        commandQueue.enqueue(.plantCare(plantID: plantID, action: type.rawValue)) {
+            PlantCareCommandService.recordCare(
+                type,
+                plant: plant,
+                executorId: currentExecutorId(),
+                context: modelContext,
+                careNote: careNote
+            )
         }
+    }
+
+    private func deferTaskOneDay(_ task: PlantCareTaskSnapshot) {
+        let formatter = ISO8601DateFormatter()
+        let tomorrow = Calendar.current.date(byAdding: .day, value: 1, to: Date()) ?? Date().addingTimeInterval(86400)
+        recordCare(.customNote, careNote: "defer:\(task.careType.rawValue):\(formatter.string(from: tomorrow))")
     }
 
     private func currentExecutorId() -> String? {
@@ -419,6 +700,19 @@ struct EditPlantSheet: View {
             location: location,
             wateringIntervalDays: wateringInterval,
             fertilizingIntervalDays: fertilizingInterval,
+            potDiameterCm: plant.potDiameterCm,
+            potMaterialRaw: plant.potMaterialRaw,
+            soilTypeRaw: plant.soilTypeRaw,
+            isIndoor: plant.isIndoor,
+            windowDirection: plant.windowDirection,
+            lightLevel: plant.lightLevel,
+            healthStatus: plant.healthStatus,
+            catalogSpeciesId: plant.catalogSpeciesId,
+            isToxicToCats: plant.isToxicToCats,
+            isToxicToDogs: plant.isToxicToDogs,
+            isToxicToChildren: plant.isToxicToChildren,
+            isIndoorSuitable: plant.isIndoorSuitable,
+            remindersEnabled: plant.remindersEnabled,
             themeHex: plant.themeColorHex,
             notes: notes
         )

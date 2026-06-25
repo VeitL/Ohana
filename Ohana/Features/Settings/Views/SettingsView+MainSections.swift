@@ -214,6 +214,13 @@ extension SettingsView {
             )
             OhanaDashedDivider(color: dividerLine).padding(.leading, 44)
             notificationToggleRow(
+                icon: "leaf.fill",
+                iconColor: Color(hex: "4CAF50"),
+                title: l.tr(zh: "植物护理提醒", en: "Plant care reminders", de: "Pflanzenpflege-Erinnerungen"),
+                group: .plantCare
+            )
+            OhanaDashedDivider(color: dividerLine).padding(.leading, 44)
+            notificationToggleRow(
                 icon: "checkmark.seal.fill",
                 iconColor: Color.goYellow,
                 title: l.tr(zh: "打卡提醒", en: "Check-in reminders", de: "Check-in-Erinnerungen"),

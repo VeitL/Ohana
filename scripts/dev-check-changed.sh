@@ -115,6 +115,7 @@ app_swift_files=()
 ui_swift_files=()
 shell_files=()
 json_files=()
+status_doc_files=()
 build_reasons=()
 test_reasons=()
 
@@ -145,7 +146,18 @@ for file in "${files[@]}"; do
     *.json)
       json_files+=("$file")
       ;;
+    *.md)
+      case "$file" in
+        docs/task-follow-ups.md|docs/testing-progress.md|docs/cloud-sync-todo.md|docs/status-ledger-map.md)
+          status_doc_files+=("$file")
+          ;;
+      esac
+      ;;
   esac
+
+  if [[ "$file" == "scripts/audit-doc-status-ledgers.sh" ]]; then
+    status_doc_files+=("$file")
+  fi
 done
 
 echo "dev-check: validating ${#files[@]} changed file(s)."
@@ -163,6 +175,10 @@ if [[ ${#json_files[@]} -gt 0 ]]; then
   for file in "${json_files[@]}"; do
     validate_json "$file"
   done
+fi
+
+if [[ ${#status_doc_files[@]} -gt 0 ]]; then
+  run "status ledger audit" scripts/audit-doc-status-ledgers.sh
 fi
 
 if [[ ${#swift_files[@]} -gt 0 ]]; then

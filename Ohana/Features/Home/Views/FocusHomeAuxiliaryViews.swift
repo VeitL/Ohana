@@ -159,7 +159,7 @@ nonisolated struct TodayFocusSnapshot: Equatable, Sendable {
         healthAlerts: PetHealthAlerting,
         now: Date = Date()
     ) -> TodayFocusSnapshot {
-        let visiblePlants = PlantFeatureGate.allows(.plants) ? plants : []
+        let visiblePlants = PlantUnlockPolicy.isUnlocked(currentLevel: AppFeatureRouteGuard.currentFeatureLevel) ? plants : []
         let quests = IslandQuestEngine.todayQuests(
             pets: pets,
             reminders: reminders,
@@ -232,7 +232,7 @@ nonisolated struct TodayFocusSnapshot: Equatable, Sendable {
         clinicalAlerts: [HealthAlert],
         now: Date = Date()
     ) -> TodayFocusSnapshot {
-        let visiblePlants = PlantFeatureGate.allows(.plants) ? plants : []
+        let visiblePlants = PlantUnlockPolicy.isUnlocked(currentLevel: AppFeatureRouteGuard.currentFeatureLevel) ? plants : []
         let quests = IslandQuestEngine.todayQuests(
             pets: pets,
             reminders: reminders,
@@ -315,7 +315,7 @@ nonisolated struct TodayFocusSnapshot: Equatable, Sendable {
         negativeSignals: [IslandNegativeSignal],
         dayToken: Int
     ) -> TodayFocusSnapshot {
-        let visiblePlants = PlantFeatureGate.allows(.plants) ? plants : []
+        let visiblePlants = PlantUnlockPolicy.isUnlocked(currentLevel: AppFeatureRouteGuard.currentFeatureLevel) ? plants : []
         return TodayFocusSnapshot(
             dayToken: dayToken,
             pets: pets.map(TodayFocusPetSnapshot.init),

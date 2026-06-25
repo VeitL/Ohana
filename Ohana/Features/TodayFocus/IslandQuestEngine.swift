@@ -80,6 +80,7 @@ nonisolated enum IslandQuestEngine {
         humanMedications: [HumanMedication] = [],
         careLedgerEntries: [TodayFocusCareLedgerEntry] = [],
         careLedgerSnapshotAvailable: Bool = false,
+        includesPlants: Bool = PlantUnlockPolicy.isUnlocked(currentLevel: AppFeatureRouteGuard.currentFeatureLevel),
         now: Date = Date(),
         questProgress: TodayFocusQuestProgress = .fromDefaults()
     ) -> [IslandQuest] {
@@ -130,6 +131,34 @@ nonisolated enum IslandQuestEngine {
             guard quests.count < maxQuests else { break }
             if !quests.contains(where: { $0.id == quest.id }) {
                 quests.append(quest)
+            }
+        }
+
+        if includesPlants {
+            // ── 植物浇水（需要浇水的植物）
+            if quests.count < maxQuests, let thirstyPlant = plants.first(where: { $0.needsWatering(on: now, calendar: cal) }) {
+                quests.append(IslandQuest(
+                    id: "q_water_plant_\(thirstyPlant.id.uuidString)",
+                    emoji: "💧",
+                    title: localized(zh: "给 \(thirstyPlant.name) 浇水", en: "Water \(thirstyPlant.name)"),
+                    subtitle: localized(zh: "植物渴了，快去浇水", en: "This plant needs water today"),
+                    isCompleted: false,
+                    targetPetId: nil,
+                    targetPlantId: thirstyPlant.id
+                ))
+            }
+
+            // ── 植物施肥（需要施肥的植物）
+            if quests.count < maxQuests, let hungryPlant = plants.first(where: { $0.needsFertilizing(on: now, calendar: cal) }) {
+                quests.append(IslandQuest(
+                    id: "q_fertilize_plant_\(hungryPlant.id.uuidString)",
+                    emoji: "🌿",
+                    title: localized(zh: "给 \(hungryPlant.name) 施肥", en: "Fertilize \(hungryPlant.name)"),
+                    subtitle: localized(zh: "植物需要补充养分", en: "This plant needs nutrients"),
+                    isCompleted: false,
+                    targetPetId: nil,
+                    targetPlantId: hungryPlant.id
+                ))
             }
         }
 
@@ -223,34 +252,6 @@ nonisolated enum IslandQuestEngine {
             for quest in oasisBuildQuests(activePets: activePets, humans: humans, questProgress: questProgress) {
                 guard quests.count < maxQuests else { break }
                 quests.append(quest)
-            }
-        }
-
-        if PlantFeatureGate.allows(.plants) {
-            // ── 植物浇水（需要浇水的植物）
-            if quests.count < maxQuests, let thirstyPlant = plants.first(where: { $0.needsWatering(on: now, calendar: cal) }) {
-                quests.append(IslandQuest(
-                    id: "q_water_plant_\(thirstyPlant.id.uuidString)",
-                    emoji: "💧",
-                    title: localized(zh: "给 \(thirstyPlant.name) 浇水", en: "Water \(thirstyPlant.name)"),
-                    subtitle: localized(zh: "植物渴了，快去浇水", en: "This plant needs water today"),
-                    isCompleted: false,
-                    targetPetId: nil,
-                    targetPlantId: thirstyPlant.id
-                ))
-            }
-
-            // ── 植物施肥（需要施肥的植物）
-            if quests.count < maxQuests, let hungryPlant = plants.first(where: { $0.needsFertilizing(on: now, calendar: cal) }) {
-                quests.append(IslandQuest(
-                    id: "q_fertilize_plant_\(hungryPlant.id.uuidString)",
-                    emoji: "🌿",
-                    title: localized(zh: "给 \(hungryPlant.name) 施肥", en: "Fertilize \(hungryPlant.name)"),
-                    subtitle: localized(zh: "植物需要补充养分", en: "This plant needs nutrients"),
-                    isCompleted: false,
-                    targetPetId: nil,
-                    targetPlantId: hungryPlant.id
-                ))
             }
         }
 
@@ -950,8 +951,8 @@ nonisolated enum IslandQuestEngine {
         default:
             if id.hasPrefix("q_med_") { return 2 }
             if id.hasPrefix("q_feed_") { return 2 }
-            if id.hasPrefix("q_water_plant") { return PlantFeatureGate.allows(.plants) ? 1 : 0 }
-            if id.hasPrefix("q_fertilize_plant") { return PlantFeatureGate.allows(.plants) ? 1 : 0 }
+            if id.hasPrefix("q_water_plant") { return PlantUnlockPolicy.isUnlocked(currentLevel: AppFeatureRouteGuard.currentFeatureLevel) ? 1 : 0 }
+            if id.hasPrefix("q_fertilize_plant") { return PlantUnlockPolicy.isUnlocked(currentLevel: AppFeatureRouteGuard.currentFeatureLevel) ? 1 : 0 }
             if id.hasPrefix("q_water_") { return 1 }
             if id.hasPrefix("q_play_") { return 2 }
             if id.hasPrefix("q_weight_") { return 2 }

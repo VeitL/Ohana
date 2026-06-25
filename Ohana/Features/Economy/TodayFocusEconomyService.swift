@@ -161,7 +161,7 @@ enum TodayFocusEconomyService {
         now: Date,
         calendar: Calendar = .current
     ) -> Bool {
-        guard PlantFeatureGate.allows(.plants) else { return false }
+        guard PlantUnlockPolicy.isUnlocked(currentLevel: AppFeatureRouteGuard.currentFeatureLevel) else { return false }
         guard let plantId = quest.targetPlantId,
               let plant = plants.first(where: { $0.id == plantId }) else {
             return false
@@ -380,6 +380,9 @@ enum TodayFocusEconomyService {
             humans = TodayFocusEconomyService.fetchHumans(context: context)
             humanMedications = TodayFocusEconomyService.fetchHumanMedications(context: context)
             plants = PlantFeatureGate.allows(.plants) ? TodayFocusEconomyService.fetchPlants(context: context) : []
+            if !plants.isEmpty {
+                PlantUnlockPolicy.noteExistingPlantData()
+            }
             reminders = TodayFocusEconomyService.fetchTodayReminders(context: context, now: now, calendar: calendar)
             events = TodayFocusEconomyService.fetchTodayFocusEvents(context: context, now: now, calendar: calendar)
             careLedgerEntries = TodayFocusEconomyService.fetchTodayCareLedgerEntries(context: context, now: now, calendar: calendar)

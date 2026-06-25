@@ -103,7 +103,9 @@ enum CalendarEventPlanCommandService {
             .memorialContentWithOptionalDerivations
         case .daily, .health, .task, .shoppingList, .chore, .vaccine, .externalDeworming,
              .internalDeworming, .grooming, .vetVisit, .foodChange, .litterBox, .watering,
-             .fertilizing, .medication, .petMedication, .petMedicationDose, .insurancePremium:
+             .fertilizing, .plantRepotting, .plantPruning, .plantMisting, .plantRotation,
+             .plantLeafCleaning, .plantPestCheck, .plantHealthCheck,
+             .medication, .petMedication, .petMedicationDose, .insurancePremium:
             .care
         }
     }
@@ -387,6 +389,16 @@ enum CalendarEventCommandService {
                 reminderCompletion.reopen(reminder, by: executorId, context: context, reschedule: true)
             }
         }
+        if shouldComplete, remindersToSync.isEmpty {
+            PlantCareScheduleSyncService.syncCompletedEvent(
+                event,
+                occurrenceDate: occurrenceDate,
+                executorId: executorId,
+                context: context,
+                source: .calendar,
+                now: now
+            )
+        }
         if remindersToSync.isEmpty {
             context.safeSave()
         }
@@ -504,7 +516,9 @@ enum CalendarEventCommandService {
             .memorialContentWithOptionalDerivations
         case .daily, .health, .task, .shoppingList, .chore, .vaccine, .externalDeworming,
              .internalDeworming, .grooming, .vetVisit, .foodChange, .litterBox, .watering,
-             .fertilizing, .medication, .petMedication, .petMedicationDose, .insurancePremium,
+             .fertilizing, .plantRepotting, .plantPruning, .plantMisting, .plantRotation,
+             .plantLeafCleaning, .plantPestCheck, .plantHealthCheck,
+             .medication, .petMedication, .petMedicationDose, .insurancePremium,
              .none:
             .care
         }

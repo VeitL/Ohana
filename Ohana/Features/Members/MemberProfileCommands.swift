@@ -162,8 +162,69 @@ struct PlantProfileCommandInput: Equatable {
     let location: String
     let wateringIntervalDays: Int
     let fertilizingIntervalDays: Int
+    let potDiameterCm: Double
+    let potMaterialRaw: String
+    let soilTypeRaw: String
+    let isIndoor: Bool
+    let windowDirection: PlantWindowDirection
+    let lightLevel: PlantLightLevel
+    let healthStatus: PlantHealthStatus
+    let catalogSpeciesId: String
+    let isToxicToCats: Bool
+    let isToxicToDogs: Bool
+    let isToxicToChildren: Bool
+    let isIndoorSuitable: Bool
+    let remindersEnabled: Bool
     let themeHex: String
     let notes: String
+
+    init(
+        name: String,
+        avatarImageData: Data?,
+        avatarEmoji: String,
+        species: String,
+        location: String,
+        wateringIntervalDays: Int,
+        fertilizingIntervalDays: Int,
+        potDiameterCm: Double = 0,
+        potMaterialRaw: String = "",
+        soilTypeRaw: String = "",
+        isIndoor: Bool = true,
+        windowDirection: PlantWindowDirection = .unknown,
+        lightLevel: PlantLightLevel = .medium,
+        healthStatus: PlantHealthStatus = .stable,
+        catalogSpeciesId: String = "",
+        isToxicToCats: Bool = false,
+        isToxicToDogs: Bool = false,
+        isToxicToChildren: Bool = false,
+        isIndoorSuitable: Bool = true,
+        remindersEnabled: Bool = true,
+        themeHex: String,
+        notes: String
+    ) {
+        self.name = name
+        self.avatarImageData = avatarImageData
+        self.avatarEmoji = avatarEmoji
+        self.species = species
+        self.location = location
+        self.wateringIntervalDays = wateringIntervalDays
+        self.fertilizingIntervalDays = fertilizingIntervalDays
+        self.potDiameterCm = potDiameterCm
+        self.potMaterialRaw = potMaterialRaw
+        self.soilTypeRaw = soilTypeRaw
+        self.isIndoor = isIndoor
+        self.windowDirection = windowDirection
+        self.lightLevel = lightLevel
+        self.healthStatus = healthStatus
+        self.catalogSpeciesId = catalogSpeciesId
+        self.isToxicToCats = isToxicToCats
+        self.isToxicToDogs = isToxicToDogs
+        self.isToxicToChildren = isToxicToChildren
+        self.isIndoorSuitable = isIndoorSuitable
+        self.remindersEnabled = remindersEnabled
+        self.themeHex = themeHex
+        self.notes = notes
+    }
 }
 
 struct MemberProfileCommandResult: Equatable {
@@ -392,8 +453,22 @@ enum MemberProfileCommandService {
         plant.location = input.location.trimmingCharacters(in: .whitespacesAndNewlines)
         plant.wateringIntervalDays = input.wateringIntervalDays
         plant.fertilizingIntervalDays = input.fertilizingIntervalDays
+        plant.potDiameterCm = input.potDiameterCm
+        plant.potMaterialRaw = input.potMaterialRaw.trimmingCharacters(in: .whitespacesAndNewlines)
+        plant.soilTypeRaw = input.soilTypeRaw.trimmingCharacters(in: .whitespacesAndNewlines)
+        plant.isIndoor = input.isIndoor
+        plant.windowDirection = input.windowDirection
+        plant.lightLevel = input.lightLevel
+        plant.healthStatus = input.healthStatus
+        plant.catalogSpeciesId = input.catalogSpeciesId
+        plant.isToxicToCats = input.isToxicToCats
+        plant.isToxicToDogs = input.isToxicToDogs
+        plant.isToxicToChildren = input.isToxicToChildren
+        plant.isIndoorSuitable = input.isIndoorSuitable
+        plant.remindersEnabled = input.remindersEnabled
         plant.themeColorHex = input.themeHex
         plant.notes = input.notes.trimmingCharacters(in: .whitespacesAndNewlines)
+        CloudSyncMutationRecorder.markModified(plant, context: context)
         context.safeSave()
 
         return MemberProfileCommandResult(
@@ -401,7 +476,10 @@ enum MemberProfileCommandService {
             kind: EntityKind.plant.rawValue,
             changedFields: [
                 "name", "avatarImageData", "avatarEmoji", "species", "location",
-                "wateringIntervalDays", "fertilizingIntervalDays", "themeColorHex", "notes"
+                "wateringIntervalDays", "fertilizingIntervalDays", "potDiameterCm",
+                "potMaterialRaw", "soilTypeRaw", "isIndoor", "windowDirectionRaw",
+                "lightLevelRaw", "healthStatusRaw", "catalogSpeciesId", "toxicity",
+                "isIndoorSuitable", "remindersEnabled", "themeColorHex", "notes"
             ]
         )
     }

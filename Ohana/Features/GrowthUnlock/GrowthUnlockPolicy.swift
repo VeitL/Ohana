@@ -125,9 +125,9 @@ enum GrowthUnlockCatalog {
             titleZh: "家庭树冠",
             titleEn: "Family Canopy",
             titleDe: "Familien-Krone",
-            detailZh: "强化家庭事务、成员档案和照护分析，让单机管理更完整。",
-            detailEn: "Add household affairs, member profiles, and care analysis for a fuller local workspace.",
-            detailDe: "Ergänzt Haushalt, Mitgliederprofile und Pflegeanalyse lokal.",
+            detailZh: "家庭从宠物扩展到家中其他生命：解锁植物档案、护理计划、日志、资料库和本地提醒。",
+            detailEn: "Extend the household from pets to other living things: unlock plant profiles, care plans, logs, catalog, and local reminders.",
+            detailDe: "Erweitert den Haushalt von Haustieren auf weitere Lebewesen: Pflanzenprofile, Pflegepläne, Protokolle, Katalog und lokale Erinnerungen.",
             icon: "house.fill",
             tintHex: "8B5CF6"
         ),
@@ -137,9 +137,9 @@ enum GrowthUnlockCatalog {
             titleZh: "绿洲收益",
             titleEn: "Oasis Yield",
             titleDe: "Oasis-Ertrag",
-            detailZh: "椰子树入口从新人礼包后开放；Lv.5 后开放每日椰子收益，让成长开始反哺日常管理。",
-            detailEn: "The Coconut Tree opens after the starter gift; Lv.5 opens daily coconut yield so growth feeds back into daily utility.",
-            detailDe: "Der Kokosbaum öffnet sich nach dem Startergeschenk; ab Lv.5 gibt es tägliche Kokos-Erträge.",
+            detailZh: "植物基础管理已经开放；Lv.5 开始把照护反馈到绿洲氛围、装饰和收益循环。",
+            detailEn: "Basic plant management is already open; Lv.5 starts feeding care back into Oasis mood, decoration, and yield loops.",
+            detailDe: "Die grundlegende Pflanzenverwaltung ist bereits offen; ab Lv.5 fließt Pflege in Oasis-Stimmung, Deko und Ertrag zurück.",
             icon: "tree.fill",
             tintHex: "84CC16"
         ),
@@ -243,7 +243,7 @@ enum GrowthUnlockPolicy {
         case .memory:
             .featureGroup(.archiveMemory)
         case .household:
-            .featureGroup(.householdHub)
+            .featureGroup(.plants)
         case .oasisPlants:
             .wealthDashboard
         case .rewards:
@@ -272,7 +272,7 @@ enum GrowthUnlockPolicy {
         case .memory:
             localized(zh: "成长档案", en: "Growth archive", de: "Wachstumsarchiv", language: language)
         case .household:
-            localized(zh: "家庭事务", en: "Household", de: "Familie", language: language)
+            localized(zh: "植物照护", en: "Plant care", de: "Pflanzenpflege", language: language)
         case .oasisPlants:
             localized(zh: "Oasis 树收益", en: "Oasis tree income", de: "Oasis-Baum-Erträge", language: language)
         case .rewards:
@@ -341,7 +341,7 @@ enum GrowthUnlockPolicy {
         case .healthBody: .bodyHealth
         case .archiveMemory: .memory
         case .householdHub: .household
-        case .plants: .oasisPlants
+        case .plants: .household
         case .oasisRewards: .rewards
         }
     }
@@ -374,8 +374,10 @@ enum GrowthUnlockPolicy {
             .household
         case .careLedgerAnalysis, .reminderObservability:
             .advancedInsights
-        case .plantsDashboard, .plantDetail, .wealthDashboard:
+        case .wealthDashboard:
             .oasisPlants
+        case .plantsDashboard, .plantDetail:
+            .household
         case .familyWeeklyReport, .coconutShop:
             .rewards
         case .gacha:

@@ -598,9 +598,9 @@ struct GrowthUnlockPopupView: View {
             )
         case .household:
             localized(
-                zh: "家庭事务入口开放，可以集中查看成员、花费和照护分析。",
-                en: "Household tools are open for members, expenses, and care analysis.",
-                de: "Haushaltswerkzeuge sind für Mitglieder, Ausgaben und Pflegeanalyse offen."
+                zh: PlantUnlockPolicy.unlockedToastZh,
+                en: "Your family canopy has opened. You can now care for the plants at home.",
+                de: "Deine Familien-Krone hat sich geöffnet. Du kannst jetzt Pflanzen zu Hause pflegen."
             )
         case .oasisPlants:
             localized(
@@ -660,8 +660,8 @@ struct GrowthUnlockPopupView: View {
             ]
         case .household:
             [
-                localized(zh: "查看成员、花费和家庭事务", en: "Review members, expenses, and household affairs", de: "Mitglieder, Ausgaben und Haushalt ansehen"),
-                localized(zh: "用照护分析回顾近期记录", en: "Use care analysis to review recent records", de: "Pflegeanalyse für aktuelle Einträge nutzen")
+                localized(zh: "添加植物、查看植物 Dashboard 和详情页", en: "Add plants and open the plant dashboard and detail pages", de: "Pflanzen hinzufügen sowie Dashboard und Detailseiten öffnen"),
+                localized(zh: "使用护理计划、日志、照片、资料库和本地提醒", en: "Use care plans, logs, photos, catalog, and local reminders", de: "Pflegepläne, Protokolle, Fotos, Katalog und lokale Erinnerungen nutzen")
             ]
         case .oasisPlants:
             [

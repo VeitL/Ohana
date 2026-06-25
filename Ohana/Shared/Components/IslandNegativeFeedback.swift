@@ -162,7 +162,7 @@ nonisolated enum IslandNegativeFeedback {
             }
         }
 
-        if PlantFeatureGate.allows(.plants) {
+        if PlantUnlockPolicy.isUnlocked(currentLevel: AppFeatureRouteGuard.currentFeatureLevel) {
             for plant in plants {
                 if let lastWatered = plant.lastWateredDate, now.timeIntervalSince(lastWatered) > 7 * 86400 {
                     let days = Int(now.timeIntervalSince(lastWatered) / 86400)

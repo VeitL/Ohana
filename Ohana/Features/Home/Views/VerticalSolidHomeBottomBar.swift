@@ -86,7 +86,9 @@ struct VerticalSolidHomeBottomBar: View {
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
     private var l: L10n { localization }
-    private var visibleTabs: [VerticalSolidHomeTab] { VerticalSolidHomeTab.visibleTabs }
+    private var visibleTabs: [VerticalSolidHomeTab] {
+        AppFeatureRouteGuard.visibleHomeTabs(currentLevel: treeLevel)
+    }
     private var metrics: HomeBottomNavigationLayoutMetrics {
         HomeBottomNavigationLayoutPolicy.metrics(
             tabCount: visibleTabs.count,

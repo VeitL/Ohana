@@ -259,6 +259,7 @@ struct VerticalSolidHomeView: View {
                     outgoingTab: controller.outgoingTab,
                     preparingTab: controller.preparingTab,
                     preparedTabs: controller.preparedTabs,
+                    visibleTabs: AppFeatureRouteGuard.visibleHomeTabs(currentLevel: treeManager.treeLevel.rawValue),
                     canAnimate: canAnimate
                 ) { lifecycle in
                     VerticalSolidHomeDashboardPage(
@@ -548,6 +549,7 @@ struct VerticalSolidHomeView: View {
         }
         .onChange(of: treeManager.treeLevel.rawValue) { _, _ in
             scheduleGrowthUnlockFeedbackIfNeeded()
+            requestHomeSnapshotRefresh()
         }
     }
 
@@ -555,6 +557,6 @@ struct VerticalSolidHomeView: View {
         starterOasisTabPromptPending &&
             starterGiftCeremonySeen &&
             controller.selectedTab == .home &&
-            AppFeatureRouteGuard.allowsHomeTab(.oasis)
+            AppFeatureRouteGuard.allowsHomeTab(.oasis, currentLevel: treeManager.treeLevel.rawValue)
     }
 }

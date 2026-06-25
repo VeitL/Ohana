@@ -17,7 +17,7 @@ final class CoconutWalletServiceTests: XCTestCase {
         _ = ModelContext(container)
 
         let schemaNames = ArkMigrationPlan.schemas.map { String(describing: $0) }
-        XCTAssertTrue(schemaNames.contains("ArkSchemaV72"))
+        XCTAssertTrue(schemaNames.contains("ArkSchemaV73"))
         XCTAssertTrue(ArkMigrationPlan.stages.isEmpty)
     }
 

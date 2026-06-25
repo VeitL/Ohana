@@ -218,7 +218,7 @@ nonisolated enum VerticalSolidHomeSnapshotBuilder {
             equippedTitleRaw: source.equippedTitleRaw,
             language: source.language
         )
-        let visiblePlants = PlantFeatureGate.allows(.plants) ? source.plants : []
+        let visiblePlants = PlantUnlockPolicy.isUnlocked(currentLevel: AppFeatureRouteGuard.currentFeatureLevel) ? source.plants : []
         let todayFocus = makeTodayFocus(
             activePets,
             visiblePlants,
@@ -278,7 +278,7 @@ nonisolated enum VerticalSolidHomeSnapshotBuilder {
     }
 
     static func signature(for source: VerticalSolidHomeSourceState, now: Date = Date()) -> String {
-        let visiblePlants = PlantFeatureGate.allows(.plants) ? source.plants : []
+        let visiblePlants = PlantUnlockPolicy.isUnlocked(currentLevel: AppFeatureRouteGuard.currentFeatureLevel) ? source.plants : []
         return [
             "day:\(dayToken(for: now))",
             petSignature(source.pets),

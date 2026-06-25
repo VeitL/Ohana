@@ -2606,6 +2606,37 @@ struct HomeCommandExecutorTests {
     }
 
     @MainActor
+    @Test func plantCareCommandServiceWritesEveryLaunchCareType() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let plant = Plant(name: "Fern")
+        context.insert(plant)
+        try context.save()
+
+        for (index, type) in PlantCareType.allCases.enumerated() {
+            PlantCareCommandService.recordCare(
+                type,
+                plant: plant,
+                executorId: nil,
+                context: context,
+                now: makeDate(year: 2026, month: 6, day: 8, hour: 9, minute: index),
+                careNote: "type.\(type.rawValue)",
+                healthStatus: type == .yellowLeaf ? .watching : nil
+            )
+        }
+
+        let logs = try context.fetch(FetchDescriptor<PlantCareLog>())
+        let events = try context.fetch(FetchDescriptor<Event>())
+        #expect(logs.count == PlantCareType.allCases.count)
+        #expect(events.count == PlantCareType.allCases.count)
+        #expect(Set(logs.map(\.careTypeRaw)) == Set(PlantCareType.allCases.map(\.rawValue)))
+        #expect(events.contains { $0.eventType == EventType.plantRepotting.rawValue })
+        #expect(events.contains { $0.eventType == EventType.plantPestCheck.rawValue })
+        #expect(events.contains { $0.eventType == EventType.plantHealthCheck.rawValue })
+        #expect(plant.healthStatus == .watching)
+    }
+
+    @MainActor
     @Test func plantCreationCommandServiceWritesOnePlantFact() throws {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
@@ -2619,7 +2650,20 @@ struct HomeCommandExecutorTests {
                 location: "  Living room  ",
                 avatarEmoji: "  ",
                 wateringIntervalDays: 5,
-                fertilizingIntervalDays: 40
+                fertilizingIntervalDays: 40,
+                potDiameterCm: 12,
+                potMaterialRaw: "  terracotta  ",
+                soilTypeRaw: "  airy mix  ",
+                isIndoor: false,
+                windowDirection: .east,
+                lightLevel: .brightIndirect,
+                healthStatus: .watching,
+                catalogSpeciesId: "chlorophytum-comosum",
+                isToxicToCats: true,
+                isToxicToDogs: false,
+                isToxicToChildren: true,
+                isIndoorSuitable: true,
+                remindersEnabled: false
             ),
             context: context
         )
@@ -2636,6 +2680,18 @@ struct HomeCommandExecutorTests {
         #expect(plant.avatarEmoji == "🌱")
         #expect(plant.wateringIntervalDays == 5)
         #expect(plant.fertilizingIntervalDays == 40)
+        #expect(plant.potDiameterCm == 12)
+        #expect(plant.potMaterialRaw == "terracotta")
+        #expect(plant.soilTypeRaw == "airy mix")
+        #expect(plant.isIndoor == false)
+        #expect(plant.windowDirection == .east)
+        #expect(plant.lightLevel == .brightIndirect)
+        #expect(plant.healthStatus == .watching)
+        #expect(plant.catalogSpeciesId == "chlorophytum-comosum")
+        #expect(plant.isToxicToCats)
+        #expect(!plant.isToxicToDogs)
+        #expect(plant.isToxicToChildren)
+        #expect(plant.remindersEnabled == false)
     }
 
     @MainActor
@@ -2917,6 +2973,19 @@ struct HomeCommandExecutorTests {
                 location: "  Living room  ",
                 wateringIntervalDays: 6,
                 fertilizingIntervalDays: 35,
+                potDiameterCm: 14,
+                potMaterialRaw: "  ceramic  ",
+                soilTypeRaw: "  fern mix  ",
+                isIndoor: true,
+                windowDirection: .north,
+                lightLevel: .low,
+                healthStatus: .stressed,
+                catalogSpeciesId: "epipremnum-aureum",
+                isToxicToCats: true,
+                isToxicToDogs: true,
+                isToxicToChildren: false,
+                isIndoorSuitable: false,
+                remindersEnabled: false,
                 themeHex: "27AE60",
                 notes: "  bright corner  "
             ),
@@ -2932,6 +3001,18 @@ struct HomeCommandExecutorTests {
         #expect(plant.location == "Living room")
         #expect(plant.wateringIntervalDays == 6)
         #expect(plant.fertilizingIntervalDays == 35)
+        #expect(plant.potDiameterCm == 14)
+        #expect(plant.potMaterialRaw == "ceramic")
+        #expect(plant.soilTypeRaw == "fern mix")
+        #expect(plant.windowDirection == .north)
+        #expect(plant.lightLevel == .low)
+        #expect(plant.healthStatus == .stressed)
+        #expect(plant.catalogSpeciesId == "epipremnum-aureum")
+        #expect(plant.isToxicToCats)
+        #expect(plant.isToxicToDogs)
+        #expect(!plant.isToxicToChildren)
+        #expect(!plant.isIndoorSuitable)
+        #expect(!plant.remindersEnabled)
         #expect(plant.themeColorHex == "27AE60")
         #expect(plant.notes == "bright corner")
     }
@@ -9197,7 +9278,7 @@ struct HomeCommandExecutorTests {
     }
 
     private func makeInMemoryContainer() throws -> ModelContainer {
-        let schema = Schema(ArkSchemaV72.models)
+        let schema = Schema(ArkSchemaV73.models)
         let config = ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)
         return try ModelContainer(for: schema, configurations: [config])
     }

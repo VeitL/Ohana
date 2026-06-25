@@ -8,6 +8,78 @@
 import Foundation
 import SwiftData
 
+enum PlantExperienceLevel: String, Codable, CaseIterable, Identifiable, Sendable {
+    case beginner
+    case intermediate
+    case experienced
+
+    var id: String { rawValue }
+}
+
+enum PlantCareScene: String, Codable, CaseIterable, Identifiable, Sendable {
+    case indoor
+    case balcony
+    case garden
+
+    var id: String { rawValue }
+}
+
+enum PlantLightLevel: String, Codable, CaseIterable, Identifiable, Sendable {
+    case low
+    case medium
+    case brightIndirect
+    case direct
+
+    var id: String { rawValue }
+
+    nonisolated var displayName: String {
+        switch self {
+        case .low: "弱光"
+        case .medium: "中等光"
+        case .brightIndirect: "明亮散射光"
+        case .direct: "直射光"
+        }
+    }
+}
+
+enum PlantHealthStatus: String, Codable, CaseIterable, Identifiable, Sendable {
+    case thriving
+    case stable
+    case watching
+    case stressed
+
+    var id: String { rawValue }
+
+    nonisolated var displayName: String {
+        switch self {
+        case .thriving: "状态很好"
+        case .stable: "稳定"
+        case .watching: "需要观察"
+        case .stressed: "状态紧张"
+        }
+    }
+}
+
+enum PlantWindowDirection: String, Codable, CaseIterable, Identifiable, Sendable {
+    case unknown
+    case north
+    case east
+    case south
+    case west
+
+    var id: String { rawValue }
+
+    nonisolated var displayName: String {
+        switch self {
+        case .unknown: "未设置"
+        case .north: "北向"
+        case .east: "东向"
+        case .south: "南向"
+        case .west: "西向"
+        }
+    }
+}
+
 @Model
 final class Plant {
     var id: UUID
@@ -21,6 +93,20 @@ final class Plant {
     var fertilizingIntervalDays: Int
     var lastWateredDate: Date?
     var lastFertilizedDate: Date?
+    var lastHealthCheckDate: Date?
+    var potDiameterCm: Double = 0
+    var potMaterialRaw: String = ""
+    var soilTypeRaw: String = ""
+    var isIndoor: Bool = true
+    var windowDirectionRaw: String = PlantWindowDirection.unknown.rawValue
+    var lightLevelRaw: String = PlantLightLevel.medium.rawValue
+    var healthStatusRaw: String = PlantHealthStatus.stable.rawValue
+    var catalogSpeciesId: String = ""
+    var isToxicToCats: Bool = false
+    var isToxicToDogs: Bool = false
+    var isToxicToChildren: Bool = false
+    var isIndoorSuitable: Bool = true
+    var remindersEnabled: Bool = true
     var notes: String
     var createdAt: Date
     // Legacy recycle-bin columns kept only for stores that already migrated through the retired deletion model.
@@ -39,7 +125,20 @@ final class Plant {
         avatarEmoji: String = "🌱",
         wateringIntervalDays: Int = 7,
         fertilizingIntervalDays: Int = 30,
-        themeColorHex: String = "4CAF50"
+        themeColorHex: String = "4CAF50",
+        potDiameterCm: Double = 0,
+        potMaterialRaw: String = "",
+        soilTypeRaw: String = "",
+        isIndoor: Bool = true,
+        windowDirection: PlantWindowDirection = .unknown,
+        lightLevel: PlantLightLevel = .medium,
+        healthStatus: PlantHealthStatus = .stable,
+        catalogSpeciesId: String = "",
+        isToxicToCats: Bool = false,
+        isToxicToDogs: Bool = false,
+        isToxicToChildren: Bool = false,
+        isIndoorSuitable: Bool = true,
+        remindersEnabled: Bool = true
     ) {
         self.id = UUID()
         self.name = name
@@ -52,9 +151,46 @@ final class Plant {
         self.fertilizingIntervalDays = fertilizingIntervalDays
         self.lastWateredDate = nil
         self.lastFertilizedDate = nil
+        self.lastHealthCheckDate = nil
+        self.potDiameterCm = potDiameterCm
+        self.potMaterialRaw = potMaterialRaw
+        self.soilTypeRaw = soilTypeRaw
+        self.isIndoor = isIndoor
+        self.windowDirectionRaw = windowDirection.rawValue
+        self.lightLevelRaw = lightLevel.rawValue
+        self.healthStatusRaw = healthStatus.rawValue
+        self.catalogSpeciesId = catalogSpeciesId
+        self.isToxicToCats = isToxicToCats
+        self.isToxicToDogs = isToxicToDogs
+        self.isToxicToChildren = isToxicToChildren
+        self.isIndoorSuitable = isIndoorSuitable
+        self.remindersEnabled = remindersEnabled
         self.notes = ""
         self.createdAt = Date()
         self.careLogs = []
+    }
+
+    var lightLevel: PlantLightLevel {
+        get { PlantLightLevel(rawValue: lightLevelRaw) ?? .medium }
+        set { lightLevelRaw = newValue.rawValue }
+    }
+
+    var healthStatus: PlantHealthStatus {
+        get { PlantHealthStatus(rawValue: healthStatusRaw) ?? .stable }
+        set { healthStatusRaw = newValue.rawValue }
+    }
+
+    var windowDirection: PlantWindowDirection {
+        get { PlantWindowDirection(rawValue: windowDirectionRaw) ?? .unknown }
+        set { windowDirectionRaw = newValue.rawValue }
+    }
+
+    var potMaterial: String {
+        potMaterialRaw.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    var soilType: String {
+        soilTypeRaw.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     var daysSinceWatered: Int? {
