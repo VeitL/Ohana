@@ -336,7 +336,7 @@ struct ContentView: View {
         case .preOnboarding,
              .needsPrimaryHuman,
              .starterGiftPending,
-             .starterGiftReadyForCeremony(_),
+             .starterGiftReadyForCeremony,
              .roadmapPromptPending,
              .complete,
              .existingUser:
