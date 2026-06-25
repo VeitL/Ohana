@@ -6,10 +6,14 @@ final class PlantFeatureGateXCTests: XCTestCase {
     override func setUp() {
         super.setUp()
         PlantUnlockPolicy.clearExistingPlantData()
+        PlantLockedPreviewPolicy.clearOnboardingPlantInterest()
+        PlantCatalogFavoriteStore.clearFavorites()
     }
 
     override func tearDown() {
         PlantUnlockPolicy.clearExistingPlantData()
+        PlantLockedPreviewPolicy.clearOnboardingPlantInterest()
+        PlantCatalogFavoriteStore.clearFavorites()
         super.tearDown()
     }
 
@@ -30,6 +34,26 @@ final class PlantFeatureGateXCTests: XCTestCase {
         XCTAssertTrue(AppFeatureRouteGuard.allowsAddEntity(.plant, currentLevel: 3))
         XCTAssertTrue(AppFeatureRouteGuard.allowsAppRoute(.plantProfile(id: UUID()), currentLevel: 3))
         XCTAssertTrue(AppFeatureRouteGuard.visibleHomeTabs(currentLevel: 3).contains(.plants))
+    }
+
+    func testLockedPreviewDoesNotUnlockPlantEntrySurfaces() {
+        PlantLockedPreviewPolicy.noteOnboardingPlantInterest()
+
+        XCTAssertTrue(PlantLockedPreviewPolicy.shouldShowLockedPreview(currentLevel: 3))
+        XCTAssertFalse(AppFeatureRouteGuard.allowsAddEntity(.plant, currentLevel: 3))
+        XCTAssertFalse(AppFeatureRouteGuard.allowsAppRoute(.plantProfile(id: UUID()), currentLevel: 3))
+        XCTAssertFalse(AppFeatureRouteGuard.visibleHomeTabs(currentLevel: 3).contains(.plants))
+        XCTAssertEqual(PlantLockedPreviewPolicy.energyRemainingForUnlock(currentEnergy: 300), 200)
+    }
+
+    func testPlantCatalogFavoritesPersistWithoutCreatingPlantAccess() {
+        XCTAssertFalse(PlantCatalogFavoriteStore.isFavorite(id: "epipremnum-aureum"))
+
+        XCTAssertTrue(PlantCatalogFavoriteStore.toggleFavorite(id: "epipremnum-aureum"))
+
+        XCTAssertTrue(PlantCatalogFavoriteStore.isFavorite(id: "epipremnum-aureum"))
+        XCTAssertEqual(PlantCatalogFavoriteStore.favoriteIDs(), ["epipremnum-aureum"])
+        XCTAssertFalse(AppFeatureRouteGuard.allowsAddEntity(.plant, currentLevel: 3))
     }
 
     func testQuestEngineOnlyGeneratesPlantQuestsWhenPlantCareIsIncluded() {

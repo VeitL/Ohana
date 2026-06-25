@@ -44,7 +44,9 @@ struct GrowthUnlockPolicyTests {
 
     @Test func plantGateOwnsBuildScopeAndGrowthUnlockTreatsPlantsAsHousehold() {
         PlantUnlockPolicy.clearExistingPlantData()
+        PlantLockedPreviewPolicy.clearOnboardingPlantInterest()
         defer { PlantUnlockPolicy.clearExistingPlantData() }
+        defer { PlantLockedPreviewPolicy.clearOnboardingPlantInterest() }
 
         #expect(PlantFeatureGate.allows(.plants))
         #expect(!GrowthUnlockPolicy.availability(for: FMDest.plantsDashboard, currentLevel: 3).isVisibleInApp)
@@ -61,6 +63,44 @@ struct GrowthUnlockPolicyTests {
         #expect(!AppFeatureRouteGuard.availability(for: FeatureGroup.plants, currentLevel: 3).isVisibleInApp)
         #expect(AppFeatureRouteGuard.availability(for: FMDest.plantsDashboard, currentLevel: 4).isVisibleInApp)
         #expect(AppFeatureRouteGuard.availability(for: FeatureGroup.plants, currentLevel: 4).isVisibleInApp)
+    }
+
+    @Test func plantLockedPreviewSetsExpectationWithoutUnlockingCare() {
+        PlantUnlockPolicy.clearExistingPlantData()
+        PlantLockedPreviewPolicy.clearOnboardingPlantInterest()
+        defer { PlantUnlockPolicy.clearExistingPlantData() }
+        defer { PlantLockedPreviewPolicy.clearOnboardingPlantInterest() }
+
+        #expect(!PlantLockedPreviewPolicy.shouldShowLockedPreview(currentLevel: 3))
+
+        PlantLockedPreviewPolicy.noteOnboardingPlantInterest()
+
+        #expect(PlantLockedPreviewPolicy.shouldShowLockedPreview(currentLevel: 3))
+        #expect(!PlantLockedPreviewPolicy.shouldShowLockedPreview(currentLevel: 4))
+        #expect(PlantLockedPreviewPolicy.levelsRemaining(currentLevel: 2) == 2)
+        #expect(PlantLockedPreviewPolicy.energyRemainingForUnlock(currentEnergy: 300) == 200)
+        #expect(!AppFeatureRouteGuard.allowsAddEntity(.plant, currentLevel: 3))
+        #expect(!AppFeatureRouteGuard.visibleHomeTabs(currentLevel: 3).contains(.plants))
+
+        if case .redirectToRoadmap = AppFeatureRouteGuard.functionDestinationDecision(.plantsDashboard, currentLevel: 3) {
+        } else {
+            Issue.record("Expected locked preview to keep plant dashboard behind Growth Roadmap before Lv4")
+        }
+    }
+
+    @Test func existingPlantDataSuppressesLockedPreviewBeforeLevelFour() {
+        let suiteName = "GrowthUnlockPolicyTests.existingPlantDataSuppressesLockedPreviewBeforeLevelFour.\(UUID().uuidString)"
+        guard let defaults = UserDefaults(suiteName: suiteName) else {
+            Issue.record("Expected isolated defaults suite")
+            return
+        }
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        PlantLockedPreviewPolicy.noteOnboardingPlantInterest(defaults: defaults)
+        #expect(PlantLockedPreviewPolicy.shouldShowLockedPreview(currentLevel: 3, defaults: defaults))
+
+        PlantUnlockPolicy.noteExistingPlantData(defaults: defaults)
+        #expect(!PlantLockedPreviewPolicy.shouldShowLockedPreview(currentLevel: 3, defaults: defaults))
     }
 
     @Test func growthRoadmapIsAlwaysVisible() {

@@ -48,3 +48,40 @@ enum PlantUnlockPolicy {
         defaults.removeObject(forKey: existingPlantDataKey)
     }
 }
+
+enum PlantLockedPreviewPolicy {
+    nonisolated static let onboardingHasPlantsKey = "ohana_onboarding_has_plants"
+
+    nonisolated static func shouldShowLockedPreview(
+        currentLevel: Int,
+        defaults: UserDefaults = .standard
+    ) -> Bool {
+        PlantFeatureGate.allows(.plants) &&
+            hasOnboardingPlantInterest(defaults: defaults) &&
+            !PlantUnlockPolicy.isUnlocked(currentLevel: currentLevel, defaults: defaults)
+    }
+
+    nonisolated static func hasOnboardingPlantInterest(defaults: UserDefaults = .standard) -> Bool {
+        defaults.bool(forKey: onboardingHasPlantsKey)
+    }
+
+    nonisolated static func noteOnboardingPlantInterest(
+        _ hasPlants: Bool = true,
+        defaults: UserDefaults = .standard
+    ) {
+        defaults.set(hasPlants, forKey: onboardingHasPlantsKey)
+    }
+
+    nonisolated static func clearOnboardingPlantInterest(defaults: UserDefaults = .standard) {
+        defaults.removeObject(forKey: onboardingHasPlantsKey)
+    }
+
+    nonisolated static func levelsRemaining(currentLevel: Int) -> Int {
+        max(0, PlantUnlockPolicy.requiredLevel - max(0, currentLevel))
+    }
+
+    nonisolated static func energyRemainingForUnlock(currentEnergy: Int) -> Int {
+        let targetEnergy = OasisTreeManager.levelStartThreshold(forRawLevel: PlantUnlockPolicy.requiredLevel)
+        return max(0, targetEnergy - max(0, currentEnergy))
+    }
+}

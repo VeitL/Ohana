@@ -85,6 +85,7 @@ struct OnboardingView: View {
     @AppStorage("ohana_onboarding_notifications_intent") private var onboardingNotificationsIntent = true
     @AppStorage("ohana_onboarding_has_pets") private var onboardingHasPets = true
     @AppStorage("ohana_onboarding_has_children") private var onboardingHasChildren = false
+    @AppStorage(PlantLockedPreviewPolicy.onboardingHasPlantsKey) private var onboardingHasPlants = false
     @AppStorage("ohana_onboarding_plant_experience") private var onboardingPlantExperience = PlantExperienceLevel.beginner.rawValue
     @AppStorage("ohana_onboarding_plant_scene") private var onboardingPlantScene = PlantCareScene.indoor.rawValue
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -500,6 +501,8 @@ struct OnboardingView: View {
                 Toggle(localized(zh: "家里有宠物", en: "Pets at home", de: "Tiere zu Hause"), isOn: $onboardingHasPets)
                     .tint(Color.goLime)
                 Toggle(localized(zh: "家里有小孩", en: "Children at home", de: "Kinder zu Hause"), isOn: $onboardingHasChildren)
+                    .tint(Color.goLime)
+                Toggle(localized(zh: "家里有植物", en: "Plants at home", de: "Pflanzen zu Hause"), isOn: $onboardingHasPlants)
                     .tint(Color.goLime)
 
                 Picker(localized(zh: "植物经验", en: "Plant experience", de: "Pflanzenerfahrung"), selection: $onboardingPlantExperience) {

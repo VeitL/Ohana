@@ -171,6 +171,10 @@ final class OasisTreeManager {
         return min(1.0, Double(max(0, totalEnergy) - currentStart) / Double(span))
     }
 
+    nonisolated static func levelStartThreshold(forRawLevel rawLevel: Int) -> Int {
+        energyThresholds[min(max(rawLevel, 0), energyThresholds.count - 1)]
+    }
+
     private static func levelStartThreshold(for level: TreeLevel) -> Int {
         energyThresholds[min(max(level.rawValue, 0), TreeLevel.lv10.rawValue)]
     }

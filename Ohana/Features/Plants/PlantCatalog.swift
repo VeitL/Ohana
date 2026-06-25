@@ -180,3 +180,36 @@ nonisolated enum PlantCatalog {
         }
     }
 }
+
+nonisolated enum PlantCatalogFavoriteStore {
+    static let favoritesKey = "ohana_plant_catalog_favorite_ids_v1"
+
+    static func favoriteIDs(defaults: UserDefaults = .standard) -> Set<String> {
+        Set(defaults.stringArray(forKey: favoritesKey) ?? [])
+    }
+
+    static func isFavorite(id: String, defaults: UserDefaults = .standard) -> Bool {
+        favoriteIDs(defaults: defaults).contains(id)
+    }
+
+    static func setFavoriteIDs(_ ids: Set<String>, defaults: UserDefaults = .standard) {
+        defaults.set(Array(ids).sorted(), forKey: favoritesKey)
+    }
+
+    @discardableResult
+    static func toggleFavorite(id: String, defaults: UserDefaults = .standard) -> Bool {
+        guard PlantCatalog.entry(id: id) != nil else { return false }
+        var ids = favoriteIDs(defaults: defaults)
+        if ids.contains(id) {
+            ids.remove(id)
+        } else {
+            ids.insert(id)
+        }
+        setFavoriteIDs(ids, defaults: defaults)
+        return ids.contains(id)
+    }
+
+    static func clearFavorites(defaults: UserDefaults = .standard) {
+        defaults.removeObject(forKey: favoritesKey)
+    }
+}

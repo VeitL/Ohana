@@ -9,6 +9,7 @@ struct FunctionMenuRootView: View {
 
     @Environment(AppServices.self) private var appServices
     @AppStorage(GrowthNewFeatureStore.revisionKey) private var newFeatureRevision = 0
+    @AppStorage(PlantLockedPreviewPolicy.onboardingHasPlantsKey) private var onboardingHasPlants = false
 
     private var activePets: [Pet] { pets.filter { !$0.hasPassedAway } }
     private var visibleHumans: [Human] { humans.filter { $0.shouldShowOnHome && !$0.hasPassedAway } }
@@ -50,11 +51,12 @@ struct FunctionMenuRootView: View {
 
                         LazyVGrid(columns: columns, spacing: 10) {
                             ForEach(functionMenuGroups, id: \.self) { group in
+                                let isPlantLockedPreview = group == .plants && showsPlantLockedPreview
                                 menuTile(
                                     icon: group.icon,
                                     iconColor: group.color,
                                     title: group.title,
-                                    status: compactSubtitle(for: subtitle(for: group)),
+                                    status: isPlantLockedPreview ? plantLockedPreviewSubtitle : compactSubtitle(for: subtitle(for: group)),
                                     showsNewFeature: showsPendingGroup(group)
                                 ) {
                                     select(.featureGroup(group))
@@ -126,10 +128,23 @@ struct FunctionMenuRootView: View {
     }
 
     private var functionMenuGroups: [FeatureGroup] {
-        AppFeatureRouteGuard.visibleFeatureGroups(
+        var groups = AppFeatureRouteGuard.visibleFeatureGroups(
             from: [.dailyCare, .healthBody, .archiveMemory, .householdHub, .plants],
             currentLevel: currentTreeLevel
         )
+        if showsPlantLockedPreview, !groups.contains(.plants) {
+            groups.append(.plants)
+        }
+        return groups
+    }
+
+    private var showsPlantLockedPreview: Bool {
+        _ = onboardingHasPlants
+        return PlantLockedPreviewPolicy.shouldShowLockedPreview(currentLevel: currentTreeLevel)
+    }
+
+    private var plantLockedPreviewSubtitle: String {
+        l.tr(zh: "Lv.4 预览 · 可收藏资料", en: "Lv.4 preview · Save catalog", de: "Lv.4 Vorschau · Katalog merken")
     }
 
     private var columns: [GridItem] {

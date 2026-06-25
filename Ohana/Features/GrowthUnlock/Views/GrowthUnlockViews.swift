@@ -317,12 +317,18 @@ struct GrowthUnlockRoadmapView: View {
     var onClose: (() -> Void)?
 
     @Environment(AppServices.self) private var appServices
+    @AppStorage(PlantLockedPreviewPolicy.onboardingHasPlantsKey) private var onboardingHasPlants = false
     @State private var ruleStatus: GrowthUnlockStatus?
     @State private var appearHandoffTask: Task<Void, Never>?
 
     private var l: L10n { L10n(appLanguage) }
     private var currentStep: GrowthUnlockStep {
         GrowthUnlockPolicy.currentStep(currentLevel: currentLevel)
+    }
+
+    private var showsPlantLockedPreview: Bool {
+        _ = onboardingHasPlants
+        return PlantLockedPreviewPolicy.shouldShowLockedPreview(currentLevel: currentLevel)
     }
 
     var body: some View {
@@ -341,6 +347,13 @@ struct GrowthUnlockRoadmapView: View {
                             progressToNextLevel: progressToNextLevel,
                             appLanguage: appLanguage
                         )
+                        if showsPlantLockedPreview {
+                            PlantLockedPreviewCard(
+                                currentLevel: currentLevel,
+                                currentEnergy: appServices.oasisTree.totalEnergy,
+                                appLanguage: appLanguage
+                            )
+                        }
                         levelRulesCard
                         roadmapCard
                     }
