@@ -3800,6 +3800,41 @@ struct HomeCommandExecutorTests {
     }
 
     @MainActor
+    @Test func plantCareBatchByIdsWritesFactsForEachPlant() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let livingRoomFern = Plant(name: "Fern")
+        let livingRoomPothos = Plant(name: "Pothos")
+        let executorHuman = insertExecutorHuman(in: context)
+        context.insert(livingRoomFern)
+        context.insert(livingRoomPothos)
+        try context.save()
+
+        let executor = HomeCommandExecutor(modelContext: context)
+
+        let recordedIDs = executor.recordPlantCare(
+            .watering,
+            plantIDs: [livingRoomFern.id, livingRoomPothos.id],
+            executorId: executorHuman.id.uuidString
+        )
+
+        let logs = try context.fetch(FetchDescriptor<PlantCareLog>())
+        let events = try context.fetch(FetchDescriptor<Event>())
+        let factEvents = events.filter { !$0.isAllDay }
+        let ledgerEvents = try context.fetch(FetchDescriptor<CareLedgerEvent>())
+        let expectedPlantIDs = Set([livingRoomFern.id, livingRoomPothos.id])
+        #expect(Set(recordedIDs) == expectedPlantIDs)
+        #expect(Set(logs.compactMap { $0.plant?.id }) == expectedPlantIDs)
+        #expect(logs.allSatisfy { $0.careType == .watering })
+        #expect(logs.allSatisfy { $0.executorId == executorHuman.id.uuidString })
+        #expect(livingRoomFern.lastWateredDate != nil)
+        #expect(livingRoomPothos.lastWateredDate != nil)
+        #expect(Set(factEvents.compactMap { UUID(uuidString: $0.relatedEntityId) }) == expectedPlantIDs)
+        #expect(factEvents.allSatisfy { $0.relatedEntityType == EntityKind.plant.rawValue })
+        #expect(ledgerEvents.count(where: { $0.eventKind == CareLedgerEventKind.plantCare.rawValue }) == 2)
+    }
+
+    @MainActor
     @Test func plantFertilizingByIdWritesOnePlantFactAndDerivedRecords() throws {
         let container = try makeInMemoryContainer()
         let context = container.mainContext

@@ -19,6 +19,28 @@ nonisolated struct IslandQuest: Identifiable, Equatable, Sendable {
     let targetPetId: UUID?
     /// 关联植物（浇水 / 施肥委托）
     let targetPlantId: UUID?
+    /// 聚合植物委托的目标列表；单株委托会自动包含 `targetPlantId`。
+    let targetPlantIds: [UUID]
+
+    init(
+        id: String,
+        emoji: String,
+        title: String,
+        subtitle: String,
+        isCompleted: Bool,
+        targetPetId: UUID?,
+        targetPlantId: UUID?,
+        targetPlantIds: [UUID] = []
+    ) {
+        self.id = id
+        self.emoji = emoji
+        self.title = title
+        self.subtitle = subtitle
+        self.isCompleted = isCompleted
+        self.targetPetId = targetPetId
+        self.targetPlantId = targetPlantId
+        self.targetPlantIds = targetPlantIds.isEmpty ? targetPlantId.map { [$0] } ?? [] : targetPlantIds
+    }
 }
 
 nonisolated struct TodayFocusQuestProgress: Equatable, Sendable {
@@ -135,30 +157,10 @@ nonisolated enum IslandQuestEngine {
         }
 
         if includesPlants {
-            // ── 植物浇水（需要浇水的植物）
-            if quests.count < maxQuests, let thirstyPlant = plants.first(where: { $0.needsWatering(on: now, calendar: cal) }) {
-                quests.append(IslandQuest(
-                    id: "q_water_plant_\(thirstyPlant.id.uuidString)",
-                    emoji: "💧",
-                    title: localized(zh: "给 \(thirstyPlant.name) 浇水", en: "Water \(thirstyPlant.name)"),
-                    subtitle: localized(zh: "植物渴了，快去浇水", en: "This plant needs water today"),
-                    isCompleted: false,
-                    targetPetId: nil,
-                    targetPlantId: thirstyPlant.id
-                ))
-            }
-
-            // ── 植物施肥（需要施肥的植物）
-            if quests.count < maxQuests, let hungryPlant = plants.first(where: { $0.needsFertilizing(on: now, calendar: cal) }) {
-                quests.append(IslandQuest(
-                    id: "q_fertilize_plant_\(hungryPlant.id.uuidString)",
-                    emoji: "🌿",
-                    title: localized(zh: "给 \(hungryPlant.name) 施肥", en: "Fertilize \(hungryPlant.name)"),
-                    subtitle: localized(zh: "植物需要补充养分", en: "This plant needs nutrients"),
-                    isCompleted: false,
-                    targetPetId: nil,
-                    targetPlantId: hungryPlant.id
-                ))
+            // ── 植物委托：只占一个 Today Focus 槽位，并按房间/任务类型聚合，避免挤占宠物核心照护。
+            if quests.count < maxQuests,
+               let plantQuest = plantCareFocusQuest(plants: plants, now: now, calendar: cal) {
+                quests.append(plantQuest)
             }
         }
 
@@ -313,6 +315,202 @@ nonisolated enum IslandQuestEngine {
         )
     }
 
+    private struct PlantFocusCandidate {
+        let plant: Plant
+        let task: PlantCareTaskSnapshot
+        let roomName: String
+        let overdueDays: Int
+        let healthScore: Int
+    }
+
+    private struct PlantFocusGroup {
+        let careType: PlantCareType
+        let roomName: String
+        let candidates: [PlantFocusCandidate]
+
+        var plantIDs: [UUID] {
+            candidates.map(\.plant.id)
+        }
+
+        var maxOverdueDays: Int {
+            candidates.map(\.overdueDays).max() ?? 0
+        }
+
+        var attentionCount: Int {
+            candidates.count(where: { $0.plant.healthStatus == .watching || $0.plant.healthStatus == .stressed })
+        }
+
+        var score: Int {
+            maxOverdueDays * 5 +
+                candidates.count * 3 +
+                (candidates.map(\.healthScore).max() ?? 0) +
+                IslandQuestEngine.careTypeFocusWeight(careType)
+        }
+    }
+
+    private static func plantCareFocusQuest(
+        plants: [Plant],
+        now: Date,
+        calendar: Calendar
+    ) -> IslandQuest? {
+        let candidates = plants
+            .filter(\.remindersEnabled)
+            .flatMap { plant in
+                PlantCarePlanService.tasks(for: plant, now: now, calendar: calendar)
+                    .filter { $0.daysUntilDue <= 0 && PlantReminderPreferenceStore.controllableCareTypes.contains($0.careType) }
+                    .map { task in
+                        PlantFocusCandidate(
+                            plant: plant,
+                            task: task,
+                            roomName: plantFocusRoomName(for: plant),
+                            overdueDays: max(0, -task.daysUntilDue),
+                            healthScore: plantFocusHealthScore(plant.healthStatus)
+                        )
+                    }
+            }
+        guard !candidates.isEmpty else { return nil }
+
+        let groups = Dictionary(grouping: candidates) { candidate in
+            "\(candidate.task.careType.rawValue)|\(candidate.roomName)"
+        }
+        let bestGroup = groups.values
+            .map { values in
+                PlantFocusGroup(
+                    careType: values[0].task.careType,
+                    roomName: values[0].roomName,
+                    candidates: values.sorted(by: plantFocusCandidateSort)
+                )
+            }
+            .sorted(by: plantFocusGroupSort)
+            .first
+        guard let bestGroup else { return nil }
+
+        let primaryPlant = bestGroup.candidates[0].plant
+        let plantIDs = bestGroup.plantIDs
+        let count = plantIDs.count
+        let id = plantFocusQuestId(group: bestGroup)
+        return IslandQuest(
+            id: id,
+            emoji: bestGroup.careType.emoji,
+            title: plantFocusTitle(group: bestGroup, primaryPlant: primaryPlant),
+            subtitle: plantFocusSubtitle(group: bestGroup),
+            isCompleted: false,
+            targetPetId: nil,
+            targetPlantId: primaryPlant.id,
+            targetPlantIds: count == 1 ? [primaryPlant.id] : plantIDs
+        )
+    }
+
+    private static func plantFocusRoomName(for plant: Plant) -> String {
+        let room = plant.roomName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !room.isEmpty else {
+            return localized(zh: "家里", en: "Home")
+        }
+        return room
+    }
+
+    private static func plantFocusHealthScore(_ status: PlantHealthStatus) -> Int {
+        switch status {
+        case .stressed: 8
+        case .watching: 4
+        case .stable: 0
+        case .thriving: -1
+        }
+    }
+
+    private static func careTypeFocusWeight(_ type: PlantCareType) -> Int {
+        switch type {
+        case .watering: 4
+        case .pestCheck: 3
+        case .fertilizing: 2
+        case .misting, .leafCleaning: 1
+        case .repotting, .pruning, .rotating: 0
+        case .photo, .newLeaf, .yellowLeaf, .pestFound, .customNote: -2
+        }
+    }
+
+    private static func plantFocusGroupSort(_ left: PlantFocusGroup, _ right: PlantFocusGroup) -> Bool {
+        if left.score != right.score { return left.score > right.score }
+        if left.maxOverdueDays != right.maxOverdueDays { return left.maxOverdueDays > right.maxOverdueDays }
+        if left.candidates.count != right.candidates.count { return left.candidates.count > right.candidates.count }
+        if left.careType.rawValue != right.careType.rawValue { return left.careType.rawValue < right.careType.rawValue }
+        return left.roomName < right.roomName
+    }
+
+    private static func plantFocusCandidateSort(_ left: PlantFocusCandidate, _ right: PlantFocusCandidate) -> Bool {
+        if left.overdueDays != right.overdueDays { return left.overdueDays > right.overdueDays }
+        if left.healthScore != right.healthScore { return left.healthScore > right.healthScore }
+        return left.plant.name < right.plant.name
+    }
+
+    private static func plantFocusQuestId(group: PlantFocusGroup) -> String {
+        if group.candidates.count == 1 {
+            let plantID = group.candidates[0].plant.id.uuidString
+            switch group.careType {
+            case .watering:
+                return "q_water_plant_\(plantID)"
+            case .fertilizing:
+                return "q_fertilize_plant_\(plantID)"
+            default:
+                break
+            }
+        }
+        let room = sanitizedQuestToken(group.roomName)
+        let ids = group.plantIDs
+            .map { String($0.uuidString.prefix(8)) }
+            .joined(separator: "-")
+        return "q_plant_group_\(group.careType.rawValue)_\(room)_\(ids)"
+    }
+
+    private static func sanitizedQuestToken(_ raw: String) -> String {
+        let allowed = raw.lowercased().filter { character in
+            character.isLetter || character.isNumber
+        }
+        return allowed.isEmpty ? "room" : String(allowed.prefix(16))
+    }
+
+    private static func plantFocusTitle(group: PlantFocusGroup, primaryPlant: Plant) -> String {
+        let actionZH = group.careType.displayName
+        let actionEN = plantCareEnglishActionName(group.careType)
+        if group.candidates.count == 1 {
+            let name = primaryPlant.name.isEmpty ? localized(zh: "植物", en: "Plant") : primaryPlant.name
+            return localized(zh: "\(group.roomName) · 给 \(name) \(actionZH)", en: "\(group.roomName) · \(actionEN) \(name)")
+        }
+        return localized(
+            zh: "\(group.roomName) \(group.candidates.count) 株需要\(actionZH)",
+            en: "\(group.candidates.count) plants in \(group.roomName) need \(actionEN.lowercased())"
+        )
+    }
+
+    private static func plantFocusSubtitle(group: PlantFocusGroup) -> String {
+        let overdueZH = group.maxOverdueDays > 0 ? "最久逾期 \(group.maxOverdueDays) 天" : "今天到期"
+        let overdueEN = group.maxOverdueDays > 0 ? "\(group.maxOverdueDays)d overdue" : "Due today"
+        let attentionZH = group.attentionCount > 0 ? " · \(group.attentionCount) 株需观察" : ""
+        let attentionEN = group.attentionCount > 0 ? " · \(group.attentionCount) need attention" : ""
+        return localized(
+            zh: "\(overdueZH)\(attentionZH) · 按房间批量处理",
+            en: "\(overdueEN)\(attentionEN) · grouped by room"
+        )
+    }
+
+    private static func plantCareEnglishActionName(_ type: PlantCareType) -> String {
+        switch type {
+        case .watering: "Water"
+        case .fertilizing: "Fertilize"
+        case .repotting: "Repot"
+        case .pruning: "Prune"
+        case .misting: "Mist"
+        case .rotating: "Rotate"
+        case .leafCleaning: "Clean leaves"
+        case .pestCheck: "Check pests"
+        case .photo: "Photograph"
+        case .newLeaf: "Log new leaf"
+        case .yellowLeaf: "Log yellow leaf"
+        case .pestFound: "Log pests"
+        case .customNote: "Add note"
+        }
+    }
+
     /// 解析委托 ID 是否为用药打卡（`q_med_<UUID>`）
     static func medicationId(fromQuestId id: String) -> UUID? {
         let prefix = "q_med_"
@@ -330,7 +528,8 @@ nonisolated enum IslandQuestEngine {
     /// 解析日历护理计划委托中的 Event ID（`q_feed_<petId>_<eventId>` 等）。
     static func carePlanEventId(fromQuestId id: String) -> UUID? {
         guard !id.hasPrefix("q_water_plant_"),
-              !id.hasPrefix("q_fertilize_plant_") else {
+              !id.hasPrefix("q_fertilize_plant_"),
+              !id.hasPrefix("q_plant_group_") else {
             return nil
         }
         let prefixes = [
@@ -348,6 +547,20 @@ nonisolated enum IslandQuestEngine {
             return UUID(uuidString: String(eventId))
         }
         return nil
+    }
+
+    static func plantCareType(fromQuestId id: String) -> PlantCareType? {
+        if id.hasPrefix("q_water_plant") { return .watering }
+        if id.hasPrefix("q_fertilize_plant") { return .fertilizing }
+        let prefix = "q_plant_group_"
+        guard id.hasPrefix(prefix) else { return nil }
+        let suffix = String(id.dropFirst(prefix.count))
+        let rawType = suffix.split(separator: "_", maxSplits: 1).first.map(String.init) ?? ""
+        return PlantCareType(rawValue: rawType)
+    }
+
+    static func isPlantCareQuest(_ id: String) -> Bool {
+        plantCareType(fromQuestId: id) != nil
     }
 
     /// 解析委托 ID 是否为人类体重记录（`q_human_weight_<UUID>`）
@@ -951,8 +1164,7 @@ nonisolated enum IslandQuestEngine {
         default:
             if id.hasPrefix("q_med_") { return 2 }
             if id.hasPrefix("q_feed_") { return 2 }
-            if id.hasPrefix("q_water_plant") { return PlantUnlockPolicy.isUnlocked(currentLevel: AppFeatureRouteGuard.currentFeatureLevel) ? 1 : 0 }
-            if id.hasPrefix("q_fertilize_plant") { return PlantUnlockPolicy.isUnlocked(currentLevel: AppFeatureRouteGuard.currentFeatureLevel) ? 1 : 0 }
+            if isPlantCareQuest(id) { return PlantUnlockPolicy.isUnlocked(currentLevel: AppFeatureRouteGuard.currentFeatureLevel) ? 1 : 0 }
             if id.hasPrefix("q_water_") { return 1 }
             if id.hasPrefix("q_play_") { return 2 }
             if id.hasPrefix("q_weight_") { return 2 }

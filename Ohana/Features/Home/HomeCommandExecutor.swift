@@ -506,6 +506,20 @@ struct HomeCommandExecutor {
         recordPlantCare(type, plant: plant, executorId: executorId, careNote: careNote)
     }
 
+    @discardableResult
+    func recordPlantCare(_ type: PlantCareType, plantIDs: [UUID], executorId: String?, careNote: String = "") -> [UUID] {
+        var recordedIDs: [UUID] = []
+        for plantID in plantIDs {
+            guard let plant = fetchPlant(id: plantID) else {
+                publishNoop(.plantCare(plantID: plantID, action: type.rawValue), note: "home.plantCare.missingPlant")
+                continue
+            }
+            recordPlantCare(type, plant: plant, executorId: executorId, careNote: careNote)
+            recordedIDs.append(plantID)
+        }
+        return recordedIDs
+    }
+
     func confirmCoconutExchange(_ request: CoconutExchangeRequest, receiver: Human) throws {
         do {
             try coconutExchange.confirm(request, by: receiver, context: modelContext)

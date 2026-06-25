@@ -4947,6 +4947,144 @@ struct OhanaTests {
     }
 
     @MainActor
+    @Test func islandQuestEngineAggregatesDuePlantsByRoom() async throws {
+        let now = dateForTest(year: 2026, month: 6, day: 11, hour: 8)
+        let calendar = Calendar.current
+
+        func duePlant(_ name: String, room: String) -> Plant {
+            let plant = Plant(name: name, wateringIntervalDays: 1, fertilizingIntervalDays: 90)
+            plant.roomNameRaw = room
+            plant.createdAt = calendar.date(byAdding: .day, value: -2, to: now) ?? now
+            plant.lastWateredDate = calendar.date(byAdding: .day, value: -2, to: now)
+            plant.lastFertilizedDate = now
+            plant.lastHealthCheckDate = now
+            return plant
+        }
+
+        let livingA = duePlant("绿萝", room: "客厅")
+        let livingB = duePlant("龟背竹", room: "客厅")
+        let livingC = duePlant("豆瓣绿", room: "客厅")
+        let balcony = duePlant("薄荷", room: "阳台")
+
+        let quests = IslandQuestEngine.todayQuests(
+            pets: [],
+            reminders: [],
+            plants: [livingA, livingB, livingC, balcony],
+            includesPlants: true,
+            now: now,
+            questProgress: TodayFocusQuestProgress(
+                isPetWizardCompleted: true,
+                isFirstMealRecorded: true,
+                isThemeColorSet: true
+            )
+        )
+        let plantQuests = quests.filter { IslandQuestEngine.isPlantCareQuest($0.id) }
+        let plantQuest = try #require(plantQuests.first)
+
+        #expect(plantQuests.count == 1)
+        #expect(plantQuest.id.hasPrefix("q_plant_group_watering_"))
+        #expect(plantQuest.title.contains("客厅"))
+        #expect(plantQuest.title.contains("3 株"))
+        #expect(Set(plantQuest.targetPlantIds) == Set([livingA.id, livingB.id, livingC.id]))
+        #expect(!plantQuest.targetPlantIds.contains(balcony.id))
+    }
+
+    @MainActor
+    @Test func islandQuestEngineRaisesStressedPlantGroupPriority() async throws {
+        let now = dateForTest(year: 2026, month: 6, day: 11, hour: 8)
+        let calendar = Calendar.current
+
+        func duePlant(
+            _ name: String,
+            room: String,
+            health: PlantHealthStatus = .stable,
+            wateredDaysAgo: Int = 2
+        ) -> Plant {
+            let plant = Plant(name: name, wateringIntervalDays: 1, fertilizingIntervalDays: 90)
+            plant.roomNameRaw = room
+            plant.healthStatus = health
+            plant.createdAt = calendar.date(byAdding: .day, value: -2, to: now) ?? now
+            plant.lastWateredDate = calendar.date(byAdding: .day, value: -wateredDaysAgo, to: now)
+            plant.lastFertilizedDate = now
+            plant.lastHealthCheckDate = now
+            return plant
+        }
+
+        let livingA = duePlant("绿萝", room: "客厅")
+        let livingB = duePlant("龟背竹", room: "客厅")
+        let livingC = duePlant("豆瓣绿", room: "客厅")
+        let balcony = duePlant("薄荷", room: "阳台")
+        let stressed = duePlant("琴叶榕", room: "卧室", health: .stressed, wateredDaysAgo: 4)
+
+        let quests = IslandQuestEngine.todayQuests(
+            pets: [],
+            reminders: [],
+            plants: [livingA, livingB, livingC, balcony, stressed],
+            includesPlants: true,
+            now: now,
+            questProgress: TodayFocusQuestProgress(
+                isPetWizardCompleted: true,
+                isFirstMealRecorded: true,
+                isThemeColorSet: true
+            )
+        )
+        let plantQuests = quests.filter { IslandQuestEngine.isPlantCareQuest($0.id) }
+        let plantQuest = try #require(plantQuests.first)
+
+        #expect(plantQuests.count == 1)
+        #expect(plantQuest.id.hasPrefix("q_water_plant_"))
+        #expect(plantQuest.title.contains("卧室"))
+        #expect(plantQuest.targetPlantIds == [stressed.id])
+        #expect(!plantQuest.targetPlantIds.contains(balcony.id))
+    }
+
+    @MainActor
+    @Test func islandQuestEngineKeepsPetCareAheadOfPlantAggregationWhenFull() async throws {
+        let now = dateForTest(year: 2026, month: 6, day: 11, hour: 8)
+        let pet = Pet(name: "Momo", species: "狗")
+        let breakfast = Event(
+            title: "喂食",
+            startDate: now,
+            eventType: EventType.foodChange.rawValue,
+            relatedEntityType: EntityKind.pet.rawValue,
+            relatedEntityId: pet.id.uuidString
+        )
+        let water = Event(
+            title: "补充饮水",
+            startDate: now,
+            eventType: EventType.watering.rawValue,
+            relatedEntityType: EntityKind.pet.rawValue,
+            relatedEntityId: pet.id.uuidString
+        )
+        let walk = Event(
+            title: "遛狗",
+            startDate: now,
+            eventType: EventType.daily.rawValue,
+            relatedEntityType: EntityKind.pet.rawValue,
+            relatedEntityId: pet.id.uuidString
+        )
+        let plant = Plant(name: "绿萝", wateringIntervalDays: 1, fertilizingIntervalDays: 90)
+        plant.roomNameRaw = "客厅"
+        plant.createdAt = Calendar.current.date(byAdding: .day, value: -2, to: now) ?? now
+        plant.lastWateredDate = Calendar.current.date(byAdding: .day, value: -2, to: now)
+        plant.lastFertilizedDate = now
+        plant.lastHealthCheckDate = now
+
+        let quests = IslandQuestEngine.todayQuests(
+            pets: [pet],
+            reminders: [],
+            plants: [plant],
+            events: [breakfast, water, walk],
+            includesPlants: true,
+            now: now
+        )
+
+        #expect(quests.count == TodayFocusLimits.maxGeneratedQuests)
+        #expect(quests.allSatisfy { !IslandQuestEngine.isPlantCareQuest($0.id) })
+        #expect(Set(quests.compactMap { IslandQuestEngine.carePlanEventId(fromQuestId: $0.id) }) == Set([breakfast.id, water.id, walk.id]))
+    }
+
+    @MainActor
     @Test func islandQuestEngineTreatsEmptyReadModelLedgerAsAuthoritative() async throws {
         let date = dateForTest(year: 2026, month: 6, day: 11, hour: 8)
         let momo = Pet(name: "Momo", species: "狗")
@@ -5294,6 +5432,19 @@ struct OhanaTests {
 
     @MainActor
     @Test func todayFocusNegativeSkipKeyTracksSignalRevisionAndPlantGate() async throws {
+        let oldInjectedEnergy = OasisTreePreferenceStore.injectedEnergy
+        let hadExistingPlantData = PlantUnlockPolicy.hasExistingPlantData()
+        OasisTreePreferenceStore.injectedEnergy = 0
+        PlantUnlockPolicy.clearExistingPlantData()
+        defer {
+            OasisTreePreferenceStore.injectedEnergy = oldInjectedEnergy
+            if hadExistingPlantData {
+                PlantUnlockPolicy.noteExistingPlantData()
+            } else {
+                PlantUnlockPolicy.clearExistingPlantData()
+            }
+        }
+
         let petId = UUID()
         let first = IslandNegativeSignal(
             iconName: "scalemass.fill",

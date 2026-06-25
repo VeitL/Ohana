@@ -400,9 +400,10 @@ extension TodayFocusCard {
             return "scalemass.fill"
         }
         if quest.id.hasPrefix("q_feed_") { return "fork.knife" }
-        if quest.id.hasPrefix("q_water_plant_") || quest.id == "q_water_plant" { return "drop.fill" }
+        if let plantCareType = IslandQuestEngine.plantCareType(fromQuestId: quest.id) {
+            return plantQuestActionIcon(for: plantCareType)
+        }
         if quest.id.hasPrefix("q_water_") { return "drop.fill" }
-        if quest.id.hasPrefix("q_fertilize_plant_") || quest.id == "q_fertilize_plant" { return "leaf.fill" }
         if quest.id == "q_walk" || quest.id.hasPrefix("q_walk_") { return "figure.walk" }
         if quest.id == "q_potty" || quest.id.hasPrefix("q_potty_") { return "pawprint.fill" }
         if quest.id.hasPrefix("q_play_") { return "tennisball.fill" }
@@ -424,13 +425,8 @@ extension TodayFocusCard {
             return l.tr(zh: "记录", en: "Log", de: "Loggen")
         }
         if quest.id.hasPrefix("q_feed_") { return l.tr(zh: "喂食", en: "Feed", de: "Füttern") }
-        if quest.id.hasPrefix("q_water_plant_") || quest.id == "q_water_plant" {
-            return l.tr(zh: "浇水", en: "Water", de: "Gießen")
-        }
+        if let plantCareType = IslandQuestEngine.plantCareType(fromQuestId: quest.id) { return plantQuestActionTitle(for: plantCareType) }
         if quest.id.hasPrefix("q_water_") { return l.tr(zh: "喂水", en: "Water", de: "Wasser") }
-        if quest.id.hasPrefix("q_fertilize_plant_") || quest.id == "q_fertilize_plant" {
-            return l.tr(zh: "施肥", en: "Fertilize", de: "Düngen")
-        }
         if quest.id == "q_walk" || quest.id.hasPrefix("q_walk_") { return l.tr(zh: "开始", en: "Start", de: "Start") }
         if quest.id == "q_potty" || quest.id.hasPrefix("q_potty_") { return l.tr(zh: "记录", en: "Log", de: "Loggen") }
         if quest.id.hasPrefix("q_play_") { return l.tr(zh: "陪玩", en: "Play", de: "Spielen") }
@@ -441,6 +437,47 @@ extension TodayFocusCard {
             return l.tr(zh: "完成", en: "Done", de: "Fertig")
         }
         return l.tr(zh: "打卡", en: "Check in", de: "Abhaken")
+    }
+
+    func plantQuestActionIcon(for type: PlantCareType) -> String {
+        switch type {
+        case .watering: "drop.fill"
+        case .fertilizing: "leaf.fill"
+        case .repotting: "arrow.triangle.2.circlepath"
+        case .pruning: "scissors"
+        case .misting: "drop.triangle.fill"
+        case .rotating: "arrow.clockwise"
+        case .leafCleaning: "sparkles"
+        case .pestCheck: "magnifyingglass"
+        case .photo: "camera.fill"
+        case .newLeaf: "leaf.circle.fill"
+        case .yellowLeaf: "exclamationmark.triangle.fill"
+        case .pestFound: "exclamationmark.triangle.fill"
+        case .customNote: "note.text"
+        }
+    }
+
+    func plantQuestActionTitle(for type: PlantCareType) -> String {
+        switch type {
+        case .watering:
+            l.tr(zh: "浇水", en: "Water", de: "Gießen")
+        case .fertilizing:
+            l.tr(zh: "施肥", en: "Fertilize", de: "Düngen")
+        case .repotting:
+            l.tr(zh: "换盆", en: "Repot", de: "Umtopfen")
+        case .pruning:
+            l.tr(zh: "修剪", en: "Prune", de: "Schneiden")
+        case .misting:
+            l.tr(zh: "喷雾", en: "Mist", de: "Sprühen")
+        case .rotating:
+            l.tr(zh: "转盆", en: "Rotate", de: "Drehen")
+        case .leafCleaning:
+            l.tr(zh: "清洁", en: "Clean", de: "Reinigen")
+        case .pestCheck:
+            l.tr(zh: "检查", en: "Check", de: "Prüfen")
+        case .photo, .newLeaf, .yellowLeaf, .pestFound, .customNote:
+            l.tr(zh: "记录", en: "Log", de: "Loggen")
+        }
     }
 
     func questCardAccessibilityIdentifier(for quest: IslandQuest) -> String {

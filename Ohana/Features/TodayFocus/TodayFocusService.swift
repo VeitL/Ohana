@@ -110,7 +110,8 @@ nonisolated enum TodayFocusService {
                 subtitle: quest.subtitle,
                 isCompleted: true,
                 targetPetId: quest.targetPetId,
-                targetPlantId: quest.targetPlantId
+                targetPlantId: quest.targetPlantId,
+                targetPlantIds: quest.targetPlantIds
             )
         }
     }
@@ -153,7 +154,8 @@ nonisolated enum TodayFocusService {
                 subtitle: quest.subtitle,
                 isCompleted: true,
                 targetPetId: quest.targetPetId,
-                targetPlantId: quest.targetPlantId
+                targetPlantId: quest.targetPlantId,
+                targetPlantIds: quest.targetPlantIds
             )
         }
     }
@@ -222,6 +224,9 @@ nonisolated enum TodayFocusService {
             return true
         }
         if PlantUnlockPolicy.isUnlocked(currentLevel: AppFeatureRouteGuard.currentFeatureLevel), quest.targetPlantId == entityId {
+            return true
+        }
+        if PlantUnlockPolicy.isUnlocked(currentLevel: AppFeatureRouteGuard.currentFeatureLevel), quest.targetPlantIds.contains(entityId) {
             return true
         }
         if IslandQuestEngine.eventId(fromQuestId: quest.id) == entityId {

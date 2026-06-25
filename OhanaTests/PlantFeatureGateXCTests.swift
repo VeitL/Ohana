@@ -91,9 +91,10 @@ final class PlantFeatureGateXCTests: XCTestCase {
             )
         )
 
-        XCTAssertTrue(quests.contains { $0.id.hasPrefix("q_water_plant") })
-        XCTAssertTrue(quests.contains { $0.id.hasPrefix("q_fertilize_plant") })
-        XCTAssertTrue(quests.contains { $0.targetPlantId == plant.id })
+        let plantQuests = quests.filter { IslandQuestEngine.isPlantCareQuest($0.id) }
+        XCTAssertEqual(plantQuests.count, 1)
+        XCTAssertEqual(plantQuests.first?.targetPlantIds, [plant.id])
+        XCTAssertTrue(plantQuests.first?.targetPlantId == plant.id)
     }
 
     func testMoodSignalsReadPlantCareStateWhenPlantCareIsUnlocked() {

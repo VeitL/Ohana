@@ -134,24 +134,18 @@ extension VerticalSolidHomeView {
         }
 
         if isPlantCareUnlockedForHome,
-           quest.id == "q_water_plant" || quest.id.hasPrefix("q_water_plant_"),
-           let plant = targetPlant(for: quest) {
-            let plantID = plant.id
-            enqueueHomeCommand(.plantCare(plantID: plantID, action: PlantCareType.watering.rawValue)) {
-                commandExecutor.recordPlantCare(.watering, plantID: plantID, executorId: currentExecutorId())
-                applyTodayFocusMutationFeedback(entityId: plantID)
-                UINotificationFeedbackGenerator().notificationOccurred(.success)
-            }
-            return
-        }
-
-        if isPlantCareUnlockedForHome,
-           quest.id == "q_fertilize_plant" || quest.id.hasPrefix("q_fertilize_plant_"),
-           let plant = targetPlant(for: quest) {
-            let plantID = plant.id
-            enqueueHomeCommand(.plantCare(plantID: plantID, action: PlantCareType.fertilizing.rawValue)) {
-                commandExecutor.recordPlantCare(.fertilizing, plantID: plantID, executorId: currentExecutorId())
-                applyTodayFocusMutationFeedback(entityId: plantID)
+           let plantCareType = IslandQuestEngine.plantCareType(fromQuestId: quest.id),
+           !quest.targetPlantIds.isEmpty {
+            let plantIDs = quest.targetPlantIds
+            let primaryID = plantIDs[0]
+            enqueueHomeCommand(.todayFocus(entityID: primaryID, action: "plantBatch.\(plantCareType.rawValue)")) {
+                let recordedIDs = commandExecutor.recordPlantCare(
+                    plantCareType,
+                    plantIDs: plantIDs,
+                    executorId: currentExecutorId()
+                )
+                guard let firstRecordedID = recordedIDs.first else { return }
+                applyTodayFocusMutationFeedback(entityId: firstRecordedID)
                 UINotificationFeedbackGenerator().notificationOccurred(.success)
             }
             return
@@ -329,6 +323,9 @@ extension VerticalSolidHomeView {
     func targetPlant(for quest: IslandQuest) -> VerticalSolidHomePlantSnapshot? {
         guard isPlantCareUnlockedForHome else { return nil }
         if let targetPlantId = quest.targetPlantId {
+            return controller.snapshot.plants.first(where: { $0.id == targetPlantId })
+        }
+        if let targetPlantId = quest.targetPlantIds.first {
             return controller.snapshot.plants.first(where: { $0.id == targetPlantId })
         }
         switch quest.id {
