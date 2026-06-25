@@ -9,7 +9,7 @@ import SwiftData
 import SwiftUI
 import UniformTypeIdentifiers
 
-extension AddExpenseSheet {
+extension AddExpenseSheetContent {
     func receiptActionButton(icon: String, title: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             receiptActionContent(icon: icon, title: title)

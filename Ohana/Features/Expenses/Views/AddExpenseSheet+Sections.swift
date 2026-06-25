@@ -9,7 +9,7 @@ import SwiftData
 import SwiftUI
 import UniformTypeIdentifiers
 
-extension AddExpenseSheet {
+extension AddExpenseSheetContent {
     var popupDragHandle: some View {
         OhanaPopupDragHandle(tint: primaryText.opacity(0.22))
             .gesture(popupHandleDragGesture)

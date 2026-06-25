@@ -8,12 +8,12 @@
 import SwiftData
 import SwiftUI
 
-struct DocumentsListView: View {
+struct DocumentsListContentView: View {
     let pet: Pet
     var showsCloseButton: Bool = true
 
-    @Query private var routeDocuments: [PetDocument] // smoothness: allow route-scoped protection rows after explicit documents navigation.
-    @Query private var routeInsurances: [PetInsurance] // smoothness: allow route-scoped protection rows after explicit documents navigation.
+    let routeDocuments: [PetDocument]
+    let routeInsurances: [PetInsurance]
     @Environment(\.modelContext) private var modelContext
     @Environment(AppServices.self) private var appServices
     @Environment(\.dismiss) private var dismiss
@@ -30,16 +30,16 @@ struct DocumentsListView: View {
         PetProtectionDashboardState(documents: sortedDocs, insurances: sortedInsurances)
     }
 
-    init(pet: Pet, showsCloseButton: Bool = true) {
+    init(
+        pet: Pet,
+        showsCloseButton: Bool = true,
+        routeDocuments: [PetDocument],
+        routeInsurances: [PetInsurance]
+    ) {
         self.pet = pet
         self.showsCloseButton = showsCloseButton
-        let petID = pet.id
-        _routeDocuments = Query(filter: #Predicate<PetDocument> { document in
-            document.pet?.id == petID
-        })
-        _routeInsurances = Query(filter: #Predicate<PetInsurance> { insurance in
-            insurance.pet?.id == petID
-        })
+        self.routeDocuments = routeDocuments
+        self.routeInsurances = routeInsurances
     }
 
     private var sortedDocs: [PetDocument] {

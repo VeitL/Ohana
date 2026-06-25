@@ -9,9 +9,9 @@ import PhotosUI
 import SwiftData
 import SwiftUI
 
-struct PetMilestoneListView: View {
+struct PetMilestoneListContentView: View {
     let pet: Pet
-    @Query private var routeMilestones: [PetMilestone] // smoothness: allow route-scoped milestone rows after explicit milestones navigation.
+    let routeMilestones: [PetMilestone]
     @Environment(\.modelContext) private var modelContext
     @Environment(AppServices.self) private var appServices
 
@@ -27,12 +27,9 @@ struct PetMilestoneListView: View {
     @State private var selectedMilestone: PetMilestone? = nil
     @StateObject private var commandQueue = DeferredDomainCommandQueue()
 
-    init(pet: Pet) {
+    init(pet: Pet, routeMilestones: [PetMilestone]) {
         self.pet = pet
-        let petID = pet.id
-        _routeMilestones = Query(filter: #Predicate<PetMilestone> { milestone in
-            milestone.pet?.id == petID
-        })
+        self.routeMilestones = routeMilestones
     }
 
     private var sortedMilestones: [PetMilestone] {

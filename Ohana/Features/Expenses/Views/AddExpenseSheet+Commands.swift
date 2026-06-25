@@ -9,7 +9,7 @@ import SwiftData
 import SwiftUI
 import UniformTypeIdentifiers
 
-extension AddExpenseSheet {
+extension AddExpenseSheetContent {
     func saveExpense() {
         guard canSave, let amount = parsedAmount, amount > 0 else { return }
         isSaving = true

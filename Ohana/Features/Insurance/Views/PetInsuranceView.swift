@@ -8,11 +8,11 @@
 import SwiftData
 import SwiftUI
 
-struct PetInsuranceView: View {
+struct PetInsuranceContentView: View {
     let pet: Pet
     /// 嵌入「证件与保障」页时为 true：无 NavigationStack、无关闭按钮，内容不套外层 ScrollView
     var embedded: Bool = false
-    @Query private var routeInsurances: [PetInsurance] // smoothness: allow route-scoped insurance rows after explicit insurance navigation.
+    let routeInsurances: [PetInsurance]
     @Environment(\.modelContext) private var modelContext
     @Environment(AppServices.self) private var appServices
     @Environment(\.dismiss) private var dismiss
@@ -21,15 +21,10 @@ struct PetInsuranceView: View {
     @State private var insuranceToEdit: PetInsurance?
     @StateObject private var commandQueue = DeferredDomainCommandQueue()
 
-    init(pet: Pet, embedded: Bool = false) {
+    init(pet: Pet, embedded: Bool = false, routeInsurances: [PetInsurance]) {
         self.pet = pet
         self.embedded = embedded
-        let petID = pet.id
-        _routeInsurances = Query(
-            filter: #Predicate<PetInsurance> { insurance in
-                insurance.pet?.id == petID
-            }
-        )
+        self.routeInsurances = routeInsurances
     }
 
     private var sorted: [PetInsurance] {

@@ -9,7 +9,7 @@ import SwiftData
 import SwiftUI
 import UniformTypeIdentifiers
 
-extension AddExpenseSheet {
+extension AddExpenseSheetContent {
     var moreSummary: String {
         if noteInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             return Calendar.current.isDateInToday(date) ? l.quickExpenseToday : date.formatted(.dateTime.month().day())

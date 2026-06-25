@@ -111,17 +111,17 @@ struct ExpenseReceiptPreviewViewer: View {
     }
 }
 
-struct AddExpenseSheet: View {
+struct AddExpenseSheetContent: View {
     let pet: Pet
     let humans: [Human]
     var allPets: [Pet] = []
+    let routeExpenseLogs: [PetExpenseLog]
+    let routeInsurances: [PetInsurance]
     var preselectedPayerId: String?
     var onSaved: (() -> Void)?
     var onRewarded: ((Int) -> Void)?
     var onDismiss: (() -> Void)?
 
-    @Query private var routeExpenseLogs: [PetExpenseLog] // smoothness: allow route-scoped expense rows after explicit expense composer presentation.
-    @Query private var routeInsurances: [PetInsurance] // smoothness: allow route-scoped insurance rows after explicit expense composer presentation.
     @Environment(\.modelContext) var modelContext
     @Environment(\.dismiss) var dismiss
     @Environment(\.colorScheme) var colorScheme
@@ -159,6 +159,8 @@ struct AddExpenseSheet: View {
         pet: Pet,
         humans: [Human],
         allPets: [Pet] = [],
+        routeExpenseLogs: [PetExpenseLog] = [],
+        routeInsurances: [PetInsurance] = [],
         preselectedPayerId: String? = nil,
         onSaved: (() -> Void)? = nil,
         onRewarded: ((Int) -> Void)? = nil,
@@ -167,23 +169,12 @@ struct AddExpenseSheet: View {
         self.pet = pet
         self.humans = humans
         self.allPets = allPets
+        self.routeExpenseLogs = routeExpenseLogs
+        self.routeInsurances = routeInsurances
         self.preselectedPayerId = preselectedPayerId
         self.onSaved = onSaved
         self.onRewarded = onRewarded
         self.onDismiss = onDismiss
-        let petID = pet.id
-        _routeExpenseLogs = Query(
-            filter: #Predicate<PetExpenseLog> { log in
-                log.pet?.id == petID
-            },
-            sort: \.date,
-            order: .reverse
-        )
-        _routeInsurances = Query(
-            filter: #Predicate<PetInsurance> { insurance in
-                insurance.pet?.id == petID
-            }
-        )
     }
 
     var l: L10n { L10n(appLanguage) }

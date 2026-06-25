@@ -3065,6 +3065,10 @@ struct MemberLifecycleGateTests {
             "Ohana/Features/Expenses/Views/AddExpenseSheet.swift",
             rootURL: rootURL
         )
+        let addExpenseRouteSource = try source(
+            "Ohana/Features/Expenses/Views/AddExpenseSheetRouteContainer.swift",
+            rootURL: rootURL
+        )
         let dashboardSource = try source(
             "Ohana/Features/Expenses/Views/PetExpenseDashboardContent.swift",
             rootURL: rootURL
@@ -3073,20 +3077,30 @@ struct MemberLifecycleGateTests {
             "Ohana/Features/Insurance/Views/PetInsuranceView.swift",
             rootURL: rootURL
         )
+        let insuranceRouteSource = try source(
+            "Ohana/Features/Insurance/Views/PetInsuranceRouteContainer.swift",
+            rootURL: rootURL
+        )
 
         #expect(!historySource.contains("pet.expenseLogs"))
         #expect(!addExpenseSource.contains("pet.expenseLogs"))
         #expect(!addExpenseSource.contains("pet.insurances"))
+        #expect(!addExpenseSource.contains("@Query"))
         #expect(!dashboardSource.contains("pet.expenseLogs"))
         #expect(!insuranceSource.contains("pet.insurances"))
+        #expect(!insuranceSource.contains("@Query"))
         #expect(!dataContainerSource.contains("@Query"))
         #expect(dataContainerSource.contains("ExpenseHistoryRouteData.load(petID:"))
         #expect(dataContainerSource.contains("return try context.fetch(descriptor) // route-first-frame: allow deferred-fetch"))
         #expect(dataContainerSource.contains("FetchDescriptor<PetExpenseLog>"))
         #expect(dataContainerSource.contains("log.pet?.id == petID"))
         #expect(dataContainerSource.contains("homeRevisionUpdates"))
-        #expect(addExpenseSource.contains("@Query private var routeExpenseLogs"))
-        #expect(addExpenseSource.contains("@Query private var routeInsurances"))
+        #expect(addExpenseRouteSource.contains("RouteFirstFrameDeferredLoad("))
+        #expect(addExpenseRouteSource.contains("AddExpenseSheetRouteData.load(petID:"))
+        #expect(addExpenseRouteSource.contains("FetchDescriptor<PetExpenseLog>"))
+        #expect(addExpenseRouteSource.contains("FetchDescriptor<PetInsurance>"))
+        #expect(addExpenseRouteSource.contains("return try context.fetch(descriptor) // route-first-frame: allow deferred-fetch"))
+        #expect(addExpenseRouteSource.contains("refreshToken: appServices.domainRevisions.homeRevision"))
         #expect(addExpenseSource.contains("AddInsuranceClaimSheet("))
         #expect(addExpenseSource.contains("allExpenses: routeExpenseLogs"))
         #expect(historySource.contains("let expenseLogs: [PetExpenseLog]"))
@@ -3095,10 +3109,12 @@ struct MemberLifecycleGateTests {
         #expect(historySource.contains("expenseLogs: expenseLogs"))
         #expect(dashboardSource.contains("let expenseLogs: [PetExpenseLog]"))
         #expect(dashboardSource.contains("ExpenseSummaryBuilder.sortedRecent(expenseLogs)"))
-        #expect(insuranceSource.contains("@Query private var routeInsurances"))
-        #expect(insuranceSource.contains("_routeInsurances = Query("))
-        #expect(insuranceSource.contains("insurance.pet?.id == petID"))
         #expect(insuranceSource.contains("routeInsurances.sorted"))
+        #expect(insuranceRouteSource.contains("RouteFirstFrameDeferredLoad("))
+        #expect(insuranceRouteSource.contains("PetInsuranceRouteData.load(petID:"))
+        #expect(insuranceRouteSource.contains("FetchDescriptor<PetInsurance>"))
+        #expect(insuranceRouteSource.contains("insurance.pet?.id == petID"))
+        #expect(insuranceRouteSource.contains("return try context.fetch(descriptor) // route-first-frame: allow deferred-fetch"))
     }
 
     @Test func coHealthDashboardsUseSnapshotInsteadOfPetWalkAndWeightRelationships() throws {
@@ -3540,8 +3556,16 @@ struct MemberLifecycleGateTests {
             "Ohana/Features/Documents/Views/DocumentsListView.swift",
             rootURL: rootURL
         )
+        let documentsRouteSource = try source(
+            "Ohana/Features/Documents/Views/DocumentsListRouteContainer.swift",
+            rootURL: rootURL
+        )
         let milestoneListSource = try source(
             "Ohana/Features/Milestones/Views/PetMilestoneListView.swift",
+            rootURL: rootURL
+        )
+        let milestoneRouteSource = try source(
+            "Ohana/Features/Milestones/Views/PetMilestoneListRouteContainer.swift",
             rootURL: rootURL
         )
         let protectionStateSource = try source(
@@ -3555,8 +3579,12 @@ struct MemberLifecycleGateTests {
 
         #expect(!documentsListSource.contains("pet.documents"))
         #expect(!documentsListSource.contains("pet.insurances"))
-        #expect(documentsListSource.contains("@Query private var routeDocuments"))
-        #expect(documentsListSource.contains("@Query private var routeInsurances"))
+        #expect(!documentsListSource.contains("@Query"))
+        #expect(documentsRouteSource.contains("RouteFirstFrameDeferredLoad("))
+        #expect(documentsRouteSource.contains("DocumentsListRouteData.load(petID:"))
+        #expect(documentsRouteSource.contains("FetchDescriptor<PetDocument>"))
+        #expect(documentsRouteSource.contains("FetchDescriptor<PetInsurance>"))
+        #expect(documentsRouteSource.contains("return try context.fetch(descriptor) // route-first-frame: allow deferred-fetch"))
         #expect(!FileManager.default.fileExists(
             atPath: rootURL.appending(path: "Ohana/Features/Documents/Views/PetDocumentsCard.swift").path
         ))
@@ -3564,7 +3592,11 @@ struct MemberLifecycleGateTests {
             atPath: rootURL.appending(path: "Ohana/Features/Milestones/Views/PetMilestonesCard.swift").path
         ))
         #expect(!milestoneListSource.contains("pet.milestones"))
-        #expect(milestoneListSource.contains("@Query private var routeMilestones"))
+        #expect(!milestoneListSource.contains("@Query"))
+        #expect(milestoneRouteSource.contains("RouteFirstFrameDeferredLoad("))
+        #expect(milestoneRouteSource.contains("PetMilestoneListRouteData.load(petID:"))
+        #expect(milestoneRouteSource.contains("FetchDescriptor<PetMilestone>"))
+        #expect(milestoneRouteSource.contains("return try context.fetch(descriptor) // route-first-frame: allow deferred-fetch"))
         #expect(!protectionStateSource.contains("pet.documents"))
         #expect(!protectionStateSource.contains("pet.insurances"))
         #expect(protectionStateSource.contains("init(documents: [PetDocument], insurances: [PetInsurance]"))
