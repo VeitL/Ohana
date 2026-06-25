@@ -14,11 +14,11 @@
 - Last compacted: 2026-06-25.
 - Release bar: **Open P0 = 0; first-release-reachable repo-code P1 = 0**.
 - Active phase: **Phase 9A / dogfooding and real-device validation**, status 🟡.
-- Open follow-ups: 13 total in `docs/task-follow-ups.md`.
+- Open follow-ups: 12 total in `docs/task-follow-ups.md`.
 - Open P1: 4 total; remaining P1s are review-gate evidence, CloudKit 1.x
   deferred work, or real-device validation.
-- Current local validation: latest Plants launch completion batch passed
-  changed-file gates, targeted simulator tests, and Debug build on the pinned
+- Current local validation: latest TFU closure batch passed targeted
+  `OhanaUITests` checks and the full `OhanaUITests` target on the pinned
   `iPhone 17` destination.
 
 ## Validation Ladder
@@ -77,7 +77,6 @@ in the archive.
 | Members | TFU-20260612-018, TFU-20260612-020 | Duplicate profile revision publishes and remaining localization coverage. |
 | Notifications / Memorial | TFU-20260612-016, TFU-20260612-017 | Real-device GAP-6 and GAP-9 validation. |
 | Settings | TFU-20260612-022 | Final privacy/support URLs and rows. |
-| UITest / Onboarding | TFU-20260625-001 | Local module-exit UITest phase is stale against the current first-run flow. |
 | Walks / Shared Care | TFU-20260611-005 | Shared walk write boundary should move to owning command/service. |
 | Recycle Bin / Future Sync | TFU-20260613-003, TFU-20260613-004 | 1.x soft-delete CloudSync round-trip and restored-pet quick access. |
 | Documents / Expenses | TFU-20260611-003 | Sanitized image attachment filename/content-type polish. |
@@ -98,6 +97,7 @@ Keep this section short; move older detail to archive during compaction.
 
 | Date | Snapshot | Evidence |
 | --- | --- | --- |
+| 2026-06-25 | TFU-20260625-001 onboarding UITest drift closure | Updated the shared onboarding flow helper for current first-run navigation, fixed Home feed snapshot invalidation after manual feed default changes, removed a time-dependent immediate manual-plan quick-check assertion, guarded UITest coordinate taps against non-finite frames, and added a Home signature regression test for feed defaults. Validation on pinned `iPhone 17`: `scripts/test-simulator.sh -only-testing:OhanaUITests/OhanaUITests/testCreateFirstHumanFromOnboarding` PASS; `scripts/test-simulator.sh -only-testing:OhanaUITests/OhanaUITests/testFeedingManualPlanAndHomeQuickActionSmoke` PASS; `scripts/test-simulator.sh -only-testing:OhanaUITests/OhanaUITests/testPetPermanentDeleteFromBasicInfoSmoke` PASS; `scripts/test-simulator.sh -only-testing:OhanaUITests` PASS (9 UITests); `scripts/test-simulator.sh '-only-testing:OhanaTests/HomeSnapshotBuilderTests/verticalSourceSignatureIncludesFeedDefaultChanges()'` PASS. |
 | 2026-06-25 | CI release data-safety audit version alignment | CI run `28189731680` had `build-test` and `lint` green but failed `Release data-safety audit` because the audit still expected `ArkSchemaV72` and backup schema `25`. The audit now checks the current `ArkSchemaV73` and backup schema `26`. Validation: `scripts/audit-release-data-safety.sh` PASS; `git diff --check` PASS; `scripts/dev-check-changed.sh` PASS. |
 | 2026-06-25 | CI audit self-test repair after Plants push | CI run `28182441974` failed `audits` at architecture fixture self-tests because Plant views still called static plant plan/command services. Plant care-plan reads now go through `AppServices.plantCarePlans`, and plant care writes go through `HomeCommandExecutor` with `careNote` preserved for defer logs. Validation: `scripts/tests/run-audit-fixture-tests.sh` PASS; `scripts/audit-architecture-boundaries.sh --all` PASS; `git diff --check` PASS; `scripts/dev-check-changed.sh` PASS; `scripts/test-simulator.sh -only-testing:OhanaTests/PlantLaunchTests` PASS (17 Swift Testing tests); `scripts/test-simulator.sh -only-testing:OhanaTests/HomeCommandExecutorTests` PASS (186 Swift Testing tests). |
 | 2026-06-25 | TFU-20260625-002 Plants launch integration closure | Plants now materializes generated care plans into local Event/Reminder rows, honors single-plant reminder disable cleanup, refreshes the next plan after calendar/reminder/care completion, exposes dashboard location filtering and full launch-field detail editing, and has explicit Today Focus/calendar/economy/Oasis/shop coverage. Validation: `git diff --check` PASS; `scripts/dev-check-changed.sh` PASS; `scripts/test-simulator.sh -only-testing:OhanaTests/PlantLaunchTests` PASS (17 Swift Testing tests); `scripts/test-simulator.sh -only-testing:OhanaTests/HomeCommandExecutorTests` PASS (186 Swift Testing tests); `scripts/build-debug-fast.sh` PASS on pinned `iPhone 17`. |

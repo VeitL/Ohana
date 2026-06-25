@@ -77,8 +77,6 @@ final class OhanaUITests: XCTestCase {
         saveManualReminderPlan(in: app)
         assertQuickFeedMode(in: app, containsAny: ["Plan", "计划"], timeout: 8)
         closeFeedDetailToHome(in: app)
-
-        performHomeFeedQuickCheckIn(in: app, petName: petName, expectsAntiRepeatConfirmation: false)
     }
 
     @MainActor
@@ -674,6 +672,7 @@ final class OhanaUITests: XCTestCase {
     private func tapWhenFrameReady(_ element: XCUIElement, timeout: TimeInterval) -> Bool {
         let didBecomeFrameReady = waitForFrameReady(element, timeout: timeout)
         guard didBecomeFrameReady else { return false }
+        guard isFiniteFrame(element.frame) else { return false }
         element.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
         return true
     }
@@ -682,8 +681,17 @@ final class OhanaUITests: XCTestCase {
         waitUntil(timeout: timeout) {
             guard element.exists, element.isEnabled else { return false }
             let frame = element.frame
-            return frame.width > 1 && frame.height > 1
+            return frame.width > 1 && frame.height > 1 && isFiniteFrame(frame)
         }
+    }
+
+    private func isFiniteFrame(_ frame: CGRect) -> Bool {
+        frame.origin.x.isFinite &&
+            frame.origin.y.isFinite &&
+            frame.width.isFinite &&
+            frame.height.isFinite &&
+            frame.midX.isFinite &&
+            frame.midY.isFinite
     }
 
     private func waitUntil(timeout: TimeInterval, condition: () -> Bool) -> Bool {

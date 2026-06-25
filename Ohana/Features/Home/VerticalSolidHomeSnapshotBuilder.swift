@@ -392,6 +392,8 @@ nonisolated enum VerticalSolidHomeSnapshotBuilder {
                 pet.species,
                 pet.avatarEmoji,
                 pet.safeThemeColorHex,
+                String(pet.dailyPortionGrams),
+                pet.mainFoodKindRaw,
                 String(pet.coconutBalance),
                 String(pet.currentStreak),
                 String(pet.hasPassedAway)

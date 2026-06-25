@@ -408,6 +408,20 @@ struct HomeSnapshotBuilderTests {
         #expect(first != second)
     }
 
+    @Test func verticalSourceSignatureIncludesFeedDefaultChanges() {
+        let pet = Pet(name: "Momo", species: "猫")
+        let before = VerticalSolidHomeSnapshotBuilder.signature(for: makeVerticalSource(pets: [pet]))
+
+        pet.dailyPortionGrams = 42
+        let afterPortion = VerticalSolidHomeSnapshotBuilder.signature(for: makeVerticalSource(pets: [pet]))
+
+        pet.mainFoodKindRaw = FeedFoodKind.wet.rawValue
+        let afterFoodKind = VerticalSolidHomeSnapshotBuilder.signature(for: makeVerticalSource(pets: [pet]))
+
+        #expect(before != afterPortion)
+        #expect(afterPortion != afterFoodKind)
+    }
+
     @Test func verticalSnapshotCardsCarryPetBondAppearanceFlags() throws {
         let pet = Pet(name: "Momo", species: "猫")
         PetBondVaultStore.unlock(.cardBorder, for: pet.id)
