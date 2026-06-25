@@ -488,21 +488,22 @@ struct HomeCommandExecutor {
         return stored.isEmpty ? nil : stored
     }
 
-    func recordPlantCare(_ type: PlantCareType, plant: Plant, executorId: String?) {
+    func recordPlantCare(_ type: PlantCareType, plant: Plant, executorId: String?, careNote: String = "") {
         PlantCareCommandExecutor(context: modelContext, revisions: revisions).recordCare(
             type,
             plant: plant,
             executorId: executorId,
-            note: "home.plantCare"
+            note: "home.plantCare",
+            careNote: careNote
         )
     }
 
-    func recordPlantCare(_ type: PlantCareType, plantID: UUID, executorId: String?) {
+    func recordPlantCare(_ type: PlantCareType, plantID: UUID, executorId: String?, careNote: String = "") {
         guard let plant = fetchPlant(id: plantID) else {
             publishNoop(.plantCare(plantID: plantID, action: type.rawValue), note: "home.plantCare.missingPlant")
             return
         }
-        recordPlantCare(type, plant: plant, executorId: executorId)
+        recordPlantCare(type, plant: plant, executorId: executorId, careNote: careNote)
     }
 
     func confirmCoconutExchange(_ request: CoconutExchangeRequest, receiver: Human) throws {

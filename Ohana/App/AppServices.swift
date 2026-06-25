@@ -41,6 +41,7 @@ final class AppServices {
     let onboardingJourney: OnboardingJourneyCoordinating
     let humanRequirements: HumanRequirementResolving
     let todayFocus: TodayFocusManaging
+    let plantCarePlans: PlantCarePlanReading
     let oasisTree: OasisTreeManaging
     let healthAlerts: PetHealthAlerting
     let walking: PetWalkingManaging
@@ -150,6 +151,7 @@ final class AppServices {
                 careLedger: careLedger,
                 revisions: domainRevisions
             ),
+            plantCarePlans: StaticPlantCarePlanReader(),
             oasisTree: SharedOasisTreeManager(manager: oasisTreeManager),
             healthAlerts: SharedPetHealthAlertEngine(),
             walking: SharedPetWalkingManager(manager: walkingManager),
@@ -211,6 +213,7 @@ final class AppServices {
         onboardingJourney: OnboardingJourneyCoordinating,
         humanRequirements: HumanRequirementResolving,
         todayFocus: TodayFocusManaging,
+        plantCarePlans: PlantCarePlanReading,
         oasisTree: OasisTreeManaging,
         healthAlerts: PetHealthAlerting,
         walking: PetWalkingManaging,
@@ -249,6 +252,7 @@ final class AppServices {
         self.onboardingJourney = onboardingJourney
         self.humanRequirements = humanRequirements
         self.todayFocus = todayFocus
+        self.plantCarePlans = plantCarePlans
         self.oasisTree = oasisTree
         self.healthAlerts = healthAlerts
         self.walking = walking

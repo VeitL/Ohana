@@ -280,6 +280,7 @@ struct PlantCareCommandExecutor {
         plant: Plant,
         executorId: String?,
         note: String,
+        careNote: String = "",
         syncCarePlan: Bool = true,
         scheduleNotifications: Bool = true,
         reminderScheduling providedReminderScheduling: ReminderSchedulingManaging? = nil
@@ -289,6 +290,7 @@ struct PlantCareCommandExecutor {
             plant: plant,
             executorId: executorId,
             context: context,
+            careNote: careNote,
             syncCarePlan: syncCarePlan,
             scheduleNotifications: scheduleNotifications,
             reminderScheduling: providedReminderScheduling

@@ -24,7 +24,8 @@ struct PlantDetailContentView: View {
     @State private var showingDeleteConfirm = false
     @State private var diagnosisResult: PlantDiagnosisResult?
     private var catalogEntry: PlantCatalogEntry? { PlantCatalog.entry(id: plant.catalogSpeciesId) }
-    private var careTasks: [PlantCareTaskSnapshot] { PlantCarePlanService.tasks(for: plant) }
+    private var careTasks: [PlantCareTaskSnapshot] { appServices.plantCarePlans.tasks(for: plant) }
+    private var commandExecutor: HomeCommandExecutor { HomeCommandExecutor(modelContext: modelContext, services: appServices) }
     private var recentLogs: [PlantCareLog] {
         plant.careLogs.sorted { $0.date > $1.date }
     }
@@ -576,11 +577,10 @@ struct PlantDetailContentView: View {
         generator.impactOccurred()
         let plantID = plant.id
         commandQueue.enqueue(.plantCare(plantID: plantID, action: type.rawValue)) {
-            PlantCareCommandService.recordCare(
+            commandExecutor.recordPlantCare(
                 type,
                 plant: plant,
                 executorId: currentExecutorId(),
-                context: modelContext,
                 careNote: careNote
             )
         }

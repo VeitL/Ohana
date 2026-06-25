@@ -60,7 +60,7 @@ struct PlantDashboardView: View {
     }
 
     private var upcomingTasks: [PlantCareTaskSnapshot] {
-        PlantCarePlanService.tasks(for: plants, days: 7)
+        appServices.plantCarePlans.tasks(for: plants, days: 7)
     }
 
     private var dueTasks: [PlantCareTaskSnapshot] {
@@ -421,7 +421,7 @@ struct PlantDashboardView: View {
 
                 statusBadge(for: plant)
 
-                if let task = PlantCarePlanService.nextTask(for: plant) {
+                if let task = appServices.plantCarePlans.nextTask(for: plant) {
                     Text(task.daysUntilDue <= 0 ? "今天：\(task.careType.displayName)" : "\(task.daysUntilDue)天后：\(task.careType.displayName)")
                         .font(OhanaFont.adaptive(size: 9, weight: .medium, design: .rounded))
                         .foregroundStyle(Color.ohanaSecondaryText)
@@ -525,12 +525,7 @@ struct PlantDashboardView: View {
         guard let plant = plants.first(where: { $0.id == task.plantID }) else { return }
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         commandQueue.enqueue(.plantCare(plantID: plant.id, action: task.careType.rawValue)) {
-            PlantCareCommandService.recordCare(
-                task.careType,
-                plant: plant,
-                executorId: currentExecutorId(),
-                context: modelContext
-            )
+            commandExecutor.recordPlantCare(task.careType, plant: plant, executorId: currentExecutorId())
         }
     }
 
@@ -547,11 +542,10 @@ struct PlantDashboardView: View {
             guard let plant = plants.first(where: { $0.id == task.plantID }) else { continue }
             let note = "defer:\(task.careType.rawValue):\(formatter.string(from: tomorrow))"
             commandQueue.enqueue(.plantCare(plantID: plant.id, action: PlantCareType.customNote.rawValue)) {
-                PlantCareCommandService.recordCare(
+                commandExecutor.recordPlantCare(
                     .customNote,
                     plant: plant,
                     executorId: currentExecutorId(),
-                    context: modelContext,
                     careNote: note
                 )
             }

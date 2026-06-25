@@ -20,6 +20,82 @@ nonisolated struct PlantCareTaskSnapshot: Identifiable, Equatable, Sendable {
     let priority: Int
 }
 
+@MainActor
+protocol PlantCarePlanReading {
+    func tasks(
+        for plant: Plant,
+        now: Date,
+        calendar: Calendar
+    ) -> [PlantCareTaskSnapshot]
+
+    func tasks(
+        for plants: [Plant],
+        days: Int,
+        now: Date,
+        calendar: Calendar
+    ) -> [PlantCareTaskSnapshot]
+
+    func nextTask(
+        for plant: Plant,
+        now: Date,
+        calendar: Calendar
+    ) -> PlantCareTaskSnapshot?
+}
+
+extension PlantCarePlanReading {
+    func tasks(
+        for plant: Plant,
+        now: Date = Date(),
+        calendar: Calendar = .current
+    ) -> [PlantCareTaskSnapshot] {
+        tasks(for: plant, now: now, calendar: calendar)
+    }
+
+    func tasks(
+        for plants: [Plant],
+        days: Int = 7,
+        now: Date = Date(),
+        calendar: Calendar = .current
+    ) -> [PlantCareTaskSnapshot] {
+        tasks(for: plants, days: days, now: now, calendar: calendar)
+    }
+
+    func nextTask(
+        for plant: Plant,
+        now: Date = Date(),
+        calendar: Calendar = .current
+    ) -> PlantCareTaskSnapshot? {
+        nextTask(for: plant, now: now, calendar: calendar)
+    }
+}
+
+struct StaticPlantCarePlanReader: PlantCarePlanReading {
+    func tasks(
+        for plant: Plant,
+        now: Date,
+        calendar: Calendar
+    ) -> [PlantCareTaskSnapshot] {
+        PlantCarePlanService.tasks(for: plant, now: now, calendar: calendar)
+    }
+
+    func tasks(
+        for plants: [Plant],
+        days: Int,
+        now: Date,
+        calendar: Calendar
+    ) -> [PlantCareTaskSnapshot] {
+        PlantCarePlanService.tasks(for: plants, days: days, now: now, calendar: calendar)
+    }
+
+    func nextTask(
+        for plant: Plant,
+        now: Date,
+        calendar: Calendar
+    ) -> PlantCareTaskSnapshot? {
+        PlantCarePlanService.nextTask(for: plant, now: now, calendar: calendar)
+    }
+}
+
 nonisolated enum PlantCarePlanService {
     static func tasks(
         for plant: Plant,
