@@ -212,6 +212,7 @@ struct HomeReadModelStoreTests {
             pendingReminders: [],
             humanMedications: [],
             humanMedicationLogs: [],
+            healthAlertSources: PetHealthAlertSourceRouteData.load(pets: [pet], from: container.mainContext),
             todayFocusCareLedgerEntries: [],
             feedingLedgerEntries: [],
             careLedgerEntries: [],
