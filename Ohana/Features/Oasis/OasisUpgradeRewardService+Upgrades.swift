@@ -228,6 +228,10 @@ extension OasisUpgradeRewardService {
             (3, 5, 4, 6)
         case .dailyFocusCompletion, .general:
             (1, 2, 1, 2)
+        case .plantWatering:
+            (1, 2, 1, 3)
+        case .plantFertilizing:
+            (2, 3, 1, 3)
         }
     }
 

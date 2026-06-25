@@ -90,6 +90,46 @@ struct PlantLaunchTests {
         #expect(restored.lastHealthCheckDate == plant.lastHealthCheckDate)
     }
 
+    @Test func plantBackupRoundTripsCareLogsAndPhotos() throws {
+        let source = try makeInMemoryContainer()
+        let sourceContext = source.mainContext
+        let date = makeDate(year: 2026, month: 6, day: 8, hour: 7)
+        let plant = Plant(name: "Pilea", species: "Pilea peperomioides", location: "Desk")
+        let log = PlantCareLog(
+            date: date,
+            careType: .newLeaf,
+            note: "Tiny new leaf",
+            executorId: "plant-owner",
+            photoData: Data([9, 8, 7]),
+            healthStatus: .thriving
+        )
+        log.id = UUID(uuidString: "11111111-2222-3333-4444-555555555555") ?? log.id
+        plant.careLogs.append(log)
+        sourceContext.insert(plant)
+        sourceContext.insert(log)
+        try sourceContext.save()
+
+        let backup = try TestDataBackupManagerProjection.manager.buildBackup(context: sourceContext)
+        let target = try makeInMemoryContainer()
+        try TestDataBackupManagerProjection.manager.applyBackup(
+            backup,
+            context: target.mainContext,
+            projectionManager: nil
+        )
+
+        let restoredLogs = try target.mainContext.fetch(FetchDescriptor<PlantCareLog>())
+        let restored = try #require(restoredLogs.first)
+        #expect(restoredLogs.count == 1)
+        #expect(restored.id == log.id)
+        #expect(restored.date == date)
+        #expect(restored.careType == .newLeaf)
+        #expect(restored.note == "Tiny new leaf")
+        #expect(restored.executorId == "plant-owner")
+        #expect(restored.photoData == Data([9, 8, 7]))
+        #expect(restored.healthStatus == .thriving)
+        #expect(restored.plant?.name == "Pilea")
+    }
+
     @Test func creatingPlantMarksExistingPlantDataForGrandfatherAccess() throws {
         PlantUnlockPolicy.clearExistingPlantData()
         defer { PlantUnlockPolicy.clearExistingPlantData() }
@@ -104,10 +144,117 @@ struct PlantLaunchTests {
             fertilizingIntervalDays: 30
         )
 
-        PlantCreationCommandService.createPlant(input: input, context: container.mainContext)
+        PlantCreationCommandService.createPlant(
+            input: input,
+            context: container.mainContext,
+            scheduleNotifications: false
+        )
 
         #expect(PlantUnlockPolicy.hasExistingPlantData())
         #expect(AppFeatureRouteGuard.allowsAddEntity(.plant, currentLevel: 3))
+    }
+
+    @Test func plantCarePlanSyncMaterializesCalendarEventsAndReminders() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let now = makeDate(year: 2026, month: 6, day: 17, hour: 8)
+        let plant = Plant(name: "Fern", wateringIntervalDays: 1, fertilizingIntervalDays: 14)
+        plant.createdAt = Calendar.current.date(byAdding: .day, value: -10, to: now) ?? now
+        plant.lastWateredDate = Calendar.current.date(byAdding: .day, value: -2, to: now)
+        plant.lastFertilizedDate = Calendar.current.date(byAdding: .day, value: -20, to: now)
+        context.insert(plant)
+        try context.save()
+
+        let result = PlantCarePlanScheduleService.sync(
+            plant: plant,
+            context: context,
+            now: now,
+            scheduleNotifications: false
+        )
+
+        let events = try context.fetch(FetchDescriptor<Event>())
+        let reminders = try context.fetch(FetchDescriptor<Reminder>())
+        let planEvents = events.filter { $0.isAllDay && $0.title.contains("植物计划") }
+        #expect(result.eventIDs.count == 7)
+        #expect(result.reminderIDs.count == 7)
+        #expect(planEvents.count == 7)
+        #expect(reminders.count == 7)
+        #expect(planEvents.contains { $0.eventType == EventType.watering.rawValue && $0.recurrenceDays == 1 })
+        #expect(planEvents.contains { $0.eventType == EventType.fertilizing.rawValue && $0.recurrenceDays == 14 })
+        #expect(planEvents.contains { $0.eventType == EventType.plantPestCheck.rawValue })
+        let remindersArePending = reminders.allSatisfy(\.isPending)
+        #expect(remindersArePending)
+    }
+
+    @Test func disabledPlantRemindersRemoveMaterializedPlantPlansAndNotifications() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let now = makeDate(year: 2026, month: 6, day: 18, hour: 8)
+        let plant = Plant(name: "Pilea", wateringIntervalDays: 1, fertilizingIntervalDays: 14)
+        plant.createdAt = Calendar.current.date(byAdding: .day, value: -10, to: now) ?? now
+        context.insert(plant)
+        try context.save()
+
+        PlantCarePlanScheduleService.sync(
+            plant: plant,
+            context: context,
+            now: now,
+            scheduleNotifications: false
+        )
+        let notificationIDs = Set(try context.fetch(FetchDescriptor<Reminder>()).map(\.notificationId))
+        plant.remindersEnabled = false
+        let notifications = PlantReminderNotificationSchedulerSpy()
+
+        let removed = PlantCarePlanScheduleService.sync(
+            plant: plant,
+            context: context,
+            now: now,
+            scheduleNotifications: false,
+            notifications: notifications
+        )
+
+        #expect(removed.removedEventIDs.count == 7)
+        #expect(removed.removedReminderIDs.count == 7)
+        let remainingEvents = try context.fetch(FetchDescriptor<Event>())
+        let remainingReminders = try context.fetch(FetchDescriptor<Reminder>())
+        #expect(remainingEvents.isEmpty)
+        #expect(remainingReminders.isEmpty)
+        #expect(Set(notifications.cancelledNotificationIDs) == notificationIDs)
+    }
+
+    @Test func recordingPlantCareRefreshesNextPlanReminder() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let now = makeDate(year: 2026, month: 6, day: 19, hour: 9)
+        let plant = Plant(name: "Mint", wateringIntervalDays: 2)
+        plant.createdAt = Calendar.current.date(byAdding: .day, value: -10, to: now) ?? now
+        plant.lastWateredDate = Calendar.current.date(byAdding: .day, value: -3, to: now)
+        context.insert(plant)
+        try context.save()
+
+        PlantCarePlanScheduleService.sync(
+            plant: plant,
+            context: context,
+            now: now,
+            scheduleNotifications: false
+        )
+        PlantCareCommandService.recordCare(
+            .watering,
+            plant: plant,
+            executorId: nil,
+            context: context,
+            now: now,
+            scheduleNotifications: false
+        )
+
+        let events = try context.fetch(FetchDescriptor<Event>())
+        let wateringPlan = try #require(events.first {
+            $0.isAllDay && $0.title.contains("植物计划") && $0.eventType == EventType.watering.rawValue
+        })
+        let expectedDue = Calendar.current.date(byAdding: .day, value: 2, to: Calendar.current.startOfDay(for: now))
+        #expect(wateringPlan.startDate == expectedDue)
+        #expect(wateringPlan.reminders.contains { $0.isPending && $0.scheduledAt > now })
+        #expect(events.contains { !$0.isAllDay && $0.eventType == EventType.watering.rawValue })
     }
 
     @Test func completingPlantCalendarEventWritesCareLogAndLedger() throws {
@@ -132,7 +279,8 @@ struct PlantLaunchTests {
             pets: [],
             context: context,
             executorId: nil,
-            now: now
+            now: now,
+            schedulePlantCareNotifications: false
         )
 
         let logs = try context.fetch(FetchDescriptor<PlantCareLog>())
@@ -172,7 +320,8 @@ struct PlantLaunchTests {
             reminder,
             by: nil,
             context: context,
-            notifications: NoopReminderNotificationScheduler()
+            notifications: NoopReminderNotificationScheduler(),
+            schedulePlantCareNotifications: false
         )
 
         let logs = try context.fetch(FetchDescriptor<PlantCareLog>())
@@ -307,7 +456,8 @@ struct PlantLaunchTests {
             pets: [],
             context: context,
             executorId: userKey,
-            now: now
+            now: now,
+            schedulePlantCareNotifications: false
         )
         let reward = TodayFocusEconomyService.awardDailyCompletionIfNeeded(
             context: context,
@@ -338,6 +488,269 @@ struct PlantLaunchTests {
         })
     }
 
+    @Test func duePlantWateringAwardsActiveHumanAndCareLedgerDelta() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let now = makeDate(year: 2026, month: 6, day: 12, hour: 9)
+        let human = Human(name: "Plant Keeper")
+        let plant = Plant(name: "Calathea", wateringIntervalDays: 1)
+        plant.lastWateredDate = Calendar.current.date(byAdding: .day, value: -3, to: now)
+        context.insert(human)
+        context.insert(plant)
+        try context.save()
+
+        let restore = prepareEconomyDefaults(
+            memberKey: human.id.uuidString,
+            careObjectKeys: [plantBudgetKey(plant)],
+            date: now
+        )
+        defer { restore() }
+
+        let result = PlantCareCommandService.recordCare(
+            .watering,
+            plant: plant,
+            executorId: human.id.uuidString,
+            context: context,
+            now: now,
+            economy: StaticCareEventEconomyAwarder(questManager: QuestManager()),
+            syncCarePlan: false
+        )
+
+        let ledger = try #require(try context.fetch(FetchDescriptor<CareLedgerEvent>()).first(where: {
+            $0.eventKind == CareLedgerEventKind.plantCare.rawValue &&
+                $0.legacyModelName == "PlantCareLog"
+        }))
+        let walletEntries = try context.fetch(FetchDescriptor<CoconutLedgerEntry>())
+        let walletTotal = walletEntries.reduce(0) { $0 + $1.delta }
+
+        #expect(result.coconutDelta >= 2)
+        #expect(human.coconutBalance == result.coconutDelta)
+        #expect(ledger.coconutDelta == result.coconutDelta)
+        #expect(walletTotal == result.coconutDelta)
+    }
+
+    @Test func notDuePlantWateringDoesNotCallEconomy() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let now = makeDate(year: 2026, month: 6, day: 13, hour: 9)
+        let plant = Plant(name: "Mint", wateringIntervalDays: 3)
+        plant.lastWateredDate = now
+        context.insert(plant)
+        try context.save()
+        let economy = PlantCareEconomyAwarderSpy(reward: (humanGot: 9, petGot: 0))
+
+        let result = PlantCareCommandService.recordCare(
+            .watering,
+            plant: plant,
+            executorId: nil,
+            context: context,
+            now: now,
+            economy: economy,
+            syncCarePlan: false
+        )
+
+        let ledger = try #require(try context.fetch(FetchDescriptor<CareLedgerEvent>()).first(where: {
+            $0.eventKind == CareLedgerEventKind.plantCare.rawValue
+        }))
+        #expect(economy.awardCalls.isEmpty)
+        #expect(result.coconutDelta == 0)
+        #expect(ledger.coconutDelta == 0)
+    }
+
+    @Test func differentPlantsHaveIndependentWateringCooldownBuckets() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let now = makeDate(year: 2026, month: 6, day: 14, hour: 9)
+        let human = Human(name: "Green Thumb")
+        let first = Plant(name: "Fern", wateringIntervalDays: 1)
+        let second = Plant(name: "Pilea", wateringIntervalDays: 1)
+        first.lastWateredDate = Calendar.current.date(byAdding: .day, value: -2, to: now)
+        second.lastWateredDate = Calendar.current.date(byAdding: .day, value: -2, to: now)
+        context.insert(human)
+        context.insert(first)
+        context.insert(second)
+        try context.save()
+
+        let restore = prepareEconomyDefaults(
+            memberKey: human.id.uuidString,
+            careObjectKeys: [plantBudgetKey(first), plantBudgetKey(second)],
+            date: now
+        )
+        defer { restore() }
+
+        let questManager = QuestManager()
+        let economy = StaticCareEventEconomyAwarder(questManager: questManager)
+        let firstResult = PlantCareCommandService.recordCare(
+            .watering,
+            plant: first,
+            executorId: human.id.uuidString,
+            context: context,
+            now: now,
+            economy: economy,
+            syncCarePlan: false
+        )
+        let secondResult = PlantCareCommandService.recordCare(
+            .watering,
+            plant: second,
+            executorId: human.id.uuidString,
+            context: context,
+            now: now,
+            economy: economy,
+            syncCarePlan: false
+        )
+
+        #expect(firstResult.coconutDelta >= 2)
+        #expect(secondResult.coconutDelta >= 2)
+        #expect(human.coconutBalance == firstResult.coconutDelta + secondResult.coconutDelta)
+    }
+
+    @Test func plantWateringAndFertilizingUseLaunchRewardAmounts() {
+        let now = makeDate(year: 2026, month: 6, day: 15, hour: 9)
+        let household = "plant-policy-\(UUID().uuidString)"
+        let member = "plant-member-\(UUID().uuidString)"
+        let plantKey = "plant.\(UUID().uuidString)"
+
+        let watering = CoconutEconomyPolicyV2.reward(
+            for: .plantWatering,
+            quality: .none,
+            isOnCooldown: false,
+            userKey: household,
+            memberKey: member,
+            careObjectKeys: [plantKey],
+            careObjectCount: 1,
+            hasHumanAccount: true,
+            hasPetAccount: false,
+            date: now,
+            forcedLuck: EconomyLuckTier.none
+        )
+        let fertilizing = CoconutEconomyPolicyV2.reward(
+            for: .plantFertilizing,
+            quality: .none,
+            isOnCooldown: false,
+            userKey: household,
+            memberKey: member,
+            careObjectKeys: [plantKey],
+            careObjectCount: 1,
+            hasHumanAccount: true,
+            hasPetAccount: false,
+            date: now,
+            forcedLuck: EconomyLuckTier.none
+        )
+
+        #expect(watering.totalCoconuts == 2)
+        #expect(watering.humanCoconuts == 2)
+        #expect(watering.petCoconuts == 0)
+        #expect(watering.growthXP == 5)
+        #expect(fertilizing.totalCoconuts == 3)
+        #expect(fertilizing.humanCoconuts == 3)
+        #expect(fertilizing.petCoconuts == 0)
+        #expect(fertilizing.growthXP == 8)
+    }
+
+    @Test func plantCareSharesMemberDailyBudgetWithPetCare() {
+        let now = makeDate(year: 2026, month: 6, day: 16, hour: 9)
+        let household = "shared-plant-pet-budget-\(UUID().uuidString)"
+        let member = "shared-member-\(UUID().uuidString)"
+        let petKeys = (0 ..< 10).map { "pet.\($0).\(UUID().uuidString)" }
+        let plantKey = "plant.\(UUID().uuidString)"
+        EconomyDailyBudgetStore.reset(householdKey: household, memberKey: member, careObjectKeys: petKeys + [plantKey], date: now)
+        defer {
+            EconomyDailyBudgetStore.reset(householdKey: household, memberKey: member, careObjectKeys: petKeys + [plantKey], date: now)
+        }
+
+        for index in 0 ..< 20 {
+            let objectKey = petKeys[index % petKeys.count]
+            let result = CoconutEconomyPolicyV2.reward(
+                for: .health,
+                quality: .none,
+                isOnCooldown: false,
+                userKey: household,
+                memberKey: member,
+                careObjectKeys: [objectKey],
+                careObjectCount: petKeys.count + 1,
+                hasHumanAccount: true,
+                hasPetAccount: true,
+                date: now,
+                forcedLuck: EconomyLuckTier.none
+            )
+            EconomyDailyBudgetStore.commit(
+                result,
+                householdKey: household,
+                memberKey: member,
+                careObjectKeys: [objectKey],
+                date: now
+            )
+            if result.budgetStage == .recordOnly {
+                break
+            }
+        }
+
+        let plantResult = CoconutEconomyPolicyV2.reward(
+            for: .plantWatering,
+            quality: .none,
+            isOnCooldown: false,
+            userKey: household,
+            memberKey: member,
+            careObjectKeys: [plantKey],
+            careObjectCount: petKeys.count + 1,
+            hasHumanAccount: true,
+            hasPetAccount: false,
+            date: now,
+            forcedLuck: EconomyLuckTier.none
+        )
+
+        #expect(plantResult.budgetStage == .recordOnly)
+        #expect(plantResult.totalCoconuts == 0)
+        #expect(plantResult.reason == "dailyBudgetRecordOnly")
+    }
+
+    @Test func plantCareRewardsFeedOasisCareEchoAndShopKeepsPlantsFree() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let now = makeDate(year: 2026, month: 6, day: 20, hour: 9)
+        let human = Human(name: "Ava")
+        let plant = Plant(name: "Fern", wateringIntervalDays: 1)
+        plant.lastWateredDate = Calendar.current.date(byAdding: .day, value: -2, to: now)
+        let critter = OasisElectronicPet(
+            catalogId: OasisUpgradeRewardCatalog.firstCritterId,
+            nameZh: "nana",
+            nameEn: "nana",
+            nameDe: "nana",
+            emoji: "🥥",
+            rarity: .rare,
+            health: 50,
+            isFeaturedOnOasis: true,
+            sourceLevel: 10
+        )
+        context.insert(human)
+        context.insert(plant)
+        context.insert(critter)
+        try context.save()
+        let restore = prepareEconomyDefaults(
+            memberKey: human.id.uuidString,
+            careObjectKeys: [plantBudgetKey(plant)],
+            date: now
+        )
+        defer { restore() }
+
+        PlantCareCommandService.recordCare(
+            .watering,
+            plant: plant,
+            executorId: human.id.uuidString,
+            context: context,
+            now: now,
+            economy: StaticCareEventEconomyAwarder(questManager: QuestManager()),
+            syncCarePlan: false
+        )
+        let oasisLogs = try context.fetch(FetchDescriptor<OasisCritterActionLog>())
+        let treeBoost = try #require(ShopCatalog.item(id: "boost_tree"))
+
+        #expect(critter.health > 50)
+        #expect(oasisLogs.contains { $0.action == .careEcho })
+        #expect(treeBoost.descriptionText.resolve("zh").contains("基础植物照护不靠购买"))
+        #expect(treeBoost.isConsumable)
+    }
+
     private func makeInMemoryContainer() throws -> ModelContainer {
         let schema = Schema(ArkSchemaV73.models)
         let config = ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)
@@ -354,6 +767,46 @@ struct PlantLaunchTests {
         components.hour = hour
         components.minute = minute
         return components.date ?? Date(timeIntervalSince1970: 0)
+    }
+
+    private func plantBudgetKey(_ plant: Plant) -> String {
+        "plant.\(plant.id.uuidString)"
+    }
+
+    private func prepareEconomyDefaults(
+        memberKey: String,
+        careObjectKeys: [String],
+        date: Date
+    ) -> () -> Void {
+        let defaults = UserDefaults.standard
+        let oldActiveHuman = defaults.object(forKey: "currentActiveHumanId")
+        let oldCooldownLogs = defaults.object(forKey: QuestManager.Keys.cooldownLogs)
+        defaults.set(memberKey, forKey: "currentActiveHumanId")
+        defaults.removeObject(forKey: QuestManager.Keys.cooldownLogs)
+        EconomyDailyBudgetStore.reset(
+            householdKey: CoconutEconomyPolicyV2.householdBudgetKey(),
+            memberKey: memberKey,
+            careObjectKeys: careObjectKeys,
+            date: date
+        )
+        return {
+            if let oldActiveHuman {
+                defaults.set(oldActiveHuman, forKey: "currentActiveHumanId")
+            } else {
+                defaults.removeObject(forKey: "currentActiveHumanId")
+            }
+            if let oldCooldownLogs {
+                defaults.set(oldCooldownLogs, forKey: QuestManager.Keys.cooldownLogs)
+            } else {
+                defaults.removeObject(forKey: QuestManager.Keys.cooldownLogs)
+            }
+            EconomyDailyBudgetStore.reset(
+                householdKey: CoconutEconomyPolicyV2.householdBudgetKey(),
+                memberKey: memberKey,
+                careObjectKeys: careObjectKeys,
+                date: date
+            )
+        }
     }
 
     private struct NoopReminderNotificationScheduler: ReminderNotificationScheduling {
@@ -381,5 +834,93 @@ struct PlantLaunchTests {
         func cancel(notificationId _: String) {}
         func cancelAll(for _: Pet, reminders _: [Reminder]) {}
         func compensate(reminders _: [Reminder]) {}
+    }
+
+    private final class PlantReminderNotificationSchedulerSpy: ReminderNotificationScheduling, @unchecked Sendable {
+        private(set) var cancelledNotificationIDs: [String] = []
+
+        func schedule(reminder _: Reminder) {}
+        func schedule(
+            reminder _: Reminder,
+            existingNotificationIds _: Set<String>?,
+            completion: ((ReminderNotificationScheduleResult) -> Void)?
+        ) {
+            completion?(.scheduled)
+        }
+
+        func schedule(
+            reminder _: Reminder,
+            deliveryDate _: Date?,
+            existingNotificationIds _: Set<String>?,
+            completion: ((ReminderNotificationScheduleResult) -> Void)?
+        ) {
+            completion?(.scheduled)
+        }
+
+        func pendingNotificationIds() async -> Set<String> { [] }
+        func scheduleRollingWindow(reminders _: [Reminder]) {}
+        func refillWindowIfNeeded(allReminders _: [Reminder]) {}
+        func cancel(notificationId: String) { cancelledNotificationIDs.append(notificationId) }
+        func cancelAll(for _: Pet, reminders _: [Reminder]) {}
+        func compensate(reminders _: [Reminder]) {}
+    }
+
+    @MainActor
+    private final class PlantCareEconomyAwarderSpy: CareEventEconomyAwarding {
+        struct AwardCall {
+            let type: DomainCareRewardAction
+            let petID: UUID?
+            let quality: DomainCareRewardQuality
+            let date: Date
+            let executorId: String?
+            let careObjectKey: UUID?
+        }
+
+        let reward: (humanGot: Int, petGot: Int)
+        private(set) var awardCalls: [AwardCall] = []
+
+        init(reward: (humanGot: Int, petGot: Int)) {
+            self.reward = reward
+        }
+
+        func awardCareAction(
+            type: DomainCareRewardAction,
+            pet: Pet?,
+            context _: ModelContext,
+            quality: DomainCareRewardQuality,
+            date: Date,
+            executorId: String?,
+            careObjectKey: UUID?
+        ) -> (humanGot: Int, petGot: Int) {
+            awardCalls.append(AwardCall(
+                type: type,
+                petID: pet?.id,
+                quality: quality,
+                date: date,
+                executorId: executorId,
+                careObjectKey: careObjectKey
+            ))
+            return reward
+        }
+
+        func awardSharedCareAction(
+            type _: DomainCareRewardAction,
+            pets _: [Pet],
+            context _: ModelContext,
+            quality _: DomainCareRewardQuality,
+            title _: String?,
+            executorId _: String?
+        ) -> (humanGot: Int, petGot: Int) {
+            reward
+        }
+
+        func rewardMetadata(for reward: (humanGot: Int, petGot: Int)?) -> String {
+            guard let reward else { return "" }
+            return "{\"humanCoconuts\":\(max(0, reward.humanGot)),\"petCoconuts\":\(max(0, reward.petGot))}"
+        }
+
+        func recordFirstMeal(actorId _: String?, context _: ModelContext) {}
+        func clearCooldown(petId _: UUID?, type _: DomainCareRewardAction) {}
+        func refreshProjectionAfterRollback(context _: ModelContext) {}
     }
 }

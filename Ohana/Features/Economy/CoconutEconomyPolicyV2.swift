@@ -975,6 +975,10 @@ enum CoconutEconomyPolicyV2 {
             return BaseReward(actionKey: "milestone", growthXP: 7, coconuts: 3, humanShare: 2, petShare: 1)
         case .dailyFocusCompletion:
             return BaseReward(actionKey: "dailyFocusCompletion", growthXP: 18, coconuts: 8, humanShare: 8, petShare: 0)
+        case .plantWatering:
+            return BaseReward(actionKey: "plant_water", growthXP: 5, coconuts: 2, humanShare: 2, petShare: 0)
+        case .plantFertilizing:
+            return BaseReward(actionKey: "plant_fertilize", growthXP: 8, coconuts: 3, humanShare: 3, petShare: 0)
         case let .general(humanReward, petReward, _, title):
             let total = max(0, humanReward) + max(0, petReward)
             return BaseReward(

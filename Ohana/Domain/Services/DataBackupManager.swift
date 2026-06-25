@@ -152,6 +152,7 @@ final nonisolated class DataBackupManager: @unchecked Sendable {
         let reminders = try context.fetch(FetchDescriptor<Reminder>()) // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
         let households = try context.fetch(FetchDescriptor<Household>()) // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
         let plants = try context.fetch(FetchDescriptor<Plant>()) // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
+        let plantCareLogs = try context.fetch(FetchDescriptor<PlantCareLog>()) // smoothness: explicit backup/export scan only
         let careLogs = try context.fetch(FetchDescriptor<PetCareLog>()) // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
         let pottyLogs = try context.fetch(FetchDescriptor<PetPottyLog>()) // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
         let walkLogs = try context.fetch(FetchDescriptor<PetWalkLog>()) // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
@@ -231,6 +232,7 @@ final nonisolated class DataBackupManager: @unchecked Sendable {
             reminders: reminders.map(encodeReminder),
             households: households.map(encodeHousehold),
             plants: plants.map(encodePlant),
+            plantCareLogs: plantCareLogs.map(encodePlantCareLog),
             petCareLogs: careLogs.map(encodeCareLog),
             petPottyLogs: pottyLogs.map(encodePottyLog),
             petWalkLogs: walkLogs.map(encodeWalkLog),
@@ -348,6 +350,13 @@ final nonisolated class DataBackupManager: @unchecked Sendable {
         }
 
         // 日志类通过 rehydrate writer 插入，避免恢复路径绕过 subject/policy 解析。
+        for dto in backup.plantCareLogs ?? [] {
+            try DomainCareFactRehydrateWriter.insertPlantCareLogIfNeeded(
+                snapshot: decodePlantCareLogSnapshot(dto),
+                source: .backupRestore,
+                context: context
+            )
+        }
         for dto in backup.petCareLogs {
             try DomainCareFactRehydrateWriter.insertPetCareLogIfNeeded(
                 snapshot: decodeCareLogSnapshot(dto),

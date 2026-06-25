@@ -106,6 +106,7 @@ final class QuestManager: CoconutProjectionManaging {
         case .weight: nil
         case .milestone: nil
         case .dailyFocusCompletion: nil
+        case .plantWatering, .plantFertilizing: 4 * 3600
         case .general: 2 * 3600
         }
     }
@@ -124,6 +125,8 @@ final class QuestManager: CoconutProjectionManaging {
         case .weight: "weight"
         case .milestone: "milestone"
         case .dailyFocusCompletion: "dailyFocusCompletion"
+        case .plantWatering: "plant_water"
+        case .plantFertilizing: "plant_fertilize"
         case let .general(_, _, _, t): "general_\(t.prefix(10))"
         }
         return "\(pid)_\(aKey)"
@@ -195,6 +198,10 @@ final class QuestManager: CoconutProjectionManaging {
 
     func careObjectKeys(for pet: Pet?) -> [String] {
         pet.map { careObjectKeys(for: [$0]) } ?? []
+    }
+
+    func careObjectKeys(forPlantId plantId: UUID?) -> [String] {
+        plantId.map { ["plant.\($0.uuidString)"] } ?? []
     }
 
     func currentActiveHuman(context: ModelContext) -> Human? {

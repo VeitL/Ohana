@@ -116,6 +116,19 @@ nonisolated extension DataBackupManager {
         )
     }
 
+    func encodePlantCareLog(_ l: PlantCareLog) -> PlantCareLogBackup {
+        PlantCareLogBackup(
+            id: l.id.uuidString,
+            date: d(l.date),
+            careTypeRaw: l.careTypeRaw,
+            note: l.note,
+            executorId: l.executorId,
+            plantId: l.plant?.id.uuidString,
+            healthStatusRaw: l.healthStatusRaw.isEmpty ? nil : l.healthStatusRaw,
+            photoBase64: l.photoData?.base64EncodedString()
+        )
+    }
+
     func decodePlantSnapshot(_ dto: PlantBackup) -> DomainPlantRehydrateSnapshot {
         DomainPlantRehydrateSnapshot(
             id: UUID(uuidString: dto.id) ?? UUID(),

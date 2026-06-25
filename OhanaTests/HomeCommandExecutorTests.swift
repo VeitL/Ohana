@@ -2553,7 +2553,8 @@ struct HomeCommandExecutorTests {
             plant: plant,
             executorId: "human-1",
             context: context,
-            now: now
+            now: now,
+            syncCarePlan: false
         )
 
         let logs = try context.fetch(FetchDescriptor<PlantCareLog>())
@@ -2592,7 +2593,8 @@ struct HomeCommandExecutorTests {
             .fertilizing,
             plant: plant,
             executorId: "human-1",
-            note: "test.plant.executor"
+            note: "test.plant.executor",
+            syncCarePlan: false
         )
         let mutation = try #require(revisionCenter.lastMutation)
 
@@ -2621,7 +2623,8 @@ struct HomeCommandExecutorTests {
                 context: context,
                 now: makeDate(year: 2026, month: 6, day: 8, hour: 9, minute: index),
                 careNote: "type.\(type.rawValue)",
-                healthStatus: type == .yellowLeaf ? .watching : nil
+                healthStatus: type == .yellowLeaf ? .watching : nil,
+                syncCarePlan: false
             )
         }
 
@@ -3777,16 +3780,20 @@ struct HomeCommandExecutorTests {
 
         let logs = try context.fetch(FetchDescriptor<PlantCareLog>())
         let events = try context.fetch(FetchDescriptor<Event>())
+        let factEvents = events.filter { !$0.isAllDay }
+        let planEvents = events.filter { $0.isAllDay && $0.title.contains("植物计划") }
         let ledgerEvents = try context.fetch(FetchDescriptor<CareLedgerEvent>())
         #expect(logs.count == 1)
         #expect(logs.first?.plant?.id == plant.id)
         #expect(logs.first?.careType == .watering)
         #expect(logs.first?.executorId == executorHuman.id.uuidString)
         #expect(plant.lastWateredDate != nil)
-        #expect(events.count == 1)
-        #expect(events.first?.relatedEntityType == EntityKind.plant.rawValue)
-        #expect(events.first?.relatedEntityId == plant.id.uuidString)
-        #expect(events.first?.assigneeId == executorHuman.id.uuidString)
+        #expect(factEvents.count == 1)
+        #expect(factEvents.first?.relatedEntityType == EntityKind.plant.rawValue)
+        #expect(factEvents.first?.relatedEntityId == plant.id.uuidString)
+        #expect(factEvents.first?.assigneeId == executorHuman.id.uuidString)
+        #expect(planEvents.contains { $0.eventType == EventType.watering.rawValue && $0.recurrenceDays > 0 })
+        #expect(planEvents.contains { $0.eventType == EventType.plantPestCheck.rawValue && $0.recurrenceDays > 0 })
         #expect(ledgerEvents.count == 1)
         #expect(ledgerEvents.first?.eventKind == CareLedgerEventKind.plantCare.rawValue)
         #expect(ledgerEvents.first?.legacyModelName == "PlantCareLog")
@@ -3807,15 +3814,19 @@ struct HomeCommandExecutorTests {
 
         let logs = try context.fetch(FetchDescriptor<PlantCareLog>())
         let events = try context.fetch(FetchDescriptor<Event>())
+        let factEvents = events.filter { !$0.isAllDay }
+        let planEvents = events.filter { $0.isAllDay && $0.title.contains("植物计划") }
         let ledgerEvents = try context.fetch(FetchDescriptor<CareLedgerEvent>())
         #expect(logs.count == 1)
         #expect(logs.first?.plant?.id == plant.id)
         #expect(logs.first?.careType == .fertilizing)
         #expect(logs.first?.executorId == executorHuman.id.uuidString)
         #expect(plant.lastFertilizedDate != nil)
-        #expect(events.count == 1)
-        #expect(events.first?.eventType == EventType.fertilizing.rawValue)
-        #expect(events.first?.relatedEntityId == plant.id.uuidString)
+        #expect(factEvents.count == 1)
+        #expect(factEvents.first?.eventType == EventType.fertilizing.rawValue)
+        #expect(factEvents.first?.relatedEntityId == plant.id.uuidString)
+        #expect(planEvents.contains { $0.eventType == EventType.fertilizing.rawValue && $0.recurrenceDays > 0 })
+        #expect(planEvents.contains { $0.eventType == EventType.plantLeafCleaning.rawValue && $0.recurrenceDays > 0 })
         #expect(ledgerEvents.count == 1)
         #expect(ledgerEvents.first?.eventKind == CareLedgerEventKind.plantCare.rawValue)
         #expect(ledgerEvents.first?.actionType == PlantCareType.fertilizing.rawValue)

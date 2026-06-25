@@ -14,6 +14,7 @@ struct PlantCareCommandResult: Equatable {
     let eventID: UUID
     let ledgerEventID: UUID
     let careType: PlantCareType
+    let coconutDelta: Int
 }
 
 enum PlantCareCommandService {
@@ -28,7 +29,11 @@ enum PlantCareCommandService {
         careNote: String = "",
         photoData: Data? = nil,
         healthStatus: PlantHealthStatus? = nil,
-        careLedger providedCareLedger: CareLedgerRecording? = nil
+        careLedger providedCareLedger: CareLedgerRecording? = nil,
+        economy providedEconomy: CareEventEconomyAwarding? = nil,
+        syncCarePlan: Bool = true,
+        scheduleNotifications: Bool = true,
+        reminderScheduling providedReminderScheduling: ReminderSchedulingManaging? = nil
     ) -> PlantCareCommandResult {
         let careLedger = providedCareLedger ?? CareLedgerService()
         let eventIntent = DomainScheduleCreateIntent(
@@ -62,10 +67,12 @@ enum PlantCareCommandService {
                 logID: UUID(),
                 eventID: UUID(),
                 ledgerEventID: UUID(),
-                careType: type
+                careType: type,
+                coconutDelta: 0
             )
         }
         let authorizedExecutorId = plan.intent.assigneeId
+        let wasRewardEligible = isRewardEligible(type, for: plant, now: now)
         switch type {
         case .watering:
             plant.lastWateredDate = now
@@ -93,6 +100,31 @@ enum PlantCareCommandService {
         CloudSyncMutationRecorder.markModified(plant, context: context, modifiedAt: now)
 
         let event = DomainScheduleWriter.createEvent(plan: plan, context: context).event
+        context.safeSave()
+        let rewardAction = rewardAction(for: type)
+        let reward: (humanGot: Int, petGot: Int)
+        let rewardMetadata: String
+        if wasRewardEligible, let rewardAction {
+            let economy = providedEconomy ?? DomainServiceDependencyRegistry.careEventEconomy()
+            reward = economy.awardCareAction(
+                type: rewardAction,
+                pet: nil,
+                context: context,
+                quality: DomainCareRewardQuality.compose(
+                    precise: false,
+                    hasNote: !careNote.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                    hasPhoto: photoData != nil
+                ),
+                date: now,
+                executorId: authorizedExecutorId,
+                careObjectKey: plant.id
+            )
+            rewardMetadata = economy.rewardMetadata(for: reward)
+        } else {
+            reward = (0, 0)
+            rewardMetadata = ""
+        }
+        let coconutDelta = max(0, reward.humanGot) + max(0, reward.petGot)
 
         let ledgerEvent = careLedger.record(
             occurredAt: log.date,
@@ -110,22 +142,54 @@ enum PlantCareCommandService {
             sourceReminderId: nil,
             legacyModelName: "PlantCareLog",
             legacyModelId: log.id.uuidString,
-            coconutDelta: 0,
+            coconutDelta: coconutDelta,
             rewardLogId: nil,
             privacyFieldRaw: nil,
-            metadataJSON: "",
+            metadataJSON: rewardMetadata,
             context: context,
             save: false
         )
         context.safeSave()
+        if syncCarePlan {
+            PlantCarePlanScheduleService.sync(
+                plant: plant,
+                context: context,
+                now: now,
+                scheduleNotifications: scheduleNotifications,
+                reminderScheduling: providedReminderScheduling
+            )
+        }
 
         return PlantCareCommandResult(
             plantID: plant.id,
             logID: log.id,
             eventID: event.id,
             ledgerEventID: ledgerEvent.id,
-            careType: type
+            careType: type,
+            coconutDelta: coconutDelta
         )
+    }
+
+    private static func rewardAction(for type: PlantCareType) -> DomainCareRewardAction? {
+        switch type {
+        case .watering:
+            .plantWatering
+        case .fertilizing:
+            .plantFertilizing
+        default:
+            nil
+        }
+    }
+
+    private static func isRewardEligible(_ type: PlantCareType, for plant: Plant, now: Date) -> Bool {
+        switch type {
+        case .watering:
+            plant.needsWatering(on: now)
+        case .fertilizing:
+            plant.needsFertilizing(on: now)
+        default:
+            false
+        }
     }
 
     private static func safetyReminderSuffix(for plant: Plant, defaults: UserDefaults = .standard) -> String {
@@ -223,7 +287,9 @@ enum PlantCreationCommandService {
     @MainActor
     static func createPlant(
         input: PlantCreationCommandInput,
-        context: ModelContext
+        context: ModelContext,
+        scheduleNotifications: Bool = true,
+        reminderScheduling providedReminderScheduling: ReminderSchedulingManaging? = nil
     ) -> PlantCreationCommandResult {
         let trimmedName = input.name.trimmingCharacters(in: .whitespacesAndNewlines)
         let plant = Plant(
@@ -255,6 +321,12 @@ enum PlantCreationCommandService {
         PlantUnlockPolicy.noteExistingPlantData()
         CloudSyncMutationRecorder.markModified(plant, context: context)
         context.safeSave()
+        PlantCarePlanScheduleService.sync(
+            plant: plant,
+            context: context,
+            scheduleNotifications: scheduleNotifications,
+            reminderScheduling: providedReminderScheduling
+        )
 
         return PlantCreationCommandResult(
             plantID: plant.id,
@@ -288,9 +360,16 @@ struct PlantCreationCommandExecutor {
     @discardableResult
     func createPlant(
         input: PlantCreationCommandInput,
-        note: String
+        note: String,
+        scheduleNotifications: Bool = true,
+        reminderScheduling providedReminderScheduling: ReminderSchedulingManaging? = nil
     ) -> PlantCreationCommandResult {
-        let result = PlantCreationCommandService.createPlant(input: input, context: context)
+        let result = PlantCreationCommandService.createPlant(
+            input: input,
+            context: context,
+            scheduleNotifications: scheduleNotifications,
+            reminderScheduling: providedReminderScheduling
+        )
         revisions.publishMemberCreation(result, note: note)
         return result
     }

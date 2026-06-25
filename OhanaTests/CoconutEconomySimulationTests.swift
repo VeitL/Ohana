@@ -571,6 +571,10 @@ private struct EconomySimulationBudgetStore {
             return EconomySimulationBaseReward(growthXP: 7, coconuts: 3, humanShare: 2, petShare: 1)
         case .dailyFocusCompletion:
             return EconomySimulationBaseReward(growthXP: 18, coconuts: 8, humanShare: 8, petShare: 0)
+        case .plantWatering:
+            return EconomySimulationBaseReward(growthXP: 5, coconuts: 2, humanShare: 2, petShare: 0)
+        case .plantFertilizing:
+            return EconomySimulationBaseReward(growthXP: 8, coconuts: 3, humanShare: 3, petShare: 0)
         case let .general(humanReward, petReward, _, _):
             let total = max(0, humanReward) + max(0, petReward)
             return EconomySimulationBaseReward(

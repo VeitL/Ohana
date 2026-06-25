@@ -26,13 +26,8 @@ nonisolated enum PlantCarePlanService {
         now: Date = Date(),
         calendar: Calendar = .current
     ) -> [PlantCareTaskSnapshot] {
-        let catalog = PlantCatalog.entry(id: plant.catalogSpeciesId)
-        let wateringDays = adjustedWateringDays(for: plant, catalog: catalog)
-        let fertilizingDays = preferredInterval(
-            customDays: plant.fertilizingIntervalDays,
-            catalogDays: catalog?.defaultFertilizingDays,
-            fallbackDays: 30
-        )
+        let wateringDays = intervalDays(for: .watering, plant: plant)
+        let fertilizingDays = intervalDays(for: .fertilizing, plant: plant)
         let base = plant.createdAt
         let candidates: [(PlantCareType, Date?, Int, Int, String)] = [
             (.watering, plant.lastWateredDate, wateringDays, 0, lightSubtitle(for: plant)),
@@ -94,11 +89,21 @@ nonisolated enum PlantCarePlanService {
         from date: Date,
         calendar: Calendar = .current
     ) -> Date {
-        let interval: Int = switch type {
+        let interval = intervalDays(for: type, plant: plant)
+        return calendar.date(byAdding: .day, value: interval, to: calendar.startOfDay(for: date))
+            ?? date.addingTimeInterval(Double(interval) * 86400)
+    }
+
+    static func intervalDays(for type: PlantCareType, plant: Plant) -> Int {
+        switch type {
         case .watering:
             adjustedWateringDays(for: plant, catalog: PlantCatalog.entry(id: plant.catalogSpeciesId))
         case .fertilizing:
-            max(plant.fertilizingIntervalDays, 1)
+            preferredInterval(
+                customDays: plant.fertilizingIntervalDays,
+                catalogDays: PlantCatalog.entry(id: plant.catalogSpeciesId)?.defaultFertilizingDays,
+                fallbackDays: 30
+            )
         case .pestCheck:
             21
         case .leafCleaning:
@@ -114,8 +119,6 @@ nonisolated enum PlantCarePlanService {
         case .photo, .newLeaf, .yellowLeaf, .pestFound, .customNote:
             14
         }
-        return calendar.date(byAdding: .day, value: interval, to: calendar.startOfDay(for: date))
-            ?? date.addingTimeInterval(Double(interval) * 86400)
     }
 
     private static func makeTask(

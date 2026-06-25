@@ -35,7 +35,7 @@ struct CalendarRouteContainer: View {
             events: routeData.events,
             pets: routeData.pets,
             humans: routeData.humans,
-            plants: [],
+            plants: routeData.plants,
             insurances: routeData.insurances,
             petMedications: routeData.petMedications,
             humanMedications: routeData.humanMedications
@@ -66,13 +66,24 @@ private struct CalendarRouteData {
     var events: [Event] = []
     var pets: [Pet] = []
     var humans: [Human] = []
+    var plants: [Plant] = []
     var insurances: [PetInsurance] = []
     var petMedications: [PetMedication] = []
     var humanMedications: [HumanMedication] = []
     var hasLoaded = false
 
     static func load(from context: ModelContext) -> CalendarRouteData {
-        CalendarRouteData(
+        let plants = AppFeatureRouteGuard.shouldLoadPlantData
+            ? fetch(
+                FetchDescriptor<Plant>(sortBy: [SortDescriptor(\.createdAt)]),
+                context: context,
+                name: "Plant"
+            )
+            : []
+        if !plants.isEmpty {
+            PlantUnlockPolicy.noteExistingPlantData()
+        }
+        return CalendarRouteData(
             events: fetch(
                 FetchDescriptor<Event>(sortBy: [SortDescriptor(\.startDate, order: .reverse)]),
                 context: context,
@@ -88,6 +99,7 @@ private struct CalendarRouteData {
                 context: context,
                 name: "Human"
             ),
+            plants: plants,
             insurances: fetch(
                 FetchDescriptor<PetInsurance>(sortBy: [SortDescriptor(\.createdAt)]),
                 context: context,

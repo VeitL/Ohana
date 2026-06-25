@@ -149,7 +149,8 @@ private final class DomainNoOpCareEventEconomyAwarder: CareEventEconomyAwarding 
         context _: ModelContext,
         quality _: DomainCareRewardQuality,
         date _: Date,
-        executorId _: String?
+        executorId _: String?,
+        careObjectKey _: UUID?
     ) -> (humanGot: Int, petGot: Int) {
         (0, 0)
     }

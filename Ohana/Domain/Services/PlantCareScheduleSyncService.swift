@@ -67,7 +67,8 @@ enum PlantCareScheduleSyncService {
         source: CareLedgerSource = .calendar,
         sourceReminderId: UUID? = nil,
         now: Date = Date(),
-        careLedger providedCareLedger: CareLedgerRecording? = nil
+        careLedger providedCareLedger: CareLedgerRecording? = nil,
+        scheduleNotifications: Bool = true
     ) -> PlantCareScheduleSyncResult {
         guard let type = careType(for: event) else {
             return PlantCareScheduleSyncResult(
@@ -159,6 +160,12 @@ enum PlantCareScheduleSyncService {
                 save: false
             )
             context.safeSave()
+            PlantCarePlanScheduleService.sync(
+                plant: plant,
+                context: context,
+                now: now,
+                scheduleNotifications: scheduleNotifications
+            )
             result = PlantCareScheduleSyncResult(
                 action: .wroteCareFact,
                 plantID: plant.id,
@@ -176,7 +183,8 @@ enum PlantCareScheduleSyncService {
         executorId: String?,
         context: ModelContext,
         now: Date = Date(),
-        careLedger providedCareLedger: CareLedgerRecording? = nil
+        careLedger providedCareLedger: CareLedgerRecording? = nil,
+        scheduleNotifications: Bool = true
     ) -> PlantCareScheduleSyncResult {
         guard let event = reminder.event else {
             return PlantCareScheduleSyncResult(
@@ -195,7 +203,8 @@ enum PlantCareScheduleSyncService {
             source: .reminder,
             sourceReminderId: reminder.id,
             now: now,
-            careLedger: providedCareLedger
+            careLedger: providedCareLedger,
+            scheduleNotifications: scheduleNotifications
         )
     }
 

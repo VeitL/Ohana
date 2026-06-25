@@ -87,7 +87,8 @@ final class ReminderCompletionService: ReminderCompleting {
         context: ModelContext,
         careLedger: CareLedgerRecording = CareLedgerService(),
         familyTasks providedFamilyTasks: FamilyTaskManaging? = nil,
-        notifications: ReminderNotificationScheduling = ReminderNotificationSchedulerRegistry.current
+        notifications: ReminderNotificationScheduling = ReminderNotificationSchedulerRegistry.current,
+        schedulePlantCareNotifications: Bool = true
     ) -> Bool {
         let familyTasks = providedFamilyTasks ?? DomainServiceDependencyRegistry.familyTasks()
         let now = Date()
@@ -113,7 +114,8 @@ final class ReminderCompletionService: ReminderCompleting {
             executorId: humanId,
             context: context,
             now: now,
-            careLedger: careLedger
+            careLedger: careLedger,
+            scheduleNotifications: schedulePlantCareNotifications
         )
         cancelNotification(for: reminder, notifications: notifications)
         runReminderEffects(

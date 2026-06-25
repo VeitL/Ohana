@@ -18,6 +18,8 @@ enum DomainCareRewardAction: Equatable {
     case milestone
     case weight
     case dailyFocusCompletion
+    case plantWatering
+    case plantFertilizing
     case general(humanReward: Int, petReward: Int, emoji: String, title: String)
 }
 

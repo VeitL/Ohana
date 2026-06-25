@@ -17,7 +17,8 @@ protocol CareEventEconomyAwarding {
         context: ModelContext,
         quality: DomainCareRewardQuality,
         date: Date,
-        executorId: String?
+        executorId: String?,
+        careObjectKey: UUID?
     ) -> (humanGot: Int, petGot: Int)
 
     @discardableResult
@@ -34,6 +35,28 @@ protocol CareEventEconomyAwarding {
     func recordFirstMeal(actorId: String?, context: ModelContext)
     func clearCooldown(petId: UUID?, type: DomainCareRewardAction)
     func refreshProjectionAfterRollback(context: ModelContext)
+}
+
+extension CareEventEconomyAwarding {
+    @discardableResult
+    func awardCareAction(
+        type: DomainCareRewardAction,
+        pet: Pet?,
+        context: ModelContext,
+        quality: DomainCareRewardQuality,
+        date: Date,
+        executorId: String?
+    ) -> (humanGot: Int, petGot: Int) {
+        awardCareAction(
+            type: type,
+            pet: pet,
+            context: context,
+            quality: quality,
+            date: date,
+            executorId: executorId,
+            careObjectKey: nil
+        )
+    }
 }
 
 @MainActor

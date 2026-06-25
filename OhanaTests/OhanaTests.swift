@@ -5589,7 +5589,8 @@ struct OhanaTests {
             context _: ModelContext,
             quality: DomainCareRewardQuality,
             date: Date,
-            executorId _: String?
+            executorId _: String?,
+            careObjectKey _: UUID?
         ) -> (humanGot: Int, petGot: Int) {
             careAwardCalls.append(
                 CareAwardCall(
@@ -5637,6 +5638,8 @@ struct OhanaTests {
             case .milestone: "milestone"
             case .weight: "weight"
             case .dailyFocusCompletion: "dailyFocusCompletion"
+            case .plantWatering: "plantWatering"
+            case .plantFertilizing: "plantFertilizing"
             case .walk: "walk"
             case .general: "general"
             }

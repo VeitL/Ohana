@@ -352,9 +352,8 @@ extension VerticalSolidHomeView {
             openHumanQuickKey(key, humanID: human.id)
         case let .humanDetail(human):
             routeCoordinator.openSheet(.humanBasicInfo(human.id))
-        case .plant:
-            AppFeatureRouteGuard.recordIntercept("homeReminderPlant")
-            openFunctionMenu(destination: .growthRoadmap)
+        case let .plant(plant):
+            openFunctionMenu(destination: .plantDetail(plant.id))
         case let .functionMenu(destination):
             openFunctionMenu(destination: destination)
         case let .calendar(entityId, humanId):
@@ -374,9 +373,8 @@ extension VerticalSolidHomeView {
             openHumanQuickKey(key, humanID: humanID)
         case let .humanDetail(humanID):
             routeCoordinator.openSheet(.humanBasicInfo(humanID))
-        case .plant:
-            AppFeatureRouteGuard.recordIntercept("homeReminderPlant")
-            openFunctionMenu(destination: .growthRoadmap)
+        case let .plant(plantID):
+            openFunctionMenu(destination: .plantDetail(plantID))
         case let .functionMenu(destination):
             openFunctionMenu(destination: destination)
         case let .calendar(entityId, humanId):

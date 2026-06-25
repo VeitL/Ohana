@@ -19,6 +19,7 @@ enum EconomyRewardDiscipline {
         quality: QuestManager.QualityBonus = .none,
         date: Date = Date(),
         executorId: String? = nil,
+        careObjectKey: UUID? = nil,
         questManager providedQuestManager: QuestManager? = nil
     ) -> (humanGot: Int, petGot: Int) {
         let questManager = providedQuestManager ?? QuestManager()
@@ -28,7 +29,8 @@ enum EconomyRewardDiscipline {
             context: context,
             quality: quality,
             date: date,
-            executorId: executorId
+            executorId: executorId,
+            careObjectKey: careObjectKey
         )
     }
 

@@ -20,7 +20,8 @@ extension QuestManager {
         context: ModelContext,
         quality: QualityBonus = .none,
         date: Date = Date(),
-        executorId: String? = nil
+        executorId: String? = nil,
+        careObjectKey: UUID? = nil
     ) -> (humanGot: Int, petGot: Int) {
         if let pet, !EconomyWalletWritePolicy.canWrite(pet) {
             lastEconomyRewardResult = .empty
@@ -39,9 +40,10 @@ extension QuestManager {
             return (0, 0)
         }
         let consumesBoost = isDoubleRewardBoostActive()
-        let isCoolingDown = isOnCooldown(petId: pet?.id, type: type)
+        let cooldownSubjectId = careObjectKey ?? pet?.id
+        let isCoolingDown = isOnCooldown(petId: cooldownSubjectId, type: type)
         let budgetKeys = economyBudgetKeys(for: human, context: context)
-        let objectKeys = careObjectKeys(for: pet)
+        let objectKeys = pet != nil ? careObjectKeys(for: pet) : careObjectKeys(forPlantId: careObjectKey)
         let result = CoconutEconomyPolicyV2.reward(
             for: type,
             quality: quality,
@@ -142,7 +144,7 @@ extension QuestManager {
             }
             // 记录冷却时间戳（持久化成功后才记录；冷却内补记不延长窗口）
             if !isCoolingDown {
-                recordCooldown(petId: pet?.id, type: type)
+                recordCooldown(petId: cooldownSubjectId, type: type)
             }
             // TASK C: 检查 Streak 里程碑奖励
             if let pet { streakRewards.checkAndAward(pet: pet, questManager: self, context: context) }

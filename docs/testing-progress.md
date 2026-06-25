@@ -12,15 +12,14 @@
 ## Current Release Read
 
 - Last compacted: 2026-06-25.
-- Release bar: **Open P0 and first-release-reachable = 0**.
+- Release bar: **Open P0 = 0; first-release-reachable repo-code P1 = 0**.
 - Active phase: **Phase 9A / dogfooding and real-device validation**, status 🟡.
-- Open follow-ups: 12 total in `docs/task-follow-ups.md`.
-- Open P1: 4 total; none currently identified as active first-release repo-code
-  work. Remaining P1s are review-gate evidence, CloudKit 1.x deferred work, or
-  real-device validation.
-- Current local validation: latest route first-frame correction batch passed
-  cheap gates, full architecture/localization audits, and targeted simulator
-  tests on the pinned `iPhone 17` destination.
+- Open follow-ups: 13 total in `docs/task-follow-ups.md`.
+- Open P1: 4 total; remaining P1s are review-gate evidence, CloudKit 1.x
+  deferred work, or real-device validation.
+- Current local validation: latest Plants launch completion batch passed
+  changed-file gates, targeted simulator tests, and Debug build on the pinned
+  `iPhone 17` destination.
 
 ## Validation Ladder
 
@@ -78,6 +77,7 @@ in the archive.
 | Members | TFU-20260612-018, TFU-20260612-020 | Duplicate profile revision publishes and remaining localization coverage. |
 | Notifications / Memorial | TFU-20260612-016, TFU-20260612-017 | Real-device GAP-6 and GAP-9 validation. |
 | Settings | TFU-20260612-022 | Final privacy/support URLs and rows. |
+| UITest / Onboarding | TFU-20260625-001 | Local module-exit UITest phase is stale against the current first-run flow. |
 | Walks / Shared Care | TFU-20260611-005 | Shared walk write boundary should move to owning command/service. |
 | Recycle Bin / Future Sync | TFU-20260613-003, TFU-20260613-004 | 1.x soft-delete CloudSync round-trip and restored-pet quick access. |
 | Documents / Expenses | TFU-20260611-003 | Sanitized image attachment filename/content-type polish. |
@@ -98,6 +98,8 @@ Keep this section short; move older detail to archive during compaction.
 
 | Date | Snapshot | Evidence |
 | --- | --- | --- |
+| 2026-06-25 | TFU-20260625-002 Plants launch integration closure | Plants now materializes generated care plans into local Event/Reminder rows, honors single-plant reminder disable cleanup, refreshes the next plan after calendar/reminder/care completion, exposes dashboard location filtering and full launch-field detail editing, and has explicit Today Focus/calendar/economy/Oasis/shop coverage. Validation: `git diff --check` PASS; `scripts/dev-check-changed.sh` PASS; `scripts/test-simulator.sh -only-testing:OhanaTests/PlantLaunchTests` PASS (17 Swift Testing tests); `scripts/test-simulator.sh -only-testing:OhanaTests/HomeCommandExecutorTests` PASS (186 Swift Testing tests); `scripts/build-debug-fast.sh` PASS on pinned `iPhone 17`. |
+| 2026-06-25 | Plants cross-module deep audit and gap split | Fixed Calendar/Home plant deep-link data flow and PlantCareLog backup/restore with photo/health status coverage. Validation: `scripts/dev-check-changed.sh` PASS; `scripts/test-simulator.sh -only-testing:OhanaTests/PlantLaunchTests` PASS (13 Swift Testing tests); `scripts/test-simulator.sh -only-testing:OhanaTests/AppRouteCoordinatorTests -only-testing:OhanaTests/HomeRouteCoordinatorTests -only-testing:OhanaTests/GrowthUnlockPolicyTests -only-testing:OhanaTests/PlantFeatureGateXCTests` PASS (72 route/gate tests + 5 XCTest PlantFeatureGate tests). Remaining Plants launch gap is TFU-20260625-002. |
 | 2026-06-25 | Status ledger deep compaction guard | Active status ownership now lives in `docs/status-ledger-map.md`; `docs/task-follow-ups.md` remains the open backlog and `docs/testing-progress.md` remains the release/validation dashboard. Added `scripts/audit-doc-status-ledgers.sh` and wired it into `scripts/dev-check-changed.sh` for active status docs. |
 | 2026-06-25 | TFU-20260623-001 Home quick-action actor-isolation cleanup | `HomeQuickActionRenderStateLogic` now owns pure quick-action render-state projection, `HomeInteractionSnapshotBuilder` no longer directly calls legacy default-MainActor helpers, and the guard still rejects `compatibilitySource`, `payload.source`, and `container.mainContext`. Validation: `git diff --check` PASS; `scripts/dev-check-changed.sh` PASS; CI YAML parse PASS; user-run Terminal targeted `scripts/test-simulator.sh -only-testing:OhanaTests/HomeReadModelStoreTests -only-testing:OhanaTests/HomeExpensePreviewStoreTests -only-testing:OhanaTests/HomeSnapshotBuilderTests` on pinned `iPhone 17` reported `TEST SUCCEEDED`. Codex shell CoreSimulator remains session-isolated and is now diagnosed by `scripts/diagnose-simulator.sh`. |
 | 2026-06-25 | TFU-006 route first-frame correction after closure | Added deferred route containers for expense, insurance, documents, and milestones; `git diff --check`, `scripts/dev-check-changed.sh`, `scripts/audit-architecture-boundaries.sh --all`, `scripts/audit-localization-coverage.sh`, and targeted `scripts/test-simulator.sh '-only-testing:OhanaTests/MemberLifecycleGateTests/expenseHistoryDashboardUsesRouteScopedRowsInsteadOfPetExpenseRelationship()' '-only-testing:OhanaTests/MemberLifecycleGateTests/archiveFeatureViewsUseRouteScopedRowsInsteadOfPetRelationships()'` PASS on `iPhone 17` (2 Swift Testing tests, xcresult `/var/folders/9j/7ldcxzn91d947mg4p_7wxmz40000gn/T/OhanaDerivedData/main-b6cf423d5931-tests/Logs/Test/Test-Ohana-2026.06.25_07-03-31-+0200.xcresult`). |

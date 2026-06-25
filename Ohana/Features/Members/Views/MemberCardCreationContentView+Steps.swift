@@ -190,7 +190,8 @@ extension MemberCardCreationContentView {
                 text: $draft.weightText,
                 placeholder: petInitialWeightPlaceholder,
                 unit: "kg",
-                maxFractionDigits: 2
+                maxFractionDigits: 2,
+                inputAccessibilityIdentifier: "member-creation-pet-weight-input"
             )
             if requiresStarterPetWeight {
                 Text(l.tr(

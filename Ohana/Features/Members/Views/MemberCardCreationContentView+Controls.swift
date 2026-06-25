@@ -118,7 +118,8 @@ extension MemberCardCreationContentView {
         text: Binding<String>,
         placeholder: String,
         unit: String,
-        maxFractionDigits: Int
+        maxFractionDigits: Int,
+        inputAccessibilityIdentifier: String? = nil
     ) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             Text(title)
@@ -137,7 +138,8 @@ extension MemberCardCreationContentView {
                 cornerRadius: OhanaRadius.input,
                 horizontalPadding: 10,
                 verticalPadding: 8,
-                usesMiniKeypad: true
+                usesMiniKeypad: true,
+                inputAccessibilityIdentifier: inputAccessibilityIdentifier
             )
         }
         .frame(maxWidth: .infinity)

@@ -24,6 +24,7 @@ struct InlineNumericInput: View {
     var horizontalPadding: CGFloat = 12
     var verticalPadding: CGFloat = 10
     var usesMiniKeypad = true
+    var inputAccessibilityIdentifier: String?
 
     @State private var showsKeypad = false
 
@@ -34,30 +35,7 @@ struct InlineNumericInput: View {
                     stepButton(systemName: "minus", deltaMultiplier: -1)
                 }
 
-                Button {
-                    GoKeyboard.dismiss()
-                    withAnimation(GoMotion.feedback) {
-                        showsKeypad.toggle()
-                    }
-                    UISelectionFeedbackGenerator().selectionChanged()
-                } label: {
-                    HStack(alignment: .firstTextBaseline, spacing: 6) {
-                        Text(text.isEmpty ? placeholder : text)
-                            .font(valueFont)
-                            .foregroundStyle(text.isEmpty ? Color.ohanaSecondaryText : Color.ohanaPrimaryText)
-                            .monospacedDigit()
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.55)
-                        if let unit {
-                            Text(unit)
-                                .font(unitFont)
-                                .foregroundStyle(accent)
-                                .lineLimit(1)
-                        }
-                    }
-                    .frame(maxWidth: .infinity, alignment: valueAlignment)
-                }
-                .buttonStyle(ScaleButtonStyle())
+                numericEntryButton
 
                 if step != nil {
                     stepButton(systemName: "plus", deltaMultiplier: 1)
@@ -81,6 +59,40 @@ struct InlineNumericInput: View {
                 }
                 .transition(.opacity.combined(with: .scale(scale: 0.98, anchor: .top)))
             }
+        }
+    }
+
+    @ViewBuilder
+    private var numericEntryButton: some View {
+        let button = Button {
+            GoKeyboard.dismiss()
+            withAnimation(GoMotion.feedback) {
+                showsKeypad.toggle()
+            }
+            UISelectionFeedbackGenerator().selectionChanged()
+        } label: {
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                Text(text.isEmpty ? placeholder : text)
+                    .font(valueFont)
+                    .foregroundStyle(text.isEmpty ? Color.ohanaSecondaryText : Color.ohanaPrimaryText)
+                    .monospacedDigit()
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.55)
+                if let unit {
+                    Text(unit)
+                        .font(unitFont)
+                        .foregroundStyle(accent)
+                        .lineLimit(1)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: valueAlignment)
+        }
+        .buttonStyle(ScaleButtonStyle())
+
+        if let inputAccessibilityIdentifier {
+            button.accessibilityIdentifier(inputAccessibilityIdentifier)
+        } else {
+            button
         }
     }
 

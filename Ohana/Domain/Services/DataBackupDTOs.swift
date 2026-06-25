@@ -19,6 +19,7 @@ nonisolated struct OhanaBackup: Codable {
     var households: [HouseholdBackup]
     var plants: [PlantBackup]
     // 日志
+    var plantCareLogs: [PlantCareLogBackup]?
     var petCareLogs: [PetCareLogBackup]
     var petPottyLogs: [PetPottyLogBackup]
     var petWalkLogs: [PetWalkLogBackup]
@@ -268,6 +269,17 @@ nonisolated struct PlantBackup: Codable {
     var isToxicToChildren: Bool?
     var isIndoorSuitable: Bool?
     var remindersEnabled: Bool?
+}
+
+nonisolated struct PlantCareLogBackup: Codable {
+    var id: String
+    var date: String
+    var careTypeRaw: String
+    var note: String
+    var executorId: String?
+    var plantId: String?
+    var healthStatusRaw: String?
+    var photoBase64: String?
 }
 
 nonisolated struct PetCareLogBackup: Codable {

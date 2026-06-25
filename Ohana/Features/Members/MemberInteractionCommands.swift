@@ -279,13 +279,19 @@ struct PlantCareCommandExecutor {
         _ type: PlantCareType,
         plant: Plant,
         executorId: String?,
-        note: String
+        note: String,
+        syncCarePlan: Bool = true,
+        scheduleNotifications: Bool = true,
+        reminderScheduling providedReminderScheduling: ReminderSchedulingManaging? = nil
     ) -> PlantCareCommandResult {
         let result = PlantCareCommandService.recordCare(
             type,
             plant: plant,
             executorId: executorId,
-            context: context
+            context: context,
+            syncCarePlan: syncCarePlan,
+            scheduleNotifications: scheduleNotifications,
+            reminderScheduling: providedReminderScheduling
         )
         revisions.publishPlantCare(result, note: note)
         return result

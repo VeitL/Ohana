@@ -26,7 +26,8 @@ final class StaticCareEventEconomyAwarder: CareEventEconomyAwarding {
         context: ModelContext,
         quality: DomainCareRewardQuality,
         date: Date,
-        executorId: String?
+        executorId: String?,
+        careObjectKey: UUID?
     ) -> (humanGot: Int, petGot: Int) {
         let reward = EconomyRewardDiscipline.awardCareAction(
             type: type,
@@ -35,6 +36,7 @@ final class StaticCareEventEconomyAwarder: CareEventEconomyAwarding {
             quality: quality,
             date: date,
             executorId: executorId,
+            careObjectKey: careObjectKey,
             questManager: questManager
         )
         oasisRewards.rewardFeaturedCritterFromCare(type: type, context: context)

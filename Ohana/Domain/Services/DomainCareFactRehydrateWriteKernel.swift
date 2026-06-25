@@ -23,6 +23,17 @@ nonisolated struct DomainPetCareLogRehydrateSnapshot: Equatable {
     let executorId: String?
 }
 
+nonisolated struct DomainPlantCareLogRehydrateSnapshot: Equatable {
+    let id: UUID
+    let date: Date
+    let careTypeRaw: String
+    let note: String
+    let executorId: String?
+    let plantId: UUID?
+    let healthStatusRaw: String
+    let photoData: Data?
+}
+
 nonisolated struct DomainPetPottyLogRehydrateSnapshot: Equatable {
     let id: UUID
     let date: Date
@@ -145,6 +156,32 @@ nonisolated struct DomainCareFactRehydrateResult {
 }
 
 nonisolated enum DomainCareFactRehydrateWriter {
+    @discardableResult
+    static func insertPlantCareLogIfNeeded(
+        snapshot: DomainPlantCareLogRehydrateSnapshot,
+        source: DomainRehydrateSourceKind,
+        context: ModelContext
+    ) throws -> DomainCareFactRehydrateResult {
+        let plan = try authorizePlant(plantId: snapshot.plantId, source: source, context: context)
+        guard plan.disposition.allowsPersistence else { return DomainCareFactRehydrateResult(inserted: false, plan: plan) }
+        guard try fetchPlantCareLog(id: snapshot.id, context: context) == nil else {
+            return DomainCareFactRehydrateResult(inserted: false, plan: plan)
+        }
+        let log = PlantCareLog(
+            date: snapshot.date,
+            careType: PlantCareType(rawValue: snapshot.careTypeRaw) ?? .customNote,
+            note: snapshot.note,
+            executorId: snapshot.executorId,
+            photoData: snapshot.photoData,
+            healthStatus: PlantHealthStatus(rawValue: snapshot.healthStatusRaw)
+        )
+        log.id = snapshot.id
+        log.plant = try plantReference(id: snapshot.plantId, context: context)
+        context.insert(log)
+        plan.consumeAuthorization()
+        return DomainCareFactRehydrateResult(inserted: true, plan: plan)
+    }
+
     @discardableResult
     static func insertPetCareLogIfNeeded(
         snapshot: DomainPetCareLogRehydrateSnapshot,
@@ -469,14 +506,57 @@ nonisolated enum DomainCareFactRehydrateWriter {
         )
     }
 
+    private static func authorizePlant(
+        plantId: UUID?,
+        source: DomainRehydrateSourceKind,
+        context: ModelContext
+    ) throws -> AuthorizedDomainRehydratePlan {
+        guard let plantId else {
+            return DomainRehydrateAuthorizer.rejectSubject(source: source, reason: "missingRequiredPlant")
+        }
+        guard try fetchPlant(id: plantId, context: context) != nil else {
+            return DomainRehydrateAuthorizer.rejectSubject(source: source, reason: "unresolvedRequiredPlant")
+        }
+        return DomainRehydrateAuthorizer.authorizeSubject(
+            request: DomainSubjectResolutionRequest(
+                relatedEntityType: EntityKind.plant.rawValue,
+                relatedEntityId: plantId.uuidString
+            ),
+            source: source,
+            context: context,
+            requirement: .household
+        )
+    }
+
     private static func petReference(id: UUID?, context: ModelContext) throws -> Pet? {
         guard let id else { return nil }
         return try fetchPet(id: id, context: context)
     }
 
+    private static func plantReference(id: UUID?, context: ModelContext) throws -> Plant? {
+        guard let id else { return nil }
+        return try fetchPlant(id: id, context: context)
+    }
+
     private static func fetchPet(id: UUID, context: ModelContext) throws -> Pet? {
         var descriptor = FetchDescriptor<Pet>(
             predicate: #Predicate<Pet> { $0.id == id }
+        )
+        descriptor.fetchLimit = 1
+        return try context.fetch(descriptor).first
+    }
+
+    private static func fetchPlant(id: UUID, context: ModelContext) throws -> Plant? {
+        var descriptor = FetchDescriptor<Plant>(
+            predicate: #Predicate<Plant> { $0.id == id }
+        )
+        descriptor.fetchLimit = 1
+        return try context.fetch(descriptor).first
+    }
+
+    private static func fetchPlantCareLog(id: UUID, context: ModelContext) throws -> PlantCareLog? {
+        var descriptor = FetchDescriptor<PlantCareLog>(
+            predicate: #Predicate<PlantCareLog> { $0.id == id }
         )
         descriptor.fetchLimit = 1
         return try context.fetch(descriptor).first

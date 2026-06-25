@@ -298,7 +298,8 @@ enum CalendarEventCommandService {
         context: ModelContext,
         executorId: String?,
         now: Date = Date(),
-        reminderCompletion providedReminderCompletion: ReminderCompleting? = nil
+        reminderCompletion providedReminderCompletion: ReminderCompleting? = nil,
+        schedulePlantCareNotifications: Bool = true
     ) -> CalendarEventCompletionResult {
         let reminderCompletion = providedReminderCompletion ?? ReminderCompletionService()
         let shouldComplete = !event.isOccurrenceMarkedComplete(on: occurrenceDate)
@@ -396,7 +397,8 @@ enum CalendarEventCommandService {
                 executorId: executorId,
                 context: context,
                 source: .calendar,
-                now: now
+                now: now,
+                scheduleNotifications: schedulePlantCareNotifications
             )
         }
         if remindersToSync.isEmpty {

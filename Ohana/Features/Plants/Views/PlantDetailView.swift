@@ -625,38 +625,31 @@ struct EditPlantSheet: View {
     @State private var wateringInterval = 7
     @State private var fertilizingInterval = 30
     @State private var notes = ""
+    @State private var potDiameterCm = 0.0
+    @State private var potMaterialRaw = ""
+    @State private var soilTypeRaw = ""
+    @State private var isIndoor = true
+    @State private var windowDirection: PlantWindowDirection = .unknown
+    @State private var lightLevel: PlantLightLevel = .medium
+    @State private var healthStatus: PlantHealthStatus = .stable
+    @State private var catalogSpeciesId = ""
+    @State private var isToxicToCats = false
+    @State private var isToxicToDogs = false
+    @State private var isToxicToChildren = false
+    @State private var isIndoorSuitable = true
+    @State private var remindersEnabled = true
     @State private var isSaving = false
 
     var body: some View {
         OhanaSheetWrapper(title: "编辑植物", onDismiss: { dismiss() }) {
-            VStack(spacing: 20) {
-                formField("名称", text: $name)
-                formField("品种", text: $species)
-                formField("位置", text: $location)
-                formField("头像 Emoji", text: $avatarEmoji)
-
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("浇水周期")
-                        .font(OhanaFont.adaptive(size: 13, weight: .medium))
-                        .foregroundStyle(Color.ohanaSecondaryText)
-                    Stepper("每 \(wateringInterval) 天", value: $wateringInterval, in: 1 ... 90)
-                }
-
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("施肥周期")
-                        .font(OhanaFont.adaptive(size: 13, weight: .medium))
-                        .foregroundStyle(Color.ohanaSecondaryText)
-                    Stepper("每 \(fertilizingInterval) 天", value: $fertilizingInterval, in: 1 ... 365)
-                }
-
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("备注")
-                        .font(OhanaFont.adaptive(size: 13, weight: .medium))
-                        .foregroundStyle(Color.ohanaSecondaryText)
-                    TextEditor(text: $notes)
-                        .frame(height: 80)
-                        .clipShape(RoundedRectangle(cornerRadius: OhanaRadius.chip))
-                }
+            VStack(spacing: 16) {
+                profileSection
+                catalogSection
+                cycleSection
+                environmentSection
+                potSection
+                healthAndSafetySection
+                notesSection
 
                 Button { save() } label: {
                     Text(isSaving ? "保存中…" : "保存").capsuleButton()
@@ -667,17 +660,140 @@ struct EditPlantSheet: View {
             .padding(.vertical, 16)
         }
         .onAppear {
-            name = plant.name
-            species = plant.species
-            location = plant.location
-            avatarEmoji = plant.avatarEmoji
-            wateringInterval = plant.wateringIntervalDays
-            fertilizingInterval = plant.fertilizingIntervalDays
-            notes = plant.notes
+            prepareState()
+        }
+        .onChange(of: catalogSpeciesId) { _, newValue in
+            applyCatalogSelection(newValue)
         }
         .onDisappear {
             commandQueue.cancelAll()
         }
+    }
+
+    private var profileSection: some View {
+        VStack(spacing: 12) {
+            formField("名称", text: $name)
+            formField("物种名", text: $species)
+            formField("房间/位置", text: $location)
+            formField("头像 Emoji", text: $avatarEmoji)
+        }
+        .padding(16)
+        .goTranslucentCard(cornerRadius: OhanaRadius.controlLarge)
+    }
+
+    private var catalogSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            sectionTitle("资料库")
+            Picker("资料库物种", selection: $catalogSpeciesId) {
+                Text("未链接").tag("")
+                if !catalogSpeciesId.isEmpty, PlantCatalog.entry(id: catalogSpeciesId) == nil {
+                    Text(catalogSpeciesId).tag(catalogSpeciesId)
+                }
+                ForEach(PlantCatalog.entries) { entry in
+                    Text("\(entry.commonName) · \(entry.latinName)").tag(entry.id)
+                }
+            }
+            .pickerStyle(.menu)
+        }
+        .padding(16)
+        .goTranslucentCard(cornerRadius: OhanaRadius.controlLarge)
+    }
+
+    private var cycleSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            sectionTitle("护理计划")
+            Stepper("浇水：每 \(wateringInterval) 天", value: $wateringInterval, in: 1 ... 90)
+                .tint(Color.goLime)
+            Stepper("施肥：每 \(fertilizingInterval) 天", value: $fertilizingInterval, in: 1 ... 365)
+                .tint(Color.goLime)
+            Toggle("植物提醒", isOn: $remindersEnabled)
+                .tint(Color.goLime)
+        }
+        .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .rounded))
+        .foregroundStyle(Color.ohanaPrimaryText)
+        .padding(16)
+        .goTranslucentCard(cornerRadius: OhanaRadius.controlLarge)
+    }
+
+    private var environmentSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            sectionTitle("环境")
+            Toggle("室内植物", isOn: $isIndoor)
+                .tint(Color.goLime)
+            Picker("窗户朝向", selection: $windowDirection) {
+                ForEach(PlantWindowDirection.allCases) { direction in
+                    Text(direction.displayName).tag(direction)
+                }
+            }
+            Picker("光照强度", selection: $lightLevel) {
+                ForEach(PlantLightLevel.allCases) { level in
+                    Text(level.displayName).tag(level)
+                }
+            }
+        }
+        .pickerStyle(.menu)
+        .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .rounded))
+        .foregroundStyle(Color.ohanaPrimaryText)
+        .padding(16)
+        .goTranslucentCard(cornerRadius: OhanaRadius.controlLarge)
+    }
+
+    private var potSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            sectionTitle("盆土")
+            Stepper("盆径 \(Int(potDiameterCm)) cm", value: $potDiameterCm, in: 0 ... 80, step: 1)
+                .foregroundStyle(Color.ohanaPrimaryText)
+                .tint(Color.goLime)
+            formField("盆材质", text: $potMaterialRaw)
+            formField("土壤类型", text: $soilTypeRaw)
+        }
+        .padding(16)
+        .goTranslucentCard(cornerRadius: OhanaRadius.controlLarge)
+    }
+
+    private var healthAndSafetySection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            sectionTitle("健康与安全")
+            Picker("当前状态", selection: $healthStatus) {
+                ForEach(PlantHealthStatus.allCases) { status in
+                    Text(status.displayName).tag(status)
+                }
+            }
+            Toggle("适合室内", isOn: $isIndoorSuitable)
+                .tint(Color.goLime)
+            Toggle("对猫有风险", isOn: $isToxicToCats)
+                .tint(Color.goLime)
+            Toggle("对狗有风险", isOn: $isToxicToDogs)
+                .tint(Color.goLime)
+            Toggle("对儿童有风险", isOn: $isToxicToChildren)
+                .tint(Color.goLime)
+        }
+        .pickerStyle(.menu)
+        .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .rounded))
+        .foregroundStyle(Color.ohanaPrimaryText)
+        .padding(16)
+        .goTranslucentCard(cornerRadius: OhanaRadius.controlLarge)
+    }
+
+    private var notesSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            sectionTitle("备注")
+            TextEditor(text: $notes)
+                .frame(height: 90)
+                .scrollContentBackground(.hidden)
+                .padding(10)
+                .background(Color.ohanaControlFill.opacity(0.68), in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
+        }
+        .padding(16)
+        .goTranslucentCard(cornerRadius: OhanaRadius.controlLarge)
+    }
+
+    private func sectionTitle(_ title: String) -> some View {
+        Text(title)
+            .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
+            .foregroundStyle(Color.ohanaSecondaryText)
+            .textCase(.uppercase)
+            .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func formField(_ title: String, text: Binding<String>) -> some View {
@@ -690,6 +806,42 @@ struct EditPlantSheet: View {
         }
     }
 
+    private func prepareState() {
+        name = plant.name
+        species = plant.species
+        location = plant.location
+        avatarEmoji = plant.avatarEmoji
+        wateringInterval = plant.wateringIntervalDays
+        fertilizingInterval = plant.fertilizingIntervalDays
+        notes = plant.notes
+        potDiameterCm = plant.potDiameterCm
+        potMaterialRaw = plant.potMaterialRaw
+        soilTypeRaw = plant.soilTypeRaw
+        isIndoor = plant.isIndoor
+        windowDirection = plant.windowDirection
+        lightLevel = plant.lightLevel
+        healthStatus = plant.healthStatus
+        catalogSpeciesId = plant.catalogSpeciesId
+        isToxicToCats = plant.isToxicToCats
+        isToxicToDogs = plant.isToxicToDogs
+        isToxicToChildren = plant.isToxicToChildren
+        isIndoorSuitable = plant.isIndoorSuitable
+        remindersEnabled = plant.remindersEnabled
+    }
+
+    private func applyCatalogSelection(_ id: String) {
+        guard let entry = PlantCatalog.entry(id: id) else { return }
+        species = entry.commonName
+        lightLevel = entry.lightRequirement
+        soilTypeRaw = entry.soil
+        wateringInterval = entry.defaultWateringDays
+        fertilizingInterval = entry.defaultFertilizingDays
+        isToxicToCats = entry.isToxicToCats
+        isToxicToDogs = entry.isToxicToDogs
+        isToxicToChildren = entry.isToxicToChildren
+        isIndoorSuitable = entry.isIndoorSuitable
+    }
+
     private func save() {
         guard !isSaving else { return }
         let input = PlantProfileCommandInput(
@@ -700,19 +852,19 @@ struct EditPlantSheet: View {
             location: location,
             wateringIntervalDays: wateringInterval,
             fertilizingIntervalDays: fertilizingInterval,
-            potDiameterCm: plant.potDiameterCm,
-            potMaterialRaw: plant.potMaterialRaw,
-            soilTypeRaw: plant.soilTypeRaw,
-            isIndoor: plant.isIndoor,
-            windowDirection: plant.windowDirection,
-            lightLevel: plant.lightLevel,
-            healthStatus: plant.healthStatus,
-            catalogSpeciesId: plant.catalogSpeciesId,
-            isToxicToCats: plant.isToxicToCats,
-            isToxicToDogs: plant.isToxicToDogs,
-            isToxicToChildren: plant.isToxicToChildren,
-            isIndoorSuitable: plant.isIndoorSuitable,
-            remindersEnabled: plant.remindersEnabled,
+            potDiameterCm: potDiameterCm,
+            potMaterialRaw: potMaterialRaw,
+            soilTypeRaw: soilTypeRaw,
+            isIndoor: isIndoor,
+            windowDirection: windowDirection,
+            lightLevel: lightLevel,
+            healthStatus: healthStatus,
+            catalogSpeciesId: catalogSpeciesId,
+            isToxicToCats: isToxicToCats,
+            isToxicToDogs: isToxicToDogs,
+            isToxicToChildren: isToxicToChildren,
+            isIndoorSuitable: isIndoorSuitable,
+            remindersEnabled: remindersEnabled,
             themeHex: plant.themeColorHex,
             notes: notes
         )

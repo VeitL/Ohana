@@ -470,6 +470,7 @@ enum MemberProfileCommandService {
         plant.notes = input.notes.trimmingCharacters(in: .whitespacesAndNewlines)
         CloudSyncMutationRecorder.markModified(plant, context: context)
         context.safeSave()
+        PlantCarePlanScheduleService.sync(plant: plant, context: context)
 
         return MemberProfileCommandResult(
             entityID: plant.id,

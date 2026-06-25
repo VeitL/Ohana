@@ -37,6 +37,10 @@ extension DomainCareRewardAction {
             return (2, 1)
         case .dailyFocusCompletion:
             return (8, 0)
+        case .plantWatering:
+            return (2, 0)
+        case .plantFertilizing:
+            return (3, 0)
         case let .general(humanReward, petReward, _, _):
             return (humanReward, petReward)
         }
@@ -61,6 +65,8 @@ extension DomainCareRewardAction {
         case .weight: "⚖️"
         case .milestone: "🏆"
         case .dailyFocusCompletion: "🎯"
+        case .plantWatering: "💧"
+        case .plantFertilizing: "🌿"
         case let .general(_, _, emoji, _): emoji
         }
     }
@@ -101,6 +107,10 @@ extension DomainCareRewardAction {
             return l.tr(zh: "\(name) 里程碑达成", en: "\(name) milestone reached", de: "\(name) Meilenstein erreicht")
         case .dailyFocusCompletion:
             return l.tr(zh: "Today Focus 全完成", en: "Today Focus complete", de: "Today Focus abgeschlossen")
+        case .plantWatering:
+            return l.tr(zh: "浇水奖励", en: "Plant watering reward", de: "Pflanzen-Gießbonus")
+        case .plantFertilizing:
+            return l.tr(zh: "施肥奖励", en: "Plant fertilizing reward", de: "Pflanzen-Düngebonus")
         case let .general(_, _, _, title):
             return title
         }

@@ -32,28 +32,15 @@ final class OhanaUITests: XCTestCase {
     func testCreateFirstPetFromTodayFocusAfterFirstHuman() throws {
         let app = launchEnglishApp()
         createFirstHuman(from: app)
-        finishRequiredStarterGift(in: app)
-        openFirstPetCreationFromTodayFocus(in: app)
-        createMember(
-            in: app,
-            name: "Codex Pet \(Int(Date().timeIntervalSince1970))",
-            flowTitle: "Create Pet Card",
-            missingFieldMessage: "Pet creation name field did not appear.",
-            completionMessage: "Creating the first pet did not leave the pet creation handoff in time."
-        )
+        completeFirstDayStarterFunnel(in: app)
     }
 
     @MainActor
     func testCreateFirstPetFromTodayFocusWithProductionOverlaysAfterFirstHuman() throws {
         let app = launchEnglishApp(enableProductionOverlays: true)
         createFirstHuman(from: app)
-        finishRequiredStarterGift(in: app)
-        openFirstPetCreationFromTodayFocus(in: app)
-        createMember(
+        completeFirstDayStarterFunnel(
             in: app,
-            name: "Codex Pet \(Int(Date().timeIntervalSince1970))",
-            flowTitle: "Create Pet Card",
-            missingFieldMessage: "Pet creation name field did not appear.",
             completionMessage: "Creating the first pet with production overlays did not leave the pet creation handoff in time."
         )
     }
@@ -62,15 +49,7 @@ final class OhanaUITests: XCTestCase {
     func testFirstReleaseReachableHomeOasisAndSettingsSmoke() throws {
         let app = launchEnglishApp(enableProductionOverlays: true)
         createFirstHuman(from: app)
-        finishRequiredStarterGift(in: app)
-        openFirstPetCreationFromTodayFocus(in: app)
-        createMember(
-            in: app,
-            name: "Codex Pet \(Int(Date().timeIntervalSince1970))",
-            flowTitle: "Create Pet Card",
-            missingFieldMessage: "Pet creation name field did not appear.",
-            completionMessage: "Creating the first pet did not leave the pet creation handoff in time."
-        )
+        completeFirstDayStarterFunnel(in: app)
 
         openOasisAndInjectStarterEnergy(in: app)
         openSettingsFromHomeChrome(in: app)
@@ -80,14 +59,10 @@ final class OhanaUITests: XCTestCase {
     func testFeedingManualPlanAndHomeQuickActionSmoke() throws {
         let app = launchEnglishApp(enableProductionOverlays: true)
         createFirstHuman(from: app)
-        finishRequiredStarterGift(in: app)
-        openFirstPetCreationFromTodayFocus(in: app)
         let petName = "Codex Feed Pet \(Int(Date().timeIntervalSince1970))"
-        createMember(
+        completeFirstDayStarterFunnel(
             in: app,
-            name: petName,
-            flowTitle: "Create Pet Card",
-            missingFieldMessage: "Pet creation name field did not appear.",
+            petName: petName,
             completionMessage: "Creating the first pet did not leave the pet creation handoff in time."
         )
 
@@ -110,14 +85,10 @@ final class OhanaUITests: XCTestCase {
     func testPetPermanentDeleteFromBasicInfoSmoke() throws {
         let app = launchEnglishApp(enableProductionOverlays: true)
         createFirstHuman(from: app)
-        finishRequiredStarterGift(in: app)
-        openFirstPetCreationFromTodayFocus(in: app)
         let petName = "Codex Delete Pet \(Int(Date().timeIntervalSince1970))"
-        createMember(
+        completeFirstDayStarterFunnel(
             in: app,
-            name: petName,
-            flowTitle: "Create Pet Card",
-            missingFieldMessage: "Pet creation name field did not appear.",
+            petName: petName,
             completionMessage: "Creating the first pet did not leave the pet creation handoff in time."
         )
 
@@ -135,20 +106,22 @@ final class OhanaUITests: XCTestCase {
         tapWhenHittable(finalDelete, timeout: 8)
 
         let deletedPrompt = app.buttons["home-add-first-pet-action"]
+        let deletedPromptCard = app.buttons["home-add-first-pet-card"]
+        let deletedPetCard = app.buttons.matching(NSPredicate(format: "label == %@", petName)).firstMatch
         let didReturnResponsive = waitUntil(timeout: 20) {
             app.state == .runningForeground &&
-                (deletedPrompt.exists || !app.buttons[petName].exists) &&
-                app.buttons["home-settings-action"].exists
+                (deletedPrompt.isHittable || deletedPromptCard.isHittable || !deletedPetCard.isHittable) &&
+                isHomeSurfaceResponsive(in: app)
         }
         XCTAssertTrue(didReturnResponsive, "Permanent pet deletion did not return to a responsive Home surface.")
-        XCTAssertFalse(app.buttons[petName].exists, "Deleted pet card is still visible on Home.")
+        XCTAssertFalse(deletedPetCard.isHittable, "Deleted pet card is still visible on Home.")
     }
 
     @MainActor
     func testDailyStreakSheetOpensAndClosesFromHome() throws {
         let app = launchEnglishApp(enableProductionOverlays: true)
         createFirstHuman(from: app)
-        finishRequiredStarterGift(in: app)
+        completeFirstDayStarterFunnel(in: app)
 
         let streak = app.buttons["home-streak-action"]
         XCTAssertTrue(streak.waitForExistence(timeout: 20), "Home streak action did not appear.")
@@ -213,20 +186,64 @@ final class OhanaUITests: XCTestCase {
 
     @MainActor
     private func createFirstHuman(from app: XCUIApplication) {
-        let introPrimary = app.buttons["onboarding-intro-primary-action"]
-        XCTAssertTrue(introPrimary.waitForExistence(timeout: 25), "Onboarding intro did not become available.")
-
-        let nameField = app.textFields["member-name-input"]
-        for _ in 0 ..< 3 where !nameField.exists {
-            tapWhenHittable(introPrimary, timeout: 8)
-        }
+        advanceOnboardingIntroToMemberCreation(in: app)
         createMember(
             in: app,
             name: "Codex Human \(Int(Date().timeIntervalSince1970))",
             flowTitle: "Create Member Card",
             missingFieldMessage: "Human creation name field did not appear.",
-            completionMessage: "Creating the first human did not leave the creation flow in time."
+            completionMessage: "Creating the first human did not leave the creation flow in time.",
+            postSaveMarkerIdentifiers: [
+                "home-add-first-pet-card",
+                "home-add-first-pet-action"
+            ]
         )
+    }
+
+    @MainActor
+    private func advanceOnboardingIntroToMemberCreation(in app: XCUIApplication) {
+        let introPrimary = app.buttons["onboarding-intro-primary-action"]
+        let nameField = app.textFields["member-name-input"]
+        let didShowStartingSurface = waitUntil(timeout: 25) {
+            introPrimary.exists || nameField.exists
+        }
+        XCTAssertTrue(didShowStartingSurface, "Onboarding intro did not become available.")
+
+        for _ in 0 ..< 6 where !(nameField.exists && nameField.isHittable) {
+            guard introPrimary.exists else {
+                break
+            }
+            tapWhenHittable(introPrimary, timeout: 8)
+            RunLoop.current.run(until: Date().addingTimeInterval(0.45))
+        }
+
+        let didReachMemberCreation = waitUntil(timeout: 12) {
+            nameField.exists && nameField.isHittable
+        }
+        XCTAssertTrue(didReachMemberCreation, "Onboarding intro did not advance to member creation.")
+    }
+
+    @MainActor
+    @discardableResult
+    private func completeFirstDayStarterFunnel(
+        in app: XCUIApplication,
+        petName: String = "Codex Pet \(Int(Date().timeIntervalSince1970))",
+        completionMessage: String = "Creating the first pet did not leave the pet creation handoff in time."
+    ) -> String {
+        openFirstPetCreationFromTodayFocus(in: app)
+        createMember(
+            in: app,
+            name: petName,
+            flowTitle: "Create Pet Card",
+            missingFieldMessage: "Pet creation name field did not appear.",
+            completionMessage: completionMessage,
+            starterPetWeight: "7",
+            postSaveMarkerIdentifiers: [
+                "starter-gift-finish-action"
+            ]
+        )
+        finishRequiredStarterGift(in: app)
+        return petName
     }
 
     @MainActor
@@ -244,9 +261,22 @@ final class OhanaUITests: XCTestCase {
 
     @MainActor
     private func openFirstPetCreationFromTodayFocus(in app: XCUIApplication) {
-        let addPet = app.buttons["home-add-first-pet-action"]
-        XCTAssertTrue(addPet.waitForExistence(timeout: 20), "Today Focus first-pet action did not appear.")
-        tapWhenHittable(addPet, timeout: 8)
+        let nameField = app.textFields["member-name-input"]
+        let addPetCard = app.buttons["home-add-first-pet-card"]
+        let addPetAction = app.buttons["home-add-first-pet-action"]
+        let didReachPetEntry = waitUntil(timeout: 20) {
+            nameField.exists || addPetCard.exists || addPetAction.exists
+        }
+        XCTAssertTrue(didReachPetEntry, "Today Focus first-pet action did not appear.")
+        if nameField.exists {
+            return
+        }
+        let didTapEntry = tapWhenFrameReady(addPetCard, timeout: 6) || tapWhenFrameReady(addPetAction, timeout: 6)
+        XCTAssertTrue(didTapEntry, "Today Focus first-pet action was visible but not tappable.")
+        XCTAssertTrue(
+            nameField.waitForExistence(timeout: 12),
+            "Pet creation did not open from the Today Focus first-pet action."
+        )
     }
 
     @MainActor
@@ -296,7 +326,7 @@ final class OhanaUITests: XCTestCase {
         usingDetailMenuWhenAvailable: Bool = false
     ) {
         ensureHomeFeedQuickActionVisible(in: app, petName: petName)
-        tapWhenHittable(app.buttons["home-quick-action-feed"], timeout: 8)
+        tapHomeFeedQuickAction(in: app, timeout: 8)
 
         let detailButton = app.buttons["home-quick-action-menu-feed-detail"]
         if usingDetailMenuWhenAvailable || detailButton.waitForExistence(timeout: 1.5) {
@@ -401,11 +431,7 @@ final class OhanaUITests: XCTestCase {
         }
         tapWhenHittable(close, timeout: 8)
 
-        let didReturnHome = waitUntil(timeout: 15) {
-            app.state == .runningForeground &&
-                !isQuickFeedHomeVisible(in: app) &&
-                app.buttons["home-quick-action-feed"].exists
-        }
+        let didReturnHome = waitForFrameReady(app.buttons["home-quick-action-feed"], timeout: 15)
         XCTAssertTrue(didReturnHome, "Closing Feed detail did not return to a responsive home card.")
         assertHomeFeedReady(in: app)
     }
@@ -417,7 +443,7 @@ final class OhanaUITests: XCTestCase {
         expectsAntiRepeatConfirmation: Bool
     ) {
         ensureHomeFeedQuickActionVisible(in: app, petName: petName)
-        tapWhenHittable(app.buttons["home-quick-action-feed"], timeout: 8)
+        tapHomeFeedQuickAction(in: app, timeout: 8)
 
         let quickButton = app.buttons["home-quick-action-menu-feed"]
         XCTAssertTrue(quickButton.waitForExistence(timeout: 8), "Home Feed quick submenu action did not appear.")
@@ -455,6 +481,15 @@ final class OhanaUITests: XCTestCase {
                 !localizedContains(feedAction.label, anyOf: ["Not set", "待设置"])
         }
         XCTAssertTrue(didBecomeReady, "Home Feed action stayed in setup state. Current: \(feedAction.label)")
+    }
+
+    @MainActor
+    private func tapHomeFeedQuickAction(in app: XCUIApplication, timeout: TimeInterval) {
+        let feedAction = app.buttons["home-quick-action-feed"]
+        XCTAssertTrue(
+            tapWhenFrameReady(feedAction, timeout: timeout),
+            "Home Feed quick action did not become tappable."
+        )
     }
 
     @MainActor
@@ -502,63 +537,128 @@ final class OhanaUITests: XCTestCase {
             app.buttons["quick-feed-mode-manual"].exists
     }
 
+    private func isHomeSurfaceResponsive(in app: XCUIApplication) -> Bool {
+        [
+            app.buttons["home-settings-action"],
+            app.buttons["home-primary-action"],
+            app.buttons["home-tab-oasis"],
+            app.buttons["home-add-first-pet-action"],
+            app.buttons["home-add-first-pet-card"]
+        ].contains { element in
+            element.exists && element.isEnabled && element.isHittable
+        }
+    }
+
     @MainActor
     private func createMember(
         in app: XCUIApplication,
         name: String,
         flowTitle: String,
         missingFieldMessage: String,
-        completionMessage: String
+        completionMessage: String,
+        starterPetWeight: String? = nil,
+        postSaveMarkerIdentifiers: [String] = []
     ) {
         let nameField = app.textFields["member-name-input"]
-        XCTAssertTrue(nameField.waitForExistence(timeout: 12), missingFieldMessage)
+        let didShowNameField = waitUntil(timeout: 12) {
+            nameField.exists && nameField.isHittable
+        }
+        XCTAssertTrue(didShowNameField, missingFieldMessage)
 
         nameField.tap()
         nameField.typeText(name)
         nameField.typeText("\n")
         RunLoop.current.run(until: Date().addingTimeInterval(0.4))
 
-        tapThroughMemberCreationSteps(in: app)
+        tapThroughMemberCreationSteps(in: app, starterPetWeight: starterPetWeight)
 
         let handoffTitle = app.staticTexts[flowTitle]
         let creationPrimary = app.buttons["member-creation-primary-action"]
         let didLeaveCreation = waitUntil(timeout: 30) {
-            app.state == .runningForeground &&
-                !nameField.exists &&
-                !creationPrimary.exists &&
-                !handoffTitle.exists
+            let didReachExpectedMarker = containsAnyElement(in: app, identifiers: postSaveMarkerIdentifiers)
+            return app.state == .runningForeground &&
+                (didReachExpectedMarker ||
+                    (!nameField.exists &&
+                        !creationPrimary.exists &&
+                        !handoffTitle.exists))
         }
         XCTAssertTrue(didLeaveCreation, completionMessage)
     }
 
+    private func containsAnyElement(in app: XCUIApplication, identifiers: [String]) -> Bool {
+        identifiers.contains { identifier in
+            app.descendants(matching: .any)[identifier].exists
+        }
+    }
+
     @MainActor
-    private func tapThroughMemberCreationSteps(in app: XCUIApplication) {
+    private func tapThroughMemberCreationSteps(in app: XCUIApplication, starterPetWeight: String? = nil) {
         let creationPrimary = app.buttons["member-creation-primary-action"]
         XCTAssertTrue(creationPrimary.waitForExistence(timeout: 8), "Member creation primary action did not appear.")
 
         var didTapFinalSave = false
-        for _ in 0 ..< 6 {
+        for _ in 0 ..< 8 {
             guard creationPrimary.exists else {
                 didTapFinalSave = true
                 break
             }
+            if let starterPetWeight {
+                fillStarterPetWeightIfNeeded(
+                    in: app,
+                    value: starterPetWeight,
+                    waitForInput: !creationPrimary.isEnabled
+                )
+            }
             let actionLabel = creationPrimary.label
             tapWhenHittable(creationPrimary, timeout: 8)
-            if actionLabel == "Join Island" {
-                didTapFinalSave = true
-                break
+            if isMemberCreationFinalActionLabel(actionLabel) {
+                let didBeginSave = waitUntil(timeout: 4) {
+                    !creationPrimary.exists || !creationPrimary.isEnabled
+                }
+                if didBeginSave {
+                    didTapFinalSave = true
+                    break
+                }
             }
             RunLoop.current.run(until: Date().addingTimeInterval(0.45))
             if !creationPrimary.exists {
                 didTapFinalSave = true
                 break
             }
-            if actionLabel != "Next", !creationPrimary.isHittable {
-                didTapFinalSave = true
-                break
-            }
         }
         XCTAssertTrue(didTapFinalSave, "Member creation did not reach the final save action.")
+    }
+
+    private func isMemberCreationFinalActionLabel(_ label: String) -> Bool {
+        label.contains("Join Island")
+            || label.contains("加入岛屿")
+            || label.contains("Insel beitreten")
+    }
+
+    @MainActor
+    private func fillStarterPetWeightIfNeeded(in app: XCUIApplication, value: String, waitForInput: Bool) {
+        let weightInput = app.buttons["member-creation-pet-weight-input"]
+        if waitForInput {
+            XCTAssertTrue(weightInput.waitForExistence(timeout: 8), "Starter pet weight input did not appear.")
+        } else {
+            guard weightInput.exists else { return }
+        }
+        guard !weightInput.label.contains(value) else { return }
+
+        tapWhenHittable(weightInput, timeout: 8)
+        for key in value.map(String.init) {
+            tapWhenHittable(app.buttons[key], timeout: 4)
+        }
+
+        let ok = app.buttons["OK"]
+        if ok.exists {
+            tapWhenHittable(ok, timeout: 4)
+        }
+
+        let didEnablePrimary = waitUntil(timeout: 8) {
+            app.buttons["member-creation-primary-action"].isEnabled
+        }
+        XCTAssertTrue(didEnablePrimary, "Starter pet weight did not enable member creation.")
     }
 
     @MainActor
@@ -568,6 +668,22 @@ final class OhanaUITests: XCTestCase {
         }
         XCTAssertTrue(didBecomeHittable, "Element did not become hittable: \(element)")
         element.tap()
+    }
+
+    @MainActor
+    private func tapWhenFrameReady(_ element: XCUIElement, timeout: TimeInterval) -> Bool {
+        let didBecomeFrameReady = waitForFrameReady(element, timeout: timeout)
+        guard didBecomeFrameReady else { return false }
+        element.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        return true
+    }
+
+    private func waitForFrameReady(_ element: XCUIElement, timeout: TimeInterval) -> Bool {
+        waitUntil(timeout: timeout) {
+            guard element.exists, element.isEnabled else { return false }
+            let frame = element.frame
+            return frame.width > 1 && frame.height > 1
+        }
     }
 
     private func waitUntil(timeout: TimeInterval, condition: () -> Bool) -> Bool {

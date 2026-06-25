@@ -12,10 +12,9 @@
 ## Current Read
 
 - Last compacted: 2026-06-25.
-- Open follow-ups: 12 total: P1 = 4, P2 = 6, P3 = 2.
+- Open follow-ups: 13 total: P1 = 4, P2 = 7, P3 = 2.
 - Open P0: 0.
-- Known first-release-reachable repository-code P1: none identified in the
-  latest local closure pass.
+- Known first-release-reachable repository-code P1: none.
 - P1 still open because of review-gate evidence, CloudKit 1.x deferred work, or
   real-device validation.
 
@@ -36,11 +35,20 @@
 
 | Bucket | TFUs | Meaning | Next move |
 | --- | --- | --- | --- |
+| First-release-reachable repository code | None | No current repository-code P1 blocks the first release bar. | Keep this bucket empty unless a reachable launch blocker is found by current-code evidence. |
 | Review-gate / likely implemented locally | TFU-20260612-014 | Local architecture/localization/notification evidence exists, but the item still needs push/CI inspection and a fresh pure review before Domain maturity can claim closure. | Run a dedicated closure pass; close or split only current-code findings. |
 | Deferred 1.x / first-release-unreachable | TFU-20260614-014 | CloudSync live-apply delete-wins, parent lifecycle, and natural identity are real work, but unreachable while `cloudKitDatabase: .none`. | Keep in CloudKit 1.x planning; do not mix into first-release burn-down unless CloudKit is enabled. |
 | External/manual validation | TFU-20260612-017, TFU-20260612-016 | Real iOS notification/UI behavior must be checked on device. Repo tests cannot close these alone. | Run GAP-9 and GAP-6 manual checklists on a physical device. |
 
 ## Open Items
+
+### TFU-20260625-001 - Refresh Onboarding UITest Human Creation Helper
+
+- Priority / bucket: P2, automated validation / UITest drift.
+- Status: Open.
+- Why still open: `scripts/module-exit-gate.sh` on 2026-06-25 passed changed audits, localization, economy boundaries, and 1081 unit tests, then failed 7 `OhanaUITests` because the shared onboarding helper reached `onboarding-intro-primary-action` but never found `member-name-input`.
+- Next action: inspect the current onboarding first-run flow and update `OhanaUITests.swift` setup/navigation helpers to the real field route or accessibility identifiers.
+- Close when: `scripts/module-exit-gate.sh` no longer fails the UITest phase on the iPhone 17 simulator for the onboarding-dependent smoke tests.
 
 ### TFU-20260612-014 - Finish Domain Presentation And Infrastructure Boundary Cleanup
 
@@ -144,6 +152,7 @@ Use the archive for full detail. High-signal closures already reflected in the c
 
 - TFU-20260612-006: CareLedger read-model migration closed; later route-first-frame correction recorded in `docs/testing-progress.md`.
 - TFU-20260613-010: expense reward farm-risk review archived Done; ECO-025 now documents the current rule and says to open a new TFU if the policy changes.
+- TFU-20260625-002: Plants launch integration closed on 2026-06-25; care-plan Event/Reminder materialization, per-plant reminder disable cleanup, plan refresh after care completion, dashboard location filtering, full-field detail editing, Today Focus/calendar/economy/Oasis/shop coverage, and targeted simulator tests are recorded in `docs/testing-progress.md`.
 - TFU-20260614-013, 015, 016, 017, 018, 019 and TFU-20260615-001: current-head closure reviews completed on 2026-06-25; raw Open P1 count reduced to 4.
 - TFU-20260623-001: Home quick-action render-state isolation cleanup closed after Terminal `iPhone 17` targeted suites reported `TEST SUCCEEDED`; Codex shell CoreSimulator remains a session blocker, now diagnosed by `scripts/diagnose-simulator.sh`.
 - TFU-20260612-019: human memorial read-only boundary closed by current guard coverage.

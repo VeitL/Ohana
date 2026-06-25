@@ -38,6 +38,7 @@ struct PlantDashboardView: View {
     @StateObject private var commandQueue = DeferredDomainCommandQueue()
     @State private var showingAddPlant = false
     @State private var selectedFilter: PlantDashboardFilter = .all
+    @State private var selectedLocation: String?
 
     init(
         plants: [Plant] = [],
@@ -66,17 +67,29 @@ struct PlantDashboardView: View {
         upcomingTasks.filter { $0.daysUntilDue <= 0 }
     }
 
+    private var locationOptions: [String] {
+        let locations = plants
+            .map { $0.location.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+        return Array(Set(locations)).sorted { $0.localizedStandardCompare($1) == .orderedAscending }
+    }
+
     private var visiblePlants: [Plant] {
+        let filtered: [Plant]
         switch selectedFilter {
         case .all:
-            return plants
+            filtered = plants
         case .due:
             let ids = Set(upcomingTasks.map(\.plantID))
-            return plants.filter { ids.contains($0.id) }
+            filtered = plants.filter { ids.contains($0.id) }
         case .watching:
-            return plants.filter { $0.healthStatus == .watching || $0.healthStatus == .stressed }
+            filtered = plants.filter { $0.healthStatus == .watching || $0.healthStatus == .stressed }
         case .indoor:
-            return plants.filter(\.isIndoor)
+            filtered = plants.filter(\.isIndoor)
+        }
+        guard let selectedLocation else { return filtered }
+        return filtered.filter {
+            $0.location.trimmingCharacters(in: .whitespacesAndNewlines) == selectedLocation
         }
     }
 
@@ -175,6 +188,34 @@ struct PlantDashboardView: View {
                             )
                     }
                     .buttonStyle(ScaleButtonStyle())
+                }
+                if !locationOptions.isEmpty {
+                    Menu {
+                        Button("全部位置") {
+                            selectedLocation = nil
+                        }
+                        ForEach(locationOptions, id: \.self) { location in
+                            Button(location) {
+                                selectedLocation = location
+                            }
+                        }
+                    } label: {
+                        HStack(spacing: 5) {
+                            Image(systemName: "mappin.and.ellipse") // a11y: allow decorative menu icon; label text names the location filter.
+                                .font(OhanaFont.adaptive(size: 11, weight: .bold))
+                                .accessibilityHidden(true)
+                            Text(selectedLocation ?? "位置")
+                                .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
+                                .lineLimit(1)
+                        }
+                        .foregroundStyle(selectedLocation == nil ? Color.ohanaPrimaryText : Color.arkInk)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                        .background(
+                            selectedLocation == nil ? Color.ohanaControlFill.opacity(0.62) : Color.goLime,
+                            in: Capsule()
+                        )
+                    }
                 }
             }
         }
@@ -336,7 +377,7 @@ struct PlantDashboardView: View {
                     .font(OhanaFont.adaptive(size: 17, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Spacer()
-                Text("\(plants.count)")
+                Text(selectedFilter == .all && selectedLocation == nil ? "\(plants.count)" : "\(visiblePlants.count)/\(plants.count)")
                     .font(OhanaFont.adaptive(size: 14, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaSecondaryText)
             }
