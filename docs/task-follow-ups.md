@@ -12,11 +12,10 @@
 ## Current Read
 
 - Last compacted: 2026-06-25.
-- Open follow-ups: 12 total: P1 = 4, P2 = 6, P3 = 2.
+- Open follow-ups: 11 total: P1 = 3, P2 = 6, P3 = 2.
 - Open P0: 0.
 - Known first-release-reachable repository-code P1: none.
-- P1 still open because of review-gate evidence, CloudKit 1.x deferred work, or
-  real-device validation.
+- P1 still open because of CloudKit 1.x deferred work or real-device validation.
 
 ## How To Update
 
@@ -36,19 +35,11 @@
 | Bucket | TFUs | Meaning | Next move |
 | --- | --- | --- | --- |
 | First-release-reachable repository code | None | No current repository-code P1 blocks the first release bar. | Keep this bucket empty unless a reachable launch blocker is found by current-code evidence. |
-| Review-gate / likely implemented locally | TFU-20260612-014 | Local architecture/localization/notification evidence exists, but the item still needs push/CI inspection and a fresh pure review before Domain maturity can claim closure. | Run a dedicated closure pass; close or split only current-code findings. |
+| Review-gate / likely implemented locally | None | No current Domain review-gate P1 remains open after the 2026-06-25 local closure pass. | Keep this bucket empty unless a fresh pure review finds current-code P1 evidence. |
 | Deferred 1.x / first-release-unreachable | TFU-20260614-014 | CloudSync live-apply delete-wins, parent lifecycle, and natural identity are real work, but unreachable while `cloudKitDatabase: .none`. | Keep in CloudKit 1.x planning; do not mix into first-release burn-down unless CloudKit is enabled. |
 | External/manual validation | TFU-20260612-017, TFU-20260612-016 | Real iOS notification/UI behavior must be checked on device. Repo tests cannot close these alone. | Run GAP-9 and GAP-6 manual checklists on a physical device. |
 
 ## Open Items
-
-### TFU-20260612-014 - Finish Domain Presentation And Infrastructure Boundary Cleanup
-
-- Priority / bucket: P1, review-gate / Domain architecture, localization, notifications.
-- Status: Open; notification scheduling, generated-copy localization, and local adapter gates have current local evidence.
-- Why still open: close condition still requires push/CI inspection and a fresh pure Domain review.
-- Next action: rerun current-code guards, inspect CI once after a coherent push, then perform a fresh pure review.
-- Close when: Domain app code has no SwiftUI leakage, Domain services do not instantiate App/Feature concrete infrastructure directly, generated user-visible Domain strings are localized, and reminder/care notification side effects are covered through injected fakes.
 
 ### TFU-20260614-014 - Enforce CloudSync Live-Apply Deletion Wins, Parent Lifecycle, And Natural Identity
 
@@ -143,6 +134,7 @@
 Use the archive for full detail. High-signal closures already reflected in the current open count:
 
 - TFU-20260612-006: CareLedger read-model migration closed; later route-first-frame correction recorded in `docs/testing-progress.md`.
+- TFU-20260612-014: Domain presentation/infrastructure boundary cleanup closed on 2026-06-25 by local current-code guards and fresh review; CI inspection was intentionally skipped per user instruction.
 - TFU-20260625-001: onboarding UITest helper drift closed on 2026-06-25 after the current first-run flow, feeding smoke, and pet-delete smoke passed in the full `OhanaUITests` suite on pinned `iPhone 17`.
 - TFU-20260613-010: expense reward farm-risk review archived Done; ECO-025 now documents the current rule and says to open a new TFU if the policy changes.
 - TFU-20260625-002: Plants launch integration closed on 2026-06-25; care-plan Event/Reminder materialization, per-plant reminder disable cleanup, plan refresh after care completion, dashboard location filtering, full-field detail editing, Today Focus/calendar/economy/Oasis/shop coverage, and targeted simulator tests are recorded in `docs/testing-progress.md`.

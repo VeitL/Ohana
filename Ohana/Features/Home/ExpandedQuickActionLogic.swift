@@ -394,7 +394,7 @@ enum ExpandedQuickActionLogic {
         case "water":
             if WaterQuickActionPolicy.isAquatic(species: pet.species) {
                 if let warning = WaterCareCycleStatusCalculator.mostUrgentWaterWarning(for: pet, now: now, calendar: cal, logSnapshot: waterCycleSnapshot) {
-                    return waterCycleOverdueText(title: warning.title, days: warning.status.overdueDays, l: l)
+                    return waterCycleOverdueText(title: warning.localizedTitle(l: l), days: warning.status.overdueDays, l: l)
                 }
                 return aquaticWaterStatusText(for: pet, careLedgerEntries: careLedgerEntries, calendar: cal, now: now)
             }

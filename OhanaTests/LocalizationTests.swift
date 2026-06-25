@@ -257,6 +257,9 @@ struct LocalizationTests {
         #expect(waterStatus.compactDueText(l: L10n("zh")) == "逾期2天")
         #expect(waterStatus.compactDueText(l: L10n("en")) == "2d overdue")
         #expect(dueToday.compactDueText(l: L10n("de")) == "Heute")
+        #expect(WaterCareCycleWarningKind.waterChange.localizedTitle(l: L10n("en")) == "Water change")
+        #expect(WaterCareCycleWarningKind.filterClean.localizedTitle(l: L10n("de")) == "Filter")
+        #expect(WaterCareCycleWarningKind.filterReplace.localizedTitle(l: L10n("en")) == "Replacement")
     }
 
     @Test @MainActor func domainGeneratedStatusAndRewardCopyResolvesLocalizedTitles() throws {

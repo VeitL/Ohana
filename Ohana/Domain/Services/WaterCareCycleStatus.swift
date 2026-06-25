@@ -7,7 +7,7 @@
 
 import Foundation
 
-nonisolated struct WaterCareCycleStatus {
+nonisolated struct WaterCareCycleStatus: Equatable {
     let elapsedDays: Int
     let intervalDays: Int
 
@@ -50,6 +50,32 @@ nonisolated struct WaterCareCycleLogSnapshot: Equatable {
         latestWaterChangeDate: nil,
         latestFilterCleanDate: nil
     )
+}
+
+nonisolated enum WaterCareCycleWarningKind: String, Equatable {
+    case waterChange
+    case filterClean
+    case filterReplace
+
+    func localizedTitle(l: L10n = .current) -> String {
+        switch self {
+        case .waterChange:
+            l.tr(zh: "换水", en: "Water change", de: "Wasserwechsel")
+        case .filterClean:
+            l.tr(zh: "滤芯", en: "Filter", de: "Filter")
+        case .filterReplace:
+            l.tr(zh: "更换", en: "Replacement", de: "Wechsel")
+        }
+    }
+}
+
+nonisolated struct WaterCareCycleWarning: Equatable {
+    let kind: WaterCareCycleWarningKind
+    let status: WaterCareCycleStatus
+
+    func localizedTitle(l: L10n = .current) -> String {
+        kind.localizedTitle(l: l)
+    }
 }
 
 nonisolated enum WaterCareCycleStatusCalculator {
@@ -115,15 +141,18 @@ nonisolated enum WaterCareCycleStatusCalculator {
         now: Date = Date(),
         calendar: Calendar = .current,
         logSnapshot: WaterCareCycleLogSnapshot? = nil
-    ) -> (title: String, status: WaterCareCycleStatus)? {
-        let warnings: [(String, WaterCareCycleStatus)] = [
-            waterChangeStatus(for: pet, now: now, calendar: calendar, logSnapshot: logSnapshot).map { ("换水", $0) },
-            filterCleanStatus(for: pet, now: now, calendar: calendar, logSnapshot: logSnapshot).map { ("滤芯", $0) },
-            filterReplaceStatus(for: pet, now: now, calendar: calendar, logSnapshot: logSnapshot).map { ("更换", $0) }
+    ) -> WaterCareCycleWarning? {
+        let warnings: [WaterCareCycleWarning] = [
+            waterChangeStatus(for: pet, now: now, calendar: calendar, logSnapshot: logSnapshot)
+                .map { WaterCareCycleWarning(kind: .waterChange, status: $0) },
+            filterCleanStatus(for: pet, now: now, calendar: calendar, logSnapshot: logSnapshot)
+                .map { WaterCareCycleWarning(kind: .filterClean, status: $0) },
+            filterReplaceStatus(for: pet, now: now, calendar: calendar, logSnapshot: logSnapshot)
+                .map { WaterCareCycleWarning(kind: .filterReplace, status: $0) }
         ].compactMap(\.self)
-            .filter(\.1.isOverdue)
+            .filter(\.status.isOverdue)
 
-        return warnings.sorted { $0.1.daysUntilDue < $1.1.daysUntilDue }.first
+        return warnings.sorted { $0.status.daysUntilDue < $1.status.daysUntilDue }.first
     }
 
     private static func elapsedDays(from start: Date, to end: Date, calendar: Calendar) -> Int {

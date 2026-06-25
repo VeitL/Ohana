@@ -14,11 +14,11 @@
 - Last compacted: 2026-06-25.
 - Release bar: **Open P0 = 0; first-release-reachable repo-code P1 = 0**.
 - Active phase: **Phase 9A / dogfooding and real-device validation**, status 🟡.
-- Open follow-ups: 12 total in `docs/task-follow-ups.md`.
-- Open P1: 4 total; remaining P1s are review-gate evidence, CloudKit 1.x
-  deferred work, or real-device validation.
+- Open follow-ups: 11 total in `docs/task-follow-ups.md`.
+- Open P1: 3 total; remaining P1s are CloudKit 1.x deferred work or
+  real-device validation.
 - Current local validation: latest TFU closure batch passed targeted
-  `OhanaUITests` checks and the full `OhanaUITests` target on the pinned
+  Domain boundary/localization gates plus `LocalizationTests` on the pinned
   `iPhone 17` destination.
 
 ## Validation Ladder
@@ -42,7 +42,7 @@ can see the pinned destination again.
 | --- | --- | --- | --- |
 | 0 | Baseline cleanup | 🟢 | Submitted at `ff7ac89f`; later work may leave the tree dirty. |
 | 1 | Models | 🟢 | Schema/migration gates passed; historical P0 follow-ups closed. |
-| 2 | Domain | 🟢 | Local P1 closure reviews reduced remaining Domain P1 to review-gate/deferred/manual buckets. |
+| 2 | Domain | 🟢 | TFU-20260612-014 closed by local current-code review; remaining Domain-adjacent P1 is deferred CloudKit 1.x work. |
 | 3 | Shared | 🟢 | Shared executor picker query moved out; no current blocking item. |
 | 4 | App | 🟢 | Startup/route/runtime policy gates passed. |
 | 5 | Home + TodayFocus + QuickCare | 🟢 | Home read-model refactor and quick-action actor-isolation cleanup are in place. |
@@ -73,7 +73,7 @@ in the archive.
 
 | Module / Area | Open pointer | Meaning |
 | --- | --- | --- |
-| Domain / CloudSync | TFU-20260612-014, TFU-20260614-014 | Domain maturity review-gate plus CloudKit 1.x live-apply policy. |
+| Domain / CloudSync | TFU-20260614-014 | CloudKit 1.x live-apply policy remains deferred while CloudKit is disabled. |
 | Members | TFU-20260612-018, TFU-20260612-020 | Duplicate profile revision publishes and remaining localization coverage. |
 | Notifications / Memorial | TFU-20260612-016, TFU-20260612-017 | Real-device GAP-6 and GAP-9 validation. |
 | Settings | TFU-20260612-022 | Final privacy/support URLs and rows. |
@@ -97,6 +97,7 @@ Keep this section short; move older detail to archive during compaction.
 
 | Date | Snapshot | Evidence |
 | --- | --- | --- |
+| 2026-06-25 | TFU-20260612-014 Domain boundary cleanup local closure | Water-care warning status now returns typed warning kinds instead of hardcoded generated titles, Home localizes the title at display time, and `LocalizationTests` lock English/German fallback behavior. Fresh current-code review found no Domain/Models SwiftUI leakage, no Domain notification singleton usage, and only allowed Domain registration comments/assertions for app-owned infrastructure. CI inspection was intentionally skipped per user instruction. Validation: `git diff --check` PASS; `scripts/dev-check-changed.sh` PASS; `scripts/audit-architecture-boundaries.sh --all` PASS; `scripts/audit-localization-coverage.sh` PASS; `scripts/test-simulator.sh -only-testing:OhanaTests/LocalizationTests` PASS (16 Swift Testing tests); `scripts/test-simulator.sh '-only-testing:OhanaTests/MemberLifecycleGateTests/waterCareCycleStatusUsesExplicitSnapshotInsteadOfPetCareLogRelationship()'` PASS (1 Swift Testing test) on pinned `iPhone 17`. |
 | 2026-06-25 | TFU-20260625-001 onboarding UITest drift closure | Updated the shared onboarding flow helper for current first-run navigation, fixed Home feed snapshot invalidation after manual feed default changes, removed a time-dependent immediate manual-plan quick-check assertion, guarded UITest coordinate taps against non-finite frames, and added a Home signature regression test for feed defaults. Validation on pinned `iPhone 17`: `scripts/test-simulator.sh -only-testing:OhanaUITests/OhanaUITests/testCreateFirstHumanFromOnboarding` PASS; `scripts/test-simulator.sh -only-testing:OhanaUITests/OhanaUITests/testFeedingManualPlanAndHomeQuickActionSmoke` PASS; `scripts/test-simulator.sh -only-testing:OhanaUITests/OhanaUITests/testPetPermanentDeleteFromBasicInfoSmoke` PASS; `scripts/test-simulator.sh -only-testing:OhanaUITests` PASS (9 UITests); `scripts/test-simulator.sh '-only-testing:OhanaTests/HomeSnapshotBuilderTests/verticalSourceSignatureIncludesFeedDefaultChanges()'` PASS. |
 | 2026-06-25 | CI release data-safety audit version alignment | CI run `28189731680` had `build-test` and `lint` green but failed `Release data-safety audit` because the audit still expected `ArkSchemaV72` and backup schema `25`. The audit now checks the current `ArkSchemaV73` and backup schema `26`. Validation: `scripts/audit-release-data-safety.sh` PASS; `git diff --check` PASS; `scripts/dev-check-changed.sh` PASS. |
 | 2026-06-25 | CI audit self-test repair after Plants push | CI run `28182441974` failed `audits` at architecture fixture self-tests because Plant views still called static plant plan/command services. Plant care-plan reads now go through `AppServices.plantCarePlans`, and plant care writes go through `HomeCommandExecutor` with `careNote` preserved for defer logs. Validation: `scripts/tests/run-audit-fixture-tests.sh` PASS; `scripts/audit-architecture-boundaries.sh --all` PASS; `git diff --check` PASS; `scripts/dev-check-changed.sh` PASS; `scripts/test-simulator.sh -only-testing:OhanaTests/PlantLaunchTests` PASS (17 Swift Testing tests); `scripts/test-simulator.sh -only-testing:OhanaTests/HomeCommandExecutorTests` PASS (186 Swift Testing tests). |
@@ -107,7 +108,7 @@ Keep this section short; move older detail to archive during compaction.
 | 2026-06-25 | TFU-006 route first-frame correction after closure | Added deferred route containers for expense, insurance, documents, and milestones; `git diff --check`, `scripts/dev-check-changed.sh`, `scripts/audit-architecture-boundaries.sh --all`, `scripts/audit-localization-coverage.sh`, and targeted `scripts/test-simulator.sh '-only-testing:OhanaTests/MemberLifecycleGateTests/expenseHistoryDashboardUsesRouteScopedRowsInsteadOfPetExpenseRelationship()' '-only-testing:OhanaTests/MemberLifecycleGateTests/archiveFeatureViewsUseRouteScopedRowsInsteadOfPetRelationships()'` PASS on `iPhone 17` (2 Swift Testing tests, xcresult `/var/folders/9j/7ldcxzn91d947mg4p_7wxmz40000gn/T/OhanaDerivedData/main-b6cf423d5931-tests/Logs/Test/Test-Ohana-2026.06.25_07-03-31-+0200.xcresult`). |
 | 2026-06-25 | P1 closure review batch | TFU-20260614-017/016/015/018/019, TFU-20260615-001, and TFU-20260614-013 marked Done from current-head guard/test evidence; raw Open P1 = 4. |
 | 2026-06-25 | TFU-006 final Home/report health-alert closure | FamilyWeeklyReport and Home health alerts consume route/read-model inputs instead of relationship arrays; targeted simulator suites passed before current CoreSimulator outage. |
-| 2026-06-24 | Domain generated-copy / adapter cleanup | Domain localization and adapter hard gates passed; remaining TFU-20260612-014 close condition is push/CI/fresh pure review. |
+| 2026-06-24 | Domain generated-copy / adapter cleanup | Domain localization and adapter hard gates passed; at that time the remaining TFU-20260612-014 close condition was push/CI/fresh pure review. |
 | 2026-06-24 | Domain notification scheduler injection | Reminder notification side effects moved to injected `ReminderNotificationScheduling`; `OhanaNotifications.current` no longer appears in `Ohana/Domain`. |
 | 2026-06-17 | Route first-frame infrastructure | `RouteFirstFrameDeferredLoad` and `RouteFirstFrameDeferredMount` added; strict route-first-frame audit catches first-frame `@Query` / sync fetch / service fetch regressions. |
 | 2026-06-16 | Phase 8 release-bar scan | P0 + first-release-reachable cleared to zero; Phase 9 became the active release path. |
