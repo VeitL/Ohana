@@ -244,6 +244,7 @@ nonisolated enum HomeInteractionSnapshotBuilder {
                 item: item,
                 pet: pet,
                 source: source,
+                localization: l,
                 now: now
             )
         }
@@ -287,7 +288,8 @@ nonisolated enum HomeInteractionSnapshotBuilder {
                 item: item,
                 human: human,
                 activeHumanID: activeHumanID,
-                source: source
+                source: source,
+                localization: l
             )
         }
         return HomeExpandedActionSnapshot(
@@ -307,6 +309,7 @@ nonisolated enum HomeInteractionSnapshotBuilder {
         item: QuickActionItem,
         pet: Pet,
         source: VerticalSolidHomeSourceState,
+        localization l: L10n,
         now: Date
     ) -> HomeQuickActionRenderSnapshot {
         let optionsArePresent = hasMenuOptions(actionType: item.actionType)
@@ -333,7 +336,8 @@ nonisolated enum HomeInteractionSnapshotBuilder {
                 petExpenseLedgerEntries: source.petExpenseLedgerEntries,
                 petWeightLedgerEntries: source.petWeightLedgerEntries,
                 petMomentEntries: source.petMomentEntries,
-                now: now
+                now: now,
+                l: l
             ),
             isCompleted: ExpandedQuickActionLogic.isCompleted(
                 item: item,
@@ -366,7 +370,8 @@ nonisolated enum HomeInteractionSnapshotBuilder {
         item: QuickActionItem,
         human: Human,
         activeHumanID: UUID?,
-        source: VerticalSolidHomeSourceState
+        source: VerticalSolidHomeSourceState,
+        localization l: L10n
     ) -> HomeQuickActionRenderSnapshot {
         let isLocked = PrivacyService.isHumanQuickActionLocked(item, human: human, viewedBy: activeHumanID)
         let medicationWarning = item.actionType == "humanMedication"
@@ -376,7 +381,7 @@ nonisolated enum HomeInteractionSnapshotBuilder {
                 logs: source.humanMedicationLogs
             )
             : nil
-        let status = medicationWarning?.compactText(l: .current) ?? ExpandedQuickActionLogic.humanCountText(
+        let status = medicationWarning?.compactText(l: l) ?? ExpandedQuickActionLogic.humanCountText(
             item: item,
             human: human,
             isLocked: isLocked,
