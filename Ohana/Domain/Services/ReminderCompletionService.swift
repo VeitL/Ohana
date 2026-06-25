@@ -138,9 +138,10 @@ final class ReminderCompletionService: ReminderCompleting {
         by humanId: String?,
         context: ModelContext,
         careLedger: CareLedgerRecording = CareLedgerService(),
-        notifications: ReminderNotificationScheduling = ReminderNotificationSchedulerRegistry.current
+        notifications: ReminderNotificationScheduling = ReminderNotificationSchedulerRegistry.current,
+        schedulePlantCareNotifications: Bool = true,
+        now: Date = Date()
     ) -> Bool {
-        let now = Date()
         guard let mutation = DomainScheduleWriteAuthorizer.authorizeExistingReminderMutation(
             reminder: reminder,
             writeKind: .care,
@@ -158,6 +159,14 @@ final class ReminderCompletionService: ReminderCompleting {
             return false
         }
         context.safeSave()
+        PlantCareScheduleSyncService.syncSkippedReminder(
+            reminder,
+            executorId: humanId,
+            context: context,
+            now: now,
+            scheduleNotifications: schedulePlantCareNotifications,
+            notifications: notifications
+        )
         cancelNotification(for: reminder, notifications: notifications)
         runReminderEffects(
             reminder,

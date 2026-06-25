@@ -27,6 +27,18 @@ struct PlantDetailContentView: View {
     @State private var diagnosisResult: PlantDiagnosisResult?
     private var catalogEntry: PlantCatalogEntry? { PlantCatalog.entry(id: plant.catalogSpeciesId) }
     private var careTasks: [PlantCareTaskSnapshot] { appServices.plantCarePlans.tasks(for: plant) }
+    private var isWateringDue: Bool {
+        careTasks.contains { $0.careType == .watering && $0.daysUntilDue <= 0 }
+    }
+    private var isFertilizingDue: Bool {
+        careTasks.contains { $0.careType == .fertilizing && $0.daysUntilDue <= 0 }
+    }
+    var wateringIntervalDays: Int {
+        careTasks.first { $0.careType == .watering }?.effectiveIntervalDays ?? plant.wateringIntervalDays
+    }
+    var fertilizingIntervalDays: Int {
+        careTasks.first { $0.careType == .fertilizing }?.effectiveIntervalDays ?? plant.fertilizingIntervalDays
+    }
     private var commandExecutor: HomeCommandExecutor { HomeCommandExecutor(modelContext: modelContext, services: appServices) }
     private var recentLogs: [PlantCareLog] {
         plant.careLogs.sorted { $0.date > $1.date }
@@ -107,6 +119,10 @@ struct PlantDetailContentView: View {
                 Text(task.subtitle)
                     .font(OhanaFont.adaptive(size: 13, weight: .medium, design: .rounded))
                     .foregroundStyle(Color.ohanaSecondaryText)
+                Text(task.explanation)
+                    .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded))
+                    .foregroundStyle(Color.ohanaSecondaryText)
+                    .fixedSize(horizontal: false, vertical: true)
                 HStack(spacing: 10) {
                     Button("完成") {
                         recordCare(task.careType)
@@ -119,6 +135,16 @@ struct PlantDetailContentView: View {
 
                     Button("延后一天") {
                         deferTaskOneDay(task)
+                    }
+                    .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
+                    .foregroundStyle(Color.ohanaPrimaryText)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 8)
+                    .background(Color.ohanaControlFill.opacity(0.72), in: Capsule())
+                }
+                if task.careType == .watering {
+                    Button("土还湿，延后") {
+                        deferTaskOneDay(task, reason: "soilWet")
                     }
                     .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
@@ -338,14 +364,14 @@ struct PlantDetailContentView: View {
             }
 
             if let days = plant.daysSinceWatered {
-                let progress = min(1.0, Double(days) / Double(plant.wateringIntervalDays))
+                let progress = min(1.0, Double(days) / Double(max(wateringIntervalDays, 1)))
                 let color: Color = progress < 0.5 ? .blue : (progress < 0.8 ? .yellow : .red)
 
                 HStack {
                     Text("距上次浇水 \(days) 天")
                         .font(OhanaFont.adaptive(size: 14, weight: .medium))
                     Spacer()
-                    Text("周期 \(plant.wateringIntervalDays) 天")
+                    Text(wateringIntervalText)
                         .font(OhanaFont.adaptive(size: 12, weight: .medium))
                         .foregroundStyle(Color.ohanaSecondaryText)
                 }
@@ -353,7 +379,7 @@ struct PlantDetailContentView: View {
                 ProgressView(value: progress)
                     .tint(color)
 
-                if plant.needsWatering {
+                if isWateringDue {
                     HStack(spacing: 4) {
                         Image(systemName: "exclamationmark.triangle.fill").accessibilityHidden(true)
                             .foregroundStyle(.orange)
@@ -386,14 +412,14 @@ struct PlantDetailContentView: View {
             }
 
             if let days = plant.daysSinceFertilized {
-                let progress = min(1.0, Double(days) / Double(plant.fertilizingIntervalDays))
+                let progress = min(1.0, Double(days) / Double(max(fertilizingIntervalDays, 1)))
                 let color: Color = progress < 0.5 ? .green : (progress < 0.8 ? .yellow : .red)
 
                 HStack {
                     Text("距上次施肥 \(days) 天")
                         .font(OhanaFont.adaptive(size: 14, weight: .medium))
                     Spacer()
-                    Text("周期 \(plant.fertilizingIntervalDays) 天")
+                    Text(fertilizingIntervalText)
                         .font(OhanaFont.adaptive(size: 12, weight: .medium))
                         .foregroundStyle(Color.ohanaSecondaryText)
                 }
@@ -401,7 +427,7 @@ struct PlantDetailContentView: View {
                 ProgressView(value: progress)
                     .tint(color)
 
-                if plant.needsFertilizing {
+                if isFertilizingDue {
                     HStack(spacing: 4) {
                         Image(systemName: "exclamationmark.triangle.fill").accessibilityHidden(true)
                             .foregroundStyle(.orange)
@@ -507,7 +533,9 @@ struct PlantDetailContentView: View {
                             Text(log.date.formatted(date: .abbreviated, time: .shortened))
                                 .font(OhanaFont.adaptive(size: 11, weight: .medium, design: .rounded))
                                 .foregroundStyle(Color.ohanaSecondaryText)
-                            if !log.note.isEmpty, !log.note.hasPrefix("defer:") {
+                            if !log.note.isEmpty,
+                               !log.note.hasPrefix("defer:"),
+                               !log.note.hasPrefix("skip:") {
                                 Text(log.note)
                                     .font(OhanaFont.adaptive(size: 12))
                                     .foregroundStyle(Color.ohanaSecondaryText)
@@ -523,34 +551,6 @@ struct PlantDetailContentView: View {
         .padding(16)
         .ohanaGlassStyle(cornerRadius: OhanaRadius.input)
         .padding(.horizontal, 16)
-    }
-
-    private func detailHeader(icon: String, title: String) -> some View {
-        HStack {
-            Image(systemName: icon)
-                .foregroundStyle(Color.goLime)
-                .accessibilityHidden(true)
-            Text(title)
-                .font(OhanaFont.adaptive(size: 16, weight: .bold, design: .rounded))
-            Spacer()
-        }
-    }
-
-    private func detailRow(_ title: String, value: String) -> some View {
-        HStack(alignment: .top) {
-            Text(title)
-                .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
-                .foregroundStyle(Color.ohanaSecondaryText)
-            Spacer(minLength: 16)
-            Text(value)
-                .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .rounded))
-                .foregroundStyle(Color.ohanaPrimaryText)
-                .multilineTextAlignment(.trailing)
-        }
-    }
-
-    private func shortDate(_ date: Date) -> String {
-        date.formatted(date: .abbreviated, time: .omitted)
     }
 
     // MARK: - Delete Section
@@ -659,10 +659,11 @@ struct PlantDetailContentView: View {
         }
     }
 
-    private func deferTaskOneDay(_ task: PlantCareTaskSnapshot) {
+    private func deferTaskOneDay(_ task: PlantCareTaskSnapshot, reason: String? = nil) {
         let formatter = ISO8601DateFormatter()
         let tomorrow = Calendar.current.date(byAdding: .day, value: 1, to: Date()) ?? Date().addingTimeInterval(86400)
-        recordCare(.customNote, careNote: "defer:\(task.careType.rawValue):\(formatter.string(from: tomorrow))")
+        let reasonSuffix = reason.map { "|\($0)" } ?? ""
+        recordCare(.customNote, careNote: "defer:\(task.careType.rawValue):\(formatter.string(from: tomorrow))\(reasonSuffix)")
     }
 
     private func currentExecutorId() -> String? {

@@ -241,13 +241,17 @@ nonisolated enum VerticalSolidHomeSnapshotBuilder {
             cards: cards,
             firstPetEmptyState: firstPetEmptyState(activePets: activePets, activeHumans: activeHumans, l: l),
             plants: visiblePlants.sorted { $0.createdAt > $1.createdAt }.map { plant in
-                VerticalSolidHomePlantSnapshot(
+                let plantTasks = PlantCarePlanService.tasks(for: plant, now: now)
+                let needsCare = plantTasks.contains { task in
+                    (task.careType == .watering || task.careType == .fertilizing) && task.daysUntilDue <= 0
+                }
+                return VerticalSolidHomePlantSnapshot(
                     id: plant.id,
                     name: plant.name.isEmpty ? l.tr(zh: "植物", en: "Plant", de: "Pflanze") : plant.name,
                     subtitle: plant.species.isEmpty ? plant.location : plant.species,
                     emoji: plant.avatarEmoji.isEmpty ? "🌱" : plant.avatarEmoji,
                     themeHex: plant.themeColorHex,
-                    needsCare: plant.needsWatering(on: now) || plant.needsFertilizing(on: now)
+                    needsCare: needsCare
                 )
             },
             heroPreparationRevision: heroPreparationRevision(for: cards)
@@ -425,8 +429,8 @@ nonisolated enum VerticalSolidHomeSnapshotBuilder {
                 String(timestamp(plant.lastFertilizedDate)),
                 String(plant.wateringIntervalDays),
                 String(plant.fertilizingIntervalDays),
-                String(plant.needsWatering(on: now)),
-                String(plant.needsFertilizing(on: now))
+                String(PlantCarePlanService.intervalDays(for: .watering, plant: plant)),
+                String(PlantCarePlanService.intervalDays(for: .fertilizing, plant: plant))
             ].joined(separator: ":")
         }.joined(separator: "|")
     }

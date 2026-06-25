@@ -183,10 +183,10 @@ enum PlantCareCommandService {
 
     private static func isRewardEligible(_ type: PlantCareType, for plant: Plant, now: Date) -> Bool {
         switch type {
-        case .watering:
-            plant.needsWatering(on: now)
-        case .fertilizing:
-            plant.needsFertilizing(on: now)
+        case .watering, .fertilizing:
+            PlantCarePlanService.tasks(for: plant, now: now).contains { task in
+                task.careType == type && task.daysUntilDue <= 0
+            }
         default:
             false
         }

@@ -25,6 +25,75 @@ struct PlantLaunchTests {
         #expect(!task.isOverdue)
     }
 
+    @Test func carePlanReadsWetSoilDeferralReasonAndExtendsWateringCadence() throws {
+        let now = makeDate(year: 2026, month: 6, day: 8)
+        let calendar = Calendar.current
+        let formatter = ISO8601DateFormatter()
+        let plant = Plant(name: "Fern", wateringIntervalDays: 3)
+        plant.createdAt = calendar.date(byAdding: .day, value: -20, to: now) ?? now
+        plant.lastWateredDate = calendar.date(byAdding: .day, value: -3, to: now)
+        for offset in [1, 2] {
+            let date = calendar.date(byAdding: .day, value: offset, to: now) ?? now
+            plant.careLogs.append(PlantCareLog(
+                date: calendar.date(byAdding: .day, value: -offset, to: now) ?? now,
+                careType: .customNote,
+                note: "defer:watering:\(formatter.string(from: date))|soilWet"
+            ))
+        }
+
+        let task = try #require(PlantCarePlanService.tasks(for: plant, now: now).first { $0.careType == .watering })
+
+        #expect(PlantCarePlanService.intervalDays(for: .watering, plant: plant) == 7)
+        #expect(task.careType == .watering)
+        #expect(task.daysUntilDue == 4)
+        #expect(task.learningSummary.contains("土还湿"))
+        #expect(task.explanation.contains("自动延长 4 天"))
+    }
+
+    @Test func carePlanLearnsFromRepeatedSkippedWatering() throws {
+        let now = makeDate(year: 2026, month: 6, day: 8)
+        let calendar = Calendar.current
+        let formatter = ISO8601DateFormatter()
+        let plant = Plant(name: "Fern", wateringIntervalDays: 3)
+        plant.createdAt = calendar.date(byAdding: .day, value: -20, to: now) ?? now
+        plant.lastWateredDate = calendar.date(byAdding: .day, value: -3, to: now)
+        for offset in [1, 2] {
+            let nextDate = calendar.date(byAdding: .day, value: 1, to: now) ?? now
+            plant.careLogs.append(PlantCareLog(
+                date: calendar.date(byAdding: .day, value: -offset, to: now) ?? now,
+                careType: .customNote,
+                note: "skip:watering:\(formatter.string(from: nextDate))|notNeeded"
+            ))
+        }
+
+        let task = try #require(PlantCarePlanService.tasks(for: plant, now: now).first { $0.careType == .watering })
+
+        #expect(PlantCarePlanService.intervalDays(for: .watering, plant: plant) == 5)
+        #expect(task.daysUntilDue == 2)
+        #expect(task.learningSummary.contains("跳过浇水"))
+        #expect(task.explanation.contains("自动延长 2 天"))
+    }
+
+    @Test func carePlanLearnsFromRepeatedEarlyWatering() throws {
+        let now = makeDate(year: 2026, month: 6, day: 20)
+        let calendar = Calendar.current
+        let plant = Plant(name: "Mint", wateringIntervalDays: 7)
+        plant.createdAt = calendar.date(byAdding: .day, value: -30, to: now) ?? now
+        let wateringDates = [-15, -10, -5].compactMap { calendar.date(byAdding: .day, value: $0, to: now) }
+        plant.lastWateredDate = wateringDates.last
+        for date in wateringDates {
+            plant.careLogs.append(PlantCareLog(date: date, careType: .watering))
+        }
+
+        let task = try #require(PlantCarePlanService.tasks(for: plant, now: now).first { $0.careType == .watering })
+
+        #expect(PlantCarePlanService.intervalDays(for: .watering, plant: plant) == 5)
+        #expect(task.careType == .watering)
+        #expect(task.daysUntilDue == 0)
+        #expect(task.learningSummary.contains("提前浇水"))
+        #expect(task.explanation.contains("自动缩短 2 天"))
+    }
+
     @Test func structuredEnvironmentAdjustsCarePlanAndTaskCopy() throws {
         let now = makeDate(year: 2026, month: 6, day: 21)
         let plant = Plant(
@@ -58,6 +127,9 @@ struct PlantLaunchTests {
         #expect(PlantCarePlanService.intervalDays(for: .repotting, plant: plant) == 270)
         #expect(watering.subtitle.contains("实测 12000 lux"))
         #expect(watering.subtitle.contains("无排水孔"))
+        #expect(watering.explanation.contains("直射光"))
+        #expect(watering.explanation.contains("小盆"))
+        #expect(watering.explanation.contains("当前有效周期 2 天"))
         #expect(misting.subtitle.contains("空调/暖气"))
     }
 
@@ -651,9 +723,49 @@ struct PlantLaunchTests {
         })
         #expect(ledgers.contains {
             $0.eventKind == CareLedgerEventKind.reminder.rawValue &&
-                $0.actionType == "complete" &&
+            $0.actionType == "complete" &&
                 $0.sourceReminderId == reminder.id.uuidString
         })
+    }
+
+    @Test func skippingPlantReminderWritesPlanFeedbackAndReschedulesTask() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let now = makeDate(year: 2026, month: 6, day: 10, hour: 10)
+        let plant = Plant(name: "Fern", wateringIntervalDays: 1)
+        plant.lastWateredDate = Calendar.current.date(byAdding: .day, value: -3, to: now)
+        let event = Event(
+            title: "给蕨类浇水",
+            startDate: now,
+            eventType: EventType.watering.rawValue,
+            relatedEntityType: EntityKind.plant.rawValue,
+            relatedEntityId: plant.id.uuidString
+        )
+        let reminder = Reminder(event: event, scheduledAt: now)
+        context.insert(plant)
+        context.insert(event)
+        context.insert(reminder)
+        try context.save()
+
+        let didSkip = ReminderCompletionService.skip(
+            reminder,
+            by: "human-1",
+            context: context,
+            notifications: NoopReminderNotificationScheduler(),
+            schedulePlantCareNotifications: false,
+            now: now
+        )
+
+        let logs = try context.fetch(FetchDescriptor<PlantCareLog>())
+        let task = try #require(PlantCarePlanService.tasks(for: plant, now: now).first { $0.careType == .watering })
+        #expect(didSkip)
+        #expect(reminder.statusEnum == .skipped)
+        #expect(plant.lastWateredDate != now)
+        #expect(logs.count == 1)
+        #expect(logs.first?.careType == .customNote)
+        #expect(logs.first?.note.hasPrefix("skip:watering:") == true)
+        #expect(task.daysUntilDue == 1)
+        #expect(task.explanation.contains("跳过/延后反馈"))
     }
 
     @Test func calendarCompletedPlantCareCountsForTodayFocusCoconutReward() throws {

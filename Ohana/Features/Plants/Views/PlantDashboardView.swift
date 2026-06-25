@@ -52,11 +52,8 @@ struct PlantDashboardView: View {
     private var commandExecutor: HomeCommandExecutor { HomeCommandExecutor(modelContext: modelContext, services: appServices) }
 
     private var plantsNeedingWater: [Plant] {
-        plants.filter(\.needsWatering)
-    }
-
-    private var plantsNeedingFertilizer: [Plant] {
-        plants.filter(\.needsFertilizing)
+        let ids = Set(dueTasks.filter { $0.careType == .watering }.map(\.plantID))
+        return plants.filter { ids.contains($0.id) }
     }
 
     private var upcomingTasks: [PlantCareTaskSnapshot] {
@@ -234,6 +231,10 @@ struct PlantDashboardView: View {
                     .font(OhanaFont.adaptive(size: 11, weight: .medium, design: .rounded))
                     .foregroundStyle(Color.ohanaSecondaryText)
                     .lineLimit(1)
+                Text(task.explanation)
+                    .font(OhanaFont.adaptive(size: 10, weight: .medium, design: .rounded))
+                    .foregroundStyle(Color.ohanaSecondaryText)
+                    .lineLimit(2)
             }
             Spacer()
             Button {
@@ -397,13 +398,14 @@ struct PlantDashboardView: View {
     }
 
     private func plantCard(_ plant: Plant) -> some View {
-        Button {
+        let nextTask = appServices.plantCarePlans.nextTask(for: plant)
+        return Button {
             onOpenPlant(plant.id)
         } label: {
             VStack(spacing: 8) {
                 ZStack {
                     Circle()
-                        .fill(plant.needsWatering ? Color.cyan.opacity(0.2) : .primary.opacity(0.08))
+                        .fill(nextTask?.careType == .watering && (nextTask?.daysUntilDue ?? 1) <= 0 ? Color.cyan.opacity(0.2) : .primary.opacity(0.08))
                         .frame(width: 56, height: 56)
                     Text(plant.avatarEmoji)
                         .font(OhanaFont.adaptive(size: 30)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
@@ -421,7 +423,7 @@ struct PlantDashboardView: View {
 
                 statusBadge(for: plant)
 
-                if let task = appServices.plantCarePlans.nextTask(for: plant) {
+                if let task = nextTask {
                     Text(task.daysUntilDue <= 0 ? "今天：\(task.careType.displayName)" : "\(task.daysUntilDue)天后：\(task.careType.displayName)")
                         .font(OhanaFont.adaptive(size: 9, weight: .medium, design: .rounded))
                         .foregroundStyle(Color.ohanaSecondaryText)
@@ -437,7 +439,8 @@ struct PlantDashboardView: View {
 
     @ViewBuilder
     private func statusBadge(for plant: Plant) -> some View {
-        if plant.needsWatering {
+        let nextTask = appServices.plantCarePlans.nextTask(for: plant)
+        if nextTask?.careType == .watering && (nextTask?.daysUntilDue ?? 1) <= 0 {
             HStack(spacing: 3) {
                 Image(systemName: "drop.fill") // a11y: allow decorative icon covered by surrounding text or control
                     .font(OhanaFont.adaptive(size: 8, weight: .bold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
@@ -448,7 +451,7 @@ struct PlantDashboardView: View {
             .padding(.horizontal, 8)
             .padding(.vertical, 3)
             .background(.cyan, in: Capsule())
-        } else if plant.needsFertilizing {
+        } else if nextTask?.careType == .fertilizing && (nextTask?.daysUntilDue ?? 1) <= 0 {
             HStack(spacing: 3) {
                 Image(systemName: "leaf.fill") // a11y: allow decorative icon covered by surrounding text or control
                     .font(OhanaFont.adaptive(size: 8, weight: .bold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup

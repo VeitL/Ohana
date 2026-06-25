@@ -11,6 +11,7 @@ import SwiftData
 struct PlantCareScheduleSyncResult: Equatable {
     enum Action: String, Equatable {
         case wroteCareFact
+        case wroteSkipFeedback
         case skippedExistingCare
         case noPlantTarget
         case unsupportedCareType
@@ -208,6 +209,67 @@ enum PlantCareScheduleSyncService {
         )
     }
 
+    @discardableResult
+    static func syncSkippedReminder(
+        _ reminder: Reminder,
+        executorId: String?,
+        context: ModelContext,
+        now: Date = Date(),
+        calendar: Calendar = .current,
+        scheduleNotifications: Bool = true,
+        notifications: ReminderNotificationScheduling = ReminderNotificationSchedulerRegistry.current
+    ) -> PlantCareScheduleSyncResult {
+        guard let event = reminder.event,
+              let type = careType(for: event) else {
+            return PlantCareScheduleSyncResult(
+                action: .unsupportedCareType,
+                plantID: nil,
+                logID: nil,
+                ledgerEventID: nil,
+                careType: nil
+            )
+        }
+        guard let plantID = DomainEntityLinkRegistry.plantId(for: event),
+              let plant = fetchPlant(id: plantID, context: context) else {
+            return PlantCareScheduleSyncResult(
+                action: .noPlantTarget,
+                plantID: nil,
+                logID: nil,
+                ledgerEventID: nil,
+                careType: type
+            )
+        }
+
+        let nextDate = calendar.date(byAdding: .day, value: 1, to: now) ?? now.addingTimeInterval(86400)
+        let log = PlantCareLog(
+            date: now,
+            careType: .customNote,
+            note: skipFeedbackNote(type: type, nextDate: nextDate),
+            executorId: executorId
+        )
+        log.plant = plant
+        context.insert(log)
+        CloudSyncMutationRecorder.markModified(plant, context: context, modifiedAt: now)
+        context.safeSave()
+
+        PlantCarePlanScheduleService.sync(
+            plant: plant,
+            context: context,
+            now: now,
+            calendar: calendar,
+            scheduleNotifications: scheduleNotifications,
+            notifications: notifications
+        )
+
+        return PlantCareScheduleSyncResult(
+            action: .wroteSkipFeedback,
+            plantID: plant.id,
+            logID: log.id,
+            ledgerEventID: nil,
+            careType: type
+        )
+    }
+
     private static func fetchPlant(id: UUID, context: ModelContext) -> Plant? {
         var descriptor = FetchDescriptor<Plant>(
             predicate: #Predicate<Plant> { plant in
@@ -254,5 +316,9 @@ enum PlantCareScheduleSyncService {
     private static func scheduleCompletionNote(for event: Event) -> String {
         let title = event.title.trimmingCharacters(in: .whitespacesAndNewlines)
         return title.isEmpty ? "计划完成" : "计划完成：\(title)"
+    }
+
+    private static func skipFeedbackNote(type: PlantCareType, nextDate: Date) -> String {
+        "skip:\(type.rawValue):\(ISO8601DateFormatter().string(from: nextDate))|notNeeded"
     }
 }

@@ -17,9 +17,9 @@
 - Open follow-ups: 11 total in `docs/task-follow-ups.md`.
 - Open P1: 3 total; remaining P1s are CloudKit 1.x deferred work or
   real-device validation.
-- Current local validation: Plants catalog / AI honesty batch passed changed-file
-  audits, full architecture boundary audit, and targeted plant unlock/catalog
-  simulator tests on the pinned `iPhone 17` destination.
+- Current local validation: Plants explainable / learnable care-plan batch passed
+  changed-file audits, architecture boundary audit, and targeted
+  `PlantLaunchTests` on the pinned `iPhone 17` destination.
 
 ## Validation Ladder
 
@@ -97,6 +97,7 @@ Keep this section short; move older detail to archive during compaction.
 
 | Date | Snapshot | Evidence |
 | --- | --- | --- |
+| 2026-06-25 | Plants explainable and learnable care plans | Plant care tasks now carry effective cadence, explanation copy, and learning summaries. Repeated wet-soil deferrals and repeated skipped watering extend watering cadence, repeated early watering shortens it, detail/dashboard surfaces show why tasks are due, Home plant care badges, calendar/reminder recurrence, and plant-care coconut eligibility read the same plan logic, and defer/skip logs remain backward compatible. Validation: `git diff --check` PASS; `scripts/dev-check-changed.sh` PASS; `scripts/audit-architecture-boundaries.sh --all` PASS; `scripts/test-simulator.sh -only-testing:OhanaTests/PlantLaunchTests` PASS (29 Swift Testing tests) on pinned `iPhone 17`. |
 | 2026-06-25 | Plants catalog and AI honesty logic | Local PlantCatalog now covers 100+ common indoor plants with aliases, Latin names, care difficulty, toxicity, light/water defaults, and ranked manual search; AddPlant shows match reason, safety, light, difficulty, and default plan chips with duplicate snapshots deferred past the first frame. Recognition policy now normalizes future provider results by deduping, clamping confidence, enriching from catalog, requiring real 3-candidate confirmation, and keeping fallback recognition empty instead of fabricating candidates. Plant Lv.4 preview energy no longer references Oasis implementation from Domain. Validation: `git diff --check` PASS; `scripts/dev-check-changed.sh` PASS; `scripts/audit-architecture-boundaries.sh --all` PASS; `scripts/test-simulator.sh -only-testing:OhanaTests/PlantLaunchTests -only-testing:OhanaTests/PlantFeatureGateXCTests -only-testing:OhanaTests/GrowthUnlockPolicyTests` PASS (37 Swift Testing tests + 7 XCTest tests) on pinned `iPhone 17`. |
 | 2026-06-25 | Plants profile creation UX safeguards | Plant add/edit/delete now warns about likely duplicate plants, applies care-relevant catalog defaults, previews which reminder/care-plan surfaces will be recalculated before saving edits, and gives destructive delete a 6-second undo window before the hard-delete command runs. Validation: `git diff --check` PASS; `scripts/dev-check-changed.sh` PASS; `scripts/test-simulator.sh -only-testing:OhanaTests/PlantLaunchTests` PASS (23 Swift Testing tests) on pinned `iPhone 17`. |
 | 2026-06-25 | Plants structured environment profile | Plant profiles now persist room/location, light measurement, humidity/temperature preference, climate-source risk, drainage, acquisition, size, hydroponic, and succulent fields through SwiftData `ArkSchemaV74` and backup schema `27`; care-plan cadence and task copy now react to those fields. Validation: `git diff --check` PASS; `scripts/dev-check-changed.sh` PASS; `scripts/audit-release-data-safety.sh` PASS; `scripts/test-simulator.sh -only-testing:OhanaTests/PlantLaunchTests -only-testing:OhanaTests/SharedModelContainerRecoveryTests -only-testing:OhanaTests/CloudSyncMetadataServiceTests -only-testing:OhanaTests/CoconutWalletServiceTests` PASS; `scripts/test-simulator.sh -only-testing:OhanaTests/SharedModelContainerRecoveryTests -only-testing:OhanaTests/CoconutWalletServiceTests/testCurrentSchemaCreatesInMemoryContainerAndKeepsLightweightStagesEmpty` PASS (5 XCTest tests). |

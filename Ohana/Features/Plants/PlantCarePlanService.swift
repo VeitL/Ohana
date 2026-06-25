@@ -14,10 +14,13 @@ nonisolated struct PlantCareTaskSnapshot: Identifiable, Equatable, Sendable {
     let careType: PlantCareType
     let title: String
     let subtitle: String
+    let explanation: String
     let dueDate: Date
     let isOverdue: Bool
     let daysUntilDue: Int
     let priority: Int
+    let effectiveIntervalDays: Int
+    let learningSummary: String
 }
 
 @MainActor
@@ -97,40 +100,88 @@ struct StaticPlantCarePlanReader: PlantCarePlanReading {
 }
 
 nonisolated enum PlantCarePlanService {
+    private struct IntervalPlan {
+        let referenceDays: Int
+        let environmentDays: Int
+        let effectiveDays: Int
+        let learning: LearningAdjustment
+
+        var environmentDelta: Int {
+            environmentDays - referenceDays
+        }
+    }
+
+    private struct LearningAdjustment {
+        let deltaDays: Int
+        let summary: String
+
+        static let none = LearningAdjustment(deltaDays: 0, summary: "")
+    }
+
     static func tasks(
         for plant: Plant,
         now: Date = Date(),
         calendar: Calendar = .current
     ) -> [PlantCareTaskSnapshot] {
-        let wateringDays = intervalDays(for: .watering, plant: plant)
-        let fertilizingDays = intervalDays(for: .fertilizing, plant: plant)
+        let wateringPlan = intervalPlan(for: .watering, plant: plant, calendar: calendar)
+        let fertilizingPlan = intervalPlan(for: .fertilizing, plant: plant, calendar: calendar)
         let base = plant.createdAt
-        var candidates: [(PlantCareType, Date?, Int, Int, String)] = [
-            (.watering, plant.lastWateredDate, wateringDays, 0, wateringSubtitle(for: plant)),
-            (.fertilizing, plant.lastFertilizedDate, fertilizingDays, 2, fertilizingSubtitle(for: plant)),
-            (.pestCheck, latestCareDate(for: plant, types: [.pestCheck, .pestFound]) ?? plant.lastHealthCheckDate, 21, 1, "查看叶背、土面和新芽"),
-            (.leafCleaning, latestCareDate(for: plant, types: [.leafCleaning]), intervalDays(for: .leafCleaning, plant: plant), 3, "擦掉灰尘，让叶片更好接光"),
-            (.rotating, latestCareDate(for: plant, types: [.rotating]), intervalDays(for: .rotating, plant: plant), 4, rotatingSubtitle(for: plant)),
-            (.pruning, latestCareDate(for: plant, types: [.pruning]), 60, 5, "剪掉黄叶、枯叶或过密枝叶"),
-            (.repotting, latestCareDate(for: plant, types: [.repotting]), intervalDays(for: .repotting, plant: plant), 6, repottingSubtitle(for: plant))
+        var candidates: [(PlantCareType, Date?, IntervalPlan, Int, String)] = [
+            (.watering, plant.lastWateredDate, wateringPlan, 0, wateringSubtitle(for: plant)),
+            (.fertilizing, plant.lastFertilizedDate, fertilizingPlan, 2, fertilizingSubtitle(for: plant)),
+            (
+                .pestCheck,
+                latestCareDate(for: plant, types: [.pestCheck, .pestFound]) ?? plant.lastHealthCheckDate,
+                intervalPlan(for: .pestCheck, plant: plant, calendar: calendar),
+                1,
+                "查看叶背、土面和新芽"
+            ),
+            (
+                .leafCleaning,
+                latestCareDate(for: plant, types: [.leafCleaning]),
+                intervalPlan(for: .leafCleaning, plant: plant, calendar: calendar),
+                3,
+                "擦掉灰尘，让叶片更好接光"
+            ),
+            (
+                .rotating,
+                latestCareDate(for: plant, types: [.rotating]),
+                intervalPlan(for: .rotating, plant: plant, calendar: calendar),
+                4,
+                rotatingSubtitle(for: plant)
+            ),
+            (
+                .pruning,
+                latestCareDate(for: plant, types: [.pruning]),
+                intervalPlan(for: .pruning, plant: plant, calendar: calendar),
+                5,
+                "剪掉黄叶、枯叶或过密枝叶"
+            ),
+            (
+                .repotting,
+                latestCareDate(for: plant, types: [.repotting]),
+                intervalPlan(for: .repotting, plant: plant, calendar: calendar),
+                6,
+                repottingSubtitle(for: plant)
+            )
         ]
         if shouldScheduleMisting(for: plant) {
             candidates.append((
                 .misting,
                 latestCareDate(for: plant, types: [.misting]),
-                intervalDays(for: .misting, plant: plant),
+                intervalPlan(for: .misting, plant: plant, calendar: calendar),
                 3,
                 mistingSubtitle(for: plant)
             ))
         }
 
         return candidates
-            .compactMap { type, lastDate, interval, priority, subtitle in
+            .compactMap { type, lastDate, plan, priority, subtitle in
                 makeTask(
                     type: type,
                     plant: plant,
                     lastDate: lastDate ?? base,
-                    intervalDays: interval,
+                    intervalPlan: plan,
                     subtitle: subtitle,
                     priority: priority,
                     now: now,
@@ -180,6 +231,58 @@ nonisolated enum PlantCarePlanService {
     }
 
     static func intervalDays(for type: PlantCareType, plant: Plant) -> Int {
+        intervalPlan(for: type, plant: plant, calendar: .current).effectiveDays
+    }
+
+    private static func intervalPlan(
+        for type: PlantCareType,
+        plant: Plant,
+        calendar: Calendar
+    ) -> IntervalPlan {
+        let reference = referenceIntervalDays(for: type, plant: plant)
+        let environment = environmentAdjustedIntervalDays(for: type, plant: plant)
+        let learning = learningAdjustment(for: type, plant: plant, environmentDays: environment, calendar: calendar)
+        return IntervalPlan(
+            referenceDays: reference,
+            environmentDays: environment,
+            effectiveDays: clampInterval(environment + learning.deltaDays),
+            learning: learning
+        )
+    }
+
+    private static func referenceIntervalDays(for type: PlantCareType, plant: Plant) -> Int {
+        let catalog = PlantCatalog.entry(id: plant.catalogSpeciesId)
+        return switch type {
+        case .watering:
+            preferredInterval(
+                customDays: plant.wateringIntervalDays,
+                catalogDays: catalog?.defaultWateringDays,
+                fallbackDays: 7
+            )
+        case .fertilizing:
+            preferredInterval(
+                customDays: plant.fertilizingIntervalDays,
+                catalogDays: catalog?.defaultFertilizingDays,
+                fallbackDays: 30
+            )
+        case .pestCheck:
+            21
+        case .leafCleaning:
+            30
+        case .rotating:
+            14
+        case .pruning:
+            60
+        case .repotting:
+            365
+        case .misting:
+            7
+        case .photo, .newLeaf, .yellowLeaf, .pestFound, .customNote:
+            14
+        }
+    }
+
+    private static func environmentAdjustedIntervalDays(for type: PlantCareType, plant: Plant) -> Int {
         switch type {
         case .watering:
             adjustedWateringDays(for: plant, catalog: PlantCatalog.entry(id: plant.catalogSpeciesId))
@@ -203,6 +306,10 @@ nonisolated enum PlantCarePlanService {
         case .photo, .newLeaf, .yellowLeaf, .pestFound, .customNote:
             14
         }
+    }
+
+    private static func clampInterval(_ days: Int) -> Int {
+        min(max(days, 1), 365)
     }
 
     private static func adjustedFertilizingDays(for plant: Plant, catalog: PlantCatalogEntry?) -> Int {
@@ -322,6 +429,116 @@ nonisolated enum PlantCarePlanService {
         return max(fallbackDays, 1)
     }
 
+    private static func learningAdjustment(
+        for type: PlantCareType,
+        plant: Plant,
+        environmentDays: Int,
+        calendar: Calendar
+    ) -> LearningAdjustment {
+        guard type == .watering else { return .none }
+
+        var delta = 0
+        var summaries: [String] = []
+        let wetCount = consecutiveWetSoilFeedbackCount(for: plant, type: type)
+        if wetCount >= 2 {
+            let extensionDays = min(6, wetCount * 2)
+            delta += extensionDays
+            summaries.append("最近 \(wetCount) 次反馈土还湿，周期自动延长 \(extensionDays) 天")
+        }
+
+        let skipCount = consecutiveSkipFeedbackCount(for: plant, type: type)
+        if skipCount >= 2 {
+            let extensionDays = min(4, skipCount)
+            delta += extensionDays
+            summaries.append("最近 \(skipCount) 次跳过浇水，周期自动延长 \(extensionDays) 天")
+        }
+
+        let earlyCount = earlyCompletionCount(for: plant, type: type, intervalDays: environmentDays, calendar: calendar)
+        if earlyCount >= 2 {
+            let shorteningDays = min(4, earlyCount)
+            delta -= shorteningDays
+            summaries.append("最近 \(earlyCount) 次提前浇水，周期自动缩短 \(shorteningDays) 天")
+        }
+
+        guard delta != 0, !summaries.isEmpty else { return .none }
+        return LearningAdjustment(deltaDays: delta, summary: summaries.joined(separator: "；"))
+    }
+
+    private static func consecutiveWetSoilFeedbackCount(for plant: Plant, type: PlantCareType) -> Int {
+        consecutiveFeedbackCount(for: plant, type: type) { log in
+            noteIndicatesWetSoil(log.note)
+        }
+    }
+
+    private static func consecutiveSkipFeedbackCount(for plant: Plant, type: PlantCareType) -> Int {
+        consecutiveFeedbackCount(for: plant, type: type) { log in
+            isSkipFeedback(log, for: type)
+        }
+    }
+
+    private static func consecutiveFeedbackCount(
+        for plant: Plant,
+        type: PlantCareType,
+        matchesFeedback: (PlantCareLog) -> Bool
+    ) -> Int {
+        var count = 0
+        for log in plant.careLogs.sorted(by: { $0.date > $1.date }) {
+            if log.careType == type {
+                break
+            }
+            if matchesFeedback(log) {
+                count += 1
+                if count >= 4 { break }
+            }
+        }
+        return count
+    }
+
+    private static func earlyCompletionCount(
+        for plant: Plant,
+        type: PlantCareType,
+        intervalDays: Int,
+        calendar: Calendar
+    ) -> Int {
+        let dates = plant.careLogs
+            .filter { $0.careType == type }
+            .map(\.date)
+            .sorted()
+        guard dates.count >= 3 else { return 0 }
+
+        let threshold = max(1, Int((Double(max(intervalDays, 1)) * 0.75).rounded(.down)))
+        let intervals = zip(dates.dropFirst(), dates).compactMap { current, previous -> Int? in
+            let days = calendar.dateComponents(
+                [.day],
+                from: calendar.startOfDay(for: previous),
+                to: calendar.startOfDay(for: current)
+            ).day
+            guard let days, days > 0 else { return nil }
+            return days
+        }
+
+        return intervals.suffix(3).count(where: { $0 <= threshold })
+    }
+
+    private static func isSkipFeedback(_ log: PlantCareLog, for type: PlantCareType) -> Bool {
+        log.careType == .customNote && log.note.hasPrefix("skip:\(type.rawValue):")
+    }
+
+    private static func noteIndicatesWetSoil(_ note: String) -> Bool {
+        let normalized = note.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !normalized.isEmpty else { return false }
+        return normalized.contains("soilwet") ||
+            normalized.contains("soil still wet") ||
+            normalized.contains("still wet") ||
+            normalized.contains("too wet") ||
+            normalized.contains("wet soil") ||
+            normalized.contains("土还湿") ||
+            normalized.contains("土还是湿") ||
+            normalized.contains("土很湿") ||
+            normalized.contains("盆土湿") ||
+            normalized.contains("湿土")
+    }
+
     private static func wateringSubtitle(for plant: Plant) -> String {
         if plant.isHydroponic {
             return "水培 · 检查水位并定期换水，避免根系缺氧"
@@ -391,21 +608,116 @@ nonisolated enum PlantCarePlanService {
         return factors
     }
 
+    private static func explanation(
+        for type: PlantCareType,
+        plant: Plant,
+        intervalPlan: IntervalPlan
+    ) -> String {
+        var parts = ["基础 \(intervalPlan.referenceDays) 天"]
+        let factors = explanationFactors(for: type, plant: plant)
+        if !factors.isEmpty {
+            parts.append("\(factors.joined(separator: " + "))影响节奏")
+        }
+        if intervalPlan.environmentDelta != 0 {
+            parts.append("环境周期\(deltaText(intervalPlan.environmentDelta))")
+        }
+        if !intervalPlan.learning.summary.isEmpty {
+            parts.append(intervalPlan.learning.summary)
+        }
+        parts.append("当前有效周期 \(intervalPlan.effectiveDays) 天")
+        return parts.joined(separator: "；")
+    }
+
+    private static func explanationFactors(for type: PlantCareType, plant: Plant) -> [String] {
+        switch type {
+        case .watering:
+            var factors: [String] = []
+            if plant.isHydroponic { factors.append("水培") }
+            if plant.isSucculent { factors.append("多肉") }
+            if plant.lightLevel == .direct { factors.append("直射光") }
+            if plant.lightLevel == .low { factors.append("弱光") }
+            if plant.lastLightMeasurementLux >= 10000 {
+                factors.append("高 lux")
+            } else if plant.lastLightMeasurementLux > 0, plant.lastLightMeasurementLux < 1000 {
+                factors.append("低 lux")
+            }
+            if plant.windowDirection == .south || plant.windowDirection == .west {
+                factors.append(plant.windowDirection.displayName)
+            } else if plant.windowDirection == .north {
+                factors.append("北向")
+            }
+            if plant.potDiameterCm > 0, plant.potDiameterCm < 10 {
+                factors.append("小盆")
+            } else if plant.potDiameterCm >= 24 {
+                factors.append("大盆")
+            }
+            if plant.potMaterial.localizedCaseInsensitiveContains("陶") ||
+                plant.potMaterial.localizedCaseInsensitiveContains("terracotta") ||
+                plant.potMaterial.localizedCaseInsensitiveContains("clay") {
+                factors.append("陶盆")
+            }
+            if !plant.potHasDrainage { factors.append("无排水孔") }
+            if plant.isNearClimateSource { factors.append("空调/暖气旁") }
+            if !plant.isIndoor { factors.append("阳台/花园") }
+            return factors
+        case .fertilizing:
+            return [
+                plant.isHydroponic ? "水培" : nil,
+                plant.isSucculent ? "多肉" : nil,
+                plant.healthStatus == .stressed ? "状态紧张" : nil
+            ].compactMap(\.self)
+        case .leafCleaning:
+            return plant.isNearClimateSource ? ["空调/暖气旁"] : []
+        case .rotating:
+            switch plant.windowDirection {
+            case .south, .west:
+                return [plant.windowDirection.displayName]
+            case .north:
+                return ["北向弱光"]
+            case .east, .unknown:
+                return []
+            }
+        case .repotting:
+            return [
+                plant.isHydroponic ? "水培" : nil,
+                !plant.potHasDrainage ? "无排水孔" : nil,
+                plant.potDiameterCm > 0 && plant.currentHeightCm > plant.potDiameterCm * 4 ? "株高明显大于盆径" : nil
+            ].compactMap(\.self)
+        case .misting:
+            return [
+                plant.humidityPreference == .humid ? "喜湿" : nil,
+                plant.isNearClimateSource ? "空调/暖气旁" : nil
+            ].compactMap(\.self)
+        case .pestCheck:
+            return plant.healthStatus == .watching || plant.healthStatus == .stressed ? ["健康状态需观察"] : []
+        case .pruning:
+            return plant.healthStatus == .stressed ? ["状态紧张"] : []
+        case .photo, .newLeaf, .yellowLeaf, .pestFound, .customNote:
+            return []
+        }
+    }
+
+    private static func deltaText(_ delta: Int) -> String {
+        delta < 0 ? "缩短 \(abs(delta)) 天" : "延长 \(delta) 天"
+    }
+
     private static func makeTask(
         type: PlantCareType,
         plant: Plant,
         lastDate: Date,
-        intervalDays: Int,
+        intervalPlan: IntervalPlan,
         subtitle: String,
         priority: Int,
         now: Date,
         calendar: Calendar
     ) -> PlantCareTaskSnapshot? {
-        var dueDate = calendar.date(byAdding: .day, value: max(intervalDays, 1), to: calendar.startOfDay(for: lastDate))
+        var dueDate = calendar.date(byAdding: .day, value: intervalPlan.effectiveDays, to: calendar.startOfDay(for: lastDate))
             ?? calendar.startOfDay(for: lastDate)
+        var explanation = explanation(for: type, plant: plant, intervalPlan: intervalPlan)
         if let deferredDate = deferredUntil(for: type, plant: plant, calendar: calendar),
            deferredDate > dueDate {
             dueDate = deferredDate
+            explanation += "；最近一次跳过/延后反馈已纳入本次到期日"
         }
         let today = calendar.startOfDay(for: now)
         let dueDay = calendar.startOfDay(for: dueDate)
@@ -417,10 +729,13 @@ nonisolated enum PlantCarePlanService {
             careType: type,
             title: "\(type.displayName) · \(plantName)",
             subtitle: subtitle,
+            explanation: explanation,
             dueDate: dueDay,
             isOverdue: dueDay < today,
             daysUntilDue: daysUntilDue,
-            priority: priority
+            priority: priority,
+            effectiveIntervalDays: intervalPlan.effectiveDays,
+            learningSummary: intervalPlan.learning.summary
         )
     }
 
@@ -436,12 +751,19 @@ nonisolated enum PlantCarePlanService {
         plant: Plant,
         calendar: Calendar
     ) -> Date? {
-        let prefix = "defer:\(type.rawValue):"
         let formatter = ISO8601DateFormatter()
+        let prefixes = [
+            "defer:\(type.rawValue):",
+            "skip:\(type.rawValue):"
+        ]
         return plant.careLogs
-            .filter { $0.careType == .customNote && $0.note.hasPrefix(prefix) }
+            .filter { log in
+                log.careType == .customNote && prefixes.contains { log.note.hasPrefix($0) }
+            }
             .compactMap { log -> Date? in
-                let rawDate = String(log.note.dropFirst(prefix.count))
+                let prefix = prefixes.first { log.note.hasPrefix($0) } ?? ""
+                let raw = String(log.note.dropFirst(prefix.count))
+                let rawDate = raw.split(separator: "|", maxSplits: 1, omittingEmptySubsequences: false).first.map(String.init) ?? raw
                 return formatter.date(from: rawDate)
             }
             .map { calendar.startOfDay(for: $0) }

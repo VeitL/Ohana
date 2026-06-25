@@ -328,7 +328,7 @@ private extension PlantCarePlanScheduleService {
             eventType: task.careType.eventType.rawValue,
             relatedEntityType: EntityKind.plant.rawValue,
             relatedEntityId: plant.id.uuidString,
-            recurrenceDays: PlantCarePlanService.intervalDays(for: task.careType, plant: plant),
+            recurrenceDays: task.effectiveIntervalDays,
             reminderDates: [reminderDate(for: dueDay, now: now, calendar: calendar)],
             writeKind: .care,
             source: .domainService
