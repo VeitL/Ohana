@@ -169,6 +169,24 @@ jobs:
             -only-testing:OhanaTests \
             -quiet \
             CODE_SIGNING_ALLOWED=NO
+      - name: Print test failure summary
+        if: failure()
+        run: |
+          if [ -d "$RUNNER_TEMP/TestResults.xcresult" ]; then
+            echo "::group::xcresult test summary"
+            xcrun xcresulttool get test-results summary \
+              --path "$RUNNER_TEMP/TestResults.xcresult" \
+              --compact || true
+            echo "::endgroup::"
+
+            echo "::group::xcresult tests"
+            xcrun xcresulttool get test-results tests \
+              --path "$RUNNER_TEMP/TestResults.xcresult" \
+              --compact || true
+            echo "::endgroup::"
+          else
+            echo "::warning::No TestResults.xcresult bundle was produced."
+          fi
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@v4
