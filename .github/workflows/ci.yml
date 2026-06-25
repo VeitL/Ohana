@@ -179,10 +179,40 @@ jobs:
               --compact || true
             echo "::endgroup::"
 
-            echo "::group::xcresult tests"
+            echo "::group::xcresult failed tests"
             xcrun xcresulttool get test-results tests \
               --path "$RUNNER_TEMP/TestResults.xcresult" \
-              --compact || true
+              --compact > "$RUNNER_TEMP/TestResults.tests.json" || true
+            {
+              printf '%s\n' 'import json'
+              printf '%s\n' 'import sys'
+              printf '%s\n' 'passed_results = {"Passed", "Skipped", "Expected Failure"}'
+              printf '%s\n' 'def walk(node, parents):'
+              printf '%s\n' '    name = node.get("name") or node.get("nodeIdentifier") or "<unnamed>"'
+              printf '%s\n' '    path = parents + [name]'
+              printf '%s\n' '    result = node.get("result")'
+              printf '%s\n' '    if result and result not in passed_results:'
+              printf '%s\n' '        identifier = node.get("nodeIdentifier", "")'
+              printf '%s\n' '        print(f"{result}: " + " / ".join(path))'
+              printf '%s\n' '        if identifier and identifier != name:'
+              printf '%s\n' '            print(f"  id: {identifier}")'
+              printf '%s\n' '        for issue in node.get("issues", []) or []:'
+              printf '%s\n' '            message = issue.get("message") or issue.get("summary") or issue.get("description")'
+              printf '%s\n' '            if message:'
+              printf '%s\n' '                print(f"  issue: {message}")'
+              printf '%s\n' '    for child in node.get("children", []) or []:'
+              printf '%s\n' '        walk(child, path)'
+              printf '%s\n' 'try:'
+              printf '%s\n' '    with open(sys.argv[1], encoding="utf-8") as handle:'
+              printf '%s\n' '        payload = json.load(handle)'
+              printf '%s\n' 'except Exception as exc:'
+              printf '%s\n' '    print(f"Could not parse xcresult tests JSON: {exc}")'
+              printf '%s\n' '    sys.exit(0)'
+              printf '%s\n' 'roots = payload if isinstance(payload, list) else [payload]'
+              printf '%s\n' 'for root in roots:'
+              printf '%s\n' '    walk(root, [])'
+            } > "$RUNNER_TEMP/print_xcresult_failures.py"
+            python3 "$RUNNER_TEMP/print_xcresult_failures.py" "$RUNNER_TEMP/TestResults.tests.json"
             echo "::endgroup::"
           else
             echo "::warning::No TestResults.xcresult bundle was produced."
