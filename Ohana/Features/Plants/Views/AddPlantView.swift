@@ -16,6 +16,7 @@ struct AddPlantView: View {
     @StateObject private var commandQueue = DeferredDomainCommandQueue()
     @State private var name = ""
     @State private var species = ""
+    @State private var roomName = ""
     @State private var location = ""
     @State private var avatarEmoji = "🌱"
     @State private var catalogQuery = ""
@@ -28,6 +29,18 @@ struct AddPlantView: View {
     @State private var isIndoor = true
     @State private var windowDirection: PlantWindowDirection = .unknown
     @State private var lightLevel: PlantLightLevel = .medium
+    @State private var lightMeasurementLux = 0
+    @State private var humidityPreference: PlantHumidityPreference = .standard
+    @State private var temperaturePreference: PlantTemperaturePreference = .standard
+    @State private var isNearClimateSource = false
+    @State private var potHasDrainage = true
+    @State private var hasAcquiredDate = false
+    @State private var acquiredDate = Date()
+    @State private var acquisitionSource = ""
+    @State private var currentHeightCm = 0.0
+    @State private var currentSpreadCm = 0.0
+    @State private var isHydroponic = false
+    @State private var isSucculent = false
     @State private var healthStatus: PlantHealthStatus = .stable
     @State private var remindersEnabled = true
     @State private var isSaving = false
@@ -81,9 +94,11 @@ struct AddPlantView: View {
                     goFormField("名称", text: $name, placeholder: "我的绿萝")
                     goFormField("品种", text: $species, placeholder: "绿萝、多肉…")
                     catalogSearchSection
-                    goFormField("位置", text: $location, placeholder: "客厅、阳台…")
+                    goFormField("房间", text: $roomName, placeholder: "客厅、阳台…")
+                    goFormField("具体位置", text: $location, placeholder: "南窗边、书桌、花架…")
                     environmentSection
                     potSection
+                    sourceSection
                     healthSection
 
                     VStack(alignment: .leading, spacing: 8) {
@@ -220,6 +235,23 @@ struct AddPlantView: View {
                     Text(level.displayName).tag(level)
                 }
             }
+            Stepper(lightMeasurementLux > 0 ? "光照实测 \(lightMeasurementLux) lux" : "光照实测 未记录", value: $lightMeasurementLux, in: 0 ... 20000, step: 250)
+                .foregroundStyle(Color.ohanaPrimaryText)
+                .tint(Color.goLime)
+            Picker("湿度偏好", selection: $humidityPreference) {
+                ForEach(PlantHumidityPreference.allCases) { preference in
+                    Text(preference.displayName).tag(preference)
+                }
+            }
+            Picker("温度偏好", selection: $temperaturePreference) {
+                ForEach(PlantTemperaturePreference.allCases) { preference in
+                    Text(preference.displayName).tag(preference)
+                }
+            }
+            Toggle("靠近空调/暖气", isOn: $isNearClimateSource)
+                .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .rounded))
+                .foregroundStyle(Color.ohanaPrimaryText)
+                .tint(Color.goLime)
         }
         .pickerStyle(.menu)
         .padding(16)
@@ -237,6 +269,10 @@ struct AddPlantView: View {
             Stepper("盆径 \(Int(potDiameterCm)) cm", value: $potDiameterCm, in: 0 ... 80, step: 1)
                 .foregroundStyle(Color.ohanaPrimaryText)
                 .tint(Color.goLime)
+            Toggle("花盆有排水孔", isOn: $potHasDrainage)
+                .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .rounded))
+                .foregroundStyle(Color.ohanaPrimaryText)
+                .tint(Color.goLime)
             TextField("盆材质，如陶盆、塑料盆", text: $potMaterial) // ui-v4: allow existing plant launch form input while OhanaTextField migration remains tracked.
                 .textFieldStyle(.plain)
                 .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .rounded))
@@ -247,6 +283,46 @@ struct AddPlantView: View {
                 .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .rounded))
                 .padding(14)
                 .background(Color.ohanaControlFill.opacity(0.68), in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .goTranslucentCard(cornerRadius: OhanaRadius.controlLarge)
+    }
+
+    private var sourceSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("来源与类型")
+                .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
+                .foregroundStyle(Color.ohanaSecondaryText)
+                .textCase(.uppercase)
+            Toggle("记录购入日期", isOn: $hasAcquiredDate)
+                .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .rounded))
+                .foregroundStyle(Color.ohanaPrimaryText)
+                .tint(Color.goLime)
+            if hasAcquiredDate {
+                DatePicker("购入日期", selection: $acquiredDate, displayedComponents: .date)
+                    .foregroundStyle(Color.ohanaPrimaryText)
+                    .tint(Color.goLime)
+            }
+            TextField("来源，如花市、朋友分株", text: $acquisitionSource) // ui-v4: allow existing plant launch form input while OhanaTextField migration remains tracked.
+                .textFieldStyle(.plain)
+                .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .rounded))
+                .padding(14)
+                .background(Color.ohanaControlFill.opacity(0.68), in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
+            Stepper("当前高度 \(Int(currentHeightCm)) cm", value: $currentHeightCm, in: 0 ... 300, step: 1)
+                .foregroundStyle(Color.ohanaPrimaryText)
+                .tint(Color.goLime)
+            Stepper("冠幅 \(Int(currentSpreadCm)) cm", value: $currentSpreadCm, in: 0 ... 300, step: 1)
+                .foregroundStyle(Color.ohanaPrimaryText)
+                .tint(Color.goLime)
+            Toggle("水培", isOn: $isHydroponic)
+                .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .rounded))
+                .foregroundStyle(Color.ohanaPrimaryText)
+                .tint(Color.goLime)
+            Toggle("多肉/仙人掌类", isOn: $isSucculent)
+                .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .rounded))
+                .foregroundStyle(Color.ohanaPrimaryText)
+                .tint(Color.goLime)
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -311,6 +387,9 @@ struct AddPlantView: View {
         fertilizingInterval = entry.defaultFertilizingDays
         lightLevel = entry.lightRequirement
         soilType = entry.soil
+        isIndoor = entry.isIndoorSuitable
+        isSucculent = entry.aliases.contains { $0.localizedCaseInsensitiveContains("succulent") } ||
+            entry.commonName.localizedCaseInsensitiveContains("多肉")
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
     }
 
@@ -326,12 +405,25 @@ struct AddPlantView: View {
             avatarEmoji: avatarEmoji,
             wateringIntervalDays: wateringInterval,
             fertilizingIntervalDays: fertilizingInterval,
+            roomNameRaw: roomName,
             potDiameterCm: potDiameterCm,
             potMaterialRaw: potMaterial,
             soilTypeRaw: soilType,
             isIndoor: isIndoor,
             windowDirection: windowDirection,
             lightLevel: lightLevel,
+            lastLightMeasurementLux: lightMeasurementLux,
+            lastLightMeasurementDate: lightMeasurementLux > 0 ? Date() : nil,
+            humidityPreference: humidityPreference,
+            temperaturePreference: temperaturePreference,
+            isNearClimateSource: isNearClimateSource,
+            potHasDrainage: potHasDrainage,
+            acquiredDate: hasAcquiredDate ? acquiredDate : nil,
+            acquisitionSourceRaw: acquisitionSource,
+            currentHeightCm: currentHeightCm,
+            currentSpreadCm: currentSpreadCm,
+            isHydroponic: isHydroponic,
+            isSucculent: isSucculent,
             healthStatus: healthStatus,
             catalogSpeciesId: selectedCatalogID,
             isToxicToCats: catalog?.isToxicToCats ?? false,

@@ -134,18 +134,40 @@ struct PlantDetailContentView: View {
     private var environmentCard: some View {
         VStack(alignment: .leading, spacing: 12) {
             detailHeader(icon: "sun.max.fill", title: "环境")
-            detailRow("位置", value: plant.location.isEmpty ? "未设置" : plant.location)
+            detailRow("房间", value: plant.roomName.isEmpty ? "未设置" : plant.roomName)
+            detailRow("具体位置", value: plant.location.isEmpty ? "未设置" : plant.location)
             detailRow("场景", value: plant.isIndoor ? "室内" : "阳台/花园")
             detailRow("窗向", value: plant.windowDirection.displayName)
             detailRow("光照", value: plant.lightLevel.displayName)
+            if plant.lastLightMeasurementLux > 0 {
+                detailRow("光照实测", value: "\(plant.lastLightMeasurementLux) lux\(plant.lastLightMeasurementDate.map { " · \(shortDate($0))" } ?? "")")
+            }
+            detailRow("湿度偏好", value: plant.humidityPreference.displayName)
+            detailRow("温度偏好", value: plant.temperaturePreference.displayName)
+            if plant.isNearClimateSource {
+                detailRow("环境风险", value: "靠近空调/暖气")
+            }
             if plant.potDiameterCm > 0 {
                 detailRow("盆径", value: "\(Int(plant.potDiameterCm)) cm")
             }
+            detailRow("排水孔", value: plant.potHasDrainage ? "有" : "无")
             if !plant.potMaterial.isEmpty {
                 detailRow("盆材质", value: plant.potMaterial)
             }
             if !plant.soilType.isEmpty {
                 detailRow("土壤", value: plant.soilType)
+            }
+            if let acquiredDate = plant.acquiredDate {
+                detailRow("购入日期", value: shortDate(acquiredDate))
+            }
+            if !plant.acquisitionSource.isEmpty {
+                detailRow("来源", value: plant.acquisitionSource)
+            }
+            if plant.currentHeightCm > 0 || plant.currentSpreadCm > 0 {
+                detailRow("当前尺寸", value: "\(Int(plant.currentHeightCm)) cm 高 · \(Int(plant.currentSpreadCm)) cm 冠幅")
+            }
+            if plant.isHydroponic || plant.isSucculent {
+                detailRow("类型", value: [plant.isHydroponic ? "水培" : nil, plant.isSucculent ? "多肉/仙人掌类" : nil].compactMap(\.self).joined(separator: " · "))
             }
         }
         .padding(16)
@@ -521,6 +543,10 @@ struct PlantDetailContentView: View {
         }
     }
 
+    private func shortDate(_ date: Date) -> String {
+        date.formatted(date: .abbreviated, time: .omitted)
+    }
+
     // MARK: - Delete Section
     private var deleteSection: some View {
         Button(role: .destructive) {
@@ -620,6 +646,7 @@ struct EditPlantSheet: View {
     @StateObject private var commandQueue = DeferredDomainCommandQueue()
     @State private var name = ""
     @State private var species = ""
+    @State private var roomNameRaw = ""
     @State private var location = ""
     @State private var avatarEmoji = ""
     @State private var wateringInterval = 7
@@ -631,6 +658,20 @@ struct EditPlantSheet: View {
     @State private var isIndoor = true
     @State private var windowDirection: PlantWindowDirection = .unknown
     @State private var lightLevel: PlantLightLevel = .medium
+    @State private var lastLightMeasurementLux = 0
+    @State private var lastLightMeasurementDate = Date()
+    @State private var recordsLightMeasurement = false
+    @State private var humidityPreference: PlantHumidityPreference = .standard
+    @State private var temperaturePreference: PlantTemperaturePreference = .standard
+    @State private var isNearClimateSource = false
+    @State private var potHasDrainage = true
+    @State private var hasAcquiredDate = false
+    @State private var acquiredDate = Date()
+    @State private var acquisitionSourceRaw = ""
+    @State private var currentHeightCm = 0.0
+    @State private var currentSpreadCm = 0.0
+    @State private var isHydroponic = false
+    @State private var isSucculent = false
     @State private var healthStatus: PlantHealthStatus = .stable
     @State private var catalogSpeciesId = ""
     @State private var isToxicToCats = false
@@ -648,6 +689,7 @@ struct EditPlantSheet: View {
                 cycleSection
                 environmentSection
                 potSection
+                sourceAndSizeSection
                 healthAndSafetySection
                 notesSection
 
@@ -674,7 +716,8 @@ struct EditPlantSheet: View {
         VStack(spacing: 12) {
             formField("名称", text: $name)
             formField("物种名", text: $species)
-            formField("房间/位置", text: $location)
+            formField("房间", text: $roomNameRaw)
+            formField("具体位置", text: $location)
             formField("头像 Emoji", text: $avatarEmoji)
         }
         .padding(16)
@@ -730,6 +773,24 @@ struct EditPlantSheet: View {
                     Text(level.displayName).tag(level)
                 }
             }
+            Toggle("记录光照实测", isOn: $recordsLightMeasurement)
+                .tint(Color.goLime)
+            if recordsLightMeasurement {
+                Stepper("光照实测 \(lastLightMeasurementLux) lux", value: $lastLightMeasurementLux, in: 0 ... 20000, step: 250)
+                    .tint(Color.goLime)
+            }
+            Picker("湿度偏好", selection: $humidityPreference) {
+                ForEach(PlantHumidityPreference.allCases) { preference in
+                    Text(preference.displayName).tag(preference)
+                }
+            }
+            Picker("温度偏好", selection: $temperaturePreference) {
+                ForEach(PlantTemperaturePreference.allCases) { preference in
+                    Text(preference.displayName).tag(preference)
+                }
+            }
+            Toggle("靠近空调/暖气", isOn: $isNearClimateSource)
+                .tint(Color.goLime)
         }
         .pickerStyle(.menu)
         .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .rounded))
@@ -744,8 +805,14 @@ struct EditPlantSheet: View {
             Stepper("盆径 \(Int(potDiameterCm)) cm", value: $potDiameterCm, in: 0 ... 80, step: 1)
                 .foregroundStyle(Color.ohanaPrimaryText)
                 .tint(Color.goLime)
+            Toggle("花盆有排水孔", isOn: $potHasDrainage)
+                .tint(Color.goLime)
             formField("盆材质", text: $potMaterialRaw)
             formField("土壤类型", text: $soilTypeRaw)
+            Toggle("水培", isOn: $isHydroponic)
+                .tint(Color.goLime)
+            Toggle("多肉/仙人掌类", isOn: $isSucculent)
+                .tint(Color.goLime)
         }
         .padding(16)
         .goTranslucentCard(cornerRadius: OhanaRadius.controlLarge)
@@ -769,6 +836,27 @@ struct EditPlantSheet: View {
                 .tint(Color.goLime)
         }
         .pickerStyle(.menu)
+        .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .rounded))
+        .foregroundStyle(Color.ohanaPrimaryText)
+        .padding(16)
+        .goTranslucentCard(cornerRadius: OhanaRadius.controlLarge)
+    }
+
+    private var sourceAndSizeSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            sectionTitle("来源与尺寸")
+            Toggle("记录购入日期", isOn: $hasAcquiredDate)
+                .tint(Color.goLime)
+            if hasAcquiredDate {
+                DatePicker("购入日期", selection: $acquiredDate, displayedComponents: .date)
+                    .tint(Color.goLime)
+            }
+            formField("来源", text: $acquisitionSourceRaw)
+            Stepper("当前高度 \(Int(currentHeightCm)) cm", value: $currentHeightCm, in: 0 ... 300, step: 1)
+                .tint(Color.goLime)
+            Stepper("冠幅 \(Int(currentSpreadCm)) cm", value: $currentSpreadCm, in: 0 ... 300, step: 1)
+                .tint(Color.goLime)
+        }
         .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .rounded))
         .foregroundStyle(Color.ohanaPrimaryText)
         .padding(16)
@@ -809,6 +897,7 @@ struct EditPlantSheet: View {
     private func prepareState() {
         name = plant.name
         species = plant.species
+        roomNameRaw = plant.roomNameRaw
         location = plant.location
         avatarEmoji = plant.avatarEmoji
         wateringInterval = plant.wateringIntervalDays
@@ -820,6 +909,20 @@ struct EditPlantSheet: View {
         isIndoor = plant.isIndoor
         windowDirection = plant.windowDirection
         lightLevel = plant.lightLevel
+        lastLightMeasurementLux = plant.lastLightMeasurementLux
+        lastLightMeasurementDate = plant.lastLightMeasurementDate ?? Date()
+        recordsLightMeasurement = plant.lastLightMeasurementLux > 0
+        humidityPreference = plant.humidityPreference
+        temperaturePreference = plant.temperaturePreference
+        isNearClimateSource = plant.isNearClimateSource
+        potHasDrainage = plant.potHasDrainage
+        hasAcquiredDate = plant.acquiredDate != nil
+        acquiredDate = plant.acquiredDate ?? Date()
+        acquisitionSourceRaw = plant.acquisitionSourceRaw
+        currentHeightCm = plant.currentHeightCm
+        currentSpreadCm = plant.currentSpreadCm
+        isHydroponic = plant.isHydroponic
+        isSucculent = plant.isSucculent
         healthStatus = plant.healthStatus
         catalogSpeciesId = plant.catalogSpeciesId
         isToxicToCats = plant.isToxicToCats
@@ -836,6 +939,7 @@ struct EditPlantSheet: View {
         soilTypeRaw = entry.soil
         wateringInterval = entry.defaultWateringDays
         fertilizingInterval = entry.defaultFertilizingDays
+        isIndoor = entry.isIndoorSuitable
         isToxicToCats = entry.isToxicToCats
         isToxicToDogs = entry.isToxicToDogs
         isToxicToChildren = entry.isToxicToChildren
@@ -852,12 +956,27 @@ struct EditPlantSheet: View {
             location: location,
             wateringIntervalDays: wateringInterval,
             fertilizingIntervalDays: fertilizingInterval,
+            roomNameRaw: roomNameRaw,
             potDiameterCm: potDiameterCm,
             potMaterialRaw: potMaterialRaw,
             soilTypeRaw: soilTypeRaw,
             isIndoor: isIndoor,
             windowDirection: windowDirection,
             lightLevel: lightLevel,
+            lastLightMeasurementLux: recordsLightMeasurement ? lastLightMeasurementLux : 0,
+            lastLightMeasurementDate: recordsLightMeasurement
+                ? (lastLightMeasurementLux == plant.lastLightMeasurementLux ? lastLightMeasurementDate : Date())
+                : nil,
+            humidityPreference: humidityPreference,
+            temperaturePreference: temperaturePreference,
+            isNearClimateSource: isNearClimateSource,
+            potHasDrainage: potHasDrainage,
+            acquiredDate: hasAcquiredDate ? acquiredDate : nil,
+            acquisitionSourceRaw: acquisitionSourceRaw,
+            currentHeightCm: currentHeightCm,
+            currentSpreadCm: currentSpreadCm,
+            isHydroponic: isHydroponic,
+            isSucculent: isSucculent,
             healthStatus: healthStatus,
             catalogSpeciesId: catalogSpeciesId,
             isToxicToCats: isToxicToCats,

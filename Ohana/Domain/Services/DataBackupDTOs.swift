@@ -9,7 +9,7 @@ import Foundation
 
 // MARK: - 顶层备份结构
 nonisolated struct OhanaBackup: Codable {
-    var schemaVersion: Int = 26
+    var schemaVersion: Int = 27
     var exportedAt: String
     // 核心实体
     var pets: [PetBackup]
@@ -256,12 +256,25 @@ nonisolated struct PlantBackup: Codable {
     var fertilizingIntervalDays: Int
     var themeColorHex: String?
     var lastHealthCheckDate: String?
+    var roomNameRaw: String?
     var potDiameterCm: Double?
     var potMaterialRaw: String?
     var soilTypeRaw: String?
     var isIndoor: Bool?
     var windowDirectionRaw: String?
     var lightLevelRaw: String?
+    var lastLightMeasurementLux: Int?
+    var lastLightMeasurementDate: String?
+    var humidityPreferenceRaw: String?
+    var temperaturePreferenceRaw: String?
+    var isNearClimateSource: Bool?
+    var potHasDrainage: Bool?
+    var acquiredDate: String?
+    var acquisitionSourceRaw: String?
+    var currentHeightCm: Double?
+    var currentSpreadCm: Double?
+    var isHydroponic: Bool?
+    var isSucculent: Bool?
     var healthStatusRaw: String?
     var catalogSpeciesId: String?
     var isToxicToCats: Bool?

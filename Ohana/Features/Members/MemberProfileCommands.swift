@@ -162,12 +162,25 @@ struct PlantProfileCommandInput: Equatable {
     let location: String
     let wateringIntervalDays: Int
     let fertilizingIntervalDays: Int
+    let roomNameRaw: String
     let potDiameterCm: Double
     let potMaterialRaw: String
     let soilTypeRaw: String
     let isIndoor: Bool
     let windowDirection: PlantWindowDirection
     let lightLevel: PlantLightLevel
+    let lastLightMeasurementLux: Int
+    let lastLightMeasurementDate: Date?
+    let humidityPreference: PlantHumidityPreference
+    let temperaturePreference: PlantTemperaturePreference
+    let isNearClimateSource: Bool
+    let potHasDrainage: Bool
+    let acquiredDate: Date?
+    let acquisitionSourceRaw: String
+    let currentHeightCm: Double
+    let currentSpreadCm: Double
+    let isHydroponic: Bool
+    let isSucculent: Bool
     let healthStatus: PlantHealthStatus
     let catalogSpeciesId: String
     let isToxicToCats: Bool
@@ -186,12 +199,25 @@ struct PlantProfileCommandInput: Equatable {
         location: String,
         wateringIntervalDays: Int,
         fertilizingIntervalDays: Int,
+        roomNameRaw: String = "",
         potDiameterCm: Double = 0,
         potMaterialRaw: String = "",
         soilTypeRaw: String = "",
         isIndoor: Bool = true,
         windowDirection: PlantWindowDirection = .unknown,
         lightLevel: PlantLightLevel = .medium,
+        lastLightMeasurementLux: Int = 0,
+        lastLightMeasurementDate: Date? = nil,
+        humidityPreference: PlantHumidityPreference = .standard,
+        temperaturePreference: PlantTemperaturePreference = .standard,
+        isNearClimateSource: Bool = false,
+        potHasDrainage: Bool = true,
+        acquiredDate: Date? = nil,
+        acquisitionSourceRaw: String = "",
+        currentHeightCm: Double = 0,
+        currentSpreadCm: Double = 0,
+        isHydroponic: Bool = false,
+        isSucculent: Bool = false,
         healthStatus: PlantHealthStatus = .stable,
         catalogSpeciesId: String = "",
         isToxicToCats: Bool = false,
@@ -209,12 +235,25 @@ struct PlantProfileCommandInput: Equatable {
         self.location = location
         self.wateringIntervalDays = wateringIntervalDays
         self.fertilizingIntervalDays = fertilizingIntervalDays
+        self.roomNameRaw = roomNameRaw
         self.potDiameterCm = potDiameterCm
         self.potMaterialRaw = potMaterialRaw
         self.soilTypeRaw = soilTypeRaw
         self.isIndoor = isIndoor
         self.windowDirection = windowDirection
         self.lightLevel = lightLevel
+        self.lastLightMeasurementLux = lastLightMeasurementLux
+        self.lastLightMeasurementDate = lastLightMeasurementDate
+        self.humidityPreference = humidityPreference
+        self.temperaturePreference = temperaturePreference
+        self.isNearClimateSource = isNearClimateSource
+        self.potHasDrainage = potHasDrainage
+        self.acquiredDate = acquiredDate
+        self.acquisitionSourceRaw = acquisitionSourceRaw
+        self.currentHeightCm = currentHeightCm
+        self.currentSpreadCm = currentSpreadCm
+        self.isHydroponic = isHydroponic
+        self.isSucculent = isSucculent
         self.healthStatus = healthStatus
         self.catalogSpeciesId = catalogSpeciesId
         self.isToxicToCats = isToxicToCats
@@ -453,12 +492,25 @@ enum MemberProfileCommandService {
         plant.location = input.location.trimmingCharacters(in: .whitespacesAndNewlines)
         plant.wateringIntervalDays = input.wateringIntervalDays
         plant.fertilizingIntervalDays = input.fertilizingIntervalDays
+        plant.roomNameRaw = input.roomNameRaw.trimmingCharacters(in: .whitespacesAndNewlines)
         plant.potDiameterCm = input.potDiameterCm
         plant.potMaterialRaw = input.potMaterialRaw.trimmingCharacters(in: .whitespacesAndNewlines)
         plant.soilTypeRaw = input.soilTypeRaw.trimmingCharacters(in: .whitespacesAndNewlines)
         plant.isIndoor = input.isIndoor
         plant.windowDirection = input.windowDirection
         plant.lightLevel = input.lightLevel
+        plant.lastLightMeasurementLux = max(0, input.lastLightMeasurementLux)
+        plant.lastLightMeasurementDate = input.lastLightMeasurementDate
+        plant.humidityPreference = input.humidityPreference
+        plant.temperaturePreference = input.temperaturePreference
+        plant.isNearClimateSource = input.isNearClimateSource
+        plant.potHasDrainage = input.potHasDrainage
+        plant.acquiredDate = input.acquiredDate
+        plant.acquisitionSourceRaw = input.acquisitionSourceRaw.trimmingCharacters(in: .whitespacesAndNewlines)
+        plant.currentHeightCm = input.currentHeightCm
+        plant.currentSpreadCm = input.currentSpreadCm
+        plant.isHydroponic = input.isHydroponic
+        plant.isSucculent = input.isSucculent
         plant.healthStatus = input.healthStatus
         plant.catalogSpeciesId = input.catalogSpeciesId
         plant.isToxicToCats = input.isToxicToCats
@@ -477,10 +529,14 @@ enum MemberProfileCommandService {
             kind: EntityKind.plant.rawValue,
             changedFields: [
                 "name", "avatarImageData", "avatarEmoji", "species", "location",
-                "wateringIntervalDays", "fertilizingIntervalDays", "potDiameterCm",
-                "potMaterialRaw", "soilTypeRaw", "isIndoor", "windowDirectionRaw",
-                "lightLevelRaw", "healthStatusRaw", "catalogSpeciesId", "toxicity",
-                "isIndoorSuitable", "remindersEnabled", "themeColorHex", "notes"
+                "wateringIntervalDays", "fertilizingIntervalDays", "roomNameRaw",
+                "potDiameterCm", "potMaterialRaw", "soilTypeRaw", "isIndoor",
+                "windowDirectionRaw", "lightLevelRaw", "lastLightMeasurementLux",
+                "lastLightMeasurementDate", "humidityPreferenceRaw", "temperaturePreferenceRaw",
+                "isNearClimateSource", "potHasDrainage", "acquiredDate", "acquisitionSourceRaw",
+                "currentHeightCm", "currentSpreadCm", "isHydroponic", "isSucculent",
+                "healthStatusRaw", "catalogSpeciesId", "toxicity", "isIndoorSuitable",
+                "remindersEnabled", "themeColorHex", "notes"
             ]
         )
     }

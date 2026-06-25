@@ -25,6 +25,63 @@ struct PlantLaunchTests {
         #expect(!task.isOverdue)
     }
 
+    @Test func structuredEnvironmentAdjustsCarePlanAndTaskCopy() throws {
+        let now = makeDate(year: 2026, month: 6, day: 21)
+        let plant = Plant(
+            name: "Calathea",
+            location: "South shelf",
+            wateringIntervalDays: 7,
+            fertilizingIntervalDays: 30,
+            roomNameRaw: "Bedroom",
+            potDiameterCm: 8,
+            potMaterialRaw: "terracotta",
+            soilTypeRaw: "airy mix",
+            isIndoor: true,
+            windowDirection: .south,
+            lightLevel: .direct,
+            lastLightMeasurementLux: 12000,
+            lastLightMeasurementDate: now,
+            humidityPreference: .humid,
+            temperaturePreference: .warm,
+            isNearClimateSource: true,
+            potHasDrainage: false,
+            currentHeightCm: 42
+        )
+        plant.createdAt = Calendar.current.date(byAdding: .day, value: -10, to: now) ?? now
+
+        let tasks = PlantCarePlanService.tasks(for: plant, now: now)
+        let watering = try #require(tasks.first { $0.careType == .watering })
+        let misting = try #require(tasks.first { $0.careType == .misting })
+
+        #expect(PlantCarePlanService.intervalDays(for: .watering, plant: plant) == 2)
+        #expect(PlantCarePlanService.intervalDays(for: .misting, plant: plant) == 3)
+        #expect(PlantCarePlanService.intervalDays(for: .repotting, plant: plant) == 270)
+        #expect(watering.subtitle.contains("实测 12000 lux"))
+        #expect(watering.subtitle.contains("无排水孔"))
+        #expect(misting.subtitle.contains("空调/暖气"))
+    }
+
+    @Test func hydroponicAndSucculentProfilesUseDifferentCareCadence() {
+        let hydroponic = Plant(
+            name: "Pothos",
+            wateringIntervalDays: 14,
+            fertilizingIntervalDays: 45,
+            isHydroponic: true
+        )
+        let succulent = Plant(
+            name: "Echeveria",
+            wateringIntervalDays: 7,
+            fertilizingIntervalDays: 14,
+            isSucculent: true
+        )
+
+        #expect(PlantCarePlanService.intervalDays(for: .watering, plant: hydroponic) == 7)
+        #expect(PlantCarePlanService.intervalDays(for: .fertilizing, plant: hydroponic) == 21)
+        #expect(PlantCarePlanService.intervalDays(for: .repotting, plant: hydroponic) == 180)
+        #expect(PlantCarePlanService.intervalDays(for: .watering, plant: succulent) == 14)
+        #expect(PlantCarePlanService.intervalDays(for: .fertilizing, plant: succulent) == 45)
+    }
+
     @Test func localDiagnosisFallbackAlwaysReturnsUncertaintyAndMultipleCauses() async {
         let result = await LocalPlantIntelligenceFallback().diagnosePlant(
             imageData: nil,
@@ -43,6 +100,8 @@ struct PlantLaunchTests {
 
         let source = try makeInMemoryContainer()
         let sourceContext = source.mainContext
+        let lightMeasuredAt = makeDate(year: 2026, month: 6, day: 6, hour: 10)
+        let acquiredAt = makeDate(year: 2026, month: 5, day: 20)
         let plant = Plant(
             name: "Spider",
             species: "吊兰",
@@ -51,12 +110,25 @@ struct PlantLaunchTests {
             wateringIntervalDays: 6,
             fertilizingIntervalDays: 40,
             themeColorHex: "4CAF50",
+            roomNameRaw: "Kitchen",
             potDiameterCm: 11,
             potMaterialRaw: "ceramic",
             soilTypeRaw: "airy mix",
             isIndoor: true,
             windowDirection: .east,
             lightLevel: .medium,
+            lastLightMeasurementLux: 3500,
+            lastLightMeasurementDate: lightMeasuredAt,
+            humidityPreference: .humid,
+            temperaturePreference: .warm,
+            isNearClimateSource: true,
+            potHasDrainage: false,
+            acquiredDate: acquiredAt,
+            acquisitionSourceRaw: "local nursery",
+            currentHeightCm: 22,
+            currentSpreadCm: 18,
+            isHydroponic: true,
+            isSucculent: false,
             healthStatus: .watching,
             catalogSpeciesId: "chlorophytum-comosum",
             isToxicToCats: false,
@@ -79,11 +151,24 @@ struct PlantLaunchTests {
 
         let restored = try #require(try target.mainContext.fetch(FetchDescriptor<Plant>()).first)
         #expect(PlantUnlockPolicy.hasExistingPlantData())
+        #expect(restored.roomNameRaw == "Kitchen")
         #expect(restored.potDiameterCm == 11)
         #expect(restored.potMaterialRaw == "ceramic")
         #expect(restored.soilTypeRaw == "airy mix")
         #expect(restored.windowDirection == .east)
         #expect(restored.lightLevel == .medium)
+        #expect(restored.lastLightMeasurementLux == 3500)
+        #expect(restored.lastLightMeasurementDate == lightMeasuredAt)
+        #expect(restored.humidityPreference == .humid)
+        #expect(restored.temperaturePreference == .warm)
+        #expect(restored.isNearClimateSource)
+        #expect(!restored.potHasDrainage)
+        #expect(restored.acquiredDate == acquiredAt)
+        #expect(restored.acquisitionSourceRaw == "local nursery")
+        #expect(restored.currentHeightCm == 22)
+        #expect(restored.currentSpreadCm == 18)
+        #expect(restored.isHydroponic)
+        #expect(!restored.isSucculent)
         #expect(restored.healthStatus == .watching)
         #expect(restored.catalogSpeciesId == "chlorophytum-comosum")
         #expect(restored.remindersEnabled == false)
@@ -152,6 +237,68 @@ struct PlantLaunchTests {
 
         #expect(PlantUnlockPolicy.hasExistingPlantData())
         #expect(AppFeatureRouteGuard.allowsAddEntity(.plant, currentLevel: 3))
+    }
+
+    @Test func creatingPlantPersistsStructuredEnvironmentFields() throws {
+        let container = try makeInMemoryContainer()
+        let measuredAt = makeDate(year: 2026, month: 6, day: 22, hour: 11)
+        let acquiredAt = makeDate(year: 2026, month: 4, day: 18)
+        let input = PlantCreationCommandInput(
+            name: "Calathea",
+            species: "Calathea orbifolia",
+            location: "South shelf",
+            avatarEmoji: "🌿",
+            wateringIntervalDays: 5,
+            fertilizingIntervalDays: 28,
+            roomNameRaw: "Bedroom",
+            potDiameterCm: 14,
+            potMaterialRaw: "terracotta",
+            soilTypeRaw: "aroid mix",
+            isIndoor: true,
+            windowDirection: .south,
+            lightLevel: .brightIndirect,
+            lastLightMeasurementLux: 4200,
+            lastLightMeasurementDate: measuredAt,
+            humidityPreference: .humid,
+            temperaturePreference: .warm,
+            isNearClimateSource: true,
+            potHasDrainage: false,
+            acquiredDate: acquiredAt,
+            acquisitionSourceRaw: "plant market",
+            currentHeightCm: 31,
+            currentSpreadCm: 36,
+            isHydroponic: false,
+            isSucculent: false,
+            healthStatus: .watching,
+            catalogSpeciesId: "calathea-orbifolia"
+        )
+
+        PlantCreationCommandService.createPlant(
+            input: input,
+            context: container.mainContext,
+            scheduleNotifications: false
+        )
+
+        let plant = try #require(try container.mainContext.fetch(FetchDescriptor<Plant>()).first)
+        #expect(plant.roomNameRaw == "Bedroom")
+        #expect(plant.location == "South shelf")
+        #expect(plant.potDiameterCm == 14)
+        #expect(plant.potMaterialRaw == "terracotta")
+        #expect(plant.soilTypeRaw == "aroid mix")
+        #expect(plant.windowDirection == .south)
+        #expect(plant.lightLevel == .brightIndirect)
+        #expect(plant.lastLightMeasurementLux == 4200)
+        #expect(plant.lastLightMeasurementDate == measuredAt)
+        #expect(plant.humidityPreference == .humid)
+        #expect(plant.temperaturePreference == .warm)
+        #expect(plant.isNearClimateSource)
+        #expect(!plant.potHasDrainage)
+        #expect(plant.acquiredDate == acquiredAt)
+        #expect(plant.acquisitionSourceRaw == "plant market")
+        #expect(plant.currentHeightCm == 31)
+        #expect(plant.currentSpreadCm == 36)
+        #expect(plant.healthStatus == .watching)
+        #expect(plant.catalogSpeciesId == "calathea-orbifolia")
     }
 
     @Test func plantCarePlanSyncMaterializesCalendarEventsAndReminders() throws {
@@ -752,7 +899,7 @@ struct PlantLaunchTests {
     }
 
     private func makeInMemoryContainer() throws -> ModelContainer {
-        let schema = Schema(ArkSchemaV73.models)
+        let schema = Schema(ArkSchemaV74.models)
         let config = ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)
         return try ModelContainer(for: schema, migrationPlan: ArkMigrationPlan.self, configurations: [config])
     }

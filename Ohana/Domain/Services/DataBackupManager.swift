@@ -136,7 +136,7 @@ final nonisolated class DataBackupManager: @unchecked Sendable {
         let decoder = JSONDecoder()
         let backup = try decoder.decode(OhanaBackup.self, from: data)
 
-        guard backup.schemaVersion <= 26 else {
+        guard backup.schemaVersion <= 27 else {
             throw BackupError.unsupportedVersion(backup.schemaVersion)
         }
 

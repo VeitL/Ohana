@@ -80,6 +80,42 @@ enum PlantWindowDirection: String, Codable, CaseIterable, Identifiable, Sendable
     }
 }
 
+enum PlantHumidityPreference: String, Codable, CaseIterable, Identifiable, Sendable {
+    case unknown
+    case dry
+    case standard
+    case humid
+
+    var id: String { rawValue }
+
+    nonisolated var displayName: String {
+        switch self {
+        case .unknown: "未设置"
+        case .dry: "偏干"
+        case .standard: "普通"
+        case .humid: "偏湿"
+        }
+    }
+}
+
+enum PlantTemperaturePreference: String, Codable, CaseIterable, Identifiable, Sendable {
+    case unknown
+    case cool
+    case standard
+    case warm
+
+    var id: String { rawValue }
+
+    nonisolated var displayName: String {
+        switch self {
+        case .unknown: "未设置"
+        case .cool: "偏凉"
+        case .standard: "普通"
+        case .warm: "偏暖"
+        }
+    }
+}
+
 @Model
 final class Plant {
     var id: UUID
@@ -94,12 +130,25 @@ final class Plant {
     var lastWateredDate: Date?
     var lastFertilizedDate: Date?
     var lastHealthCheckDate: Date?
+    var roomNameRaw: String = ""
     var potDiameterCm: Double = 0
     var potMaterialRaw: String = ""
     var soilTypeRaw: String = ""
     var isIndoor: Bool = true
     var windowDirectionRaw: String = PlantWindowDirection.unknown.rawValue
     var lightLevelRaw: String = PlantLightLevel.medium.rawValue
+    var lastLightMeasurementLux: Int = 0
+    var lastLightMeasurementDate: Date?
+    var humidityPreferenceRaw: String = PlantHumidityPreference.standard.rawValue
+    var temperaturePreferenceRaw: String = PlantTemperaturePreference.standard.rawValue
+    var isNearClimateSource: Bool = false
+    var potHasDrainage: Bool = true
+    var acquiredDate: Date?
+    var acquisitionSourceRaw: String = ""
+    var currentHeightCm: Double = 0
+    var currentSpreadCm: Double = 0
+    var isHydroponic: Bool = false
+    var isSucculent: Bool = false
     var healthStatusRaw: String = PlantHealthStatus.stable.rawValue
     var catalogSpeciesId: String = ""
     var isToxicToCats: Bool = false
@@ -126,12 +175,25 @@ final class Plant {
         wateringIntervalDays: Int = 7,
         fertilizingIntervalDays: Int = 30,
         themeColorHex: String = "4CAF50",
+        roomNameRaw: String = "",
         potDiameterCm: Double = 0,
         potMaterialRaw: String = "",
         soilTypeRaw: String = "",
         isIndoor: Bool = true,
         windowDirection: PlantWindowDirection = .unknown,
         lightLevel: PlantLightLevel = .medium,
+        lastLightMeasurementLux: Int = 0,
+        lastLightMeasurementDate: Date? = nil,
+        humidityPreference: PlantHumidityPreference = .standard,
+        temperaturePreference: PlantTemperaturePreference = .standard,
+        isNearClimateSource: Bool = false,
+        potHasDrainage: Bool = true,
+        acquiredDate: Date? = nil,
+        acquisitionSourceRaw: String = "",
+        currentHeightCm: Double = 0,
+        currentSpreadCm: Double = 0,
+        isHydroponic: Bool = false,
+        isSucculent: Bool = false,
         healthStatus: PlantHealthStatus = .stable,
         catalogSpeciesId: String = "",
         isToxicToCats: Bool = false,
@@ -152,12 +214,25 @@ final class Plant {
         self.lastWateredDate = nil
         self.lastFertilizedDate = nil
         self.lastHealthCheckDate = nil
+        self.roomNameRaw = roomNameRaw
         self.potDiameterCm = potDiameterCm
         self.potMaterialRaw = potMaterialRaw
         self.soilTypeRaw = soilTypeRaw
         self.isIndoor = isIndoor
         self.windowDirectionRaw = windowDirection.rawValue
         self.lightLevelRaw = lightLevel.rawValue
+        self.lastLightMeasurementLux = lastLightMeasurementLux
+        self.lastLightMeasurementDate = lastLightMeasurementDate
+        self.humidityPreferenceRaw = humidityPreference.rawValue
+        self.temperaturePreferenceRaw = temperaturePreference.rawValue
+        self.isNearClimateSource = isNearClimateSource
+        self.potHasDrainage = potHasDrainage
+        self.acquiredDate = acquiredDate
+        self.acquisitionSourceRaw = acquisitionSourceRaw
+        self.currentHeightCm = currentHeightCm
+        self.currentSpreadCm = currentSpreadCm
+        self.isHydroponic = isHydroponic
+        self.isSucculent = isSucculent
         self.healthStatusRaw = healthStatus.rawValue
         self.catalogSpeciesId = catalogSpeciesId
         self.isToxicToCats = isToxicToCats
@@ -185,12 +260,31 @@ final class Plant {
         set { windowDirectionRaw = newValue.rawValue }
     }
 
+    var humidityPreference: PlantHumidityPreference {
+        get { PlantHumidityPreference(rawValue: humidityPreferenceRaw) ?? .standard }
+        set { humidityPreferenceRaw = newValue.rawValue }
+    }
+
+    var temperaturePreference: PlantTemperaturePreference {
+        get { PlantTemperaturePreference(rawValue: temperaturePreferenceRaw) ?? .standard }
+        set { temperaturePreferenceRaw = newValue.rawValue }
+    }
+
+    var roomName: String {
+        let room = roomNameRaw.trimmingCharacters(in: .whitespacesAndNewlines)
+        return room.isEmpty ? location.trimmingCharacters(in: .whitespacesAndNewlines) : room
+    }
+
     var potMaterial: String {
         potMaterialRaw.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     var soilType: String {
         soilTypeRaw.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    var acquisitionSource: String {
+        acquisitionSourceRaw.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     var daysSinceWatered: Int? {

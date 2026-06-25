@@ -105,12 +105,25 @@ nonisolated struct DomainPlantRehydrateSnapshot: Equatable {
     let fertilizingIntervalDays: Int
     let themeColorHex: String
     let lastHealthCheckDate: Date?
+    let roomNameRaw: String
     let potDiameterCm: Double
     let potMaterialRaw: String
     let soilTypeRaw: String
     let isIndoor: Bool
     let windowDirection: PlantWindowDirection
     let lightLevel: PlantLightLevel
+    let lastLightMeasurementLux: Int
+    let lastLightMeasurementDate: Date?
+    let humidityPreference: PlantHumidityPreference
+    let temperaturePreference: PlantTemperaturePreference
+    let isNearClimateSource: Bool
+    let potHasDrainage: Bool
+    let acquiredDate: Date?
+    let acquisitionSourceRaw: String
+    let currentHeightCm: Double
+    let currentSpreadCm: Double
+    let isHydroponic: Bool
+    let isSucculent: Bool
     let healthStatus: PlantHealthStatus
     let catalogSpeciesId: String
     let isToxicToCats: Bool
@@ -454,12 +467,25 @@ nonisolated enum DomainGeneralRehydrateWriter {
             wateringIntervalDays: snapshot.wateringIntervalDays,
             fertilizingIntervalDays: snapshot.fertilizingIntervalDays,
             themeColorHex: snapshot.themeColorHex,
+            roomNameRaw: snapshot.roomNameRaw,
             potDiameterCm: snapshot.potDiameterCm,
             potMaterialRaw: snapshot.potMaterialRaw,
             soilTypeRaw: snapshot.soilTypeRaw,
             isIndoor: snapshot.isIndoor,
             windowDirection: snapshot.windowDirection,
             lightLevel: snapshot.lightLevel,
+            lastLightMeasurementLux: snapshot.lastLightMeasurementLux,
+            lastLightMeasurementDate: snapshot.lastLightMeasurementDate,
+            humidityPreference: snapshot.humidityPreference,
+            temperaturePreference: snapshot.temperaturePreference,
+            isNearClimateSource: snapshot.isNearClimateSource,
+            potHasDrainage: snapshot.potHasDrainage,
+            acquiredDate: snapshot.acquiredDate,
+            acquisitionSourceRaw: snapshot.acquisitionSourceRaw,
+            currentHeightCm: snapshot.currentHeightCm,
+            currentSpreadCm: snapshot.currentSpreadCm,
+            isHydroponic: snapshot.isHydroponic,
+            isSucculent: snapshot.isSucculent,
             healthStatus: snapshot.healthStatus,
             catalogSpeciesId: snapshot.catalogSpeciesId,
             isToxicToCats: snapshot.isToxicToCats,

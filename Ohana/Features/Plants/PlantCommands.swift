@@ -215,12 +215,25 @@ struct PlantCreationCommandInput: Equatable {
     let avatarEmoji: String
     let wateringIntervalDays: Int
     let fertilizingIntervalDays: Int
+    let roomNameRaw: String
     let potDiameterCm: Double
     let potMaterialRaw: String
     let soilTypeRaw: String
     let isIndoor: Bool
     let windowDirection: PlantWindowDirection
     let lightLevel: PlantLightLevel
+    let lastLightMeasurementLux: Int
+    let lastLightMeasurementDate: Date?
+    let humidityPreference: PlantHumidityPreference
+    let temperaturePreference: PlantTemperaturePreference
+    let isNearClimateSource: Bool
+    let potHasDrainage: Bool
+    let acquiredDate: Date?
+    let acquisitionSourceRaw: String
+    let currentHeightCm: Double
+    let currentSpreadCm: Double
+    let isHydroponic: Bool
+    let isSucculent: Bool
     let healthStatus: PlantHealthStatus
     let catalogSpeciesId: String
     let isToxicToCats: Bool
@@ -238,12 +251,25 @@ struct PlantCreationCommandInput: Equatable {
         avatarEmoji: String,
         wateringIntervalDays: Int,
         fertilizingIntervalDays: Int,
+        roomNameRaw: String = "",
         potDiameterCm: Double = 0,
         potMaterialRaw: String = "",
         soilTypeRaw: String = "",
         isIndoor: Bool = true,
         windowDirection: PlantWindowDirection = .unknown,
         lightLevel: PlantLightLevel = .medium,
+        lastLightMeasurementLux: Int = 0,
+        lastLightMeasurementDate: Date? = nil,
+        humidityPreference: PlantHumidityPreference = .standard,
+        temperaturePreference: PlantTemperaturePreference = .standard,
+        isNearClimateSource: Bool = false,
+        potHasDrainage: Bool = true,
+        acquiredDate: Date? = nil,
+        acquisitionSourceRaw: String = "",
+        currentHeightCm: Double = 0,
+        currentSpreadCm: Double = 0,
+        isHydroponic: Bool = false,
+        isSucculent: Bool = false,
         healthStatus: PlantHealthStatus = .stable,
         catalogSpeciesId: String = "",
         isToxicToCats: Bool = false,
@@ -260,12 +286,25 @@ struct PlantCreationCommandInput: Equatable {
         self.avatarEmoji = avatarEmoji
         self.wateringIntervalDays = wateringIntervalDays
         self.fertilizingIntervalDays = fertilizingIntervalDays
+        self.roomNameRaw = roomNameRaw
         self.potDiameterCm = potDiameterCm
         self.potMaterialRaw = potMaterialRaw
         self.soilTypeRaw = soilTypeRaw
         self.isIndoor = isIndoor
         self.windowDirection = windowDirection
         self.lightLevel = lightLevel
+        self.lastLightMeasurementLux = lastLightMeasurementLux
+        self.lastLightMeasurementDate = lastLightMeasurementDate
+        self.humidityPreference = humidityPreference
+        self.temperaturePreference = temperaturePreference
+        self.isNearClimateSource = isNearClimateSource
+        self.potHasDrainage = potHasDrainage
+        self.acquiredDate = acquiredDate
+        self.acquisitionSourceRaw = acquisitionSourceRaw
+        self.currentHeightCm = currentHeightCm
+        self.currentSpreadCm = currentSpreadCm
+        self.isHydroponic = isHydroponic
+        self.isSucculent = isSucculent
         self.healthStatus = healthStatus
         self.catalogSpeciesId = catalogSpeciesId
         self.isToxicToCats = isToxicToCats
@@ -301,12 +340,25 @@ enum PlantCreationCommandService {
                 : input.avatarEmoji.trimmingCharacters(in: .whitespacesAndNewlines),
             wateringIntervalDays: input.wateringIntervalDays,
             fertilizingIntervalDays: input.fertilizingIntervalDays,
+            roomNameRaw: input.roomNameRaw.trimmingCharacters(in: .whitespacesAndNewlines),
             potDiameterCm: input.potDiameterCm,
             potMaterialRaw: input.potMaterialRaw.trimmingCharacters(in: .whitespacesAndNewlines),
             soilTypeRaw: input.soilTypeRaw.trimmingCharacters(in: .whitespacesAndNewlines),
             isIndoor: input.isIndoor,
             windowDirection: input.windowDirection,
             lightLevel: input.lightLevel,
+            lastLightMeasurementLux: max(0, input.lastLightMeasurementLux),
+            lastLightMeasurementDate: input.lastLightMeasurementDate,
+            humidityPreference: input.humidityPreference,
+            temperaturePreference: input.temperaturePreference,
+            isNearClimateSource: input.isNearClimateSource,
+            potHasDrainage: input.potHasDrainage,
+            acquiredDate: input.acquiredDate,
+            acquisitionSourceRaw: input.acquisitionSourceRaw.trimmingCharacters(in: .whitespacesAndNewlines),
+            currentHeightCm: input.currentHeightCm,
+            currentSpreadCm: input.currentSpreadCm,
+            isHydroponic: input.isHydroponic,
+            isSucculent: input.isSucculent,
             healthStatus: input.healthStatus,
             catalogSpeciesId: input.catalogSpeciesId,
             isToxicToCats: input.isToxicToCats,
