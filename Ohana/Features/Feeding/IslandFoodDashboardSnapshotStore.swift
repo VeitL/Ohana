@@ -95,7 +95,7 @@ struct IslandFoodDashboardSnapshot {
         selectedPetId: UUID?,
         allEvents: [Event],
         allFeedingLedgerEntries: [FoodLedgerEntry],
-        legacyStockCareLogs: [PetCareLog],
+        allStockFeedingLedgerEntries: [QuickFeedLedgerEntry],
         allFoodRecords: [PetFoodRecord],
         allSharedCareSessions: [SharedCareSession] = [],
         now: Date,
@@ -111,11 +111,7 @@ struct IslandFoodDashboardSnapshot {
         let cutoff = calendar.date(byAdding: .day, value: -6, to: today) ?? today
         let activePetsByID = petsByID(activePets)
         let ledgerEntriesByPetID = Dictionary(grouping: allFeedingLedgerEntries, by: \.petId)
-        let legacyStockLogsByPetID = Dictionary(grouping: legacyStockCareLogs.compactMap { log -> (UUID, PetCareLog)? in
-            guard log.careType == .feeding, let petID = log.pet?.id else { return nil }
-            return (petID, log)
-        }, by: \.0)
-            .mapValues { $0.map(\.1) }
+        let stockEntriesByPetID = Dictionary(grouping: allStockFeedingLedgerEntries, by: \.petId)
         let recordsByPetID = Dictionary(grouping: allFoodRecords.compactMap { record -> (UUID, PetFoodRecord)? in
             guard let petID = record.pet?.id else { return nil }
             return (petID, record)
@@ -154,7 +150,7 @@ struct IslandFoodDashboardSnapshot {
             guard let stock = foodStockOverview(
                 for: pet,
                 allEvents: allEvents,
-                legacyStockCareLogs: legacyStockLogsByPetID[pet.id] ?? [],
+                feedingLedgerEntries: stockEntriesByPetID[pet.id] ?? [],
                 foodRecords: recordsByPetID[pet.id] ?? [],
                 sharedCareSessions: allSharedCareSessions,
                 now: now,
@@ -199,7 +195,7 @@ struct IslandFoodDashboardSnapshot {
     private static func foodStockOverview(
         for pet: Pet,
         allEvents: [Event],
-        legacyStockCareLogs: [PetCareLog],
+        feedingLedgerEntries: [QuickFeedLedgerEntry],
         foodRecords: [PetFoodRecord],
         sharedCareSessions: [SharedCareSession],
         now: Date,
@@ -209,7 +205,7 @@ struct IslandFoodDashboardSnapshot {
             for: pet,
             foodKind: .dry,
             events: allEvents,
-            careLogs: legacyStockCareLogs,
+            feedingLedgerEntries: feedingLedgerEntries,
             foodRecords: foodRecords,
             sharedCareSessions: sharedCareSessions,
             now: now,
@@ -219,7 +215,7 @@ struct IslandFoodDashboardSnapshot {
             for: pet,
             foodKind: .wet,
             events: allEvents,
-            careLogs: legacyStockCareLogs,
+            feedingLedgerEntries: feedingLedgerEntries,
             foodRecords: foodRecords,
             sharedCareSessions: sharedCareSessions,
             now: now,
@@ -241,7 +237,7 @@ struct IslandFoodDashboardSnapshot {
             let legacyConsumedGrams = FeedStockCalculator.mainConsumedSinceRestock(
                 for: pet,
                 foodKind: .dry,
-                careLogs: legacyStockCareLogs,
+                feedingLedgerEntries: feedingLedgerEntries,
                 foodRecords: foodRecords,
                 sharedCareSessions: sharedCareSessions,
                 now: now
@@ -267,7 +263,7 @@ struct IslandFoodDashboardInputRevision: Equatable {
     let petRevision: Int
     let eventRevision: Int
     let feedingLedgerRevision: Int
-    let legacyStockLogRevision: Int
+    let stockFeedingLedgerRevision: Int
     let foodRecordRevision: Int
     let sharedSessionRevision: Int
     let selectedPetRawValue: String
@@ -277,7 +273,7 @@ struct IslandFoodDashboardInputRevision: Equatable {
         selectedPetId: UUID?,
         allEvents: [Event],
         allFeedingLedgerEntries: [FoodLedgerEntry],
-        legacyStockCareLogs: [PetCareLog],
+        allStockFeedingLedgerEntries: [QuickFeedLedgerEntry],
         allFoodRecords: [PetFoodRecord],
         allSharedCareSessions: [SharedCareSession]
     ) -> IslandFoodDashboardInputRevision {
@@ -308,14 +304,16 @@ struct IslandFoodDashboardInputRevision: Equatable {
                 hasher.combine(entry.date.timeIntervalSince1970)
                 hasher.combine(entry.amountGrams)
             },
-            legacyStockLogRevision: revisionHash(legacyStockCareLogs.prefix(500)) { hasher, log in
-                hasher.combine(log.id)
-                hasher.combine(log.date.timeIntervalSince1970)
-                hasher.combine(log.amountGrams)
-                hasher.combine(log.type)
-                hasher.combine(log.pet?.id)
-                hasher.combine(log.foodKindRaw)
-                hasher.combine(log.note)
+            stockFeedingLedgerRevision: revisionHash(allStockFeedingLedgerEntries.prefix(500)) { hasher, entry in
+                hasher.combine(entry.id)
+                hasher.combine(entry.petId)
+                hasher.combine(entry.date.timeIntervalSince1970)
+                hasher.combine(entry.amountGrams)
+                hasher.combine(entry.source.rawValue)
+                hasher.combine(entry.foodKind.rawValue)
+                hasher.combine(entry.treatKind?.rawValue ?? "")
+                hasher.combine(entry.sharedSessionId)
+                hasher.combine(entry.metadataJSON)
             },
             foodRecordRevision: revisionHash(allFoodRecords.prefix(220)) { hasher, record in
                 hasher.combine(record.id)
@@ -366,7 +364,7 @@ struct IslandFoodDashboardSnapshotRevision: Equatable {
         selectedPetId: UUID?,
         allEvents: [Event],
         allFeedingLedgerEntries: [FoodLedgerEntry],
-        legacyStockCareLogs: [PetCareLog],
+        allStockFeedingLedgerEntries: [QuickFeedLedgerEntry],
         allFoodRecords: [PetFoodRecord],
         allSharedCareSessions: [SharedCareSession],
         now: Date
@@ -377,7 +375,7 @@ struct IslandFoodDashboardSnapshotRevision: Equatable {
                 selectedPetId: selectedPetId,
                 allEvents: allEvents,
                 allFeedingLedgerEntries: allFeedingLedgerEntries,
-                legacyStockCareLogs: legacyStockCareLogs,
+                allStockFeedingLedgerEntries: allStockFeedingLedgerEntries,
                 allFoodRecords: allFoodRecords,
                 allSharedCareSessions: allSharedCareSessions
             ),
@@ -396,7 +394,7 @@ final class IslandFoodDashboardSnapshotStore: ObservableObject {
         selectedPetId: UUID?,
         allEvents: [Event],
         allFeedingLedgerEntries: [FoodLedgerEntry],
-        legacyStockCareLogs: [PetCareLog],
+        allStockFeedingLedgerEntries: [QuickFeedLedgerEntry],
         allFoodRecords: [PetFoodRecord],
         allSharedCareSessions: [SharedCareSession],
         now: Date = Date(),
@@ -407,7 +405,7 @@ final class IslandFoodDashboardSnapshotStore: ObservableObject {
             selectedPetId: selectedPetId,
             allEvents: allEvents,
             allFeedingLedgerEntries: allFeedingLedgerEntries,
-            legacyStockCareLogs: legacyStockCareLogs,
+            allStockFeedingLedgerEntries: allStockFeedingLedgerEntries,
             allFoodRecords: allFoodRecords,
             allSharedCareSessions: allSharedCareSessions,
             now: now
@@ -418,7 +416,7 @@ final class IslandFoodDashboardSnapshotStore: ObservableObject {
             selectedPetId: selectedPetId,
             allEvents: allEvents,
             allFeedingLedgerEntries: allFeedingLedgerEntries,
-            legacyStockCareLogs: legacyStockCareLogs,
+            allStockFeedingLedgerEntries: allStockFeedingLedgerEntries,
             allFoodRecords: allFoodRecords,
             allSharedCareSessions: allSharedCareSessions,
             now: now

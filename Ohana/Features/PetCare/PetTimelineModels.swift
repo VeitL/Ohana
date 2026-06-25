@@ -65,10 +65,24 @@ struct PetTimelineArchiveSection: Identifiable {
     let items: [UnifiedLogItem]
 }
 
+struct PetTimelineSourceRows {
+    var careLogs: [PetCareLog] = []
+    var pottyLogs: [PetPottyLog] = []
+    var walkLogs: [PetWalkLog] = []
+    var healthLogs: [PetHealthLog] = []
+    var expenseLogs: [PetExpenseLog] = []
+    var weightLogs: [PetWeightLog] = []
+    var photoLogs: [PetPhotoLog] = []
+    var milestones: [PetMilestone] = []
+
+    static let empty = PetTimelineSourceRows()
+}
+
 enum PetTimelineItemsBuilder {
     /// 构建统一时间轴；`limit` 为 nil 时不截断
     static func items(
         for pet: Pet,
+        sourceRows: PetTimelineSourceRows,
         limit: Int? = nil,
         sharedCareSessions: [SharedCareSession] = [],
         l: L10n = L10n(AppLanguage.code)
@@ -76,7 +90,7 @@ enum PetTimelineItemsBuilder {
         var list: [UnifiedLogItem] = []
         let sessionsById = sharedSessionLookup(sharedCareSessions)
 
-        for w in pet.walkLogs {
+        for w in sourceRows.walkLogs {
             let session = sharedSession(for: w.sharedSessionId, in: sessionsById)
             list.append(UnifiedLogItem(id: session?.id ?? w.id, date: w.startDate, type: "walk",
                                        title: walkTitle(for: w, session: session, l: l),
@@ -84,20 +98,20 @@ enum PetTimelineItemsBuilder {
                                        iconName: "figure.walk", color: .goPrimary,
                                        sharedSessionID: session?.id))
         }
-        for p in pet.pottyLogs {
+        for p in sourceRows.pottyLogs {
             let session = sharedSession(for: p.sharedSessionId, in: sessionsById)
             list.append(UnifiedLogItem(id: session?.id ?? p.id, date: p.date, type: "potty",
                                        title: "噗噗 · \(p.pottyType.emoji)\(p.pottyType.rawValue)", subtitle: "",
                                        iconName: "drop.fill", color: .goOrange,
                                        sharedSessionID: session?.id))
         }
-        for h in pet.healthLogs {
+        for h in sourceRows.healthLogs {
             list.append(UnifiedLogItem(id: h.id, date: h.date, type: "health",
                                        title: "\(h.healthLogType.emoji) \(h.type)",
                                        subtitle: h.note.isEmpty ? (h.vetName.isEmpty ? "" : h.vetName) : h.note,
                                        iconName: "heart.text.clipboard", color: .goTeal))
         }
-        for e in pet.expenseLogs {
+        for e in sourceRows.expenseLogs {
             let session = sharedSession(for: e.sharedSessionId, in: sessionsById)
             let visibleNote = SharedCareMetadata.visibleNote(e.note)
             list.append(UnifiedLogItem(id: session?.id ?? e.id, date: e.date, type: "expense",
@@ -106,12 +120,12 @@ enum PetTimelineItemsBuilder {
                                        iconName: "\(AppCurrency.systemIconName).fill", color: .goYellow,
                                        sharedSessionID: session?.id))
         }
-        for w in pet.weightLogs {
+        for w in sourceRows.weightLogs {
             list.append(UnifiedLogItem(id: w.id, date: w.date, type: "weight",
                                        title: String(format: "体重 %.1f kg", w.weight), subtitle: "",
                                        iconName: "scalemass.fill", color: .goTeal))
         }
-        for c in pet.careLogs {
+        for c in sourceRows.careLogs {
             let session = sharedSession(for: c.sharedSessionId, in: sessionsById)
             list.append(UnifiedLogItem(id: session?.id ?? c.id, date: c.date, type: "care",
                                        title: careTitle(for: c, session: session, l: l),
@@ -130,10 +144,11 @@ enum PetTimelineItemsBuilder {
     static func archiveSections(
         for pet: Pet,
         mode: PetTimelineDisplayMode,
+        sourceRows: PetTimelineSourceRows,
         l: L10n,
         sharedCareSessions: [SharedCareSession] = []
     ) -> [PetTimelineArchiveSection] {
-        let visibleItems = archiveItems(for: pet, mode: mode, l: l, sharedCareSessions: sharedCareSessions)
+        let visibleItems = archiveItems(for: pet, mode: mode, sourceRows: sourceRows, l: l, sharedCareSessions: sharedCareSessions)
         let calendar = Calendar.current
         let grouped = Dictionary(grouping: visibleItems) { item in
             calendar.startOfDay(for: item.date)
@@ -160,11 +175,12 @@ enum PetTimelineItemsBuilder {
     static func archiveItems(
         for pet: Pet,
         mode: PetTimelineDisplayMode,
+        sourceRows: PetTimelineSourceRows,
         l: L10n,
         sharedCareSessions: [SharedCareSession] = []
     ) -> [UnifiedLogItem] {
         let now = Date()
-        let base = items(for: pet, limit: nil, sharedCareSessions: sharedCareSessions, l: l)
+        let base = items(for: pet, sourceRows: sourceRows, limit: nil, sharedCareSessions: sharedCareSessions, l: l)
             .filter { isVisiblePast($0.date, now: now) }
             .map { item in
                 var copy = item
@@ -172,8 +188,8 @@ enum PetTimelineItemsBuilder {
                 copy.isHighlight = mode == .all ? false : isImportant(item)
                 return copy
             }
-        let moments = memoryItems(for: pet, l: l, now: now)
-        let generated = generatedMeaningfulMoments(for: pet, l: l, now: now)
+        let moments = memoryItems(for: pet, sourceRows: sourceRows, l: l, now: now)
+        let generated = generatedMeaningfulMoments(for: pet, milestones: sourceRows.milestones, l: l, now: now)
 
         let all: [UnifiedLogItem] = switch mode {
         case .highlights:
@@ -343,8 +359,8 @@ enum PetTimelineItemsBuilder {
         return String(format: "%.1f %@", value, unit)
     }
 
-    private static func memoryItems(for pet: Pet, l: L10n, now: Date) -> [UnifiedLogItem] {
-        let photoGroups = groupedPhotoLogs(for: pet, now: now)
+    private static func memoryItems(for _: Pet, sourceRows: PetTimelineSourceRows, l: L10n, now: Date) -> [UnifiedLogItem] {
+        let photoGroups = groupedPhotoLogs(sourceRows.photoLogs, now: now)
         let photoItems = photoGroups.map { group -> UnifiedLogItem in
             let first = group[0]
             let note = first.note.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -370,7 +386,7 @@ enum PetTimelineItemsBuilder {
             )
         }
 
-        let milestoneItems = pet.milestones
+        let milestoneItems = sourceRows.milestones
             .filter { isVisiblePast($0.date, now: now) }
             .map { milestone in
                 UnifiedLogItem(
@@ -389,8 +405,8 @@ enum PetTimelineItemsBuilder {
         return photoItems + milestoneItems
     }
 
-    private static func groupedPhotoLogs(for pet: Pet, now: Date) -> [[PetPhotoLog]] {
-        let sorted = pet.photoLogs
+    private static func groupedPhotoLogs(_ photoLogs: [PetPhotoLog], now: Date) -> [[PetPhotoLog]] {
+        let sorted = photoLogs
             .filter { isVisiblePast($0.date, now: now) }
             .sorted { $0.date < $1.date }
         var groups: [[PetPhotoLog]] = []
@@ -410,12 +426,12 @@ enum PetTimelineItemsBuilder {
         return groups.sorted { ($0.first?.date ?? .distantPast) > ($1.first?.date ?? .distantPast) }
     }
 
-    private static func generatedMeaningfulMoments(for pet: Pet, l: L10n, now: Date) -> [UnifiedLogItem] {
+    private static func generatedMeaningfulMoments(for pet: Pet, milestones: [PetMilestone], l: L10n, now: Date) -> [UnifiedLogItem] {
         var entries: [UnifiedLogItem] = []
         let calendar = Calendar.current
         let today = calendar.startOfDay(for: now)
         let lifeEnd = pet.passedAwayDate.map { min($0, now) } ?? now
-        let existingMilestones = pet.milestones.filter { isVisiblePast($0.date, now: now) }
+        let existingMilestones = milestones.filter { isVisiblePast($0.date, now: now) }
 
         if let birthday = pet.birthday,
            let birthYear = calendar.dateComponents([.year], from: birthday).year,

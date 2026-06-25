@@ -6,6 +6,7 @@ struct FunctionMenuDestinationRouter: View {
     @Binding var parentPath: NavigationPath
     let pets: [Pet]
     let humans: [Human]
+    var petAggregateSummaries: [UUID: FunctionMenuPetAggregateSummary] = [:]
     let plants: [Plant]
 
     @Environment(AppServices.self) private var appServices
@@ -55,7 +56,8 @@ struct FunctionMenuDestinationRouter: View {
                 group: group,
                 parentPath: $parentPath,
                 pets: pets,
-                humans: humans
+                humans: humans,
+                petAggregateSummaries: petAggregateSummaries
             )
         case let .featureAggregate(feature):
             FeatureAggregateView(
@@ -63,6 +65,7 @@ struct FunctionMenuDestinationRouter: View {
                 parentPath: $parentPath,
                 pets: pets,
                 humans: humans,
+                petAggregateSummaries: petAggregateSummaries,
                 showsEntityChips: false
             )
         case let .petHealth(id):

@@ -218,7 +218,7 @@ extension PetHealthDetailContentView {
         guard !isRenderingPDF else { return }
         isRenderingPDF = true
         Task {
-            pdfURL = await PetVetSummaryPDFRenderer.render(pet: pet)
+            pdfURL = await PetVetSummaryPDFRenderer.render(pet: pet, context: modelContext)
             isRenderingPDF = false
             if pdfURL != nil { showingPDFPreview = true }
         }

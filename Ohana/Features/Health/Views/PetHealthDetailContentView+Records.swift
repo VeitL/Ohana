@@ -127,7 +127,7 @@ extension PetHealthDetailContentView {
                 guard !isRenderingPDF else { return }
                 isRenderingPDF = true
                 Task {
-                    pdfURL = await PetVetSummaryPDFRenderer.render(pet: pet)
+                    pdfURL = await PetVetSummaryPDFRenderer.render(pet: pet, context: modelContext)
                     isRenderingPDF = false
                     if pdfURL != nil { showingPDFPreview = true }
                 }
@@ -434,14 +434,14 @@ extension PetHealthDetailContentView {
                     .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
                     .foregroundStyle(Color.red)
                 Spacer()
-                Text("\(pet.activeSymptomLogs.count) 条")
+                Text("\(symptomLogs.count) 条")
                     .font(OhanaFont.adaptive(size: 11, weight: .bold))
                     .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                     .padding(.horizontal, 8).padding(.vertical, 3)
                     .background(Color.primary.opacity(0.06), in: Capsule())
             }
 
-            ForEach(pet.activeSymptomLogs.sorted(by: { $0.date > $1.date })) { log in
+            ForEach(sortedSymptomLogs) { log in
                 HStack(spacing: 12) {
                     ZStack {
                         Circle().fill(Color.red.opacity(0.15)).frame(width: 38, height: 38) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
@@ -481,7 +481,7 @@ extension PetHealthDetailContentView {
                     .disabled(deletingHealthRecordIDs.contains(log.id))
                 }
                 .padding(.vertical, 6)
-                if log.id != pet.activeSymptomLogs.sorted(by: { $0.date > $1.date }).last?.id {
+                if log.id != sortedSymptomLogs.last?.id {
                     Divider()
                 }
             }
@@ -496,14 +496,14 @@ extension PetHealthDetailContentView {
                     .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
                     .foregroundStyle(Color.pink)
                 Spacer()
-                Text("\(pet.activeHeatCycleLogs.count) 条")
+                Text("\(heatCycleLogs.count) 条")
                     .font(OhanaFont.adaptive(size: 11, weight: .bold))
                     .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                     .padding(.horizontal, 8).padding(.vertical, 3)
                     .background(Color.primary.opacity(0.06), in: Capsule())
             }
 
-            ForEach(pet.activeHeatCycleLogs.sorted(by: { $0.startDate > $1.startDate })) { log in
+            ForEach(sortedHeatCycleLogs) { log in
                 HStack(spacing: 12) {
                     ZStack {
                         Circle().fill(Color(hex: log.status.colorHex).opacity(0.15)).frame(width: 38, height: 38) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
@@ -539,7 +539,7 @@ extension PetHealthDetailContentView {
                     .disabled(deletingHealthRecordIDs.contains(log.id))
                 }
                 .padding(.vertical, 6)
-                if log.id != pet.activeHeatCycleLogs.sorted(by: { $0.startDate > $1.startDate }).last?.id {
+                if log.id != sortedHeatCycleLogs.last?.id {
                     Divider()
                 }
             }

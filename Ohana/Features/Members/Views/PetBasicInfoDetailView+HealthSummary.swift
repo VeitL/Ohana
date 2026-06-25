@@ -8,7 +8,178 @@ import PhotosUI
 import SwiftData
 import SwiftUI
 
+struct PetProfileLatestWeight: Equatable {
+    let kg: Double
+    let occurredAt: Date
+
+    func compactText(fractionDigits: Int = 2, unitSpacing: String = "") -> String {
+        let value = String(format: "%.\(fractionDigits)f\(unitSpacing)kg", kg)
+        return "\(value) · \(occurredAt.formatted(.dateTime.year().month().day()))"
+    }
+}
+
+struct PetBasicInfoHealthSummary: Equatable {
+    var vaccineSummaryText: String = "未记录"
+    var activeMedicationSummaryText: String = "无进行中用药"
+    var recentSymptomSummaryText: String = "近况无症状记录"
+    var insuranceSummaryText: String = "未登记保险"
+    var recentWeightSummaryText: String = "未记录体重"
+    var latestWeight: PetProfileLatestWeight?
+
+    static let empty = PetBasicInfoHealthSummary()
+
+    @MainActor
+    static func load(petID: UUID, context: ModelContext, now: Date = Date()) -> PetBasicInfoHealthSummary {
+        let latestWeight = latestWeight(petID: petID, context: context)
+        return PetBasicInfoHealthSummary(
+            vaccineSummaryText: vaccineSummary(petID: petID, context: context),
+            activeMedicationSummaryText: activeMedicationSummary(petID: petID, context: context, now: now),
+            recentSymptomSummaryText: recentSymptomSummary(petID: petID, context: context),
+            insuranceSummaryText: insuranceSummary(petID: petID, context: context),
+            recentWeightSummaryText: latestWeight?.compactText() ?? "未记录体重",
+            latestWeight: latestWeight
+        )
+    }
+
+    @MainActor
+    static func latestWeight(petID: UUID, context: ModelContext) -> PetProfileLatestWeight? {
+        let petSubjectKind = CareLedgerSubjectKind.pet.rawValue
+        let subjectID = petID.uuidString
+        let weightKind = CareLedgerEventKind.weight.rawValue
+        var descriptor = FetchDescriptor<CareLedgerEvent>(
+            predicate: #Predicate<CareLedgerEvent> { event in
+                event.subjectKind == petSubjectKind &&
+                    event.subjectId == subjectID &&
+                    event.eventKind == weightKind
+            },
+            sortBy: [SortDescriptor(\.occurredAt, order: .reverse)]
+        )
+        descriptor.fetchLimit = 8
+        do {
+            guard let event = try context.fetch(descriptor).first(where: { $0.amountValue > 0 }) else {
+                return nil
+            }
+            return PetProfileLatestWeight(kg: event.amountValue, occurredAt: event.occurredAt)
+        } catch {
+            OhanaLog.warning(
+                "Pet profile latest weight fetch failed: \(error.localizedDescription)",
+                category: "Members"
+            )
+            return nil
+        }
+    }
+
+    @MainActor
+    private static func vaccineSummary(petID: UUID, context: ModelContext) -> String {
+        let vaccineType = HealthLogType.vaccine.rawValue
+        var descriptor = FetchDescriptor<PetHealthLog>(
+            predicate: #Predicate<PetHealthLog> { log in
+                log.pet?.id == petID &&
+                    log.type == vaccineType
+            },
+            sortBy: [SortDescriptor(\.date, order: .reverse)]
+        )
+        descriptor.fetchLimit = 1
+        do {
+            guard let latest = try context.fetch(descriptor).first else { return "未记录" }
+            let name = latest.note.isEmpty ? "疫苗" : latest.note
+            if let expiry = latest.expirationDate {
+                return "\(name) · 有效至 \(expiry.formatted(.dateTime.year().month().day()))"
+            }
+            return "\(name) · \(latest.date.formatted(.dateTime.year().month().day()))"
+        } catch {
+            OhanaLog.warning(
+                "Pet profile vaccine summary fetch failed: \(error.localizedDescription)",
+                category: "Members"
+            )
+            return "未记录"
+        }
+    }
+
+    @MainActor
+    private static func activeMedicationSummary(petID: UUID, context: ModelContext, now: Date) -> String {
+        var descriptor = FetchDescriptor<PetMedication>(
+            predicate: #Predicate<PetMedication> { medication in
+                medication.pet?.id == petID &&
+                    medication.isActive
+            },
+            sortBy: [SortDescriptor(\.createdAt, order: .reverse)]
+        )
+        descriptor.fetchLimit = 12
+        do {
+            let medications = try context.fetch(descriptor)
+                .filter { $0.isActive(on: now) }
+            guard !medications.isEmpty else { return "无进行中用药" }
+            return medications.prefix(3)
+                .map { "\($0.name.isEmpty ? "未命名药品" : $0.name)（\($0.dosage.isEmpty ? "按医嘱" : $0.dosage)）" }
+                .joined(separator: "、")
+        } catch {
+            OhanaLog.warning(
+                "Pet profile medication summary fetch failed: \(error.localizedDescription)",
+                category: "Members"
+            )
+            return "无进行中用药"
+        }
+    }
+
+    @MainActor
+    private static func recentSymptomSummary(petID: UUID, context: ModelContext) -> String {
+        var descriptor = FetchDescriptor<SymptomLog>(
+            predicate: #Predicate<SymptomLog> { log in
+                log.pet?.id == petID
+            },
+            sortBy: [SortDescriptor(\.date, order: .reverse)]
+        )
+        descriptor.fetchLimit = 3
+        do {
+            let recent = try context.fetch(descriptor)
+            guard !recent.isEmpty else { return "近况无症状记录" }
+            return recent
+                .map { "\($0.symptomName)（\($0.severity.label)）" }
+                .joined(separator: "、")
+        } catch {
+            OhanaLog.warning(
+                "Pet profile symptom summary fetch failed: \(error.localizedDescription)",
+                category: "Members"
+            )
+            return "近况无症状记录"
+        }
+    }
+
+    @MainActor
+    private static func insuranceSummary(petID: UUID, context: ModelContext) -> String {
+        var descriptor = FetchDescriptor<PetInsurance>(
+            predicate: #Predicate<PetInsurance> { insurance in
+                insurance.pet?.id == petID &&
+                    insurance.isActive
+            },
+            sortBy: [SortDescriptor(\.renewalDate, order: .forward)]
+        )
+        descriptor.fetchLimit = 1
+        do {
+            guard let first = try context.fetch(descriptor).first else { return "未登记保险" }
+            let name = first.productName.isEmpty ? (first.companyName.isEmpty ? "保险" : first.companyName) : first.productName
+            return "\(name) · \(first.renewalStatusLabel)"
+        } catch {
+            OhanaLog.warning(
+                "Pet profile insurance summary fetch failed: \(error.localizedDescription)",
+                category: "Members"
+            )
+            return "未登记保险"
+        }
+    }
+}
+
 extension PetBasicInfoDetailView {
+    func scheduleHealthSummaryLoad() {
+        healthSummaryLoadTask?.cancel()
+        let petID = pet.id
+        healthSummaryLoadTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: 24) {
+            healthSummary = PetBasicInfoHealthSummary.load(petID: petID, context: modelContext)
+            healthSummaryLoadTask = nil
+        }
+    }
+
     var vetVisitSummaryCard: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 8) {
@@ -60,49 +231,23 @@ extension PetBasicInfoDetailView {
     }
 
     var vaccineSummaryText: String {
-        let latest = pet.healthLogs
-            .filter { $0.healthLogType == .vaccine }
-            .sorted { $0.date > $1.date }
-            .first
-        guard let latest else { return "未记录" }
-        let name = latest.note.isEmpty ? "疫苗" : latest.note
-        if let expiry = latest.expirationDate {
-            return "\(name) · 有效至 \(expiry.formatted(.dateTime.year().month().day()))"
-        }
-        return "\(name) · \(latest.date.formatted(.dateTime.year().month().day()))"
+        healthSummary.vaccineSummaryText
     }
 
     var activeMedicationSummaryText: String {
-        let meds = pet.medications.filter(\.isActiveToday)
-        guard !meds.isEmpty else { return "无进行中用药" }
-        return meds.prefix(3)
-            .map { "\($0.name.isEmpty ? "未命名药品" : $0.name)（\($0.dosage.isEmpty ? "按医嘱" : $0.dosage)）" }
-            .joined(separator: "、")
+        healthSummary.activeMedicationSummaryText
     }
 
     var recentSymptomSummaryText: String {
-        let recent = pet.symptomLogs
-            .sorted { $0.date > $1.date }
-            .prefix(3)
-        guard !recent.isEmpty else { return "近况无症状记录" }
-        return recent
-            .map { "\($0.symptomName)（\($0.severity.label)）" }
-            .joined(separator: "、")
+        healthSummary.recentSymptomSummaryText
     }
 
     var insuranceSummaryText: String {
-        let active = pet.insurances.filter(\.isActive)
-        guard let first = active.sorted(by: { $0.renewalDate < $1.renewalDate }).first else { return "未登记保险" }
-        let name = first.productName.isEmpty ? (first.companyName.isEmpty ? "保险" : first.companyName) : first.productName
-        return "\(name) · \(first.renewalStatusLabel)"
+        healthSummary.insuranceSummaryText
     }
 
     var recentWeightSummaryText: String {
-        guard let latest = pet.weightLogs.sorted(by: { $0.date > $1.date }).first else { return "未记录体重" }
-        let value = latest.weightUnit == "g"
-            ? "\(Int(latest.weight))g"
-            : String(format: "%.2fkg", latest.weight)
-        return "\(value) · \(latest.date.formatted(.dateTime.year().month().day()))"
+        healthSummary.recentWeightSummaryText
     }
 
     var vetVisitSummaryText: String {

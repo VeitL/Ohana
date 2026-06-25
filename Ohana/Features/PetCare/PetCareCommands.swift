@@ -439,6 +439,20 @@ struct PetCareCommandExecutor {
         return result
     }
 
+    func careLog(id: UUID) -> PetCareLog? {
+        var descriptor = FetchDescriptor<PetCareLog>(
+            predicate: #Predicate<PetCareLog> { log in
+                log.id == id
+            }
+        )
+        descriptor.fetchLimit = 1
+        return fetchPetCareCommandModelsOrLog(
+            descriptor,
+            context: context,
+            operation: "fetch care log by id"
+        ).first
+    }
+
     @discardableResult
     func deletePottyLog(
         _ log: PetPottyLog,
@@ -448,6 +462,20 @@ struct PetCareCommandExecutor {
         let result = PetPottyCommandService.deletePottyLog(log, pet: pet, context: context)
         derivePottyDelete(result, pet: pet, note: note)
         return result
+    }
+
+    func pottyLog(id: UUID) -> PetPottyLog? {
+        var descriptor = FetchDescriptor<PetPottyLog>(
+            predicate: #Predicate<PetPottyLog> { log in
+                log.id == id
+            }
+        )
+        descriptor.fetchLimit = 1
+        return fetchPetCareCommandModelsOrLog(
+            descriptor,
+            context: context,
+            operation: "fetch potty log by id"
+        ).first
     }
 
     @discardableResult

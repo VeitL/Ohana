@@ -9,7 +9,7 @@ import SwiftUI
 
 struct CoHealthDashboardContentView: View {
     let human: Human
-    let allPets: [Pet]
+    let snapshot: CoHealthDashboardSnapshot
 
     @Environment(AppServices.self) private var appServices
     @AppStorage("currentActiveHumanId") private var activeHumanIdStr = ""
@@ -27,54 +27,33 @@ struct CoHealthDashboardContentView: View {
     }
 
     // 人类体重（最近10条，升序）
-    private var humanWeightPoints: [WeightPoint] {
-        Array(
-            human.weightLogs
-                .filter { $0.date >= past30Days && $0.weight.isFinite }
-                .sorted { $0.date < $1.date }
-                .suffix(10)
-        ).enumerated().map { i, log in
-            WeightPoint(index: i, date: log.date, value: log.weight, label: human.name)
-        }
+    private var humanWeightPoints: [CoHealthWeightPoint] {
+        snapshot.humanWeightPoints
     }
 
-    // 关联宠物（只取有 walkLogs 的狗）
-    private var associatedPets: [Pet] {
-        allPets.filter { pet in
-            pet.species == "狗" &&
-                pet.walkLogs.contains { $0.executorIds.contains(human.id.uuidString) }
-        }
+    // 关联宠物（只取有遛狗 ledger 的狗）
+    private var associatedPets: [CoHealthPetSnapshot] {
+        snapshot.associatedPets(for: human.id, dogsOnly: true)
     }
 
     // 宠物体重（最近10条，升序）
-    private func petWeightPoints(_ pet: Pet) -> [WeightPoint] {
+    private func petWeightPoints(_ pet: CoHealthPetSnapshot) -> [CoHealthWeightPoint] {
         Array(
-            pet.weightLogs
-                .filter { $0.date >= past30Days && $0.weight.isFinite }
+            pet.weightPoints
+                .filter { $0.date >= past30Days && $0.value.isFinite }
                 .sorted { $0.date < $1.date }
                 .suffix(10)
-        ).enumerated().map { i, log in
-            WeightPoint(index: i, date: log.date, value: log.weight, label: pet.name)
-        }
+        )
     }
 
     // 本月遛狗总里程（km）
     private var thisMonthWalkKm: Double {
-        let start = Calendar.current.dateInterval(of: .month, for: Date())?.start ?? past30Days
-        let myId = human.id.uuidString
-        let allLogs: [PetWalkLog] = associatedPets.flatMap(\.walkLogs)
-        let filtered = allLogs.filter { $0.executorIds.contains(myId) && $0.startDate >= start }
-        let totalMeters = filtered.reduce(0.0) { $0 + $1.distanceMeters }
-        return totalMeters / 1000
+        snapshot.thisMonthWalkKm(for: human.id, pets: associatedPets)
     }
 
     // 宠物本月体重变化
     private var petWeightDelta: Double? {
-        guard let pet = associatedPets.first else { return nil }
-        let start = Calendar.current.dateInterval(of: .month, for: Date())?.start ?? past30Days
-        let logs = pet.weightLogs.filter { $0.date >= start }.sorted { $0.date < $1.date }
-        guard logs.count >= 2, let first = logs.first?.weight, let last = logs.last?.weight else { return nil }
-        return last - first
+        snapshot.petWeightDelta(for: associatedPets)
     }
 
     // 趣味总结文案
@@ -166,20 +145,18 @@ struct CoHealthDashboardContentView: View {
                 color: Color.goPrimary
             )
             miniStat(
-                value: human.weightLogs.sorted { $0.date > $1.date }.first.flatMap {
-                    $0.weight.isFinite ? String(format: "%.1f", $0.weight) : nil
-                } ?? "--",
+                value: snapshot.latestHumanWeightKg.flatMap { $0.isFinite ? String(format: "%.1f", $0) : nil } ?? "--",
                 unit: "kg",
                 label: "当前体重",
                 color: Color.goTeal
             )
             if let pet = associatedPets.first,
-               let w = pet.weightLogs.sorted(by: { $0.date > $1.date }).first?.weight {
+               let w = pet.latestWeightKg {
                 miniStat(
                     value: String(format: "%.1f", w),
                     unit: "kg",
                     label: "\(pet.name)体重",
-                    color: pet.themeColor.color
+                    color: Color(hex: pet.themeColorHex)
                 )
             }
         }
@@ -237,7 +214,7 @@ struct CoHealthDashboardContentView: View {
                     HStack(spacing: 12) {
                         legendItem(color: Color.goTeal, label: human.name)
                         if let pet = associatedPets.first {
-                            legendItem(color: pet.themeColor.color, label: pet.name)
+                            legendItem(color: Color(hex: pet.themeColorHex), label: pet.name)
                         }
                     }
                     OhanaMinimalMultiTrendChart(
@@ -247,11 +224,11 @@ struct CoHealthDashboardContentView: View {
                                 points: hPoints.map { OhanaMinimalChartPoint(date: $0.date, value: $0.value, id: $0.id.uuidString) },
                                 tint: Color.goTeal.opacity(0.9)
                             ),
-                            OhanaMinimalLineSeries(
-                                id: "pet",
-                                points: pPoints.map { OhanaMinimalChartPoint(date: $0.date, value: $0.value, id: $0.id.uuidString) },
-                                tint: associatedPets.first?.themeColor.color ?? Color.goPrimary
-                            )
+                        OhanaMinimalLineSeries(
+                            id: "pet",
+                            points: pPoints.map { OhanaMinimalChartPoint(date: $0.date, value: $0.value, id: $0.id.uuidString) },
+                            tint: associatedPets.first.map { Color(hex: $0.themeColorHex) } ?? Color.goPrimary
+                        )
                         ],
                         yDomain: yDomain,
                         progress: Double(chartRevealProgress)
@@ -272,13 +249,4 @@ struct CoHealthDashboardContentView: View {
                 .foregroundStyle(Color.ohanaPrimaryText.opacity(0.5))
         }
     }
-}
-
-// MARK: - WeightPoint 辅助结构
-private struct WeightPoint: Identifiable {
-    let id = UUID()
-    let index: Int
-    let date: Date
-    let value: Double
-    let label: String
 }

@@ -15,7 +15,6 @@ struct QuickWaterDetailSheet: View {
     let allEvents: [Event]
     let allPets: [Pet]
     let waterEntries: [QuickWaterLedgerEntry]
-    let legacyWaterDeleteLogs: [PetCareLog]
 
     @Environment(\.modelContext) var modelContext
     @Environment(\.dismiss) var dismiss
@@ -77,8 +76,7 @@ struct QuickWaterDetailSheet: View {
         onClose: (() -> Void)? = nil,
         allEvents: [Event] = [],
         allPets: [Pet] = [],
-        waterEntries: [QuickWaterLedgerEntry] = [],
-        legacyWaterDeleteLogs: [PetCareLog] = []
+        waterEntries: [QuickWaterLedgerEntry] = []
     ) {
         self.pet = pet
         self.onRemove = onRemove
@@ -86,7 +84,6 @@ struct QuickWaterDetailSheet: View {
         self.allEvents = allEvents
         self.allPets = allPets
         self.waterEntries = waterEntries
-        self.legacyWaterDeleteLogs = legacyWaterDeleteLogs
         _displayedWaterMode = State(initialValue: WaterOperatingMode.stored(pet.id) ?? .manual)
     }
 

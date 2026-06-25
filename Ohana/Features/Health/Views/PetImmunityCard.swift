@@ -8,7 +8,13 @@ import SwiftUI
 
 struct PetImmunityCard: View {
     let pet: Pet
+    let healthLogs: [PetHealthLog]
     @Environment(\.modelContext) private var modelContext
+
+    init(pet: Pet, healthLogs: [PetHealthLog] = []) {
+        self.pet = pet
+        self.healthLogs = healthLogs
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -48,13 +54,13 @@ struct PetImmunityCard: View {
     }
 
     private var rows: [ImmunityRow] {
-        let vaccineLogs = pet.activeHealthLogs.filter { $0.type == HealthLogType.vaccine.rawValue }.sorted { $0.date > $1.date }
+        let vaccineLogs = healthLogs.filter { $0.type == HealthLogType.vaccine.rawValue }.sorted { $0.date > $1.date }
         // Bug8: 同时匹配旧 medication 和新 dewormingInternal
-        let dewormInternalLogs = pet.activeHealthLogs.filter {
+        let dewormInternalLogs = healthLogs.filter {
             $0.type == HealthLogType.dewormingInternal.rawValue || $0.type == HealthLogType.medication.rawValue
         }.sorted { $0.date > $1.date }
-        let dewormExternalLogs = pet.activeHealthLogs.filter { $0.type == HealthLogType.dewormingExternal.rawValue }.sorted { $0.date > $1.date }
-        let checkupLogs = pet.activeHealthLogs.filter { $0.type == HealthLogType.checkup.rawValue }.sorted { $0.date > $1.date }
+        let dewormExternalLogs = healthLogs.filter { $0.type == HealthLogType.dewormingExternal.rawValue }.sorted { $0.date > $1.date }
+        let checkupLogs = healthLogs.filter { $0.type == HealthLogType.checkup.rawValue }.sorted { $0.date > $1.date }
 
         // Bug6: 优先使用 log.expirationDate，若无则按固定周期推算
         func nextDue(_ log: PetHealthLog?, fallback: (Date) -> Date?) -> Date? {

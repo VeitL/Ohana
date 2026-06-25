@@ -77,7 +77,107 @@ struct QuickFeedStockSnapshotStoreTests {
         #expect(snapshot.totalGrams(for: record) == 1500)
     }
 
+    @Test func stockSnapshotUsesFeedingLedgerEntriesForConsumptionWhenProvided() {
+        let pet = Pet(name: "Momo", species: "猫")
+        pet.dailyPortionGrams = 60
+        let now = fixedDate()
+        let record = stockRecord(pet: pet, totalGrams: 1000, foodKind: .dry, now: now)
+        let legacyLog = PetCareLog(
+            date: now.addingTimeInterval(-600),
+            type: .feeding,
+            amountGrams: 300,
+            foodKind: .dry,
+            pet: pet
+        )
+        let ledgerEntry = feedEntry(
+            pet: pet,
+            date: now.addingTimeInterval(-300),
+            amount: 120,
+            source: .manualMain,
+            foodKind: .dry
+        )
+
+        let snapshot = QuickFeedStockSnapshot.build(
+            pet: pet,
+            allEvents: [],
+            careLogs: [legacyLog],
+            feedingLedgerEntries: [ledgerEntry],
+            foodRecords: [record],
+            now: now
+        )
+
+        #expect(snapshot.dryStock.consumedGrams == 120)
+        #expect(snapshot.dryStock.remainingGrams == 880)
+    }
+
+    @Test func stockSnapshotTreatsSuppliedEmptyFeedingLedgerEntriesAsAuthoritative() {
+        let pet = Pet(name: "Momo", species: "猫")
+        let now = fixedDate()
+        let record = stockRecord(pet: pet, totalGrams: 1000, foodKind: .dry, now: now)
+        let legacyLog = PetCareLog(
+            date: now.addingTimeInterval(-600),
+            type: .feeding,
+            amountGrams: 300,
+            foodKind: .dry,
+            pet: pet
+        )
+
+        let snapshot = QuickFeedStockSnapshot.build(
+            pet: pet,
+            allEvents: [],
+            careLogs: [legacyLog],
+            feedingLedgerEntries: [],
+            foodRecords: [record],
+            now: now
+        )
+
+        #expect(snapshot.dryStock.consumedGrams == 0)
+        #expect(snapshot.dryStock.remainingGrams == 1000)
+    }
+
     private func fixedDate() -> Date {
         Date(timeIntervalSince1970: 1_800_000_000)
+    }
+
+    private func stockRecord(
+        pet: Pet,
+        totalGrams: Double,
+        foodKind: FeedFoodKind,
+        now: Date
+    ) -> PetFoodRecord {
+        PetFoodRecord(
+            brand: "Stock",
+            totalGrams: totalGrams,
+            foodKind: foodKind,
+            startDate: now.addingTimeInterval(-86400),
+            pet: pet
+        )
+    }
+
+    private func feedEntry(
+        pet: Pet,
+        date: Date,
+        amount: Double,
+        source: FeedLogSource,
+        foodKind: FeedFoodKind,
+        sharedSessionId: String = "",
+        note: String = ""
+    ) -> QuickFeedLedgerEntry {
+        QuickFeedLedgerEntry(
+            id: UUID(),
+            petId: pet.id,
+            date: date,
+            amountGrams: amount,
+            note: note,
+            source: source,
+            foodKind: foodKind,
+            treatKind: nil,
+            legacyModelId: nil,
+            sharedSessionId: sharedSessionId,
+            actorId: nil,
+            sourceEventId: nil,
+            sourceReminderId: nil,
+            metadataJSON: ""
+        )
     }
 }

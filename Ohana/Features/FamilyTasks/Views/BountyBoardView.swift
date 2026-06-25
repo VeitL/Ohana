@@ -12,6 +12,7 @@ import SwiftUI
 struct BountyBoardContentView: View {
     let humans: [Human]
     let pets: [Pet]
+    let careLedgerEntries: [FamilyCareLedgerEntry]
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var colorScheme
@@ -483,20 +484,24 @@ struct BountyBoardContentView: View {
         var walk: [String: Int] = [:]
         var expense: [String: Int] = [:]
 
-        for pet in pets {
-            for log in pet.careLogs where log.date >= start {
-                if let id = log.executorId, !id.isEmpty { care[id, default: 0] += 1 }
-            }
-            for log in pet.pottyLogs where log.date >= start {
-                if let id = log.executorId, !id.isEmpty { potty[id, default: 0] += 1 }
-            }
-            for log in pet.walkLogs where log.startDate >= start {
-                for id in log.executorIds where !id.isEmpty {
+        for entry in careLedgerEntries where entry.date >= start {
+            switch entry.kind {
+            case .care:
+                for id in entry.executorIDs {
+                    care[id, default: 0] += 1
+                }
+            case .potty:
+                for id in entry.executorIDs {
+                    potty[id, default: 0] += 1
+                }
+            case .walk:
+                for id in entry.executorIDs {
                     walk[id, default: 0] += 1
                 }
-            }
-            for log in pet.expenseLogs where log.date >= start {
-                if let id = log.executorId, !id.isEmpty { expense[id, default: 0] += 1 }
+            case .expense:
+                for id in entry.executorIDs {
+                    expense[id, default: 0] += 1
+                }
             }
         }
 

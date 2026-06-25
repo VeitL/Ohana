@@ -437,7 +437,9 @@ extension OasisRewardView {
         bentoSnapshot = commandExecutor.makeBentoSnapshot(
             pets: pets,
             electronicPets: electronicPets,
-            activeCoconutBalance: nextActionSnapshot.activeCoconutBalance
+            activeCoconutBalance: nextActionSnapshot.activeCoconutBalance,
+            careLedgerEvents: liveData.careLedgerEvents,
+            petActivitySummaries: liveData.petActivitySummaries
         )
         critterRenderSnapshots = commandExecutor.makeCritterSnapshots(
             electronicPets: electronicPets,

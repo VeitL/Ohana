@@ -49,9 +49,15 @@ struct OasisRewardCommandExecutor {
     func makeBentoSnapshot(
         pets: [Pet],
         electronicPets: [OasisElectronicPet],
-        activeCoconutBalance: Int
+        activeCoconutBalance: Int,
+        careLedgerEvents: [CareLedgerEvent],
+        petActivitySummaries: [UUID: AchievementPetActivitySummary]
     ) -> OasisBentoSnapshot {
-        let allAchievements = pets.flatMap { AchievementManager.compute(for: $0) }
+        let context = AchievementComputationContext(
+            careLedgerEvents: careLedgerEvents,
+            petActivitySummaries: petActivitySummaries
+        )
+        let allAchievements = pets.flatMap { AchievementManager.compute(for: $0, context: context) }
         let unlockedCount = allAchievements.filter(\.isUnlocked).count
         let totalCount = allAchievements.count
         let activeCritterCount = electronicPets.count(where: { !$0.isArchived })

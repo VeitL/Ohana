@@ -28,7 +28,7 @@ struct QuickFeedLedgerEntry: Identifiable, Hashable {
         max(0, amountGrams)
     }
 
-    static func entries(
+    nonisolated static func entries(
         pet: Pet,
         feedingLedgerEvents: [CareLedgerEvent],
         legacyCareLogs: [PetCareLog],

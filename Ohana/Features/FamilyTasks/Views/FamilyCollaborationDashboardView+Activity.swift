@@ -285,10 +285,19 @@ extension FamilyCollaborationDashboardView {
     func missingCareLabels(for pet: Pet) -> [String] {
         let cal = Calendar.current
         func careDone(_ type: CareType) -> Bool {
-            pet.careLogs.contains { $0.careType == type && cal.isDateInToday($0.date) }
+            careLedgerEntries.contains {
+                $0.petID == pet.id &&
+                    $0.kind == .care &&
+                    $0.actionType == type.rawValue &&
+                    cal.isDateInToday($0.date)
+            }
         }
         func pottyDone() -> Bool {
-            pet.pottyLogs.contains { cal.isDateInToday($0.date) } || careDone(.litter)
+            careLedgerEntries.contains {
+                $0.petID == pet.id &&
+                    $0.kind == .potty &&
+                    cal.isDateInToday($0.date)
+            } || careDone(.litter)
         }
 
         let species = pet.species.lowercased()
@@ -306,7 +315,7 @@ extension FamilyCollaborationDashboardView {
             [
                 (careTitle(.feeding), careDone(.feeding)),
                 (careTitle(.watering), careDone(.watering)),
-                (l.tr(zh: "遛狗", en: "Walk", de: "Gassi"), pet.walkLogs.contains { cal.isDateInToday($0.startDate) })
+                (l.tr(zh: "遛狗", en: "Walk", de: "Gassi"), walkDone(for: pet, calendar: cal))
             ]
         } else if isCat {
             [
@@ -322,6 +331,14 @@ extension FamilyCollaborationDashboardView {
             ]
         }
         return expected.filter { !$0.1 }.map(\.0)
+    }
+
+    func walkDone(for pet: Pet, calendar: Calendar) -> Bool {
+        careLedgerEntries.contains {
+            $0.petID == pet.id &&
+                $0.kind == .walk &&
+                calendar.isDateInToday($0.date)
+        }
     }
 
     func actorName(_ id: String?) -> String {
@@ -365,6 +382,49 @@ extension FamilyCollaborationDashboardView {
 
     func pottyTitle(_ type: PottyType) -> String {
         type.localizedLabel(l)
+    }
+
+    func collaborationActivity(from entry: FamilyCareLedgerEntry, petName: String) -> CollaborationActivity? {
+        switch entry.kind {
+        case .care:
+            guard let type = CareType(rawValue: entry.actionType) else { return nil }
+            return CollaborationActivity(
+                title: careTitle(type),
+                petName: petName,
+                actor: actorNames(entry.executorIDs),
+                date: entry.date,
+                icon: type.systemIconName,
+                tint: Color(hex: type.accentColorHex)
+            )
+        case .potty:
+            guard let type = PottyType(rawValue: entry.actionType) else { return nil }
+            return CollaborationActivity(
+                title: pottyTitle(type),
+                petName: petName,
+                actor: actorNames(entry.executorIDs),
+                date: entry.date,
+                icon: type.systemIconName,
+                tint: Color.goYellow
+            )
+        case .walk:
+            return CollaborationActivity(
+                title: l.tr(zh: "遛狗", en: "Walk", de: "Gassi"),
+                petName: petName,
+                actor: actorNames(entry.executorIDs),
+                date: entry.date,
+                icon: "figure.walk",
+                tint: Color.goPurple
+            )
+        case .expense:
+            return CollaborationActivity(
+                title: l.tr(zh: "花费", en: "Expense", de: "Ausgabe"),
+                petName: petName,
+                actor: actorNames(entry.executorIDs),
+                date: entry.date,
+                icon: "creditcard.fill",
+                tint: Color(hex: "FF6B6B")
+            )
+        }
     }
 
     enum ReminderRole {

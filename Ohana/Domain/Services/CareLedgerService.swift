@@ -26,6 +26,37 @@ nonisolated enum CareLedgerMetadata {
         return normalized.isEmpty ? nil : normalized
     }
 
+    static func stringArrayValue(named name: String, in metadataJSON: String) -> [String] {
+        let trimmed = metadataJSON.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty,
+              let data = trimmed.data(using: .utf8),
+              let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let values = object[name] as? [Any]
+        else { return [] }
+
+        return values.compactMap { value -> String? in
+            guard let raw = value as? String else { return nil }
+            let normalized = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+            return normalized.isEmpty ? nil : normalized
+        }
+    }
+
+    static func doubleValue(named name: String, in metadataJSON: String) -> Double? {
+        let trimmed = metadataJSON.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty,
+              let data = trimmed.data(using: .utf8),
+              let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let value = object[name]
+        else { return nil }
+
+        if let doubleValue = value as? Double { return doubleValue }
+        if let intValue = value as? Int { return Double(intValue) }
+        if let stringValue = value as? String {
+            return Double(stringValue.trimmingCharacters(in: .whitespacesAndNewlines))
+        }
+        return nil
+    }
+
     static func addingString(_ name: String, value: String?, to metadataJSON: String) -> String {
         guard let value = value?.trimmingCharacters(in: .whitespacesAndNewlines),
               !value.isEmpty

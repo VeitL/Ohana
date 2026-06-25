@@ -21,7 +21,7 @@ nonisolated enum FocusHomeCardDataSource {
         let real = (
             pets
                 .filter { !$0.hasPassedAway && HomeCardVisibility.isPetVisible($0, raw: hiddenPetIDsRaw) }
-                .map { FocusCard.from($0, includeAvatarData: false, includeWalkDistance: false) }
+                .map { FocusCard.from($0, includeAvatarData: false) }
                 + humans
                 .filter { $0.shouldShowOnHome && !$0.hasPassedAway }
                 .map { FocusCard.from($0, includeAvatarData: false) }

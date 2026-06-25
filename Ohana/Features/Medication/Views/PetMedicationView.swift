@@ -10,7 +10,9 @@ import SwiftUI
 
 struct PetMedicationContentView: View {
     let pet: Pet
-    let allEvents: [Event]
+    let medications: [PetMedication]
+    let doseEvents: [Event]
+    var onDataChanged: (() -> Void)?
 
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
@@ -26,21 +28,21 @@ struct PetMedicationContentView: View {
     private var l: L10n { L10n(appLanguage) }
     private var chromeAccent: Color { colorScheme == .dark ? Color.goPrimary : Color.goBlue }
     private var medicationEvents: [Event] {
-        let ids = Set(pet.medications.map(\.id))
-        return allEvents.filter {
+        let ids = Set(medications.map(\.id))
+        return doseEvents.filter {
             guard let medicationId = PetMedicationDoseLogging.doseMedicationId(for: $0) else { return false }
             return ids.contains(medicationId)
         }
     }
 
     private var activeMeds: [PetMedication] {
-        pet.medications
+        medications
             .filter(\.isActiveToday)
             .sorted { medicationSortKey($0) < medicationSortKey($1) }
     }
 
     private var inactiveMeds: [PetMedication] {
-        pet.medications
+        medications
             .filter { !$0.isActiveToday }
             .sorted { $0.createdAt > $1.createdAt }
     }
@@ -96,11 +98,11 @@ struct PetMedicationContentView: View {
 
                         summaryStrip
 
-                        if !pet.medications.isEmpty {
+                        if !medications.isEmpty {
                             medicationRhythmStrip
                         }
 
-                        if pet.medications.isEmpty {
+                        if medications.isEmpty {
                             emptyState
                         } else {
                             todayPanel
@@ -156,7 +158,7 @@ struct PetMedicationContentView: View {
                 }
             }
             .sheet(item: $selectedMedication) { med in
-                PetMedicationDetailSheet(pet: pet, medication: med)
+                PetMedicationDetailSheet(pet: pet, medication: med, onDataChanged: onDataChanged)
             }
             .animation(GoMotion.stateChange, value: doseRefreshToken)
             .animation(GoMotion.feedback, value: toastMessage)
@@ -187,6 +189,7 @@ struct PetMedicationContentView: View {
                     onSaved: {
                         appServices.medicationReminders.scheduleMedicationReminders(for: pet, context: modelContext)
                         doseRefreshToken = UUID()
+                        onDataChanged?()
                         closeAddMedicationPopup()
                     }
                 )
@@ -338,10 +341,10 @@ struct PetMedicationContentView: View {
     }
 
     private func medicationDayStats(for day: Date) -> (required: Int, done: Int) {
-        let required = pet.medications.reduce(0) { total, medication in
+        let required = medications.reduce(0) { total, medication in
             total + PetMedicationDoseLogging.requiredDoses(on: day, for: medication)
         }
-        let done = pet.medications.reduce(0) { total, medication in
+        let done = medications.reduce(0) { total, medication in
             let count = medicationEvents.count(where: { event in
                 PetMedicationDoseLogging.isDoseEvent(event, medicationId: medication.id) &&
                     Calendar.current.isDate(event.startDate, inSameDayAs: day)
@@ -636,6 +639,7 @@ struct PetMedicationContentView: View {
         appServices.medicationReminders.scheduleMedicationReminders(for: pet, context: modelContext)
         UINotificationFeedbackGenerator().notificationOccurred(.success)
         doseRefreshToken = UUID()
+        onDataChanged?()
         showToast(l.tr(zh: "已记录喂药", en: "Dose logged", de: "Dosis erfasst"))
     }
 

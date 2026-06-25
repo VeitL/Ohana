@@ -21,7 +21,6 @@ struct PetHygieneDetailContentView: View {
     let pet: Pet
     let allReminders: [Reminder]
     let hygieneEntries: [PetHygieneLedgerEntry]
-    let legacyDeleteLogs: [PetHygieneLog]
 
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
@@ -484,18 +483,26 @@ struct PetHygieneDetailContentView: View {
     }
 
     private func deleteHygieneEntry(_ entry: PetHygieneLedgerEntry) {
-        guard let logId = entry.legacyLogId,
-              let log = legacyDeleteLogs.first(where: { $0.id == logId }) else {
+        guard let logId = entry.legacyLogId else {
             OhanaLog.warning(
                 "PetHygieneDetailView could not resolve hygiene log for ledger entry \(entry.id.uuidString)",
                 category: "Care"
             )
             return
         }
-        let command = DomainCommand.petHygieneDelete(petID: pet.id, recordID: log.id)
+        let command = DomainCommand.petHygieneDelete(petID: pet.id, recordID: logId)
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
         commandQueue.enqueue(command) {
-            PetHygieneCommandExecutor(context: modelContext, services: appServices).delete(
+            let executor = PetHygieneCommandExecutor(context: modelContext, services: appServices)
+            guard let log = executor.hygieneLog(id: logId) else {
+                OhanaLog.warning(
+                    "PetHygieneDetailView could not resolve hygiene log \(logId.uuidString)",
+                    category: "Care"
+                )
+                return
+            }
+            // recordDeletion: PetHygieneCommandService.delete marks CloudSync tombstones.
+            executor.delete(
                 log,
                 pet: pet,
                 note: "pet.hygiene.detail.delete"

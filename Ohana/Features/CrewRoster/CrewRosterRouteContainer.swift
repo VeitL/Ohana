@@ -29,6 +29,8 @@ struct CrewRosterOverlayRouteContainer: View {
             plants: [],
             pendingReminders: routeData.pendingReminders,
             familyTasks: routeData.familyTasks,
+            careLedgerEntries: routeData.careLedgerEntries,
+            petSummaries: routeData.petSummaries,
             onSelectPet: onSelectPet,
             onSelectHuman: onSelectHuman,
             onInlinePetSaved: onInlinePetSaved,
@@ -69,16 +71,19 @@ private struct CrewRosterRouteData {
     var humans: [Human] = []
     var pendingReminders: [Reminder] = []
     var familyTasks: [FamilyCollaborationTask] = []
+    var careLedgerEntries: [FamilyCareLedgerEntry] = []
+    var petSummaries: [UUID: CrewRosterPetSummary] = [:]
     var hasLoaded = false
 
     static func load(from context: ModelContext) -> CrewRosterRouteData {
         let isCollaborationEnabled = OnlineFeatureGate.allows(.onlineCollaboration)
+        let pets = fetch(
+            FetchDescriptor<Pet>(sortBy: [SortDescriptor(\.createdAt)]),
+            context: context,
+            name: "Pet"
+        )
         return CrewRosterRouteData(
-            pets: fetch(
-                FetchDescriptor<Pet>(sortBy: [SortDescriptor(\.createdAt)]),
-                context: context,
-                name: "Pet"
-            ),
+            pets: pets,
             humans: fetch(
                 FetchDescriptor<Human>(sortBy: [SortDescriptor(\.createdAt)]),
                 context: context,
@@ -99,6 +104,11 @@ private struct CrewRosterRouteData {
                 context: context,
                 name: "FamilyCollaborationTask"
             ) : [],
+            careLedgerEntries: isCollaborationEnabled ? FamilyCareLedgerEntry.fetchPetEntries(
+                since: FamilyCareLedgerEntry.weekStart(),
+                context: context
+            ) : [],
+            petSummaries: CrewRosterPetSummary.load(pets: pets, context: context),
             hasLoaded: true
         )
     }
@@ -116,6 +126,41 @@ private struct CrewRosterRouteData {
                 category: "CrewRoster"
             )
             return []
+        }
+    }
+}
+
+struct CrewRosterPetSummary: Equatable {
+    var documentCount: Int = 0
+
+    static let empty = CrewRosterPetSummary()
+
+    @MainActor
+    static func load(pets: [Pet], context: ModelContext) -> [UUID: CrewRosterPetSummary] {
+        var summaries: [UUID: CrewRosterPetSummary] = [:]
+        for pet in pets {
+            summaries[pet.id] = CrewRosterPetSummary(
+                documentCount: documentCount(petID: pet.id, context: context)
+            )
+        }
+        return summaries
+    }
+
+    @MainActor
+    private static func documentCount(petID: UUID, context: ModelContext) -> Int {
+        let descriptor = FetchDescriptor<PetDocument>(
+            predicate: #Predicate<PetDocument> { document in
+                document.pet?.id == petID
+            }
+        )
+        do {
+            return try context.fetchCount(descriptor) // route-first-frame: allow deferred-fetch
+        } catch {
+            OhanaLog.warning(
+                "Crew roster pet document count failed: \(error.localizedDescription)",
+                category: "CrewRoster"
+            )
+            return 0
         }
     }
 }

@@ -70,6 +70,7 @@ struct CrewRosterProfilePanel: View {
     let pet: Pet?
     let human: Human?
     let plant: Plant?
+    let petSummary: CrewRosterPetSummary
     let allPets: [Pet]
     let allHumans: [Human]
     let detailProgress: CGFloat
@@ -355,7 +356,7 @@ struct CrewRosterProfilePanel: View {
                 infoRow("医生", emptyText(pet.vetDoctorName))
                 infoRow("电话", emptyText(pet.vetContact))
                 infoRow("过敏", emptyText(pet.allergies))
-                infoRow("证件", "\(pet.documents.count)")
+                infoRow("证件", "\(petSummary.documentCount)")
             }
             if !pet.notes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 profileSection("备注", icon: "note.text") { paragraph(pet.notes) }

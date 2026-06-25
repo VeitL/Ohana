@@ -4,14 +4,18 @@
 //
 //  寄养名片：一页纸宠物信息 + 截图分享
 
+import SwiftData
 import SwiftUI
 
 struct SitterCardPreviewSheet: View {
     let pet: Pet
+    @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
     @State private var shareImage: UIImage? = nil
     @State private var isSharing = false
     @State private var isRendering = false
+    @State private var latestWeight: PetProfileLatestWeight?
+    @State private var latestWeightLoadTask: Task<Void, Never>?
 
     var body: some View {
         NavigationStack {
@@ -56,6 +60,13 @@ struct SitterCardPreviewSheet: View {
                 if let img = shareImage {
                     ShareSheet(image: img)
                 }
+            }
+            .onAppear {
+                scheduleLatestWeightLoad()
+            }
+            .onDisappear {
+                latestWeightLoadTask?.cancel()
+                latestWeightLoadTask = nil
             }
         }
     }
@@ -104,10 +115,10 @@ struct SitterCardPreviewSheet: View {
                               value: homeDate.formatted(.dateTime.year().month().day()) + " · \(pet.daysTogether) 天")
                     GoDashedDivider().padding(.leading, 52)
                 }
-                if let w = pet.weightLogs.sorted(by: { $0.date > $1.date }).first {
+                if let latestWeight {
                     sitterRow(icon: "scalemass.fill", color: Color.goCardCyan,
                               label: "体重",
-                              value: String(format: "%.1f kg", w.weight) + " · " + w.date.formatted(.dateTime.year().month().day()))
+                              value: latestWeight.compactText(fractionDigits: 1, unitSpacing: " "))
                     GoDashedDivider().padding(.leading, 52)
                 }
                 if !pet.birthCountry.isEmpty {
@@ -219,6 +230,15 @@ struct SitterCardPreviewSheet: View {
     }
 
     // MARK: - Share
+    private func scheduleLatestWeightLoad() {
+        latestWeightLoadTask?.cancel()
+        let petID = pet.id
+        latestWeightLoadTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: 24) {
+            latestWeight = PetBasicInfoHealthSummary.latestWeight(petID: petID, context: modelContext)
+            latestWeightLoadTask = nil
+        }
+    }
+
     @MainActor
     private func renderAndShare() async {
         isRendering = true

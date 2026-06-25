@@ -11,6 +11,7 @@ import SwiftUI
 
 struct PetMilestoneListView: View {
     let pet: Pet
+    @Query private var routeMilestones: [PetMilestone] // smoothness: allow route-scoped milestone rows after explicit milestones navigation.
     @Environment(\.modelContext) private var modelContext
     @Environment(AppServices.self) private var appServices
 
@@ -26,8 +27,16 @@ struct PetMilestoneListView: View {
     @State private var selectedMilestone: PetMilestone? = nil
     @StateObject private var commandQueue = DeferredDomainCommandQueue()
 
+    init(pet: Pet) {
+        self.pet = pet
+        let petID = pet.id
+        _routeMilestones = Query(filter: #Predicate<PetMilestone> { milestone in
+            milestone.pet?.id == petID
+        })
+    }
+
     private var sortedMilestones: [PetMilestone] {
-        pet.milestones.sorted { $0.date > $1.date }
+        routeMilestones.sorted { $0.date > $1.date }
     }
 
     var body: some View {

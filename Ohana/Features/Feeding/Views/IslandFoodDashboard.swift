@@ -14,7 +14,7 @@ struct IslandFoodDashboardContentView: View {
     let pets: [Pet]
     let allEvents: [Event]
     let allFeedingLedgerEntries: [FoodLedgerEntry]
-    let legacyStockCareLogs: [PetCareLog]
+    let allStockFeedingLedgerEntries: [QuickFeedLedgerEntry]
     let allFoodRecords: [PetFoodRecord]
     let allSharedCareSessions: [SharedCareSession]
 
@@ -58,7 +58,7 @@ struct IslandFoodDashboardContentView: View {
             selectedPetId: selectedPetId,
             allEvents: allEvents,
             allFeedingLedgerEntries: allFeedingLedgerEntries,
-            legacyStockCareLogs: legacyStockCareLogs,
+            allStockFeedingLedgerEntries: allStockFeedingLedgerEntries,
             allFoodRecords: allFoodRecords,
             allSharedCareSessions: allSharedCareSessions
         )
@@ -480,7 +480,7 @@ struct IslandFoodDashboardContentView: View {
             selectedPetId: selectedPetId,
             allEvents: allEvents,
             allFeedingLedgerEntries: allFeedingLedgerEntries,
-            legacyStockCareLogs: legacyStockCareLogs,
+            allStockFeedingLedgerEntries: allStockFeedingLedgerEntries,
             allFoodRecords: allFoodRecords,
             allSharedCareSessions: allSharedCareSessions,
             force: force

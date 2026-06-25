@@ -50,6 +50,7 @@ nonisolated struct TodayFocusCareLedgerEntry: Equatable, Sendable {
     let eventKind: CareLedgerEventKind
     let actionType: String
     let date: Date
+    let amountValue: Double
     let sourceEventId: UUID?
     let actorId: String?
 
@@ -59,6 +60,7 @@ nonisolated struct TodayFocusCareLedgerEntry: Equatable, Sendable {
         eventKind: CareLedgerEventKind,
         actionType: String,
         date: Date,
+        amountValue: Double = 0,
         sourceEventId: UUID? = nil,
         actorId: String? = nil
     ) {
@@ -67,6 +69,7 @@ nonisolated struct TodayFocusCareLedgerEntry: Equatable, Sendable {
         self.eventKind = eventKind
         self.actionType = actionType
         self.date = date
+        self.amountValue = amountValue
         self.sourceEventId = sourceEventId
         self.actorId = actorId
     }
@@ -338,9 +341,9 @@ nonisolated enum TodayFocusService {
         if quest.id.hasPrefix("q_weight_"), let petId = quest.targetPetId {
             if let event = carePlanEvent(for: quest, events: events) {
                 return event.isOccurrenceMarkedComplete(on: now) ||
-                    hasPetWeightLog(petId: petId, pets: pets, calendar: calendar, now: now)
+                    hasPetWeightLedgerEntry(petId: petId, entries: careLedgerEntries, calendar: calendar, now: now)
             }
-            return hasPetWeightLog(petId: petId, pets: pets, calendar: calendar, now: now)
+            return hasPetWeightLedgerEntry(petId: petId, entries: careLedgerEntries, calendar: calendar, now: now)
         }
         if let humanId = IslandQuestEngine.humanWeightId(fromQuestId: quest.id) {
             let liveDone = humanWeightLogs.contains {
@@ -445,15 +448,20 @@ nonisolated enum TodayFocusService {
         )
     }
 
-    private static func hasPetWeightLog(
+    private static func hasPetWeightLedgerEntry(
         petId: UUID,
-        pets: [Pet],
+        entries: [TodayFocusCareLedgerEntry],
         calendar: Calendar,
         now: Date
     ) -> Bool {
-        pets.first(where: { $0.id == petId })?.weightLogs.contains {
-            calendar.isDate($0.date, inSameDayAs: now)
-        } == true
+        hasCareLedgerEntry(
+            petId: petId,
+            entries: entries,
+            eventKinds: [.weight],
+            actionTypes: nil,
+            calendar: calendar,
+            now: now
+        )
     }
 
     private static func legacyLedgerEntries(
@@ -469,6 +477,7 @@ nonisolated enum TodayFocusService {
                 eventKind: .care,
                 actionType: log.careType.rawValue,
                 date: log.date,
+                amountValue: legacyCareAmountValue(for: log),
                 sourceEventId: plannedCareEventId(from: log.note),
                 actorId: log.executorId
             )
@@ -480,6 +489,7 @@ nonisolated enum TodayFocusService {
                 eventKind: .walk,
                 actionType: "walk",
                 date: log.startDate,
+                amountValue: log.distanceMeters,
                 actorId: log.executorId
             )
         } + pottyLogs.compactMap { log in
@@ -492,6 +502,17 @@ nonisolated enum TodayFocusService {
                 date: log.date,
                 actorId: log.executorId
             )
+        }
+    }
+
+    private static func legacyCareAmountValue(for log: PetCareLog) -> Double {
+        switch log.careType {
+        case .feeding:
+            log.amountGrams
+        case .watering:
+            log.amountMl
+        default:
+            0
         }
     }
 

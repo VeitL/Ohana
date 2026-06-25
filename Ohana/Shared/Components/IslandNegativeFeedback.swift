@@ -7,24 +7,49 @@
 
 import Foundation
 
+nonisolated struct IslandNegativeCareLedgerEntry: Equatable, Sendable {
+    let petId: UUID
+    let eventKind: CareLedgerEventKind
+    let actionType: String
+    let date: Date
+    let amountValue: Double
+
+    init(
+        petId: UUID,
+        eventKind: CareLedgerEventKind,
+        actionType: String,
+        date: Date,
+        amountValue: Double = 0
+    ) {
+        self.petId = petId
+        self.eventKind = eventKind
+        self.actionType = actionType
+        self.date = date
+        self.amountValue = amountValue
+    }
+}
+
 nonisolated enum IslandNegativeFeedback {
     @MainActor
     static func signals(
         pets: [Pet],
         plants: [Plant] = [],
-        healthAlerts: PetHealthAlerting
+        healthAlerts: PetHealthAlerting,
+        careLedgerEntries: [IslandNegativeCareLedgerEntry] = []
     ) -> [IslandNegativeSignal] {
         signals(
             pets: pets,
             plants: plants,
-            clinicalAlerts: healthAlerts.scanAlerts(pets: pets)
+            clinicalAlerts: healthAlerts.scanAlerts(pets: pets),
+            careLedgerEntries: careLedgerEntries
         )
     }
 
     static func signals(
         pets: [Pet],
         plants: [Plant] = [],
-        clinicalAlerts: [HealthAlert]
+        clinicalAlerts: [HealthAlert],
+        careLedgerEntries: [IslandNegativeCareLedgerEntry] = []
     ) -> [IslandNegativeSignal] {
         var result: [IslandNegativeSignal] = []
         let calendar = Calendar.current
@@ -58,13 +83,13 @@ nonisolated enum IslandNegativeFeedback {
         }
 
         for pet in pets where !pet.hasPassedAway {
-            if let signal = appetiteTrendSignal(for: pet, calendar: calendar, now: now) {
+            if let signal = appetiteTrendSignal(for: pet, careLedgerEntries: careLedgerEntries, calendar: calendar, now: now) {
                 result.append(signal)
             }
-            if let signal = abnormalPottyTrendSignal(for: pet, calendar: calendar, now: now) {
+            if let signal = abnormalPottyTrendSignal(for: pet, careLedgerEntries: careLedgerEntries, calendar: calendar, now: now) {
                 result.append(signal)
             }
-            if let signal = drinkingTrendSignal(for: pet, calendar: calendar, now: now) {
+            if let signal = drinkingTrendSignal(for: pet, careLedgerEntries: careLedgerEntries, calendar: calendar, now: now) {
                 result.append(signal)
             }
         }
@@ -72,7 +97,7 @@ nonisolated enum IslandNegativeFeedback {
         let brokenStreakPets = pets.filter { pet in
             !pet.hasPassedAway &&
                 pet.currentStreak == 0 &&
-                !hasAnyPetCheckInToday(pet, calendar: calendar)
+                !hasAnyPetCheckInToday(pet, careLedgerEntries: careLedgerEntries, calendar: calendar)
         }
         if !brokenStreakPets.isEmpty {
             let names = joinedNames(brokenStreakPets.prefix(2).map(\.name))
@@ -115,8 +140,8 @@ nonisolated enum IslandNegativeFeedback {
         }
 
         for pet in pets where !pet.hasPassedAway {
-            let lastFeed = pet.careLogs
-                .filter { $0.type == CareType.feeding.rawValue }
+            let lastFeed = careLedgerEntries
+                .filter { $0.petId == pet.id && $0.eventKind == .care && $0.actionType == CareType.feeding.rawValue }
                 .map(\.date)
                 .max()
             if let lastFeed, now.timeIntervalSince(lastFeed) > 72 * 3600 {
@@ -168,28 +193,26 @@ nonisolated enum IslandNegativeFeedback {
     static func hasAnyNegativeSignal(
         pets: [Pet],
         plants: [Plant] = [],
-        healthAlerts: PetHealthAlerting
+        healthAlerts: PetHealthAlerting,
+        careLedgerEntries: [IslandNegativeCareLedgerEntry] = []
     ) -> Bool {
-        !signals(pets: pets, plants: plants, healthAlerts: healthAlerts).isEmpty
+        !signals(pets: pets, plants: plants, healthAlerts: healthAlerts, careLedgerEntries: careLedgerEntries).isEmpty
     }
 
-    private static func hasAnyPetCheckInToday(_ pet: Pet, calendar: Calendar) -> Bool {
+    private static func hasAnyPetCheckInToday(
+        _ pet: Pet,
+        careLedgerEntries: [IslandNegativeCareLedgerEntry],
+        calendar: Calendar
+    ) -> Bool {
         if let lastCheckInDate = pet.lastCheckInDate, calendar.isDateInToday(lastCheckInDate) {
             return true
         }
-        if pet.careLogs.contains(where: { calendar.isDateInToday($0.date) }) {
-            return true
+        let checkInKinds: Set<CareLedgerEventKind> = [.care, .walk, .potty, .hygiene]
+        return careLedgerEntries.contains { entry in
+            entry.petId == pet.id &&
+                checkInKinds.contains(entry.eventKind) &&
+                calendar.isDateInToday(entry.date)
         }
-        if pet.walkLogs.contains(where: { calendar.isDateInToday($0.startDate) }) {
-            return true
-        }
-        if pet.pottyLogs.contains(where: { calendar.isDateInToday($0.date) }) {
-            return true
-        }
-        if pet.hygieneLogs.contains(where: { calendar.isDateInToday($0.date) }) {
-            return true
-        }
-        return false
     }
 
     private static func localized(zh: String, en: String) -> String {
@@ -303,11 +326,21 @@ nonisolated enum IslandNegativeFeedback {
         }
     }
 
-    private static func appetiteTrendSignal(for pet: Pet, calendar: Calendar, now: Date) -> IslandNegativeSignal? {
-        let feedLogs = pet.careLogs.filter { $0.careType == .feeding && $0.amountGrams > 0 }
+    private static func appetiteTrendSignal(
+        for pet: Pet,
+        careLedgerEntries: [IslandNegativeCareLedgerEntry],
+        calendar: Calendar,
+        now: Date
+    ) -> IslandNegativeSignal? {
+        let feedLogs = careLedgerEntries.filter {
+            $0.petId == pet.id &&
+                $0.eventKind == .care &&
+                $0.actionType == CareType.feeding.rawValue &&
+                $0.amountValue > 0
+        }
         guard feedLogs.count >= 4 else { return nil }
-        let recent = dailyAverageAmount(feedLogs, amount: \.amountGrams, daysAgo: 0 ..< 3, calendar: calendar, now: now)
-        let previous = dailyAverageAmount(feedLogs, amount: \.amountGrams, daysAgo: 3 ..< 6, calendar: calendar, now: now)
+        let recent = dailyAverageAmount(feedLogs, daysAgo: 0 ..< 3, calendar: calendar, now: now)
+        let previous = dailyAverageAmount(feedLogs, daysAgo: 3 ..< 6, calendar: calendar, now: now)
         guard previous > 0, recent > 0, recent < previous * 0.65 else { return nil }
         return IslandNegativeSignal(
             iconName: "fork.knife.circle.fill",
@@ -323,10 +356,18 @@ nonisolated enum IslandNegativeFeedback {
         )
     }
 
-    private static func abnormalPottyTrendSignal(for pet: Pet, calendar: Calendar, now: Date) -> IslandNegativeSignal? {
+    private static func abnormalPottyTrendSignal(
+        for pet: Pet,
+        careLedgerEntries: [IslandNegativeCareLedgerEntry],
+        calendar: Calendar,
+        now: Date
+    ) -> IslandNegativeSignal? {
         let start = calendar.date(byAdding: .day, value: -3, to: now) ?? now
-        let abnormal = pet.pottyLogs.filter {
-            $0.date >= start && ($0.pottyType == .softPoop || $0.pottyType == .liquidPoop)
+        let abnormal = careLedgerEntries.filter {
+            $0.petId == pet.id &&
+                $0.eventKind == .potty &&
+                $0.date >= start &&
+                ($0.actionType == PottyType.softPoop.rawValue || $0.actionType == PottyType.liquidPoop.rawValue)
         }
         guard abnormal.count >= 2 else { return nil }
         return IslandNegativeSignal(
@@ -337,17 +378,27 @@ nonisolated enum IslandNegativeFeedback {
                 zh: "近 3 天记录到 \(abnormal.count) 次软便/水便，建议留意饮食变化",
                 en: "\(abnormal.count) soft or liquid stool record(s) in the last 3 days. Watch diet changes."
             ),
-            severity: abnormal.contains { $0.pottyType == .liquidPoop } ? .critical : .warning,
+            severity: abnormal.contains { $0.actionType == PottyType.liquidPoop.rawValue } ? .critical : .warning,
             petId: pet.id,
             routeHint: .potty
         )
     }
 
-    private static func drinkingTrendSignal(for pet: Pet, calendar: Calendar, now: Date) -> IslandNegativeSignal? {
-        let waterLogs = pet.careLogs.filter { $0.careType == .watering && $0.amountMl > 0 }
+    private static func drinkingTrendSignal(
+        for pet: Pet,
+        careLedgerEntries: [IslandNegativeCareLedgerEntry],
+        calendar: Calendar,
+        now: Date
+    ) -> IslandNegativeSignal? {
+        let waterLogs = careLedgerEntries.filter {
+            $0.petId == pet.id &&
+                $0.eventKind == .care &&
+                $0.actionType == CareType.watering.rawValue &&
+                $0.amountValue > 0
+        }
         guard waterLogs.count >= 4 else { return nil }
-        let recent = dailyAverageAmount(waterLogs, amount: \.amountMl, daysAgo: 0 ..< 3, calendar: calendar, now: now)
-        let previous = dailyAverageAmount(waterLogs, amount: \.amountMl, daysAgo: 3 ..< 6, calendar: calendar, now: now)
+        let recent = dailyAverageAmount(waterLogs, daysAgo: 0 ..< 3, calendar: calendar, now: now)
+        let previous = dailyAverageAmount(waterLogs, daysAgo: 3 ..< 6, calendar: calendar, now: now)
         guard previous > 0, recent > 0 else { return nil }
         if recent > previous * 1.7 {
             return IslandNegativeSignal(
@@ -381,17 +432,16 @@ nonisolated enum IslandNegativeFeedback {
     }
 
     private static func dailyAverageAmount(
-        _ logs: [PetCareLog],
-        amount: KeyPath<PetCareLog, Double>,
+        _ entries: [IslandNegativeCareLedgerEntry],
         daysAgo: Range<Int>,
         calendar: Calendar,
         now: Date
     ) -> Double {
         let values = daysAgo.map { dayOffset -> Double in
             guard let day = calendar.date(byAdding: .day, value: -dayOffset, to: now) else { return 0 }
-            return logs
+            return entries
                 .filter { calendar.isDate($0.date, inSameDayAs: day) }
-                .reduce(0) { $0 + $1[keyPath: amount] }
+                .reduce(0) { $0 + $1.amountValue }
         }
         let nonZero = values.filter { $0 > 0 }
         guard !nonZero.isEmpty else { return 0 }

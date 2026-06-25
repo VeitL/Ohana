@@ -98,13 +98,6 @@ extension FocusCard {
         return "c"
     }
 
-    nonisolated static func weeklyWalkDistanceMeters(for pet: Pet, now: Date = Date()) -> Double {
-        let start = Calendar.current.date(byAdding: .day, value: -6, to: now) ?? now
-        return pet.walkLogs
-            .filter { $0.startDate >= start }
-            .reduce(0.0) { $0 + $1.distanceMeters }
-    }
-
     private nonisolated var isRegularPetCard: Bool {
         !isHuman && !isElectronicPet
     }
@@ -165,7 +158,7 @@ extension FocusCard {
     nonisolated static func from(
         _ pet: Pet,
         includeAvatarData: Bool = true,
-        includeWalkDistance: Bool = true
+        homeWalkDistanceMeters: Double = 0
     ) -> FocusCard {
         let isDog = pet.species.contains("狗") || pet.species.lowercased().contains("dog")
         let isCat = pet.species.contains("猫") || pet.species.lowercased().contains("cat")
@@ -217,7 +210,6 @@ extension FocusCard {
         } else {
             togetherHeadline = l.tr(zh: "相伴 \(togetherDays) 天", en: "\(togetherDays) Days Together", de: "\(togetherDays) Tage zusammen")
         }
-        let walkDistanceMeters = includeWalkDistance ? weeklyWalkDistanceMeters(for: pet) : 0
         let popoutImageData = includeAvatarData && pet.cardStyleRaw == "popout"
             ? (pet.cardPopoutImageData ?? pet.avatarImageData)
             : nil
@@ -258,7 +250,7 @@ extension FocusCard {
             passedAwayDate: pet.passedAwayDate,
             daysTogetherAtPassing: pet.daysTogetherAtPassing,
             isReal: true,
-            homeWalkDistanceMeters: walkDistanceMeters,
+            homeWalkDistanceMeters: homeWalkDistanceMeters,
             actions: Array(acts.prefix(4))
         )
     }

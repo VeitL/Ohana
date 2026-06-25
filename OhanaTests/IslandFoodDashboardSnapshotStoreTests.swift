@@ -12,11 +12,11 @@ struct IslandFoodDashboardSnapshotStoreTests {
         momo.dailyPortionGrams = 50
         let nori = Pet(name: "Nori", species: "猫")
         nori.dailyPortionGrams = 60
-        let momoLog = PetCareLog(date: today.addingTimeInterval(3600), amountGrams: 40, foodKind: .dry, pet: momo)
-        let noriLog = PetCareLog(date: today.addingTimeInterval(7200), amountGrams: 60, foodKind: .dry, pet: nori)
-        let momoLedger = feedingLedgerEvent(pet: momo, date: momoLog.date, grams: 40)
-        let noriLedger = feedingLedgerEvent(pet: nori, date: noriLog.date, grams: 60)
-        let ledgerEntries = FoodLedgerEntry.entries(from: [momoLedger, noriLedger])
+        let momoLedger = feedingLedgerEvent(pet: momo, date: today.addingTimeInterval(3600), grams: 40)
+        let noriLedger = feedingLedgerEvent(pet: nori, date: today.addingTimeInterval(7200), grams: 60)
+        let ledgerEvents = [momoLedger, noriLedger]
+        let ledgerEntries = FoodLedgerEntry.entries(from: ledgerEvents)
+        let stockLedgerEntries = quickFeedEntries(pets: [momo, nori], events: ledgerEvents)
         let momoStock = PetFoodRecord(
             brand: "Dry",
             totalGrams: 1000,
@@ -30,7 +30,7 @@ struct IslandFoodDashboardSnapshotStoreTests {
             selectedPetId: nil,
             allEvents: [],
             allFeedingLedgerEntries: ledgerEntries,
-            legacyStockCareLogs: [momoLog, noriLog],
+            allStockFeedingLedgerEntries: stockLedgerEntries,
             allFoodRecords: [momoStock],
             now: now,
             calendar: calendar
@@ -49,7 +49,7 @@ struct IslandFoodDashboardSnapshotStoreTests {
             selectedPetId: momo.id,
             allEvents: [],
             allFeedingLedgerEntries: ledgerEntries,
-            legacyStockCareLogs: [momoLog, noriLog],
+            allStockFeedingLedgerEntries: stockLedgerEntries,
             allFoodRecords: [momoStock],
             now: now,
             calendar: calendar
@@ -78,19 +78,20 @@ struct IslandFoodDashboardSnapshotStoreTests {
             selectedPetId: nil,
             allEvents: [],
             allFeedingLedgerEntries: originalEntries,
-            legacyStockCareLogs: [],
+            allStockFeedingLedgerEntries: quickFeedEntries(pets: [pet], events: [ledger]),
             allFoodRecords: [foodRecord],
             allSharedCareSessions: []
         )
 
         ledger.amountValue = 55
         let changedEntries = FoodLedgerEntry.entries(from: [ledger])
+        let changedStockEntries = quickFeedEntries(pets: [pet], events: [ledger])
         let changedLedger = IslandFoodDashboardInputRevision.make(
             pets: [pet],
             selectedPetId: nil,
             allEvents: [],
             allFeedingLedgerEntries: changedEntries,
-            legacyStockCareLogs: [],
+            allStockFeedingLedgerEntries: changedStockEntries,
             allFoodRecords: [foodRecord],
             allSharedCareSessions: []
         )
@@ -100,7 +101,7 @@ struct IslandFoodDashboardSnapshotStoreTests {
             selectedPetId: nil,
             allEvents: [],
             allFeedingLedgerEntries: changedEntries,
-            legacyStockCareLogs: [],
+            allStockFeedingLedgerEntries: changedStockEntries,
             allFoodRecords: [foodRecord],
             allSharedCareSessions: []
         )
@@ -154,5 +155,15 @@ struct IslandFoodDashboardSnapshotStoreTests {
             amountUnit: "g",
             legacyModelName: "PetCareLog"
         )
+    }
+
+    private func quickFeedEntries(pets: [Pet], events: [CareLedgerEvent]) -> [QuickFeedLedgerEntry] {
+        pets.flatMap { pet in
+            QuickFeedLedgerEntry.entries(
+                pet: pet,
+                feedingLedgerEvents: events,
+                legacyCareLogs: []
+            )
+        }
     }
 }

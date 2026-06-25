@@ -1134,8 +1134,8 @@ struct HomeCommandExecutorTests {
         let session = try #require(sessions.first)
         let unknownLog = try #require(pottyLogs.first)
         let ledgerEvent = try #require(ledgerEvents.first)
-        let claimItems = QuickPottyUnknownClaimStore.items(for: second, context: context)
-        let claimItem = try #require(claimItems.first)
+        let claimEntries = QuickPottyUnknownClaimStore.entries(for: second.id, context: context)
+        let claimEntry = try #require(claimEntries.first)
 
         #expect(result?.petID == first.id)
         #expect(result?.pottyLogID == unknownLog.id)
@@ -1154,12 +1154,8 @@ struct HomeCommandExecutorTests {
         #expect(revisionCenter.homeRevision.value == beforeRevision + 1)
         #expect(revisionCenter.lastMutation?.command == .quickCare(entityID: first.id, action: "unknownSharedPotty"))
 
-        if case let .unknownPotty(itemLog, targetCount) = claimItem {
-            #expect(itemLog.id == unknownLog.id)
-            #expect(targetCount == 2)
-        } else {
-            Issue.record("Expected unknown shared potty claim item")
-        }
+        #expect(claimEntry.id == unknownLog.id)
+        #expect(claimEntry.targetCount == 2)
 
         let claimResult = PetCareCommandExecutor(context: context, revisionCenter: revisionCenter).claimUnknownPottyLog(
             unknownLog,
@@ -1183,8 +1179,8 @@ struct HomeCommandExecutorTests {
         #expect(claimedSession.targetPetIds == [second.id.uuidString])
         #expect(claimedLedgerEvent.subjectKind == CareLedgerSubjectKind.pet.rawValue)
         #expect(claimedLedgerEvent.subjectId == second.id.uuidString)
-        #expect(QuickPottyUnknownClaimStore.items(for: first, context: context).isEmpty)
-        #expect(QuickPottyUnknownClaimStore.items(for: second, context: context).isEmpty)
+        #expect(QuickPottyUnknownClaimStore.entries(for: first.id, context: context).isEmpty)
+        #expect(QuickPottyUnknownClaimStore.entries(for: second.id, context: context).isEmpty)
         #expect(revisionCenter.homeRevision.value == beforeRevision + 2)
         #expect(revisionCenter.lastMutation?.command == .quickCare(entityID: second.id, action: "claimUnknownPotty"))
         #expect(revisionCenter.lastMutation?.note == "test.potty.claim")

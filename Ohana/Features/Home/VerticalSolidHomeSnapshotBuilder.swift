@@ -17,6 +17,7 @@ nonisolated struct VerticalSolidHomeSourceState {
     let pendingReminders: [Reminder]
     let humanMedications: [HumanMedication]
     let humanMedicationLogs: [HumanMedicationLog]
+    let healthAlertSources: [PetHealthAlertSource]
     let todayFocusCareLedgerEntries: [TodayFocusCareLedgerEntry]
     let feedingLedgerEntries: [HomeFeedQuickActionEntry]
     let careLedgerEntries: [HomeCareQuickActionEntry]
@@ -46,6 +47,7 @@ nonisolated struct VerticalSolidHomeSourceState {
         pendingReminders: [Reminder],
         humanMedications: [HumanMedication],
         humanMedicationLogs: [HumanMedicationLog],
+        healthAlertSources: [PetHealthAlertSource] = [],
         todayFocusCareLedgerEntries: [TodayFocusCareLedgerEntry] = [],
         feedingLedgerEntries: [HomeFeedQuickActionEntry],
         careLedgerEntries: [HomeCareQuickActionEntry],
@@ -74,6 +76,7 @@ nonisolated struct VerticalSolidHomeSourceState {
         self.pendingReminders = pendingReminders
         self.humanMedications = humanMedications
         self.humanMedicationLogs = humanMedicationLogs
+        self.healthAlertSources = healthAlertSources
         self.todayFocusCareLedgerEntries = todayFocusCareLedgerEntries
         self.feedingLedgerEntries = feedingLedgerEntries
         self.careLedgerEntries = careLedgerEntries
@@ -144,7 +147,7 @@ nonisolated enum VerticalSolidHomeSnapshotBuilder {
         questProgress: TodayFocusQuestProgress = .fromDefaults(),
         healthAlertEngine: PetHealthAlertEngine = PetHealthAlertEngine()
     ) -> VerticalSolidHomeSnapshot {
-        let clinicalAlerts = healthAlertEngine.scanAlerts(pets: source.pets.filter { !$0.hasPassedAway })
+        let clinicalAlerts = healthAlertEngine.scanAlerts(sources: source.healthAlertSources)
         return build(
             from: source,
             now: now,
@@ -286,6 +289,7 @@ nonisolated enum VerticalSolidHomeSnapshotBuilder {
             reminderSignature(source.pendingReminders),
             medicationSignature(source.humanMedications),
             medicationLogSignature(source.humanMedicationLogs),
+            healthAlertSourceSignature(source.healthAlertSources),
             todayFocusCareLedgerSignature(source.todayFocusCareLedgerEntries),
             feedingLedgerSignature(source.feedingLedgerEntries),
             careLedgerSignature(source.careLedgerEntries),
@@ -492,6 +496,91 @@ nonisolated enum VerticalSolidHomeSnapshotBuilder {
                 log.statusRaw
             ].joined(separator: ":")
         }.joined(separator: "|")
+    }
+
+    private static func healthAlertSourceSignature(_ sources: [PetHealthAlertSource]) -> String {
+        sources.map { source in
+            [
+                source.petId.uuidString,
+                source.healthLogs.map(healthAlertHealthLogSignature).joined(separator: ";"),
+                source.weightLogs.map(healthAlertWeightLogSignature).joined(separator: ";"),
+                source.careLogs.map(healthAlertCareLogSignature).joined(separator: ";"),
+                source.pottyLogs.map(healthAlertPottyLogSignature).joined(separator: ";"),
+                source.walkLogs.map(healthAlertWalkLogSignature).joined(separator: ";"),
+                source.documents.map(healthAlertDocumentSignature).joined(separator: ";"),
+                source.symptomLogs.map(healthAlertSymptomSignature).joined(separator: ";"),
+                source.heatCycleLogs.map(healthAlertHeatCycleSignature).joined(separator: ";")
+            ].joined(separator: ":")
+        }.joined(separator: "|")
+    }
+
+    private static func healthAlertHealthLogSignature(_ log: PetHealthLog) -> String {
+        [
+            log.id.uuidString,
+            log.type,
+            String(Int(log.date.timeIntervalSince1970)),
+            String(timestamp(log.expirationDate)),
+            String(timestamp(log.nextCheckupDate))
+        ].joined(separator: ",")
+    }
+
+    private static func healthAlertWeightLogSignature(_ log: PetWeightLog) -> String {
+        [
+            log.id.uuidString,
+            String(Int(log.date.timeIntervalSince1970)),
+            String(Int((log.weight * 1000).rounded()))
+        ].joined(separator: ",")
+    }
+
+    private static func healthAlertCareLogSignature(_ log: PetCareLog) -> String {
+        [
+            log.id.uuidString,
+            log.type,
+            String(Int(log.date.timeIntervalSince1970))
+        ].joined(separator: ",")
+    }
+
+    private static func healthAlertPottyLogSignature(_ log: PetPottyLog) -> String {
+        [
+            log.id.uuidString,
+            log.type,
+            String(Int(log.date.timeIntervalSince1970))
+        ].joined(separator: ",")
+    }
+
+    private static func healthAlertWalkLogSignature(_ log: PetWalkLog) -> String {
+        [
+            log.id.uuidString,
+            String(Int(log.startDate.timeIntervalSince1970))
+        ].joined(separator: ",")
+    }
+
+    private static func healthAlertDocumentSignature(_ document: PetDocument) -> String {
+        [
+            document.id.uuidString,
+            document.category,
+            String(timestamp(document.expiryDate))
+        ].joined(separator: ",")
+    }
+
+    private static func healthAlertSymptomSignature(_ log: SymptomLog) -> String {
+        [
+            log.id.uuidString,
+            log.categoryRaw,
+            log.symptomName,
+            String(log.severityRaw),
+            String(Int(log.date.timeIntervalSince1970))
+        ].joined(separator: ",")
+    }
+
+    private static func healthAlertHeatCycleSignature(_ log: HeatCycleLog) -> String {
+        [
+            log.id.uuidString,
+            log.statusRaw,
+            String(Int(log.startDate.timeIntervalSince1970)),
+            String(timestamp(log.endDate)),
+            String(timestamp(log.expectedDeliveryDate))
+        ].joined(separator: ",")
     }
 
     private static func todayFocusCareLedgerSignature(_ entries: [TodayFocusCareLedgerEntry]) -> String {

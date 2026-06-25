@@ -177,9 +177,7 @@ struct IslandWeightDashboardContentView: View {
            let latest = latestWeight(for: selectedSeriesID) {
             return latest
         }
-        let petWeight = visiblePets.compactMap { $0.weightLogs.sorted { $0.date > $1.date }.first?.weightInKg }.reduce(0, +)
-        let humanWeight = visibleWeightHumans.compactMap { $0.weightLogs.sorted { $0.date > $1.date }.first?.weight }.reduce(0, +)
-        return petWeight + humanWeight
+        return visibleSeriesIDs.compactMap { latestWeight(for: $0) }.reduce(0, +)
     }
 
     // 轻量趣味类比
@@ -823,14 +821,14 @@ struct IslandWeightDashboardContentView: View {
         for pet in visiblePets {
             let seriesID = "pet:\(pet.id.uuidString)"
             if includeSelection, let selectedSeriesID, selectedSeriesID != seriesID { continue }
-            let sorted = pet.weightLogs.sorted { $0.date < $1.date }
+            let sorted = weightAbsolutePoints(for: seriesID)
             guard !sorted.isEmpty else { continue }
             let pts = sorted.map { SparkPoint(date: $0.date, weight: $0.weight) }
             result.append(SparkEntry(
                 id: seriesID,
                 seriesID: seriesID,
                 emoji: pet.avatarEmoji, name: pet.name,
-                current: sorted.last!.weightInKg,
+                current: sorted.last!.weight,
                 delta: deltaForSeries(seriesID),
                 isHuman: false,
                 history: pts,
@@ -841,7 +839,7 @@ struct IslandWeightDashboardContentView: View {
         for human in visibleWeightHumans {
             let seriesID = "human:\(human.id.uuidString)"
             if includeSelection, let selectedSeriesID, selectedSeriesID != seriesID { continue }
-            let sorted = human.weightLogs.sorted { $0.date < $1.date }
+            let sorted = weightAbsolutePoints(for: seriesID)
             guard !sorted.isEmpty else { continue }
             let pts = sorted.map { SparkPoint(date: $0.date, weight: $0.weight) }
             result.append(SparkEntry(
@@ -987,10 +985,13 @@ struct IslandWeightDashboardContentView: View {
     }
 
     private func latestWeight(for seriesID: String) -> Double? {
+        weightAbsolutePoints(for: seriesID).last?.weight
+    }
+
+    private func weightAbsolutePoints(for seriesID: String) -> [WeightAbsolutePoint] {
         vm.weightAbsolutes
             .filter { $0.seriesID == seriesID }
-            .max(by: { $0.date < $1.date })?
-            .weight
+            .sorted { $0.date < $1.date }
     }
 
     private func humanAvatarView(_ human: Human, size: CGFloat) -> some View {

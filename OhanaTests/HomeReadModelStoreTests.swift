@@ -245,10 +245,17 @@ struct HomeReadModelStoreTests {
     @Test func storeSourceDoesNotReintroduceMainContextCompatibilityFetch() throws {
         let file = try sourceFile(named: "HomeReadModelStore.swift")
         let source = try String(contentsOf: file, encoding: .utf8)
+        let builderFile = try sourceFile(named: "VerticalSolidHomeSnapshotBuilder.swift")
+        let builderSource = try String(contentsOf: builderFile, encoding: .utf8)
 
         #expect(!source.contains("compatibilitySource"))
         #expect(!source.contains("payload.source"))
         #expect(!source.contains("container.mainContext"))
+        #expect(source.contains("let healthAlertSources = fetches.healthAlertSources(pets: pets)"))
+        #expect(source.contains("PetHealthAlertSourceRouteData.load(pets: pets, from: context)"))
+        #expect(builderSource.contains("let healthAlertSources: [PetHealthAlertSource]"))
+        #expect(builderSource.contains("scanAlerts(sources: source.healthAlertSources)"))
+        #expect(!builderSource.contains("scanAlerts(pets: source.pets"))
     }
 
     private func makeContainer() throws -> ModelContainer {

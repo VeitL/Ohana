@@ -11,7 +11,8 @@ import SwiftUI
 struct PetMedicationDetailContentSheet: View {
     let pet: Pet
     let medication: PetMedication
-    let allEvents: [Event]
+    let doseEvents: [Event]
+    var onDataChanged: (() -> Void)?
 
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
@@ -27,7 +28,7 @@ struct PetMedicationDetailContentSheet: View {
     private var l: L10n { L10n(appLanguage) }
 
     private var medEvents: [Event] {
-        allEvents.filter {
+        doseEvents.filter {
             PetMedicationDoseLogging.isDoseEvent($0, medicationId: medication.id)
         }
     }
@@ -41,7 +42,7 @@ struct PetMedicationDetailContentSheet: View {
     }
 
     private var todayDone: Int {
-        PetMedicationDoseLogging.todayDoseCount(events: allEvents, medicationId: medication.id)
+        PetMedicationDoseLogging.todayDoseCount(events: doseEvents, medicationId: medication.id)
     }
 
     private var administrationDisplay: String {
@@ -96,7 +97,13 @@ struct PetMedicationDetailContentSheet: View {
             }
             .toolbar(.hidden, for: .navigationBar)
             .sheet(isPresented: $showingEdit) {
-                AddPetMedicationSheet(pet: pet, existing: medication)
+                AddPetMedicationSheet(
+                    pet: pet,
+                    existing: medication,
+                    onSaved: {
+                        onDataChanged?()
+                    }
+                )
             }
         }
     }
@@ -190,6 +197,7 @@ struct PetMedicationDetailContentSheet: View {
             guard result.didRecord, result.allowsDerivedEffects else { return }
             appServices.medicationReminders.scheduleMedicationReminders(for: pet, context: modelContext)
             UINotificationFeedbackGenerator().notificationOccurred(.success)
+            onDataChanged?()
         } label: {
             HStack {
                 Image(systemName: "checkmark.circle.fill").accessibilityHidden(true)
@@ -215,6 +223,7 @@ struct PetMedicationDetailContentSheet: View {
                 medication: medication,
                 note: "pet.medication.detail.delete"
             )
+            onDataChanged?()
             UINotificationFeedbackGenerator().notificationOccurred(.success)
             dismiss()
         }
@@ -234,6 +243,7 @@ struct PetMedicationDetailContentSheet: View {
                 isActive: isActive,
                 note: "pet.medication.detail.activation"
             )
+            onDataChanged?()
             UINotificationFeedbackGenerator().notificationOccurred(.success)
         }
     }

@@ -9,12 +9,18 @@ import SwiftUI
 
 struct WeeklyReportCard: View {
     let pet: Pet
+    let ledgerEvents: [CareLedgerEvent]
     @State private var isRendering = false
     @State private var isSharing = false
     @State private var shareImage: UIImage? = nil
     @State private var pulseShare = false
     @State private var isVisible = false
     @ObservedObject private var workloadPolicy = AppWorkloadPolicy.shared
+
+    init(pet: Pet, ledgerEvents: [CareLedgerEvent] = []) {
+        self.pet = pet
+        self.ledgerEvents = ledgerEvents
+    }
 
     private var shouldPulseShare: Bool {
         workloadPolicy.shouldRunRepeatingAnimation(isVisible: isVisible)
@@ -28,26 +34,37 @@ struct WeeklyReportCard: View {
         Calendar.current.dateInterval(of: .weekOfYear, for: Date())?.end ?? Date()
     }
 
-    private var weekWalks: [PetWalkLog] {
-        pet.walkLogs.filter { $0.startDate >= weekStart && $0.startDate < weekEnd }
+    private var weekLedgerEvents: [CareLedgerEvent] {
+        ledgerEvents.filter { event in
+            isPetEvent(event) &&
+                event.occurredAt >= weekStart &&
+                event.occurredAt < weekEnd &&
+                isWeeklyReportActivity(event)
+        }
     }
 
-    private var weekPotties: [PetPottyLog] {
-        pet.pottyLogs.filter { $0.date >= weekStart && $0.date < weekEnd }
+    private var weekWalkEvents: [CareLedgerEvent] {
+        weekLedgerEvents.filter { $0.eventKindEnum == .walk }
+    }
+
+    private var weekPottyEvents: [CareLedgerEvent] {
+        weekLedgerEvents.filter { $0.eventKindEnum == .potty }
     }
 
     private var weekExpenses: Double {
-        pet.expenseLogs
-            .filter { $0.date >= weekStart && $0.date < weekEnd }
-            .reduce(0) { $0 + $1.amount }
+        weekLedgerEvents
+            .filter { $0.eventKindEnum == .expense }
+            .reduce(0) { $0 + max(0, $1.amountValue) }
     }
 
     private var totalWalkDistance: Double {
-        weekWalks.reduce(0) { $0 + $1.distanceMeters }
+        weekWalkEvents.reduce(0) { $0 + max(0, $1.amountValue) }
     }
 
     private var totalWalkDuration: TimeInterval {
-        weekWalks.reduce(0) { $0 + TimeInterval($1.durationSeconds) }
+        weekWalkEvents.reduce(0) { partial, event in
+            partial + max(0, CareLedgerMetadata.doubleValue(named: "durationSeconds", in: event.metadataJSON) ?? 0)
+        }
     }
 
     var body: some View {
@@ -101,10 +118,10 @@ struct WeeklyReportCard: View {
                 GridItem(.flexible(), spacing: 10),
                 GridItem(.flexible(), spacing: 10)
             ], spacing: 10) {
-                statBubble(emoji: "🚶", value: "\(weekWalks.count)", label: "巡岛")
+                statBubble(emoji: "🚶", value: "\(weekWalkEvents.count)", label: "巡岛")
                 statBubble(emoji: "📏", value: distanceFormatted, label: "距离")
                 statBubble(emoji: "⏱️", value: durationFormatted, label: "时长")
-                statBubble(emoji: "💩", value: "\(weekPotties.count)", label: "便便")
+                statBubble(emoji: "💩", value: "\(weekPottyEvents.count)", label: "便便")
                 statBubble(emoji: "💰", value: AppCurrency.format(weekExpenses, fractionDigits: 0), label: "花费")
                 statBubble(emoji: "⚖️", value: latestWeight, label: "体重")
             }
@@ -169,6 +186,7 @@ struct WeeklyReportCard: View {
     }
 
     private var durationFormatted: String {
+        guard totalWalkDuration > 0 else { return "--" }
         let minutes = Int(totalWalkDuration / 60)
         if minutes >= 60 {
             return "\(minutes / 60)h\(minutes % 60)m"
@@ -177,18 +195,32 @@ struct WeeklyReportCard: View {
     }
 
     private var latestWeight: String {
-        if let w = pet.weightLogs.sorted(by: { $0.date > $1.date }).first {
-            return String(format: "%.1fkg", w.weight)
+        let weightEvents = ledgerEvents
+            .filter { isPetEvent($0) && $0.eventKindEnum == .weight && $0.amountValue > 0 }
+            .sorted { $0.occurredAt > $1.occurredAt }
+        if let event = weightEvents.first {
+            return String(format: "%.1fkg", event.amountValue)
         }
         return "--"
     }
 
     private func hasActivityOn(_ date: Date) -> Bool {
         let cal = Calendar.current
-        let hasWalk = weekWalks.contains { cal.isDate($0.startDate, inSameDayAs: date) }
-        let hasPotty = weekPotties.contains { cal.isDate($0.date, inSameDayAs: date) }
-        let hasHygiene = pet.hygieneLogs.contains { cal.isDate($0.date, inSameDayAs: date) }
-        return hasWalk || hasPotty || hasHygiene
+        return weekLedgerEvents.contains { cal.isDate($0.occurredAt, inSameDayAs: date) }
+    }
+
+    private func isPetEvent(_ event: CareLedgerEvent) -> Bool {
+        event.subjectKind == CareLedgerSubjectKind.pet.rawValue &&
+            event.subjectId == pet.id.uuidString
+    }
+
+    private func isWeeklyReportActivity(_ event: CareLedgerEvent) -> Bool {
+        switch event.eventKindEnum {
+        case .care, .potty, .walk, .hygiene, .health, .weight, .medication, .expense:
+            true
+        case .reminder, .plantCare, .coconut, .workout, .milestone, .unknown:
+            false
+        }
     }
 
     // MARK: - Share Poster
@@ -264,10 +296,10 @@ struct WeeklyReportCard: View {
 
             // 数据网格
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
-                posterStat(emoji: "🚶", value: "\(weekWalks.count)次", label: "巡岛")
+                posterStat(emoji: "🚶", value: "\(weekWalkEvents.count)次", label: "巡岛")
                 posterStat(emoji: "📏", value: distanceFormatted, label: "距离")
                 posterStat(emoji: "⏱️", value: durationFormatted, label: "时长")
-                posterStat(emoji: "💩", value: "\(weekPotties.count)次", label: "便便")
+                posterStat(emoji: "💩", value: "\(weekPottyEvents.count)次", label: "便便")
                 posterStat(emoji: "💰", value: AppCurrency.format(weekExpenses, fractionDigits: 0), label: "花费")
                 posterStat(emoji: "⚖️", value: latestWeight, label: "体重")
             }

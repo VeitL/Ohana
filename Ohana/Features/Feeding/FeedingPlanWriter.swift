@@ -333,13 +333,13 @@ enum FeedingPlanWriter {
         }
 
         var reminders: [Reminder] = []
-        let careLogs = stockCareLogs(petID: pet.id, context: context)
+        let stockLedgerEntries = feedingLedgerEntries(pet: pet, allEvents: allEvents, context: context)
         for foodKind in FeedFoodKind.allCases {
             let snapshot = FeedStockCalculator.snapshot(
                 for: pet,
                 foodKind: foodKind,
                 events: allEvents,
-                careLogs: careLogs,
+                feedingLedgerEntries: stockLedgerEntries,
                 now: now,
                 calendar: calendar
             )
@@ -413,20 +413,31 @@ enum FeedingPlanWriter {
         return eventsById.values.sorted { $0.startDate < $1.startDate }
     }
 
-    private nonisolated static func stockCareLogs(petID: UUID, context: ModelContext) -> [PetCareLog] {
+    private nonisolated static func feedingLedgerEntries(pet: Pet, allEvents: [Event], context: ModelContext) -> [QuickFeedLedgerEntry] {
         let feedingType = CareType.feeding.rawValue
-        let descriptor = FetchDescriptor<PetCareLog>(
-            predicate: #Predicate<PetCareLog> { log in
-                log.type == feedingType &&
-                    log.pet?.id == petID
+        let careKind = CareLedgerEventKind.care.rawValue
+        let petSubject = CareLedgerSubjectKind.pet.rawValue
+        let petID = pet.id.uuidString
+        let descriptor = FetchDescriptor<CareLedgerEvent>(
+            predicate: #Predicate<CareLedgerEvent> { event in
+                event.subjectKind == petSubject &&
+                    event.subjectId == petID &&
+                    event.eventKind == careKind &&
+                    event.actionType == feedingType
             },
-            sortBy: [SortDescriptor(\.date, order: .reverse)]
+            sortBy: [SortDescriptor(\.occurredAt, order: .reverse)]
         )
         do {
-            return try context.fetch(descriptor)
+            return QuickFeedLedgerEntry.entries(
+                pet: pet,
+                feedingLedgerEvents: try context.fetch(descriptor),
+                legacyCareLogs: [],
+                manualPlanEvents: allEvents,
+                autoFeederEvents: allEvents
+            )
         } catch {
             OhanaLog.warning(
-                "FeedingPlanWriter failed to fetch stock care logs: \(error.localizedDescription)",
+                "FeedingPlanWriter failed to fetch stock feeding ledger entries: \(error.localizedDescription)",
                 category: "Care"
             )
             return []

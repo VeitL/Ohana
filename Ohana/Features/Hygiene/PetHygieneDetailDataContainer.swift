@@ -33,11 +33,9 @@ struct PetHygieneDetailView: View {
 
     @Query(sort: \Reminder.scheduledAt, order: .forward) private var allReminders: [Reminder]
     @Query private var hygieneLedgerEvents: [CareLedgerEvent]
-    @Query private var legacyDeleteLogs: [PetHygieneLog]
 
     init(pet: Pet) {
         self.pet = pet
-        let petUUID = pet.id
         let petId = pet.id.uuidString
         let petSubject = CareLedgerSubjectKind.pet.rawValue
         let hygieneKind = CareLedgerEventKind.hygiene.rawValue
@@ -50,21 +48,13 @@ struct PetHygieneDetailView: View {
             sort: \.occurredAt,
             order: .reverse
         )
-        _legacyDeleteLogs = Query(
-            filter: #Predicate<PetHygieneLog> { log in
-                log.pet?.id == petUUID
-            },
-            sort: \.date,
-            order: .reverse
-        )
     }
 
     var body: some View {
         PetHygieneDetailContentView(
             pet: pet,
             allReminders: allReminders,
-            hygieneEntries: PetHygieneLedgerEntry.entries(from: hygieneLedgerEvents, petID: pet.id),
-            legacyDeleteLogs: legacyDeleteLogs
+            hygieneEntries: PetHygieneLedgerEntry.entries(from: hygieneLedgerEvents, petID: pet.id)
         )
     }
 }

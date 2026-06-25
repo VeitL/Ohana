@@ -9,7 +9,7 @@ import SwiftUI
 
 struct CoHealthDashboardFullContentView: View {
     let human: Human
-    let allPets: [Pet]
+    let snapshot: CoHealthDashboardSnapshot
 
     @AppStorage("currentActiveHumanId") private var activeHumanIdStr = ""
 
@@ -18,32 +18,16 @@ struct CoHealthDashboardFullContentView: View {
         human.isPrivate(.weight, viewedBy: activeHumanId) || human.isPrivate(.workout, viewedBy: activeHumanId)
     }
 
-    private var past30Days: Date {
-        Calendar.current.date(byAdding: .day, value: -29,
-                              to: Calendar.current.startOfDay(for: Date())) ?? Date()
-    }
-
-    private var associatedPets: [Pet] {
-        allPets.filter { pet in
-            pet.walkLogs.contains { $0.executorIds.contains(human.id.uuidString) }
-        }
+    private var associatedPets: [CoHealthPetSnapshot] {
+        snapshot.associatedPets(for: human.id, dogsOnly: false)
     }
 
     private var thisMonthWalkKm: Double {
-        let start = Calendar.current.dateInterval(of: .month, for: Date())?.start ?? past30Days
-        let myId = human.id.uuidString
-        let allLogs: [PetWalkLog] = associatedPets.flatMap(\.walkLogs)
-        let filtered = allLogs.filter { $0.executorIds.contains(myId) && $0.startDate >= start }
-        let total = filtered.reduce(0.0) { acc, log in acc + log.distanceMeters }
-        return total / 1000
+        snapshot.thisMonthWalkKm(for: human.id, pets: associatedPets)
     }
 
     private var petWeightDelta: Double? {
-        guard let pet = associatedPets.first else { return nil }
-        let start = Calendar.current.dateInterval(of: .month, for: Date())?.start ?? past30Days
-        let logs = pet.weightLogs.filter { $0.date >= start }.sorted { $0.date < $1.date }
-        guard logs.count >= 2 else { return nil }
-        return logs.last!.weight - logs.first!.weight
+        snapshot.petWeightDelta(for: associatedPets)
     }
 
     private var summaryText: String {
@@ -171,31 +155,15 @@ struct CoHealthDashboardFullContentView: View {
         .goTranslucentCard(cornerRadius: OhanaRadius.cardLarge)
     }
 
-    private var last7DaysWalkData: [DayWalkPoint] {
-        let myId = human.id.uuidString
-        let allLogs: [PetWalkLog] = associatedPets.flatMap(\.walkLogs)
-        let fmt = DateFormatter()
-        fmt.dateFormat = "E"
-        fmt.locale = AppLanguage.effectiveLocale
-        return (0 ..< 7).map { offset in
-            let day = Calendar.current.date(byAdding: .day, value: -(6 - offset), to: Date())!
-            let dayLogs = allLogs.filter { log in
-                log.executorIds.contains(myId) &&
-                    Calendar.current.isDate(log.startDate, inSameDayAs: day)
-            }
-            let totalMeters = dayLogs.reduce(0.0) { acc, log in acc + log.distanceMeters }
-            let km = totalMeters / 1000
-            let isToday = Calendar.current.isDateInToday(day)
-            let todayLabel = L10n(AppLanguage.code).tr(zh: "今", en: "Today", de: "Heute")
-            return DayWalkPoint(label: isToday ? todayLabel : fmt.string(from: day), km: km, isToday: isToday)
-        }
+    private var last7DaysWalkData: [CoHealthWalkDayPoint] {
+        snapshot.last7DaysWalkData(for: human.id, pets: associatedPets)
     }
 
     // MARK: - Weight Compare Section
     private var weightCompareSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             sectionTitle("⚖️ 体重对比趋势")
-            CoHealthDashboardView(human: human)
+            CoHealthDashboardContentView(human: human, snapshot: snapshot)
                 .allowsHitTesting(false)
         }
         .padding(20)
@@ -211,7 +179,7 @@ struct CoHealthDashboardFullContentView: View {
                     PetAvatarPortraitView(
                         imageData: pet.avatarImageData,
                         fallbackText: pet.avatarEmoji,
-                        themeColor: Color(hex: pet.safeThemeColorHex),
+                        themeColor: Color(hex: pet.themeColorHex),
                         size: 44,
                         backgroundOpacity: 0.18
                     )
@@ -219,18 +187,14 @@ struct CoHealthDashboardFullContentView: View {
                         Text(pet.name)
                             .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(Color.ohanaPrimaryText)
-                        if let w = pet.weightLogs.sorted(by: { $0.date > $1.date }).first?.weight {
+                        if let w = pet.latestWeightKg {
                             Text("最新体重 \(String(format: "%.1f", w)) kg")
                                 .font(OhanaFont.adaptive(size: 11, weight: .medium)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                 .foregroundStyle(Color.ohanaPrimaryText.opacity(0.5))
                         }
                     }
                     Spacer()
-                    let monthWalk = pet.walkLogs
-                        .filter { $0.executorIds.contains(human.id.uuidString) &&
-                            Calendar.current.isDate($0.startDate, equalTo: Date(), toGranularity: .month)
-                        }
-                        .reduce(0.0) { $0 + $1.distanceMeters } / 1000
+                    let monthWalk = snapshot.thisMonthWalkKm(for: human.id, pets: [pet])
                     VStack(alignment: .trailing, spacing: 2) {
                         Text(String(format: "%.1f km", monthWalk))
                             .font(OhanaFont.adaptive(size: 16, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
@@ -258,11 +222,4 @@ struct CoHealthDashboardFullContentView: View {
             .frame(maxWidth: .infinity, alignment: .center)
             .padding(.vertical, 24)
     }
-}
-
-private struct DayWalkPoint: Identifiable {
-    let id = UUID()
-    let label: String
-    let km: Double
-    let isToday: Bool
 }

@@ -12,6 +12,8 @@ struct DocumentsListView: View {
     let pet: Pet
     var showsCloseButton: Bool = true
 
+    @Query private var routeDocuments: [PetDocument] // smoothness: allow route-scoped protection rows after explicit documents navigation.
+    @Query private var routeInsurances: [PetInsurance] // smoothness: allow route-scoped protection rows after explicit documents navigation.
     @Environment(\.modelContext) private var modelContext
     @Environment(AppServices.self) private var appServices
     @Environment(\.dismiss) private var dismiss
@@ -24,16 +26,30 @@ struct DocumentsListView: View {
     @StateObject private var commandQueue = DeferredDomainCommandQueue()
 
     private var l: L10n { L10n() }
-    private var state: PetProtectionDashboardState { PetProtectionDashboardState(pet: pet) }
+    private var state: PetProtectionDashboardState {
+        PetProtectionDashboardState(documents: sortedDocs, insurances: sortedInsurances)
+    }
+
+    init(pet: Pet, showsCloseButton: Bool = true) {
+        self.pet = pet
+        self.showsCloseButton = showsCloseButton
+        let petID = pet.id
+        _routeDocuments = Query(filter: #Predicate<PetDocument> { document in
+            document.pet?.id == petID
+        })
+        _routeInsurances = Query(filter: #Predicate<PetInsurance> { insurance in
+            insurance.pet?.id == petID
+        })
+    }
 
     private var sortedDocs: [PetDocument] {
-        pet.documents
+        routeDocuments
             .filter { $0.documentCategory != .vaccine && $0.documentCategory != .insurance }
             .sorted { ($0.expiryDate ?? .distantFuture) < ($1.expiryDate ?? .distantFuture) }
     }
 
     private var sortedInsurances: [PetInsurance] {
-        pet.insurances.sorted { $0.renewalDate < $1.renewalDate }
+        routeInsurances.sorted { $0.renewalDate < $1.renewalDate }
     }
 
     private var showingInlinePopup: Bool {

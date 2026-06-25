@@ -26,7 +26,7 @@ struct QuickFeedDetailSheet: View {
     let allHumans: [Human]
     let allPets: [Pet]
     let feedingLedgerEntries: [QuickFeedLedgerEntry]
-    let allCareLogs: [PetCareLog]
+    let legacyCareLogs: [PetCareLog]
     let allFoodRecords: [PetFoodRecord]
     let allSharedCareSessions: [SharedCareSession]
 
@@ -46,7 +46,7 @@ struct QuickFeedDetailSheet: View {
         allHumans: [Human] = [],
         allPets: [Pet] = [],
         feedingLedgerEntries: [QuickFeedLedgerEntry] = [],
-        allCareLogs: [PetCareLog] = [],
+        legacyCareLogs: [PetCareLog] = [],
         allFoodRecords: [PetFoodRecord] = [],
         allSharedCareSessions: [SharedCareSession] = []
     ) {
@@ -60,7 +60,7 @@ struct QuickFeedDetailSheet: View {
         self.allHumans = allHumans
         self.allPets = allPets
         self.feedingLedgerEntries = feedingLedgerEntries
-        self.allCareLogs = allCareLogs
+        self.legacyCareLogs = legacyCareLogs
         self.allFoodRecords = allFoodRecords
         self.allSharedCareSessions = allSharedCareSessions
     }
@@ -77,7 +77,7 @@ struct QuickFeedDetailSheet: View {
             allHumans: allHumans,
             allPets: allPets,
             feedingLedgerEntries: feedingLedgerEntries,
-            allCareLogs: allCareLogs,
+            legacyCareLogs: legacyCareLogs,
             allFoodRecords: allFoodRecords,
             allSharedCareSessions: allSharedCareSessions,
             commandExecutor: QuickFeedCommandExecutor(
@@ -103,7 +103,7 @@ struct QuickFeedDetailContent: View {
     let allHumans: [Human]
     let allPets: [Pet]
     let feedingLedgerEntries: [QuickFeedLedgerEntry]
-    let allCareLogs: [PetCareLog]
+    let legacyCareLogs: [PetCareLog]
     let allFoodRecords: [PetFoodRecord]
     let allSharedCareSessions: [SharedCareSession]
     let commandExecutor: QuickFeedCommandExecutor
@@ -139,7 +139,7 @@ struct QuickFeedDetailContent: View {
         allHumans: [Human],
         allPets: [Pet],
         feedingLedgerEntries: [QuickFeedLedgerEntry],
-        allCareLogs: [PetCareLog],
+        legacyCareLogs: [PetCareLog],
         allFoodRecords: [PetFoodRecord],
         allSharedCareSessions: [SharedCareSession],
         commandExecutor: QuickFeedCommandExecutor,
@@ -156,7 +156,7 @@ struct QuickFeedDetailContent: View {
         self.allHumans = allHumans
         self.allPets = allPets
         self.feedingLedgerEntries = feedingLedgerEntries
-        self.allCareLogs = allCareLogs
+        self.legacyCareLogs = legacyCareLogs
         self.allFoodRecords = allFoodRecords
         self.allSharedCareSessions = allSharedCareSessions
         self.commandExecutor = commandExecutor
@@ -170,7 +170,8 @@ struct QuickFeedDetailContent: View {
             initial: QuickFeedStockSnapshot.build(
                 pet: pet,
                 allEvents: allEvents,
-                careLogs: allCareLogs,
+                careLogs: legacyCareLogs,
+                feedingLedgerEntries: feedingLedgerEntries,
                 foodRecords: allFoodRecords,
                 sharedCareSessions: allSharedCareSessions,
                 now: initialNow
@@ -267,7 +268,7 @@ struct QuickFeedDetailContent: View {
         FeedHomeSnapshotInput(
             pet: pet,
             allEvents: currentAllEvents,
-            careLogs: allCareLogs,
+            careLogs: legacyCareLogs,
             feedingLedgerEntries: observedFeedingLedgerEntries,
             foodRecords: allFoodRecords,
             sharedCareSessions: allSharedCareSessions,
@@ -300,7 +301,7 @@ struct QuickFeedDetailContent: View {
     }
 
     var observedCareLogs: [PetCareLog] {
-        dataController.observedCareLogs(fallback: allCareLogs)
+        dataController.observedCareLogs(fallback: legacyCareLogs)
     }
 
     var observedFeedingLedgerEntries: [QuickFeedLedgerEntry] {
@@ -448,7 +449,7 @@ struct QuickFeedDetailContent: View {
             planCalendarSelectedDate: draftStore.feedPlanCalendarSelectedDate,
             eventCount: allEvents.count,
             feedingLedgerEntryCount: feedingLedgerEntries.count,
-            careLogCount: allCareLogs.count,
+            careLogCount: legacyCareLogs.count,
             foodRecordCount: allFoodRecords.count,
             sharedSessionCount: allSharedCareSessions.count,
             appLanguage: appLanguage,
@@ -715,7 +716,7 @@ struct QuickFeedDetailContent: View {
         dataController.loadFullCareLogs(
             petID: pet.id,
             feedingType: CareType.feeding.rawValue,
-            fallback: allCareLogs,
+            fallback: legacyCareLogs,
             force: force,
             fetcher: commandExecutor.fullCareLogs
         )

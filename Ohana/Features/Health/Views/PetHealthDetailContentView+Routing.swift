@@ -63,7 +63,8 @@ extension PetHealthDetailContentView {
                         closeHealthRecordPopup()
                     },
                     onSaved: {
-                        healthAlerts = appServices.healthAlerts.scanAlerts(pets: [pet])
+                        onHealthDataChanged?()
+                        refreshHealthAlerts()
                         OhanaFeedback.success()
                         closeHealthRecordPopup(feedback: false)
                     }
@@ -120,6 +121,7 @@ extension PetHealthDetailContentView {
                     onSaved: {
                         medicationDoseRefreshToken = UUID()
                         appServices.medicationReminders.scheduleMedicationReminders(for: pet, context: modelContext)
+                        onMedicationDataChanged?()
                         OhanaFeedback.success()
                         closeMedicationPopup(feedback: false)
                     }

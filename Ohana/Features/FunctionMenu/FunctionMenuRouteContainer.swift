@@ -16,6 +16,7 @@ struct FunctionMenuDestinationRouteContainer: View {
             parentPath: $parentPath,
             pets: routeData.pets,
             humans: routeData.humans,
+            petAggregateSummaries: routeData.petAggregateSummaries,
             plants: []
         )
         .onAppear {
@@ -83,20 +84,24 @@ struct FunctionMenuRootRouteContainer: View {
 private struct FunctionMenuRouteData {
     var pets: [Pet] = []
     var humans: [Human] = []
+    var petAggregateSummaries: [UUID: FunctionMenuPetAggregateSummary] = [:]
     var hasLoaded = false
 
     static func load(from context: ModelContext) -> FunctionMenuRouteData {
-        FunctionMenuRouteData(
-            pets: fetch(
-                FetchDescriptor<Pet>(sortBy: [SortDescriptor(\.createdAt)]),
-                context: context,
-                name: "Pet"
-            ),
-            humans: fetch(
-                FetchDescriptor<Human>(sortBy: [SortDescriptor(\.name)]),
-                context: context,
-                name: "Human"
-            ),
+        let pets = fetch(
+            FetchDescriptor<Pet>(sortBy: [SortDescriptor(\.createdAt)]),
+            context: context,
+            name: "Pet"
+        )
+        let humans = fetch(
+            FetchDescriptor<Human>(sortBy: [SortDescriptor(\.name)]),
+            context: context,
+            name: "Human"
+        )
+        return FunctionMenuRouteData(
+            pets: pets,
+            humans: humans,
+            petAggregateSummaries: FunctionMenuPetAggregateSummary.load(pets: pets, context: context),
             hasLoaded: true
         )
     }
@@ -114,6 +119,69 @@ private struct FunctionMenuRouteData {
                 category: "FunctionMenu"
             )
             return []
+        }
+    }
+}
+
+struct FunctionMenuPetAggregateSummary: Equatable {
+    var documentCount: Int = 0
+    var photoCount: Int = 0
+    var milestoneCount: Int = 0
+
+    static let empty = FunctionMenuPetAggregateSummary()
+
+    @MainActor
+    static func load(pets: [Pet], context: ModelContext) -> [UUID: FunctionMenuPetAggregateSummary] {
+        var summaries: [UUID: FunctionMenuPetAggregateSummary] = [:]
+        for pet in pets {
+            let petID = pet.id
+            summaries[petID] = FunctionMenuPetAggregateSummary(
+                documentCount: count(
+                    FetchDescriptor<PetDocument>(
+                        predicate: #Predicate<PetDocument> { document in
+                            document.pet?.id == petID
+                        }
+                    ),
+                    context: context,
+                    name: "PetDocument"
+                ),
+                photoCount: count(
+                    FetchDescriptor<PetPhotoLog>(
+                        predicate: #Predicate<PetPhotoLog> { photo in
+                            photo.pet?.id == petID
+                        }
+                    ),
+                    context: context,
+                    name: "PetPhotoLog"
+                ),
+                milestoneCount: count(
+                    FetchDescriptor<PetMilestone>(
+                        predicate: #Predicate<PetMilestone> { milestone in
+                            milestone.pet?.id == petID
+                        }
+                    ),
+                    context: context,
+                    name: "PetMilestone"
+                )
+            )
+        }
+        return summaries
+    }
+
+    @MainActor
+    private static func count(
+        _ descriptor: FetchDescriptor<some PersistentModel>,
+        context: ModelContext,
+        name: String
+    ) -> Int {
+        do {
+            return try context.fetchCount(descriptor)
+        } catch {
+            OhanaLog.warning(
+                "Function menu aggregate count failed for \(name): \(error.localizedDescription)",
+                category: "FunctionMenu"
+            )
+            return 0
         }
     }
 }

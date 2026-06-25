@@ -11,6 +11,7 @@ import SwiftUI
 
 struct PetPhotoAlbumView: View {
     let pet: Pet
+    let photoLogs: [PetPhotoLog]
     /// 嵌入 `PetMomentsHubView` 时传入，由外层工具栏与 onChange 负责选图入库
     var hubPickerSelection: Binding<[PhotosPickerItem]>?
 
@@ -32,7 +33,7 @@ struct PetPhotoAlbumView: View {
     private let columns = [GridItem(.flexible(), spacing: 3), GridItem(.flexible(), spacing: 3), GridItem(.flexible(), spacing: 3)]
 
     private var sortedPhotos: [PetPhotoLog] {
-        pet.photoLogs.sorted { $0.date > $1.date }
+        photoLogs.sorted { $0.date > $1.date }
     }
 
     private var grouped: [(String, [PetPhotoLog])] {

@@ -120,6 +120,8 @@ struct AddExpenseSheet: View {
     var onRewarded: ((Int) -> Void)?
     var onDismiss: (() -> Void)?
 
+    @Query private var routeExpenseLogs: [PetExpenseLog] // smoothness: allow route-scoped expense rows after explicit expense composer presentation.
+    @Query private var routeInsurances: [PetInsurance] // smoothness: allow route-scoped insurance rows after explicit expense composer presentation.
     @Environment(\.modelContext) var modelContext
     @Environment(\.dismiss) var dismiss
     @Environment(\.colorScheme) var colorScheme
@@ -152,6 +154,37 @@ struct AddExpenseSheet: View {
     // 报销申请快捷入口
     @State var savedExpenseId: String? = nil
     @State var showClaimSheet = false
+
+    init(
+        pet: Pet,
+        humans: [Human],
+        allPets: [Pet] = [],
+        preselectedPayerId: String? = nil,
+        onSaved: (() -> Void)? = nil,
+        onRewarded: ((Int) -> Void)? = nil,
+        onDismiss: (() -> Void)? = nil
+    ) {
+        self.pet = pet
+        self.humans = humans
+        self.allPets = allPets
+        self.preselectedPayerId = preselectedPayerId
+        self.onSaved = onSaved
+        self.onRewarded = onRewarded
+        self.onDismiss = onDismiss
+        let petID = pet.id
+        _routeExpenseLogs = Query(
+            filter: #Predicate<PetExpenseLog> { log in
+                log.pet?.id == petID
+            },
+            sort: \.date,
+            order: .reverse
+        )
+        _routeInsurances = Query(
+            filter: #Predicate<PetInsurance> { insurance in
+                insurance.pet?.id == petID
+            }
+        )
+    }
 
     var l: L10n { L10n(appLanguage) }
 
@@ -202,7 +235,7 @@ struct AddExpenseSheet: View {
 
     // 该宠物的活跃保单（用于报销快捷入口）
     var activeInsurances: [PetInsurance] {
-        pet.insurances.filter(\.isActive)
+        routeInsurances.filter(\.isActive)
     }
 
     var sameSpeciesExpensePets: [Pet] {
@@ -231,7 +264,7 @@ struct AddExpenseSheet: View {
 
     var quickAmounts: [Double] {
         var values: [Double] = []
-        let positiveLogs = pet.expenseLogs
+        let positiveLogs = routeExpenseLogs
             .filter { $0.amount > 0 }
             .sorted { $0.date > $1.date }
 
@@ -319,7 +352,7 @@ struct AddExpenseSheet: View {
                 AddInsuranceClaimSheet(
                     insurance: firstInsurance,
                     pet: pet,
-                    allExpenses: pet.expenseLogs,
+                    allExpenses: routeExpenseLogs,
                     prelinkedExpenseId: savedExpenseId
                 )
             }

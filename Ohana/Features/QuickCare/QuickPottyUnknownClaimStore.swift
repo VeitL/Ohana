@@ -7,9 +7,8 @@ import Foundation
 import SwiftData
 
 enum QuickPottyUnknownClaimStore {
-    @MainActor
-    static func items(for pet: Pet, context: ModelContext) -> [PoopLogItem] {
-        let petID = pet.id.uuidString
+    static func entries(for petID: UUID, context: ModelContext) -> [PoopUnknownPottyEntry] {
+        let petID = petID.uuidString
         let unknownKind = SharedCareActionKind.pottyUnknown.rawValue
         let sessions = fetchOrLog(FetchDescriptor<SharedCareSession>(
             predicate: #Predicate<SharedCareSession> { session in
@@ -33,10 +32,15 @@ enum QuickPottyUnknownClaimStore {
         return logs
             .filter { $0.pet == nil }
             .sorted { $0.date > $1.date }
-            .map { .unknownPotty($0, targetCount: targetCounts[$0.sharedSessionId] ?? 1) }
+            .map {
+                PoopUnknownPottyEntry(
+                    id: $0.id,
+                    date: $0.date,
+                    targetCount: targetCounts[$0.sharedSessionId] ?? 1
+                )
+            }
     }
 
-    @MainActor
     private static func fetchOrLog<T: PersistentModel>(
         _ descriptor: FetchDescriptor<T>,
         context: ModelContext,

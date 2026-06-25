@@ -13,6 +13,7 @@ struct FeatureGroupDashboardView: View {
     @Binding var parentPath: NavigationPath
     let pets: [Pet]
     let humans: [Human]
+    var petAggregateSummaries: [UUID: FunctionMenuPetAggregateSummary] = [:]
 
     @Environment(AppServices.self) private var appServices
     @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
@@ -154,6 +155,7 @@ struct FeatureGroupDashboardView: View {
                 parentPath: $parentPath,
                 pets: pets,
                 humans: humans,
+                petAggregateSummaries: petAggregateSummaries,
                 showsNavigationChrome: false,
                 showsEntityChips: false
             )

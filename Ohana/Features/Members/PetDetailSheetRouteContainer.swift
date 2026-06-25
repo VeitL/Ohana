@@ -46,7 +46,10 @@ extension AppPetDetailSheetDestination {
 
 struct AppPetDetailSheetRouteContainer: View {
     @Environment(\.modelContext) private var modelContext
+    @Environment(AppServices.self) private var appServices
     @Query private var pets: [Pet]
+    @State private var allFeaturesActivitySummary = PetAllFeaturesActivitySummary.empty
+    @State private var allFeaturesActivitySummaryTask: Task<Void, Never>?
     @AppStorage("currentActiveHumanId") private var activeHumanIdRaw = ""
     let destination: AppPetDetailSheetDestination
     let onMissing: () -> Void
@@ -90,10 +93,21 @@ struct AppPetDetailSheetRouteContainer: View {
             case .allFeatures:
                 PetAllFeaturesSheet(
                     pet: pet,
+                    activitySummary: allFeaturesActivitySummary,
                     onOpenDestination: { destination in
                         onOpenFeatureDestination?(pet.id, destination)
                     }
                 )
+                .onAppear {
+                    scheduleAllFeaturesActivitySummaryLoad(petID: pet.id)
+                }
+                .onReceive(appServices.domainRevisions.homeRevisionUpdates) { _ in
+                    scheduleAllFeaturesActivitySummaryLoad(petID: pet.id, force: true)
+                }
+                .onDisappear {
+                    allFeaturesActivitySummaryTask?.cancel()
+                    allFeaturesActivitySummaryTask = nil
+                }
             case .basicInfo:
                 NavigationStack { PetBasicInfoDetailView(pet: pet) }
             case .food:
@@ -159,6 +173,20 @@ struct AppPetDetailSheetRouteContainer: View {
             case .bondVault:
                 NavigationStack { PetBondVaultView(pet: pet) }
             }
+        }
+    }
+
+    private func scheduleAllFeaturesActivitySummaryLoad(
+        petID: UUID,
+        force: Bool = false,
+        delayMilliseconds: UInt64 = 24
+    ) {
+        guard destination == .allFeatures else { return }
+        guard force || allFeaturesActivitySummary == .empty else { return }
+        guard allFeaturesActivitySummaryTask == nil else { return }
+        allFeaturesActivitySummaryTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: delayMilliseconds) {
+            allFeaturesActivitySummary = PetAllFeaturesActivitySummary.load(petID: petID, context: modelContext)
+            allFeaturesActivitySummaryTask = nil
         }
     }
 }

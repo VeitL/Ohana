@@ -36,6 +36,8 @@ struct CrewRosterOverlay: View {
     var plants: [Plant] = []
     var pendingReminders: [Reminder] = []
     var familyTasks: [FamilyCollaborationTask] = []
+    var careLedgerEntries: [FamilyCareLedgerEntry] = []
+    var petSummaries: [UUID: CrewRosterPetSummary] = [:]
     let onSelectPet: (Pet) -> Void
     let onSelectHuman: (Human) -> Void
     var onInlinePetSaved: (Pet) -> Void = { _ in }
@@ -144,6 +146,7 @@ struct CrewRosterOverlay: View {
                             humans: humans,
                             pendingReminders: pendingReminders,
                             familyTasks: familyTasks,
+                            careLedgerEntries: careLedgerEntries,
                             createTaskTrigger: collaborationCreateTaskTrigger,
                             onEditorVisibilityChanged: { isPresented in
                                 withAnimation(GoMotion.feedback) {
@@ -604,6 +607,7 @@ struct CrewRosterOverlay: View {
                 pet: pet,
                 human: nil,
                 plant: nil,
+                petSummary: petSummaries[pet.id] ?? .empty,
                 allPets: pets,
                 allHumans: humans,
                 detailProgress: detailProgress,
@@ -618,6 +622,7 @@ struct CrewRosterOverlay: View {
                 pet: nil,
                 human: human,
                 plant: nil,
+                petSummary: .empty,
                 allPets: pets,
                 allHumans: humans,
                 detailProgress: detailProgress,
@@ -632,6 +637,7 @@ struct CrewRosterOverlay: View {
                 pet: nil,
                 human: nil,
                 plant: plant,
+                petSummary: .empty,
                 allPets: pets,
                 allHumans: humans,
                 detailProgress: detailProgress,

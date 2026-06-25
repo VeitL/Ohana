@@ -107,6 +107,12 @@ struct PoopLitterLedgerEntry: Identifiable, Hashable {
     }
 }
 
+struct PoopUnknownPottyEntry: Identifiable, Hashable {
+    let id: UUID
+    let date: Date
+    let targetCount: Int
+}
+
 struct PoopInlineSheetGlassSurface: View {
     let cornerRadius: CGFloat
 
@@ -117,13 +123,13 @@ struct PoopInlineSheetGlassSurface: View {
 
 enum PoopLogItem: Identifiable {
     case potty(PoopPottyLedgerEntry)
-    case unknownPotty(PetPottyLog, targetCount: Int)
+    case unknownPotty(PoopUnknownPottyEntry)
     case litter(PoopLitterLedgerEntry)
 
     var id: String {
         switch self {
         case let .potty(entry): "potty-\(entry.id.uuidString)"
-        case let .unknownPotty(log, _): "unknown-potty-\(log.id.uuidString)"
+        case let .unknownPotty(entry): "unknown-potty-\(entry.id.uuidString)"
         case let .litter(entry): "litter-\(entry.id.uuidString)"
         }
     }
@@ -131,7 +137,7 @@ enum PoopLogItem: Identifiable {
     var date: Date {
         switch self {
         case let .potty(entry): entry.date
-        case let .unknownPotty(log, _): log.date
+        case let .unknownPotty(entry): entry.date
         case let .litter(entry): entry.date
         }
     }
@@ -148,9 +154,9 @@ enum PoopLogItem: Identifiable {
         switch self {
         case let .potty(entry):
             return entry.pottyType.localizedLabel(l)
-        case let .unknownPotty(_, targetCount):
-            if targetCount > 1 {
-                return l.tr(zh: "共同未知噗噗 · \(targetCount)只", en: "Shared mystery poop · \(targetCount)", de: "Unbekanntes Gruppen-Häufchen · \(targetCount)")
+        case let .unknownPotty(entry):
+            if entry.targetCount > 1 {
+                return l.tr(zh: "共同未知噗噗 · \(entry.targetCount)只", en: "Shared mystery poop · \(entry.targetCount)", de: "Unbekanntes Gruppen-Häufchen · \(entry.targetCount)")
             }
             return l.tr(zh: "未知噗噗", en: "Mystery poop", de: "Unbekanntes Häufchen")
         case .litter:
@@ -196,10 +202,10 @@ enum PoopLogItem: Identifiable {
         }
     }
 
-    var claimablePottyLog: PetPottyLog? {
+    var claimablePottyLogId: UUID? {
         switch self {
-        case let .unknownPotty(log, _):
-            log
+        case let .unknownPotty(entry):
+            entry.id
         case .potty, .litter:
             nil
         }
@@ -461,7 +467,7 @@ struct PoopLogRow: View {
     let tint: Color
     var showDelete = true
     var claimTargets: [Pet] = []
-    var onClaim: ((PetPottyLog, Pet) -> Void)?
+    var onClaim: ((UUID, Pet) -> Void)?
     let onDelete: () -> Void
 
     @AppStorage("appLanguage") private var appLanguage = AppLanguage.fallbackCode
@@ -489,11 +495,11 @@ struct PoopLogRow: View {
             Text(item.date, format: .dateTime.month().day().hour().minute())
                 .font(OhanaFont.adaptive(size: 11, weight: .semibold, design: .rounded))
                 .foregroundStyle(Color.ohanaSecondaryText)
-            if let log = item.claimablePottyLog, !claimTargets.isEmpty, let onClaim {
+            if let logId = item.claimablePottyLogId, !claimTargets.isEmpty, let onClaim {
                 Menu {
                     ForEach(claimTargets) { target in
                         Button {
-                            onClaim(log, target)
+                            onClaim(logId, target)
                         } label: {
                             Label(target.name, systemImage: "pawprint.fill")
                         }
@@ -865,7 +871,7 @@ struct PoopHistorySheet: View {
     let items: [PoopLogItem]
     let tintForItem: (PoopLogItem) -> Color
     var claimTargets: [Pet] = []
-    var onClaim: ((PetPottyLog, Pet) -> Void)?
+    var onClaim: ((UUID, Pet) -> Void)?
     let onDelete: (PoopLogItem) -> Void
 
     @AppStorage("appLanguage") private var appLanguage = AppLanguage.fallbackCode

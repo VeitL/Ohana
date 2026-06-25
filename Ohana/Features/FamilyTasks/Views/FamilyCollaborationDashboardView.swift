@@ -14,6 +14,7 @@ struct FamilyCollaborationDashboardHost: View {
     let humans: [Human]
     let pendingReminders: [Reminder]
     let familyTasks: [FamilyCollaborationTask]
+    let careLedgerEntries: [FamilyCareLedgerEntry]
     var createTaskTrigger: Int = 0
     var onEditorVisibilityChanged: (Bool) -> Void = { _ in }
     var onOpenPetActivity: (Pet) -> Void
@@ -29,6 +30,7 @@ struct FamilyCollaborationDashboardHost: View {
             humans: humans,
             pendingReminders: pendingReminders,
             familyTasks: familyTasks,
+            careLedgerEntries: careLedgerEntries,
             legacyBountySyncToken: legacyBountyTasksRaw,
             commandExecutor: FamilyCollaborationCommandExecutor(
                 modelContext: modelContext,
@@ -48,6 +50,7 @@ struct FamilyCollaborationDashboardView: View {
     let humans: [Human]
     let pendingReminders: [Reminder]
     let familyTasks: [FamilyCollaborationTask]
+    let careLedgerEntries: [FamilyCareLedgerEntry]
     let legacyBountySyncToken: String
     let commandExecutor: FamilyCollaborationCommandExecutor
     var createTaskTrigger: Int = 0
@@ -111,6 +114,10 @@ struct FamilyCollaborationDashboardView: View {
         pets.filter { !$0.hasPassedAway }
     }
 
+    var activePetNamesByID: [UUID: String] {
+        Dictionary(uniqueKeysWithValues: activePets.map { ($0.id, $0.name) })
+    }
+
     var selectedPet: Pet? {
         if let selectedPetId,
            let pet = activePets.first(where: { $0.id == selectedPetId }) {
@@ -154,39 +161,11 @@ struct FamilyCollaborationDashboardView: View {
     }
 
     var latestActivity: [CollaborationActivity] {
-        pets.flatMap { pet in
-            var rows: [CollaborationActivity] = []
-            rows += pet.careLogs.map {
-                CollaborationActivity(
-                    title: careTitle($0.careType),
-                    petName: pet.name,
-                    actor: actorName($0.executorId),
-                    date: $0.date,
-                    icon: $0.careType.systemIconName,
-                    tint: Color(hex: $0.careType.accentColorHex)
-                )
-            }
-            rows += pet.pottyLogs.map {
-                CollaborationActivity(
-                    title: pottyTitle($0.pottyType),
-                    petName: pet.name,
-                    actor: actorName($0.executorId),
-                    date: $0.date,
-                    icon: $0.pottyType.systemIconName,
-                    tint: Color.goYellow
-                )
-            }
-            rows += pet.walkLogs.map {
-                CollaborationActivity(
-                    title: l.tr(zh: "遛狗", en: "Walk", de: "Gassi"),
-                    petName: pet.name,
-                    actor: actorNames($0.executorIds),
-                    date: $0.startDate,
-                    icon: "figure.walk",
-                    tint: Color.goPurple
-                )
-            }
-            return rows
+        careLedgerEntries.compactMap { entry in
+            guard let petName = activePetNamesByID[entry.petID],
+                  let activity = collaborationActivity(from: entry, petName: petName)
+            else { return nil }
+            return activity
         }
         .sorted { $0.date > $1.date }
     }

@@ -391,6 +391,19 @@ struct MemberCreationServiceTests {
         #expect(visible.first?.id == promoted.id)
     }
 
+    @Test func focusHomeCardUsesExplicitWalkDistanceInsteadOfPetWalkRelationship() throws {
+        resetGlobalState()
+        let pet = Pet(name: "Momo", species: "Dog")
+        pet.walkLogs.append(PetWalkLog(pet: pet))
+        pet.walkLogs[0].distanceMeters = 1500
+
+        let implicitCard = FocusCard.from(pet, includeAvatarData: false)
+        let explicitCard = FocusCard.from(pet, includeAvatarData: false, homeWalkDistanceMeters: 1500)
+
+        #expect(implicitCard.homeWalkDistanceMeters == 0)
+        #expect(explicitCard.homeWalkDistanceMeters == 1500)
+    }
+
     @Test func homeCardSelectionReconciliationClearsDeletedSelectedCard() throws {
         resetGlobalState()
         let remaining = FocusCard.from(Human(name: "Remaining"))

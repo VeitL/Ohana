@@ -584,6 +584,20 @@ struct QuickWaterCommandExecutor {
         return kind
     }
 
+    func careLog(id: UUID) -> PetCareLog? {
+        var descriptor = FetchDescriptor<PetCareLog>(
+            predicate: #Predicate<PetCareLog> { log in
+                log.id == id
+            }
+        )
+        descriptor.fetchLimit = 1
+        return fetchQuickWaterModelsOrLog(
+            descriptor,
+            context: context,
+            operation: "fetch water care log by id"
+        ).first
+    }
+
     func activeExecutorId() -> String? {
         activeHumanSelection.currentHumanId
     }

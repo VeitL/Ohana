@@ -711,18 +711,25 @@ extension QuickWaterDetailSheet {
     }
 
     func deleteLog(_ entry: QuickWaterLedgerEntry) {
-        guard let log = legacyWaterDeleteLog(for: entry) else {
+        guard let logId = entry.legacyLogId else {
             OhanaLog.warning(
                 "QuickWaterDetailSheet could not resolve care log for ledger entry \(entry.id.uuidString)",
                 category: "Care"
             )
             return
         }
-        guard scheduleDeferredWaterAction({ deleteLogBusiness(log) }) else { return }
+        guard scheduleDeferredWaterAction({ deleteLogBusiness(id: logId) }) else { return }
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
     }
 
-    func deleteLogBusiness(_ log: PetCareLog) {
+    func deleteLogBusiness(id: UUID) {
+        guard let log = commandExecutor.careLog(id: id) else {
+            OhanaLog.warning(
+                "QuickWaterDetailSheet could not resolve care log \(id.uuidString)",
+                category: "Care"
+            )
+            return
+        }
         switch commandExecutor.deleteLog(log) {
         case .waterChange:
             saveWaterChangePlanToCalendar(toast: l.tr(zh: "已更新换水周期", en: "Water change cycle updated", de: "Wasserwechselzyklus aktualisiert"))
@@ -779,10 +786,6 @@ extension QuickWaterDetailSheet {
         )
     }
 
-    func legacyWaterDeleteLog(for entry: QuickWaterLedgerEntry) -> PetCareLog? {
-        guard let legacyLogId = entry.legacyLogId else { return nil }
-        return legacyWaterDeleteLogs.first { $0.id == legacyLogId }
-    }
     func tint(for log: QuickWaterLedgerEntry) -> Color {
         if log.careType == .waterChange {
             return waterChangeTint

@@ -10,6 +10,8 @@ import SwiftUI
 
 struct VaccinePassportView: View {
     let pet: Pet
+    let healthLogs: [PetHealthLog]
+    var onDataChanged: (() -> Void)?
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
     @Environment(AppServices.self) private var appServices
@@ -22,7 +24,7 @@ struct VaccinePassportView: View {
     private var l: L10n { L10n(appLanguage) }
 
     private var vaccineLogs: [PetHealthLog] {
-        pet.activeHealthLogs
+        healthLogs
             .filter { $0.type == HealthLogType.vaccine.rawValue }
             .sorted { $0.date > $1.date }
     }
@@ -101,7 +103,7 @@ struct VaccinePassportView: View {
         }
         .toolbar(.hidden, for: .navigationBar)
         .sheet(isPresented: $showingAdd) {
-            AddVaccineSheet(pet: pet)
+            AddVaccineSheet(pet: pet, onSaved: onDataChanged)
         }
     }
 
@@ -122,6 +124,7 @@ struct VaccinePassportView: View {
                 note: "pet.vaccine.delete"
             )
             deletingLogIDs.remove(log.id)
+            onDataChanged?()
         }
     }
 
@@ -400,6 +403,7 @@ private struct VaccineRow: View {
 // MARK: - Add Vaccine Sheet
 struct AddVaccineSheet: View {
     let pet: Pet
+    var onSaved: (() -> Void)?
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
     @Environment(AppServices.self) private var appServices
@@ -734,6 +738,7 @@ struct AddVaccineSheet: View {
                 UINotificationFeedbackGenerator().notificationOccurred(.error)
                 return
             }
+            onSaved?()
             dismiss()
         }
     }

@@ -62,11 +62,7 @@ nonisolated enum WaterCareCycleStatusCalculator {
         let key = pet.id.uuidString
         let settings = WaterCareSettingsStore.snapshot(petKey: key, now: now, calendar: calendar)
         let anchorDate = settings.createdWaterChangeAnchor ? nil : settings.waterChangeAnchorDate
-        let latestLogDate = if let logSnapshot {
-            logSnapshot.latestWaterChangeDate
-        } else {
-            latestCareLogDate(for: pet, type: .waterChange)
-        }
+        let latestLogDate = (logSnapshot ?? .empty).latestWaterChangeDate
 
         guard let baseDate = latestLogDate ?? anchorDate else {
             return nil
@@ -85,11 +81,7 @@ nonisolated enum WaterCareCycleStatusCalculator {
         logSnapshot: WaterCareCycleLogSnapshot? = nil
     ) -> WaterCareCycleStatus? {
         let key = pet.id.uuidString
-        let latestLogDate = if let logSnapshot {
-            logSnapshot.latestFilterCleanDate
-        } else {
-            latestCareLogDate(for: pet, type: .filterClean)
-        }
+        let latestLogDate = (logSnapshot ?? .empty).latestFilterCleanDate
         guard let latestLogDate else {
             return nil
         }
@@ -107,11 +99,7 @@ nonisolated enum WaterCareCycleStatusCalculator {
         logSnapshot: WaterCareCycleLogSnapshot? = nil
     ) -> WaterCareCycleStatus? {
         let key = pet.id.uuidString
-        let latestLogDate = if let logSnapshot {
-            logSnapshot.latestFilterCleanDate
-        } else {
-            latestCareLogDate(for: pet, type: .filterClean)
-        }
+        let latestLogDate = (logSnapshot ?? .empty).latestFilterCleanDate
         guard let latestLogDate else {
             return nil
         }
@@ -136,13 +124,6 @@ nonisolated enum WaterCareCycleStatusCalculator {
             .filter(\.1.isOverdue)
 
         return warnings.sorted { $0.1.daysUntilDue < $1.1.daysUntilDue }.first
-    }
-
-    private static func latestCareLogDate(for pet: Pet, type: CareType) -> Date? {
-        pet.careLogs
-            .filter { $0.type == type.rawValue }
-            .max(by: { $0.date < $1.date })?
-            .date
     }
 
     private static func elapsedDays(from start: Date, to end: Date, calendar: Calendar) -> Int {

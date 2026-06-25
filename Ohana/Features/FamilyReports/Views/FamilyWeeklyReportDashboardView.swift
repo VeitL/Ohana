@@ -12,6 +12,8 @@ struct FamilyWeeklyReportDashboardContentView: View {
     let pets: [Pet]
     let humans: [Human]
     let ledgerEvents: [CareLedgerEvent]
+    let photoMemories: [FamilyWeeklyPhotoMemory]
+    let healthAlertSources: [PetHealthAlertSource]
 
     @Environment(AppServices.self) private var appServices
     @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
@@ -38,10 +40,7 @@ struct FamilyWeeklyReportDashboardContentView: View {
     private var activePets: [Pet] { pets.filter { !$0.hasPassedAway } }
 
     private var allEntries: [ReportEntry] {
-        activePets.flatMap { pet in
-            entries(for: pet, in: weekInterval)
-        }
-        .sorted { $0.date > $1.date }
+        entries(for: activePets, in: weekInterval)
     }
 
     private var rankedMembers: [MemberStat] {
@@ -81,27 +80,21 @@ struct FamilyWeeklyReportDashboardContentView: View {
             .first
     }
 
-    private var weekPhotoMemories: [PhotoMemory] {
-        activePets.flatMap { pet in
-            pet.photoLogs
-                .filter { weekInterval.contains($0.date) }
-                .map {
-                    PhotoMemory(
-                        id: $0.id,
-                        petName: pet.name,
-                        imageData: $0.imageData,
-                        note: $0.note,
-                        date: $0.date
-                    )
-                }
-        }
-        .sorted { $0.date > $1.date }
+    private var weekPhotoMemories: [FamilyWeeklyPhotoMemory] {
+        photoMemories
     }
 
     private var weekWeightTrends: [WeightTrend] {
         activePets.compactMap { pet in
-            let logs = pet.weightLogs
-                .filter { $0.date < weekInterval.end }
+            let logs = ledgerEvents
+                .filter {
+                    $0.subjectKind == CareLedgerSubjectKind.pet.rawValue &&
+                        $0.subjectId == pet.id.uuidString &&
+                        $0.eventKindEnum == .weight &&
+                        $0.occurredAt < weekInterval.end &&
+                        $0.amountValue > 0
+                }
+                .map { WeightSample(date: $0.occurredAt, weight: $0.amountValue) }
                 .sorted { $0.date < $1.date }
             guard let latest = logs.last else { return nil }
             let baseline = logs.last { $0.date < weekInterval.start } ?? logs.dropLast().last
@@ -118,7 +111,7 @@ struct FamilyWeeklyReportDashboardContentView: View {
     }
 
     private var healthAlerts: [HealthAlert] {
-        appServices.healthAlerts.scanAlerts(pets: activePets)
+        PetHealthAlertEngine().scanAlerts(sources: healthAlertSources)
     }
 
     private var storyHeadline: String {
@@ -348,7 +341,7 @@ struct FamilyWeeklyReportDashboardContentView: View {
         VStack(alignment: .leading, spacing: 12) {
             sectionHeader("宠物照护覆盖", icon: "pawprint.fill")
             ForEach(activePets) { pet in
-                let count = entries(for: pet, in: weekInterval).count
+                let count = entries(for: [pet], in: weekInterval).count
                 HStack {
                     FMPetAvatar(pet: pet, size: 34)
                     VStack(alignment: .leading, spacing: 2) {
@@ -502,45 +495,20 @@ struct FamilyWeeklyReportDashboardContentView: View {
             .padding(.vertical, 8)
     }
 
-    private func entries(for pet: Pet, in interval: DateInterval) -> [ReportEntry] {
-        let ledgerEntries = appServices.careLedgerStats.reportEntries(
+    private func entries(for pets: [Pet], in interval: DateInterval) -> [ReportEntry] {
+        appServices.careLedgerStats.reportEntries(
             events: ledgerEvents,
-            pets: [pet],
+            pets: pets,
             humans: humans,
             interval: interval
         )
-        if !ledgerEntries.isEmpty {
-            return ledgerEntries
-        }
-        // Fallback keeps older local data visible before ledger backfill has run.
-        var entries: [ReportEntry] = []
-        for log in pet.careLogs where interval.contains(log.date) {
-            entries.append(entry(date: log.date, actorId: log.executorId, pet: pet, title: log.careType.rawValue, icon: log.careType.systemIconName, colorToken: .hex(log.careType.accentColorHex), coconuts: 1))
-        }
-        for log in pet.pottyLogs where interval.contains(log.date) {
-            entries.append(entry(date: log.date, actorId: log.executorId, pet: pet, title: log.pottyType.rawValue, icon: log.pottyType.systemIconName, colorToken: .goOrange, coconuts: 1))
-        }
-        for log in pet.walkLogs where interval.contains(log.startDate) {
-            for executorId in log.executorIds {
-                entries.append(entry(date: log.startDate, actorId: executorId, pet: pet, title: "遛狗", icon: "figure.walk", colorToken: .goTeal, coconuts: log.coconutsEarned))
-            }
-        }
-        for log in pet.expenseLogs where interval.contains(log.date) {
-            entries.append(entry(date: log.date, actorId: log.executorId, pet: pet, title: log.expenseCategory.rawValue, icon: log.expenseCategory.systemIconName, colorToken: .goYellow, coconuts: 0))
-        }
-        return entries
-    }
-
-    private func entry(date: Date, actorId: String?, pet: Pet, title: String, icon: String, colorToken: DomainColorToken, coconuts: Int) -> ReportEntry {
-        let human = actorId.flatMap { id in humans.first { $0.id.uuidString == id } }
-        return ReportEntry(date: date, actorId: actorId, actorName: human?.name ?? "未指定", petName: pet.name, title: title, icon: icon, colorToken: colorToken, coconuts: max(coconuts, 0))
     }
 
     private func lastFourWeeks() -> [(label: String, count: Int)] {
         (0 ..< 4).map { offset in
             let base = Calendar.current.date(byAdding: .weekOfYear, value: -(3 - offset), to: Date()) ?? Date()
             let interval = Calendar.current.dateInterval(of: .weekOfYear, for: base) ?? weekInterval
-            let count = activePets.flatMap { entries(for: $0, in: interval) }.count
+            let count = entries(for: activePets, in: interval).count
             return ("W\(offset + 1)", count)
         }
     }
@@ -569,7 +537,12 @@ private struct WeightTrend: Identifiable {
     let days: Int
 }
 
-private struct PhotoMemory: Identifiable {
+private struct WeightSample {
+    let date: Date
+    let weight: Double
+}
+
+struct FamilyWeeklyPhotoMemory: Identifiable, Equatable {
     let id: UUID
     let petName: String
     let imageData: Data

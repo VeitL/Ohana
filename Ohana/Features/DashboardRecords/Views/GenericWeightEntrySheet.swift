@@ -44,6 +44,8 @@ struct GenericWeightEntrySheet: View {
     @State private var isClosing = false
     @State private var isSaving = false
     @State private var popupDragOffset: CGFloat = 0
+    @State private var latestPetWeightKg: Double?
+    @State private var latestPetWeightLoadTask: Task<Void, Never>?
     @StateObject private var commandQueue = DeferredDomainCommandQueue()
 
     private var l: L10n { L10n(appLanguage) }
@@ -96,7 +98,6 @@ struct GenericWeightEntrySheet: View {
     private var quickWeights: [Double] {
         switch target {
         case let .pet(pet):
-            let latest = pet.weightLogs.sorted { $0.date > $1.date }.first?.weightInKg
             let species = pet.species.lowercased()
             let defaults: [Double] = if species.contains("cat") || pet.species.contains("猫") {
                 [3.5, 4.5, 5.5]
@@ -105,7 +106,7 @@ struct GenericWeightEntrySheet: View {
             } else {
                 [0.5, 1, 2]
             }
-            return uniqueWeights([latest].compactMap(\.self) + defaults)
+            return uniqueWeights([latestPetWeightKg].compactMap(\.self) + defaults)
         case let .human(human):
             let latest = human.weightLogs.sorted { $0.date > $1.date }.first?.weight
             return uniqueWeights([latest].compactMap(\.self) + [50, 60, 70])
@@ -196,6 +197,7 @@ struct GenericWeightEntrySheet: View {
                     popupVisible = true
                 }
             }
+            scheduleLatestPetWeightLoad()
         }
         .onChange(of: weightText) { _, newValue in
             let sanitized = CountryDecimalInput.sanitize(
@@ -223,6 +225,7 @@ struct GenericWeightEntrySheet: View {
             }
         }
         .onDisappear {
+            latestPetWeightLoadTask?.cancel()
             commandQueue.cancelAll()
         }
     }
@@ -528,6 +531,16 @@ struct GenericWeightEntrySheet: View {
         return abs(parsedWeight - kg) < 0.05
     }
 
+    private func scheduleLatestPetWeightLoad() {
+        guard case let .pet(pet) = target else { return }
+        latestPetWeightLoadTask?.cancel()
+        let petID = pet.id
+        latestPetWeightLoadTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: 24) {
+            latestPetWeightKg = PetWeightLedgerRouteMetrics.latestWeightKg(petID: petID, context: modelContext)
+            latestPetWeightLoadTask = nil
+        }
+    }
+
     private func bcsColor(_ score: Int) -> Color {
         switch score {
         case 1 ... 3: Color(hex: "4ECDC4")
@@ -632,6 +645,33 @@ struct GenericWeightEntrySheet: View {
             }
         } else {
             dismiss()
+        }
+    }
+}
+
+enum PetWeightLedgerRouteMetrics {
+    @MainActor
+    static func latestWeightKg(petID: UUID, context: ModelContext) -> Double? {
+        let petSubjectKind = CareLedgerSubjectKind.pet.rawValue
+        let subjectID = petID.uuidString
+        let weightKind = CareLedgerEventKind.weight.rawValue
+        var descriptor = FetchDescriptor<CareLedgerEvent>(
+            predicate: #Predicate<CareLedgerEvent> { event in
+                event.subjectKind == petSubjectKind &&
+                    event.subjectId == subjectID &&
+                    event.eventKind == weightKind
+            },
+            sortBy: [SortDescriptor(\.occurredAt, order: .reverse)]
+        )
+        descriptor.fetchLimit = 8
+        do {
+            return try context.fetch(descriptor).first { $0.amountValue > 0 }?.amountValue
+        } catch {
+            OhanaLog.warning(
+                "Latest pet weight ledger fetch failed: \(error.localizedDescription)",
+                category: "DashboardRecords"
+            )
+            return nil
         }
     }
 }

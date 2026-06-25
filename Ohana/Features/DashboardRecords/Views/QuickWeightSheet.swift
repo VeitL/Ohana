@@ -17,6 +17,8 @@ struct QuickWeightSheet: View {
     @State private var weightText: String = ""
     @State private var recordDate: Date = .init()
     @State private var didSave = false
+    @State private var latestPetWeightKg: Double?
+    @State private var latestPetWeightLoadTask: Task<Void, Never>?
     @StateObject private var commandQueue = DeferredDomainCommandQueue()
     @AppStorage("currentActiveHumanId") private var activeHumanIdRaw = ""
 
@@ -79,11 +81,11 @@ struct QuickWeightSheet: View {
             .padding(.horizontal, 20)
 
             // ── 上次体重提示
-            if let last = pet.weightLogs.sorted(by: { $0.date > $1.date }).first {
+            if let latestPetWeightKg {
                 HStack(spacing: 6) {
                     Image(systemName: "clock.arrow.circlepath").accessibilityHidden(true)
                         .font(OhanaFont.adaptive(size: 11, weight: .semibold))
-                    Text("上次记录：\(last.weight, specifier: "%.1f") kg")
+                    Text("上次记录：\(latestPetWeightKg, specifier: "%.1f") kg")
                         .font(OhanaFont.adaptive(size: 12, weight: .medium, design: .rounded))
                 }
                 .foregroundStyle(Color.ohanaPrimaryText.opacity(0.35))
@@ -134,8 +136,21 @@ struct QuickWeightSheet: View {
         }
         .background(Color.ohanaCardSurface)
         .presentationBackground(.clear)
+        .onAppear {
+            scheduleLatestPetWeightLoad()
+        }
         .onDisappear {
+            latestPetWeightLoadTask?.cancel()
             commandQueue.cancelAll()
+        }
+    }
+
+    private func scheduleLatestPetWeightLoad() {
+        latestPetWeightLoadTask?.cancel()
+        let petID = pet.id
+        latestPetWeightLoadTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: 24) {
+            latestPetWeightKg = PetWeightLedgerRouteMetrics.latestWeightKg(petID: petID, context: modelContext)
+            latestPetWeightLoadTask = nil
         }
     }
 

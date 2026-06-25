@@ -209,7 +209,8 @@ nonisolated struct TodayFocusSnapshot: Equatable, Sendable {
             negativeSignals: IslandNegativeFeedback.signals(
                 pets: pets,
                 plants: visiblePlants,
-                healthAlerts: healthAlerts
+                healthAlerts: healthAlerts,
+                careLedgerEntries: negativeCareLedgerEntries(from: careLedgerEntries)
             ),
             dayToken: dayToken(for: now)
         )
@@ -283,10 +284,25 @@ nonisolated struct TodayFocusSnapshot: Equatable, Sendable {
             negativeSignals: IslandNegativeFeedback.signals(
                 pets: pets,
                 plants: visiblePlants,
-                clinicalAlerts: clinicalAlerts
+                clinicalAlerts: clinicalAlerts,
+                careLedgerEntries: negativeCareLedgerEntries(from: careLedgerEntries)
             ),
             dayToken: dayToken(for: now)
         )
+    }
+
+    private static func negativeCareLedgerEntries(
+        from entries: [TodayFocusCareLedgerEntry]
+    ) -> [IslandNegativeCareLedgerEntry] {
+        entries.map {
+            IslandNegativeCareLedgerEntry(
+                petId: $0.petId,
+                eventKind: $0.eventKind,
+                actionType: $0.actionType,
+                date: $0.date,
+                amountValue: $0.amountValue
+            )
+        }
     }
 
     private static func make(

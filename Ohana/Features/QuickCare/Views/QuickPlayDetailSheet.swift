@@ -39,7 +39,6 @@ struct QuickPlayDetailSheet: View {
     var onClose: (() -> Void)?
     var allEvents: [Event] = []
     let playEntries: [QuickPlayLedgerEntry]
-    let legacyPlayDeleteLogs: [PetCareLog]
 
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
@@ -77,15 +76,13 @@ struct QuickPlayDetailSheet: View {
         onRemove: @escaping () -> Void,
         onClose: (() -> Void)? = nil,
         allEvents: [Event] = [],
-        playEntries: [QuickPlayLedgerEntry] = [],
-        legacyPlayDeleteLogs: [PetCareLog] = []
+        playEntries: [QuickPlayLedgerEntry] = []
     ) {
         self.pet = pet
         self.onRemove = onRemove
         self.onClose = onClose
         self.allEvents = allEvents
         self.playEntries = playEntries
-        self.legacyPlayDeleteLogs = legacyPlayDeleteLogs
     }
 
     private var playPlanEvent: Event? {
@@ -503,12 +500,20 @@ struct QuickPlayDetailSheet: View {
 
             Spacer()
 
-            if let log = legacyPlayDeleteLog(for: entry) {
+            if let legacyLogId = entry.legacyLogId {
                 Button {
                     UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                    commandQueue.enqueue(.petCareDelete(petID: pet.id, logID: log.id)) {
+                    commandQueue.enqueue(.petCareDelete(petID: pet.id, logID: legacyLogId)) {
+                        let executor = PetCareCommandExecutor(context: modelContext, services: appServices)
+                        guard let log = executor.careLog(id: legacyLogId) else {
+                            OhanaLog.warning(
+                                "QuickPlayDetailSheet could not resolve care log \(legacyLogId.uuidString)",
+                                category: "Care"
+                            )
+                            return
+                        }
                         withAnimation(GoMotion.feedback) {
-                            _ = PetCareCommandExecutor(context: modelContext, services: appServices).deleteCareLog(
+                            _ = executor.deleteCareLog(
                                 log,
                                 pet: pet,
                                 note: "quickPlay.deleteRecentLog"
@@ -527,11 +532,6 @@ struct QuickPlayDetailSheet: View {
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
         .background(Color.ohanaCardSurfaceElevated, in: RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous))
-    }
-
-    private func legacyPlayDeleteLog(for entry: QuickPlayLedgerEntry) -> PetCareLog? {
-        guard let legacyLogId = entry.legacyLogId else { return nil }
-        return legacyPlayDeleteLogs.first { $0.id == legacyLogId }
     }
 
     private var playPlanInlineOverlay: some View {

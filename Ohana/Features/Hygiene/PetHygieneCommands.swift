@@ -383,6 +383,20 @@ struct PetHygieneCommandExecutor {
         return result
     }
 
+    func hygieneLog(id: UUID) -> PetHygieneLog? {
+        var descriptor = FetchDescriptor<PetHygieneLog>(
+            predicate: #Predicate<PetHygieneLog> { log in
+                log.id == id
+            }
+        )
+        descriptor.fetchLimit = 1
+        return fetchPetHygieneCommandModelsOrLog(
+            descriptor,
+            context: context,
+            operation: "fetch hygiene log by id"
+        ).first
+    }
+
     @discardableResult
     func createPlan(
         pet: Pet,

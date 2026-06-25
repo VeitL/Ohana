@@ -30,6 +30,8 @@ struct AchievementComputationContext {
     var critterActionLogs: [OasisCritterActionLog] = []
     var gachaOwnedItems: [GachaOwnedItem] = []
     var gachaDrawLogs: [GachaDrawLog] = []
+    var careLedgerEvents: [CareLedgerEvent] = []
+    var petActivitySummaries: [UUID: AchievementPetActivitySummary] = [:]
 
     static let empty = AchievementComputationContext()
 
@@ -40,6 +42,262 @@ struct AchievementComputationContext {
             || !critterActionLogs.isEmpty
             || !gachaOwnedItems.isEmpty
             || !gachaDrawLogs.isEmpty
+    }
+
+    func careLedgerSummary(for pet: Pet) -> AchievementCareLedgerSummary {
+        AchievementCareLedgerSummary(events: careLedgerEvents, petID: pet.id)
+    }
+
+    func petActivitySummary(for pet: Pet) -> AchievementPetActivitySummary {
+        petActivitySummaries[pet.id] ?? .empty
+    }
+}
+
+struct AchievementPetActivitySummary: Equatable {
+    var foodRecordDates: [Date]
+    var photoDates: [Date]
+    var milestoneDates: [Date]
+    var documentIssueDates: [Date]
+    var insuranceCreatedDates: [Date]
+    var activeMedicationEndDates: [Date]
+    var symptomDates: [Date]
+    var documentCount: Int
+    var insuranceCount: Int
+
+    static let empty = AchievementPetActivitySummary()
+
+    init(
+        foodRecordDates: [Date] = [],
+        photoDates: [Date] = [],
+        milestoneDates: [Date] = [],
+        documentIssueDates: [Date] = [],
+        insuranceCreatedDates: [Date] = [],
+        activeMedicationEndDates: [Date] = [],
+        symptomDates: [Date] = [],
+        documentCount: Int = 0,
+        insuranceCount: Int = 0
+    ) {
+        self.foodRecordDates = foodRecordDates
+        self.photoDates = photoDates
+        self.milestoneDates = milestoneDates
+        self.documentIssueDates = documentIssueDates
+        self.insuranceCreatedDates = insuranceCreatedDates
+        self.activeMedicationEndDates = activeMedicationEndDates
+        self.symptomDates = symptomDates
+        self.documentCount = documentCount
+        self.insuranceCount = insuranceCount
+    }
+
+    var foodRecordCount: Int { foodRecordDates.count }
+    var photoCount: Int { photoDates.count }
+    var milestoneCount: Int { milestoneDates.count }
+    var symptomCount: Int { symptomDates.count }
+    var hasProtectionRecord: Bool { documentCount > 0 || insuranceCount > 0 }
+    var hasArchiveRecord: Bool {
+        foodRecordCount > 0 || photoCount > 0 || milestoneCount > 0
+    }
+
+    func completedMedicationEndDates(now: Date) -> [Date] {
+        activeMedicationEndDates.filter { $0 < now }
+    }
+}
+
+struct AchievementCareLedgerSummary {
+    private let events: [CareLedgerEvent]
+
+    init(events: [CareLedgerEvent], petID: UUID) {
+        let subjectId = petID.uuidString
+        self.events = events.filter {
+            $0.subjectKind == CareLedgerSubjectKind.pet.rawValue &&
+                $0.subjectId == subjectId
+        }
+    }
+
+    var hasAnyRecord: Bool {
+        !recordDates.isEmpty
+    }
+
+    var recordDates: [Date] {
+        events
+            .filter { Self.isPetAchievementRecordKind($0.eventKindEnum) }
+            .map(\.occurredAt)
+    }
+
+    var healthEvents: [CareLedgerEvent] { events(kind: .health) }
+    var hygieneEvents: [CareLedgerEvent] { events(kind: .hygiene) }
+    var pottyEvents: [CareLedgerEvent] { events(kind: .potty) }
+    var walkEvents: [CareLedgerEvent] { events(kind: .walk) }
+    var careEvents: [CareLedgerEvent] { events(kind: .care) }
+    var expenseEvents: [CareLedgerEvent] { events(kind: .expense) }
+    var weightEvents: [CareLedgerEvent] { events(kind: .weight) }
+
+    var mainFeedEvents: [CareLedgerEvent] {
+        careEvents.filter { event in
+            event.actionType == CareType.feeding.rawValue &&
+                feedSource(for: event) != .treat
+        }
+    }
+
+    var treatEvents: [CareLedgerEvent] {
+        careEvents.filter { feedSource(for: $0) == .treat }
+    }
+
+    var wateringEvents: [CareLedgerEvent] {
+        careEvents(actionTypes: [CareType.watering.rawValue])
+    }
+
+    var waterCareEvents: [CareLedgerEvent] {
+        careEvents(actionTypes: [
+            CareType.watering.rawValue,
+            CareType.waterChange.rawValue
+        ])
+    }
+
+    var playEvents: [CareLedgerEvent] {
+        careEvents(actionTypes: [CareType.play.rawValue])
+    }
+
+    var cleaningCareEvents: [CareLedgerEvent] {
+        careEvents(actionTypes: Self.cleaningCareActionTypes)
+    }
+
+    func events(kind: CareLedgerEventKind) -> [CareLedgerEvent] {
+        events.filter { $0.eventKindEnum == kind }
+    }
+
+    func dates(kind: CareLedgerEventKind) -> [Date] {
+        events(kind: kind).map(\.occurredAt)
+    }
+
+    func careEvents(actionTypes: Set<String>) -> [CareLedgerEvent] {
+        careEvents.filter { actionTypes.contains($0.actionType) }
+    }
+
+    func hasTodayRecord(kind: CareLedgerEventKind, calendar: Calendar, now: Date) -> Bool {
+        let today = calendar.startOfDay(for: now)
+        return events(kind: kind).contains { calendar.isDate($0.occurredAt, inSameDayAs: today) }
+    }
+
+    func hasTodayCareRecord(calendar: Calendar, now: Date) -> Bool {
+        let today = calendar.startOfDay(for: now)
+        return careEvents.contains { calendar.isDate($0.occurredAt, inSameDayAs: today) }
+    }
+
+    func consecutivePerfectPoopDays(calendar: Calendar, today: Date, maxDays: Int = 30) -> Int {
+        consecutiveDays(calendar: calendar, today: today, maxDays: maxDays) { day in
+            pottyEvents.contains {
+                calendar.isDate($0.occurredAt, inSameDayAs: day) &&
+                    $0.actionType == PottyType.perfectPoop.rawValue
+            }
+        }
+    }
+
+    func consecutiveWalkDays(calendar: Calendar, today: Date, maxDays: Int = 30) -> Int {
+        consecutiveDays(calendar: calendar, today: today, maxDays: maxDays) { day in
+            walkEvents.contains { calendar.isDate($0.occurredAt, inSameDayAs: day) }
+        }
+    }
+
+    func consecutiveAnyRecordDays(calendar: Calendar, today: Date, maxDays: Int = 30) -> Int {
+        let dates = recordDates
+        return consecutiveDays(calendar: calendar, today: today, maxDays: maxDays) { day in
+            dates.contains { calendar.isDate($0, inSameDayAs: day) }
+        }
+    }
+
+    func totalWalkMeters() -> Double {
+        walkEvents.reduce(0.0) { $0 + $1.amountValue }
+    }
+
+    func walkMeters(on day: Date, calendar: Calendar) -> Double {
+        walkEvents
+            .filter { calendar.isDate($0.occurredAt, inSameDayAs: day) }
+            .reduce(0.0) { $0 + $1.amountValue }
+    }
+
+    func maxSingleWalkMeters() -> Double {
+        walkEvents.map(\.amountValue).max() ?? 0
+    }
+
+    func feedingSpanDays(calendar: Calendar) -> Int {
+        let dates = mainFeedEvents.map(\.occurredAt)
+        guard let first = dates.min(), let last = dates.max() else { return 0 }
+        return calendar.dateComponents([.day], from: first, to: last).day ?? 0
+    }
+
+    func recordedFoodKindCount() -> Int {
+        Set(mainFeedEvents.compactMap {
+            CareLedgerMetadata.stringValue(named: CareLedgerMetadata.feedFoodKind, in: $0.metadataJSON)
+        }).count
+    }
+
+    func autoMainFeedCount() -> Int {
+        mainFeedEvents.count { feedSource(for: $0) == .autoMain }
+    }
+
+    func hasRecentEmergencyOrSurgery(since cutoff: Date) -> Bool {
+        healthEvents.contains {
+            $0.occurredAt >= cutoff &&
+                ["emergency", "surgery"].contains($0.actionType)
+        }
+    }
+
+    func hasVaccineRecord() -> Bool {
+        healthEvents.contains {
+            $0.actionType == "vaccine"
+                || $0.actionType == "vaccination"
+                || $0.note.localizedCaseInsensitiveContains("疫苗")
+                || $0.note.localizedCaseInsensitiveContains("vaccine")
+                || $0.note.localizedCaseInsensitiveContains("impf")
+        }
+    }
+
+    private func feedSource(for event: CareLedgerEvent) -> FeedLogSource? {
+        FeedLogMetadata.source(
+            actionType: event.actionType,
+            note: event.note,
+            ledgerSource: event.sourceEnum,
+            sourceEventId: event.sourceEventId,
+            sourceReminderId: event.sourceReminderId,
+            metadataJSON: event.metadataJSON
+        )
+    }
+
+    private func consecutiveDays(
+        calendar: Calendar,
+        today: Date,
+        maxDays: Int,
+        hasRecord: (Date) -> Bool
+    ) -> Int {
+        var count = 0
+        for offset in 0 ..< maxDays {
+            guard let day = calendar.date(byAdding: .day, value: -offset, to: today) else { break }
+            if hasRecord(day) {
+                count += 1
+            } else {
+                break
+            }
+        }
+        return count
+    }
+
+    private static var cleaningCareActionTypes: Set<String> {
+        [
+            CareType.litter.rawValue,
+            CareType.waterChange.rawValue,
+            CareType.filterClean.rawValue,
+            CareType.cageCleaning.rawValue,
+            CareType.substrateChange.rawValue
+        ]
+    }
+
+    private static func isPetAchievementRecordKind(_ kind: CareLedgerEventKind) -> Bool {
+        switch kind {
+        case .care, .potty, .walk, .hygiene, .health, .weight, .expense, .medication, .milestone:
+            true
+        case .workout, .reminder, .plantCare, .coconut, .unknown:
+            false
+        }
     }
 }
 
@@ -72,14 +330,17 @@ final class AchievementManager {
     // MARK: - 人宠联动成就（需要 HealthKit 数据）
 
     /// 计算跨维度成就（需要人类 HealthKit 数据作为额外输入）
-    static func computeBonded(for pet: Pet, humanDistanceKm: Double) -> [Achievement] {
+    static func computeBonded(
+        for pet: Pet,
+        humanDistanceKm: Double,
+        context: AchievementComputationContext = .empty
+    ) -> [Achievement] {
         let calendar = Calendar.current
         let today = calendar.startOfDay(for: Date())
+        let careLedgerSummary = context.careLedgerSummary(for: pet)
 
         // 今日宠物遛狗总距离（km）
-        let petTodayDistanceKm = pet.walkLogs
-            .filter { calendar.isDate($0.startDate, inSameDayAs: today) }
-            .reduce(0.0) { $0 + $1.distanceMeters / 1000.0 }
+        let petTodayDistanceKm = careLedgerSummary.walkMeters(on: today, calendar: calendar) / 1000.0
 
         // 同甘共苦：主人今日步行距离 ≥ 宠物今日遛狗距离（且宠物有遛狗记录）
         let bondedWalk = Achievement(
@@ -110,37 +371,20 @@ final class AchievementManager {
         let today = calendar.startOfDay(for: now)
         let allPets = context.allPets.isEmpty ? [pet] : context.allPets
         let livePets = allPets.filter { !$0.hasPassedAway }
-
-        // F5: 预计算 — 只过滤最近 7 天的日志，避免对全量数据做 N 次 isDate(inSameDayAs:)
-        let sevenDaysAgo = calendar.date(byAdding: .day, value: -7, to: today) ?? today
-        let recentPottyLogs = pet.pottyLogs.filter { $0.date >= sevenDaysAgo }
-        let recentWalkLogs = pet.walkLogs.filter { $0.startDate >= sevenDaysAgo }
-        let mainFeedLogs = pet.careLogs.filter { FeedLogMetadata.isMainFoodLog($0) }
-        let treatLogs = pet.careLogs.filter { FeedLogMetadata.isTreatLog($0) }
-        let waterLogs = pet.careLogs.filter { $0.careType == .watering }
-        let waterCareLogs = pet.careLogs.filter { [.watering, .waterChange].contains($0.careType) }
-        let playLogs = pet.careLogs.filter { $0.careType == .play }
-        let cleaningCareLogs = pet.careLogs.filter {
-            [.litter, .waterChange, .filterClean, .cageCleaning, .substrateChange].contains($0.careType)
-        }
+        let careLedgerSummary = context.careLedgerSummary(for: pet)
+        let petActivitySummary = context.petActivitySummary(for: pet)
 
         // 预计算"今天"标志（用于多个成就复用）
-        let hasTodayHealth = pet.healthLogs.contains { calendar.isDateInToday($0.date) }
-        let hasTodayHygiene = pet.hygieneLogs.contains { calendar.isDateInToday($0.date) }
-        let hasTodayPotty = recentPottyLogs.contains { calendar.isDateInToday($0.date) }
-        let hasTodayCare = pet.careLogs.contains { calendar.isDateInToday($0.date) }
-        let hasTodayWalk = recentWalkLogs.contains { calendar.isDateInToday($0.startDate) }
-        let hasTodayWeight = pet.weightLogs.contains { calendar.isDateInToday($0.date) }
-        let allRecordDates = pet.healthLogs.map(\.date)
-            + pet.pottyLogs.map(\.date)
-            + pet.walkLogs.map(\.startDate)
-            + pet.hygieneLogs.map(\.date)
-            + pet.careLogs.map(\.date)
-            + pet.foodRecords.map(\.startDate)
-            + pet.expenseLogs.map(\.date)
-            + pet.weightLogs.map(\.date)
-            + pet.photoLogs.map(\.date)
-            + pet.milestones.map(\.date)
+        let hasTodayHealth = careLedgerSummary.hasTodayRecord(kind: .health, calendar: calendar, now: now)
+        let hasTodayHygiene = careLedgerSummary.hasTodayRecord(kind: .hygiene, calendar: calendar, now: now)
+        let hasTodayPotty = careLedgerSummary.hasTodayRecord(kind: .potty, calendar: calendar, now: now)
+        let hasTodayCare = careLedgerSummary.hasTodayCareRecord(calendar: calendar, now: now)
+        let hasTodayWalk = careLedgerSummary.hasTodayRecord(kind: .walk, calendar: calendar, now: now)
+        let hasTodayWeight = careLedgerSummary.hasTodayRecord(kind: .weight, calendar: calendar, now: now)
+        let allRecordDates = careLedgerSummary.recordDates
+            + petActivitySummary.foodRecordDates
+            + petActivitySummary.photoDates
+            + petActivitySummary.milestoneDates
 
         func hasAnyRecord(on day: Date) -> Bool {
             allRecordDates.contains { calendar.isDate($0, inSameDayAs: day) }
@@ -153,8 +397,9 @@ final class AchievementManager {
                 guard let day = calendar.date(byAdding: .day, value: -i, to: today) else { streak = false
                     break
                 }
-                let has = recentPottyLogs.contains {
-                    calendar.isDate($0.date, inSameDayAs: day) && $0.pottyType == .perfectPoop
+                let has = careLedgerSummary.pottyEvents.contains {
+                    calendar.isDate($0.occurredAt, inSameDayAs: day) &&
+                        $0.actionType == PottyType.perfectPoop.rawValue
                 }
                 if !has { streak = false
                     break
@@ -167,7 +412,7 @@ final class AchievementManager {
 
         // 2. 🏃 铁脚板：累计遛狗 >= 100km
         let ironPaw: Achievement = {
-            let total = pet.walkLogs.reduce(0.0) { $0 + $1.distanceMeters }
+            let total = careLedgerSummary.totalWalkMeters()
             return Achievement(id: "iron_paw", emoji: "🏃", title: "铁脚板",
                                description: "累计遛狗总距离达到 100km",
                                color: Color.goTeal, isUnlocked: total >= 100_000)
@@ -180,7 +425,7 @@ final class AchievementManager {
                 guard let day = calendar.date(byAdding: .day, value: -i, to: today) else { streak = false
                     break
                 }
-                let has = recentWalkLogs.contains { calendar.isDate($0.startDate, inSameDayAs: day) }
+                let has = careLedgerSummary.walkEvents.contains { calendar.isDate($0.occurredAt, inSameDayAs: day) }
                 if !has { streak = false
                     break
                 }
@@ -193,18 +438,17 @@ final class AchievementManager {
         // 4. 💎 健康达人：30 天内无 emergency / surgery healthLog
         let healthHero: Achievement = {
             let cutoff = calendar.date(byAdding: .day, value: -30, to: now) ?? now
-            let hasEmergency = pet.healthLogs.contains {
-                $0.date >= cutoff && ($0.type == "emergency" || $0.type == "surgery")
-            }
+            let hasEmergency = careLedgerSummary.hasRecentEmergencyOrSurgery(since: cutoff)
+            let hasHealth = !careLedgerSummary.healthEvents.isEmpty
             return Achievement(id: "health_hero", emoji: "💎", title: "健康达人",
                                description: "30 天内无紧急就医或手术记录",
-                               color: Color.goMint, isUnlocked: !hasEmergency && !pet.healthLogs.isEmpty)
+                               color: Color.goMint, isUnlocked: !hasEmergency && hasHealth)
         }()
 
         // 5. 🍗 营养师：连续记录喂食 14 天（foodRecords 中最近记录间隔 ≤ 1天）
         let nutritionist: Achievement = {
-            let feedDates = pet.foodRecords.map(\.startDate)
-                + pet.careLogs.filter { $0.careType == .feeding }.map(\.date)
+            let feedDates = petActivitySummary.foodRecordDates
+                + careLedgerSummary.mainFeedEvents.map(\.occurredAt)
             let sorted = feedDates.sorted()
             guard sorted.count >= 2 else {
                 return Achievement(id: "nutritionist", emoji: "🍗", title: "营养师",
@@ -239,11 +483,7 @@ final class AchievementManager {
 
         // 8. 📝 第一步：拥有至少一条任意记录（健康/排泄/遛狗/护理）
         let firstRecord: Achievement = {
-            let hasAny = !pet.healthLogs.isEmpty || !pet.pottyLogs.isEmpty
-                || !pet.walkLogs.isEmpty || !pet.hygieneLogs.isEmpty
-                || !pet.careLogs.isEmpty || !pet.foodRecords.isEmpty
-                || !pet.expenseLogs.isEmpty || !pet.weightLogs.isEmpty
-                || !pet.photoLogs.isEmpty || !pet.milestones.isEmpty
+            let hasAny = careLedgerSummary.hasAnyRecord || petActivitySummary.hasArchiveRecord
             return Achievement(id: "first_record", emoji: "📝", title: "第一步",
                                description: "完成第一条宠物记录",
                                color: Color.goCardCyan, isUnlocked: hasAny)
@@ -265,7 +505,7 @@ final class AchievementManager {
 
         // 11. 🐾 长跑健将：单次遛狗超过 5km
         let longRunner: Achievement = {
-            let has5km = pet.walkLogs.contains { $0.distanceMeters >= 5000 }
+            let has5km = careLedgerSummary.maxSingleWalkMeters() >= 5000
             return Achievement(id: "long_runner", emoji: "🐾", title: "长跑健将",
                                description: "单次遛狗距离超过 5km",
                                color: Color.goOrange, isUnlocked: has5km)
@@ -273,10 +513,7 @@ final class AchievementManager {
 
         // 12. 💊 坚持到底：完成至少一个疗程用药（有 endDate 且已过期的药）
         let medicationComplete: Achievement = {
-            let completed = pet.medications.contains {
-                guard let end = $0.endDate else { return false }
-                return end < now && $0.isActive
-            }
+            let completed = !petActivitySummary.completedMedicationEndDates(now: now).isEmpty
             return Achievement(id: "medication_complete", emoji: "💊", title: "坚持到底",
                                description: "认真完成了一个完整的用药疗程",
                                color: Color.goTeal, isUnlocked: completed)
@@ -285,17 +522,17 @@ final class AchievementManager {
         // 13. 📸 拍照达人：上传 20 张以上照片
         let photoEnthusiast = Achievement(id: "photo_enthusiast", emoji: "📸", title: "拍照达人",
                                           description: "为宠物上传了 20 张以上照片",
-                                          color: Color.goPrimary, isUnlocked: pet.photoLogs.count >= 20)
+                                          color: Color.goPrimary, isUnlocked: petActivitySummary.photoCount >= 20)
 
         // 14. 💰 记账能手：累计记录 10 条以上花费
         let expenseTracker = Achievement(id: "expense_tracker", emoji: "💰", title: "记账能手",
                                          description: "累计记录了 10 条以上花费",
-                                         color: Color.goYellow, isUnlocked: pet.expenseLogs.count >= 10)
+                                         color: Color.goYellow, isUnlocked: careLedgerSummary.expenseEvents.count >= 10)
 
         // 15. 🏋️ 体重管理师：累计体重记录 7 条以上
         let weightManager = Achievement(id: "weight_manager", emoji: "🏋️", title: "体重管理师",
                                         description: "坚持记录体重，累计超过 7 条记录",
-                                        color: Color.goCardBlue, isUnlocked: pet.weightLogs.count >= 7)
+                                        color: Color.goCardBlue, isUnlocked: careLedgerSummary.weightEvents.count >= 7)
 
         // 16. 💧 喝水伙伴：累计喂水 14 次
         let hydrationBuddy = Achievement(
@@ -304,7 +541,7 @@ final class AchievementManager {
             title: "喝水伙伴",
             description: "累计完成 14 次喂水记录",
             color: Color.goTeal,
-            isUnlocked: waterLogs.count >= 14
+            isUnlocked: careLedgerSummary.wateringEvents.count >= 14
         )
 
         // 17. 🎾 逗玩达人：累计逗玩 20 次
@@ -314,7 +551,7 @@ final class AchievementManager {
             title: "逗玩达人",
             description: "累计完成 20 次陪玩或逗玩记录",
             color: Color.goOrange,
-            isUnlocked: playLogs.count >= 20
+            isUnlocked: careLedgerSummary.playEvents.count >= 20
         )
 
         // 18. 🧹 清洁管家：累计清洁/铲屎/换水/滤芯 20 次
@@ -324,7 +561,7 @@ final class AchievementManager {
             title: "清洁管家",
             description: "累计完成 20 次清洁类照护",
             color: Color.goMint,
-            isUnlocked: pet.hygieneLogs.count + cleaningCareLogs.count >= 20
+            isUnlocked: careLedgerSummary.hygieneEvents.count + careLedgerSummary.cleaningCareEvents.count >= 20
         )
 
         // 19. 🦴 零食侦探：累计记录 10 次零食
@@ -334,7 +571,7 @@ final class AchievementManager {
             title: "零食侦探",
             description: "累计记录 10 次零食",
             color: Color.goYellow,
-            isUnlocked: treatLogs.count >= 10
+            isUnlocked: careLedgerSummary.treatEvents.count >= 10
         )
 
         // 20. 🥣 干湿双修：干粮和湿粮都记录过
@@ -344,7 +581,7 @@ final class AchievementManager {
             title: "干湿双修",
             description: "干粮和湿粮都完成过记录",
             color: Color.goOrange,
-            isUnlocked: mainFeedLogs.contains { $0.foodKind == .dry } && mainFeedLogs.contains { $0.foodKind == .wet }
+            isUnlocked: careLedgerSummary.recordedFoodKindCount() >= 2
         )
 
         // 21. 🤖 自动喂养：自动猫粮机生成过记录
@@ -354,7 +591,7 @@ final class AchievementManager {
             title: "自动喂养",
             description: "自动猫粮机完成过 3 次记录",
             color: Color.goTeal,
-            isUnlocked: mainFeedLogs.filter(\.isAutoFeedLogEntry).count >= 3
+            isUnlocked: careLedgerSummary.autoMainFeedCount() >= 3
         )
 
         // 22. 🧺 粮仓管理员：补粮记录达到 2 次
@@ -364,7 +601,7 @@ final class AchievementManager {
             title: "粮仓管理员",
             description: "累计添加 2 次余粮或补粮记录",
             color: Color.goPrimary,
-            isUnlocked: pet.foodRecords.count >= 2
+            isUnlocked: petActivitySummary.foodRecordCount >= 2
         )
 
         // 23. 🛡️ 证件守护：建立证件或保险
@@ -374,7 +611,7 @@ final class AchievementManager {
             title: "证件守护",
             description: "为宠物添加证件或保险保障",
             color: Color.goCardBlue,
-            isUnlocked: !pet.documents.isEmpty || !pet.insurances.isEmpty
+            isUnlocked: petActivitySummary.hasProtectionRecord
         )
 
         // 24. 💉 疫苗本：记录过疫苗
@@ -384,7 +621,7 @@ final class AchievementManager {
             title: "疫苗本",
             description: "在健康模块记录过疫苗",
             color: Color.goMint,
-            isUnlocked: pet.healthLogs.contains { $0.type == "vaccine" || $0.type == "vaccination" || $0.note.localizedCaseInsensitiveContains("疫苗") }
+            isUnlocked: careLedgerSummary.hasVaccineRecord()
         )
 
         // 25. 🌡️ 异常观察员：记录过 3 次症状/异常
@@ -394,7 +631,7 @@ final class AchievementManager {
             title: "异常观察员",
             description: "累计记录 3 次症状或异常",
             color: Color.goRed,
-            isUnlocked: pet.symptomLogs.count >= 3
+            isUnlocked: petActivitySummary.symptomCount >= 3
         )
 
         // 26. 🧭 照护连线：连续 14 天任意记录
@@ -425,7 +662,7 @@ final class AchievementManager {
             title: "餐桌档案",
             description: "累计完成 50 次主食喂养记录",
             color: Color.goOrange,
-            isUnlocked: mainFeedLogs.count >= 50
+            isUnlocked: careLedgerSummary.mainFeedEvents.count >= 50
         )
 
         // 28. 🚰 清泉守卫：累计 50 次喂水记录
@@ -435,7 +672,7 @@ final class AchievementManager {
             title: "清泉守卫",
             description: "累计完成 50 次喂水或换水记录",
             color: Color.goTeal,
-            isUnlocked: waterCareLogs.count >= 50
+            isUnlocked: careLedgerSummary.waterCareEvents.count >= 50
         )
 
         // 29. 🖼️ 记忆相册：累计 50 张照片
@@ -445,7 +682,7 @@ final class AchievementManager {
             title: "记忆相册",
             description: "为宠物留下 50 张照片记录",
             color: Color.goCardBlue,
-            isUnlocked: pet.photoLogs.count >= 50
+            isUnlocked: petActivitySummary.photoCount >= 50
         )
 
         // 30. 📊 体重节奏：累计 14 条体重记录
@@ -455,7 +692,7 @@ final class AchievementManager {
             title: "体重节奏",
             description: "累计记录 14 次体重变化",
             color: Color.goCardCyan,
-            isUnlocked: pet.weightLogs.count >= 14
+            isUnlocked: careLedgerSummary.weightEvents.count >= 14
         )
 
         // 31. 🌿 一年同行：陪伴满 365 天

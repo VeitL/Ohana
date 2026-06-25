@@ -1849,20 +1849,20 @@ actionable; long-term product ideas belong in planning docs instead.
 
 ### TFU-20260612-006 - Finish CareLedger read-model migration for care surfaces
 
-- Status: Open
+- Status: Done
 - Priority: P1 (release-bar reclassified from legacy P0 on 2026-06-16; first-release reachable but not P0-blocking)
 - Area: Care / QuickCare / Hygiene / Read Models
 - Source task: Care maturity remediation, 2026-06-12
-- Blocker: This crosses QuickCare, Home snapshots, expanded quick-action state,
+- Resolution: This crossed QuickCare, Home snapshots, expanded quick-action state,
   expense previews, and legacy log compatibility. `PetHygieneDetailView` display
   state, `IslandHygieneDashboard` summaries, `QuickPlayDetailSheet` display
   history, `QuickPottyDetailSheet` owned potty/litter history, and
   `QuickWaterDetailSheet` water/change/filter history now read from
-  `CareLedgerEvent` snapshots. `IslandFoodDashboard` feeding summaries and
-  trends now receive pure `FoodLedgerEntry` values after the route container
-  immediately projects bounded `CareLedgerEvent` rows; its old `PetCareLog`
-  input remains a stock-calculator compatibility source because food-kind/stock
-  consumption semantics have not yet moved fully into ledger metadata. QuickFeed full
+  `CareLedgerEvent` snapshots. `IslandFoodDashboard` feeding summaries, trends,
+  and stock overview now receive pure `FoodLedgerEntry` /
+  `QuickFeedLedgerEntry` values after the route container projects bounded
+  `CareLedgerEvent` rows; the old `PetCareLog` stock input was removed from the
+  dashboard route and snapshot path. QuickFeed full
   history, plan-calendar auto occurrence state, overview, mode-history, and
   treat overview snapshots now receive pure `QuickFeedLedgerEntry` values;
   route-scoped/event-fetch helpers still use `PetCareLog` only as a legacy
@@ -1899,31 +1899,32 @@ actionable; long-term product ideas belong in planning docs instead.
   `TodayFocusSnapshot`, and `TodayFocusEconomyService` now use lightweight
   `TodayFocusCareLedgerEntry` values for Today Focus care completion and daily
   reward gating instead of fetching today `PetCareLog`, `PetWalkLog`, or
-  `PetPottyLog` rows. `TodayFocusService` has direct ledger-entry completion
-  coverage for planned feed, walk, potty, and play-equivalent quests.
+  `PetPottyLog` rows; pet weight ledger rows are included as well.
+  `TodayFocusService` has direct ledger-entry completion coverage for planned
+  feed, walk, potty, play-equivalent, and pet-weight quests.
   `IslandQuestEngine` now consumes the same lightweight ledger entries when
   generating care-plan and family-level play quests, including event-scoped
-  feed/water completion checks and actor-aware routine subtitles when ledger
-  actor data is available.
+  feed/water/weight completion checks and actor-aware routine subtitles when
+  ledger actor data is available.
+  `PetAllFeaturesActivitySummary` now loads after the first frame and uses
+  pet-scoped `CareLedgerEvent` rows plus route-scoped narrow counts for
+  feature-hub metrics, so the all-features render path no longer reads broad
+  care, potty, walk, health, weight, expense, photo, or milestone relationship
+  arrays.
   Legacy logs remain only as action-time single-id edit/delete,
-  claim/stock/typed-metric compatibility bridges where old commands or
-  calculators still require the original model.
-  Remaining fallback branches in Today Focus still read legacy relationship
-  arrays only when no ledger-entry snapshot has been supplied.
-- Next step: Move remaining feeding stock historical bridges and
-  claim/typed-metric compatibility paths off direct
-  `PetCareLog`, `PetPottyLog`, `PetWalkLog`, and `PetExpenseLog` queries where
-  `CareLedgerEvent` has enough structured metadata, then cover each migrated
-  surface with targeted tests. Reason not completed in the same round: feeding
-  stock calculators still need historical stock semantics until that data
-  is represented structurally in ledger metadata; Today Focus still retains
-  legacy relationship-array fallbacks for compatibility when a caller has not
-  supplied ledger snapshots; hygiene delete/detail compatibility still needs
-  the original `PetHygieneLog` record for explicit user deletion.
-- Current task disposition: Accepted follow-up for future migration scope. The
-  current care-maturity remediation is complete because remaining direct legacy
-  reads are either explicit compatibility bridges or cross-surface migrations
-  documented here with exact next steps and close conditions.
+  claim/typed-metric compatibility bridges, export/report surfaces, or explicit
+  calculator fallback tests/callers where the original model is intentionally
+  supplied.
+- Next step: No active TFU-006 follow-up remains. Future work on non-CareLedger
+  medication Home helpers, deletion cleanup internals, or background schedule
+  compatibility should be tracked under separate, narrower tickets if it becomes
+  user-visible debt.
+- Current task disposition: Closed. User-facing care/Home/Today Focus/Family
+  report/achievement/dashboard surfaces now consume ledger-backed read models,
+  route-scoped rows, or pure summaries. Remaining direct relationship-array
+  reads are contained to deletion/cleanup services, action-time single-id
+  commands, background schedule compatibility, explicit legacy fallback APIs, or
+  non-CareLedger medication/deeplink helpers.
 - Progress: 2026-06-24 tightened the Hygiene detail render path. Added
   `PetHygieneLedgerEntry` as the route-local value projection for hygiene
   ledger rows; `PetHygieneDetailView` now maps `CareLedgerEvent` objects in the
@@ -2202,15 +2203,766 @@ actionable; long-term product ideas belong in planning docs instead.
   -only-testing:OhanaTests/ManualFeedCommandTests` PASSed (33 Swift Testing
   tests, iPhone 17 simulator; xcresult
   `/var/folders/9j/7ldcxzn91d947mg4p_7wxmz40000gn/T/OhanaDerivedData/main-b6cf423d5931-tests/Logs/Test/Test-Ohana-2026.06.25_00-26-18-+0200.xcresult`).
+- Progress: 2026-06-25 batch-tightened QuickCare/Hygiene explicit delete
+  bridges. QuickPlay, QuickWater, and QuickPotty route data no longer prefetch
+  delete-only legacy log arrays; their detail rows keep only ledger
+  `legacyLogId` values and fetch `PetCareLog` / `PetPottyLog` by single id only
+  after the user taps delete. `PetHygieneDetailView` also removed the
+  delete-only `PetHygieneLog` query from its route container and fetches a
+  single `PetHygieneLog` at action time. Added executor helpers
+  `PetCareCommandExecutor.careLog(id:)`, `PetCareCommandExecutor.pottyLog(id:)`,
+  `QuickWaterCommandExecutor.careLog(id:)`, and
+  `PetHygieneCommandExecutor.hygieneLog(id:)`; unknown-potty claim remains an
+  explicit compatibility path because the row itself represents an unknown
+  legacy potty record. Guard added:
+  `HomeExpensePreviewStoreTests.quickCareDeleteBridgesUseActionTimeIdFetches`.
+  Validation: first targeted run exposed an over-strict source assertion against
+  the required `"PetHygieneLog"` legacy-model-name string; after narrowing the
+  guard to the `@Query`/array boundary, `scripts/test-simulator.sh
+  -only-testing:OhanaTests/HomeExpensePreviewStoreTests` PASSed (17 Swift
+  Testing tests, iPhone 17 simulator; xcresult
+  `/var/folders/9j/7ldcxzn91d947mg4p_7wxmz40000gn/T/OhanaDerivedData/main-b6cf423d5931-tests/Logs/Test/Test-Ohana-2026.06.25_00-35-47-+0200.xcresult`).
+- Progress: 2026-06-25 tightened QuickFeed route preload scope. `QuickFeedRouteData`
+  no longer fetches recent feeding `PetCareLog` rows by date before presenting
+  the detail route; it now fetches feeding `CareLedgerEvent` rows first and
+  resolves only the single legacy log ids referenced by those ledger rows for
+  historical metadata enrichment. `QuickFeedDetailSheet` renamed that input to
+  `legacyCareLogs`, while full history / stock-heavy surfaces still use the
+  existing lazy sheet-time `fullCareLogs` fetch. Guard added:
+  `QuickFeedDataControllerTests.quickFeedRouteUsesLedgerScopedLegacyCareLogs`.
+  Validation: `scripts/test-simulator.sh
+  -only-testing:OhanaTests/QuickFeedDataControllerTests
+  -only-testing:OhanaTests/QuickFeedOverviewSnapshotStoreTests
+  -only-testing:OhanaTests/ManualFeedCommandTests` PASSed (31 Swift Testing
+  tests, iPhone 17 simulator; xcresult
+  `/var/folders/9j/7ldcxzn91d947mg4p_7wxmz40000gn/T/OhanaDerivedData/main-b6cf423d5931-tests/Logs/Test/Test-Ohana-2026.06.25_00-41-28-+0200.xcresult`).
+- Progress: 2026-06-25 tightened PetAllFeatures activity metrics and typed
+  feature-hub counts. The all-features sheet no longer reads `pet.careLogs`,
+  `pet.pottyLogs`, `pet.walkLogs`, `pet.healthLogs`, `pet.weightLogs`,
+  `pet.expenseLogs`, `pet.photoLogs`, or `pet.milestones` relationship arrays
+  while rendering feature subtitles, counters, archive score, latest weight, or
+  expense totals. `PetDetailSheetRouteContainer` still loads a pure
+  `PetAllFeaturesActivitySummary` after the first frame, but the summary now
+  reads pet-scoped `CareLedgerEvent` rows for care/potty/walk/health/weight/
+  expense metrics and uses route-scoped narrow counts for photos, milestones,
+  documents, insurance, and medications. Guards added/updated:
+  `MemberLifecycleGateTests.petAllFeaturesUsesRouteScopedActivitySummaryInsteadOfPetRelationshipCareLogs`
+  and `petAllFeaturesActivitySummaryUsesLedgerAndRouteScopedCounts`.
+  Validation: `scripts/test-simulator.sh
+  -only-testing:OhanaTests/MemberLifecycleGateTests` PASSed (65 Swift Testing
+  tests, iPhone 17 simulator; xcresult
+  `/var/folders/9j/7ldcxzn91d947mg4p_7wxmz40000gn/T/OhanaDerivedData/main-b6cf423d5931-tests/Logs/Test/Test-Ohana-2026.06.25_02-46-18-+0200.xcresult`).
+- Progress: 2026-06-25 removed dead legacy care subtitles from
+  `FeatureAggregateView`. The aggregate page already routes food, hygiene,
+  potty, walks, retention, health, medication, weight, and expense features to
+  their dashboard surfaces, so the old per-pet `subtitle(for:)` branches were
+  unreachable UI code but still carried broad relationship-array reads such as
+  `pet.careLogs`, `pet.pottyLogs`, `pet.walkLogs`, `pet.hygieneLogs`,
+  `pet.expenseLogs`, and `pet.weightLogs`. The summary subtitle switch now
+  keeps only currently rendered basic info / documents / moments /
+  achievements cases and returns an empty placeholder for dashboard-backed
+  feature cases. Guard added:
+  `MemberLifecycleGateTests.featureAggregateViewDoesNotCarryLegacyCareRelationshipSubtitles`.
+  Validation: `scripts/test-simulator.sh
+  -only-testing:OhanaTests/MemberLifecycleGateTests/deceasedFeatureHubsExposeOnlyMemorialSafeDestinations()
+  -only-testing:OhanaTests/MemberLifecycleGateTests/petAllFeaturesUsesRouteScopedActivitySummaryInsteadOfPetRelationshipCareLogs()
+  -only-testing:OhanaTests/MemberLifecycleGateTests/featureAggregateViewDoesNotCarryLegacyCareRelationshipSubtitles()`
+  PASSed (3 Swift Testing tests, iPhone 17 simulator; xcresult
+  `/var/folders/9j/7ldcxzn91d947mg4p_7wxmz40000gn/T/OhanaDerivedData/main-b6cf423d5931-tests/Logs/Test/Test-Ohana-2026.06.25_00-52-38-+0200.xcresult`).
+- Progress: 2026-06-25 moved `FamilyActivityStripView` off pet relationship
+  arrays. `FamilyActivityStripRouteContainer` now fetches today's
+  `CareLedgerEvent` rows for the current pet after the first frame and passes
+  pure `FamilyActivityEntry` values into the strip view. The view no longer scans
+  `pet.careLogs`, `pet.pottyLogs`, `pet.walkLogs`, or `pet.expenseLogs` while
+  rendering; shared walk rows preserve multi-executor display by reading the
+  ledger metadata `executorIds` array through
+  `CareLedgerMetadata.stringArrayValue(named:in:)`. Guards added:
+  `MemberLifecycleGateTests.familyActivityStripUsesLedgerEntriesInsteadOfPetRelationshipLogs`
+  and `familyActivityEntriesProjectTodayLedgerEventsAndSharedWalkExecutors`.
+  Validation: the first targeted run exposed two stale `ActivityEntry` type
+  references after the pure-value rename; a later changed-file gate then caught
+  the initial route `@Query` version, so the route was corrected to a deferred
+  `ModelContext` fetch. After both fixes,
+  `scripts/test-simulator.sh
+  -only-testing:OhanaTests/MemberLifecycleGateTests/familyActivityStripUsesLedgerEntriesInsteadOfPetRelationshipLogs()
+  -only-testing:OhanaTests/MemberLifecycleGateTests/familyActivityEntriesProjectTodayLedgerEventsAndSharedWalkExecutors()`
+  PASSed (2 Swift Testing tests, iPhone 17 simulator; xcresult
+  `/var/folders/9j/7ldcxzn91d947mg4p_7wxmz40000gn/T/OhanaDerivedData/main-b6cf423d5931-tests/Logs/Test/Test-Ohana-2026.06.25_01-02-34-+0200.xcresult`).
+- Progress: 2026-06-25 moved BountyBoard and FamilyCollaborationDashboard
+  activity summaries onto a shared pure ledger projection. Added
+  `FamilyCareLedgerEntry` to project pet-subject `CareLedgerEvent` rows into
+  pet id, executor ids, event kind, action type, and date. `BountyBoardView`
+  now loads this bounded week window after the first frame and computes weekly
+  human care/potty/walk/expense stats from pure entries instead of scanning
+  `pet.careLogs`, `pet.pottyLogs`, `pet.walkLogs`, or `pet.expenseLogs`.
+  `CrewRosterRouteData` now fetches the same bounded entries for the family
+  collaboration overlay; `FamilyCollaborationDashboardView` uses them for latest
+  activity, today activity count, board progress, and care-gap detection. Shared
+  walk rows keep their multi-executor display through the same `executorIds`
+  metadata path. Guards added:
+  `MemberLifecycleGateTests.familyTaskActivitySurfacesUseLedgerEntriesInsteadOfPetRelationshipLogs`
+  and `familyCareLedgerEntriesProjectWeeklyStatsAndExecutorLists`. Validation:
+  first targeted run exposed a `[Any]` inference bug in the new executor-id
+  helper; after explicit `[String]` annotation,
+  `scripts/test-simulator.sh
+  -only-testing:OhanaTests/MemberLifecycleGateTests/familyActivityStripUsesLedgerEntriesInsteadOfPetRelationshipLogs()
+  -only-testing:OhanaTests/MemberLifecycleGateTests/familyActivityEntriesProjectTodayLedgerEventsAndSharedWalkExecutors()
+  -only-testing:OhanaTests/MemberLifecycleGateTests/familyTaskActivitySurfacesUseLedgerEntriesInsteadOfPetRelationshipLogs()
+	  -only-testing:OhanaTests/MemberLifecycleGateTests/familyCareLedgerEntriesProjectWeeklyStatsAndExecutorLists()`
+	  PASSed (4 Swift Testing tests, iPhone 17 simulator; xcresult
+	  `/var/folders/9j/7ldcxzn91d947mg4p_7wxmz40000gn/T/OhanaDerivedData/main-b6cf423d5931-tests/Logs/Test/Test-Ohana-2026.06.25_01-16-17-+0200.xcresult`).
+	- Progress: 2026-06-25 moved FamilyWeeklyReport onto a deferred ledger
+	  read model. `FamilyWeeklyReportDashboardView` no longer installs live
+	  `@Query` subscriptions for pets, humans, or all `CareLedgerEvent` rows on
+	  the first frame; `FamilyWeeklyReportRouteData` now loads pets, humans, and a
+	  bounded four-week pet ledger window after the first frame. The dashboard
+	  removed its legacy fallback loops over `pet.careLogs`, `pet.pottyLogs`,
+	  `pet.walkLogs`, and `pet.expenseLogs`, and weight trend now comes from
+	  `.weight` ledger events instead of `pet.weightLogs`. `WeeklyReportCard`
+	  also renders walk count/distance, potty count, expense total, active days,
+	  and latest weight from ledger events; walk duration reads optional ledger
+	  metadata and otherwise safely degrades. Guard added:
+	  `MemberLifecycleGateTests.familyWeeklyReportsUseDeferredLedgerReadModelInsteadOfPetRelationshipLogs`.
+	  Validation: `git diff --check` PASS; `scripts/audit-route-first-frame.sh
+	  --changed` PASS; targeted `scripts/test-simulator.sh
+	  -only-testing:OhanaTests/MemberLifecycleGateTests/familyActivityStripUsesLedgerEntriesInsteadOfPetRelationshipLogs()
+	  -only-testing:OhanaTests/MemberLifecycleGateTests/familyActivityEntriesProjectTodayLedgerEventsAndSharedWalkExecutors()
+	  -only-testing:OhanaTests/MemberLifecycleGateTests/familyTaskActivitySurfacesUseLedgerEntriesInsteadOfPetRelationshipLogs()
+	  -only-testing:OhanaTests/MemberLifecycleGateTests/familyWeeklyReportsUseDeferredLedgerReadModelInsteadOfPetRelationshipLogs()
+	  -only-testing:OhanaTests/MemberLifecycleGateTests/familyCareLedgerEntriesProjectWeeklyStatsAndExecutorLists()`
+	  PASSed (5 Swift Testing tests, iPhone 17 simulator; xcresult
+	  `/var/folders/9j/7ldcxzn91d947mg4p_7wxmz40000gn/T/OhanaDerivedData/main-b6cf423d5931-tests/Logs/Test/Test-Ohana-2026.06.25_01-24-01-+0200.xcresult`);
+	  `scripts/dev-check-changed.sh` PASS; after SwiftFormat normalized
+	  `descriptor.fetchLimit = 1200`, the post-format guard rerun
+	  `scripts/test-simulator.sh
+	  -only-testing:OhanaTests/MemberLifecycleGateTests/familyWeeklyReportsUseDeferredLedgerReadModelInsteadOfPetRelationshipLogs()`
+	  PASSed (1 Swift Testing test, iPhone 17 simulator; xcresult
+	  `/var/folders/9j/7ldcxzn91d947mg4p_7wxmz40000gn/T/OhanaDerivedData/main-b6cf423d5931-tests/Logs/Test/Test-Ohana-2026.06.25_01-26-29-+0200.xcresult`).
+- Progress: 2026-06-25 moved `StreakManager` daily check-in detection onto a
+  pet/day-scoped ledger query. `refreshStreak(for:context:)` now treats only
+  today's potty, walk, or feeding `CareLedgerEvent` as check-in evidence, with
+  `fetchLimit = 1`; it no longer scans `pet.pottyLogs`, `pet.walkLogs`, or
+  `pet.foodRecords` relationship arrays. Guards added:
+  `MemberLifecycleGateTests.streakManagerUsesLedgerNarrowCheckInInsteadOfPetRelationshipLogs`
+  and `streakManagerCheckInReadsLedgerInsteadOfPetRelationshipLogs`. Validation:
+  `git diff --check` PASS; `scripts/audit-route-first-frame.sh --changed` PASS;
+  targeted `scripts/test-simulator.sh
+  -only-testing:OhanaTests/MemberLifecycleGateTests/streakManagerUsesLedgerNarrowCheckInInsteadOfPetRelationshipLogs()
+  -only-testing:OhanaTests/MemberLifecycleGateTests/streakManagerCheckInReadsLedgerInsteadOfPetRelationshipLogs()
+  -only-testing:OhanaTests/MemberLifecycleGateTests/familyWeeklyReportsUseDeferredLedgerReadModelInsteadOfPetRelationshipLogs()
+  -only-testing:OhanaTests/MemberLifecycleGateTests/familyCareLedgerEntriesProjectWeeklyStatsAndExecutorLists()`
+  PASSed (4 Swift Testing tests, iPhone 17 simulator; xcresult
+  `/var/folders/9j/7ldcxzn91d947mg4p_7wxmz40000gn/T/OhanaDerivedData/main-b6cf423d5931-tests/Logs/Test/Test-Ohana-2026.06.25_01-33-27-+0200.xcresult`).
+- Progress: 2026-06-25 removed the unused `pets:` relationship-array API from
+  `IslandProsperityManager`. Prosperity level/progress now accepts either an
+  already projected total count or filtered `CareLedgerEvent` rows, and it no
+  longer carries dormant `pet.walkLogs`, `pet.pottyLogs`, `pet.hygieneLogs`,
+  `pet.healthLogs`, `pet.weightLogs`, `pet.foodRecords`, or `pet.milestones`
+  reads that could be revived by future Oasis/dashboard work. Guards added:
+  `MemberLifecycleGateTests.islandProsperityUsesLedgerCountsInsteadOfPetRelationshipLogs`
+  and `islandProsperityCountsOnlyPetLedgerActivity`. Validation:
+  `scripts/test-simulator.sh
+  -only-testing:OhanaTests/MemberLifecycleGateTests/streakManagerUsesLedgerNarrowCheckInInsteadOfPetRelationshipLogs()
+  -only-testing:OhanaTests/MemberLifecycleGateTests/streakManagerCheckInReadsLedgerInsteadOfPetRelationshipLogs()
+  -only-testing:OhanaTests/MemberLifecycleGateTests/islandProsperityUsesLedgerCountsInsteadOfPetRelationshipLogs()
+  -only-testing:OhanaTests/MemberLifecycleGateTests/islandProsperityCountsOnlyPetLedgerActivity()`
+  PASSed (4 Swift Testing tests, iPhone 17 simulator; xcresult
+  `/var/folders/9j/7ldcxzn91d947mg4p_7wxmz40000gn/T/OhanaDerivedData/main-b6cf423d5931-tests/Logs/Test/Test-Ohana-2026.06.25_01-38-52-+0200.xcresult`).
+- Progress: 2026-06-25 moved AchievementWall and `AchievementManager` pet-care
+  achievement summaries onto route-scoped CareLedger input.
+  `AchievementWallRouteData` now loads pet-subject `CareLedgerEvent` rows after
+  the first frame and passes optional ledger rows into
+  `AchievementComputationContext`; `AchievementCareLedgerSummary` drives unlock
+  computation, progress values, and completion dates for care, potty, walk,
+  hygiene, health, weight, expense, and feeding achievements. A supplied empty
+  ledger input is authoritative, while `nil` keeps the legacy fallback available
+  for unmigrated callers. Guards added:
+  `MemberLifecycleGateTests.achievementWallRoutesLedgerEventsIntoAchievementContext`
+  and
+  `achievementManagerPrefersAuthoritativeLedgerCareSummaryWhenProvided`.
+  Validation: `git diff --check` PASS; `scripts/dev-check-changed.sh` PASS;
+  post-format targeted `scripts/test-simulator.sh
+  -only-testing:OhanaTests/MemberLifecycleGateTests/streakManagerUsesLedgerNarrowCheckInInsteadOfPetRelationshipLogs()
+  -only-testing:OhanaTests/MemberLifecycleGateTests/streakManagerCheckInReadsLedgerInsteadOfPetRelationshipLogs()
+  -only-testing:OhanaTests/MemberLifecycleGateTests/islandProsperityUsesLedgerCountsInsteadOfPetRelationshipLogs()
+  -only-testing:OhanaTests/MemberLifecycleGateTests/islandProsperityCountsOnlyPetLedgerActivity()
+  -only-testing:OhanaTests/MemberLifecycleGateTests/achievementWallRoutesLedgerEventsIntoAchievementContext()
+  -only-testing:OhanaTests/MemberLifecycleGateTests/achievementManagerPrefersAuthoritativeLedgerCareSummaryWhenProvided()`
+  PASSed (6 Swift Testing tests, iPhone 17 simulator; xcresult
+  `/var/folders/9j/7ldcxzn91d947mg4p_7wxmz40000gn/T/OhanaDerivedData/main-b6cf423d5931-tests/Logs/Test/Test-Ohana-2026.06.25_01-54-57-+0200.xcresult`).
+  TFU-006 remains Open: typed-metric compatibility, stock calculator historical
+  bridges, and non-AchievementWall callers still need migration or explicit
+  boundary documentation.
+- Progress: 2026-06-25 moved QuickPotty unknown-claim UI/render state to pure
+  route-deferred entries. `QuickPottyUnknownClaimStore` now projects
+  `PoopUnknownPottyEntry` values; `QuickPottyRouteData` loads those entries
+  after the first frame and passes them into `QuickPottyDetailSheet`.
+  `PoopLogItem.unknownPotty` no longer carries `PetPottyLog`, and claim/delete
+  buttons now pass only a log id; `QuickPottyDetailSheet` fetches the single
+  `PetPottyLog` only after the user taps claim/delete. Guards updated:
+  `HomeCommandExecutorTests.quickPottyUnknownSharedFlowCanBeClaimedAndRefreshesSessionAndLedger`
+  and
+  `HomeExpensePreviewStoreTests.quickPottyUnknownClaimUsesRoutePureEntriesAndActionTimeFetches`.
+  Validation: `git diff --check` PASS; `scripts/dev-check-changed.sh` PASS;
+  targeted `scripts/test-simulator.sh
+  -only-testing:OhanaTests/HomeCommandExecutorTests/quickPottyUnknownSharedFlowCanBeClaimedAndRefreshesSessionAndLedger()
+  -only-testing:OhanaTests/HomeExpensePreviewStoreTests/quickCareDeleteBridgesUseActionTimeIdFetches()
+  -only-testing:OhanaTests/HomeExpensePreviewStoreTests/quickPottyUnknownClaimUsesRoutePureEntriesAndActionTimeFetches()`
+  PASSed (3 Swift Testing tests, iPhone 17 simulator; xcresult
+  `/var/folders/9j/7ldcxzn91d947mg4p_7wxmz40000gn/T/OhanaDerivedData/main-b6cf423d5931-tests/Logs/Test/Test-Ohana-2026.06.25_02-02-40-+0200.xcresult`).
+  TFU-006 remains Open: typed-metric compatibility, stock calculator historical
+  bridges, and non-AchievementWall callers still need migration or explicit
+  boundary documentation.
+- Progress: 2026-06-25 moved QuickFeed and FeedHome stock consumption onto
+  supplied `QuickFeedLedgerEntry` values. `FeedStockCalculator` now accepts an
+  optional feeding-ledger input; when the input is supplied, even as an empty
+  array, it is authoritative for stock consumption, recent average, remaining
+  grams, and runout estimates. `QuickFeedStockSnapshotStore`,
+  `QuickFeedDetailSheet`, `QuickFeedDetailContent.refreshStockSnapshot`, and
+  `FeedHomeSnapshotBuilder` pass observed feeding ledger entries into the stock
+  path, while the legacy `PetCareLog` input remains only as an explicit fallback
+  for callers that have not supplied ledger entries. Added
+  `QuickFeedStockSnapshotStoreTests.stockSnapshotUsesFeedingLedgerEntriesForConsumptionWhenProvided`
+  and
+  `stockSnapshotTreatsSuppliedEmptyFeedingLedgerEntriesAsAuthoritative`.
+  Validation: `git diff --check` PASS; `scripts/test-simulator.sh
+  -only-testing:OhanaTests/QuickFeedStockSnapshotStoreTests
+  -only-testing:OhanaTests/QuickFeedOverviewSnapshotStoreTests
+  -only-testing:OhanaTests/QuickFeedDataControllerTests/feedTodayStateDoesNotFallbackToPetCareLogRelationship()`
+  PASSed (10 Swift Testing tests, iPhone 17 simulator; xcresult
+  `/var/folders/9j/7ldcxzn91d947mg4p_7wxmz40000gn/T/OhanaDerivedData/main-b6cf423d5931-tests/Logs/Test/Test-Ohana-2026.06.25_02-10-41-+0200.xcresult`);
+  `scripts/dev-check-changed.sh` PASS; post-format `git diff --check` PASS.
+  TFU-006 remains Open: typed-metric compatibility, non-AchievementWall callers,
+  and explicit legacy stock fallback callers such as independent dashboard/writer
+  rebuild paths still need migration or documented containment.
+- Progress: 2026-06-25 moved the remaining non-AchievementWall
+  `AchievementManager` callers onto explicit ledger context. `OasisRewardLiveDataStore`
+  now loads pet-subject achievement ledger events after the visible Oasis surface
+  has yielded its first frame, and `OasisRewardCommandExecutor.makeBentoSnapshot`
+  passes those events through `AchievementComputationContext` instead of calling
+  `AchievementManager.compute(for:)` naked. `PetRetentionHubView` and
+  `IslandRetentionDashboardContentView` also defer pet ledger loading and pass
+  pure ledger input into their screen models before computing achievement
+  progress. Guard added:
+  `MemberLifecycleGateTests.nonWallAchievementCallersUseLedgerContext`. Validation:
+  first targeted run exposed a missing `return` in
+  `IslandRetentionDashboardScreenModel.summaries`, the second exposed optional
+  `CareLedgerEvent.subjectId`; after fixing both, `scripts/test-simulator.sh
+  -only-testing:OhanaTests/MemberLifecycleGateTests/achievementWallRoutesLedgerEventsIntoAchievementContext()
+  -only-testing:OhanaTests/MemberLifecycleGateTests/achievementManagerPrefersAuthoritativeLedgerCareSummaryWhenProvided()
+  -only-testing:OhanaTests/MemberLifecycleGateTests/nonWallAchievementCallersUseLedgerContext()`
+  PASSed (3 Swift Testing tests, iPhone 17 simulator; xcresult
+  `/var/folders/9j/7ldcxzn91d947mg4p_7wxmz40000gn/T/OhanaDerivedData/main-b6cf423d5931-tests/Logs/Test/Test-Ohana-2026.06.25_02-16-48-+0200.xcresult`);
+  `scripts/dev-check-changed.sh` PASS; post-check `git diff --check` PASS and
+  source search finds no naked `AchievementManager.compute(for: pet)` /
+  `AchievementManager.compute(for: $0)` in Oasis, DashboardRecords, or
+  Achievements callers. TFU-006 remains Open: typed-metric compatibility and
+  explicit legacy stock fallback callers such as independent dashboard/writer
+  rebuild paths still need migration or documented containment.
+- Progress: 2026-06-25 tightened Today Focus pet-weight completion against the
+  same read-model ledger boundary. `HomeReadModelStore` and
+  `TodayFocusEconomyService` now include pet-subject `.weight` ledger events in
+  their `TodayFocusCareLedgerEntry` inputs; `TodayFocusService` completes
+  `q_weight_*` quests from `.weight` ledger rows instead of `pet.weightLogs` on
+  the read-model path; and `IslandQuestEngine` uses ledger weight entries for
+  generated weight task suppression plus weight care-plan completion whenever a
+  ledger snapshot is supplied. Added/updated tests:
+  `OhanaTests.todayFocusServiceCompletesCareQuestsFromLedgerEntries`,
+  `todayFocusServiceTreatsLedgerWeightAsAuthoritative`,
+  `islandQuestEngineTreatsEmptyReadModelLedgerAsAuthoritative`, and
+  `islandQuestEngineUsesLedgerWeightForReadModelCompletion`. Validation:
+  method-level Swift Testing filters compiled but selected 0 tests, so they were
+  not counted; file-level `scripts/test-simulator.sh
+  -only-testing:OhanaTests/OhanaTests` first exposed an outdated daily-completion
+  fixture and the economy-service weight fetch gap, then PASSed after fixing
+  both (140 Swift Testing tests, iPhone 17 simulator; xcresult
+  `/var/folders/9j/7ldcxzn91d947mg4p_7wxmz40000gn/T/OhanaDerivedData/main-b6cf423d5931-tests/Logs/Test/Test-Ohana-2026.06.25_02-24-40-+0200.xcresult`).
+  TFU-006 remains Open: explicit legacy stock fallback callers such as
+  independent dashboard/writer rebuild paths and remaining compatibility bridges
+  still need migration or documented containment.
+- Progress: 2026-06-25 moved the independent feeding stock dashboard/writer
+  callers onto ledger-authoritative input. `FeedingPlanWriter` now rebuilds
+  stock reminders from pet-scoped feeding `CareLedgerEvent` rows projected into
+  `QuickFeedLedgerEntry` values instead of fetching stock `PetCareLog` rows.
+  `IslandFoodDashboardRouteData` also projects bounded feeding ledger rows into
+  stock-specific `QuickFeedLedgerEntry` values; `IslandFoodDashboardSnapshot`,
+  revisions, and `IslandFoodDashboardContentView` no longer carry
+  `legacyStockCareLogs`. `QuickFeedLedgerEntry.entries` was marked
+  `nonisolated` because it is a pure value projection used by nonisolated writer
+  code. Guards updated:
+  `QuickFeedDataControllerTests.feedTodayStateDoesNotFallbackToPetCareLogRelationship`
+  and `IslandFoodDashboardSnapshotStoreTests.dashboardSnapshotAggregatesSelectedPetsAndStockOnce`.
+  Validation: `git diff --check` PASS; targeted
+  `scripts/test-simulator.sh
+  -only-testing:OhanaTests/IslandFoodDashboardSnapshotStoreTests
+  -only-testing:OhanaTests/QuickFeedDataControllerTests
+  -only-testing:OhanaTests/QuickFeedStockSnapshotStoreTests`
+  PASSed twice after the isolation cleanup (12 Swift Testing tests, iPhone 17
+  simulator; final xcresult
+  `/var/folders/9j/7ldcxzn91d947mg4p_7wxmz40000gn/T/OhanaDerivedData/main-b6cf423d5931-tests/Logs/Test/Test-Ohana-2026.06.25_02-32-39-+0200.xcresult`).
+  TFU-006 remains Open: typed-metric compatibility and remaining explicit
+  action-time/delete/claim bridges still need migration or documented
+  containment.
+- Progress: 2026-06-25 moved the Home / Today Focus negative-feedback generator
+  onto explicit ledger-projected input. `IslandNegativeFeedback` now accepts
+  pure `IslandNegativeCareLedgerEntry` values and no longer scans
+  `pet.careLogs`, `pet.walkLogs`, `pet.pottyLogs`, or `pet.hygieneLogs` for
+  no-check-in, appetite, drinking, potty, or overdue-feed signals. Home
+  `TodayFocusSnapshot` maps its existing `TodayFocusCareLedgerEntry` read-model
+  input into those pure negative-feedback values, and
+  `TodayFocusCareLedgerEntry` now carries `amountValue` from
+  `CareLedgerEvent.amountValue` so amount-based appetite/drinking signals keep
+  their old semantics without returning to legacy relationship arrays. Guard
+  added:
+  `MemberLifecycleGateTests.islandNegativeFeedbackUsesLedgerEntriesInsteadOfPetRelationshipLogs`.
+  Behavior coverage added in `OhanaTests`: legacy relationship check-ins no
+  longer suppress the warning when ledger input is empty, ledger check-ins do
+  suppress it, and feeding amount trends come from ledger values. Validation:
+  `git diff --check` PASS; `scripts/test-simulator.sh
+  -only-testing:OhanaTests/OhanaTests
+  -only-testing:OhanaTests/MemberLifecycleGateTests` PASSed (208 Swift Testing
+  tests, iPhone 17 simulator; xcresult
+  `/var/folders/9j/7ldcxzn91d947mg4p_7wxmz40000gn/T/OhanaDerivedData/main-b6cf423d5931-tests/Logs/Test/Test-Ohana-2026.06.25_02-54-22-+0200.xcresult`).
+  TFU-006 remains Open: remaining action-time/delete/claim bridges and explicit
+  fallback callers still need migration or documented containment.
+- Progress: 2026-06-25 finished the same Home / Today Focus quest-generation
+  chain by making `IslandQuestEngine` treat `TodayFocusCareLedgerEntry` input as
+  the only care-completion source for care-plan completion, play-equivalent
+  suppression, pet weight tasks, routine subtitles, and last-routine actor
+  hints. The engine no longer falls back to `pet.careLogs`, `pet.walkLogs`,
+  `pet.pottyLogs`, or `pet.weightLogs`; legacy relationship rows cannot mark
+  read-model quests complete unless they were projected into ledger entries.
+  Guard added:
+  `MemberLifecycleGateTests.islandQuestEngineUsesLedgerEntriesInsteadOfPetRelationshipCareFallbacks`.
+  Existing authoritative-empty coverage remains in
+  `OhanaTests.islandQuestEngineTreatsEmptyReadModelLedgerAsAuthoritative`, and
+  `islandQuestEngineDoesNotCreatePlayTaskForEveryPetAfterInteraction` now feeds
+  walk interaction through `TodayFocusCareLedgerEntry`. Validation:
+  `git diff --check` PASS; `scripts/test-simulator.sh
+  -only-testing:OhanaTests/OhanaTests
+  -only-testing:OhanaTests/MemberLifecycleGateTests` PASSed (209 Swift Testing
+  tests, iPhone 17 simulator; xcresult
+  `/var/folders/9j/7ldcxzn91d947mg4p_7wxmz40000gn/T/OhanaDerivedData/main-b6cf423d5931-tests/Logs/Test/Test-Ohana-2026.06.25_03-01-36-+0200.xcresult`).
+  TFU-006 remains Open: remaining action-time/delete/claim bridges and explicit
+  fallback callers still need migration or documented containment.
+- Progress: 2026-06-25 tightened the water-cycle calculator boundary so
+  `WaterCareCycleStatusCalculator` consumes only an explicit
+  `WaterCareCycleLogSnapshot` (defaulting to `.empty`) plus settings anchors; it
+  no longer scans `pet.careLogs` when a caller omits the snapshot. Home's
+  expanded quick-action path already supplies read-model water-cycle entries, so
+  this removes a hidden broad compatibility fallback without changing the
+  intended Home source of truth. Guard added:
+  `MemberLifecycleGateTests.waterCareCycleStatusUsesExplicitSnapshotInsteadOfPetCareLogRelationship`.
+  Behavior coverage added:
+  `HomeExpensePreviewStoreTests.waterCareCycleStatusIgnoresLegacyCareLogRelationshipWithoutSnapshot`.
+  Validation: `git diff --check` PASS; `scripts/test-simulator.sh
+  -only-testing:OhanaTests/HomeExpensePreviewStoreTests
+  -only-testing:OhanaTests/MemberLifecycleGateTests` PASSed (87 Swift Testing
+  tests, iPhone 17 simulator; xcresult
+  `/var/folders/9j/7ldcxzn91d947mg4p_7wxmz40000gn/T/OhanaDerivedData/main-b6cf423d5931-tests/Logs/Test/Test-Ohana-2026.06.25_03-07-18-+0200.xcresult`).
+  TFU-006 remains Open: remaining action-time/delete/claim bridges and explicit
+  fallback callers still need migration or documented containment.
+- Progress: 2026-06-25 removed a dormant Home card metric fallback:
+  `FocusCard.from(_ pet:)` no longer computes weekly dog walk distance by
+  scanning `pet.walkLogs`; any Home card walk distance must now be supplied as
+  an explicit pure `homeWalkDistanceMeters` value. `FocusHomeCardDataSource`
+  continues to build first-screen cards without walk relationship reads.
+  Guards added:
+  `MemberLifecycleGateTests.focusHomeCardModelUsesExplicitWalkDistanceInsteadOfPetWalkRelationship`.
+  Behavior coverage added:
+  `MemberCreationServiceTests.focusHomeCardUsesExplicitWalkDistanceInsteadOfPetWalkRelationship`.
+  Validation: `git diff --check` PASS; source search of
+  `FocusHomeModels.swift` / `FocusHomeCardDataSource.swift` found no
+  `includeWalkDistance`, `weeklyWalkDistanceMeters`, or `pet.walkLogs`;
+  `scripts/test-simulator.sh -only-testing:OhanaTests/MemberCreationServiceTests
+  -only-testing:OhanaTests/MemberLifecycleGateTests` PASSed (92 Swift Testing
+	  tests, iPhone 17 simulator; xcresult
+	  `/var/folders/9j/7ldcxzn91d947mg4p_7wxmz40000gn/T/OhanaDerivedData/main-b6cf423d5931-tests/Logs/Test/Test-Ohana-2026.06.25_03-10-53-+0200.xcresult`).
+	  TFU-006 remains Open: remaining action-time/delete/claim bridges and explicit
+	  fallback callers still need migration or documented containment.
+- Progress: 2026-06-25 tightened DashboardRecords retention metrics after the
+  non-wall achievement caller migration. `PetRetentionHubView` and
+  `IslandRetentionDashboardContentView` now load `PetRetentionArchiveMetrics`
+  after the first frame; archive score, photo/milestone counts, latest memory
+  date, health baseline, expiring protection count, timeline count, and
+  dashboard memory capsules come from `PetAllFeaturesActivitySummary` plus
+  route-scoped narrow fetches instead of rendering from `pet.photoLogs`,
+  `pet.milestones`, `pet.weightLogs`, `pet.healthLogs`, `pet.expenseLogs`,
+  `pet.careLogs`, `pet.walkLogs`, `pet.documents`, `pet.insurances`, or
+  `pet.medications`. The retention screen models also use the same pure metrics
+  for per-pet summaries and retention scoring. Guard updated:
+  `MemberLifecycleGateTests.nonWallAchievementCallersUseLedgerContext`.
+  Behavior coverage added:
+  `MemberLifecycleGateTests.petRetentionArchiveMetricsUsesRouteScopedCountsAndLatestMemory`.
+  Validation: `git diff --check` PASS; source search across the four
+  DashboardRecords retention files found no direct `pet.*Logs` / protection
+  relationship reads listed above; first targeted run exposed a missing
+  `return` in `retentionScore`, then
+  `scripts/test-simulator.sh
+  -only-testing:OhanaTests/MemberLifecycleGateTests/nonWallAchievementCallersUseLedgerContext()
+  -only-testing:OhanaTests/MemberLifecycleGateTests/petRetentionArchiveMetricsUsesRouteScopedCountsAndLatestMemory()`
+  PASSed (2 Swift Testing tests, iPhone 17 simulator; xcresult
+  `/var/folders/9j/7ldcxzn91d947mg4p_7wxmz40000gn/T/OhanaDerivedData/main-b6cf423d5931-tests/Logs/Test/Test-Ohana-2026.06.25_03-21-38-+0200.xcresult`);
+  `scripts/dev-check-changed.sh` PASSed (SwiftFormat checked changed Swift files,
+  formatted 0 files; UI/accessibility/smoothness/route-first-frame/runtime/
+  economy/member-lifecycle/derived-state audits PASS; build still recommended
+  for the wider dirty compiler surface, but this batch is covered by the
+  targeted simulator run above).
+  TFU-006 remains Open: remaining action-time/delete/claim bridges and explicit
+  fallback callers still need migration or documented containment.
+- Progress: 2026-06-25 migrated DashboardRecords weight/exploration stats to
+  pet ledger metrics. `IslandUnifiedStatsViewModel` now route-loads pet weight
+  and walk `CareLedgerEvent` rows, then computes pet weight deltas, pet absolute
+  weight series, weekly exploration distance, and weekly exploration count from
+  pure metric entries instead of `pet.weightLogs` or `pet.walkLogs`.
+  `IslandWeightDashboard` total island weight and pet sparklines now read the
+  view model's `weightAbsolutes` series instead of sorting pet relationship
+  logs. Guard added:
+  `MemberLifecycleGateTests.islandWeightDashboardUsesPetLedgerMetricsInsteadOfPetRelationships`.
+  Behavior coverage added:
+  `MemberLifecycleGateTests.islandUnifiedStatsUsesPetLedgerMetricsInsteadOfLegacyPetRelationships`,
+  proving legacy relationship rows are ignored when ledger metrics are present.
+  Validation: source search across `IslandUnifiedStatsViewModel.swift` and
+  `IslandWeightDashboard.swift` found no `pet.weightLogs` or `pet.walkLogs`;
+  `git diff --check` PASS;
+  `scripts/test-simulator.sh
+  -only-testing:OhanaTests/MemberLifecycleGateTests/islandWeightDashboardUsesPetLedgerMetricsInsteadOfPetRelationships()
+  -only-testing:OhanaTests/MemberLifecycleGateTests/islandUnifiedStatsUsesPetLedgerMetricsInsteadOfLegacyPetRelationships()`
+  PASSed (2 Swift Testing tests, iPhone 17 simulator; xcresult
+  `/var/folders/9j/7ldcxzn91d947mg4p_7wxmz40000gn/T/OhanaDerivedData/main-b6cf423d5931-tests/Logs/Test/Test-Ohana-2026.06.25_03-27-51-+0200.xcresult`).
+  TFU-006 remains Open: quick weight sheets, dormant/legacy chart surfaces, and
+  remaining action-time/delete/claim bridges still need migration or documented
+  containment.
+- Progress: 2026-06-25 migrated quick weight sheet latest-weight hints to a
+  route-scoped ledger metric. `GenericWeightEntrySheet` quick weight chips and
+  `QuickWeightSheet` "last record" hint now load `latestPetWeightKg` after the
+  first frame via `PetWeightLedgerRouteMetrics.latestWeightKg(petID:context:)`;
+  render/computed UI state no longer sorts `pet.weightLogs`. The helper performs
+  a pet-id-scoped `CareLedgerEvent` weight fetch with a small fetch limit and
+  stores only a `Double?` in view state. Guard added:
+  `MemberLifecycleGateTests.quickWeightSheetsUseRouteScopedLedgerMetricsInsteadOfPetWeightRelationships`.
+  Behavior coverage added:
+  `MemberLifecycleGateTests.quickWeightSheetsUseLedgerLatestWeightInsteadOfLegacyPetRelationship`,
+  proving legacy `PetWeightLog` relationship rows do not affect the quick-sheet
+  hint when ledger weight rows are present. Validation: source search across
+  `GenericWeightEntrySheet.swift` and `QuickWeightSheet.swift` found no
+  `pet.weightLogs`; first targeted run failed on an optional-binding mistake for
+  non-optional `CareLedgerEvent.amountValue`, then
+  `scripts/test-simulator.sh
+  -only-testing:OhanaTests/MemberLifecycleGateTests/quickWeightSheetsUseRouteScopedLedgerMetricsInsteadOfPetWeightRelationships()
+  -only-testing:OhanaTests/MemberLifecycleGateTests/quickWeightSheetsUseLedgerLatestWeightInsteadOfLegacyPetRelationship()`
+  PASSed (2 Swift Testing tests, iPhone 17 simulator; xcresult
+  `/var/folders/9j/7ldcxzn91d947mg4p_7wxmz40000gn/T/OhanaDerivedData/main-b6cf423d5931-tests/Logs/Test/Test-Ohana-2026.06.25_03-33-57-+0200.xcresult`);
+  post-check `git diff --check` PASSed; `scripts/dev-check-changed.sh`
+  PASSed (SwiftFormat checked changed Swift files, formatted 1 file;
+  UI/accessibility/smoothness/route-first-frame/runtime/economy/member-lifecycle/
+  derived-state audits PASS; build still recommended for the wider dirty
+  compiler surface, but this batch is covered by the targeted simulator run
+  above).
+  TFU-006 remains Open: dormant/legacy chart surfaces and remaining
+  action-time/delete/claim bridges still need migration or documented
+  containment.
+- Progress: 2026-06-25 removed dormant `PetChartDashboard.swift`, a stale
+  DashboardRecords chart surface that was not referenced by active Swift source
+  or `Ohana.xcodeproj` and still scanned `pet.weightLogs`, `pet.walkLogs`,
+  `pet.pottyLogs`, and `pet.expenseLogs` in render helpers. Added
+  `MemberLifecycleGateTests.dormantPetChartDashboardBroadReadSurfaceStaysRemoved`
+  so the old broad-read surface cannot silently return. Validation:
+  `rg PetChartDashboard` found only historical docs plus the new guard;
+  targeted
+  `scripts/test-simulator.sh
+  -only-testing:OhanaTests/MemberLifecycleGateTests/quickWeightSheetsUseRouteScopedLedgerMetricsInsteadOfPetWeightRelationships()
+  -only-testing:OhanaTests/MemberLifecycleGateTests/quickWeightSheetsUseLedgerLatestWeightInsteadOfLegacyPetRelationship()
+	  -only-testing:OhanaTests/MemberLifecycleGateTests/dormantPetChartDashboardBroadReadSurfaceStaysRemoved()`
+  PASSed (3 Swift Testing tests, iPhone 17 simulator; xcresult
+  `/var/folders/9j/7ldcxzn91d947mg4p_7wxmz40000gn/T/OhanaDerivedData/main-b6cf423d5931-tests/Logs/Test/Test-Ohana-2026.06.25_03-37-41-+0200.xcresult`);
+  post-check `git diff --check` PASSed; `scripts/dev-check-changed.sh`
+  PASSed (SwiftFormat formatted 0 files; changed-file audits PASS).
+  TFU-006 remains Open: FunctionMenu legacy aggregate counts and remaining
+  action-time/delete/claim bridges still need migration or documented
+  containment.
+- Progress: 2026-06-25 migrated FunctionMenu pet archive aggregate subtitles to
+  route-scoped summaries. `FeatureAggregateView` no longer renders Documents,
+  Moments, or Achievements subtitles from `pet.documents.count`,
+  `pet.photoLogs.count`, or `pet.milestones.count`; `FunctionMenuRouteData`
+  now loads `FunctionMenuPetAggregateSummary` after the first frame by doing
+  pet-id-scoped `fetchCount` queries for `PetDocument`, `PetPhotoLog`, and
+  `PetMilestone`, then passes only `[UUID: FunctionMenuPetAggregateSummary]`
+  into the destination router and dashboard views. Guards added:
+  `MemberLifecycleGateTests.functionMenuAggregateUsesRouteScopedSummariesInsteadOfPetArchiveRelationships`
+  and
+  `MemberLifecycleGateTests.functionMenuPetAggregateSummaryCountsRouteScopedArchiveItems`.
+  Validation: source search across FunctionMenu found no legacy
+  `pet.documents.count` / `pet.photoLogs.count` / `pet.milestones.count` render
+  reads; first targeted runs exposed missing `return` statements in the new
+  route data and subtitle helpers, then
+  `scripts/test-simulator.sh
+  -only-testing:OhanaTests/MemberLifecycleGateTests/functionMenuAggregateUsesRouteScopedSummariesInsteadOfPetArchiveRelationships()
+  -only-testing:OhanaTests/MemberLifecycleGateTests/functionMenuPetAggregateSummaryCountsRouteScopedArchiveItems()`
+	  PASSed (2 Swift Testing tests, iPhone 17 simulator; xcresult
+	  `/var/folders/9j/7ldcxzn91d947mg4p_7wxmz40000gn/T/OhanaDerivedData/main-b6cf423d5931-tests/Logs/Test/Test-Ohana-2026.06.25_03-45-16-+0200.xcresult`);
+	  post-check `git diff --check` PASSed; `scripts/dev-check-changed.sh`
+	  PASSed (SwiftFormat formatted 0 files; changed-file audits PASS; build still
+	  recommended for the wider dirty compiler surface, but this batch is covered by
+	  the targeted simulator run above).
+	  TFU-006 remains Open: remaining action-time/delete/claim bridges still need
+	  migration or documented containment.
+- Progress: 2026-06-25 migrated archive document/milestone route surfaces to
+  pet-id-scoped route rows. `DocumentsListView` and `PetMilestoneListView` now
+  use route-scoped `@Query` results for `PetDocument`, `PetInsurance`, and
+  `PetMilestone` after explicit navigation instead of rendering from
+  `pet.documents`, `pet.insurances`, or `pet.milestones`; dormant
+  `PetDocumentsCard` and `PetMilestonesCard` files were removed instead of
+  keeping hidden broad-read surfaces alive.
+  `PetProtectionDashboardState` now builds from supplied document/insurance
+  rows, and the unused `ArchiveMemorySnapshot.init(pet:)` compatibility
+  initializer was removed so archive scoring can no longer fall back to
+  `pet.healthLogs`, `pet.weightLogs`, `pet.photoLogs`, `pet.milestones`,
+  `pet.documents`, `pet.insurances`, or `pet.medications`. Guards/coverage
+  added:
+  `MemberLifecycleGateTests.archiveFeatureViewsUseRouteScopedRowsInsteadOfPetRelationships`,
+  `MemberLifecycleGateTests.protectionDashboardStateUsesSuppliedArchiveRows`,
+  and updated `OhanaTests.archiveMemorySnapshotRecommends*` tests to pass
+  explicit `PetAllFeaturesActivitySummary`. Validation: source search across
+  the touched archive files found no `pet.documents` / `pet.insurances` /
+  `pet.milestones` reads and no `ArchiveMemorySnapshot(pet:)` caller; the
+  guard also asserts the dormant document/milestone card files stay removed.
+  First targeted run exposed a test-helper-only compile issue, then a changed
+  smoothness audit flagged the dormant card queries, so those files were
+  removed and the route page queries were documented as explicit-navigation
+  route scope. Final validation:
+  `scripts/test-simulator.sh
+  -only-testing:OhanaTests/MemberLifecycleGateTests/archiveFeatureViewsUseRouteScopedRowsInsteadOfPetRelationships()
+  -only-testing:OhanaTests/MemberLifecycleGateTests/protectionDashboardStateUsesSuppliedArchiveRows()
+  -only-testing:OhanaTests/OhanaTests/archiveMemorySnapshotRecommendsBasicInfoForEmptyProfile()
+  -only-testing:OhanaTests/OhanaTests/archiveMemorySnapshotRecommendsDocumentsAfterBasicInfo()
+  -only-testing:OhanaTests/OhanaTests/archiveMemorySnapshotRecommendsMomentsAfterProtection()
+  -only-testing:OhanaTests/OhanaTests/archiveMemorySnapshotRecommendsWeightAfterMemory()
+  -only-testing:OhanaTests/OhanaTests/archiveMemorySnapshotRecommendsRetentionWhenComplete()`
+  PASSed (7 Swift Testing tests, iPhone 17 simulator; xcresult
+  `/var/folders/9j/7ldcxzn91d947mg4p_7wxmz40000gn/T/OhanaDerivedData/main-b6cf423d5931-tests/Logs/Test/Test-Ohana-2026.06.25_03-55-30-+0200.xcresult`);
+  post-check `git diff --check` PASSed; `scripts/dev-check-changed.sh`
+  PASSed (SwiftFormat formatted 0 files; changed-file audits PASS; build still
+  recommended for the wider dirty compiler surface, but this batch is covered by
+  the targeted simulator run above).
+  TFU-006 remains Open: PDF/export surfaces and remaining
+  action-time/delete/claim bridges still need migration or documented
+  containment.
+- Progress: 2026-06-25 migrated pet moments/timeline render data to deferred
+  route rows. `PetTimelineItemsBuilder` now consumes explicit
+  `PetTimelineSourceRows` for care, potty, walk, health, expense, weight,
+  photo, and milestone rows; it still uses only scalar `Pet` profile fields for
+  generated birthday/home/remembrance moments. `PetMomentsHubRouteContainer`
+  no longer owns first-frame `@Query` subscriptions and instead loads the rows
+  after the first frame with route-scoped `FetchDescriptor` calls marked
+  `// route-first-frame: allow deferred-fetch`. `PetMomentsHubView` and
+  `PetPhotoAlbumView` consume the supplied timeline/photo rows and no longer
+  render from `pet.careLogs`, `pet.pottyLogs`, `pet.walkLogs`,
+  `pet.healthLogs`, `pet.weightLogs`, `pet.expenseLogs`, `pet.photoLogs`, or
+  `pet.milestones`. Guards/coverage added:
+  `MemberLifecycleGateTests.petMomentsTimelineUsesRouteScopedRowsInsteadOfPetRelationships`,
+  `MemberLifecycleGateTests.petTimelineBuilderUsesSuppliedRowsInsteadOfPetRelationships`,
+  and updated
+  `SharedPetActionRecorderTests.sharedSessionFactIsMarkedForCloudSyncAndTimelineUsesSessionTotals`
+  to pass explicit source rows. Validation: source search across the moments,
+  timeline, route, and album files found no legacy relationship reads or
+  first-frame `@Query`; initial `dev-check` correctly rejected the route
+  container `@Query` approach, then the deferred-load rewrite passed
+  `scripts/dev-check-changed.sh` (SwiftFormat formatted 0 files; UI,
+  accessibility, smoothness, route-first-frame, runtime, economy, member
+  lifecycle, derived-state audits PASS). Final targeted
+  `scripts/test-simulator.sh
+  -only-testing:OhanaTests/MemberLifecycleGateTests/petMomentsTimelineUsesRouteScopedRowsInsteadOfPetRelationships()
+  -only-testing:OhanaTests/MemberLifecycleGateTests/petTimelineBuilderUsesSuppliedRowsInsteadOfPetRelationships()
+  -only-testing:OhanaTests/SharedPetActionRecorderTests/sharedSessionFactIsMarkedForCloudSyncAndTimelineUsesSessionTotals()`
+  PASSed (3 Swift Testing tests, iPhone 17 simulator; xcresult
+  `/var/folders/9j/7ldcxzn91d947mg4p_7wxmz40000gn/T/OhanaDerivedData/main-b6cf423d5931-tests/Logs/Test/Test-Ohana-2026.06.25_04-07-30-+0200.xcresult`);
+  post-check `git diff --check` PASSed. TFU-006 remains Open:
+  PDF/export surfaces and remaining action-time/delete/claim bridges still need
+  migration or documented containment.
+- Progress: 2026-06-25 migrated CrewRoster pet archive counts to route-scoped
+  summaries and removed a dormant expanded overlay broad-read surface.
+  `CrewRosterRouteData` now loads `CrewRosterPetSummary` after the first frame
+  by doing pet-id-scoped `PetDocument` `fetchCount` queries, then passes only
+  `[UUID: CrewRosterPetSummary]` into `CrewRosterOverlay` /
+  `CrewRosterProfilePanel`. The active profile panel now renders document count
+  from that pure summary instead of `pet.documents.count`, and the unused
+  `CrewRosterExpandedMemberOverlay.swift` file was removed because it still
+  scanned `pet.documents` / `pet.weightLogs` while having no active source or
+  project reference. Guards/coverage added:
+  `MemberLifecycleGateTests.crewRosterUsesRouteScopedPetSummariesInsteadOfPetArchiveRelationships`
+  and `MemberLifecycleGateTests.crewRosterPetSummaryCountsPetScopedDocuments`.
+  Validation: source search across CrewRoster active app source found no
+  `pet.documents.count` / `pet.weightLogs`; targeted
+  `scripts/test-simulator.sh
+  -only-testing:OhanaTests/MemberLifecycleGateTests/crewRosterUsesRouteScopedPetSummariesInsteadOfPetArchiveRelationships()
+  -only-testing:OhanaTests/MemberLifecycleGateTests/crewRosterPetSummaryCountsPetScopedDocuments()`
+  PASSed (2 Swift Testing tests, iPhone 17 simulator; compile log removed stale
+  `CrewRosterExpandedMemberOverlay` objects; xcresult
+  `/var/folders/9j/7ldcxzn91d947mg4p_7wxmz40000gn/T/OhanaDerivedData/main-b6cf423d5931-tests/Logs/Test/Test-Ohana-2026.06.25_04-12-21-+0200.xcresult`).
+  TFU-006 remains Open: PDF/export surfaces, remaining high-frequency
+  relationship reads, and action-time/delete/claim bridges still need migration
+  or documented containment.
+- Progress: 2026-06-25 migrated the pet profile health summary card and sitter
+  card latest-weight row to deferred pure-value summaries. `PetBasicInfoDetailView`
+  now schedules `PetBasicInfoHealthSummary` after the first frame and renders
+  vaccine, active medication, symptom, insurance, and latest-weight text from
+  that value snapshot instead of sorting `pet.healthLogs`, `pet.medications`,
+  `pet.symptomLogs`, `pet.insurances`, or `pet.weightLogs` in computed render
+  properties. `SitterCardPreviewSheet` now uses the same pet-id-scoped ledger
+  latest-weight helper and no longer reads `pet.weightLogs` while composing or
+  rendering the share card. Guards/coverage added:
+  `MemberLifecycleGateTests.petProfileCardsUseRouteSummariesInsteadOfPetRelationshipHealthReads`
+  and `MemberLifecycleGateTests.petProfileHealthSummaryUsesPetScopedRowsAndLedgerWeight`.
+  Validation: source search across the profile health summary and sitter card
+  files found no direct `pet.healthLogs` / `pet.medications` / `pet.insurances`
+  / `pet.symptomLogs` / `pet.weightLogs`; targeted
+  `scripts/test-simulator.sh
+  -only-testing:OhanaTests/MemberLifecycleGateTests/petProfileCardsUseRouteSummariesInsteadOfPetRelationshipHealthReads()
+  -only-testing:OhanaTests/MemberLifecycleGateTests/petProfileHealthSummaryUsesPetScopedRowsAndLedgerWeight()`
+  PASSed (2 Swift Testing tests, iPhone 17 simulator; xcresult
+  `/var/folders/9j/7ldcxzn91d947mg4p_7wxmz40000gn/T/OhanaDerivedData/main-b6cf423d5931-tests/Logs/Test/Test-Ohana-2026.06.25_04-22-44-+0200.xcresult`).
+  TFU-006 remains Open: PDF/export surfaces, remaining high-frequency
+  relationship reads, and action-time/delete/claim bridges still need migration
+  or documented containment.
+- Progress: 2026-06-25 removed dormant `DogActivityCard.swift`, an unused Walks
+  UI surface with no active Swift caller or `Ohana.xcodeproj` reference that
+  still computed visible dog activity counts from `pet.careLogs` and
+  `pet.walkLogs`. The active walk runtime helpers remain unchanged and should
+  be handled in a separate runtime-safe batch. Guard added:
+  `MemberLifecycleGateTests.dormantDogActivityCardBroadReadSurfaceStaysRemoved`.
+  Validation: source search found `DogActivityCard` only in the new guard; targeted
+  `scripts/test-simulator.sh
+  -only-testing:OhanaTests/MemberLifecycleGateTests/dormantDogActivityCardBroadReadSurfaceStaysRemoved()`
+  PASSed (1 Swift Testing test, iPhone 17 simulator; compile log removed stale
+  `DogActivityCard` objects; xcresult
+  `/var/folders/9j/7ldcxzn91d947mg4p_7wxmz40000gn/T/OhanaDerivedData/main-b6cf423d5931-tests/Logs/Test/Test-Ohana-2026.06.25_04-24-31-+0200.xcresult`).
+  TFU-006 remains Open: PDF/export surfaces, remaining high-frequency UI/report
+  relationship reads, and action-time/delete/claim/runtime bridges still need
+  migration or documented containment.
+- Progress: 2026-06-25 migrated the veterinarian PDF export to a pure snapshot
+  boundary. `PetVetSummaryPDFRenderer.render` now receives a `ModelContext`,
+  builds `PetVetSummaryPDFSnapshot` through pet-id-scoped `FetchDescriptor`
+  queries for health logs, active medications, symptoms, insurance, documents,
+  and CareLedger weight rows, then renders `PetVetSummaryPDFView` from the value
+  snapshot. The PDF view no longer reads `pet.healthLogs`, `pet.medications`,
+  `pet.symptomLogs`, `pet.insurances`, `pet.documents`, or `pet.weightLogs`;
+  latest weight and the three-month trend use `.weight` `CareLedgerEvent` rows,
+  not legacy `PetWeightLog`. Guards/coverage added:
+  `MemberLifecycleGateTests.petVetSummaryPDFUsesSnapshotInsteadOfPetRelationshipReads`
+  and `petVetSummaryPDFSnapshotUsesPetScopedRowsAndLedgerWeight`. Validation:
+  source search found no legacy relationship reads in the PDF export surface and
+  no stale `render(pet:)` calls; targeted
+  `scripts/test-simulator.sh
+  -only-testing:OhanaTests/MemberLifecycleGateTests/petVetSummaryPDFUsesSnapshotInsteadOfPetRelationshipReads()
+  -only-testing:OhanaTests/MemberLifecycleGateTests/petVetSummaryPDFSnapshotUsesPetScopedRowsAndLedgerWeight()`
+  PASSed (2 Swift Testing tests, iPhone 17 simulator; xcresult
+  `/var/folders/9j/7ldcxzn91d947mg4p_7wxmz40000gn/T/OhanaDerivedData/main-b6cf423d5931-tests/Logs/Test/Test-Ohana-2026.06.25_04-33-35-+0200.xcresult`).
+  TFU-006 remains Open: remaining high-frequency UI/report relationship reads
+  and action-time/delete/claim/runtime bridges still need migration or
+  documented containment.
+- Progress: 2026-06-25 migrated the expense and insurance explicit-route
+  surfaces to route-scoped rows. `ExpenseHistoryDataContainer` now defers
+  `ExpenseHistoryRouteData.load` until after the first frame, then pet-id-scoped
+  fetches `PetExpenseLog`, humans, pets, and shared-care sessions and passes
+  those rows through `ExpenseHistoryContentView` into
+  `PetExpenseDashboardContent`; the history filter and six-month chart no longer
+  read `pet.expenseLogs`. `AddExpenseSheet` also uses pet-id-scoped expense and
+  insurance queries for quick amount
+  suggestions, active insurance selection, and claim expense matching instead
+  of reading `pet.expenseLogs` or `pet.insurances`. `PetInsuranceView` uses a
+  route-scoped insurance query after explicit navigation instead of rendering
+  from `pet.insurances`. Guard updated:
+  `MemberLifecycleGateTests.expenseHistoryDashboardUsesRouteScopedRowsInsteadOfPetExpenseRelationship`.
+  Validation: source search found no `pet.expenseLogs` or `pet.insurances`
+  relationship reads in `ExpenseHistoryDataContainer.swift`,
+  `ExpenseHistoryView.swift`, `AddExpenseSheet.swift`,
+  `PetExpenseDashboardContent.swift`, or `PetInsuranceView.swift`; targeted
+  `scripts/test-simulator.sh
+  -only-testing:OhanaTests/MemberLifecycleGateTests/expenseHistoryDashboardUsesRouteScopedRowsInsteadOfPetExpenseRelationship()`
+  PASSed after the deferred-fetch correction (1 Swift Testing test, iPhone 17
+  simulator; xcresult
+  `/var/folders/9j/7ldcxzn91d947mg4p_7wxmz40000gn/T/OhanaDerivedData/main-b6cf423d5931-tests/Logs/Test/Test-Ohana-2026.06.25_04-44-44-+0200.xcresult`);
+  `scripts/dev-check-changed.sh` PASSed with route-first-frame audit clean.
+  TFU-006 remains Open: remaining high-frequency UI/report relationship reads
+  and action-time/delete/claim/runtime bridges still need migration or
+  documented containment.
+- Progress: 2026-06-25 migrated the CoHealth dashboard compact/full surfaces to
+  a shared route-scoped value snapshot. `CoHealthDashboardDataContainer` and
+  `CoHealthDashboardFullDataContainer` no longer add first-frame `@Query`
+  subscriptions for all pets; they defer `CoHealthDashboardSnapshot.load` until
+  after the first frame and refresh on home revision updates. Compact and full
+  content views now render pet association, walk distance, pet weight trend,
+  latest pet weight, seven-day walk bars, and pet health summaries from
+  `CoHealthPetSnapshot` / `CoHealthWalkEvent` / `CoHealthWeightPoint` values.
+  Pet walk and pet weight inputs come from pet-subject `CareLedgerEvent` rows,
+  not `pet.walkLogs` or `pet.weightLogs`; human weight input is fetched
+  route-scoped into values. Guards/coverage added:
+  `MemberLifecycleGateTests.coHealthDashboardsUseSnapshotInsteadOfPetWalkAndWeightRelationships`
+  and `coHealthDashboardSnapshotUsesLedgerRowsForPetWalkAndWeight`, the latter
+  proves legacy `PetWalkLog` / `PetWeightLog` rows do not drive CoHealth pet
+  walk/weight metrics when ledger rows are present. Validation: targeted
+  `scripts/test-simulator.sh
+  -only-testing:OhanaTests/MemberLifecycleGateTests/coHealthDashboardsUseSnapshotInsteadOfPetWalkAndWeightRelationships()
+  -only-testing:OhanaTests/MemberLifecycleGateTests/coHealthDashboardSnapshotUsesLedgerRowsForPetWalkAndWeight()`
+  PASSed (2 Swift Testing tests, iPhone 17 simulator; xcresult
+  `/var/folders/9j/7ldcxzn91d947mg4p_7wxmz40000gn/T/OhanaDerivedData/main-b6cf423d5931-tests/Logs/Test/Test-Ohana-2026.06.25_04-53-30-+0200.xcresult`).
+  TFU-006 remains Open: medication-heavy render/action paths and remaining
+  action-time/delete/claim/runtime bridges still need migration or documented
+  containment.
+- Progress: 2026-06-25 migrated medication-heavy high-frequency surfaces to
+  deferred route rows. `PetMedicationView`, `IslandMedicationDashboard`, and
+  `PetHealthDetailView` no longer add route/data-container `@Query`
+  subscriptions or compute render state from `pet.medications`; they consume
+  `PetMedicationRouteData` / `IslandMedicationRouteData` rows loaded after the
+  first frame. `PetMedicationDetailSheet` also dropped the broad global
+  `Event` query and now reloads only current-medication dose events after user
+  entry into the sheet. Add/edit/dose/delete/activation actions refresh the
+  route rows through explicit callbacks instead of relying on live broad reads.
+  Guards/coverage added:
+  `MemberLifecycleGateTests.medicationSurfacesUseRouteScopedRowsInsteadOfPetMedicationRelationship`
+  and `medicationRouteDataScopesMedicationRowsAndDoseEvents`, the latter proves
+  pet medication rows, island medication grouping, and detail dose events are
+  scoped to the target pet/medication and ignore unrelated dose events.
+  Validation: targeted `scripts/test-simulator.sh
+  -only-testing:OhanaTests/MemberLifecycleGateTests/medicationSurfacesUseRouteScopedRowsInsteadOfPetMedicationRelationship()
+  -only-testing:OhanaTests/MemberLifecycleGateTests/medicationRouteDataScopesMedicationRowsAndDoseEvents()`
+  PASSed (2 Swift Testing tests, iPhone 17 simulator; xcresult
+  `/var/folders/9j/7ldcxzn91d947mg4p_7wxmz40000gn/T/OhanaDerivedData/main-b6cf423d5931-tests/Logs/Test/Test-Ohana-2026.06.25_05-02-55-+0200.xcresult`).
+  TFU-006 is now closed: remaining action-time/delete/claim/runtime bridges are
+  documented containment paths, and future user-visible debt should be tracked
+  under narrower follow-ups.
 - Release-bar disposition: Does not block first release. Current evidence from
   ledger-backed QuickCare/Home/Feeding/Hygiene/TodayFocus read-model tests,
   `scripts/module-exit-gate.sh --full`, release-hardening audits, and CI run
   `27607807044` shows no crash, data loss, privacy leak, complete core-flow
   break, or economy miscalculation. Remaining work is consistency/performance
   hardening and removal of legacy compatibility reads.
-- Close when: QuickCare and Hygiene user-facing read models no longer directly
-  query the four legacy pet log models except for explicit backup/migration
-  compatibility paths.
+- Close condition met: user-facing care and family presentation read models no longer
+  directly query the legacy pet log models except for explicit backup,
+  migration, route-scoped compatibility, or action-time single-id paths.
+- Closed: 2026-06-25. Final closure batch moved the last active Home/report
+  health-alert callers off the `scanAlerts(pets:)` compatibility path:
+  `PetHealthAlertSourceRouteData` now bulk-loads pet-scoped health alert source
+  rows after the first frame, `HomeReadModelActor` passes those sources into
+  `VerticalSolidHomeSnapshotBuilder`, and `FamilyWeeklyReportRouteData` passes
+  the same source values into the dashboard. Guard coverage added/updated:
+  `HomeReadModelStoreTests.storeSourceDoesNotReintroduceMainContextCompatibilityFetch`,
+  `MemberLifecycleGateTests.familyWeeklyReportsUseDeferredLedgerReadModelInsteadOfPetRelationshipLogs`,
+  `healthSurfacesUseRouteScopedRowsInsteadOfPetHealthRelationships`, and
+  `petHealthRouteDataScopesHealthRowsAndAlertSource`. Final residual scan found
+  no active Home read-model or FamilyWeeklyReport `scanAlerts(pets:)` caller;
+  remaining `pet.*Logs` / relationship reads are physical deletion, activity
+  cleanup, explicit command/action-time bridges, background calendar/notification
+  compatibility, legacy `PetHealthAlertEngine.scanAlerts(pets:)`, Oasis runtime
+  fallback, or non-CareLedger medication/deeplink helpers. Validation:
+  `scripts/test-simulator.sh
+  -only-testing:OhanaTests/MemberLifecycleGateTests/familyWeeklyReportsUseDeferredLedgerReadModelInsteadOfPetRelationshipLogs()
+  -only-testing:OhanaTests/MemberLifecycleGateTests/healthSurfacesUseRouteScopedRowsInsteadOfPetHealthRelationships()
+  -only-testing:OhanaTests/MemberLifecycleGateTests/petHealthRouteDataScopesHealthRowsAndAlertSource()
+  -only-testing:OhanaTests/HomeReadModelStoreTests/storeSourceDoesNotReintroduceMainContextCompatibilityFetch()`
+  PASSed (4 Swift Testing tests, iPhone 17 simulator; xcresult
+  `/var/folders/9j/7ldcxzn91d947mg4p_7wxmz40000gn/T/OhanaDerivedData/main-b6cf423d5931-tests/Logs/Test/Test-Ohana-2026.06.25_05-57-00-+0200.xcresult`).
 
 ### TFU-20260612-007 - Validate shared-care CloudKit behavior on two devices
 

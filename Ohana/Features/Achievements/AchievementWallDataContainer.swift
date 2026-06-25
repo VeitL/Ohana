@@ -31,7 +31,9 @@ struct AchievementWallView: View {
             allHumans: routeData.allHumans,
             humanMedications: routeData.humanMedications,
             humanMedicationLogs: routeData.humanMedicationLogs,
-            allExpenseLogs: routeData.allExpenseLogs
+            allExpenseLogs: routeData.allExpenseLogs,
+            careLedgerEvents: routeData.careLedgerEvents,
+            petActivitySummaries: routeData.petActivitySummaries
         )
         .onAppear {
             scheduleRouteDataLoad()
@@ -65,6 +67,8 @@ private struct AchievementWallRouteData {
     var humanMedications: [HumanMedication] = []
     var humanMedicationLogs: [HumanMedicationLog] = []
     var allExpenseLogs: [PetExpenseLog] = []
+    var careLedgerEvents: [CareLedgerEvent] = []
+    var petActivitySummaries: [UUID: AchievementPetActivitySummary] = [:]
     var hasLoaded = false
 
     static func load(from context: ModelContext) -> AchievementWallRouteData {
@@ -114,8 +118,34 @@ private struct AchievementWallRouteData {
                 context: context,
                 name: "PetExpenseLog"
             ),
+            careLedgerEvents: fetchCareLedgerEvents(context: context),
+            petActivitySummaries: AchievementPetActivityRouteData.loadPetActivitySummaries(from: context),
             hasLoaded: true
         )
+    }
+
+    private static func fetchCareLedgerEvents(context: ModelContext) -> [CareLedgerEvent] {
+        let petSubjectKind = CareLedgerSubjectKind.pet.rawValue
+        return fetch(
+            FetchDescriptor<CareLedgerEvent>(
+                predicate: #Predicate<CareLedgerEvent> { event in
+                    event.subjectKind == petSubjectKind
+                },
+                sortBy: [SortDescriptor(\.occurredAt, order: .reverse)]
+            ),
+            context: context,
+            name: "CareLedgerEvent"
+        )
+        .filter(isAchievementLedgerEvent)
+    }
+
+    private nonisolated static func isAchievementLedgerEvent(_ event: CareLedgerEvent) -> Bool {
+        switch event.eventKindEnum {
+        case .care, .potty, .walk, .hygiene, .health, .weight, .expense, .medication, .milestone:
+            true
+        case .workout, .reminder, .plantCare, .coconut, .unknown:
+            false
+        }
     }
 
     private static func fetch<T: PersistentModel>(

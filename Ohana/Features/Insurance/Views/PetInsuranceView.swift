@@ -12,6 +12,7 @@ struct PetInsuranceView: View {
     let pet: Pet
     /// 嵌入「证件与保障」页时为 true：无 NavigationStack、无关闭按钮，内容不套外层 ScrollView
     var embedded: Bool = false
+    @Query private var routeInsurances: [PetInsurance] // smoothness: allow route-scoped insurance rows after explicit insurance navigation.
     @Environment(\.modelContext) private var modelContext
     @Environment(AppServices.self) private var appServices
     @Environment(\.dismiss) private var dismiss
@@ -20,8 +21,19 @@ struct PetInsuranceView: View {
     @State private var insuranceToEdit: PetInsurance?
     @StateObject private var commandQueue = DeferredDomainCommandQueue()
 
+    init(pet: Pet, embedded: Bool = false) {
+        self.pet = pet
+        self.embedded = embedded
+        let petID = pet.id
+        _routeInsurances = Query(
+            filter: #Predicate<PetInsurance> { insurance in
+                insurance.pet?.id == petID
+            }
+        )
+    }
+
     private var sorted: [PetInsurance] {
-        pet.insurances.sorted { $0.renewalDate > $1.renewalDate }
+        routeInsurances.sorted { $0.renewalDate > $1.renewalDate }
     }
 
     var body: some View {

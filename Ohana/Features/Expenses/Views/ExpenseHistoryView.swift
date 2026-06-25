@@ -10,11 +10,13 @@ import SwiftUI
 
 struct ExpenseHistoryContentView: View {
     let pet: Pet
+    let expenseLogs: [PetExpenseLog]
     let allHumans: [Human]
     let allPets: [Pet]
     let allSharedCareSessions: [SharedCareSession]
     var onRemove: (() -> Void)?
     var showsCloseButton: Bool = true
+    var onDataChanged: (() -> Void)?
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
     @Environment(AppServices.self) private var appServices
@@ -40,7 +42,7 @@ struct ExpenseHistoryContentView: View {
     private var filteredLogs: [PetExpenseLog] {
         let cal = Calendar.current
         let now = Date()
-        return pet.expenseLogs.filter { log in
+        return expenseLogs.filter { log in
             switch selectedRange {
             case .week:
                 cal.isDate(log.date, equalTo: now, toGranularity: .weekOfYear)
@@ -105,7 +107,7 @@ struct ExpenseHistoryContentView: View {
     private var last6MonthsData: [(String, Double)] {
         (0 ..< 6).map { offset in
             guard let month = Calendar.current.date(byAdding: .month, value: -(5 - offset), to: Date()) else { return ("", 0) }
-            let total = pet.expenseLogs.filter {
+            let total = expenseLogs.filter {
                 Calendar.current.isDate($0.date, equalTo: month, toGranularity: .month)
             }.reduce(0.0) { $0 + $1.amount }
             let label = month.formatted(.dateTime.month(.abbreviated))
@@ -117,6 +119,7 @@ struct ExpenseHistoryContentView: View {
         ZStack {
             PetExpenseDashboardContent(
                 pet: pet,
+                expenseLogs: expenseLogs,
                 allHumans: allHumans,
                 allSharedCareSessions: allSharedCareSessions,
                 showsCloseButton: showsCloseButton,
@@ -136,6 +139,9 @@ struct ExpenseHistoryContentView: View {
                     humans: allHumans,
                     allPets: allPets,
                     preselectedPayerId: selectedPayerId ?? currentActiveHumanId,
+                    onSaved: {
+                        onDataChanged?()
+                    },
                     onDismiss: {
                         withAnimation(GoMotion.feedback) {
                             showingExpensePopup = false
@@ -624,6 +630,7 @@ struct ExpenseHistoryContentView: View {
                 command: command,
                 revisionNote: "dashboard.expense.entry"
             )
+            onDataChanged?()
         }
     }
 }

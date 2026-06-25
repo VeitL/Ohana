@@ -10,6 +10,7 @@ import SwiftUI
 
 struct PetExpenseDashboardContent: View {
     let pet: Pet
+    let expenseLogs: [PetExpenseLog]
     let allHumans: [Human]
     var allSharedCareSessions: [SharedCareSession] = []
     var showsCloseButton = true
@@ -26,7 +27,7 @@ struct PetExpenseDashboardContent: View {
     @StateObject private var commandQueue = DeferredDomainCommandQueue()
 
     private var l: L10n { L10n(appLanguage) }
-    private var baseLogs: [PetExpenseLog] { ExpenseSummaryBuilder.sortedRecent(pet.expenseLogs) }
+    private var baseLogs: [PetExpenseLog] { ExpenseSummaryBuilder.sortedRecent(expenseLogs) }
     private var filteredLogs: [PetExpenseLog] {
         ExpenseSummaryBuilder.logs(
             ExpenseSummaryBuilder.logs(baseLogs, in: selectedRange),

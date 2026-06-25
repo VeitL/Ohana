@@ -68,37 +68,46 @@ enum IslandLevel: Int, CaseIterable {
 }
 
 enum IslandProsperityManager {
-    /// 根据 SwiftData 中所有记录的总条数计算当前等级
-    static func level(pets: [Pet]) -> IslandLevel {
-        let total = totalLogCount(pets: pets)
+    /// 根据已投影的记录总条数计算当前等级。
+    static func level(totalLogCount total: Int) -> IslandLevel {
         switch total {
-        case ..<50: return .seedling
-        case 50 ..< 200: return .blooming
-        default: return .paradise
+        case ..<50: .seedling
+        case 50 ..< 200: .blooming
+        default: .paradise
         }
     }
 
-    static func totalLogCount(pets: [Pet]) -> Int {
-        pets.reduce(0) { acc, pet in
-            acc
-                + pet.walkLogs.count
-                + pet.pottyLogs.count
-                + pet.hygieneLogs.count
-                + pet.healthLogs.count
-                + pet.weightLogs.count
-                + pet.foodRecords.count
-                + pet.milestones.count
+    static func level(events: [CareLedgerEvent], petIDs: Set<String>? = nil) -> IslandLevel {
+        level(totalLogCount: totalLogCount(events: events, petIDs: petIDs))
+    }
+
+    static func totalLogCount(events: [CareLedgerEvent], petIDs: Set<String>? = nil) -> Int {
+        events.count { event in
+            guard event.subjectKind == CareLedgerSubjectKind.pet.rawValue,
+                  petIDs.map({ ids in event.subjectId.map { ids.contains($0) } == true }) ?? true
+            else {
+                return false
+            }
+            switch event.eventKindEnum {
+            case .care, .potty, .walk, .hygiene, .health, .weight, .expense, .medication:
+                return true
+            case .reminder, .plantCare, .coconut, .workout, .milestone, .unknown:
+                return false
+            }
         }
     }
 
     /// 当前等级进度（0~1），用于进度条展示
-    static func progress(pets: [Pet]) -> Double {
-        let total = totalLogCount(pets: pets)
-        let lv = level(pets: pets)
+    static func progress(totalLogCount total: Int) -> Double {
+        let lv = level(totalLogCount: total)
         switch lv {
         case .seedling: return min(Double(total) / 50.0, 1.0)
         case .blooming: return min(Double(total - 50) / 150.0, 1.0)
         case .paradise: return 1.0
         }
+    }
+
+    static func progress(events: [CareLedgerEvent], petIDs: Set<String>? = nil) -> Double {
+        progress(totalLogCount: totalLogCount(events: events, petIDs: petIDs))
     }
 }

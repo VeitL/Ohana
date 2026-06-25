@@ -7,11 +7,7 @@
 //  展示当天对该宠物发生过动作的家庭成员头像 + 动作徽章，让用户一眼看到
 //  「今天谁给 TA 做了什么」。
 //
-//  数据来源（均含 executorId 字段）：
-//  - PetCareLog（喂食 / 喂水 / 换水 / 滤材 / 铲屎 / 逗玩 / ...）
-//  - PetPottyLog（便便 / 尿尿）
-//  - PetWalkLog（遛狗）
-//  - PetExpenseLog（花费）
+//  数据来源：route container 将 CareLedgerEvent 投影成 FamilyActivityEntry。
 //
 //  去重规则：同一(humanId, 动作类别) 取最新一条，最多展示 8 条。
 //  空态：当日无数据 → 渲染 EmptyView，避免首页冗余。
@@ -19,9 +15,90 @@
 
 import SwiftUI
 
+struct FamilyActivityEntry: Identifiable, Equatable {
+    let id: String
+    let date: Date
+    let executorId: String?
+    let iconName: String
+    let accentHex: String
+    let dedupKey: String
+
+    static func entries(
+        from ledgerEvents: [CareLedgerEvent],
+        petID: UUID,
+        calendar: Calendar = .current,
+        now: Date = Date()
+    ) -> [FamilyActivityEntry] {
+        let dayStart = calendar.startOfDay(for: now)
+        let dayEnd = calendar.date(byAdding: .day, value: 1, to: dayStart) ?? now
+        return FamilyCareLedgerEntry.entries(
+            from: ledgerEvents,
+            petIDs: [petID],
+            start: dayStart,
+            end: dayEnd
+        )
+        .flatMap { Self.entries(from: $0) }
+    }
+
+    private static func entries(from entry: FamilyCareLedgerEntry) -> [FamilyActivityEntry] {
+        switch entry.kind {
+        case .care:
+            guard let type = CareType(rawValue: entry.actionType) else { return [] }
+            return expandedEntries(
+                from: entry,
+                iconName: type.systemIconName,
+                accentHex: type.accentColorHex,
+                dedupKind: "care_\(type.rawValue)"
+            )
+        case .potty:
+            guard let type = PottyType(rawValue: entry.actionType) else { return [] }
+            return expandedEntries(
+                from: entry,
+                iconName: type.systemIconName,
+                accentHex: "FFD93D",
+                dedupKind: "potty"
+            )
+        case .walk:
+            return expandedEntries(
+                from: entry,
+                iconName: "figure.walk",
+                accentHex: "7FFF6B",
+                dedupKind: "walk"
+            )
+        case .expense:
+            return expandedEntries(
+                from: entry,
+                iconName: "creditcard.fill",
+                accentHex: "FF6B6B",
+                dedupKind: "expense"
+            )
+        }
+    }
+
+    private static func expandedEntries(
+        from entry: FamilyCareLedgerEntry,
+        iconName: String,
+        accentHex: String,
+        dedupKind: String
+    ) -> [FamilyActivityEntry] {
+        let executorIds = entry.executorIDs.isEmpty ? [nil] : entry.executorIDs.map(Optional.some)
+        return executorIds.enumerated().map { index, executorId in
+            FamilyActivityEntry(
+                id: "\(entry.id.uuidString)-\(index)-\(executorId ?? "unknown")",
+                date: entry.date,
+                executorId: executorId,
+                iconName: iconName,
+                accentHex: accentHex,
+                dedupKey: "\(executorId ?? "nil")_\(dedupKind)"
+            )
+        }
+    }
+}
+
 struct FamilyActivityStripView: View {
-    let pet: Pet
+    let petName: String
     let humans: [Human]
+    let entries: [FamilyActivityEntry]
     /// 展示样式
     /// - `.full`：原有大条带（头像 + 徽章 + 姓名，约 80pt）
     /// - `.compact`：小胶囊模式（约 30pt），点击展开完整 Sheet
@@ -34,66 +111,12 @@ struct FamilyActivityStripView: View {
     @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
     private var l: L10n { L10n(appLanguage) }
 
-    // MARK: - Entry model
-
-    private struct ActivityEntry: Identifiable {
-        let id = UUID()
-        let date: Date
-        let executorId: String?
-        let iconName: String // SF Symbol
-        let accent: Color // 徽章底色
-        let dedupKey: String
-    }
-
     // MARK: - Data
 
-    private var todayEntries: [ActivityEntry] {
-        let cal = Calendar.current
-        let today = Date()
-        var entries: [ActivityEntry] = []
-
-        for log in pet.careLogs where cal.isDate(log.date, inSameDayAs: today) {
-            entries.append(ActivityEntry(
-                date: log.date,
-                executorId: log.executorId,
-                iconName: log.careType.systemIconName,
-                accent: Color(hex: log.careType.accentColorHex),
-                dedupKey: "\(log.executorId ?? "nil")_care_\(log.type)"
-            ))
-        }
-        for log in pet.pottyLogs where cal.isDate(log.date, inSameDayAs: today) {
-            entries.append(ActivityEntry(
-                date: log.date,
-                executorId: log.executorId,
-                iconName: log.pottyType.systemIconName,
-                accent: Color(hex: "FFD93D"),
-                dedupKey: "\(log.executorId ?? "nil")_potty"
-            ))
-        }
-        for log in pet.walkLogs where cal.isDate(log.startDate, inSameDayAs: today) {
-            for executorId in log.executorIds {
-                entries.append(ActivityEntry(
-                    date: log.startDate,
-                    executorId: executorId,
-                    iconName: "figure.walk",
-                    accent: Color(hex: "7FFF6B"),
-                    dedupKey: "\(executorId)_walk"
-                ))
-            }
-        }
-        for log in pet.expenseLogs where cal.isDate(log.date, inSameDayAs: today) {
-            entries.append(ActivityEntry(
-                date: log.date,
-                executorId: log.executorId,
-                iconName: "creditcard.fill",
-                accent: Color(hex: "FF6B6B"),
-                dedupKey: "\(log.executorId ?? "nil")_expense"
-            ))
-        }
-
+    private var todayEntries: [FamilyActivityEntry] {
         let sorted = entries.sorted { $0.date > $1.date }
         var seen: Set<String> = []
-        var deduped: [ActivityEntry] = []
+        var deduped: [FamilyActivityEntry] = []
         for e in sorted where seen.insert(e.dedupKey).inserted {
             deduped.append(e)
         }
@@ -136,7 +159,7 @@ struct FamilyActivityStripView: View {
     // MARK: - Compact Pill
 
     @ViewBuilder
-    private func compactPill(entries: [ActivityEntry]) -> some View {
+    private func compactPill(entries: [FamilyActivityEntry]) -> some View {
         let uniqueHumans = uniqueHumanList(from: entries)
         Button(action: onExpand) {
             HStack(spacing: 8) {
@@ -173,7 +196,7 @@ struct FamilyActivityStripView: View {
         .padding(.horizontal, 20)
     }
 
-    private func uniqueHumanList(from entries: [ActivityEntry]) -> [Human] {
+    private func uniqueHumanList(from entries: [FamilyActivityEntry]) -> [Human] {
         var seen = Set<String>()
         var list: [Human] = []
         for e in entries {
@@ -189,9 +212,9 @@ struct FamilyActivityStripView: View {
         if uniqueCount == 0 {
             l.tr(zh: "今天 \(actionCount) 次记录", en: "\(actionCount) records today", de: "\(actionCount) Einträge heute")
         } else if uniqueCount == 1 {
-            l.tr(zh: "今天已照顾 \(pet.name) \(actionCount) 次", en: "\(pet.name) cared for \(actionCount)x today", de: "\(pet.name) heute \(actionCount)x versorgt")
+            l.tr(zh: "今天已照顾 \(petName) \(actionCount) 次", en: "\(petName) cared for \(actionCount)x today", de: "\(petName) heute \(actionCount)x versorgt")
         } else {
-            l.tr(zh: "全家今日一起照顾 \(pet.name) \(actionCount) 次", en: "Family cared for \(pet.name) \(actionCount)x today", de: "Familie hat \(pet.name) heute \(actionCount)x versorgt")
+            l.tr(zh: "全家今日一起照顾 \(petName) \(actionCount) 次", en: "Family cared for \(petName) \(actionCount)x today", de: "Familie hat \(petName) heute \(actionCount)x versorgt")
         }
     }
 
@@ -211,7 +234,7 @@ struct FamilyActivityStripView: View {
         HStack(spacing: 6) {
             Image(systemName: "person.2.fill") // a11y: allow decorative icon covered by surrounding text or control
                 .font(OhanaFont.adaptive(size: 10, weight: .bold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-            Text(l.tr(zh: "今日 · 谁在照顾 \(pet.name)", en: "Today · Who cared for \(pet.name)", de: "Heute · Wer versorgt \(pet.name)"))
+            Text(l.tr(zh: "今日 · 谁在照顾 \(petName)", en: "Today · Who cared for \(petName)", de: "Heute · Wer versorgt \(petName)"))
                 .font(OhanaFont.adaptive(size: 11, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .tracking(0.4)
             Spacer(minLength: 0)
@@ -221,7 +244,7 @@ struct FamilyActivityStripView: View {
     }
 
     @ViewBuilder
-    private func chip(for entry: ActivityEntry) -> some View {
+    private func chip(for entry: FamilyActivityEntry) -> some View {
         let h = human(for: entry.executorId)
         let name = h.map { $0.name.trimmingCharacters(in: .whitespaces) } ?? ""
         let display = name.isEmpty ? (h == nil ? l.tr(zh: "未指定", en: "Unassigned", de: "Nicht zugewiesen") : l.tr(zh: "家人", en: "Family", de: "Familie")) : name
@@ -229,7 +252,7 @@ struct FamilyActivityStripView: View {
         VStack(spacing: 4) {
             ZStack(alignment: .bottomTrailing) {
                 avatarCircle(for: h)
-                badge(icon: entry.iconName, accent: entry.accent)
+                badge(icon: entry.iconName, accent: Color(hex: entry.accentHex))
                     .offset(x: 4, y: 4)
             }
             Text(display)

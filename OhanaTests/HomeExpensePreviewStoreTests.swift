@@ -421,6 +421,40 @@ struct HomeExpensePreviewStoreTests {
         #expect(readModelAttention == true)
     }
 
+    @Test func waterCareCycleStatusIgnoresLegacyCareLogRelationshipWithoutSnapshot() throws {
+        let calendar = Calendar(identifier: .gregorian)
+        let now = try #require(calendar.date(from: DateComponents(year: 2026, month: 6, day: 8, hour: 14)))
+        let recentAnchor = try #require(calendar.date(from: DateComponents(year: 2026, month: 6, day: 8, hour: 9)))
+        let oldWaterChange = try #require(calendar.date(from: DateComponents(year: 2026, month: 6, day: 3, hour: 9)))
+        let pet = Pet(name: "Nemo", species: "鱼")
+        WaterCareSettingsStore.saveWaterSettings(
+            petKey: pet.id.uuidString,
+            intervalDays: 3,
+            reminderOn: true,
+            cycleAnchor: recentAnchor
+        )
+        pet.careLogs.append(PetCareLog(date: oldWaterChange, type: .waterChange, pet: pet))
+
+        let implicitStatus = try #require(WaterCareCycleStatusCalculator.waterChangeStatus(
+            for: pet,
+            now: now,
+            calendar: calendar
+        ))
+        let readModelStatus = try #require(WaterCareCycleStatusCalculator.waterChangeStatus(
+            for: pet,
+            now: now,
+            calendar: calendar,
+            logSnapshot: WaterCareCycleLogSnapshot(
+                latestWaterChangeDate: oldWaterChange,
+                latestFilterCleanDate: nil
+            )
+        ))
+
+        #expect(implicitStatus.isOverdue == false)
+        #expect(readModelStatus.isOverdue == true)
+        #expect(readModelStatus.overdueDays == 2)
+    }
+
     @Test func expandedGroomQuickActionUsesHygieneLedgerEntriesForCompletion() throws {
         let calendar = Calendar(identifier: .gregorian)
         let now = try #require(calendar.date(from: DateComponents(year: 2026, month: 6, day: 8, hour: 15)))
@@ -855,6 +889,71 @@ struct HomeExpensePreviewStoreTests {
         ])
     }
 
+    @Test func quickCareDeleteBridgesUseActionTimeIdFetches() throws {
+        let rootURL = repositoryRootURL()
+        let routeContainer = try source("Ohana/Features/QuickCare/QuickCareRouteContainer.swift", rootURL: rootURL)
+        let playSheet = try source("Ohana/Features/QuickCare/Views/QuickPlayDetailSheet.swift", rootURL: rootURL)
+        let waterSheet = try source("Ohana/Features/QuickCare/Views/QuickWaterDetailSheet.swift", rootURL: rootURL)
+        let waterLogic = try source("Ohana/Features/QuickCare/Views/QuickWaterDetailSheet+Logic.swift", rootURL: rootURL)
+        let pottySheet = try source("Ohana/Features/QuickCare/Views/QuickPottyDetailSheet.swift", rootURL: rootURL)
+        let pottyLogic = try source("Ohana/Features/QuickCare/Views/QuickPottyDetailSheet+Logic.swift", rootURL: rootURL)
+        let hygieneContainer = try source("Ohana/Features/Hygiene/PetHygieneDetailDataContainer.swift", rootURL: rootURL)
+        let hygieneView = try source("Ohana/Features/Hygiene/Views/PetHygieneDetailView.swift", rootURL: rootURL)
+
+        #expect(!routeContainer.contains("legacyPlayDeleteLogs"))
+        #expect(!routeContainer.contains("legacyWaterDeleteLogs"))
+        #expect(!routeContainer.contains("legacyPottyDeleteLogs"))
+        #expect(!routeContainer.contains("legacyLitterDeleteLogs"))
+
+        #expect(!playSheet.contains("legacyPlayDeleteLogs"))
+        #expect(!playSheet.contains("legacyPlayDeleteLog(for"))
+        #expect(playSheet.contains("executor.careLog(id: legacyLogId)"))
+
+        #expect(!waterSheet.contains("legacyWaterDeleteLogs"))
+        #expect(!waterLogic.contains("legacyWaterDeleteLog(for"))
+        #expect(waterLogic.contains("deleteLogBusiness(id:"))
+        #expect(waterLogic.contains("commandExecutor.careLog(id: id)"))
+
+        #expect(!pottySheet.contains("legacyPottyDeleteLogs"))
+        #expect(!pottySheet.contains("legacyLitterDeleteLogs"))
+        #expect(!pottyLogic.contains("legacyPottyDeleteLog(for"))
+        #expect(!pottyLogic.contains("legacyLitterDeleteLog(for"))
+        #expect(pottyLogic.contains("executor.pottyLog(id: logId)"))
+        #expect(pottyLogic.contains("executor.careLog(id: logId)"))
+
+        #expect(!hygieneContainer.contains("legacyDeleteLogs"))
+        #expect(!hygieneContainer.contains("@Query private var legacyDeleteLogs"))
+        #expect(!hygieneView.contains("legacyDeleteLogs"))
+        #expect(hygieneView.contains("executor.hygieneLog(id: logId)"))
+    }
+
+    @Test func quickPottyUnknownClaimUsesRoutePureEntriesAndActionTimeFetches() throws {
+        let rootURL = repositoryRootURL()
+        let routeContainer = try source("Ohana/Features/QuickCare/QuickCareRouteContainer.swift", rootURL: rootURL)
+        let pottySheet = try source("Ohana/Features/QuickCare/Views/QuickPottyDetailSheet.swift", rootURL: rootURL)
+        let pottyLogic = try source("Ohana/Features/QuickCare/Views/QuickPottyDetailSheet+Logic.swift", rootURL: rootURL)
+        let pottyComponents = try source("Ohana/Features/QuickCare/Views/QuickPottyDetailComponents.swift", rootURL: rootURL)
+        let unknownStore = try source("Ohana/Features/QuickCare/QuickPottyUnknownClaimStore.swift", rootURL: rootURL)
+
+        #expect(routeContainer.contains("unknownPottyEntries: QuickPottyUnknownClaimStore.entries"))
+        #expect(pottySheet.contains("let unknownPottyEntries: [PoopUnknownPottyEntry]"))
+        #expect(pottySheet.contains("unknownPottyEntries.map(PoopLogItem.unknownPotty)"))
+        #expect(!pottySheet.contains("QuickPottyUnknownClaimStore.items"))
+        #expect(!pottySheet.contains("items(for: pet, context: modelContext)"))
+
+        #expect(pottyComponents.contains("case unknownPotty(PoopUnknownPottyEntry)"))
+        #expect(!pottyComponents.contains("case unknownPotty(PetPottyLog"))
+        #expect(!pottyComponents.contains("var claimablePottyLog: PetPottyLog?"))
+        #expect(pottyComponents.contains("var claimablePottyLogId: UUID?"))
+        #expect(pottyComponents.contains("var onClaim: ((UUID, Pet) -> Void)?"))
+
+        #expect(unknownStore.contains("static func entries(for petID: UUID"))
+        #expect(unknownStore.contains("PoopUnknownPottyEntry("))
+        #expect(pottyLogic.contains("func claimUnknownPotty(_ logId: UUID, target: Pet)"))
+        #expect(pottyLogic.contains("executor.pottyLog(id: logId)"))
+        #expect(pottyLogic.contains("executor.pottyLog(id: entry.id)"))
+    }
+
     private func expenseLedger(date: Date, amount: Double, actorId: String) -> CareLedgerEvent {
         CareLedgerEvent(
             occurredAt: date,
@@ -869,6 +968,16 @@ struct HomeExpensePreviewStoreTests {
             source: .service,
             legacyModelName: "PetExpenseLog"
         )
+    }
+
+    private func repositoryRootURL() -> URL {
+        URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+    }
+
+    private func source(_ path: String, rootURL: URL) throws -> String {
+        try String(contentsOf: rootURL.appendingPathComponent(path), encoding: .utf8)
     }
 
     private func makeContainer() throws -> ModelContainer {

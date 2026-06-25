@@ -32,7 +32,7 @@ struct IslandFoodDashboard: View {
             pets: routeData.pets,
             allEvents: routeData.allEvents,
             allFeedingLedgerEntries: routeData.allFeedingLedgerEntries,
-            legacyStockCareLogs: routeData.legacyStockCareLogs,
+            allStockFeedingLedgerEntries: routeData.allStockFeedingLedgerEntries,
             allFoodRecords: routeData.allFoodRecords,
             allSharedCareSessions: routeData.allSharedCareSessions
         )
@@ -62,7 +62,7 @@ private struct IslandFoodDashboardRouteData {
     var pets: [Pet] = []
     var allEvents: [Event] = []
     var allFeedingLedgerEntries: [FoodLedgerEntry] = []
-    var legacyStockCareLogs: [PetCareLog] = []
+    var allStockFeedingLedgerEntries: [QuickFeedLedgerEntry] = []
     var allFoodRecords: [PetFoodRecord] = []
     var allSharedCareSessions: [SharedCareSession] = []
     var hasLoaded = false
@@ -73,6 +73,19 @@ private struct IslandFoodDashboardRouteData {
         let feedingCareType = CareType.feeding.rawValue
         let sharedFeedingKind = SharedCareActionKind.feeding.rawValue
         let careLogWindowStart = Calendar.current.date(byAdding: .day, value: -730, to: Date()) ?? .distantPast
+        let pets = fetch(
+            FetchDescriptor<Pet>(
+                predicate: #Predicate<Pet> { $0.passedAwayDate == nil },
+                sortBy: [SortDescriptor(\.name)]
+            ),
+            context: context,
+            name: "Pet"
+        )
+        let allEvents = fetch(
+            FetchDescriptor<Event>(sortBy: [SortDescriptor(\.startDate)]),
+            context: context,
+            name: "Event"
+        )
         let feedingLedgerEvents = fetch(
             FetchDescriptor<CareLedgerEvent>(
                 predicate: #Predicate<CareLedgerEvent> { event in
@@ -88,31 +101,18 @@ private struct IslandFoodDashboardRouteData {
         )
 
         return IslandFoodDashboardRouteData(
-            pets: fetch(
-                FetchDescriptor<Pet>(
-                    predicate: #Predicate<Pet> { $0.passedAwayDate == nil },
-                    sortBy: [SortDescriptor(\.name)]
-                ),
-                context: context,
-                name: "Pet"
-            ),
-            allEvents: fetch(
-                FetchDescriptor<Event>(sortBy: [SortDescriptor(\.startDate)]),
-                context: context,
-                name: "Event"
-            ),
+            pets: pets,
+            allEvents: allEvents,
             allFeedingLedgerEntries: FoodLedgerEntry.entries(from: feedingLedgerEvents),
-            legacyStockCareLogs: fetch(
-                FetchDescriptor<PetCareLog>(
-                    predicate: #Predicate<PetCareLog> { log in
-                        log.type == feedingCareType &&
-                            log.date >= careLogWindowStart
-                    },
-                    sortBy: [SortDescriptor(\.date, order: .reverse)]
-                ),
-                context: context,
-                name: "PetCareLog"
-            ),
+            allStockFeedingLedgerEntries: pets.flatMap { pet in
+                QuickFeedLedgerEntry.entries(
+                    pet: pet,
+                    feedingLedgerEvents: feedingLedgerEvents,
+                    legacyCareLogs: [],
+                    manualPlanEvents: allEvents,
+                    autoFeederEvents: allEvents
+                )
+            },
             allFoodRecords: fetch(
                 FetchDescriptor<PetFoodRecord>(
                     predicate: #Predicate<PetFoodRecord> { $0.pet?.passedAwayDate == nil },

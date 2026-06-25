@@ -1896,6 +1896,1857 @@ struct MemberLifecycleGateTests {
         #expect(!HumanAllFeatureDestination.wishlist.isAvailableInMemorialMode)
     }
 
+    @Test func petAllFeaturesUsesRouteScopedActivitySummaryInsteadOfPetRelationshipCareLogs() throws {
+        let rootURL = repositoryRootURL()
+        let sheetSource = try source("Ohana/Features/Members/Views/PetAllFeaturesSheet.swift", rootURL: rootURL)
+        let routeSource = try source("Ohana/Features/Members/PetDetailSheetRouteContainer.swift", rootURL: rootURL)
+        let sheetViewSource = try #require(sheetSource.components(separatedBy: "enum ArchiveMemoryNextStepKind").first)
+
+        #expect(!sheetViewSource.contains("pet.careLogs"))
+        #expect(!sheetViewSource.contains("pet.pottyLogs"))
+        #expect(!sheetViewSource.contains("pet.walkLogs"))
+        #expect(!sheetViewSource.contains("pet.weightLogs"))
+        #expect(!sheetViewSource.contains("pet.expenseLogs"))
+        #expect(!sheetViewSource.contains("pet.healthLogs"))
+        #expect(!sheetViewSource.contains("pet.photoLogs"))
+        #expect(!sheetViewSource.contains("pet.milestones"))
+        #expect(!sheetViewSource.contains("activeCareLogs"))
+        #expect(!sheetViewSource.contains("activePottyLogs"))
+        #expect(!sheetViewSource.contains("activeWalkLogs"))
+        #expect(!sheetViewSource.contains("activeWeightLogs"))
+        #expect(!sheetViewSource.contains("activeExpenseLogs"))
+        #expect(!sheetViewSource.contains("activeHealthLogs"))
+        #expect(!sheetViewSource.contains("activePhotoLogs"))
+        #expect(!sheetViewSource.contains("activeMilestones"))
+        #expect(!sheetSource.contains("FetchDescriptor<PetCareLog>"))
+        #expect(!sheetSource.contains("FetchDescriptor<PetPottyLog>"))
+        #expect(!sheetSource.contains("FetchDescriptor<PetWalkLog>"))
+        #expect(sheetSource.contains("FetchDescriptor<CareLedgerEvent>"))
+        #expect(sheetSource.contains("ArchiveMemorySnapshot(pet: pet, activitySummary: activitySummary)"))
+        #expect(sheetSource.contains("struct PetAllFeaturesActivitySummary"))
+        #expect(sheetSource.contains("try context.fetchCount"))
+        #expect(routeSource.contains("@State private var allFeaturesActivitySummary"))
+        #expect(routeSource.contains("PetAllFeaturesActivitySummary.load(petID: petID, context: modelContext)"))
+        #expect(routeSource.contains("OhanaFrameScheduler.runAfterNextFrame"))
+    }
+
+    @Test func petAllFeaturesActivitySummaryUsesLedgerAndRouteScopedCounts() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let calendar = Calendar(identifier: .gregorian)
+        let now = try #require(calendar.date(from: DateComponents(year: 2026, month: 6, day: 25, hour: 12)))
+        let todayStart = calendar.startOfDay(for: now)
+        let pet = Pet(name: "Momo", species: "狗")
+        let otherPet = Pet(name: "Nori", species: "猫")
+        context.insert(pet)
+        context.insert(otherPet)
+
+        context.insert(PetCareLog(date: now, type: .feeding, amountGrams: 999, pet: pet))
+        context.insert(PetPottyLog(date: now, type: .pee, pet: pet))
+        context.insert(PetWalkLog(startDate: now, pet: pet))
+
+        context.insert(CareLedgerEvent(
+            occurredAt: todayStart.addingTimeInterval(3600),
+            actorKind: .human,
+            actorId: "human-a",
+            subjectKind: .pet,
+            subjectId: pet.id.uuidString,
+            eventKind: .care,
+            actionType: CareType.feeding.rawValue,
+            amountValue: 42
+        ))
+        context.insert(CareLedgerEvent(
+            occurredAt: todayStart.addingTimeInterval(4200),
+            actorKind: .human,
+            actorId: "human-a",
+            subjectKind: .pet,
+            subjectId: pet.id.uuidString,
+            eventKind: .care,
+            actionType: CareType.play.rawValue
+        ))
+        context.insert(CareLedgerEvent(
+            occurredAt: todayStart.addingTimeInterval(-86400),
+            actorKind: .human,
+            actorId: "human-a",
+            subjectKind: .pet,
+            subjectId: pet.id.uuidString,
+            eventKind: .care,
+            actionType: CareType.watering.rawValue
+        ))
+        context.insert(CareLedgerEvent(
+            occurredAt: todayStart.addingTimeInterval(5000),
+            actorKind: .human,
+            actorId: "human-a",
+            subjectKind: .pet,
+            subjectId: pet.id.uuidString,
+            eventKind: .potty,
+            actionType: PottyType.pee.rawValue
+        ))
+        context.insert(CareLedgerEvent(
+            occurredAt: todayStart.addingTimeInterval(6000),
+            actorKind: .human,
+            actorId: "human-a",
+            subjectKind: .pet,
+            subjectId: pet.id.uuidString,
+            eventKind: .walk,
+            actionType: "walk",
+            amountValue: 1200
+        ))
+        context.insert(CareLedgerEvent(
+            occurredAt: todayStart.addingTimeInterval(-2 * 86400),
+            actorKind: .human,
+            actorId: "human-a",
+            subjectKind: .pet,
+            subjectId: pet.id.uuidString,
+            eventKind: .walk,
+            actionType: "walk",
+            amountValue: 800
+        ))
+        context.insert(CareLedgerEvent(
+            occurredAt: todayStart.addingTimeInterval(7000),
+            actorKind: .human,
+            actorId: "human-a",
+            subjectKind: .pet,
+            subjectId: pet.id.uuidString,
+            eventKind: .health,
+            actionType: HealthLogType.checkup.rawValue
+        ))
+        context.insert(CareLedgerEvent(
+            occurredAt: todayStart.addingTimeInterval(-7000),
+            actorKind: .human,
+            actorId: "human-a",
+            subjectKind: .pet,
+            subjectId: pet.id.uuidString,
+            eventKind: .weight,
+            actionType: "petWeight",
+            amountValue: 4.2
+        ))
+        context.insert(CareLedgerEvent(
+            occurredAt: todayStart.addingTimeInterval(8000),
+            actorKind: .human,
+            actorId: "human-a",
+            subjectKind: .pet,
+            subjectId: pet.id.uuidString,
+            eventKind: .weight,
+            actionType: "petWeight",
+            amountValue: 4.8
+        ))
+        context.insert(CareLedgerEvent(
+            occurredAt: todayStart.addingTimeInterval(9000),
+            actorKind: .human,
+            actorId: "human-a",
+            subjectKind: .pet,
+            subjectId: pet.id.uuidString,
+            eventKind: .expense,
+            actionType: ExpenseCategory.food.rawValue,
+            amountValue: 20
+        ))
+        context.insert(CareLedgerEvent(
+            occurredAt: todayStart.addingTimeInterval(10000),
+            actorKind: .human,
+            actorId: "human-a",
+            subjectKind: .pet,
+            subjectId: pet.id.uuidString,
+            eventKind: .expense,
+            actionType: ExpenseCategory.treats.rawValue,
+            amountValue: 30
+        ))
+        context.insert(CareLedgerEvent(
+            occurredAt: todayStart.addingTimeInterval(11000),
+            actorKind: .human,
+            actorId: "human-a",
+            subjectKind: .pet,
+            subjectId: otherPet.id.uuidString,
+            eventKind: .care,
+            actionType: CareType.feeding.rawValue
+        ))
+
+        context.insert(PetPhotoLog(imageData: Data([1, 2, 3]), pet: pet))
+        context.insert(PetMilestone(title: "First hike", pet: pet))
+        context.insert(PetDocument(title: "Vaccine", category: .vaccine, pet: pet))
+        context.insert(PetDocument(title: "Passport", category: .other, pet: pet))
+        context.insert(PetInsurance(companyName: "Ohana Care", pet: pet))
+        context.insert(PetMedication(name: "Active", startDate: todayStart, pet: pet))
+        let inactiveMedication = PetMedication(name: "Inactive", startDate: todayStart, pet: pet)
+        inactiveMedication.isActive = false
+        context.insert(inactiveMedication)
+        try context.save()
+
+        let summary = PetAllFeaturesActivitySummary.load(petID: pet.id, context: context, now: now)
+
+        #expect(summary.todayFeedCount == 1)
+        #expect(summary.todayNonFeedingCareCount == 1)
+        #expect(summary.totalNonFeedingCareCount == 2)
+        #expect(summary.todayPottyCount == 1)
+        #expect(summary.todayWalkCount == 1)
+        #expect(summary.totalWalkCount == 2)
+        #expect(summary.weekWalkDistanceMeters == 2000)
+        #expect(summary.healthCount == 1)
+        #expect(summary.weightCount == 2)
+        #expect(summary.latestWeightKg == 4.8)
+        #expect(summary.expenseCount == 2)
+        #expect(summary.expenseTotal == 50)
+        #expect(summary.photoCount == 1)
+        #expect(summary.milestoneCount == 1)
+        #expect(summary.documentCount == 2)
+        #expect(summary.protectionDocumentCount == 1)
+        #expect(summary.insuranceCount == 1)
+        #expect(summary.medicationCount == 2)
+        #expect(summary.activeMedicationCount == 1)
+    }
+
+    @Test func featureAggregateViewDoesNotCarryLegacyCareRelationshipSubtitles() throws {
+        let rootURL = repositoryRootURL()
+        let source = try source("Ohana/Features/FunctionMenu/Views/FeatureAggregateView.swift", rootURL: rootURL)
+
+        #expect(!source.contains("pet.careLogs"))
+        #expect(!source.contains("pet.pottyLogs"))
+        #expect(!source.contains("pet.walkLogs"))
+        #expect(!source.contains("pet.hygieneLogs"))
+        #expect(!source.contains("pet.expenseLogs"))
+        #expect(!source.contains("pet.weightLogs"))
+        #expect(source.contains("case .health, .medications, .food, .hygiene, .walks, .potty, .retention, .weight, .expense:"))
+    }
+
+    @Test func familyActivityStripUsesLedgerEntriesInsteadOfPetRelationshipLogs() throws {
+        let rootURL = repositoryRootURL()
+        let stripSource = try source("Ohana/Features/FamilyTasks/Views/FamilyActivityStripView.swift", rootURL: rootURL)
+        let routeSource = try source("Ohana/Features/FamilyTasks/FamilyActivityStripRouteContainer.swift", rootURL: rootURL)
+
+        #expect(!stripSource.contains("pet.careLogs"))
+        #expect(!stripSource.contains("pet.pottyLogs"))
+        #expect(!stripSource.contains("pet.walkLogs"))
+        #expect(!stripSource.contains("pet.expenseLogs"))
+        #expect(!routeSource.contains("@Query private var ledgerEvents"))
+        #expect(routeSource.contains("OhanaFrameScheduler.runAfterNextFrame"))
+        #expect(routeSource.contains("try context.fetch(descriptor)"))
+        #expect(routeSource.contains("FamilyActivityEntry.entries("))
+    }
+
+    @Test func familyActivityEntriesProjectTodayLedgerEventsAndSharedWalkExecutors() throws {
+        let calendar = Calendar(identifier: .gregorian)
+        let now = try #require(calendar.date(from: DateComponents(year: 2026, month: 6, day: 25, hour: 12)))
+        let today = calendar.startOfDay(for: now)
+        let petID = UUID()
+        let otherPetID = UUID()
+        let humanA = UUID().uuidString
+        let humanB = UUID().uuidString
+        let humanC = UUID().uuidString
+
+        let care = CareLedgerEvent(
+            id: UUID(uuidString: "11111111-1111-1111-1111-111111111111") ?? UUID(),
+            occurredAt: today.addingTimeInterval(3600),
+            actorKind: .human,
+            actorId: humanA,
+            subjectKind: .pet,
+            subjectId: petID.uuidString,
+            eventKind: .care,
+            actionType: CareType.feeding.rawValue
+        )
+        let walk = CareLedgerEvent(
+            id: UUID(uuidString: "22222222-2222-2222-2222-222222222222") ?? UUID(),
+            occurredAt: today.addingTimeInterval(7200),
+            actorKind: .human,
+            actorId: humanB,
+            subjectKind: .pet,
+            subjectId: petID.uuidString,
+            eventKind: .walk,
+            actionType: "walk",
+            metadataJSON: "{\"executorIds\":[\"\(humanB)\",\"\(humanC)\"]}"
+        )
+        let previousDay = CareLedgerEvent(
+            occurredAt: today.addingTimeInterval(-60),
+            actorKind: .human,
+            actorId: humanA,
+            subjectKind: .pet,
+            subjectId: petID.uuidString,
+            eventKind: .potty,
+            actionType: PottyType.pee.rawValue
+        )
+        let otherPet = CareLedgerEvent(
+            occurredAt: today.addingTimeInterval(3900),
+            actorKind: .human,
+            actorId: humanA,
+            subjectKind: .pet,
+            subjectId: otherPetID.uuidString,
+            eventKind: .expense,
+            actionType: ExpenseCategory.food.rawValue
+        )
+
+        let entries = FamilyActivityEntry.entries(
+            from: [care, walk, previousDay, otherPet],
+            petID: petID,
+            calendar: calendar,
+            now: now
+        )
+
+        #expect(entries.compactMap(\.executorId) == [humanA, humanB, humanC])
+        #expect(entries.map(\.dedupKey) == [
+            "\(humanA)_care_\(CareType.feeding.rawValue)",
+            "\(humanB)_walk",
+            "\(humanC)_walk"
+        ])
+        #expect(entries.map(\.iconName) == ["fork.knife", "figure.walk", "figure.walk"])
+    }
+
+    @Test func familyTaskActivitySurfacesUseLedgerEntriesInsteadOfPetRelationshipLogs() throws {
+        let rootURL = repositoryRootURL()
+        let bountySource = try source("Ohana/Features/FamilyTasks/Views/BountyBoardView.swift", rootURL: rootURL)
+        let bountyRouteSource = try source("Ohana/Features/FamilyTasks/BountyBoardDataContainer.swift", rootURL: rootURL)
+        let collaborationSource = try source("Ohana/Features/FamilyTasks/Views/FamilyCollaborationDashboardView.swift", rootURL: rootURL)
+        let collaborationActivitySource = try source("Ohana/Features/FamilyTasks/Views/FamilyCollaborationDashboardView+Activity.swift", rootURL: rootURL)
+        let crewRouteSource = try source("Ohana/Features/CrewRoster/CrewRosterRouteContainer.swift", rootURL: rootURL)
+
+        for source in [bountySource, collaborationSource, collaborationActivitySource] {
+            #expect(!source.contains("pet.careLogs"))
+            #expect(!source.contains("pet.pottyLogs"))
+            #expect(!source.contains("pet.walkLogs"))
+            #expect(!source.contains("pet.expenseLogs"))
+        }
+        #expect(bountySource.contains("careLedgerEntries: [FamilyCareLedgerEntry]"))
+        #expect(bountyRouteSource.contains("FamilyCareLedgerEntry.fetchPetEntries"))
+        #expect(crewRouteSource.contains("careLedgerEntries: isCollaborationEnabled ? FamilyCareLedgerEntry.fetchPetEntries"))
+        #expect(collaborationSource.contains("careLedgerEntries.compactMap"))
+        #expect(collaborationActivitySource.contains("careLedgerEntries.contains"))
+    }
+
+    @Test func crewRosterUsesRouteScopedPetSummariesInsteadOfPetArchiveRelationships() throws {
+        let rootURL = repositoryRootURL()
+        let routeSource = try source("Ohana/Features/CrewRoster/CrewRosterRouteContainer.swift", rootURL: rootURL)
+        let overlaySource = try source("Ohana/Features/CrewRoster/Views/CrewRosterOverlay.swift", rootURL: rootURL)
+        let editorsSource = try source("Ohana/Features/CrewRoster/Views/CrewRosterOverlayEditors.swift", rootURL: rootURL)
+
+        #expect(!FileManager.default.fileExists(
+            atPath: rootURL.appending(path: "Ohana/Features/CrewRoster/Views/CrewRosterExpandedMemberOverlay.swift").path
+        ))
+        #expect(!overlaySource.contains("pet.documents.count"))
+        #expect(!overlaySource.contains("pet.weightLogs"))
+        #expect(!editorsSource.contains("pet.documents.count"))
+        #expect(!editorsSource.contains("pet.weightLogs"))
+        #expect(routeSource.contains("struct CrewRosterPetSummary"))
+        #expect(routeSource.contains("FetchDescriptor<PetDocument>"))
+        #expect(routeSource.contains("context.fetchCount(descriptor)"))
+        #expect(overlaySource.contains("var petSummaries: [UUID: CrewRosterPetSummary]"))
+        #expect(editorsSource.contains("let petSummary: CrewRosterPetSummary"))
+    }
+
+    @Test func crewRosterPetSummaryCountsPetScopedDocuments() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let pet = Pet(name: "Momo", species: "cat")
+        let otherPet = Pet(name: "Nori", species: "dog")
+        context.insert(pet)
+        context.insert(otherPet)
+        context.insert(PetDocument(title: "Passport", category: .passport, pet: pet))
+        context.insert(PetDocument(title: "Vaccine", category: .vaccine, pet: pet))
+        context.insert(PetDocument(title: "Other", category: .other, pet: otherPet))
+        try context.save()
+
+        let summaries = CrewRosterPetSummary.load(pets: [pet, otherPet], context: context)
+
+        #expect(summaries[pet.id]?.documentCount == 2)
+        #expect(summaries[otherPet.id]?.documentCount == 1)
+    }
+
+    @Test func petProfileCardsUseRouteSummariesInsteadOfPetRelationshipHealthReads() throws {
+        let rootURL = repositoryRootURL()
+        let basicSource = try source("Ohana/Features/Members/Views/PetBasicInfoDetailView.swift", rootURL: rootURL)
+        let healthSource = try source("Ohana/Features/Members/Views/PetBasicInfoDetailView+HealthSummary.swift", rootURL: rootURL)
+        let sitterSource = try source("Ohana/Features/Members/Views/SitterCardPreviewSheet.swift", rootURL: rootURL)
+
+        for source in [healthSource, sitterSource] {
+            #expect(!source.contains("pet.healthLogs"))
+            #expect(!source.contains("pet.medications"))
+            #expect(!source.contains("pet.insurances"))
+            #expect(!source.contains("pet.symptomLogs"))
+            #expect(!source.contains("pet.weightLogs"))
+        }
+        #expect(basicSource.contains("@State var healthSummary = PetBasicInfoHealthSummary.empty"))
+        #expect(basicSource.contains("scheduleHealthSummaryLoad()"))
+        #expect(healthSource.contains("struct PetBasicInfoHealthSummary"))
+        #expect(healthSource.contains("FetchDescriptor<PetHealthLog>"))
+        #expect(healthSource.contains("FetchDescriptor<PetMedication>"))
+        #expect(healthSource.contains("FetchDescriptor<SymptomLog>"))
+        #expect(healthSource.contains("FetchDescriptor<PetInsurance>"))
+        #expect(healthSource.contains("FetchDescriptor<CareLedgerEvent>"))
+        #expect(healthSource.contains("OhanaFrameScheduler.runAfterNextFrame"))
+        #expect(sitterSource.contains("PetBasicInfoHealthSummary.latestWeight"))
+        #expect(sitterSource.contains("OhanaFrameScheduler.runAfterNextFrame"))
+    }
+
+    @MainActor
+    @Test func petProfileHealthSummaryUsesPetScopedRowsAndLedgerWeight() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let now = Date()
+        let pet = Pet(name: "Momo", species: "cat")
+        let otherPet = Pet(name: "Nori", species: "dog")
+        context.insert(pet)
+        context.insert(otherPet)
+
+        let vaccine = PetHealthLog(
+            date: now.addingTimeInterval(-86400),
+            type: .vaccine,
+            note: "Rabies",
+            pet: pet
+        )
+        vaccine.expirationDate = now.addingTimeInterval(86400 * 30)
+        context.insert(vaccine)
+        context.insert(PetHealthLog(
+            date: now.addingTimeInterval(60),
+            type: .vaccine,
+            note: "Other pet vaccine",
+            pet: otherPet
+        ))
+        context.insert(PetMedication(
+            name: "Antibiotic",
+            dosage: "5ml",
+            startDate: now.addingTimeInterval(-3600),
+            pet: pet
+        ))
+        context.insert(SymptomLog(
+            date: now,
+            category: .respiratory,
+            symptomName: "Cough",
+            severity: .moderate,
+            pet: pet
+        ))
+        context.insert(PetInsurance(
+            companyName: "CareCo",
+            productName: "Guard Plan",
+            renewalDate: now.addingTimeInterval(86400 * 14),
+            pet: pet
+        ))
+        context.insert(PetWeightLog(date: now.addingTimeInterval(120), weight: 99, pet: pet))
+        context.insert(CareLedgerEvent(
+            occurredAt: now,
+            subjectKind: .pet,
+            subjectId: pet.id.uuidString,
+            eventKind: .weight,
+            actionType: "petWeight",
+            amountValue: 4.6
+        ))
+        context.insert(CareLedgerEvent(
+            occurredAt: now.addingTimeInterval(60),
+            subjectKind: .pet,
+            subjectId: otherPet.id.uuidString,
+            eventKind: .weight,
+            actionType: "petWeight",
+            amountValue: 9.9
+        ))
+        try context.save()
+
+        let summary = PetBasicInfoHealthSummary.load(petID: pet.id, context: context, now: now)
+
+        #expect(summary.vaccineSummaryText.contains("Rabies"))
+        #expect(summary.activeMedicationSummaryText.contains("Antibiotic"))
+        #expect(summary.recentSymptomSummaryText.contains("Cough"))
+        #expect(summary.insuranceSummaryText.contains("Guard Plan"))
+        #expect(summary.latestWeight?.kg == 4.6)
+        #expect(!summary.recentWeightSummaryText.contains("99"))
+        #expect(!summary.recentWeightSummaryText.contains("9.9"))
+    }
+
+    @Test func familyWeeklyReportsUseDeferredLedgerReadModelInsteadOfPetRelationshipLogs() throws {
+        let rootURL = repositoryRootURL()
+        let cardSource = try source("Ohana/Features/FamilyReports/Views/WeeklyReportCard.swift", rootURL: rootURL)
+        let dashboardSource = try source("Ohana/Features/FamilyReports/Views/FamilyWeeklyReportDashboardView.swift", rootURL: rootURL)
+        let dataContainerSource = try source("Ohana/Features/FamilyReports/FamilyWeeklyReportDataContainer.swift", rootURL: rootURL)
+
+        for source in [cardSource, dashboardSource] {
+            #expect(!source.contains("pet.careLogs"))
+            #expect(!source.contains("pet.pottyLogs"))
+            #expect(!source.contains("pet.walkLogs"))
+            #expect(!source.contains("pet.expenseLogs"))
+            #expect(!source.contains("pet.hygieneLogs"))
+            #expect(!source.contains("pet.weightLogs"))
+            #expect(!source.contains("pet.photoLogs"))
+        }
+        #expect(!dashboardSource.contains("Fallback keeps older local data visible"))
+        #expect(dashboardSource.contains("let photoMemories: [FamilyWeeklyPhotoMemory]"))
+        #expect(dashboardSource.contains("let healthAlertSources: [PetHealthAlertSource]"))
+        #expect(dashboardSource.contains("private var weekPhotoMemories: [FamilyWeeklyPhotoMemory]"))
+        #expect(dashboardSource.contains("scanAlerts(sources: healthAlertSources)"))
+        #expect(!dashboardSource.contains("scanAlerts(pets: activePets)"))
+        #expect(dashboardSource.contains("appServices.careLedgerStats.reportEntries"))
+        #expect(dataContainerSource.contains("FamilyWeeklyReportRouteData.load(from: modelContext)"))
+        #expect(dataContainerSource.contains("var photoMemories: [FamilyWeeklyPhotoMemory] = []"))
+        #expect(dataContainerSource.contains("var healthAlertSources: [PetHealthAlertSource] = []"))
+        #expect(dataContainerSource.contains("PetHealthAlertSourceRouteData.load(pets: pets, from: context)"))
+        #expect(dataContainerSource.contains("FetchDescriptor<PetPhotoLog>"))
+        #expect(dataContainerSource.contains("FamilyWeeklyPhotoMemory("))
+        #expect(dataContainerSource.contains("OhanaFrameScheduler.runAfterNextFrame"))
+        #expect(dataContainerSource.contains("descriptor.fetchLimit = 1200"))
+        #expect(!dataContainerSource.contains("@Query(sort: \\CareLedgerEvent.occurredAt"))
+    }
+
+    @Test func streakManagerUsesLedgerNarrowCheckInInsteadOfPetRelationshipLogs() throws {
+        let rootURL = repositoryRootURL()
+        let source = try source("Ohana/Features/Economy/StreakManager.swift", rootURL: rootURL)
+
+        #expect(!source.contains("pet.pottyLogs"))
+        #expect(!source.contains("pet.walkLogs"))
+        #expect(!source.contains("pet.foodRecords"))
+        #expect(source.contains("FetchDescriptor<CareLedgerEvent>"))
+        #expect(source.contains("descriptor.fetchLimit = 1"))
+        #expect(source.contains("event.subjectId == subjectId"))
+        #expect(source.contains("event.actionType == feedingAction"))
+    }
+
+    @Test func streakManagerCheckInReadsLedgerInsteadOfPetRelationshipLogs() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let pet = Pet(name: "Momo", species: "cat")
+        let legacyPotty = PetPottyLog(date: Date(), type: .perfectPoop, pet: pet)
+        context.insert(pet)
+        context.insert(legacyPotty)
+        try context.save()
+
+        StreakManager.refreshStreak(for: pet, context: context)
+
+        #expect(pet.currentStreak == 0)
+        #expect(pet.lastCheckInDate == nil)
+
+        context.insert(CareLedgerEvent(
+            occurredAt: Date(),
+            actorKind: .human,
+            actorId: UUID().uuidString,
+            subjectKind: .pet,
+            subjectId: pet.id.uuidString,
+            eventKind: .care,
+            actionType: CareType.feeding.rawValue
+        ))
+        try context.save()
+
+        StreakManager.refreshStreak(for: pet, context: context)
+
+        #expect(pet.currentStreak == 1)
+        #expect(pet.lastCheckInDate != nil)
+    }
+
+    @Test func islandNegativeFeedbackUsesLedgerEntriesInsteadOfPetRelationshipLogs() throws {
+        let rootURL = repositoryRootURL()
+        let feedbackSource = try source("Ohana/Shared/Components/IslandNegativeFeedback.swift", rootURL: rootURL)
+        let homeAuxiliarySource = try source("Ohana/Features/Home/Views/FocusHomeAuxiliaryViews.swift", rootURL: rootURL)
+
+        #expect(!feedbackSource.contains("pet.careLogs"))
+        #expect(!feedbackSource.contains("pet.walkLogs"))
+        #expect(!feedbackSource.contains("pet.pottyLogs"))
+        #expect(!feedbackSource.contains("pet.hygieneLogs"))
+        #expect(!feedbackSource.contains("[PetCareLog]"))
+        #expect(feedbackSource.contains("struct IslandNegativeCareLedgerEntry"))
+        #expect(feedbackSource.contains("careLedgerEntries: [IslandNegativeCareLedgerEntry]"))
+        #expect(feedbackSource.contains("amountValue"))
+        #expect(homeAuxiliarySource.contains("negativeCareLedgerEntries(from: careLedgerEntries)"))
+    }
+
+    @Test func islandQuestEngineUsesLedgerEntriesInsteadOfPetRelationshipCareFallbacks() throws {
+        let rootURL = repositoryRootURL()
+        let source = try source("Ohana/Features/TodayFocus/IslandQuestEngine.swift", rootURL: rootURL)
+
+        #expect(!source.contains("pet.careLogs"))
+        #expect(!source.contains("pet.walkLogs"))
+        #expect(!source.contains("pet.pottyLogs"))
+        #expect(!source.contains("pet.weightLogs"))
+        #expect(!source.contains("hasPlannedCareLog"))
+        #expect(source.contains("hasCareLedgerEntry("))
+        #expect(source.contains("lastLedgerRoutineActor"))
+    }
+
+    @Test func waterCareCycleStatusUsesExplicitSnapshotInsteadOfPetCareLogRelationship() throws {
+        let rootURL = repositoryRootURL()
+        let source = try source("Ohana/Domain/Services/WaterCareCycleStatus.swift", rootURL: rootURL)
+
+        #expect(!source.contains("pet.careLogs"))
+        #expect(!source.contains("latestCareLogDate"))
+        #expect(source.contains("(logSnapshot ?? .empty).latestWaterChangeDate"))
+        #expect(source.contains("(logSnapshot ?? .empty).latestFilterCleanDate"))
+    }
+
+    @Test func focusHomeCardModelUsesExplicitWalkDistanceInsteadOfPetWalkRelationship() throws {
+        let rootURL = repositoryRootURL()
+        let modelSource = try source("Ohana/Features/Home/FocusHomeModels.swift", rootURL: rootURL)
+        let dataSource = try source("Ohana/Features/Home/FocusHomeCardDataSource.swift", rootURL: rootURL)
+
+        #expect(!modelSource.contains("pet.walkLogs"))
+        #expect(!modelSource.contains("weeklyWalkDistanceMeters"))
+        #expect(!modelSource.contains("includeWalkDistance"))
+        #expect(modelSource.contains("homeWalkDistanceMeters: Double = 0"))
+        #expect(!dataSource.contains("includeWalkDistance"))
+    }
+
+    @Test func islandProsperityUsesLedgerCountsInsteadOfPetRelationshipLogs() throws {
+        let rootURL = repositoryRootURL()
+        let source = try source("Ohana/Features/Economy/IslandProsperityManager.swift", rootURL: rootURL)
+
+        #expect(!source.contains("level(pets:"))
+        #expect(!source.contains("progress(pets:"))
+        #expect(!source.contains("totalLogCount(pets:"))
+        #expect(!source.contains("pet.walkLogs"))
+        #expect(!source.contains("pet.pottyLogs"))
+        #expect(!source.contains("pet.hygieneLogs"))
+        #expect(!source.contains("pet.healthLogs"))
+        #expect(!source.contains("pet.weightLogs"))
+        #expect(!source.contains("pet.foodRecords"))
+        #expect(!source.contains("pet.milestones"))
+        #expect(source.contains("totalLogCount(events: [CareLedgerEvent]"))
+    }
+
+    @Test func islandProsperityCountsOnlyPetLedgerActivity() {
+        let petID = UUID().uuidString
+        let otherPetID = UUID().uuidString
+        let events = [
+            CareLedgerEvent(
+                subjectKind: .pet,
+                subjectId: petID,
+                eventKind: .care,
+                actionType: CareType.feeding.rawValue
+            ),
+            CareLedgerEvent(
+                subjectKind: .pet,
+                subjectId: petID,
+                eventKind: .walk,
+                actionType: "walk"
+            ),
+            CareLedgerEvent(
+                subjectKind: .pet,
+                subjectId: otherPetID,
+                eventKind: .potty,
+                actionType: PottyType.pee.rawValue
+            ),
+            CareLedgerEvent(
+                subjectKind: .human,
+                subjectId: UUID().uuidString,
+                eventKind: .workout,
+                actionType: "walk"
+            ),
+            CareLedgerEvent(
+                subjectKind: .pet,
+                subjectId: petID,
+                eventKind: .coconut,
+                actionType: "reward"
+            )
+        ]
+
+        #expect(IslandProsperityManager.totalLogCount(events: events, petIDs: [petID]) == 2)
+        #expect(IslandProsperityManager.totalLogCount(events: events) == 3)
+        #expect(IslandProsperityManager.level(totalLogCount: 49) == .seedling)
+        #expect(IslandProsperityManager.level(totalLogCount: 50) == .blooming)
+        #expect(IslandProsperityManager.level(totalLogCount: 200) == .paradise)
+        #expect(IslandProsperityManager.progress(totalLogCount: 25) == 0.5)
+        #expect(IslandProsperityManager.progress(totalLogCount: 125) == 0.5)
+    }
+
+    @Test func achievementWallRoutesLedgerEventsIntoAchievementContext() throws {
+        let rootURL = repositoryRootURL()
+        let dataContainerSource = try source("Ohana/Features/Achievements/AchievementWallDataContainer.swift", rootURL: rootURL)
+        let wallSource = try source("Ohana/Features/Achievements/Views/AchievementWallView.swift", rootURL: rootURL)
+        let progressSource = try source("Ohana/Features/Achievements/Views/AchievementWallContentView+Progress.swift", rootURL: rootURL)
+        let completionSource = try source("Ohana/Features/Achievements/Views/AchievementWallContentView+CompletionDates.swift", rootURL: rootURL)
+        let managerSource = try source("Ohana/Features/Economy/AchievementManager.swift", rootURL: rootURL)
+        let routeDataSource = try source("Ohana/Features/Achievements/AchievementPetActivityRouteData.swift", rootURL: rootURL)
+
+        #expect(dataContainerSource.contains("var careLedgerEvents: [CareLedgerEvent] = []"))
+        #expect(dataContainerSource.contains("var petActivitySummaries: [UUID: AchievementPetActivitySummary] = [:]"))
+        #expect(dataContainerSource.contains("FetchDescriptor<CareLedgerEvent>"))
+        #expect(dataContainerSource.contains("event.subjectKind == petSubjectKind"))
+        #expect(dataContainerSource.contains("careLedgerEvents: routeData.careLedgerEvents"))
+        #expect(dataContainerSource.contains("petActivitySummaries: routeData.petActivitySummaries"))
+        #expect(routeDataSource.contains("enum AchievementPetActivityRouteData"))
+        #expect(routeDataSource.contains("FetchDescriptor<PetFoodRecord>"))
+        #expect(routeDataSource.contains("FetchDescriptor<PetPhotoLog>"))
+        #expect(routeDataSource.contains("FetchDescriptor<PetMedication>"))
+        #expect(wallSource.contains("careLedgerEvents: careLedgerEvents"))
+        #expect(wallSource.contains("petActivitySummaries: petActivitySummaries"))
+        #expect(progressSource.contains("activeCareLedgerSummary"))
+        #expect(progressSource.contains("activePetActivitySummary"))
+        #expect(completionSource.contains("activeCareLedgerSummary"))
+        #expect(completionSource.contains("activePetActivitySummary"))
+        #expect(managerSource.contains("struct AchievementCareLedgerSummary"))
+        #expect(managerSource.contains("struct AchievementPetActivitySummary"))
+        #expect(managerSource.contains("careLedgerEvents: [CareLedgerEvent] = []"))
+        #expect(managerSource.contains("petActivitySummaries: [UUID: AchievementPetActivitySummary] = [:]"))
+
+        for source in [managerSource, progressSource, completionSource] {
+            #expect(!source.contains("pet.careLogs"))
+            #expect(!source.contains("pet.walkLogs"))
+            #expect(!source.contains("pet.pottyLogs"))
+            #expect(!source.contains("pet.hygieneLogs"))
+            #expect(!source.contains("pet.weightLogs"))
+            #expect(!source.contains("pet.healthLogs"))
+            #expect(!source.contains("pet.expenseLogs"))
+            #expect(!source.contains("pet.photoLogs"))
+            #expect(!source.contains("pet.milestones"))
+            #expect(!source.contains("pet.documents"))
+            #expect(!source.contains("pet.insurances"))
+            #expect(!source.contains("pet.medications"))
+            #expect(!source.contains("pet.symptomLogs"))
+        }
+    }
+
+    @Test func achievementManagerPrefersAuthoritativeLedgerCareSummaryWhenProvided() {
+        let pet = Pet(name: "Momo", species: "cat")
+        let now = Date()
+        let legacyWalk = PetWalkLog(pet: pet)
+        legacyWalk.distanceMeters = 200_000
+        pet.walkLogs.append(legacyWalk)
+        for _ in 0 ..< 20 {
+            pet.careLogs.append(PetCareLog(type: .watering, pet: pet))
+        }
+        for offset in 0 ..< 50 {
+            pet.photoLogs.append(PetPhotoLog(imageData: Data([1]), date: now.addingTimeInterval(Double(offset)), pet: pet))
+        }
+        pet.documents.append(PetDocument(title: "Passport", category: .other, pet: pet))
+        pet.symptomLogs.append(SymptomLog(category: .digestive, symptomName: "Nausea", severity: .mild, pet: pet))
+
+        let emptyLedgerAchievements = AchievementManager.compute(
+            for: pet,
+            context: AchievementComputationContext(careLedgerEvents: [])
+        )
+
+        #expect(!isAchievementUnlocked("iron_paw", in: emptyLedgerAchievements))
+        #expect(!isAchievementUnlocked("hydration_buddy", in: emptyLedgerAchievements))
+        #expect(!isAchievementUnlocked("photo_enthusiast", in: emptyLedgerAchievements))
+        #expect(!isAchievementUnlocked("memory_collector", in: emptyLedgerAchievements))
+        #expect(!isAchievementUnlocked("protection_ready", in: emptyLedgerAchievements))
+        #expect(!isAchievementUnlocked("symptom_watcher", in: emptyLedgerAchievements))
+
+        let ledgerAchievements = AchievementManager.compute(
+            for: pet,
+            context: AchievementComputationContext(
+                careLedgerEvents: [
+                    CareLedgerEvent(
+                        subjectKind: .pet,
+                        subjectId: pet.id.uuidString,
+                        eventKind: .walk,
+                        actionType: "walk",
+                        amountValue: 100_000
+                    )
+                ] + (0 ..< 14).map { offset in
+                    CareLedgerEvent(
+                        occurredAt: now.addingTimeInterval(Double(offset) * 60),
+                        subjectKind: .pet,
+                        subjectId: pet.id.uuidString,
+                        eventKind: .care,
+                        actionType: CareType.watering.rawValue
+                    )
+                },
+                petActivitySummaries: [
+                    pet.id: AchievementPetActivitySummary(
+                        foodRecordDates: [now, now.addingTimeInterval(60)],
+                        photoDates: (0 ..< 50).map { now.addingTimeInterval(Double($0)) },
+                        documentIssueDates: [now],
+                        activeMedicationEndDates: [now.addingTimeInterval(-60)],
+                        symptomDates: (0 ..< 3).map { now.addingTimeInterval(Double($0)) },
+                        documentCount: 1
+                    )
+                ]
+            )
+        )
+
+        #expect(isAchievementUnlocked("iron_paw", in: ledgerAchievements))
+        #expect(isAchievementUnlocked("hydration_buddy", in: ledgerAchievements))
+        #expect(isAchievementUnlocked("photo_enthusiast", in: ledgerAchievements))
+        #expect(isAchievementUnlocked("memory_collector", in: ledgerAchievements))
+        #expect(isAchievementUnlocked("protection_ready", in: ledgerAchievements))
+        #expect(isAchievementUnlocked("symptom_watcher", in: ledgerAchievements))
+        #expect(isAchievementUnlocked("stock_keeper", in: ledgerAchievements))
+        #expect(isAchievementUnlocked("medication_complete", in: ledgerAchievements))
+    }
+
+    @MainActor
+    @Test func achievementPetActivityRouteDataScopesActivitySummaries() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let now = Date()
+        let pet = Pet(name: "Momo", species: "cat")
+        let otherPet = Pet(name: "Nori", species: "dog")
+        context.insert(pet)
+        context.insert(otherPet)
+        context.insert(PetFoodRecord(brand: "Core", totalGrams: 1000, startDate: now, pet: pet))
+        context.insert(PetPhotoLog(imageData: Data([1]), date: now, pet: pet))
+        context.insert(PetMilestone(date: now, title: "First climb", pet: pet))
+        let document = PetDocument(title: "Passport", category: .other, pet: pet)
+        document.issueDate = now
+        context.insert(document)
+        context.insert(PetInsurance(companyName: "Care", renewalDate: now, pet: pet))
+        context.insert(PetMedication(name: "Drops", endDate: now.addingTimeInterval(-60), pet: pet))
+        context.insert(SymptomLog(date: now, category: .digestive, symptomName: "Nausea", severity: .mild, pet: pet))
+        context.insert(PetPhotoLog(imageData: Data([9]), date: now, pet: otherPet))
+        try context.save()
+
+        let summaries = AchievementPetActivityRouteData.loadPetActivitySummaries(from: context, petIDs: [pet.id])
+        let summary = try #require(summaries[pet.id])
+
+        #expect(summary.foodRecordCount == 1)
+        #expect(summary.photoCount == 1)
+        #expect(summary.milestoneCount == 1)
+        #expect(summary.documentCount == 1)
+        #expect(summary.insuranceCount == 1)
+        #expect(summary.symptomCount == 1)
+        #expect(summary.completedMedicationEndDates(now: now).count == 1)
+        #expect(summaries[otherPet.id] == nil)
+    }
+
+    @Test func nonWallAchievementCallersUseLedgerContext() throws {
+        let rootURL = repositoryRootURL()
+        let oasisSnapshots = try source("Ohana/Features/Oasis/OasisRewardSnapshots.swift", rootURL: rootURL)
+        let oasisExecutor = try source("Ohana/Features/Oasis/OasisRewardCommandExecutor.swift", rootURL: rootURL)
+        let oasisRuntime = try source("Ohana/Features/Oasis/Views/OasisRewardView+Runtime.swift", rootURL: rootURL)
+        let petRetentionModel = try source("Ohana/Features/DashboardRecords/PetRetentionHubScreenModel.swift", rootURL: rootURL)
+        let petRetentionView = try source("Ohana/Features/DashboardRecords/Views/PetRetentionHubView.swift", rootURL: rootURL)
+        let islandRetentionModel = try source("Ohana/Features/DashboardRecords/IslandRetentionDashboardScreenModel.swift", rootURL: rootURL)
+        let islandRetentionView = try source("Ohana/Features/DashboardRecords/Views/IslandRetentionDashboard.swift", rootURL: rootURL)
+
+        #expect(oasisSnapshots.contains("var careLedgerEvents: [CareLedgerEvent] = []"))
+        #expect(oasisSnapshots.contains("var petActivitySummaries: [UUID: AchievementPetActivitySummary] = [:]"))
+        #expect(oasisSnapshots.contains("FetchDescriptor<CareLedgerEvent>"))
+        #expect(oasisExecutor.contains("careLedgerEvents: [CareLedgerEvent]"))
+        #expect(oasisExecutor.contains("petActivitySummaries: [UUID: AchievementPetActivitySummary]"))
+        #expect(oasisExecutor.contains("petActivitySummaries: petActivitySummaries"))
+        #expect(!oasisExecutor.contains("pets.flatMap { AchievementManager.compute(for: $0) }"))
+        #expect(oasisRuntime.contains("careLedgerEvents: liveData.careLedgerEvents"))
+        #expect(oasisRuntime.contains("petActivitySummaries: liveData.petActivitySummaries"))
+
+        #expect(petRetentionModel.contains("var careLedgerEvents: [CareLedgerEvent] = []"))
+        #expect(petRetentionModel.contains("struct PetRetentionArchiveMetrics"))
+        #expect(petRetentionModel.contains("let achievementActivitySummary: AchievementPetActivitySummary"))
+        #expect(petRetentionModel.contains("petActivitySummaries: [pet.id: archiveMetrics.achievementActivitySummary]"))
+        #expect(!petRetentionModel.contains("AchievementManager.compute(for: pet)"))
+        #expect(petRetentionView.contains("fetchCareLedgerEvents(petID:"))
+        #expect(petRetentionView.contains("PetRetentionArchiveMetrics.load(petID: petID, context: context)"))
+        #expect(petRetentionView.contains("ArchiveMemorySnapshot(pet: pet, activitySummary: archiveMetrics.activitySummary)"))
+        #expect(petRetentionView.contains("OhanaFrameScheduler.runAfterNextFrame"))
+
+        #expect(islandRetentionModel.contains("var careLedgerEvents: [CareLedgerEvent] = []"))
+        #expect(islandRetentionModel.contains("archiveMetricsByPetId: [UUID: PetRetentionArchiveMetrics]"))
+        #expect(islandRetentionModel.contains("petActivitySummaries: [pet.id: metrics.achievementActivitySummary]"))
+        #expect(!islandRetentionModel.contains("AchievementManager.compute(for: pet)"))
+        #expect(islandRetentionView.contains("fetchCareLedgerEvents(petIDs:"))
+        #expect(islandRetentionView.contains("fetchArchiveMetrics(petIDs: petIDs, context: context)"))
+        #expect(islandRetentionView.contains("archiveMetrics: screenModel.archiveMetrics(for: pet.id)"))
+        #expect(islandRetentionView.contains("OhanaFrameScheduler.runAfterNextFrame"))
+
+        for source in [petRetentionModel, petRetentionView, islandRetentionModel, islandRetentionView] {
+            #expect(!source.contains("pet.careLogs"))
+            #expect(!source.contains("pet.walkLogs"))
+            #expect(!source.contains("pet.pottyLogs"))
+            #expect(!source.contains("pet.hygieneLogs"))
+            #expect(!source.contains("pet.weightLogs"))
+            #expect(!source.contains("pet.healthLogs"))
+            #expect(!source.contains("pet.expenseLogs"))
+            #expect(!source.contains("pet.photoLogs"))
+            #expect(!source.contains("pet.milestones"))
+            #expect(!source.contains("pet.documents"))
+            #expect(!source.contains("pet.insurances"))
+            #expect(!source.contains("pet.medications"))
+        }
+    }
+
+    @MainActor
+    @Test func petRetentionArchiveMetricsUsesRouteScopedCountsAndLatestMemory() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let calendar = Calendar(identifier: .gregorian)
+        let now = try #require(calendar.date(from: DateComponents(year: 2026, month: 6, day: 25, hour: 12)))
+        let soon = try #require(calendar.date(byAdding: .day, value: 7, to: now))
+        let oldMemoryDate = try #require(calendar.date(byAdding: .day, value: -2, to: now))
+        let latestMemoryDate = try #require(calendar.date(byAdding: .hour, value: -3, to: now))
+        let pet = Pet(name: "Momo", species: "cat")
+        let otherPet = Pet(name: "Nori", species: "dog")
+        context.insert(pet)
+        context.insert(otherPet)
+        context.insert(PetPhotoLog(imageData: Data([1, 2, 3]), date: oldMemoryDate, pet: pet))
+        context.insert(PetMilestone(date: latestMemoryDate, title: "First hike", pet: pet))
+        context.insert(PetPhotoLog(imageData: Data([9]), date: now, pet: otherPet))
+        let document = PetDocument(title: "Passport", category: .other, pet: pet)
+        document.expiryDate = soon
+        context.insert(document)
+        context.insert(PetInsurance(companyName: "Ohana Care", renewalDate: soon, pet: pet))
+        context.insert(CareLedgerEvent(
+            occurredAt: oldMemoryDate,
+            subjectKind: .pet,
+            subjectId: pet.id.uuidString,
+            eventKind: .health,
+            actionType: "health"
+        ))
+        context.insert(CareLedgerEvent(
+            occurredAt: latestMemoryDate,
+            subjectKind: .pet,
+            subjectId: pet.id.uuidString,
+            eventKind: .weight,
+            actionType: "weight",
+            amountValue: 4.2
+        ))
+        context.insert(CareLedgerEvent(
+            occurredAt: now,
+            subjectKind: .pet,
+            subjectId: otherPet.id.uuidString,
+            eventKind: .weight,
+            actionType: "weight",
+            amountValue: 9.9
+        ))
+        try context.save()
+
+        let metrics = PetRetentionArchiveMetrics.load(petID: pet.id, context: context, now: now)
+
+        #expect(metrics.isLoaded)
+        #expect(metrics.activitySummary.photoCount == 1)
+        #expect(metrics.activitySummary.milestoneCount == 1)
+        #expect(metrics.activitySummary.healthCount == 1)
+        #expect(metrics.activitySummary.weightCount == 1)
+        #expect(metrics.activitySummary.latestWeightKg == 4.2)
+        #expect(metrics.activitySummary.documentCount == 1)
+        #expect(metrics.activitySummary.insuranceCount == 1)
+        #expect(metrics.latestMemoryDate == latestMemoryDate)
+        #expect(metrics.expiringProtectionCount == 2)
+        #expect(metrics.memoryCount == 2)
+        #expect(metrics.protectionCount == 2)
+        #expect(metrics.timelineCount(careLedgerEvents: []) == 4)
+    }
+
+    @Test func islandWeightDashboardUsesPetLedgerMetricsInsteadOfPetRelationships() throws {
+        let rootURL = repositoryRootURL()
+        let viewModelSource = try source("Ohana/Features/DashboardRecords/IslandUnifiedStatsViewModel.swift", rootURL: rootURL)
+        let viewSource = try source("Ohana/Features/DashboardRecords/Views/IslandWeightDashboard.swift", rootURL: rootURL)
+
+        #expect(viewModelSource.contains("FetchDescriptor<CareLedgerEvent>"))
+        #expect(viewModelSource.contains("eventKind: .weight"))
+        #expect(viewModelSource.contains("eventKind: .walk"))
+        #expect(viewSource.contains("weightAbsolutePoints(for: seriesID)"))
+        #expect(!viewModelSource.contains("pet.weightLogs"))
+        #expect(!viewModelSource.contains("pet.walkLogs"))
+        #expect(!viewSource.contains("pet.weightLogs"))
+        #expect(!viewSource.contains("pet.walkLogs"))
+    }
+
+    @MainActor
+    @Test func islandUnifiedStatsUsesPetLedgerMetricsInsteadOfLegacyPetRelationships() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let now = Date()
+        let baselineDate = now.addingTimeInterval(-86400)
+        let pet = Pet(name: "Momo", species: "dog")
+        context.insert(pet)
+        context.insert(PetWeightLog(date: now, weight: 99, pet: pet))
+        let legacyWalk = PetWalkLog(startDate: now, pet: pet)
+        legacyWalk.distanceMeters = 9000
+        context.insert(legacyWalk)
+        context.insert(CareLedgerEvent(
+            occurredAt: baselineDate,
+            subjectKind: .pet,
+            subjectId: pet.id.uuidString,
+            eventKind: .weight,
+            actionType: "petWeight",
+            amountValue: 4.0
+        ))
+        context.insert(CareLedgerEvent(
+            occurredAt: now,
+            subjectKind: .pet,
+            subjectId: pet.id.uuidString,
+            eventKind: .weight,
+            actionType: "petWeight",
+            amountValue: 4.8
+        ))
+        context.insert(CareLedgerEvent(
+            occurredAt: now,
+            subjectKind: .pet,
+            subjectId: pet.id.uuidString,
+            eventKind: .walk,
+            actionType: "walk",
+            amountValue: 1200
+        ))
+        try context.save()
+
+        let viewModel = IslandUnifiedStatsViewModel()
+        viewModel.load(modelContext: context, pets: [pet], humans: [])
+
+        #expect(viewModel.weightAbsolutes.map(\.weight) == [4.0, 4.8])
+        #expect(!viewModel.weightAbsolutes.contains { $0.weight == 99 })
+        #expect(abs(viewModel.totalWeeklyExplorationKm - 1.2) < 0.001)
+        #expect(viewModel.weeklyExplorationCount == 1)
+        #expect(viewModel.gainChampion?.entityName == "Momo")
+    }
+
+    @Test func quickWeightSheetsUseRouteScopedLedgerMetricsInsteadOfPetWeightRelationships() throws {
+        let rootURL = repositoryRootURL()
+        let genericSource = try source(
+            "Ohana/Features/DashboardRecords/Views/GenericWeightEntrySheet.swift",
+            rootURL: rootURL
+        )
+        let quickSource = try source(
+            "Ohana/Features/DashboardRecords/Views/QuickWeightSheet.swift",
+            rootURL: rootURL
+        )
+
+        #expect(!genericSource.contains("pet.weightLogs"))
+        #expect(!quickSource.contains("pet.weightLogs"))
+        #expect(genericSource.contains("enum PetWeightLedgerRouteMetrics"))
+        #expect(genericSource.contains("FetchDescriptor<CareLedgerEvent>"))
+        #expect(genericSource.contains("CareLedgerEventKind.weight.rawValue"))
+        #expect(genericSource.contains("OhanaFrameScheduler.runAfterNextFrame"))
+        #expect(quickSource.contains("PetWeightLedgerRouteMetrics.latestWeightKg"))
+        #expect(quickSource.contains("OhanaFrameScheduler.runAfterNextFrame"))
+    }
+
+    @MainActor
+    @Test func quickWeightSheetsUseLedgerLatestWeightInsteadOfLegacyPetRelationship() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let now = Date()
+        let pet = Pet(name: "Momo", species: "cat")
+        context.insert(pet)
+        context.insert(PetWeightLog(date: now, weight: 99, pet: pet))
+        context.insert(CareLedgerEvent(
+            occurredAt: now.addingTimeInterval(-3600),
+            subjectKind: .pet,
+            subjectId: pet.id.uuidString,
+            eventKind: .weight,
+            actionType: "petWeight",
+            amountValue: 4.2
+        ))
+        context.insert(CareLedgerEvent(
+            occurredAt: now,
+            subjectKind: .pet,
+            subjectId: pet.id.uuidString,
+            eventKind: .weight,
+            actionType: "petWeight",
+            amountValue: 4.8
+        ))
+        context.insert(CareLedgerEvent(
+            occurredAt: now.addingTimeInterval(60),
+            subjectKind: .pet,
+            subjectId: pet.id.uuidString,
+            eventKind: .weight,
+            actionType: "petWeight",
+            amountValue: -1
+        ))
+        try context.save()
+
+        #expect(PetWeightLedgerRouteMetrics.latestWeightKg(petID: pet.id, context: context) == 4.8)
+    }
+
+    @Test func dormantPetChartDashboardBroadReadSurfaceStaysRemoved() {
+        let rootURL = repositoryRootURL()
+        let path = rootURL.appending(path: "Ohana/Features/DashboardRecords/Views/PetChartDashboard.swift")
+
+        #expect(!FileManager.default.fileExists(atPath: path.path))
+    }
+
+    @Test func dormantDogActivityCardBroadReadSurfaceStaysRemoved() {
+        let rootURL = repositoryRootURL()
+        let path = rootURL.appending(path: "Ohana/Features/Walks/Views/DogActivityCard.swift")
+
+        #expect(!FileManager.default.fileExists(atPath: path.path))
+    }
+
+    @Test func petVetSummaryPDFUsesSnapshotInsteadOfPetRelationshipReads() throws {
+        let rootURL = repositoryRootURL()
+        let pdfSource = try source(
+            "Ohana/Features/Documents/Views/PetVetSummaryPDFView.swift",
+            rootURL: rootURL
+        )
+        let retentionSource = try source(
+            "Ohana/Features/DashboardRecords/Views/PetRetentionHubView.swift",
+            rootURL: rootURL
+        )
+        let guidedSource = try source(
+            "Ohana/Features/Health/Views/PetHealthDetailContentView+GuidedHome.swift",
+            rootURL: rootURL
+        )
+        let recordsSource = try source(
+            "Ohana/Features/Health/Views/PetHealthDetailContentView+Records.swift",
+            rootURL: rootURL
+        )
+
+        #expect(!pdfSource.contains("pet.healthLogs"))
+        #expect(!pdfSource.contains("pet.medications"))
+        #expect(!pdfSource.contains("pet.symptomLogs"))
+        #expect(!pdfSource.contains("pet.insurances"))
+        #expect(!pdfSource.contains("pet.documents"))
+        #expect(!pdfSource.contains("pet.weightLogs"))
+        #expect(pdfSource.contains("struct PetVetSummaryPDFSnapshot"))
+        #expect(pdfSource.contains("PetVetSummaryPDFSnapshot.load(pet: pet, context: context)"))
+        #expect(pdfSource.contains("FetchDescriptor<PetHealthLog>"))
+        #expect(pdfSource.contains("FetchDescriptor<PetMedication>"))
+        #expect(pdfSource.contains("FetchDescriptor<SymptomLog>"))
+        #expect(pdfSource.contains("FetchDescriptor<PetInsurance>"))
+        #expect(pdfSource.contains("FetchDescriptor<PetDocument>"))
+        #expect(pdfSource.contains("FetchDescriptor<CareLedgerEvent>"))
+        #expect(retentionSource.contains("PetVetSummaryPDFRenderer.render(pet: pet, context: modelContext)"))
+        #expect(guidedSource.contains("PetVetSummaryPDFRenderer.render(pet: pet, context: modelContext)"))
+        #expect(recordsSource.contains("PetVetSummaryPDFRenderer.render(pet: pet, context: modelContext)"))
+    }
+
+    @MainActor
+    @Test func petVetSummaryPDFSnapshotUsesPetScopedRowsAndLedgerWeight() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let now = Date(timeIntervalSince1970: 1_782_345_600)
+        let pet = Pet(name: "Momo", species: "cat")
+        let otherPet = Pet(name: "Nori", species: "dog")
+        context.insert(pet)
+        context.insert(otherPet)
+
+        let vaccine = PetHealthLog(date: now.addingTimeInterval(-120), type: .vaccine, note: "Rabies", pet: pet)
+        vaccine.expirationDate = now.addingTimeInterval(86400 * 30)
+        context.insert(vaccine)
+        context.insert(PetHealthLog(date: now, type: .checkup, note: "Other pet", pet: otherPet))
+        context.insert(PetMedication(
+            name: "Antibiotic",
+            dosage: "5ml",
+            startDate: now.addingTimeInterval(-3600),
+            pet: pet
+        ))
+        context.insert(SymptomLog(
+            date: now,
+            category: .respiratory,
+            symptomName: "Cough",
+            severity: .moderate,
+            pet: pet
+        ))
+        context.insert(PetInsurance(
+            companyName: "CareCo",
+            productName: "Guard Plan",
+            renewalDate: now.addingTimeInterval(86400 * 14),
+            pet: pet
+        ))
+        context.insert(PetDocument(title: "Passport", category: .passport, pet: pet))
+        context.insert(PetDocument(title: "Other", category: .other, pet: otherPet))
+        context.insert(PetWeightLog(date: now, weight: 99, pet: pet))
+        context.insert(CareLedgerEvent(
+            occurredAt: now.addingTimeInterval(-3600),
+            subjectKind: .pet,
+            subjectId: pet.id.uuidString,
+            eventKind: .weight,
+            actionType: "petWeight",
+            amountValue: 4.2
+        ))
+        context.insert(CareLedgerEvent(
+            occurredAt: now,
+            subjectKind: .pet,
+            subjectId: pet.id.uuidString,
+            eventKind: .weight,
+            actionType: "petWeight",
+            amountValue: 4.8
+        ))
+        context.insert(CareLedgerEvent(
+            occurredAt: now,
+            subjectKind: .pet,
+            subjectId: otherPet.id.uuidString,
+            eventKind: .weight,
+            actionType: "petWeight",
+            amountValue: 8.8
+        ))
+        try context.save()
+
+        let snapshot = PetVetSummaryPDFSnapshot.load(pet: pet, context: context, now: now)
+
+        #expect(snapshot.recentHealthLogs.map(\.note) == ["Rabies"])
+        #expect(snapshot.activeMedications.map(\.name) == ["Antibiotic"])
+        #expect(snapshot.recentSymptoms.map(\.symptomName) == ["Cough"])
+        #expect(snapshot.activeInsurance?.productName == "Guard Plan")
+        #expect(snapshot.keyDocuments.map(\.title) == ["Passport"])
+        #expect(snapshot.latestWeightKg == 4.8)
+        #expect(snapshot.weightPoints3Mo.map(\.weightKg) == [4.2, 4.8])
+    }
+
+    @Test func expenseHistoryDashboardUsesRouteScopedRowsInsteadOfPetExpenseRelationship() throws {
+        let rootURL = repositoryRootURL()
+        let dataContainerSource = try source(
+            "Ohana/Features/Expenses/ExpenseHistoryDataContainer.swift",
+            rootURL: rootURL
+        )
+        let historySource = try source(
+            "Ohana/Features/Expenses/Views/ExpenseHistoryView.swift",
+            rootURL: rootURL
+        )
+        let addExpenseSource = try source(
+            "Ohana/Features/Expenses/Views/AddExpenseSheet.swift",
+            rootURL: rootURL
+        )
+        let dashboardSource = try source(
+            "Ohana/Features/Expenses/Views/PetExpenseDashboardContent.swift",
+            rootURL: rootURL
+        )
+        let insuranceSource = try source(
+            "Ohana/Features/Insurance/Views/PetInsuranceView.swift",
+            rootURL: rootURL
+        )
+
+        #expect(!historySource.contains("pet.expenseLogs"))
+        #expect(!addExpenseSource.contains("pet.expenseLogs"))
+        #expect(!addExpenseSource.contains("pet.insurances"))
+        #expect(!dashboardSource.contains("pet.expenseLogs"))
+        #expect(!insuranceSource.contains("pet.insurances"))
+        #expect(!dataContainerSource.contains("@Query"))
+        #expect(dataContainerSource.contains("ExpenseHistoryRouteData.load(petID:"))
+        #expect(dataContainerSource.contains("return try context.fetch(descriptor) // route-first-frame: allow deferred-fetch"))
+        #expect(dataContainerSource.contains("FetchDescriptor<PetExpenseLog>"))
+        #expect(dataContainerSource.contains("log.pet?.id == petID"))
+        #expect(dataContainerSource.contains("homeRevisionUpdates"))
+        #expect(addExpenseSource.contains("@Query private var routeExpenseLogs"))
+        #expect(addExpenseSource.contains("@Query private var routeInsurances"))
+        #expect(addExpenseSource.contains("AddInsuranceClaimSheet("))
+        #expect(addExpenseSource.contains("allExpenses: routeExpenseLogs"))
+        #expect(historySource.contains("let expenseLogs: [PetExpenseLog]"))
+        #expect(historySource.contains("var onDataChanged: (() -> Void)?"))
+        #expect(historySource.contains("PetExpenseDashboardContent("))
+        #expect(historySource.contains("expenseLogs: expenseLogs"))
+        #expect(dashboardSource.contains("let expenseLogs: [PetExpenseLog]"))
+        #expect(dashboardSource.contains("ExpenseSummaryBuilder.sortedRecent(expenseLogs)"))
+        #expect(insuranceSource.contains("@Query private var routeInsurances"))
+        #expect(insuranceSource.contains("_routeInsurances = Query("))
+        #expect(insuranceSource.contains("insurance.pet?.id == petID"))
+        #expect(insuranceSource.contains("routeInsurances.sorted"))
+    }
+
+    @Test func coHealthDashboardsUseSnapshotInsteadOfPetWalkAndWeightRelationships() throws {
+        let rootURL = repositoryRootURL()
+        let compactContainerSource = try source(
+            "Ohana/Features/Health/CoHealthDashboardDataContainer.swift",
+            rootURL: rootURL
+        )
+        let fullContainerSource = try source(
+            "Ohana/Features/Health/CoHealthDashboardFullDataContainer.swift",
+            rootURL: rootURL
+        )
+        let compactSource = try source(
+            "Ohana/Features/Health/Views/CoHealthDashboardView.swift",
+            rootURL: rootURL
+        )
+        let fullSource = try source(
+            "Ohana/Features/Health/Views/CoHealthDashboardFullView.swift",
+            rootURL: rootURL
+        )
+        let snapshotSource = try source(
+            "Ohana/Features/Health/CoHealthDashboardSnapshot.swift",
+            rootURL: rootURL
+        )
+
+        for source in [compactContainerSource, fullContainerSource] {
+            #expect(!source.contains("@Query"))
+            #expect(source.contains("CoHealthDashboardSnapshot.load(human: human, context: modelContext)"))
+            #expect(source.contains("homeRevisionUpdates"))
+        }
+        for source in [compactSource, fullSource] {
+            #expect(!source.contains("pet.walkLogs"))
+            #expect(!source.contains("pet.weightLogs"))
+            #expect(source.contains("CoHealthDashboardSnapshot"))
+        }
+        #expect(snapshotSource.contains("CareLedgerEventKind.walk.rawValue"))
+        #expect(snapshotSource.contains("CareLedgerEventKind.weight.rawValue"))
+        #expect(snapshotSource.contains("return try context.fetch(descriptor) // route-first-frame: allow deferred-fetch"))
+    }
+
+    @Test func coHealthDashboardSnapshotUsesLedgerRowsForPetWalkAndWeight() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let now = Date(timeIntervalSince1970: 1_800_006_000)
+        let human = Human(name: "Ava")
+        let pet = Pet(name: "Momo", species: "狗")
+        context.insert(human)
+        context.insert(pet)
+
+        let legacyWalk = PetWalkLog(startDate: now, pet: pet, executorId: human.id.uuidString)
+        legacyWalk.distanceMeters = 9000
+        let legacyWeight = PetWeightLog(date: now, weight: 99, pet: pet, executorId: human.id.uuidString)
+        context.insert(legacyWalk)
+        context.insert(legacyWeight)
+        context.insert(
+            CareLedgerEvent(
+                occurredAt: now,
+                actorKind: .human,
+                actorId: human.id.uuidString,
+                subjectKind: .pet,
+                subjectId: pet.id.uuidString,
+                eventKind: .walk,
+                actionType: "walk",
+                amountValue: 1200,
+                amountUnit: "m",
+                source: .detail
+            )
+        )
+        context.insert(
+            CareLedgerEvent(
+                occurredAt: now,
+                actorKind: .human,
+                actorId: human.id.uuidString,
+                subjectKind: .pet,
+                subjectId: pet.id.uuidString,
+                eventKind: .weight,
+                actionType: "weight",
+                amountValue: 4.8,
+                amountUnit: "kg",
+                source: .detail
+            )
+        )
+        try context.save()
+
+        let snapshot = CoHealthDashboardSnapshot.load(human: human, context: context, now: now)
+        let associatedDogs = snapshot.associatedPets(for: human.id, dogsOnly: true)
+
+        #expect(associatedDogs.map(\.name) == ["Momo"])
+        #expect(associatedDogs.first?.latestWeightKg == 4.8)
+        #expect(abs(snapshot.thisMonthWalkKm(for: human.id, pets: associatedDogs, now: now) - 1.2) < 0.001)
+    }
+
+    @Test func medicationSurfacesUseRouteScopedRowsInsteadOfPetMedicationRelationship() throws {
+        let rootURL = repositoryRootURL()
+        let routeDataSource = try source(
+            "Ohana/Features/Medication/PetMedicationRouteData.swift",
+            rootURL: rootURL
+        )
+        let medicationContainerSource = try source(
+            "Ohana/Features/Medication/PetMedicationDataContainer.swift",
+            rootURL: rootURL
+        )
+        let islandContainerSource = try source(
+            "Ohana/Features/Medication/IslandMedicationDashboardDataContainer.swift",
+            rootURL: rootURL
+        )
+        let detailContainerSource = try source(
+            "Ohana/Features/Medication/PetMedicationDetailDataContainer.swift",
+            rootURL: rootURL
+        )
+        let healthContainerSource = try source(
+            "Ohana/Features/Health/PetHealthDetailDataContainer.swift",
+            rootURL: rootURL
+        )
+        let medicationSource = try source(
+            "Ohana/Features/Medication/Views/PetMedicationView.swift",
+            rootURL: rootURL
+        )
+        let islandSource = try source(
+            "Ohana/Features/Medication/Views/IslandMedicationDashboard.swift",
+            rootURL: rootURL
+        )
+        let detailSource = try source(
+            "Ohana/Features/Medication/Views/PetMedicationDetailSheet.swift",
+            rootURL: rootURL
+        )
+        let healthSource = try source(
+            "Ohana/Features/Health/Views/PetHealthDetailView.swift",
+            rootURL: rootURL
+        )
+        let healthOverviewSource = try source(
+            "Ohana/Features/Health/Views/PetHealthDetailContentView+Overview.swift",
+            rootURL: rootURL
+        )
+
+        for source in [medicationContainerSource, islandContainerSource, detailContainerSource, healthContainerSource] {
+            #expect(!source.contains("@Query"))
+            #expect(source.contains("homeRevisionUpdates"))
+        }
+        for source in [medicationSource, islandSource, detailSource, healthSource, healthOverviewSource] {
+            #expect(!source.contains("pet.medications"))
+        }
+        #expect(!medicationSource.contains("let allEvents: [Event]"))
+        #expect(!detailSource.contains("let allEvents: [Event]"))
+        #expect(!healthSource.contains("let allEvents: [Event]"))
+        #expect(routeDataSource.contains("FetchDescriptor<PetMedication>"))
+        #expect(routeDataSource.contains("medication.pet?.id == petID"))
+        #expect(routeDataSource.contains("FetchDescriptor<Event>"))
+        #expect(routeDataSource.contains("EventType.petMedicationDose.rawValue"))
+        #expect(routeDataSource.contains("loadDoseEvents(medicationID:"))
+        #expect(routeDataSource.contains("return try context.fetch(descriptor) // route-first-frame: allow deferred-fetch"))
+        #expect(medicationSource.contains("let medications: [PetMedication]"))
+        #expect(medicationSource.contains("let doseEvents: [Event]"))
+        #expect(islandSource.contains("let medicationsByPetID: [UUID: [PetMedication]]"))
+        #expect(healthSource.contains("let medications: [PetMedication]"))
+        #expect(healthSource.contains("let medicationDoseEvents: [Event]"))
+    }
+
+    @Test func medicationRouteDataScopesMedicationRowsAndDoseEvents() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let now = Date(timeIntervalSince1970: 1_800_010_000)
+        let pet = Pet(name: "Momo", species: "cat")
+        let otherPet = Pet(name: "Nori", species: "dog")
+        let medication = PetMedication(name: "Drops", frequency: .daily, pet: pet)
+        let otherMedication = PetMedication(name: "Tablets", frequency: .daily, pet: otherPet)
+        let doseEvent = Event(
+            title: "Momo drops",
+            startDate: now.addingTimeInterval(-3600),
+            eventType: EventType.petMedicationDose.rawValue,
+            relatedEntityType: DomainEntityLinkRegistry.petMedicationDose,
+            relatedEntityId: medication.id.uuidString
+        )
+        let otherDoseEvent = Event(
+            title: "Nori tablets",
+            startDate: now.addingTimeInterval(-1800),
+            eventType: EventType.petMedicationDose.rawValue,
+            relatedEntityType: DomainEntityLinkRegistry.petMedicationDose,
+            relatedEntityId: otherMedication.id.uuidString
+        )
+        let unrelatedEvent = Event(
+            title: "General reminder",
+            startDate: now,
+            eventType: EventType.task.rawValue,
+            relatedEntityType: EntityKind.pet.rawValue,
+            relatedEntityId: pet.id.uuidString
+        )
+        context.insert(pet)
+        context.insert(otherPet)
+        context.insert(medication)
+        context.insert(otherMedication)
+        context.insert(doseEvent)
+        context.insert(otherDoseEvent)
+        context.insert(unrelatedEvent)
+        try context.save()
+
+        let routeData = PetMedicationRouteData.load(petID: pet.id, from: context, now: now)
+        let detailDoseEvents = PetMedicationRouteData.loadDoseEvents(medicationID: medication.id, from: context, now: now)
+        let islandData = IslandMedicationRouteData.load(from: context)
+
+        #expect(routeData.medications.map(\.name) == ["Drops"])
+        #expect(routeData.doseEvents.map(\.title) == ["Momo drops"])
+        #expect(detailDoseEvents.map(\.title) == ["Momo drops"])
+        #expect(islandData.medicationsByPetID[pet.id]?.map(\.name) == ["Drops"])
+        #expect(islandData.medicationsByPetID[otherPet.id]?.map(\.name) == ["Tablets"])
+    }
+
+    @Test func healthSurfacesUseRouteScopedRowsInsteadOfPetHealthRelationships() throws {
+        let rootURL = repositoryRootURL()
+        let routeDataSource = try source(
+            "Ohana/Features/Health/PetHealthRouteData.swift",
+            rootURL: rootURL
+        )
+        let detailContainerSource = try source(
+            "Ohana/Features/Health/PetHealthDetailDataContainer.swift",
+            rootURL: rootURL
+        )
+        let islandContainerSource = try source(
+            "Ohana/Features/Health/IslandHealthDashboardDataContainer.swift",
+            rootURL: rootURL
+        )
+        let detailSource = try source(
+            "Ohana/Features/Health/Views/PetHealthDetailView.swift",
+            rootURL: rootURL
+        )
+        let recordsSource = try source(
+            "Ohana/Features/Health/Views/PetHealthDetailContentView+Records.swift",
+            rootURL: rootURL
+        )
+        let overviewSource = try source(
+            "Ohana/Features/Health/Views/PetHealthDetailContentView+Overview.swift",
+            rootURL: rootURL
+        )
+        let routingSource = try source(
+            "Ohana/Features/Health/Views/PetHealthDetailContentView+Routing.swift",
+            rootURL: rootURL
+        )
+        let archiveSource = try source(
+            "Ohana/Features/Health/Views/PetHealthArchiveView.swift",
+            rootURL: rootURL
+        )
+        let passportSource = try source(
+            "Ohana/Features/Health/Views/VaccinePassportView.swift",
+            rootURL: rootURL
+        )
+        let logCardSource = try source(
+            "Ohana/Features/Health/Views/PetHealthLogCard.swift",
+            rootURL: rootURL
+        )
+        let immunitySource = try source(
+            "Ohana/Features/Health/Views/PetImmunityCard.swift",
+            rootURL: rootURL
+        )
+        let alertEngineSource = try source(
+            "Ohana/Features/Health/PetHealthAlertEngine.swift",
+            rootURL: rootURL
+        )
+        let forbiddenRelationshipReads = [
+            "pet.activeHealthLogs",
+            "pet.activeSymptomLogs",
+            "pet.activeHeatCycleLogs",
+            "pet.healthLogs",
+            "pet.symptomLogs",
+            "pet.heatCycleLogs"
+        ]
+
+        for source in [detailContainerSource, islandContainerSource] {
+            #expect(!source.contains("@Query"))
+            #expect(source.contains("homeRevisionUpdates"))
+            #expect(source.contains("OhanaFrameScheduler.runAfterNextFrame"))
+        }
+        for source in [
+            detailSource,
+            recordsSource,
+            overviewSource,
+            routingSource,
+            archiveSource,
+            passportSource,
+            logCardSource,
+            immunitySource
+        ] {
+            for forbidden in forbiddenRelationshipReads {
+                #expect(!source.contains(forbidden))
+            }
+        }
+        #expect(routeDataSource.contains("struct PetHealthRouteData"))
+        #expect(routeDataSource.contains("PetHealthAlertSourceRouteData"))
+        #expect(routeDataSource.contains("struct IslandHealthRouteData"))
+        #expect(routeDataSource.contains("FetchDescriptor<PetHealthLog>"))
+        #expect(routeDataSource.contains("FetchDescriptor<SymptomLog>"))
+        #expect(routeDataSource.contains("FetchDescriptor<HeatCycleLog>"))
+        #expect(routeDataSource.contains("static func load(pets: [Pet], from context: ModelContext)"))
+        #expect(routeDataSource.contains("allowedPetIDs.contains(id)"))
+        #expect(routeDataSource.contains("log.pet?.id == petID"))
+        #expect(routeDataSource.contains("return try context.fetch(descriptor) // route-first-frame: allow deferred-fetch"))
+        #expect(detailSource.contains("let healthLogs: [PetHealthLog]"))
+        #expect(detailSource.contains("let symptomLogs: [SymptomLog]"))
+        #expect(detailSource.contains("let heatCycleLogs: [HeatCycleLog]"))
+        #expect(detailSource.contains("let healthAlertSource: PetHealthAlertSource?"))
+        #expect(detailSource.contains("scanAlerts(sources: [healthAlertSource])"))
+        #expect(alertEngineSource.contains("func scanAlerts(sources: [PetHealthAlertSource])"))
+    }
+
+    @Test func petHealthRouteDataScopesHealthRowsAndAlertSource() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let now = Date()
+        let pet = Pet(name: "Momo", species: "猫")
+        let otherPet = Pet(name: "Nori", species: "狗")
+        let vaccine = PetHealthLog(
+            date: now.addingTimeInterval(-86400),
+            type: .vaccine,
+            note: "Rabies",
+            pet: pet
+        )
+        vaccine.expirationDate = now.addingTimeInterval(-3600)
+        let otherVaccine = PetHealthLog(
+            date: now,
+            type: .vaccine,
+            note: "Other vaccine",
+            pet: otherPet
+        )
+        let symptom = SymptomLog(
+            date: now,
+            category: .respiratory,
+            symptomName: "Cough",
+            severity: .severe,
+            pet: pet
+        )
+        let otherSymptom = SymptomLog(
+            date: now,
+            category: .skin,
+            symptomName: "Itch",
+            severity: .mild,
+            pet: otherPet
+        )
+        let heatCycle = HeatCycleLog(
+            startDate: now.addingTimeInterval(-7200),
+            status: .estrus,
+            pet: pet
+        )
+        context.insert(pet)
+        context.insert(otherPet)
+        context.insert(vaccine)
+        context.insert(otherVaccine)
+        context.insert(symptom)
+        context.insert(otherSymptom)
+        context.insert(heatCycle)
+        context.insert(PetWeightLog(date: now, weight: 4.8, pet: pet))
+        context.insert(PetWeightLog(date: now, weight: 28, pet: otherPet))
+        try context.save()
+
+        let routeData = PetHealthRouteData.load(petID: pet.id, from: context)
+        let islandData = IslandHealthRouteData.load(from: context)
+        let bulkSources = PetHealthAlertSourceRouteData.load(pets: [pet, otherPet], from: context)
+        let source = try #require(routeData.alertSource)
+        let bulkSource = try #require(bulkSources.first { $0.petId == pet.id })
+        let otherBulkSource = try #require(bulkSources.first { $0.petId == otherPet.id })
+        let alerts = PetHealthAlertEngine().scanAlerts(sources: [source])
+
+        #expect(routeData.healthLogs.map(\.note) == ["Rabies"])
+        #expect(routeData.symptomLogs.map(\.symptomName) == ["Cough"])
+        #expect(routeData.heatCycleLogs.map(\.status) == [.estrus])
+        #expect(source.healthLogs.map(\.note) == ["Rabies"])
+        #expect(source.symptomLogs.map(\.symptomName) == ["Cough"])
+        #expect(source.weightLogs.map(\.weight) == [4.8])
+        #expect(bulkSource.healthLogs.map(\.note) == ["Rabies"])
+        #expect(bulkSource.symptomLogs.map(\.symptomName) == ["Cough"])
+        #expect(bulkSource.weightLogs.map(\.weight) == [4.8])
+        #expect(otherBulkSource.healthLogs.map(\.note) == ["Other vaccine"])
+        #expect(otherBulkSource.weightLogs.map(\.weight) == [28])
+        #expect(islandData.healthLogsByPetID[pet.id]?.map(\.note) == ["Rabies"])
+        #expect(islandData.healthLogsByPetID[otherPet.id]?.map(\.note) == ["Other vaccine"])
+        #expect(alerts.contains { $0.type == .vaccineExpired && $0.petId == pet.id })
+        #expect(alerts.contains { $0.type == .activeSymptom && $0.petId == pet.id })
+        #expect(!alerts.contains { $0.petId == otherPet.id })
+    }
+
+    @Test func functionMenuAggregateUsesRouteScopedSummariesInsteadOfPetArchiveRelationships() throws {
+        let rootURL = repositoryRootURL()
+        let aggregateSource = try source(
+            "Ohana/Features/FunctionMenu/Views/FeatureAggregateView.swift",
+            rootURL: rootURL
+        )
+        let routeSource = try source(
+            "Ohana/Features/FunctionMenu/FunctionMenuRouteContainer.swift",
+            rootURL: rootURL
+        )
+        let routerSource = try source(
+            "Ohana/Features/FunctionMenu/Views/FunctionMenuDestinationRouter.swift",
+            rootURL: rootURL
+        )
+        let groupSource = try source(
+            "Ohana/Features/FunctionMenu/Views/FeatureGroupDashboardView.swift",
+            rootURL: rootURL
+        )
+
+        #expect(!aggregateSource.contains("pet.documents.count"))
+        #expect(!aggregateSource.contains("pet.photoLogs.count"))
+        #expect(!aggregateSource.contains("pet.milestones.count"))
+        #expect(aggregateSource.contains("petAggregateSummaries[pet.id]"))
+        #expect(routeSource.contains("struct FunctionMenuPetAggregateSummary"))
+        #expect(routeSource.contains("FetchDescriptor<PetDocument>"))
+        #expect(routeSource.contains("FetchDescriptor<PetPhotoLog>"))
+        #expect(routeSource.contains("FetchDescriptor<PetMilestone>"))
+        #expect(routeSource.contains("context.fetchCount(descriptor)"))
+        #expect(routerSource.contains("petAggregateSummaries: petAggregateSummaries"))
+        #expect(groupSource.contains("petAggregateSummaries: petAggregateSummaries"))
+    }
+
+    @MainActor
+    @Test func functionMenuPetAggregateSummaryCountsRouteScopedArchiveItems() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let pet = Pet(name: "Momo", species: "cat")
+        let otherPet = Pet(name: "Nori", species: "dog")
+        context.insert(pet)
+        context.insert(otherPet)
+        context.insert(PetDocument(title: "Passport", category: .passport, pet: pet))
+        context.insert(PetPhotoLog(imageData: Data([1, 2, 3]), pet: pet))
+        context.insert(PetMilestone(title: "First hike", pet: pet))
+        context.insert(PetDocument(title: "Other", category: .other, pet: otherPet))
+        context.insert(PetPhotoLog(imageData: Data([9]), pet: otherPet))
+        try context.save()
+
+        let summaries = FunctionMenuPetAggregateSummary.load(pets: [pet, otherPet], context: context)
+
+        #expect(summaries[pet.id]?.documentCount == 1)
+        #expect(summaries[pet.id]?.photoCount == 1)
+        #expect(summaries[pet.id]?.milestoneCount == 1)
+        #expect(summaries[otherPet.id]?.documentCount == 1)
+        #expect(summaries[otherPet.id]?.photoCount == 1)
+        #expect(summaries[otherPet.id]?.milestoneCount == 0)
+    }
+
+    @Test func archiveFeatureViewsUseRouteScopedRowsInsteadOfPetRelationships() throws {
+        let rootURL = repositoryRootURL()
+        let documentsListSource = try source(
+            "Ohana/Features/Documents/Views/DocumentsListView.swift",
+            rootURL: rootURL
+        )
+        let milestoneListSource = try source(
+            "Ohana/Features/Milestones/Views/PetMilestoneListView.swift",
+            rootURL: rootURL
+        )
+        let protectionStateSource = try source(
+            "Ohana/Features/Insurance/Views/ProtectionDashboardComponents.swift",
+            rootURL: rootURL
+        )
+        let allFeaturesSource = try source(
+            "Ohana/Features/Members/Views/PetAllFeaturesSheet.swift",
+            rootURL: rootURL
+        )
+
+        #expect(!documentsListSource.contains("pet.documents"))
+        #expect(!documentsListSource.contains("pet.insurances"))
+        #expect(documentsListSource.contains("@Query private var routeDocuments"))
+        #expect(documentsListSource.contains("@Query private var routeInsurances"))
+        #expect(!FileManager.default.fileExists(
+            atPath: rootURL.appending(path: "Ohana/Features/Documents/Views/PetDocumentsCard.swift").path
+        ))
+        #expect(!FileManager.default.fileExists(
+            atPath: rootURL.appending(path: "Ohana/Features/Milestones/Views/PetMilestonesCard.swift").path
+        ))
+        #expect(!milestoneListSource.contains("pet.milestones"))
+        #expect(milestoneListSource.contains("@Query private var routeMilestones"))
+        #expect(!protectionStateSource.contains("pet.documents"))
+        #expect(!protectionStateSource.contains("pet.insurances"))
+        #expect(protectionStateSource.contains("init(documents: [PetDocument], insurances: [PetInsurance]"))
+        #expect(!allFeaturesSource.contains("healthCount: pet.healthLogs.count"))
+        #expect(!allFeaturesSource.contains("documentCount: pet.documents.count"))
+    }
+
+    @Test func protectionDashboardStateUsesSuppliedArchiveRows() {
+        let now = Date(timeIntervalSince1970: 1_782_345_600)
+        let expiredDocument = PetDocument(title: "Passport", category: .passport)
+        expiredDocument.expiryDate = now.addingTimeInterval(-86400)
+        let futureInsurance = PetInsurance(
+            companyName: "Ohana Care",
+            renewalDate: now.addingTimeInterval(86400 * 90)
+        )
+
+        let state = PetProtectionDashboardState(
+            documents: [expiredDocument],
+            insurances: [futureInsurance],
+            now: now
+        )
+
+        #expect(state.documentCount == 1)
+        #expect(state.insuranceCount == 1)
+        #expect(state.documentsRisk == ProtectionRiskLevel.expired)
+        #expect(state.insuranceRisk == ProtectionRiskLevel.protected)
+        #expect(state.nextInsuranceDate == futureInsurance.renewalDate)
+    }
+
+    @Test func petMomentsTimelineUsesRouteScopedRowsInsteadOfPetRelationships() throws {
+        let rootURL = repositoryRootURL()
+        let builderSource = try source(
+            "Ohana/Features/PetCare/PetTimelineModels.swift",
+            rootURL: rootURL
+        )
+        let hubSource = try source(
+            "Ohana/Features/Moments/Views/PetMomentsHubView.swift",
+            rootURL: rootURL
+        )
+        let routeSource = try source(
+            "Ohana/Features/Moments/Views/PetMomentsHubRouteContainer.swift",
+            rootURL: rootURL
+        )
+        let albumSource = try source(
+            "Ohana/Features/PhotoAlbum/Views/PetPhotoAlbumView.swift",
+            rootURL: rootURL
+        )
+        let forbiddenRelationshipReads = [
+            "pet.careLogs",
+            "pet.pottyLogs",
+            "pet.walkLogs",
+            "pet.healthLogs",
+            "pet.weightLogs",
+            "pet.expenseLogs",
+            "pet.photoLogs",
+            "pet.milestones"
+        ]
+
+        for forbidden in forbiddenRelationshipReads {
+            #expect(!builderSource.contains(forbidden))
+            #expect(!hubSource.contains(forbidden))
+            #expect(!albumSource.contains(forbidden))
+        }
+        #expect(builderSource.contains("struct PetTimelineSourceRows"))
+        #expect(builderSource.contains("sourceRows.walkLogs"))
+        #expect(builderSource.contains("sourceRows.photoLogs"))
+        #expect(builderSource.contains("sourceRows.milestones"))
+        #expect(hubSource.contains("let timelineRows: PetTimelineSourceRows"))
+        #expect(albumSource.contains("let photoLogs: [PetPhotoLog]"))
+        #expect(!routeSource.contains("@Query"))
+        #expect(routeSource.contains("PetMomentsHubRouteData.load"))
+        #expect(routeSource.contains("PetTimelineSourceRows("))
+        #expect(routeSource.contains("FetchDescriptor<PetCareLog>"))
+        #expect(routeSource.contains("FetchDescriptor<PetPottyLog>"))
+        #expect(routeSource.contains("FetchDescriptor<PetWalkLog>"))
+        #expect(routeSource.contains("FetchDescriptor<PetHealthLog>"))
+        #expect(routeSource.contains("FetchDescriptor<PetExpenseLog>"))
+        #expect(routeSource.contains("FetchDescriptor<PetWeightLog>"))
+        #expect(routeSource.contains("FetchDescriptor<PetPhotoLog>"))
+        #expect(routeSource.contains("FetchDescriptor<PetMilestone>"))
+        #expect(routeSource.contains("// route-first-frame: allow deferred-fetch"))
+    }
+
+    @Test func petTimelineBuilderUsesSuppliedRowsInsteadOfPetRelationships() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let pet = Pet(name: "Momo", species: "cat")
+        let relationshipLog = PetCareLog(
+            date: Date(timeIntervalSince1970: 1000),
+            type: .feeding,
+            amountGrams: 42,
+            pet: pet
+        )
+        context.insert(pet)
+        context.insert(relationshipLog)
+        try context.save()
+
+        let emptyItems = PetTimelineItemsBuilder.items(
+            for: pet,
+            sourceRows: .empty,
+            l: L10n("en")
+        )
+        let suppliedItems = PetTimelineItemsBuilder.items(
+            for: pet,
+            sourceRows: PetTimelineSourceRows(careLogs: [relationshipLog]),
+            l: L10n("en")
+        )
+
+        #expect(emptyItems.isEmpty)
+        #expect(suppliedItems.contains { $0.id == relationshipLog.id && $0.type == "care" })
+    }
+
+    @Test func familyCareLedgerEntriesProjectWeeklyStatsAndExecutorLists() throws {
+        let calendar = Calendar(identifier: .gregorian)
+        let now = try #require(calendar.date(from: DateComponents(year: 2026, month: 6, day: 25, hour: 12)))
+        let weekStart = FamilyCareLedgerEntry.weekStart(now: now, calendar: calendar)
+        let weekEnd = try #require(calendar.date(byAdding: .day, value: 7, to: weekStart))
+        let petID = UUID()
+        let otherPetID = UUID()
+        let humanA = UUID().uuidString
+        let humanB = UUID().uuidString
+        let humanC = UUID().uuidString
+
+        let care = CareLedgerEvent(
+            occurredAt: weekStart.addingTimeInterval(3600),
+            actorKind: .human,
+            actorId: humanA,
+            subjectKind: .pet,
+            subjectId: petID.uuidString,
+            eventKind: .care,
+            actionType: CareType.watering.rawValue
+        )
+        let walk = CareLedgerEvent(
+            occurredAt: weekStart.addingTimeInterval(7200),
+            actorKind: .human,
+            actorId: humanB,
+            subjectKind: .pet,
+            subjectId: petID.uuidString,
+            eventKind: .walk,
+            actionType: "walk",
+            metadataJSON: "{\"executorIds\":[\"\(humanB)\",\"\(humanC)\"]}"
+        )
+        let expense = CareLedgerEvent(
+            occurredAt: weekStart.addingTimeInterval(10800),
+            actorKind: .human,
+            actorId: humanC,
+            subjectKind: .pet,
+            subjectId: petID.uuidString,
+            eventKind: .expense,
+            actionType: ExpenseCategory.food.rawValue
+        )
+        let otherPet = CareLedgerEvent(
+            occurredAt: weekStart.addingTimeInterval(12000),
+            actorKind: .human,
+            actorId: humanA,
+            subjectKind: .pet,
+            subjectId: otherPetID.uuidString,
+            eventKind: .care,
+            actionType: CareType.play.rawValue
+        )
+        let outsideWeek = CareLedgerEvent(
+            occurredAt: weekStart.addingTimeInterval(-60),
+            actorKind: .human,
+            actorId: humanA,
+            subjectKind: .pet,
+            subjectId: petID.uuidString,
+            eventKind: .potty,
+            actionType: PottyType.pee.rawValue
+        )
+
+        let entries = FamilyCareLedgerEntry.entries(
+            from: [care, walk, expense, otherPet, outsideWeek],
+            petIDs: [petID],
+            start: weekStart,
+            end: weekEnd
+        )
+
+        #expect(entries.map(\.kind) == [.care, .walk, .expense])
+        #expect(entries.map(\.executorIDs) == [[humanA], [humanB, humanC], [humanC]])
+        #expect(entries.map(\.petID) == [petID, petID, petID])
+    }
+
     @Test func deceasedPetCannotDeleteOrUndoCareFacts() throws {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
@@ -2320,5 +4171,19 @@ struct MemberLifecycleGateTests {
         }
 
         func compensate(reminders _: [Reminder]) {}
+    }
+
+    private func repositoryRootURL() -> URL {
+        URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+    }
+
+    private func source(_ path: String, rootURL: URL) throws -> String {
+        try String(contentsOf: rootURL.appending(path: path), encoding: .utf8)
+    }
+
+    private func isAchievementUnlocked(_ id: String, in achievements: [Achievement]) -> Bool {
+        achievements.first(where: { $0.id == id })?.isUnlocked ?? false
     }
 }

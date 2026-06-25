@@ -36,8 +36,7 @@ struct QuickPlayDetailRouteContainer: View {
                     onRemove: onRemove,
                     onClose: onClose,
                     allEvents: routeData.allEvents,
-                    playEntries: routeData.playEntries,
-                    legacyPlayDeleteLogs: routeData.legacyPlayDeleteLogs
+                    playEntries: routeData.playEntries
                 )
             } else if routeData.hasLoaded {
                 QuickCareMissingRouteEntityView(kind: "pet")
@@ -111,7 +110,7 @@ struct QuickFeedDetailRouteContainer: View {
                     allHumans: routeData.allHumans,
                     allPets: routeData.allPets,
                     feedingLedgerEntries: routeData.feedingLedgerEntries,
-                    allCareLogs: routeData.allCareLogs,
+                    legacyCareLogs: routeData.legacyCareLogs,
                     allFoodRecords: routeData.allFoodRecords,
                     allSharedCareSessions: routeData.sharedCareSessions
                 )
@@ -173,8 +172,7 @@ struct QuickWaterDetailRouteContainer: View {
                     onClose: onClose,
                     allEvents: routeData.allEvents,
                     allPets: routeData.allPets,
-                    waterEntries: routeData.waterEntries,
-                    legacyWaterDeleteLogs: routeData.legacyWaterDeleteLogs
+                    waterEntries: routeData.waterEntries
                 )
             } else if routeData.hasLoaded {
                 QuickCareMissingRouteEntityView(kind: "pet")
@@ -236,8 +234,7 @@ struct QuickPottyDetailRouteContainer: View {
                     allPets: routeData.allPets,
                     pottyEntries: routeData.pottyEntries,
                     litterEntries: routeData.litterEntries,
-                    legacyPottyDeleteLogs: routeData.legacyPottyDeleteLogs,
-                    legacyLitterDeleteLogs: routeData.legacyLitterDeleteLogs
+                    unknownPottyEntries: routeData.unknownPottyEntries
                 )
             } else if routeData.hasLoaded {
                 QuickCareMissingRouteEntityView(kind: "pet")
@@ -272,7 +269,6 @@ private struct QuickPlayRouteData {
     var pet: Pet?
     var allEvents: [Event] = []
     var playEntries: [QuickPlayLedgerEntry] = []
-    var legacyPlayDeleteLogs: [PetCareLog] = []
     var hasLoaded = false
 
     static func load(id: UUID, from context: ModelContext) -> QuickPlayRouteData {
@@ -296,17 +292,6 @@ private struct QuickPlayRouteData {
                 context: context,
                 name: "CareLedgerEvent"
             ), petID: id),
-            legacyPlayDeleteLogs: fetch(
-                FetchDescriptor<PetCareLog>(
-                    predicate: #Predicate<PetCareLog> { log in
-                        log.pet?.id == id &&
-                            log.type == playType
-                    },
-                    sortBy: [SortDescriptor(\.date, order: .reverse)]
-                ),
-                context: context,
-                name: "PetCareLog"
-            ),
             hasLoaded: true
         )
     }
@@ -318,7 +303,7 @@ private struct QuickFeedRouteData {
     var allHumans: [Human] = []
     var allPets: [Pet] = []
     var feedingLedgerEntries: [QuickFeedLedgerEntry] = []
-    var allCareLogs: [PetCareLog] = []
+    var legacyCareLogs: [PetCareLog] = []
     var allFoodRecords: [PetFoodRecord] = []
     var sharedCareSessions: [SharedCareSession] = []
     var hasLoaded = false
@@ -336,18 +321,6 @@ private struct QuickFeedRouteData {
         ) ?? Date().addingTimeInterval(-6 * 86400)
         let pet = fetchPet(id: id, context: context)
         let allEvents = events(context: context)
-        let allCareLogs = fetch(
-            FetchDescriptor<PetCareLog>(
-                predicate: #Predicate<PetCareLog> { log in
-                    log.type == feedingType &&
-                        log.pet?.id == id &&
-                        log.date >= homeLogStartDate
-                },
-                sortBy: [SortDescriptor(\.date, order: .reverse)]
-            ),
-            context: context,
-            name: "PetCareLog"
-        )
         let feedingLedgerEvents = fetch(
             FetchDescriptor<CareLedgerEvent>(
                 predicate: #Predicate<CareLedgerEvent> { event in
@@ -362,6 +335,7 @@ private struct QuickFeedRouteData {
             context: context,
             name: "CareLedgerEvent"
         )
+        let legacyCareLogs = legacyCareLogsForLedgerEvents(feedingLedgerEvents, context: context)
         let feedRuleState = pet.map { FeedRuleState(pet: $0, allEvents: allEvents, now: Date()) }
 
         return QuickFeedRouteData(
@@ -377,12 +351,12 @@ private struct QuickFeedRouteData {
                 QuickFeedLedgerEntry.entries(
                     pet: $0,
                     feedingLedgerEvents: feedingLedgerEvents,
-                    legacyCareLogs: allCareLogs,
+                    legacyCareLogs: legacyCareLogs,
                     manualPlanEvents: feedRuleState?.manualReminderEvents ?? [],
                     autoFeederEvents: feedRuleState?.autoFeederEvents ?? []
                 )
             } ?? [],
-            allCareLogs: allCareLogs,
+            legacyCareLogs: legacyCareLogs,
             allFoodRecords: fetch(
                 FetchDescriptor<PetFoodRecord>(
                     predicate: #Predicate<PetFoodRecord> { record in
@@ -407,6 +381,28 @@ private struct QuickFeedRouteData {
             hasLoaded: true
         )
     }
+
+    private static func legacyCareLogsForLedgerEvents(
+        _ events: [CareLedgerEvent],
+        context: ModelContext
+    ) -> [PetCareLog] {
+        let ids = Set(events.compactMap(\.legacyModelId).compactMap(UUID.init(uuidString:)))
+            .sorted { $0.uuidString < $1.uuidString }
+        guard !ids.isEmpty else { return [] }
+        return ids.compactMap { id in
+            var descriptor = FetchDescriptor<PetCareLog>(
+                predicate: #Predicate<PetCareLog> { log in
+                    log.id == id
+                }
+            )
+            descriptor.fetchLimit = 1
+            return fetch(
+                descriptor,
+                context: context,
+                name: "PetCareLog"
+            ).first
+        }
+    }
 }
 
 private struct QuickWaterRouteData {
@@ -414,7 +410,6 @@ private struct QuickWaterRouteData {
     var allEvents: [Event] = []
     var allPets: [Pet] = []
     var waterEntries: [QuickWaterLedgerEntry] = []
-    var legacyWaterDeleteLogs: [PetCareLog] = []
     var hasLoaded = false
 
     static func load(id: UUID, from context: ModelContext) -> QuickWaterRouteData {
@@ -444,19 +439,6 @@ private struct QuickWaterRouteData {
                 context: context,
                 name: "CareLedgerEvent"
             ), petID: id),
-            legacyWaterDeleteLogs: fetch(
-                FetchDescriptor<PetCareLog>(
-                    predicate: #Predicate<PetCareLog> { log in
-                        (log.type == wateringType ||
-                            log.type == waterChangeType ||
-                            log.type == filterCleanType) &&
-                            log.pet?.id == id
-                    },
-                    sortBy: [SortDescriptor(\.date, order: .reverse)]
-                ),
-                context: context,
-                name: "PetCareLog"
-            ),
             hasLoaded: true
         )
     }
@@ -468,8 +450,7 @@ private struct QuickPottyRouteData {
     var allPets: [Pet] = []
     var pottyEntries: [PoopPottyLedgerEntry] = []
     var litterEntries: [PoopLitterLedgerEntry] = []
-    var legacyPottyDeleteLogs: [PetPottyLog] = []
-    var legacyLitterDeleteLogs: [PetCareLog] = []
+    var unknownPottyEntries: [PoopUnknownPottyEntry] = []
     var hasLoaded = false
 
     static func load(id: UUID, from context: ModelContext) -> QuickPottyRouteData {
@@ -507,26 +488,9 @@ private struct QuickPottyRouteData {
                 context: context,
                 name: "CareLedgerEvent"
             ), petID: id),
-            legacyPottyDeleteLogs: fetch(
-                FetchDescriptor<PetPottyLog>(
-                    predicate: #Predicate<PetPottyLog> { log in
-                        log.pet?.id == id
-                    },
-                    sortBy: [SortDescriptor(\.date, order: .reverse)]
-                ),
-                context: context,
-                name: "PetPottyLog"
-            ),
-            legacyLitterDeleteLogs: fetch(
-                FetchDescriptor<PetCareLog>(
-                    predicate: #Predicate<PetCareLog> { log in
-                        log.pet?.id == id &&
-                            log.type == litterType
-                    },
-                    sortBy: [SortDescriptor(\.date, order: .reverse)]
-                ),
-                context: context,
-                name: "PetCareLog"
+            unknownPottyEntries: QuickPottyUnknownClaimStore.entries(
+                for: id,
+                context: context
             ),
             hasLoaded: true
         )

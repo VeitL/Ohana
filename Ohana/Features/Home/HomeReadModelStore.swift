@@ -352,6 +352,7 @@ actor HomeReadModelActor {
 
         let humanMedications = fetches.humanMedications()
         let humanMedicationLogs = fetches.humanMedicationLogs()
+        let healthAlertSources = fetches.healthAlertSources(pets: pets)
         let todayFocusCareLedgerEntries = fetches.todayFocusCareLedgerEntries()
         let feedingLedgerEntries = fetches.feedingLedgerEntries()
         let careLedgerEntries = fetches.careQuickActionEntries()
@@ -377,6 +378,7 @@ actor HomeReadModelActor {
             pendingReminders: pendingReminders,
             humanMedications: humanMedications,
             humanMedicationLogs: humanMedicationLogs,
+            healthAlertSources: healthAlertSources,
             todayFocusCareLedgerEntries: todayFocusCareLedgerEntries,
             feedingLedgerEntries: feedingLedgerEntries,
             careLedgerEntries: careLedgerEntries,
@@ -552,19 +554,25 @@ private nonisolated struct HomeReadModelFetches {
         return fetchOrLog(descriptor, operation: "fetch home human medication logs")
     }
 
+    func healthAlertSources(pets: [Pet]) -> [PetHealthAlertSource] {
+        PetHealthAlertSourceRouteData.load(pets: pets, from: context)
+    }
+
     func todayFocusCareLedgerEntries() -> [TodayFocusCareLedgerEntry] {
         let today = calendar.startOfDay(for: now)
         let petSubject = CareLedgerSubjectKind.pet.rawValue
         let careKind = CareLedgerEventKind.care.rawValue
         let walkKind = CareLedgerEventKind.walk.rawValue
         let pottyKind = CareLedgerEventKind.potty.rawValue
+        let weightKind = CareLedgerEventKind.weight.rawValue
         var descriptor = FetchDescriptor<CareLedgerEvent>(
             predicate: #Predicate<CareLedgerEvent> { event in
                 event.occurredAt >= today &&
                     event.subjectKind == petSubject &&
                     (event.eventKind == careKind ||
                         event.eventKind == walkKind ||
-                        event.eventKind == pottyKind)
+                        event.eventKind == pottyKind ||
+                        event.eventKind == weightKind)
             },
             sortBy: [SortDescriptor(\CareLedgerEvent.occurredAt, order: .reverse)]
         )
@@ -801,6 +809,7 @@ private nonisolated struct HomeReadModelFetches {
             eventKind: event.eventKindEnum,
             actionType: event.actionType,
             date: event.occurredAt,
+            amountValue: event.amountValue,
             sourceEventId: event.sourceEventId.flatMap(UUID.init(uuidString:)),
             actorId: event.actorId
         )

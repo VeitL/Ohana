@@ -26,57 +26,57 @@ extension AchievementWallContentView {
         case "old_friend":
             return Calendar.current.date(byAdding: .day, value: 7, to: activePet.createdAt)
         case "long_runner":
-            return activePet.walkLogs
-                .filter { $0.distanceMeters >= 5000 }
-                .map(\.startDate)
+            return activeCareLedgerSummary.walkEvents
+                .filter { $0.amountValue >= 5000 }
+                .map(\.occurredAt)
                 .min()
         case "medication_complete":
-            return activePet.medications.compactMap(\.endDate).filter { $0 <= Date() }.min()
+            return activePetActivitySummary.completedMedicationEndDates(now: Date()).min()
         case "photo_enthusiast":
-            return thresholdDate(from: activePet.photoLogs.map(\.date), target: 20)
+            return thresholdDate(from: activePetActivitySummary.photoDates, target: 20)
         case "expense_tracker":
-            return thresholdDate(from: activePet.expenseLogs.map(\.date), target: 10)
+            return thresholdDate(from: activeCareLedgerSummary.dates(kind: .expense), target: 10)
         case "weight_manager":
-            return thresholdDate(from: activePet.weightLogs.map(\.date), target: 7)
+            return thresholdDate(from: activeCareLedgerSummary.dates(kind: .weight), target: 7)
         case "hydration_buddy":
-            return thresholdDate(from: activePet.careLogs.filter { $0.careType == .watering }.map(\.date), target: 14)
+            return thresholdDate(from: activeCareLedgerSummary.wateringEvents.map(\.occurredAt), target: 14)
         case "play_champion":
-            return thresholdDate(from: activePet.careLogs.filter { $0.careType == .play }.map(\.date), target: 20)
+            return thresholdDate(from: activeCareLedgerSummary.playEvents.map(\.occurredAt), target: 20)
         case "clean_keeper":
             return thresholdDate(from: cleaningRecordDates(), target: 20)
         case "treat_scout":
-            return thresholdDate(from: activePet.careLogs.filter { FeedLogMetadata.isTreatLog($0) }.map(\.date), target: 10)
+            return thresholdDate(from: activeCareLedgerSummary.treatEvents.map(\.occurredAt), target: 10)
         case "food_kind_explorer":
-            return latestDate(from: mainFeedLogs().map(\.date))
+            return latestDate(from: mainFeedRecordDates())
         case "auto_feeder_pilot":
-            return thresholdDate(from: mainFeedLogs().filter(\.isAutoFeedLogEntry).map(\.date), target: 3)
+            return thresholdDate(from: autoMainFeedRecordDates(), target: 3)
         case "stock_keeper":
-            return thresholdDate(from: activePet.foodRecords.map(\.startDate), target: 2)
+            return thresholdDate(from: activePetActivitySummary.foodRecordDates, target: 2)
         case "protection_ready":
-            return earliestDate(from: activePet.insurances.map(\.createdAt) + activePet.documents.compactMap(\.issueDate))
+            return earliestDate(from: activePetActivitySummary.insuranceCreatedDates + activePetActivitySummary.documentIssueDates)
         case "vaccine_keeper":
-            return activePet.healthLogs
+            return activeCareLedgerSummary.healthEvents
                 .filter {
-                    $0.type == "vaccine"
-                        || $0.type == "vaccination"
+                    $0.actionType == "vaccine"
+                        || $0.actionType == "vaccination"
                         || $0.note.localizedCaseInsensitiveContains("疫苗")
                         || $0.note.localizedCaseInsensitiveContains("vaccine")
                         || $0.note.localizedCaseInsensitiveContains("impf")
                 }
-                .map(\.date)
+                .map(\.occurredAt)
                 .min()
         case "symptom_watcher":
-            return thresholdDate(from: activePet.symptomLogs.map(\.date), target: 3)
+            return thresholdDate(from: activePetActivitySummary.symptomDates, target: 3)
         case "care_streak_keeper":
             return badge.isUnlocked ? Date() : nil
         case "meal_archivist":
-            return thresholdDate(from: mainFeedLogs().map(\.date), target: 50)
+            return thresholdDate(from: mainFeedRecordDates(), target: 50)
         case "water_guardian":
             return thresholdDate(from: waterCareRecordDates(), target: 50)
         case "memory_collector":
-            return thresholdDate(from: activePet.photoLogs.map(\.date), target: 50)
+            return thresholdDate(from: activePetActivitySummary.photoDates, target: 50)
         case "weight_rhythm":
-            return thresholdDate(from: activePet.weightLogs.map(\.date), target: 14)
+            return thresholdDate(from: activeCareLedgerSummary.dates(kind: .weight), target: 14)
         case "year_companion":
             return Calendar.current.date(byAdding: .day, value: 365, to: activePet.createdAt)
         case "global_island_crew":
@@ -184,40 +184,51 @@ extension AchievementWallContentView {
 
     func cumulativeWalkDate(targetMeters: Double) -> Date? {
         var total = 0.0
-        for log in activePet.walkLogs.sorted(by: { $0.startDate < $1.startDate }) {
-            total += log.distanceMeters
-            if total >= targetMeters { return log.startDate }
+        for event in activeCareLedgerSummary.walkEvents.sorted(by: { $0.occurredAt < $1.occurredAt }) {
+            total += event.amountValue
+            if total >= targetMeters { return event.occurredAt }
         }
         return nil
     }
 
     func petRecordDates() -> [Date] {
-        activePet.healthLogs.map(\.date)
-            + activePet.pottyLogs.map(\.date)
-            + activePet.walkLogs.map(\.startDate)
-            + activePet.hygieneLogs.map(\.date)
-            + activePet.careLogs.map(\.date)
-            + activePet.foodRecords.map(\.startDate)
-            + activePet.expenseLogs.map(\.date)
-            + activePet.weightLogs.map(\.date)
-            + activePet.photoLogs.map(\.date)
-            + activePet.milestones.map(\.date)
+        activeCareLedgerSummary.recordDates
+            + activePetActivitySummary.foodRecordDates
+            + activePetActivitySummary.photoDates
+            + activePetActivitySummary.milestoneDates
     }
 
     func feedingRecordDates() -> [Date] {
-        activePet.foodRecords.map(\.startDate)
-            + activePet.careLogs.filter { $0.careType == .feeding }.map(\.date)
+        activePetActivitySummary.foodRecordDates
+            + activeCareLedgerSummary.mainFeedEvents.map(\.occurredAt)
     }
 
     func cleaningRecordDates() -> [Date] {
-        activePet.hygieneLogs.map(\.date)
-            + activePet.careLogs.filter {
-                [.litter, .waterChange, .filterClean, .cageCleaning, .substrateChange].contains($0.careType)
-            }.map(\.date)
+        activeCareLedgerSummary.hygieneEvents.map(\.occurredAt)
+            + activeCareLedgerSummary.cleaningCareEvents.map(\.occurredAt)
     }
 
     func waterCareRecordDates() -> [Date] {
-        activePet.careLogs.filter { [.watering, .waterChange].contains($0.careType) }.map(\.date)
+        activeCareLedgerSummary.waterCareEvents.map(\.occurredAt)
+    }
+
+    func mainFeedRecordDates() -> [Date] {
+        activeCareLedgerSummary.mainFeedEvents.map(\.occurredAt)
+    }
+
+    func autoMainFeedRecordDates() -> [Date] {
+        activeCareLedgerSummary.mainFeedEvents
+            .filter { event in
+                FeedLogMetadata.source(
+                    actionType: event.actionType,
+                    note: event.note,
+                    ledgerSource: event.sourceEnum,
+                    sourceEventId: event.sourceEventId,
+                    sourceReminderId: event.sourceReminderId,
+                    metadataJSON: event.metadataJSON
+                ) == .autoMain
+            }
+            .map(\.occurredAt)
     }
 
     func humanRecordDates(_ human: Human) -> [Date] {

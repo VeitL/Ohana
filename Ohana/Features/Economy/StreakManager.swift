@@ -9,7 +9,7 @@ import SwiftData
 
 enum StreakManager {
     /// 检查并更新 pet 的 streak。
-    /// 规则：今日有任意一条 pottyLog / walkLog / foodRecord 即视为打卡。
+    /// 规则：今日有任意一条 potty / walk / feeding ledger event 即视为打卡。
     /// 调用时机：App foreground / 任意记录写入后。
     @MainActor
     static func refreshStreak(for pet: Pet, context: ModelContext) {
@@ -18,7 +18,7 @@ enum StreakManager {
         let today = cal.startOfDay(for: Date())
         let yesterday = cal.date(byAdding: .day, value: -1, to: today)!
 
-        let checkedInToday = hasCheckIn(pet: pet, on: today)
+        let checkedInToday = hasCheckIn(pet: pet, on: today, context: context)
 
         if let lastDate = pet.lastCheckInDate {
             let lastDay = cal.startOfDay(for: lastDate)
@@ -64,12 +64,41 @@ enum StreakManager {
         context.safeSave()
     }
 
-    private static func hasCheckIn(pet: Pet, on day: Date) -> Bool {
+    private static func hasCheckIn(pet: Pet, on day: Date, context: ModelContext) -> Bool {
         let cal = Calendar.current
-        let hasPotty = pet.pottyLogs.contains { cal.isDate($0.date, inSameDayAs: day) }
-        let hasWalk = pet.walkLogs.contains { cal.isDate($0.startDate, inSameDayAs: day) }
-        let hasFood = pet.foodRecords.contains { cal.isDate($0.startDate, inSameDayAs: day) }
-        return hasPotty || hasWalk || hasFood
+        let dayStart = cal.startOfDay(for: day)
+        let dayEnd = cal.date(byAdding: .day, value: 1, to: dayStart)
+            ?? dayStart.addingTimeInterval(86400)
+        let subjectKind = CareLedgerSubjectKind.pet.rawValue
+        let subjectId = pet.id.uuidString
+        let careKind = CareLedgerEventKind.care.rawValue
+        let pottyKind = CareLedgerEventKind.potty.rawValue
+        let walkKind = CareLedgerEventKind.walk.rawValue
+        let feedingAction = CareType.feeding.rawValue
+        var descriptor = FetchDescriptor<CareLedgerEvent>(
+            predicate: #Predicate<CareLedgerEvent> { event in
+                event.subjectKind == subjectKind &&
+                    event.subjectId == subjectId &&
+                    event.occurredAt >= dayStart &&
+                    event.occurredAt < dayEnd &&
+                    (
+                        event.eventKind == pottyKind ||
+                            event.eventKind == walkKind ||
+                            (event.eventKind == careKind && event.actionType == feedingAction)
+                    )
+            },
+            sortBy: [SortDescriptor(\CareLedgerEvent.occurredAt, order: .reverse)]
+        )
+        descriptor.fetchLimit = 1
+        do {
+            return try !context.fetch(descriptor).isEmpty
+        } catch {
+            OhanaLog.warning(
+                "Streak check-in ledger fetch failed: \(error.localizedDescription)",
+                category: "Economy"
+            )
+            return false
+        }
     }
 
     /// 最高 streak 的宠物

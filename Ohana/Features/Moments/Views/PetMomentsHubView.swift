@@ -71,6 +71,7 @@ private struct PendingSharedSessionDelete: Identifiable {
 
 struct PetMomentsHubView: View {
     let pet: Pet
+    let timelineRows: PetTimelineSourceRows
     let sharedCareSessions: [SharedCareSession]
 
     @Environment(\.dismiss) private var dismiss
@@ -89,15 +90,15 @@ struct PetMomentsHubView: View {
     private var themeColor: Color { Color(hex: pet.safeThemeColorHex) }
 
     private var highlightCount: Int {
-        PetTimelineItemsBuilder.archiveItems(for: pet, mode: .highlights, l: l, sharedCareSessions: sharedCareSessions).count
+        PetTimelineItemsBuilder.archiveItems(for: pet, mode: .highlights, sourceRows: timelineRows, l: l, sharedCareSessions: sharedCareSessions).count
     }
 
     private var memoryCount: Int {
-        PetTimelineItemsBuilder.archiveItems(for: pet, mode: .memories, l: l, sharedCareSessions: sharedCareSessions).count
+        PetTimelineItemsBuilder.archiveItems(for: pet, mode: .memories, sourceRows: timelineRows, l: l, sharedCareSessions: sharedCareSessions).count
     }
 
     private var realPhotos: [PetPhotoLog] {
-        pet.photoLogs
+        timelineRows.photoLogs
             .filter { !$0.imageData.isEmpty }
             .sorted { $0.date > $1.date }
     }
@@ -105,9 +106,9 @@ struct PetMomentsHubView: View {
     private var currentSections: [PetTimelineArchiveSection] {
         switch tab {
         case .highlights:
-            PetTimelineItemsBuilder.archiveSections(for: pet, mode: .highlights, l: l, sharedCareSessions: sharedCareSessions)
+            PetTimelineItemsBuilder.archiveSections(for: pet, mode: .highlights, sourceRows: timelineRows, l: l, sharedCareSessions: sharedCareSessions)
         case .timeline:
-            PetTimelineItemsBuilder.archiveSections(for: pet, mode: archiveFilter.mode, l: l, sharedCareSessions: sharedCareSessions)
+            PetTimelineItemsBuilder.archiveSections(for: pet, mode: archiveFilter.mode, sourceRows: timelineRows, l: l, sharedCareSessions: sharedCareSessions)
         case .photos:
             []
         }
@@ -139,7 +140,7 @@ struct PetMomentsHubView: View {
                     }
 
                     if tab == .photos {
-                        PetPhotoAlbumView(pet: pet, hubPickerSelection: $photosPickerItems)
+                        PetPhotoAlbumView(pet: pet, photoLogs: timelineRows.photoLogs, hubPickerSelection: $photosPickerItems)
                     } else {
                         archiveScroll
                     }

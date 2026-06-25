@@ -733,8 +733,15 @@ struct SharedPetActionRecorderTests {
             localRecordId: session.id,
             context: context
         )
+        let firstPetID = first.id
+        let careLogs = try context.fetch(FetchDescriptor<PetCareLog>(
+            predicate: #Predicate<PetCareLog> { log in
+                log.pet?.id == firstPetID
+            }
+        ))
         let item = try #require(PetTimelineItemsBuilder.items(
             for: first,
+            sourceRows: PetTimelineSourceRows(careLogs: careLogs),
             sharedCareSessions: [session],
             l: L10n("en")
         ).first { $0.type == "care" })

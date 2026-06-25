@@ -68,12 +68,7 @@ struct PetProtectionDashboardState {
     let nextDocumentDate: Date?
     let nextInsuranceDate: Date?
 
-    init(pet: Pet, calendar: Calendar = .current, now: Date = Date()) {
-        let documents = pet.documents.filter { doc in
-            doc.documentCategory != .vaccine && doc.documentCategory != .insurance
-        }
-        let insurances = pet.insurances
-
+    init(documents: [PetDocument], insurances: [PetInsurance], calendar: Calendar = .current, now: Date = Date()) {
         documentCount = documents.count
         insuranceCount = insurances.count
         documentsRisk = Self.risk(for: documents.compactMap(\.expiryDate), now: now, calendar: calendar, empty: documents.isEmpty)

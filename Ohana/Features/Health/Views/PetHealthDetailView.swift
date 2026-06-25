@@ -11,11 +11,18 @@ import SwiftUI
 
 struct PetHealthDetailContentView: View {
     let pet: Pet
-    let allEvents: [Event]
+    let healthLogs: [PetHealthLog]
+    let symptomLogs: [SymptomLog]
+    let heatCycleLogs: [HeatCycleLog]
+    let healthAlertSource: PetHealthAlertSource?
+    let medications: [PetMedication]
+    let medicationDoseEvents: [Event]
     var isModal: Bool = false
     var initialSection: PetHealthInitialSection?
     /// D4: 关闭时额外回调（如需一并关闭父级）
     var onFullDismiss: (() -> Void)?
+    var onHealthDataChanged: (() -> Void)?
+    var onMedicationDataChanged: (() -> Void)?
     @Environment(\.modelContext) var modelContext
     @Environment(\.dismiss) var dismiss
     @Environment(\.colorScheme) var colorScheme
@@ -51,13 +58,31 @@ struct PetHealthDetailContentView: View {
     var l: L10n { L10n(appLanguage) }
     /// 深色：界面结构色统一荧光绿；与宠物相关的记录语义仍用 `themeColor` / `colorForType`
     var chromeAccent: Color { isDark ? Color.goPrimary : Color.goBlue }
+    var healthAlertRefreshKey: String {
+        [
+            healthLogs.first?.id.uuidString ?? "none",
+            symptomLogs.first?.id.uuidString ?? "none",
+            heatCycleLogs.first?.id.uuidString ?? "none",
+            "\(healthLogs.count)",
+            "\(symptomLogs.count)",
+            "\(heatCycleLogs.count)"
+        ].joined(separator: "|")
+    }
 
     var sortedLogs: [PetHealthLog] {
-        pet.activeHealthLogs.sorted { $0.date > $1.date }
+        healthLogs.sorted { $0.date > $1.date }
+    }
+
+    var sortedSymptomLogs: [SymptomLog] {
+        symptomLogs.sorted { $0.date > $1.date }
+    }
+
+    var sortedHeatCycleLogs: [HeatCycleLog] {
+        heatCycleLogs.sorted { $0.startDate > $1.startDate }
     }
 
     func latestLog(type: HealthLogType) -> PetHealthLog? {
-        pet.activeHealthLogs.filter { $0.type == type.rawValue }.sorted { $0.date > $1.date }.first
+        healthLogs.filter { $0.type == type.rawValue }.sorted { $0.date > $1.date }.first
     }
 
     func dueDate(for type: HealthLogType) -> Date? {
@@ -136,6 +161,7 @@ struct PetHealthDetailContentView: View {
         commandQueue.enqueue(command) {
             _ = operation()
             deletingHealthRecordIDs.remove(recordID)
+            onHealthDataChanged?()
         }
     }
 
@@ -225,7 +251,7 @@ struct PetHealthDetailContentView: View {
     // 散点数据：最近 12 个月每条记录一个点
     var scatterPoints: [HealthScatterPoint] {
         let cutoff = Calendar.current.date(byAdding: .month, value: -12, to: Date())!
-        return pet.activeHealthLogs
+        return healthLogs
             .filter { $0.date >= cutoff }
             .map { HealthScatterPoint(date: $0.date, typeName: $0.type,
                                       typeEnum: HealthLogType(rawValue: $0.type) ?? .general) }
@@ -256,13 +282,7 @@ struct PetHealthDetailContentView: View {
     }
 
     var activeMedications: [PetMedication] {
-        pet.medications.filter(\.isActiveToday)
-    }
-
-    var medicationDoseEvents: [Event] {
-        allEvents.filter {
-            PetMedicationDoseLogging.doseMedicationId(for: $0) != nil
-        }
+        medications.filter(\.isActiveToday)
     }
 
     var totalMedicationDosesToday: Int {
@@ -333,7 +353,7 @@ struct PetHealthDetailContentView: View {
     }
 
     var latestSymptomLog: SymptomLog? {
-        pet.activeSymptomLogs.sorted { $0.date > $1.date }.first
+        sortedSymptomLogs.first
     }
 
     var preventiveTypes: [HealthLogType] {
@@ -397,7 +417,7 @@ struct PetHealthDetailContentView: View {
     }
 
     var archiveStatusText: String {
-        let count = pet.activeHealthLogs.count + pet.activeSymptomLogs.count + pet.activeHeatCycleLogs.count
+        let count = healthLogs.count + symptomLogs.count + heatCycleLogs.count
         return count == 0 ? l.tr(zh: "空", en: "Empty", de: "Leer") : l.tr(zh: "\(count) 条", en: "\(count) items", de: "\(count) Einträge")
     }
 
@@ -484,7 +504,7 @@ struct PetHealthDetailContentView: View {
     }
 
     var latestVisitLog: PetHealthLog? {
-        pet.activeHealthLogs
+        healthLogs
             .filter { visitTypes.contains($0.healthLogType) }
             .sorted { $0.date > $1.date }
             .first
@@ -495,7 +515,7 @@ struct PetHealthDetailContentView: View {
     }
 
     var recentHealthActivities: [HealthActivityItem] {
-        let logItems = pet.activeHealthLogs.map { log in
+        let logItems = healthLogs.map { log in
             HealthActivityItem(
                 id: "health-\(log.id.uuidString)",
                 date: log.date,
@@ -505,7 +525,7 @@ struct PetHealthDetailContentView: View {
                 tint: colorForType(log.healthLogType)
             )
         }
-        let symptomItems = pet.activeSymptomLogs.map { log in
+        let symptomItems = symptomLogs.map { log in
             HealthActivityItem(
                 id: "symptom-\(log.id.uuidString)",
                 date: log.date,
@@ -515,7 +535,7 @@ struct PetHealthDetailContentView: View {
                 tint: log.severity == .severe || log.severity == .critical ? Color.goRed : Color.goOrange
             )
         }
-        let heatItems = pet.activeHeatCycleLogs.map { log in
+        let heatItems = heatCycleLogs.map { log in
             HealthActivityItem(
                 id: "heat-\(log.id.uuidString)",
                 date: log.startDate,
@@ -555,6 +575,7 @@ struct PetHealthDetailContentView: View {
         appServices.medicationReminders.scheduleMedicationReminders(for: pet, context: modelContext)
         OhanaFeedback.success()
         medicationDoseRefreshToken = UUID()
+        onMedicationDataChanged?()
     }
 
     func medicationDoseItems(from start: Date, through end: Date) -> [PetHealthMedicationDoseItem] {
@@ -625,8 +646,11 @@ struct PetHealthDetailContentView: View {
                 .padding(.top, 12)
             }
             .onAppear {
-                healthAlerts = appServices.healthAlerts.scanAlerts(pets: [pet])
+                refreshHealthAlerts()
                 openInitialSectionIfNeeded()
+            }
+            .onChange(of: healthAlertRefreshKey) { _, _ in
+                refreshHealthAlerts()
             }
 
             VStack {
@@ -661,11 +685,11 @@ struct PetHealthDetailContentView: View {
             case .direct:
                 EmptyView()
             case .medications:
-                PetMedicationView(pet: pet)
+                PetMedicationView(pet: pet, onDataChanged: onMedicationDataChanged)
             case .symptom:
-                AddSymptomSheet(pet: pet)
+                AddSymptomSheet(pet: pet, onSaved: onHealthDataChanged)
             case .heatCycle:
-                AddHeatCycleSheet(pet: pet)
+                AddHeatCycleSheet(pet: pet, onSaved: onHealthDataChanged)
             }
         }
         .sheet(isPresented: $showingPDFPreview) {
@@ -678,13 +702,31 @@ struct PetHealthDetailContentView: View {
                 .ohanaSheetPagePresentation() // ui-v4: allow long health overview sheet
         }
         .navigationDestination(isPresented: $showingHistory) {
-            PetHealthArchiveView(pet: pet)
+            PetHealthArchiveView(
+                pet: pet,
+                healthLogs: healthLogs,
+                symptomLogs: symptomLogs,
+                heatCycleLogs: heatCycleLogs,
+                onDataChanged: onHealthDataChanged
+            )
         }
         .navigationDestination(isPresented: $showingPassport) {
-            VaccinePassportView(pet: pet)
+            VaccinePassportView(
+                pet: pet,
+                healthLogs: healthLogs,
+                onDataChanged: onHealthDataChanged
+            )
         }
         .onDisappear {
             commandQueue.cancelAll()
+        }
+    }
+
+    func refreshHealthAlerts() {
+        if let healthAlertSource {
+            healthAlerts = PetHealthAlertEngine().scanAlerts(sources: [healthAlertSource])
+        } else {
+            healthAlerts = []
         }
     }
 }

@@ -8,10 +8,16 @@ import SwiftUI
 
 struct PetHealthLogCard: View {
     let pet: Pet
+    let healthLogs: [PetHealthLog]
     @Environment(\.modelContext) private var modelContext
     @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
     @State private var showingAllLogs = false
     private var l: L10n { L10n(appLanguage) }
+
+    init(pet: Pet, healthLogs: [PetHealthLog] = []) {
+        self.pet = pet
+        self.healthLogs = healthLogs
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -24,15 +30,15 @@ struct PetHealthLogCard: View {
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Spacer()
                 Text(l.tr(
-                    zh: "\(pet.activeHealthLogs.count) 条",
-                    en: "\(pet.activeHealthLogs.count) records",
-                    de: "\(pet.activeHealthLogs.count) Einträge"
+                    zh: "\(healthLogs.count) 条",
+                    en: "\(healthLogs.count) records",
+                    de: "\(healthLogs.count) Einträge"
                 ))
                 .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
                 .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
             }
 
-            let recentLogs = pet.activeHealthLogs.sorted { $0.date > $1.date }.prefix(5)
+            let recentLogs = healthLogs.sorted { $0.date > $1.date }.prefix(5)
             ForEach(Array(recentLogs)) { log in
                 HStack(spacing: 10) {
                     Text(log.healthLogType.emoji)
@@ -94,7 +100,7 @@ struct PetHealthLogCard: View {
                 }
             }
 
-            if pet.activeHealthLogs.isEmpty {
+            if healthLogs.isEmpty {
                 Text(l.tr(zh: "暂无健康日志", en: "No health logs yet", de: "Noch keine Gesundheitseinträge"))
                     .font(OhanaFont.adaptive(size: 13, weight: .medium))
                     .foregroundStyle(Color.ohanaPrimaryText.opacity(0.3))
@@ -102,13 +108,13 @@ struct PetHealthLogCard: View {
                     .padding(.vertical, 8)
             }
 
-            if pet.activeHealthLogs.count > 5 {
+            if healthLogs.count > 5 {
                 Button { showingAllLogs = true } label: {
                     HStack(spacing: 4) {
                         Text(l.tr(
-                            zh: "查看全部 \(pet.activeHealthLogs.count) 条",
-                            en: "View all \(pet.activeHealthLogs.count)",
-                            de: "Alle \(pet.activeHealthLogs.count) anzeigen"
+                            zh: "查看全部 \(healthLogs.count) 条",
+                            en: "View all \(healthLogs.count)",
+                            de: "Alle \(healthLogs.count) anzeigen"
                         ))
                         .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
                         .foregroundStyle(Color.goPrimary)
@@ -124,7 +130,7 @@ struct PetHealthLogCard: View {
         .padding(16)
         .goTranslucentCard(cornerRadius: OhanaRadius.input)
         .navigationDestination(isPresented: $showingAllLogs) {
-            HealthLogListView(pet: pet)
+            HealthLogListView(pet: pet, healthLogs: healthLogs)
         }
     }
 
@@ -160,13 +166,14 @@ struct PetHealthLogCard: View {
 // MARK: - Full Health Log List
 struct HealthLogListView: View {
     let pet: Pet
+    let healthLogs: [PetHealthLog]
     @Environment(\.modelContext) private var modelContext
     @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
     @State private var selectedType: HealthLogType? = nil
     private var l: L10n { L10n(appLanguage) }
 
     private var filteredLogs: [PetHealthLog] {
-        let sorted = pet.activeHealthLogs.sorted { $0.date > $1.date }
+        let sorted = healthLogs.sorted { $0.date > $1.date }
         guard let type = selectedType else { return sorted }
         return sorted.filter { $0.type == type.rawValue }
     }

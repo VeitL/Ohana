@@ -16,8 +16,7 @@ struct QuickPottyDetailSheet: View {
     let allPets: [Pet]
     let pottyEntries: [PoopPottyLedgerEntry]
     let litterEntries: [PoopLitterLedgerEntry]
-    let legacyPottyDeleteLogs: [PetPottyLog]
-    let legacyLitterDeleteLogs: [PetCareLog]
+    let unknownPottyEntries: [PoopUnknownPottyEntry]
 
     @Environment(\.modelContext) var modelContext
     @Environment(\.dismiss) var dismiss
@@ -62,8 +61,7 @@ struct QuickPottyDetailSheet: View {
         allPets: [Pet] = [],
         pottyEntries: [PoopPottyLedgerEntry] = [],
         litterEntries: [PoopLitterLedgerEntry] = [],
-        legacyPottyDeleteLogs: [PetPottyLog] = [],
-        legacyLitterDeleteLogs: [PetCareLog] = []
+        unknownPottyEntries: [PoopUnknownPottyEntry] = []
     ) {
         self.pet = pet
         self.onRemove = onRemove
@@ -72,8 +70,7 @@ struct QuickPottyDetailSheet: View {
         self.allPets = allPets
         self.pottyEntries = pottyEntries
         self.litterEntries = litterEntries
-        self.legacyPottyDeleteLogs = legacyPottyDeleteLogs
-        self.legacyLitterDeleteLogs = legacyLitterDeleteLogs
+        self.unknownPottyEntries = unknownPottyEntries
     }
 
     typealias PottyFocus = QuickPottyFocus
@@ -130,7 +127,7 @@ struct QuickPottyDetailSheet: View {
     }
 
     var unknownSharedPottyItems: [PoopLogItem] {
-        QuickPottyUnknownClaimStore.items(for: pet, context: modelContext)
+        unknownPottyEntries.map(PoopLogItem.unknownPotty)
     }
 
     var pottyHistoryItems: [PoopLogItem] {

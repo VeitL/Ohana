@@ -5,45 +5,69 @@
 //  V4 growth archive dashboard for one pet.
 //
 
+import SwiftData
 import SwiftUI
 
 struct PetRetentionHubView: View {
     let pet: Pet
     var showsCloseButton: Bool = false
 
+    @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
     @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
 
+    @State private var careLedgerEvents: [CareLedgerEvent]
+    @State private var archiveMetrics: PetRetentionArchiveMetrics
+    @State private var ledgerLoadTask: Task<Void, Never>?
     @State private var isRenderingPDF = false
     @State private var pdfShare: PetArchivePDFShare?
 
+    init(
+        pet: Pet,
+        showsCloseButton: Bool = false,
+        careLedgerEvents: [CareLedgerEvent] = [],
+        archiveMetrics: PetRetentionArchiveMetrics? = nil
+    ) {
+        self.pet = pet
+        self.showsCloseButton = showsCloseButton
+        _careLedgerEvents = State(initialValue: careLedgerEvents)
+        _archiveMetrics = State(initialValue: archiveMetrics ?? .empty(petID: pet.id))
+    }
+
     private var l: L10n { L10n(appLanguage) }
     private var themeColor: Color { Color(hex: pet.safeThemeColorHex) }
-    private var archiveSnapshot: ArchiveMemorySnapshot { ArchiveMemorySnapshot(pet: pet) }
-    private var screenModel: PetRetentionHubScreenModel { PetRetentionHubScreenModel(pet: pet) }
+    private var archiveSnapshot: ArchiveMemorySnapshot {
+        ArchiveMemorySnapshot(pet: pet, activitySummary: archiveMetrics.activitySummary)
+    }
+    private var screenModel: PetRetentionHubScreenModel {
+        PetRetentionHubScreenModel(
+            pet: pet,
+            careLedgerEvents: careLedgerEvents,
+            archiveMetrics: archiveMetrics
+        )
+    }
 
     private var latestWeightText: String {
-        guard let latest = pet.weightLogs.sorted(by: { $0.date < $1.date }).last else {
+        guard let latestWeightKg = archiveMetrics.activitySummary.latestWeightKg else {
             return l.tr(zh: "未记录", en: "No record", de: "Kein Eintrag")
         }
-        return String(format: "%.1fkg", latest.weight)
+        return String(format: "%.1fkg", latestWeightKg)
     }
 
     private var healthBaselineText: String {
-        if !pet.weightLogs.isEmpty { return latestWeightText }
-        if !pet.healthLogs.isEmpty {
-            return l.tr(zh: "\(pet.healthLogs.count) 条健康记录", en: "\(pet.healthLogs.count) health logs", de: "\(pet.healthLogs.count) Gesundheitsdaten")
+        if archiveMetrics.activitySummary.latestWeightKg != nil { return latestWeightText }
+        if archiveMetrics.activitySummary.healthCount > 0 {
+            let healthCount = archiveMetrics.activitySummary.healthCount
+            return l.tr(zh: "\(healthCount) 条健康记录", en: "\(healthCount) health logs", de: "\(healthCount) Gesundheitsdaten")
         }
         return l.tr(zh: "缺少健康基线", en: "Missing baseline", de: "Basis fehlt")
     }
 
-    private var memoryCount: Int { pet.photoLogs.count + pet.milestones.count }
-    private var protectionCount: Int { pet.documents.count + pet.insurances.count }
+    private var memoryCount: Int { archiveMetrics.memoryCount }
+    private var protectionCount: Int { archiveMetrics.protectionCount }
 
     private var expiringProtectionCount: Int {
-        let expiringDocs = pet.documents.count(where: { $0.isExpired || $0.isExpiringSoon })
-        let expiringInsurances = pet.insurances.count(where: { $0.daysUntilRenewal <= 30 })
-        return expiringDocs + expiringInsurances
+        archiveMetrics.expiringProtectionCount
     }
 
     private var protectionStatus: String {
@@ -57,9 +81,7 @@ struct PetRetentionHubView: View {
     }
 
     private var recentMemoryText: String {
-        let latestPhoto = pet.photoLogs.sorted { $0.date > $1.date }.first?.date
-        let latestMilestone = pet.milestones.sorted { $0.date > $1.date }.first?.date
-        guard let latest = [latestPhoto, latestMilestone].compactMap(\.self).max() else {
+        guard let latest = archiveMetrics.latestMemoryDate else {
             return l.tr(zh: "还没有回忆", en: "No memories yet", de: "Noch keine Erinnerungen")
         }
         return latest.formatted(.relative(presentation: .named))
@@ -112,6 +134,11 @@ struct PetRetentionHubView: View {
             }
         }
         .petMemorialTone(isActive: pet.hasPassedAway)
+        .onAppear { scheduleCareLedgerLoad() }
+        .onDisappear {
+            ledgerLoadTask?.cancel()
+            ledgerLoadTask = nil
+        }
     }
 
     private var header: some View {
@@ -147,6 +174,56 @@ struct PetRetentionHubView: View {
                 .buttonStyle(ScaleButtonStyle())
                 .accessibilityLabel(l.tr(zh: "关闭", en: "Close", de: "Schließen"))
             }
+        }
+    }
+
+    private func scheduleCareLedgerLoad(delayMilliseconds: UInt64 = 48, force: Bool = false) {
+        guard force || careLedgerEvents.isEmpty || !archiveMetrics.isLoaded else { return }
+        guard ledgerLoadTask == nil else { return }
+        let petID = pet.id
+        ledgerLoadTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: delayMilliseconds) {
+            let routeData = Self.fetchRouteData(petID: petID, context: modelContext)
+            careLedgerEvents = routeData.careLedgerEvents
+            archiveMetrics = routeData.archiveMetrics
+            ledgerLoadTask = nil
+        }
+    }
+
+    @MainActor
+    private static func fetchRouteData(petID: UUID, context: ModelContext) -> PetRetentionRouteData {
+        PetRetentionRouteData(
+            careLedgerEvents: fetchCareLedgerEvents(petID: petID, context: context),
+            archiveMetrics: PetRetentionArchiveMetrics.load(petID: petID, context: context)
+        )
+    }
+
+    private static func fetchCareLedgerEvents(petID: UUID, context: ModelContext) -> [CareLedgerEvent] {
+        let petSubjectKind = CareLedgerSubjectKind.pet.rawValue
+        let subjectID = petID.uuidString
+        let descriptor = FetchDescriptor<CareLedgerEvent>(
+            predicate: #Predicate<CareLedgerEvent> { event in
+                event.subjectKind == petSubjectKind &&
+                    event.subjectId == subjectID
+            },
+            sortBy: [SortDescriptor(\.occurredAt, order: .reverse)]
+        )
+        do {
+            return try context.fetch(descriptor).filter(isAchievementLedgerEvent)
+        } catch {
+            OhanaLog.warning(
+                "Pet retention ledger fetch failed: \(error.localizedDescription)",
+                category: "DashboardRecords"
+            )
+            return []
+        }
+    }
+
+    private nonisolated static func isAchievementLedgerEvent(_ event: CareLedgerEvent) -> Bool {
+        switch event.eventKindEnum {
+        case .care, .potty, .walk, .hygiene, .health, .weight, .expense, .medication, .milestone:
+            true
+        case .workout, .reminder, .plantCare, .coconut, .unknown:
+            false
         }
     }
 
@@ -338,7 +415,7 @@ struct PetRetentionHubView: View {
     }
 
     private var timelineCount: Int {
-        pet.photoLogs.count + pet.milestones.count + pet.healthLogs.count + pet.weightLogs.count + pet.careLogs.count + pet.walkLogs.count
+        screenModel.archiveMetrics.timelineCount(careLedgerEvents: careLedgerEvents)
     }
 
     private func sectionTitle(_ title: String) -> some View {
@@ -449,7 +526,7 @@ struct PetRetentionHubView: View {
         guard !isRenderingPDF else { return }
         isRenderingPDF = true
         Task {
-            let url = await PetVetSummaryPDFRenderer.render(pet: pet)
+            let url = await PetVetSummaryPDFRenderer.render(pet: pet, context: modelContext)
             await MainActor.run {
                 isRenderingPDF = false
                 if let url {
@@ -463,4 +540,9 @@ struct PetRetentionHubView: View {
 private struct PetArchivePDFShare: Identifiable {
     let id = UUID()
     let url: URL
+}
+
+private struct PetRetentionRouteData {
+    let careLedgerEvents: [CareLedgerEvent]
+    let archiveMetrics: PetRetentionArchiveMetrics
 }

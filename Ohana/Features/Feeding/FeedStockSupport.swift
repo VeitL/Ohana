@@ -39,6 +39,20 @@ nonisolated enum FeedStockCalculator {
         }
     }
 
+    static func mainFoodEntries(
+        for pet: Pet,
+        foodKind: FeedFoodKind? = nil,
+        since startDate: Date? = nil,
+        feedingLedgerEntries: [QuickFeedLedgerEntry]
+    ) -> [QuickFeedLedgerEntry] {
+        feedingLedgerEntries.filter { entry in
+            entry.petId == pet.id &&
+                entry.source != .treat &&
+                (foodKind.map { entry.foodKind == $0 } ?? true) &&
+                (startDate.map { entry.date >= $0 } ?? true)
+        }
+    }
+
     static func treatLogs(for pet: Pet, since startDate: Date? = nil, careLogs: [PetCareLog] = []) -> [PetCareLog] {
         careLogs.filter { log in
             log.pet?.id == pet.id &&
@@ -51,12 +65,13 @@ nonisolated enum FeedStockCalculator {
     static func mainConsumedSinceRestock(
         for pet: Pet,
         careLogs: [PetCareLog] = [],
+        feedingLedgerEntries: [QuickFeedLedgerEntry]? = nil,
         foodRecords: [PetFoodRecord]? = nil,
         sharedCareSessions: [SharedCareSession]? = nil,
         now: Date = Date()
     ) -> Double {
         FeedFoodKind.allCases.reduce(0) {
-            $0 + mainConsumedSinceRestock(for: pet, foodKind: $1, careLogs: careLogs, foodRecords: foodRecords, sharedCareSessions: sharedCareSessions, now: now)
+            $0 + mainConsumedSinceRestock(for: pet, foodKind: $1, careLogs: careLogs, feedingLedgerEntries: feedingLedgerEntries, foodRecords: foodRecords, sharedCareSessions: sharedCareSessions, now: now)
         }
     }
 
@@ -64,6 +79,7 @@ nonisolated enum FeedStockCalculator {
         for pet: Pet,
         foodKind: FeedFoodKind,
         careLogs: [PetCareLog] = [],
+        feedingLedgerEntries: [QuickFeedLedgerEntry]? = nil,
         foodRecords: [PetFoodRecord]? = nil,
         sharedCareSessions: [SharedCareSession]? = nil,
         now: Date = Date(),
@@ -72,6 +88,18 @@ nonisolated enum FeedStockCalculator {
         let stock = activeStockRecord(for: pet, foodKind: foodKind, foodRecords: foodRecords, now: now)
         let startDate = stock.map { stockOpenDay(for: $0) } ?? (foodKind == .dry ? pet.restockDate : nil)
         let mode = calculationMode ?? stock.map { FeedStockRecordMetadata.calculationMode(for: $0) }
+        if let feedingLedgerEntries {
+            return stockConsumptionEntries(
+                for: pet,
+                foodKind: foodKind,
+                since: startDate,
+                feedingLedgerEntries: feedingLedgerEntries,
+                calculationMode: mode
+            )
+            .reduce(0) { total, entry in
+                total + stockDeductionAmount(for: entry, pet: pet, sharedCareSessions: sharedCareSessions)
+            }
+        }
         return stockConsumptionLogs(for: pet, foodKind: foodKind, since: startDate, careLogs: careLogs, calculationMode: mode)
             .reduce(0) { total, log in
                 total + stockDeductionAmount(for: log, pet: pet, sharedCareSessions: sharedCareSessions)
@@ -80,6 +108,10 @@ nonisolated enum FeedStockCalculator {
 
     static func effectiveMainFoodAmount(for log: PetCareLog, pet: Pet) -> Double {
         log.amountGrams > 0 ? log.amountGrams : pet.dailyPortionGrams
+    }
+
+    static func effectiveMainFoodAmount(for entry: QuickFeedLedgerEntry, pet: Pet) -> Double {
+        entry.amountGrams > 0 ? entry.amountGrams : pet.dailyPortionGrams
     }
 
     static func stockDeductionAmount(
@@ -99,10 +131,28 @@ nonisolated enum FeedStockCalculator {
         return effectiveMainFoodAmount(for: log, pet: pet)
     }
 
+    static func stockDeductionAmount(
+        for entry: QuickFeedLedgerEntry,
+        pet: Pet,
+        sharedCareSessions: [SharedCareSession]? = nil
+    ) -> Double {
+        if !entry.sharedSessionId.isEmpty {
+            if let session = sharedFeedingSession(id: entry.sharedSessionId, sharedCareSessions: sharedCareSessions) {
+                return session.stockOwnerPetId == pet.id.uuidString ? max(0, session.totalAmountGrams) : 0
+            }
+            if let sharedStockTotal = SharedCareMetadata.stockDeductionGrams(from: entry.note) {
+                return max(0, sharedStockTotal)
+            }
+            return 0
+        }
+        return effectiveMainFoodAmount(for: entry, pet: pet)
+    }
+
     static func recentDailyAverageGrams(
         for pet: Pet,
         foodKind: FeedFoodKind? = nil,
         careLogs: [PetCareLog] = [],
+        feedingLedgerEntries: [QuickFeedLedgerEntry]? = nil,
         foodRecords: [PetFoodRecord]? = nil,
         now: Date = Date(),
         calendar: Calendar = .current,
@@ -112,6 +162,16 @@ nonisolated enum FeedStockCalculator {
         let activeRecord = foodKind.flatMap { activeStockRecord(for: pet, foodKind: $0, foodRecords: foodRecords, now: now) }
         let restockStart = activeRecord.map { stockOpenDay(for: $0, calendar: calendar) } ?? pet.restockDate
         let mode = calculationMode ?? activeRecord.map { FeedStockRecordMetadata.calculationMode(for: $0) }
+        if let feedingLedgerEntries {
+            let entries = stockConsumptionEntries(for: pet, foodKind: foodKind, since: maxDate(windowStart, restockStart), feedingLedgerEntries: feedingLedgerEntries, calculationMode: mode)
+                .filter { $0.date <= now }
+            let grouped = Dictionary(grouping: entries) { calendar.startOfDay(for: $0.date) }
+            let dayTotals = grouped.values.map { entries in
+                entries.reduce(0) { $0 + effectiveMainFoodAmount(for: $1, pet: pet) }
+            }.filter { $0 > 0 }
+            guard !dayTotals.isEmpty else { return nil }
+            return dayTotals.reduce(0, +) / Double(dayTotals.count)
+        }
         let logs = stockConsumptionLogs(for: pet, foodKind: foodKind, since: maxDate(windowStart, restockStart), careLogs: careLogs, calculationMode: mode)
             .filter { $0.date <= now }
         let grouped = Dictionary(grouping: logs) { calendar.startOfDay(for: $0.date) }
@@ -177,6 +237,7 @@ nonisolated enum FeedStockCalculator {
         events: [Event] = [],
         foodKind: FeedFoodKind? = nil,
         careLogs: [PetCareLog] = [],
+        feedingLedgerEntries: [QuickFeedLedgerEntry]? = nil,
         foodRecords: [PetFoodRecord]? = nil,
         now: Date = Date(),
         calendar: Calendar = .current,
@@ -185,12 +246,12 @@ nonisolated enum FeedStockCalculator {
         if calculationMode == .autoFeeder {
             let planTotal = activePlanRuleDailyTotalGrams(for: pet, events: events, foodKind: foodKind, now: now, calendar: calendar)
             if planTotal > 0 { return (planTotal, .autoRules) }
-            if let average = recentDailyAverageGrams(for: pet, foodKind: foodKind, careLogs: careLogs, foodRecords: foodRecords, now: now, calendar: calendar, calculationMode: calculationMode), average > 0 {
+            if let average = recentDailyAverageGrams(for: pet, foodKind: foodKind, careLogs: careLogs, feedingLedgerEntries: feedingLedgerEntries, foodRecords: foodRecords, now: now, calendar: calendar, calculationMode: calculationMode), average > 0 {
                 return (average, .recentAverage)
             }
             return (0, .unavailable)
         }
-        if let average = recentDailyAverageGrams(for: pet, foodKind: foodKind, careLogs: careLogs, foodRecords: foodRecords, now: now, calendar: calendar, calculationMode: calculationMode), average > 0 {
+        if let average = recentDailyAverageGrams(for: pet, foodKind: foodKind, careLogs: careLogs, feedingLedgerEntries: feedingLedgerEntries, foodRecords: foodRecords, now: now, calendar: calendar, calculationMode: calculationMode), average > 0 {
             return (average, .recentAverage)
         }
         if calculationMode == nil {
@@ -209,12 +270,13 @@ nonisolated enum FeedStockCalculator {
         for pet: Pet,
         events: [Event] = [],
         careLogs: [PetCareLog] = [],
+        feedingLedgerEntries: [QuickFeedLedgerEntry]? = nil,
         foodRecords: [PetFoodRecord]? = nil,
         sharedCareSessions: [SharedCareSession]? = nil,
         now: Date = Date(),
         calendar: Calendar = .current
     ) -> FeedStockSnapshot {
-        snapshot(for: pet, foodKind: .dry, events: events, careLogs: careLogs, foodRecords: foodRecords, sharedCareSessions: sharedCareSessions, now: now, calendar: calendar)
+        snapshot(for: pet, foodKind: .dry, events: events, careLogs: careLogs, feedingLedgerEntries: feedingLedgerEntries, foodRecords: foodRecords, sharedCareSessions: sharedCareSessions, now: now, calendar: calendar)
     }
 
     static func snapshot(
@@ -222,6 +284,7 @@ nonisolated enum FeedStockCalculator {
         foodKind: FeedFoodKind,
         events: [Event] = [],
         careLogs: [PetCareLog] = [],
+        feedingLedgerEntries: [QuickFeedLedgerEntry]? = nil,
         foodRecords: [PetFoodRecord]? = nil,
         sharedCareSessions: [SharedCareSession]? = nil,
         now: Date = Date(),
@@ -240,15 +303,21 @@ nonisolated enum FeedStockCalculator {
         if let stockRecord,
            let correctionGrams = stockRecord.remainingCorrectionGrams,
            let correctionDate = stockRecord.remainingCorrectionDate {
-            consumed = stockConsumptionLogs(for: pet, foodKind: foodKind, since: correctionDate, careLogs: careLogs, calculationMode: calculationMode)
-                .filter { $0.date <= now }
-                .reduce(0) { $0 + stockDeductionAmount(for: $1, pet: pet, sharedCareSessions: sharedCareSessions) }
+            if let feedingLedgerEntries {
+                consumed = stockConsumptionEntries(for: pet, foodKind: foodKind, since: correctionDate, feedingLedgerEntries: feedingLedgerEntries, calculationMode: calculationMode)
+                    .filter { $0.date <= now }
+                    .reduce(0) { $0 + stockDeductionAmount(for: $1, pet: pet, sharedCareSessions: sharedCareSessions) }
+            } else {
+                consumed = stockConsumptionLogs(for: pet, foodKind: foodKind, since: correctionDate, careLogs: careLogs, calculationMode: calculationMode)
+                    .filter { $0.date <= now }
+                    .reduce(0) { $0 + stockDeductionAmount(for: $1, pet: pet, sharedCareSessions: sharedCareSessions) }
+            }
             remaining = max(0, correctionGrams - consumed)
         } else {
-            consumed = mainConsumedSinceRestock(for: pet, foodKind: foodKind, careLogs: careLogs, foodRecords: foodRecords, sharedCareSessions: sharedCareSessions, now: now, calculationMode: calculationMode)
+            consumed = mainConsumedSinceRestock(for: pet, foodKind: foodKind, careLogs: careLogs, feedingLedgerEntries: feedingLedgerEntries, foodRecords: foodRecords, sharedCareSessions: sharedCareSessions, now: now, calculationMode: calculationMode)
             remaining = max(0, total - consumed)
         }
-        let estimate = estimatedDailyMainFoodGrams(for: pet, events: events, foodKind: foodKind, careLogs: careLogs, foodRecords: foodRecords, now: now, calendar: calendar, calculationMode: calculationMode)
+        let estimate = estimatedDailyMainFoodGrams(for: pet, events: events, foodKind: foodKind, careLogs: careLogs, feedingLedgerEntries: feedingLedgerEntries, foodRecords: foodRecords, now: now, calendar: calendar, calculationMode: calculationMode)
         let days = estimate.0 > 0 ? Int(remaining / estimate.0) : 0
         let runOut = days > 0 ? calendar.date(byAdding: .day, value: days, to: now) : nil
         return FeedStockSnapshot(
@@ -279,6 +348,18 @@ nonisolated enum FeedStockCalculator {
         return logs.filter { logMatchesStockCalculationMode($0, mode: calculationMode) }
     }
 
+    private static func stockConsumptionEntries(
+        for pet: Pet,
+        foodKind: FeedFoodKind? = nil,
+        since startDate: Date? = nil,
+        feedingLedgerEntries: [QuickFeedLedgerEntry],
+        calculationMode: FeedStockCalculationMode?
+    ) -> [QuickFeedLedgerEntry] {
+        let entries = mainFoodEntries(for: pet, foodKind: foodKind, since: startDate, feedingLedgerEntries: feedingLedgerEntries)
+        guard let calculationMode else { return entries }
+        return entries.filter { entryMatchesStockCalculationMode($0, mode: calculationMode) }
+    }
+
     private static func logMatchesStockCalculationMode(_ log: PetCareLog, mode: FeedStockCalculationMode) -> Bool {
         switch mode {
         case .manualOrPlan:
@@ -288,14 +369,31 @@ nonisolated enum FeedStockCalculator {
         }
     }
 
+    private static func entryMatchesStockCalculationMode(_ entry: QuickFeedLedgerEntry, mode: FeedStockCalculationMode) -> Bool {
+        switch mode {
+        case .manualOrPlan:
+            entry.source != .autoMain
+        case .autoFeeder:
+            entry.source == .autoMain
+        }
+    }
+
     private static func sharedFeedingSession(
         for log: PetCareLog,
         sharedCareSessions: [SharedCareSession]?
     ) -> SharedCareSession? {
         guard !log.sharedSessionId.isEmpty,
               let sharedCareSessions else { return nil }
+        return sharedFeedingSession(id: log.sharedSessionId, sharedCareSessions: sharedCareSessions)
+    }
+
+    private static func sharedFeedingSession(
+        id: String,
+        sharedCareSessions: [SharedCareSession]?
+    ) -> SharedCareSession? {
+        guard !id.isEmpty, let sharedCareSessions else { return nil }
         return sharedCareSessions.first { session in
-            session.id.uuidString == log.sharedSessionId &&
+            session.id.uuidString == id &&
                 session.actionKind == .feeding
         }
     }

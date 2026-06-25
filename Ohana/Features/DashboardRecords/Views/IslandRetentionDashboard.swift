@@ -13,21 +13,26 @@ struct IslandRetentionDashboardContentView: View {
     var onOpenPet: ((Pet) -> Void)?
     let pets: [Pet]
 
+    @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
 
+    @State private var careLedgerEvents: [CareLedgerEvent] = []
+    @State private var archiveMetricsByPetId: [UUID: PetRetentionArchiveMetrics] = [:]
+    @State private var ledgerLoadTask: Task<Void, Never>?
     @State private var selectedPetId: UUID? = nil
     @State private var sheetPet: Pet? = nil
     @State private var growProgress: CGFloat = 0
 
     private var screenModel: IslandRetentionDashboardScreenModel {
-        IslandRetentionDashboardScreenModel(pets: pets, selectedPetId: selectedPetId)
+        IslandRetentionDashboardScreenModel(
+            pets: pets,
+            selectedPetId: selectedPetId,
+            careLedgerEvents: careLedgerEvents,
+            archiveMetricsByPetId: archiveMetricsByPetId
+        )
     }
 
     private var activePets: [Pet] { screenModel.activePets }
-
-    private var selectedPets: [Pet] {
-        screenModel.selectedPets
-    }
 
     private var summaries: [RetentionPetSummary] {
         screenModel.summaries
@@ -51,10 +56,84 @@ struct IslandRetentionDashboardContentView: View {
     var body: some View {
         dashboardBody
             .sheet(item: $sheetPet) { pet in
-                NavigationStack { PetRetentionHubView(pet: pet) }
+                NavigationStack {
+                    PetRetentionHubView(
+                        pet: pet,
+                        careLedgerEvents: careLedgerEvents,
+                        archiveMetrics: screenModel.archiveMetrics(for: pet.id)
+                    )
+                }
             }
-            .onAppear { animateGrowth() }
+            .onAppear {
+                animateGrowth()
+                scheduleCareLedgerLoad()
+            }
             .onChange(of: selectedPetId) { _, _ in animateGrowth() }
+            .onDisappear {
+                ledgerLoadTask?.cancel()
+                ledgerLoadTask = nil
+            }
+    }
+
+    private func scheduleCareLedgerLoad(delayMilliseconds: UInt64 = 48, force: Bool = false) {
+        guard force || careLedgerEvents.isEmpty || archiveMetricsByPetId.isEmpty else { return }
+        guard ledgerLoadTask == nil else { return }
+        let petIDs = Set(pets.map(\.id))
+        ledgerLoadTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: delayMilliseconds) {
+            let routeData = Self.fetchRouteData(petIDs: petIDs, context: modelContext)
+            careLedgerEvents = routeData.careLedgerEvents
+            archiveMetricsByPetId = routeData.archiveMetricsByPetId
+            ledgerLoadTask = nil
+        }
+    }
+
+    @MainActor
+    private static func fetchRouteData(petIDs: Set<UUID>, context: ModelContext) -> IslandRetentionRouteData {
+        IslandRetentionRouteData(
+            careLedgerEvents: fetchCareLedgerEvents(petIDs: Set(petIDs.map(\.uuidString)), context: context),
+            archiveMetricsByPetId: fetchArchiveMetrics(petIDs: petIDs, context: context)
+        )
+    }
+
+    @MainActor
+    private static func fetchArchiveMetrics(petIDs: Set<UUID>, context: ModelContext) -> [UUID: PetRetentionArchiveMetrics] {
+        guard !petIDs.isEmpty else { return [:] }
+        var archiveMetricsByPetId: [UUID: PetRetentionArchiveMetrics] = [:]
+        for petID in petIDs {
+            archiveMetricsByPetId[petID] = PetRetentionArchiveMetrics.load(petID: petID, context: context)
+        }
+        return archiveMetricsByPetId
+    }
+
+    private static func fetchCareLedgerEvents(petIDs: Set<String>, context: ModelContext) -> [CareLedgerEvent] {
+        guard !petIDs.isEmpty else { return [] }
+        let petSubjectKind = CareLedgerSubjectKind.pet.rawValue
+        let descriptor = FetchDescriptor<CareLedgerEvent>(
+            predicate: #Predicate<CareLedgerEvent> { event in
+                event.subjectKind == petSubjectKind
+            },
+            sortBy: [SortDescriptor(\.occurredAt, order: .reverse)]
+        )
+        do {
+            return try context.fetch(descriptor).filter {
+                petIDs.contains($0.subjectId ?? "") && isAchievementLedgerEvent($0)
+            }
+        } catch {
+            OhanaLog.warning(
+                "Island retention ledger fetch failed: \(error.localizedDescription)",
+                category: "DashboardRecords"
+            )
+            return []
+        }
+    }
+
+    private nonisolated static func isAchievementLedgerEvent(_ event: CareLedgerEvent) -> Bool {
+        switch event.eventKindEnum {
+        case .care, .potty, .walk, .hygiene, .health, .weight, .expense, .medication, .milestone:
+            true
+        case .workout, .reminder, .plantCare, .coconut, .unknown:
+            false
+        }
     }
 
     @ViewBuilder
@@ -167,9 +246,9 @@ struct IslandRetentionDashboardContentView: View {
 
     private var memoryCapsules: some View {
         HStack(spacing: 8) {
-            archiveMetric("照片", "\(selectedPets.reduce(0) { $0 + $1.photoLogs.count })", "photo.on.rectangle.angled", .goTeal)
-            archiveMetric("时刻", "\(selectedPets.reduce(0) { $0 + $1.milestones.count })", "sparkles", .goPrimary)
-            archiveMetric("证件", "\(selectedPets.reduce(0) { $0 + $1.documents.count })", "doc.fill", .goOrange)
+            archiveMetric("照片", "\(summaries.reduce(0) { $0 + $1.photos })", "photo.on.rectangle.angled", .goTeal)
+            archiveMetric("时刻", "\(summaries.reduce(0) { $0 + $1.milestones })", "sparkles", .goPrimary)
+            archiveMetric("证件", "\(summaries.reduce(0) { $0 + $1.documents })", "doc.fill", .goOrange)
         }
     }
 
@@ -270,4 +349,9 @@ struct IslandRetentionDashboardContentView: View {
             growProgress = 1
         }
     }
+}
+
+private struct IslandRetentionRouteData {
+    let careLedgerEvents: [CareLedgerEvent]
+    let archiveMetricsByPetId: [UUID: PetRetentionArchiveMetrics]
 }

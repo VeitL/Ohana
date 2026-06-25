@@ -22,6 +22,8 @@ struct AchievementWallContentView: View {
     let humanMedications: [HumanMedication]
     let humanMedicationLogs: [HumanMedicationLog]
     let allExpenseLogs: [PetExpenseLog]
+    let careLedgerEvents: [CareLedgerEvent]
+    let petActivitySummaries: [UUID: AchievementPetActivitySummary]
 
     @Environment(\.dismiss) var dismiss
     @Environment(\.modelContext) var modelContext
@@ -214,7 +216,9 @@ struct AchievementWallContentView: View {
         [
             "med:\(humanMedications.count):\(Int(humanMedications.first?.createdAt.timeIntervalSince1970 ?? 0))",
             "log:\(humanMedicationLogs.count):\(Int(humanMedicationLogs.first?.createdAt.timeIntervalSince1970 ?? 0))",
-            "expense:\(allExpenseLogs.count):\(Int(allExpenseLogs.first?.date.timeIntervalSince1970 ?? 0))"
+            "expense:\(allExpenseLogs.count):\(Int(allExpenseLogs.first?.date.timeIntervalSince1970 ?? 0))",
+            "ledger:\(careLedgerEvents.count):\(Int(careLedgerEvents.first?.occurredAt.timeIntervalSince1970 ?? 0))",
+            "activity:\(petActivitySummaries.count):\(petActivitySummaries.keys.map(\.uuidString).sorted().joined(separator: ","))"
         ].joined(separator: "|")
     }
 
@@ -249,6 +253,14 @@ struct AchievementWallContentView: View {
         return .pet(activePet.id)
     }
 
+    var activeCareLedgerSummary: AchievementCareLedgerSummary {
+        AchievementCareLedgerSummary(events: careLedgerEvents, petID: activePet.id)
+    }
+
+    var activePetActivitySummary: AchievementPetActivitySummary {
+        petActivitySummaries[activePet.id] ?? .empty
+    }
+
     var achievementContext: AchievementComputationContext {
         AchievementComputationContext(
             allPets: pets,
@@ -256,7 +268,9 @@ struct AchievementWallContentView: View {
             critterFragments: critterFragments,
             critterActionLogs: critterActionLogs,
             gachaOwnedItems: gachaOwnedItems,
-            gachaDrawLogs: gachaDrawLogs
+            gachaDrawLogs: gachaDrawLogs,
+            careLedgerEvents: careLedgerEvents,
+            petActivitySummaries: petActivitySummaries
         )
     }
 

@@ -132,12 +132,30 @@ struct QuickFeedDataControllerTests {
         #expect(alertHostSource.contains("let onDeleteFeedLog: (UUID) -> Void"))
     }
 
+    @Test func quickFeedRouteUsesLedgerScopedLegacyCareLogs() throws {
+        let rootURL = repositoryRootURL()
+        let routeSource = try source("Ohana/Features/QuickCare/QuickCareRouteContainer.swift", rootURL: rootURL)
+        let detailSource = try source("Ohana/Features/Feeding/Views/QuickFeedDetailSheet.swift", rootURL: rootURL)
+
+        #expect(!routeSource.contains("var allCareLogs: [PetCareLog]"))
+        #expect(!routeSource.contains("let allCareLogs = fetch("))
+        #expect(!routeSource.contains("log.date >= homeLogStartDate"))
+        #expect(routeSource.contains("legacyCareLogsForLedgerEvents"))
+        #expect(routeSource.contains("descriptor.fetchLimit = 1"))
+        #expect(routeSource.contains("legacyCareLogs: routeData.legacyCareLogs"))
+        #expect(detailSource.contains("let legacyCareLogs: [PetCareLog]"))
+        #expect(!detailSource.contains("let allCareLogs: [PetCareLog]"))
+        #expect(!detailSource.contains("allCareLogs: [PetCareLog]"))
+    }
+
     @Test func feedTodayStateDoesNotFallbackToPetCareLogRelationship() throws {
         let rootURL = repositoryRootURL()
         let todayStateSource = try source("Ohana/Features/Feeding/FeedTodayState.swift", rootURL: rootURL)
         let dashboardStateSource = try source("Ohana/Features/Feeding/FeedingDashboardState.swift", rootURL: rootURL)
         let stockSupportSource = try source("Ohana/Features/Feeding/FeedStockSupport.swift", rootURL: rootURL)
         let planWriterSource = try source("Ohana/Features/Feeding/FeedingPlanWriter.swift", rootURL: rootURL)
+        let foodDashboardRouteSource = try source("Ohana/Features/Feeding/IslandFoodDashboardDataContainer.swift", rootURL: rootURL)
+        let foodDashboardSnapshotSource = try source("Ohana/Features/Feeding/IslandFoodDashboardSnapshotStore.swift", rootURL: rootURL)
         let petSource = try source("Ohana/Models/Pet.swift", rootURL: rootURL)
 
         #expect(!todayStateSource.contains("pet.careLogs"))
@@ -148,7 +166,12 @@ struct QuickFeedDataControllerTests {
         #expect(!stockSupportSource.contains("pet.careLogs"))
         #expect(!stockSupportSource.contains("careLogs ??"))
         #expect(!stockSupportSource.contains("careLogs: [PetCareLog]?"))
-        #expect(planWriterSource.contains("stockCareLogs(petID: pet.id, context: context)"))
+        #expect(!planWriterSource.contains("stockCareLogs"))
+        #expect(planWriterSource.contains("let stockLedgerEntries = feedingLedgerEntries(pet: pet, allEvents: allEvents, context: context)"))
+        #expect(!foodDashboardRouteSource.contains("legacyStockCareLogs"))
+        #expect(!foodDashboardRouteSource.contains("FetchDescriptor<PetCareLog>"))
+        #expect(!foodDashboardSnapshotSource.contains("legacyStockCareLogs"))
+        #expect(foodDashboardSnapshotSource.contains("allStockFeedingLedgerEntries"))
         #expect(!petSource.contains("careLogs.compactMap { log -> UUID?"))
         #expect(!petSource.contains("FeedStockCalculator.snapshot(for: self, sharedCareSessions:"))
     }

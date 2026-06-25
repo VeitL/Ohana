@@ -28,6 +28,7 @@ struct QuickFeedStockSnapshot {
         pet: Pet,
         allEvents: [Event],
         careLogs: [PetCareLog],
+        feedingLedgerEntries: [QuickFeedLedgerEntry]? = nil,
         foodRecords: [PetFoodRecord],
         sharedCareSessions: [SharedCareSession] = [],
         now: Date,
@@ -52,6 +53,7 @@ struct QuickFeedStockSnapshot {
             foodKind: .dry,
             events: allEvents,
             careLogs: careLogs,
+            feedingLedgerEntries: feedingLedgerEntries,
             foodRecords: records,
             sharedCareSessions: sharedCareSessions,
             now: now,
@@ -62,6 +64,7 @@ struct QuickFeedStockSnapshot {
             foodKind: .wet,
             events: allEvents,
             careLogs: careLogs,
+            feedingLedgerEntries: feedingLedgerEntries,
             foodRecords: records,
             sharedCareSessions: sharedCareSessions,
             now: now,
@@ -129,6 +132,7 @@ struct QuickFeedStockSnapshot {
 struct QuickFeedStockSnapshotRevision: Equatable {
     let eventRevision: Int
     let careLogRevision: Int
+    let feedingLedgerRevision: Int?
     let foodRecordRevision: Int
     let sharedSessionRevision: Int
     let petRevision: Int
@@ -138,6 +142,7 @@ struct QuickFeedStockSnapshotRevision: Equatable {
         pet: Pet,
         allEvents: [Event],
         careLogs: [PetCareLog],
+        feedingLedgerEntries: [QuickFeedLedgerEntry]?,
         foodRecords: [PetFoodRecord],
         sharedCareSessions: [SharedCareSession],
         now: Date
@@ -159,6 +164,7 @@ struct QuickFeedStockSnapshotRevision: Equatable {
                 hasher.combine(log.foodKindRaw)
                 hasher.combine(log.note)
             },
+            feedingLedgerRevision: hashFeedingLedgerEntries(feedingLedgerEntries),
             foodRecordRevision: revisionHash(foodRecords.prefix(90)) { hasher, record in
                 hasher.combine(record.id)
                 hasher.combine(record.startDate.timeIntervalSince1970)
@@ -202,6 +208,21 @@ struct QuickFeedStockSnapshotRevision: Equatable {
         hasher.combine(count)
         return hasher.finalize()
     }
+
+    private static func hashFeedingLedgerEntries(_ entries: [QuickFeedLedgerEntry]?) -> Int? {
+        entries.map { entries in
+            revisionHash(entries.prefix(240)) { hasher, entry in
+                hasher.combine(entry.id)
+                hasher.combine(entry.petId)
+                hasher.combine(entry.date.timeIntervalSince1970)
+                hasher.combine(entry.amountGrams)
+                hasher.combine(entry.source.rawValue)
+                hasher.combine(entry.foodKind.rawValue)
+                hasher.combine(entry.sharedSessionId)
+                hasher.combine(entry.metadataJSON)
+            }
+        }
+    }
 }
 
 @MainActor
@@ -217,6 +238,7 @@ final class QuickFeedStockSnapshotStore: ObservableObject {
         pet: Pet,
         allEvents: [Event],
         careLogs: [PetCareLog],
+        feedingLedgerEntries: [QuickFeedLedgerEntry]? = nil,
         foodRecords: [PetFoodRecord],
         sharedCareSessions: [SharedCareSession],
         now: Date,
@@ -226,6 +248,7 @@ final class QuickFeedStockSnapshotStore: ObservableObject {
             pet: pet,
             allEvents: allEvents,
             careLogs: careLogs,
+            feedingLedgerEntries: feedingLedgerEntries,
             foodRecords: foodRecords,
             sharedCareSessions: sharedCareSessions,
             now: now
@@ -235,6 +258,7 @@ final class QuickFeedStockSnapshotStore: ObservableObject {
             pet: pet,
             allEvents: allEvents,
             careLogs: careLogs,
+            feedingLedgerEntries: feedingLedgerEntries,
             foodRecords: foodRecords,
             sharedCareSessions: sharedCareSessions,
             now: now

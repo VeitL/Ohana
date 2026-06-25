@@ -10,6 +10,7 @@ import SwiftUI
 
 struct AddHeatCycleSheet: View {
     let pet: Pet
+    var onSaved: (() -> Void)?
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
     @Environment(AppServices.self) private var appServices
@@ -129,6 +130,7 @@ struct AddHeatCycleSheet: View {
                 return
             }
             UINotificationFeedbackGenerator().notificationOccurred(.success)
+            onSaved?()
             dismiss()
         }
     }

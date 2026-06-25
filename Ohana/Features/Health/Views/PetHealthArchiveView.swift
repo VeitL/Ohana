@@ -49,6 +49,10 @@ struct PetHealthArchiveItem: Identifiable {
 
 struct PetHealthArchiveView: View {
     let pet: Pet
+    let healthLogs: [PetHealthLog]
+    let symptomLogs: [SymptomLog]
+    let heatCycleLogs: [HeatCycleLog]
+    var onDataChanged: (() -> Void)?
     @Environment(\.modelContext) private var modelContext
     @Environment(\.colorScheme) private var colorScheme
     @Environment(AppServices.self) private var appServices
@@ -62,7 +66,7 @@ struct PetHealthArchiveView: View {
     private var l: L10n { L10n(appLanguage) }
 
     private var items: [PetHealthArchiveItem] {
-        let healthItems = pet.activeHealthLogs.map { log in
+        let healthItems = healthLogs.map { log in
             PetHealthArchiveItem(
                 id: "health-\(log.id.uuidString)",
                 date: log.date,
@@ -74,7 +78,7 @@ struct PetHealthArchiveView: View {
                 source: .health(log)
             )
         }
-        let symptomItems = pet.activeSymptomLogs.map { log in
+        let symptomItems = symptomLogs.map { log in
             PetHealthArchiveItem(
                 id: "symptom-\(log.id.uuidString)",
                 date: log.date,
@@ -86,7 +90,7 @@ struct PetHealthArchiveView: View {
                 source: .symptom(log)
             )
         }
-        let heatItems = pet.activeHeatCycleLogs.map { log in
+        let heatItems = heatCycleLogs.map { log in
             PetHealthArchiveItem(
                 id: "heat-\(log.id.uuidString)",
                 date: log.startDate,
@@ -302,6 +306,7 @@ struct PetHealthArchiveView: View {
                 executor.deleteHeatCycleLog(log, pet: pet, note: "pet.health.archive.delete.heat")
             }
             deletingItemIDs.remove(item.id)
+            onDataChanged?()
         }
     }
 }

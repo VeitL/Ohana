@@ -142,11 +142,9 @@ extension AchievementWallContentView {
         case "walk_streak":
             return .init(current: Double(consecutiveWalkDays()), target: 7, unit: "天", actionTitle: "连续遛狗记录")
         case "health_hero":
-            let hasHealth = !activePet.healthLogs.isEmpty
+            let hasHealth = !activeCareLedgerSummary.healthEvents.isEmpty
             let cutoff = Calendar.current.date(byAdding: .day, value: -30, to: Date()) ?? .distantPast
-            let hasRecentEmergency = activePet.healthLogs.contains {
-                $0.date >= cutoff && ($0.type == "emergency" || $0.type == "surgery")
-            }
+            let hasRecentEmergency = activeCareLedgerSummary.hasRecentEmergencyOrSurgery(since: cutoff)
             return .init(current: hasHealth && !hasRecentEmergency ? 1 : 0, target: 1, unit: "项", actionTitle: "添加健康记录并保持稳定")
         case "nutritionist":
             return .init(current: Double(feedingSpanDays()), target: 14, unit: "天", actionTitle: "持续记录饮食")
@@ -166,41 +164,41 @@ extension AchievementWallContentView {
         case "medication_complete":
             return .init(current: badge.isUnlocked ? 1 : 0, target: 1, unit: "个疗程", actionTitle: "完成一个用药疗程")
         case "photo_enthusiast":
-            return .init(current: Double(activePet.photoLogs.count), target: 20, unit: "张", actionTitle: "添加宠物照片")
+            return .init(current: Double(activePetActivitySummary.photoCount), target: 20, unit: "张", actionTitle: "添加宠物照片")
         case "expense_tracker":
-            return .init(current: Double(activePet.expenseLogs.count), target: 10, unit: "条", actionTitle: "记录宠物花费")
+            return .init(current: Double(activeCareLedgerSummary.expenseEvents.count), target: 10, unit: "条", actionTitle: "记录宠物花费")
         case "weight_manager":
-            return .init(current: Double(activePet.weightLogs.count), target: 7, unit: "条", actionTitle: "记录体重")
+            return .init(current: Double(activeCareLedgerSummary.weightEvents.count), target: 7, unit: "条", actionTitle: "记录体重")
         case "hydration_buddy":
-            return .init(current: Double(activePet.careLogs.count(where: { $0.careType == .watering })), target: 14, unit: "次", actionTitle: "累计喂水")
+            return .init(current: Double(activeCareLedgerSummary.wateringEvents.count), target: 14, unit: "次", actionTitle: "累计喂水")
         case "play_champion":
-            return .init(current: Double(activePet.careLogs.count(where: { $0.careType == .play })), target: 20, unit: "次", actionTitle: "累计陪玩")
+            return .init(current: Double(activeCareLedgerSummary.playEvents.count), target: 20, unit: "次", actionTitle: "累计陪玩")
         case "clean_keeper":
             return .init(current: Double(cleaningRecordCount()), target: 20, unit: "次", actionTitle: "累计清洁照护")
         case "treat_scout":
-            return .init(current: Double(activePet.careLogs.count(where: { FeedLogMetadata.isTreatLog($0) })), target: 10, unit: "次", actionTitle: "累计记录零食")
+            return .init(current: Double(activeCareLedgerSummary.treatEvents.count), target: 10, unit: "次", actionTitle: "累计记录零食")
         case "food_kind_explorer":
             return .init(current: Double(recordedFoodKindCount()), target: 2, unit: "种", actionTitle: "干粮湿粮都记录")
         case "auto_feeder_pilot":
-            return .init(current: Double(mainFeedLogs().filter(\.isAutoFeedLogEntry).count), target: 3, unit: "次", actionTitle: "自动猫粮机记录")
+            return .init(current: Double(autoMainFeedCount()), target: 3, unit: "次", actionTitle: "自动猫粮机记录")
         case "stock_keeper":
-            return .init(current: Double(activePet.foodRecords.count), target: 2, unit: "次", actionTitle: "添加余粮")
+            return .init(current: Double(activePetActivitySummary.foodRecordCount), target: 2, unit: "次", actionTitle: "添加余粮")
         case "protection_ready":
-            return .init(current: (!activePet.documents.isEmpty || !activePet.insurances.isEmpty) ? 1 : 0, target: 1, unit: "项", actionTitle: "添加证件或保险")
+            return .init(current: activePetActivitySummary.hasProtectionRecord ? 1 : 0, target: 1, unit: "项", actionTitle: "添加证件或保险")
         case "vaccine_keeper":
             return .init(current: hasVaccineRecord() ? 1 : 0, target: 1, unit: "针", actionTitle: "记录疫苗")
         case "symptom_watcher":
-            return .init(current: Double(activePet.symptomLogs.count), target: 3, unit: "次", actionTitle: "记录症状")
+            return .init(current: Double(activePetActivitySummary.symptomCount), target: 3, unit: "次", actionTitle: "记录症状")
         case "care_streak_keeper":
             return .init(current: Double(consecutiveAnyRecordDays()), target: 14, unit: "天", actionTitle: "连续照护记录")
         case "meal_archivist":
-            return .init(current: Double(mainFeedLogs().count), target: 50, unit: "次", actionTitle: "累计主食记录")
+            return .init(current: Double(mainFeedCount()), target: 50, unit: "次", actionTitle: "累计主食记录")
         case "water_guardian":
             return .init(current: Double(waterCareRecordDates().count), target: 50, unit: "次", actionTitle: "累计喂水/换水")
         case "memory_collector":
-            return .init(current: Double(activePet.photoLogs.count), target: 50, unit: "张", actionTitle: "添加宠物照片")
+            return .init(current: Double(activePetActivitySummary.photoCount), target: 50, unit: "张", actionTitle: "添加宠物照片")
         case "weight_rhythm":
-            return .init(current: Double(activePet.weightLogs.count), target: 14, unit: "条", actionTitle: "记录体重")
+            return .init(current: Double(activeCareLedgerSummary.weightEvents.count), target: 14, unit: "条", actionTitle: "记录体重")
         case "year_companion":
             return .init(current: Double(max(0, activePet.daysTogether)), target: 365, unit: "天", actionTitle: "共同生活天数")
         case "global_island_crew":
@@ -268,17 +266,19 @@ extension AchievementWallContentView {
     }
 
     func consecutivePerfectPoopDays() -> Int {
-        consecutiveDays { day in
-            activePet.pottyLogs.contains {
-                Calendar.current.isDate($0.date, inSameDayAs: day) && $0.pottyType == .perfectPoop
-            }
-        }
+        let calendar = Calendar.current
+        return activeCareLedgerSummary.consecutivePerfectPoopDays(
+            calendar: calendar,
+            today: calendar.startOfDay(for: Date())
+        )
     }
 
     func consecutiveWalkDays() -> Int {
-        consecutiveDays { day in
-            activePet.walkLogs.contains { Calendar.current.isDate($0.startDate, inSameDayAs: day) }
-        }
+        let calendar = Calendar.current
+        return activeCareLedgerSummary.consecutiveWalkDays(
+            calendar: calendar,
+            today: calendar.startOfDay(for: Date())
+        )
     }
 
     func consecutiveAnyRecordDays() -> Int {
@@ -300,60 +300,52 @@ extension AchievementWallContentView {
     }
 
     func totalWalkKm() -> Double {
-        activePet.walkLogs.reduce(0.0) { $0 + $1.distanceMeters / 1000.0 }
+        activeCareLedgerSummary.totalWalkMeters() / 1000.0
     }
 
     func maxSingleWalkKm() -> Double {
-        activePet.walkLogs.map { $0.distanceMeters / 1000.0 }.max() ?? 0
+        activeCareLedgerSummary.maxSingleWalkMeters() / 1000.0
     }
 
     func feedingSpanDays() -> Int {
-        let dates = activePet.foodRecords.map(\.startDate)
-            + activePet.careLogs.filter { $0.careType == .feeding }.map(\.date)
+        let dates = activePetActivitySummary.foodRecordDates
+            + activeCareLedgerSummary.mainFeedEvents.map(\.occurredAt)
         guard let first = dates.min(), let last = dates.max() else { return 0 }
         return Calendar.current.dateComponents([.day], from: first, to: last).day ?? 0
     }
 
     func hasAnyRecord() -> Bool {
-        !activePet.healthLogs.isEmpty || !activePet.pottyLogs.isEmpty || !activePet.walkLogs.isEmpty
-            || !activePet.hygieneLogs.isEmpty || !activePet.careLogs.isEmpty || !activePet.foodRecords.isEmpty
-            || !activePet.expenseLogs.isEmpty || !activePet.weightLogs.isEmpty || !activePet.photoLogs.isEmpty
-            || !activePet.milestones.isEmpty
+        activeCareLedgerSummary.hasAnyRecord || activePetActivitySummary.hasArchiveRecord
     }
 
     func hasAnyTodayRecord() -> Bool {
         let calendar = Calendar.current
-        return activePet.healthLogs.contains { calendar.isDateInToday($0.date) }
-            || activePet.hygieneLogs.contains { calendar.isDateInToday($0.date) }
-            || activePet.pottyLogs.contains { calendar.isDateInToday($0.date) }
-            || activePet.walkLogs.contains { calendar.isDateInToday($0.startDate) }
-            || activePet.careLogs.contains { calendar.isDateInToday($0.date) }
-            || activePet.weightLogs.contains { calendar.isDateInToday($0.date) }
-    }
-
-    func mainFeedLogs() -> [PetCareLog] {
-        activePet.careLogs.filter { FeedLogMetadata.isMainFoodLog($0) }
+        return activeCareLedgerSummary.hasTodayRecord(kind: .health, calendar: calendar, now: Date())
+            || activeCareLedgerSummary.hasTodayRecord(kind: .hygiene, calendar: calendar, now: Date())
+            || activeCareLedgerSummary.hasTodayRecord(kind: .potty, calendar: calendar, now: Date())
+            || activeCareLedgerSummary.hasTodayRecord(kind: .walk, calendar: calendar, now: Date())
+            || activeCareLedgerSummary.hasTodayCareRecord(calendar: calendar, now: Date())
+            || activeCareLedgerSummary.hasTodayRecord(kind: .weight, calendar: calendar, now: Date())
     }
 
     func cleaningRecordCount() -> Int {
-        let careCount = activePet.careLogs.count(where: {
-            [.litter, .waterChange, .filterClean, .cageCleaning, .substrateChange].contains($0.careType)
-        })
-        return activePet.hygieneLogs.count + careCount
+        activeCareLedgerSummary.hygieneEvents.count + activeCareLedgerSummary.cleaningCareEvents.count
     }
 
     func recordedFoodKindCount() -> Int {
-        Set(mainFeedLogs().map(\.foodKindRaw).filter { !$0.isEmpty }).count
+        activeCareLedgerSummary.recordedFoodKindCount()
+    }
+
+    func mainFeedCount() -> Int {
+        activeCareLedgerSummary.mainFeedEvents.count
+    }
+
+    func autoMainFeedCount() -> Int {
+        activeCareLedgerSummary.autoMainFeedCount()
     }
 
     func hasVaccineRecord() -> Bool {
-        activePet.healthLogs.contains {
-            $0.type == "vaccine"
-                || $0.type == "vaccination"
-                || $0.note.localizedCaseInsensitiveContains("疫苗")
-                || $0.note.localizedCaseInsensitiveContains("vaccine")
-                || $0.note.localizedCaseInsensitiveContains("impf")
-        }
+        activeCareLedgerSummary.hasVaccineRecord()
     }
 
     func uniqueGachaItemCount() -> Int {

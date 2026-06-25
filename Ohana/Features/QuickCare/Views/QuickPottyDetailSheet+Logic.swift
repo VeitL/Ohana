@@ -336,7 +336,7 @@ extension QuickPottyDetailSheet {
     func deleteItem(_ item: PoopLogItem) {
         switch item {
         case let .potty(entry):
-            guard let log = legacyPottyDeleteLog(for: entry) else {
+            guard let logId = entry.legacyLogId else {
                 OhanaLog.warning(
                     "QuickPottyDetailSheet could not resolve potty log for ledger entry \(entry.id.uuidString)",
                     category: "Care"
@@ -344,24 +344,40 @@ extension QuickPottyDetailSheet {
                 return
             }
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
-            commandQueue.enqueue(.petPottyDelete(petID: pet.id, logID: log.id)) {
-                _ = PetCareCommandExecutor(context: modelContext, services: appServices).deletePottyLog(
+            commandQueue.enqueue(.petPottyDelete(petID: pet.id, logID: logId)) {
+                let executor = PetCareCommandExecutor(context: modelContext, services: appServices)
+                guard let log = executor.pottyLog(id: logId) else {
+                    OhanaLog.warning(
+                        "QuickPottyDetailSheet could not resolve potty log \(logId.uuidString)",
+                        category: "Care"
+                    )
+                    return
+                }
+                _ = executor.deletePottyLog(
                     log,
                     pet: pet,
                     note: "quickPotty.deletePotty"
                 )
             }
-        case let .unknownPotty(log, _):
+        case let .unknownPotty(entry):
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
-            commandQueue.enqueue(.petPottyDelete(petID: pet.id, logID: log.id)) {
-                _ = PetCareCommandExecutor(context: modelContext, services: appServices).deletePottyLog(
+            commandQueue.enqueue(.petPottyDelete(petID: pet.id, logID: entry.id)) {
+                let executor = PetCareCommandExecutor(context: modelContext, services: appServices)
+                guard let log = executor.pottyLog(id: entry.id) else {
+                    OhanaLog.warning(
+                        "QuickPottyDetailSheet could not resolve unknown potty log \(entry.id.uuidString)",
+                        category: "Care"
+                    )
+                    return
+                }
+                _ = executor.deletePottyLog(
                     log,
                     pet: pet,
                     note: "quickPotty.deletePotty"
                 )
             }
         case let .litter(entry):
-            guard let log = legacyLitterDeleteLog(for: entry) else {
+            guard let logId = entry.legacyLogId else {
                 OhanaLog.warning(
                     "QuickPottyDetailSheet could not resolve litter care log for ledger entry \(entry.id.uuidString)",
                     category: "Care"
@@ -369,8 +385,16 @@ extension QuickPottyDetailSheet {
                 return
             }
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
-            commandQueue.enqueue(.petCareDelete(petID: pet.id, logID: log.id)) {
-                _ = PetCareCommandExecutor(context: modelContext, services: appServices).deleteCareLog(
+            commandQueue.enqueue(.petCareDelete(petID: pet.id, logID: logId)) {
+                let executor = PetCareCommandExecutor(context: modelContext, services: appServices)
+                guard let log = executor.careLog(id: logId) else {
+                    OhanaLog.warning(
+                        "QuickPottyDetailSheet could not resolve litter care log \(logId.uuidString)",
+                        category: "Care"
+                    )
+                    return
+                }
+                _ = executor.deleteCareLog(
                     log,
                     pet: pet,
                     note: "quickPotty.deleteLitter"
@@ -380,20 +404,18 @@ extension QuickPottyDetailSheet {
         }
     }
 
-    func legacyPottyDeleteLog(for entry: PoopPottyLedgerEntry) -> PetPottyLog? {
-        guard let legacyLogId = entry.legacyLogId else { return nil }
-        return legacyPottyDeleteLogs.first { $0.id == legacyLogId }
-    }
-
-    func legacyLitterDeleteLog(for entry: PoopLitterLedgerEntry) -> PetCareLog? {
-        guard let legacyLogId = entry.legacyLogId else { return nil }
-        return legacyLitterDeleteLogs.first { $0.id == legacyLogId }
-    }
-
-    func claimUnknownPotty(_ log: PetPottyLog, target: Pet) {
+    func claimUnknownPotty(_ logId: UUID, target: Pet) {
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
         commandQueue.enqueue(.quickCare(entityID: target.id, action: "claimUnknownPotty")) {
-            _ = PetCareCommandExecutor(context: modelContext, services: appServices).claimUnknownPottyLog(
+            let executor = PetCareCommandExecutor(context: modelContext, services: appServices)
+            guard let log = executor.pottyLog(id: logId) else {
+                OhanaLog.warning(
+                    "QuickPottyDetailSheet could not resolve unknown potty log \(logId.uuidString)",
+                    category: "Care"
+                )
+                return
+            }
+            _ = executor.claimUnknownPottyLog(
                 log,
                 pet: target,
                 note: "quickPotty.claimUnknown"

@@ -20,6 +20,8 @@ struct IslandMedicationDashboardContentView: View {
     var standalone: Bool = true
     var onOpenPet: ((Pet) -> Void)?
     let pets: [Pet]
+    let medicationsByPetID: [UUID: [PetMedication]]
+    var onMedicationDataChanged: (() -> Void)?
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
@@ -39,7 +41,7 @@ struct IslandMedicationDashboardContentView: View {
 
     private var summaries: [MedicationPetSummary] {
         selectedPets.map { pet in
-            let meds = pet.medications.filter(\.isActiveToday).sorted { $0.createdAt > $1.createdAt }
+            let meds = medications(for: pet).filter(\.isActiveToday).sorted { $0.createdAt > $1.createdAt }
             let due = meds.reduce(0) { $0 + max(0, $1.frequency.dosesPerDay) }
             let taken = meds.reduce(0) { $0 + min(appServices.medicationReminders.dosesTakenToday(for: $1.id), max(0, $1.frequency.dosesPerDay)) }
             _ = doseRefreshToken
@@ -48,7 +50,19 @@ struct IslandMedicationDashboardContentView: View {
     }
 
     private var activeMeds: [PetMedication] {
-        selectedPets.flatMap(\.medications).filter(\.isActiveToday)
+        selectedPets.flatMap { medications(for: $0) }
+            .filter(\.isActiveToday)
+            .sorted { $0.createdAt > $1.createdAt }
+    }
+
+    private var medicationPetNamesByID: [UUID: String] {
+        var names: [UUID: String] = [:]
+        for pet in pets {
+            for medication in medications(for: pet) {
+                names[medication.id] = pet.name
+            }
+        }
+        return names
     }
 
     private var dueDoses: Int {
@@ -77,7 +91,7 @@ struct IslandMedicationDashboardContentView: View {
     var body: some View {
         dashboardBody
             .sheet(item: $sheetPet) { pet in
-                PetMedicationView(pet: pet)
+                PetMedicationView(pet: pet, onDataChanged: onMedicationDataChanged)
             }
             .onAppear { animateReveal() }
             .onChange(of: selectedPetId) { _, _ in animateReveal() }
@@ -219,7 +233,6 @@ struct IslandMedicationDashboardContentView: View {
         let need = max(0, med.frequency.dosesPerDay)
         let taken = min(appServices.medicationReminders.dosesTakenToday(for: med.id), max(need, 1))
         let done = need > 0 && taken >= need
-        let pet = med.pet
         _ = doseRefreshToken
         return VStack(spacing: 8) {
             ZStack {
@@ -241,7 +254,7 @@ struct IslandMedicationDashboardContentView: View {
                 .font(OhanaFont.adaptive(size: 10, weight: .black, design: .rounded))
                 .foregroundStyle(Color.goCardWhite)
                 .lineLimit(1)
-            Text(pet?.name ?? med.frequency.rawValue)
+            Text(medicationPetNamesByID[med.id] ?? med.frequency.rawValue)
                 .font(OhanaFont.adaptive(size: 9, weight: .bold, design: .rounded))
                 .foregroundStyle(Color.goCardWhite.opacity(0.42))
                 .lineLimit(1)
@@ -315,6 +328,10 @@ struct IslandMedicationDashboardContentView: View {
     }
 
     private var medAccent: Color { Color(hex: "FF5A00") }
+
+    private func medications(for pet: Pet) -> [PetMedication] {
+        medicationsByPetID[pet.id, default: []]
+    }
 
     private func open(_ pet: Pet) {
         if let onOpenPet {

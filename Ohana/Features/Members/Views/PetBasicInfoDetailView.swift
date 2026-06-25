@@ -21,6 +21,8 @@ struct PetBasicInfoDetailView: View {
     @State var showingRainbowBridgeAlert = false
     @State var showingUndoPassingAlert = false
     @State var rainbowBridgeDate = Date()
+    @State var healthSummary = PetBasicInfoHealthSummary.empty
+    @State var healthSummaryLoadTask: Task<Void, Never>?
 
     // Edit state mirrors
     @State var eName = ""
@@ -110,6 +112,13 @@ struct PetBasicInfoDetailView: View {
             if hasPassedAway {
                 isEditing = false
             }
+        }
+        .onAppear {
+            scheduleHealthSummaryLoad()
+        }
+        .onDisappear {
+            healthSummaryLoadTask?.cancel()
+            healthSummaryLoadTask = nil
         }
         .accessibilityIdentifier("pet-basic-info-screen")
     }

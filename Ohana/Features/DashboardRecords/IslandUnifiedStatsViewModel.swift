@@ -45,6 +45,13 @@ struct FameRanking {
     let isHuman: Bool
 }
 
+private struct PetLedgerMetricEntry {
+    let id: UUID
+    let petID: UUID
+    let date: Date
+    let value: Double
+}
+
 // MARK: - ViewModel
 
 @Observable
@@ -66,22 +73,42 @@ final class IslandUnifiedStatsViewModel {
     // MARK: - Load
 
     func load(modelContext: ModelContext, pets: [Pet], humans: [Human]) {
-        loadWeightDeltas(pets: pets, humans: humans)
-        loadExplorations(modelContext: modelContext, pets: pets, humans: humans)
-        computeWeeklyExplorationCount(pets: pets, humans: humans)
+        let petWeightEntriesByPetId = Self.fetchPetLedgerMetricEntries(
+            modelContext: modelContext,
+            pets: pets,
+            eventKind: .weight,
+            valueTransform: { $0.amountValue }
+        )
+        let petWalkEntriesByPetId = Self.fetchPetLedgerMetricEntries(
+            modelContext: modelContext,
+            pets: pets,
+            eventKind: .walk,
+            valueTransform: { max(0, $0.amountValue) }
+        )
+        loadWeightDeltas(pets: pets, humans: humans, petWeightEntriesByPetId: petWeightEntriesByPetId)
+        loadExplorations(
+            petWalkEntriesByPetId: petWalkEntriesByPetId,
+            pets: pets,
+            humans: humans
+        )
+        computeWeeklyExplorationCount(petWalkEntriesByPetId: petWalkEntriesByPetId, humans: humans)
     }
 
     // MARK: - Weight Gravity（变动百分比，消除量纲差异）
 
-    private func loadWeightDeltas(pets: [Pet], humans: [Human]) {
+    private func loadWeightDeltas(
+        pets: [Pet],
+        humans: [Human],
+        petWeightEntriesByPetId: [UUID: [PetLedgerMetricEntry]]
+    ) {
         var points: [WeightDeltaPoint] = []
 
         // 宠物体重
         for pet in pets {
-            let sorted = pet.weightLogs.sorted { $0.date < $1.date }
-            guard let baseline = sorted.first?.weight, baseline > 0 else { continue }
+            let sorted = petWeightEntriesByPetId[pet.id] ?? []
+            guard let baseline = sorted.first?.value, baseline > 0 else { continue }
             for log in sorted {
-                let pct = (log.weight - baseline) / baseline * 100
+                let pct = (log.value - baseline) / baseline * 100
                 points.append(WeightDeltaPoint(
                     date: log.date,
                     entityName: pet.name,
@@ -109,23 +136,27 @@ final class IslandUnifiedStatsViewModel {
         weightDeltas = points.sorted { $0.date < $1.date }
 
         // F4: 加载实际体重绝对值
-        loadWeightAbsolutes(pets: pets, humans: humans)
+        loadWeightAbsolutes(pets: pets, humans: humans, petWeightEntriesByPetId: petWeightEntriesByPetId)
 
         // 计算排行榜（本月）
-        computeRankings(pets: pets, humans: humans)
+        computeRankings(pets: pets, humans: humans, petWeightEntriesByPetId: petWeightEntriesByPetId)
     }
 
-    private func loadWeightAbsolutes(pets: [Pet], humans: [Human]) {
+    private func loadWeightAbsolutes(
+        pets: [Pet],
+        humans: [Human],
+        petWeightEntriesByPetId: [UUID: [PetLedgerMetricEntry]]
+    ) {
         var pts: [WeightAbsolutePoint] = []
         for pet in pets {
             let sid = "pet:\(pet.id.uuidString)"
-            for log in pet.weightLogs {
+            for log in petWeightEntriesByPetId[pet.id] ?? [] {
                 pts.append(WeightAbsolutePoint(
                     id: log.id,
                     date: log.date,
                     seriesID: sid,
                     displayName: pet.name,
-                    weight: log.weightInKg,
+                    weight: log.value,
                     isHuman: false
                 ))
             }
@@ -155,7 +186,11 @@ final class IslandUnifiedStatsViewModel {
         }
     }
 
-    private func computeRankings(pets: [Pet], humans: [Human]) {
+    private func computeRankings(
+        pets: [Pet],
+        humans: [Human],
+        petWeightEntriesByPetId: [UUID: [PetLedgerMetricEntry]]
+    ) {
         let cal = Calendar.current
         let now = Date()
         let startOfMonth = cal.date(from: cal.dateComponents([.year, .month], from: now)) ?? now
@@ -163,11 +198,11 @@ final class IslandUnifiedStatsViewModel {
         var entries: [FameRanking] = []
 
         for pet in pets {
-            let sorted = pet.weightLogs.sorted { $0.date < $1.date }
-            guard let baseline = sorted.first?.weight, baseline > 0 else { continue }
+            let sorted = petWeightEntriesByPetId[pet.id] ?? []
+            guard let baseline = sorted.first?.value, baseline > 0 else { continue }
             let monthLogs = sorted.filter { $0.date >= startOfMonth }
             guard let latest = monthLogs.last else { continue }
-            let pct = (latest.weight - baseline) / baseline * 100
+            let pct = (latest.value - baseline) / baseline * 100
             entries.append(FameRanking(entityName: pet.name, emoji: pet.avatarEmoji, deltaPercent: pct, isHuman: false))
         }
 
@@ -193,7 +228,11 @@ final class IslandUnifiedStatsViewModel {
 
     // MARK: - Exploration（近 7 天里程聚合）
 
-    private func loadExplorations(modelContext _: ModelContext, pets: [Pet], humans: [Human]) {
+    private func loadExplorations(
+        petWalkEntriesByPetId: [UUID: [PetLedgerMetricEntry]],
+        pets: [Pet],
+        humans: [Human]
+    ) {
         let cal = Calendar.current
         let now = Date()
         guard let sevenDaysAgo = cal.date(byAdding: .day, value: -6, to: cal.startOfDay(for: now)) else { return }
@@ -203,12 +242,12 @@ final class IslandUnifiedStatsViewModel {
 
         // 宠物遛狗
         for pet in pets {
-            let recentWalks = pet.walkLogs.filter { $0.startDate >= sevenDaysAgo }
+            let recentWalks = (petWalkEntriesByPetId[pet.id] ?? []).filter { $0.date >= sevenDaysAgo }
             for log in recentWalks {
                 points.append(ExplorationPoint(
-                    date: cal.startOfDay(for: log.startDate),
+                    date: cal.startOfDay(for: log.date),
                     entityName: pet.name,
-                    distanceKm: log.distanceMeters / 1000,
+                    distanceKm: log.value / 1000,
                     isHuman: false
                 ))
             }
@@ -238,9 +277,9 @@ final class IslandUnifiedStatsViewModel {
         // 月里程：包含 30 天
         var monthPoints: [ExplorationPoint] = []
         for pet in pets {
-            let logs = pet.walkLogs.filter { $0.startDate >= thirtyDaysAgo }
+            let logs = (petWalkEntriesByPetId[pet.id] ?? []).filter { $0.date >= thirtyDaysAgo }
             monthPoints += logs.map {
-                ExplorationPoint(date: $0.startDate, entityName: pet.name, distanceKm: $0.distanceMeters / 1000, isHuman: false)
+                ExplorationPoint(date: $0.date, entityName: pet.name, distanceKm: $0.value / 1000, isHuman: false)
             }
         }
         for human in humans {
@@ -254,19 +293,60 @@ final class IslandUnifiedStatsViewModel {
 
     // MARK: - 全岛探索次数（本周，用于 IslandStatCard 大数字）
 
-    private func computeWeeklyExplorationCount(pets: [Pet], humans: [Human]) {
+    private func computeWeeklyExplorationCount(petWalkEntriesByPetId: [UUID: [PetLedgerMetricEntry]], humans: [Human]) {
         let cal = Calendar.current
         guard let weekStart = cal.date(from: cal.dateComponents([.yearForWeekOfYear, .weekOfYear], from: Date())) else { return }
 
         var count = 0
-        for pet in pets {
-            count += pet.walkLogs.count(where: { $0.startDate >= weekStart })
+        for logs in petWalkEntriesByPetId.values {
+            count += logs.count(where: { $0.date >= weekStart })
         }
         let walkingTypes = [WorkoutType.walking.rawValue, WorkoutType.running.rawValue, WorkoutType.hiking.rawValue]
         for human in humans {
             count += human.workoutLogs.count(where: { $0.date >= weekStart && walkingTypes.contains($0.typeRaw) })
         }
         weeklyExplorationCount = count
+    }
+
+    private static func fetchPetLedgerMetricEntries(
+        modelContext: ModelContext,
+        pets: [Pet],
+        eventKind: CareLedgerEventKind,
+        valueTransform: (CareLedgerEvent) -> Double
+    ) -> [UUID: [PetLedgerMetricEntry]] {
+        let petSubjectKind = CareLedgerSubjectKind.pet.rawValue
+        let eventKindRaw = eventKind.rawValue
+        let petIDs = Set(pets.map(\.id.uuidString))
+        guard !petIDs.isEmpty else { return [:] }
+        let descriptor = FetchDescriptor<CareLedgerEvent>(
+            predicate: #Predicate<CareLedgerEvent> { event in
+                event.subjectKind == petSubjectKind &&
+                    event.eventKind == eventKindRaw
+            },
+            sortBy: [SortDescriptor(\.occurredAt, order: .forward)]
+        )
+        do {
+            let entries = try modelContext.fetch(descriptor).compactMap { event -> PetLedgerMetricEntry? in
+                guard let subjectId = event.subjectId,
+                      petIDs.contains(subjectId),
+                      let petID = UUID(uuidString: subjectId) else { return nil }
+                let value = valueTransform(event)
+                guard value > 0 else { return nil }
+                return PetLedgerMetricEntry(
+                    id: event.id,
+                    petID: petID,
+                    date: event.occurredAt,
+                    value: value
+                )
+            }
+            return Dictionary(grouping: entries, by: \.petID)
+        } catch {
+            OhanaLog.warning(
+                "Island unified stats failed to fetch pet \(eventKind.rawValue) ledger events: \(error.localizedDescription)",
+                category: "DashboardRecords"
+            )
+            return [:]
+        }
     }
 
     // MARK: - Chart Helpers

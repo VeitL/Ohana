@@ -9,6 +9,8 @@ struct OasisRewardLiveDataSnapshot {
     var upgradeCoconuts: [OasisUpgradeCoconut] = []
     var electronicPets: [OasisElectronicPet] = []
     var critterFragments: [OasisCritterFragmentBalance] = []
+    var careLedgerEvents: [CareLedgerEvent] = []
+    var petActivitySummaries: [UUID: AchievementPetActivitySummary] = [:]
 }
 
 @MainActor
@@ -42,7 +44,9 @@ final class OasisRewardLiveDataStore: ObservableObject {
             plants: AppFeatureRouteGuard.shouldLoadPlantData ? fetchPlants(context: context) : [],
             upgradeCoconuts: fetchUpgradeCoconuts(context: context),
             electronicPets: fetchElectronicPets(context: context),
-            critterFragments: fetchCritterFragments(context: context)
+            critterFragments: fetchCritterFragments(context: context),
+            careLedgerEvents: fetchCareLedgerEvents(context: context),
+            petActivitySummaries: AchievementPetActivityRouteData.loadPetActivitySummaries(from: context)
         )
     }
 
@@ -92,6 +96,30 @@ final class OasisRewardLiveDataStore: ObservableObject {
         )
         descriptor.fetchLimit = 120
         return fetch(descriptor, label: "critter fragments", context: context)
+    }
+
+    private static func fetchCareLedgerEvents(context: ModelContext) -> [CareLedgerEvent] {
+        let petSubjectKind = CareLedgerSubjectKind.pet.rawValue
+        return fetch(
+            FetchDescriptor<CareLedgerEvent>(
+                predicate: #Predicate<CareLedgerEvent> { event in
+                    event.subjectKind == petSubjectKind
+                },
+                sortBy: [SortDescriptor(\CareLedgerEvent.occurredAt, order: .reverse)]
+            ),
+            label: "care ledger events",
+            context: context
+        )
+        .filter(isAchievementLedgerEvent)
+    }
+
+    private nonisolated static func isAchievementLedgerEvent(_ event: CareLedgerEvent) -> Bool {
+        switch event.eventKindEnum {
+        case .care, .potty, .walk, .hygiene, .health, .weight, .expense, .medication, .milestone:
+            true
+        case .workout, .reminder, .plantCare, .coconut, .unknown:
+            false
+        }
     }
 
     private static func fetch<T: PersistentModel>(

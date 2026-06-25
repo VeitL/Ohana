@@ -281,13 +281,15 @@ enum TodayFocusEconomyService {
         let careKind = CareLedgerEventKind.care.rawValue
         let walkKind = CareLedgerEventKind.walk.rawValue
         let pottyKind = CareLedgerEventKind.potty.rawValue
+        let weightKind = CareLedgerEventKind.weight.rawValue
         var descriptor = FetchDescriptor<CareLedgerEvent>(
             predicate: #Predicate<CareLedgerEvent> { event in
                 event.occurredAt >= start &&
                     event.subjectKind == petSubject &&
                     (event.eventKind == careKind ||
                         event.eventKind == walkKind ||
-                        event.eventKind == pottyKind)
+                        event.eventKind == pottyKind ||
+                        event.eventKind == weightKind)
             },
             sortBy: [SortDescriptor(\CareLedgerEvent.occurredAt, order: .reverse)]
         )
@@ -336,6 +338,7 @@ enum TodayFocusEconomyService {
             eventKind: event.eventKindEnum,
             actionType: event.actionType,
             date: event.occurredAt,
+            amountValue: event.amountValue,
             sourceEventId: event.sourceEventId.flatMap(UUID.init(uuidString:)),
             actorId: event.actorId
         )

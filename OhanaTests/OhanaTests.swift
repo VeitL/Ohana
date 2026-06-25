@@ -733,6 +733,19 @@ struct OhanaTests {
             actionType: CareType.play.rawValue
         )
         let petWeightLog = PetWeightLog(date: date, weight: 4.8, pet: pet)
+        let petWeightLedger = CareLedgerEvent(
+            occurredAt: date,
+            actorKind: .human,
+            actorId: human.id.uuidString,
+            subjectKind: .pet,
+            subjectId: pet.id.uuidString,
+            eventKind: .weight,
+            actionType: "petWeight",
+            amountValue: petWeightLog.weightInKg,
+            amountUnit: "kg",
+            legacyModelName: "PetWeightLog",
+            legacyModelId: petWeightLog.id.uuidString
+        )
         let photoLog = PetPhotoLog(imageData: Data([1, 2, 3]), date: date, note: "today", pet: pet)
         pet.careLogs.append(playLog)
         pet.weightLogs.append(petWeightLog)
@@ -743,6 +756,7 @@ struct OhanaTests {
         context.insert(playLog)
         context.insert(playLedger)
         context.insert(petWeightLog)
+        context.insert(petWeightLedger)
         context.insert(photoLog)
         try context.save()
 
@@ -4661,6 +4675,15 @@ struct OhanaTests {
                 isCompleted: false,
                 targetPetId: pet.id,
                 targetPlantId: nil
+            ),
+            IslandQuest(
+                id: "q_weight_\(pet.id.uuidString)",
+                emoji: "⚖️",
+                title: "体重",
+                subtitle: "",
+                isCompleted: false,
+                targetPetId: pet.id,
+                targetPlantId: nil
             )
         ]
         let ledgerEntries = [
@@ -4685,6 +4708,13 @@ struct OhanaTests {
                 eventKind: .potty,
                 actionType: PottyType.perfectPoop.rawValue,
                 date: date
+            ),
+            TodayFocusCareLedgerEntry(
+                id: UUID(),
+                petId: pet.id,
+                eventKind: .weight,
+                actionType: "petWeight",
+                date: date
             )
         ]
 
@@ -4697,7 +4727,47 @@ struct OhanaTests {
         )
         let completionStates = refreshed.map(\.isCompleted)
 
-        #expect(completionStates == [true, true, true, true])
+        #expect(completionStates == [true, true, true, true, true])
+    }
+
+    @MainActor
+    @Test func todayFocusServiceTreatsLedgerWeightAsAuthoritative() async throws {
+        let date = dateForTest(year: 2026, month: 6, day: 12, hour: 9)
+        let pet = Pet(name: "Momo", species: "狗")
+        pet.weightLogs.append(PetWeightLog(date: date, weight: 4.8, pet: pet))
+        let quest = IslandQuest(
+            id: "q_weight_\(pet.id.uuidString)",
+            emoji: "⚖️",
+            title: "体重",
+            subtitle: "",
+            isCompleted: false,
+            targetPetId: pet.id,
+            targetPlantId: nil
+        )
+
+        let emptyLedger = TodayFocusService.refreshedQuests(
+            [quest],
+            pets: [pet],
+            careLedgerEntries: [],
+            now: date
+        )
+        let ledgerDone = TodayFocusService.refreshedQuests(
+            [quest],
+            pets: [pet],
+            careLedgerEntries: [
+                TodayFocusCareLedgerEntry(
+                    id: UUID(),
+                    petId: pet.id,
+                    eventKind: .weight,
+                    actionType: "petWeight",
+                    date: date
+                )
+            ],
+            now: date
+        )
+
+        #expect(emptyLedger.first?.isCompleted == false)
+        #expect(ledgerDone.first?.isCompleted == true)
     }
 
     @MainActor
@@ -4721,17 +4791,69 @@ struct OhanaTests {
 
     @MainActor
     @Test func islandNegativeFeedbackDoesNotWarnAfterTodayCareCheckIn() async throws {
-        let container = try makeInMemoryContainer()
-        let context = container.mainContext
         let pet = Pet(name: "Momo", species: "猫")
         pet.currentStreak = 0
         pet.lastCheckInDate = nil
-        context.insert(pet)
-        context.insert(PetCareLog(type: .watering, amountMl: 250, pet: pet))
-        try context.save()
 
-        let signals = IslandNegativeFeedback.signals(pets: [pet], healthAlerts: EmptyPetHealthAlerts())
+        let signals = IslandNegativeFeedback.signals(
+            pets: [pet],
+            healthAlerts: EmptyPetHealthAlerts(),
+            careLedgerEntries: [
+                IslandNegativeCareLedgerEntry(
+                    petId: pet.id,
+                    eventKind: .care,
+                    actionType: CareType.watering.rawValue,
+                    date: Date(),
+                    amountValue: 250
+                )
+            ]
+        )
+
         #expect(!signals.contains { $0.iconName == "cloud.fill" })
+    }
+
+    @MainActor
+    @Test func islandNegativeFeedbackIgnoresLegacyRelationshipCheckInsWhenLedgerIsEmpty() async throws {
+        let pet = Pet(name: "Momo", species: "猫")
+        pet.currentStreak = 0
+        pet.lastCheckInDate = nil
+        pet.careLogs.append(PetCareLog(type: .watering, amountMl: 250, pet: pet))
+
+        let signals = IslandNegativeFeedback.signals(
+            pets: [pet],
+            clinicalAlerts: [],
+            careLedgerEntries: []
+        )
+
+        #expect(signals.contains { $0.iconName == "cloud.fill" })
+    }
+
+    @MainActor
+    @Test func islandNegativeFeedbackUsesLedgerAmountsForAppetiteTrend() async throws {
+        let pet = Pet(name: "Momo", species: "猫")
+        pet.currentStreak = 1
+        pet.lastCheckInDate = Date()
+        let now = Date()
+        let calendar = Calendar.current
+        func day(_ offset: Int) -> Date {
+            calendar.date(byAdding: .day, value: -offset, to: now) ?? now
+        }
+        let entries = [
+            IslandNegativeCareLedgerEntry(petId: pet.id, eventKind: .care, actionType: CareType.feeding.rawValue, date: day(5), amountValue: 120),
+            IslandNegativeCareLedgerEntry(petId: pet.id, eventKind: .care, actionType: CareType.feeding.rawValue, date: day(4), amountValue: 120),
+            IslandNegativeCareLedgerEntry(petId: pet.id, eventKind: .care, actionType: CareType.feeding.rawValue, date: day(3), amountValue: 120),
+            IslandNegativeCareLedgerEntry(petId: pet.id, eventKind: .care, actionType: CareType.feeding.rawValue, date: day(2), amountValue: 30),
+            IslandNegativeCareLedgerEntry(petId: pet.id, eventKind: .care, actionType: CareType.feeding.rawValue, date: day(1), amountValue: 30),
+            IslandNegativeCareLedgerEntry(petId: pet.id, eventKind: .care, actionType: CareType.feeding.rawValue, date: day(0), amountValue: 30)
+        ]
+
+        let signals = IslandNegativeFeedback.signals(
+            pets: [pet],
+            clinicalAlerts: [],
+            careLedgerEntries: entries
+        )
+
+        #expect(signals.contains { $0.iconName == "fork.knife.circle.fill" && $0.routeHint == .feed })
     }
 
     @MainActor
@@ -4806,9 +4928,20 @@ struct OhanaTests {
     @Test func islandQuestEngineDoesNotCreatePlayTaskForEveryPetAfterInteraction() async throws {
         let momo = Pet(name: "Momo", species: "狗")
         let lilo = Pet(name: "Lilo", species: "猫")
-        momo.walkLogs.append(PetWalkLog(pet: momo))
 
-        let quests = IslandQuestEngine.todayQuests(pets: [momo, lilo], reminders: [])
+        let quests = IslandQuestEngine.todayQuests(
+            pets: [momo, lilo],
+            reminders: [],
+            careLedgerEntries: [
+                TodayFocusCareLedgerEntry(
+                    id: UUID(),
+                    petId: momo.id,
+                    eventKind: .walk,
+                    actionType: "walk",
+                    date: Date()
+                )
+            ]
+        )
 
         #expect(!quests.contains { $0.id.hasPrefix("q_play_") })
     }
@@ -4818,6 +4951,7 @@ struct OhanaTests {
         let date = dateForTest(year: 2026, month: 6, day: 11, hour: 8)
         let momo = Pet(name: "Momo", species: "狗")
         momo.walkLogs.append(PetWalkLog(startDate: date, pet: momo))
+        momo.weightLogs.append(PetWeightLog(date: date, weight: 4.8, pet: momo))
         let walk = Event(
             title: "遛狗",
             startDate: date,
@@ -4837,6 +4971,46 @@ struct OhanaTests {
 
         #expect(quests.contains { IslandQuestEngine.carePlanEventId(fromQuestId: $0.id) == walk.id })
         #expect(quests.contains { $0.id.hasPrefix("q_play_") })
+        #expect(quests.contains { $0.id == "q_weight_\(momo.id.uuidString)" })
+    }
+
+    @MainActor
+    @Test func islandQuestEngineUsesLedgerWeightForReadModelCompletion() async throws {
+        let date = dateForTest(year: 2026, month: 6, day: 11, hour: 8)
+        let momo = Pet(name: "Momo", species: "狗")
+        let progress = TodayFocusQuestProgress(
+            isPetWizardCompleted: true,
+            isFirstMealRecorded: true,
+            isThemeColorSet: true
+        )
+
+        let withoutLedgerWeight = IslandQuestEngine.todayQuests(
+            pets: [momo],
+            reminders: [],
+            careLedgerEntries: [],
+            careLedgerSnapshotAvailable: true,
+            now: date,
+            questProgress: progress
+        )
+        let withLedgerWeight = IslandQuestEngine.todayQuests(
+            pets: [momo],
+            reminders: [],
+            careLedgerEntries: [
+                TodayFocusCareLedgerEntry(
+                    id: UUID(),
+                    petId: momo.id,
+                    eventKind: .weight,
+                    actionType: "petWeight",
+                    date: date
+                )
+            ],
+            careLedgerSnapshotAvailable: true,
+            now: date,
+            questProgress: progress
+        )
+
+        #expect(withoutLedgerWeight.contains { $0.id == "q_weight_\(momo.id.uuidString)" })
+        #expect(!withLedgerWeight.contains { $0.id == "q_weight_\(momo.id.uuidString)" })
     }
 
     @MainActor
@@ -5315,7 +5489,7 @@ struct OhanaTests {
     @Test func archiveMemorySnapshotRecommendsBasicInfoForEmptyProfile() async throws {
         let pet = Pet(name: "Momo", species: "猫")
 
-        let snapshot = ArchiveMemorySnapshot(pet: pet)
+        let snapshot = ArchiveMemorySnapshot(pet: pet, activitySummary: .empty)
 
         #expect(snapshot.score == 0)
         #expect(snapshot.nextStep.kind == .basicInfo)
@@ -5325,7 +5499,7 @@ struct OhanaTests {
     @Test func archiveMemorySnapshotRecommendsDocumentsAfterBasicInfo() async throws {
         let pet = archiveReadyPet()
 
-        let snapshot = ArchiveMemorySnapshot(pet: pet)
+        let snapshot = ArchiveMemorySnapshot(pet: pet, activitySummary: .empty)
 
         #expect(snapshot.score == 1)
         #expect(snapshot.nextStep.kind == .documents)
@@ -5333,14 +5507,10 @@ struct OhanaTests {
 
     @MainActor
     @Test func archiveMemorySnapshotRecommendsMomentsAfterProtection() async throws {
-        let container = try makeInMemoryContainer()
-        let context = container.mainContext
         let pet = archiveReadyPet()
-        context.insert(pet)
-        context.insert(PetDocument(title: "疫苗本", category: .vaccine, pet: pet))
-        try context.save()
+        let summary = PetAllFeaturesActivitySummary(documentCount: 1)
 
-        let snapshot = ArchiveMemorySnapshot(pet: pet)
+        let snapshot = ArchiveMemorySnapshot(pet: pet, activitySummary: summary)
 
         #expect(snapshot.score == 2)
         #expect(snapshot.nextStep.kind == .moments)
@@ -5348,15 +5518,13 @@ struct OhanaTests {
 
     @MainActor
     @Test func archiveMemorySnapshotRecommendsWeightAfterMemory() async throws {
-        let container = try makeInMemoryContainer()
-        let context = container.mainContext
         let pet = archiveReadyPet()
-        context.insert(pet)
-        context.insert(PetInsurance(companyName: "Ohana Care", pet: pet))
-        context.insert(PetPhotoLog(imageData: Data([1, 2, 3]), note: "first photo", pet: pet))
-        try context.save()
+        let summary = PetAllFeaturesActivitySummary(
+            photoCount: 1,
+            insuranceCount: 1
+        )
 
-        let snapshot = ArchiveMemorySnapshot(pet: pet)
+        let snapshot = ArchiveMemorySnapshot(pet: pet, activitySummary: summary)
 
         #expect(snapshot.score == 3)
         #expect(snapshot.nextStep.kind == .weight)
@@ -5364,17 +5532,15 @@ struct OhanaTests {
 
     @MainActor
     @Test func archiveMemorySnapshotRecommendsRetentionWhenComplete() async throws {
-        let container = try makeInMemoryContainer()
-        let context = container.mainContext
         let pet = archiveReadyPet()
         pet.currentStreak = 3
-        context.insert(pet)
-        context.insert(PetDocument(title: "疫苗本", category: .vaccine, pet: pet))
-        context.insert(PetPhotoLog(imageData: Data([1, 2, 3]), note: "first photo", pet: pet))
-        context.insert(PetWeightLog(weight: 4.2, pet: pet))
-        try context.save()
+        let summary = PetAllFeaturesActivitySummary(
+            weightCount: 1,
+            photoCount: 1,
+            documentCount: 1
+        )
 
-        let snapshot = ArchiveMemorySnapshot(pet: pet)
+        let snapshot = ArchiveMemorySnapshot(pet: pet, activitySummary: summary)
 
         #expect(snapshot.score == 5)
         #expect(snapshot.nextStep.kind == .retention)
