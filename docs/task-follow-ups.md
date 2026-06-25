@@ -10,7 +10,7 @@
 ## Current Read
 
 - Last compacted: 2026-06-25.
-- Open follow-ups: 13 total: P1 = 4, P2 = 7, P3 = 2.
+- Open follow-ups: 12 total: P1 = 4, P2 = 6, P3 = 2.
 - Open P0: 0.
 - Known first-release-reachable repository-code P1: none identified in the
   latest local closure pass.
@@ -68,14 +68,6 @@
 - Why still open: repo tests cannot prove banners, permission prompts, Focus/DND interaction, or notification action behavior on physical devices.
 - Next action: run the GAP-6 manual checklist in `docs/planning/gap-acceptance-track-list.md#gap-6-通知分级`.
 - Close when: real-device checklist is checked off and any delivery/routing defect is fixed or split into a scoped follow-up.
-
-### TFU-20260623-001 - Split Home Quick-Action Pure State Helpers From MainActor Defaults
-
-- Priority / bucket: P2, compiler-migration risk / first-release-unreachable runtime.
-- Status: Open; Home read-model object-array and main-context compatibility paths are already removed.
-- Why still open: stricter Swift isolation still warns around pure interaction shaping helpers that are default MainActor.
-- Next action: extract actor-safe nonisolated route/status calculators or mark a proven pure subset nonisolated after feed/water/privacy value APIs match.
-- Close when: Home read-model targeted suites pass with no `HomeInteractionSnapshot.swift` actor-isolation warnings and the guard still rejects `compatibilitySource`, `payload.source`, and `container.mainContext`.
 
 ### TFU-20260613-004 - Restore Pet Quick-Access Derived State
 
@@ -147,6 +139,7 @@ Use the archive for full detail. High-signal closures already reflected in the c
 
 - TFU-20260612-006: CareLedger read-model migration closed; later route-first-frame correction recorded in `docs/testing-progress.md`.
 - TFU-20260614-013, 015, 016, 017, 018, 019 and TFU-20260615-001: current-head closure reviews completed on 2026-06-25; raw Open P1 count reduced to 4.
+- TFU-20260623-001: Home quick-action render-state isolation cleanup closed after Terminal `iPhone 17` targeted suites reported `TEST SUCCEEDED`; Codex shell CoreSimulator remains a session blocker, now diagnosed by `scripts/diagnose-simulator.sh`.
 - TFU-20260612-019: human memorial read-only boundary closed by current guard coverage.
 - TFU-20260611-001: App Store Connect privacy setup closed; final public URL/support row remains TFU-20260612-022.
 

@@ -152,8 +152,8 @@ jobs:
       - name: Show toolchain
         run: |
           xcodebuild -version
-          xcrun simctl list devices available | grep -E 'iPhone 17' || {
-            echo "::error::No 'iPhone 17' simulator available on this runner. See docs/os-support-matrix.md."
+          scripts/diagnose-simulator.sh --brief || {
+            echo "::error::No healthy 'iPhone 17' simulator available on this runner. See docs/os-support-matrix.md."
             exit 1
           }
       - name: Build & test

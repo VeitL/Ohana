@@ -8,7 +8,7 @@
 import Foundation
 import SwiftData
 
-struct OhanaReminderRoutePayload {
+nonisolated struct OhanaReminderRoutePayload {
     let reminderId: UUID?
     let notificationId: String?
     let eventId: UUID?
@@ -65,7 +65,7 @@ struct OhanaReminderRoutePayload {
     }
 }
 
-enum FocusHomeReminderDestination {
+nonisolated enum FocusHomeReminderDestination {
     case petQuick(String, Pet)
     case petFeature(PetFeature, Pet)
     case petHealth(Pet, PetHealthInitialSection)
@@ -76,7 +76,7 @@ enum FocusHomeReminderDestination {
     case calendar(entityId: String?, humanId: String?)
 }
 
-enum FocusHomeReminderDeepLinkRouter {
+nonisolated enum FocusHomeReminderDeepLinkRouter {
     static func destination(
         for payload: OhanaReminderRoutePayload,
         reminders: [Reminder],
@@ -141,7 +141,6 @@ enum FocusHomeReminderDeepLinkRouter {
         }
 
         if linkRole(for: event) == .directPlant {
-            AppFeatureRouteGuard.recordIntercept("reminderPlant")
             return .functionMenu(.growthRoadmap)
         }
 
@@ -206,7 +205,6 @@ enum FocusHomeReminderDeepLinkRouter {
             return .humanDetail(human)
         }
         if resolution.role == .directPlant {
-            AppFeatureRouteGuard.recordIntercept("reminderPlantFallback")
             return .functionMenu(.growthRoadmap)
         }
         if case let .pet(petId) = resolution.owner,

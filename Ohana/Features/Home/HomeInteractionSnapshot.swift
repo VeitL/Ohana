@@ -240,7 +240,7 @@ nonisolated enum HomeInteractionSnapshotBuilder {
             kind: .pet
         )
         let states = stateDictionary(for: visibleItems + candidateItems) { item in
-            petRenderState(
+            HomeQuickActionRenderStateLogic.petRenderState(
                 item: item,
                 pet: pet,
                 source: source,
@@ -284,7 +284,7 @@ nonisolated enum HomeInteractionSnapshotBuilder {
             kind: .human
         )
         let states = stateDictionary(for: visibleItems + candidateItems) { item in
-            humanRenderState(
+            HomeQuickActionRenderStateLogic.humanRenderState(
                 item: item,
                 human: human,
                 activeHumanID: activeHumanID,
@@ -305,103 +305,6 @@ nonisolated enum HomeInteractionSnapshotBuilder {
         )
     }
 
-    private static func petRenderState(
-        item: QuickActionItem,
-        pet: Pet,
-        source: VerticalSolidHomeSourceState,
-        localization l: L10n,
-        now: Date
-    ) -> HomeQuickActionRenderSnapshot {
-        let optionsArePresent = hasMenuOptions(actionType: item.actionType)
-        let basePolicy = ExpandedQuickActionLogic.petMenuPolicy(
-            for: item,
-            pet: pet,
-            allEvents: source.events,
-            feedingLedgerEntries: source.feedingLedgerEntries,
-            now: now
-        )
-        let menuPolicy = optionsArePresent
-            ? HomeQuickActionMenuPolicySnapshot(showsMenu: basePolicy.showsMenu || optionsArePresent, showsQuickButton: false)
-            : HomeQuickActionMenuPolicySnapshot(basePolicy)
-        return HomeQuickActionRenderSnapshot(
-            status: ExpandedQuickActionLogic.countText(
-                item: item,
-                pet: pet,
-                allEvents: source.events,
-                feedingLedgerEntries: source.feedingLedgerEntries,
-                careLedgerEntries: source.careLedgerEntries,
-                hygieneLedgerEntries: source.hygieneLedgerEntries,
-                walkLedgerEntries: source.walkLedgerEntries,
-                pottyLedgerEntries: source.pottyLedgerEntries,
-                petExpenseLedgerEntries: source.petExpenseLedgerEntries,
-                petWeightLedgerEntries: source.petWeightLedgerEntries,
-                petMomentEntries: source.petMomentEntries,
-                now: now,
-                l: l
-            ),
-            isCompleted: ExpandedQuickActionLogic.isCompleted(
-                item: item,
-                pet: pet,
-                allEvents: source.events,
-                feedingLedgerEntries: source.feedingLedgerEntries,
-                careLedgerEntries: source.careLedgerEntries,
-                hygieneLedgerEntries: source.hygieneLedgerEntries,
-                walkLedgerEntries: source.walkLedgerEntries,
-                pottyLedgerEntries: source.pottyLedgerEntries,
-                petWeightLedgerEntries: source.petWeightLedgerEntries,
-                now: now
-            ),
-            showsAttention: ExpandedQuickActionLogic.showsAttentionDot(
-                item: item,
-                pet: pet,
-                allEvents: source.events,
-                feedingLedgerEntries: source.feedingLedgerEntries,
-                careLedgerEntries: source.careLedgerEntries,
-                walkLedgerEntries: source.walkLedgerEntries,
-                pottyLedgerEntries: source.pottyLedgerEntries,
-                now: now
-            ),
-            isLocked: false,
-            menuPolicy: menuPolicy
-        )
-    }
-
-    private static func humanRenderState(
-        item: QuickActionItem,
-        human: Human,
-        activeHumanID: UUID?,
-        source: VerticalSolidHomeSourceState,
-        localization l: L10n
-    ) -> HomeQuickActionRenderSnapshot {
-        let isLocked = PrivacyService.isHumanQuickActionLocked(item, human: human, viewedBy: activeHumanID)
-        let medicationWarning = item.actionType == "humanMedication"
-            ? CarePlanOverdueStatusCalculator.humanMedicationWarning(
-                for: human,
-                medications: source.humanMedications,
-                logs: source.humanMedicationLogs
-            )
-            : nil
-        let status = medicationWarning?.compactText(l: l) ?? ExpandedQuickActionLogic.humanCountText(
-            item: item,
-            human: human,
-            isLocked: isLocked,
-            activeMedications: source.humanMedications,
-            todayMedicationLogs: source.humanMedicationLogs
-        )
-        return HomeQuickActionRenderSnapshot(
-            status: status,
-            isCompleted: ExpandedQuickActionLogic.humanCompleted(
-                item: item,
-                human: human,
-                isLocked: isLocked,
-                todayMedicationLogs: source.humanMedicationLogs
-            ),
-            showsAttention: medicationWarning != nil,
-            isLocked: isLocked,
-            menuPolicy: HomeQuickActionMenuPolicySnapshot(ExpandedQuickActionLogic.humanMenuPolicy(actionType: item.actionType))
-        )
-    }
-
     private static func stableItems(_ items: [QuickActionItem], entityID: UUID, kind: EntityKind) -> [QuickActionItem] {
         items.map { item in
             var stableItem = item
@@ -416,15 +319,6 @@ nonisolated enum HomeInteractionSnapshotBuilder {
     ) -> [String: HomeQuickActionRenderSnapshot] {
         items.reduce(into: [:]) { result, item in
             result[item.actionType] = makeState(item)
-        }
-    }
-
-    private static func hasMenuOptions(actionType: String) -> Bool {
-        switch actionType {
-        case "groom", "potty", "health":
-            true
-        default:
-            false
         }
     }
 }

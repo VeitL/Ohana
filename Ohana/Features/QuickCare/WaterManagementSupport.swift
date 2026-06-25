@@ -8,7 +8,7 @@
 import Foundation
 import SwiftData
 
-enum WaterOperatingMode: String, CaseIterable, Identifiable, Equatable {
+nonisolated enum WaterOperatingMode: String, CaseIterable, Identifiable, Equatable {
     case manual
     case reminder
 
@@ -51,7 +51,7 @@ nonisolated enum WaterPlanCatchUpPolicy {
     }
 }
 
-struct WaterRuleState {
+nonisolated struct WaterRuleState {
     let pet: Pet
     let allEvents: [Event]
     let now: Date
@@ -325,13 +325,13 @@ enum WaterPlanWriter {
         return created
     }
 
-    static func planEvents(pet: Pet, allEvents: [Event]) -> [Event] {
+    nonisolated static func planEvents(pet: Pet, allEvents: [Event]) -> [Event] {
         allEvents
             .filter { isPlanEvent($0, pet: pet) }
             .sorted { $0.startDate < $1.startDate }
     }
 
-    static func isPlanEvent(_ event: Event, pet: Pet) -> Bool {
+    nonisolated static func isPlanEvent(_ event: Event, pet: Pet) -> Bool {
         let role = DomainEntityLinkRegistry.role(for: event)
         return role == .petWaterPlan &&
             MemberLifecycleActiveScheduleResolver.eventBelongsToPet(event, petId: pet.id.uuidString) &&

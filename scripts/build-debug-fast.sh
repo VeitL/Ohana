@@ -66,7 +66,7 @@ resolve_simulator_destination() {
       return 0
     fi
     echo "Simulator preflight failed: CoreSimulator is not available." >&2
-    echo "Try opening Xcode > Settings > Platforms and installing the iOS simulator runtime." >&2
+    "${REPO_ROOT}/scripts/diagnose-simulator.sh" --brief >&2 || true
     echo "If you are intentionally bypassing this preflight, set OHANA_SKIP_SIMULATOR_PREFLIGHT=1." >&2
     exit 70
   fi
@@ -94,6 +94,7 @@ if candidates:
 
   if [[ -z "${resolved}" ]]; then
     echo "Simulator preflight failed: no available simulator named '${REQUIRED_SIMULATOR_NAME}'." >&2
+    "${REPO_ROOT}/scripts/diagnose-simulator.sh" --brief >&2 || true
     echo "Available iPhone simulators:" >&2
     xcrun simctl list devices available | grep -E '^[[:space:]]+iPhone' >&2 || true
     echo "Create an '${REQUIRED_SIMULATOR_NAME}' simulator in Xcode > Devices and Simulators," >&2

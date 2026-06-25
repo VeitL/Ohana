@@ -59,6 +59,8 @@ resolve_simulator_destination() {
       return 0
     fi
     echo "Simulator preflight failed: CoreSimulator is not available." >&2
+    "${REPO_ROOT}/scripts/diagnose-simulator.sh" --brief >&2 || true
+    echo "If this only fails inside Codex, run the same test command in a normal Terminal or use CI for simulator proof." >&2
     exit 70
   fi
 
@@ -85,6 +87,7 @@ if candidates:
 
   if [[ -z "${resolved}" ]]; then
     echo "Simulator preflight failed: no available simulator named '${REQUIRED_SIMULATOR_NAME}'." >&2
+    "${REPO_ROOT}/scripts/diagnose-simulator.sh" --brief >&2 || true
     xcrun simctl list devices available | grep -E '^[[:space:]]+iPhone' >&2 || true
     exit 70
   fi

@@ -8,7 +8,7 @@
 import Foundation
 import SwiftUI
 
-enum ExpandedPetQuickTapRoute {
+nonisolated enum ExpandedPetQuickTapRoute {
     case perform(String)
     case waterManagement
     case weight
@@ -18,7 +18,7 @@ enum ExpandedPetQuickTapRoute {
     case none
 }
 
-enum ExpandedPetQuickLongPressRoute {
+nonisolated enum ExpandedPetQuickLongPressRoute {
     case feedDetail
     case waterManagement
     case walk
@@ -33,7 +33,7 @@ enum ExpandedPetQuickLongPressRoute {
     case none
 }
 
-enum ExpandedHumanQuickRoute {
+nonisolated enum ExpandedHumanQuickRoute {
     case privacyAlert
     case weightQuick
     case workoutQuick
@@ -50,7 +50,7 @@ enum ExpandedHumanQuickRoute {
     case none
 }
 
-struct ExpandedQuickMenuPolicy: Equatable {
+nonisolated struct ExpandedQuickMenuPolicy: Equatable {
     let showsMenu: Bool
     let showsQuickButton: Bool
 
@@ -59,7 +59,7 @@ struct ExpandedQuickMenuPolicy: Equatable {
     static let quickWithDetail = ExpandedQuickMenuPolicy(showsMenu: true, showsQuickButton: true)
 }
 
-struct HomeFeedQuickActionEntry: Equatable, Identifiable {
+nonisolated struct HomeFeedQuickActionEntry: Equatable, Identifiable {
     let id: UUID
     let petId: UUID
     let date: Date
@@ -67,7 +67,7 @@ struct HomeFeedQuickActionEntry: Equatable, Identifiable {
     let source: FeedLogSource
 }
 
-struct HomeCareQuickActionEntry: Equatable, Identifiable {
+nonisolated struct HomeCareQuickActionEntry: Equatable, Identifiable {
     let id: UUID
     let petId: UUID
     let actionType: String
@@ -75,48 +75,48 @@ struct HomeCareQuickActionEntry: Equatable, Identifiable {
     let amountValue: Double
 }
 
-struct HomeHygieneQuickActionEntry: Equatable, Identifiable {
+nonisolated struct HomeHygieneQuickActionEntry: Equatable, Identifiable {
     let id: UUID
     let petId: UUID
     let hygieneType: HygieneType
     let date: Date
 }
 
-struct HomeWalkQuickActionEntry: Equatable, Identifiable {
+nonisolated struct HomeWalkQuickActionEntry: Equatable, Identifiable {
     let id: UUID
     let petId: UUID
     let startDate: Date
     let distanceMeters: Double
 }
 
-struct HomePottyQuickActionEntry: Equatable, Identifiable {
+nonisolated struct HomePottyQuickActionEntry: Equatable, Identifiable {
     let id: UUID
     let petId: UUID
     let date: Date
     let pottyType: PottyType
 }
 
-struct HomePetExpenseQuickActionEntry: Equatable, Identifiable {
+nonisolated struct HomePetExpenseQuickActionEntry: Equatable, Identifiable {
     let id: UUID
     let petId: UUID
     let date: Date
     let amount: Double
 }
 
-struct HomePetWeightQuickActionEntry: Equatable, Identifiable {
+nonisolated struct HomePetWeightQuickActionEntry: Equatable, Identifiable {
     let id: UUID
     let petId: UUID
     let date: Date
     let weightKg: Double
 }
 
-struct HomePetMomentQuickActionEntry: Equatable, Identifiable {
+nonisolated struct HomePetMomentQuickActionEntry: Equatable, Identifiable {
     let id: UUID
     let petId: UUID
     let date: Date
 }
 
-private struct HomeFeedQuickActionState {
+private nonisolated struct HomeFeedQuickActionState {
     let rules: FeedRuleState
     let todayEntries: [HomeFeedQuickActionEntry]
     let todayPlanReminders: [Reminder]
@@ -163,11 +163,11 @@ enum ExpandedQuickActionLogic {
         return FeedingDashboardState(pet: pet, allEvents: allEvents, manualGoalCount: goal, careLogs: [], now: now)
     }
 
-    static func waterRuleState(for pet: Pet, allEvents: [Event], now: Date = Date()) -> WaterRuleState {
+    nonisolated static func waterRuleState(for pet: Pet, allEvents: [Event], now: Date = Date()) -> WaterRuleState {
         WaterRuleState(pet: pet, allEvents: allEvents, now: now)
     }
 
-    static func playPlanEvent(for pet: Pet, allEvents: [Event]) -> Event? {
+    nonisolated static func playPlanEvent(for pet: Pet, allEvents: [Event]) -> Event? {
         let title = "\(pet.name) 陪玩计划"
         return allEvents
             .filter {
@@ -178,7 +178,7 @@ enum ExpandedQuickActionLogic {
             .first
     }
 
-    static func defaultWaterAmountMl(for pet: Pet) -> Double? {
+    nonisolated static func defaultWaterAmountMl(for pet: Pet) -> Double? {
         let key = pet.id.uuidString
         let settings = WaterCareSettingsStore.snapshot(petKey: key)
         return settings.waterAmountEnabled ? settings.waterAmountMl : nil
@@ -192,7 +192,7 @@ enum ExpandedQuickActionLogic {
         feedDashboard(for: pet, allEvents: allEvents, now: now).nextManualReminder
     }
 
-    static func feedAppearsComplete(
+    nonisolated static func feedAppearsComplete(
         for pet: Pet,
         allEvents: [Event],
         feedingLedgerEntries: [HomeFeedQuickActionEntry],
@@ -216,7 +216,7 @@ enum ExpandedQuickActionLogic {
         }
     }
 
-    static func showsAttentionDot(
+    nonisolated static func showsAttentionDot(
         item: QuickActionItem,
         pet: Pet,
         allEvents: [Event],
@@ -278,7 +278,7 @@ enum ExpandedQuickActionLogic {
         return false
     }
 
-    static func isCompleted(
+    nonisolated static func isCompleted(
         item: QuickActionItem,
         pet: Pet,
         allEvents: [Event],
@@ -345,7 +345,7 @@ enum ExpandedQuickActionLogic {
         }
     }
 
-    static func countText(
+    nonisolated static func countText(
         item: QuickActionItem,
         pet: Pet,
         allEvents: [Event],
@@ -572,7 +572,7 @@ enum ExpandedQuickActionLogic {
         }
     }
 
-    static func petMenuPolicy(
+    nonisolated static func petMenuPolicy(
         for item: QuickActionItem,
         pet: Pet,
         allEvents: [Event],
@@ -607,7 +607,7 @@ enum ExpandedQuickActionLogic {
         }
     }
 
-    static func humanMenuPolicy(actionType: String) -> ExpandedQuickMenuPolicy {
+    nonisolated static func humanMenuPolicy(actionType: String) -> ExpandedQuickMenuPolicy {
         switch actionType {
         case "humanWeight", "humanWorkout", "humanMedication", "humanNote", "humanExpense":
             .quickWithDetail
@@ -618,7 +618,7 @@ enum ExpandedQuickActionLogic {
         }
     }
 
-    static func feedQuickCheckInAvailable(
+    nonisolated static func feedQuickCheckInAvailable(
         for pet: Pet,
         allEvents: [Event],
         feedingLedgerEntries: [HomeFeedQuickActionEntry],
@@ -642,7 +642,7 @@ enum ExpandedQuickActionLogic {
         }
     }
 
-    static func waterQuickCheckInAvailable(for pet: Pet, allEvents: [Event], now: Date) -> Bool {
+    nonisolated static func waterQuickCheckInAvailable(for pet: Pet, allEvents: [Event], now: Date) -> Bool {
         guard !WaterQuickActionPolicy.isAquatic(species: pet.species) else { return false }
         let state = waterRuleState(for: pet, allEvents: allEvents, now: now)
         switch state.operatingMode {
@@ -653,7 +653,7 @@ enum ExpandedQuickActionLogic {
         }
     }
 
-    static func medicationQuickCheckInAvailable(for pet: Pet, allEvents: [Event], now: Date) -> Bool {
+    nonisolated static func medicationQuickCheckInAvailable(for pet: Pet, allEvents: [Event], now: Date) -> Bool {
         pet.medications
             .filter(\.isActiveToday)
             .contains { medication in
@@ -728,7 +728,7 @@ enum ExpandedQuickActionLogic {
         }
     }
 
-    static func humanCompleted(
+    nonisolated static func humanCompleted(
         item: QuickActionItem,
         human: Human,
         isLocked: Bool,
@@ -756,7 +756,7 @@ enum ExpandedQuickActionLogic {
         }
     }
 
-    static func humanCountText(
+    nonisolated static func humanCountText(
         item: QuickActionItem,
         human: Human,
         isLocked: Bool,
@@ -873,7 +873,7 @@ enum ExpandedQuickActionLogic {
         }
     }
 
-    private static func scoopQuickStatusText(
+    private nonisolated static func scoopQuickStatusText(
         for pet: Pet,
         careLedgerEntries: [HomeCareQuickActionEntry],
         calendar: Calendar,
@@ -899,7 +899,7 @@ enum ExpandedQuickActionLogic {
         return l.tr(zh: "每\(interval)天", en: "Every \(interval)d", de: "Alle \(interval) T.")
     }
 
-    private static func overdueQuickStatusText(
+    private nonisolated static func overdueQuickStatusText(
         for actionType: String,
         pet: Pet,
         allEvents: [Event],
@@ -921,7 +921,7 @@ enum ExpandedQuickActionLogic {
         return warning.compactText(l: l)
     }
 
-    private static func waterCycleOverdueText(title: String, days: Int, l: L10n) -> String {
+    private nonisolated static func waterCycleOverdueText(title: String, days: Int, l: L10n) -> String {
         let localizedTitle = waterCycleTitle(title, l: l)
         return l.tr(
             zh: "\(localizedTitle)逾期\(days)天",
@@ -930,7 +930,7 @@ enum ExpandedQuickActionLogic {
         )
     }
 
-    private static func waterCycleTitle(_ title: String, l: L10n) -> String {
+    private nonisolated static func waterCycleTitle(_ title: String, l: L10n) -> String {
         switch title {
         case "换水":
             l.tr(zh: "换水", en: "Water change", de: "Wasserwechsel")
@@ -945,14 +945,14 @@ enum ExpandedQuickActionLogic {
         }
     }
 
-    private static func quickPlanTimeText(_ date: Date, now: Date, calendar: Calendar) -> String {
+    private nonisolated static func quickPlanTimeText(_ date: Date, now: Date, calendar: Calendar) -> String {
         if calendar.isDate(date, inSameDayAs: now) {
             return date.formatted(date: .omitted, time: .shortened)
         }
         return date.formatted(date: .abbreviated, time: .shortened)
     }
 
-    private static func latestCareAgeText(
+    private nonisolated static func latestCareAgeText(
         _ type: CareType,
         pet: Pet,
         careLedgerEntries: [HomeCareQuickActionEntry],
@@ -967,7 +967,7 @@ enum ExpandedQuickActionLogic {
         return days == 0 ? todayDone : "\(days)天前"
     }
 
-    private static func aquaticWaterStatusText(
+    private nonisolated static func aquaticWaterStatusText(
         for pet: Pet,
         careLedgerEntries: [HomeCareQuickActionEntry],
         calendar cal: Calendar,
@@ -987,7 +987,7 @@ enum ExpandedQuickActionLogic {
         return "长按管理"
     }
 
-    private static func waterCycleLogSnapshot(
+    private nonisolated static func waterCycleLogSnapshot(
         for pet: Pet,
         careLedgerEntries: [HomeCareQuickActionEntry]
     ) -> WaterCareCycleLogSnapshot {
@@ -997,7 +997,7 @@ enum ExpandedQuickActionLogic {
         )
     }
 
-    private static func todayCareEntryCount(
+    private nonisolated static func todayCareEntryCount(
         _ type: CareType,
         pet: Pet,
         careLedgerEntries: [HomeCareQuickActionEntry],
@@ -1008,7 +1008,7 @@ enum ExpandedQuickActionLogic {
             .count { cal.isDate($0.date, inSameDayAs: now) }
     }
 
-    private static func latestCareEntry(
+    private nonisolated static func latestCareEntry(
         _ type: CareType,
         pet: Pet,
         careLedgerEntries: [HomeCareQuickActionEntry]
@@ -1017,7 +1017,7 @@ enum ExpandedQuickActionLogic {
             .max(by: { $0.date < $1.date })
     }
 
-    private static func careEntries(
+    private nonisolated static func careEntries(
         for pet: Pet,
         actionTypes: Set<String>,
         careLedgerEntries: [HomeCareQuickActionEntry]
@@ -1027,7 +1027,7 @@ enum ExpandedQuickActionLogic {
         }
     }
 
-    private static func todayHygieneEntries(
+    private nonisolated static func todayHygieneEntries(
         for pet: Pet,
         hygieneLedgerEntries: [HomeHygieneQuickActionEntry],
         now: Date,
@@ -1038,7 +1038,7 @@ enum ExpandedQuickActionLogic {
         }
     }
 
-    private static func todayWalkEntries(
+    private nonisolated static func todayWalkEntries(
         for pet: Pet,
         walkLedgerEntries: [HomeWalkQuickActionEntry],
         now: Date,
@@ -1049,7 +1049,7 @@ enum ExpandedQuickActionLogic {
         }
     }
 
-    private static func todayPottyEntries(
+    private nonisolated static func todayPottyEntries(
         for pet: Pet,
         pottyLedgerEntries: [HomePottyQuickActionEntry],
         now: Date,
@@ -1060,7 +1060,7 @@ enum ExpandedQuickActionLogic {
         }
     }
 
-    private static func latestPottyEntry(
+    private nonisolated static func latestPottyEntry(
         for pet: Pet,
         pottyLedgerEntries: [HomePottyQuickActionEntry]
     ) -> HomePottyQuickActionEntry? {
@@ -1069,7 +1069,7 @@ enum ExpandedQuickActionLogic {
             .max(by: { $0.date < $1.date })
     }
 
-    private static func todayWeightEntries(
+    private nonisolated static func todayWeightEntries(
         for pet: Pet,
         weightLedgerEntries: [HomePetWeightQuickActionEntry],
         now: Date,
@@ -1080,7 +1080,7 @@ enum ExpandedQuickActionLogic {
         }
     }
 
-    private static func latestWeightEntry(
+    private nonisolated static func latestWeightEntry(
         for pet: Pet,
         weightLedgerEntries: [HomePetWeightQuickActionEntry]
     ) -> HomePetWeightQuickActionEntry? {
@@ -1089,7 +1089,7 @@ enum ExpandedQuickActionLogic {
             .max(by: { $0.date < $1.date })
     }
 
-    private static func todayMomentEntries(
+    private nonisolated static func todayMomentEntries(
         for pet: Pet,
         momentEntries: [HomePetMomentQuickActionEntry],
         now: Date,
@@ -1100,7 +1100,7 @@ enum ExpandedQuickActionLogic {
         }
     }
 
-    private static func latestMomentEntry(
+    private nonisolated static func latestMomentEntry(
         for pet: Pet,
         momentEntries: [HomePetMomentQuickActionEntry]
     ) -> HomePetMomentQuickActionEntry? {
@@ -1109,14 +1109,14 @@ enum ExpandedQuickActionLogic {
             .max(by: { $0.date < $1.date })
     }
 
-    private static func momentAgeText(for date: Date, now: Date, calendar: Calendar, l: L10n) -> String {
+    private nonisolated static func momentAgeText(for date: Date, now: Date, calendar: Calendar, l: L10n) -> String {
         let days = calendar.dateComponents([.day], from: calendar.startOfDay(for: date), to: calendar.startOfDay(for: now)).day ?? 0
         if days <= 0 { return l.tr(zh: "今天", en: "today", de: "heute") }
         if days == 1 { return l.tr(zh: "昨天", en: "yesterday", de: "gestern") }
         return l.tr(zh: "\(days)天前", en: "\(days)d ago", de: "vor \(days) T.")
     }
 
-    private static func latestHumanNoteDate(for human: Human) -> Date? {
+    private nonisolated static func latestHumanNoteDate(for human: Human) -> Date? {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd"
         return human.notes
@@ -1133,21 +1133,21 @@ enum ExpandedQuickActionLogic {
             .max()
     }
 
-    private static func latestHumanExpenseDate(for human: Human, in expenses: [HomeExpensePreviewEntry]) -> Date? {
+    private nonisolated static func latestHumanExpenseDate(for human: Human, in expenses: [HomeExpensePreviewEntry]) -> Date? {
         expenses
             .filter { $0.actorId == human.id.uuidString }
             .map(\.date)
             .max()
     }
 
-    private static func relativeDayText(for date: Date, calendar: Calendar) -> String {
+    private nonisolated static func relativeDayText(for date: Date, calendar: Calendar) -> String {
         let days = calendar.dateComponents([.day], from: calendar.startOfDay(for: date), to: calendar.startOfDay(for: Date())).day ?? 0
         if days <= 0 { return "今天" }
         if days == 1 { return "昨天" }
         return "\(days)天前"
     }
 
-    private static func relativeFutureDayText(for date: Date, calendar: Calendar) -> String {
+    private nonisolated static func relativeFutureDayText(for date: Date, calendar: Calendar) -> String {
         let days = calendar.dateComponents([.day], from: calendar.startOfDay(for: Date()), to: calendar.startOfDay(for: date)).day ?? 0
         if days <= 0 { return "今天" }
         if days == 1 { return "明天" }

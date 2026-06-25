@@ -248,6 +248,10 @@ struct HomeReadModelStoreTests {
         let source = try String(contentsOf: file, encoding: .utf8)
         let builderFile = try sourceFile(named: "VerticalSolidHomeSnapshotBuilder.swift")
         let builderSource = try String(contentsOf: builderFile, encoding: .utf8)
+        let interactionFile = try sourceFile(named: "HomeInteractionSnapshot.swift")
+        let interactionSource = try String(contentsOf: interactionFile, encoding: .utf8)
+        let renderStateFile = try sourceFile(named: "HomeQuickActionRenderStateLogic.swift")
+        let renderStateSource = try String(contentsOf: renderStateFile, encoding: .utf8)
 
         #expect(!source.contains("compatibilitySource"))
         #expect(!source.contains("payload.source"))
@@ -257,6 +261,13 @@ struct HomeReadModelStoreTests {
         #expect(builderSource.contains("let healthAlertSources: [PetHealthAlertSource]"))
         #expect(builderSource.contains("scanAlerts(sources: source.healthAlertSources)"))
         #expect(!builderSource.contains("scanAlerts(pets: source.pets"))
+        #expect(interactionSource.contains("HomeQuickActionRenderStateLogic.petRenderState("))
+        #expect(interactionSource.contains("HomeQuickActionRenderStateLogic.humanRenderState("))
+        #expect(!interactionSource.contains("ExpandedQuickActionLogic.countText("))
+        #expect(!interactionSource.contains("ExpandedQuickActionLogic.isCompleted("))
+        #expect(!interactionSource.contains("ExpandedQuickActionLogic.showsAttentionDot("))
+        #expect(!interactionSource.contains("PrivacyService.isHumanQuickActionLocked("))
+        #expect(renderStateSource.contains("nonisolated enum HomeQuickActionRenderStateLogic"))
     }
 
     private func makeContainer() throws -> ModelContainer {
