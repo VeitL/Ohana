@@ -200,7 +200,11 @@ nonisolated enum NotificationDeliveryPolicy {
         EventType.plantHealthCheck.rawValue
     ]
 
-    static func plan(reminders: [Reminder], calendar: Calendar = .current) -> [UUID: NotificationDeliveryDecision] {
+    static func plan(
+        reminders: [Reminder],
+        calendar: Calendar = .current,
+        defaults: UserDefaults = .standard
+    ) -> [UUID: NotificationDeliveryDecision] {
         var decisions: [UUID: NotificationDeliveryDecision] = [:]
         var routineCountByDay: [String: Int] = [:]
         var ambientCountByDay: [String: Int] = [:]
@@ -210,14 +214,28 @@ nonisolated enum NotificationDeliveryPolicy {
         for reminder in reminders.sorted(by: reminderSort) {
             guard let event = reminder.event else { continue }
             let classification = classification(for: event)
-            guard NotificationPreferenceStore.isCategoryEnabled(classification.category) else {
+            guard NotificationPreferenceStore.isCategoryEnabled(classification.category, defaults: defaults) else {
                 decisions[reminder.id] = .skippedUserDisabled(
                     classification: classification,
                     scheduledAt: reminder.scheduledAt
                 )
                 continue
             }
-            let delivery = deliveryDate(for: reminder.scheduledAt, classification: classification, calendar: calendar)
+            if classification.category == .plantCare,
+               !PlantReminderPreferenceStore.shouldDeliverNotification(for: event, defaults: defaults) {
+                decisions[reminder.id] = .skippedUserDisabled(
+                    classification: classification,
+                    scheduledAt: reminder.scheduledAt
+                )
+                continue
+            }
+            let delivery = deliveryDate(
+                for: reminder.scheduledAt,
+                classification: classification,
+                event: event,
+                calendar: calendar,
+                defaults: defaults
+            )
             let deferred = delivery != reminder.scheduledAt
             let dayKey = dayKey(for: delivery, calendar: calendar)
 
@@ -272,9 +290,16 @@ nonisolated enum NotificationDeliveryPolicy {
     static func deliveryDate(
         for scheduledAt: Date,
         classification: NotificationDeliveryClassification,
-        calendar: Calendar = .current
+        event: Event? = nil,
+        calendar: Calendar = .current,
+        defaults: UserDefaults = .standard
     ) -> Date {
         guard classification.tier != .healthCritical else { return scheduledAt }
+        if classification.category == .plantCare,
+           let event,
+           PlantReminderPreferenceStore.isPlantCareEvent(event) {
+            return PlantReminderPreferenceStore.deliveryDate(for: scheduledAt, calendar: calendar, defaults: defaults)
+        }
         let hour = calendar.component(.hour, from: scheduledAt)
         if hour >= 22 {
             let nextDay = calendar.date(byAdding: .day, value: 1, to: scheduledAt) ?? scheduledAt.addingTimeInterval(86400)

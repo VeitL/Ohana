@@ -213,12 +213,7 @@ extension SettingsView {
                 group: .hygiene
             )
             OhanaDashedDivider(color: dividerLine).padding(.leading, 44)
-            notificationToggleRow(
-                icon: "leaf.fill",
-                iconColor: Color(hex: "4CAF50"),
-                title: l.tr(zh: "植物护理提醒", en: "Plant care reminders", de: "Pflanzenpflege-Erinnerungen"),
-                group: .plantCare
-            )
+            plantReminderSettingsPanel
             OhanaDashedDivider(color: dividerLine).padding(.leading, 44)
             notificationToggleRow(
                 icon: "checkmark.seal.fill",

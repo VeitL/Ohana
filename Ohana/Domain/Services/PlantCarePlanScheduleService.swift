@@ -69,7 +69,10 @@ enum PlantCarePlanScheduleService {
             return removed
         }
 
-        let scheduledRawTypes = Set(scheduledCareTypes.map(\.rawValue))
+        let enabledScheduledCareTypes = scheduledCareTypes.filter {
+            PlantReminderPreferenceStore.isCareTypeReminderEnabled($0, defaults: defaults)
+        }
+        let scheduledRawTypes = Set(enabledScheduledCareTypes.map(\.rawValue))
         let tasks = PlantCarePlanService.tasks(for: plant, now: now, calendar: calendar)
             .filter { scheduledRawTypes.contains($0.careType.rawValue) }
         let taskRawTypes = Set(tasks.map(\.careType.rawValue))
@@ -185,7 +188,7 @@ private extension PlantCarePlanScheduleService {
         let key = storageKey(plant: plant, type: task.careType)
         let existing = storedPlanEvent(defaults.string(forKey: key), context: context)
             ?? matchingPlanEvent(plant: plant, type: task.careType, context: context)
-        let reminderDate = reminderDate(for: task.dueDate, now: now, calendar: calendar)
+        let reminderDate = reminderDate(for: task.dueDate, now: now, calendar: calendar, defaults: defaults)
 
         if let existing {
             defaults.set(existing.id.uuidString, forKey: key)
@@ -329,17 +332,24 @@ private extension PlantCarePlanScheduleService {
             relatedEntityType: EntityKind.plant.rawValue,
             relatedEntityId: plant.id.uuidString,
             recurrenceDays: task.effectiveIntervalDays,
-            reminderDates: [reminderDate(for: dueDay, now: now, calendar: calendar)],
+            reminderDates: [reminderDate(for: dueDay, now: now, calendar: calendar, defaults: defaults)],
             writeKind: .care,
             source: .domainService
         )
     }
 
-    static func reminderDate(for dueDate: Date, now: Date, calendar: Calendar) -> Date {
-        let dueDay = calendar.startOfDay(for: dueDate)
-        let preferred = calendar.date(bySettingHour: 9, minute: 0, second: 0, of: dueDay) ?? dueDay
-        guard preferred <= now else { return preferred }
-        return now.addingTimeInterval(5 * 60)
+    static func reminderDate(
+        for dueDate: Date,
+        now: Date,
+        calendar: Calendar,
+        defaults: UserDefaults
+    ) -> Date {
+        PlantReminderPreferenceStore.reminderDate(
+            for: dueDate,
+            now: now,
+            calendar: calendar,
+            defaults: defaults
+        )
     }
 
     static func storedPlanEvent(_ rawID: String?, context: ModelContext) -> Event? {

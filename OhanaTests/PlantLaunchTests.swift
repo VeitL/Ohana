@@ -606,6 +606,195 @@ struct PlantLaunchTests {
         #expect(Set(notifications.cancelledNotificationIDs) == notificationIDs)
     }
 
+    @Test func mutedPlantReminderCareTypeRemovesOnlyThatMaterializedPlan() throws {
+        let (defaults, suiteName) = try makePlantReminderDefaults()
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let now = makeDate(year: 2026, month: 6, day: 18, hour: 8)
+        let plant = Plant(name: "Fern", wateringIntervalDays: 1, fertilizingIntervalDays: 14)
+        plant.createdAt = Calendar.current.date(byAdding: .day, value: -10, to: now) ?? now
+        plant.lastWateredDate = Calendar.current.date(byAdding: .day, value: -2, to: now)
+        plant.lastFertilizedDate = Calendar.current.date(byAdding: .day, value: -20, to: now)
+        context.insert(plant)
+        try context.save()
+
+        PlantCarePlanScheduleService.sync(
+            plant: plant,
+            context: context,
+            now: now,
+            scheduleNotifications: false,
+            defaults: defaults
+        )
+        PlantReminderPreferenceStore.setCareTypeReminderEnabled(false, for: .watering, defaults: defaults)
+        let result = PlantCarePlanScheduleService.sync(
+            plant: plant,
+            context: context,
+            now: now,
+            scheduleNotifications: false,
+            defaults: defaults
+        )
+
+        let events = try context.fetch(FetchDescriptor<Event>())
+        let reminders = try context.fetch(FetchDescriptor<Reminder>())
+        #expect(!result.removedEventIDs.isEmpty)
+        #expect(!events.contains { $0.eventType == EventType.watering.rawValue && $0.title.contains("植物计划") })
+        #expect(events.contains { $0.eventType == EventType.fertilizing.rawValue && $0.title.contains("植物计划") })
+        #expect(!reminders.contains { $0.event?.eventType == EventType.watering.rawValue })
+        #expect(reminders.contains { $0.event?.eventType == EventType.fertilizing.rawValue })
+    }
+
+    @Test func plantReminderTimeWindowControlsMaterializedReminderTime() throws {
+        let (defaults, suiteName) = try makePlantReminderDefaults()
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        PlantReminderPreferenceStore.setTimeWindow(.evening, defaults: defaults)
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let now = makeDate(year: 2026, month: 6, day: 18, hour: 8)
+        let plant = Plant(name: "Pilea", wateringIntervalDays: 1)
+        plant.createdAt = Calendar.current.date(byAdding: .day, value: -10, to: now) ?? now
+        plant.lastWateredDate = Calendar.current.date(byAdding: .day, value: -2, to: now)
+        context.insert(plant)
+        try context.save()
+
+        PlantCarePlanScheduleService.sync(
+            plant: plant,
+            context: context,
+            now: now,
+            scheduleNotifications: false,
+            defaults: defaults
+        )
+
+        let reminders = try context.fetch(FetchDescriptor<Reminder>())
+        let wateringReminder = try #require(reminders.first { $0.event?.eventType == EventType.watering.rawValue })
+        #expect(Calendar.current.component(.hour, from: wateringReminder.scheduledAt) == 18)
+        #expect(Calendar.current.component(.minute, from: wateringReminder.scheduledAt) == 30)
+    }
+
+    @Test func weekendQuietAndTravelModeAffectPlantNotificationPolicyOnly() throws {
+        let (defaults, suiteName) = try makePlantReminderDefaults()
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let saturday = makeDate(year: 2026, month: 6, day: 20, hour: 9)
+        let plant = Plant(name: "Fern")
+        let event = Event(
+            title: "给蕨类浇水植物计划",
+            startDate: saturday,
+            eventType: EventType.watering.rawValue,
+            relatedEntityType: EntityKind.plant.rawValue,
+            relatedEntityId: plant.id.uuidString
+        )
+        let reminder = Reminder(event: event, scheduledAt: saturday)
+        PlantReminderPreferenceStore.setTimeWindow(.midday, defaults: defaults)
+        PlantReminderPreferenceStore.setWeekendQuietEnabled(true, defaults: defaults)
+
+        let quietDecision = try #require(NotificationDeliveryPolicy.plan(
+            reminders: [reminder],
+            calendar: .current,
+            defaults: defaults
+        )[reminder.id])
+
+        guard case let .deliver(deliveryDate, classification, deferred) = quietDecision else {
+            Issue.record("Expected weekend quiet to defer delivery instead of disabling it")
+            return
+        }
+        #expect(classification.category == .plantCare)
+        #expect(deferred)
+        #expect(!Calendar.current.isDateInWeekend(deliveryDate))
+        #expect(Calendar.current.component(.hour, from: deliveryDate) == 12)
+        #expect(Calendar.current.component(.minute, from: deliveryDate) == 30)
+
+        PlantReminderPreferenceStore.setTravelModeEnabled(true, defaults: defaults)
+        let travelDecision = try #require(NotificationDeliveryPolicy.plan(
+            reminders: [reminder],
+            calendar: .current,
+            defaults: defaults
+        )[reminder.id])
+        guard case let .skippedUserDisabled(travelClassification, _) = travelDecision else {
+            Issue.record("Expected travel mode to skip plant notification delivery")
+            return
+        }
+        #expect(travelClassification.category == .plantCare)
+    }
+
+    @Test func plantReminderControlsMuteSinglePlantAndDeferDueTasks() throws {
+        let (defaults, suiteName) = try makePlantReminderDefaults()
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let now = makeDate(year: 2026, month: 6, day: 19, hour: 9)
+        let plant = Plant(name: "Mint", wateringIntervalDays: 1)
+        plant.createdAt = now
+        plant.lastWateredDate = Calendar.current.date(byAdding: .day, value: -2, to: now)
+        context.insert(plant)
+        try context.save()
+
+        PlantCarePlanScheduleService.sync(
+            plant: plant,
+            context: context,
+            now: now,
+            scheduleNotifications: false,
+            defaults: defaults
+        )
+        let didMute = PlantReminderControlService.setPlantRemindersEnabled(
+            false,
+            plant: plant,
+            context: context,
+            now: now,
+            scheduleNotifications: false,
+            notifications: NoopReminderNotificationScheduler()
+        )
+        #expect(didMute)
+        #expect(!plant.remindersEnabled)
+        #expect(try context.fetch(FetchDescriptor<Reminder>()).isEmpty)
+
+        PlantReminderControlService.setPlantRemindersEnabled(
+            true,
+            plant: plant,
+            context: context,
+            now: now,
+            scheduleNotifications: false,
+            notifications: NoopReminderNotificationScheduler()
+        )
+        let result = PlantReminderControlService.deferDueTasksOneDay(
+            plants: [plant],
+            context: context,
+            executorId: "human-1",
+            now: now,
+            scheduleNotifications: false,
+            notifications: NoopReminderNotificationScheduler(),
+            defaults: defaults
+        )
+        let wateringTask = try #require(PlantCarePlanService.tasks(for: plant, now: now).first { $0.careType == .watering })
+        #expect(result.deferredTaskCount == 1)
+        #expect(result.affectedPlantCount == 1)
+        #expect(wateringTask.daysUntilDue == 1)
+        #expect(plant.careLogs.contains { $0.note.hasPrefix("defer:watering:") })
+    }
+
+    @Test func explicitPlantReminderPayloadDeepLinksToPlant() {
+        let plant = Plant(name: "Fern")
+        let payload = OhanaReminderRoutePayload(userInfo: [
+            "plantId": plant.id.uuidString,
+            "plantCareType": PlantCareType.watering.rawValue
+        ])!
+
+        let destination = FocusHomeReminderDeepLinkRouter.destination(
+            for: payload,
+            reminders: [],
+            events: [],
+            pets: [],
+            humans: [],
+            plants: [plant],
+            humanMedications: []
+        )
+
+        if case let .plant(routedPlant) = destination {
+            #expect(routedPlant.id == plant.id)
+        } else {
+            Issue.record("Expected explicit plant notification payload to route to plant detail")
+        }
+    }
+
     @Test func recordingPlantCareRefreshesNextPlanReminder() throws {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
@@ -1191,6 +1380,13 @@ struct PlantLaunchTests {
         components.hour = hour
         components.minute = minute
         return components.date ?? Date(timeIntervalSince1970: 0)
+    }
+
+    private func makePlantReminderDefaults() throws -> (UserDefaults, String) {
+        let suiteName = "plant-reminder-\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        defaults.removePersistentDomain(forName: suiteName)
+        return (defaults, suiteName)
     }
 
     private func plantBudgetKey(_ plant: Plant) -> String {

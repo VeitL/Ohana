@@ -42,6 +42,7 @@ final class AppServices {
     let humanRequirements: HumanRequirementResolving
     let todayFocus: TodayFocusManaging
     let plantCarePlans: PlantCarePlanReading
+    let plantReminderControls: PlantReminderControlling
     let oasisTree: OasisTreeManaging
     let healthAlerts: PetHealthAlerting
     let walking: PetWalkingManaging
@@ -152,6 +153,7 @@ final class AppServices {
                 revisions: domainRevisions
             ),
             plantCarePlans: StaticPlantCarePlanReader(),
+            plantReminderControls: StaticPlantReminderController(),
             oasisTree: SharedOasisTreeManager(manager: oasisTreeManager),
             healthAlerts: SharedPetHealthAlertEngine(),
             walking: SharedPetWalkingManager(manager: walkingManager),
@@ -214,6 +216,7 @@ final class AppServices {
         humanRequirements: HumanRequirementResolving,
         todayFocus: TodayFocusManaging,
         plantCarePlans: PlantCarePlanReading,
+        plantReminderControls: PlantReminderControlling,
         oasisTree: OasisTreeManaging,
         healthAlerts: PetHealthAlerting,
         walking: PetWalkingManaging,
@@ -253,6 +256,7 @@ final class AppServices {
         self.humanRequirements = humanRequirements
         self.todayFocus = todayFocus
         self.plantCarePlans = plantCarePlans
+        self.plantReminderControls = plantReminderControls
         self.oasisTree = oasisTree
         self.healthAlerts = healthAlerts
         self.walking = walking

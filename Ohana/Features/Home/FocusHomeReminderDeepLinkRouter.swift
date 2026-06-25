@@ -15,6 +15,8 @@ nonisolated struct OhanaReminderRoutePayload {
     let eventType: String?
     let relatedEntityType: String?
     let relatedEntityId: String?
+    let plantId: UUID?
+    let plantCareType: String?
     let petId: UUID?
     let humanId: UUID?
     let medicationId: UUID?
@@ -37,6 +39,8 @@ nonisolated struct OhanaReminderRoutePayload {
         let eventType = value("eventType")
         let relatedEntityType = value("relatedEntityType")
         let relatedEntityId = value("relatedEntityId")
+        let plantId = value("plantId").flatMap(UUID.init(uuidString:))
+        let plantCareType = value("plantCareType")
         let petId = value("petId").flatMap(UUID.init(uuidString:))
         let humanId = value("humanId").flatMap(UUID.init(uuidString:))
         let medicationId = value("medicationId").flatMap(UUID.init(uuidString:))
@@ -46,6 +50,7 @@ nonisolated struct OhanaReminderRoutePayload {
             notificationId != nil ||
             eventId != nil ||
             relatedEntityId != nil ||
+            plantId != nil ||
             petId != nil ||
             humanId != nil ||
             medicationId != nil ||
@@ -58,6 +63,8 @@ nonisolated struct OhanaReminderRoutePayload {
         self.eventType = eventType
         self.relatedEntityType = relatedEntityType
         self.relatedEntityId = relatedEntityId
+        self.plantId = plantId
+        self.plantCareType = plantCareType
         self.petId = petId
         self.humanId = humanId
         self.medicationId = medicationId
@@ -172,6 +179,10 @@ nonisolated enum FocusHomeReminderDeepLinkRouter {
         plants: [Plant],
         humanMedications: [HumanMedication]
     ) -> FocusHomeReminderDestination? {
+        if let plantId = payload.plantId,
+           let plant = plants.first(where: { $0.id == plantId }) {
+            return .plant(plant)
+        }
         if let humanMedicationId = payload.humanMedicationId,
            let medication = humanMedications.first(where: { $0.id == humanMedicationId }),
            let human = humans.first(where: { $0.id.uuidString == medication.humanId }) {

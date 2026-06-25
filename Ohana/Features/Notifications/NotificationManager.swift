@@ -124,10 +124,13 @@ final class NotificationManager: NSObject, @unchecked Sendable {
                 completion: completion
             )
         case .skippedBudget:
+            cancel(notificationId: reminder.notificationId)
             completion?(.skippedBudget(policyDecision.metadataJSON))
         case .merged:
+            cancel(notificationId: reminder.notificationId)
             completion?(.skippedMerged(policyDecision.metadataJSON))
         case .skippedUserDisabled:
+            cancel(notificationId: reminder.notificationId)
             completion?(.skippedUserDisabled(policyDecision.metadataJSON))
         }
     }
@@ -286,14 +289,19 @@ final class NotificationManager: NSObject, @unchecked Sendable {
     private func makeContent(event: Event, reminder: Reminder) -> UNMutableNotificationContent {
         let l = L10n()
         let content = UNMutableNotificationContent()
-        content.title = l.tr(zh: "Ohana 提醒", en: "Ohana reminder", de: "Ohana Erinnerung")
         let localizedEventTitle = WaterRuleMetadata.localizedTitle(for: event, l: l) ?? FeedRuleMetadata.localizedTitle(for: event, l: l)
-        content.body = "\(event.emoji) \(localizedEventTitle)"
+        if PlantReminderPreferenceStore.isPlantCareEvent(event) {
+            content.title = l.tr(zh: "植物护理提醒", en: "Plant care reminder", de: "Pflanzenpflege-Erinnerung")
+            content.body = plantCareNotificationBody(for: event, fallbackTitle: localizedEventTitle)
+        } else {
+            content.title = l.tr(zh: "Ohana 提醒", en: "Ohana reminder", de: "Ohana Erinnerung")
+            content.body = "\(event.emoji) \(localizedEventTitle)"
+        }
         content.sound = .default
         content.categoryIdentifier = categoryID
         let classification = NotificationDeliveryPolicy.classification(for: event)
         let policyUserInfo = NotificationDeliveryPolicy.userInfo(for: classification)
-        content.userInfo = [
+        var userInfo: [AnyHashable: Any] = [
             "reminderId": reminder.id.uuidString,
             "notificationId": reminder.notificationId,
             "reminderCreatedAt": reminder.createdAt.timeIntervalSince1970,
@@ -302,7 +310,22 @@ final class NotificationManager: NSObject, @unchecked Sendable {
             "relatedEntityType": event.relatedEntityType,
             "relatedEntityId": event.relatedEntityId
         ].merging(policyUserInfo) { _, new in new }
+        if let plantId = DomainEntityLinkRegistry.plantId(for: event) {
+            userInfo["plantId"] = plantId.uuidString
+        }
+        if let plantCareType = PlantReminderPreferenceStore.careType(forEventType: event.eventType) {
+            userInfo["plantCareType"] = plantCareType.rawValue
+        }
+        content.userInfo = userInfo
         return content
+    }
+
+    private func plantCareNotificationBody(for event: Event, fallbackTitle: String) -> String {
+        let title = fallbackTitle
+            .replacingOccurrences(of: "植物计划", with: "")
+            .replacingOccurrences(of: "  ", with: " ")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        return "\(event.emoji) \(title)"
     }
 }
 
@@ -395,6 +418,12 @@ extension NotificationManager: UNUserNotificationCenterDelegate {
         }
         if let relatedEntityId = userInfo["relatedEntityId"] as? String {
             payload["relatedEntityId"] = relatedEntityId
+        }
+        if let plantId = userInfo["plantId"] as? String {
+            payload["plantId"] = plantId
+        }
+        if let plantCareType = userInfo["plantCareType"] as? String {
+            payload["plantCareType"] = plantCareType
         }
         if let petId = userInfo["petId"] as? String {
             payload["petId"] = petId
