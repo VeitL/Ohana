@@ -32,6 +32,23 @@ actionable; long-term product ideas belong in planning docs instead.
 - Close entries by changing `Status` to `Done` and adding a short `Closed` note.
 - If there is no meaningful follow-up after a task, do not add noise here.
 
+## P1 Backlog Triage (2026-06-25)
+
+This section prevents the Open P1 count from overstating live engineering work.
+The individual TFU entries below remain the source of truth; this summary is a
+planning index for the next repair/review pass.
+
+| Bucket | TFUs | Current meaning | Recommended next move |
+| --- | --- | --- | --- |
+| Review-gate / likely implemented locally | TFU-20260615-001, TFU-20260614-019, TFU-20260614-018, TFU-20260614-017, TFU-20260614-016, TFU-20260614-015, TFU-20260614-013, TFU-20260612-014 | These are still counted as Open P1 because their close conditions require broader gate, push/CI, or a fresh pure review. Their entries already record local repair evidence or local hard-gate evidence. | Do a dedicated pure-review closure pass: rerun the relevant current-code guards, inspect CI for the pushed head, and close or split only the findings that are still real. Do not treat all eight as eight fresh code projects until review disproves the local evidence. |
+| Actual code / product-policy work still likely needed | TFU-20260612-019 | Human memorial read-only boundaries may be partly or fully covered by TFU-20260614-019, but the tracker has not yet proven that the human-specific Members route/command matrix is closed. | Verify overlap against TFU-20260614-019 tests. If covered, close TFU-019 as duplicate/subsumed; if not, keep it as one focused human-members repair. |
+| Deferred 1.x / first-release-unreachable code work | TFU-20260614-014 | CloudSync live-apply delete-wins, parent lifecycle, and natural identity are real architecture work, but the entry explicitly says it is unreachable while `cloudKitDatabase: .none`. | Keep visible as CloudKit 1.x work; do not mix it into first-release P1 burn-down unless CloudKit is enabled. |
+| External/manual validation | TFU-20260612-017, TFU-20260612-016 | These require a real device notification/UI checklist. Repository code cannot close them alone. | Run the GAP-9 and GAP-6 manual checklists on a physical device; any discovered defect should become a new scoped repair TFU. |
+
+Operational read: the raw Open P1 count is 12, but only 1-2 appear to be active
+repository code repairs before a fresh review. Most of the number is review-gate
+debt, first-release-unreachable CloudSync 1.x work, or real-device validation.
+
 ## Open Items
 
 ### TFU-20260623-001 - Split Home quick-action pure state helpers from MainActor defaults
