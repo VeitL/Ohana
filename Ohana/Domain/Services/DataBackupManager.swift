@@ -129,18 +129,26 @@ final nonisolated class DataBackupManager: @unchecked Sendable {
         from url: URL,
         context: ModelContext,
         projectionManager: CoconutProjectionManaging? = nil,
-        password: String? = nil
+        password: String? = nil,
+        schedulePlantNotifications: Bool = true,
+        plantNotifications: ReminderNotificationScheduling = ReminderNotificationSchedulerRegistry.current
     ) async throws {
         let fileData = try Data(contentsOf: url) // smoothness: allow legacy prepared-avatar decode path; media service migration tracked after P1 baseline
         let data = try DataBackupEncryption.decryptIfNeeded(fileData, password: password)
         let decoder = JSONDecoder()
         let backup = try decoder.decode(OhanaBackup.self, from: data)
 
-        guard backup.schemaVersion <= 27 else {
+        guard backup.schemaVersion <= 28 else {
             throw BackupError.unsupportedVersion(backup.schemaVersion)
         }
 
-        try applyBackup(backup, context: context, projectionManager: projectionManager)
+        try applyBackup(
+            backup,
+            context: context,
+            projectionManager: projectionManager,
+            schedulePlantNotifications: schedulePlantNotifications,
+            plantNotifications: plantNotifications
+        )
     }
 
     // MARK: - Build Backup
@@ -221,7 +229,8 @@ final nonisolated class DataBackupManager: @unchecked Sendable {
                 avatar2DExtraPassCount: ud.integer(forKey: ShopInventoryDefaultsKeys.avatar2DExtraPassInventory),
                 doubleRewardBoostActive: ud.bool(forKey: ShopInventoryDefaultsKeys.doubleRewardBoost),
                 streakShieldExpiry: d(ud.object(forKey: ShopInventoryDefaultsKeys.streakShieldExpiry) as? Date)
-            )
+            ),
+            plantReminderPreferences: makePlantReminderPreferencesBackup(defaults: ud)
         )
 
         return OhanaBackup(
@@ -296,7 +305,13 @@ final nonisolated class DataBackupManager: @unchecked Sendable {
     }
 
     @MainActor
-    func applyBackup(_ backup: OhanaBackup, context: ModelContext, projectionManager: CoconutProjectionManaging?) throws {
+    func applyBackup(
+        _ backup: OhanaBackup,
+        context: ModelContext,
+        projectionManager: CoconutProjectionManaging?,
+        schedulePlantNotifications: Bool = true,
+        plantNotifications: ReminderNotificationScheduling = ReminderNotificationSchedulerRegistry.current
+    ) throws {
         // 以 UUID 为主键去重：先构建现有 ID 集合，再 upsert。
         // Event/Reminder 不能在 writer 前过滤；rehydrate writer 必须重新解析已有 schedule aggregate。
         var rehydrateNotificationIdsToCancel: [String] = []
@@ -658,6 +673,9 @@ final nonisolated class DataBackupManager: @unchecked Sendable {
                 ud.removeObject(forKey: ShopInventoryDefaultsKeys.streakShieldExpiry)
             }
         }
+        if let plantReminderPreferences = s.plantReminderPreferences {
+            applyPlantReminderPreferences(plantReminderPreferences, defaults: ud)
+        }
         if isLegacyCoconutBackup {
             try? CoconutEconomyBootstrapService.bootstrapIfNeeded(
                 context: context,
@@ -667,6 +685,52 @@ final nonisolated class DataBackupManager: @unchecked Sendable {
             )
         } else {
             CoconutWalletService.refreshQuestProjection(context: context, manager: projectionManager)
+        }
+        if !backup.plants.isEmpty || backup.plantCareLogs?.isEmpty == false {
+            try PlantBackupRestoreReconcileService.rebuildPlantCarePlans(
+                context: context,
+                scheduleNotifications: schedulePlantNotifications,
+                notifications: plantNotifications,
+                defaults: ud
+            )
+        }
+    }
+
+    private func makePlantReminderPreferencesBackup(defaults: UserDefaults) -> PlantReminderPreferencesBackup {
+        let disabledCareTypes = PlantReminderPreferenceStore.controllableCareTypes
+            .filter { !PlantReminderPreferenceStore.isCareTypeReminderEnabled($0, defaults: defaults) }
+            .map(\.rawValue)
+
+        return PlantReminderPreferencesBackup(
+            timeWindowRaw: PlantReminderPreferenceStore.timeWindow(defaults: defaults).rawValue,
+            weekendQuietEnabled: PlantReminderPreferenceStore.isWeekendQuietEnabled(defaults: defaults),
+            travelModeEnabled: PlantReminderPreferenceStore.isTravelModeEnabled(defaults: defaults),
+            disabledCareTypesRaw: disabledCareTypes
+        )
+    }
+
+    private func applyPlantReminderPreferences(
+        _ preferences: PlantReminderPreferencesBackup,
+        defaults: UserDefaults
+    ) {
+        if let rawValue = preferences.timeWindowRaw,
+           let timeWindow = PlantReminderTimeWindow(rawValue: rawValue) {
+            PlantReminderPreferenceStore.setTimeWindow(timeWindow, defaults: defaults)
+        }
+        if let weekendQuietEnabled = preferences.weekendQuietEnabled {
+            PlantReminderPreferenceStore.setWeekendQuietEnabled(weekendQuietEnabled, defaults: defaults)
+        }
+        if let travelModeEnabled = preferences.travelModeEnabled {
+            PlantReminderPreferenceStore.setTravelModeEnabled(travelModeEnabled, defaults: defaults)
+        }
+        guard let disabledCareTypesRaw = preferences.disabledCareTypesRaw else { return }
+        let disabledCareTypes = Set(disabledCareTypesRaw)
+        for careType in PlantReminderPreferenceStore.controllableCareTypes {
+            PlantReminderPreferenceStore.setCareTypeReminderEnabled(
+                !disabledCareTypes.contains(careType.rawValue),
+                for: careType,
+                defaults: defaults
+            )
         }
     }
 

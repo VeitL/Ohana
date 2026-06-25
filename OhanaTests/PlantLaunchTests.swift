@@ -452,6 +452,112 @@ struct PlantLaunchTests {
         #expect(restored.plant?.name == "Pilea")
     }
 
+    @Test func plantBackupRestoresReminderPreferencesAndRebuildsCarePlans() throws {
+        let (sourceDefaults, sourceSuiteName) = try makePlantReminderDefaults()
+        let (targetDefaults, targetSuiteName) = try makePlantReminderDefaults()
+        defer {
+            sourceDefaults.removePersistentDomain(forName: sourceSuiteName)
+            targetDefaults.removePersistentDomain(forName: targetSuiteName)
+        }
+        PlantReminderPreferenceStore.setTimeWindow(.evening, defaults: sourceDefaults)
+        PlantReminderPreferenceStore.setWeekendQuietEnabled(true, defaults: sourceDefaults)
+        PlantReminderPreferenceStore.setTravelModeEnabled(true, defaults: sourceDefaults)
+        PlantReminderPreferenceStore.setCareTypeReminderEnabled(false, for: .watering, defaults: sourceDefaults)
+
+        let source = try makeInMemoryContainer()
+        let sourceContext = source.mainContext
+        let calendar = Calendar.current
+        let now = Date()
+        let fertilizingDueDate = calendar.date(byAdding: .day, value: 4, to: now) ?? now.addingTimeInterval(4 * 86400)
+        let plant = Plant(name: "Fern", wateringIntervalDays: 1, fertilizingIntervalDays: 14)
+        plant.createdAt = calendar.date(byAdding: .day, value: -10, to: now) ?? now
+        plant.lastWateredDate = calendar.date(byAdding: .day, value: -2, to: now)
+        plant.lastFertilizedDate = calendar.date(byAdding: .day, value: -14, to: fertilizingDueDate)
+        sourceContext.insert(plant)
+        try sourceContext.save()
+
+        let sourceManager = DataBackupManager(defaults: sourceDefaults)
+        let backup = try sourceManager.buildBackup(context: sourceContext)
+        let target = try makeInMemoryContainer()
+        let notifications = PlantReminderNotificationSchedulerSpy()
+        try DataBackupManager(defaults: targetDefaults).applyBackup(
+            backup,
+            context: target.mainContext,
+            projectionManager: nil,
+            schedulePlantNotifications: true,
+            plantNotifications: notifications
+        )
+
+        let restoredEvents = try target.mainContext.fetch(FetchDescriptor<Event>())
+        let restoredReminders = try target.mainContext.fetch(FetchDescriptor<Reminder>())
+        let planEvents = restoredEvents.filter { $0.title.contains("植物计划") }
+        let fertilizingReminder = try #require(restoredReminders.first {
+            $0.event?.eventType == EventType.fertilizing.rawValue
+        })
+
+        #expect(backup.schemaVersion == 28)
+        #expect(PlantReminderPreferenceStore.timeWindow(defaults: targetDefaults) == .evening)
+        #expect(PlantReminderPreferenceStore.isWeekendQuietEnabled(defaults: targetDefaults))
+        #expect(PlantReminderPreferenceStore.isTravelModeEnabled(defaults: targetDefaults))
+        #expect(!PlantReminderPreferenceStore.isCareTypeReminderEnabled(.watering, defaults: targetDefaults))
+        #expect(PlantReminderPreferenceStore.isCareTypeReminderEnabled(.fertilizing, defaults: targetDefaults))
+        #expect(!planEvents.contains { $0.eventType == EventType.watering.rawValue })
+        #expect(planEvents.contains { $0.eventType == EventType.fertilizing.rawValue })
+        #expect(!restoredReminders.contains { $0.event?.eventType == EventType.watering.rawValue })
+        #expect(calendar.component(.hour, from: fertilizingReminder.scheduledAt) == 18)
+        #expect(calendar.component(.minute, from: fertilizingReminder.scheduledAt) == 30)
+        #expect(restoredReminders.count == notifications.scheduledReminderIDs.count)
+    }
+
+    @Test func plantGrowthDiaryExportKeepsPhotosOptIn() throws {
+        let plant = Plant(
+            name: "Pilea",
+            species: "Pilea peperomioides",
+            location: "Desk",
+            healthStatus: .thriving
+        )
+        plant.createdAt = makeDate(year: 2026, month: 1, day: 1)
+        let firstLog = PlantCareLog(
+            date: makeDate(year: 2026, month: 6, day: 2),
+            careType: .newLeaf,
+            note: "First tiny leaf",
+            photoData: Data([1, 2, 3, 4]),
+            healthStatus: .thriving
+        )
+        let secondLog = PlantCareLog(
+            date: makeDate(year: 2026, month: 6, day: 8),
+            careType: .watering,
+            note: "Soil was dry"
+        )
+        plant.careLogs.append(secondLog)
+        plant.careLogs.append(firstLog)
+
+        let compact = PlantGrowthDiaryExportService.makePayload(
+            for: plant,
+            exportedAt: makeDate(year: 2026, month: 6, day: 9),
+            includePhotos: false
+        )
+        let withPhotos = PlantGrowthDiaryExportService.makePayload(
+            for: plant,
+            exportedAt: makeDate(year: 2026, month: 6, day: 9),
+            includePhotos: true
+        )
+        let markdown = PlantGrowthDiaryExportService.markdown(
+            for: compact,
+            includePhotoPlaceholders: true,
+            languageCode: "zh"
+        )
+
+        #expect(compact.schemaVersion == 1)
+        #expect(compact.entries.map(\.careTypeRaw) == [PlantCareType.newLeaf.rawValue, PlantCareType.watering.rawValue])
+        #expect(compact.entries[0].hasPhoto)
+        #expect(compact.entries[0].photoByteCount == 4)
+        #expect(compact.entries[0].photoBase64 == nil)
+        #expect(withPhotos.entries[0].photoBase64 == Data([1, 2, 3, 4]).base64EncodedString())
+        #expect(markdown.contains("照片"))
+        #expect(markdown.contains("4 bytes"))
+    }
+
     @Test func creatingPlantMarksExistingPlantDataForGrandfatherAccess() throws {
         PlantUnlockPolicy.clearExistingPlantData()
         defer { PlantUnlockPolicy.clearExistingPlantData() }
@@ -1518,23 +1624,29 @@ struct PlantLaunchTests {
     }
 
     private final class PlantReminderNotificationSchedulerSpy: ReminderNotificationScheduling, @unchecked Sendable {
+        private(set) var scheduledReminderIDs: [UUID] = []
         private(set) var cancelledNotificationIDs: [String] = []
 
-        func schedule(reminder _: Reminder) {}
+        func schedule(reminder: Reminder) {
+            scheduledReminderIDs.append(reminder.id)
+        }
+
         func schedule(
-            reminder _: Reminder,
+            reminder: Reminder,
             existingNotificationIds _: Set<String>?,
             completion: ((ReminderNotificationScheduleResult) -> Void)?
         ) {
+            scheduledReminderIDs.append(reminder.id)
             completion?(.scheduled)
         }
 
         func schedule(
-            reminder _: Reminder,
+            reminder: Reminder,
             deliveryDate _: Date?,
             existingNotificationIds _: Set<String>?,
             completion: ((ReminderNotificationScheduleResult) -> Void)?
         ) {
+            scheduledReminderIDs.append(reminder.id)
             completion?(.scheduled)
         }
 

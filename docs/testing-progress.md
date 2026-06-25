@@ -17,10 +17,9 @@
 - Open follow-ups: 11 total in `docs/task-follow-ups.md`.
 - Open P1: 3 total; remaining P1s are CloudKit 1.x deferred work or
   real-device validation.
-- Current local validation: Plants Oasis/shop ambience integration passed
-  changed-file audits, architecture boundary audit, targeted
-  `PlantLaunchTests`, `HomeCommandExecutorTests`, and `CoconutWalletServiceTests`
-  on the pinned `iPhone 17` destination.
+- Current local validation: Plants backup/restore and growth-diary export passed
+  changed-file audits, release data-safety audit, and targeted
+  `PlantLaunchTests` on the pinned `iPhone 17` destination.
 
 ## Validation Ladder
 
@@ -98,6 +97,7 @@ Keep this section short; move older detail to archive during compaction.
 
 | Date | Snapshot | Evidence |
 | --- | --- | --- |
+| 2026-06-25 | Plants backup restore and growth diary export | Backup schema `28` now includes global plant reminder preferences, restore re-applies those preferences before rebuilding plant care Event/Reminder rows through the normal schedule service, restored plant data can immediately continue reminders, and growth-diary export is available as a JSON/Markdown service with photos opt-in by default to control payload size. CloudKit remains `.none`; multiplayer/shared plant sync stays deferred to 1.x. Validation: `git diff --check` PASS; `scripts/dev-check-changed.sh` PASS; `scripts/audit-release-data-safety.sh` PASS; `scripts/test-simulator.sh -only-testing:OhanaTests/PlantLaunchTests` PASS (37 Swift Testing tests) on pinned `iPhone 17`. |
 | 2026-06-25 | Plants Oasis/shop ambience integration | Plant care now feeds a lightweight Oasis ambience snapshot from plant-care ledger count without changing tree XP or paid care access. Lv.4 plant unlock enables lushness feedback, Lv.5 adds the Oasis-yield ambience layer, owned plant data keeps grandfather access, and the Coconut Shop now sells cosmetic-only plant decorations with inventory/equip support and Oasis stage visuals. Validation: `git diff --check` PASS; `scripts/dev-check-changed.sh` PASS; `scripts/audit-architecture-boundaries.sh` PASS; `scripts/test-simulator.sh -only-testing:OhanaTests/PlantLaunchTests` PASS (35 Swift Testing tests); `scripts/test-simulator.sh -only-testing:OhanaTests/HomeCommandExecutorTests -only-testing:OhanaTests/CoconutWalletServiceTests` PASS (`HomeCommandExecutorTests` 187 Swift Testing tests plus `CoconutWalletServiceTests` XCTest cases) on pinned `iPhone 17`. |
 | 2026-06-25 | Plants Today Focus aggregation and pet-priority scheduling | Today Focus now lets pet care-plan events fill core slots first, emits at most one weighted plant-care quest, groups due plants by room and task type (for example, one living-room watering card for multiple plants), ranks plant groups by overdue days, health attention, task weight, and batch size, and batch completion writes each plant fact through `HomeCommandExecutor`. Validation: `git diff --check` PASS; `scripts/dev-check-changed.sh` PASS; `scripts/audit-architecture-boundaries.sh --all` PASS; `scripts/test-simulator.sh -only-testing:OhanaTests/PlantFeatureGateXCTests/testQuestEngineOnlyGeneratesPlantQuestsWhenPlantCareIsIncluded` PASS (1 XCTest); `scripts/test-simulator.sh -only-testing:OhanaTests/OhanaTests` PASS (145 Swift Testing tests); `scripts/test-simulator.sh -only-testing:OhanaTests/HomeCommandExecutorTests` PASS (187 Swift Testing tests) on pinned `iPhone 17`. |
 | 2026-06-25 | Plants reminder controls and notification policy | Plant reminders now have a Settings panel for global plant notification enablement, preferred reminder window, quiet weekends, travel mode, task-type muting, single-plant muting, and one-tap due-task deferral. Plant plan materialization honors task-type/user window preferences, notification policy suppresses plant pushes during travel mode and moves quiet-weekend pushes, notification payloads carry plant/task IDs for deep links, and overdue plant reminders first respect today's preferred window before falling back to immediate reminders. Validation: `git diff --check` PASS; `scripts/dev-check-changed.sh` PASS; `scripts/audit-architecture-boundaries.sh --all` PASS; `scripts/test-simulator.sh -only-testing:OhanaTests/PlantLaunchTests` PASS (34 Swift Testing tests) on pinned `iPhone 17`. |
