@@ -116,7 +116,7 @@ struct PlantDashboardView: View {
             }
         }
         .sheet(isPresented: $showingAddPlant) {
-            AddPlantView {}
+            AddPlantDataContainer {}
         }
         .onDisappear {
             commandQueue.cancelAll()

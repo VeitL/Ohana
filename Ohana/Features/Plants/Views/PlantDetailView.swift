@@ -22,6 +22,8 @@ struct PlantDetailContentView: View {
     @StateObject private var commandQueue = DeferredDomainCommandQueue()
     @State private var showingEditSheet = false
     @State private var showingDeleteConfirm = false
+    @State private var isDeletePending = false
+    @State private var deleteUndoTask: Task<Void, Never>?
     @State private var diagnosisResult: PlantDiagnosisResult?
     private var catalogEntry: PlantCatalogEntry? { PlantCatalog.entry(id: plant.catalogSpeciesId) }
     private var careTasks: [PlantCareTaskSnapshot] { appServices.plantCarePlans.tasks(for: plant) }
@@ -65,15 +67,19 @@ struct PlantDetailContentView: View {
         .sheet(isPresented: $showingEditSheet) {
             EditPlantSheet(plant: plant)
         }
+        .safeAreaInset(edge: .bottom) {
+            pendingDeleteBanner
+        }
         .alert("确认删除", isPresented: $showingDeleteConfirm) {
             Button("取消", role: .cancel) {}
             Button("删除", role: .destructive) {
-                deletePlant()
+                stagePlantDelete()
             }
         } message: {
-            Text("确定要删除 \(plant.name) 吗？")
+            Text("确定要删除 \(plant.name) 吗？确认后会先保留 6 秒，可在本页撤销。")
         }
         .onDisappear {
+            deleteUndoTask?.cancel()
             commandQueue.cancelAll()
         }
         .task(id: plant.healthStatusRaw) {
@@ -548,6 +554,45 @@ struct PlantDetailContentView: View {
     }
 
     // MARK: - Delete Section
+    @ViewBuilder
+    private var pendingDeleteBanner: some View {
+        if isDeletePending {
+            HStack(spacing: 12) {
+                Image(systemName: "trash.fill") // a11y: allow decorative pending-delete glyph; adjacent text describes the state.
+                    .foregroundStyle(.red)
+                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("即将删除 \(plant.name)")
+                        .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
+                        .foregroundStyle(Color.ohanaPrimaryText)
+                    Text("6 秒内可撤销；到时会清理相关日历和提醒。")
+                        .font(OhanaFont.adaptive(size: 11, weight: .semibold, design: .rounded))
+                        .foregroundStyle(Color.ohanaSecondaryText)
+                }
+                Spacer(minLength: 8)
+                Button("撤销") {
+                    cancelPendingDelete()
+                }
+                .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
+                .foregroundStyle(Color.goLime)
+
+                Button("立即删除", role: .destructive) {
+                    commitPendingDelete()
+                }
+                .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
+            .background(Color.ohanaCardSurface.opacity(0.94), in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous)
+                    .strokeBorder(.red.opacity(0.2), lineWidth: 1)
+            }
+            .padding(.horizontal, 16)
+            .padding(.bottom, 8)
+        }
+    }
+
     private var deleteSection: some View {
         Button(role: .destructive) {
             showingDeleteConfirm = true
@@ -566,6 +611,8 @@ struct PlantDetailContentView: View {
                     .strokeBorder(.red.opacity(0.2), lineWidth: 1)
             }
         }
+        .disabled(isDeletePending)
+        .opacity(isDeletePending ? 0.55 : 1)
         .padding(.horizontal, 16)
     }
 
@@ -620,6 +667,35 @@ struct PlantDetailContentView: View {
 
     private func currentExecutorId() -> String? {
         activeHumanIdRaw.isEmpty ? nil : activeHumanIdRaw
+    }
+
+    private func stagePlantDelete() {
+        guard !isDeletePending else { return }
+        isDeletePending = true
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        deleteUndoTask?.cancel()
+        deleteUndoTask = Task {
+            try? await Task.sleep(nanoseconds: 6_000_000_000)
+            guard !Task.isCancelled else { return }
+            await MainActor.run {
+                commitPendingDelete()
+            }
+        }
+    }
+
+    private func cancelPendingDelete() {
+        deleteUndoTask?.cancel()
+        deleteUndoTask = nil
+        isDeletePending = false
+        UINotificationFeedbackGenerator().notificationOccurred(.warning)
+    }
+
+    private func commitPendingDelete() {
+        guard isDeletePending else { return }
+        deleteUndoTask?.cancel()
+        deleteUndoTask = nil
+        isDeletePending = false
+        deletePlant()
     }
 
     private func deletePlant() {
@@ -692,6 +768,7 @@ struct EditPlantSheet: View {
                 sourceAndSizeSection
                 healthAndSafetySection
                 notesSection
+                recalculationNoticeSection
 
                 Button { save() } label: {
                     Text(isSaving ? "保存中…" : "保存").capsuleButton()
@@ -876,6 +953,49 @@ struct EditPlantSheet: View {
         .goTranslucentCard(cornerRadius: OhanaRadius.controlLarge)
     }
 
+    @ViewBuilder
+    private var recalculationNoticeSection: some View {
+        let impacts = recalculationImpacts
+        if !impacts.isEmpty {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(spacing: 8) {
+                    Image(systemName: "arrow.triangle.2.circlepath") // a11y: allow decorative recalculation glyph; section title names the effect.
+                        .foregroundStyle(Color.goLime)
+                        .accessibilityHidden(true)
+                    Text("保存后会重算")
+                        .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
+                        .foregroundStyle(Color.ohanaPrimaryText)
+                    Spacer()
+                    Text("\(impacts.count) 项")
+                        .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded))
+                        .foregroundStyle(Color.arkInk)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(Color.goLime, in: Capsule())
+                }
+                ForEach(impacts) { impact in
+                    HStack(alignment: .top, spacing: 10) {
+                        Image(systemName: impact.iconName)
+                            .frame(width: 18)
+                            .foregroundStyle(Color.ohanaSecondaryText)
+                            .accessibilityHidden(true)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(impact.title)
+                                .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
+                                .foregroundStyle(Color.ohanaPrimaryText)
+                            Text(impact.detail)
+                                .font(OhanaFont.adaptive(size: 11, weight: .medium, design: .rounded))
+                                .foregroundStyle(Color.ohanaSecondaryText)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                }
+            }
+            .padding(16)
+            .goTranslucentCard(cornerRadius: OhanaRadius.controlLarge)
+        }
+    }
+
     private func sectionTitle(_ title: String) -> some View {
         Text(title)
             .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
@@ -934,12 +1054,18 @@ struct EditPlantSheet: View {
 
     private func applyCatalogSelection(_ id: String) {
         guard let entry = PlantCatalog.entry(id: id) else { return }
-        species = entry.commonName
-        lightLevel = entry.lightRequirement
-        soilTypeRaw = entry.soil
-        wateringInterval = entry.defaultWateringDays
-        fertilizingInterval = entry.defaultFertilizingDays
-        isIndoor = entry.isIndoorSuitable
+        let defaults = PlantProfileUXPolicy.catalogDefaults(for: entry)
+        species = defaults.species
+        lightLevel = defaults.lightLevel
+        soilTypeRaw = defaults.soilTypeRaw
+        wateringInterval = defaults.wateringIntervalDays
+        fertilizingInterval = defaults.fertilizingIntervalDays
+        isIndoor = defaults.isIndoor
+        humidityPreference = defaults.humidityPreference
+        temperaturePreference = defaults.temperaturePreference
+        potHasDrainage = defaults.potHasDrainage
+        isHydroponic = defaults.isHydroponic
+        isSucculent = defaults.isSucculent
         isToxicToCats = entry.isToxicToCats
         isToxicToDogs = entry.isToxicToDogs
         isToxicToChildren = entry.isToxicToChildren
@@ -948,7 +1074,85 @@ struct EditPlantSheet: View {
 
     private func save() {
         guard !isSaving else { return }
-        let input = PlantProfileCommandInput(
+        let input = makeProfileInput()
+        let command = DomainCommand.memberProfile(entityID: plant.id, kind: EntityKind.plant.rawValue)
+
+        isSaving = true
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        commandQueue.enqueue(command) {
+            MemberCommandExecutor(context: modelContext, services: appServices).updatePlantProfile(
+                plant,
+                input: input,
+                note: "plant.detail.profile"
+            )
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+            dismiss()
+        }
+    }
+
+    private var recalculationImpacts: [PlantCarePlanRecalculationImpact] {
+        PlantProfileUXPolicy.recalculationImpacts(
+            old: originalRecalculationSnapshot,
+            new: draftRecalculationSnapshot
+        )
+    }
+
+    private var originalRecalculationSnapshot: PlantCarePlanRecalculationSnapshot {
+        PlantCarePlanRecalculationSnapshot(
+            roomName: plant.roomNameRaw,
+            location: plant.location,
+            wateringIntervalDays: plant.wateringIntervalDays,
+            fertilizingIntervalDays: plant.fertilizingIntervalDays,
+            potDiameterCm: plant.potDiameterCm,
+            potMaterialRaw: plant.potMaterialRaw,
+            soilTypeRaw: plant.soilTypeRaw,
+            isIndoor: plant.isIndoor,
+            windowDirection: plant.windowDirection,
+            lightLevel: plant.lightLevel,
+            lastLightMeasurementLux: plant.lastLightMeasurementLux,
+            humidityPreference: plant.humidityPreference,
+            temperaturePreference: plant.temperaturePreference,
+            isNearClimateSource: plant.isNearClimateSource,
+            potHasDrainage: plant.potHasDrainage,
+            currentHeightCm: plant.currentHeightCm,
+            currentSpreadCm: plant.currentSpreadCm,
+            isHydroponic: plant.isHydroponic,
+            isSucculent: plant.isSucculent,
+            healthStatus: plant.healthStatus,
+            catalogSpeciesId: plant.catalogSpeciesId,
+            remindersEnabled: plant.remindersEnabled
+        )
+    }
+
+    private var draftRecalculationSnapshot: PlantCarePlanRecalculationSnapshot {
+        PlantCarePlanRecalculationSnapshot(
+            roomName: roomNameRaw,
+            location: location,
+            wateringIntervalDays: wateringInterval,
+            fertilizingIntervalDays: fertilizingInterval,
+            potDiameterCm: potDiameterCm,
+            potMaterialRaw: potMaterialRaw,
+            soilTypeRaw: soilTypeRaw,
+            isIndoor: isIndoor,
+            windowDirection: windowDirection,
+            lightLevel: lightLevel,
+            lastLightMeasurementLux: recordsLightMeasurement ? lastLightMeasurementLux : 0,
+            humidityPreference: humidityPreference,
+            temperaturePreference: temperaturePreference,
+            isNearClimateSource: isNearClimateSource,
+            potHasDrainage: potHasDrainage,
+            currentHeightCm: currentHeightCm,
+            currentSpreadCm: currentSpreadCm,
+            isHydroponic: isHydroponic,
+            isSucculent: isSucculent,
+            healthStatus: healthStatus,
+            catalogSpeciesId: catalogSpeciesId,
+            remindersEnabled: remindersEnabled
+        )
+    }
+
+    private func makeProfileInput() -> PlantProfileCommandInput {
+        PlantProfileCommandInput(
             name: name,
             avatarImageData: plant.avatarImageData,
             avatarEmoji: avatarEmoji,
@@ -987,18 +1191,5 @@ struct EditPlantSheet: View {
             themeHex: plant.themeColorHex,
             notes: notes
         )
-        let command = DomainCommand.memberProfile(entityID: plant.id, kind: EntityKind.plant.rawValue)
-
-        isSaving = true
-        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-        commandQueue.enqueue(command) {
-            MemberCommandExecutor(context: modelContext, services: appServices).updatePlantProfile(
-                plant,
-                input: input,
-                note: "plant.detail.profile"
-            )
-            UINotificationFeedbackGenerator().notificationOccurred(.success)
-            dismiss()
-        }
     }
 }

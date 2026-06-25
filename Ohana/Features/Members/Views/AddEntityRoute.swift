@@ -77,7 +77,7 @@ struct AddEntityDestinationView: View {
                 }
             )
         case .plant:
-            AddPlantView(onComplete: onComplete)
+            AddPlantDataContainer(onComplete: onComplete)
         }
     }
 }

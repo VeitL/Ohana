@@ -8,8 +8,30 @@
 import SwiftData
 import SwiftUI
 
+struct AddPlantDataContainer: View {
+    let onComplete: () -> Void
+    @Query(sort: \Plant.createdAt, order: .reverse) private var plants: [Plant] // smoothness: allow route-scoped duplicate scan for explicit add-plant flow; the form receives value snapshots.
+
+    var body: some View {
+        AddPlantView(
+            onComplete: onComplete,
+            existingPlantSnapshots: plants.map {
+                PlantDuplicateScanSnapshot(
+                    id: $0.id,
+                    name: $0.name,
+                    species: $0.species,
+                    roomName: $0.roomNameRaw,
+                    location: $0.location,
+                    catalogSpeciesId: $0.catalogSpeciesId
+                )
+            }
+        )
+    }
+}
+
 struct AddPlantView: View {
     let onComplete: () -> Void
+    let existingPlantSnapshots: [PlantDuplicateScanSnapshot]
     @Environment(\.modelContext) private var modelContext
     @Environment(AppServices.self) private var appServices
 
@@ -44,6 +66,8 @@ struct AddPlantView: View {
     @State private var healthStatus: PlantHealthStatus = .stable
     @State private var remindersEnabled = true
     @State private var isSaving = false
+    @State private var showDuplicateAlert = false
+    @State private var duplicateAcknowledgementKey = ""
 
     private let plantEmojis = ["🌱", "🌿", "🍀", "🌵", "🌻", "🌹", "🌺", "🪴", "🌳", "🎋", "🌾", "💐"]
     private var selectedCatalog: PlantCatalogEntry? {
@@ -52,6 +76,31 @@ struct AddPlantView: View {
 
     private var catalogMatches: [PlantCatalogEntry] {
         Array(PlantCatalog.search(catalogQuery).prefix(5))
+    }
+
+    private var duplicateDraft: PlantDuplicateScanDraft {
+        PlantDuplicateScanDraft(
+            name: name,
+            species: species,
+            roomName: roomName,
+            location: location,
+            catalogSpeciesId: selectedCatalogID
+        )
+    }
+
+    private var duplicateCandidates: [PlantDuplicateCandidate] {
+        PlantProfileUXPolicy.duplicateCandidates(
+            draft: duplicateDraft,
+            existingPlants: existingPlantSnapshots
+        )
+    }
+
+    private var currentDuplicateAcknowledgementKey: String {
+        PlantProfileUXPolicy.duplicateAcknowledgementKey(for: duplicateDraft)
+    }
+
+    private var requiresDuplicateAcknowledgement: Bool {
+        !duplicateCandidates.isEmpty && duplicateAcknowledgementKey != currentDuplicateAcknowledgementKey
     }
 
     var body: some View {
@@ -96,6 +145,7 @@ struct AddPlantView: View {
                     catalogSearchSection
                     goFormField("房间", text: $roomName, placeholder: "客厅、阳台…")
                     goFormField("具体位置", text: $location, placeholder: "南窗边、书桌、花架…")
+                    duplicateWarningSection
                     environmentSection
                     potSection
                     sourceSection
@@ -163,6 +213,15 @@ struct AddPlantView: View {
         .onDisappear {
             commandQueue.cancelAll()
         }
+        .alert("可能已经建过档", isPresented: $showDuplicateAlert) {
+            Button("返回检查", role: .cancel) {}
+            Button("仍然添加") {
+                duplicateAcknowledgementKey = currentDuplicateAcknowledgementKey
+                savePlant()
+            }
+        } message: {
+            Text(duplicateAlertMessage)
+        }
     }
 
     private var catalogSearchSection: some View {
@@ -217,6 +276,56 @@ struct AddPlantView: View {
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
         .goTranslucentCard(cornerRadius: OhanaRadius.controlLarge)
+    }
+
+    @ViewBuilder
+    private var duplicateWarningSection: some View {
+        if !duplicateCandidates.isEmpty {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(spacing: 8) {
+                    Image(systemName: "exclamationmark.triangle.fill") // a11y: allow decorative warning glyph; adjacent title and rows explain duplicate risk.
+                        .foregroundStyle(Color.goYellow)
+                        .accessibilityHidden(true)
+                    Text("可能重复")
+                        .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
+                        .foregroundStyle(Color.ohanaPrimaryText)
+                    Spacer()
+                    if duplicateAcknowledgementKey == currentDuplicateAcknowledgementKey {
+                        Text("已确认")
+                            .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded))
+                            .foregroundStyle(Color.goLime)
+                    }
+                }
+                ForEach(duplicateCandidates) { candidate in
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(candidate.title)
+                            .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
+                            .foregroundStyle(Color.ohanaPrimaryText)
+                        Text("\(candidate.reason) · \(candidate.detail)")
+                            .font(OhanaFont.adaptive(size: 12, weight: .medium, design: .rounded))
+                            .foregroundStyle(Color.ohanaSecondaryText)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                Button {
+                    duplicateAcknowledgementKey = currentDuplicateAcknowledgementKey
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                } label: {
+                    Label("仍然添加为新植物", systemImage: "plus.circle")
+                        .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
+                }
+                .buttonStyle(ScaleButtonStyle())
+                .foregroundStyle(Color.goLime)
+            }
+            .padding(16)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color.goYellow.opacity(0.09), in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous)
+                    .strokeBorder(Color.goYellow.opacity(0.22), lineWidth: 1)
+            }
+        }
     }
 
     private var environmentSection: some View {
@@ -378,24 +487,33 @@ struct AddPlantView: View {
     }
 
     private func applyCatalog(_ entry: PlantCatalogEntry) {
+        let defaults = PlantProfileUXPolicy.catalogDefaults(for: entry)
         selectedCatalogID = entry.id
-        catalogQuery = entry.commonName
-        if species.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            species = entry.commonName
+        catalogQuery = "\(entry.commonName) · \(entry.latinName)"
+        if name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            name = defaults.name
         }
-        wateringInterval = entry.defaultWateringDays
-        fertilizingInterval = entry.defaultFertilizingDays
-        lightLevel = entry.lightRequirement
-        soilType = entry.soil
-        isIndoor = entry.isIndoorSuitable
-        isSucculent = entry.aliases.contains { $0.localizedCaseInsensitiveContains("succulent") } ||
-            entry.commonName.localizedCaseInsensitiveContains("多肉")
+        species = defaults.species
+        wateringInterval = defaults.wateringIntervalDays
+        fertilizingInterval = defaults.fertilizingIntervalDays
+        lightLevel = defaults.lightLevel
+        soilType = defaults.soilTypeRaw
+        isIndoor = defaults.isIndoor
+        humidityPreference = defaults.humidityPreference
+        temperaturePreference = defaults.temperaturePreference
+        potHasDrainage = defaults.potHasDrainage
+        isHydroponic = defaults.isHydroponic
+        isSucculent = defaults.isSucculent
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
     }
 
     private func savePlant() {
         let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedName.isEmpty, !isSaving else { return }
+        if requiresDuplicateAcknowledgement {
+            showDuplicateAlert = true
+            return
+        }
         let catalog = selectedCatalog
 
         let input = PlantCreationCommandInput(
@@ -444,5 +562,12 @@ struct AddPlantView: View {
             UINotificationFeedbackGenerator().notificationOccurred(.success)
             onComplete()
         }
+    }
+
+    private var duplicateAlertMessage: String {
+        guard let first = duplicateCandidates.first else {
+            return "Ohana 没找到明显重复项，可以继续添加。"
+        }
+        return "找到相似植物：\(first.title)。原因：\(first.reason)。如果这是另一盆植物，可以继续添加。"
     }
 }

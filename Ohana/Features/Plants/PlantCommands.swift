@@ -321,6 +321,288 @@ struct PlantCreationCommandResult: Equatable {
     let kind: String
 }
 
+nonisolated struct PlantDuplicateScanDraft: Equatable, Sendable {
+    let name: String
+    let species: String
+    let roomName: String
+    let location: String
+    let catalogSpeciesId: String
+}
+
+nonisolated struct PlantDuplicateScanSnapshot: Equatable, Sendable {
+    let id: UUID
+    let name: String
+    let species: String
+    let roomName: String
+    let location: String
+    let catalogSpeciesId: String
+}
+
+nonisolated struct PlantDuplicateCandidate: Identifiable, Equatable, Sendable {
+    let id: UUID
+    let title: String
+    let detail: String
+    let reason: String
+}
+
+nonisolated struct PlantCatalogProfileDefaults: Equatable, Sendable {
+    let name: String
+    let species: String
+    let wateringIntervalDays: Int
+    let fertilizingIntervalDays: Int
+    let lightLevel: PlantLightLevel
+    let soilTypeRaw: String
+    let isIndoor: Bool
+    let humidityPreference: PlantHumidityPreference
+    let temperaturePreference: PlantTemperaturePreference
+    let potHasDrainage: Bool
+    let isHydroponic: Bool
+    let isSucculent: Bool
+}
+
+nonisolated struct PlantCarePlanRecalculationSnapshot: Equatable, Sendable {
+    let roomName: String
+    let location: String
+    let wateringIntervalDays: Int
+    let fertilizingIntervalDays: Int
+    let potDiameterCm: Double
+    let potMaterialRaw: String
+    let soilTypeRaw: String
+    let isIndoor: Bool
+    let windowDirection: PlantWindowDirection
+    let lightLevel: PlantLightLevel
+    let lastLightMeasurementLux: Int
+    let humidityPreference: PlantHumidityPreference
+    let temperaturePreference: PlantTemperaturePreference
+    let isNearClimateSource: Bool
+    let potHasDrainage: Bool
+    let currentHeightCm: Double
+    let currentSpreadCm: Double
+    let isHydroponic: Bool
+    let isSucculent: Bool
+    let healthStatus: PlantHealthStatus
+    let catalogSpeciesId: String
+    let remindersEnabled: Bool
+}
+
+nonisolated enum PlantCarePlanRecalculationImpact: String, CaseIterable, Identifiable, Sendable {
+    case remindersOff
+    case remindersOn
+    case watering
+    case fertilizing
+    case misting
+    case rotation
+    case repotting
+    case location
+
+    var id: String { rawValue }
+
+    var iconName: String {
+        switch self {
+        case .remindersOff, .remindersOn: "bell.badge"
+        case .watering: "drop.fill"
+        case .fertilizing: "leaf.fill"
+        case .misting: "humidity.fill"
+        case .rotation: "rotate.3d"
+        case .repotting: "shippingbox.fill"
+        case .location: "house.fill"
+        }
+    }
+
+    var title: String {
+        switch self {
+        case .remindersOff: "关闭植物提醒"
+        case .remindersOn: "重新打开提醒"
+        case .watering: "浇水日期会重算"
+        case .fertilizing: "施肥日期会重算"
+        case .misting: "喷雾任务可能变化"
+        case .rotation: "转盆节奏可能变化"
+        case .repotting: "换盆检查会重算"
+        case .location: "房间/位置筛选会更新"
+        }
+    }
+
+    var detail: String {
+        switch self {
+        case .remindersOff: "保存后会清理这株植物未完成的本地植物计划提醒。"
+        case .remindersOn: "保存后会重新生成这株植物后续的本地护理计划。"
+        case .watering: "水培、多肉、光照、盆径、盆材质或排水信息会影响下一次浇水。"
+        case .fertilizing: "施肥频率、健康状态、水培或多肉类型会影响下一次施肥。"
+        case .misting: "湿度偏好或空调/暖气位置会影响是否安排喷雾。"
+        case .rotation: "窗向、光照强度和实测 lux 会影响转盆提醒。"
+        case .repotting: "盆径、株高、水培和排水孔会影响换盆复查节奏。"
+        case .location: "房间和具体位置会影响植物列表、筛选和卡片展示。"
+        }
+    }
+}
+
+nonisolated enum PlantProfileUXPolicy {
+    static func duplicateAcknowledgementKey(for draft: PlantDuplicateScanDraft) -> String {
+        [
+            normalized(draft.name),
+            normalized(draft.species),
+            normalized(draft.roomName),
+            normalized(draft.location),
+            normalized(draft.catalogSpeciesId)
+        ].joined(separator: "|")
+    }
+
+    static func duplicateCandidates(
+        draft: PlantDuplicateScanDraft,
+        existingPlants: [PlantDuplicateScanSnapshot]
+    ) -> [PlantDuplicateCandidate] {
+        let draftName = normalized(draft.name)
+        let draftSpecies = normalized(draft.species)
+        let draftRoom = normalized(draft.roomName)
+        let draftLocation = normalized(draft.location)
+        let draftCatalog = normalized(draft.catalogSpeciesId)
+        guard !draftName.isEmpty || !draftSpecies.isEmpty || !draftCatalog.isEmpty else { return [] }
+
+        var candidates: [PlantDuplicateCandidate] = []
+        var seenIds = Set<UUID>()
+        for plant in existingPlants {
+            let plantName = normalized(plant.name)
+            let plantSpecies = normalized(plant.species)
+            let plantRoom = normalized(plant.roomName)
+            let plantLocation = normalized(plant.location)
+            let plantCatalog = normalized(plant.catalogSpeciesId)
+            let reason: String? = if !draftCatalog.isEmpty, draftCatalog == plantCatalog, !draftRoom.isEmpty, draftRoom == plantRoom {
+                "资料库物种和房间相同"
+            } else if !draftName.isEmpty, draftName == plantName {
+                "昵称相同"
+            } else if !draftSpecies.isEmpty, draftSpecies == plantSpecies, !draftRoom.isEmpty, draftRoom == plantRoom {
+                "物种和房间相同"
+            } else if !draftSpecies.isEmpty, draftSpecies == plantSpecies, !draftLocation.isEmpty, draftLocation == plantLocation {
+                "物种和具体位置相同"
+            } else {
+                nil
+            }
+            guard let reason, !seenIds.contains(plant.id) else { continue }
+            seenIds.insert(plant.id)
+            let roomDetail = plant.roomName.trimmingCharacters(in: .whitespacesAndNewlines)
+            let locationDetail = plant.location.trimmingCharacters(in: .whitespacesAndNewlines)
+            let detail = [roomDetail, locationDetail].filter { !$0.isEmpty }.joined(separator: " · ")
+            candidates.append(PlantDuplicateCandidate(
+                id: plant.id,
+                title: plant.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "未命名植物" : plant.name,
+                detail: detail.isEmpty ? "没有位置记录" : detail,
+                reason: reason
+            ))
+        }
+        return Array(candidates.prefix(3))
+    }
+
+    static func catalogDefaults(for entry: PlantCatalogEntry) -> PlantCatalogProfileDefaults {
+        PlantCatalogProfileDefaults(
+            name: entry.commonName,
+            species: entry.latinName,
+            wateringIntervalDays: entry.defaultWateringDays,
+            fertilizingIntervalDays: entry.defaultFertilizingDays,
+            lightLevel: entry.lightRequirement,
+            soilTypeRaw: entry.soil,
+            isIndoor: entry.isIndoorSuitable,
+            humidityPreference: humidityPreference(from: entry.humidity),
+            temperaturePreference: temperaturePreference(from: entry.temperature),
+            potHasDrainage: true,
+            isHydroponic: false,
+            isSucculent: isSucculentLike(entry)
+        )
+    }
+
+    static func recalculationImpacts(
+        old: PlantCarePlanRecalculationSnapshot,
+        new: PlantCarePlanRecalculationSnapshot
+    ) -> [PlantCarePlanRecalculationImpact] {
+        var impacts: [PlantCarePlanRecalculationImpact] = []
+        if old.remindersEnabled, !new.remindersEnabled {
+            impacts.append(.remindersOff)
+        } else if !old.remindersEnabled, new.remindersEnabled {
+            impacts.append(.remindersOn)
+        }
+        if old.wateringIntervalDays != new.wateringIntervalDays ||
+            old.potDiameterCm != new.potDiameterCm ||
+            normalized(old.potMaterialRaw) != normalized(new.potMaterialRaw) ||
+            old.isIndoor != new.isIndoor ||
+            old.lightLevel != new.lightLevel ||
+            old.windowDirection != new.windowDirection ||
+            old.lastLightMeasurementLux != new.lastLightMeasurementLux ||
+            old.isNearClimateSource != new.isNearClimateSource ||
+            old.potHasDrainage != new.potHasDrainage ||
+            old.isHydroponic != new.isHydroponic ||
+            old.isSucculent != new.isSucculent ||
+            old.catalogSpeciesId != new.catalogSpeciesId {
+            impacts.append(.watering)
+        }
+        if old.fertilizingIntervalDays != new.fertilizingIntervalDays ||
+            old.healthStatus != new.healthStatus ||
+            old.isHydroponic != new.isHydroponic ||
+            old.isSucculent != new.isSucculent ||
+            old.catalogSpeciesId != new.catalogSpeciesId {
+            impacts.append(.fertilizing)
+        }
+        if old.humidityPreference != new.humidityPreference ||
+            old.isNearClimateSource != new.isNearClimateSource {
+            impacts.append(.misting)
+        }
+        if old.windowDirection != new.windowDirection ||
+            old.lightLevel != new.lightLevel ||
+            old.lastLightMeasurementLux != new.lastLightMeasurementLux {
+            impacts.append(.rotation)
+        }
+        if old.potDiameterCm != new.potDiameterCm ||
+            old.currentHeightCm != new.currentHeightCm ||
+            old.potHasDrainage != new.potHasDrainage ||
+            old.isHydroponic != new.isHydroponic {
+            impacts.append(.repotting)
+        }
+        if normalized(old.roomName) != normalized(new.roomName) ||
+            normalized(old.location) != normalized(new.location) {
+            impacts.append(.location)
+        }
+        return impacts
+    }
+
+    private static func normalized(_ value: String) -> String {
+        value
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .folding(options: [.caseInsensitive, .diacriticInsensitive, .widthInsensitive], locale: .current)
+            .lowercased()
+    }
+
+    private static func humidityPreference(from text: String) -> PlantHumidityPreference {
+        let value = normalized(text)
+        if value.contains("高湿") || value.contains("偏高") || value.contains("中高") || value.contains("humid") {
+            return .humid
+        }
+        if value.contains("偏干") || value.contains("耐干") || value.contains("dry") {
+            return .dry
+        }
+        return .standard
+    }
+
+    private static func temperaturePreference(from text: String) -> PlantTemperaturePreference {
+        let value = normalized(text)
+        if value.contains("冷") || value.contains("凉") || value.contains("cool") {
+            return .cool
+        }
+        if value.contains("暖") || value.contains("warm") {
+            return .warm
+        }
+        return .standard
+    }
+
+    private static func isSucculentLike(_ entry: PlantCatalogEntry) -> Bool {
+        let searchableText = ([entry.commonName, entry.latinName, entry.soil, entry.wateringPreference] + entry.aliases)
+            .map(normalized)
+            .joined(separator: " ")
+        return searchableText.contains("多肉") ||
+            searchableText.contains("仙人掌") ||
+            searchableText.contains("succulent") ||
+            searchableText.contains("cactus") ||
+            searchableText.contains("snake plant")
+    }
+}
+
 enum PlantCreationCommandService {
     @discardableResult
     @MainActor

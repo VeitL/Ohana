@@ -82,6 +82,109 @@ struct PlantLaunchTests {
         #expect(PlantCarePlanService.intervalDays(for: .fertilizing, plant: succulent) == 45)
     }
 
+    @Test func plantDuplicatePolicyFlagsSameCatalogRoomAndExactName() throws {
+        let existingId = UUID()
+        let draft = PlantDuplicateScanDraft(
+            name: "Bedroom Pothos",
+            species: "Epipremnum aureum",
+            roomName: "Bedroom",
+            location: "South shelf",
+            catalogSpeciesId: "epipremnum-aureum"
+        )
+        let candidates = PlantProfileUXPolicy.duplicateCandidates(
+            draft: draft,
+            existingPlants: [
+                PlantDuplicateScanSnapshot(
+                    id: existingId,
+                    name: "Bedroom Pothos",
+                    species: "Epipremnum aureum",
+                    roomName: "Bedroom",
+                    location: "Window",
+                    catalogSpeciesId: "epipremnum-aureum"
+                )
+            ]
+        )
+
+        let candidate = try #require(candidates.first)
+        #expect(candidate.id == existingId)
+        #expect(candidate.reason == "资料库物种和房间相同")
+    }
+
+    @Test func plantCatalogDefaultsPrefillCareRelevantFields() throws {
+        let monstera = try #require(PlantCatalog.entry(id: "monstera-deliciosa"))
+        let snakePlant = try #require(PlantCatalog.entry(id: "sansevieria-trifasciata"))
+        let monsteraDefaults = PlantProfileUXPolicy.catalogDefaults(for: monstera)
+        let snakeDefaults = PlantProfileUXPolicy.catalogDefaults(for: snakePlant)
+
+        #expect(monsteraDefaults.name == "龟背竹")
+        #expect(monsteraDefaults.species == "Monstera deliciosa")
+        #expect(monsteraDefaults.humidityPreference == .humid)
+        #expect(monsteraDefaults.wateringIntervalDays == 8)
+        #expect(monsteraDefaults.potHasDrainage)
+        #expect(snakeDefaults.isSucculent)
+        #expect(snakeDefaults.humidityPreference == .dry)
+    }
+
+    @Test func plantProfileRecalculationPolicyExplainsChangedReminders() {
+        let old = PlantCarePlanRecalculationSnapshot(
+            roomName: "Living room",
+            location: "East shelf",
+            wateringIntervalDays: 7,
+            fertilizingIntervalDays: 30,
+            potDiameterCm: 12,
+            potMaterialRaw: "plastic",
+            soilTypeRaw: "airy mix",
+            isIndoor: true,
+            windowDirection: .east,
+            lightLevel: .medium,
+            lastLightMeasurementLux: 0,
+            humidityPreference: .standard,
+            temperaturePreference: .standard,
+            isNearClimateSource: false,
+            potHasDrainage: true,
+            currentHeightCm: 20,
+            currentSpreadCm: 16,
+            isHydroponic: false,
+            isSucculent: false,
+            healthStatus: .stable,
+            catalogSpeciesId: "chlorophytum-comosum",
+            remindersEnabled: true
+        )
+        let new = PlantCarePlanRecalculationSnapshot(
+            roomName: "Bedroom",
+            location: "South shelf",
+            wateringIntervalDays: 5,
+            fertilizingIntervalDays: 21,
+            potDiameterCm: 8,
+            potMaterialRaw: "terracotta",
+            soilTypeRaw: "succulent mix",
+            isIndoor: true,
+            windowDirection: .south,
+            lightLevel: .direct,
+            lastLightMeasurementLux: 12000,
+            humidityPreference: .humid,
+            temperaturePreference: .warm,
+            isNearClimateSource: true,
+            potHasDrainage: false,
+            currentHeightCm: 42,
+            currentSpreadCm: 20,
+            isHydroponic: false,
+            isSucculent: true,
+            healthStatus: .watching,
+            catalogSpeciesId: "sansevieria-trifasciata",
+            remindersEnabled: false
+        )
+        let impacts = PlantProfileUXPolicy.recalculationImpacts(old: old, new: new)
+
+        #expect(impacts.contains(.remindersOff))
+        #expect(impacts.contains(.watering))
+        #expect(impacts.contains(.fertilizing))
+        #expect(impacts.contains(.misting))
+        #expect(impacts.contains(.rotation))
+        #expect(impacts.contains(.repotting))
+        #expect(impacts.contains(.location))
+    }
+
     @Test func localDiagnosisFallbackAlwaysReturnsUncertaintyAndMultipleCauses() async {
         let result = await LocalPlantIntelligenceFallback().diagnosePlant(
             imageData: nil,
