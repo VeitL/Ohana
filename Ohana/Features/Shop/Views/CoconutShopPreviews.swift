@@ -279,6 +279,14 @@ struct ShopAppliedPreview: View {
                     planterPreview
                 } else if item.id == OasisPlantDecorID.seasonalMiniScape {
                     seasonalPreview
+                } else if item.id == OasisPlantDecorID.mossPath {
+                    mossPathPreview
+                } else if item.id == OasisPlantDecorID.hangingVines {
+                    hangingVinesPreview
+                } else if item.id == OasisPlantDecorID.terracottaPotSkin {
+                    terracottaPotPreview
+                } else if item.id == OasisPlantDecorID.glassTerrariumSkin {
+                    glassTerrariumPreview
                 } else {
                     potSkinPreview
                 }
@@ -351,6 +359,40 @@ struct ShopAppliedPreview: View {
         .frame(width: 100, height: 62)
     }
 
+    private var mossPathPreview: some View {
+        HStack(spacing: 3) {
+            ForEach(0 ..< 8, id: \.self) { index in
+                Capsule()
+                    .fill(index.isMultiple(of: 2) ? Color.goPrimary.opacity(0.84) : Color.goTeal.opacity(0.72))
+                    .frame(width: index.isMultiple(of: 3) ? 17 : 12, height: index.isMultiple(of: 2) ? 7 : 5)
+                    .offset(y: animate ? CGFloat([0, -3, 1, -1, 2, 0, -2, 1][index]) : 8)
+            }
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 6)
+        .background(Color.goPrimary.opacity(0.14), in: Capsule())
+    }
+
+    private var hangingVinesPreview: some View {
+        HStack(alignment: .top, spacing: 7) {
+            ForEach(0 ..< 5, id: \.self) { index in
+                VStack(spacing: -3) {
+                    ForEach(0 ..< (index.isMultiple(of: 2) ? 3 : 4), id: \.self) { leafIndex in
+                        Image(systemName: "leaf.fill") // a11y: allow decorative hanging vine leaves
+                            .font(OhanaFont.adaptive(size: 9 + CGFloat(leafIndex), weight: .black))
+                            .foregroundStyle(leafIndex.isMultiple(of: 2) ? Color.goPrimary : Color.goTeal)
+                            .rotationEffect(.degrees(leafIndex.isMultiple(of: 2) ? -25 : 25))
+                            .offset(y: animate ? 0 : -12)
+                    }
+                }
+                .offset(y: CGFloat(index % 3) * 3)
+            }
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .background(Color.ohanaCardSurface.opacity(0.46), in: Capsule())
+    }
+
     private var potSkinPreview: some View {
         HStack(spacing: 8) {
             ForEach(0 ..< 3, id: \.self) { index in
@@ -369,6 +411,50 @@ struct ShopAppliedPreview: View {
                                 .padding(.horizontal, 3)
                                 .padding(.top, 3)
                         }
+                }
+            }
+        }
+    }
+
+    private var terracottaPotPreview: some View {
+        HStack(spacing: 8) {
+            ForEach(0 ..< 3, id: \.self) { index in
+                VStack(spacing: 0) {
+                    Image(systemName: "leaf.fill") // a11y: allow decorative terracotta pot leaves
+                        .font(OhanaFont.adaptive(size: 13, weight: .black))
+                        .foregroundStyle(index == 1 ? Color.goPrimary : Color.goTeal)
+                        .offset(y: animate ? 1 : 8)
+                    RoundedRectangle(cornerRadius: OhanaRadius.micro, style: .continuous)
+                        .fill(Color(hex: index == 1 ? "B45309" : "D97706").opacity(index == 1 ? 0.94 : 0.76))
+                        .frame(width: index == 1 ? 29 : 22, height: index == 1 ? 24 : 19)
+                        .overlay(alignment: .top) {
+                            Capsule()
+                                .fill(Color(hex: "F59E0B").opacity(0.44))
+                                .frame(height: 4)
+                                .padding(.horizontal, 3)
+                                .padding(.top, 3)
+                        }
+                }
+            }
+        }
+    }
+
+    private var glassTerrariumPreview: some View {
+        HStack(spacing: 8) {
+            ForEach(0 ..< 3, id: \.self) { index in
+                ZStack(alignment: .bottom) {
+                    Circle()
+                        .fill(Color.ohanaCardSurface.opacity(0.50))
+                        .frame(width: index == 1 ? 31 : 24, height: index == 1 ? 31 : 24)
+                        .overlay {
+                            Circle()
+                                .strokeBorder(Color.goTeal.opacity(0.68), lineWidth: 1.2)
+                        }
+                    Image(systemName: "leaf.fill") // a11y: allow decorative terrarium leaf
+                        .font(OhanaFont.adaptive(size: index == 1 ? 12 : 9, weight: .black))
+                        .foregroundStyle(index == 1 ? Color.goPrimary : Color.goTeal)
+                        .offset(y: animate ? -4 : 3)
+                        .padding(.bottom, index == 1 ? 7 : 5)
                 }
             }
         }

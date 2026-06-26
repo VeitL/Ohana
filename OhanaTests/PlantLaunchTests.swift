@@ -154,6 +154,23 @@ struct PlantLaunchTests {
         #expect(PlantCarePlanService.intervalDays(for: .fertilizing, plant: succulent) == 45)
     }
 
+    @Test func carePlanListKeepsReminderMutedPlantsVisible() throws {
+        let (defaults, suiteName) = try makePlantReminderDefaults()
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let now = makeDate(year: 2026, month: 6, day: 18, hour: 8)
+        let plant = Plant(name: "Muted Mint", wateringIntervalDays: 1, fertilizingIntervalDays: 14)
+        plant.createdAt = Calendar.current.date(byAdding: .day, value: -10, to: now) ?? now
+        plant.lastWateredDate = Calendar.current.date(byAdding: .day, value: -2, to: now)
+        plant.lastFertilizedDate = Calendar.current.date(byAdding: .day, value: -20, to: now)
+        plant.remindersEnabled = false
+        PlantReminderPreferenceStore.setCareTypeReminderEnabled(false, for: .watering, defaults: defaults)
+
+        let tasks = PlantCarePlanService.tasks(for: [plant], days: 7, now: now)
+
+        #expect(tasks.contains { $0.plantID == plant.id && $0.careType == .watering })
+        #expect(tasks.contains { $0.plantID == plant.id && $0.careType == .fertilizing })
+    }
+
     @Test func plantDuplicatePolicyFlagsSameCatalogRoomAndExactName() throws {
         let existingId = UUID()
         let draft = PlantDuplicateScanDraft(
@@ -877,6 +894,37 @@ struct PlantLaunchTests {
         #expect(plant.careLogs.contains { $0.note.hasPrefix("defer:watering:") })
     }
 
+    @Test func plantBulkDeferAppliesToMutedVisibleCareTasksWithoutRecreatingReminders() throws {
+        let (defaults, suiteName) = try makePlantReminderDefaults()
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let now = makeDate(year: 2026, month: 6, day: 19, hour: 9)
+        let plant = Plant(name: "Quiet Mint", wateringIntervalDays: 1)
+        plant.createdAt = Calendar.current.date(byAdding: .day, value: -10, to: now) ?? now
+        plant.lastWateredDate = Calendar.current.date(byAdding: .day, value: -2, to: now)
+        plant.remindersEnabled = false
+        context.insert(plant)
+        try context.save()
+
+        let result = PlantReminderControlService.deferDueTasksOneDay(
+            plants: [plant],
+            context: context,
+            executorId: "human-1",
+            now: now,
+            scheduleNotifications: false,
+            notifications: NoopReminderNotificationScheduler(),
+            defaults: defaults
+        )
+
+        let wateringTask = try #require(PlantCarePlanService.tasks(for: plant, now: now).first { $0.careType == .watering })
+        let reminders = try context.fetch(FetchDescriptor<Reminder>())
+        #expect(result.deferredTaskCount == 1)
+        #expect(result.affectedPlantCount == 1)
+        #expect(wateringTask.daysUntilDue == 1)
+        #expect(reminders.isEmpty)
+    }
+
     @Test func explicitPlantReminderPayloadDeepLinksToPlant() {
         let plant = Plant(name: "Fern")
         let payload = OhanaReminderRoutePayload(userInfo: [
@@ -1207,6 +1255,178 @@ struct PlantLaunchTests {
         })
     }
 
+    @Test func aggregatedPlantQuestCompletionRequiresEveryTargetPlant() {
+        let hadExistingPlantData = PlantUnlockPolicy.hasExistingPlantData()
+        PlantUnlockPolicy.noteExistingPlantData()
+        defer {
+            if hadExistingPlantData {
+                PlantUnlockPolicy.noteExistingPlantData()
+            } else {
+                PlantUnlockPolicy.clearExistingPlantData()
+            }
+        }
+        let now = makeDate(year: 2046, month: 11, day: 23, hour: 9)
+        let first = Plant(name: "Pothos")
+        let second = Plant(name: "Monstera")
+        let quest = IslandQuest(
+            id: "q_plant_group_watering_living",
+            emoji: "💧",
+            title: "客厅 2 株需要浇水",
+            subtitle: "",
+            isCompleted: false,
+            targetPetId: nil,
+            targetPlantId: first.id,
+            targetPlantIds: [first.id, second.id]
+        )
+        let firstOnly = [
+            TodayFocusCareLedgerEntry(
+                id: UUID(),
+                subjectId: first.id,
+                eventKind: .plantCare,
+                actionType: PlantCareType.watering.rawValue,
+                date: now
+            )
+        ]
+
+        let partial = TodayFocusService.refreshedQuests(
+            [quest],
+            plants: [first, second],
+            careLedgerEntries: firstOnly,
+            now: now
+        )
+        let complete = TodayFocusService.refreshedQuests(
+            [quest],
+            plants: [first, second],
+            careLedgerEntries: firstOnly + [
+                TodayFocusCareLedgerEntry(
+                    id: UUID(),
+                    subjectId: second.id,
+                    eventKind: .plantCare,
+                    actionType: PlantCareType.watering.rawValue,
+                    date: now
+                )
+            ],
+            now: now
+        )
+
+        #expect(partial.first?.isCompleted == false)
+        #expect(complete.first?.isCompleted == true)
+    }
+
+    @Test func todayFocusDailyCompletionWaitsForAllPlantsInAggregatedQuest() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let now = makeDate(year: 2046, month: 11, day: 23, hour: 9)
+        let human = Human(name: "Plant Keeper")
+        let pet = Pet(name: "Momo", species: "猫")
+        let humanWeightLog = HumanWeightLog(date: now, weight: 66, human: human)
+        let playLedger = CareLedgerEvent(
+            occurredAt: now,
+            actorKind: .human,
+            actorId: human.id.uuidString,
+            subjectKind: .pet,
+            subjectId: pet.id.uuidString,
+            eventKind: .care,
+            actionType: CareType.play.rawValue
+        )
+        let petWeightLog = PetWeightLog(date: now, weight: 4.8, pet: pet)
+        let petWeightLedger = CareLedgerEvent(
+            occurredAt: now,
+            actorKind: .human,
+            actorId: human.id.uuidString,
+            subjectKind: .pet,
+            subjectId: pet.id.uuidString,
+            eventKind: .weight,
+            actionType: "petWeight",
+            amountValue: petWeightLog.weightInKg,
+            amountUnit: "kg",
+            legacyModelName: "PetWeightLog",
+            legacyModelId: petWeightLog.id.uuidString
+        )
+        let photoLog = PetPhotoLog(imageData: Data([1, 2, 3]), date: now, note: "today", pet: pet)
+        let first = Plant(name: "Pothos", wateringIntervalDays: 1)
+        let second = Plant(name: "Monstera", wateringIntervalDays: 1)
+        first.createdAt = Calendar.current.date(byAdding: .day, value: -4, to: now) ?? now
+        second.createdAt = first.createdAt
+        first.lastWateredDate = Calendar.current.date(byAdding: .day, value: -3, to: now)
+        second.lastWateredDate = Calendar.current.date(byAdding: .day, value: -3, to: now)
+        human.weightLogs.append(humanWeightLog)
+        pet.weightLogs.append(petWeightLog)
+        pet.photoLogs.append(photoLog)
+        context.insert(human)
+        context.insert(pet)
+        context.insert(humanWeightLog)
+        context.insert(playLedger)
+        context.insert(petWeightLog)
+        context.insert(petWeightLedger)
+        context.insert(photoLog)
+        context.insert(first)
+        context.insert(second)
+        try context.save()
+
+        let userKey = human.id.uuidString
+        let manager = QuestManager()
+        let restore = prepareEconomyDefaults(
+            memberKey: userKey,
+            careObjectKeys: [plantBudgetKey(first), plantBudgetKey(second)],
+            date: now
+        )
+        defer {
+            restore()
+            TodayFocusEconomyService.resetDailyCompletionMarker(userKey: userKey, date: now)
+        }
+
+        manager.isPetWizardCompleted = true
+        manager.isFirstMealRecorded = true
+        manager.isThemeColorSet = true
+        TodayFocusEconomyService.resetDailyCompletionMarker(userKey: userKey, date: now)
+        let quest = IslandQuest(
+            id: "q_plant_group_watering_living",
+            emoji: "💧",
+            title: "客厅 2 株需要浇水",
+            subtitle: "",
+            isCompleted: false,
+            targetPetId: nil,
+            targetPlantId: first.id,
+            targetPlantIds: [first.id, second.id]
+        )
+        func markWatered(_ plant: Plant) throws {
+            plant.lastWateredDate = now
+            context.insert(CareLedgerEvent(
+                occurredAt: now,
+                actorKind: .human,
+                actorId: userKey,
+                subjectKind: .plant,
+                subjectId: plant.id.uuidString,
+                eventKind: .plantCare,
+                actionType: PlantCareType.watering.rawValue
+            ))
+            try context.save()
+        }
+
+        try markWatered(first)
+
+        let partialReward = TodayFocusEconomyService.awardDailyCompletionIfNeeded(
+            context: context,
+            executorId: userKey,
+            visibleQuests: [quest],
+            now: now,
+            questManager: manager
+        )
+
+        try markWatered(second)
+        let completeReward = TodayFocusEconomyService.awardDailyCompletionIfNeeded(
+            context: context,
+            executorId: userKey,
+            visibleQuests: [quest],
+            now: now,
+            questManager: manager
+        )
+
+        #expect(partialReward == nil)
+        #expect(completeReward != nil)
+    }
+
     @Test func duePlantWateringAwardsActiveHumanAndCareLedgerDelta() throws {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
@@ -1473,6 +1693,26 @@ struct PlantLaunchTests {
         #expect(!plantDecor.isConsumable)
         #expect(plantDecor.descriptionText.resolve("zh").contains("不影响护理计划"))
         #expect(ShopItem.ShopCategory.visibleCases.contains(.plantDecor))
+    }
+
+    @Test func plantDecorCatalogProvidesCosmeticSceneAndPotShelves() throws {
+        let plantDecorItems = ShopCatalog.allItems().filter { $0.category == .plantDecor }
+        let plantDecorIDs = Set(plantDecorItems.map(\.id))
+        let knownDecorIDs = OasisPlantDecorID.sceneIDs.union(OasisPlantDecorID.potSkinIDs)
+        let combinedChineseCopy = plantDecorItems
+            .map { $0.descriptionText.resolve("zh") }
+            .joined(separator: " ")
+
+        #expect(plantDecorItems.count >= 8)
+        #expect(plantDecorIDs.isSuperset(of: knownDecorIDs))
+        #expect(plantDecorItems.allSatisfy { !$0.isConsumable })
+        #expect(plantDecorItems.allSatisfy { OasisPlantDecorID.isPlantDecor($0.id) })
+        #expect(OasisPlantDecorID.sceneIDs.count >= 5)
+        #expect(OasisPlantDecorID.potSkinIDs.count >= 3)
+        #expect(OasisPlantDecorID.slot(for: OasisPlantDecorID.hangingVines) == .scene)
+        #expect(OasisPlantDecorID.slot(for: OasisPlantDecorID.glassTerrariumSkin) == .potSkin)
+        #expect(combinedChineseCopy.contains("免费"))
+        #expect(combinedChineseCopy.contains("不出售植物识别"))
     }
 
     @Test func plantCareAmbienceUsesLevelFourUnlockAndLevelFiveYieldLayer() {

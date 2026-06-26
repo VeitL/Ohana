@@ -282,6 +282,30 @@ enum ShopCatalog {
             category: .plantDecor
         ),
         ShopItem(
+            id: OasisPlantDecorID.mossPath,
+            emoji: "⌁",
+            nameText: .init(zh: "苔藓小径", en: "Moss Path", de: "Moospfad"),
+            descriptionText: .init(
+                zh: "给绿洲铺一条柔软苔藓路；只改变岛屿外观，不影响植物提醒。",
+                en: "Adds a soft moss path to the Oasis. Cosmetic only; plant reminders stay free.",
+                de: "Ein weicher Moospfad für Oasis. Nur Deko; Pflanzenerinnerungen bleiben kostenlos."
+            ),
+            cost: 360,
+            category: .plantDecor
+        ),
+        ShopItem(
+            id: OasisPlantDecorID.hangingVines,
+            emoji: "⌇",
+            nameText: .init(zh: "垂藤帘", en: "Hanging Vines", de: "Hängende Ranken"),
+            descriptionText: .init(
+                zh: "给生命之树旁加一层垂藤；不出售植物识别、诊断或护理计划。",
+                en: "Adds hanging vines near the life tree. Recognition, diagnosis, and care plans are not sold here.",
+                de: "Hängende Ranken am Lebensbaum. Erkennung, Diagnose und Pflegepläne werden hier nicht verkauft."
+            ),
+            cost: 760,
+            category: .plantDecor
+        ),
+        ShopItem(
             id: OasisPlantDecorID.ceramicPotSkin,
             emoji: "◍",
             nameText: .init(zh: "陶盆皮肤", en: "Ceramic Pot Skin", de: "Keramiktopf-Skin"),
@@ -291,6 +315,30 @@ enum ShopCatalog {
                 de: "Keramiktopf-Look für Oasis-Pflanzen. Gieß- und Düngepläne bleiben gleich."
             ),
             cost: 260,
+            category: .plantDecor
+        ),
+        ShopItem(
+            id: OasisPlantDecorID.terracottaPotSkin,
+            emoji: "▣",
+            nameText: .init(zh: "赤陶盆皮肤", en: "Terracotta Pot Skin", de: "Terrakotta-Skin"),
+            descriptionText: .init(
+                zh: "给绿洲植物换成赤陶盆；只是装饰，不改变浇水周期。",
+                en: "Switches Oasis plants to terracotta pots. Cosmetic only; watering cadence does not change.",
+                de: "Terrakotta-Töpfe für Oasis-Pflanzen. Nur Deko; Gießrhythmen bleiben gleich."
+            ),
+            cost: 320,
+            category: .plantDecor
+        ),
+        ShopItem(
+            id: OasisPlantDecorID.glassTerrariumSkin,
+            emoji: "◇",
+            nameText: .init(zh: "玻璃生态瓶", en: "Glass Terrarium", de: "Glas-Terrarium"),
+            descriptionText: .init(
+                zh: "给绿洲摆上玻璃生态瓶；核心植物管理、资料库和提醒仍然免费。",
+                en: "Adds glass terrariums to the Oasis. Core plant management, catalog, and reminders remain free.",
+                de: "Glas-Terrarien für Oasis. Pflanzenverwaltung, Katalog und Erinnerungen bleiben kostenlos."
+            ),
+            cost: 460,
             category: .plantDecor
         )
     ]

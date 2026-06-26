@@ -36,6 +36,7 @@ struct HomeCommandExecutor {
     let questManager: QuestManager
     let medicationReminders: MedicationReminderManaging
     let todayFocus: TodayFocusManaging
+    let plantReminderControls: PlantReminderControlling
 
     init(modelContext: ModelContext) {
         self.init(
@@ -45,7 +46,8 @@ struct HomeCommandExecutor {
             revisions: SharedDomainRevisionPublisher(),
             questManager: QuestManager(),
             medicationReminders: SharedMedicationReminderManager(),
-            todayFocus: StaticTodayFocusManager()
+            todayFocus: StaticTodayFocusManager(),
+            plantReminderControls: StaticPlantReminderController()
         )
     }
 
@@ -57,7 +59,8 @@ struct HomeCommandExecutor {
             revisions: SharedDomainRevisionPublisher(),
             questManager: QuestManager(),
             medicationReminders: SharedMedicationReminderManager(),
-            todayFocus: StaticTodayFocusManager()
+            todayFocus: StaticTodayFocusManager(),
+            plantReminderControls: StaticPlantReminderController()
         )
     }
 
@@ -69,7 +72,8 @@ struct HomeCommandExecutor {
             revisions: services.domainRevisions,
             questManager: services.questManager,
             medicationReminders: services.medicationReminders,
-            todayFocus: services.todayFocus
+            todayFocus: services.todayFocus,
+            plantReminderControls: services.plantReminderControls
         )
     }
 
@@ -82,6 +86,28 @@ struct HomeCommandExecutor {
         medicationReminders: MedicationReminderManaging,
         todayFocus: TodayFocusManaging
     ) {
+        self.init(
+            modelContext: modelContext,
+            careEvents: careEvents,
+            coconutExchange: coconutExchange,
+            revisions: revisions,
+            questManager: questManager,
+            medicationReminders: medicationReminders,
+            todayFocus: todayFocus,
+            plantReminderControls: StaticPlantReminderController()
+        )
+    }
+
+    init(
+        modelContext: ModelContext,
+        careEvents: CareEventRecording,
+        coconutExchange: CoconutExchangeManaging,
+        revisions: DomainRevisionPublishing,
+        questManager: QuestManager,
+        medicationReminders: MedicationReminderManaging,
+        todayFocus: TodayFocusManaging,
+        plantReminderControls: PlantReminderControlling
+    ) {
         self.modelContext = modelContext
         self.careEvents = careEvents
         self.coconutExchange = coconutExchange
@@ -90,6 +116,7 @@ struct HomeCommandExecutor {
         self.questManager = questManager
         self.medicationReminders = medicationReminders
         self.todayFocus = todayFocus
+        self.plantReminderControls = plantReminderControls
     }
 
     @discardableResult
@@ -518,6 +545,39 @@ struct HomeCommandExecutor {
             recordedIDs.append(plantID)
         }
         return recordedIDs
+    }
+
+    @discardableResult
+    func deferPlantDueTasksOneDay(
+        plants: [Plant],
+        executorId: String?,
+        now: Date = Date(),
+        calendar: Calendar = .current
+    ) -> PlantReminderBulkDeferResult {
+        let command = DomainCommand.command(
+            "plants",
+            "deferDueTasksOneDay",
+            ["plantCount": String(plants.count)]
+        )
+        let result = plantReminderControls.deferDueTasksOneDay(
+            plants: plants,
+            context: modelContext,
+            executorId: resolvedExecutorId(executorId),
+            now: now,
+            calendar: calendar,
+            scheduleNotifications: true,
+            notifications: ReminderNotificationSchedulerRegistry.current,
+            defaults: .standard
+        )
+        revisions.publish(
+            DomainMutationResult(
+                command: command,
+                affectedEntityIDs: Set(plants.map(\.id)),
+                wroteBusinessFact: result.deferredTaskCount > 0,
+                note: "home.plantCare.deferDueTasks"
+            )
+        )
+        return result
     }
 
     func confirmCoconutExchange(_ request: CoconutExchangeRequest, receiver: Human) throws {

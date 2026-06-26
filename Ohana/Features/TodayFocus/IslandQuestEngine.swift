@@ -354,7 +354,6 @@ nonisolated enum IslandQuestEngine {
         calendar: Calendar
     ) -> IslandQuest? {
         let candidates = plants
-            .filter(\.remindersEnabled)
             .flatMap { plant in
                 PlantCarePlanService.tasks(for: plant, now: now, calendar: calendar)
                     .filter { $0.daysUntilDue <= 0 && PlantReminderPreferenceStore.controllableCareTypes.contains($0.careType) }

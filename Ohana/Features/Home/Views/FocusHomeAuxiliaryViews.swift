@@ -174,6 +174,7 @@ nonisolated struct TodayFocusSnapshot: Equatable, Sendable {
         let refreshedQuests = todayFocus.refreshedQuests(
             quests,
             pets: pets,
+            plants: visiblePlants,
             humans: humans,
             events: events,
             careLedgerEntries: careLedgerEntries,
@@ -248,6 +249,7 @@ nonisolated struct TodayFocusSnapshot: Equatable, Sendable {
         let refreshedQuests = TodayFocusQuestRefresher().refreshedQuests(
             quests,
             pets: pets,
+            plants: visiblePlants,
             humans: humans,
             events: events,
             careLedgerEntries: careLedgerEntries,

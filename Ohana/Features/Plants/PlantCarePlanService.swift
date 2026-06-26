@@ -211,7 +211,6 @@ nonisolated enum PlantCarePlanService {
     ) -> [PlantCareTaskSnapshot] {
         let end = calendar.date(byAdding: .day, value: days, to: now) ?? now.addingTimeInterval(Double(days) * 86400)
         return plants
-            .filter(\.remindersEnabled)
             .flatMap { tasks(for: $0, now: now, calendar: calendar).filter { $0.dueDate <= end } }
             .sorted {
                 if $0.dueDate != $1.dueDate { return $0.dueDate < $1.dueDate }

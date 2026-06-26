@@ -539,19 +539,21 @@ struct PlantDashboardView: View {
     }
 
     private func deferDueTasksOneDay() {
-        let formatter = ISO8601DateFormatter()
-        let tomorrow = Calendar.current.date(byAdding: .day, value: 1, to: Date()) ?? Date().addingTimeInterval(86400)
-        for task in dueTasks {
-            guard let plant = plants.first(where: { $0.id == task.plantID }) else { continue }
-            let note = "defer:\(task.careType.rawValue):\(formatter.string(from: tomorrow))"
-            commandQueue.enqueue(.plantCare(plantID: plant.id, action: PlantCareType.customNote.rawValue)) {
-                commandExecutor.recordPlantCare(
-                    .customNote,
-                    plant: plant,
-                    executorId: currentExecutorId(),
-                    careNote: note
-                )
-            }
+        let duePlantIDs = Set(dueTasks.map(\.plantID))
+        let duePlants = plants.filter { duePlantIDs.contains($0.id) }
+        guard !duePlants.isEmpty else { return }
+
+        commandQueue.enqueue(
+            .command(
+                "plants",
+                "deferDueTasksOneDay",
+                ["plantCount": String(duePlants.count)]
+            )
+        ) {
+            commandExecutor.deferPlantDueTasksOneDay(
+                plants: duePlants,
+                executorId: currentExecutorId()
+            )
         }
     }
 

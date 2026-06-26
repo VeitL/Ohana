@@ -182,6 +182,10 @@ struct CoconutShopView: View {
                 categoryRail
                     .padding(.bottom, 12)
 
+                categoryIntro
+                    .padding(.horizontal, 20)
+                    .padding(.bottom, effectiveSelectedCategory == .plantDecor ? 12 : 0)
+
                 ScrollView {
                     if effectiveSelectedCategory == .cashExchange {
                         cashExchangeSection

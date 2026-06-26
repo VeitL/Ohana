@@ -564,6 +564,7 @@ private final class DenseFixtureTodayFocusManager: TodayFocusManaging {
     func refreshedQuests(
         _ quests: [IslandQuest],
         pets _: [Pet],
+        plants _: [Plant],
         humans _: [Human],
         events _: [Event],
         careLedgerEntries _: [TodayFocusCareLedgerEntry],

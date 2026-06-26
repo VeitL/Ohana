@@ -564,18 +564,22 @@ private nonisolated struct HomeReadModelFetches {
     func todayFocusCareLedgerEntries() -> [TodayFocusCareLedgerEntry] {
         let today = calendar.startOfDay(for: now)
         let petSubject = CareLedgerSubjectKind.pet.rawValue
+        let plantSubject = CareLedgerSubjectKind.plant.rawValue
         let careKind = CareLedgerEventKind.care.rawValue
         let walkKind = CareLedgerEventKind.walk.rawValue
         let pottyKind = CareLedgerEventKind.potty.rawValue
         let weightKind = CareLedgerEventKind.weight.rawValue
+        let plantCareKind = CareLedgerEventKind.plantCare.rawValue
         var descriptor = FetchDescriptor<CareLedgerEvent>(
             predicate: #Predicate<CareLedgerEvent> { event in
                 event.occurredAt >= today &&
-                    event.subjectKind == petSubject &&
-                    (event.eventKind == careKind ||
-                        event.eventKind == walkKind ||
-                        event.eventKind == pottyKind ||
-                        event.eventKind == weightKind)
+                    ((event.subjectKind == petSubject &&
+                            (event.eventKind == careKind ||
+                                event.eventKind == walkKind ||
+                                event.eventKind == pottyKind ||
+                                event.eventKind == weightKind)) ||
+                        (event.subjectKind == plantSubject &&
+                            event.eventKind == plantCareKind))
             },
             sortBy: [SortDescriptor(\CareLedgerEvent.occurredAt, order: .reverse)]
         )
@@ -808,7 +812,7 @@ private nonisolated struct HomeReadModelFetches {
         guard let subjectId = event.subjectId.flatMap({ UUID(uuidString: $0) }) else { return nil }
         return TodayFocusCareLedgerEntry(
             id: event.id,
-            petId: subjectId,
+            subjectId: subjectId,
             eventKind: event.eventKindEnum,
             actionType: event.actionType,
             date: event.occurredAt,

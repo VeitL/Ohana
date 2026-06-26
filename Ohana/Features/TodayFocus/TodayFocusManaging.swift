@@ -6,6 +6,7 @@ protocol TodayFocusManaging {
     func refreshedQuests(
         _ quests: [IslandQuest],
         pets: [Pet],
+        plants: [Plant],
         humans: [Human],
         events: [Event],
         careLedgerEntries: [TodayFocusCareLedgerEntry],
@@ -53,6 +54,7 @@ final class StaticTodayFocusManager: TodayFocusManaging {
     func refreshedQuests(
         _ quests: [IslandQuest],
         pets: [Pet],
+        plants: [Plant],
         humans: [Human],
         events: [Event],
         careLedgerEntries: [TodayFocusCareLedgerEntry],
@@ -63,6 +65,7 @@ final class StaticTodayFocusManager: TodayFocusManaging {
         TodayFocusService.refreshedQuests(
             quests,
             pets: pets,
+            plants: plants,
             humans: humans,
             events: events,
             careLedgerEntries: careLedgerEntries,

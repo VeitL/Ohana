@@ -14,16 +14,24 @@ nonisolated enum OasisPlantDecorID {
     static let greenhouseCorner = "plant_decor_greenhouse_corner"
     static let balconyPlanters = "plant_decor_balcony_planters"
     static let seasonalMiniScape = "plant_decor_seasonal_mini_scape"
+    static let mossPath = "plant_decor_moss_path"
+    static let hangingVines = "plant_decor_hanging_vines"
     static let ceramicPotSkin = "plant_decor_ceramic_pot_skin"
+    static let terracottaPotSkin = "plant_decor_terracotta_pot_skin"
+    static let glassTerrariumSkin = "plant_decor_glass_terrarium_skin"
 
     static let sceneIDs: Set<String> = [
         greenhouseCorner,
         balconyPlanters,
-        seasonalMiniScape
+        seasonalMiniScape,
+        mossPath,
+        hangingVines
     ]
 
     static let potSkinIDs: Set<String> = [
-        ceramicPotSkin
+        ceramicPotSkin,
+        terracottaPotSkin,
+        glassTerrariumSkin
     ]
 
     static func slot(for itemID: String) -> OasisPlantDecorSlot? {
@@ -44,8 +52,16 @@ nonisolated enum OasisPlantDecorID {
             "rectangle.split.3x1.fill"
         case seasonalMiniScape:
             "camera.macro"
+        case mossPath:
+            "leaf.arrow.triangle.circlepath"
+        case hangingVines:
+            "curtains.closed"
         case ceramicPotSkin:
             "circle.hexagongrid.fill"
+        case terracottaPotSkin:
+            "circle.grid.cross.fill"
+        case glassTerrariumSkin:
+            "circle.dotted.circle.fill"
         default:
             "leaf.fill"
         }

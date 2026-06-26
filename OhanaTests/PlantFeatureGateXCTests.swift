@@ -97,6 +97,34 @@ final class PlantFeatureGateXCTests: XCTestCase {
         XCTAssertTrue(plantQuests.first?.targetPlantId == plant.id)
     }
 
+    func testPlantCareQuestStillIncludesReminderMutedPlants() {
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        let plant = Plant(name: "Quiet Fern", wateringIntervalDays: 1, fertilizingIntervalDays: 90)
+        plant.createdAt = now.addingTimeInterval(-3 * 86400)
+        plant.lastWateredDate = now.addingTimeInterval(-3 * 86400)
+        plant.lastFertilizedDate = now
+        plant.lastHealthCheckDate = now
+        plant.remindersEnabled = false
+
+        let quests = IslandQuestEngine.todayQuests(
+            pets: [],
+            reminders: [],
+            plants: [plant],
+            humans: [Human(name: "Owner")],
+            includesPlants: true,
+            now: now,
+            questProgress: TodayFocusQuestProgress(
+                isPetWizardCompleted: true,
+                isFirstMealRecorded: true,
+                isThemeColorSet: true
+            )
+        )
+
+        let plantQuests = quests.filter { IslandQuestEngine.isPlantCareQuest($0.id) }
+        XCTAssertEqual(plantQuests.count, 1)
+        XCTAssertEqual(plantQuests.first?.targetPlantIds, [plant.id])
+    }
+
     func testMoodSignalsReadPlantCareStateWhenPlantCareIsUnlocked() {
         PlantUnlockPolicy.noteExistingPlantData()
         let plant = Plant(name: "Fern")

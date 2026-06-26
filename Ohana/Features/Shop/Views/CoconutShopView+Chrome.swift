@@ -100,4 +100,37 @@ extension CoconutShopView {
             .padding(.horizontal, 20)
         }
     }
+
+    @ViewBuilder
+    var categoryIntro: some View {
+        if effectiveSelectedCategory == .plantDecor {
+            HStack(alignment: .top, spacing: 10) {
+                Image(systemName: "leaf.circle.fill") // a11y: allow decorative category marker; nearby copy names the shelf
+                    .font(OhanaFont.adaptive(size: 22, weight: .black))
+                    .foregroundStyle(Color.goTeal)
+                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(l.tr(zh: "植物装饰只影响绿洲外观", en: "Plant decor is cosmetic", de: "Pflanzendeko ist kosmetisch"))
+                        .font(OhanaFont.caption(.black))
+                        .foregroundStyle(primaryText)
+                    Text(l.tr(
+                        zh: "添加植物、护理计划、资料库和提醒仍然免费；这里兑换的是场景、盆器和岛屿氛围。",
+                        en: "Adding plants, care plans, catalog, and reminders stay free. This shelf unlocks scenes, pot skins, and island ambience.",
+                        de: "Pflanzen, Pflegepläne, Katalog und Erinnerungen bleiben kostenlos. Dieses Regal schaltet Szenen, Topf-Skins und Inselstimmung frei."
+                    ))
+                    .font(OhanaFont.caption2(.semibold))
+                    .foregroundStyle(secondaryText)
+                    .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            .padding(12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous)
+                    .strokeBorder(Color.goTeal.opacity(0.22), lineWidth: 1)
+            }
+            .accessibilityElement(children: .combine)
+        }
+    }
 }

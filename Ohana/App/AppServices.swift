@@ -43,6 +43,7 @@ final class AppServices {
     let todayFocus: TodayFocusManaging
     let plantCarePlans: PlantCarePlanReading
     let plantReminderControls: PlantReminderControlling
+    let plantIntelligence: PlantIntelligenceProviding
     let oasisTree: OasisTreeManaging
     let healthAlerts: PetHealthAlerting
     let walking: PetWalkingManaging
@@ -154,6 +155,7 @@ final class AppServices {
             ),
             plantCarePlans: StaticPlantCarePlanReader(),
             plantReminderControls: StaticPlantReminderController(),
+            plantIntelligence: LocalPlantIntelligenceFallback(),
             oasisTree: SharedOasisTreeManager(manager: oasisTreeManager),
             healthAlerts: SharedPetHealthAlertEngine(),
             walking: SharedPetWalkingManager(manager: walkingManager),
@@ -217,6 +219,7 @@ final class AppServices {
         todayFocus: TodayFocusManaging,
         plantCarePlans: PlantCarePlanReading,
         plantReminderControls: PlantReminderControlling,
+        plantIntelligence: PlantIntelligenceProviding,
         oasisTree: OasisTreeManaging,
         healthAlerts: PetHealthAlerting,
         walking: PetWalkingManaging,
@@ -257,6 +260,7 @@ final class AppServices {
         self.todayFocus = todayFocus
         self.plantCarePlans = plantCarePlans
         self.plantReminderControls = plantReminderControls
+        self.plantIntelligence = plantIntelligence
         self.oasisTree = oasisTree
         self.healthAlerts = healthAlerts
         self.walking = walking

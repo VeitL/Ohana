@@ -3835,6 +3835,56 @@ struct HomeCommandExecutorTests {
     }
 
     @MainActor
+    @Test func plantDueTaskDeferralUsesReminderControlBoundaryFromHome() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let revisionCenter = ReadModelRevisionCenter()
+        let now = makeDate(year: 2026, month: 6, day: 19, hour: 9, minute: 0)
+        let plant = Plant(name: "Mint", wateringIntervalDays: 1, fertilizingIntervalDays: 90)
+        plant.createdAt = Calendar.current.date(byAdding: .day, value: -5, to: now) ?? now
+        plant.lastWateredDate = Calendar.current.date(byAdding: .day, value: -2, to: now)
+        plant.lastFertilizedDate = now
+        plant.lastHealthCheckDate = now
+        let executorHuman = insertExecutorHuman(in: context)
+        context.insert(plant)
+        try context.save()
+
+        let revisions = SharedDomainRevisionPublisher(center: revisionCenter)
+        let executor = HomeCommandExecutor(
+            modelContext: context,
+            careEvents: CareEventService(),
+            coconutExchange: StaticCoconutExchangeManager(),
+            revisions: revisions,
+            questManager: QuestManager(wallet: SwiftDataCoconutWalletManager(), revisions: revisions),
+            medicationReminders: SharedMedicationReminderManager(),
+            todayFocus: StaticTodayFocusManager()
+        )
+        let beforeRevision = revisionCenter.homeRevision.value
+
+        let result = executor.deferPlantDueTasksOneDay(
+            plants: [plant],
+            executorId: executorHuman.id.uuidString,
+            now: now
+        )
+
+        let logs = try context.fetch(FetchDescriptor<PlantCareLog>())
+        let wateringTask = try #require(PlantCarePlanService.tasks(for: plant, now: now).first { $0.careType == .watering })
+        let mutation = try #require(revisionCenter.lastMutation)
+        #expect(result.deferredTaskCount == 1)
+        #expect(result.affectedPlantCount == 1)
+        #expect(wateringTask.daysUntilDue == 1)
+        #expect(logs.count == 1)
+        #expect(logs.first?.careType == .customNote)
+        #expect(logs.first?.note.hasPrefix("defer:watering:") == true)
+        #expect(logs.first?.executorId == executorHuman.id.uuidString)
+        #expect(revisionCenter.homeRevision.value == beforeRevision + 1)
+        #expect(mutation.command == .command("plants", "deferDueTasksOneDay", ["plantCount": "1"]))
+        #expect(mutation.affectedEntityIDs == [plant.id])
+        #expect(mutation.wroteBusinessFact)
+        #expect(mutation.note == "home.plantCare.deferDueTasks")
+    }
+
+    @MainActor
     @Test func plantFertilizingByIdWritesOnePlantFactAndDerivedRecords() throws {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
@@ -7516,6 +7566,47 @@ struct HomeCommandExecutorTests {
         )
         #expect(duplicateRefundDelete == false)
         #expect(try context.fetch(FetchDescriptor<ShopPurchaseRecord>()).count == 1)
+    }
+
+    @MainActor
+    @Test func plantDecorPurchaseIsCosmeticOnlyAndDoesNotWritePlantCareFacts() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let human = Human(name: "Plant Decor Buyer")
+        let plant = Plant(name: "Pothos", wateringIntervalDays: 1, fertilizingIntervalDays: 14)
+        let item = try #require(ShopCatalog.item(id: OasisPlantDecorID.hangingVines))
+        human.coconutBalance = item.cost
+        context.insert(human)
+        context.insert(plant)
+        try context.save()
+
+        let result = ShopPurchaseCommandService.purchase(
+            item: item,
+            buyer: human,
+            itemName: "Redeemed Hanging Vines",
+            context: context,
+            questManager: QuestManager(),
+            wallet: SwiftDataCoconutWalletManager(),
+            careLedger: CareLedgerService()
+        )
+
+        let ledgerEvents = try context.fetch(FetchDescriptor<CareLedgerEvent>())
+        let purchaseRecords = try context.fetch(FetchDescriptor<ShopPurchaseRecord>())
+
+        #expect(result.didPurchase)
+        #expect(result.itemID == item.id)
+        #expect(human.coconutBalance == 0)
+        #expect(purchaseRecords.count == 1)
+        #expect(purchaseRecords.first?.itemId == item.id)
+        #expect(ledgerEvents.count == 1)
+        #expect(ledgerEvents.first?.eventKind == CareLedgerEventKind.coconut.rawValue)
+        #expect(ledgerEvents.first?.actionType == "shopPurchase")
+        #expect(ledgerEvents.allSatisfy { $0.eventKind != CareLedgerEventKind.plantCare.rawValue })
+        #expect(try context.fetch(FetchDescriptor<PlantCareLog>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<Event>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<Reminder>()).isEmpty)
+        #expect(plant.lastWateredDate == nil)
+        #expect(plant.lastFertilizedDate == nil)
     }
 
     @MainActor

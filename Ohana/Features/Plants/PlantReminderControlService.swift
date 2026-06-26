@@ -215,12 +215,9 @@ enum PlantReminderControlService {
         var deferredTaskCount = 0
         var affectedPlantIDs = Set<UUID>()
 
-        for plant in plants where plant.remindersEnabled {
+        for plant in plants {
             let dueTasks = PlantCarePlanService.tasks(for: plant, now: now, calendar: calendar)
-                .filter { task in
-                    task.daysUntilDue <= 0 &&
-                        PlantReminderPreferenceStore.isCareTypeReminderEnabled(task.careType, defaults: defaults)
-                }
+                .filter { $0.daysUntilDue <= 0 }
             guard !dueTasks.isEmpty else { continue }
             affectedPlantIDs.insert(plant.id)
             for task in dueTasks {

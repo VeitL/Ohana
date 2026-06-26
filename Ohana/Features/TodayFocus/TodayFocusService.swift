@@ -46,13 +46,35 @@ nonisolated enum TodayFocusContent {
 
 nonisolated struct TodayFocusCareLedgerEntry: Equatable, Sendable {
     let id: UUID
-    let petId: UUID
+    let subjectId: UUID
     let eventKind: CareLedgerEventKind
     let actionType: String
     let date: Date
     let amountValue: Double
     let sourceEventId: UUID?
     let actorId: String?
+
+    var petId: UUID { subjectId }
+
+    init(
+        id: UUID,
+        subjectId: UUID,
+        eventKind: CareLedgerEventKind,
+        actionType: String,
+        date: Date,
+        amountValue: Double = 0,
+        sourceEventId: UUID? = nil,
+        actorId: String? = nil
+    ) {
+        self.id = id
+        self.subjectId = subjectId
+        self.eventKind = eventKind
+        self.actionType = actionType
+        self.date = date
+        self.amountValue = amountValue
+        self.sourceEventId = sourceEventId
+        self.actorId = actorId
+    }
 
     init(
         id: UUID,
@@ -64,14 +86,16 @@ nonisolated struct TodayFocusCareLedgerEntry: Equatable, Sendable {
         sourceEventId: UUID? = nil,
         actorId: String? = nil
     ) {
-        self.id = id
-        self.petId = petId
-        self.eventKind = eventKind
-        self.actionType = actionType
-        self.date = date
-        self.amountValue = amountValue
-        self.sourceEventId = sourceEventId
-        self.actorId = actorId
+        self.init(
+            id: id,
+            subjectId: petId,
+            eventKind: eventKind,
+            actionType: actionType,
+            date: date,
+            amountValue: amountValue,
+            sourceEventId: sourceEventId,
+            actorId: actorId
+        )
     }
 }
 
@@ -81,6 +105,7 @@ nonisolated enum TodayFocusService {
     static func refreshedQuests(
         _ quests: [IslandQuest],
         pets: [Pet] = [],
+        plants: [Plant] = [],
         humans: [Human] = [],
         events: [Event] = [],
         careLedgerEntries: [TodayFocusCareLedgerEntry],
@@ -94,6 +119,7 @@ nonisolated enum TodayFocusService {
             let done = isQuestCompletedToday(
                 quest,
                 pets: pets,
+                plants: plants,
                 humans: humans,
                 events: events,
                 careLedgerEntries: careLedgerEntries,
@@ -119,6 +145,7 @@ nonisolated enum TodayFocusService {
     static func refreshedQuests(
         _ quests: [IslandQuest],
         pets: [Pet] = [],
+        plants: [Plant] = [],
         humans: [Human] = [],
         events: [Event] = [],
         careLogs: [PetCareLog],
@@ -134,6 +161,7 @@ nonisolated enum TodayFocusService {
             let done = isQuestCompletedToday(
                 quest,
                 pets: pets,
+                plants: plants,
                 humans: humans,
                 events: events,
                 careLedgerEntries: legacyLedgerEntries(
@@ -164,6 +192,7 @@ nonisolated enum TodayFocusService {
     static func refreshedQuests(
         _ quests: [IslandQuest],
         pets: [Pet] = [],
+        plants: [Plant] = [],
         humans: [Human] = [],
         events: [Event] = [],
         careLedgerEntries: [TodayFocusCareLedgerEntry],
@@ -175,6 +204,7 @@ nonisolated enum TodayFocusService {
         refreshedQuests(
             quests,
             pets: pets,
+            plants: plants,
             humans: humans,
             events: events,
             careLedgerEntries: careLedgerEntries,
@@ -244,6 +274,7 @@ nonisolated enum TodayFocusService {
     private static func isQuestCompletedToday(
         _ quest: IslandQuest,
         pets: [Pet],
+        plants: [Plant],
         humans: [Human],
         events: [Event],
         careLedgerEntries: [TodayFocusCareLedgerEntry],
@@ -336,6 +367,15 @@ nonisolated enum TodayFocusService {
                 .map { PetMedicationDoseLogging.requiredDoses(on: now, for: $0) } ?? 1
             return PetMedicationDoseLogging.doseCount(on: now, events: events, medicationId: medicationId, calendar: calendar) >= max(1, required)
         }
+        if IslandQuestEngine.isPlantCareQuest(quest.id) {
+            return isPlantQuestCompletedToday(
+                quest,
+                plants: plants,
+                careLedgerEntries: careLedgerEntries,
+                calendar: calendar,
+                now: now
+            )
+        }
         if quest.id.hasPrefix("q_play_"), let petId = quest.targetPetId {
             if let event = carePlanEvent(for: quest, events: events) {
                 return event.isOccurrenceMarkedComplete(on: now) ||
@@ -382,6 +422,32 @@ nonisolated enum TodayFocusService {
         return false
     }
 
+    static func isPlantQuestCompletedToday(
+        _ quest: IslandQuest,
+        plants: [Plant],
+        careLedgerEntries: [TodayFocusCareLedgerEntry],
+        calendar: Calendar = .current,
+        now: Date = Date()
+    ) -> Bool {
+        guard PlantUnlockPolicy.isUnlocked(currentLevel: AppFeatureRouteGuard.currentFeatureLevel),
+              let careType = IslandQuestEngine.plantCareType(fromQuestId: quest.id)
+        else {
+            return false
+        }
+        let targetIDs = quest.targetPlantIds.isEmpty ? quest.targetPlantId.map { [$0] } ?? [] : quest.targetPlantIds
+        guard !targetIDs.isEmpty else { return false }
+        return targetIDs.allSatisfy { plantID in
+            guard let plant = plants.first(where: { $0.id == plantID }) else { return false }
+            return hasPlantCareEntry(
+                plant,
+                careType: careType,
+                entries: careLedgerEntries,
+                calendar: calendar,
+                now: now
+            )
+        }
+    }
+
     private static func carePlanEvent(for quest: IslandQuest, events: [Event]) -> Event? {
         guard let eventId = IslandQuestEngine.carePlanEventId(fromQuestId: quest.id) else {
             return nil
@@ -404,6 +470,38 @@ nonisolated enum TodayFocusService {
                 (actionTypes?.contains(entry.actionType) ?? true) &&
                 (eventId == nil || entry.sourceEventId == eventId) &&
                 calendar.isDate(entry.date, inSameDayAs: now)
+        }
+    }
+
+    private static func hasPlantCareEntry(
+        _ plant: Plant,
+        careType: PlantCareType,
+        entries: [TodayFocusCareLedgerEntry],
+        calendar: Calendar,
+        now: Date
+    ) -> Bool {
+        if entries.contains(where: {
+            $0.subjectId == plant.id &&
+                $0.eventKind == .plantCare &&
+                $0.actionType == careType.rawValue &&
+                calendar.isDate($0.date, inSameDayAs: now)
+        }) {
+            return true
+        }
+        if plant.careLogs.contains(where: {
+            $0.careType == careType && calendar.isDate($0.date, inSameDayAs: now)
+        }) {
+            return true
+        }
+        switch careType {
+        case .watering:
+            return plant.lastWateredDate.map { calendar.isDate($0, inSameDayAs: now) } == true
+        case .fertilizing:
+            return plant.lastFertilizedDate.map { calendar.isDate($0, inSameDayAs: now) } == true
+        case .pestCheck:
+            return plant.lastHealthCheckDate.map { calendar.isDate($0, inSameDayAs: now) } == true
+        case .repotting, .pruning, .misting, .rotating, .leafCleaning, .photo, .newLeaf, .yellowLeaf, .pestFound, .customNote:
+            return false
         }
     }
 
@@ -534,6 +632,7 @@ nonisolated struct TodayFocusQuestRefresher {
     func refreshedQuests(
         _ quests: [IslandQuest],
         pets: [Pet],
+        plants: [Plant] = [],
         humans: [Human],
         events: [Event] = [],
         careLedgerEntries: [TodayFocusCareLedgerEntry],
@@ -545,6 +644,7 @@ nonisolated struct TodayFocusQuestRefresher {
         TodayFocusService.refreshedQuests(
             quests,
             pets: pets,
+            plants: plants,
             humans: humans,
             events: events,
             careLedgerEntries: careLedgerEntries,
@@ -558,6 +658,7 @@ nonisolated struct TodayFocusQuestRefresher {
     func refreshedQuests(
         _ quests: [IslandQuest],
         pets: [Pet],
+        plants: [Plant] = [],
         humans: [Human],
         events: [Event] = [],
         careLogs: [PetCareLog],
@@ -571,6 +672,7 @@ nonisolated struct TodayFocusQuestRefresher {
         TodayFocusService.refreshedQuests(
             quests,
             pets: pets,
+            plants: plants,
             humans: humans,
             events: events,
             careLogs: careLogs,
@@ -587,6 +689,7 @@ nonisolated struct TodayFocusQuestRefresher {
     func refreshedQuests(
         _ quests: [IslandQuest],
         pets: [Pet],
+        plants: [Plant] = [],
         humans: [Human],
         events: [Event] = [],
         careLedgerEntries: [TodayFocusCareLedgerEntry],
@@ -598,6 +701,7 @@ nonisolated struct TodayFocusQuestRefresher {
         refreshedQuests(
             quests,
             pets: pets,
+            plants: plants,
             humans: humans,
             events: events,
             careLedgerEntries: careLedgerEntries,
@@ -612,6 +716,7 @@ nonisolated struct TodayFocusQuestRefresher {
     func refreshedQuests(
         _ quests: [IslandQuest],
         pets: [Pet],
+        plants: [Plant] = [],
         humans: [Human],
         events: [Event] = [],
         careLogs: [PetCareLog],
@@ -625,6 +730,7 @@ nonisolated struct TodayFocusQuestRefresher {
         refreshedQuests(
             quests,
             pets: pets,
+            plants: plants,
             humans: humans,
             events: events,
             careLogs: careLogs,

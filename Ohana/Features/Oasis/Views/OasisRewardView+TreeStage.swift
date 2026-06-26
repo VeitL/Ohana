@@ -241,6 +241,12 @@ extension OasisRewardView {
         case OasisPlantDecorID.seasonalMiniScape:
             seasonalMiniScapeStageDecor
                 .offset(x: 92, y: -24)
+        case OasisPlantDecorID.mossPath:
+            mossPathStageDecor
+                .offset(x: -4, y: 12)
+        case OasisPlantDecorID.hangingVines:
+            hangingVinesStageDecor
+                .offset(x: -8, y: -68)
         default:
             EmptyView()
         }
@@ -248,9 +254,18 @@ extension OasisRewardView {
 
     @ViewBuilder
     func stagePlantPotDecor(id: String) -> some View {
-        if id == OasisPlantDecorID.ceramicPotSkin {
+        switch id {
+        case OasisPlantDecorID.ceramicPotSkin:
             ceramicPotStageDecor
                 .offset(x: -74, y: -2)
+        case OasisPlantDecorID.terracottaPotSkin:
+            terracottaPotStageDecor
+                .offset(x: -74, y: -2)
+        case OasisPlantDecorID.glassTerrariumSkin:
+            glassTerrariumStageDecor
+                .offset(x: -76, y: -2)
+        default:
+            EmptyView()
         }
     }
 
@@ -308,6 +323,39 @@ extension OasisRewardView {
         .frame(width: 96, height: 58)
     }
 
+    var mossPathStageDecor: some View {
+        HStack(spacing: 3) {
+            ForEach(0 ..< 10, id: \.self) { index in
+                Capsule()
+                    .fill(index.isMultiple(of: 2) ? Color.goPrimary.opacity(0.84) : Color.goTeal.opacity(0.72))
+                    .frame(width: index.isMultiple(of: 3) ? 18 : 13, height: index.isMultiple(of: 2) ? 7 : 5)
+                    .offset(y: CGFloat([0, -2, 1, -1, 2, 0, -2, 1, 0, -1][index]))
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 6)
+        .background(Color.goPrimary.opacity(colorScheme == .light ? 0.14 : 0.20), in: Capsule())
+    }
+
+    var hangingVinesStageDecor: some View {
+        HStack(alignment: .top, spacing: 8) {
+            ForEach(0 ..< 6, id: \.self) { index in
+                VStack(spacing: -3) {
+                    ForEach(0 ..< (index.isMultiple(of: 2) ? 3 : 4), id: \.self) { leafIndex in
+                        Image(systemName: "leaf.fill") // a11y: allow decorative hanging vine leaf
+                            .font(OhanaFont.adaptive(size: 10 + CGFloat(leafIndex), weight: .black))
+                            .foregroundStyle(leafIndex.isMultiple(of: 2) ? Color.goPrimary : Color.goTeal)
+                            .rotationEffect(.degrees(leafIndex.isMultiple(of: 2) ? -28 : 26))
+                    }
+                }
+                .offset(y: CGFloat(index % 3) * 4)
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(Color.ohanaCardSurface.opacity(colorScheme == .light ? 0.54 : 0.22), in: Capsule())
+    }
+
     var ceramicPotStageDecor: some View {
         HStack(spacing: 7) {
             ForEach(0 ..< 3, id: \.self) { index in
@@ -325,6 +373,48 @@ extension OasisRewardView {
                                 .padding(.horizontal, 3)
                                 .padding(.top, 3)
                         }
+                }
+            }
+        }
+    }
+
+    var terracottaPotStageDecor: some View {
+        HStack(spacing: 7) {
+            ForEach(0 ..< 3, id: \.self) { index in
+                VStack(spacing: 0) {
+                    Image(systemName: "leaf.fill") // a11y: allow decorative terracotta pot leaf
+                        .font(OhanaFont.adaptive(size: 12 + CGFloat(index == 1 ? 3 : 0), weight: .black))
+                        .foregroundStyle(index == 1 ? Color.goPrimary : Color.goTeal)
+                    RoundedRectangle(cornerRadius: OhanaRadius.micro, style: .continuous)
+                        .fill(Color(hex: index == 1 ? "B45309" : "D97706").opacity(index == 1 ? 0.94 : 0.78))
+                        .frame(width: index == 1 ? 28 : 21, height: index == 1 ? 23 : 18)
+                        .overlay(alignment: .top) {
+                            Capsule()
+                                .fill(Color(hex: "F59E0B").opacity(0.44))
+                                .frame(height: 4)
+                                .padding(.horizontal, 3)
+                                .padding(.top, 3)
+                        }
+                }
+            }
+        }
+    }
+
+    var glassTerrariumStageDecor: some View {
+        HStack(spacing: 8) {
+            ForEach(0 ..< 3, id: \.self) { index in
+                ZStack(alignment: .bottom) {
+                    Circle()
+                        .fill(Color.ohanaCardSurface.opacity(colorScheme == .light ? 0.50 : 0.18))
+                        .frame(width: index == 1 ? 30 : 23, height: index == 1 ? 30 : 23)
+                        .overlay {
+                            Circle()
+                                .strokeBorder(Color.goTeal.opacity(0.68), lineWidth: 1.2)
+                        }
+                    Image(systemName: "leaf.fill") // a11y: allow decorative terrarium leaf
+                        .font(OhanaFont.adaptive(size: index == 1 ? 12 : 9, weight: .black))
+                        .foregroundStyle(index == 1 ? Color.goPrimary : Color.goTeal)
+                        .padding(.bottom, index == 1 ? 7 : 5)
                 }
             }
         }

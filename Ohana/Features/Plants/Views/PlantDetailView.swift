@@ -95,7 +95,7 @@ struct PlantDetailContentView: View {
             commandQueue.cancelAll()
         }
         .task(id: plant.healthStatusRaw) {
-            diagnosisResult = await LocalPlantIntelligenceFallback().diagnosePlant(
+            diagnosisResult = await appServices.plantIntelligence.diagnosePlant(
                 imageData: nil,
                 symptoms: diagnosisSymptoms
             )

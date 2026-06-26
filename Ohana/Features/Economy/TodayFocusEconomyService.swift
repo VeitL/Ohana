@@ -138,6 +138,7 @@ enum TodayFocusEconomyService {
         let refreshed = TodayFocusService.refreshedQuests(
             quests,
             pets: data.pets,
+            plants: data.plants,
             humans: data.humans,
             events: data.events,
             careLedgerEntries: data.careLedgerEntries,
@@ -148,31 +149,16 @@ enum TodayFocusEconomyService {
         )
 
         return refreshed.allSatisfy { quest in
-            if isPlantQuestCompleted(quest, plants: data.plants, now: now) {
+            if TodayFocusService.isPlantQuestCompletedToday(
+                quest,
+                plants: data.plants,
+                careLedgerEntries: data.careLedgerEntries,
+                now: now
+            ) {
                 return true
             }
             return quest.isCompleted
         }
-    }
-
-    private static func isPlantQuestCompleted(
-        _ quest: IslandQuest,
-        plants: [Plant],
-        now: Date,
-        calendar: Calendar = .current
-    ) -> Bool {
-        guard PlantUnlockPolicy.isUnlocked(currentLevel: AppFeatureRouteGuard.currentFeatureLevel) else { return false }
-        guard let plantId = quest.targetPlantId,
-              let plant = plants.first(where: { $0.id == plantId }) else {
-            return false
-        }
-        if quest.id == "q_water_plant" || quest.id.hasPrefix("q_water_plant_") {
-            return plant.lastWateredDate.map { calendar.isDate($0, inSameDayAs: now) } == true
-        }
-        if quest.id == "q_fertilize_plant" || quest.id.hasPrefix("q_fertilize_plant_") {
-            return plant.lastFertilizedDate.map { calendar.isDate($0, inSameDayAs: now) } == true
-        }
-        return false
     }
 
     private static func fetchPets(context: ModelContext) -> [Pet] {
@@ -278,18 +264,22 @@ enum TodayFocusEconomyService {
     ) -> [TodayFocusCareLedgerEntry] {
         let start = calendar.startOfDay(for: now)
         let petSubject = CareLedgerSubjectKind.pet.rawValue
+        let plantSubject = CareLedgerSubjectKind.plant.rawValue
         let careKind = CareLedgerEventKind.care.rawValue
         let walkKind = CareLedgerEventKind.walk.rawValue
         let pottyKind = CareLedgerEventKind.potty.rawValue
         let weightKind = CareLedgerEventKind.weight.rawValue
+        let plantCareKind = CareLedgerEventKind.plantCare.rawValue
         var descriptor = FetchDescriptor<CareLedgerEvent>(
             predicate: #Predicate<CareLedgerEvent> { event in
                 event.occurredAt >= start &&
-                    event.subjectKind == petSubject &&
-                    (event.eventKind == careKind ||
-                        event.eventKind == walkKind ||
-                        event.eventKind == pottyKind ||
-                        event.eventKind == weightKind)
+                    ((event.subjectKind == petSubject &&
+                            (event.eventKind == careKind ||
+                                event.eventKind == walkKind ||
+                                event.eventKind == pottyKind ||
+                                event.eventKind == weightKind)) ||
+                        (event.subjectKind == plantSubject &&
+                            event.eventKind == plantCareKind))
             },
             sortBy: [SortDescriptor(\CareLedgerEvent.occurredAt, order: .reverse)]
         )
@@ -334,7 +324,7 @@ enum TodayFocusEconomyService {
         guard let subjectId = event.subjectId.flatMap({ UUID(uuidString: $0) }) else { return nil }
         return TodayFocusCareLedgerEntry(
             id: event.id,
-            petId: subjectId,
+            subjectId: subjectId,
             eventKind: event.eventKindEnum,
             actionType: event.actionType,
             date: event.occurredAt,
