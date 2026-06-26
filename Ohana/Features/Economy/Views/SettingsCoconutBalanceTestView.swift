@@ -183,7 +183,7 @@ struct CoconutBalanceTestContentView: View {
         VStack(alignment: .leading, spacing: 10) {
             sectionTitle(l.tr(zh: "快速设置", en: "Quick presets", de: "Schnellwerte"))
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
-                ForEach([0, 100, 500, 1000, 5000, 10000], id: \.self) { value in
+                ForEach([0, 100, 500, 1000, 5000, 10000, 50000, 100_000], id: \.self) { value in
                     Button {
                         withAnimation(GoMotion.feedback) {
                             amountText = "\(value)"

@@ -68,6 +68,9 @@ struct SettingsView: View {
     @State var areDataSectionsMounted = false
     @State var dataSectionsMountTask: Task<Void, Never>?
     @State var biometricGateAvailability = MemberGateBiometricAvailability.unavailable
+    #if DEBUG
+    @State var showingCoconutBalanceTest = false
+    #endif
 
     init(
         homeHouseholds: [Household]? = nil,
@@ -209,6 +212,14 @@ struct SettingsView: View {
             SettingsPetManagementSheet(pets: homePets ?? [])
                 .ohanaCompactSheetPresentation(detents: [.medium, .large])
         }
+        #if DEBUG
+        .sheet(isPresented: $showingCoconutBalanceTest) {
+            NavigationStack {
+                CoconutBalanceTestView()
+            }
+            .ohanaSheetPagePresentation() // ui-v4: allow developer balance console as long sheet
+        }
+        #endif
         .sheet(item: $quickSwitchHuman) { human in
             HumanQuickSwitchPasscodeSheet(human: human) {
                 switchActiveHuman(to: human, emitSuccessFeedback: false)
