@@ -15,6 +15,7 @@ struct PlantDetailContentView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
     @Environment(AppServices.self) private var appServices
+    @AppStorage("appLanguage") private var appLanguage = "zh"
     @AppStorage("currentActiveHumanId") private var activeHumanIdRaw = ""
     @AppStorage("ohana_onboarding_has_pets") private var onboardingHasPets = true
     @AppStorage("ohana_onboarding_has_children") private var onboardingHasChildren = false
@@ -26,6 +27,7 @@ struct PlantDetailContentView: View {
     @State private var deleteUndoTask: Task<Void, Never>?
     @State private var diagnosisResult: PlantDiagnosisResult?
     private var catalogEntry: PlantCatalogEntry? { PlantCatalog.entry(id: plant.catalogSpeciesId) }
+    private var l: L10n { L10n(appLanguage) }
     private var careTasks: [PlantCareTaskSnapshot] { appServices.plantCarePlans.tasks(for: plant) }
     private var isWateringDue: Bool {
         careTasks.contains { $0.careType == .watering && $0.daysUntilDue <= 0 }
@@ -82,13 +84,17 @@ struct PlantDetailContentView: View {
         .safeAreaInset(edge: .bottom) {
             pendingDeleteBanner
         }
-        .alert("确认删除", isPresented: $showingDeleteConfirm) {
-            Button("取消", role: .cancel) {}
-            Button("删除", role: .destructive) {
+        .alert(l.tr(zh: "确认删除", en: "Confirm deletion", de: "Löschen bestätigen"), isPresented: $showingDeleteConfirm) {
+            Button(l.tr(zh: "取消", en: "Cancel", de: "Abbrechen"), role: .cancel) {}
+            Button(l.tr(zh: "删除", en: "Delete", de: "Löschen"), role: .destructive) {
                 stagePlantDelete()
             }
         } message: {
-            Text("确定要删除 \(plant.name) 吗？确认后会先保留 6 秒，可在本页撤销。")
+            Text(l.tr(
+                zh: "确定要删除 \(plant.name) 吗？确认后会先保留 6 秒，可在本页撤销。",
+                en: "Delete \(plant.name)? After confirming, Ohana keeps it for 6 seconds so you can undo here.",
+                de: "\(plant.name) löschen? Nach der Bestätigung bleibt es 6 Sekunden lang hier widerrufbar."
+            ))
         }
         .onDisappear {
             deleteUndoTask?.cancel()
@@ -108,7 +114,7 @@ struct PlantDetailContentView: View {
                 Image(systemName: "sparkles") // a11y: allow decorative section glyph; heading names the next task.
                     .foregroundStyle(Color.goLime)
                     .accessibilityHidden(true)
-                Text("下一步")
+                Text(l.tr(zh: "下一步", en: "Next step", de: "Nächster Schritt"))
                     .font(OhanaFont.adaptive(size: 16, weight: .bold, design: .rounded))
                 Spacer()
             }
@@ -124,7 +130,7 @@ struct PlantDetailContentView: View {
                     .foregroundStyle(Color.ohanaSecondaryText)
                     .fixedSize(horizontal: false, vertical: true)
                 HStack(spacing: 10) {
-                    Button("完成") {
+                    Button(l.tr(zh: "完成", en: "Done", de: "Erledigt")) {
                         recordCare(task.careType)
                     }
                     .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
@@ -133,7 +139,7 @@ struct PlantDetailContentView: View {
                     .padding(.vertical, 8)
                     .background(Color.goLime, in: Capsule())
 
-                    Button("延后一天") {
+                    Button(l.tr(zh: "延后一天", en: "Defer one day", de: "Um einen Tag verschieben")) {
                         deferTaskOneDay(task)
                     }
                     .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
@@ -143,7 +149,7 @@ struct PlantDetailContentView: View {
                     .background(Color.ohanaControlFill.opacity(0.72), in: Capsule())
                 }
                 if task.careType == .watering {
-                    Button("土还湿，延后") {
+                    Button(l.tr(zh: "土还湿，延后", en: "Soil still wet, defer", de: "Erde noch feucht, verschieben")) {
                         deferTaskOneDay(task, reason: "soilWet")
                     }
                     .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
@@ -153,7 +159,7 @@ struct PlantDetailContentView: View {
                     .background(Color.ohanaControlFill.opacity(0.72), in: Capsule())
                 }
             } else {
-                Text("暂无任务")
+                Text(l.tr(zh: "暂无任务", en: "No tasks yet", de: "Noch keine Aufgaben"))
                     .font(OhanaFont.adaptive(size: 14, weight: .semibold, design: .rounded))
                     .foregroundStyle(Color.ohanaSecondaryText)
             }
@@ -165,41 +171,51 @@ struct PlantDetailContentView: View {
 
     private var environmentCard: some View {
         VStack(alignment: .leading, spacing: 12) {
-            detailHeader(icon: "sun.max.fill", title: "环境")
-            detailRow("房间", value: plant.roomName.isEmpty ? "未设置" : plant.roomName)
-            detailRow("具体位置", value: plant.location.isEmpty ? "未设置" : plant.location)
-            detailRow("场景", value: plant.isIndoor ? "室内" : "阳台/花园")
-            detailRow("窗向", value: plant.windowDirection.displayName)
-            detailRow("光照", value: plant.lightLevel.displayName)
+            detailHeader(icon: "sun.max.fill", title: l.tr(zh: "环境", en: "Environment", de: "Umgebung"))
+            detailRow(l.tr(zh: "房间", en: "Room", de: "Raum"), value: plant.roomName.isEmpty ? l.tr(zh: "未设置", en: "Not set", de: "Nicht festgelegt") : plant.roomName)
+            detailRow(l.tr(zh: "具体位置", en: "Exact spot", de: "Genauer Standort"), value: plant.location.isEmpty ? l.tr(zh: "未设置", en: "Not set", de: "Nicht festgelegt") : plant.location)
+            detailRow(l.tr(zh: "场景", en: "Scene", de: "Standortart"), value: plant.isIndoor ? l.tr(zh: "室内", en: "Indoor", de: "Drinnen") : l.tr(zh: "阳台/花园", en: "Balcony/garden", de: "Balkon/Garten"))
+            detailRow(l.tr(zh: "窗向", en: "Window", de: "Fenster"), value: plant.windowDirection.displayName)
+            detailRow(l.tr(zh: "光照", en: "Light", de: "Licht"), value: plant.lightLevel.displayName)
             if plant.lastLightMeasurementLux > 0 {
-                detailRow("光照实测", value: "\(plant.lastLightMeasurementLux) lux\(plant.lastLightMeasurementDate.map { " · \(shortDate($0))" } ?? "")")
+                detailRow(l.tr(zh: "光照实测", en: "Light reading", de: "Lichtmessung"), value: "\(plant.lastLightMeasurementLux) lux\(plant.lastLightMeasurementDate.map { " · \(shortDate($0))" } ?? "")")
             }
-            detailRow("湿度偏好", value: plant.humidityPreference.displayName)
-            detailRow("温度偏好", value: plant.temperaturePreference.displayName)
+            detailRow(l.tr(zh: "湿度偏好", en: "Humidity preference", de: "Luftfeuchte"), value: plant.humidityPreference.displayName)
+            detailRow(l.tr(zh: "温度偏好", en: "Temperature preference", de: "Temperatur"), value: plant.temperaturePreference.displayName)
             if plant.isNearClimateSource {
-                detailRow("环境风险", value: "靠近空调/暖气")
+                detailRow(l.tr(zh: "环境风险", en: "Environment risk", de: "Umgebungsrisiko"), value: l.tr(zh: "靠近空调/暖气", en: "Near AC/heater", de: "Nahe an Klimaanlage/Heizung"))
             }
             if plant.potDiameterCm > 0 {
-                detailRow("盆径", value: "\(Int(plant.potDiameterCm)) cm")
+                detailRow(l.tr(zh: "盆径", en: "Pot diameter", de: "Topfdurchmesser"), value: "\(Int(plant.potDiameterCm)) cm")
             }
-            detailRow("排水孔", value: plant.potHasDrainage ? "有" : "无")
+            detailRow(l.tr(zh: "排水孔", en: "Drainage hole", de: "Abzugsloch"), value: plant.potHasDrainage ? l.tr(zh: "有", en: "Yes", de: "Ja") : l.tr(zh: "无", en: "No", de: "Nein"))
             if !plant.potMaterial.isEmpty {
-                detailRow("盆材质", value: plant.potMaterial)
+                detailRow(l.tr(zh: "盆材质", en: "Pot material", de: "Topfmaterial"), value: plant.potMaterial)
             }
             if !plant.soilType.isEmpty {
-                detailRow("土壤", value: plant.soilType)
+                detailRow(l.tr(zh: "土壤", en: "Soil", de: "Erde"), value: plant.soilType)
             }
             if let acquiredDate = plant.acquiredDate {
-                detailRow("购入日期", value: shortDate(acquiredDate))
+                detailRow(l.tr(zh: "购入日期", en: "Acquired date", de: "Kaufdatum"), value: shortDate(acquiredDate))
             }
             if !plant.acquisitionSource.isEmpty {
-                detailRow("来源", value: plant.acquisitionSource)
+                detailRow(l.tr(zh: "来源", en: "Source", de: "Quelle"), value: plant.acquisitionSource)
             }
             if plant.currentHeightCm > 0 || plant.currentSpreadCm > 0 {
-                detailRow("当前尺寸", value: "\(Int(plant.currentHeightCm)) cm 高 · \(Int(plant.currentSpreadCm)) cm 冠幅")
+                detailRow(
+                    l.tr(zh: "当前尺寸", en: "Current size", de: "Aktuelle Größe"),
+                    value: l.tr(
+                        zh: "\(Int(plant.currentHeightCm)) cm 高 · \(Int(plant.currentSpreadCm)) cm 冠幅",
+                        en: "\(Int(plant.currentHeightCm)) cm tall · \(Int(plant.currentSpreadCm)) cm spread",
+                        de: "\(Int(plant.currentHeightCm)) cm hoch · \(Int(plant.currentSpreadCm)) cm breit"
+                    )
+                )
             }
             if plant.isHydroponic || plant.isSucculent {
-                detailRow("类型", value: [plant.isHydroponic ? "水培" : nil, plant.isSucculent ? "多肉/仙人掌类" : nil].compactMap(\.self).joined(separator: " · "))
+                detailRow(l.tr(zh: "类型", en: "Type", de: "Typ"), value: [
+                    plant.isHydroponic ? l.tr(zh: "水培", en: "Hydroponic", de: "Hydrokultur") : nil,
+                    plant.isSucculent ? l.tr(zh: "多肉/仙人掌类", en: "Succulent/cactus", de: "Sukkulente/Kaktus") : nil
+                ].compactMap(\.self).joined(separator: " · "))
             }
         }
         .padding(16)
@@ -211,25 +227,41 @@ struct PlantDetailContentView: View {
     private var safetyCard: some View {
         if plant.isToxicToCats || plant.isToxicToDogs || plant.isToxicToChildren || !plant.isIndoorSuitable {
             VStack(alignment: .leading, spacing: 10) {
-                detailHeader(icon: "exclamationmark.triangle.fill", title: "安全提示")
+                detailHeader(icon: "exclamationmark.triangle.fill", title: l.tr(zh: "安全提示", en: "Safety note", de: "Sicherheitshinweis"))
                 if onboardingHasPets, plant.isToxicToCats || plant.isToxicToDogs {
-                    Text("对猫/狗有误食风险，请放在宠物够不到的位置。")
+                    Text(l.tr(
+                        zh: "对猫/狗有误食风险，请放在宠物够不到的位置。",
+                        en: "May be risky if cats or dogs chew it. Keep it out of pets' reach.",
+                        de: "Kann bei Katzen oder Hunden beim Anknabbern riskant sein. Außer Reichweite von Haustieren stellen."
+                    ))
                         .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .rounded))
                         .foregroundStyle(Color.ohanaPrimaryText)
                 }
                 if onboardingHasChildren, plant.isToxicToChildren {
-                    Text("对儿童有误食刺激风险，提醒文案会优先提示安全摆放。")
+                    Text(l.tr(
+                        zh: "对儿童有误食刺激风险，提醒文案会优先提示安全摆放。",
+                        en: "May irritate children if eaten. Reminders will prioritize safe placement.",
+                        de: "Kann Kinder beim Verschlucken reizen. Erinnerungen betonen eine sichere Platzierung."
+                    ))
                         .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .rounded))
                         .foregroundStyle(Color.ohanaPrimaryText)
                 }
                 if (!onboardingHasPets && (plant.isToxicToCats || plant.isToxicToDogs)) ||
                     (!onboardingHasChildren && plant.isToxicToChildren) {
-                    Text("资料库标记存在误食风险；若家里之后有宠物或儿童，可以在设置/详情中优先关注摆放安全。")
+                    Text(l.tr(
+                        zh: "资料库标记存在误食风险；若家里之后有宠物或儿童，可以在设置/详情中优先关注摆放安全。",
+                        en: "The catalog marks an ingestion risk. If pets or children join later, prioritize safe placement in Settings or details.",
+                        de: "Der Katalog markiert ein Verschluckrisiko. Wenn später Haustiere oder Kinder dazukommen, sichere Platzierung in Einstellungen oder Details priorisieren."
+                    ))
                         .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .rounded))
                         .foregroundStyle(Color.ohanaPrimaryText)
                 }
                 if !plant.isIndoorSuitable {
-                    Text("资料库标记为不太适合室内长期养护。")
+                    Text(l.tr(
+                        zh: "资料库标记为不太适合室内长期养护。",
+                        en: "The catalog marks this as less suitable for long-term indoor care.",
+                        de: "Der Katalog markiert sie als weniger geeignet für langfristige Innenpflege."
+                    ))
                         .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .rounded))
                         .foregroundStyle(Color.ohanaPrimaryText)
                 }
@@ -244,12 +276,12 @@ struct PlantDetailContentView: View {
     private var catalogCard: some View {
         if let catalogEntry {
             VStack(alignment: .leading, spacing: 12) {
-                detailHeader(icon: "books.vertical.fill", title: "资料库")
-                detailRow("拉丁名", value: catalogEntry.latinName)
-                detailRow("浇水", value: catalogEntry.wateringPreference)
-                detailRow("湿度", value: catalogEntry.humidity)
-                detailRow("温度", value: catalogEntry.temperature)
-                detailRow("常见问题", value: catalogEntry.commonIssues)
+                detailHeader(icon: "books.vertical.fill", title: l.tr(zh: "资料库", en: "Catalog", de: "Katalog"))
+                detailRow(l.tr(zh: "拉丁名", en: "Latin name", de: "Lateinischer Name"), value: catalogEntry.latinName)
+                detailRow(l.tr(zh: "浇水", en: "Watering", de: "Gießen"), value: catalogEntry.localizedWateringPreference)
+                detailRow(l.tr(zh: "湿度", en: "Humidity", de: "Luftfeuchte"), value: catalogEntry.localizedHumidity)
+                detailRow(l.tr(zh: "温度", en: "Temperature", de: "Temperatur"), value: catalogEntry.localizedTemperature)
+                detailRow(l.tr(zh: "常见问题", en: "Common issues", de: "Häufige Probleme"), value: catalogEntry.localizedCommonIssues)
             }
             .padding(16)
             .ohanaGlassStyle(cornerRadius: OhanaRadius.input)
@@ -259,8 +291,12 @@ struct PlantDetailContentView: View {
 
     private var diagnosisCard: some View {
         VStack(alignment: .leading, spacing: 12) {
-            detailHeader(icon: "stethoscope", title: "病虫害诊断")
-            Text(diagnosisResult?.uncertaintyMessage ?? "当前未连接智能诊断服务，Ohana 会展示不确定性和可执行复查步骤。")
+            detailHeader(icon: "stethoscope", title: l.tr(zh: "病虫害诊断", en: "Pest and disease check", de: "Schädlings- und Krankheitscheck"))
+            Text(diagnosisResult?.uncertaintyMessage ?? l.tr(
+                zh: "当前未连接智能诊断服务，Ohana 会展示不确定性和可执行复查步骤。",
+                en: "Smart diagnosis is not connected yet. Ohana shows uncertainty and actionable recheck steps.",
+                de: "Die intelligente Diagnose ist noch nicht verbunden. Ohana zeigt Unsicherheit und konkrete Schritte zur Kontrolle."
+            ))
                 .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded))
                 .foregroundStyle(Color.ohanaSecondaryText)
                 .fixedSize(horizontal: false, vertical: true)
@@ -282,7 +318,9 @@ struct PlantDetailContentView: View {
                         .font(OhanaFont.adaptive(size: 12, weight: .medium, design: .rounded))
                         .foregroundStyle(Color.ohanaSecondaryText)
                         .lineLimit(3)
-                    Text(cause.shouldIsolate ? "建议先隔离，\(cause.recheckAfterDays) 天后复查" : "\(cause.recheckAfterDays) 天后复查")
+                    Text(cause.shouldIsolate
+                        ? l.tr(zh: "建议先隔离，\(cause.recheckAfterDays) 天后复查", en: "Isolate first; recheck in \(cause.recheckAfterDays) days", de: "Zuerst isolieren; in \(cause.recheckAfterDays) Tagen prüfen")
+                        : l.tr(zh: "\(cause.recheckAfterDays) 天后复查", en: "Recheck in \(cause.recheckAfterDays) days", de: "In \(cause.recheckAfterDays) Tagen prüfen"))
                         .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded))
                         .foregroundStyle(cause.shouldIsolate ? Color.goRed : Color.ohanaSecondaryText)
                 }
@@ -358,7 +396,7 @@ struct PlantDetailContentView: View {
             HStack {
                 Image(systemName: "drop.fill").accessibilityHidden(true)
                     .foregroundStyle(.blue)
-                Text("浇水状态")
+                Text(l.tr(zh: "浇水状态", en: "Watering status", de: "Gießstatus"))
                     .font(OhanaFont.adaptive(size: 16, weight: .bold, design: .rounded))
                 Spacer()
             }
@@ -368,7 +406,7 @@ struct PlantDetailContentView: View {
                 let color: Color = progress < 0.5 ? .blue : (progress < 0.8 ? .yellow : .red)
 
                 HStack {
-                    Text("距上次浇水 \(days) 天")
+                    Text(l.tr(zh: "距上次浇水 \(days) 天", en: "\(days) days since watering", de: "\(days) Tage seit dem Gießen"))
                         .font(OhanaFont.adaptive(size: 14, weight: .medium))
                     Spacer()
                     Text(wateringIntervalText)
@@ -384,13 +422,13 @@ struct PlantDetailContentView: View {
                         Image(systemName: "exclamationmark.triangle.fill").accessibilityHidden(true)
                             .foregroundStyle(.orange)
                             .font(OhanaFont.adaptive(size: 12))
-                        Text("该浇水了！")
+                        Text(l.tr(zh: "该浇水了！", en: "Time to water!", de: "Zeit zum Gießen!"))
                             .font(OhanaFont.adaptive(size: 13, weight: .semibold))
                             .foregroundStyle(.orange)
                     }
                 }
             } else {
-                Text("还没有浇水记录")
+                Text(l.tr(zh: "还没有浇水记录", en: "No watering records yet", de: "Noch keine Gießprotokolle"))
                     .font(OhanaFont.adaptive(size: 14))
                     .foregroundStyle(Color.ohanaSecondaryText)
             }
@@ -406,7 +444,7 @@ struct PlantDetailContentView: View {
             HStack {
                 Image(systemName: "leaf.fill").accessibilityHidden(true)
                     .foregroundStyle(.green)
-                Text("施肥状态")
+                Text(l.tr(zh: "施肥状态", en: "Fertilizing status", de: "Düngestatus"))
                     .font(OhanaFont.adaptive(size: 16, weight: .bold, design: .rounded))
                 Spacer()
             }
@@ -416,7 +454,7 @@ struct PlantDetailContentView: View {
                 let color: Color = progress < 0.5 ? .green : (progress < 0.8 ? .yellow : .red)
 
                 HStack {
-                    Text("距上次施肥 \(days) 天")
+                    Text(l.tr(zh: "距上次施肥 \(days) 天", en: "\(days) days since fertilizing", de: "\(days) Tage seit dem Düngen"))
                         .font(OhanaFont.adaptive(size: 14, weight: .medium))
                     Spacer()
                     Text(fertilizingIntervalText)
@@ -432,13 +470,13 @@ struct PlantDetailContentView: View {
                         Image(systemName: "exclamationmark.triangle.fill").accessibilityHidden(true)
                             .foregroundStyle(.orange)
                             .font(OhanaFont.adaptive(size: 12))
-                        Text("该施肥了！")
+                        Text(l.tr(zh: "该施肥了！", en: "Time to fertilize!", de: "Zeit zum Düngen!"))
                             .font(OhanaFont.adaptive(size: 13, weight: .semibold))
                             .foregroundStyle(.orange)
                     }
                 }
             } else {
-                Text("还没有施肥记录")
+                Text(l.tr(zh: "还没有施肥记录", en: "No fertilizing records yet", de: "Noch keine Düngeprotokolle"))
                     .font(OhanaFont.adaptive(size: 14))
                     .foregroundStyle(Color.ohanaSecondaryText)
             }
@@ -456,7 +494,7 @@ struct PlantDetailContentView: View {
             } label: {
                 HStack(spacing: 8) {
                     Image(systemName: "drop.fill").accessibilityHidden(true)
-                    Text("浇水")
+                    Text(l.tr(zh: "浇水", en: "Water", de: "Gießen"))
                 }
                 .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .rounded))
                 .foregroundStyle(Color.ohanaPrimaryText)
@@ -474,7 +512,7 @@ struct PlantDetailContentView: View {
             } label: {
                 HStack(spacing: 8) {
                     Image(systemName: "leaf.fill").accessibilityHidden(true)
-                    Text("施肥")
+                    Text(l.tr(zh: "施肥", en: "Fertilize", de: "Düngen"))
                 }
                 .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .rounded))
                 .foregroundStyle(Color.ohanaPrimaryText)
@@ -501,7 +539,7 @@ struct PlantDetailContentView: View {
                     HStack {
                         Image(systemName: "note.text").accessibilityHidden(true)
                             .foregroundStyle(.purple)
-                        Text("备注")
+                        Text(l.tr(zh: "备注", en: "Notes", de: "Notizen"))
                             .font(OhanaFont.adaptive(size: 16, weight: .bold, design: .rounded))
                         Spacer()
                     }
@@ -517,9 +555,9 @@ struct PlantDetailContentView: View {
 
     private var historyCard: some View {
         VStack(alignment: .leading, spacing: 12) {
-            detailHeader(icon: "clock.arrow.circlepath", title: "护理历史")
+            detailHeader(icon: "clock.arrow.circlepath", title: l.tr(zh: "护理历史", en: "Care history", de: "Pflegeverlauf"))
             if recentLogs.isEmpty {
-                Text("还没有护理日志")
+                Text(l.tr(zh: "还没有护理日志", en: "No care logs yet", de: "Noch keine Pflegeprotokolle"))
                     .font(OhanaFont.adaptive(size: 14))
                     .foregroundStyle(Color.ohanaSecondaryText)
             } else {
@@ -562,21 +600,25 @@ struct PlantDetailContentView: View {
                     .foregroundStyle(.red)
                     .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 3) {
-                    Text("即将删除 \(plant.name)")
+                    Text(l.tr(zh: "即将删除 \(plant.name)", en: "Deleting \(plant.name) soon", de: "\(plant.name) wird gleich gelöscht"))
                         .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
                         .foregroundStyle(Color.ohanaPrimaryText)
-                    Text("6 秒内可撤销；到时会清理相关日历和提醒。")
+                    Text(l.tr(
+                        zh: "6 秒内可撤销；到时会清理相关日历和提醒。",
+                        en: "Undo within 6 seconds; related calendar items and reminders will be cleaned up.",
+                        de: "Innerhalb von 6 Sekunden widerrufbar; zugehörige Kalenderpunkte und Erinnerungen werden bereinigt."
+                    ))
                         .font(OhanaFont.adaptive(size: 11, weight: .semibold, design: .rounded))
                         .foregroundStyle(Color.ohanaSecondaryText)
                 }
                 Spacer(minLength: 8)
-                Button("撤销") {
+                Button(l.tr(zh: "撤销", en: "Undo", de: "Widerrufen")) {
                     cancelPendingDelete()
                 }
                 .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
                 .foregroundStyle(Color.goLime)
 
-                Button("立即删除", role: .destructive) {
+                Button(l.tr(zh: "立即删除", en: "Delete now", de: "Jetzt löschen"), role: .destructive) {
                     commitPendingDelete()
                 }
                 .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
@@ -599,7 +641,7 @@ struct PlantDetailContentView: View {
         } label: {
             HStack {
                 Image(systemName: "trash").accessibilityHidden(true)
-                Text("删除植物")
+                Text(l.tr(zh: "删除植物", en: "Delete plant", de: "Pflanze löschen"))
             }
             .font(OhanaFont.adaptive(size: 14, weight: .semibold))
             .foregroundStyle(.red)
@@ -719,6 +761,7 @@ struct EditPlantSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
     @Environment(AppServices.self) private var appServices
+    @AppStorage("appLanguage") private var appLanguage = "zh"
 
     @StateObject private var commandQueue = DeferredDomainCommandQueue()
     @State private var name = ""
@@ -757,9 +800,10 @@ struct EditPlantSheet: View {
     @State private var isIndoorSuitable = true
     @State private var remindersEnabled = true
     @State private var isSaving = false
+    private var l: L10n { L10n(appLanguage) }
 
     var body: some View {
-        OhanaSheetWrapper(title: "编辑植物", onDismiss: { dismiss() }) {
+        OhanaSheetWrapper(title: l.tr(zh: "编辑植物", en: "Edit plant", de: "Pflanze bearbeiten"), onDismiss: { dismiss() }) {
             VStack(spacing: 16) {
                 profileSection
                 catalogSection
@@ -772,7 +816,7 @@ struct EditPlantSheet: View {
                 recalculationNoticeSection
 
                 Button { save() } label: {
-                    Text(isSaving ? "保存中…" : "保存").capsuleButton()
+                    Text(isSaving ? l.tr(zh: "保存中…", en: "Saving...", de: "Speichern...") : l.tr(zh: "保存", en: "Save", de: "Speichern")).capsuleButton()
                 }
                 .padding(.top, 8)
                 .disabled(isSaving)
@@ -792,11 +836,11 @@ struct EditPlantSheet: View {
 
     private var profileSection: some View {
         VStack(spacing: 12) {
-            formField("名称", text: $name)
-            formField("物种名", text: $species)
-            formField("房间", text: $roomNameRaw)
-            formField("具体位置", text: $location)
-            formField("头像 Emoji", text: $avatarEmoji)
+            formField(l.tr(zh: "名称", en: "Name", de: "Name"), text: $name)
+            formField(l.tr(zh: "物种名", en: "Species", de: "Art"), text: $species)
+            formField(l.tr(zh: "房间", en: "Room", de: "Raum"), text: $roomNameRaw)
+            formField(l.tr(zh: "具体位置", en: "Exact spot", de: "Genauer Standort"), text: $location)
+            formField(l.tr(zh: "头像 Emoji", en: "Avatar emoji", de: "Avatar-Emoji"), text: $avatarEmoji)
         }
         .padding(16)
         .goTranslucentCard(cornerRadius: OhanaRadius.controlLarge)
@@ -804,14 +848,14 @@ struct EditPlantSheet: View {
 
     private var catalogSection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            sectionTitle("资料库")
-            Picker("资料库物种", selection: $catalogSpeciesId) {
-                Text("未链接").tag("")
+            sectionTitle(l.tr(zh: "资料库", en: "Catalog", de: "Katalog"))
+            Picker(l.tr(zh: "资料库物种", en: "Catalog species", de: "Katalogart"), selection: $catalogSpeciesId) {
+                Text(l.tr(zh: "未链接", en: "Not linked", de: "Nicht verknüpft")).tag("")
                 if !catalogSpeciesId.isEmpty, PlantCatalog.entry(id: catalogSpeciesId) == nil {
                     Text(catalogSpeciesId).tag(catalogSpeciesId)
                 }
                 ForEach(PlantCatalog.entries) { entry in
-                    Text("\(entry.commonName) · \(entry.latinName)").tag(entry.id)
+                    Text("\(entry.localizedCommonName) · \(entry.latinName)").tag(entry.id)
                 }
             }
             .pickerStyle(.menu)
@@ -822,12 +866,12 @@ struct EditPlantSheet: View {
 
     private var cycleSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            sectionTitle("护理计划")
-            Stepper("浇水：每 \(wateringInterval) 天", value: $wateringInterval, in: 1 ... 90)
+            sectionTitle(l.tr(zh: "护理计划", en: "Care plan", de: "Pflegeplan"))
+            Stepper(l.tr(zh: "浇水：每 \(wateringInterval) 天", en: "Water: every \(wateringInterval) days", de: "Gießen: alle \(wateringInterval) Tage"), value: $wateringInterval, in: 1 ... 90)
                 .tint(Color.goLime)
-            Stepper("施肥：每 \(fertilizingInterval) 天", value: $fertilizingInterval, in: 1 ... 365)
+            Stepper(l.tr(zh: "施肥：每 \(fertilizingInterval) 天", en: "Fertilize: every \(fertilizingInterval) days", de: "Düngen: alle \(fertilizingInterval) Tage"), value: $fertilizingInterval, in: 1 ... 365)
                 .tint(Color.goLime)
-            Toggle("植物提醒", isOn: $remindersEnabled)
+            Toggle(l.tr(zh: "植物提醒", en: "Plant reminders", de: "Pflanzenerinnerungen"), isOn: $remindersEnabled)
                 .tint(Color.goLime)
         }
         .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .rounded))
@@ -838,36 +882,36 @@ struct EditPlantSheet: View {
 
     private var environmentSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            sectionTitle("环境")
-            Toggle("室内植物", isOn: $isIndoor)
+            sectionTitle(l.tr(zh: "环境", en: "Environment", de: "Umgebung"))
+            Toggle(l.tr(zh: "室内植物", en: "Indoor plant", de: "Zimmerpflanze"), isOn: $isIndoor)
                 .tint(Color.goLime)
-            Picker("窗户朝向", selection: $windowDirection) {
+            Picker(l.tr(zh: "窗户朝向", en: "Window direction", de: "Fensterausrichtung"), selection: $windowDirection) {
                 ForEach(PlantWindowDirection.allCases) { direction in
                     Text(direction.displayName).tag(direction)
                 }
             }
-            Picker("光照强度", selection: $lightLevel) {
+            Picker(l.tr(zh: "光照强度", en: "Light level", de: "Lichtstärke"), selection: $lightLevel) {
                 ForEach(PlantLightLevel.allCases) { level in
                     Text(level.displayName).tag(level)
                 }
             }
-            Toggle("记录光照实测", isOn: $recordsLightMeasurement)
+            Toggle(l.tr(zh: "记录光照实测", en: "Record light reading", de: "Lichtmessung erfassen"), isOn: $recordsLightMeasurement)
                 .tint(Color.goLime)
             if recordsLightMeasurement {
-                Stepper("光照实测 \(lastLightMeasurementLux) lux", value: $lastLightMeasurementLux, in: 0 ... 20000, step: 250)
+                Stepper(l.tr(zh: "光照实测 \(lastLightMeasurementLux) lux", en: "Light reading \(lastLightMeasurementLux) lux", de: "Lichtmessung \(lastLightMeasurementLux) lux"), value: $lastLightMeasurementLux, in: 0 ... 20000, step: 250)
                     .tint(Color.goLime)
             }
-            Picker("湿度偏好", selection: $humidityPreference) {
+            Picker(l.tr(zh: "湿度偏好", en: "Humidity preference", de: "Luftfeuchte"), selection: $humidityPreference) {
                 ForEach(PlantHumidityPreference.allCases) { preference in
                     Text(preference.displayName).tag(preference)
                 }
             }
-            Picker("温度偏好", selection: $temperaturePreference) {
+            Picker(l.tr(zh: "温度偏好", en: "Temperature preference", de: "Temperatur"), selection: $temperaturePreference) {
                 ForEach(PlantTemperaturePreference.allCases) { preference in
                     Text(preference.displayName).tag(preference)
                 }
             }
-            Toggle("靠近空调/暖气", isOn: $isNearClimateSource)
+            Toggle(l.tr(zh: "靠近空调/暖气", en: "Near AC/heater", de: "Nahe an Klimaanlage/Heizung"), isOn: $isNearClimateSource)
                 .tint(Color.goLime)
         }
         .pickerStyle(.menu)
@@ -879,17 +923,17 @@ struct EditPlantSheet: View {
 
     private var potSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            sectionTitle("盆土")
-            Stepper("盆径 \(Int(potDiameterCm)) cm", value: $potDiameterCm, in: 0 ... 80, step: 1)
+            sectionTitle(l.tr(zh: "盆土", en: "Pot and soil", de: "Topf und Erde"))
+            Stepper(l.tr(zh: "盆径 \(Int(potDiameterCm)) cm", en: "Pot diameter \(Int(potDiameterCm)) cm", de: "Topfdurchmesser \(Int(potDiameterCm)) cm"), value: $potDiameterCm, in: 0 ... 80, step: 1)
                 .foregroundStyle(Color.ohanaPrimaryText)
                 .tint(Color.goLime)
-            Toggle("花盆有排水孔", isOn: $potHasDrainage)
+            Toggle(l.tr(zh: "花盆有排水孔", en: "Pot has drainage hole", de: "Topf hat Abzugsloch"), isOn: $potHasDrainage)
                 .tint(Color.goLime)
-            formField("盆材质", text: $potMaterialRaw)
-            formField("土壤类型", text: $soilTypeRaw)
-            Toggle("水培", isOn: $isHydroponic)
+            formField(l.tr(zh: "盆材质", en: "Pot material", de: "Topfmaterial"), text: $potMaterialRaw)
+            formField(l.tr(zh: "土壤类型", en: "Soil type", de: "Erdtyp"), text: $soilTypeRaw)
+            Toggle(l.tr(zh: "水培", en: "Hydroponic", de: "Hydrokultur"), isOn: $isHydroponic)
                 .tint(Color.goLime)
-            Toggle("多肉/仙人掌类", isOn: $isSucculent)
+            Toggle(l.tr(zh: "多肉/仙人掌类", en: "Succulent/cactus", de: "Sukkulente/Kaktus"), isOn: $isSucculent)
                 .tint(Color.goLime)
         }
         .padding(16)
@@ -898,19 +942,19 @@ struct EditPlantSheet: View {
 
     private var healthAndSafetySection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            sectionTitle("健康与安全")
-            Picker("当前状态", selection: $healthStatus) {
+            sectionTitle(l.tr(zh: "健康与安全", en: "Health and safety", de: "Gesundheit und Sicherheit"))
+            Picker(l.tr(zh: "当前状态", en: "Current status", de: "Aktueller Zustand"), selection: $healthStatus) {
                 ForEach(PlantHealthStatus.allCases) { status in
                     Text(status.displayName).tag(status)
                 }
             }
-            Toggle("适合室内", isOn: $isIndoorSuitable)
+            Toggle(l.tr(zh: "适合室内", en: "Suitable indoors", de: "Für drinnen geeignet"), isOn: $isIndoorSuitable)
                 .tint(Color.goLime)
-            Toggle("对猫有风险", isOn: $isToxicToCats)
+            Toggle(l.tr(zh: "对猫有风险", en: "Risk for cats", de: "Risiko für Katzen"), isOn: $isToxicToCats)
                 .tint(Color.goLime)
-            Toggle("对狗有风险", isOn: $isToxicToDogs)
+            Toggle(l.tr(zh: "对狗有风险", en: "Risk for dogs", de: "Risiko für Hunde"), isOn: $isToxicToDogs)
                 .tint(Color.goLime)
-            Toggle("对儿童有风险", isOn: $isToxicToChildren)
+            Toggle(l.tr(zh: "对儿童有风险", en: "Risk for children", de: "Risiko für Kinder"), isOn: $isToxicToChildren)
                 .tint(Color.goLime)
         }
         .pickerStyle(.menu)
@@ -922,17 +966,17 @@ struct EditPlantSheet: View {
 
     private var sourceAndSizeSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            sectionTitle("来源与尺寸")
-            Toggle("记录购入日期", isOn: $hasAcquiredDate)
+            sectionTitle(l.tr(zh: "来源与尺寸", en: "Source and size", de: "Quelle und Größe"))
+            Toggle(l.tr(zh: "记录购入日期", en: "Record acquired date", de: "Kaufdatum erfassen"), isOn: $hasAcquiredDate)
                 .tint(Color.goLime)
             if hasAcquiredDate {
-                DatePicker("购入日期", selection: $acquiredDate, displayedComponents: .date)
+                DatePicker(l.tr(zh: "购入日期", en: "Acquired date", de: "Kaufdatum"), selection: $acquiredDate, displayedComponents: .date)
                     .tint(Color.goLime)
             }
-            formField("来源", text: $acquisitionSourceRaw)
-            Stepper("当前高度 \(Int(currentHeightCm)) cm", value: $currentHeightCm, in: 0 ... 300, step: 1)
+            formField(l.tr(zh: "来源", en: "Source", de: "Quelle"), text: $acquisitionSourceRaw)
+            Stepper(l.tr(zh: "当前高度 \(Int(currentHeightCm)) cm", en: "Current height \(Int(currentHeightCm)) cm", de: "Aktuelle Höhe \(Int(currentHeightCm)) cm"), value: $currentHeightCm, in: 0 ... 300, step: 1)
                 .tint(Color.goLime)
-            Stepper("冠幅 \(Int(currentSpreadCm)) cm", value: $currentSpreadCm, in: 0 ... 300, step: 1)
+            Stepper(l.tr(zh: "冠幅 \(Int(currentSpreadCm)) cm", en: "Spread \(Int(currentSpreadCm)) cm", de: "Breite \(Int(currentSpreadCm)) cm"), value: $currentSpreadCm, in: 0 ... 300, step: 1)
                 .tint(Color.goLime)
         }
         .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .rounded))
@@ -943,7 +987,7 @@ struct EditPlantSheet: View {
 
     private var notesSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            sectionTitle("备注")
+            sectionTitle(l.tr(zh: "备注", en: "Notes", de: "Notizen"))
             TextEditor(text: $notes)
                 .frame(height: 90)
                 .scrollContentBackground(.hidden)
@@ -963,11 +1007,11 @@ struct EditPlantSheet: View {
                     Image(systemName: "arrow.triangle.2.circlepath") // a11y: allow decorative recalculation glyph; section title names the effect.
                         .foregroundStyle(Color.goLime)
                         .accessibilityHidden(true)
-                    Text("保存后会重算")
+                    Text(l.tr(zh: "保存后会重算", en: "Recalculated after saving", de: "Nach dem Speichern neu berechnet"))
                         .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
                         .foregroundStyle(Color.ohanaPrimaryText)
                     Spacer()
-                    Text("\(impacts.count) 项")
+                    Text(l.tr(zh: "\(impacts.count) 项", en: "\(impacts.count) items", de: "\(impacts.count) Punkte"))
                         .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded))
                         .foregroundStyle(Color.arkInk)
                         .padding(.horizontal, 8)

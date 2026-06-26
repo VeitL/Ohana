@@ -38,15 +38,15 @@ extension PlantDetailContentView {
 
     var wateringIntervalText: String {
         if wateringIntervalDays != plant.wateringIntervalDays {
-            return "学习后 \(wateringIntervalDays) 天"
+            return L10n.current.tr(zh: "学习后 \(wateringIntervalDays) 天", en: "Learned: \(wateringIntervalDays)d", de: "Gelernt: \(wateringIntervalDays) T.")
         }
-        return "周期 \(wateringIntervalDays) 天"
+        return L10n.current.tr(zh: "周期 \(wateringIntervalDays) 天", en: "Every \(wateringIntervalDays)d", de: "Alle \(wateringIntervalDays) T.")
     }
 
     var fertilizingIntervalText: String {
         if fertilizingIntervalDays != plant.fertilizingIntervalDays {
-            return "调整后 \(fertilizingIntervalDays) 天"
+            return L10n.current.tr(zh: "调整后 \(fertilizingIntervalDays) 天", en: "Adjusted: \(fertilizingIntervalDays)d", de: "Angepasst: \(fertilizingIntervalDays) T.")
         }
-        return "周期 \(fertilizingIntervalDays) 天"
+        return L10n.current.tr(zh: "周期 \(fertilizingIntervalDays) 天", en: "Every \(fertilizingIntervalDays)d", de: "Alle \(fertilizingIntervalDays) T.")
     }
 }

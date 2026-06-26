@@ -16,12 +16,12 @@ private enum PlantDashboardFilter: String, CaseIterable, Identifiable {
 
     var id: String { rawValue }
 
-    var title: String {
+    func title(_ l: L10n) -> String {
         switch self {
-        case .all: "全部"
-        case .due: "7天任务"
-        case .watching: "需观察"
-        case .indoor: "室内"
+        case .all: l.tr(zh: "全部", en: "All", de: "Alle")
+        case .due: l.tr(zh: "7天任务", en: "7-day tasks", de: "7-Tage-Aufgaben")
+        case .watching: l.tr(zh: "需观察", en: "Watch", de: "Beobachten")
+        case .indoor: l.tr(zh: "室内", en: "Indoor", de: "Drinnen")
         }
     }
 }
@@ -126,14 +126,14 @@ struct PlantDashboardView: View {
                 Image(systemName: "calendar.badge.clock") // a11y: allow decorative section glyph; heading names the task window.
                     .foregroundStyle(Color.goLime)
                     .accessibilityHidden(true)
-                Text("今日与未来 7 天")
+                Text(l.tr(zh: "今日与未来 7 天", en: "Today and next 7 days", de: "Heute und die nächsten 7 Tage"))
                     .font(OhanaFont.adaptive(size: 16, weight: .bold, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Spacer()
             }
 
             if dueTasks.isEmpty {
-                Text("今天没有到期植物任务")
+                Text(l.tr(zh: "今天没有到期植物任务", en: "No plant tasks due today", de: "Heute keine fälligen Pflanzenaufgaben"))
                     .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .rounded))
                     .foregroundStyle(Color.ohanaSecondaryText)
             } else {
@@ -143,7 +143,7 @@ struct PlantDashboardView: View {
                     }
                 }
                 HStack(spacing: 10) {
-                    Button("全部完成") {
+                    Button(l.tr(zh: "全部完成", en: "Complete all", de: "Alle erledigen")) {
                         completeDueTasks()
                     }
                     .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
@@ -152,7 +152,7 @@ struct PlantDashboardView: View {
                     .padding(.vertical, 8)
                     .background(Color.goLime, in: Capsule())
 
-                    Button("全部延后一天") {
+                    Button(l.tr(zh: "全部延后一天", en: "Defer all one day", de: "Alle um einen Tag verschieben")) {
                         deferDueTasksOneDay()
                     }
                     .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
@@ -174,7 +174,7 @@ struct PlantDashboardView: View {
                     Button {
                         selectedFilter = filter
                     } label: {
-                        Text(filter.title)
+                        Text(filter.title(l))
                             .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
                             .foregroundStyle(selectedFilter == filter ? Color.arkInk : Color.ohanaPrimaryText)
                             .padding(.horizontal, 12)
@@ -188,7 +188,7 @@ struct PlantDashboardView: View {
                 }
                 if !locationOptions.isEmpty {
                     Menu {
-                        Button("全部位置") {
+                        Button(l.tr(zh: "全部位置", en: "All locations", de: "Alle Standorte")) {
                             selectedLocation = nil
                         }
                         ForEach(locationOptions, id: \.self) { location in
@@ -201,7 +201,7 @@ struct PlantDashboardView: View {
                             Image(systemName: "mappin.and.ellipse") // a11y: allow decorative menu icon; label text names the location filter.
                                 .font(OhanaFont.adaptive(size: 11, weight: .bold))
                                 .accessibilityHidden(true)
-                            Text(selectedLocation ?? "位置")
+                            Text(selectedLocation ?? l.tr(zh: "位置", en: "Location", de: "Standort"))
                                 .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
                                 .lineLimit(1)
                         }
@@ -247,7 +247,7 @@ struct PlantDashboardView: View {
                     .background(Color.goLime, in: Circle())
                     .accessibilityHidden(true)
             }
-            .accessibilityLabel("完成\(task.careType.displayName)")
+            .accessibilityLabel(l.tr(zh: "完成\(task.careType.displayName)", en: "Complete \(task.careType.displayName)", de: "\(task.careType.displayName) erledigen"))
             .buttonStyle(ScaleButtonStyle())
         }
         .padding(10)
@@ -424,7 +424,9 @@ struct PlantDashboardView: View {
                 statusBadge(for: plant)
 
                 if let task = nextTask {
-                    Text(task.daysUntilDue <= 0 ? "今天：\(task.careType.displayName)" : "\(task.daysUntilDue)天后：\(task.careType.displayName)")
+                    Text(task.daysUntilDue <= 0
+                        ? l.tr(zh: "今天：\(task.careType.displayName)", en: "Today: \(task.careType.displayName)", de: "Heute: \(task.careType.displayName)")
+                        : l.tr(zh: "\(task.daysUntilDue)天后：\(task.careType.displayName)", en: "In \(task.daysUntilDue)d: \(task.careType.displayName)", de: "In \(task.daysUntilDue) T.: \(task.careType.displayName)"))
                         .font(OhanaFont.adaptive(size: 9, weight: .medium, design: .rounded))
                         .foregroundStyle(Color.ohanaSecondaryText)
                         .lineLimit(1)

@@ -36,8 +36,9 @@ enum PlantCareCommandService {
         reminderScheduling providedReminderScheduling: ReminderSchedulingManaging? = nil
     ) -> PlantCareCommandResult {
         let careLedger = providedCareLedger ?? CareLedgerService()
+        let l = L10n.current
         let eventIntent = DomainScheduleCreateIntent(
-            title: "\(type.emoji) 给 \(plant.name)\(type.displayName)\(safetyReminderSuffix(for: plant))",
+            title: "\(type.emoji) \(l.tr(zh: "给 \(plant.name)\(type.displayName)", en: "\(type.displayName) for \(plant.name)", de: "\(type.displayName) für \(plant.name)"))\(safetyReminderSuffix(for: plant))",
             startDate: now,
             isAllDay: false,
             eventType: type.eventType.rawValue,
@@ -198,10 +199,10 @@ enum PlantCareCommandService {
             : defaults.bool(forKey: "ohana_onboarding_has_pets")
         let hasChildren = defaults.bool(forKey: "ohana_onboarding_has_children")
         if hasPets, plant.isToxicToCats || plant.isToxicToDogs {
-            return " · 放到宠物够不到处"
+            return " · \(L10n.current.tr(zh: "放到宠物够不到处", en: "Keep out of pets' reach", de: "Außer Reichweite von Haustieren"))"
         }
         if hasChildren, plant.isToxicToChildren {
-            return " · 注意儿童误食"
+            return " · \(L10n.current.tr(zh: "注意儿童误食", en: "Watch for child ingestion", de: "Auf Verschlucken durch Kinder achten"))"
         }
         return ""
     }
@@ -410,28 +411,30 @@ nonisolated enum PlantCarePlanRecalculationImpact: String, CaseIterable, Identif
     }
 
     var title: String {
-        switch self {
-        case .remindersOff: "关闭植物提醒"
-        case .remindersOn: "重新打开提醒"
-        case .watering: "浇水日期会重算"
-        case .fertilizing: "施肥日期会重算"
-        case .misting: "喷雾任务可能变化"
-        case .rotation: "转盆节奏可能变化"
-        case .repotting: "换盆检查会重算"
-        case .location: "房间/位置筛选会更新"
+        let l = L10n.current
+        return switch self {
+        case .remindersOff: l.tr(zh: "关闭植物提醒", en: "Turn off plant reminders", de: "Pflanzenerinnerungen ausschalten")
+        case .remindersOn: l.tr(zh: "重新打开提醒", en: "Turn reminders back on", de: "Erinnerungen wieder einschalten")
+        case .watering: l.tr(zh: "浇水日期会重算", en: "Watering date will recalculate", de: "Gießdatum wird neu berechnet")
+        case .fertilizing: l.tr(zh: "施肥日期会重算", en: "Fertilizing date will recalculate", de: "Düngedatum wird neu berechnet")
+        case .misting: l.tr(zh: "喷雾任务可能变化", en: "Misting tasks may change", de: "Sprühaufgaben können sich ändern")
+        case .rotation: l.tr(zh: "转盆节奏可能变化", en: "Rotation cadence may change", de: "Drehrhythmus kann sich ändern")
+        case .repotting: l.tr(zh: "换盆检查会重算", en: "Repotting check will recalculate", de: "Umtopfprüfung wird neu berechnet")
+        case .location: l.tr(zh: "房间/位置筛选会更新", en: "Room/location filters will update", de: "Raum-/Standortfilter werden aktualisiert")
         }
     }
 
     var detail: String {
-        switch self {
-        case .remindersOff: "保存后会清理这株植物未完成的本地植物计划提醒。"
-        case .remindersOn: "保存后会重新生成这株植物后续的本地护理计划。"
-        case .watering: "水培、多肉、光照、盆径、盆材质或排水信息会影响下一次浇水。"
-        case .fertilizing: "施肥频率、健康状态、水培或多肉类型会影响下一次施肥。"
-        case .misting: "湿度偏好或空调/暖气位置会影响是否安排喷雾。"
-        case .rotation: "窗向、光照强度和实测 lux 会影响转盆提醒。"
-        case .repotting: "盆径、株高、水培和排水孔会影响换盆复查节奏。"
-        case .location: "房间和具体位置会影响植物列表、筛选和卡片展示。"
+        let l = L10n.current
+        return switch self {
+        case .remindersOff: l.tr(zh: "保存后会清理这株植物未完成的本地植物计划提醒。", en: "After saving, unfinished local care reminders for this plant will be cleared.", de: "Nach dem Speichern werden offene lokale Pflegeerinnerungen für diese Pflanze bereinigt.")
+        case .remindersOn: l.tr(zh: "保存后会重新生成这株植物后续的本地护理计划。", en: "After saving, future local care plans for this plant will be regenerated.", de: "Nach dem Speichern werden zukünftige lokale Pflegepläne für diese Pflanze neu erzeugt.")
+        case .watering: l.tr(zh: "水培、多肉、光照、盆径、盆材质或排水信息会影响下一次浇水。", en: "Hydroponics, succulent type, light, pot size, pot material, or drainage can affect the next watering.", de: "Hydrokultur, Sukkulentenart, Licht, Topfgröße, Material oder Drainage können das nächste Gießen beeinflussen.")
+        case .fertilizing: l.tr(zh: "施肥频率、健康状态、水培或多肉类型会影响下一次施肥。", en: "Fertilizing frequency, health status, hydroponics, or succulent type can affect the next fertilizing task.", de: "Düngefrequenz, Zustand, Hydrokultur oder Sukkulentenart können die nächste Düngung beeinflussen.")
+        case .misting: l.tr(zh: "湿度偏好或空调/暖气位置会影响是否安排喷雾。", en: "Humidity preference or AC/heater placement can affect whether misting is scheduled.", de: "Luftfeuchte und Nähe zu Klimaanlage/Heizung können beeinflussen, ob Sprühen geplant wird.")
+        case .rotation: l.tr(zh: "窗向、光照强度和实测 lux 会影响转盆提醒。", en: "Window direction, light level, and measured lux can affect rotation reminders.", de: "Fensterausrichtung, Lichtstärke und gemessene Lux können Dreherinnerungen beeinflussen.")
+        case .repotting: l.tr(zh: "盆径、株高、水培和排水孔会影响换盆复查节奏。", en: "Pot diameter, plant height, hydroponics, and drainage holes can affect repotting checks.", de: "Topfdurchmesser, Pflanzenhöhe, Hydrokultur und Abzugslöcher können Umtopfkontrollen beeinflussen.")
+        case .location: l.tr(zh: "房间和具体位置会影响植物列表、筛选和卡片展示。", en: "Room and exact spot affect plant lists, filters, and card display.", de: "Raum und genauer Standort beeinflussen Pflanzenlisten, Filter und Kartenanzeige.")
         }
     }
 }
@@ -466,14 +469,15 @@ nonisolated enum PlantProfileUXPolicy {
             let plantRoom = normalized(plant.roomName)
             let plantLocation = normalized(plant.location)
             let plantCatalog = normalized(plant.catalogSpeciesId)
+            let l = L10n.current
             let reason: String? = if !draftCatalog.isEmpty, draftCatalog == plantCatalog, !draftRoom.isEmpty, draftRoom == plantRoom {
-                "资料库物种和房间相同"
+                l.tr(zh: "资料库物种和房间相同", en: "Same catalog species and room", de: "Gleiche Katalogart und gleicher Raum")
             } else if !draftName.isEmpty, draftName == plantName {
-                "昵称相同"
+                l.tr(zh: "昵称相同", en: "Same nickname", de: "Gleicher Spitzname")
             } else if !draftSpecies.isEmpty, draftSpecies == plantSpecies, !draftRoom.isEmpty, draftRoom == plantRoom {
-                "物种和房间相同"
+                l.tr(zh: "物种和房间相同", en: "Same species and room", de: "Gleiche Art und gleicher Raum")
             } else if !draftSpecies.isEmpty, draftSpecies == plantSpecies, !draftLocation.isEmpty, draftLocation == plantLocation {
-                "物种和具体位置相同"
+                l.tr(zh: "物种和具体位置相同", en: "Same species and exact spot", de: "Gleiche Art und gleicher Standort")
             } else {
                 nil
             }
@@ -484,8 +488,8 @@ nonisolated enum PlantProfileUXPolicy {
             let detail = [roomDetail, locationDetail].filter { !$0.isEmpty }.joined(separator: " · ")
             candidates.append(PlantDuplicateCandidate(
                 id: plant.id,
-                title: plant.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "未命名植物" : plant.name,
-                detail: detail.isEmpty ? "没有位置记录" : detail,
+                title: plant.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? L10n.current.tr(zh: "未命名植物", en: "Unnamed plant", de: "Unbenannte Pflanze") : plant.name,
+                detail: detail.isEmpty ? L10n.current.tr(zh: "没有位置记录", en: "No location recorded", de: "Kein Standort erfasst") : detail,
                 reason: reason
             ))
         }
@@ -494,12 +498,12 @@ nonisolated enum PlantProfileUXPolicy {
 
     static func catalogDefaults(for entry: PlantCatalogEntry) -> PlantCatalogProfileDefaults {
         PlantCatalogProfileDefaults(
-            name: entry.commonName,
+            name: entry.localizedCommonName,
             species: entry.latinName,
             wateringIntervalDays: entry.defaultWateringDays,
             fertilizingIntervalDays: entry.defaultFertilizingDays,
             lightLevel: entry.lightRequirement,
-            soilTypeRaw: entry.soil,
+            soilTypeRaw: entry.localizedSoil,
             isIndoor: entry.isIndoorSuitable,
             humidityPreference: humidityPreference(from: entry.humidity),
             temperaturePreference: temperaturePreference(from: entry.temperature),

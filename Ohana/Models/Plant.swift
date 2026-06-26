@@ -33,11 +33,12 @@ enum PlantLightLevel: String, Codable, CaseIterable, Identifiable, Sendable {
     var id: String { rawValue }
 
     nonisolated var displayName: String {
-        switch self {
-        case .low: "弱光"
-        case .medium: "中等光"
-        case .brightIndirect: "明亮散射光"
-        case .direct: "直射光"
+        let l = L10n.current
+        return switch self {
+        case .low: l.tr(zh: "弱光", en: "Low light", de: "Schwaches Licht")
+        case .medium: l.tr(zh: "中等光", en: "Medium light", de: "Mittleres Licht")
+        case .brightIndirect: l.tr(zh: "明亮散射光", en: "Bright indirect light", de: "Helles indirektes Licht")
+        case .direct: l.tr(zh: "直射光", en: "Direct sun", de: "Direktes Licht")
         }
     }
 }
@@ -51,11 +52,12 @@ enum PlantHealthStatus: String, Codable, CaseIterable, Identifiable, Sendable {
     var id: String { rawValue }
 
     nonisolated var displayName: String {
-        switch self {
-        case .thriving: "状态很好"
-        case .stable: "稳定"
-        case .watching: "需要观察"
-        case .stressed: "状态紧张"
+        let l = L10n.current
+        return switch self {
+        case .thriving: l.tr(zh: "状态很好", en: "Thriving", de: "Sehr guter Zustand")
+        case .stable: l.tr(zh: "稳定", en: "Stable", de: "Stabil")
+        case .watching: l.tr(zh: "需要观察", en: "Needs watching", de: "Beobachten")
+        case .stressed: l.tr(zh: "状态紧张", en: "Stressed", de: "Gestresst")
         }
     }
 }
@@ -70,12 +72,13 @@ enum PlantWindowDirection: String, Codable, CaseIterable, Identifiable, Sendable
     var id: String { rawValue }
 
     nonisolated var displayName: String {
-        switch self {
-        case .unknown: "未设置"
-        case .north: "北向"
-        case .east: "东向"
-        case .south: "南向"
-        case .west: "西向"
+        let l = L10n.current
+        return switch self {
+        case .unknown: l.tr(zh: "未设置", en: "Not set", de: "Nicht festgelegt")
+        case .north: l.tr(zh: "北向", en: "North-facing", de: "Nach Norden")
+        case .east: l.tr(zh: "东向", en: "East-facing", de: "Nach Osten")
+        case .south: l.tr(zh: "南向", en: "South-facing", de: "Nach Süden")
+        case .west: l.tr(zh: "西向", en: "West-facing", de: "Nach Westen")
         }
     }
 }
@@ -89,11 +92,12 @@ enum PlantHumidityPreference: String, Codable, CaseIterable, Identifiable, Senda
     var id: String { rawValue }
 
     nonisolated var displayName: String {
-        switch self {
-        case .unknown: "未设置"
-        case .dry: "偏干"
-        case .standard: "普通"
-        case .humid: "偏湿"
+        let l = L10n.current
+        return switch self {
+        case .unknown: l.tr(zh: "未设置", en: "Not set", de: "Nicht festgelegt")
+        case .dry: l.tr(zh: "偏干", en: "Drier", de: "Eher trocken")
+        case .standard: l.tr(zh: "普通", en: "Standard", de: "Normal")
+        case .humid: l.tr(zh: "偏湿", en: "More humid", de: "Feuchter")
         }
     }
 }
@@ -107,11 +111,12 @@ enum PlantTemperaturePreference: String, Codable, CaseIterable, Identifiable, Se
     var id: String { rawValue }
 
     nonisolated var displayName: String {
-        switch self {
-        case .unknown: "未设置"
-        case .cool: "偏凉"
-        case .standard: "普通"
-        case .warm: "偏暖"
+        let l = L10n.current
+        return switch self {
+        case .unknown: l.tr(zh: "未设置", en: "Not set", de: "Nicht festgelegt")
+        case .cool: l.tr(zh: "偏凉", en: "Cooler", de: "Eher kühl")
+        case .standard: l.tr(zh: "普通", en: "Standard", de: "Normal")
+        case .warm: l.tr(zh: "偏暖", en: "Warmer", de: "Eher warm")
         }
     }
 }

@@ -622,9 +622,9 @@ nonisolated enum CarePlanOverdueStatusCalculator {
 
     private static func plantWarningTitle(for actionType: String) -> String? {
         switch actionType {
-        case "plantWatering": "浇水"
-        case "plantFertilizing": "施肥"
-        case "plantTask": "植物"
+        case "plantWatering": L10n.current.tr(zh: "浇水", en: "Watering", de: "Gießen")
+        case "plantFertilizing": L10n.current.tr(zh: "施肥", en: "Fertilizing", de: "Düngen")
+        case "plantTask": L10n.current.tr(zh: "植物", en: "Plant", de: "Pflanze")
         default: nil
         }
     }
@@ -648,7 +648,7 @@ nonisolated enum CarePlanOverdueStatusCalculator {
     ) -> [CarePlanOverdueStatus] {
         [
             plantCycleWarning(
-                title: "浇水",
+                title: L10n.current.tr(zh: "浇水", en: "Watering", de: "Gießen"),
                 actionType: "plantWatering",
                 lastCareDate: plant.lastWateredDate ?? latestPlantCareDate(for: plant, type: .watering),
                 intervalDays: plant.wateringIntervalDays,
@@ -656,7 +656,7 @@ nonisolated enum CarePlanOverdueStatusCalculator {
                 calendar: calendar
             ),
             plantCycleWarning(
-                title: "施肥",
+                title: L10n.current.tr(zh: "施肥", en: "Fertilizing", de: "Düngen"),
                 actionType: "plantFertilizing",
                 lastCareDate: plant.lastFertilizedDate ?? latestPlantCareDate(for: plant, type: .fertilizing),
                 intervalDays: plant.fertilizingIntervalDays,

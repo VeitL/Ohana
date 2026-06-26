@@ -44,20 +44,21 @@ enum PlantCareType: String, Codable, CaseIterable, Identifiable, Sendable {
     }
 
     nonisolated var displayName: String {
-        switch self {
-        case .watering: "浇水"
-        case .fertilizing: "施肥"
-        case .repotting: "换盆"
-        case .pruning: "修剪"
-        case .misting: "喷雾"
-        case .rotating: "转盆"
-        case .leafCleaning: "清洁叶片"
-        case .pestCheck: "检查病虫害"
-        case .photo: "拍照"
-        case .newLeaf: "新叶"
-        case .yellowLeaf: "黄叶"
-        case .pestFound: "发现虫害"
-        case .customNote: "备注"
+        let l = L10n.current
+        return switch self {
+        case .watering: l.tr(zh: "浇水", en: "Watering", de: "Gießen")
+        case .fertilizing: l.tr(zh: "施肥", en: "Fertilizing", de: "Düngen")
+        case .repotting: l.tr(zh: "换盆", en: "Repotting", de: "Umtopfen")
+        case .pruning: l.tr(zh: "修剪", en: "Pruning", de: "Schneiden")
+        case .misting: l.tr(zh: "喷雾", en: "Misting", de: "Besprühen")
+        case .rotating: l.tr(zh: "转盆", en: "Rotate pot", de: "Topf drehen")
+        case .leafCleaning: l.tr(zh: "清洁叶片", en: "Clean leaves", de: "Blätter reinigen")
+        case .pestCheck: l.tr(zh: "检查病虫害", en: "Pest check", de: "Schädlingscheck")
+        case .photo: l.tr(zh: "拍照", en: "Photo", de: "Foto")
+        case .newLeaf: l.tr(zh: "新叶", en: "New leaf", de: "Neues Blatt")
+        case .yellowLeaf: l.tr(zh: "黄叶", en: "Yellow leaf", de: "Gelbes Blatt")
+        case .pestFound: l.tr(zh: "发现虫害", en: "Pests found", de: "Schädlinge entdeckt")
+        case .customNote: l.tr(zh: "备注", en: "Note", de: "Notiz")
         }
     }
 

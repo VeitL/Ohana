@@ -134,14 +134,14 @@ nonisolated enum PlantCarePlanService {
                 latestCareDate(for: plant, types: [.pestCheck, .pestFound]) ?? plant.lastHealthCheckDate,
                 intervalPlan(for: .pestCheck, plant: plant, calendar: calendar),
                 1,
-                "查看叶背、土面和新芽"
+                L10n.current.tr(zh: "查看叶背、土面和新芽", en: "Check leaf undersides, soil surface, and new growth", de: "Blattunterseiten, Erdoberfläche und neue Triebe prüfen")
             ),
             (
                 .leafCleaning,
                 latestCareDate(for: plant, types: [.leafCleaning]),
                 intervalPlan(for: .leafCleaning, plant: plant, calendar: calendar),
                 3,
-                "擦掉灰尘，让叶片更好接光"
+                L10n.current.tr(zh: "擦掉灰尘，让叶片更好接光", en: "Wipe dust so leaves can receive light better", de: "Staub abwischen, damit Blätter besser Licht bekommen")
             ),
             (
                 .rotating,
@@ -155,7 +155,7 @@ nonisolated enum PlantCarePlanService {
                 latestCareDate(for: plant, types: [.pruning]),
                 intervalPlan(for: .pruning, plant: plant, calendar: calendar),
                 5,
-                "剪掉黄叶、枯叶或过密枝叶"
+                L10n.current.tr(zh: "剪掉黄叶、枯叶或过密枝叶", en: "Trim yellow, dry, or crowded leaves", de: "Gelbe, trockene oder zu dichte Blätter schneiden")
             ),
             (
                 .repotting,
@@ -442,21 +442,21 @@ nonisolated enum PlantCarePlanService {
         if wetCount >= 2 {
             let extensionDays = min(6, wetCount * 2)
             delta += extensionDays
-            summaries.append("最近 \(wetCount) 次反馈土还湿，周期自动延长 \(extensionDays) 天")
+            summaries.append(L10n.current.tr(zh: "最近 \(wetCount) 次反馈土还湿，周期自动延长 \(extensionDays) 天", en: "Last \(wetCount) wet-soil feedback entries extend the cadence by \(extensionDays) days", de: "Die letzten \(wetCount) Rückmeldungen zu feuchter Erde verlängern den Rhythmus um \(extensionDays) Tage"))
         }
 
         let skipCount = consecutiveSkipFeedbackCount(for: plant, type: type)
         if skipCount >= 2 {
             let extensionDays = min(4, skipCount)
             delta += extensionDays
-            summaries.append("最近 \(skipCount) 次跳过浇水，周期自动延长 \(extensionDays) 天")
+            summaries.append(L10n.current.tr(zh: "最近 \(skipCount) 次跳过浇水，周期自动延长 \(extensionDays) 天", en: "Last \(skipCount) skipped watering entries extend the cadence by \(extensionDays) days", de: "Die letzten \(skipCount) übersprungenen Gießaufgaben verlängern den Rhythmus um \(extensionDays) Tage"))
         }
 
         let earlyCount = earlyCompletionCount(for: plant, type: type, intervalDays: environmentDays, calendar: calendar)
         if earlyCount >= 2 {
             let shorteningDays = min(4, earlyCount)
             delta -= shorteningDays
-            summaries.append("最近 \(earlyCount) 次提前浇水，周期自动缩短 \(shorteningDays) 天")
+            summaries.append(L10n.current.tr(zh: "最近 \(earlyCount) 次提前浇水，周期自动缩短 \(shorteningDays) 天", en: "Last \(earlyCount) early watering entries shorten the cadence by \(shorteningDays) days", de: "Die letzten \(earlyCount) frühen Gießvorgänge verkürzen den Rhythmus um \(shorteningDays) Tage"))
         }
 
         guard delta != 0, !summaries.isEmpty else { return .none }
@@ -539,70 +539,78 @@ nonisolated enum PlantCarePlanService {
     }
 
     private static func wateringSubtitle(for plant: Plant) -> String {
+        let l = L10n.current
         if plant.isHydroponic {
-            return "水培 · 检查水位并定期换水，避免根系缺氧"
+            return l.tr(zh: "水培 · 检查水位并定期换水，避免根系缺氧", en: "Hydroponic · check water level and change water regularly to avoid low root oxygen", de: "Hydrokultur · Wasserstand prüfen und regelmäßig wechseln, damit die Wurzeln Sauerstoff bekommen")
         }
         let factors = environmentFactors(for: plant)
-        return factors.isEmpty ? "按土壤干湿微调" : "\(factors.joined(separator: " · "))，按土壤干湿微调"
+        return factors.isEmpty
+            ? l.tr(zh: "按土壤干湿微调", en: "Adjust by soil moisture", de: "Nach Erdfeuchte anpassen")
+            : l.tr(zh: "\(factors.joined(separator: " · "))，按土壤干湿微调", en: "\(factors.joined(separator: " · ")) · adjust by soil moisture", de: "\(factors.joined(separator: " · ")) · nach Erdfeuchte anpassen")
     }
 
     private static func fertilizingSubtitle(for plant: Plant) -> String {
+        let l = L10n.current
         if plant.isHydroponic {
-            return "水培营养液少量勤换；水质异常先换水"
+            return l.tr(zh: "水培营养液少量勤换；水质异常先换水", en: "Use small hydroponic nutrient changes; change water first if water looks off", de: "Hydrokultur-Nährlösung sparsam und öfter wechseln; bei auffälligem Wasser zuerst Wasser wechseln")
         }
         if plant.isSucculent {
-            return "多肉少肥；生长期薄肥，休眠或状态紧张时延后"
+            return l.tr(zh: "多肉少肥；生长期薄肥，休眠或状态紧张时延后", en: "Succulents need little fertilizer; use light feeding in growth season and defer during dormancy or stress", de: "Sukkulenten brauchen wenig Dünger; in der Wachstumszeit schwach düngen, bei Ruhe oder Stress verschieben")
         }
         if plant.healthStatus == .stressed {
-            return "状态紧张时先稳定环境，施肥自动后移"
+            return l.tr(zh: "状态紧张时先稳定环境，施肥自动后移", en: "When stressed, stabilize the environment first; fertilizing moves later", de: "Bei Stress zuerst Umgebung stabilisieren; Düngen wird nach hinten verschoben")
         }
-        return "生长期薄肥；冬季可以延后"
+        return l.tr(zh: "生长期薄肥；冬季可以延后", en: "Use light fertilizer in growth season; winter can be deferred", de: "In der Wachstumszeit schwach düngen; im Winter kann es warten")
     }
 
     private static func mistingSubtitle(for plant: Plant) -> String {
-        plant.isNearClimateSource ? "靠近空调/暖气，先补湿再观察叶尖" : "喜湿环境，少量喷雾并保持通风"
+        plant.isNearClimateSource
+            ? L10n.current.tr(zh: "靠近空调/暖气，先补湿再观察叶尖", en: "Near AC/heater; add humidity and watch leaf tips", de: "Nahe an Klimaanlage/Heizung; Feuchte erhöhen und Blattspitzen beobachten")
+            : L10n.current.tr(zh: "喜湿环境，少量喷雾并保持通风", en: "Prefers humidity; mist lightly and keep airflow", de: "Mag feuchtere Luft; leicht sprühen und lüften")
     }
 
     private static func rotatingSubtitle(for plant: Plant) -> String {
         switch plant.windowDirection {
         case .south, .west:
-            "强单侧光，定期转盆避免偏冠和晒伤"
+            L10n.current.tr(zh: "强单侧光，定期转盆避免偏冠和晒伤", en: "Strong one-sided light; rotate to avoid leaning and scorch", de: "Starkes einseitiges Licht; drehen gegen Schiefwuchs und Sonnenbrand")
         case .north:
-            "北向光较弱，转盆同时观察徒长"
+            L10n.current.tr(zh: "北向光较弱，转盆同时观察徒长", en: "North light is weaker; rotate and watch for legginess", de: "Nordlicht ist schwächer; drehen und auf Vergeilen achten")
         case .east, .unknown:
-            "让受光更均匀"
+            L10n.current.tr(zh: "让受光更均匀", en: "Keep light exposure more even", de: "Licht gleichmäßiger verteilen")
         }
     }
 
     private static func repottingSubtitle(for plant: Plant) -> String {
+        let l = L10n.current
         if plant.isHydroponic {
-            return "水培容器、根系和水质需要定期复查"
+            return l.tr(zh: "水培容器、根系和水质需要定期复查", en: "Check hydroponic container, roots, and water quality regularly", de: "Hydrokulturgefäß, Wurzeln und Wasserqualität regelmäßig prüfen")
         }
         if !plant.potHasDrainage {
-            return "无排水孔更容易积水，优先检查根系和介质"
+            return l.tr(zh: "无排水孔更容易积水，优先检查根系和介质", en: "No drainage hole increases waterlogging risk; check roots and medium first", de: "Ohne Abzugsloch staut sich leichter Wasser; zuerst Wurzeln und Substrat prüfen")
         }
         if plant.potDiameterCm > 0, plant.currentHeightCm > plant.potDiameterCm * 4 {
-            return "株高明显大于盆径，留意头重脚轻或根系拥挤"
+            return l.tr(zh: "株高明显大于盆径，留意头重脚轻或根系拥挤", en: "Plant is much taller than pot width; watch for top-heaviness or crowded roots", de: "Pflanze ist deutlich höher als der Topf breit; auf Kopflastigkeit oder enge Wurzeln achten")
         }
-        return "根系拥挤或土壤板结时优先"
+        return l.tr(zh: "根系拥挤或土壤板结时优先", en: "Prioritize when roots are crowded or soil is compacted", de: "Priorisieren, wenn Wurzeln eng sind oder Erde verdichtet ist")
     }
 
     private static func environmentFactors(for plant: Plant) -> [String] {
-        var factors = [plant.isIndoor ? "室内" : "阳台/花园", plant.lightLevel.displayName]
+        let l = L10n.current
+        var factors = [plant.isIndoor ? l.tr(zh: "室内", en: "Indoor", de: "Drinnen") : l.tr(zh: "阳台/花园", en: "Balcony/garden", de: "Balkon/Garten"), plant.lightLevel.displayName]
         if plant.windowDirection != .unknown {
             factors.append(plant.windowDirection.displayName)
         }
         if plant.lastLightMeasurementLux > 0 {
-            factors.append("实测 \(plant.lastLightMeasurementLux) lux")
+            factors.append(l.tr(zh: "实测 \(plant.lastLightMeasurementLux) lux", en: "Measured \(plant.lastLightMeasurementLux) lux", de: "Gemessen \(plant.lastLightMeasurementLux) lux"))
         }
         if plant.isNearClimateSource {
-            factors.append("靠近空调/暖气")
+            factors.append(l.tr(zh: "靠近空调/暖气", en: "Near AC/heater", de: "Nahe an Klimaanlage/Heizung"))
         }
         if !plant.potHasDrainage {
-            factors.append("无排水孔")
+            factors.append(l.tr(zh: "无排水孔", en: "No drainage hole", de: "Kein Abzugsloch"))
         }
         if plant.isSucculent {
-            factors.append("多肉")
+            factors.append(l.tr(zh: "多肉", en: "Succulent", de: "Sukkulente"))
         }
         return factors
     }
@@ -612,92 +620,96 @@ nonisolated enum PlantCarePlanService {
         plant: Plant,
         intervalPlan: IntervalPlan
     ) -> String {
-        var parts = ["基础 \(intervalPlan.referenceDays) 天"]
+        let l = L10n.current
+        var parts = [l.tr(zh: "基础 \(intervalPlan.referenceDays) 天", en: "Base \(intervalPlan.referenceDays)d", de: "Basis \(intervalPlan.referenceDays) T.")]
         let factors = explanationFactors(for: type, plant: plant)
         if !factors.isEmpty {
-            parts.append("\(factors.joined(separator: " + "))影响节奏")
+            parts.append(l.tr(zh: "\(factors.joined(separator: " + "))影响节奏", en: "\(factors.joined(separator: " + ")) affects cadence", de: "\(factors.joined(separator: " + ")) beeinflusst den Rhythmus"))
         }
         if intervalPlan.environmentDelta != 0 {
-            parts.append("环境周期\(deltaText(intervalPlan.environmentDelta))")
+            parts.append(l.tr(zh: "环境周期\(deltaText(intervalPlan.environmentDelta))", en: "Environment \(deltaText(intervalPlan.environmentDelta))", de: "Umgebung \(deltaText(intervalPlan.environmentDelta))"))
         }
         if !intervalPlan.learning.summary.isEmpty {
             parts.append(intervalPlan.learning.summary)
         }
-        parts.append("当前有效周期 \(intervalPlan.effectiveDays) 天")
+        parts.append(l.tr(zh: "当前有效周期 \(intervalPlan.effectiveDays) 天", en: "Effective cadence \(intervalPlan.effectiveDays)d", de: "Aktueller Rhythmus \(intervalPlan.effectiveDays) T."))
         return parts.joined(separator: "；")
     }
 
     private static func explanationFactors(for type: PlantCareType, plant: Plant) -> [String] {
         switch type {
         case .watering:
+            let l = L10n.current
             var factors: [String] = []
-            if plant.isHydroponic { factors.append("水培") }
-            if plant.isSucculent { factors.append("多肉") }
-            if plant.lightLevel == .direct { factors.append("直射光") }
-            if plant.lightLevel == .low { factors.append("弱光") }
+            if plant.isHydroponic { factors.append(l.tr(zh: "水培", en: "Hydroponic", de: "Hydrokultur")) }
+            if plant.isSucculent { factors.append(l.tr(zh: "多肉", en: "Succulent", de: "Sukkulente")) }
+            if plant.lightLevel == .direct { factors.append(l.tr(zh: "直射光", en: "Direct sun", de: "Direktes Licht")) }
+            if plant.lightLevel == .low { factors.append(l.tr(zh: "弱光", en: "Low light", de: "Schwaches Licht")) }
             if plant.lastLightMeasurementLux >= 10000 {
-                factors.append("高 lux")
+                factors.append(l.tr(zh: "高 lux", en: "High lux", de: "Hohe Lux"))
             } else if plant.lastLightMeasurementLux > 0, plant.lastLightMeasurementLux < 1000 {
-                factors.append("低 lux")
+                factors.append(l.tr(zh: "低 lux", en: "Low lux", de: "Niedrige Lux"))
             }
             if plant.windowDirection == .south || plant.windowDirection == .west {
                 factors.append(plant.windowDirection.displayName)
             } else if plant.windowDirection == .north {
-                factors.append("北向")
+                factors.append(l.tr(zh: "北向", en: "North-facing", de: "Nach Norden"))
             }
             if plant.potDiameterCm > 0, plant.potDiameterCm < 10 {
-                factors.append("小盆")
+                factors.append(l.tr(zh: "小盆", en: "Small pot", de: "Kleiner Topf"))
             } else if plant.potDiameterCm >= 24 {
-                factors.append("大盆")
+                factors.append(l.tr(zh: "大盆", en: "Large pot", de: "Großer Topf"))
             }
             if plant.potMaterial.localizedCaseInsensitiveContains("陶") ||
                 plant.potMaterial.localizedCaseInsensitiveContains("terracotta") ||
                 plant.potMaterial.localizedCaseInsensitiveContains("clay") {
-                factors.append("陶盆")
+                factors.append(l.tr(zh: "陶盆", en: "Clay pot", de: "Tontopf"))
             }
-            if !plant.potHasDrainage { factors.append("无排水孔") }
-            if plant.isNearClimateSource { factors.append("空调/暖气旁") }
-            if !plant.isIndoor { factors.append("阳台/花园") }
+            if !plant.potHasDrainage { factors.append(l.tr(zh: "无排水孔", en: "No drainage hole", de: "Kein Abzugsloch")) }
+            if plant.isNearClimateSource { factors.append(l.tr(zh: "空调/暖气旁", en: "Near AC/heater", de: "Neben Klimaanlage/Heizung")) }
+            if !plant.isIndoor { factors.append(l.tr(zh: "阳台/花园", en: "Balcony/garden", de: "Balkon/Garten")) }
             return factors
         case .fertilizing:
             return [
-                plant.isHydroponic ? "水培" : nil,
-                plant.isSucculent ? "多肉" : nil,
-                plant.healthStatus == .stressed ? "状态紧张" : nil
+                plant.isHydroponic ? L10n.current.tr(zh: "水培", en: "Hydroponic", de: "Hydrokultur") : nil,
+                plant.isSucculent ? L10n.current.tr(zh: "多肉", en: "Succulent", de: "Sukkulente") : nil,
+                plant.healthStatus == .stressed ? L10n.current.tr(zh: "状态紧张", en: "Stressed", de: "Gestresst") : nil
             ].compactMap(\.self)
         case .leafCleaning:
-            return plant.isNearClimateSource ? ["空调/暖气旁"] : []
+            return plant.isNearClimateSource ? [L10n.current.tr(zh: "空调/暖气旁", en: "Near AC/heater", de: "Neben Klimaanlage/Heizung")] : []
         case .rotating:
             switch plant.windowDirection {
             case .south, .west:
                 return [plant.windowDirection.displayName]
             case .north:
-                return ["北向弱光"]
+                return [L10n.current.tr(zh: "北向弱光", en: "North-facing low light", de: "Nordseitiges schwaches Licht")]
             case .east, .unknown:
                 return []
             }
         case .repotting:
             return [
-                plant.isHydroponic ? "水培" : nil,
-                !plant.potHasDrainage ? "无排水孔" : nil,
-                plant.potDiameterCm > 0 && plant.currentHeightCm > plant.potDiameterCm * 4 ? "株高明显大于盆径" : nil
+                plant.isHydroponic ? L10n.current.tr(zh: "水培", en: "Hydroponic", de: "Hydrokultur") : nil,
+                !plant.potHasDrainage ? L10n.current.tr(zh: "无排水孔", en: "No drainage hole", de: "Kein Abzugsloch") : nil,
+                plant.potDiameterCm > 0 && plant.currentHeightCm > plant.potDiameterCm * 4 ? L10n.current.tr(zh: "株高明显大于盆径", en: "Height much larger than pot diameter", de: "Höhe deutlich größer als Topfdurchmesser") : nil
             ].compactMap(\.self)
         case .misting:
             return [
-                plant.humidityPreference == .humid ? "喜湿" : nil,
-                plant.isNearClimateSource ? "空调/暖气旁" : nil
+                plant.humidityPreference == .humid ? L10n.current.tr(zh: "喜湿", en: "Humidity-loving", de: "Mag Feuchtigkeit") : nil,
+                plant.isNearClimateSource ? L10n.current.tr(zh: "空调/暖气旁", en: "Near AC/heater", de: "Neben Klimaanlage/Heizung") : nil
             ].compactMap(\.self)
         case .pestCheck:
-            return plant.healthStatus == .watching || plant.healthStatus == .stressed ? ["健康状态需观察"] : []
+            return plant.healthStatus == .watching || plant.healthStatus == .stressed ? [L10n.current.tr(zh: "健康状态需观察", en: "Health needs watching", de: "Zustand beobachten")] : []
         case .pruning:
-            return plant.healthStatus == .stressed ? ["状态紧张"] : []
+            return plant.healthStatus == .stressed ? [L10n.current.tr(zh: "状态紧张", en: "Stressed", de: "Gestresst")] : []
         case .photo, .newLeaf, .yellowLeaf, .pestFound, .customNote:
             return []
         }
     }
 
     private static func deltaText(_ delta: Int) -> String {
-        delta < 0 ? "缩短 \(abs(delta)) 天" : "延长 \(delta) 天"
+        delta < 0
+            ? L10n.current.tr(zh: "缩短 \(abs(delta)) 天", en: "shortens by \(abs(delta))d", de: "verkürzt um \(abs(delta)) T.")
+            : L10n.current.tr(zh: "延长 \(delta) 天", en: "extends by \(delta)d", de: "verlängert um \(delta) T.")
     }
 
     private static func makeTask(
@@ -716,12 +728,12 @@ nonisolated enum PlantCarePlanService {
         if let deferredDate = deferredUntil(for: type, plant: plant, calendar: calendar),
            deferredDate > dueDate {
             dueDate = deferredDate
-            explanation += "；最近一次跳过/延后反馈已纳入本次到期日"
+            explanation += "；\(L10n.current.tr(zh: "最近一次跳过/延后反馈已纳入本次到期日", en: "The latest skip/defer feedback is included in this due date", de: "Die letzte Überspringen-/Verschieben-Rückmeldung ist in diesem Termin berücksichtigt"))"
         }
         let today = calendar.startOfDay(for: now)
         let dueDay = calendar.startOfDay(for: dueDate)
         let daysUntilDue = calendar.dateComponents([.day], from: today, to: dueDay).day ?? 0
-        let plantName = plant.name.isEmpty ? "植物" : plant.name
+        let plantName = plant.name.isEmpty ? L10n.current.tr(zh: "植物", en: "Plant", de: "Pflanze") : plant.name
         return PlantCareTaskSnapshot(
             id: "\(plant.id.uuidString)-\(type.rawValue)-\(Int(dueDay.timeIntervalSince1970))",
             plantID: plant.id,

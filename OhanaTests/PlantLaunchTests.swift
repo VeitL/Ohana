@@ -46,8 +46,18 @@ struct PlantLaunchTests {
         #expect(PlantCarePlanService.intervalDays(for: .watering, plant: plant) == 7)
         #expect(task.careType == .watering)
         #expect(task.daysUntilDue == 4)
-        #expect(task.learningSummary.contains("土还湿"))
-        #expect(task.explanation.contains("自动延长 4 天"))
+        expectLocalizedSubstring(
+            task.learningSummary,
+            zh: "土还湿",
+            en: "wet-soil feedback",
+            de: "Rückmeldungen zu feuchter Erde"
+        )
+        expectLocalizedSubstring(
+            task.explanation,
+            zh: "自动延长 4 天",
+            en: "extend the cadence by 4 days",
+            de: "verlängern den Rhythmus um 4 Tage"
+        )
     }
 
     @Test func carePlanLearnsFromRepeatedSkippedWatering() throws {
@@ -70,8 +80,18 @@ struct PlantLaunchTests {
 
         #expect(PlantCarePlanService.intervalDays(for: .watering, plant: plant) == 5)
         #expect(task.daysUntilDue == 2)
-        #expect(task.learningSummary.contains("跳过浇水"))
-        #expect(task.explanation.contains("自动延长 2 天"))
+        expectLocalizedSubstring(
+            task.learningSummary,
+            zh: "跳过浇水",
+            en: "skipped watering",
+            de: "übersprungenen Gießaufgaben"
+        )
+        expectLocalizedSubstring(
+            task.explanation,
+            zh: "自动延长 2 天",
+            en: "extend the cadence by 2 days",
+            de: "verlängern den Rhythmus um 2 Tage"
+        )
     }
 
     @Test func carePlanLearnsFromRepeatedEarlyWatering() throws {
@@ -90,8 +110,18 @@ struct PlantLaunchTests {
         #expect(PlantCarePlanService.intervalDays(for: .watering, plant: plant) == 5)
         #expect(task.careType == .watering)
         #expect(task.daysUntilDue == 0)
-        #expect(task.learningSummary.contains("提前浇水"))
-        #expect(task.explanation.contains("自动缩短 2 天"))
+        expectLocalizedSubstring(
+            task.learningSummary,
+            zh: "提前浇水",
+            en: "early watering",
+            de: "frühen Gießvorgänge"
+        )
+        expectLocalizedSubstring(
+            task.explanation,
+            zh: "自动缩短 2 天",
+            en: "shorten the cadence by 2 days",
+            de: "verkürzen den Rhythmus um 2 Tage"
+        )
     }
 
     @Test func structuredEnvironmentAdjustsCarePlanAndTaskCopy() throws {
@@ -125,12 +155,12 @@ struct PlantLaunchTests {
         #expect(PlantCarePlanService.intervalDays(for: .watering, plant: plant) == 2)
         #expect(PlantCarePlanService.intervalDays(for: .misting, plant: plant) == 3)
         #expect(PlantCarePlanService.intervalDays(for: .repotting, plant: plant) == 270)
-        #expect(watering.subtitle.contains("实测 12000 lux"))
-        #expect(watering.subtitle.contains("无排水孔"))
-        #expect(watering.explanation.contains("直射光"))
-        #expect(watering.explanation.contains("小盆"))
-        #expect(watering.explanation.contains("当前有效周期 2 天"))
-        #expect(misting.subtitle.contains("空调/暖气"))
+        expectLocalizedSubstring(watering.subtitle, zh: "实测 12000 lux", en: "Measured 12000 lux", de: "Gemessen 12000 lux")
+        expectLocalizedSubstring(watering.subtitle, zh: "无排水孔", en: "No drainage hole", de: "Kein Abzugsloch")
+        expectLocalizedSubstring(watering.explanation, zh: "直射光", en: "Direct sun", de: "Direktes Licht")
+        expectLocalizedSubstring(watering.explanation, zh: "小盆", en: "Small pot", de: "Kleiner Topf")
+        expectLocalizedSubstring(watering.explanation, zh: "当前有效周期 2 天", en: "Effective cadence 2d", de: "Aktueller Rhythmus 2 T.")
+        expectLocalizedSubstring(misting.subtitle, zh: "空调/暖气", en: "AC/heater", de: "Klimaanlage/Heizung")
     }
 
     @Test func hydroponicAndSucculentProfilesUseDifferentCareCadence() {
@@ -196,7 +226,12 @@ struct PlantLaunchTests {
 
         let candidate = try #require(candidates.first)
         #expect(candidate.id == existingId)
-        #expect(candidate.reason == "资料库物种和房间相同")
+        expectLocalizedValue(
+            candidate.reason,
+            zh: "资料库物种和房间相同",
+            en: "Same catalog species and room",
+            de: "Gleiche Katalogart und gleicher Raum"
+        )
     }
 
     @Test func plantCatalogDefaultsPrefillCareRelevantFields() throws {
@@ -205,7 +240,7 @@ struct PlantLaunchTests {
         let monsteraDefaults = PlantProfileUXPolicy.catalogDefaults(for: monstera)
         let snakeDefaults = PlantProfileUXPolicy.catalogDefaults(for: snakePlant)
 
-        #expect(monsteraDefaults.name == "龟背竹")
+        #expect(["龟背竹", "monstera"].contains(monsteraDefaults.name))
         #expect(monsteraDefaults.species == "Monstera deliciosa")
         #expect(monsteraDefaults.humidityPreference == .humid)
         #expect(monsteraDefaults.wateringIntervalDays == 8)
@@ -1108,7 +1143,12 @@ struct PlantLaunchTests {
         #expect(logs.first?.careType == .customNote)
         #expect(logs.first?.note.hasPrefix("skip:watering:") == true)
         #expect(task.daysUntilDue == 1)
-        #expect(task.explanation.contains("跳过/延后反馈"))
+        expectLocalizedSubstring(
+            task.explanation,
+            zh: "跳过/延后反馈",
+            en: "skip/defer feedback",
+            de: "Überspringen-/Verschieben-Rückmeldung"
+        )
     }
 
     @Test func calendarCompletedPlantCareCountsForTodayFocusCoconutReward() throws {
@@ -1798,6 +1838,15 @@ struct PlantLaunchTests {
 
     private func plantBudgetKey(_ plant: Plant) -> String {
         "plant.\(plant.id.uuidString)"
+    }
+
+    private func expectLocalizedValue(_ actual: String, zh: String, en: String, de: String) {
+        #expect([zh, en, de].contains(actual))
+    }
+
+    private func expectLocalizedSubstring(_ actual: String?, zh: String, en: String, de: String) {
+        let actual = actual ?? ""
+        #expect([zh, en, de].contains { actual.contains($0) })
     }
 
     private func prepareEconomyDefaults(

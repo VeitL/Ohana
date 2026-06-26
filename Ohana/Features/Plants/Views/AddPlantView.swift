@@ -13,6 +13,7 @@ struct AddPlantView: View {
     let existingPlantSnapshots: [PlantDuplicateScanSnapshot]
     @Environment(\.modelContext) private var modelContext
     @Environment(AppServices.self) private var appServices
+    @AppStorage("appLanguage") private var appLanguage = "zh"
 
     @StateObject private var commandQueue = DeferredDomainCommandQueue()
     @State private var name = ""
@@ -52,6 +53,7 @@ struct AddPlantView: View {
     private var selectedCatalog: PlantCatalogEntry? {
         selectedCatalogID.isEmpty ? nil : PlantCatalog.entry(id: selectedCatalogID)
     }
+    private var l: L10n { L10n(appLanguage) }
 
     private var catalogMatches: [PlantCatalogSearchResult] {
         PlantCatalog.searchResults(catalogQuery, limit: 8)
@@ -119,11 +121,11 @@ struct AddPlantView: View {
                 .padding(.horizontal, 20)
 
                 VStack(spacing: 16) {
-                    goFormField("名称", text: $name, placeholder: "我的绿萝")
-                    goFormField("品种", text: $species, placeholder: "绿萝、多肉…")
+                    goFormField(l.tr(zh: "名称", en: "Name", de: "Name"), text: $name, placeholder: l.tr(zh: "我的绿萝", en: "My pothos", de: "Meine Efeutute"))
+                    goFormField(l.tr(zh: "品种", en: "Species", de: "Art"), text: $species, placeholder: l.tr(zh: "绿萝、多肉…", en: "Pothos, succulent...", de: "Efeutute, Sukkulente..."))
                     catalogSearchSection
-                    goFormField("房间", text: $roomName, placeholder: "客厅、阳台…")
-                    goFormField("具体位置", text: $location, placeholder: "南窗边、书桌、花架…")
+                    goFormField(l.tr(zh: "房间", en: "Room", de: "Raum"), text: $roomName, placeholder: l.tr(zh: "客厅、阳台…", en: "Living room, balcony...", de: "Wohnzimmer, Balkon..."))
+                    goFormField(l.tr(zh: "具体位置", en: "Exact spot", de: "Genauer Standort"), text: $location, placeholder: l.tr(zh: "南窗边、书桌、花架…", en: "South window, desk, plant stand...", de: "Südfenster, Schreibtisch, Pflanzenregal..."))
                     duplicateWarningSection
                     environmentSection
                     potSection
@@ -131,12 +133,12 @@ struct AddPlantView: View {
                     healthSection
 
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("浇水周期")
+                        Text(l.tr(zh: "浇水周期", en: "Watering cadence", de: "Gießrhythmus"))
                             .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
                             .foregroundStyle(Color.ohanaSecondaryText)
                             .textCase(.uppercase)
                             .tracking(0.6)
-                        Stepper("每 \(wateringInterval) 天", value: $wateringInterval, in: 1 ... 90)
+                        Stepper(l.tr(zh: "每 \(wateringInterval) 天", en: "Every \(wateringInterval) days", de: "Alle \(wateringInterval) Tage"), value: $wateringInterval, in: 1 ... 90)
                             .foregroundStyle(Color.ohanaPrimaryText)
                             .tint(Color.goLime)
                     }
@@ -145,12 +147,12 @@ struct AddPlantView: View {
                     .goTranslucentCard(cornerRadius: OhanaRadius.controlLarge)
 
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("施肥周期")
+                        Text(l.tr(zh: "施肥周期", en: "Fertilizing cadence", de: "Düngerhythmus"))
                             .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
                             .foregroundStyle(Color.ohanaSecondaryText)
                             .textCase(.uppercase)
                             .tracking(0.6)
-                        Stepper("每 \(fertilizingInterval) 天", value: $fertilizingInterval, in: 1 ... 365)
+                        Stepper(l.tr(zh: "每 \(fertilizingInterval) 天", en: "Every \(fertilizingInterval) days", de: "Alle \(fertilizingInterval) Tage"), value: $fertilizingInterval, in: 1 ... 365)
                             .foregroundStyle(Color.ohanaPrimaryText)
                             .tint(Color.goLime)
                     }
@@ -158,7 +160,7 @@ struct AddPlantView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .goTranslucentCard(cornerRadius: OhanaRadius.controlLarge)
 
-                    Toggle("植物提醒", isOn: $remindersEnabled)
+                    Toggle(l.tr(zh: "植物提醒", en: "Plant reminders", de: "Pflanzenerinnerungen"), isOn: $remindersEnabled)
                         .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .rounded))
                         .foregroundStyle(Color.ohanaPrimaryText)
                         .tint(Color.goLime)
@@ -171,7 +173,7 @@ struct AddPlantView: View {
                 Button {
                     savePlant()
                 } label: {
-                    Text(name.isEmpty ? "请先输入名称" : (isSaving ? "正在添加…" : "添加植物 🌿"))
+                    Text(name.isEmpty ? l.tr(zh: "请先输入名称", en: "Enter a name first", de: "Zuerst einen Namen eingeben") : (isSaving ? l.tr(zh: "正在添加…", en: "Adding...", de: "Wird hinzugefügt...") : l.tr(zh: "添加植物 🌿", en: "Add plant 🌿", de: "Pflanze hinzufügen 🌿")))
                         .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
                         .foregroundStyle(name.isEmpty ? Color.ohanaTertiaryText : Color.arkInk)
                         .frame(maxWidth: .infinity)
@@ -192,9 +194,9 @@ struct AddPlantView: View {
         .onDisappear {
             commandQueue.cancelAll()
         }
-        .alert("可能已经建过档", isPresented: $showDuplicateAlert) {
-            Button("返回检查", role: .cancel) {}
-            Button("仍然添加") {
+        .alert(l.tr(zh: "可能已经建过档", en: "This may already exist", de: "Vielleicht schon angelegt"), isPresented: $showDuplicateAlert) {
+            Button(l.tr(zh: "返回检查", en: "Go back and check", de: "Zurück und prüfen"), role: .cancel) {}
+            Button(l.tr(zh: "仍然添加", en: "Add anyway", de: "Trotzdem hinzufügen")) {
                 duplicateAcknowledgementKey = currentDuplicateAcknowledgementKey
                 savePlant()
             }
@@ -205,7 +207,7 @@ struct AddPlantView: View {
 
     private var catalogSearchSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("资料库匹配")
+            Text(l.tr(zh: "资料库匹配", en: "Catalog match", de: "Katalogtreffer"))
                 .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
                 .foregroundStyle(Color.ohanaSecondaryText)
                 .textCase(.uppercase)
@@ -214,12 +216,16 @@ struct AddPlantView: View {
                 Image(systemName: "leaf.circle.fill") // a11y: allow decorative catalog status glyph; adjacent text names catalog and AI state.
                     .foregroundStyle(Color.goLime)
                     .accessibilityHidden(true)
-                Text("本地资料库 \(PlantCatalog.entries.count) 种 · AI 识别未配置时不生成假候选")
+                Text(l.tr(
+                    zh: "本地资料库 \(PlantCatalog.entries.count) 种 · AI 识别未配置时不生成假候选",
+                    en: "\(PlantCatalog.entries.count) local catalog plants · No fake AI candidates when recognition is not configured",
+                    de: "\(PlantCatalog.entries.count) lokale Katalogpflanzen · Keine falschen KI-Kandidaten ohne Erkennungsdienst"
+                ))
                     .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded))
                     .foregroundStyle(Color.ohanaSecondaryText)
                     .fixedSize(horizontal: false, vertical: true)
             }
-            TextField("搜索绿萝、Monstera、吊兰…", text: $catalogQuery) // ui-v4: allow existing plant launch form input while OhanaTextField migration remains tracked.
+            TextField(l.tr(zh: "搜索绿萝、Monstera、吊兰…", en: "Search pothos, Monstera, spider plant...", de: "Efeutute, Monstera, Grünlilie suchen..."), text: $catalogQuery) // ui-v4: allow existing plant launch form input while OhanaTextField migration remains tracked.
                 .textFieldStyle(.plain)
                 .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .rounded))
                 .padding(14)
@@ -228,10 +234,14 @@ struct AddPlantView: View {
             VStack(spacing: 8) {
                 if catalogMatches.isEmpty {
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("没有找到匹配")
+                        Text(l.tr(zh: "没有找到匹配", en: "No match found", de: "Kein Treffer"))
                             .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
                             .foregroundStyle(Color.ohanaPrimaryText)
-                        Text("可以继续手动建档；护理计划会使用你填写的光照、盆土和周期。")
+                        Text(l.tr(
+                            zh: "可以继续手动建档；护理计划会使用你填写的光照、盆土和周期。",
+                            en: "You can keep adding it manually. The care plan will use the light, pot, soil, and cadence you enter.",
+                            de: "Du kannst sie manuell weiter anlegen. Der Pflegeplan nutzt Licht, Topf, Erde und Rhythmus aus deinen Angaben."
+                        ))
                             .font(OhanaFont.adaptive(size: 12, weight: .medium, design: .rounded))
                             .foregroundStyle(Color.ohanaSecondaryText)
                             .fixedSize(horizontal: false, vertical: true)
@@ -262,7 +272,7 @@ struct AddPlantView: View {
                         .foregroundStyle(selectedCatalogID == entry.id ? Color.goLime : Color.ohanaSecondaryText)
                         .accessibilityHidden(true)
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(entry.commonName)
+                        Text(entry.localizedCommonName)
                             .font(OhanaFont.adaptive(size: 14, weight: .bold, design: .rounded))
                             .foregroundStyle(Color.ohanaPrimaryText)
                         Text(entry.latinName)
@@ -275,15 +285,21 @@ struct AddPlantView: View {
                         .foregroundStyle(Color.goLime)
                 }
                 HStack(spacing: 6) {
-                    catalogChip(entry.careDifficulty, foreground: Color.arkInk, background: Color.goLime)
+                    catalogChip(entry.localizedCareDifficulty, foreground: Color.arkInk, background: Color.goLime)
                     catalogChip(entry.lightRequirement.displayName, foreground: Color.ohanaPrimaryText, background: Color.ohanaControlFill.opacity(0.78))
                     catalogChip(
-                        entry.isToxicToCats || entry.isToxicToDogs || entry.isToxicToChildren ? "误食风险" : "宠物低风险",
+                        entry.isToxicToCats || entry.isToxicToDogs || entry.isToxicToChildren
+                            ? l.tr(zh: "误食风险", en: "Ingestion risk", de: "Verschluckrisiko")
+                            : l.tr(zh: "宠物低风险", en: "Low pet risk", de: "Geringes Haustierrisiko"),
                         foreground: Color.ohanaPrimaryText,
                         background: Color.ohanaControlFill.opacity(0.78)
                     )
                 }
-                Text("默认计划：浇水 \(entry.defaultWateringDays) 天 · 施肥 \(entry.defaultFertilizingDays) 天")
+                Text(l.tr(
+                    zh: "默认计划：浇水 \(entry.defaultWateringDays) 天 · 施肥 \(entry.defaultFertilizingDays) 天",
+                    en: "Default plan: water \(entry.defaultWateringDays)d · fertilize \(entry.defaultFertilizingDays)d",
+                    de: "Standardplan: gießen \(entry.defaultWateringDays) T. · düngen \(entry.defaultFertilizingDays) T."
+                ))
                     .font(OhanaFont.adaptive(size: 11, weight: .medium, design: .rounded))
                     .foregroundStyle(Color.ohanaSecondaryText)
             }
@@ -291,7 +307,7 @@ struct AddPlantView: View {
             .background(Color.ohanaControlFill.opacity(0.5), in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
         }
         .buttonStyle(ScaleButtonStyle())
-        .accessibilityLabel("\(entry.commonName)，\(entry.latinName)，\(result.matchSummary)")
+        .accessibilityLabel("\(entry.localizedCommonName), \(entry.latinName), \(result.matchSummary)")
     }
 
     private func catalogChip(_ title: String, foreground: Color, background: Color) -> some View {
@@ -313,12 +329,12 @@ struct AddPlantView: View {
                     Image(systemName: "exclamationmark.triangle.fill") // a11y: allow decorative warning glyph; adjacent title and rows explain duplicate risk.
                         .foregroundStyle(Color.goYellow)
                         .accessibilityHidden(true)
-                    Text("可能重复")
+                    Text(l.tr(zh: "可能重复", en: "Possible duplicate", de: "Möglicherweise doppelt"))
                         .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
                         .foregroundStyle(Color.ohanaPrimaryText)
                     Spacer()
                     if duplicateAcknowledgementKey == currentDuplicateAcknowledgementKey {
-                        Text("已确认")
+                        Text(l.tr(zh: "已确认", en: "Confirmed", de: "Bestätigt"))
                             .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded))
                             .foregroundStyle(Color.goLime)
                     }
@@ -339,7 +355,7 @@ struct AddPlantView: View {
                     duplicateAcknowledgementKey = currentDuplicateAcknowledgementKey
                     UIImpactFeedbackGenerator(style: .light).impactOccurred()
                 } label: {
-                    Label("仍然添加为新植物", systemImage: "plus.circle")
+                    Label(l.tr(zh: "仍然添加为新植物", en: "Still add as a new plant", de: "Trotzdem als neue Pflanze hinzufügen"), systemImage: "plus.circle")
                         .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
                 }
                 .buttonStyle(ScaleButtonStyle())
@@ -357,34 +373,41 @@ struct AddPlantView: View {
 
     private var environmentSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Toggle("室内植物", isOn: $isIndoor)
+            Toggle(l.tr(zh: "室内植物", en: "Indoor plant", de: "Zimmerpflanze"), isOn: $isIndoor)
                 .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .rounded))
                 .foregroundStyle(Color.ohanaPrimaryText)
                 .tint(Color.goLime)
-            Picker("窗户朝向", selection: $windowDirection) {
+            Picker(l.tr(zh: "窗户朝向", en: "Window direction", de: "Fensterausrichtung"), selection: $windowDirection) {
                 ForEach(PlantWindowDirection.allCases) { direction in
                     Text(direction.displayName).tag(direction)
                 }
             }
-            Picker("光照强度", selection: $lightLevel) {
+            Picker(l.tr(zh: "光照强度", en: "Light level", de: "Lichtstärke"), selection: $lightLevel) {
                 ForEach(PlantLightLevel.allCases) { level in
                     Text(level.displayName).tag(level)
                 }
             }
-            Stepper(lightMeasurementLux > 0 ? "光照实测 \(lightMeasurementLux) lux" : "光照实测 未记录", value: $lightMeasurementLux, in: 0 ... 20000, step: 250)
+            Stepper(
+                lightMeasurementLux > 0
+                    ? l.tr(zh: "光照实测 \(lightMeasurementLux) lux", en: "Light reading \(lightMeasurementLux) lux", de: "Lichtmessung \(lightMeasurementLux) lux")
+                    : l.tr(zh: "光照实测 未记录", en: "Light reading not recorded", de: "Lichtmessung nicht erfasst"),
+                value: $lightMeasurementLux,
+                in: 0 ... 20000,
+                step: 250
+            )
                 .foregroundStyle(Color.ohanaPrimaryText)
                 .tint(Color.goLime)
-            Picker("湿度偏好", selection: $humidityPreference) {
+            Picker(l.tr(zh: "湿度偏好", en: "Humidity preference", de: "Luftfeuchte"), selection: $humidityPreference) {
                 ForEach(PlantHumidityPreference.allCases) { preference in
                     Text(preference.displayName).tag(preference)
                 }
             }
-            Picker("温度偏好", selection: $temperaturePreference) {
+            Picker(l.tr(zh: "温度偏好", en: "Temperature preference", de: "Temperatur"), selection: $temperaturePreference) {
                 ForEach(PlantTemperaturePreference.allCases) { preference in
                     Text(preference.displayName).tag(preference)
                 }
             }
-            Toggle("靠近空调/暖气", isOn: $isNearClimateSource)
+            Toggle(l.tr(zh: "靠近空调/暖气", en: "Near AC/heater", de: "Nahe an Klimaanlage/Heizung"), isOn: $isNearClimateSource)
                 .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .rounded))
                 .foregroundStyle(Color.ohanaPrimaryText)
                 .tint(Color.goLime)
@@ -397,24 +420,24 @@ struct AddPlantView: View {
 
     private var potSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("盆土")
+            Text(l.tr(zh: "盆土", en: "Pot and soil", de: "Topf und Erde"))
                 .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
                 .foregroundStyle(Color.ohanaSecondaryText)
                 .textCase(.uppercase)
                 .tracking(0.6)
-            Stepper("盆径 \(Int(potDiameterCm)) cm", value: $potDiameterCm, in: 0 ... 80, step: 1)
+            Stepper(l.tr(zh: "盆径 \(Int(potDiameterCm)) cm", en: "Pot diameter \(Int(potDiameterCm)) cm", de: "Topfdurchmesser \(Int(potDiameterCm)) cm"), value: $potDiameterCm, in: 0 ... 80, step: 1)
                 .foregroundStyle(Color.ohanaPrimaryText)
                 .tint(Color.goLime)
-            Toggle("花盆有排水孔", isOn: $potHasDrainage)
+            Toggle(l.tr(zh: "花盆有排水孔", en: "Pot has drainage hole", de: "Topf hat Abzugsloch"), isOn: $potHasDrainage)
                 .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .rounded))
                 .foregroundStyle(Color.ohanaPrimaryText)
                 .tint(Color.goLime)
-            TextField("盆材质，如陶盆、塑料盆", text: $potMaterial) // ui-v4: allow existing plant launch form input while OhanaTextField migration remains tracked.
+            TextField(l.tr(zh: "盆材质，如陶盆、塑料盆", en: "Pot material, e.g. terracotta or plastic", de: "Topfmaterial, z. B. Ton oder Kunststoff"), text: $potMaterial) // ui-v4: allow existing plant launch form input while OhanaTextField migration remains tracked.
                 .textFieldStyle(.plain)
                 .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .rounded))
                 .padding(14)
                 .background(Color.ohanaControlFill.opacity(0.68), in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
-            TextField("土壤类型，如疏松排水型通用土", text: $soilType) // ui-v4: allow existing plant launch form input while OhanaTextField migration remains tracked.
+            TextField(l.tr(zh: "土壤类型，如疏松排水型通用土", en: "Soil type, e.g. loose well-draining mix", de: "Erdtyp, z. B. lockere gut drainierende Erde"), text: $soilType) // ui-v4: allow existing plant launch form input while OhanaTextField migration remains tracked.
                 .textFieldStyle(.plain)
                 .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .rounded))
                 .padding(14)
@@ -427,35 +450,35 @@ struct AddPlantView: View {
 
     private var sourceSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("来源与类型")
+            Text(l.tr(zh: "来源与类型", en: "Source and type", de: "Quelle und Typ"))
                 .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
                 .foregroundStyle(Color.ohanaSecondaryText)
                 .textCase(.uppercase)
-            Toggle("记录购入日期", isOn: $hasAcquiredDate)
+            Toggle(l.tr(zh: "记录购入日期", en: "Record acquired date", de: "Kaufdatum erfassen"), isOn: $hasAcquiredDate)
                 .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .rounded))
                 .foregroundStyle(Color.ohanaPrimaryText)
                 .tint(Color.goLime)
             if hasAcquiredDate {
-                DatePicker("购入日期", selection: $acquiredDate, displayedComponents: .date)
+                DatePicker(l.tr(zh: "购入日期", en: "Acquired date", de: "Kaufdatum"), selection: $acquiredDate, displayedComponents: .date)
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .tint(Color.goLime)
             }
-            TextField("来源，如花市、朋友分株", text: $acquisitionSource) // ui-v4: allow existing plant launch form input while OhanaTextField migration remains tracked.
+            TextField(l.tr(zh: "来源，如花市、朋友分株", en: "Source, e.g. market or friend's cutting", de: "Quelle, z. B. Markt oder Ableger von Freunden"), text: $acquisitionSource) // ui-v4: allow existing plant launch form input while OhanaTextField migration remains tracked.
                 .textFieldStyle(.plain)
                 .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .rounded))
                 .padding(14)
                 .background(Color.ohanaControlFill.opacity(0.68), in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
-            Stepper("当前高度 \(Int(currentHeightCm)) cm", value: $currentHeightCm, in: 0 ... 300, step: 1)
+            Stepper(l.tr(zh: "当前高度 \(Int(currentHeightCm)) cm", en: "Current height \(Int(currentHeightCm)) cm", de: "Aktuelle Höhe \(Int(currentHeightCm)) cm"), value: $currentHeightCm, in: 0 ... 300, step: 1)
                 .foregroundStyle(Color.ohanaPrimaryText)
                 .tint(Color.goLime)
-            Stepper("冠幅 \(Int(currentSpreadCm)) cm", value: $currentSpreadCm, in: 0 ... 300, step: 1)
+            Stepper(l.tr(zh: "冠幅 \(Int(currentSpreadCm)) cm", en: "Spread \(Int(currentSpreadCm)) cm", de: "Breite \(Int(currentSpreadCm)) cm"), value: $currentSpreadCm, in: 0 ... 300, step: 1)
                 .foregroundStyle(Color.ohanaPrimaryText)
                 .tint(Color.goLime)
-            Toggle("水培", isOn: $isHydroponic)
+            Toggle(l.tr(zh: "水培", en: "Hydroponic", de: "Hydrokultur"), isOn: $isHydroponic)
                 .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .rounded))
                 .foregroundStyle(Color.ohanaPrimaryText)
                 .tint(Color.goLime)
-            Toggle("多肉/仙人掌类", isOn: $isSucculent)
+            Toggle(l.tr(zh: "多肉/仙人掌类", en: "Succulent/cactus", de: "Sukkulente/Kaktus"), isOn: $isSucculent)
                 .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .rounded))
                 .foregroundStyle(Color.ohanaPrimaryText)
                 .tint(Color.goLime)
@@ -467,7 +490,7 @@ struct AddPlantView: View {
 
     private var healthSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Picker("当前状态", selection: $healthStatus) {
+            Picker(l.tr(zh: "当前状态", en: "Current status", de: "Aktueller Zustand"), selection: $healthStatus) {
                 ForEach(PlantHealthStatus.allCases) { status in
                     Text(status.displayName).tag(status)
                 }
@@ -478,7 +501,11 @@ struct AddPlantView: View {
                     Image(systemName: "exclamationmark.triangle.fill") // a11y: allow decorative warning glyph; adjacent text carries the warning.
                         .foregroundStyle(Color.goYellow)
                         .accessibilityHidden(true)
-                    Text("已标记宠物/儿童误食风险，详情页和提醒会优先提示。")
+                    Text(l.tr(
+                        zh: "已标记宠物/儿童误食风险，详情页和提醒会优先提示。",
+                        en: "Marked as an ingestion risk for pets/children. Details and reminders will prioritize safety.",
+                        de: "Als Verschluckrisiko für Haustiere/Kinder markiert. Details und Erinnerungen betonen Sicherheit."
+                    ))
                         .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded))
                         .foregroundStyle(Color.ohanaPrimaryText)
                 }
@@ -516,7 +543,7 @@ struct AddPlantView: View {
     private func applyCatalog(_ entry: PlantCatalogEntry) {
         let defaults = PlantProfileUXPolicy.catalogDefaults(for: entry)
         selectedCatalogID = entry.id
-        catalogQuery = "\(entry.commonName) · \(entry.latinName)"
+        catalogQuery = "\(entry.localizedCommonName) · \(entry.latinName)"
         if name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             name = defaults.name
         }
@@ -593,8 +620,12 @@ struct AddPlantView: View {
 
     private var duplicateAlertMessage: String {
         guard let first = duplicateCandidates.first else {
-            return "Ohana 没找到明显重复项，可以继续添加。"
+            return l.tr(zh: "Ohana 没找到明显重复项，可以继续添加。", en: "Ohana did not find an obvious duplicate. You can keep adding it.", de: "Ohana hat kein offensichtliches Duplikat gefunden. Du kannst fortfahren.")
         }
-        return "找到相似植物：\(first.title)。原因：\(first.reason)。如果这是另一盆植物，可以继续添加。"
+        return l.tr(
+            zh: "找到相似植物：\(first.title)。原因：\(first.reason)。如果这是另一盆植物，可以继续添加。",
+            en: "Similar plant found: \(first.title). Reason: \(first.reason). If this is another pot, you can still add it.",
+            de: "Ähnliche Pflanze gefunden: \(first.title). Grund: \(first.reason). Wenn es ein anderer Topf ist, kannst du sie trotzdem hinzufügen."
+        )
     }
 }

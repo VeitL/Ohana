@@ -171,7 +171,7 @@ private struct PlantLockedPreviewCatalogRow: View {
                 .background(Color.ohanaControlFill, in: Circle())
 
             VStack(alignment: .leading, spacing: 2) {
-                Text("\(entry.commonName) · \(entry.careDifficulty)")
+                Text("\(entry.localizedCommonName) · \(entry.localizedCareDifficulty)")
                     .font(OhanaFont.caption(.black))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(1)
@@ -201,9 +201,9 @@ private struct PlantLockedPreviewCatalogRow: View {
 
     private var favoriteLabel: String {
         if isFavorite {
-            return l.tr(zh: "取消收藏 \(entry.commonName)", en: "Unsave \(entry.commonName)", de: "\(entry.commonName) nicht mehr merken")
+            return l.tr(zh: "取消收藏 \(entry.localizedCommonName)", en: "Unsave \(entry.localizedCommonName)", de: "\(entry.localizedCommonName) nicht mehr merken")
         }
-        return l.tr(zh: "收藏 \(entry.commonName)", en: "Save \(entry.commonName)", de: "\(entry.commonName) merken")
+        return l.tr(zh: "收藏 \(entry.localizedCommonName)", en: "Save \(entry.localizedCommonName)", de: "\(entry.localizedCommonName) merken")
     }
 }
 

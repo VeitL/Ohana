@@ -102,31 +102,32 @@ enum PlantGrowthDiaryExportService {
     ) -> String {
         let l = L10n(languageCode)
         let formatter = ISO8601DateFormatter()
-        let species = payload.species.isEmpty ? l.tr(zh: "未知", en: "Unknown") : payload.species
-        let location = payload.location.isEmpty ? l.tr(zh: "未设置", en: "Unspecified") : payload.location
+        let species = payload.species.isEmpty ? l.tr(zh: "未知", en: "Unknown", de: "Unbekannt") : payload.species
+        let location = payload.location.isEmpty ? l.tr(zh: "未设置", en: "Unspecified", de: "Nicht angegeben") : payload.location
         var lines: [String] = [
             "# \(payload.plantName)",
             "",
-            "- \(l.tr(zh: "物种", en: "Species")): \(species)",
-            "- \(l.tr(zh: "位置", en: "Location")): \(location)",
-            "- \(l.tr(zh: "当前健康", en: "Current health")): \(payload.healthStatusRaw)",
-            "- \(l.tr(zh: "导出时间", en: "Exported at")): \(formatter.string(from: payload.exportedAt))",
+            "- \(l.tr(zh: "物种", en: "Species", de: "Art")): \(species)",
+            "- \(l.tr(zh: "位置", en: "Location", de: "Standort")): \(location)",
+            "- \(l.tr(zh: "当前健康", en: "Current health", de: "Aktueller Zustand")): \(payload.healthStatusRaw)",
+            "- \(l.tr(zh: "导出时间", en: "Exported at", de: "Exportiert am")): \(formatter.string(from: payload.exportedAt))",
             ""
         ]
 
         for entry in payload.entries {
             lines.append("## \(formatter.string(from: entry.date)) · \(entry.careTypeTitle)")
             if let healthStatusRaw = entry.healthStatusRaw {
-                lines.append("- \(l.tr(zh: "健康", en: "Health")): \(healthStatusRaw)")
+                lines.append("- \(l.tr(zh: "健康", en: "Health", de: "Gesundheit")): \(healthStatusRaw)")
             }
             if !entry.note.isEmpty {
                 lines.append(entry.note)
             }
             if includePhotoPlaceholders, entry.hasPhoto {
-                let photoLabel = l.tr(zh: "照片", en: "Photo")
+                let photoLabel = l.tr(zh: "照片", en: "Photo", de: "Foto")
                 let sourceCopy = l.tr(
                     zh: "保留在 Ohana 备份/导出源中",
-                    en: "kept in the Ohana backup/export source"
+                    en: "kept in the Ohana backup/export source",
+                    de: "in der Ohana-Backup-/Exportquelle enthalten"
                 )
                 lines.append("- \(photoLabel): \(entry.photoByteCount) bytes, \(sourceCopy)")
             }

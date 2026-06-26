@@ -213,7 +213,7 @@ nonisolated enum AppLanguage {
 
 // MARK: - Localized text value
 
-nonisolated struct AppLocalizedText: Hashable {
+nonisolated struct AppLocalizedText: Hashable, Sendable {
     let translations: [String: String]
     let fallbackCode: String
 

@@ -28,6 +28,7 @@ struct AppPlantRouteContainer: View {
 
 private struct PlantRouteMissingEntityView: View {
     let kind: String
+    private var l: L10n { .current }
 
     var body: some View {
         VStack(spacing: 14) {
@@ -35,7 +36,7 @@ private struct PlantRouteMissingEntityView: View {
                 .font(OhanaFont.title(.bold))
                 .foregroundStyle(Color.goPrimary)
                 .accessibilityHidden(true)
-            Text("内容已不可用")
+            Text(l.tr(zh: "内容已不可用", en: "Content is no longer available", de: "Inhalt ist nicht mehr verfügbar"))
                 .font(OhanaFont.title3(.black))
                 .foregroundStyle(Color.ohanaPrimaryText)
             Text(kind)
