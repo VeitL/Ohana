@@ -264,6 +264,38 @@ struct PlantLaunchTests {
         #expect(lowLight.contains { $0.entry.id == "zamioculcas-zamiifolia" })
     }
 
+    @Test func plantCatalogLocalizedDisplayFieldsDoNotFallbackToChineseForEnglishOrGerman() {
+        let defaults = UserDefaults.standard
+        let oldLanguage = defaults.object(forKey: "appLanguage")
+        defer { restoreUserDefault(oldLanguage, forKey: "appLanguage") }
+
+        for languageCode in ["en", "de"] {
+            defaults.set(languageCode, forKey: "appLanguage")
+            for entry in PlantCatalog.entries {
+                let profileDefaults = PlantProfileUXPolicy.catalogDefaults(for: entry)
+                let displayValues = [
+                    entry.localizedCommonName,
+                    entry.localizedWateringPreference,
+                    entry.localizedHumidity,
+                    entry.localizedTemperature,
+                    entry.localizedSoil,
+                    entry.localizedFertilizing,
+                    entry.localizedPropagation,
+                    entry.localizedPruning,
+                    entry.localizedCommonIssues,
+                    entry.localizedToxicity,
+                    entry.localizedCareDifficulty,
+                    profileDefaults.name,
+                    profileDefaults.soilTypeRaw
+                ]
+
+                for value in displayValues {
+                    #expect(!containsHanCharacters(value))
+                }
+            }
+        }
+    }
+
     @Test func plantRecognitionPolicyNormalizesProviderCandidatesWithoutFakingResults() async {
         let fallback = await LocalPlantIntelligenceFallback().recognizePlant(imageData: Data([1, 2, 3]))
         #expect(fallback.candidates.isEmpty)
@@ -1847,6 +1879,18 @@ struct PlantLaunchTests {
     private func expectLocalizedSubstring(_ actual: String?, zh: String, en: String, de: String) {
         let actual = actual ?? ""
         #expect([zh, en, de].contains { actual.contains($0) })
+    }
+
+    private func containsHanCharacters(_ value: String) -> Bool {
+        value.range(of: "\\p{Han}", options: .regularExpression) != nil
+    }
+
+    private func restoreUserDefault(_ value: Any?, forKey key: String) {
+        if let value {
+            UserDefaults.standard.set(value, forKey: key)
+        } else {
+            UserDefaults.standard.removeObject(forKey: key)
+        }
     }
 
     private func prepareEconomyDefaults(

@@ -1011,6 +1011,8 @@ nonisolated enum PlantCatalogLocalization {
             return l.tr(zh: "进阶", en: "Advanced", de: "Fortgeschritten")
         case "表土 2-3 cm 变干后浇透":
             return l.tr(zh: zh, en: "Water thoroughly after the top 2-3 cm of soil dries", de: "Gründlich gießen, wenn die oberen 2-3 cm Erde trocken sind")
+        case "表土 2-3 cm 变干后浇透，避免盆底积水":
+            return l.tr(zh: zh, en: "Water thoroughly after the top 2-3 cm of soil dries; avoid water collecting at the pot bottom", de: "Gründlich gießen, wenn die oberen 2-3 cm Erde trocken sind; Staunässe am Topfboden vermeiden")
         case "上层土干后浇透，避免长期积水":
             return l.tr(zh: zh, en: "Water thoroughly after the upper soil dries; avoid standing water", de: "Gründlich gießen, wenn die obere Erde trocken ist; Staunässe vermeiden")
         case "保持轻微湿润，冬季减少":
@@ -1165,8 +1167,12 @@ nonisolated enum PlantCatalogLocalization {
             return l.tr(zh: zh, en: "Divide pups after the mother plant blooms", de: "Kindel nach der Blüte der Mutterpflanze teilen")
         case "修剪过长藤蔓，促进分枝":
             return l.tr(zh: zh, en: "Trim long vines to encourage branching", de: "Lange Ranken schneiden, um Verzweigung zu fördern")
+        case "剪除老叶和过长藤蔓":
+            return l.tr(zh: zh, en: "Remove old leaves and overly long vines", de: "Alte Blätter und zu lange Ranken entfernen")
         case "剪除老叶和过密枝叶":
             return l.tr(zh: zh, en: "Remove old and crowded foliage", de: "Alte und zu dichte Blätter entfernen")
+        case "剪除老叶和受损叶":
+            return l.tr(zh: zh, en: "Remove old and damaged leaves", de: "Alte und beschädigte Blätter entfernen")
         case "剪除干尖和老叶":
             return l.tr(zh: zh, en: "Remove dry tips and old leaves", de: "Trockene Spitzen und alte Blätter entfernen")
         case "剪除受损老叶":
@@ -1179,6 +1185,8 @@ nonisolated enum PlantCatalogLocalization {
             return l.tr(zh: zh, en: "Remove curled, scorched, or old leaves", de: "Eingerollte, verbrannte oder alte Blätter entfernen")
         case "修剪过密枝叶保持通风":
             return l.tr(zh: zh, en: "Thin dense growth to keep airflow", de: "Dichten Wuchs auslichten für Luftzirkulation")
+        case "修剪过密枝叶，保持树形":
+            return l.tr(zh: zh, en: "Thin dense growth to keep the tree shape", de: "Dichten Wuchs auslichten, um die Baumform zu halten")
         case "修剪徒长枝和受损叶":
             return l.tr(zh: zh, en: "Trim leggy stems and damaged leaves", de: "Lange Triebe und beschädigte Blätter schneiden")
         case "只剪除完全枯黄叶片":
@@ -1272,7 +1280,7 @@ nonisolated enum PlantCatalogLocalization {
 }
 
 private extension String {
-    var containsChineseCharacters: Bool {
+    nonisolated var containsChineseCharacters: Bool {
         range(of: "\\p{Han}", options: .regularExpression) != nil
     }
 }
