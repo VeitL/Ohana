@@ -36,10 +36,10 @@ enum PlantReminderTimeWindow: String, CaseIterable, Identifiable, Sendable {
 }
 
 nonisolated enum PlantReminderPreferenceStore {
-    static let timeWindowKey = "plantReminder.timeWindow.v1"
-    static let weekendQuietKey = "plantReminder.weekendQuiet.v1"
-    static let travelModeKey = "plantReminder.travelMode.v1"
-    private static let careTypePrefix = "plantReminder.careTypeEnabled.v1."
+    static let timeWindowStorageName = "plantReminder.timeWindow.v1"
+    static let weekendQuietStorageName = "plantReminder.weekendQuiet.v1"
+    static let travelModeStorageName = "plantReminder.travelMode.v1"
+    private static let careTypeStoragePrefix = "plantReminder.careTypeEnabled.v1."
 
     static let controllableCareTypes: [PlantCareType] = [
         .watering,
@@ -53,28 +53,28 @@ nonisolated enum PlantReminderPreferenceStore {
     ]
 
     static func timeWindow(defaults: UserDefaults = .standard) -> PlantReminderTimeWindow {
-        defaults.string(forKey: timeWindowKey)
+        defaults.string(forKey: timeWindowStorageName)
             .flatMap(PlantReminderTimeWindow.init(rawValue:)) ?? .morning
     }
 
     static func setTimeWindow(_ window: PlantReminderTimeWindow, defaults: UserDefaults = .standard) {
-        defaults.set(window.rawValue, forKey: timeWindowKey)
+        defaults.set(window.rawValue, forKey: timeWindowStorageName)
     }
 
     static func isWeekendQuietEnabled(defaults: UserDefaults = .standard) -> Bool {
-        defaults.object(forKey: weekendQuietKey) == nil ? false : defaults.bool(forKey: weekendQuietKey)
+        defaults.object(forKey: weekendQuietStorageName) == nil ? false : defaults.bool(forKey: weekendQuietStorageName)
     }
 
     static func setWeekendQuietEnabled(_ value: Bool, defaults: UserDefaults = .standard) {
-        defaults.set(value, forKey: weekendQuietKey)
+        defaults.set(value, forKey: weekendQuietStorageName)
     }
 
     static func isTravelModeEnabled(defaults: UserDefaults = .standard) -> Bool {
-        defaults.object(forKey: travelModeKey) == nil ? false : defaults.bool(forKey: travelModeKey)
+        defaults.object(forKey: travelModeStorageName) == nil ? false : defaults.bool(forKey: travelModeStorageName)
     }
 
     static func setTravelModeEnabled(_ value: Bool, defaults: UserDefaults = .standard) {
-        defaults.set(value, forKey: travelModeKey)
+        defaults.set(value, forKey: travelModeStorageName)
     }
 
     static func isCareTypeReminderEnabled(_ type: PlantCareType, defaults: UserDefaults = .standard) -> Bool {
@@ -171,6 +171,6 @@ nonisolated enum PlantReminderPreferenceStore {
     }
 
     private static func careTypeKey(_ type: PlantCareType) -> String {
-        "\(careTypePrefix)\(type.rawValue)"
+        "\(careTypeStoragePrefix)\(type.rawValue)"
     }
 }
