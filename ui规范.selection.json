@@ -65,7 +65,7 @@
     }
   ],
   "componentRules": {
-    "background": "Global page backgrounds are selected as light/dark pairs. Each official option defines both light-mode and dark-mode gradients in one choice; light backgrounds must remain one step darker than light card surfaces. Custom photo backgrounds use one uploaded image with adaptive light/dark scrims. Power saving reduces motion only and must not override the selected background pair.",
+    "background": "Global page backgrounds are selected as light/dark pairs. Each official option defines both light-mode and dark-mode gradients in one choice; light backgrounds must remain one step darker than light card surfaces. Large backgrounds use neutral mist / cool gray first, with blue kept as a restrained brand hint instead of a full-screen wash. Custom photo backgrounds use one uploaded image with adaptive light/dark scrims. Power saving reduces motion only and must not override the selected background pair.",
     "button": "Primary CTA uses pill with goPrimary/adaptivePrimary; keep one primary action per screen and make secondary actions visibly quieter.",
     "buttonGrammar": "Use stable button roles: primary pill for the main command, muted secondary for alternate commands, semantic destructive for danger, and icon-only controls only with a 44pt hit area and accessibility label.",
     "actionColorDiscipline": "goPrimary/adaptivePrimary is the only global click-me color for primary CTAs, confirmations, key navigation, functional icons, focus, and selected system states. Feeding, reminders, danger, success, rewards, and charts may use semantic colors only for domain meaning.",
@@ -112,7 +112,7 @@
     "accent": "adaptivePrimary",
     "background": "adaptiveOfficial",
     "badge": "solid",
-    "backgroundLightDepth": "blueGrayOneStepDarkerThanCards",
+    "backgroundLightDepth": "neutralMistOneStepDarkerThanCards",
     "backgroundOptions": "paired:goIsland,cleanBlueGray,paperCream,forestGlade,deepAmbient; customPhoto",
     "backgroundPowerSavingPolicy": "keepSelectedStyleReduceMotionOnly",
     "banner": "inline",
@@ -211,7 +211,7 @@
     "accent": "adaptivePrimary",
     "background": "adaptiveOfficial",
     "badge": "solid",
-    "backgroundLightDepth": "blueGrayOneStepDarkerThanCards",
+    "backgroundLightDepth": "neutralMistOneStepDarkerThanCards",
     "backgroundOptions": "paired:goIsland,cleanBlueGray,paperCream,forestGlade,deepAmbient; customPhoto",
     "backgroundPowerSavingPolicy": "keepSelectedStyleReduceMotionOnly",
     "banner": "inline",

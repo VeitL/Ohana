@@ -95,7 +95,7 @@ private struct GoDefaultBackground: View {
 
     var body: some View {
         ZStack {
-            Color(hex: isDark ? "0A0A0C" : "F0F4FF")
+            Color(hex: isDark ? "0A0A0C" : "F5F7FA")
                 .ignoresSafeArea()
 
             ZStack {
@@ -106,13 +106,13 @@ private struct GoDefaultBackground: View {
                     .offset(x: -80 + blob1Offset.width, y: -160 + blob1Offset.height)
 
                 Circle()
-                    .fill(Color.goBlue.opacity(isDark ? 0.45 : 0.25))
+                    .fill(Color(hex: isDark ? "64748B" : "CBD5E1").opacity(isDark ? 0.28 : 0.22))
                     .frame(width: 300)
                     .blur(radius: 90)
                     .offset(x: 110 + blob2Offset.width, y: 60 + blob2Offset.height)
 
                 Circle()
-                    .fill(Color.goPurple.opacity(isDark ? 0.55 : 0.30))
+                    .fill(Color.goPurple.opacity(isDark ? 0.38 : 0.18))
                     .frame(width: 220)
                     .blur(radius: 60)
                     .offset(x: -40 + blob3Offset.width, y: 280 + blob3Offset.height)
@@ -143,9 +143,7 @@ private struct GoIslandBackground: View {
     @Environment(\.colorScheme) private var colorScheme
 
     private var gradientColors: [Color] {
-        colorScheme == .dark
-            ? [Color(hex: "2D4ECC"), Color(hex: "1A2E8A"), Color(hex: "0C1640")]
-            : [Color(hex: "E6EEFB"), Color(hex: "D5E0F2"), Color(hex: "C8D6EA")]
+        AppBackgroundStyle.goIsland.gradientColors(for: colorScheme)
     }
 
     var body: some View {
@@ -173,15 +171,15 @@ private struct CleanBlueGrayBackground: View {
         ZStack {
             LinearGradient(
                 colors: colorScheme == .dark
-                    ? [Color(hex: "0C1640"), Color(hex: "152560"), Color(hex: "081126")]
-                    : [Color(hex: "E1EBFA"), Color(hex: "D1DDEC"), Color(hex: "BFCDD8")],
+                    ? [Color(hex: "111318"), Color(hex: "1A1E25"), Color(hex: "090B10")]
+                    : [Color(hex: "F1F4F8"), Color(hex: "E5EAF0"), Color(hex: "D7DFE8")],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
             .ignoresSafeArea()
 
             Circle()
-                .fill(Color.goBlue.opacity(colorScheme == .dark ? 0.16 : 0.14))
+                .fill(Color(hex: "64748B").opacity(colorScheme == .dark ? 0.16 : 0.12))
                 .frame(width: 280)
                 .blur(radius: 90)
                 .offset(x: 110, y: -180)
@@ -231,8 +229,8 @@ private struct CustomPhotoBackground: View {
         ZStack {
             LinearGradient(
                 colors: colorScheme == .dark
-                    ? [Color(hex: "020617").opacity(0.76), Color(hex: "0F172A").opacity(0.70), Color.arkInk.opacity(0.78)]
-                    : [Color(hex: "DDE8F6").opacity(0.68), Color(hex: "C7D4E7").opacity(0.62), Color(hex: "AEBFD4").opacity(0.58)],
+                    ? [Color(hex: "020617").opacity(0.76), Color(hex: "111827").opacity(0.70), Color.arkInk.opacity(0.78)]
+                    : [Color(hex: "F1F5F9").opacity(0.70), Color(hex: "E2E8F0").opacity(0.64), Color(hex: "CBD5E1").opacity(0.58)],
                 startPoint: .top,
                 endPoint: .bottom
             )
@@ -261,17 +259,17 @@ private struct DeepAmbientBackground: View {
                 LinearGradient(
                     colors: isDark
                         ? [Color(hex: "030712"), Color(hex: "0F172A"), Color(hex: "111827")]
-                        : [Color(hex: "E6EAFB"), Color(hex: "D8DDF4"), Color(hex: "C8D0EA")],
+                        : [Color(hex: "EEF1F7"), Color(hex: "E3E7F0"), Color(hex: "D4DAE6")],
                     startPoint: .topLeading,
                     endPoint: .bottomTrailing
                 )
                 .ignoresSafeArea()
 
                 Circle()
-                    .fill(Color(hex: isDark ? "1D4ED8" : "93C5FD"))
+                    .fill(Color(hex: isDark ? "334155" : "CBD5E1"))
                     .frame(width: min(geo.size.width * 0.8, 600))
                     .blur(radius: 100)
-                    .opacity(isDark ? 0.40 : 0.30)
+                    .opacity(isDark ? 0.30 : 0.24)
                     .offset(
                         x: isAnimating ? 150 : -100,
                         y: isAnimating ? -120 : 80
@@ -282,7 +280,7 @@ private struct DeepAmbientBackground: View {
                     .fill(Color(hex: isDark ? "6D28D9" : "C4B5FD"))
                     .frame(width: min(geo.size.width * 0.7, 500))
                     .blur(radius: 100)
-                    .opacity(isDark ? 0.35 : 0.28)
+                    .opacity(isDark ? 0.28 : 0.20)
                     .offset(
                         x: isAnimating ? -150 : 80,
                         y: isAnimating ? 120 : -100
@@ -290,10 +288,10 @@ private struct DeepAmbientBackground: View {
                     .scaleEffect(isAnimating ? 1.4 : 0.8)
 
                 Circle()
-                    .fill(Color(hex: isDark ? "0369A1" : "67E8F9"))
+                    .fill(Color(hex: isDark ? "0E7490" : "BAE6FD"))
                     .frame(width: min(geo.size.width * 0.9, 700))
                     .blur(radius: 120)
-                    .opacity(isDark ? 0.40 : 0.22)
+                    .opacity(isDark ? 0.24 : 0.14)
                     .offset(
                         x: isAnimating ? 100 : -120,
                         y: isAnimating ? 150 : -100
@@ -301,10 +299,10 @@ private struct DeepAmbientBackground: View {
                     .scaleEffect(isAnimating ? 1.2 : 0.9)
 
                 Circle()
-                    .fill(Color(hex: isDark ? "4338CA" : "818CF8"))
+                    .fill(Color(hex: isDark ? "3730A3" : "C7D2FE"))
                     .frame(width: min(geo.size.width * 0.8, 600))
                     .blur(radius: 100)
-                    .opacity(isDark ? 0.35 : 0.24)
+                    .opacity(isDark ? 0.24 : 0.16)
                     .offset(
                         x: isAnimating ? -120 : 140,
                         y: isAnimating ? -140 : 110
@@ -428,7 +426,7 @@ struct GoIslandWizardBackdrop: View {
     var body: some View {
         ZStack {
             LinearGradient(
-                colors: [Color(hex: "2D4ECC"), Color(hex: "1A2E8A"), Color(hex: "0C1640")],
+                colors: AppBackgroundStyle.goIsland.gradientColors(for: .dark),
                 startPoint: .top,
                 endPoint: .bottom
             )
@@ -444,10 +442,10 @@ struct GoIslandWizardBackdrop: View {
                         .offset(x: blobPulse ? -50 : -70, y: blobPulse ? -70 : -90)
 
                     Circle()
-                        .fill(Color(hex: "5B6AFF"))
+                        .fill(Color(hex: "64748B"))
                         .frame(width: 300, height: 300)
                         .blur(radius: 90)
-                        .opacity(shouldReduceWork ? 0.20 : 0.40)
+                        .opacity(shouldReduceWork ? 0.14 : 0.26)
                         .offset(x: blobPulse ? geo.size.width - 80 : geo.size.width - 100,
                                 y: blobPulse ? 180 : 220)
 

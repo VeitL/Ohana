@@ -50,15 +50,15 @@ struct DesignSpecPaletteV4 {
     var background: Color {
         if isDark {
             switch selection.background {
-            case "deep": Color(hex: "100B2E")
+            case "deep": Color(hex: "111827")
             case "plain": Color(hex: "10131A")
-            default: Color.goDeepNavy
+            default: Color(hex: "080B12")
             }
         } else {
             switch selection.background {
-            case "soft": Color(hex: "F4F7FF")
+            case "soft": Color(hex: "F5F7FA")
             case "plain": Color(hex: "F7F8FB")
-            default: Color(hex: "EEF2FF")
+            default: Color(hex: "EEF2F7")
             }
         }
     }

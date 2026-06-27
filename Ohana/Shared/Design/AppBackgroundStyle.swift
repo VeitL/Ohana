@@ -8,7 +8,7 @@ import SwiftUI
 // MARK: - 背景风格枚举
 enum AppBackgroundStyle: String, CaseIterable, Identifiable {
     case goDefault = "go_default"
-    /// GO Focus 首页同款：深蓝竖向渐变，可在子页复用。
+    /// GO Focus 首页同款：冷静岛屿底色，可在子页复用。
     case goIsland = "go_island"
     case cleanBlueGray = "clean_blue_gray"
     case deepAmbient = "deep_ambient"
@@ -75,7 +75,7 @@ enum AppBackgroundStyle: String, CaseIterable, Identifiable {
     func localizedName(_ lang: String) -> String {
         switch self {
         case .goIsland:
-            L10n(lang).tr(zh: "岛屿蓝", en: "Island Blue", de: "Inselblau")
+            L10n(lang).tr(zh: "岛屿雾灰", en: "Island Mist", de: "Inselnebel")
         case .cleanBlueGray:
             L10n(lang).tr(zh: "清爽天空", en: "Clear Sky", de: "Klarer Himmel")
         case .paperCream:
@@ -110,9 +110,9 @@ enum AppBackgroundStyle: String, CaseIterable, Identifiable {
     func localizedSubtitle(_ lang: String) -> String {
         switch self {
         case .goIsland:
-            L10n(lang).tr(zh: "浅色蓝灰，深色深海", en: "Blue-gray light, deep ocean dark", de: "Blaugrau hell, Tiefsee dunkel")
+            L10n(lang).tr(zh: "冷静雾灰，保留一点岛屿蓝", en: "Calm mist gray with a hint of island blue", de: "Ruhiges Nebelgrau mit etwas Inselblau")
         case .cleanBlueGray:
-            L10n(lang).tr(zh: "干净、冷静、适合日常", en: "Clean, calm, daily-use friendly", de: "Klar, ruhig, alltagstauglich")
+            L10n(lang).tr(zh: "更少蓝色、更适合日常", en: "Less blue, easier for daily use", de: "Weniger Blau, angenehmer im Alltag")
         case .paperCream:
             L10n(lang).tr(zh: "温暖柔和，阅读舒适", en: "Warm, soft, comfortable to read", de: "Warm, weich, angenehm lesbar")
         case .forestGlade:
@@ -146,16 +146,16 @@ enum AppBackgroundStyle: String, CaseIterable, Identifiable {
         switch self {
         case .goDefault:
             colorScheme == .dark
-                ? [Color(hex: "0A0A0C"), .goPrimary, .goBlue]
-                : [Color(hex: "E7EFFC"), Color(hex: "D6E2F4"), Color(hex: "C8D8EF")]
+                ? [Color(hex: "0A0A0C"), Color(hex: "151923"), Color(hex: "10131A")]
+                : [Color(hex: "F3F6FA"), Color(hex: "E7ECF3"), Color(hex: "D9E1EA")]
         case .goIsland:
             colorScheme == .dark
-                ? [Color(hex: "2D4ECC"), Color(hex: "1A2E8A"), Color(hex: "0C1640")]
-                : [Color(hex: "E6EEFB"), Color(hex: "D5E0F2"), Color(hex: "C8D6EA")]
+                ? [Color(hex: "171A24"), Color(hex: "111622"), Color(hex: "080B12")]
+                : [Color(hex: "EEF2F7"), Color(hex: "E5EBF2"), Color(hex: "D9E1EA")]
         case .cleanBlueGray:
             colorScheme == .dark
-                ? [Color(hex: "0C1640"), Color(hex: "152560"), Color(hex: "081126")]
-                : [Color(hex: "E1EBFA"), Color(hex: "D1DDEC"), Color(hex: "BFCDD8")]
+                ? [Color(hex: "111318"), Color(hex: "1A1E25"), Color(hex: "090B10")]
+                : [Color(hex: "F1F4F8"), Color(hex: "E5EAF0"), Color(hex: "D7DFE8")]
         case .paperCream:
             colorScheme == .dark
                 ? [Color(hex: "1C1917"), Color(hex: "292524"), Color(hex: "1C1917")]
@@ -166,8 +166,8 @@ enum AppBackgroundStyle: String, CaseIterable, Identifiable {
                 : [Color(hex: "E2F0E8"), Color(hex: "D0E3D8"), Color(hex: "BFD5CB")]
         case .deepAmbient:
             colorScheme == .dark
-                ? [Color(hex: "030712"), Color(hex: "1D4ED8"), Color(hex: "6D28D9")]
-                : [Color(hex: "E6EAFB"), Color(hex: "D8DDF4"), Color(hex: "C8D0EA")]
+                ? [Color(hex: "030712"), Color(hex: "1A1F2B"), Color(hex: "2D2A4A")]
+                : [Color(hex: "EEF1F7"), Color(hex: "E3E7F0"), Color(hex: "D4DAE6")]
         case .aurora:
             colorScheme == .dark
                 ? [Color(hex: "020617"), Color(hex: "0F766E"), Color(hex: "312E81")]
@@ -210,8 +210,8 @@ enum AppBackgroundStyle: String, CaseIterable, Identifiable {
                 : [Color(hex: "D8DEE8"), Color(hex: "C8D1DD"), Color(hex: "B7C1CF")]
         case .customPhoto:
             colorScheme == .dark
-                ? [Color(hex: "0F172A"), Color.goPrimary, Color(hex: "94A3B8")]
-                : [Color(hex: "DDE8F6"), Color(hex: "BFD0E6"), Color(hex: "91A8C3")]
+                ? [Color(hex: "111827"), Color(hex: "1F2937"), Color(hex: "475569")]
+                : [Color(hex: "F1F5F9"), Color(hex: "E2E8F0"), Color(hex: "CBD5E1")]
         }
     }
 
