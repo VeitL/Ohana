@@ -552,6 +552,7 @@ struct QuickWaterDetailSheet: View {
             }
         }
         .buttonStyle(ScaleButtonStyle())
+        .accessibilityIdentifier(mode == .manual ? "quick-water-mode-manual" : "quick-water-mode-plan")
         .zIndex(selected ? 1 : 0)
     }
 

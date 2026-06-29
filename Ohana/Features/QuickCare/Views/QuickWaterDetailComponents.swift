@@ -1047,6 +1047,7 @@ struct WaterPlanSettingsSheet: View {
                             .background(Color.ohanaCardSurface, in: Capsule())
                     }
                     .buttonStyle(ScaleButtonStyle())
+                    .accessibilityIdentifier("quick-water-plan-delete-action")
 
                     Button {
                         onSave()
@@ -1059,12 +1060,14 @@ struct WaterPlanSettingsSheet: View {
                             .background(tint, in: Capsule())
                     }
                     .buttonStyle(ScaleButtonStyle())
+                    .accessibilityIdentifier("quick-water-plan-save-action")
                 }
             }
             .padding(.horizontal, 18)
             .padding(.top, 18)
             .padding(.bottom, 16)
         }
+        .accessibilityIdentifier("quick-water-plan-settings-sheet")
     }
 
     private func time(at index: Int) -> Date {

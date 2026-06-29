@@ -697,6 +697,62 @@ final class OhanaUITests: XCTestCase {
     }
 
     @MainActor
+    func testPetWaterPlanCalendarEventAppearsAndDeletesFromQuickCareDetail() throws {
+        let app = launchEnglishApp(enableProductionOverlays: true)
+        let humanName = createFirstHuman(from: app)
+        let petName = "Codex Water Calendar Pet \(Int(Date().timeIntervalSince1970))"
+        let waterEventTitles = [
+            "Water \(petName)",
+            "\(petName) 喂水",
+            "\(petName) Wasser geben"
+        ]
+        completeFirstDayStarterFunnel(
+            in: app,
+            petName: petName,
+            completionMessage: "Creating the first pet did not leave the pet creation handoff in time."
+        )
+
+        openPetWaterDetailFromHome(in: app, petName: petName, humanName: humanName)
+        tapWhenHittable(app.buttons["quick-water-mode-plan"], timeout: 8)
+        XCTAssertTrue(
+            app.descendants(matching: .any)["quick-water-plan-settings-sheet"].waitForExistence(timeout: 10),
+            "Water plan settings did not open before Calendar sync setup."
+        )
+        tapWhenHittable(app.buttons["quick-water-plan-save-action"], timeout: 8)
+        XCTAssertTrue(
+            waitUntil(timeout: 12) {
+                !app.descendants(matching: .any)["quick-water-plan-settings-sheet"].exists
+            },
+            "Water plan settings stayed open after saving the Calendar-backed plan."
+        )
+        closeCurrentSheetToHome(in: app, humanName: humanName)
+
+        openCalendarTab(in: app, petName: petName)
+        tapWhenHittable(app.buttons["calendar-filter-pet-\(petName)"], timeout: 8)
+        assertCalendarEventAny(of: waterEventTitles, exists: true, in: app, context: "water plan save calendar readback")
+
+        closeCurrentSheetToHome(in: app, humanName: humanName)
+        openPetWaterDetailFromHome(in: app, petName: petName, humanName: humanName)
+        tapWhenHittable(app.buttons["quick-water-settings-action"], timeout: 8)
+        XCTAssertTrue(
+            app.descendants(matching: .any)["quick-water-plan-settings-sheet"].waitForExistence(timeout: 10),
+            "Water plan settings did not reopen before deleting the Calendar-backed plan."
+        )
+        tapWhenHittable(app.buttons["quick-water-plan-delete-action"], timeout: 8)
+        XCTAssertTrue(
+            waitUntil(timeout: 12) {
+                !app.descendants(matching: .any)["quick-water-plan-settings-sheet"].exists
+            },
+            "Water plan settings stayed open after switching back to manual."
+        )
+        closeCurrentSheetToHome(in: app, humanName: humanName)
+
+        openCalendarTab(in: app, petName: petName)
+        tapWhenHittable(app.buttons["calendar-filter-pet-\(petName)"], timeout: 8)
+        assertCalendarEventAny(of: waterEventTitles, exists: false, in: app, context: "water plan delete calendar readback")
+    }
+
+    @MainActor
     func testPetFeatureHubDailyAndHealthRoutesOpenAndCancel() throws {
         let app = launchEnglishApp(enableProductionOverlays: true)
         let humanName = createFirstHuman(from: app)
