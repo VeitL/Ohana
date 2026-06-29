@@ -646,6 +646,57 @@ final class OhanaUITests: XCTestCase {
     }
 
     @MainActor
+    func testPetWaterCareRewardAppearsInBondVaultLedger() throws {
+        let app = launchEnglishApp(enableProductionOverlays: true)
+        let humanName = createFirstHuman(from: app)
+        let petName = "Codex Water Reward Pet \(Int(Date().timeIntervalSince1970))"
+        completeFirstDayStarterFunnel(
+            in: app,
+            petName: petName,
+            completionMessage: "Creating the first pet did not leave the pet creation handoff in time."
+        )
+
+        openPetWaterDetailFromHome(in: app, petName: petName, humanName: humanName)
+        let logAction = app.buttons["quick-water-log-action"]
+        scrollToElement(logAction, in: app, maxSwipes: 5)
+        tapWhenHittable(logAction, timeout: 8)
+        XCTAssertTrue(
+            app.descendants(matching: .any)
+                .matching(NSPredicate(format: "identifier BEGINSWITH %@", "quick-water-log-row-watering-"))
+                .firstMatch
+                .waitForExistence(timeout: 18),
+            "Water record did not appear before checking the Bond Vault reward ledger."
+        )
+        closeCurrentSheetToHome(in: app, humanName: humanName)
+
+        openPetFeatureHubFromHome(in: app, petName: petName, humanName: humanName)
+        let bondVaultTile = app.buttons["feature-hub-finance-bondVault"]
+        scrollToElement(bondVaultTile, in: app, maxSwipes: 6)
+        XCTAssertTrue(
+            bondVaultTile.waitForExistence(timeout: 12),
+            "Pet feature hub did not expose the Bond Vault tile after water care."
+        )
+        tapWhenHittable(bondVaultTile, timeout: 8)
+
+        XCTAssertTrue(
+            app.descendants(matching: .any)["pet-bond-vault-screen"].waitForExistence(timeout: 18),
+            "Pet Bond Vault did not open after recording water care."
+        )
+        let balance = app.staticTexts["pet-bond-vault-balance"]
+        XCTAssertTrue(balance.waitForExistence(timeout: 8), "Pet Bond Vault balance did not appear after water care.")
+        XCTAssertTrue(
+            waitUntil(timeout: 12) {
+                (Int(numericLabel(balance.label)) ?? 0) > 0
+            },
+            "Recording water care did not surface a positive pet bond coconut balance in Bond Vault."
+        )
+        XCTAssertTrue(
+            app.staticTexts["pet-bond-vault-recent-log"].waitForExistence(timeout: 8),
+            "Recording water care did not create a visible pet Bond Vault recent economy log."
+        )
+    }
+
+    @MainActor
     func testPetFeatureHubDailyAndHealthRoutesOpenAndCancel() throws {
         let app = launchEnglishApp(enableProductionOverlays: true)
         let humanName = createFirstHuman(from: app)
