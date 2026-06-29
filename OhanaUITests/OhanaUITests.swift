@@ -1242,6 +1242,29 @@ final class OhanaUITests: XCTestCase {
     }
 
     @MainActor
+    func testPetCalendarWeightEventRowOpensWeightDetail() throws {
+        let app = launchEnglishApp(enableProductionOverlays: true)
+        _ = createFirstHuman(from: app)
+        let timestamp = Int(Date().timeIntervalSince1970)
+        let petName = "Codex Calendar Weight Pet \(timestamp)"
+        let petEventTitle = "Codex weight reminder \(timestamp)"
+        completeFirstDayStarterFunnel(
+            in: app,
+            petName: petName,
+            completionMessage: "Creating the first pet did not leave the pet creation handoff in time."
+        )
+
+        openCalendarTab(in: app, petName: petName)
+        addCalendarEvent(title: petEventTitle, linkedPetName: petName, in: app)
+        tapCalendarEvent(petEventTitle, in: app)
+
+        XCTAssertTrue(
+            app.descendants(matching: .any)["pet-weight-detail-screen"].waitForExistence(timeout: 18),
+            "Tapping a pet-linked weight calendar event did not deep-link to the pet Weight detail route."
+        )
+    }
+
+    @MainActor
     func testPetCalendarHealthEventRowOpensHealthDetail() throws {
         let app = launchEnglishApp(enableProductionOverlays: true)
         _ = createFirstHuman(from: app)

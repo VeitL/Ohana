@@ -43,5 +43,6 @@ struct WeightHistoryView: View {
             }
         }
         .toolbar(.hidden, for: .navigationBar)
+        .accessibilityIdentifier("pet-weight-detail-screen")
     }
 }
