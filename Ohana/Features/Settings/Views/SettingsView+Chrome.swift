@@ -28,6 +28,25 @@ extension SettingsView {
                 .buttonStyle(ScaleButtonStyle())
                 .accessibilityLabel(l.tr(zh: "Debug 椰子", en: "Debug Coconuts", de: "Debug-Kokosnüsse"))
                 .accessibilityIdentifier("settings-debug-coconuts-shortcut")
+
+                if SettingsDebugTools.isRunningUITests {
+                    Button {
+                        applyUITestRewardTierShortcut()
+                    } label: {
+                        Image(systemName: "bag.fill") // a11y: allow decorative icon covered by surrounding label
+                            .font(OhanaFont.adaptive(size: 13, weight: .black))
+                            .foregroundStyle(Color.goPrimary)
+                            .frame(width: 44, height: 44)
+                            .background(Color.ohanaControlFill, in: Capsule())
+                    }
+                    .buttonStyle(ScaleButtonStyle())
+                    .accessibilityLabel(l.tr(
+                        zh: "Debug 奖励层",
+                        en: "Debug Reward Tier",
+                        de: "Debug-Belohnungsstufe"
+                    ))
+                    .accessibilityIdentifier("settings-debug-reward-tier-shortcut")
+                }
             }
             Button { closeSettings() } label: {
                 Image(systemName: "xmark") // a11y: allow decorative icon covered by surrounding text or control

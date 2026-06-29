@@ -787,6 +787,7 @@ private struct VerticalSolidHomeHomeFabShortcutButton: View {
         }
         .buttonStyle(ScaleButtonStyle())
         .accessibilityLabel(shortcut.label)
+        .accessibilityIdentifier("home-fab-shortcut-\(shortcut.accessibilityIdentifierFragment)")
     }
 
     private var iconActionType: String {
@@ -797,5 +798,33 @@ private struct VerticalSolidHomeHomeFabShortcutButton: View {
             return "calendar"
         }
         return shortcut.id
+    }
+}
+
+private extension HomeFabFunctionShortcut {
+    var accessibilityIdentifierFragment: String {
+        if let destination {
+            switch destination {
+            case let .featureAggregate(feature):
+                return "feature-\(feature.rawValue)"
+            case .calendar:
+                return "calendar"
+            case .coconutShop:
+                return "coconutShop"
+            case .gacha:
+                return "gacha"
+            case .wealthDashboard:
+                return "wealth"
+            case .familyWeeklyReport:
+                return "weeklyReport"
+            case .careLedgerAnalysis:
+                return "careLedgerAnalysis"
+            case .reminderObservability:
+                return "reminderObservability"
+            default:
+                break
+            }
+        }
+        return "more"
     }
 }

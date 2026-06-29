@@ -80,7 +80,8 @@ struct FunctionMenuRootView: View {
                                         iconColor: entry.color,
                                         title: entry.title,
                                         status: compactSubtitle(for: entry.subtitle),
-                                        showsNewFeature: showsPendingDestination(entry.destination)
+                                        showsNewFeature: showsPendingDestination(entry.destination),
+                                        accessibilityIdentifier: "function-menu-tool-\(entry.id)"
                                     ) {
                                         select(entry.destination)
                                     }
@@ -255,6 +256,7 @@ struct FunctionMenuRootView: View {
         title: String,
         status: String,
         showsNewFeature: Bool = false,
+        accessibilityIdentifier: String? = nil,
         action: @escaping () -> Void
     ) -> some View {
         Button(action: action) {
@@ -294,6 +296,7 @@ struct FunctionMenuRootView: View {
             .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous))
         }
         .buttonStyle(ScaleButtonStyle())
+        .accessibilityIdentifier(accessibilityIdentifier ?? "function-menu-tile-\(title)")
     }
 
     private func sectionHeader(icon: String, title: String, label: String) -> some View {

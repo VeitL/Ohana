@@ -14,6 +14,7 @@ extension CoconutShopView {
                     Text(l.tr(zh: "椰子商店", en: "Coconut Shop", de: "Kokosnuss-Shop"))
                         .font(OhanaFont.title(.black))
                         .foregroundStyle(primaryText)
+                        .accessibilityIdentifier("coconut-shop-screen")
                     Text(l.tr(zh: "买断外观、植物装饰、称号和 App Icon。", en: "Unlock looks, plant decor, titles, and App Icons.", de: "Schalte Looks, Pflanzendeko, Titel und App Icons frei."))
                         .font(OhanaFont.caption(.semibold))
                         .foregroundStyle(secondaryText)
@@ -35,16 +36,34 @@ extension CoconutShopView {
             }
 
             HStack(spacing: 18) {
-                metric(label: l.tr(zh: "本人余额", en: "My balance", de: "Mein Guthaben"), value: "\(currentHumanBalance)", suffix: "🥥", tint: Color.goYellow)
-                metric(label: l.tr(zh: "已拥有", en: "Owned", de: "Besitzt"), value: "\(ownedCount)", suffix: "", tint: Color.goPrimary)
+                metric(
+                    label: l.tr(zh: "本人余额", en: "My balance", de: "Mein Guthaben"),
+                    value: "\(currentHumanBalance)",
+                    suffix: "🥥",
+                    tint: Color.goYellow,
+                    accessibilityIdentifier: "coconut-shop-current-human-balance"
+                )
+                metric(
+                    label: l.tr(zh: "已拥有", en: "Owned", de: "Besitzt"),
+                    value: "\(ownedCount)",
+                    suffix: "",
+                    tint: Color.goPrimary,
+                    accessibilityIdentifier: "coconut-shop-owned-count"
+                )
                 if CoconutExchangeFeatureGate.isEnabled {
-                    metric(label: l.tr(zh: "待确认", en: "Pending", de: "Offen"), value: "\(incomingPendingExchanges.count)", suffix: "", tint: Color.goTeal)
+                    metric(
+                        label: l.tr(zh: "待确认", en: "Pending", de: "Offen"),
+                        value: "\(incomingPendingExchanges.count)",
+                        suffix: "",
+                        tint: Color.goTeal,
+                        accessibilityIdentifier: nil
+                    )
                 }
             }
         }
     }
 
-    func metric(label: String, value: String, suffix: String, tint: Color) -> some View {
+    func metric(label: String, value: String, suffix: String, tint: Color, accessibilityIdentifier: String?) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(label)
                 .font(OhanaFont.caption2(.bold))
@@ -65,6 +84,10 @@ extension CoconutShopView {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(label)
+        .accessibilityValue("\(value)\(suffix)")
+        .accessibilityIdentifier(accessibilityIdentifier ?? "coconut-shop-metric-\(label)")
     }
 
     var selectedAppIconShortName: String {
@@ -95,6 +118,7 @@ extension CoconutShopView {
                         .background(selectedCategory == category ? Color.goPrimary : Color.ohanaControlFill, in: Capsule())
                     }
                     .buttonStyle(ScaleButtonStyle())
+                    .accessibilityIdentifier("coconut-shop-category-\(category.rawValue)")
                 }
             }
             .padding(.horizontal, 20)

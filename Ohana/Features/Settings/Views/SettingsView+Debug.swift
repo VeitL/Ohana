@@ -33,6 +33,18 @@ extension SettingsView {
                 openCoconutBalanceDebugTool()
             }
             .accessibilityIdentifier("settings-debug-coconuts")
+
+            if SettingsDebugTools.isRunningUITests {
+                settingsRow(
+                    icon: "bag.fill",
+                    title: l.tr(zh: "Debug 奖励层", en: "Debug Reward Tier", de: "Debug-Belohnungsstufe"),
+                    subtitle: l.tr(zh: "解锁商店/奖励层 GUI 测试", en: "Unlock shop/reward GUI tests", de: "Shop-/Belohnungs-GUI-Tests freischalten"),
+                    iconColor: Color.goPrimary
+                ) {
+                    applyUITestRewardTierShortcut()
+                }
+                .accessibilityIdentifier("settings-debug-reward-tier")
+            }
         }
         .accessibilityIdentifier("settings-debug-section")
     }
@@ -66,6 +78,15 @@ extension SettingsView {
             )
         }
         currentActiveHumanId = result.humanID?.uuidString ?? currentActiveHumanId
+        closeSettings()
+    }
+
+    func applyUITestRewardTierShortcut() {
+        #if DEBUG
+            OasisTreeManagerRegistry.current.setEnergyForTesting(
+                injectedEnergy: OasisTreeManager.levelStartThreshold(forRawLevel: 6)
+            )
+        #endif
         closeSettings()
     }
 

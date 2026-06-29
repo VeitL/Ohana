@@ -28,14 +28,14 @@ final class PlantModuleUITests: XCTestCase {
         addPlantFromHomePlantsTab(named: plantName, in: app)
         assertHomePlantCard(named: plantName, in: app)
 
-        openPlantDetail(named: plantName, in: app)
-        exercisePlantDetailCareAndDeleteUndo(named: plantName, in: app)
-        returnFromPlantDetailToHome(in: app)
-
         openPlantReminderSettingsAndTogglePlant(named: plantName, in: app)
         closeSettingsToHome(in: app)
 
         openCalendarAndAssertPlantVisible(named: plantName, in: app)
+
+        openPlantDetail(named: plantName, in: app)
+        exercisePlantDetailCareAndDeleteUndo(named: plantName, in: app)
+        returnFromPlantDetailToHome(in: app)
 
         openPlantDetail(named: plantName, in: app)
         permanentlyDeletePlant(named: plantName, in: app)
@@ -163,6 +163,7 @@ final class PlantModuleUITests: XCTestCase {
         dismissKeyboardIfPresent(in: app)
         tapWhenFrameReady(app.buttons["add-plant-catalog-result-epipremnum-aureum"], timeout: 8)
         typeText("Living room", intoTextField: "add-plant-room-input", in: app)
+        dismissKeyboardIfPresent(in: app)
         typeText("South window", intoTextField: "add-plant-location-input", in: app)
         dismissKeyboardIfPresent(in: app)
 
@@ -401,7 +402,7 @@ final class PlantModuleUITests: XCTestCase {
             let actionLabel = creationPrimary.label
             tapWhenHittable(creationPrimary, timeout: 8)
             if actionLabel.contains("Join Island") || actionLabel.contains("加入岛屿") || actionLabel.contains("Insel beitreten") {
-                if waitUntil(timeout: 4, condition: { !creationPrimary.exists || !creationPrimary.isEnabled }) {
+                if waitUntil(timeout: 4, condition: { !creationPrimary.exists }) {
                     didTapFinalSave = true
                     break
                 }
@@ -441,8 +442,12 @@ final class PlantModuleUITests: XCTestCase {
         scrollToElement(field, in: app, maxSwipes: 8)
         scrollElementAboveKeyboardIfNeeded(field, in: app)
         XCTAssertTrue(tapWhenFrameReady(field, timeout: 8), "Text field did not become tappable: \(identifier)")
-        XCTAssertTrue(waitForKeyboardFocus(on: field, timeout: 4), "Text field did not receive keyboard focus: \(identifier)")
+        XCTAssertTrue(
+            waitForKeyboardFocus(on: field, timeout: 2) || app.keyboards.firstMatch.waitForExistence(timeout: 2),
+            "Text field did not receive keyboard input readiness: \(identifier)"
+        )
         field.typeText(text)
+        XCTAssertTrue(waitForTextField(field, toContain: text, timeout: 4), "Text field did not accept typed text: \(identifier)")
     }
 
     @MainActor
@@ -495,6 +500,13 @@ final class PlantModuleUITests: XCTestCase {
     private func waitForKeyboardFocus(on element: XCUIElement, timeout: TimeInterval) -> Bool {
         waitUntil(timeout: timeout) {
             element.value(forKey: "hasKeyboardFocus") as? Bool == true
+        }
+    }
+
+    private func waitForTextField(_ element: XCUIElement, toContain text: String, timeout: TimeInterval) -> Bool {
+        waitUntil(timeout: timeout) {
+            let currentValue = String(describing: element.value ?? "")
+            return currentValue.contains(text)
         }
     }
 

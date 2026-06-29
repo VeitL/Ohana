@@ -9,36 +9,37 @@ import SwiftUI
 extension CoconutShopView {
     func shopItemCard(_ item: ShopItem) -> some View {
         let state = itemState(item)
-        return Button {
-            handleItemTap(item)
-        } label: {
-            VStack(alignment: .leading, spacing: 10) {
-                itemPreview(item)
-                    .frame(height: previewHeight(for: item))
-                    .frame(maxWidth: .infinity)
+        return VStack(alignment: .leading, spacing: 10) {
+            itemPreview(item)
+                .frame(height: previewHeight(for: item))
+                .frame(maxWidth: .infinity)
 
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack(spacing: 6) {
-                        Text(item.name(l))
-                            .font(OhanaFont.subheadline(.black))
-                            .foregroundStyle(primaryText)
-                            .lineLimit(1)
-                        if state.isEquipped {
-                            Image(systemName: "checkmark.seal.fill") // a11y: allow decorative icon covered by surrounding text or control
-                                .font(OhanaFont.adaptive(size: 13, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                                .foregroundStyle(Color.goPrimary)
-                        }
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 6) {
+                    Text(item.name(l))
+                        .font(OhanaFont.subheadline(.black))
+                        .foregroundStyle(primaryText)
+                        .lineLimit(1)
+                    if state.isEquipped {
+                        Image(systemName: "checkmark.seal.fill") // a11y: allow decorative icon covered by surrounding text or control
+                            .font(OhanaFont.adaptive(size: 13, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                            .foregroundStyle(Color.goPrimary)
                     }
-
-                    Text(item.description(l))
-                        .font(OhanaFont.caption2(.semibold))
-                        .foregroundStyle(tertiaryText)
-                        .lineLimit(2)
-                        .fixedSize(horizontal: false, vertical: true)
                 }
 
-                Spacer(minLength: 0)
+                Text(item.description(l))
+                    .font(OhanaFont.caption2(.semibold))
+                    .foregroundStyle(tertiaryText)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
 
+            Spacer(minLength: 0)
+
+            Button {
+                guard !state.isDisabled else { return }
+                handleItemTap(item)
+            } label: {
                 HStack(spacing: 8) {
                     Text(state.label)
                         .font(OhanaFont.caption(.black))
@@ -54,20 +55,29 @@ extension CoconutShopView {
                             .foregroundStyle(canAfford(item) ? Color.goYellow : tertiaryText)
                     }
                 }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 9)
+                .background(
+                    state.tint.opacity(colorScheme == .dark ? 0.18 : 0.12),
+                    in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous)
+                )
+                .contentShape(RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
             }
-            .padding(12)
-            .frame(maxWidth: .infinity, minHeight: item.category == .appIcon ? 214 : 198, alignment: .topLeading)
-            .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous)
-                    .strokeBorder(state.isEquipped ? Color.goPrimary.opacity(0.52) : Color.clear, lineWidth: 1.5)
-            }
-            .ohanaMarchingBorder(accent: state.tint, cornerRadius: OhanaRadius.cardSoft, isActive: state.isEquipped)
-            .ohanaShine(trigger: state.isEquipped, cornerRadius: OhanaRadius.cardSoft, isEnabled: state.isEquipped)
-            .opacity(state.isDisabled ? 0.58 : 1)
+            .buttonStyle(ScaleButtonStyle())
+            .disabled(state.isDisabled)
+            .accessibilityIdentifier("coconut-shop-item-\(item.id)")
         }
-        .buttonStyle(ScaleButtonStyle())
-        .disabled(itemState(item).isDisabled)
+        .padding(12)
+        .frame(maxWidth: .infinity, minHeight: item.category == .appIcon ? 214 : 198, alignment: .topLeading)
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous))
+        .contentShape(RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous)
+                .strokeBorder(state.isEquipped ? Color.goPrimary.opacity(0.52) : Color.clear, lineWidth: 1.5)
+        }
+        .ohanaMarchingBorder(accent: state.tint, cornerRadius: OhanaRadius.cardSoft, isActive: state.isEquipped)
+        .ohanaShine(trigger: state.isEquipped, cornerRadius: OhanaRadius.cardSoft, isEnabled: state.isEquipped)
+        .opacity(state.isDisabled ? 0.58 : 1)
     }
 
     @ViewBuilder

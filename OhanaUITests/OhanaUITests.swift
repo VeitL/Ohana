@@ -1676,6 +1676,76 @@ final class OhanaUITests: XCTestCase {
     }
 
     @MainActor
+    func testPetCoconutShopEffectPurchaseSpendsHumanBalanceFromFunctionMenu() throws {
+        let app = launchEnglishApp(enableProductionOverlays: true)
+        let humanName = createFirstHuman(from: app)
+        let petName = "Codex Shop Pet \(Int(Date().timeIntervalSince1970))"
+        completeFirstDayStarterFunnel(
+            in: app,
+            petName: petName,
+            completionMessage: "Creating the first pet did not leave the pet creation handoff in time."
+        )
+
+        openSettingsFromHomeChrome(in: app)
+        let debugCoconuts = app.buttons["settings-debug-coconuts-shortcut"].exists
+            ? app.buttons["settings-debug-coconuts-shortcut"]
+            : app.buttons["settings-debug-coconuts"]
+        XCTAssertTrue(
+            debugCoconuts.waitForExistence(timeout: 12),
+            "Settings did not expose the UI-test Debug Coconuts shortcut before the shop purchase."
+        )
+        tapWhenHittable(debugCoconuts, timeout: 8)
+        ensureHomeSurfaceVisible(in: app, humanName: humanName)
+
+        openSettingsFromHomeChrome(in: app)
+        let rewardTier = app.buttons["settings-debug-reward-tier-shortcut"].exists
+            ? app.buttons["settings-debug-reward-tier-shortcut"]
+            : app.buttons["settings-debug-reward-tier"]
+        XCTAssertTrue(
+            rewardTier.waitForExistence(timeout: 12),
+            "Settings did not expose the UI-test reward-tier shortcut for the shop route."
+        )
+        tapWhenHittable(rewardTier, timeout: 8)
+        ensureHomeSurfaceVisible(in: app, humanName: humanName)
+
+        openCoconutShopFromHomeFunctionMenu(in: app, humanName: humanName)
+
+        let balance = app.descendants(matching: .any)["coconut-shop-current-human-balance"]
+        XCTAssertTrue(balance.waitForExistence(timeout: 12), "Coconut Shop balance did not appear.")
+        XCTAssertTrue(
+            accessibilityText(for: balance).contains("1000"),
+            "Debug Coconuts did not seed the active human balance before shop purchase. Current: \(accessibilityText(for: balance))"
+        )
+
+        tapWhenHittable(app.buttons["coconut-shop-category-effect"], timeout: 8)
+        let limeGlow = app.descendants(matching: .any)["coconut-shop-item-fx_lime_glow"]
+        scrollToElement(limeGlow, in: app, maxSwipes: 4)
+        XCTAssertTrue(limeGlow.waitForExistence(timeout: 12), "Coconut Shop did not expose the Lime Glow pet effect item.")
+        tapWhenHittable(limeGlow, timeout: 8)
+        if !app.descendants(matching: .any)["coconut-shop-purchase-popup-fx_lime_glow"].waitForExistence(timeout: 2) {
+            XCTAssertTrue(
+                tapWhenFrameReady(limeGlow, offset: CGVector(dx: 0.5, dy: 0.82), timeout: 5),
+                "Coconut Shop Lime Glow item did not expose a stable tappable frame."
+            )
+        }
+
+        XCTAssertTrue(
+            app.descendants(matching: .any)["coconut-shop-purchase-popup-fx_lime_glow"].waitForExistence(timeout: 8),
+            "Tapping Lime Glow did not open the purchase confirmation popup."
+        )
+        tapWhenHittable(app.buttons["coconut-shop-confirm-purchase-fx_lime_glow"], timeout: 8)
+
+        let didSpend = waitUntil(timeout: 12) {
+            accessibilityText(for: balance).contains("700")
+        }
+        XCTAssertTrue(didSpend, "Purchasing Lime Glow did not spend 300 human coconuts through the shop GUI.")
+        XCTAssertTrue(
+            app.descendants(matching: .any)["coconut-shop-toast"].waitForExistence(timeout: 8),
+            "Coconut Shop did not show purchase feedback after the effect purchase."
+        )
+    }
+
+    @MainActor
     func testPetBasicInfoEditCancelDoesNotPersistAndSaveDoes() throws {
         let app = launchEnglishApp(enableProductionOverlays: true)
         _ = createFirstHuman(from: app)
@@ -2206,6 +2276,26 @@ final class OhanaUITests: XCTestCase {
 
         let settingsScreen = app.otherElements["settings-screen"]
         XCTAssertTrue(settingsScreen.waitForExistence(timeout: 12), "Settings screen did not open from home chrome.")
+    }
+
+    @MainActor
+    private func openCoconutShopFromHomeFunctionMenu(in app: XCUIApplication, humanName: String) {
+        closeCurrentSheetToHomeIfNeeded(in: app, humanName: humanName)
+        ensureHomeSurfaceVisible(in: app, humanName: humanName)
+
+        tapWhenHittable(app.buttons["home-primary-action"], timeout: 8)
+        let moreShortcut = app.buttons["home-fab-shortcut-more"]
+        XCTAssertTrue(moreShortcut.waitForExistence(timeout: 8), "Home FAB did not expose the More shortcut.")
+        tapWhenHittable(moreShortcut, timeout: 8)
+
+        let shopTool = app.buttons["function-menu-tool-shop"]
+        XCTAssertTrue(shopTool.waitForExistence(timeout: 14), "Function Menu did not expose the Coconut Shop tool.")
+        tapWhenHittable(shopTool, timeout: 8)
+
+        XCTAssertTrue(
+            app.descendants(matching: .any)["coconut-shop-screen"].waitForExistence(timeout: 18),
+            "Coconut Shop did not open from the Home Function Menu."
+        )
     }
 
     @MainActor
@@ -3771,6 +3861,11 @@ final class OhanaUITests: XCTestCase {
             frame.height.isFinite &&
             frame.midX.isFinite &&
             frame.midY.isFinite
+    }
+
+    private func accessibilityText(for element: XCUIElement) -> String {
+        let value = element.value.map { String(describing: $0) } ?? ""
+        return "\(element.label) \(value)"
     }
 
     private func waitUntil(timeout: TimeInterval, condition: () -> Bool) -> Bool {

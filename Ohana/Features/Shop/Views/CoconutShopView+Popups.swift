@@ -17,6 +17,7 @@ extension CoconutShopView {
             ) {
                 pendingPurchaseItem = nil
             }
+            .accessibilityIdentifier("coconut-shop-purchase-popup-\(item.id)")
 
             HStack(spacing: 12) {
                 itemPreview(item)
@@ -47,6 +48,7 @@ extension CoconutShopView {
                 .background(Color.goPrimary, in: Capsule())
             }
             .buttonStyle(ScaleButtonStyle())
+            .accessibilityIdentifier("coconut-shop-confirm-purchase-\(item.id)")
         }
     }
 
@@ -353,5 +355,6 @@ extension CoconutShopView {
             Spacer()
         }
         .padding(.horizontal, 20)
+        .accessibilityIdentifier("coconut-shop-toast")
     }
 }
