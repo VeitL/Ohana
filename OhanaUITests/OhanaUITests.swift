@@ -1252,6 +1252,78 @@ final class OhanaUITests: XCTestCase {
     }
 
     @MainActor
+    func testDeletedPetCalendarEventDoesNotOpenLiveCareRoute() throws {
+        let app = launchEnglishApp(enableProductionOverlays: true)
+        let humanName = createFirstHuman(from: app)
+        let timestamp = Int(Date().timeIntervalSince1970)
+        let petName = "Codex Deleted Calendar Pet \(timestamp)"
+        let petEventTitle = "Codex deleted water reminder \(timestamp)"
+        completeFirstDayStarterFunnel(
+            in: app,
+            petName: petName,
+            completionMessage: "Creating the first pet did not leave the pet creation handoff in time."
+        )
+
+        openCalendarTab(in: app, petName: petName)
+        addCalendarEvent(title: petEventTitle, linkedPetName: petName, in: app)
+        tapWhenHittable(app.buttons["home-tab-home"], timeout: 8)
+        ensureHomeSurfaceVisible(in: app, humanName: humanName)
+
+        openPetBasicInfoFromHome(in: app, petName: petName)
+        scrollToElement(app.buttons["pet-danger-delete-action"], in: app)
+        tapWhenHittable(app.buttons["pet-danger-delete-action"], timeout: 8)
+
+        let nameInput = app.textFields["pet-delete-confirm-name-input"]
+        XCTAssertTrue(nameInput.waitForExistence(timeout: 8), "Pet delete confirmation input did not appear before stale Calendar route check.")
+        tapWhenHittable(nameInput, timeout: 8)
+        nameInput.typeText(petName)
+
+        let finalDelete = app.buttons["pet-delete-confirm-delete"]
+        XCTAssertTrue(finalDelete.waitForExistence(timeout: 8), "Pet delete confirmation action did not appear before stale Calendar route check.")
+        XCTAssertTrue(finalDelete.isEnabled, "Pet delete action did not enable after entering the exact pet name.")
+        tapWhenHittable(finalDelete, timeout: 8)
+
+        let deletedPetCard = app.buttons.matching(NSPredicate(format: "label == %@", petName)).firstMatch
+        XCTAssertTrue(
+            waitUntil(timeout: 20) {
+                app.state == .runningForeground &&
+                    !deletedPetCard.isHittable &&
+                    isHomeSurfaceResponsive(in: app)
+            },
+            "Permanent pet deletion did not return to a responsive Home surface before stale Calendar route check."
+        )
+
+        app.terminate()
+        app.launchArguments.removeAll { $0 == "-OHANA_RESET_PERSISTENT_STATE" }
+        app.launch()
+        ensureHomeSurfaceVisible(in: app, humanName: humanName)
+
+        openCalendarTabFromHome(in: app, humanName: humanName)
+        let staleRow = app.descendants(matching: .any)["calendar-event-row-\(petEventTitle)"]
+        if !staleRow.waitForExistence(timeout: 4) {
+            scrollToElement(staleRow, in: app, maxSwipes: 4)
+        }
+        if staleRow.exists {
+            tapCalendarEvent(petEventTitle, in: app)
+            XCTAssertTrue(
+                waitUntil(timeout: 8) {
+                    app.state == .runningForeground
+                },
+                "Tapping a stale Calendar event for a deleted pet left the app unresponsive."
+            )
+            XCTAssertFalse(
+                isAnyLivePetRouteVisible(in: app),
+                "Tapping a stale Calendar event for a deleted pet opened a live care, health, walk, or economy route."
+            )
+        } else {
+            XCTAssertFalse(
+                staleRow.exists,
+                "Deleted pet Calendar event was neither cleaned up nor available for stale-route verification."
+            )
+        }
+    }
+
+    @MainActor
     func testPetMemorialMarkCancelConfirmAndUndoFlow() throws {
         let app = launchEnglishApp(enableProductionOverlays: true)
         _ = createFirstHuman(from: app)
