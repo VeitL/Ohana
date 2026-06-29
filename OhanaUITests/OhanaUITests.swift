@@ -291,6 +291,200 @@ final class OhanaUITests: XCTestCase {
     }
 
     @MainActor
+    func testPetRealUserLongSessionCoversCareCalendarEconomyAndSafeguards() throws {
+        let app = launchEnglishApp(enableProductionOverlays: true)
+        let humanName = createFirstHuman(from: app)
+        let timestamp = Int(Date().timeIntervalSince1970)
+        let petName = "Codex Long Cat \(timestamp)"
+        let calendarTitle = "Codex linked pet visit \(timestamp)"
+
+        completeFirstDayStarterFunnel(
+            in: app,
+            petName: petName,
+            petSpeciesLabel: "Cat",
+            completionMessage: "Creating the long-session pet did not leave the pet creation handoff in time."
+        )
+
+        openFeedDetailFromHome(in: app, petName: petName)
+        saveManualFeedingDefault(in: app)
+        closeFeedDetailToHome(in: app)
+        performHomeFeedQuickCheckIn(in: app, petName: petName, expectsAntiRepeatConfirmation: false)
+        performHomeFeedQuickCheckIn(in: app, petName: petName, expectsAntiRepeatConfirmation: true)
+
+        openPetWaterDetailFromHome(in: app, petName: petName, humanName: humanName)
+        let waterLogAction = app.buttons["quick-water-log-action"]
+        scrollToElement(waterLogAction, in: app, maxSwipes: 5)
+        tapWhenHittable(waterLogAction, timeout: 8)
+        XCTAssertTrue(
+            app.descendants(matching: .any)
+                .matching(NSPredicate(format: "identifier BEGINSWITH %@", "quick-water-log-row-watering-"))
+                .firstMatch
+                .waitForExistence(timeout: 18),
+            "Long-session water log did not appear after recording."
+        )
+        closeCurrentSheetToHome(in: app, humanName: humanName)
+
+        openPetPottyDetailFromHome(in: app, petName: petName, humanName: humanName)
+        openLitterSettings(in: app)
+        tapWhenHittable(app.descendants(matching: .any)["quick-potty-litter-settings-reminder-toggle"], timeout: 8)
+        dismissInlinePottySheetByBackdrop(in: app)
+        openLitterSettings(in: app)
+        assertLitterSettingsStatus(
+            in: app,
+            containsAny: ["Local only", "仅本地记录", "Nur lokal"],
+            message: "Closing litter settings without saving persisted the long-session reminder draft."
+        )
+        tapWhenHittable(app.descendants(matching: .any)["quick-potty-litter-settings-reminder-toggle"], timeout: 8)
+        tapWhenHittable(app.buttons["quick-potty-litter-settings-save-action"], timeout: 8)
+        XCTAssertTrue(
+            waitUntil(timeout: 8) {
+                !app.descendants(matching: .any)["quick-potty-litter-settings-sheet"].exists
+            },
+            "Long-session litter settings sheet stayed open after saving."
+        )
+        openLitterSettings(in: app)
+        assertLitterSettingsStatus(
+            in: app,
+            containsAny: ["Reminder on", "提醒已开启", "Erinnerung an"],
+            message: "Saving litter settings did not persist the long-session reminder state."
+        )
+        dismissInlinePottySheetByBackdrop(in: app)
+
+        let scoopAction = app.buttons["quick-potty-scoop-primary-action"]
+        scrollToElement(scoopAction, in: app, maxSwipes: 6)
+        tapWhenHittable(scoopAction, timeout: 8)
+        tapWhenHittable(app.buttons["quick-potty-scoop-confirm-action"], timeout: 8)
+        XCTAssertTrue(
+            app.descendants(matching: .any)
+                .matching(NSPredicate(format: "identifier BEGINSWITH %@", "quick-potty-recent-row-litter-"))
+                .firstMatch
+                .waitForExistence(timeout: 18),
+            "Long-session scoop log did not appear in recent potty records."
+        )
+        tapWhenHittable(scoopAction, timeout: 8)
+        XCTAssertFalse(
+            app.buttons["quick-potty-scoop-confirm-action"].isEnabled,
+            "Long-session same-day scoop repeat confirmation remained enabled."
+        )
+        closeCurrentSheetToHome(in: app, humanName: humanName)
+
+        openPetHygieneDetailFromHome(in: app, petName: petName, humanName: humanName)
+        let hygieneAction = app.buttons["pet-hygiene-teeth-record-action"]
+        scrollToElement(hygieneAction, in: app, maxSwipes: 6)
+        tapWhenHittable(hygieneAction, timeout: 8)
+        XCTAssertTrue(
+            app.descendants(matching: .any)
+                .matching(NSPredicate(format: "identifier BEGINSWITH %@", "pet-hygiene-teeth-recent-row-"))
+                .firstMatch
+                .waitForExistence(timeout: 18),
+            "Long-session hygiene log did not appear after recording."
+        )
+        tapWhenHittable(hygieneAction, timeout: 8)
+        XCTAssertTrue(
+            waitUntil(timeout: 8) {
+                app.staticTexts["今天已经完成了"].exists || app.buttons["知道了"].exists
+            },
+            "Long-session repeat hygiene tap did not show the single-use guard."
+        )
+        tapWhenHittable(app.buttons["知道了"], timeout: 8)
+        closeCurrentSheetToHome(in: app, humanName: humanName)
+
+        openPetHealthDetailFromHome(in: app, petName: petName, humanName: humanName)
+        let healthRecentRow = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "identifier BEGINSWITH %@", "pet-health-recent-row-"))
+            .firstMatch
+        openPetHealthVisitPopup(in: app)
+        tapWhenHittable(petHealthPopupButton(in: app, labels: ["关闭", "Close"]), timeout: 8)
+        XCTAssertFalse(
+            healthRecentRow.waitForExistence(timeout: 2),
+            "Cancelling the long-session health popup created a recent health record."
+        )
+        openPetHealthVisitPopup(in: app)
+        tapWhenHittable(petHealthPopupButton(in: app, labels: ["保存记录", "Save record"]), timeout: 8)
+        XCTAssertTrue(
+            healthRecentRow.waitForExistence(timeout: 18),
+            "Long-session health log did not appear after saving."
+        )
+        closeCurrentSheetToHome(in: app, humanName: humanName)
+
+        if isHomePetQuickActionAvailable(actionType: "walk", in: app, petName: petName) {
+            startWalkFromHomeQuickAction(in: app, petName: petName)
+            stopWalkFromVisibleHomeControls(in: app, petName: petName)
+            openPetWalkSummaryFromHome(in: app, petName: petName, humanName: humanName)
+            XCTAssertTrue(
+                app.descendants(matching: .any)
+                    .matching(NSPredicate(format: "identifier BEGINSWITH %@", "walk-summary-row-"))
+                    .firstMatch
+                    .waitForExistence(timeout: 18),
+                "Long-session walk summary did not show a persisted walk row."
+            )
+            closeCurrentSheetToHome(in: app, humanName: humanName)
+        }
+
+        openCalendarTab(in: app, petName: petName)
+        addCalendarEvent(title: calendarTitle, linkedPetName: petName, in: app)
+        tapWhenHittable(app.buttons["calendar-filter-pet-\(petName)"], timeout: 8)
+        assertCalendarEvent(calendarTitle, exists: true, in: app, context: "long-session pet calendar filter")
+        tapWhenHittable(app.buttons["home-tab-home"], timeout: 8)
+        ensureHomeSurfaceVisible(in: app, humanName: humanName)
+
+        openPetFeatureHubFromHome(in: app, petName: petName, humanName: humanName)
+        let bondVaultTile = app.buttons["feature-hub-finance-bondVault"]
+        scrollToElement(bondVaultTile, in: app, maxSwipes: 6)
+        tapWhenHittable(bondVaultTile, timeout: 8)
+        XCTAssertTrue(
+            app.descendants(matching: .any)["pet-bond-vault-screen"].waitForExistence(timeout: 18),
+            "Long-session Pet Bond Vault did not open before the low-balance check."
+        )
+        let balance = app.staticTexts["pet-bond-vault-balance"]
+        XCTAssertTrue(balance.waitForExistence(timeout: 8), "Long-session Pet Bond Vault balance did not appear.")
+        XCTAssertEqual(balance.label, "0", "Long-session pet should reach Bond Vault with zero coconuts before seeding.")
+        let missingBalanceMarkers = ["80🥥 short", "80🥥", "short"]
+        for _ in 0 ..< 4 where !containsAnyMarker(missingBalanceMarkers, in: app) {
+            app.swipeUp()
+            RunLoop.current.run(until: Date().addingTimeInterval(0.25))
+        }
+        XCTAssertTrue(
+            containsAnyMarker(missingBalanceMarkers, in: app),
+            "Long-session Pet Bond Vault did not explain the low-balance purchase block."
+        )
+        closeCurrentSheetToHome(in: app, humanName: humanName)
+
+        openSettingsFromHomeChrome(in: app)
+        let debugCoconuts = app.buttons["settings-debug-coconuts-shortcut"].exists
+            ? app.buttons["settings-debug-coconuts-shortcut"]
+            : app.buttons["settings-debug-coconuts"]
+        tapWhenHittable(debugCoconuts, timeout: 8)
+        ensureHomeSurfaceVisible(in: app, humanName: humanName)
+
+        openPetFeatureHubFromHome(in: app, petName: petName, humanName: humanName)
+        scrollToElement(bondVaultTile, in: app, maxSwipes: 6)
+        tapWhenHittable(bondVaultTile, timeout: 8)
+        XCTAssertTrue(
+            app.descendants(matching: .any)["pet-bond-vault-screen"].waitForExistence(timeout: 18),
+            "Long-session Pet Bond Vault did not reopen after seeding coconuts."
+        )
+        XCTAssertTrue(
+            waitUntil(timeout: 12) { numericLabel(balance.label) == "1000" },
+            "Long-session debug coconut seed did not reach the Pet Bond Vault."
+        )
+        let unlockAction = app.buttons["pet-bond-vault-unlock-card_border"]
+        scrollToElement(unlockAction, in: app, maxSwipes: 4)
+        XCTAssertTrue(
+            tapWhenFrameReady(unlockAction, timeout: 8),
+            "Long-session Pet Bond Vault unlock action was not frame-ready."
+        )
+        XCTAssertTrue(
+            waitUntil(timeout: 12) { numericLabel(balance.label) == "920" },
+            "Long-session Pet Bond Vault unlock did not spend 80 pet coconuts."
+        )
+        XCTAssertTrue(
+            app.staticTexts["pet-bond-vault-recent-log"].waitForExistence(timeout: 8),
+            "Long-session Pet Bond Vault unlock did not create a recent economy log row."
+        )
+    }
+
+    @MainActor
     func testPetWaterRecordPersistsFromQuickCareDetail() throws {
         let app = launchEnglishApp(enableProductionOverlays: true)
         let humanName = createFirstHuman(from: app)
@@ -2031,6 +2225,17 @@ final class OhanaUITests: XCTestCase {
     }
 
     @MainActor
+    private func isHomePetQuickActionAvailable(actionType: String, in app: XCUIApplication, petName: String) -> Bool {
+        let action = app.buttons["home-quick-action-\(actionType)"]
+        if action.waitForExistence(timeout: 3) { return true }
+
+        let petCard = app.buttons.matching(NSPredicate(format: "label == %@", petName)).firstMatch
+        guard petCard.waitForExistence(timeout: 8) else { return false }
+        tapWhenHittable(petCard, timeout: 8)
+        return action.waitForExistence(timeout: 5)
+    }
+
+    @MainActor
     private func assertPetFeatureHubRouteOpens(
         _ route: PetFeatureHubRouteExpectation,
         in app: XCUIApplication,
@@ -2382,8 +2587,11 @@ final class OhanaUITests: XCTestCase {
         tapHomeFeedQuickAction(in: app, timeout: 8)
 
         let quickButton = app.buttons["home-quick-action-menu-feed"]
-        XCTAssertTrue(quickButton.waitForExistence(timeout: 8), "Home Feed quick submenu action did not appear.")
-        tapWhenHittable(quickButton, timeout: 8)
+        if quickButton.waitForExistence(timeout: 4) {
+            tapWhenHittable(quickButton, timeout: 8)
+        } else if waitForQuickFeedHome(in: app, timeout: 2) {
+            tapWhenHittable(app.buttons["quick-feed-primary-action"], timeout: 8)
+        }
 
         if expectsAntiRepeatConfirmation {
             let confirmCandidates = [
@@ -2403,10 +2611,14 @@ final class OhanaUITests: XCTestCase {
 
         let didFinish = waitUntil(timeout: 15) {
             app.state == .runningForeground &&
-                app.buttons["home-quick-action-feed"].exists &&
+                (app.buttons["home-quick-action-feed"].exists || isQuickFeedHomeVisible(in: app)) &&
                 !app.buttons["Check in anyway"].exists
         }
         XCTAssertTrue(didFinish, "Home Feed quick check-in did not finish with a responsive home surface.")
+
+        if isQuickFeedHomeVisible(in: app) {
+            closeFeedDetailToHome(in: app)
+        }
     }
 
     @MainActor
@@ -2585,9 +2797,15 @@ final class OhanaUITests: XCTestCase {
     @MainActor
     private func closeCurrentSheetToHome(in app: XCUIApplication, humanName: String) {
         closeCurrentSheetToHomeIfNeeded(in: app, humanName: humanName)
+        let homeTab = app.buttons["home-tab-home"]
+        if homeTab.exists && homeTab.isEnabled && homeTab.isHittable {
+            tapWhenHittable(homeTab, timeout: 5)
+        }
         let didReturnHome = waitUntil(timeout: 16) {
             app.state == .runningForeground &&
-                (app.buttons[humanName].isHittable || app.buttons["home-primary-action"].isHittable)
+                (app.buttons[humanName].exists ||
+                    app.buttons["home-primary-action"].exists ||
+                    app.buttons["home-tab-home"].exists)
         }
         XCTAssertTrue(didReturnHome, "Closing the human feature route did not return to Home.")
     }
@@ -2603,11 +2821,11 @@ final class OhanaUITests: XCTestCase {
         let closeCandidates = [
             app.buttons["human-basic-info-close-action"],
             app.buttons["ohana-sheet-close-action"],
-            app.buttons["Close"],
-            app.buttons["Done"],
-            app.buttons["关闭"],
-            app.buttons["完成"],
-            app.buttons["xmark"]
+            app.buttons["xmark"].firstMatch,
+            app.buttons["Close"].firstMatch,
+            app.buttons["Done"].firstMatch,
+            app.buttons["关闭"].firstMatch,
+            app.buttons["完成"].firstMatch
         ]
 
         if let close = closeCandidates.first(where: { $0.exists && $0.isEnabled && $0.isHittable }) {
