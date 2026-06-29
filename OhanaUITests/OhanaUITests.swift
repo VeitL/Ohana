@@ -1219,6 +1219,29 @@ final class OhanaUITests: XCTestCase {
     }
 
     @MainActor
+    func testPetCalendarPlayEventRowOpensQuickPlayDetail() throws {
+        let app = launchEnglishApp(enableProductionOverlays: true)
+        _ = createFirstHuman(from: app)
+        let timestamp = Int(Date().timeIntervalSince1970)
+        let petName = "Codex Calendar Play Pet \(timestamp)"
+        let petEventTitle = "Codex play reminder \(timestamp)"
+        completeFirstDayStarterFunnel(
+            in: app,
+            petName: petName,
+            completionMessage: "Creating the first pet did not leave the pet creation handoff in time."
+        )
+
+        openCalendarTab(in: app, petName: petName)
+        addCalendarEvent(title: petEventTitle, linkedPetName: petName, in: app)
+        tapCalendarEvent(petEventTitle, in: app)
+
+        XCTAssertTrue(
+            app.descendants(matching: .any)["quick-play-detail-sheet"].waitForExistence(timeout: 18),
+            "Tapping a pet-linked play calendar event did not deep-link to the pet Play detail route."
+        )
+    }
+
+    @MainActor
     func testPetCalendarHealthEventRowOpensHealthDetail() throws {
         let app = launchEnglishApp(enableProductionOverlays: true)
         _ = createFirstHuman(from: app)
