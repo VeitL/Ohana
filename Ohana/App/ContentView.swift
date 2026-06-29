@@ -127,24 +127,22 @@ struct ContentView: View {
             coordinator: appRoutes,
             onRequiredHumanSaved: { activateRequiredHuman($0) },
             onPetSavedFromAddEntity: { pet in
-                createdEntitySignal = HomeCreatedEntitySignal(entityID: pet.id)
-                scheduleOnboardingJourneyEvaluation()
+                scheduleCreatedEntitySignalAfterHomeHandoff(pet.id)
+                scheduleOnboardingJourneyEvaluationAfterHomeHandoff()
             },
             onHumanSavedFromAddEntity: { human in
                 currentActiveHumanId = ActiveHumanSelectionPolicy.activeHumanIdAfterCreatingHuman(
                     currentHumanIdRaw: currentActiveHumanId,
                     createdHumanId: human.id
                 )
-                createdEntitySignal = HomeCreatedEntitySignal(entityID: human.id)
-                scheduleOnboardingJourneyEvaluation()
+                scheduleCreatedEntitySignalAfterHomeHandoff(human.id)
+                scheduleOnboardingJourneyEvaluationAfterHomeHandoff(activeHumanIDOverride: human.id.uuidString)
             },
             onFirstSuccessMomentCompleted: { _ in
-                appServices.onboardingJourney.markFirstCareCompleted()
-                scheduleOnboardingJourneyEvaluation()
+                completeFirstCareAfterHomeHandoff()
             },
             onHumanDoseTaken: { _ in
-                appServices.onboardingJourney.markFirstCareCompleted()
-                scheduleOnboardingJourneyEvaluation()
+                completeFirstCareAfterHomeHandoff()
             }
         )
         .onChange(of: currentActiveHumanId) { _, newValue in
@@ -237,7 +235,7 @@ struct ContentView: View {
             appServices.cloudSync.startAfterFirstRender(modelContainer: modelContext.container)
             scheduleCoconutWalletBootstrap()
             reconcileHumanProfileRequirement()
-            scheduleOnboardingJourneyEvaluation()
+            scheduleOnboardingJourneyEvaluationAfterHomeHandoff()
             OnboardingHomeJoinHandoffGate.consume()
             rootAppearHandoffTask = nil
         }
@@ -286,8 +284,8 @@ struct ContentView: View {
 
     private func activateRequiredHuman(_ human: Human) {
         currentActiveHumanId = human.id.uuidString
-        createdEntitySignal = HomeCreatedEntitySignal(entityID: human.id)
-        scheduleOnboardingJourneyEvaluation()
+        scheduleCreatedEntitySignalAfterHomeHandoff(human.id)
+        scheduleOnboardingJourneyEvaluationAfterHomeHandoff(activeHumanIDOverride: human.id.uuidString)
     }
 
     private func scheduleOnboardingJourneyEvaluation(
@@ -371,10 +369,10 @@ struct ContentView: View {
 
     private func scheduleOnboardingJourneyEvaluationForActiveHumanChange(_ humanID: String) {
         guard hasOnboarded else { return }
-        if onboardingPrimaryHumanID == humanID {
-            let handoffDelay = OnboardingHomeJoinHandoffGate.remainingPostHomeEffectDelayMilliseconds(
-                defaultDelayMilliseconds: 480
-            )
+        let handoffDelay = OnboardingHomeJoinHandoffGate.remainingPostHomeEffectDelayMilliseconds(
+            defaultDelayMilliseconds: 480
+        )
+        if onboardingPrimaryHumanID == humanID || handoffDelay > 480 {
             scheduleOnboardingJourneyEvaluation(delayMilliseconds: handoffDelay, activeHumanIDOverride: humanID)
         } else {
             scheduleOnboardingJourneyEvaluation()
@@ -414,10 +412,26 @@ struct ContentView: View {
         scheduleOnboardingJourneyEvaluation(delayMilliseconds: handoffDelay, activeHumanIDOverride: humanID)
     }
 
-    private func scheduleOnboardingCreatedEntitySignal(_ id: UUID) {
+    private func scheduleOnboardingJourneyEvaluationAfterHomeHandoff(activeHumanIDOverride: String? = nil) {
+        let handoffDelay = OnboardingHomeJoinHandoffGate.remainingPostHomeEffectDelayMilliseconds(
+            defaultDelayMilliseconds: 480
+        )
+        scheduleOnboardingJourneyEvaluation(delayMilliseconds: handoffDelay, activeHumanIDOverride: activeHumanIDOverride)
+    }
+
+    private func completeFirstCareAfterHomeHandoff() {
+        OnboardingHomeJoinHandoffGate.markCompleted()
+        appServices.onboardingJourney.markFirstCareCompleted()
+        scheduleOnboardingJourneyEvaluationAfterHomeHandoff()
+    }
+
+    private func scheduleCreatedEntitySignalAfterHomeHandoff(
+        _ id: UUID,
+        defaultDelayMilliseconds: UInt64 = 0
+    ) {
         onboardingCreatedEntitySignalTask?.cancel()
         let delay = OnboardingHomeJoinHandoffGate.remainingHomeVisualEffectDelayMilliseconds(
-            defaultDelayMilliseconds: 240
+            defaultDelayMilliseconds: defaultDelayMilliseconds
         )
         onboardingCreatedEntitySignalTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: delay) {
             var transaction = Transaction(animation: nil)
@@ -427,6 +441,10 @@ struct ContentView: View {
             }
             onboardingCreatedEntitySignalTask = nil
         }
+    }
+
+    private func scheduleOnboardingCreatedEntitySignal(_ id: UUID) {
+        scheduleCreatedEntitySignalAfterHomeHandoff(id, defaultDelayMilliseconds: 240)
     }
 
     private func completeStarterGiftCeremony() {

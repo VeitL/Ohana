@@ -25,22 +25,22 @@ extension HumanDetailView {
             bentoStatMini(
                 icon: "pills.fill",
                 value: human.isPrivate(.medication, viewedBy: activeHumanId) ? "—" : "\(myMeds.count)",
-                unit: human.isPrivate(.medication, viewedBy: activeHumanId) ? "" : "种",
-                label: "用药",
+                unit: human.isPrivate(.medication, viewedBy: activeHumanId) ? "" : l.tr(zh: "种", en: "meds", de: "Meds"),
+                label: l.tr(zh: "用药", en: "Meds", de: "Meds"),
                 color: Color.goRed
             )
             bentoStatMini(
                 icon: "bell.badge.fill",
                 value: "\(humanReminders.count)",
-                unit: "条",
-                label: "待办",
+                unit: l.tr(zh: "条", en: "items", de: "Einträge"),
+                label: l.tr(zh: "待办", en: "To-dos", de: "To-dos"),
                 color: Color.goOrange
             )
             bentoStatMini(
                 icon: "leaf.fill",
                 value: human.isPrivate(.wishlist, viewedBy: activeHumanId) ? "—" : "\(human.coconutBalance)",
                 unit: human.isPrivate(.wishlist, viewedBy: activeHumanId) ? "" : "🥥",
-                label: "椰子",
+                label: l.tr(zh: "椰子", en: "Coconuts", de: "Kokosnüsse"),
                 color: Color.goYellow
             )
         }
@@ -91,7 +91,7 @@ extension HumanDetailView {
                         Image(systemName: "trophy.fill") // a11y: allow decorative icon covered by surrounding text or control
                             .font(OhanaFont.callout(.bold))
                             .foregroundStyle(Color.goYellow)
-                        Text("动态称号")
+                        Text(l.tr(zh: "动态称号", en: "Dynamic Badges", de: "Dynamische Abzeichen"))
                             .font(OhanaFont.headline(.bold))
                             .foregroundStyle(Color(hex: "1E3A8A"))
                     }

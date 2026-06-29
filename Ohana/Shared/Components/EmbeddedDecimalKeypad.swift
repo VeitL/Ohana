@@ -43,6 +43,7 @@ struct EmbeddedDecimalKeypad: View {
                     .buttonStyle(ScaleButtonStyle())
                     .disabled(!isEnabled || (key == "decimal" && maxFractionDigits == 0))
                     .opacity((key == "decimal" && maxFractionDigits == 0) ? 0.28 : 1)
+                    .accessibilityIdentifier("embedded-decimal-keypad-key-\(key)")
                     .simultaneousGesture(
                         LongPressGesture(minimumDuration: 0.35).onEnded { _ in
                             if key == "delete" {

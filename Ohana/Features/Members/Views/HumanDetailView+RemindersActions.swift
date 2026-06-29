@@ -14,7 +14,7 @@ extension HumanDetailView {
                 Image(systemName: "bell.badge.fill") // a11y: allow decorative icon covered by surrounding text or control
                     .font(OhanaFont.callout(.bold))
                     .foregroundStyle(Color.goOrange)
-                Text("待办提醒")
+                Text(l.tr(zh: "待办提醒", en: "Pending Reminders", de: "Ausstehende Erinnerungen"))
                     .font(OhanaFont.headline(.bold))
                     .foregroundStyle(Color(hex: "1E3A8A"))
                 Spacer()
@@ -32,7 +32,9 @@ extension HumanDetailView {
                     Spacer()
                     VStack(spacing: 6) {
                         Image(systemName: "checkmark.circle").font(OhanaFont.metric(size: 28)).foregroundStyle(Color(hex: "6B82C4").opacity(0.35)) // a11y: allow decorative icon covered by surrounding text or control
-                        Text("暂无待办提醒").font(OhanaFont.callout()).foregroundStyle(Color(hex: "6B82C4"))
+                        Text(l.tr(zh: "暂无待办提醒", en: "No pending reminders", de: "Keine ausstehenden Erinnerungen"))
+                            .font(OhanaFont.callout())
+                            .foregroundStyle(Color(hex: "6B82C4"))
                     }
                     .padding(.vertical, 12)
                     Spacer()
@@ -55,7 +57,7 @@ extension HumanDetailView {
         HStack(spacing: 12) {
             Text(reminder.event?.emoji ?? "📌").font(OhanaFont.title3())
             VStack(alignment: .leading, spacing: 2) {
-                Text(reminder.event?.title ?? "提醒")
+                Text(reminder.event?.title ?? l.tr(zh: "提醒", en: "Reminder", de: "Erinnerung"))
                     .font(OhanaFont.callout(.bold))
                     .foregroundStyle(Color(hex: "1E3A8A"))
                 Text(reminder.scheduledAt, style: .date)
@@ -85,7 +87,7 @@ extension HumanDetailView {
     var notesSection: some View {
         Group {
             if human.isPrivate(.note, viewedBy: activeHumanId) {
-                privacyPlaceholderCard(label: "备注")
+                privacyPlaceholderCard(label: l.tr(zh: "备注", en: "Notes", de: "Notizen"))
             } else if !human.notes.isEmpty {
                 VStack(spacing: 10) {
                     HumanPrivateDataNotice(human: human, field: .note)
@@ -95,7 +97,7 @@ extension HumanDetailView {
                             Image(systemName: "note.text") // a11y: allow decorative icon covered by surrounding text or control
                                 .font(OhanaFont.callout(.bold))
                                 .foregroundStyle(Color.goPrimary)
-                            Text("备注")
+                            Text(l.tr(zh: "备注", en: "Notes", de: "Notizen"))
                                 .font(OhanaFont.headline(.bold))
                                 .foregroundStyle(Color(hex: "1E3A8A"))
                         }

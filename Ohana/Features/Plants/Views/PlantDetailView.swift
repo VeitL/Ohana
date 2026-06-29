@@ -76,8 +76,10 @@ struct PlantDetailContentView: View {
                     Image(systemName: "pencil.circle").accessibilityHidden(true)
                         .foregroundStyle(Color.ohanaPrimaryText)
                 }
+                .accessibilityIdentifier("plant-detail-edit-action")
             }
         }
+        .accessibilityIdentifier("plant-detail-screen")
         .sheet(isPresented: $showingEditSheet) {
             EditPlantSheet(plant: plant)
         }
@@ -138,6 +140,7 @@ struct PlantDetailContentView: View {
                     .padding(.horizontal, 14)
                     .padding(.vertical, 8)
                     .background(Color.goLime, in: Capsule())
+                    .accessibilityIdentifier("plant-detail-next-task-complete")
 
                     Button(l.tr(zh: "延后一天", en: "Defer one day", de: "Um einen Tag verschieben")) {
                         deferTaskOneDay(task)
@@ -147,6 +150,7 @@ struct PlantDetailContentView: View {
                     .padding(.horizontal, 14)
                     .padding(.vertical, 8)
                     .background(Color.ohanaControlFill.opacity(0.72), in: Capsule())
+                    .accessibilityIdentifier("plant-detail-next-task-defer")
                 }
                 if task.careType == .watering {
                     Button(l.tr(zh: "土还湿，延后", en: "Soil still wet, defer", de: "Erde noch feucht, verschieben")) {
@@ -157,6 +161,7 @@ struct PlantDetailContentView: View {
                     .padding(.horizontal, 14)
                     .padding(.vertical, 8)
                     .background(Color.ohanaControlFill.opacity(0.72), in: Capsule())
+                    .accessibilityIdentifier("plant-detail-next-task-soil-wet-defer")
                 }
             } else {
                 Text(l.tr(zh: "暂无任务", en: "No tasks yet", de: "Noch keine Aufgaben"))
@@ -395,7 +400,7 @@ struct PlantDetailContentView: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Image(systemName: "drop.fill").accessibilityHidden(true)
-                    .foregroundStyle(.blue)
+                    .foregroundStyle(Color.goTeal)
                 Text(l.tr(zh: "浇水状态", en: "Watering status", de: "Gießstatus"))
                     .font(OhanaFont.adaptive(size: 16, weight: .bold, design: .rounded))
                 Spacer()
@@ -403,7 +408,7 @@ struct PlantDetailContentView: View {
 
             if let days = plant.daysSinceWatered {
                 let progress = min(1.0, Double(days) / Double(max(wateringIntervalDays, 1)))
-                let color: Color = progress < 0.5 ? .blue : (progress < 0.8 ? .yellow : .red)
+                let color: Color = progress < 0.5 ? Color.goTeal : (progress < 0.8 ? .yellow : .red)
 
                 HStack {
                     Text(l.tr(zh: "距上次浇水 \(days) 天", en: "\(days) days since watering", de: "\(days) Tage seit dem Gießen"))
@@ -500,12 +505,13 @@ struct PlantDetailContentView: View {
                 .foregroundStyle(Color.ohanaPrimaryText)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 14)
-                .background(Color.blue.opacity(0.6), in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
+                .background(Color.goTeal.opacity(0.42), in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
                 .overlay {
                     RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous)
                         .strokeBorder(Color.ohanaCardSurface.opacity(0.24), lineWidth: 1)
                 }
             }
+            .accessibilityIdentifier("plant-detail-water-action")
 
             Button {
                 fertilizePlant()
@@ -524,6 +530,7 @@ struct PlantDetailContentView: View {
                         .strokeBorder(Color.ohanaCardSurface.opacity(0.24), lineWidth: 1)
                 }
             }
+            .accessibilityIdentifier("plant-detail-fertilize-action")
 
             careActionButton(type: .pestCheck, icon: "ladybug.fill", color: Color.goYellow)
             careActionButton(type: .leafCleaning, icon: "sparkles", color: Color.goTeal)
@@ -617,11 +624,13 @@ struct PlantDetailContentView: View {
                 }
                 .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
                 .foregroundStyle(Color.goLime)
+                .accessibilityIdentifier("plant-detail-delete-undo")
 
                 Button(l.tr(zh: "立即删除", en: "Delete now", de: "Jetzt löschen"), role: .destructive) {
                     commitPendingDelete()
                 }
                 .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
+                .accessibilityIdentifier("plant-detail-delete-now")
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 12)
@@ -655,6 +664,7 @@ struct PlantDetailContentView: View {
         }
         .disabled(isDeletePending)
         .opacity(isDeletePending ? 0.55 : 1)
+        .accessibilityIdentifier("plant-detail-delete-action")
         .padding(.horizontal, 16)
     }
 
@@ -685,6 +695,7 @@ struct PlantDetailContentView: View {
                     .strokeBorder(Color.ohanaCardSurface.opacity(0.24), lineWidth: 1)
             }
         }
+        .accessibilityIdentifier("plant-detail-care-action-\(type.rawValue)")
     }
 
     private func recordCare(_ type: PlantCareType, careNote: String = "") {

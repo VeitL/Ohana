@@ -437,6 +437,7 @@ struct GrowthUnlockPopupView: View {
                 .transition(.opacity.combined(with: .scale(scale: reduceMotion ? 1 : 0.96)))
         }
         .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("growth-unlock-popup")
     }
 
     private var popupCard: some View {
@@ -482,6 +483,7 @@ struct GrowthUnlockPopupView: View {
                 }
                 .buttonStyle(ScaleButtonStyle())
                 .accessibilityLabel(localized(zh: "关闭", en: "Close", de: "Schließen"))
+                .accessibilityIdentifier("growth-unlock-close-action")
             }
 
             Text(featureSummary)
@@ -515,6 +517,7 @@ struct GrowthUnlockPopupView: View {
                         .background(Color.ohanaControlFill, in: Capsule())
                 }
                 .buttonStyle(ScaleButtonStyle())
+                .accessibilityIdentifier("growth-unlock-later-action")
 
                 Button(action: onOpen) {
                     Text(openTitle)
@@ -528,6 +531,7 @@ struct GrowthUnlockPopupView: View {
                 }
                 .buttonStyle(ScaleButtonStyle())
                 .accessibilityLabel(openAccessibilityLabel)
+                .accessibilityIdentifier("growth-unlock-open-action")
             }
         }
         .padding(18)

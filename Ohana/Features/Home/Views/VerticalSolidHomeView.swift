@@ -237,8 +237,16 @@ struct VerticalSolidHomeView: View {
             let isHomeTabVisible = controller.selectedTab == .home
             let cardHeroProgress = min(max(homeCardHeroProgress, 0), 1)
             let todayFocusVisualProgress = Self.todayFocusVisualProgress(cardHeroProgress: cardHeroProgress)
-            let shouldMountTodayFocusChrome = isHomeTabVisible && todayFocusVisualProgress > 0.001
+            let isWaitingForArrivingCardSnapshot = arrivingHomeCardId.map { arrivingID in
+                !controller.snapshot.cards.contains { $0.id == arrivingID }
+            } ?? false
+            let shouldSuppressTodayFocusDuringArrival = isWaitingForArrivingCardSnapshot &&
+                controller.snapshot.firstPetEmptyState != nil
+            let shouldMountTodayFocusChrome = isHomeTabVisible &&
+                !shouldSuppressTodayFocusDuringArrival &&
+                todayFocusVisualProgress > 0.001
             let isTodayFocusInteractive = isHomeTabVisible &&
+                !shouldSuppressTodayFocusDuringArrival &&
                 !isHomeCardExpandedOrTransitioning &&
                 !isHomeCardHeroAnimating &&
                 todayFocusVisualProgress > 0.98
@@ -557,6 +565,8 @@ struct VerticalSolidHomeView: View {
         starterOasisTabPromptPending &&
             starterGiftCeremonySeen &&
             controller.selectedTab == .home &&
+            !isHomeCardExpandedOrTransitioning &&
+            !isHomeCardHeroAnimating &&
             AppFeatureRouteGuard.allowsHomeTab(.oasis, currentLevel: treeManager.treeLevel.rawValue)
     }
 }

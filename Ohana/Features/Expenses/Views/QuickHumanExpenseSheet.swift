@@ -201,6 +201,7 @@ struct QuickHumanExpenseSheet: View {
                 Text(l.tr(zh: "快速记账", en: "Quick Expense", de: "Schnelle Ausgabe"))
                     .font(OhanaFont.title3(.black))
                     .foregroundStyle(Color.ohanaPrimaryText)
+                    .accessibilityIdentifier("quick-human-expense-sheet")
                 Text(human.name)
                     .font(OhanaFont.caption(.semibold))
                     .foregroundStyle(Color.ohanaSecondaryText)
@@ -249,7 +250,7 @@ struct QuickHumanExpenseSheet: View {
 
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
-                    ForEach(quickAmounts, id: \.self) { amount in
+                    ForEach(Array(quickAmounts.enumerated()), id: \.element) { index, amount in
                         Button {
                             amountText = displayAmount(amount)
                             UIImpactFeedbackGenerator(style: .light).impactOccurred()
@@ -265,6 +266,7 @@ struct QuickHumanExpenseSheet: View {
                                 )
                         }
                         .buttonStyle(ScaleButtonStyle())
+                        .accessibilityIdentifier("quick-human-expense-amount-\(index)")
                     }
                 }
                 .padding(.horizontal, 22)
@@ -306,6 +308,7 @@ struct QuickHumanExpenseSheet: View {
                     RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous)
                         .strokeBorder(Color.ohanaCardStroke, lineWidth: 1)
                 }
+                .accessibilityIdentifier("quick-human-expense-note-input")
         }
         .padding(.horizontal, 22)
     }
@@ -350,6 +353,7 @@ struct QuickHumanExpenseSheet: View {
         }
         .buttonStyle(ScaleButtonStyle())
         .disabled(!isValid || isSaving)
+        .accessibilityIdentifier("quick-human-expense-save-action")
         .padding(.horizontal, 22)
         .padding(.top, 10)
         .padding(.bottom, 16)

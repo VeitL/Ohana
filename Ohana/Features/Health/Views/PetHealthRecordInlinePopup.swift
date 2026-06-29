@@ -114,6 +114,7 @@ struct PetHealthRecordInlinePopup: View {
                     guard !isSaving else { return }
                     onClose()
                 }
+                .accessibilityIdentifier("pet-health-record-close-action")
             }
             .padding(.horizontal, 18)
 
@@ -206,12 +207,14 @@ struct PetHealthRecordInlinePopup: View {
             }
             .buttonStyle(ScaleButtonStyle())
             .disabled(isSaving || !pet.canWriteHealthFacts)
+            .accessibilityIdentifier("pet-health-record-save-action")
             .padding(.horizontal, 18)
             .padding(.bottom, 14)
         }
         .background {
             FeedInlineSheetGlassSurface(cornerRadius: OhanaRadius.inlinePopup, glassMode: .regular)
         }
+        .accessibilityIdentifier("pet-health-record-inline-popup")
         .onAppear(perform: applyDefaultsForSelectedType)
         .onChange(of: selectedType) { _, _ in applyDefaultsForSelectedType() }
         .onChange(of: date) { _, newDate in

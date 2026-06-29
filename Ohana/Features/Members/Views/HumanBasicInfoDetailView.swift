@@ -16,10 +16,12 @@ struct HumanBasicInfoDetailContentView: View {
     @Environment(AppServices.self) private var appServices
     @AppStorage("currentActiveHumanId") private var activeHumanIdStr = ""
     @AppStorage(HomeCardVisibility.hiddenPetIDsKey) private var hiddenHomePetIDsRaw = ""
+    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
 
     @StateObject private var commandQueue = DeferredDomainCommandQueue()
     private var activeHumanId: UUID? { UUID(uuidString: activeHumanIdStr) }
     private var isViewingOwnProfile: Bool { activeHumanId == human.id }
+    private var l: L10n { L10n(appLanguage) }
 
     @State private var isEditing = false
     @State private var isDeleting = false
@@ -70,7 +72,7 @@ struct HumanBasicInfoDetailContentView: View {
                 .padding(.top, 8)
             }
         }
-        .navigationTitle("\(human.name) 的信息")
+        .navigationTitle(l.tr(zh: "\(human.name) 的信息", en: "\(human.name)'s Info", de: "Infos zu \(human.name)"))
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
@@ -80,10 +82,11 @@ struct HumanBasicInfoDetailContentView: View {
                             saveChanges()
                             withAnimation { isEditing = false }
                         } label: {
-                            Text("保存")
+                            Text(l.tr(zh: "保存", en: "Save", de: "Speichern"))
                                 .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                 .foregroundStyle(Color.goPrimary)
                         }
+                        .accessibilityIdentifier("human-basic-info-save-action")
                     } else {
                         Button {
                             loadEditState()
@@ -94,12 +97,16 @@ struct HumanBasicInfoDetailContentView: View {
                                 .symbolRenderingMode(.hierarchical)
                                 .foregroundStyle(Color.goPrimary)
                         }
+                        .accessibilityIdentifier("human-basic-info-edit-action")
                     }
                 }
             }
-            if isEditing {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button("取消") { withAnimation { isEditing = false } }
+            ToolbarItem(placement: .topBarLeading) {
+                if isEditing {
+                    Button(l.tr(zh: "取消", en: "Cancel", de: "Abbrechen")) { withAnimation { isEditing = false } }
+                } else {
+                    Button(l.tr(zh: "关闭", en: "Close", de: "Schließen")) { dismiss() }
+                        .accessibilityIdentifier("human-basic-info-close-action")
                 }
             }
         }
@@ -108,10 +115,14 @@ struct HumanBasicInfoDetailContentView: View {
                 isEditing = false
             }
         }
-        .alert("首页卡片堆已满", isPresented: $showingHomeStackFullAlert) {
-            Button("知道了", role: .cancel) {}
+        .alert(l.tr(zh: "首页卡片堆已满", en: "Home card stack is full", de: "Startkartenstapel ist voll"), isPresented: $showingHomeStackFullAlert) {
+            Button(l.tr(zh: "知道了", en: "Got it", de: "Verstanden"), role: .cancel) {}
         } message: {
-            Text("首页最多显示 \(HomeCardVisibility.maxVisibleCards) 张卡片。请先从首页移除一张宠物或人类卡片，再添加 \(human.name)。")
+            Text(l.tr(
+                zh: "首页最多显示 \(HomeCardVisibility.maxVisibleCards) 张卡片。请先从首页移除一张宠物或人类卡片，再添加 \(human.name)。",
+                en: "Home can show up to \(HomeCardVisibility.maxVisibleCards) cards. Remove a pet or human card from Home before adding \(human.name).",
+                de: "Auf der Startseite können bis zu \(HomeCardVisibility.maxVisibleCards) Karten angezeigt werden. Entferne zuerst eine Haustier- oder Menschenkarte, bevor du \(human.name) hinzufügst."
+            ))
         }
     }
 
@@ -131,10 +142,10 @@ struct HumanBasicInfoDetailContentView: View {
                     .lineLimit(1)
                     .minimumScaleFactor(0.62)
                 HStack(spacing: 8) {
-                    chip(isEditing ? roleLabel(for: eRole) : human.roleText, color: isEditing ? Color(hex: eThemeColorHex) : Color(hex: human.safeThemeColorHex))
+                    chip(isEditing ? roleLabel(for: eRole) : localizedRoleText(for: human.role), color: isEditing ? Color(hex: eThemeColorHex) : Color(hex: human.safeThemeColorHex))
                     if let birthday = isEditing && eHasBirthday ? eBirthday : human.birthday {
-                        chip(isEditing && eHasBirthday ? humanAgeText(for: birthday) : human.ageText, color: Color.goPrimary)
-                        chip(Human.westernZodiacChinese(for: birthday), color: Color.goPurple)
+                        chip(humanAgeText(for: birthday), color: Color.goPrimary)
+                        chip(Human.westernZodiacDisplay(for: birthday, l: l), color: Color.goPurple)
                     }
                     let mbti = isEditing ? eMBTI : human.mbti
                     if !mbti.isEmpty {
@@ -180,47 +191,49 @@ struct HumanBasicInfoDetailContentView: View {
     }
 
     private func roleLabel(for role: String) -> String {
-        HumanPermissionRole.title(for: role)
+        localizedRoleText(for: role)
     }
 
     private func humanAgeText(for birthday: Date) -> String {
         let years = Calendar.current.dateComponents([.year], from: birthday, to: Date()).year ?? 0
-        return years > 0 ? "\(years)岁" : "未满1岁"
+        return years > 0
+            ? l.tr(zh: "\(years)岁", en: "\(years) yrs", de: "\(years) J.")
+            : l.tr(zh: "未满1岁", en: "Under 1", de: "Unter 1")
     }
 
     private var readContent: some View {
         VStack(spacing: 16) {
-            infoSection(title: "基本信息", icon: "person.fill", iconColor: Color.goPrimary) {
-                infoRow(label: "名字", value: human.name)
-                infoRow(label: "权限", value: human.roleText)
-                infoRow(label: "性别/身份", value: HumanGenderIdentity.title(for: human.genderRaw))
+            infoSection(title: l.tr(zh: "基本信息", en: "Basic Info", de: "Basisinfos"), icon: "person.fill", iconColor: Color.goPrimary) {
+                infoRow(label: l.tr(zh: "名字", en: "Name", de: "Name"), value: human.name)
+                infoRow(label: l.tr(zh: "权限", en: "Role", de: "Rolle"), value: localizedRoleText(for: human.role))
+                infoRow(label: l.tr(zh: "性别/身份", en: "Gender / Identity", de: "Geschlecht / Identität"), value: localizedGenderTitle(for: human.genderRaw))
                 if let birthday = human.birthday {
-                    infoRow(label: "生日", value: birthday.formatted(.dateTime.year().month().day()))
-                    infoRow(label: "星座", value: Human.westernZodiacChinese(for: birthday))
+                    infoRow(label: l.tr(zh: "生日", en: "Birthday", de: "Geburtstag"), value: birthday.formatted(.dateTime.year().month().day()))
+                    infoRow(label: l.tr(zh: "星座", en: "Zodiac", de: "Sternzeichen"), value: Human.westernZodiacDisplay(for: birthday, l: l))
                 } else {
-                    infoRow(label: "生日", value: "未填写")
+                    infoRow(label: l.tr(zh: "生日", en: "Birthday", de: "Geburtstag"), value: localizedEmptyValue)
                 }
             }
 
-            infoSection(title: "身体资料", icon: "heart.text.square.fill", iconColor: Color.goRed) {
-                infoRow(label: "血型", value: human.bloodType.isEmpty ? "未填写" : human.bloodType)
-                infoRow(label: "身高", value: human.heightCm > 0 && human.heightCm.isFinite ? String(format: "%.0f cm", human.heightCm) : "未填写")
-                infoRow(label: "MBTI", value: human.mbti.isEmpty ? "未填写" : human.mbti.uppercased())
+            infoSection(title: l.tr(zh: "身体资料", en: "Body Info", de: "Körperdaten"), icon: "heart.text.square.fill", iconColor: Color.goRed) {
+                infoRow(label: l.tr(zh: "血型", en: "Blood Type", de: "Blutgruppe"), value: human.bloodType.isEmpty ? localizedEmptyValue : human.bloodType)
+                infoRow(label: l.tr(zh: "身高", en: "Height", de: "Größe"), value: human.heightCm > 0 && human.heightCm.isFinite ? String(format: "%.0f cm", human.heightCm) : localizedEmptyValue)
+                infoRow(label: "MBTI", value: human.mbti.isEmpty ? localizedEmptyValue : human.mbti.uppercased())
             }
 
-            infoSection(title: "家庭与位置", icon: "house.fill", iconColor: Color.goTeal) {
-                infoRow(label: "国籍", value: human.nationality.isEmpty ? "未填写" : human.nationality)
-                infoRow(label: "现居地", value: human.city.isEmpty ? "未填写" : human.city)
-                infoRow(label: "加入时间", value: human.createdAt.formatted(.dateTime.year().month().day()))
-                infoRow(label: "相处天数", value: "\(daysTogether) 天")
+            infoSection(title: l.tr(zh: "家庭与位置", en: "Family & Location", de: "Familie & Standort"), icon: "house.fill", iconColor: Color.goTeal) {
+                infoRow(label: l.tr(zh: "国籍", en: "Nationality", de: "Nationalität"), value: human.nationality.isEmpty ? localizedEmptyValue : human.nationality)
+                infoRow(label: l.tr(zh: "现居地", en: "Residence", de: "Wohnort"), value: human.city.isEmpty ? localizedEmptyValue : human.city)
+                infoRow(label: l.tr(zh: "加入时间", en: "Joined", de: "Beigetreten"), value: human.createdAt.formatted(.dateTime.year().month().day()))
+                infoRow(label: l.tr(zh: "相处天数", en: "Days Together", de: "Gemeinsame Tage"), value: l.tr(zh: "\(daysTogether) 天", en: "\(daysTogether) days", de: "\(daysTogether) Tage"))
             }
 
-            infoSection(title: "显示与隐私", icon: "lock.shield.fill", iconColor: Color.goYellow) {
-                infoRow(label: "首页显示", value: human.shouldShowOnHome ? "显示" : "隐藏")
-                infoRow(label: "隐私项目", value: privacySummary)
+            infoSection(title: l.tr(zh: "显示与隐私", en: "Display & Privacy", de: "Anzeige & Datenschutz"), icon: "lock.shield.fill", iconColor: Color.goYellow) {
+                infoRow(label: l.tr(zh: "首页显示", en: "Home Display", de: "Startseite"), value: human.shouldShowOnHome ? l.tr(zh: "显示", en: "Shown", de: "Angezeigt") : l.tr(zh: "隐藏", en: "Hidden", de: "Ausgeblendet"))
+                infoRow(label: l.tr(zh: "隐私项目", en: "Private Fields", de: "Private Felder"), value: privacySummary)
             }
 
-            infoSection(title: "主题色", icon: "paintpalette.fill", iconColor: Color(hex: human.safeThemeColorHex)) {
+            infoSection(title: l.tr(zh: "主题色", en: "Theme Color", de: "Designfarbe"), icon: "paintpalette.fill", iconColor: Color(hex: human.safeThemeColorHex)) {
                 HStack(spacing: 10) {
                     RoundedRectangle(cornerRadius: OhanaRadius.icon)
                         .fill(Color(hex: human.safeThemeColorHex))
@@ -232,7 +245,7 @@ struct HumanBasicInfoDetailContentView: View {
             }
 
             if !displayNotes.isEmpty {
-                infoSection(title: "备注", icon: "note.text", iconColor: Color.goOrange) {
+                infoSection(title: l.tr(zh: "备注", en: "Notes", de: "Notizen"), icon: "note.text", iconColor: Color.goOrange) {
                     Text(displayNotes)
                         .font(OhanaFont.adaptive(size: 14, weight: .medium)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.ohanaPrimaryText.opacity(0.7))
@@ -246,28 +259,28 @@ struct HumanBasicInfoDetailContentView: View {
 
     private var editContent: some View {
         VStack(spacing: 14) {
-            editSection(title: "基本信息", icon: "person.fill", iconColor: Color.goPrimary) {
-                editField("名字", text: $eName)
+            editSection(title: l.tr(zh: "基本信息", en: "Basic Info", de: "Basisinfos"), icon: "person.fill", iconColor: Color.goPrimary) {
+                editField(l.tr(zh: "名字", en: "Name", de: "Name"), text: $eName)
                 Divider().opacity(0.1)
-                editField("头像 Emoji", text: $eAvatarEmoji)
+                editField(l.tr(zh: "头像 Emoji", en: "Avatar Emoji", de: "Avatar-Emoji"), text: $eAvatarEmoji)
                 Divider().opacity(0.1)
                 HStack {
-                    editLabel("权限")
+                    editLabel(l.tr(zh: "权限", en: "Role", de: "Rolle"))
                     Spacer()
                     Picker("", selection: $eRole) {
-                        Text("管理者").tag("owner")
-                        Text("成员").tag("member")
+                        Text(l.tr(zh: "管理者", en: "Owner", de: "Verwaltung")).tag("owner")
+                        Text(l.tr(zh: "成员", en: "Member", de: "Mitglied")).tag("member")
                     }
                     .pickerStyle(.segmented)
                     .frame(maxWidth: 180)
                 }
                 Divider().opacity(0.1)
                 HStack {
-                    editLabel("性别/身份")
+                    editLabel(l.tr(zh: "性别/身份", en: "Gender / Identity", de: "Geschlecht / Identität"))
                     Spacer()
                     Picker("", selection: $eGender) {
                         ForEach(genderOptions, id: \.key) { option in
-                            Text(HumanGenderIdentity.title(for: option.key)).tag(option.key)
+                            Text(localizedGenderTitle(for: option.key)).tag(option.key)
                         }
                     }
                     .pickerStyle(.menu)
@@ -275,7 +288,7 @@ struct HumanBasicInfoDetailContentView: View {
                 }
                 Divider().opacity(0.1)
                 Toggle(isOn: $eHasBirthday) {
-                    editLabel("设置生日")
+                    editLabel(l.tr(zh: "设置生日", en: "Set Birthday", de: "Geburtstag festlegen"))
                 }
                 .tint(Color.goPrimary)
                 if eHasBirthday {
@@ -286,18 +299,18 @@ struct HumanBasicInfoDetailContentView: View {
                 }
             }
 
-            editSection(title: "身体资料", icon: "heart.text.square.fill", iconColor: Color.goRed) {
-                optionChipGrid(title: "血型", selection: $eBloodType, options: bloodTypeOptions, accent: Color.goRed)
+            editSection(title: l.tr(zh: "身体资料", en: "Body Info", de: "Körperdaten"), icon: "heart.text.square.fill", iconColor: Color.goRed) {
+                optionChipGrid(title: l.tr(zh: "血型", en: "Blood Type", de: "Blutgruppe"), selection: $eBloodType, options: bloodTypeOptions, accent: Color.goRed)
                 Divider().opacity(0.1)
                 heightStepperRow
                 Divider().opacity(0.1)
                 optionChipGrid(title: "MBTI", selection: $eMBTI, options: mbtiOptions, accent: Color.goOrange)
             }
 
-            editSection(title: "家庭与位置", icon: "house.fill", iconColor: Color.goTeal) {
-                optionPickerRow("国籍", selection: $eNationality, options: countryOptions)
+            editSection(title: l.tr(zh: "家庭与位置", en: "Family & Location", de: "Familie & Standort"), icon: "house.fill", iconColor: Color.goTeal) {
+                optionPickerRow(l.tr(zh: "国籍", en: "Nationality", de: "Nationalität"), selection: $eNationality, options: countryOptions)
                 Divider().opacity(0.1)
-                optionPickerRow("现居地", selection: $eCity, options: residenceCityOptions)
+                optionPickerRow(l.tr(zh: "现居地", en: "Residence", de: "Wohnort"), selection: $eCity, options: residenceCityOptions)
                 Divider().opacity(0.1)
                 Toggle(isOn: Binding(
                     get: { eShouldShowOnHome },
@@ -309,21 +322,21 @@ struct HumanBasicInfoDetailContentView: View {
                         eShouldShowOnHome = visible
                     }
                 )) {
-                    editLabel("在首页显示")
+                    editLabel(l.tr(zh: "在首页显示", en: "Show on Home", de: "Auf Startseite anzeigen"))
                 }
                 .tint(Color.goPrimary)
             }
 
-            editSection(title: "隐私设置", icon: "lock.shield.fill", iconColor: Color.goYellow) {
-                privacyToggle("体重记录", isOn: $ePrivateWeight)
-                privacyToggle("运动记录", isOn: $ePrivateWorkout)
-                privacyToggle("吃药提醒", isOn: $ePrivateMedication)
-                privacyToggle("备注", isOn: $ePrivateNote)
-                privacyToggle("椰子资产与心愿", isOn: $ePrivateWishlist)
-                privacyToggle("花费记录", isOn: $ePrivateExpense)
+            editSection(title: l.tr(zh: "隐私设置", en: "Privacy Settings", de: "Datenschutzeinstellungen"), icon: "lock.shield.fill", iconColor: Color.goYellow) {
+                privacyToggle(l.tr(zh: "体重记录", en: "Weight Records", de: "Gewichtsverlauf"), isOn: $ePrivateWeight)
+                privacyToggle(l.tr(zh: "运动记录", en: "Workout Records", de: "Trainingseinträge"), isOn: $ePrivateWorkout)
+                privacyToggle(l.tr(zh: "吃药提醒", en: "Medication Reminders", de: "Medikamentenerinnerungen"), isOn: $ePrivateMedication)
+                privacyToggle(l.tr(zh: "备注", en: "Notes", de: "Notizen"), isOn: $ePrivateNote)
+                privacyToggle(l.tr(zh: "椰子资产与心愿", en: "Coconut Assets & Wishes", de: "Kokosnussvermögen & Wünsche"), isOn: $ePrivateWishlist)
+                privacyToggle(l.tr(zh: "花费记录", en: "Expense Records", de: "Ausgabeneinträge"), isOn: $ePrivateExpense)
             }
 
-            editSection(title: "主题色", icon: "paintpalette.fill", iconColor: Color(hex: eThemeColorHex)) {
+            editSection(title: l.tr(zh: "主题色", en: "Theme Color", de: "Designfarbe"), icon: "paintpalette.fill", iconColor: Color(hex: eThemeColorHex)) {
                 LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 5), spacing: 12) {
                     ForEach(themePresets, id: \.self) { hex in
                         Button { eThemeColorHex = hex } label: {
@@ -342,12 +355,13 @@ struct HumanBasicInfoDetailContentView: View {
                 }
             }
 
-            editSection(title: "备注", icon: "note.text", iconColor: Color.goOrange) {
+            editSection(title: l.tr(zh: "备注", en: "Notes", de: "Notizen"), icon: "note.text", iconColor: Color.goOrange) {
                 TextEditor(text: $eNotes)
                     .frame(minHeight: 90)
                     .scrollContentBackground(.hidden)
                     .padding(10)
                     .background(Color.primary.opacity(0.06), in: RoundedRectangle(cornerRadius: OhanaRadius.chip, style: .continuous))
+                    .accessibilityIdentifier("human-basic-info-notes-input")
             }
         }
     }
@@ -438,9 +452,9 @@ struct HumanBasicInfoDetailContentView: View {
     private var heightStepperRow: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
-                editLabel("身高")
+                editLabel(l.tr(zh: "身高", en: "Height", de: "Größe"))
                 Spacer()
-                Text(heightValue > 0 ? "\(Int(heightValue)) cm" : "未填写")
+                Text(heightValue > 0 ? "\(Int(heightValue)) cm" : localizedEmptyValue)
                     .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaPrimaryText.opacity(0.82))
             }
@@ -449,7 +463,7 @@ struct HumanBasicInfoDetailContentView: View {
                     Button {
                         eHeightText = option == "未填写" ? "" : option
                     } label: {
-                        Text(option == "未填写" ? option : "\(option)")
+                        Text(option == "未填写" ? localizedEmptyValue : "\(option)")
                             .font(OhanaFont.adaptive(size: 12, weight: heightOptionSelected(option) ? .black : .semibold, design: .rounded))
                             .foregroundStyle(heightOptionSelected(option) ? Color.arkInk : .primary.opacity(0.78))
                             .padding(.horizontal, 10)
@@ -467,7 +481,7 @@ struct HumanBasicInfoDetailContentView: View {
                 in: 80 ... 230,
                 step: 1
             ) {
-                Text("微调 80-230 cm")
+                Text(l.tr(zh: "微调 80-230 cm", en: "Fine tune 80-230 cm", de: "Feinabstimmung 80-230 cm"))
                     .font(OhanaFont.adaptive(size: 12, weight: .medium, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaSecondaryText)
             }
@@ -490,7 +504,7 @@ struct HumanBasicInfoDetailContentView: View {
                 set: { selection.wrappedValue = $0 == "未填写" ? "" : $0 }
             )) {
                 ForEach(options, id: \.self) { option in
-                    Text(option).tag(option)
+                    Text(localizedOptionTitle(option)).tag(option)
                 }
             }
             .pickerStyle(.menu)
@@ -507,7 +521,7 @@ struct HumanBasicInfoDetailContentView: View {
                     Button {
                         selection.wrappedValue = option == "未填写" ? "" : option
                     } label: {
-                        Text(option)
+                        Text(localizedOptionTitle(option))
                             .font(OhanaFont.adaptive(size: 12, weight: selected ? .black : .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(selected ? Color.arkInk : .primary.opacity(0.82))
                             .padding(.horizontal, 10)
@@ -546,8 +560,8 @@ struct HumanBasicInfoDetailContentView: View {
     private var privacySummary: String {
         let titles = HumanPrivateField.allCases
             .filter { human.privateFields.contains($0.rawValue) }
-            .map(\.title)
-        return titles.isEmpty ? "全部公开" : titles.joined(separator: "、")
+            .map(localizedPrivateFieldTitle)
+        return titles.isEmpty ? l.tr(zh: "全部公开", en: "All visible", de: "Alles sichtbar") : titles.joined(separator: l.tr(zh: "、", en: ", ", de: ", "))
     }
 
     private var displayNotes: String {
@@ -614,12 +628,11 @@ struct HumanBasicInfoDetailContentView: View {
             privateFieldsRaw: editedPrivateFieldsRaw
         )
         commandQueue.enqueue(.memberProfile(entityID: human.id, kind: EntityKind.human.rawValue)) {
-            let result = MemberCommandExecutor(context: modelContext, services: appServices).updateHumanProfile(
+            MemberCommandExecutor(context: modelContext, services: appServices).updateHumanProfile(
                 human,
                 input: input,
                 note: "humanBasicInfo.profile"
             )
-            appServices.domainRevisions.publishMemberProfile(result, note: "humanBasicInfo.profile")
             UINotificationFeedbackGenerator().notificationOccurred(.success)
         }
     }
@@ -633,6 +646,55 @@ struct HumanBasicInfoDetailContentView: View {
         if ePrivateExpense { fields.insert(HumanPrivateField.expense.rawValue) }
         if ePrivateNote { fields.insert(HumanPrivateField.note.rawValue) }
         return fields
+    }
+
+    private var localizedEmptyValue: String {
+        l.tr(zh: "未填写", en: "Not set", de: "Nicht festgelegt")
+    }
+
+    private func localizedOptionTitle(_ option: String) -> String {
+        option == "未填写" ? localizedEmptyValue : option
+    }
+
+    private func localizedRoleText(for raw: String) -> String {
+        switch HumanProfileOptions.normalizedRole(raw) {
+        case "owner":
+            l.tr(zh: "管理者", en: "Owner", de: "Verwaltung")
+        default:
+            l.tr(zh: "成员", en: "Member", de: "Mitglied")
+        }
+    }
+
+    private func localizedGenderTitle(for raw: String) -> String {
+        switch HumanProfileOptions.normalizedGender(raw) {
+        case "女":
+            l.tr(zh: "女", en: "Female", de: "Weiblich")
+        case "男":
+            l.tr(zh: "男", en: "Male", de: "Männlich")
+        case "非二元":
+            l.tr(zh: "非二元", en: "Non-binary", de: "Nichtbinär")
+        case "不透露":
+            l.tr(zh: "不透露", en: "Prefer not to say", de: "Keine Angabe")
+        default:
+            HumanGenderIdentity.title(for: raw)
+        }
+    }
+
+    private func localizedPrivateFieldTitle(_ field: HumanPrivateField) -> String {
+        switch field {
+        case .weight:
+            l.tr(zh: "体重", en: "Weight", de: "Gewicht")
+        case .workout:
+            l.tr(zh: "运动", en: "Workouts", de: "Training")
+        case .medication:
+            l.tr(zh: "吃药提醒", en: "Medication", de: "Medikamente")
+        case .wishlist:
+            l.tr(zh: "椰子资产与心愿", en: "Coconut Assets & Wishes", de: "Kokosnussvermögen & Wünsche")
+        case .expense:
+            l.tr(zh: "花费", en: "Expenses", de: "Ausgaben")
+        case .note:
+            l.tr(zh: "备注", en: "Notes", de: "Notizen")
+        }
     }
 
     private func deleteHumanAndReturnHome() {
@@ -705,10 +767,12 @@ struct HumanLifecycleDangerZone: View {
     let onUndoPassedAway: () -> Void
     let onDelete: () -> Void
 
+    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
     @State private var passedDate = Date()
     @State private var showingPassedAlert = false
     @State private var showingUndoPassedAlert = false
     @State private var showingDeleteSheet = false
+    private var l: L10n { L10n(appLanguage) }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -716,7 +780,7 @@ struct HumanLifecycleDangerZone: View {
                 Image(systemName: "exclamationmark.triangle.fill") // a11y: allow decorative icon covered by surrounding text or control
                     .font(OhanaFont.adaptive(size: 12, weight: .black))
                     .foregroundStyle(Color.goRed.opacity(0.72))
-                Text("生命与危险操作")
+                Text(l.tr(zh: "生命与危险操作", en: "Life & Danger Actions", de: "Lebens- & Gefahrenaktionen"))
                     .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.goRed.opacity(0.78))
                     .tracking(1.2)
@@ -726,18 +790,18 @@ struct HumanLifecycleDangerZone: View {
             if human.hasPassedAway {
                 passedAwaySummary
                 lifecycleButton(
-                    title: "撤销离世标记",
+                    title: l.tr(zh: "撤销离世标记", en: "Undo Passing Mark", de: "Verstorben-Markierung zurücknehmen"),
                     icon: "arrow.uturn.backward",
                     color: Color.goYellow
                 ) {
                     showingUndoPassedAlert = true
                 }
             } else {
-                DatePicker("离世日期", selection: $passedDate, in: ...Date(), displayedComponents: .date)
+                DatePicker(l.tr(zh: "离世日期", en: "Date of Passing", de: "Sterbedatum"), selection: $passedDate, in: ...Date(), displayedComponents: .date)
                     .datePickerStyle(.compact)
                     .tint(Color.goPrimary)
                 lifecycleButton(
-                    title: "标记 \(human.name) 已离世",
+                    title: l.tr(zh: "标记 \(human.name) 已离世", en: "Mark \(human.name) as passed away", de: "\(human.name) als verstorben markieren"),
                     icon: "rainbow",
                     color: Color.goPurple
                 ) {
@@ -746,7 +810,7 @@ struct HumanLifecycleDangerZone: View {
             }
 
             lifecycleButton(
-                title: "彻底删除 \(human.name)",
+                title: l.tr(zh: "彻底删除 \(human.name)", en: "Permanently delete \(human.name)", de: "\(human.name) endgültig löschen"),
                 icon: "trash.fill",
                 color: Color.goRed
             ) {
@@ -761,21 +825,29 @@ struct HumanLifecycleDangerZone: View {
         .onChange(of: human.passedAwayDate) { _, date in
             passedDate = date ?? Date()
         }
-        .alert("确认标记离世", isPresented: $showingPassedAlert) {
-            Button("确认", role: .destructive) {
+        .alert(l.tr(zh: "确认标记离世", en: "Confirm Passing Mark", de: "Verstorben-Markierung bestätigen"), isPresented: $showingPassedAlert) {
+            Button(l.tr(zh: "确认", en: "Confirm", de: "Bestätigen"), role: .destructive) {
                 onMarkPassedAway(passedDate)
             }
-            Button("取消", role: .cancel) {}
+            Button(l.tr(zh: "取消", en: "Cancel", de: "Abbrechen"), role: .cancel) {}
         } message: {
-            Text("将标记 \(human.name) 为离世，并让未来安排退出活跃提醒。原有数据会保留，此操作可撤销。")
+            Text(l.tr(
+                zh: "将标记 \(human.name) 为离世，并让未来安排退出活跃提醒。原有数据会保留，此操作可撤销。",
+                en: "\(human.name) will be marked as passed away, and future schedules will leave active reminders. Existing data is kept, and this can be undone.",
+                de: "\(human.name) wird als verstorben markiert, und zukünftige Termine verlassen aktive Erinnerungen. Bestehende Daten bleiben erhalten und dies kann rückgängig gemacht werden."
+            ))
         }
-        .alert("撤销离世标记", isPresented: $showingUndoPassedAlert) {
-            Button("撤销", role: .destructive) {
+        .alert(l.tr(zh: "撤销离世标记", en: "Undo Passing Mark", de: "Verstorben-Markierung zurücknehmen"), isPresented: $showingUndoPassedAlert) {
+            Button(l.tr(zh: "撤销", en: "Undo", de: "Zurücknehmen"), role: .destructive) {
                 onUndoPassedAway()
             }
-            Button("取消", role: .cancel) {}
+            Button(l.tr(zh: "取消", en: "Cancel", de: "Abbrechen"), role: .cancel) {}
         } message: {
-            Text("将清除 \(human.name) 的离世记录，恢复为在世状态。")
+            Text(l.tr(
+                zh: "将清除 \(human.name) 的离世记录，恢复为在世状态。",
+                en: "\(human.name)'s passing record will be cleared and restored to active status.",
+                de: "Der Verstorben-Eintrag von \(human.name) wird gelöscht und der aktive Status wiederhergestellt."
+            ))
         }
         .sheet(isPresented: $showingDeleteSheet) {
             HumanDeleteConfirmationSheet(
@@ -797,11 +869,19 @@ struct HumanLifecycleDangerZone: View {
     private var passedAwaySummary: some View {
         VStack(alignment: .leading, spacing: 4) {
             if let date = human.passedAwayDate {
-                Text("离世日期：\(date.formatted(.dateTime.year().month().day()))")
+                Text(l.tr(
+                    zh: "离世日期：\(date.formatted(.dateTime.year().month().day()))",
+                    en: "Date of passing: \(date.formatted(.dateTime.year().month().day()))",
+                    de: "Sterbedatum: \(date.formatted(.dateTime.year().month().day()))"
+                ))
                     .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaPrimaryText.opacity(0.72))
             }
-            Text("相伴 \(human.daysTogetherAtPassing) 天 · \(human.ageAtPassingText)")
+            Text(l.tr(
+                zh: "相伴 \(human.daysTogetherAtPassing) 天 · \(human.ageAtPassingText)",
+                en: "Together for \(human.daysTogetherAtPassing) days · \(localizedAgeAtPassing)",
+                de: "\(human.daysTogetherAtPassing) Tage zusammen · \(localizedAgeAtPassing)"
+            ))
                 .font(OhanaFont.adaptive(size: 12, weight: .medium, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(Color.ohanaSecondaryText)
         }
@@ -836,6 +916,17 @@ struct HumanLifecycleDangerZone: View {
         }
         .buttonStyle(ScaleButtonStyle())
     }
+
+    private var localizedAgeAtPassing: String {
+        guard let birthday = human.birthday,
+              let passed = human.passedAwayDate else {
+            return l.tr(zh: "未知年龄", en: "Unknown age", de: "Unbekanntes Alter")
+        }
+        let years = Calendar.current.dateComponents([.year], from: birthday, to: passed).year ?? 0
+        return years > 0
+            ? l.tr(zh: "\(years)岁", en: "\(years) yrs", de: "\(years) J.")
+            : l.tr(zh: "未满1岁", en: "Under 1", de: "Unter 1")
+    }
 }
 
 private struct HumanDeleteConfirmationSheet: View {
@@ -843,8 +934,10 @@ private struct HumanDeleteConfirmationSheet: View {
     let onCancel: () -> Void
     let onDelete: () -> Void
 
+    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
     @State private var confirmName = ""
     @FocusState private var confirmNameFocused: Bool
+    private var l: L10n { L10n(appLanguage) }
 
     private var canDelete: Bool {
         ConfirmationNameMatcher.matches(confirmName, expectedName: humanName)
@@ -861,10 +954,10 @@ private struct HumanDeleteConfirmationSheet: View {
                         .frame(width: 36, height: 36) // a11y: allow decorative non-interactive frame; hit area handled by parent
                         .background(Color.goRed.opacity(0.12), in: RoundedRectangle(cornerRadius: OhanaRadius.badge, style: .continuous))
                     VStack(alignment: .leading, spacing: 3) {
-                        Text("删除成员 \(humanName)")
+                        Text(l.tr(zh: "删除成员 \(humanName)", en: "Delete member \(humanName)", de: "Mitglied \(humanName) löschen"))
                             .font(OhanaFont.adaptive(size: 18, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(Color.ohanaPrimaryText)
-                        Text("输入名字后才能继续")
+                        Text(l.tr(zh: "输入名字后才能继续", en: "Enter the name to continue", de: "Namen eingeben, um fortzufahren"))
                             .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(Color.ohanaSecondaryText)
                     }
@@ -880,15 +973,19 @@ private struct HumanDeleteConfirmationSheet: View {
                 }
 
                 VStack(alignment: .leading, spacing: 10) {
-                    Text("这会删除成员资料、体重与运动记录，无法撤销。")
+                    Text(l.tr(
+                        zh: "这会删除成员资料、体重与运动记录，无法撤销。",
+                        en: "This deletes the member profile, weight records, and workout records. It cannot be undone.",
+                        de: "Dies löscht Mitgliederprofil, Gewichtseinträge und Trainingseinträge. Es kann nicht rückgängig gemacht werden."
+                    ))
                         .font(OhanaFont.adaptive(size: 13, weight: .medium, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.ohanaPrimaryText.opacity(0.68))
-                    Text("请输入：\(humanName)")
+                    Text(l.tr(zh: "请输入：\(humanName)", en: "Enter: \(humanName)", de: "Eingeben: \(humanName)"))
                         .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.goRed.opacity(0.8))
                 }
 
-                TextField("成员名字", text: $confirmName) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
+                TextField(l.tr(zh: "成员名字", en: "Member name", de: "Mitgliedsname"), text: $confirmName) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
                     .font(OhanaFont.adaptive(size: 16, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
@@ -903,7 +1000,7 @@ private struct HumanDeleteConfirmationSheet: View {
 
                 HStack(spacing: 10) {
                     Button(action: cancelAfterResigningKeyboard) {
-                        Text("取消")
+                        Text(l.tr(zh: "取消", en: "Cancel", de: "Abbrechen"))
                             .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(Color.ohanaPrimaryText.opacity(0.72))
                             .frame(maxWidth: .infinity)
@@ -913,7 +1010,7 @@ private struct HumanDeleteConfirmationSheet: View {
                     .buttonStyle(ScaleButtonStyle())
 
                     Button(action: attemptDelete) {
-                        Text("删除")
+                        Text(l.tr(zh: "删除", en: "Delete", de: "Löschen"))
                             .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(canDelete ? Color.white : Color.ohanaTertiaryText) // ui-v4: allow destructive red button needs white contrast
                             .frame(maxWidth: .infinity)

@@ -34,6 +34,7 @@ struct ExpandedHumanFeaturesContentSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(AppServices.self) private var appServices
     @AppStorage("currentActiveHumanId") private var activeHumanIdStr = ""
+    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
 
     @StateObject private var commandQueue = DeferredDomainCommandQueue()
 
@@ -44,6 +45,7 @@ struct ExpandedHumanFeaturesContentSheet: View {
 
     private var activeHumanId: UUID? { UUID(uuidString: activeHumanIdStr) }
     private var isViewingOwnProfile: Bool { activeHumanId == human.id }
+    private var l: L10n { L10n(appLanguage) }
     private var isAllPrivateForViewer: Bool {
         !isViewingOwnProfile && HumanPrivateField.allCases.allSatisfy { human.privateFields.contains($0.rawValue) }
     }
@@ -99,21 +101,21 @@ struct ExpandedHumanFeaturesContentSheet: View {
                             ownerPrivateDataNoticeStack
                         }
 
-                        sectionHeader("功能入口")
+                        sectionHeader(l.tr(zh: "功能入口", en: "Feature Entry", de: "Funktionszugang"))
                             .frame(maxWidth: .infinity, alignment: .leading)
 
                         HStack(spacing: 12) {
                             featureNavigation(
                                 field: .weight,
                                 route: .weight,
-                                lockedTitle: "体重",
+                                lockedTitle: l.tr(zh: "体重", en: "Weight", de: "Gewicht"),
                                 label: {
                                     bentoCard(
                                         icon: "scalemass.fill",
                                         color: .goTeal,
-                                        title: "体重",
+                                        title: l.tr(zh: "体重", en: "Weight", de: "Gewicht"),
                                         value: latestWeightText,
-                                        subtitle: "趋势与记录",
+                                        subtitle: l.tr(zh: "趋势与记录", en: "Trends & Records", de: "Trends & Einträge"),
                                         height: 146
                                     )
                                 }
@@ -121,14 +123,14 @@ struct ExpandedHumanFeaturesContentSheet: View {
                             featureNavigation(
                                 field: .workout,
                                 route: .workout,
-                                lockedTitle: "活动",
+                                lockedTitle: l.tr(zh: "活动", en: "Activity", de: "Aktivität"),
                                 label: {
                                     bentoCard(
                                         icon: "figure.run",
                                         color: Color.goOrange,
-                                        title: "活动",
+                                        title: l.tr(zh: "活动", en: "Activity", de: "Aktivität"),
                                         value: "\(visibleWorkoutCount)",
-                                        subtitle: "运动与共同健康",
+                                        subtitle: l.tr(zh: "运动与共同健康", en: "Workouts & shared health", de: "Training & gemeinsame Gesundheit"),
                                         height: 146
                                     )
                                 }
@@ -138,12 +140,12 @@ struct ExpandedHumanFeaturesContentSheet: View {
                         featureNavigation(
                             field: .weight,
                             route: .metrics,
-                            lockedTitle: "体检指标",
+                            lockedTitle: l.tr(zh: "体检指标", en: "Checkup Metrics", de: "Check-up-Werte"),
                             label: {
                                 compactBentoCard(
                                     icon: "waveform.path.ecg.rectangle.fill",
                                     color: .goTeal,
-                                    title: "体检指标",
+                                    title: l.tr(zh: "体检指标", en: "Checkup Metrics", de: "Check-up-Werte"),
                                     subtitle: healthMetricSubtitle
                                 )
                             }
@@ -153,17 +155,17 @@ struct ExpandedHumanFeaturesContentSheet: View {
                             featureNavigation(
                                 field: .medication,
                                 route: .medication,
-                                lockedTitle: "用药",
+                                lockedTitle: l.tr(zh: "用药", en: "Medication", de: "Medikamente"),
                                 label: {
-                                    compactBentoCard(icon: "pills.fill", color: .goPurple, title: "用药", subtitle: "服药与提醒")
+                                    compactBentoCard(icon: "pills.fill", color: .goPurple, title: l.tr(zh: "用药", en: "Medication", de: "Medikamente"), subtitle: l.tr(zh: "服药与提醒", en: "Doses & reminders", de: "Einnahmen & Erinnerungen"))
                                 }
                             )
                             featureNavigation(
                                 field: .weight,
                                 route: .report,
-                                lockedTitle: "健康报告",
+                                lockedTitle: l.tr(zh: "健康报告", en: "Health Reports", de: "Gesundheitsberichte"),
                                 label: {
-                                    compactBentoCard(icon: "cross.case.fill", color: .goRed, title: "健康报告", subtitle: "体检与档案")
+                                    compactBentoCard(icon: "cross.case.fill", color: .goRed, title: l.tr(zh: "健康报告", en: "Health Reports", de: "Gesundheitsberichte"), subtitle: l.tr(zh: "体检与档案", en: "Checkups & files", de: "Untersuchungen & Akten"))
                                 }
                             )
                         }
@@ -172,14 +174,14 @@ struct ExpandedHumanFeaturesContentSheet: View {
                             featureNavigation(
                                 field: .expense,
                                 route: .expense,
-                                lockedTitle: "花费",
+                                lockedTitle: l.tr(zh: "花费", en: "Expenses", de: "Ausgaben"),
                                 label: {
                                     bentoCard(
                                         icon: "creditcard.fill",
                                         color: .goOrange,
-                                        title: "花费",
-                                        value: "账本",
-                                        subtitle: "谁花了多少钱",
+                                        title: l.tr(zh: "花费", en: "Expenses", de: "Ausgaben"),
+                                        value: l.tr(zh: "账本", en: "Ledger", de: "Buch"),
+                                        subtitle: l.tr(zh: "谁花了多少钱", en: "Who paid what", de: "Wer was bezahlt hat"),
                                         height: 132
                                     )
                                 }
@@ -187,14 +189,14 @@ struct ExpandedHumanFeaturesContentSheet: View {
                             featureNavigation(
                                 field: .wishlist,
                                 route: .wishlist,
-                                lockedTitle: "椰子资产",
+                                lockedTitle: l.tr(zh: "椰子资产", en: "Coconut Assets", de: "Kokosnussvermögen"),
                                 label: {
                                     bentoCard(
                                         icon: "gift.fill",
                                         color: Color(hex: "EC4899"),
-                                        title: "椰子资产",
+                                        title: l.tr(zh: "椰子资产", en: "Coconut Assets", de: "Kokosnussvermögen"),
                                         value: visibleCoconutText,
-                                        subtitle: "愿望清单和资产",
+                                        subtitle: l.tr(zh: "愿望清单和资产", en: "Wishlist and assets", de: "Wunschliste und Vermögen"),
                                         height: 132
                                     )
                                 }
@@ -202,7 +204,7 @@ struct ExpandedHumanFeaturesContentSheet: View {
                         }
 
                         if !isAllPrivateForViewer {
-                            sectionHeader("提醒与备注")
+                            sectionHeader(l.tr(zh: "提醒与备注", en: "Reminders & Notes", de: "Erinnerungen & Notizen"))
                                 .frame(maxWidth: .infinity, alignment: .leading)
                             remindersCard
                             notesCard
@@ -216,7 +218,7 @@ struct ExpandedHumanFeaturesContentSheet: View {
                     .padding(.bottom, 28)
                 }
             }
-            .navigationTitle("\(human.name) 的功能")
+            .navigationTitle(l.tr(zh: "\(human.name) 的功能", en: "\(human.name)'s Features", de: "Funktionen von \(human.name)"))
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
@@ -240,7 +242,7 @@ struct ExpandedHumanFeaturesContentSheet: View {
                             }
                             .buttonStyle(ScaleButtonStyle())
                         }
-                        Button("完成") { dismiss() }
+                        Button(l.tr(zh: "完成", en: "Done", de: "Fertig")) { dismiss() }
                             .font(.system(size: 15, weight: .semibold)) // a11y: allow fixed display glyph/legacy hero typography; Dynamic Type migration tracked by P1 baseline
                             .foregroundStyle(Color.goPrimary)
                     }
@@ -252,13 +254,17 @@ struct ExpandedHumanFeaturesContentSheet: View {
                 humanFeatureRouteView(route)
                     .background(OhanaAppBackground().ignoresSafeArea())
             }
-            .alert("确认删除", isPresented: $showingDeleteConfirm) {
-                Button("取消", role: .cancel) {}
-                Button("删除", role: .destructive) {
+            .alert(l.tr(zh: "确认删除", en: "Confirm Delete", de: "Löschen bestätigen"), isPresented: $showingDeleteConfirm) {
+                Button(l.tr(zh: "取消", en: "Cancel", de: "Abbrechen"), role: .cancel) {}
+                Button(l.tr(zh: "删除", en: "Delete", de: "Löschen"), role: .destructive) {
                     deleteHumanAndDismiss()
                 }
             } message: {
-                Text("确定要删除 \(human.name) 吗？此操作不可撤销。")
+                Text(l.tr(
+                    zh: "确定要删除 \(human.name) 吗？此操作不可撤销。",
+                    en: "Delete \(human.name)? This cannot be undone.",
+                    de: "\(human.name) löschen? Dies kann nicht rückgängig gemacht werden."
+                ))
             }
         }
     }
@@ -349,13 +355,13 @@ struct ExpandedHumanFeaturesContentSheet: View {
             }
 
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
-                infoPill(title: "权限", value: human.roleText.isEmpty ? "成员" : human.roleText)
-                infoPill(title: "性别/身份", value: HumanGenderIdentity.title(for: human.genderRaw))
-                infoPill(title: "年龄", value: human.birthday == nil ? "未设置" : human.ageText)
-                infoPill(title: "血型", value: human.bloodType.isEmpty ? "未设置" : human.bloodType)
-                infoPill(title: "身高", value: human.heightCm > 0 && human.heightCm.isFinite ? String(format: "%.0f cm", human.heightCm) : "未设置")
-                infoPill(title: "国籍", value: human.nationality.isEmpty ? "未设置" : human.nationality)
-                infoPill(title: "城市", value: human.city.isEmpty ? "未设置" : human.city)
+                infoPill(title: l.tr(zh: "权限", en: "Role", de: "Rolle"), value: localizedRoleText(for: human.role))
+                infoPill(title: l.tr(zh: "性别/身份", en: "Gender / Identity", de: "Geschlecht / Identität"), value: localizedGenderTitle(for: human.genderRaw))
+                infoPill(title: l.tr(zh: "年龄", en: "Age", de: "Alter"), value: human.birthday == nil ? localizedEmptyValue : localizedAgeText)
+                infoPill(title: l.tr(zh: "血型", en: "Blood Type", de: "Blutgruppe"), value: human.bloodType.isEmpty ? localizedEmptyValue : human.bloodType)
+                infoPill(title: l.tr(zh: "身高", en: "Height", de: "Größe"), value: human.heightCm > 0 && human.heightCm.isFinite ? String(format: "%.0f cm", human.heightCm) : localizedEmptyValue)
+                infoPill(title: l.tr(zh: "国籍", en: "Nationality", de: "Nationalität"), value: human.nationality.isEmpty ? localizedEmptyValue : human.nationality)
+                infoPill(title: l.tr(zh: "城市", en: "City", de: "Stadt"), value: human.city.isEmpty ? localizedEmptyValue : human.city)
             }
         }
         .padding(16)
@@ -374,7 +380,7 @@ struct ExpandedHumanFeaturesContentSheet: View {
                     HStack(spacing: 8) {
                         Image(systemName: "trophy.fill") // a11y: allow decorative/status glyph; surrounding text or control label carries meaning
                             .foregroundStyle(Color.goYellow)
-                        Text("动态称号")
+                        Text(l.tr(zh: "动态称号", en: "Dynamic Badges", de: "Dynamische Abzeichen"))
                             .font(OhanaFont.callout(.black))
                             .foregroundStyle(Color.ohanaPrimaryText)
                     }
@@ -410,7 +416,7 @@ struct ExpandedHumanFeaturesContentSheet: View {
             HStack(spacing: 8) {
                 Image(systemName: "bell.badge.fill") // a11y: allow decorative/status glyph; surrounding text or control label carries meaning
                     .foregroundStyle(Color.goOrange)
-                Text("待办提醒")
+                Text(l.tr(zh: "待办提醒", en: "Pending Reminders", de: "Ausstehende Erinnerungen"))
                     .font(OhanaFont.callout(.black))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Spacer()
@@ -423,7 +429,7 @@ struct ExpandedHumanFeaturesContentSheet: View {
             }
 
             if humanReminders.isEmpty {
-                emptyInlineRow(icon: "checkmark.circle", title: "暂无待办提醒")
+                emptyInlineRow(icon: "checkmark.circle", title: l.tr(zh: "暂无待办提醒", en: "No pending reminders", de: "Keine ausstehenden Erinnerungen"))
             } else {
                 ForEach(humanReminders.prefix(4)) { reminder in
                     reminderRow(reminder)
@@ -441,7 +447,7 @@ struct ExpandedHumanFeaturesContentSheet: View {
     @ViewBuilder
     private var notesCard: some View {
         if human.isPrivate(.note, viewedBy: activeHumanId) {
-            lockedWideCard(title: "备注")
+            lockedWideCard(title: l.tr(zh: "备注", en: "Notes", de: "Notizen"))
         } else {
             Button {
                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
@@ -454,10 +460,10 @@ struct ExpandedHumanFeaturesContentSheet: View {
                         .frame(width: 36, height: 36) // a11y: allow visual glyph frame; interactive hit target is provided by the surrounding control or container
                         .background(Color.goPrimary.opacity(0.16), in: RoundedRectangle(cornerRadius: OhanaRadius.chip, style: .continuous))
                     VStack(alignment: .leading, spacing: 3) {
-                        Text("备注记录")
+                        Text(l.tr(zh: "备注记录", en: "Note Records", de: "Notizeinträge"))
                             .font(OhanaFont.callout(.black))
                             .foregroundStyle(Color.ohanaPrimaryText)
-                        Text(human.notes.isEmpty ? "暂无备注" : human.notes.components(separatedBy: "\n\n").first ?? "查看备注")
+                        Text(human.notes.isEmpty ? l.tr(zh: "暂无备注", en: "No notes", de: "Keine Notizen") : human.notes.components(separatedBy: "\n\n").first ?? l.tr(zh: "查看备注", en: "View notes", de: "Notizen ansehen"))
                             .font(OhanaFont.caption2(.bold))
                             .foregroundStyle(Color.ohanaSecondaryText)
                             .lineLimit(1)
@@ -482,7 +488,7 @@ struct ExpandedHumanFeaturesContentSheet: View {
         Button(role: .destructive) {
             showingDeleteConfirm = true
         } label: {
-            Label("删除成员", systemImage: "trash")
+            Label(l.tr(zh: "删除成员", en: "Delete Member", de: "Mitglied löschen"), systemImage: "trash")
                 .font(OhanaFont.callout(.black))
                 .foregroundStyle(Color.goRed)
                 .frame(maxWidth: .infinity)
@@ -501,10 +507,14 @@ struct ExpandedHumanFeaturesContentSheet: View {
             Image(systemName: "lock.shield.fill") // a11y: allow decorative/status glyph; surrounding text or control label carries meaning
                 .font(.system(size: 34, weight: .black)) // a11y: allow fixed display glyph/legacy hero typography; Dynamic Type migration tracked by P1 baseline
                 .foregroundStyle(Color.goYellow)
-            Text("此成员资料仅本人可见")
+            Text(l.tr(zh: "此成员资料仅本人可见", en: "This member profile is private", de: "Dieses Mitgliederprofil ist privat"))
                 .font(OhanaFont.title3(.black))
                 .foregroundStyle(Color.ohanaPrimaryText)
-            Text("当前家庭成员无法查看 TA 的体重、运动、吃药、备注、花费和椰子资产等相关数据。")
+            Text(l.tr(
+                zh: "当前家庭成员无法查看 TA 的体重、运动、吃药、备注、花费和椰子资产等相关数据。",
+                en: "Current family members cannot view their weight, workouts, medication, notes, expenses, coconut assets, or related data.",
+                de: "Aktuelle Familienmitglieder können Gewicht, Training, Medikamente, Notizen, Ausgaben, Kokosnussvermögen und verwandte Daten nicht sehen."
+            ))
                 .font(OhanaFont.caption(.bold))
                 .foregroundStyle(Color.ohanaSecondaryText)
                 .multilineTextAlignment(.center)
@@ -544,7 +554,11 @@ struct ExpandedHumanFeaturesContentSheet: View {
         HStack(spacing: 10) {
             Image(systemName: "lock.fill") // a11y: allow decorative/status glyph; surrounding text or control label carries meaning
                 .foregroundStyle(Color.ohanaTertiaryText)
-            Text("\(title) · 仅本人可见")
+            Text(l.tr(
+                zh: "\(title) · 仅本人可见",
+                en: "\(title) · Private to owner",
+                de: "\(title) · Nur selbst sichtbar"
+            ))
                 .font(OhanaFont.caption(.black))
                 .foregroundStyle(Color.ohanaSecondaryText)
                 .lineLimit(2)
@@ -575,7 +589,7 @@ struct ExpandedHumanFeaturesContentSheet: View {
             Text(reminder.event?.emoji ?? "📌")
                 .font(OhanaFont.title3())
             VStack(alignment: .leading, spacing: 2) {
-                Text(reminder.event?.title ?? "提醒")
+                Text(reminder.event?.title ?? l.tr(zh: "提醒", en: "Reminder", de: "Erinnerung"))
                     .font(OhanaFont.caption(.black))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Text(reminder.scheduledAt, style: .date)
@@ -692,9 +706,9 @@ struct ExpandedHumanFeaturesContentSheet: View {
                 }
 
                 HStack(spacing: 9) {
-                    heroChip(title: "椰子", value: privateAwareHeroValue(.wishlist, "\(human.coconutBalance)"))
-                    heroChip(title: "运动", value: privateAwareHeroValue(.workout, "\(human.workoutLogs.count)"))
-                    heroChip(title: "体重", value: privateAwareHeroValue(.weight, "\(human.weightLogs.count)"))
+                    heroChip(title: l.tr(zh: "椰子", en: "Coconuts", de: "Kokosnüsse"), value: privateAwareHeroValue(.wishlist, "\(human.coconutBalance)"))
+                    heroChip(title: l.tr(zh: "运动", en: "Workouts", de: "Training"), value: privateAwareHeroValue(.workout, "\(human.workoutLogs.count)"))
+                    heroChip(title: l.tr(zh: "体重", en: "Weight", de: "Gewicht"), value: privateAwareHeroValue(.weight, "\(human.weightLogs.count)"))
                 }
             }
             .padding(18)
@@ -720,8 +734,8 @@ struct ExpandedHumanFeaturesContentSheet: View {
     }
 
     private var humanSubtitle: String {
-        let zodiac = human.birthday.map { Human.westernZodiacChinese(for: $0) }
-        return [human.roleText, HumanGenderIdentity.title(for: human.genderRaw), zodiac, human.mbti.isEmpty ? nil : human.mbti]
+        let zodiac = human.birthday.map { Human.westernZodiacDisplay(for: $0, l: l) }
+        return [localizedRoleText(for: human.role), localizedGenderTitle(for: human.genderRaw), zodiac, human.mbti.isEmpty ? nil : human.mbti]
             .compactMap(\.self)
             .joined(separator: " · ")
     }
@@ -736,9 +750,45 @@ struct ExpandedHumanFeaturesContentSheet: View {
         guard let latest = human.healthMetricLogs.sorted(by: { $0.date > $1.date }).first,
               let metric = HealthMetricCatalog.metric(forKey: latest.metricKey),
               let unit = metric.unit(for: latest.unitCode) else {
-            return "TSH / HbA1c / 血压"
+            return l.tr(zh: "TSH / HbA1c / 血压", en: "TSH / HbA1c / Blood Pressure", de: "TSH / HbA1c / Blutdruck")
         }
-        return "\(metric.displayName(L10n(AppLanguage.code))) · \(unit.formattedValue(latest.value))"
+        return "\(metric.displayName(l)) · \(unit.formattedValue(latest.value))"
+    }
+
+    private var localizedEmptyValue: String {
+        l.tr(zh: "未设置", en: "Not set", de: "Nicht festgelegt")
+    }
+
+    private var localizedAgeText: String {
+        guard let birthday = human.birthday else { return localizedEmptyValue }
+        let years = Calendar.current.dateComponents([.year], from: birthday, to: Date()).year ?? 0
+        return years > 0
+            ? l.tr(zh: "\(years)岁", en: "\(years) yrs", de: "\(years) J.")
+            : l.tr(zh: "未满1岁", en: "Under 1", de: "Unter 1")
+    }
+
+    private func localizedRoleText(for raw: String) -> String {
+        switch HumanProfileOptions.normalizedRole(raw) {
+        case "owner":
+            l.tr(zh: "管理者", en: "Owner", de: "Verwaltung")
+        default:
+            l.tr(zh: "成员", en: "Member", de: "Mitglied")
+        }
+    }
+
+    private func localizedGenderTitle(for raw: String) -> String {
+        switch HumanProfileOptions.normalizedGender(raw) {
+        case "女":
+            l.tr(zh: "女", en: "Female", de: "Weiblich")
+        case "男":
+            l.tr(zh: "男", en: "Male", de: "Männlich")
+        case "非二元":
+            l.tr(zh: "非二元", en: "Non-binary", de: "Nichtbinär")
+        case "不透露":
+            l.tr(zh: "不透露", en: "Prefer not to say", de: "Keine Angabe")
+        default:
+            HumanGenderIdentity.title(for: raw)
+        }
     }
 
     private func privateAwareHeroValue(_ field: HumanPrivateField, _ value: String) -> String {

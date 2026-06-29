@@ -12,6 +12,7 @@ struct QuickPottyDetailSheet: View {
     let pet: Pet
     let onRemove: () -> Void
     var onClose: (() -> Void)?
+    var onRecordChanged: () -> Void
     let allEvents: [Event]
     let allPets: [Pet]
     let pottyEntries: [PoopPottyLedgerEntry]
@@ -57,6 +58,7 @@ struct QuickPottyDetailSheet: View {
         pet: Pet,
         onRemove: @escaping () -> Void,
         onClose: (() -> Void)? = nil,
+        onRecordChanged: @escaping () -> Void = {},
         allEvents: [Event] = [],
         allPets: [Pet] = [],
         pottyEntries: [PoopPottyLedgerEntry] = [],
@@ -66,6 +68,7 @@ struct QuickPottyDetailSheet: View {
         self.pet = pet
         self.onRemove = onRemove
         self.onClose = onClose
+        self.onRecordChanged = onRecordChanged
         self.allEvents = allEvents
         self.allPets = allPets
         self.pottyEntries = pottyEntries
@@ -284,6 +287,7 @@ struct QuickPottyDetailSheet: View {
             .ignoresSafeArea(.keyboard, edges: .bottom)
             .petMemorialTone(isActive: pet.hasPassedAway)
         }
+        .accessibilityIdentifier("quick-potty-detail-sheet")
         .onAppear {
             loadSettings()
             selectedSharedPottyPetIds = SharedPetSelectionMemory.restoredSelection(
@@ -711,7 +715,8 @@ struct QuickPottyDetailSheet: View {
                 selectedFocus = .potty
                 openRootPottySheet(.pottyOverview)
             },
-            feedbackToken: pottyFeedbackToken
+            feedbackToken: pottyFeedbackToken,
+            accessibilityIDPrefix: "quick-potty-poop"
         )
     }
 
@@ -747,7 +752,8 @@ struct QuickPottyDetailSheet: View {
                 selectedFocus = .scoop
                 openRootPottySheet(.scoopOverview)
             },
-            feedbackToken: scoopFeedbackToken
+            feedbackToken: scoopFeedbackToken,
+            accessibilityIDPrefix: "quick-potty-scoop"
         )
     }
 
@@ -783,7 +789,8 @@ struct QuickPottyDetailSheet: View {
                 selectedFocus = .litter
                 openRootPottySheet(.litterOverview)
             },
-            feedbackToken: litterFeedbackToken
+            feedbackToken: litterFeedbackToken,
+            accessibilityIDPrefix: "quick-potty-litter"
         )
     }
 
@@ -793,6 +800,7 @@ struct QuickPottyDetailSheet: View {
                 Text(l.tr(zh: "最近", en: "Latest", de: "Zuletzt"))
                     .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaSecondaryText)
+                    .accessibilityIdentifier("quick-potty-recent-strip")
                 Spacer()
                 Button {
                     openPottySheet(.history)

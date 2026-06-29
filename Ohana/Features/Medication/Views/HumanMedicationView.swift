@@ -283,6 +283,7 @@ struct HumanMedicationContentView: View {
                     .background(Color.goPrimary, in: Capsule())
                 }
                 .buttonStyle(ScaleButtonStyle())
+                .accessibilityIdentifier("human-medication-add-action")
                 .padding(.bottom, 28)
             }
         }

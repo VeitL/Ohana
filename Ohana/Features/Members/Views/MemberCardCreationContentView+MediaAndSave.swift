@@ -499,11 +499,9 @@ extension MemberCardCreationContentView {
     func finishSaveAfterHomeJoinHandoff(pet: Pet?, human: Human?) {
         guard isJoinHandoffRunning else { return }
         clearMediaReturnStepStorage()
+        OnboardingHomeJoinHandoffGate.markCompleted()
         notifySavedMembers(pet: pet, human: human)
         joinSaveTask = OhanaFrameScheduler.runAfterNextFrame {
-            if presentationStyle == .onboarding {
-                OnboardingHomeJoinHandoffGate.markCompleted()
-            }
             onComplete()
             joinSaveTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: homeJoinHandoffResetDelayMilliseconds) {
                 resetHomeJoinHandoffState()

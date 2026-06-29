@@ -19,10 +19,13 @@ struct HumanWorkoutCard: View {
     @State private var toastVisible = false
     @State private var toastMessage = ""
     @State private var toastColor: Color = .goPrimary
+    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
 
     private var sortedLogs: [HumanWorkoutLog] {
         human.workoutLogs.sorted { $0.date > $1.date }
     }
+
+    private var l: L10n { L10n(appLanguage) }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -37,7 +40,7 @@ struct HumanWorkoutCard: View {
                             .font(OhanaFont.callout(.bold))
                             .foregroundStyle(Color.goPrimary)
                     }
-                    Text("运动记录")
+                    Text(l.tr(zh: "运动记录", en: "Workout Records", de: "Trainingseinträge"))
                         .font(OhanaFont.headline())
                         .foregroundStyle(Color.ohanaPrimaryText)
                     Spacer()
@@ -59,11 +62,11 @@ struct HumanWorkoutCard: View {
             let totalKm = monthLogs.reduce(0.0) { $0 + $1.distanceKm }
 
             HStack(spacing: 0) {
-                workoutStatCell(value: "\(monthLogs.count)", label: "本月次数", color: .goPrimary)
+                workoutStatCell(value: "\(monthLogs.count)", label: l.tr(zh: "本月次数", en: "This month", de: "Dieser Monat"), color: .goPrimary)
                 Rectangle().fill(Color.ohanaDivider).frame(width: 1, height: 32) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
-                workoutStatCell(value: "\(totalMinutes)", label: "总分钟", color: .goCardCyan)
+                workoutStatCell(value: "\(totalMinutes)", label: l.tr(zh: "总分钟", en: "Total min", de: "Minuten gesamt"), color: .goCardCyan)
                 Rectangle().fill(Color.ohanaDivider).frame(width: 1, height: 32) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
-                workoutStatCell(value: String(format: "%.1f", totalKm), label: "总公里", color: .goOrange)
+                workoutStatCell(value: String(format: "%.1f", totalKm), label: l.tr(zh: "总公里", en: "Total km", de: "Kilometer gesamt"), color: .goOrange)
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 10)
@@ -123,7 +126,7 @@ struct HumanWorkoutCard: View {
             ForEach(sortedLogs.prefix(3)) { log in
                 workoutRow(
                     icon: log.workoutType.icon,
-                    name: log.workoutType.rawValue,
+                    name: log.workoutType.localizedTitle(l),
                     duration: log.durationMinutes,
                     distance: log.distanceKm,
                     calories: log.calories,
@@ -141,7 +144,7 @@ struct HumanWorkoutCard: View {
                 HStack(spacing: 6) {
                     Image(systemName: "plus").accessibilityHidden(true)
                         .font(OhanaFont.caption(.bold))
-                    Text("手动添加运动")
+                    Text(l.tr(zh: "手动添加运动", en: "Add Manually", de: "Manuell hinzufügen"))
                         .font(OhanaFont.caption(.semibold))
                 }
                 .foregroundStyle(Color.goPrimary.opacity(0.8))
@@ -149,6 +152,7 @@ struct HumanWorkoutCard: View {
                 .padding(.vertical, 10)
             }
             .buttonStyle(ScaleButtonStyle())
+            .accessibilityIdentifier("human-workout-add-action")
         }
     }
 
@@ -209,15 +213,16 @@ struct HumanWorkoutCard: View {
             Image(systemName: "figure.run.circle").accessibilityHidden(true)
                 .font(OhanaFont.metric(size: 36))
                 .foregroundStyle(Color.ohanaPrimaryText.opacity(0.2))
-            Text("暂无运动记录")
+            Text(l.tr(zh: "暂无运动记录", en: "No workouts yet", de: "Noch keine Trainings"))
                 .font(OhanaFont.subheadline())
                 .foregroundStyle(Color.ohanaPrimaryText.opacity(0.35))
             Button { showAddSheet = true } label: {
-                Text("+ 添加运动")
+                Text(l.tr(zh: "+ 添加运动", en: "+ Add Workout", de: "+ Training hinzufügen"))
                     .font(OhanaFont.caption(.bold))
                     .foregroundStyle(Color.goPrimary)
             }
             .buttonStyle(ScaleButtonStyle())
+            .accessibilityIdentifier("human-workout-add-action")
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 20)
@@ -240,11 +245,13 @@ struct AddWorkoutSheet: View {
     @State private var notes = ""
     @State private var isSaving = false
     @StateObject private var commandQueue = DeferredDomainCommandQueue()
+    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
 
     private var duration: Int { Int(durationStr) ?? 0 }
     private var distance: Double { Double(distanceStr.replacingOccurrences(of: ",", with: ".")) ?? 0 }
     private var calories: Int { Int(caloriesStr) ?? 0 }
     private var canSave: Bool { duration > 0 }
+    private var l: L10n { L10n(appLanguage) }
 
     var body: some View {
         NavigationStack {
@@ -256,7 +263,7 @@ struct AddWorkoutSheet: View {
 
                         // 运动类型选择
                         VStack(alignment: .leading, spacing: 8) {
-                            Text("运动类型")
+                            Text(l.tr(zh: "运动类型", en: "Workout Type", de: "Trainingsart"))
                                 .font(OhanaFont.subheadline(.bold))
                                 .foregroundStyle(Color.ohanaPrimaryText.opacity(0.6))
                             LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 4), spacing: 10) {
@@ -269,9 +276,9 @@ struct AddWorkoutSheet: View {
 
                         // 时长/距离/卡路里
                         VStack(spacing: 12) {
-                            workoutField(icon: "timer", label: "时长（分钟）", placeholder: "0", text: $durationStr, color: .goPrimary)
-                            workoutField(icon: "map", label: "距离（公里，可选）", placeholder: "0.0", text: $distanceStr, color: .goCardCyan)
-                            workoutField(icon: "flame", label: "卡路里（可选）", placeholder: "0", text: $caloriesStr, color: .goOrange)
+                            workoutField(icon: "timer", label: l.tr(zh: "时长（分钟）", en: "Duration (min)", de: "Dauer (Min.)"), placeholder: "0", text: $durationStr, color: .goPrimary, step: 5)
+                            workoutField(icon: "map", label: l.tr(zh: "距离（公里，可选）", en: "Distance (km, optional)", de: "Distanz (km, optional)"), placeholder: "0.0", text: $distanceStr, color: .goCardCyan, step: 0.5)
+                            workoutField(icon: "flame", label: l.tr(zh: "卡路里（可选）", en: "Calories (optional)", de: "Kalorien (optional)"), placeholder: "0", text: $caloriesStr, color: .goOrange, step: 5)
                         }
                         .padding(16).goIslandModuleCard(cornerRadius: OhanaRadius.input)
 
@@ -280,7 +287,7 @@ struct AddWorkoutSheet: View {
                             Image(systemName: "calendar").accessibilityHidden(true)
                                 .font(OhanaFont.callout())
                                 .foregroundStyle(Color.goPrimary)
-                            Text("日期")
+                            Text(l.tr(zh: "日期", en: "Date", de: "Datum"))
                                 .font(OhanaFont.callout(.semibold))
                                 .foregroundStyle(Color.ohanaPrimaryText)
                             Spacer()
@@ -293,7 +300,7 @@ struct AddWorkoutSheet: View {
 
                         // 备注
                         VStack(alignment: .leading, spacing: 8) {
-                            Label("备注（可选）", systemImage: "note.text")
+                            Label(l.tr(zh: "备注（可选）", en: "Notes (optional)", de: "Notizen (optional)"), systemImage: "note.text")
                                 .font(OhanaFont.callout(.semibold))
                                 .foregroundStyle(Color.ohanaPrimaryText)
                             TextEditor(text: $notes)
@@ -303,23 +310,26 @@ struct AddWorkoutSheet: View {
                                 .frame(minHeight: 80)
                                 .padding(10)
                                 .background(Color.primary.opacity(0.06), in: RoundedRectangle(cornerRadius: OhanaRadius.chip, style: .continuous))
+                                .accessibilityIdentifier("add-human-workout-notes-input")
                         }
                         .padding(16).goIslandModuleCard(cornerRadius: OhanaRadius.input)
                     }
                     .padding(.horizontal, 16).padding(.vertical, 8)
                 }
             }
-            .navigationTitle("添加运动记录")
+            .navigationTitle(l.tr(zh: "添加运动记录", en: "Add Workout", de: "Training hinzufügen"))
             .navigationBarTitleDisplayMode(.inline)
+            .accessibilityIdentifier("add-human-workout-sheet")
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    Button("取消") { dismiss() }
+                    Button(l.tr(zh: "取消", en: "Cancel", de: "Abbrechen")) { dismiss() }
                 }
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button(isSaving ? "保存中" : "保存") { save() }
+                    Button(isSaving ? l.tr(zh: "保存中", en: "Saving", de: "Speichert") : l.tr(zh: "保存", en: "Save", de: "Sichern")) { save() }
                         .font(OhanaFont.callout(.bold))
                         .foregroundStyle(canSave ? Color.goPrimary : .secondary)
                         .disabled(!canSave || isSaving)
+                        .accessibilityIdentifier("add-human-workout-save-action")
                 }
             }
         }
@@ -334,7 +344,7 @@ struct AddWorkoutSheet: View {
                 Image(systemName: type.icon)
                     .font(OhanaFont.title3())
                     .foregroundStyle(isSelected ? color : .primary.opacity(0.45))
-                Text(type.rawValue)
+                Text(type.localizedTitle(l))
                     .font(OhanaFont.caption2(.bold))
                     .foregroundStyle(isSelected ? Color.primary : Color.primary.opacity(0.45))
             }
@@ -350,6 +360,7 @@ struct AddWorkoutSheet: View {
             )
         }
         .buttonStyle(ScaleButtonStyle())
+        .accessibilityIdentifier("add-human-workout-type-\(type.rawValue)")
     }
 
     private var workoutPreview: some View {
@@ -361,7 +372,7 @@ struct AddWorkoutSheet: View {
                 .background(Color(hex: selectedType.colorHex).opacity(0.16), in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
 
             VStack(alignment: .leading, spacing: 5) {
-                Text("\(human.name) 的\(selectedType.rawValue)")
+                Text(workoutPreviewTitle)
                     .font(OhanaFont.headline(.bold))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Text(previewSubtitle)
@@ -376,13 +387,18 @@ struct AddWorkoutSheet: View {
 
     private var previewSubtitle: String {
         var parts: [String] = []
-        if duration > 0 { parts.append("\(duration) 分钟") }
-        if distance > 0 { parts.append(String(format: "%.1f 公里", distance)) }
+        if duration > 0 { parts.append(l.tr(zh: "\(duration) 分钟", en: "\(duration) min", de: "\(duration) Min.")) }
+        if distance > 0 { parts.append(l.tr(zh: String(format: "%.1f 公里", distance), en: String(format: "%.1f km", distance), de: String(format: "%.1f km", distance))) }
         if calories > 0 { parts.append("\(calories) kcal") }
-        return parts.isEmpty ? "填写时长后即可保存" : parts.joined(separator: " · ")
+        return parts.isEmpty ? l.tr(zh: "填写时长后即可保存", en: "Add duration to save", de: "Dauer eingeben, dann sichern") : parts.joined(separator: " · ")
     }
 
-    private func workoutField(icon: String, label: String, placeholder: String, text: Binding<String>, color: Color) -> some View {
+    private var workoutPreviewTitle: String {
+        let title = selectedType.localizedTitle(l)
+        return l.tr(zh: "\(human.name) 的\(title)", en: "\(title) for \(human.name)", de: "\(title) für \(human.name)")
+    }
+
+    private func workoutField(icon: String, label: String, placeholder: String, text: Binding<String>, color: Color, step: Double) -> some View {
         let allowsDecimal = placeholder.contains(".")
         return HStack(spacing: 10) {
             Image(systemName: icon)
@@ -398,16 +414,45 @@ struct AddWorkoutSheet: View {
                 placeholder: placeholder,
                 maxFractionDigits: allowsDecimal ? 1 : 0,
                 accent: color,
-                step: label.contains("分钟") || label.contains("卡路里") ? 5 : 0.5,
+                step: step,
                 valueFont: OhanaFont.callout(.bold),
                 valueAlignment: .trailing,
                 fill: Color.ohanaControlFill,
                 cornerRadius: OhanaRadius.row,
                 horizontalPadding: 10,
-                verticalPadding: 6
+                verticalPadding: 6,
+                inputAccessibilityIdentifier: workoutFieldIdentifier(for: label),
+                decrementAccessibilityIdentifier: workoutFieldStepIdentifier(for: label, direction: "decrement"),
+                incrementAccessibilityIdentifier: workoutFieldStepIdentifier(for: label, direction: "increment")
             )
             .frame(width: 102)
         }
+    }
+
+    private func workoutFieldIdentifier(for label: String) -> String? {
+        if label == l.tr(zh: "时长（分钟）", en: "Duration (min)", de: "Dauer (Min.)") {
+            return "add-human-workout-duration-input"
+        }
+        if label == l.tr(zh: "距离（公里，可选）", en: "Distance (km, optional)", de: "Distanz (km, optional)") {
+            return "add-human-workout-distance-input"
+        }
+        if label == l.tr(zh: "卡路里（可选）", en: "Calories (optional)", de: "Kalorien (optional)") {
+            return "add-human-workout-calories-input"
+        }
+        return nil
+    }
+
+    private func workoutFieldStepIdentifier(for label: String, direction: String) -> String? {
+        if label == l.tr(zh: "时长（分钟）", en: "Duration (min)", de: "Dauer (Min.)") {
+            return "add-human-workout-duration-\(direction)"
+        }
+        if label == l.tr(zh: "距离（公里，可选）", en: "Distance (km, optional)", de: "Distanz (km, optional)") {
+            return "add-human-workout-distance-\(direction)"
+        }
+        if label == l.tr(zh: "卡路里（可选）", en: "Calories (optional)", de: "Kalorien (optional)") {
+            return "add-human-workout-calories-\(direction)"
+        }
+        return nil
     }
 
     private func save() {
@@ -452,9 +497,11 @@ struct HumanWorkoutHistoryView: View {
     @StateObject private var commandQueue = DeferredDomainCommandQueue()
 
     @State private var showAddSheet = false
+    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
 
     private var activeHumanId: UUID? { UUID(uuidString: activeHumanIdStr) }
     private var isPrivacyLocked: Bool { human.isPrivate(.workout, viewedBy: activeHumanId) }
+    private var l: L10n { L10n(appLanguage) }
 
     private var sortedLogs: [HumanWorkoutLog] {
         human.workoutLogs.sorted { $0.date > $1.date }
@@ -482,7 +529,7 @@ struct HumanWorkoutHistoryView: View {
 
                             if sortedLogs.isEmpty {
                                 VStack(spacing: 12) {
-                                    Text("还没有运动记录")
+                                    Text(l.tr(zh: "还没有运动记录", en: "No workouts yet", de: "Noch keine Trainings"))
                                         .font(OhanaFont.body())
                                         .foregroundStyle(Color.ohanaPrimaryText.opacity(0.35))
                                         .padding(.top, 60)
@@ -491,7 +538,7 @@ struct HumanWorkoutHistoryView: View {
                                         Image(systemName: "hammer.fill").accessibilityHidden(true)
                                             .font(OhanaFont.callout())
                                             .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
-                                        Text("Apple Health 同步功能开发中")
+                                        Text(l.tr(zh: "Apple Health 同步功能开发中", en: "Apple Health sync is in development", de: "Apple Health-Sync ist in Entwicklung"))
                                             .font(OhanaFont.subheadline(.medium))
                                             .foregroundStyle(Color.ohanaPrimaryText.opacity(0.5))
                                     }
@@ -516,7 +563,7 @@ struct HumanWorkoutHistoryView: View {
                         HStack(spacing: 8) {
                             Image(systemName: "plus").accessibilityHidden(true)
                                 .font(OhanaFont.adaptive(size: 16, weight: .black))
-                            Text("添加运动")
+                            Text(l.tr(zh: "添加运动", en: "Add Workout", de: "Training hinzufügen"))
                                 .font(OhanaFont.adaptive(size: 16, weight: .black, design: .rounded))
                         }
                         .foregroundStyle(Color.arkInk)
@@ -524,10 +571,11 @@ struct HumanWorkoutHistoryView: View {
                         .background(Color.goPrimary, in: Capsule())
                     }
                     .buttonStyle(ScaleButtonStyle())
+                    .accessibilityIdentifier("human-workout-add-action")
                     .padding(.bottom, 28)
                 }
             }
-            .navigationTitle("运动历史")
+            .navigationTitle(l.tr(zh: "运动历史", en: "Workout History", de: "Trainingsverlauf"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
@@ -556,7 +604,7 @@ struct HumanWorkoutHistoryView: View {
             Text(appServices.privacy.lockedMessage(for: .workout))
                 .font(OhanaFont.headline(.bold))
                 .foregroundStyle(Color.ohanaPrimaryText)
-            Text("请切换到本人档案后再查看。")
+            Text(l.tr(zh: "请切换到本人档案后再查看。", en: "Switch to this profile to view it.", de: "Wechsle zu diesem Profil, um es zu sehen."))
                 .font(OhanaFont.callout())
                 .foregroundStyle(Color.ohanaSecondaryText)
         }
@@ -567,11 +615,11 @@ struct HumanWorkoutHistoryView: View {
 
     private var summarySection: some View {
         HStack(spacing: 0) {
-            summaryCell(value: "\(sortedLogs.count)", label: "手动记录", color: .goPrimary)
+            summaryCell(value: "\(sortedLogs.count)", label: l.tr(zh: "手动记录", en: "Manual", de: "Manuell"), color: .goPrimary)
             Divider().background(Color.ohanaDivider).frame(height: 40)
-            summaryCell(value: "\(sortedLogs.reduce(0) { $0 + $1.durationMinutes })", label: "总分钟", color: .goCardCyan)
+            summaryCell(value: "\(sortedLogs.reduce(0) { $0 + $1.durationMinutes })", label: l.tr(zh: "总分钟", en: "Total min", de: "Minuten gesamt"), color: .goCardCyan)
             Divider().background(Color.ohanaDivider).frame(height: 40)
-            summaryCell(value: String(format: "%.1f", sortedLogs.reduce(0) { $0 + $1.distanceKm }), label: "总公里", color: .goOrange)
+            summaryCell(value: String(format: "%.1f", sortedLogs.reduce(0) { $0 + $1.distanceKm }), label: l.tr(zh: "总公里", en: "Total km", de: "Kilometer gesamt"), color: .goOrange)
         }
         .padding(.vertical, 14)
         .goIslandModuleCard(cornerRadius: OhanaRadius.input)
@@ -591,7 +639,7 @@ struct HumanWorkoutHistoryView: View {
 
     private var manualSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("手动记录")
+            Text(l.tr(zh: "手动记录", en: "Manual Records", de: "Manuelle Einträge"))
                 .font(OhanaFont.subheadline(.bold))
                 .foregroundStyle(Color.ohanaPrimaryText.opacity(0.7))
                 .padding(.horizontal, 16)
@@ -604,7 +652,7 @@ struct HumanWorkoutHistoryView: View {
                             .foregroundStyle(Color(hex: log.workoutType.colorHex))
                             .frame(width: 32)
                         VStack(alignment: .leading, spacing: 2) {
-                            Text(log.workoutType.rawValue)
+                            Text(log.workoutType.localizedTitle(l))
                                 .font(OhanaFont.subheadline(.bold))
                                 .foregroundStyle(Color.ohanaPrimaryText)
                             Text(log.date, format: .dateTime.year().month().day())
@@ -647,6 +695,29 @@ struct HumanWorkoutHistoryView: View {
             }
             .goIslandModuleCard(cornerRadius: OhanaRadius.input)
             .padding(.horizontal, 16)
+        }
+    }
+}
+
+private extension WorkoutType {
+    func localizedTitle(_ l: L10n) -> String {
+        switch self {
+        case .running:
+            l.tr(zh: "跑步", en: "Running", de: "Laufen")
+        case .walking:
+            l.tr(zh: "步行", en: "Walking", de: "Gehen")
+        case .cycling:
+            l.tr(zh: "骑行", en: "Cycling", de: "Radfahren")
+        case .swimming:
+            l.tr(zh: "游泳", en: "Swimming", de: "Schwimmen")
+        case .gym:
+            l.tr(zh: "健身", en: "Gym", de: "Fitness")
+        case .yoga:
+            l.tr(zh: "瑜伽", en: "Yoga", de: "Yoga")
+        case .hiking:
+            l.tr(zh: "徒步", en: "Hiking", de: "Wandern")
+        case .other:
+            l.tr(zh: "其他", en: "Other", de: "Sonstiges")
         }
     }
 }

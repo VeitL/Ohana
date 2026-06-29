@@ -35,6 +35,11 @@ struct CrewRosterEditorMenuRow: View {
     let icon: String
     @Binding var selection: String
     let options: [String]
+    var optionTitle: ((String) -> String)? = nil
+
+    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
+
+    private var l: L10n { L10n(appLanguage) }
 
     var body: some View {
         HStack(spacing: 10) {
@@ -42,7 +47,7 @@ struct CrewRosterEditorMenuRow: View {
             Spacer(minLength: 8)
             Picker(title, selection: $selection) {
                 ForEach(options, id: \.self) { option in
-                    Text(option.isEmpty ? "未填写" : option).tag(option)
+                    Text(displayTitle(for: option)).tag(option)
                 }
             }
             .pickerStyle(.menu)
@@ -51,6 +56,15 @@ struct CrewRosterEditorMenuRow: View {
         .padding(12)
         .frame(minHeight: 56)
         .background(Color.goCardWhite.opacity(0.08), in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
+    }
+
+    private func displayTitle(for option: String) -> String {
+        if let optionTitle {
+            return optionTitle(option)
+        }
+        return option.isEmpty || option == "未填写"
+            ? l.tr(zh: "未填写", en: "Not set", de: "Nicht festgelegt")
+            : option
     }
 }
 
@@ -159,6 +173,9 @@ struct CrewRosterThemeSwatchRow: View {
     let title: String
     @Binding var selectedHex: String
 
+    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
+
+    private var l: L10n { L10n(appLanguage) }
     private var themeHexes: [String] {
         PetThemeColor.allCases.map(\.hexValue)
     }
@@ -185,7 +202,7 @@ struct CrewRosterThemeSwatchRow: View {
                         .contentShape(Circle())
                     }
                     .buttonStyle(ScaleButtonStyle())
-                    .accessibilityLabel("主题色")
+                    .accessibilityLabel(l.tr(zh: "主题色", en: "Accent color", de: "Akzentfarbe"))
                 }
             }
         }

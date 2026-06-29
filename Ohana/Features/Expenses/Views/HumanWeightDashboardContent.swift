@@ -174,6 +174,7 @@ struct HumanWeightDashboardContent: View {
         }
         .buttonStyle(ScaleButtonStyle())
         .accessibilityLabel(l.tr(zh: "添加体重", en: "Add weight", de: "Gewicht hinzufügen"))
+        .accessibilityIdentifier("human-weight-add-action")
     }
 
     private var latestWeightText: String {

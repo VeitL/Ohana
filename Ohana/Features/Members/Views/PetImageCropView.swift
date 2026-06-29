@@ -25,6 +25,9 @@ struct PetImageCropView: View {
     @State private var lastOffset: CGSize = .zero
     @State private var fitDisplaySize: CGSize = .zero
     @State private var containerSize: CGSize = .zero
+    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
+
+    private var l: L10n { L10n(appLanguage) }
 
     var body: some View {
         GeometryReader { geo in
@@ -56,7 +59,7 @@ struct PetImageCropView: View {
 
                 VStack {
                     Spacer()
-                    Label("卡片取景", systemImage: "crop")
+                    Label(l.tr(zh: "卡片取景", en: "Card crop", de: "Kartenausschnitt"), systemImage: "crop")
                         .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded))
                         .foregroundStyle(Color.goCardWhite.opacity(0.5))
                         .padding(.horizontal, 10)
@@ -140,7 +143,7 @@ struct PetImageCropView: View {
     private var cropActions: some View {
         HStack(spacing: 12) {
             Button { onCrop(nil) } label: {
-                Text("取消")
+                Text(l.cancel)
                     .font(OhanaFont.adaptive(size: 16, weight: .semibold, design: .rounded))
                     .foregroundStyle(Color.goCardWhite.opacity(0.75))
                     .frame(maxWidth: .infinity)
@@ -150,7 +153,7 @@ struct PetImageCropView: View {
             .buttonStyle(ScaleButtonStyle())
 
             Button { performCrop() } label: {
-                Text("确认裁剪")
+                Text(l.tr(zh: "确认裁剪", en: "Crop", de: "Zuschneiden"))
                     .font(OhanaFont.adaptive(size: 16, weight: .bold, design: .rounded))
                     .foregroundStyle(Color.arkInk)
                     .frame(maxWidth: .infinity)

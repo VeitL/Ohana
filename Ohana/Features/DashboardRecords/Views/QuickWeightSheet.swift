@@ -21,6 +21,7 @@ struct QuickWeightSheet: View {
     @State private var latestPetWeightLoadTask: Task<Void, Never>?
     @StateObject private var commandQueue = DeferredDomainCommandQueue()
     @AppStorage("currentActiveHumanId") private var activeHumanIdRaw = ""
+    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
 
     private var parsedWeight: Double? { CountryDecimalInput.parse(weightText, countryCode: AppCountry.code) }
     private var isValid: Bool {
@@ -29,6 +30,7 @@ struct QuickWeightSheet: View {
     }
 
     private var themeColor: Color { Color(hex: pet.safeThemeColorHex) }
+    private var l: L10n { L10n(appLanguage) }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -47,7 +49,7 @@ struct QuickWeightSheet: View {
                         Text(pet.name)
                             .font(OhanaFont.adaptive(size: 16, weight: .black, design: .rounded))
                             .foregroundStyle(Color.ohanaPrimaryText)
-                        Text("记录体重")
+                        Text(l.tr(zh: "记录体重", en: "Record Weight", de: "Gewicht erfassen"))
                             .font(OhanaFont.adaptive(size: 12, weight: .medium, design: .rounded))
                             .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                     }
@@ -82,10 +84,11 @@ struct QuickWeightSheet: View {
 
             // ── 上次体重提示
             if let latestPetWeightKg {
+                let latestWeightText = String(format: "%.1f", latestPetWeightKg)
                 HStack(spacing: 6) {
                     Image(systemName: "clock.arrow.circlepath").accessibilityHidden(true)
                         .font(OhanaFont.adaptive(size: 11, weight: .semibold))
-                    Text("上次记录：\(latestPetWeightKg, specifier: "%.1f") kg")
+                    Text(l.tr(zh: "上次记录：\(latestWeightText) kg", en: "Last record: \(latestWeightText) kg", de: "Letzter Eintrag: \(latestWeightText) kg"))
                         .font(OhanaFont.adaptive(size: 12, weight: .medium, design: .rounded))
                 }
                 .foregroundStyle(Color.ohanaPrimaryText.opacity(0.35))
@@ -99,7 +102,7 @@ struct QuickWeightSheet: View {
                 Image(systemName: "calendar").accessibilityHidden(true)
                     .font(OhanaFont.adaptive(size: 13, weight: .semibold))
                     .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
-                Text("记录日期")
+                Text(l.tr(zh: "记录日期", en: "Record Date", de: "Eintragsdatum"))
                     .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                 Spacer()
@@ -117,7 +120,7 @@ struct QuickWeightSheet: View {
                 HStack(spacing: 8) {
                     Image(systemName: didSave ? "checkmark.circle.fill" : "scalemass.fill")
                         .font(OhanaFont.adaptive(size: 16, weight: .bold))
-                    Text(didSave ? "已保存 ✓" : "保存记录")
+                    Text(didSave ? l.tr(zh: "已保存 ✓", en: "Saved ✓", de: "Gespeichert ✓") : l.tr(zh: "保存记录", en: "Save Record", de: "Eintrag sichern"))
                         .font(OhanaFont.adaptive(size: 16, weight: .black, design: .rounded))
                 }
                 .foregroundStyle(Color.arkInk)

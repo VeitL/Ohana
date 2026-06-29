@@ -15,6 +15,7 @@ struct QuickWaterDetailSheet: View {
     let allEvents: [Event]
     let allPets: [Pet]
     let waterEntries: [QuickWaterLedgerEntry]
+    var onRecordChanged: (() -> Void)?
 
     @Environment(\.modelContext) var modelContext
     @Environment(\.dismiss) var dismiss
@@ -76,7 +77,8 @@ struct QuickWaterDetailSheet: View {
         onClose: (() -> Void)? = nil,
         allEvents: [Event] = [],
         allPets: [Pet] = [],
-        waterEntries: [QuickWaterLedgerEntry] = []
+        waterEntries: [QuickWaterLedgerEntry] = [],
+        onRecordChanged: (() -> Void)? = nil
     ) {
         self.pet = pet
         self.onRemove = onRemove
@@ -84,6 +86,7 @@ struct QuickWaterDetailSheet: View {
         self.allEvents = allEvents
         self.allPets = allPets
         self.waterEntries = waterEntries
+        self.onRecordChanged = onRecordChanged
         _displayedWaterMode = State(initialValue: WaterOperatingMode.stored(pet.id) ?? .manual)
     }
 
@@ -260,6 +263,7 @@ struct QuickWaterDetailSheet: View {
             .ignoresSafeArea(.keyboard, edges: .bottom)
             .petMemorialTone(isActive: pet.hasPassedAway)
         }
+        .accessibilityIdentifier("quick-water-detail-sheet")
         .onAppear {
             loadSettings()
             rebuildWaterSnapshot(force: true)
@@ -682,7 +686,9 @@ struct QuickWaterDetailSheet: View {
                 handleWaterSettingsTap()
             },
             tapAction: { openRootWaterSheet(.waterOverview) },
-            feedbackToken: waterFeedbackToken
+            feedbackToken: waterFeedbackToken,
+            primaryIdentifier: "quick-water-log-action",
+            secondaryIdentifier: "quick-water-settings-action"
         )
     }
 
@@ -713,7 +719,9 @@ struct QuickWaterDetailSheet: View {
             },
             tapAction: { openRootWaterSheet(.waterChangeOverview) },
             feedbackToken: waterChangeFeedbackToken,
-            isWarning: isWaterChangeOverdue
+            isWarning: isWaterChangeOverdue,
+            primaryIdentifier: "quick-water-change-log-action",
+            secondaryIdentifier: "quick-water-change-manage-action"
         )
     }
 
@@ -744,7 +752,9 @@ struct QuickWaterDetailSheet: View {
             },
             tapAction: { openRootWaterSheet(.filterOverview) },
             feedbackToken: filterFeedbackToken,
-            isWarning: isFilterOverdue
+            isWarning: isFilterOverdue,
+            primaryIdentifier: "quick-water-filter-clean-action",
+            secondaryIdentifier: "quick-water-filter-manage-action"
         )
     }
 

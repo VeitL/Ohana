@@ -19,15 +19,19 @@ enum TodayFocusCardPresentation {
 }
 
 enum TodayFocusCardLayout {
-    static let frontHeight: CGFloat = 46
-    static let compactStackHeight: CGFloat = 58
+    static let frontHeight: CGFloat = 92
+    static let compactStackHeight: CGFloat = 112
     static let legacySwitchHeight: CGFloat = 52
     static let backCardSpacing: CGFloat = 4
     static let contentHorizontalPadding: CGFloat = 10
     static let contentVerticalPadding: CGFloat = 6
-    static let homeChromeMinHeight: CGFloat = 58
-    static let homeChromeMaxHeight: CGFloat = 62
-    static let homeChromeHeightRatio: CGFloat = 0.07
+    static let homeChromeMinHeight: CGFloat = 108
+    static let homeChromeMaxHeight: CGFloat = 122
+    static let homeChromeHeightRatio: CGFloat = 0.13
+    static let carouselCornerRadius: CGFloat = 28
+    static let carouselHorizontalMargin: CGFloat = 18
+    static let carouselTopPeekInset: CGFloat = 12
+    static let carouselSideGap: CGFloat = 20
 }
 
 // MARK: - TodayFocusCard
@@ -228,6 +232,40 @@ struct TodayFocusCard: View {
             }
         }
         .animation(cardContentAnimation, value: animationIdentity)
+    }
+}
+
+struct TodayFocusCarouselBackPlate: View {
+    let depth: Int
+    let width: CGFloat
+    let height: CGFloat
+    let topInset: CGFloat
+    let spacing: CGFloat
+
+    private var depthValue: CGFloat {
+        CGFloat(depth)
+    }
+
+    private var shape: RoundedRectangle {
+        RoundedRectangle(cornerRadius: TodayFocusCardLayout.carouselCornerRadius, style: .continuous)
+    }
+
+    var body: some View {
+        shape
+            .fill(Color.ohanaCardSurface.opacity(max(0.42, 0.66 - Double(depth) * 0.10)))
+            .overlay {
+                shape.strokeBorder(Color.arkInk.opacity(0.055), lineWidth: 1)
+            }
+            .frame(width: width - depthValue * 12, height: height)
+            .offset(y: topInset - depthValue * spacing)
+            .shadow( // ui-v4: allow stacked Today Focus banner depth matching the reference interaction
+                color: Color.arkInk.opacity(max(0.04, 0.12 - Double(depth) * 0.03)),
+                radius: max(8, 18 - depthValue * 4),
+                x: 0,
+                y: max(3, 9 - depthValue * 2)
+            )
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
     }
 }
 

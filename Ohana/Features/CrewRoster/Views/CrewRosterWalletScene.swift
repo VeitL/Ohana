@@ -32,8 +32,11 @@ struct CrewRosterWalletScene<CardOverlay: View, MemberContent: View>: View {
     let onCollapse: () -> Void
     let onOpenEditor: (FocusCard) -> Void
     let onCloseEditor: () -> Void
+    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
     @AppStorage("shop_equip_fx_lime_glow") private var equipFxLimeGlow = false
     @AppStorage("shop_equip_fx_popout_card") private var equipFxPopoutCard = true
+
+    private var l: L10n { L10n(appLanguage) }
 
     private var selectedCardIndex: Int? {
         selectedCardId.flatMap { selectedId in
@@ -243,8 +246,8 @@ struct CrewRosterWalletScene<CardOverlay: View, MemberContent: View>: View {
                     openExpandedDetail(card)
                 }
         )
-        .accessibilityLabel("展开全部信息")
-        .accessibilityHint("向下拉动或点击以展开")
+        .accessibilityLabel(l.tr(zh: "展开全部信息", en: "Expand full info", de: "Alle Infos erweitern"))
+        .accessibilityHint(l.tr(zh: "向下拉动或点击以展开", en: "Pull down or tap to expand", de: "Nach unten ziehen oder tippen zum Erweitern"))
     }
 
     private func openExpandedDetail(_ card: FocusCard) {

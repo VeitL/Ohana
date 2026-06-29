@@ -10,13 +10,90 @@ import UniformTypeIdentifiers
 extension SettingsView {
     @ViewBuilder
     var settingsDataSections: some View {
-        if areDataSectionsMounted {
-            if let homeHumans, !homeHumans.isEmpty {
+        if let homeHumans, !homeHumans.isEmpty {
+            if areDataSectionsMounted {
                 deviceIdentitySection(homeHumans)
+            } else {
+                deviceIdentityPlaceholderSection
             }
-            if let homePets, !homePets.isEmpty {
+        }
+        if let homePets, !homePets.isEmpty {
+            if areDataSectionsMounted {
                 petManagementEntrySection(homePets)
+            } else {
+                petManagementPlaceholderSection
             }
+        }
+    }
+
+    private var deviceIdentityPlaceholderSection: some View {
+        settingsSection(title: l.tr(zh: "设备身份", en: "Device Identity", de: "Geräteidentität")) {
+            VStack(alignment: .leading, spacing: 12) {
+                settingsDataPlaceholderRow(titleWidth: 154, subtitleWidth: 96)
+                    .frame(minHeight: 68)
+                    .padding(12)
+                    .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
+
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 10) {
+                        ForEach(0 ..< 3, id: \.self) { _ in
+                            VStack(spacing: 6) {
+                                Circle()
+                                    .fill(Color.ohanaControlFill)
+                                    .frame(width: 44, height: 44)
+                                Capsule()
+                                    .fill(tertiaryText.opacity(0.24))
+                                    .frame(width: 40, height: 10) // a11y: allow non-interactive loading skeleton hidden from accessibility
+                            }
+                            .frame(minWidth: 56, minHeight: 72)
+                        }
+                    }
+                }
+                .scrollDisabled(true)
+
+                HStack(spacing: 6) {
+                    Circle()
+                        .fill(Color.goPrimary.opacity(0.28))
+                        .frame(width: 12, height: 12) // a11y: allow non-interactive loading skeleton hidden from accessibility
+                    Capsule()
+                        .fill(tertiaryText.opacity(0.24))
+                        .frame(width: 182, height: 10)
+                }
+                .frame(height: 18)
+            }
+            .redacted(reason: .placeholder)
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
+        }
+    }
+
+    private var petManagementPlaceholderSection: some View {
+        settingsSection(title: l.tr(zh: "宠物管理", en: "Pet Management", de: "Tierverwaltung")) {
+            settingsDataPlaceholderRow(titleWidth: 94, subtitleWidth: 136)
+                .frame(minHeight: 44)
+                .redacted(reason: .placeholder)
+                .allowsHitTesting(false)
+                .accessibilityHidden(true)
+        }
+    }
+
+    private func settingsDataPlaceholderRow(titleWidth: CGFloat, subtitleWidth: CGFloat) -> some View {
+        HStack(spacing: 12) {
+            Circle()
+                .fill(Color.ohanaControlFill)
+                .frame(width: 32, height: 32) // a11y: allow non-interactive loading skeleton hidden from accessibility
+            VStack(alignment: .leading, spacing: 7) {
+                Capsule()
+                    .fill(primaryText.opacity(0.22))
+                    .frame(width: titleWidth, height: 14)
+                Capsule()
+                    .fill(tertiaryText.opacity(0.22))
+                    .frame(width: subtitleWidth, height: 10)
+            }
+            Spacer()
+            Capsule()
+                .fill(tertiaryText.opacity(0.20))
+                .frame(width: 8, height: 14) // a11y: allow non-interactive loading skeleton hidden from accessibility
         }
     }
 
@@ -49,6 +126,7 @@ extension SettingsView {
                     .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
                 }
                 .buttonStyle(ScaleButtonStyle())
+                .accessibilityIdentifier("settings-human-account-switcher-action")
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 10) {
                         /* Removing "Unbind" option to enforce mandatory identity */

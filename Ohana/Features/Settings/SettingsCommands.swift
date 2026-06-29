@@ -20,6 +20,13 @@ struct SettingsCoconutBalanceCommandResult: Equatable {
     let legacyDelta: Int
 }
 
+struct SettingsPetCoconutBalanceCommandResult: Equatable {
+    let petID: UUID
+    let amount: Int
+    let delta: Int
+    let didApply: Bool
+}
+
 enum SettingsCommandService {
     @discardableResult
     @MainActor
@@ -69,7 +76,8 @@ enum SettingsCommandService {
         actorName: String?,
         context: ModelContext,
         wallet: CoconutWalletManaging,
-        projectionManager: QuestManager
+        projectionManager: QuestManager,
+        updatesProjection: Bool = true
     ) -> SettingsCoconutBalanceCommandResult {
         let amount = max(0, rawAmount)
         let current = if let human {
@@ -97,15 +105,54 @@ enum SettingsCommandService {
             context: context
         )
         context.safeSave()
-        projectionManager.replaceCoconutProjection(
-            count: amount,
-            logs: projectionManager.coconutLogs
-        )
+        if updatesProjection {
+            projectionManager.replaceCoconutProjection(
+                count: amount,
+                logs: projectionManager.coconutLogs
+            )
+        }
 
         return SettingsCoconutBalanceCommandResult(
             humanID: human?.id,
             amount: amount,
             legacyDelta: delta
+        )
+    }
+
+    @discardableResult
+    @MainActor
+    static func applyPetCoconutBalanceTest(
+        amount rawAmount: Int,
+        pet: Pet,
+        actorName: String?,
+        context: ModelContext,
+        wallet: CoconutWalletManaging
+    ) -> SettingsPetCoconutBalanceCommandResult {
+        let current = wallet.balance(for: pet, context: context)
+        guard EconomyWalletWritePolicy.canWrite(pet) else {
+            return SettingsPetCoconutBalanceCommandResult(
+                petID: pet.id,
+                amount: current,
+                delta: 0,
+                didApply: false
+            )
+        }
+
+        let amount = max(0, rawAmount)
+        let delta = amount - current
+        CoconutWalletService.setDeveloperOverrideBalance(
+            amount: amount,
+            for: pet,
+            displayName: actorName ?? pet.name,
+            context: context
+        )
+        context.safeSave()
+
+        return SettingsPetCoconutBalanceCommandResult(
+            petID: pet.id,
+            amount: amount,
+            delta: delta,
+            didApply: true
         )
     }
 }
@@ -187,7 +234,9 @@ struct SettingsCommandExecutor {
         human: Human?,
         title: String,
         actorName: String?,
-        note: String
+        note: String,
+        updatesProjection: Bool = true,
+        publishesRevision: Bool = true
     ) -> SettingsCoconutBalanceCommandResult {
         let result = SettingsCommandService.applyCoconutBalanceTest(
             amount: amount,
@@ -196,9 +245,28 @@ struct SettingsCommandExecutor {
             actorName: actorName,
             context: context,
             wallet: wallet,
-            projectionManager: questManager
+            projectionManager: questManager,
+            updatesProjection: updatesProjection
         )
-        revisions.publishSettingsCoconutBalance(result, note: note)
+        if publishesRevision {
+            revisions.publishSettingsCoconutBalance(result, note: note)
+        }
         return result
+    }
+
+    @discardableResult
+    func applyPetCoconutBalanceTest(
+        amount: Int,
+        pet: Pet,
+        actorName: String?,
+        note _: String
+    ) -> SettingsPetCoconutBalanceCommandResult {
+        SettingsCommandService.applyPetCoconutBalanceTest(
+            amount: amount,
+            pet: pet,
+            actorName: actorName,
+            context: context,
+            wallet: wallet
+        )
     }
 }

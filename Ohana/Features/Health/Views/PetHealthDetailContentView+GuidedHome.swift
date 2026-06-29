@@ -63,6 +63,7 @@ extension PetHealthDetailContentView {
                     }
                     .allowsHitTesting(healthFabItemsVisible && (action != .pdf || !isRenderingPDF))
                     .accessibilityHidden(!healthFabItemsVisible)
+                    .accessibilityIdentifier("pet-health-fab-action-\(action.id)")
                 }
             }
 
@@ -73,6 +74,7 @@ extension PetHealthDetailContentView {
                     : l.tr(zh: "展开健康菜单", en: "Open health menu", de: "Gesundheitsmenü öffnen"),
                 action: toggleHealthFabMenu
             )
+            .accessibilityIdentifier("pet-health-fab-toggle")
         }
     }
 

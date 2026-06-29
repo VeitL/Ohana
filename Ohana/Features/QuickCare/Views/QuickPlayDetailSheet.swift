@@ -215,6 +215,7 @@ struct QuickPlayDetailSheet: View {
                 commandQueue.cancelAll()
             }
         }
+        .accessibilityIdentifier("quick-play-detail-sheet")
     }
 
     private var headerRow: some View {

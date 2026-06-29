@@ -203,6 +203,7 @@ struct HumanExpenseDashboardContent: View {
         }
         .buttonStyle(ScaleButtonStyle())
         .accessibilityLabel(l.tr(zh: "添加花费", en: "Add expense", de: "Kosten hinzufügen"))
+        .accessibilityIdentifier("human-expense-add-action")
     }
 
     private var chartBuckets: [ExpenseTimeBucket] {

@@ -17,6 +17,7 @@ struct ExecutorPickerBar: View {
     var compact: Bool = false
 
     @AppStorage("currentActiveHumanId") private var activeHumanId: String = ""
+    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
     @ObservedObject private var avatarPipeline = AvatarPipelineRegistry.current
     @State private var showingExecutorSwitcher = false
     @State private var avatarSignature = ""
@@ -25,6 +26,8 @@ struct ExecutorPickerBar: View {
     private var currentHuman: Human? {
         humans.first { $0.id.uuidString == activeHumanId }
     }
+
+    private var l: L10n { L10n(appLanguage) }
 
     init(
         humans: [Human] = [],
@@ -65,11 +68,11 @@ struct ExecutorPickerBar: View {
             avatarCircle
 
             VStack(alignment: .leading, spacing: 0) {
-                Text("执行人")
+                Text(l.tr(zh: "执行人", en: "Executor", de: "Ausführend"))
                     .font(OhanaFont.adaptive(size: 9, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaSecondaryText)
                     .tracking(0.6)
-                Text(currentHuman.map(displayName) ?? "选择账户")
+                Text(currentHuman.map(displayName) ?? l.tr(zh: "选择账户", en: "Choose Account", de: "Konto wählen"))
                     .font(.system(size: compact ? 11 : 12, weight: .bold, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(1)
@@ -121,7 +124,7 @@ struct ExecutorPickerBar: View {
     }
 
     private func displayName(_ h: Human) -> String {
-        h.name.trimmingCharacters(in: .whitespaces).isEmpty ? "未命名成员" : h.name
+        h.name.trimmingCharacters(in: .whitespaces).isEmpty ? l.tr(zh: "未命名成员", en: "Unnamed member", de: "Unbenanntes Mitglied") : h.name
     }
 
     private var avatarSourceKey: String {

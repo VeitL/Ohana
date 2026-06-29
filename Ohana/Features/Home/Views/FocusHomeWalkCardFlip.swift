@@ -114,6 +114,7 @@ struct FocusHomeWalkCardFlip<Front: View>: View {
         OhanaFrameScheduler.runAfterNextFrame(milliseconds: cleanupDelayMilliseconds) {
             guard targetGeneration == generation else { return }
             appServices.walking.reset()
+            appServices.publishWalkingPresentationChange()
             retainedWalkPet = nil
         }
     }

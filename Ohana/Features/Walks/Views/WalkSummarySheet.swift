@@ -106,6 +106,7 @@ struct WalkSummarySheet: View {
                 }
             }
         }
+        .accessibilityIdentifier("walk-summary-sheet")
     }
 
     private var petHeader: some View {
@@ -446,6 +447,7 @@ struct WalkSummarySheet: View {
                     walkRow(walk)
                 }
                 .buttonStyle(ScaleButtonStyle())
+                .accessibilityIdentifier("walk-summary-row-\(walk.id.uuidString)")
                 .ohanaSmoothAppear(index: index)
             }
 

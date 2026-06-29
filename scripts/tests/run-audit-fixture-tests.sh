@@ -92,10 +92,12 @@ fixtures="scripts/tests/fixtures/Views"
 agent_skill_fixtures="scripts/tests/fixtures/AgentSkills"
 architecture_fixture_path="Ohana/Domain/__ArchitectureBoundaryFixture.swift"
 architecture_model_fixture_path="Ohana/Models/__ArchitectureModelBoundaryFixture.swift"
+member_view_revision_fixture_path="Ohana/Features/Members/Views/__MemberProfileRevisionBoundaryFixture.swift"
 
 cleanup_architecture_fixture() {
   rm -f "$architecture_fixture_path"
   rm -f "$architecture_model_fixture_path"
+  rm -f "$member_view_revision_fixture_path"
 }
 
 trap cleanup_architecture_fixture EXIT
@@ -164,6 +166,24 @@ if [[ "$status" -ne 0 ]]; then
   fail "scripts/audit-architecture-boundaries.sh ArchitectureModelBoundariesGood.swift: expected clean exit 0, got $status: $output"
 else
   echo "ok  scripts/audit-architecture-boundaries.sh passes ArchitectureModelBoundariesGood.swift"
+fi
+cleanup_architecture_fixture
+
+cp "$fixtures/MemberProfileRevisionBoundaryBad.swift" "$member_view_revision_fixture_path"
+run_audit scripts/audit-architecture-boundaries.sh --changed
+if [[ "$status" -ne 1 ]]; then
+  fail "scripts/audit-architecture-boundaries.sh MemberProfileRevisionBoundaryBad.swift: expected strict exit 1, got $status"
+elif ! grep -qF "[member-view-direct-profile-revision]" <<<"$output"; then
+  fail "scripts/audit-architecture-boundaries.sh MemberProfileRevisionBoundaryBad.swift: rule [member-view-direct-profile-revision] no longer fires"
+else
+  echo "ok  scripts/audit-architecture-boundaries.sh catches direct Members view profile revision publishes"
+fi
+cp "$fixtures/MemberProfileRevisionBoundaryGood.swift" "$member_view_revision_fixture_path"
+run_audit scripts/audit-architecture-boundaries.sh --changed
+if [[ "$status" -ne 0 ]]; then
+  fail "scripts/audit-architecture-boundaries.sh MemberProfileRevisionBoundaryGood.swift: expected clean exit 0, got $status: $output"
+else
+  echo "ok  scripts/audit-architecture-boundaries.sh passes MemberProfileRevisionBoundaryGood.swift"
 fi
 cleanup_architecture_fixture
 

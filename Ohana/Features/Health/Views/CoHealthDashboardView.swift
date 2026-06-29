@@ -13,6 +13,7 @@ struct CoHealthDashboardContentView: View {
 
     @Environment(AppServices.self) private var appServices
     @AppStorage("currentActiveHumanId") private var activeHumanIdStr = ""
+    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
     @State private var chartRevealProgress: CGFloat = 0.0
 
     private var activeHumanId: UUID? { UUID(uuidString: activeHumanIdStr) }
@@ -20,6 +21,7 @@ struct CoHealthDashboardContentView: View {
         appServices.privacy.isLocked(.weight, for: human, viewedBy: activeHumanId) ||
             appServices.privacy.isLocked(.workout, for: human, viewedBy: activeHumanId)
     }
+    private var l: L10n { L10n(appLanguage) }
 
     // 取过去30天数据
     private var past30Days: Date {
@@ -58,13 +60,15 @@ struct CoHealthDashboardContentView: View {
 
     // 趣味总结文案
     private var summaryText: String {
-        let petName = associatedPets.first?.name ?? "毛孩子"
+        let petName = associatedPets.first?.name ?? l.tr(zh: "毛孩子", en: "your pets", de: "deine Tiere")
         let km = String(format: "%.1f", thisMonthWalkKm)
         if let delta = petWeightDelta {
-            let dir = delta < 0 ? "瘦了" : "胖了"
-            return "本月你带 \(petName) 走了 \(km)km，\(petName)\(dir) \(String(format: "%.1f", abs(delta)))kg 🎉"
+            let amount = String(format: "%.1f", abs(delta))
+            return delta < 0
+                ? l.tr(zh: "本月你带 \(petName) 走了 \(km)km，\(petName)瘦了 \(amount)kg 🎉", en: "You walked \(km) km with \(petName) this month. \(petName) is down \(amount) kg 🎉", de: "Du bist diesen Monat \(km) km mit \(petName) gegangen. \(petName) hat \(amount) kg abgenommen 🎉")
+                : l.tr(zh: "本月你带 \(petName) 走了 \(km)km，\(petName)胖了 \(amount)kg 🎉", en: "You walked \(km) km with \(petName) this month. \(petName) is up \(amount) kg 🎉", de: "Du bist diesen Monat \(km) km mit \(petName) gegangen. \(petName) hat \(amount) kg zugenommen 🎉")
         }
-        return "本月你带 \(petName) 走了 \(km)km，继续加油！💪"
+        return l.tr(zh: "本月你带 \(petName) 走了 \(km)km，继续加油！💪", en: "You walked \(km) km with \(petName) this month. Keep going! 💪", de: "Du bist diesen Monat \(km) km mit \(petName) gegangen. Weiter so! 💪")
     }
 
     private func playWeightChartReveal() {
@@ -90,10 +94,10 @@ struct CoHealthDashboardContentView: View {
                 .frame(width: 38, height: 38) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
                 .background(Color.goYellow.opacity(0.14), in: Circle())
             VStack(alignment: .leading, spacing: 3) {
-                Text("人宠共健仅本人可见")
+                Text(l.tr(zh: "人宠共健仅本人可见", en: "Co-health is private", de: "Gemeinsame Gesundheit ist privat"))
                     .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
-                Text("切换到本人账户后可查看体重与运动趋势")
+                Text(l.tr(zh: "切换到本人账户后可查看体重与运动趋势", en: "Switch to this account to view weight and workout trends.", de: "Wechsle zu diesem Konto, um Gewicht und Trainingstrends zu sehen."))
                     .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded))
                     .foregroundStyle(Color.ohanaSecondaryText)
             }
@@ -108,7 +112,7 @@ struct CoHealthDashboardContentView: View {
             HStack(spacing: 8) {
                 Text("🏃")
                     .font(OhanaFont.adaptive(size: 18))
-                Text("人宠共健仪表盘")
+                Text(l.tr(zh: "人宠共健仪表盘", en: "Co-health Dashboard", de: "Gemeinsames Gesundheitsdashboard"))
                     .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Spacer()
@@ -141,13 +145,13 @@ struct CoHealthDashboardContentView: View {
             miniStat(
                 value: String(format: "%.1f", thisMonthWalkKm),
                 unit: "km",
-                label: "本月遛狗",
+                label: l.tr(zh: "本月遛狗", en: "Walks this month", de: "Gassi diesen Monat"),
                 color: Color.goPrimary
             )
             miniStat(
                 value: snapshot.latestHumanWeightKg.flatMap { $0.isFinite ? String(format: "%.1f", $0) : nil } ?? "--",
                 unit: "kg",
-                label: "当前体重",
+                label: l.tr(zh: "当前体重", en: "Current weight", de: "Aktuelles Gewicht"),
                 color: Color.goTeal
             )
             if let pet = associatedPets.first,
@@ -155,7 +159,7 @@ struct CoHealthDashboardContentView: View {
                 miniStat(
                     value: String(format: "%.1f", w),
                     unit: "kg",
-                    label: "\(pet.name)体重",
+                    label: l.tr(zh: "\(pet.name)体重", en: "\(pet.name) weight", de: "Gewicht von \(pet.name)"),
                     color: Color(hex: pet.themeColorHex)
                 )
             }
@@ -192,13 +196,13 @@ struct CoHealthDashboardContentView: View {
         let hasData = hPoints.count >= 2 || pPoints.count >= 2
 
         VStack(alignment: .leading, spacing: 8) {
-            Text("体重对比趋势")
+            Text(l.tr(zh: "体重对比趋势", en: "Weight Trend Comparison", de: "Gewichtstrend-Vergleich"))
                 .font(OhanaFont.adaptive(size: 10, weight: .bold, design: .rounded))
                 .foregroundStyle(Color.ohanaPrimaryText.opacity(0.3))
                 .textCase(.uppercase)
 
             if !hasData {
-                Text("体重记录 2 条以上后可查看趋势对比")
+                Text(l.tr(zh: "体重记录 2 条以上后可查看趋势对比", en: "Add at least 2 weight records to compare trends.", de: "Füge mindestens 2 Gewichtseinträge hinzu, um Trends zu vergleichen."))
                     .font(OhanaFont.adaptive(size: 12, weight: .medium))
                     .foregroundStyle(Color.ohanaPrimaryText.opacity(0.25))
                     .frame(maxWidth: .infinity, alignment: .center)

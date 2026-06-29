@@ -23,7 +23,11 @@ extension VerticalSolidHomeView {
 
     func openQuickActionItem(_ item: QuickActionItem, card: FocusCard, usesPrimaryAction: Bool) {
         OhanaFeedback.light()
-        if card.isHuman, interaction.containsHuman(card.id) {
+        if card.isHuman {
+            guard card.isReal else {
+                openCard(card)
+                return
+            }
             openHumanQuickActionItem(item, humanID: card.id, usesPrimaryAction: usesPrimaryAction)
             return
         }
@@ -146,6 +150,11 @@ extension VerticalSolidHomeView {
     }
 
     func performPetQuickAction(_ actionType: String, petID: UUID) {
+        if actionType == "walk" {
+            startWalkFromQuickAction(petID: petID)
+            return
+        }
+
         enqueueHomeCommand(.quickCare(entityID: petID, action: actionType)) {
             commandExecutor.performActionType(
                 actionType,
@@ -281,8 +290,10 @@ extension VerticalSolidHomeView {
         }
         OhanaFeedback.medium()
         appServices.walking.start(pet: pet)
-        appServices.walking.isWalkCardExpandedSurfaceVisible = true
-        walkCardPresentationRevision &+= 1
+        if appServices.walking.currentPet?.id == pet.id {
+            appServices.publishWalkingPresentationChange()
+            walkCardPresentationRevision &+= 1
+        }
     }
 
     func fetchPetForHomeAction(id: UUID) -> Pet? {

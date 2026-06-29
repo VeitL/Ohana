@@ -18,11 +18,11 @@ extension HumanDetailView {
                         .foregroundStyle(Color.goRed)
                 }
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("吃药提醒")
+                    Text(l.tr(zh: "吃药提醒", en: "Medication Reminders", de: "Medikamentenerinnerungen"))
                         .font(OhanaFont.callout(.bold))
                         .foregroundStyle(Color(hex: "1E3A8A"))
                     if myMeds.isEmpty {
-                        Text("暂无用药计划")
+                        Text(l.tr(zh: "暂无用药计划", en: "No medication plans", de: "Keine Medikamentenpläne"))
                             .font(OhanaFont.caption())
                             .foregroundStyle(Color(hex: "6B82C4"))
                     } else {
@@ -80,21 +80,21 @@ extension HumanDetailView {
                         .foregroundStyle(Color.goTeal)
                 }
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("身体检测报告")
+                    Text(l.tr(zh: "身体检测报告", en: "Health Reports", de: "Gesundheitsberichte"))
                         .font(OhanaFont.callout(.bold))
                         .foregroundStyle(Color(hex: "1E3A8A"))
                     if myReports.isEmpty {
-                        Text("暂无检测报告")
+                        Text(l.tr(zh: "暂无检测报告", en: "No health reports", de: "Keine Gesundheitsberichte"))
                             .font(OhanaFont.caption())
                             .foregroundStyle(Color(hex: "6B82C4"))
                     } else {
                         let abnormal = myReports.count(where: { $0.conclusion == .abnormal || $0.conclusion == .critical })
                         HStack(spacing: 6) {
-                            Text("\(myReports.count) 份报告")
+                            Text(l.tr(zh: "\(myReports.count) 份报告", en: "\(myReports.count) reports", de: "\(myReports.count) Berichte"))
                                 .font(OhanaFont.caption(.semibold))
                                 .foregroundStyle(Color(hex: "6B82C4"))
                             if abnormal > 0 {
-                                Text("· \(abnormal) 项异常")
+                                Text(l.tr(zh: "· \(abnormal) 项异常", en: "· \(abnormal) abnormal", de: "· \(abnormal) auffällig"))
                                     .font(OhanaFont.caption(.semibold))
                                     .foregroundStyle(Color.goOrange)
                             }
@@ -189,7 +189,7 @@ extension HumanDetailView {
                         .foregroundStyle(Color.goPrimary)
                 }
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("体重记录")
+                    Text(l.tr(zh: "体重记录", en: "Weight Records", de: "Gewichtsverlauf"))
                         .font(OhanaFont.callout(.bold))
                         .foregroundStyle(Color(hex: "1E3A8A"))
                     if let latest = human.weightLogs.sorted(by: { $0.date > $1.date }).first {
@@ -197,7 +197,7 @@ extension HumanDetailView {
                             .font(OhanaFont.caption())
                             .foregroundStyle(Color(hex: "6B82C4"))
                     } else {
-                        Text("暂无记录")
+                        Text(l.tr(zh: "暂无记录", en: "No records", de: "Keine Einträge"))
                             .font(OhanaFont.caption())
                             .foregroundStyle(Color(hex: "6B82C4"))
                     }

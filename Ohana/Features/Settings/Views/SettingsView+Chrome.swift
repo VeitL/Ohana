@@ -15,6 +15,20 @@ extension SettingsView {
                 .font(OhanaFont.largeTitle(.black))
                 .foregroundStyle(primaryText)
             Spacer()
+            if SettingsDebugTools.isVisible {
+                Button {
+                    openCoconutBalanceDebugTool()
+                } label: {
+                    Image(systemName: "hammer.fill") // a11y: allow decorative icon covered by surrounding label
+                        .font(OhanaFont.adaptive(size: 13, weight: .black))
+                        .foregroundStyle(Color.goYellow)
+                        .frame(width: 44, height: 44)
+                        .background(Color.ohanaControlFill, in: Capsule())
+                }
+                .buttonStyle(ScaleButtonStyle())
+                .accessibilityLabel(l.tr(zh: "Debug 椰子", en: "Debug Coconuts", de: "Debug-Kokosnüsse"))
+                .accessibilityIdentifier("settings-debug-coconuts-shortcut")
+            }
             Button { closeSettings() } label: {
                 Image(systemName: "xmark") // a11y: allow decorative icon covered by surrounding text or control
                     .font(OhanaFont.adaptive(size: 13, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
@@ -23,6 +37,7 @@ extension SettingsView {
                     .background(Color.ohanaControlFill, in: Capsule())
             }
             .buttonStyle(ScaleButtonStyle())
+            .accessibilityIdentifier("settings-close-action")
         }
         .padding(.horizontal, 2)
         .padding(.top, 2)

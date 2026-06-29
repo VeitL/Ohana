@@ -234,6 +234,7 @@ struct QuickHumanNoteSheet: View {
                 Text(l.tr(zh: "添加记录", en: "Add Record", de: "Eintrag hinzufügen"))
                     .font(OhanaFont.title3(.black))
                     .foregroundStyle(Color.ohanaPrimaryText)
+                    .accessibilityIdentifier("quick-human-note-sheet")
                 Text(human.name)
                     .font(OhanaFont.caption(.semibold))
                     .foregroundStyle(Color.ohanaSecondaryText)
@@ -258,6 +259,7 @@ struct QuickHumanNoteSheet: View {
                 .frame(minHeight: 110)
                 .padding(12)
                 .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous))
+                .accessibilityIdentifier("quick-human-note-input")
                 .overlay(alignment: .topLeading) {
                     if noteText.isEmpty {
                         Text(l.tr(zh: "记录此刻、想法或要跟进的事……", en: "Write a thought, moment, or follow-up…", de: "Gedanke, Moment oder To-do notieren…"))
@@ -434,6 +436,7 @@ struct QuickHumanNoteSheet: View {
         }
         .buttonStyle(ScaleButtonStyle())
         .disabled(!canSave || isSaving)
+        .accessibilityIdentifier("quick-human-note-save-action")
         .padding(.horizontal, 22)
         .padding(.top, 10)
         .padding(.bottom, 16)

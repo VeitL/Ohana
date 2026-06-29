@@ -33,17 +33,18 @@ enum HumanWishlistCommandError: LocalizedError, Equatable {
     case insufficientCoconuts(missing: Int)
 
     var errorDescription: String? {
+        let l = L10n.current
         switch self {
         case .emptyTitle:
-            "心愿内容不能为空。"
+            return l.tr(zh: "心愿内容不能为空。", en: "Wish title cannot be empty.", de: "Der Wunsch darf nicht leer sein.")
         case .invalidCost:
-            "心愿兑换费用必须大于 0。"
+            return l.tr(zh: "心愿兑换费用必须大于 0。", en: "Wish cost must be greater than 0.", de: "Wunschkosten müssen größer als 0 sein.")
         case .itemOwnershipMismatch:
-            "这个心愿不属于当前成员。"
+            return l.tr(zh: "这个心愿不属于当前成员。", en: "This wish does not belong to the current member.", de: "Dieser Wunsch gehört nicht zum aktuellen Mitglied.")
         case .alreadyRedeemed:
-            "这个心愿已经兑换。"
+            return l.tr(zh: "这个心愿已经兑换。", en: "This wish has already been redeemed.", de: "Dieser Wunsch wurde bereits eingelöst.")
         case let .insufficientCoconuts(missing):
-            "椰子余额不足，还差 \(missing) 个。"
+            return l.tr(zh: "椰子余额不足，还差 \(missing) 个。", en: "Not enough coconuts. Need \(missing) more.", de: "Nicht genug Kokosnüsse. Es fehlen \(missing).")
         }
     }
 }
@@ -185,6 +186,7 @@ enum HumanWishlistCommandService {
             throw HumanWishlistCommandError.itemOwnershipMismatch
         }
         do {
+            let l = L10n.current
             var walletApplyError: Error?
             DomainMemberFactEffectsDispatcher.run(plan: write) { _ in
                 do {
@@ -195,7 +197,7 @@ enum HumanWishlistCommandService {
                                 delta: -item.cost,
                                 entryKind: .spend,
                                 source: .shop,
-                                title: "兑换「\(item.title)」",
+                                title: l.tr(zh: "兑换「\(item.title)」", en: "Redeemed \"\(item.title)\"", de: "\"\(item.title)\" eingelöst"),
                                 emoji: "🎁",
                                 actorId: human.id.uuidString,
                                 actorName: human.name,

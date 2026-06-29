@@ -62,6 +62,7 @@ struct DailyStreakDetailView: View {
     @Environment(AppServices.self) private var appServices
     @ObservedObject private var avatarPipeline = AvatarPipelineRegistry.current
     @AppStorage("currentActiveHumanId") private var currentActiveHumanId: String = ""
+    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
     @State private var selectedMonth = Date()
     @State private var checkedInDates: Set<String> = []
     @State private var makeupDates: Set<String> = []
@@ -81,6 +82,8 @@ struct DailyStreakDetailView: View {
             shopInventory: appServices.shopInventory
         )
     }
+
+    private var l: L10n { L10n(appLanguage) }
 
     private var activeHuman: Human? {
         humans.first { $0.id.uuidString == currentActiveHumanId } ?? humans.first
@@ -103,7 +106,7 @@ struct DailyStreakDetailView: View {
 
     var body: some View {
         OhanaSheetPageScaffold(
-            title: "打卡连击",
+            title: l.tr(zh: "打卡连击", en: "Check-in streak", de: "Check-in-Serie"),
             subtitle: activeHuman?.name ?? "Ohana",
             onClose: closePage,
             leading: {
@@ -149,18 +152,18 @@ struct DailyStreakDetailView: View {
             scheduleTodayCheckIn()
         }
         .alert(
-            "补签确认",
+            l.tr(zh: "补签确认", en: "Confirm makeup check-in", de: "Nachhol-Check-in bestaetigen"),
             isPresented: Binding(get: { showMakeupConfirm != nil }, set: { if !$0 { showMakeupConfirm = nil } })
         ) {
-            Button("消耗1个补签包确认") {
+            Button(l.tr(zh: "消耗1个补签包确认", en: "Use 1 makeup pack", de: "1 Nachholpaket verwenden")) {
                 if let date = showMakeupConfirm {
                     applyMakeup(date: date)
                 }
                 showMakeupConfirm = nil
             }
-            Button("取消", role: .cancel) { showMakeupConfirm = nil }
+            Button(l.tr(zh: "取消", en: "Cancel", de: "Abbrechen"), role: .cancel) { showMakeupConfirm = nil }
         } message: {
-            Text("补签 \(showMakeupConfirm ?? "")，将消耗1个补签包")
+            Text(l.tr(zh: "补签 \(showMakeupConfirm ?? "")，将消耗1个补签包", en: "Make up \(showMakeupConfirm ?? "") using 1 makeup pack", de: "\(showMakeupConfirm ?? "") mit 1 Nachholpaket nachholen"))
         }
         .onDisappear {
             checkInCommandTask?.cancel()
@@ -202,10 +205,10 @@ struct DailyStreakDetailView: View {
                     .accessibilityHidden(true)
 
                 VStack(alignment: .leading, spacing: 3) {
-                    Text("椰子账本")
+                    Text(l.tr(zh: "椰子账本", en: "Coconut ledger", de: "Kokosnuss-Buch"))
                         .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
                         .foregroundStyle(Color.ohanaPrimaryText)
-                    Text("查看连击和奖励记录")
+                    Text(l.tr(zh: "查看连击和奖励记录", en: "View streak and reward history", de: "Serien- und Belohnungsverlauf ansehen"))
                         .font(OhanaFont.adaptive(size: 11, weight: .semibold, design: .rounded))
                         .foregroundStyle(Color.ohanaSecondaryText)
                 }
@@ -235,7 +238,7 @@ struct DailyStreakDetailView: View {
             .contentShape(RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous))
         }
         .buttonStyle(ScaleButtonStyle())
-        .accessibilityLabel("查看椰子账本，当前 \(balance) 个椰子")
+        .accessibilityLabel(l.tr(zh: "查看椰子账本，当前 \(balance) 个椰子", en: "View coconut ledger, current balance \(balance) coconuts", de: "Kokosnuss-Buch ansehen, aktueller Stand \(balance) Kokosnuesse"))
     }
 
     private var myStreakCard: some View {
@@ -255,10 +258,10 @@ struct DailyStreakDetailView: View {
                     }
                 }
                 VStack(alignment: .leading, spacing: 3) {
-                    Text(activeHuman?.name ?? "我")
+                    Text(activeHuman?.name ?? l.tr(zh: "我", en: "Me", de: "Ich"))
                         .font(OhanaFont.adaptive(size: 17, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.ohanaPrimaryText)
-                    Text("每天打开 App 即打卡")
+                    Text(l.tr(zh: "每天打开 App 即打卡", en: "Open the app daily to check in", de: "Oeffne die App taeglich zum Check-in"))
                         .font(OhanaFont.adaptive(size: 12, weight: .medium, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                 }
@@ -269,11 +272,11 @@ struct DailyStreakDetailView: View {
                             .font(OhanaFont.adaptive(size: 44, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(currentStreak > 0 ? Color.goOrange : Color.ohanaPrimaryText.opacity(0.25))
                             .contentTransition(.numericText())
-                        Text("天")
+                        Text(l.tr(zh: "天", en: "days", de: "Tage"))
                             .font(OhanaFont.adaptive(size: 16, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(Color.ohanaPrimaryText.opacity(0.45))
                     }
-                    Text(currentStreak >= 30 ? "🔥 传奇！" : currentStreak >= 7 ? "🔥 火热！" : "继续保持")
+                    Text(streakMoodText)
                         .font(OhanaFont.adaptive(size: 11, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.goOrange)
                 }
@@ -286,11 +289,11 @@ struct DailyStreakDetailView: View {
                 let progress = Double(currentStreak - prev) / Double(next - prev)
                 VStack(alignment: .leading, spacing: 6) {
                     HStack {
-                        Text("距离 \(next) 天里程碑")
+                        Text(l.tr(zh: "距离 \(next) 天里程碑", en: "\(next)-day milestone ahead", de: "\(next)-Tage-Meilenstein voraus"))
                             .font(OhanaFont.adaptive(size: 11, weight: .medium, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                         Spacer()
-                        Text("还差 \(next - currentStreak) 天")
+                        Text(l.tr(zh: "还差 \(next - currentStreak) 天", en: "\(next - currentStreak) days left", de: "Noch \(next - currentStreak) Tage"))
                             .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(Color.goOrange.opacity(0.8))
                     }
@@ -321,10 +324,10 @@ struct DailyStreakDetailView: View {
         return VStack(alignment: .leading, spacing: 12) {
             HStack {
                 VStack(alignment: .leading, spacing: 3) {
-                    Text("家庭连击")
+                    Text(l.tr(zh: "家庭连击", en: "Family streak", de: "Familienserie"))
                         .font(OhanaFont.adaptive(size: 17, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.ohanaPrimaryText)
-                    Text("本周照护贡献，谁最稳一眼就知道")
+                    Text(l.tr(zh: "本周照护贡献，谁最稳一眼就知道", en: "This week's care contributions at a glance", de: "Pflegebeitraege dieser Woche auf einen Blick"))
                         .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.ohanaSecondaryText)
                 }
@@ -347,7 +350,7 @@ struct DailyStreakDetailView: View {
                                 .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                 .foregroundStyle(Color.ohanaPrimaryText)
                                 .lineLimit(1)
-                            Text(entry.count == 0 ? "本周还没有记录" : "\(entry.count) 次照护 · +\(entry.coconuts)🥥")
+                            Text(entry.count == 0 ? l.tr(zh: "本周还没有记录", en: "No records this week yet", de: "Diese Woche noch keine Eintraege") : l.tr(zh: "\(entry.count) 次照护 · +\(entry.coconuts)🥥", en: "\(entry.count) care actions · +\(entry.coconuts)🥥", de: "\(entry.count) Pflegeaktionen · +\(entry.coconuts)🥥"))
                                 .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                 .foregroundStyle(Color.ohanaSecondaryText)
                         }
@@ -378,14 +381,14 @@ struct DailyStreakDetailView: View {
                     Image(systemName: "calendar.badge.checkmark") // a11y: allow decorative icon covered by surrounding text or control
                         .font(OhanaFont.adaptive(size: 16, weight: .bold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.goPrimary)
-                    Text("打卡日历")
+                    Text(l.tr(zh: "打卡日历", en: "Check-in calendar", de: "Check-in-Kalender"))
                         .font(OhanaFont.adaptive(size: 17, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.ohanaPrimaryText)
                 }
                 Spacer()
                 HStack(spacing: 4) {
                     Text("🔥")
-                    Text("\(currentStreak) 天连胜")
+                    Text(l.tr(zh: "\(currentStreak) 天连胜", en: "\(currentStreak)-day streak", de: "\(currentStreak)-Tage-Serie"))
                         .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.goOrange)
                 }
@@ -409,7 +412,7 @@ struct DailyStreakDetailView: View {
                         .background(Color.ohanaControlFill, in: Circle())
                 }
                 .buttonStyle(ScaleButtonStyle())
-                .accessibilityLabel("上个月")
+                .accessibilityLabel(l.tr(zh: "上个月", en: "Previous month", de: "Vorheriger Monat"))
 
                 Spacer()
 
@@ -427,15 +430,15 @@ struct DailyStreakDetailView: View {
                         nextMonthIcon(isEnabled: true)
                     }
                     .buttonStyle(ScaleButtonStyle())
-                    .accessibilityLabel("下个月")
+                    .accessibilityLabel(l.tr(zh: "下个月", en: "Next month", de: "Naechster Monat"))
                 } else {
                     nextMonthIcon(isEnabled: false)
-                        .accessibilityLabel("已经是当前月份")
+                        .accessibilityLabel(l.tr(zh: "已经是当前月份", en: "Already the current month", de: "Bereits der aktuelle Monat"))
                 }
             }
 
             HStack(spacing: 0) {
-                ForEach(["日", "一", "二", "三", "四", "五", "六"], id: \.self) { d in
+                ForEach(localizedWeekdaySymbols, id: \.self) { d in
                     Text(d)
                         .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.ohanaPrimaryText.opacity(0.3))
@@ -460,7 +463,7 @@ struct DailyStreakDetailView: View {
             HStack(spacing: 12) {
                 HStack(spacing: 4) {
                     Text("📦").font(OhanaFont.adaptive(size: 14)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                    Text("补签包")
+                    Text(l.tr(zh: "补签包", en: "Makeup packs", de: "Nachholpakete"))
                         .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.ohanaPrimaryText.opacity(0.7))
                     Text("×\(makeupPackCount)")
@@ -469,14 +472,14 @@ struct DailyStreakDetailView: View {
                 }
                 Spacer()
                 if makeupPackCount > 0 {
-                    Text("点击灰色日期补签")
+                    Text(l.tr(zh: "点击灰色日期补签", en: "Tap a gray date to make it up", de: "Tippe ein graues Datum zum Nachholen"))
                         .font(OhanaFont.adaptive(size: 10, weight: .medium, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.goPrimary.opacity(0.7))
                 } else if let coconutShopLockedLevel {
                     lockedShopLabel(level: coconutShopLockedLevel)
                 } else {
                     Button { presentCoconutShop(.boost) } label: {
-                        Text("去商店购买 →")
+                        Text(l.tr(zh: "去商店购买 →", en: "Buy in shop →", de: "Im Shop kaufen →"))
                             .font(OhanaFont.adaptive(size: 10, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(Color.goYellow.opacity(0.85))
                     }
@@ -500,10 +503,10 @@ struct DailyStreakDetailView: View {
 
     private var checkInStatsRow: some View {
         HStack(spacing: 10) {
-            checkInStatCell(value: "\(checkedInDates.count)", label: "总打卡", icon: "checkmark.circle.fill", color: Color.goPrimary)
-            checkInStatCell(value: "\(currentStreak)", label: "当前连胜", icon: "flame.fill", color: Color.goOrange)
-            checkInStatCell(value: "\(longestStreak)", label: "最长连胜", icon: "trophy.fill", color: Color.goYellow)
-            checkInStatCell(value: "\(monthCheckInRate)%", label: "本月", icon: "chart.bar.fill", color: Color.goCardCyan)
+            checkInStatCell(value: "\(checkedInDates.count)", label: l.tr(zh: "总打卡", en: "Total", de: "Gesamt"), icon: "checkmark.circle.fill", color: Color.goPrimary)
+            checkInStatCell(value: "\(currentStreak)", label: l.tr(zh: "当前连胜", en: "Current", de: "Aktuell"), icon: "flame.fill", color: Color.goOrange)
+            checkInStatCell(value: "\(longestStreak)", label: l.tr(zh: "最长连胜", en: "Longest", de: "Laengste"), icon: "trophy.fill", color: Color.goYellow)
+            checkInStatCell(value: "\(monthCheckInRate)%", label: l.tr(zh: "本月", en: "This month", de: "Dieser Monat"), icon: "chart.bar.fill", color: Color.goCardCyan)
         }
     }
 
@@ -540,7 +543,7 @@ struct DailyStreakDetailView: View {
             Image(systemName: "lock.fill") // a11y: allow decorative lock icon; capsule label describes the locked shop.
                 .font(OhanaFont.adaptive(size: 9, weight: .black))
                 .accessibilityHidden(true)
-            Text("商店 Lv.\(level) 解锁")
+            Text(l.tr(zh: "商店 Lv.\(level) 解锁", en: "Shop unlocks at Lv.\(level)", de: "Shop wird auf Lv.\(level) freigeschaltet"))
                 .font(OhanaFont.adaptive(size: 10, weight: .black, design: .rounded))
                 .lineLimit(1)
                 .minimumScaleFactor(0.74)
@@ -549,7 +552,7 @@ struct DailyStreakDetailView: View {
         .padding(.horizontal, 8)
         .padding(.vertical, 5)
         .background(Color.ohanaControlFill.opacity(0.72), in: Capsule())
-        .accessibilityLabel("椰子商店生命之树 Lv.\(level) 解锁")
+        .accessibilityLabel(l.tr(zh: "椰子商店生命之树 Lv.\(level) 解锁", en: "Coconut shop unlocks at Life Tree Lv.\(level)", de: "Kokosnuss-Shop wird mit Lebensbaum Lv.\(level) freigeschaltet"))
     }
 
     private var checkInMilestoneRow: some View {
@@ -565,7 +568,11 @@ struct DailyStreakDetailView: View {
             if let nextMilestone {
                 HStack(spacing: 6) {
                     Text(nextMilestone.emoji)
-                    Text("再连续 \(nextMilestone.days - currentStreak) 天即可领取 +\(nextMilestone.reward)🥥")
+                    Text(l.tr(
+                        zh: "再连续 \(nextMilestone.days - currentStreak) 天即可领取 +\(nextMilestone.reward)🥥",
+                        en: "\(nextMilestone.days - currentStreak) more streak days to claim +\(nextMilestone.reward)🥥",
+                        de: "Noch \(nextMilestone.days - currentStreak) Serientage fuer +\(nextMilestone.reward)🥥"
+                    ))
                         .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.goPrimary.opacity(0.75))
                     Spacer()
@@ -580,11 +587,11 @@ struct DailyStreakDetailView: View {
                     HStack(spacing: 8) {
                         Text(milestone.emoji)
                             .font(OhanaFont.adaptive(size: 16)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                        Text("\(milestone.days) 天连胜达成！")
+                        Text(l.tr(zh: "\(milestone.days) 天连胜达成！", en: "\(milestone.days)-day streak reached!", de: "\(milestone.days)-Tage-Serie erreicht!"))
                             .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(Color.ohanaPrimaryActionText)
                         Spacer()
-                        Text("+\(milestone.reward)🥥 领取")
+                        Text(l.tr(zh: "+\(milestone.reward)🥥 领取", en: "Claim +\(milestone.reward)🥥", de: "+\(milestone.reward)🥥 abholen"))
                             .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(Color.ohanaPrimaryActionText.opacity(0.72))
                     }
@@ -674,7 +681,7 @@ struct DailyStreakDetailView: View {
                     calendarDayCellContent(cell)
                 }
                 .buttonStyle(ScaleButtonStyle())
-                .accessibilityLabel("补签 \(cell.dateStr)")
+                .accessibilityLabel(l.tr(zh: "补签 \(cell.dateStr)", en: "Make up \(cell.dateStr)", de: "\(cell.dateStr) nachholen"))
             } else {
                 calendarDayCellContent(cell)
             }
@@ -836,6 +843,27 @@ struct DailyStreakDetailView: View {
 
     private func monthYearString(_ date: Date) -> String {
         monthYearFormatter.string(from: date)
+    }
+
+    private var localizedWeekdaySymbols: [String] {
+        switch l.languageCode {
+        case "en":
+            ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+        case "de":
+            ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"]
+        default:
+            ["日", "一", "二", "三", "四", "五", "六"]
+        }
+    }
+
+    private var streakMoodText: String {
+        if currentStreak >= 30 {
+            return l.tr(zh: "🔥 传奇！", en: "🔥 Legendary!", de: "🔥 Legendaer!")
+        }
+        if currentStreak >= 7 {
+            return l.tr(zh: "🔥 火热！", en: "🔥 On fire!", de: "🔥 Laeuft heiss!")
+        }
+        return l.tr(zh: "继续保持", en: "Keep it going", de: "Dranbleiben")
     }
 
     private var currentStreak: Int {

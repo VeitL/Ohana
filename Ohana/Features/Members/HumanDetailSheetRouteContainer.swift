@@ -329,7 +329,9 @@ private func fetch<T: PersistentModel>(
 }
 
 private struct HumanRouteMissingEntityView: View {
+    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
     let kind: String
+    private var l: L10n { L10n(appLanguage) }
 
     var body: some View {
         VStack(spacing: 14) {
@@ -337,30 +339,52 @@ private struct HumanRouteMissingEntityView: View {
                 .font(OhanaFont.title(.bold))
                 .foregroundStyle(Color.goPrimary)
                 .accessibilityHidden(true)
-            Text("内容已不可用")
+            Text(l.tr(zh: "内容已不可用", en: "Content is no longer available", de: "Inhalt ist nicht mehr verfügbar"))
                 .font(OhanaFont.title3(.black))
                 .foregroundStyle(Color.ohanaPrimaryText)
-            Text(kind)
+            Text(localizedKind)
                 .font(OhanaFont.caption(.semibold))
                 .foregroundStyle(Color.ohanaSecondaryText)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(OhanaAppBackground().ignoresSafeArea())
     }
+
+    private var localizedKind: String {
+        switch kind {
+        case "human":
+            l.tr(zh: "成员", en: "Member", de: "Mitglied")
+        case "memorial":
+            l.tr(zh: "纪念资料", en: "Memorial profile", de: "Gedenkprofil")
+        default:
+            kind
+        }
+    }
 }
 
 private struct HumanRouteLoadingEntityView: View {
+    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
     let kind: String
+    private var l: L10n { L10n(appLanguage) }
 
     var body: some View {
         VStack(spacing: 12) {
             ProgressView()
                 .controlSize(.regular)
-            Text(kind)
+            Text(localizedKind)
                 .font(OhanaFont.caption(.semibold))
                 .foregroundStyle(Color.ohanaSecondaryText)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(OhanaAppBackground().ignoresSafeArea())
+    }
+
+    private var localizedKind: String {
+        switch kind {
+        case "human":
+            l.tr(zh: "正在载入成员", en: "Loading member", de: "Mitglied wird geladen")
+        default:
+            kind
+        }
     }
 }

@@ -112,18 +112,18 @@ extension PetHealthDetailContentView {
 
     var quickToolsRow: some View {
         HStack(spacing: 10) {
-            healthToolButton(title: "就诊", icon: "cross.case.fill", tint: Color.goRed) {
+            healthToolButton(title: "就诊", icon: "cross.case.fill", tint: Color.goRed, identifier: "pet-health-tool-visit-action") {
                 healthPlusDestination = .guided(.visit)
             }
-            healthToolButton(title: "疫苗本", icon: "syringe.fill", tint: Color.goTeal) {
+            healthToolButton(title: "疫苗本", icon: "syringe.fill", tint: Color.goTeal, identifier: "pet-health-tool-vaccine-passport-action") {
                 showingPassport = true
             }
             if !pet.isNeutered {
-                healthToolButton(title: "生理期", icon: "heart.text.square.fill", tint: Color.pink) {
+                healthToolButton(title: "生理期", icon: "heart.text.square.fill", tint: Color.pink, identifier: "pet-health-tool-heat-cycle-action") {
                     healthPlusDestination = .heatCycle
                 }
             }
-            healthToolButton(title: "PDF", icon: "doc.richtext", tint: chromeAccent) {
+            healthToolButton(title: "PDF", icon: "doc.richtext", tint: chromeAccent, identifier: "pet-health-tool-pdf-action") {
                 guard !isRenderingPDF else { return }
                 isRenderingPDF = true
                 Task {
@@ -135,7 +135,13 @@ extension PetHealthDetailContentView {
         }
     }
 
-    func healthToolButton(title: String, icon: String, tint: Color, action: @escaping () -> Void) -> some View {
+    func healthToolButton(
+        title: String,
+        icon: String,
+        tint: Color,
+        identifier: String? = nil,
+        action: @escaping () -> Void
+    ) -> some View {
         Button {
             OhanaFeedback.light()
             action()
@@ -156,6 +162,8 @@ extension PetHealthDetailContentView {
             .goIslandModuleCard(cornerRadius: OhanaRadius.controlLarge)
         }
         .buttonStyle(ScaleButtonStyle())
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier(identifier ?? "")
     }
 
     var recentActivityCard: some View {
@@ -211,6 +219,7 @@ extension PetHealthDetailContentView {
                             .foregroundStyle(.tertiary)
                     }
                     .padding(.vertical, 3)
+                    .accessibilityIdentifier("pet-health-recent-row-\(item.id)")
                 }
             }
         }

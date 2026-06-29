@@ -31,6 +31,7 @@ struct WalkTrackingFullScreen: View {
         }
         .background(Color.arkInk.ignoresSafeArea())
         .statusBarHidden(false)
+        .accessibilityIdentifier("walk-tracking-full-screen")
     }
 
     private var minimizeButton: some View {
@@ -54,5 +55,6 @@ struct WalkTrackingFullScreen: View {
             )
         }
         .buttonStyle(ScaleButtonStyle())
+        .accessibilityIdentifier("walk-tracking-minimize-action")
     }
 }

@@ -160,11 +160,15 @@ struct VerticalSolidHomeExpandedCardActions: View {
         let state = actionSnapshot.state(for: item)
         let options = menuOptions(for: item)
         let menuPolicy = state.isLocked ? .none : state.menuPolicy.expandedPolicy
+        let startsSessionDirectly = item.actionType == "walk"
         let directActionUsesQuickPath = menuPolicy.showsQuickButton
+        let usesDirectHumanQuickPath = card.isHuman && item.actionType != "humanAllFeatures"
+        let actionUsesQuickPath = startsSessionDirectly || usesDirectHumanQuickPath || directActionUsesQuickPath
         return VerticalHomeEmbeddedAction(
             id: item.id,
             title: item.label,
             icon: item.icon,
+            actionType: item.actionType,
             statusText: state.status,
             isCompleted: state.isCompleted,
             showsAttention: state.showsAttention,
@@ -173,13 +177,13 @@ struct VerticalSolidHomeExpandedCardActions: View {
             isPrimaryDisabled: isPrimaryDisabled(item: item, state: state),
             detailIcon: detailIcon(for: item.actionType, isHuman: card.isHuman),
             menuOptions: options,
-            showsMenu: menuPolicy.showsMenu,
+            showsMenu: startsSessionDirectly || usesDirectHumanQuickPath ? false : menuPolicy.showsMenu,
             showsQuickButton: menuPolicy.showsQuickButton,
             quickAccessibilityLabel: item.label,
             detailAccessibilityLabel: l.tr(zh: "查看详情", en: "Details", de: "Details"),
-            detailAction: { onAction(item, false) },
+            detailAction: startsSessionDirectly || usesDirectHumanQuickPath ? nil : { onAction(item, false) },
             optionAction: { optionId in onOptionAction(item, optionId) },
-            action: { onAction(item, directActionUsesQuickPath) }
+            action: { onAction(item, actionUsesQuickPath) }
         )
     }
 
@@ -192,6 +196,7 @@ struct VerticalSolidHomeExpandedCardActions: View {
             id: item.actionType,
             title: item.label,
             icon: item.icon,
+            actionType: item.actionType,
             isCompleted: false,
             isAddDisabled: isAlreadyAdded,
             quickAccessibilityLabel: l.tr(zh: "添加快捷操作", en: "Add quick action", de: "Schnellaktion hinzufügen"),

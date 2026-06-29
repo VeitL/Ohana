@@ -32,9 +32,13 @@ extension HumanDetailView {
 
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 8) {
-                        humanChip(human.roleText, color: themeColor)
-                        if human.birthday != nil { humanChip(human.ageText, color: Color(hex: "6B82C4")) }
-                        if !human.bloodType.isEmpty { humanChip("血型 \(human.bloodType)", color: Color.goRed) }
+                        humanChip(localizedHeroRoleText, color: themeColor)
+                        if let birthday = human.birthday {
+                            humanChip(localizedHeroAgeText(for: birthday), color: Color(hex: "6B82C4"))
+                        }
+                        if !human.bloodType.isEmpty {
+                            humanChip(l.tr(zh: "血型 \(human.bloodType)", en: "Blood \(human.bloodType)", de: "Blut \(human.bloodType)"), color: Color.goRed)
+                        }
                         if !human.nationality.isEmpty { humanChip("🌍 \(human.nationality)", color: Color(hex: "6B82C4")) }
                         if !human.city.isEmpty { humanChip("📍 \(human.city)", color: Color(hex: "6B82C4")) }
                         if human.heightCm > 0, human.heightCm.isFinite { humanChip(String(format: "%.0f cm", human.heightCm), color: Color.goTeal) }
@@ -105,6 +109,22 @@ extension HumanDetailView {
 
     func presentCoconutLog() {
         onPresentCoconutLog(.human(human.id))
+    }
+
+    private var localizedHeroRoleText: String {
+        switch HumanProfileOptions.normalizedRole(human.role) {
+        case "owner":
+            l.tr(zh: "管理者", en: "Owner", de: "Verwaltung")
+        default:
+            l.tr(zh: "成员", en: "Member", de: "Mitglied")
+        }
+    }
+
+    private func localizedHeroAgeText(for birthday: Date) -> String {
+        let years = Calendar.current.dateComponents([.year], from: birthday, to: Date()).year ?? 0
+        return years > 0
+            ? l.tr(zh: "\(years)岁", en: "\(years) yrs", de: "\(years) J.")
+            : l.tr(zh: "未满1岁", en: "Under 1", de: "Unter 1")
     }
 
     // MARK: - Stats Bento（与 GO「岛屿统计」小卡同款：白底 + 轻阴影）

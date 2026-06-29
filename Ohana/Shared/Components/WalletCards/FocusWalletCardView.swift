@@ -30,6 +30,9 @@ struct FocusWalletCardView: View {
     private let accent = Color(hex: "FF5A3D")
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @ObservedObject private var workloadPolicy = AppWorkloadPolicy.shared
+    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
+
+    private var l: L10n { L10n(appLanguage) }
 
     private var shouldReduceWork: Bool {
         reduceMotion || workloadPolicy.interactionMotionBudget(isVisible: true) != .full
@@ -634,7 +637,7 @@ struct FocusWalletCardView: View {
         } else {
             VStack(alignment: .trailing, spacing: spacing) {
                 if showsCardTextBadges, card.streak > 1 {
-                    Text("🔥 \(card.streak)天连续")
+                    Text(l.tr(zh: "🔥 \(card.streak)天连续", en: "🔥 \(card.streak)-day streak", de: "🔥 \(card.streak)-Tage-Serie"))
                         .font(OhanaFont.adaptive(size: 10, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.arkInk)
                         .padding(.horizontal, 9).padding(.vertical, 4)
@@ -759,7 +762,7 @@ struct FocusWalletCardView: View {
         return HStack(spacing: 6) {
             Image(systemName: isShown ? "house.fill" : "house.slash.fill")
                 .font(OhanaFont.adaptive(size: 10, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-            Text(isShown ? "首页显示中" : "未显示在首页")
+            Text(isShown ? l.tr(zh: "首页显示中", en: "Shown on Home", de: "Auf Startseite sichtbar") : l.tr(zh: "未显示在首页", en: "Hidden from Home", de: "Nicht auf Startseite"))
                 .font(OhanaFont.adaptive(size: 10, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .lineLimit(1)
                 .minimumScaleFactor(0.72)

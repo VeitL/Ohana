@@ -14,7 +14,10 @@ struct CrewRosterDeleteConfirmationSheet: View {
     let onCancel: () -> Void
     let onDelete: () -> Void
 
+    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
     @State private var confirmName = ""
+
+    private var l: L10n { L10n(appLanguage) }
 
     private var canDelete: Bool {
         ConfirmationNameMatcher.matches(confirmName, expectedName: name)
@@ -36,7 +39,7 @@ struct CrewRosterDeleteConfirmationSheet: View {
                             .foregroundStyle(Color.ohanaPrimaryText)
                             .lineLimit(1)
                             .minimumScaleFactor(0.72)
-                        Text("输入名字后才能继续")
+                        Text(l.tr(zh: "输入名字后才能继续", en: "Type the name to continue", de: "Zum Fortfahren Namen eingeben"))
                             .font(OhanaFont.caption2(.bold))
                             .foregroundStyle(Color.ohanaSecondaryText)
                     }
@@ -70,7 +73,7 @@ struct CrewRosterDeleteConfirmationSheet: View {
 
                 HStack(spacing: 10) {
                     Button(action: onCancel) {
-                        Text("取消")
+                        Text(l.cancel)
                             .font(OhanaFont.callout(.black))
                             .foregroundStyle(Color.ohanaPrimaryText.opacity(0.72))
                             .frame(maxWidth: .infinity)
@@ -80,7 +83,7 @@ struct CrewRosterDeleteConfirmationSheet: View {
                     .buttonStyle(ScaleButtonStyle())
 
                     Button(action: onDelete) {
-                        Text("删除")
+                        Text(l.tr(zh: "删除", en: "Delete", de: "Loeschen"))
                             .font(OhanaFont.callout(.black))
                             .foregroundStyle(canDelete ? Color.ohanaPrimaryActionText : Color.primary.opacity(0.32))
                             .frame(maxWidth: .infinity)

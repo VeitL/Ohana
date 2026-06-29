@@ -204,11 +204,7 @@ private struct OhanaBootstrapShell: View {
     var body: some View {
         ZStack {
             LinearGradient(
-                colors: [
-                    Color(red: 0.18, green: 0.30, blue: 0.80),
-                    Color(red: 0.10, green: 0.18, blue: 0.54),
-                    Color(red: 0.05, green: 0.09, blue: 0.25)
-                ],
+                colors: AppBackgroundStyle.goIsland.gradientColors(for: .dark),
                 startPoint: .top,
                 endPoint: .bottom
             )

@@ -260,60 +260,18 @@ struct VerticalHomeEmbeddedQuickActions: View {
     private func actionCell(_ item: VerticalHomeEmbeddedAction, index: Int) -> some View {
         ZStack {
             Button {
-                guard !isEditMode else { return }
-                triggerIconAnimation(for: item.id)
-                OhanaFeedback.light()
-                if shouldOpenMenu(for: item) {
-                    withAnimation(motion) {
-                        openActionId = openActionId == item.id ? nil : item.id
-                    }
-                } else {
-                    performDirectAction(for: item)
-                }
+                performActionCellTap(item)
             } label: {
-                let state = visualState(for: item)
-                let statusLine = statusText(for: item)
-                VStack(spacing: 2) {
-                    ZStack(alignment: .topTrailing) {
-                        OhanaQuickActionIcon(
-                            actionType: item.actionType,
-                            fallbackSystemName: item.icon,
-                            size: iconSize,
-                            color: state.foreground,
-                            isCompleted: state.showsCompleted,
-                            showsCompletionBadge: state.showsCompleted,
-                            animationTrigger: iconAnimationTokens[item.id, default: 0],
-                            animatesStateChanges: !shouldReduceWork
-                        )
-                        if item.showsAttention, !isEditMode {
-                            Circle()
-                                .fill(Color.goRed)
-                                .frame(width: 7, height: 7) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
-                                .offset(x: 3, y: -3)
-                        }
-                        if item.isLocked, !isEditMode {
-                            Image(systemName: "lock.fill").accessibilityHidden(true)
-                                .font(OhanaFont.adaptive(size: 8, weight: .black))
-                                .foregroundStyle(Color.goYellow)
-                                .offset(x: 4, y: -4)
-                        }
-                    }
-                    Text(item.title)
-                        .font(OhanaFont.adaptive(size: 10.5, weight: .black, design: .rounded))
-                        .foregroundStyle(state.foreground)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.55)
-                    Text(statusLine)
-                        .font(OhanaFont.adaptive(size: 8.4, weight: .bold, design: .rounded))
-                        .foregroundStyle(state.statusForeground)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.55)
-                }
-                .frame(maxWidth: .infinity)
-                .frame(height: cellHeight)
-                .contentShape(RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
+                actionCellContent(item)
             }
             .buttonStyle(ScaleButtonStyle())
+            .frame(maxWidth: .infinity)
+            .frame(height: cellHeight)
+            .background(
+                Color.ohanaPrimaryText.opacity(0.001),
+                in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous)
+            ) // ui-v4: allow invisible quick-action hit surface so the full 72pt cell activates, including label/icon gaps.
+            .contentShape(RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
             .allowsHitTesting(!isEditMode)
             .accessibilityLabel(accessibilityLabel(for: item, statusText: statusText(for: item)))
             .accessibilityIdentifier("home-quick-action-\(item.actionType)")
@@ -358,6 +316,62 @@ struct VerticalHomeEmbeddedQuickActions: View {
                 onMove: onMove
             )
         )
+    }
+
+    private func actionCellContent(_ item: VerticalHomeEmbeddedAction) -> some View {
+        let state = visualState(for: item)
+        let statusLine = statusText(for: item)
+        return VStack(spacing: 2) {
+            ZStack(alignment: .topTrailing) {
+                OhanaQuickActionIcon(
+                    actionType: item.actionType,
+                    fallbackSystemName: item.icon,
+                    size: iconSize,
+                    color: state.foreground,
+                    isCompleted: state.showsCompleted,
+                    showsCompletionBadge: state.showsCompleted,
+                    animationTrigger: iconAnimationTokens[item.id, default: 0],
+                    animatesStateChanges: !shouldReduceWork
+                )
+                if item.showsAttention, !isEditMode {
+                    Circle()
+                        .fill(Color.goRed)
+                        .frame(width: 7, height: 7) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
+                        .offset(x: 3, y: -3)
+                }
+                if item.isLocked, !isEditMode {
+                    Image(systemName: "lock.fill").accessibilityHidden(true)
+                        .font(OhanaFont.adaptive(size: 8, weight: .black))
+                        .foregroundStyle(Color.goYellow)
+                        .offset(x: 4, y: -4)
+                }
+            }
+            Text(item.title)
+                .font(OhanaFont.adaptive(size: 10.5, weight: .black, design: .rounded))
+                .foregroundStyle(state.foreground)
+                .lineLimit(1)
+                .minimumScaleFactor(0.55)
+            Text(statusLine)
+                .font(OhanaFont.adaptive(size: 8.4, weight: .bold, design: .rounded))
+                .foregroundStyle(state.statusForeground)
+                .lineLimit(1)
+                .minimumScaleFactor(0.55)
+        }
+        .frame(maxWidth: .infinity)
+        .frame(height: cellHeight)
+    }
+
+    private func performActionCellTap(_ item: VerticalHomeEmbeddedAction) {
+        guard !isEditMode else { return }
+        triggerIconAnimation(for: item.id)
+        OhanaFeedback.light()
+        if shouldOpenMenu(for: item) {
+            withAnimation(motion) {
+                openActionId = openActionId == item.id ? nil : item.id
+            }
+        } else {
+            performDirectAction(for: item)
+        }
     }
 
     private func inlineMenu(item: VerticalHomeEmbeddedAction, detailAction: (() -> Void)?, index: Int) -> some View {

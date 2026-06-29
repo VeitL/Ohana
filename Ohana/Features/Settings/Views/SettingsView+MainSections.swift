@@ -10,9 +10,9 @@ extension SettingsView {
     var settingsBodySections: some View {
         AnyView(settingsHeader)
         AnyView(settingsDataSections)
-        #if DEBUG
-        AnyView(settingsDebugSection)
-        #endif
+        if SettingsDebugTools.isVisible {
+            AnyView(settingsDebugSection)
+        }
         if OnlineFeatureGate.allows(.onlineCollaboration) {
             AnyView(householdSyncSection)
         }

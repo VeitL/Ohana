@@ -1,6 +1,6 @@
 # Members 业务规则书
 
-> 状态：已按 2026-06-14 产品主人二态删除模型更新；S-MEM-004/006 仍为余留项。
+> 状态：已按 2026-06-14 产品主人二态删除模型更新；S-MEM-006 仍为余留项。
 > 范围：`Ohana/Features/Members`。来源行号按 2026-06-14 当前工作区记录。
 
 ## 1. 业务不变量
@@ -168,9 +168,9 @@ stateDiagram-v2
 
 GAP-9 已改为：UI 文案不再承诺删除；Members command 委托 `RainbowBridgeService`；规则书 `docs/specs/Memorial-logic.md` 明确未来提醒 / 事件以纪念退场标记退出活跃流并可撤销。来源：`Ohana/Features/Members/Views/PetBasicInfoDetailView+MemorialDanger.swift:93`、`Ohana/Features/Memorial/RainbowBridgeService.swift:16`。
 
-### S-MEM-004 重复发布 member profile revision（余留）
+### S-MEM-004 重复发布 member profile revision（已修复）
 
-代码现在是：`MemberCommandExecutor.update*Profile` 已发布 member profile revision；部分 View 在调用 executor 后又手动 `appServices.domainRevisions.publishMemberProfile`。产品意图是每次资料保存只发布一次 domain mutation；本轮未修，见 `docs/task-follow-ups.md` 的 Members revision 余留项。来源：`Ohana/Features/Members/MemberInteractionCommands.swift:277`、`Ohana/Features/Members/Views/PetBasicInfoDetailView+Commands.swift:73`、`Ohana/Features/Members/Views/HumanBasicInfoDetailView.swift:635`、`Ohana/Features/Members/Views/EditHumanSheet.swift:148`。
+2026-06-28 修复结果：`MemberCommandExecutor.update*Profile` 仍是 profile revision 的唯一发布边界；Pet / Human 资料保存的 View 调用点只调用 executor，不再在 executor 返回后手动 `appServices.domainRevisions.publishMemberProfile`。`scripts/audit-architecture-boundaries.sh` 新增 `member-view-direct-profile-revision` guard，并由 bad/good fixture 锁住，防止 Members view 重新直发 profile revision。来源：`Ohana/Features/Members/MemberInteractionCommands.swift`、`Ohana/Features/Members/Views/PetBasicInfoDetailView+Commands.swift`、`Ohana/Features/Members/Views/HumanBasicInfoDetailView.swift`、`Ohana/Features/Members/Views/EditHumanSheet.swift`、`scripts/audit-architecture-boundaries.sh`、`scripts/tests/fixtures/Views/MemberProfileRevisionBoundaryBad.swift`。
 
 ### S-MEM-005 离世成员 command 层只读硬门（已修复）
 
@@ -178,11 +178,11 @@ GAP-9 已改为：UI 文案不再承诺删除；Members command 委托 `RainbowB
 
 ### S-MEM-006 本地化覆盖不完整（余留）
 
-代码现在是：Members 一部分文案走 `L10n`，但详情、编辑、隐私占位、Pet read content 仍大量硬编码中文。产品意图是用户可见文案至少有中英文 authoring；本轮未做大面本地化，见 `docs/task-follow-ups.md` 的 Members localization 余留项。来源：`Ohana/Features/Members/Views/HumanDetailView.swift:121`、`Ohana/Features/Members/Views/HumanDetailView+PrivacyAssets.swift:20`、`Ohana/Features/Members/Views/EditHumanSheet.swift:36`、`Ohana/Features/Members/Views/PetBasicInfoDetailView+Read.swift:19`。
+2026-06-28 人类侧收敛结果：Human detail overview、basic-info 读写页、Human feature hubs、隐私占位、提醒 / 备注、route fallback/loading/missing、动态 role/age/blood chips、`EditHumanSheet`、人类可达 CrewRoster 编辑 / 删除 / accessibility 文案，以及共享头像选择 / 裁剪控件已走 `L10n.tr`，且不改变 role/gender/blood/MBTI 存储值、隐私规则、route 或 command 行为。TFU-20260612-020 仍 open，因为 Pet edit/read/danger-zone surfaces、sitter card、Pet health/medication 等宠物侧页面还有用户可见硬编码中文。产品意图仍是用户可见文案至少有中英文 authoring；见 `docs/task-follow-ups.md` 的 Members localization 余留项。
 
 ## 5. 确认与余留
 
 - 2026-06-12 产品答复采用 A 路径：S-MEM-001、S-MEM-002 纳入本轮 P0 修复；RequiredHumanProfileView a11y 纳入 P1 修复。
 - S-MEM-001 / S-MEM-002 已有定向测试覆盖并通过。
 - RequiredHumanProfileView 的 decorative icon 已隐藏给 VoiceOver，44pt 容器通过 `scripts/audit-accessibility.sh Ohana/Features/Members`。
-- S-MEM-004 / S-MEM-006 与 Economy 侧删除后钱包/账本可见性审计作为跨范围余留，写入 `docs/task-follow-ups.md`。
+- S-MEM-006 与 Economy 侧删除后钱包/账本可见性审计作为跨范围余留，写入 `docs/task-follow-ups.md`。

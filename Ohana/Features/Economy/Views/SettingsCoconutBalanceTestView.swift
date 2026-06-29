@@ -22,6 +22,10 @@ struct CoconutBalanceTestContentView: View {
     @State private var message = ""
 
     private var l: L10n { L10n(appLanguage) }
+    private var isRunningUITests: Bool {
+        ProcessInfo.processInfo.arguments.contains("-OHANA_UI_TESTS")
+    }
+
     private var selectedHuman: Human? {
         humans.first { $0.id.uuidString == selectedHumanId }
     }
@@ -59,6 +63,7 @@ struct CoconutBalanceTestContentView: View {
                             .padding(.horizontal, 12)
                             .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
                             .transition(.opacity.combined(with: .move(edge: .top)))
+                            .accessibilityIdentifier("coconut-balance-result-message")
                     }
 
                     Text(l.tr(
@@ -78,6 +83,7 @@ struct CoconutBalanceTestContentView: View {
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.hidden, for: .navigationBar)
+        .accessibilityIdentifier("coconut-balance-test-screen")
         .onAppear(perform: configureInitialSelection)
         .onChange(of: selectedHumanId) { _, _ in
             amountText = "\(currentDisplayAmount)"
@@ -104,6 +110,7 @@ struct CoconutBalanceTestContentView: View {
                     .background(Color.ohanaControlFill, in: Capsule())
             }
             .buttonStyle(ScaleButtonStyle())
+            .accessibilityIdentifier("coconut-balance-close-action")
         }
     }
 
@@ -198,6 +205,7 @@ struct CoconutBalanceTestContentView: View {
                             .background(Color.ohanaControlFill, in: Capsule())
                     }
                     .buttonStyle(ScaleButtonStyle())
+                    .accessibilityIdentifier("coconut-balance-preset-\(value)")
                 }
             }
         }
@@ -218,6 +226,7 @@ struct CoconutBalanceTestContentView: View {
             .background(Color.goPrimary, in: Capsule())
         }
         .buttonStyle(ScaleButtonStyle())
+        .accessibilityIdentifier("coconut-balance-apply-action")
     }
 
     private func memberChip(_ human: Human) -> some View {
@@ -300,8 +309,17 @@ struct CoconutBalanceTestContentView: View {
             human: human,
             title: l.tr(zh: "测试调整椰子数量", en: "Test coconut balance adjustment", de: "Testanpassung Kokosnüsse"),
             actorName: human.map { displayName($0) },
-            note: "settings.coconut.test"
+            note: "settings.coconut.test",
+            updatesProjection: !isRunningUITests,
+            publishesRevision: !isRunningUITests
         )
+
+        if isRunningUITests {
+            amountText = "\(result.amount)"
+            message = ""
+            dismiss()
+            return
+        }
 
         withAnimation(GoMotion.feedback) {
             amountText = "\(result.amount)"

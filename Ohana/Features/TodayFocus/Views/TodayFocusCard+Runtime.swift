@@ -197,6 +197,50 @@ extension TodayFocusCard {
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
     }
 
+    func dismissFocusContent(_ content: TodayFocusContent) {
+        guard canDismissFocusContent(content) else { return }
+
+        var nextSkippedKeys = skippedFocusKeys
+        var nextClosedKeys = closedNegativeKeys
+        switch content {
+        case let .negative(signal):
+            nextClosedKeys.insert(negativeSkipKey(signal))
+        case .quest, .familyTask, .coconutExchange:
+            nextSkippedKeys.insert(contentKey(content))
+        case .celebrate, .welcome:
+            return
+        }
+
+        let nextDeck = TodayFocusRenderDeck.make(
+            snapshot: snapshot,
+            skippedFocusKeys: nextSkippedKeys,
+            closedNegativeKeys: nextClosedKeys
+        )
+        let nextIndex = min(selectedFocusIndex, max(nextDeck.cards.count - 1, 0))
+        withAnimation(GoMotion.selection) {
+            skippedFocusKeys = nextSkippedKeys
+            closedNegativeKeys = nextClosedKeys
+            renderDeck = nextDeck
+            selectedFocusIndex = nextIndex
+            hiddenFocusVersion += 1
+        }
+        TodayFocusHiddenStateStore.save(
+            skippedFocusKeys: nextSkippedKeys,
+            closedNegativeKeys: nextClosedKeys,
+            date: Self.hiddenFocusDate(for: hiddenFocusDayToken)
+        )
+        OhanaFeedback.light()
+    }
+
+    func canDismissFocusContent(_ content: TodayFocusContent) -> Bool {
+        switch content {
+        case .quest, .familyTask, .coconutExchange, .negative:
+            true
+        case .celebrate, .welcome:
+            false
+        }
+    }
+
     func reloadHiddenFocusKeysIfNeeded(for snapshotDayToken: Int) {
         let dayToken = snapshotDayToken == 0 ? Self.currentHiddenFocusDayToken() : snapshotDayToken
         guard dayToken != hiddenFocusDayToken else { return }

@@ -121,10 +121,10 @@ struct HumanDetailView: View {
                         statsBento
                         showOnHomeCard
 
-                        sectionHeader("健康 & 身体")
+                        sectionHeader(l.tr(zh: "健康 & 身体", en: "Health & Body", de: "Gesundheit & Körper"))
 
                         if human.isPrivate(.weight, viewedBy: activeHumanId) {
-                            privacyPlaceholderCard(label: "体重记录")
+                            privacyPlaceholderCard(label: l.tr(zh: "体重记录", en: "Weight Records", de: "Gewichtsverlauf"))
                         } else {
                             HumanPrivateDataNotice(human: human, field: .weight)
                                 .padding(.horizontal, 16)
@@ -136,22 +136,22 @@ struct HumanDetailView: View {
                             healthMetricCard
                         }
                         if human.isPrivate(.medication, viewedBy: activeHumanId) {
-                            privacyPlaceholderCard(label: "吃药提醒")
+                            privacyPlaceholderCard(label: l.tr(zh: "吃药提醒", en: "Medication Reminders", de: "Medikamentenerinnerungen"))
                         } else {
                             HumanPrivateDataNotice(human: human, field: .medication)
                                 .padding(.horizontal, 16)
                             medicationCard
                         }
                         if human.isPrivate(.weight, viewedBy: activeHumanId) {
-                            privacyPlaceholderCard(label: "身体检测报告")
+                            privacyPlaceholderCard(label: l.tr(zh: "身体检测报告", en: "Health Reports", de: "Gesundheitsberichte"))
                         } else {
                             healthReportCard
                         }
 
-                        sectionHeader("活动 & 记录")
+                        sectionHeader(l.tr(zh: "活动 & 记录", en: "Activity & Records", de: "Aktivität & Einträge"))
 
                         if human.isPrivate(.workout, viewedBy: activeHumanId) {
-                            privacyPlaceholderCard(label: "运动记录")
+                            privacyPlaceholderCard(label: l.tr(zh: "运动记录", en: "Workout Records", de: "Trainingseinträge"))
                         } else {
                             HumanPrivateDataNotice(human: human, field: .workout)
                                 .padding(.horizontal, 16)
@@ -160,31 +160,31 @@ struct HumanDetailView: View {
                         }
                         if human.isPrivate(.weight, viewedBy: activeHumanId) ||
                             human.isPrivate(.workout, viewedBy: activeHumanId) {
-                            privacyPlaceholderCard(label: "共健数据")
+                            privacyPlaceholderCard(label: l.tr(zh: "共健数据", en: "Shared Health Data", de: "Gemeinsame Gesundheitsdaten"))
                         } else {
                             coHealthCard
                         }
 
-                        sectionHeader("财务")
+                        sectionHeader(l.tr(zh: "财务", en: "Finance", de: "Finanzen"))
 
                         if human.isPrivate(.expense, viewedBy: activeHumanId) {
-                            privacyPlaceholderCard(label: "花费记录")
+                            privacyPlaceholderCard(label: l.tr(zh: "花费记录", en: "Expense Records", de: "Ausgabeneinträge"))
                         } else {
                             HumanPrivateDataNotice(human: human, field: .expense)
                                 .padding(.horizontal, 16)
                             humanExpenseCard
                         }
                         if human.isPrivate(.wishlist, viewedBy: activeHumanId) {
-                            privacyPlaceholderCard(label: "椰子资产")
+                            privacyPlaceholderCard(label: l.tr(zh: "椰子资产", en: "Coconut Assets", de: "Kokosnussvermögen"))
                         } else {
                             HumanPrivateDataNotice(human: human, field: .wishlist)
                                 .padding(.horizontal, 16)
                             humanAssetCard
                         }
 
-                        sectionHeader("提醒 & 备注")
+                        sectionHeader(l.tr(zh: "提醒 & 备注", en: "Reminders & Notes", de: "Erinnerungen & Notizen"))
                         if human.isPrivate(.medication, viewedBy: activeHumanId) {
-                            privacyPlaceholderCard(label: "待办提醒")
+                            privacyPlaceholderCard(label: l.tr(zh: "待办提醒", en: "Pending Reminders", de: "Ausstehende Erinnerungen"))
                         } else {
                             remindersSection
                         }
@@ -228,10 +228,14 @@ struct HumanDetailView: View {
         }
         .navigationDestination(isPresented: $showingHealthReport) { HumanHealthReportView(human: human) }
         .navigationDestination(isPresented: $showingHealthMetrics) { HumanHealthCheckupView(human: human) }
-        .alert("首页卡片堆已满", isPresented: $showingHomeStackFullAlert) {
-            Button("知道了", role: .cancel) {}
+        .alert(l.tr(zh: "首页卡片堆已满", en: "Home card stack is full", de: "Startkartenstapel ist voll"), isPresented: $showingHomeStackFullAlert) {
+            Button(l.tr(zh: "知道了", en: "Got it", de: "Verstanden"), role: .cancel) {}
         } message: {
-            Text("首页最多显示 \(HomeCardVisibility.maxVisibleCards) 张卡片。请先从首页移除一张宠物或人类卡片，再添加 \(human.name)。")
+            Text(l.tr(
+                zh: "首页最多显示 \(HomeCardVisibility.maxVisibleCards) 张卡片。请先从首页移除一张宠物或人类卡片，再添加 \(human.name)。",
+                en: "Home can show up to \(HomeCardVisibility.maxVisibleCards) cards. Remove a pet or human card from Home before adding \(human.name).",
+                de: "Auf der Startseite können bis zu \(HomeCardVisibility.maxVisibleCards) Karten angezeigt werden. Entferne zuerst eine Haustier- oder Menschenkarte, bevor du \(human.name) hinzufügst."
+            ))
         }
         .task(id: avatarSourceKey) {
             await prepareAvatar()

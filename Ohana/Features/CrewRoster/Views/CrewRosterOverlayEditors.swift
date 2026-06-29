@@ -14,11 +14,14 @@ struct RosterHomeVisibilityToggle: View {
     let label: String
     let onChange: (Bool) -> Bool
 
+    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
     @State private var visualOverride: Bool?
 
     private var visualIsOn: Bool {
         visualOverride ?? isOn
     }
+
+    private var l: L10n { L10n(appLanguage) }
 
     var body: some View {
         Button {
@@ -57,7 +60,7 @@ struct RosterHomeVisibilityToggle: View {
         }
         .buttonStyle(ScaleButtonStyle())
         .accessibilityLabel(label)
-        .accessibilityValue(visualIsOn ? "开启" : "关闭")
+        .accessibilityValue(visualIsOn ? l.tr(zh: "开启", en: "On", de: "Ein") : l.tr(zh: "关闭", en: "Off", de: "Aus"))
         .onChange(of: isOn) { _, newValue in
             guard visualOverride == newValue else { return }
             visualOverride = nil
@@ -195,21 +198,21 @@ struct CrewRosterProfilePanel: View {
         } message: {
             Text("将删除护理、体重、花费、健康、散步、喂食、清洁、里程碑、用药与相册等记录；保留名字、头像、品种与证件/保险档案。此操作不可撤销。")
         }
-        .alert("确认标记纪念模式", isPresented: $showingHumanPassedAlert) {
-            Button("确认", role: .destructive) {
+        .alert(l.tr(zh: "确认标记纪念模式", en: "Mark memorial mode?", de: "Gedenkmodus markieren?"), isPresented: $showingHumanPassedAlert) {
+            Button(l.tr(zh: "确认", en: "Confirm", de: "Bestaetigen"), role: .destructive) {
                 markHumanPassedAway()
             }
-            Button("取消", role: .cancel) {}
+            Button(l.tr(zh: "取消", en: "Cancel", de: "Abbrechen"), role: .cancel) {}
         } message: {
-            Text("将把该成员设为纪念模式。")
+            Text(l.tr(zh: "将把该成员设为纪念模式。", en: "This member will be moved into memorial mode.", de: "Dieses Mitglied wird in den Gedenkmodus versetzt."))
         }
-        .alert("撤销纪念模式", isPresented: $showingHumanUndoPassedAlert) {
-            Button("撤销", role: .destructive) {
+        .alert(l.tr(zh: "撤销纪念模式", en: "Undo memorial mode?", de: "Gedenkmodus zuruecknehmen?"), isPresented: $showingHumanUndoPassedAlert) {
+            Button(l.tr(zh: "撤销", en: "Undo", de: "Zuruecknehmen"), role: .destructive) {
                 undoHumanPassedAway()
             }
-            Button("取消", role: .cancel) {}
+            Button(l.tr(zh: "取消", en: "Cancel", de: "Abbrechen"), role: .cancel) {}
         } message: {
-            Text("将清除该成员的纪念模式日期。")
+            Text(l.tr(zh: "将清除该成员的纪念模式日期。", en: "This will clear the member's memorial-mode date.", de: "Das Datum fuer den Gedenkmodus dieses Mitglieds wird geloescht."))
         }
         .alert("确认删除植物", isPresented: $showingPlantDeleteAlert) {
             Button("取消", role: .cancel) {}
@@ -235,10 +238,11 @@ struct CrewRosterProfilePanel: View {
             .ohanaCompactSheetPresentation(detents: [.height(380), .medium])
         }
         .sheet(isPresented: $showingHumanDeleteSheet) {
+            let humanName = human?.name ?? ""
             CrewRosterDeleteConfirmationSheet(
-                title: "删除成员 \(human?.name ?? "")",
+                title: l.tr(zh: "删除成员 \(humanName)", en: "Delete member \(humanName)", de: "Mitglied \(humanName) loeschen"),
                 name: human?.name ?? "",
-                warning: "这会删除成员资料、体重与运动记录，无法撤销。",
+                warning: l.tr(zh: "这会删除成员资料、体重与运动记录，无法撤销。", en: "This will delete the member profile, weight logs, and workout records. It cannot be undone.", de: "Dies loescht Profil, Gewichtseintraege und Trainingsdaten des Mitglieds. Das kann nicht rueckgaengig gemacht werden."),
                 onCancel: { showingHumanDeleteSheet = false },
                 onDelete: deleteHumanAndReturnHome
             )
@@ -281,7 +285,7 @@ struct CrewRosterProfilePanel: View {
                     .contentShape(Circle())
             }
             .buttonStyle(ScaleButtonStyle())
-            .accessibilityLabel(isEditing ? "保存" : "编辑")
+            .accessibilityLabel(isEditing ? l.save : l.tr(zh: "编辑", en: "Edit", de: "Bearbeiten"))
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(displayName)
@@ -289,7 +293,7 @@ struct CrewRosterProfilePanel: View {
                     .foregroundStyle(Color.goCardWhite)
                     .lineLimit(1)
                     .minimumScaleFactor(0.70)
-                Text(isEditing ? "编辑基本信息" : "基本信息")
+                Text(isEditing ? l.tr(zh: "编辑基本信息", en: "Editing basic info", de: "Basisdaten bearbeiten") : l.tr(zh: "基本信息", en: "Basic info", de: "Basisdaten"))
                     .font(OhanaFont.caption2(.bold))
                     .foregroundStyle(Color.goCardWhite.opacity(0.64))
             }
@@ -302,7 +306,7 @@ struct CrewRosterProfilePanel: View {
                     .contentShape(Circle())
             }
             .buttonStyle(ScaleButtonStyle())
-            .accessibilityLabel("关闭")
+            .accessibilityLabel(l.tr(zh: "关闭", en: "Close", de: "Schliessen"))
         }
         .padding(.horizontal, 14)
         .padding(.top, 12)
@@ -367,27 +371,27 @@ struct CrewRosterProfilePanel: View {
 
     private func humanReadContent(_ human: Human) -> some View {
         VStack(spacing: 12) {
-            profileSection("身份", icon: "person.fill") {
-                infoRow("权限", HumanPermissionRole.title(for: human.role))
-                infoRow("年龄", human.hasPassedAway ? human.ageAtPassingText : human.ageText)
-                infoRow("性别/身份", HumanGenderIdentity.title(for: human.genderRaw))
-                infoRow("生日", formattedDate(human.birthday))
-                infoRow("星座", human.birthday.map { Human.westernZodiacChinese(for: $0) } ?? "未填写")
+            profileSection(l.tr(zh: "身份", en: "Identity", de: "Identitaet"), icon: "person.fill") {
+                infoRow(l.tr(zh: "权限", en: "Role", de: "Rolle"), localizedRoleText(for: human.role))
+                infoRow(l.tr(zh: "年龄", en: "Age", de: "Alter"), localizedHumanAge(human))
+                infoRow(l.tr(zh: "性别/身份", en: "Gender / identity", de: "Geschlecht / Identitaet"), localizedGenderTitle(for: human.genderRaw))
+                infoRow(l.tr(zh: "生日", en: "Birthday", de: "Geburtstag"), formattedDate(human.birthday))
+                infoRow(l.tr(zh: "星座", en: "Zodiac", de: "Sternzeichen"), human.birthday.map { Human.westernZodiacDisplay(for: $0, l: l) } ?? localizedEmptyValue)
             }
-            profileSection("身体", icon: "heart.text.square.fill") {
-                infoRow("血型", emptyText(human.bloodType))
-                infoRow("身高", human.heightCm > 0 ? "\(Int(human.heightCm)) cm" : "未填写")
-                infoRow("MBTI", human.mbti.isEmpty ? "未填写" : human.mbti.uppercased())
+            profileSection(l.tr(zh: "身体", en: "Body", de: "Koerper"), icon: "heart.text.square.fill") {
+                infoRow(l.tr(zh: "血型", en: "Blood type", de: "Blutgruppe"), emptyText(human.bloodType))
+                infoRow(l.tr(zh: "身高", en: "Height", de: "Groesse"), human.heightCm > 0 ? "\(Int(human.heightCm)) cm" : localizedEmptyValue)
+                infoRow("MBTI", human.mbti.isEmpty ? localizedEmptyValue : human.mbti.uppercased())
             }
-            profileSection("家庭与显示", icon: "house.fill") {
-                infoRow("国籍", emptyText(human.nationality))
-                infoRow("现居地", emptyText(human.city))
-                infoRow("首页显示", human.shouldShowOnHome ? "显示" : "隐藏")
-                infoRow("隐私项目", privacySummary(for: human))
+            profileSection(l.tr(zh: "家庭与显示", en: "Family & display", de: "Familie & Anzeige"), icon: "house.fill") {
+                infoRow(l.tr(zh: "国籍", en: "Nationality", de: "Nationalitaet"), emptyText(human.nationality))
+                infoRow(l.tr(zh: "现居地", en: "Current city", de: "Aktueller Ort"), emptyText(human.city))
+                infoRow(l.tr(zh: "首页显示", en: "Home visibility", de: "Startseitenanzeige"), human.shouldShowOnHome ? l.tr(zh: "显示", en: "Shown", de: "Angezeigt") : l.tr(zh: "隐藏", en: "Hidden", de: "Ausgeblendet"))
+                infoRow(l.tr(zh: "隐私项目", en: "Private fields", de: "Private Felder"), privacySummary(for: human))
             }
             let humanNotes = HumanProfileOptions.visibleNoteParts(from: human.notes).joined(separator: "｜")
             if !humanNotes.isEmpty {
-                profileSection("备注", icon: "note.text") { paragraph(humanNotes) }
+                profileSection(l.tr(zh: "备注", en: "Notes", de: "Notizen"), icon: "note.text") { paragraph(humanNotes) }
             }
             humanLifecycleSection(human)
         }
@@ -413,7 +417,7 @@ struct CrewRosterProfilePanel: View {
     }
 
     private var profileEditAvatar: some View {
-        profileSection("头像", icon: "person.crop.square.fill") {
+        profileSection(l.tr(zh: "头像", en: "Avatar", de: "Avatar"), icon: "person.crop.square.fill") {
             HStack(spacing: 14) {
                 profileAvatar(size: 72)
                 EditableProfileAvatarPicker(
@@ -443,18 +447,32 @@ struct CrewRosterProfilePanel: View {
 
     private var humanEditContent: some View {
         VStack(spacing: 10) {
-            CrewRosterEditorTextField(title: "名字", text: $name, icon: "text.cursor") // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
-            CrewRosterEditorTextField(title: "头像 Emoji", text: $avatarEmoji, icon: "face.smiling") // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
-            CrewRosterEditorSegmentedRow(title: "权限", selection: $role, options: [("owner", "管理者"), ("member", "成员")])
-            CrewRosterEditorMenuRow(title: "性别/身份", icon: "person.fill", selection: $gender, options: HumanProfileOptions.genderOptions.map(\.key))
-            CrewRosterEditorDateToggleRow(title: "生日", icon: "gift.fill", isOn: $hasBirthday, date: $birthday, upperBound: Date())
-            CrewRosterEditorMenuRow(title: "血型", icon: "drop.fill", selection: $bloodType, options: bloodTypeOptions)
-            CrewRosterEditorTextField(title: "身高 cm", text: $heightText, icon: "ruler.fill") // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
+            CrewRosterEditorTextField(title: l.tr(zh: "名字", en: "Name", de: "Name"), text: $name, icon: "text.cursor") // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
+            CrewRosterEditorTextField(title: l.tr(zh: "头像 Emoji", en: "Avatar emoji", de: "Avatar-Emoji"), text: $avatarEmoji, icon: "face.smiling") // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
+            CrewRosterEditorSegmentedRow(title: l.tr(zh: "权限", en: "Role", de: "Rolle"), selection: $role, options: [
+                ("owner", localizedRoleText(for: "owner")),
+                ("member", localizedRoleText(for: "member"))
+            ])
+            CrewRosterEditorMenuRow(
+                title: l.tr(zh: "性别/身份", en: "Gender / identity", de: "Geschlecht / Identitaet"),
+                icon: "person.fill",
+                selection: $gender,
+                options: HumanProfileOptions.genderOptions.map(\.key),
+                optionTitle: { l.humanGenderDisplay($0) }
+            )
+            CrewRosterEditorDateToggleRow(title: l.tr(zh: "生日", en: "Birthday", de: "Geburtstag"), icon: "gift.fill", isOn: $hasBirthday, date: $birthday, upperBound: Date())
+            CrewRosterEditorMenuRow(
+                title: l.tr(zh: "血型", en: "Blood type", de: "Blutgruppe"),
+                icon: "drop.fill",
+                selection: $bloodType,
+                options: bloodTypeOptions
+            )
+            CrewRosterEditorTextField(title: l.tr(zh: "身高 cm", en: "Height cm", de: "Groesse cm"), text: $heightText, icon: "ruler.fill") // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
             CrewRosterEditorMenuRow(title: "MBTI", icon: "brain.head.profile", selection: $mbti, options: mbtiOptions)
-            CrewRosterEditorTextField(title: "国籍", text: $nationality, icon: "globe.asia.australia.fill") // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
-            CrewRosterEditorTextField(title: "现居地", text: $city, icon: "location.fill") // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
-            CrewRosterThemeSwatchRow(title: "主题色", selectedHex: $themeHex)
-            CrewRosterEditorTextField(title: "备注", text: $notes, icon: "note.text", axis: .vertical) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
+            CrewRosterEditorTextField(title: l.tr(zh: "国籍", en: "Nationality", de: "Nationalitaet"), text: $nationality, icon: "globe.asia.australia.fill") // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
+            CrewRosterEditorTextField(title: l.tr(zh: "现居地", en: "Current city", de: "Aktueller Ort"), text: $city, icon: "location.fill") // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
+            CrewRosterThemeSwatchRow(title: l.tr(zh: "主题色", en: "Accent color", de: "Akzentfarbe"), selectedHex: $themeHex)
+            CrewRosterEditorTextField(title: l.tr(zh: "备注", en: "Notes", de: "Notizen"), text: $notes, icon: "note.text", axis: .vertical) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
         }
     }
 
@@ -496,22 +514,22 @@ struct CrewRosterProfilePanel: View {
     }
 
     private func humanLifecycleSection(_ human: Human) -> some View {
-        profileSection("生命与危险操作", icon: "exclamationmark.triangle.fill") {
+        profileSection(l.tr(zh: "生命与危险操作", en: "Life & danger actions", de: "Leben & riskante Aktionen"), icon: "exclamationmark.triangle.fill") {
             if human.hasPassedAway {
-                infoRow("纪念日期", formattedDate(human.passedAwayDate))
-                secondaryButton("撤销纪念模式", icon: "arrow.uturn.backward", color: Color.goYellow) {
+                infoRow(l.tr(zh: "纪念日期", en: "Memorial date", de: "Gedenkdatum"), formattedDate(human.passedAwayDate))
+                secondaryButton(l.tr(zh: "撤销纪念模式", en: "Undo memorial mode", de: "Gedenkmodus zuruecknehmen"), icon: "arrow.uturn.backward", color: Color.goYellow) {
                     showingHumanUndoPassedAlert = true
                 }
             } else {
-                DatePicker("纪念日期", selection: $passedDate, in: ...Date(), displayedComponents: .date)
+                DatePicker(l.tr(zh: "纪念日期", en: "Memorial date", de: "Gedenkdatum"), selection: $passedDate, in: ...Date(), displayedComponents: .date)
                     .datePickerStyle(.compact)
                     .tint(Color.goPrimary)
                     .foregroundStyle(Color.goCardWhite)
-                secondaryButton("标记纪念模式", icon: "sparkles", color: Color.goPurple) {
+                secondaryButton(l.tr(zh: "标记纪念模式", en: "Mark memorial mode", de: "Gedenkmodus markieren"), icon: "sparkles", color: Color.goPurple) {
                     showingHumanPassedAlert = true
                 }
             }
-            destructiveButton("删除成员", icon: "trash.fill", color: Color.goRed) {
+            destructiveButton(l.tr(zh: "删除成员", en: "Delete member", de: "Mitglied loeschen"), icon: "trash.fill", color: Color.goRed) {
                 showingHumanDeleteSheet = true
             }
         }
@@ -644,18 +662,74 @@ struct CrewRosterProfilePanel: View {
     }
 
     private func emptyText(_ value: String) -> String {
-        value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "未填写" : value
+        value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? localizedEmptyValue : value
     }
 
     private func formattedDate(_ date: Date?) -> String {
-        date?.formatted(.dateTime.year().month().day()) ?? "未填写"
+        date?.formatted(.dateTime.year().month().day()) ?? localizedEmptyValue
     }
 
     private func privacySummary(for human: Human) -> String {
         let titles = HumanPrivateField.allCases
             .filter { human.privateFields.contains($0.rawValue) }
-            .map(\.title)
-        return titles.isEmpty ? "全部公开" : titles.joined(separator: "、")
+            .map(localizedPrivateFieldTitle)
+        return titles.isEmpty ? l.tr(zh: "全部公开", en: "All public", de: "Alles oeffentlich") : titles.joined(separator: l.tr(zh: "、", en: ", ", de: ", "))
+    }
+
+    private var localizedEmptyValue: String {
+        l.tr(zh: "未填写", en: "Not set", de: "Nicht festgelegt")
+    }
+
+    private func localizedRoleText(for raw: String) -> String {
+        switch HumanProfileOptions.normalizedRole(raw) {
+        case "owner":
+            l.tr(zh: "管理者", en: "Owner", de: "Verwaltung")
+        default:
+            l.tr(zh: "成员", en: "Member", de: "Mitglied")
+        }
+    }
+
+    private func localizedGenderTitle(for raw: String) -> String {
+        switch HumanProfileOptions.normalizedGender(raw) {
+        case "女":
+            return l.tr(zh: "女", en: "Female", de: "Weiblich")
+        case "男":
+            return l.tr(zh: "男", en: "Male", de: "Maennlich")
+        case "非二元":
+            return l.tr(zh: "非二元", en: "Non-binary", de: "Nichtbinaer")
+        case "不透露":
+            return l.tr(zh: "不透露", en: "Prefer not to say", de: "Keine Angabe")
+        default:
+            let title = HumanGenderIdentity.title(for: raw)
+            return title == "未填写" ? localizedEmptyValue : title
+        }
+    }
+
+    private func localizedHumanAge(_ human: Human) -> String {
+        let referenceDate = human.passedAwayDate ?? Date()
+        guard let birthday = human.birthday else { return l.tr(zh: "未知", en: "Unknown", de: "Unbekannt") }
+        let years = max(0, Calendar.current.dateComponents([.year], from: birthday, to: referenceDate).year ?? 0)
+        if years >= 1 {
+            return l.tr(zh: "\(years)岁", en: "\(years) years old", de: "\(years) Jahre alt")
+        }
+        return l.tr(zh: "不满1岁", en: "Under 1", de: "Unter 1")
+    }
+
+    private func localizedPrivateFieldTitle(_ field: HumanPrivateField) -> String {
+        switch field {
+        case .weight:
+            l.tr(zh: "体重", en: "Weight", de: "Gewicht")
+        case .workout:
+            l.tr(zh: "运动", en: "Workouts", de: "Training")
+        case .medication:
+            l.tr(zh: "吃药提醒", en: "Medication", de: "Medikamente")
+        case .wishlist:
+            l.tr(zh: "椰子资产与心愿", en: "Coconut Assets & Wishes", de: "Kokosnussvermoegen & Wuensche")
+        case .expense:
+            l.tr(zh: "花费", en: "Expenses", de: "Ausgaben")
+        case .note:
+            l.tr(zh: "备注", en: "Notes", de: "Notizen")
+        }
     }
 
     private func loadEditState() {

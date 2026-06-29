@@ -50,22 +50,25 @@ struct EditableProfileAvatarPicker: View {
     @State private var cropImageItem: IdentifiableCropImage? = nil
     @State private var cropPresentationTask: Task<Void, Never>? = nil
     @State private var isPasting = false
+    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
+
+    private var l: L10n { L10n(appLanguage) }
 
     var body: some View {
         VStack(spacing: 10) {
             HStack(spacing: 8) {
-                avatarActionButton(icon: "doc.on.clipboard.fill", title: "粘贴") {
+                avatarActionButton(icon: "doc.on.clipboard.fill", title: l.tr(zh: "粘贴", en: "Paste", de: "Einfuegen")) {
                     pastePasteboardImage()
                 }
 
                 Button {
                     presentPhotoLibrary()
                 } label: {
-                    avatarActionLabel(icon: "photo.on.rectangle.angled", title: "相册")
+                    avatarActionLabel(icon: "photo.on.rectangle.angled", title: l.tr(zh: "相册", en: "Photos", de: "Fotos"))
                 }
                 .buttonStyle(ScaleButtonStyle())
 
-                avatarActionButton(icon: "camera.fill", title: "拍照") {
+                avatarActionButton(icon: "camera.fill", title: l.tr(zh: "拍照", en: "Camera", de: "Kamera")) {
                     presentCamera()
                 }
             }
@@ -74,7 +77,7 @@ struct EditableProfileAvatarPicker: View {
                 Button {
                     avatarImageData = nil
                 } label: {
-                    Text("移除头像")
+                    Text(l.tr(zh: "移除头像", en: "Remove avatar", de: "Avatar entfernen"))
                         .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.ohanaPrimaryText.opacity(0.45))
                 }
@@ -128,7 +131,7 @@ struct EditableProfileAvatarPicker: View {
                 }
                 .toolbar {
                     ToolbarItem(placement: .cancellationAction) {
-                        Button("取消") {
+                        Button(l.cancel) {
                             cropImageItem = nil
                             photosPickerItem = nil
                         }
@@ -137,10 +140,10 @@ struct EditableProfileAvatarPicker: View {
             }
             .presentationDetents([.large]) // ui-v4: allow photo crop editor needs full-height system sheet
         }
-        .alert("无法打开相机", isPresented: $showCameraPermissionAlert) {
-            Button("好", role: .cancel) {}
+        .alert(l.tr(zh: "无法打开相机", en: "Camera unavailable", de: "Kamera nicht verfuegbar"), isPresented: $showCameraPermissionAlert) {
+            Button(l.tr(zh: "好", en: "OK", de: "OK"), role: .cancel) {}
         } message: {
-            Text("请在系统设置中允许 Ohana 访问相机。")
+            Text(l.tr(zh: "请在系统设置中允许 Ohana 访问相机。", en: "Allow Ohana to access the camera in system settings.", de: "Erlaube Ohana den Kamerazugriff in den Systemeinstellungen."))
         }
     }
 

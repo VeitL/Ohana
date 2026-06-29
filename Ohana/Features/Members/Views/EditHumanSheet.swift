@@ -12,6 +12,7 @@ struct EditHumanSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
     @Environment(AppServices.self) private var appServices
+    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
 
     @StateObject private var commandQueue = DeferredDomainCommandQueue()
     @State private var name: String = ""
@@ -32,39 +33,41 @@ struct EditHumanSheet: View {
     @State private var privateExpense = false
     @State private var privateNote = false
 
-    var body: some View {
-        OhanaSheetWrapper(title: "编辑成员", onDismiss: { dismiss() }) {
-            VStack(spacing: 16) {
-                formField("姓名", text: $name)
-                formField("头像 Emoji", text: $avatarEmoji)
+    private var l: L10n { L10n(appLanguage) }
 
-                Toggle("设置生日", isOn: $hasBirthday)
+    var body: some View {
+        OhanaSheetWrapper(title: l.tr(zh: "编辑成员", en: "Edit Member", de: "Mitglied bearbeiten"), onDismiss: { dismiss() }) {
+            VStack(spacing: 16) {
+                formField(l.tr(zh: "姓名", en: "Name", de: "Name"), text: $name)
+                formField(l.tr(zh: "头像 Emoji", en: "Avatar Emoji", de: "Avatar-Emoji"), text: $avatarEmoji)
+
+                Toggle(l.tr(zh: "设置生日", en: "Set Birthday", de: "Geburtstag festlegen"), isOn: $hasBirthday)
                     .tint(Color.goPrimary)
                     .padding(.horizontal, 4)
 
                 if hasBirthday {
-                    DatePicker("生日", selection: $birthday, displayedComponents: .date)
+                    DatePicker(l.tr(zh: "生日", en: "Birthday", de: "Geburtstag"), selection: $birthday, displayedComponents: .date)
                 }
 
-                formField("血型", text: $bloodType)
-                formField("国籍", text: $nationality)
-                formField("城市", text: $city)
+                formField(l.tr(zh: "血型", en: "Blood Type", de: "Blutgruppe"), text: $bloodType)
+                formField(l.tr(zh: "国籍", en: "Nationality", de: "Nationalität"), text: $nationality)
+                formField(l.tr(zh: "城市", en: "City", de: "Stadt"), text: $city)
 
-                Picker("角色", selection: $role) {
-                    Text("管理者").tag("owner")
-                    Text("成员").tag("member")
+                Picker(l.tr(zh: "角色", en: "Role", de: "Rolle"), selection: $role) {
+                    Text(l.tr(zh: "管理者", en: "Owner", de: "Verwaltung")).tag("owner")
+                    Text(l.tr(zh: "成员", en: "Member", de: "Mitglied")).tag("member")
                 }
                 .pickerStyle(.segmented)
 
-                Picker("性别/身份", selection: $gender) {
+                Picker(l.tr(zh: "性别/身份", en: "Gender / Identity", de: "Geschlecht / Identität"), selection: $gender) {
                     ForEach(HumanProfileOptions.genderOptions, id: \.key) { option in
-                        Text(HumanGenderIdentity.title(for: option.key)).tag(option.key)
+                        Text(localizedGenderTitle(for: option.key)).tag(option.key)
                     }
                 }
                 .pickerStyle(.segmented)
 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("备注")
+                    Text(l.tr(zh: "备注", en: "Notes", de: "Notizen"))
                         .font(OhanaFont.subheadline())
                         .foregroundStyle(Color.ohanaSecondaryText)
                     TextEditor(text: $notes)
@@ -74,21 +77,21 @@ struct EditHumanSheet: View {
 
                 // FIX 1: 隐私设置 Section
                 VStack(alignment: .leading, spacing: 10) {
-                    Text("🔒  隐私设置")
+                    Text(l.tr(zh: "🔒  隐私设置", en: "🔒  Privacy Settings", de: "🔒  Datenschutzeinstellungen"))
                         .font(OhanaFont.subheadline())
                         .foregroundStyle(Color.ohanaSecondaryText)
-                    editPrivacyRow("体重记录", binding: $privateWeight)
-                    editPrivacyRow("运动记录", binding: $privateWorkout)
-                    editPrivacyRow("吃药提醒", binding: $privateMedication)
-                    editPrivacyRow("备注", binding: $privateNote)
-                    editPrivacyRow("心愿单", binding: $privateWishlist)
-                    editPrivacyRow("花费记录", binding: $privateExpense)
+                    editPrivacyRow(l.tr(zh: "体重记录", en: "Weight Records", de: "Gewichtsverlauf"), binding: $privateWeight)
+                    editPrivacyRow(l.tr(zh: "运动记录", en: "Workout Records", de: "Trainingseinträge"), binding: $privateWorkout)
+                    editPrivacyRow(l.tr(zh: "吃药提醒", en: "Medication Reminders", de: "Medikamentenerinnerungen"), binding: $privateMedication)
+                    editPrivacyRow(l.tr(zh: "备注", en: "Notes", de: "Notizen"), binding: $privateNote)
+                    editPrivacyRow(l.tr(zh: "心愿单", en: "Wishlist", de: "Wunschliste"), binding: $privateWishlist)
+                    editPrivacyRow(l.tr(zh: "花费记录", en: "Expense Records", de: "Ausgabeneinträge"), binding: $privateExpense)
                 }
 
                 Button {
                     save()
                 } label: {
-                    Text("保存")
+                    Text(l.tr(zh: "保存", en: "Save", de: "Speichern"))
                         .capsuleButton()
                 }
                 .padding(.top, 8)
@@ -146,12 +149,11 @@ struct EditHumanSheet: View {
             privateFieldsRaw: editedPrivateFieldsRaw
         )
         commandQueue.enqueue(.memberProfile(entityID: human.id, kind: EntityKind.human.rawValue)) {
-            let result = MemberCommandExecutor(context: modelContext, services: appServices).updateHumanProfile(
+            MemberCommandExecutor(context: modelContext, services: appServices).updateHumanProfile(
                 human,
                 input: input,
                 note: "human.detail.profile"
             )
-            appServices.domainRevisions.publishMemberProfile(result, note: "human.detail.profile")
             UINotificationFeedbackGenerator().notificationOccurred(.success)
             dismiss()
         }
@@ -173,6 +175,21 @@ struct EditHumanSheet: View {
         if privateWishlist { fields.insert(HumanPrivateField.wishlist.rawValue) }
         if privateExpense { fields.insert(HumanPrivateField.expense.rawValue) }
         return fields
+    }
+
+    private func localizedGenderTitle(for raw: String) -> String {
+        switch HumanProfileOptions.normalizedGender(raw) {
+        case "女":
+            l.tr(zh: "女", en: "Female", de: "Weiblich")
+        case "男":
+            l.tr(zh: "男", en: "Male", de: "Männlich")
+        case "非二元":
+            l.tr(zh: "非二元", en: "Non-binary", de: "Nichtbinär")
+        case "不透露":
+            l.tr(zh: "不透露", en: "Prefer not to say", de: "Keine Angabe")
+        default:
+            HumanGenderIdentity.title(for: raw)
+        }
     }
 
     private func editPrivacyRow(_ title: String, binding: Binding<Bool>) -> some View {

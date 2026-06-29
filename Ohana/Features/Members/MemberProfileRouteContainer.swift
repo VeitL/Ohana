@@ -217,6 +217,8 @@ private func fetch<T: PersistentModel>(
 
 private struct MemberProfileMissingEntityView: View {
     let kind: String
+    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
+    private var l: L10n { L10n(appLanguage) }
 
     var body: some View {
         VStack(spacing: 14) {
@@ -224,7 +226,7 @@ private struct MemberProfileMissingEntityView: View {
                 .font(OhanaFont.title(.bold))
                 .foregroundStyle(Color.goPrimary)
                 .accessibilityHidden(true)
-            Text("内容已不可用")
+            Text(l.tr(zh: "内容已不可用", en: "Content is no longer available", de: "Inhalt ist nicht mehr verfügbar"))
                 .font(OhanaFont.title3(.black))
                 .foregroundStyle(Color.ohanaPrimaryText)
             Text(kind)

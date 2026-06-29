@@ -280,6 +280,7 @@ struct GenericWeightEntrySheet: View {
                 Text(l.tr(zh: "记录体重", en: "Record weight", de: "Gewicht erfassen"))
                     .font(OhanaFont.title3(.black))
                     .foregroundStyle(Color.ohanaPrimaryText)
+                    .accessibilityIdentifier(sheetAccessibilityIdentifier)
                 Text(entityName)
                     .font(OhanaFont.caption(.semibold))
                     .foregroundStyle(Color.ohanaSecondaryText)
@@ -318,6 +319,7 @@ struct GenericWeightEntrySheet: View {
                     .foregroundStyle(weightText.isEmpty ? Color.ohanaTertiaryText : Color.ohanaPrimaryText)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .minimumScaleFactor(0.45)
+                    .accessibilityIdentifier(weightValueAccessibilityIdentifier)
 
                 unitPicker
             }
@@ -354,7 +356,7 @@ struct GenericWeightEntrySheet: View {
     private var quickWeightStrip: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
-                ForEach(quickWeights, id: \.self) { weight in
+                ForEach(Array(quickWeights.enumerated()), id: \.element) { index, weight in
                     Button {
                         applyQuickWeight(weight)
                     } label: {
@@ -366,6 +368,7 @@ struct GenericWeightEntrySheet: View {
                             .goSelectableSurface(isSelected: isQuickWeightSelected(weight), tint: accentColor, in: Capsule())
                     }
                     .buttonStyle(ScaleButtonStyle())
+                    .accessibilityIdentifier("generic-weight-entry-quick-weight-\(index)")
                 }
             }
             .padding(.horizontal, 20)
@@ -477,9 +480,15 @@ struct GenericWeightEntrySheet: View {
             .padding(.vertical, 14)
             .background(isValid && !isSaving ? accentColor : accentColor.opacity(0.38), in: Capsule())
             .opacity(isValid || isSaving ? 1 : 0.62)
+            .accessibilityElement(children: .combine)
         }
         .buttonStyle(ScaleButtonStyle())
         .disabled(!isValid || isSaving)
+        .accessibilityLabel(isSaving
+            ? l.tr(zh: "保存中", en: "Saving", de: "Speichert")
+            : l.tr(zh: "保存体重记录", en: "Save weight", de: "Gewicht speichern")
+        )
+        .accessibilityIdentifier("generic-weight-entry-save-action")
         .padding(.horizontal, 20)
         .padding(.top, 10)
         .padding(.bottom, 14)
@@ -516,6 +525,24 @@ struct GenericWeightEntrySheet: View {
             if result.count >= 4 { break }
         }
         return result
+    }
+
+    private var sheetAccessibilityIdentifier: String {
+        switch target {
+        case .pet:
+            "generic-weight-entry-sheet-pet"
+        case .human:
+            "generic-weight-entry-sheet-human"
+        }
+    }
+
+    private var weightValueAccessibilityIdentifier: String {
+        switch target {
+        case .pet:
+            "generic-weight-entry-value-pet"
+        case .human:
+            "generic-weight-entry-value-human"
+        }
     }
 
     private func applyQuickWeight(_ kg: Double) {

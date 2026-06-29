@@ -54,9 +54,16 @@ struct AppSettingsSheetRouteContainer: View {
                 )
             }
         }
-        .onReceive(appServices.domainRevisions.homeRevisionUpdates) { _ in
+        .onReceive(appServices.domainRevisions.homeRevisionUpdates) { revision in
+            guard shouldReloadSettingsRouteData(for: revision) else { return }
             refreshToken &+= 1
         }
+    }
+
+    private func shouldReloadSettingsRouteData(for revision: HomeRevision) -> Bool {
+        guard let command = revision.lastCommand else { return false }
+
+        return command.feature != "privacy"
     }
 }
 
@@ -92,11 +99,7 @@ private struct SettingsFirstFrameShell: View {
                     .accessibilityLabel(l.tr(zh: "关闭设置", en: "Close settings", de: "Einstellungen schliessen"))
                 }
 
-                Spacer(minLength: 0)
-
-                ProgressView()
-                    .tint(Color.goPrimary)
-                    .controlSize(.large)
+                SettingsFirstFrameSkeleton()
                     .accessibilityHidden(true)
 
                 Spacer(minLength: 0)
@@ -105,7 +108,87 @@ private struct SettingsFirstFrameShell: View {
             .padding(.top, 18)
             .padding(.bottom, 28)
         }
-        .accessibilityIdentifier("settings-screen")
+        .accessibilityIdentifier("settings-loading-screen")
+        .accessibilityLabel(l.tr(zh: "正在打开设置", en: "Opening settings", de: "Einstellungen werden geoffnet"))
+    }
+}
+
+private struct SettingsFirstFrameSkeleton: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            skeletonSection(width: 86)
+
+            VStack(spacing: 10) {
+                skeletonRow(width: 252)
+                skeletonProfileBlock()
+            }
+            .padding(16)
+            .background(Color.ohanaCardSurface.opacity(0.72), in: RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous))
+
+            skeletonSection(width: 76)
+            skeletonRow(width: 220)
+
+            skeletonSection(width: 54)
+            skeletonRow(width: 236)
+
+            skeletonSection(width: 86)
+            VStack(spacing: 12) {
+                skeletonRow(width: 244)
+                skeletonRow(width: 208)
+                skeletonRow(width: 232)
+            }
+            .padding(16)
+            .background(Color.ohanaCardSurface.opacity(0.64), in: RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous))
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .redacted(reason: .placeholder)
+    }
+
+    private func skeletonSection(width: CGFloat) -> some View {
+        HStack(spacing: 9) {
+            Capsule()
+                .fill(Color.goPrimary.opacity(0.9))
+                .frame(width: 4, height: 22) // a11y: allow non-interactive loading skeleton hidden from accessibility
+            Capsule()
+                .fill(Color.ohanaSecondaryText.opacity(0.32))
+                .frame(width: width, height: 14)
+        }
+    }
+
+    private func skeletonRow(width: CGFloat) -> some View {
+        HStack(spacing: 13) {
+            Circle()
+                .fill(Color.goPrimary.opacity(0.82))
+                .frame(width: 30, height: 30) // a11y: allow non-interactive loading skeleton hidden from accessibility
+            VStack(alignment: .leading, spacing: 8) {
+                Capsule()
+                    .fill(Color.ohanaPrimaryText.opacity(0.34))
+                    .frame(width: width, height: 18)
+                Capsule()
+                    .fill(Color.ohanaSecondaryText.opacity(0.24))
+                    .frame(width: min(width * 0.74, 190), height: 12)
+            }
+            Spacer(minLength: 0)
+        }
+        .frame(maxWidth: .infinity, minHeight: 58)
+    }
+
+    private func skeletonProfileBlock() -> some View {
+        HStack(spacing: 14) {
+            Circle()
+                .fill(Color.goPrimary.opacity(0.42))
+                .frame(width: 58, height: 58)
+            VStack(alignment: .leading, spacing: 10) {
+                Capsule()
+                    .fill(Color.goPrimary.opacity(0.44))
+                    .frame(width: 190, height: 18)
+                Capsule()
+                    .fill(Color.ohanaSecondaryText.opacity(0.24))
+                    .frame(width: 260, height: 12)
+            }
+            Spacer(minLength: 0)
+        }
+        .frame(maxWidth: .infinity, minHeight: 86)
     }
 }
 

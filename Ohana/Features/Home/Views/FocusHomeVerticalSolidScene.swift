@@ -135,6 +135,7 @@ struct FocusHomeVerticalSolidScene<QuickActions: View, ContextMenuContent: View>
     let onCollapse: () -> Void
     let onOpenDetails: (FocusCard) -> Void
 
+    @Environment(AppServices.self) private var appServices
     @ObservedObject private var workloadPolicy = AppWorkloadPolicy.shared
     @State private var floatingResumeStartTime: TimeInterval?
     @State private var animatedArrivalCardId: UUID?
@@ -342,63 +343,123 @@ struct FocusHomeVerticalSolidScene<QuickActions: View, ContextMenuContent: View>
             heroDirection: heroDirection,
             reduceMotion: reduceMotion
         )
+        let embeddedQuickActionsReady = isExpandedInteractionReady && embeddedQuickActionReveal > 0.98
         let showsEmbeddedQuickActions = embedsQuickActionsInCard
             && isExpandedSurface
             && walkTrackingPet == nil
             && embeddedQuickActionsMounted
-            && embeddedQuickActionReveal > 0.001
+            && embeddedQuickActionsReady
 
-        return FocusHomeWalkCardFlip(
-            walkPet: walkTrackingPet,
-            reduceMotion: reduceMotion,
-            walkCardPadding: 10,
-            retainsWalkPetDuringClose: isExpandedInteractionReady
-        ) {
-            ZStack(alignment: .bottom) {
-                FocusHomeVerticalSolidCardSurface(
-                    card: renderCard,
-                    progress: visualProgress,
-                    reduceMotion: reduceMotion,
-                    localization: localization,
-                    frozenAvatarSource: frozenAvatarSource,
-                    allowsLiveAvatarFallback: selectedCardId == nil && motionSnapshot == nil
-                )
+        return cardTapLayer(
+            FocusHomeWalkCardFlip(
+                walkPet: walkTrackingPet,
+                reduceMotion: reduceMotion,
+                walkCardPadding: 10,
+                retainsWalkPetDuringClose: isExpandedInteractionReady
+            ) {
+                ZStack(alignment: .bottom) {
+                    FocusHomeVerticalSolidCardSurface(
+                        card: renderCard,
+                        progress: visualProgress,
+                        reduceMotion: reduceMotion,
+                        localization: localization,
+                        frozenAvatarSource: frozenAvatarSource,
+                        allowsLiveAvatarFallback: selectedCardId == nil && motionSnapshot == nil
+                    )
 
-                if embedsQuickActionsInCard, isExpandedSurface, isExpandedCollapseReady, walkTrackingPet == nil {
-                    embeddedCardCollapseHitLayer(for: renderCard, frame: frame)
-                        .zIndex(10)
-                }
+                    if embedsQuickActionsInCard, isExpandedSurface, isExpandedCollapseReady, walkTrackingPet == nil {
+                        embeddedCardCollapseHitLayer(for: renderCard, frame: frame)
+                            .zIndex(10)
+                    }
 
-                if showsEmbeddedQuickActions {
-                    embeddedQuickActionLayer(for: renderCard, frame: frame, reveal: embeddedQuickActionReveal)
-                }
+                    if showsEmbeddedQuickActions {
+                        embeddedQuickActionLayer(
+                            for: renderCard,
+                            frame: frame,
+                            reveal: embeddedQuickActionReveal,
+                            isReady: embeddedQuickActionsReady
+                        )
+                    }
 
-                if showsDetailButton(for: renderCard, isExpandedSurface: isExpandedSurface, walkTrackingPet: walkTrackingPet) {
-                    expandedDetailButton(for: renderCard, frame: frame)
-                        .zIndex(16)
+                    if showsDetailButton(for: renderCard, isExpandedSurface: isExpandedSurface, walkTrackingPet: walkTrackingPet) {
+                        expandedDetailButton(for: renderCard, frame: frame)
+                            .zIndex(16)
+                    }
                 }
             }
-        }
-        .frame(width: frame.width, height: frame.height)
-        .rotationEffect(.degrees(rotation))
-        .rotation3DEffect(.degrees(arrival.flip), axis: (x: 0, y: 1, z: 0), perspective: 0.72)
-        .scaleEffect(scale)
-        .opacity(opacity)
-        .position(x: frame.midX + floating.x, y: frame.midY + dragY + floating.y + arrival.y)
-        .zIndex(zIndex)
-        .contentShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
-        .contextMenu { contextMenu(renderCard) }
-        .onTapGesture {
-            guard !embedsQuickActionsInCard else { return }
-            guard walkTrackingPet == nil else { return }
-            handleCardTap(isSelected: isExpandedSurface)
-        }
+            .id(walkTrackingIdentity(for: renderCard, walkPet: walkTrackingPet))
+            .frame(width: frame.width, height: frame.height)
+            .rotationEffect(.degrees(rotation))
+            .rotation3DEffect(.degrees(arrival.flip), axis: (x: 0, y: 1, z: 0), perspective: 0.72)
+            .scaleEffect(scale)
+            .opacity(opacity)
+            .position(x: frame.midX + floating.x, y: frame.midY + dragY + floating.y + arrival.y)
+            .zIndex(zIndex)
+            .contentShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+            .contextMenu { contextMenu(renderCard) },
+            isExpandedSurface: isExpandedSurface,
+            walkTrackingPet: walkTrackingPet
+        )
         .simultaneousGesture(collapseDragGesture(isEnabled: isExpandedSurface && isExpandedCollapseReady && walkTrackingPet == nil))
         .allowsHitTesting(isExpandedSurface)
+        .accessibilityHidden(selectedCardId != nil && !isExpandedSurface)
     }
 
-    private func walkTrackingPet(for _: FocusCard, isSelected _: Bool) -> Pet? {
-        nil
+    @ViewBuilder
+    private func cardTapLayer(
+        _ content: some View,
+        isExpandedSurface: Bool,
+        walkTrackingPet: Pet?
+    ) -> some View {
+        if embedsQuickActionsInCard {
+            content
+        } else {
+            content
+                .onTapGesture {
+                    guard walkTrackingPet == nil else { return }
+                    handleCardTap(isSelected: isExpandedSurface)
+                }
+        }
+    }
+
+    private func walkTrackingPet(for card: FocusCard, isSelected: Bool) -> Pet? {
+        guard isSelected,
+              !card.isHuman,
+              let walkingPet = appServices.walking.currentPet,
+              walkingPet.id == card.id,
+              !walkingPet.hasPassedAway else {
+            return nil
+        }
+
+        switch appServices.walking.phase {
+        case .running, .paused, .finished:
+            return walkingPet
+        case .idle:
+            return nil
+        }
+    }
+
+    private func walkTrackingIdentity(for card: FocusCard, walkPet: Pet?) -> String {
+        [
+            card.id.uuidString,
+            walkPet?.id.uuidString ?? "none",
+            walkPhaseKey(appServices.walking.phase),
+            "\(walkPresentationRevision)",
+            "\(appServices.walkingPresentationRevision)"
+        ].joined(separator: "#")
+    }
+
+    private func walkPhaseKey(_ phase: WalkPhase) -> String {
+        switch phase {
+        case .idle:
+            "idle"
+        case .running:
+            "running"
+        case .paused:
+            "paused"
+        case let .finished(elapsed, poopCount):
+            "finished-\(Int(elapsed))-\(poopCount)"
+        }
     }
 
     private func handleCardTap(isSelected: Bool) {
@@ -454,7 +515,12 @@ struct FocusHomeVerticalSolidScene<QuickActions: View, ContextMenuContent: View>
         .position(x: frame.midX, y: y)
     }
 
-    private func embeddedQuickActionLayer(for card: FocusCard, frame: CGRect, reveal: CGFloat) -> some View {
+    private func embeddedQuickActionLayer(
+        for card: FocusCard,
+        frame: CGRect,
+        reveal: CGFloat,
+        isReady: Bool
+    ) -> some View {
         let dockWidth = max(0, frame.width - 18)
         let dockHeight = embeddedQuickActionDockHeight(for: frame)
         return FocusHomeVerticalSolidQuickActionLayer(
@@ -462,7 +528,7 @@ struct FocusHomeVerticalSolidScene<QuickActions: View, ContextMenuContent: View>
             width: dockWidth,
             height: dockHeight,
             reveal: reveal,
-            isReady: isExpandedInteractionReady
+            isReady: isReady
         )
         .padding(.horizontal, 11)
         .padding(.bottom, 8)
@@ -474,26 +540,23 @@ struct FocusHomeVerticalSolidScene<QuickActions: View, ContextMenuContent: View>
         let protectedBottomHeight = embeddedQuickActionDockHeight(for: frame) + 42
         let hitHeight = max(44, frame.height - protectedBottomHeight)
 
-        return VStack(spacing: 0) {
-            Rectangle()
-                .fill(Color.ohanaPrimaryText.opacity(0.001)) // ui-v4: allow invisible expanded card collapse hit zone
-                .contentShape(Rectangle())
-                .frame(width: frame.width, height: hitHeight)
-                .onTapGesture {
-                    OhanaFeedback.light()
-                    onCollapse()
-                }
-                .accessibilityLabel(card.name)
-                .accessibilityHint(l.tr(
-                    zh: "点击返回首页",
-                    en: "Tap to return home",
-                    de: "Tippen, um zur Startseite zurückzukehren"
-                ))
-                .accessibilityAddTraits(.isButton)
-
-            Spacer(minLength: 0)
-        }
-        .frame(width: frame.width, height: frame.height, alignment: .top)
+        return Rectangle()
+            .fill(Color.ohanaPrimaryText.opacity(0.001)) // ui-v4: allow invisible expanded card collapse hit zone without covering embedded actions
+            .contentShape(Rectangle())
+            .frame(width: frame.width, height: hitHeight)
+            .offset(y: -(frame.height - hitHeight))
+            .onTapGesture {
+                OhanaFeedback.light()
+                onCollapse()
+            }
+            .accessibilityLabel(card.name)
+            .accessibilityIdentifier(cardAccessibilityIdentifier(for: card))
+            .accessibilityHint(l.tr(
+                zh: "点击返回首页",
+                en: "Tap to return home",
+                de: "Tippen, um zur Startseite zurückzukehren"
+            ))
+            .accessibilityAddTraits(.isButton)
     }
 
     private func showsDetailButton(
@@ -534,6 +597,7 @@ struct FocusHomeVerticalSolidScene<QuickActions: View, ContextMenuContent: View>
                 }
                 .buttonStyle(ScaleButtonStyle())
                 .accessibilityLabel(detailButtonAccessibilityLabel(for: card))
+                .accessibilityIdentifier(card.isHuman ? "home-expanded-detail-human" : "home-expanded-detail-pet")
                 .accessibilityHint(l.tr(
                     zh: "打开这张卡片的资料页",
                     en: "Open this card's detail page",
@@ -558,6 +622,10 @@ struct FocusHomeVerticalSolidScene<QuickActions: View, ContextMenuContent: View>
             return l.tr(zh: "打开人类详情", en: "Open human details", de: "Menschendetails öffnen")
         }
         return l.tr(zh: "打开宠物详情", en: "Open pet details", de: "Haustierdetails öffnen")
+    }
+
+    private func cardAccessibilityIdentifier(for card: FocusCard) -> String {
+        "home-card-\(card.isHuman ? "human" : "pet")-\(card.name)"
     }
 
     private func embeddedQuickActionDockHeight(for frame: CGRect) -> CGFloat {
@@ -591,6 +659,7 @@ struct FocusHomeVerticalSolidScene<QuickActions: View, ContextMenuContent: View>
                             }
                     )
                     .accessibilityLabel(card.name)
+                    .accessibilityIdentifier(cardAccessibilityIdentifier(for: card))
                     .accessibilityHint(l.tr(
                         zh: "点击放大卡片",
                         en: "Tap to expand card",

@@ -13,11 +13,14 @@ enum CareLedgerRangeFilter: CaseIterable {
     case month
     case all
 
-    var title: String {
+    func title(l: L10n) -> String {
         switch self {
-        case .week: "本周"
-        case .month: "本月"
-        case .all: "全部"
+        case .week:
+            l.tr(zh: "本周", en: "This week", de: "Diese Woche")
+        case .month:
+            l.tr(zh: "本月", en: "This month", de: "Dieser Monat")
+        case .all:
+            l.tr(zh: "全部", en: "All", de: "Alle")
         }
     }
 
@@ -70,38 +73,42 @@ final class CareLedgerAnalysisScreenModel {
         return grouped.map { ($0.key, $0.value.count) }.sorted { $0.1 > $1.1 }
     }
 
-    var actorStats: [(String, Int)] {
+    func actorStats(l: L10n) -> [(String, Int)] {
         let grouped = Dictionary(grouping: filteredEvents) { event in
-            actorName(for: event.actorId, kind: event.actorKind)
+            actorName(for: event.actorId, kind: event.actorKind, l: l)
         }
         return grouped.map { ($0.key, $0.value.count) }.sorted { $0.1 > $1.1 }
     }
 
-    func actorName(for id: String?, kind: String) -> String {
-        guard let id, !id.isEmpty else { return "系统/未指定" }
+    func actorName(for id: String?, kind: String, l: L10n = .current) -> String {
+        guard let id, !id.isEmpty else {
+            return l.tr(zh: "系统/未指定", en: "System/unspecified", de: "System/nicht festgelegt")
+        }
         if kind == CareLedgerActorKind.human.rawValue {
-            return humans.first { $0.id.uuidString == id }?.name ?? "家人"
+            return humans.first { $0.id.uuidString == id }?.name ?? l.tr(zh: "家人", en: "Family", de: "Familie")
         }
         if kind == CareLedgerActorKind.pet.rawValue {
-            return pets.first { $0.id.uuidString == id }?.name ?? "宠物"
+            return pets.first { $0.id.uuidString == id }?.name ?? l.tr(zh: "宠物", en: "Pet", de: "Haustier")
         }
         if kind == CareLedgerActorKind.plant.rawValue {
-            return "植物"
+            return l.tr(zh: "植物", en: "Plant", de: "Pflanze")
         }
-        return "系统"
+        return l.tr(zh: "系统", en: "System", de: "System")
     }
 
-    func subjectName(for id: String?, kind: String) -> String {
-        guard let id, !id.isEmpty else { return "全家" }
+    func subjectName(for id: String?, kind: String, l: L10n = .current) -> String {
+        guard let id, !id.isEmpty else {
+            return l.tr(zh: "全家", en: "Household", de: "Haushalt")
+        }
         if kind == CareLedgerSubjectKind.pet.rawValue {
-            return pets.first { $0.id.uuidString == id }?.name ?? "宠物"
+            return pets.first { $0.id.uuidString == id }?.name ?? l.tr(zh: "宠物", en: "Pet", de: "Haustier")
         }
         if kind == CareLedgerSubjectKind.human.rawValue {
-            return humans.first { $0.id.uuidString == id }?.name ?? "家人"
+            return humans.first { $0.id.uuidString == id }?.name ?? l.tr(zh: "家人", en: "Family", de: "Familie")
         }
         if kind == CareLedgerSubjectKind.plant.rawValue {
-            return "植物"
+            return l.tr(zh: "植物", en: "Plant", de: "Pflanze")
         }
-        return "全家"
+        return l.tr(zh: "全家", en: "Household", de: "Haushalt")
     }
 }

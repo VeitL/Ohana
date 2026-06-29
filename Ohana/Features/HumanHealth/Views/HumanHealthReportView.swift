@@ -15,12 +15,14 @@ struct HumanHealthReportContentView: View {
 
     @Environment(\.modelContext) private var modelContext
     @AppStorage("currentActiveHumanId") private var activeHumanIdStr = ""
+    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
 
     @State private var showAddSheet = false
     @State private var editingReport: HumanHealthReport? = nil
 
     private var activeHumanId: UUID? { UUID(uuidString: activeHumanIdStr) }
     private var isPrivacyLocked: Bool { human.isPrivate(.weight, viewedBy: activeHumanId) }
+    private var l: L10n { L10n(appLanguage) }
 
     init(human: Human, myReports: [HumanHealthReport]) {
         self.human = human
@@ -51,7 +53,7 @@ struct HumanHealthReportContentView: View {
                             .padding(.horizontal, 16)
 
                         if !myReports.isEmpty {
-                            sectionLabel("检测报告")
+                            sectionLabel(l.tr(zh: "检测报告", en: "Health Reports", de: "Gesundheitsberichte"))
                             ForEach(myReports) { report in
                                 reportRow(report)
                                     .padding(.horizontal, 16)
@@ -75,7 +77,7 @@ struct HumanHealthReportContentView: View {
                     HStack(spacing: 8) {
                         Image(systemName: "plus").accessibilityHidden(true)
                             .font(OhanaFont.headline(.black))
-                        Text("添加报告")
+                        Text(l.tr(zh: "添加报告", en: "Add Report", de: "Bericht hinzufügen"))
                             .font(OhanaFont.headline(.black))
                     }
                     .foregroundStyle(Color.arkInk)
@@ -83,10 +85,11 @@ struct HumanHealthReportContentView: View {
                     .background(Color.goTeal, in: Capsule())
                 }
                 .buttonStyle(ScaleButtonStyle())
+                .accessibilityIdentifier("human-health-report-add-action")
                 .padding(.bottom, 28)
             }
         }
-        .navigationTitle("🏥 身体检测报告")
+        .navigationTitle(l.tr(zh: "🏥 身体检测报告", en: "🏥 Health Reports", de: "🏥 Gesundheitsberichte"))
         .navigationBarTitleDisplayMode(.inline)
         .sheet(isPresented: $showAddSheet) {
             AddHumanHealthReportSheet(human: human)
@@ -103,10 +106,10 @@ struct HumanHealthReportContentView: View {
             Image(systemName: "lock.shield.fill").accessibilityHidden(true)
                 .font(OhanaFont.metric(size: 44))
                 .foregroundStyle(Color.goYellow)
-            Text("身体数据仅本人可见")
+            Text(l.tr(zh: "身体数据仅本人可见", en: "Health data is private", de: "Gesundheitsdaten sind privat"))
                 .font(OhanaFont.headline(.bold))
                 .foregroundStyle(Color.ohanaPrimaryText)
-            Text("请切换到本人档案后再查看。")
+            Text(l.tr(zh: "请切换到本人档案后再查看。", en: "Switch to this profile to view it.", de: "Wechsle zu diesem Profil, um es zu sehen."))
                 .font(OhanaFont.callout())
                 .foregroundStyle(Color.ohanaSecondaryText)
         }
@@ -120,11 +123,11 @@ struct HumanHealthReportContentView: View {
     private var summaryBento: some View {
         humanReportSurface {
             HStack(spacing: 12) {
-                bentoStat(icon: "doc.text.fill", label: "报告总数", value: "\(myReports.count)", color: Color.goTeal)
+                bentoStat(icon: "doc.text.fill", label: l.tr(zh: "报告总数", en: "Reports", de: "Berichte"), value: "\(myReports.count)", color: Color.goTeal)
                 divider
-                bentoStat(icon: "exclamationmark.triangle.fill", label: "异常项", value: "\(abnormalCount)", color: Color.goOrange)
+                bentoStat(icon: "exclamationmark.triangle.fill", label: l.tr(zh: "异常项", en: "Abnormal", de: "Auffällig"), value: "\(abnormalCount)", color: Color.goOrange)
                 divider
-                bentoStat(icon: "calendar.badge.clock", label: "近期复查", value: "\(upcomingCheckCount)", color: Color.goYellow)
+                bentoStat(icon: "calendar.badge.clock", label: l.tr(zh: "近期复查", en: "Follow-ups", de: "Kontrollen"), value: "\(upcomingCheckCount)", color: Color.goYellow)
             }
             .padding(16)
         }
@@ -164,10 +167,10 @@ struct HumanHealthReportContentView: View {
 
                     VStack(alignment: .leading, spacing: 4) {
                         HStack(spacing: 6) {
-                            Text(report.reportType.emoji + " " + report.reportType.rawValue)
+                            Text(report.reportType.emoji + " " + report.reportType.localizedTitle(l))
                                 .font(OhanaFont.callout(.bold))
                                 .foregroundStyle(Color.ohanaPrimaryText)
-                            Text(report.conclusion.rawValue)
+                            Text(report.conclusion.localizedTitle(l))
                                 .font(OhanaFont.caption2(.bold))
                                 .foregroundStyle(report.conclusion.color)
                                 .padding(.horizontal, 6).padding(.vertical, 2)
@@ -197,7 +200,7 @@ struct HumanHealthReportContentView: View {
                                 Image(systemName: "calendar.badge.clock").accessibilityHidden(true)
                                     .font(OhanaFont.caption2())
                                     .foregroundStyle(Color.ohanaTertiaryText)
-                                Text(days > 0 ? "距复查还有 \(days) 天" : days == 0 ? "今天复查" : "已逾期 \(-days) 天")
+                                Text(nextCheckText(days))
                                     .font(OhanaFont.caption(.semibold))
                                     .foregroundStyle(days <= 7 ? Color.goOrange : Color.ohanaSecondaryText)
                             }
@@ -225,8 +228,8 @@ struct HumanHealthReportContentView: View {
                     Circle().fill(Color.goTeal.opacity(0.12)).frame(width: 72, height: 72)
                     Image(systemName: "stethoscope").accessibilityHidden(true).font(OhanaFont.adaptive(size: 32)).foregroundStyle(Color.goTeal)
                 }
-                Text("还没有检测报告").font(OhanaFont.title3(.bold)).foregroundStyle(Color.ohanaPrimaryText)
-                Text("点击下方按钮添加第一条身体检测报告").font(OhanaFont.callout()).foregroundStyle(Color.ohanaSecondaryText)
+                Text(l.tr(zh: "还没有检测报告", en: "No health reports yet", de: "Noch keine Gesundheitsberichte")).font(OhanaFont.title3(.bold)).foregroundStyle(Color.ohanaPrimaryText)
+                Text(l.tr(zh: "点击下方按钮添加第一条身体检测报告", en: "Use the button below to add the first report.", de: "Füge den ersten Bericht über die Schaltfläche unten hinzu.")).font(OhanaFont.callout()).foregroundStyle(Color.ohanaSecondaryText)
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 32)
@@ -241,6 +244,16 @@ struct HumanHealthReportContentView: View {
             .tracking(1.0)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 20)
+    }
+
+    private func nextCheckText(_ days: Int) -> String {
+        if days > 0 {
+            return l.tr(zh: "距复查还有 \(days) 天", en: "\(days) days until follow-up", de: "Noch \(days) Tage bis zur Kontrolle")
+        }
+        if days == 0 {
+            return l.tr(zh: "今天复查", en: "Follow-up today", de: "Kontrolle heute")
+        }
+        return l.tr(zh: "已逾期 \(-days) 天", en: "\(-days) days overdue", de: "\(-days) Tage überfällig")
     }
 
     private func humanReportSurface(@ViewBuilder content: () -> some View) -> some View {
@@ -262,6 +275,7 @@ struct AddHumanHealthReportSheet: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
     @Environment(AppServices.self) private var appServices
+    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
 
     @StateObject private var commandQueue = DeferredDomainCommandQueue()
     @State private var reportType: HealthReportType = .physical
@@ -274,6 +288,7 @@ struct AddHumanHealthReportSheet: View {
     @State private var summary = ""
     @State private var notes = ""
     @State private var isSaving = false
+    private var l: L10n { L10n(appLanguage) }
 
     var body: some View {
         ZStack {
@@ -283,7 +298,7 @@ struct AddHumanHealthReportSheet: View {
                 VStack(spacing: 20) {
                     // Title
                     HStack {
-                        Text(editing == nil ? "添加检测报告" : "编辑报告")
+                        Text(editing == nil ? l.tr(zh: "添加检测报告", en: "Add Health Report", de: "Gesundheitsbericht hinzufügen") : l.tr(zh: "编辑报告", en: "Edit Report", de: "Bericht bearbeiten"))
                             .font(OhanaFont.title2(.bold))
                             .foregroundStyle(Color.ohanaPrimaryText)
                         Spacer()
@@ -295,7 +310,7 @@ struct AddHumanHealthReportSheet: View {
                                 .contentShape(Rectangle())
                         }
                         .buttonStyle(ScaleButtonStyle())
-                        .accessibilityLabel("关闭")
+                        .accessibilityLabel(l.tr(zh: "关闭", en: "Close", de: "Schließen"))
                     }
                     .padding(.horizontal, 20)
                     .padding(.top, 24)
@@ -303,7 +318,7 @@ struct AddHumanHealthReportSheet: View {
                     // Card 1: Report Type
                     reportSheetCard {
                         VStack(alignment: .leading, spacing: 16) {
-                            cardHeader(icon: "doc.text.fill", color: Color.goTeal, title: "报告类型")
+                            cardHeader(icon: "doc.text.fill", color: Color.goTeal, title: l.tr(zh: "报告类型", en: "Report Type", de: "Berichtstyp"))
 
                             ScrollView(.horizontal, showsIndicators: false) {
                                 HStack(spacing: 8) {
@@ -313,7 +328,7 @@ struct AddHumanHealthReportSheet: View {
                                         } label: {
                                             HStack(spacing: 4) {
                                                 Text(type.emoji)
-                                                Text(type.rawValue)
+                                                Text(type.localizedTitle(l))
                                                     .font(OhanaFont.caption(.bold))
                                             }
                                             .foregroundStyle(reportType == type ? Color.arkInk : Color.ohanaPrimaryText)
@@ -332,7 +347,7 @@ struct AddHumanHealthReportSheet: View {
                     // Card 2: Conclusion
                     reportSheetCard {
                         VStack(alignment: .leading, spacing: 16) {
-                            cardHeader(icon: "checkmark.seal.fill", color: conclusion.color, title: "报告结论")
+                            cardHeader(icon: "checkmark.seal.fill", color: conclusion.color, title: l.tr(zh: "报告结论", en: "Conclusion", de: "Ergebnis"))
 
                             HStack(spacing: 8) {
                                 ForEach(ReportConclusion.allCases) { c in
@@ -342,7 +357,7 @@ struct AddHumanHealthReportSheet: View {
                                         VStack(spacing: 4) {
                                             Text(c.emoji)
                                                 .font(OhanaFont.adaptive(size: 20))
-                                            Text(c.rawValue)
+                                            Text(c.localizedTitle(l))
                                                 .font(OhanaFont.caption2(.bold))
                                         }
                                         .foregroundStyle(conclusion == c ? Color.arkInk : Color.ohanaPrimaryText)
@@ -361,21 +376,23 @@ struct AddHumanHealthReportSheet: View {
                     // Card 3: Details
                     reportSheetCard {
                         VStack(alignment: .leading, spacing: 16) {
-                            cardHeader(icon: "building.2.fill", color: Color.goCardCyan, title: "检测详情")
+                            cardHeader(icon: "building.2.fill", color: Color.goCardCyan, title: l.tr(zh: "检测详情", en: "Visit Details", de: "Untersuchungsdetails"))
 
-                            fieldRow(icon: "building.2", label: "医院名称") {
-                                TextField("如：北京协和医院", text: $hospitalName) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
+                            fieldRow(icon: "building.2", label: l.tr(zh: "医院名称", en: "Hospital", de: "Klinik")) {
+                                TextField(l.tr(zh: "如：北京协和医院", en: "e.g. City Hospital", de: "z. B. Stadtklinik"), text: $hospitalName) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
                                     .font(OhanaFont.body())
                                     .foregroundStyle(Color.ohanaPrimaryText)
+                                    .accessibilityIdentifier("add-human-health-report-hospital-input")
                             }
-                            fieldRow(icon: "person.fill", label: "医生姓名") {
-                                TextField("如：张医生", text: $doctorName) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
+                            fieldRow(icon: "person.fill", label: l.tr(zh: "医生姓名", en: "Doctor", de: "Ärztin/Arzt")) {
+                                TextField(l.tr(zh: "如：张医生", en: "e.g. Dr. Lee", de: "z. B. Dr. Lee"), text: $doctorName) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
                                     .font(OhanaFont.body())
                                     .foregroundStyle(Color.ohanaPrimaryText)
+                                    .accessibilityIdentifier("add-human-health-report-doctor-input")
                             }
 
                             HStack {
-                                Label("检测日期", systemImage: "calendar")
+                                Label(l.tr(zh: "检测日期", en: "Report Date", de: "Berichtsdatum"), systemImage: "calendar")
                                     .font(OhanaFont.caption(.bold))
                                     .foregroundStyle(Color.ohanaSecondaryText)
                                 Spacer()
@@ -384,7 +401,7 @@ struct AddHumanHealthReportSheet: View {
                             }
 
                             Toggle(isOn: $hasNextCheck) {
-                                Label("设置复查日期", systemImage: "calendar.badge.checkmark")
+                                Label(l.tr(zh: "设置复查日期", en: "Set Follow-up Date", de: "Kontrolldatum setzen"), systemImage: "calendar.badge.checkmark")
                                     .font(OhanaFont.callout(.bold))
                                     .foregroundStyle(Color.ohanaPrimaryText)
                             }
@@ -392,7 +409,7 @@ struct AddHumanHealthReportSheet: View {
 
                             if hasNextCheck {
                                 HStack {
-                                    Label("复查日期", systemImage: "calendar.badge.clock")
+                                    Label(l.tr(zh: "复查日期", en: "Follow-up Date", de: "Kontrolldatum"), systemImage: "calendar.badge.clock")
                                         .font(OhanaFont.caption(.bold))
                                         .foregroundStyle(Color.ohanaSecondaryText)
                                     Spacer()
@@ -408,10 +425,10 @@ struct AddHumanHealthReportSheet: View {
                     // Card 4: Summary & Notes
                     reportSheetCard {
                         VStack(alignment: .leading, spacing: 16) {
-                            cardHeader(icon: "note.text", color: Color.goYellow, title: "摘要 & 备注")
+                            cardHeader(icon: "note.text", color: Color.goYellow, title: l.tr(zh: "摘要 & 备注", en: "Summary & Notes", de: "Zusammenfassung & Notizen"))
 
                             VStack(alignment: .leading, spacing: 6) {
-                                Label("检测摘要", systemImage: "text.alignleft")
+                                Label(l.tr(zh: "检测摘要", en: "Summary", de: "Zusammenfassung"), systemImage: "text.alignleft")
                                     .font(OhanaFont.caption(.bold))
                                     .foregroundStyle(Color.ohanaSecondaryText)
                                 TextEditor(text: $summary)
@@ -421,10 +438,11 @@ struct AddHumanHealthReportSheet: View {
                                     .frame(height: 60)
                                     .padding(10)
                                     .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: OhanaRadius.badge))
+                                    .accessibilityIdentifier("add-human-health-report-summary-input")
                             }
 
                             VStack(alignment: .leading, spacing: 6) {
-                                Label("备注", systemImage: "note.text")
+                                Label(l.tr(zh: "备注", en: "Notes", de: "Notizen"), systemImage: "note.text")
                                     .font(OhanaFont.caption(.bold))
                                     .foregroundStyle(Color.ohanaSecondaryText)
                                 TextEditor(text: $notes)
@@ -434,6 +452,7 @@ struct AddHumanHealthReportSheet: View {
                                     .frame(height: 60)
                                     .padding(10)
                                     .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: OhanaRadius.badge))
+                                    .accessibilityIdentifier("add-human-health-report-notes-input")
                             }
                         }
                         .padding(16)
@@ -445,7 +464,7 @@ struct AddHumanHealthReportSheet: View {
                         Button {
                             delete(report)
                         } label: {
-                            Label("删除这条报告", systemImage: "trash")
+                            Label(l.tr(zh: "删除这条报告", en: "Delete this report", de: "Diesen Bericht löschen"), systemImage: "trash")
                                 .font(OhanaFont.callout(.semibold))
                                 .foregroundStyle(Color.goRed)
                                 .frame(maxWidth: .infinity)
@@ -460,7 +479,7 @@ struct AddHumanHealthReportSheet: View {
 
                     // Save
                     Button { save() } label: {
-                        Text(editing == nil ? "保存报告" : "更新")
+                        Text(editing == nil ? l.tr(zh: "保存报告", en: "Save Report", de: "Bericht sichern") : l.tr(zh: "更新", en: "Update", de: "Aktualisieren"))
                             .font(OhanaFont.headline(.bold))
                             .foregroundStyle(Color.arkInk)
                             .frame(maxWidth: .infinity)
@@ -469,12 +488,14 @@ struct AddHumanHealthReportSheet: View {
                     }
                     .buttonStyle(ScaleButtonStyle())
                     .disabled(isSaving)
+                    .accessibilityIdentifier("add-human-health-report-save-action")
                     .padding(.horizontal, 16)
                     .padding(.bottom, 40)
                 }
             }
         }
         .onAppear { loadEditing() }
+        .accessibilityIdentifier("add-human-health-report-sheet")
     }
 
     private func cardHeader(icon: String, color: Color, title: String) -> some View {

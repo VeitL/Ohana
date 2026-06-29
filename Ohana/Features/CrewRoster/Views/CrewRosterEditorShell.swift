@@ -15,6 +15,10 @@ struct CrewRosterEditorShell<Content: View>: View {
     let onSave: () -> Void
     @ViewBuilder let content: () -> Content
 
+    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
+
+    private var l: L10n { L10n(appLanguage) }
+
     var body: some View {
         VStack(spacing: 12) {
             HStack(spacing: 10) {
@@ -28,7 +32,7 @@ struct CrewRosterEditorShell<Content: View>: View {
                         .contentShape(Circle())
                 }
                 .buttonStyle(ScaleButtonStyle())
-                .accessibilityLabel("取消")
+                .accessibilityLabel(l.cancel)
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(title)
@@ -55,7 +59,7 @@ struct CrewRosterEditorShell<Content: View>: View {
                         .contentShape(Circle())
                 }
                 .buttonStyle(ScaleButtonStyle())
-                .accessibilityLabel("保存")
+                .accessibilityLabel(l.save)
             }
 
             ScrollView(.vertical, showsIndicators: false) {

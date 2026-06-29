@@ -121,11 +121,11 @@ struct AddPlantView: View {
                 .padding(.horizontal, 20)
 
                 VStack(spacing: 16) {
-                    goFormField(l.tr(zh: "名称", en: "Name", de: "Name"), text: $name, placeholder: l.tr(zh: "我的绿萝", en: "My pothos", de: "Meine Efeutute"))
-                    goFormField(l.tr(zh: "品种", en: "Species", de: "Art"), text: $species, placeholder: l.tr(zh: "绿萝、多肉…", en: "Pothos, succulent...", de: "Efeutute, Sukkulente..."))
+                    goFormField(l.tr(zh: "名称", en: "Name", de: "Name"), text: $name, placeholder: l.tr(zh: "我的绿萝", en: "My pothos", de: "Meine Efeutute"), identifier: "add-plant-name-input")
+                    goFormField(l.tr(zh: "品种", en: "Species", de: "Art"), text: $species, placeholder: l.tr(zh: "绿萝、多肉…", en: "Pothos, succulent...", de: "Efeutute, Sukkulente..."), identifier: "add-plant-species-input")
                     catalogSearchSection
-                    goFormField(l.tr(zh: "房间", en: "Room", de: "Raum"), text: $roomName, placeholder: l.tr(zh: "客厅、阳台…", en: "Living room, balcony...", de: "Wohnzimmer, Balkon..."))
-                    goFormField(l.tr(zh: "具体位置", en: "Exact spot", de: "Genauer Standort"), text: $location, placeholder: l.tr(zh: "南窗边、书桌、花架…", en: "South window, desk, plant stand...", de: "Südfenster, Schreibtisch, Pflanzenregal..."))
+                    goFormField(l.tr(zh: "房间", en: "Room", de: "Raum"), text: $roomName, placeholder: l.tr(zh: "客厅、阳台…", en: "Living room, balcony...", de: "Wohnzimmer, Balkon..."), identifier: "add-plant-room-input")
+                    goFormField(l.tr(zh: "具体位置", en: "Exact spot", de: "Genauer Standort"), text: $location, placeholder: l.tr(zh: "南窗边、书桌、花架…", en: "South window, desk, plant stand...", de: "Südfenster, Schreibtisch, Pflanzenregal..."), identifier: "add-plant-location-input")
                     duplicateWarningSection
                     environmentSection
                     potSection
@@ -185,6 +185,7 @@ struct AddPlantView: View {
                 }
                 .buttonStyle(ScaleButtonStyle())
                 .disabled(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isSaving)
+                .accessibilityIdentifier("add-plant-save-action")
                 .padding(.horizontal, 24)
                 .padding(.top, 4)
 
@@ -230,6 +231,7 @@ struct AddPlantView: View {
                 .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .rounded))
                 .padding(14)
                 .background(Color.ohanaControlFill.opacity(0.68), in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
+                .accessibilityIdentifier("add-plant-catalog-search-input")
 
             VStack(spacing: 8) {
                 if catalogMatches.isEmpty {
@@ -308,6 +310,7 @@ struct AddPlantView: View {
         }
         .buttonStyle(ScaleButtonStyle())
         .accessibilityLabel("\(entry.localizedCommonName), \(entry.latinName), \(result.matchSummary)")
+        .accessibilityIdentifier("add-plant-catalog-result-\(entry.id)")
     }
 
     private func catalogChip(_ title: String, foreground: Color, background: Color) -> some View {
@@ -517,7 +520,7 @@ struct AddPlantView: View {
         .goTranslucentCard(cornerRadius: OhanaRadius.controlLarge)
     }
 
-    private func goFormField(_ title: String, text: Binding<String>, placeholder: String) -> some View {
+    private func goFormField(_ title: String, text: Binding<String>, placeholder: String, identifier: String) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(title)
                 .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
@@ -534,6 +537,7 @@ struct AddPlantView: View {
                     RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous)
                         .strokeBorder(Color.ohanaCardSurface.opacity(0.18), lineWidth: 1)
                 )
+                .accessibilityIdentifier(identifier)
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)

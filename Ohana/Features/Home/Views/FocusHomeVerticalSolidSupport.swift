@@ -23,7 +23,9 @@ struct FocusHomeVerticalSolidQuickActionLayer<Content: View>: View {
             }
             .frame(width: width, alignment: .top)
             .frame(height: height, alignment: .top)
+            .contentShape(Rectangle())
             .clipShape(WalletHeroRevealShape(reveal: reveal))
+            .contentShape(Rectangle())
             .opacity(Double(reveal))
             .allowsHitTesting(isReady)
             .accessibilityHidden(!isReady)

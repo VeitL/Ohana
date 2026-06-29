@@ -52,6 +52,7 @@ final class AppServices {
     let domainRevisions: DomainRevisionPublishing
     let lifecycle: AppLifecycleHandling
     let cloudSync: CloudSyncManaging
+    var walkingPresentationRevision = 0
 
     convenience init(modelContainer: ModelContainer? = nil) {
         let activeHumanSelection = UserDefaultsActiveHumanSelection()
@@ -269,5 +270,9 @@ final class AppServices {
         self.domainRevisions = domainRevisions
         self.lifecycle = lifecycle
         self.cloudSync = cloudSync
+    }
+
+    func publishWalkingPresentationChange() {
+        walkingPresentationRevision &+= 1
     }
 }

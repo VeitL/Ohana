@@ -26,6 +26,8 @@ Purpose:
     ModelContext write authority.
   - @Query only appears in screen/route data containers.
   - Views do not directly use UserDefaults or construct command executors.
+  - Members views do not publish member profile revisions directly; profile
+    command executors own the publish boundary.
   - Swift files above 800 lines are ratcheted; no new oversized files and no
     growth in the existing oversized baseline.
   - Coconut balances may be mutated only by the wallet service, model defaults,
@@ -166,6 +168,25 @@ view_static_business_calls() {
     | rg -v ':\s*//' \
     | rg -v '\bFileManager\.default\b' \
     | rg -v '\bExpandedQuickActionExecutor\.Feedback\b' || true
+}
+
+member_view_direct_profile_revision_publishes() {
+  local scoped_files=()
+  if [[ "$mode" == "all" ]]; then
+    while IFS= read -r file; do
+      [[ -n "$file" ]] && scoped_files+=("$file")
+    done < <(find Ohana/Features/Members/Views -type f -name '*.swift' | sort)
+  else
+    for file in "${files[@]}"; do
+      case "$file" in
+        Ohana/Features/Members/Views/*.swift)
+          [[ -f "$file" ]] && scoped_files+=("$file")
+          ;;
+      esac
+    done
+  fi
+  [[ ${#scoped_files[@]} -eq 0 ]] && return 0
+  rg -n --with-filename --pcre2 '\bpublishMemberProfile\s*\(' "${scoped_files[@]}" || true
 }
 
 oversized_swift_files() {
@@ -547,6 +568,11 @@ record_matches \
   "view-static-business-call" \
   "Views must call injected AppServices protocols instead of static Service/Manager/Coordinator/Executor entry points." \
   view_static_business_calls
+
+record_matches \
+  "member-view-direct-profile-revision" \
+  "Members views must not publish profile revisions directly; MemberCommandExecutor.update*Profile owns the single profile revision publish." \
+  member_view_direct_profile_revision_publishes
 
 record_matches \
   "oversized-swift-file" \

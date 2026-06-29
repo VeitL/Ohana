@@ -12,7 +12,7 @@
 ## Current Read
 
 - Last compacted: 2026-06-25.
-- Open follow-ups: 11 total: P1 = 3, P2 = 6, P3 = 2.
+- Open follow-ups: 12 total: P1 = 3, P2 = 7, P3 = 2.
 - Open P0: 0.
 - Known first-release-reachable repository-code P1: none.
 - P1 still open because of CloudKit 1.x deferred work or real-device validation.
@@ -73,6 +73,22 @@
 - Next action: decide intended restored-pet product behavior, then recreate previous quick access or recompute defaults during restore.
 - Close when: restored pets have approved quick-action availability and a focused regression test covers it.
 
+### TFU-20260629-004 - Finish Pet Simulator GUI Deep Coverage
+
+- Priority / bucket: P2, Pet simulator validation / UI-test coverage gap.
+- Status: Open.
+- Why still open: the pinned `iPhone 17` pet GUI coverage now passes first-pet onboarding, production-overlay first-pet onboarding, feeding manual/reminder quick actions with anti-repeat confirmation, permanent delete from basic info, delete cancel/wrong-name protection, Water detail route open/close plus write/readback through `QuickWaterCommandExecutor.recordWater` / `CareEventService.recordCareFact`, Play quick-tap responsiveness, Feature Hub route-open coverage for potty, hygiene, walk, and health, Potty detail write/readback through `QuickPottyCommandExecutor.record` / `CareEventService.recordPottyFact`, cat litter scoop write/readback plus same-day repeat-submit guard coverage and cat litter full-change write/readback coverage through `QuickPottyCommandExecutor.recordLitterCare` / `CareEventService.recordCareFact`, cat litter plan reminder cancel/save/delete coverage through the quick-potty settings sync boundary, Hygiene detail write/readback plus same-day repeat-tap guard coverage through `PetHygieneCommandExecutor` / `CareEventService.recordHygieneFact`, Health visit-record cancel/save write/readback through `PetHealthCommandExecutor.recordHealth` / `CareEventService`, Pet Basic Info memorial mark/undo cancel-confirm coverage through member lifecycle commands, memorial-pet Home live-care entry hiding after relaunch, Pet Basic Info edit cancel/save persistence coverage, Pet Basic Info empty-name save protection/readback coverage, Walk Home quick-action start/stop plus summary persistence/readback coverage through `WalkTrackingCommandExecutor.stopWalk` / `PetWalkingManager.stop`, Calendar pet-linked event creation/filter readback through `CalendarCommandExecutor.createEvent(input:)`, Calendar pet-linked event row jumps to linked Pet Basic Info, Water detail, and Potty detail through `FocusHomeReminderDeepLinkRouter`, and Pet Bond Vault Feature Hub entry, zero-balance blocked-unlock readback, and seeded positive unlock/spend readback through the UI-test Debug Coconuts shortcut. The suite still does not exercise litter plan calendar-reminder edge paths, broader pet calendar care-type/deep-link paths beyond Basic Info/Water/Potty, broader pet shop/economy purchases beyond Bond Vault, deceased-pet Feature Hub non-memorial route blocking, stale-route protection after memorial/delete, or broader edit-negative paths beyond empty-name protection in one GUI pass. A targeted Walk-title Calendar probe did not reach `walk-summary-sheet` on the pinned simulator (`/tmp/OhanaDerivedData-ohana-gui-calendar-potty-jump-1782797000/Logs/Test/Test-Ohana-2026.06.29_20-47-54-+0200.xcresult`), so Walk calendar deep-linking remains a concrete diagnostic gap rather than covered evidence.
+- Next action: diagnose the failed Walk-title Calendar row deep-link first, then continue remaining negative and cross-feature GUI paths through pet calendar care-type deep-linking beyond Basic Info/Water/Potty, reminders, deceased-pet Feature Hub non-memorial route blocking, stale routes after memorial/delete, litter plan calendar edge cases, broader pet shop/economy purchases, and invalid-value/broader edit-negative flows; add narrow simulator tests as each real blocker is exposed.
+- Close when: a targeted pet GUI suite proves create/edit/cancel, quick care, reminder/calendar, shop/economy, memorial/deceased, delete-cancel/delete-confirm, stale-route protection, and duplicate-write protection with passing xcresult evidence.
+
+### TFU-20260629-002 - Finish Plant Simulator GUI Coverage
+
+- Priority / bucket: P2, Plants simulator validation / UI-test focus blocker.
+- Status: Open.
+- Why still open: the one-time pinned `iPhone 17` plant GUI validation could not complete the full create/detail/reminder/calendar/delete pass. The first run reached plant creation, catalog matching, detail, defer/water/fertilize/pest/leaf actions, then failed because the test expected English care-history copy while Ohana still used the app's persisted language setting. After launching with `-appLanguage en`, the rerun reached catalog selection and room entry, but `add-plant-location-input` existed and was tapped while XCTest never observed keyboard focus, so creation could not proceed to reminder/calendar/delete verification.
+- Next action: harden the plant UITest form-entry helper or add a stable focus/accessibility path for `AddPlantView` text fields, then rerun `scripts/test-simulator.sh -only-testing:OhanaUITests/PlantModuleUITests/testPlantModuleUnlockCreateCareReminderCalendarAndDelete` on the pinned `iPhone 17` simulator.
+- Close when: the targeted plant UI test completes creation, edit/cancel if present, care logs/history, reminders/settings, dashboard/home/calendar/economy integration, delete/undo/final delete, and records passing xcresult/screenshot evidence.
+
 ### TFU-20260613-003 - Round-Trip Recycle-Bin Soft-Delete Fields In CloudSync
 
 - Priority / bucket: P2, future CloudSync / 1.x.
@@ -93,17 +109,9 @@
 
 - Priority / bucket: P2, Members localization.
 - Status: Open.
-- Why still open: detail, edit, privacy, and read-only profile surfaces still contain broad user-visible hardcoded Chinese strings.
-- Next action: move Members user-facing copy onto the registered localization path, authoring Chinese and English at minimum.
+- Why still open: the 2026-06-28 human slices moved Human detail overview, basic-info edit/read surfaces, feature hubs, privacy placeholders, reminder/notes copy, route fallback/loading/missing copy, dynamic role/age/blood chips, `EditHumanSheet`, human-reachable CrewRoster edit/delete/accessibility copy, and shared avatar/crop controls onto `L10n`, but broader Members Pet/plant-specific surfaces still contain user-visible hardcoded Chinese strings.
+- Next action: continue with Pet edit/read/danger-zone surfaces plus sitter-card and Pet health/medication copy, authoring Chinese and English at minimum.
 - Close when: Members user-facing strings pass localization coverage and main long-language screens remain visually clean.
-
-### TFU-20260612-018 - Remove Duplicate Member Profile Revision Publishes
-
-- Priority / bucket: P2, smoothness / invalidation cleanup.
-- Status: Open.
-- Why still open: executors already publish profile revisions, but some view callers publish another revision after executor return.
-- Next action: remove duplicate view-level publishes after confirming the executor emits the intended mutation.
-- Close when: each profile save publishes exactly one member profile revision and a focused test or audit prevents recurrence.
 
 ### TFU-20260611-005 - Route Shared Walk Writes Through Owning Command/Service
 
@@ -140,6 +148,10 @@ Use the archive for full detail. High-signal closures already reflected in the c
 - TFU-20260625-002: Plants launch integration closed on 2026-06-25; care-plan Event/Reminder materialization, per-plant reminder disable cleanup, plan refresh after care completion, dashboard location filtering, full-field detail editing, Today Focus/calendar/economy/Oasis/shop coverage, and targeted simulator tests are recorded in `docs/testing-progress.md`.
 - TFU-20260614-013, 015, 016, 017, 018, 019 and TFU-20260615-001: current-head closure reviews completed on 2026-06-25; raw Open P1 count reduced to 4.
 - TFU-20260623-001: Home quick-action render-state isolation cleanup closed after Terminal `iPhone 17` targeted suites reported `TEST SUCCEEDED`; Codex shell CoreSimulator remains a session blocker, now diagnosed by `scripts/diagnose-simulator.sh`.
+- TFU-20260629-003: Human Settings privacy batch-action UITest/smoothness gap closed on 2026-06-29 after Settings route data stopped reloading for `privacy.*` revisions and the account security sheet moved privacy toggles/batch actions to optimistic first-frame state plus deferred writes; targeted pinned `iPhone 17` UITest now taps all-private and all-open and verifies both readbacks without XCTest idle or snapshot timeouts.
+- TFU-20260629-001: Human automated write-flow coverage closed on 2026-06-29; the combined pinned `iPhone 17` UI run passed route coverage, Home human quick actions, feature-hub record persistence, and extended health/workout/report/wishlist/profile writes.
+- TFU-20260628-001: Home first-pet onboarding accessibility polish closed in the same validation pass; non-front Today Focus compact-stack cards are no longer mounted at rest, and expanded non-selected Home card surfaces are hidden from accessibility.
+- TFU-20260612-018: duplicate Members profile revision publishes closed on 2026-06-28; profile executors own the single publish boundary and `scripts/audit-architecture-boundaries.sh` now guards against direct Members view publishes.
 - TFU-20260612-019: human memorial read-only boundary closed by current guard coverage.
 - TFU-20260611-001: App Store Connect privacy setup closed; final public URL/support row remains TFU-20260612-022.
 

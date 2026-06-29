@@ -36,7 +36,8 @@ struct GlobalWalkBanner: View {
     private var locationProvider: LocationProviding { appServices.location }
     private let flipCardHeight: CGFloat = 272
     private var shouldShowFloatingControl: Bool {
-        isActive && !mgr.isWalkCardExpandedSurfaceVisible
+        _ = appServices.walkingPresentationRevision
+        return isActive && !mgr.isWalkCardExpandedSurfaceVisible
     }
 
     private var walkClockInterval: TimeInterval {
@@ -156,6 +157,7 @@ struct GlobalWalkBanner: View {
         .padding(.bottom, safeBottom(geo) + 160)
         .offset(y: clampedY)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
+        .accessibilityIdentifier("global-walk-bubble")
     }
 
     // MARK: - 展开大卡片
@@ -192,6 +194,7 @@ struct GlobalWalkBanner: View {
                         .font(OhanaFont.adaptive(size: 22))
                         .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                 }
+                .accessibilityIdentifier("global-walk-minimize-action")
             }
             .padding(.horizontal, 20).padding(.top, 18)
 
@@ -242,6 +245,7 @@ struct GlobalWalkBanner: View {
                     .background(mgr.phase == .running ? Color.goYellow : Color.goTeal,
                                 in: RoundedRectangle(cornerRadius: OhanaRadius.row))
                 }
+                .accessibilityIdentifier("global-walk-pause-resume-action")
                 Button {
                     mgr.addPoop()
                     UIImpactFeedbackGenerator(style: .medium).impactOccurred()
@@ -250,6 +254,7 @@ struct GlobalWalkBanner: View {
                         .frame(width: 48, height: 48)
                         .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
                 }
+                .accessibilityIdentifier("global-walk-poop-action")
                 Button {
                     UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
                     // B2: 先隐藏展开卡，同帧立即显示翻转卡（不中间消失）
@@ -264,6 +269,7 @@ struct GlobalWalkBanner: View {
                         .frame(maxWidth: .infinity).padding(.vertical, 13)
                         .background(Color.goRed, in: RoundedRectangle(cornerRadius: OhanaRadius.row))
                 }
+                .accessibilityIdentifier("global-walk-stop-action")
             }
             .buttonStyle(ScaleButtonStyle())
             .padding(.horizontal, 20).padding(.vertical, 14)
@@ -273,6 +279,7 @@ struct GlobalWalkBanner: View {
             RoundedRectangle(cornerRadius: OhanaRadius.hero, style: .continuous)
                 .strokeBorder(walkPanelStroke, lineWidth: 1)
         }
+        .accessibilityIdentifier("global-walk-expanded-card")
         .shadow(color: Color.arkInk.opacity(0.25), radius: 16, x: 0, y: 6) // ui-v4: allow active walk card elevation
     }
 
@@ -385,6 +392,7 @@ struct GlobalWalkBanner: View {
                 .frame(width: 52, height: 52)
                 .contentShape(Rectangle())
                 .buttonStyle(ScaleButtonStyle())
+                .accessibilityIdentifier("global-walk-summary-close-action")
             }
             .padding(.horizontal, 18).padding(.top, 12)
 
@@ -449,6 +457,7 @@ struct GlobalWalkBanner: View {
             .padding(.horizontal, 4)
             .padding(.vertical, 10)
         }
+        .accessibilityIdentifier("global-walk-summary-card")
     }
 
     private func summaryMapSnapshotSignature(for walk: PetWalkLog?) -> String {

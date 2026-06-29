@@ -87,6 +87,7 @@ private struct SettingsPlantReminderPanelContent: View {
             }
         }
         .id(preferenceRevision)
+        .accessibilityIdentifier("settings-plant-reminders-panel")
     }
 
     private var sectionDivider: some View {
@@ -114,6 +115,7 @@ private struct SettingsPlantReminderPanelContent: View {
                 }
             )
         )
+        .accessibilityIdentifier("settings-plant-reminders-master-toggle")
     }
 
     private var timeWindowRow: some View {
@@ -269,6 +271,7 @@ private struct SettingsPlantReminderPanelContent: View {
                         ))
                         .tint(accentColor)
                         .labelsHidden()
+                        .accessibilityIdentifier("settings-plant-reminders-plant-toggle-\(plant.name)")
                     }
                     .frame(minHeight: 46)
                     .padding(.leading, 44)
@@ -311,6 +314,7 @@ private struct SettingsPlantReminderPanelContent: View {
             .frame(minHeight: 52)
         }
         .buttonStyle(ScaleButtonStyle())
+        .accessibilityIdentifier("settings-plant-reminders-defer-all")
     }
 
     private func toggleRow(

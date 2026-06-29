@@ -72,6 +72,7 @@ struct WalkTrackingCommandExecutor {
 
     func stopWalk(manager: PetWalkingManaging, sharedTargets: [Pet], executorIds: [String]) {
         manager.stop(modelContext: modelContext, sharedTargets: sharedTargets, executorIds: executorIds)
+        services.publishWalkingPresentationChange()
     }
 
     func saveWeeklyGoal(_ goal: Double, for pet: Pet) {

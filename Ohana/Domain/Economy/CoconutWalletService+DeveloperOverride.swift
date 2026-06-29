@@ -43,6 +43,38 @@ extension CoconutWalletService {
         human?.coconutBalance = amount
     }
 
+    static func setDeveloperOverrideBalance(
+        amount rawAmount: Int,
+        for pet: Pet,
+        displayName: String,
+        context: ModelContext
+    ) {
+        let amount = max(0, rawAmount)
+        let accountKey = CoconutAccountKey.pet(pet.id)
+        let now = Date()
+
+        if let account = account(accountKey: accountKey, context: context) {
+            account.ownerKindRaw = CoconutWalletOwnerKind.pet.rawValue
+            account.ownerId = pet.id.uuidString
+            account.displayName = displayName
+            account.balance = amount
+            account.updatedAt = now
+        } else {
+            context.insert(CoconutAccount(
+                accountKey: accountKey,
+                ownerKind: .pet,
+                ownerId: pet.id.uuidString,
+                displayName: displayName,
+                balance: amount,
+                createdAt: now,
+                updatedAt: now,
+                metadataJSON: "{\"source\":\"settings.coconut.test\"}"
+            ))
+        }
+
+        pet.coconutBalance = amount
+    }
+
     private static func account(accountKey: String, context: ModelContext) -> CoconutAccount? {
         var descriptor = FetchDescriptor<CoconutAccount>(
             predicate: #Predicate<CoconutAccount> { $0.accountKey == accountKey }

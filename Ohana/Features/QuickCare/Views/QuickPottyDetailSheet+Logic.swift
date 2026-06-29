@@ -190,6 +190,7 @@ extension QuickPottyDetailSheet {
             pottyFeedbackToken = CheckInFeedbackToken(kind: .gain, deltaText: delta > 0 ? "+\(delta)" : "+1", tint: pottyTint)
             scheduleFeedbackClear()
             showSaveConfirmation(delta > 0 ? "\(type.emoji) +\(delta)🥥" : l.tr(zh: "噗噗已记录", en: "Poop logged", de: "Häufchen erfasst"))
+            onRecordChanged()
         }
     }
 
@@ -218,6 +219,7 @@ extension QuickPottyDetailSheet {
             UINotificationFeedbackGenerator().notificationOccurred(.success)
             pottyFeedbackToken = CheckInFeedbackToken(kind: .gain, deltaText: "+1", tint: pottyTint)
             scheduleFeedbackClear()
+            onRecordChanged()
             showSaveConfirmation(l.tr(zh: "猫砂盆事件已记录", en: "Litter-box event logged", de: "Klo-Ereignis erfasst"))
         }
     }
@@ -268,6 +270,7 @@ extension QuickPottyDetailSheet {
                 ? l.tr(zh: "\(result.targetCount)只猫 已铲", en: "\(result.targetCount) cats scooped", de: "\(result.targetCount) Katzenklos sauber")
                 : l.tr(zh: "铲砂已记录", en: "Scoop logged", de: "Klo erfasst")
             showSaveConfirmation(delta > 0 ? "\(actionText) +\(delta)🥥" : actionText)
+            onRecordChanged()
         }
     }
 
@@ -317,6 +320,7 @@ extension QuickPottyDetailSheet {
                     ? l.tr(zh: "\(targets.count)只猫 已换砂", en: "\(targets.count) litter boxes changed", de: "\(targets.count) Katzenstreus gewechselt")
                     : l.tr(zh: "换砂已记录", en: "Litter change logged", de: "Streuwechsel erfasst")
             )
+            onRecordChanged()
         }
     }
 

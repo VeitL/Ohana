@@ -51,6 +51,8 @@ extension QuickPottyDetailSheet {
                     primaryTitle: scoopNeedsCatchUp ? l.tr(zh: "补打卡", en: "Catch up", de: "Nachtragen") : (todayLitterLogs.isEmpty ? l.tr(zh: "完成铲砂", en: "Scoop done", de: "Klo sauber") : l.tr(zh: "今天已完成", en: "Done today", de: "Heute erledigt")),
                     secondaryTitle: l.tr(zh: "编辑计划", en: "Edit plan", de: "Plan ändern"),
                     isPrimaryDisabled: !todayLitterLogs.isEmpty && daysUntilScoop >= 0,
+                    primaryAccessibilityIdentifier: "quick-potty-scoop-confirm-action",
+                    secondaryAccessibilityIdentifier: "quick-potty-scoop-edit-plan-action",
                     primaryAction: {
                         recordScoop()
                         dismissInlinePoopSheet()
@@ -89,6 +91,8 @@ extension QuickPottyDetailSheet {
                     primaryTitle: l.tr(zh: "记录换砂", en: "Log change", de: "Wechsel loggen"),
                     secondaryTitle: l.tr(zh: "编辑计划", en: "Edit plan", de: "Plan ändern"),
                     isPrimaryDisabled: false,
+                    primaryAccessibilityIdentifier: "quick-potty-litter-confirm-action",
+                    secondaryAccessibilityIdentifier: "quick-potty-litter-edit-plan-action",
                     primaryAction: {
                         doFullChange()
                         dismissInlinePoopSheet()
@@ -117,6 +121,7 @@ extension QuickPottyDetailSheet {
                 intervalDays: $scoopIntervalDays,
                 anchorDate: $scoopAnchorDate,
                 reminderOn: $scoopReminderOn,
+                accessibilityIDPrefix: "quick-potty-scoop-settings",
                 onSave: {
                     startPottyPlanSave {
                         syncScoopPlan(showToast: true)
@@ -147,6 +152,7 @@ extension QuickPottyDetailSheet {
                 intervalDays: $litterChangeIntervalDays,
                 anchorDate: $litterCycleAnchorDate,
                 reminderOn: $litterReminderOn,
+                accessibilityIDPrefix: "quick-potty-litter-settings",
                 onSave: {
                     startPottyPlanSave {
                         syncLitterChangePlan(showToast: true)

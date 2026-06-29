@@ -17,6 +17,7 @@ struct HumanExecutorSwitchSheet: View {
     @Environment(AppServices.self) private var appServices
     @AppStorage("currentActiveHumanId") private var activeHumanId = ""
     @AppStorage(MemberGateBiometricAuthStore.enabledKey) private var enableMemberGateBiometrics = MemberGateBiometricAuthStore.defaultEnabled
+    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
 
     @State private var pendingHuman: Human? = nil
     @State private var pin = ""
@@ -33,6 +34,8 @@ struct HumanExecutorSwitchSheet: View {
     private var switchableHumans: [Human] {
         humans.filter { !$0.hasPassedAway }
     }
+
+    private var l: L10n { L10n(appLanguage) }
 
     var body: some View {
         ZStack {
@@ -67,10 +70,10 @@ struct HumanExecutorSwitchSheet: View {
                 .frame(width: 42, height: 42) // a11y: allow decorative non-interactive frame; hit area handled by parent
                 .background(Color.goPrimary.opacity(0.16), in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
             VStack(alignment: .leading, spacing: 3) {
-                Text("切换执行人")
+                Text(l.tr(zh: "切换执行人", en: "Switch executor", de: "Ausführende Person wechseln"))
                     .font(OhanaFont.title3(.black))
                     .foregroundStyle(Color.ohanaPrimaryText)
-                Text("后续打卡会记录到当前账户")
+                Text(l.tr(zh: "后续打卡会记录到当前账户", en: "Future check-ins will use this account", de: "Künftige Check-ins laufen über dieses Konto"))
                     .font(OhanaFont.caption(.semibold))
                     .foregroundStyle(Color.ohanaSecondaryText)
             }
@@ -109,7 +112,7 @@ struct HumanExecutorSwitchSheet: View {
                     Text(displayName(human))
                         .font(OhanaFont.callout(.black))
                         .foregroundStyle(Color.ohanaPrimaryText)
-                    Text(isActive ? "当前执行人" : (appServices.passcodes.hasPasscode(human) ? "需要 4 位密码" : "可直接切换"))
+                    Text(isActive ? l.tr(zh: "当前执行人", en: "Current executor", de: "Aktuell ausführend") : (appServices.passcodes.hasPasscode(human) ? l.tr(zh: "需要 4 位密码", en: "4-digit PIN required", de: "4-stellige PIN nötig") : l.tr(zh: "可直接切换", en: "Can switch directly", de: "Direkt wechselbar")))
                         .font(OhanaFont.caption2(.bold))
                         .foregroundStyle(Color.ohanaSecondaryText)
                 }
@@ -148,10 +151,10 @@ struct HumanExecutorSwitchSheet: View {
             HStack(spacing: 10) {
                 accountAvatar(human, size: 34)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("输入 \(displayName(human)) 的 4 位密码")
+                    Text(l.tr(zh: "输入 \(displayName(human)) 的 4 位密码", en: "Enter \(displayName(human))'s 4-digit PIN", de: "4-stellige PIN für \(displayName(human)) eingeben"))
                         .font(OhanaFont.callout(.black))
                         .foregroundStyle(Color.ohanaPrimaryText)
-                    Text(statusMessage.isEmpty ? "验证后切换执行人" : statusMessage)
+                    Text(statusMessage.isEmpty ? l.tr(zh: "验证后切换执行人", en: "Verify to switch executor", de: "Zum Wechseln verifizieren") : statusMessage)
                         .font(OhanaFont.caption(.bold))
                         .foregroundStyle(isError ? Color.goRed : .secondary)
                 }
@@ -162,7 +165,7 @@ struct HumanExecutorSwitchSheet: View {
                     statusMessage = ""
                     isError = false
                 } label: {
-                    Text("换人")
+                    Text(l.tr(zh: "换人", en: "Choose another", de: "Andere wählen"))
                         .font(OhanaFont.caption(.black))
                         .foregroundStyle(Color.goPrimary)
                         .padding(.horizontal, 10)
@@ -181,7 +184,9 @@ struct HumanExecutorSwitchSheet: View {
                     authenticatePendingHumanWithBiometrics(human)
                 } label: {
                     Label(
-                        isAuthenticatingBiometrics ? "正在验证 \(biometricAvailability.label)" : "使用 \(biometricAvailability.label)",
+                        isAuthenticatingBiometrics
+                            ? l.tr(zh: "正在验证 \(biometricAvailability.label)", en: "Verifying with \(biometricAvailability.label)", de: "Verifizierung mit \(biometricAvailability.label)")
+                            : l.tr(zh: "使用 \(biometricAvailability.label)", en: "Use \(biometricAvailability.label)", de: "\(biometricAvailability.label) verwenden"),
                         systemImage: biometricAvailability.symbolName
                     )
                     .font(OhanaFont.callout(.black))
@@ -217,7 +222,7 @@ struct HumanExecutorSwitchSheet: View {
         pin = ""
         if let seconds = appServices.passcodes.remainingLockoutSeconds(for: human, now: now) {
             isError = true
-            statusMessage = "请 \(seconds) 秒后再试"
+            statusMessage = l.tr(zh: "请 \(seconds) 秒后再试", en: "Try again in \(seconds) seconds", de: "In \(seconds) Sekunden erneut versuchen")
         } else {
             isError = false
             statusMessage = ""
@@ -233,22 +238,23 @@ struct HumanExecutorSwitchSheet: View {
         case let .incorrect(remaining):
             pin = ""
             isError = true
-            statusMessage = "密码不正确，还可尝试 \(remaining) 次"
+            statusMessage = l.tr(zh: "密码不正确，还可尝试 \(remaining) 次", en: "Incorrect PIN. \(remaining) attempts left.", de: "Falsche PIN. Noch \(remaining) Versuche.")
             UINotificationFeedbackGenerator().notificationOccurred(.error)
         case let .locked(until):
             pin = ""
             isError = true
-            statusMessage = "尝试过多，请 \(max(1, Int(ceil(until.timeIntervalSince(now))))) 秒后再试"
+            let seconds = max(1, Int(ceil(until.timeIntervalSince(now))))
+            statusMessage = l.tr(zh: "尝试过多，请 \(seconds) 秒后再试", en: "Too many attempts. Try again in \(seconds) seconds.", de: "Zu viele Versuche. In \(seconds) Sekunden erneut versuchen.")
             UINotificationFeedbackGenerator().notificationOccurred(.error)
         case .invalidFormat:
             pin = ""
             isError = true
-            statusMessage = "请输入 4 位数字"
+            statusMessage = l.tr(zh: "请输入 4 位数字", en: "Enter a 4-digit PIN", de: "4-stellige PIN eingeben")
             UINotificationFeedbackGenerator().notificationOccurred(.error)
         case .memberInactive:
             pin = ""
             isError = true
-            statusMessage = "纪念成员不能切换为执行人"
+            statusMessage = l.tr(zh: "纪念成员不能切换为执行人", en: "Memorial members cannot become executors", de: "Gedenkmitglieder können nicht ausführend sein")
             UINotificationFeedbackGenerator().notificationOccurred(.error)
         }
     }
@@ -272,17 +278,17 @@ struct HumanExecutorSwitchSheet: View {
         guard !isAuthenticatingBiometrics else { return }
         isAuthenticatingBiometrics = true
         isError = false
-        statusMessage = "正在验证 \(biometricAvailability.label)"
+        statusMessage = l.tr(zh: "正在验证 \(biometricAvailability.label)", en: "Verifying with \(biometricAvailability.label)", de: "Verifizierung mit \(biometricAvailability.label)")
         Task { @MainActor in
             let success = await MemberGateBiometricAuthenticator.authenticate(
-                reason: "验证后切换到 \(displayName(human))"
+                reason: l.tr(zh: "验证后切换到 \(displayName(human))", en: "Verify to switch to \(displayName(human))", de: "Verifizieren, um zu \(displayName(human)) zu wechseln")
             )
             isAuthenticatingBiometrics = false
             if success {
                 switchTo(human)
             } else {
                 isError = true
-                statusMessage = "\(biometricAvailability.label) 未通过，可继续输入密码"
+                statusMessage = l.tr(zh: "\(biometricAvailability.label) 未通过，可继续输入密码", en: "\(biometricAvailability.label) did not pass. You can still enter the PIN.", de: "\(biometricAvailability.label) nicht bestätigt. Du kannst die PIN eingeben.")
                 UINotificationFeedbackGenerator().notificationOccurred(.error)
             }
         }
@@ -300,6 +306,6 @@ struct HumanExecutorSwitchSheet: View {
 
     private func displayName(_ human: Human) -> String {
         let name = human.name.trimmingCharacters(in: .whitespacesAndNewlines)
-        return name.isEmpty ? "未命名成员" : name
+        return name.isEmpty ? l.tr(zh: "未命名成员", en: "Unnamed member", de: "Unbenanntes Mitglied") : name
     }
 }

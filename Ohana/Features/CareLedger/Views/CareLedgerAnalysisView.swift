@@ -14,6 +14,8 @@ struct CareLedgerAnalysisContentView: View {
     let humans: [Human]
 
     @State private var screenModel = CareLedgerAnalysisScreenModel()
+    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
+    private var l: L10n { L10n(appLanguage) }
 
     var body: some View {
         ZStack {
@@ -30,7 +32,7 @@ struct CareLedgerAnalysisContentView: View {
                 .padding(.bottom, 40)
             }
         }
-        .navigationTitle("照护账本分析")
+        .navigationTitle(l.tr(zh: "照护账本分析", en: "Care ledger analysis", de: "Pflegebuch-Analyse"))
         .navigationBarTitleDisplayMode(.inline)
         .onAppear(perform: syncScreenModel)
         .onChange(of: ledgerEvents.count) { syncScreenModel() }
@@ -50,18 +52,22 @@ struct CareLedgerAnalysisContentView: View {
         VStack(alignment: .leading, spacing: 14) {
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("统一照护事件账本")
+                    Text(l.tr(zh: "统一照护事件账本", en: "Unified care event ledger", de: "Einheitliches Pflegeereignis-Buch"))
                         .font(OhanaFont.adaptive(size: 20, weight: .black, design: .rounded))
-                    Text("用同一事件层查看谁、给谁、做了什么")
+                    Text(l.tr(
+                        zh: "用同一事件层查看谁、给谁、做了什么",
+                        en: "See who did what for whom from one event layer",
+                        de: "Sieh in einer Ereignisebene, wer was fuer wen getan hat"
+                    ))
                         .font(OhanaFont.adaptive(size: 12, weight: .medium, design: .rounded))
                         .foregroundStyle(Color.ohanaSecondaryText)
                 }
                 Spacer()
             }
             HStack(spacing: 10) {
-                metric("事件", "\(screenModel.filteredEvents.count)", .goPrimary)
-                metric("奖励", "\(screenModel.positiveRewardTotal)🥥", .goYellow)
-                metric("类型", "\(screenModel.kindStats.count)", .goTeal)
+                metric(l.tr(zh: "事件", en: "Events", de: "Ereignisse"), "\(screenModel.filteredEvents.count)", .goPrimary)
+                metric(l.tr(zh: "奖励", en: "Rewards", de: "Belohnungen"), "\(screenModel.positiveRewardTotal)🥥", .goYellow)
+                metric(l.tr(zh: "类型", en: "Types", de: "Typen"), "\(screenModel.kindStats.count)", .goTeal)
             }
         }
         .padding(16)
@@ -70,20 +76,20 @@ struct CareLedgerAnalysisContentView: View {
 
     private var filterCard: some View {
         VStack(alignment: .leading, spacing: 12) {
-            sectionHeader("筛选", icon: "line.3.horizontal.decrease.circle.fill")
-            Picker("范围", selection: $screenModel.selectedRange) {
+            sectionHeader(l.tr(zh: "筛选", en: "Filter", de: "Filter"), icon: "line.3.horizontal.decrease.circle.fill")
+            Picker(l.tr(zh: "范围", en: "Range", de: "Zeitraum"), selection: $screenModel.selectedRange) {
                 ForEach(CareLedgerRangeFilter.allCases, id: \.self) { range in
-                    Text(range.title).tag(range)
+                    Text(range.title(l: l)).tag(range)
                 }
             }
             .pickerStyle(.segmented)
 
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
-                    kindChip(title: "全部", kind: nil)
+                    kindChip(title: l.tr(zh: "全部", en: "All", de: "Alle"), kind: nil)
                     ForEach(CareLedgerEventKind.allCases, id: \.self) { kind in
                         if kind != .unknown {
-                            kindChip(title: kind.displayName, kind: kind)
+                            kindChip(title: kind.displayName(l: l), kind: kind)
                         }
                     }
                 }
@@ -95,12 +101,12 @@ struct CareLedgerAnalysisContentView: View {
 
     private var kindBreakdownCard: some View {
         VStack(alignment: .leading, spacing: 12) {
-            sectionHeader("事件类型分布", icon: "chart.bar.xaxis")
+            sectionHeader(l.tr(zh: "事件类型分布", en: "Event type breakdown", de: "Ereignistyp-Verteilung"), icon: "chart.bar.xaxis")
             if screenModel.kindStats.isEmpty {
-                emptyText("暂无账本事件")
+                emptyText(l.tr(zh: "暂无账本事件", en: "No ledger events yet", de: "Noch keine Buchereignisse"))
             } else {
                 ForEach(screenModel.kindStats, id: \.0) { kind, count in
-                    statBar(title: kind.displayName, count: count, total: max(screenModel.filteredEvents.count, 1), color: kind.color)
+                    statBar(title: kind.displayName(l: l), count: count, total: max(screenModel.filteredEvents.count, 1), color: kind.color)
                 }
             }
         }
@@ -109,12 +115,13 @@ struct CareLedgerAnalysisContentView: View {
     }
 
     private var actorBreakdownCard: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            sectionHeader("谁做得最多", icon: "person.fill.checkmark")
-            if screenModel.actorStats.isEmpty {
-                emptyText("暂无成员统计")
+        let actorStats = screenModel.actorStats(l: l)
+        return VStack(alignment: .leading, spacing: 12) {
+            sectionHeader(l.tr(zh: "谁做得最多", en: "Most active helper", de: "Aktivste helfende Person"), icon: "person.fill.checkmark")
+            if actorStats.isEmpty {
+                emptyText(l.tr(zh: "暂无成员统计", en: "No member stats yet", de: "Noch keine Mitgliederstatistik"))
             } else {
-                ForEach(screenModel.actorStats.prefix(6), id: \.0) { name, count in
+                ForEach(actorStats.prefix(6), id: \.0) { name, count in
                     statBar(title: name, count: count, total: max(screenModel.filteredEvents.count, 1), color: .goPrimary)
                 }
             }
@@ -125,9 +132,13 @@ struct CareLedgerAnalysisContentView: View {
 
     private var latestEventsCard: some View {
         VStack(alignment: .leading, spacing: 12) {
-            sectionHeader("最近账本流水", icon: "list.bullet.rectangle")
+            sectionHeader(l.tr(zh: "最近账本流水", en: "Recent ledger activity", de: "Aktuelle Buchaktivitaet"), icon: "list.bullet.rectangle")
             if screenModel.filteredEvents.isEmpty {
-                emptyText("完成一次照护、提醒或椰子操作后，这里会出现流水")
+                emptyText(l.tr(
+                    zh: "完成一次照护、提醒或椰子操作后，这里会出现流水",
+                    en: "Care, reminder, or coconut activity will appear here after it is completed",
+                    de: "Pflege-, Erinnerungs- oder Kokosnuss-Aktivitaet erscheint hier nach Abschluss"
+                ))
             } else {
                 ForEach(screenModel.filteredEvents.prefix(20)) { event in
                     HStack(spacing: 10) {
@@ -137,10 +148,10 @@ struct CareLedgerAnalysisContentView: View {
                             .frame(width: 30, height: 30) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
                             .background(event.eventKindEnum.color.opacity(0.14), in: Circle())
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("\(event.eventKindEnum.displayName) · \(event.actionType)")
+                            Text("\(event.eventKindEnum.displayName(l: l)) · \(event.actionType)")
                                 .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
                                 .lineLimit(1)
-                            Text("\(screenModel.actorName(for: event.actorId, kind: event.actorKind)) → \(screenModel.subjectName(for: event.subjectId, kind: event.subjectKind))")
+                            Text("\(screenModel.actorName(for: event.actorId, kind: event.actorKind, l: l)) → \(screenModel.subjectName(for: event.subjectId, kind: event.subjectKind, l: l))")
                                 .font(OhanaFont.adaptive(size: 11, weight: .medium, design: .rounded))
                                 .foregroundStyle(Color.ohanaSecondaryText)
                                 .lineLimit(1)
@@ -219,22 +230,36 @@ struct CareLedgerAnalysisContentView: View {
 }
 
 private extension CareLedgerEventKind {
-    var displayName: String {
+    func displayName(l: L10n) -> String {
         switch self {
-        case .care: "照护"
-        case .potty: "便便"
-        case .walk: "遛狗"
-        case .hygiene: "护理"
-        case .health: "健康"
-        case .weight: "体重"
-        case .medication: "吃药"
-        case .workout: "运动"
-        case .expense: "花费"
-        case .reminder: "提醒"
-        case .plantCare: "植物"
-        case .coconut: "椰子"
-        case .milestone: "里程碑"
-        case .unknown: "未知"
+        case .care:
+            l.tr(zh: "照护", en: "Care", de: "Pflege")
+        case .potty:
+            l.tr(zh: "便便", en: "Potty", de: "Toilette")
+        case .walk:
+            l.tr(zh: "遛狗", en: "Walk", de: "Spaziergang")
+        case .hygiene:
+            l.tr(zh: "护理", en: "Grooming", de: "Pflege")
+        case .health:
+            l.tr(zh: "健康", en: "Health", de: "Gesundheit")
+        case .weight:
+            l.tr(zh: "体重", en: "Weight", de: "Gewicht")
+        case .medication:
+            l.tr(zh: "吃药", en: "Medication", de: "Medikation")
+        case .workout:
+            l.tr(zh: "运动", en: "Workout", de: "Training")
+        case .expense:
+            l.tr(zh: "花费", en: "Expense", de: "Ausgabe")
+        case .reminder:
+            l.tr(zh: "提醒", en: "Reminder", de: "Erinnerung")
+        case .plantCare:
+            l.tr(zh: "植物", en: "Plant", de: "Pflanze")
+        case .coconut:
+            l.tr(zh: "椰子", en: "Coconuts", de: "Kokosnuesse")
+        case .milestone:
+            l.tr(zh: "里程碑", en: "Milestone", de: "Meilenstein")
+        case .unknown:
+            l.tr(zh: "未知", en: "Unknown", de: "Unbekannt")
         }
     }
 

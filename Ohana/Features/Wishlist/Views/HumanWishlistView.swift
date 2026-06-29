@@ -59,6 +59,7 @@ struct HumanWishlistContentView: View {
                 ) {
                     showAddSheet = true
                 }
+                .accessibilityIdentifier("human-wishlist-add-action")
                 .padding(.bottom, 28)
             }
         }
@@ -85,7 +86,7 @@ struct HumanWishlistContentView: View {
                     emptyState.padding(.top, 60)
                 } else {
                     if !pendingItems.isEmpty {
-                        sectionHeader("🎁 待兑换心愿")
+                        sectionHeader(l.tr(zh: "🎁 待兑换心愿", en: "🎁 Pending wishes", de: "🎁 Offene Wünsche"))
                             .padding(.horizontal, 20)
                         ForEach(pendingItems) { item in
                             wishCard(item: item, redeemed: false)
@@ -93,7 +94,7 @@ struct HumanWishlistContentView: View {
                         }
                     }
                     if !redeemedItems.isEmpty {
-                        sectionHeader("✅ 已兑换")
+                        sectionHeader(l.tr(zh: "✅ 已兑换", en: "✅ Redeemed", de: "✅ Eingelöst"))
                             .padding(.horizontal, 20)
                         ForEach(redeemedItems) { item in
                             wishCard(item: item, redeemed: true)
@@ -166,7 +167,7 @@ struct HumanWishlistContentView: View {
                     let isRedeeming = redeemingItemIDs.contains(item.id)
                     let canRedeem = walletBalance >= item.cost && !isRedeeming
                     Button { redeem(item: item) } label: {
-                        Text(isRedeeming ? "兑换中" : "兑换")
+                        Text(isRedeeming ? l.tr(zh: "兑换中", en: "Redeeming", de: "Wird eingelöst") : l.tr(zh: "兑换", en: "Redeem", de: "Einlösen"))
                             .font(OhanaFont.callout(.black))
                             .foregroundStyle(canRedeem ? Color.arkInk : .primary.opacity(0.3))
                             .padding(.horizontal, 14).padding(.vertical, 8)
@@ -177,19 +178,23 @@ struct HumanWishlistContentView: View {
                     }
                     .disabled(!canRedeem)
                     .buttonStyle(ScaleButtonStyle())
+                    .accessibilityIdentifier("human-wishlist-redeem-action")
 
                     Button { delete(item: item) } label: {
                         Image(systemName: "trash").accessibilityHidden(true)
                             .font(OhanaFont.footnote())
                             .foregroundStyle(Color.ohanaPrimaryText.opacity(0.2))
                     }
+                    .accessibilityLabel(l.tr(zh: "删除心愿", en: "Delete wish", de: "Wunsch löschen"))
                     .buttonStyle(ScaleButtonStyle())
+                    .accessibilityIdentifier("human-wishlist-delete-action")
                 } else {
-                    Text("已兑换 ✓")
+                    Text(l.tr(zh: "已兑换 ✓", en: "Redeemed ✓", de: "Eingelöst ✓"))
                         .font(OhanaFont.caption(.semibold))
                         .foregroundStyle(Color.ohanaPrimaryText.opacity(0.25))
                         .padding(.horizontal, 10).padding(.vertical, 6)
                         .background(Color.ohanaControlFill, in: Capsule())
+                        .accessibilityIdentifier("human-wishlist-redeemed-state")
                 }
             }
             .padding(16)
@@ -208,10 +213,10 @@ struct HumanWishlistContentView: View {
     private var emptyState: some View {
         VStack(spacing: 16) {
             Text("🌟").font(OhanaFont.metric(size: 56))
-            Text("还没有心愿")
+            Text(l.tr(zh: "还没有心愿", en: "No wishes yet", de: "Noch keine Wünsche"))
                 .font(OhanaFont.headline(.black))
                 .foregroundStyle(Color.ohanaPrimaryText)
-            Text("许下你想要的礼物\n让家人帮你兑换！")
+            Text(l.tr(zh: "许下你想要的礼物\n让家人帮你兑换！", en: "Add a gift you want\nand let family help redeem it.", de: "Speichere ein Geschenk\nund lass die Familie beim Einlösen helfen."))
                 .font(OhanaFont.callout())
                 .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                 .multilineTextAlignment(.center)
@@ -229,10 +234,11 @@ struct HumanWishlistContentView: View {
                     .frame(width: 40, height: 4) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
                     .padding(.top, 12).padding(.bottom, 20)
 
-                Text("许一个愿 🌟")
+                Text(l.tr(zh: "许一个愿 🌟", en: "Make a wish 🌟", de: "Wunsch speichern 🌟"))
                     .font(OhanaFont.title3(.black))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .frame(maxWidth: .infinity, alignment: .leading)
+                    .accessibilityIdentifier("add-human-wishlist-sheet")
                     .padding(.horizontal, 24)
 
                 VStack(spacing: 14) {
@@ -240,10 +246,11 @@ struct HumanWishlistContentView: View {
                     HStack {
                         Image(systemName: "sparkles").accessibilityHidden(true)
                             .foregroundStyle(Color.ohanaPrimaryText.opacity(0.3))
-                        TextField("心愿内容（例如：新耳机）", text: $newTitle) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
-                            .font(OhanaFont.callout(.semibold))
-                            .foregroundStyle(Color.ohanaPrimaryText)
-                    }
+                TextField(l.tr(zh: "心愿内容（例如：新耳机）", en: "Wish item, e.g. new headphones", de: "Wunsch, z. B. neue Kopfhörer"), text: $newTitle) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
+                    .font(OhanaFont.callout(.semibold))
+                    .foregroundStyle(Color.ohanaPrimaryText)
+                    .accessibilityIdentifier("add-human-wishlist-title-input")
+            }
                     .padding(.horizontal, 16).padding(.vertical, 14)
                     .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
                     .overlay(RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous).strokeBorder(Color.ohanaCardStroke, lineWidth: 1))
@@ -251,7 +258,7 @@ struct HumanWishlistContentView: View {
                     // 椰子费用
                     VStack(alignment: .leading, spacing: 8) {
                         HStack {
-                            Text("兑换费用")
+                            Text(l.tr(zh: "兑换费用", en: "Redeem cost", de: "Einlösekosten"))
                                 .font(OhanaFont.callout(.bold))
                                 .foregroundStyle(Color.ohanaPrimaryText)
                             Spacer()
@@ -283,7 +290,7 @@ struct HumanWishlistContentView: View {
                 Button {
                     createWish()
                 } label: {
-                    Text("保存心愿")
+                    Text(l.tr(zh: "保存心愿", en: "Save Wish", de: "Wunsch speichern"))
                         .font(OhanaFont.headline(.black))
                         .foregroundStyle(Color.arkInk)
                         .frame(maxWidth: .infinity).padding(.vertical, 18)
@@ -292,6 +299,7 @@ struct HumanWishlistContentView: View {
                 }
                 .disabled(newTitle.isEmpty)
                 .buttonStyle(ScaleButtonStyle())
+                .accessibilityIdentifier("add-human-wishlist-save-action")
                 .padding(.horizontal, 24).padding(.bottom, 32)
             }
         }

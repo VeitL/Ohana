@@ -181,6 +181,7 @@ struct PetHygieneDetailContentView: View {
         .tint(themeColor)
         .toolbarBackground(.hidden, for: .navigationBar)
         .toolbar(.hidden, for: .navigationBar)
+        .accessibilityIdentifier("pet-hygiene-detail-screen")
         // 护理卡片「计划」按钮 → 待办 sheet
         .sheet(item: $groomingPlanTarget) { hygieneType in
             HygieneTodoSheet(pet: pet, type: hygieneType, accent: themeColor) {
@@ -315,6 +316,7 @@ struct PetHygieneDetailContentView: View {
         let stripHasData = monthStripPoints(type).contains { $0.count > 0 }
         let doneToday = isDoneToday(type)
         let plans = pendingHygienePlans(for: type)
+        let accessibilityPrefix = "pet-hygiene-\(type.accessibilityIdentifierFragment)"
 
         return VStack(alignment: .leading, spacing: 10) {
             // 标题行：名称 + 状态 + 计划 + 打卡（主题色仅用于图标/按钮）
@@ -355,6 +357,7 @@ struct PetHygieneDetailContentView: View {
                     .overlay(Capsule().strokeBorder(themeColor.opacity(0.35), lineWidth: 0.5))
                 }
                 .buttonStyle(ScaleButtonStyle())
+                .accessibilityIdentifier("\(accessibilityPrefix)-plan-action")
                 Button {
                     recordHygiene(type, doneToday: doneToday)
                 } label: {
@@ -373,6 +376,7 @@ struct PetHygieneDetailContentView: View {
                     }
                 }
                 .buttonStyle(ScaleButtonStyle())
+                .accessibilityIdentifier("\(accessibilityPrefix)-record-action")
             }
 
             // 已添加的护理计划（HygieneTodoSheet → Event + Reminder）
@@ -446,8 +450,10 @@ struct PetHygieneDetailContentView: View {
                                 Image(systemName: "trash").accessibilityHidden(true).font(OhanaFont.adaptive(size: 10))
                                     .foregroundStyle(Color.ohanaSecondaryText.opacity(0.4))
                             }
+                            .accessibilityIdentifier("\(accessibilityPrefix)-delete-\(log.id.uuidString)")
                         }
                         .padding(.vertical, 4)
+                        .accessibilityIdentifier("\(accessibilityPrefix)-recent-row-\(log.id.uuidString)")
                     }
                 }
                 .padding(.top, 2)
@@ -507,6 +513,18 @@ struct PetHygieneDetailContentView: View {
                 pet: pet,
                 note: "pet.hygiene.detail.delete"
             )
+        }
+    }
+}
+
+private extension HygieneType {
+    var accessibilityIdentifierFragment: String {
+        switch self {
+        case .teeth: "teeth"
+        case .nails: "nails"
+        case .ears: "ears"
+        case .brushing: "brushing"
+        case .bath: "bath"
         }
     }
 }

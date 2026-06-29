@@ -12,6 +12,7 @@ struct CoHealthDashboardFullContentView: View {
     let snapshot: CoHealthDashboardSnapshot
 
     @AppStorage("currentActiveHumanId") private var activeHumanIdStr = ""
+    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
 
     private var activeHumanId: UUID? { UUID(uuidString: activeHumanIdStr) }
     private var isPrivacyLocked: Bool {
@@ -30,14 +31,18 @@ struct CoHealthDashboardFullContentView: View {
         snapshot.petWeightDelta(for: associatedPets)
     }
 
+    private var l: L10n { L10n(appLanguage) }
+
     private var summaryText: String {
-        let petName = associatedPets.first?.name ?? "毛孩子"
+        let petName = associatedPets.first?.name ?? l.tr(zh: "毛孩子", en: "your pets", de: "deine Tiere")
         let km = String(format: "%.1f", thisMonthWalkKm)
         if let delta = petWeightDelta {
-            let dir = delta < 0 ? "瘦了" : "胖了"
-            return "本月你带 \(petName) 走了 \(km)km\n\(petName)\(dir) \(String(format: "%.1f", abs(delta)))kg 🎉"
+            let amount = String(format: "%.1f", abs(delta))
+            return delta < 0
+                ? l.tr(zh: "本月你带 \(petName) 走了 \(km)km\n\(petName)瘦了 \(amount)kg 🎉", en: "You walked \(km) km with \(petName) this month\n\(petName) is down \(amount) kg 🎉", de: "Du bist diesen Monat \(km) km mit \(petName) gegangen\n\(petName) hat \(amount) kg abgenommen 🎉")
+                : l.tr(zh: "本月你带 \(petName) 走了 \(km)km\n\(petName)胖了 \(amount)kg 🎉", en: "You walked \(km) km with \(petName) this month\n\(petName) is up \(amount) kg 🎉", de: "Du bist diesen Monat \(km) km mit \(petName) gegangen\n\(petName) hat \(amount) kg zugenommen 🎉")
         }
-        return "本月你带 \(petName) 走了 \(km)km\n继续加油！💪"
+        return l.tr(zh: "本月你带 \(petName) 走了 \(km)km\n继续加油！💪", en: "You walked \(km) km with \(petName) this month\nKeep going! 💪", de: "Du bist diesen Monat \(km) km mit \(petName) gegangen\nWeiter so! 💪")
     }
 
     var body: some View {
@@ -79,7 +84,7 @@ struct CoHealthDashboardFullContentView: View {
                 }
             }
         }
-        .navigationTitle("人宠共健")
+        .navigationTitle(l.tr(zh: "人宠共健", en: "Co-health", de: "Gemeinsame Gesundheit"))
         .navigationBarTitleDisplayMode(.inline)
     }
 
@@ -88,10 +93,10 @@ struct CoHealthDashboardFullContentView: View {
             Image(systemName: "lock.shield.fill") // a11y: allow decorative icon covered by surrounding text or control
                 .font(OhanaFont.metric(size: 44))
                 .foregroundStyle(Color.goYellow)
-            Text("共健数据仅本人可见")
+            Text(l.tr(zh: "共健数据仅本人可见", en: "Co-health data is private", de: "Gemeinsame Gesundheitsdaten sind privat"))
                 .font(OhanaFont.headline(.bold))
                 .foregroundStyle(Color.ohanaPrimaryText)
-            Text("请切换到本人档案后再查看。")
+            Text(l.tr(zh: "请切换到本人档案后再查看。", en: "Switch to this profile to view it.", de: "Wechsle zu diesem Profil, um es zu sehen."))
                 .font(OhanaFont.callout())
                 .foregroundStyle(Color.ohanaSecondaryText)
         }
@@ -106,10 +111,10 @@ struct CoHealthDashboardFullContentView: View {
             HStack(spacing: 12) {
                 HumanAvatarPipelineView(human: human, size: 52)
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(human.name + " × 毛孩子")
+                    Text(human.name + " × " + l.tr(zh: "毛孩子", en: "Pets", de: "Tiere"))
                         .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.ohanaPrimaryText)
-                    Text("人宠共健报告")
+                    Text(l.tr(zh: "人宠共健报告", en: "Co-health Report", de: "Gemeinsamer Gesundheitsbericht"))
                         .font(OhanaFont.adaptive(size: 11, weight: .medium)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                 }
@@ -129,11 +134,11 @@ struct CoHealthDashboardFullContentView: View {
     // MARK: - Walk Bar Section
     private var walkBarSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            sectionTitle("🦮 遛狗里程（近7天）")
+            sectionTitle(l.tr(zh: "🦮 遛狗里程（近7天）", en: "🦮 Walk Distance (7 Days)", de: "🦮 Gassi-Distanz (7 Tage)"))
 
             let data = last7DaysWalkData
             if data.allSatisfy({ $0.km == 0 }) {
-                emptyLabel("暂无遛狗记录")
+                emptyLabel(l.tr(zh: "暂无遛狗记录", en: "No walk records yet", de: "Noch keine Spaziergänge"))
             } else {
                 OhanaMinimalBarChart(
                     points: data.enumerated().map { index, pt in
@@ -162,7 +167,7 @@ struct CoHealthDashboardFullContentView: View {
     // MARK: - Weight Compare Section
     private var weightCompareSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            sectionTitle("⚖️ 体重对比趋势")
+            sectionTitle(l.tr(zh: "⚖️ 体重对比趋势", en: "⚖️ Weight Trend Comparison", de: "⚖️ Gewichtstrend-Vergleich"))
             CoHealthDashboardContentView(human: human, snapshot: snapshot)
                 .allowsHitTesting(false)
         }
@@ -173,7 +178,7 @@ struct CoHealthDashboardFullContentView: View {
     // MARK: - Pet Health Section
     private var petHealthSection: some View {
         VStack(alignment: .leading, spacing: 14) {
-            sectionTitle("🐾 毛孩子健康摘要")
+            sectionTitle(l.tr(zh: "🐾 毛孩子健康摘要", en: "🐾 Pet Health Summary", de: "🐾 Gesundheitsübersicht der Tiere"))
             ForEach(associatedPets) { pet in
                 HStack(spacing: 14) {
                     PetAvatarPortraitView(
@@ -188,7 +193,7 @@ struct CoHealthDashboardFullContentView: View {
                             .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(Color.ohanaPrimaryText)
                         if let w = pet.latestWeightKg {
-                            Text("最新体重 \(String(format: "%.1f", w)) kg")
+                            Text(l.tr(zh: "最新体重 \(String(format: "%.1f", w)) kg", en: "Latest weight \(String(format: "%.1f", w)) kg", de: "Letztes Gewicht \(String(format: "%.1f", w)) kg"))
                                 .font(OhanaFont.adaptive(size: 11, weight: .medium)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                 .foregroundStyle(Color.ohanaPrimaryText.opacity(0.5))
                         }
@@ -199,7 +204,7 @@ struct CoHealthDashboardFullContentView: View {
                         Text(String(format: "%.1f km", monthWalk))
                             .font(OhanaFont.adaptive(size: 16, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(Color.goPrimary)
-                        Text("本月同行").font(OhanaFont.adaptive(size: 9)).foregroundStyle(Color.ohanaPrimaryText.opacity(0.3)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                        Text(l.tr(zh: "本月同行", en: "Together this month", de: "Diesen Monat zusammen")).font(OhanaFont.adaptive(size: 9)).foregroundStyle(Color.ohanaPrimaryText.opacity(0.3)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     }
                 }
             }

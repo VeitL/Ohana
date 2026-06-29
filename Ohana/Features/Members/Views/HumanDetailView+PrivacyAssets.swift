@@ -17,10 +17,12 @@ extension HumanDetailView {
                     .foregroundStyle(Color.goPrimary)
             }
             VStack(alignment: .leading, spacing: 3) {
-                Text("在首页显示")
+                Text(l.tr(zh: "在首页显示", en: "Show on Home", de: "Auf Startseite anzeigen"))
                     .font(OhanaFont.callout(.bold))
                     .foregroundStyle(Color(hex: "1E3A8A"))
-                Text(displayedHomeVisibility ? "已加入首页卡堆与岛屿统计" : "不在首页卡堆与岛屿体重中显示")
+                Text(displayedHomeVisibility
+                    ? l.tr(zh: "已加入首页卡堆与岛屿统计", en: "Included in Home cards and island stats", de: "In Startkarten und Inselstatistiken enthalten")
+                    : l.tr(zh: "不在首页卡堆与岛屿体重中显示", en: "Hidden from Home cards and island weight stats", de: "Nicht in Startkarten und Insel-Gewichtsstatistiken enthalten"))
                     .font(OhanaFont.caption())
                     .foregroundStyle(Color(hex: "6B82C4"))
             }
@@ -68,14 +70,14 @@ extension HumanDetailView {
                     Text("🥥").font(OhanaFont.title2())
                 }
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("椰子资产")
+                    Text(l.tr(zh: "椰子资产", en: "Coconut Assets", de: "Kokosnussvermögen"))
                         .font(OhanaFont.callout(.bold))
                         .foregroundStyle(Color(hex: "1E3A8A"))
                     HStack(spacing: 4) {
-                        Text("\(human.coconutBalance) 个")
+                        Text(l.tr(zh: "\(human.coconutBalance) 个", en: "\(human.coconutBalance) coconuts", de: "\(human.coconutBalance) Kokosnüsse"))
                             .font(OhanaFont.caption(.semibold))
                             .foregroundStyle(Color.goYellow)
-                        Text("· 兑换心愿")
+                        Text(l.tr(zh: "· 兑换心愿", en: "· Redeem wishes", de: "· Wünsche einlösen"))
                             .font(OhanaFont.caption())
                             .foregroundStyle(Color(hex: "6B82C4"))
                     }
@@ -103,10 +105,10 @@ extension HumanDetailView {
                         .foregroundStyle(Color.goCardCyan)
                 }
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("账单花费")
+                    Text(l.tr(zh: "账单花费", en: "Bill Expenses", de: "Rechnungsausgaben"))
                         .font(OhanaFont.callout(.bold))
                         .foregroundStyle(Color(hex: "1E3A8A"))
-                    Text("查看经手支出明细")
+                    Text(l.tr(zh: "查看经手支出明细", en: "Review handled expense details", de: "Bearbeitete Ausgaben ansehen"))
                         .font(OhanaFont.caption())
                         .foregroundStyle(Color(hex: "6B82C4"))
                 }
@@ -138,7 +140,11 @@ extension HumanDetailView {
             Image(systemName: "lock.fill") // a11y: allow decorative icon covered by surrounding text or control
                 .font(OhanaFont.headline())
                 .foregroundStyle(Color(hex: "6B82C4").opacity(0.6))
-            Text("🔒 \(label) · 仅本人可见")
+            Text(l.tr(
+                zh: "🔒 \(label) · 仅本人可见",
+                en: "🔒 \(label) · Private to owner",
+                de: "🔒 \(label) · Nur selbst sichtbar"
+            ))
                 .font(OhanaFont.callout(.semibold))
                 .foregroundStyle(Color(hex: "6B82C4"))
         }
@@ -153,10 +159,14 @@ extension HumanDetailView {
             Image(systemName: "lock.shield.fill") // a11y: allow decorative icon covered by surrounding text or control
                 .font(OhanaFont.metric(size: 34))
                 .foregroundStyle(Color.goYellow)
-            Text("此成员资料仅本人可见")
+            Text(l.tr(zh: "此成员资料仅本人可见", en: "This member profile is private", de: "Dieses Mitgliederprofil ist privat"))
                 .font(OhanaFont.title3(.black))
                 .foregroundStyle(Color(hex: "1E3A8A"))
-            Text("当前家庭成员无法查看 TA 的体重、运动、吃药、备注、花费和椰子资产等相关数据。")
+            Text(l.tr(
+                zh: "当前家庭成员无法查看 TA 的体重、运动、吃药、备注、花费和椰子资产等相关数据。",
+                en: "Current family members cannot view their weight, workouts, medication, notes, expenses, coconut assets, or related data.",
+                de: "Aktuelle Familienmitglieder können Gewicht, Training, Medikamente, Notizen, Ausgaben, Kokosnussvermögen und verwandte Daten nicht sehen."
+            ))
                 .font(OhanaFont.callout(.medium))
                 .foregroundStyle(Color(hex: "6B82C4"))
                 .multilineTextAlignment(.center)

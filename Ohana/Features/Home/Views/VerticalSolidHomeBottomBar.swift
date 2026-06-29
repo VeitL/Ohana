@@ -356,6 +356,7 @@ struct StarterOasisTabPromptView: View {
                 .strokeBorder(Color.goPrimary.opacity(0.26), lineWidth: 1)
         }
         .shadow(color: Color.arkInk.opacity(0.16), radius: 16, x: 0, y: 8) // ui-v4: allow one-time onboarding nudge depth.
+        .allowsHitTesting(false)
         .accessibilityElement(children: .combine)
         .accessibilityIdentifier("starter-oasis-tab-prompt")
     }

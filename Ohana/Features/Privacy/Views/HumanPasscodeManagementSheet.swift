@@ -14,6 +14,7 @@ struct HumanPasscodeManagementSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
     @Environment(AppServices.self) private var appServices
+    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
 
     @State private var mode: Mode = .set
     @State private var currentPin = ""
@@ -40,6 +41,8 @@ struct HumanPasscodeManagementSheet: View {
     init(human: Human) {
         self.human = human
     }
+
+    private var l: L10n { L10n(appLanguage) }
 
     var body: some View {
         ZStack {
@@ -70,10 +73,10 @@ struct HumanPasscodeManagementSheet: View {
                 .frame(width: 42, height: 42) // a11y: allow decorative non-interactive frame; hit area handled by parent
                 .background(Color.goYellow.opacity(0.16), in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
             VStack(alignment: .leading, spacing: 3) {
-                Text("账户 4 位密码")
+                Text(l.tr(zh: "账户 4 位密码", en: "Account 4-digit PIN", de: "4-stellige Konto-PIN"))
                     .font(OhanaFont.title3(.black))
                     .foregroundStyle(Color.ohanaPrimaryText)
-                Text("用于在同一设备上切换到 \(displayName(human)) 时验证")
+                Text(l.tr(zh: "用于在同一设备上切换到 \(displayName(human)) 时验证", en: "Used to verify switches to \(displayName(human)) on this device", de: "Wird beim Wechsel zu \(displayName(human)) auf diesem Gerät geprüft"))
                     .font(OhanaFont.caption(.semibold))
                     .foregroundStyle(Color.ohanaSecondaryText)
             }
@@ -94,44 +97,54 @@ struct HumanPasscodeManagementSheet: View {
         switch mode {
         case .overview:
             VStack(spacing: 12) {
-                statusCard(title: "已开启", subtitle: "其他成员切换到此账户时需要输入 4 位密码", icon: "checkmark.shield.fill", tint: Color.goPrimary)
+                statusCard(
+                    title: l.tr(zh: "已开启", en: "Enabled", de: "Aktiviert"),
+                    subtitle: l.tr(zh: "其他成员切换到此账户时需要输入 4 位密码", en: "Other members need the 4-digit PIN to switch to this account", de: "Andere Mitglieder brauchen die 4-stellige PIN für dieses Konto"),
+                    icon: "checkmark.shield.fill",
+                    tint: Color.goPrimary
+                )
                 Button { resetInputs()
                     mode = .change
                 } label: {
-                    actionRow(title: "修改密码", icon: "key.fill", tint: Color.goPrimary)
+                    actionRow(title: l.tr(zh: "修改密码", en: "Change PIN", de: "PIN ändern"), icon: "key.fill", tint: Color.goPrimary)
                 }
                 .buttonStyle(ScaleButtonStyle())
                 Button { resetInputs()
                     mode = .remove
                 } label: {
-                    actionRow(title: "关闭密码", icon: "lock.open.fill", tint: Color.goRed)
+                    actionRow(title: l.tr(zh: "关闭密码", en: "Turn off PIN", de: "PIN deaktivieren"), icon: "lock.open.fill", tint: Color.goRed)
                 }
                 .buttonStyle(ScaleButtonStyle())
             }
         case .set:
             formContent(
-                title: "设置 4 位密码",
+                title: l.tr(zh: "设置 4 位密码", en: "Set 4-digit PIN", de: "4-stellige PIN festlegen"),
                 needsCurrent: false,
-                primaryTitle: "开启密码",
+                primaryTitle: l.tr(zh: "开启密码", en: "Enable PIN", de: "PIN aktivieren"),
                 primaryAction: setPasscode
             )
         case .change:
             formContent(
-                title: "修改 4 位密码",
+                title: l.tr(zh: "修改 4 位密码", en: "Change 4-digit PIN", de: "4-stellige PIN ändern"),
                 needsCurrent: true,
-                primaryTitle: "保存新密码",
+                primaryTitle: l.tr(zh: "保存新密码", en: "Save new PIN", de: "Neue PIN speichern"),
                 primaryAction: changePasscode
             )
         case .remove:
             VStack(spacing: 14) {
-                statusCard(title: "关闭后可直接切换", subtitle: "请输入当前密码确认关闭", icon: "exclamationmark.lock.fill", tint: Color.goRed)
-                pinField("当前密码", text: $currentPin, target: .current)
+                statusCard(
+                    title: l.tr(zh: "关闭后可直接切换", en: "Direct switching after turning off", de: "Direkter Wechsel nach dem Deaktivieren"),
+                    subtitle: l.tr(zh: "请输入当前密码确认关闭", en: "Enter the current PIN to confirm", de: "Aktuelle PIN zur Bestätigung eingeben"),
+                    icon: "exclamationmark.lock.fill",
+                    tint: Color.goRed
+                )
+                pinField(l.tr(zh: "当前密码", en: "Current PIN", de: "Aktuelle PIN"), text: $currentPin, target: .current)
                 messageView
                 HStack(spacing: 10) {
-                    secondaryButton("返回") { resetInputs()
+                    secondaryButton(l.tr(zh: "返回", en: "Back", de: "Zurück")) { resetInputs()
                         mode = .overview
                     }
-                    primaryButton("关闭密码", tint: Color.goRed, foreground: .white, action: removePasscode)
+                    primaryButton(l.tr(zh: "关闭密码", en: "Turn off PIN", de: "PIN deaktivieren"), tint: Color.goRed, foreground: .white, action: removePasscode)
                 }
             }
         }
@@ -143,14 +156,14 @@ struct HumanPasscodeManagementSheet: View {
                 .font(OhanaFont.callout(.black))
                 .foregroundStyle(Color.ohanaPrimaryText)
             if needsCurrent {
-                pinField("当前密码", text: $currentPin, target: .current)
+                pinField(l.tr(zh: "当前密码", en: "Current PIN", de: "Aktuelle PIN"), text: $currentPin, target: .current)
             }
-            pinField("新密码", text: $newPin, target: .new)
-            pinField("确认新密码", text: $confirmPin, target: .confirm)
+            pinField(l.tr(zh: "新密码", en: "New PIN", de: "Neue PIN"), text: $newPin, target: .new)
+            pinField(l.tr(zh: "确认新密码", en: "Confirm new PIN", de: "Neue PIN bestätigen"), text: $confirmPin, target: .confirm)
             messageView
             HStack(spacing: 10) {
                 if appServices.passcodes.hasPasscode(human) {
-                    secondaryButton("返回") { resetInputs()
+                    secondaryButton(l.tr(zh: "返回", en: "Back", de: "Zurück")) { resetInputs()
                         mode = .overview
                     }
                 }
@@ -284,9 +297,9 @@ struct HumanPasscodeManagementSheet: View {
                 for: human,
                 note: "human.privacy.passcode.set"
             )
-            successAndDismiss("密码已开启")
+            successAndDismiss(l.tr(zh: "密码已开启", en: "PIN enabled", de: "PIN aktiviert"))
         } catch {
-            showError("请输入 4 位数字")
+            showError(l.tr(zh: "请输入 4 位数字", en: "Enter a 4-digit PIN", de: "4-stellige PIN eingeben"))
         }
     }
 
@@ -299,9 +312,9 @@ struct HumanPasscodeManagementSheet: View {
                 for: human,
                 note: "human.privacy.passcode.change"
             )
-            handleManagementResult(result, success: "密码已修改")
+            handleManagementResult(result, success: l.tr(zh: "密码已修改", en: "PIN changed", de: "PIN geändert"))
         } catch {
-            showError("请输入 4 位数字")
+            showError(l.tr(zh: "请输入 4 位数字", en: "Enter a 4-digit PIN", de: "4-stellige PIN eingeben"))
         }
     }
 
@@ -312,9 +325,9 @@ struct HumanPasscodeManagementSheet: View {
                 for: human,
                 note: "human.privacy.passcode.remove"
             )
-            handleManagementResult(result, success: "密码已关闭")
+            handleManagementResult(result, success: l.tr(zh: "密码已关闭", en: "PIN turned off", de: "PIN deaktiviert"))
         } catch {
-            showError("请输入当前 4 位密码")
+            showError(l.tr(zh: "请输入当前 4 位密码", en: "Enter the current 4-digit PIN", de: "Aktuelle 4-stellige PIN eingeben"))
         }
     }
 
@@ -323,25 +336,26 @@ struct HumanPasscodeManagementSheet: View {
         case .success:
             successAndDismiss(success)
         case let .incorrect(remaining):
-            showError("当前密码不正确，还可尝试 \(remaining) 次")
+            showError(l.tr(zh: "当前密码不正确，还可尝试 \(remaining) 次", en: "Current PIN is incorrect. \(remaining) attempts left.", de: "Aktuelle PIN ist falsch. Noch \(remaining) Versuche."))
         case let .locked(until):
-            showError("尝试过多，请 \(max(1, Int(ceil(until.timeIntervalSince(Date()))))) 秒后再试")
+            let seconds = max(1, Int(ceil(until.timeIntervalSince(Date()))))
+            showError(l.tr(zh: "尝试过多，请 \(seconds) 秒后再试", en: "Too many attempts. Try again in \(seconds) seconds.", de: "Zu viele Versuche. In \(seconds) Sekunden erneut versuchen."))
         case .invalidFormat:
-            showError("请输入 4 位数字")
+            showError(l.tr(zh: "请输入 4 位数字", en: "Enter a 4-digit PIN", de: "4-stellige PIN eingeben"))
         case .noPasscode:
-            showError("此账户还没有密码")
+            showError(l.tr(zh: "此账户还没有密码", en: "This account does not have a PIN yet", de: "Dieses Konto hat noch keine PIN"))
         case .memberInactive:
-            showError("纪念成员不能修改密码")
+            showError(l.tr(zh: "纪念成员不能修改密码", en: "Memorial members cannot change PINs", de: "Gedenkmitglieder können keine PIN ändern"))
         }
     }
 
     private func validateNewPins() -> Bool {
         guard appServices.passcodes.isValidPin(newPin) else {
-            showError("新密码需要是 4 位数字")
+            showError(l.tr(zh: "新密码需要是 4 位数字", en: "The new PIN must be 4 digits", de: "Die neue PIN muss 4-stellig sein"))
             return false
         }
         guard newPin == confirmPin else {
-            showError("两次输入不一致")
+            showError(l.tr(zh: "两次输入不一致", en: "The two PIN entries do not match", de: "Die beiden PINs stimmen nicht überein"))
             return false
         }
         return true
@@ -375,6 +389,6 @@ struct HumanPasscodeManagementSheet: View {
 
     private func displayName(_ human: Human) -> String {
         let name = human.name.trimmingCharacters(in: .whitespacesAndNewlines)
-        return name.isEmpty ? "未命名成员" : name
+        return name.isEmpty ? l.tr(zh: "未命名成员", en: "Unnamed member", de: "Unbenanntes Mitglied") : name
     }
 }

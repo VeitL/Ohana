@@ -26,6 +26,7 @@ struct IslandMedicationDashboardContentView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
     @Environment(AppServices.self) private var appServices
+    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
 
     @State private var selectedPetId: UUID? = nil
     @State private var sheetPet: Pet? = nil
@@ -88,6 +89,8 @@ struct IslandMedicationDashboardContentView: View {
         })
     }
 
+    private var l: L10n { L10n(appLanguage) }
+
     var body: some View {
         dashboardBody
             .sheet(item: $sheetPet) { pet in
@@ -140,7 +143,7 @@ struct IslandMedicationDashboardContentView: View {
             }
             .buttonStyle(ScaleButtonStyle())
             Spacer()
-            Text("今日药盒")
+            Text(l.tr(zh: "今日药盒", en: "Today's pillbox", de: "Heutige Medikamentenbox"))
                 .font(OhanaFont.adaptive(size: 17, weight: .black, design: .rounded))
                 .foregroundStyle(Color.goCardWhite)
             Spacer()
@@ -152,7 +155,7 @@ struct IslandMedicationDashboardContentView: View {
     private var memberSelector: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
-                selectorChip(title: "全部", icon: "pills.fill", isSelected: selectedPetId == nil) {
+                selectorChip(title: l.tr(zh: "全部", en: "All", de: "Alle"), icon: "pills.fill", isSelected: selectedPetId == nil) {
                     selectedPetId = nil
                 }
                 ForEach(activePets) { pet in
@@ -186,13 +189,17 @@ struct IslandMedicationDashboardContentView: View {
             }
 
             VStack(alignment: .leading, spacing: 7) {
-                Text("今日服药进度")
+                Text(l.tr(zh: "今日服药进度", en: "Today's medication progress", de: "Heutiger Medikationsfortschritt"))
                     .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
                     .foregroundStyle(Color.goCardWhite.opacity(0.56))
-                Text(dueDoses == 0 ? "没有固定剂量" : completion >= 1 ? "今日完成" : "还有 \(max(0, dueDoses - takenDoses)) 次")
+                Text(todayMedicationStatus)
                     .font(OhanaFont.adaptive(size: 24, weight: .black, design: .rounded))
                     .foregroundStyle(Color.goCardWhite)
-                Text("\(activeMeds.count) 个当前用药 · \(endingSoonCount) 个 7 天内结束")
+                Text(l.tr(
+                    zh: "\(activeMeds.count) 个当前用药 · \(endingSoonCount) 个 7 天内结束",
+                    en: "\(activeMeds.count) active medications · \(endingSoonCount) ending within 7 days",
+                    de: "\(activeMeds.count) aktive Medikamente · \(endingSoonCount) enden innerhalb von 7 Tagen"
+                ))
                     .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
                     .foregroundStyle(Color.goCardWhite.opacity(0.52))
             }
@@ -211,12 +218,16 @@ struct IslandMedicationDashboardContentView: View {
 
     private var todayMedicationStrip: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("药盒格")
+            Text(l.tr(zh: "药盒格", en: "Pill slots", de: "Medikamentenfaecher"))
                 .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
                 .foregroundStyle(Color.goCardWhite.opacity(0.72))
 
             if activeMeds.isEmpty {
-                emptyState("暂无当前用药\n进入成员页添加药物计划")
+                emptyState(l.tr(
+                    zh: "暂无当前用药\n进入成员页添加药物计划",
+                    en: "No active medications yet\nOpen a member page to add a medication plan",
+                    de: "Noch keine aktiven Medikamente\nOeffne eine Mitgliederseite, um einen Plan hinzuzufuegen"
+                ))
             } else {
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 76), spacing: 10)], spacing: 10) {
                     ForEach(activeMeds.prefix(12)) { med in
@@ -250,7 +261,7 @@ struct IslandMedicationDashboardContentView: View {
                             .rotationEffect(.degrees(-18))
                     }
             }
-            Text(med.name.isEmpty ? "未命名" : med.name)
+            Text(med.name.isEmpty ? l.tr(zh: "未命名", en: "Unnamed", de: "Unbenannt") : med.name)
                 .font(OhanaFont.adaptive(size: 10, weight: .black, design: .rounded))
                 .foregroundStyle(Color.goCardWhite)
                 .lineLimit(1)
@@ -266,7 +277,7 @@ struct IslandMedicationDashboardContentView: View {
 
     private var medicationRows: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("成员药盒")
+            Text(l.tr(zh: "成员药盒", en: "Member pillboxes", de: "Medikamentenboxen der Mitglieder"))
                 .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
                 .foregroundStyle(Color.goCardWhite)
             ForEach(summaries) { summary in
@@ -277,7 +288,7 @@ struct IslandMedicationDashboardContentView: View {
                             Text(summary.pet.name)
                                 .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
                                 .foregroundStyle(Color.goCardWhite)
-                            Text(summary.activeMeds.isEmpty ? "暂无当前用药" : "\(summary.activeMeds.count) 个当前用药")
+                            Text(summary.activeMeds.isEmpty ? l.tr(zh: "暂无当前用药", en: "No active medications", de: "Keine aktiven Medikamente") : l.tr(zh: "\(summary.activeMeds.count) 个当前用药", en: "\(summary.activeMeds.count) active medications", de: "\(summary.activeMeds.count) aktive Medikamente"))
                                 .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
                                 .foregroundStyle(Color.goCardWhite.opacity(0.48))
                         }
@@ -328,6 +339,17 @@ struct IslandMedicationDashboardContentView: View {
     }
 
     private var medAccent: Color { Color(hex: "FF5A00") }
+
+    private var todayMedicationStatus: String {
+        if dueDoses == 0 {
+            return l.tr(zh: "没有固定剂量", en: "No fixed doses", de: "Keine festen Dosen")
+        }
+        if completion >= 1 {
+            return l.tr(zh: "今日完成", en: "Done today", de: "Heute erledigt")
+        }
+        let remaining = max(0, dueDoses - takenDoses)
+        return l.tr(zh: "还有 \(remaining) 次", en: "\(remaining) doses left", de: "Noch \(remaining) Dosen")
+    }
 
     private func medications(for pet: Pet) -> [PetMedication] {
         medicationsByPetID[pet.id, default: []]

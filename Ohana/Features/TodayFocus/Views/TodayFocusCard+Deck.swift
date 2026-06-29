@@ -101,27 +101,19 @@ extension TodayFocusCard {
 
     @ViewBuilder
     func compactStackCard(cards: [TodayFocusContent]) -> some View {
-        if surfaceGate.allowsAmbientMotion {
-            physicalStackCard(cards: cards.map { FocusDeckCard(id: contentKey($0), content: $0) })
-        } else {
-            let frontContent = cards.isEmpty ? TodayFocusContent.welcome : cards[min(selectedFocusIndex, cards.count - 1)]
-            frozenCompactStackCard(
-                content: frontContent,
-                backCardCount: min(TodayFocusLimits.maxVisibleBackCards, max(cards.count - 1, 0))
-            )
-        }
+        horizontalBannerCarousel(cards: cards)
     }
 
     func frozenCompactStackCard(content frontContent: TodayFocusContent, backCardCount: Int) -> some View {
         GeometryReader { geo in
-            let width = max(298, min(geo.size.width, 390))
+            let width = todayFocusCarouselWidth(in: geo.size.width)
             let cardHeight = TodayFocusCardLayout.frontHeight
             let backSpacing = TodayFocusCardLayout.backCardSpacing
-            let topPeekInset: CGFloat = backSpacing
+            let topPeekInset = TodayFocusCardLayout.carouselTopPeekInset
             ZStack {
                 if backCardCount > 0 {
                     ForEach(Array((1 ... backCardCount).reversed()), id: \.self) { depth in
-                        TodayFocusFrozenBackPlate(
+                        TodayFocusCarouselBackPlate(
                             depth: depth,
                             width: width,
                             height: cardHeight,
@@ -131,7 +123,11 @@ extension TodayFocusCard {
                     }
                 }
 
-                cardContent(frontContent)
+                carouselCardContent(
+                    frontContent,
+                    selected: min(selectedFocusIndex, max(focusCards.count - 1, 0)),
+                    count: max(focusCards.count, 1)
+                )
                     .frame(width: width, height: cardHeight)
                     .offset(y: topPeekInset)
                     .zIndex(20)
@@ -143,6 +139,95 @@ extension TodayFocusCard {
             }
         }
         .frame(height: TodayFocusCardLayout.compactStackHeight)
+    }
+
+    func horizontalBannerCarousel(cards sourceCards: [TodayFocusContent]) -> some View {
+        let cards = sourceCards.isEmpty ? [TodayFocusContent.welcome] : sourceCards
+        return GeometryReader { geo in
+            let width = todayFocusCarouselWidth(in: geo.size.width)
+            let cardHeight = TodayFocusCardLayout.frontHeight
+            let backCount = min(TodayFocusLimits.maxVisibleBackCards, max(cards.count - 1, 0))
+            let topPeekInset = TodayFocusCardLayout.carouselTopPeekInset
+            ZStack {
+                if backCount > 0 {
+                    ForEach(Array((1 ... backCount).reversed()), id: \.self) { depth in
+                        TodayFocusCarouselBackPlate(
+                            depth: depth,
+                            width: width,
+                            height: cardHeight,
+                            topInset: topPeekInset,
+                            spacing: TodayFocusCardLayout.backCardSpacing
+                        )
+                    }
+                }
+
+                ZStack {
+                    ForEach(Array(cards.enumerated()), id: \.offset) { index, item in
+                        let relative = focusRelativeIndex(for: index, count: cards.count)
+                        let itemOpacity = carouselItemOpacity(relative: relative)
+                        let shouldMountContent = relative == 0 || itemOpacity > 0.001
+                        Group {
+                            if shouldMountContent {
+                                carouselCardContent(item, selected: index, count: cards.count)
+                                    .accessibilityHidden(relative != 0)
+                            } else {
+                                Color.clear.accessibilityHidden(true)
+                            }
+                        }
+                        .frame(width: width, height: cardHeight)
+                        .offset(x: carouselItemOffset(relative: relative, width: width))
+                        .scaleEffect(carouselItemScale(relative: relative))
+                        .opacity(itemOpacity)
+                        .allowsHitTesting(relative == 0)
+                    }
+                }
+                .frame(width: width, height: cardHeight)
+                .clipShape(RoundedRectangle(cornerRadius: TodayFocusCardLayout.carouselCornerRadius, style: .continuous))
+                .contentShape(RoundedRectangle(cornerRadius: TodayFocusCardLayout.carouselCornerRadius, style: .continuous))
+                .highPriorityGesture(focusSwipeGesture(count: cards.count))
+                .offset(y: topPeekInset)
+                .zIndex(20)
+                .animation(carouselSwitchAnimation, value: selectedFocusIndex)
+            }
+            .frame(maxWidth: .infinity, alignment: .center)
+        }
+        .frame(height: TodayFocusCardLayout.compactStackHeight)
+        .onChange(of: cards.count) { _, count in
+            if selectedFocusIndex >= count {
+                selectedFocusIndex = max(0, count - 1)
+            }
+        }
+    }
+
+    func todayFocusCarouselWidth(in availableWidth: CGFloat) -> CGFloat {
+        max(302, min(availableWidth - TodayFocusCardLayout.carouselHorizontalMargin * 2, 430))
+    }
+
+    var carouselSwitchAnimation: Animation? {
+        guard !freezesToFrontCard, !reduceMotion else { return nil }
+        guard workloadPolicy.shouldRunInteractionAnimation(isVisible: true) else { return nil }
+        return .interactiveSpring(response: 0.42, dampingFraction: 0.86, blendDuration: 0.12)
+    }
+
+    func carouselItemOffset(relative: Int, width: CGFloat) -> CGFloat {
+        CGFloat(relative) * (width + TodayFocusCardLayout.carouselSideGap) + focusDragX
+    }
+
+    func carouselItemScale(relative: Int) -> CGFloat {
+        let dragProgress = min(1, abs(focusDragX) / 120)
+        if relative == 0 {
+            return 1 - dragProgress * 0.018
+        }
+        return 0.985 + dragProgress * 0.015
+    }
+
+    func carouselItemOpacity(relative: Int) -> Double {
+        let dragProgress = min(1, abs(focusDragX) / 120)
+        if relative == 0 {
+            return Double(1 - dragProgress * 0.20)
+        }
+        let isIncoming = (focusDragX < 0 && relative == 1) || (focusDragX > 0 && relative == -1)
+        return isIncoming ? Double(0.18 + dragProgress * 0.82) : 0
     }
 
     @ViewBuilder
@@ -183,13 +268,21 @@ extension TodayFocusCard {
                 ZStack {
                     ForEach(Array(cards.enumerated()), id: \.offset) { index, item in
                         let relative = focusRelativeIndex(for: index, count: cards.count)
-                        cardContent(item)
-                            .padding(.horizontal, 2)
-                            .offset(x: focusItemOffset(relative: relative))
-                            .scaleEffect(focusItemScale(relative: relative))
-                            .opacity(focusItemOpacity(relative: relative))
-                            .allowsHitTesting(relative == 0)
-                            .accessibilityHidden(relative != 0)
+                        let itemOpacity = focusItemOpacity(relative: relative)
+                        let shouldMountContent = relative == 0 || itemOpacity > 0.001
+                        Group {
+                            if shouldMountContent {
+                                cardContent(item)
+                                    .accessibilityHidden(relative != 0)
+                            } else {
+                                Color.clear.accessibilityHidden(true)
+                            }
+                        }
+                        .padding(.horizontal, 2)
+                        .offset(x: focusItemOffset(relative: relative))
+                        .scaleEffect(focusItemScale(relative: relative))
+                        .opacity(itemOpacity)
+                        .allowsHitTesting(relative == 0)
                     }
                 }
                 .frame(height: TodayFocusCardLayout.legacySwitchHeight)
@@ -209,10 +302,12 @@ extension TodayFocusCard {
     func focusSwipeGesture(count: Int) -> some Gesture {
         DragGesture(minimumDistance: 8, coordinateSpace: .local)
             .updating($focusDragX) { value, state, _ in
+                guard count > 1 else { return }
                 guard abs(value.translation.width) > abs(value.translation.height) else { return }
                 state = max(-92, min(92, value.translation.width))
             }
             .onEnded { value in
+                guard count > 1 else { return }
                 let horizontal = value.translation.width
                 guard abs(horizontal) > abs(value.translation.height) else { return }
                 let predicted = value.predictedEndTranslation.width

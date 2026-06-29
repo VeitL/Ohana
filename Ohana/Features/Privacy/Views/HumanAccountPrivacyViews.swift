@@ -21,6 +21,7 @@ struct HumanAccountSwitcherSheet: View {
     @AppStorage("currentActiveHumanId") private var activeHumanId = ""
     @AppStorage(HomeCardVisibility.hiddenPetIDsKey) private var hiddenHomePetIDsRaw = ""
     @AppStorage("goFocusHomeCardOrder.v1") private var homeCardOrderRaw = ""
+    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
 
     @State private var pendingHuman: Human? = nil
     @State private var pin = ""
@@ -34,12 +35,12 @@ struct HumanAccountSwitcherSheet: View {
         case switchAccount
         case manageSecurity
 
-        var prompt: String {
+        func prompt(_ l: L10n) -> String {
             switch self {
             case .switchAccount:
-                "验证通过后会切换到该账户"
+                l.tr(zh: "验证通过后会切换到该账户", en: "Verify to switch to this account", de: "Verifizieren, um zu diesem Konto zu wechseln")
             case .manageSecurity:
-                "验证通过后打开密码与隐私设置"
+                l.tr(zh: "验证通过后打开密码与隐私设置", en: "Verify to open PIN and privacy settings", de: "Verifizieren, um PIN und Datenschutz zu öffnen")
             }
         }
     }
@@ -51,6 +52,8 @@ struct HumanAccountSwitcherSheet: View {
     private var switchableHumans: [Human] {
         humans.filter { !$0.hasPassedAway }
     }
+
+    private var l: L10n { L10n(appLanguage) }
 
     var body: some View {
         ZStack {
@@ -72,6 +75,7 @@ struct HumanAccountSwitcherSheet: View {
         }
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.hidden)
+        .accessibilityIdentifier("human-account-switcher-sheet")
         .animation(GoMotion.feedback, value: pendingHuman?.id)
         .sheet(item: $securityHuman) { human in
             HumanAccountSecuritySheet(human: human)
@@ -86,10 +90,10 @@ struct HumanAccountSwitcherSheet: View {
                 .frame(width: 42, height: 42) // a11y: allow decorative non-interactive frame; hit area handled by parent
                 .background(Color.goPrimary.opacity(0.16), in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
             VStack(alignment: .leading, spacing: 3) {
-                Text("切换人类账户")
+                Text(l.tr(zh: "切换人类账户", en: "Switch human account", de: "Menschenkonto wechseln"))
                     .font(OhanaFont.title3(.black))
                     .foregroundStyle(Color.ohanaPrimaryText)
-                Text("成员与密码")
+                Text(l.tr(zh: "成员与密码", en: "Members and PINs", de: "Mitglieder und PINs"))
                     .font(OhanaFont.caption(.semibold))
                     .foregroundStyle(Color.ohanaSecondaryText)
             }
@@ -104,6 +108,7 @@ struct HumanAccountSwitcherSheet: View {
                     .background(Color.ohanaControlFill, in: Capsule())
             }
             .buttonStyle(ScaleButtonStyle())
+            .accessibilityIdentifier("human-account-switcher-close-action")
         }
     }
 
@@ -113,7 +118,7 @@ struct HumanAccountSwitcherSheet: View {
             HStack(spacing: 12) {
                 accountAvatar(activeHuman, size: 48)
                 VStack(alignment: .leading, spacing: 3) {
-                    Text("当前账户")
+                    Text(l.tr(zh: "当前账户", en: "Current account", de: "Aktuelles Konto"))
                         .font(OhanaFont.caption2(.black))
                         .foregroundStyle(Color.ohanaSecondaryText)
                     Text(displayName(activeHuman))
@@ -121,16 +126,17 @@ struct HumanAccountSwitcherSheet: View {
                         .foregroundStyle(Color.ohanaPrimaryText)
                 }
                 Spacer()
-                lockButton(for: activeHuman)
+                lockButton(for: activeHuman, identifier: "human-account-security-active-action")
             }
             .padding(14)
             .goTranslucentCard(cornerRadius: OhanaRadius.controlLarge)
+            .accessibilityIdentifier("human-account-active-card")
         }
     }
 
     private var accountList: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("成员")
+            Text(l.tr(zh: "成员", en: "Members", de: "Mitglieder"))
                 .font(OhanaFont.caption(.black))
                 .foregroundStyle(Color.ohanaSecondaryText)
                 .padding(.horizontal, 2)
@@ -152,7 +158,7 @@ struct HumanAccountSwitcherSheet: View {
                         Text(displayName(human))
                             .font(OhanaFont.callout(.black))
                             .foregroundStyle(Color.ohanaPrimaryText)
-                        Text(human.roleText)
+                        Text(localizedRoleText(for: human.role))
                             .font(OhanaFont.caption2(.bold))
                             .foregroundStyle(Color.ohanaSecondaryText)
                     }
@@ -161,8 +167,9 @@ struct HumanAccountSwitcherSheet: View {
                 }
             }
             .buttonStyle(ScaleButtonStyle())
+            .accessibilityIdentifier("human-account-switch-row-\(displayName(human))")
 
-            lockButton(for: human)
+            lockButton(for: human, identifier: "human-account-security-row-action-\(displayName(human))")
         }
         .padding(13)
         .background(pendingHuman?.id == human.id ? Color.goPrimary.opacity(0.16) : Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
@@ -175,21 +182,21 @@ struct HumanAccountSwitcherSheet: View {
     @ViewBuilder
     private func statusBadge(for human: Human) -> some View {
         if human.id.uuidString == activeHumanId {
-            Text("当前")
+            Text(l.tr(zh: "当前", en: "Current", de: "Aktuell"))
                 .font(OhanaFont.caption2(.black))
                 .foregroundStyle(Color.arkInk)
                 .padding(.horizontal, 9)
                 .padding(.vertical, 5)
                 .background(Color.goPrimary, in: Capsule())
         } else if appServices.passcodes.hasPasscode(human) {
-            Text("需密码")
+            Text(l.tr(zh: "需密码", en: "PIN needed", de: "PIN nötig"))
                 .font(OhanaFont.caption2(.black))
                 .foregroundStyle(Color.goYellow)
                 .padding(.horizontal, 9)
                 .padding(.vertical, 5)
                 .background(Color.goYellow.opacity(0.14), in: Capsule())
         } else {
-            Text("可切换")
+            Text(l.tr(zh: "可切换", en: "Can switch", de: "Wechselbar"))
                 .font(OhanaFont.caption2(.black))
                 .foregroundStyle(Color.ohanaSecondaryText)
                 .padding(.horizontal, 9)
@@ -198,7 +205,7 @@ struct HumanAccountSwitcherSheet: View {
         }
     }
 
-    private func lockButton(for human: Human) -> some View {
+    private func lockButton(for human: Human, identifier: String) -> some View {
         Button {
             openSecurity(for: human)
         } label: {
@@ -209,7 +216,8 @@ struct HumanAccountSwitcherSheet: View {
                 .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: OhanaRadius.chip, style: .continuous))
         }
         .buttonStyle(ScaleButtonStyle())
-        .accessibilityLabel("密码与隐私")
+        .accessibilityLabel(l.tr(zh: "密码与隐私", en: "PIN & Privacy", de: "PIN & Datenschutz"))
+        .accessibilityIdentifier(identifier)
     }
 
     private func pinPanel(for human: Human) -> some View {
@@ -217,10 +225,10 @@ struct HumanAccountSwitcherSheet: View {
             HStack(spacing: 10) {
                 accountAvatar(human, size: 38)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("输入 \(displayName(human)) 的 4 位密码")
+                    Text(l.tr(zh: "输入 \(displayName(human)) 的 4 位密码", en: "Enter \(displayName(human))'s 4-digit PIN", de: "4-stellige PIN für \(displayName(human)) eingeben"))
                         .font(OhanaFont.callout(.black))
                         .foregroundStyle(Color.ohanaPrimaryText)
-                    Text(statusMessage.isEmpty ? pendingPurpose.prompt : statusMessage)
+                    Text(statusMessage.isEmpty ? pendingPurpose.prompt(l) : statusMessage)
                         .font(OhanaFont.caption(.bold))
                         .foregroundStyle(isError ? Color.goRed : Color.ohanaSecondaryText)
                 }
@@ -255,7 +263,7 @@ struct HumanAccountSwitcherSheet: View {
             pendingHuman = human
             pin = ""
             isError = true
-            statusMessage = "请 \(seconds) 秒后再试"
+            statusMessage = l.tr(zh: "请 \(seconds) 秒后再试", en: "Try again in \(seconds) seconds", de: "In \(seconds) Sekunden erneut versuchen")
             return
         }
         pendingHuman = human
@@ -282,7 +290,7 @@ struct HumanAccountSwitcherSheet: View {
         pin = ""
         if let seconds = appServices.passcodes.remainingLockoutSeconds(for: human, now: now) {
             isError = true
-            statusMessage = "请 \(seconds) 秒后再试"
+            statusMessage = l.tr(zh: "请 \(seconds) 秒后再试", en: "Try again in \(seconds) seconds", de: "In \(seconds) Sekunden erneut versuchen")
         } else {
             isError = false
             statusMessage = ""
@@ -298,23 +306,24 @@ struct HumanAccountSwitcherSheet: View {
         case let .incorrect(remaining):
             pin = ""
             isError = true
-            statusMessage = "密码不正确，还可尝试 \(remaining) 次"
+            statusMessage = l.tr(zh: "密码不正确，还可尝试 \(remaining) 次", en: "Incorrect PIN. \(remaining) attempts left.", de: "Falsche PIN. Noch \(remaining) Versuche.")
             UINotificationFeedbackGenerator().notificationOccurred(.error)
         case let .locked(until):
             pin = ""
             isError = true
-            statusMessage = "尝试过多，请 \(max(1, Int(ceil(until.timeIntervalSince(now))))) 秒后再试"
+            let seconds = max(1, Int(ceil(until.timeIntervalSince(now))))
+            statusMessage = l.tr(zh: "尝试过多，请 \(seconds) 秒后再试", en: "Too many attempts. Try again in \(seconds) seconds.", de: "Zu viele Versuche. In \(seconds) Sekunden erneut versuchen.")
             UINotificationFeedbackGenerator().notificationOccurred(.error)
         case .invalidFormat:
             pin = ""
             isError = true
-            statusMessage = "请输入 4 位数字"
+            statusMessage = l.tr(zh: "请输入 4 位数字", en: "Enter a 4-digit PIN", de: "4-stellige PIN eingeben")
         case .noPasscode:
             completePendingAccess(for: human)
         case .memberInactive:
             pin = ""
             isError = true
-            statusMessage = "纪念成员不能切换或修改安全设置"
+            statusMessage = l.tr(zh: "纪念成员不能切换或修改安全设置", en: "Memorial members cannot switch accounts or change security settings", de: "Gedenkmitglieder können weder wechseln noch Sicherheit ändern")
             UINotificationFeedbackGenerator().notificationOccurred(.error)
         }
     }
@@ -386,6 +395,15 @@ struct HumanAccountSwitcherSheet: View {
 
     private func displayName(_ human: Human) -> String {
         let name = human.name.trimmingCharacters(in: .whitespacesAndNewlines)
-        return name.isEmpty ? "未命名成员" : name
+        return name.isEmpty ? l.tr(zh: "未命名成员", en: "Unnamed member", de: "Unbenanntes Mitglied") : name
+    }
+
+    private func localizedRoleText(for raw: String) -> String {
+        switch HumanProfileOptions.normalizedRole(raw) {
+        case "owner":
+            l.tr(zh: "管理者", en: "Owner", de: "Verwaltung")
+        default:
+            l.tr(zh: "成员", en: "Member", de: "Mitglied")
+        }
     }
 }

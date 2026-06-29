@@ -31,9 +31,9 @@ extension WalkTrackingCard {
                         .frame(height: mapHeight)
 
                     HStack(spacing: 8) {
-                        summaryStatCell(label: "时间", value: formatElapsed(elapsed), accent: .goPrimary)
-                        summaryStatCell(label: "距离", value: distanceText(distance), accent: .goTeal)
-                        summaryStatCell(label: "便便", value: "\(poop)次", accent: .goYellow)
+                        summaryStatCell(label: "时间", value: formatElapsed(elapsed), accent: .goPrimary, identifier: "walk-tracking-summary-duration")
+                        summaryStatCell(label: "距离", value: distanceText(distance), accent: .goTeal, identifier: "walk-tracking-summary-distance")
+                        summaryStatCell(label: "便便", value: "\(poop)次", accent: .goYellow, identifier: "walk-tracking-summary-poop")
                     }
                 }
                 .padding(.horizontal, 12)
@@ -113,6 +113,7 @@ extension WalkTrackingCard {
         .contentShape(Circle())
         .buttonStyle(ScaleButtonStyle())
         .accessibilityLabel("关闭遛狗摘要")
+        .accessibilityIdentifier("walk-tracking-summary-close-action")
     }
 
     var summaryEditGoalIconButton: some View {
@@ -130,6 +131,7 @@ extension WalkTrackingCard {
         .contentShape(Circle())
         .buttonStyle(ScaleButtonStyle())
         .accessibilityLabel("编辑遛狗目标")
+        .accessibilityIdentifier("walk-tracking-summary-goal-action")
     }
 
     @ViewBuilder
@@ -344,13 +346,14 @@ extension WalkTrackingCard {
         }
     }
 
-    func summaryStatCell(label: String, value: String, accent: Color) -> some View {
+    func summaryStatCell(label: String, value: String, accent: Color, identifier: String) -> some View {
         VStack(spacing: 5) {
             Text(value)
                 .font(OhanaFont.callout(.black))
                 .foregroundStyle(Color.goCardWhite)
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
+                .accessibilityIdentifier("\(identifier)-value")
             Text(label)
                 .font(OhanaFont.caption2(.bold))
                 .foregroundStyle(accent)

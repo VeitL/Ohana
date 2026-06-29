@@ -288,6 +288,7 @@ struct SwipeableEventRow: View {
         // Squish: card compresses horizontally, slightly taller on deep swipe
         .scaleEffect(x: squishX, y: squishY, anchor: .trailing)
         .animation(GoMotion.feedback, value: leftProgress)
+        .accessibilityIdentifier("calendar-event-row-\(event.title)")
     }
 
     // MARK: - Color Coding

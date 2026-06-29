@@ -187,6 +187,7 @@ struct AddMedicationSheet: View {
                 Text(isEditing ? l.tr(zh: "编辑药物", en: "Edit medication", de: "Medikament bearbeiten") : l.tr(zh: "添加药物", en: "Add medication", de: "Medikament hinzufügen"))
                     .font(OhanaFont.title2(.bold))
                     .foregroundStyle(primaryText)
+                    .accessibilityIdentifier("add-human-medication-sheet")
                 Text(l.tr(zh: "先设好药名、频率和时间。", en: "Set the name, frequency, and time first.", de: "Lege zuerst Name, Häufigkeit und Zeit fest."))
                     .font(OhanaFont.caption())
                     .foregroundStyle(secondaryText)
@@ -221,6 +222,7 @@ struct AddMedicationSheet: View {
                     )
                     .font(OhanaFont.body())
                     .foregroundStyle(primaryText)
+                    .accessibilityIdentifier("add-human-medication-name-input")
                 }
                 VStack(alignment: .leading, spacing: 10) {
                     Label(l.tr(zh: "剂型", en: "Form", de: "Form"), systemImage: "pills")
@@ -566,6 +568,7 @@ struct AddMedicationSheet: View {
             }
             .buttonStyle(ScaleButtonStyle())
             .disabled(!canSave)
+            .accessibilityIdentifier("add-human-medication-save-action")
             .padding(.horizontal, 16)
             .padding(.top, 12)
             .padding(.bottom, 12)

@@ -15,6 +15,7 @@ struct IslandRetentionDashboardContentView: View {
 
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
+    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
 
     @State private var careLedgerEvents: [CareLedgerEvent] = []
     @State private var archiveMetricsByPetId: [UUID: PetRetentionArchiveMetrics] = [:]
@@ -52,6 +53,8 @@ struct IslandRetentionDashboardContentView: View {
             (partial.0 + item.unlocked, partial.1 + item.totalAchievements)
         }
     }
+
+    private var l: L10n { L10n(appLanguage) }
 
     var body: some View {
         dashboardBody
@@ -178,7 +181,7 @@ struct IslandRetentionDashboardContentView: View {
             }
             .buttonStyle(ScaleButtonStyle())
             Spacer()
-            Text("成长档案")
+            Text(l.tr(zh: "成长档案", en: "Growth Archive", de: "Wachstumsarchiv"))
                 .font(OhanaFont.adaptive(size: 17, weight: .black, design: .rounded))
                 .foregroundStyle(.white) // ui-v4: allow pre-existing visual token debt surfaced by accessibility font migration; tracked by full-scope ratchet.
             Spacer()
@@ -190,7 +193,7 @@ struct IslandRetentionDashboardContentView: View {
     private var memberSelector: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
-                selectorChip(title: "全部", icon: "tree.fill", isSelected: selectedPetId == nil) {
+                selectorChip(title: l.tr(zh: "全部", en: "All", de: "Alle"), icon: "tree.fill", isSelected: selectedPetId == nil) {
                     selectedPetId = nil
                 }
                 ForEach(activePets) { pet in
@@ -219,7 +222,7 @@ struct IslandRetentionDashboardContentView: View {
             .frame(width: 112, height: 112)
 
             VStack(alignment: .leading, spacing: 7) {
-                Text("档案完整度")
+                Text(l.tr(zh: "档案完整度", en: "Archive completeness", de: "Archivvollstaendigkeit"))
                     .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
                     .foregroundStyle(.white.opacity(0.56)) // ui-v4: allow pre-existing visual token debt surfaced by accessibility font migration; tracked by full-scope ratchet.
                 HStack(alignment: .firstTextBaseline, spacing: 5) {
@@ -230,7 +233,11 @@ struct IslandRetentionDashboardContentView: View {
                         .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
                         .foregroundStyle(Color.goLime)
                 }
-                Text("\(totalMemories) 个记忆点 · \(totalAchievements.unlocked)/\(totalAchievements.total) 枚成就")
+                Text(l.tr(
+                    zh: "\(totalMemories) 个记忆点 · \(totalAchievements.unlocked)/\(totalAchievements.total) 枚成就",
+                    en: "\(totalMemories) memory points · \(totalAchievements.unlocked)/\(totalAchievements.total) achievements",
+                    de: "\(totalMemories) Erinnerungspunkte · \(totalAchievements.unlocked)/\(totalAchievements.total) Erfolge"
+                ))
                     .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
                     .foregroundStyle(.white.opacity(0.52)) // ui-v4: allow pre-existing visual token debt surfaced by accessibility font migration; tracked by full-scope ratchet.
                     .lineLimit(2)
@@ -246,9 +253,9 @@ struct IslandRetentionDashboardContentView: View {
 
     private var memoryCapsules: some View {
         HStack(spacing: 8) {
-            archiveMetric("照片", "\(summaries.reduce(0) { $0 + $1.photos })", "photo.on.rectangle.angled", .goTeal)
-            archiveMetric("时刻", "\(summaries.reduce(0) { $0 + $1.milestones })", "sparkles", .goPrimary)
-            archiveMetric("证件", "\(summaries.reduce(0) { $0 + $1.documents })", "doc.fill", .goOrange)
+            archiveMetric(l.tr(zh: "照片", en: "Photos", de: "Fotos"), "\(summaries.reduce(0) { $0 + $1.photos })", "photo.on.rectangle.angled", .goTeal)
+            archiveMetric(l.tr(zh: "时刻", en: "Moments", de: "Momente"), "\(summaries.reduce(0) { $0 + $1.milestones })", "sparkles", .goPrimary)
+            archiveMetric(l.tr(zh: "证件", en: "Documents", de: "Dokumente"), "\(summaries.reduce(0) { $0 + $1.documents })", "doc.fill", .goOrange)
         }
     }
 
@@ -270,7 +277,7 @@ struct IslandRetentionDashboardContentView: View {
 
     private var archiveRows: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("成员成长档案")
+            Text(l.tr(zh: "成员成长档案", en: "Member growth archive", de: "Wachstumsarchiv der Mitglieder"))
                 .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
                 .foregroundStyle(.white) // ui-v4: allow pre-existing visual token debt surfaced by accessibility font migration; tracked by full-scope ratchet.
             ForEach(summaries) { summary in
@@ -296,7 +303,11 @@ struct IslandRetentionDashboardContentView: View {
                                 }
                             }
                             .frame(height: 7)
-                            Text("\(summary.photos) 张照片 · \(summary.milestones) 个时刻 · \(summary.unlocked)/\(summary.totalAchievements) 成就")
+                            Text(l.tr(
+                                zh: "\(summary.photos) 张照片 · \(summary.milestones) 个时刻 · \(summary.unlocked)/\(summary.totalAchievements) 成就",
+                                en: "\(summary.photos) photos · \(summary.milestones) moments · \(summary.unlocked)/\(summary.totalAchievements) achievements",
+                                de: "\(summary.photos) Fotos · \(summary.milestones) Momente · \(summary.unlocked)/\(summary.totalAchievements) Erfolge"
+                            ))
                                 .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded))
                                 .foregroundStyle(.white.opacity(0.46)) // ui-v4: allow pre-existing visual token debt surfaced by accessibility font migration; tracked by full-scope ratchet.
                                 .lineLimit(1)

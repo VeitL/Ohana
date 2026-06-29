@@ -251,6 +251,7 @@ struct QuickHumanMedicationSheet: View {
                 Text(l.tr(zh: "添加药物", en: "Add Medication", de: "Medikament hinzufügen"))
                     .font(OhanaFont.title3(.black))
                     .foregroundStyle(Color.ohanaPrimaryText)
+                    .accessibilityIdentifier("quick-human-medication-sheet")
                 Text(human.name)
                     .font(OhanaFont.caption(.semibold))
                     .foregroundStyle(Color.ohanaSecondaryText)
@@ -275,10 +276,11 @@ struct QuickHumanMedicationSheet: View {
                 .padding(.horizontal, 16)
                 .frame(height: 52)
                 .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous))
+                .accessibilityIdentifier("quick-human-medication-name-input")
 
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
-                    ForEach(HumanMedicationQuickCatalog.names(for: appCountry), id: \.self) { option in
+                    ForEach(Array(HumanMedicationQuickCatalog.names(for: appCountry).enumerated()), id: \.element) { index, option in
                         Button {
                             withAnimation(GoMotion.feedback) { medicationName = option }
                         } label: {
@@ -290,6 +292,7 @@ struct QuickHumanMedicationSheet: View {
                                 .background(medicationName == option ? Color.goPrimary : Color.ohanaCardSurface, in: Capsule())
                         }
                         .buttonStyle(ScaleButtonStyle())
+                        .accessibilityIdentifier("quick-human-medication-preset-\(index)")
                     }
                 }
             }
@@ -441,6 +444,7 @@ struct QuickHumanMedicationSheet: View {
         }
         .buttonStyle(ScaleButtonStyle())
         .disabled(!canSave || isSaving)
+        .accessibilityIdentifier("quick-human-medication-save-action")
         .padding(.horizontal, 22)
         .padding(.top, 10)
         .padding(.bottom, 16)

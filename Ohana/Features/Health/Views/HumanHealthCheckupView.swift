@@ -52,6 +52,10 @@ struct HumanHealthCheckupView: View {
         }
     }
 
+    private var starterMetric: HealthMetric? {
+        HealthMetricCatalog.metric(forKey: "tsh") ?? HealthMetricCatalog.all.first
+    }
+
     var body: some View {
         ZStack(alignment: .bottom) {
             OhanaAppBackground()
@@ -151,23 +155,50 @@ struct HumanHealthCheckupView: View {
     }
 
     private var trackedChartEmptyState: some View {
-        HStack(spacing: 12) {
-            Image(systemName: "chart.line.uptrend.xyaxis").accessibilityHidden(true)
-                .font(OhanaFont.adaptive(size: 18, weight: .black))
-                .foregroundStyle(Color.goOrange)
-                .frame(width: 42, height: 42) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
-                .background(Color.goOrange.opacity(0.14), in: Circle())
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 12) {
+                Image(systemName: "chart.line.uptrend.xyaxis").accessibilityHidden(true)
+                    .font(OhanaFont.adaptive(size: 18, weight: .black))
+                    .foregroundStyle(Color.goOrange)
+                    .frame(width: 42, height: 42) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
+                    .background(Color.goOrange.opacity(0.14), in: Circle())
 
-            VStack(alignment: .leading, spacing: 3) {
-                Text(l.tr(zh: "录入任意指标后会生成追踪图", en: "Charts appear after you log a metric.", de: "Diagramme erscheinen nach dem ersten Wert."))
-                    .font(OhanaFont.callout(.black))
-                    .foregroundStyle(Color.ohanaPrimaryText)
-                Text(l.tr(zh: "从下方分类选择指标开始。", en: "Pick a metric from the catalog below.", de: "Wähle unten einen Wert aus dem Katalog."))
-                    .font(OhanaFont.caption(.semibold))
-                    .foregroundStyle(Color.ohanaSecondaryText)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(l.tr(zh: "录入任意指标后会生成追踪图", en: "Charts appear after you log a metric.", de: "Diagramme erscheinen nach dem ersten Wert."))
+                        .font(OhanaFont.callout(.black))
+                        .foregroundStyle(Color.ohanaPrimaryText)
+                    Text(l.tr(zh: "从下方分类选择指标开始。", en: "Pick a metric from the catalog below.", de: "Wähle unten einen Wert aus dem Katalog."))
+                        .font(OhanaFont.caption(.semibold))
+                        .foregroundStyle(Color.ohanaSecondaryText)
+                }
+
+                Spacer(minLength: 0)
             }
 
-            Spacer(minLength: 0)
+            if let starterMetric {
+                Button {
+                    withAnimation(GoMotion.feedback) {
+                        recordingMetric = starterMetric
+                    }
+                    UISelectionFeedbackGenerator().selectionChanged()
+                } label: {
+                    Label(
+                        l.tr(
+                            zh: "记录 \(starterMetric.displayName(l))",
+                            en: "Record \(starterMetric.displayName(l))",
+                            de: "\(starterMetric.displayName(l)) erfassen"
+                        ),
+                        systemImage: "plus.circle.fill"
+                    )
+                    .font(OhanaFont.caption(.black))
+                    .foregroundStyle(Color.arkInk)
+                    .padding(.horizontal, 12)
+                    .frame(height: 36)
+                    .background(Color.goOrange, in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
+                }
+                .buttonStyle(ScaleButtonStyle())
+                .accessibilityIdentifier("human-health-metric-starter-record-action")
+            }
         }
         .padding(14)
         .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
@@ -389,11 +420,14 @@ struct HumanHealthCheckupView: View {
                 .frame(minHeight: 64)
             }
             .buttonStyle(ScaleButtonStyle())
+            .frame(maxWidth: .infinity, minHeight: 64, alignment: .leading)
+            .contentShape(Rectangle())
             .accessibilityLabel(l.tr(
                 zh: "记录 \(metric.displayName(l))",
                 en: "Record \(metric.displayName(l))",
                 de: "\(metric.displayName(l)) erfassen"
             ))
+            .accessibilityIdentifier("human-health-metric-record-\(metric.key)")
 
             Button {
                 detailMetric = metric
@@ -411,6 +445,7 @@ struct HumanHealthCheckupView: View {
                 en: "View \(metric.displayName(l)) trend",
                 de: "Verlauf von \(metric.displayName(l)) anzeigen"
             ))
+            .accessibilityIdentifier("human-health-metric-trend-\(metric.key)")
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 12)

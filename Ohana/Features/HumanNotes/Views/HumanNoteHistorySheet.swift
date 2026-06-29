@@ -226,6 +226,7 @@ struct HumanNoteHistorySheet: View {
         ) {
             showAddSheet = true
         }
+        .accessibilityIdentifier("human-note-add-action")
     }
 
     private var privacyLockedView: some View {

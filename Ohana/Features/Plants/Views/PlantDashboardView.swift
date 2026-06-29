@@ -113,8 +113,11 @@ struct PlantDashboardView: View {
             }
         }
         .sheet(isPresented: $showingAddPlant) {
-            AddPlantDataContainer {}
+            AddPlantDataContainer {
+                showingAddPlant = false
+            }
         }
+        .accessibilityIdentifier("plant-dashboard-screen")
         .onDisappear {
             commandQueue.cancelAll()
         }
@@ -151,6 +154,7 @@ struct PlantDashboardView: View {
                     .padding(.horizontal, 14)
                     .padding(.vertical, 8)
                     .background(Color.goLime, in: Capsule())
+                    .accessibilityIdentifier("plant-dashboard-complete-all-due")
 
                     Button(l.tr(zh: "全部延后一天", en: "Defer all one day", de: "Alle um einen Tag verschieben")) {
                         deferDueTasksOneDay()
@@ -160,6 +164,7 @@ struct PlantDashboardView: View {
                     .padding(.horizontal, 14)
                     .padding(.vertical, 8)
                     .background(Color.ohanaControlFill.opacity(0.72), in: Capsule())
+                    .accessibilityIdentifier("plant-dashboard-defer-all-due")
                 }
             }
         }
@@ -292,6 +297,7 @@ struct PlantDashboardView: View {
                 .background(Color.goPrimary, in: Capsule())
             }
             .buttonStyle(ScaleButtonStyle())
+            .accessibilityIdentifier("plant-dashboard-empty-add-action")
 
             Spacer()
         }
@@ -437,6 +443,7 @@ struct PlantDashboardView: View {
             .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
         }
         .buttonStyle(ScaleButtonStyle())
+        .accessibilityIdentifier("plant-dashboard-card-\(plant.name)")
     }
 
     @ViewBuilder
@@ -505,6 +512,7 @@ struct PlantDashboardView: View {
             .background(Color.ohanaCardSurface.opacity(0.5), in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
         }
         .buttonStyle(ScaleButtonStyle())
+        .accessibilityIdentifier("plant-dashboard-grid-add-action")
     }
 
     // MARK: - Actions

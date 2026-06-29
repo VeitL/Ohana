@@ -18,6 +18,175 @@ extension TodayFocusCard {
         }
     }
 
+    func carouselCardContent(_ content: TodayFocusContent, selected: Int, count: Int) -> some View {
+        let shape = RoundedRectangle(cornerRadius: TodayFocusCardLayout.carouselCornerRadius, style: .continuous)
+        return ZStack(alignment: .topTrailing) {
+            VStack(alignment: .leading, spacing: 0) {
+                HStack(alignment: .firstTextBaseline, spacing: 7) {
+                    Text(carouselTitle(for: content))
+                        .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
+                        .foregroundStyle(Color.arkInk.opacity(0.92))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.82)
+
+                    Image(systemName: "chevron.right") // a11y: allow decorative chevron; card label carries the action
+                        .font(OhanaFont.adaptive(size: 13, weight: .black))
+                        .foregroundStyle(Color.arkInk.opacity(0.88))
+                        .accessibilityHidden(true)
+
+                    Spacer(minLength: 26)
+                }
+
+                Text(carouselSubtitle(for: content))
+                    .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
+                    .foregroundStyle(Color.arkInk.opacity(0.48))
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.top, 7)
+
+                Spacer(minLength: 0)
+
+                carouselPageIndicator(count: count, selected: selected)
+                    .padding(.bottom, 2)
+            }
+            .padding(.leading, 18)
+            .padding(.trailing, 38)
+            .padding(.top, 16)
+            .padding(.bottom, 10)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+            .background {
+                carouselBackground(shape: shape)
+            }
+            .overlay {
+                shape.strokeBorder(Color.arkInk.opacity(0.06), lineWidth: 1)
+            }
+            .clipShape(shape)
+            .shadow( // ui-v4: allow reference-matched floating Today Focus banner shadow
+                color: Color.arkInk.opacity(0.12),
+                radius: 18,
+                x: 0,
+                y: 10
+            )
+            .contentShape(shape)
+            .onTapGesture {
+                activateCarouselContent(content)
+            }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("\(carouselTitle(for: content)). \(carouselSubtitle(for: content))")
+            .accessibilityAddTraits(.isButton)
+
+            if canDismissFocusContent(content) {
+                Button {
+                    dismissFocusContent(content)
+                } label: {
+                    Image(systemName: "xmark") // a11y: allow decorative close glyph; button label is set below
+                        .font(OhanaFont.adaptive(size: 13, weight: .black))
+                        .foregroundStyle(Color.arkInk.opacity(0.20))
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
+                        .accessibilityHidden(true)
+                }
+                .buttonStyle(ScaleButtonStyle())
+                .accessibilityLabel(l.tr(zh: "收起这张卡片", en: "Dismiss this card", de: "Diese Karte ausblenden"))
+                .padding(.top, 8)
+                .padding(.trailing, 10)
+            }
+        }
+    }
+
+    @ViewBuilder
+    func carouselBackground(shape: RoundedRectangle) -> some View {
+        if #available(iOS 26.0, *) {
+            shape
+                .fill(Color.ohanaCardSurface.opacity(0.46))
+                .glassEffect(.regular.interactive(false), in: shape) // ui-v4: allow reference-matched translucent Today Focus banner
+                .overlay {
+                    shape.fill(Color.goCardWhite.opacity(0.32))
+                }
+        } else {
+            shape
+                .fill(.regularMaterial) // ui-v4: allow pre-iOS-26 translucent Today Focus banner fallback
+                .overlay {
+                    shape.fill(Color.goCardWhite.opacity(0.28))
+                }
+        }
+    }
+
+    func carouselTitle(for content: TodayFocusContent) -> String {
+        switch content {
+        case let .quest(quest):
+            quest.title
+        case let .familyTask(task):
+            task.status == .pendingReview
+                ? l.tr(zh: "确认协作任务", en: "Review shared task", de: "Aufgabe prüfen")
+                : task.title
+        case .coconutExchange:
+            l.tr(zh: "确认线下收款", en: "Confirm cash received", de: "Zahlung bestätigen")
+        case let .negative(signal):
+            signal.title
+        case .celebrate:
+            hasNoHiddenFocusCards
+                ? l.tr(zh: "今日清空", en: "All clear", de: "Alles klar")
+                : l.tr(zh: "已收起项目", en: "Hidden today", de: "Heute ausgeblendet")
+        case .welcome:
+            l.tr(zh: "添加第一只宠物", en: "Add your first pet", de: "Erstes Haustier hinzufügen")
+        }
+    }
+
+    func carouselSubtitle(for content: TodayFocusContent) -> String {
+        switch content {
+        case let .quest(quest):
+            if !quest.subtitle.isEmpty {
+                return quest.subtitle
+            }
+            if let name = questTargetName(quest) {
+                return l.tr(
+                    zh: "\(name) 今天需要你看一下。",
+                    en: "\(name) needs a quick check today.",
+                    de: "\(name) braucht heute einen kurzen Check."
+                )
+            }
+            return l.tr(zh: "完成今天最重要的一件事。", en: "Take care of the most important thing today.", de: "Erledige heute das Wichtigste.")
+        case let .familyTask(task):
+            let rewardText = task.rewardCoconuts > 0 ? " · +\(task.rewardCoconuts)" : ""
+            let performer = task.completedByName ?? l.tr(zh: "对方", en: "Someone", de: "Jemand")
+            return taskStatusLine(task, performer: performer, rewardText: rewardText)
+        case let .coconutExchange(request):
+            let amount = CoconutExchangeOption.format(request.localAmount, currencyCode: request.currencyCode)
+            return "\(request.senderName) → \(amount) · \(request.coconutCost)"
+        case let .negative(signal):
+            return signal.detail.isEmpty ? negativeStatusText(for: signal) : signal.detail
+        case .celebrate:
+            return hasNoHiddenFocusCards
+                ? l.tr(zh: "今天的重点都处理完了。", en: "Today's focus is handled.", de: "Der Fokus für heute ist erledigt.")
+                : l.tr(zh: "点这里恢复今天收起的项目。", en: "Tap to restore hidden items for today.", de: "Tippen, um ausgeblendete Punkte wiederherzustellen.")
+        case .welcome:
+            return l.tr(zh: "先让伙伴住进岛屿。", en: "Bring a companion home first.", de: "Hol zuerst einen Begleiter nach Hause.")
+        }
+    }
+
+    func activateCarouselContent(_ content: TodayFocusContent) {
+        OhanaFeedback.light()
+        switch content {
+        case let .quest(quest):
+            onOpenQuest(quest)
+        case let .familyTask(task):
+            onTapFamilyTask(task)
+        case let .coconutExchange(request):
+            onOpenExchange(request)
+        case let .negative(signal):
+            onTapNegativeSignal(signal)
+        case .celebrate:
+            if hasNoHiddenFocusCards {
+                onTapOasis()
+            } else {
+                restoreSkippedFocusCards()
+            }
+        case .welcome:
+            onTapOasis()
+        }
+    }
+
     // MARK: - Quest card
 
     func questCard(_ q: IslandQuest) -> some View {
@@ -564,6 +733,34 @@ extension TodayFocusCard {
             en: "Today Focus \(min(selected + 1, count)) of \(count)",
             de: "Today Focus \(min(selected + 1, count)) von \(count)"
         ))
+    }
+
+    func carouselPageIndicator(count: Int, selected: Int) -> some View {
+        let visibleCount = min(max(count, 1), 5)
+        let selectedDot = carouselVisibleDotIndex(selected: selected, count: count, visibleCount: visibleCount)
+        return HStack(spacing: 5) {
+            ForEach(0 ..< visibleCount, id: \.self) { idx in
+                Capsule()
+                    .fill(idx == selectedDot ? Color.arkInk.opacity(0.48) : Color.arkInk.opacity(0.14))
+                    .frame(width: idx == selectedDot ? 9 : 4, height: 3)
+                    .animation(GoMotion.feedback, value: selectedDot)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityLabel(l.tr(
+            zh: "今日重点 \(min(selected + 1, count)) / \(count)",
+            en: "Today Focus \(min(selected + 1, count)) of \(count)",
+            de: "Today Focus \(min(selected + 1, count)) von \(count)"
+        ))
+    }
+
+    func carouselVisibleDotIndex(selected: Int, count: Int, visibleCount: Int) -> Int {
+        guard count > 1, visibleCount > 1 else { return 0 }
+        if count <= visibleCount {
+            return min(max(selected, 0), visibleCount - 1)
+        }
+        let ratio = Double(min(max(selected, 0), count - 1)) / Double(count - 1)
+        return min(max(Int((ratio * Double(visibleCount - 1)).rounded()), 0), visibleCount - 1)
     }
 
     func indexedStatus(current: Int?, total: Int, zh: String, en: String, de: String) -> String {

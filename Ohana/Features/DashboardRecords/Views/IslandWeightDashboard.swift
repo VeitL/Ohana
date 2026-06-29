@@ -83,6 +83,7 @@ struct IslandWeightDashboardContentView: View {
     @Environment(\.colorScheme) private var colorScheme
     @Environment(AppServices.self) private var appServices
     @AppStorage("currentActiveHumanId") private var activeHumanIdStr = ""
+    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
 
     @State private var vm = IslandUnifiedStatsViewModel()
     @State private var weightTimeRange: WeightTimeFilter = .days30
@@ -94,7 +95,7 @@ struct IslandWeightDashboardContentView: View {
         case days7 = "7"
         case days30 = "30"
         case days90 = "90"
-        case all = "全部"
+        case all
         var id: String { rawValue }
 
         var dayCount: Int? {
@@ -110,6 +111,7 @@ struct IslandWeightDashboardContentView: View {
     private let humanColor = Color.goPrimary
     /// 无法匹配到宠物档案时的折线色（重名/数据残留等）
     private let petColorFallback = Color(hex: "80FFEA")
+    private var l: L10n { L10n(appLanguage) }
 
     private func color(forSeriesID seriesID: String, isHuman: Bool) -> Color {
         if seriesID.hasPrefix("human:"),
@@ -183,12 +185,23 @@ struct IslandWeightDashboardContentView: View {
     // 轻量趣味类比
     private var weightComparison: String {
         let kg = totalIslandWeightKg
-        if kg <= 0 { return "等待第一条体重" }
-        else if kg < 10 { return "≈ \(max(1, Int(kg / 0.5))) 只兔子" }
-        else if kg < 50 { return "≈ \(max(1, Int(kg / 10))) 只大型犬" }
-        else if kg < 120 { return "≈ \(String(format: "%.1f", kg / 70)) 个成年人" }
-        else if kg < 300 { return "≈ \(max(1, Int(kg / 136))) 只大猩猩" }
-        else { return "≈ 半头大象" }
+        if kg <= 0 {
+            return l.tr(zh: "等待第一条体重", en: "Waiting for the first weight record", de: "Wartet auf den ersten Gewichtseintrag")
+        } else if kg < 10 {
+            let count = max(1, Int(kg / 0.5))
+            return l.tr(zh: "≈ \(count) 只兔子", en: "≈ \(count) rabbits", de: "≈ \(count) Kaninchen")
+        } else if kg < 50 {
+            let count = max(1, Int(kg / 10))
+            return l.tr(zh: "≈ \(count) 只大型犬", en: "≈ \(count) large dogs", de: "≈ \(count) grosse Hunde")
+        } else if kg < 120 {
+            let count = String(format: "%.1f", kg / 70)
+            return l.tr(zh: "≈ \(count) 个成年人", en: "≈ \(count) adults", de: "≈ \(count) Erwachsene")
+        } else if kg < 300 {
+            let count = max(1, Int(kg / 136))
+            return l.tr(zh: "≈ \(count) 只大猩猩", en: "≈ \(count) gorillas", de: "≈ \(count) Gorillas")
+        } else {
+            return l.tr(zh: "≈ 半头大象", en: "≈ half an elephant", de: "≈ ein halber Elefant")
+        }
     }
 
     var body: some View {
@@ -271,7 +284,7 @@ struct IslandWeightDashboardContentView: View {
             }
             .buttonStyle(ScaleButtonStyle())
             Spacer()
-            Text("体重星球")
+            Text(l.tr(zh: "体重星球", en: "Weight Planet", de: "Gewichtsplanet"))
                 .font(OhanaFont.adaptive(size: 18, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(primaryText)
             Spacer()
@@ -285,7 +298,7 @@ struct IslandWeightDashboardContentView: View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
                 weightEntityChip(
-                    title: "全部",
+                    title: l.tr(zh: "全部", en: "All", de: "Alle"),
                     icon: "sparkles",
                     tint: Color.goLime,
                     isSelected: selectedSeriesID == nil
@@ -331,7 +344,7 @@ struct IslandWeightDashboardContentView: View {
                     .frame(width: 26, height: 26) // a11y: allow decorative non-interactive frame; hit area handled by parent
                     .background(Color.goYellow.opacity(0.16), in: Circle())
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("包含仅自己可见的体重数据")
+                    Text(l.tr(zh: "包含仅自己可见的体重数据", en: "Includes private weight data", de: "Enthält private Gewichtsdaten"))
                         .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(primaryText)
                     Text(privateWeightNoticeText)
@@ -355,8 +368,8 @@ struct IslandWeightDashboardContentView: View {
     }
 
     private var privateWeightNoticeText: String {
-        let names = privateVisibleWeightHumans.map(\.name).joined(separator: "、")
-        return "\(names) 的体重只会在本人账户下显示，其他成员看不到。"
+        let names = privateVisibleWeightHumans.map(\.name).joined(separator: l.tr(zh: "、", en: ", ", de: ", "))
+        return l.tr(zh: "\(names) 的体重只会在本人账户下显示，其他成员看不到。", en: "\(names)'s weight only appears in their own account. Other members cannot see it.", de: "Das Gewicht von \(names) erscheint nur im eigenen Konto. Andere Mitglieder sehen es nicht.")
     }
 
     private func weightEntityChip(
@@ -422,7 +435,7 @@ struct IslandWeightDashboardContentView: View {
                             .frame(width: 34, height: 34) // a11y: allow decorative non-interactive frame; hit area handled by parent
                             .background(chartAccentColor, in: Circle())
 
-                        Text(selectedSeriesID == nil ? "体重星球" : selectedEntityName)
+                        Text(selectedSeriesID == nil ? l.tr(zh: "体重星球", en: "Weight Planet", de: "Gewichtsplanet") : selectedEntityName)
                             .font(OhanaFont.adaptive(size: 20, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(primaryText)
                     }
@@ -471,7 +484,7 @@ struct IslandWeightDashboardContentView: View {
             HStack(spacing: 7) {
                 Image(systemName: selectedWeightEntryRoute == nil ? "person.crop.circle.badge.plus" : "plus")
                     .font(OhanaFont.adaptive(size: 13, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                Text(selectedWeightEntryRoute == nil ? "选成员" : "记录")
+                Text(selectedWeightEntryRoute == nil ? l.tr(zh: "选成员", en: "Choose", de: "Wählen") : l.tr(zh: "记录", en: "Record", de: "Eintragen"))
                     .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
             }
             .foregroundStyle(Color.arkInk)
@@ -501,8 +514,8 @@ struct IslandWeightDashboardContentView: View {
     }
 
     private func deltaText(for delta: Double?) -> String {
-        guard let delta else { return "新数据" }
-        if abs(delta) < 0.05 { return "稳定" }
+        guard let delta else { return l.tr(zh: "新数据", en: "New data", de: "Neue Daten") }
+        if abs(delta) < 0.05 { return l.tr(zh: "稳定", en: "Stable", de: "Stabil") }
         return "\(delta >= 0 ? "+" : "")\(String(format: "%.1f", delta))kg"
     }
 
@@ -523,10 +536,10 @@ struct IslandWeightDashboardContentView: View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(alignment: .center, spacing: 12) {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(selectedSeriesID == nil ? "全岛总质量趋势" : "体重趋势")
+                    Text(selectedSeriesID == nil ? l.tr(zh: "全岛总质量趋势", en: "Total Weight Trend", de: "Gesamtgewichtstrend") : l.tr(zh: "体重趋势", en: "Weight Trend", de: "Gewichtstrend"))
                         .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(primaryText)
-                    Text(weightTimeRange == .all ? "全部记录" : "近 \(weightTimeRange.rawValue) 天")
+                    Text(weightTimeRange == .all ? l.tr(zh: "全部记录", en: "All records", de: "Alle Einträge") : l.tr(zh: "近 \(weightTimeRange.rawValue) 天", en: "Last \(weightTimeRange.rawValue) days", de: "Letzte \(weightTimeRange.rawValue) Tage"))
                         .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(secondaryText)
                 }
@@ -535,7 +548,7 @@ struct IslandWeightDashboardContentView: View {
             }
 
             if chartTrendPoints.isEmpty {
-                emptyState("记录体重后出现趋势")
+                emptyState(l.tr(zh: "记录体重后出现趋势", en: "Add weight records to show the trend", de: "Gewicht erfassen, um den Trend zu sehen"))
                     .frame(height: 188)
             } else {
                 weightTrendChart
@@ -555,7 +568,7 @@ struct IslandWeightDashboardContentView: View {
                     }
                     UISelectionFeedbackGenerator().selectionChanged()
                 } label: {
-                    Text(range.rawValue)
+                    Text(range.localizedTitle(l))
                         .font(OhanaFont.adaptive(size: 11, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(weightTimeRange == range ? Color.arkInk : primaryText)
                         .frame(minWidth: range == .all ? 42 : 30)
@@ -732,16 +745,16 @@ struct IslandWeightDashboardContentView: View {
     private var weightBadgeStrip: some View {
         HStack(spacing: 10) {
             rankingPill(
-                title: "增长",
+                title: l.tr(zh: "增长", en: "Gain", de: "Zunahme"),
                 ranking: vm.gainChampion,
                 accent: Color.goOrange,
-                fallback: "暂无"
+                fallback: l.tr(zh: "暂无", en: "None yet", de: "Noch keine")
             )
             rankingPill(
-                title: "下降",
+                title: l.tr(zh: "下降", en: "Loss", de: "Abnahme"),
                 ranking: vm.lossChampion,
                 accent: Color.goBlue,
-                fallback: "暂无"
+                fallback: l.tr(zh: "暂无", en: "None yet", de: "Noch keine")
             )
         }
     }
@@ -777,7 +790,7 @@ struct IslandWeightDashboardContentView: View {
     private var individualSparklineCard: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Label("成员", systemImage: "person.2.fill")
+                Label(l.tr(zh: "成员", en: "Members", de: "Mitglieder"), systemImage: "person.2.fill")
                     .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(primaryText)
                 Spacer()
@@ -789,7 +802,7 @@ struct IslandWeightDashboardContentView: View {
 
             let allEntries = buildSparklineEntries()
             if allEntries.isEmpty {
-                emptyState("还没有体重记录")
+                emptyState(l.tr(zh: "还没有体重记录", en: "No weight records yet", de: "Noch keine Gewichtseinträge"))
                     .frame(minHeight: 86)
                     .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous))
             } else {
@@ -941,7 +954,7 @@ struct IslandWeightDashboardContentView: View {
     }
 
     private var selectedEntityName: String {
-        guard let selectedSeriesID else { return "全部成员" }
+        guard let selectedSeriesID else { return l.tr(zh: "全部成员", en: "All members", de: "Alle Mitglieder") }
         if selectedSeriesID.hasPrefix("pet:"),
            let id = UUID(uuidString: String(selectedSeriesID.dropFirst(4))),
            let pet = pets.first(where: { $0.id == id }) {
@@ -952,13 +965,13 @@ struct IslandWeightDashboardContentView: View {
            let human = visibleWeightHumans.first(where: { $0.id == id }) {
             return human.name
         }
-        return "成员"
+        return l.tr(zh: "成员", en: "Member", de: "Mitglied")
     }
 
     private var selectedEntitySubtitle: String {
         guard let selectedSeriesID else { return weightComparison }
         let count = vm.weightAbsolutes.count(where: { $0.seriesID == selectedSeriesID })
-        return count == 0 ? "还没有体重记录" : "\(count) 条体重记录"
+        return count == 0 ? l.tr(zh: "还没有体重记录", en: "No weight records yet", de: "Noch keine Gewichtseinträge") : l.tr(zh: "\(count) 条体重记录", en: "\(count) weight records", de: "\(count) Gewichtseinträge")
     }
 
     private var selectedWeightEntryRoute: IslandWeightEntryRoute? {
@@ -1001,6 +1014,21 @@ struct IslandWeightDashboardContentView: View {
             fallbackScale: 0.42,
             backgroundOpacity: 0.24
         )
+    }
+}
+
+private extension IslandWeightDashboardContentView.WeightTimeFilter {
+    func localizedTitle(_ l: L10n) -> String {
+        switch self {
+        case .days7:
+            "7"
+        case .days30:
+            "30"
+        case .days90:
+            "90"
+        case .all:
+            l.tr(zh: "全部", en: "All", de: "Alle")
+        }
     }
 }
 

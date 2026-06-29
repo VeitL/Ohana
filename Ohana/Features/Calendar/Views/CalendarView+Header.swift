@@ -53,6 +53,7 @@ extension CalendarView {
             }
             .buttonStyle(ScaleButtonStyle())
             .accessibilityLabel(l.tr(zh: "添加事件", en: "Add event", de: "Ereignis hinzufügen"))
+            .accessibilityIdentifier("calendar-add-event-action")
         }
         .padding(.horizontal, 20)
         .padding(.top, 8)
@@ -96,6 +97,7 @@ extension CalendarView {
             }
             .buttonStyle(ScaleButtonStyle())
             .accessibilityLabel(l.tr(zh: "添加事件", en: "Add event", de: "Ereignis hinzufügen"))
+            .accessibilityIdentifier("calendar-add-event-action")
 
             // View toggle pill
             HStack(spacing: 2) {

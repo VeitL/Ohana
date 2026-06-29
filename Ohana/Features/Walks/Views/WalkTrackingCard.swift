@@ -121,11 +121,13 @@ struct WalkTrackingCard: View {
                     .opacity(summaryRotation < 90 ? 1 : 0)
                     .allowsHitTesting(!showSummaryBack)
 
-                walkSummaryBackFace
-                    .frame(width: proxy.size.width, height: proxy.size.height)
-                    .rotation3DEffect(.degrees(180), axis: (x: 0, y: 1, z: 0))
-                    .opacity(summaryRotation >= 90 ? 1 : 0)
-                    .allowsHitTesting(showSummaryBack)
+                if showSummaryBack || isClosingSummaryBack {
+                    walkSummaryBackFace
+                        .frame(width: proxy.size.width, height: proxy.size.height)
+                        .rotation3DEffect(.degrees(180), axis: (x: 0, y: 1, z: 0))
+                        .opacity(summaryRotation >= 90 ? 1 : 0)
+                        .allowsHitTesting(showSummaryBack)
+                }
             }
             .frame(width: proxy.size.width, height: proxy.size.height)
             .rotation3DEffect(.degrees(summaryRotation), axis: (x: 0, y: 1, z: 0), perspective: 0.75)

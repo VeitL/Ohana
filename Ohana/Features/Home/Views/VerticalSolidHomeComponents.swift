@@ -173,7 +173,7 @@ struct VerticalSolidHomeDashboardPage: View {
     var body: some View {
         GeometryReader { _ in
             ZStack(alignment: .top) {
-                if let firstPetEmptyState = snapshot.firstPetEmptyState {
+                if let firstPetEmptyState = snapshot.firstPetEmptyState, arrivingCardId == nil {
                     VerticalSolidHomeFirstPetEmptyStateView(
                         state: firstPetEmptyState,
                         onAddPet: onAddFirstPet
@@ -615,6 +615,7 @@ struct VerticalSolidHomePlantsPage: View {
                         title: l.tr(zh: "添加第一株植物", en: "Add first plant", de: "Erste Pflanze hinzufügen"),
                         action: onAddPlant
                     )
+                    .accessibilityIdentifier("home-plants-empty-add-action")
                     .padding(.top, 72)
                 } else {
                     ForEach(plants) { plant in
@@ -644,6 +645,7 @@ struct VerticalSolidHomePlantsPage: View {
                             .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous))
                         }
                         .buttonStyle(ScaleButtonStyle())
+                        .accessibilityIdentifier("home-plants-card-\(plant.name)")
                     }
                 }
                 Spacer(minLength: 20)
@@ -653,6 +655,7 @@ struct VerticalSolidHomePlantsPage: View {
             .padding(.bottom, 18)
         }
         .scrollBounceBehavior(.basedOnSize)
+        .accessibilityIdentifier("home-plants-page")
     }
 }
 

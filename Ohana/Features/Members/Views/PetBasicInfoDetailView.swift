@@ -90,6 +90,7 @@ struct PetBasicInfoDetailView: View {
                             .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(Color.goPrimary)
                     }
+                    .accessibilityIdentifier("pet-basic-info-save-action")
                 } else if !pet.hasPassedAway {
                     Button {
                         loadEditState()
@@ -100,11 +101,14 @@ struct PetBasicInfoDetailView: View {
                             .symbolRenderingMode(.hierarchical)
                             .foregroundStyle(Color.goPrimary)
                     }
+                    .accessibilityLabel("编辑宠物资料")
+                    .accessibilityIdentifier("pet-basic-info-edit-action")
                 }
             }
             if isEditing {
                 ToolbarItem(placement: .topBarLeading) {
                     Button("取消") { withAnimation { isEditing = false } }
+                        .accessibilityIdentifier("pet-basic-info-cancel-edit-action")
                 }
             }
         }

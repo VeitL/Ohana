@@ -75,6 +75,7 @@ extension PetBasicInfoDetailView {
                         .font(OhanaFont.adaptive(size: 14, weight: .medium)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.ohanaPrimaryText.opacity(0.7))
                         .frame(maxWidth: .infinity, alignment: .leading)
+                        .accessibilityIdentifier("pet-basic-info-notes-readback")
                 }
             }
 

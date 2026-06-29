@@ -17,6 +17,7 @@ struct FocusHomeHeaderView: View {
     let activeHumanDisplayName: String
     let activeHumanAvatarImage: UIImage?
     let activeHumanAvatarEmoji: String?
+    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
 
     let onStreak: () -> Void
     let onCoconut: () -> Void
@@ -59,6 +60,8 @@ struct FocusHomeHeaderView: View {
         self.onSettings = onSettings
     }
 
+    private var l: L10n { L10n(appLanguage) }
+
     var body: some View {
         HStack(alignment: .center, spacing: 0) {
             HStack(spacing: 8) {
@@ -74,7 +77,7 @@ struct FocusHomeHeaderView: View {
                     }
                 }
                 .buttonStyle(ScaleButtonStyle())
-                .accessibilityLabel("连续打卡 \(streak) 天")
+                .accessibilityLabel(l.tr(zh: "连续打卡 \(streak) 天", en: "\(streak)-day streak", de: "\(streak)-Tage-Serie"))
                 .accessibilityIdentifier("home-streak-action")
 
                 CoconutBalanceCapsule(
@@ -104,8 +107,8 @@ struct FocusHomeHeaderView: View {
                             onAccountSwitcher()
                         }
                 )
-                .accessibilityLabel("Ohana 成员")
-                .accessibilityHint("点击打开成员名册，长按切换人类账户")
+                .accessibilityLabel(l.tr(zh: "Ohana 成员", en: "Ohana members", de: "Ohana-Mitglieder"))
+                .accessibilityHint(l.tr(zh: "点击打开成员名册，长按切换人类账户", en: "Tap to open the roster. Long press to switch human account.", de: "Tippen öffnet die Mitgliederliste. Lange drücken wechselt das Menschenkonto."))
 
                 Button {
                     OhanaFeedback.light()
@@ -116,7 +119,7 @@ struct FocusHomeHeaderView: View {
                 .buttonStyle(ScaleButtonStyle())
                 .background(headerHitSlop)
                 .contentShape(Rectangle())
-                .accessibilityLabel("设置，当前用户 \(activeHumanDisplayName)")
+                .accessibilityLabel(l.tr(zh: "设置，当前用户 \(activeHumanDisplayName)", en: "Settings, current user \(activeHumanDisplayName)", de: "Einstellungen, aktueller Nutzer \(activeHumanDisplayName)"))
                 .accessibilityIdentifier("home-settings-action")
             }
         }

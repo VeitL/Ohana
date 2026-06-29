@@ -135,6 +135,7 @@ extension PetBasicInfoDetailView {
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .tint(Color.goOrange)
                     .lineLimit(3 ... 6)
+                    .accessibilityIdentifier("pet-basic-info-notes-input")
             }
         }
     }
@@ -145,7 +146,7 @@ extension PetBasicInfoDetailView {
             ZStack(alignment: .topTrailing) {
                 VStack(spacing: 10) {
                     profileAvatarImage(
-                        data: isEditing ? eAvatarImageData : pet.avatarImageData,
+                        data: isEditing ? eAvatarImageData : nil,
                         fallbackEmoji: pet.avatarEmoji,
                         accent: isEditing ? Color(hex: eThemeColorHex) : Color(hex: pet.safeThemeColorHex),
                         size: 84
@@ -156,6 +157,7 @@ extension PetBasicInfoDetailView {
                             .foregroundStyle(Color.ohanaPrimaryText)
                             .lineLimit(1)
                             .minimumScaleFactor(0.65)
+                            .accessibilityIdentifier("pet-basic-info-name-readback")
                         Text("\(isEditing ? eSpecies : pet.species) · \(isEditing ? (eBreed.isEmpty ? "未填写品种" : eBreed) : (pet.breed.isEmpty ? "未填写品种" : pet.breed))")
                             .font(OhanaFont.adaptive(size: 13, weight: .medium)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(Color.ohanaPrimaryText.opacity(0.5))
@@ -243,6 +245,23 @@ extension PetBasicInfoDetailView {
                 .foregroundStyle(Color.ohanaPrimaryText)
                 .tint(Color.goPrimary)
                 .multilineTextAlignment(.trailing)
+                .accessibilityIdentifier(editFieldIdentifier(for: label))
+        }
+    }
+
+    func editFieldIdentifier(for label: String) -> String {
+        switch label {
+        case "名字": "pet-basic-info-name-input"
+        case "芯片号": "pet-basic-info-microchip-input"
+        case "诊所名称": "pet-basic-info-vet-clinic-input"
+        case "主治医生": "pet-basic-info-vet-doctor-input"
+        case "联系电话": "pet-basic-info-vet-contact-input"
+        case "诊所地址": "pet-basic-info-vet-address-input"
+        case "过敏原": "pet-basic-info-allergies-input"
+        case "护照编号": "pet-basic-info-passport-input"
+        case "曾用名": "pet-basic-info-former-name-input"
+        case "血统信息": "pet-basic-info-lineage-input"
+        default: "pet-basic-info-field-\(label)"
         }
     }
 

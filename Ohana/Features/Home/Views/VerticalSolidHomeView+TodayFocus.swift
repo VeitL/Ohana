@@ -14,16 +14,17 @@ extension VerticalSolidHomeView {
 
     func handleNewHomeMemberSaved(id: UUID) {
         cancelGrowthOnboardingPrompt()
-        homeCardOrderRaw = FocusHomeCardDataSource.promotedOrderRaw(id: id, currentRaw: homeCardOrderRaw)
         arrivalClearTask?.cancel()
-        arrivalClearTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: newMemberArrivalStartDelayMilliseconds) {
-            guard arrivingHomeCardId != id else { return }
+        var transaction = Transaction(animation: nil)
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
             arrivingHomeCardId = id
-            arrivalClearTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: 1500) {
-                guard arrivingHomeCardId == id else { return }
-                arrivingHomeCardId = nil
-                arrivalClearTask = nil
-            }
+            homeCardOrderRaw = FocusHomeCardDataSource.promotedOrderRaw(id: id, currentRaw: homeCardOrderRaw)
+        }
+        arrivalClearTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: newMemberArrivalClearDelayMilliseconds) {
+            guard arrivingHomeCardId == id else { return }
+            arrivingHomeCardId = nil
+            arrivalClearTask = nil
         }
     }
 
@@ -35,8 +36,8 @@ extension VerticalSolidHomeView {
         onCreatedEntitySignalHandled(signal)
     }
 
-    var newMemberArrivalStartDelayMilliseconds: UInt64 {
-        AppWorkloadPolicy.shared.interactionMotionBudget(isVisible: true).allowsMotion ? 560 : 120
+    var newMemberArrivalClearDelayMilliseconds: UInt64 {
+        AppWorkloadPolicy.shared.interactionMotionBudget(isVisible: true).allowsMotion ? 1500 : 420
     }
 
     func clearArrivalState() {

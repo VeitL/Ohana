@@ -52,9 +52,13 @@ struct QuickWaterLedgerEntry: Identifiable, Hashable {
         legacyLogId != nil
     }
 
-    static func entries(from events: [CareLedgerEvent], petID: UUID) -> [QuickWaterLedgerEntry] {
+    static func entries(
+        from events: [CareLedgerEvent],
+        fallbackLogs: [PetCareLog] = [],
+        petID: UUID
+    ) -> [QuickWaterLedgerEntry] {
         let petKey = petID.uuidString
-        return events.compactMap { event in
+        var entries: [QuickWaterLedgerEntry] = events.compactMap { event in
             guard event.eventKindEnum == .care,
                   event.subjectKind == CareLedgerSubjectKind.pet.rawValue,
                   event.subjectId == petKey,
@@ -73,6 +77,20 @@ struct QuickWaterLedgerEntry: Identifiable, Hashable {
                 legacyLogId: legacyLogId
             )
         }
+        let knownLegacyIds = Set<UUID>(entries.compactMap(\.legacyLogId))
+        entries += fallbackLogs.compactMap { log -> QuickWaterLedgerEntry? in
+            guard !knownLegacyIds.contains(log.id),
+                  log.careType == .watering || log.careType == .waterChange || log.careType == .filterClean
+            else { return nil }
+            return QuickWaterLedgerEntry(
+                id: log.id,
+                date: log.date,
+                careType: log.careType,
+                amountMl: log.careType == .watering ? max(0, log.amountMl) : 0,
+                legacyLogId: log.id
+            )
+        }
+        return entries
         .sorted { $0.date > $1.date }
     }
 }
@@ -247,6 +265,8 @@ struct WaterCoreCard: View {
     var tapAction: (() -> Void)?
     var feedbackToken: CheckInFeedbackToken?
     var isWarning: Bool = false
+    var primaryIdentifier: String?
+    var secondaryIdentifier: String?
 
     @Environment(\.colorScheme) private var colorScheme
 
@@ -282,6 +302,7 @@ struct WaterCoreCard: View {
                         .background(cardTint, in: Capsule())
                     }
                     .buttonStyle(ScaleButtonStyle())
+                    .accessibilityIdentifier(primaryIdentifier ?? "")
 
                     if let secondaryTitle, let secondaryAction {
                         Button(action: secondaryAction) {
@@ -294,6 +315,7 @@ struct WaterCoreCard: View {
                                 .background(isWarning ? Color.goRed.opacity(0.16) : Color.ohanaCardSurfaceElevated, in: Capsule())
                         }
                         .buttonStyle(ScaleButtonStyle())
+                        .accessibilityIdentifier(secondaryIdentifier ?? "")
                     }
                 }
             }
@@ -513,6 +535,15 @@ struct WaterLogRow: View {
     var showDelete = true
     let onDelete: () -> Void
 
+    private var accessibilityTypeKey: String {
+        switch log.careType {
+        case .watering: "watering"
+        case .waterChange: "water-change"
+        case .filterClean: "filter-clean"
+        default: log.careType.rawValue
+        }
+    }
+
     var body: some View {
         HStack(spacing: 10) {
             Image(systemName: log.careType.systemIconName)
@@ -545,6 +576,7 @@ struct WaterLogRow: View {
             }
         }
         .padding(.vertical, 3)
+        .accessibilityIdentifier("quick-water-log-row-\(accessibilityTypeKey)-\(log.id.uuidString)")
     }
 }
 

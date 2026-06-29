@@ -12,9 +12,12 @@ struct HumanPrivacyTestView: View {
     let humans: [Human]
     @Environment(AppServices.self) private var appServices
     @AppStorage("currentActiveHumanId") private var activeHumanId = ""
+    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
 
     @State private var viewerId = ""
     @State private var targetId = ""
+
+    private var l: L10n { L10n(appLanguage) }
 
     private var viewer: Human? {
         humans.first { $0.id.uuidString == viewerId }
@@ -36,7 +39,7 @@ struct HumanPrivacyTestView: View {
                 .padding(16)
             }
         }
-        .navigationTitle("隐私测试")
+        .navigationTitle(l.tr(zh: "隐私测试", en: "Privacy test", de: "Datenschutztest"))
         .navigationBarTitleDisplayMode(.inline)
         .onAppear(perform: ensureSelection)
         .onChange(of: humans.map(\.id)) { _, _ in ensureSelection() }
@@ -51,10 +54,14 @@ struct HumanPrivacyTestView: View {
                     .frame(width: 38, height: 38) // a11y: allow decorative non-interactive frame; hit area handled by parent
                     .background(Color.goYellow.opacity(0.14), in: RoundedRectangle(cornerRadius: OhanaRadius.chip, style: .continuous))
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("人类隐私检查")
+                    Text(l.tr(zh: "人类隐私检查", en: "Human privacy check", de: "Menschen-Datenschutzcheck"))
                         .font(OhanaFont.title3(.black))
                         .foregroundStyle(Color.ohanaPrimaryText)
-                    Text("只显示可见/锁定结果，不展示任何私密内容")
+                    Text(l.tr(
+                        zh: "只显示可见/锁定结果，不展示任何私密内容",
+                        en: "Shows only visible/locked results, never private content.",
+                        de: "Zeigt nur sichtbar/gesperrt an, nie private Inhalte."
+                    ))
                         .font(OhanaFont.caption(.semibold))
                         .foregroundStyle(Color.ohanaSecondaryText)
                 }
@@ -66,8 +73,8 @@ struct HumanPrivacyTestView: View {
 
     private var pickerSection: some View {
         VStack(spacing: 12) {
-            pickerRow(title: "查看者", selection: $viewerId)
-            pickerRow(title: "目标成员", selection: $targetId)
+            pickerRow(title: l.tr(zh: "查看者", en: "Viewer", de: "Betrachter"), selection: $viewerId)
+            pickerRow(title: l.tr(zh: "目标成员", en: "Target member", de: "Zielmitglied"), selection: $targetId)
         }
         .padding(16)
         .goTranslucentCard(cornerRadius: OhanaRadius.input)
@@ -78,11 +85,11 @@ struct HumanPrivacyTestView: View {
         if let target {
             VStack(alignment: .leading, spacing: 12) {
                 HStack {
-                    Text("字段矩阵")
+                    Text(l.tr(zh: "字段矩阵", en: "Field matrix", de: "Feldmatrix"))
                         .font(OhanaFont.callout(.black))
                         .foregroundStyle(Color.ohanaPrimaryText)
                     Spacer()
-                    Text(viewer?.id == target.id ? "本人视角" : "他人视角")
+                    Text(viewer?.id == target.id ? l.tr(zh: "本人视角", en: "Own view", de: "Eigene Ansicht") : l.tr(zh: "他人视角", en: "Other viewer", de: "Andere Ansicht"))
                         .font(OhanaFont.caption2(.black))
                         .foregroundStyle(Color.arkInk)
                         .padding(.horizontal, 9)
@@ -90,11 +97,17 @@ struct HumanPrivacyTestView: View {
                         .background(Color.goPrimary, in: Capsule())
                 }
 
-                visibleRow(title: "基础身份", subtitle: "名字、头像、角色、性别入口", isLocked: false)
+                visibleRow(
+                    title: l.tr(zh: "基础身份", en: "Basic identity", de: "Basisidentitaet"),
+                    subtitle: l.tr(zh: "名字、头像、角色、性别入口", en: "Name, avatar, role, and gender entry", de: "Name, Avatar, Rolle und Geschlecht"),
+                    isLocked: false
+                )
                 ForEach(HumanPrivateField.allCases) { field in
                     visibleRow(
-                        title: field.title,
-                        subtitle: target.privateFields.contains(field.rawValue) ? "目标成员设为仅本人" : "目标成员设为公开",
+                        title: localizedPrivateFieldTitle(field),
+                        subtitle: target.privateFields.contains(field.rawValue)
+                            ? l.tr(zh: "目标成员设为仅本人", en: "Target member set this to private", de: "Zielmitglied hat dies privat gesetzt")
+                            : l.tr(zh: "目标成员设为公开", en: "Target member set this to public", de: "Zielmitglied hat dies oeffentlich gesetzt"),
                         isLocked: appServices.privacy.isLocked(field, for: target, viewedBy: viewer?.id)
                     )
                 }
@@ -102,7 +115,7 @@ struct HumanPrivacyTestView: View {
             .padding(16)
             .goTranslucentCard(cornerRadius: OhanaRadius.input)
         } else {
-            Text("请先创建人类成员")
+            Text(l.tr(zh: "请先创建人类成员", en: "Create a human member first", de: "Erstelle zuerst ein Menschenmitglied"))
                 .font(OhanaFont.callout(.bold))
                 .foregroundStyle(Color.ohanaSecondaryText)
                 .frame(maxWidth: .infinity)
@@ -143,7 +156,7 @@ struct HumanPrivacyTestView: View {
                     .foregroundStyle(Color.ohanaSecondaryText)
             }
             Spacer()
-            Text(isLocked ? "锁定" : "可见")
+            Text(isLocked ? l.tr(zh: "锁定", en: "Locked", de: "Gesperrt") : l.tr(zh: "可见", en: "Visible", de: "Sichtbar"))
                 .font(OhanaFont.caption2(.black))
                 .foregroundStyle(isLocked ? Color.goYellow : Color.arkInk)
                 .padding(.horizontal, 9)
@@ -165,6 +178,23 @@ struct HumanPrivacyTestView: View {
 
     private func displayName(_ human: Human) -> String {
         let name = human.name.trimmingCharacters(in: .whitespacesAndNewlines)
-        return name.isEmpty ? "未命名成员" : name
+        return name.isEmpty ? l.tr(zh: "未命名成员", en: "Unnamed member", de: "Unbenanntes Mitglied") : name
+    }
+
+    private func localizedPrivateFieldTitle(_ field: HumanPrivateField) -> String {
+        switch field {
+        case .weight:
+            l.tr(zh: "体重", en: "Weight", de: "Gewicht")
+        case .workout:
+            l.tr(zh: "运动", en: "Workouts", de: "Training")
+        case .medication:
+            l.tr(zh: "吃药提醒", en: "Medication", de: "Medikamente")
+        case .wishlist:
+            l.tr(zh: "椰子资产与心愿", en: "Coconut Assets & Wishes", de: "Kokosnussvermoegen & Wuensche")
+        case .expense:
+            l.tr(zh: "花费", en: "Expenses", de: "Ausgaben")
+        case .note:
+            l.tr(zh: "备注", en: "Notes", de: "Notizen")
+        }
     }
 }

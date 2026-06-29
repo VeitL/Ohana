@@ -210,7 +210,7 @@ struct HumanAllFeaturesSheet: View {
         if human.hasPassedAway {
             return l.tr(zh: "纪念模式 · 只读", en: "Memorial mode · read-only", de: "Gedenkmodus · nur Lesen")
         }
-        let role = human.roleText
+        let role = localizedRoleText(for: human.role)
         let age = localizedAgeText
         if age.isEmpty { return role }
         return "\(role) · \(age)"
@@ -345,7 +345,7 @@ struct HumanAllFeaturesSheet: View {
             item(
                 id: "basic",
                 title: l.tr(zh: "基本信息", en: "Profile", de: "Profil"),
-                value: human.roleText,
+                value: localizedRoleText(for: human.role),
                 subtitle: l.tr(zh: "身份、头像、隐私", en: "Identity, avatar, privacy", de: "Identität, Avatar, Datenschutz"),
                 icon: "person.crop.circle.fill",
                 tint: themeColor,
@@ -546,6 +546,15 @@ struct HumanAllFeaturesSheet: View {
         human.pinHash.isEmpty
             ? l.tr(zh: "未设置", en: "No PIN", de: "Keine PIN")
             : l.tr(zh: "已设置", en: "PIN on", de: "PIN aktiv")
+    }
+
+    private func localizedRoleText(for raw: String) -> String {
+        switch HumanProfileOptions.normalizedRole(raw) {
+        case "owner":
+            l.tr(zh: "管理者", en: "Owner", de: "Verwaltung")
+        default:
+            l.tr(zh: "成员", en: "Member", de: "Mitglied")
+        }
     }
 
     private var myMeds: [HumanMedication] {

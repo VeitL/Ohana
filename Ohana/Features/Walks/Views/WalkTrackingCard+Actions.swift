@@ -29,17 +29,18 @@ extension WalkTrackingCard {
                         .background(Color.goPrimary, in: Capsule())
                 }
                 .buttonStyle(ScaleButtonStyle())
+                .accessibilityIdentifier("walk-tracking-start-action")
 
             case .running:
-                circleButton(icon: "pause.fill", color: Color.goYellow) { mgr.pause() }
-                circleButton(icon: "stop.fill", color: Color.goRed) {
+                circleButton(icon: "pause.fill", color: Color.goYellow, accessibilityIdentifier: "walk-tracking-pause-action") { mgr.pause() }
+                circleButton(icon: "stop.fill", color: Color.goRed, accessibilityIdentifier: "walk-tracking-stop-action") {
                     finishWalkAndFlip()
                 }
                 poopButton
 
             case .paused:
-                circleButton(icon: "play.fill", color: Color.goTeal) { mgr.resume() }
-                circleButton(icon: "stop.fill", color: Color.goRed) {
+                circleButton(icon: "play.fill", color: Color.goTeal, accessibilityIdentifier: "walk-tracking-resume-action") { mgr.resume() }
+                circleButton(icon: "stop.fill", color: Color.goRed, accessibilityIdentifier: "walk-tracking-stop-action") {
                     finishWalkAndFlip()
                 }
                 poopButton
@@ -56,6 +57,7 @@ extension WalkTrackingCard {
                         .background(Color.goPrimary, in: Capsule())
                 }
                 .buttonStyle(ScaleButtonStyle())
+                .accessibilityIdentifier("walk-tracking-restart-action")
             }
         }
     }
@@ -162,7 +164,7 @@ extension WalkTrackingCard {
         return name.isEmpty ? L10n(appLanguage).tr(zh: "未命名成员", en: "Unnamed member", de: "Unbenannt") : name
     }
 
-    func circleButton(icon: String, color: Color, action: @escaping () -> Void) -> some View {
+    func circleButton(icon: String, color: Color, accessibilityIdentifier: String? = nil, action: @escaping () -> Void) -> some View {
         Button {
             action()
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
@@ -174,6 +176,7 @@ extension WalkTrackingCard {
                 .background(color, in: Circle())
         }
         .buttonStyle(ScaleButtonStyle())
+        .accessibilityIdentifier(accessibilityIdentifier ?? "")
     }
 
     var poopButton: some View {
@@ -189,6 +192,7 @@ extension WalkTrackingCard {
                     .frame(width: 34, height: 34) // a11y: allow decorative non-interactive frame; hit area handled by parent
                     .background(Color.ohanaCardSurface, in: Circle())
             }
+            .accessibilityIdentifier("walk-tracking-poop-action")
             if mgr.poopCount > 0 {
                 Text("\(mgr.poopCount)")
                     .font(OhanaFont.caption2(.bold))

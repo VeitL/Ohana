@@ -172,7 +172,10 @@ struct QuickWaterDetailRouteContainer: View {
                     onClose: onClose,
                     allEvents: routeData.allEvents,
                     allPets: routeData.allPets,
-                    waterEntries: routeData.waterEntries
+                    waterEntries: routeData.waterEntries,
+                    onRecordChanged: {
+                        scheduleRouteDataLoad(delayMilliseconds: 120, force: true)
+                    }
                 )
             } else if routeData.hasLoaded {
                 QuickCareMissingRouteEntityView(kind: "pet")
@@ -230,6 +233,9 @@ struct QuickPottyDetailRouteContainer: View {
                     pet: pet,
                     onRemove: onRemove,
                     onClose: onClose,
+                    onRecordChanged: {
+                        scheduleRouteDataLoad(delayMilliseconds: 120, force: true)
+                    },
                     allEvents: routeData.allEvents,
                     allPets: routeData.allPets,
                     pottyEntries: routeData.pottyEntries,
@@ -257,6 +263,10 @@ struct QuickPottyDetailRouteContainer: View {
 
     private func scheduleRouteDataLoad(delayMilliseconds: UInt64 = 120, force: Bool = false) {
         guard force || !routeData.hasLoaded else { return }
+        if force {
+            dataLoadTask?.cancel()
+            dataLoadTask = nil
+        }
         guard dataLoadTask == nil else { return }
         dataLoadTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: delayMilliseconds) {
             routeData = QuickPottyRouteData.load(id: id, from: modelContext)
@@ -438,6 +448,18 @@ private struct QuickWaterRouteData {
                 ),
                 context: context,
                 name: "CareLedgerEvent"
+            ), fallbackLogs: fetch(
+                FetchDescriptor<PetCareLog>(
+                    predicate: #Predicate<PetCareLog> { log in
+                        log.pet?.id == id &&
+                            (log.type == wateringType ||
+                                log.type == waterChangeType ||
+                                log.type == filterCleanType)
+                    },
+                    sortBy: [SortDescriptor(\.date, order: .reverse)]
+                ),
+                context: context,
+                name: "PetCareLog"
             ), petID: id),
             hasLoaded: true
         )
@@ -474,6 +496,15 @@ private struct QuickPottyRouteData {
                 ),
                 context: context,
                 name: "CareLedgerEvent"
+            ), fallbackLogs: fetch(
+                FetchDescriptor<PetPottyLog>(
+                    predicate: #Predicate<PetPottyLog> { log in
+                        log.pet?.id == id
+                    },
+                    sortBy: [SortDescriptor(\.date, order: .reverse)]
+                ),
+                context: context,
+                name: "PetPottyLog"
             ), petID: id),
             litterEntries: PoopLitterLedgerEntry.entries(from: fetch(
                 FetchDescriptor<CareLedgerEvent>(

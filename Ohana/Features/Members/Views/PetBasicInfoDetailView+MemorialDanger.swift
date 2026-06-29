@@ -27,6 +27,7 @@ extension PetBasicInfoDetailView {
                             Text("离世日期：\(d.formatted(.dateTime.year().month().day()))")
                                 .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                 .foregroundStyle(Color.ohanaPrimaryText.opacity(0.7))
+                                .accessibilityIdentifier("pet-memorial-passed-date")
                         }
                         Text("相伴 \(pet.daysTogetherAtPassing) 天 · \(pet.ageAtPassingText)")
                             .font(OhanaFont.adaptive(size: 11, weight: .medium, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
@@ -42,6 +43,7 @@ extension PetBasicInfoDetailView {
                             .overlay(Capsule().strokeBorder(Color.goYellow.opacity(0.3), lineWidth: 1))
                     }
                     .buttonStyle(ScaleButtonStyle())
+                    .accessibilityIdentifier("pet-memorial-undo-action")
                 }
                 .padding(14)
                 .background(Color.purple.opacity(0.08), in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
@@ -83,6 +85,7 @@ extension PetBasicInfoDetailView {
                         .strokeBorder(Color.purple.opacity(0.25), lineWidth: 1))
                 }
                 .buttonStyle(ScaleButtonStyle())
+                .accessibilityIdentifier("pet-memorial-mark-action")
             }
             .alert("确认标记离世", isPresented: $showingRainbowBridgeAlert) {
                 Button("确认", role: .destructive) {

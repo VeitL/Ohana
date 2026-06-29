@@ -86,16 +86,31 @@ struct CalendarPetChipFilterBar: View {
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
-                chipButton(label: "全部", systemImage: "square.grid.2x2.fill", isSelected: selectedPetId == nil && selectedHumanId == nil) {
+                chipButton(
+                    label: "全部",
+                    systemImage: "square.grid.2x2.fill",
+                    identifier: "calendar-filter-all",
+                    isSelected: selectedPetId == nil && selectedHumanId == nil
+                ) {
                     onSelect(.all)
                 }
                 ForEach(pets) { pet in
-                    chipButton(label: pet.name, systemImage: pet.speciesSilhouetteSymbol, isSelected: selectedPetId == pet.id.uuidString) {
+                    chipButton(
+                        label: pet.name,
+                        systemImage: pet.speciesSilhouetteSymbol,
+                        identifier: "calendar-filter-pet-\(pet.name)",
+                        isSelected: selectedPetId == pet.id.uuidString
+                    ) {
                         onSelect(.pet(pet.id.uuidString))
                     }
                 }
                 ForEach(humans) { human in
-                    chipButton(label: human.name, systemImage: "person.fill", isSelected: selectedHumanId == human.id.uuidString) {
+                    chipButton(
+                        label: human.name,
+                        systemImage: "person.fill",
+                        identifier: "calendar-filter-human-\(human.name)",
+                        isSelected: selectedHumanId == human.id.uuidString
+                    ) {
                         onSelect(.human(human.id.uuidString))
                     }
                 }
@@ -106,7 +121,13 @@ struct CalendarPetChipFilterBar: View {
         }
     }
 
-    private func chipButton(label: String, systemImage: String, isSelected: Bool, action: @escaping () -> Void) -> some View {
+    private func chipButton(
+        label: String,
+        systemImage: String,
+        identifier: String,
+        isSelected: Bool,
+        action: @escaping () -> Void
+    ) -> some View {
         Button(action: action) {
             HStack(spacing: 5) {
                 Image(systemName: systemImage)
@@ -121,6 +142,7 @@ struct CalendarPetChipFilterBar: View {
         }
         .buttonStyle(ScaleButtonStyle())
         .ohanaSelectionMotion(isSelected: isSelected, scale: 1.018)
+        .accessibilityIdentifier(identifier)
     }
 
     private func chipForeground(isSelected: Bool) -> Color {

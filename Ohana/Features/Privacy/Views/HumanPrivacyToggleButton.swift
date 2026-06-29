@@ -19,6 +19,7 @@ struct HumanPrivacyToggleButton: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(AppServices.self) private var appServices
     @AppStorage("currentActiveHumanId") private var activeHumanIdStr = ""
+    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
     @State private var optimisticIsPrivate: Bool?
     @StateObject private var commandQueue = DeferredDomainCommandQueue()
 
@@ -33,6 +34,8 @@ struct HumanPrivacyToggleButton: View {
     private var isOwner: Bool {
         UUID(uuidString: activeHumanIdStr) == human.id
     }
+
+    private var l: L10n { L10n(appLanguage) }
 
     var body: some View {
         Button {
@@ -66,7 +69,7 @@ struct HumanPrivacyToggleButton: View {
             .frame(width: 74, height: 44)
             .contentShape(Rectangle())
             .animation(GoMotion.feedback, value: displayIsPrivate)
-            .accessibilityLabel(displayIsPrivate ? "隐私已开启，仅本人可见" : "隐私已关闭，家庭成员可见")
+            .accessibilityLabel(displayIsPrivate ? l.tr(zh: "隐私已开启，仅本人可见", en: "Privacy on, only owner can view", de: "Privat, nur selbst sichtbar") : l.tr(zh: "隐私已关闭，家庭成员可见", en: "Privacy off, visible to family", de: "Offen, für Familie sichtbar"))
         }
         .buttonStyle(ScaleButtonStyle())
         .opacity(isOwner ? 1 : 0.5)
@@ -120,6 +123,7 @@ struct HumanPrivateDataNotice: View {
     let field: HumanPrivateField
 
     @AppStorage("currentActiveHumanId") private var activeHumanIdStr = ""
+    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
 
     private var isOwner: Bool {
         UUID(uuidString: activeHumanIdStr) == human.id
@@ -128,6 +132,8 @@ struct HumanPrivateDataNotice: View {
     private var isFieldPrivate: Bool {
         human.privateFields.contains(field.rawValue)
     }
+
+    private var l: L10n { L10n(appLanguage) }
 
     var body: some View {
         if isOwner, isFieldPrivate {
@@ -139,10 +145,10 @@ struct HumanPrivateDataNotice: View {
                     .background(Color.goYellow.opacity(0.16), in: Circle())
 
                 VStack(alignment: .leading, spacing: 3) {
-                    Text("只有你能看到")
+                    Text(l.tr(zh: "只有你能看到", en: "Only you can see this", de: "Nur du kannst das sehen"))
                         .font(OhanaFont.caption(.black))
                         .foregroundStyle(Color.ohanaPrimaryText)
-                    Text("\(field.title)数据已设为隐私，其他家庭成员不会看到这些内容。")
+                    Text(l.tr(zh: "\(field.localizedTitle(l))数据已设为隐私，其他家庭成员不会看到这些内容。", en: "\(field.localizedTitle(l)) is private. Other family members will not see it.", de: "\(field.localizedTitle(l)) ist privat. Andere Familienmitglieder sehen es nicht."))
                         .font(OhanaFont.caption2(.bold))
                         .foregroundStyle(Color.ohanaSecondaryText)
                         .fixedSize(horizontal: false, vertical: true)
@@ -156,6 +162,25 @@ struct HumanPrivateDataNotice: View {
                 RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous)
                     .strokeBorder(Color.goYellow.opacity(0.18), lineWidth: 1)
             )
+        }
+    }
+}
+
+private extension HumanPrivateField {
+    func localizedTitle(_ l: L10n) -> String {
+        switch self {
+        case .weight:
+            l.tr(zh: "体重", en: "Weight", de: "Gewicht")
+        case .workout:
+            l.tr(zh: "运动", en: "Workouts", de: "Training")
+        case .medication:
+            l.tr(zh: "吃药提醒", en: "Medication reminders", de: "Medikamentenerinnerungen")
+        case .wishlist:
+            l.tr(zh: "椰子资产与心愿", en: "Coconuts & wishes", de: "Kokosnüsse & Wünsche")
+        case .expense:
+            l.tr(zh: "花费", en: "Expenses", de: "Ausgaben")
+        case .note:
+            l.tr(zh: "备注", en: "Notes", de: "Notizen")
         }
     }
 }

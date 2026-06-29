@@ -7,7 +7,17 @@ import SwiftData
 import SwiftUI
 
 extension CalendarView {
+    @ViewBuilder
     var calendarContent: some View {
+        if hideToolbar {
+            calendarContentBody
+        } else {
+            calendarContentBody
+                .toolbar(.hidden, for: .navigationBar)
+        }
+    }
+
+    private var calendarContentBody: some View {
         ZStack(alignment: .top) {
             if !hideToolbar {
                 OhanaAppBackground()
@@ -57,7 +67,6 @@ extension CalendarView {
                 calStickyHeader
             }
         }
-        .toolbar(.hidden, for: .navigationBar)
         .overlay { inlineAddEventLayer }
         .onChange(of: addEventTrigger) { _, _ in requestAddEventPresentation() }
         .onChange(of: viewModeRaw) { _, newValue in

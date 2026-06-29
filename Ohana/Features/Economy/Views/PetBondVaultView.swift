@@ -77,6 +77,7 @@ struct PetBondVaultContentView: View {
             }
         }
         .petMemorialTone(isActive: pet.hasPassedAway)
+        .accessibilityIdentifier("pet-bond-vault-screen")
         .onAppear {
             unlockedIDs = PetBondVaultStore.unlockedIDs(for: pet.id)
         }
@@ -115,6 +116,7 @@ struct PetBondVaultContentView: View {
             }
             .buttonStyle(ScaleButtonStyle())
             .contentShape(Circle())
+            .accessibilityIdentifier("pet-bond-vault-close-action")
         }
     }
 
@@ -127,6 +129,7 @@ struct PetBondVaultContentView: View {
                     .font(OhanaFont.largeTitle(.black))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .contentTransition(.numericText())
+                    .accessibilityIdentifier("pet-bond-vault-balance")
                 Text(l.tr(zh: "成长椰子", en: "bond coconuts", de: "Bindungskokos"))
                     .font(OhanaFont.callout(.black))
                     .foregroundStyle(Color.ohanaSecondaryText)
@@ -207,6 +210,7 @@ struct PetBondVaultContentView: View {
                         .background(Color.ohanaControlFill, in: Capsule())
                 }
                 .buttonStyle(ScaleButtonStyle())
+                .accessibilityIdentifier("pet-bond-vault-preview-\(item.id)")
 
                 Button {
                     unlock(item)
@@ -217,15 +221,21 @@ struct PetBondVaultContentView: View {
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 9)
                         .background(canUnlock ? Color.goPrimary : Color.ohanaControlFill, in: Capsule())
+                        .accessibilityIdentifier("pet-bond-vault-unlock-label-\(item.id)")
                 }
                 .buttonStyle(ScaleButtonStyle())
                 .disabled(!canUnlock)
+                .accessibilityIdentifier("pet-bond-vault-unlock-\(item.id)")
+                .accessibilityLabel(actionTitle(for: item, unlocked: unlocked, balance: balance, isFrozen: petWalletFrozen))
+                .accessibilityValue(canUnlock ? "available" : "blocked")
             }
         }
         .frame(maxWidth: .infinity, minHeight: 258, alignment: .topLeading)
         .padding(14)
         .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous))
         .animation(GoMotion.feedback, value: unlockedIDs)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("pet-bond-vault-item-\(item.id)")
     }
 
     private var recentLogs: some View {
@@ -242,6 +252,7 @@ struct PetBondVaultContentView: View {
                     .padding(14)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
+                    .accessibilityIdentifier("pet-bond-vault-recent-empty")
             } else {
                 VStack(spacing: 8) {
                     ForEach(petLogs) { log in
@@ -263,6 +274,7 @@ struct PetBondVaultContentView: View {
                         }
                         .padding(12)
                         .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
+                        .accessibilityIdentifier("pet-bond-vault-recent-log")
                     }
                 }
             }

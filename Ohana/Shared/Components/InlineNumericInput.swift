@@ -25,6 +25,8 @@ struct InlineNumericInput: View {
     var verticalPadding: CGFloat = 10
     var usesMiniKeypad = true
     var inputAccessibilityIdentifier: String?
+    var decrementAccessibilityIdentifier: String?
+    var incrementAccessibilityIdentifier: String?
 
     @State private var showsKeypad = false
 
@@ -32,13 +34,21 @@ struct InlineNumericInput: View {
         VStack(spacing: 8) {
             HStack(spacing: 10) {
                 if step != nil {
-                    stepButton(systemName: "minus", deltaMultiplier: -1)
+                    stepButton(
+                        systemName: "minus",
+                        deltaMultiplier: -1,
+                        accessibilityIdentifier: decrementAccessibilityIdentifier
+                    )
                 }
 
                 numericEntryButton
 
                 if step != nil {
-                    stepButton(systemName: "plus", deltaMultiplier: 1)
+                    stepButton(
+                        systemName: "plus",
+                        deltaMultiplier: 1,
+                        accessibilityIdentifier: incrementAccessibilityIdentifier
+                    )
                 }
             }
             .padding(.horizontal, horizontalPadding)
@@ -96,8 +106,13 @@ struct InlineNumericInput: View {
         }
     }
 
-    private func stepButton(systemName: String, deltaMultiplier: Double) -> some View {
-        Button {
+    @ViewBuilder
+    private func stepButton(
+        systemName: String,
+        deltaMultiplier: Double,
+        accessibilityIdentifier: String?
+    ) -> some View {
+        let button = Button {
             guard let step else { return }
             let current = CountryDecimalInput.parse(text, countryCode: countryCode) ?? 0
             let next = max(minValue, current + step * deltaMultiplier)
@@ -114,5 +129,11 @@ struct InlineNumericInput: View {
                 .background(accent, in: Circle())
         }
         .buttonStyle(ScaleButtonStyle())
+
+        if let accessibilityIdentifier {
+            button.accessibilityIdentifier(accessibilityIdentifier)
+        } else {
+            button
+        }
     }
 }

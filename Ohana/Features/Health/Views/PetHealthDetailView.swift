@@ -670,6 +670,7 @@ struct PetHealthDetailContentView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(.hidden, for: .navigationBar)
         .toolbar(.hidden, for: .navigationBar)
+        .accessibilityIdentifier("pet-health-detail-screen")
         .overlay {
             if let dest = healthPlusDestination, dest.usesInlineRecordPopup {
                 healthRecordInlineOverlay(dest)

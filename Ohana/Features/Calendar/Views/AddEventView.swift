@@ -253,6 +253,7 @@ struct AddEventContentView: View {
                             titleFocused = false
                             GoKeyboard.dismiss()
                         }
+                        .accessibilityIdentifier("add-event-title-input")
 
                     if !title.isEmpty {
                         Button {
@@ -340,6 +341,7 @@ struct AddEventContentView: View {
                             imageData: pet.avatarImageData,
                             fallback: pet.avatarEmoji.isEmpty ? pet.speciesEmoji : pet.avatarEmoji,
                             tint: Color(hex: pet.safeThemeColorHex),
+                            identifier: "add-event-related-pet-\(pet.name)",
                             isSelected: relatedEntityId == pet.id.uuidString
                         ) {
                             relatedEntityType = EntityKind.pet.rawValue
@@ -353,6 +355,7 @@ struct AddEventContentView: View {
                             imageData: human.avatarImageData,
                             fallback: human.avatarEmoji.isEmpty ? "🙂" : human.avatarEmoji,
                             tint: Color(hex: human.safeThemeColorHex),
+                            identifier: "add-event-related-human-\(human.name)",
                             isSelected: relatedEntityId == human.id.uuidString
                         ) {
                             relatedEntityType = EntityKind.human.rawValue
@@ -442,6 +445,7 @@ struct AddEventContentView: View {
                             imageData: human.avatarImageData,
                             fallback: human.avatarEmoji.isEmpty ? "🙂" : human.avatarEmoji,
                             tint: Color(hex: human.safeThemeColorHex),
+                            identifier: "add-event-assignee-human-\(human.name)",
                             isSelected: assigneeId == human.id.uuidString
                         ) {
                             assigneeId = human.id.uuidString
@@ -478,6 +482,7 @@ struct AddEventContentView: View {
             }
             .buttonStyle(ScaleButtonStyle())
             .disabled(!canSave)
+            .accessibilityIdentifier("add-event-save-action")
             .padding(.horizontal, 20)
             .padding(.bottom, safeBottom)
             .background {
@@ -666,6 +671,7 @@ struct AddEventContentView: View {
         imageData: Data?,
         fallback: String,
         tint: Color,
+        identifier: String,
         isSelected: Bool,
         action: @escaping () -> Void
     ) -> some View {
@@ -695,6 +701,7 @@ struct AddEventContentView: View {
             .background(isSelected ? tint : Color.ohanaControlFill, in: Capsule())
         }
         .buttonStyle(ScaleButtonStyle())
+        .accessibilityIdentifier(identifier)
     }
 
     private func eventTypeTitle(_ type: EventType) -> String {

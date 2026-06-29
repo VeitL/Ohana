@@ -92,7 +92,7 @@ struct HumanHealthMetricEntrySheet: View {
         GeometryReader { proxy in
             let minPanelHeight: CGFloat = 390
             let maxPanelHeight = max(minPanelHeight, proxy.size.height * 0.92)
-            let scrollMaxHeight = max(230, maxPanelHeight - 156)
+            let scrollMaxHeight = max(230, maxPanelHeight - 224)
             let measuredScrollHeight = scrollContentHeight > 1 ? scrollContentHeight : min(380, scrollMaxHeight)
             let scrollHeight = min(measuredScrollHeight, scrollMaxHeight)
             let panelHeightEstimate = min(maxPanelHeight, max(adaptiveSheetHeight, minPanelHeight))
@@ -253,6 +253,7 @@ struct HumanHealthMetricEntrySheet: View {
                 Text(l.tr(zh: "记录指标", en: "Record metric", de: "Wert erfassen"))
                     .font(OhanaFont.title3(.black))
                     .foregroundStyle(Color.ohanaPrimaryText)
+                    .accessibilityIdentifier("human-health-metric-entry-sheet-\(metric.key)")
                 Text(metric.displayName(l))
                     .font(OhanaFont.caption(.semibold))
                     .foregroundStyle(Color.ohanaSecondaryText)
@@ -293,6 +294,7 @@ struct HumanHealthMetricEntrySheet: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .minimumScaleFactor(0.45)
                     .contentTransition(.numericText())
+                    .accessibilityIdentifier("human-health-metric-entry-value")
 
                 Text(selectedUnit.label)
                     .font(OhanaFont.title3(.black))
@@ -382,6 +384,7 @@ struct HumanHealthMetricEntrySheet: View {
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(2 ... 4)
                     .textInputAutocapitalization(.sentences)
+                    .accessibilityIdentifier("human-health-metric-entry-notes-input")
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 12)
@@ -425,12 +428,15 @@ struct HumanHealthMetricEntrySheet: View {
             }
             .foregroundStyle(Color.arkInk)
             .frame(maxWidth: .infinity)
+            .frame(minHeight: 52)
+            .contentShape(Rectangle())
             .padding(.vertical, 14)
             .background(isValid && !isSaving ? Color.goPrimary : Color.goPrimary.opacity(0.38), in: Capsule())
             .opacity(isValid && !isSaving ? 1 : 0.62)
         }
         .buttonStyle(ScaleButtonStyle())
         .disabled(!isValid || isSaving)
+        .accessibilityIdentifier("human-health-metric-entry-save-action")
         .padding(.horizontal, 20)
         .padding(.top, 10)
         .padding(.bottom, 14)

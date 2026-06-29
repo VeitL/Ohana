@@ -10,6 +10,7 @@ import SwiftUI
 struct ExpenseSplitterCard: View {
     let filteredLogs: [PetExpenseLog]
     let humans: [Human]
+    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
 
     private struct SplitResult: Identifiable {
         let id: UUID
@@ -21,6 +22,7 @@ struct ExpenseSplitterCard: View {
     }
 
     private var totalExpense: Double { filteredLogs.reduce(0) { $0 + $1.amount } }
+    private var l: L10n { L10n(appLanguage) }
 
     private var results: [SplitResult] {
         guard !humans.isEmpty, totalExpense > 0 else { return [] }
@@ -41,9 +43,9 @@ struct ExpenseSplitterCard: View {
         let payers = results.filter { $0.balance > 0.5 }.sorted { $0.balance > $1.balance }
         let owes = results.filter { $0.balance < -0.5 }.sorted { $0.balance < $1.balance }
         guard let top = payers.first, let debtor = owes.first else {
-            return results.isEmpty ? "暂无记录" : "大家花费相当，无需结算 🎉"
+            return results.isEmpty ? l.tr(zh: "暂无记录", en: "No records yet", de: "Noch keine Einträge") : l.tr(zh: "大家花费相当，无需结算 🎉", en: "Everyone is even. No settlement needed 🎉", de: "Alle sind ausgeglichen. Keine Abrechnung nötig 🎉")
         }
-        return "\(debtor.name) 需向 \(top.name) 支付 \(AppCurrency.format(abs(debtor.balance), fractionDigits: 0))"
+        return l.tr(zh: "\(debtor.name) 需向 \(top.name) 支付 \(AppCurrency.format(abs(debtor.balance), fractionDigits: 0))", en: "\(debtor.name) owes \(top.name) \(AppCurrency.format(abs(debtor.balance), fractionDigits: 0))", de: "\(debtor.name) zahlt \(top.name) \(AppCurrency.format(abs(debtor.balance), fractionDigits: 0))")
     }
 
     var body: some View {
@@ -52,12 +54,12 @@ struct ExpenseSplitterCard: View {
             HStack(spacing: 8) {
                 Text("⚖️")
                     .font(OhanaFont.adaptive(size: 18))
-                Text("财务结算室")
+                Text(l.tr(zh: "财务结算室", en: "Settlement Room", de: "Abrechnung"))
                     .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Spacer()
                 if totalExpense > 0 {
-                    Text("人均 \(AppCurrency.format(totalExpense / max(1, Double(humans.count)), fractionDigits: 0))")
+                    Text(l.tr(zh: "人均 \(AppCurrency.format(totalExpense / max(1, Double(humans.count)), fractionDigits: 0))", en: "Avg \(AppCurrency.format(totalExpense / max(1, Double(humans.count)), fractionDigits: 0))", de: "Ø \(AppCurrency.format(totalExpense / max(1, Double(humans.count)), fractionDigits: 0))"))
                         .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded))
                         .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                         .padding(.horizontal, 10).padding(.vertical, 5)
@@ -67,7 +69,7 @@ struct ExpenseSplitterCard: View {
             .padding(.horizontal, 20).padding(.top, 18).padding(.bottom, 14)
 
             if results.isEmpty {
-                Text("添加花费记录并指定支付人后，这里会自动计算谁欠谁多少钱。")
+                Text(l.tr(zh: "添加花费记录并指定支付人后，这里会自动计算谁欠谁多少钱。", en: "Add expenses with payers to calculate who owes whom.", de: "Erfasse Ausgaben mit zahlender Person, um Ausgleich zu berechnen."))
                     .font(OhanaFont.adaptive(size: 12, weight: .medium))
                     .foregroundStyle(Color.ohanaPrimaryText.opacity(0.35))
                     .padding(.horizontal, 20).padding(.bottom, 18)
@@ -105,16 +107,16 @@ struct ExpenseSplitterCard: View {
                 Text(r.name)
                     .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
-                Text("实付 \(AppCurrency.format(r.paid, fractionDigits: 0))")
+                Text(l.tr(zh: "实付 \(AppCurrency.format(r.paid, fractionDigits: 0))", en: "Paid \(AppCurrency.format(r.paid, fractionDigits: 0))", de: "Bezahlt \(AppCurrency.format(r.paid, fractionDigits: 0))"))
                     .font(OhanaFont.adaptive(size: 10, weight: .medium))
                     .foregroundStyle(Color.ohanaPrimaryText.opacity(0.35))
             }
             Spacer()
             VStack(alignment: .trailing, spacing: 2) {
-                Text(isPositive ? "应收 \(AppCurrency.format(r.balance, fractionDigits: 0))" : "应付 \(AppCurrency.format(abs(r.balance), fractionDigits: 0))")
+                Text(isPositive ? l.tr(zh: "应收 \(AppCurrency.format(r.balance, fractionDigits: 0))", en: "Receives \(AppCurrency.format(r.balance, fractionDigits: 0))", de: "Erhält \(AppCurrency.format(r.balance, fractionDigits: 0))") : l.tr(zh: "应付 \(AppCurrency.format(abs(r.balance), fractionDigits: 0))", en: "Owes \(AppCurrency.format(abs(r.balance), fractionDigits: 0))", de: "Zahlt \(AppCurrency.format(abs(r.balance), fractionDigits: 0))"))
                     .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
                     .foregroundStyle(isPositive ? Color.goPrimary : Color.goRed)
-                Text(isPositive ? "垫付较多" : "少付了")
+                Text(isPositive ? l.tr(zh: "垫付较多", en: "Paid more", de: "Mehr bezahlt") : l.tr(zh: "少付了", en: "Paid less", de: "Weniger bezahlt"))
                     .font(OhanaFont.adaptive(size: 9, weight: .medium))
                     .foregroundStyle(Color.ohanaPrimaryText.opacity(0.3))
             }

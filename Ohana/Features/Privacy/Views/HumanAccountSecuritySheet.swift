@@ -14,14 +14,23 @@ struct HumanAccountSecuritySheet: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
     @Environment(AppServices.self) private var appServices
+    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
     @State private var showingPasscodeSheet = false
+    @State private var optimisticPrivateFields: Set<String>? = nil
+    @StateObject private var commandQueue = DeferredDomainCommandQueue()
+
+    private var l: L10n { L10n(appLanguage) }
 
     private var hasPasscode: Bool {
         appServices.passcodes.hasPasscode(human)
     }
 
+    private var displayedPrivateFields: Set<String> {
+        optimisticPrivateFields ?? human.privateFields
+    }
+
     private var privateCount: Int {
-        HumanPrivateField.allCases.count(where: { human.privateFields.contains($0.rawValue) })
+        HumanPrivateField.allCases.count(where: { displayedPrivateFields.contains($0.rawValue) })
     }
 
     var body: some View {
@@ -40,8 +49,13 @@ struct HumanAccountSecuritySheet: View {
         }
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.hidden)
+        .accessibilityIdentifier("human-account-security-sheet")
         .sheet(isPresented: $showingPasscodeSheet) {
             HumanPasscodeManagementSheet(human: human)
+        }
+        .onDisappear {
+            commandQueue.cancelAll()
+            optimisticPrivateFields = nil
         }
     }
 
@@ -49,7 +63,7 @@ struct HumanAccountSecuritySheet: View {
         HStack(spacing: 12) {
             accountAvatar(size: 46)
             VStack(alignment: .leading, spacing: 3) {
-                Text("密码与隐私")
+                Text(l.tr(zh: "密码与隐私", en: "PIN & Privacy", de: "PIN & Datenschutz"))
                     .font(OhanaFont.title3(.black))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Text(displayName(human))
@@ -65,6 +79,7 @@ struct HumanAccountSecuritySheet: View {
                     .background(Color.primary.opacity(0.08), in: Circle())
             }
             .buttonStyle(ScaleButtonStyle())
+            .accessibilityIdentifier("human-account-security-close-action")
         }
     }
 
@@ -77,15 +92,15 @@ struct HumanAccountSecuritySheet: View {
                     .frame(width: 40, height: 40) // a11y: allow decorative non-interactive frame; hit area handled by parent
                     .background((hasPasscode ? Color.goYellow : Color.goPrimary).opacity(0.14), in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
                 VStack(alignment: .leading, spacing: 3) {
-                    Text("账户密码")
+                    Text(l.tr(zh: "账户密码", en: "Account PIN", de: "Konto-PIN"))
                         .font(OhanaFont.callout(.black))
                         .foregroundStyle(Color.ohanaPrimaryText)
-                    Text(hasPasscode ? "切换到此账户时需要 4 位密码" : "当前为公开切换，可直接进入")
+                    Text(hasPasscode ? l.tr(zh: "切换到此账户时需要 4 位密码", en: "Switching to this account requires a 4-digit PIN", de: "Für dieses Konto ist eine 4-stellige PIN nötig") : l.tr(zh: "当前为公开切换，可直接进入", en: "This account can be opened directly", de: "Dieses Konto kann direkt geöffnet werden"))
                         .font(OhanaFont.caption(.semibold))
                         .foregroundStyle(Color.ohanaSecondaryText)
                 }
                 Spacer()
-                Text(hasPasscode ? "隐私" : "公开")
+                Text(hasPasscode ? l.tr(zh: "隐私", en: "Private", de: "Privat") : l.tr(zh: "公开", en: "Open", de: "Offen"))
                     .font(OhanaFont.caption2(.black))
                     .foregroundStyle(hasPasscode ? Color.goYellow : Color.arkInk)
                     .padding(.horizontal, 10)
@@ -96,7 +111,7 @@ struct HumanAccountSecuritySheet: View {
             Button {
                 showingPasscodeSheet = true
             } label: {
-                Label(hasPasscode ? "修改或关闭密码" : "设置 4 位密码", systemImage: "key.fill")
+                Label(hasPasscode ? l.tr(zh: "修改或关闭密码", en: "Change or turn off PIN", de: "PIN ändern oder deaktivieren") : l.tr(zh: "设置 4 位密码", en: "Set 4-digit PIN", de: "4-stellige PIN festlegen"), systemImage: "key.fill")
                     .font(OhanaFont.callout(.black))
                     .foregroundStyle(Color.arkInk)
                     .frame(maxWidth: .infinity)
@@ -104,6 +119,7 @@ struct HumanAccountSecuritySheet: View {
                     .background(Color.goPrimary, in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
             }
             .buttonStyle(ScaleButtonStyle())
+            .accessibilityIdentifier("human-passcode-manage-action")
         }
         .padding(16)
         .goTranslucentCard(cornerRadius: OhanaRadius.input)
@@ -113,18 +129,19 @@ struct HumanAccountSecuritySheet: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 VStack(alignment: .leading, spacing: 3) {
-                    Text("资料可见性")
+                    Text(l.tr(zh: "资料可见性", en: "Data Visibility", de: "Datensichtbarkeit"))
                         .font(OhanaFont.callout(.black))
                         .foregroundStyle(Color.ohanaPrimaryText)
-                    Text(privateCount == 0 ? "所有敏感资料对家庭成员公开" : "\(privateCount) 项设为仅本人可见")
+                    Text(privateCount == 0 ? l.tr(zh: "所有敏感资料对家庭成员公开", en: "All sensitive data is visible to family members", de: "Alle sensiblen Daten sind für Familienmitglieder sichtbar") : l.tr(zh: "\(privateCount) 项设为仅本人可见", en: "\(privateCount) fields are private", de: "\(privateCount) Felder sind privat"))
                         .font(OhanaFont.caption(.semibold))
                         .foregroundStyle(Color.ohanaSecondaryText)
+                        .accessibilityIdentifier("human-account-privacy-status")
                 }
                 Spacer()
                 Button {
                     setAllPrivate(false)
                 } label: {
-                    Text("全公开")
+                    Text(l.tr(zh: "全公开", en: "All open", de: "Alles offen"))
                         .font(OhanaFont.caption2(.black))
                         .foregroundStyle(Color.goPrimary)
                         .padding(.horizontal, 10)
@@ -132,10 +149,11 @@ struct HumanAccountSecuritySheet: View {
                         .background(Color.goPrimary.opacity(0.12), in: Capsule())
                 }
                 .buttonStyle(ScaleButtonStyle())
+                .accessibilityIdentifier("human-account-privacy-all-open-action")
                 Button {
                     setAllPrivate(true)
                 } label: {
-                    Text("全隐私")
+                    Text(l.tr(zh: "全隐私", en: "All private", de: "Alles privat"))
                         .font(OhanaFont.caption2(.black))
                         .foregroundStyle(Color.goYellow)
                         .padding(.horizontal, 10)
@@ -143,6 +161,7 @@ struct HumanAccountSecuritySheet: View {
                         .background(Color.goYellow.opacity(0.14), in: Capsule())
                 }
                 .buttonStyle(ScaleButtonStyle())
+                .accessibilityIdentifier("human-account-privacy-all-private-action")
             }
 
             ForEach(HumanPrivateField.allCases) { field in
@@ -155,14 +174,9 @@ struct HumanAccountSecuritySheet: View {
 
     private func privacyToggleRow(_ field: HumanPrivateField) -> some View {
         Toggle(isOn: Binding(
-            get: { human.privateFields.contains(field.rawValue) },
+            get: { displayedPrivateFields.contains(field.rawValue) },
             set: { isPrivate in
-                HumanPrivacyCommandExecutor(context: modelContext, services: appServices).setPrivateField(
-                    field,
-                    isPrivate: isPrivate,
-                    for: human,
-                    note: "human.privacy.field"
-                )
+                setPrivateField(field, isPrivate: isPrivate)
                 UISelectionFeedbackGenerator().selectionChanged()
             }
         )) {
@@ -173,10 +187,10 @@ struct HumanAccountSecuritySheet: View {
                     .frame(width: 30, height: 30) // a11y: allow decorative non-interactive frame; hit area handled by parent
                     .background(Color.goYellow.opacity(0.12), in: RoundedRectangle(cornerRadius: OhanaRadius.badge, style: .continuous))
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(field.title)
+                    Text(localizedFieldTitle(field))
                         .font(OhanaFont.callout(.black))
                         .foregroundStyle(Color.ohanaPrimaryText)
-                    Text(human.privateFields.contains(field.rawValue) ? "仅本人可见" : "家庭成员可见")
+                    Text(displayedPrivateFields.contains(field.rawValue) ? l.tr(zh: "仅本人可见", en: "Private to owner", de: "Nur selbst sichtbar") : l.tr(zh: "家庭成员可见", en: "Visible to family", de: "Für Familie sichtbar"))
                         .font(OhanaFont.caption2(.bold))
                         .foregroundStyle(Color.ohanaSecondaryText)
                 }
@@ -184,15 +198,60 @@ struct HumanAccountSecuritySheet: View {
         }
         .tint(Color.goYellow)
         .padding(.vertical, 4)
+        .accessibilityIdentifier("human-account-privacy-toggle-\(field.rawValue)")
+    }
+
+    private func setPrivateField(_ field: HumanPrivateField, isPrivate: Bool) {
+        var nextFields = displayedPrivateFields
+        if isPrivate {
+            nextFields.insert(field.rawValue)
+        } else {
+            nextFields.remove(field.rawValue)
+        }
+        setOptimisticPrivateFields(nextFields)
+
+        let action = "field.\(field.rawValue).\(isPrivate ? "private" : "public")"
+        let command = DomainCommand.humanPrivacy(humanID: human.id, action: action)
+        commandQueue.enqueue(command, delayMilliseconds: 160) {
+            HumanPrivacyCommandExecutor(context: modelContext, services: appServices).setPrivateField(
+                field,
+                isPrivate: isPrivate,
+                for: human,
+                note: "human.privacy.field"
+            )
+            clearOptimisticPrivateFieldsIfCommitted()
+        }
     }
 
     private func setAllPrivate(_ isPrivate: Bool) {
-        HumanPrivacyCommandExecutor(context: modelContext, services: appServices).setAllPrivateFields(
-            isPrivate: isPrivate,
-            for: human,
-            note: isPrivate ? "human.privacy.allPrivate" : "human.privacy.allPublic"
-        )
+        let nextFields: Set<String> = isPrivate ? Set(HumanPrivateField.allCases.map(\.rawValue)) : []
+        setOptimisticPrivateFields(nextFields)
+
+        let action = isPrivate ? "allPrivate" : "allPublic"
+        let command = DomainCommand.humanPrivacy(humanID: human.id, action: action)
+        commandQueue.cancelAll()
+        commandQueue.enqueue(command, delayMilliseconds: 160) {
+            HumanPrivacyCommandExecutor(context: modelContext, services: appServices).setAllPrivateFields(
+                isPrivate: isPrivate,
+                for: human,
+                note: isPrivate ? "human.privacy.allPrivate" : "human.privacy.allPublic"
+            )
+            clearOptimisticPrivateFieldsIfCommitted()
+        }
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
+    }
+
+    private func setOptimisticPrivateFields(_ fields: Set<String>) {
+        var transaction = Transaction(animation: nil)
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            optimisticPrivateFields = fields
+        }
+    }
+
+    private func clearOptimisticPrivateFieldsIfCommitted() {
+        guard optimisticPrivateFields == human.privateFields else { return }
+        optimisticPrivateFields = nil
     }
 
     @ViewBuilder
@@ -216,8 +275,25 @@ struct HumanAccountSecuritySheet: View {
         }
     }
 
+    private func localizedFieldTitle(_ field: HumanPrivateField) -> String {
+        switch field {
+        case .weight:
+            l.tr(zh: "体重", en: "Weight", de: "Gewicht")
+        case .workout:
+            l.tr(zh: "运动", en: "Workouts", de: "Training")
+        case .medication:
+            l.tr(zh: "吃药提醒", en: "Medication reminders", de: "Medikamentenerinnerungen")
+        case .wishlist:
+            l.tr(zh: "椰子资产与心愿", en: "Coconuts & wishes", de: "Kokosnüsse & Wünsche")
+        case .expense:
+            l.tr(zh: "花费", en: "Expenses", de: "Ausgaben")
+        case .note:
+            l.tr(zh: "备注", en: "Notes", de: "Notizen")
+        }
+    }
+
     private func displayName(_ human: Human) -> String {
         let name = human.name.trimmingCharacters(in: .whitespacesAndNewlines)
-        return name.isEmpty ? "未命名成员" : name
+        return name.isEmpty ? l.tr(zh: "未命名成员", en: "Unnamed member", de: "Unbenanntes Mitglied") : name
     }
 }

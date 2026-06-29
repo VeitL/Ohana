@@ -625,6 +625,7 @@ extension QuickWaterDetailSheet {
         triggerWaterFeedback()
         let actionText = result.targetCount > 1 ? localizedSharedWaterLogged(result.targetCount) : l.tr(zh: "已记录喂水", en: "Water logged", de: "Trinken eingetragen")
         showSaveConfirmation(result.coconutDelta > 0 ? "\(actionText) +\(result.coconutDelta)🥥" : actionText)
+        onRecordChanged?()
     }
 
     func doWaterChange() {
@@ -652,6 +653,7 @@ extension QuickWaterDetailSheet {
         UINotificationFeedbackGenerator().notificationOccurred(.success)
         triggerWaterChangeFeedback()
         showSaveConfirmation(l.tr(zh: "已记录换水", en: "Water change logged", de: "Wasserwechsel eingetragen"))
+        onRecordChanged?()
     }
 
     func doFilterClean() {
@@ -679,6 +681,7 @@ extension QuickWaterDetailSheet {
         UINotificationFeedbackGenerator().notificationOccurred(.success)
         triggerFilterFeedback()
         showSaveConfirmation(l.tr(zh: "滤芯已清洗", en: "Filter cleaned", de: "Filter gereinigt"))
+        onRecordChanged?()
     }
 
     func triggerWaterFeedback() {

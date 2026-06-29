@@ -62,8 +62,16 @@ struct PoopPottyLedgerEntry: Identifiable, Hashable {
     let legacyLogId: UUID?
 
     static func entries(from events: [CareLedgerEvent], petID: UUID) -> [PoopPottyLedgerEntry] {
+        entries(from: events, fallbackLogs: [], petID: petID)
+    }
+
+    static func entries(
+        from events: [CareLedgerEvent],
+        fallbackLogs: [PetPottyLog],
+        petID: UUID
+    ) -> [PoopPottyLedgerEntry] {
         let petKey = petID.uuidString
-        return events.compactMap { event in
+        let ledgerEntries: [PoopPottyLedgerEntry] = events.compactMap { event -> PoopPottyLedgerEntry? in
             guard event.eventKindEnum == .potty,
                   event.subjectKind == CareLedgerSubjectKind.pet.rawValue,
                   event.subjectId == petKey,
@@ -78,7 +86,18 @@ struct PoopPottyLedgerEntry: Identifiable, Hashable {
                 legacyLogId: legacyLogId
             )
         }
-        .sorted { $0.date > $1.date }
+        let ledgerLogIDs = Set<UUID>(ledgerEntries.compactMap(\.legacyLogId))
+        let fallbackEntries = fallbackLogs.compactMap { log -> PoopPottyLedgerEntry? in
+            guard log.pet?.id == petID, !ledgerLogIDs.contains(log.id) else { return nil }
+            return PoopPottyLedgerEntry(
+                id: log.id,
+                date: log.date,
+                pottyType: log.pottyType,
+                legacyLogId: log.id
+            )
+        }
+        return (ledgerEntries + fallbackEntries)
+            .sorted { $0.date > $1.date }
     }
 }
 
@@ -226,6 +245,7 @@ struct PoopCoreCard: View {
     var secondaryAction: (() -> Void)?
     var tapAction: (() -> Void)?
     var feedbackToken: CheckInFeedbackToken?
+    var accessibilityIDPrefix: String?
 
     @Environment(\.colorScheme) private var colorScheme
 
@@ -253,6 +273,7 @@ struct PoopCoreCard: View {
                         .background(tint, in: Capsule())
                     }
                     .buttonStyle(ScaleButtonStyle())
+                    .accessibilityIdentifier(accessibilityIDPrefix.map { "\($0)-primary-action" } ?? "")
 
                     if let secondaryTitle, let secondaryAction {
                         Button(action: secondaryAction) {
@@ -265,6 +286,7 @@ struct PoopCoreCard: View {
                                 .background(Color.ohanaCardSurfaceElevated, in: Capsule())
                         }
                         .buttonStyle(ScaleButtonStyle())
+                        .accessibilityIdentifier(accessibilityIDPrefix.map { "\($0)-secondary-action" } ?? "")
                     }
                 }
             }
@@ -290,6 +312,7 @@ struct PoopCoreCard: View {
                 infoContent
             }
             .buttonStyle(ScaleButtonStyle())
+            .accessibilityIdentifier(accessibilityIDPrefix.map { "\($0)-info-action" } ?? "")
         } else {
             infoContent
         }
@@ -485,6 +508,7 @@ struct PoopLogRow: View {
                 Text(item.title(l))
                     .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
+                    .accessibilityIdentifier("quick-potty-recent-row-\(item.id)")
                 if let detail = item.detail(l) {
                     Text(detail)
                         .font(OhanaFont.adaptive(size: 10, weight: .bold, design: .rounded))
@@ -523,6 +547,7 @@ struct PoopLogRow: View {
             }
         }
         .padding(.vertical, 3)
+        .accessibilityIdentifier("quick-potty-recent-row-\(item.id)")
     }
 }
 
@@ -582,6 +607,7 @@ struct PoopPrimaryButton: View {
     let icon: String
     let tint: Color
     var isDisabled = false
+    var accessibilityIdentifier: String?
     let action: () -> Void
 
     var body: some View {
@@ -595,6 +621,7 @@ struct PoopPrimaryButton: View {
         }
         .buttonStyle(ScaleButtonStyle())
         .disabled(isDisabled)
+        .accessibilityIdentifier(accessibilityIdentifier ?? "")
     }
 }
 
@@ -607,6 +634,8 @@ struct PoopCheckInSheet: View {
     let primaryTitle: String
     let secondaryTitle: String
     let isPrimaryDisabled: Bool
+    var primaryAccessibilityIdentifier: String?
+    var secondaryAccessibilityIdentifier: String?
     let primaryAction: () -> Void
     let secondaryAction: () -> Void
 
@@ -657,6 +686,7 @@ struct PoopCheckInSheet: View {
                     icon: "checkmark.circle.fill",
                     tint: tint,
                     isDisabled: isPrimaryDisabled,
+                    accessibilityIdentifier: primaryAccessibilityIdentifier,
                     action: primaryAction
                 )
 
@@ -669,6 +699,7 @@ struct PoopCheckInSheet: View {
                         .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
                 }
                 .buttonStyle(ScaleButtonStyle())
+                .accessibilityIdentifier(secondaryAccessibilityIdentifier ?? "")
             }
             .padding(20)
         }
@@ -720,6 +751,7 @@ struct PottyTypeSheet: View {
                             .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
                         }
                         .buttonStyle(ScaleButtonStyle())
+                        .accessibilityIdentifier("quick-potty-type-\(type.accessibilityIdentifierFragment)")
                     }
                 }
 
@@ -733,6 +765,7 @@ struct PottyTypeSheet: View {
                             .background(tint, in: Capsule())
                     }
                     .buttonStyle(ScaleButtonStyle())
+                    .accessibilityIdentifier("quick-potty-type-unknown-group")
                 }
 
                 PoopInlineNotice(
@@ -759,6 +792,21 @@ struct PottyTypeSheet: View {
     }
 }
 
+private extension PottyType {
+    var accessibilityIdentifierFragment: String {
+        switch self {
+        case .perfectPoop:
+            "perfect"
+        case .softPoop:
+            "soft"
+        case .liquidPoop:
+            "liquid"
+        case .pee:
+            "pee"
+        }
+    }
+}
+
 struct PoopCycleSettingsSheet: View {
     let tint: Color
     let icon: String
@@ -771,10 +819,14 @@ struct PoopCycleSettingsSheet: View {
     @Binding var intervalDays: Int
     @Binding var anchorDate: Date
     @Binding var reminderOn: Bool
+    var accessibilityIDPrefix: String?
     let onSave: () -> Void
     let onDelete: () -> Void
 
     @AppStorage("appLanguage") private var appLanguage = AppLanguage.fallbackCode
+    @State private var draftIntervalDays = 0
+    @State private var draftAnchorDate = Date()
+    @State private var draftReminderOn = false
 
     private var l: L10n { L10n(appLanguage) }
 
@@ -793,9 +845,11 @@ struct PoopCycleSettingsSheet: View {
                         Text(statusTitle)
                             .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
                             .foregroundStyle(Color.ohanaSecondaryText)
+                            .accessibilityIdentifier(accessibilityIDPrefix.map { "\($0)-status-title" } ?? "")
                         Text(statusValue)
                             .font(OhanaFont.adaptive(size: 26, weight: .black, design: .rounded))
                             .foregroundStyle(tint)
+                            .accessibilityIdentifier(accessibilityIDPrefix.map { "\($0)-status-value" } ?? "")
                         Text(statusDetail)
                             .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded))
                             .foregroundStyle(Color.ohanaSecondaryText)
@@ -807,31 +861,38 @@ struct PoopCycleSettingsSheet: View {
                 .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous))
 
                 VStack(spacing: 12) {
-                    Stepper(value: $intervalDays, in: intervalRange) {
-                        settingsRow(l.tr(zh: "周期", en: "Cycle", de: "Rhythmus"), value: everyDaysText(intervalDays))
+                    Stepper(value: $draftIntervalDays, in: intervalRange) {
+                        settingsRow(l.tr(zh: "周期", en: "Cycle", de: "Rhythmus"), value: everyDaysText(draftIntervalDays))
                     }
                     .tint(tint)
+                    .accessibilityIdentifier(accessibilityIDPrefix.map { "\($0)-interval-stepper" } ?? "")
 
-                    DatePicker(selection: $anchorDate, displayedComponents: .date) {
+                    DatePicker(selection: $draftAnchorDate, displayedComponents: .date) {
                         Text(l.tr(zh: "起算日", en: "Start date", de: "Startdatum"))
                     }
                     .font(OhanaFont.adaptive(size: 15, weight: .bold, design: .rounded))
                     .tint(tint)
+                    .accessibilityIdentifier(accessibilityIDPrefix.map { "\($0)-anchor-date-picker" } ?? "")
 
-                    Toggle(isOn: $reminderOn) {
+                    Toggle(isOn: $draftReminderOn) {
                         settingsRow(
                             l.tr(zh: "提醒", en: "Reminder", de: "Erinnerung"),
-                            value: reminderOn ? l.tr(zh: "开", en: "On", de: "Ein") : l.tr(zh: "关", en: "Off", de: "Aus")
+                            value: draftReminderOn ? l.tr(zh: "开", en: "On", de: "Ein") : l.tr(zh: "关", en: "Off", de: "Aus")
                         )
                     }
                     .tint(tint)
+                    .accessibilityIdentifier(accessibilityIDPrefix.map { "\($0)-reminder-toggle" } ?? "")
                 }
                 .padding(14)
                 .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous))
 
                 PoopPrimaryButton(title: l.tr(zh: "保存计划", en: "Save plan", de: "Plan speichern"), icon: "checkmark", tint: tint) {
+                    intervalDays = draftIntervalDays
+                    anchorDate = draftAnchorDate
+                    reminderOn = draftReminderOn
                     onSave()
                 }
+                .accessibilityIdentifier(accessibilityIDPrefix.map { "\($0)-save-action" } ?? "")
 
                 Button(role: .destructive) {
                     onDelete()
@@ -844,8 +905,15 @@ struct PoopCycleSettingsSheet: View {
                         .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
                 }
                 .buttonStyle(ScaleButtonStyle())
+                .accessibilityIdentifier(accessibilityIDPrefix.map { "\($0)-delete-action" } ?? "")
             }
             .padding(20)
+        }
+        .accessibilityIdentifier(accessibilityIDPrefix.map { "\($0)-sheet" } ?? "")
+        .onAppear {
+            draftIntervalDays = intervalDays
+            draftAnchorDate = anchorDate
+            draftReminderOn = reminderOn
         }
     }
 
