@@ -954,6 +954,74 @@ final class OhanaUITests: XCTestCase {
     }
 
     @MainActor
+    func testPetLitterPlanCalendarEventAppearsAndDeletesFromQuickCareDetail() throws {
+        let app = launchEnglishApp(enableProductionOverlays: true)
+        let humanName = createFirstHuman(from: app)
+        let petName = "Codex Litter Calendar Cat \(Int(Date().timeIntervalSince1970))"
+        let litterEventTitles = [
+            "\(petName) Litter change",
+            "\(petName) 换猫砂",
+            "\(petName) Streu wechseln"
+        ]
+        completeFirstDayStarterFunnel(
+            in: app,
+            petName: petName,
+            petSpeciesLabel: "Cat",
+            completionMessage: "Creating the first cat did not leave the pet creation handoff in time."
+        )
+
+        openPetPottyDetailFromHome(in: app, petName: petName, humanName: humanName)
+        openLitterSettings(in: app)
+
+        let reminderToggle = app.descendants(matching: .any)["quick-potty-litter-settings-reminder-toggle"]
+        XCTAssertTrue(
+            reminderToggle.waitForExistence(timeout: 10),
+            "Litter settings did not expose the reminder toggle before Calendar sync setup."
+        )
+        tapWhenHittable(reminderToggle, timeout: 8)
+        tapWhenHittable(app.buttons["quick-potty-litter-settings-save-action"], timeout: 8)
+        XCTAssertTrue(
+            waitUntil(timeout: 8) {
+                !app.descendants(matching: .any)["quick-potty-litter-settings-sheet"].exists
+            },
+            "Litter settings sheet stayed open after saving the Calendar-backed reminder."
+        )
+        closeCurrentSheetToHome(in: app, humanName: humanName)
+
+        openCalendarTab(in: app, petName: petName)
+        tapWhenHittable(app.buttons["calendar-filter-pet-\(petName)"], timeout: 8)
+        assertCalendarEventAny(of: litterEventTitles, exists: true, in: app, context: "litter plan save calendar readback")
+
+        closeCurrentSheetToHome(in: app, humanName: humanName)
+        openPetPottyDetailFromHome(in: app, petName: petName, humanName: humanName)
+        openLitterSettings(in: app)
+        assertLitterSettingsStatus(
+            in: app,
+            containsAny: ["Reminder on", "提醒已开启", "Erinnerung an"],
+            message: "Litter settings did not retain reminder-on state before deleting Calendar plan."
+        )
+
+        let deleteAction = app.buttons["quick-potty-litter-settings-delete-action"]
+        scrollToElement(deleteAction, in: app, maxSwipes: 4)
+        XCTAssertTrue(
+            deleteAction.waitForExistence(timeout: 10),
+            "Litter settings did not expose the delete-plan action before Calendar removal."
+        )
+        tapWhenHittable(deleteAction, timeout: 8)
+        XCTAssertTrue(
+            waitUntil(timeout: 8) {
+                !app.descendants(matching: .any)["quick-potty-litter-settings-sheet"].exists
+            },
+            "Litter settings sheet stayed open after deleting the Calendar-backed reminder."
+        )
+        closeCurrentSheetToHome(in: app, humanName: humanName)
+
+        openCalendarTab(in: app, petName: petName)
+        tapWhenHittable(app.buttons["calendar-filter-pet-\(petName)"], timeout: 8)
+        assertCalendarEventAny(of: litterEventTitles, exists: false, in: app, context: "litter plan delete calendar readback")
+    }
+
+    @MainActor
     func testPetHygieneRecordPersistsAndRepeatTapIsBlocked() throws {
         let app = launchEnglishApp(enableProductionOverlays: true)
         let humanName = createFirstHuman(from: app)
@@ -2890,12 +2958,33 @@ final class OhanaUITests: XCTestCase {
     @MainActor
     private func assertCalendarEvent(_ title: String, exists expected: Bool, in app: XCUIApplication, context: String) {
         let row = app.descendants(matching: .any)["calendar-event-row-\(title)"]
+        if expected, !waitUntil(timeout: 4, condition: { row.exists }) {
+            scrollToElement(row, in: app, maxSwipes: 10)
+        }
         let didMatch = waitUntil(timeout: expected ? 12 : 3) {
             row.exists == expected
         }
         XCTAssertTrue(
             didMatch,
             "Calendar event \(title) existence was \(row.exists), expected \(expected) during \(context)."
+        )
+    }
+
+    @MainActor
+    private func assertCalendarEventAny(of titles: [String], exists expected: Bool, in app: XCUIApplication, context: String) {
+        let rows = titles.map { app.descendants(matching: .any)["calendar-event-row-\($0)"] }
+        if expected, !waitUntil(timeout: 4, condition: { rows.contains { $0.exists } }) {
+            for _ in 0 ..< 10 where !rows.contains(where: \.exists) {
+                app.swipeUp()
+                RunLoop.current.run(until: Date().addingTimeInterval(0.25))
+            }
+        }
+        let didMatch = waitUntil(timeout: expected ? 12 : 3) {
+            (rows.contains { $0.exists }) == expected
+        }
+        XCTAssertTrue(
+            didMatch,
+            "Calendar event candidates \(titles) existence was \(rows.contains { $0.exists }), expected \(expected) during \(context)."
         )
     }
 
