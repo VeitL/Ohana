@@ -485,6 +485,132 @@ final class OhanaUITests: XCTestCase {
     }
 
     @MainActor
+    func testPetDogRealUserLongSessionCoversWalkMemorialEditAndDeleteSafeguards() throws {
+        let app = launchEnglishApp(enableProductionOverlays: true)
+        let humanName = createFirstHuman(from: app)
+        let timestamp = Int(Date().timeIntervalSince1970)
+        let petName = "Codex Long Dog \(timestamp)"
+        let cancelledNote = "cancelled dog note \(timestamp)"
+        let savedNote = "saved dog note \(timestamp)"
+
+        completeFirstDayStarterFunnel(
+            in: app,
+            petName: petName,
+            petSpeciesLabel: "Dog",
+            completionMessage: "Creating the long-session dog did not leave the pet creation handoff in time."
+        )
+
+        startWalkFromHomeQuickAction(in: app, petName: petName)
+        stopWalkFromVisibleHomeControls(in: app, petName: petName)
+        openPetWalkSummaryFromHome(in: app, petName: petName, humanName: humanName)
+        XCTAssertTrue(
+            app.descendants(matching: .any)
+                .matching(NSPredicate(format: "identifier BEGINSWITH %@", "walk-summary-row-"))
+                .firstMatch
+                .waitForExistence(timeout: 18),
+            "Dog long-session walk summary did not show a persisted walk row."
+        )
+        closeCurrentSheetToHome(in: app, humanName: humanName)
+
+        app.terminate()
+        app.launchArguments.removeAll { $0 == "-OHANA_RESET_PERSISTENT_STATE" }
+        app.launch()
+        ensureHomeSurfaceVisible(in: app, humanName: humanName)
+
+        openPetBasicInfoFromHome(in: app, petName: petName)
+        openPetBasicInfoEditMode(in: app)
+        enterPetBasicInfoNote(cancelledNote, in: app)
+        tapWhenHittable(app.buttons["pet-basic-info-cancel-edit-action"], timeout: 8)
+        XCTAssertFalse(
+            app.staticTexts["pet-basic-info-notes-readback"].waitForExistence(timeout: 2),
+            "Cancelling dog long-session Basic Info edit persisted an unsaved note."
+        )
+
+        openPetBasicInfoEditMode(in: app)
+        enterPetBasicInfoNote(savedNote, in: app)
+        tapWhenHittable(app.buttons["pet-basic-info-save-action"], timeout: 8)
+        let noteReadback = app.staticTexts["pet-basic-info-notes-readback"]
+        XCTAssertTrue(
+            waitUntil(timeout: 12) {
+                noteReadback.exists && noteReadback.label.contains(savedNote)
+            },
+            "Saving dog long-session Basic Info edit did not persist the note readback."
+        )
+        XCTAssertFalse(
+            noteReadback.label.contains(cancelledNote),
+            "Dog long-session Basic Info readback contains the previously cancelled note."
+        )
+
+        let markAction = app.buttons["pet-memorial-mark-action"]
+        scrollToElement(markAction, in: app)
+        tapWhenHittable(markAction, timeout: 8)
+        tapWhenHittable(app.buttons["取消"], timeout: 8)
+        XCTAssertFalse(
+            app.staticTexts["pet-memorial-passed-date"].waitForExistence(timeout: 2),
+            "Cancelling the dog long-session memorial mark still wrote a passed-away date."
+        )
+
+        tapWhenHittable(markAction, timeout: 8)
+        tapWhenHittable(app.buttons["确认"], timeout: 8)
+        let passedDate = app.staticTexts["pet-memorial-passed-date"]
+        XCTAssertTrue(
+            passedDate.waitForExistence(timeout: 12),
+            "Confirming dog long-session memorial mark did not show the passed-away summary."
+        )
+
+        let undoAction = app.buttons["pet-memorial-undo-action"]
+        scrollToElement(undoAction, in: app)
+        tapWhenHittable(undoAction, timeout: 8)
+        tapWhenHittable(app.buttons["取消"], timeout: 8)
+        XCTAssertTrue(
+            passedDate.waitForExistence(timeout: 4),
+            "Cancelling dog long-session memorial undo unexpectedly cleared the passed-away date."
+        )
+
+        tapWhenHittable(undoAction, timeout: 8)
+        tapWhenHittable(app.buttons["撤销"], timeout: 8)
+        XCTAssertTrue(
+            markAction.waitForExistence(timeout: 12),
+            "Confirming dog long-session memorial undo did not restore the live-pet mark action."
+        )
+
+        scrollToElement(app.buttons["pet-danger-delete-action"], in: app)
+        tapWhenHittable(app.buttons["pet-danger-delete-action"], timeout: 8)
+        let finalDelete = app.buttons["pet-delete-confirm-delete"]
+        XCTAssertTrue(finalDelete.waitForExistence(timeout: 8), "Dog long-session delete confirmation action did not appear.")
+        XCTAssertFalse(finalDelete.isEnabled, "Dog long-session delete action should stay disabled before exact-name confirmation.")
+        let nameInput = app.textFields["pet-delete-confirm-name-input"]
+        XCTAssertTrue(nameInput.waitForExistence(timeout: 8), "Dog long-session delete confirmation input did not appear.")
+        tapWhenHittable(nameInput, timeout: 8)
+        nameInput.typeText("wrong \(petName)")
+        XCTAssertFalse(finalDelete.isEnabled, "Dog long-session delete action became enabled for a mismatched pet name.")
+        tapWhenHittable(app.buttons["pet-delete-confirm-cancel"], timeout: 8)
+        XCTAssertTrue(
+            app.descendants(matching: .any)["pet-basic-info-screen"].waitForExistence(timeout: 8),
+            "Cancelling dog long-session delete did not return to Basic Info."
+        )
+
+        scrollToElement(app.buttons["pet-danger-delete-action"], in: app)
+        tapWhenHittable(app.buttons["pet-danger-delete-action"], timeout: 8)
+        XCTAssertTrue(nameInput.waitForExistence(timeout: 8), "Dog long-session final delete input did not reappear.")
+        tapWhenHittable(nameInput, timeout: 8)
+        nameInput.typeText(petName)
+        XCTAssertTrue(finalDelete.isEnabled, "Dog long-session delete action did not enable after exact-name confirmation.")
+        tapWhenHittable(finalDelete, timeout: 8)
+
+        let deletedPrompt = app.buttons["home-add-first-pet-action"]
+        let deletedPromptCard = app.buttons["home-add-first-pet-card"]
+        let deletedPetCard = app.buttons.matching(NSPredicate(format: "label == %@", petName)).firstMatch
+        let didReturnResponsive = waitUntil(timeout: 20) {
+            app.state == .runningForeground &&
+                (deletedPrompt.isHittable || deletedPromptCard.isHittable || !deletedPetCard.isHittable) &&
+                isHomeSurfaceResponsive(in: app)
+        }
+        XCTAssertTrue(didReturnResponsive, "Dog long-session permanent delete did not return to a responsive Home surface.")
+        XCTAssertFalse(deletedPetCard.isHittable, "Deleted dog long-session pet card is still visible on Home.")
+    }
+
+    @MainActor
     func testPetWaterRecordPersistsFromQuickCareDetail() throws {
         let app = launchEnglishApp(enableProductionOverlays: true)
         let humanName = createFirstHuman(from: app)
@@ -3103,7 +3229,11 @@ final class OhanaUITests: XCTestCase {
             creationPrimary.tap()
             if isMemberCreationFinalActionLabel(actionLabel) {
                 didTapFinalSave = true
-                break
+                RunLoop.current.run(until: Date().addingTimeInterval(0.8))
+                if !creationPrimary.exists {
+                    break
+                }
+                continue
             }
             RunLoop.current.run(until: Date().addingTimeInterval(0.45))
             if !creationPrimary.exists {
