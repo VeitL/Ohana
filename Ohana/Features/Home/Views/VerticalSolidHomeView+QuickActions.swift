@@ -354,7 +354,7 @@ extension VerticalSolidHomeView {
     func openCalendarEventDestinationAfterDismiss(_ destination: FocusHomeReminderDestination) {
         switch destination {
         case let .petQuick(key, pet):
-            openPetQuickKey(key, petID: pet.id)
+            openPetReminderQuickKey(key, petID: pet.id)
         case let .petFeature(feature, pet):
             openPetFeature(feature, petID: pet.id)
         case let .petHealth(pet, section):
@@ -375,7 +375,7 @@ extension VerticalSolidHomeView {
     func openCalendarEventDestinationAfterDismiss(_ destination: HomeReminderRouteSnapshot) {
         switch destination {
         case let .petQuick(key, petID):
-            openPetQuickKey(key, petID: petID)
+            openPetReminderQuickKey(key, petID: petID)
         case let .petFeature(feature, petID):
             openPetFeature(feature, petID: petID)
         case let .petHealth(petID, section):
@@ -390,6 +390,14 @@ extension VerticalSolidHomeView {
             openFunctionMenu(destination: destination)
         case let .calendar(entityId, humanId):
             routeCoordinator.openCalendar(entityID: entityId, humanID: humanId)
+        }
+    }
+
+    func openPetReminderQuickKey(_ key: String, petID: UUID) {
+        if key == "walk" {
+            routeCoordinator.openSheet(.petWalkSummary(petID))
+        } else {
+            openPetQuickKey(key, petID: petID)
         }
     }
 

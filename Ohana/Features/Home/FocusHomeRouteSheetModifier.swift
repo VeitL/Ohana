@@ -236,7 +236,7 @@ struct FocusHomeRouteSheetModifier: ViewModifier {
     private func openCalendarEventDestinationAfterDismiss(_ destination: FocusHomeReminderDestination) {
         switch destination {
         case let .petQuick(key, pet):
-            openPetQuickKey(key, petID: pet.id)
+            openPetReminderQuickKey(key, petID: pet.id)
         case let .petFeature(feature, pet):
             openPetFeature(feature, petID: pet.id)
         case let .petHealth(pet, section):
@@ -251,6 +251,14 @@ struct FocusHomeRouteSheetModifier: ViewModifier {
             openFunctionMenu(destination: destination)
         case let .calendar(entityId, humanId):
             routes.openCalendar(entityID: entityId, humanID: humanId)
+        }
+    }
+
+    private func openPetReminderQuickKey(_ key: String, petID: UUID) {
+        if key == "walk" {
+            routes.openSheet(.petWalkSummary(petID))
+        } else {
+            openPetQuickKey(key, petID: petID)
         }
     }
 

@@ -1149,6 +1149,29 @@ final class OhanaUITests: XCTestCase {
     }
 
     @MainActor
+    func testPetCalendarFeedEventRowOpensQuickFeedDetail() throws {
+        let app = launchEnglishApp(enableProductionOverlays: true)
+        _ = createFirstHuman(from: app)
+        let timestamp = Int(Date().timeIntervalSince1970)
+        let petName = "Codex Calendar Feed Pet \(timestamp)"
+        let petEventTitle = "Codex food reminder \(timestamp)"
+        completeFirstDayStarterFunnel(
+            in: app,
+            petName: petName,
+            completionMessage: "Creating the first pet did not leave the pet creation handoff in time."
+        )
+
+        openCalendarTab(in: app, petName: petName)
+        addCalendarEvent(title: petEventTitle, linkedPetName: petName, in: app)
+        tapCalendarEvent(petEventTitle, in: app)
+
+        XCTAssertTrue(
+            waitForQuickFeedHome(in: app, timeout: 18),
+            "Tapping a pet-linked food calendar event did not deep-link to the pet Feeding detail route."
+        )
+    }
+
+    @MainActor
     func testPetCalendarPottyEventRowOpensQuickPottyDetail() throws {
         let app = launchEnglishApp(enableProductionOverlays: true)
         _ = createFirstHuman(from: app)
@@ -1168,6 +1191,76 @@ final class OhanaUITests: XCTestCase {
         XCTAssertTrue(
             app.descendants(matching: .any)["quick-potty-detail-sheet"].waitForExistence(timeout: 18),
             "Tapping a pet-linked potty calendar event did not deep-link to the pet Potty detail route."
+        )
+    }
+
+    @MainActor
+    func testPetCalendarWalkEventRowOpensWalkSummary() throws {
+        let app = launchEnglishApp(enableProductionOverlays: true)
+        _ = createFirstHuman(from: app)
+        let timestamp = Int(Date().timeIntervalSince1970)
+        let petName = "Codex Calendar Walk Pet \(timestamp)"
+        let petEventTitle = "Codex walk reminder \(timestamp)"
+        completeFirstDayStarterFunnel(
+            in: app,
+            petName: petName,
+            petSpeciesLabel: "Dog",
+            completionMessage: "Creating the first dog did not leave the pet creation handoff in time."
+        )
+
+        openCalendarTab(in: app, petName: petName)
+        addCalendarEvent(title: petEventTitle, linkedPetName: petName, in: app)
+        tapCalendarEvent(petEventTitle, in: app)
+
+        XCTAssertTrue(
+            app.descendants(matching: .any)["walk-summary-sheet"].waitForExistence(timeout: 18),
+            "Tapping a pet-linked walk calendar event did not deep-link to the pet Walk summary route."
+        )
+    }
+
+    @MainActor
+    func testPetCalendarHealthEventRowOpensHealthDetail() throws {
+        let app = launchEnglishApp(enableProductionOverlays: true)
+        _ = createFirstHuman(from: app)
+        let timestamp = Int(Date().timeIntervalSince1970)
+        let petName = "Codex Calendar Health Pet \(timestamp)"
+        let petEventTitle = "Codex vet check reminder \(timestamp)"
+        completeFirstDayStarterFunnel(
+            in: app,
+            petName: petName,
+            completionMessage: "Creating the first pet did not leave the pet creation handoff in time."
+        )
+
+        openCalendarTab(in: app, petName: petName)
+        addCalendarEvent(title: petEventTitle, linkedPetName: petName, in: app)
+        tapCalendarEvent(petEventTitle, in: app)
+
+        XCTAssertTrue(
+            app.descendants(matching: .any)["pet-health-detail-screen"].waitForExistence(timeout: 18),
+            "Tapping a pet-linked health calendar event did not deep-link to the pet Health detail route."
+        )
+    }
+
+    @MainActor
+    func testPetCalendarHygieneEventRowOpensHygieneDetail() throws {
+        let app = launchEnglishApp(enableProductionOverlays: true)
+        _ = createFirstHuman(from: app)
+        let timestamp = Int(Date().timeIntervalSince1970)
+        let petName = "Codex Calendar Hygiene Pet \(timestamp)"
+        let petEventTitle = "Codex grooming reminder \(timestamp)"
+        completeFirstDayStarterFunnel(
+            in: app,
+            petName: petName,
+            completionMessage: "Creating the first pet did not leave the pet creation handoff in time."
+        )
+
+        openCalendarTab(in: app, petName: petName)
+        addCalendarEvent(title: petEventTitle, linkedPetName: petName, in: app)
+        tapCalendarEvent(petEventTitle, in: app)
+
+        XCTAssertTrue(
+            app.descendants(matching: .any)["pet-hygiene-detail-screen"].waitForExistence(timeout: 18),
+            "Tapping a pet-linked hygiene calendar event did not deep-link to the pet Hygiene detail route."
         )
     }
 
