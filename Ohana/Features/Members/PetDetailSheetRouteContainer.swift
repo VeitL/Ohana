@@ -275,6 +275,7 @@ private struct PetRouteMissingEntityView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(OhanaAppBackground().ignoresSafeArea())
+        .accessibilityIdentifier("pet-route-missing-\(kind)")
     }
 }
 

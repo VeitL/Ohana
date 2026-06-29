@@ -1342,6 +1342,55 @@ final class OhanaUITests: XCTestCase {
     }
 
     @MainActor
+    func testMemorialPetCalendarEventDoesNotOpenLiveCareRoute() throws {
+        let app = launchEnglishApp(enableProductionOverlays: true)
+        let humanName = createFirstHuman(from: app)
+        let timestamp = Int(Date().timeIntervalSince1970)
+        let petName = "Codex Memorial Calendar Pet \(timestamp)"
+        let petEventTitle = "Codex stale water reminder \(timestamp)"
+        completeFirstDayStarterFunnel(
+            in: app,
+            petName: petName,
+            completionMessage: "Creating the first pet did not leave the pet creation handoff in time."
+        )
+
+        openCalendarTab(in: app, petName: petName)
+        addCalendarEvent(title: petEventTitle, linkedPetName: petName, in: app)
+        tapWhenHittable(app.buttons["home-tab-home"], timeout: 8)
+        ensureHomeSurfaceVisible(in: app, humanName: humanName)
+
+        openPetBasicInfoFromHome(in: app, petName: petName)
+        let markAction = app.buttons["pet-memorial-mark-action"]
+        scrollToElement(markAction, in: app)
+        tapWhenHittable(markAction, timeout: 8)
+        tapWhenHittable(app.buttons["确认"], timeout: 8)
+        XCTAssertTrue(
+            app.staticTexts["pet-memorial-passed-date"].waitForExistence(timeout: 12),
+            "Confirming memorial mark did not show the passed-away summary before stale Calendar route check."
+        )
+
+        app.terminate()
+        app.launchArguments.removeAll { $0 == "-OHANA_RESET_PERSISTENT_STATE" }
+        app.launch()
+        ensureHomeSurfaceVisible(in: app, humanName: humanName)
+
+        openCalendarTabFromHome(in: app, humanName: humanName)
+        assertCalendarEvent(petEventTitle, exists: true, in: app, context: "memorial stale calendar row still visible")
+        tapCalendarEvent(petEventTitle, in: app)
+
+        XCTAssertTrue(
+            waitUntil(timeout: 8) {
+                app.state == .runningForeground
+            },
+            "Tapping a stale Calendar event for a memorial pet left the app unresponsive."
+        )
+        XCTAssertFalse(
+            isAnyLivePetRouteVisible(in: app),
+            "Tapping a stale Calendar event for a memorial pet opened a live care, health, walk, or economy route."
+        )
+    }
+
+    @MainActor
     func testPetBondVaultInsufficientBalanceBlocksUnlockFromFeatureHub() throws {
         let app = launchEnglishApp(enableProductionOverlays: true)
         let humanName = createFirstHuman(from: app)
@@ -3024,6 +3073,18 @@ final class OhanaUITests: XCTestCase {
     }
 
     @MainActor
+    private func openCalendarTabFromHome(in app: XCUIApplication, humanName: String) {
+        ensureHomeSurfaceVisible(in: app, humanName: humanName)
+        let calendarTab = app.buttons["home-tab-calendar"]
+        XCTAssertTrue(calendarTab.waitForExistence(timeout: 20), "Calendar tab did not appear from Home.")
+        tapWhenHittable(calendarTab, timeout: 8)
+        XCTAssertTrue(
+            app.buttons["calendar-filter-all"].waitForExistence(timeout: 14),
+            "Calendar screen did not open from Home."
+        )
+    }
+
+    @MainActor
     private func selectCalendarListView(in app: XCUIApplication) {
         let listViewButton = app.buttons["calendar-view-mode-list"]
         XCTAssertTrue(listViewButton.waitForExistence(timeout: 10), "Calendar list-view toggle did not appear.")
@@ -3103,6 +3164,23 @@ final class OhanaUITests: XCTestCase {
             "Calendar event row \(title) did not exist before tapping."
         )
         tapWhenHittable(row, timeout: 8)
+    }
+
+    @MainActor
+    private func isAnyLivePetRouteVisible(in app: XCUIApplication) -> Bool {
+        [
+            "quick-feed-detail-sheet",
+            "quick-water-detail-sheet",
+            "quick-potty-detail-sheet",
+            "quick-play-detail-sheet",
+            "pet-hygiene-detail-screen",
+            "pet-health-detail-screen",
+            "pet-weight-detail-screen",
+            "walk-summary-sheet",
+            "pet-bond-vault-screen"
+        ].contains { identifier in
+            app.descendants(matching: .any)[identifier].exists
+        }
     }
 
     @MainActor
