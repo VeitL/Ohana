@@ -257,5 +257,6 @@ extension CalendarView {
         .accessibilityValue(viewMode == mode
             ? l.tr(zh: "已选中", en: "Selected", de: "Ausgewählt")
             : l.tr(zh: "未选中", en: "Not selected", de: "Nicht ausgewählt"))
+        .accessibilityIdentifier("calendar-view-mode-\(mode == .month ? "month" : "list")")
     }
 }

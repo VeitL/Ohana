@@ -1022,6 +1022,76 @@ final class OhanaUITests: XCTestCase {
     }
 
     @MainActor
+    func testPetScoopPlanCalendarEventAppearsAndDeletesFromQuickCareDetail() throws {
+        let app = launchEnglishApp(enableProductionOverlays: true)
+        let humanName = createFirstHuman(from: app)
+        let petName = "Codex Scoop Calendar Cat \(Int(Date().timeIntervalSince1970))"
+        let scoopEventTitles = [
+            "\(petName) Scoop plan",
+            "\(petName) 铲屎计划",
+            "\(petName) Klo-Plan"
+        ]
+        completeFirstDayStarterFunnel(
+            in: app,
+            petName: petName,
+            petSpeciesLabel: "Cat",
+            completionMessage: "Creating the first cat did not leave the pet creation handoff in time."
+        )
+
+        openPetPottyDetailFromHome(in: app, petName: petName, humanName: humanName)
+        openScoopSettings(in: app)
+
+        let reminderToggle = app.descendants(matching: .any)["quick-potty-scoop-settings-reminder-toggle"]
+        XCTAssertTrue(
+            reminderToggle.waitForExistence(timeout: 10),
+            "Scoop settings did not expose the reminder toggle before Calendar sync setup."
+        )
+        tapWhenHittable(reminderToggle, timeout: 8)
+        tapWhenHittable(app.buttons["quick-potty-scoop-settings-save-action"], timeout: 8)
+        XCTAssertTrue(
+            waitUntil(timeout: 8) {
+                !app.descendants(matching: .any)["quick-potty-scoop-settings-sheet"].exists
+            },
+            "Scoop settings sheet stayed open after saving the Calendar-backed reminder."
+        )
+        closeCurrentSheetToHome(in: app, humanName: humanName)
+
+        openCalendarTab(in: app, petName: petName)
+        selectCalendarListView(in: app)
+        tapWhenHittable(app.buttons["calendar-filter-pet-\(petName)"], timeout: 8)
+        assertCalendarEventAny(of: scoopEventTitles, exists: true, in: app, context: "scoop plan save calendar readback")
+
+        closeCurrentSheetToHome(in: app, humanName: humanName)
+        openPetPottyDetailFromHome(in: app, petName: petName, humanName: humanName)
+        openScoopSettings(in: app)
+        assertScoopSettingsStatus(
+            in: app,
+            containsAny: ["Reminder on", "提醒已开启", "Erinnerung an"],
+            message: "Scoop settings did not retain reminder-on state before deleting Calendar plan."
+        )
+
+        let deleteAction = app.buttons["quick-potty-scoop-settings-delete-action"]
+        scrollToElement(deleteAction, in: app, maxSwipes: 4)
+        XCTAssertTrue(
+            deleteAction.waitForExistence(timeout: 10),
+            "Scoop settings did not expose the delete-plan action before Calendar removal."
+        )
+        tapWhenHittable(deleteAction, timeout: 8)
+        XCTAssertTrue(
+            waitUntil(timeout: 8) {
+                !app.descendants(matching: .any)["quick-potty-scoop-settings-sheet"].exists
+            },
+            "Scoop settings sheet stayed open after deleting the Calendar-backed reminder."
+        )
+        closeCurrentSheetToHome(in: app, humanName: humanName)
+
+        openCalendarTab(in: app, petName: petName)
+        selectCalendarListView(in: app)
+        tapWhenHittable(app.buttons["calendar-filter-pet-\(petName)"], timeout: 8)
+        assertCalendarEventAny(of: scoopEventTitles, exists: false, in: app, context: "scoop plan delete calendar readback")
+    }
+
+    @MainActor
     func testPetHygieneRecordPersistsAndRepeatTapIsBlocked() throws {
         let app = launchEnglishApp(enableProductionOverlays: true)
         let humanName = createFirstHuman(from: app)
@@ -2486,9 +2556,36 @@ final class OhanaUITests: XCTestCase {
     }
 
     @MainActor
+    private func openScoopSettings(in app: XCUIApplication) {
+        let manageAction = app.buttons["quick-potty-scoop-secondary-action"]
+        scrollToElement(manageAction, in: app, maxSwipes: 6)
+        XCTAssertTrue(
+            manageAction.waitForExistence(timeout: 12),
+            "Cat potty detail did not expose the scoop settings action."
+        )
+        tapWhenHittable(manageAction, timeout: 8)
+        XCTAssertTrue(
+            app.descendants(matching: .any)["quick-potty-scoop-settings-sheet"].waitForExistence(timeout: 12),
+            "Scoop settings sheet did not open."
+        )
+    }
+
+    @MainActor
     private func assertLitterSettingsStatus(in app: XCUIApplication, containsAny markers: [String], message: String) {
         let statusTitle = app.staticTexts["quick-potty-litter-settings-status-title"]
         XCTAssertTrue(statusTitle.waitForExistence(timeout: 10), "Litter settings status title did not appear.")
+        XCTAssertTrue(
+            waitUntil(timeout: 8) {
+                markers.contains { statusTitle.label.contains($0) }
+            },
+            message
+        )
+    }
+
+    @MainActor
+    private func assertScoopSettingsStatus(in app: XCUIApplication, containsAny markers: [String], message: String) {
+        let statusTitle = app.staticTexts["quick-potty-scoop-settings-status-title"]
+        XCTAssertTrue(statusTitle.waitForExistence(timeout: 10), "Scoop settings status title did not appear.")
         XCTAssertTrue(
             waitUntil(timeout: 8) {
                 markers.contains { statusTitle.label.contains($0) }
@@ -2924,6 +3021,13 @@ final class OhanaUITests: XCTestCase {
             app.buttons["calendar-filter-all"].waitForExistence(timeout: 14),
             "Calendar screen did not open from the Home tab."
         )
+    }
+
+    @MainActor
+    private func selectCalendarListView(in app: XCUIApplication) {
+        let listViewButton = app.buttons["calendar-view-mode-list"]
+        XCTAssertTrue(listViewButton.waitForExistence(timeout: 10), "Calendar list-view toggle did not appear.")
+        tapWhenHittable(listViewButton, timeout: 8)
     }
 
     @MainActor
