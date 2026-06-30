@@ -12,7 +12,7 @@ final class PlantModuleUITests: XCTestCase {
 
     @MainActor
     func testPlantModuleUnlockCreateCareReminderCalendarAndDelete() throws {
-        let app = launchEnglishApp(enableProductionOverlays: true)
+        let app = launchEnglishApp(resetPersistentState: true, enableProductionOverlays: true)
         createFirstHuman(from: app)
         completeFirstDayStarterFunnel(in: app)
 
@@ -42,7 +42,27 @@ final class PlantModuleUITests: XCTestCase {
     }
 
     @MainActor
-    private func launchEnglishApp(enableProductionOverlays: Bool = false) -> XCUIApplication {
+    func testExistingPlantReminderToggleWithoutReset() throws {
+        let app = launchEnglishApp(enableProductionOverlays: true)
+        guard app.buttons["home-settings-action"].waitForExistence(timeout: 12) else {
+            throw XCTSkip("No existing household state is available for no-reset plant reminder coverage.")
+        }
+
+        openSettingsFromHomeChrome(in: app)
+        XCTAssertTrue(containsAnyMarker(["Plant care reminders"], in: app, timeout: 10), "Plant reminder settings panel did not appear in Settings.")
+        let plantToggle = findAnyPlantReminderToggle(in: app, maxSwipes: 18)
+        guard plantToggle.exists else {
+            throw XCTSkip("No existing plant is available for no-reset plant reminder coverage.")
+        }
+
+        assertPlantReminderToggleCanRoundTrip(plantToggle, in: app)
+    }
+
+    @MainActor
+    private func launchEnglishApp(
+        resetPersistentState: Bool = false,
+        enableProductionOverlays: Bool = false
+    ) -> XCUIApplication {
         let app = XCUIApplication()
         app.launchArguments += [
             "-AppleLanguages",
@@ -51,9 +71,11 @@ final class PlantModuleUITests: XCTestCase {
             "en_US",
             "-appLanguage",
             "en",
-            "-OHANA_UI_TESTS",
-            "-OHANA_RESET_PERSISTENT_STATE"
+            "-OHANA_UI_TESTS"
         ]
+        if resetPersistentState {
+            app.launchArguments += ["-OHANA_RESET_PERSISTENT_STATE"]
+        }
         if enableProductionOverlays {
             app.launchArguments += ["-OHANA_ENABLE_PRODUCTION_OVERLAYS_IN_UI_TESTS"]
         }
@@ -226,17 +248,97 @@ final class PlantModuleUITests: XCTestCase {
     private func openPlantReminderSettingsAndTogglePlant(named plantName: String, in app: XCUIApplication) {
         openSettingsFromHomeChrome(in: app)
         XCTAssertTrue(containsAnyMarker(["Plant care reminders"], in: app, timeout: 10), "Plant reminder settings panel did not appear in Settings.")
-        let plantToggle = app.descendants(matching: .any)["settings-plant-reminders-plant-toggle-\(plantName)"]
-        scrollToElement(plantToggle, in: app, maxSwipes: 8)
+        let plantToggle = findPlantReminderToggle(named: plantName, in: app, maxSwipes: 18)
         XCTAssertTrue(plantToggle.waitForExistence(timeout: 8), "Per-plant reminder toggle did not appear.")
-        tapWhenFrameReady(plantToggle, timeout: 8)
-        XCTAssertTrue(containsAnyMarker(["muted", "已静音"], in: app, timeout: 8), "Per-plant reminder toggle did not show a muted status.")
-        tapWhenFrameReady(plantToggle, timeout: 8)
-        XCTAssertTrue(containsAnyMarker(["enabled", "已开启提醒"], in: app, timeout: 8), "Per-plant reminder toggle did not show an enabled status.")
+        assertPlantReminderToggleCanRoundTrip(plantToggle, in: app)
 
         scrollToElement(app.buttons["settings-plant-reminders-defer-all"], in: app, maxSwipes: 3)
         tapWhenFrameReady(app.buttons["settings-plant-reminders-defer-all"], timeout: 8)
         XCTAssertTrue(containsAnyMarker(["Deferred", "No plant tasks are due", "已延后", "当前没有已到期"], in: app, timeout: 8), "Plant reminder bulk defer did not report a result.")
+    }
+
+    @MainActor
+    private func assertPlantReminderToggleCanRoundTrip(_ plantToggle: XCUIElement, in app: XCUIApplication) {
+        guard let startsEnabled = switchOnState(of: plantToggle) else {
+            XCTFail("Per-plant reminder control did not expose an initial on/off value. label=\(plantToggle.label), value=\(String(describing: plantToggle.value ?? ""))")
+            return
+        }
+
+        tapReminderToggleControl(plantToggle, timeout: 8)
+        XCTAssertTrue(
+            waitForSwitchOnState(plantToggle, toEqual: !startsEnabled, timeout: 8),
+            "Per-plant reminder control did not switch to the opposite state. label=\(plantToggle.label), value=\(String(describing: plantToggle.value ?? ""))"
+        )
+
+        tapReminderToggleControl(plantToggle, timeout: 8)
+        XCTAssertTrue(
+            waitForSwitchOnState(plantToggle, toEqual: startsEnabled, timeout: 8),
+            "Per-plant reminder control did not switch back to the original state. label=\(plantToggle.label), value=\(String(describing: plantToggle.value ?? ""))"
+        )
+    }
+
+    @MainActor
+    private func findPlantReminderToggle(named plantName: String, in app: XCUIApplication, maxSwipes: Int) -> XCUIElement {
+        let identified = app.descendants(matching: .any)["settings-plant-reminders-plant-toggle-\(plantName)"]
+        let labelled = app.scrollViews.buttons.matching(NSPredicate(
+            format: "label CONTAINS[c] %@ AND identifier != %@",
+            plantName,
+            "settings-plant-reminders-panel"
+        )).firstMatch
+        let section = app.descendants(matching: .any)["settings-plant-reminders-plant-section"]
+        let emptyState = app.descendants(matching: .any)["settings-plant-reminders-empty-state"]
+
+        for _ in 0 ..< maxSwipes {
+            if identified.exists { return identified }
+            if labelled.exists { return labelled }
+            if emptyState.exists {
+                XCTFail("Settings plant reminder panel loaded with no plants after creating \(plantName).")
+                return identified
+            }
+            if section.exists {
+                RunLoop.current.run(until: Date().addingTimeInterval(0.4))
+                if identified.exists { return identified }
+                if labelled.exists { return labelled }
+            }
+            app.swipeUp()
+            RunLoop.current.run(until: Date().addingTimeInterval(0.25))
+        }
+
+        if emptyState.exists {
+            XCTFail("Settings plant reminder panel loaded with no plants after creating \(plantName).")
+        }
+        return identified.exists ? identified : labelled
+    }
+
+    @MainActor
+    private func findAnyPlantReminderToggle(in app: XCUIApplication, maxSwipes: Int) -> XCUIElement {
+        let identified = app.descendants(matching: .any).matching(NSPredicate(
+            format: "identifier BEGINSWITH %@",
+            "settings-plant-reminders-plant-toggle-"
+        )).firstMatch
+        let emptyState = app.descendants(matching: .any)["settings-plant-reminders-empty-state"]
+
+        for _ in 0 ..< maxSwipes {
+            if identified.exists { return identified }
+            if emptyState.exists { return identified }
+            app.swipeUp()
+            RunLoop.current.run(until: Date().addingTimeInterval(0.25))
+        }
+
+        return identified
+    }
+
+    @MainActor
+    private func findPlantReminderToggle(matching element: XCUIElement, in app: XCUIApplication, maxSwipes: Int) -> XCUIElement {
+        let identifier = element.identifier
+        guard !identifier.isEmpty else { return element }
+        let identified = app.descendants(matching: .any)[identifier]
+        for _ in 0 ..< maxSwipes {
+            if identified.exists { return identified }
+            app.swipeUp()
+            RunLoop.current.run(until: Date().addingTimeInterval(0.25))
+        }
+        return identified.exists ? identified : element
     }
 
     @MainActor
@@ -508,6 +610,32 @@ final class PlantModuleUITests: XCTestCase {
             let currentValue = String(describing: element.value ?? "")
             return currentValue.contains(text)
         }
+    }
+
+    private func waitForSwitchOnState(_ element: XCUIElement, toEqual expected: Bool, timeout: TimeInterval) -> Bool {
+        waitUntil(timeout: timeout) {
+            switchOnState(of: element) == expected
+        }
+    }
+
+    private func switchOnState(of element: XCUIElement) -> Bool? {
+        let rawValue = String(describing: element.value ?? "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+        switch rawValue {
+        case "1", "true", "on", "yes":
+            return true
+        case "0", "false", "off", "no":
+            return false
+        default:
+            return nil
+        }
+    }
+
+    @MainActor
+    private func tapReminderToggleControl(_ element: XCUIElement, timeout: TimeInterval) {
+        XCTAssertTrue(waitForFrameReady(element, timeout: timeout), "Reminder toggle did not become frame-ready: \(element)")
+        element.tap()
     }
 
     @MainActor

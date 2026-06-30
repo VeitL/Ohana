@@ -5,18 +5,41 @@
 
 import SwiftData
 import SwiftUI
+import UIKit
 
 struct SettingsPlantReminderDataContainer: View {
     @Environment(\.modelContext) private var modelContext
+    @Environment(AppServices.self) private var appServices
+    @State private var refreshToken = 0
+    @State private var observedRevisionValue: Int?
 
     var body: some View {
         RouteFirstFrameDeferredLoad(
             initialData: SettingsPlantReminderRouteData(),
+            refreshToken: refreshToken,
             loadDelayMilliseconds: 80,
-            shouldLoad: { !$0.hasLoaded },
+            reloadDelayMilliseconds: 80,
+            shouldLoad: { !$0.hasLoaded || $0.plants.isEmpty },
             load: { SettingsPlantReminderRouteData.load(from: modelContext) }
         ) { data in
             SettingsPlantReminderPanelContent(plants: data.plants)
+        }
+        .onReceive(appServices.domainRevisions.homeRevisionUpdates) { revision in
+            guard shouldRefreshPlantReminderData(for: revision) else { return }
+            guard observedRevisionValue != revision.value else { return }
+            defer { observedRevisionValue = revision.value }
+            guard observedRevisionValue != nil else { return }
+            refreshToken &+= 1
+        }
+    }
+
+    private func shouldRefreshPlantReminderData(for revision: HomeRevision) -> Bool {
+        guard let command = revision.lastCommand else { return false }
+        switch command.feature {
+        case "members", "plants":
+            return true
+        default:
+            return false
         }
     }
 }
@@ -51,7 +74,8 @@ private struct SettingsPlantReminderPanelContent: View {
     @Environment(AppServices.self) private var appServices
     @AppStorage("appLanguage") private var appLanguage = "zh"
     @AppStorage("currentActiveHumanId") private var currentActiveHumanId = ""
-    @State private var preferenceRevision = 0
+    @State private var plantReminderDisplayState: [UUID: Bool] = [:]
+    @State private var pendingPlantReminderUpdates: [UUID: PendingPlantReminderUpdate] = [:]
     @State private var statusMessage: String?
 
     private var l: L10n { L10n(appLanguage) }
@@ -83,11 +107,16 @@ private struct SettingsPlantReminderPanelContent: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(.top, 8)
                         .padding(.leading, 44)
+                        .accessibilityIdentifier("settings-plant-reminders-status")
                 }
             }
         }
-        .id(preferenceRevision)
-        .accessibilityIdentifier("settings-plant-reminders-panel")
+        .onDisappear {
+            flushPendingPlantReminderUpdates()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.willResignActiveNotification)) { _ in
+            flushPendingPlantReminderUpdates()
+        }
     }
 
     private var sectionDivider: some View {
@@ -234,6 +263,7 @@ private struct SettingsPlantReminderPanelContent: View {
                     de: "Kalendererinnerungen für einzelne Pflanzen pausieren"
                 )
             )
+            .accessibilityIdentifier("settings-plant-reminders-plant-section")
             if plants.isEmpty {
                 Text(l.tr(zh: "还没有植物", en: "No plants yet", de: "Noch keine Pflanzen"))
                     .font(OhanaFont.caption(.semibold))
@@ -241,40 +271,42 @@ private struct SettingsPlantReminderPanelContent: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.leading, 44)
                     .padding(.vertical, 8)
+                    .accessibilityIdentifier("settings-plant-reminders-empty-state")
             } else {
                 ForEach(plants) { plant in
-                    HStack(spacing: 12) {
-                        Text(plant.avatarEmoji.isEmpty ? "🌱" : plant.avatarEmoji)
-                            .font(OhanaFont.body(.semibold))
-                            .frame(width: 44, height: 44)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(plant.name.isEmpty ? l.tr(zh: "植物", en: "Plant", de: "Pflanze") : plant.name)
+                    Button {
+                        togglePlantReminders(for: plant)
+                    } label: {
+                        HStack(spacing: 12) {
+                            Text(plant.avatarEmoji.isEmpty ? "🌱" : plant.avatarEmoji)
                                 .font(OhanaFont.body(.semibold))
-                                .foregroundStyle(primaryText)
-                            Text(plant.location.isEmpty ? plant.species : plant.location)
-                                .font(OhanaFont.caption2(.semibold))
-                                .foregroundStyle(tertiaryText)
-                                .lineLimit(1)
-                        }
-                        Spacer()
-                        Toggle("", isOn: Binding(
-                            get: { plant.remindersEnabled },
-                            set: { value in
-                                appServices.plantReminderControls.setPlantRemindersEnabled(
-                                    value,
-                                    plant: plant,
-                                    context: modelContext
-                                )
-                                statusMessage = plantToggleMessage(plant, enabled: value)
-                                preferenceRevision += 1
+                                .frame(width: 44, height: 44)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(plant.name.isEmpty ? l.tr(zh: "植物", en: "Plant", de: "Pflanze") : plant.name)
+                                    .font(OhanaFont.body(.semibold))
+                                    .foregroundStyle(primaryText)
+                                Text(plant.location.isEmpty ? plant.species : plant.location)
+                                    .font(OhanaFont.caption2(.semibold))
+                                    .foregroundStyle(tertiaryText)
+                                    .lineLimit(1)
                             }
-                        ))
-                        .tint(accentColor)
-                        .labelsHidden()
-                        .accessibilityIdentifier("settings-plant-reminders-plant-toggle-\(plant.name)")
+                            Spacer()
+                            plantReminderToggleIndicator(isOn: plantRemindersEnabled(for: plant))
+                                .accessibilityHidden(true)
+                        }
+                        .frame(minHeight: 46)
+                        .padding(.leading, 44)
+                        .contentShape(Rectangle())
                     }
-                    .frame(minHeight: 46)
-                    .padding(.leading, 44)
+                    .buttonStyle(.plain) // ui-v4: allow visual switch state is the press feedback; scale animation delayed UI-test idle on this settings row
+                    .accessibilityLabel(plantReminderAccessibilityLabel(plant))
+                    .accessibilityValue(plantReminderAccessibilityValue(plant))
+                    .accessibilityHint(l.tr(
+                        zh: "双击切换这株植物的日历提醒",
+                        en: "Double tap to toggle calendar reminders for this plant",
+                        de: "Doppeltippen, um Kalendererinnerungen für diese Pflanze umzuschalten"
+                    ))
+                    .accessibilityIdentifier("settings-plant-reminders-plant-toggle-\(plant.name)")
                 }
             }
         }
@@ -288,7 +320,6 @@ private struct SettingsPlantReminderPanelContent: View {
                 executorId: currentActiveHumanId.isEmpty ? nil : currentActiveHumanId
             )
             statusMessage = bulkDeferMessage(result)
-            preferenceRevision += 1
             UIImpactFeedbackGenerator(style: result.deferredTaskCount > 0 ? .medium : .light).impactOccurred()
         } label: {
             HStack(spacing: 12) {
@@ -315,6 +346,78 @@ private struct SettingsPlantReminderPanelContent: View {
         }
         .buttonStyle(ScaleButtonStyle())
         .accessibilityIdentifier("settings-plant-reminders-defer-all")
+    }
+
+    private func plantRemindersEnabled(for plant: Plant) -> Bool {
+        plantReminderDisplayState[plant.id] ?? plant.remindersEnabled
+    }
+
+    private func plantReminderAccessibilityLabel(_ plant: Plant) -> String {
+        let name = plant.name.isEmpty ? l.tr(zh: "植物", en: "Plant", de: "Pflanze") : plant.name
+        return l.tr(
+            zh: "\(name) 提醒",
+            en: "\(name) reminders",
+            de: "Erinnerungen für \(name)"
+        )
+    }
+
+    private func plantReminderAccessibilityValue(_ plant: Plant) -> String {
+        plantRemindersEnabled(for: plant)
+            ? l.tr(zh: "开启", en: "On", de: "Ein")
+            : l.tr(zh: "关闭", en: "Off", de: "Aus")
+    }
+
+    private func plantReminderToggleIndicator(isOn: Bool) -> some View {
+        HStack(spacing: 0) {
+            if isOn {
+                Spacer(minLength: 0)
+            }
+            Circle()
+                .fill(Color.ohanaCardSurface)
+                .frame(width: 22, height: 22) // a11y: allow decorative toggle knob; row button owns the 44pt+ hit target
+            if !isOn {
+                Spacer(minLength: 0)
+            }
+        }
+        .padding(3)
+        .frame(width: 50, height: 30)
+        .background(
+            Capsule().fill(isOn ? accentColor : Color.ohanaControlFill)
+        )
+        .overlay(
+            Capsule().stroke(isOn ? Color.clear : dividerLine.opacity(0.7), lineWidth: 1)
+        )
+        .transaction { transaction in
+            transaction.animation = nil
+        }
+    }
+
+    private func togglePlantReminders(for plant: Plant) {
+        setPlantRemindersEnabled(!plantRemindersEnabled(for: plant), for: plant)
+    }
+
+    private func setPlantRemindersEnabled(_ enabled: Bool, for plant: Plant) {
+        plantReminderDisplayState[plant.id] = enabled
+        statusMessage = plantToggleMessage(plant, enabled: enabled)
+        pendingPlantReminderUpdates[plant.id] = PendingPlantReminderUpdate(
+            plantID: plant.id,
+            enabled: enabled
+        )
+    }
+
+    private func flushPendingPlantReminderUpdates() {
+        guard !pendingPlantReminderUpdates.isEmpty else { return }
+
+        let updates = pendingPlantReminderUpdates
+        pendingPlantReminderUpdates.removeAll()
+        for update in updates.values {
+            guard let plant = plants.first(where: { $0.id == update.plantID }) else { continue }
+            appServices.plantReminderControls.setPlantRemindersEnabled(
+                update.enabled,
+                plant: plant,
+                context: modelContext
+            )
+        }
     }
 
     private func toggleRow(
@@ -394,7 +497,6 @@ private struct SettingsPlantReminderPanelContent: View {
             en: "Updated reminder plans for \(resyncedCount) plants",
             de: "Erinnerungspläne für \(resyncedCount) Pflanzen aktualisiert"
         )
-        preferenceRevision += 1
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
     }
 
@@ -435,4 +537,9 @@ private struct SettingsPlantReminderPanelContent: View {
             de: "\(result.deferredTaskCount) Aufgaben für \(result.affectedPlantCount) Pflanzen verschoben"
         )
     }
+}
+
+private struct PendingPlantReminderUpdate: Equatable {
+    let plantID: UUID
+    let enabled: Bool
 }
