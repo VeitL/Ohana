@@ -1392,14 +1392,14 @@ final class OhanaUITests: XCTestCase {
 
         let deletedPrompt = app.buttons["home-add-first-pet-action"]
         let deletedPromptCard = app.buttons["home-add-first-pet-card"]
-        let deletedPetCard = app.buttons.matching(NSPredicate(format: "label == %@", petName)).firstMatch
+        let deletedPetCard = app.buttons["home-card-pet-\(petName)"]
         let didReturnResponsive = waitUntil(timeout: 20) {
             app.state == .runningForeground &&
-                (deletedPrompt.isHittable || deletedPromptCard.isHittable || !deletedPetCard.isHittable) &&
+                (deletedPrompt.isHittable || deletedPromptCard.isHittable || !deletedPetCard.exists) &&
                 isHomeSurfaceResponsive(in: app)
         }
         XCTAssertTrue(didReturnResponsive, "Permanent pet deletion did not return to a responsive Home surface.")
-        XCTAssertFalse(deletedPetCard.isHittable, "Deleted pet card is still visible on Home.")
+        XCTAssertFalse(deletedPetCard.exists, "Deleted pet card is still visible on Home.")
     }
 
     @MainActor
@@ -1468,11 +1468,11 @@ final class OhanaUITests: XCTestCase {
         XCTAssertTrue(finalDelete.isEnabled, "Pet delete action did not enable after entering the exact pet name.")
         tapWhenHittable(finalDelete, timeout: 8)
 
-        let deletedPetCard = app.buttons.matching(NSPredicate(format: "label == %@", petName)).firstMatch
+        let deletedPetCard = app.buttons["home-card-pet-\(petName)"]
         XCTAssertTrue(
             waitUntil(timeout: 20) {
                 app.state == .runningForeground &&
-                    !deletedPetCard.isHittable &&
+                    !deletedPetCard.exists &&
                     isHomeSurfaceResponsive(in: app)
             },
             "Permanent pet deletion did not return to a responsive Home surface before stale Calendar route check."
@@ -3355,7 +3355,17 @@ final class OhanaUITests: XCTestCase {
         if quickButton.waitForExistence(timeout: 4) {
             tapWhenHittable(quickButton, timeout: 8)
         } else if waitForQuickFeedHome(in: app, timeout: 2) {
-            tapWhenHittable(app.buttons["quick-feed-primary-action"], timeout: 8)
+            let primaryAction = app.buttons["quick-feed-primary-action"]
+            if primaryAction.waitForExistence(timeout: 8),
+               primaryAction.isEnabled,
+               !primaryAction.isHittable {
+                XCTAssertTrue(
+                    tapWhenFrameReady(primaryAction, timeout: 8),
+                    "Quick Feed primary action was not frame-ready for the home quick check-in."
+                )
+            } else {
+                tapWhenHittable(primaryAction, timeout: 8)
+            }
         }
 
         if expectsAntiRepeatConfirmation {
