@@ -274,39 +274,42 @@ private struct SettingsPlantReminderPanelContent: View {
                     .accessibilityIdentifier("settings-plant-reminders-empty-state")
             } else {
                 ForEach(plants) { plant in
-                    Button {
-                        togglePlantReminders(for: plant)
-                    } label: {
-                        HStack(spacing: 12) {
-                            Text(plant.avatarEmoji.isEmpty ? "🌱" : plant.avatarEmoji)
+                    HStack(spacing: 12) {
+                        Text(plant.avatarEmoji.isEmpty ? "🌱" : plant.avatarEmoji)
+                            .font(OhanaFont.body(.semibold))
+                            .frame(width: 44, height: 44)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(plant.name.isEmpty ? l.tr(zh: "植物", en: "Plant", de: "Pflanze") : plant.name)
                                 .font(OhanaFont.body(.semibold))
-                                .frame(width: 44, height: 44)
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(plant.name.isEmpty ? l.tr(zh: "植物", en: "Plant", de: "Pflanze") : plant.name)
-                                    .font(OhanaFont.body(.semibold))
-                                    .foregroundStyle(primaryText)
-                                Text(plant.location.isEmpty ? plant.species : plant.location)
-                                    .font(OhanaFont.caption2(.semibold))
-                                    .foregroundStyle(tertiaryText)
-                                    .lineLimit(1)
-                            }
-                            Spacer()
-                            plantReminderToggleIndicator(isOn: plantRemindersEnabled(for: plant))
-                                .accessibilityHidden(true)
+                                .foregroundStyle(primaryText)
+                            Text(plant.location.isEmpty ? plant.species : plant.location)
+                                .font(OhanaFont.caption2(.semibold))
+                                .foregroundStyle(tertiaryText)
+                                .lineLimit(1)
                         }
-                        .frame(minHeight: 46)
-                        .padding(.leading, 44)
+                        Spacer()
+                        Button {
+                            setPlantRemindersEnabled(!plantRemindersEnabled(for: plant), for: plant)
+                        } label: {
+                            plantReminderToggleIndicator(isOn: plantRemindersEnabled(for: plant))
+                        }
+                        .buttonStyle(.plain) // ui-v4: allow switch indicator owns visual state; scale feedback delayed UI-test idle on this compact control
                         .contentShape(Rectangle())
+                        .transaction { transaction in
+                            transaction.animation = nil
+                        }
+                        .frame(width: 50, height: 30)
+                            .accessibilityLabel(plantReminderAccessibilityLabel(plant))
+                            .accessibilityValue(plantReminderAccessibilityValue(plant))
+                            .accessibilityHint(l.tr(
+                                zh: "双击切换这株植物的日历提醒",
+                                en: "Double tap to toggle calendar reminders for this plant",
+                                de: "Doppeltippen, um Kalendererinnerungen für diese Pflanze umzuschalten"
+                            ))
+                            .accessibilityIdentifier("settings-plant-reminders-plant-toggle-\(plant.name)")
                     }
-                    .buttonStyle(.plain) // ui-v4: allow visual switch state is the press feedback; scale animation delayed UI-test idle on this settings row
-                    .accessibilityLabel(plantReminderAccessibilityLabel(plant))
-                    .accessibilityValue(plantReminderAccessibilityValue(plant))
-                    .accessibilityHint(l.tr(
-                        zh: "双击切换这株植物的日历提醒",
-                        en: "Double tap to toggle calendar reminders for this plant",
-                        de: "Doppeltippen, um Kalendererinnerungen für diese Pflanze umzuschalten"
-                    ))
-                    .accessibilityIdentifier("settings-plant-reminders-plant-toggle-\(plant.name)")
+                    .frame(minHeight: 46)
+                    .padding(.leading, 44)
                 }
             }
         }
@@ -374,7 +377,7 @@ private struct SettingsPlantReminderPanelContent: View {
             }
             Circle()
                 .fill(Color.ohanaCardSurface)
-                .frame(width: 22, height: 22) // a11y: allow decorative toggle knob; row button owns the 44pt+ hit target
+                .frame(width: 22, height: 22) // a11y: allow decorative toggle knob; compact button owns the accessible label/value
             if !isOn {
                 Spacer(minLength: 0)
             }
@@ -387,18 +390,10 @@ private struct SettingsPlantReminderPanelContent: View {
         .overlay(
             Capsule().stroke(isOn ? Color.clear : dividerLine.opacity(0.7), lineWidth: 1)
         )
-        .transaction { transaction in
-            transaction.animation = nil
-        }
-    }
-
-    private func togglePlantReminders(for plant: Plant) {
-        setPlantRemindersEnabled(!plantRemindersEnabled(for: plant), for: plant)
     }
 
     private func setPlantRemindersEnabled(_ enabled: Bool, for plant: Plant) {
         plantReminderDisplayState[plant.id] = enabled
-        statusMessage = plantToggleMessage(plant, enabled: enabled)
         pendingPlantReminderUpdates[plant.id] = PendingPlantReminderUpdate(
             plantID: plant.id,
             enabled: enabled
@@ -513,14 +508,6 @@ private struct SettingsPlantReminderPanelContent: View {
 
     private func windowSubtitle(_ window: PlantReminderTimeWindow) -> String {
         String(format: "%02d:%02d - %02d:00", window.startHour, window.minute, window.endHour)
-    }
-
-    private func plantToggleMessage(_ plant: Plant, enabled: Bool) -> String {
-        l.tr(
-            zh: "\(plant.name) \(enabled ? "已开启提醒" : "已静音")",
-            en: "\(plant.name) reminders \(enabled ? "enabled" : "muted")",
-            de: "Erinnerungen für \(plant.name) \(enabled ? "aktiviert" : "stummgeschaltet")"
-        )
     }
 
     private func bulkDeferMessage(_ result: PlantReminderBulkDeferResult) -> String {

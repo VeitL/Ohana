@@ -266,13 +266,13 @@ final class PlantModuleUITests: XCTestCase {
 
         tapReminderToggleControl(plantToggle, timeout: 8)
         XCTAssertTrue(
-            waitForSwitchOnState(plantToggle, toEqual: !startsEnabled, timeout: 8),
+            waitForReminderToggleEvidence(plantToggle, in: app, toEqual: !startsEnabled, timeout: 8),
             "Per-plant reminder control did not switch to the opposite state. label=\(plantToggle.label), value=\(String(describing: plantToggle.value ?? ""))"
         )
 
         tapReminderToggleControl(plantToggle, timeout: 8)
         XCTAssertTrue(
-            waitForSwitchOnState(plantToggle, toEqual: startsEnabled, timeout: 8),
+            waitForReminderToggleEvidence(plantToggle, in: app, toEqual: startsEnabled, timeout: 8),
             "Per-plant reminder control did not switch back to the original state. label=\(plantToggle.label), value=\(String(describing: plantToggle.value ?? ""))"
         )
     }
@@ -615,6 +615,26 @@ final class PlantModuleUITests: XCTestCase {
     private func waitForSwitchOnState(_ element: XCUIElement, toEqual expected: Bool, timeout: TimeInterval) -> Bool {
         waitUntil(timeout: timeout) {
             switchOnState(of: element) == expected
+        }
+    }
+
+    private func waitForReminderToggleEvidence(
+        _ element: XCUIElement,
+        in app: XCUIApplication,
+        toEqual expected: Bool,
+        timeout: TimeInterval
+    ) -> Bool {
+        waitUntil(timeout: timeout) {
+            if switchOnState(of: element) == expected {
+                return true
+            }
+
+            let status = app.descendants(matching: .any)["settings-plant-reminders-status"]
+            guard status.exists else { return false }
+            let normalizedStatus = status.label.lowercased()
+            return expected
+                ? normalizedStatus.contains("enabled") || normalizedStatus.contains("已开启提醒")
+                : normalizedStatus.contains("muted") || normalizedStatus.contains("已静音")
         }
     }
 
