@@ -289,7 +289,7 @@ private struct SettingsPlantReminderPanelContent: View {
                         }
                         Spacer()
                         Button {
-                            setPlantRemindersEnabled(!plantRemindersEnabled(for: plant), for: plant)
+                            togglePlantReminders(for: plant)
                         } label: {
                             plantReminderToggleIndicator(isOn: plantRemindersEnabled(for: plant))
                         }
@@ -371,16 +371,10 @@ private struct SettingsPlantReminderPanelContent: View {
     }
 
     private func plantReminderToggleIndicator(isOn: Bool) -> some View {
-        HStack(spacing: 0) {
-            if isOn {
-                Spacer(minLength: 0)
-            }
+        ZStack(alignment: isOn ? .trailing : .leading) {
             Circle()
                 .fill(Color.ohanaCardSurface)
                 .frame(width: 22, height: 22) // a11y: allow decorative toggle knob; compact button owns the accessible label/value
-            if !isOn {
-                Spacer(minLength: 0)
-            }
         }
         .padding(3)
         .frame(width: 50, height: 30)
@@ -390,6 +384,14 @@ private struct SettingsPlantReminderPanelContent: View {
         .overlay(
             Capsule().stroke(isOn ? Color.clear : dividerLine.opacity(0.7), lineWidth: 1)
         )
+    }
+
+    private func togglePlantReminders(for plant: Plant) {
+        var transaction = Transaction()
+        transaction.animation = nil
+        withTransaction(transaction) {
+            setPlantRemindersEnabled(!plantRemindersEnabled(for: plant), for: plant)
+        }
     }
 
     private func setPlantRemindersEnabled(_ enabled: Bool, for plant: Plant) {
