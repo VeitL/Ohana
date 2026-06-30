@@ -611,6 +611,78 @@ final class OhanaUITests: XCTestCase {
     }
 
     @MainActor
+    func testExistingPetRealUserJourneyWithoutReset() throws {
+        let app = launchEnglishApp(resetPersistentState: false, enableProductionOverlays: true)
+        let humanName: String = if let existingHumanName = firstExistingHomeHumanName(in: app) {
+            existingHumanName
+        } else if isOnboardingEntryAvailable(in: app, timeout: 2) {
+            createFirstHuman(from: app)
+        } else {
+            seedReusablePetBaselineByResettingEmptyState(in: app)
+        }
+
+        let petName: String = if let existingPetName = firstExistingHomePetName(in: app) {
+            existingPetName
+        } else {
+            completeFirstDayStarterFunnel(
+                in: app,
+                petName: "Codex No Reset Pet \(Int(Date().timeIntervalSince1970))",
+                completionMessage: "Creating the reusable no-reset pet baseline did not leave the pet creation handoff in time."
+            )
+        }
+
+        let calendarTitle = "Codex no-reset pet visit \(Int(Date().timeIntervalSince1970))"
+
+        ensureHomeSurfaceVisible(in: app, humanName: humanName)
+        openPetWaterDetailFromHome(in: app, petName: petName, humanName: humanName)
+        let waterLogAction = app.buttons["quick-water-log-action"]
+        scrollToElement(waterLogAction, in: app, maxSwipes: 5)
+        tapWhenHittable(waterLogAction, timeout: 8)
+        XCTAssertTrue(
+            app.descendants(matching: .any)
+                .matching(NSPredicate(format: "identifier BEGINSWITH %@", "quick-water-log-row-watering-"))
+                .firstMatch
+                .waitForExistence(timeout: 18),
+            "No-reset pet journey did not show a recent Water record after logging."
+        )
+        closeCurrentSheetToHome(in: app, humanName: humanName)
+
+        openCalendarTab(in: app, petName: petName)
+        addCalendarEvent(title: calendarTitle, linkedPetName: petName, in: app)
+        tapWhenHittable(app.buttons["calendar-filter-pet-\(petName)"], timeout: 8)
+        assertCalendarEvent(calendarTitle, exists: true, in: app, context: "no-reset pet calendar readback")
+        tapWhenHittable(app.buttons["home-tab-home"], timeout: 8)
+        ensureHomeSurfaceVisible(in: app, humanName: humanName)
+
+        openPetFeatureHubFromHome(in: app, petName: petName, humanName: humanName)
+        let bondVaultTile = app.buttons["feature-hub-finance-bondVault"]
+        scrollToElement(bondVaultTile, in: app, maxSwipes: 6)
+        XCTAssertTrue(
+            bondVaultTile.waitForExistence(timeout: 12),
+            "No-reset pet journey did not expose the Bond Vault tile."
+        )
+        tapWhenHittable(bondVaultTile, timeout: 8)
+        XCTAssertTrue(
+            app.descendants(matching: .any)["pet-bond-vault-screen"].waitForExistence(timeout: 18),
+            "No-reset pet journey did not open Pet Bond Vault."
+        )
+        XCTAssertTrue(
+            app.staticTexts["pet-bond-vault-balance"].waitForExistence(timeout: 8),
+            "No-reset pet journey did not show the Pet Bond Vault balance."
+        )
+        closeCurrentSheetToHome(in: app, humanName: humanName)
+
+        app.terminate()
+        app.launch()
+        ensureHomeSurfaceVisible(in: app, humanName: humanName)
+        XCTAssertTrue(
+            app.buttons["home-card-pet-\(petName)"].waitForExistence(timeout: 14) ||
+                app.buttons.matching(NSPredicate(format: "label == %@", petName)).firstMatch.waitForExistence(timeout: 2),
+            "No-reset pet journey did not preserve the existing pet after relaunch."
+        )
+    }
+
+    @MainActor
     func testPetWaterRecordPersistsFromQuickCareDetail() throws {
         let app = launchEnglishApp(enableProductionOverlays: true)
         let humanName = createFirstHuman(from: app)
@@ -2116,16 +2188,21 @@ final class OhanaUITests: XCTestCase {
     }
 
     @MainActor
-    private func launchEnglishApp(enableProductionOverlays: Bool = false) -> XCUIApplication {
+    private func launchEnglishApp(
+        resetPersistentState: Bool = true,
+        enableProductionOverlays: Bool = false
+    ) -> XCUIApplication {
         let app = XCUIApplication()
         app.launchArguments += [
             "-AppleLanguages",
             "(en)",
             "-AppleLocale",
             "en_US",
-            "-OHANA_UI_TESTS",
-            "-OHANA_RESET_PERSISTENT_STATE"
+            "-OHANA_UI_TESTS"
         ]
+        if resetPersistentState {
+            app.launchArguments += ["-OHANA_RESET_PERSISTENT_STATE"]
+        }
         if enableProductionOverlays {
             app.launchArguments += ["-OHANA_ENABLE_PRODUCTION_OVERLAYS_IN_UI_TESTS"]
         }
@@ -2691,6 +2768,54 @@ final class OhanaUITests: XCTestCase {
                 (humanCard.exists || app.buttons["home-primary-action"].exists)
         }
         XCTAssertTrue(didReachHome, "Home surface did not become visible before human route testing.")
+    }
+
+    @MainActor
+    private func firstExistingHomeHumanName(in app: XCUIApplication) -> String? {
+        _ = waitUntil(timeout: 18) {
+            app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "home-card-human-")).firstMatch.exists ||
+                app.buttons["home-add-first-pet-card"].exists ||
+                app.buttons["home-primary-action"].exists ||
+                app.textFields["member-name-input"].exists
+        }
+
+        let humanCard = app.buttons
+            .matching(NSPredicate(format: "identifier BEGINSWITH %@", "home-card-human-"))
+            .firstMatch
+        guard humanCard.exists else { return nil }
+        return humanCard.identifier.replacingOccurrences(of: "home-card-human-", with: "")
+    }
+
+    @MainActor
+    private func firstExistingHomePetName(in app: XCUIApplication) -> String? {
+        let homeTab = app.buttons["home-tab-home"]
+        if homeTab.exists && homeTab.isHittable {
+            tapWhenHittable(homeTab, timeout: 4)
+        }
+
+        let petCard = app.buttons
+            .matching(NSPredicate(format: "identifier BEGINSWITH %@", "home-card-pet-"))
+            .firstMatch
+        guard petCard.waitForExistence(timeout: 10) else { return nil }
+        return petCard.identifier.replacingOccurrences(of: "home-card-pet-", with: "")
+    }
+
+    @MainActor
+    private func isOnboardingEntryAvailable(in app: XCUIApplication, timeout: TimeInterval) -> Bool {
+        waitUntil(timeout: timeout) {
+            app.buttons["onboarding-intro-primary-action"].exists ||
+                app.textFields["member-name-input"].exists
+        }
+    }
+
+    @MainActor
+    private func seedReusablePetBaselineByResettingEmptyState(in app: XCUIApplication) -> String {
+        app.terminate()
+        app.launchArguments.append("-OHANA_RESET_PERSISTENT_STATE")
+        app.launch()
+        let humanName = createFirstHuman(from: app)
+        app.launchArguments.removeAll { $0 == "-OHANA_RESET_PERSISTENT_STATE" }
+        return humanName
     }
 
     @MainActor
