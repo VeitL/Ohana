@@ -44,6 +44,16 @@ extension SettingsView {
                     applyUITestRewardTierShortcut()
                 }
                 .accessibilityIdentifier("settings-debug-reward-tier")
+
+                settingsRow(
+                    icon: "arrow.counterclockwise.circle.fill",
+                    title: l.tr(zh: "Debug 重置奖励预算", en: "Debug Reset Reward Budget", de: "Debug-Belohnungsbudget zurücksetzen"),
+                    subtitle: l.tr(zh: "隔离奖励正向路径 GUI 测试", en: "Isolate positive reward GUI tests", de: "Positive Belohnungs-GUI-Tests isolieren"),
+                    iconColor: Color.goTeal
+                ) {
+                    applyUITestEconomyBudgetResetShortcut()
+                }
+                .accessibilityIdentifier("settings-debug-economy-budget-reset")
             }
         }
         .accessibilityIdentifier("settings-debug-section")
@@ -86,6 +96,13 @@ extension SettingsView {
             OasisTreeManagerRegistry.current.setEnergyForTesting(
                 injectedEnergy: OasisTreeManager.levelStartThreshold(forRawLevel: 6)
             )
+        #endif
+        closeSettings()
+    }
+
+    func applyUITestEconomyBudgetResetShortcut() {
+        #if DEBUG
+            EconomyDailyBudgetStore.resetAllForTesting(context: modelContext)
         #endif
         closeSettings()
     }

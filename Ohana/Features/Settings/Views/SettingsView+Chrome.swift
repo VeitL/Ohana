@@ -46,6 +46,23 @@ extension SettingsView {
                         de: "Debug-Belohnungsstufe"
                     ))
                     .accessibilityIdentifier("settings-debug-reward-tier-shortcut")
+
+                    Button {
+                        applyUITestEconomyBudgetResetShortcut()
+                    } label: {
+                        Image(systemName: "arrow.counterclockwise.circle.fill") // a11y: allow decorative icon covered by surrounding label
+                            .font(OhanaFont.adaptive(size: 13, weight: .black))
+                            .foregroundStyle(Color.goTeal)
+                            .frame(width: 44, height: 44)
+                            .background(Color.ohanaControlFill, in: Capsule())
+                    }
+                    .buttonStyle(ScaleButtonStyle())
+                    .accessibilityLabel(l.tr(
+                        zh: "Debug 重置奖励预算",
+                        en: "Debug Reset Reward Budget",
+                        de: "Debug-Belohnungsbudget zurücksetzen"
+                    ))
+                    .accessibilityIdentifier("settings-debug-economy-budget-reset-shortcut")
                 }
             }
             Button { closeSettings() } label: {

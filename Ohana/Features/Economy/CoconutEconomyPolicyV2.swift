@@ -464,6 +464,26 @@ enum EconomyDailyBudgetStore {
         }
     }
 
+    #if DEBUG
+        static func resetAllForTesting(context: ModelContext) {
+            resetAll()
+            do {
+                let events = try context.fetch(FetchDescriptor<EconomyBudgetUsageEvent>())
+                for event in events {
+                    context.delete(event)
+                }
+                if !events.isEmpty {
+                    try context.save()
+                }
+            } catch {
+                OhanaLog.error(
+                    "[EconomyDailyBudgetStore] testing reset failed: \(error.localizedDescription)",
+                    category: "Economy"
+                )
+            }
+        }
+    #endif
+
     @discardableResult
     static func pruneOldUsageEvents(
         context: ModelContext,

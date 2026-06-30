@@ -733,6 +733,7 @@ final class OhanaUITests: XCTestCase {
             completionMessage: "Creating the first pet did not leave the pet creation handoff in time."
         )
 
+        resetEconomyBudgetFromHomeChrome(in: app)
         openPetWaterDetailFromHome(in: app, petName: petName, humanName: humanName)
         let logAction = app.buttons["quick-water-log-action"]
         scrollToElement(logAction, in: app, maxSwipes: 5)
@@ -1812,14 +1813,14 @@ final class OhanaUITests: XCTestCase {
         )
         tapWhenHittable(app.buttons["coconut-shop-confirm-purchase-fx_lime_glow"], timeout: 8)
 
+        XCTAssertTrue(
+            app.descendants(matching: .any)["coconut-shop-toast"].waitForExistence(timeout: 4),
+            "Coconut Shop did not show purchase feedback after the effect purchase."
+        )
         let didSpend = waitUntil(timeout: 12) {
             accessibilityText(for: balance).contains("700")
         }
         XCTAssertTrue(didSpend, "Purchasing Lime Glow did not spend 300 human coconuts through the shop GUI.")
-        XCTAssertTrue(
-            app.descendants(matching: .any)["coconut-shop-toast"].waitForExistence(timeout: 8),
-            "Coconut Shop did not show purchase feedback after the effect purchase."
-        )
     }
 
     @MainActor
@@ -2358,6 +2359,19 @@ final class OhanaUITests: XCTestCase {
 
         let settingsScreen = app.otherElements["settings-screen"]
         XCTAssertTrue(settingsScreen.waitForExistence(timeout: 12), "Settings screen did not open from home chrome.")
+    }
+
+    @MainActor
+    private func resetEconomyBudgetFromHomeChrome(in app: XCUIApplication) {
+        openSettingsFromHomeChrome(in: app)
+        let resetBudget = app.buttons["settings-debug-economy-budget-reset-shortcut"].exists
+            ? app.buttons["settings-debug-economy-budget-reset-shortcut"]
+            : app.buttons["settings-debug-economy-budget-reset"]
+        XCTAssertTrue(
+            resetBudget.waitForExistence(timeout: 12),
+            "Settings did not expose the UI-test economy budget reset shortcut."
+        )
+        tapWhenHittable(resetBudget, timeout: 8)
     }
 
     @MainActor

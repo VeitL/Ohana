@@ -125,7 +125,7 @@ struct PetBondVaultContentView: View {
             HStack(alignment: .lastTextBaseline, spacing: 8) {
                 Text("🥥")
                     .font(OhanaFont.adaptive(size: 26)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                Text("\(pet.coconutBalance)")
+                Text("\(petWalletBalance)")
                     .font(OhanaFont.largeTitle(.black))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .contentTransition(.numericText())
