@@ -19,6 +19,12 @@ Promote local UI to a shared component when it appears in two features, encodes 
 
 This template is a construction starter, not a route-ownership rule. Do not copy the sample `NavigationStack` into leaf views already hosted by an app route host. Route hosts own navigation containers; pages own content, local chrome, local interaction state, and typed intents.
 
+Default to MV, not MVVM. Use local `@State` for view-owned state,
+`@Environment` for shared services, scoped `@Query` only in route/data
+containers, and services/models for business rules. Do not add a view model just
+to mirror local state, wrap environment dependencies, or hide a long `body`;
+split the view into dedicated subview types first.
+
 ## Default Page Shape
 
 Use `ZStack` as the visual root. For static content it is simply the background/content layering tool. For key motion interactions, use a stable motion scene: keep layers mounted, freeze the UI snapshot before animation, and drive transforms/masks from one progress value.
@@ -226,6 +232,22 @@ Rules:
 - Apply Ohana premium micro-motion by default: visible numbers use `.ohanaNumericMotion(value)` or `contentTransition(.numericText())`; member/filter/segmented/calendar-owner switches use selected-state-first snapshot handoff with `GoMotion.selection` or `GoMotion.stateChange`; related visible changes begin in the same interaction frame.
 - Keep micro scale restrained: roughly 1.01-1.05 for selection/context feedback and up to about 1.08-1.12 only for reward or success pulses. Avoid hard content replacement, delayed two-step transitions, large bounce, repeated wobble, and fake delta animations during context switches.
 - For key animated interactions, use `OhanaMotionScene` or an equivalent stable `ZStack + single progress` scene; avoid independent delayed animations for the same action.
+- Prefer dedicated subview `View` types over large computed `some View` helpers
+  when a section has state, async work, branching, or deserves its own preview.
+- Keep `.task(id:)` identifiers cheap and stable: ids, revision tokens, small
+  visibility flags, or user input after debounce. Do not use full content
+  signatures, localized labels, image data, relationship scans, or `Date()`
+  buckets as task ids on high-frequency surfaces.
+- Use `sheet(item:)` or typed sheet/popup routes when presentation state carries
+  a selected model. Avoid parallel booleans for mutually exclusive sheets and
+  avoid `if let` inside a sheet body when the route already carries the data.
+- If an action can enter from App Intents, widgets, notifications, deep links, or
+  Shortcuts, model it as a typed route or typed command first; do not add a
+  system-surface-specific side channel.
+- Liquid Glass migrations must use native `glassEffect` / `GlassEffectContainer`
+  with availability fallback, consistent shapes, and `.interactive()` only on
+  interactive elements. Ordinary business cards still follow V4 solid surfaces
+  unless the task explicitly asks for Liquid Glass migration.
 - Settings rows must follow `settingIcon`; non-sheet pages must follow `pageBackButton` and `pageCloseButton`; sheet close controls must follow `sheetChrome`.
 - New sheets must follow independent sheet tokens from `ui规范.selection.json`: compact layout, nativeRegular background, flat card/input, pill button, iconOnly chrome, and an adaptive content-height detent for short record/confirm sheets.
 - Charts use area trends and quiet axes.

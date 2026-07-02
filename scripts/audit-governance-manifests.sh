@@ -12,12 +12,21 @@ for stale_rule_dir in .cursor .windsurf; do
   fi
 done
 
+for stale_rule_file in CONTEXT.md UIRules.md RULES.md INSTRUCTIONS.md CLAUDE.md GEMINI.md .cursorrules; do
+  if [[ -e "$stale_rule_file" ]]; then
+    echo "Governance manifest audit: failed." >&2
+    echo " - $stale_rule_file must not exist; AGENTS.md is the only root agent/navigation rule file." >&2
+    exit 1
+  fi
+done
+
 python3 - <<'PY'
 from __future__ import annotations
 
 import glob
 import json
 import pathlib
+import re
 import sys
 
 ROOT = pathlib.Path.cwd()
@@ -91,6 +100,12 @@ swift_source = "\n".join(
     path.read_text(encoding="utf-8", errors="ignore")
     for path in (ROOT / "Ohana").rglob("*.swift")
 )
+swift_symbols = set(
+    re.findall(
+        r"\b(?:class|struct|enum|protocol|actor|typealias)\s+([A-Z][A-Za-z0-9_]*)\b",
+        swift_source,
+    )
+)
 
 for name, data in manifests.items():
     if not data:
@@ -107,6 +122,17 @@ for entry in feature.get("features", []):
     for key in ("activationTriggers", "routes", "services", "readModels", "tests", "sloIds"):
         require_list(entry, key, where)
     require_paths(entry, "ownedPaths", where)
+    for raw_service in entry.get("services", []):
+        if not isinstance(raw_service, str):
+            fail(f"{where} services entries must be strings.")
+            continue
+        service_tokens = re.findall(r"\b[A-Z][A-Za-z0-9_]{2,}\b", raw_service)
+        for token in service_tokens:
+            if token not in swift_symbols:
+                fail(
+                    f"{where} services references unknown Swift symbol '{token}' "
+                    f"in '{raw_service}'. Use a real type name or move prose outside services."
+                )
 
 cache = manifests.get("cache-ownership.json", {})
 for entry in cache.get("caches", []):

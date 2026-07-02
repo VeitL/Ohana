@@ -88,13 +88,13 @@ if __name__ == "__main__":
             project_slug = args.project_name.lower().replace(' ', '-') if args.project_name else "default"
             print("\n" + "=" * 60)
             print(f"✅ Design system persisted to design-system/{project_slug}/")
-            print(f"   📄 design-system/{project_slug}/MASTER.md (Global Source of Truth)")
+            print(f"   📄 design-system/{project_slug}/MASTER.md (Generated design baseline)")
             if args.page:
                 page_filename = args.page.lower().replace(' ', '-')
                 print(f"   📄 design-system/{project_slug}/pages/{page_filename}.md (Page Overrides)")
             print("")
             print(f"📖 Usage: When building a page, check design-system/{project_slug}/pages/[page].md first.")
-            print(f"   If exists, its rules override MASTER.md. Otherwise, use MASTER.md.")
+            print(f"   If exists, it refines MASTER.md for that page. Otherwise, use MASTER.md.")
             print("=" * 60)
     # Stack search
     elif args.stack:

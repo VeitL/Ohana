@@ -124,10 +124,10 @@ jobs:
   # Speed notes (this job is the wall-clock long pole):
   #   - Only the unit test bundle runs here through the OhanaUnitTests scheme.
   #     The main Ohana scheme still references the UI test runner through its
-  #     test plan, so using a unit-only scheme avoids building template UI tests
-  #     for this per-push gate. The local module-exit-gate still runs the full
-  #     plan; flesh UI tests into real flows + a nightly job before relying on
-  #     CI for UI coverage.
+  #     test plan, so using a unit-only scheme avoids paying the real UI-suite
+  #     cold-runner cost on every push. The local module-exit-gate and launch
+  #     acceptance work run selected UI flows; add a scheduled UI job before
+  #     treating UI coverage as a per-push CI gate.
   #   - Build intermediates are cached across runs (no SPM deps, so the cache
   #     target is just DerivedData/Build). Exact-key miss on every source change
   #     is expected; restore-keys give the latest partial cache for incremental.

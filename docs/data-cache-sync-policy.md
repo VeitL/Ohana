@@ -90,13 +90,12 @@ noticeably slower than a three-week-old one.
 
 - Caches that hold decoded images or large snapshots (`FocusPopoutImageCache`,
   `FocusWalletAvatarCache`, avatar pipelines, map snapshot caches) must evict
-  on memory-pressure warnings and re-derive lazily. Wiring the eviction path is
-  tracked as P0 in `docs/release-hardening-plan.md`; new caches must ship with
-  eviction from day one.
+  on memory-pressure warnings and re-derive lazily. The memory-warning eviction
+  path exists through `MemoryWarningEvictionRegistry`; new caches must register
+  with it from day one.
 - A cache without an entry in `cache-ownership.json` (owner, invalidation,
   expiry, recovery) fails the governance manifest audit — register it before
   shipping.
 - Long-session memory growth is a release-blocking regression class: validate
   repeated route open/dismiss cycles for leaks of frozen snapshots, motion
   scenes, and route-scoped tasks.
-

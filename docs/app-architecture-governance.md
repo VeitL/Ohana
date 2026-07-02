@@ -173,8 +173,11 @@ Never protect prefetch, decoration, or dashboard freshness at the cost of curren
 常规小改：
 
 ```bash
-scripts/build-debug-fast.sh
+scripts/dev-check-changed.sh
 ```
+
+`scripts/build-debug-fast.sh` 是 compiler-surface、runtime、route、persistence
+或中高风险改动的升级验证，不是文档/纯 UI 小改的心跳命令。
 
 UI 改动：
 
@@ -201,3 +204,10 @@ scripts/audit-git-size.sh
 - running 遛狗锁屏/后台继续记录路线。
 - 低电量模式下常驻动画降级，关键交互仍顺滑。
 - `scripts/build-debug-fast.sh` 通过；必要时跑相关 SwiftData in-memory 测试。
+
+性能/泄漏专项验证：
+
+- SwiftUI 性能问题先做 code-first 审查：观察范围、身份稳定、body 内重活、图片解码、布局和动画 fan-out。
+- Instruments / ETTrace 只测一条明确用户流；ETTrace 结论必须基于符号化后的 `output_*.json`。
+- 泄漏修复必须有同一路径 before/after memgraph、app-owned 类型计数和消失的 retaining edge。
+- Simulator UI 结论必须附起始状态、操作路径、最终截图或 UI snapshot；坐标点击只能作为 fallback 并标注 testability gap。

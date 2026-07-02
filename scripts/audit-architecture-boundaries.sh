@@ -151,19 +151,55 @@ forbidden_patterns() {
 }
 
 view_user_defaults() {
-  local roots=(Ohana/Features Ohana/Shared/Components)
-  rg -n 'UserDefaults\.standard' "${roots[@]}" --glob '*.swift' \
+  local scoped_files=()
+  if [[ "$mode" == "all" ]]; then
+    scoped_files=(Ohana/Features Ohana/Shared/Components)
+  else
+    for file in "${files[@]}"; do
+      case "$file" in
+        Ohana/Features/*.swift|Ohana/Features/*/*.swift|Ohana/Features/*/*/*.swift|Ohana/Features/*/*/*/*.swift|Ohana/Shared/Components/*.swift|Ohana/Shared/Components/*/*.swift)
+          [[ -f "$file" ]] && scoped_files+=("$file")
+          ;;
+      esac
+    done
+  fi
+  [[ ${#scoped_files[@]} -eq 0 ]] && return 0
+  rg -n 'UserDefaults\.standard' "${scoped_files[@]}" --glob '*.swift' \
     | rg '/Views/|Ohana/Shared/Components/' || true
 }
 
 view_command_executors() {
-  local roots=(Ohana/Features Ohana/Shared/Components)
-  rg -n --pcre2 '\b[A-Za-z0-9_]*CommandExecutor\s*\(\s*context:\s*modelContext\s*\)' "${roots[@]}" --glob '*.swift' || true
+  local scoped_files=()
+  if [[ "$mode" == "all" ]]; then
+    scoped_files=(Ohana/Features Ohana/Shared/Components)
+  else
+    for file in "${files[@]}"; do
+      case "$file" in
+        Ohana/Features/*.swift|Ohana/Features/*/*.swift|Ohana/Features/*/*/*.swift|Ohana/Features/*/*/*/*.swift|Ohana/Shared/Components/*.swift|Ohana/Shared/Components/*/*.swift)
+          [[ -f "$file" ]] && scoped_files+=("$file")
+          ;;
+      esac
+    done
+  fi
+  [[ ${#scoped_files[@]} -eq 0 ]] && return 0
+  rg -n --pcre2 '\b[A-Za-z0-9_]*CommandExecutor\s*\(\s*context:\s*modelContext\s*\)' "${scoped_files[@]}" --glob '*.swift' || true
 }
 
 view_static_business_calls() {
-  local roots=(Ohana/App/ContentView.swift Ohana/App/RouteContainers Ohana/Features Ohana/Shared/Components)
-  rg -n --pcre2 '\b[A-Z][A-Za-z0-9_]*(Service|Manager|Coordinator|Executor)\.' "${roots[@]}" --glob '*.swift' \
+  local scoped_files=()
+  if [[ "$mode" == "all" ]]; then
+    scoped_files=(Ohana/App/ContentView.swift Ohana/App/RouteContainers Ohana/Features Ohana/Shared/Components)
+  else
+    for file in "${files[@]}"; do
+      case "$file" in
+        Ohana/App/ContentView.swift|Ohana/App/RouteContainers/*.swift|Ohana/App/RouteContainers/*/*.swift|Ohana/Features/*.swift|Ohana/Features/*/*.swift|Ohana/Features/*/*/*.swift|Ohana/Features/*/*/*/*.swift|Ohana/Shared/Components/*.swift|Ohana/Shared/Components/*/*.swift)
+          [[ -f "$file" ]] && scoped_files+=("$file")
+          ;;
+      esac
+    done
+  fi
+  [[ ${#scoped_files[@]} -eq 0 ]] && return 0
+  rg -n --pcre2 '\b[A-Z][A-Za-z0-9_]*(Service|Manager|Coordinator|Executor)\.' "${scoped_files[@]}" --glob '*.swift' \
     | rg '/Views/|Ohana/Shared/Components/|RouteContainers/|Ohana/App/ContentView\.swift:' \
     | rg -v ':\s*//' \
     | rg -v '\bFileManager\.default\b' \

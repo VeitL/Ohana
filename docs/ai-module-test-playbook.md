@@ -332,7 +332,7 @@ AI 不可替代你的部分：真机手感、Apple 账号操作（证书/截图/
 
 ### Phase 2：`Ohana/Domain`（服务/命令/事件/经济）
 
-**专属检查点：** 每个用户动作"写一个业务事实一次"，奖励只走 `CoconutEconomyService` / `QuestManager` 管线；删除/纪念模式/隐私过滤边界；服务不 import SwiftUI。
+**专属检查点：** 每个用户动作"写一个业务事实一次"，奖励只走 `QuestManager` 底层管线，并通过 `EconomyRewardDiscipline` / `CareEventEconomyAwarding` 等受审计收口；删除/纪念模式/隐私过滤边界；服务不 import SwiftUI。
 **专属验收：** 核心服务每个有行为测试；`CoconutEconomySimulationTests` 全绿。
 **注意：** Domain 影响全 app，本阶段每轮修复后跑全量测试（门禁本来就含全量，迭代中也别只跑定向）。
 

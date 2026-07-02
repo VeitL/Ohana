@@ -417,7 +417,7 @@ Ohana/
 - `CareLedgerEvent.swift`：统一账本 SwiftData 模型与 `CareLedgerActorKind` / `CareLedgerSubjectKind` / `CareLedgerEventKind` / `CareLedgerSource`
 - `CareLedgerService.swift`：统一记录入口
 - `CareLedgerBackfillService.swift`：历史数据幂等回填服务
-- `CareEventService.swift` / `CoconutEconomyService` 相关路径：逐步集中写逻辑，减少 View 直接改模型
+- `CareEventService.swift` / `QuestManager` / `EconomyRewardDiscipline` / `CareEventEconomyAwarding` 相关路径：逐步集中写逻辑，减少 View 直接改模型
 - `DataBackupManager.swift`：已补充账本、提醒、食粮记录、expense executor 等导出/导入字段
 
 已接入范围：

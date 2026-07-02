@@ -6,7 +6,9 @@
     "docs/feature-module-contract.md",
     "docs/app-architecture-governance.md",
     "docs/startup-and-lazy-loading-policy.md",
-    "docs/release-quality-gates.md"
+    "docs/release-quality-gates.md",
+    "docs/specs/AppIntents-logic.md",
+    "docs/specs/BackupRestore-logic.md"
   ],
   "features": [
     {
@@ -28,7 +30,9 @@
         "HomeCommandExecutor",
         "CareEventService",
         "FamilyTaskService",
-        "CoconutEconomyService or QuestManager reward pipeline"
+        "QuestManager",
+        "EconomyRewardDiscipline",
+        "CareEventEconomyAwarding"
       ],
       "readModels": [
         "HomeSnapshotBuilder",

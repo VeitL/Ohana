@@ -73,6 +73,56 @@ Critical flows should emit privacy-safe signposts or diagnostics for:
 
 Diagnostics must not include pet names, human names, private notes, PIN, health values, precise routes, or raw user text.
 
+## Code-First Performance Triage
+
+Before profiling, inspect the target SwiftUI path for the common high-impact
+smells:
+
+- Broad `@Observable`, `ObservableObject`, `@Environment`, or `@Query` fan-out.
+- Unstable identity in `ForEach`, lists, grids, sheets, or route paths.
+- Sorting, filtering, formatting, localization, image decode, or service calls in
+  `body` / view builders / row rendering.
+- Top-level conditional view swapping that churns the root tree for small state
+  changes.
+- Layout thrash from nested `GeometryReader`, preference chains, or custom scroll
+  containers where `List`, `LazyVStack`, or `LazyHGrid` would suffice.
+- Animation or transition work attached to too broad a subtree.
+
+If code review explains the symptom, fix the root cause and validate the same
+flow. Use runtime traces only when code review is inconclusive, the path is
+high-traffic, or before/after numbers are needed.
+
+## Instruments and ETTrace Evidence
+
+Runtime performance evidence must be one focused user-visible flow, not "use the
+app for a while."
+
+- Record start and stop points before capturing.
+- Prefer Release or release-like builds when possible; call out Debug-only
+  caveats.
+- For ETTrace, link the tracing framework only as a temporary simulator/debug
+  profiling patch, collect UUID-matched dSYMs, preserve fresh processed
+  `output_*.json` files, and analyze only symbolicated first-party stacks.
+- Treat meaningful first-party "have library but no symbol" output as a failed
+  trace. Do not draw product conclusions from unsymbolicated flamegraphs.
+- Report artifacts, simulator/device, run count, top first-party stacks, sample
+  weights, and caveats. Before/after deltas require comparable setup.
+
+## Leak and Memory-Growth Evidence
+
+Long-session memory growth and retained route snapshots are release-risk issues.
+A credible leak report includes:
+
+- The exact flow and simulator/app build.
+- Before/after memgraph paths for the same flow when a fix is made.
+- App-owned leaked types and counts.
+- A trace-tree ownership path, grouped leak tree, or source-level retaining edge.
+- The specific edge removed or lifetime narrowed.
+- Remaining framework/runtime noise called out separately.
+
+Do not claim a leak fix from smaller total memory alone. The app-owned type or
+ownership path must disappear or be explained.
+
 ## Probe Naming Convention
 
 Probes registered in `docs/governance/manifests/performance-slo.json` use the
@@ -121,13 +171,11 @@ For performance-sensitive changes, validate at least the relevant subset:
 - Reopen after background.
 - Low Power Mode.
 - Reduce Motion.
-- Elevated thermal state (Instruments or thermal-state override; the
-  `AppWorkloadPolicy` thermal budget is tracked in
-  `docs/release-hardening-plan.md`).
+- Elevated thermal state (Instruments or thermal-state override through
+  `AppWorkloadPolicy`).
 - Smallest supported iPhone.
 - Long localized German text.
 - Dense local dataset (see Dense-Data Fixture Standard above).
 - Missing images.
 - Offline or degraded network.
 - Long session after repeated route open/dismiss (memory growth).
-

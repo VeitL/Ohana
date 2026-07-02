@@ -89,11 +89,29 @@ issues: list[str] = []
 
 for path in files:
     text = path.read_text(encoding="utf-8")
-    if not is_self_improving(path, text):
-        continue
-
+    self_improving = is_self_improving(path, text)
     lower = text.lower()
     lines = text.splitlines()
+
+    for idx, line in enumerate(lines, start=1):
+        lower_line = line.lower()
+        if "source of truth" in lower_line and not is_negated(lower_line):
+            report(
+                path,
+                idx,
+                "skill-source-of-truth-claim",
+                "Repo-local skills must not claim source-of-truth authority over AGENTS.md, governance docs, or project tokens.",
+            )
+        if re.search(r"\b(?:python3|python|node|bash|sh)\s+skills/[^\s`]+", line):
+            report(
+                path,
+                idx,
+                "skill-repo-relative-command",
+                "Repo-local skill commands must use an existing path such as .codex/skills/... or an explicit skill-root variable.",
+            )
+
+    if not self_improving:
+        continue
 
     if path.name == "SKILL.md":
         if "required output" not in lower or "improvement proposal" not in lower:

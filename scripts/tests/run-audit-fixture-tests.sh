@@ -93,6 +93,9 @@ agent_skill_fixtures="scripts/tests/fixtures/AgentSkills"
 architecture_fixture_path="Ohana/Domain/__ArchitectureBoundaryFixture.swift"
 architecture_model_fixture_path="Ohana/Models/__ArchitectureModelBoundaryFixture.swift"
 member_view_revision_fixture_path="Ohana/Features/Members/Views/__MemberProfileRevisionBoundaryFixture.swift"
+governance_manifest_path="docs/governance/manifests/feature-ownership.json"
+governance_manifest_backup="$(mktemp "${TMPDIR:-/tmp}/ohana-feature-ownership.XXXXXX")"
+cp "$governance_manifest_path" "$governance_manifest_backup"
 
 cleanup_architecture_fixture() {
   rm -f "$architecture_fixture_path"
@@ -100,7 +103,15 @@ cleanup_architecture_fixture() {
   rm -f "$member_view_revision_fixture_path"
 }
 
-trap cleanup_architecture_fixture EXIT
+cleanup_governance_fixture() {
+  rm -f CONTEXT.md UIRules.md RULES.md INSTRUCTIONS.md CLAUDE.md GEMINI.md .cursorrules
+  if [[ -f "$governance_manifest_backup" ]]; then
+    cp "$governance_manifest_backup" "$governance_manifest_path"
+    rm -f "$governance_manifest_backup"
+  fi
+}
+
+trap 'cleanup_architecture_fixture; cleanup_governance_fixture' EXIT
 
 assert_bad scripts/audit-ui-v4.sh "$fixtures/UiV4Bad.swift" \
   background system-text-color hardcoded-white-black material shadow \
@@ -226,6 +237,46 @@ assert_bad scripts/audit-agent-skill-governance.sh "$agent_skill_fixtures/SelfIm
   skill-missing-required-output skill-missing-human-approval skill-missing-evidence \
   skill-auto-mutation skill-priority-over-governance
 assert_good scripts/audit-agent-skill-governance.sh "$agent_skill_fixtures/SelfImprovingGood/SKILL.md"
+assert_bad scripts/audit-agent-skill-governance.sh "$agent_skill_fixtures/GenericGovernanceBad/SKILL.md" \
+  skill-source-of-truth-claim skill-repo-relative-command
+assert_good scripts/audit-agent-skill-governance.sh "$agent_skill_fixtures/GenericGovernanceGood/SKILL.md"
+
+run_audit scripts/audit-governance-manifests.sh
+if [[ "$status" -ne 0 ]]; then
+  fail "scripts/audit-governance-manifests.sh: expected current manifests to pass, got $status: $output"
+else
+  echo "ok  scripts/audit-governance-manifests.sh passes current manifests"
+fi
+
+: > CONTEXT.md
+run_audit scripts/audit-governance-manifests.sh
+rm -f CONTEXT.md
+if [[ "$status" -ne 1 ]]; then
+  fail "scripts/audit-governance-manifests.sh CONTEXT.md fixture: expected strict exit 1, got $status"
+elif ! grep -qF "AGENTS.md is the only root agent/navigation rule file" <<<"$output"; then
+  fail "scripts/audit-governance-manifests.sh CONTEXT.md fixture: stale root rule file guard no longer fires"
+else
+  echo "ok  scripts/audit-governance-manifests.sh catches stale root rule files"
+fi
+
+python3 - <<'PY'
+import json
+from pathlib import Path
+
+path = Path("docs/governance/manifests/feature-ownership.json")
+data = json.loads(path.read_text(encoding="utf-8"))
+data["features"][0]["services"].append("GhostEconomyService")
+path.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+PY
+run_audit scripts/audit-governance-manifests.sh
+cp "$governance_manifest_backup" "$governance_manifest_path"
+if [[ "$status" -ne 1 ]]; then
+  fail "scripts/audit-governance-manifests.sh ghost service fixture: expected strict exit 1, got $status"
+elif ! grep -qF "unknown Swift symbol 'GhostEconomyService'" <<<"$output"; then
+  fail "scripts/audit-governance-manifests.sh ghost service fixture: unknown-symbol guard no longer fires"
+else
+  echo "ok  scripts/audit-governance-manifests.sh catches manifest service ghost symbols"
+fi
 
 assert_bad scripts/audit-derived-state-lifecycle.sh "$fixtures/DerivedStateLifecycleBad.swift" \
   derived-state-lifecycle-checklist physical-delete-without-tombstone \

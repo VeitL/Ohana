@@ -258,7 +258,7 @@ G2 余额可重放
 
 任何成员钱包余额必须可由账本事实流重放推导。
 岛屿总资产 ≡ Σ成员钱包。
-禁止任何视图直改余额；禁止绕过 CoconutEconomyService / QuestManager 管线发奖。
+禁止任何视图直改余额；禁止绕过 QuestManager 底层奖励管线以及 EconomyRewardDiscipline / CareEventEconomyAwarding 等受审计收口发奖。
 
 G3 经济受预算管控
 
@@ -601,6 +601,8 @@ O10	植物模块首发状态已决 → D19 / D21
 
 14. 待产出的设计细则
 
+首发补齐优先级：备份与恢复规则书已补齐，因为自动备份/手动导出/恢复旧存档属于 G10 数据安全命脉；首次体验脚本次之。免费 / 付费规则书可在首发免费版不触达付费能力时继续保留为待产出，但任何新付费入口落地前必须先补规则书。
+
 1. 连胜细则
     写入 docs/specs/DailyStreak-logic.md
     内容包括：岛屿 / 每宠双层定义、中断、冻结卡、椰子兑换上限、离世成员处理。
@@ -617,7 +619,7 @@ O10	植物模块首发状态已决 → D19 / D21
     写入 docs/specs/PlantFeatureGate-logic.md
     内容包括：首发开启路径、基础免费能力、Family 协作能力、Care+ 智能能力和诚实降级规则。
 6. 备份与恢复规则书
-    写入 docs/specs/BackupRestore-logic.md
+    已写入 docs/specs/BackupRestore-logic.md；自动备份细则见 docs/specs/AutomaticBackup-logic.md。
     内容包括：自动备份频率、失败提示、手动导出、恢复旧存档警告、删除与备份一致性。
 
 ⸻

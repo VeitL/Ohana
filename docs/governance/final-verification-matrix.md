@@ -25,7 +25,7 @@
 | SwiftFormat lint | Passed | `swiftformat --lint .` passed after the P1 formatting baseline cleanup. |
 | Dense snapshot performance | Passed | `OhanaTests/DenseDataSnapshotPerformanceTests` covers Home, Today Focus, and Calendar snapshot builders against dense fixture wall-clock budgets. |
 | Fixed simulator build | Passed | `scripts/build-debug-fast.sh` passed on `platform=iOS Simulator,name=iPhone 17` with `-sdk iphonesimulator`. |
-| Fixed simulator tests | Passed | `xcodebuild test -project Ohana.xcodeproj -scheme Ohana -sdk iphonesimulator -destination 'platform=iOS Simulator,id=EC2C2B3B-3135-4427-89B7-F4B6A6049D66' CODE_SIGNING_ALLOWED=NO` passed on 2026-06-10. Result bundle: `/Users/guanchenli/Documents/Space/Ohana/.build/DerivedData/main-b6cf423d5931/Logs/Test/Test-Ohana-2026.06.10_14-02-04-+0200.xcresult`. Swift Testing: 478 tests in 44 suites passed. XCTest UI: 3 tests passed. |
+| Fixed simulator tests | Passed | Historical evidence from 2026-06-10 used a machine-local simulator UDID; current repeat commands must use the name-pinned destination `platform=iOS Simulator,name=iPhone 17` with `-sdk iphonesimulator`. Result bundle from the historical run: `/Users/guanchenli/Documents/Space/Ohana/.build/DerivedData/main-b6cf423d5931/Logs/Test/Test-Ohana-2026.06.10_14-02-04-+0200.xcresult`. Swift Testing: 478 tests in 44 suites passed. XCTest UI: 3 tests passed. |
 
 ## Resolved Test Failure Clusters
 
