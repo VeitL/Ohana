@@ -11,6 +11,7 @@
 | `docs/task-follow-ups.md` | The active open follow-up backlog, priority, blocker, next action, and close condition. | Closed-item history, repeated validation output, detailed CloudKit device scripts. |
 | `docs/cloud-sync-todo.md` | CloudKit and real-device sync work that is deferred while CloudKit is disabled or unproven. | General app P1/P2 backlog outside sync. |
 | `docs/planning/gap-acceptance-track-list.md` | Manual acceptance debt that cannot be proven in repo tests or simulator-only runs. | Normal code follow-ups that can be closed by repo changes. |
+| `docs/release-true-device-test-plan.md` | Chinese operator checklist for first-release physical-device testing, derived from the active ledgers. | Canonical release status, historical evidence, or follow-up ownership. |
 | `docs/archive/*-full-2026-06-25.md` | Full pre-compaction history for lookup. | Current status. |
 
 ## Update Rules
@@ -24,6 +25,9 @@
 - If a manual/device check is impossible to automate now, record the checklist
   source in `docs/planning/gap-acceptance-track-list.md` and keep only the active
   blocker pointer in `docs/task-follow-ups.md`.
+- If the user needs to execute true-device validation, keep
+  `docs/release-true-device-test-plan.md` as the concise Chinese checklist and
+  backfill pass/fail results to the owning ledger above.
 - Do not paste full command logs into active ledgers. Keep the command name,
   result, and why it matters; archive long history during compaction.
 

@@ -30,6 +30,13 @@ enum HumanPrivateField: String, CaseIterable, Identifiable {
     }
 }
 
+nonisolated enum HumanLocalPrivacyPolicy {
+    // First release is local-first and single-device oriented. Human privacy/PIN
+    // remains stored for future multi-device identity work, but is not enforced
+    // or surfaced in the ordinary local account switch flow.
+    static let isEnabled = false
+}
+
 nonisolated enum HumanProfileOptions {
     static let permissionRoles: [(key: String, title: String, description: String, icon: String)] = [
         ("owner", "管理者", "可管理家庭资料与核心设置", "crown.fill"),
@@ -382,6 +389,7 @@ final class Human {
     /// 判断某字段是否对非本人隐藏
     /// - Parameter currentActiveHumanId: 当前查看者的 Human.id（来自 @AppStorage）
     func isPrivate(_ field: String, viewedBy currentId: UUID?) -> Bool {
+        guard HumanLocalPrivacyPolicy.isEnabled else { return false }
         guard let privateField = HumanPrivateField(rawValue: field) else {
             guard currentId != self.id else { return false }
             return privateFields.contains(field)
@@ -390,6 +398,7 @@ final class Human {
     }
 
     func isPrivate(_ field: HumanPrivateField, viewedBy currentId: UUID?) -> Bool {
+        guard HumanLocalPrivacyPolicy.isEnabled else { return false }
         guard currentId != self.id else { return false }
         return privateFields.contains(field.rawValue)
     }

@@ -149,6 +149,15 @@ enum CarePlanCalendarSync {
         return generatedTitles.contains(event.title)
     }
 
+    static func isGeneratedCalendarPlan(_ event: Event, pets: [Pet]) -> Bool {
+        if isDefaultGeneratedCalendarPlan(event, pets: pets) { return true }
+        guard let pet = MemberLifecycleActiveScheduleResolver.petTarget(for: event, pets: pets) else { return false }
+        let petKey = pet.id.uuidString
+        return storedGeneratedPlanKinds.contains { kind in
+            UserDefaults.standard.string(forKey: eventStorageKey(kind: kind, petKey: petKey)) == event.id.uuidString
+        }
+    }
+
     static func shouldShowModeScopedPlanOccurrence(
         _ event: Event,
         occurrenceDate: Date,
@@ -654,6 +663,15 @@ enum CarePlanCalendarSync {
         "default_breedRiskFeatherBreathing",
         "default_breedRiskHabitat",
         "default_breedRiskWaterQuality"
+    ]
+
+    private static let storedGeneratedPlanKinds: Set<String> = [
+        "waterChange",
+        "filterClean",
+        "filterReplace",
+        "litterFull",
+        "scoop",
+        "play"
     ]
 
     private static func defaultPlanItems(for pet: Pet) -> [DefaultPlanItem] {

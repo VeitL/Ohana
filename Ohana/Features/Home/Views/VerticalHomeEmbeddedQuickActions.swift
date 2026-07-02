@@ -275,6 +275,7 @@ struct VerticalHomeEmbeddedQuickActions: View {
             .allowsHitTesting(!isEditMode)
             .accessibilityLabel(accessibilityLabel(for: item, statusText: statusText(for: item)))
             .accessibilityIdentifier("home-quick-action-\(item.actionType)")
+            .highPriorityGesture(detailLongPressGesture(for: item))
 
             if openActionId == item.id {
                 inlineMenu(item: item, detailAction: item.detailAction, index: index)
@@ -372,6 +373,20 @@ struct VerticalHomeEmbeddedQuickActions: View {
         } else {
             performDirectAction(for: item)
         }
+    }
+
+    private func detailLongPressGesture(for item: VerticalHomeEmbeddedAction) -> some Gesture {
+        LongPressGesture(minimumDuration: 0.55)
+            .onEnded { _ in
+                guard !isEditMode, let detailAction = item.detailAction else { return }
+                OhanaFeedback.medium()
+                withAnimation(motion) {
+                    openActionId = nil
+                }
+                OhanaFrameScheduler.runAfterNextFrame(milliseconds: 28) {
+                    detailAction()
+                }
+            }
     }
 
     private func inlineMenu(item: VerticalHomeEmbeddedAction, detailAction: (() -> Void)?, index: Int) -> some View {

@@ -204,7 +204,6 @@ extension QuickFeedDetailContent {
                 .opacity(inlineSheetVisible ? 1 : 0.94)
                 .scaleEffect(inlineSheetVisible ? 1 : 0.982, anchor: .bottom)
                 .padding(.bottom, bottomInset)
-                .animation(GoMotion.page, value: inlineKeyboardHeight)
                 .animation(GoMotion.feedback, value: inlineSheetDragOffset)
                 .animation(GoMotion.page, value: inlineSheetVisible)
             }
@@ -298,8 +297,7 @@ extension QuickFeedDetailContent {
         guard activeInlineSheet != nil else { return }
         guard let frame = notification.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect else { return }
         let height = max(0, frame.height)
-        withAnimation(GoMotion.quick) {
-            inlineKeyboardHeight = height
-        }
+        guard abs(inlineKeyboardHeight - height) > 0.5 else { return }
+        inlineKeyboardHeight = height
     }
 }

@@ -35,6 +35,7 @@ struct CalendarView: View {
     @State var selectedDate = Date()
     @AppStorage("calendar_filterPetId") var calendarFilterPetId: String = ""
     @AppStorage("calendar_filterHumanId") var calendarFilterHumanId: String = ""
+    @AppStorage("calendar_filterPlantId") var calendarFilterPlantId: String = ""
     @State var showingAddEvent = false
     @State var addEventPresentationProgress: CGFloat = 0
     @State var isAddEventContentMounted = false
@@ -46,9 +47,11 @@ struct CalendarView: View {
     @State var appliedFilterSelection = CalendarFilterSelection.all
     @State var didSyncCalendarFilter = false
     @State var deletingEvent: Event? = nil
+    @State var eventDetailPresentation: CalendarEventDetailPresentation?
     @State var showDeleteSeriesAlert = false
     @Environment(\.colorScheme) var colorScheme
     @StateObject var visibleDateCoordinator = CalendarVisibleDateCoordinator()
+    @StateObject var timelinePositionCoordinator = CalendarTimelinePositionCoordinator()
     @State var listVisibleTopDate = Calendar.current.startOfDay(for: Date())
     @State var visibleTimelineDateID: String? = CalendarView.todayTimelineDateID
     @State var timelineTodayScrollRequest = 0
@@ -88,7 +91,11 @@ struct CalendarView: View {
     }
 
     var storedFilterSelection: CalendarFilterSelection {
-        CalendarFilterSelection(petId: calendarFilterPetId, humanId: calendarFilterHumanId)
+        CalendarFilterSelection(
+            petId: calendarFilterPetId,
+            humanId: calendarFilterHumanId,
+            plantId: calendarFilterPlantId
+        )
     }
 
     var displayedFilterSelection: CalendarFilterSelection {
@@ -100,7 +107,9 @@ struct CalendarView: View {
     }
 
     var effectiveFilterSelection: CalendarFilterSelection {
-        if let preselectedPetId { return .pet(preselectedPetId) }
+        if let preselectedPetId {
+            return preselectedEntityIsPlant(preselectedPetId) ? .plant(preselectedPetId) : .pet(preselectedPetId)
+        }
         if let preselectedHumanId { return .human(preselectedHumanId) }
         return activeFilterSelection
     }
@@ -125,15 +134,39 @@ struct CalendarView: View {
 
     /// 从宠物详情进入时固定为该宠物；否则使用 AppStorage 筛选
     var effectivePetFilterId: String? {
-        if let p = preselectedPetId { return p }
-        if preselectedHumanId != nil || !activeFilterSelection.humanId.isEmpty { return nil }
+        if let p = preselectedPetId {
+            return preselectedEntityIsPlant(p) ? nil : p
+        }
+        if preselectedHumanId != nil ||
+            !activeFilterSelection.humanId.isEmpty ||
+            !activeFilterSelection.plantId.isEmpty {
+            return nil
+        }
         return activeFilterSelection.selectedPetId
     }
 
     /// 从人类卡片进入时固定为该成员；首页默认不筛选，继续显示全部日历项目。
     var effectiveHumanFilterId: String? {
         if let preselectedHumanId { return preselectedHumanId }
+        if preselectedPetId != nil ||
+            !activeFilterSelection.petId.isEmpty ||
+            !activeFilterSelection.plantId.isEmpty {
+            return nil
+        }
         return activeFilterSelection.selectedHumanId
+    }
+
+    var effectivePlantFilterId: String? {
+        if let entityId = preselectedPetId, preselectedEntityIsPlant(entityId) {
+            return entityId
+        }
+        if preselectedPetId != nil ||
+            preselectedHumanId != nil ||
+            !activeFilterSelection.petId.isEmpty ||
+            !activeFilterSelection.humanId.isEmpty {
+            return nil
+        }
+        return activeFilterSelection.selectedPlantId
     }
 
     var filteredEvents: [Event] {
@@ -154,7 +187,14 @@ struct CalendarView: View {
         if let humanId = effectiveHumanFilterId {
             result = result.filter { eventIsRelatedToHuman($0, humanId: humanId) }
         }
+        if let plantId = effectivePlantFilterId {
+            result = result.filter { eventIsRelatedToPlant($0, plantId: plantId) }
+        }
         return result
+    }
+
+    func preselectedEntityIsPlant(_ entityId: String) -> Bool {
+        plants.contains { $0.id.uuidString == entityId }
     }
 
     func eventIsRelatedToDeceasedMember(_ event: Event) -> Bool {
@@ -187,6 +227,10 @@ struct CalendarView: View {
             humanId: humanId,
             humanMedications: humanMedications
         )
+    }
+
+    func eventIsRelatedToPlant(_ event: Event, plantId: String) -> Bool {
+        DomainEntityLinkRegistry.plantId(for: event)?.uuidString == plantId
     }
 
     /// 首页嵌入时为全局顶栏 + 外层宠物条预留空间。
@@ -269,6 +313,26 @@ struct CalendarView: View {
                     calendarContent
                 }
             }
+        }
+        .sheet(item: $eventDetailPresentation) { presentation in
+            EventDetailSheet(
+                event: presentation.event,
+                occurrenceDate: presentation.occurrenceDate,
+                pets: pets,
+                humans: humans,
+                allowsEditing: presentation.allowsEditing,
+                onDelete: {
+                    eventDetailPresentation = nil
+                },
+                onComplete: {
+                    toggleEventCompletion(
+                        presentation.event,
+                        occurrenceDate: presentation.occurrenceDate
+                    )
+                }
+            )
+            .presentationDetents([.medium])
+            .presentationDragIndicator(.hidden)
         }
     }
 }

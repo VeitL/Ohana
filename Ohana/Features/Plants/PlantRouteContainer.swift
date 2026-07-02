@@ -10,8 +10,10 @@ import SwiftUI
 
 struct AppPlantRouteContainer: View {
     @Query private var plants: [Plant]
+    let onOpenCalendar: (UUID) -> Void
 
-    init(id: UUID) {
+    init(id: UUID, onOpenCalendar: @escaping (UUID) -> Void = { _ in }) {
+        self.onOpenCalendar = onOpenCalendar
         _plants = Query(filter: #Predicate<Plant> { plant in
             plant.id == id
         })
@@ -19,7 +21,10 @@ struct AppPlantRouteContainer: View {
 
     var body: some View {
         if let plant = plants.first {
-            PlantDetailView(plant: plant)
+            PlantDetailView(
+                plant: plant,
+                onOpenCalendar: onOpenCalendar
+            )
         } else {
             PlantRouteMissingEntityView(kind: "plant")
         }

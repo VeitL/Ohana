@@ -57,6 +57,7 @@ struct FunctionMenuDestinationRouter: View {
                 parentPath: $parentPath,
                 pets: pets,
                 humans: humans,
+                plants: plants,
                 petAggregateSummaries: petAggregateSummaries
             )
         case let .featureAggregate(feature):
@@ -100,11 +101,34 @@ struct FunctionMenuDestinationRouter: View {
             if let pet = pet(for: id) { ExpenseHistoryView(pet: pet) }
         case let .humanWeight(id):
             if let human = human(for: id) { HumanWeightHistoryView(human: human) }
+        case let .humanWorkout(id):
+            if let human = human(for: id) { HumanWorkoutHistoryView(human: human) }
+        case let .humanMedication(id):
+            if let human = human(for: id) { HumanMedicationView(human: human) }
+        case let .humanNote(id):
+            if let human = human(for: id) { HumanNoteHistorySheet(human: human) }
         case let .humanExpense(id):
             if let human = human(for: id) { HumanExpenseDetailView(human: human) }
         case .plantsDashboard:
             PlantDashboardView(
                 plants: plants,
+                initialMode: .sites,
+                onOpenPlant: { plantID in
+                    parentPath.append(FMDest.plantDetail(plantID))
+                }
+            )
+        case .plantsList:
+            PlantDashboardView(
+                plants: plants,
+                initialMode: .plants,
+                onOpenPlant: { plantID in
+                    parentPath.append(FMDest.plantDetail(plantID))
+                }
+            )
+        case .plantsPhotos:
+            PlantDashboardView(
+                plants: plants,
+                initialMode: .photos,
                 onOpenPlant: { plantID in
                     parentPath.append(FMDest.plantDetail(plantID))
                 }
@@ -130,7 +154,106 @@ struct FunctionMenuDestinationRouter: View {
         case .gacha:
             GachaRouteContainer()
         case .calendar:
-            CalendarRouteContainer()
+            CalendarRouteContainer(onOpenEventDestination: openCalendarEventDestination)
+        }
+    }
+
+    private func openCalendarEventDestination(_ destination: FocusHomeReminderDestination) {
+        switch destination {
+        case let .petQuick(key, pet):
+            if let destination = functionMenuDestination(forPetQuickKey: key, pet: pet) {
+                parentPath.append(destination)
+            }
+        case let .petFeature(feature, pet):
+            parentPath.append(functionMenuDestination(for: feature, pet: pet))
+        case let .petHealth(pet, _):
+            parentPath.append(FMDest.petHealth(pet.persistentModelID))
+        case let .humanQuick(key, human):
+            if let destination = functionMenuDestination(forHumanQuickKey: key, human: human) {
+                parentPath.append(destination)
+            }
+        case .humanDetail:
+            parentPath.append(FMDest.featureGroup(.householdHub))
+        case let .plant(plant):
+            parentPath.append(FMDest.plantDetail(plant.id))
+        case let .functionMenu(destination):
+            parentPath.append(destination)
+        case .calendar:
+            break
+        }
+    }
+
+    private func functionMenuDestination(forPetQuickKey key: String, pet: Pet) -> FMDest? {
+        switch key {
+        case "feed":
+            .petFood(pet.persistentModelID)
+        case "water", "waterChange", "filterClean", "groom", "cageCleaning",
+             "freeFlight", "misting", "substrateChange":
+            .petHygiene(pet.persistentModelID)
+        case "potty", "litter":
+            .petPotty(pet.persistentModelID)
+        case "walk":
+            .petWalks(pet.persistentModelID)
+        case "health":
+            .petHealth(pet.persistentModelID)
+        case "medication":
+            .petMedications(pet.persistentModelID)
+        case "weight":
+            .petWeight(pet.persistentModelID)
+        case "expense":
+            .petExpense(pet.persistentModelID)
+        case "play":
+            .featureGroup(.dailyCare)
+        default:
+            nil
+        }
+    }
+
+    private func functionMenuDestination(for feature: PetFeature, pet: Pet) -> FMDest {
+        switch feature {
+        case .health:
+            .petHealth(pet.persistentModelID)
+        case .medications:
+            .petMedications(pet.persistentModelID)
+        case .food:
+            .petFood(pet.persistentModelID)
+        case .hygiene:
+            .petHygiene(pet.persistentModelID)
+        case .walks:
+            .petWalks(pet.persistentModelID)
+        case .potty:
+            .petPotty(pet.persistentModelID)
+        case .basicInfo:
+            .petBasicInfo(pet.persistentModelID)
+        case .documents:
+            .petDocuments(pet.persistentModelID)
+        case .moments:
+            .petMoments(pet.persistentModelID)
+        case .achievements:
+            .petAchievements(pet.persistentModelID)
+        case .retention:
+            .petRetention(pet.persistentModelID)
+        case .weight:
+            .petWeight(pet.persistentModelID)
+        case .expense:
+            .petExpense(pet.persistentModelID)
+        }
+    }
+
+    private func functionMenuDestination(forHumanQuickKey key: String, human: Human) -> FMDest? {
+        switch key {
+        case "humanWeight":
+            .humanWeight(human.persistentModelID)
+        case "humanWorkout":
+            .humanWorkout(human.persistentModelID)
+        case "humanMedication":
+            .humanMedication(human.persistentModelID)
+        case "humanNote":
+            .humanNote(human.persistentModelID)
+        case "humanExpense":
+            .humanExpense(human.persistentModelID)
+        default:
+            nil
         }
     }
 

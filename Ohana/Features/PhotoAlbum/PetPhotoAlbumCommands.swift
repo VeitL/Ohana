@@ -39,6 +39,11 @@ enum PetPhotoAlbumCommandService {
         var logs: [PetPhotoLog] = []
         for (index, data) in payloads.enumerated() {
             let logDate = date.addingTimeInterval(Double(index) * 0.01)
+            let sanitizedData = AttachmentPrivacySanitizer.sanitizedData(
+                data,
+                filename: "pet-photo-\(index).jpg",
+                isImage: true
+            )
             guard let write = DomainMemberFactWriteAuthorizer.authorizePetFact(
                 pet: pet,
                 occurredAt: logDate,
@@ -48,7 +53,7 @@ enum PetPhotoAlbumCommandService {
             ) else { continue }
             let log = DomainMemberFactWriter.createPetPhotoLog(
                 plan: write,
-                imageData: data,
+                imageData: sanitizedData,
                 date: logDate,
                 pet: pet,
                 context: context

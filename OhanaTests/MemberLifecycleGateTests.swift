@@ -549,6 +549,9 @@ struct MemberLifecycleGateTests {
         let futureReminder = Reminder(event: futureEvent, scheduledAt: future)
         let pastReminder = Reminder(event: pastEvent, scheduledAt: past)
         let otherFutureReminder = Reminder(event: otherFutureEvent, scheduledAt: future)
+        futureReminder.notificationId = "memorial-pet-future"
+        pastReminder.notificationId = "memorial-pet-past"
+        otherFutureReminder.notificationId = "memorial-other-pet-future"
         let futureEventID = futureEvent.id
         let pastEventID = pastEvent.id
         let otherFutureEventID = otherFutureEvent.id
@@ -564,6 +567,9 @@ struct MemberLifecycleGateTests {
         context.insert(pastReminder)
         context.insert(otherFutureReminder)
         try context.save()
+        let scheduler = CapturingReminderNotificationScheduler()
+        OhanaNotifications.current = scheduler
+        defer { OhanaNotifications.useLive() }
 
         _ = MemberLifecycleCommandService.markPetPassedAway(pet, date: passDate, context: context)
 
@@ -576,6 +582,75 @@ struct MemberLifecycleGateTests {
         #expect(reminders.contains { $0.id == pastReminderID })
         #expect(events.contains { $0.id == otherFutureEventID })
         #expect(reminders.contains { $0.id == otherFutureReminderID })
+        #expect(scheduler.cancelledNotificationIds == ["memorial-pet-future"])
+    }
+
+    @Test func markingHumanPassedAwayRemovesFutureActiveSchedulesAndCancelsNotifications() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let human = Human(name: "Ava")
+        let otherHuman = Human(name: "Guan")
+        let passDate = Date(timeIntervalSince1970: 1_800_001_410)
+        let future = passDate.addingTimeInterval(3600)
+        let past = passDate.addingTimeInterval(-3600)
+        let futureEvent = Event(
+            title: "Future human care",
+            startDate: future,
+            eventType: EventType.health.rawValue,
+            relatedEntityType: EntityKind.human.rawValue,
+            relatedEntityId: human.id.uuidString
+        )
+        let pastEvent = Event(
+            title: "Past human care",
+            startDate: past,
+            eventType: EventType.health.rawValue,
+            relatedEntityType: EntityKind.human.rawValue,
+            relatedEntityId: human.id.uuidString
+        )
+        let otherFutureEvent = Event(
+            title: "Other human care",
+            startDate: future,
+            eventType: EventType.health.rawValue,
+            relatedEntityType: EntityKind.human.rawValue,
+            relatedEntityId: otherHuman.id.uuidString
+        )
+        let futureReminder = Reminder(event: futureEvent, scheduledAt: future)
+        let pastReminder = Reminder(event: pastEvent, scheduledAt: past)
+        let otherFutureReminder = Reminder(event: otherFutureEvent, scheduledAt: future)
+        futureReminder.notificationId = "memorial-human-future"
+        pastReminder.notificationId = "memorial-human-past"
+        otherFutureReminder.notificationId = "memorial-other-human-future"
+        let futureEventID = futureEvent.id
+        let pastEventID = pastEvent.id
+        let otherFutureEventID = otherFutureEvent.id
+        let futureReminderID = futureReminder.id
+        let pastReminderID = pastReminder.id
+        let otherFutureReminderID = otherFutureReminder.id
+        context.insert(human)
+        context.insert(otherHuman)
+        context.insert(futureEvent)
+        context.insert(pastEvent)
+        context.insert(otherFutureEvent)
+        context.insert(futureReminder)
+        context.insert(pastReminder)
+        context.insert(otherFutureReminder)
+        try context.save()
+        let scheduler = CapturingReminderNotificationScheduler()
+        OhanaNotifications.current = scheduler
+        defer { OhanaNotifications.useLive() }
+
+        _ = MemberLifecycleCommandService.markHumanPassedAway(human, date: passDate, context: context)
+
+        let events = try context.fetch(FetchDescriptor<Event>())
+        let reminders = try context.fetch(FetchDescriptor<Reminder>())
+        #expect(human.passedAwayDate == passDate)
+        #expect(!events.contains { $0.id == futureEventID })
+        #expect(!reminders.contains { $0.id == futureReminderID })
+        #expect(events.contains { $0.id == pastEventID })
+        #expect(reminders.contains { $0.id == pastReminderID })
+        #expect(events.contains { $0.id == otherFutureEventID })
+        #expect(reminders.contains { $0.id == otherFutureReminderID })
+        #expect(scheduler.cancelledNotificationIds == ["memorial-human-future"])
     }
 
     @Test func foodStockReminderUsesUnifiedPetResolver() throws {
@@ -1896,6 +1971,56 @@ struct MemberLifecycleGateTests {
         #expect(!HumanAllFeatureDestination.wishlist.isAvailableInMemorialMode)
     }
 
+    @Test func memorialSurfacesDoNotUseRecycleBinOrPendingDeleteLanguage() throws {
+        let rootURL = repositoryRootURL()
+        let memorialSurfacePaths = [
+            "Ohana/Features/Members/Views/HumanBasicInfoDetailView.swift",
+            "Ohana/Features/Members/Views/PetBasicInfoDetailView+MemorialDanger.swift",
+            "Ohana/Features/Members/Views/PetBasicInfoDangerZone.swift",
+            "Ohana/Features/Members/Views/HumanAllFeaturesSheet.swift",
+            "Ohana/Features/Members/Views/PetAllFeaturesSheet.swift",
+            "Ohana/Features/Members/HumanDetailSheetRouteContainer.swift",
+            "Ohana/Features/Members/PetDetailSheetRouteContainer.swift"
+        ]
+        let disallowedTerms = [
+            "回收",
+            "回收站",
+            "待删除",
+            "30 天",
+            "30天",
+            "30 days",
+            "recycle",
+            "pending delete",
+            "pending deletion"
+        ]
+
+        for path in memorialSurfacePaths {
+            let text = try source(path, rootURL: rootURL)
+            for term in disallowedTerms where text.localizedCaseInsensitiveContains(term) {
+                Issue.record("Memorial surface \(path) must not use recycle-bin or pending-delete language: \(term)")
+            }
+        }
+    }
+
+    @Test func petMemorialConfirmationExplainsActiveReminderExitWithoutDeletionCopy() throws {
+        let source = try source(
+            "Ohana/Features/Members/Views/PetBasicInfoDetailView+MemorialDanger.swift",
+            rootURL: repositoryRootURL()
+        )
+        let alertSection = try #require(
+            source.components(separatedBy: ".alert(\"确认标记离世\"").dropFirst().first?
+                .components(separatedBy: "// MARK: - Danger Zone").first
+        )
+
+        #expect(alertSection.contains("未来照护安排退出活跃提醒"))
+        #expect(alertSection.contains("原有数据会保留"))
+        #expect(alertSection.contains("此操作可撤销"))
+
+        for term in ["删除未来提醒", "删除未来事件", "删除提醒", "删除事件"] {
+            #expect(!alertSection.localizedCaseInsensitiveContains(term))
+        }
+    }
+
     @Test func petAllFeaturesUsesRouteScopedActivitySummaryInsteadOfPetRelationshipCareLogs() throws {
         let rootURL = repositoryRootURL()
         let sheetSource = try source("Ohana/Features/Members/Views/PetAllFeaturesSheet.swift", rootURL: rootURL)
@@ -2378,6 +2503,52 @@ struct MemberLifecycleGateTests {
         #expect(dataContainerSource.contains("OhanaFrameScheduler.runAfterNextFrame"))
         #expect(dataContainerSource.contains("descriptor.fetchLimit = 1200"))
         #expect(!dataContainerSource.contains("@Query(sort: \\CareLedgerEvent.occurredAt"))
+    }
+
+    @Test func familyWeeklyReportActiveContributionExcludesDeceasedMembers() throws {
+        let rootURL = repositoryRootURL()
+        let dashboardSource = try source(
+            "Ohana/Features/FamilyReports/Views/FamilyWeeklyReportDashboardView.swift",
+            rootURL: rootURL
+        )
+        let dataContainerSource = try source(
+            "Ohana/Features/FamilyReports/FamilyWeeklyReportDataContainer.swift",
+            rootURL: rootURL
+        )
+
+        #expect(dashboardSource.contains("private var visibleHumans: [Human]"))
+        #expect(dashboardSource.contains("humans.filter { !$0.hasPassedAway }"))
+        #expect(dashboardSource.contains("let visibleHumansById = Dictionary(uniqueKeysWithValues: visibleHumans.map"))
+        #expect(dashboardSource.contains("guard id == \"unknown\" || visibleHumansById[id] != nil else { continue }"))
+        #expect(dashboardSource.contains("humanCount: visibleHumanCount"))
+        #expect(dataContainerSource.contains("pets.filter { !$0.hasPassedAway }"))
+    }
+
+    @Test func coconutHistoryKeepsFrozenMemberLedgerReadableWhileActiveTotalsExcludeThem() throws {
+        let rootURL = repositoryRootURL()
+        let logSource = try source("Ohana/Features/Economy/Views/CoconutLogView.swift", rootURL: rootURL)
+        let afterVisibleLogs = try #require(
+            logSource.components(separatedBy: "private var visibleLogs: [CoconutLogEntry] {").dropFirst().first
+        )
+        let visibleLogsSection = try #require(
+            afterVisibleLogs.components(separatedBy: "private var visibleCoconutTotal: Int {").first
+        )
+        let afterVisibleTotal = try #require(
+            logSource.components(separatedBy: "private var visibleCoconutTotal: Int {").dropFirst().first
+        )
+        let visibleTotalSection = try #require(
+            afterVisibleTotal.components(separatedBy: "private func balance(for actorId: String) -> Int {").first
+        )
+
+        #expect(logSource.contains("let frozenActorIds = Set("))
+        #expect(logSource.contains("pets.filter { !EconomyWalletWritePolicy.canWrite($0) }"))
+        #expect(logSource.contains("humans.filter { !EconomyWalletWritePolicy.canWrite($0) }"))
+        #expect(visibleTotalSection.contains("!memberSnapshot.frozenActorIds.contains(account.ownerId)"))
+        #expect(visibleLogsSection.contains("walletLedgerEntries"))
+        #expect(visibleLogsSection.contains(".filter { $0.delta != 0 }"))
+        #expect(visibleLogsSection.contains(".filter { !memberSnapshot.hiddenHumanIds.contains($0.actorId ?? \"\") }"))
+        #expect(!visibleLogsSection.contains("frozenActorIds"))
+        #expect(!visibleLogsSection.contains("EconomyWalletWritePolicy.canWrite"))
     }
 
     @Test func streakManagerUsesLedgerNarrowCheckInInsteadOfPetRelationshipLogs() throws {
@@ -3523,6 +3694,32 @@ struct MemberLifecycleGateTests {
         #expect(routeSource.contains("context.fetchCount(descriptor)"))
         #expect(routerSource.contains("petAggregateSummaries: petAggregateSummaries"))
         #expect(groupSource.contains("petAggregateSummaries: petAggregateSummaries"))
+    }
+
+    @Test func functionMenuSurfacesDoNotExposeDeceasedMembersAsActiveTargets() throws {
+        let rootURL = repositoryRootURL()
+        let rootSource = try source(
+            "Ohana/Features/FunctionMenu/Views/FunctionMenuRootView.swift",
+            rootURL: rootURL
+        )
+        let groupSource = try source(
+            "Ohana/Features/FunctionMenu/Views/FeatureGroupDashboardView.swift",
+            rootURL: rootURL
+        )
+        let aggregateSource = try source(
+            "Ohana/Features/FunctionMenu/Views/FeatureAggregateView.swift",
+            rootURL: rootURL
+        )
+
+        for surface in [rootSource, groupSource, aggregateSource] {
+            #expect(surface.contains("private var activePets: [Pet] { pets.filter { !$0.hasPassedAway } }"))
+            #expect(surface.contains("private var visibleHumans: [Human] { humans.filter { $0.shouldShowOnHome && !$0.hasPassedAway } }"))
+        }
+        #expect(aggregateSource.contains("ForEach(chipsForFeature)"))
+        #expect(aggregateSource.contains("ForEach(humansForFeature)"))
+        #expect(aggregateSource.contains("ForEach(activePets)"))
+        #expect(aggregateSource.contains("appServices.privacy.unlockedHumans(for: .weight, from: visibleHumans"))
+        #expect(aggregateSource.contains("appServices.privacy.unlockedHumans(for: .expense, from: visibleHumans"))
     }
 
     @MainActor

@@ -337,6 +337,7 @@ struct CrewRosterOverlay: View {
                 }
                 .buttonStyle(ScaleButtonStyle())
                 .accessibilityLabel(l.tr(zh: "关闭", en: "Close", de: "Schließen"))
+                .accessibilityIdentifier("crew-roster-close-action")
             }
         }
     }
@@ -441,6 +442,7 @@ struct CrewRosterOverlay: View {
             .frame(width: rosterFabMetrics.actionHitSize, height: rosterFabMetrics.actionHitSize)
             .contentShape(Circle())
             .accessibilityLabel(fabAccessibilityLabel)
+            .accessibilityIdentifier("crew-roster-primary-action")
         }
     }
 
@@ -529,6 +531,7 @@ struct CrewRosterOverlay: View {
         }
         .buttonStyle(ScaleButtonStyle())
         .accessibilityLabel(addEntityTitle(for: type))
+        .accessibilityIdentifier("crew-roster-add-\(type.rawValue)-action")
     }
 
     private func addEntityTitle(for type: EntityType) -> String {
@@ -654,14 +657,16 @@ struct CrewRosterOverlay: View {
         if let pet = filteredPets.first(where: { $0.id == card.id && !$0.hasPassedAway }) {
             RosterHomeVisibilityToggle(
                 isOn: effectivePetHomeVisibility(pet),
-                label: l.tr(zh: "首页", en: "Home", de: "Start")
+                label: l.tr(zh: "首页", en: "Home", de: "Start"),
+                identifier: "crew-roster-home-visibility-pet-\(pet.name)"
             ) {
                 setPetHomeVisibility(pet, visible: $0)
             }
         } else if let human = filteredHumans.first(where: { $0.id == card.id }) {
             RosterHomeVisibilityToggle(
                 isOn: effectiveHumanHomeVisibility(human),
-                label: l.tr(zh: "首页", en: "Home", de: "Start")
+                label: l.tr(zh: "首页", en: "Home", de: "Start"),
+                identifier: "crew-roster-home-visibility-human-\(human.name)"
             ) {
                 setHumanHomeVisibility(human, visible: $0)
             }

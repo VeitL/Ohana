@@ -385,11 +385,15 @@ private struct WalletMotionLabScene: View {
     }
 
     private func zIndex(for _: WalletMotionLabCard, index: Int, isActive: Bool) -> Double {
+        let collapsedZIndex = Double(index)
         if isActive {
-            return heroDirection < 0 ? Double(index) + 0.25 : 40
+            return WalletHeroLayeringPolicy.activeZIndex(
+                collapsedZIndex: collapsedZIndex,
+                progress: progress,
+                direction: heroDirection
+            )
         }
-        if selectedCardId != nil { return Double(index) }
-        return Double(index)
+        return collapsedZIndex
     }
 
     private var selectedCardIndex: Int? {

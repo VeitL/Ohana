@@ -345,7 +345,8 @@ final class MedicationReminderService {
         guard !doses.isEmpty else { return }
 
         let l = L10n.current
-        let hidesMedicationDetail = human.privateFields.contains(HumanPrivateField.medication.rawValue)
+        let hidesMedicationDetail = HumanLocalPrivacyPolicy.isEnabled &&
+            human.privateFields.contains(HumanPrivateField.medication.rawValue)
 
         for dose in doses {
             let fireDate = dose.scheduledTime

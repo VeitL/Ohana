@@ -1028,9 +1028,9 @@ struct OhanaTests {
         )
 
         #expect(PrivacyService.field(forHumanAction: "humanWeight") == .weight)
-        #expect(PrivacyService.isHumanQuickActionLocked(item, human: owner, viewedBy: viewer.id))
+        #expect(!PrivacyService.isHumanQuickActionLocked(item, human: owner, viewedBy: viewer.id))
         #expect(!PrivacyService.isHumanQuickActionLocked(item, human: owner, viewedBy: owner.id))
-        #expect(PrivacyService.badgeText(for: .weight, human: owner, viewedBy: viewer.id) == "仅自己")
+        #expect(PrivacyService.badgeText(for: .weight, human: owner, viewedBy: viewer.id) == "公开")
     }
 
     @MainActor
@@ -2336,7 +2336,8 @@ struct OhanaTests {
         #expect(restored.mbti == "INTJ")
         #expect(restored.themeColorHex == "FF8800")
         #expect(restored.heightCm == 168)
-        #expect(restored.isPrivate(.weight, viewedBy: UUID()))
+        #expect(restored.privateFields.contains(HumanPrivateField.weight.rawValue))
+        #expect(!restored.isPrivate(.weight, viewedBy: UUID()))
         #expect(restored.avatarImageData == Data([1, 2, 3]))
         #expect(restored.passedAwayDate == passedAwayDate)
 
@@ -2536,7 +2537,7 @@ struct OhanaTests {
         #expect(PrivacyService.field(forHumanAction: "medication") == .medication)
         #expect(PrivacyService.field(forHumanAction: "wishlist") == .wishlist)
         #expect(PrivacyService.field(forHumanAction: "humanExpense") == .expense)
-        #expect(PrivacyService.badgeText(for: .medication, human: owner, viewedBy: viewer.id) == "仅自己")
+        #expect(PrivacyService.badgeText(for: .medication, human: owner, viewedBy: viewer.id) == "公开")
         #expect(PrivacyService.badgeText(for: .expense, human: owner, viewedBy: owner.id) == "公开")
         #expect(PrivacyService.lockedMessage(for: .workout) == "运动数据仅本人可见")
     }

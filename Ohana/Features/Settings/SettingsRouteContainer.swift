@@ -55,15 +55,23 @@ struct AppSettingsSheetRouteContainer: View {
             }
         }
         .onReceive(appServices.domainRevisions.homeRevisionUpdates) { revision in
-            guard shouldReloadSettingsRouteData(for: revision) else { return }
+            guard SettingsRouteReloadPolicy.shouldReloadSettingsRouteData(for: revision) else { return }
             refreshToken &+= 1
         }
     }
+}
 
-    private func shouldReloadSettingsRouteData(for revision: HomeRevision) -> Bool {
+enum SettingsRouteReloadPolicy {
+    static func shouldReloadSettingsRouteData(for revision: HomeRevision) -> Bool {
         guard let command = revision.lastCommand else { return false }
 
-        return command.feature != "privacy"
+        switch (command.feature, command.action) {
+        case ("privacy", _),
+             ("settings", "coconutBalance"):
+            return false
+        default:
+            return true
+        }
     }
 }
 

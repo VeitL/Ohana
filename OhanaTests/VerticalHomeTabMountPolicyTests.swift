@@ -193,18 +193,32 @@ struct VerticalHomeTabMountPolicyTests {
         )
     }
 
-    @Test func embeddedQuickActionsStayUnmountedUntilHeroSettles() {
+    @Test func embeddedQuickActionsThawDuringHeroExpansion() {
         #expect(!FocusHomeEmbeddedQuickActionThawPolicy.isMounted(
-            progress: 0.9,
+            progress: 0.35,
             heroDirection: 1,
             reduceMotion: false
         ))
 
         #expect(FocusHomeEmbeddedQuickActionThawPolicy.isMounted(
-            progress: 0.99,
+            progress: 0.45,
             heroDirection: 1,
             reduceMotion: false
         ))
+
+        let midReveal = FocusHomeEmbeddedQuickActionThawPolicy.reveal(
+            progress: 0.55,
+            heroDirection: 1,
+            reduceMotion: false
+        )
+        #expect(midReveal > 0)
+        #expect(midReveal < 1)
+
+        #expect(FocusHomeEmbeddedQuickActionThawPolicy.reveal(
+            progress: 0.74,
+            heroDirection: 1,
+            reduceMotion: false
+        ) == 1)
     }
 
     @Test func embeddedQuickActionsUseShortReducedMotionThaw() {
@@ -221,6 +235,39 @@ struct VerticalHomeTabMountPolicyTests {
         ))
     }
 
+    @Test func embeddedQuickActionsCanRenderBeforeExpandedInteractionSettles() {
+        #expect(FocusHomeEmbeddedQuickActionPresentationPolicy.isVisible(
+            embedsQuickActionsInCard: true,
+            isExpandedSurface: true,
+            hasWalkTrackingCard: false,
+            isMounted: true
+        ))
+
+        #expect(!FocusHomeEmbeddedQuickActionPresentationPolicy.isVisible(
+            embedsQuickActionsInCard: true,
+            isExpandedSurface: true,
+            hasWalkTrackingCard: true,
+            isMounted: true
+        ))
+    }
+
+    @Test func embeddedQuickActionsBecomeInteractiveOnlyAfterHeroSettles() {
+        #expect(!FocusHomeEmbeddedQuickActionPresentationPolicy.isInteractive(
+            isExpandedInteractionReady: false,
+            reveal: 1
+        ))
+
+        #expect(!FocusHomeEmbeddedQuickActionPresentationPolicy.isInteractive(
+            isExpandedInteractionReady: true,
+            reveal: 0.8
+        ))
+
+        #expect(FocusHomeEmbeddedQuickActionPresentationPolicy.isInteractive(
+            isExpandedInteractionReady: true,
+            reveal: 1
+        ))
+    }
+
     @Test func embeddedQuickActionsRemainMountedDuringEarlyCollapseExit() {
         #expect(FocusHomeEmbeddedQuickActionThawPolicy.isMounted(
             progress: 0.9,
@@ -233,6 +280,53 @@ struct VerticalHomeTabMountPolicyTests {
             heroDirection: -1,
             reduceMotion: false
         ))
+    }
+
+    @Test func expandedCardCollapseHitLayerMountsBeforeQuickActionsAreReady() {
+        #expect(FocusHomeEmbeddedCardCollapseHitPolicy.isMounted(
+            isExpandedSurface: true,
+            hasWalkTrackingCard: false
+        ))
+        #expect(!FocusHomeEmbeddedQuickActionThawPolicy.isMounted(
+            progress: 0.2,
+            heroDirection: 1,
+            reduceMotion: false
+        ))
+        #expect(!FocusHomeEmbeddedCardCollapseHitPolicy.protectsQuickActionDock(
+            quickActionsAreVisible: false
+        ))
+        #expect(FocusHomeEmbeddedCardCollapseHitPolicy.hitHeight(
+            frameHeight: 500,
+            quickActionDockHeight: 160,
+            protectsQuickActionDock: false
+        ) == 500)
+    }
+
+    @Test func expandedCardCollapseHitLayerProtectsQuickActionsOnlyAfterTheyAreVisible() {
+        #expect(!FocusHomeEmbeddedCardCollapseHitPolicy.protectsQuickActionDock(
+            quickActionsAreVisible: false
+        ))
+        #expect(FocusHomeEmbeddedCardCollapseHitPolicy.protectsQuickActionDock(
+            quickActionsAreVisible: true
+        ))
+        #expect(FocusHomeEmbeddedCardCollapseHitPolicy.hitHeight(
+            frameHeight: 500,
+            quickActionDockHeight: 160,
+            protectsQuickActionDock: true
+        ) == 298)
+    }
+
+    @Test func expandedCardCollapseHitLayerStaysOffForWalkTrackingCard() {
+        #expect(!FocusHomeEmbeddedCardCollapseHitPolicy.isMounted(
+            isExpandedSurface: true,
+            hasWalkTrackingCard: true
+        ))
+    }
+
+    @Test func walkCardIdentityStaysStableWhenPausingActiveWalk() {
+        #expect(FocusHomeWalkCardIdentityPolicy.phaseKey(.running) == FocusHomeWalkCardIdentityPolicy.phaseKey(.paused))
+        #expect(FocusHomeWalkCardIdentityPolicy.phaseKey(.paused) != FocusHomeWalkCardIdentityPolicy.phaseKey(.finished(elapsed: 12, poopCount: 1)))
+        #expect(FocusHomeWalkCardIdentityPolicy.phaseKey(.idle) != FocusHomeWalkCardIdentityPolicy.phaseKey(.running))
     }
 
     @Test func ambientFloatOnlyRunsForVisibleCollapsedHomeCards() {

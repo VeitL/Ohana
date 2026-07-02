@@ -42,6 +42,7 @@ extension CalendarView {
                         selection: displayedFilterSelection,
                         pets: pets,
                         humans: humans,
+                        plants: plants,
                         onSelect: selectCalendarFilter
                     )
                 }
@@ -78,6 +79,9 @@ extension CalendarView {
         .onChange(of: calendarFilterHumanId) { _, _ in
             syncCalendarFilterFromStorage(animated: true)
         }
+        .onChange(of: calendarFilterPlantId) { _, _ in
+            syncCalendarFilterFromStorage(animated: true)
+        }
         .onAppear {
             recordCalendarOpen()
             syncCalendarViewModeFromStorage(viewModeRaw)
@@ -95,6 +99,7 @@ extension CalendarView {
             filterStorageCommitTask?.cancel()
             listInitialPositionTask?.cancel()
             listInitialPositionTask = nil
+            timelinePositionCoordinator.cancel()
             addEventPresentationTask?.cancel()
             addEventContentMountTask?.cancel()
         }
@@ -108,6 +113,7 @@ extension CalendarView {
                 cancelPendingCalendarMaintenance()
                 listInitialPositionTask?.cancel()
                 listInitialPositionTask = nil
+                timelinePositionCoordinator.cancel()
             }
         }
         .onChange(of: isEmbeddedPrepared) { _, isPrepared in
@@ -120,6 +126,7 @@ extension CalendarView {
                 cancelPendingCalendarMaintenance()
                 listInitialPositionTask?.cancel()
                 listInitialPositionTask = nil
+                timelinePositionCoordinator.cancel()
             }
         }
         .onChange(of: isEmbeddedVisible) { _, isVisible in
@@ -133,6 +140,7 @@ extension CalendarView {
                 cancelPendingCalendarMaintenance()
                 listInitialPositionTask?.cancel()
                 listInitialPositionTask = nil
+                timelinePositionCoordinator.cancel()
             }
         }
     }
@@ -399,6 +407,7 @@ extension CalendarView {
             withTransaction(transaction) {
                 calendarFilterPetId = selection.petId
                 calendarFilterHumanId = selection.humanId
+                calendarFilterPlantId = selection.plantId
             }
             filterStorageCommitTask = nil
         }
@@ -408,8 +417,11 @@ extension CalendarView {
         listInitialPositionTask?.cancel()
         listInitialPositionTask = nil
         let today = Calendar.current.startOfDay(for: Date())
+        let todayID = timelineDateID(today)
         didScrollListToToday = false
-        visibleTimelineDateID = timelineDateID(today)
+        if visibleTimelineDateID != todayID {
+            visibleTimelineDateID = todayID
+        }
         listVisibleTopDate = today
     }
 }

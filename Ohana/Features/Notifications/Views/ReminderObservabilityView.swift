@@ -49,6 +49,7 @@ struct ReminderObservabilityContentView: View {
         }
         .navigationTitle("提醒健康")
         .navigationBarTitleDisplayMode(.inline)
+        .accessibilityIdentifier("reminder-observability-screen")
         .task { await refreshNotificationStatus() }
     }
 
@@ -73,6 +74,7 @@ struct ReminderObservabilityContentView: View {
         }
         .padding(16)
         .goTranslucentCard(cornerRadius: OhanaRadius.cardSoft)
+        .accessibilityIdentifier("reminder-observability-ledger-card")
     }
 
     private var notificationPermissionCard: some View {
@@ -121,7 +123,7 @@ struct ReminderObservabilityContentView: View {
             } else {
                 ForEach(stats, id: \.0) { action, count in
                     HStack {
-                        Text(actionDisplayName(action))
+                        Text(Self.actionDisplayName(action))
                             .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
                         Spacer()
                         Text("\(count)")
@@ -236,7 +238,7 @@ struct ReminderObservabilityContentView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    private func actionDisplayName(_ action: String) -> String {
+    nonisolated static func actionDisplayName(_ action: String) -> String {
         switch action {
         case "scheduleSuccess", "scheduled": "调度成功"
         case "scheduleDeferred", "refillDeferred": "夜间延后"

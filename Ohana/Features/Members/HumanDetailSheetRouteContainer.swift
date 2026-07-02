@@ -207,7 +207,7 @@ struct AppHumanDetailSheetRouteContainer: View {
             case .workoutDashboard:
                 CoHealthDashboardFullView(human: human)
             case .metrics:
-                HumanHealthCheckupView(human: human)
+                NavigationStack { HumanHealthCheckupView(human: human) }
             case .report:
                 HumanHealthReportView(human: human)
             case .expenseQuick:

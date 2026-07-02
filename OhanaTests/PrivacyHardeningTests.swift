@@ -97,6 +97,51 @@ struct PrivacyHardeningTests {
         #expect(!hasGPSMetadata(attachment.data))
     }
 
+    @MainActor
+    @Test func petPhotoAlbumSanitizesImageBytesBeforeSave() throws {
+        let container = try makePrivacyHardeningContainer()
+        let context = container.mainContext
+        let pet = Pet(name: "Momo", species: "猫")
+        let jpegWithGPS = try makeJPEGWithGPSMetadata()
+        context.insert(pet)
+        try context.save()
+
+        PetPhotoAlbumCommandService.createPhotos(
+            data: [jpegWithGPS],
+            pet: pet,
+            context: context,
+            date: Date(timeIntervalSince1970: 1_800_000_000)
+        )
+
+        let photo = try #require(try context.fetch(FetchDescriptor<PetPhotoLog>()).first)
+        #expect(!hasGPSMetadata(photo.imageData))
+    }
+
+    @MainActor
+    @Test func quickMomentSanitizesPhotoBytesBeforeSave() throws {
+        let container = try makePrivacyHardeningContainer()
+        let context = container.mainContext
+        let pet = Pet(name: "Momo", species: "猫")
+        let jpegWithGPS = try makeJPEGWithGPSMetadata()
+        context.insert(pet)
+        try context.save()
+
+        MomentCommandService.recordMoment(
+            pet: pet,
+            note: "sunny window",
+            photoData: [jpegWithGPS],
+            locationLatitude: 52.52,
+            locationLongitude: 13.405,
+            locationPlacename: "Home",
+            context: context,
+            date: Date(timeIntervalSince1970: 1_800_000_000)
+        )
+
+        let photo = try #require(try context.fetch(FetchDescriptor<PetPhotoLog>()).first)
+        #expect(!hasGPSMetadata(photo.imageData))
+        #expect(photo.locationPlacename == "Home")
+    }
+
     @Test func encryptedBackupRejectsWeakPasswordsAndUsesPBKDF2ForNewExports() throws {
         do {
             _ = try DataBackupEncryption.encrypt(Data("private".utf8), password: "1234567")

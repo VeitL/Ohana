@@ -69,6 +69,10 @@ struct SettingsView: View {
     @State var dataSectionsMountTask: Task<Void, Never>?
     @State var biometricGateAvailability = MemberGateBiometricAvailability.unavailable
     @State var showingCoconutBalanceTest = false
+    @State var showingReminderObservability = false
+    @State var showingFamilyWeeklyReportDebug = false
+    @State var showAdvancedNotificationSettings = false
+    @State var notificationPreferenceRevision = 0
 
     init(
         homeHouseholds: [Household]? = nil,
@@ -215,6 +219,40 @@ struct SettingsView: View {
                 CoconutBalanceTestView()
             }
             .ohanaSheetPagePresentation() // ui-v4: allow developer balance console as long sheet
+        }
+        .sheet(isPresented: $showingReminderObservability) {
+            NavigationStack {
+                ReminderObservabilityView()
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) {
+                            Button {
+                                showingReminderObservability = false
+                            } label: {
+                                Image(systemName: "xmark") // a11y: allow decorative icon covered by surrounding label
+                            }
+                            .accessibilityLabel(l.tr(zh: "关闭", en: "Close", de: "Schließen"))
+                            .accessibilityIdentifier("reminder-observability-close-action")
+                        }
+                    }
+            }
+            .ohanaSheetPagePresentation() // ui-v4: allow developer reminder observability console as long sheet
+        }
+        .sheet(isPresented: $showingFamilyWeeklyReportDebug) {
+            NavigationStack {
+                FamilyWeeklyReportDashboardView()
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) {
+                            Button {
+                                showingFamilyWeeklyReportDebug = false
+                            } label: {
+                                Image(systemName: "xmark") // a11y: allow decorative icon covered by surrounding label
+                            }
+                            .accessibilityLabel(l.tr(zh: "关闭", en: "Close", de: "Schließen"))
+                            .accessibilityIdentifier("family-weekly-report-debug-close-action")
+                        }
+                    }
+            }
+            .ohanaSheetPagePresentation() // ui-v4: allow developer weekly report console as long sheet
         }
         .sheet(item: $quickSwitchHuman) { human in
             HumanQuickSwitchPasscodeSheet(human: human) {

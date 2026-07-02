@@ -29,7 +29,41 @@ extension SettingsView {
                 .accessibilityLabel(l.tr(zh: "Debug 椰子", en: "Debug Coconuts", de: "Debug-Kokosnüsse"))
                 .accessibilityIdentifier("settings-debug-coconuts-shortcut")
 
+                Button {
+                    showingReminderObservability = true
+                } label: {
+                    Image(systemName: "list.clipboard.fill") // a11y: allow decorative icon covered by surrounding label
+                        .font(OhanaFont.adaptive(size: 13, weight: .black))
+                        .foregroundStyle(Color.goPrimary)
+                        .frame(width: 44, height: 44)
+                        .background(Color.ohanaControlFill, in: Capsule())
+                }
+                .buttonStyle(ScaleButtonStyle())
+                .accessibilityLabel(l.tr(
+                    zh: "提醒可观测面板",
+                    en: "Reminder Observability",
+                    de: "Erinnerungsbeobachtung"
+                ))
+                .accessibilityIdentifier("settings-debug-reminder-observability-shortcut")
+
                 if SettingsDebugTools.isRunningUITests {
+                    Button {
+                        showingFamilyWeeklyReportDebug = true
+                    } label: {
+                        Image(systemName: "chart.bar.doc.horizontal") // a11y: allow decorative icon covered by surrounding label
+                            .font(OhanaFont.adaptive(size: 13, weight: .black))
+                            .foregroundStyle(Color.goPrimary)
+                            .frame(width: 44, height: 44)
+                            .background(Color.ohanaControlFill, in: Capsule())
+                    }
+                    .buttonStyle(ScaleButtonStyle())
+                    .accessibilityLabel(l.tr(
+                        zh: "Debug 家庭周报",
+                        en: "Debug Weekly Report",
+                        de: "Debug-Wochenbericht"
+                    ))
+                    .accessibilityIdentifier("settings-debug-family-weekly-report-shortcut")
+
                     Button {
                         applyUITestRewardTierShortcut()
                     } label: {
@@ -63,6 +97,23 @@ extension SettingsView {
                         de: "Debug-Belohnungsbudget zurücksetzen"
                     ))
                     .accessibilityIdentifier("settings-debug-economy-budget-reset-shortcut")
+
+                    Button {
+                        applyUITestPlantBaselineShortcut()
+                    } label: {
+                        Image(systemName: "leaf.fill") // a11y: allow decorative icon covered by surrounding label
+                            .font(OhanaFont.adaptive(size: 13, weight: .black))
+                            .foregroundStyle(Color.goTeal)
+                            .frame(width: 44, height: 44)
+                            .background(Color.ohanaControlFill, in: Capsule())
+                    }
+                    .buttonStyle(ScaleButtonStyle())
+                    .accessibilityLabel(l.tr(
+                        zh: "Debug 植物基线",
+                        en: "Debug Plant Baseline",
+                        de: "Debug-Pflanzenbasis"
+                    ))
+                    .accessibilityIdentifier("settings-debug-plant-baseline-shortcut")
                 }
             }
             Button { closeSettings() } label: {
@@ -154,8 +205,10 @@ extension SettingsView {
     var privacySecuritySection: some View {
         settingsSection(title: l.tr(zh: "隐私与安全", en: "Privacy & Security", de: "Datenschutz & Sicherheit")) {
             appSwitcherSnapshotPrivacyRow
-            OhanaDashedDivider(color: dividerLine).padding(.leading, 44)
-            memberGateBiometricRow
+            if HumanLocalPrivacyPolicy.isEnabled {
+                OhanaDashedDivider(color: dividerLine).padding(.leading, 44)
+                memberGateBiometricRow
+            }
         }
     }
 
@@ -223,6 +276,157 @@ extension SettingsView {
         biometricGateAvailability = MemberGateBiometricAuthenticator.availability()
     }
 
+    var notificationPreferenceGroups: [NotificationPreferenceGroup] {
+        NotificationPreferenceGroup.allCases
+    }
+
+    var enabledNotificationPreferenceCount: Int {
+        _ = notificationPreferenceRevision
+        return notificationPreferenceGroups.count(where: { NotificationPreferenceStore.isEnabled($0) })
+    }
+
+    var routineNotificationSummary: String {
+        let enabledCount = enabledNotificationPreferenceCount
+        let totalCount = notificationPreferenceGroups.count
+        if enabledCount == totalCount {
+            return l.tr(zh: "全部开启", en: "All on", de: "Alle an")
+        }
+        if enabledCount == 0 {
+            return l.tr(zh: "全部关闭", en: "All off", de: "Alle aus")
+        }
+        return l.tr(
+            zh: "\(enabledCount)/\(totalCount) 已开启",
+            en: "\(enabledCount)/\(totalCount) on",
+            de: "\(enabledCount)/\(totalCount) an"
+        )
+    }
+
+    var routineNotificationsBinding: Binding<Bool> {
+        Binding(
+            get: {
+                _ = notificationPreferenceRevision
+                return notificationPreferenceGroups.allSatisfy { NotificationPreferenceStore.isEnabled($0) }
+            },
+            set: { value in
+                notificationPreferenceGroups.forEach { NotificationPreferenceStore.set(value, for: $0) }
+                notificationPreferenceRevision += 1
+            }
+        )
+    }
+
+    func notificationPreferenceBinding(for group: NotificationPreferenceGroup) -> Binding<Bool> {
+        Binding(
+            get: {
+                _ = notificationPreferenceRevision
+                return NotificationPreferenceStore.isEnabled(group)
+            },
+            set: { value in
+                NotificationPreferenceStore.set(value, for: group)
+                notificationPreferenceRevision += 1
+            }
+        )
+    }
+
+    var routineNotificationsToggleRow: some View {
+        HStack(spacing: 12) {
+            settingsIcon("bell.badge.fill", color: Color.goPrimary)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(l.tr(zh: "常规提醒", en: "Routine reminders", de: "Reguläre Erinnerungen"))
+                    .font(OhanaFont.body(.semibold))
+                    .foregroundStyle(primaryText)
+                Text(routineNotificationSummary)
+                    .font(OhanaFont.footnote())
+                    .foregroundStyle(tertiaryText)
+            }
+            Spacer()
+            Toggle("", isOn: routineNotificationsBinding)
+                .tint(accentColor)
+                .labelsHidden()
+        }
+        .frame(minHeight: 44)
+        .animation(GoMotion.feedback, value: notificationPreferenceRevision)
+        .accessibilityIdentifier("settings-routine-notifications-toggle")
+    }
+
+    var advancedNotificationSettingsDisclosure: some View {
+        VStack(spacing: 0) {
+            Button {
+                withAnimation(GoMotion.feedback) {
+                    showAdvancedNotificationSettings.toggle()
+                }
+            } label: {
+                HStack(spacing: 12) {
+                    settingsIcon("slider.horizontal.3", color: Color.goTeal)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(l.tr(zh: "高级提醒设置", en: "Advanced reminder settings", de: "Erweiterte Erinnerungen"))
+                            .font(OhanaFont.body(.semibold))
+                            .foregroundStyle(primaryText)
+                        Text(routineNotificationSummary)
+                            .font(OhanaFont.footnote())
+                            .foregroundStyle(tertiaryText)
+                    }
+                    Spacer()
+                    Image(systemName: showAdvancedNotificationSettings ? "chevron.up" : "chevron.down")
+                        .font(OhanaFont.footnote(.bold))
+                        .symbolRenderingMode(.monochrome)
+                        .foregroundStyle(tertiaryText)
+                }
+                .frame(minHeight: 44)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("settings-advanced-notifications-disclosure")
+
+            if showAdvancedNotificationSettings {
+                advancedNotificationSettingsRows
+            }
+        }
+        .animation(GoMotion.feedback, value: showAdvancedNotificationSettings)
+    }
+
+    var advancedNotificationSettingsRows: some View {
+        VStack(spacing: 0) {
+            notificationToggleRow(
+                icon: "pills.fill",
+                iconColor: Color(hex: "FF5A00"),
+                title: l.tr(zh: "用药提醒", en: "Medication reminders", de: "Medikamentenerinnerungen"),
+                group: .medication
+            )
+            OhanaDashedDivider(color: dividerLine).padding(.leading, 44)
+            notificationToggleRow(
+                icon: "calendar.badge.clock",
+                iconColor: Color.goBlue,
+                title: l.tr(zh: "日历事项提醒", en: "Calendar event reminders", de: "Kalendererinnerungen"),
+                group: .calendar
+            )
+            OhanaDashedDivider(color: dividerLine).padding(.leading, 44)
+            notificationToggleRow(
+                icon: "fork.knife",
+                iconColor: Color.goPrimary,
+                title: l.tr(zh: "喂食提醒", en: "Feeding reminders", de: "Fütterungserinnerungen"),
+                group: .feeding
+            )
+            OhanaDashedDivider(color: dividerLine).padding(.leading, 44)
+            notificationToggleRow(
+                icon: "bubbles.and.sparkles.fill",
+                iconColor: Color.goTeal,
+                title: l.tr(zh: "护理提醒", en: "Care reminders", de: "Pflegeerinnerungen"),
+                group: .hygiene
+            )
+            OhanaDashedDivider(color: dividerLine).padding(.leading, 44)
+            plantReminderSettingsPanel
+            OhanaDashedDivider(color: dividerLine).padding(.leading, 44)
+            notificationToggleRow(
+                icon: "checkmark.seal.fill",
+                iconColor: Color.goYellow,
+                title: l.tr(zh: "打卡提醒", en: "Check-in reminders", de: "Check-in-Erinnerungen"),
+                group: .checkIn
+            )
+        }
+        .padding(.top, 10)
+        .transition(.opacity.combined(with: .move(edge: .top)))
+    }
+
     func notificationToggleRow(icon: String, iconColor: Color, title: String, group: NotificationPreferenceGroup) -> some View {
         HStack(spacing: 12) {
             settingsIcon(icon, color: iconColor)
@@ -230,12 +434,10 @@ extension SettingsView {
                 .font(OhanaFont.body(.semibold))
                 .foregroundStyle(primaryText)
             Spacer()
-            Toggle("", isOn: Binding(
-                get: { NotificationPreferenceStore.isEnabled(group) },
-                set: { NotificationPreferenceStore.set($0, for: group) }
-            ))
+            Toggle("", isOn: notificationPreferenceBinding(for: group))
             .tint(accentColor)
             .labelsHidden()
+            .accessibilityIdentifier("settings-notification-\(group.rawValue)-toggle")
         }
         .frame(minHeight: 44)
     }

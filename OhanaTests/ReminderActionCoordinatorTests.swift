@@ -29,6 +29,32 @@ struct ReminderActionCoordinatorTests {
         #expect(untouched.statusEnum == .pending)
     }
 
+    @Test func notificationSnoozeActionRoutesToOneDaySnooze() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let reminder = Reminder(scheduledAt: Date(timeIntervalSince1970: 1_800_000_000))
+        let completion = SpyReminderCompleter()
+        context.insert(reminder)
+        try context.save()
+
+        let result = ReminderActionCoordinator.handle(
+            userInfo: [
+                "action": "SNOOZE",
+                "reminderId": reminder.id.uuidString
+            ],
+            currentActiveHumanId: "human-1",
+            context: context,
+            reminderCompletion: completion
+        )
+
+        #expect(result == .snoozed)
+        #expect(completion.snoozedReminderIDs == [reminder.id])
+        #expect(completion.snoozedBy == ["human-1"])
+        #expect(completion.snoozeRescheduleFlags == [true])
+        #expect(completion.completedReminderIDs.isEmpty)
+        #expect(completion.skippedReminderIDs.isEmpty)
+    }
+
     @Test func missingReminderDoesNotMutateExistingReminders() throws {
         let container = try makeContainer()
         let context = container.mainContext
@@ -407,4 +433,36 @@ private final class FakeMedicationReminderManager: MedicationReminderManaging {
     }
 
     func scheduleHumanMedicationReminders(for _: Human, meds _: [HumanMedication], context _: ModelContext?) {}
+}
+
+@MainActor
+private final class SpyReminderCompleter: ReminderCompleting {
+    var completedReminderIDs: [UUID] = []
+    var skippedReminderIDs: [UUID] = []
+    var reopenedReminderIDs: [UUID] = []
+    var snoozedReminderIDs: [UUID] = []
+    var snoozedBy: [String?] = []
+    var snoozeRescheduleFlags: [Bool] = []
+
+    func complete(_ reminder: Reminder, by _: String?, context _: ModelContext) -> Bool {
+        completedReminderIDs.append(reminder.id)
+        return true
+    }
+
+    func skip(_ reminder: Reminder, by _: String?, context _: ModelContext) -> Bool {
+        skippedReminderIDs.append(reminder.id)
+        return true
+    }
+
+    func reopen(_ reminder: Reminder, by _: String?, context _: ModelContext, reschedule _: Bool) -> Bool {
+        reopenedReminderIDs.append(reminder.id)
+        return true
+    }
+
+    func snoozeOneDay(_ reminder: Reminder, by humanId: String?, context _: ModelContext, reschedule: Bool) -> Bool {
+        snoozedReminderIDs.append(reminder.id)
+        snoozedBy.append(humanId)
+        snoozeRescheduleFlags.append(reschedule)
+        return true
+    }
 }

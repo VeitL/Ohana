@@ -70,12 +70,14 @@ struct InlineNumericInput: View {
                 .transition(.opacity.combined(with: .scale(scale: 0.98, anchor: .top)))
             }
         }
+        .transaction { transaction in
+            transaction.animation = nil
+        }
     }
 
     @ViewBuilder
     private var numericEntryButton: some View {
         let button = Button {
-            GoKeyboard.dismiss()
             withAnimation(GoMotion.feedback) {
                 showsKeypad.toggle()
             }

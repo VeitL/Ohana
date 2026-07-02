@@ -12,14 +12,17 @@ struct SwipeableEventRow: View {
     let event: Event
     var occurrenceDate: Date = .init()
     var petThemeColor: Color?
+    var allowsUserEventDetail = true
     let onComplete: () -> Void
     let onDelete: () -> Void
+    var onOpenDetail: (() -> Void)?
     var onOpenRelated: (() -> Bool)?
 
     @Environment(\.modelContext) private var modelContext
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(AppServices.self) private var appServices
+    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
     @AppStorage(AppPerformanceMode.powerSavingKey) private var powerSavingMode = false
 
     @State private var offsetX: CGFloat = 0
@@ -27,7 +30,6 @@ struct SwipeableEventRow: View {
     @State private var showDeleteConfirmAlert = false
     @State private var celebrationParticles: [CelebrationParticle] = []
     @AppStorage("shop_equip_fx_stars") private var equipFxStars: Bool = false
-    @State private var showDetail = false
     @State private var activeDragAxis: DragAxis? = nil
 
     // Overdue emphasis stays static in list geometry; rows must not drift while the user scans.
@@ -46,6 +48,12 @@ struct SwipeableEventRow: View {
 
     private var leftProgress: CGFloat { max(0, -offsetX) / triggerThreshold }
     private var rightProgress: CGFloat { max(0, offsetX) / triggerThreshold }
+    private var l: L10n { L10n(appLanguage) }
+    private var accessibilityHint: String {
+        allowsUserEventDetail
+            ? l.tr(zh: "查看日历事项详情", en: "View calendar event details", de: "Kalendertermin-Details anzeigen")
+            : l.tr(zh: "打开相关功能", en: "Open related feature", de: "Zugehorige Funktion offnen")
+    }
 
     // MARK: - Row State（重复序列按「本次发生日」判断完成/逾期，避免整串共用一个 isCompleted / startDate）
     private enum RowState { case pending, completed, overdue }
@@ -118,15 +126,9 @@ struct SwipeableEventRow: View {
             eventCard
                 .offset(x: offsetX)
                 .simultaneousGesture(rowSwipeGesture)
-                .onTapGesture {
-                    guard onOpenRelated?() != true else { return }
-                    showDetail = true
-                }
-        }
-        .sheet(isPresented: $showDetail) {
-            EventDetailSheet(event: event, occurrenceDate: occurrenceDate, onDelete: onDelete, onComplete: onComplete)
-                .presentationDetents([.medium])
-                .presentationDragIndicator(.hidden)
+                .highPriorityGesture(
+                    TapGesture().onEnded { openPrimaryAction() }
+                )
         }
         // F1+F2: 唯一删除确认弹窗，所有逻辑在此处理
         .confirmationDialog(
@@ -288,6 +290,11 @@ struct SwipeableEventRow: View {
         // Squish: card compresses horizontally, slightly taller on deep swipe
         .scaleEffect(x: squishX, y: squishY, anchor: .trailing)
         .animation(GoMotion.feedback, value: leftProgress)
+        .contentShape(Rectangle())
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(event.title)
+        .accessibilityHint(accessibilityHint)
+        .accessibilityAddTraits(.isButton)
         .accessibilityIdentifier("calendar-event-row-\(event.title)")
     }
 
@@ -379,6 +386,13 @@ struct SwipeableEventRow: View {
         }
     }
 
+    private func openPrimaryAction() {
+        guard !isTriggerred, offsetX == 0 else { return }
+        guard onOpenRelated?() != true else { return }
+        guard allowsUserEventDetail else { return }
+        onOpenDetail?()
+    }
+
     // E1: 右滑只弹确认 alert，回弹到原位
     private func pendingDelete() {
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
@@ -428,15 +442,24 @@ struct SwipeableEventRow: View {
 
 // MARK: - Event Detail Sheet（F2F0F5 浅色大圆角底板）
 
-private struct EventDetailSheet: View {
+struct EventDetailSheet: View {
     let event: Event
     var occurrenceDate: Date
+    let pets: [Pet]
+    let humans: [Human]
+    let allowsEditing: Bool
     let onDelete: () -> Void
     let onComplete: () -> Void
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
     @Environment(AppServices.self) private var appServices
+    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
     @State private var showDeleteConfirm = false
+    @State private var showEditEvent = false
+    private var l: L10n { L10n(appLanguage) }
+    private var detailActions: [CalendarEventDetailAction] {
+        CalendarEventInteractionPolicy.detailActions(for: event, allowsEditing: allowsEditing)
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -498,17 +521,26 @@ private struct EventDetailSheet: View {
                             }
                         }
                     }
-                    if event.recurrenceDays > 0 {
-                        infoRow(icon: "repeat", label: "重复",
-                                value: recurrenceLabel(event.recurrenceDays))
-                    }
-
                     GoDashedDivider().padding(.horizontal, 24)
 
                     // 操作按钮
-                    HStack(spacing: 12) {
+                    VStack(spacing: 10) {
+                        if detailActions.contains(.edit) {
+                            Button {
+                                showEditEvent = true
+                            } label: {
+                                Label(l.tr(zh: "编辑", en: "Edit", de: "Bearbeiten"), systemImage: "pencil")
+                                    .font(OhanaFont.adaptive(size: 15, weight: .bold, design: .rounded))
+                                    .foregroundStyle(Color.arkInk)
+                                    .frame(maxWidth: .infinity).padding(.vertical, 14)
+                                    .background(Color.goPrimary, in: RoundedRectangle(cornerRadius: OhanaRadius.row))
+                            }
+                            .buttonStyle(ScaleButtonStyle())
+                            .accessibilityIdentifier("calendar-event-edit-action")
+                        }
+
                         // 信息性事件（生日/纪念日）不显示完成按钮
-                        if event.isActionableTask {
+                        if detailActions.contains(.complete) {
                             Button {
                                 onComplete()
                                 dismiss()
@@ -521,32 +553,32 @@ private struct EventDetailSheet: View {
                                     .background(Color.goTeal, in: RoundedRectangle(cornerRadius: OhanaRadius.row))
                             }
                             .buttonStyle(ScaleButtonStyle())
+                            .accessibilityIdentifier("calendar-event-complete-action")
                         }
 
-                        Button {
-                            showDeleteConfirm = true
-                        } label: {
-                            Label("删除", systemImage: "trash.fill")
-                                .font(OhanaFont.adaptive(size: 15, weight: .bold, design: .rounded))
-                                .foregroundStyle(Color.ohanaPrimaryText)
-                                .frame(maxWidth: .infinity).padding(.vertical, 14)
-                                .background(Color.goRed, in: RoundedRectangle(cornerRadius: OhanaRadius.row))
-                        }
-                        .buttonStyle(ScaleButtonStyle())
-                        .confirmationDialog("确认删除", isPresented: $showDeleteConfirm, titleVisibility: .visible) {
-                            Button("删除此事项", role: .destructive) {
-                                CalendarCommandExecutor(context: modelContext, services: appServices).delete(
-                                    event: event,
-                                    occurrenceDate: occurrenceDate,
-                                    scope: .wholeEvent,
-                                    note: "calendar.event.delete.detail"
-                                )
-                                onDelete()
-                                dismiss()
+                        if detailActions.contains(.delete) {
+                            Button {
+                                showDeleteConfirm = true
+                            } label: {
+                                Label(l.tr(zh: "删除", en: "Delete", de: "Loschen"), systemImage: "trash.fill")
+                                    .font(OhanaFont.adaptive(size: 15, weight: .bold, design: .rounded))
+                                    .foregroundStyle(Color.ohanaPrimaryText)
+                                    .frame(maxWidth: .infinity).padding(.vertical, 14)
+                                    .background(Color.goRed, in: RoundedRectangle(cornerRadius: OhanaRadius.row))
                             }
-                            Button("取消", role: .cancel) {}
-                        } message: {
-                            Text("确定要删除「\(event.title)」吗？此操作不可撤回。")
+                            .buttonStyle(ScaleButtonStyle())
+                            .accessibilityIdentifier("calendar-event-delete-action")
+                            .confirmationDialog(deleteDialogTitle, isPresented: $showDeleteConfirm, titleVisibility: .visible) {
+                                ForEach(deleteScopes, id: \.revisionActionKey) { scope in
+                                    Button(deleteLabel(for: scope), role: .destructive) {
+                                        deleteEvent(scope: scope)
+                                    }
+                                    .accessibilityIdentifier(confirmDeleteAccessibilityIdentifier(for: scope))
+                                }
+                                Button(l.cancel, role: .cancel) {}
+                            } message: {
+                                Text(deleteDialogMessage)
+                            }
                         }
                     }
                     .padding(.horizontal, 24)
@@ -560,7 +592,81 @@ private struct EventDetailSheet: View {
                 Color.goPrimary.opacity(0.15)
             }
         }
+        .accessibilityIdentifier("calendar-event-detail-sheet")
+        .sheet(isPresented: $showEditEvent) {
+            AddEventContentView(
+                onClose: {
+                    showEditEvent = false
+                    dismiss()
+                },
+                pets: pets,
+                humans: humans,
+                editingEvent: event,
+                editingOccurrenceDate: occurrenceDate
+            )
+        }
         .presentationCornerRadius(OhanaRadius.hero)
+    }
+
+    private var deleteScopes: [CalendarEventDeletionScope] {
+        CalendarEventInteractionPolicy.detailDeletionScopes(for: event)
+    }
+
+    private var deleteDialogTitle: String {
+        event.recurrenceDays > 0
+            ? l.tr(zh: "删除重复事项", en: "Delete repeating event", de: "Wiederholten Termin loschen")
+            : l.tr(
+                zh: "删除「\(event.title)」",
+                en: "Delete \"\(event.title)\"",
+                de: "\"\(event.title)\" loschen"
+            )
+    }
+
+    private var deleteDialogMessage: String {
+        event.recurrenceDays > 0
+            ? l.tr(
+                zh: "这是一个重复事项，请选择删除范围。",
+                en: "This is a repeating event. Choose what to delete.",
+                de: "Dies ist ein wiederholter Termin. Wahle, was geloscht wird."
+            )
+            : l.tr(
+                zh: "确定要删除「\(event.title)」吗？此操作不可撤回。",
+                en: "Delete \"\(event.title)\"? This can't be undone.",
+                de: "\"\(event.title)\" loschen? Dies kann nicht ruckgangig gemacht werden."
+            )
+    }
+
+    private func deleteLabel(for scope: CalendarEventDeletionScope) -> String {
+        switch scope {
+        case .wholeEvent:
+            l.tr(zh: "删除此事项", en: "Delete event", de: "Termin loschen")
+        case .singleOccurrence:
+            l.tr(zh: "仅删除本次", en: "Delete this occurrence", de: "Nur diesen Termin loschen")
+        case .thisAndFuture:
+            l.tr(zh: "删除本次及之后", en: "Delete this and future occurrences", de: "Diesen und zukunftige Termine loschen")
+        }
+    }
+
+    private func confirmDeleteAccessibilityIdentifier(for scope: CalendarEventDeletionScope) -> String {
+        switch scope {
+        case .wholeEvent:
+            "calendar-event-confirm-delete-action"
+        case .singleOccurrence:
+            "calendar-event-confirm-delete-single-occurrence-action"
+        case .thisAndFuture:
+            "calendar-event-confirm-delete-this-and-future-action"
+        }
+    }
+
+    private func deleteEvent(scope: CalendarEventDeletionScope) {
+        CalendarCommandExecutor(context: modelContext, services: appServices).delete(
+            event: event,
+            occurrenceDate: occurrenceDate,
+            scope: scope,
+            note: "calendar.event.delete.detail.\(scope.revisionActionKey)"
+        )
+        onDelete()
+        dismiss()
     }
 
     private func infoRow(icon: String, label: String, value: String) -> some View {
@@ -579,16 +685,6 @@ private struct EventDetailSheet: View {
                 .foregroundStyle(Color.ohanaPrimaryText)
         }
         .padding(.horizontal, 24)
-    }
-
-    private func recurrenceLabel(_ days: Int) -> String {
-        switch days {
-        case 1: "每天"
-        case 7: "每周"
-        case 14: "每两周"
-        case 30: "每月"
-        default: "每\(days)天"
-        }
     }
 
     private var nodeColor: Color {

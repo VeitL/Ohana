@@ -61,8 +61,8 @@ struct FocusHomeVerticalSolidHeroSnapshot {
 }
 
 enum FocusHomeEmbeddedQuickActionThawPolicy {
-    static let openingMountProgress: CGFloat = 0.98
-    static let openingFullyVisibleProgress: CGFloat = 0.995
+    static let openingMountProgress: CGFloat = 0.36
+    static let openingFullyVisibleProgress: CGFloat = 0.74
     static let reducedMotionMountProgress: CGFloat = 0.5
     static let closingKeepAliveProgress: CGFloat = 0.82
 
@@ -83,6 +83,61 @@ enum FocusHomeEmbeddedQuickActionThawPolicy {
             return WalletHeroTimeline.smooth(progress, closingKeepAliveProgress, 0.92)
         }
         return WalletHeroTimeline.smooth(progress, openingMountProgress, openingFullyVisibleProgress)
+    }
+}
+
+enum FocusHomeEmbeddedQuickActionPresentationPolicy {
+    static func isVisible(
+        embedsQuickActionsInCard: Bool,
+        isExpandedSurface: Bool,
+        hasWalkTrackingCard: Bool,
+        isMounted: Bool
+    ) -> Bool {
+        embedsQuickActionsInCard
+            && isExpandedSurface
+            && !hasWalkTrackingCard
+            && isMounted
+    }
+
+    static func isInteractive(
+        isExpandedInteractionReady: Bool,
+        reveal: CGFloat
+    ) -> Bool {
+        isExpandedInteractionReady && reveal > 0.98
+    }
+}
+
+enum FocusHomeEmbeddedCardCollapseHitPolicy {
+    static let quickActionDockProtectionPadding: CGFloat = 42
+
+    static func isMounted(isExpandedSurface: Bool, hasWalkTrackingCard: Bool) -> Bool {
+        isExpandedSurface && !hasWalkTrackingCard
+    }
+
+    static func protectsQuickActionDock(quickActionsAreVisible: Bool) -> Bool {
+        quickActionsAreVisible
+    }
+
+    static func hitHeight(
+        frameHeight: CGFloat,
+        quickActionDockHeight: CGFloat,
+        protectsQuickActionDock: Bool
+    ) -> CGFloat {
+        guard protectsQuickActionDock else { return max(44, frameHeight) }
+        return max(44, frameHeight - (quickActionDockHeight + quickActionDockProtectionPadding))
+    }
+}
+
+enum FocusHomeWalkCardIdentityPolicy {
+    static func phaseKey(_ phase: WalkPhase) -> String {
+        switch phase {
+        case .idle:
+            "idle"
+        case .running, .paused:
+            "active"
+        case .finished:
+            "finished"
+        }
     }
 }
 
@@ -133,6 +188,7 @@ struct FocusHomeVerticalSolidScene<QuickActions: View, ContextMenuContent: View>
     let contextMenu: (FocusCard) -> ContextMenuContent
     let onSelect: (FocusHomeVerticalSolidHeroSnapshot) -> Void
     let onCollapse: () -> Void
+    let onWalkCardMinimizeToFloatingControl: () -> Void
     let onOpenDetails: (FocusCard) -> Void
 
     @Environment(AppServices.self) private var appServices
@@ -343,19 +399,24 @@ struct FocusHomeVerticalSolidScene<QuickActions: View, ContextMenuContent: View>
             heroDirection: heroDirection,
             reduceMotion: reduceMotion
         )
-        let embeddedQuickActionsReady = isExpandedInteractionReady && embeddedQuickActionReveal > 0.98
-        let showsEmbeddedQuickActions = embedsQuickActionsInCard
-            && isExpandedSurface
-            && walkTrackingPet == nil
-            && embeddedQuickActionsMounted
-            && embeddedQuickActionsReady
+        let embeddedQuickActionsReady = FocusHomeEmbeddedQuickActionPresentationPolicy.isInteractive(
+            isExpandedInteractionReady: isExpandedInteractionReady,
+            reveal: embeddedQuickActionReveal
+        )
+        let showsEmbeddedQuickActions = FocusHomeEmbeddedQuickActionPresentationPolicy.isVisible(
+            embedsQuickActionsInCard: embedsQuickActionsInCard,
+            isExpandedSurface: isExpandedSurface,
+            hasWalkTrackingCard: walkTrackingPet != nil,
+            isMounted: embeddedQuickActionsMounted
+        )
 
         return cardTapLayer(
             FocusHomeWalkCardFlip(
                 walkPet: walkTrackingPet,
                 reduceMotion: reduceMotion,
                 walkCardPadding: 10,
-                retainsWalkPetDuringClose: isExpandedInteractionReady
+                retainsWalkPetDuringClose: isExpandedInteractionReady,
+                onMinimizeToFloatingWalkControl: onWalkCardMinimizeToFloatingControl
             ) {
                 ZStack(alignment: .bottom) {
                     FocusHomeVerticalSolidCardSurface(
@@ -367,8 +428,18 @@ struct FocusHomeVerticalSolidScene<QuickActions: View, ContextMenuContent: View>
                         allowsLiveAvatarFallback: selectedCardId == nil && motionSnapshot == nil
                     )
 
-                    if embedsQuickActionsInCard, isExpandedSurface, isExpandedCollapseReady, walkTrackingPet == nil {
-                        embeddedCardCollapseHitLayer(for: renderCard, frame: frame)
+                    if embedsQuickActionsInCard,
+                       FocusHomeEmbeddedCardCollapseHitPolicy.isMounted(
+                           isExpandedSurface: isExpandedSurface,
+                           hasWalkTrackingCard: walkTrackingPet != nil
+                       ) {
+                        embeddedCardCollapseHitLayer(
+                            for: renderCard,
+                            frame: frame,
+                            protectsQuickActionDock: FocusHomeEmbeddedCardCollapseHitPolicy.protectsQuickActionDock(
+                                quickActionsAreVisible: showsEmbeddedQuickActions
+                            )
+                        )
                             .zIndex(10)
                     }
 
@@ -379,6 +450,7 @@ struct FocusHomeVerticalSolidScene<QuickActions: View, ContextMenuContent: View>
                             reveal: embeddedQuickActionReveal,
                             isReady: embeddedQuickActionsReady
                         )
+                        .zIndex(24)
                     }
 
                     if showsDetailButton(for: renderCard, isExpandedSurface: isExpandedSurface, walkTrackingPet: walkTrackingPet) {
@@ -425,6 +497,7 @@ struct FocusHomeVerticalSolidScene<QuickActions: View, ContextMenuContent: View>
     private func walkTrackingPet(for card: FocusCard, isSelected: Bool) -> Pet? {
         guard isSelected,
               !card.isHuman,
+              appServices.walking.isWalkCardExpandedSurfaceVisible,
               let walkingPet = appServices.walking.currentPet,
               walkingPet.id == card.id,
               !walkingPet.hasPassedAway else {
@@ -443,23 +516,10 @@ struct FocusHomeVerticalSolidScene<QuickActions: View, ContextMenuContent: View>
         [
             card.id.uuidString,
             walkPet?.id.uuidString ?? "none",
-            walkPhaseKey(appServices.walking.phase),
+            FocusHomeWalkCardIdentityPolicy.phaseKey(appServices.walking.phase),
             "\(walkPresentationRevision)",
             "\(appServices.walkingPresentationRevision)"
         ].joined(separator: "#")
-    }
-
-    private func walkPhaseKey(_ phase: WalkPhase) -> String {
-        switch phase {
-        case .idle:
-            "idle"
-        case .running:
-            "running"
-        case .paused:
-            "paused"
-        case let .finished(elapsed, poopCount):
-            "finished-\(Int(elapsed))-\(poopCount)"
-        }
     }
 
     private func handleCardTap(isSelected: Bool) {
@@ -536,9 +596,16 @@ struct FocusHomeVerticalSolidScene<QuickActions: View, ContextMenuContent: View>
         .zIndex(12)
     }
 
-    private func embeddedCardCollapseHitLayer(for card: FocusCard, frame: CGRect) -> some View {
-        let protectedBottomHeight = embeddedQuickActionDockHeight(for: frame) + 42
-        let hitHeight = max(44, frame.height - protectedBottomHeight)
+    private func embeddedCardCollapseHitLayer(
+        for card: FocusCard,
+        frame: CGRect,
+        protectsQuickActionDock: Bool
+    ) -> some View {
+        let hitHeight = FocusHomeEmbeddedCardCollapseHitPolicy.hitHeight(
+            frameHeight: frame.height,
+            quickActionDockHeight: embeddedQuickActionDockHeight(for: frame),
+            protectsQuickActionDock: protectsQuickActionDock
+        )
 
         return Rectangle()
             .fill(Color.ohanaPrimaryText.opacity(0.001)) // ui-v4: allow invisible expanded card collapse hit zone without covering embedded actions

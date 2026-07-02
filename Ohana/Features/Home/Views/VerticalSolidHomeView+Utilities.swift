@@ -45,6 +45,36 @@ extension VerticalSolidHomeView {
         }
     }
 
+    func openVerticalFabMenu(immediate: Bool) {
+        guard !fabExpanded || !fabMenuItemsVisible else { return }
+        if immediate || !canAnimate {
+            var transaction = Transaction(animation: nil)
+            transaction.disablesAnimations = true
+            withTransaction(transaction) {
+                fabExpanded = true
+                fabMenuItemsVisible = true
+            }
+            return
+        }
+
+        fabMenuItemsVisible = false
+        withAnimation(HeroAnim.fabSpring) {
+            fabExpanded = true
+        }
+        OhanaFrameScheduler.runAfterNextFrame(milliseconds: 16) {
+            withAnimation(HeroAnim.fabSpring) {
+                fabMenuItemsVisible = true
+            }
+        }
+    }
+
+    func dismissExpandedFabBeforeCardCollapse() -> Bool {
+        guard expandedBottomBarCard != nil,
+              fabExpanded || fabMenuItemsVisible else { return false }
+        closeVerticalFabMenu(immediate: true)
+        return true
+    }
+
     func injectEmbeddedOasisEnergy() {
         pendingOasisEnergyInjectionCount = min(pendingOasisEnergyInjectionCount + 1, 10)
         schedulePendingEmbeddedOasisEnergyInjection()

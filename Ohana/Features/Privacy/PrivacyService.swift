@@ -32,15 +32,18 @@ enum PrivacyService {
     }
 
     static func unlockedHumans(for field: HumanPrivateField, from humans: [Human], viewedBy viewerId: UUID?) -> [Human] {
-        humans.filter { !isLocked(field, for: $0, viewedBy: viewerId) }
+        guard HumanLocalPrivacyPolicy.isEnabled else { return humans }
+        return humans.filter { !isLocked(field, for: $0, viewedBy: viewerId) }
     }
 
     static func publicHumans(for field: HumanPrivateField, from humans: [Human]) -> [Human] {
-        humans.filter { !$0.privateFields.contains(field.rawValue) }
+        guard HumanLocalPrivacyPolicy.isEnabled else { return humans }
+        return humans.filter { !$0.privateFields.contains(field.rawValue) }
     }
 
     static func isPubliclyHidden(_ field: HumanPrivateField, for human: Human) -> Bool {
-        human.privateFields.contains(field.rawValue)
+        guard HumanLocalPrivacyPolicy.isEnabled else { return false }
+        return human.privateFields.contains(field.rawValue)
     }
 
     static func isPubliclyHidden(_ field: HumanPrivateField, humanId: String?, in humans: [Human]) -> Bool {

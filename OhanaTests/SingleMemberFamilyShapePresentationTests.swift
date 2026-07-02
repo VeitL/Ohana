@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 @testable import Ohana
 
@@ -15,13 +16,36 @@ struct SingleMemberFamilyShapePresentationTests {
         #expect(!SingleMemberFamilyShapePresentation.weeklyReportLeaderStory(name: "Guan", humanCount: 1, l: l).contains("最多"))
     }
 
-    @Test func multiHumanCopyKeepsRankingWhenThereIsRealComparison() {
+    @Test func multiHumanWeeklyReportCopyAvoidsCompetitionLanguage() {
         let l = L10n("zh")
+        let en = L10n("en")
 
         #expect(!SingleMemberFamilyShapePresentation.isSingleVisibleHumanFamily(humanCount: 2))
-        #expect(SingleMemberFamilyShapePresentation.weeklyReportContributionSectionTitle(humanCount: 2, l: l) == "照护贡献排行")
-        #expect(SingleMemberFamilyShapePresentation.weeklyReportLeaderStory(name: "Guan", humanCount: 2, l: l) == "Guan 照顾最多")
-        #expect(SingleMemberFamilyShapePresentation.weeklyReportShareLeaderLabel(humanCount: 2, l: l) == "本周之星")
+        #expect(SingleMemberFamilyShapePresentation.weeklyReportContributionSectionTitle(humanCount: 2, l: l) == "本周照护摘要")
+        #expect(SingleMemberFamilyShapePresentation.weeklyReportLeaderStory(name: "Guan", humanCount: 2, l: l) == "Guan 参与了本周照护")
+        #expect(SingleMemberFamilyShapePresentation.weeklyReportLeaderPillSubtitle(humanCount: 2, l: l) == "照护记录")
+        #expect(SingleMemberFamilyShapePresentation.weeklyReportShareLeaderLabel(humanCount: 2, l: l) == "本周照护者")
+        #expect(SingleMemberFamilyShapePresentation.weeklyReportRecentActivityEmptyText(humanCount: 2, l: l).contains("照护动态"))
+
+        let zhStrings = [
+            SingleMemberFamilyShapePresentation.weeklyReportContributionSectionTitle(humanCount: 2, l: l),
+            SingleMemberFamilyShapePresentation.weeklyReportLeaderStory(name: "Guan", humanCount: 2, l: l),
+            SingleMemberFamilyShapePresentation.weeklyReportLeaderPillSubtitle(humanCount: 2, l: l),
+            SingleMemberFamilyShapePresentation.weeklyReportShareLeaderLabel(humanCount: 2, l: l)
+        ]
+        #expect(!zhStrings.joined(separator: " ").contains("排行"))
+        #expect(!zhStrings.joined(separator: " ").contains("最多"))
+        #expect(!zhStrings.joined(separator: " ").contains("本周之星"))
+
+        let enStrings = [
+            SingleMemberFamilyShapePresentation.weeklyReportContributionSectionTitle(humanCount: 2, l: en),
+            SingleMemberFamilyShapePresentation.weeklyReportLeaderStory(name: "Guan", humanCount: 2, l: en),
+            SingleMemberFamilyShapePresentation.weeklyReportLeaderPillSubtitle(humanCount: 2, l: en),
+            SingleMemberFamilyShapePresentation.weeklyReportShareLeaderLabel(humanCount: 2, l: en)
+        ]
+        #expect(!enStrings.joined(separator: " ").localizedCaseInsensitiveContains("ranking"))
+        #expect(!enStrings.joined(separator: " ").localizedCaseInsensitiveContains("most care"))
+        #expect(!enStrings.joined(separator: " ").localizedCaseInsensitiveContains("star of the week"))
     }
 
     @Test func singleWealthRowUsesAccountShapeInsteadOfLeaderboard() {

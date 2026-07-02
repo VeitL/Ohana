@@ -115,6 +115,7 @@ nonisolated enum HomeQuickActionRenderStateLogic {
     }
 
     private static func isHumanQuickActionLocked(_ item: QuickActionItem, human: Human, viewedBy viewerID: UUID?) -> Bool {
+        guard HumanLocalPrivacyPolicy.isEnabled else { return false }
         guard item.entityKind == .human,
               let field = humanPrivateFieldRawValue(for: item.actionType),
               viewerID != human.id else {

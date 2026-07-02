@@ -12,6 +12,7 @@ struct FocusHomeWalkCardFlip<Front: View>: View {
     var reduceMotion: Bool = false
     var walkCardPadding: CGFloat = 10
     var retainsWalkPetDuringClose: Bool = true
+    var onMinimizeToFloatingWalkControl: (() -> Void)?
     private let front: () -> Front
 
     @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
@@ -25,12 +26,14 @@ struct FocusHomeWalkCardFlip<Front: View>: View {
         reduceMotion: Bool = false,
         walkCardPadding: CGFloat = 10,
         retainsWalkPetDuringClose: Bool = true,
+        onMinimizeToFloatingWalkControl: (() -> Void)? = nil,
         @ViewBuilder front: @escaping () -> Front
     ) {
         self.walkPet = walkPet
         self.reduceMotion = reduceMotion
         self.walkCardPadding = walkCardPadding
         self.retainsWalkPetDuringClose = retainsWalkPetDuringClose
+        self.onMinimizeToFloatingWalkControl = onMinimizeToFloatingWalkControl
         self.front = front
     }
 
@@ -41,10 +44,19 @@ struct FocusHomeWalkCardFlip<Front: View>: View {
                 .allowsHitTesting(currentWalkPet == nil && rotation < 90)
 
             if let pet = currentWalkPet {
-                WalkTrackingCardHost(
-                    pet: pet,
-                    onCloseSummaryToPetCard: closeWalkSummaryToPetCard
-                )
+                ZStack(alignment: .topTrailing) {
+                    WalkTrackingCardHost(
+                        pet: pet,
+                        onCloseSummaryToPetCard: closeWalkSummaryToPetCard
+                    )
+
+                    if showsMinimizeButton {
+                        minimizeToFloatingButton
+                            .padding(.top, walkCardPadding + 4)
+                            .padding(.trailing, walkCardPadding + 4)
+                            .zIndex(40)
+                    }
+                }
                 .padding(walkCardPadding)
                 .rotation3DEffect(.degrees(180), axis: (x: 0, y: 1, z: 0))
                 .opacity(rotation >= 90 ? 1 : 0)
@@ -81,8 +93,41 @@ struct FocusHomeWalkCardFlip<Front: View>: View {
         effectiveReduceMotion ? GoMotion.reduced : GoMotion.zStackHero
     }
 
+    private var showsMinimizeButton: Bool {
+        guard onMinimizeToFloatingWalkControl != nil else { return false }
+        switch appServices.walking.phase {
+        case .running, .paused:
+            return true
+        case .idle, .finished:
+            return false
+        }
+    }
+
     private var cleanupDelayMilliseconds: UInt64 {
         effectiveReduceMotion ? 120 : 540
+    }
+
+    private var minimizeToFloatingButton: some View {
+        Button {
+            minimizeToFloatingWalkControl()
+        } label: {
+            Image(systemName: "minus.circle.fill") // a11y: allow decorative icon covered by the surrounding labeled button.
+                .accessibilityHidden(true)
+                .font(OhanaFont.adaptive(size: 24, weight: .bold))
+                .foregroundStyle(Color.goCardWhite)
+                .frame(width: 44, height: 44)
+                .background(Color.arkInk.opacity(0.48), in: Circle())
+                .overlay {
+                    Circle().strokeBorder(Color.goCardWhite.opacity(0.22), lineWidth: 1)
+                }
+        }
+        .buttonStyle(ScaleButtonStyle())
+        .accessibilityLabel(L10n(AppLanguage.code).tr(
+            zh: "最小化遛狗卡片",
+            en: "Minimize walk card",
+            de: "Gassi-Karte minimieren"
+        ))
+        .accessibilityIdentifier("walk-tracking-card-minimize-action")
     }
 
     private func syncWalkPet(animated: Bool) {
@@ -115,6 +160,19 @@ struct FocusHomeWalkCardFlip<Front: View>: View {
             guard targetGeneration == generation else { return }
             appServices.walking.reset()
             appServices.publishWalkingPresentationChange()
+            retainedWalkPet = nil
+        }
+    }
+
+    private func minimizeToFloatingWalkControl() {
+        guard let onMinimizeToFloatingWalkControl else { return }
+        generation += 1
+        let targetGeneration = generation
+        OhanaFeedback.light()
+        setRotation(0, animated: true)
+        OhanaFrameScheduler.runAfterNextFrame(milliseconds: cleanupDelayMilliseconds) {
+            guard targetGeneration == generation else { return }
+            onMinimizeToFloatingWalkControl()
             retainedWalkPet = nil
         }
     }

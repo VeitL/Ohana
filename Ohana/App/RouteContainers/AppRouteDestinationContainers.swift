@@ -10,13 +10,16 @@ import SwiftUI
 struct AppRouteDestination: View {
     let route: AppRoute
     let onPresentCoconutLog: ((CoconutLogSubject?) -> Void)?
+    let onPresentCalendar: ((String?) -> Void)?
 
     init(
         route: AppRoute,
-        onPresentCoconutLog: ((CoconutLogSubject?) -> Void)? = nil
+        onPresentCoconutLog: ((CoconutLogSubject?) -> Void)? = nil,
+        onPresentCalendar: ((String?) -> Void)? = nil
     ) {
         self.route = route
         self.onPresentCoconutLog = onPresentCoconutLog
+        self.onPresentCalendar = onPresentCalendar
     }
 
     var body: some View {
@@ -30,7 +33,12 @@ struct AppRouteDestination: View {
             )
         case let .plantProfile(id):
             if AppFeatureRouteGuard.allowsAppRoute(route) {
-                AppPlantRouteContainer(id: id)
+                AppPlantRouteContainer(
+                    id: id,
+                    onOpenCalendar: { plantId in
+                        onPresentCalendar?(plantId.uuidString)
+                    }
+                )
             } else {
                 HiddenRouteInterceptView(note: route.id)
             }

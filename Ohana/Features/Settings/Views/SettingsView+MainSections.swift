@@ -193,37 +193,11 @@ extension SettingsView {
         settingsSection(title: l.notifications) {
             settingsNotificationPermissionRow
             OhanaDashedDivider(color: dividerLine).padding(.leading, 44)
-            notificationToggleRow(
-                icon: "pills.fill",
-                iconColor: Color(hex: "FF5A00"),
-                title: l.tr(zh: "用药提醒", en: "Medication reminders", de: "Medikamentenerinnerungen"),
-                group: .medication
-            )
+            routineNotificationsToggleRow
             OhanaDashedDivider(color: dividerLine).padding(.leading, 44)
             petMedicationNotificationPrivacyRow
             OhanaDashedDivider(color: dividerLine).padding(.leading, 44)
-            notificationToggleRow(
-                icon: "fork.knife",
-                iconColor: Color.goPrimary,
-                title: l.tr(zh: "喂食提醒", en: "Feeding reminders", de: "Fütterungserinnerungen"),
-                group: .feeding
-            )
-            OhanaDashedDivider(color: dividerLine).padding(.leading, 44)
-            notificationToggleRow(
-                icon: "bubbles.and.sparkles.fill",
-                iconColor: Color.goTeal,
-                title: l.tr(zh: "护理提醒", en: "Care reminders", de: "Pflegeerinnerungen"),
-                group: .hygiene
-            )
-            OhanaDashedDivider(color: dividerLine).padding(.leading, 44)
-            plantReminderSettingsPanel
-            OhanaDashedDivider(color: dividerLine).padding(.leading, 44)
-            notificationToggleRow(
-                icon: "checkmark.seal.fill",
-                iconColor: Color.goYellow,
-                title: l.tr(zh: "打卡提醒", en: "Check-in reminders", de: "Check-in-Erinnerungen"),
-                group: .checkIn
-            )
+            advancedNotificationSettingsDisclosure
         }
     }
 

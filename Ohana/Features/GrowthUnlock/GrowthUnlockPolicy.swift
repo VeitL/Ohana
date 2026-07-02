@@ -365,6 +365,7 @@ enum GrowthUnlockPolicy {
             stageID(for: feature)
         case .petFood, .petPotty, .petBasicInfo, .calendar,
              .petHealth, .petHygiene, .petWeight, .humanWeight,
+             .humanWorkout, .humanMedication, .humanNote,
              .petMedications, .petWalks, .petDocuments, .petInsurance,
              .petExpense, .humanExpense:
             .dailyCare
@@ -376,7 +377,7 @@ enum GrowthUnlockPolicy {
             .advancedInsights
         case .wealthDashboard:
             .oasisPlants
-        case .plantsDashboard, .plantDetail:
+        case .plantsDashboard, .plantsList, .plantsPhotos, .plantDetail:
             .household
         case .familyWeeklyReport, .coconutShop:
             .rewards

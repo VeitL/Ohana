@@ -107,12 +107,12 @@ extension SettingsView {
                     }
                 } label: {
                     HStack(spacing: 10) {
-                        settingsIcon("person.2.badge.key.fill", color: Color.goPrimary)
+                        settingsIcon("person.2.fill", color: Color.goPrimary)
                         VStack(alignment: .leading, spacing: 2) {
-                            Text(l.tr(zh: "切换人类账户", en: "Switch Human Account", de: "Menschenkonto wechseln"))
+                            Text(l.tr(zh: "切换记录成员", en: "Switch Check-in Member", de: "Eintragsmitglied wechseln"))
                                 .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                 .foregroundStyle(primaryText)
-                            Text(l.tr(zh: "账户与密码", en: "Account and PIN", de: "Konto und PIN"))
+                            Text(l.tr(zh: "当前打卡归属", en: "Check-in identity", de: "Check-in-Identität"))
                                 .font(OhanaFont.adaptive(size: 11, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                 .foregroundStyle(tertiaryText)
                         }
@@ -142,7 +142,8 @@ extension SettingsView {
                                             human: human,
                                             isSelected: isSelected
                                         )
-                                        if appServices.passcodes.hasPasscode(human) {
+                                        if HumanLocalPrivacyPolicy.isEnabled,
+                                           appServices.passcodes.hasPasscode(human) {
                                             Image(systemName: "lock.fill") // a11y: allow decorative icon covered by surrounding text or control
                                                 .font(OhanaFont.adaptive(size: 8, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                                 .foregroundStyle(Color.arkInk)
@@ -159,6 +160,7 @@ extension SettingsView {
                                 .frame(minWidth: 56, minHeight: 72)
                             }
                             .buttonStyle(ScaleButtonStyle())
+                            .accessibilityIdentifier("settings-human-identity-switch-\(human.name.isEmpty ? "Member" : human.name)")
                         }
                     }
                 }
@@ -221,7 +223,8 @@ extension SettingsView {
     func quickSwitch(to human: Human) {
         UISelectionFeedbackGenerator().selectionChanged()
         guard currentActiveHumanId != human.id.uuidString else { return }
-        if appServices.passcodes.hasPasscode(human) {
+        if HumanLocalPrivacyPolicy.isEnabled,
+           appServices.passcodes.hasPasscode(human) {
             quickSwitchHuman = human
         } else {
             switchActiveHuman(to: human)

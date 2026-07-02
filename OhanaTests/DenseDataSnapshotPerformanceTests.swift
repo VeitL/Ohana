@@ -30,9 +30,8 @@ struct DenseDataSnapshotPerformanceTests {
     private func expectFixtureShape(_ fixture: DenseFixture) {
         let hasMemorialPet = fixture.pets.contains { pet in pet.hasPassedAway }
         let hasMemorialHuman = fixture.humans.contains { human in human.hasPassedAway }
-        let viewerId = fixture.humans.first?.id
-        let hasPrivacyLockedHuman = fixture.humans.contains { human in
-            human.isPrivate(.weight, viewedBy: viewerId)
+        let hasStoredPrivateHuman = fixture.humans.contains { human in
+            human.privateFields.contains(HumanPrivateField.weight.rawValue)
         }
 
         #expect(fixture.pets.count == 4)
@@ -45,7 +44,7 @@ struct DenseDataSnapshotPerformanceTests {
         #expect(fixture.photoLogs.count >= 50)
         #expect(hasMemorialPet)
         #expect(hasMemorialHuman)
-        #expect(hasPrivacyLockedHuman)
+        #expect(hasStoredPrivateHuman)
     }
 
     private func buildHomeSnapshot(_ fixture: DenseFixture) -> VerticalSolidHomeSnapshot {
@@ -524,15 +523,18 @@ private final class DenseFixtureHumanPrivacyManager: HumanPrivacyManaging {
     }
 
     func unlockedHumans(for field: HumanPrivateField, from humans: [Human], viewedBy viewerId: UUID?) -> [Human] {
-        humans.filter { !isLocked(field, for: $0, viewedBy: viewerId) }
+        guard HumanLocalPrivacyPolicy.isEnabled else { return humans }
+        return humans.filter { !isLocked(field, for: $0, viewedBy: viewerId) }
     }
 
     func publicHumans(for field: HumanPrivateField, from humans: [Human]) -> [Human] {
-        humans.filter { !$0.privateFields.contains(field.rawValue) }
+        guard HumanLocalPrivacyPolicy.isEnabled else { return humans }
+        return humans.filter { !$0.privateFields.contains(field.rawValue) }
     }
 
     func isPubliclyHidden(_ field: HumanPrivateField, for human: Human) -> Bool {
-        human.privateFields.contains(field.rawValue)
+        guard HumanLocalPrivacyPolicy.isEnabled else { return false }
+        return human.privateFields.contains(field.rawValue)
     }
 
     func isPubliclyHidden(_ field: HumanPrivateField, humanId: String?, in humans: [Human]) -> Bool {
@@ -546,6 +548,7 @@ private final class DenseFixtureHumanPrivacyManager: HumanPrivacyManaging {
     }
 
     func isHumanQuickActionLocked(_: QuickActionItem, human: Human?, viewedBy viewerId: UUID?) -> Bool {
+        guard HumanLocalPrivacyPolicy.isEnabled else { return false }
         guard let human else { return false }
         return human.isPrivate(.medication, viewedBy: viewerId)
     }

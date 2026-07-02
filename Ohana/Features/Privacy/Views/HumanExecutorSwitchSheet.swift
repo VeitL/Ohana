@@ -112,7 +112,7 @@ struct HumanExecutorSwitchSheet: View {
                     Text(displayName(human))
                         .font(OhanaFont.callout(.black))
                         .foregroundStyle(Color.ohanaPrimaryText)
-                    Text(isActive ? l.tr(zh: "当前执行人", en: "Current executor", de: "Aktuell ausführend") : (appServices.passcodes.hasPasscode(human) ? l.tr(zh: "需要 4 位密码", en: "4-digit PIN required", de: "4-stellige PIN nötig") : l.tr(zh: "可直接切换", en: "Can switch directly", de: "Direkt wechselbar")))
+                    Text(executorSwitchSubtitle(for: human, isActive: isActive))
                         .font(OhanaFont.caption2(.bold))
                         .foregroundStyle(Color.ohanaSecondaryText)
                 }
@@ -121,7 +121,8 @@ struct HumanExecutorSwitchSheet: View {
                     Image(systemName: "checkmark.circle.fill") // a11y: allow decorative icon covered by surrounding text or control
                         .font(OhanaFont.adaptive(size: 17, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.goPrimary)
-                } else if appServices.passcodes.hasPasscode(human) {
+                } else if HumanLocalPrivacyPolicy.isEnabled,
+                          appServices.passcodes.hasPasscode(human) {
                     Image(systemName: "lock.fill") // a11y: allow decorative icon covered by surrounding text or control
                         .font(OhanaFont.adaptive(size: 13, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.goYellow)
@@ -213,6 +214,10 @@ struct HumanExecutorSwitchSheet: View {
             dismiss()
             return
         }
+        guard HumanLocalPrivacyPolicy.isEnabled else {
+            switchTo(human)
+            return
+        }
         guard appServices.passcodes.hasPasscode(human) else {
             switchTo(human)
             return
@@ -271,7 +276,7 @@ struct HumanExecutorSwitchSheet: View {
     }
 
     private var canUseBiometricMemberGate: Bool {
-        enableMemberGateBiometrics && biometricAvailability.isAvailable
+        HumanLocalPrivacyPolicy.isEnabled && enableMemberGateBiometrics && biometricAvailability.isAvailable
     }
 
     private func authenticatePendingHumanWithBiometrics(_ human: Human) {
@@ -307,5 +312,16 @@ struct HumanExecutorSwitchSheet: View {
     private func displayName(_ human: Human) -> String {
         let name = human.name.trimmingCharacters(in: .whitespacesAndNewlines)
         return name.isEmpty ? l.tr(zh: "未命名成员", en: "Unnamed member", de: "Unbenanntes Mitglied") : name
+    }
+
+    private func executorSwitchSubtitle(for human: Human, isActive: Bool) -> String {
+        if isActive {
+            return l.tr(zh: "当前执行人", en: "Current executor", de: "Aktuell ausführend")
+        }
+        guard HumanLocalPrivacyPolicy.isEnabled,
+              appServices.passcodes.hasPasscode(human) else {
+            return l.tr(zh: "可直接切换", en: "Can switch directly", de: "Direkt wechselbar")
+        }
+        return l.tr(zh: "需要 4 位密码", en: "4-digit PIN required", de: "4-stellige PIN nötig")
     }
 }

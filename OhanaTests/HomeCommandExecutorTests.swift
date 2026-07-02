@@ -5875,6 +5875,38 @@ struct HomeCommandExecutorTests {
     }
 
     @MainActor
+    @Test func calendarEventPlanServiceCreatesAtTimeReminderForNearFutureEvents() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let start = Date().addingTimeInterval(3 * 60)
+
+        let input = CalendarEventPlanCommandInput(
+            title: "Soon",
+            startDate: start,
+            isAllDay: false,
+            eventType: .task,
+            relatedEntityType: "",
+            relatedEntityId: "",
+            recurrenceDays: 0,
+            recurrenceEndDate: nil,
+            reminderLeadMinutes: 0,
+            assigneeId: nil
+        )
+
+        let result = try #require(CalendarEventPlanCommandService.createEvent(
+            input: input,
+            context: context,
+            scheduleNotifications: false
+        ))
+
+        let reminders = try context.fetch(FetchDescriptor<Reminder>())
+        let reminder = try #require(reminders.first)
+        #expect(reminders.count == 1)
+        #expect(result.reminderIDs == [reminder.id])
+        #expect(reminder.scheduledAt == start)
+    }
+
+    @MainActor
     @Test func calendarEventPlanServiceCreatesRecurringReminders() throws {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
@@ -7566,6 +7598,70 @@ struct HomeCommandExecutorTests {
         )
         #expect(duplicateRefundDelete == false)
         #expect(try context.fetch(FetchDescriptor<ShopPurchaseRecord>()).count == 1)
+    }
+
+    @MainActor
+    @Test func shopCatalogRejectsUnknownItemAndDeleteUnknownOwnershipIsNoOp() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+
+        #expect(ShopCatalog.item(id: "not_a_real_shop_item") == nil)
+
+        let deleted = try ShopPurchaseRecordStore.deleteOwnershipRecord(
+            itemID: "not_a_real_shop_item",
+            transactionKey: "shop:not_a_real_shop_item:missing-human",
+            context: context
+        )
+
+        #expect(deleted == false)
+        #expect(try context.fetch(FetchDescriptor<CareLedgerEvent>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<CoconutLedgerEntry>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<ShopPurchaseRecord>()).isEmpty)
+    }
+
+    @MainActor
+    @Test func consumableShopPurchaseSpendsButDoesNotCreateOwnershipRecordAndAddsInventory() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let human = Human(name: "Guan")
+        let item = try #require(ShopCatalog.item(id: "boost_backdate_pack"))
+        let startingBalance = item.cost + 20
+        human.coconutBalance = startingBalance
+        let defaults = UserDefaults.standard
+        let oldBackdatePassRaw = defaults.object(forKey: CheckInStreakStore.makeupPackKey)
+        defer {
+            if let oldBackdatePassRaw {
+                defaults.set(oldBackdatePassRaw, forKey: CheckInStreakStore.makeupPackKey)
+            } else {
+                defaults.removeObject(forKey: CheckInStreakStore.makeupPackKey)
+            }
+        }
+        defaults.removeObject(forKey: CheckInStreakStore.makeupPackKey)
+        let services = AppServices()
+        context.insert(human)
+        try context.save()
+
+        let result = ShopPurchaseCommandService.purchase(
+            item: item,
+            buyer: human,
+            itemName: "Backdate Pack",
+            context: context,
+            wallet: SwiftDataCoconutWalletManager(),
+            careLedger: CareLedgerService()
+        )
+        let fulfilled = ShopPurchaseFulfillmentService().fulfillConsumable(
+            item: item,
+            context: context,
+            services: services
+        )
+
+        #expect(result.didPurchase)
+        #expect(fulfilled)
+        #expect(human.coconutBalance == startingBalance - item.cost)
+        #expect(try context.fetch(FetchDescriptor<ShopPurchaseRecord>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<CareLedgerEvent>()).count == 1)
+        #expect(services.shopInventory.consumableSnapshot().backdatePassCount == 3)
+        #expect(services.shopInventory.consumeBackdatePass() == 2)
     }
 
     @MainActor

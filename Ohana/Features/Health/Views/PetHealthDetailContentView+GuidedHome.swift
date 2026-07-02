@@ -40,6 +40,8 @@ extension PetHealthDetailContentView {
                     .frame(width: 40, height: 40) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
                     .contentShape(Rectangle())
             }
+            .accessibilityLabel(l.tr(zh: "关闭健康详情", en: "Close health details", de: "Gesundheitsdetails schließen"))
+            .accessibilityIdentifier("pet-health-detail-close-action")
             .buttonStyle(ScaleButtonStyle())
         }
         .padding(.top, 4)

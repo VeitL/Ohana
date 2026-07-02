@@ -75,17 +75,18 @@ struct EditHumanSheet: View {
                         .clipShape(RoundedRectangle(cornerRadius: OhanaRadius.chip))
                 }
 
-                // FIX 1: 隐私设置 Section
-                VStack(alignment: .leading, spacing: 10) {
-                    Text(l.tr(zh: "🔒  隐私设置", en: "🔒  Privacy Settings", de: "🔒  Datenschutzeinstellungen"))
-                        .font(OhanaFont.subheadline())
-                        .foregroundStyle(Color.ohanaSecondaryText)
-                    editPrivacyRow(l.tr(zh: "体重记录", en: "Weight Records", de: "Gewichtsverlauf"), binding: $privateWeight)
-                    editPrivacyRow(l.tr(zh: "运动记录", en: "Workout Records", de: "Trainingseinträge"), binding: $privateWorkout)
-                    editPrivacyRow(l.tr(zh: "吃药提醒", en: "Medication Reminders", de: "Medikamentenerinnerungen"), binding: $privateMedication)
-                    editPrivacyRow(l.tr(zh: "备注", en: "Notes", de: "Notizen"), binding: $privateNote)
-                    editPrivacyRow(l.tr(zh: "心愿单", en: "Wishlist", de: "Wunschliste"), binding: $privateWishlist)
-                    editPrivacyRow(l.tr(zh: "花费记录", en: "Expense Records", de: "Ausgabeneinträge"), binding: $privateExpense)
+                if HumanLocalPrivacyPolicy.isEnabled {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text(l.tr(zh: "🔒  隐私设置", en: "🔒  Privacy Settings", de: "🔒  Datenschutzeinstellungen"))
+                            .font(OhanaFont.subheadline())
+                            .foregroundStyle(Color.ohanaSecondaryText)
+                        editPrivacyRow(l.tr(zh: "体重记录", en: "Weight Records", de: "Gewichtsverlauf"), binding: $privateWeight)
+                        editPrivacyRow(l.tr(zh: "运动记录", en: "Workout Records", de: "Trainingseinträge"), binding: $privateWorkout)
+                        editPrivacyRow(l.tr(zh: "吃药提醒", en: "Medication Reminders", de: "Medikamentenerinnerungen"), binding: $privateMedication)
+                        editPrivacyRow(l.tr(zh: "备注", en: "Notes", de: "Notizen"), binding: $privateNote)
+                        editPrivacyRow(l.tr(zh: "心愿单", en: "Wishlist", de: "Wunschliste"), binding: $privateWishlist)
+                        editPrivacyRow(l.tr(zh: "花费记录", en: "Expense Records", de: "Ausgabeneinträge"), binding: $privateExpense)
+                    }
                 }
 
                 Button {
@@ -146,7 +147,7 @@ struct EditHumanSheet: View {
             themeHex: human.safeThemeColorHex,
             notes: notes,
             preservedNoteParts: preservedRelationshipMetadataParts,
-            privateFieldsRaw: editedPrivateFieldsRaw
+            privateFieldsRaw: HumanLocalPrivacyPolicy.isEnabled ? editedPrivateFieldsRaw : nil
         )
         commandQueue.enqueue(.memberProfile(entityID: human.id, kind: EntityKind.human.rawValue)) {
             MemberCommandExecutor(context: modelContext, services: appServices).updateHumanProfile(

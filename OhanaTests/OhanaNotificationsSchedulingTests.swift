@@ -235,6 +235,41 @@ struct OhanaNotificationsSchedulingTests {
         #expect(ledgerActions == ["scheduleMerged", "scheduleSuccess"])
     }
 
+    @Test func reminderObservabilityShowsChineseSchedulingLedgerActions() {
+        #expect(ReminderObservabilityContentView.actionDisplayName("scheduleDeferred") == "夜间延后")
+        #expect(ReminderObservabilityContentView.actionDisplayName("scheduleSkippedBudget") == "预算跳过")
+        #expect(ReminderObservabilityContentView.actionDisplayName("scheduleMerged") == "同类合并")
+    }
+
+    @Test func notificationDelegateHandoffKeepsDefaultTapAndActionsSeparate() throws {
+        let managerSource = try source("Ohana/Features/Notifications/NotificationManager.swift")
+
+        #expect(managerSource.contains("identifier: \"COMPLETE\""))
+        #expect(managerSource.contains("identifier: \"SKIP\""))
+        #expect(managerSource.contains("identifier: \"SNOOZE\""))
+        #expect(managerSource.contains("actions: [completeAction, skipAction, snoozeAction]"))
+        #expect(managerSource.contains("case UNNotificationDefaultActionIdentifier:"))
+        #expect(managerSource.contains("self.routeCenter.requestReminderRoute(payload)"))
+        #expect(managerSource.contains("case \"COMPLETE\", \"SKIP\", \"SNOOZE\":"))
+        #expect(managerSource.contains("self.routeCenter.publishReminderAction(payload)"))
+
+        for key in [
+            "reminderId",
+            "notificationId",
+            "eventId",
+            "relatedEntityType",
+            "relatedEntityId",
+            "plantId",
+            "petId",
+            "humanId",
+            "medicationId",
+            "humanMedicationId",
+            "scheduledAt"
+        ] {
+            #expect(managerSource.contains("payload[\"\(key)\"]"))
+        }
+    }
+
     @Test func ambientRemindersAllowOnlyOnePerDeliveryDay() async throws {
         let container = try makeContainer()
         let context = container.mainContext
@@ -301,6 +336,131 @@ struct OhanaNotificationsSchedulingTests {
         #expect(ledgerEvents.first?.metadataJSON.contains("\"reason\":\"userDisabled\"") == true)
     }
 
+    @Test func calendarReminderIgnoresDisabledCheckInPreference() async throws {
+        let defaults = UserDefaults.standard
+        let checkInPreferenceKey = NotificationPreferenceGroup.checkIn.storageKey
+        let calendarPreferenceKey = NotificationPreferenceGroup.calendar.storageKey
+        let previousCheckInPreference = defaults.object(forKey: checkInPreferenceKey)
+        let previousCalendarPreference = defaults.object(forKey: calendarPreferenceKey)
+        NotificationPreferenceStore.set(false, for: .checkIn, defaults: defaults)
+        NotificationPreferenceStore.set(true, for: .calendar, defaults: defaults)
+        defer {
+            restorePreference(previousCheckInPreference, key: checkInPreferenceKey, defaults: defaults)
+            restorePreference(previousCalendarPreference, key: calendarPreferenceKey, defaults: defaults)
+        }
+
+        let container = try makeContainer()
+        let context = container.mainContext
+        let fake = FakeScheduler()
+        OhanaNotifications.current = fake
+        defer { OhanaNotifications.useLive() }
+
+        let scheduledAt = futureDate(dayOffset: 2, hour: 10, minute: 0)
+        let reminder = makeReminder(
+            title: "Calendar task",
+            eventType: .task,
+            relatedEntityType: "",
+            relatedEntityId: "",
+            scheduledAt: scheduledAt,
+            context: context
+        )
+        try context.save()
+
+        await ReminderSchedulingService.scheduleManyIfNeeded(reminders: [reminder], context: context, source: .calendar)
+
+        #expect(fake.scheduledIds == [reminder.notificationId])
+        let ledgerEvents = try context.fetch(FetchDescriptor<CareLedgerEvent>())
+        #expect(ledgerEvents.map(\.actionType) == ["scheduleSuccess"])
+    }
+
+    @Test func disabledCalendarPreferenceSkipsCalendarReminder() async throws {
+        let defaults = UserDefaults.standard
+        let preferenceKey = NotificationPreferenceGroup.calendar.storageKey
+        let previousPreference = defaults.object(forKey: preferenceKey)
+        NotificationPreferenceStore.set(false, for: .calendar, defaults: defaults)
+        defer {
+            restorePreference(previousPreference, key: preferenceKey, defaults: defaults)
+        }
+
+        let container = try makeContainer()
+        let context = container.mainContext
+        let fake = FakeScheduler()
+        OhanaNotifications.current = fake
+        defer { OhanaNotifications.useLive() }
+
+        let scheduledAt = futureDate(dayOffset: 2, hour: 10, minute: 0)
+        let reminder = makeReminder(
+            title: "Calendar task",
+            eventType: .task,
+            relatedEntityType: "",
+            relatedEntityId: "",
+            scheduledAt: scheduledAt,
+            context: context
+        )
+        try context.save()
+
+        await ReminderSchedulingService.scheduleManyIfNeeded(reminders: [reminder], context: context, source: .calendar)
+
+        #expect(fake.scheduledIds.isEmpty)
+        let ledgerEvents = try context.fetch(FetchDescriptor<CareLedgerEvent>())
+        #expect(ledgerEvents.map(\.actionType) == ["scheduleUserDisabled"])
+    }
+
+    @Test func calendarEventEditorRequestsNotificationPermissionBeforeSavingReminder() throws {
+        let addEventSource = try source("Ohana/Features/Calendar/Views/AddEventView.swift")
+
+        #expect(addEventSource.contains("guard input.reminderLeadMinutes == nil else"))
+        #expect(addEventSource.contains("await appServices.userNotifications.requestPermission()"))
+        #expect(addEventSource.contains("enqueueSaveEvent(input: input, command: command)"))
+    }
+
+    @Test func localNotificationTriggerPreservesSecondsForNearFutureCalendarReminders() {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        let fireDate = calendar.date(
+            from: DateComponents(
+                timeZone: calendar.timeZone,
+                year: 2026,
+                month: 7,
+                day: 1,
+                hour: 12,
+                minute: 34,
+                second: 56
+            )
+        )!
+
+        let components = NotificationManager.triggerDateComponents(for: fireDate, calendar: calendar)
+
+        #expect(components.year == 2026)
+        #expect(components.month == 7)
+        #expect(components.day == 1)
+        #expect(components.hour == 12)
+        #expect(components.minute == 34)
+        #expect(components.second == 56)
+    }
+
+    @Test func newCalendarEventDefaultStartDateLeavesTimeForPermissionPrompt() {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        let now = calendar.date(
+            from: DateComponents(
+                timeZone: calendar.timeZone,
+                year: 2026,
+                month: 7,
+                day: 1,
+                hour: 12,
+                minute: 34,
+                second: 20
+            )
+        )!
+
+        let defaultStartDate = AddEventContentView.defaultNewEventStartDate(now: now)
+
+        #expect(defaultStartDate.timeIntervalSince(now) >= 5 * 60)
+        #expect(calendar.component(.second, from: defaultStartDate) == 0)
+        #expect(calendar.component(.minute, from: defaultStartDate).isMultiple(of: 5))
+    }
+
     @Test func petNotificationCancellationUsesDomainSubjectResolution() throws {
         let container = try makeContainer()
         let context = container.mainContext
@@ -350,21 +510,45 @@ struct OhanaNotificationsSchedulingTests {
     }
 
     @Test func weeklyReportNotificationIsAmbientCareCopy() {
-        let content = FamilyWeeklyReportService.makeWeeklyReportContent(l: L10n("zh"))
+        let localizedCases: [(language: String, careNeedle: String, blockedTerms: [String])] = [
+            ("zh", "照护", ["悬赏", "悬赏榜", "指派", "竞争", "谁更勤快", "勤快"]),
+            ("en", "care", ["bounty", "leaderboard", "assign", "competition", "who did more"]),
+            ("de", "pflege", ["prämie", "rangliste", "zuweisen", "wettbewerb"])
+        ]
 
-        #expect(content.title.contains("照护周报"))
-        #expect(content.body.contains("照护"))
-        #expect(!content.title.contains("悬赏"))
-        #expect(!content.body.contains("悬赏"))
-        #expect(!content.body.contains("勤快"))
-        #expect(content.userInfo["notificationTier"] as? String == NotificationDeliveryTier.ambient.rawValue)
-        #expect(content.userInfo["notificationCategory"] as? String == NotificationDeliveryCategory.weeklyReport.rawValue)
+        for localizedCase in localizedCases {
+            let content = FamilyWeeklyReportService.makeWeeklyReportContent(l: L10n(localizedCase.language))
+            let copy = "\(content.title)\n\(content.body)"
+
+            #expect(copy.localizedCaseInsensitiveContains(localizedCase.careNeedle))
+            for term in localizedCase.blockedTerms {
+                #expect(!copy.localizedCaseInsensitiveContains(term))
+            }
+            #expect(content.categoryIdentifier == "FAMILY_WEEKLY_REPORT")
+            #expect(content.userInfo["notificationTier"] as? String == NotificationDeliveryTier.ambient.rawValue)
+            #expect(content.userInfo["notificationCategory"] as? String == NotificationDeliveryCategory.weeklyReport.rawValue)
+        }
     }
 
     private func makeContainer() throws -> ModelContainer {
         let schema = Schema(ArkSchemaV71.models)
         let config = ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)
         return try ModelContainer(for: schema, configurations: [config])
+    }
+
+    private func source(_ path: String) throws -> String {
+        let rootURL = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        return try String(contentsOf: rootURL.appendingPathComponent(path), encoding: .utf8)
+    }
+
+    private func restorePreference(_ previousValue: Any?, key: String, defaults: UserDefaults) {
+        if let previousValue {
+            defaults.set(previousValue, forKey: key)
+        } else {
+            defaults.removeObject(forKey: key)
+        }
     }
 
     private func futureDate(dayOffset: Int, hour: Int, minute: Int) -> Date {

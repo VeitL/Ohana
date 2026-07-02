@@ -186,6 +186,7 @@ struct FamilyWeeklyReportDashboardContentView: View {
         }
         .navigationTitle("家庭周报")
         .navigationBarTitleDisplayMode(.inline)
+        .accessibilityIdentifier("family-weekly-report-screen")
     }
 
     private var headerCard: some View {
@@ -217,6 +218,7 @@ struct FamilyWeeklyReportDashboardContentView: View {
         }
         .padding(16)
         .goTranslucentCard(cornerRadius: OhanaRadius.cardSoft)
+        .accessibilityIdentifier("family-weekly-report-header-card")
     }
 
     private var weeklyStoryCard: some View {
@@ -258,6 +260,7 @@ struct FamilyWeeklyReportDashboardContentView: View {
         }
         .padding(16)
         .goTranslucentCard(cornerRadius: OhanaRadius.cardSoft)
+        .accessibilityIdentifier("family-weekly-report-story-card")
     }
 
     private var memberRankingCard: some View {
@@ -271,6 +274,7 @@ struct FamilyWeeklyReportDashboardContentView: View {
             )
             if rankedMembers.isEmpty {
                 emptyText("本周还没有照护记录")
+                    .accessibilityIdentifier("family-weekly-report-member-contribution-empty")
             } else {
                 ForEach(Array(rankedMembers.prefix(5).enumerated()), id: \.element.id) { index, stat in
                     HStack(spacing: 10) {
@@ -282,11 +286,13 @@ struct FamilyWeeklyReportDashboardContentView: View {
                         }
                         Spacer()
                     }
+                    .accessibilityIdentifier("family-weekly-report-member-contribution-row-\(stat.id)")
                 }
             }
         }
         .padding(16)
         .goTranslucentCard(cornerRadius: OhanaRadius.cardSoft)
+        .accessibilityIdentifier("family-weekly-report-member-contribution-card")
     }
 
     private var memoryAndHealthCard: some View {
@@ -335,6 +341,7 @@ struct FamilyWeeklyReportDashboardContentView: View {
         }
         .padding(16)
         .goTranslucentCard(cornerRadius: OhanaRadius.cardSoft)
+        .accessibilityIdentifier("family-weekly-report-memory-health-card")
     }
 
     private var petCoverageCard: some View {
@@ -359,6 +366,7 @@ struct FamilyWeeklyReportDashboardContentView: View {
         }
         .padding(16)
         .goTranslucentCard(cornerRadius: OhanaRadius.cardSoft)
+        .accessibilityIdentifier("family-weekly-report-pet-coverage-card")
     }
 
     private var recentActivityCard: some View {
@@ -369,6 +377,7 @@ struct FamilyWeeklyReportDashboardContentView: View {
                     humanCount: visibleHumanCount,
                     l: l
                 ))
+                .accessibilityIdentifier("family-weekly-report-recent-activity-empty")
             } else {
                 ForEach(allEntries.prefix(8)) { entry in
                     HStack(spacing: 10) {
@@ -386,11 +395,13 @@ struct FamilyWeeklyReportDashboardContentView: View {
                         }
                         Spacer()
                     }
+                    .accessibilityIdentifier("family-weekly-report-recent-activity-row-\(entry.id.uuidString)")
                 }
             }
         }
         .padding(16)
         .goTranslucentCard(cornerRadius: OhanaRadius.cardSoft)
+        .accessibilityIdentifier("family-weekly-report-recent-activity-card")
     }
 
     private var previousWeeksCard: some View {
@@ -413,6 +424,7 @@ struct FamilyWeeklyReportDashboardContentView: View {
         }
         .padding(16)
         .goTranslucentCard(cornerRadius: OhanaRadius.cardSoft)
+        .accessibilityIdentifier("family-weekly-report-previous-weeks-card")
     }
 
     private func metric(_ label: String, _ value: String, _ color: Color) -> some View {

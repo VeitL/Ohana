@@ -162,6 +162,86 @@ struct ManualFeedCommandTests {
         #expect(stockReminderEvents(for: pet, context: context).count == 1)
     }
 
+    @Test func quickFeedExecutorManualRecordUsesSelectedBackdate() throws {
+        let revisionCenter = ReadModelRevisionCenter()
+        let container = try makeContainer()
+        let context = container.mainContext
+        let pet = Pet(name: "Momo", species: "猫")
+        let human = Human(name: "Guan")
+        context.insert(pet)
+        context.insert(human)
+        try context.save()
+
+        let selectedDate = date(year: 2026, month: 4, day: 18, hour: 7)
+        let beforeRevision = revisionCenter.homeRevision.value
+        let executor = QuickFeedCommandExecutor(context: context, revisionCenter: revisionCenter)
+        let result = executor.recordManual(
+            pet: pet,
+            targets: [pet],
+            grams: 42,
+            foodKind: .wet,
+            saveAsDefault: false,
+            foodRecords: [],
+            allEvents: [],
+            executorId: human.id.uuidString,
+            date: selectedDate
+        )
+
+        let log = try #require(try context.fetch(FetchDescriptor<PetCareLog>()).first)
+        let ledger = try #require(try context.fetch(FetchDescriptor<CareLedgerEvent>()).first)
+        #expect(result.didRecord)
+        #expect(log.date == selectedDate)
+        #expect(log.foodKind == .wet)
+        #expect(ledger.occurredAt == selectedDate)
+        #expect(ledger.legacyModelId == log.id.uuidString)
+        #expect(revisionCenter.homeRevision.value == beforeRevision + 1)
+        #expect(revisionCenter.lastMutation?.command == .feedLog(petID: pet.id, source: "manual"))
+    }
+
+    @Test func quickFeedManualRecordAppearsInWeeklyReportEntries() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let pet = Pet(name: "Momo", species: "猫")
+        let human = Human(name: "Guan")
+        context.insert(pet)
+        context.insert(human)
+        try context.save()
+
+        let feedAt = date(year: 2026, month: 6, day: 30, hour: 8)
+        let executor = QuickFeedCommandExecutor(context: context)
+        let result = executor.recordManual(
+            pet: pet,
+            targets: [pet],
+            grams: 42,
+            foodKind: .wet,
+            saveAsDefault: false,
+            foodRecords: [],
+            allEvents: [],
+            executorId: human.id.uuidString,
+            date: feedAt
+        )
+
+        let ledgerEvents = try context.fetch(FetchDescriptor<CareLedgerEvent>())
+        let entries = CareLedgerStatsService().reportEntries(
+            events: ledgerEvents,
+            pets: [pet],
+            humans: [human],
+            interval: DateInterval(
+                start: feedAt.addingTimeInterval(-60),
+                end: feedAt.addingTimeInterval(60)
+            ),
+            l: L10n("en")
+        )
+        let entry = try #require(entries.first)
+
+        #expect(result.didRecord)
+        #expect(entries.count == 1)
+        #expect(entry.actorId == human.id.uuidString)
+        #expect(entry.actorName == "Guan")
+        #expect(entry.petName == "Momo")
+        #expect(entry.title == "Feeding")
+    }
+
     @Test func manualFeedCommandDeletesExistingStockReminderWhenCallerHasNoEvents() throws {
         let container = try makeContainer()
         let context = container.mainContext

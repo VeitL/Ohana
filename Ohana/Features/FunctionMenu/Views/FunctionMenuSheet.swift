@@ -239,7 +239,11 @@ struct FunctionMenuSheet: View {
         case .growthRoadmap:
             (L10n(appLanguage).tr(zh: "椰子树路线", en: "Tree Roadmap", de: "Baum-Roadmap"), "tree.fill")
         case .plantsDashboard:
-            (L10n(appLanguage).tr(zh: "植物", en: "Plants", de: "Pflanzen"), "leaf.fill")
+            (L10n(appLanguage).tr(zh: "植物总览", en: "Plant Overview", de: "Pflanzenübersicht"), "leaf.fill")
+        case .plantsList:
+            (L10n(appLanguage).tr(zh: "植物列表", en: "Plant List", de: "Pflanzenliste"), "list.bullet.rectangle.fill")
+        case .plantsPhotos:
+            (L10n(appLanguage).tr(zh: "成长照片", en: "Growth Photos", de: "Wachstumsfotos"), "photo.stack.fill")
         default:
             (L10n(appLanguage).tr(zh: "详情", en: "Details", de: "Details"), "square.grid.2x2.fill")
         }

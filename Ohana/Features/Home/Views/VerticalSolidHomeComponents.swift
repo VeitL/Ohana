@@ -160,6 +160,8 @@ struct VerticalSolidHomeDashboardPage: View {
     let onQuickActionForCard: (QuickActionItem, FocusCard, Bool) -> Void
     let onQuickActionOptionForCard: (QuickActionItem, FocusCard, String) -> Void
     let onQuickActionLimitReached: () -> Void
+    let onExpandedCardCollapseIntent: () -> Bool
+    let onWalkCardMinimizeToFloatingControl: () -> Void
     let onAddFirstPet: () -> Void
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -216,7 +218,8 @@ struct VerticalSolidHomeDashboardPage: View {
                         },
                         contextMenu: { _ in EmptyView() },
                         onSelect: expandCard,
-                        onCollapse: collapseCard,
+                        onCollapse: handleExpandedCardCollapseIntent,
+                        onWalkCardMinimizeToFloatingControl: onWalkCardMinimizeToFloatingControl,
                         onOpenDetails: onOpenCardDetails
                     )
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -320,6 +323,13 @@ struct VerticalSolidHomeDashboardPage: View {
         } completion: {
             completeCollapse(cardId: selectedCardId, generation: generation)
         }
+    }
+
+    private func handleExpandedCardCollapseIntent() {
+        if onExpandedCardCollapseIntent() {
+            return
+        }
+        collapseCard()
     }
 
     private func completeExpand(cardId: UUID, generation: Int) {

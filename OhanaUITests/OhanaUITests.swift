@@ -56,6 +56,143 @@ final class OhanaUITests: XCTestCase {
     }
 
     @MainActor
+    func testSettingsAdvancedNotificationControlsMountOnlyWhenExpanded() throws {
+        let app = launchEnglishApp(enableProductionOverlays: true)
+        createFirstHuman(from: app)
+        completeFirstDayStarterFunnel(in: app)
+
+        openSettingsFromHomeChrome(in: app)
+        let advancedNotifications = app.buttons["settings-advanced-notifications-disclosure"]
+        scrollToElement(advancedNotifications, in: app, maxSwipes: 8)
+        XCTAssertTrue(
+            advancedNotifications.waitForExistence(timeout: 12),
+            "Settings did not expose the advanced notification row."
+        )
+
+        let calendarToggle = app.descendants(matching: .any)["settings-notification-calendar-toggle"]
+        XCTAssertFalse(
+            calendarToggle.exists,
+            "Calendar notification toggle was mounted before advanced notification settings were expanded."
+        )
+
+        tapWhenHittable(advancedNotifications, timeout: 8)
+        XCTAssertTrue(
+            calendarToggle.waitForExistence(timeout: 8),
+            "Expanding advanced notification settings did not mount the calendar notification toggle."
+        )
+
+        tapWhenHittable(advancedNotifications, timeout: 8)
+        XCTAssertTrue(
+            waitUntil(timeout: 5) { !calendarToggle.exists },
+            "Collapsing advanced notification settings did not unmount category controls."
+        )
+    }
+
+    @MainActor
+    func testSettingsCoconutBalanceApplyButtonDoesNotFreeze() throws {
+        let app = launchEnglishApp(
+            enableProductionOverlays: true,
+            extraLaunchArguments: ["-OHANA_UI_TEST_OPEN_COCONUT_BALANCE_SHEET"]
+        )
+        createFirstHuman(from: app)
+        completeFirstDayStarterFunnel(in: app)
+
+        openSettingsFromHomeChrome(in: app)
+        let debugCoconuts = app.buttons["settings-debug-coconuts-shortcut"].exists
+            ? app.buttons["settings-debug-coconuts-shortcut"]
+            : app.buttons["settings-debug-coconuts"]
+        scrollToElement(debugCoconuts, in: app, maxSwipes: 6)
+        XCTAssertTrue(
+            debugCoconuts.waitForExistence(timeout: 12),
+            "Settings did not expose the coconut balance developer tool."
+        )
+        tapWhenHittable(debugCoconuts, timeout: 8)
+
+        let coconutScreen = app.descendants(matching: .any)["coconut-balance-test-screen"]
+        XCTAssertTrue(
+            coconutScreen.waitForExistence(timeout: 12),
+            "Coconut balance developer tool did not open its sheet."
+        )
+        tapWhenHittable(app.buttons["coconut-balance-apply-action"], timeout: 8)
+
+        let resultMessage = app.descendants(matching: .any)["coconut-balance-result-message"]
+        XCTAssertTrue(
+            resultMessage.waitForExistence(timeout: 12),
+            "Applying the coconut test balance did not finish and show a result message."
+        )
+        tapWhenHittable(app.buttons["coconut-balance-close-action"], timeout: 8)
+        XCTAssertTrue(
+            waitUntil(timeout: 12) { !coconutScreen.exists && app.otherElements["settings-screen"].exists },
+            "Coconut balance developer tool did not remain responsive after applying the test balance."
+        )
+    }
+
+    @MainActor
+    func testSingleHumanPetHomeAndFunctionMenuFeelComplete() throws {
+        let app = launchEnglishApp(enableProductionOverlays: true)
+        let humanName = createFirstHuman(from: app)
+        let petName = "Codex Single Shape \(Int(Date().timeIntervalSince1970))"
+        completeFirstDayStarterFunnel(
+            in: app,
+            petName: petName,
+            completionMessage: "Creating the first pet did not leave the single-member starter flow in time."
+        )
+        assertSingleMemberShapeHasNoDeficitCopy(in: app, context: "single-member Home after first pet")
+
+        openOasisAndInjectStarterEnergy(in: app)
+        openFunctionMenuRootFromHome(in: app, humanName: humanName)
+
+        XCTAssertTrue(
+            app.descendants(matching: .any)["function-menu-root"].waitForExistence(timeout: 12),
+            "Function Menu root did not open for a one-human one-pet household."
+        )
+        XCTAssertTrue(
+            app.buttons["function-menu-group-dailyCare"].waitForExistence(timeout: 8),
+            "Function Menu did not expose daily care for a one-human one-pet household."
+        )
+        assertSingleMemberShapeHasNoDeficitCopy(in: app, context: "single-member Function Menu")
+    }
+
+    @MainActor
+    func testReminderObservabilityPanelOpensFromDebugSettings() throws {
+        let app = launchEnglishApp(enableProductionOverlays: true)
+        createFirstHuman(from: app)
+        completeFirstDayStarterFunnel(in: app)
+
+        openSettingsFromHomeChrome(in: app)
+        let observabilityRow = app.buttons["settings-debug-reminder-observability-shortcut"]
+        XCTAssertTrue(
+            observabilityRow.waitForExistence(timeout: 12),
+            "Settings did not expose the reminder observability debug shortcut."
+        )
+        tapWhenHittable(observabilityRow, timeout: 8)
+
+        XCTAssertTrue(
+            app.descendants(matching: .any)["reminder-observability-screen"].waitForExistence(timeout: 12),
+            "Reminder observability panel did not open from Settings debug tools."
+        )
+        XCTAssertTrue(
+            app.descendants(matching: .any)["reminder-observability-ledger-card"].waitForExistence(timeout: 8),
+            "Reminder observability panel did not expose the scheduling ledger card."
+        )
+    }
+
+    @MainActor
+    func testFamilyWeeklyReportOpensFromDebugSettingsWithoutCompetitionCopy() throws {
+        let app = launchEnglishApp(enableProductionOverlays: true)
+        let humanName = createFirstHuman(from: app)
+        let petName = "Codex Weekly Report \(Int(Date().timeIntervalSince1970))"
+        completeFirstDayStarterFunnel(
+            in: app,
+            petName: petName,
+            completionMessage: "Creating the first pet did not leave the weekly report starter flow in time."
+        )
+
+        openFamilyWeeklyReportFromDebugSettings(in: app, humanName: humanName)
+        assertWeeklyReportAvoidsCompetitionCopy(in: app, context: "weekly report debug settings smoke")
+    }
+
+    @MainActor
     func testHumanFeatureHubRoutesOpenFromHome() throws {
         let app = launchEnglishApp(enableProductionOverlays: true)
         let humanName = createFirstHuman(from: app)
@@ -172,6 +309,41 @@ final class OhanaUITests: XCTestCase {
     }
 
     @MainActor
+    func testHumanExtendedModuleDeletesDisappearFromFeatureHub() throws {
+        let app = launchEnglishApp(enableProductionOverlays: true)
+        let humanName = createFirstHuman(from: app)
+        completeFirstDayStarterFunnel(in: app)
+
+        let timestamp = Int(Date().timeIntervalSince1970)
+        let workoutNote = "Codex delete workout \(timestamp)"
+        let reportHospital = "Codex Delete Clinic \(timestamp)"
+        let reportSummary = "Codex delete report \(timestamp)"
+        let noteText = "Codex delete note \(timestamp)"
+
+        saveHumanHealthMetricFromFeatureHub(in: app, humanName: humanName)
+        deleteHumanHealthMetricFromFeatureHub(in: app, humanName: humanName)
+
+        saveHumanWorkoutFromFeatureHub(in: app, humanName: humanName, note: workoutNote)
+        deleteHumanWorkoutFromProfile(in: app, humanName: humanName)
+
+        saveHumanHealthReportFromFeatureHub(
+            in: app,
+            humanName: humanName,
+            hospital: reportHospital,
+            summary: reportSummary
+        )
+        deleteHumanHealthReportFromFeatureHub(
+            in: app,
+            humanName: humanName,
+            hospital: reportHospital,
+            summary: reportSummary
+        )
+
+        saveHumanNoteFromFeatureHub(in: app, humanName: humanName, note: noteText)
+        deleteHumanNoteFromFeatureHub(in: app, humanName: humanName, note: noteText)
+    }
+
+    @MainActor
     func testHumanWishlistRedeemSpendsCoconutsFromFeatureHub() throws {
         let app = launchEnglishApp(enableProductionOverlays: true)
         let humanName = createFirstHuman(from: app)
@@ -184,9 +356,9 @@ final class OhanaUITests: XCTestCase {
     }
 
     @MainActor
-    func testHumanSettingsAccountPrivacyWritesFromGlobalSettings() throws {
+    func testHumanSettingsAccountSwitcherHidesLocalPrivacyControls() throws {
         let app = launchEnglishApp(enableProductionOverlays: true)
-        _ = createFirstHuman(from: app)
+        let humanName = createFirstHuman(from: app)
         completeFirstDayStarterFunnel(in: app)
 
         openSettingsFromHomeChrome(in: app)
@@ -203,41 +375,32 @@ final class OhanaUITests: XCTestCase {
             app.descendants(matching: .any)["human-account-switcher-sheet"].waitForExistence(timeout: 12),
             "Human account switcher did not open from Settings."
         )
-        tapWhenHittable(app.buttons["human-account-active-card"], timeout: 8)
+        XCTAssertTrue(
+            app.buttons["human-account-switch-row-\(humanName)"].waitForExistence(timeout: 8),
+            "Human account switcher did not list the current local member."
+        )
 
         let securitySheet = app.descendants(matching: .any)["human-account-security-sheet"]
-        XCTAssertTrue(
-            securitySheet.waitForExistence(timeout: 12),
-            "Human account security sheet did not open for the active Human."
+        XCTAssertFalse(
+            securitySheet.waitForExistence(timeout: 2),
+            "First-release local member switching should not expose the future Human privacy/PIN sheet."
         )
+        XCTAssertFalse(app.buttons["human-account-security-active-action"].exists)
+        XCTAssertFalse(app.buttons["human-account-privacy-all-private-action"].exists)
+        XCTAssertFalse(app.buttons["human-account-privacy-all-open-action"].exists)
 
-        let allPrivateAction = app.buttons["human-account-privacy-all-private-action"]
-        let allOpenAction = app.buttons["human-account-privacy-all-open-action"]
-        XCTAssertTrue(waitForFrameReady(allPrivateAction, timeout: 8), "All-private privacy action was not reachable.")
-        XCTAssertTrue(waitForFrameReady(allOpenAction, timeout: 8), "All-open privacy action was not reachable.")
+        tapWhenHittable(app.buttons["human-account-switcher-close-action"], timeout: 8)
+    }
 
-        tapWhenHittable(allPrivateAction, timeout: 8)
-        let privacyStatus = app.staticTexts["human-account-privacy-status"]
-        XCTAssertTrue(
-            waitUntil(timeout: 10) {
-                let label = privacyStatus.label
-                return label.contains("fields are private")
-                    || label.contains("项设为仅本人可见")
-                    || label.contains("Felder sind privat")
-            },
-            "Setting all Human privacy fields private did not update the Settings privacy status."
-        )
+    @MainActor
+    func testHumanProfileStaysVisibleWhenViewedByOtherLocalMember() throws {
+        let app = launchEnglishApp(enableProductionOverlays: true)
+        let ownerName = createFirstHuman(from: app)
+        let viewerName = createAdditionalHumanFromCrewRoster(in: app, homeHumanName: ownerName)
 
-        tapWhenHittable(app.buttons["human-account-privacy-all-open-action"], timeout: 8)
-        XCTAssertTrue(
-            waitUntil(timeout: 10) {
-                let label = privacyStatus.label
-                return label.contains("All sensitive data")
-                    || label.contains("所有敏感资料")
-                    || label.contains("Alle sensiblen Daten")
-            },
-            "Reopening all Human privacy fields did not update the Settings privacy status."
-        )
+        switchActiveHumanFromSettings(in: app, to: viewerName)
+        openHumanProfileViaUITestLaunchRoute(in: app, humanName: ownerName)
+        assertHumanProfileVisibleInLocalFirstMode(in: app, ownerName: ownerName, viewerName: viewerName)
     }
 
     @MainActor
@@ -265,6 +428,33 @@ final class OhanaUITests: XCTestCase {
     }
 
     @MainActor
+    func testFeedingManualHistoryAddOpensBackdateLogSheetAndRecords() throws {
+        let app = launchEnglishApp(enableProductionOverlays: true)
+        createFirstHuman(from: app)
+        let petName = "Codex Backdate Feed \(Int(Date().timeIntervalSince1970))"
+        completeFirstDayStarterFunnel(
+            in: app,
+            petName: petName,
+            completionMessage: "Creating the first pet did not leave the pet creation handoff in time."
+        )
+
+        openFeedDetailFromHome(in: app, petName: petName)
+        saveManualFeedingDefault(in: app)
+
+        let yesterdayID = manualFeedHistoryDayIdentifier(daysAgo: 1)
+        let twoDaysAgoID = manualFeedHistoryDayIdentifier(daysAgo: 2)
+        addBackdatedManualFeedHistoryLog(daysAgo: 1, in: app)
+        addBackdatedManualFeedHistoryLog(daysAgo: 2, in: app)
+
+        let history = app.buttons["quick-feed-dock-history"]
+        scrollToElement(history, in: app, maxSwipes: 4)
+        tapWhenHittable(history, timeout: 8)
+
+        assertManualFeedHistoryRow(dayIdentifier: yesterdayID, in: app)
+        assertManualFeedHistoryRow(dayIdentifier: twoDaysAgoID, in: app)
+    }
+
+    @MainActor
     func testPetHomeQuickActionDetailRoutesOpenAndCancel() throws {
         let app = launchEnglishApp(enableProductionOverlays: true)
         let humanName = createFirstHuman(from: app)
@@ -288,6 +478,106 @@ final class OhanaUITests: XCTestCase {
             petName: petName,
             humanName: humanName
         )
+    }
+
+    @MainActor
+    func testPetExpandedCardShowsQuickActionsWithoutSecondTap() throws {
+        let app = launchEnglishApp(enableProductionOverlays: true)
+        createFirstHuman(from: app)
+        let petName = "Codex Quick Reveal \(Int(Date().timeIntervalSince1970))"
+        completeFirstDayStarterFunnel(
+            in: app,
+            petName: petName,
+            completionMessage: "Creating the first pet did not leave the pet creation handoff in time."
+        )
+
+        let petCard = app.buttons["home-card-pet-\(petName)"]
+        XCTAssertTrue(petCard.waitForExistence(timeout: 14), "Home pet card did not appear before expansion.")
+        tapWhenHittable(petCard, timeout: 8)
+
+        let expandedFabShortcut = app.buttons["home-expanded-shortcut-allFeatures"]
+        XCTAssertFalse(
+            waitUntil(timeout: 1.5) {
+                expandedFabShortcut.exists
+            },
+            "Tapping the Home card auto-opened the FAB secondary menu."
+        )
+
+        XCTAssertTrue(
+            waitUntil(timeout: 4) {
+                app.buttons["home-quick-action-feed"].exists ||
+                    app.buttons["home-quick-action-water"].exists ||
+                    app.buttons["home-quick-action-play"].exists
+            },
+            "Expanded pet card did not expose pet quick actions without a second tap."
+        )
+        XCTAssertFalse(
+            expandedFabShortcut.exists,
+            "FAB secondary menu opened while waiting for embedded card quick actions."
+        )
+    }
+
+    @MainActor
+    func testPetHomeWalkCardMinimizesToFloatingBubble() throws {
+        let app = launchEnglishApp(enableProductionOverlays: true)
+        createFirstHuman(from: app)
+        let petName = "Codex Walk Minimize \(Int(Date().timeIntervalSince1970))"
+        completeFirstDayStarterFunnel(
+            in: app,
+            petName: petName,
+            petSpeciesLabel: "Dog",
+            completionMessage: "Creating the first pet did not leave the walk minimize starter flow in time."
+        )
+
+        startWalkFromHomeQuickAction(in: app, petName: petName)
+
+        let homeWalkMinimize = app.buttons["walk-tracking-card-minimize-action"]
+        XCTAssertTrue(
+            homeWalkMinimize.waitForExistence(timeout: 10),
+            "Home embedded walk card did not expose the top-right minimize action."
+        )
+        XCTAssertFalse(
+            app.descendants(matching: .any)["global-walk-bubble"].exists,
+            "Global walk bubble appeared while the Home embedded walk card was still expanded."
+        )
+
+        tapWhenHittable(homeWalkMinimize, timeout: 8)
+
+        XCTAssertTrue(
+            waitUntil(timeout: 14) {
+                app.buttons["home-card-pet-\(petName)"].exists ||
+                    app.buttons.matching(NSPredicate(format: "label == %@", petName)).firstMatch.exists
+            },
+            "Minimizing the Home walk card did not reveal the pet card face."
+        )
+        XCTAssertTrue(
+            app.descendants(matching: .any)["global-walk-bubble"].waitForExistence(timeout: 12),
+            "Minimizing the Home walk card did not reveal the global walk bubble."
+        )
+        XCTAssertFalse(
+            app.buttons["walk-tracking-card-minimize-action"].exists || app.buttons["walk-tracking-stop-action"].exists,
+            "Home embedded walk controls remained visible while the global walk bubble was visible."
+        )
+
+        ensureHomePetQuickActionVisible(actionType: "walk", in: app, petName: petName)
+        let resumeWalkAction = app.buttons["home-quick-action-walk"]
+        tapWhenHittable(resumeWalkAction, timeout: 8)
+        let quickStart = app.buttons["home-quick-action-menu-walk"]
+        if quickStart.waitForExistence(timeout: 3) {
+            tapWhenHittable(quickStart, timeout: 8)
+        }
+
+        XCTAssertTrue(
+            app.buttons["walk-tracking-card-minimize-action"].waitForExistence(timeout: 10) ||
+                app.buttons["walk-tracking-stop-action"].waitForExistence(timeout: 10),
+            "Tapping Walk again during an active walk did not flip back to the embedded current-walk card."
+        )
+        XCTAssertFalse(
+            app.descendants(matching: .any)["global-walk-bubble"].exists,
+            "Global walk bubble stayed visible after returning to the embedded current-walk card."
+        )
+
+        stopWalkFromVisibleHomeControls(in: app, petName: petName)
     }
 
     @MainActor
@@ -1437,6 +1727,60 @@ final class OhanaUITests: XCTestCase {
     }
 
     @MainActor
+    func testHumanPermanentDeleteCancelAndWrongNameAreSafe() throws {
+        let app = launchEnglishApp(enableProductionOverlays: true)
+        let humanName = createFirstHuman(from: app)
+        completeFirstDayStarterFunnel(in: app)
+
+        openHumanFeatureHubFromHome(in: app, humanName: humanName)
+        openHumanFeatureTile("feature-hub-account-profile", in: app)
+        XCTAssertTrue(
+            app.descendants(matching: .any)["human-basic-info-screen"].waitForExistence(timeout: 12),
+            "Human Basic Info did not open before the permanent delete safety check."
+        )
+
+        let markAction = app.buttons["human-memorial-mark-action"]
+        scrollToElement(markAction, in: app)
+        XCTAssertTrue(
+            markAction.waitForExistence(timeout: 8),
+            "Human Basic Info did not expose a separate memorial mark action before delete."
+        )
+
+        let deleteAction = app.buttons["human-danger-delete-action"]
+        scrollToElement(deleteAction, in: app)
+        XCTAssertTrue(
+            deleteAction.waitForExistence(timeout: 8),
+            "Human Basic Info did not expose the permanent delete action."
+        )
+        tapWhenHittable(deleteAction, timeout: 8)
+
+        let nameInput = app.textFields["human-delete-confirm-name-input"]
+        XCTAssertTrue(nameInput.waitForExistence(timeout: 8), "Human delete confirmation input did not appear.")
+
+        let finalDelete = app.buttons["human-delete-confirm-delete"]
+        XCTAssertTrue(finalDelete.waitForExistence(timeout: 8), "Human delete confirmation action did not appear.")
+        XCTAssertFalse(finalDelete.isEnabled, "Human delete action should stay disabled until the exact human name is entered.")
+
+        tapWhenHittable(nameInput, timeout: 8)
+        nameInput.typeText("wrong \(humanName)")
+        XCTAssertFalse(finalDelete.isEnabled, "Human delete action became enabled for a mismatched human name.")
+
+        tapWhenHittable(app.buttons["human-delete-confirm-cancel"], timeout: 8)
+        XCTAssertFalse(nameInput.waitForExistence(timeout: 2), "Human delete confirmation sheet stayed visible after cancel.")
+        XCTAssertTrue(
+            app.descendants(matching: .any)["human-basic-info-screen"].waitForExistence(timeout: 8),
+            "Canceling human delete did not return to Basic Info."
+        )
+        XCTAssertTrue(
+            waitUntil(timeout: 8) {
+                app.buttons["human-memorial-mark-action"].exists &&
+                    app.buttons["human-danger-delete-action"].exists
+            },
+            "Human memorial and permanent delete actions were not both still available after canceling delete."
+        )
+    }
+
+    @MainActor
     func testDeletedPetCalendarEventDoesNotOpenLiveCareRoute() throws {
         let app = launchEnglishApp(enableProductionOverlays: true)
         let humanName = createFirstHuman(from: app)
@@ -1555,6 +1899,61 @@ final class OhanaUITests: XCTestCase {
     }
 
     @MainActor
+    func testHumanMemorialMarkCancelConfirmAndUndoFlow() throws {
+        let app = launchEnglishApp(enableProductionOverlays: true)
+        let humanName = createFirstHuman(from: app)
+        completeFirstDayStarterFunnel(in: app)
+
+        openHumanFeatureHubFromHome(in: app, humanName: humanName)
+        openHumanFeatureTile("feature-hub-account-profile", in: app)
+        XCTAssertTrue(
+            app.descendants(matching: .any)["human-basic-info-screen"].waitForExistence(timeout: 12),
+            "Human Basic Info did not open before the memorial lifecycle flow."
+        )
+
+        let markAction = app.buttons["human-memorial-mark-action"]
+        scrollToElement(markAction, in: app)
+        tapWhenHittable(markAction, timeout: 8)
+        tapFirstAvailableButton(["Cancel", "取消", "Abbrechen"], in: app, timeout: 8, context: "human memorial mark cancel")
+        XCTAssertFalse(
+            app.staticTexts["human-memorial-passed-date"].waitForExistence(timeout: 2),
+            "Cancelling the human memorial mark alert still wrote a passed-away date."
+        )
+
+        tapWhenHittable(markAction, timeout: 8)
+        tapFirstAvailableButton(["Confirm", "确认", "Bestätigen"], in: app, timeout: 8, context: "human memorial mark confirm")
+        let passedDate = app.staticTexts["human-memorial-passed-date"]
+        XCTAssertTrue(
+            passedDate.waitForExistence(timeout: 12),
+            "Confirming the human memorial mark did not show the passed-away summary."
+        )
+        XCTAssertFalse(
+            app.buttons["human-basic-info-edit-action"].waitForExistence(timeout: 2),
+            "Human Basic Info still exposed live edit after entering memorial mode."
+        )
+
+        let undoAction = app.buttons["human-memorial-undo-action"]
+        scrollToElement(undoAction, in: app)
+        tapWhenHittable(undoAction, timeout: 8)
+        tapFirstAvailableButton(["Cancel", "取消", "Abbrechen"], in: app, timeout: 8, context: "human memorial undo cancel")
+        XCTAssertTrue(
+            passedDate.waitForExistence(timeout: 4),
+            "Cancelling human memorial undo unexpectedly cleared the passed-away date."
+        )
+
+        tapWhenHittable(undoAction, timeout: 8)
+        tapFirstAvailableButton(["Undo", "撤销", "Zurücknehmen"], in: app, timeout: 8, context: "human memorial undo confirm")
+        XCTAssertTrue(
+            markAction.waitForExistence(timeout: 12),
+            "Confirming human memorial undo did not restore the live mark action."
+        )
+        XCTAssertTrue(
+            app.buttons["human-basic-info-edit-action"].waitForExistence(timeout: 8),
+            "Confirming human memorial undo did not restore the live edit entry."
+        )
+    }
+
+    @MainActor
     func testPetMemorialHidesHomeLiveCareEntrypoints() throws {
         let app = launchEnglishApp(enableProductionOverlays: true)
         let humanName = createFirstHuman(from: app)
@@ -1595,6 +1994,37 @@ final class OhanaUITests: XCTestCase {
         XCTAssertFalse(
             app.buttons["home-quick-action-feed"].exists || app.buttons["home-quick-action-water"].exists,
             "Memorial pet still exposed live-care quick actions on Home."
+        )
+
+        openOasisAndInjectStarterEnergy(in: app)
+        tapWhenHittable(app.buttons["home-tab-home"], timeout: 8)
+        ensureHomeSurfaceVisible(in: app, humanName: humanName)
+
+        tapWhenHittable(app.buttons["home-primary-action"], timeout: 8)
+        let moreShortcut = app.buttons["home-fab-shortcut-more"]
+        XCTAssertTrue(moreShortcut.waitForExistence(timeout: 8), "Home FAB did not expose More after memorial pet return.")
+        tapWhenHittable(moreShortcut, timeout: 8)
+
+        let dailyCareGroup = app.buttons["function-menu-group-dailyCare"]
+        XCTAssertTrue(dailyCareGroup.waitForExistence(timeout: 12), "Function Menu did not expose the daily care group.")
+        tapWhenHittable(dailyCareGroup, timeout: 8)
+
+        XCTAssertTrue(
+            app.descendants(matching: .any)["function-menu-group-screen-dailyCare"].waitForExistence(timeout: 12),
+            "Function Menu daily care group did not open."
+        )
+        XCTAssertTrue(
+            app.descendants(matching: .any)["function-menu-aggregate-food"].waitForExistence(timeout: 12),
+            "Function Menu daily care group did not render the food aggregate surface."
+        )
+        XCTAssertFalse(
+            app.buttons.matching(NSPredicate(format: "label == %@", petName)).firstMatch.exists ||
+                app.staticTexts.matching(NSPredicate(format: "label == %@", petName)).firstMatch.exists,
+            "Memorial pet still appeared as an active Function Menu daily-care target."
+        )
+        XCTAssertFalse(
+            isAnyLivePetRouteVisible(in: app),
+            "Opening Function Menu daily care for a memorial-only household opened a live pet route."
         )
     }
 
@@ -1933,7 +2363,129 @@ final class OhanaUITests: XCTestCase {
     }
 
     @MainActor
-    func testPetCalendarEventRowOpensLinkedPetProfile() throws {
+    func testCalendarAddEventKeyboardKeepsEditorControlsVisible() throws {
+        let app = launchEnglishApp(enableProductionOverlays: true)
+        _ = createFirstHuman(from: app)
+        let timestamp = Int(Date().timeIntervalSince1970)
+        let petName = "Codex Keyboard Calendar Pet \(timestamp)"
+        let eventTitle = "Codex keyboard event \(timestamp)"
+        completeFirstDayStarterFunnel(
+            in: app,
+            petName: petName,
+            completionMessage: "Creating the first pet did not leave the pet creation handoff in time."
+        )
+
+        openCalendarTab(in: app, petName: petName)
+        tapWhenHittable(app.buttons["home-primary-action"], timeout: 8)
+
+        let titleField = app.textFields["add-event-title-input"]
+        XCTAssertTrue(titleField.waitForExistence(timeout: 10), "Calendar add-event sheet did not expose title input.")
+        XCTAssertTrue(
+            app.buttons["add-event-reminder-lead-atTime"].waitForExistence(timeout: 8),
+            "Calendar add-event sheet did not default to an at-time reminder option."
+        )
+        XCTAssertTrue(tapWhenFrameReady(titleField, timeout: 8), "Calendar event title input was not frame-ready.")
+
+        let keyboard = app.keyboards.firstMatch
+        XCTAssertTrue(keyboard.waitForExistence(timeout: 5), "System keyboard did not appear after focusing the event title.")
+        titleField.typeText(eventTitle)
+
+        var visibleSaveAction: XCUIElement?
+        let didKeepSaveAboveKeyboard = waitUntil(timeout: 6) {
+            guard
+                let saveAction = firstHittableButton(identifier: "add-event-save-action", in: app),
+                keyboard.exists
+            else { return false }
+            visibleSaveAction = saveAction
+            let saveFrame = saveAction.frame
+            let keyboardFrame = keyboard.frame
+            let windowFrame = app.windows.firstMatch.frame
+            return isFiniteFrame(saveFrame) &&
+                isFiniteFrame(keyboardFrame) &&
+                isFiniteFrame(windowFrame) &&
+                saveFrame.maxY <= keyboardFrame.minY + 2 &&
+                saveFrame.width <= windowFrame.width * 0.55 &&
+                saveFrame.height <= 72
+        }
+        XCTAssertTrue(
+            didKeepSaveAboveKeyboard,
+            "Calendar add-event save action should be a compact keyboard toolbar action, not a full-width overlay. save=\(visibleSaveAction?.frame.debugDescription ?? "nil"), keyboard=\(keyboard.frame)"
+        )
+
+        tapFirstHittableButton(identifier: "add-event-save-action", in: app, timeout: 8, context: "keyboard-visible calendar save")
+        XCTAssertTrue(
+            waitUntil(timeout: 14) {
+                !app.textFields["add-event-title-input"].exists
+            },
+            "Calendar add-event sheet did not close after saving while the keyboard was visible."
+        )
+        assertCalendarEvent(eventTitle, exists: true, in: app, context: "keyboard-visible add-event save")
+    }
+
+    @MainActor
+    func testManualCalendarEventRowOpensDetailEditsAndDeletes() throws {
+        let app = launchEnglishApp(enableProductionOverlays: true)
+        _ = createFirstHuman(from: app)
+        let timestamp = Int(Date().timeIntervalSince1970)
+        let petName = "Codex Calendar Manual Pet \(timestamp)"
+        let eventTitle = "Codex manual event \(timestamp)"
+        let editedTitle = "Codex edited manual event \(timestamp)"
+        completeFirstDayStarterFunnel(
+            in: app,
+            petName: petName,
+            completionMessage: "Creating the first pet did not leave the pet creation handoff in time."
+        )
+
+        openCalendarTab(in: app, petName: petName)
+        addCalendarEvent(title: eventTitle, linkedPetName: nil, in: app)
+        tapCalendarEvent(eventTitle, in: app)
+
+        let detailEditAction = app.buttons["calendar-event-edit-action"]
+        XCTAssertTrue(
+            detailEditAction.waitForExistence(timeout: 8),
+            "Tapping a manually added calendar event did not open its detail sheet."
+        )
+        tapWhenHittable(detailEditAction, timeout: 8)
+
+        let titleField = app.textFields["add-event-title-input"]
+        XCTAssertTrue(titleField.waitForExistence(timeout: 10), "Calendar event edit sheet did not expose title input.")
+        clearTextField(titleField, in: app)
+        titleField.typeText(editedTitle)
+        dismissKeyboardIfPresent(in: app)
+        tapFirstHittableButton(identifier: "add-event-save-action", in: app, timeout: 8, context: "calendar event edit save")
+
+        XCTAssertTrue(
+            waitUntil(timeout: 14) {
+                !app.textFields["add-event-title-input"].exists &&
+                    !detailEditAction.exists
+            },
+            "Calendar event edit flow did not close back to the list after saving."
+        )
+        assertCalendarEvent(eventTitle, exists: false, in: app, context: "post-edit old title")
+        assertCalendarEvent(editedTitle, exists: true, in: app, context: "post-edit new title")
+
+        tapCalendarEvent(editedTitle, in: app)
+        let reopenedDetailEditAction = app.buttons["calendar-event-edit-action"]
+        XCTAssertTrue(
+            reopenedDetailEditAction.waitForExistence(timeout: 8),
+            "Edited calendar event did not reopen its detail sheet before deletion."
+        )
+        tapWhenHittable(app.buttons["calendar-event-delete-action"], timeout: 8)
+        let confirmDeleteAction = app.buttons
+            .matching(identifier: "calendar-event-confirm-delete-action")
+            .firstMatch
+        tapWhenHittable(confirmDeleteAction, timeout: 8)
+        XCTAssertTrue(
+            waitUntil(timeout: 10) {
+                !reopenedDetailEditAction.exists
+            },
+            "Calendar event detail sheet did not close after deletion."
+        )
+        assertCalendarEvent(editedTitle, exists: false, in: app, context: "post-delete")
+    }
+
+    @MainActor
+    func testPetLinkedManualCalendarEventRowOpensEventDetail() throws {
         let app = launchEnglishApp(enableProductionOverlays: true)
         _ = createFirstHuman(from: app)
         let timestamp = Int(Date().timeIntervalSince1970)
@@ -1949,18 +2501,11 @@ final class OhanaUITests: XCTestCase {
         addCalendarEvent(title: petEventTitle, linkedPetName: petName, in: app)
         tapCalendarEvent(petEventTitle, in: app)
 
-        XCTAssertTrue(
-            app.descendants(matching: .any)["pet-basic-info-screen"].waitForExistence(timeout: 18),
-            "Tapping a pet-linked calendar event did not deep-link to the pet profile route."
-        )
-        XCTAssertTrue(
-            waitUntil(timeout: 8) { containsAnyMarker([petName], in: app) },
-            "The pet calendar deep-link opened a route that did not show the linked pet."
-        )
+        assertCalendarEventDetailOpen(in: app, context: "manual pet-linked calendar event")
     }
 
     @MainActor
-    func testPetCalendarWaterEventRowOpensQuickWaterDetail() throws {
+    func testPetLinkedManualWaterTitleCalendarEventRowOpensEventDetail() throws {
         let app = launchEnglishApp(enableProductionOverlays: true)
         _ = createFirstHuman(from: app)
         let timestamp = Int(Date().timeIntervalSince1970)
@@ -1976,37 +2521,36 @@ final class OhanaUITests: XCTestCase {
         addCalendarEvent(title: petEventTitle, linkedPetName: petName, in: app)
         tapCalendarEvent(petEventTitle, in: app)
 
-        XCTAssertTrue(
-            app.descendants(matching: .any)["quick-water-detail-sheet"].waitForExistence(timeout: 18),
-            "Tapping a pet-linked water calendar event did not deep-link to the pet Water detail route."
-        )
+        assertCalendarEventDetailOpen(in: app, context: "manual pet-linked water-title calendar event")
     }
 
     @MainActor
-    func testPetCalendarFeedEventRowOpensQuickFeedDetail() throws {
+    func testSystemGeneratedPetCalendarFeedEventRowOpensQuickFeedDetail() throws {
         let app = launchEnglishApp(enableProductionOverlays: true)
         _ = createFirstHuman(from: app)
         let timestamp = Int(Date().timeIntervalSince1970)
         let petName = "Codex Calendar Feed Pet \(timestamp)"
-        let petEventTitle = "Codex food reminder \(timestamp)"
         completeFirstDayStarterFunnel(
             in: app,
             petName: petName,
             completionMessage: "Creating the first pet did not leave the pet creation handoff in time."
         )
 
+        openFeedDetailFromHome(in: app, petName: petName)
+        saveManualReminderPlan(in: app)
+        closeFeedDetailToHome(in: app)
+
         openCalendarTab(in: app, petName: petName)
-        addCalendarEvent(title: petEventTitle, linkedPetName: petName, in: app)
-        tapCalendarEvent(petEventTitle, in: app)
+        tapFirstCalendarEventAny(of: feedPlanCalendarTitleCandidates(), in: app)
 
         XCTAssertTrue(
             waitForQuickFeedHome(in: app, timeout: 18),
-            "Tapping a pet-linked food calendar event did not deep-link to the pet Feeding detail route."
+            "Tapping a system-generated feeding plan calendar event did not deep-link to the pet Feeding detail route."
         )
     }
 
     @MainActor
-    func testPetCalendarPottyEventRowOpensQuickPottyDetail() throws {
+    func testPetLinkedManualPottyTitleCalendarEventRowOpensEventDetail() throws {
         let app = launchEnglishApp(enableProductionOverlays: true)
         _ = createFirstHuman(from: app)
         let timestamp = Int(Date().timeIntervalSince1970)
@@ -2022,14 +2566,11 @@ final class OhanaUITests: XCTestCase {
         addCalendarEvent(title: petEventTitle, linkedPetName: petName, in: app)
         tapCalendarEvent(petEventTitle, in: app)
 
-        XCTAssertTrue(
-            app.descendants(matching: .any)["quick-potty-detail-sheet"].waitForExistence(timeout: 18),
-            "Tapping a pet-linked potty calendar event did not deep-link to the pet Potty detail route."
-        )
+        assertCalendarEventDetailOpen(in: app, context: "manual pet-linked potty-title calendar event")
     }
 
     @MainActor
-    func testPetCalendarWalkEventRowOpensWalkSummary() throws {
+    func testPetLinkedManualWalkTitleCalendarEventRowOpensEventDetail() throws {
         let app = launchEnglishApp(enableProductionOverlays: true)
         _ = createFirstHuman(from: app)
         let timestamp = Int(Date().timeIntervalSince1970)
@@ -2046,14 +2587,11 @@ final class OhanaUITests: XCTestCase {
         addCalendarEvent(title: petEventTitle, linkedPetName: petName, in: app)
         tapCalendarEvent(petEventTitle, in: app)
 
-        XCTAssertTrue(
-            app.descendants(matching: .any)["walk-summary-sheet"].waitForExistence(timeout: 18),
-            "Tapping a pet-linked walk calendar event did not deep-link to the pet Walk summary route."
-        )
+        assertCalendarEventDetailOpen(in: app, context: "manual pet-linked walk-title calendar event")
     }
 
     @MainActor
-    func testPetCalendarPlayEventRowOpensQuickPlayDetail() throws {
+    func testPetLinkedManualPlayTitleCalendarEventRowOpensEventDetail() throws {
         let app = launchEnglishApp(enableProductionOverlays: true)
         _ = createFirstHuman(from: app)
         let timestamp = Int(Date().timeIntervalSince1970)
@@ -2069,14 +2607,11 @@ final class OhanaUITests: XCTestCase {
         addCalendarEvent(title: petEventTitle, linkedPetName: petName, in: app)
         tapCalendarEvent(petEventTitle, in: app)
 
-        XCTAssertTrue(
-            app.descendants(matching: .any)["quick-play-detail-sheet"].waitForExistence(timeout: 18),
-            "Tapping a pet-linked play calendar event did not deep-link to the pet Play detail route."
-        )
+        assertCalendarEventDetailOpen(in: app, context: "manual pet-linked play-title calendar event")
     }
 
     @MainActor
-    func testPetCalendarWeightEventRowOpensWeightDetail() throws {
+    func testPetLinkedManualWeightTitleCalendarEventRowOpensEventDetail() throws {
         let app = launchEnglishApp(enableProductionOverlays: true)
         _ = createFirstHuman(from: app)
         let timestamp = Int(Date().timeIntervalSince1970)
@@ -2092,14 +2627,11 @@ final class OhanaUITests: XCTestCase {
         addCalendarEvent(title: petEventTitle, linkedPetName: petName, in: app)
         tapCalendarEvent(petEventTitle, in: app)
 
-        XCTAssertTrue(
-            app.descendants(matching: .any)["pet-weight-detail-screen"].waitForExistence(timeout: 18),
-            "Tapping a pet-linked weight calendar event did not deep-link to the pet Weight detail route."
-        )
+        assertCalendarEventDetailOpen(in: app, context: "manual pet-linked weight-title calendar event")
     }
 
     @MainActor
-    func testPetCalendarHealthEventRowOpensHealthDetail() throws {
+    func testPetLinkedManualHealthTitleCalendarEventRowOpensEventDetail() throws {
         let app = launchEnglishApp(enableProductionOverlays: true)
         _ = createFirstHuman(from: app)
         let timestamp = Int(Date().timeIntervalSince1970)
@@ -2115,14 +2647,11 @@ final class OhanaUITests: XCTestCase {
         addCalendarEvent(title: petEventTitle, linkedPetName: petName, in: app)
         tapCalendarEvent(petEventTitle, in: app)
 
-        XCTAssertTrue(
-            app.descendants(matching: .any)["pet-health-detail-screen"].waitForExistence(timeout: 18),
-            "Tapping a pet-linked health calendar event did not deep-link to the pet Health detail route."
-        )
+        assertCalendarEventDetailOpen(in: app, context: "manual pet-linked health-title calendar event")
     }
 
     @MainActor
-    func testPetCalendarHygieneEventRowOpensHygieneDetail() throws {
+    func testPetLinkedManualHygieneTitleCalendarEventRowOpensEventDetail() throws {
         let app = launchEnglishApp(enableProductionOverlays: true)
         _ = createFirstHuman(from: app)
         let timestamp = Int(Date().timeIntervalSince1970)
@@ -2138,10 +2667,7 @@ final class OhanaUITests: XCTestCase {
         addCalendarEvent(title: petEventTitle, linkedPetName: petName, in: app)
         tapCalendarEvent(petEventTitle, in: app)
 
-        XCTAssertTrue(
-            app.descendants(matching: .any)["pet-hygiene-detail-screen"].waitForExistence(timeout: 18),
-            "Tapping a pet-linked hygiene calendar event did not deep-link to the pet Hygiene detail route."
-        )
+        assertCalendarEventDetailOpen(in: app, context: "manual pet-linked hygiene-title calendar event")
     }
 
     @MainActor
@@ -2196,7 +2722,8 @@ final class OhanaUITests: XCTestCase {
     @MainActor
     private func launchEnglishApp(
         resetPersistentState: Bool = true,
-        enableProductionOverlays: Bool = false
+        enableProductionOverlays: Bool = false,
+        extraLaunchArguments: [String] = []
     ) -> XCUIApplication {
         let app = XCUIApplication()
         app.launchArguments += [
@@ -2212,6 +2739,7 @@ final class OhanaUITests: XCTestCase {
         if enableProductionOverlays {
             app.launchArguments += ["-OHANA_ENABLE_PRODUCTION_OVERLAYS_IN_UI_TESTS"]
         }
+        app.launchArguments += extraLaunchArguments
         app.launch()
         return app
     }
@@ -2362,6 +2890,221 @@ final class OhanaUITests: XCTestCase {
     }
 
     @MainActor
+    @discardableResult
+    private func createAdditionalHumanFromCrewRoster(
+        in app: XCUIApplication,
+        homeHumanName: String,
+        name: String = "Codex Viewer \(Int(Date().timeIntervalSince1970))"
+    ) -> String {
+        ensureHomeSurfaceVisible(in: app, humanName: homeHumanName)
+
+        let crewButton = app.buttons["home-crew-roster-action"]
+        XCTAssertTrue(crewButton.waitForExistence(timeout: 12), "Home crew roster action did not appear.")
+        tapWhenHittable(crewButton, timeout: 8)
+
+        let addMember = app.buttons["crew-roster-primary-action"]
+        XCTAssertTrue(addMember.waitForExistence(timeout: 12), "Crew roster did not expose the add-member action.")
+        tapWhenHittable(addMember, timeout: 8)
+
+        let humanCrew = app.buttons["crew-roster-add-human-action"]
+        XCTAssertTrue(humanCrew.waitForExistence(timeout: 8), "Crew roster add menu did not expose Human crew.")
+        tapWhenHittable(humanCrew, timeout: 8)
+
+        createMember(
+            in: app,
+            name: name,
+            flowTitle: "Create Member Card",
+            missingFieldMessage: "Additional Human creation name field did not appear.",
+            completionMessage: "Creating the additional Human did not return to Home.",
+            postSaveMarkerIdentifiers: [
+                "home-card-human-\(name)",
+                "home-primary-action"
+            ]
+        )
+        cancelMemberCreationIfStillPresented(in: app)
+        closeCrewRosterIfNeeded(in: app)
+        ensureHomeSurfaceVisible(in: app, humanName: name)
+        return name
+    }
+
+    @MainActor
+    private func closeCrewRosterIfNeeded(in app: XCUIApplication) {
+        let closeRoster = app.buttons["crew-roster-close-action"]
+        let didFindClose = waitUntil(timeout: 3) {
+            closeRoster.exists && closeRoster.isEnabled && closeRoster.isHittable
+        }
+        guard didFindClose else { return }
+        closeRoster.tap()
+        _ = waitUntil(timeout: 8) {
+            !closeRoster.exists || app.buttons["home-settings-action"].isHittable
+        }
+    }
+
+    @MainActor
+    private func cancelMemberCreationIfStillPresented(in app: XCUIApplication) {
+        guard app.buttons["member-creation-primary-action"].exists || app.textFields["member-name-input"].exists else {
+            return
+        }
+        let cancelCandidates = [
+            app.buttons["Cancel"].firstMatch,
+            app.buttons["取消"].firstMatch,
+            app.buttons["Abbrechen"].firstMatch
+        ]
+        guard let cancel = cancelCandidates.first(where: { $0.exists && $0.isEnabled && $0.isHittable }) else {
+            return
+        }
+        cancel.tap()
+        _ = waitUntil(timeout: 8) {
+            !app.buttons["member-creation-primary-action"].exists &&
+                !app.textFields["member-name-input"].exists
+        }
+    }
+
+    @MainActor
+    private func switchActiveHumanFromSettings(in app: XCUIApplication, to humanName: String) {
+        closeCurrentSheetToHomeIfNeeded(in: app, humanName: humanName)
+        ensureHomeSurfaceVisible(in: app, humanName: humanName)
+        openSettingsFromHomeChrome(in: app)
+
+        let quickSwitch = app.buttons["settings-human-identity-switch-\(humanName)"]
+        XCTAssertTrue(
+            quickSwitch.waitForExistence(timeout: 12),
+            "Settings did not expose the Human identity quick switch for \(humanName)."
+        )
+        tapWhenHittable(quickSwitch, timeout: 8)
+
+        RunLoop.current.run(until: Date().addingTimeInterval(0.8))
+        app.terminate()
+        app.launchArguments.removeAll { $0 == "-OHANA_RESET_PERSISTENT_STATE" }
+        app.launch()
+        ensureHomeSurfaceVisible(in: app, humanName: humanName)
+
+        let settings = app.buttons["home-settings-action"]
+        XCTAssertTrue(
+            waitUntil(timeout: 14) {
+                settings.exists && settings.label.contains(humanName)
+            },
+            "Relaunch did not restore the active Human switch to \(humanName)."
+        )
+    }
+
+    @MainActor
+    private func openHumanProfileViaUITestLaunchRoute(in app: XCUIApplication, humanName: String) {
+        app.terminate()
+        app.launchArguments.removeAll { $0 == "-OHANA_RESET_PERSISTENT_STATE" }
+        removeLaunchArgumentPair("-OHANA_UI_TEST_OPEN_HUMAN_PROFILE_NAME", from: &app.launchArguments)
+        app.launchArguments += ["-OHANA_UI_TEST_OPEN_HUMAN_PROFILE_NAME", humanName]
+        app.launch()
+
+        let detailScreen = app.descendants(matching: .any)["human-detail-screen"]
+        XCTAssertTrue(
+            detailScreen.waitForExistence(timeout: 24),
+            "UI-test Human profile route did not open \(humanName)."
+        )
+    }
+
+    private func removeLaunchArgumentPair(_ flag: String, from arguments: inout [String]) {
+        while let index = arguments.firstIndex(of: flag) {
+            arguments.remove(at: index)
+            if arguments.indices.contains(index) {
+                arguments.remove(at: index)
+            }
+        }
+    }
+
+    @MainActor
+    private func assertHumanProfileVisibleInLocalFirstMode(
+        in app: XCUIApplication,
+        ownerName: String,
+        viewerName: String
+    ) {
+        XCTAssertTrue(
+            app.descendants(matching: .any)["human-detail-screen"].waitForExistence(timeout: 12),
+            "Human profile screen did not appear for private owner \(ownerName)."
+        )
+        XCTAssertTrue(
+            !app.descendants(matching: .any)["human-detail-private-profile-lock"].exists,
+            "Local-first Human profile showed a private profile lock for \(ownerName) when viewed by \(viewerName)."
+        )
+    }
+
+    @MainActor
+    private func ensureHumanShownOnHomeFromCrewRoster(
+        in app: XCUIApplication,
+        humanName: String,
+        activeHumanName: String
+    ) {
+        if app.buttons["home-card-human-\(humanName)"].exists || app.buttons[humanName].exists {
+            return
+        }
+
+        ensureHomeSurfaceVisible(in: app, humanName: activeHumanName)
+
+        let crewButton = app.buttons["home-crew-roster-action"]
+        XCTAssertTrue(crewButton.waitForExistence(timeout: 12), "Home crew roster action did not appear before showing \(humanName) on Home.")
+        XCTAssertTrue(
+            tapWhenFrameReady(crewButton, timeout: 8),
+            "Home crew roster action did not expose a finite tappable frame before showing \(humanName) on Home."
+        )
+
+        let visibilityToggle = app.buttons["crew-roster-home-visibility-human-\(humanName)"]
+        XCTAssertTrue(
+            visibilityToggle.waitForExistence(timeout: 12),
+            "Crew roster did not expose the Home visibility toggle for \(humanName)."
+        )
+
+        let value = visibilityToggle.value.map { String(describing: $0) } ?? ""
+        if value.contains("Off") || value.contains("关闭") || value.contains("Aus") || value.isEmpty {
+            XCTAssertTrue(
+                tapWhenFrameReady(visibilityToggle, timeout: 8),
+                "Crew roster Home visibility toggle did not expose a finite tappable frame for \(humanName)."
+            )
+        }
+
+        closeCrewRosterIfNeeded(in: app)
+        ensureHomeSurfaceVisible(in: app, humanName: activeHumanName)
+
+        let homeCard = app.buttons["home-card-human-\(humanName)"]
+        let labeledCard = app.buttons[humanName]
+        XCTAssertTrue(
+            waitUntil(timeout: 16) {
+                homeCard.exists || labeledCard.exists
+            },
+            "Crew roster Home visibility toggle did not restore \(humanName) to Home."
+        )
+    }
+
+    @MainActor
+    private func openHumanAccountSwitcherFromSettings(in app: XCUIApplication, homeHumanName: String) {
+        closeCurrentSheetToHomeIfNeeded(in: app, humanName: homeHumanName)
+        ensureHomeSurfaceVisible(in: app, humanName: homeHumanName)
+        openSettingsFromHomeChrome(in: app)
+
+        let accountSwitcher = app.buttons["settings-human-account-switcher-action"]
+        scrollToElement(accountSwitcher, in: app, maxSwipes: 3)
+        XCTAssertTrue(
+            accountSwitcher.waitForExistence(timeout: 12),
+            "Settings did not expose the Human account switcher entry."
+        )
+        tapWhenHittable(accountSwitcher, timeout: 8)
+        XCTAssertTrue(
+            app.descendants(matching: .any)["human-account-switcher-sheet"].waitForExistence(timeout: 12),
+            "Human account switcher did not open from Settings."
+        )
+    }
+
+    @MainActor
+    private func closeSettingsToHome(in app: XCUIApplication, humanName: String) {
+        let close = app.buttons["ohana-sheet-close-action"]
+        if close.exists {
+            tapWhenHittable(close, timeout: 8)
+        } else {
+            dismissCurrentSheetByDrag(in: app)
+        }
+        ensureHomeSurfaceVisible(in: app, humanName: humanName)
+    }
+
+    @MainActor
     private func resetEconomyBudgetFromHomeChrome(in app: XCUIApplication) {
         openSettingsFromHomeChrome(in: app)
         let resetBudget = app.buttons["settings-debug-economy-budget-reset-shortcut"].exists
@@ -2379,10 +3122,7 @@ final class OhanaUITests: XCTestCase {
         closeCurrentSheetToHomeIfNeeded(in: app, humanName: humanName)
         ensureHomeSurfaceVisible(in: app, humanName: humanName)
 
-        tapWhenHittable(app.buttons["home-primary-action"], timeout: 8)
-        let moreShortcut = app.buttons["home-fab-shortcut-more"]
-        XCTAssertTrue(moreShortcut.waitForExistence(timeout: 8), "Home FAB did not expose the More shortcut.")
-        tapWhenHittable(moreShortcut, timeout: 8)
+        openFunctionMenuRootFromHome(in: app, humanName: humanName)
 
         let shopTool = app.buttons["function-menu-tool-shop"]
         XCTAssertTrue(shopTool.waitForExistence(timeout: 14), "Function Menu did not expose the Coconut Shop tool.")
@@ -2392,6 +3132,152 @@ final class OhanaUITests: XCTestCase {
             app.descendants(matching: .any)["coconut-shop-screen"].waitForExistence(timeout: 18),
             "Coconut Shop did not open from the Home Function Menu."
         )
+    }
+
+    @MainActor
+    private func openFamilyWeeklyReportFromFunctionMenu(in app: XCUIApplication, humanName: String) {
+        closeCurrentSheetToHomeIfNeeded(in: app, humanName: humanName)
+        ensureHomeSurfaceVisible(in: app, humanName: humanName)
+
+        openFunctionMenuRootFromHome(in: app, humanName: humanName)
+
+        let reportTool = app.buttons["function-menu-tool-report"]
+        scrollToElement(reportTool, in: app, maxSwipes: 6)
+        XCTAssertTrue(reportTool.waitForExistence(timeout: 14), "Function Menu did not expose the Weekly Report tool.")
+        tapWhenHittable(reportTool, timeout: 8)
+
+        XCTAssertTrue(
+            app.descendants(matching: .any)["family-weekly-report-screen"].waitForExistence(timeout: 18),
+            "Weekly Report did not open from the Home Function Menu."
+        )
+        XCTAssertTrue(
+            app.descendants(matching: .any)["family-weekly-report-member-contribution-card"].waitForExistence(timeout: 12),
+            "Weekly Report did not expose the caregiver summary card."
+        )
+        XCTAssertTrue(
+            app.descendants(matching: .any)["family-weekly-report-recent-activity-card"].waitForExistence(timeout: 12),
+            "Weekly Report did not expose the recent activity card."
+        )
+    }
+
+    @MainActor
+    private func openFamilyWeeklyReportFromDebugSettings(in app: XCUIApplication, humanName: String) {
+        closeCurrentSheetToHomeIfNeeded(in: app, humanName: humanName)
+        ensureHomeSurfaceVisible(in: app, humanName: humanName)
+        openSettingsFromHomeChrome(in: app)
+
+        let reportShortcut = app.buttons["settings-debug-family-weekly-report-shortcut"]
+        XCTAssertTrue(
+            reportShortcut.waitForExistence(timeout: 12),
+            "Settings did not expose the UI-test Weekly Report shortcut."
+        )
+        tapWhenHittable(reportShortcut, timeout: 8)
+
+        XCTAssertTrue(
+            app.descendants(matching: .any)["family-weekly-report-screen"].waitForExistence(timeout: 18),
+            "Weekly Report did not open from the Settings UI-test shortcut."
+        )
+        XCTAssertTrue(
+            app.descendants(matching: .any)["family-weekly-report-member-contribution-card"].waitForExistence(timeout: 12),
+            "Weekly Report did not expose the caregiver summary card."
+        )
+        XCTAssertTrue(
+            app.descendants(matching: .any)["family-weekly-report-recent-activity-card"].waitForExistence(timeout: 12),
+            "Weekly Report did not expose the recent activity card."
+        )
+    }
+
+    @MainActor
+    private func unlockRewardTierForUITests(in app: XCUIApplication, humanName: String) {
+        openSettingsFromHomeChrome(in: app)
+        let rewardTier = app.buttons["settings-debug-reward-tier-shortcut"].exists
+            ? app.buttons["settings-debug-reward-tier-shortcut"]
+            : app.buttons["settings-debug-reward-tier"]
+        XCTAssertTrue(
+            rewardTier.waitForExistence(timeout: 12),
+            "Settings did not expose the UI-test reward-tier shortcut."
+        )
+        tapWhenHittable(rewardTier, timeout: 8)
+        ensureHomeSurfaceVisible(in: app, humanName: humanName)
+    }
+
+    @MainActor
+    private func openFunctionMenuRootFromHome(in app: XCUIApplication, humanName: String) {
+        closeCurrentSheetToHomeIfNeeded(in: app, humanName: humanName)
+        ensureHomeSurfaceVisible(in: app, humanName: humanName)
+        collapseExpandedPetCardIfNeeded(in: app)
+        collapseExpandedHumanCardIfNeeded(in: app, humanName: humanName)
+
+        tapWhenHittable(app.buttons["home-primary-action"], timeout: 8)
+        let moreShortcut = app.buttons["home-fab-shortcut-more"]
+        if !moreShortcut.waitForExistence(timeout: 4) {
+            tapWhenHittable(app.buttons["home-primary-action"], timeout: 8)
+            collapseExpandedPetCardIfNeeded(in: app)
+            collapseExpandedHumanCardIfNeeded(in: app, humanName: humanName)
+            tapWhenHittable(app.buttons["home-primary-action"], timeout: 8)
+        }
+        XCTAssertTrue(moreShortcut.waitForExistence(timeout: 8), "Home FAB did not expose the More shortcut.")
+        tapWhenHittable(moreShortcut, timeout: 8)
+
+        XCTAssertTrue(
+            app.descendants(matching: .any)["function-menu-root"].waitForExistence(timeout: 14),
+            "Function Menu root did not open from the Home FAB More shortcut."
+        )
+    }
+
+    private func assertWeeklyReportAvoidsCompetitionCopy(in app: XCUIApplication, context: String) {
+        let forbiddenCopy = [
+            "Care contribution ranking",
+            "care contribution ranking",
+            "leaderboard",
+            "competition",
+            "who did more",
+            "cared the most",
+            "Most care",
+            "Star of the week",
+            "照护贡献排行",
+            "排行榜",
+            "悬赏榜",
+            "竞赛",
+            "比赛",
+            "谁做得更多",
+            "照顾最多",
+            "本周之星"
+        ]
+        for text in forbiddenCopy {
+            let matchingText = app.staticTexts
+                .matching(NSPredicate(format: "label CONTAINS[c] %@", text))
+                .firstMatch
+            XCTAssertFalse(
+                matchingText.exists,
+                "\(context) showed weekly-report competition copy: \(text)"
+            )
+        }
+    }
+
+    private func assertSingleMemberShapeHasNoDeficitCopy(in app: XCUIApplication, context: String) {
+        let forbiddenCopy = [
+            "Add another family member",
+            "add another family member",
+            "more family members",
+            "more humans",
+            "one person is not enough",
+            "not enough family",
+            "添加更多人类",
+            "添加更多家庭成员",
+            "更多家庭成员",
+            "一个人不够",
+            "解锁家庭感"
+        ]
+        for text in forbiddenCopy {
+            let matchingText = app.staticTexts
+                .matching(NSPredicate(format: "label CONTAINS[c] %@", text))
+                .firstMatch
+            XCTAssertFalse(
+                matchingText.exists,
+                "\(context) showed single-member deficit copy: \(text)"
+            )
+        }
     }
 
     @MainActor
@@ -2450,6 +3336,51 @@ final class OhanaUITests: XCTestCase {
     }
 
     @MainActor
+    private func collapseExpandedPetCardIfNeeded(in app: XCUIApplication) {
+        let petExpandedMarkers = [
+            app.buttons["home-expanded-detail-pet"],
+            app.buttons["home-expanded-shortcut-allFeatures"],
+            app.buttons["home-quick-action-feed"],
+            app.buttons["home-quick-action-water"],
+            app.buttons["home-quick-action-potty"],
+            app.buttons["home-quick-action-play"],
+            app.buttons["home-quick-action-walk"]
+        ]
+        guard petExpandedMarkers.contains(where: \.exists) else { return }
+
+        let primaryAction = app.buttons["home-primary-action"]
+        if app.buttons["home-expanded-shortcut-allFeatures"].exists,
+           primaryAction.exists,
+           primaryAction.isHittable {
+            tapWhenHittable(primaryAction, timeout: 5)
+        }
+
+        let petCard = app.buttons
+            .matching(NSPredicate(format: "identifier BEGINSWITH %@", "home-card-pet-"))
+            .firstMatch
+        guard petCard.waitForExistence(timeout: 8) else { return }
+
+        for _ in 0 ..< 3 where petExpandedMarkers.contains(where: \.exists) {
+            guard waitUntil(timeout: 2, condition: { !petCard.frame.isEmpty }) else { break }
+            petCard.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.18)).tap()
+            RunLoop.current.run(until: Date().addingTimeInterval(0.3))
+        }
+
+        XCTAssertTrue(
+            waitUntil(timeout: 8) {
+                !app.buttons["home-expanded-detail-pet"].exists &&
+                    !app.buttons["home-expanded-shortcut-allFeatures"].exists &&
+                    !app.buttons["home-quick-action-feed"].exists &&
+                    !app.buttons["home-quick-action-water"].exists &&
+                    !app.buttons["home-quick-action-potty"].exists &&
+                    !app.buttons["home-quick-action-play"].exists &&
+                    !app.buttons["home-quick-action-walk"].exists
+            },
+            "Expanded pet card did not collapse before opening another Home tab."
+        )
+    }
+
+    @MainActor
     private func collapseExpandedHumanCardIfNeeded(in app: XCUIApplication, humanName: String) {
         let expandedMarkers = [
             app.buttons["home-expanded-detail-human"],
@@ -2493,6 +3424,28 @@ final class OhanaUITests: XCTestCase {
         openHumanFeatureTile(tileIdentifier, in: app)
         assertAnyMarkerExists(markers, in: app, timeout: 14, context: tileIdentifier)
         closeCurrentSheetToHome(in: app, humanName: humanName)
+    }
+
+    @MainActor
+    private func assertHumanPrivateRouteLock(
+        _ tileIdentifier: String,
+        markers: [String],
+        hiddenActionIdentifiers: [String],
+        in app: XCUIApplication,
+        ownerName: String,
+        viewerName: String
+    ) {
+        openHumanFeatureHubFromHome(in: app, humanName: ownerName)
+        openHumanFeatureTile(tileIdentifier, in: app)
+        assertAnyMarkerExists(markers, in: app, timeout: 14, context: "\(tileIdentifier) privacy lock")
+
+        for identifier in hiddenActionIdentifiers {
+            XCTAssertFalse(
+                app.buttons[identifier].exists,
+                "\(tileIdentifier) exposed private owner action \(identifier) while viewed by \(viewerName)."
+            )
+        }
+        closeCurrentSheetToHome(in: app, humanName: ownerName)
     }
 
     @MainActor
@@ -2625,7 +3578,6 @@ final class OhanaUITests: XCTestCase {
             "Human quick note sheet did not open."
         )
         typeText(note, intoTextView: "quick-human-note-input", in: app)
-        dismissKeyboardIfPresent(in: app)
         tapWhenHittable(app.buttons["quick-human-note-save-action"], timeout: 8)
         assertAnyMarkerExists([note], in: app, timeout: 14, context: "human note save")
         closeCurrentSheetToHome(in: app, humanName: humanName)
@@ -2673,22 +3625,23 @@ final class OhanaUITests: XCTestCase {
         closeCurrentSheetToHomeIfNeeded(in: app, humanName: humanName)
         ensureHomeSurfaceVisible(in: app, humanName: humanName)
 
-        let detailButton = app.buttons["home-expanded-detail-human"]
-        if !detailButton.exists || !detailButton.isHittable {
+        let workoutQuickAction = app.buttons["home-quick-action-humanWorkout"]
+        if !workoutQuickAction.exists || !workoutQuickAction.isHittable {
             expandHumanCardFromHome(in: app, humanName: humanName)
         }
 
         XCTAssertTrue(
-            waitUntil(timeout: 10) { detailButton.exists && detailButton.isEnabled && detailButton.isHittable },
-            "Expanded human card did not expose the human detail entry."
+            waitUntil(timeout: 10) {
+                workoutQuickAction.exists && workoutQuickAction.isEnabled && workoutQuickAction.isHittable
+            },
+            "Expanded human card did not expose the Workout quick action."
         )
-        tapWhenHittable(detailButton, timeout: 8)
+        workoutQuickAction.press(forDuration: 0.8)
 
         let addWorkout = app.buttons["human-workout-add-action"]
-        scrollToElement(addWorkout, in: app, maxSwipes: 10)
         XCTAssertTrue(
             addWorkout.waitForExistence(timeout: 14),
-            "Human profile did not expose the Workout add action."
+            "Human workout history did not expose the add action."
         )
     }
 
@@ -2716,6 +3669,100 @@ final class OhanaUITests: XCTestCase {
         scrollToElement(app.buttons["add-human-health-report-save-action"], in: app, maxSwipes: 4)
         tapWhenHittable(app.buttons["add-human-health-report-save-action"], timeout: 8)
         assertAnyMarkerExists([hospital, summary], in: app, timeout: 18, context: "human health report save")
+        closeCurrentSheetToHome(in: app, humanName: humanName)
+    }
+
+    @MainActor
+    private func deleteHumanHealthMetricFromFeatureHub(in app: XCUIApplication, humanName: String) {
+        openHumanFeatureHubFromHome(in: app, humanName: humanName)
+        openHumanFeatureTile("feature-hub-body-metrics", in: app)
+        let metricCard = app.buttons["human-health-metric-chart-tsh"]
+        scrollTowardElement(metricCard, in: app, maxSwipes: 5)
+        XCTAssertTrue(metricCard.waitForExistence(timeout: 10), "Human health metric card did not appear before delete.")
+        tapWhenHittable(metricCard, timeout: 8)
+
+        let detailScreen = app.descendants(matching: .any)["human-health-metric-detail-tsh"]
+        XCTAssertTrue(detailScreen.waitForExistence(timeout: 10), "Human health metric detail did not open before delete.")
+
+        let deleteAction = app.buttons["human-health-metric-delete-action"]
+        scrollTowardElement(deleteAction, in: app, maxSwipes: 8)
+        XCTAssertTrue(
+            deleteAction.waitForExistence(timeout: 12),
+            "Human health metric detail did not expose a delete action."
+        )
+        tapWhenHittable(deleteAction, timeout: 8)
+        XCTAssertTrue(
+            waitUntil(timeout: 12) {
+                !deleteAction.exists &&
+                    containsAnyMarker(["No history in the selected unit", "当前单位还没有历史记录"], in: app)
+            },
+            "Deleting the human health metric did not remove the visible history row."
+        )
+        closeCurrentSheetToHome(in: app, humanName: humanName)
+    }
+
+    @MainActor
+    private func deleteHumanWorkoutFromProfile(in app: XCUIApplication, humanName: String) {
+        openHumanWorkoutCardFromHomeProfile(in: app, humanName: humanName)
+        let deleteAction = app.buttons["human-workout-delete-action"]
+        scrollToElement(deleteAction, in: app, maxSwipes: 5)
+        XCTAssertTrue(deleteAction.waitForExistence(timeout: 12), "Human workout row did not expose a delete action.")
+        tapWhenHittable(deleteAction, timeout: 8)
+        XCTAssertTrue(
+            waitUntil(timeout: 12) {
+                !deleteAction.exists &&
+                    containsAnyMarker(["0", "Manual", "手动记录"], in: app)
+            },
+            "Deleting the human workout did not remove the visible workout row."
+        )
+        closeHumanProfileToHome(in: app, humanName: humanName)
+    }
+
+    @MainActor
+    private func deleteHumanHealthReportFromFeatureHub(
+        in app: XCUIApplication,
+        humanName: String,
+        hospital: String,
+        summary: String
+    ) {
+        openHumanFeatureHubFromHome(in: app, humanName: humanName)
+        openHumanFeatureTile("feature-hub-body-report", in: app)
+        assertAnyMarkerExists([hospital, summary], in: app, timeout: 14, context: "human health report before delete")
+
+        let reportRow = app.buttons["human-health-report-row"].firstMatch
+        XCTAssertTrue(reportRow.waitForExistence(timeout: 10), "Human health report row did not appear before delete.")
+        tapWhenHittable(reportRow, timeout: 8)
+
+        let deleteAction = app.buttons["add-human-health-report-delete-action"]
+        scrollToElement(deleteAction, in: app, maxSwipes: 5)
+        XCTAssertTrue(deleteAction.waitForExistence(timeout: 10), "Human health report edit sheet did not expose delete.")
+        tapWhenHittable(deleteAction, timeout: 8)
+
+        XCTAssertTrue(
+            waitUntil(timeout: 14) {
+                !containsAnyMarker([hospital, summary], in: app) &&
+                    containsAnyMarker(["No health reports yet", "还没有检测报告"], in: app)
+            },
+            "Deleting the human health report did not remove the visible report row."
+        )
+        closeCurrentSheetToHome(in: app, humanName: humanName)
+    }
+
+    @MainActor
+    private func deleteHumanNoteFromFeatureHub(in app: XCUIApplication, humanName: String, note: String) {
+        openHumanFeatureHubFromHome(in: app, humanName: humanName)
+        openHumanFeatureTile("feature-hub-money-notes", in: app)
+        assertAnyMarkerExists([note], in: app, timeout: 14, context: "human note before delete")
+
+        let deleteAction = app.buttons["human-note-delete-action"].firstMatch
+        XCTAssertTrue(deleteAction.waitForExistence(timeout: 10), "Human note row did not expose a delete action.")
+        tapWhenHittable(deleteAction, timeout: 8)
+        XCTAssertTrue(
+            waitUntil(timeout: 12) {
+                !containsAnyMarker([note], in: app)
+            },
+            "Deleting the human note did not remove the visible note row."
+        )
         closeCurrentSheetToHome(in: app, humanName: humanName)
     }
 
@@ -3274,6 +4321,52 @@ final class OhanaUITests: XCTestCase {
     }
 
     @MainActor
+    private func addBackdatedManualFeedHistoryLog(daysAgo: Int, in app: XCUIApplication) {
+        let addHistoryLog = app.buttons["quick-feed-dock-history-secondary"]
+        scrollToElement(addHistoryLog, in: app, maxSwipes: 4)
+        XCTAssertTrue(addHistoryLog.waitForExistence(timeout: 10), "Manual feed History card did not expose the add-log action.")
+        tapWhenHittable(addHistoryLog, timeout: 8)
+
+        XCTAssertTrue(
+            app.descendants(matching: .any)["quick-feed-manual-log-date"].waitForExistence(timeout: 8),
+            "Manual feed log sheet did not expose the date picker."
+        )
+        let dateShortcut = app.buttons["quick-feed-manual-log-date-minus-\(daysAgo)-day"]
+        XCTAssertTrue(dateShortcut.waitForExistence(timeout: 8), "Manual feed log sheet did not expose the \(daysAgo)-day backdate shortcut in UI-test mode.")
+        tapWhenHittable(dateShortcut, timeout: 8)
+        tapWhenHittable(app.buttons["quick-feed-manual-log-save"], timeout: 8)
+
+        XCTAssertTrue(
+            waitUntil(timeout: 12) {
+                isQuickFeedHomeVisible(in: app) &&
+                    !app.buttons["quick-feed-manual-log-save"].exists
+            },
+            "Manual feed log sheet did not close after saving the \(daysAgo)-day backdated log."
+        )
+    }
+
+    private func assertManualFeedHistoryRow(dayIdentifier: String, in app: XCUIApplication) {
+        let row = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "identifier BEGINSWITH %@", "quick-feed-log-row-manualMain-\(dayIdentifier)-"))
+            .firstMatch
+        XCTAssertTrue(
+            row.waitForExistence(timeout: 15),
+            "Manual feed History did not show a manualMain log row for backdated day \(dayIdentifier)."
+        )
+    }
+
+    private func manualFeedHistoryDayIdentifier(daysAgo: Int) -> String {
+        let targetDate = Calendar.current.date(byAdding: .day, value: -daysAgo, to: Date()) ?? Date()
+        let components = Calendar.current.dateComponents([.year, .month, .day], from: targetDate)
+        return String(
+            format: "%04d%02d%02d",
+            components.year ?? 0,
+            components.month ?? 0,
+            components.day ?? 0
+        )
+    }
+
+    @MainActor
     private func saveManualReminderPlan(in app: XCUIApplication) {
         tapWhenHittable(app.buttons["quick-feed-mode-manualReminder"], timeout: 8)
 
@@ -3333,7 +4426,10 @@ final class OhanaUITests: XCTestCase {
             XCTFail("Feed detail close action did not appear.")
             return
         }
-        tapWhenHittable(close, timeout: 8)
+        XCTAssertTrue(
+            tapWhenFrameReady(close, timeout: 8),
+            "Feed detail close action was not frame-ready."
+        )
 
         let didReturnHome = waitForFrameReady(app.buttons["home-quick-action-feed"], timeout: 15)
         XCTAssertTrue(didReturnHome, "Closing Feed detail did not return to a responsive home card.")
@@ -3483,28 +4579,30 @@ final class OhanaUITests: XCTestCase {
     }
 
     private func isEmptyTextFieldValue(_ value: String) -> Bool {
-        value.isEmpty || value == "名字"
+        value.isEmpty ||
+            value == "名字" ||
+            value == "给这件事起个名字" ||
+            value == "Name this event" ||
+            value == "Termin benennen"
     }
 
     @MainActor
     private func openCalendarTab(in app: XCUIApplication, petName: String) {
         let petCard = app.buttons["home-card-pet-\(petName)"]
         XCTAssertTrue(petCard.waitForExistence(timeout: 20), "Pet home card did not appear before opening pet Calendar context.")
-        if app.buttons["home-expanded-detail-pet"].exists {
-            tapWhenHittable(petCard, timeout: 8)
-            XCTAssertTrue(
-                waitUntil(timeout: 10) { !app.buttons["home-expanded-detail-pet"].exists },
-                "Expanded pet card did not collapse before opening global Calendar."
-            )
-        }
+        closeCurrentPetRouteIfNeeded(in: app)
+        collapseExpandedPetCardIfNeeded(in: app)
 
         let calendarTab = app.buttons["home-tab-calendar"]
         XCTAssertTrue(calendarTab.waitForExistence(timeout: 20), "Calendar tab did not appear after starter setup.")
         tapWhenHittable(calendarTab, timeout: 8)
+        let allFilter = app.buttons["calendar-filter-all"]
+        let listViewButton = app.buttons["calendar-view-mode-list"]
         XCTAssertTrue(
-            app.buttons["calendar-filter-all"].waitForExistence(timeout: 14),
+            waitUntil(timeout: 14) { allFilter.exists || listViewButton.exists },
             "Calendar screen did not open from the Home tab."
         )
+        closeCurrentPetRouteIfNeeded(in: app)
     }
 
     @MainActor
@@ -3533,7 +4631,7 @@ final class OhanaUITests: XCTestCase {
         expectVisibleAfterSave: Bool = true,
         in app: XCUIApplication
     ) {
-        tapWhenHittable(app.buttons["home-primary-action"], timeout: 8)
+        tapCalendarAddEventAction(in: app)
         XCTAssertTrue(
             app.textFields["add-event-title-input"].waitForExistence(timeout: 10),
             "Calendar add-event sheet did not open."
@@ -3545,7 +4643,7 @@ final class OhanaUITests: XCTestCase {
             scrollToElement(petChip, in: app, maxSwipes: 8)
             tapWhenHittable(petChip, timeout: 8)
         }
-        tapWhenHittable(app.buttons["add-event-save-action"], timeout: 8)
+        tapFirstHittableButton(identifier: "add-event-save-action", in: app, timeout: 8, context: "calendar event save")
         XCTAssertTrue(
             waitUntil(timeout: 14) {
                 !app.textFields["add-event-title-input"].exists
@@ -3553,6 +4651,41 @@ final class OhanaUITests: XCTestCase {
             "Calendar add-event sheet did not close after saving \(title)."
         )
         assertCalendarEvent(title, exists: expectVisibleAfterSave, in: app, context: "post-save readback")
+    }
+
+    @MainActor
+    private func tapCalendarAddEventAction(in app: XCUIApplication) {
+        closeCurrentPetRouteIfNeeded(in: app)
+        let calendarAddEventAction = app.buttons["calendar-add-event-action"]
+        if calendarAddEventAction.exists && calendarAddEventAction.isEnabled && calendarAddEventAction.isHittable {
+            tapWhenHittable(calendarAddEventAction, timeout: 5)
+            return
+        }
+
+        let addEventAction = app.buttons["home-primary-action"]
+        let didBecomeHittable = waitUntil(timeout: 8) {
+            addEventAction.exists && addEventAction.isEnabled && addEventAction.isHittable
+        }
+        if didBecomeHittable {
+            addEventAction.tap()
+            return
+        }
+
+        closeCurrentPetRouteIfNeeded(in: app)
+        let didBecomeHittableAfterClosingRoute = waitUntil(timeout: 4) {
+            addEventAction.exists && addEventAction.isEnabled && addEventAction.isHittable
+        }
+        if didBecomeHittableAfterClosingRoute {
+            addEventAction.tap()
+            return
+        }
+
+        let elementValue = addEventAction.value.map { String(describing: $0) } ?? "nil"
+        XCTAssertTrue(
+            addEventAction.exists && addEventAction.isEnabled,
+            "Calendar add-event action was not ready: \(addEventAction) exists=\(addEventAction.exists) enabled=\(addEventAction.isEnabled) hittable=\(addEventAction.isHittable) frame=\(addEventAction.frame) label=\(addEventAction.label) value=\(elementValue)"
+        )
+        addEventAction.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
     }
 
     @MainActor
@@ -3589,6 +4722,53 @@ final class OhanaUITests: XCTestCase {
     }
 
     @MainActor
+    private func assertCalendarEventDetailOpen(in app: XCUIApplication, context: String) {
+        XCTAssertTrue(
+            app.buttons["calendar-event-edit-action"].waitForExistence(timeout: 10),
+            "Calendar event detail did not open for \(context)."
+        )
+        XCTAssertFalse(
+            isAnyLivePetRouteVisible(in: app),
+            "Manual calendar event opened a pet route instead of event detail for \(context)."
+        )
+    }
+
+    @MainActor
+    private func tapFirstCalendarEventAny(of titles: [String], in app: XCUIApplication) {
+        let rows = titles.map {
+            app.descendants(matching: .any)
+                .matching(identifier: "calendar-event-row-\($0)")
+                .firstMatch
+        }
+        if !waitUntil(timeout: 4, condition: { rows.contains { $0.exists } }) {
+            for _ in 0 ..< 12 where !rows.contains(where: \.exists) {
+                app.swipeUp()
+                RunLoop.current.run(until: Date().addingTimeInterval(0.25))
+            }
+        }
+        guard let row = rows.first(where: \.exists) else {
+            XCTFail("None of the expected calendar event rows existed: \(titles)")
+            return
+        }
+        scrollToElement(row, in: app, maxSwipes: 10)
+        tapWhenHittable(row, timeout: 8)
+    }
+
+    private func feedPlanCalendarTitleCandidates() -> [String] {
+        let mealNames = [
+            "Breakfast", "Lunch", "Dinner",
+            "早餐", "午餐", "晚餐",
+            "Frühstück", "Mittagessen", "Abendessen"
+        ]
+        let foodNames = ["Dry food", "干粮", "Trockenfutter"]
+        return mealNames.flatMap { mealName in
+            foodNames.map { foodName in
+                "\(mealName) \(foodName) 50g"
+            }
+        }
+    }
+
+    @MainActor
     private func tapCalendarEvent(_ title: String, in app: XCUIApplication) {
         let row = app.descendants(matching: .any)
             .matching(NSPredicate(format: "identifier == %@", "calendar-event-row-\(title)"))
@@ -3603,6 +4783,30 @@ final class OhanaUITests: XCTestCase {
 
     @MainActor
     private func isAnyLivePetRouteVisible(in app: XCUIApplication) -> Bool {
+        livePetRouteIdentifiers().contains { identifier in
+            let element = app.descendants(matching: .any)[identifier]
+            return element.exists && element.isHittable
+        }
+    }
+
+    @MainActor
+    private func closeCurrentPetRouteIfNeeded(in app: XCUIApplication) {
+        let healthDetailScreen = app.descendants(matching: .any)["pet-health-detail-screen"]
+        guard healthDetailScreen.exists else { return }
+
+        let close = app.buttons["pet-health-detail-close-action"]
+        if close.exists && close.isEnabled && close.isHittable {
+            tapWhenHittable(close, timeout: 5)
+        } else {
+            app.coordinate(withNormalizedOffset: CGVector(dx: 0.86, dy: 0.12)).tap()
+        }
+
+        _ = waitUntil(timeout: 8) {
+            !healthDetailScreen.exists
+        }
+    }
+
+    private func livePetRouteIdentifiers() -> [String] {
         [
             "quick-feed-detail-sheet",
             "quick-water-detail-sheet",
@@ -3613,16 +4817,47 @@ final class OhanaUITests: XCTestCase {
             "pet-weight-detail-screen",
             "walk-summary-sheet",
             "pet-bond-vault-screen"
-        ].contains { identifier in
-            app.descendants(matching: .any)[identifier].exists
-        }
+        ]
     }
 
     @MainActor
     private func scrollToElement(_ element: XCUIElement, in app: XCUIApplication, maxSwipes: Int = 8) {
         for _ in 0 ..< maxSwipes where !element.exists || !element.isHittable {
-            app.swipeUp()
+            swipeUpInPrimaryScrollArea(in: app)
             RunLoop.current.run(until: Date().addingTimeInterval(0.25))
+        }
+    }
+
+    @MainActor
+    private func scrollTowardElement(_ element: XCUIElement, in app: XCUIApplication, maxSwipes: Int = 8) {
+        for _ in 0 ..< maxSwipes where !element.exists || !element.isHittable {
+            if element.exists, element.frame.midY < app.frame.midY {
+                app.swipeDown()
+            } else {
+                swipeUpInPrimaryScrollArea(in: app)
+            }
+            RunLoop.current.run(until: Date().addingTimeInterval(0.25))
+        }
+    }
+
+    @MainActor
+    private func swipeUpInPrimaryScrollArea(in app: XCUIApplication) {
+        let calendarList = app.scrollViews["calendar-list-scroll-view"]
+        if calendarList.exists {
+            calendarList
+                .coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.82))
+                .press(
+                    forDuration: 0.01,
+                    thenDragTo: calendarList.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.26))
+                )
+            return
+        }
+
+        let scrollView = app.scrollViews.firstMatch
+        if scrollView.exists {
+            scrollView.swipeUp()
+        } else {
+            app.swipeUp()
         }
     }
 
@@ -3635,6 +4870,7 @@ final class OhanaUITests: XCTestCase {
         }
         let didReturnHome = waitUntil(timeout: 16) {
             app.state == .runningForeground &&
+                !isHumanFeatureRouteOverlayVisible(in: app) &&
                 (app.buttons[humanName].exists ||
                     app.buttons["home-primary-action"].exists ||
                     app.buttons["home-tab-home"].exists)
@@ -3646,14 +4882,16 @@ final class OhanaUITests: XCTestCase {
     private func closeCurrentSheetToHomeIfNeeded(in app: XCUIApplication, humanName: String) {
         if app.buttons[humanName].isHittable || app.buttons["home-primary-action"].isHittable,
            !app.buttons["feature-hub-body-weight"].exists,
+           !isHumanFeatureRouteOverlayVisible(in: app),
            !containsAnyMarker(["Weight trend", "Charts appear after you log a metric", "Co-health Report", "Health Reports", "No medication plan yet", "No expenses yet", "No wishes yet", "Timeline"], in: app) {
             return
         }
 
         let closeCandidates = [
+            app.buttons["crew-roster-close-action"],
+            app.buttons["human-workout-close-action"],
             app.buttons["human-basic-info-close-action"],
             app.buttons["ohana-sheet-close-action"],
-            app.buttons["xmark"].firstMatch,
             app.buttons["Close"].firstMatch,
             app.buttons["Done"].firstMatch,
             app.buttons["关闭"].firstMatch,
@@ -3679,7 +4917,8 @@ final class OhanaUITests: XCTestCase {
         }
 
         _ = waitUntil(timeout: 8) {
-            app.buttons[humanName].isHittable || app.buttons["home-primary-action"].isHittable
+            !isHumanFeatureRouteOverlayVisible(in: app) &&
+                (app.buttons[humanName].isHittable || app.buttons["home-primary-action"].isHittable)
         }
     }
 
@@ -3704,27 +4943,57 @@ final class OhanaUITests: XCTestCase {
 
     @MainActor
     private func closeHumanProfileToHome(in app: XCUIApplication, humanName: String) {
-        if app.buttons[humanName].isHittable || app.buttons["home-primary-action"].isHittable {
+        if app.buttons[humanName].isHittable || app.buttons["home-primary-action"].isHittable,
+           !isHumanFeatureRouteOverlayVisible(in: app) {
             return
         }
 
+        let closeCandidates = [
+            app.buttons["human-workout-close-action"],
+            app.buttons["human-basic-info-close-action"],
+            app.buttons["ohana-sheet-close-action"],
+            app.buttons["Close"].firstMatch,
+            app.buttons["Done"].firstMatch,
+            app.buttons["关闭"].firstMatch,
+            app.buttons["完成"].firstMatch
+        ]
+        let backCandidates = [
+            app.buttons["BackButton"],
+            app.buttons["Back"],
+            app.buttons["返回"]
+        ]
         let homeTab = app.buttons["home-tab-home"]
-        if homeTab.exists && homeTab.isHittable {
+        if let close = closeCandidates.first(where: { $0.exists && $0.isEnabled && $0.isHittable }) {
+            tapWhenHittable(close, timeout: 5)
+        } else if let back = backCandidates.first(where: { $0.exists && $0.isEnabled && $0.isHittable }) {
+            tapWhenHittable(back, timeout: 5)
+        } else if homeTab.exists && homeTab.isHittable {
             tapWhenHittable(homeTab, timeout: 5)
         } else {
-            let navigationBack = app.navigationBars.buttons.element(boundBy: 0)
-            if navigationBack.exists && navigationBack.isEnabled && navigationBack.isHittable {
-                tapWhenHittable(navigationBack, timeout: 5)
-            } else {
-                app.swipeRight()
-            }
+            app.swipeRight()
         }
 
         let didReturnHome = waitUntil(timeout: 14) {
             app.state == .runningForeground &&
+                !isHumanFeatureRouteOverlayVisible(in: app) &&
                 (app.buttons[humanName].isHittable || app.buttons["home-primary-action"].isHittable)
         }
         XCTAssertTrue(didReturnHome, "Closing the human profile did not return to Home.")
+    }
+
+    private func isHumanFeatureRouteOverlayVisible(in app: XCUIApplication) -> Bool {
+        [
+            "add-human-workout-sheet",
+            "human-basic-info-screen",
+            "human-health-metric-detail-tsh",
+            "human-health-metric-entry-sheet-tsh",
+            "human-health-report-add-action",
+            "human-note-history-screen",
+            "human-workout-add-action",
+            "human-workout-delete-action"
+        ].contains { identifier in
+            app.descendants(matching: .any)[identifier].exists
+        }
     }
 
     private func assertAnyMarkerExists(_ markers: [String], in app: XCUIApplication, timeout: TimeInterval, context: String) {
@@ -3993,6 +5262,57 @@ final class OhanaUITests: XCTestCase {
             "Element did not become hittable: \(element) exists=\(element.exists) enabled=\(element.isEnabled) hittable=\(element.isHittable) frame=\(element.frame) label=\(element.label) value=\(elementValue)"
         )
         element.tap()
+    }
+
+    @MainActor
+    private func firstHittableButton(identifier: String, in app: XCUIApplication) -> XCUIElement? {
+        let matches = app.buttons.matching(identifier: identifier)
+        let count = matches.count
+        guard count > 0 else { return nil }
+
+        for index in 0 ..< count {
+            let button = matches.element(boundBy: index)
+            if button.exists, button.isEnabled, button.isHittable {
+                return button
+            }
+        }
+        return nil
+    }
+
+    @MainActor
+    private func tapFirstHittableButton(identifier: String, in app: XCUIApplication, timeout: TimeInterval, context: String) {
+        let didTap = waitUntil(timeout: timeout) {
+            guard let button = firstHittableButton(identifier: identifier, in: app) else {
+                return false
+            }
+            button.tap()
+            return true
+        }
+        let matchCount = app.buttons.matching(identifier: identifier).count
+        XCTAssertTrue(
+            didTap,
+            "No hittable button \(identifier) became available for \(context). matches=\(matchCount)"
+        )
+    }
+
+    @MainActor
+    private func tapFirstAvailableButton(
+        _ labels: [String],
+        in app: XCUIApplication,
+        timeout: TimeInterval,
+        context: String
+    ) {
+        let didTap = waitUntil(timeout: timeout) {
+            for label in labels {
+                let button = app.buttons[label]
+                if button.exists && button.isEnabled && button.isHittable {
+                    button.tap()
+                    return true
+                }
+            }
+            return false
+        }
+        XCTAssertTrue(didTap, "No alert button became available for \(context): \(labels.joined(separator: ", "))")
     }
 
     @MainActor

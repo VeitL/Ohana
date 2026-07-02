@@ -28,13 +28,17 @@ struct HumanNoteHistorySheet: View {
     @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
 
     @State private var showAddSheet = false
+    @State private var noteRevision = 0
     @StateObject private var commandQueue = DeferredDomainCommandQueue()
 
     private var l: L10n { L10n(appLanguage) }
     private var activeHumanId: UUID? { UUID(uuidString: activeHumanIdStr) }
     private var isViewingOwnProfile: Bool { activeHumanId == human.id }
     private var isPrivacyLocked: Bool { human.isPrivate(.note, viewedBy: activeHumanId) }
-    private var noteEntries: [HumanNoteEntry] { parseNotes() }
+    private var noteEntries: [HumanNoteEntry] {
+        _ = noteRevision
+        return parseNotes()
+    }
 
     var body: some View {
         NavigationStack {
@@ -64,6 +68,7 @@ struct HumanNoteHistorySheet: View {
                 if showAddSheet {
                     QuickHumanNoteSheet(
                         human: human,
+                        onSaved: { noteRevision += 1 },
                         onDismiss: { showAddSheet = false }
                     )
                     .zIndex(20)
@@ -144,6 +149,7 @@ struct HumanNoteHistorySheet: View {
                 }
                 .buttonStyle(ScaleButtonStyle())
                 .accessibilityLabel(l.tr(zh: "删除备注", en: "Delete note", de: "Notiz löschen"))
+                .accessibilityIdentifier("human-note-delete-action")
             }
 
             Text(entry.text)

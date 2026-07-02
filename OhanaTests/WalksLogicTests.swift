@@ -67,6 +67,56 @@ struct WalksLogicTests {
         #expect(location.startWalkSessionCount == 0)
     }
 
+    @Test func homeWalkQuickActionRevealsActiveWalkInsteadOfStartingAnotherSession() {
+        let requestedPetID = UUID()
+        let otherPetID = UUID()
+
+        #expect(
+            HomeWalkQuickActionPresentationPolicy.existingWalkDisposition(
+                requestedPetID: requestedPetID,
+                currentPetID: requestedPetID,
+                phase: .running
+            ) == .embeddedCurrentPet
+        )
+        #expect(
+            HomeWalkQuickActionPresentationPolicy.existingWalkDisposition(
+                requestedPetID: requestedPetID,
+                currentPetID: requestedPetID,
+                phase: .paused
+            ) == .embeddedCurrentPet
+        )
+        #expect(
+            HomeWalkQuickActionPresentationPolicy.existingWalkDisposition(
+                requestedPetID: requestedPetID,
+                currentPetID: otherPetID,
+                phase: .running
+            ) == .floatingOtherPet
+        )
+        #expect(
+            HomeWalkQuickActionPresentationPolicy.existingWalkDisposition(
+                requestedPetID: requestedPetID,
+                currentPetID: requestedPetID,
+                phase: .idle
+            ) == nil
+        )
+        #expect(
+            HomeWalkQuickActionPresentationPolicy.existingWalkDisposition(
+                requestedPetID: requestedPetID,
+                currentPetID: requestedPetID,
+                phase: .finished(elapsed: 12, poopCount: 0)
+            ) == nil
+        )
+    }
+
+    @Test func pausedWalkUsesStaticPausedRoutePresentation() {
+        #expect(WalkTrackingMapPresentationPolicy.routeVisualStyle(for: .running) == .active)
+        #expect(WalkTrackingMapPresentationPolicy.routeVisualStyle(for: .paused) == .paused)
+        #expect(WalkTrackingMapPresentationPolicy.allowsRainbowRoute(phase: .running, isRainbowEquipped: true))
+        #expect(!WalkTrackingMapPresentationPolicy.allowsRainbowRoute(phase: .paused, isRainbowEquipped: true))
+        #expect(WalkTrackingMapPresentationPolicy.allowsRouteFlow(phase: .running, shouldAnimate: true))
+        #expect(!WalkTrackingMapPresentationPolicy.allowsRouteFlow(phase: .paused, shouldAnimate: true))
+    }
+
     @Test func stoppingWalkWithPoopPersistsPottyLedgerForExecutor() throws {
         let container = try makeContainer()
         let context = container.mainContext

@@ -62,7 +62,9 @@ struct HumanDetailView: View {
 
     var isViewingOwnProfile: Bool { activeHumanId == human.id }
     var isAllPrivateForViewer: Bool {
-        !isViewingOwnProfile && HumanPrivateField.allCases.allSatisfy { human.privateFields.contains($0.rawValue) }
+        HumanLocalPrivacyPolicy.isEnabled &&
+            !isViewingOwnProfile &&
+            HumanPrivateField.allCases.allSatisfy { human.privateFields.contains($0.rawValue) }
     }
 
     var humanReminders: [Reminder] {
@@ -214,6 +216,7 @@ struct HumanDetailView: View {
                 }
             }
         }
+        .accessibilityIdentifier("human-detail-screen")
         .sheet(isPresented: $showingEditSheet) { EditHumanSheet(human: human) }
         .sheet(isPresented: $showWeightHistory) {
             NavigationStack { HumanWeightHistoryView(human: human) }

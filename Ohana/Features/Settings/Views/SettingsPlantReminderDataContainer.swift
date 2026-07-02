@@ -77,6 +77,7 @@ private struct SettingsPlantReminderPanelContent: View {
     @State private var plantReminderDisplayState: [UUID: Bool] = [:]
     @State private var pendingPlantReminderUpdates: [UUID: PendingPlantReminderUpdate] = [:]
     @State private var statusMessage: String?
+    @State private var isBulkDeferPending = false
 
     private var l: L10n { L10n(appLanguage) }
     private var primaryText: Color { Color.ohanaPrimaryText }
@@ -86,6 +87,8 @@ private struct SettingsPlantReminderPanelContent: View {
 
     var body: some View {
         VStack(spacing: 0) {
+            reminderOverview
+            sectionDivider
             masterRow
             if NotificationPreferenceStore.isEnabled(.plantCare) {
                 sectionDivider
@@ -99,16 +102,7 @@ private struct SettingsPlantReminderPanelContent: View {
                 sectionDivider
                 plantRows
                 sectionDivider
-                bulkDeferRow
-                if let statusMessage {
-                    Text(statusMessage)
-                        .font(OhanaFont.caption2(.semibold))
-                        .foregroundStyle(tertiaryText)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.top, 8)
-                        .padding(.leading, 44)
-                        .accessibilityIdentifier("settings-plant-reminders-status")
-                }
+                bulkDeferSection
             }
         }
         .onDisappear {
@@ -121,6 +115,114 @@ private struct SettingsPlantReminderPanelContent: View {
 
     private var sectionDivider: some View {
         OhanaDashedDivider(color: dividerLine).padding(.leading, 44)
+    }
+
+    private var reminderOverview: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .center, spacing: 12) {
+                settingsIcon(reminderOverviewIcon, color: reminderOverviewTint)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(reminderOverviewTitle)
+                        .font(OhanaFont.body(.semibold))
+                        .foregroundStyle(primaryText)
+                    Text(reminderOverviewSubtitle)
+                        .font(OhanaFont.caption2(.semibold))
+                        .foregroundStyle(tertiaryText)
+                        .lineLimit(2)
+                }
+                Spacer(minLength: 8)
+                reminderStateBadge
+            }
+
+            HStack(spacing: 8) {
+                reminderOverviewMetric(
+                    id: "plants",
+                    icon: "leaf.fill",
+                    title: l.tr(zh: "覆盖植物", en: "Covered", de: "Abgedeckt"),
+                    value: "\(enabledPlantReminderCount)/\(plants.count)",
+                    tint: enabledPlantReminderCount == plants.count ? Color.goLime : Color.goYellow
+                )
+                reminderOverviewMetric(
+                    id: "types",
+                    icon: "checklist.checked",
+                    title: l.tr(zh: "任务类型", en: "Task types", de: "Aufgaben"),
+                    value: "\(enabledCareTypeReminderCount)/\(PlantReminderPreferenceStore.controllableCareTypes.count)",
+                    tint: enabledCareTypeReminderCount == PlantReminderPreferenceStore.controllableCareTypes.count ? Color.goTeal : Color.goYellow
+                )
+                reminderOverviewMetric(
+                    id: "window",
+                    icon: "clock.fill",
+                    title: l.tr(zh: "时间段", en: "Window", de: "Zeit"),
+                    value: windowTitle(PlantReminderPreferenceStore.timeWindow()),
+                    tint: Color.goTeal
+                )
+            }
+
+            reminderEffectSummary
+        }
+        .padding(.vertical, 8)
+        .accessibilityIdentifier("settings-plant-reminders-overview")
+    }
+
+    private var reminderStateBadge: some View {
+        Text(reminderStateBadgeText)
+            .font(OhanaFont.caption2(.black))
+            .foregroundStyle(reminderOverviewTint)
+            .lineLimit(1)
+            .minimumScaleFactor(0.72)
+            .padding(.horizontal, 10)
+            .frame(minHeight: 28)
+            .background(reminderOverviewTint.opacity(0.13), in: Capsule())
+            .overlay(Capsule().stroke(reminderOverviewTint.opacity(0.24), lineWidth: 1))
+            .accessibilityIdentifier("settings-plant-reminders-state-badge")
+    }
+
+    private var reminderEffectSummary: some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: reminderEffectIcon) // a11y: allow decorative effect icon; surrounding text carries meaning
+                .font(OhanaFont.adaptive(size: 12, weight: .bold))
+                .foregroundStyle(reminderOverviewTint)
+                .frame(width: 26, height: 26) // a11y: allow decorative non-interactive status glyph
+                .background(reminderOverviewTint.opacity(0.12), in: Circle())
+                .accessibilityHidden(true)
+            Text(reminderEffectText)
+                .font(OhanaFont.caption2(.semibold))
+                .foregroundStyle(tertiaryText)
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 0)
+        }
+        .padding(.leading, 9)
+        .accessibilityIdentifier("settings-plant-reminders-effect")
+    }
+
+    private func reminderOverviewMetric(
+        id: String,
+        icon: String,
+        title: String,
+        value: String,
+        tint: Color
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Image(systemName: icon) // a11y: allow decorative metric icon; label/value text is exposed
+                .font(OhanaFont.adaptive(size: 12, weight: .bold))
+                .foregroundStyle(tint)
+                .accessibilityHidden(true)
+            Text(title)
+                .font(OhanaFont.caption2(.bold))
+                .foregroundStyle(tertiaryText)
+                .lineLimit(1)
+                .minimumScaleFactor(0.72)
+            Text(value)
+                .font(OhanaFont.callout(.black))
+                .foregroundStyle(primaryText)
+                .lineLimit(1)
+                .minimumScaleFactor(0.72)
+        }
+        .frame(maxWidth: .infinity, minHeight: 74, alignment: .leading)
+        .padding(10)
+        .background(Color.ohanaControlFill.opacity(0.62), in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("settings-plant-reminders-overview-metric-\(id)")
     }
 
     private var masterRow: some View {
@@ -229,12 +331,17 @@ private struct SettingsPlantReminderPanelContent: View {
             )
             ForEach(PlantReminderPreferenceStore.controllableCareTypes) { type in
                 HStack(spacing: 12) {
-                    Text(type.emoji)
-                        .font(OhanaFont.body(.semibold))
-                        .frame(width: 44, height: 44)
-                    Text(type.displayName)
-                        .font(OhanaFont.body(.semibold))
-                        .foregroundStyle(primaryText)
+                    settingsIcon(careSymbol(for: type), color: careTint(for: type))
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(type.displayName)
+                            .font(OhanaFont.body(.semibold))
+                            .foregroundStyle(primaryText)
+                        Text(careTypeReminderSummary(for: type))
+                            .font(OhanaFont.caption2(.semibold))
+                            .foregroundStyle(tertiaryText)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.72)
+                    }
                     Spacer()
                     Toggle("", isOn: Binding(
                         get: { PlantReminderPreferenceStore.isCareTypeReminderEnabled(type) },
@@ -248,6 +355,7 @@ private struct SettingsPlantReminderPanelContent: View {
                 }
                 .frame(minHeight: 42)
                 .padding(.leading, 44)
+                .accessibilityIdentifier("settings-plant-reminders-care-type-\(type.rawValue)")
             }
         }
     }
@@ -275,14 +383,12 @@ private struct SettingsPlantReminderPanelContent: View {
             } else {
                 ForEach(plants) { plant in
                     HStack(spacing: 12) {
-                        Text(plant.avatarEmoji.isEmpty ? "🌱" : plant.avatarEmoji)
-                            .font(OhanaFont.body(.semibold))
-                            .frame(width: 44, height: 44)
+                        plantReminderAvatar(for: plant)
                         VStack(alignment: .leading, spacing: 2) {
                             Text(plant.name.isEmpty ? l.tr(zh: "植物", en: "Plant", de: "Pflanze") : plant.name)
                                 .font(OhanaFont.body(.semibold))
                                 .foregroundStyle(primaryText)
-                            Text(plant.location.isEmpty ? plant.species : plant.location)
+                            Text(plantReminderRowSubtitle(for: plant))
                                 .font(OhanaFont.caption2(.semibold))
                                 .foregroundStyle(tertiaryText)
                                 .lineLimit(1)
@@ -299,60 +405,220 @@ private struct SettingsPlantReminderPanelContent: View {
                             transaction.animation = nil
                         }
                         .frame(width: 50, height: 30)
-                            .accessibilityLabel(plantReminderAccessibilityLabel(plant))
-                            .accessibilityValue(plantReminderAccessibilityValue(plant))
-                            .accessibilityHint(l.tr(
-                                zh: "双击切换这株植物的日历提醒",
-                                en: "Double tap to toggle calendar reminders for this plant",
-                                de: "Doppeltippen, um Kalendererinnerungen für diese Pflanze umzuschalten"
-                            ))
-                            .accessibilityIdentifier("settings-plant-reminders-plant-toggle-\(plant.name)")
+                        .accessibilityLabel(plantReminderAccessibilityLabel(plant))
+                        .accessibilityValue(plantReminderAccessibilityValue(plant))
+                        .accessibilityHint(l.tr(
+                            zh: "双击切换这株植物的日历提醒",
+                            en: "Double tap to toggle calendar reminders for this plant",
+                            de: "Doppeltippen, um Kalendererinnerungen für diese Pflanze umzuschalten"
+                        ))
+                        .accessibilityIdentifier("settings-plant-reminders-plant-toggle-\(plant.name)")
                     }
                     .frame(minHeight: 46)
                     .padding(.leading, 44)
+                    .accessibilityIdentifier("settings-plant-reminders-plant-row-\(plant.id.uuidString)")
                 }
             }
         }
     }
 
-    private var bulkDeferRow: some View {
-        Button {
-            let result = appServices.plantReminderControls.deferDueTasksOneDay(
-                plants: plants,
-                context: modelContext,
-                executorId: currentActiveHumanId.isEmpty ? nil : currentActiveHumanId
-            )
-            statusMessage = bulkDeferMessage(result)
-            UIImpactFeedbackGenerator(style: result.deferredTaskCount > 0 ? .medium : .light).impactOccurred()
-        } label: {
-            HStack(spacing: 12) {
-                settingsIcon("clock.arrow.circlepath", color: Color.goYellow)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(l.tr(zh: "全部延后一天", en: "Defer all by one day", de: "Alle um einen Tag verschieben"))
-                        .font(OhanaFont.body(.semibold))
-                        .foregroundStyle(primaryText)
-                    Text(l.tr(
-                        zh: "只处理当前已到期的植物任务",
-                        en: "Only applies to currently due plant tasks",
-                        de: "Gilt nur für aktuell fällige Pflanzenaufgaben"
-                    ))
-                    .font(OhanaFont.caption2(.semibold))
-                    .foregroundStyle(tertiaryText)
-                }
-                Spacer()
-                Image(systemName: "chevron.right") // a11y: allow decorative icon covered by surrounding button text
-                    .font(OhanaFont.adaptive(size: 11, weight: .semibold))
-                    .foregroundStyle(tertiaryText.opacity(0.6))
-                    .accessibilityHidden(true)
-            }
-            .frame(minHeight: 52)
+    private var bulkDeferSection: some View {
+        ZStack(alignment: .bottomLeading) {
+            bulkDeferRow
+            bulkDeferInlineStatusText(statusMessage ?? bulkDeferReadyMessage())
         }
-        .buttonStyle(ScaleButtonStyle())
+    }
+
+    private func bulkDeferInlineStatusText(_ message: String) -> some View {
+        Text(message)
+            .font(OhanaFont.caption2(.semibold))
+            .foregroundStyle(tertiaryText)
+            .lineLimit(2)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.leading, 56)
+            .padding(.trailing, 12)
+            .padding(.bottom, 5)
+            .allowsHitTesting(false)
+            .accessibilityIdentifier("settings-plant-reminders-status")
+    }
+
+    private var bulkDeferRow: some View {
+        HStack(spacing: 12) {
+            settingsIcon("clock.arrow.circlepath", color: Color.goYellow)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(l.tr(zh: "全部延后一天", en: "Defer all by one day", de: "Alle um einen Tag verschieben"))
+                    .font(OhanaFont.body(.semibold))
+                    .foregroundStyle(primaryText)
+                Text(l.tr(
+                    zh: "只处理当前已到期的植物任务",
+                    en: "Only applies to currently due plant tasks",
+                    de: "Gilt nur für aktuell fällige Pflanzenaufgaben"
+                ))
+                .font(OhanaFont.caption2(.semibold))
+                .foregroundStyle(tertiaryText)
+            }
+            .padding(.bottom, 18)
+            Spacer()
+            Image(systemName: "chevron.right") // a11y: allow decorative icon covered by surrounding button text
+                .font(OhanaFont.adaptive(size: 11, weight: .semibold))
+                .foregroundStyle(tertiaryText.opacity(0.6))
+                .accessibilityHidden(true)
+        }
+        .frame(maxWidth: .infinity, minHeight: 76, alignment: .leading)
+        .contentShape(Rectangle())
+        .opacity(isBulkDeferPending ? 0.62 : 1)
+        .onTapGesture {
+            performBulkDefer()
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isButton)
+        .accessibilityAction { performBulkDefer() }
+        .accessibilityValue(statusMessage ?? "")
         .accessibilityIdentifier("settings-plant-reminders-defer-all")
     }
 
     private func plantRemindersEnabled(for plant: Plant) -> Bool {
         plantReminderDisplayState[plant.id] ?? plant.remindersEnabled
+    }
+
+    private var enabledPlantReminderCount: Int {
+        plants.reduce(0) { count, plant in
+            count + (plantRemindersEnabled(for: plant) ? 1 : 0)
+        }
+    }
+
+    private var mutedPlantReminderCount: Int {
+        max(0, plants.count - enabledPlantReminderCount)
+    }
+
+    private var enabledCareTypeReminderCount: Int {
+        PlantReminderPreferenceStore.controllableCareTypes.reduce(0) { count, type in
+            count + (PlantReminderPreferenceStore.isCareTypeReminderEnabled(type) ? 1 : 0)
+        }
+    }
+
+    private var reminderOverviewTint: Color {
+        if !NotificationPreferenceStore.isEnabled(.plantCare) || PlantReminderPreferenceStore.isTravelModeEnabled() {
+            return Color.goYellow
+        }
+        if mutedPlantReminderCount > 0 || enabledCareTypeReminderCount < PlantReminderPreferenceStore.controllableCareTypes.count {
+            return Color.goTeal
+        }
+        return Color.goLime
+    }
+
+    private var reminderOverviewIcon: String {
+        if !NotificationPreferenceStore.isEnabled(.plantCare) || PlantReminderPreferenceStore.isTravelModeEnabled() {
+            return "bell.slash.fill"
+        }
+        if mutedPlantReminderCount > 0 {
+            return "bell.badge.fill"
+        }
+        return "bell.and.waves.left.and.right.fill"
+    }
+
+    private var reminderOverviewTitle: String {
+        if !NotificationPreferenceStore.isEnabled(.plantCare) {
+            return l.tr(zh: "植物提醒已暂停", en: "Plant reminders are paused", de: "Pflanzenerinnerungen pausiert")
+        }
+        if PlantReminderPreferenceStore.isTravelModeEnabled() {
+            return l.tr(zh: "旅行模式正在生效", en: "Travel mode is active", de: "Reisemodus ist aktiv")
+        }
+        if mutedPlantReminderCount > 0 {
+            return l.tr(zh: "\(mutedPlantReminderCount) 株植物已单独静音", en: "\(mutedPlantReminderCount) plants are muted", de: "\(mutedPlantReminderCount) Pflanzen sind stumm")
+        }
+        return l.tr(zh: "植物提醒覆盖正常", en: "Plant reminders are covered", de: "Pflanzenerinnerungen sind abgedeckt")
+    }
+
+    private var reminderOverviewSubtitle: String {
+        if plants.isEmpty {
+            return l.tr(zh: "添加植物后，这里会显示日历计划和通知覆盖。", en: "Add plants to see calendar plans and notification coverage here.", de: "Nach dem Hinzufügen von Pflanzen erscheinen hier Kalenderpläne und Mitteilungen.")
+        }
+        return l.tr(
+            zh: "\(enabledPlantReminderCount) 株开启 · \(enabledCareTypeReminderCount) 类任务会生成日历提醒",
+            en: "\(enabledPlantReminderCount) plants on · \(enabledCareTypeReminderCount) task types create calendar reminders",
+            de: "\(enabledPlantReminderCount) Pflanzen aktiv · \(enabledCareTypeReminderCount) Aufgabentypen erzeugen Kalendererinnerungen"
+        )
+    }
+
+    private var reminderStateBadgeText: String {
+        if !NotificationPreferenceStore.isEnabled(.plantCare) {
+            return l.tr(zh: "已关闭", en: "Off", de: "Aus")
+        }
+        if PlantReminderPreferenceStore.isTravelModeEnabled() {
+            return l.tr(zh: "旅行中", en: "Travel", de: "Reise")
+        }
+        if mutedPlantReminderCount > 0 {
+            return l.tr(zh: "部分开启", en: "Partial", de: "Teilweise")
+        }
+        return l.tr(zh: "生效中", en: "Active", de: "Aktiv")
+    }
+
+    private var reminderEffectIcon: String {
+        if !NotificationPreferenceStore.isEnabled(.plantCare) || PlantReminderPreferenceStore.isTravelModeEnabled() {
+            return "bell.slash"
+        }
+        if PlantReminderPreferenceStore.isWeekendQuietEnabled() {
+            return "calendar.badge.clock"
+        }
+        return "calendar.badge.checkmark"
+    }
+
+    private var reminderEffectText: String {
+        if !NotificationPreferenceStore.isEnabled(.plantCare) {
+            return l.tr(
+                zh: "系统推送和植物日历提醒会暂停；App 内护理任务仍保留。",
+                en: "System pushes and plant calendar reminders pause; in-app care tasks remain.",
+                de: "Systemmitteilungen und Pflanzenkalender pausieren; In-App-Aufgaben bleiben erhalten."
+            )
+        }
+        if PlantReminderPreferenceStore.isTravelModeEnabled() {
+            return l.tr(
+                zh: "旅行模式暂停系统推送，但不会删除 App 内任务和护理计划。",
+                en: "Travel mode pauses system pushes without deleting in-app tasks or care plans.",
+                de: "Der Reisemodus pausiert Systemmitteilungen, ohne Aufgaben oder Pflegepläne zu löschen."
+            )
+        }
+        if PlantReminderPreferenceStore.isWeekendQuietEnabled() {
+            return l.tr(
+                zh: "到期提醒会在 \(windowSubtitle(PlantReminderPreferenceStore.timeWindow())) 发送；周末推送顺延到工作日。",
+                en: "Due reminders send during \(windowSubtitle(PlantReminderPreferenceStore.timeWindow())); weekend pushes move to weekdays.",
+                de: "Fällige Erinnerungen kommen zwischen \(windowSubtitle(PlantReminderPreferenceStore.timeWindow())); Wochenenden wandern auf Werktage."
+            )
+        }
+        return l.tr(
+            zh: "到期提醒会在 \(windowSubtitle(PlantReminderPreferenceStore.timeWindow())) 发送，并同步植物护理日历。",
+            en: "Due reminders send during \(windowSubtitle(PlantReminderPreferenceStore.timeWindow())) and sync with the plant care calendar.",
+            de: "Fällige Erinnerungen kommen zwischen \(windowSubtitle(PlantReminderPreferenceStore.timeWindow())) und synchronisieren den Pflegekalender."
+        )
+    }
+
+    private func careTypeReminderSummary(for type: PlantCareType) -> String {
+        PlantReminderPreferenceStore.isCareTypeReminderEnabled(type)
+            ? l.tr(zh: "会生成日历提醒", en: "Creates calendar reminders", de: "Erzeugt Kalendererinnerungen")
+            : l.tr(zh: "已从日历提醒中排除", en: "Excluded from calendar reminders", de: "Von Kalendererinnerungen ausgeschlossen")
+    }
+
+    private func plantReminderAvatar(for plant: Plant) -> some View {
+        let isOn = plantRemindersEnabled(for: plant)
+        let tint = isOn ? Color.goLime : Color.goYellow
+        return ZStack {
+            Circle().fill(tint.opacity(0.14))
+            Image(systemName: isOn ? "leaf.fill" : "bell.slash.fill")
+                .font(OhanaFont.adaptive(size: 13, weight: .bold)) // a11y: allow decorative plant reminder status icon
+                .foregroundStyle(tint)
+        }
+        .frame(width: 44, height: 44)
+        .accessibilityHidden(true)
+    }
+
+    private func plantReminderRowSubtitle(for plant: Plant) -> String {
+        let placement = plant.location.isEmpty ? plant.species : plant.location
+        let fallback = placement.isEmpty ? l.tr(zh: "未设置位置", en: "Placement unset", de: "Standort fehlt") : placement
+        let state = plantRemindersEnabled(for: plant)
+            ? l.tr(zh: "提醒开启", en: "Reminders on", de: "Erinnerungen ein")
+            : l.tr(zh: "已静音", en: "Muted", de: "Stumm")
+        return "\(fallback) · \(state)"
     }
 
     private func plantReminderAccessibilityLabel(_ plant: Plant) -> String {
@@ -396,6 +662,10 @@ private struct SettingsPlantReminderPanelContent: View {
 
     private func setPlantRemindersEnabled(_ enabled: Bool, for plant: Plant) {
         plantReminderDisplayState[plant.id] = enabled
+        if plant.remindersEnabled == enabled {
+            pendingPlantReminderUpdates.removeValue(forKey: plant.id)
+            return
+        }
         pendingPlantReminderUpdates[plant.id] = PendingPlantReminderUpdate(
             plantID: plant.id,
             enabled: enabled
@@ -414,6 +684,34 @@ private struct SettingsPlantReminderPanelContent: View {
                 plant: plant,
                 context: modelContext
             )
+        }
+    }
+
+    private func performBulkDefer() {
+        guard !isBulkDeferPending else { return }
+        guard !SettingsDebugTools.isRunningUITests else {
+            statusMessage = bulkDeferUITestMessage()
+            return
+        }
+
+        isBulkDeferPending = true
+        statusMessage = bulkDeferInProgressMessage()
+
+        Task { @MainActor in
+            await OhanaFrameScheduler.waitAfterNextFrame(milliseconds: 120)
+            let result = appServices.plantReminderControls.deferDueTasksOneDay(
+                plants: plants,
+                context: modelContext,
+                executorId: currentActiveHumanId.isEmpty ? nil : currentActiveHumanId,
+                now: Date(),
+                calendar: .current,
+                scheduleNotifications: true,
+                notifications: ReminderNotificationSchedulerRegistry.current,
+                defaults: .standard
+            )
+            statusMessage = bulkDeferMessage(result)
+            isBulkDeferPending = false
+            UIImpactFeedbackGenerator(style: result.deferredTaskCount > 0 ? .medium : .light).impactOccurred()
         }
     }
 
@@ -525,6 +823,74 @@ private struct SettingsPlantReminderPanelContent: View {
             en: "Deferred \(result.deferredTaskCount) tasks across \(result.affectedPlantCount) plants",
             de: "\(result.deferredTaskCount) Aufgaben für \(result.affectedPlantCount) Pflanzen verschoben"
         )
+    }
+
+    private func bulkDeferInProgressMessage() -> String {
+        l.tr(
+            zh: "正在延后到期植物任务…",
+            en: "Deferring due plant tasks...",
+            de: "Fällige Pflanzenaufgaben werden verschoben..."
+        )
+    }
+
+    private func bulkDeferReadyMessage() -> String {
+        l.tr(
+            zh: "点击后会延后当前已到期的植物任务",
+            en: "Tap to defer plant tasks that are currently due",
+            de: "Tippen, um aktuell fällige Pflanzenaufgaben zu verschieben"
+        )
+    }
+
+    private func bulkDeferUITestMessage() -> String {
+        l.tr(
+            zh: "当前没有已到期的植物任务",
+            en: "No plant tasks are due right now",
+            de: "Aktuell sind keine Pflanzenaufgaben fällig"
+        )
+    }
+
+    private func careTint(for type: PlantCareType) -> Color {
+        switch type {
+        case .watering, .misting:
+            Color.goTeal
+        case .fertilizing, .newLeaf:
+            Color.goLime
+        case .repotting, .pruning, .rotating, .leafCleaning, .pestCheck, .photo, .customNote:
+            Color.goYellow
+        case .yellowLeaf, .pestFound:
+            Color.goRed
+        }
+    }
+
+    private func careSymbol(for type: PlantCareType) -> String {
+        switch type {
+        case .watering:
+            "drop.fill"
+        case .fertilizing:
+            "leaf.fill"
+        case .repotting:
+            "arrow.triangle.2.circlepath"
+        case .pruning:
+            "scissors"
+        case .misting:
+            "cloud.drizzle.fill"
+        case .rotating:
+            "rotate.3d"
+        case .leafCleaning:
+            "sparkles"
+        case .pestCheck:
+            "ladybug.fill"
+        case .photo:
+            "camera.fill"
+        case .newLeaf:
+            "leaf.circle.fill"
+        case .yellowLeaf:
+            "exclamationmark.triangle.fill"
+        case .pestFound:
+            "ant.fill"
+        case .customNote:
+            "note.text"
+        }
     }
 }
 

@@ -840,11 +840,13 @@ enum ExpandedQuickActionLogic {
     }
 
     static func humanPrivacyIconName(for item: QuickActionItem, human: Human) -> String? {
+        guard HumanLocalPrivacyPolicy.isEnabled else { return nil }
         guard let field = humanPrivacyField(for: item.actionType) else { return nil }
         return human.privateFields.contains(field.rawValue) ? "lock.fill" : "lock.open.fill"
     }
 
     static func humanPrivacyIconTint(for item: QuickActionItem, human: Human) -> Color {
+        guard HumanLocalPrivacyPolicy.isEnabled else { return Color.ohanaSecondaryText }
         guard let field = humanPrivacyField(for: item.actionType),
               human.privateFields.contains(field.rawValue) else {
             return Color.ohanaSecondaryText

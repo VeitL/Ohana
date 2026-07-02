@@ -78,6 +78,7 @@ struct FeatureAggregateView: View {
         .onDisappear {
             avatarPipeline.cancel(key: humanAvatarCacheKey)
         }
+        .accessibilityIdentifier("function-menu-aggregate-\(feature.rawValue)")
     }
 
     private var pageHeader: some View {

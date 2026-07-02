@@ -20,11 +20,10 @@ struct CoconutBalanceTestContentView: View {
     @State private var selectedHumanId = ""
     @State private var amountText = ""
     @State private var message = ""
+    @State private var isApplying = false
+    @State private var selectionSyncTask: Task<Void, Never>?
 
     private var l: L10n { L10n(appLanguage) }
-    private var isRunningUITests: Bool {
-        ProcessInfo.processInfo.arguments.contains("-OHANA_UI_TESTS")
-    }
 
     private var selectedHuman: Human? {
         humans.first { $0.id.uuidString == selectedHumanId }
@@ -85,9 +84,12 @@ struct CoconutBalanceTestContentView: View {
         .toolbar(.hidden, for: .navigationBar)
         .accessibilityIdentifier("coconut-balance-test-screen")
         .onAppear(perform: configureInitialSelection)
-        .onChange(of: selectedHumanId) { _, _ in
-            amountText = "\(currentDisplayAmount)"
-            message = ""
+        .onDisappear {
+            selectionSyncTask?.cancel()
+            selectionSyncTask = nil
+        }
+        .onChange(of: selectedHumanId) { _, newValue in
+            scheduleSelectionSync(for: newValue)
         }
     }
 
@@ -226,15 +228,15 @@ struct CoconutBalanceTestContentView: View {
             .background(Color.goPrimary, in: Capsule())
         }
         .buttonStyle(ScaleButtonStyle())
+        .disabled(isApplying)
+        .opacity(isApplying ? 0.72 : 1)
         .accessibilityIdentifier("coconut-balance-apply-action")
     }
 
     private func memberChip(_ human: Human) -> some View {
         let selected = human.id.uuidString == selectedHumanId
         return Button {
-            withAnimation(GoMotion.feedback) {
-                selectedHumanId = human.id.uuidString
-            }
+            selectedHumanId = human.id.uuidString
             UISelectionFeedbackGenerator().selectionChanged()
         } label: {
             HStack(spacing: 8) {
@@ -301,35 +303,45 @@ struct CoconutBalanceTestContentView: View {
         amountText = "\(currentDisplayAmount)"
     }
 
+    private func scheduleSelectionSync(for humanId: String) {
+        selectionSyncTask?.cancel()
+        selectionSyncTask = OhanaFrameScheduler.runAfterNextFrame {
+            guard selectedHumanId == humanId else { return }
+            amountText = "\(currentDisplayAmount)"
+            message = ""
+            selectionSyncTask = nil
+        }
+    }
+
     private func applyAmount() {
+        guard !isApplying else { return }
         let amount = parsedAmount
         let human = selectedHuman
-        let result = SettingsCommandExecutor(context: modelContext, services: appServices).applyCoconutBalanceTest(
-            amount: amount,
-            human: human,
-            title: l.tr(zh: "测试调整椰子数量", en: "Test coconut balance adjustment", de: "Testanpassung Kokosnüsse"),
-            actorName: human.map { displayName($0) },
-            note: "settings.coconut.test",
-            updatesProjection: !isRunningUITests,
-            publishesRevision: !isRunningUITests
-        )
+        let actorName = human.map { displayName($0) }
+        isApplying = true
 
-        if isRunningUITests {
-            amountText = "\(result.amount)"
-            message = ""
-            dismiss()
-            return
-        }
-
-        withAnimation(GoMotion.feedback) {
-            amountText = "\(result.amount)"
-            message = l.tr(
-                zh: "已设置为 \(result.amount)🥥",
-                en: "Set to \(result.amount)🥥",
-                de: "Auf \(result.amount)🥥 gesetzt"
+        Task { @MainActor in
+            await OhanaFrameScheduler.waitAfterNextFrame()
+            guard !Task.isCancelled else { return }
+            let result = SettingsCommandExecutor(context: modelContext, services: appServices).applyCoconutBalanceTest(
+                amount: amount,
+                human: human,
+                title: l.tr(zh: "测试调整椰子数量", en: "Test coconut balance adjustment", de: "Testanpassung Kokosnüsse"),
+                actorName: actorName,
+                note: "settings.coconut.test"
             )
+
+            withAnimation(GoMotion.feedback) {
+                amountText = "\(result.amount)"
+                message = l.tr(
+                    zh: "已设置为 \(result.amount)🥥",
+                    en: "Set to \(result.amount)🥥",
+                    de: "Auf \(result.amount)🥥 gesetzt"
+                )
+            }
+            isApplying = false
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
         }
-        UINotificationFeedbackGenerator().notificationOccurred(.success)
     }
 
     private func displayName(_ human: Human?) -> String {

@@ -391,9 +391,9 @@ struct HumanAllFeaturesSheet: View {
             item(
                 id: "profile",
                 title: l.tr(zh: "账户资料", en: "Account", de: "Konto"),
-                value: pinStateText,
-                subtitle: l.tr(zh: "PIN、公开/隐私", en: "PIN, public/private", de: "PIN, öffentlich/privat"),
-                icon: human.pinHash.isEmpty ? "lock.open.fill" : "lock.fill",
+                value: accountStateText,
+                subtitle: accountSubtitle,
+                icon: accountIcon,
                 tint: Color(hex: "64748B"),
                 destination: .basicInfo
             )
@@ -542,10 +542,24 @@ struct HumanAllFeaturesSheet: View {
             : l.tr(zh: "最近有记录", en: "Recent notes", de: "Aktuelle Notizen")
     }
 
-    private var pinStateText: String {
-        human.pinHash.isEmpty
+    private var accountStateText: String {
+        guard HumanLocalPrivacyPolicy.isEnabled else {
+            return localizedRoleText(for: human.role)
+        }
+        return human.pinHash.isEmpty
             ? l.tr(zh: "未设置", en: "No PIN", de: "Keine PIN")
             : l.tr(zh: "已设置", en: "PIN on", de: "PIN aktiv")
+    }
+
+    private var accountSubtitle: String {
+        HumanLocalPrivacyPolicy.isEnabled
+            ? l.tr(zh: "PIN、公开/隐私", en: "PIN, public/private", de: "PIN, öffentlich/privat")
+            : l.tr(zh: "资料、首页显示", en: "Profile and Home display", de: "Profil und Startseite")
+    }
+
+    private var accountIcon: String {
+        guard HumanLocalPrivacyPolicy.isEnabled else { return "person.crop.circle.fill" }
+        return human.pinHash.isEmpty ? "lock.open.fill" : "lock.fill"
     }
 
     private func localizedRoleText(for raw: String) -> String {

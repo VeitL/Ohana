@@ -124,6 +124,7 @@ extension QuickFeedDetailContent {
         draftStore.inputError = nil
         draftStore.manualFeedSheetMode = settingsOnly ? .settingsOnly : .log
         draftStore.manualFoodKindDraft = pet.mainFoodKind
+        draftStore.manualFeedDate = Date()
         draftStore.selectedSharedFeedPetIds = settingsOnly
             ? Set([pet.id])
             : SharedPetSelectionMemory.restoredSelection(

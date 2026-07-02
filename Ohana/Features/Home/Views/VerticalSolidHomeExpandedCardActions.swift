@@ -47,6 +47,7 @@ struct VerticalSolidHomeExpandedCardActions: View {
             onAdd: addAction
         )
         .onAppear {
+            primeRenderModelIfNeeded()
             scheduleRenderModelRefresh()
         }
         .onChange(of: card.id) { _, _ in
@@ -100,6 +101,13 @@ struct VerticalSolidHomeExpandedCardActions: View {
             }
             .joined(separator: ";")
         return [items, candidates, states].joined(separator: "|")
+    }
+
+    private func primeRenderModelIfNeeded() {
+        guard renderModel.actions.isEmpty, renderModel.addActions.isEmpty else { return }
+        withTransaction(Transaction(animation: nil)) {
+            renderModel = buildRenderModel()
+        }
     }
 
     private func scheduleRenderModelRefresh() {
@@ -181,7 +189,7 @@ struct VerticalSolidHomeExpandedCardActions: View {
             showsQuickButton: menuPolicy.showsQuickButton,
             quickAccessibilityLabel: item.label,
             detailAccessibilityLabel: l.tr(zh: "查看详情", en: "Details", de: "Details"),
-            detailAction: startsSessionDirectly || usesDirectHumanQuickPath ? nil : { onAction(item, false) },
+            detailAction: startsSessionDirectly ? nil : { onAction(item, false) },
             optionAction: { optionId in onOptionAction(item, optionId) },
             action: { onAction(item, actionUsesQuickPath) }
         )

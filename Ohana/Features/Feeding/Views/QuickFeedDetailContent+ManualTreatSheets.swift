@@ -8,6 +8,7 @@ extension QuickFeedDetailContent {
         let isSettingsOnly = draftStore.manualFeedSheetMode == .settingsOnly
         let nextReminder = overviewSnapshot.nextPendingManualReminder
         let isPlannedCompletion = !isSettingsOnly && nextReminder != nil
+        let latestManualLogDate = Date()
         return ScrollView {
             VStack(alignment: .leading, spacing: 14) {
                 sheetHero(icon: "fork.knife.circle.fill", title: manualFeedSheetTitle, tint: mainFoodTint)
@@ -34,6 +35,9 @@ extension QuickFeedDetailContent {
                     tint: mainFoodTint,
                     quickValues: quickMainGramOptions
                 )
+                if !isSettingsOnly, nextReminder == nil {
+                    manualFeedDatePicker(latestDate: latestManualLogDate)
+                }
                 if !isSettingsOnly {
                     manualDefaultToggle
                 }
@@ -80,6 +84,64 @@ extension QuickFeedDetailContent {
             ? l.tr(zh: "喂食设置", en: "Feeding settings", de: "Fütterung einstellen")
             : l.tr(zh: "记录喂食", en: "Log feeding", de: "Fütterung eintragen")
     }
+
+    func manualFeedDatePicker(latestDate: Date) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            DatePicker(
+                l.tr(zh: "时间", en: "Time", de: "Zeit"),
+                selection: $draftStore.manualFeedDate,
+                in: ...latestDate,
+                displayedComponents: [.date, .hourAndMinute]
+            )
+            .font(OhanaFont.adaptive(size: 14, weight: .bold, design: .rounded))
+            .foregroundStyle(Color.ohanaPrimaryText)
+            .tint(mainFoodTint)
+            .accessibilityIdentifier("quick-feed-manual-log-date")
+
+            #if DEBUG
+                manualFeedUITestDateShortcuts(latestDate: latestDate)
+            #endif
+        }
+        .padding(12)
+        .feedFlatBlockSurface(cornerRadius: OhanaRadius.control)
+        .accessibilityElement(children: .contain)
+    }
+
+    #if DEBUG
+        @ViewBuilder
+        func manualFeedUITestDateShortcuts(latestDate: Date) -> some View {
+            if isRunningQuickFeedUITests {
+                HStack(spacing: 8) {
+                    manualFeedUITestDateShortcut(title: "Yesterday", daysAgo: 1, latestDate: latestDate)
+                    manualFeedUITestDateShortcut(title: "Two days ago", daysAgo: 2, latestDate: latestDate)
+                }
+            }
+        }
+
+        var isRunningQuickFeedUITests: Bool {
+            let processInfo = ProcessInfo.processInfo
+            let environment = processInfo.environment
+            return processInfo.arguments.contains("-OHANA_UI_TESTS")
+                || environment["XCTestConfigurationFilePath"] != nil
+                || environment["XCTestBundlePath"] != nil
+                || environment["XCTestSessionIdentifier"] != nil
+        }
+
+        func manualFeedUITestDateShortcut(title: String, daysAgo: Int, latestDate: Date) -> some View {
+            Button {
+                let targetDate = Calendar.current.date(byAdding: .day, value: -daysAgo, to: latestDate) ?? latestDate
+                draftStore.manualFeedDate = min(targetDate, latestDate)
+            } label: {
+                Text(title)
+                    .font(OhanaFont.adaptive(size: 11, weight: .black, design: .rounded))
+                    .foregroundStyle(Color.arkInk)
+                    .frame(maxWidth: .infinity, minHeight: 32)
+                    .background(mainFoodTint, in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
+            }
+            .buttonStyle(ScaleButtonStyle())
+            .accessibilityIdentifier("quick-feed-manual-log-date-minus-\(daysAgo)-day")
+        }
+    #endif
 
     var treatFeedSheet: some View {
         ScrollView {

@@ -12,7 +12,7 @@ nonisolated enum SingleMemberFamilyShapePresentation {
         if isSingleVisibleHumanFamily(humanCount: humanCount) {
             return l.tr(zh: "本周照护者", en: "Caregiver this week", de: "Pflegeperson der Woche")
         }
-        return l.tr(zh: "照护贡献排行", en: "Care contribution ranking", de: "Pflege-Beitragsrang")
+        return l.tr(zh: "本周照护摘要", en: "Care summary this week", de: "Pflegeueberblick der Woche")
     }
 
     static func weeklyReportLeaderStory(
@@ -28,9 +28,9 @@ nonisolated enum SingleMemberFamilyShapePresentation {
             )
         }
         return l.tr(
-            zh: "\(name) 照顾最多",
-            en: "\(name) cared the most",
-            de: "\(name) hat am meisten gepflegt"
+            zh: "\(name) 参与了本周照护",
+            en: "\(name) joined this week's care",
+            de: "\(name) war diese Woche an der Pflege beteiligt"
         )
     }
 
@@ -41,7 +41,7 @@ nonisolated enum SingleMemberFamilyShapePresentation {
         if isSingleVisibleHumanFamily(humanCount: humanCount) {
             return l.tr(zh: "本周照护者", en: "Caregiver this week", de: "Pflegeperson der Woche")
         }
-        return l.tr(zh: "照顾最多", en: "Most care", de: "Meiste Pflege")
+        return l.tr(zh: "照护记录", en: "Care records", de: "Pflegeeintraege")
     }
 
     static func weeklyReportShareLeaderLabel(
@@ -51,7 +51,7 @@ nonisolated enum SingleMemberFamilyShapePresentation {
         if isSingleVisibleHumanFamily(humanCount: humanCount) {
             return l.tr(zh: "本周照护者", en: "Caregiver this week", de: "Pflegeperson der Woche")
         }
-        return l.tr(zh: "本周之星", en: "Star of the week", de: "Star der Woche")
+        return l.tr(zh: "本周照护者", en: "Caregivers this week", de: "Pflegepersonen der Woche")
     }
 
     static func weeklyReportRecentActivityEmptyText(
@@ -66,9 +66,9 @@ nonisolated enum SingleMemberFamilyShapePresentation {
             )
         }
         return l.tr(
-            zh: "完成一次快捷打卡后，这里会出现全家动态",
-            en: "After one quick check-in, household activity will appear here.",
-            de: "Nach einem schnellen Check-in erscheinen hier Familienaktivitäten."
+            zh: "完成一次快捷打卡后，这里会出现本周照护动态",
+            en: "After one quick check-in, this week's care activity will appear here.",
+            de: "Nach einem schnellen Check-in erscheinen hier die Pflegeaktivitäten dieser Woche."
         )
     }
 

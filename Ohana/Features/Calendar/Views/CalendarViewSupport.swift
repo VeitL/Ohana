@@ -44,21 +44,58 @@ final class CalendarVisibleDateCoordinator: ObservableObject {
     }
 }
 
+@MainActor
+final class CalendarTimelinePositionCoordinator: ObservableObject {
+    let objectWillChange = ObservableObjectPublisher()
+
+    private var pendingDateID: String?
+    private var updateTask: Task<Void, Never>?
+
+    deinit {
+        updateTask?.cancel()
+    }
+
+    func scheduleUpdate(to dateID: String?, apply: @escaping @MainActor (String?) -> Void) {
+        pendingDateID = dateID
+        guard updateTask == nil else { return }
+
+        updateTask = OhanaFrameScheduler.runAfterNextFrame { [weak self] in
+            guard let self else { return }
+            let dateID = pendingDateID
+            pendingDateID = nil
+            updateTask = nil
+            apply(dateID)
+        }
+    }
+
+    func cancel() {
+        pendingDateID = nil
+        updateTask?.cancel()
+        updateTask = nil
+    }
+}
+
 struct CalendarFilterSelection: Equatable {
     var petId: String
     var humanId: String
+    var plantId: String
 
-    static let all = CalendarFilterSelection(petId: "", humanId: "")
+    static let all = CalendarFilterSelection(petId: "", humanId: "", plantId: "")
 
     var selectedPetId: String? { petId.isEmpty ? nil : petId }
     var selectedHumanId: String? { humanId.isEmpty ? nil : humanId }
+    var selectedPlantId: String? { plantId.isEmpty ? nil : plantId }
 
     static func pet(_ id: String) -> CalendarFilterSelection {
-        CalendarFilterSelection(petId: id, humanId: "")
+        CalendarFilterSelection(petId: id, humanId: "", plantId: "")
     }
 
     static func human(_ id: String) -> CalendarFilterSelection {
-        CalendarFilterSelection(petId: "", humanId: id)
+        CalendarFilterSelection(petId: "", humanId: id, plantId: "")
+    }
+
+    static func plant(_ id: String) -> CalendarFilterSelection {
+        CalendarFilterSelection(petId: "", humanId: "", plantId: id)
     }
 }
 
@@ -67,11 +104,22 @@ struct CalendarContentHandoffState: Equatable {
     var filter: CalendarFilterSelection
 }
 
+struct CalendarEventDetailPresentation: Identifiable {
+    let event: Event
+    let occurrenceDate: Date
+    let allowsEditing: Bool
+
+    var id: String {
+        "\(event.id.uuidString)-\(Int(occurrenceDate.timeIntervalSince1970))-\(allowsEditing)"
+    }
+}
+
 /// 日历宠物筛选条：点击时只回传本地视觉选择，持久化由 `CalendarView` 下一帧处理。
 struct CalendarPetChipFilterBar: View {
     let selection: CalendarFilterSelection
     let pets: [Pet]
     let humans: [Human]
+    let plants: [Plant]
     let onSelect: (CalendarFilterSelection) -> Void
 
     @Environment(\.colorScheme) private var colorScheme
@@ -82,6 +130,7 @@ struct CalendarPetChipFilterBar: View {
     private var matSurface: Color { colorScheme == .light ? .white : Color(hex: "1C1C1E") }
     private var selectedPetId: String? { selection.selectedPetId }
     private var selectedHumanId: String? { selection.selectedHumanId }
+    private var selectedPlantId: String? { selection.selectedPlantId }
 
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
@@ -90,7 +139,7 @@ struct CalendarPetChipFilterBar: View {
                     label: "全部",
                     systemImage: "square.grid.2x2.fill",
                     identifier: "calendar-filter-all",
-                    isSelected: selectedPetId == nil && selectedHumanId == nil
+                    isSelected: selectedPetId == nil && selectedHumanId == nil && selectedPlantId == nil
                 ) {
                     onSelect(.all)
                 }
@@ -112,6 +161,16 @@ struct CalendarPetChipFilterBar: View {
                         isSelected: selectedHumanId == human.id.uuidString
                     ) {
                         onSelect(.human(human.id.uuidString))
+                    }
+                }
+                ForEach(plants) { plant in
+                    chipButton(
+                        label: plant.name,
+                        systemImage: "leaf.fill",
+                        identifier: "calendar-filter-plant-\(plant.name)",
+                        isSelected: selectedPlantId == plant.id.uuidString
+                    ) {
+                        onSelect(.plant(plant.id.uuidString))
                     }
                 }
             }

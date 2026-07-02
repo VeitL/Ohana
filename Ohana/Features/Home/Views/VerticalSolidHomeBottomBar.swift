@@ -62,6 +62,7 @@ enum HomeBottomNavigationLayoutPolicy {
 nonisolated enum HomeFabShortcutHitAreaPolicy {
     static let minimumHitSize: CGFloat = 44
     static let visualDiameter: CGFloat = 42
+    static let expandedCardEmbeddedActionClearance: CGFloat = 184
 }
 
 struct VerticalSolidHomeBottomBar: View {
@@ -104,7 +105,7 @@ struct VerticalSolidHomeBottomBar: View {
                 .frame(width: metrics.actionHitSize, alignment: .center)
                 .frame(maxWidth: .infinity, alignment: .trailing)
                 .padding(.trailing, metrics.horizontalPadding)
-                .padding(.bottom, safeBottom + metrics.barHeight + 18)
+                .padding(.bottom, menuRowsBottomPadding(metrics: metrics))
 
             navigationChrome(metrics: metrics)
                 .padding(.horizontal, metrics.horizontalPadding)
@@ -148,6 +149,12 @@ struct VerticalSolidHomeBottomBar: View {
         }
         .frame(height: metrics.barHeight)
         .accessibilityElement(children: .contain)
+    }
+
+    private func menuRowsBottomPadding(metrics: HomeBottomNavigationLayoutMetrics) -> CGFloat {
+        let basePadding = safeBottom + metrics.barHeight + 18
+        guard activeCard != nil else { return basePadding }
+        return basePadding + HomeFabShortcutHitAreaPolicy.expandedCardEmbeddedActionClearance
     }
 
     private func tabStrip(metrics: HomeBottomNavigationLayoutMetrics) -> some View {

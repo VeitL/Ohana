@@ -291,6 +291,8 @@ struct VerticalSolidHomeView: View {
                         onQuickActionForCard: openQuickActionItem,
                         onQuickActionOptionForCard: openQuickActionOption,
                         onQuickActionLimitReached: { routeCoordinator.showQuickActionLimit() },
+                        onExpandedCardCollapseIntent: dismissExpandedFabBeforeCardCollapse,
+                        onWalkCardMinimizeToFloatingControl: minimizeWalkCardToFloatingControl,
                         onAddFirstPet: { routeCoordinator.openAddEntity(.pet) }
                     )
                 } calendar: { lifecycle in
@@ -312,6 +314,7 @@ struct VerticalSolidHomeView: View {
                     .clipShape(RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous))
                     .padding(.horizontal, 10)
                     .padding(.top, 4)
+                    .padding(.bottom, max(88, safeBottom + 54))
                 } oasis: { lifecycle in
                     let treeLevel = treeManager.treeLevel.rawValue
                     let shopUnlockLevel = GrowthUnlockPolicy.status(for: FMDest.coconutShop, currentLevel: 0).step.requiredLevel
@@ -551,6 +554,11 @@ struct VerticalSolidHomeView: View {
         }
         .onChange(of: starterGiftCeremonySeen) { _, _ in
             closeVerticalFabMenu(immediate: true)
+        }
+        .onReceive(routeCoordinator.$sheet) { sheet in
+            if sheet != nil {
+                closeVerticalFabMenu(immediate: true)
+            }
         }
         .onChange(of: expandedBottomBarCard?.id) { _, _ in
             closeVerticalFabMenu(immediate: true)

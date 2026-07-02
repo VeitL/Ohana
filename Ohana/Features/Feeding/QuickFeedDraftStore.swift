@@ -22,6 +22,7 @@ final class QuickFeedDraftStore: ObservableObject {
 
     @Published var manualFeedSheetMode: ManualFeedSheetMode = .log
     @Published var manualFoodKindDraft: FeedFoodKind = .dry
+    @Published var manualFeedDate = Date()
     @Published var manualGramsText = ""
     @Published var manualDefaultEnabled = true
     @Published var saveManualAsDefault = true

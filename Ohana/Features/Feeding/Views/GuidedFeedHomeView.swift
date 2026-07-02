@@ -523,32 +523,55 @@ private struct FeedDiscoveryCompactDockCard: View {
     let item: FeedDiscoveryDockItem
 
     var body: some View {
-        Button {
-            OhanaFeedback.light()
-            item.action()
-        } label: {
-            HStack(spacing: 11) {
-                Image(systemName: item.icon)
-                    .font(OhanaFont.adaptive(size: 15, weight: .black))
-                    .foregroundStyle(item.tint)
-                    .frame(width: 36, height: 36) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
-                    .background(item.tint.opacity(0.12), in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
-                Text(item.title)
-                    .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
-                    .foregroundStyle(Color.ohanaPrimaryText)
-                Spacer()
-                Text(item.value)
-                    .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
-                    .foregroundStyle(Color.ohanaSecondaryText)
-                Image(systemName: "chevron.right").accessibilityHidden(true)
-                    .font(OhanaFont.adaptive(size: 10, weight: .black))
-                    .foregroundStyle(Color.ohanaTertiaryText)
+        ZStack(alignment: .trailing) {
+            Button {
+                OhanaFeedback.light()
+                item.action()
+            } label: {
+                HStack(spacing: 11) {
+                    Image(systemName: item.icon)
+                        .font(OhanaFont.adaptive(size: 15, weight: .black))
+                        .foregroundStyle(item.tint)
+                        .frame(width: 36, height: 36) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
+                        .background(item.tint.opacity(0.12), in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
+                    Text(item.title)
+                        .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
+                        .foregroundStyle(Color.ohanaPrimaryText)
+                    Spacer()
+                    Text(item.value)
+                        .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
+                        .foregroundStyle(Color.ohanaSecondaryText)
+                    if item.secondaryAction == nil {
+                        Image(systemName: "chevron.right").accessibilityHidden(true)
+                            .font(OhanaFont.adaptive(size: 10, weight: .black))
+                            .foregroundStyle(Color.ohanaTertiaryText)
+                    }
+                }
+                .padding(12)
+                .padding(.trailing, item.secondaryAction == nil ? 0 : 52)
+                .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous))
+                .contentShape(RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous))
             }
-            .padding(12)
-            .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous))
-            .contentShape(RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous))
+            .buttonStyle(ScaleButtonStyle())
+            .accessibilityIdentifier("quick-feed-dock-\(item.id)")
+
+            if let secondaryIcon = item.secondaryIcon, let secondaryAction = item.secondaryAction {
+                Button {
+                    OhanaFeedback.light()
+                    secondaryAction()
+                } label: {
+                    Image(systemName: secondaryIcon)
+                        .font(OhanaFont.adaptive(size: 14, weight: .black))
+                        .foregroundStyle(Color.arkInk)
+                        .frame(width: 44, height: 44)
+                        .background(item.tint, in: Circle())
+                        .contentShape(Circle())
+                }
+                .buttonStyle(ScaleButtonStyle())
+                .accessibilityLabel(Text(item.secondaryAccessibilityLabel ?? item.title))
+                .accessibilityIdentifier("quick-feed-dock-\(item.id)-secondary")
+                .padding(.trailing, 8)
+            }
         }
-        .buttonStyle(ScaleButtonStyle())
-        .accessibilityIdentifier("quick-feed-dock-\(item.id)")
     }
 }

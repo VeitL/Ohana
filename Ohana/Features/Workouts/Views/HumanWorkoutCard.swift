@@ -587,6 +587,7 @@ struct HumanWorkoutHistoryView: View {
                             .symbolRenderingMode(.hierarchical)
                             .foregroundStyle(Color.ohanaSecondaryText)
                     }
+                    .accessibilityIdentifier("human-workout-close-action")
                 }
             }
             .sheet(isPresented: $showAddSheet) {
@@ -686,6 +687,7 @@ struct HumanWorkoutHistoryView: View {
                                 .font(OhanaFont.caption())
                                 .foregroundStyle(Color.ohanaSecondaryText.opacity(0.4))
                         }
+                        .accessibilityIdentifier("human-workout-delete-action")
                     }
                     .padding(.horizontal, 16).padding(.vertical, 10)
                     if log.id != sortedLogs.last?.id {

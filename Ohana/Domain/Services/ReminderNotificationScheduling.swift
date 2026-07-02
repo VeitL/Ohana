@@ -48,6 +48,10 @@ enum ReminderNotificationSchedulerRegistry {
         makeLiveScheduler = factory
     }
 
+    static func disabledScheduler() -> ReminderNotificationScheduling {
+        DomainNoOpReminderNotificationScheduler()
+    }
+
     /// Restores the app-registered notification scheduler. Call in test teardown.
     static func useLive() {
         current = makeLiveScheduler?() ?? DomainNoOpReminderNotificationScheduler()

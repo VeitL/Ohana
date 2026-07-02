@@ -103,7 +103,9 @@ struct OhanaTextField: View {
             .frame(height: style == .boxed ? 52 : 42)
             .background(surface)
             .overlay(focusBorder)
-            .animation(GoMotion.stateChange, value: isFocused)
+            .transaction { transaction in
+                transaction.animation = nil
+            }
     }
 
     @ViewBuilder private var surface: some View {

@@ -65,6 +65,41 @@ struct WalkTrackingSnapshot {
     }
 }
 
+enum WalkTrackingRouteVisualStyle: Equatable {
+    case active
+    case paused
+}
+
+enum WalkTrackingMapPresentationPolicy {
+    static func routeVisualStyle(for phase: WalkPhase) -> WalkTrackingRouteVisualStyle {
+        if case .paused = phase {
+            return .paused
+        }
+        return .active
+    }
+
+    static func routeNormalColor(for style: WalkTrackingRouteVisualStyle) -> Color {
+        switch style {
+        case .active:
+            Color.goPrimary
+        case .paused:
+            Color.ohanaSecondaryText.opacity(0.72)
+        }
+    }
+
+    static func allowsRainbowRoute(phase: WalkPhase, isRainbowEquipped: Bool) -> Bool {
+        guard isRainbowEquipped else { return false }
+        if case .paused = phase { return false }
+        return true
+    }
+
+    static func allowsRouteFlow(phase: WalkPhase, shouldAnimate: Bool) -> Bool {
+        guard shouldAnimate else { return false }
+        if case .paused = phase { return false }
+        return true
+    }
+}
+
 @MainActor
 struct WalkTrackingCommandExecutor {
     let modelContext: ModelContext

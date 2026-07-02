@@ -124,6 +124,7 @@ struct HumanBasicInfoDetailContentView: View {
                 de: "Auf der Startseite können bis zu \(HomeCardVisibility.maxVisibleCards) Karten angezeigt werden. Entferne zuerst eine Haustier- oder Menschenkarte, bevor du \(human.name) hinzufügst."
             ))
         }
+        .accessibilityIdentifier("human-basic-info-screen")
     }
 
     private var avatarSection: some View {
@@ -228,9 +229,11 @@ struct HumanBasicInfoDetailContentView: View {
                 infoRow(label: l.tr(zh: "相处天数", en: "Days Together", de: "Gemeinsame Tage"), value: l.tr(zh: "\(daysTogether) 天", en: "\(daysTogether) days", de: "\(daysTogether) Tage"))
             }
 
-            infoSection(title: l.tr(zh: "显示与隐私", en: "Display & Privacy", de: "Anzeige & Datenschutz"), icon: "lock.shield.fill", iconColor: Color.goYellow) {
+            infoSection(title: l.tr(zh: "显示", en: "Display", de: "Anzeige"), icon: "rectangle.grid.1x2.fill", iconColor: Color.goYellow) {
                 infoRow(label: l.tr(zh: "首页显示", en: "Home Display", de: "Startseite"), value: human.shouldShowOnHome ? l.tr(zh: "显示", en: "Shown", de: "Angezeigt") : l.tr(zh: "隐藏", en: "Hidden", de: "Ausgeblendet"))
-                infoRow(label: l.tr(zh: "隐私项目", en: "Private Fields", de: "Private Felder"), value: privacySummary)
+                if HumanLocalPrivacyPolicy.isEnabled {
+                    infoRow(label: l.tr(zh: "隐私项目", en: "Private Fields", de: "Private Felder"), value: privacySummary)
+                }
             }
 
             infoSection(title: l.tr(zh: "主题色", en: "Theme Color", de: "Designfarbe"), icon: "paintpalette.fill", iconColor: Color(hex: human.safeThemeColorHex)) {
@@ -327,13 +330,15 @@ struct HumanBasicInfoDetailContentView: View {
                 .tint(Color.goPrimary)
             }
 
-            editSection(title: l.tr(zh: "隐私设置", en: "Privacy Settings", de: "Datenschutzeinstellungen"), icon: "lock.shield.fill", iconColor: Color.goYellow) {
-                privacyToggle(l.tr(zh: "体重记录", en: "Weight Records", de: "Gewichtsverlauf"), isOn: $ePrivateWeight)
-                privacyToggle(l.tr(zh: "运动记录", en: "Workout Records", de: "Trainingseinträge"), isOn: $ePrivateWorkout)
-                privacyToggle(l.tr(zh: "吃药提醒", en: "Medication Reminders", de: "Medikamentenerinnerungen"), isOn: $ePrivateMedication)
-                privacyToggle(l.tr(zh: "备注", en: "Notes", de: "Notizen"), isOn: $ePrivateNote)
-                privacyToggle(l.tr(zh: "椰子资产与心愿", en: "Coconut Assets & Wishes", de: "Kokosnussvermögen & Wünsche"), isOn: $ePrivateWishlist)
-                privacyToggle(l.tr(zh: "花费记录", en: "Expense Records", de: "Ausgabeneinträge"), isOn: $ePrivateExpense)
+            if HumanLocalPrivacyPolicy.isEnabled {
+                editSection(title: l.tr(zh: "隐私设置", en: "Privacy Settings", de: "Datenschutzeinstellungen"), icon: "lock.shield.fill", iconColor: Color.goYellow) {
+                    privacyToggle(l.tr(zh: "体重记录", en: "Weight Records", de: "Gewichtsverlauf"), isOn: $ePrivateWeight)
+                    privacyToggle(l.tr(zh: "运动记录", en: "Workout Records", de: "Trainingseinträge"), isOn: $ePrivateWorkout)
+                    privacyToggle(l.tr(zh: "吃药提醒", en: "Medication Reminders", de: "Medikamentenerinnerungen"), isOn: $ePrivateMedication)
+                    privacyToggle(l.tr(zh: "备注", en: "Notes", de: "Notizen"), isOn: $ePrivateNote)
+                    privacyToggle(l.tr(zh: "椰子资产与心愿", en: "Coconut Assets & Wishes", de: "Kokosnussvermögen & Wünsche"), isOn: $ePrivateWishlist)
+                    privacyToggle(l.tr(zh: "花费记录", en: "Expense Records", de: "Ausgabeneinträge"), isOn: $ePrivateExpense)
+                }
             }
 
             editSection(title: l.tr(zh: "主题色", en: "Theme Color", de: "Designfarbe"), icon: "paintpalette.fill", iconColor: Color(hex: eThemeColorHex)) {
@@ -625,7 +630,7 @@ struct HumanBasicInfoDetailContentView: View {
             notes: eNotes,
             preservedNoteParts: preservedMetadataParts,
             shouldShowOnHome: eShouldShowOnHome,
-            privateFieldsRaw: editedPrivateFieldsRaw
+            privateFieldsRaw: HumanLocalPrivacyPolicy.isEnabled ? editedPrivateFieldsRaw : nil
         )
         commandQueue.enqueue(.memberProfile(entityID: human.id, kind: EntityKind.human.rawValue)) {
             MemberCommandExecutor(context: modelContext, services: appServices).updateHumanProfile(
@@ -792,7 +797,8 @@ struct HumanLifecycleDangerZone: View {
                 lifecycleButton(
                     title: l.tr(zh: "撤销离世标记", en: "Undo Passing Mark", de: "Verstorben-Markierung zurücknehmen"),
                     icon: "arrow.uturn.backward",
-                    color: Color.goYellow
+                    color: Color.goYellow,
+                    identifier: "human-memorial-undo-action"
                 ) {
                     showingUndoPassedAlert = true
                 }
@@ -803,7 +809,8 @@ struct HumanLifecycleDangerZone: View {
                 lifecycleButton(
                     title: l.tr(zh: "标记 \(human.name) 已离世", en: "Mark \(human.name) as passed away", de: "\(human.name) als verstorben markieren"),
                     icon: "rainbow",
-                    color: Color.goPurple
+                    color: Color.goPurple,
+                    identifier: "human-memorial-mark-action"
                 ) {
                     showingPassedAlert = true
                 }
@@ -812,7 +819,8 @@ struct HumanLifecycleDangerZone: View {
             lifecycleButton(
                 title: l.tr(zh: "彻底删除 \(human.name)", en: "Permanently delete \(human.name)", de: "\(human.name) endgültig löschen"),
                 icon: "trash.fill",
-                color: Color.goRed
+                color: Color.goRed,
+                identifier: "human-danger-delete-action"
             ) {
                 showingDeleteSheet = true
             }
@@ -890,12 +898,14 @@ struct HumanLifecycleDangerZone: View {
         .background(Color.goPurple.opacity(0.08), in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous)
             .strokeBorder(Color.goPurple.opacity(0.22), lineWidth: 1))
+        .accessibilityIdentifier("human-memorial-passed-date")
     }
 
     private func lifecycleButton(
         title: String,
         icon: String,
         color: Color,
+        identifier: String,
         action: @escaping () -> Void
     ) -> some View {
         Button(action: action) {
@@ -915,6 +925,7 @@ struct HumanLifecycleDangerZone: View {
                 .strokeBorder(color.opacity(0.26), lineWidth: 1))
         }
         .buttonStyle(ScaleButtonStyle())
+        .accessibilityIdentifier(identifier)
     }
 
     private var localizedAgeAtPassing: String {
@@ -970,6 +981,7 @@ private struct HumanDeleteConfirmationSheet: View {
                             .background(Color.primary.opacity(0.08), in: Circle())
                     }
                     .buttonStyle(ScaleButtonStyle())
+                    .accessibilityIdentifier("human-delete-confirm-close")
                 }
 
                 VStack(alignment: .leading, spacing: 10) {
@@ -997,6 +1009,7 @@ private struct HumanDeleteConfirmationSheet: View {
                     .background(Color.primary.opacity(0.08), in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
                     .overlay(RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous)
                         .strokeBorder(canDelete ? Color.goRed.opacity(0.7) : Color.primary.opacity(0.12), lineWidth: 1))
+                    .accessibilityIdentifier("human-delete-confirm-name-input")
 
                 HStack(spacing: 10) {
                     Button(action: cancelAfterResigningKeyboard) {
@@ -1008,6 +1021,7 @@ private struct HumanDeleteConfirmationSheet: View {
                             .background(Color.primary.opacity(0.08), in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
                     }
                     .buttonStyle(ScaleButtonStyle())
+                    .accessibilityIdentifier("human-delete-confirm-cancel")
 
                     Button(action: attemptDelete) {
                         Text(l.tr(zh: "删除", en: "Delete", de: "Löschen"))
@@ -1019,6 +1033,7 @@ private struct HumanDeleteConfirmationSheet: View {
                     }
                     .buttonStyle(ScaleButtonStyle())
                     .disabled(!canDelete)
+                    .accessibilityIdentifier("human-delete-confirm-delete")
                 }
             }
             .padding(20)

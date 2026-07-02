@@ -20,11 +20,15 @@ extension CalendarView {
                             timelineSection(date: section.date, occurrences: section.occurrences)
                                 .id(timelineDateID(section.date))
                         }
+
+                        Color.clear
+                            .frame(height: timelineBottomClearance)
+                            .accessibilityHidden(true)
                     }
                     .scrollTargetLayout()
                     .padding(.horizontal, 16)
-                    .padding(.bottom, 20)
                 }
+                .accessibilityIdentifier("calendar-list-scroll-view")
                 .scrollPosition(id: $visibleTimelineDateID, anchor: .top)
                 .onAppear {
                     scheduleInitialTimelineScrollIfNeeded(proxy: proxy)
@@ -43,8 +47,7 @@ extension CalendarView {
                     scheduleInitialTimelineScrollIfNeeded(proxy: proxy)
                 }
                 .onChange(of: visibleTimelineDateID) { _, dateID in
-                    guard isCalendarPrepared else { return }
-                    scheduleVisibleCalendarMonthUpdate(from: dateID)
+                    scheduleVisibleTimelineDateHandling(from: dateID)
                 }
                 .onChange(of: timelineTodayScrollRequest) { _, _ in
                     scrollListToToday(proxy: proxy)
@@ -52,6 +55,10 @@ extension CalendarView {
             }
             // F2: 删除 alert 已移至 SwipeableEventRow’s confirmationDialog
         }
+    }
+
+    var timelineBottomClearance: CGFloat {
+        hideToolbar ? 192 : 32
     }
 
     // 环境光斑
@@ -223,7 +230,9 @@ extension CalendarView {
         transaction.disablesAnimations = true
         withTransaction(transaction) {
             listVisibleTopDate = today
-            visibleTimelineDateID = todayID
+            if visibleTimelineDateID != todayID {
+                visibleTimelineDateID = todayID
+            }
         }
     }
 
@@ -274,7 +283,9 @@ extension CalendarView {
             selectedDate = today
             listVisibleTopDate = today
             if timelineDateIDs.contains(todayID) {
-                visibleTimelineDateID = todayID
+                if visibleTimelineDateID != todayID {
+                    visibleTimelineDateID = todayID
+                }
                 timelineTodayScrollRequest += 1
             }
             didScrollListToToday = true
@@ -288,6 +299,17 @@ extension CalendarView {
         guard timelineDateIDs.contains(todayID) else { return }
         scrollTimeline(proxy, to: todayID, animated: false)
         scheduleVisibleCalendarMonthUpdate(from: todayID)
+    }
+
+    func scheduleVisibleTimelineDateHandling(from dateID: String?) {
+        guard isCalendarPrepared else {
+            timelinePositionCoordinator.cancel()
+            return
+        }
+        timelinePositionCoordinator.scheduleUpdate(to: dateID) { pendingDateID in
+            guard isCalendarPrepared else { return }
+            scheduleVisibleCalendarMonthUpdate(from: pendingDateID)
+        }
     }
 
     func scheduleVisibleCalendarMonthUpdate(from dateID: String?) {
@@ -341,29 +363,51 @@ extension CalendarView {
             )
             .flatMap { plantId in plants.first(where: { $0.id == plantId }) }
             .map { Color(hex: $0.themeColorHex) }
+        let allowsUserEventDetail = CalendarEventInteractionPolicy.allowsUserEventDetail(for: event, pets: pets)
         return SwipeableEventRow(
             event: event,
             occurrenceDate: occurrenceDate,
             petThemeColor: relatedPetColor,
+            allowsUserEventDetail: allowsUserEventDetail,
             onComplete: {
-                let executor = CalendarCommandExecutor(context: modelContext, services: appServices)
-                executor.toggleCompletion(
-                    event: event,
-                    occurrenceDate: occurrenceDate,
-                    pets: pets,
-                    executorId: appServices.activeHumanSelection.currentHumanId,
-                    note: "calendar.event.completion.toggle"
-                )
+                toggleEventCompletion(event, occurrenceDate: occurrenceDate)
             },
             onDelete: { /* F2: 删除逻辑已在 SwipeableEventRow 内处理 */ },
+            onOpenDetail: {
+                openEventDetail(
+                    event,
+                    occurrenceDate: occurrenceDate,
+                    allowsEditing: allowsUserEventDetail
+                )
+            },
             onOpenRelated: {
                 openRelatedDestination(for: event)
             }
         )
     }
 
+    func openEventDetail(_ event: Event, occurrenceDate: Date, allowsEditing: Bool) {
+        eventDetailPresentation = CalendarEventDetailPresentation(
+            event: event,
+            occurrenceDate: occurrenceDate,
+            allowsEditing: allowsEditing
+        )
+    }
+
+    func toggleEventCompletion(_ event: Event, occurrenceDate: Date) {
+        let executor = CalendarCommandExecutor(context: modelContext, services: appServices)
+        executor.toggleCompletion(
+            event: event,
+            occurrenceDate: occurrenceDate,
+            pets: pets,
+            executorId: appServices.activeHumanSelection.currentHumanId,
+            note: "calendar.event.completion.toggle"
+        )
+    }
+
     func openRelatedDestination(for event: Event) -> Bool {
         guard let onOpenEventDestination else { return false }
+        guard CalendarEventInteractionPolicy.shouldOpenRelatedDestination(for: event, pets: pets) else { return false }
         let destination = FocusHomeReminderDeepLinkRouter.destination(
             for: event,
             pets: pets,

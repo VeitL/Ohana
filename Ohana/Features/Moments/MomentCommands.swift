@@ -36,10 +36,18 @@ enum MomentCommandService {
             return MomentCommandResult(savedLogIDs: [], coconutDelta: 0)
         }
         let payloads = photoData.isEmpty ? [Data(count: 1)] : photoData
+        let shouldSanitizePayloads = !photoData.isEmpty
         var savedLogs: [PetPhotoLog] = []
         var writes: [AuthorizedDomainMemberFactWrite] = []
         for (index, data) in payloads.enumerated() {
             let logDate = date.addingTimeInterval(Double(index) * 0.01)
+            let imageData = shouldSanitizePayloads
+                ? AttachmentPrivacySanitizer.sanitizedData(
+                    data,
+                    filename: "moment-photo-\(index).jpg",
+                    isImage: true
+                )
+                : data
             let write = if let pet {
                 DomainMemberFactWriteAuthorizer.authorizePetFact(
                     pet: pet,
@@ -61,7 +69,7 @@ enum MomentCommandService {
             guard let write else { continue }
             let log = DomainMemberFactWriter.createPetPhotoLog(
                 plan: write,
-                imageData: data,
+                imageData: imageData,
                 date: logDate,
                 note: cleanNote,
                 pet: pet,

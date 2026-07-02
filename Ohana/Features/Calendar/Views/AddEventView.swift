@@ -13,6 +13,8 @@ struct AddEventContentView: View {
     var onClose: (() -> Void)?
     let pets: [Pet]
     let humans: [Human]
+    let editingEvent: Event?
+    let editingOccurrenceDate: Date?
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
@@ -30,18 +32,15 @@ struct AddEventContentView: View {
     @State private var recurrenceOption: RecurrenceOption = .none
     @State private var recurrenceDays = 2
     @State private var recurrenceEndDate = Calendar.current.date(byAdding: .month, value: 1, to: Date()) ?? Date()
-    @State private var reminderLeadOption: ReminderLeadOption = .thirtyMinutes
+    @State private var reminderLeadOption: ReminderLeadOption = .atTime
     @State private var hasReminder = true
     @State private var assigneeId: String? = nil
     @State private var showsTypePicker = false
     @State private var isSaving = false
     @State private var didSave = false
+    @State private var keyboardHeight: CGFloat = 0
     @StateObject private var commandQueue = DeferredDomainCommandQueue()
     @FocusState private var titleFocused: Bool
-
-    private var l: L10n { L10n(appLanguage) }
-    private var activePets: [Pet] { pets.filter { !$0.hasPassedAway } }
-    private var activeHumans: [Human] { humans.filter { !$0.hasPassedAway } }
 
     private enum RecurrenceOption: String, CaseIterable, Identifiable {
         case none
@@ -74,6 +73,7 @@ struct AddEventContentView: View {
     }
 
     private enum ReminderLeadOption: Int, CaseIterable, Identifiable {
+        case atTime = 0
         case thirtyMinutes = 30
         case oneHour = 60
         case threeHours = 180
@@ -81,8 +81,19 @@ struct AddEventContentView: View {
 
         var id: Int { rawValue }
 
+        var accessibilityID: String {
+            switch self {
+            case .atTime: "atTime"
+            case .thirtyMinutes: "thirtyMinutes"
+            case .oneHour: "oneHour"
+            case .threeHours: "threeHours"
+            case .oneDay: "oneDay"
+            }
+        }
+
         func title(_ l: L10n) -> String {
             switch self {
+            case .atTime: l.tr(zh: "准时", en: "At time", de: "Zur Startzeit")
             case .thirtyMinutes: l.tr(zh: "前30分钟", en: "30m before", de: "30 Min. vorher")
             case .oneHour: l.tr(zh: "前1小时", en: "1h before", de: "1 Std. vorher")
             case .threeHours: l.tr(zh: "前3小时", en: "3h before", de: "3 Std. vorher")
@@ -90,6 +101,38 @@ struct AddEventContentView: View {
             }
         }
     }
+
+    init(
+        onClose: (() -> Void)? = nil,
+        pets: [Pet],
+        humans: [Human],
+        editingEvent: Event? = nil,
+        editingOccurrenceDate: Date? = nil
+    ) {
+        self.onClose = onClose
+        self.pets = pets
+        self.humans = humans
+        self.editingEvent = editingEvent
+        self.editingOccurrenceDate = editingOccurrenceDate
+
+        let initial = Self.initialState(for: editingEvent, occurrenceDate: editingOccurrenceDate)
+        _title = State(initialValue: initial.title)
+        _eventType = State(initialValue: initial.eventType)
+        _startDate = State(initialValue: initial.startDate)
+        _isAllDay = State(initialValue: initial.isAllDay)
+        _relatedEntityType = State(initialValue: initial.relatedEntityType)
+        _relatedEntityId = State(initialValue: initial.relatedEntityId)
+        _recurrenceOption = State(initialValue: initial.recurrenceOption)
+        _recurrenceDays = State(initialValue: initial.recurrenceDays)
+        _recurrenceEndDate = State(initialValue: initial.recurrenceEndDate)
+        _reminderLeadOption = State(initialValue: initial.reminderLeadOption)
+        _hasReminder = State(initialValue: initial.hasReminder)
+        _assigneeId = State(initialValue: initial.assigneeId)
+    }
+
+    private var l: L10n { L10n(appLanguage) }
+    private var activePets: [Pet] { pets.filter { !$0.hasPassedAway } }
+    private var activeHumans: [Human] { humans.filter { !$0.hasPassedAway } }
 
     private var trimmedTitle: String {
         title.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -103,14 +146,32 @@ struct AddEventContentView: View {
         [.daily, .task, .health, .birthday, .anniversary, .chore, .shoppingList, .medication, .petMedication]
     }
 
+    private var isEditing: Bool {
+        editingEvent != nil
+    }
+
+    private var editorTitle: String {
+        isEditing ? l.tr(zh: "编辑事项", en: "Edit event", de: "Termin bearbeiten") : l.addEvent
+    }
+
+    private var primaryActionTitle: String {
+        isEditing ? l.tr(zh: "保存修改", en: "Save changes", de: "Änderungen speichern") : l.addEvent
+    }
+
+    private var savedActionTitle: String {
+        isEditing ? l.tr(zh: "已保存", en: "Saved", de: "Gespeichert") : l.tr(zh: "已添加", en: "Added", de: "Hinzugefügt")
+    }
+
     private var visibleRecurrenceOptions: [RecurrenceOption] {
-        [.none, .daily, .weekly, .monthly]
+        recurrenceOption == .custom
+            ? [.none, .daily, .weekly, .monthly, .custom]
+            : [.none, .daily, .weekly, .monthly]
     }
 
     private var allowedReminderLeadOptions: [ReminderLeadOption] {
         recurrenceOption == .none
-            ? [.thirtyMinutes, .oneHour, .threeHours, .oneDay]
-            : [.thirtyMinutes, .oneHour, .threeHours]
+            ? [.atTime, .thirtyMinutes, .oneHour, .threeHours, .oneDay]
+            : [.atTime, .thirtyMinutes, .oneHour, .threeHours]
     }
 
     private var selectedRecurrenceDays: Int {
@@ -120,9 +181,14 @@ struct AddEventContentView: View {
     var body: some View {
         GeometryReader { proxy in
             let effectiveSafeTop = max(proxy.safeAreaInsets.top, inlinePageSafeAreaInsets.top)
-            let effectiveSafeBottom = max(proxy.safeAreaInsets.bottom, inlinePageSafeAreaInsets.bottom)
+            let stableSafeBottom = Self.stableBottomSafeInset(
+                proxyBottom: proxy.safeAreaInsets.bottom,
+                inlineBottom: inlinePageSafeAreaInsets.bottom
+            )
             let headerTopInset = max(14, effectiveSafeTop + 12)
-            let bottomControlInset = max(18, effectiveSafeBottom + 14)
+            let bottomControlInset = max(18, stableSafeBottom + 14)
+            let isKeyboardVisible = titleFocused || keyboardHeight > 1
+            let scrollBottomInset: CGFloat = 18
 
             ZStack {
                 OhanaAppBackground()
@@ -153,17 +219,34 @@ struct AddEventContentView: View {
                             assigneeSection
                         }
                         .padding(.horizontal, 20)
-                        .padding(.bottom, bottomControlInset + 86)
+                        .padding(.bottom, scrollBottomInset)
                     }
                     .scrollDismissesKeyboard(.interactively)
-                }
 
-                saveBar(safeBottom: bottomControlInset)
-                    .frame(maxHeight: .infinity, alignment: .bottom)
+                    if !isKeyboardVisible {
+                        saveBar(safeBottom: bottomControlInset)
+                    }
+                }
             }
         }
         .ohanaSheetPagePresentation() // ui-v4: allow long calendar editor uses system sheet
         .interactiveDismissDisabled(isSaving)
+        .toolbar {
+            ToolbarItemGroup(placement: .keyboard) {
+                Spacer()
+                Button(l.tr(zh: "完成", en: "Done", de: "Fertig")) {
+                    titleFocused = false
+                    GoKeyboard.dismiss()
+                }
+                if canSave {
+                    Button(l.tr(zh: "保存", en: "Save", de: "Sichern")) {
+                        saveEvent()
+                    }
+                    .fontWeight(.bold)
+                    .accessibilityIdentifier("add-event-save-action")
+                }
+            }
+        }
         .onChange(of: startDate) { _, newValue in
             keepDependentDatesAfter(newValue)
         }
@@ -176,8 +259,18 @@ struct AddEventContentView: View {
                 startDate = cal.startOfDay(for: startDate)
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillChangeFrameNotification)) { notification in
+            updateKeyboardHeight(notification)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in
+            if keyboardHeight > 0 {
+                keyboardHeight = 0
+            }
+        }
         .onAppear {
-            if assigneeId == nil, activeHumans.contains(where: { $0.id.uuidString == currentActiveHumanId }) {
+            if !isEditing,
+               assigneeId == nil,
+               activeHumans.contains(where: { $0.id.uuidString == currentActiveHumanId }) {
                 assigneeId = currentActiveHumanId
             }
         }
@@ -189,7 +282,7 @@ struct AddEventContentView: View {
     private var header: some View {
         HStack(alignment: .center, spacing: 12) {
             VStack(alignment: .leading, spacing: 4) {
-                Text(l.addEvent)
+                Text(editorTitle)
                     .font(OhanaFont.adaptive(size: 26, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(1)
@@ -417,6 +510,7 @@ struct AddEventContentView: View {
                             .background(selected ? Color.goPrimary : Color.ohanaCardSurface, in: Capsule())
                     }
                     .buttonStyle(ScaleButtonStyle())
+                    .accessibilityIdentifier("add-event-reminder-lead-\(option.accessibilityID)")
                 }
             }
         }
@@ -471,8 +565,8 @@ struct AddEventContentView: View {
                 saveEvent()
             } label: {
                 HStack(spacing: 8) {
-                    Image(systemName: didSave ? "checkmark.circle.fill" : "calendar.badge.plus")
-                    Text(didSave ? l.tr(zh: "已添加", en: "Added", de: "Hinzugefügt") : l.addEvent)
+                    Image(systemName: didSave ? "checkmark.circle.fill" : (isEditing ? "checkmark.circle" : "calendar.badge.plus"))
+                    Text(didSave ? savedActionTitle : primaryActionTitle)
                 }
                 .font(OhanaFont.adaptive(size: 17, weight: .black, design: .rounded))
                 .foregroundStyle(canSave ? Color.arkInk : Color.ohanaSecondaryText)
@@ -487,10 +581,10 @@ struct AddEventContentView: View {
             .padding(.bottom, safeBottom)
             .background {
                 Color.ohanaCardSurfaceElevated
-                    .opacity(0.92)
-                    .ignoresSafeArea(edges: .bottom)
+                    .opacity(0.98)
             }
         }
+        .frame(maxWidth: .infinity)
     }
 
     private var dateSummary: String {
@@ -527,10 +621,122 @@ struct AddEventContentView: View {
         )
     }
 
+    private struct InitialState {
+        let title: String
+        let eventType: EventType
+        let startDate: Date
+        let isAllDay: Bool
+        let relatedEntityType: String
+        let relatedEntityId: String
+        let recurrenceOption: RecurrenceOption
+        let recurrenceDays: Int
+        let recurrenceEndDate: Date
+        let reminderLeadOption: ReminderLeadOption
+        let hasReminder: Bool
+        let assigneeId: String?
+    }
+
+    private static func initialState(for event: Event?, occurrenceDate: Date?) -> InitialState {
+        let defaultStartDate = defaultNewEventStartDate()
+        let fallbackRecurrenceEnd = Calendar.current.date(byAdding: .month, value: 1, to: defaultStartDate) ?? defaultStartDate
+        guard let event else {
+            return InitialState(
+                title: "",
+                eventType: .daily,
+                startDate: defaultStartDate,
+                isAllDay: false,
+                relatedEntityType: "",
+                relatedEntityId: "",
+                recurrenceOption: .none,
+                recurrenceDays: 2,
+                recurrenceEndDate: fallbackRecurrenceEnd,
+                reminderLeadOption: .atTime,
+                hasReminder: true,
+                assigneeId: nil
+            )
+        }
+
+        let startDate = displayStartDate(for: event, occurrenceDate: occurrenceDate)
+        let recurrenceOption = recurrenceOption(for: event.recurrenceDays)
+        let reminderLead = reminderLeadOption(for: event, displayStartDate: startDate)
+        return InitialState(
+            title: event.title,
+            eventType: EventType(rawValue: event.eventType) ?? .daily,
+            startDate: startDate,
+            isAllDay: event.isAllDay,
+            relatedEntityType: event.relatedEntityType,
+            relatedEntityId: event.relatedEntityId,
+            recurrenceOption: recurrenceOption,
+            recurrenceDays: max(2, event.recurrenceDays),
+            recurrenceEndDate: event.recurrenceEndDate ?? fallbackRecurrenceEnd,
+            reminderLeadOption: reminderLead ?? .atTime,
+            hasReminder: reminderLead != nil,
+            assigneeId: event.assigneeId
+        )
+    }
+
+    nonisolated static func defaultNewEventStartDate(now: Date = Date()) -> Date {
+        let minimumFutureDate = now.addingTimeInterval(5 * 60)
+        let fiveMinuteQuantum: TimeInterval = 5 * 60
+        let roundedInterval = ceil(minimumFutureDate.timeIntervalSinceReferenceDate / fiveMinuteQuantum) * fiveMinuteQuantum
+        return Date(timeIntervalSinceReferenceDate: roundedInterval)
+    }
+
+    private static func displayStartDate(for event: Event, occurrenceDate: Date?) -> Date {
+        guard event.recurrenceDays > 0,
+              let occurrenceDate else {
+            return event.startDate
+        }
+        return event.isAllDay
+            ? Calendar.current.startOfDay(for: occurrenceDate)
+            : Event.dateMergingTime(from: event.startDate, ontoOccurrenceDay: occurrenceDate)
+    }
+
+    private static func recurrenceOption(for days: Int) -> RecurrenceOption {
+        switch days {
+        case 0:
+            .none
+        case 1:
+            .daily
+        case 7:
+            .weekly
+        case 30:
+            .monthly
+        default:
+            .custom
+        }
+    }
+
+    private static func reminderLeadOption(for event: Event, displayStartDate: Date) -> ReminderLeadOption? {
+        guard let reminder = event.reminders.sorted(by: { $0.scheduledAt < $1.scheduledAt }).first else {
+            return nil
+        }
+        let minutes = Int(round(displayStartDate.timeIntervalSince(reminder.scheduledAt) / 60))
+        return ReminderLeadOption(rawValue: max(0, minutes))
+    }
+
     private func sectionLabel(_ text: String) -> some View {
         Text(text)
             .font(OhanaFont.caption(.black))
             .foregroundStyle(Color.ohanaSecondaryText)
+    }
+
+    private static func stableBottomSafeInset(proxyBottom: CGFloat, inlineBottom: CGFloat) -> CGFloat {
+        let windowBottom = (UIApplication.shared.connectedScenes.first as? UIWindowScene)?
+            .keyWindow?.safeAreaInsets.bottom ?? 0
+        let candidates = [proxyBottom, inlineBottom, windowBottom].filter { inset in
+            inset > 1 && inset < 96
+        }
+        return candidates.max() ?? 34
+    }
+
+    private func updateKeyboardHeight(_ notification: Notification) {
+        guard let keyboardFrame = notification.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect else {
+            return
+        }
+        let height = max(0, keyboardFrame.height)
+        guard abs(keyboardHeight - height) > 0.5 else { return }
+        keyboardHeight = height
     }
 
     private var eventTypeAnchorMenu: some View {
@@ -746,14 +952,35 @@ struct AddEventContentView: View {
     private func saveEvent() {
         guard canSave else { return }
         let input = eventCommandInput
-        let command = DomainCommand.calendarEventPlan(eventID: nil)
+        let command = DomainCommand.calendarEventPlan(eventID: editingEvent?.id)
         isSaving = true
         titleFocused = false
         GoKeyboard.dismiss()
 
+        guard input.reminderLeadMinutes == nil else {
+            Task { @MainActor in
+                guard await appServices.userNotifications.requestPermission() else {
+                    isSaving = false
+                    UINotificationFeedbackGenerator().notificationOccurred(.error)
+                    return
+                }
+                enqueueSaveEvent(input: input, command: command)
+            }
+            return
+        }
+
+        enqueueSaveEvent(input: input, command: command)
+    }
+
+    private func enqueueSaveEvent(input: CalendarEventPlanCommandInput, command: DomainCommand) {
         commandQueue.enqueue(command) {
             let executor = CalendarCommandExecutor(context: modelContext, services: appServices)
-            guard executor.createEvent(input: input) != nil else {
+            let result: CalendarEventPlanCommandResult? = if let editingEvent {
+                executor.updateEvent(event: editingEvent, input: input)
+            } else {
+                executor.createEvent(input: input)
+            }
+            guard result != nil else {
                 isSaving = false
                 UINotificationFeedbackGenerator().notificationOccurred(.error)
                 return

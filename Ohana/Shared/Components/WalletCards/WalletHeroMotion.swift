@@ -147,6 +147,26 @@ enum WalletHeroTimeline {
     }
 }
 
+enum WalletHeroLayeringPolicy {
+    static let activeForegroundZIndex: Double = 40
+    static let collapsedProgressThreshold: CGFloat = 0.001
+    static let collapseReturnProgressThreshold: CGFloat = 0.035
+
+    static func activeZIndex(
+        collapsedZIndex: Double,
+        progress: CGFloat,
+        direction: Int
+    ) -> Double {
+        if progress <= collapsedProgressThreshold {
+            return collapsedZIndex
+        }
+        if direction < 0, progress < collapseReturnProgressThreshold {
+            return collapsedZIndex
+        }
+        return activeForegroundZIndex
+    }
+}
+
 struct WalletHeroLayout {
     let size: CGSize
     let safeTop: CGFloat

@@ -333,11 +333,15 @@ struct CrewRosterWalletScene<CardOverlay: View, MemberContent: View>: View {
     }
 
     private func zIndex(index: Int, isActive: Bool) -> Double {
+        let collapsedZIndex = Double(index)
         if isActive {
-            return heroDirection < 0 ? Double(index) + 0.25 : 40
+            return WalletHeroLayeringPolicy.activeZIndex(
+                collapsedZIndex: collapsedZIndex,
+                progress: progress,
+                direction: heroDirection
+            )
         }
-        if selectedCardId != nil { return Double(index) }
-        return Double(index)
+        return collapsedZIndex
     }
 
     private func collapsedHitZones(layout: WalletHeroLayout) -> some View {

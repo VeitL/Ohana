@@ -170,10 +170,7 @@ final class NotificationManager: NSObject, @unchecked Sendable {
         }
 
         let content = makeContent(event: event, reminder: reminder)
-        let components = Calendar.current.dateComponents(
-            [.year, .month, .day, .hour, .minute],
-            from: fireDate
-        )
+        let components = Self.triggerDateComponents(for: fireDate)
         let trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: false)
         let request = UNNotificationRequest(
             identifier: reminder.notificationId,
@@ -187,6 +184,10 @@ final class NotificationManager: NSObject, @unchecked Sendable {
                 completion?(.scheduled)
             }
         }
+    }
+
+    nonisolated static func triggerDateComponents(for fireDate: Date, calendar: Calendar = .current) -> DateComponents {
+        calendar.dateComponents([.year, .month, .day, .hour, .minute, .second], from: fireDate)
     }
 
     func pendingNotificationIds() async -> Set<String> {

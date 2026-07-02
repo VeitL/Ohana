@@ -217,6 +217,7 @@ struct HumanHealthReportContentView: View {
             }
         }
         .buttonStyle(ScaleButtonStyle())
+        .accessibilityIdentifier("human-health-report-row")
     }
 
     // MARK: - Empty State
@@ -474,6 +475,7 @@ struct AddHumanHealthReportSheet: View {
                         }
                         .buttonStyle(ScaleButtonStyle())
                         .disabled(isSaving)
+                        .accessibilityIdentifier("add-human-health-report-delete-action")
                         .padding(.horizontal, 16)
                     }
 

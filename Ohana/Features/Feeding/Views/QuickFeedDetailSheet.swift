@@ -494,7 +494,7 @@ struct QuickFeedDetailContent: View {
             },
             onKeyboardFrameChange: updateInlineKeyboardHeight,
             onKeyboardHide: {
-                withAnimation(GoMotion.quick) {
+                if inlineKeyboardHeight > 0 {
                     inlineKeyboardHeight = 0
                 }
             },
@@ -817,6 +817,9 @@ struct QuickFeedDetailContent: View {
             },
             onOpenTaskSettings: toggleEmbeddedModeSettings,
             onQuickAddTreat: toggleEmbeddedTreatAdd,
+            onQuickAddManualFeed: {
+                openManualFeedSheet()
+            },
             onOpenManualHistory: {
                 collapseEmbeddedPanel()
                 openRootFeedSheet(.history)

@@ -114,6 +114,7 @@ struct HumanHealthMetricDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(.hidden, for: .navigationBar)
         .environment(\.locale, AppLanguage.effectiveLocale)
+        .accessibilityIdentifier("human-health-metric-detail-\(metric.key)")
         .onAppear {
             if selectedUnitCode.isEmpty {
                 selectedUnitCode = preferredUnit.code
@@ -488,14 +489,15 @@ struct HumanHealthMetricDetailView: View {
                 Image(systemName: "trash").accessibilityHidden(true)
                     .font(OhanaFont.adaptive(size: 14, weight: .semibold))
                     .foregroundStyle(Color.ohanaTertiaryText)
-                    .frame(width: 34, height: 34) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
+                    .frame(width: 44, height: 44)
                     .contentShape(Rectangle())
             }
             .buttonStyle(ScaleButtonStyle())
             .accessibilityLabel(l.tr(zh: "删除记录", en: "Delete log", de: "Eintrag löschen"))
+            .accessibilityIdentifier("human-health-metric-delete-action")
         }
         .padding(.horizontal, 14)
-        .padding(.vertical, 12)
+        .padding(.vertical, 7)
         .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
     }
 }

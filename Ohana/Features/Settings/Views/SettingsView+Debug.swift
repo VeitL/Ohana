@@ -5,11 +5,16 @@
 //  Developer-only settings tools.
 //
 
+import SwiftData
 import SwiftUI
 
 enum SettingsDebugTools {
     static var isRunningUITests: Bool {
         ProcessInfo.processInfo.arguments.contains("-OHANA_UI_TESTS")
+    }
+
+    static var opensCoconutBalanceSheetInUITests: Bool {
+        ProcessInfo.processInfo.arguments.contains("-OHANA_UI_TEST_OPEN_COCONUT_BALANCE_SHEET")
     }
 
     static var isVisible: Bool {
@@ -34,6 +39,16 @@ extension SettingsView {
             }
             .accessibilityIdentifier("settings-debug-coconuts")
 
+            settingsRow(
+                icon: "list.clipboard.fill",
+                title: l.tr(zh: "提醒可观测面板", en: "Reminder Observability", de: "Erinnerungsbeobachtung"),
+                subtitle: l.tr(zh: "查看权限、系统队列和调度账本", en: "Inspect permission, queue, and scheduling ledger", de: "Berechtigung, Warteschlange und Planungsprotokoll prüfen"),
+                iconColor: Color.goPrimary
+            ) {
+                showingReminderObservability = true
+            }
+            .accessibilityIdentifier("settings-debug-reminder-observability")
+
             if SettingsDebugTools.isRunningUITests {
                 settingsRow(
                     icon: "bag.fill",
@@ -54,13 +69,24 @@ extension SettingsView {
                     applyUITestEconomyBudgetResetShortcut()
                 }
                 .accessibilityIdentifier("settings-debug-economy-budget-reset")
+
+                settingsRow(
+                    icon: "leaf.fill",
+                    title: l.tr(zh: "Debug 植物基线", en: "Debug Plant Baseline", de: "Debug-Pflanzenbasis"),
+                    subtitle: l.tr(zh: "为植物 GUI 测试创建一株植物", en: "Create one plant for GUI tests", de: "Eine Pflanze für GUI-Tests erstellen"),
+                    iconColor: Color.goTeal
+                ) {
+                    applyUITestPlantBaselineShortcut()
+                }
+                .accessibilityIdentifier("settings-debug-plant-baseline")
             }
         }
         .accessibilityIdentifier("settings-debug-section")
     }
 
     func openCoconutBalanceDebugTool() {
-        if SettingsDebugTools.isRunningUITests {
+        if SettingsDebugTools.isRunningUITests,
+           !SettingsDebugTools.opensCoconutBalanceSheetInUITests {
             applyUITestCoconutBalanceShortcut(amount: 1000)
         } else {
             showingCoconutBalanceTest = true
@@ -105,6 +131,40 @@ extension SettingsView {
             EconomyDailyBudgetStore.resetAllForTesting(context: modelContext)
         #endif
         closeSettings()
+    }
+
+    func applyUITestPlantBaselineShortcut() {
+        #if DEBUG
+            let timestamp = Int(Date().timeIntervalSince1970)
+            let plant = Plant(
+                name: "Codex Pothos \(timestamp)",
+                species: "Epipremnum aureum",
+                location: "South window",
+                avatarEmoji: "🪴",
+                wateringIntervalDays: 7,
+                fertilizingIntervalDays: 30,
+                roomNameRaw: "Living room",
+                potDiameterCm: 12,
+                potMaterialRaw: "Ceramic",
+                soilTypeRaw: "Well-draining potting mix",
+                isIndoor: true,
+                windowDirection: .south,
+                lightLevel: .brightIndirect,
+                currentHeightCm: 18,
+                currentSpreadCm: 22,
+                catalogSpeciesId: "epipremnum-aureum",
+                remindersEnabled: true
+            )
+            plant.notes = "Seeded by UI tests"
+            modelContext.insert(plant)
+            PlantUnlockPolicy.noteExistingPlantData()
+            modelContext.safeSave()
+            appServices.domainRevisions.publishMemberCreation(
+                entityID: plant.id,
+                kind: EntityKind.plant.rawValue,
+                note: "settings.plant.uiTestShortcut"
+            )
+        #endif
     }
 
     private func displayNameForDebugCoconut(_ human: Human) -> String {

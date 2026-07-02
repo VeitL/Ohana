@@ -6,6 +6,27 @@
 import SwiftData
 import SwiftUI
 
+enum HomeWalkQuickActionPresentationPolicy {
+    enum ExistingWalkDisposition: Equatable {
+        case embeddedCurrentPet
+        case floatingOtherPet
+    }
+
+    static func existingWalkDisposition(
+        requestedPetID: UUID,
+        currentPetID: UUID?,
+        phase: WalkPhase
+    ) -> ExistingWalkDisposition? {
+        guard let currentPetID else { return nil }
+        switch phase {
+        case .running, .paused:
+            return currentPetID == requestedPetID ? .embeddedCurrentPet : .floatingOtherPet
+        case .idle, .finished:
+            return nil
+        }
+    }
+}
+
 extension VerticalSolidHomeView {
     func openHeaderCoconutDestination() {
         if let card = headerContextCard {
@@ -289,11 +310,42 @@ extension VerticalSolidHomeView {
             return
         }
         OhanaFeedback.medium()
+        if presentExistingWalkFromQuickAction(requestedPetID: pet.id) {
+            return
+        }
+
         appServices.walking.start(pet: pet)
         if appServices.walking.currentPet?.id == pet.id {
+            appServices.walking.isWalkCardExpandedSurfaceVisible = true
             appServices.publishWalkingPresentationChange()
             walkCardPresentationRevision &+= 1
         }
+    }
+
+    func presentExistingWalkFromQuickAction(requestedPetID: UUID) -> Bool {
+        guard let disposition = HomeWalkQuickActionPresentationPolicy.existingWalkDisposition(
+            requestedPetID: requestedPetID,
+            currentPetID: appServices.walking.currentPet?.id,
+            phase: appServices.walking.phase
+        ) else {
+            return false
+        }
+
+        switch disposition {
+        case .embeddedCurrentPet:
+            appServices.walking.isWalkCardExpandedSurfaceVisible = true
+        case .floatingOtherPet:
+            appServices.walking.isWalkCardExpandedSurfaceVisible = false
+        }
+        appServices.publishWalkingPresentationChange()
+        walkCardPresentationRevision &+= 1
+        return true
+    }
+
+    func minimizeWalkCardToFloatingControl() {
+        appServices.walking.isWalkCardExpandedSurfaceVisible = false
+        appServices.publishWalkingPresentationChange()
+        walkCardPresentationRevision &+= 1
     }
 
     func fetchPetForHomeAction(id: UUID) -> Pet? {

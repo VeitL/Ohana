@@ -40,7 +40,7 @@ struct HumanAccountSwitcherSheet: View {
             case .switchAccount:
                 l.tr(zh: "验证通过后会切换到该账户", en: "Verify to switch to this account", de: "Verifizieren, um zu diesem Konto zu wechseln")
             case .manageSecurity:
-                l.tr(zh: "验证通过后打开密码与隐私设置", en: "Verify to open PIN and privacy settings", de: "Verifizieren, um PIN und Datenschutz zu öffnen")
+                l.tr(zh: "验证通过后打开成员保护设置", en: "Verify to open member protection settings", de: "Verifizieren, um Mitgliederschutz zu öffnen")
             }
         }
     }
@@ -84,16 +84,16 @@ struct HumanAccountSwitcherSheet: View {
 
     private var header: some View {
         HStack(alignment: .center, spacing: 12) {
-            Image(systemName: "person.2.badge.key.fill") // a11y: allow decorative icon covered by surrounding text or control
+            Image(systemName: "person.2.fill") // a11y: allow decorative icon covered by surrounding text or control
                 .font(OhanaFont.adaptive(size: 18, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(Color.goPrimary)
                 .frame(width: 42, height: 42) // a11y: allow decorative non-interactive frame; hit area handled by parent
                 .background(Color.goPrimary.opacity(0.16), in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
             VStack(alignment: .leading, spacing: 3) {
-                Text(l.tr(zh: "切换人类账户", en: "Switch human account", de: "Menschenkonto wechseln"))
+                Text(l.tr(zh: "切换记录成员", en: "Switch check-in member", de: "Eintragsmitglied wechseln"))
                     .font(OhanaFont.title3(.black))
                     .foregroundStyle(Color.ohanaPrimaryText)
-                Text(l.tr(zh: "成员与密码", en: "Members and PINs", de: "Mitglieder und PINs"))
+                Text(l.tr(zh: "选择后续记录归属的成员", en: "Choose who future records belong to", de: "Wähle, wem künftige Einträge gehören"))
                     .font(OhanaFont.caption(.semibold))
                     .foregroundStyle(Color.ohanaSecondaryText)
             }
@@ -126,7 +126,9 @@ struct HumanAccountSwitcherSheet: View {
                         .foregroundStyle(Color.ohanaPrimaryText)
                 }
                 Spacer()
-                lockButton(for: activeHuman, identifier: "human-account-security-active-action")
+                if HumanLocalPrivacyPolicy.isEnabled {
+                    lockButton(for: activeHuman, identifier: "human-account-security-active-action")
+                }
             }
             .padding(14)
             .goTranslucentCard(cornerRadius: OhanaRadius.controlLarge)
@@ -169,7 +171,9 @@ struct HumanAccountSwitcherSheet: View {
             .buttonStyle(ScaleButtonStyle())
             .accessibilityIdentifier("human-account-switch-row-\(displayName(human))")
 
-            lockButton(for: human, identifier: "human-account-security-row-action-\(displayName(human))")
+            if HumanLocalPrivacyPolicy.isEnabled {
+                lockButton(for: human, identifier: "human-account-security-row-action-\(displayName(human))")
+            }
         }
         .padding(13)
         .background(pendingHuman?.id == human.id ? Color.goPrimary.opacity(0.16) : Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
@@ -188,7 +192,8 @@ struct HumanAccountSwitcherSheet: View {
                 .padding(.horizontal, 9)
                 .padding(.vertical, 5)
                 .background(Color.goPrimary, in: Capsule())
-        } else if appServices.passcodes.hasPasscode(human) {
+        } else if HumanLocalPrivacyPolicy.isEnabled,
+                  appServices.passcodes.hasPasscode(human) {
             Text(l.tr(zh: "需密码", en: "PIN needed", de: "PIN nötig"))
                 .font(OhanaFont.caption2(.black))
                 .foregroundStyle(Color.goYellow)
@@ -216,7 +221,7 @@ struct HumanAccountSwitcherSheet: View {
                 .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: OhanaRadius.chip, style: .continuous))
         }
         .buttonStyle(ScaleButtonStyle())
-        .accessibilityLabel(l.tr(zh: "密码与隐私", en: "PIN & Privacy", de: "PIN & Datenschutz"))
+        .accessibilityLabel(l.tr(zh: "成员保护", en: "Member protection", de: "Mitgliederschutz"))
         .accessibilityIdentifier(identifier)
     }
 
@@ -254,6 +259,10 @@ struct HumanAccountSwitcherSheet: View {
             dismiss()
             return
         }
+        guard HumanLocalPrivacyPolicy.isEnabled else {
+            switchTo(human)
+            return
+        }
         guard appServices.passcodes.hasPasscode(human) else {
             switchTo(human)
             return
@@ -273,6 +282,7 @@ struct HumanAccountSwitcherSheet: View {
     }
 
     private func openSecurity(for human: Human) {
+        guard HumanLocalPrivacyPolicy.isEnabled else { return }
         UISelectionFeedbackGenerator().selectionChanged()
         guard human.id.uuidString != activeHumanId else {
             pendingHuman = nil

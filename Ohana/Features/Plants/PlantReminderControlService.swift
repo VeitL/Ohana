@@ -222,18 +222,16 @@ enum PlantReminderControlService {
             affectedPlantIDs.insert(plant.id)
             for task in dueTasks {
                 let note = "defer:\(task.careType.rawValue):\(formatter.string(from: tomorrow))"
-                PlantCareCommandService.recordCare(
-                    .customNote,
+                recordDeferFeedback(
+                    note,
                     plant: plant,
                     executorId: executorId,
                     context: context,
-                    now: now,
-                    careNote: note,
-                    syncCarePlan: false,
-                    scheduleNotifications: false
+                    now: now
                 )
                 deferredTaskCount += 1
             }
+            context.safeSave()
             PlantCarePlanScheduleService.sync(
                 plant: plant,
                 context: context,
@@ -247,5 +245,23 @@ enum PlantReminderControlService {
             deferredTaskCount: deferredTaskCount,
             affectedPlantCount: affectedPlantIDs.count
         )
+    }
+
+    private static func recordDeferFeedback(
+        _ note: String,
+        plant: Plant,
+        executorId: String?,
+        context: ModelContext,
+        now: Date
+    ) {
+        let log = PlantCareLog(
+            date: now,
+            careType: .customNote,
+            note: note,
+            executorId: executorId
+        )
+        log.plant = plant
+        context.insert(log)
+        CloudSyncMutationRecorder.markModified(plant, context: context, modifiedAt: now)
     }
 }

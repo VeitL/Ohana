@@ -1,10 +1,12 @@
 # 人工验收总 Track List
 
-更新日期：2026-06-19
+更新日期：2026-06-30
 
 本文件是 GAP 建设阶段与模块门禁阶段唯一的人工验收 track list。后续不再新增 `gap-*-acceptance-track-list.md` 或模块单独 track list；需要人工目检、真机、真实 iCloud、真实通知或真实数据确认的项目，都追加到本文对应小节。
 
 自动测试、源码审计和门禁结论记录在 `docs/testing-progress.md` 与各模块规则书中；本文只保留足够让产品主人逐项验收的清单和关键自动验收摘要。
+
+真机执行时优先使用 `docs/release-true-device-test-plan.md`。该文件把本文的长验收项整理成“已测过 / 真机还要测 / 通过标准 / 记录”的中文执行视图；本文仍保留详细验收记录和最终人工验收状态。
 
 当前产品删除模型以 `docs/specs/product-foundation.md` D8/D16、`docs/specs/RecycleBin-logic.md` 和各模块规则书为准：用户可见回收站、30 天恢复窗口和可恢复软删除已退役；删除是明确确认后的不可恢复物理删除，CloudSync 只可保留用户不可见、不可恢复的 sync tombstone 元数据。
 
@@ -18,7 +20,7 @@
 | GAP-4 总账恒等 | 🟢 | `1951f7834` | 钱包总账恒等、`system:legacy` 排除、账本重放修复、Oasis 夹具、`scripts/module-exit-gate.sh` 均通过 | 待真实迁移样本 / 正式包抽查 |
 | GAP-5 触顶感知 | 🟢 | `1a775bc7c` | `recordOnly` 九语言文案、反馈中心、changed gate、`scripts/module-exit-gate.sh` 均通过 | 待真实 UI / 长语言抽查 |
 | GAP-6 通知分级 | 🟢 | `6bb766cc3` | 通知预算、夜间免打扰、合并、关键提醒豁免、周报语义、`scripts/module-exit-gate.sh` 均通过 | 待真机通知抽查 |
-| GAP-7 补记结算 | 🟢 | `528cf2cdd` | 补记历史日期与操作日奖励结算测试、changed gate、`scripts/module-exit-gate.sh` 均通过 | 待真实 UI 补记路径抽查 |
+| GAP-7 补记结算 | 🟢 | `528cf2cdd` | 补记历史日期与操作日奖励结算测试、changed gate、`scripts/module-exit-gate.sh` 均通过；2026-06-30 补上手动喂食补记 UI 日期入口、执行器 backdate 传参测试、以及模拟器 UI 自动化两条历史日期保存/回读预检 | 待真实 UI 手选历史日期补记路径抽查 |
 | GAP-8 单成员形态 | 🟢 | `6c4a98db2` | 单成员展示红绿测试、负面文案扫描、route 首帧硬门、changed gate、`scripts/module-exit-gate.sh` 均通过 | 首建人类、首宠、Home Oasis 五次注入 Lv0 -> Lv1、Settings 真机自动 smoke 已过；剩余为普通人工文案/菜单抽查 |
 | GAP-9 离世退场 | 🟢 | `e6a45e72c` | 纪念模式规则书、未来计划可逆退场、离世成员活跃入口过滤、奖励冻结定向测试、changed gate、`scripts/module-exit-gate.sh` 均通过 | 待真实 UI / 真机通知抽查 |
 | GAP-12 植物功能门 | 🟢 | `a1e0e0376` / `8f6c792dc` recheck | `PlantFeatureGate` 不变量、添加/路由/FunctionMenu、quest 引擎、心情信号、Oasis 植物历史隔离、`scripts/module-exit-gate.sh --full` 与 CI 均通过 | 待真实 UI 抽查 |
@@ -193,31 +195,31 @@ Xcode preflight 停在 `Unlock Guanchen's iPhone to Continue`，等待后取消�
 
 - [ ] 真机允许通知权限后，创建 5 条同一天 routine 提醒。
   - 预期：系统通知最多到达 4 条；第 5 条仍在 App 内待办中可见，不被自动完成、跳过或删除。
-  - 记录：
+  - 记录：2026-06-30 simulator preflight 已通过 `OhanaNotificationsSchedulingTests.routineReminderSchedulingHonorsDailyBudget()` 证明 app 调度策略对 5 条同日 routine 只排程 4 条，并为第 5 条写入 `scheduleSkippedBudget` 账本；真机仍需证明权限允许后 iOS 实际通知到达数与展示行为。
 
 - [ ] 真机创建 22:00-08:00 之间的非关键提醒。
   - 预期：系统通知延后到 08:30 后；App 内提醒列表仍显示原始计划时间。
-  - 记录：
+  - 记录：2026-06-30 simulator preflight 已通过 `OhanaNotificationsSchedulingTests.nonCriticalReminderInQuietHoursIsDeferredButAppReminderStaysPending()` 证明 app 策略把 23:15 非关键提醒投递时间延后到次日 08:30，同时保留 App 内 reminder `pending` 状态和原始计划时间语义；真机仍需证明 iOS 真实投递时间。
 
 - [ ] 真机创建夜间用药 / 疫苗 / 就医类健康关键提醒。
   - 预期：系统通知按用户设定时间到达，不被预算和免打扰延后。
-  - 记录：
+  - 记录：2026-06-30 simulator preflight 已通过 `OhanaNotificationsSchedulingTests.healthCriticalRemindersBypassBudgetMergeAndQuietHours()` 证明夜间健康关键提醒不受 routine 预算、同类合并和 quiet-hours 延后影响，按原 scheduledAt 进入调度边界；真机仍需证明 Focus/DND/锁屏环境下的真实系统投递表现。
 
 - [ ] 真机创建同一天、同成员、同类别的非用药提醒。
   - 预期：系统通知只到达第一条；App 内后续提醒仍 pending。
-  - 记录：
+  - 记录：2026-06-30 simulator preflight 已通过 `OhanaNotificationsSchedulingTests.sameDaySameMemberSameCategoryNonMedicationRemindersAreMerged()` 证明同日同成员同类别非用药提醒只把第一条送入通知排程，后续 reminder 仍保持 `pending`，并记录 `scheduleMerged`；真机仍需证明系统层只实际到达第一条。
 
 - [ ] 真机点击普通提醒通知以及“完成 / 跳过 / 明天再说”等通知动作。
   - 预期：仍能进入正确提醒处理路径。
-  - 记录：
+  - 记录：2026-06-30 simulator/source preflight 已通过 `OhanaNotificationsSchedulingTests.notificationDelegateHandoffKeepsDefaultTapAndActionsSeparate()` 证明普通点击进入 reminder route、COMPLETE/SKIP/SNOOZE 进入 action payload，并通过 `ReminderActionCoordinatorTests.notificationSnoozeActionRoutesToOneDaySnooze()` 证明“明天再说”会进入一天 snooze 且请求重排；真机仍需证明用户从系统通知 UI 点击这些动作时 iOS 会真实交付给 app。
 
 - [ ] 真机等待或临时触发周报通知。
   - 预期：标题/正文只表达照护周报，不出现悬赏榜、指派、多人竞争或“谁更勤快”的语义。
-  - 记录：
+  - 记录：2026-06-30 unit preflight 已通过 `OhanaNotificationsSchedulingTests.weeklyReportNotificationIsAmbientCareCopy()` 证明周报通知为 ambient / weeklyReport 分类，标题/正文保持照护周报语义，并在中英德文案中阻止悬赏榜、指派、竞争、“谁更勤快”等语义回退；真机仍需证明真实周报通知展示。
 
 - [ ] 在开发/观测面板查看提醒调度账本。
   - 预期：能看到“夜间延后”“预算跳过”“同类合并”等中文动作名。
-  - 记录：
+  - 记录：2026-06-30 unit preflight 已通过 `OhanaNotificationsSchedulingTests.reminderObservabilityShowsChineseSchedulingLedgerActions()` 证明调度账本 action 显示名包含“夜间延后”“预算跳过”“同类合并”；同日 simulator GUI smoke 已通过 `OhanaUITests.testReminderObservabilityPanelOpensFromDebugSettings` 证明 Settings Debug 快捷入口能打开 Reminder Observability 面板并看到 `reminder-observability-ledger-card`。这部分不依赖物理通知投递；若首发手动表仍要求全真机签字，可在真机上做一次 unlocked-device smoke，但剩余主要风险已不是系统通知送达。
 
 ## GAP-7 补记结算
 
@@ -225,11 +227,11 @@ Xcode preflight 停在 `Unlock Guanchen's iPhone to Continue`，等待后取消�
 
 - [ ] 真实 UI 中创建一条历史日期的手动喂食补记。
   - 预期：照护历史显示在所选历史日期，奖励反馈在当前操作时出现。
-  - 记录：
+  - 记录：2026-06-30 simulator/unit/UI preflight 已补齐手动喂食“历史”卡片加号入口、补记弹窗 `quick-feed-manual-log-date` 时间选择器、以及 `QuickFeedCommandExecutor.recordManual(... date:)` 到 `ManualFeedCommand.recordManual(... date:)` 的传参链路；`ManualFeedCommandTests.quickFeedExecutorManualRecordUsesSelectedBackdate()` 在 pinned `iPhone 17` 模拟器上通过，证明指定历史日期会写入 `PetCareLog.date` 与 `CareLedgerEvent.occurredAt`。同日补齐 compact History dock secondary action 渲染，并通过 `OhanaUITests.testFeedingManualHistoryAddOpensBackdateLogSheetAndRecords` 证明模拟器 UI 可从 History “+”打开带日期控件的补记弹窗、选择 1 天前日期、保存并在历史列表读到 `quick-feed-log-row-manualMain-YYYYMMDD-*` 行；最新 xcresult `/tmp/OhanaDerivedData-gap7-backdate-two-days-1782820800/Logs/Test/Test-Ohana-2026.06.30_13-10-47-+0200.xcresult`。尚未用手工交互真实滚动/点选系统日期控件完成一条记录，因此本项保持未勾选。
 
 - [ ] 真实 UI 中连续补记两条不同历史日期的喂食记录。
   - 预期：第一条有奖励，第二条显示冷却 / 无额外椰子语义，两个历史记录均存在。
-  - 记录：
+  - 记录：2026-06-30 simulator/unit/UI preflight 复用 `EconomyBackdateSettlementTests.backdatedCareRecordUsesOperationTimeForCooldown()` 的经济规则证据，并通过 `ManualFeedCommandTests` suite 证明 UI 执行器已能传入手选日期；模拟器 UI 预检已实际从 History “+”连续保存 1 天前与 2 天前两条补记，并在 History 中回读两个 `manualMain` 历史日期行；最新 xcresult `/tmp/OhanaDerivedData-gap7-backdate-two-days-1782820800/Logs/Test/Test-Ohana-2026.06.30_13-10-47-+0200.xcresult`。尚未用手工交互真实滚动/点选系统日期控件连续完成两条记录，因此本项保持未勾选。
 
 ## GAP-8 单成员形态
 
@@ -250,6 +252,7 @@ Xcode preflight 停在 `Unlock Guanchen's iPhone to Continue`，等待后取消�
   - 记录：2026-06-17 真机前置复验已由 Codex 侧推进一层：`Ohana Local Device` 用 `/tmp/ohana-local-device-p0` DerivedData 重新构建并签名通过；仓库内 `.build/DerivedData/phase9a-local-device` 路径仍会让 bundle root 带 `com.apple.FinderInfo` 而 CodeSign 失败，因此本轮按签名污染例外切到 `/tmp`。验证：`codesign --verify --deep --strict /tmp/ohana-local-device-p0/Build/Products/LocalDeviceDebug-iphoneos/Ohana.app` PASS；`xcrun devicectl device install app --device 00008150-001270342EA3401C /tmp/ohana-local-device-p0/Build/Products/LocalDeviceDebug-iphoneos/Ohana.app` 覆盖安装 PASS；`xcrun devicectl device process launch --device 00008150-001270342EA3401C com.guanchen.li.Ohana.LocalDevice` PASS；进程列表显示 `/Ohana.app/Ohana` 正在运行；拉取 `Library/Application Support/ohana-startup-probe.log` 显示本次启动已走到 `bootstrap.payload-set`。未完成项：物理 `testFirstReleaseReachableHomeOasisAndSettingsSmoke` 自动化被签名配置挡住，标准 Debug bundle 需要个人团队不支持的 Push/iCloud profile，`LocalDeviceDebug` 又未给 test targets 配完整 bundle id / Swift version / Info.plist；所以“首建主人 -> starter gift -> Today Focus 建首宠 -> Home Oasis FAB -> Settings”仍需用户手动复测或后续新增 LocalDevice UITest scheme。P0 关闭条件仍是手动交互链不卡死。
   - 记录：2026-06-17 首发 P0 物理 UI smoke 已跑通。先修复 `LocalDeviceDebug` 下 test target 签名 / bundle id / generated plist / Swift version 后，物理 smoke 可在 `Guanchen’s iPhone` 上运行。首轮物理 smoke 证明人类、首宠、Home Oasis 与 FAB 已能走通，但点击 Settings 后出现真机 crash；xcresult crash log 指向 `SettingsView.body.getter -> LazyVStack.init -> Swift runtime generic metadata demangle`，根因是 Settings 首帧巨大 inline SwiftUI 泛型树在真机 Debug/XCTest 下触发 stack guard，而不是单纯 fetch 等待。处理：设置页移除首帧 DEBUG 开发工具区；将 inline `LazyVStack` 拆为 `SettingsView+MainSections.swift`，按 section 做类型擦除，并把 reset alerts 移到 Settings 根视图。验证：`xcodebuild test -allowProvisioningUpdates -project Ohana.xcodeproj -scheme Ohana -configuration LocalDeviceDebug -destination 'id=00008150-001270342EA3401C' -derivedDataPath /tmp/ohana-device-ui-p0-localconfig -only-testing:OhanaUITests/OhanaUITests/testFirstReleaseReachableHomeOasisAndSettingsSmoke CODE_SIGNING_ALLOWED=YES` PASS（1 UI test，46.921s，xcresult `/tmp/ohana-device-ui-p0-localconfig/Logs/Test/Test-Ohana-2026.06.17_13-20-42-+0200.xcresult`）。结论：覆盖安装启动层、首建主人、starter gift、Today Focus 建首宠、Home Oasis Lv0 -> Lv1 注入、Settings 可打开这条首发可达 P0 链路已由真机自动化清零；剩余 GAP-8 项是普通文案 / 菜单 / 周报人工抽查，不再是本 P0。
   - 记录：2026-06-17 route-first-frame 假绿复验追加。用户铁证指出旧 audit 放过 `AppAccountSwitcherRouteContainer` 的首帧 `@Query` 和 Oasis 首帧路径 service fetch；本轮先让真实 Settings / Oasis 文件在 audit 下报红，再迁移真实消费者：账户切换器和 Settings sheet 走 `RouteFirstFrameDeferredLoad` / `RouteFirstFrameDeferredMount`，Oasis render snapshot 不再同步 fetch 当前主人钱包，审计增加 route/data `@Query` ratchet、unmarked direct fetch 零容忍和 `rewards.currentHumanBalance(context:)` service bypass 零容忍。验证：`scripts/audit-route-first-frame.sh --all` PASS（845 files）；`scripts/tests/run-audit-fixture-tests.sh` PASS，bad fixture 同时抓 `@Query` / sync fetch / service fetch；`xcodebuild test -allowProvisioningUpdates -project Ohana.xcodeproj -scheme Ohana -configuration LocalDeviceDebug -destination 'id=00008150-001270342EA3401C' -derivedDataPath /tmp/ohana-device-route-first-frame-p0 -only-testing:OhanaUITests/OhanaUITests/testFirstReleaseReachableHomeOasisAndSettingsSmoke CODE_SIGNING_ALLOWED=YES` PASS（1 UI test，53.049s，xcresult `/tmp/ohana-device-route-first-frame-p0/Logs/Test/Test-Ohana-2026.06.17_14-07-40-+0200.xcresult`）。结论：本 P0 不再只靠脚手架或旧物理证据，route-first-frame 假绿修复后的首建主人、首建宠、Home Oasis、FAB 注入、Settings 路径已由真机自动化复验。
+  - 记录：2026-06-30 simulator UI preflight 已通过 `OhanaUITests.testSingleHumanPetHomeAndFunctionMenuFeelComplete()` 覆盖 fresh 一人一宠：创建首个人类、创建首宠、关闭 starter gift、Oasis Lv0 -> Lv1 注入、回 Home 后通过 FAB -> More 打开 Function Menu root，并确认 `function-menu-group-dailyCare` 可见；同一测试在 Home 与 Function Menu 两处断言没有出现“添加更多人类 / 添加更多家庭成员 / 一个人不够 / Add another family member / more family members / one person is not enough”等单成员缺陷文案。通过证据：pinned `iPhone 17` simulator，`DERIVED_DATA_PATH=/tmp/OhanaDerivedData-gap8-single-member-function-menu-1782822600 scripts/test-simulator.sh '-only-testing:OhanaUITests/OhanaUITests/testSingleHumanPetHomeAndFunctionMenuFeelComplete'`，xcresult `/tmp/OhanaDerivedData-gap8-single-member-function-menu-1782822600/Logs/Test/Test-Ohana-2026.06.30_13-17-45-+0200.xcresult`。本项仍保留未勾选，等待最终真机视觉目检签字。
 
 - [ ] 打开家庭周报空态。
   - 预期：最近动态文案为照护动态语义，而不是“全家动态”或多人竞赛暗示。
@@ -313,35 +316,35 @@ iPhoneOS 编译和签名，`Ohana.app` 保留 development Push 与 iCloud entitl
 
 - [ ] 在真实 UI 中标记一只宠物离世。
   - 预期：确认文案表达“未来照护安排退出活跃提醒、数据保留、可撤销”，不出现“删除未来提醒 / 事件”。
-  - 记录：
+  - 记录：2026-06-30 simulator/source preflight 已通过 `OhanaUITests.testPetMemorialMarkCancelConfirmAndUndoFlow()` 覆盖取消/确认标记与结果读回，并通过 `MemberLifecycleGateTests.petMemorialConfirmationExplainsActiveReminderExitWithoutDeletionCopy()` 锁定确认文案为“未来照护安排退出活跃提醒、原有数据保留、可撤销”，且不出现“删除未来提醒 / 事件”语义；真机仍需确认物理设备上的 alert 展示与触控表现。
 
 - [ ] 标记宠物离世后遍历首页、FAB、全功能菜单、QuickCare、Feeding、Today Focus。
   - 预期：离世宠物不再作为活跃照护目标、任务目标、Today Focus 委托目标或快捷打卡目标出现。
-  - 记录：
+  - 记录：2026-06-30 simulator/source preflight 已通过 `OhanaUITests.testPetMemorialHidesHomeLiveCareEntrypoints()` 证明离世宠物重启后不再显示 Home 主卡和 Home quick actions，并在 Oasis Lv1 解锁后走 Home FAB -> More -> Function Menu -> daily care，证明 food aggregate 不再把该宠物作为活跃目标且不会打开 live pet route；同时通过 `MemberLifecycleGateTests.functionMenuSurfacesDoNotExposeDeceasedMembersAsActiveTargets()` 锁定全功能菜单聚合/分组/根视图只使用 active pets 与 visible active humans。真机仍需做一轮完整视觉遍历确认 FAB、QuickCare、Feeding、Today Focus 无设备展示遗漏。
 
 - [ ] 标记宠物离世后打开日历 / 提醒相关页面。
   - 预期：未来照护安排不再作为 active pending 提醒打扰；历史事件、历史记录和纪念资料仍可查看。
-  - 记录：
+  - 记录：2026-06-30 simulator preflight 已证明标记宠物离世会移除目标宠物的未来 active schedule 和对应提醒，同时保留过去历史与其他成员未来安排；真机仍需确认真实 UI 展示与系统通知不再到达。
 
 - [ ] 撤销宠物离世。
   - 预期：宠物回到在世状态；由纪念流程退场的未来照护安排恢复；用户自己跳过 / 删除 / 完成的提醒不会被误恢复。
-  - 记录：
+  - 记录：2026-06-30 simulator preflight 已通过 `OhanaUITests.testPetMemorialMarkCancelConfirmAndUndoFlow()` 证明撤销取消不会清除离世日期，撤销确认会恢复 live pet mark action；真机仍需确认物理设备 UI，并且系统通知恢复/重排仍归入下方通知项验证。
 
 - [ ] 真机允许通知后，验证离世与撤销的通知表现。
   - 预期：标记离世会取消该宠物未来本地通知；撤销后未来 pending 提醒可重新排程或在下次通知维护中恢复，不崩溃、不静默丢失数据。
-  - 记录：
+  - 记录：2026-06-30 simulator preflight 已证明宠物 / 人类进入纪念模式时，未来 active schedule 删除会把对应 notification id 分发到 app 的通知取消边界；真机仍需证明 iOS 实际取消已注册通知，以及撤销后真实 pending 通知能恢复或由维护任务重排。
 
 - [ ] 标记一位人类成员进入纪念模式。
   - 预期：该成员不再出现在首页主卡、功能菜单人类目标、Today Focus 体重委托、周报活跃贡献统计或奖励账户写入路径。
-  - 记录：
+  - 记录：2026-06-30 simulator/source preflight 已通过 `OhanaUITests.testHumanMemorialMarkCancelConfirmAndUndoFlow()` 覆盖人类纪念标记/撤销 UI，并通过 `MemberLifecycleGateTests.functionMenuSurfacesDoNotExposeDeceasedMembersAsActiveTargets()`、`MemberLifecycleGateTests.familyWeeklyReportActiveContributionExcludesDeceasedMembers()` 与 `MemberLifecycleGateTests.deceasedMembersRejectPresentationSecurityEconomyAndSettingsWrites()` 证明功能菜单目标、周报活跃贡献和奖励账户写入会排除离世人类；真机仍需确认首页/Today Focus 等物理设备展示。
 
 - [ ] 打开离世宠物 / 人类的资料、档案、历史记录和钱包历史。
   - 预期：历史仍可查看，纪念语气得体；钱包历史保留但不再产生新的奖励写入。
-  - 记录：
+  - 记录：2026-06-30 simulator/source preflight 已通过 `MemberLifecycleGateTests.memorialContentAllowsContentButNoCareOrEconomyDerivation()`、`MemberLifecycleGateTests.deceasedFeatureHubsExposeOnlyMemorialSafeDestinations()`、`MemberLifecycleGateTests.coconutHistoryKeepsFrozenMemberLedgerReadableWhileActiveTotalsExcludeThem()` 等测试证明纪念内容/档案入口可保留，活跃钱包合计排除冻结成员但历史 ledger 仍可读；真机仍需视觉确认资料、档案、历史和钱包页面的纪念语气。
 
 - [ ] 在设置页、成员详情危险区和全功能菜单中检查纪念状态与删除入口。
   - 预期：纪念退场不显示为“待删除 / 30 天后清理”状态；不存在回收站入口；删除仍是单独的不可恢复确认流程。
-  - 记录：
+  - 记录：2026-06-30 simulator/source preflight 已通过 `MemberLifecycleGateTests.memorialSurfacesDoNotUseRecycleBinOrPendingDeleteLanguage()` 证明纪念相关表面不使用回收站、待删除或 30 天清理语义，并通过 `OhanaUITests.testPetPermanentDeleteCancelAndWrongNameAreSafe()` 与 `OhanaUITests.testHumanPermanentDeleteCancelAndWrongNameAreSafe()` 覆盖永久删除仍是独立精确名称确认流程；真机仍需最终手动 smoke 确认设置页、成员详情危险区和全功能菜单展示。
 
 ## GAP-12 植物功能门
 
@@ -533,19 +536,21 @@ iPhoneOS 编译和签名，`Ohana.app` 保留 development Push 与 iCloud entitl
 
 - [ ] Medication / Notifications：创建宠物用药、人类用药、普通提醒和健康关键提醒，并在真机上点通知。
   - 预期：提醒按成员和优先级正确出现；健康关键提醒不被夜间/预算错误延后；通知点击进入 typed route；完成 / 跳过不会重复写账或跳到错误成员。
-  - 记录：
+  - 记录：2026-06-30 模拟器预检通过：`OhanaNotificationsSchedulingTests` 覆盖普通提醒预算上限与 skipped ledger、夜间延后且 App reminder 保持 pending、健康关键用药提醒绕过预算 / 合并 / 夜间延后、同日同成员同分类非用药合并、Observability 中文动作名、notification delegate 区分默认 tap 与 COMPLETE / SKIP / SNOOZE action payload（含 medication / humanMedication 上下文）、ambient once-per-day、关闭偏好跳过、宠物通知取消 subject resolution；`ReminderActionCoordinatorTests` 覆盖通知 action 窄查找、缺失 reminder 不写入、明天再说重排、manual feed complete / deceased executor、离世宠物 Calendar 通知不写历史 fact、Human medication 通知完成写 dose log、离世 Human medication action ignored、Pet medication 通知完成写 dose event / 扣 remaining amount / 重排；`HomeCommandExecutorTests` 覆盖宠物用药计划 create / update / delete 与 revision、人类用药计划 create / update / delete / activation / dose ledger / pending reversal、quick human medication fact / revision / deceased noop、普通 calendar / reminder command 边界；UI 侧 `testReminderObservabilityPanelOpensFromDebugSettings` 覆盖 Settings Debug -> Reminder Observability screen / ledger-card 可达。命令：`DERIVED_DATA_PATH=/tmp/OhanaDerivedData-medication-notifications-green-1782850800 scripts/test-simulator.sh '-only-testing:OhanaTests/OhanaNotificationsSchedulingTests' '-only-testing:OhanaTests/ReminderActionCoordinatorTests' '-only-testing:OhanaTests/HomeCommandExecutorTests' '-only-testing:OhanaUITests/OhanaUITests/testReminderObservabilityPanelOpensFromDebugSettings'`；结果：216 selected tests passed，0 failures，xcresult `/tmp/OhanaDerivedData-medication-notifications-green-1782850800/Logs/Test/Test-Ohana-2026.06.30_14-58-50-+0200.xcresult`。本项不关闭：真实 iOS notification permission / delivery、系统通知点按与 action delivery、Focus / DND / lockscreen 行为、`UNUserNotificationCenter` 前台呈现、长语言 banner / lockscreen 外观与真机手感仍需最终验收；Human medication add/readback UI 已由后续记录补齐。
+  - 记录：2026-06-30 已补 Human medication add/readback simulator UI 预检：`OhanaUITests.testHumanRecordOperationsPersistFromFeatureHub` 在 pinned `iPhone 17` simulator 通过，覆盖 fresh onboarding / starter gift 后从 Home 人类卡进入 Human Feature Hub，打开 Medication tile，创建 `Vitamin D` human medication，保存后重新进入 Medication tile 并回读到该药名；同一路径还回归 weight / expense / note 的保存与回读。命令：`DERIVED_DATA_PATH=/tmp/OhanaDerivedData-human-medication-ui-1782871200 scripts/test-simulator.sh '-only-testing:OhanaUITests/OhanaUITests/testHumanRecordOperationsPersistFromFeatureHub'`；结果：1 UI test passed，xcresult `/tmp/OhanaDerivedData-human-medication-ui-1782871200/Logs/Test/Test-Ohana-2026.06.30_17-12-54-+0200.xcresult`。本项仍不勾选：真实 iOS notification permission / delivery、系统通知点按与 action delivery、Focus / DND / lockscreen 行为、`UNUserNotificationCenter` 前台呈现、长语言 banner / lockscreen 外观与真机手感仍需最终验收。
 
 - [ ] Calendar / DashboardRecords / CareLedger：用密集样本打开日历、统计趋势、照护账本并切换筛选。
   - 预期：首屏不空白；长列表滚动稳定；筛选后不出现已删除成员、已离世 active 写入或错误 subject；账本与照护事实能互相解释。
-  - 记录：
+  - 记录：2026-06-30 模拟器预检通过：`HomeCommandExecutorTests` 在 pinned `iPhone 17` simulator 覆盖 Calendar plan/reminder create、recurring、blank-title skip、completion -> care fact + undo、missing-executor fallback fact write、recurring split/truncate delete、create/complete/delete revision，以及 DashboardRecords / CareLedger 的 weight/expense/shared-expense fallback、delete fact + ledger/revision 边界；UI 侧 `testPetCalendarFilterShowsOnlyPetLinkedEvents`、`testPetCalendarHealthEventRowOpensHealthDetail`、`testPetWaterPlanCalendarEventAppearsAndDeletesFromQuickCareDetail` 覆盖 Calendar all/pet filter、pet health row deep-link、Water plan Calendar save/delete readback。命令：`DERIVED_DATA_PATH=/tmp/OhanaDerivedData-calendar-dashboard-careledger-green-1782842400 scripts/test-simulator.sh '-only-testing:OhanaTests/HomeCommandExecutorTests' '-only-testing:OhanaUITests/OhanaUITests/testPetCalendarFilterShowsOnlyPetLinkedEvents' '-only-testing:OhanaUITests/OhanaUITests/testPetCalendarHealthEventRowOpensHealthDetail' '-only-testing:OhanaUITests/OhanaUITests/testPetWaterPlanCalendarEventAppearsAndDeletesFromQuickCareDetail'`；结果：194 selected tests passed，0 failures，xcresult `/tmp/OhanaDerivedData-calendar-dashboard-careledger-green-1782842400/Logs/Test/Test-Ohana-2026.06.30_14-34-13-+0200.xcresult`。本项不关闭：密集样本长列表滚动、Dashboard trend / CareLedger 可视筛选、deleted / passed-away / legacy sample 目检与真机手感仍需最终验收。
+  - 记录：2026-06-30 追加密集样本 / 账本快照预检通过：`DenseDataSnapshotPerformanceTests` 用 4 pets、4 humans、2 electronic pets、18,000+ events、200+ reminders、100+ tasks、500+ ledger entries、50+ photos 的 fixture 覆盖 Home / Today Focus / Calendar timeline snapshot 预算与 memorial / privacy-locked 维度；`HomeExpensePreviewStoreTests` 覆盖 QuickAction detail / dashboard 从 ledger 读取并按 subject、kind、月份过滤排序；`CareLedgerBackfillActorTests` 覆盖 idempotent backfill、partial-resume 去重、orphan legacy pet logs、pet weight kg 转换、hygiene backfill 和跨 batch care log 处理。命令：`DERIVED_DATA_PATH=/tmp/OhanaDerivedData-calendar-careledger-dense-1782865200 scripts/test-simulator.sh '-only-testing:OhanaTests/DenseDataSnapshotPerformanceTests' '-only-testing:OhanaTests/HomeExpensePreviewStoreTests' '-only-testing:OhanaTests/CareLedgerBackfillActorTests'`；结果：26 tests passed，0 failures，xcresult `/tmp/OhanaDerivedData-calendar-careledger-dense-1782865200/Logs/Test/Test-Ohana-2026.06.30_15-20-42-+0200.xcresult`。本项仍不关闭：真实长列表滚动、Dashboard trend / CareLedger 可视筛选、deleted / passed-away / legacy sample 目检与真机手感仍需最终验收。
 
 - [ ] Expenses / Insurance / Documents：添加票据、保单附件、文档附件，并执行删除。
   - 预期：附件可预览；费用 / 保费 / 理赔写入后账本可见；确认删除后附件、费用事实和关联入口退出普通 UI；没有恢复或回收站入口。
-  - 记录：
+  - 记录：2026-06-30 模拟器预检通过：`InsuranceExpenseLedgerTests` 覆盖保单自动缴费写 expense + CareLedger、理赔报销写负向 expense + CareLedger、重复批准不重复写入且不发奖励；`ExpenseReceiptSupportTests` 覆盖保险缴费日期、保险文档费用计划、报销去重、费用汇总、收据附件草稿和中英德文案；`PrivacyHardeningTests` 覆盖图片附件 GPS 元数据清洗、PDF 原始字节保留、收据 / 文档 command 保存前清洗；`PhysicalDeletionServiceTests` 覆盖文档删除同步删除附件并写 tombstone、宠物物理删除级联移除 expense / document / attachment / insurance / claim / CareLedger；`HomeCommandExecutorTests` 覆盖 pet expense 创建收据文档 + 双附件 + ledger、pet document create/update/delete revision、insurance policy/claim create/deactivate/delete revision、保单日历/缴费计划和理赔报销；UI 侧 `testHumanRecordOperationsPersistFromFeatureHub` 覆盖 Human Feature Hub 添加 expense 并回读 note。命令：`DERIVED_DATA_PATH=/tmp/OhanaDerivedData-expense-insurance-documents-1782844800 scripts/test-simulator.sh '-only-testing:OhanaTests/InsuranceExpenseLedgerTests' '-only-testing:OhanaTests/ExpenseReceiptSupportTests' '-only-testing:OhanaTests/PrivacyHardeningTests' '-only-testing:OhanaTests/PhysicalDeletionServiceTests' '-only-testing:OhanaTests/HomeCommandExecutorTests' '-only-testing:OhanaUITests/OhanaUITests/testHumanRecordOperationsPersistFromFeatureHub'`；结果：219 selected tests passed，0 failures，xcresult `/tmp/OhanaDerivedData-expense-insurance-documents-1782844800/Logs/Test/Test-Ohana-2026.06.30_14-42-30-+0200.xcresult`。本项不关闭：真实相册 / 文件选择、票据 / 保单 / 文档附件预览、UI 删除后入口消失目检和真机手感仍需最终验收。
 
-- [ ] Privacy / Security：设置 PIN、锁定隐私字段、切换查看者并执行解锁 / 失败解锁。
-  - 预期：锁定内容不泄漏在首页、成员详情、财富页、筛选器和分享文案；解锁后只恢复授权内容；PIN/锁屏 UI 在真机上不破版。
-  - 记录：
+- [ ] Privacy / Security：确认首发本地模式隐藏成员级隐私 / PIN 控件，并保留未来多设备成员保护的命令边界。
+  - 预期：同一设备内切换成员只改变后续记录归属，不遮挡本地成员资料；Settings 不暴露成员隐私 / PIN 设置入口；已存 privateFields 与 passcode 命令边界保留但不作为首发 UI / 遮挡策略；多设备 / 多真人账户下的跨查看者隐藏验收延后到对应同步身份阶段。
+  - 记录：2026-06-30 旧模拟器预检曾证明成员级 PIN / privateFields 命令边界、backup passcode 排除、inactive/deceased 写入拒绝，以及 Settings all-private/all-open UI 回读；该 UI 证据已被首发本地产品策略取代，不再作为 launch acceptance。保留有效部分：`HomeCommandExecutorTests`、`OhanaTests.humanPasscodeValidatesHashesAndLocksAfterFailures`、`OhanaTests.humanPasscodeIsNotIncludedInBackupAndRestore`、`MemberLifecycleGateTests.deceasedMembersRejectPresentationSecurityEconomyAndSettingsWrites` 仍覆盖未来命令边界与备份安全。当前首发验收改为：Settings check-in identity 可切换，成员隐私 / PIN 控件不可达，同设备 viewer 切换后成员资料仍可见。最新验证：`DERIVED_DATA_PATH=/tmp/OhanaDerivedData-human-local-privacy-1782913600 scripts/test-simulator.sh '-only-testing:OhanaTests/OhanaTests/privacyServiceMapsHumanQuickActions()' '-only-testing:OhanaTests/OhanaTests/backupRestoresHumanFieldsAndLogRelationships()' '-only-testing:OhanaTests/OhanaTests/privacyServiceCoversHumanSensitiveActions()' '-only-testing:OhanaTests/DenseDataSnapshotPerformanceTests'` PASS（4 Swift Testing tests，xcresult `/tmp/OhanaDerivedData-human-local-privacy-1782913600/Logs/Test/Test-Ohana-2026.06.30_22-11-35-+0200.xcresult`）；`DERIVED_DATA_PATH=/tmp/OhanaDerivedData-human-local-privacy-1782913600 scripts/test-simulator.sh '-only-testing:OhanaUITests/OhanaUITests/testHumanSettingsAccountSwitcherHidesLocalPrivacyControls' '-only-testing:OhanaUITests/OhanaUITests/testHumanProfileStaysVisibleWhenViewedByOtherLocalMember'` PASS（2 UI tests，xcresult `/tmp/OhanaDerivedData-human-local-privacy-1782913600/Logs/Test/Test-Ohana-2026.06.30_22-17-19-+0200.xcresult`）。
 
 - [ ] Onboarding / CrewRoster / FunctionMenu：从全新安装或 App reset 后走首启、建主人、建宠物、切换成员并遍历全功能菜单。
   - 预期：首启没有空白或死路；单人单宠可完成核心路径；功能菜单只显示首发可达功能；联机和植物入口仍被门禁收起。
@@ -570,23 +575,26 @@ iPhoneOS 编译和签名，`Ohana.app` 保留 development Push 与 iCloud entitl
 
 - [ ] PetCare / CatCare / Hygiene / Moments：执行快捷照护、猫砂、护理和 quick moment。
   - 预期：事实保存、奖励反馈、账本、Today Focus 状态和历史记录一致；重复点击不会重复奖励；已故对象只读或 no-op。
-  - 记录：
+  - 记录：2026-06-30 已补一轮模拟器 / 业务层预检：`HomeCommandExecutorTests` 在 pinned `iPhone 17` simulator 上整套通过（191 tests），覆盖 Home 快捷照护、喂食计划 / 手动喂食、Water、Potty / litter、Hygiene、Health、Play、quick moment、Pet Photo Album、CareLedger / reward / cooldown / duplicate guard、已故 / 冻结钱包 fallback，以及 CatCare litter record / undo / revision 等命令边界；其中 `quickMomentServiceWritesPhotoFactAndLedger()`、`momentCommandExecutorPublishesQuickMomentRevision()`、`repeatableMomentRewardUsesBudgetAndCooldownPipeline()` 证明 quick moment 会写入照片事实 / ledger、发布 revision，并走预算与冷却奖励管线。验证：`DERIVED_DATA_PATH=/tmp/OhanaDerivedData-moments-petcare-preflight-1782829200 scripts/test-simulator.sh '-only-testing:OhanaTests/HomeCommandExecutorTests'` PASS（191 tests，xcresult `/tmp/OhanaDerivedData-moments-petcare-preflight-1782829200/Logs/Test/Test-Ohana-2026.06.30_14-04-57-+0200.xcresult`）。更早一次只筛 3 个 Swift Testing 方法的命令实际执行 0 tests，已丢弃不计证据。本项仍不勾选：现有 Pet GUI 长会话和本轮业务层已覆盖大部分模拟器可验证内容，但最终真机视觉手感、长时间连续点击、历史记录跨页读回和低性能设备手感仍需人工签收。
 
 - [ ] Achievements / Milestones / GrowthUnlock / Wishlist：完成一次成就领取、里程碑创建、成长解锁查看和心愿单兑换。
   - 预期：奖励和消费都进入正确钱包/账本；余额不足和冻结钱包反馈得体；长文案不遮挡主要按钮。
-  - 记录：
+  - 记录：2026-06-30 已补模拟器 / 业务层预检：`HomeCommandExecutorTests`、`HumanWishlistCommandTests`、`GrowthUnlockPolicyTests` 与 `OhanaUITests.testHumanWishlistRedeemSpendsCoconutsFromFeatureHub` 在 pinned `iPhone 17` simulator 上同批通过。业务层覆盖成就奖励领取只写一次并进入 ledger、冻结钱包不领取、宠物里程碑 seed / 创建奖励 / 删除 ledger、心愿单创建 / 兑换 / 删除 revision、余额不足 no-op、成长解锁策略与 roadmap 可见性；UI 层覆盖 fresh onboarding 后从 Human Feature Hub 创建心愿并完成兑换，验证 `human-wishlist-redeemed-state`。验证：`DERIVED_DATA_PATH=/tmp/OhanaDerivedData-achievements-growth-wishlist-1782832800 scripts/test-simulator.sh '-only-testing:OhanaTests/HomeCommandExecutorTests' '-only-testing:OhanaTests/HumanWishlistCommandTests' '-only-testing:OhanaTests/GrowthUnlockPolicyTests' '-only-testing:OhanaUITests/OhanaUITests/testHumanWishlistRedeemSpendsCoconutsFromFeatureHub'` PASS（unit side: 204 tests in 3 suites；UI side: 1 test；xcresult `/tmp/OhanaDerivedData-achievements-growth-wishlist-1782832800/Logs/Test/Test-Ohana-2026.06.30_14-08-20-+0200.xcresult`）。本项仍不勾选：成就墙 / 里程碑 / 成长解锁的真实 UI 文案、按钮遮挡与真机触感尚未逐项人工签收，当前证据主要证明业务边界和心愿单 UI 兑换。
 
 - [ ] HumanHealth / HumanNotes / Workouts：添加、查看、删除人类健康、笔记和锻炼记录。
-  - 预期：隐私字段按查看者生效；删除后普通入口不再显示；不会产生错误奖励或错误成员 revision。
-  - 记录：
+  - 预期：首发本地同设备查看者切换不遮挡成员资料；删除后普通入口不再显示；不会产生错误奖励或错误成员 revision。
+  - 记录：2026-06-30 已补模拟器 / 业务层预检：`HomeCommandExecutorTests` 与 `OhanaUITests.testHumanExtendedModuleOperationsPersistFromFeatureHub` 在 pinned `iPhone 17` simulator 上同批通过。业务层覆盖 quick / detail workout 写入 ledger、workout 删除移除 fact 与 ledger、health metric 写入 / 删除、health report 创建 / 更新 / 删除与 revision、human note 写入附件 / reminder 与删除 no-op 边界，并覆盖 quick workout / medication / metric / note revision 发布；UI 层覆盖 fresh onboarding 后从 Human Feature Hub 添加健康指标、锻炼记录、健康报告、心愿单和 Basic Info 个人资料笔记并完成回读。验证：`DERIVED_DATA_PATH=/tmp/OhanaDerivedData-human-health-notes-workouts-1782836400 scripts/test-simulator.sh '-only-testing:OhanaTests/HomeCommandExecutorTests' '-only-testing:OhanaUITests/OhanaUITests/testHumanExtendedModuleOperationsPersistFromFeatureHub'` PASS（unit side: 191 tests；UI side: 1 test；xcresult `/tmp/OhanaDerivedData-human-health-notes-workouts-1782836400/Logs/Test/Test-Ohana-2026.06.30_14-13-57-+0200.xcresult`）。本项当时仍不勾选；后续记录继续补齐删除与隐私查看者切换，最终仍需真机键盘 / 长文案 / 手感逐项人工签收。
+  - 记录：2026-06-30 已补删除后入口消失的 simulator UI 预检：`OhanaUITests.testHumanExtendedModuleDeletesDisappearFromFeatureHub` 在 pinned `iPhone 17` simulator 通过，覆盖 fresh onboarding 后从 Human Feature Hub 创建并删除 TSH 健康指标、Workout、Health Report 和 Human Note，并逐项断言删除后可见入口 / 行不再存在。过程中修复真实可达性 / 路由缺口：Human Feature Hub -> Checkup Metrics 加回 `NavigationStack` 以允许进入指标详情；TSH metric detail 补稳定 delete action 标识和可点击 hit area；Home 人类 workout quick action 支持长按进入 history/detail；Workout history 关闭按钮补 `human-workout-close-action`，UI test 关闭 helper 不再把隐私锁按钮误当返回键。验证：`DERIVED_DATA_PATH=/tmp/OhanaDerivedData-human-delete-ui-current-1782867600 scripts/test-simulator.sh '-only-testing:OhanaUITests/OhanaUITests/testHumanExtendedModuleDeletesDisappearFromFeatureHub'` PASS（1 UI test，xcresult `/tmp/OhanaDerivedData-human-delete-ui-current-1782867600/Logs/Test/Test-Ohana-2026.06.30_16-12-39-+0200.xcresult`）。本项仍不勾选：隐私查看者切换已由后续记录补齐；真机键盘 / 长文案 / 手感，以及真实设备上的最终视觉签收仍未完成。
+  - 记录：2026-06-30 旧“隐私查看者切换”模拟器预检曾证明 all-private owner 对 viewer 显示 private lock；该验收已被首发本地策略取代。当前期望是 `OhanaUITests.testHumanProfileStaysVisibleWhenViewedByOtherLocalMember`：fresh owner + viewer、切换 active human 到 viewer、通过 UI-test typed Human profile route 打开 owner profile，并断言不出现 private profile lock。该测试已在 pinned `iPhone 17` simulator 通过（见 Privacy / Security 条目同一 xcresult）。本项仍不勾选：真机键盘 / 长文案 / 手感，以及真实设备上的最终视觉签收仍未完成。
 
 - [ ] PhotoAlbum / FamilyReports：打开相册大图、批量照片样本和家庭周报。
   - 预期：大图不卡死、不泄漏隐私附件；周报只表达照护周报，不出现悬赏榜、协作排行或多人竞赛暗示。
-  - 记录：
+  - 记录：2026-06-30 已完成家庭周报中可由模拟器覆盖的语义预检：周报贡献文案改为照护摘要 / 照护者语义并用 `SingleMemberFamilyShapePresentationTests` 阻止“排行 / 最多 / 本周之星 / ranking / Most care / Star of the week”等竞赛文案回流；`FamilyWeeklyReportDashboardView` 补稳定 UI 标识；`ManualFeedCommandTests.quickFeedManualRecordAppearsInWeeklyReportEntries()` 证明 QuickFeed 手动喂食写出的 `CareLedgerEvent` 会进入周报统计条目；`OhanaUITests.testFamilyWeeklyReportOpensFromDebugSettingsWithoutCompetitionCopy` 通过 Settings UI-test shortcut 在 iPhone 17 simulator 打开家庭周报并验证 screen、成员贡献卡、最近活动卡和无竞赛文案。验证：`DERIVED_DATA_PATH=/tmp/OhanaDerivedData-family-weekly-report-semantics-1782824400 scripts/test-simulator.sh '-only-testing:OhanaTests/ManualFeedCommandTests'` PASS（23 tests，xcresult `/tmp/OhanaDerivedData-family-weekly-report-semantics-1782824400/Logs/Test/Test-Ohana-2026.06.30_13-57-54-+0200.xcresult`）；`DERIVED_DATA_PATH=/tmp/OhanaDerivedData-family-weekly-report-semantics-1782824400 scripts/test-simulator.sh '-only-testing:OhanaUITests/OhanaUITests/testFamilyWeeklyReportOpensFromDebugSettingsWithoutCompetitionCopy'` PASS（1 UI test，xcresult `/tmp/OhanaDerivedData-family-weekly-report-semantics-1782824400/Logs/Test/Test-Ohana-2026.06.30_13-58-30-+0200.xcresult`）。本项仍不勾选：相册大图、批量照片样本、隐私附件泄漏检查、以及最终真机视觉 / 性能手感签收还未完成。
+  - 记录：2026-06-30 已补相册侧模拟器预检与一个真实隐私缺口修复：`PetPhotoAlbumCommandService.createPhotos` 与 `MomentCommandService.recordMoment` 入库 `PetPhotoLog.imageData` 前复用 `AttachmentPrivacySanitizer` 清洗图片 bytes，防止 EXIF GPS 等源图片元数据进入 SwiftData，同时保留 quick moment 显式位置字段。`PrivacyHardeningTests` 新增 `petPhotoAlbumSanitizesImageBytesBeforeSave()` 与 `quickMomentSanitizesPhotoBytesBeforeSave()`，连同既有附件隐私测试在 pinned `iPhone 17` simulator 通过（8 tests，xcresult `/tmp/OhanaDerivedData-photoalbum-privacy-1782861600/Logs/Test/Test-Ohana-2026.06.30_15-13-42-+0200.xcresult`）。相册业务边界同批预检通过：`HomeCommandExecutorTests` 覆盖相册批量 create / note update / delete、revision 发布和 tombstone；`CareCompletionChokepointCharacterizationTests` 覆盖 quick moment 照片事实不混入 care facts / ledger / reward 以及离世宠物 memorial moment 只写照片；`PhysicalDeletionServiceTests` 覆盖永久删除宠物级联移除 `PetPhotoLog`；`DenseDataSnapshotPerformanceTests` 覆盖 dense fixture 至少 50 条照片样本；`MemberLifecycleGateTests` 覆盖相册 / moments timeline 使用 route-scoped photo rows 而非 `pet.photoLogs` 广读，以及离世宠物 memorial photo 无照护派生。验证命令：`DERIVED_DATA_PATH=/tmp/OhanaDerivedData-photoalbum-privacy-1782861600 scripts/test-simulator.sh '-only-testing:OhanaTests/HomeCommandExecutorTests' '-only-testing:OhanaTests/CareCompletionChokepointCharacterizationTests' '-only-testing:OhanaTests/PhysicalDeletionServiceTests' '-only-testing:OhanaTests/DenseDataSnapshotPerformanceTests' '-only-testing:OhanaTests/MemberLifecycleGateTests'` PASS（330 tests，xcresult `/tmp/OhanaDerivedData-photoalbum-privacy-1782861600/Logs/Test/Test-Ohana-2026.06.30_15-16-30-+0200.xcresult`）。本项仍不勾选：真实 PhotosPicker 权限 / picker 行为、相册大图 viewer、真实批量照片样本的视觉与性能、以及最终真机视觉 / 隐私 / 手感签收还未完成。
 
 - [ ] Memorial / Plants：打开纪念对象历史资料，并用带历史植物数据的样本遍历首页、Today Focus、Oasis、FunctionMenu。
   - 预期：纪念对象历史可读但无活跃写入；首发植物功能不可达，历史植物数据不影响当前可见状态或奖励。
-  - 记录：
+  - 记录：2026-06-30 模拟器预检通过：植物 / route 侧 `PlantFeatureGateXCTests`、`PlantLaunchTests`、`HomeRouteCoordinatorTests` 在 pinned `iPhone 17` simulator 通过，覆盖 Plant entry surface 需 Lv4 或 existing plant data grandfather、locked preview / catalog favorite 不解锁入口、植物任务只在 includesPlants 时生成、Plant FunctionMenu / AddEntity 在 Lv4 前导向 growth roadmap、Lv4 后才允许进入、历史植物 care logs / photos / reminder preferences backup round-trip、植物 reminder materialization / mute / defer / deep-link、植物 Calendar completion / reminder completion 写 care log + ledger、聚合植物任务完成条件、植物照护奖励 / 冷却 / member daily budget / Oasis care echo / shop free boundary。纪念生命周期侧完整 `MemberLifecycleGateTests` 通过，覆盖 memorial content 允许历史/档案内容但不允许 care fact / derived effects / economy、离世对象 Feature Hub 只暴露 memorial-safe destinations、纪念文案不使用回收站 / 待删除 / 30-day 语义、冻结钱包历史 ledger 仍可读但 active total 排除、FunctionMenu / 周报活跃贡献排除离世成员、离世对象不能写 walk goal / summary / care facts / family tasks / privacy/security/economy/settings，且 memorial photo 可写但无照护派生。命令：`DERIVED_DATA_PATH=/tmp/OhanaDerivedData-memorial-plants-1782852600 scripts/test-simulator.sh '-only-testing:OhanaTests/PlantFeatureGateXCTests' '-only-testing:OhanaTests/PlantLaunchTests' '-only-testing:OhanaTests/HomeRouteCoordinatorTests'`，结果 84 tests passed，xcresult `/tmp/OhanaDerivedData-memorial-plants-1782852600/Logs/Test/Test-Ohana-2026.06.30_15-08-34-+0200.xcresult`；`DERIVED_DATA_PATH=/tmp/OhanaDerivedData-memorial-plants-1782852600 scripts/test-simulator.sh '-only-testing:OhanaTests/MemberLifecycleGateTests'`，结果 102 tests passed，xcresult `/tmp/OhanaDerivedData-memorial-plants-1782852600/Logs/Test/Test-Ohana-2026.06.30_15-07-40-+0200.xcresult`。本项不关闭：真机仍需用实际纪念对象历史资料和带历史植物数据样本遍历 Home / Today Focus / Oasis / FunctionMenu，确认视觉入口、长列表/长文案、历史资料语气和手感；本轮没有跑植物完整 GUI create/care/delete 长链，也没有替代真实历史样本目检。
 
 ## 验收后记录规则
 

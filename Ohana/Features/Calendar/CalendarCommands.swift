@@ -97,6 +97,142 @@ enum CalendarEventPlanCommandService {
         )
     }
 
+    @discardableResult
+    @MainActor
+    static func updateEvent(
+        event: Event,
+        input: CalendarEventPlanCommandInput,
+        context: ModelContext,
+        scheduleNotifications: Bool = true,
+        reminderScheduling providedReminderScheduling: ReminderSchedulingManaging? = nil,
+        now: Date = Date()
+    ) -> CalendarEventPlanCommandResult? {
+        guard !input.cleanTitle.isEmpty else { return nil }
+        let intent = DomainScheduleCreateIntent(
+            title: input.cleanTitle,
+            startDate: input.startDate,
+            endDate: nil,
+            isAllDay: input.isAllDay,
+            eventType: input.eventType.rawValue,
+            relatedEntityType: input.relatedEntityType,
+            relatedEntityId: input.relatedEntityId,
+            recurrenceDays: input.recurrenceDays,
+            recurrenceEndDate: input.recurrenceEndDate,
+            reminderLeadMinutes: input.reminderLeadMinutes,
+            assigneeId: input.assigneeId,
+            writeKind: writeKind(for: input),
+            source: .userCommand
+        )
+        guard let mutation = DomainScheduleWriteAuthorizer.authorizeExistingEventUpdate(
+            event: event,
+            intent: intent,
+            writeKind: writeKind(for: input),
+            source: .userCommand,
+            context: context
+        ) else {
+            return nil
+        }
+
+        guard DomainScheduleWriter.updateEvent(event, intent: intent, mutation: mutation) else {
+            return nil
+        }
+        CloudSyncMutationRecorder.markModified(event, context: context, modifiedAt: now)
+        replaceReminders(
+            for: event,
+            context: context,
+            now: now
+        )
+
+        let reminderDates = reminderDates(for: input)
+        let createdReminders: [Reminder]
+        if reminderDates.isEmpty {
+            createdReminders = []
+        } else if let reminderMutation = DomainScheduleWriteAuthorizer.authorizeExistingEventMutation(
+            event: event,
+            writeKind: writeKind(for: input),
+            source: .userCommand,
+            context: context
+        ) {
+            createdReminders = DomainScheduleWriter.createReminders(
+                for: event,
+                scheduledAt: reminderDates,
+                mutation: reminderMutation,
+                context: context
+            )
+            for reminder in createdReminders {
+                CloudSyncMutationRecorder.markModified(reminder, context: context, modifiedAt: now)
+            }
+        } else {
+            createdReminders = []
+        }
+        context.safeSave()
+
+        let shouldScheduleReminders = scheduleNotifications && !createdReminders.isEmpty
+        if shouldScheduleReminders {
+            let reminderScheduling = providedReminderScheduling ?? ReminderSchedulingManager()
+            Task { @MainActor in
+                await reminderScheduling.scheduleManyIfNeeded(
+                    reminders: createdReminders,
+                    context: context,
+                    source: .calendar
+                )
+            }
+        }
+
+        return CalendarEventPlanCommandResult(
+            eventID: event.id,
+            reminderIDs: createdReminders.map(\.id),
+            affectedSubjectIDs: DomainScheduleSubjectResolver.resolve(intent: intent, context: context).affectedEntityIDs,
+            scheduledReminderSync: shouldScheduleReminders
+        )
+    }
+
+    @discardableResult
+    @MainActor
+    private static func replaceReminders(
+        for event: Event,
+        context: ModelContext,
+        now: Date
+    ) -> [DomainScheduleDeleteResult] {
+        let existingReminders = event.reminders
+        return existingReminders.compactMap { reminder in
+            guard let mutation = DomainScheduleWriteAuthorizer.authorizeExistingReminderMutation(
+                reminder: reminder,
+                writeKind: writeKind(for: event),
+                source: .userCommand,
+                context: context
+            ) else { return nil }
+            let result = DomainScheduleWriter.deleteReminder(
+                reminder,
+                mutation: mutation,
+                context: context,
+                deletedAt: now
+            )
+            DomainScheduleEffectsDispatcher.dispatch(delete: result)
+            return result
+        }
+    }
+
+    private static func reminderDates(for input: CalendarEventPlanCommandInput, calendar: Calendar = .current) -> [Date] {
+        guard let leadMinutes = input.reminderLeadMinutes else { return [] }
+        if input.recurrenceDays >= 1, let recurrenceEndDate = input.recurrenceEndDate {
+            var dates: [Date] = []
+            var cursor = input.startDate
+            var safetyCount = 0
+            while cursor <= recurrenceEndDate, safetyCount < maxReminderOccurrences {
+                dates.append(calendar.date(byAdding: .minute, value: -leadMinutes, to: cursor) ?? cursor)
+                guard let next = calendar.date(byAdding: .day, value: input.recurrenceDays, to: cursor),
+                      next > cursor else {
+                    break
+                }
+                cursor = next
+                safetyCount += 1
+            }
+            return dates
+        }
+        return [calendar.date(byAdding: .minute, value: -leadMinutes, to: input.startDate) ?? input.startDate]
+    }
+
     private static func writeKind(for input: CalendarEventPlanCommandInput) -> MemberWriteKind {
         switch input.eventType {
         case .birthday, .anniversary:
@@ -106,6 +242,20 @@ enum CalendarEventPlanCommandService {
              .fertilizing, .plantRepotting, .plantPruning, .plantMisting, .plantRotation,
              .plantLeafCleaning, .plantPestCheck, .plantHealthCheck,
              .medication, .petMedication, .petMedicationDose, .insurancePremium:
+            .care
+        }
+    }
+
+    private static func writeKind(for event: Event) -> MemberWriteKind {
+        switch EventType(rawValue: event.eventType) {
+        case .birthday, .anniversary:
+            .memorialContentWithOptionalDerivations
+        case .daily, .health, .task, .shoppingList, .chore, .vaccine, .externalDeworming,
+             .internalDeworming, .grooming, .vetVisit, .foodChange, .litterBox, .watering,
+             .fertilizing, .plantRepotting, .plantPruning, .plantMisting, .plantRotation,
+             .plantLeafCleaning, .plantPestCheck, .plantHealthCheck,
+             .medication, .petMedication, .petMedicationDose, .insurancePremium,
+             .none:
             .care
         }
     }
@@ -616,6 +766,32 @@ struct CalendarCommandExecutor {
         revisions.publishCalendarEventPlan(
             result,
             note: result.scheduledReminderSync ? "calendar.event.created.reminders" : "calendar.event.created"
+        )
+        return result
+    }
+
+    @discardableResult
+    func updateEvent(event: Event, input: CalendarEventPlanCommandInput) -> CalendarEventPlanCommandResult? {
+        let command = DomainCommand.calendarEventPlan(eventID: event.id)
+        guard let result = CalendarEventPlanCommandService.updateEvent(
+            event: event,
+            input: input,
+            context: context,
+            reminderScheduling: reminderScheduling
+        ) else {
+            derivations.derive(
+                .noOp(
+                    command: command,
+                    affectedEntityIDs: [event.id],
+                    note: "calendar.event.update.noop"
+                )
+            )
+            return nil
+        }
+
+        revisions.publishCalendarEventPlan(
+            result,
+            note: result.scheduledReminderSync ? "calendar.event.updated.reminders" : "calendar.event.updated"
         )
         return result
     }

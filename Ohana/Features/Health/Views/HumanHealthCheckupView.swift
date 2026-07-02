@@ -276,6 +276,7 @@ struct HumanHealthCheckupView: View {
             en: "View \(metric.displayName(l)) tracking chart",
             de: "Tracking-Diagramm für \(metric.displayName(l)) anzeigen"
         ))
+        .accessibilityIdentifier("human-health-metric-chart-\(metric.key)")
     }
 
     private var countryTitle: String {

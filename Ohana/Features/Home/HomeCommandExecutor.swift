@@ -515,33 +515,56 @@ struct HomeCommandExecutor {
         return stored.isEmpty ? nil : stored
     }
 
-    func recordPlantCare(_ type: PlantCareType, plant: Plant, executorId: String?, careNote: String = "") {
+    func recordPlantCare(
+        _ type: PlantCareType,
+        plant: Plant,
+        executorId: String?,
+        careNote: String = "",
+        photoData: Data? = nil,
+        healthStatus: PlantHealthStatus? = nil
+    ) {
         PlantCareCommandExecutor(context: modelContext, revisions: revisions).recordCare(
             type,
             plant: plant,
             executorId: executorId,
             note: "home.plantCare",
-            careNote: careNote
+            careNote: careNote,
+            photoData: photoData,
+            healthStatus: healthStatus
         )
     }
 
-    func recordPlantCare(_ type: PlantCareType, plantID: UUID, executorId: String?, careNote: String = "") {
+    func recordPlantCare(
+        _ type: PlantCareType,
+        plantID: UUID,
+        executorId: String?,
+        careNote: String = "",
+        photoData: Data? = nil,
+        healthStatus: PlantHealthStatus? = nil
+    ) {
         guard let plant = fetchPlant(id: plantID) else {
             publishNoop(.plantCare(plantID: plantID, action: type.rawValue), note: "home.plantCare.missingPlant")
             return
         }
-        recordPlantCare(type, plant: plant, executorId: executorId, careNote: careNote)
+        recordPlantCare(type, plant: plant, executorId: executorId, careNote: careNote, photoData: photoData, healthStatus: healthStatus)
     }
 
     @discardableResult
-    func recordPlantCare(_ type: PlantCareType, plantIDs: [UUID], executorId: String?, careNote: String = "") -> [UUID] {
+    func recordPlantCare(
+        _ type: PlantCareType,
+        plantIDs: [UUID],
+        executorId: String?,
+        careNote: String = "",
+        photoData: Data? = nil,
+        healthStatus: PlantHealthStatus? = nil
+    ) -> [UUID] {
         var recordedIDs: [UUID] = []
         for plantID in plantIDs {
             guard let plant = fetchPlant(id: plantID) else {
                 publishNoop(.plantCare(plantID: plantID, action: type.rawValue), note: "home.plantCare.missingPlant")
                 continue
             }
-            recordPlantCare(type, plant: plant, executorId: executorId, careNote: careNote)
+            recordPlantCare(type, plant: plant, executorId: executorId, careNote: careNote, photoData: photoData, healthStatus: healthStatus)
             recordedIDs.append(plantID)
         }
         return recordedIDs

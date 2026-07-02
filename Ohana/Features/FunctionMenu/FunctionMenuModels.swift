@@ -64,8 +64,13 @@ enum FMDest: Hashable {
     case petWeight(PersistentIdentifier)
     case petExpense(PersistentIdentifier)
     case humanWeight(PersistentIdentifier)
+    case humanWorkout(PersistentIdentifier)
+    case humanMedication(PersistentIdentifier)
+    case humanNote(PersistentIdentifier)
     case humanExpense(PersistentIdentifier)
     case plantsDashboard
+    case plantsList
+    case plantsPhotos
     case plantDetail(UUID)
     case growthRoadmap
     case wealthDashboard

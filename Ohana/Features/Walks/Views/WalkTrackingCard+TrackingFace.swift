@@ -31,15 +31,22 @@ extension WalkTrackingCard {
     @ViewBuilder
     var mapBackground: some View {
         if isRunningWalk {
+            let routeStyle = WalkTrackingMapPresentationPolicy.routeVisualStyle(for: mgr.phase)
             // 活跃遛狗中：实时位置地图
             Map(position: $cameraPosition) {
                 UserAnnotation()
                 RainbowRoutePolyline(
                     coordinates: liveRouteCoordinates,
-                    normalColor: .goPrimary,
+                    normalColor: WalkTrackingMapPresentationPolicy.routeNormalColor(for: routeStyle),
                     lineWidth: 6,
-                    isRainbow: equipFxRainbowRoute,
-                    isFlowing: shouldAnimateRainbowWalkEffects,
+                    isRainbow: WalkTrackingMapPresentationPolicy.allowsRainbowRoute(
+                        phase: mgr.phase,
+                        isRainbowEquipped: equipFxRainbowRoute
+                    ),
+                    isFlowing: WalkTrackingMapPresentationPolicy.allowsRouteFlow(
+                        phase: mgr.phase,
+                        shouldAnimate: shouldAnimateRainbowWalkEffects
+                    ),
                     flowPhase: rainbowRoutePhase
                 )
                 ForEach(livePoopMarkers) { marker in
@@ -54,24 +61,26 @@ extension WalkTrackingCard {
             .mapControls {
                 MapCompass()
             }
-            .overlay(alignment: .topTrailing) {
-                Text(distanceText)
-                    .font(OhanaFont.footnote(.bold))
-                    .foregroundStyle(Color.goCardWhite)
-                    .padding(.horizontal, 10).padding(.vertical, 4)
-                    .background(Color.arkInk.opacity(0.6), in: Capsule())
-                    .padding(8)
+            .overlay(alignment: .topLeading) {
+                distanceBadge
             }
         } else if isWalking {
             let coords = liveRouteCoordinates
             if coords.count >= 2, let region = routeRegion(for: coords) {
+                let routeStyle = WalkTrackingMapPresentationPolicy.routeVisualStyle(for: mgr.phase)
                 Map(initialPosition: .region(region)) {
                     RainbowRoutePolyline(
                         coordinates: coords,
-                        normalColor: .goYellow,
+                        normalColor: WalkTrackingMapPresentationPolicy.routeNormalColor(for: routeStyle),
                         lineWidth: 6,
-                        isRainbow: equipFxRainbowRoute,
-                        isFlowing: shouldAnimateRainbowWalkEffects,
+                        isRainbow: WalkTrackingMapPresentationPolicy.allowsRainbowRoute(
+                            phase: mgr.phase,
+                            isRainbowEquipped: equipFxRainbowRoute
+                        ),
+                        isFlowing: WalkTrackingMapPresentationPolicy.allowsRouteFlow(
+                            phase: mgr.phase,
+                            shouldAnimate: shouldAnimateRainbowWalkEffects
+                        ),
                         flowPhase: rainbowRoutePhase
                     )
                     ForEach(livePoopMarkers) { marker in
@@ -83,13 +92,8 @@ extension WalkTrackingCard {
                     }
                 }
                 .mapStyle(.standard)
-                .overlay(alignment: .topTrailing) {
-                    Text(distanceText)
-                        .font(OhanaFont.footnote(.bold))
-                        .foregroundStyle(Color.goCardWhite)
-                        .padding(.horizontal, 10).padding(.vertical, 4)
-                        .background(Color.arkInk.opacity(0.6), in: Capsule())
-                        .padding(8)
+                .overlay(alignment: .topLeading) {
+                    distanceBadge
                 }
             } else {
                 pausedRoutePlaceholder
@@ -121,6 +125,17 @@ extension WalkTrackingCard {
                 )
             }
         }
+    }
+
+    var distanceBadge: some View {
+        Text(distanceText)
+            .font(OhanaFont.footnote(.bold))
+            .foregroundStyle(Color.goCardWhite)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 4)
+            .background(Color.arkInk.opacity(0.6), in: Capsule())
+            .padding(8)
+            .accessibilityIdentifier("walk-tracking-distance-badge")
     }
 
     var pausedRoutePlaceholder: some View {

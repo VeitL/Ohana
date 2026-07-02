@@ -13,6 +13,7 @@ struct FeatureGroupDashboardView: View {
     @Binding var parentPath: NavigationPath
     let pets: [Pet]
     let humans: [Human]
+    let plants: [Plant]
     var petAggregateSummaries: [UUID: FunctionMenuPetAggregateSummary] = [:]
 
     @Environment(AppServices.self) private var appServices
@@ -69,6 +70,7 @@ struct FeatureGroupDashboardView: View {
         }
         .onAppear(perform: ensureSelectedItem)
         .onChange(of: items.map(\.id)) { _, _ in ensureSelectedItem() }
+        .accessibilityIdentifier("function-menu-group-screen-\(group.rawValue)")
     }
 
     private var pageHeader: some View {
@@ -169,6 +171,30 @@ struct FeatureGroupDashboardView: View {
             }
         case .familyWeeklyReport:
             FamilyWeeklyReportDashboardView()
+        case .plantsDashboard:
+            PlantDashboardView(
+                plants: plants,
+                initialMode: .sites,
+                onOpenPlant: { plantID in
+                    parentPath.append(FMDest.plantDetail(plantID))
+                }
+            )
+        case .plantsList:
+            PlantDashboardView(
+                plants: plants,
+                initialMode: .plants,
+                onOpenPlant: { plantID in
+                    parentPath.append(FMDest.plantDetail(plantID))
+                }
+            )
+        case .plantsPhotos:
+            PlantDashboardView(
+                plants: plants,
+                initialMode: .photos,
+                onOpenPlant: { plantID in
+                    parentPath.append(FMDest.plantDetail(plantID))
+                }
+            )
         default:
             EmptyView()
         }
@@ -247,7 +273,11 @@ private struct FeatureGroupItem: Identifiable {
             items.append(destination(id: "weekly-report", title: "照护周报", icon: "chart.bar.doc.horizontal", .familyWeeklyReport))
             return items
         case .plants:
-            return [destination(id: "plants-dashboard", title: "植物", icon: "leaf.fill", .plantsDashboard)]
+            return [
+                destination(id: "plants-dashboard", title: "植物总览", icon: "leaf.fill", .plantsDashboard),
+                destination(id: "plants-list", title: "植物列表", icon: "list.bullet.rectangle.fill", .plantsList),
+                destination(id: "plants-photos", title: "成长照片", icon: "photo.stack.fill", .plantsPhotos)
+            ]
         case .oasisRewards:
             return []
         }

@@ -109,6 +109,7 @@ struct FocusHomeHeaderView: View {
                 )
                 .accessibilityLabel(l.tr(zh: "Ohana 成员", en: "Ohana members", de: "Ohana-Mitglieder"))
                 .accessibilityHint(l.tr(zh: "点击打开成员名册，长按切换人类账户", en: "Tap to open the roster. Long press to switch human account.", de: "Tippen öffnet die Mitgliederliste. Lange drücken wechselt das Menschenkonto."))
+                .accessibilityIdentifier("home-crew-roster-action")
 
                 Button {
                     OhanaFeedback.light()

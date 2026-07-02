@@ -31,6 +31,7 @@ nonisolated enum NotificationPreferenceGroup: String, CaseIterable, Equatable {
     case feeding
     case hygiene
     case plantCare
+    case calendar
     case checkIn
 
     var storageKey: String {
@@ -39,6 +40,7 @@ nonisolated enum NotificationPreferenceGroup: String, CaseIterable, Equatable {
         case .feeding: "notif_feeding_enabled"
         case .hygiene: "notif_hygiene_enabled"
         case .plantCare: "notif_plant_care_enabled"
+        case .calendar: "notif_calendar_enabled"
         case .checkIn: "notif_checkin_enabled"
         }
     }
@@ -53,7 +55,9 @@ nonisolated enum NotificationPreferenceGroup: String, CaseIterable, Equatable {
             [.hygiene]
         case .plantCare:
             [.plantCare]
-        case .calendar, .weeklyReport:
+        case .calendar:
+            [.calendar]
+        case .weeklyReport:
             [.checkIn]
         case .health, .hydration, .insurance:
             []

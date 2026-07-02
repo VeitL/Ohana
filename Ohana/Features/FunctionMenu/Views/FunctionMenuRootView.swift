@@ -57,7 +57,8 @@ struct FunctionMenuRootView: View {
                                     iconColor: group.color,
                                     title: group.title,
                                     status: isPlantLockedPreview ? plantLockedPreviewSubtitle : compactSubtitle(for: subtitle(for: group)),
-                                    showsNewFeature: showsPendingGroup(group)
+                                    showsNewFeature: showsPendingGroup(group),
+                                    accessibilityIdentifier: "function-menu-group-\(group.rawValue)"
                                 ) {
                                     select(.featureGroup(group))
                                 }
@@ -94,6 +95,7 @@ struct FunctionMenuRootView: View {
                 .padding(.bottom, 30)
             }
         }
+        .accessibilityIdentifier("function-menu-root")
     }
 
     private var rootHeader: some View {

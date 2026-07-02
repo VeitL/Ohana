@@ -29,6 +29,7 @@ extension QuickFeedDetailContent {
                 { activeAlert = .deleteFeedLog(id: id) }
             }
         )
+        .accessibilityIdentifier("quick-feed-log-row-\(entry.source.rawValue)-\(entry.date.quickFeedLogAccessibilityDayID)-\(entry.id.uuidString)")
     }
 
     func editableFeedLogId(for entry: QuickFeedLedgerEntry) -> UUID? {
@@ -106,6 +107,18 @@ extension QuickFeedDetailContent {
             onDelete: {
                 activeAlert = .deleteFoodRecord(record)
             }
+        )
+    }
+}
+
+private extension Date {
+    var quickFeedLogAccessibilityDayID: String {
+        let components = Calendar.current.dateComponents([.year, .month, .day], from: self)
+        return String(
+            format: "%04d%02d%02d",
+            components.year ?? 0,
+            components.month ?? 0,
+            components.day ?? 0
         )
     }
 }

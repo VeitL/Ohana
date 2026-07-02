@@ -30,6 +30,7 @@ struct QuickFeedHomePresenter {
     let onOpenTreatOverview: () -> Void
     let onOpenTaskSettings: () -> Void
     let onQuickAddTreat: () -> Void
+    let onQuickAddManualFeed: () -> Void
     let onOpenManualHistory: () -> Void
     let onOpenModeHistory: () -> Void
     let inlineTaskPanel: AnyView?
@@ -220,9 +221,7 @@ struct QuickFeedHomePresenter {
                 action: onOpenTreatOverview,
                 secondaryAction: onQuickAddTreat
             ),
-            dockItem(id: "history", icon: "clock.arrow.circlepath", title: localization.tr(zh: "历史", en: "History", de: "Verlauf"), value: viewState.mode.feedShortTitle(localization), tint: viewState.mode.feedTint, action: {
-                viewState.mode == .manual ? onOpenManualHistory() : onOpenModeHistory()
-            })
+            historyDockItem
         ]
     }
 
@@ -240,10 +239,36 @@ struct QuickFeedHomePresenter {
                 action: onOpenTreatOverview,
                 secondaryAction: onQuickAddTreat
             ),
-            dockItem(id: "history", icon: "clock.arrow.circlepath", title: localization.tr(zh: "历史", en: "History", de: "Verlauf"), value: viewState.mode.feedShortTitle(localization), tint: viewState.mode.feedTint, action: {
-                viewState.mode == .manual ? onOpenManualHistory() : onOpenModeHistory()
-            })
+            historyDockItem
         ]
+    }
+
+    private var historyDockItem: FeedDiscoveryDockItem {
+        if viewState.mode == .manual {
+            return dockItem(
+                id: "history",
+                icon: "clock.arrow.circlepath",
+                title: localization.tr(zh: "历史", en: "History", de: "Verlauf"),
+                value: viewState.mode.feedShortTitle(localization),
+                tint: viewState.mode.feedTint,
+                secondaryIcon: "plus",
+                secondaryAccessibilityLabel: localization.tr(
+                    zh: "补记喂食",
+                    en: "Add feeding log",
+                    de: "Fütterung nachtragen"
+                ),
+                action: onOpenManualHistory,
+                secondaryAction: onQuickAddManualFeed
+            )
+        }
+        return dockItem(
+            id: "history",
+            icon: "clock.arrow.circlepath",
+            title: localization.tr(zh: "历史", en: "History", de: "Verlauf"),
+            value: viewState.mode.feedShortTitle(localization),
+            tint: viewState.mode.feedTint,
+            action: onOpenModeHistory
+        )
     }
 
     private func dockItem(

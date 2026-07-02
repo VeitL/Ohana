@@ -8,7 +8,11 @@ extension QuickFeedDetailContent {
             draftStore.inputError = l.tr(zh: "请输入有效克数。", en: "Enter valid grams.", de: "Bitte gültige Gramm eingeben.")
             return
         }
-        commitManualFeed(grams: grams, saveAsDefault: draftStore.saveManualAsDefault)
+        commitManualFeed(
+            grams: grams,
+            saveAsDefault: draftStore.saveManualAsDefault,
+            date: draftStore.manualFeedDate
+        )
     }
 
     func saveManualFeedSettings() {
@@ -35,7 +39,12 @@ extension QuickFeedDetailContent {
         )
     }
 
-    func commitManualFeed(grams: Double, saveAsDefault: Bool, foodKind selectedFoodKind: FeedFoodKind? = nil) {
+    func commitManualFeed(
+        grams: Double,
+        saveAsDefault: Bool,
+        foodKind selectedFoodKind: FeedFoodKind? = nil,
+        date: Date = Date()
+    ) {
         draftStore.inputError = nil
         let foodKind = selectedFoodKind ?? draftStore.manualFoodKindDraft
         let action = {
@@ -47,7 +56,8 @@ extension QuickFeedDetailContent {
                 saveAsDefault: saveAsDefault,
                 foodRecords: observedFoodRecords,
                 allEvents: allEvents,
-                executorId: currentUserId
+                executorId: currentUserId,
+                date: date
             )
             guard result.didRecord else { return }
             guard result.allowsDerivedEffects else {

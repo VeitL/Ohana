@@ -104,6 +104,9 @@ struct GoDraftTextField: View {
             .onDisappear {
                 commitNow()
             }
+            .transaction { transaction in
+                transaction.animation = nil
+            }
     }
 
     private func scheduleCommit(_ value: String) {
@@ -118,6 +121,7 @@ struct GoDraftTextField: View {
 
     private func commitNow() {
         commitTask?.cancel()
+        commitTask = nil
         commit(draftText)
     }
 
@@ -185,6 +189,9 @@ struct GoDraftTextEditor: View {
         .onDisappear {
             commitNow()
         }
+        .transaction { transaction in
+            transaction.animation = nil
+        }
     }
 
     private func scheduleCommit(_ value: String) {
@@ -199,6 +206,7 @@ struct GoDraftTextEditor: View {
 
     private func commitNow() {
         commitTask?.cancel()
+        commitTask = nil
         commit(draftText)
     }
 

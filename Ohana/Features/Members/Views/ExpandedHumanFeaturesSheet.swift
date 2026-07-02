@@ -47,7 +47,9 @@ struct ExpandedHumanFeaturesContentSheet: View {
     private var isViewingOwnProfile: Bool { activeHumanId == human.id }
     private var l: L10n { L10n(appLanguage) }
     private var isAllPrivateForViewer: Bool {
-        !isViewingOwnProfile && HumanPrivateField.allCases.allSatisfy { human.privateFields.contains($0.rawValue) }
+        HumanLocalPrivacyPolicy.isEnabled &&
+            !isViewingOwnProfile &&
+            HumanPrivateField.allCases.allSatisfy { human.privateFields.contains($0.rawValue) }
     }
 
     private var humanReminders: [Reminder] {

@@ -8,7 +8,6 @@
 import Combine
 import SwiftData
 import SwiftUI
-import UIKit
 
 struct ContentView: View {
     var showsEmbeddedOnboarding = true
@@ -24,9 +23,11 @@ struct ContentView: View {
     @State private var coconutWalletBootstrapTask: Task<Void, Never>?
     @State private var activeHumanReactionTask: Task<Void, Never>?
     @State private var onboardingCreatedEntitySignalTask: Task<Void, Never>?
+    @State private var uiTestRouteTask: Task<Void, Never>?
     @State private var onboardingJourneyPhase: OnboardingJourneyPhase = .preOnboarding
     @State private var handledOnboardingPrimaryHumanID: String?
     @State private var signaledOnboardingPrimaryHumanID: String?
+    @State private var handledUITestHumanProfileRouteName: String?
     @State private var homeCardStateResetToken = UUID()
     @State private var didAutoPresentFirstPetPrompt = false
     @State private var autoPresentedFirstCarePetID: UUID?
@@ -53,28 +54,16 @@ struct ContentView: View {
                                 route: route,
                                 onPresentCoconutLog: { subject in
                                     appRoutes.presentCoconutLog(subject)
+                                },
+                                onPresentCalendar: { entityID in
+                                    appRoutes.presentCalendar(entityID: entityID)
                                 }
                             )
                         }
                         .navigationTransition(.zoom(sourceID: route.sourceID, in: heroNS))
                     }
-                    .toolbar {
-                        ToolbarItemGroup(placement: .keyboard) {
-                            Spacer()
-                            Button {
-                                dismissKeyboard()
-                            } label: {
-                                Label(
-                                    l.tr(zh: "隐藏键盘", en: "Hide keyboard", de: "Tastatur ausblenden"),
-                                    systemImage: "keyboard.chevron.compact.down"
-                                )
-                                .font(OhanaFont.callout(.semibold))
-                            }
-                        }
-                    }
             }
             .id(appRoutes.rootIdentity)
-            .ignoresSafeArea(.keyboard, edges: .bottom)
 
             if hasOnboarded, !appRoutes.suppressesGlobalWalkBanner {
                 GlobalWalkBanner()
@@ -100,6 +89,7 @@ struct ContentView: View {
         .onAppear {
             scheduleRootAppearHandoff()
             applyOnboardingPrimaryHumanIDIfNeeded()
+            scheduleUITestHumanProfileRouteIfNeeded()
         }
         .onDisappear {
             rootAppearHandoffTask?.cancel()
@@ -108,11 +98,14 @@ struct ContentView: View {
             activeHumanReactionTask = nil
             onboardingCreatedEntitySignalTask?.cancel()
             onboardingCreatedEntitySignalTask = nil
+            uiTestRouteTask?.cancel()
+            uiTestRouteTask = nil
         }
         .onChange(of: hasOnboarded) { _, hasOnboarded in
             guard hasOnboarded else { return }
             scheduleRootAppearHandoff()
             applyOnboardingPrimaryHumanIDIfNeeded()
+            scheduleUITestHumanProfileRouteIfNeeded()
         }
         .onChange(of: onboardingPrimaryHumanID) { _, _ in
             applyOnboardingPrimaryHumanIDIfNeeded()
@@ -154,7 +147,6 @@ struct ContentView: View {
                 reconcileHumanProfileRequirement()
             }
         }
-        .ignoresSafeArea(.keyboard, edges: .bottom)
     }
 
     @ViewBuilder
@@ -217,10 +209,6 @@ struct ContentView: View {
             return nil
         }
         return amount
-    }
-
-    private var l: L10n {
-        L10n(appLanguage)
     }
 
     private func scheduleRootAppearHandoff() {
@@ -475,15 +463,6 @@ struct ContentView: View {
         }
     }
 
-    private func dismissKeyboard() {
-        UIApplication.shared.sendAction(
-            #selector(UIResponder.resignFirstResponder),
-            to: nil,
-            from: nil,
-            for: nil
-        )
-    }
-
     private func fetchModelsOrLog<T: PersistentModel>(
         _ descriptor: FetchDescriptor<T>,
         operation: String
@@ -498,9 +477,39 @@ struct ContentView: View {
             return []
         }
     }
+
+    private func scheduleUITestHumanProfileRouteIfNeeded() {
+        guard hasOnboarded,
+              let humanName = Self.uiTestHumanProfileRouteName,
+              handledUITestHumanProfileRouteName != humanName else { return }
+        uiTestRouteTask?.cancel()
+        uiTestRouteTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: 520) {
+            defer { uiTestRouteTask = nil }
+            guard Self.uiTestHumanProfileRouteName == humanName,
+                  let human = fetchModelsOrLog(
+                    FetchDescriptor<Human>(sortBy: [SortDescriptor(\.createdAt)]),
+                    operation: "fetch humans for UI-test human profile route"
+                  )
+                  .first(where: { $0.name == humanName }) else { return }
+            handledUITestHumanProfileRouteName = humanName
+            appRoutes.openHuman(human.id)
+        }
+    }
 }
 
 private extension ContentView {
+    static var uiTestHumanProfileRouteName: String? {
+        let arguments = ProcessInfo.processInfo.arguments
+        guard isRunningTests,
+              let flagIndex = arguments.firstIndex(of: "-OHANA_UI_TEST_OPEN_HUMAN_PROFILE_NAME") else {
+            return nil
+        }
+        let nameIndex = arguments.index(after: flagIndex)
+        guard arguments.indices.contains(nameIndex) else { return nil }
+        let name = arguments[nameIndex].trimmingCharacters(in: .whitespacesAndNewlines)
+        return name.isEmpty ? nil : name
+    }
+
     static var shouldHideGlobalRewardFeedbackOverlay: Bool {
         let arguments = ProcessInfo.processInfo.arguments
         if arguments.contains("-OHANA_ENABLE_PRODUCTION_OVERLAYS_IN_UI_TESTS") {

@@ -8,6 +8,23 @@
 import SwiftUI
 
 extension PlantDetailContentView {
+    func plantSectionHeader(_ title: String, subtitle: String? = nil) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title)
+                .font(OhanaFont.adaptive(size: 18, weight: .heavy, design: .rounded))
+                .foregroundStyle(Color.ohanaPrimaryText)
+            if let subtitle {
+                Text(subtitle)
+                    .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded))
+                    .foregroundStyle(Color.ohanaSecondaryText)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 16)
+        .padding(.top, 4)
+    }
+
     func detailHeader(icon: String, title: String) -> some View {
         HStack {
             Image(systemName: icon)

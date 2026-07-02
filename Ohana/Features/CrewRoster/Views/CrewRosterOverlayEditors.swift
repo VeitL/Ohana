@@ -12,6 +12,7 @@ import UIKit
 struct RosterHomeVisibilityToggle: View {
     let isOn: Bool
     let label: String
+    var identifier: String?
     let onChange: (Bool) -> Bool
 
     @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
@@ -61,6 +62,7 @@ struct RosterHomeVisibilityToggle: View {
         .buttonStyle(ScaleButtonStyle())
         .accessibilityLabel(label)
         .accessibilityValue(visualIsOn ? l.tr(zh: "开启", en: "On", de: "Ein") : l.tr(zh: "关闭", en: "Off", de: "Aus"))
+        .accessibilityIdentifier(identifier ?? "")
         .onChange(of: isOn) { _, newValue in
             guard visualOverride == newValue else { return }
             visualOverride = nil
@@ -387,7 +389,9 @@ struct CrewRosterProfilePanel: View {
                 infoRow(l.tr(zh: "国籍", en: "Nationality", de: "Nationalitaet"), emptyText(human.nationality))
                 infoRow(l.tr(zh: "现居地", en: "Current city", de: "Aktueller Ort"), emptyText(human.city))
                 infoRow(l.tr(zh: "首页显示", en: "Home visibility", de: "Startseitenanzeige"), human.shouldShowOnHome ? l.tr(zh: "显示", en: "Shown", de: "Angezeigt") : l.tr(zh: "隐藏", en: "Hidden", de: "Ausgeblendet"))
-                infoRow(l.tr(zh: "隐私项目", en: "Private fields", de: "Private Felder"), privacySummary(for: human))
+                if HumanLocalPrivacyPolicy.isEnabled {
+                    infoRow(l.tr(zh: "隐私项目", en: "Private fields", de: "Private Felder"), privacySummary(for: human))
+                }
             }
             let humanNotes = HumanProfileOptions.visibleNoteParts(from: human.notes).joined(separator: "｜")
             if !humanNotes.isEmpty {
@@ -670,6 +674,9 @@ struct CrewRosterProfilePanel: View {
     }
 
     private func privacySummary(for human: Human) -> String {
+        guard HumanLocalPrivacyPolicy.isEnabled else {
+            return l.tr(zh: "首发未启用", en: "Not enabled in first release", de: "Zum Start nicht aktiviert")
+        }
         let titles = HumanPrivateField.allCases
             .filter { human.privateFields.contains($0.rawValue) }
             .map(localizedPrivateFieldTitle)

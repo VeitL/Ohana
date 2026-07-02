@@ -91,7 +91,6 @@ private struct OhanaBootstrapRootView: View {
         .tint(Color.goPrimary)
         .preferredColorScheme(preferredScheme)
         .environment(\.locale, AppLanguage.swiftUIPreferredLocale)
-        .ignoresSafeArea(.keyboard, edges: .bottom)
         .onAppear(perform: startBootstrapIfNeeded)
         .onDisappear {
             bootstrapTask?.cancel()

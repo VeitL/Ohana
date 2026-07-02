@@ -51,7 +51,6 @@ struct RootView: View {
         }
         .buttonStyle(ScaleButtonStyle())
         .toggleStyle(OhanaPillToggleStyle())
-        .ignoresSafeArea(.keyboard, edges: .bottom)
         .onAppear {
             startupMaintenance.startAfterFirstRender(context: modelContext)
         }

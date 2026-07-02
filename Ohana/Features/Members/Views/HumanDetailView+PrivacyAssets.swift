@@ -177,6 +177,7 @@ extension HumanDetailView {
         .padding(.vertical, 28)
         .goIslandModuleCard(cornerRadius: OhanaRadius.cardLarge)
         .padding(.horizontal, 16)
+        .accessibilityIdentifier("human-detail-private-profile-lock")
     }
 
     // MARK: - Reminders Section

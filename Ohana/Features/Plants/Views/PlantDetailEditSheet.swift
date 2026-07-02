@@ -8,6 +8,61 @@
 import SwiftData
 import SwiftUI
 
+private enum PlantEditFocusSection: String, CaseIterable, Identifiable {
+    case all
+    case identity
+    case care
+    case environment
+    case potting
+    case growth
+    case safety
+    case notes
+
+    var id: String { rawValue }
+
+    var icon: String {
+        switch self {
+        case .all:
+            "square.grid.2x2.fill"
+        case .identity:
+            "person.text.rectangle.fill"
+        case .care:
+            "calendar.badge.clock"
+        case .environment:
+            "sun.max.fill"
+        case .potting:
+            "shippingbox.fill"
+        case .growth:
+            "ruler.fill"
+        case .safety:
+            "shield.checkered"
+        case .notes:
+            "note.text"
+        }
+    }
+
+    func title(_ l: L10n) -> String {
+        switch self {
+        case .all:
+            l.tr(zh: "全部", en: "All", de: "Alles")
+        case .identity:
+            l.tr(zh: "身份", en: "Identity", de: "Identität")
+        case .care:
+            l.tr(zh: "护理", en: "Care", de: "Pflege")
+        case .environment:
+            l.tr(zh: "环境", en: "Environment", de: "Umgebung")
+        case .potting:
+            l.tr(zh: "盆土", en: "Potting", de: "Topf")
+        case .growth:
+            l.tr(zh: "成长", en: "Growth", de: "Wachstum")
+        case .safety:
+            l.tr(zh: "安全", en: "Safety", de: "Sicherheit")
+        case .notes:
+            l.tr(zh: "备注", en: "Notes", de: "Notizen")
+        }
+    }
+}
+
 // MARK: - Edit Plant Sheet
 struct EditPlantSheet: View {
     let plant: Plant
@@ -53,19 +108,209 @@ struct EditPlantSheet: View {
     @State private var isIndoorSuitable = true
     @State private var remindersEnabled = true
     @State private var isSaving = false
+    @State private var selectedEditFocus: PlantEditFocusSection = .all
     private var l: L10n { L10n(appLanguage) }
+
+    private struct PlantEditReadinessItem: Identifiable {
+        let id: String
+        let title: String
+        let isComplete: Bool
+    }
+
+    private var selectedCatalogEntry: PlantCatalogEntry? {
+        catalogSpeciesId.isEmpty ? nil : PlantCatalog.entry(id: catalogSpeciesId)
+    }
+
+    private var trimmedName: String {
+        name.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private var trimmedSpecies: String {
+        species.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private var trimmedRoomName: String {
+        roomNameRaw.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private var trimmedLocation: String {
+        location.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private var profileReadinessItems: [PlantEditReadinessItem] {
+        [
+            PlantEditReadinessItem(
+                id: "identity",
+                title: l.tr(zh: "身份", en: "Identity", de: "Identität"),
+                isComplete: !trimmedName.isEmpty && (selectedCatalogEntry != nil || !trimmedSpecies.isEmpty)
+            ),
+            PlantEditReadinessItem(
+                id: "place",
+                title: l.tr(zh: "位置", en: "Place", de: "Standort"),
+                isComplete: !trimmedRoomName.isEmpty || !trimmedLocation.isEmpty
+            ),
+            PlantEditReadinessItem(
+                id: "care",
+                title: l.tr(zh: "计划", en: "Plan", de: "Plan"),
+                isComplete: wateringInterval > 0 && fertilizingInterval > 0
+            ),
+            PlantEditReadinessItem(
+                id: "environment",
+                title: l.tr(zh: "环境", en: "Environment", de: "Umgebung"),
+                isComplete: windowDirection != .unknown || lastLightMeasurementLux > 0 || selectedCatalogEntry != nil
+            ),
+            PlantEditReadinessItem(
+                id: "safety",
+                title: l.tr(zh: "安全", en: "Safety", de: "Sicherheit"),
+                isComplete: isIndoorSuitable || safetyRiskCount == 0
+            )
+        ]
+    }
+
+    private var completedProfileReadinessCount: Int {
+        profileReadinessItems.filter(\.isComplete).count
+    }
+
+    private var profileCompletionPercent: Int {
+        guard !profileReadinessItems.isEmpty else { return 0 }
+        return Int((Double(completedProfileReadinessCount) / Double(profileReadinessItems.count) * 100).rounded())
+    }
+
+    private var safetyRiskCount: Int {
+        [isToxicToCats, isToxicToDogs, isToxicToChildren].count(where: { $0 })
+    }
+
+    private var editOverviewTitle: String {
+        if recalculationImpacts.isEmpty {
+            return l.tr(zh: "档案已保持稳定", en: "Profile stays stable", de: "Profil bleibt stabil")
+        }
+        return l.tr(zh: "保存前先看影响", en: "Review save impact", de: "Auswirkung vor dem Speichern prüfen")
+    }
+
+    private var draftProfileName: String {
+        trimmedName.isEmpty ? l.tr(zh: "未命名植物", en: "Unnamed plant", de: "Unbenannte Pflanze") : trimmedName
+    }
+
+    private var draftProfileSpecies: String {
+        if let selectedCatalogEntry {
+            return selectedCatalogEntry.localizedCommonName
+        }
+        if !trimmedSpecies.isEmpty {
+            return trimmedSpecies
+        }
+        return l.tr(zh: "物种待补充", en: "Species missing", de: "Art fehlt")
+    }
+
+    private var draftPlaceSummary: String {
+        if !trimmedRoomName.isEmpty, !trimmedLocation.isEmpty {
+            return "\(trimmedRoomName) · \(trimmedLocation)"
+        }
+        if !trimmedRoomName.isEmpty {
+            return trimmedRoomName
+        }
+        if !trimmedLocation.isEmpty {
+            return trimmedLocation
+        }
+        return isIndoor
+            ? l.tr(zh: "室内位置待补充", en: "Indoor place missing", de: "Innenstandort fehlt")
+            : l.tr(zh: "户外位置待补充", en: "Outdoor place missing", de: "Außenstandort fehlt")
+    }
+
+    private var draftCareSummary: String {
+        l.tr(
+            zh: "浇水 \(wateringInterval) 天 · 施肥 \(fertilizingInterval) 天",
+            en: "Water \(wateringInterval)d · fertilize \(fertilizingInterval)d",
+            de: "Gießen \(wateringInterval) T. · düngen \(fertilizingInterval) T."
+        )
+    }
+
+    private var draftEnvironmentSummary: String {
+        let lightText = lastLightMeasurementLux > 0
+            ? "\(lightLevel.displayName) · \(lastLightMeasurementLux) lux"
+            : lightLevel.displayName
+        return "\(isIndoor ? l.tr(zh: "室内", en: "Indoor", de: "Drinnen") : l.tr(zh: "户外", en: "Outdoor", de: "Draußen")) · \(lightText)"
+    }
+
+    private var draftSafetySummary: String {
+        if safetyRiskCount > 0 {
+            return l.tr(zh: "\(safetyRiskCount) 项误食风险", en: "\(safetyRiskCount) ingestion risks", de: "\(safetyRiskCount) Verschluckrisiken")
+        }
+        if !isIndoorSuitable {
+            return l.tr(zh: "不建议室内摆放", en: "Not ideal indoors", de: "Nicht ideal für drinnen")
+        }
+        return l.tr(zh: "家庭低风险", en: "Low household risk", de: "Geringes Haushaltsrisiko")
+    }
+
+    private var editFocusSummary: String {
+        switch selectedEditFocus {
+        case .all:
+            l.tr(zh: "全部字段 · \(profileCompletionPercent)% 档案完整度", en: "All fields · \(profileCompletionPercent)% profile complete", de: "Alle Felder · \(profileCompletionPercent)% Profil")
+        case .identity:
+            "\(draftProfileName) · \(draftProfileSpecies)"
+        case .care:
+            draftCareSummary
+        case .environment:
+            draftEnvironmentSummary
+        case .potting:
+            pottingFocusStatus
+        case .growth:
+            growthFocusStatus
+        case .safety:
+            draftSafetySummary
+        case .notes:
+            notes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                ? l.tr(zh: "暂无备注", en: "No notes yet", de: "Noch keine Notizen")
+                : l.tr(zh: "已记录备注", en: "Notes saved in draft", de: "Notizen im Entwurf")
+        }
+    }
+
+    private var pottingFocusStatus: String {
+        var items: [String] = []
+        if potDiameterCm > 0 {
+            items.append(l.tr(zh: "\(Int(potDiameterCm)) cm 盆", en: "\(Int(potDiameterCm)) cm pot", de: "\(Int(potDiameterCm)) cm Topf"))
+        }
+        if !potMaterialRaw.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            items.append(potMaterialRaw.trimmingCharacters(in: .whitespacesAndNewlines))
+        }
+        if !soilTypeRaw.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            items.append(soilTypeRaw.trimmingCharacters(in: .whitespacesAndNewlines))
+        }
+        if isHydroponic {
+            items.append(l.tr(zh: "水培", en: "Hydroponic", de: "Hydrokultur"))
+        }
+        if isSucculent {
+            items.append(l.tr(zh: "多肉", en: "Succulent", de: "Sukkulente"))
+        }
+        return items.isEmpty
+            ? l.tr(zh: "盆土待补充", en: "Potting missing", de: "Topfdetails fehlen")
+            : items.prefix(2).joined(separator: " · ")
+    }
+
+    private var growthFocusStatus: String {
+        var items: [String] = []
+        if hasAcquiredDate {
+            items.append(l.tr(zh: "有购入日期", en: "Acquired date set", de: "Kaufdatum gesetzt"))
+        }
+        if !acquisitionSourceRaw.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            items.append(acquisitionSourceRaw.trimmingCharacters(in: .whitespacesAndNewlines))
+        }
+        if currentHeightCm > 0 {
+            items.append(l.tr(zh: "\(Int(currentHeightCm)) cm 高", en: "\(Int(currentHeightCm)) cm tall", de: "\(Int(currentHeightCm)) cm hoch"))
+        }
+        if currentSpreadCm > 0 {
+            items.append(l.tr(zh: "\(Int(currentSpreadCm)) cm 冠幅", en: "\(Int(currentSpreadCm)) cm spread", de: "\(Int(currentSpreadCm)) cm breit"))
+        }
+        return items.isEmpty
+            ? l.tr(zh: "成长线索待补充", en: "Growth details missing", de: "Wachstumsdetails fehlen")
+            : items.prefix(2).joined(separator: " · ")
+    }
 
     var body: some View {
         OhanaSheetWrapper(title: l.tr(zh: "编辑植物", en: "Edit plant", de: "Pflanze bearbeiten"), onDismiss: { dismiss() }) {
             VStack(spacing: 16) {
-                profileSection
-                catalogSection
-                cycleSection
-                environmentSection
-                potSection
-                sourceAndSizeSection
-                healthAndSafetySection
-                notesSection
+                editProfileOverview
+                editFocusSwitcher
+                focusedEditSections
                 recalculationNoticeSection
 
                 Button { save() } label: {
@@ -73,9 +318,11 @@ struct EditPlantSheet: View {
                 }
                 .padding(.top, 8)
                 .disabled(isSaving)
+                .accessibilityIdentifier("plant-edit-save-action")
             }
             .padding(.vertical, 16)
         }
+        .accessibilityIdentifier("plant-edit-sheet")
         .onAppear {
             prepareState()
         }
@@ -87,12 +334,286 @@ struct EditPlantSheet: View {
         }
     }
 
+    private var editFocusSwitcher: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .top, spacing: 10) {
+                Image(systemName: "slider.horizontal.3") // a11y: allow decorative edit-focus glyph; section heading names the control.
+                    .font(OhanaFont.adaptive(size: 14, weight: .black))
+                    .foregroundStyle(Color.goLime)
+                    .frame(width: 44, height: 44)
+                    .background(Color.goLime.opacity(0.14), in: Circle())
+                    .accessibilityHidden(true)
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(l.tr(zh: "编辑重点", en: "Edit focus", de: "Bearbeitungsfokus"))
+                        .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
+                        .foregroundStyle(Color.ohanaPrimaryText)
+                    Text(editFocusSummary)
+                        .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded))
+                        .foregroundStyle(Color.ohanaSecondaryText)
+                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(PlantEditFocusSection.allCases) { section in
+                        editFocusButton(section)
+                    }
+                }
+                .padding(.vertical, 1)
+            }
+            .scrollClipDisabled()
+            .accessibilityElement(children: .contain)
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .goTranslucentCard(cornerRadius: OhanaRadius.controlLarge)
+        .accessibilityIdentifier("plant-edit-focus-switcher")
+    }
+
+    private func editFocusButton(_ section: PlantEditFocusSection) -> some View {
+        let isSelected = selectedEditFocus == section
+        let tint = editFocusTint(for: section)
+        return Button {
+            withAnimation(GoMotion.selection) {
+                selectedEditFocus = section
+            }
+        } label: {
+            VStack(alignment: .leading, spacing: 7) {
+                Image(systemName: section.icon) // a11y: allow decorative focus glyph; button text names the section.
+                    .font(OhanaFont.adaptive(size: 13, weight: .black))
+                    .foregroundStyle(isSelected ? Color.arkInk : tint)
+                    .accessibilityHidden(true)
+                Text(section.title(l))
+                    .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
+                    .foregroundStyle(isSelected ? Color.arkInk : Color.ohanaPrimaryText)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+                Text(editFocusStatus(for: section))
+                    .font(OhanaFont.adaptive(size: 10, weight: .bold, design: .rounded))
+                    .foregroundStyle(isSelected ? Color.arkInk.opacity(0.76) : Color.ohanaSecondaryText)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+            }
+            .frame(width: 102, alignment: .leading)
+            .frame(minHeight: 82, alignment: .leading)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .background(isSelected ? tint : Color.ohanaControlFill.opacity(0.52), in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous)
+                    .strokeBorder(isSelected ? Color.clear : tint.opacity(0.28), lineWidth: 1)
+            )
+        }
+        .buttonStyle(ScaleButtonStyle())
+        .accessibilityLabel("\(section.title(l)), \(editFocusStatus(for: section))")
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+        .accessibilityIdentifier("plant-edit-focus-\(section.rawValue)")
+    }
+
+    private func editFocusTint(for section: PlantEditFocusSection) -> Color {
+        switch section {
+        case .all:
+            Color.goLime
+        case .identity:
+            Color.goTeal
+        case .care:
+            remindersEnabled ? Color.goLime : Color.goYellow
+        case .environment:
+            isNearClimateSource ? Color.goYellow : Color.goTeal
+        case .potting:
+            potHasDrainage ? Color.goTeal : Color.goYellow
+        case .growth:
+            Color.goLime
+        case .safety:
+            safetyRiskCount > 0 || !isIndoorSuitable ? Color.goYellow : Color.goLime
+        case .notes:
+            Color.goTeal
+        }
+    }
+
+    private func editFocusStatus(for section: PlantEditFocusSection) -> String {
+        switch section {
+        case .all:
+            "\(profileCompletionPercent)%"
+        case .identity:
+            selectedCatalogEntry == nil
+                ? l.tr(zh: "待匹配", en: "Match", de: "Abgleich")
+                : l.tr(zh: "已匹配", en: "Matched", de: "Verknüpft")
+        case .care:
+            remindersEnabled
+                ? l.tr(zh: "提醒开", en: "Alerts on", de: "Hinweise an")
+                : l.tr(zh: "提醒关", en: "Alerts off", de: "Hinweise aus")
+        case .environment:
+            lightLevel.displayName
+        case .potting:
+            potDiameterCm > 0 || !soilTypeRaw.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                ? l.tr(zh: "已记录", en: "Set", de: "Gesetzt")
+                : l.tr(zh: "待补充", en: "Missing", de: "Fehlt")
+        case .growth:
+            currentHeightCm > 0 || currentSpreadCm > 0 || hasAcquiredDate
+                ? l.tr(zh: "有线索", en: "Tracked", de: "Erfasst")
+                : l.tr(zh: "待补充", en: "Missing", de: "Fehlt")
+        case .safety:
+            draftSafetySummary
+        case .notes:
+            notes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                ? l.tr(zh: "空", en: "Empty", de: "Leer")
+                : l.tr(zh: "已写", en: "Written", de: "Notiert")
+        }
+    }
+
+    @ViewBuilder
+    private var focusedEditSections: some View {
+        switch selectedEditFocus {
+        case .all:
+            profileSection
+            catalogSection
+            cycleSection
+            environmentSection
+            potSection
+            sourceAndSizeSection
+            healthAndSafetySection
+            notesSection
+        case .identity:
+            profileSection
+            catalogSection
+        case .care:
+            cycleSection
+        case .environment:
+            environmentSection
+        case .potting:
+            potSection
+        case .growth:
+            sourceAndSizeSection
+        case .safety:
+            healthAndSafetySection
+        case .notes:
+            notesSection
+        }
+    }
+
+    private var editProfileOverview: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .top, spacing: 12) {
+                ZStack {
+                    Circle()
+                        .fill(Color.goTeal.opacity(0.16))
+                        .frame(width: 58, height: 58)
+                    Text(avatarEmoji.isEmpty ? plant.avatarEmoji : avatarEmoji)
+                        .font(OhanaFont.adaptive(size: 30))
+                }
+                .accessibilityHidden(true)
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(editOverviewTitle)
+                        .font(OhanaFont.adaptive(size: 18, weight: .black, design: .rounded))
+                        .foregroundStyle(Color.ohanaPrimaryText)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Text("\(draftProfileName) · \(draftProfileSpecies)")
+                        .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
+                        .foregroundStyle(Color.ohanaSecondaryText)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.78)
+                    Text(draftPlaceSummary)
+                        .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded))
+                        .foregroundStyle(Color.ohanaTertiaryText)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.78)
+                }
+
+                Spacer(minLength: 8)
+
+                VStack(alignment: .trailing, spacing: 2) {
+                    Text("\(profileCompletionPercent)%")
+                        .font(OhanaFont.adaptive(size: 18, weight: .black, design: .rounded))
+                        .foregroundStyle(Color.goLime)
+                    Text(l.tr(zh: "档案", en: "profile", de: "Profil"))
+                        .font(OhanaFont.adaptive(size: 10, weight: .black, design: .rounded))
+                        .foregroundStyle(Color.ohanaTertiaryText)
+                        .textCase(.uppercase)
+                }
+                .accessibilityElement(children: .combine)
+            }
+
+            ProgressView(value: Double(completedProfileReadinessCount), total: Double(max(profileReadinessItems.count, 1)))
+                .tint(Color.goLime)
+                .accessibilityLabel(l.tr(zh: "植物档案完整度", en: "Plant profile completeness", de: "Pflanzenprofil-Vollständigkeit"))
+                .accessibilityValue("\(profileCompletionPercent)%")
+
+            LazyVGrid(columns: [
+                GridItem(.flexible(), spacing: 8),
+                GridItem(.flexible(), spacing: 8)
+            ], spacing: 8) {
+                ForEach(profileReadinessItems) { item in
+                    readinessPill(item)
+                }
+            }
+
+            Divider()
+                .overlay(Color.ohanaControlFill.opacity(0.55))
+
+            VStack(alignment: .leading, spacing: 8) {
+                editOverviewFact(icon: "calendar.badge.clock", title: l.tr(zh: "照护节奏", en: "Care rhythm", de: "Pflegerhythmus"), value: draftCareSummary, tint: Color.goYellow)
+                editOverviewFact(icon: "sun.max.fill", title: l.tr(zh: "环境", en: "Environment", de: "Umgebung"), value: draftEnvironmentSummary, tint: Color.goTeal)
+                editOverviewFact(icon: "shield.checkered", title: l.tr(zh: "安全", en: "Safety", de: "Sicherheit"), value: draftSafetySummary, tint: safetyRiskCount > 0 ? Color.goYellow : Color.goLime)
+            }
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .goTranslucentCard(cornerRadius: OhanaRadius.controlLarge)
+        .accessibilityIdentifier("plant-edit-profile-overview")
+    }
+
+    private func readinessPill(_ item: PlantEditReadinessItem) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: item.isComplete ? "checkmark.circle.fill" : "circle")
+                .font(OhanaFont.adaptive(size: 11, weight: .black))
+                .foregroundStyle(item.isComplete ? Color.goLime : Color.ohanaTertiaryText)
+                .accessibilityHidden(true)
+            Text(item.title)
+                .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded))
+                .foregroundStyle(item.isComplete ? Color.ohanaPrimaryText : Color.ohanaSecondaryText)
+                .lineLimit(1)
+                .minimumScaleFactor(0.78)
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .background(Color.ohanaControlFill.opacity(item.isComplete ? 0.66 : 0.38), in: Capsule())
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(item.title), \(item.isComplete ? l.tr(zh: "已完成", en: "complete", de: "fertig") : l.tr(zh: "待补充", en: "missing", de: "fehlt"))")
+    }
+
+    private func editOverviewFact(icon: String, title: String, value: String, tint: Color) -> some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: icon)
+                .font(OhanaFont.adaptive(size: 13, weight: .black))
+                .foregroundStyle(tint)
+                .frame(width: 28, height: 28) // a11y: allow non-interactive overview glyph; adjacent text carries the fact.
+                .background(tint.opacity(0.14), in: Circle())
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
+                    .foregroundStyle(Color.ohanaPrimaryText)
+                Text(value)
+                    .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded))
+                    .foregroundStyle(Color.ohanaSecondaryText)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .accessibilityElement(children: .combine)
+    }
+
     private var profileSection: some View {
         VStack(spacing: 12) {
-            formField(l.tr(zh: "名称", en: "Name", de: "Name"), text: $name)
-            formField(l.tr(zh: "物种名", en: "Species", de: "Art"), text: $species)
-            formField(l.tr(zh: "房间", en: "Room", de: "Raum"), text: $roomNameRaw)
-            formField(l.tr(zh: "具体位置", en: "Exact spot", de: "Genauer Standort"), text: $location)
+            formField(l.tr(zh: "名称", en: "Name", de: "Name"), text: $name, identifier: "plant-edit-name-input")
+            formField(l.tr(zh: "物种名", en: "Species", de: "Art"), text: $species, identifier: "plant-edit-species-input")
+            formField(l.tr(zh: "房间", en: "Room", de: "Raum"), text: $roomNameRaw, identifier: "plant-edit-room-input")
+            formField(l.tr(zh: "具体位置", en: "Exact spot", de: "Genauer Standort"), text: $location, identifier: "plant-edit-location-input")
             formField(l.tr(zh: "头像 Emoji", en: "Avatar emoji", de: "Avatar-Emoji"), text: $avatarEmoji)
         }
         .padding(16)
@@ -302,13 +823,30 @@ struct EditPlantSheet: View {
             .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    private func formField(_ title: String, text: Binding<String>) -> some View {
+    @ViewBuilder
+    private func formField(_ title: String, text: Binding<String>, identifier: String? = nil) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(title)
                 .font(OhanaFont.adaptive(size: 13, weight: .medium))
                 .foregroundStyle(Color.ohanaSecondaryText)
-            TextField(title, text: text) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
-                .textFieldStyle(.roundedBorder)
+            if let identifier {
+                TextField(title, text: text) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
+                    .textFieldStyle(.plain)
+                    .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .rounded))
+                    .foregroundStyle(Color.ohanaPrimaryText)
+                    .padding(.horizontal, 14)
+                    .frame(minHeight: 52)
+                    .background(Color.ohanaControlFill.opacity(0.68), in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
+                    .accessibilityIdentifier(identifier)
+            } else {
+                TextField(title, text: text) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
+                    .textFieldStyle(.plain)
+                    .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .rounded))
+                    .foregroundStyle(Color.ohanaPrimaryText)
+                    .padding(.horizontal, 14)
+                    .frame(minHeight: 52)
+                    .background(Color.ohanaControlFill.opacity(0.68), in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
+            }
         }
     }
 

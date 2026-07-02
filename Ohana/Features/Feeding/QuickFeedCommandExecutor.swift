@@ -210,7 +210,8 @@ struct QuickFeedCommandExecutor {
         saveAsDefault: Bool,
         foodRecords: [PetFoodRecord],
         allEvents: [Event],
-        executorId: String?
+        executorId: String?,
+        date: Date = Date()
     ) -> ManualFeedCommandResult {
         let result = ManualFeedCommand.recordManual(
             pet: pet,
@@ -222,7 +223,8 @@ struct QuickFeedCommandExecutor {
             allEvents: allEvents,
             context: context,
             executorId: executorId,
-            careEvents: careEvents
+            careEvents: careEvents,
+            date: date
         )
         deriveFeedMutation(
             .feedLog(petID: pet.id, source: "manual"),

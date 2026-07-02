@@ -150,7 +150,7 @@ struct IslandWeightDashboardContentView: View {
 
     private var visibleWeightHumanSignature: String {
         visibleWeightHumans
-            .map { "\($0.id.uuidString):\($0.privateFieldsRaw):\($0.weightLogs.count)" }
+            .map { "\($0.id.uuidString):\(HumanLocalPrivacyPolicy.isEnabled ? $0.privateFieldsRaw : ""):\($0.weightLogs.count)" }
             .joined(separator: "|")
     }
 
