@@ -18,6 +18,7 @@ struct FeatureAggregateView: View {
 
     @Environment(AppServices.self) private var appServices
     @AppStorage("currentActiveHumanId") private var activeHumanIdStr = ""
+    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
     @ObservedObject private var avatarPipeline = AvatarPipelineRegistry.current
     @State private var humanAvatarSignatures: [UUID: String] = [:]
     @State private var humanAvatarCacheKey = "feature-aggregate-human-avatar-empty"
@@ -25,6 +26,7 @@ struct FeatureAggregateView: View {
     private var activePets: [Pet] { pets.filter { !$0.hasPassedAway } }
     private var visibleHumans: [Human] { humans.filter { $0.shouldShowOnHome && !$0.hasPassedAway } }
     private var activeHumanId: UUID? { UUID(uuidString: activeHumanIdStr) }
+    private var l: L10n { L10n(appLanguage) }
 
     private func isDog(_ pet: Pet) -> Bool {
         pet.species.lowercased().contains("狗") || pet.species.lowercased().contains("dog")
@@ -87,7 +89,7 @@ struct FeatureAggregateView: View {
                 .font(OhanaFont.adaptive(size: 17, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(Color.goPrimary)
                 .frame(width: 34, height: 34) // a11y: allow decorative non-interactive frame; hit area handled by parent
-            Text(LocalizedStringKey(feature.title))
+            Text(feature.title(l: l))
                 .font(OhanaFont.title2(.black))
                 .foregroundStyle(Color.ohanaPrimaryText)
                 .lineLimit(1)
@@ -107,7 +109,7 @@ struct FeatureAggregateView: View {
                 HStack(spacing: 5) {
                     Image(systemName: "square.grid.2x2.fill") // a11y: allow decorative icon covered by surrounding text or control
                         .font(OhanaFont.adaptive(size: 11, weight: .bold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                    Text("全部")
+                    Text(l.tr(zh: "全部", en: "All", de: "Alle"))
                         .font(OhanaFont.adaptive(size: 13, weight: .bold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 }
                 .foregroundStyle(Color.ohanaPrimaryActionText)

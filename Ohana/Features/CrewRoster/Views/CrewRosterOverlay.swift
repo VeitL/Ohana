@@ -554,7 +554,13 @@ struct CrewRosterOverlay: View {
             card.isShownOnHome = effectiveHumanHomeVisibility(human)
             return card
         }
-        let plantCards = filteredPlants.map { plantFocusCard($0) }
+        let plantCards = filteredPlants.map { plant in
+            FocusCard.fromPlant(
+                plant,
+                catalog: PlantCatalog.entry(id: plant.catalogSpeciesId),
+                localization: l
+            )
+        }
         return (petCards + humanCards + plantCards).sorted { lhs, rhs in
             if lhs.createdAt != rhs.createdAt {
                 return lhs.createdAt > rhs.createdAt
@@ -794,37 +800,6 @@ struct CrewRosterOverlay: View {
             entityID: id,
             kind: kind,
             note: "crewRoster.homeVisibility"
-        )
-    }
-
-    private func plantFocusCard(_ plant: Plant) -> FocusCard {
-        let days = max(0, Calendar.current.dateComponents([.day], from: plant.createdAt, to: Date()).day ?? 0)
-        let needsCare = plant.needsWatering || plant.needsFertilizing
-        let status = needsCare
-            ? l.tr(zh: "待照护", en: "Needs care", de: "Braucht Pflege")
-            : l.tr(zh: "状态良好", en: "All good", de: "Alles gut")
-        return FocusCard(
-            id: plant.id,
-            name: plant.name.isEmpty ? l.tr(zh: "植物", en: "Plant", de: "Pflanze") : plant.name,
-            kind: plant.species.isEmpty ? l.tr(zh: "植物", en: "Plant", de: "Pflanze") : plant.species,
-            emoji: plant.avatarEmoji.isEmpty ? "leaf" : plant.avatarEmoji,
-            color: Color(hex: plant.themeColorHex),
-            streak: 0,
-            coconutBalance: 0,
-            createdAt: plant.createdAt,
-            daysTogetherText: l.tr(zh: "\(days) 天", en: "\(days) days", de: "\(days) Tage"),
-            ageText: status,
-            personalityHint: plant.location.isEmpty ? nil : plant.location,
-            avatarImageData: plant.avatarImageData,
-            themeColorHex: plant.themeColorHex,
-            daysTogether: days,
-            statusBadgeText: status,
-            statusBadgeIsWarning: needsCare,
-            isReal: true,
-            actions: [
-                .init(label: l.tr(zh: "浇水", en: "WATER", de: "GIESSEN"), icon: "drop.fill", colorHex: "00D4AA"),
-                .init(label: l.tr(zh: "施肥", en: "FEED", de: "DUENGEN"), icon: "leaf.fill", colorHex: "9EF06A")
-            ]
         )
     }
 

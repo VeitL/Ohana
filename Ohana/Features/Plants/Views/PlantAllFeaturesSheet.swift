@@ -125,11 +125,8 @@ struct PlantAllFeaturesSheet: View {
     }
 
     private func open(_ destination: PlantFeatureDestination) {
+        onOpenDestination(destination)
         dismiss()
-        Task { @MainActor in
-            await OhanaFrameScheduler.waitAfterNextFrame()
-            onOpenDestination(destination)
-        }
     }
 
     private var headerSubtitle: String {

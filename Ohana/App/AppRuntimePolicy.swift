@@ -257,6 +257,12 @@ final class AppWorkloadPolicy: ObservableObject {
         interactionMotionBudget(isVisible: isVisible).allowsMotion
     }
 
+    func shouldPlayFeedback(isVisible: Bool = true) -> Bool {
+        guard isVisible, isForeground else { return false }
+        guard !isLowPowerModeEnabled else { return false }
+        return thermalState != .critical
+    }
+
     func interactionMotionBudget(isVisible: Bool = true) -> OhanaMotionBudget {
         guard isVisible else { return .static }
         guard isForeground else { return .static }

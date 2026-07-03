@@ -39,6 +39,7 @@ nonisolated enum PlantReminderPreferenceStore {
     static let timeWindowStorageName = "plantReminder.timeWindow.v1"
     static let weekendQuietStorageName = "plantReminder.weekendQuiet.v1"
     static let travelModeStorageName = "plantReminder.travelMode.v1"
+    static let generatedPlanTitleMarker = "植物计划"
     private static let careTypeStoragePrefix = "plantReminder.careTypeEnabled.v1."
 
     static let controllableCareTypes: [PlantCareType] = [
@@ -99,8 +100,15 @@ nonisolated enum PlantReminderPreferenceStore {
     }
 
     static func isPlantCareEvent(_ event: Event) -> Bool {
+        isGeneratedPlantCareEvent(event)
+    }
+
+    static func isGeneratedPlantCareEvent(_ event: Event) -> Bool {
         DomainEntityLinkRegistry.plantId(for: event) != nil &&
-            careType(forEventType: event.eventType) != nil
+            careType(forEventType: event.eventType) != nil &&
+            event.isAllDay &&
+            event.recurrenceDays > 0 &&
+            event.title.contains(generatedPlanTitleMarker)
     }
 
     static func careType(forEventType rawValue: String) -> PlantCareType? {

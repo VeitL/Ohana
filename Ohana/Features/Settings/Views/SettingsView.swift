@@ -15,6 +15,7 @@ struct SettingsView: View {
     let homePets: [Pet]?
     let homeHumans: [Human]?
     let homeElectronicPets: [OasisElectronicPet]?
+    let isRouteDataLoaded: Bool
 
     @Environment(\.dismiss) var dismiss
     @Environment(\.modelContext) var modelContext
@@ -79,12 +80,14 @@ struct SettingsView: View {
         homePets: [Pet]? = nil,
         homeHumans: [Human]? = nil,
         homeElectronicPets: [OasisElectronicPet]? = nil,
+        isRouteDataLoaded: Bool = true,
         onClose: (() -> Void)? = nil
     ) {
         self.homeHouseholds = homeHouseholds
         self.homePets = homePets
         self.homeHumans = homeHumans
         self.homeElectronicPets = homeElectronicPets
+        self.isRouteDataLoaded = isRouteDataLoaded
         self.onClose = onClose
     }
 

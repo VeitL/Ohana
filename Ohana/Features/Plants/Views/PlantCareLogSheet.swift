@@ -125,7 +125,7 @@ struct PlantCareLogSheet: View {
                 id: "timeline",
                 icon: "clock.arrow.circlepath",
                 title: l.tr(zh: "进入时间线", en: "Adds to timeline", de: "In die Zeitachse"),
-                detail: selectedCareType.displayName,
+                detail: selectedCareType.displayName(l: l),
                 tint: tint
             ),
             PlantCareLogImpactItem(
@@ -396,7 +396,7 @@ struct PlantCareLogSheet: View {
                 HStack(spacing: 8) {
                     ForEach(careTypes) { type in
                         chipButton(
-                            title: type.displayName,
+                            title: type.displayName(l: l),
                             icon: careSymbol(for: type),
                             tint: careTint(for: type),
                             isSelected: selectedCareType == type

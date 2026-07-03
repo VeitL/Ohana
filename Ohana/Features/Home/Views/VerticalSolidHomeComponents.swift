@@ -62,6 +62,24 @@ enum VerticalHomeTabTransitionPolicy {
     }
 }
 
+enum VerticalSolidHomePageContentHeightPolicy {
+    static func height(
+        selectedTab: VerticalSolidHomeTab,
+        containerHeight: CGFloat,
+        topChromeHeight: CGFloat,
+        bottomChromeHeight: CGFloat
+    ) -> CGFloat {
+        let reservedBottom = selectedTab.extendsBehindFloatingBottomChrome ? 0 : bottomChromeHeight
+        return max(300, containerHeight - topChromeHeight - reservedBottom)
+    }
+}
+
+extension VerticalSolidHomeTab {
+    var extendsBehindFloatingBottomChrome: Bool {
+        self == .calendar || self == .plants
+    }
+}
+
 struct VerticalSolidHomePageDeck<HomePage: View, CalendarPage: View, OasisPage: View, PlantsPage: View>: View {
     let selectedTab: VerticalSolidHomeTab
     let outgoingTab: VerticalSolidHomeTab?
@@ -100,9 +118,11 @@ struct VerticalSolidHomePageDeck<HomePage: View, CalendarPage: View, OasisPage: 
             VerticalSolidHomePreparedPlaceholder()
         } else if lifecycle.isPreparingForDisplay {
             switch tab {
+            case .calendar:
+                calendar(lifecycle)
             case .oasis:
                 oasis(lifecycle)
-            case .home, .calendar, .plants:
+            case .home, .plants:
                 VerticalSolidHomePreparedPlaceholder()
             }
         } else if lifecycle.isVisible {
@@ -115,6 +135,13 @@ struct VerticalSolidHomePageDeck<HomePage: View, CalendarPage: View, OasisPage: 
                 oasis(lifecycle)
             case .plants:
                 plants(lifecycle)
+            }
+        } else if lifecycle.isPrepared {
+            switch tab {
+            case .calendar:
+                calendar(lifecycle)
+            case .home, .oasis, .plants:
+                VerticalSolidHomePreparedPlaceholder()
             }
         } else {
             VerticalSolidHomePreparedPlaceholder()
@@ -608,17 +635,136 @@ struct VerticalSolidHomeTodayFocusChrome: View {
     }
 }
 
+enum VerticalSolidHomePlantWalletScrollPolicy {
+    static let maxCardsPerSection = 6
+    static let sectionSpacing: CGFloat = 18
+    static let minimumSceneHeight: CGFloat = 360
+    static let topContentInset: CGFloat = 6
+    static let bottomContentInset: CGFloat = 28
+    static let roomRailVisibleBottomInset: CGFloat = 72
+    static let roomRailHiddenBottomInset: CGFloat = 24
+
+    static func cardViewportHeight(
+        containerHeight: CGFloat,
+        bottomChromeHeight: CGFloat
+    ) -> CGFloat {
+        max(minimumSceneHeight, containerHeight - bottomChromeHeight)
+    }
+
+    static func sectionCount(
+        cardCount: Int,
+        maxCardsPerSection: Int = Self.maxCardsPerSection
+    ) -> Int {
+        guard cardCount > 0, maxCardsPerSection > 0 else { return 0 }
+        return Int(ceil(Double(cardCount) / Double(maxCardsPerSection)))
+    }
+
+    static func sectionHeight(
+        cardCount: Int,
+        isExpanded: Bool,
+        availableHeight: CGFloat
+    ) -> CGFloat {
+        guard cardCount > 0 else { return 0 }
+        _ = isExpanded
+
+        return max(minimumSceneHeight, availableHeight)
+    }
+
+    static func sceneHeight(
+        cardCount: Int,
+        isExpanded: Bool,
+        availableHeight: CGFloat
+    ) -> CGFloat {
+        guard cardCount > 0 else { return 0 }
+        _ = isExpanded
+
+        return max(minimumSceneHeight, availableHeight)
+    }
+}
+
+nonisolated enum VerticalSolidHomeBottomChromeScrollPolicy {
+    static let hideThreshold: CGFloat = 24
+    static let showAtTopThreshold: CGFloat = 6
+
+    static func hidesBottomChrome(scrollOffset: CGFloat, currentHidden: Bool) -> Bool {
+        if scrollOffset > hideThreshold {
+            return true
+        }
+        if scrollOffset <= showAtTopThreshold {
+            return false
+        }
+        return currentHidden
+    }
+}
+
+nonisolated enum VerticalSolidHomePlantScrollChromePolicy {
+    static func hidesBottomChrome(scrollOffset: CGFloat, currentHidden: Bool) -> Bool {
+        VerticalSolidHomeBottomChromeScrollPolicy.hidesBottomChrome(
+            scrollOffset: scrollOffset,
+            currentHidden: currentHidden
+        )
+    }
+}
+
+nonisolated enum VerticalSolidHomePlantRoomRailPolicy {
+    static func shouldShow(plantCount: Int, selectedCardId: UUID?, heroDirection: Int) -> Bool {
+        plantCount > 0 && selectedCardId == nil && heroDirection == 0
+    }
+}
+
+private struct VerticalSolidHomePlantCardSection: Identifiable {
+    let id: String
+    let cards: [FocusCard]
+
+    init(cards: [FocusCard]) {
+        self.cards = cards
+        id = cards.map(\.id.uuidString).joined(separator: "|")
+    }
+
+    func contains(cardId: UUID?) -> Bool {
+        guard let cardId else { return false }
+        return cards.contains { $0.id == cardId }
+    }
+}
+
+private struct VerticalSolidHomePlantRoomSummary: Identifiable, Equatable {
+    let id: String
+    let title: String
+    let plantCount: Int
+    let dueCount: Int
+}
+
 struct VerticalSolidHomePlantsPage: View {
     let plants: [VerticalSolidHomePlantSnapshot]
     let localization: L10n
+    @Binding var hidesBottomChrome: Bool
+    let bottomChromeHeight: CGFloat
     let onOpenPlant: (VerticalSolidHomePlantSnapshot) -> Void
+    let onQuickAction: (VerticalSolidHomePlantSnapshot, VerticalSolidHomePlantQuickAction) -> Void
     let onAddPlant: () -> Void
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    @Environment(\.colorScheme) private var colorScheme
+    @State private var selectedCardId: UUID?
+    @State private var selectedRoomId: String?
+    @State private var preparedHeroSnapshots: [UUID: FocusHomeVerticalSolidHeroSnapshot] = [:]
+    @State private var activeHeroSnapshot: FocusHomeVerticalSolidHeroSnapshot?
+    @State private var heroProgress: CGFloat = 0
+    @State private var heroDirection: Int = 0
+    @State private var heroGeneration = 0
+    @State private var collapseCleanupTask: Task<Void, Never>?
 
     private var l: L10n { localization }
 
     var body: some View {
-        ScrollView(.vertical, showsIndicators: false) {
-            VStack(alignment: .leading, spacing: 12) {
+        GeometryReader { proxy in
+            let cardViewportHeight = VerticalSolidHomePlantWalletScrollPolicy.cardViewportHeight(
+                containerHeight: proxy.size.height,
+                bottomChromeHeight: bottomChromeHeight
+            )
+
+            ZStack(alignment: .top) {
                 if plants.isEmpty {
                     VerticalSolidHomeEmptyAction(
                         icon: "leaf.fill",
@@ -626,46 +772,660 @@ struct VerticalSolidHomePlantsPage: View {
                         action: onAddPlant
                     )
                     .accessibilityIdentifier("home-plants-empty-add-action")
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                    .padding(.horizontal, 16)
                     .padding(.top, 72)
                 } else {
-                    ForEach(plants) { plant in
-                        Button {
-                            onOpenPlant(plant)
-                        } label: {
-                            HStack(spacing: 12) {
-                                VerticalSolidHomeAvatar(emoji: plant.emoji, color: Color(hex: plant.themeHex), size: 46)
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text(plant.name)
-                                        .font(OhanaFont.adaptive(size: 16, weight: .black, design: .rounded))
-                                        .foregroundStyle(Color.ohanaPrimaryText)
-                                        .lineLimit(1)
-                                    Text(plant.subtitle.isEmpty ? l.tr(zh: "植物", en: "Plant", de: "Pflanze") : plant.subtitle)
-                                        .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
-                                        .foregroundStyle(Color.ohanaSecondaryText)
-                                        .lineLimit(1)
-                                }
-                                Spacer()
-                                if plant.needsCare {
-                                    Image(systemName: "drop.fill").accessibilityHidden(true)
-                                        .font(OhanaFont.adaptive(size: 15, weight: .black))
-                                        .foregroundStyle(Color.goTeal)
+                    ScrollViewReader { scrollProxy in
+                        ScrollView(.vertical, showsIndicators: true) {
+                            LazyVStack(spacing: VerticalSolidHomePlantWalletScrollPolicy.sectionSpacing) {
+                                ForEach(plantCardSections) { section in
+                                    plantCardSection(section, availableHeight: cardViewportHeight)
+                                        .id(section.id)
                                 }
                             }
-                            .padding(14)
-                            .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous))
+                            .padding(.horizontal, 2)
+                            .padding(.top, VerticalSolidHomePlantWalletScrollPolicy.topContentInset)
+                            .padding(.bottom, bottomChromeHeight + VerticalSolidHomePlantWalletScrollPolicy.bottomContentInset)
                         }
-                        .buttonStyle(ScaleButtonStyle())
-                        .accessibilityIdentifier("home-plants-card-\(plant.name)")
+                        .scrollBounceBehavior(.basedOnSize)
+                        .onScrollGeometryChange(for: CGFloat.self) { geometry in
+                            geometry.contentOffset.y
+                        } action: { _, offsetY in
+                            updateBottomChromeVisibility(offsetY)
+                        }
+                        .onChange(of: selectedRoomId) { _, _ in
+                            scrollToFirstPlantSection(using: scrollProxy)
+                        }
+                        .accessibilityIdentifier("home-plants-scroll-view")
+                    }
+
+                    if showsRoomRail {
+                        plantRoomRail
+                            .padding(.trailing, 4)
+                            .padding(.top, 22)
+                            .padding(.bottom, hidesBottomChrome
+                                ? VerticalSolidHomePlantWalletScrollPolicy.roomRailHiddenBottomInset
+                                : VerticalSolidHomePlantWalletScrollPolicy.roomRailVisibleBottomInset)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+                            .transition(.opacity.combined(with: .move(edge: .trailing)))
+                            .zIndex(30)
                     }
                 }
-                Spacer(minLength: 20)
             }
-            .padding(.horizontal, 16)
-            .padding(.top, 12)
-            .padding(.bottom, 18)
         }
-        .scrollBounceBehavior(.basedOnSize)
+        .onAppear {
+            prepareHeroSnapshots()
+            reconcileRoomSelection()
+            reconcileCardSelection()
+        }
+        .onChange(of: plantCardsSignature) { _, _ in
+            prepareHeroSnapshots()
+            reconcileRoomSelection()
+            reconcileCardSelection()
+        }
+        .onChange(of: plantRoomsSignature) { _, _ in
+            reconcileRoomSelection()
+            reconcileCardSelection()
+        }
+        .onDisappear {
+            collapseCleanupTask?.cancel()
+            collapseCleanupTask = nil
+            heroGeneration += 1
+            withoutAnimation {
+                selectedCardId = nil
+                activeHeroSnapshot = nil
+                heroProgress = 0
+                heroDirection = 0
+            }
+            if hidesBottomChrome {
+                hidesBottomChrome = false
+            }
+        }
         .accessibilityIdentifier("home-plants-page")
+    }
+
+    private var plantCards: [FocusCard] {
+        visiblePlants.map { plant in
+            FocusCard(
+                id: plant.id,
+                name: plant.name,
+                kind: plant.subtitle.isEmpty ? l.tr(zh: "植物", en: "Plant", de: "Pflanze") : plant.subtitle,
+                emoji: plant.emoji,
+                color: Color(hex: plant.themeHex),
+                streak: 0,
+                coconutBalance: 0,
+                petSpecies: plant.subtitle,
+                themeColorHex: plant.themeHex,
+                statusBadgeText: plant.needsCare ? l.tr(zh: "待照护", en: "Care due", de: "Pflege fällig") : nil,
+                statusBadgeIsWarning: plant.needsCare,
+                isPlant: true,
+                isReal: true,
+                actions: [
+                    FocusCard.Action(label: l.tr(zh: "照护", en: "Care", de: "Pflege"), icon: "drop.fill", colorHex: "4FB6A3"),
+                    FocusCard.Action(label: l.tr(zh: "详情", en: "Detail", de: "Detail"), icon: "leaf.circle.fill", colorHex: plant.themeHex)
+                ]
+            )
+        }
+    }
+
+    private var visiblePlants: [VerticalSolidHomePlantSnapshot] {
+        guard let selectedRoomId else { return plants }
+        return plants.filter { roomIdentifier(for: $0) == selectedRoomId }
+    }
+
+    private var plantCardSections: [VerticalSolidHomePlantCardSection] {
+        let cards = plantCards
+        let sectionSize = VerticalSolidHomePlantWalletScrollPolicy.maxCardsPerSection
+        return stride(from: 0, to: cards.count, by: sectionSize).map { start in
+            let end = min(start + sectionSize, cards.count)
+            return VerticalSolidHomePlantCardSection(cards: Array(cards[start ..< end]))
+        }
+    }
+
+    private var plantCardsSignature: String {
+        plantCards.map { card in
+            [
+                card.id.uuidString,
+                card.name,
+                card.kind,
+                card.statusBadgeText ?? "",
+                card.themeColorHex
+            ].joined(separator: ":")
+        }.joined(separator: "|")
+    }
+
+    private var plantRoomsSignature: String {
+        plantRoomSummaries.map { summary in
+            "\(summary.id):\(summary.plantCount):\(summary.dueCount)"
+        }.joined(separator: "|")
+    }
+
+    private var plantRoomSummaries: [VerticalSolidHomePlantRoomSummary] {
+        Dictionary(grouping: plants, by: roomIdentifier(for:))
+            .map { id, roomPlants in
+                VerticalSolidHomePlantRoomSummary(
+                    id: id,
+                    title: roomTitle(for: roomPlants.first),
+                    plantCount: roomPlants.count,
+                    dueCount: roomPlants.count(where: \.needsCare)
+                )
+            }
+            .sorted { lhs, rhs in
+                if lhs.dueCount != rhs.dueCount {
+                    return lhs.dueCount > rhs.dueCount
+                }
+                if lhs.plantCount != rhs.plantCount {
+                    return lhs.plantCount > rhs.plantCount
+                }
+                return lhs.title.localizedStandardCompare(rhs.title) == .orderedAscending
+            }
+    }
+
+    private var showsRoomRail: Bool {
+        VerticalSolidHomePlantRoomRailPolicy.shouldShow(
+            plantCount: plants.count,
+            selectedCardId: selectedCardId,
+            heroDirection: heroDirection
+        )
+    }
+
+    private func plantQuickActionItems(for card: FocusCard) -> [VerticalHomeEmbeddedAction] {
+        [
+            VerticalHomeEmbeddedAction(
+                id: "home-plant-\(card.id.uuidString)-water",
+                title: l.tr(zh: "浇水", en: "Water", de: "Gießen"),
+                icon: "drop.fill",
+                actionType: "plantWater",
+                statusText: card.statusBadgeIsWarning
+                    ? l.tr(zh: "待确认", en: "Check", de: "Prüfen")
+                    : l.tr(zh: "一键记录", en: "One tap", de: "1 Tipp"),
+                isCompleted: false,
+                showsAttention: card.statusBadgeIsWarning,
+                primaryIcon: "checkmark",
+                detailIcon: "info.circle.fill",
+                showsMenu: false,
+                showsQuickButton: true,
+                quickAccessibilityLabel: l.tr(zh: "记录植物浇水", en: "Log plant watering", de: "Pflanze gegossen erfassen"),
+                detailAccessibilityLabel: l.tr(zh: "查看植物详情", en: "View plant details", de: "Pflanzendetails ansehen"),
+                detailAction: { openPlant(card) },
+                action: { performPlantAction(.water, card: card) }
+            ),
+            VerticalHomeEmbeddedAction(
+                id: "home-plant-\(card.id.uuidString)-fertilize",
+                title: l.tr(zh: "施肥", en: "Fertilize", de: "Düngen"),
+                icon: "leaf.fill",
+                actionType: "fertilizePlant",
+                statusText: l.tr(zh: "一键记录", en: "One tap", de: "1 Tipp"),
+                isCompleted: false,
+                primaryIcon: "checkmark",
+                detailIcon: "info.circle.fill",
+                showsMenu: false,
+                showsQuickButton: true,
+                quickAccessibilityLabel: l.tr(zh: "记录植物施肥", en: "Log plant fertilizing", de: "Pflanze gedüngt erfassen"),
+                detailAccessibilityLabel: l.tr(zh: "查看植物详情", en: "View plant details", de: "Pflanzendetails ansehen"),
+                detailAction: { openPlant(card) },
+                action: { performPlantAction(.fertilize, card: card) }
+            ),
+            VerticalHomeEmbeddedAction(
+                id: "home-plant-\(card.id.uuidString)-log",
+                title: l.tr(zh: "记录", en: "Log", de: "Notiz"),
+                icon: "note.text",
+                actionType: "plantNote",
+                statusText: l.tr(zh: "备注/照片", en: "Note/photo", de: "Notiz/Foto"),
+                isCompleted: false,
+                primaryIcon: "square.and.pencil",
+                detailIcon: "info.circle.fill",
+                showsMenu: false,
+                showsQuickButton: true,
+                quickAccessibilityLabel: l.tr(zh: "打开植物记录", en: "Open plant log", de: "Pflanzennotiz öffnen"),
+                detailAccessibilityLabel: l.tr(zh: "查看植物详情", en: "View plant details", de: "Pflanzendetails ansehen"),
+                detailAction: { openPlant(card) },
+                action: { performPlantAction(.log, card: card) }
+            ),
+            VerticalHomeEmbeddedAction(
+                id: "home-plant-\(card.id.uuidString)-detail",
+                title: l.tr(zh: "详情", en: "Detail", de: "Detail"),
+                icon: "info.circle.fill",
+                actionType: "plantDetail",
+                isCompleted: false,
+                primaryIcon: "arrow.right",
+                detailIcon: "info.circle.fill",
+                showsMenu: false,
+                showsQuickButton: true,
+                quickAccessibilityLabel: l.tr(zh: "打开植物详情", en: "Open plant details", de: "Pflanzendetails öffnen"),
+                detailAccessibilityLabel: l.tr(zh: "打开植物详情", en: "Open plant details", de: "Pflanzendetails öffnen"),
+                detailAction: { openPlant(card) },
+                action: { performPlantAction(.detail, card: card) }
+            )
+        ]
+    }
+
+    private var plantRoomRail: some View {
+        VStack(spacing: 8) {
+            plantRoomRailButton(
+                id: "all",
+                title: l.tr(zh: "全部", en: "All", de: "Alle"),
+                shortTitle: l.tr(zh: "全", en: "All", de: "Alle"),
+                count: plants.count,
+                dueCount: plants.count(where: \.needsCare),
+                isSelected: selectedRoomId == nil
+            ) {
+                selectRoom(nil)
+            }
+
+            ForEach(plantRoomSummaries.prefix(7)) { summary in
+                plantRoomRailButton(
+                    id: summary.id,
+                    title: summary.title,
+                    shortTitle: roomRailShortTitle(summary.title),
+                    count: summary.plantCount,
+                    dueCount: summary.dueCount,
+                    isSelected: selectedRoomId == summary.id
+                ) {
+                    selectRoom(selectedRoomId == summary.id ? nil : summary.id)
+                }
+            }
+        }
+        .padding(.vertical, 8)
+        .padding(.horizontal, 5)
+        .background(roomRailBackground)
+        .opacity(showsRoomRail ? 1 : 0)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("home-plants-room-edge-rail")
+    }
+
+    private func plantRoomRailButton(
+        id: String,
+        title: String,
+        shortTitle: String,
+        count: Int,
+        dueCount: Int,
+        isSelected: Bool,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            VStack(spacing: 2) {
+                Text(shortTitle)
+                    .font(OhanaFont.adaptive(size: shortTitle.count > 2 ? 9 : 11, weight: .black, design: .rounded))
+                    .foregroundStyle(isSelected ? Color.arkInk : Color.ohanaPrimaryText)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.62)
+                Text("\(count)")
+                    .font(OhanaFont.adaptive(size: 9, weight: .black, design: .rounded))
+                    .foregroundStyle(isSelected ? Color.arkInk.opacity(0.72) : Color.ohanaSecondaryText)
+                    .lineLimit(1)
+            }
+            .frame(width: 44, height: 44)
+            .background(isSelected ? Color.goLime : Color.ohanaControlFill.opacity(0.62), in: Circle())
+            .overlay(alignment: .topTrailing) {
+                if dueCount > 0 {
+                    Circle()
+                        .fill(Color.goYellow)
+                        .frame(width: 9, height: 9) // a11y: allow decorative due dot inside the 44pt home plant room rail button
+                        .overlay {
+                            Circle().strokeBorder(Color.ohanaCardSurface.opacity(0.8), lineWidth: 1)
+                        }
+                        .offset(x: -5, y: 5)
+                        .accessibilityHidden(true)
+                }
+            }
+        }
+        .buttonStyle(ScaleButtonStyle())
+        .accessibilityLabel(roomRailAccessibilityLabel(title: title, count: count, dueCount: dueCount, isSelected: isSelected))
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+        .accessibilityIdentifier("home-plants-room-edge-\(roomRailIdentifier(id))")
+    }
+
+    private var roomRailBackground: some View {
+        Capsule()
+            .fill(reduceTransparency ? Color.ohanaCardSurface.opacity(0.94) : Color.clear)
+            .glassEffect(.regular.tint(roomRailGlassTint).interactive(true), in: Capsule()) // ui-v4: allow Liquid Glass room rail above plant cards
+            .overlay {
+                Capsule()
+                    .strokeBorder(
+                        LinearGradient(
+                            colors: [
+                                Color.ohanaPrimaryText.opacity(colorScheme == .dark ? 0.18 : 0.14),
+                                Color.ohanaSecondaryText.opacity(colorScheme == .dark ? 0.18 : 0.10),
+                                Color.ohanaGlassStroke.opacity(0.20)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        lineWidth: 1
+                    )
+            }
+            .shadow( // ui-v4: allow floating glass room rail depth
+                color: Color.arkInk.opacity(0.16),
+                radius: 16,
+                x: 0,
+                y: 8
+            )
+    }
+
+    private var roomRailGlassTint: Color {
+        if reduceTransparency {
+            return Color.ohanaCardSurface.opacity(0.94)
+        }
+        return Color.ohanaCardSurface.opacity(colorScheme == .dark ? 0.34 : 0.42)
+    }
+
+    private func plantCardSection(
+        _ section: VerticalSolidHomePlantCardSection,
+        availableHeight: CGFloat
+    ) -> some View {
+        let sectionSelectedCardId = section.contains(cardId: selectedCardId) ? selectedCardId : nil
+        let sectionHeroSnapshot = section.contains(cardId: activeHeroSnapshot?.card.id) ? activeHeroSnapshot : nil
+        let sectionProgress = sectionSelectedCardId == nil ? 0 : heroProgress
+        let sectionHeroDirection = sectionSelectedCardId == nil ? 0 : heroDirection
+        let sectionHeight = VerticalSolidHomePlantWalletScrollPolicy.sectionHeight(
+            cardCount: section.cards.count,
+            isExpanded: sectionSelectedCardId != nil,
+            availableHeight: availableHeight
+        )
+        let sceneHeight = VerticalSolidHomePlantWalletScrollPolicy.sceneHeight(
+            cardCount: section.cards.count,
+            isExpanded: sectionSelectedCardId != nil,
+            availableHeight: availableHeight
+        )
+
+        return FocusHomeVerticalSolidScene(
+            cards: section.cards,
+            safeTop: 0,
+            safeBottom: 0,
+            selectedCardId: sectionSelectedCardId,
+            preparedHeroSnapshots: preparedHeroSnapshots,
+            heroSnapshot: sectionHeroSnapshot,
+            progress: sectionProgress,
+            heroDirection: sectionHeroDirection,
+            arrivingCardId: nil,
+            reduceMotion: reduceMotion,
+            localization: localization,
+            allowsAmbientFloat: false,
+            isVisible: true,
+            embedsQuickActionsInCard: true,
+            freezesInactiveCollapsedGeometryDuringHero: true,
+            collapsedTopInset: 0,
+            collapsedVerticalBias: FocusHomeVerticalSolidCollapsedLayoutPolicy.bottomExtendedVerticalBias,
+            quickActions: { card in
+                VerticalHomeEmbeddedQuickActions(
+                    title: l.tr(zh: "快捷", en: "Quick", de: "Schnell"),
+                    items: plantQuickActionItems(for: card),
+                    localization: localization,
+                    itemsRevision: card.id.uuidString,
+                    shouldReduceWork: reduceMotion,
+                    forcesSubmenusBelow: false
+                )
+            },
+            contextMenu: { _ in EmptyView() },
+            onSelect: expandCard,
+            onCollapse: collapseCard,
+            onWalkCardMinimizeToFloatingControl: {},
+            onOpenDetails: openPlant
+        )
+        .frame(height: sceneHeight)
+        .frame(maxWidth: .infinity, minHeight: sectionHeight, alignment: .center)
+        .id(section.id)
+    }
+
+    private func expandCard(_ snapshot: FocusHomeVerticalSolidHeroSnapshot) {
+        let card = snapshot.card
+        let canReopenSettledCard = selectedCardId == card.id
+            && heroDirection == 0
+            && heroProgress <= 0.06
+        guard selectedCardId != card.id || canReopenSettledCard else { return }
+        collapseCleanupTask?.cancel()
+        collapseCleanupTask = nil
+        heroGeneration += 1
+        let generation = heroGeneration
+        OhanaFeedback.light()
+        withoutAnimation {
+            selectedCardId = card.id
+            activeHeroSnapshot = snapshot
+            heroDirection = 1
+            heroProgress = 0
+        }
+        OhanaFrameScheduler.runAfterNextFrame {
+            guard generation == heroGeneration,
+                  selectedCardId == card.id,
+                  heroDirection == 1 else { return }
+            withAnimation(heroAnimation, completionCriteria: .removed) {
+                heroProgress = 1
+            } completion: {
+                completeExpand(cardId: card.id, generation: generation)
+            }
+        }
+    }
+
+    private func collapseCard() {
+        guard let selectedCardId else { return }
+        OhanaFeedback.light()
+        collapseCleanupTask?.cancel()
+        collapseCleanupTask = nil
+        heroGeneration += 1
+        let generation = heroGeneration
+        guard let collapseSnapshot = activeHeroSnapshot
+            ?? preparedHeroSnapshots[selectedCardId]
+            ?? makeHeroSnapshot(for: selectedCardId) else {
+            return
+        }
+        withoutAnimation {
+            activeHeroSnapshot = collapseSnapshot
+            heroDirection = -1
+        }
+        withAnimation(heroAnimation, completionCriteria: .removed) {
+            heroProgress = 0
+        } completion: {
+            completeCollapse(cardId: selectedCardId, generation: generation)
+        }
+    }
+
+    private func completeExpand(cardId: UUID, generation: Int) {
+        guard generation == heroGeneration,
+              selectedCardId == cardId,
+              heroDirection == 1 else { return }
+        withoutAnimation {
+            heroProgress = 1
+            heroDirection = 0
+        }
+    }
+
+    private func completeCollapse(cardId: UUID, generation: Int) {
+        guard generation == heroGeneration,
+              selectedCardId == cardId,
+              heroDirection == -1 else { return }
+        withoutAnimation {
+            heroProgress = 0
+            heroDirection = 0
+        }
+        collapseCleanupTask = OhanaFrameScheduler.runAfterNextFrame {
+            guard generation == heroGeneration,
+                  selectedCardId == cardId,
+                  heroDirection == 0 else { return }
+            collapseCleanupTask = OhanaFrameScheduler.runAfterNextFrame {
+                guard generation == heroGeneration,
+                      selectedCardId == cardId,
+                      heroDirection == 0 else { return }
+                withoutAnimation {
+                    self.selectedCardId = nil
+                    activeHeroSnapshot = nil
+                }
+                collapseCleanupTask = nil
+            }
+        }
+    }
+
+    private func openPlant(_ card: FocusCard) {
+        guard let plant = plants.first(where: { $0.id == card.id }) else { return }
+        onOpenPlant(plant)
+    }
+
+    private func performPlantAction(_ action: VerticalSolidHomePlantQuickAction, card: FocusCard) {
+        guard let plant = plants.first(where: { $0.id == card.id }) else { return }
+        onQuickAction(plant, action)
+    }
+
+    private func makeHeroSnapshot(for card: FocusCard, index: Int) -> FocusHomeVerticalSolidHeroSnapshot {
+        FocusHomeVerticalSolidHeroSnapshot(
+            card: card,
+            index: index,
+            avatarSource: FocusHomeFrozenAvatarSource.cached(for: card) ?? .placeholder
+        )
+    }
+
+    private func makeHeroSnapshot(for cardId: UUID) -> FocusHomeVerticalSolidHeroSnapshot? {
+        guard let pair = sectionIndexedPlantCards().first(where: { $0.card.id == cardId }) else {
+            return nil
+        }
+        return makeHeroSnapshot(for: pair.card, index: pair.index)
+    }
+
+    private func prepareHeroSnapshots() {
+        let next = Dictionary(
+            uniqueKeysWithValues: sectionIndexedPlantCards().map { pair in
+                (pair.card.id, makeHeroSnapshot(for: pair.card, index: pair.index))
+            }
+        )
+        withoutAnimation {
+            preparedHeroSnapshots = next
+            if let selectedCardId,
+               let refreshed = next[selectedCardId],
+               heroDirection == 0 {
+                activeHeroSnapshot = refreshed.preservingCollapsedGeometry(from: activeHeroSnapshot)
+            }
+        }
+    }
+
+    private func selectRoom(_ roomId: String?) {
+        OhanaFeedback.light()
+        resetCardSelectionForRoomChange()
+        withAnimation(reduceMotion ? GoMotion.reduced : GoMotion.quick) {
+            selectedRoomId = roomId
+        }
+    }
+
+    private func updateBottomChromeVisibility(_ scrollOffset: CGFloat) {
+        let next = VerticalSolidHomePlantScrollChromePolicy.hidesBottomChrome(
+            scrollOffset: scrollOffset,
+            currentHidden: hidesBottomChrome
+        )
+        guard next != hidesBottomChrome else { return }
+        withAnimation(reduceMotion ? GoMotion.reduced : GoMotion.quick) {
+            hidesBottomChrome = next
+        }
+    }
+
+    private func reconcileRoomSelection() {
+        guard let selectedRoomId,
+              !plantRoomSummaries.contains(where: { $0.id == selectedRoomId }) else { return }
+        self.selectedRoomId = nil
+    }
+
+    private func sectionIndexedPlantCards() -> [(card: FocusCard, index: Int)] {
+        plantCardSections.flatMap { section in
+            section.cards.enumerated().map { index, card in
+                (card: card, index: index)
+            }
+        }
+    }
+
+    private func scrollToFirstPlantSection(using proxy: ScrollViewProxy) {
+        guard let firstSectionId = plantCardSections.first?.id else { return }
+        OhanaFrameScheduler.runAfterNextFrame {
+            withAnimation(reduceMotion ? GoMotion.reduced : GoMotion.quick) {
+                proxy.scrollTo(firstSectionId, anchor: .top)
+            }
+        }
+    }
+
+    private func resetCardSelectionForRoomChange() {
+        collapseCleanupTask?.cancel()
+        collapseCleanupTask = nil
+        heroGeneration += 1
+        withoutAnimation {
+            selectedCardId = nil
+            activeHeroSnapshot = nil
+            heroProgress = 0
+            heroDirection = 0
+        }
+    }
+
+    private func reconcileCardSelection() {
+        guard let selectedCardId,
+              !visiblePlants.contains(where: { $0.id == selectedCardId }) else { return }
+        collapseCleanupTask?.cancel()
+        collapseCleanupTask = nil
+        heroGeneration += 1
+        withoutAnimation {
+            self.selectedCardId = nil
+            activeHeroSnapshot = nil
+            heroProgress = 0
+            heroDirection = 0
+        }
+    }
+
+    private var heroAnimation: Animation {
+        reduceMotion ? HeroAnim.walletReduced : GoMotion.zStackHero
+    }
+
+    private func withoutAnimation(_ updates: () -> Void) {
+        var transaction = Transaction(animation: nil)
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            updates()
+        }
+    }
+
+    private func roomIdentifier(for plant: VerticalSolidHomePlantSnapshot) -> String {
+        roomTitle(for: plant)
+            .folding(options: [.caseInsensitive, .diacriticInsensitive, .widthInsensitive], locale: .current)
+            .lowercased()
+    }
+
+    private func roomTitle(for plant: VerticalSolidHomePlantSnapshot?) -> String {
+        let trimmed = plant?.roomName.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return trimmed.isEmpty ? l.tr(zh: "未设置", en: "Unassigned", de: "Ohne Ort") : trimmed
+    }
+
+    private func roomRailShortTitle(_ value: String) -> String {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return "?" }
+        if trimmed.unicodeScalars.contains(where: { (0x4E00 ... 0x9FFF).contains(Int($0.value)) }) {
+            return String(trimmed.prefix(1))
+        }
+        let words = trimmed
+            .split(whereSeparator: { $0.isWhitespace || $0 == "-" || $0 == "_" })
+            .map(String.init)
+        if words.count >= 2 {
+            return words.prefix(2).compactMap(\.first).map(String.init).joined().uppercased()
+        }
+        return String(trimmed.prefix(3)).uppercased()
+    }
+
+    private func roomRailIdentifier(_ value: String) -> String {
+        value
+            .folding(options: [.caseInsensitive, .diacriticInsensitive, .widthInsensitive], locale: .current)
+            .lowercased()
+            .replacingOccurrences(of: " ", with: "-")
+            .filter { $0.isLetter || $0.isNumber || $0 == "-" }
+    }
+
+    private func roomRailAccessibilityLabel(
+        title: String,
+        count: Int,
+        dueCount: Int,
+        isSelected: Bool
+    ) -> String {
+        let state = isSelected ? l.tr(zh: "已选择", en: "selected", de: "ausgewählt") : l.tr(zh: "未选择", en: "not selected", de: "nicht ausgewählt")
+        let due = dueCount == 0
+            ? l.tr(zh: "无到期任务", en: "no due tasks", de: "keine fälligen Aufgaben")
+            : l.tr(zh: "\(dueCount) 项到期", en: "\(dueCount) due", de: "\(dueCount) fällig")
+        return l.tr(
+            zh: "\(title)，\(count) 株植物，\(due)，\(state)",
+            en: "\(title), \(count) plants, \(due), \(state)",
+            de: "\(title), \(count) Pflanzen, \(due), \(state)"
+        )
     }
 }
 
@@ -732,6 +1492,7 @@ struct OasisTreeRenderSnapshot: Equatable {
     let totalEnergy: Int
     let nextLevelThreshold: Int
     let shopLockedLevel: Int?
+    let shopInitialCategory: ShopItem.ShopCategory
     let crittersLockedLevel: Int?
     let gachaLockedLevel: Int?
 
@@ -741,6 +1502,7 @@ struct OasisTreeRenderSnapshot: Equatable {
         totalEnergy: Int = 0,
         nextLevelThreshold: Int = 0,
         shopLockedLevel: Int? = nil,
+        shopInitialCategory: ShopItem.ShopCategory = .effect,
         crittersLockedLevel: Int? = nil,
         gachaLockedLevel: Int? = nil
     ) {
@@ -749,6 +1511,7 @@ struct OasisTreeRenderSnapshot: Equatable {
         self.totalEnergy = max(0, totalEnergy)
         self.nextLevelThreshold = max(0, nextLevelThreshold)
         self.shopLockedLevel = shopLockedLevel
+        self.shopInitialCategory = shopInitialCategory
         self.crittersLockedLevel = crittersLockedLevel
         self.gachaLockedLevel = gachaLockedLevel
     }
@@ -761,6 +1524,7 @@ struct OasisTreeRenderSnapshot: Equatable {
 
 struct VerticalSolidHomeOasisFrozenTreeStage: View {
     let snapshot: OasisTreeRenderSnapshot
+    var onOpenShop: (ShopItem.ShopCategory) -> Void = { _ in }
     @Environment(\.colorScheme) private var colorScheme
     @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
 
@@ -848,8 +1612,10 @@ struct VerticalSolidHomeOasisFrozenTreeStage: View {
             crittersLockedLevel: snapshot.crittersLockedLevel,
             gachaLockedLevel: snapshot.gachaLockedLevel,
             isCompact: true,
-            isInteractive: false,
-            onOpenShop: {},
+            interactiveFeatures: [.shop],
+            onOpenShop: {
+                onOpenShop(snapshot.shopInitialCategory)
+            },
             onOpenAchievements: {},
             onOpenCritters: {},
             onOpenGacha: {}

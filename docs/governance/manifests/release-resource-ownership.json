@@ -1,6 +1,6 @@
 {
   "schema": "ohana.governance.release-resource-ownership.v1",
-  "updated": "2026-06-23",
+  "updated": "2026-07-03",
   "policyDocuments": [
     "AGENTS.md",
     "docs/release-quality-gates.md",
@@ -32,6 +32,15 @@
       "path": "Resources/Avatars/HumanAvatarAssets",
       "limitMiB": 10,
       "rationale": "Human avatar resources should remain compact relative to pet assets.",
+      "releaseGate": "scripts/audit-resource-integrity.sh",
+      "evidence": "Resource integrity audit prints the current directory size and blocks over-budget growth."
+    },
+    {
+      "id": "plant-avatar-assets",
+      "owner": "Avatar asset owner",
+      "path": "Resources/Avatars/PlantAvatarAssets",
+      "limitMiB": 10,
+      "rationale": "Plant avatar resources should follow the same bounded bundled-avatar ownership model as pet and human avatars.",
       "releaseGate": "scripts/audit-resource-integrity.sh",
       "evidence": "Resource integrity audit prints the current directory size and blocks over-budget growth."
     },

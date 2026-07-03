@@ -440,13 +440,14 @@ struct SwipeableEventRow: View {
     }
 }
 
-// MARK: - Event Detail Sheet（F2F0F5 浅色大圆角底板）
+// MARK: - Calendar Event Detail Page
 
-struct EventDetailSheet: View {
+struct CalendarEventDetailPage: View {
     let event: Event
     var occurrenceDate: Date
     let pets: [Pet]
     let humans: [Human]
+    let plants: [Plant]
     let allowsEditing: Bool
     let onDelete: () -> Void
     let onComplete: () -> Void
@@ -460,140 +461,44 @@ struct EventDetailSheet: View {
     private var detailActions: [CalendarEventDetailAction] {
         CalendarEventInteractionPolicy.detailActions(for: event, allowsEditing: allowsEditing)
     }
+    private var isOccurrenceComplete: Bool {
+        event.isOccurrenceMarkedComplete(on: occurrenceDate)
+    }
 
     var body: some View {
-        VStack(spacing: 0) {
-            Capsule()
-                .fill(Color.goCardWhite.opacity(0.2))
-                .frame(width: 40, height: 4) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
-                .padding(.top, 12).padding(.bottom, 20)
+        GeometryReader { proxy in
+            let headerTopInset = max(14, proxy.safeAreaInsets.top + 12)
+            let bottomInset = max(18, proxy.safeAreaInsets.bottom + 14)
+            let actionReserve = detailActions.isEmpty
+                ? bottomInset + 24
+                : CGFloat(detailActions.count) * 64 + CGFloat(max(0, detailActions.count - 1)) * 10 + bottomInset + 28
 
-            ScrollView(showsIndicators: false) {
-                VStack(alignment: .leading, spacing: 20) {
-                    // 标题行
-                    HStack(spacing: 14) {
-                        ZStack {
-                            RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous)
-                                .fill(nodeColor.opacity(0.15))
-                                .frame(width: 52, height: 52)
-                            Image(systemName: event.silhouetteListSymbol)
-                                .font(OhanaFont.adaptive(size: 22, weight: .bold))
-                                .symbolRenderingMode(.monochrome)
-                                .foregroundStyle(nodeColor)
+            ZStack(alignment: .bottom) {
+                OhanaAppBackground()
+                    .ignoresSafeArea()
+
+                VStack(spacing: 0) {
+                    header
+                        .padding(.horizontal, 20)
+                        .padding(.top, headerTopInset)
+                        .padding(.bottom, 12)
+
+                    ScrollView(showsIndicators: false) {
+                        VStack(alignment: .leading, spacing: 16) {
+                            eventSummary
+                            timingSection
                         }
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(event.title)
-                                .font(OhanaFont.adaptive(size: 18, weight: .black, design: .rounded))
-                                .foregroundStyle(Color.ohanaPrimaryText)
-                                .lineLimit(2)
-                            Text(event.eventType)
-                                .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
-                                .foregroundStyle(nodeColor)
-                                .padding(.horizontal, 8).padding(.vertical, 3)
-                                .background(nodeColor.opacity(0.12), in: Capsule())
-                        }
-                        Spacer()
+                        .padding(.horizontal, 20)
+                        .padding(.bottom, actionReserve)
                     }
-                    .padding(.horizontal, 24)
+                }
 
-                    // 时间信息（重复日程展示「本次发生」的日期+时间）
-                    Group {
-                        if event.isAllDay {
-                            infoRow(icon: "clock.fill", label: "开始",
-                                    value: Calendar.current.startOfDay(for: occurrenceDate).formatted(date: .abbreviated, time: .omitted))
-                        } else {
-                            let startDT = Event.dateMergingTime(from: event.startDate, ontoOccurrenceDay: occurrenceDate)
-                            infoRow(icon: "clock.fill", label: "开始",
-                                    value: startDT.formatted(date: .abbreviated, time: .shortened))
-                        }
-                        if let end = event.endDate {
-                            if event.isAllDay {
-                                infoRow(icon: "clock.badge.checkmark.fill", label: "截止",
-                                        value: Calendar.current.startOfDay(for: end).formatted(date: .abbreviated, time: .omitted))
-                            } else {
-                                let cal = Calendar.current
-                                let sameDay = cal.isDate(event.startDate, inSameDayAs: end)
-                                let endDT = sameDay
-                                    ? Event.dateMergingTime(from: end, ontoOccurrenceDay: occurrenceDate)
-                                    : end
-                                infoRow(icon: "clock.badge.checkmark.fill", label: "截止",
-                                        value: endDT.formatted(date: .abbreviated, time: .shortened))
-                            }
-                        }
-                    }
-                    GoDashedDivider().padding(.horizontal, 24)
-
-                    // 操作按钮
-                    VStack(spacing: 10) {
-                        if detailActions.contains(.edit) {
-                            Button {
-                                showEditEvent = true
-                            } label: {
-                                Label(l.tr(zh: "编辑", en: "Edit", de: "Bearbeiten"), systemImage: "pencil")
-                                    .font(OhanaFont.adaptive(size: 15, weight: .bold, design: .rounded))
-                                    .foregroundStyle(Color.arkInk)
-                                    .frame(maxWidth: .infinity).padding(.vertical, 14)
-                                    .background(Color.goPrimary, in: RoundedRectangle(cornerRadius: OhanaRadius.row))
-                            }
-                            .buttonStyle(ScaleButtonStyle())
-                            .accessibilityIdentifier("calendar-event-edit-action")
-                        }
-
-                        // 信息性事件（生日/纪念日）不显示完成按钮
-                        if detailActions.contains(.complete) {
-                            Button {
-                                onComplete()
-                                dismiss()
-                            } label: {
-                                Label(event.isOccurrenceMarkedComplete(on: occurrenceDate) ? "标记未完成" : "标记完成",
-                                      systemImage: event.isOccurrenceMarkedComplete(on: occurrenceDate) ? "xmark.circle" : "checkmark.circle.fill")
-                                    .font(OhanaFont.adaptive(size: 15, weight: .bold, design: .rounded))
-                                    .foregroundStyle(Color.ohanaPrimaryText)
-                                    .frame(maxWidth: .infinity).padding(.vertical, 14)
-                                    .background(Color.goTeal, in: RoundedRectangle(cornerRadius: OhanaRadius.row))
-                            }
-                            .buttonStyle(ScaleButtonStyle())
-                            .accessibilityIdentifier("calendar-event-complete-action")
-                        }
-
-                        if detailActions.contains(.delete) {
-                            Button {
-                                showDeleteConfirm = true
-                            } label: {
-                                Label(l.tr(zh: "删除", en: "Delete", de: "Loschen"), systemImage: "trash.fill")
-                                    .font(OhanaFont.adaptive(size: 15, weight: .bold, design: .rounded))
-                                    .foregroundStyle(Color.ohanaPrimaryText)
-                                    .frame(maxWidth: .infinity).padding(.vertical, 14)
-                                    .background(Color.goRed, in: RoundedRectangle(cornerRadius: OhanaRadius.row))
-                            }
-                            .buttonStyle(ScaleButtonStyle())
-                            .accessibilityIdentifier("calendar-event-delete-action")
-                            .confirmationDialog(deleteDialogTitle, isPresented: $showDeleteConfirm, titleVisibility: .visible) {
-                                ForEach(deleteScopes, id: \.revisionActionKey) { scope in
-                                    Button(deleteLabel(for: scope), role: .destructive) {
-                                        deleteEvent(scope: scope)
-                                    }
-                                    .accessibilityIdentifier(confirmDeleteAccessibilityIdentifier(for: scope))
-                                }
-                                Button(l.cancel, role: .cancel) {}
-                            } message: {
-                                Text(deleteDialogMessage)
-                            }
-                        }
-                    }
-                    .padding(.horizontal, 24)
-                    .padding(.bottom, 30)
+                if !detailActions.isEmpty {
+                    actionSection(bottomInset: bottomInset)
                 }
             }
         }
-        .background {
-            ZStack {
-                Color.goDeepNavy
-                Color.goPrimary.opacity(0.15)
-            }
-        }
-        .accessibilityIdentifier("calendar-event-detail-sheet")
-        .sheet(isPresented: $showEditEvent) {
+        .fullScreenCover(isPresented: $showEditEvent) {
             AddEventContentView(
                 onClose: {
                     showEditEvent = false
@@ -601,11 +506,230 @@ struct EventDetailSheet: View {
                 },
                 pets: pets,
                 humans: humans,
+                plants: plants,
                 editingEvent: event,
                 editingOccurrenceDate: occurrenceDate
             )
         }
-        .presentationCornerRadius(OhanaRadius.hero)
+    }
+
+    private var header: some View {
+        HStack(alignment: .center, spacing: 12) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(l.tr(zh: "事项详情", en: "Event details", de: "Termindetails"))
+                    .font(OhanaFont.adaptive(size: 26, weight: .black, design: .rounded))
+                    .foregroundStyle(Color.ohanaPrimaryText)
+                    .lineLimit(1)
+                    .accessibilityIdentifier("calendar-event-detail-page")
+                Text(occurrenceStartValue)
+                    .font(OhanaFont.caption(.bold))
+                    .foregroundStyle(Color.ohanaSecondaryText)
+                    .contentTransition(.numericText())
+            }
+
+            Spacer()
+
+            Button {
+                dismiss()
+            } label: {
+                Image(systemName: "xmark").accessibilityHidden(true)
+                    .font(OhanaFont.adaptive(size: 15, weight: .black))
+                    .foregroundStyle(Color.ohanaPrimaryText)
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(ScaleButtonStyle())
+            .accessibilityLabel(l.tr(zh: "关闭", en: "Close", de: "Schliessen"))
+            .accessibilityIdentifier("calendar-event-detail-close-action")
+        }
+    }
+
+    private var eventSummary: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack(alignment: .top, spacing: 14) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous)
+                        .fill(nodeColor.opacity(0.15))
+                    Image(systemName: event.silhouetteListSymbol)
+                        .font(OhanaFont.adaptive(size: 22, weight: .bold))
+                        .symbolRenderingMode(.monochrome)
+                        .foregroundStyle(nodeColor)
+                }
+                .frame(width: 56, height: 56)
+                .accessibilityHidden(true)
+
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(event.title)
+                        .font(OhanaFont.adaptive(size: 24, weight: .black, design: .rounded))
+                        .foregroundStyle(Color.ohanaPrimaryText)
+                        .lineLimit(3)
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    HStack(spacing: 8) {
+                        detailPill(event.eventType, systemImage: event.silhouetteListSymbol, tint: nodeColor)
+                        if event.recurrenceDays > 0 {
+                            detailPill(
+                                l.tr(zh: "重复", en: "Repeats", de: "Wiederholt"),
+                                systemImage: "repeat",
+                                tint: Color.goPrimary
+                            )
+                        }
+                        if isOccurrenceComplete {
+                            detailPill(
+                                l.tr(zh: "已完成", en: "Completed", de: "Erledigt"),
+                                systemImage: "checkmark.circle.fill",
+                                tint: Color.goTeal
+                            )
+                        }
+                    }
+                    .lineLimit(1)
+                }
+
+                Spacer(minLength: 0)
+            }
+        }
+        .padding(18)
+        .background(Color.ohanaCardSurfaceElevated.opacity(0.94), in: RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous)
+                .strokeBorder(Color.ohanaCardStroke, lineWidth: 1)
+        )
+    }
+
+    private var timingSection: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            infoRow(
+                icon: event.isAllDay ? "calendar" : "clock.fill",
+                label: l.tr(zh: "开始", en: "Starts", de: "Beginn"),
+                value: occurrenceStartValue
+            )
+            if let occurrenceEndValue {
+                GoDashedDivider()
+                    .padding(.leading, 54)
+                infoRow(
+                    icon: "clock.badge.checkmark.fill",
+                    label: l.tr(zh: "截止", en: "Ends", de: "Ende"),
+                    value: occurrenceEndValue
+                )
+            }
+        }
+        .padding(.vertical, 4)
+        .background(Color.ohanaControlFill.opacity(0.86), in: RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous))
+    }
+
+    private func actionSection(bottomInset: CGFloat) -> some View {
+        VStack(spacing: 10) {
+            if detailActions.contains(.edit) {
+                actionButton(
+                    title: l.tr(zh: "编辑", en: "Edit", de: "Bearbeiten"),
+                    systemImage: "pencil",
+                    fill: Color.goPrimary
+                ) {
+                    showEditEvent = true
+                }
+                .accessibilityIdentifier("calendar-event-edit-action")
+            }
+
+            if detailActions.contains(.complete) {
+                actionButton(
+                    title: isOccurrenceComplete
+                        ? l.tr(zh: "标记未完成", en: "Mark incomplete", de: "Als offen markieren")
+                        : l.tr(zh: "标记完成", en: "Mark complete", de: "Als erledigt markieren"),
+                    systemImage: isOccurrenceComplete ? "xmark.circle" : "checkmark.circle.fill",
+                    fill: Color.goTeal
+                ) {
+                    onComplete()
+                    dismiss()
+                }
+                .accessibilityIdentifier("calendar-event-complete-action")
+            }
+
+            if detailActions.contains(.delete) {
+                actionButton(
+                    title: l.tr(zh: "删除", en: "Delete", de: "Loeschen"),
+                    systemImage: "trash.fill",
+                    fill: Color.goRed
+                ) {
+                    showDeleteConfirm = true
+                }
+                .accessibilityIdentifier("calendar-event-delete-action")
+                .confirmationDialog(deleteDialogTitle, isPresented: $showDeleteConfirm, titleVisibility: .visible) {
+                    ForEach(deleteScopes, id: \.revisionActionKey) { scope in
+                        Button(deleteLabel(for: scope), role: .destructive) {
+                            deleteEvent(scope: scope)
+                        }
+                        .accessibilityIdentifier(confirmDeleteAccessibilityIdentifier(for: scope))
+                    }
+                    Button(l.cancel, role: .cancel) {}
+                } message: {
+                    Text(deleteDialogMessage)
+                }
+            }
+        }
+        .padding(.horizontal, 20)
+        .padding(.top, 14)
+        .padding(.bottom, bottomInset)
+        .background {
+            Color.ohanaCardSurfaceElevated
+                .opacity(0.96)
+                .ignoresSafeArea(edges: .bottom)
+        }
+    }
+
+    private func actionButton(
+        title: String,
+        systemImage: String,
+        fill: Color,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Label(title, systemImage: systemImage)
+                .font(OhanaFont.adaptive(size: 15, weight: .bold, design: .rounded))
+                .foregroundStyle(Color.arkInk)
+                .frame(maxWidth: .infinity)
+                .frame(minHeight: 52)
+                .background(fill, in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
+        }
+        .buttonStyle(ScaleButtonStyle())
+    }
+
+    private func detailPill(_ title: String, systemImage: String, tint: Color) -> some View {
+        HStack(spacing: 5) {
+            Image(systemName: systemImage)
+                .font(OhanaFont.adaptive(size: 10, weight: .bold))
+                .symbolRenderingMode(.monochrome)
+                .accessibilityHidden(true)
+            Text(title)
+                .font(OhanaFont.caption2(.bold))
+        }
+        .foregroundStyle(tint)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .background(tint.opacity(0.12), in: Capsule())
+    }
+
+    private var occurrenceStartDate: Date {
+        event.isAllDay
+            ? Calendar.current.startOfDay(for: occurrenceDate)
+            : Event.dateMergingTime(from: event.startDate, ontoOccurrenceDay: occurrenceDate)
+    }
+
+    private var occurrenceStartValue: String {
+        event.isAllDay
+            ? occurrenceStartDate.formatted(date: .abbreviated, time: .omitted)
+            : occurrenceStartDate.formatted(date: .abbreviated, time: .shortened)
+    }
+
+    private var occurrenceEndValue: String? {
+        guard let end = event.endDate else { return nil }
+        if event.isAllDay {
+            return Calendar.current.startOfDay(for: end).formatted(date: .abbreviated, time: .omitted)
+        }
+        let cal = Calendar.current
+        let endDate = cal.isDate(event.startDate, inSameDayAs: end)
+            ? Event.dateMergingTime(from: end, ontoOccurrenceDay: occurrenceDate)
+            : end
+        return endDate.formatted(date: .abbreviated, time: .shortened)
     }
 
     private var deleteScopes: [CalendarEventDeletionScope] {

@@ -12,6 +12,7 @@ protocol OasisTreeManaging {
     var canHarvestToday: Bool { get }
 
     func treeLevel(forTotalEnergy totalEnergy: Int) -> TreeLevel
+    func levelStartThreshold(forRawLevel rawLevel: Int) -> Int
     func progressToNextLevel(forTotalEnergy totalEnergy: Int) -> Double
     func nextLevelThreshold(forTotalEnergy totalEnergy: Int) -> Int
     func canUseInjectionPackage(cost: Int, date: Date) -> Bool
@@ -85,6 +86,10 @@ final class SharedOasisTreeManager: OasisTreeManaging {
 
     func treeLevel(forTotalEnergy totalEnergy: Int) -> TreeLevel {
         OasisTreeManager.treeLevel(forTotalEnergy: totalEnergy)
+    }
+
+    func levelStartThreshold(forRawLevel rawLevel: Int) -> Int {
+        OasisTreeManager.levelStartThreshold(forRawLevel: rawLevel)
     }
 
     func progressToNextLevel(forTotalEnergy totalEnergy: Int) -> Double {

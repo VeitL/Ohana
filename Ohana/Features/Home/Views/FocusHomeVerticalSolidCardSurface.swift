@@ -442,6 +442,7 @@ struct FocusHomeVerticalSolidCardSurface: View {
     private var avatarSymbol: String {
         if card.isElectronicPet { return "leaf.fill" }
         if card.isHuman { return "person.fill" }
+        if card.isPlant { return "leaf.fill" }
         let species = (card.petSpecies ?? card.kind).lowercased()
         if species.contains("dog") || species.contains("狗") { return "dog.fill" }
         if species.contains("cat") || species.contains("猫") { return "cat.fill" }

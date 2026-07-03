@@ -11,13 +11,15 @@ import SwiftUI
 struct CalendarView: View {
     var preselectedPetId: String?
     var preselectedHumanId: String?
+    var preselectedPlantId: String?
     var hideToolbar: Bool = false
     var showsEmbeddedControls: Bool = false
     var addEventTrigger: Int = 0
     var isEmbeddedPrepared: Bool = true
     var isEmbeddedVisible: Bool = true
     var isEmbeddedActive: Bool = true
-    var onRequestAddEvent: (() -> Void)?
+    var onRequestAddEvent: (([Plant]) -> Void)?
+    var onEmbeddedScrollOffsetChange: ((CGFloat) -> Void)?
     var onOpenEventDestination: ((FocusHomeReminderDestination) -> Void)?
     var onPresentCoconutLog: ((CoconutLogSubject?) -> Void)?
     var events: [Event] = []
@@ -46,6 +48,7 @@ struct CalendarView: View {
     @State var visualFilterSelection = CalendarFilterSelection.all
     @State var appliedFilterSelection = CalendarFilterSelection.all
     @State var didSyncCalendarFilter = false
+    @State var hasUserOverriddenRouteFilter = false
     @State var deletingEvent: Event? = nil
     @State var eventDetailPresentation: CalendarEventDetailPresentation?
     @State var showDeleteSeriesAlert = false
@@ -63,6 +66,9 @@ struct CalendarView: View {
     @State var listInitialPositionTask: Task<Void, Never>?
     @State var addEventPresentationTask: Task<Void, Never>?
     @State var addEventContentMountTask: Task<Void, Never>?
+    @State var isCalendarMainContentMounted = false
+    @State var calendarMainContentMountTask: Task<Void, Never>?
+    @State var embeddedBottomChromeBaselineOffset: CGFloat?
     @State var didScheduleCalendarMaintenance = false
     @State var calendarOpenStartedAt: CFAbsoluteTime?
     @State var addEventFlowStartedAt: CFAbsoluteTime?
@@ -90,28 +96,58 @@ struct CalendarView: View {
         isEmbeddedPrepared || isEmbeddedVisible || isEmbeddedActive
     }
 
+    var shouldRenderCalendarMainContent: Bool {
+        CalendarEmbeddedContentMountPolicy.shouldRenderMainContent(
+            hideToolbar: hideToolbar,
+            isEmbeddedPrepared: isEmbeddedPrepared,
+            isEmbeddedVisible: isEmbeddedVisible,
+            isEmbeddedActive: isEmbeddedActive,
+            isContentMounted: isCalendarMainContentMounted
+        )
+    }
+
     var storedFilterSelection: CalendarFilterSelection {
         CalendarFilterSelection(
             petId: calendarFilterPetId,
             humanId: calendarFilterHumanId,
             plantId: calendarFilterPlantId
         )
+        .normalizedForUserFilterControls
     }
 
     var displayedFilterSelection: CalendarFilterSelection {
-        didSyncCalendarFilter ? visualFilterSelection : storedFilterSelection
+        if !hasUserOverriddenRouteFilter, let routeFilterSelection {
+            return routeFilterSelection
+        }
+        return didSyncCalendarFilter ? visualFilterSelection : storedFilterSelection
+    }
+
+    var chipFilterSelection: CalendarFilterSelection {
+        displayedFilterSelection
     }
 
     var activeFilterSelection: CalendarFilterSelection {
-        didSyncCalendarFilter ? appliedFilterSelection : storedFilterSelection
+        if !hasUserOverriddenRouteFilter, let routeFilterSelection {
+            return routeFilterSelection
+        }
+        return didSyncCalendarFilter ? appliedFilterSelection : storedFilterSelection
     }
 
-    var effectiveFilterSelection: CalendarFilterSelection {
+    var routeFilterSelection: CalendarFilterSelection? {
+        if let preselectedPlantId {
+            return .plant(preselectedPlantId)
+        }
         if let preselectedPetId {
             return preselectedEntityIsPlant(preselectedPetId) ? .plant(preselectedPetId) : .pet(preselectedPetId)
         }
-        if let preselectedHumanId { return .human(preselectedHumanId) }
-        return activeFilterSelection
+        if let preselectedHumanId {
+            return .human(preselectedHumanId)
+        }
+        return nil
+    }
+
+    var effectiveFilterSelection: CalendarFilterSelection {
+        activeFilterSelection
     }
 
     var contentHandoffState: CalendarContentHandoffState {
@@ -132,41 +168,37 @@ struct CalendarView: View {
         activeHuman?.coconutBalance ?? humans.reduce(0) { $0 + $1.coconutBalance }
     }
 
-    /// 从宠物详情进入时固定为该宠物；否则使用 AppStorage 筛选
     var effectivePetFilterId: String? {
-        if let p = preselectedPetId {
-            return preselectedEntityIsPlant(p) ? nil : p
-        }
-        if preselectedHumanId != nil ||
-            !activeFilterSelection.humanId.isEmpty ||
-            !activeFilterSelection.plantId.isEmpty {
+        let selection = effectiveFilterSelection
+        if !selection.humanId.isEmpty ||
+            !selection.plantId.isEmpty {
             return nil
         }
-        return activeFilterSelection.selectedPetId
+        return selection.selectedPetId
     }
 
-    /// 从人类卡片进入时固定为该成员；首页默认不筛选，继续显示全部日历项目。
     var effectiveHumanFilterId: String? {
-        if let preselectedHumanId { return preselectedHumanId }
-        if preselectedPetId != nil ||
-            !activeFilterSelection.petId.isEmpty ||
-            !activeFilterSelection.plantId.isEmpty {
+        let selection = effectiveFilterSelection
+        if !selection.petId.isEmpty ||
+            !selection.plantId.isEmpty {
             return nil
         }
-        return activeFilterSelection.selectedHumanId
+        return selection.selectedHumanId
     }
 
     var effectivePlantFilterId: String? {
-        if let entityId = preselectedPetId, preselectedEntityIsPlant(entityId) {
-            return entityId
-        }
-        if preselectedPetId != nil ||
-            preselectedHumanId != nil ||
-            !activeFilterSelection.petId.isEmpty ||
-            !activeFilterSelection.humanId.isEmpty {
+        let selection = effectiveFilterSelection
+        if !selection.petId.isEmpty ||
+            !selection.humanId.isEmpty {
             return nil
         }
-        return activeFilterSelection.selectedPlantId
+        return selection.selectedPlantId
+    }
+
+    var effectivePlantFilterIncludesAll: Bool {
+        let selection = effectiveFilterSelection
+        guard selection.petId.isEmpty, selection.humanId.isEmpty else { return false }
+        return selection.isAllPlantsSelected
     }
 
     var filteredEvents: [Event] {
@@ -187,7 +219,9 @@ struct CalendarView: View {
         if let humanId = effectiveHumanFilterId {
             result = result.filter { eventIsRelatedToHuman($0, humanId: humanId) }
         }
-        if let plantId = effectivePlantFilterId {
+        if effectivePlantFilterIncludesAll {
+            result = result.filter { eventIsRelatedToAnyPlant($0) }
+        } else if let plantId = effectivePlantFilterId {
             result = result.filter { eventIsRelatedToPlant($0, plantId: plantId) }
         }
         return result
@@ -233,11 +267,19 @@ struct CalendarView: View {
         DomainEntityLinkRegistry.plantId(for: event)?.uuidString == plantId
     }
 
+    func eventIsRelatedToAnyPlant(_ event: Event) -> Bool {
+        guard let plantId = DomainEntityLinkRegistry.plantId(for: event) else { return false }
+        return plants.contains { $0.id == plantId }
+    }
+
     /// 首页嵌入时为全局顶栏 + 外层宠物条预留空间。
     var overviewCalendarEmbedTopInset: CGFloat { 98 }
 
     var shouldShowInlinePetChips: Bool {
-        preselectedPetId == nil && preselectedHumanId == nil && (!hideToolbar || showsEmbeddedControls || isMaterial)
+        if preselectedPetId != nil || preselectedHumanId != nil || preselectedPlantId != nil {
+            return !hideToolbar || isMaterial
+        }
+        return !hideToolbar || showsEmbeddedControls || isMaterial
     }
 
     typealias EventOccurrence = CalendarEventOccurrence
@@ -314,12 +356,13 @@ struct CalendarView: View {
                 }
             }
         }
-        .sheet(item: $eventDetailPresentation) { presentation in
-            EventDetailSheet(
+        .fullScreenCover(item: $eventDetailPresentation) { presentation in
+            CalendarEventDetailPage(
                 event: presentation.event,
                 occurrenceDate: presentation.occurrenceDate,
                 pets: pets,
                 humans: humans,
+                plants: plants,
                 allowsEditing: presentation.allowsEditing,
                 onDelete: {
                     eventDetailPresentation = nil
@@ -331,8 +374,6 @@ struct CalendarView: View {
                     )
                 }
             )
-            .presentationDetents([.medium])
-            .presentationDragIndicator(.hidden)
         }
     }
 }

@@ -133,10 +133,25 @@ struct FunctionMenuDestinationRouter: View {
                     parentPath.append(FMDest.plantDetail(plantID))
                 }
             )
+        case .plantsCalendar:
+            CalendarRouteContainer(
+                preselectedPlantId: CalendarFilterSelection.allPlants.plantId,
+                onOpenEventDestination: openCalendarEventDestination
+            )
         case let .plantDetail(id):
             if let plant = plant(for: id) {
-                PlantDetailView(plant: plant)
+                PlantDetailView(
+                    plant: plant,
+                    onOpenCalendar: { plantID in
+                        parentPath.append(FMDest.plantCalendar(plantID))
+                    }
+                )
             }
+        case let .plantCalendar(id):
+            CalendarRouteContainer(
+                preselectedPlantId: id.uuidString,
+                onOpenEventDestination: openCalendarEventDestination
+            )
         case .wealthDashboard:
             IslandWealthDashboardView()
         case .bountyBoard:

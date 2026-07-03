@@ -7,7 +7,7 @@
 
 import SwiftUI
 
-enum OasisBentoFeature: String, Identifiable {
+enum OasisBentoFeature: String, CaseIterable, Hashable, Identifiable {
     case shop
     case achievements
     case critters
@@ -100,6 +100,7 @@ struct OasisBentoGridView: View {
     var gachaLockedLevel: Int?
     var isCompact: Bool = false
     var isInteractive: Bool = true
+    var interactiveFeatures: Set<OasisBentoFeature> = Set(OasisBentoFeature.allCases)
     var onShowFeatureInfo: (OasisBentoFeatureInfo) -> Void = { _ in }
     let onOpenShop: () -> Void
     let onOpenAchievements: () -> Void
@@ -119,6 +120,7 @@ struct OasisBentoGridView: View {
                     feature: .shop,
                     metric: snapshot.shopMetric,
                     accent: Color.goYellow,
+                    allowsInteraction: interactiveFeatures.contains(.shop),
                     lockedLevel: shopLockedLevel,
                     showsNewFeature: showsPendingFeature(.shop),
                     action: onOpenShop
@@ -128,6 +130,7 @@ struct OasisBentoGridView: View {
                     metric: snapshot.achievementMetric,
                     accent: snapshot.achievementsLocked ? Color.ohanaSecondaryText : Color.goTeal,
                     isEnabled: !snapshot.achievementsLocked,
+                    allowsInteraction: interactiveFeatures.contains(.achievements),
                     lockedLevel: achievementsLockedLevel,
                     unavailableLabel: snapshot.achievementsLocked
                         ? localization.tr(zh: "暂无宠物", en: "No pets", de: "Keine Haustiere")
@@ -142,6 +145,7 @@ struct OasisBentoGridView: View {
                     feature: .critters,
                     metric: snapshot.critterMetric,
                     accent: Color.goTeal,
+                    allowsInteraction: interactiveFeatures.contains(.critters),
                     lockedLevel: crittersLockedLevel,
                     showsNewFeature: showsPendingFeature(.critters),
                     action: onOpenCritters
@@ -150,6 +154,7 @@ struct OasisBentoGridView: View {
                     feature: .gacha,
                     metric: "80",
                     accent: Color.goPrimary,
+                    allowsInteraction: interactiveFeatures.contains(.gacha),
                     lockedLevel: gachaLockedLevel,
                     showsNewFeature: showsPendingFeature(.gacha),
                     action: onOpenGacha
@@ -163,13 +168,14 @@ struct OasisBentoGridView: View {
         metric: String,
         accent: Color,
         isEnabled: Bool = true,
+        allowsInteraction: Bool = true,
         lockedLevel: Int? = nil,
         unavailableLabel: String? = nil,
         showsNewFeature: Bool = false,
         action: @escaping () -> Void
     ) -> some View {
         let isLocked = lockedLevel != nil
-        let isUnavailable = isLocked || !isEnabled || !isInteractive
+        let isUnavailable = isLocked || !isEnabled || !isInteractive || !allowsInteraction
         let title = feature.title(localization)
         let iconFrame: CGFloat = isCompact ? 30 : 34
         let iconFontSize: CGFloat = isCompact ? 16 : 18
@@ -177,7 +183,7 @@ struct OasisBentoGridView: View {
         let metricFontSize: CGFloat = isCompact ? 14 : 16
         let contentSpacing: CGFloat = isCompact ? 8 : 10
         return Button {
-            guard isInteractive else { return }
+            guard isInteractive, allowsInteraction else { return }
             if isLocked || !isEnabled {
                 OhanaFeedback.light()
                 onShowFeatureInfo(
@@ -242,10 +248,11 @@ struct OasisBentoGridView: View {
             )
         }
         .buttonStyle(ScaleButtonStyle())
-        .disabled(!isInteractive)
+        .disabled(!isInteractive || !allowsInteraction)
         .opacity(isInteractive ? 1 : 0.55)
         .saturation(isUnavailable ? 0.12 : 1)
         .accessibilityLabel(accessibilityLabel(title: title, lockedLevel: lockedLevel, unavailableLabel: unavailableLabel))
+        .accessibilityIdentifier("oasis-bento-\(feature.id)")
     }
 
     private func lockedBadge(level: Int) -> some View {

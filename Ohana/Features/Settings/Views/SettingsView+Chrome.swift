@@ -374,7 +374,7 @@ extension SettingsView {
                 .frame(minHeight: 44)
                 .contentShape(Rectangle())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(ScaleButtonStyle())
             .accessibilityIdentifier("settings-advanced-notifications-disclosure")
 
             if showAdvancedNotificationSettings {

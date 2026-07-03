@@ -170,7 +170,9 @@ struct PlantSiteDetailSheet: View {
     }
 
     private func dueCareRow(task: PlantCareTaskSnapshot, plant: Plant) -> some View {
-        HStack(spacing: 10) {
+        let careTypeName = task.careType.displayName(l: l)
+
+        return HStack(spacing: 10) {
             Image(systemName: careSymbol(for: task.careType)) // a11y: decorative care glyph; row text names task.
                 .font(OhanaFont.adaptive(size: 13, weight: .black))
                 .foregroundStyle(careTint(for: task.careType))
@@ -179,7 +181,7 @@ struct PlantSiteDetailSheet: View {
                 .accessibilityHidden(true)
 
             VStack(alignment: .leading, spacing: 2) {
-                Text("\(plant.name) · \(task.careType.displayName)")
+                Text("\(plant.name) · \(careTypeName)")
                     .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(1)
@@ -203,7 +205,7 @@ struct PlantSiteDetailSheet: View {
                     .accessibilityHidden(true)
             }
             .buttonStyle(ScaleButtonStyle())
-            .accessibilityLabel(l.tr(zh: "记录\(plant.name)的\(task.careType.displayName)", en: "Log \(task.careType.displayName) for \(plant.name)", de: "\(task.careType.displayName) für \(plant.name) erfassen"))
+            .accessibilityLabel(l.tr(zh: "记录\(plant.name)的\(careTypeName)", en: "Log \(careTypeName) for \(plant.name)", de: "\(careTypeName) für \(plant.name) erfassen"))
         }
         .padding(10)
         .background(Color.ohanaControlFill.opacity(0.62), in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))

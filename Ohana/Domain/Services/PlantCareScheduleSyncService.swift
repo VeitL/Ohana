@@ -15,6 +15,7 @@ struct PlantCareScheduleSyncResult: Equatable {
         case skippedExistingCare
         case noPlantTarget
         case unsupportedCareType
+        case notGeneratedPlantPlan
         case unauthorized
     }
 
@@ -56,7 +57,7 @@ enum PlantCareScheduleSyncService {
     }
 
     static func isPlantCareEvent(_ event: Event) -> Bool {
-        DomainEntityLinkRegistry.plantId(for: event) != nil && careType(for: event) != nil
+        PlantReminderPreferenceStore.isGeneratedPlantCareEvent(event)
     }
 
     @discardableResult
@@ -71,6 +72,15 @@ enum PlantCareScheduleSyncService {
         careLedger providedCareLedger: CareLedgerRecording? = nil,
         scheduleNotifications: Bool = true
     ) -> PlantCareScheduleSyncResult {
+        guard isPlantCareEvent(event) else {
+            return PlantCareScheduleSyncResult(
+                action: .notGeneratedPlantPlan,
+                plantID: DomainEntityLinkRegistry.plantId(for: event),
+                logID: nil,
+                ledgerEventID: nil,
+                careType: careType(for: event)
+            )
+        }
         guard let type = careType(for: event) else {
             return PlantCareScheduleSyncResult(
                 action: .unsupportedCareType,
@@ -219,11 +229,28 @@ enum PlantCareScheduleSyncService {
         scheduleNotifications: Bool = true,
         notifications: ReminderNotificationScheduling = ReminderNotificationSchedulerRegistry.current
     ) -> PlantCareScheduleSyncResult {
-        guard let event = reminder.event,
-              let type = careType(for: event) else {
+        guard let event = reminder.event else {
             return PlantCareScheduleSyncResult(
                 action: .unsupportedCareType,
                 plantID: nil,
+                logID: nil,
+                ledgerEventID: nil,
+                careType: nil
+            )
+        }
+        guard isPlantCareEvent(event) else {
+            return PlantCareScheduleSyncResult(
+                action: .notGeneratedPlantPlan,
+                plantID: DomainEntityLinkRegistry.plantId(for: event),
+                logID: nil,
+                ledgerEventID: nil,
+                careType: careType(for: event)
+            )
+        }
+        guard let type = careType(for: event) else {
+            return PlantCareScheduleSyncResult(
+                action: .unsupportedCareType,
+                plantID: DomainEntityLinkRegistry.plantId(for: event),
                 logID: nil,
                 ledgerEventID: nil,
                 careType: nil

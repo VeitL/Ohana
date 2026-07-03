@@ -39,7 +39,7 @@ extension CalendarView {
 
                 if shouldShowInlinePetChips {
                     CalendarPetChipFilterBar(
-                        selection: displayedFilterSelection,
+                        selection: chipFilterSelection,
                         pets: pets,
                         humans: humans,
                         plants: plants,
@@ -48,11 +48,15 @@ extension CalendarView {
                 }
 
                 Group {
-                    switch viewMode {
-                    case .month:
-                        goMonthView
-                    case .list:
-                        goListView
+                    if shouldRenderCalendarMainContent {
+                        switch viewMode {
+                        case .month:
+                            goMonthView
+                        case .list:
+                            goListView
+                        }
+                    } else {
+                        calendarDeferredContentPlaceholder
                     }
                 }
                 .ohanaContextHandoff(
@@ -82,10 +86,20 @@ extension CalendarView {
         .onChange(of: calendarFilterPlantId) { _, _ in
             syncCalendarFilterFromStorage(animated: true)
         }
+        .onChange(of: preselectedPetId) { _, _ in
+            resetRouteFilterOverride()
+        }
+        .onChange(of: preselectedHumanId) { _, _ in
+            resetRouteFilterOverride()
+        }
+        .onChange(of: preselectedPlantId) { _, _ in
+            resetRouteFilterOverride()
+        }
         .onAppear {
             recordCalendarOpen()
             syncCalendarViewModeFromStorage(viewModeRaw)
             syncCalendarFilterFromStorage(animated: false)
+            scheduleCalendarMainContentMountIfNeeded()
             if isCalendarPrepared, viewMode == .list {
                 scheduleInitialListPositionIfNeeded()
             }
@@ -94,6 +108,7 @@ extension CalendarView {
             }
         }
         .onDisappear {
+            resetEmbeddedBottomChromeScrollBaseline()
             cancelPendingCalendarMaintenance()
             filterApplyTask?.cancel()
             filterStorageCommitTask?.cancel()
@@ -102,14 +117,17 @@ extension CalendarView {
             timelinePositionCoordinator.cancel()
             addEventPresentationTask?.cancel()
             addEventContentMountTask?.cancel()
+            cancelPendingCalendarMainContentMount(resetMountedState: true)
         }
         .onChange(of: isEmbeddedActive) { _, isActive in
             if isActive {
+                scheduleCalendarMainContentMountIfNeeded()
                 scheduleCalendarMaintenance()
                 if viewMode == .list {
                     scheduleInitialListPositionIfNeeded()
                 }
             } else if !isCalendarPrepared {
+                cancelPendingCalendarMainContentMount(resetMountedState: true)
                 cancelPendingCalendarMaintenance()
                 listInitialPositionTask?.cancel()
                 listInitialPositionTask = nil
@@ -118,11 +136,13 @@ extension CalendarView {
         }
         .onChange(of: isEmbeddedPrepared) { _, isPrepared in
             if isPrepared {
+                scheduleCalendarMainContentMountIfNeeded()
                 scheduleCalendarMaintenance()
                 if viewMode == .list {
                     scheduleInitialListPositionIfNeeded()
                 }
             } else if !isEmbeddedVisible, !isEmbeddedActive {
+                cancelPendingCalendarMainContentMount(resetMountedState: true)
                 cancelPendingCalendarMaintenance()
                 listInitialPositionTask?.cancel()
                 listInitialPositionTask = nil
@@ -132,11 +152,13 @@ extension CalendarView {
         .onChange(of: isEmbeddedVisible) { _, isVisible in
             if isVisible {
                 syncCalendarViewModeFromStorage(viewModeRaw)
+                scheduleCalendarMainContentMountIfNeeded()
                 scheduleCalendarMaintenance()
                 if viewMode == .list {
                     scheduleInitialListPositionIfNeeded()
                 }
             } else if !isEmbeddedPrepared, !isEmbeddedActive {
+                cancelPendingCalendarMainContentMount(resetMountedState: true)
                 cancelPendingCalendarMaintenance()
                 listInitialPositionTask?.cancel()
                 listInitialPositionTask = nil
@@ -153,16 +175,41 @@ extension CalendarView {
                 isContentMounted: isAddEventContentMounted,
                 reservesSafeArea: false
             ) {
-                AddEventView(onClose: closeInlineAddEvent)
+                AddEventView(onClose: closeInlineAddEvent, plants: plants)
             }
             .zIndex(90)
         }
     }
 
+    var calendarDeferredContentPlaceholder: some View {
+        VStack(spacing: 12) {
+            ForEach(0 ..< 5, id: \.self) { index in
+                RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous)
+                    .fill(Color.ohanaControlFill.opacity(index == 0 ? 0.84 : 0.58))
+                    .frame(height: index == 0 ? 50 : 58) // a11y: allow fixed-format noninteractive loading row
+                    .overlay(alignment: .leading) {
+                        HStack(spacing: 10) {
+                            Circle()
+                                .fill(Color.ohanaControlFill)
+                                .frame(width: 32, height: 32) // a11y: allow fixed-format decorative loading dot
+                            RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous)
+                                .fill(Color.ohanaControlFill)
+                                .frame(width: index == 0 ? 116 : 168, height: 12) // a11y: allow fixed-format skeleton line
+                        }
+                        .padding(.horizontal, 14)
+                    }
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.top, 12)
+        .padding(.bottom, timelineBottomClearance)
+        .accessibilityHidden(true)
+    }
+
     func requestAddEventPresentation() {
         OhanaFeedback.light()
         if let onRequestAddEvent {
-            onRequestAddEvent()
+            onRequestAddEvent(plants)
         } else {
             openInlineAddEvent()
         }
@@ -265,12 +312,50 @@ extension CalendarView {
         calendarMaintenanceTask = nil
     }
 
+    func scheduleCalendarMainContentMountIfNeeded() {
+        guard CalendarEmbeddedContentMountPolicy.shouldScheduleDeferredMount(
+            hideToolbar: hideToolbar,
+            isEmbeddedPrepared: isEmbeddedPrepared,
+            isEmbeddedVisible: isEmbeddedVisible,
+            isEmbeddedActive: isEmbeddedActive,
+            isContentMounted: isCalendarMainContentMounted
+        ) else { return }
+        guard calendarMainContentMountTask == nil else { return }
+
+        let delayMilliseconds = CalendarEmbeddedContentMountPolicy
+            .contentDelayMilliseconds(isEmbeddedActive: isEmbeddedActive)
+        calendarMainContentMountTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: delayMilliseconds) {
+            guard isCalendarPrepared else {
+                calendarMainContentMountTask = nil
+                return
+            }
+            var transaction = Transaction(animation: nil)
+            transaction.disablesAnimations = true
+            withTransaction(transaction) {
+                isCalendarMainContentMounted = true
+            }
+            calendarMainContentMountTask = nil
+        }
+    }
+
+    func cancelPendingCalendarMainContentMount(resetMountedState: Bool) {
+        calendarMainContentMountTask?.cancel()
+        calendarMainContentMountTask = nil
+        guard resetMountedState, isCalendarMainContentMounted else { return }
+        var transaction = Transaction(animation: nil)
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            isCalendarMainContentMounted = false
+        }
+    }
+
     func selectCalendarViewMode(_ mode: CalendarViewMode) {
         guard viewMode != mode else { return }
         let startedAt = AppFlowPerformance.start(
             AppPerformanceFlows.calendarModeSwitch,
             note: ["to": mode.rawValue]
         )
+        resetEmbeddedBottomChromeScrollBaseline()
         withAnimation(GoMotion.selection) {
             displayedViewModeRaw = mode.rawValue
         }
@@ -294,6 +379,9 @@ extension CalendarView {
         transaction.disablesAnimations = true
         withTransaction(transaction) {
             displayedViewModeRaw = rawValue
+        }
+        if previousMode != newMode {
+            resetEmbeddedBottomChromeScrollBaseline()
         }
         if previousMode != .list, newMode == .list {
             resetCalendarListPositionForModeSwitch()
@@ -320,9 +408,12 @@ extension CalendarView {
         guard displayedFilterSelection != selection else { return }
         let startedAt = AppFlowPerformance.start(
             AppPerformanceFlows.calendarFilter,
-            note: ["scope": selection.selectedPetId != nil ? "pet" : (selection.selectedHumanId != nil ? "human" : "all")]
+            note: ["scope": selection.metricScope]
         )
         withAnimation(GoMotion.selection) {
+            if routeFilterSelection != nil {
+                hasUserOverriddenRouteFilter = true
+            }
             visualFilterSelection = selection
             didSyncCalendarFilter = true
         }
@@ -355,6 +446,34 @@ extension CalendarView {
                 note: ["prepared": isCalendarPrepared ? "true" : "false"]
             )
         }
+    }
+
+    func resetRouteFilterOverride() {
+        guard hasUserOverriddenRouteFilter else { return }
+        var transaction = Transaction(animation: nil)
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            hasUserOverriddenRouteFilter = false
+        }
+    }
+
+    func reportEmbeddedBottomChromeScrollOffset(_ scrollOffset: CGFloat, canEstablishBaseline: Bool = true) {
+        guard hideToolbar else { return }
+        guard canEstablishBaseline else { return }
+
+        let clampedOffset = max(0, scrollOffset)
+        guard let baseline = embeddedBottomChromeBaselineOffset else {
+            embeddedBottomChromeBaselineOffset = clampedOffset
+            onEmbeddedScrollOffsetChange?(0)
+            return
+        }
+
+        onEmbeddedScrollOffsetChange?(max(0, clampedOffset - baseline))
+    }
+
+    func resetEmbeddedBottomChromeScrollBaseline() {
+        embeddedBottomChromeBaselineOffset = nil
+        onEmbeddedScrollOffsetChange?(0)
     }
 
     func syncCalendarFilterFromStorage(animated: Bool) {
@@ -390,6 +509,9 @@ extension CalendarView {
             withAnimation(GoMotion.stateChange) {
                 appliedFilterSelection = selection
             }
+            if viewMode == .list {
+                resetCalendarListPositionForModeSwitch()
+            }
             filterApplyTask = nil
             scheduleCalendarFilterStorageCommit(selection)
         }
@@ -414,6 +536,7 @@ extension CalendarView {
     }
 
     func resetCalendarListPositionForModeSwitch() {
+        resetEmbeddedBottomChromeScrollBaseline()
         listInitialPositionTask?.cancel()
         listInitialPositionTask = nil
         let today = Calendar.current.startOfDay(for: Date())

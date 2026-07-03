@@ -55,8 +55,8 @@ struct ContentView: View {
                                 onPresentCoconutLog: { subject in
                                     appRoutes.presentCoconutLog(subject)
                                 },
-                                onPresentCalendar: { entityID in
-                                    appRoutes.presentCalendar(entityID: entityID)
+                                onPresentPlantCalendar: { entityID in
+                                    appRoutes.presentCalendar(plantID: entityID)
                                 }
                             )
                         }

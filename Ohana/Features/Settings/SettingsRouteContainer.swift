@@ -50,6 +50,7 @@ struct AppSettingsSheetRouteContainer: View {
                     homePets: data.pets,
                     homeHumans: data.humans,
                     homeElectronicPets: data.electronicPets,
+                    isRouteDataLoaded: data.hasLoaded,
                     onClose: onClose
                 )
             }

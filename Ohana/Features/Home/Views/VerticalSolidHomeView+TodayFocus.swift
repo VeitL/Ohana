@@ -9,6 +9,10 @@ import SwiftUI
 extension VerticalSolidHomeView {
     func openHomeFabShortcut(_ shortcut: HomeFabFunctionShortcut) {
         closeVerticalFabMenu(immediate: true)
+        if let entityToAdd = shortcut.entityToAdd {
+            routeCoordinator.openAddEntity(entityToAdd)
+            return
+        }
         openFunctionMenu(destination: shortcut.destination)
     }
 

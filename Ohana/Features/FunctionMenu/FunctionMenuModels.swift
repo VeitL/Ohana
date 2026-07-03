@@ -12,13 +12,23 @@ enum FeatureGroup: String, Hashable, CaseIterable {
     case plants
 
     var title: String {
+        title(l: L10n("zh"))
+    }
+
+    func title(l: L10n) -> String {
         switch self {
-        case .dailyCare: "每日照护"
-        case .healthBody: "健康"
-        case .archiveMemory: "成长档案"
-        case .householdHub: "家庭事务"
-        case .oasisRewards: "绿洲奖励"
-        case .plants: "植物"
+        case .dailyCare:
+            l.tr(zh: "每日照护", en: "Daily Care", de: "Tägliche Pflege")
+        case .healthBody:
+            l.tr(zh: "健康", en: "Health", de: "Gesundheit")
+        case .archiveMemory:
+            l.tr(zh: "成长档案", en: "Growth Records", de: "Wachstumsakte")
+        case .householdHub:
+            l.tr(zh: "家庭事务", en: "Household", de: "Haushalt")
+        case .oasisRewards:
+            l.tr(zh: "绿洲奖励", en: "Oasis Rewards", de: "Oasis-Belohnungen")
+        case .plants:
+            l.tr(zh: "植物", en: "Plants", de: "Pflanzen")
         }
     }
 
@@ -71,7 +81,9 @@ enum FMDest: Hashable {
     case plantsDashboard
     case plantsList
     case plantsPhotos
+    case plantsCalendar
     case plantDetail(UUID)
+    case plantCalendar(UUID)
     case growthRoadmap
     case wealthDashboard
     case bountyBoard
@@ -89,20 +101,37 @@ enum PetFeature: String, Hashable, CaseIterable {
     case weight, expense
 
     var title: String {
+        title(l: L10n("zh"))
+    }
+
+    func title(l: L10n) -> String {
         switch self {
-        case .health: "健康档案"
-        case .medications: "用药管理"
-        case .food: "饮食管理"
-        case .hygiene: "清洁护理"
-        case .walks: "遛狗记录"
-        case .potty: "噗噗电台"
-        case .retention: "成长档案"
-        case .basicInfo: "基本信息"
-        case .documents: "证件保障"
-        case .moments: "重要时刻"
-        case .achievements: "成就"
-        case .weight: "体重记录"
-        case .expense: "花费记录"
+        case .health:
+            l.tr(zh: "健康档案", en: "Health Records", de: "Gesundheitsakte")
+        case .medications:
+            l.tr(zh: "用药管理", en: "Medication", de: "Medikamente")
+        case .food:
+            l.tr(zh: "饮食管理", en: "Food", de: "Futter")
+        case .hygiene:
+            l.tr(zh: "清洁护理", en: "Hygiene", de: "Hygiene")
+        case .walks:
+            l.tr(zh: "遛狗记录", en: "Walks", de: "Spaziergänge")
+        case .potty:
+            l.tr(zh: "噗噗电台", en: "Poop Radio", de: "Häufchen-Radio")
+        case .retention:
+            l.tr(zh: "成长档案", en: "Growth Records", de: "Wachstumsakte")
+        case .basicInfo:
+            l.tr(zh: "基本信息", en: "Basic Info", de: "Basisdaten")
+        case .documents:
+            l.tr(zh: "证件保障", en: "Documents", de: "Dokumente")
+        case .moments:
+            l.tr(zh: "重要时刻", en: "Moments", de: "Momente")
+        case .achievements:
+            l.tr(zh: "成就", en: "Achievements", de: "Erfolge")
+        case .weight:
+            l.tr(zh: "体重记录", en: "Weight", de: "Gewicht")
+        case .expense:
+            l.tr(zh: "花费记录", en: "Expenses", de: "Ausgaben")
         }
     }
 

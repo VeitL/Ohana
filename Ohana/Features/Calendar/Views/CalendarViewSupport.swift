@@ -76,15 +76,32 @@ final class CalendarTimelinePositionCoordinator: ObservableObject {
 }
 
 struct CalendarFilterSelection: Equatable {
+    static let allPlantsToken = "__all_plants__"
+
     var petId: String
     var humanId: String
     var plantId: String
 
     static let all = CalendarFilterSelection(petId: "", humanId: "", plantId: "")
+    static let allPlants = CalendarFilterSelection(petId: "", humanId: "", plantId: allPlantsToken)
 
     var selectedPetId: String? { petId.isEmpty ? nil : petId }
     var selectedHumanId: String? { humanId.isEmpty ? nil : humanId }
-    var selectedPlantId: String? { plantId.isEmpty ? nil : plantId }
+    var isAllPlantsSelected: Bool { plantId == Self.allPlantsToken }
+    var selectedPlantId: String? { plantId.isEmpty || isAllPlantsSelected ? nil : plantId }
+    var isPlantScopeSelected: Bool { isAllPlantsSelected || selectedPlantId != nil }
+    var normalizedForUserFilterControls: CalendarFilterSelection {
+        guard petId.isEmpty, humanId.isEmpty, !plantId.isEmpty, !isAllPlantsSelected else { return self }
+        return .allPlants
+    }
+
+    var metricScope: String {
+        if selectedPetId != nil { return "pet" }
+        if selectedHumanId != nil { return "human" }
+        if isAllPlantsSelected { return "plants" }
+        if selectedPlantId != nil { return "plant" }
+        return "all"
+    }
 
     static func pet(_ id: String) -> CalendarFilterSelection {
         CalendarFilterSelection(petId: id, humanId: "", plantId: "")
@@ -102,6 +119,56 @@ struct CalendarFilterSelection: Equatable {
 struct CalendarContentHandoffState: Equatable {
     var viewModeRaw: String
     var filter: CalendarFilterSelection
+}
+
+nonisolated enum CalendarEmbeddedContentMountPolicy {
+    static let inactiveEmbeddedDataLoadDelayMilliseconds: UInt64 = 220
+    static let visibleEmbeddedDataLoadDelayMilliseconds: UInt64 = 24
+    static let activeEmbeddedDataLoadDelayMilliseconds: UInt64 = 120
+    static let inactiveEmbeddedContentDelayMilliseconds: UInt64 = 220
+    static let activeEmbeddedContentDelayMilliseconds: UInt64 = 96
+
+    static func shouldRenderMainContent(
+        hideToolbar: Bool,
+        isEmbeddedPrepared: Bool,
+        isEmbeddedVisible: Bool,
+        isEmbeddedActive: Bool,
+        isContentMounted: Bool
+    ) -> Bool {
+        guard hideToolbar else { return true }
+        guard isEmbeddedPrepared || isEmbeddedVisible || isEmbeddedActive else { return false }
+        return isEmbeddedVisible || isEmbeddedActive || isContentMounted
+    }
+
+    static func shouldScheduleDeferredMount(
+        hideToolbar: Bool,
+        isEmbeddedPrepared: Bool,
+        isEmbeddedVisible: Bool,
+        isEmbeddedActive: Bool,
+        isContentMounted: Bool
+    ) -> Bool {
+        guard hideToolbar else { return false }
+        guard !isContentMounted else { return false }
+        return isEmbeddedPrepared || isEmbeddedVisible || isEmbeddedActive
+    }
+
+    static func contentDelayMilliseconds(isEmbeddedActive: Bool) -> UInt64 {
+        isEmbeddedActive ? activeEmbeddedContentDelayMilliseconds : inactiveEmbeddedContentDelayMilliseconds
+    }
+
+    static func routeDataLoadDelayMilliseconds(
+        hideToolbar: Bool,
+        isEmbeddedVisible: Bool,
+        isEmbeddedActive: Bool
+    ) -> UInt64 {
+        guard hideToolbar else { return activeEmbeddedDataLoadDelayMilliseconds }
+        if isEmbeddedVisible || isEmbeddedActive {
+            return visibleEmbeddedDataLoadDelayMilliseconds
+        }
+        return isEmbeddedActive
+            ? activeEmbeddedDataLoadDelayMilliseconds
+            : inactiveEmbeddedDataLoadDelayMilliseconds
+    }
 }
 
 struct CalendarEventDetailPresentation: Identifiable {
@@ -130,18 +197,30 @@ struct CalendarPetChipFilterBar: View {
     private var matSurface: Color { colorScheme == .light ? .white : Color(hex: "1C1C1E") }
     private var selectedPetId: String? { selection.selectedPetId }
     private var selectedHumanId: String? { selection.selectedHumanId }
-    private var selectedPlantId: String? { selection.selectedPlantId }
+    private var isPlantScopeSelected: Bool { selection.isPlantScopeSelected }
+    private var showsPlantsChip: Bool { !plants.isEmpty || isPlantScopeSelected }
 
     var body: some View {
+        let l = L10n(AppLanguage.code)
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
                 chipButton(
-                    label: "全部",
+                    label: l.tr(zh: "全部", en: "All", de: "Alle"),
                     systemImage: "square.grid.2x2.fill",
                     identifier: "calendar-filter-all",
-                    isSelected: selectedPetId == nil && selectedHumanId == nil && selectedPlantId == nil
+                    isSelected: selectedPetId == nil && selectedHumanId == nil && !isPlantScopeSelected
                 ) {
                     onSelect(.all)
+                }
+                if showsPlantsChip {
+                    chipButton(
+                        label: l.tr(zh: "植物", en: "Plants", de: "Pflanzen"),
+                        systemImage: "leaf.fill",
+                        identifier: "calendar-filter-plants",
+                        isSelected: isPlantScopeSelected
+                    ) {
+                        onSelect(.allPlants)
+                    }
                 }
                 ForEach(pets) { pet in
                     chipButton(
@@ -163,21 +242,12 @@ struct CalendarPetChipFilterBar: View {
                         onSelect(.human(human.id.uuidString))
                     }
                 }
-                ForEach(plants) { plant in
-                    chipButton(
-                        label: plant.name,
-                        systemImage: "leaf.fill",
-                        identifier: "calendar-filter-plant-\(plant.name)",
-                        isSelected: selectedPlantId == plant.id.uuidString
-                    ) {
-                        onSelect(.plant(plant.id.uuidString))
-                    }
-                }
             }
             .padding(.horizontal, 16)
             .padding(.top, 4)
             .padding(.bottom, 6)
         }
+        .accessibilityIdentifier("calendar-filter-chip-bar")
     }
 
     private func chipButton(
@@ -195,6 +265,7 @@ struct CalendarPetChipFilterBar: View {
                 Text(label).font(OhanaFont.subheadline(.bold))
             }
             .foregroundStyle(chipForeground(isSelected: isSelected))
+            .frame(minHeight: 44)
             .padding(.horizontal, 14).padding(.vertical, 8)
             .background(chipBackground(isSelected: isSelected), in: Capsule())
             .shadow(color: isSelected && isMaterial ? chipAccent.opacity(0.25) : .clear, radius: 6, x: 0, y: 2) // ui-v4: allow legacy material calendar chip depth
@@ -202,6 +273,9 @@ struct CalendarPetChipFilterBar: View {
         .buttonStyle(ScaleButtonStyle())
         .ohanaSelectionMotion(isSelected: isSelected, scale: 1.018)
         .accessibilityIdentifier(identifier)
+        .accessibilityValue(isSelected
+            ? L10n.current.tr(zh: "已选中", en: "Selected", de: "Ausgewählt")
+            : L10n.current.tr(zh: "未选中", en: "Not selected", de: "Nicht ausgewählt"))
     }
 
     private func chipForeground(isSelected: Bool) -> Color {

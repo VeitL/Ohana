@@ -131,6 +131,11 @@ extension CalendarView {
                 }
                 .padding(.horizontal, 16)
             }
+            .onScrollGeometryChange(for: CGFloat.self) { geometry in
+                geometry.contentOffset.y
+            } action: { _, offsetY in
+                reportEmbeddedBottomChromeScrollOffset(offsetY)
+            }
         }
         .contentShape(Rectangle())
         .simultaneousGesture(monthSwipeGesture)

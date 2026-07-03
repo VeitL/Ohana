@@ -217,35 +217,40 @@ struct FunctionMenuSheet: View {
     }
 
     private func destinationChrome(for destination: FMDest) -> (title: String, icon: String) {
-        switch destination {
+        let l = L10n(appLanguage)
+        return switch destination {
         case let .featureGroup(group):
-            (group.title, group.icon)
+            (group.title(l: l), group.icon)
         case let .featureAggregate(feature):
-            (feature.title, feature.icon)
+            (feature.title(l: l), feature.icon)
         case .calendar:
-            (L10n(appLanguage).tr(zh: "日历", en: "Calendar", de: "Kalender"), "calendar")
+            (l.tr(zh: "日历", en: "Calendar", de: "Kalender"), "calendar")
         case .familyWeeklyReport:
-            (L10n(appLanguage).tr(zh: "家庭周报", en: "Weekly Report", de: "Wochenbericht"), "chart.bar.xaxis")
+            (l.tr(zh: "家庭周报", en: "Weekly Report", de: "Wochenbericht"), "chart.bar.xaxis")
         case .careLedgerAnalysis:
-            (L10n(appLanguage).tr(zh: "照护账本", en: "Care Ledger", de: "Pflegebuch"), "list.bullet.rectangle.fill")
+            (l.tr(zh: "照护账本", en: "Care Ledger", de: "Pflegebuch"), "list.bullet.rectangle.fill")
         case .reminderObservability:
-            (L10n(appLanguage).tr(zh: "提醒观测", en: "Reminder Monitor", de: "Erinnerungen"), "bell.badge.fill")
+            (l.tr(zh: "提醒观测", en: "Reminder Monitor", de: "Erinnerungsmonitor"), "bell.badge.fill")
         case .coconutShop:
-            (L10n(appLanguage).tr(zh: "椰子商店", en: "Coconut Shop", de: "Kokos-Shop"), "bag.fill")
+            (l.tr(zh: "椰子商店", en: "Coconut Shop", de: "Kokos-Shop"), "bag.fill")
         case .gacha:
-            (L10n(appLanguage).tr(zh: "扭蛋机", en: "Gacha", de: "Gacha"), "circle.grid.cross.fill")
+            (l.tr(zh: "扭蛋机", en: "Gacha", de: "Gacha"), "circle.grid.cross.fill")
         case .wealthDashboard:
-            (L10n(appLanguage).tr(zh: "Ohana 财富", en: "Ohana Wealth", de: "Ohana Vermögen"), "chart.pie.fill")
+            (l.tr(zh: "Ohana 财富", en: "Ohana Wealth", de: "Ohana Vermögen"), "chart.pie.fill")
         case .growthRoadmap:
-            (L10n(appLanguage).tr(zh: "椰子树路线", en: "Tree Roadmap", de: "Baum-Roadmap"), "tree.fill")
+            (l.tr(zh: "椰子树路线", en: "Tree Roadmap", de: "Baum-Roadmap"), "tree.fill")
         case .plantsDashboard:
-            (L10n(appLanguage).tr(zh: "植物总览", en: "Plant Overview", de: "Pflanzenübersicht"), "leaf.fill")
+            (l.tr(zh: "植物总览", en: "Plant Overview", de: "Pflanzenübersicht"), "leaf.fill")
         case .plantsList:
-            (L10n(appLanguage).tr(zh: "植物列表", en: "Plant List", de: "Pflanzenliste"), "list.bullet.rectangle.fill")
+            (l.tr(zh: "植物列表", en: "Plant List", de: "Pflanzenliste"), "list.bullet.rectangle.fill")
         case .plantsPhotos:
-            (L10n(appLanguage).tr(zh: "成长照片", en: "Growth Photos", de: "Wachstumsfotos"), "photo.stack.fill")
+            (l.tr(zh: "成长照片", en: "Growth Photos", de: "Wachstumsfotos"), "photo.stack.fill")
+        case .plantsCalendar:
+            (l.tr(zh: "植物日历", en: "Plant Calendar", de: "Pflanzenkalender"), "calendar")
+        case .plantCalendar:
+            (l.tr(zh: "植物日历", en: "Plant Calendar", de: "Pflanzenkalender"), "calendar")
         default:
-            (L10n(appLanguage).tr(zh: "详情", en: "Details", de: "Details"), "square.grid.2x2.fill")
+            (l.tr(zh: "详情", en: "Details", de: "Details"), "square.grid.2x2.fill")
         }
     }
 }

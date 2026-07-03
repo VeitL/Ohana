@@ -34,12 +34,40 @@ struct PlantGrowthDiaryExportEntry: Codable, Equatable, Identifiable {
 }
 
 @MainActor
+protocol PlantGrowthDiaryExporting {
+    func markdown(
+        for plant: Plant,
+        exportedAt: Date,
+        includePhotoPlaceholders: Bool,
+        languageCode: String
+    ) -> String
+}
+
+@MainActor
+struct LivePlantGrowthDiaryExporter: PlantGrowthDiaryExporting {
+    func markdown(
+        for plant: Plant,
+        exportedAt: Date = Date(),
+        includePhotoPlaceholders: Bool = true,
+        languageCode: String = AppLanguage.code
+    ) -> String {
+        PlantGrowthDiaryExportService.markdown(
+            for: plant,
+            exportedAt: exportedAt,
+            includePhotoPlaceholders: includePhotoPlaceholders,
+            languageCode: languageCode
+        )
+    }
+}
+
+@MainActor
 enum PlantGrowthDiaryExportService {
     static func makePayload(
         for plant: Plant,
         exportedAt: Date = Date(),
         includePhotos: Bool = false
     ) -> PlantGrowthDiaryExportPayload {
+        let l = L10n.current
         let entries = plant.careLogs
             .sorted { $0.date < $1.date }
             .map { log in
@@ -47,7 +75,7 @@ enum PlantGrowthDiaryExportService {
                     id: log.id,
                     date: log.date,
                     careTypeRaw: log.careType.rawValue,
-                    careTypeTitle: log.careType.displayName,
+                    careTypeTitle: log.careType.displayName(l: l),
                     note: log.note,
                     healthStatusRaw: log.healthStatusRaw.isEmpty ? nil : log.healthStatusRaw,
                     hasPhoto: log.photoData != nil,

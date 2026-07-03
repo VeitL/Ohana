@@ -251,6 +251,7 @@ nonisolated enum VerticalSolidHomeSnapshotBuilder {
                     subtitle: plant.species.isEmpty ? plant.location : plant.species,
                     emoji: plant.avatarEmoji.isEmpty ? "🌱" : plant.avatarEmoji,
                     themeHex: plant.themeColorHex,
+                    roomName: plant.roomName,
                     needsCare: needsCare
                 )
             },

@@ -3,6 +3,7 @@ import SwiftUI
 
 struct AddEventView: View {
     var onClose: (() -> Void)?
+    var plants: [Plant] = []
 
     @Query(sort: \Pet.createdAt) private var pets: [Pet]
     @Query(sort: \Human.createdAt) private var humans: [Human]
@@ -11,7 +12,8 @@ struct AddEventView: View {
         AddEventContentView(
             onClose: onClose,
             pets: pets,
-            humans: humans
+            humans: humans,
+            plants: plants
         )
     }
 }

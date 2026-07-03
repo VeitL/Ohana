@@ -46,6 +46,7 @@ enum HomeSheetRoute: Identifiable {
     case humanWishlist(UUID)
     case humanNoteQuick(UUID)
     case humanNote(UUID)
+    case plantCareLog(UUID, initialCareType: PlantCareType)
 
     var id: String {
         switch self {
@@ -86,6 +87,7 @@ enum HomeSheetRoute: Identifiable {
         case let .humanWishlist(id): "human-wishlist-\(id.uuidString)"
         case let .humanNoteQuick(id): "human-note-quick-\(id.uuidString)"
         case let .humanNote(id): "human-note-\(id.uuidString)"
+        case let .plantCareLog(id, type): "plant-care-log-\(id.uuidString)-\(type.rawValue)"
         }
     }
 }
@@ -107,7 +109,7 @@ enum HomeModalRoute: Identifiable {
     case coconutLog(CoconutLogSubject?)
     case crewRoster(CrewRosterMode)
     case accountSwitcher
-    case calendar(entityID: String?, humanID: String?)
+    case calendar(entityID: String?, humanID: String?, plantID: String?)
     case settings
 
     var id: String {
@@ -124,8 +126,8 @@ enum HomeModalRoute: Identifiable {
             "crew-roster-\(mode.rawValue)"
         case .accountSwitcher:
             "account-switcher"
-        case let .calendar(entityID, humanID):
-            "calendar-\(entityID ?? "all")-\(humanID ?? "all")"
+        case let .calendar(entityID, humanID, plantID):
+            "calendar-\(entityID ?? "all")-\(humanID ?? "all")-\(plantID ?? "all")"
         case .settings:
             "settings"
         }
@@ -320,13 +322,13 @@ final class HomeRouteCoordinator: ObservableObject {
         modal = .accountSwitcher
     }
 
-    func openCalendar(entityID: String? = nil, humanID: String? = nil) {
+    func openCalendar(entityID: String? = nil, humanID: String? = nil, plantID: String? = nil) {
         if let appSheetRouteSink {
-            appSheetRouteSink(.appSheet(.calendar(entityID: entityID, humanID: humanID)))
+            appSheetRouteSink(.appSheet(.calendar(entityID: entityID, humanID: humanID, plantID: plantID)))
             modal = nil
             return
         }
-        modal = .calendar(entityID: entityID, humanID: humanID)
+        modal = .calendar(entityID: entityID, humanID: humanID, plantID: plantID)
     }
 
     func openFullScreen(_ route: HomeFullScreenRoute) {
@@ -535,7 +537,8 @@ private extension HomeSheetRoute {
              .humanExpense,
              .humanWishlist,
              .humanNoteQuick,
-             .humanNote:
+             .humanNote,
+             .plantCareLog:
             nil
         }
     }
@@ -579,7 +582,8 @@ private extension HomeSheetRoute {
              .petDocuments,
              .petAchievements,
              .petRetention,
-             .petBondVault:
+             .petBondVault,
+             .plantCareLog:
             false
         }
     }
@@ -657,7 +661,8 @@ private extension HomeSheetRoute {
         case let .humanNote(id):
             .humanNote(id)
         case .petBasicInfo,
-             .humanBasicInfo:
+             .humanBasicInfo,
+             .plantCareLog:
             nil
         }
     }

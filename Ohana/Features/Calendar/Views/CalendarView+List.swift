@@ -30,6 +30,11 @@ extension CalendarView {
                 }
                 .accessibilityIdentifier("calendar-list-scroll-view")
                 .scrollPosition(id: $visibleTimelineDateID, anchor: .top)
+                .onScrollGeometryChange(for: CGFloat.self) { geometry in
+                    geometry.contentOffset.y
+                } action: { _, offsetY in
+                    reportEmbeddedBottomChromeScrollOffset(offsetY, canEstablishBaseline: didScrollListToToday)
+                }
                 .onAppear {
                     scheduleInitialTimelineScrollIfNeeded(proxy: proxy)
                 }
@@ -273,6 +278,7 @@ extension CalendarView {
 
     func returnCalendarToToday() {
         OhanaFeedback.light()
+        resetEmbeddedBottomChromeScrollBaseline()
         listInitialPositionTask?.cancel()
         listInitialPositionTask = nil
         let today = Calendar.current.startOfDay(for: Date())
@@ -415,9 +421,10 @@ extension CalendarView {
             plants: plants,
             humanMedications: humanMedications
         )
-        if case let .calendar(entityId, humanId) = destination,
+        if case let .calendar(entityId, humanId, plantId) = destination,
            entityId == nil,
-           humanId == nil {
+           humanId == nil,
+           plantId == nil {
             return false
         }
         onOpenEventDestination(destination)

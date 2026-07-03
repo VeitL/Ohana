@@ -54,7 +54,17 @@ nonisolated struct VerticalSolidHomePlantSnapshot: Identifiable, Equatable, Send
     let subtitle: String
     let emoji: String
     let themeHex: String
+    let roomName: String
     let needsCare: Bool
+}
+
+nonisolated enum VerticalSolidHomePlantQuickAction: String, CaseIterable, Identifiable, Sendable {
+    case water
+    case fertilize
+    case log
+    case detail
+
+    var id: String { rawValue }
 }
 
 nonisolated struct VerticalSolidHomeFirstPetEmptyState: Equatable, Sendable {

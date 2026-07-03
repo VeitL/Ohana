@@ -17,6 +17,16 @@ enum SettingsDebugTools {
         ProcessInfo.processInfo.arguments.contains("-OHANA_UI_TEST_OPEN_COCONUT_BALANCE_SHEET")
     }
 
+    static var plantBaselineSeedCount: Int {
+        let arguments = ProcessInfo.processInfo.arguments
+        guard let flagIndex = arguments.firstIndex(of: "-OHANA_UI_TEST_PLANT_BASELINE_COUNT"),
+              arguments.indices.contains(arguments.index(after: flagIndex)),
+              let count = Int(arguments[arguments.index(after: flagIndex)]) else {
+            return 1
+        }
+            return min(max(count, 1), 12)
+    }
+
     static var isVisible: Bool {
         #if DEBUG
             return true
@@ -73,7 +83,7 @@ extension SettingsView {
                 settingsRow(
                     icon: "leaf.fill",
                     title: l.tr(zh: "Debug 植物基线", en: "Debug Plant Baseline", de: "Debug-Pflanzenbasis"),
-                    subtitle: l.tr(zh: "为植物 GUI 测试创建一株植物", en: "Create one plant for GUI tests", de: "Eine Pflanze für GUI-Tests erstellen"),
+                    subtitle: l.tr(zh: "为植物 GUI 测试创建样本植物", en: "Create sample plants for GUI tests", de: "Beispielpflanzen für GUI-Tests erstellen"),
                     iconColor: Color.goTeal
                 ) {
                     applyUITestPlantBaselineShortcut()
@@ -120,7 +130,7 @@ extension SettingsView {
     func applyUITestRewardTierShortcut() {
         #if DEBUG
             OasisTreeManagerRegistry.current.setEnergyForTesting(
-                injectedEnergy: OasisTreeManager.levelStartThreshold(forRawLevel: 6)
+                injectedEnergy: appServices.oasisTree.levelStartThreshold(forRawLevel: 6)
             )
         #endif
         closeSettings()
@@ -136,34 +146,37 @@ extension SettingsView {
     func applyUITestPlantBaselineShortcut() {
         #if DEBUG
             let timestamp = Int(Date().timeIntervalSince1970)
-            let plant = Plant(
-                name: "Codex Pothos \(timestamp)",
-                species: "Epipremnum aureum",
-                location: "South window",
-                avatarEmoji: "🪴",
-                wateringIntervalDays: 7,
-                fertilizingIntervalDays: 30,
-                roomNameRaw: "Living room",
-                potDiameterCm: 12,
-                potMaterialRaw: "Ceramic",
-                soilTypeRaw: "Well-draining potting mix",
-                isIndoor: true,
-                windowDirection: .south,
-                lightLevel: .brightIndirect,
-                currentHeightCm: 18,
-                currentSpreadCm: 22,
-                catalogSpeciesId: "epipremnum-aureum",
-                remindersEnabled: true
-            )
-            plant.notes = "Seeded by UI tests"
-            modelContext.insert(plant)
-            PlantUnlockPolicy.noteExistingPlantData()
+            let seedCount = SettingsDebugTools.plantBaselineSeedCount
+            for index in 0 ..< seedCount {
+                let plant = Plant(
+                    name: seedCount == 1 ? "Codex Pothos \(timestamp)" : "Codex Pothos \(timestamp)-\(index + 1)",
+                    species: "Epipremnum aureum",
+                    location: index.isMultiple(of: 2) ? "South window" : "Balcony shelf",
+                    avatarEmoji: "🪴",
+                    wateringIntervalDays: 7,
+                    fertilizingIntervalDays: 30,
+                    roomNameRaw: index.isMultiple(of: 2) ? "Living room" : "Balcony",
+                    potDiameterCm: 12,
+                    potMaterialRaw: "Ceramic",
+                    soilTypeRaw: "Well-draining potting mix",
+                    isIndoor: true,
+                    windowDirection: .south,
+                    lightLevel: .brightIndirect,
+                    currentHeightCm: 18,
+                    currentSpreadCm: 22,
+                    catalogSpeciesId: "epipremnum-aureum",
+                    remindersEnabled: true
+                )
+                plant.notes = "Seeded by UI tests"
+                modelContext.insert(plant)
+                PlantUnlockPolicy.noteExistingPlantData()
+                appServices.domainRevisions.publishMemberCreation(
+                    entityID: plant.id,
+                    kind: EntityKind.plant.rawValue,
+                    note: "settings.plant.uiTestShortcut"
+                )
+            }
             modelContext.safeSave()
-            appServices.domainRevisions.publishMemberCreation(
-                entityID: plant.id,
-                kind: EntityKind.plant.rawValue,
-                note: "settings.plant.uiTestShortcut"
-            )
         #endif
     }
 

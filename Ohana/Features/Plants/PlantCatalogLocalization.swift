@@ -14,6 +14,109 @@ nonisolated enum PlantCatalogLocalization {
         return l.tr(zh: zh, en: english, de: english)
     }
 
+    static func summary(for entry: PlantCatalogEntry) -> String {
+        let l = L10n.current
+        return l.tr(
+            zh: "\(entry.commonName) 是适合家庭管理的常见植物，重点关注\(entry.lightRequirement.displayName)、浇水节奏和摆放安全。",
+            en: "\(entry.localizedCommonName) is a common home plant. Focus on \(entry.lightRequirement.displayName.lowercased()), watering rhythm, and safe placement.",
+            de: "\(entry.localizedCommonName) ist eine häufige Zimmerpflanze. Achte auf \(entry.lightRequirement.displayName.lowercased()), Gießrhythmus und sicheren Standort."
+        )
+    }
+
+    static func habitNotes(for entry: PlantCatalogEntry) -> String {
+        let l = L10n.current
+        if entry.defaultWateringDays >= 14 {
+            return l.tr(
+                zh: "偏耐旱，宁可等介质明显变干再浇；弱光或冬季应继续拉长间隔。",
+                en: "Drought tolerant. Wait for the medium to dry clearly; extend intervals in low light or winter.",
+                de: "Trockenheitsverträglich. Erst gießen, wenn das Substrat deutlich trocken ist; bei wenig Licht oder im Winter verlängern."
+            )
+        }
+        if entry.humidity.contains("高湿") || entry.humidity.contains("偏高") || entry.humidity.contains("中高") {
+            return l.tr(
+                zh: "喜欢稳定湿度和柔和光线，叶片状态会很快反映干燥、冷风或暴晒。",
+                en: "Likes steady humidity and soft light. Leaves quickly show dryness, drafts, or harsh sun.",
+                de: "Mag stabile Feuchte und weiches Licht. Blätter zeigen Trockenheit, Zugluft oder pralle Sonne schnell."
+            )
+        }
+        if entry.lightRequirement == .direct {
+            return l.tr(
+                zh: "需要更强光线才会紧凑生长或开花，室内应靠近明亮窗边。",
+                en: "Needs stronger light for compact growth or bloom. Place near a bright window indoors.",
+                de: "Braucht stärkeres Licht für kompakten Wuchs oder Blüte. Drinnen nahe ans helle Fenster stellen."
+            )
+        }
+        return l.tr(
+            zh: "适合明亮到中等室内光线，保持稳定环境比频繁移动更重要。",
+            en: "Fits bright to medium indoor light. A stable spot matters more than frequent moving.",
+            de: "Passt zu hellem bis mittlerem Innenlicht. Ein stabiler Standort ist wichtiger als häufiges Umstellen."
+        )
+    }
+
+    static func careTips(for entry: PlantCatalogEntry) -> [String] {
+        let l = L10n.current
+        var tips = [
+            l.tr(
+                zh: "浇水前摸表土或掂盆重，不要只按固定日期。",
+                en: "Check topsoil or pot weight before watering; do not rely only on dates.",
+                de: "Vor dem Gießen Oberfläche oder Topfgewicht prüfen; nicht nur nach Datum gehen."
+            ),
+            l.tr(
+                zh: "新买回家先观察 1-2 周，再换盆或重剪。",
+                en: "Observe for 1-2 weeks after bringing it home before repotting or heavy pruning.",
+                de: "Nach dem Kauf 1-2 Wochen beobachten, bevor umgetopft oder stark geschnitten wird."
+            )
+        ]
+
+        if entry.defaultFertilizingDays <= 30 {
+            tips.append(l.tr(
+                zh: "生长期薄肥即可，状态紧张或冬季先暂停施肥。",
+                en: "Use light fertilizer in growth season; pause when stressed or in winter.",
+                de: "In der Wachstumszeit schwach düngen; bei Stress oder im Winter pausieren."
+            ))
+        } else {
+            tips.append(l.tr(
+                zh: "施肥需求不高，少量低浓度比一次重肥更安全。",
+                en: "Fertilizer needs are modest; low strength is safer than a heavy dose.",
+                de: "Der Düngebedarf ist gering; niedrige Dosierung ist sicherer als eine starke Gabe."
+            ))
+        }
+
+        return tips
+    }
+
+    static func cautionNotes(for entry: PlantCatalogEntry) -> [String] {
+        let l = L10n.current
+        var notes: [String] = []
+        if entry.isToxicToCats || entry.isToxicToDogs || entry.isToxicToChildren {
+            notes.append(l.tr(
+                zh: "有误食风险，家中有宠物或儿童时请放到够不到的位置。",
+                en: "Ingestion risk. Keep out of reach of pets or children.",
+                de: "Risiko beim Verschlucken. Außer Reichweite von Haustieren oder Kindern platzieren."
+            ))
+        } else {
+            notes.append(l.tr(
+                zh: "通常属于家庭低风险植物，但仍建议避免宠物或儿童啃咬。",
+                en: "Usually low risk at home, but still avoid chewing by pets or children.",
+                de: "Meist geringes Risiko zuhause, aber Kauen durch Haustiere oder Kinder vermeiden."
+            ))
+        }
+        if entry.commonIssues.contains("黄叶") || entry.commonIssues.contains("烂根") {
+            notes.append(l.tr(
+                zh: "黄叶、软茎或异味通常先检查积水和根系。",
+                en: "Yellow leaves, soft stems, or odor usually mean checking waterlogging and roots first.",
+                de: "Gelbe Blätter, weiche Triebe oder Geruch bedeuten zuerst Staunässe und Wurzeln prüfen."
+            ))
+        } else {
+            notes.append(l.tr(
+                zh: "突然换位置后先观察新叶和叶缘，避免连续调整。",
+                en: "After moving it, watch new growth and leaf edges before making more changes.",
+                de: "Nach Standortwechsel Neutriebe und Blattränder beobachten, bevor weiter umgestellt wird."
+            ))
+        }
+        return notes
+    }
+
     static func text(_ zh: String) -> String {
         let l = L10n.current
         switch zh {

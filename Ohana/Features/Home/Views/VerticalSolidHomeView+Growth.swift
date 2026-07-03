@@ -7,11 +7,12 @@ import SwiftData
 import SwiftUI
 
 extension VerticalSolidHomeView {
-    func openCalendarAddEvent() {
+    func openCalendarAddEvent(plants: [Plant] = []) {
         guard !isCalendarAddEventPresented else { return }
         closeVerticalFabMenu(immediate: true)
         calendarAddEventPresentationTask?.cancel()
         calendarAddEventContentMountTask?.cancel()
+        calendarAddEventPlants = plants
         isCalendarAddEventPresented = true
         calendarAddEventProgress = 0
         isCalendarAddEventContentMounted = false
@@ -52,6 +53,7 @@ extension VerticalSolidHomeView {
             }
             isCalendarAddEventPresented = false
             isCalendarAddEventContentMounted = false
+            calendarAddEventPlants = []
             calendarAddEventPresentationTask = nil
         }
     }

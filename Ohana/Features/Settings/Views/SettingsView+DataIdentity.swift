@@ -10,18 +10,23 @@ import UniformTypeIdentifiers
 extension SettingsView {
     @ViewBuilder
     var settingsDataSections: some View {
-        if let homeHumans, !homeHumans.isEmpty {
-            if areDataSectionsMounted {
-                deviceIdentitySection(homeHumans)
-            } else {
-                deviceIdentityPlaceholderSection
+        if !isRouteDataLoaded {
+            deviceIdentityPlaceholderSection
+            petManagementPlaceholderSection
+        } else {
+            if let homeHumans, !homeHumans.isEmpty {
+                if areDataSectionsMounted {
+                    deviceIdentitySection(homeHumans)
+                } else {
+                    deviceIdentityPlaceholderSection
+                }
             }
-        }
-        if let homePets, !homePets.isEmpty {
-            if areDataSectionsMounted {
-                petManagementEntrySection(homePets)
-            } else {
-                petManagementPlaceholderSection
+            if let homePets, !homePets.isEmpty {
+                if areDataSectionsMounted {
+                    petManagementEntrySection(homePets)
+                } else {
+                    petManagementPlaceholderSection
+                }
             }
         }
     }

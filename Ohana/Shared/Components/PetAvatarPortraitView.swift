@@ -271,8 +271,10 @@ private enum PetAvatarPortraitCacheKey {
 
 enum PetAvatarTransparencyCache {
     private static let cache = NSCache<NSString, NSNumber>()
+    private static var didRegisterMemoryWarningObserver = false
 
     static func isTransparentAvatar(_ data: Data) -> Bool {
+        bootstrapMemoryWarningObserver()
         let prefix = Data(data.prefix(16)).base64EncodedString()
         let suffix = Data(data.suffix(16)).base64EncodedString()
         let key = "\(data.count)-\(prefix)-\(suffix)" as NSString
@@ -283,5 +285,13 @@ enum PetAvatarTransparencyCache {
         let value = ImageSubjectCutoutProcessor.isTransparentPNG(data)
         cache.setObject(NSNumber(value: value), forKey: key)
         return value
+    }
+
+    private static func bootstrapMemoryWarningObserver() {
+        guard !didRegisterMemoryWarningObserver else { return }
+        didRegisterMemoryWarningObserver = true
+        MemoryWarningEvictionRegistry.register(ownerID: "pet-avatar-transparency-cache") {
+            cache.removeAllObjects()
+        }
     }
 }

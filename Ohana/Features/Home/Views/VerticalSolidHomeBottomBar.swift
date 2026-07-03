@@ -65,12 +65,34 @@ nonisolated enum HomeFabShortcutHitAreaPolicy {
     static let expandedCardEmbeddedActionClearance: CGFloat = 184
 }
 
+nonisolated enum HomeBottomNavigationPrimaryActionPresentation {
+    static func icon(
+        selectedTab: VerticalSolidHomeTab,
+        isFabExpanded: Bool,
+        usesFabMenu: Bool
+    ) -> String {
+        if isFabExpanded {
+            return "xmark"
+        }
+        if usesFabMenu {
+            return "plus"
+        }
+        switch selectedTab {
+        case .home: return "plus"
+        case .calendar: return "calendar.badge.plus"
+        case .oasis: return "bolt.fill"
+        case .plants: return "plus"
+        }
+    }
+}
+
 struct VerticalSolidHomeBottomBar: View {
     let selectedTab: VerticalSolidHomeTab
     @Binding var isFabExpanded: Bool
     @Binding var itemsVisible: Bool
     let activeCard: FocusCard?
     let homeShortcuts: [HomeFabFunctionShortcut]
+    let plantShortcuts: [HomeFabFunctionShortcut]
     let expandedShortcuts: [ExpandedCardFabShortcut]
     let safeBottom: CGFloat
     let treeLevel: Int
@@ -111,7 +133,6 @@ struct VerticalSolidHomeBottomBar: View {
                 .padding(.horizontal, metrics.horizontalPadding)
                 .padding(.bottom, barBottomInset)
         }
-        .animation(canAnimate ? GoMotion.selection : GoMotion.reduced, value: selectedTab)
         .animation(canAnimate ? HeroAnim.fabSpring : GoMotion.reduced, value: isFabExpanded)
         .animation(canAnimate ? HeroAnim.fabSpring : GoMotion.reduced, value: itemsVisible)
     }
@@ -185,18 +206,11 @@ struct VerticalSolidHomeBottomBar: View {
     }
 
     private var centerIcon: String {
-        if isFabExpanded {
-            return "xmark"
-        }
-        if usesFabMenu {
-            return "plus"
-        }
-        switch selectedTab {
-        case .home: return "plus"
-        case .calendar: return "calendar.badge.plus"
-        case .oasis: return "bolt.fill"
-        case .plants: return "leaf.fill"
-        }
+        HomeBottomNavigationPrimaryActionPresentation.icon(
+            selectedTab: selectedTab,
+            isFabExpanded: isFabExpanded,
+            usesFabMenu: usesFabMenu
+        )
     }
 
     private var centerButtonAccessibilityLabel: String {
@@ -208,6 +222,9 @@ struct VerticalSolidHomeBottomBar: View {
         }
         if selectedTab == .home {
             return l.tr(zh: "展开首页快捷菜单", en: "Show home shortcuts", de: "Home-Schnellzugriffe anzeigen")
+        }
+        if selectedTab == .plants {
+            return l.tr(zh: "展开植物快捷菜单", en: "Show plant shortcuts", de: "Pflanzen-Schnellzugriffe anzeigen")
         }
         switch selectedTab {
         case .home:
@@ -303,11 +320,32 @@ struct VerticalSolidHomeBottomBar: View {
                 }
             }
             .padding(.vertical, 2)
+        } else if isFabExpanded, selectedTab == .plants {
+            VStack(spacing: 10) {
+                ForEach(Array(plantShortcuts.enumerated()), id: \.element.id) { index, shortcut in
+                    VerticalSolidHomeHomeFabShortcutButton(shortcut: shortcut) {
+                        guard shortcut.isAvailable else {
+                            OhanaFeedback.light()
+                            return
+                        }
+                        onHomeShortcut(shortcut)
+                    }
+                    .ohanaStaggeredMenuItem(
+                        isVisible: itemsVisible,
+                        index: index,
+                        total: plantShortcuts.count,
+                        anchor: .bottom
+                    )
+                    .allowsHitTesting(itemsVisible)
+                    .accessibilityHidden(!itemsVisible)
+                }
+            }
+            .padding(.vertical, 2)
         }
     }
 
     private var usesFabMenu: Bool {
-        activeCard != nil || selectedTab == .home
+        activeCard != nil || selectedTab == .home || selectedTab == .plants
     }
 
     private func toggleFab() {
@@ -387,9 +425,7 @@ private struct HomeBottomNavigationTabButton: View {
 
     var body: some View {
         Button {
-            withAnimation(selectionAnimation) {
-                action(tab)
-            }
+            action(tab)
         } label: {
             tabContent
                 .foregroundStyle(isSelected ? selectedIconColor : inactiveIconColor)
@@ -405,6 +441,7 @@ private struct HomeBottomNavigationTabButton: View {
                 .contentShape(Rectangle())
         }
         .buttonStyle(ScaleButtonStyle())
+        .animation(selectionAnimation, value: isSelected)
         .accessibilityLabel(accessibilityLabel)
         .accessibilityIdentifier("home-tab-\(tab.rawValue)")
         .accessibilityAddTraits(isSelected ? .isSelected : [])
@@ -810,10 +847,15 @@ private struct VerticalSolidHomeHomeFabShortcutButton: View {
 
 private extension HomeFabFunctionShortcut {
     var accessibilityIdentifierFragment: String {
+        if let entityToAdd {
+            return "add-\(entityToAdd.rawValue)"
+        }
         if let destination {
             switch destination {
             case let .featureAggregate(feature):
                 return "feature-\(feature.rawValue)"
+            case let .featureGroup(group):
+                return "feature-group-\(group.rawValue)"
             case .calendar:
                 return "calendar"
             case .coconutShop:

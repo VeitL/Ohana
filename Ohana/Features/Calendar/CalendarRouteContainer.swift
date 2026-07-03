@@ -9,13 +9,16 @@ struct CalendarRouteContainer: View {
 
     var preselectedPetId: String?
     var preselectedHumanId: String?
+    var preselectedPlantId: String?
     var hideToolbar: Bool = false
     var showsEmbeddedControls: Bool = false
     var addEventTrigger: Int = 0
     var isEmbeddedPrepared: Bool = true
     var isEmbeddedVisible: Bool = true
     var isEmbeddedActive: Bool = true
-    var onRequestAddEvent: (() -> Void)?
+    var onRequestAddEvent: (([Plant]) -> Void)?
+    var onPlantsLoaded: (([Plant]) -> Void)?
+    var onEmbeddedScrollOffsetChange: ((CGFloat) -> Void)?
     var onOpenEventDestination: ((FocusHomeReminderDestination) -> Void)?
     var onPresentCoconutLog: ((CoconutLogSubject?) -> Void)?
 
@@ -23,6 +26,7 @@ struct CalendarRouteContainer: View {
         CalendarView(
             preselectedPetId: preselectedPetId,
             preselectedHumanId: preselectedHumanId,
+            preselectedPlantId: preselectedPlantId,
             hideToolbar: hideToolbar,
             showsEmbeddedControls: showsEmbeddedControls,
             addEventTrigger: addEventTrigger,
@@ -30,6 +34,7 @@ struct CalendarRouteContainer: View {
             isEmbeddedVisible: isEmbeddedVisible,
             isEmbeddedActive: isEmbeddedActive,
             onRequestAddEvent: onRequestAddEvent,
+            onEmbeddedScrollOffsetChange: onEmbeddedScrollOffsetChange,
             onOpenEventDestination: onOpenEventDestination,
             onPresentCoconutLog: onPresentCoconutLog,
             events: routeData.events,
@@ -41,10 +46,16 @@ struct CalendarRouteContainer: View {
             humanMedications: routeData.humanMedications
         )
         .onAppear {
-            scheduleRouteDataLoad()
+            scheduleRouteDataLoad(delayMilliseconds: routeDataLoadDelayMilliseconds)
+        }
+        .onChange(of: isEmbeddedActive) { _, isActive in
+            guard isActive, !routeData.hasLoaded else { return }
+            dataLoadTask?.cancel()
+            dataLoadTask = nil
+            scheduleRouteDataLoad(delayMilliseconds: routeDataLoadDelayMilliseconds)
         }
         .onReceive(appServices.domainRevisions.homeRevisionUpdates) { _ in
-            scheduleRouteDataLoad(delayMilliseconds: 120, force: true)
+            scheduleRouteDataLoad(delayMilliseconds: routeDataLoadDelayMilliseconds, force: true)
         }
         .onDisappear {
             dataLoadTask?.cancel()
@@ -56,9 +67,19 @@ struct CalendarRouteContainer: View {
         guard force || !routeData.hasLoaded else { return }
         guard dataLoadTask == nil else { return }
         dataLoadTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: delayMilliseconds) {
-            routeData = CalendarRouteData.load(from: modelContext)
+            let loadedData = CalendarRouteData.load(from: modelContext)
+            routeData = loadedData
+            onPlantsLoaded?(loadedData.plants)
             dataLoadTask = nil
         }
+    }
+
+    private var routeDataLoadDelayMilliseconds: UInt64 {
+        CalendarEmbeddedContentMountPolicy.routeDataLoadDelayMilliseconds(
+            hideToolbar: hideToolbar,
+            isEmbeddedVisible: isEmbeddedVisible,
+            isEmbeddedActive: isEmbeddedActive
+        )
     }
 }
 

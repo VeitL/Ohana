@@ -2440,11 +2440,8 @@ final class OhanaUITests: XCTestCase {
         addCalendarEvent(title: eventTitle, linkedPetName: nil, in: app)
         tapCalendarEvent(eventTitle, in: app)
 
+        assertCalendarEventDetailOpen(in: app, context: "manual calendar event")
         let detailEditAction = app.buttons["calendar-event-edit-action"]
-        XCTAssertTrue(
-            detailEditAction.waitForExistence(timeout: 8),
-            "Tapping a manually added calendar event did not open its detail sheet."
-        )
         tapWhenHittable(detailEditAction, timeout: 8)
 
         let titleField = app.textFields["add-event-title-input"]
@@ -2465,11 +2462,8 @@ final class OhanaUITests: XCTestCase {
         assertCalendarEvent(editedTitle, exists: true, in: app, context: "post-edit new title")
 
         tapCalendarEvent(editedTitle, in: app)
+        assertCalendarEventDetailOpen(in: app, context: "edited manual calendar event before deletion")
         let reopenedDetailEditAction = app.buttons["calendar-event-edit-action"]
-        XCTAssertTrue(
-            reopenedDetailEditAction.waitForExistence(timeout: 8),
-            "Edited calendar event did not reopen its detail sheet before deletion."
-        )
         tapWhenHittable(app.buttons["calendar-event-delete-action"], timeout: 8)
         let confirmDeleteAction = app.buttons
             .matching(identifier: "calendar-event-confirm-delete-action")
@@ -2479,7 +2473,7 @@ final class OhanaUITests: XCTestCase {
             waitUntil(timeout: 10) {
                 !reopenedDetailEditAction.exists
             },
-            "Calendar event detail sheet did not close after deletion."
+            "Calendar event detail page did not close after deletion."
         )
         assertCalendarEvent(editedTitle, exists: false, in: app, context: "post-delete")
     }
@@ -4723,9 +4717,23 @@ final class OhanaUITests: XCTestCase {
 
     @MainActor
     private func assertCalendarEventDetailOpen(in app: XCUIApplication, context: String) {
+        let detailPage = app.descendants(matching: .any)
+            .matching(identifier: "calendar-event-detail-page")
+            .firstMatch
         XCTAssertTrue(
-            app.buttons["calendar-event-edit-action"].waitForExistence(timeout: 10),
+            detailPage.waitForExistence(timeout: 10),
             "Calendar event detail did not open for \(context)."
+        )
+        XCTAssertTrue(
+            app.buttons["calendar-event-edit-action"].exists,
+            "Calendar event detail did not expose edit action for \(context)."
+        )
+        XCTAssertFalse(
+            app.descendants(matching: .any)
+                .matching(identifier: "calendar-event-detail-sheet")
+                .firstMatch
+                .exists,
+            "Manual calendar event still opened the old sheet for \(context)."
         )
         XCTAssertFalse(
             isAnyLivePetRouteVisible(in: app),

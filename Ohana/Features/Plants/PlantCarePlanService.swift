@@ -733,12 +733,13 @@ nonisolated enum PlantCarePlanService {
         let today = calendar.startOfDay(for: now)
         let dueDay = calendar.startOfDay(for: dueDate)
         let daysUntilDue = calendar.dateComponents([.day], from: today, to: dueDay).day ?? 0
-        let plantName = plant.name.isEmpty ? L10n.current.tr(zh: "植物", en: "Plant", de: "Pflanze") : plant.name
+        let l = L10n.current
+        let plantName = plant.name.isEmpty ? l.tr(zh: "植物", en: "Plant", de: "Pflanze") : plant.name
         return PlantCareTaskSnapshot(
             id: "\(plant.id.uuidString)-\(type.rawValue)-\(Int(dueDay.timeIntervalSince1970))",
             plantID: plant.id,
             careType: type,
-            title: "\(type.displayName) · \(plantName)",
+            title: "\(type.displayName(l: l)) · \(plantName)",
             subtitle: subtitle,
             explanation: explanation,
             dueDate: dueDay,

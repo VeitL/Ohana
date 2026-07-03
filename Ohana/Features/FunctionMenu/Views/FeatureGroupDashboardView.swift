@@ -3,7 +3,7 @@
 //  Ohana
 //
 //  Grouped GO home FAB destination. Each group is a focused segmented detail
-//  view; users can tap segments or swipe horizontally between child functions.
+//  view; users tap segments to mount one child function at a time.
 //
 
 import SwiftUI
@@ -23,6 +23,7 @@ struct FeatureGroupDashboardView: View {
     private var activePets: [Pet] { pets.filter { !$0.hasPassedAway } }
     private var visibleHumans: [Human] { humans.filter { $0.shouldShowOnHome && !$0.hasPassedAway } }
     private var currentTreeLevel: Int { appServices.oasisTree.treeLevel.rawValue }
+    private var l: L10n { L10n(appLanguage) }
 
     private var hasDogs: Bool {
         activePets.contains {
@@ -32,7 +33,7 @@ struct FeatureGroupDashboardView: View {
     }
 
     private var items: [FeatureGroupItem] {
-        FeatureGroupItem.items(for: group, hasDogs: hasDogs)
+        FeatureGroupItem.items(for: group, hasDogs: hasDogs, l: l)
             .filter {
                 AppFeatureRouteGuard.isVisibleFunctionDestination(
                     $0.destination,
@@ -79,7 +80,7 @@ struct FeatureGroupDashboardView: View {
                 .font(OhanaFont.adaptive(size: 17, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(group.color)
                 .frame(width: 34, height: 34) // a11y: allow decorative non-interactive frame; hit area handled by parent
-            Text(LocalizedStringKey(group.title))
+            Text(group.title(l: l))
                 .font(OhanaFont.title2(.black))
                 .foregroundStyle(Color.ohanaPrimaryText)
                 .lineLimit(1)
@@ -103,7 +104,7 @@ struct FeatureGroupDashboardView: View {
                         HStack(spacing: 6) {
                             Image(systemName: item.icon)
                                 .font(OhanaFont.adaptive(size: 11, weight: .bold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                            Text(LocalizedStringKey(item.title))
+                            Text(item.title)
                                 .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                 .lineLimit(1)
                         }
@@ -113,6 +114,10 @@ struct FeatureGroupDashboardView: View {
                         .background(effectiveSelectedItemID == item.id ? Color.goPrimary : Color.ohanaControlFill, in: Capsule())
                     }
                     .buttonStyle(ScaleButtonStyle())
+                    .accessibilityIdentifier("function-menu-group-segment-\(item.id)")
+                    .accessibilityValue(effectiveSelectedItemID == item.id
+                        ? l.tr(zh: "已选中", en: "Selected", de: "Ausgewählt")
+                        : l.tr(zh: "未选中", en: "Not selected", de: "Nicht ausgewählt"))
                 }
             }
             .padding(.horizontal, 16)
@@ -120,18 +125,15 @@ struct FeatureGroupDashboardView: View {
         }
     }
 
+    @ViewBuilder
     private var pager: some View {
-        TabView(selection: Binding(
-            get: { effectiveSelectedItemID },
-            set: { selectedItemID = $0 }
-        )) {
-            ForEach(items) { item in
-                content(for: item)
-                    .tag(item.id)
-            }
+        if let selectedItem {
+            content(for: selectedItem)
+                .id(selectedItem.id)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .transition(.opacity)
+                .animation(GoMotion.page, value: effectiveSelectedItemID)
         }
-        .tabViewStyle(.page(indexDisplayMode: .never))
-        .animation(GoMotion.page, value: effectiveSelectedItemID)
     }
 
     @ViewBuilder
@@ -195,6 +197,15 @@ struct FeatureGroupDashboardView: View {
                     parentPath.append(FMDest.plantDetail(plantID))
                 }
             )
+        case .plantsCalendar:
+            FunctionMenuDestinationRouter(
+                destination: item.destination,
+                parentPath: $parentPath,
+                pets: pets,
+                humans: humans,
+                petAggregateSummaries: petAggregateSummaries,
+                plants: plants
+            )
         default:
             EmptyView()
         }
@@ -241,52 +252,88 @@ private struct FeatureGroupItem: Identifiable {
     let icon: String
     let destination: FMDest
 
-    static func items(for group: FeatureGroup, hasDogs: Bool) -> [FeatureGroupItem] {
+    static func items(for group: FeatureGroup, hasDogs: Bool, l: L10n) -> [FeatureGroupItem] {
         switch group {
         case .dailyCare:
             var items = [
-                feature(.food),
-                feature(.hygiene)
+                feature(.food, l: l),
+                feature(.hygiene, l: l)
             ]
             if hasDogs {
-                items.append(feature(.walks))
+                items.append(feature(.walks, l: l))
             }
-            items.append(feature(.potty))
+            items.append(feature(.potty, l: l))
             return items
         case .healthBody:
             // 「提醒健康」迁出至「家」hub（属家庭层面审计）；本组聚焦个体健康指标
             return [
-                feature(.health),
-                feature(.medications),
-                feature(.weight)
+                feature(.health, l: l),
+                feature(.medications, l: l),
+                feature(.weight, l: l)
             ]
         case .archiveMemory:
             // 单一聚合入口：用户进入 hub 后再选择 基本信息 / 证件 / 重要时刻 / 成就
-            return [feature(.retention)]
+            return [feature(.retention, l: l)]
         case .householdHub:
             // 整合自旧 financeLedger + familyCollab + 提醒健康（跨模块协作类）
             var items: [FeatureGroupItem] = [
-                feature(.expense),
-                destination(id: "care-ledger", title: "照护分析", icon: "list.bullet.rectangle.portrait.fill", .careLedgerAnalysis),
-                destination(id: "reminder-observability", title: "提醒健康", icon: "bell.badge.fill", .reminderObservability)
+                feature(.expense, l: l),
+                destination(
+                    id: "care-ledger",
+                    title: l.tr(zh: "照护分析", en: "Care Analysis", de: "Pflegeanalyse"),
+                    icon: "list.bullet.rectangle.portrait.fill",
+                    .careLedgerAnalysis
+                ),
+                destination(
+                    id: "reminder-observability",
+                    title: l.tr(zh: "提醒健康", en: "Reminder Health", de: "Erinnerungsstatus"),
+                    icon: "bell.badge.fill",
+                    .reminderObservability
+                )
             ]
-            items.append(destination(id: "weekly-report", title: "照护周报", icon: "chart.bar.doc.horizontal", .familyWeeklyReport))
+            items.append(destination(
+                id: "weekly-report",
+                title: l.tr(zh: "照护周报", en: "Care Weekly", de: "Pflegewoche"),
+                icon: "chart.bar.doc.horizontal",
+                .familyWeeklyReport
+            ))
             return items
         case .plants:
             return [
-                destination(id: "plants-dashboard", title: "植物总览", icon: "leaf.fill", .plantsDashboard),
-                destination(id: "plants-list", title: "植物列表", icon: "list.bullet.rectangle.fill", .plantsList),
-                destination(id: "plants-photos", title: "成长照片", icon: "photo.stack.fill", .plantsPhotos)
+                destination(
+                    id: "plants-dashboard",
+                    title: l.tr(zh: "植物总览", en: "Plant Overview", de: "Pflanzenübersicht"),
+                    icon: "leaf.fill",
+                    .plantsDashboard
+                ),
+                destination(
+                    id: "plants-list",
+                    title: l.tr(zh: "植物列表", en: "Plant List", de: "Pflanzenliste"),
+                    icon: "list.bullet.rectangle.fill",
+                    .plantsList
+                ),
+                destination(
+                    id: "plants-photos",
+                    title: l.tr(zh: "成长照片", en: "Growth Photos", de: "Wachstumsfotos"),
+                    icon: "photo.stack.fill",
+                    .plantsPhotos
+                ),
+                destination(
+                    id: "plants-calendar",
+                    title: l.tr(zh: "植物日历", en: "Plant Calendar", de: "Pflanzenkalender"),
+                    icon: "calendar",
+                    .plantsCalendar
+                )
             ]
         case .oasisRewards:
             return []
         }
     }
 
-    private static func feature(_ feature: PetFeature) -> FeatureGroupItem {
+    private static func feature(_ feature: PetFeature, l: L10n) -> FeatureGroupItem {
         FeatureGroupItem(
             id: "feature-\(feature.rawValue)",
-            title: feature.title,
+            title: feature.title(l: l),
             icon: feature.icon,
             destination: .featureAggregate(feature)
         )

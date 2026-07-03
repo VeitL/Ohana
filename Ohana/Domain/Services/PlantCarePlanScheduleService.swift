@@ -32,7 +32,6 @@ struct PlantCarePlanScheduleResult: Equatable {
 @MainActor
 enum PlantCarePlanScheduleService {
     private static let storagePrefix = "ohana_plant_care_plan_event_v1"
-    private static let planTitleMarker = "植物计划"
     private static let scheduledCareTypes: [PlantCareType] = [
         .watering,
         .fertilizing,
@@ -324,8 +323,9 @@ private extension PlantCarePlanScheduleService {
         defaults: UserDefaults
     ) -> DomainScheduleCreateIntent {
         let dueDay = calendar.startOfDay(for: task.dueDate)
+        let l = L10n.current
         return DomainScheduleCreateIntent(
-            title: "\(task.careType.emoji) \(plant.name) · \(task.careType.displayName)\(planTitleMarker)\(safetyReminderSuffix(for: plant, defaults: defaults))",
+            title: "\(task.careType.emoji) \(plant.name) · \(task.careType.displayName(l: l))\(planTitleMarker)\(safetyReminderSuffix(for: plant, defaults: defaults))",
             startDate: dueDay,
             isAllDay: true,
             eventType: task.careType.eventType.rawValue,
@@ -388,6 +388,10 @@ private extension PlantCarePlanScheduleService {
 
     static func storageKey(plant: Plant, type: PlantCareType) -> String {
         "\(storagePrefix)_\(plant.id.uuidString)_\(type.rawValue)"
+    }
+
+    private static var planTitleMarker: String {
+        PlantReminderPreferenceStore.generatedPlanTitleMarker
     }
 
     static func safetyReminderSuffix(for plant: Plant, defaults: UserDefaults) -> String {

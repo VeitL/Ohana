@@ -55,6 +55,30 @@ struct SettingsRouteContainerTests {
         #expect(SettingsRouteReloadPolicy.shouldReloadSettingsRouteData(for: activeHumanRevision))
     }
 
+    @Test func settingsDataSectionsReserveSlotsBeforeDeferredRouteDataLoads() throws {
+        let settingsSource = try source(
+            "Ohana/Features/Settings/Views/SettingsView.swift",
+            rootURL: repositoryRootURL()
+        )
+        let dataIdentitySource = try source(
+            "Ohana/Features/Settings/Views/SettingsView+DataIdentity.swift",
+            rootURL: repositoryRootURL()
+        )
+        let routeSource = try source(
+            "Ohana/Features/Settings/SettingsRouteContainer.swift",
+            rootURL: repositoryRootURL()
+        )
+
+        #expect(settingsSource.contains("let isRouteDataLoaded: Bool"))
+        #expect(routeSource.contains("isRouteDataLoaded: data.hasLoaded"))
+        #expect(dataIdentitySource.contains("""
+        if !isRouteDataLoaded {
+            deviceIdentityPlaceholderSection
+            petManagementPlaceholderSection
+        } else {
+"""))
+    }
+
     @Test func notificationSettingsKeepCategoryControlsBehindAdvancedDisclosure() throws {
         let settingsSource = try source(
             "Ohana/Features/Settings/Views/SettingsView.swift",

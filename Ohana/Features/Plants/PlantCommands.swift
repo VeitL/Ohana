@@ -37,8 +37,9 @@ enum PlantCareCommandService {
     ) -> PlantCareCommandResult {
         let careLedger = providedCareLedger ?? CareLedgerService()
         let l = L10n.current
+        let careTypeName = type.displayName(l: l)
         let eventIntent = DomainScheduleCreateIntent(
-            title: "\(type.emoji) \(l.tr(zh: "给 \(plant.name)\(type.displayName)", en: "\(type.displayName) for \(plant.name)", de: "\(type.displayName) für \(plant.name)"))\(safetyReminderSuffix(for: plant))",
+            title: "\(type.emoji) \(l.tr(zh: "给 \(plant.name)\(careTypeName)", en: "\(careTypeName) for \(plant.name)", de: "\(careTypeName) für \(plant.name)"))\(safetyReminderSuffix(for: plant))",
             startDate: now,
             isAllDay: false,
             eventType: type.eventType.rawValue,

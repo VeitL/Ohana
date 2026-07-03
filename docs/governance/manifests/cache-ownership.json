@@ -51,6 +51,18 @@
       ]
     },
     {
+      "id": "pet-avatar-transparency-cache",
+      "owner": "Shared avatar component owner",
+      "scope": "process",
+      "sourceOfTruth": "Pet avatar image bytes; cached value is only a derived transparent-PNG boolean keyed by payload size and edge bytes.",
+      "invalidation": "Avatar payload signature changes create a new key; UIApplication memory warnings clear the NSCache through MemoryWarningEvictionRegistry.",
+      "expiry": "Process lifetime or memory pressure; values are cheap to rederive.",
+      "recovery": "Recompute transparency lazily the next time the avatar renders.",
+      "paths": [
+        "Ohana/Shared/Components/PetAvatarPortraitView.swift"
+      ]
+    },
+    {
       "id": "quick-feed-snapshot-stores",
       "owner": "Feeding feature owner",
       "scope": "feature",
@@ -77,6 +89,7 @@
       "paths": [
         "Resources/Avatars/PetAvatarAssets/manifest.json",
         "Resources/Avatars/HumanAvatarAssets/manifest.json",
+        "Resources/Avatars/PlantAvatarAssets/manifest.json",
         "OhanaTests/PetAvatarAssetCatalogTests.swift",
         "OhanaTests/HumanAvatarAssetCatalogTests.swift"
       ]

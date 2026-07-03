@@ -9,7 +9,15 @@ import SwiftUI
 
 enum FocusWalletCardPresentation {
     case home
+    case plant
     case rosterMember
+}
+
+enum FocusWalletNamedImageLoader {
+    static func image(named name: String?) -> UIImage? {
+        guard let name, !name.isEmpty else { return nil }
+        return UIImage(named: name)
+    }
 }
 
 struct FocusWalletCardView: View {
@@ -39,7 +47,7 @@ struct FocusWalletCardView: View {
     }
 
     private var showsCardTextBadges: Bool {
-        presentation == .home
+        presentation == .home || presentation == .plant
     }
 
     private var showsHomeVisibilityStatusBadge: Bool {
@@ -59,7 +67,7 @@ struct FocusWalletCardView: View {
             let renderH = OhanaHeroGeometry.lerp(K.cardH, h, progress: visualProgress)
             let avatarEntry = FocusWalletAvatarCache.cachedEntry(for: card.id, signature: card.avatarImageSignature)
                 ?? FocusWalletAvatarCache.Entry(
-                    image: nil,
+                    image: FocusWalletNamedImageLoader.image(named: card.avatarImageAssetName),
                     isTransparent: false,
                     signature: card.avatarImageSignature,
                     isFinal: false

@@ -7,59 +7,6 @@
 
 import Foundation
 
-nonisolated struct PlantCatalogEntry: Identifiable, Equatable, Sendable {
-    let id: String
-    let commonName: String
-    let latinName: String
-    let aliases: [String]
-    let imageName: String
-    let lightRequirement: PlantLightLevel
-    let wateringPreference: String
-    let humidity: String
-    let temperature: String
-    let soil: String
-    let fertilizing: String
-    let propagation: String
-    let pruning: String
-    let commonIssues: String
-    let toxicity: String
-    let careDifficulty: String
-    let isToxicToCats: Bool
-    let isToxicToDogs: Bool
-    let isToxicToChildren: Bool
-    let isIndoorSuitable: Bool
-    let defaultWateringDays: Int
-    let defaultFertilizingDays: Int
-
-    var localizedCommonName: String {
-        PlantCatalogLocalization.commonName(
-            id: id,
-            zh: commonName,
-            latinName: latinName,
-            aliases: aliases
-        )
-    }
-
-    var localizedWateringPreference: String { PlantCatalogLocalization.text(wateringPreference) }
-    var localizedHumidity: String { PlantCatalogLocalization.text(humidity) }
-    var localizedTemperature: String { PlantCatalogLocalization.text(temperature) }
-    var localizedSoil: String { PlantCatalogLocalization.text(soil) }
-    var localizedFertilizing: String { PlantCatalogLocalization.text(fertilizing) }
-    var localizedPropagation: String { PlantCatalogLocalization.text(propagation) }
-    var localizedPruning: String { PlantCatalogLocalization.text(pruning) }
-    var localizedCommonIssues: String { PlantCatalogLocalization.text(commonIssues) }
-    var localizedToxicity: String { PlantCatalogLocalization.text(toxicity) }
-    var localizedCareDifficulty: String { PlantCatalogLocalization.text(careDifficulty) }
-}
-
-nonisolated struct PlantCatalogSearchResult: Identifiable, Equatable, Sendable {
-    let entry: PlantCatalogEntry
-    let score: Int
-    let matchSummary: String
-
-    var id: String { entry.id }
-}
-
 nonisolated enum PlantCatalog {
     static let entries: [PlantCatalogEntry] = coreEntries + commonIndoorEntries
 
@@ -69,7 +16,7 @@ nonisolated enum PlantCatalog {
             commonName: "绿萝",
             latinName: "Epipremnum aureum",
             aliases: ["pothos", "黄金葛", "devils ivy"],
-            imageName: "plant_catalog_pothos",
+            imageName: PlantCatalogMedia.avatarAssetName(forCatalogID: "epipremnum-aureum"),
             lightRequirement: .brightIndirect,
             wateringPreference: "表土 2-3 cm 变干后浇透",
             humidity: "普通室内湿度即可",
@@ -93,7 +40,7 @@ nonisolated enum PlantCatalog {
             commonName: "龟背竹",
             latinName: "Monstera deliciosa",
             aliases: ["monstera", "swiss cheese plant"],
-            imageName: "plant_catalog_monstera",
+            imageName: PlantCatalogMedia.avatarAssetName(forCatalogID: "monstera-deliciosa"),
             lightRequirement: .brightIndirect,
             wateringPreference: "上层土干后浇透，避免长期积水",
             humidity: "偏高湿度更佳",
@@ -117,7 +64,7 @@ nonisolated enum PlantCatalog {
             commonName: "吊兰",
             latinName: "Chlorophytum comosum",
             aliases: ["spider plant", "airplane plant"],
-            imageName: "plant_catalog_spider_plant",
+            imageName: PlantCatalogMedia.avatarAssetName(forCatalogID: "chlorophytum-comosum"),
             lightRequirement: .medium,
             wateringPreference: "保持轻微湿润，冬季减少",
             humidity: "普通室内湿度",
@@ -141,7 +88,7 @@ nonisolated enum PlantCatalog {
             commonName: "虎尾兰",
             latinName: "Dracaena trifasciata",
             aliases: ["snake plant", "虎皮兰"],
-            imageName: "plant_catalog_snake_plant",
+            imageName: PlantCatalogMedia.avatarAssetName(forCatalogID: "sansevieria-trifasciata"),
             lightRequirement: .medium,
             wateringPreference: "土壤完全干透后再浇",
             humidity: "耐普通偏干环境",
@@ -165,7 +112,7 @@ nonisolated enum PlantCatalog {
             commonName: "琴叶榕",
             latinName: "Ficus lyrata",
             aliases: ["fiddle leaf fig"],
-            imageName: "plant_catalog_fiddle_leaf_fig",
+            imageName: PlantCatalogMedia.avatarAssetName(forCatalogID: "ficus-lyrata"),
             lightRequirement: .brightIndirect,
             wateringPreference: "表土明显变干后浇透，保持节奏稳定",
             humidity: "中高湿更佳",
@@ -303,7 +250,135 @@ nonisolated enum PlantCatalog {
         CatalogSeed("guzmania-lingulata", "擎天凤梨", "Guzmania lingulata", ["scarlet star bromeliad"], .bromeliad),
         CatalogSeed("vriesea-splendens", "火剑凤梨", "Vriesea splendens", ["flaming sword"], .bromeliad),
         CatalogSeed("tillandsia-ionantha", "空气凤梨", "Tillandsia ionantha", ["air plant"], .bromeliadAdvanced),
-        CatalogSeed("cryptanthus-bivittatus", "姬凤梨", "Cryptanthus bivittatus", ["earth star"], .bromeliad)
+        CatalogSeed("cryptanthus-bivittatus", "姬凤梨", "Cryptanthus bivittatus", ["earth star"], .bromeliad),
+        CatalogSeed("philodendron-gloriosum", "荣耀蔓绿绒", "Philodendron gloriosum", ["gloriosum philodendron"], .aroidAdvanced),
+        CatalogSeed("philodendron-prince-of-orange", "橙王子蔓绿绒", "Philodendron Prince of Orange", ["prince of orange philodendron"], .aroid),
+        CatalogSeed("philodendron-rojo-congo", "红刚果蔓绿绒", "Philodendron Rojo Congo", ["rojo congo philodendron"], .aroid),
+        CatalogSeed("philodendron-xanadu", "小天使蔓绿绒", "Thaumatophyllum xanadu", ["xanadu philodendron"], .aroid),
+        CatalogSeed("scindapsus-pictus-exotica", "大叶银斑葛", "Scindapsus pictus Exotica", ["satin pothos exotica"], .aroidVine),
+        CatalogSeed("scindapsus-pictus-argyraeus", "银星葛", "Scindapsus pictus Argyraeus", ["argyraeus pothos"], .aroidVine),
+        CatalogSeed("epipremnum-aureum-marble-queen", "雪花绿萝", "Epipremnum aureum Marble Queen", ["marble queen pothos"], .aroidVine),
+        CatalogSeed("epipremnum-aureum-njoy", "N'Joy 绿萝", "Epipremnum aureum N'Joy", ["njoy pothos"], .aroidVine),
+        CatalogSeed("epipremnum-aureum-manjula", "曼珠绿萝", "Epipremnum aureum Manjula", ["manjula pothos"], .aroidVine),
+        CatalogSeed("epipremnum-aureum-global-green", "环球绿萝", "Epipremnum aureum Global Green", ["global green pothos"], .aroidVine),
+        CatalogSeed("monstera-thai-constellation", "泰国星座龟背竹", "Monstera deliciosa Thai Constellation", ["thai constellation monstera"], .aroidAdvanced),
+        CatalogSeed("monstera-albo-variegata", "白锦龟背竹", "Monstera deliciosa Albo Variegata", ["albo monstera"], .aroidAdvanced),
+        CatalogSeed("monstera-siltepecana", "银脉龟背藤", "Monstera siltepecana", ["silver monstera"], .aroid),
+        CatalogSeed("rhaphidophora-decursiva", "龙鳞藤", "Rhaphidophora decursiva", ["dragon tail plant"], .aroid),
+        CatalogSeed("syngonium-neon-robusta", "粉合果芋", "Syngonium Neon Robusta", ["pink arrowhead plant"], .aroid),
+        CatalogSeed("syngonium-albo-variegatum", "白锦合果芋", "Syngonium podophyllum Albo Variegatum", ["variegated arrowhead plant"], .aroidAdvanced),
+        CatalogSeed("aglaonema-pictum-tricolor", "迷彩万年青", "Aglaonema pictum Tricolor", ["camouflage aglaonema"], .lowLightToxic),
+        CatalogSeed("aglaonema-pink-valentine", "粉色万年青", "Aglaonema Pink Valentine", ["pink valentine aglaonema"], .lowLightToxic),
+        CatalogSeed("dieffenbachia-camille", "卡米拉花叶万年青", "Dieffenbachia Camille", ["camille dumb cane"], .lowLightToxic),
+        CatalogSeed("dieffenbachia-tropic-snow", "雪斑万年青", "Dieffenbachia Tropic Snow", ["tropic snow dumb cane"], .lowLightToxic),
+        CatalogSeed("calathea-lancifolia", "响尾蛇竹芋", "Goeppertia insignis", ["rattlesnake plant"], .prayerPlant),
+        CatalogSeed("calathea-roseopicta", "玫瑰竹芋", "Goeppertia roseopicta", ["rose painted calathea"], .prayerPlant),
+        CatalogSeed("calathea-medallion", "勋章竹芋", "Goeppertia veitchiana Medallion", ["medallion calathea"], .prayerPlant),
+        CatalogSeed("ctenanthe-burle-marxii", "鱼骨竹芋", "Ctenanthe burle-marxii", ["fishbone prayer plant"], .prayerPlant),
+        CatalogSeed("ctenanthe-setosa", "灰星竹芋", "Ctenanthe setosa", ["grey star ctenanthe"], .prayerPlant),
+        CatalogSeed("maranta-kim", "锦叶豹纹竹芋", "Maranta leuconeura Kim", ["kim prayer plant"], .prayerPlant),
+        CatalogSeed("peperomia-rosso", "红背椒草", "Peperomia Rosso", ["rosso peperomia"], .peperomia),
+        CatalogSeed("peperomia-graveolens", "红边豆瓣绿", "Peperomia graveolens", ["ruby glow peperomia"], .peperomia),
+        CatalogSeed("peperomia-raindrop", "雨滴椒草", "Peperomia polybotrya", ["raindrop peperomia"], .peperomia),
+        CatalogSeed("pilea-glauca", "蓝叶冷水花", "Pilea glauca", ["silver sparkle pilea"], .petSafeEasy),
+        CatalogSeed("pilea-depressa", "迷你冷水花", "Pilea depressa", ["baby tears pilea"], .petSafeMoist),
+        CatalogSeed("hoya-obovata", "圆叶球兰", "Hoya obovata", ["obovata hoya"], .hoya),
+        CatalogSeed("hoya-compacta", "卷叶球兰", "Hoya carnosa Compacta", ["hindu rope hoya"], .hoya),
+        CatalogSeed("hoya-australis", "澳洲球兰", "Hoya australis", ["australis hoya"], .hoya),
+        CatalogSeed("hoya-mathilde", "玛蒂尔达球兰", "Hoya Mathilde", ["mathilde hoya"], .hoya),
+        CatalogSeed("ceropegia-linearis", "细叶爱之蔓", "Ceropegia linearis", ["string of needles"], .succulentSafe),
+        CatalogSeed("dischidia-ovata", "西瓜藤", "Dischidia ovata", ["watermelon dischidia"], .hoya),
+        CatalogSeed("senecio-radicans", "佛珠香蕉", "Curio radicans", ["string of bananas"], .succulentToxic),
+        CatalogSeed("tradescantia-fluminensis", "白花紫露草", "Tradescantia fluminensis", ["wandering jew plant"], .petIrritant),
+        CatalogSeed("tradescantia-nanouk", "粉紫露草", "Tradescantia Nanouk", ["nanouk tradescantia"], .petIrritant),
+        CatalogSeed("episcia-cupreata", "红桐草", "Episcia cupreata", ["flame violet"], .petSafeFlowering),
+        CatalogSeed("selaginella-kraussiana", "卷柏", "Selaginella kraussiana", ["spikemoss"], .petSafeMoist),
+        CatalogSeed("selaginella-martensii", "翠云草", "Selaginella martensii", ["frosty fern"], .petSafeMoist),
+        CatalogSeed("nephrolepis-cordifolia", "肾蕨", "Nephrolepis cordifolia", ["tuberous sword fern"], .fern),
+        CatalogSeed("blechnum-gibbum", "银蕨", "Blechnum gibbum", ["silver lady fern"], .fern),
+        CatalogSeed("pteris-cretica", "凤尾蕨", "Pteris cretica", ["cretan brake fern"], .fern),
+        CatalogSeed("ficus-lyrata-bambino", "小提琴叶榕", "Ficus lyrata Bambino", ["bambino fiddle leaf fig"], .ficus),
+        CatalogSeed("ficus-alii", "长叶榕", "Ficus binnendijkii Alii", ["alii ficus"], .ficus),
+        CatalogSeed("ficus-audrey", "奥黛丽榕", "Ficus benghalensis Audrey", ["audrey ficus"], .ficus),
+        CatalogSeed("ficus-pumila", "爬墙虎榕", "Ficus pumila", ["creeping fig"], .trailingToxic),
+        CatalogSeed("schefflera-actinophylla", "大叶鹅掌柴", "Schefflera actinophylla", ["octopus tree"], .woodyToxic),
+        CatalogSeed("polyscias-scutellaria-fabian", "法比安南洋森", "Polyscias scutellaria Fabian", ["fabian aralia"], .woodyToxic),
+        CatalogSeed("dracaena-compacta", "密叶龙血树", "Dracaena fragrans Compacta", ["compact dracaena"], .lowLightToxic),
+        CatalogSeed("dracaena-lemon-lime", "柠檬青龙血树", "Dracaena Lemon Lime", ["lemon lime dracaena"], .lowLightToxic),
+        CatalogSeed("dracaena-gold-star", "金星龙血树", "Dracaena Gold Star", ["gold star dracaena"], .lowLightToxic),
+        CatalogSeed("aspidistra-elatior", "一叶兰", "Aspidistra elatior", ["cast iron plant"], .petSafeEasy),
+        CatalogSeed("chlorophytum-comosum-bonnie", "卷叶吊兰", "Chlorophytum comosum Bonnie", ["bonnie spider plant"], .petSafeEasy),
+        CatalogSeed("dracaena-trifasciata-moonshine", "月光虎尾兰", "Dracaena trifasciata Moonshine", ["moonshine snake plant"], .lowLightToxic),
+        CatalogSeed("dracaena-trifasciata-golden-hahnii", "金边短叶虎尾兰", "Dracaena trifasciata Golden Hahnii", ["golden bird nest snake plant"], .lowLightToxic),
+        CatalogSeed("chamaedorea-seifrizii", "竹棕", "Chamaedorea seifrizii", ["bamboo palm"], .palm),
+        CatalogSeed("phoenix-roebelenii", "袖珍海枣", "Phoenix roebelenii", ["pygmy date palm"], .palm),
+        CatalogSeed("cycas-revoluta", "苏铁", "Cycas revoluta", ["sago palm"], .woodyToxic),
+        CatalogSeed("ravenea-rivularis", "国王椰子", "Ravenea rivularis", ["majesty palm"], .palm),
+        CatalogSeed("alocasia-frydek", "绿天鹅绒海芋", "Alocasia micholitziana Frydek", ["frydek alocasia"], .aroidAdvanced),
+        CatalogSeed("alocasia-black-velvet", "黑天鹅绒海芋", "Alocasia reginula", ["black velvet alocasia"], .aroidAdvanced),
+        CatalogSeed("alocasia-zebrina", "斑马海芋", "Alocasia zebrina", ["zebrina alocasia"], .aroidAdvanced),
+        CatalogSeed("anthurium-crystallinum", "水晶花烛", "Anthurium crystallinum", ["crystal anthurium"], .aroidAdvanced),
+        CatalogSeed("anthurium-warocqueanum", "皇后花烛", "Anthurium warocqueanum", ["queen anthurium"], .aroidAdvanced),
+        CatalogSeed("begonia-escargot", "蜗牛秋海棠", "Begonia Escargot", ["escargot begonia"], .floweringToxic),
+        CatalogSeed("begonia-angel-wing", "天使翼秋海棠", "Begonia Angel Wing", ["angel wing begonia"], .floweringToxic),
+        CatalogSeed("begonia-erythrophylla", "牛排秋海棠", "Begonia erythrophylla", ["beefsteak begonia"], .floweringToxic),
+        CatalogSeed("sinningia-speciosa", "大岩桐", "Sinningia speciosa", ["gloxinia"], .petSafeFlowering),
+        CatalogSeed("nematanthus-gregarius", "金鱼花", "Nematanthus gregarius", ["goldfish plant"], .petSafeFlowering),
+        CatalogSeed("columnea-gloriosa", "鲸鱼花", "Columnea gloriosa", ["columnea"], .petSafeFlowering),
+        CatalogSeed("eschynanthus-radicans", "口红花", "Aeschynanthus radicans", ["lipstick plant"], .petSafeFlowering),
+        CatalogSeed("schlumbergera-bridgesii", "圣诞仙人掌", "Schlumbergera bridgesii", ["christmas cactus"], .succulentSafe),
+        CatalogSeed("hatiora-salicornioides", "珊瑚仙人掌", "Hatiora salicornioides", ["dancing bones cactus"], .succulentSafe),
+        CatalogSeed("rhipsalis-cereuscula", "米粒仙人掌", "Rhipsalis cereuscula", ["rice cactus"], .succulentSafe),
+        CatalogSeed("epiphyllum-anguliger", "鱼骨令箭", "Disocactus anguliger", ["fishbone cactus"], .succulentSafe),
+        CatalogSeed("aloe-aristata", "绫锦芦荟", "Aristaloe aristata", ["lace aloe"], .succulentSafe),
+        CatalogSeed("aloe-humilis", "矮芦荟", "Aloe humilis", ["spider aloe"], .succulentToxic),
+        CatalogSeed("haworthia-cooperi", "水晶寿", "Haworthia cooperi", ["cooper haworthia"], .succulentSafe),
+        CatalogSeed("gasteria-little-warty", "小疣卧牛", "Gasteria Little Warty", ["little warty gasteria"], .succulentSafe),
+        CatalogSeed("echeveria-perle-von-nurnberg", "紫珍珠", "Echeveria Perle von Nurnberg", ["perle von nurnberg echeveria"], .succulentSafe),
+        CatalogSeed("echeveria-lola", "劳尔拟石莲", "Echeveria Lola", ["lola echeveria"], .succulentSafe),
+        CatalogSeed("graptopetalum-paraguayense", "胧月", "Graptopetalum paraguayense", ["ghost plant"], .succulentSafe),
+        CatalogSeed("graptoveria-fred-ives", "弗雷德多肉", "Graptoveria Fred Ives", ["fred ives succulent"], .succulentSafe),
+        CatalogSeed("sedum-rubrotinctum", "虹之玉", "Sedum rubrotinctum", ["jelly bean plant"], .succulentSafe),
+        CatalogSeed("sedum-adolphii", "铭月", "Sedum adolphii", ["golden sedum"], .succulentSafe),
+        CatalogSeed("crassula-muscosa", "青锁龙", "Crassula muscosa", ["watch chain plant"], .succulentToxic),
+        CatalogSeed("crassula-perforata", "串钱景天", "Crassula perforata", ["string of buttons"], .succulentToxic),
+        CatalogSeed("portulacaria-afra", "金枝玉叶", "Portulacaria afra", ["elephant bush"], .succulentSafe),
+        CatalogSeed("pachyphytum-oviferum", "桃美人", "Pachyphytum oviferum", ["moonstones succulent"], .succulentSafe),
+        CatalogSeed("sempervivum-tectorum", "观音莲", "Sempervivum tectorum", ["hens and chicks"], .succulentSafe),
+        CatalogSeed("kalanchoe-tomentosa", "月兔耳", "Kalanchoe tomentosa", ["panda plant"], .succulentToxic),
+        CatalogSeed("kalanchoe-thyrsiflora", "唐印", "Kalanchoe thyrsiflora", ["paddle plant"], .succulentToxic),
+        CatalogSeed("euphorbia-milii", "虎刺梅", "Euphorbia milii", ["crown of thorns"], .euphorbia),
+        CatalogSeed("euphorbia-lactea", "白斑麒麟", "Euphorbia lactea", ["dragon bones tree"], .euphorbia),
+        CatalogSeed("cereus-repandus", "秘鲁天轮柱", "Cereus repandus", ["peruvian apple cactus"], .cactus),
+        CatalogSeed("echinocactus-grusonii", "金琥", "Echinocactus grusonii", ["golden barrel cactus"], .cactus),
+        CatalogSeed("parodia-leninghausii", "金晃丸", "Parodia leninghausii", ["golden ball cactus"], .cactus),
+        CatalogSeed("myrtillocactus-geometrizans", "蓝柱", "Myrtillocactus geometrizans", ["blue candle cactus"], .cactus),
+        CatalogSeed("disocactus-ackermannii", "红花令箭", "Disocactus ackermannii", ["red orchid cactus"], .succulentSafe),
+        CatalogSeed("asparagus-densiflorus", "狐尾武竹", "Asparagus densiflorus", ["foxtail fern"], .petIrritant),
+        CatalogSeed("codiaeum-petra", "佩特拉变叶木", "Codiaeum variegatum Petra", ["petra croton"], .woodyToxic),
+        CatalogSeed("strelitzia-reginae", "鹤望兰", "Strelitzia reginae", ["orange bird of paradise"], .woodyToxic),
+        CatalogSeed("citrus-calamondin", "四季桔", "Citrus microcarpa", ["calamondin orange"], .sunnyToxic),
+        CatalogSeed("olea-europaea", "橄榄树", "Olea europaea", ["olive tree"], .sunnyPetIrritant),
+        CatalogSeed("ficus-carica", "无花果", "Ficus carica", ["fig tree"], .sunnyToxic),
+        CatalogSeed("thymus-vulgaris", "百里香", "Thymus vulgaris", ["thyme"], .herb),
+        CatalogSeed("origanum-vulgare", "牛至", "Origanum vulgare", ["oregano"], .herb),
+        CatalogSeed("petroselinum-crispum", "欧芹", "Petroselinum crispum", ["parsley"], .herb),
+        CatalogSeed("coriandrum-sativum", "香菜", "Coriandrum sativum", ["cilantro", "coriander"], .herb),
+        CatalogSeed("capsicum-annuum", "观赏辣椒", "Capsicum annuum", ["ornamental pepper"], .sunnyPetIrritant),
+        CatalogSeed("fragaria-vesca", "草莓", "Fragaria vesca", ["wild strawberry"], .herb),
+        CatalogSeed("pelargonium-zonale", "天竺葵", "Pelargonium zonale", ["zonal geranium"], .floweringToxic),
+        CatalogSeed("hibiscus-rosa-sinensis", "扶桑", "Hibiscus rosa-sinensis", ["hibiscus"], .petSafeFlowering),
+        CatalogSeed("bougainvillea-glabra", "三角梅", "Bougainvillea glabra", ["bougainvillea"], .sunnyPetIrritant),
+        CatalogSeed("passiflora-caerulea", "蓝花西番莲", "Passiflora caerulea", ["passion flower"], .petSafeFlowering),
+        CatalogSeed("jasminum-sambac", "茉莉花", "Jasminum sambac", ["arabian jasmine"], .petSafeFlowering),
+        CatalogSeed("stephanotis-floribunda", "非洲茉莉藤", "Stephanotis floribunda", ["madagascar jasmine"], .petSafeFlowering),
+        CatalogSeed("oncidium-sharry-baby", "巧克力文心兰", "Oncidium Sharry Baby", ["sharry baby orchid"], .orchid),
+        CatalogSeed("paphiopedilum-maudiae", "兜兰", "Paphiopedilum Maudiae", ["lady slipper orchid"], .orchid),
+        CatalogSeed("cattleya-hybrid", "卡特兰", "Cattleya Hybrid", ["cattleya orchid"], .orchid),
+        CatalogSeed("ludisia-discolor", "宝石兰", "Ludisia discolor", ["jewel orchid"], .orchid),
+        CatalogSeed("aechmea-fasciata", "银叶凤梨", "Aechmea fasciata", ["silver vase bromeliad"], .bromeliad),
+        CatalogSeed("neoregelia-carolinae", "彩叶凤梨", "Neoregelia carolinae", ["blushing bromeliad"], .bromeliad),
+        CatalogSeed("tillandsia-xerographica", "霸王空气凤梨", "Tillandsia xerographica", ["xerographica air plant"], .bromeliadAdvanced)
     ]
 
     private enum CatalogCareProfile {
@@ -390,7 +465,7 @@ nonisolated enum PlantCatalog {
             commonName: seed.commonName,
             latinName: seed.latinName,
             aliases: seed.aliases,
-            imageName: "",
+            imageName: PlantCatalogMedia.bundledAvatarAssetName(forCatalogID: seed.id),
             lightRequirement: defaults.light,
             wateringPreference: defaults.watering,
             humidity: defaults.humidity,
@@ -953,6 +1028,10 @@ nonisolated enum PlantCatalog {
         add(lightSearchText(for: entry), weight: 10, label: L10n.current.tr(zh: "光照", en: "Light", de: "Licht"))
         add(entry.wateringPreference, weight: 7, label: L10n.current.tr(zh: "浇水", en: "Watering", de: "Gießen"))
         add(entry.localizedWateringPreference, weight: 7, label: L10n.current.tr(zh: "浇水", en: "Watering", de: "Gießen"))
+        add(entry.localizedSummary, weight: 7, label: L10n.current.tr(zh: "简介", en: "Summary", de: "Kurzinfo"))
+        add(entry.localizedHabitNotes, weight: 7, label: L10n.current.tr(zh: "习性", en: "Habit", de: "Wuchs"))
+        addBest(entry.localizedCareTips, weight: 6, label: L10n.current.tr(zh: "提示", en: "Tip", de: "Tipp"))
+        addBest(entry.localizedCautionNotes, weight: 6, label: L10n.current.tr(zh: "注意", en: "Caution", de: "Achtung"))
         add(entry.humidity, weight: 7, label: L10n.current.tr(zh: "湿度", en: "Humidity", de: "Luftfeuchte"))
         add(entry.localizedHumidity, weight: 7, label: L10n.current.tr(zh: "湿度", en: "Humidity", de: "Luftfeuchte"))
         add(entry.soil, weight: 6, label: L10n.current.tr(zh: "土壤", en: "Soil", de: "Erde"))

@@ -102,7 +102,7 @@ struct OnboardingHandoffResponsivenessTests {
         #expect(source.contains("scheduleBootstrapWatchdog"))
         #expect(source.contains("OhanaStartupProbe.mark"))
         #expect(source.contains("ohana-startup-probe.log"))
-        #expect(source.contains("Color(red: 0.18, green: 0.30, blue: 0.80)"))
+        #expect(source.contains("AppBackgroundStyle.goIsland.gradientColors(for: .dark)"))
         #expect(!source.contains("OhanaAppBackground()"))
         #expect(!source.contains("Eager before RootView"))
         #expect(!source.contains("private let modelContainer: ModelContainer"))

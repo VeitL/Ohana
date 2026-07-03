@@ -1,0 +1,2234 @@
+[
+  {
+    "catalogId": "epipremnum-aureum",
+    "filename": "plant_epipremnum_aureum.png",
+    "commonName": "绿萝",
+    "latinName": "Epipremnum aureum",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-soft-3d-plush-plant-avatar-v1"
+  },
+  {
+    "catalogId": "monstera-deliciosa",
+    "filename": "plant_monstera_deliciosa.png",
+    "commonName": "龟背竹",
+    "latinName": "Monstera deliciosa",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-soft-3d-plush-plant-avatar-v1"
+  },
+  {
+    "catalogId": "chlorophytum-comosum",
+    "filename": "plant_chlorophytum_comosum.png",
+    "commonName": "吊兰",
+    "latinName": "Chlorophytum comosum",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-soft-3d-plush-plant-avatar-v1"
+  },
+  {
+    "catalogId": "sansevieria-trifasciata",
+    "filename": "plant_sansevieria_trifasciata.png",
+    "commonName": "虎尾兰",
+    "latinName": "Dracaena trifasciata",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-soft-3d-plush-plant-avatar-v1"
+  },
+  {
+    "catalogId": "ficus-lyrata",
+    "filename": "plant_ficus_lyrata.png",
+    "commonName": "琴叶榕",
+    "latinName": "Ficus lyrata",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-soft-3d-plush-plant-avatar-v1"
+  },
+  {
+    "catalogId": "zamioculcas-zamiifolia",
+    "filename": "plant_zamioculcas_zamiifolia.png",
+    "commonName": "金钱树",
+    "latinName": "Zamioculcas zamiifolia",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-soft-3d-plush-plant-avatar-v1"
+  },
+  {
+    "catalogId": "spathiphyllum-wallisii",
+    "filename": "plant_spathiphyllum_wallisii.png",
+    "commonName": "白掌",
+    "latinName": "Spathiphyllum wallisii",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-soft-3d-plush-plant-avatar-v1"
+  },
+  {
+    "catalogId": "philodendron-hederaceum",
+    "filename": "plant_philodendron_hederaceum.png",
+    "commonName": "心叶蔓绿绒",
+    "latinName": "Philodendron hederaceum",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-soft-3d-plush-plant-avatar-v1"
+  },
+  {
+    "catalogId": "philodendron-birkin",
+    "filename": "plant_philodendron_birkin.png",
+    "commonName": "白锦蔓绿绒",
+    "latinName": "Philodendron Birkin",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-soft-3d-plush-plant-avatar-v1"
+  },
+  {
+    "catalogId": "philodendron-micans",
+    "filename": "plant_philodendron_micans.png",
+    "commonName": "丝绒蔓绿绒",
+    "latinName": "Philodendron hederaceum micans",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-soft-3d-plush-plant-avatar-v1"
+  },
+  {
+    "catalogId": "scindapsus-pictus",
+    "filename": "plant_scindapsus_pictus.png",
+    "commonName": "银斑葛",
+    "latinName": "Scindapsus pictus",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-soft-3d-plush-plant-avatar-v1"
+  },
+  {
+    "catalogId": "syngonium-podophyllum",
+    "filename": "plant_syngonium_podophyllum.png",
+    "commonName": "合果芋",
+    "latinName": "Syngonium podophyllum",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-soft-3d-plush-plant-avatar-v1"
+  },
+  {
+    "catalogId": "aglaonema-commutatum",
+    "filename": "plant_aglaonema_commutatum.png",
+    "commonName": "广东万年青",
+    "latinName": "Aglaonema commutatum",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-paper-cut-sticker-d-v1"
+  },
+  {
+    "catalogId": "dieffenbachia-seguine",
+    "filename": "plant_dieffenbachia_seguine.png",
+    "commonName": "花叶万年青",
+    "latinName": "Dieffenbachia seguine",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-paper-cut-sticker-d-v1"
+  },
+  {
+    "catalogId": "calathea-orbifolia",
+    "filename": "plant_calathea_orbifolia.png",
+    "commonName": "圆叶竹芋",
+    "latinName": "Goeppertia orbifolia",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-paper-cut-sticker-d-v1"
+  },
+  {
+    "catalogId": "calathea-makoyana",
+    "filename": "plant_calathea_makoyana.png",
+    "commonName": "孔雀竹芋",
+    "latinName": "Goeppertia makoyana",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-paper-cut-sticker-d-v1"
+  },
+  {
+    "catalogId": "goeppertia-ornata",
+    "filename": "plant_goeppertia_ornata.png",
+    "commonName": "纹叶竹芋",
+    "latinName": "Goeppertia ornata",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-paper-cut-sticker-d-v1"
+  },
+  {
+    "catalogId": "maranta-leuconeura",
+    "filename": "plant_maranta_leuconeura.png",
+    "commonName": "红脉豹纹竹芋",
+    "latinName": "Maranta leuconeura",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-paper-cut-sticker-d-v1"
+  },
+  {
+    "catalogId": "stromanthe-triostar",
+    "filename": "plant_stromanthe_triostar.png",
+    "commonName": "三色肖竹芋",
+    "latinName": "Stromanthe sanguinea Triostar",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-paper-cut-sticker-d-v1"
+  },
+  {
+    "catalogId": "peperomia-obtusifolia",
+    "filename": "plant_peperomia_obtusifolia.png",
+    "commonName": "圆叶椒草",
+    "latinName": "Peperomia obtusifolia",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-paper-cut-sticker-d-v1"
+  },
+  {
+    "catalogId": "peperomia-argyreia",
+    "filename": "plant_peperomia_argyreia.png",
+    "commonName": "西瓜皮椒草",
+    "latinName": "Peperomia argyreia",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-paper-cut-sticker-d-v1"
+  },
+  {
+    "catalogId": "pilea-peperomioides",
+    "filename": "plant_pilea_peperomioides.png",
+    "commonName": "镜面草",
+    "latinName": "Pilea peperomioides",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-paper-cut-sticker-d-v1"
+  },
+  {
+    "catalogId": "hoya-carnosa",
+    "filename": "plant_hoya_carnosa.png",
+    "commonName": "球兰",
+    "latinName": "Hoya carnosa",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-paper-cut-sticker-d-v1"
+  },
+  {
+    "catalogId": "hoya-kerrii",
+    "filename": "plant_hoya_kerrii.png",
+    "commonName": "心叶球兰",
+    "latinName": "Hoya kerrii",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-paper-cut-sticker-d-v1"
+  },
+  {
+    "catalogId": "dischidia-nummularia",
+    "filename": "plant_dischidia_nummularia.png",
+    "commonName": "纽扣玉藤",
+    "latinName": "Dischidia nummularia",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-paper-cut-sticker-d-v1"
+  },
+  {
+    "catalogId": "ceropegia-woodii",
+    "filename": "plant_ceropegia_woodii.png",
+    "commonName": "爱之蔓",
+    "latinName": "Ceropegia woodii",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-paper-cut-sticker-d-v1"
+  },
+  {
+    "catalogId": "senecio-rowleyanus",
+    "filename": "plant_senecio_rowleyanus.png",
+    "commonName": "珍珠吊兰",
+    "latinName": "Curio rowleyanus",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-paper-cut-sticker-d-v1"
+  },
+  {
+    "catalogId": "tradescantia-zebrina",
+    "filename": "plant_tradescantia_zebrina.png",
+    "commonName": "吊竹梅",
+    "latinName": "Tradescantia zebrina",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-paper-cut-sticker-d-v1"
+  },
+  {
+    "catalogId": "fittonia-albivenis",
+    "filename": "plant_fittonia_albivenis.png",
+    "commonName": "网纹草",
+    "latinName": "Fittonia albivenis",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-paper-cut-sticker-d-v1"
+  },
+  {
+    "catalogId": "soleirolia-soleirolii",
+    "filename": "plant_soleirolia_soleirolii.png",
+    "commonName": "婴儿泪",
+    "latinName": "Soleirolia soleirolii",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-paper-cut-sticker-d-v1"
+  },
+  {
+    "catalogId": "nephrolepis-exaltata",
+    "filename": "plant_nephrolepis_exaltata.png",
+    "commonName": "波士顿蕨",
+    "latinName": "Nephrolepis exaltata",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-paper-cut-sticker-d-v1"
+  },
+  {
+    "catalogId": "asplenium-nidus",
+    "filename": "plant_asplenium_nidus.png",
+    "commonName": "鸟巢蕨",
+    "latinName": "Asplenium nidus",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-paper-cut-sticker-d-v1"
+  },
+  {
+    "catalogId": "adiantum-raddianum",
+    "filename": "plant_adiantum_raddianum.png",
+    "commonName": "铁线蕨",
+    "latinName": "Adiantum raddianum",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-paper-cut-sticker-d-v1"
+  },
+  {
+    "catalogId": "platycerium-bifurcatum",
+    "filename": "plant_platycerium_bifurcatum.png",
+    "commonName": "鹿角蕨",
+    "latinName": "Platycerium bifurcatum",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-paper-cut-sticker-d-v1"
+  },
+  {
+    "catalogId": "davallia-fejeensis",
+    "filename": "plant_davallia_fejeensis.png",
+    "commonName": "兔脚蕨",
+    "latinName": "Davallia fejeensis",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-paper-cut-sticker-d-v1"
+  },
+  {
+    "catalogId": "ficus-elastica",
+    "filename": "plant_ficus_elastica.png",
+    "commonName": "橡皮树",
+    "latinName": "Ficus elastica",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-paper-cut-sticker-d-v1"
+  },
+  {
+    "catalogId": "ficus-benjamina",
+    "filename": "plant_ficus_benjamina.png",
+    "commonName": "垂叶榕",
+    "latinName": "Ficus benjamina",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-paper-cut-sticker-d-v1"
+  },
+  {
+    "catalogId": "ficus-microcarpa-ginseng",
+    "filename": "plant_ficus_microcarpa_ginseng.png",
+    "commonName": "人参榕",
+    "latinName": "Ficus microcarpa Ginseng",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-paper-cut-sticker-d-v1"
+  },
+  {
+    "catalogId": "schefflera-arboricola",
+    "filename": "plant_schefflera_arboricola.png",
+    "commonName": "鹅掌柴",
+    "latinName": "Schefflera arboricola",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-paper-cut-sticker-d-v1"
+  },
+  {
+    "catalogId": "pachira-aquatica",
+    "filename": "plant_pachira_aquatica.png",
+    "commonName": "发财树",
+    "latinName": "Pachira aquatica",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-paper-cut-sticker-d-v1"
+  },
+  {
+    "catalogId": "dracaena-marginata",
+    "filename": "plant_dracaena_marginata.png",
+    "commonName": "龙血树",
+    "latinName": "Dracaena marginata",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-paper-cut-sticker-d-v1"
+  },
+  {
+    "catalogId": "dracaena-fragrans",
+    "filename": "plant_dracaena_fragrans.png",
+    "commonName": "巴西木",
+    "latinName": "Dracaena fragrans",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-paper-cut-sticker-d-v1"
+  },
+  {
+    "catalogId": "dracaena-reflexa",
+    "filename": "plant_dracaena_reflexa.png",
+    "commonName": "百合竹",
+    "latinName": "Dracaena reflexa",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-paper-cut-sticker-d-v1"
+  },
+  {
+    "catalogId": "beaucarnea-recurvata",
+    "filename": "plant_beaucarnea_recurvata.png",
+    "commonName": "酒瓶兰",
+    "latinName": "Beaucarnea recurvata",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-paper-cut-sticker-d-v1"
+  },
+  {
+    "catalogId": "chamaedorea-elegans",
+    "filename": "plant_chamaedorea_elegans.png",
+    "commonName": "袖珍椰子",
+    "latinName": "Chamaedorea elegans",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-paper-cut-sticker-d-v1"
+  },
+  {
+    "catalogId": "dypsis-lutescens",
+    "filename": "plant_dypsis_lutescens.png",
+    "commonName": "散尾葵",
+    "latinName": "Dypsis lutescens",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-paper-cut-sticker-d-v1"
+  },
+  {
+    "catalogId": "howea-forsteriana",
+    "filename": "plant_howea_forsteriana.png",
+    "commonName": "肯氏椰子",
+    "latinName": "Howea forsteriana",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-paper-cut-sticker-d-v1"
+  },
+  {
+    "catalogId": "rhapis-excelsa",
+    "filename": "plant_rhapis_excelsa.png",
+    "commonName": "棕竹",
+    "latinName": "Rhapis excelsa",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-paper-cut-sticker-d-v1"
+  },
+  {
+    "catalogId": "chamaedorea-metallica",
+    "filename": "plant_chamaedorea_metallica.png",
+    "commonName": "金属袖珍椰子",
+    "latinName": "Chamaedorea metallica",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-paper-cut-sticker-d-v1"
+  },
+  {
+    "catalogId": "strelitzia-nicolai",
+    "filename": "plant_strelitzia_nicolai.png",
+    "commonName": "天堂鸟",
+    "latinName": "Strelitzia nicolai",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-paper-cut-sticker-d-v1"
+  },
+  {
+    "catalogId": "musa-acuminata-dwarf-cavendish",
+    "filename": "plant_musa_acuminata_dwarf_cavendish.png",
+    "commonName": "矮生香蕉",
+    "latinName": "Musa acuminata Dwarf Cavendish",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-paper-cut-sticker-d-v1"
+  },
+  {
+    "catalogId": "alocasia-amazonica",
+    "filename": "plant_alocasia_amazonica.png",
+    "commonName": "亚马逊海芋",
+    "latinName": "Alocasia amazonica",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-paper-cut-sticker-d-v1"
+  },
+  {
+    "catalogId": "colocasia-esculenta",
+    "filename": "plant_colocasia_esculenta.png",
+    "commonName": "海芋",
+    "latinName": "Colocasia esculenta",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-paper-cut-sticker-d-v1"
+  },
+  {
+    "catalogId": "anthurium-andraeanum",
+    "filename": "plant_anthurium_andraeanum.png",
+    "commonName": "红掌",
+    "latinName": "Anthurium andraeanum",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-paper-cut-sticker-d-v1"
+  },
+  {
+    "catalogId": "anthurium-clarinervium",
+    "filename": "plant_anthurium_clarinervium.png",
+    "commonName": "丝绒花烛",
+    "latinName": "Anthurium clarinervium",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-paper-cut-sticker-d-v1"
+  },
+  {
+    "catalogId": "epipremnum-pinnatum-cebu-blue",
+    "filename": "plant_epipremnum_pinnatum_cebu_blue.png",
+    "commonName": "蓝星绿萝",
+    "latinName": "Epipremnum pinnatum Cebu Blue",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-paper-cut-sticker-d-v1"
+  },
+  {
+    "catalogId": "rhaphidophora-tetrasperma",
+    "filename": "plant_rhaphidophora_tetrasperma.png",
+    "commonName": "姬龟背",
+    "latinName": "Rhaphidophora tetrasperma",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-paper-cut-sticker-d-v1"
+  },
+  {
+    "catalogId": "monstera-adansonii",
+    "filename": "plant_monstera_adansonii.png",
+    "commonName": "仙洞龟背竹",
+    "latinName": "Monstera adansonii",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-paper-cut-sticker-d-v1"
+  },
+  {
+    "catalogId": "monstera-standleyana",
+    "filename": "plant_monstera_standleyana.png",
+    "commonName": "五孔龟背竹",
+    "latinName": "Monstera standleyana",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-paper-cut-sticker-d-v1"
+  },
+  {
+    "catalogId": "thaumatophyllum-bipinnatifidum",
+    "filename": "plant_thaumatophyllum_bipinnatifidum.png",
+    "commonName": "裂叶喜林芋",
+    "latinName": "Thaumatophyllum bipinnatifidum",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-paper-cut-sticker-d-v1"
+  },
+  {
+    "catalogId": "peperomia-prostrata",
+    "filename": "plant_peperomia_prostrata.png",
+    "commonName": "串钱龟椒草",
+    "latinName": "Peperomia prostrata",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-paper-cut-sticker-d-v1"
+  },
+  {
+    "catalogId": "begonia-maculata",
+    "filename": "plant_begonia_maculata.png",
+    "commonName": "鳟鱼秋海棠",
+    "latinName": "Begonia maculata",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-paper-cut-sticker-d-v1"
+  },
+  {
+    "catalogId": "begonia-rex-cultorum",
+    "filename": "plant_begonia_rex_cultorum.png",
+    "commonName": "蟆叶秋海棠",
+    "latinName": "Begonia rex-cultorum",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-paper-cut-sticker-d-v1"
+  },
+  {
+    "catalogId": "oxalis-triangularis",
+    "filename": "plant_oxalis_triangularis.png",
+    "commonName": "紫叶酢浆草",
+    "latinName": "Oxalis triangularis",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-paper-cut-sticker-d-v1"
+  },
+  {
+    "catalogId": "hypoestes-phyllostachya",
+    "filename": "plant_hypoestes_phyllostachya.png",
+    "commonName": "彩叶草",
+    "latinName": "Hypoestes phyllostachya",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-paper-cut-sticker-d-v1"
+  },
+  {
+    "catalogId": "hedera-helix",
+    "filename": "plant_hedera_helix.png",
+    "commonName": "常春藤",
+    "latinName": "Hedera helix",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-paper-cut-sticker-d-v1"
+  },
+  {
+    "catalogId": "fatsia-japonica",
+    "filename": "plant_fatsia_japonica.png",
+    "commonName": "八角金盘",
+    "latinName": "Fatsia japonica",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-paper-cut-sticker-d-v1"
+  },
+  {
+    "catalogId": "clivia-miniata",
+    "filename": "plant_clivia_miniata.png",
+    "commonName": "君子兰",
+    "latinName": "Clivia miniata",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-paper-cut-sticker-d-v1"
+  },
+  {
+    "catalogId": "saintpaulia-ionantha",
+    "filename": "plant_saintpaulia_ionantha.png",
+    "commonName": "非洲堇",
+    "latinName": "Saintpaulia ionantha",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-paper-cut-sticker-d-v1"
+  },
+  {
+    "catalogId": "streptocarpus-cape-primrose",
+    "filename": "plant_streptocarpus_cape_primrose.png",
+    "commonName": "堇兰",
+    "latinName": "Streptocarpus",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-paper-cut-sticker-d-v1"
+  },
+  {
+    "catalogId": "schlumbergera-truncata",
+    "filename": "plant_schlumbergera_truncata.png",
+    "commonName": "蟹爪兰",
+    "latinName": "Schlumbergera truncata",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-paper-cut-sticker-d-v1"
+  },
+  {
+    "catalogId": "rhipsalidopsis-gaertneri",
+    "filename": "plant_rhipsalidopsis_gaertneri.png",
+    "commonName": "复活节仙人掌",
+    "latinName": "Rhipsalidopsis gaertneri",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-paper-cut-sticker-d-v1"
+  },
+  {
+    "catalogId": "rhipsalis-baccifera",
+    "filename": "plant_rhipsalis_baccifera.png",
+    "commonName": "丝苇",
+    "latinName": "Rhipsalis baccifera",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-paper-cut-sticker-d-v1"
+  },
+  {
+    "catalogId": "epiphyllum-oxypetalum",
+    "filename": "plant_epiphyllum_oxypetalum.png",
+    "commonName": "昙花",
+    "latinName": "Epiphyllum oxypetalum",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-paper-cut-sticker-d-v1"
+  },
+  {
+    "catalogId": "aloe-vera",
+    "filename": "plant_aloe_vera.png",
+    "commonName": "芦荟",
+    "latinName": "Aloe vera",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-paper-cut-sticker-d-v1"
+  },
+  {
+    "catalogId": "haworthiopsis-attenuata",
+    "filename": "plant_haworthiopsis_attenuata.png",
+    "commonName": "条纹十二卷",
+    "latinName": "Haworthiopsis attenuata",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-paper-cut-sticker-d-v1"
+  },
+  {
+    "catalogId": "echeveria-elegans",
+    "filename": "plant_echeveria_elegans.png",
+    "commonName": "月影",
+    "latinName": "Echeveria elegans",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-paper-cut-sticker-d-v1"
+  },
+  {
+    "catalogId": "crassula-ovata",
+    "filename": "plant_crassula_ovata.png",
+    "commonName": "玉树",
+    "latinName": "Crassula ovata",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-paper-cut-sticker-d-v1"
+  },
+  {
+    "catalogId": "kalanchoe-blossfeldiana",
+    "filename": "plant_kalanchoe_blossfeldiana.png",
+    "commonName": "长寿花",
+    "latinName": "Kalanchoe blossfeldiana",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-paper-cut-sticker-d-v1"
+  },
+  {
+    "catalogId": "sedum-morganianum",
+    "filename": "plant_sedum_morganianum.png",
+    "commonName": "玉缀",
+    "latinName": "Sedum morganianum",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-paper-cut-sticker-d-v1"
+  },
+  {
+    "catalogId": "aeonium-arboreum",
+    "filename": "plant_aeonium_arboreum.png",
+    "commonName": "黑法师",
+    "latinName": "Aeonium arboreum",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-paper-cut-sticker-d-v1"
+  },
+  {
+    "catalogId": "lithops-lesliei",
+    "filename": "plant_lithops_lesliei.png",
+    "commonName": "生石花",
+    "latinName": "Lithops lesliei",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-paper-cut-sticker-d-v1"
+  },
+  {
+    "catalogId": "euphorbia-trigona",
+    "filename": "plant_euphorbia_trigona.png",
+    "commonName": "龙骨",
+    "latinName": "Euphorbia trigona",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-paper-cut-sticker-d-v1"
+  },
+  {
+    "catalogId": "opuntia-microdasys",
+    "filename": "plant_opuntia_microdasys.png",
+    "commonName": "兔耳仙人掌",
+    "latinName": "Opuntia microdasys",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-paper-cut-sticker-d-v1"
+  },
+  {
+    "catalogId": "mammillaria-elongata",
+    "filename": "plant_mammillaria_elongata.png",
+    "commonName": "金手指",
+    "latinName": "Mammillaria elongata",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-paper-cut-sticker-d-v1"
+  },
+  {
+    "catalogId": "gymnocalycium-mihanovichii",
+    "filename": "plant_gymnocalycium_mihanovichii.png",
+    "commonName": "绯花玉锦",
+    "latinName": "Gymnocalycium mihanovichii",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-paper-cut-sticker-d-v1"
+  },
+  {
+    "catalogId": "asparagus-setaceus",
+    "filename": "plant_asparagus_setaceus.png",
+    "commonName": "文竹",
+    "latinName": "Asparagus setaceus",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-paper-cut-sticker-d-v1"
+  },
+  {
+    "catalogId": "codiaeum-variegatum",
+    "filename": "plant_codiaeum_variegatum.png",
+    "commonName": "变叶木",
+    "latinName": "Codiaeum variegatum",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-paper-cut-sticker-d-v1"
+  },
+  {
+    "catalogId": "cordyline-fruticosa",
+    "filename": "plant_cordyline_fruticosa.png",
+    "commonName": "朱蕉",
+    "latinName": "Cordyline fruticosa",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-paper-cut-sticker-d-v1"
+  },
+  {
+    "catalogId": "polyscias-fruticosa",
+    "filename": "plant_polyscias_fruticosa.png",
+    "commonName": "南洋森",
+    "latinName": "Polyscias fruticosa",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-paper-cut-sticker-d-v1"
+  },
+  {
+    "catalogId": "plerandra-elegantissima",
+    "filename": "plant_plerandra_elegantissima.png",
+    "commonName": "细叶伞树",
+    "latinName": "Plerandra elegantissima",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-paper-cut-sticker-d-v1"
+  },
+  {
+    "catalogId": "yucca-elephantipes",
+    "filename": "plant_yucca_elephantipes.png",
+    "commonName": "无刺丝兰",
+    "latinName": "Yucca elephantipes",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-paper-cut-sticker-d-v1"
+  },
+  {
+    "catalogId": "citrus-meyerii",
+    "filename": "plant_citrus_meyerii.png",
+    "commonName": "香水柠檬",
+    "latinName": "Citrus x meyeri",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-paper-cut-sticker-d-v1"
+  },
+  {
+    "catalogId": "lavandula-angustifolia",
+    "filename": "plant_lavandula_angustifolia.png",
+    "commonName": "薰衣草",
+    "latinName": "Lavandula angustifolia",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-paper-cut-sticker-d-v1"
+  },
+  {
+    "catalogId": "salvia-rosmarinus",
+    "filename": "plant_salvia_rosmarinus.png",
+    "commonName": "迷迭香",
+    "latinName": "Salvia rosmarinus",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-paper-cut-sticker-d-v1"
+  },
+  {
+    "catalogId": "ocimum-basilicum",
+    "filename": "plant_ocimum_basilicum.png",
+    "commonName": "罗勒",
+    "latinName": "Ocimum basilicum",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-paper-cut-sticker-d-v1"
+  },
+  {
+    "catalogId": "mentha-spicata",
+    "filename": "plant_mentha_spicata.png",
+    "commonName": "留兰香薄荷",
+    "latinName": "Mentha spicata",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-paper-cut-sticker-d-v1"
+  },
+  {
+    "catalogId": "pelargonium-graveolens",
+    "filename": "plant_pelargonium_graveolens.png",
+    "commonName": "香叶天竺葵",
+    "latinName": "Pelargonium graveolens",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-paper-cut-sticker-d-v1"
+  },
+  {
+    "catalogId": "gardenia-jasminoides",
+    "filename": "plant_gardenia_jasminoides.png",
+    "commonName": "栀子花",
+    "latinName": "Gardenia jasminoides",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-paper-cut-sticker-d-v1"
+  },
+  {
+    "catalogId": "jasminum-polyanthum",
+    "filename": "plant_jasminum_polyanthum.png",
+    "commonName": "多花素馨",
+    "latinName": "Jasminum polyanthum",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-paper-cut-sticker-d-v1"
+  },
+  {
+    "catalogId": "hoya-pubicalyx",
+    "filename": "plant_hoya_pubicalyx.png",
+    "commonName": "紫花球兰",
+    "latinName": "Hoya pubicalyx",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-paper-cut-sticker-d-v1"
+  },
+  {
+    "catalogId": "hoya-linearis",
+    "filename": "plant_hoya_linearis.png",
+    "commonName": "线叶球兰",
+    "latinName": "Hoya linearis",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-paper-cut-sticker-d-v1"
+  },
+  {
+    "catalogId": "epipremnum-aureum-neon",
+    "filename": "plant_epipremnum_aureum_neon.png",
+    "commonName": "霓虹绿萝",
+    "latinName": "Epipremnum aureum Neon",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-paper-cut-sticker-d-v1"
+  },
+  {
+    "catalogId": "philodendron-erubescens",
+    "filename": "plant_philodendron_erubescens.png",
+    "commonName": "红柄蔓绿绒",
+    "latinName": "Philodendron erubescens",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-paper-cut-sticker-d-v1"
+  },
+  {
+    "catalogId": "scindapsus-treubii",
+    "filename": "plant_scindapsus_treubii.png",
+    "commonName": "月光银葛",
+    "latinName": "Scindapsus treubii",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-paper-cut-sticker-d-v1"
+  },
+  {
+    "catalogId": "aglaonema-silver-bay",
+    "filename": "plant_aglaonema_silver_bay.png",
+    "commonName": "银皇后",
+    "latinName": "Aglaonema Silver Bay",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-paper-cut-sticker-d-v1"
+  },
+  {
+    "catalogId": "aglaonema-red-siam",
+    "filename": "plant_aglaonema_red_siam.png",
+    "commonName": "红暹罗万年青",
+    "latinName": "Aglaonema Red Siam",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-paper-cut-sticker-d-v1"
+  },
+  {
+    "catalogId": "pilea-cadierei",
+    "filename": "plant_pilea_cadierei.png",
+    "commonName": "冷水花",
+    "latinName": "Pilea cadierei",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-paper-cut-sticker-d-v1"
+  },
+  {
+    "catalogId": "peperomia-caperata",
+    "filename": "plant_peperomia_caperata.png",
+    "commonName": "皱叶椒草",
+    "latinName": "Peperomia caperata",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-paper-cut-sticker-d-v1"
+  },
+  {
+    "catalogId": "peperomia-hope",
+    "filename": "plant_peperomia_hope.png",
+    "commonName": "希望椒草",
+    "latinName": "Peperomia Hope",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-paper-cut-sticker-d-v1"
+  },
+  {
+    "catalogId": "dracaena-angolensis",
+    "filename": "plant_dracaena_angolensis.png",
+    "commonName": "棒叶虎尾兰",
+    "latinName": "Dracaena angolensis",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-paper-cut-sticker-d-v1"
+  },
+  {
+    "catalogId": "dracaena-sanderiana",
+    "filename": "plant_dracaena_sanderiana.png",
+    "commonName": "富贵竹",
+    "latinName": "Dracaena sanderiana",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-paper-cut-sticker-d-v1"
+  },
+  {
+    "catalogId": "caladium-bicolor",
+    "filename": "plant_caladium_bicolor.png",
+    "commonName": "五彩芋",
+    "latinName": "Caladium bicolor",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-paper-cut-sticker-d-v1"
+  },
+  {
+    "catalogId": "cyclamen-persicum",
+    "filename": "plant_cyclamen_persicum.png",
+    "commonName": "仙客来",
+    "latinName": "Cyclamen persicum",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-paper-cut-sticker-d-v1"
+  },
+  {
+    "catalogId": "phalaenopsis-amabilis",
+    "filename": "plant_phalaenopsis_amabilis.png",
+    "commonName": "蝴蝶兰",
+    "latinName": "Phalaenopsis amabilis",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-paper-cut-sticker-d-v1"
+  },
+  {
+    "catalogId": "dendrobium-nobile",
+    "filename": "plant_dendrobium_nobile.png",
+    "commonName": "石斛兰",
+    "latinName": "Dendrobium nobile",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-paper-cut-sticker-d-v1"
+  },
+  {
+    "catalogId": "guzmania-lingulata",
+    "filename": "plant_guzmania_lingulata.png",
+    "commonName": "擎天凤梨",
+    "latinName": "Guzmania lingulata",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-paper-cut-sticker-d-v1"
+  },
+  {
+    "catalogId": "vriesea-splendens",
+    "filename": "plant_vriesea_splendens.png",
+    "commonName": "火剑凤梨",
+    "latinName": "Vriesea splendens",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-paper-cut-sticker-d-v1"
+  },
+  {
+    "catalogId": "tillandsia-ionantha",
+    "filename": "plant_tillandsia_ionantha.png",
+    "commonName": "空气凤梨",
+    "latinName": "Tillandsia ionantha",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-paper-cut-sticker-d-v1"
+  },
+  {
+    "catalogId": "cryptanthus-bivittatus",
+    "filename": "plant_cryptanthus_bivittatus.png",
+    "commonName": "姬凤梨",
+    "latinName": "Cryptanthus bivittatus",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-paper-cut-sticker-d-v1"
+  },
+  {
+    "catalogId": "philodendron-gloriosum",
+    "filename": "plant_philodendron_gloriosum.png",
+    "commonName": "荣耀蔓绿绒",
+    "latinName": "Philodendron gloriosum",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-procedural-plant-avatar-v1"
+  },
+  {
+    "catalogId": "philodendron-prince-of-orange",
+    "filename": "plant_philodendron_prince_of_orange.png",
+    "commonName": "橙王子蔓绿绒",
+    "latinName": "Philodendron Prince of Orange",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-procedural-plant-avatar-v1"
+  },
+  {
+    "catalogId": "philodendron-rojo-congo",
+    "filename": "plant_philodendron_rojo_congo.png",
+    "commonName": "红刚果蔓绿绒",
+    "latinName": "Philodendron Rojo Congo",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-procedural-plant-avatar-v1"
+  },
+  {
+    "catalogId": "philodendron-xanadu",
+    "filename": "plant_philodendron_xanadu.png",
+    "commonName": "小天使蔓绿绒",
+    "latinName": "Thaumatophyllum xanadu",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-procedural-plant-avatar-v1"
+  },
+  {
+    "catalogId": "scindapsus-pictus-exotica",
+    "filename": "plant_scindapsus_pictus_exotica.png",
+    "commonName": "大叶银斑葛",
+    "latinName": "Scindapsus pictus Exotica",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-procedural-plant-avatar-v1"
+  },
+  {
+    "catalogId": "scindapsus-pictus-argyraeus",
+    "filename": "plant_scindapsus_pictus_argyraeus.png",
+    "commonName": "银星葛",
+    "latinName": "Scindapsus pictus Argyraeus",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-procedural-plant-avatar-v1"
+  },
+  {
+    "catalogId": "epipremnum-aureum-marble-queen",
+    "filename": "plant_epipremnum_aureum_marble_queen.png",
+    "commonName": "雪花绿萝",
+    "latinName": "Epipremnum aureum Marble Queen",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-procedural-plant-avatar-v1"
+  },
+  {
+    "catalogId": "epipremnum-aureum-njoy",
+    "filename": "plant_epipremnum_aureum_njoy.png",
+    "commonName": "N'Joy 绿萝",
+    "latinName": "Epipremnum aureum N'Joy",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-procedural-plant-avatar-v1"
+  },
+  {
+    "catalogId": "epipremnum-aureum-manjula",
+    "filename": "plant_epipremnum_aureum_manjula.png",
+    "commonName": "曼珠绿萝",
+    "latinName": "Epipremnum aureum Manjula",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-procedural-plant-avatar-v1"
+  },
+  {
+    "catalogId": "epipremnum-aureum-global-green",
+    "filename": "plant_epipremnum_aureum_global_green.png",
+    "commonName": "环球绿萝",
+    "latinName": "Epipremnum aureum Global Green",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-procedural-plant-avatar-v1"
+  },
+  {
+    "catalogId": "monstera-thai-constellation",
+    "filename": "plant_monstera_thai_constellation.png",
+    "commonName": "泰国星座龟背竹",
+    "latinName": "Monstera deliciosa Thai Constellation",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-procedural-plant-avatar-v1"
+  },
+  {
+    "catalogId": "monstera-albo-variegata",
+    "filename": "plant_monstera_albo_variegata.png",
+    "commonName": "白锦龟背竹",
+    "latinName": "Monstera deliciosa Albo Variegata",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-procedural-plant-avatar-v1"
+  },
+  {
+    "catalogId": "monstera-siltepecana",
+    "filename": "plant_monstera_siltepecana.png",
+    "commonName": "银脉龟背藤",
+    "latinName": "Monstera siltepecana",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-procedural-plant-avatar-v1"
+  },
+  {
+    "catalogId": "rhaphidophora-decursiva",
+    "filename": "plant_rhaphidophora_decursiva.png",
+    "commonName": "龙鳞藤",
+    "latinName": "Rhaphidophora decursiva",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-procedural-plant-avatar-v1"
+  },
+  {
+    "catalogId": "syngonium-neon-robusta",
+    "filename": "plant_syngonium_neon_robusta.png",
+    "commonName": "粉合果芋",
+    "latinName": "Syngonium Neon Robusta",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-procedural-plant-avatar-v1"
+  },
+  {
+    "catalogId": "syngonium-albo-variegatum",
+    "filename": "plant_syngonium_albo_variegatum.png",
+    "commonName": "白锦合果芋",
+    "latinName": "Syngonium podophyllum Albo Variegatum",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-procedural-plant-avatar-v1"
+  },
+  {
+    "catalogId": "aglaonema-pictum-tricolor",
+    "filename": "plant_aglaonema_pictum_tricolor.png",
+    "commonName": "迷彩万年青",
+    "latinName": "Aglaonema pictum Tricolor",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-procedural-plant-avatar-v1"
+  },
+  {
+    "catalogId": "aglaonema-pink-valentine",
+    "filename": "plant_aglaonema_pink_valentine.png",
+    "commonName": "粉色万年青",
+    "latinName": "Aglaonema Pink Valentine",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-procedural-plant-avatar-v1"
+  },
+  {
+    "catalogId": "dieffenbachia-camille",
+    "filename": "plant_dieffenbachia_camille.png",
+    "commonName": "卡米拉花叶万年青",
+    "latinName": "Dieffenbachia Camille",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-procedural-plant-avatar-v1"
+  },
+  {
+    "catalogId": "dieffenbachia-tropic-snow",
+    "filename": "plant_dieffenbachia_tropic_snow.png",
+    "commonName": "雪斑万年青",
+    "latinName": "Dieffenbachia Tropic Snow",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-procedural-plant-avatar-v1"
+  },
+  {
+    "catalogId": "calathea-lancifolia",
+    "filename": "plant_calathea_lancifolia.png",
+    "commonName": "响尾蛇竹芋",
+    "latinName": "Goeppertia insignis",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-procedural-plant-avatar-v1"
+  },
+  {
+    "catalogId": "calathea-roseopicta",
+    "filename": "plant_calathea_roseopicta.png",
+    "commonName": "玫瑰竹芋",
+    "latinName": "Goeppertia roseopicta",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-procedural-plant-avatar-v1"
+  },
+  {
+    "catalogId": "calathea-medallion",
+    "filename": "plant_calathea_medallion.png",
+    "commonName": "勋章竹芋",
+    "latinName": "Goeppertia veitchiana Medallion",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-procedural-plant-avatar-v1"
+  },
+  {
+    "catalogId": "ctenanthe-burle-marxii",
+    "filename": "plant_ctenanthe_burle_marxii.png",
+    "commonName": "鱼骨竹芋",
+    "latinName": "Ctenanthe burle-marxii",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-procedural-plant-avatar-v1"
+  },
+  {
+    "catalogId": "ctenanthe-setosa",
+    "filename": "plant_ctenanthe_setosa.png",
+    "commonName": "灰星竹芋",
+    "latinName": "Ctenanthe setosa",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-procedural-plant-avatar-v1"
+  },
+  {
+    "catalogId": "maranta-kim",
+    "filename": "plant_maranta_kim.png",
+    "commonName": "锦叶豹纹竹芋",
+    "latinName": "Maranta leuconeura Kim",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-procedural-plant-avatar-v1"
+  },
+  {
+    "catalogId": "peperomia-rosso",
+    "filename": "plant_peperomia_rosso.png",
+    "commonName": "红背椒草",
+    "latinName": "Peperomia Rosso",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-procedural-plant-avatar-v1"
+  },
+  {
+    "catalogId": "peperomia-graveolens",
+    "filename": "plant_peperomia_graveolens.png",
+    "commonName": "红边豆瓣绿",
+    "latinName": "Peperomia graveolens",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-procedural-plant-avatar-v1"
+  },
+  {
+    "catalogId": "peperomia-raindrop",
+    "filename": "plant_peperomia_raindrop.png",
+    "commonName": "雨滴椒草",
+    "latinName": "Peperomia polybotrya",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-procedural-plant-avatar-v1"
+  },
+  {
+    "catalogId": "pilea-glauca",
+    "filename": "plant_pilea_glauca.png",
+    "commonName": "蓝叶冷水花",
+    "latinName": "Pilea glauca",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-procedural-plant-avatar-v1"
+  },
+  {
+    "catalogId": "pilea-depressa",
+    "filename": "plant_pilea_depressa.png",
+    "commonName": "迷你冷水花",
+    "latinName": "Pilea depressa",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-procedural-plant-avatar-v1"
+  },
+  {
+    "catalogId": "hoya-obovata",
+    "filename": "plant_hoya_obovata.png",
+    "commonName": "圆叶球兰",
+    "latinName": "Hoya obovata",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-procedural-plant-avatar-v1"
+  },
+  {
+    "catalogId": "hoya-compacta",
+    "filename": "plant_hoya_compacta.png",
+    "commonName": "卷叶球兰",
+    "latinName": "Hoya carnosa Compacta",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-procedural-plant-avatar-v1"
+  },
+  {
+    "catalogId": "hoya-australis",
+    "filename": "plant_hoya_australis.png",
+    "commonName": "澳洲球兰",
+    "latinName": "Hoya australis",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-procedural-plant-avatar-v1"
+  },
+  {
+    "catalogId": "hoya-mathilde",
+    "filename": "plant_hoya_mathilde.png",
+    "commonName": "玛蒂尔达球兰",
+    "latinName": "Hoya Mathilde",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-procedural-plant-avatar-v1"
+  },
+  {
+    "catalogId": "ceropegia-linearis",
+    "filename": "plant_ceropegia_linearis.png",
+    "commonName": "细叶爱之蔓",
+    "latinName": "Ceropegia linearis",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-procedural-plant-avatar-v1"
+  },
+  {
+    "catalogId": "dischidia-ovata",
+    "filename": "plant_dischidia_ovata.png",
+    "commonName": "西瓜藤",
+    "latinName": "Dischidia ovata",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-procedural-plant-avatar-v1"
+  },
+  {
+    "catalogId": "senecio-radicans",
+    "filename": "plant_senecio_radicans.png",
+    "commonName": "佛珠香蕉",
+    "latinName": "Curio radicans",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-procedural-plant-avatar-v1"
+  },
+  {
+    "catalogId": "tradescantia-fluminensis",
+    "filename": "plant_tradescantia_fluminensis.png",
+    "commonName": "白花紫露草",
+    "latinName": "Tradescantia fluminensis",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-procedural-plant-avatar-v1"
+  },
+  {
+    "catalogId": "tradescantia-nanouk",
+    "filename": "plant_tradescantia_nanouk.png",
+    "commonName": "粉紫露草",
+    "latinName": "Tradescantia Nanouk",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-procedural-plant-avatar-v1"
+  },
+  {
+    "catalogId": "episcia-cupreata",
+    "filename": "plant_episcia_cupreata.png",
+    "commonName": "红桐草",
+    "latinName": "Episcia cupreata",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-procedural-plant-avatar-v1"
+  },
+  {
+    "catalogId": "selaginella-kraussiana",
+    "filename": "plant_selaginella_kraussiana.png",
+    "commonName": "卷柏",
+    "latinName": "Selaginella kraussiana",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-procedural-plant-avatar-v1"
+  },
+  {
+    "catalogId": "selaginella-martensii",
+    "filename": "plant_selaginella_martensii.png",
+    "commonName": "翠云草",
+    "latinName": "Selaginella martensii",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-procedural-plant-avatar-v1"
+  },
+  {
+    "catalogId": "nephrolepis-cordifolia",
+    "filename": "plant_nephrolepis_cordifolia.png",
+    "commonName": "肾蕨",
+    "latinName": "Nephrolepis cordifolia",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-procedural-plant-avatar-v1"
+  },
+  {
+    "catalogId": "blechnum-gibbum",
+    "filename": "plant_blechnum_gibbum.png",
+    "commonName": "银蕨",
+    "latinName": "Blechnum gibbum",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-procedural-plant-avatar-v1"
+  },
+  {
+    "catalogId": "pteris-cretica",
+    "filename": "plant_pteris_cretica.png",
+    "commonName": "凤尾蕨",
+    "latinName": "Pteris cretica",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-procedural-plant-avatar-v1"
+  },
+  {
+    "catalogId": "ficus-lyrata-bambino",
+    "filename": "plant_ficus_lyrata_bambino.png",
+    "commonName": "小提琴叶榕",
+    "latinName": "Ficus lyrata Bambino",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-procedural-plant-avatar-v1"
+  },
+  {
+    "catalogId": "ficus-alii",
+    "filename": "plant_ficus_alii.png",
+    "commonName": "长叶榕",
+    "latinName": "Ficus binnendijkii Alii",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-procedural-plant-avatar-v1"
+  },
+  {
+    "catalogId": "ficus-audrey",
+    "filename": "plant_ficus_audrey.png",
+    "commonName": "奥黛丽榕",
+    "latinName": "Ficus benghalensis Audrey",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-procedural-plant-avatar-v1"
+  },
+  {
+    "catalogId": "ficus-pumila",
+    "filename": "plant_ficus_pumila.png",
+    "commonName": "爬墙虎榕",
+    "latinName": "Ficus pumila",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-procedural-plant-avatar-v1"
+  },
+  {
+    "catalogId": "schefflera-actinophylla",
+    "filename": "plant_schefflera_actinophylla.png",
+    "commonName": "大叶鹅掌柴",
+    "latinName": "Schefflera actinophylla",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-procedural-plant-avatar-v1"
+  },
+  {
+    "catalogId": "polyscias-scutellaria-fabian",
+    "filename": "plant_polyscias_scutellaria_fabian.png",
+    "commonName": "法比安南洋森",
+    "latinName": "Polyscias scutellaria Fabian",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-procedural-plant-avatar-v1"
+  },
+  {
+    "catalogId": "dracaena-compacta",
+    "filename": "plant_dracaena_compacta.png",
+    "commonName": "密叶龙血树",
+    "latinName": "Dracaena fragrans Compacta",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-procedural-plant-avatar-v1"
+  },
+  {
+    "catalogId": "dracaena-lemon-lime",
+    "filename": "plant_dracaena_lemon_lime.png",
+    "commonName": "柠檬青龙血树",
+    "latinName": "Dracaena Lemon Lime",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-procedural-plant-avatar-v1"
+  },
+  {
+    "catalogId": "dracaena-gold-star",
+    "filename": "plant_dracaena_gold_star.png",
+    "commonName": "金星龙血树",
+    "latinName": "Dracaena Gold Star",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-procedural-plant-avatar-v1"
+  },
+  {
+    "catalogId": "aspidistra-elatior",
+    "filename": "plant_aspidistra_elatior.png",
+    "commonName": "一叶兰",
+    "latinName": "Aspidistra elatior",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-procedural-plant-avatar-v1"
+  },
+  {
+    "catalogId": "chlorophytum-comosum-bonnie",
+    "filename": "plant_chlorophytum_comosum_bonnie.png",
+    "commonName": "卷叶吊兰",
+    "latinName": "Chlorophytum comosum Bonnie",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-procedural-plant-avatar-v1"
+  },
+  {
+    "catalogId": "dracaena-trifasciata-moonshine",
+    "filename": "plant_dracaena_trifasciata_moonshine.png",
+    "commonName": "月光虎尾兰",
+    "latinName": "Dracaena trifasciata Moonshine",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-procedural-plant-avatar-v1"
+  },
+  {
+    "catalogId": "dracaena-trifasciata-golden-hahnii",
+    "filename": "plant_dracaena_trifasciata_golden_hahnii.png",
+    "commonName": "金边短叶虎尾兰",
+    "latinName": "Dracaena trifasciata Golden Hahnii",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-procedural-plant-avatar-v1"
+  },
+  {
+    "catalogId": "chamaedorea-seifrizii",
+    "filename": "plant_chamaedorea_seifrizii.png",
+    "commonName": "竹棕",
+    "latinName": "Chamaedorea seifrizii",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-procedural-plant-avatar-v1"
+  },
+  {
+    "catalogId": "phoenix-roebelenii",
+    "filename": "plant_phoenix_roebelenii.png",
+    "commonName": "袖珍海枣",
+    "latinName": "Phoenix roebelenii",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-procedural-plant-avatar-v1"
+  },
+  {
+    "catalogId": "cycas-revoluta",
+    "filename": "plant_cycas_revoluta.png",
+    "commonName": "苏铁",
+    "latinName": "Cycas revoluta",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-procedural-plant-avatar-v1"
+  },
+  {
+    "catalogId": "ravenea-rivularis",
+    "filename": "plant_ravenea_rivularis.png",
+    "commonName": "国王椰子",
+    "latinName": "Ravenea rivularis",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-procedural-plant-avatar-v1"
+  },
+  {
+    "catalogId": "alocasia-frydek",
+    "filename": "plant_alocasia_frydek.png",
+    "commonName": "绿天鹅绒海芋",
+    "latinName": "Alocasia micholitziana Frydek",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-procedural-plant-avatar-v1"
+  },
+  {
+    "catalogId": "alocasia-black-velvet",
+    "filename": "plant_alocasia_black_velvet.png",
+    "commonName": "黑天鹅绒海芋",
+    "latinName": "Alocasia reginula",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-procedural-plant-avatar-v1"
+  },
+  {
+    "catalogId": "alocasia-zebrina",
+    "filename": "plant_alocasia_zebrina.png",
+    "commonName": "斑马海芋",
+    "latinName": "Alocasia zebrina",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-procedural-plant-avatar-v1"
+  },
+  {
+    "catalogId": "anthurium-crystallinum",
+    "filename": "plant_anthurium_crystallinum.png",
+    "commonName": "水晶花烛",
+    "latinName": "Anthurium crystallinum",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-procedural-plant-avatar-v1"
+  },
+  {
+    "catalogId": "anthurium-warocqueanum",
+    "filename": "plant_anthurium_warocqueanum.png",
+    "commonName": "皇后花烛",
+    "latinName": "Anthurium warocqueanum",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-procedural-plant-avatar-v1"
+  },
+  {
+    "catalogId": "begonia-escargot",
+    "filename": "plant_begonia_escargot.png",
+    "commonName": "蜗牛秋海棠",
+    "latinName": "Begonia Escargot",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-procedural-plant-avatar-v1"
+  },
+  {
+    "catalogId": "begonia-angel-wing",
+    "filename": "plant_begonia_angel_wing.png",
+    "commonName": "天使翼秋海棠",
+    "latinName": "Begonia Angel Wing",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-procedural-plant-avatar-v1"
+  },
+  {
+    "catalogId": "begonia-erythrophylla",
+    "filename": "plant_begonia_erythrophylla.png",
+    "commonName": "牛排秋海棠",
+    "latinName": "Begonia erythrophylla",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-procedural-plant-avatar-v1"
+  },
+  {
+    "catalogId": "sinningia-speciosa",
+    "filename": "plant_sinningia_speciosa.png",
+    "commonName": "大岩桐",
+    "latinName": "Sinningia speciosa",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-procedural-plant-avatar-v1"
+  },
+  {
+    "catalogId": "nematanthus-gregarius",
+    "filename": "plant_nematanthus_gregarius.png",
+    "commonName": "金鱼花",
+    "latinName": "Nematanthus gregarius",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-procedural-plant-avatar-v1"
+  },
+  {
+    "catalogId": "columnea-gloriosa",
+    "filename": "plant_columnea_gloriosa.png",
+    "commonName": "鲸鱼花",
+    "latinName": "Columnea gloriosa",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-procedural-plant-avatar-v1"
+  },
+  {
+    "catalogId": "eschynanthus-radicans",
+    "filename": "plant_eschynanthus_radicans.png",
+    "commonName": "口红花",
+    "latinName": "Aeschynanthus radicans",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-procedural-plant-avatar-v1"
+  },
+  {
+    "catalogId": "schlumbergera-bridgesii",
+    "filename": "plant_schlumbergera_bridgesii.png",
+    "commonName": "圣诞仙人掌",
+    "latinName": "Schlumbergera bridgesii",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-procedural-plant-avatar-v1"
+  },
+  {
+    "catalogId": "hatiora-salicornioides",
+    "filename": "plant_hatiora_salicornioides.png",
+    "commonName": "珊瑚仙人掌",
+    "latinName": "Hatiora salicornioides",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-procedural-plant-avatar-v1"
+  },
+  {
+    "catalogId": "rhipsalis-cereuscula",
+    "filename": "plant_rhipsalis_cereuscula.png",
+    "commonName": "米粒仙人掌",
+    "latinName": "Rhipsalis cereuscula",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-procedural-plant-avatar-v1"
+  },
+  {
+    "catalogId": "epiphyllum-anguliger",
+    "filename": "plant_epiphyllum_anguliger.png",
+    "commonName": "鱼骨令箭",
+    "latinName": "Disocactus anguliger",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-procedural-plant-avatar-v1"
+  },
+  {
+    "catalogId": "aloe-aristata",
+    "filename": "plant_aloe_aristata.png",
+    "commonName": "绫锦芦荟",
+    "latinName": "Aristaloe aristata",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-procedural-plant-avatar-v1"
+  },
+  {
+    "catalogId": "aloe-humilis",
+    "filename": "plant_aloe_humilis.png",
+    "commonName": "矮芦荟",
+    "latinName": "Aloe humilis",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-procedural-plant-avatar-v1"
+  },
+  {
+    "catalogId": "haworthia-cooperi",
+    "filename": "plant_haworthia_cooperi.png",
+    "commonName": "水晶寿",
+    "latinName": "Haworthia cooperi",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-procedural-plant-avatar-v1"
+  },
+  {
+    "catalogId": "gasteria-little-warty",
+    "filename": "plant_gasteria_little_warty.png",
+    "commonName": "小疣卧牛",
+    "latinName": "Gasteria Little Warty",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-procedural-plant-avatar-v1"
+  },
+  {
+    "catalogId": "echeveria-perle-von-nurnberg",
+    "filename": "plant_echeveria_perle_von_nurnberg.png",
+    "commonName": "紫珍珠",
+    "latinName": "Echeveria Perle von Nurnberg",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-procedural-plant-avatar-v1"
+  },
+  {
+    "catalogId": "echeveria-lola",
+    "filename": "plant_echeveria_lola.png",
+    "commonName": "劳尔拟石莲",
+    "latinName": "Echeveria Lola",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-procedural-plant-avatar-v1"
+  },
+  {
+    "catalogId": "graptopetalum-paraguayense",
+    "filename": "plant_graptopetalum_paraguayense.png",
+    "commonName": "胧月",
+    "latinName": "Graptopetalum paraguayense",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-procedural-plant-avatar-v1"
+  },
+  {
+    "catalogId": "graptoveria-fred-ives",
+    "filename": "plant_graptoveria_fred_ives.png",
+    "commonName": "弗雷德多肉",
+    "latinName": "Graptoveria Fred Ives",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-procedural-plant-avatar-v1"
+  },
+  {
+    "catalogId": "sedum-rubrotinctum",
+    "filename": "plant_sedum_rubrotinctum.png",
+    "commonName": "虹之玉",
+    "latinName": "Sedum rubrotinctum",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-procedural-plant-avatar-v1"
+  },
+  {
+    "catalogId": "sedum-adolphii",
+    "filename": "plant_sedum_adolphii.png",
+    "commonName": "铭月",
+    "latinName": "Sedum adolphii",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-procedural-plant-avatar-v1"
+  },
+  {
+    "catalogId": "crassula-muscosa",
+    "filename": "plant_crassula_muscosa.png",
+    "commonName": "青锁龙",
+    "latinName": "Crassula muscosa",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-procedural-plant-avatar-v1"
+  },
+  {
+    "catalogId": "crassula-perforata",
+    "filename": "plant_crassula_perforata.png",
+    "commonName": "串钱景天",
+    "latinName": "Crassula perforata",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-procedural-plant-avatar-v1"
+  },
+  {
+    "catalogId": "portulacaria-afra",
+    "filename": "plant_portulacaria_afra.png",
+    "commonName": "金枝玉叶",
+    "latinName": "Portulacaria afra",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-procedural-plant-avatar-v1"
+  },
+  {
+    "catalogId": "pachyphytum-oviferum",
+    "filename": "plant_pachyphytum_oviferum.png",
+    "commonName": "桃美人",
+    "latinName": "Pachyphytum oviferum",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-procedural-plant-avatar-v1"
+  },
+  {
+    "catalogId": "sempervivum-tectorum",
+    "filename": "plant_sempervivum_tectorum.png",
+    "commonName": "观音莲",
+    "latinName": "Sempervivum tectorum",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-procedural-plant-avatar-v1"
+  },
+  {
+    "catalogId": "kalanchoe-tomentosa",
+    "filename": "plant_kalanchoe_tomentosa.png",
+    "commonName": "月兔耳",
+    "latinName": "Kalanchoe tomentosa",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-procedural-plant-avatar-v1"
+  },
+  {
+    "catalogId": "kalanchoe-thyrsiflora",
+    "filename": "plant_kalanchoe_thyrsiflora.png",
+    "commonName": "唐印",
+    "latinName": "Kalanchoe thyrsiflora",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-procedural-plant-avatar-v1"
+  },
+  {
+    "catalogId": "euphorbia-milii",
+    "filename": "plant_euphorbia_milii.png",
+    "commonName": "虎刺梅",
+    "latinName": "Euphorbia milii",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-procedural-plant-avatar-v1"
+  },
+  {
+    "catalogId": "euphorbia-lactea",
+    "filename": "plant_euphorbia_lactea.png",
+    "commonName": "白斑麒麟",
+    "latinName": "Euphorbia lactea",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-procedural-plant-avatar-v1"
+  },
+  {
+    "catalogId": "cereus-repandus",
+    "filename": "plant_cereus_repandus.png",
+    "commonName": "秘鲁天轮柱",
+    "latinName": "Cereus repandus",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-procedural-plant-avatar-v1"
+  },
+  {
+    "catalogId": "echinocactus-grusonii",
+    "filename": "plant_echinocactus_grusonii.png",
+    "commonName": "金琥",
+    "latinName": "Echinocactus grusonii",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-procedural-plant-avatar-v1"
+  },
+  {
+    "catalogId": "parodia-leninghausii",
+    "filename": "plant_parodia_leninghausii.png",
+    "commonName": "金晃丸",
+    "latinName": "Parodia leninghausii",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-procedural-plant-avatar-v1"
+  },
+  {
+    "catalogId": "myrtillocactus-geometrizans",
+    "filename": "plant_myrtillocactus_geometrizans.png",
+    "commonName": "蓝柱",
+    "latinName": "Myrtillocactus geometrizans",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-procedural-plant-avatar-v1"
+  },
+  {
+    "catalogId": "disocactus-ackermannii",
+    "filename": "plant_disocactus_ackermannii.png",
+    "commonName": "红花令箭",
+    "latinName": "Disocactus ackermannii",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-procedural-plant-avatar-v1"
+  },
+  {
+    "catalogId": "asparagus-densiflorus",
+    "filename": "plant_asparagus_densiflorus.png",
+    "commonName": "狐尾武竹",
+    "latinName": "Asparagus densiflorus",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-procedural-plant-avatar-v1"
+  },
+  {
+    "catalogId": "codiaeum-petra",
+    "filename": "plant_codiaeum_petra.png",
+    "commonName": "佩特拉变叶木",
+    "latinName": "Codiaeum variegatum Petra",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-procedural-plant-avatar-v1"
+  },
+  {
+    "catalogId": "strelitzia-reginae",
+    "filename": "plant_strelitzia_reginae.png",
+    "commonName": "鹤望兰",
+    "latinName": "Strelitzia reginae",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-procedural-plant-avatar-v1"
+  },
+  {
+    "catalogId": "citrus-calamondin",
+    "filename": "plant_citrus_calamondin.png",
+    "commonName": "四季桔",
+    "latinName": "Citrus microcarpa",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-procedural-plant-avatar-v1"
+  },
+  {
+    "catalogId": "olea-europaea",
+    "filename": "plant_olea_europaea.png",
+    "commonName": "橄榄树",
+    "latinName": "Olea europaea",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-procedural-plant-avatar-v1"
+  },
+  {
+    "catalogId": "ficus-carica",
+    "filename": "plant_ficus_carica.png",
+    "commonName": "无花果",
+    "latinName": "Ficus carica",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-procedural-plant-avatar-v1"
+  },
+  {
+    "catalogId": "thymus-vulgaris",
+    "filename": "plant_thymus_vulgaris.png",
+    "commonName": "百里香",
+    "latinName": "Thymus vulgaris",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-procedural-plant-avatar-v1"
+  },
+  {
+    "catalogId": "origanum-vulgare",
+    "filename": "plant_origanum_vulgare.png",
+    "commonName": "牛至",
+    "latinName": "Origanum vulgare",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-procedural-plant-avatar-v1"
+  },
+  {
+    "catalogId": "petroselinum-crispum",
+    "filename": "plant_petroselinum_crispum.png",
+    "commonName": "欧芹",
+    "latinName": "Petroselinum crispum",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-procedural-plant-avatar-v1"
+  },
+  {
+    "catalogId": "coriandrum-sativum",
+    "filename": "plant_coriandrum_sativum.png",
+    "commonName": "香菜",
+    "latinName": "Coriandrum sativum",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-procedural-plant-avatar-v1"
+  },
+  {
+    "catalogId": "capsicum-annuum",
+    "filename": "plant_capsicum_annuum.png",
+    "commonName": "观赏辣椒",
+    "latinName": "Capsicum annuum",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-procedural-plant-avatar-v1"
+  },
+  {
+    "catalogId": "fragaria-vesca",
+    "filename": "plant_fragaria_vesca.png",
+    "commonName": "草莓",
+    "latinName": "Fragaria vesca",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-procedural-plant-avatar-v1"
+  },
+  {
+    "catalogId": "pelargonium-zonale",
+    "filename": "plant_pelargonium_zonale.png",
+    "commonName": "天竺葵",
+    "latinName": "Pelargonium zonale",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-procedural-plant-avatar-v1"
+  },
+  {
+    "catalogId": "hibiscus-rosa-sinensis",
+    "filename": "plant_hibiscus_rosa_sinensis.png",
+    "commonName": "扶桑",
+    "latinName": "Hibiscus rosa-sinensis",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-procedural-plant-avatar-v1"
+  },
+  {
+    "catalogId": "bougainvillea-glabra",
+    "filename": "plant_bougainvillea_glabra.png",
+    "commonName": "三角梅",
+    "latinName": "Bougainvillea glabra",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-procedural-plant-avatar-v1"
+  },
+  {
+    "catalogId": "passiflora-caerulea",
+    "filename": "plant_passiflora_caerulea.png",
+    "commonName": "蓝花西番莲",
+    "latinName": "Passiflora caerulea",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-procedural-plant-avatar-v1"
+  },
+  {
+    "catalogId": "jasminum-sambac",
+    "filename": "plant_jasminum_sambac.png",
+    "commonName": "茉莉花",
+    "latinName": "Jasminum sambac",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-procedural-plant-avatar-v1"
+  },
+  {
+    "catalogId": "stephanotis-floribunda",
+    "filename": "plant_stephanotis_floribunda.png",
+    "commonName": "非洲茉莉藤",
+    "latinName": "Stephanotis floribunda",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-procedural-plant-avatar-v1"
+  },
+  {
+    "catalogId": "oncidium-sharry-baby",
+    "filename": "plant_oncidium_sharry_baby.png",
+    "commonName": "巧克力文心兰",
+    "latinName": "Oncidium Sharry Baby",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-procedural-plant-avatar-v1"
+  },
+  {
+    "catalogId": "paphiopedilum-maudiae",
+    "filename": "plant_paphiopedilum_maudiae.png",
+    "commonName": "兜兰",
+    "latinName": "Paphiopedilum Maudiae",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-procedural-plant-avatar-v1"
+  },
+  {
+    "catalogId": "cattleya-hybrid",
+    "filename": "plant_cattleya_hybrid.png",
+    "commonName": "卡特兰",
+    "latinName": "Cattleya Hybrid",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-procedural-plant-avatar-v1"
+  },
+  {
+    "catalogId": "ludisia-discolor",
+    "filename": "plant_ludisia_discolor.png",
+    "commonName": "宝石兰",
+    "latinName": "Ludisia discolor",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-procedural-plant-avatar-v1"
+  },
+  {
+    "catalogId": "aechmea-fasciata",
+    "filename": "plant_aechmea_fasciata.png",
+    "commonName": "银叶凤梨",
+    "latinName": "Aechmea fasciata",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-procedural-plant-avatar-v1"
+  },
+  {
+    "catalogId": "neoregelia-carolinae",
+    "filename": "plant_neoregelia_carolinae.png",
+    "commonName": "彩叶凤梨",
+    "latinName": "Neoregelia carolinae",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-procedural-plant-avatar-v1"
+  },
+  {
+    "catalogId": "tillandsia-xerographica",
+    "filename": "plant_tillandsia_xerographica.png",
+    "commonName": "霸王空气凤梨",
+    "latinName": "Tillandsia xerographica",
+    "width": 450,
+    "height": 600,
+    "style": "ohana-procedural-plant-avatar-v1"
+  }
+]

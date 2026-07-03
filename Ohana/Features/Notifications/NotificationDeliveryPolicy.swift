@@ -155,8 +155,12 @@ nonisolated enum NotificationDeliveryPolicy {
             return NotificationDeliveryClassification(tier: .healthCritical, category: .foodStock, mergeAllowed: false)
         }
 
-        if role.isPlantScoped {
+        if PlantReminderPreferenceStore.isGeneratedPlantCareEvent(event) || role == .plantScoped {
             return NotificationDeliveryClassification(tier: .routine, category: .plantCare, mergeAllowed: true)
+        }
+
+        if role == .directPlant {
+            return calendarClassification(for: event)
         }
 
         if event.eventType == EventType.foodChange.rawValue || role == .petAutoFeeder {
@@ -182,10 +186,10 @@ nonisolated enum NotificationDeliveryPolicy {
 
         if event.eventType == EventType.birthday.rawValue ||
             event.eventType == EventType.anniversary.rawValue {
-            return NotificationDeliveryClassification(tier: .ambient, category: .calendar, mergeAllowed: true)
+            return calendarClassification(for: event)
         }
 
-        return NotificationDeliveryClassification(tier: .routine, category: .calendar, mergeAllowed: true)
+        return calendarClassification(for: event)
     }
 
     static func weeklyReportClassification() -> NotificationDeliveryClassification {
@@ -304,6 +308,9 @@ nonisolated enum NotificationDeliveryPolicy {
            PlantReminderPreferenceStore.isPlantCareEvent(event) {
             return PlantReminderPreferenceStore.deliveryDate(for: scheduledAt, calendar: calendar, defaults: defaults)
         }
+        if classification.category == .calendar {
+            return scheduledAt
+        }
         let hour = calendar.component(.hour, from: scheduledAt)
         if hour >= 22 {
             let nextDay = calendar.date(byAdding: .day, value: 1, to: scheduledAt) ?? scheduledAt.addingTimeInterval(86400)
@@ -356,6 +363,16 @@ nonisolated enum NotificationDeliveryPolicy {
             request: DomainSubjectResolutionRequest(event: event),
             catalog: DomainSubjectResolutionCatalog()
         )
+    }
+
+    private static func calendarClassification(for event: Event) -> NotificationDeliveryClassification {
+        let tier: NotificationDeliveryTier = if event.eventType == EventType.birthday.rawValue ||
+            event.eventType == EventType.anniversary.rawValue {
+            .ambient
+        } else {
+            .routine
+        }
+        return NotificationDeliveryClassification(tier: tier, category: .calendar, mergeAllowed: true)
     }
 
     private static func dayKey(for date: Date, calendar: Calendar) -> String {

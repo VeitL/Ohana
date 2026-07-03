@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		4FDA09012F7A0001004B725F /* PetAvatarAssets in Resources */ = {isa = PBXBuildFile; fileRef = 4FDA09002F7A0001004B725F /* PetAvatarAssets */; };
 		4FDA09112F7B0001004B725F /* HumanAvatarAssets in Resources */ = {isa = PBXBuildFile; fileRef = 4FDA09102F7B0001004B725F /* HumanAvatarAssets */; };
+		4FDA09212F870001004B725F /* PlantAvatarAssets in Resources */ = {isa = PBXBuildFile; fileRef = 4FDA09202F870001004B725F /* PlantAvatarAssets */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -34,6 +35,7 @@
 		4FDA02482F54E0D6004B725F /* OhanaUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = OhanaUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		4FDA09002F7A0001004B725F /* PetAvatarAssets */ = {isa = PBXFileReference; lastKnownFileType = folder; name = PetAvatarAssets; path = Resources/Avatars/PetAvatarAssets; sourceTree = "<group>"; };
 		4FDA09102F7B0001004B725F /* HumanAvatarAssets */ = {isa = PBXFileReference; lastKnownFileType = folder; name = HumanAvatarAssets; path = Resources/Avatars/HumanAvatarAssets; sourceTree = "<group>"; };
+		4FDA09202F870001004B725F /* PlantAvatarAssets */ = {isa = PBXFileReference; lastKnownFileType = folder; name = PlantAvatarAssets; path = Resources/Avatars/PlantAvatarAssets; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -99,6 +101,7 @@
 				4FDA02332F54E0D4004B725F /* Ohana */,
 				4FDA09102F7B0001004B725F /* HumanAvatarAssets */,
 				4FDA09002F7A0001004B725F /* PetAvatarAssets */,
+				4FDA09202F870001004B725F /* PlantAvatarAssets */,
 				4FDA02412F54E0D6004B725F /* OhanaTests */,
 				4FDA024B2F54E0D6004B725F /* OhanaUITests */,
 				4FDA02322F54E0D4004B725F /* Products */,
@@ -248,6 +251,7 @@
 			files = (
 				4FDA09112F7B0001004B725F /* HumanAvatarAssets in Resources */,
 				4FDA09012F7A0001004B725F /* PetAvatarAssets in Resources */,
+				4FDA09212F870001004B725F /* PlantAvatarAssets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

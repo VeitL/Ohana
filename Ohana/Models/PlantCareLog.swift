@@ -44,8 +44,11 @@ enum PlantCareType: String, Codable, CaseIterable, Identifiable, Sendable {
     }
 
     nonisolated var displayName: String {
-        let l = L10n.current
-        return switch self {
+        displayName(l: L10n.current)
+    }
+
+    nonisolated func displayName(l: L10n) -> String {
+        switch self {
         case .watering: l.tr(zh: "浇水", en: "Watering", de: "Gießen")
         case .fertilizing: l.tr(zh: "施肥", en: "Fertilizing", de: "Düngen")
         case .repotting: l.tr(zh: "换盆", en: "Repotting", de: "Umtopfen")

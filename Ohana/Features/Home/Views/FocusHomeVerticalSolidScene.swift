@@ -14,38 +14,53 @@ struct FocusHomeVerticalSolidHeroSnapshot {
     let avatarSource: FocusHomeFrozenAvatarSource
     let collapsedFrame: CGRect?
     let collapsedRotation: Double?
+    let inactiveCollapsedGeometry: [UUID: FocusHomeInactiveHeroCollapsedGeometry]
 
     init(
         card: FocusCard,
         index: Int,
         avatarSource: FocusHomeFrozenAvatarSource,
         collapsedFrame: CGRect? = nil,
-        collapsedRotation: Double? = nil
+        collapsedRotation: Double? = nil,
+        inactiveCollapsedGeometry: [UUID: FocusHomeInactiveHeroCollapsedGeometry] = [:]
     ) {
         self.card = card
         self.index = index
         self.avatarSource = avatarSource
         self.collapsedFrame = collapsedFrame
         self.collapsedRotation = collapsedRotation
+        self.inactiveCollapsedGeometry = inactiveCollapsedGeometry
     }
 
-    func freezingCollapsedGeometry(frame: CGRect, rotation: Double) -> FocusHomeVerticalSolidHeroSnapshot {
+    func freezingCollapsedGeometry(
+        frame: CGRect,
+        rotation: Double,
+        inactiveCollapsedGeometry: [UUID: FocusHomeInactiveHeroCollapsedGeometry] = [:]
+    ) -> FocusHomeVerticalSolidHeroSnapshot {
         FocusHomeVerticalSolidHeroSnapshot(
             card: card,
             index: index,
             avatarSource: avatarSource,
             collapsedFrame: frame,
-            collapsedRotation: rotation
+            collapsedRotation: rotation,
+            inactiveCollapsedGeometry: inactiveCollapsedGeometry
         )
     }
 
     func preservingCollapsedGeometry(from snapshot: FocusHomeVerticalSolidHeroSnapshot?) -> FocusHomeVerticalSolidHeroSnapshot {
-        FocusHomeVerticalSolidHeroSnapshot(
+        let preservedInactiveGeometry: [UUID: FocusHomeInactiveHeroCollapsedGeometry] = if let inactiveGeometry = snapshot?.inactiveCollapsedGeometry, !inactiveGeometry.isEmpty {
+            inactiveGeometry
+        } else {
+            inactiveCollapsedGeometry
+        }
+
+        return FocusHomeVerticalSolidHeroSnapshot(
             card: card,
             index: index,
             avatarSource: avatarSource,
             collapsedFrame: snapshot?.collapsedFrame ?? collapsedFrame,
-            collapsedRotation: snapshot?.collapsedRotation ?? collapsedRotation
+            collapsedRotation: snapshot?.collapsedRotation ?? collapsedRotation,
+            inactiveCollapsedGeometry: preservedInactiveGeometry
         )
     }
 
@@ -55,8 +70,113 @@ struct FocusHomeVerticalSolidHeroSnapshot {
             index: index,
             avatarSource: avatarSource,
             collapsedFrame: collapsedFrame,
-            collapsedRotation: collapsedRotation
+            collapsedRotation: collapsedRotation,
+            inactiveCollapsedGeometry: inactiveCollapsedGeometry
         )
+    }
+}
+
+struct FocusHomeInactiveHeroCollapsedGeometry: Equatable {
+    let frame: CGRect
+    let rotation: Double
+
+    nonisolated static func == (
+        lhs: FocusHomeInactiveHeroCollapsedGeometry,
+        rhs: FocusHomeInactiveHeroCollapsedGeometry
+    ) -> Bool {
+        lhs.frame == rhs.frame && lhs.rotation == rhs.rotation
+    }
+}
+
+nonisolated enum FocusHomeInactiveHeroGeometryPolicy {
+    static func collapsedFrame(
+        stableFrame: CGRect,
+        preparedFrame: CGRect?,
+        frozenFrame: CGRect?,
+        freezesInactiveGeometry: Bool,
+        selectedCardId: UUID?,
+        cardId: UUID
+    ) -> CGRect {
+        guard selectedCardId != nil else { return stableFrame }
+        guard selectedCardId != cardId else { return preparedFrame ?? stableFrame }
+        if freezesInactiveGeometry, let frozenFrame {
+            return frozenFrame
+        }
+        return preparedFrame ?? stableFrame
+    }
+}
+
+nonisolated enum FocusHomeInactiveHeroRotationPolicy {
+    static func rotation(
+        stableRotation: Double,
+        frozenRotation: Double?,
+        freezesInactiveGeometry: Bool,
+        selectedCardId: UUID?,
+        cardId: UUID
+    ) -> Double {
+        guard selectedCardId != nil else { return stableRotation }
+        guard selectedCardId != cardId else { return stableRotation }
+        if freezesInactiveGeometry, let frozenRotation {
+            return frozenRotation
+        }
+        return stableRotation
+    }
+}
+
+nonisolated enum FocusHomeInactiveHeroGeometrySourcePolicy {
+    static func geometry(
+        cardId: UUID,
+        selectedCardId: UUID?,
+        local: [UUID: FocusHomeInactiveHeroCollapsedGeometry],
+        localSelectionId: UUID?,
+        external: [UUID: FocusHomeInactiveHeroCollapsedGeometry],
+        externalSelectionId: UUID?,
+        freezesInactiveGeometry: Bool
+    ) -> FocusHomeInactiveHeroCollapsedGeometry? {
+        guard freezesInactiveGeometry,
+              let selectedCardId else {
+            return nil
+        }
+        if externalSelectionId == selectedCardId,
+           let externalGeometry = external[cardId] {
+            return externalGeometry
+        }
+        if localSelectionId == selectedCardId {
+            return local[cardId]
+        }
+        return nil
+    }
+}
+
+nonisolated enum FocusHomeInactiveHeroVisualPolicy {
+    static func scale(
+        selectedCardId: UUID?,
+        cardId: UUID,
+        progress: CGFloat,
+        reduceMotion: Bool,
+        freezesInactiveGeometry: Bool
+    ) -> CGFloat {
+        guard selectedCardId != nil, cardId != selectedCardId else { return 1 }
+        guard !reduceMotion else { return 1 }
+        guard !freezesInactiveGeometry else { return 1 }
+        return 1 - smooth(progress, 0, 0.16) * 0.08
+    }
+
+    private static func smooth(_ value: CGFloat, _ start: CGFloat, _ end: CGFloat) -> CGFloat {
+        guard end > start else { return value >= end ? 1 : 0 }
+        let x = min(max((value - start) / (end - start), 0), 1)
+        return x * x * (3 - 2 * x)
+    }
+}
+
+nonisolated enum FocusHomeInactiveHeroLayerPolicy {
+    static func disablesImplicitAnimations(
+        selectedCardId: UUID?,
+        cardId: UUID,
+        freezesInactiveGeometry: Bool
+    ) -> Bool {
+        guard freezesInactiveGeometry, let selectedCardId else { return false }
+        return selectedCardId != cardId
     }
 }
 
@@ -167,6 +287,15 @@ enum FocusHomeAmbientFloatPolicy {
     }
 }
 
+enum FocusHomeVerticalSolidCollapsedLayoutPolicy {
+    static let defaultVerticalBias: CGFloat = 0
+    static let bottomExtendedVerticalBias: CGFloat = 0.12
+
+    static func clampedVerticalBias(_ value: CGFloat) -> CGFloat {
+        min(max(value, -0.16), 0.16)
+    }
+}
+
 struct FocusHomeVerticalSolidScene<QuickActions: View, ContextMenuContent: View>: View {
     let cards: [FocusCard]
     let safeTop: CGFloat
@@ -183,11 +312,16 @@ struct FocusHomeVerticalSolidScene<QuickActions: View, ContextMenuContent: View>
     var isVisible: Bool = true
     var walkPresentationRevision: Int = 0
     var embedsQuickActionsInCard: Bool = false
+    var freezesInactiveCollapsedGeometryDuringHero: Bool = false
+    var externalInactiveCollapsedGeometry: [UUID: FocusHomeInactiveHeroCollapsedGeometry] = [:]
+    var externalInactiveCollapsedGeometrySelectionId: UUID?
     var collapsedTopInset: CGFloat = 0
+    var collapsedVerticalBias: CGFloat = FocusHomeVerticalSolidCollapsedLayoutPolicy.defaultVerticalBias
     let quickActions: (FocusCard) -> QuickActions
     let contextMenu: (FocusCard) -> ContextMenuContent
     let onSelect: (FocusHomeVerticalSolidHeroSnapshot) -> Void
     let onCollapse: () -> Void
+    var onInactiveCollapsedGeometryFrozen: ([UUID: FocusHomeInactiveHeroCollapsedGeometry], UUID) -> Void = { _, _ in }
     let onWalkCardMinimizeToFloatingControl: () -> Void
     let onOpenDetails: (FocusCard) -> Void
 
@@ -197,6 +331,8 @@ struct FocusHomeVerticalSolidScene<QuickActions: View, ContextMenuContent: View>
     @State private var animatedArrivalCardId: UUID?
     @State private var arrivalProgress: CGFloat = 1
     @State private var arrivalCleanupTask: Task<Void, Never>?
+    @State private var inactiveHeroCollapsedGeometry: [UUID: FocusHomeInactiveHeroCollapsedGeometry] = [:]
+    @State private var inactiveHeroCollapsedGeometrySelectionId: UUID?
     @GestureState private var expandedDragY: CGFloat = 0
 
     private var l: L10n { localization }
@@ -261,8 +397,16 @@ struct FocusHomeVerticalSolidScene<QuickActions: View, ContextMenuContent: View>
             .onAppear {
                 primeFloatingMotionIfVisible()
                 prepareArrivalIfNeeded()
+                updateInactiveHeroCollapsedGeometry(
+                    size: geo.size,
+                    selectedCardId: selectedCardId
+                )
             }
             .onChange(of: selectedCardId) { _, newValue in
+                updateInactiveHeroCollapsedGeometry(
+                    size: geo.size,
+                    selectedCardId: newValue
+                )
                 if newValue == nil {
                     primeFloatingMotionIfVisible()
                 } else {
@@ -346,6 +490,77 @@ struct FocusHomeVerticalSolidScene<QuickActions: View, ContextMenuContent: View>
         }
     }
 
+    private func updateInactiveHeroCollapsedGeometry(
+        size: CGSize,
+        selectedCardId: UUID?
+    ) {
+        guard freezesInactiveCollapsedGeometryDuringHero else { return }
+        guard let selectedCardId else {
+            setInactiveHeroCollapsedGeometry([:], selectionId: nil)
+            return
+        }
+        guard inactiveHeroCollapsedGeometrySelectionId != selectedCardId
+                || inactiveHeroCollapsedGeometry.isEmpty else { return }
+
+        setInactiveHeroCollapsedGeometry(
+            inactiveCollapsedGeometry(size: size, selectedCardId: selectedCardId, time: nil),
+            selectionId: selectedCardId
+        )
+    }
+
+    private func inactiveCollapsedGeometry(
+        size: CGSize,
+        selectedCardId: UUID,
+        time: TimeInterval?
+    ) -> [UUID: FocusHomeInactiveHeroCollapsedGeometry] {
+        Dictionary(
+            uniqueKeysWithValues: cards.enumerated()
+                .filter { _, card in card.id != selectedCardId }
+                .map { index, card in
+                    let frame = collapsedFrame(index: index, count: cards.count, in: size)
+                    let floating = time.map {
+                        floatingTransform(index: index, isSelected: false, time: $0)
+                    } ?? (x: 0, y: 0, rotation: 0)
+                    return (
+                        card.id,
+                        FocusHomeInactiveHeroCollapsedGeometry(
+                            frame: frame.offsetBy(dx: floating.x, dy: floating.y),
+                            rotation: collapsedRotation(index: index) + floating.rotation
+                        )
+                    )
+                }
+        )
+    }
+
+    private func setInactiveHeroCollapsedGeometry(
+        _ next: [UUID: FocusHomeInactiveHeroCollapsedGeometry],
+        selectionId: UUID?
+    ) {
+        guard inactiveHeroCollapsedGeometry != next
+                || inactiveHeroCollapsedGeometrySelectionId != selectionId else { return }
+        var transaction = Transaction(animation: nil)
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            inactiveHeroCollapsedGeometry = next
+            inactiveHeroCollapsedGeometrySelectionId = selectionId
+        }
+        if let selectionId {
+            onInactiveCollapsedGeometryFrozen(next, selectionId)
+        }
+    }
+
+    private func inactiveHeroCollapsedGeometry(for cardId: UUID) -> FocusHomeInactiveHeroCollapsedGeometry? {
+        FocusHomeInactiveHeroGeometrySourcePolicy.geometry(
+            cardId: cardId,
+            selectedCardId: selectedCardId,
+            local: inactiveHeroCollapsedGeometry,
+            localSelectionId: inactiveHeroCollapsedGeometrySelectionId,
+            external: externalInactiveCollapsedGeometry,
+            externalSelectionId: externalInactiveCollapsedGeometrySelectionId,
+            freezesInactiveGeometry: freezesInactiveCollapsedGeometryDuringHero
+        )
+    }
+
     private func arrivalTransform(for card: FocusCard) -> (scale: CGFloat, rotation: Double, flip: Double, y: CGFloat, opacity: Double) {
         guard card.id == animatedArrivalCardId, selectedCardId == nil, !reduceMotion else {
             return (1, 0, 0, 0, 1)
@@ -379,8 +594,21 @@ struct FocusHomeVerticalSolidScene<QuickActions: View, ContextMenuContent: View>
         )
         let arrival = arrivalTransform(for: renderCard)
         let dragY = isExpandedSurface ? max(0, expandedDragY) : 0
-        let floating = floatingTransform(index: renderIndex, isSelected: isSelected, time: time)
-        let rotation = rotation(for: renderIndex, snapshot: motionSnapshot, isSelected: isExpandedSurface) + floating.rotation + arrival.rotation
+        let frozenInactiveGeometry = isExpandedSurface ? nil : inactiveHeroCollapsedGeometry(for: renderCard.id)
+        let freezesInactiveLayer = FocusHomeInactiveHeroLayerPolicy.disablesImplicitAnimations(
+            selectedCardId: selectedCardId,
+            cardId: renderCard.id,
+            freezesInactiveGeometry: freezesInactiveCollapsedGeometryDuringHero
+        )
+        let floating = frozenInactiveGeometry == nil
+            ? floatingTransform(index: renderIndex, isSelected: isSelected, time: time)
+            : (x: 0, y: 0, rotation: 0)
+        let rotation = rotation(
+            for: renderCard,
+            index: renderIndex,
+            snapshot: motionSnapshot,
+            isSelected: isExpandedSurface
+        ) + floating.rotation + arrival.rotation
         let scale = (isExpandedSurface ? max(0.94, 1 - dragY / 1400) : inactiveScale(for: renderCard)) * arrival.scale
         let opacity = inactiveOpacity(for: renderCard) * arrival.opacity
         let zIndex = zIndex(for: renderIndex, isSelected: isSelected)
@@ -475,6 +703,11 @@ struct FocusHomeVerticalSolidScene<QuickActions: View, ContextMenuContent: View>
         .simultaneousGesture(collapseDragGesture(isEnabled: isExpandedSurface && isExpandedCollapseReady && walkTrackingPet == nil))
         .allowsHitTesting(isExpandedSurface)
         .accessibilityHidden(selectedCardId != nil && !isExpandedSurface)
+        .transaction { transaction in
+            guard freezesInactiveLayer else { return }
+            transaction.animation = nil
+            transaction.disablesAnimations = true
+        }
     }
 
     @ViewBuilder
@@ -617,7 +850,7 @@ struct FocusHomeVerticalSolidScene<QuickActions: View, ContextMenuContent: View>
                 onCollapse()
             }
             .accessibilityLabel(card.name)
-            .accessibilityIdentifier(cardAccessibilityIdentifier(for: card))
+            .accessibilityIdentifier(expandedCollapseAccessibilityIdentifier(for: card))
             .accessibilityHint(l.tr(
                 zh: "点击返回首页",
                 en: "Tap to return home",
@@ -664,7 +897,7 @@ struct FocusHomeVerticalSolidScene<QuickActions: View, ContextMenuContent: View>
                 }
                 .buttonStyle(ScaleButtonStyle())
                 .accessibilityLabel(detailButtonAccessibilityLabel(for: card))
-                .accessibilityIdentifier(card.isHuman ? "home-expanded-detail-human" : "home-expanded-detail-pet")
+                .accessibilityIdentifier(expandedDetailAccessibilityIdentifier(for: card))
                 .accessibilityHint(l.tr(
                     zh: "打开这张卡片的资料页",
                     en: "Open this card's detail page",
@@ -681,18 +914,39 @@ struct FocusHomeVerticalSolidScene<QuickActions: View, ContextMenuContent: View>
     }
 
     private func detailButtonIcon(for card: FocusCard) -> String {
-        card.isHuman ? "person.crop.circle.fill" : "pawprint.circle.fill"
+        if card.isPlant { return "leaf.circle.fill" }
+        return card.isHuman ? "person.crop.circle.fill" : "pawprint.circle.fill"
     }
 
     private func detailButtonAccessibilityLabel(for card: FocusCard) -> String {
+        if card.isPlant {
+            return l.tr(zh: "打开植物详情", en: "Open plant details", de: "Pflanzendetails öffnen")
+        }
         if card.isHuman {
             return l.tr(zh: "打开人类详情", en: "Open human details", de: "Menschendetails öffnen")
         }
         return l.tr(zh: "打开宠物详情", en: "Open pet details", de: "Haustierdetails öffnen")
     }
 
+    private func expandedDetailAccessibilityIdentifier(for card: FocusCard) -> String {
+        if card.isPlant { return "home-expanded-detail-plant" }
+        return card.isHuman ? "home-expanded-detail-human" : "home-expanded-detail-pet"
+    }
+
+    private func expandedCollapseAccessibilityIdentifier(for card: FocusCard) -> String {
+        if card.isPlant { return "home-expanded-collapse-plant" }
+        return card.isHuman ? "home-expanded-collapse-human" : "home-expanded-collapse-pet"
+    }
+
     private func cardAccessibilityIdentifier(for card: FocusCard) -> String {
-        "home-card-\(card.isHuman ? "human" : "pet")-\(card.name)"
+        let kind = if card.isPlant {
+            "plant"
+        } else if card.isHuman {
+            "human"
+        } else {
+            "pet"
+        }
+        return "home-card-\(kind)-\(card.name)"
     }
 
     private func embeddedQuickActionDockHeight(for frame: CGRect) -> CGFloat {
@@ -705,6 +959,13 @@ struct FocusHomeVerticalSolidScene<QuickActions: View, ContextMenuContent: View>
                 let frame = collapsedFrame(index: index, count: cards.count, in: size)
                 let floating = floatingTransform(index: index, isSelected: false, time: time)
                 let cornerRadius = CGFloat(30)
+                let inactiveGeometry = freezesInactiveCollapsedGeometryDuringHero
+                    ? inactiveCollapsedGeometry(
+                        size: size,
+                        selectedCardId: card.id,
+                        time: time
+                    )
+                    : [:]
 
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                     .fill(Color.ohanaPrimaryText.opacity(0.001)) // ui-v4: allow invisible vertical home card hit zone
@@ -716,11 +977,15 @@ struct FocusHomeVerticalSolidScene<QuickActions: View, ContextMenuContent: View>
                     .highPriorityGesture(
                         TapGesture()
                             .onEnded {
+                                if freezesInactiveCollapsedGeometryDuringHero {
+                                    setInactiveHeroCollapsedGeometry(inactiveGeometry, selectionId: card.id)
+                                }
                                 onSelect(
                                     preparedHeroSnapshot(for: card, index: index)
                                         .freezingCollapsedGeometry(
                                             frame: frame.offsetBy(dx: floating.x, dy: floating.y),
-                                            rotation: collapsedRotation(index: index) + floating.rotation
+                                            rotation: collapsedRotation(index: index) + floating.rotation,
+                                            inactiveCollapsedGeometry: inactiveGeometry
                                         )
                                 )
                             }
@@ -745,8 +1010,16 @@ struct FocusHomeVerticalSolidScene<QuickActions: View, ContextMenuContent: View>
         visibleCenterX: CGFloat
     ) -> CGRect {
         let stableCollapsed = collapsedFrame(index: index, count: cards.count, in: size)
+        let preparedCollapsed = FocusHomeInactiveHeroGeometryPolicy.collapsedFrame(
+            stableFrame: stableCollapsed,
+            preparedFrame: preparedHeroSnapshots[card.id]?.collapsedFrame,
+            frozenFrame: inactiveHeroCollapsedGeometry(for: card.id)?.frame,
+            freezesInactiveGeometry: freezesInactiveCollapsedGeometryDuringHero,
+            selectedCardId: selectedCardId,
+            cardId: card.id
+        )
         guard card.id == selectedCardId else {
-            return stableCollapsed
+            return selectedCardId == nil ? stableCollapsed : preparedCollapsed
         }
 
         let collapsed = collapsedFrame(for: snapshot, stableFrame: stableCollapsed)
@@ -770,6 +1043,10 @@ struct FocusHomeVerticalSolidScene<QuickActions: View, ContextMenuContent: View>
             return collapsedZIndex(index: index, count: cards.count)
         }
 
+        if embedsQuickActionsInCard, heroDirection > 0 {
+            return expandedCardZIndex()
+        }
+
         if progress <= 0.001 {
             return collapsedZIndex(index: index, count: cards.count)
         }
@@ -778,20 +1055,38 @@ struct FocusHomeVerticalSolidScene<QuickActions: View, ContextMenuContent: View>
             return collapsedZIndex(index: index, count: cards.count)
         }
 
+        if embedsQuickActionsInCard {
+            return expandedCardZIndex()
+        }
+
         return 24
     }
 
+    private func expandedCardZIndex() -> Double {
+        let inactiveMax = (0 ..< cards.count)
+            .map { collapsedZIndex(index: $0, count: cards.count) }
+            .max() ?? 0
+        return max(24, inactiveMax + 40)
+    }
+
     private func rotation(
-        for index: Int,
+        for card: FocusCard,
+        index: Int,
         snapshot: FocusHomeVerticalSolidHeroSnapshot?,
         isSelected: Bool
     ) -> Double {
         let stableCollapsed = collapsedRotation(index: index)
         guard isSelected, selectedCardId != nil else {
-            return stableCollapsed
+            return FocusHomeInactiveHeroRotationPolicy.rotation(
+                stableRotation: stableCollapsed,
+                frozenRotation: inactiveHeroCollapsedGeometry(for: card.id)?.rotation,
+                freezesInactiveGeometry: freezesInactiveCollapsedGeometryDuringHero,
+                selectedCardId: selectedCardId,
+                cardId: card.id
+            )
         }
 
-        let collapsed = heroDirection > 0 ? (snapshot?.collapsedRotation ?? stableCollapsed) : stableCollapsed
+        let collapsed = snapshot?.collapsedRotation ?? stableCollapsed
         if reduceMotion {
             return progress > 0.5 ? 0 : collapsed
         }
@@ -826,7 +1121,11 @@ struct FocusHomeVerticalSolidScene<QuickActions: View, ContextMenuContent: View>
             )
         )
         let height = width * 1.58
-        let center = CGPoint(x: size.width / 2, y: collapsedTopInset + availableHeight / 2)
+        let verticalBias = availableHeight * FocusHomeVerticalSolidCollapsedLayoutPolicy.clampedVerticalBias(collapsedVerticalBias)
+        let center = CGPoint(
+            x: size.width / 2,
+            y: collapsedTopInset + availableHeight / 2 + verticalBias
+        )
         let x = center.x + offset.width * width
         let y = center.y + offset.height * width
         return CGRect(x: x - width / 2, y: y - height / 2, width: width, height: height)
@@ -928,8 +1227,13 @@ struct FocusHomeVerticalSolidScene<QuickActions: View, ContextMenuContent: View>
     }
 
     private func inactiveScale(for card: FocusCard) -> CGFloat {
-        guard selectedCardId != nil, card.id != selectedCardId else { return 1 }
-        return reduceMotion ? 1 : 1 - smooth(progress, 0, 0.16) * 0.08
+        FocusHomeInactiveHeroVisualPolicy.scale(
+            selectedCardId: selectedCardId,
+            cardId: card.id,
+            progress: progress,
+            reduceMotion: reduceMotion,
+            freezesInactiveGeometry: freezesInactiveCollapsedGeometryDuringHero
+        )
     }
 
     private func collapseDragGesture(isEnabled: Bool) -> some Gesture {

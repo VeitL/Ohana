@@ -2727,6 +2727,52 @@ struct HomeCommandExecutorTests {
     }
 
     @MainActor
+    @Test func plantCreationCommandExecutorMaterializesCarePlansForCalendarAndReminders() throws {
+        let revisionCenter = ReadModelRevisionCenter()
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let id = UUID()
+
+        PlantCreationCommandExecutor(context: context, revisionCenter: revisionCenter).createPlant(
+            input: PlantCreationCommandInput(
+                id: id,
+                name: "Pothos",
+                species: "Epipremnum aureum",
+                location: "Living room shelf",
+                avatarEmoji: "🌿",
+                wateringIntervalDays: 3,
+                fertilizingIntervalDays: 21,
+                catalogSpeciesId: "epipremnum-aureum",
+                remindersEnabled: true
+            ),
+            note: "test.plant.creation.schedule",
+            scheduleNotifications: false
+        )
+
+        let events = try context.fetch(FetchDescriptor<Event>())
+        let reminders = try context.fetch(FetchDescriptor<Reminder>())
+        let plantPlanEvents = events.filter {
+            $0.isAllDay &&
+                $0.relatedEntityType == EntityKind.plant.rawValue &&
+                $0.relatedEntityId == id.uuidString &&
+                $0.title.contains("植物计划")
+        }
+        let plantPlanReminderEventIDs = Set(plantPlanEvents.map(\.id))
+        let plantPlanReminders = reminders.filter { reminder in
+            guard let event = reminder.event else { return false }
+            return plantPlanReminderEventIDs.contains(event.id)
+        }
+
+        #expect(!plantPlanEvents.isEmpty)
+        #expect(!plantPlanReminders.isEmpty)
+        #expect(plantPlanEvents.contains { $0.eventType == EventType.watering.rawValue })
+        #expect(plantPlanEvents.contains { $0.eventType == EventType.fertilizing.rawValue })
+        for reminder in plantPlanReminders {
+            #expect(reminder.isPending)
+        }
+    }
+
+    @MainActor
     @Test func memberDeletionServiceDeletesPetRelatedEventsAndQuickActions() throws {
         let container = try makeInMemoryContainer()
         let context = container.mainContext

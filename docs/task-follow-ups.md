@@ -12,7 +12,7 @@
 ## Current Read
 
 - Last compacted: 2026-06-25.
-- Open follow-ups: 12 total: P1 = 3, P2 = 7, P3 = 2.
+- Open follow-ups: 11 total: P1 = 3, P2 = 6, P3 = 2.
 - Open P0: 0.
 - Known first-release-reachable repository-code P1: none.
 - P1 still open because of CloudKit 1.x deferred work or real-device validation.
@@ -81,14 +81,6 @@
 - Next action: continue remaining negative and cross-feature GUI paths through pet calendar care-type deep-linking beyond Basic Info/Water/Feeding/Potty/Walk/Play/Weight/Health/Hygiene and generated litter/scoop/water plan rows, reminders/tasks/ledger readback beyond Bond Vault, deceased-pet Feature Hub non-memorial route blocking beyond stale Calendar event taps, stale routes after memorial/delete beyond stale Calendar event taps, broader pet shop/economy categories and negative purchase paths beyond the covered Lime Glow effect purchase, and invalid-value/broader edit-negative flows. For old-user realism across multiple validation commands, add or use a persistent dogfooding/manual app-runner harness that installs once and drives the app without `xcodebuild test` clearing the container. Add narrow simulator tests as each real blocker is exposed.
 - Close when: targeted pet GUI coverage proves create/edit/cancel, quick care, reminder/calendar, shop/economy, memorial/deceased, delete-cancel/delete-confirm, stale-route protection, and duplicate-write protection through either one maintainable suite or multiple real-user long sessions with passing xcresult evidence.
 
-### TFU-20260629-002 - Finish Plant Simulator GUI Coverage
-
-- Priority / bucket: P2, Plants simulator validation / UI-test focus blocker.
-- Status: Open, narrowed after the core simulator GUI full-flow passed.
-- Why still open: the 2026-06-30 pinned `iPhone 17` simulator rerun of `PlantModuleUITests.testPlantModuleUnlockCreateCareReminderCalendarAndDelete` now passes from fresh onboarding through first Human/Pet setup, starter gift, Oasis Lv4 plant unlock, plant tab open, catalog-backed plant creation, Settings per-plant reminder round trip, Calendar plant reminder visibility, detail wet-soil defer/water/fertilize/pest/leaf actions, care-history readback, delete undo, and final permanent delete. Passing xcresult: `/tmp/OhanaDerivedData-plant-final-1782813600/Logs/Test/Test-Ohana-2026.06.30_11-59-37-+0200.xcresult`. The blocker is no longer Settings idle or reminder/calendar/detail/delete reachability. The follow-up remains open only for the broader long-tail plant GUI matrix: edit/cancel paths if launch-required, Settings bulk defer GUI if kept in launch scope, broader dashboard/home/calendar/economy/Oasis/shop negative paths, and a real-user long-session style pass that avoids treating one cold-start XCTest as the whole plant launch story.
-- Next action: add narrow GUI slices for the remaining plant long-tail paths or explicitly remove them from launch scope, then rerun only those targeted slices plus the core full-flow if the touched code affects shared plant routing, Settings reminder controls, Calendar materialization, or delete behavior.
-- Close when: the remaining launch-required plant GUI paths are either covered by passing simulator evidence or explicitly marked non-launch-required, with the current full-flow xcresult retained as the core create/care/reminder/calendar/delete evidence.
-
 ### TFU-20260613-003 - Round-Trip Recycle-Bin Soft-Delete Fields In CloudSync
 
 - Priority / bucket: P2, future CloudSync / 1.x.
@@ -150,11 +142,13 @@ Use the archive for full detail. High-signal closures already reflected in the c
 - TFU-20260623-001: Home quick-action render-state isolation cleanup closed after Terminal `iPhone 17` targeted suites reported `TEST SUCCEEDED`; Codex shell CoreSimulator remains a session blocker, now diagnosed by `scripts/diagnose-simulator.sh`.
 - TFU-20260629-003: Human Settings privacy batch-action UITest/smoothness gap closed on 2026-06-29 for the then-current PIN/privacy UI; that UI evidence is now superseded by the first-release local policy that hides member privacy/PIN controls and treats same-device member switching as attribution only.
 - TFU-20260630-001: Coconut Shop Function Menu route blocker closed on 2026-06-30 after the current iPhone 17 simulator revalidation passed the Home FAB -> Function Menu -> Coconut Shop -> Lime Glow purchase UI test plus route, growth, gacha, catalog, and plant-shop guards.
+- TFU-20260629-002: Plants simulator GUI coverage closed on 2026-07-03 after current evidence covered the launch-required simulator paths: full unlock/create/reminder/Calendar/care/delete, no-reset reminder toggle, no-reset detail profile sections, no-reset Settings bulk defer plus edit cancel/save, Calendar plant filter, catalog-first add flow, and wallet expand/collapse position stability including the mid-animation inactive-card jump root fix. Remaining plant work is tracked as true-device/manual acceptance in `docs/release-true-device-test-plan.md` or as non-launch future scope, not as a simulator focus blocker.
 - TFU-20260629-001: Human automated write-flow coverage closed on 2026-06-29; the combined pinned `iPhone 17` UI run passed route coverage, Home human quick actions, feature-hub record persistence, and extended health/workout/report/wishlist/profile writes.
 - TFU-20260628-001: Home first-pet onboarding accessibility polish closed in the same validation pass; non-front Today Focus compact-stack cards are no longer mounted at rest, and expanded non-selected Home card surfaces are hidden from accessibility.
 - TFU-20260612-018: duplicate Members profile revision publishes closed on 2026-06-28; profile executors own the single publish boundary and `scripts/audit-architecture-boundaries.sh` now guards against direct Members view publishes.
 - TFU-20260612-019: human memorial read-only boundary closed by current guard coverage.
 - TFU-20260611-001: App Store Connect privacy setup closed; final public URL/support row remains TFU-20260612-022.
+- TFU-20260702-001: Plants oversized SwiftUI split closed on 2026-07-02 after `PlantDashboardView.swift` and `PlantDetailView.swift` were split below the oversized-file threshold and the architecture gate passed.
 
 ## Archive
 

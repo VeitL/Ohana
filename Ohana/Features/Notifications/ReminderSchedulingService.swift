@@ -60,11 +60,23 @@ enum ReminderSchedulingService {
         } else {
             await OhanaNotifications.current.pendingNotificationIds()
         }
+        let shouldReplaceDeferredCalendarDuplicate = shouldReplaceDeferredCalendarDuplicate(
+            reminder: reminder,
+            policyDecision: policyDecision,
+            existingNotificationIds: existingIds,
+            context: context
+        )
+        if shouldReplaceDeferredCalendarDuplicate {
+            OhanaNotifications.current.cancel(notificationId: reminder.notificationId)
+        }
+        let schedulingExistingIds = shouldReplaceDeferredCalendarDuplicate
+            ? existingIds.subtracting([reminder.notificationId])
+            : existingIds
         let result = await withCheckedContinuation { continuation in
             OhanaNotifications.current.schedule(
                 reminder: reminder,
                 deliveryDate: deliveryDate,
-                existingNotificationIds: existingIds
+                existingNotificationIds: schedulingExistingIds
             ) { result in
                 continuation.resume(returning: result)
             }
@@ -272,6 +284,49 @@ enum ReminderSchedulingService {
             }
         }
         context.safeSave()
+    }
+
+    @MainActor
+    private static func shouldReplaceDeferredCalendarDuplicate(
+        reminder: Reminder,
+        policyDecision: NotificationDeliveryDecision?,
+        existingNotificationIds: Set<String>,
+        context: ModelContext
+    ) -> Bool {
+        guard existingNotificationIds.contains(reminder.notificationId),
+              let policyDecision,
+              case let .deliver(_, classification, deferred) = policyDecision,
+              classification.category == .calendar,
+              !deferred else {
+            return false
+        }
+
+        let reminderId = reminder.id.uuidString
+        let reminderKind = CareLedgerEventKind.reminder.rawValue
+        var descriptor = FetchDescriptor<CareLedgerEvent>(
+            predicate: #Predicate<CareLedgerEvent> { event in
+                event.sourceReminderId == reminderId &&
+                    event.eventKind == reminderKind
+            },
+            sortBy: [SortDescriptor(\CareLedgerEvent.occurredAt, order: .reverse)]
+        )
+        descriptor.fetchLimit = 12
+
+        guard let entries = try? context.fetch(descriptor) else { return false }
+        for entry in entries {
+            switch entry.actionType {
+            case "scheduleSuccess", "refillSuccess":
+                return false
+            case "scheduleDeferred", "refillDeferred":
+                if entry.metadataJSON.contains("\"category\":\"calendar\"") &&
+                    entry.metadataJSON.contains("\"deferred\":true") {
+                    return true
+                }
+            default:
+                continue
+            }
+        }
+        return false
     }
 
     private static func dedupeKey(for reminder: Reminder) -> String {

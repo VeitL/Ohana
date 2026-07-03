@@ -13,6 +13,7 @@ struct AddEventContentView: View {
     var onClose: (() -> Void)?
     let pets: [Pet]
     let humans: [Human]
+    let plants: [Plant]
     let editingEvent: Event?
     let editingOccurrenceDate: Date?
 
@@ -106,12 +107,14 @@ struct AddEventContentView: View {
         onClose: (() -> Void)? = nil,
         pets: [Pet],
         humans: [Human],
+        plants: [Plant],
         editingEvent: Event? = nil,
         editingOccurrenceDate: Date? = nil
     ) {
         self.onClose = onClose
         self.pets = pets
         self.humans = humans
+        self.plants = plants
         self.editingEvent = editingEvent
         self.editingOccurrenceDate = editingOccurrenceDate
 
@@ -133,6 +136,14 @@ struct AddEventContentView: View {
     private var l: L10n { L10n(appLanguage) }
     private var activePets: [Pet] { pets.filter { !$0.hasPassedAway } }
     private var activeHumans: [Human] { humans.filter { !$0.hasPassedAway } }
+    private var activePlants: [Plant] {
+        plants.sorted { lhs, rhs in
+            if lhs.createdAt != rhs.createdAt {
+                return lhs.createdAt > rhs.createdAt
+            }
+            return lhs.name.localizedStandardCompare(rhs.name) == .orderedAscending
+        }
+    }
 
     private var trimmedTitle: String {
         title.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -209,13 +220,13 @@ struct AddEventContentView: View {
                         VStack(spacing: 14) {
                             titleSection
                                 .zIndex(showsTypePicker ? 10 : 0)
+                            relatedSection
                             timeSection
                             recurrenceSection
                             if recurrenceOption != .none {
                                 recurrenceEndSection
                             }
                             reminderLeadSection
-                            relatedSection
                             assigneeSection
                         }
                         .padding(.horizontal, 20)
@@ -416,49 +427,62 @@ struct AddEventContentView: View {
         VStack(alignment: .leading, spacing: 10) {
             sectionLabel(l.tr(zh: "关联对象", en: "Link to", de: "Verknüpfen"))
 
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
-                    relatedChip(
-                        title: l.tr(zh: "无", en: "None", de: "Keine"),
-                        icon: "circle.slash",
-                        isSelected: relatedEntityType.isEmpty,
-                        tint: Color.goPrimary
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 132), spacing: 8, alignment: .leading)], alignment: .leading, spacing: 8) {
+                relatedChip(
+                    title: l.tr(zh: "无", en: "None", de: "Keine"),
+                    icon: "circle.slash",
+                    isSelected: relatedEntityType.isEmpty,
+                    tint: Color.goPrimary
+                ) {
+                    relatedEntityType = ""
+                    relatedEntityId = ""
+                }
+
+                ForEach(activePlants) { plant in
+                    relatedPersonChip(
+                        title: plant.name,
+                        imageData: plant.avatarImageData,
+                        fallback: plant.avatarEmoji.isEmpty ? "🌱" : plant.avatarEmoji,
+                        tint: plantChipTint(for: plant),
+                        identifier: "add-event-related-plant-\(plant.name)",
+                        isSelected: relatedEntityType == EntityKind.plant.rawValue && relatedEntityId == plant.id.uuidString
                     ) {
-                        relatedEntityType = ""
-                        relatedEntityId = ""
-                    }
-
-                    ForEach(activePets) { pet in
-                        relatedPersonChip(
-                            title: pet.name,
-                            imageData: pet.avatarImageData,
-                            fallback: pet.avatarEmoji.isEmpty ? pet.speciesEmoji : pet.avatarEmoji,
-                            tint: Color(hex: pet.safeThemeColorHex),
-                            identifier: "add-event-related-pet-\(pet.name)",
-                            isSelected: relatedEntityId == pet.id.uuidString
-                        ) {
-                            relatedEntityType = EntityKind.pet.rawValue
-                            relatedEntityId = pet.id.uuidString
-                        }
-                    }
-
-                    ForEach(activeHumans) { human in
-                        relatedPersonChip(
-                            title: human.name,
-                            imageData: human.avatarImageData,
-                            fallback: human.avatarEmoji.isEmpty ? "🙂" : human.avatarEmoji,
-                            tint: Color(hex: human.safeThemeColorHex),
-                            identifier: "add-event-related-human-\(human.name)",
-                            isSelected: relatedEntityId == human.id.uuidString
-                        ) {
-                            relatedEntityType = EntityKind.human.rawValue
-                            relatedEntityId = human.id.uuidString
-                        }
+                        relatedEntityType = EntityKind.plant.rawValue
+                        relatedEntityId = plant.id.uuidString
                     }
                 }
-                .padding(.vertical, 1)
+
+                ForEach(activePets) { pet in
+                    relatedPersonChip(
+                        title: pet.name,
+                        imageData: pet.avatarImageData,
+                        fallback: pet.avatarEmoji.isEmpty ? pet.speciesEmoji : pet.avatarEmoji,
+                        tint: Color(hex: pet.safeThemeColorHex),
+                        identifier: "add-event-related-pet-\(pet.name)",
+                        isSelected: relatedEntityType == EntityKind.pet.rawValue && relatedEntityId == pet.id.uuidString
+                    ) {
+                        relatedEntityType = EntityKind.pet.rawValue
+                        relatedEntityId = pet.id.uuidString
+                    }
+                }
+
+                ForEach(activeHumans) { human in
+                    relatedPersonChip(
+                        title: human.name,
+                        imageData: human.avatarImageData,
+                        fallback: human.avatarEmoji.isEmpty ? "🙂" : human.avatarEmoji,
+                        tint: Color(hex: human.safeThemeColorHex),
+                        identifier: "add-event-related-human-\(human.name)",
+                        isSelected: relatedEntityType == EntityKind.human.rawValue && relatedEntityId == human.id.uuidString
+                    ) {
+                        relatedEntityType = EntityKind.human.rawValue
+                        relatedEntityId = human.id.uuidString
+                    }
+                }
             }
         }
+        .padding(14)
+        .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous))
     }
 
     private var recurrenceSection: some View {
@@ -864,12 +888,13 @@ struct AddEventContentView: View {
             }
             .font(OhanaFont.caption(.black))
             .foregroundStyle(isSelected ? Color.arkInk : Color.ohanaPrimaryText)
+            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
             .padding(.leading, 12)
             .padding(.trailing, 14)
-            .padding(.vertical, 9)
             .background(isSelected ? tint : Color.ohanaControlFill, in: Capsule())
         }
         .buttonStyle(ScaleButtonStyle())
+        .accessibilityValue(selectionAccessibilityValue(isSelected: isSelected))
     }
 
     private func relatedPersonChip(
@@ -901,13 +926,25 @@ struct AddEventContentView: View {
             }
             .font(OhanaFont.caption(.black))
             .foregroundStyle(isSelected ? Color.arkInk : Color.ohanaPrimaryText)
+            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
             .padding(.leading, 8)
             .padding(.trailing, 13)
-            .padding(.vertical, 7)
             .background(isSelected ? tint : Color.ohanaControlFill, in: Capsule())
         }
         .buttonStyle(ScaleButtonStyle())
         .accessibilityIdentifier(identifier)
+        .accessibilityValue(selectionAccessibilityValue(isSelected: isSelected))
+    }
+
+    private func selectionAccessibilityValue(isSelected: Bool) -> String {
+        isSelected
+            ? L10n.current.tr(zh: "已选中", en: "Selected", de: "Ausgewählt")
+            : L10n.current.tr(zh: "未选中", en: "Not selected", de: "Nicht ausgewählt")
+    }
+
+    private func plantChipTint(for plant: Plant) -> Color {
+        let trimmed = plant.themeColorHex.trimmingCharacters(in: .whitespacesAndNewlines)
+        return Color(hex: trimmed.isEmpty ? "2ED3B7" : trimmed)
     }
 
     private func eventTypeTitle(_ type: EventType) -> String {

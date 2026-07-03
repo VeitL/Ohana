@@ -43,6 +43,7 @@ final class AppServices {
     let todayFocus: TodayFocusManaging
     let plantCarePlans: PlantCarePlanReading
     let plantReminderControls: PlantReminderControlling
+    let plantGrowthDiaryExports: PlantGrowthDiaryExporting
     let plantIntelligence: PlantIntelligenceProviding
     let oasisTree: OasisTreeManaging
     let healthAlerts: PetHealthAlerting
@@ -156,6 +157,7 @@ final class AppServices {
             ),
             plantCarePlans: StaticPlantCarePlanReader(),
             plantReminderControls: StaticPlantReminderController(),
+            plantGrowthDiaryExports: LivePlantGrowthDiaryExporter(),
             plantIntelligence: LocalPlantIntelligenceFallback(),
             oasisTree: SharedOasisTreeManager(manager: oasisTreeManager),
             healthAlerts: SharedPetHealthAlertEngine(),
@@ -220,6 +222,7 @@ final class AppServices {
         todayFocus: TodayFocusManaging,
         plantCarePlans: PlantCarePlanReading,
         plantReminderControls: PlantReminderControlling,
+        plantGrowthDiaryExports: PlantGrowthDiaryExporting,
         plantIntelligence: PlantIntelligenceProviding,
         oasisTree: OasisTreeManaging,
         healthAlerts: PetHealthAlerting,
@@ -261,6 +264,7 @@ final class AppServices {
         self.todayFocus = todayFocus
         self.plantCarePlans = plantCarePlans
         self.plantReminderControls = plantReminderControls
+        self.plantGrowthDiaryExports = plantGrowthDiaryExports
         self.plantIntelligence = plantIntelligence
         self.oasisTree = oasisTree
         self.healthAlerts = healthAlerts

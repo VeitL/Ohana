@@ -130,3 +130,67 @@ struct OhanaTextField: View {
         }
     }
 }
+
+// MARK: - Choice Chips
+
+/// Horizontal selection chips for forms where common choices should come before
+/// keyboard entry. Keep the bound text open-ended so users can still type a
+/// custom value when none of the chips fit.
+struct OhanaChoiceChipRow: View {
+    let title: String
+    let options: [String]
+    @Binding var selection: String
+    var identifierPrefix: String?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(title)
+                .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
+                .foregroundStyle(Color.ohanaSecondaryText)
+                .textCase(.uppercase)
+                .tracking(0.6)
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(Array(options.enumerated()), id: \.offset) { index, option in
+                        chip(option, index: index)
+                    }
+                }
+                .padding(.vertical, 1)
+            }
+            .scrollClipDisabled()
+            .accessibilityElement(children: .contain)
+        }
+        .accessibilityIdentifier("\(identifierPrefix ?? "ohana-choice-chip")-row")
+    }
+
+    private func chip(_ option: String, index: Int) -> some View {
+        let isSelected = selection.trimmingCharacters(in: .whitespacesAndNewlines) == option
+        return Button {
+            withAnimation(GoMotion.selection) {
+                selection = option
+            }
+            UISelectionFeedbackGenerator().selectionChanged()
+        } label: {
+            Text(option)
+                .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
+                .foregroundStyle(isSelected ? Color.arkInk : Color.ohanaPrimaryText)
+                .lineLimit(1)
+                .minimumScaleFactor(0.78)
+                .padding(.horizontal, 12)
+                .frame(minHeight: 44)
+                .background(
+                    isSelected ? Color.goLime : Color.ohanaControlFill.opacity(0.62),
+                    in: Capsule()
+                )
+                .overlay(
+                    Capsule()
+                        .strokeBorder(isSelected ? Color.clear : Color.ohanaCardSurface.opacity(0.18), lineWidth: 1)
+                )
+        }
+        .buttonStyle(ScaleButtonStyle())
+        .accessibilityLabel(option)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+        .accessibilityIdentifier("\(identifierPrefix ?? "ohana-choice-chip")-\(index)")
+    }
+}

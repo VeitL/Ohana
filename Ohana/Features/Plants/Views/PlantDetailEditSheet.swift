@@ -111,6 +111,68 @@ struct EditPlantSheet: View {
     @State private var selectedEditFocus: PlantEditFocusSection = .all
     private var l: L10n { L10n(appLanguage) }
 
+    private var commonCatalogEntries: [PlantCatalogEntry] {
+        [
+            "epipremnum-aureum",
+            "monstera-deliciosa",
+            "chlorophytum-comosum",
+            "sansevieria-trifasciata",
+            "zamioculcas-zamiifolia",
+            "pilea-peperomioides"
+        ].compactMap { PlantCatalog.entry(id: $0) }
+    }
+
+    private var commonRoomOptions: [String] {
+        [
+            l.tr(zh: "客厅", en: "Living room", de: "Wohnzimmer"),
+            l.tr(zh: "阳台", en: "Balcony", de: "Balkon"),
+            l.tr(zh: "卧室", en: "Bedroom", de: "Schlafzimmer"),
+            l.tr(zh: "厨房", en: "Kitchen", de: "Küche"),
+            l.tr(zh: "书房", en: "Study", de: "Arbeitszimmer"),
+            l.tr(zh: "浴室", en: "Bathroom", de: "Bad"),
+            l.tr(zh: "办公室", en: "Office", de: "Büro")
+        ]
+    }
+
+    private var commonSpotOptions: [String] {
+        [
+            l.tr(zh: "南窗边", en: "South window", de: "Südfenster"),
+            l.tr(zh: "东窗边", en: "East window", de: "Ostfenster"),
+            l.tr(zh: "西窗边", en: "West window", de: "Westfenster"),
+            l.tr(zh: "北窗边", en: "North window", de: "Nordfenster"),
+            l.tr(zh: "窗台", en: "Window sill", de: "Fensterbank"),
+            l.tr(zh: "书桌", en: "Desk", de: "Schreibtisch"),
+            l.tr(zh: "花架", en: "Plant stand", de: "Pflanzenregal")
+        ]
+    }
+
+    private var commonPotMaterialOptions: [String] {
+        [
+            l.tr(zh: "陶盆", en: "Terracotta", de: "Terrakotta"),
+            l.tr(zh: "塑料盆", en: "Plastic", de: "Kunststoff"),
+            l.tr(zh: "釉面陶瓷", en: "Glazed ceramic", de: "Glasierte Keramik"),
+            l.tr(zh: "自吸水盆", en: "Self-watering", de: "Selbstbewässernd")
+        ]
+    }
+
+    private var commonSoilOptions: [String] {
+        [
+            l.tr(zh: "疏松排水型通用土", en: "Loose all-purpose mix", de: "Lockere Universalerde"),
+            l.tr(zh: "多肉/仙人掌土", en: "Succulent mix", de: "Sukkulentenerde"),
+            l.tr(zh: "观叶植物土", en: "Foliage plant mix", de: "Grünpflanzenerde"),
+            l.tr(zh: "树皮颗粒混合土", en: "Bark chunky mix", de: "Rindensubstrat")
+        ]
+    }
+
+    private var commonSourceOptions: [String] {
+        [
+            l.tr(zh: "花市", en: "Plant market", de: "Pflanzenmarkt"),
+            l.tr(zh: "花店", en: "Plant shop", de: "Pflanzengeschäft"),
+            l.tr(zh: "朋友分株", en: "Friend's cutting", de: "Ableger von Freunden"),
+            l.tr(zh: "网购", en: "Online order", de: "Online bestellt")
+        ]
+    }
+
     private struct PlantEditReadinessItem: Identifiable {
         let id: String
         let title: String
@@ -611,13 +673,83 @@ struct EditPlantSheet: View {
     private var profileSection: some View {
         VStack(spacing: 12) {
             formField(l.tr(zh: "名称", en: "Name", de: "Name"), text: $name, identifier: "plant-edit-name-input")
+            commonCatalogChoiceSection
             formField(l.tr(zh: "物种名", en: "Species", de: "Art"), text: $species, identifier: "plant-edit-species-input")
+            OhanaChoiceChipRow(
+                title: l.tr(zh: "常用房间", en: "Common rooms", de: "Häufige Räume"),
+                options: commonRoomOptions,
+                selection: $roomNameRaw,
+                identifierPrefix: "plant-edit-room-choice"
+            )
             formField(l.tr(zh: "房间", en: "Room", de: "Raum"), text: $roomNameRaw, identifier: "plant-edit-room-input")
+            OhanaChoiceChipRow(
+                title: l.tr(zh: "常用位置", en: "Common spots", de: "Häufige Plätze"),
+                options: commonSpotOptions,
+                selection: $location,
+                identifierPrefix: "plant-edit-location-choice"
+            )
             formField(l.tr(zh: "具体位置", en: "Exact spot", de: "Genauer Standort"), text: $location, identifier: "plant-edit-location-input")
             formField(l.tr(zh: "头像 Emoji", en: "Avatar emoji", de: "Avatar-Emoji"), text: $avatarEmoji)
         }
         .padding(16)
         .goTranslucentCard(cornerRadius: OhanaRadius.controlLarge)
+    }
+
+    private var commonCatalogChoiceSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            sectionTitle(l.tr(zh: "常见植物", en: "Common plants", de: "Häufige Pflanzen"))
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(commonCatalogEntries) { entry in
+                        commonCatalogChoiceButton(entry)
+                    }
+                }
+                .padding(.vertical, 1)
+            }
+            .scrollClipDisabled()
+            .accessibilityElement(children: .contain)
+        }
+        .accessibilityIdentifier("plant-edit-common-catalog")
+    }
+
+    private func commonCatalogChoiceButton(_ entry: PlantCatalogEntry) -> some View {
+        let isSelected = catalogSpeciesId == entry.id
+        return Button {
+            withAnimation(GoMotion.selection) {
+                catalogSpeciesId = entry.id
+            }
+            UISelectionFeedbackGenerator().selectionChanged()
+        } label: {
+            VStack(alignment: .leading, spacing: 6) {
+                Text(entry.localizedCommonName)
+                    .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
+                    .foregroundStyle(isSelected ? Color.arkInk : Color.ohanaPrimaryText)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.78)
+                Text(l.tr(
+                    zh: "\(entry.defaultWateringDays)天浇水",
+                    en: "Water \(entry.defaultWateringDays)d",
+                    de: "\(entry.defaultWateringDays) T. gießen"
+                ))
+                    .font(OhanaFont.adaptive(size: 10, weight: .bold, design: .rounded))
+                    .foregroundStyle(isSelected ? Color.arkInk.opacity(0.74) : Color.ohanaSecondaryText)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.78)
+            }
+            .frame(width: 104, alignment: .leading)
+            .frame(minHeight: 54, alignment: .leading)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .background(isSelected ? Color.goLime : Color.ohanaControlFill.opacity(0.62), in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous)
+                    .strokeBorder(isSelected ? Color.clear : Color.ohanaCardSurface.opacity(0.18), lineWidth: 1)
+            )
+        }
+        .buttonStyle(ScaleButtonStyle())
+        .accessibilityLabel("\(entry.localizedCommonName), \(entry.latinName)")
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+        .accessibilityIdentifier("plant-edit-common-catalog-\(entry.id)")
     }
 
     private var catalogSection: some View {
@@ -703,7 +835,19 @@ struct EditPlantSheet: View {
                 .tint(Color.goLime)
             Toggle(l.tr(zh: "花盆有排水孔", en: "Pot has drainage hole", de: "Topf hat Abzugsloch"), isOn: $potHasDrainage)
                 .tint(Color.goLime)
+            OhanaChoiceChipRow(
+                title: l.tr(zh: "常见盆材质", en: "Common pot materials", de: "Häufige Topfmaterialien"),
+                options: commonPotMaterialOptions,
+                selection: $potMaterialRaw,
+                identifierPrefix: "plant-edit-pot-material-choice"
+            )
             formField(l.tr(zh: "盆材质", en: "Pot material", de: "Topfmaterial"), text: $potMaterialRaw)
+            OhanaChoiceChipRow(
+                title: l.tr(zh: "常见土壤", en: "Common soil", de: "Häufige Erde"),
+                options: commonSoilOptions,
+                selection: $soilTypeRaw,
+                identifierPrefix: "plant-edit-soil-choice"
+            )
             formField(l.tr(zh: "土壤类型", en: "Soil type", de: "Erdtyp"), text: $soilTypeRaw)
             Toggle(l.tr(zh: "水培", en: "Hydroponic", de: "Hydrokultur"), isOn: $isHydroponic)
                 .tint(Color.goLime)
@@ -747,6 +891,12 @@ struct EditPlantSheet: View {
                 DatePicker(l.tr(zh: "购入日期", en: "Acquired date", de: "Kaufdatum"), selection: $acquiredDate, displayedComponents: .date)
                     .tint(Color.goLime)
             }
+            OhanaChoiceChipRow(
+                title: l.tr(zh: "常见来源", en: "Common sources", de: "Häufige Quellen"),
+                options: commonSourceOptions,
+                selection: $acquisitionSourceRaw,
+                identifierPrefix: "plant-edit-source-choice"
+            )
             formField(l.tr(zh: "来源", en: "Source", de: "Quelle"), text: $acquisitionSourceRaw)
             Stepper(l.tr(zh: "当前高度 \(Int(currentHeightCm)) cm", en: "Current height \(Int(currentHeightCm)) cm", de: "Aktuelle Höhe \(Int(currentHeightCm)) cm"), value: $currentHeightCm, in: 0 ... 300, step: 1)
                 .tint(Color.goLime)

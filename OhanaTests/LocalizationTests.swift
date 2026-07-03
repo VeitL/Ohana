@@ -117,6 +117,19 @@ struct LocalizationTests {
         #expect(it.petCardVaccineCountdown(daysUntilDue: 5) == "tra 5 g")
     }
 
+    @Test func functionMenuCopyResolvesPlantEntrypoints() {
+        let zh = L10n("zh")
+        let en = L10n("en")
+        let de = L10n("de")
+
+        #expect(FeatureGroup.plants.title(l: zh) == "植物")
+        #expect(FeatureGroup.plants.title(l: en) == "Plants")
+        #expect(FeatureGroup.plants.title(l: de) == "Pflanzen")
+        #expect(FeatureGroup.householdHub.title(l: en) == "Household")
+        #expect(PetFeature.food.title(l: en) == "Food")
+        #expect(PetFeature.potty.title(l: de) == "Häufchen-Radio")
+    }
+
     @Test func localizedHelpersDoNotCollapseGermanToEnglish() {
         let de = L10n("de")
         let date = Calendar(identifier: .gregorian).date(from: DateComponents(year: 2026, month: 1, day: 1))!
@@ -260,6 +273,19 @@ struct LocalizationTests {
         #expect(WaterCareCycleWarningKind.waterChange.localizedTitle(l: L10n("en")) == "Water change")
         #expect(WaterCareCycleWarningKind.filterClean.localizedTitle(l: L10n("de")) == "Filter")
         #expect(WaterCareCycleWarningKind.filterReplace.localizedTitle(l: L10n("en")) == "Replacement")
+    }
+
+    @Test func plantCareTypeDisplayNameCanUseExplicitLanguage() {
+        let zh = L10n("zh")
+        let en = L10n("en")
+        let de = L10n("de")
+
+        #expect(PlantCareType.watering.displayName(l: zh) == "浇水")
+        #expect(PlantCareType.watering.displayName(l: en) == "Watering")
+        #expect(PlantCareType.watering.displayName(l: de) == "Gießen")
+        #expect(PlantCareType.pestCheck.displayName(l: en) == "Pest check")
+        #expect(PlantCareType.pestCheck.displayName(l: de) == "Schädlingscheck")
+        #expect(PlantCareType.customNote.displayName(l: zh) == "备注")
     }
 
     @Test @MainActor func domainGeneratedStatusAndRewardCopyResolvesLocalizedTitles() throws {

@@ -118,7 +118,16 @@ struct AppRouteCoordinatorTests {
 
         #expect(coordinator.overlay == nil)
         #expect(coordinator.fullScreen == nil)
-        #expect(coordinator.sheet == .calendar(entityID: petID, humanID: nil))
+        #expect(coordinator.sheet == .calendar(entityID: petID, humanID: nil, plantID: nil))
+    }
+
+    @Test func plantCalendarUsesExplicitPlantSlot() {
+        let coordinator = AppRouteCoordinator()
+        let plantID = UUID().uuidString
+
+        coordinator.presentCalendar(plantID: plantID)
+
+        #expect(coordinator.sheet == .calendar(entityID: nil, humanID: nil, plantID: plantID))
     }
 
     @Test func coconutShopUsesGlobalSheetRoute() {

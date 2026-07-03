@@ -133,11 +133,23 @@ extension VerticalSolidHomeView {
         case .home:
             openFunctionMenu(destination: nil)
         case .calendar:
-            openCalendarAddEvent()
+            openCalendarAddEvent(plants: embeddedCalendarPlants)
         case .oasis:
             injectEmbeddedOasisEnergy()
         case .plants:
             routeCoordinator.openAddEntity(.plant)
+        }
+    }
+
+    func updateCalendarBottomChromeVisibility(_ scrollOffset: CGFloat) {
+        guard controller.selectedTab == .calendar else { return }
+        let next = VerticalSolidHomeBottomChromeScrollPolicy.hidesBottomChrome(
+            scrollOffset: scrollOffset,
+            currentHidden: calendarBottomChromeHidden
+        )
+        guard next != calendarBottomChromeHidden else { return }
+        withAnimation(canAnimate ? GoMotion.quick : GoMotion.reduced) {
+            calendarBottomChromeHidden = next
         }
     }
 }

@@ -102,7 +102,8 @@ private extension HomeSheetRoute {
              .humanWeightQuick,
              .humanWorkoutQuick,
              .humanExpenseQuick,
-             .humanNoteQuick:
+             .humanNoteQuick,
+             .plantCareLog:
             true
         case .petAllFeatures,
              .humanAllFeatures,
@@ -214,6 +215,8 @@ private extension HomeSheetRoute {
             "humanNoteQuick"
         case .humanNote:
             "humanNote"
+        case .plantCareLog:
+            "plantCareLog"
         }
     }
 }

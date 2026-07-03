@@ -20,9 +20,13 @@ struct OhanaNotificationsSchedulingTests {
 
         func schedule(
             reminder: Reminder,
-            existingNotificationIds _: Set<String>?,
+            existingNotificationIds: Set<String>?,
             completion: ((ReminderNotificationScheduleResult) -> Void)?
         ) {
+            guard existingNotificationIds?.contains(reminder.notificationId) != true else {
+                completion?(.skippedDuplicate)
+                return
+            }
             scheduledIds.append(reminder.notificationId)
             scheduledDeliveryDates.append(reminder.scheduledAt)
             completion?(.scheduled)
@@ -31,9 +35,13 @@ struct OhanaNotificationsSchedulingTests {
         func schedule(
             reminder: Reminder,
             deliveryDate: Date?,
-            existingNotificationIds _: Set<String>?,
+            existingNotificationIds: Set<String>?,
             completion: ((ReminderNotificationScheduleResult) -> Void)?
         ) {
+            guard existingNotificationIds?.contains(reminder.notificationId) != true else {
+                completion?(.skippedDuplicate)
+                return
+            }
             scheduledIds.append(reminder.notificationId)
             scheduledDeliveryDates.append(deliveryDate ?? reminder.scheduledAt)
             completion?(.scheduled)
@@ -371,6 +379,143 @@ struct OhanaNotificationsSchedulingTests {
         #expect(fake.scheduledIds == [reminder.notificationId])
         let ledgerEvents = try context.fetch(FetchDescriptor<CareLedgerEvent>())
         #expect(ledgerEvents.map(\.actionType) == ["scheduleSuccess"])
+    }
+
+    @Test func lateNightCalendarReminderKeepsUserSelectedTimeWhenSavedFromCalendar() async throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let fake = FakeScheduler()
+        OhanaNotifications.current = fake
+        defer { OhanaNotifications.useLive() }
+
+        let scheduledAt = futureDate(dayOffset: 2, hour: 23, minute: 30)
+        let reminder = makeReminder(
+            title: "Late calendar task",
+            eventType: .task,
+            relatedEntityType: "",
+            relatedEntityId: "",
+            scheduledAt: scheduledAt,
+            context: context
+        )
+        try context.save()
+
+        await ReminderSchedulingService.scheduleManyIfNeeded(reminders: [reminder], context: context, source: .calendar)
+
+        #expect(fake.scheduledDeliveryDates == [scheduledAt])
+        let ledgerEvents = try context.fetch(FetchDescriptor<CareLedgerEvent>())
+        #expect(ledgerEvents.map(\.actionType) == ["scheduleSuccess"])
+    }
+
+    @Test func lateNightPlantLinkedCalendarReminderKeepsUserSelectedTime() async throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let fake = FakeScheduler()
+        OhanaNotifications.current = fake
+        defer { OhanaNotifications.useLive() }
+
+        let scheduledAt = futureDate(dayOffset: 2, hour: 23, minute: 30)
+        let plant = Plant(name: "Calendar Fern")
+        context.insert(plant)
+        let reminder = makeReminder(
+            title: "Move fern before guests arrive",
+            eventType: .task,
+            relatedEntityType: EntityKind.plant.rawValue,
+            relatedEntityId: plant.id.uuidString,
+            scheduledAt: scheduledAt,
+            context: context
+        )
+        try context.save()
+
+        let decision = try #require(NotificationDeliveryPolicy.plan(reminders: [reminder])[reminder.id])
+        guard case let .deliver(deliveryDate, classification, deferred) = decision else {
+            Issue.record("Expected a plant-linked user calendar reminder to deliver normally")
+            return
+        }
+        #expect(classification.category == .calendar)
+        #expect(deliveryDate == scheduledAt)
+        #expect(!deferred)
+
+        await ReminderSchedulingService.scheduleManyIfNeeded(reminders: [reminder], context: context, source: .calendar)
+
+        #expect(fake.scheduledDeliveryDates == [scheduledAt])
+        let ledgerEvents = try context.fetch(FetchDescriptor<CareLedgerEvent>())
+        #expect(ledgerEvents.map(\.actionType) == ["scheduleSuccess"])
+    }
+
+    @Test func lateNightCalendarReminderKeepsUserSelectedTimeDuringRefill() async throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let fake = FakeScheduler()
+        OhanaNotifications.current = fake
+        defer { OhanaNotifications.useLive() }
+
+        let scheduledAt = futureDate(dayOffset: 2, hour: 23, minute: 30)
+        let reminder = makeReminder(
+            title: "Refill calendar task",
+            eventType: .task,
+            relatedEntityType: "",
+            relatedEntityId: "",
+            scheduledAt: scheduledAt,
+            context: context
+        )
+        try context.save()
+
+        await ReminderSchedulingService.refillMissingPendingNotifications(
+            reminders: [reminder],
+            context: context,
+            careLedger: CareLedgerService()
+        )
+
+        #expect(fake.scheduledDeliveryDates == [scheduledAt])
+        let ledgerEvents = try context.fetch(FetchDescriptor<CareLedgerEvent>())
+        #expect(ledgerEvents.map(\.actionType) == ["refillSuccess"])
+    }
+
+    @Test func refillReplacesPreviouslyDeferredCalendarReminderRequest() async throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let fake = FakeScheduler()
+        OhanaNotifications.current = fake
+        defer { OhanaNotifications.useLive() }
+
+        let scheduledAt = futureDate(dayOffset: 2, hour: 23, minute: 30)
+        let reminder = makeReminder(
+            title: "Already deferred calendar task",
+            eventType: .task,
+            relatedEntityType: "",
+            relatedEntityId: "",
+            scheduledAt: scheduledAt,
+            context: context
+        )
+        let deferredMetadata = "{\"tier\":\"routine\",\"category\":\"calendar\",\"deliveryAt\":\(scheduledAt.addingTimeInterval(9 * 3600).timeIntervalSince1970),\"deferred\":true}"
+        context.insert(CareLedgerEvent(
+            occurredAt: scheduledAt.addingTimeInterval(-120),
+            eventKind: .reminder,
+            actionType: "scheduleDeferred",
+            sourceReminderId: reminder.id.uuidString,
+            metadataJSON: deferredMetadata
+        ))
+        context.insert(CareLedgerEvent(
+            occurredAt: scheduledAt.addingTimeInterval(-60),
+            eventKind: .reminder,
+            actionType: "refillSkippedExisting",
+            sourceReminderId: reminder.id.uuidString
+        ))
+        try context.save()
+
+        let result = await ReminderSchedulingService.scheduleIfNeeded(
+            reminder: reminder,
+            context: context,
+            source: .service,
+            existingNotificationIds: [reminder.notificationId],
+            operation: "refill"
+        )
+
+        #expect(result == .scheduled)
+        #expect(fake.cancelledIds == [reminder.notificationId])
+        #expect(fake.scheduledDeliveryDates == [scheduledAt])
+        let ledgerEvents = try context.fetch(FetchDescriptor<CareLedgerEvent>())
+        #expect(ledgerEvents.map(\.actionType).contains("refillSuccess"))
     }
 
     @Test func disabledCalendarPreferenceSkipsCalendarReminder() async throws {

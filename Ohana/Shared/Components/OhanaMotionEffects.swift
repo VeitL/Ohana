@@ -87,7 +87,7 @@ enum OhanaFeedback {
     }
 
     private static var canPlayFeedback: Bool {
-        !ProcessInfo.processInfo.isLowPowerModeEnabled
+        AppWorkloadPolicy.shared.shouldPlayFeedback()
     }
 
     private static func impactGenerator(for style: UIImpactFeedbackGenerator.FeedbackStyle) -> UIImpactFeedbackGenerator {

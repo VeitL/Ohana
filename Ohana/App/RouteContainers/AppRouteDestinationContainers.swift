@@ -10,16 +10,16 @@ import SwiftUI
 struct AppRouteDestination: View {
     let route: AppRoute
     let onPresentCoconutLog: ((CoconutLogSubject?) -> Void)?
-    let onPresentCalendar: ((String?) -> Void)?
+    let onPresentPlantCalendar: ((String?) -> Void)?
 
     init(
         route: AppRoute,
         onPresentCoconutLog: ((CoconutLogSubject?) -> Void)? = nil,
-        onPresentCalendar: ((String?) -> Void)? = nil
+        onPresentPlantCalendar: ((String?) -> Void)? = nil
     ) {
         self.route = route
         self.onPresentCoconutLog = onPresentCoconutLog
-        self.onPresentCalendar = onPresentCalendar
+        self.onPresentPlantCalendar = onPresentPlantCalendar
     }
 
     var body: some View {
@@ -36,7 +36,7 @@ struct AppRouteDestination: View {
                 AppPlantRouteContainer(
                     id: id,
                     onOpenCalendar: { plantId in
-                        onPresentCalendar?(plantId.uuidString)
+                        onPresentPlantCalendar?(plantId.uuidString)
                     }
                 )
             } else {
@@ -147,8 +147,8 @@ struct AppRoutePresentationHost: ViewModifier {
             coordinator.openPlant(plant.id)
         case let .functionMenu(destination):
             coordinator.presentFunctionMenu(destination: destination)
-        case let .calendar(entityID, humanID):
-            coordinator.presentCalendar(entityID: entityID, humanID: humanID)
+        case let .calendar(entityID, humanID, plantID):
+            coordinator.presentCalendar(entityID: entityID, humanID: humanID, plantID: plantID)
         }
     }
 
@@ -308,10 +308,11 @@ private struct AppSheetRouteDestination: View {
                 HiddenRouteInterceptView(note: "addEntity:\(type.rawValue)")
                     .onAppear(perform: onDismiss)
             }
-        case let .calendar(entityID, humanID):
+        case let .calendar(entityID, humanID, plantID):
             CalendarRouteContainer(
                 preselectedPetId: entityID,
                 preselectedHumanId: humanID,
+                preselectedPlantId: plantID,
                 onOpenEventDestination: onCalendarEventDestination,
                 onPresentCoconutLog: { subject in
                     coordinator.presentCoconutLog(subject)

@@ -273,6 +273,22 @@ finger frame, frozen handoff, deferred work, visual/business separation, runtime
 budget, thaw timing, safe area/hit testing, and validation. Do not call a change
 complete while any row is knowingly partial.
 
+Before reporting completion for strict smoothness work, include a compliance
+matrix. Each row must be marked exactly `Compliant`, `Partial`, or
+`Not compliant`, with brief evidence:
+
+- Finger-first frame.
+- Frozen render or snapshot handoff.
+- Heavy work deferred and cancellable.
+- Visual/business separation.
+- Runtime budget and visibility gating.
+- Thaw timing.
+- Safe area and hit testing.
+- Validation performed.
+
+If any row is `Partial` or `Not compliant`, do not present the task as complete.
+State the remaining gap, why it remains, and the next concrete step.
+
 ## Architecture And Runtime Ownership
 
 Use `docs/app-architecture-governance.md` as the main engineering reference for

@@ -13,6 +13,8 @@ regexTarget = "line"
 regexes = [
   # SharedCareSession note-format literal key ("stockOwner=1"), not a secret.
   '''stockOwnerKey = "stockOwner=1"''',
+  # Plant reminder UserDefaults storage key, not a credential.
+  '''weekendQuiet(Key|StorageName) = "plantReminder\.weekendQuiet(\.v1)?"''',
 ]
 paths = [
   # Audit fixture files contain intentionally suspicious-looking Swift.

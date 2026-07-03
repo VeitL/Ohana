@@ -27,6 +27,7 @@ nonisolated struct FocusCard: Identifiable, @unchecked Sendable {
     var personalityHint: String?
     var avatarImageData: Data?
     var avatarImageSignature: String = ""
+    var avatarImageAssetName: String?
     var cardStyleRaw: String = "classic"
     var cardPopoutImageData: Data?
     var cardPopoutImageSignature: String = ""
@@ -50,6 +51,7 @@ nonisolated struct FocusCard: Identifiable, @unchecked Sendable {
     var statusBadgeText: String?
     var statusBadgeIsWarning: Bool = false
     var isHuman: Bool = false
+    var isPlant: Bool = false
     var isElectronicPet: Bool = false
     var critterCatalogId: String?
     var critterAppearanceStage: Int = 1
@@ -132,8 +134,14 @@ struct HomeFabFunctionShortcut: Identifiable {
     var isAvailable: Bool = true
     var badge: String?
     var destination: FMDest?
+    var entityToAdd: EntityType?
 
-    var id: String { label }
+    var id: String {
+        if let entityToAdd {
+            return "\(label)-add-\(entityToAdd.rawValue)"
+        }
+        return label
+    }
 }
 
 enum ExpandedCardFabAction: Hashable {

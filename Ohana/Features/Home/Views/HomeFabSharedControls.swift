@@ -18,6 +18,22 @@ enum HomeFabShortcutCatalog {
             HomeFabFunctionShortcut(label: "更多", icon: "ellipsis.circle.fill", destination: nil)
         ]
     }
+
+    static func plantShortcuts(l: L10n) -> [HomeFabFunctionShortcut] {
+        [
+            HomeFabFunctionShortcut(
+                label: l.tr(zh: "添加植物", en: "Add plant", de: "Pflanze hinzufügen"),
+                icon: "plus",
+                destination: nil,
+                entityToAdd: .plant
+            ),
+            HomeFabFunctionShortcut(
+                label: l.tr(zh: "更多", en: "More", de: "Mehr"),
+                icon: "ellipsis.circle.fill",
+                destination: .featureGroup(.plants)
+            )
+        ]
+    }
 }
 
 struct HomeFabActionRow: View {

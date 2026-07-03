@@ -39,7 +39,7 @@ enum AppRoute: Hashable, Identifiable {
 enum AppSheetRoute: Hashable, Identifiable {
     case accountSwitcher
     case addEntity(EntityType)
-    case calendar(entityID: String?, humanID: String?)
+    case calendar(entityID: String?, humanID: String?, plantID: String?)
     case coconutLog(CoconutLogSubject?)
     case coconutShop(ShopItem.ShopCategory)
     case crewRoster(CrewRosterMode)
@@ -91,8 +91,8 @@ enum AppSheetRoute: Hashable, Identifiable {
             "account-switcher"
         case let .addEntity(type):
             "add-entity-\(type.id)"
-        case let .calendar(entityID, humanID):
-            "calendar-\(entityID ?? "all")-\(humanID ?? "all")"
+        case let .calendar(entityID, humanID, plantID):
+            "calendar-\(entityID ?? "all")-\(humanID ?? "all")-\(plantID ?? "all")"
         case let .coconutLog(subject):
             "coconut-log-\(subject?.id ?? "all")"
         case let .coconutShop(category):
@@ -332,8 +332,8 @@ final class AppRouteCoordinator: ObservableObject {
         applySheetDecision(functionMenuPresentationDecision(destination: destination))
     }
 
-    func presentCalendar(entityID: String? = nil, humanID: String? = nil) {
-        presentSheet(.calendar(entityID: entityID, humanID: humanID))
+    func presentCalendar(entityID: String? = nil, humanID: String? = nil, plantID: String? = nil) {
+        presentSheet(.calendar(entityID: entityID, humanID: humanID, plantID: plantID))
     }
 
     func presentCoconutShop(category: ShopItem.ShopCategory = .appIcon) {

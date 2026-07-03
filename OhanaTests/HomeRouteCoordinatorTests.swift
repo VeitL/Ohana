@@ -218,7 +218,22 @@ struct HomeRouteCoordinatorTests {
 
         coordinator.openCalendar(entityID: petID)
 
-        #expect(appSheets == [.appSheet(.calendar(entityID: petID, humanID: nil))])
+        #expect(appSheets == [.appSheet(.calendar(entityID: petID, humanID: nil, plantID: nil))])
+        #expect(coordinator.modal == nil)
+    }
+
+    @Test func appSheetSinkKeepsPlantCalendarIdInPlantSlot() {
+        let plantID = UUID().uuidString
+        let coordinator = HomeRouteCoordinator()
+        var appSheets: [HomeAppSheetRoute] = []
+
+        coordinator.bindAppSheetRouteSink { route in
+            appSheets.append(route)
+        }
+
+        coordinator.openCalendar(plantID: plantID)
+
+        #expect(appSheets == [.appSheet(.calendar(entityID: nil, humanID: nil, plantID: plantID))])
         #expect(coordinator.modal == nil)
     }
 
@@ -597,12 +612,13 @@ struct HomeRouteCoordinatorTests {
 
         coordinator.openCalendar(entityID: pet.id.uuidString, humanID: nil)
 
-        guard case let .calendar(entityID, humanID) = coordinator.modal else {
+        guard case let .calendar(entityID, humanID, plantID) = coordinator.modal else {
             Issue.record("Expected calendar modal route")
             return
         }
         #expect(entityID == pet.id.uuidString)
         #expect(humanID == nil)
+        #expect(plantID == nil)
 
         coordinator.openWalk(pet)
 

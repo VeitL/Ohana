@@ -14,6 +14,8 @@ struct PlantDashboardCarePlanSheet: View {
     let onOpenCareLog: (Plant, PlantCareType) -> Void
     let onCompleteDueTasks: () -> Void
     let onDeferDueTasks: () -> Void
+    let onDeferTask: (PlantCareTaskSnapshot) -> Void
+    let onSkipTask: (PlantCareTaskSnapshot) -> Void
 
     @Environment(\.dismiss) private var dismiss
     @AppStorage("appLanguage") private var appLanguage = "zh"
@@ -235,59 +237,104 @@ struct PlantDashboardCarePlanSheet: View {
     }
 
     private func taskRow(_ task: PlantCareTaskSnapshot, plant: Plant) -> some View {
-        HStack(spacing: 10) {
-            Image(systemName: careSymbol(for: task.careType)) // a11y: allow decorative task glyph; row text and buttons name actions.
-                .font(OhanaFont.adaptive(size: 13, weight: .black))
-                .foregroundStyle(careTint(for: task.careType))
-                .frame(width: 34, height: 34) // a11y: allow non-interactive task glyph; buttons provide 44pt hit targets.
-                .background(careTint(for: task.careType).opacity(0.16), in: Circle())
-                .accessibilityHidden(true)
+        let careTypeName = task.careType.displayName(l: l)
 
-            VStack(alignment: .leading, spacing: 3) {
-                Text("\(plant.name) · \(task.careType.displayName)")
-                    .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
-                    .foregroundStyle(Color.ohanaPrimaryText)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.78)
-                Text("\(task.subtitle) · \(dueText(for: task))")
-                    .font(OhanaFont.adaptive(size: 11, weight: .semibold, design: .rounded))
-                    .foregroundStyle(Color.ohanaSecondaryText)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.76)
-            }
-
-            Spacer(minLength: 8)
-
-            Button {
-                onOpenPlant(plant.id)
-                dismiss()
-            } label: {
-                Image(systemName: "arrow.right") // a11y: allow decorative open glyph; accessibility label names destination.
+        return VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 10) {
+                Image(systemName: careSymbol(for: task.careType)) // a11y: allow decorative task glyph; row text and buttons name actions.
                     .font(OhanaFont.adaptive(size: 13, weight: .black))
-                    .foregroundStyle(Color.ohanaPrimaryText)
-                    .frame(width: 44, height: 44)
+                    .foregroundStyle(careTint(for: task.careType))
+                    .frame(width: 34, height: 34) // a11y: allow non-interactive task glyph; buttons provide 44pt hit targets.
+                    .background(careTint(for: task.careType).opacity(0.16), in: Circle())
                     .accessibilityHidden(true)
-            }
-            .buttonStyle(ScaleButtonStyle())
-            .accessibilityLabel(l.tr(zh: "打开\(plant.name)", en: "Open \(plant.name)", de: "\(plant.name) öffnen"))
 
-            Button {
-                onOpenCareLog(plant, task.careType)
-            } label: {
-                Image(systemName: "checkmark") // a11y: allow decorative log glyph; accessibility label names the care log.
-                    .font(OhanaFont.adaptive(size: 12, weight: .black))
-                    .foregroundStyle(Color.arkInk)
-                    .frame(width: 44, height: 44)
-                    .background(Color.goLime, in: Circle())
-                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("\(plant.name) · \(careTypeName)")
+                        .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
+                        .foregroundStyle(Color.ohanaPrimaryText)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.78)
+                    Text("\(task.subtitle) · \(dueText(for: task))")
+                        .font(OhanaFont.adaptive(size: 11, weight: .semibold, design: .rounded))
+                        .foregroundStyle(Color.ohanaSecondaryText)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.76)
+                }
+
+                Spacer(minLength: 8)
+
+                Button {
+                    onOpenPlant(plant.id)
+                    dismiss()
+                } label: {
+                    Image(systemName: "arrow.right") // a11y: allow decorative open glyph; accessibility label names destination.
+                        .font(OhanaFont.adaptive(size: 13, weight: .black))
+                        .foregroundStyle(Color.ohanaPrimaryText)
+                        .frame(width: 44, height: 44)
+                        .accessibilityHidden(true)
+                }
+                .buttonStyle(ScaleButtonStyle())
+                .accessibilityLabel(l.tr(zh: "打开\(plant.name)", en: "Open \(plant.name)", de: "\(plant.name) öffnen"))
+
+                Button {
+                    onOpenCareLog(plant, task.careType)
+                } label: {
+                    Image(systemName: "checkmark") // a11y: allow decorative log glyph; accessibility label names the care log.
+                        .font(OhanaFont.adaptive(size: 12, weight: .black))
+                        .foregroundStyle(Color.arkInk)
+                        .frame(width: 44, height: 44)
+                        .background(Color.goLime, in: Circle())
+                        .accessibilityHidden(true)
+                }
+                .buttonStyle(ScaleButtonStyle())
+                .accessibilityLabel(l.tr(zh: "记录\(plant.name)的\(careTypeName)", en: "Log \(careTypeName) for \(plant.name)", de: "\(careTypeName) für \(plant.name) erfassen"))
+                .accessibilityIdentifier("plant-dashboard-care-plan-task-\(task.id)")
             }
-            .buttonStyle(ScaleButtonStyle())
-            .accessibilityLabel(l.tr(zh: "记录\(plant.name)的\(task.careType.displayName)", en: "Log \(task.careType.displayName) for \(plant.name)", de: "\(task.careType.displayName) für \(plant.name) erfassen"))
-            .accessibilityIdentifier("plant-dashboard-care-plan-task-\(task.id)")
+
+            HStack(spacing: 8) {
+                taskFeedbackButton(
+                    title: l.tr(zh: "延后一天", en: "Defer 1 day", de: "1 Tag später"),
+                    identifier: "plant-dashboard-care-plan-task-defer-\(task.id)",
+                    accessibilityLabel: l.tr(zh: "延后\(plant.name)的\(careTypeName)一天", en: "Defer \(careTypeName) for \(plant.name) by one day", de: "\(careTypeName) für \(plant.name) um einen Tag verschieben")
+                ) {
+                    onDeferTask(task)
+                    dismiss()
+                }
+
+                taskFeedbackButton(
+                    title: l.tr(zh: "跳过", en: "Skip", de: "Überspringen"),
+                    identifier: "plant-dashboard-care-plan-task-skip-\(task.id)",
+                    accessibilityLabel: l.tr(zh: "跳过\(plant.name)的\(careTypeName)", en: "Skip \(careTypeName) for \(plant.name)", de: "\(careTypeName) für \(plant.name) überspringen")
+                ) {
+                    onSkipTask(task)
+                    dismiss()
+                }
+            }
         }
         .padding(10)
         .background(Color.ohanaControlFill.opacity(0.62), in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
         .accessibilityElement(children: .contain)
+    }
+
+    private func taskFeedbackButton(
+        title: String,
+        identifier: String,
+        accessibilityLabel: String,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Text(title)
+                .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
+                .foregroundStyle(Color.ohanaPrimaryText)
+                .lineLimit(1)
+                .minimumScaleFactor(0.78)
+                .frame(maxWidth: .infinity)
+                .frame(minHeight: 44)
+                .background(Color.ohanaControlFill.opacity(0.72), in: Capsule())
+        }
+        .buttonStyle(ScaleButtonStyle())
+        .accessibilityLabel(accessibilityLabel)
+        .accessibilityIdentifier(identifier)
     }
 
     private func metricPill(icon: String, value: String, label: String, tint: Color) -> some View {

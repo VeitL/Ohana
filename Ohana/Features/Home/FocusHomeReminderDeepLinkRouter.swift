@@ -80,7 +80,7 @@ nonisolated enum FocusHomeReminderDestination {
     case humanDetail(Human)
     case plant(Plant)
     case functionMenu(FMDest)
-    case calendar(entityId: String?, humanId: String?)
+    case calendar(entityId: String?, humanId: String?, plantId: String?)
 }
 
 nonisolated enum FocusHomeReminderDeepLinkRouter {
@@ -310,16 +310,16 @@ nonisolated enum FocusHomeReminderDeepLinkRouter {
         let role = DomainEntityLinkRegistry.role(for: link)
         if let humanId = DomainEntityLinkRegistry.resolvedId(for: link, role: .directHuman)
             ?? DomainEntityLinkRegistry.resolvedId(for: link, role: .humanNote) {
-            return .calendar(entityId: nil, humanId: humanId.uuidString)
+            return .calendar(entityId: nil, humanId: humanId.uuidString, plantId: nil)
         }
         if let petId = DomainEntityLinkRegistry.resolvedId(for: link, role: .directPet) {
-            return .calendar(entityId: petId.uuidString, humanId: nil)
+            return .calendar(entityId: petId.uuidString, humanId: nil, plantId: nil)
         }
         if role.isPlantScoped,
            let plantId = DomainEntityLinkRegistry.plantId(for: link) {
-            return .calendar(entityId: plantId.uuidString, humanId: nil)
+            return .calendar(entityId: nil, humanId: nil, plantId: plantId.uuidString)
         }
-        return .calendar(entityId: nil, humanId: nil)
+        return .calendar(entityId: nil, humanId: nil, plantId: nil)
     }
 
     private static func sharedLitterKey(for pet: Pet) -> String {

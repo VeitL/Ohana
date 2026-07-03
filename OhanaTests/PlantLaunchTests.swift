@@ -1,11 +1,69 @@
 import Foundation
 import SwiftData
 import Testing
+import UIKit
 @testable import Ohana
 
 @MainActor
 @Suite(.serialized)
 struct PlantLaunchTests {
+    @Test func calendarAllPlantsFilterSelectionAndMatcherStayPlantScoped() {
+        let plant = Plant(name: "Mint")
+        let secondPlant = Plant(name: "Fern")
+        let plantEvent = Event(
+            title: "给薄荷浇水",
+            eventType: EventType.watering.rawValue,
+            relatedEntityType: EntityKind.plant.rawValue,
+            relatedEntityId: plant.id.uuidString
+        )
+        let plantScopedEvent = Event(
+            title: "检查蕨类叶片",
+            eventType: EventType.plantHealthCheck.rawValue,
+            relatedEntityType: "plant_health_check",
+            relatedEntityId: secondPlant.id.uuidString
+        )
+        let petEvent = Event(
+            title: "喂猫",
+            eventType: EventType.daily.rawValue,
+            relatedEntityType: EntityKind.pet.rawValue,
+            relatedEntityId: UUID().uuidString
+        )
+        let unscopedUUIDEvent = Event(
+            title: "家庭任务",
+            eventType: EventType.task.rawValue,
+            relatedEntityType: "",
+            relatedEntityId: UUID().uuidString
+        )
+        let allPlants = CalendarFilterSelection.allPlants
+        let singlePlant = CalendarFilterSelection.plant(plant.id.uuidString)
+        let view = CalendarView(
+            events: [plantEvent, plantScopedEvent, petEvent, unscopedUUIDEvent],
+            plants: [plant, secondPlant]
+        )
+
+        #expect(allPlants.isAllPlantsSelected)
+        #expect(allPlants.selectedPlantId == nil)
+        #expect(allPlants.metricScope == "plants")
+        #expect(!singlePlant.isAllPlantsSelected)
+        #expect(singlePlant.selectedPlantId == plant.id.uuidString)
+        #expect(singlePlant.metricScope == "plant")
+        #expect(singlePlant.normalizedForUserFilterControls == .allPlants)
+        #expect(view.eventIsRelatedToAnyPlant(plantEvent))
+        #expect(view.eventIsRelatedToAnyPlant(plantScopedEvent))
+        #expect(!view.eventIsRelatedToAnyPlant(petEvent))
+        #expect(!view.eventIsRelatedToAnyPlant(unscopedUUIDEvent))
+    }
+
+    @Test func calendarPlantRouteFilterDoesNotDependOnLoadedPlantRows() throws {
+        let plantID = UUID().uuidString
+        let view = CalendarView(preselectedPlantId: plantID)
+
+        #expect(view.routeFilterSelection == .plant(plantID))
+        #expect(view.effectivePlantFilterId == plantID)
+        #expect(view.effectivePetFilterId == nil)
+        #expect(view.chipFilterSelection == .plant(plantID))
+    }
+
     @Test func carePlanReadsOneDayDeferralLog() throws {
         let now = makeDate(year: 2026, month: 6, day: 8)
         let tomorrow = Calendar.current.date(byAdding: .day, value: 1, to: now) ?? now.addingTimeInterval(86400)
@@ -250,18 +308,76 @@ struct PlantLaunchTests {
     }
 
     @Test func plantCatalogCoversCommonIndoorPlantsAndRanksManualSearch() throws {
-        #expect(PlantCatalog.entries.count >= 100)
+        #expect(PlantCatalogStore.shared.entries.count == PlantCatalog.entries.count)
+        #expect(PlantCatalog.entries.count >= 200)
         #expect(PlantCatalog.entries.count <= 300)
+        #expect(PlantCatalog.entries.allSatisfy { !$0.catalogImageAssetName.isEmpty })
+        #expect(PlantCatalog.entries.allSatisfy { !$0.sourceAttribution.title.isEmpty })
+        #expect(PlantCatalog.entries.allSatisfy { !$0.sourceAttribution.license.isEmpty })
+        #expect(PlantCatalog.entries.allSatisfy { !$0.sourceAttribution.sourceURL.isEmpty })
+        #expect(PlantCatalog.entries.allSatisfy { !$0.summary.isEmpty })
+        #expect(PlantCatalog.entries.allSatisfy { !$0.habitNotes.isEmpty })
+        #expect(PlantCatalog.entries.allSatisfy { !$0.careTips.isEmpty && !$0.cautionNotes.isEmpty })
 
         let pothos = try #require(PlantCatalog.searchResults("pothos").first)
         let latin = try #require(PlantCatalog.searchResults("Monstera deliciosa").first)
+        let thaiConstellation = try #require(PlantCatalog.searchResults("thai constellation").first)
+        let xerographica = try #require(PlantCatalog.searchResults("xerographica").first)
         let petSafe = PlantCatalog.searchResults("pet safe")
         let lowLight = PlantCatalog.searchResults("低光")
 
         #expect(pothos.entry.id == "epipremnum-aureum")
         #expect(latin.entry.id == "monstera-deliciosa")
+        #expect(thaiConstellation.entry.id == "monstera-thai-constellation")
+        #expect(xerographica.entry.id == "tillandsia-xerographica")
         #expect(petSafe.contains { !$0.entry.isToxicToCats && !$0.entry.isToxicToDogs })
         #expect(lowLight.contains { $0.entry.id == "zamioculcas-zamiifolia" })
+    }
+
+    @Test func plantCatalogUsesBundledAvatarImagesForEveryEntry() throws {
+        let entriesByID = Dictionary(uniqueKeysWithValues: PlantCatalog.entries.map { ($0.id, $0) })
+        let entriesMissingImages = PlantCatalog.entries.filter {
+            FocusWalletNamedImageLoader.image(named: $0.catalogImageAssetName) == nil
+        }
+        let entriesUsingFallback = PlantCatalog.entries.filter {
+            $0.catalogImageAssetName == PlantCatalogMedia.localFoliage.assetName
+        }
+
+        #expect(PlantCatalog.entries.count >= 200)
+        #expect(PlantCatalog.entries.count == 248)
+        #expect(entriesMissingImages.isEmpty)
+        #expect(entriesUsingFallback.isEmpty)
+        #expect(PlantCatalog.entries.allSatisfy {
+            $0.catalogImageAssetName == PlantCatalogMedia.avatarAssetName(forCatalogID: $0.id)
+        })
+
+        let pothos = try #require(entriesByID["epipremnum-aureum"])
+        let airPlant = try #require(entriesByID["tillandsia-xerographica"])
+        #expect(pothos.catalogImageAssetName == "PlantAvatarAssets/plant_epipremnum_aureum.png")
+        #expect(FocusWalletNamedImageLoader.image(named: pothos.catalogImageAssetName) != nil)
+        #expect(airPlant.catalogImageAssetName == "PlantAvatarAssets/plant_tillandsia_xerographica.png")
+        #expect(FocusWalletNamedImageLoader.image(named: airPlant.catalogImageAssetName) != nil)
+    }
+
+    @Test func plantFocusCardsKeepLeafFallbackForUnknownCatalog() {
+        let plant = Plant(name: "Unknown plant")
+        let card = FocusCard.fromPlant(plant, catalog: nil, includeAvatarData: false)
+
+        #expect(card.avatarImageData == nil)
+        #expect(card.avatarImageAssetName == PlantCatalogMedia.localFoliage.assetName)
+        #expect(card.avatarImageSignature == "asset:\(PlantCatalogMedia.localFoliage.assetName)")
+    }
+
+    @Test func plantFocusCardsUseCatalogAvatarAssetWhenUserPhotoIsMissing() throws {
+        let catalog = try #require(PlantCatalog.entry(id: "monstera-deliciosa"))
+        let plant = Plant(name: "Monstera", species: "Monstera deliciosa")
+        plant.catalogSpeciesId = catalog.id
+
+        let card = FocusCard.fromPlant(plant, catalog: catalog, includeAvatarData: false)
+
+        #expect(card.avatarImageData == nil)
+        #expect(card.avatarImageAssetName == PlantCatalogMedia.avatarAssetName(forCatalogID: "monstera-deliciosa"))
+        #expect(card.avatarImageSignature == "asset:\(PlantCatalogMedia.avatarAssetName(forCatalogID: "monstera-deliciosa"))")
     }
 
     @Test func plantCatalogLocalizedDisplayFieldsDoNotFallbackToChineseForEnglishOrGerman() {
@@ -285,6 +401,10 @@ struct PlantLaunchTests {
                     entry.localizedCommonIssues,
                     entry.localizedToxicity,
                     entry.localizedCareDifficulty,
+                    entry.localizedSummary,
+                    entry.localizedHabitNotes,
+                    entry.localizedCareTips.joined(separator: " "),
+                    entry.localizedCautionNotes.joined(separator: " "),
                     profileDefaults.name,
                     profileDefaults.soilTypeRaw
                 ]
@@ -869,10 +989,12 @@ struct PlantLaunchTests {
         let event = Event(
             title: "给蕨类浇水植物计划",
             startDate: saturday,
+            isAllDay: true,
             eventType: EventType.watering.rawValue,
             relatedEntityType: EntityKind.plant.rawValue,
             relatedEntityId: plant.id.uuidString
         )
+        event.recurrenceDays = 2
         let reminder = Reminder(event: event, scheduledAt: saturday)
         PlantReminderPreferenceStore.setTimeWindow(.midday, defaults: defaults)
         PlantReminderPreferenceStore.setWeekendQuietEnabled(true, defaults: defaults)
@@ -1016,6 +1138,32 @@ struct PlantLaunchTests {
         }
     }
 
+    @Test func plantCalendarFallbackUsesExplicitPlantSlot() {
+        let plant = Plant(name: "Fern")
+        let event = Event(
+            title: "Fern care",
+            eventType: EventType.plantHealthCheck.rawValue,
+            relatedEntityType: EntityKind.plant.rawValue,
+            relatedEntityId: plant.id.uuidString
+        )
+
+        let destination = FocusHomeReminderDeepLinkRouter.destination(
+            for: event,
+            pets: [],
+            humans: [],
+            plants: [],
+            humanMedications: []
+        )
+
+        if case let .calendar(entityId, humanId, plantId) = destination {
+            #expect(entityId == nil)
+            #expect(humanId == nil)
+            #expect(plantId == plant.id.uuidString)
+        } else {
+            Issue.record("Expected plant calendar fallback to keep id in plant slot")
+        }
+    }
+
     @Test func recordingPlantCareRefreshesNextPlanReminder() throws {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
@@ -1057,12 +1205,14 @@ struct PlantLaunchTests {
         let now = makeDate(year: 2026, month: 6, day: 9, hour: 8)
         let plant = Plant(name: "Monstera", wateringIntervalDays: 3)
         let event = Event(
-            title: "给龟背竹浇水",
+            title: "给龟背竹浇水植物计划",
             startDate: now,
+            isAllDay: true,
             eventType: EventType.watering.rawValue,
             relatedEntityType: EntityKind.plant.rawValue,
             relatedEntityId: plant.id.uuidString
         )
+        event.recurrenceDays = 3
         context.insert(plant)
         context.insert(event)
         try context.save()
@@ -1092,18 +1242,54 @@ struct PlantLaunchTests {
         })
     }
 
+    @Test func completingDirectPlantUserCalendarEventDoesNotWriteCareFact() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let now = makeDate(year: 2026, month: 6, day: 9, hour: 18)
+        let plant = Plant(name: "Fern", wateringIntervalDays: 3)
+        let event = Event(
+            title: "Water fern before vacation",
+            startDate: now,
+            eventType: EventType.watering.rawValue,
+            relatedEntityType: EntityKind.plant.rawValue,
+            relatedEntityId: plant.id.uuidString
+        )
+        context.insert(plant)
+        context.insert(event)
+        try context.save()
+
+        let result = CalendarEventCommandService.toggleCompletion(
+            event: event,
+            occurrenceDate: now,
+            pets: [],
+            context: context,
+            executorId: nil,
+            now: now,
+            schedulePlantCareNotifications: false
+        )
+
+        let logs = try context.fetch(FetchDescriptor<PlantCareLog>())
+        let ledgers = try context.fetch(FetchDescriptor<CareLedgerEvent>())
+        #expect(result.isCompleted)
+        #expect(plant.lastWateredDate == nil)
+        #expect(logs.isEmpty)
+        #expect(!ledgers.contains { $0.eventKind == CareLedgerEventKind.plantCare.rawValue })
+    }
+
     @Test func completingPlantReminderWritesCareLogAndKeepsReminderLedger() throws {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
         let now = makeDate(year: 2026, month: 6, day: 10, hour: 10)
         let plant = Plant(name: "Basil", fertilizingIntervalDays: 14)
         let event = Event(
-            title: "给罗勒施肥",
+            title: "给罗勒施肥植物计划",
             startDate: now,
+            isAllDay: true,
             eventType: EventType.fertilizing.rawValue,
             relatedEntityType: EntityKind.plant.rawValue,
             relatedEntityId: plant.id.uuidString
         )
+        event.recurrenceDays = 14
         let reminder = Reminder(event: event, scheduledAt: now)
         context.insert(plant)
         context.insert(event)
@@ -1138,6 +1324,88 @@ struct PlantLaunchTests {
         })
     }
 
+    @Test func completingDirectPlantUserReminderDoesNotWriteCareFact() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let now = makeDate(year: 2026, month: 6, day: 10, hour: 16)
+        let plant = Plant(name: "Basil", fertilizingIntervalDays: 14)
+        let event = Event(
+            title: "Move basil to balcony",
+            startDate: now,
+            eventType: EventType.fertilizing.rawValue,
+            relatedEntityType: EntityKind.plant.rawValue,
+            relatedEntityId: plant.id.uuidString
+        )
+        let reminder = Reminder(event: event, scheduledAt: now)
+        context.insert(plant)
+        context.insert(event)
+        context.insert(reminder)
+        try context.save()
+
+        let didComplete = ReminderCompletionService.complete(
+            reminder,
+            by: nil,
+            context: context,
+            notifications: NoopReminderNotificationScheduler(),
+            schedulePlantCareNotifications: false
+        )
+
+        let logs = try context.fetch(FetchDescriptor<PlantCareLog>())
+        let ledgers = try context.fetch(FetchDescriptor<CareLedgerEvent>())
+        #expect(didComplete)
+        #expect(reminder.statusEnum == .completed)
+        #expect(plant.lastFertilizedDate == nil)
+        #expect(logs.isEmpty)
+        #expect(!ledgers.contains { $0.eventKind == CareLedgerEventKind.plantCare.rawValue })
+        #expect(ledgers.contains {
+            $0.eventKind == CareLedgerEventKind.reminder.rawValue &&
+            $0.actionType == "complete" &&
+                $0.sourceReminderId == reminder.id.uuidString
+        })
+    }
+
+    @Test func skippingDirectPlantUserReminderDoesNotWriteCareFact() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let now = makeDate(year: 2026, month: 6, day: 10, hour: 17)
+        let plant = Plant(name: "Mint", wateringIntervalDays: 3)
+        let event = Event(
+            title: "Move mint away from window",
+            startDate: now,
+            eventType: EventType.watering.rawValue,
+            relatedEntityType: EntityKind.plant.rawValue,
+            relatedEntityId: plant.id.uuidString
+        )
+        let reminder = Reminder(event: event, scheduledAt: now)
+        context.insert(plant)
+        context.insert(event)
+        context.insert(reminder)
+        try context.save()
+
+        let didSkip = ReminderCompletionService.skip(
+            reminder,
+            by: "human-1",
+            context: context,
+            careLedger: CareLedgerService(),
+            notifications: NoopReminderNotificationScheduler(),
+            schedulePlantCareNotifications: false,
+            now: now
+        )
+
+        let logs = try context.fetch(FetchDescriptor<PlantCareLog>())
+        let ledgers = try context.fetch(FetchDescriptor<CareLedgerEvent>())
+        #expect(didSkip)
+        #expect(reminder.statusEnum == .skipped)
+        #expect(plant.lastWateredDate == nil)
+        #expect(logs.isEmpty)
+        #expect(!ledgers.contains { $0.eventKind == CareLedgerEventKind.plantCare.rawValue })
+        #expect(ledgers.contains {
+            $0.eventKind == CareLedgerEventKind.reminder.rawValue &&
+            $0.actionType == "skip" &&
+                $0.sourceReminderId == reminder.id.uuidString
+        })
+    }
+
     @Test func skippingPlantReminderWritesPlanFeedbackAndReschedulesTask() throws {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
@@ -1145,12 +1413,14 @@ struct PlantLaunchTests {
         let plant = Plant(name: "Fern", wateringIntervalDays: 1)
         plant.lastWateredDate = Calendar.current.date(byAdding: .day, value: -3, to: now)
         let event = Event(
-            title: "给蕨类浇水",
+            title: "给蕨类浇水植物计划",
             startDate: now,
+            isAllDay: true,
             eventType: EventType.watering.rawValue,
             relatedEntityType: EntityKind.plant.rawValue,
             relatedEntityId: plant.id.uuidString
         )
+        event.recurrenceDays = 1
         let reminder = Reminder(event: event, scheduledAt: now)
         context.insert(plant)
         context.insert(event)
@@ -1230,12 +1500,14 @@ struct PlantLaunchTests {
         plant.lastWateredDate = Calendar.current.date(byAdding: .day, value: -3, to: now)
         plant.lastFertilizedDate = now
         let event = Event(
-            title: "给绿萝浇水",
+            title: "给绿萝浇水植物计划",
             startDate: now,
+            isAllDay: true,
             eventType: EventType.watering.rawValue,
             relatedEntityType: EntityKind.plant.rawValue,
             relatedEntityId: plant.id.uuidString
         )
+        event.recurrenceDays = 1
         human.weightLogs.append(humanWeightLog)
         pet.careLogs.append(playLog)
         pet.weightLogs.append(petWeightLog)

@@ -210,10 +210,11 @@ struct FocusHomeRouteSheetModifier: ViewModifier {
         case .accountSwitcher:
             AppAccountSwitcherRouteContainer(onSwitched: { routes.dismissModal() })
             .ohanaCompactSheetPresentation(detents: [.medium, .large])
-        case let .calendar(entityID, humanID):
+        case let .calendar(entityID, humanID, plantID):
             CalendarRouteContainer(
                 preselectedPetId: entityID,
                 preselectedHumanId: humanID,
+                preselectedPlantId: plantID,
                 onOpenEventDestination: openCalendarEventDestination,
                 onPresentCoconutLog: { subject in
                     routes.openCoconutLog(subject)
@@ -249,8 +250,8 @@ struct FocusHomeRouteSheetModifier: ViewModifier {
             openFunctionMenu(destination: .plantDetail(plant.id))
         case let .functionMenu(destination):
             openFunctionMenu(destination: destination)
-        case let .calendar(entityId, humanId):
-            routes.openCalendar(entityID: entityId, humanID: humanId)
+        case let .calendar(entityId, humanId, plantId):
+            routes.openCalendar(entityID: entityId, humanID: humanId, plantID: plantId)
         }
     }
 
@@ -616,6 +617,12 @@ struct FocusHomeRouteSheetModifier: ViewModifier {
         case let .humanNote(id):
             humanRouteContainer(id: id, destination: .note)
                 .ohanaSheetPagePresentation() // ui-v4: allow long overview/detail sheet
+        case let .plantCareLog(id, initialCareType):
+            HomePlantCareLogRouteContainer(
+                id: id,
+                initialCareType: initialCareType,
+                onMissing: { routes.dismissSheet() }
+            )
         }
     }
 

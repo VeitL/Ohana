@@ -20,8 +20,6 @@ enum CalendarEventDetailAction: Equatable {
 }
 
 enum CalendarEventInteractionPolicy {
-    private static let plantPlanTitleMarker = "植物计划"
-
     static func tapInteraction(for event: Event, pets: [Pet]) -> CalendarEventTapInteraction {
         shouldOpenRelatedDestination(for: event, pets: pets) ? .relatedDestination : .userEventDetail
     }
@@ -49,7 +47,7 @@ enum CalendarEventInteractionPolicy {
              .plantScoped:
             return true
         case .directPlant:
-            return isGeneratedPlantCarePlan(event)
+            return PlantReminderPreferenceStore.isGeneratedPlantCareEvent(event)
         case .directPet, .directHuman, .unscoped, .unknown:
             return false
         }
@@ -80,26 +78,5 @@ enum CalendarEventInteractionPolicy {
     private static func isGeneratedManualFeedPlan(_ event: Event, pet: Pet) -> Bool {
         event.feedRuleKindRaw == FeedRuleKind.manualReminder.rawValue &&
             FeedRuleMetadata.isManualReminderEvent(event, pet: pet)
-    }
-
-    private static func isGeneratedPlantCarePlan(_ event: Event) -> Bool {
-        guard
-            event.isAllDay,
-            event.recurrenceDays > 0,
-            event.title.contains(plantPlanTitleMarker),
-            let eventType = EventType(rawValue: event.eventType)
-        else { return false }
-
-        switch eventType {
-        case .watering, .fertilizing, .plantRepotting, .plantPruning,
-             .plantMisting, .plantRotation, .plantLeafCleaning,
-             .plantPestCheck, .plantHealthCheck:
-            return true
-        case .birthday, .anniversary, .daily, .health, .task, .shoppingList,
-             .chore, .vaccine, .externalDeworming, .internalDeworming,
-             .grooming, .vetVisit, .foodChange, .litterBox, .medication,
-             .petMedication, .petMedicationDose, .insurancePremium:
-            return false
-        }
     }
 }

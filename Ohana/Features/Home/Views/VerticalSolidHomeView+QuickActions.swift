@@ -217,6 +217,35 @@ extension VerticalSolidHomeView {
         scheduleTodayFocusDailyCompletion(afterCompleting: feedback.cardId)
     }
 
+    func performPlantQuickAction(
+        _ action: VerticalSolidHomePlantQuickAction,
+        plant: VerticalSolidHomePlantSnapshot
+    ) {
+        switch action {
+        case .water:
+            recordPlantQuickCare(.watering, plantID: plant.id)
+        case .fertilize:
+            recordPlantQuickCare(.fertilizing, plantID: plant.id)
+        case .log:
+            routeCoordinator.openSheet(.plantCareLog(plant.id, initialCareType: .customNote))
+        case .detail:
+            openPlant(plant)
+        }
+    }
+
+    func recordPlantQuickCare(_ type: PlantCareType, plantID: UUID) {
+        OhanaFeedback.light()
+        enqueueHomeCommand(.plantCare(plantID: plantID, action: type.rawValue)) {
+            commandExecutor.recordPlantCare(
+                type,
+                plantID: plantID,
+                executorId: currentExecutorId()
+            )
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+            applyTodayFocusMutationFeedback(entityId: plantID)
+        }
+    }
+
     func currentExecutorId() -> String? {
         activeHumanIdRaw.isEmpty ? nil : activeHumanIdRaw
     }
@@ -419,8 +448,8 @@ extension VerticalSolidHomeView {
             openFunctionMenu(destination: .plantDetail(plant.id))
         case let .functionMenu(destination):
             openFunctionMenu(destination: destination)
-        case let .calendar(entityId, humanId):
-            routeCoordinator.openCalendar(entityID: entityId, humanID: humanId)
+        case let .calendar(entityId, humanId, plantId):
+            routeCoordinator.openCalendar(entityID: entityId, humanID: humanId, plantID: plantId)
         }
     }
 
@@ -440,8 +469,8 @@ extension VerticalSolidHomeView {
             openFunctionMenu(destination: .plantDetail(plantID))
         case let .functionMenu(destination):
             openFunctionMenu(destination: destination)
-        case let .calendar(entityId, humanId):
-            routeCoordinator.openCalendar(entityID: entityId, humanID: humanId)
+        case let .calendar(entityId, humanId, plantId):
+            routeCoordinator.openCalendar(entityID: entityId, humanID: humanId, plantID: plantId)
         }
     }
 
