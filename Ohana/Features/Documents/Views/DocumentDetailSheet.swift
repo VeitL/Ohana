@@ -19,7 +19,6 @@ struct DocumentDetailSheet: View {
     @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
 
     @State private var previewImageData: Data?
-    @State private var previewImage: UIImage?
     @State private var showingDeleteAlert = false
     @StateObject private var commandQueue = DeferredDomainCommandQueue()
 
@@ -42,34 +41,61 @@ struct DocumentDetailSheet: View {
         return l.tr(zh: "长期", en: "Long-term", de: "Langfristig")
     }
 
-    private var imageAttachments: [Data] {
-        var result = doc.attachments.filter(\.isImage).map(\.data)
-        if result.isEmpty, let legacy = doc.attachmentData {
-            result.append(legacy)
+    private var imageAttachmentItems: [DocumentImageAttachmentItem] {
+        var result = doc.attachments
+            .filter(\.isImage)
+            .filter(\.canAttemptDataAttachmentLoad)
+            .map { attachment in
+                DocumentImageAttachmentItem(
+                    id: attachment.id.uuidString,
+                    cacheID: "document-attachment-\(attachment.id.uuidString)",
+                    sourceSignature: attachment.dataThumbnailSignature,
+                    dataProvider: { attachment.canAttemptDataAttachmentLoad ? attachment.data : nil }
+                )
+            }
+        if result.isEmpty, doc.shouldDisplayLegacyAttachmentSlot, legacyAttachmentShouldRenderAsImage {
+            result.append(
+                DocumentImageAttachmentItem(
+                    id: "legacy-\(doc.id.uuidString)",
+                    cacheID: "document-attachment-legacy-\(doc.id.uuidString)",
+                    sourceSignature: doc.legacyAttachmentThumbnailSignature,
+                    dataProvider: { doc.canAttemptLegacyAttachmentLoad ? doc.attachmentData : nil }
+                )
+            )
         }
         return result
     }
 
-    private var fileAttachments: [(data: Data, name: String)] {
-        doc.attachments.filter { !$0.isImage }.map { ($0.data, $0.filename) }
+    private var fileAttachmentItems: [DocumentFileAttachmentItem] {
+        var result = doc.attachments
+            .filter { !$0.isImage }
+            .map { attachment in
+                DocumentFileAttachmentItem(
+                    id: attachment.id.uuidString,
+                    name: attachment.filename.isEmpty
+                        ? l.tr(zh: "附件", en: "Attachment", de: "Anhang")
+                        : attachment.filename
+                )
+            }
+        if result.isEmpty, doc.shouldDisplayLegacyAttachmentSlot, !legacyAttachmentShouldRenderAsImage {
+            result.append(
+                DocumentFileAttachmentItem(
+                    id: "legacy-\(doc.id.uuidString)",
+                    name: doc.attachmentFilename.isEmpty
+                        ? l.tr(zh: "附件", en: "Attachment", de: "Anhang")
+                        : doc.attachmentFilename
+                )
+            )
+        }
+        return result
+    }
+
+    private var legacyAttachmentShouldRenderAsImage: Bool {
+        doc.attachmentFilename.isEmpty || AttachmentPrivacySanitizer.isImageFilename(doc.attachmentFilename)
     }
 
     private var visibleNotes: String {
         ExpenseReceiptMetadata.visibleNotes(from: doc.notes)
-    }
-
-    private var previewImageKey: String {
-        guard let previewImageData else { return "none" }
-        return "\(previewImageData.count)-\(previewImageData.hashValue)"
-    }
-
-    @MainActor
-    private func decodePreviewImage() async {
-        guard let previewImageData else {
-            previewImage = nil
-            return
-        }
-        previewImage = await AttachmentImageDecoder.decode(previewImageData)
     }
 
     var body: some View {
@@ -89,13 +115,10 @@ struct DocumentDetailSheet: View {
                 .padding(.top, 18)
             }
 
-            if let previewImage {
-                imagePreview(previewImage)
+            if let previewImageData {
+                imagePreview(previewImageData)
                     .zIndex(20)
             }
-        }
-        .task(id: previewImageKey) {
-            await decodePreviewImage()
         }
         .alert(l.tr(zh: "删除证件？", en: "Delete document?", de: "Dokument löschen?"), isPresented: $showingDeleteAlert) {
             Button(l.tr(zh: "取消", en: "Cancel", de: "Abbrechen"), role: .cancel) {}
@@ -151,7 +174,7 @@ struct DocumentDetailSheet: View {
     private var statusStrip: some View {
         HStack(spacing: 12) {
             metric(title: l.tr(zh: "状态", en: "Status", de: "Status"), value: statusText, tint: expiryColor)
-            metric(title: l.tr(zh: "附件", en: "Files", de: "Anhänge"), value: "\(imageAttachments.count + fileAttachments.count)", tint: Color.goPrimary)
+            metric(title: l.tr(zh: "附件", en: "Files", de: "Anhänge"), value: "\(imageAttachmentItems.count + fileAttachmentItems.count)", tint: Color.goPrimary)
             metric(title: l.tr(zh: "花费", en: "Cost", de: "Kosten"), value: doc.cost > 0 ? AppCurrency.format(doc.cost, fractionDigits: 0) : "—", tint: Color.goTeal)
         }
     }
@@ -208,23 +231,23 @@ struct DocumentDetailSheet: View {
 
     @ViewBuilder
     private var attachmentSection: some View {
-        if !imageAttachments.isEmpty || !fileAttachments.isEmpty {
+        if !imageAttachmentItems.isEmpty || !fileAttachmentItems.isEmpty {
             VStack(alignment: .leading, spacing: 12) {
                 Text(l.tr(zh: "附件", en: "Attachments", de: "Anhänge"))
                     .font(OhanaFont.headline(.black))
                     .foregroundStyle(Color.ohanaPrimaryText)
 
-                if !imageAttachments.isEmpty {
+                if !imageAttachmentItems.isEmpty {
                     LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
-                        ForEach(Array(imageAttachments.enumerated()), id: \.offset) { _, data in
-                            DocumentAttachmentThumbnailView(data: data) {
-                                previewImageData = data
+                        ForEach(imageAttachmentItems) { item in
+                            DocumentAttachmentThumbnailView(item: item) {
+                                previewImageData = item.dataProvider()
                             }
                         }
                     }
                 }
 
-                ForEach(Array(fileAttachments.enumerated()), id: \.offset) { _, attachment in
+                ForEach(fileAttachmentItems) { attachment in
                     HStack(spacing: 12) {
                         Image(systemName: "doc.fill") // a11y: allow decorative icon covered by surrounding text or control
                             .font(OhanaFont.adaptive(size: 14, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
@@ -274,15 +297,25 @@ struct DocumentDetailSheet: View {
         .padding(.top, 4)
     }
 
-    private func imagePreview(_ ui: UIImage) -> some View {
+    private func imagePreview(_ data: Data) -> some View {
         ZStack {
             Color.arkInk.opacity(0.94)
                 .ignoresSafeArea()
                 .onTapGesture { dismissPreview() }
-            Image(uiImage: ui)
-                .resizable()
-                .scaledToFit()
-                .padding(18)
+            AsyncDecodedImageView(
+                data: data,
+                cacheID: "document-detail-preview",
+                maxPixel: 2200
+            ) { image in
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFit()
+                    .padding(18)
+            } placeholder: {
+                ProgressView()
+                    .tint(Color.ohanaPrimaryText)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
             VStack {
                 HStack {
                     Spacer()
@@ -303,20 +336,25 @@ struct DocumentDetailSheet: View {
     private func dismissPreview() {
         withAnimation(GoMotion.page) {
             previewImageData = nil
-            previewImage = nil
         }
     }
 }
 
+private struct DocumentImageAttachmentItem: Identifiable {
+    let id: String
+    let cacheID: String
+    let sourceSignature: String
+    let dataProvider: @MainActor () -> Data?
+}
+
+private struct DocumentFileAttachmentItem: Identifiable {
+    let id: String
+    let name: String
+}
+
 private struct DocumentAttachmentThumbnailView: View {
-    let data: Data
+    let item: DocumentImageAttachmentItem
     let onTap: () -> Void
-
-    @State private var image: UIImage?
-
-    private var imageKey: String {
-        "\(data.count)-\(data.hashValue)"
-    }
 
     var body: some View {
         Button(action: onTap) {
@@ -324,11 +362,18 @@ private struct DocumentAttachmentThumbnailView: View {
                 RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous)
                     .fill(Color.ohanaCardSurface)
 
-                if let image {
+                AsyncDecodedImageView(
+                    cacheID: item.cacheID,
+                    sourceSignature: item.sourceSignature,
+                    maxPixel: 520,
+                    dataProvider: {
+                    item.dataProvider()
+                    }
+                ) { image in
                     Image(uiImage: image)
                         .resizable()
                         .scaledToFill()
-                } else {
+                } placeholder: {
                     Image(systemName: "photo.fill") // a11y: allow decorative icon covered by surrounding text or control
                         .font(OhanaFont.title3(.bold))
                         .foregroundStyle(Color.ohanaSecondaryText.opacity(0.45))
@@ -341,12 +386,5 @@ private struct DocumentAttachmentThumbnailView: View {
             .contentShape(RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
         }
         .buttonStyle(ScaleButtonStyle())
-        .task(id: imageKey) {
-            let decoded = await AttachmentImageDecoder.decode(data)
-            guard !Task.isCancelled else { return }
-            await MainActor.run {
-                image = decoded
-            }
-        }
     }
 }

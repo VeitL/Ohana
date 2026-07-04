@@ -632,7 +632,7 @@ enum PetCardAppearanceCommandService {
         guard MemberLifecycleGate.disposition(pet: pet, writeKind: .presentationPreference).writesContent else {
             return PetCardAppearanceCommandResult(petID: pet.id, action: "enablePopout")
         }
-        pet.cardPopoutImageData = imageData
+        pet.updateCardPopoutImageData(imageData)
         pet.cardPopoutSourceRaw = sourceRaw
         pet.cardStyleRaw = "popout"
         context.safeSave()
@@ -694,7 +694,7 @@ enum Avatar2DUpgradeCommandService {
             )
         }
 
-        human.avatarImageData = data
+        human.updateAvatarImageData(data)
         human.avatarEmoji = HumanGenderIdentity.fallbackAvatarEmoji(for: avatarGender)
         context.safeSave()
         return Avatar2DUpgradeCommandResult(
@@ -742,7 +742,7 @@ enum Avatar2DUpgradeCommandService {
             )
         }
 
-        pet.avatarImageData = data
+        pet.updateAvatarImageData(data)
         context.safeSave()
         return Avatar2DUpgradeCommandResult(
             entityID: pet.id,

@@ -137,8 +137,14 @@ struct QuickHumanNoteSheet: View {
             Task {
                 var loaded: [UIImage] = []
                 for item in newItems {
-                    if let data = try? await item.loadTransferable(type: Data.self),
-                       let image = await AttachmentImageDecoder.decode(data) {
+                    guard let data = try? await item.loadTransferable(type: Data.self) else { continue }
+                    let signature = MediaThumbnailProvider.signature(for: data)
+                    let key = MediaThumbnailKey(
+                        id: "quick-human-note-import-\(signature)",
+                        sourceSignature: signature,
+                        maxPixel: 1800
+                    )
+                    if let image = await MediaThumbnailProvider.image(for: key, dataProvider: { data }) {
                         loaded.append(image)
                     }
                 }

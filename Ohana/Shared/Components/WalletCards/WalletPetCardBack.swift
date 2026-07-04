@@ -192,9 +192,9 @@ struct WalletPetCardBack: View {
     // MARK: - Top bar
     private var topBar: some View {
         HStack(spacing: 6) {
-            if pet.avatarImageData != nil {
+            if pet.hasAvatarImageAttachment {
                 PetAvatarPortraitView(
-                    imageData: pet.avatarImageData,
+                    pet: pet,
                     fallbackText: pet.avatarEmoji.isEmpty ? pet.speciesEmoji : pet.avatarEmoji,
                     themeColor: Color.goCardWhite,
                     size: 24,

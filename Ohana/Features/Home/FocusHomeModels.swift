@@ -6,10 +6,12 @@
 //
 
 import Foundation
+import SwiftData
 import SwiftUI
 
 nonisolated struct FocusCard: Identifiable, @unchecked Sendable {
     let id: UUID
+    var modelID: PersistentIdentifier? = nil
     let name: String
     let kind: String
     let emoji: String
@@ -165,7 +167,7 @@ struct ExpandedCardFabShortcut: Identifiable {
 extension FocusCard {
     nonisolated static func from(
         _ pet: Pet,
-        includeAvatarData: Bool = true,
+        includeAvatarData: Bool = false,
         homeWalkDistanceMeters: Double = 0
     ) -> FocusCard {
         let isDog = pet.species.contains("狗") || pet.species.lowercased().contains("dog")
@@ -218,11 +220,18 @@ extension FocusCard {
         } else {
             togetherHeadline = l.tr(zh: "相伴 \(togetherDays) 天", en: "\(togetherDays) Days Together", de: "\(togetherDays) Tage zusammen")
         }
+        let hasAvatarAttachment = pet.hasAvatarImageAttachment
+        let avatarImageData = includeAvatarData && hasAvatarAttachment ? pet.avatarImageData : nil
+        let avatarImageSignature = hasAvatarAttachment ? pet.avatarThumbnailSignature : ""
         let popoutImageData = includeAvatarData && pet.cardStyleRaw == "popout"
-            ? (pet.cardPopoutImageData ?? pet.avatarImageData)
+            ? (pet.hasCardPopoutImageAttachment ? pet.cardPopoutImageData : avatarImageData)
             : nil
+        let popoutImageSignature = pet.cardStyleRaw == "popout"
+            ? (pet.hasCardPopoutImageAttachment ? pet.cardPopoutThumbnailSignature : avatarImageSignature)
+            : ""
         return FocusCard(
             id: pet.id,
+            modelID: pet.persistentModelID,
             name: pet.name.isEmpty ? l.tr(zh: "未命名", en: "Unnamed", de: "Unbenannt") : pet.name,
             kind: pet.hasPassedAway ? l.tr(zh: "彩虹桥", en: "Rainbow Bridge", de: "Regenbogenbrücke") : (pet.species.isEmpty ? "PET" : pet.species),
             emoji: pet.avatarEmoji.isEmpty ? "🐾" : pet.avatarEmoji,
@@ -241,11 +250,11 @@ extension FocusCard {
             humanEquivalentAgeText: pet.birthday.map { pet.humanEquivalentAgeTextForWallet(birthday: $0, l: l) },
             genderText: pet.genderSymbol + (pet.isNeutered ? l.tr(zh: " 已绝育", en: " neutered", de: " kastriert") : ""),
             personalityHint: PetTagGreeting.homeSubtitleHint(pet: pet, hour: hour, l: L10n(language)),
-            avatarImageData: includeAvatarData ? pet.avatarImageData : nil,
-            avatarImageSignature: includeAvatarData ? pet.avatarImageData.map(FocusWalletAvatarCache.signature(for:)) ?? "" : "",
+            avatarImageData: avatarImageData,
+            avatarImageSignature: avatarImageSignature,
             cardStyleRaw: pet.cardStyleRaw,
             cardPopoutImageData: popoutImageData,
-            cardPopoutImageSignature: popoutImageData.map(FocusWalletAvatarCache.signature(for:)) ?? "",
+            cardPopoutImageSignature: popoutImageSignature,
             cardPopoutSourceRaw: pet.cardPopoutSourceRaw ?? "",
             petSpecies: pet.species,
             coatColor: WalletPetCardTheme.silhouetteCoatColor(for: pet),
@@ -263,15 +272,17 @@ extension FocusCard {
         )
     }
 
-    nonisolated static func from(_ human: Human, includeAvatarData: Bool = true) -> FocusCard {
+    nonisolated static func from(_ human: Human, includeAvatarData: Bool = false) -> FocusCard {
         let hex = human.safeThemeColorHex
         let days = human.hasPassedAway
             ? human.daysTogetherAtPassing
             : max(0, Calendar.current.dateComponents([.day], from: human.createdAt, to: Date()).day ?? 0)
         let language = AppLanguage.code
         let l = L10n(language)
+        let hasAvatarAttachment = human.hasAvatarImageAttachment
         return FocusCard(
             id: human.id,
+            modelID: human.persistentModelID,
             name: human.name.isEmpty ? l.tr(zh: "成员", en: "Human", de: "Mitglied") : human.name,
             kind: human.hasPassedAway ? l.tr(zh: "纪念", en: "Memorial", de: "Gedenken") : l.tr(zh: "家人", en: "Member", de: "Mitglied"),
             emoji: human.avatarEmoji.isEmpty ? "👤" : human.avatarEmoji,
@@ -288,8 +299,8 @@ extension FocusCard {
             zodiacText: human.birthday.map { Human.westernZodiacDisplay(for: $0, l: l) },
             mbtiText: human.mbti.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : human.mbti.uppercased(),
             genderText: HumanGenderIdentity.title(for: human.genderRaw),
-            avatarImageData: includeAvatarData ? human.avatarImageData : nil,
-            avatarImageSignature: includeAvatarData ? human.avatarImageData.map(FocusWalletAvatarCache.signature(for:)) ?? "" : "",
+            avatarImageData: includeAvatarData && hasAvatarAttachment ? human.avatarImageData : nil,
+            avatarImageSignature: hasAvatarAttachment ? human.avatarThumbnailSignature : "",
             humanGender: human.genderRaw,
             themeColorHex: hex,
             daysTogether: days,

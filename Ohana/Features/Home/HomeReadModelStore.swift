@@ -30,12 +30,12 @@ nonisolated struct HomeHeaderAvatarSnapshot: Equatable, Sendable {
     }
 
     init(human: Human?) {
-        guard let human, let data = human.avatarImageData else {
+        guard let human, human.hasAvatarImageAttachment else {
             self = .empty
             return
         }
         id = human.id
-        signature = FocusWalletAvatarCache.signature(for: data)
+        signature = human.avatarThumbnailSignature
     }
 }
 
@@ -46,6 +46,7 @@ struct HomeReadModelPayload {
     let signature: String
     let activeHumanAvatar: HomeHeaderAvatarSnapshot
     let avatarPreloadSignature: String
+    let mediaPreloadRequests: [VerticalSolidHomeMediaPreloadRequest]
     let avatarPreloadPayloads: [FocusWalletAvatarCache.Payload]
     let popoutPreloadSignature: String
     let popoutPreloadPayloads: [FocusWalletAvatarCache.Payload]
@@ -57,6 +58,7 @@ struct HomeReadModelPayload {
         signature: "",
         activeHumanAvatar: .empty,
         avatarPreloadSignature: "",
+        mediaPreloadRequests: [],
         avatarPreloadPayloads: [],
         popoutPreloadSignature: "",
         popoutPreloadPayloads: []
@@ -81,6 +83,7 @@ nonisolated struct HomeReadModelActorResult: Sendable {
     let signature: String
     let activeHumanAvatar: HomeHeaderAvatarSnapshot
     let avatarPreloadSignature: String
+    let mediaPreloadRequests: [VerticalSolidHomeMediaPreloadRequest]
     let avatarPreloadPayloads: [FocusWalletAvatarCache.Payload]
     let popoutPreloadSignature: String
     let popoutPreloadPayloads: [FocusWalletAvatarCache.Payload]
@@ -271,6 +274,7 @@ final class HomeReadModelStore: ObservableObject {
             signature: actorResult.signature,
             activeHumanAvatar: actorResult.activeHumanAvatar,
             avatarPreloadSignature: actorResult.avatarPreloadSignature,
+            mediaPreloadRequests: actorResult.mediaPreloadRequests,
             avatarPreloadPayloads: actorResult.avatarPreloadPayloads,
             popoutPreloadSignature: actorResult.popoutPreloadSignature,
             popoutPreloadPayloads: actorResult.popoutPreloadPayloads
@@ -301,20 +305,6 @@ final class HomeReadModelStore: ObservableObject {
             return false
         }
         return true
-    }
-
-    private func avatarPayloads(
-        snapshot: HomeSnapshot,
-        activeHuman: Human?
-    ) -> [FocusWalletAvatarCache.Payload] {
-        var payloads = VerticalSolidHomePreloadPlanner.avatarPayloads(snapshot: snapshot)
-        guard let activeHuman,
-              activeHuman.avatarImageData != nil,
-              !payloads.contains(where: { $0.id == activeHuman.id }) else {
-            return payloads
-        }
-        payloads.append(FocusWalletAvatarCache.Payload(id: activeHuman.id, data: activeHuman.avatarImageData))
-        return payloads
     }
 
     func markPrepared(_ tab: VerticalSolidHomeTab) {
@@ -414,13 +404,13 @@ actor HomeReadModelActor {
         try Task.checkCancellation()
 
         let activeHumanAvatar = HomeHeaderAvatarSnapshot(human: source.activeHuman)
-        let avatarPreloadPayloads = Self.avatarPayloads(
+        let mediaPreloadRequests = VerticalSolidHomePreloadPlanner.mediaRequests(
             snapshot: snapshot,
+            pets: pets,
+            humans: humans,
             activeHuman: source.activeHuman
         )
-        let avatarPreloadSignature = VerticalSolidHomePreloadPlanner.avatarSignature(for: avatarPreloadPayloads)
-        let popoutPreloadPayloads = VerticalSolidHomePreloadPlanner.popoutPayloads(snapshot: snapshot)
-        let popoutPreloadSignature = VerticalSolidHomePreloadPlanner.popoutSignature(for: popoutPreloadPayloads)
+        let avatarPreloadSignature = VerticalSolidHomePreloadPlanner.mediaSignature(for: mediaPreloadRequests)
 
         return HomeReadModelActorResult(
             snapshot: snapshot,
@@ -428,27 +418,14 @@ actor HomeReadModelActor {
             signature: signature,
             activeHumanAvatar: activeHumanAvatar,
             avatarPreloadSignature: avatarPreloadSignature,
-            avatarPreloadPayloads: avatarPreloadPayloads,
-            popoutPreloadSignature: popoutPreloadSignature,
-            popoutPreloadPayloads: popoutPreloadPayloads,
+            mediaPreloadRequests: mediaPreloadRequests,
+            avatarPreloadPayloads: [],
+            popoutPreloadSignature: "",
+            popoutPreloadPayloads: [],
             petCount: pets.count,
             humanCount: humans.count,
             eventCount: events.count
         )
-    }
-
-    private static func avatarPayloads(
-        snapshot: HomeSnapshot,
-        activeHuman: Human?
-    ) -> [FocusWalletAvatarCache.Payload] {
-        var payloads = VerticalSolidHomePreloadPlanner.avatarPayloads(snapshot: snapshot)
-        guard let activeHuman,
-              activeHuman.avatarImageData != nil,
-              !payloads.contains(where: { $0.id == activeHuman.id }) else {
-            return payloads
-        }
-        payloads.append(FocusWalletAvatarCache.Payload(id: activeHuman.id, data: activeHuman.avatarImageData))
-        return payloads
     }
 }
 

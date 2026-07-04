@@ -360,7 +360,9 @@ struct PetAllFeaturesSheet: View {
                     onClose: { dismiss() },
                     avatar: {
                         FeatureHubAvatar(
-                            imageData: pet.avatarImageData,
+                            imageCacheID: "pet-all-features-\(pet.id.uuidString)",
+                            imageSignature: pet.avatarThumbnailSignature,
+                            petModelID: pet.persistentModelID,
                             emoji: pet.avatarEmoji,
                             fallback: pet.speciesEmoji,
                             tint: Color(hex: pet.safeThemeColorHex)

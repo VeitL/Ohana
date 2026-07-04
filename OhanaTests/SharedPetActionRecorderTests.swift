@@ -754,6 +754,29 @@ struct SharedPetActionRecorderTests {
         #expect(item.subtitle.contains("Dry food"))
     }
 
+    @Test func petPhotoAlbumRenderDataGroupsByMonthAndSortsPhotos() {
+        let imageData = Data(repeating: 1, count: 12)
+        let januaryEarly = PetPhotoLog(
+            imageData: imageData,
+            date: makeDate(year: 2026, month: 1, day: 2, hour: 10)
+        )
+        let januaryLate = PetPhotoLog(
+            imageData: imageData,
+            date: makeDate(year: 2026, month: 1, day: 20, hour: 18)
+        )
+        let february = PetPhotoLog(
+            imageData: imageData,
+            date: makeDate(year: 2026, month: 2, day: 3, hour: 9)
+        )
+
+        let renderData = PetPhotoAlbumRenderData.build(photoLogs: [januaryEarly, february, januaryLate])
+
+        #expect(renderData.groups.count == 2)
+        #expect(renderData.groups[0].photos.map(\.id) == [february.id])
+        #expect(renderData.groups[1].photos.map(\.id) == [januaryLate.id, januaryEarly.id])
+        #expect(renderData.groups[0].monthStart > renderData.groups[1].monthStart)
+    }
+
     @Test func updatingSharedFeedLogReconcilesSessionAndRestagesCloudSync() throws {
         let container = try makeContainer()
         let context = container.mainContext
@@ -1361,7 +1384,7 @@ struct SharedPetActionRecorderTests {
     }
 
     private func makeContainer() throws -> ModelContainer {
-        let schema = Schema(ArkSchemaV74.models)
+        let schema = Schema(ArkSchemaV82.models)
         let config = ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)
         return try ModelContainer(for: schema, configurations: [config])
     }
@@ -1370,6 +1393,17 @@ struct SharedPetActionRecorderTests {
         let defaults = try #require(UserDefaults(suiteName: suiteName))
         defaults.removePersistentDomain(forName: suiteName)
         return defaults
+    }
+
+    private func makeDate(year: Int, month: Int, day: Int, hour: Int = 0) -> Date {
+        var components = DateComponents()
+        components.calendar = Calendar(identifier: .gregorian)
+        components.timeZone = TimeZone(secondsFromGMT: 0)
+        components.year = year
+        components.month = month
+        components.day = day
+        components.hour = hour
+        return components.date ?? .distantPast
     }
 
     private func isolateEconomy(activeHumanID: String?) -> () -> Void {

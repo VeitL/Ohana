@@ -132,7 +132,7 @@ struct FamilyCollaborationDashboardView: View {
 
     var petAvatarSourceKey: String {
         let key = activePets
-            .map { "\($0.id.uuidString):\($0.avatarImageData?.count ?? 0)" }
+            .map { "\($0.id.uuidString):\($0.avatarThumbnailSignature)" }
             .joined(separator: "|")
         return key.isEmpty ? "family-collaboration-pet-avatar-empty" : key
     }

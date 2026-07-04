@@ -78,7 +78,7 @@ enum AvatarAssetMaintenanceService {
         let compactedPets = Dictionary(uniqueKeysWithValues: updates.0)
         for pet in pets where compactedPets[pet.id] != nil {
             guard let compacted = compactedPets[pet.id] else { continue }
-            pet.avatarImageData = compacted
+            pet.updateAvatarImageData(compacted)
             didChange = true
         }
 
@@ -90,7 +90,7 @@ enum AvatarAssetMaintenanceService {
         let compactedHumans = Dictionary(uniqueKeysWithValues: updates.1)
         for human in humans where compactedHumans[human.id] != nil {
             guard let compacted = compactedHumans[human.id] else { continue }
-            human.avatarImageData = compacted
+            human.updateAvatarImageData(compacted)
             didChange = true
         }
 

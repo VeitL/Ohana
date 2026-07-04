@@ -40,7 +40,7 @@ extension PlantDetailContentView {
                     icon: "arrow.forward.circle.fill",
                     title: l.tr(zh: "下一步", en: "Next", de: "Nächstes"),
                     value: nextTask.map { dueText(for: $0) } ?? l.tr(zh: "无计划", en: "No plan", de: "Kein Plan"),
-                    tint: nextTask?.isOverdue == true ? Color.goRed : Color.goLime
+                    tint: nextTask?.isOverdue == true ? Color.goRed : Color.goPrimary
                 )
                 overviewMetric(
                     icon: "drop.fill",
@@ -52,7 +52,7 @@ extension PlantDetailContentView {
                     icon: "mappin.and.ellipse",
                     title: l.tr(zh: "位置", en: "Place", de: "Ort"),
                     value: placementSummary,
-                    tint: Color.goLime
+                    tint: Color.goPrimary
                 )
             }
         }
@@ -67,9 +67,9 @@ extension PlantDetailContentView {
             HStack(alignment: .top, spacing: 10) {
                 Image(systemName: "checklist.checked") // a11y: allow decorative queue glyph; heading names the card.
                     .font(OhanaFont.adaptive(size: 16, weight: .black))
-                    .foregroundStyle(Color.goLime)
+                    .foregroundStyle(Color.goPrimary)
                     .frame(width: 34, height: 34) // a11y: allow non-interactive queue glyph; text carries the accessible content.
-                    .background(Color.goLime.opacity(0.16), in: Circle())
+                    .background(Color.goPrimary.opacity(0.16), in: Circle())
                     .accessibilityHidden(true)
 
                 VStack(alignment: .leading, spacing: 3) {
@@ -89,7 +89,7 @@ extension PlantDetailContentView {
                     .foregroundStyle(Color.arkInk)
                     .padding(.horizontal, 10)
                     .padding(.vertical, 7)
-                    .background(Color.goLime, in: Capsule())
+                    .background(Color.goPrimary, in: Capsule())
                     .accessibilityLabel(l.tr(zh: "档案完成度 \(profileCompletionPercent)%", en: "Profile \(profileCompletionPercent)% complete", de: "Profil zu \(profileCompletionPercent)% vollständig"))
             }
 
@@ -224,22 +224,13 @@ extension PlantDetailContentView {
     var actionQueueToolRail: some View {
         HStack(spacing: 8) {
             actionQueueToolButton(
-                id: "calendar",
-                icon: "calendar.badge.clock",
-                title: l.tr(zh: "日历", en: "Calendar", de: "Kalender"),
-                subtitle: nextTask.map { dueText(for: $0) } ?? l.tr(zh: "计划", en: "Plan", de: "Plan"),
-                tint: nextTask?.isOverdue == true ? Color.goRed : Color.goTeal,
-                action: openCareCalendar
-            )
-
-            actionQueueToolButton(
                 id: "reminders",
                 icon: plant.remindersEnabled ? "bell.badge.fill" : "bell.slash.fill",
                 title: l.tr(zh: "提醒", en: "Reminders", de: "Hinweise"),
                 subtitle: plant.remindersEnabled
                     ? l.tr(zh: "开启", en: "On", de: "An")
                     : l.tr(zh: "关闭", en: "Off", de: "Aus"),
-                tint: plant.remindersEnabled ? Color.goLime : Color.goYellow,
+                tint: plant.remindersEnabled ? Color.goPrimary : Color.goYellow,
                 action: openReminderSettings
             )
 
@@ -302,13 +293,13 @@ extension PlantDetailContentView {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Image(systemName: "sparkles") // a11y: allow decorative section glyph; heading names the next task.
-                    .foregroundStyle(Color.goLime)
+                    .foregroundStyle(Color.goPrimary)
                     .accessibilityHidden(true)
                 Text(l.tr(zh: "下一步", en: "Next step", de: "Nächster Schritt"))
                     .font(OhanaFont.adaptive(size: 16, weight: .bold, design: .rounded))
                 Spacer()
             }
-            if let task = careTasks.first {
+            if let task = nextTask {
                 Text(task.title)
                     .font(OhanaFont.adaptive(size: 18, weight: .heavy, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
@@ -328,7 +319,7 @@ extension PlantDetailContentView {
                         .foregroundStyle(Color.arkInk)
                         .frame(minHeight: 44)
                         .padding(.horizontal, 14)
-                        .background(Color.goLime, in: Capsule())
+                        .background(Color.goPrimary, in: Capsule())
                         .buttonStyle(ScaleButtonStyle())
                         .accessibilityIdentifier("plant-detail-next-task-complete")
 
@@ -397,10 +388,10 @@ extension PlantDetailContentView {
                 title: l.tr(zh: "施肥", en: "Fertilizing", de: "Düngen"),
                 status: fertilizingStatusText,
                 detail: fertilizingIntervalText,
-                tint: isFertilizingDue ? Color.goYellow : Color.goLime,
+                tint: isFertilizingDue ? Color.goYellow : Color.goPrimary,
                 progress: plant.daysSinceFertilized.map { min(1, Double($0) / Double(max(fertilizingIntervalDays, 1))) }
             )
-            if let pestTask = careTasks.first(where: { $0.careType == .pestCheck }) {
+            if let pestTask = taskSummary?.pestCheckTask {
                 rhythmRow(
                     icon: "ladybug.fill",
                     title: PlantCareType.pestCheck.displayName(l: l),
@@ -410,7 +401,7 @@ extension PlantDetailContentView {
                     progress: nil
                 )
             }
-            if let cleaningTask = careTasks.first(where: { $0.careType == .leafCleaning }) {
+            if let cleaningTask = taskSummary?.leafCleaningTask {
                 rhythmRow(
                     icon: "sparkles",
                     title: PlantCareType.leafCleaning.displayName(l: l),
@@ -456,7 +447,7 @@ extension PlantDetailContentView {
                     .minimumScaleFactor(0.78)
                     .frame(minHeight: 44)
                     .padding(.horizontal, 12)
-                    .background(Color.goLime, in: Capsule())
+                    .background(Color.goPrimary, in: Capsule())
             }
             .buttonStyle(ScaleButtonStyle())
             .accessibilityIdentifier("plant-detail-care-plan-edit-profile")
@@ -810,7 +801,7 @@ extension PlantDetailContentView {
             diagnosisActionButton(
                 type: .pestCheck,
                 icon: "ladybug.fill",
-                tint: Color.goLime,
+                tint: Color.goPrimary,
                 isSubtle: false,
                 identifier: "plant-detail-diagnosis-pest-check",
                 accessibilityText: l.tr(zh: "记录\(plant.name)的病虫害复查", en: "Log a pest check for \(plant.name)", de: "Schädlingscheck für \(plant.name) erfassen")

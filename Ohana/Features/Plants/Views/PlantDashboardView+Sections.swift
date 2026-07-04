@@ -57,11 +57,7 @@ extension PlantDashboardView {
                 }
 
             if let plant = dashboardLeadPlant {
-                PlantDashboardPhotoTile(
-                    imageData: previewImageData(for: plant),
-                    fallbackEmoji: plant.avatarEmoji,
-                    tint: siteTint(for: plant)
-                )
+                plantPreviewTile(for: plant)
                 .clipShape(Circle())
                 .padding(4)
             } else {
@@ -104,7 +100,7 @@ extension PlantDashboardView {
                 icon: "plus",
                 tint: Color.arkInk,
                 label: l.tr(zh: "添加植物", en: "Add plant", de: "Pflanze hinzufügen"),
-                fill: Color.goLime
+                fill: Color.goPrimary
             ) {
                 showingAddPlant = true
             }
@@ -156,7 +152,7 @@ extension PlantDashboardView {
                 title: watchedPlantsCount == 0
                     ? l.tr(zh: "状态稳定", en: "Stable", de: "Stabil")
                     : l.tr(zh: "\(watchedPlantsCount) 株观察", en: "\(watchedPlantsCount) watch", de: "\(watchedPlantsCount) beobachten"),
-                tint: watchedPlantsCount == 0 ? Color.goLime : Color.goYellow
+                tint: watchedPlantsCount == 0 ? Color.goPrimary : Color.goYellow
             )
 
             dashboardStatusChip(
@@ -235,7 +231,7 @@ extension PlantDashboardView {
                         .frame(minWidth: 86)
                         .frame(height: 44)
                         .background(
-                            selectedDashboardMode == mode ? Color.goLime : Color.clear,
+                            selectedDashboardMode == mode ? Color.goPrimary : Color.clear,
                             in: Capsule()
                         )
                 }
@@ -318,7 +314,7 @@ extension PlantDashboardView {
                 subtitle: profileReadinessItems.isEmpty
                     ? l.tr(zh: "完成", en: "Ready", de: "Bereit")
                     : l.tr(zh: "\(profileReadinessItems.count) 项", en: "\(profileReadinessItems.count) items", de: "\(profileReadinessItems.count) Punkte"),
-                tint: profileReadinessItems.isEmpty ? Color.goLime : Color.goYellow,
+                tint: profileReadinessItems.isEmpty ? Color.goPrimary : Color.goYellow,
                 action: openDashboardProfileQueue
             )
 
@@ -477,7 +473,7 @@ extension PlantDashboardView {
             .foregroundStyle(Color.arkInk)
             .padding(.horizontal, 11)
             .frame(minHeight: 34)
-            .background(Color.goLime, in: Capsule())
+            .background(Color.goPrimary, in: Capsule())
         }
         .accessibilityElement(children: .combine)
         .accessibilityIdentifier("plant-dashboard-sites-header")
@@ -516,7 +512,7 @@ extension PlantDashboardView {
                     .accessibilityHidden(true)
             }
             .padding(12)
-            .background(dueTasks.isEmpty ? Color.goLime : Color.goYellow, in: RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous))
+            .background(dueTasks.isEmpty ? Color.goPrimary : Color.goYellow, in: RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous))
         }
         .buttonStyle(ScaleButtonStyle())
         .accessibilityLabel("\(plantsModeBannerTitle), \(plantsModeBannerSubtitle)")
@@ -548,7 +544,7 @@ extension PlantDashboardView {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 8) {
                 Image(systemName: "calendar.badge.clock") // a11y: allow decorative section glyph; heading names the task window.
-                    .foregroundStyle(Color.goLime)
+                    .foregroundStyle(Color.goPrimary)
                     .accessibilityHidden(true)
                 Text(l.tr(zh: "今日与未来 7 天", en: "Today and next 7 days", de: "Heute und die nächsten 7 Tage"))
                     .font(OhanaFont.adaptive(size: 16, weight: .bold, design: .rounded))
@@ -564,7 +560,7 @@ extension PlantDashboardView {
                             .foregroundStyle(Color.arkInk)
                             .padding(.horizontal, 11)
                             .frame(minHeight: 34)
-                            .background(Color.goLime, in: Capsule())
+                            .background(Color.goPrimary, in: Capsule())
                     }
                     .buttonStyle(ScaleButtonStyle())
                     .accessibilityLabel(l.tr(zh: "查看全部植物护理计划", en: "View all plant care plans", de: "Alle Pflanzenpflegepläne anzeigen"))
@@ -606,7 +602,7 @@ extension PlantDashboardView {
                         .foregroundStyle(Color.arkInk)
                         .padding(.horizontal, 14)
                         .padding(.vertical, 8)
-                        .background(Color.goLime, in: Capsule())
+                        .background(Color.goPrimary, in: Capsule())
                         .accessibilityIdentifier("plant-dashboard-complete-all-due")
 
                         Button(l.tr(zh: "全部延后一天", en: "Defer all one day", de: "Alle um einen Tag verschieben")) {
@@ -640,7 +636,7 @@ extension PlantDashboardView {
                             .padding(.horizontal, 12)
                             .padding(.vertical, 8)
                             .background(
-                                selectedFilter == filter ? Color.goLime : Color.ohanaControlFill.opacity(0.62),
+                                selectedFilter == filter ? Color.goPrimary : Color.ohanaControlFill.opacity(0.62),
                                 in: Capsule()
                             )
                     }
@@ -683,7 +679,7 @@ extension PlantDashboardView {
                     .font(OhanaFont.adaptive(size: 12, weight: .bold))
                     .foregroundStyle(Color.arkInk)
                     .frame(width: 44, height: 44)
-                    .background(Color.goLime, in: Circle())
+                    .background(Color.goPrimary, in: Circle())
                     .accessibilityHidden(true)
             }
             .accessibilityLabel(l.tr(zh: "完成\(careTypeName)", en: "Complete \(careTypeName)", de: "\(careTypeName) erledigen"))

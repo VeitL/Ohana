@@ -192,7 +192,7 @@ struct ExpenseHistoryContentView: View {
                 }
                 Spacer()
                 PetAvatarPortraitView(
-                    imageData: pet.avatarImageData,
+                    pet: pet,
                     fallbackText: pet.avatarEmoji,
                     themeColor: Color(hex: pet.safeThemeColorHex),
                     size: 48,

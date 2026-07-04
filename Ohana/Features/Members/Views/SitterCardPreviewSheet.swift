@@ -77,7 +77,7 @@ struct SitterCardPreviewSheet: View {
             // 头部：头像 + 名字 + 物种
             HStack(spacing: 16) {
                 PetAvatarPortraitView(
-                    imageData: pet.avatarImageData,
+                    pet: pet,
                     fallbackText: pet.avatarEmoji,
                     themeColor: Color(hex: pet.safeThemeColorHex),
                     size: 72,

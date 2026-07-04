@@ -2295,7 +2295,7 @@ struct OhanaTests {
         human.themeColorHex = "FF8800"
         human.heightCm = 168
         human.setPrivate(.weight, true)
-        human.avatarImageData = Data([1, 2, 3])
+        human.updateAvatarImageData(Data([1, 2, 3]))
         human.passedAwayDate = passedAwayDate
         let metricLog = HumanHealthMetricLog(
             metricKey: "hba1c",

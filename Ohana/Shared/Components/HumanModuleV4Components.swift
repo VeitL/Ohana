@@ -5,6 +5,7 @@
 //  Shared V4 chrome for human module pages.
 //
 
+import SwiftData
 import SwiftUI
 
 struct HumanModulePageHeader<Trailing: View>: View {
@@ -34,7 +35,9 @@ struct HumanModulePageHeader<Trailing: View>: View {
     var body: some View {
         HStack(spacing: 12) {
             FeatureHubAvatar(
-                imageData: human.avatarImageData,
+                imageCacheID: "human-module-\(human.id.uuidString)",
+                imageSignature: human.avatarThumbnailSignature,
+                humanModelID: human.persistentModelID,
                 emoji: human.avatarEmoji,
                 fallback: "👤",
                 tint: Color(hex: human.safeThemeColorHex)

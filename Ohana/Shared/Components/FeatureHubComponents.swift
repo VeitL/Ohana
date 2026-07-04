@@ -5,6 +5,7 @@
 //  Shared V4 feature hub components and memorial-mode visuals.
 //
 
+import SwiftData
 import SwiftUI
 import UIKit
 
@@ -104,11 +105,156 @@ struct FeatureHubHeader<Avatar: View>: View {
 struct FeatureHubAvatar: View {
     var image: UIImage?
     let imageData: Data?
+    let imageCacheID: String?
+    let imageSignature: String
+    private let imageDataProvider: (@MainActor () -> Data?)?
+    private let asyncImageDataProvider: (@Sendable () async -> Data?)?
+    private let imageBlobSource: FeatureHubAvatarBlobSource?
     let emoji: String
     let fallback: String
     let tint: Color
 
+    @Environment(\.modelContext) private var modelContext
+
+    @State private var lazyImage: UIImage?
+    @State private var lazyImageIsTransparent = false
+    @State private var loadedLazyImageKey: MediaThumbnailKey?
+
+    init(
+        image: UIImage? = nil,
+        imageData: Data?,
+        emoji: String,
+        fallback: String,
+        tint: Color
+    ) {
+        self.image = image
+        self.imageData = imageData
+        self.imageCacheID = nil
+        self.imageSignature = imageData.map(MediaPayloadSignature.signature(for:)) ?? ""
+        self.imageDataProvider = nil
+        self.asyncImageDataProvider = nil
+        self.imageBlobSource = nil
+        self.emoji = emoji
+        self.fallback = fallback
+        self.tint = tint
+    }
+
+    init(
+        image: UIImage? = nil,
+        imageCacheID: String,
+        imageSignature: String,
+        imageDataProvider: @escaping @MainActor () -> Data?,
+        emoji: String,
+        fallback: String,
+        tint: Color
+    ) {
+        self.image = image
+        self.imageData = nil
+        self.imageCacheID = imageCacheID
+        self.imageSignature = imageSignature
+        self.imageDataProvider = imageDataProvider
+        self.asyncImageDataProvider = nil
+        self.imageBlobSource = nil
+        self.emoji = emoji
+        self.fallback = fallback
+        self.tint = tint
+    }
+
+    init(
+        image: UIImage? = nil,
+        imageCacheID: String,
+        imageSignature: String,
+        asyncImageDataProvider: @escaping @Sendable () async -> Data?,
+        emoji: String,
+        fallback: String,
+        tint: Color
+    ) {
+        self.image = image
+        self.imageData = nil
+        self.imageCacheID = imageCacheID
+        self.imageSignature = imageSignature
+        self.imageDataProvider = nil
+        self.asyncImageDataProvider = asyncImageDataProvider
+        self.imageBlobSource = nil
+        self.emoji = emoji
+        self.fallback = fallback
+        self.tint = tint
+    }
+
+    init(
+        image: UIImage? = nil,
+        imageCacheID: String,
+        imageSignature: String,
+        petModelID: PersistentIdentifier,
+        emoji: String,
+        fallback: String,
+        tint: Color
+    ) {
+        self.image = image
+        self.imageData = nil
+        self.imageCacheID = imageCacheID
+        self.imageSignature = imageSignature
+        self.imageDataProvider = nil
+        self.asyncImageDataProvider = nil
+        self.imageBlobSource = .pet(petModelID)
+        self.emoji = emoji
+        self.fallback = fallback
+        self.tint = tint
+    }
+
+    init(
+        image: UIImage? = nil,
+        imageCacheID: String,
+        imageSignature: String,
+        humanModelID: PersistentIdentifier,
+        emoji: String,
+        fallback: String,
+        tint: Color
+    ) {
+        self.image = image
+        self.imageData = nil
+        self.imageCacheID = imageCacheID
+        self.imageSignature = imageSignature
+        self.imageDataProvider = nil
+        self.asyncImageDataProvider = nil
+        self.imageBlobSource = .human(humanModelID)
+        self.emoji = emoji
+        self.fallback = fallback
+        self.tint = tint
+    }
+
+    init(
+        image: UIImage? = nil,
+        imageCacheID: String,
+        imageSignature: String,
+        plantModelID: PersistentIdentifier,
+        emoji: String,
+        fallback: String,
+        tint: Color
+    ) {
+        self.image = image
+        self.imageData = nil
+        self.imageCacheID = imageCacheID
+        self.imageSignature = imageSignature
+        self.imageDataProvider = nil
+        self.asyncImageDataProvider = nil
+        self.imageBlobSource = .plant(plantModelID)
+        self.emoji = emoji
+        self.fallback = fallback
+        self.tint = tint
+    }
+
+    private var lazyThumbnailKey: MediaThumbnailKey {
+        MediaThumbnailKey(
+            id: imageCacheID ?? "feature-hub-avatar-\(imageSignature)",
+            sourceSignature: imageSignature,
+            maxPixel: 160
+        )
+    }
+
     var body: some View {
+        let hasLazyDataSource = imageDataProvider != nil || asyncImageDataProvider != nil || imageBlobSource != nil
+
         ZStack {
             if let image {
                 RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous)
@@ -117,6 +263,8 @@ struct FeatureHubAvatar: View {
                     .resizable()
                     .scaledToFill()
                     .frame(width: 58, height: 58)
+            } else if hasLazyDataSource, !imageSignature.isEmpty {
+                lazyAvatar
             } else {
                 PetAvatarPortraitRoundedView(
                     imageData: imageData,
@@ -135,6 +283,98 @@ struct FeatureHubAvatar: View {
                 .strokeBorder(Color.ohanaCardStroke, lineWidth: 1)
         }
     }
+
+    @ViewBuilder
+    private var lazyAvatar: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous)
+                .fill(tint.opacity(0.18))
+
+            if let image = resolvedLazyImage {
+                lazyAvatarImage(image, isTransparent: lazyImageIsTransparent)
+            } else {
+                Text((emoji.isEmpty ? fallback : emoji).isEmpty ? "🐾" : (emoji.isEmpty ? fallback : emoji))
+                    .font(.system(size: 58 * 0.52)) // a11y: allow decorative avatar emoji inside fixed avatar frame.
+                    .minimumScaleFactor(0.5)
+            }
+        }
+        .task(id: lazyThumbnailKey) {
+            await loadLazyAvatarImage(for: lazyThumbnailKey)
+        }
+    }
+
+    private var resolvedLazyImage: UIImage? {
+        if loadedLazyImageKey == lazyThumbnailKey, let lazyImage {
+            return lazyImage
+        }
+        return MediaThumbnailProvider.cachedImage(for: lazyThumbnailKey)
+    }
+
+    @ViewBuilder
+    private func lazyAvatarImage(_ image: UIImage, isTransparent: Bool) -> some View {
+        if isTransparent {
+            Image(uiImage: image)
+                .resizable()
+                .scaledToFit()
+                .frame(width: 58 * 0.84, height: 58 * 1.18, alignment: .top)
+                .offset(y: 58 * 0.12)
+                .frame(width: 58, height: 58)
+        } else {
+            Image(uiImage: image)
+                .resizable()
+                .scaledToFill()
+                .frame(width: 58, height: 58)
+        }
+    }
+
+    @MainActor
+    private func loadLazyAvatarImage(for key: MediaThumbnailKey) async {
+        let resolvedAsyncImageDataProvider = resolvedAsyncImageDataProvider
+        let result: MediaThumbnailProvider.Result? = if let resolvedAsyncImageDataProvider {
+            await MediaThumbnailProvider.imageWithTransparency(for: key, asyncDataProvider: resolvedAsyncImageDataProvider)
+        } else if let asyncImageDataProvider {
+            await MediaThumbnailProvider.imageWithTransparency(for: key, asyncDataProvider: asyncImageDataProvider)
+        } else if let imageDataProvider {
+            await MediaThumbnailProvider.imageWithTransparency(for: key, dataProvider: imageDataProvider)
+        } else {
+            nil
+        }
+
+        guard let result, !Task.isCancelled else {
+            lazyImage = nil
+            loadedLazyImageKey = key
+            lazyImageIsTransparent = false
+            return
+        }
+
+        lazyImage = result.image
+        lazyImageIsTransparent = result.isTransparent
+        loadedLazyImageKey = key
+    }
+
+    private var resolvedAsyncImageDataProvider: (@Sendable () async -> Data?)? {
+        guard let imageBlobSource else {
+            return nil
+        }
+        let container = modelContext.container
+        return {
+            let loader = SwiftDataMediaBlobLoader(modelContainer: container)
+            switch imageBlobSource {
+            case let .pet(modelID):
+                return await loader.petAvatarImageData(modelID: modelID)
+            case let .human(modelID):
+                return await loader.humanAvatarImageData(modelID: modelID)
+            case let .plant(modelID):
+                return await loader.plantAvatarImageData(modelID: modelID)
+            }
+        }
+    }
+}
+
+private enum FeatureHubAvatarBlobSource: Sendable {
+    case pet(PersistentIdentifier)
+    case human(PersistentIdentifier)
+    case plant(PersistentIdentifier)
 }
 
 struct FeatureHubMetricStrip: View {

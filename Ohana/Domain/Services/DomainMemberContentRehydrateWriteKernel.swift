@@ -213,8 +213,7 @@ nonisolated enum DomainMemberContentRehydrateWriter {
         document.notes = snapshot.notes
         document.reminderDate = snapshot.reminderDate
         document.cost = snapshot.cost
-        document.attachmentData = snapshot.attachmentData
-        document.attachmentFilename = snapshot.attachmentFilename
+        document.updateLegacyAttachment(data: snapshot.attachmentData, filename: snapshot.attachmentFilename)
         context.insert(document)
         plan.consumeAuthorization()
         return DomainMemberContentRehydrateResult(inserted: true, plan: plan)

@@ -62,8 +62,8 @@ struct ProtectionDocumentContentPopup: View {
         _issuingAuthority = State(initialValue: existing?.issuingAuthority ?? "")
         _notes = State(initialValue: ExpenseReceiptMetadata.visibleNotes(from: existing?.notes ?? ""))
         _costText = State(initialValue: (existing?.cost ?? 0) > 0 ? CountryDecimalInput.format(existing?.cost ?? 0, countryCode: AppCountry.code, maxFractionDigits: 2) : "")
-        _attachmentData = State(initialValue: existing?.attachmentData ?? existing?.attachments.first?.data)
-        _attachmentFilename = State(initialValue: existing?.attachmentFilename ?? existing?.attachments.first?.filename ?? "")
+        _attachmentData = State(initialValue: nil)
+        _attachmentFilename = State(initialValue: Self.initialAttachmentFilename(for: existing))
         _attachmentIsImage = State(initialValue: {
             if let first = existing?.attachments.first { return first.isImage }
             guard let filename = existing?.attachmentFilename, !filename.isEmpty else { return false }
@@ -224,6 +224,19 @@ struct ProtectionDocumentContentPopup: View {
     private var currentPayerId: String? {
         let stored = appServices.activeHumanSelection.currentHumanIdRaw
         return humans.first(where: { $0.id.uuidString == stored })?.id.uuidString ?? humans.first?.id.uuidString
+    }
+
+    private static func initialAttachmentFilename(for existing: PetDocument?) -> String {
+        if let filename = existing?.attachments.first?.filename, !filename.isEmpty {
+            return filename
+        }
+        if let filename = existing?.attachmentFilename, !filename.isEmpty {
+            return filename
+        }
+        if existing?.shouldDisplayLegacyAttachmentSlot == true {
+            return "attachment"
+        }
+        return ""
     }
 
     private var categoryPicker: some View {

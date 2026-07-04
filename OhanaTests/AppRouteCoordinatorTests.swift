@@ -121,13 +121,13 @@ struct AppRouteCoordinatorTests {
         #expect(coordinator.sheet == .calendar(entityID: petID, humanID: nil, plantID: nil))
     }
 
-    @Test func plantCalendarUsesExplicitPlantSlot() {
+    @Test func calendarIgnoresLegacyPlantSlot() {
         let coordinator = AppRouteCoordinator()
         let plantID = UUID().uuidString
 
         coordinator.presentCalendar(plantID: plantID)
 
-        #expect(coordinator.sheet == .calendar(entityID: nil, humanID: nil, plantID: plantID))
+        #expect(coordinator.sheet == .calendar(entityID: nil, humanID: nil, plantID: nil))
     }
 
     @Test func coconutShopUsesGlobalSheetRoute() {

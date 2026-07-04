@@ -453,7 +453,7 @@ extension MemberCardCreationContentView {
             if let pet = result.pet {
                 FocusWalletAvatarCache.storeDecodedImage(
                     cardId: pet.id,
-                    data: pet.avatarImageData,
+                    data: pet.hasAvatarImageAttachment ? pet.avatarImageData : nil,
                     image: decodedAvatar,
                     isTransparent: decodedAvatarTransparent
                 )
@@ -461,7 +461,7 @@ extension MemberCardCreationContentView {
             if let human = result.human {
                 FocusWalletAvatarCache.storeDecodedImage(
                     cardId: human.id,
-                    data: human.avatarImageData,
+                    data: human.hasAvatarImageAttachment ? human.avatarImageData : nil,
                     image: decodedAvatar,
                     isTransparent: decodedAvatarTransparent
                 )

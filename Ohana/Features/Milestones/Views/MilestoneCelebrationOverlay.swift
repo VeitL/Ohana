@@ -103,7 +103,7 @@ struct MilestoneCelebrationOverlay: View {
                     VStack(spacing: 20) {
                         // 宠物头像
                         PetAvatarPortraitView(
-                            imageData: pet.avatarImageData,
+                            pet: pet,
                             fallbackText: pet.avatarEmoji.isEmpty ? pet.speciesEmoji : pet.avatarEmoji,
                             themeColor: milestone.accentColor,
                             size: 110,

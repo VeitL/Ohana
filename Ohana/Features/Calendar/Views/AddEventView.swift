@@ -441,7 +441,10 @@ struct AddEventContentView: View {
                 ForEach(activePlants) { plant in
                     relatedPersonChip(
                         title: plant.name,
-                        imageData: plant.avatarImageData,
+                        imageSignature: plant.avatarThumbnailSignature,
+                        imageDataProvider: {
+                            plant.hasAvatarImageAttachment ? plant.avatarImageData : nil
+                        },
                         fallback: plant.avatarEmoji.isEmpty ? "🌱" : plant.avatarEmoji,
                         tint: plantChipTint(for: plant),
                         identifier: "add-event-related-plant-\(plant.name)",
@@ -455,7 +458,10 @@ struct AddEventContentView: View {
                 ForEach(activePets) { pet in
                     relatedPersonChip(
                         title: pet.name,
-                        imageData: pet.avatarImageData,
+                        imageSignature: pet.avatarThumbnailSignature,
+                        imageDataProvider: {
+                            pet.hasAvatarImageAttachment ? pet.avatarImageData : nil
+                        },
                         fallback: pet.avatarEmoji.isEmpty ? pet.speciesEmoji : pet.avatarEmoji,
                         tint: Color(hex: pet.safeThemeColorHex),
                         identifier: "add-event-related-pet-\(pet.name)",
@@ -469,7 +475,10 @@ struct AddEventContentView: View {
                 ForEach(activeHumans) { human in
                     relatedPersonChip(
                         title: human.name,
-                        imageData: human.avatarImageData,
+                        imageSignature: human.avatarThumbnailSignature,
+                        imageDataProvider: {
+                            human.hasAvatarImageAttachment ? human.avatarImageData : nil
+                        },
                         fallback: human.avatarEmoji.isEmpty ? "🙂" : human.avatarEmoji,
                         tint: Color(hex: human.safeThemeColorHex),
                         identifier: "add-event-related-human-\(human.name)",
@@ -560,7 +569,10 @@ struct AddEventContentView: View {
                     ForEach(activeHumans) { human in
                         relatedPersonChip(
                             title: human.name,
-                            imageData: human.avatarImageData,
+                            imageSignature: human.avatarThumbnailSignature,
+                            imageDataProvider: {
+                                human.hasAvatarImageAttachment ? human.avatarImageData : nil
+                            },
                             fallback: human.avatarEmoji.isEmpty ? "🙂" : human.avatarEmoji,
                             tint: Color(hex: human.safeThemeColorHex),
                             identifier: "add-event-assignee-human-\(human.name)",
@@ -899,7 +911,8 @@ struct AddEventContentView: View {
 
     private func relatedPersonChip(
         title: String,
-        imageData: Data?,
+        imageSignature: String,
+        imageDataProvider: @escaping @MainActor () -> Data?,
         fallback: String,
         tint: Color,
         identifier: String,
@@ -912,7 +925,8 @@ struct AddEventContentView: View {
         } label: {
             HStack(spacing: 7) {
                 PetAvatarPortraitView(
-                    imageData: imageData,
+                    imageSignature: imageSignature,
+                    imageDataProvider: imageDataProvider,
                     fallbackText: fallback,
                     themeColor: tint,
                     size: 26,

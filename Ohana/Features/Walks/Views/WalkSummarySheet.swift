@@ -112,7 +112,7 @@ struct WalkSummarySheet: View {
     private var petHeader: some View {
         HStack(spacing: 14) {
             PetAvatarPortraitView(
-                imageData: pet.avatarImageData,
+                pet: pet,
                 fallbackText: pet.avatarEmoji,
                 themeColor: Color(hex: pet.safeThemeColorHex),
                 size: 54,

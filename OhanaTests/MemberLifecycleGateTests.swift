@@ -2353,6 +2353,10 @@ struct MemberLifecycleGateTests {
         #expect(routeSource.contains("context.fetchCount(descriptor)"))
         #expect(overlaySource.contains("var petSummaries: [UUID: CrewRosterPetSummary]"))
         #expect(editorsSource.contains("let petSummary: CrewRosterPetSummary"))
+        #expect(editorsSource.contains("@State private var avatarImageRevision"))
+        #expect(editorsSource.contains("avatarImageData: editableAvatarImageData"))
+        #expect(editorsSource.contains("avatarImageRevision &+="))
+        #expect(!editorsSource.contains("avatarImageData?.count"))
     }
 
     @Test func crewRosterPetSummaryCountsPetScopedDocuments() throws {
@@ -2491,6 +2495,16 @@ struct MemberLifecycleGateTests {
         #expect(dashboardSource.contains("let photoMemories: [FamilyWeeklyPhotoMemory]"))
         #expect(dashboardSource.contains("let healthAlertSources: [PetHealthAlertSource]"))
         #expect(dashboardSource.contains("private var weekPhotoMemories: [FamilyWeeklyPhotoMemory]"))
+        #expect(dashboardSource.contains("let modelID: PersistentIdentifier"))
+        #expect(dashboardSource.contains("let imageSignature: String"))
+        #expect(dashboardSource.contains("let canAttemptImageAttachmentLoad: Bool"))
+        #expect(dashboardSource.contains("SwiftDataMediaBlobLoader(modelContainer: modelContext.container)"))
+        #expect(dashboardSource.contains("await loader.petPhotoLogImageData(modelID: memory.modelID)"))
+        #expect(dashboardSource.contains("asyncDataProvider:"))
+        #expect(dashboardSource.contains("sourceSignature: memory.imageSignature"))
+        #expect(!dashboardSource.contains("let imageData: Data"))
+        #expect(!dashboardSource.contains("AsyncDecodedImageView(data: memory.imageData"))
+        #expect(!dashboardSource.contains("return log.imageData"))
         #expect(dashboardSource.contains("scanAlerts(sources: healthAlertSources)"))
         #expect(!dashboardSource.contains("scanAlerts(pets: activePets)"))
         #expect(dashboardSource.contains("appServices.careLedgerStats.reportEntries"))
@@ -2500,6 +2514,10 @@ struct MemberLifecycleGateTests {
         #expect(dataContainerSource.contains("PetHealthAlertSourceRouteData.load(pets: pets, from: context)"))
         #expect(dataContainerSource.contains("FetchDescriptor<PetPhotoLog>"))
         #expect(dataContainerSource.contains("FamilyWeeklyPhotoMemory("))
+        #expect(dataContainerSource.contains("modelID: log.persistentModelID"))
+        #expect(dataContainerSource.contains("imageSignature: log.imageThumbnailSignature"))
+        #expect(dataContainerSource.contains("canAttemptImageAttachmentLoad: log.canAttemptImageAttachmentLoad"))
+        #expect(!dataContainerSource.contains("imageData: log.imageData"))
         #expect(dataContainerSource.contains("OhanaFrameScheduler.runAfterNextFrame"))
         #expect(dataContainerSource.contains("descriptor.fetchLimit = 1200"))
         #expect(!dataContainerSource.contains("@Query(sort: \\CareLedgerEvent.occurredAt"))
@@ -3765,6 +3783,10 @@ struct MemberLifecycleGateTests {
             "Ohana/Features/Milestones/Views/PetMilestoneListRouteContainer.swift",
             rootURL: rootURL
         )
+        let milestoneModelSource = try source(
+            "Ohana/Models/PetMilestone.swift",
+            rootURL: rootURL
+        )
         let protectionStateSource = try source(
             "Ohana/Features/Insurance/Views/ProtectionDashboardComponents.swift",
             rootURL: rootURL
@@ -3790,6 +3812,15 @@ struct MemberLifecycleGateTests {
         ))
         #expect(!milestoneListSource.contains("pet.milestones"))
         #expect(!milestoneListSource.contains("@Query"))
+        #expect(milestoneListSource.contains("sourceSignature: milestone.photoThumbnailSignature"))
+        #expect(milestoneListSource.contains("milestonePhotoData(for: milestone)"))
+        #expect(milestoneListSource.contains("modelContext.model(for: milestone.persistentModelID) as? PetMilestone"))
+        #expect(!milestoneListSource.contains("if let photoData = milestone.photoData"))
+        #expect(!milestoneListSource.contains("if let data = milestone.photoData"))
+        #expect(milestoneModelSource.contains("@Attribute(.externalStorage) var photoData: Data?"))
+        #expect(milestoneModelSource.contains("var photoImageSignature: String = \"\""))
+        #expect(milestoneModelSource.contains("var photoThumbnailSignature: String"))
+        #expect(milestoneModelSource.contains("func repairPhotoAttachmentIndexIfNeeded()"))
         #expect(milestoneRouteSource.contains("RouteFirstFrameDeferredLoad("))
         #expect(milestoneRouteSource.contains("PetMilestoneListRouteData.load(petID:"))
         #expect(milestoneRouteSource.contains("FetchDescriptor<PetMilestone>"))
@@ -3861,11 +3892,33 @@ struct MemberLifecycleGateTests {
         #expect(builderSource.contains("sourceRows.walkLogs"))
         #expect(builderSource.contains("sourceRows.photoLogs"))
         #expect(builderSource.contains("sourceRows.milestones"))
-        #expect(hubSource.contains("let timelineRows: PetTimelineSourceRows"))
-        #expect(albumSource.contains("let photoLogs: [PetPhotoLog]"))
+        #expect(builderSource.contains("struct PetTimelineRenderItem"))
+        #expect(builderSource.contains("struct PetTimelinePhotoReference"))
+        #expect(builderSource.contains("struct PetMomentsHubRenderData: Sendable"))
+        #expect(hubSource.contains("let renderData: PetMomentsHubRenderData"))
+        #expect(hubSource.contains("let albumRenderData: PetPhotoAlbumRenderData"))
+        #expect(!hubSource.contains(".onAppear(perform: refreshRenderData)"))
+        #expect(!hubSource.contains("PetMomentsHubRenderData.build("))
+        #expect(hubSource.contains("PetPhotoAlbumView(pet: pet, renderData: albumRenderData"))
+        #expect(!hubSource.contains("PetPhotoAlbumView(pet: pet, photoLogs:"))
+        #expect(albumSource.contains("let renderData: PetPhotoAlbumRenderData"))
+        #expect(!albumSource.contains("let photoLogs: [PetPhotoLog]"))
+        #expect(!albumSource.contains("PetPhotoAlbumRenderData.build(photoLogs: photoLogs)"))
         #expect(!routeSource.contains("@Query"))
-        #expect(routeSource.contains("PetMomentsHubRouteData.load"))
+        #expect(!routeSource.contains("PetMomentsHubRouteData.load"))
+        #expect(routeSource.contains("@ModelActor"))
+        #expect(routeSource.contains("PetMomentsHubRouteDataActor"))
+        #expect(routeSource.contains("PetMomentsHubRouteDataReference: Sendable"))
+        #expect(routeSource.contains("renderData = reference.renderData"))
+        #expect(routeSource.contains("albumRenderData = reference.albumRenderData"))
+        #expect(routeSource.contains("PetMomentsHubRenderData.build("))
+        #expect(routeSource.contains("PetPhotoAlbumRenderData.build("))
+        #expect(routeSource.contains("[PersistentIdentifier]"))
+        #expect(routeSource.contains("context.model(for: $0) as? T"))
         #expect(routeSource.contains("PetTimelineSourceRows("))
+        #expect(!routeSource.contains("var timelineRows = PetTimelineSourceRows.empty"))
+        #expect(!routeSource.contains("PetTimelineSourceRowReferences"))
+        #expect(!routeSource.contains("photoLogs: Self.rehydrate(reference.timelineRows.photoLogs"))
         #expect(routeSource.contains("FetchDescriptor<PetCareLog>"))
         #expect(routeSource.contains("FetchDescriptor<PetPottyLog>"))
         #expect(routeSource.contains("FetchDescriptor<PetWalkLog>"))
@@ -3874,7 +3927,87 @@ struct MemberLifecycleGateTests {
         #expect(routeSource.contains("FetchDescriptor<PetWeightLog>"))
         #expect(routeSource.contains("FetchDescriptor<PetPhotoLog>"))
         #expect(routeSource.contains("FetchDescriptor<PetMilestone>"))
-        #expect(routeSource.contains("// route-first-frame: allow deferred-fetch"))
+        #expect(!routeSource.contains("// route-first-frame: allow deferred-fetch"))
+        #expect(albumSource.contains("struct PetPhotoAlbumPhotoItem"))
+        #expect(albumSource.contains("let modelID: PersistentIdentifier"))
+        #expect(albumSource.contains("let photos: [PetPhotoAlbumPhotoItem]"))
+        #expect(albumSource.contains("@State private var selectedPhoto: PetPhotoAlbumPhotoItem?"))
+        #expect(albumSource.contains("let photo: PetPhotoAlbumPhotoItem"))
+        #expect(albumSource.contains("modelContext.model(for: photo.modelID) as? PetPhotoLog"))
+        #expect(albumSource.contains("SwiftDataMediaBlobLoader(modelContainer: modelContext.container)"))
+        #expect(albumSource.contains("await loader.petPhotoLogImageData(modelID: photo.modelID)"))
+        #expect(albumSource.contains("asyncDataProvider:"))
+        #expect(!albumSource.contains("let photos: [PetPhotoLog]"))
+        #expect(!albumSource.contains("@State private var selectedPhoto: PetPhotoLog?"))
+        #expect(!albumSource.contains("let photo: PetPhotoLog"))
+        #expect(!albumSource.contains("photo.canAttemptImageAttachmentLoad ? photo.imageData : nil"))
+        #expect(!albumSource.contains("return photoLog.imageData"))
+        #expect(hubSource.contains("await loader.petPhotoLogImageData(modelID: photo.modelID)"))
+        #expect(!hubSource.contains("return log.imageData"))
+    }
+
+    @Test func featureHubAvatarsUseLazyMediaProviderInsteadOfRenderBlobReads() throws {
+        let rootURL = repositoryRootURL()
+        let componentSource = try source(
+            "Ohana/Shared/Components/FeatureHubComponents.swift",
+            rootURL: rootURL
+        )
+        let migratedSources = [
+            "Ohana/Features/Moments/Views/PetMomentsHubView.swift",
+            "Ohana/Features/Moments/Views/QuickMomentSheet.swift",
+            "Ohana/Shared/Components/HumanModuleV4Components.swift",
+            "Ohana/Features/Economy/Views/PetBondVaultView.swift",
+            "Ohana/Features/Plants/Views/PlantAllFeaturesSheet.swift",
+            "Ohana/Features/Members/Views/PetAllFeaturesSheet.swift",
+            "Ohana/Features/DashboardRecords/Views/PetRetentionHubView.swift",
+            "Ohana/Features/Medication/Views/PetMedicationDetailSheet.swift",
+            "Ohana/Features/Medication/Views/PetMedicationView.swift",
+            "Ohana/Features/Expenses/Views/HumanWeightDashboardContent.swift",
+            "Ohana/Features/Expenses/Views/HumanExpenseDashboardContent.swift",
+            "Ohana/Features/Expenses/Views/PetWeightDashboardContent.swift",
+            "Ohana/Features/Expenses/Views/PetExpenseDashboardContent.swift"
+        ]
+        let forbiddenDirectAvatarReads = [
+            "imageData: pet.hasAvatarImageAttachment ? pet.avatarImageData : nil",
+            "imageData: human.hasAvatarImageAttachment ? human.avatarImageData : nil",
+            "imageData: plant.hasAvatarImageAttachment ? plant.avatarImageData : nil"
+        ]
+
+        #expect(componentSource.contains("imageDataProvider: @escaping @MainActor () -> Data?"))
+        #expect(componentSource.contains("asyncImageDataProvider: @escaping @Sendable () async -> Data?"))
+        #expect(componentSource.contains("MediaThumbnailProvider.imageWithTransparency"))
+
+        for path in migratedSources {
+            let fileSource = try source(path, rootURL: rootURL)
+            #expect(fileSource.contains("imageSignature:"))
+            #expect(fileSource.contains("imageDataProvider:") || fileSource.contains("asyncImageDataProvider:"))
+            for forbidden in forbiddenDirectAvatarReads {
+                #expect(!fileSource.contains(forbidden))
+            }
+        }
+    }
+
+    @Test func avatarPortraitEntrypointsDoNotPassExternalStorageBlobsAsRenderParameters() throws {
+        let rootURL = repositoryRootURL()
+        let portraitSource = try source(
+            "Ohana/Shared/Components/PetAvatarPortraitView.swift",
+            rootURL: rootURL
+        )
+        let forbiddenDirectAvatarReads = [
+            "imageData: pet.hasAvatarImageAttachment ? pet.avatarImageData : nil",
+            "imageData: human.hasAvatarImageAttachment ? human.avatarImageData : nil",
+            "imageData: plant.hasAvatarImageAttachment ? plant.avatarImageData : nil"
+        ]
+
+        #expect(portraitSource.contains("imageSignature: pet.avatarThumbnailSignature"))
+        #expect(portraitSource.contains("MediaThumbnailProvider.imageWithTransparency"))
+
+        for path in try swiftSourcePaths(under: ["Ohana/Features", "Ohana/Shared"], rootURL: rootURL) {
+            let fileSource = try source(path, rootURL: rootURL)
+            for forbidden in forbiddenDirectAvatarReads {
+                #expect(!fileSource.contains(forbidden))
+            }
+        }
     }
 
     @Test func petTimelineBuilderUsesSuppliedRowsInsteadOfPetRelationships() throws {
@@ -4358,7 +4491,7 @@ struct MemberLifecycleGateTests {
     }
 
     private func makeInMemoryContainer() throws -> ModelContainer {
-        let schema = Schema(ArkSchemaV74.models)
+        let schema = Schema(ArkSchemaV82.models)
         let config = ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)
         return try ModelContainer(for: schema, configurations: [config])
     }
@@ -4410,6 +4543,29 @@ struct MemberLifecycleGateTests {
 
     private func source(_ path: String, rootURL: URL) throws -> String {
         try String(contentsOf: rootURL.appending(path: path), encoding: .utf8)
+    }
+
+    private func swiftSourcePaths(under directories: [String], rootURL: URL) throws -> [String] {
+        try directories.flatMap { directory in
+            let directoryURL = rootURL.appending(path: directory)
+            guard let enumerator = FileManager.default.enumerator(
+                at: directoryURL,
+                includingPropertiesForKeys: [.isRegularFileKey],
+                options: [.skipsHiddenFiles]
+            ) else {
+                return [String]()
+            }
+
+            return try enumerator.compactMap { entry -> String? in
+                guard let url = entry as? URL,
+                      url.pathExtension == "swift" else {
+                    return nil
+                }
+                let values = try url.resourceValues(forKeys: [.isRegularFileKey])
+                guard values.isRegularFile == true else { return nil }
+                return String(url.path.dropFirst(rootURL.path.count + 1))
+            }
+        }
     }
 
     private func isAchievementUnlocked(_ id: String, in achievements: [Achievement]) -> Bool {

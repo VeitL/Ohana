@@ -52,7 +52,9 @@ struct HumanExpenseDashboardContent: View {
             onClose: onClose,
             leading: {
                 FeatureHubAvatar(
-                    imageData: human.avatarImageData,
+                    imageCacheID: "human-expense-dashboard-\(human.id.uuidString)",
+                    imageSignature: human.avatarThumbnailSignature,
+                    humanModelID: human.persistentModelID,
                     emoji: human.avatarEmoji,
                     fallback: "👤",
                     tint: Color(hex: human.safeThemeColorHex)

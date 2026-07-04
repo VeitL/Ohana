@@ -49,7 +49,7 @@ extension CalendarView {
                     }
                 }
                 .onChange(of: timelineDateSignature) { _, _ in
-                    scheduleInitialTimelineScrollIfNeeded(proxy: proxy)
+                    handleTimelineDateSignatureChange(proxy: proxy)
                 }
                 .onChange(of: visibleTimelineDateID) { _, dateID in
                     scheduleVisibleTimelineDateHandling(from: dateID)
@@ -265,6 +265,77 @@ extension CalendarView {
         }
     }
 
+    func handleTimelineDateSignatureChange(proxy: ScrollViewProxy) {
+        guard isCalendarPrepared else { return }
+        if pendingFilterTimelineAnchorDate != nil {
+            stabilizeVisibleTimelinePositionAfterFilterChange(proxy: proxy)
+            return
+        }
+        if let dateID = visibleTimelineDateID,
+           timelineDateIDs.contains(dateID) {
+            scheduleInitialTimelineScrollIfNeeded(proxy: proxy)
+            return
+        }
+        stabilizeVisibleTimelinePositionAfterDateSetChange(proxy: proxy)
+    }
+
+    func stabilizeVisibleTimelinePositionAfterFilterChange(proxy: ScrollViewProxy) {
+        guard isCalendarPrepared else {
+            pendingFilterTimelineAnchorDate = nil
+            return
+        }
+        let anchorDate = pendingFilterTimelineAnchorDate ?? listVisibleTopDate
+        guard let fallbackDate = nearestTimelineDate(to: anchorDate) else {
+            pendingFilterTimelineAnchorDate = nil
+            return
+        }
+        let fallbackID = timelineDateID(fallbackDate)
+        guard timelineDateIDs.contains(fallbackID) else {
+            pendingFilterTimelineAnchorDate = nil
+            return
+        }
+
+        listInitialPositionTask?.cancel()
+        listInitialPositionTask = nil
+        timelinePositionCoordinator.cancel()
+        var transaction = Transaction(animation: nil)
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            listVisibleTopDate = fallbackDate
+            visibleTimelineDateID = fallbackID
+            didScrollListToToday = true
+            pendingFilterTimelineAnchorDate = nil
+        }
+        scrollTimeline(proxy, to: fallbackID, animated: false)
+        scheduleVisibleCalendarMonthUpdate(from: fallbackID)
+    }
+
+    func stabilizeVisibleTimelinePositionAfterDateSetChange(proxy: ScrollViewProxy) {
+        guard isCalendarPrepared,
+              let fallbackDate = nearestTimelineDate(to: listVisibleTopDate) else { return }
+        let fallbackID = timelineDateID(fallbackDate)
+        guard timelineDateIDs.contains(fallbackID) else { return }
+
+        listInitialPositionTask?.cancel()
+        listInitialPositionTask = nil
+        var transaction = Transaction(animation: nil)
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            listVisibleTopDate = fallbackDate
+            visibleTimelineDateID = fallbackID
+            didScrollListToToday = true
+        }
+        scrollTimeline(proxy, to: fallbackID, animated: false)
+        scheduleVisibleCalendarMonthUpdate(from: fallbackID)
+    }
+
+    func nearestTimelineDate(to date: Date) -> Date? {
+        let target = Calendar.current.startOfDay(for: date)
+        return timelineDates.min { lhs, rhs in
+            abs(lhs.timeIntervalSince(target)) < abs(rhs.timeIntervalSince(target))
+        }
+    }
+
     func scrollTimeline(_ proxy: ScrollViewProxy, to dateID: String, animated: Bool) {
         guard timelineDateIDs.contains(dateID) else { return }
         if animated {
@@ -279,6 +350,7 @@ extension CalendarView {
     func returnCalendarToToday() {
         OhanaFeedback.light()
         resetEmbeddedBottomChromeScrollBaseline()
+        pendingFilterTimelineAnchorDate = nil
         listInitialPositionTask?.cancel()
         listInitialPositionTask = nil
         let today = Calendar.current.startOfDay(for: Date())
@@ -309,6 +381,10 @@ extension CalendarView {
 
     func scheduleVisibleTimelineDateHandling(from dateID: String?) {
         guard isCalendarPrepared else {
+            timelinePositionCoordinator.cancel()
+            return
+        }
+        guard pendingFilterTimelineAnchorDate == nil else {
             timelinePositionCoordinator.cancel()
             return
         }
@@ -378,7 +454,9 @@ extension CalendarView {
             onComplete: {
                 toggleEventCompletion(event, occurrenceDate: occurrenceDate)
             },
-            onDelete: { /* F2: 删除逻辑已在 SwipeableEventRow 内处理 */ },
+            onDelete: {
+                schedulePreparedCalendarSnapshotRebuild(delayMilliseconds: 220, force: true)
+            },
             onOpenDetail: {
                 openEventDetail(
                     event,
@@ -409,6 +487,7 @@ extension CalendarView {
             executorId: appServices.activeHumanSelection.currentHumanId,
             note: "calendar.event.completion.toggle"
         )
+        schedulePreparedCalendarSnapshotRebuild(force: true)
     }
 
     func openRelatedDestination(for event: Event) -> Bool {

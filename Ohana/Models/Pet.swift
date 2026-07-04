@@ -49,6 +49,19 @@ enum PetThemeColor: String, Codable, CaseIterable {
     }
 }
 
+enum MemberAvatarAttachmentState: String, Codable, Sendable {
+    case unknown
+    case absent
+    case present
+}
+
+enum MemberAvatarTransparencyState: String, Codable, Sendable {
+    case unknown
+    case absent
+    case opaque
+    case transparent
+}
+
 // MARK: - Pet Model
 @Model
 final class Pet {
@@ -61,6 +74,9 @@ final class Pet {
     var isNeutered: Bool
     var avatarEmoji: String
     @Attribute(.externalStorage) var avatarImageData: Data?
+    var avatarAttachmentStateRaw: String = MemberAvatarAttachmentState.unknown.rawValue
+    var avatarImageSignature: String = ""
+    var avatarTransparencyStateRaw: String = MemberAvatarTransparencyState.unknown.rawValue
     var microchipID: String
     var vetContact: String // 向后兼容：存电话号码
     // ArkSchemaV24 兽医联系人结构化
@@ -113,6 +129,8 @@ final class Pet {
     var cardStyleRaw: String
     // ArkSchemaV51：3D 破框卡片专用主体图，独立于全局头像
     @Attribute(.externalStorage) var cardPopoutImageData: Data?
+    var cardPopoutAttachmentStateRaw: String = MemberAvatarAttachmentState.unknown.rawValue
+    var cardPopoutImageSignature: String = ""
     var cardPopoutSourceRaw: String?
     // ArkSchemaV23 步行周目标（km，0 = 未设置）
     var weeklyWalkGoalKm: Double
@@ -156,6 +174,9 @@ final class Pet {
         self.isNeutered = isNeutered
         self.avatarEmoji = avatarEmoji
         self.avatarImageData = nil
+        self.avatarAttachmentStateRaw = MemberAvatarAttachmentState.absent.rawValue
+        self.avatarImageSignature = ""
+        self.avatarTransparencyStateRaw = MemberAvatarTransparencyState.absent.rawValue
         self.microchipID = ""
         self.vetContact = ""
         self.vetClinicName = ""
@@ -196,6 +217,8 @@ final class Pet {
         self.passedAwayDate = nil
         self.cardStyleRaw = "classic"
         self.cardPopoutImageData = nil
+        self.cardPopoutAttachmentStateRaw = MemberAvatarAttachmentState.absent.rawValue
+        self.cardPopoutImageSignature = ""
         self.cardPopoutSourceRaw = nil
         self.weeklyWalkGoalKm = 0
         self.personalityTagsRaw = ""
@@ -224,6 +247,158 @@ final class Pet {
 
     var safeThemeColorHex: String {
         OhanaThemeColorPolicy.normalizedMemberThemeHex(themeColorHex, fallback: OhanaThemeColorPolicy.petFallbackHex)
+    }
+
+    var avatarAttachmentState: MemberAvatarAttachmentState {
+        get { MemberAvatarAttachmentState(rawValue: avatarAttachmentStateRaw) ?? .unknown }
+        set { avatarAttachmentStateRaw = newValue.rawValue }
+    }
+
+    var hasAvatarImageAttachment: Bool {
+        canAttemptAvatarImageAttachmentLoad
+    }
+
+    var canAttemptAvatarImageAttachmentLoad: Bool {
+        avatarAttachmentState != .absent
+    }
+
+    var avatarThumbnailSignature: String {
+        if !avatarImageSignature.isEmpty {
+            return avatarImageSignature
+        }
+        guard canAttemptAvatarImageAttachmentLoad else { return "" }
+        return "legacy:\(id.uuidString):avatar:\(createdAt.timeIntervalSince1970)"
+    }
+
+    var avatarTransparencyState: MemberAvatarTransparencyState {
+        get { MemberAvatarTransparencyState(rawValue: avatarTransparencyStateRaw) ?? .unknown }
+        set { avatarTransparencyStateRaw = newValue.rawValue }
+    }
+
+    var hasTransparentAvatarImage: Bool {
+        avatarTransparencyState == .transparent
+    }
+
+    var shouldShowAvatarBackground: Bool {
+        !(hasAvatarImageAttachment && hasTransparentAvatarImage)
+    }
+
+    var needsAvatarAttachmentIndexRepair: Bool {
+        avatarAttachmentState == .unknown || (hasAvatarImageAttachment && avatarImageSignature.isEmpty)
+    }
+
+    var needsAvatarTransparencyIndexRepair: Bool {
+        avatarTransparencyState == .unknown
+    }
+
+    var needsAvatarMediaIndexRepair: Bool {
+        needsAvatarAttachmentIndexRepair || needsAvatarTransparencyIndexRepair
+    }
+
+    func updateAvatarImageData(_ data: Data?) {
+        avatarImageData = data
+        updateAvatarAttachmentIndex(for: data)
+    }
+
+    @discardableResult
+    func repairAvatarAttachmentIndexIfNeeded() -> Bool {
+        guard needsAvatarAttachmentIndexRepair else { return false }
+        updateAvatarAttachmentIndex(for: avatarImageData)
+        return true
+    }
+
+    @discardableResult
+    func repairAvatarMediaIndexesIfNeeded() -> Bool {
+        guard needsAvatarMediaIndexRepair else { return false }
+        updateAvatarAttachmentIndex(for: avatarImageData)
+        return true
+    }
+
+    @discardableResult
+    func backfillAvatarAttachmentPresence(hasData: Bool) -> Bool {
+        if hasData {
+            guard avatarAttachmentState != .present else { return false }
+            avatarAttachmentState = .present
+            return true
+        }
+
+        guard avatarAttachmentState != .absent
+            || !avatarImageSignature.isEmpty
+            || avatarTransparencyState != .absent
+        else { return false }
+        avatarAttachmentState = .absent
+        avatarImageSignature = ""
+        avatarTransparencyState = .absent
+        return true
+    }
+
+    private func updateAvatarAttachmentIndex(for data: Data?) {
+        avatarAttachmentState = data == nil ? .absent : .present
+        avatarImageSignature = data.map(MediaPayloadSignature.signature(for:)) ?? ""
+        avatarTransparencyState = Self.avatarTransparencyState(for: data)
+    }
+
+    private static func avatarTransparencyState(for data: Data?) -> MemberAvatarTransparencyState {
+        guard let data else { return .absent }
+        return ImageCutoutService.isTransparentPNG(data) ? .transparent : .opaque
+    }
+
+    var cardPopoutAttachmentState: MemberAvatarAttachmentState {
+        get { MemberAvatarAttachmentState(rawValue: cardPopoutAttachmentStateRaw) ?? .unknown }
+        set { cardPopoutAttachmentStateRaw = newValue.rawValue }
+    }
+
+    var hasCardPopoutImageAttachment: Bool {
+        canAttemptCardPopoutImageAttachmentLoad
+    }
+
+    var canAttemptCardPopoutImageAttachmentLoad: Bool {
+        cardPopoutAttachmentState != .absent
+    }
+
+    var cardPopoutThumbnailSignature: String {
+        if !cardPopoutImageSignature.isEmpty {
+            return cardPopoutImageSignature
+        }
+        guard canAttemptCardPopoutImageAttachmentLoad else { return "" }
+        return "legacy:\(id.uuidString):card-popout:\(createdAt.timeIntervalSince1970)"
+    }
+
+    var needsCardPopoutAttachmentIndexRepair: Bool {
+        cardPopoutAttachmentState == .unknown || (hasCardPopoutImageAttachment && cardPopoutImageSignature.isEmpty)
+    }
+
+    func updateCardPopoutImageData(_ data: Data?) {
+        cardPopoutImageData = data
+        updateCardPopoutAttachmentIndex(for: data)
+    }
+
+    @discardableResult
+    func repairCardPopoutAttachmentIndexIfNeeded() -> Bool {
+        guard needsCardPopoutAttachmentIndexRepair else { return false }
+        updateCardPopoutAttachmentIndex(for: cardPopoutImageData)
+        return true
+    }
+
+    @discardableResult
+    func backfillCardPopoutAttachmentPresence(hasData: Bool) -> Bool {
+        if hasData {
+            guard cardPopoutAttachmentState != .present else { return false }
+            cardPopoutAttachmentState = .present
+            return true
+        }
+
+        guard cardPopoutAttachmentState != .absent
+            || !cardPopoutImageSignature.isEmpty
+        else { return false }
+        cardPopoutAttachmentState = .absent
+        cardPopoutImageSignature = ""
+        return true
+    }
+
+    private func updateCardPopoutAttachmentIndex(for data: Data?) {
+        cardPopoutAttachmentState = data == nil ? .absent : .present
+        cardPopoutImageSignature = data.map(MediaPayloadSignature.signature(for:)) ?? ""
     }
 
     var daysTogether: Int {

@@ -54,14 +54,14 @@ struct PlantLaunchTests {
         #expect(!view.eventIsRelatedToAnyPlant(unscopedUUIDEvent))
     }
 
-    @Test func calendarPlantRouteFilterDoesNotDependOnLoadedPlantRows() throws {
+    @Test func calendarRouteFilterDoesNotPromotePlantIdsToPlantCalendar() throws {
         let plantID = UUID().uuidString
-        let view = CalendarView(preselectedPlantId: plantID)
+        let view = CalendarView(preselectedPetId: plantID)
 
-        #expect(view.routeFilterSelection == .plant(plantID))
-        #expect(view.effectivePlantFilterId == plantID)
-        #expect(view.effectivePetFilterId == nil)
-        #expect(view.chipFilterSelection == .plant(plantID))
+        #expect(view.routeFilterSelection == .pet(plantID))
+        #expect(view.effectivePlantFilterId == nil)
+        #expect(view.effectivePetFilterId == plantID)
+        #expect(view.chipFilterSelection == .pet(plantID))
     }
 
     @Test func carePlanReadsOneDayDeferralLog() throws {
@@ -378,6 +378,18 @@ struct PlantLaunchTests {
         #expect(card.avatarImageData == nil)
         #expect(card.avatarImageAssetName == PlantCatalogMedia.avatarAssetName(forCatalogID: "monstera-deliciosa"))
         #expect(card.avatarImageSignature == "asset:\(PlantCatalogMedia.avatarAssetName(forCatalogID: "monstera-deliciosa"))")
+    }
+
+    @Test func plantFocusCardsKeepUserAvatarSignatureWithoutEmbeddingDataByDefault() {
+        let avatarData = Data([9, 8, 7, 6, 5, 4])
+        let plant = Plant(name: "Photo plant")
+        plant.updateAvatarImageData(avatarData)
+
+        let card = FocusCard.fromPlant(plant)
+
+        #expect(card.avatarImageData == nil)
+        #expect(card.avatarImageAssetName == nil)
+        #expect(card.avatarImageSignature == MediaPayloadSignature.signature(for: avatarData))
     }
 
     @Test func plantCatalogLocalizedDisplayFieldsDoNotFallbackToChineseForEnglishOrGerman() {
@@ -754,12 +766,16 @@ struct PlantLaunchTests {
 
         #expect(compact.schemaVersion == 1)
         #expect(compact.entries.map(\.careTypeRaw) == [PlantCareType.newLeaf.rawValue, PlantCareType.watering.rawValue])
+        #expect(firstLog.hasPhotoAttachment)
+        #expect(firstLog.photoImageSignature == MediaPayloadSignature.signature(for: Data([1, 2, 3, 4])))
+        #expect(!secondLog.hasPhotoAttachment)
         #expect(compact.entries[0].hasPhoto)
-        #expect(compact.entries[0].photoByteCount == 4)
+        #expect(compact.entries[0].photoByteCount == 0)
         #expect(compact.entries[0].photoBase64 == nil)
+        #expect(withPhotos.entries[0].photoByteCount == 4)
         #expect(withPhotos.entries[0].photoBase64 == Data([1, 2, 3, 4]).base64EncodedString())
         #expect(markdown.contains("照片"))
-        #expect(markdown.contains("4 bytes"))
+        #expect(!markdown.contains("4 bytes"))
     }
 
     @Test func creatingPlantMarksExistingPlantDataForGrandfatherAccess() throws {
@@ -790,11 +806,13 @@ struct PlantLaunchTests {
         let container = try makeInMemoryContainer()
         let measuredAt = makeDate(year: 2026, month: 6, day: 22, hour: 11)
         let acquiredAt = makeDate(year: 2026, month: 4, day: 18)
+        let avatarData = Data([4, 2, 7, 9])
         let input = PlantCreationCommandInput(
             name: "Calathea",
             species: "Calathea orbifolia",
             location: "South shelf",
             avatarEmoji: "🌿",
+            avatarImageData: avatarData,
             wateringIntervalDays: 5,
             fertilizingIntervalDays: 28,
             roomNameRaw: "Bedroom",
@@ -828,6 +846,9 @@ struct PlantLaunchTests {
 
         let plant = try #require(try container.mainContext.fetch(FetchDescriptor<Plant>()).first)
         #expect(plant.roomNameRaw == "Bedroom")
+        #expect(plant.avatarImageData == avatarData)
+        #expect(plant.hasAvatarImageAttachment)
+        #expect(plant.avatarImageSignature == MediaPayloadSignature.signature(for: avatarData))
         #expect(plant.location == "South shelf")
         #expect(plant.potDiameterCm == 14)
         #expect(plant.potMaterialRaw == "terracotta")
@@ -1138,7 +1159,7 @@ struct PlantLaunchTests {
         }
     }
 
-    @Test func plantCalendarFallbackUsesExplicitPlantSlot() {
+    @Test func plantCalendarFallbackOpensGlobalCalendarWithoutPlantSlot() {
         let plant = Plant(name: "Fern")
         let event = Event(
             title: "Fern care",
@@ -1158,9 +1179,9 @@ struct PlantLaunchTests {
         if case let .calendar(entityId, humanId, plantId) = destination {
             #expect(entityId == nil)
             #expect(humanId == nil)
-            #expect(plantId == plant.id.uuidString)
+            #expect(plantId == nil)
         } else {
-            Issue.record("Expected plant calendar fallback to keep id in plant slot")
+            Issue.record("Expected plant fallback to use the global calendar route")
         }
     }
 
@@ -2116,7 +2137,7 @@ struct PlantLaunchTests {
     }
 
     private func makeInMemoryContainer() throws -> ModelContainer {
-        let schema = Schema(ArkSchemaV74.models)
+        let schema = Schema(ArkSchemaV82.models)
         let config = ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)
         return try ModelContainer(for: schema, migrationPlan: ArkMigrationPlan.self, configurations: [config])
     }

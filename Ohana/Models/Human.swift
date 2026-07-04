@@ -169,6 +169,8 @@ final class Human {
     var bloodType: String
     var avatarEmoji: String
     @Attribute(.externalStorage) var avatarImageData: Data?
+    var avatarAttachmentStateRaw: String = MemberAvatarAttachmentState.unknown.rawValue
+    var avatarImageSignature: String = ""
     var role: String
     // Legacy local field retained for lightweight store compatibility. No Sign in with Apple flow writes it,
     // and new backups intentionally omit it.
@@ -226,6 +228,8 @@ final class Human {
         self.bloodType = bloodType
         self.avatarEmoji = avatarEmoji
         self.avatarImageData = nil
+        self.avatarAttachmentStateRaw = MemberAvatarAttachmentState.absent.rawValue
+        self.avatarImageSignature = ""
         self.role = HumanProfileOptions.normalizedRole(role)
         self.appleUserIdentifier = ""
         self.notes = ""
@@ -250,6 +254,62 @@ final class Human {
 
     var safeThemeColorHex: String {
         OhanaThemeColorPolicy.normalizedMemberThemeHex(themeColorHex, fallback: OhanaThemeColorPolicy.humanFallbackHex)
+    }
+
+    var avatarAttachmentState: MemberAvatarAttachmentState {
+        get { MemberAvatarAttachmentState(rawValue: avatarAttachmentStateRaw) ?? .unknown }
+        set { avatarAttachmentStateRaw = newValue.rawValue }
+    }
+
+    var hasAvatarImageAttachment: Bool {
+        canAttemptAvatarImageAttachmentLoad
+    }
+
+    var canAttemptAvatarImageAttachmentLoad: Bool {
+        avatarAttachmentState != .absent
+    }
+
+    var avatarThumbnailSignature: String {
+        if !avatarImageSignature.isEmpty {
+            return avatarImageSignature
+        }
+        guard canAttemptAvatarImageAttachmentLoad else { return "" }
+        return "legacy:\(id.uuidString):avatar:\(createdAt.timeIntervalSince1970)"
+    }
+
+    var needsAvatarAttachmentIndexRepair: Bool {
+        avatarAttachmentState == .unknown || (hasAvatarImageAttachment && avatarImageSignature.isEmpty)
+    }
+
+    func updateAvatarImageData(_ data: Data?) {
+        avatarImageData = data
+        updateAvatarAttachmentIndex(for: data)
+    }
+
+    @discardableResult
+    func repairAvatarAttachmentIndexIfNeeded() -> Bool {
+        guard needsAvatarAttachmentIndexRepair else { return false }
+        updateAvatarAttachmentIndex(for: avatarImageData)
+        return true
+    }
+
+    @discardableResult
+    func backfillAvatarAttachmentPresence(hasData: Bool) -> Bool {
+        if hasData {
+            guard avatarAttachmentState != .present else { return false }
+            avatarAttachmentState = .present
+            return true
+        }
+
+        guard avatarAttachmentState != .absent || !avatarImageSignature.isEmpty else { return false }
+        avatarAttachmentState = .absent
+        avatarImageSignature = ""
+        return true
+    }
+
+    private func updateAvatarAttachmentIndex(for data: Data?) {
+        avatarAttachmentState = data == nil ? .absent : .present
+        avatarImageSignature = data.map(MediaPayloadSignature.signature(for:)) ?? ""
     }
 
     var ageText: String {

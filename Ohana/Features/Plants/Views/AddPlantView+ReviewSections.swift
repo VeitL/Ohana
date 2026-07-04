@@ -24,7 +24,7 @@ extension AddPlantView {
                     if duplicateAcknowledgementKey == currentDuplicateAcknowledgementKey {
                         Text(l.tr(zh: "已确认", en: "Confirmed", de: "Bestätigt"))
                             .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded))
-                            .foregroundStyle(Color.goLime)
+                            .foregroundStyle(Color.goPrimary)
                     }
                 }
                 ForEach(duplicateCandidates) { candidate in
@@ -47,7 +47,7 @@ extension AddPlantView {
                         .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
                 }
                 .buttonStyle(ScaleButtonStyle())
-                .foregroundStyle(Color.goLime)
+                .foregroundStyle(Color.goPrimary)
             }
             .padding(16)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -64,7 +64,7 @@ extension AddPlantView {
             Toggle(l.tr(zh: "室内植物", en: "Indoor plant", de: "Zimmerpflanze"), isOn: $isIndoor)
                 .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .rounded))
                 .foregroundStyle(Color.ohanaPrimaryText)
-                .tint(Color.goLime)
+                .tint(Color.goPrimary)
             Picker(l.tr(zh: "窗户朝向", en: "Window direction", de: "Fensterausrichtung"), selection: $windowDirection) {
                 ForEach(PlantWindowDirection.allCases) { direction in
                     Text(direction.displayName).tag(direction)
@@ -84,7 +84,7 @@ extension AddPlantView {
                 step: 250
             )
                 .foregroundStyle(Color.ohanaPrimaryText)
-                .tint(Color.goLime)
+                .tint(Color.goPrimary)
             Picker(l.tr(zh: "湿度偏好", en: "Humidity preference", de: "Luftfeuchte"), selection: $humidityPreference) {
                 ForEach(PlantHumidityPreference.allCases) { preference in
                     Text(preference.displayName).tag(preference)
@@ -98,7 +98,7 @@ extension AddPlantView {
             Toggle(l.tr(zh: "靠近空调/暖气", en: "Near AC/heater", de: "Nahe an Klimaanlage/Heizung"), isOn: $isNearClimateSource)
                 .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .rounded))
                 .foregroundStyle(Color.ohanaPrimaryText)
-                .tint(Color.goLime)
+                .tint(Color.goPrimary)
         }
         .pickerStyle(.menu)
         .padding(16)

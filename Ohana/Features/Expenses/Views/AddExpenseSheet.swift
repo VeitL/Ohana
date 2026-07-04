@@ -22,36 +22,27 @@ struct ExpenseReceiptThumbnail: View {
     let data: Data
     let tint: Color
 
-    @State var image: UIImage?
-
-    var signature: String {
-        FocusWalletAvatarCache.signature(for: data)
-    }
-
     var body: some View {
         ZStack {
             RoundedRectangle(cornerRadius: OhanaRadius.icon, style: .continuous)
                 .fill(tint.opacity(0.12))
                 .frame(width: 44, height: 44)
 
-            if let image {
+            AsyncDecodedImageView(
+                data: data,
+                cacheID: "expense-receipt-thumbnail",
+                maxPixel: 120
+            ) { image in
                 Image(uiImage: image)
                     .resizable()
                     .scaledToFill()
                     .frame(width: 44, height: 44)
                     .clipShape(RoundedRectangle(cornerRadius: OhanaRadius.badge, style: .continuous))
-            } else {
+            } placeholder: {
                 Image(systemName: "photo.fill") // a11y: allow decorative icon covered by surrounding text or control
                     .font(OhanaFont.callout(.semibold))
                     .foregroundStyle(tint)
                     .accessibilityHidden(true)
-            }
-        }
-        .task(id: signature) {
-            let decoded = await AttachmentImageDecoder.decode(data)
-            guard !Task.isCancelled else { return }
-            await MainActor.run {
-                image = decoded
             }
         }
     }
@@ -62,24 +53,23 @@ struct ExpenseReceiptPreviewViewer: View {
     let onClose: () -> Void
 
     @AppStorage("appLanguage") var appLanguage = AppLanguage.code
-    @State var image: UIImage?
 
     var l: L10n { L10n(appLanguage) }
-
-    var signature: String {
-        FocusWalletAvatarCache.signature(for: receipt.data)
-    }
 
     var body: some View {
         ZStack {
             Color.black.ignoresSafeArea() // ui-v4: allow receipt preview full-screen black viewer
 
-            if let image {
+            AsyncDecodedImageView(
+                data: receipt.isImage ? receipt.data : nil,
+                cacheID: "expense-receipt-preview",
+                maxPixel: 2200
+            ) { image in
                 Image(uiImage: image)
                     .resizable()
                     .scaledToFit()
                     .ignoresSafeArea()
-            } else {
+            } placeholder: {
                 Image(systemName: receipt.isImage ? "photo.fill" : "doc.fill")
                     .font(.largeTitle.weight(.semibold))
                     .foregroundStyle(Color.white.opacity(0.72)) // ui-v4: allow receipt preview placeholder on black viewer
@@ -98,14 +88,6 @@ struct ExpenseReceiptPreviewViewer: View {
                     .accessibilityLabel(l.tr(zh: "关闭预览", en: "Close preview", de: "Vorschau schließen"))
                 }
                 Spacer()
-            }
-        }
-        .task(id: signature) {
-            guard receipt.isImage else { return }
-            let decoded = await AttachmentImageDecoder.decode(receipt.data)
-            guard !Task.isCancelled else { return }
-            await MainActor.run {
-                image = decoded
             }
         }
     }

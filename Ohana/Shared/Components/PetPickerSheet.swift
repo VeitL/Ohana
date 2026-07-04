@@ -68,7 +68,7 @@ struct PetPickerSheet: View {
                             HStack(spacing: 14) {
                                 // 头像
                                 PetAvatarPortraitView(
-                                    imageData: pet.avatarImageData,
+                                    pet: pet,
                                     fallbackText: pet.species == "狗" ? "🐶" : pet.species == "猫" ? "🐱" : "🐾",
                                     themeColor: Color(hex: pet.safeThemeColorHex),
                                     size: 52,

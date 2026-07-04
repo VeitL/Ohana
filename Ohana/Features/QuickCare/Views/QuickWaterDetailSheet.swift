@@ -477,7 +477,7 @@ struct QuickWaterDetailSheet: View {
     var header: some View {
         HStack(spacing: 12) {
             PetAvatarPortraitView(
-                imageData: pet.avatarImageData,
+                pet: pet,
                 fallbackText: pet.avatarEmoji,
                 themeColor: themeColor,
                 size: 48,

@@ -7,23 +7,35 @@
 //
 
 import Foundation
+import SwiftData
 
-struct CalendarEventOccurrence: Identifiable {
+nonisolated struct CalendarEventOccurrence: Identifiable {
     let id: String
     let event: Event
     let occurrenceDate: Date
 }
 
-struct CalendarTimelineDateSection: Identifiable {
+nonisolated struct CalendarEventOccurrenceReference: Identifiable, Sendable {
+    let id: String
+    let eventModelID: PersistentIdentifier
+    let occurrenceDate: Date
+}
+
+nonisolated struct CalendarTimelineDateSection: Identifiable {
     let date: Date
     let occurrences: [CalendarEventOccurrence]
 
     var id: Date { date }
 }
 
-struct CalendarTimelineSnapshot {
+nonisolated struct CalendarTimelineSnapshot {
     let expandedOccurrences: [CalendarEventOccurrence]
     let sections: [CalendarTimelineDateSection]
+
+    static let empty = CalendarTimelineSnapshot(
+        expandedOccurrences: [],
+        sections: []
+    )
 
     var dates: [Date] {
         sections.map(\.date)
@@ -38,7 +50,118 @@ struct CalendarTimelineSnapshot {
     }
 }
 
-enum CalendarSnapshotBuilder {
+nonisolated struct CalendarTimelineSnapshotReference: Sendable {
+    let expandedOccurrences: [CalendarEventOccurrenceReference]
+    let sections: [CalendarTimelineSectionReference]
+}
+
+nonisolated struct CalendarTimelineSectionReference: Identifiable, Sendable {
+    let date: Date
+    let occurrences: [CalendarEventOccurrenceReference]
+
+    var id: Date { date }
+}
+
+nonisolated struct CalendarPreparedSnapshot {
+    let filteredEvents: [Event]
+    let timeline: CalendarTimelineSnapshot
+    let selectedDateEvents: [Event]
+    let weekEventsByDay: [String: [Event]]
+    let monthEventDayIDs: Set<String>
+
+    static let empty = CalendarPreparedSnapshot(
+        filteredEvents: [],
+        timeline: .empty,
+        selectedDateEvents: [],
+        weekEventsByDay: [:],
+        monthEventDayIDs: []
+    )
+}
+
+nonisolated struct CalendarPreparedSnapshotReference: Sendable {
+    let filteredEventModelIDs: [PersistentIdentifier]
+    let timeline: CalendarTimelineSnapshotReference
+    let selectedDateEventModelIDs: [PersistentIdentifier]
+    let weekEventModelIDsByDay: [String: [PersistentIdentifier]]
+    let monthEventDayIDs: Set<String>
+}
+
+nonisolated struct CalendarRoutePreparedSnapshot {
+    let key: CalendarPreparedSnapshotTriggerKey
+    let snapshot: CalendarPreparedSnapshot
+}
+
+nonisolated struct CalendarRoutePreparedSnapshotReference: Sendable {
+    let key: CalendarPreparedSnapshotTriggerKey
+    let snapshot: CalendarPreparedSnapshotReference
+}
+
+extension CalendarRoutePreparedSnapshotReference {
+    nonisolated func rehydrated(eventByModelID: [PersistentIdentifier: Event]) -> CalendarRoutePreparedSnapshot {
+        CalendarRoutePreparedSnapshot(
+            key: key,
+            snapshot: snapshot.rehydrated(eventByModelID: eventByModelID)
+        )
+    }
+}
+
+extension CalendarPreparedSnapshotReference {
+    nonisolated func rehydrated(eventByModelID: [PersistentIdentifier: Event]) -> CalendarPreparedSnapshot {
+        CalendarPreparedSnapshot(
+            filteredEvents: events(for: filteredEventModelIDs, eventByModelID: eventByModelID),
+            timeline: timeline.rehydrated(eventByModelID: eventByModelID),
+            selectedDateEvents: events(for: selectedDateEventModelIDs, eventByModelID: eventByModelID),
+            weekEventsByDay: weekEventModelIDsByDay.mapValues { modelIDs in
+                events(for: modelIDs, eventByModelID: eventByModelID)
+            },
+            monthEventDayIDs: monthEventDayIDs
+        )
+    }
+
+    private nonisolated func events(
+        for modelIDs: [PersistentIdentifier],
+        eventByModelID: [PersistentIdentifier: Event]
+    ) -> [Event] {
+        modelIDs.compactMap { eventByModelID[$0] }
+    }
+}
+
+extension CalendarTimelineSnapshotReference {
+    nonisolated func rehydrated(eventByModelID: [PersistentIdentifier: Event]) -> CalendarTimelineSnapshot {
+        CalendarTimelineSnapshot(
+            expandedOccurrences: expandedOccurrences.compactMap {
+                $0.rehydrated(eventByModelID: eventByModelID)
+            },
+            sections: sections.map {
+                $0.rehydrated(eventByModelID: eventByModelID)
+            }
+        )
+    }
+}
+
+extension CalendarTimelineSectionReference {
+    nonisolated func rehydrated(eventByModelID: [PersistentIdentifier: Event]) -> CalendarTimelineDateSection {
+        CalendarTimelineDateSection(
+            date: date,
+            occurrences: occurrences.compactMap {
+                $0.rehydrated(eventByModelID: eventByModelID)
+            }
+        )
+    }
+}
+
+extension CalendarEventOccurrenceReference {
+    nonisolated func rehydrated(eventByModelID: [PersistentIdentifier: Event]) -> CalendarEventOccurrence? {
+        guard let event = eventByModelID[eventModelID] else { return nil }
+        return CalendarEventOccurrence(
+            id: id,
+            event: event,
+            occurrenceDate: occurrenceDate
+        )
+    }
+}
+
+nonisolated enum CalendarSnapshotBuilder {
     static func buildTimeline(
         events: [Event],
         allEvents: [Event],
@@ -52,11 +175,96 @@ enum CalendarSnapshotBuilder {
             now: now,
             calendar: calendar
         )
+        return buildTimeline(
+            events: events,
+            visibilityContext: visibilityContext
+        )
+    }
+
+    static func preparedSnapshot(
+        filteredEvents: [Event],
+        allEvents: [Event],
+        pets: [Pet],
+        selectedDate: Date,
+        weekDays: [Date],
+        monthDays: [Date],
+        now: Date = Date(),
+        calendar: Calendar = .current
+    ) -> CalendarPreparedSnapshot {
+        let visibilityContext = VisibilityContext(
+            allEvents: allEvents,
+            pets: pets,
+            now: now,
+            calendar: calendar
+        )
+        let timeline = buildTimeline(
+            events: filteredEvents,
+            visibilityContext: visibilityContext
+        )
+        let selectedDateEvents = eventsForDate(
+            filteredEvents,
+            date: selectedDate,
+            visibilityContext: visibilityContext
+        )
+        var weekEventsByDay: [String: [Event]] = [:]
+        for day in weekDays {
+            let dayID = timelineDateID(day)
+            weekEventsByDay[dayID] = eventsForDate(
+                filteredEvents,
+                date: day,
+                visibilityContext: visibilityContext
+            )
+        }
+        var monthEventDayIDs = Set<String>()
+        for day in monthDays where !eventsForDate(
+            filteredEvents,
+            date: day,
+            visibilityContext: visibilityContext
+        ).isEmpty {
+            monthEventDayIDs.insert(timelineDateID(day))
+        }
+        return CalendarPreparedSnapshot(
+            filteredEvents: filteredEvents,
+            timeline: timeline,
+            selectedDateEvents: selectedDateEvents,
+            weekEventsByDay: weekEventsByDay,
+            monthEventDayIDs: monthEventDayIDs
+        )
+    }
+
+    static func preparedSnapshotReference(
+        filteredEvents: [Event],
+        allEvents: [Event],
+        pets: [Pet],
+        selectedDate: Date,
+        weekDays: [Date],
+        monthDays: [Date],
+        now: Date = Date(),
+        calendar: Calendar = .current
+    ) -> CalendarPreparedSnapshotReference {
+        preparedSnapshot(
+            filteredEvents: filteredEvents,
+            allEvents: allEvents,
+            pets: pets,
+            selectedDate: selectedDate,
+            weekDays: weekDays,
+            monthDays: monthDays,
+            now: now,
+            calendar: calendar
+        )
+        .reference
+    }
+
+    private static func buildTimeline(
+        events: [Event],
+        visibilityContext: VisibilityContext
+    ) -> CalendarTimelineSnapshot {
         let occurrences = expandedOccurrences(
             events: events,
             visibilityContext: visibilityContext
         )
-        let today = calendar.startOfDay(for: now)
+        let calendar = visibilityContext.calendar
+        let today = calendar.startOfDay(for: visibilityContext.now)
         let occurrencesByDay = Dictionary(grouping: occurrences) { occurrence in
             calendar.startOfDay(for: occurrence.occurrenceDate)
         }
@@ -92,8 +300,20 @@ enum CalendarSnapshotBuilder {
             now: now,
             calendar: calendar
         )
-        return events.filter {
-            eventOccursOnDate($0, date: date, calendar: calendar) &&
+        return eventsForDate(
+            events,
+            date: date,
+            visibilityContext: visibilityContext
+        )
+    }
+
+    private static func eventsForDate(
+        _ events: [Event],
+        date: Date,
+        visibilityContext: VisibilityContext
+    ) -> [Event] {
+        events.filter {
+            eventOccursOnDate($0, date: date, calendar: visibilityContext.calendar) &&
                 shouldShowOccurrence($0, occurrenceDate: date, visibilityContext: visibilityContext)
         }
     }
@@ -230,7 +450,7 @@ enum CalendarSnapshotBuilder {
         ) ?? occurrenceDate
     }
 
-    private struct VisibilityContext {
+    private nonisolated struct VisibilityContext {
         let pets: [Pet]
         let feedModeByPetId: [String: FeedOperatingMode]
         let waterModeByPetId: [String: WaterOperatingMode]
@@ -309,5 +529,47 @@ enum CalendarSnapshotBuilder {
             }
             return hasPlanEvents ? .reminder : .manual
         }
+    }
+}
+
+private extension CalendarPreparedSnapshot {
+    nonisolated var reference: CalendarPreparedSnapshotReference {
+        CalendarPreparedSnapshotReference(
+            filteredEventModelIDs: filteredEvents.map(\.persistentModelID),
+            timeline: timeline.reference,
+            selectedDateEventModelIDs: selectedDateEvents.map(\.persistentModelID),
+            weekEventModelIDsByDay: weekEventsByDay.mapValues { events in
+                events.map(\.persistentModelID)
+            },
+            monthEventDayIDs: monthEventDayIDs
+        )
+    }
+}
+
+private extension CalendarTimelineSnapshot {
+    nonisolated var reference: CalendarTimelineSnapshotReference {
+        CalendarTimelineSnapshotReference(
+            expandedOccurrences: expandedOccurrences.map(\.reference),
+            sections: sections.map(\.reference)
+        )
+    }
+}
+
+private extension CalendarTimelineDateSection {
+    nonisolated var reference: CalendarTimelineSectionReference {
+        CalendarTimelineSectionReference(
+            date: date,
+            occurrences: occurrences.map(\.reference)
+        )
+    }
+}
+
+private extension CalendarEventOccurrence {
+    nonisolated var reference: CalendarEventOccurrenceReference {
+        CalendarEventOccurrenceReference(
+            id: id,
+            eventModelID: event.persistentModelID,
+            occurrenceDate: occurrenceDate
+        )
     }
 }

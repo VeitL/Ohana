@@ -778,7 +778,7 @@ struct FocusWalletCardView: View {
         .foregroundStyle(isShown ? Color.arkInk : Color.goCardWhite.opacity(0.74))
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
-        .background(isShown ? Color.goLime : Color.arkInk.opacity(0.26), in: Capsule())
+        .background(isShown ? Color.goPrimary : Color.arkInk.opacity(0.26), in: Capsule())
         .overlay(
             Capsule()
                 .strokeBorder(isShown ? Color.clear : Color.goCardWhite.opacity(0.16), lineWidth: 0.6)

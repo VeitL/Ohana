@@ -42,13 +42,13 @@ extension PlantDetailContentView {
                     icon: "tray.full.fill",
                     title: l.tr(zh: "30天观察", en: "30d notes", de: "30T Notizen"),
                     value: "\(recentObservationLogCount)",
-                    tint: recentStressSignalLogs.isEmpty ? Color.goTeal : Color.goYellow
+                    tint: hasRecentStressSignals ? Color.goYellow : Color.goTeal
                 )
                 healthReviewMetric(
                     icon: "clock.badge.checkmark.fill",
                     title: l.tr(zh: "最近复查", en: "Latest", de: "Zuletzt"),
                     value: latestHealthReviewText,
-                    tint: latestHealthReviewLog == nil ? Color.goYellow : Color.goLime
+                    tint: latestHealthReviewLog == nil ? Color.goYellow : Color.goPrimary
                 )
             }
 
@@ -69,7 +69,7 @@ extension PlantDetailContentView {
                         .minimumScaleFactor(0.78)
                         .frame(minHeight: 44)
                         .padding(.horizontal, 12)
-                        .background(Color.goLime, in: Capsule())
+                        .background(Color.goPrimary, in: Capsule())
                 }
                 .buttonStyle(ScaleButtonStyle())
                 .accessibilityLabel(l.tr(zh: "为\(plant.name)记录一次病虫害复查", en: "Log a pest check for \(plant.name)", de: "Schädlingscheck für \(plant.name) erfassen"))
@@ -184,8 +184,8 @@ extension PlantDetailContentView {
                 diaryStatPill(
                     icon: "tray.full.fill",
                     title: l.tr(zh: "记录", en: "Logs", de: "Protokolle"),
-                    value: "\(recentLogs.count)",
-                    tint: Color.goLime
+                    value: "\(logSummary?.logCount ?? 0)",
+                    tint: Color.goPrimary
                 )
                 diaryStatPill(
                     icon: "photo.on.rectangle.angled",
@@ -208,23 +208,20 @@ extension PlantDetailContentView {
             }
 
             HStack(spacing: 10) {
-                ShareLink(item: growthDiaryMarkdown) {
-                    HStack(spacing: 6) {
-                        Image(systemName: "square.and.arrow.up") // a11y: allow decorative share glyph; button label names export action.
-                            .font(OhanaFont.adaptive(size: 12, weight: .black))
-                            .accessibilityHidden(true)
-                        Text(l.tr(zh: "导出 Markdown", en: "Export Markdown", de: "Markdown exportieren"))
-                            .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.78)
+                if isRenderDataReady {
+                    ShareLink(item: growthDiaryMarkdown) { // smoothness: allow cached render-data export string prepared after visual handoff
+                        growthDiaryExportButtonLabel
                     }
-                    .foregroundStyle(Color.arkInk)
-                    .frame(minHeight: 44)
-                    .padding(.horizontal, 12)
-                    .background(Color.goLime, in: Capsule())
+                    .accessibilityLabel(l.tr(zh: "导出\(plant.name)成长档案", en: "Export \(plant.name)'s growth diary", de: "Wachstumstagebuch von \(plant.name) exportieren"))
+                    .accessibilityIdentifier("plant-detail-growth-diary-export")
+                } else {
+                    Button {} label: {
+                        growthDiaryExportButtonLabel
+                    }
+                    .disabled(true)
+                    .accessibilityLabel(l.tr(zh: "\(plant.name)成长档案准备中", en: "\(plant.name)'s growth diary is preparing", de: "Wachstumstagebuch von \(plant.name) wird vorbereitet"))
+                    .accessibilityIdentifier("plant-detail-growth-diary-export-loading")
                 }
-                .accessibilityLabel(l.tr(zh: "导出\(plant.name)成长档案", en: "Export \(plant.name)'s growth diary", de: "Wachstumstagebuch von \(plant.name) exportieren"))
-                .accessibilityIdentifier("plant-detail-growth-diary-export")
 
                 if !photos.isEmpty {
                     Button {
@@ -286,6 +283,22 @@ extension PlantDetailContentView {
         .padding(.horizontal, 16)
     }
 
+    var growthDiaryExportButtonLabel: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "square.and.arrow.up") // a11y: allow decorative share glyph; button label names export action.
+                .font(OhanaFont.adaptive(size: 12, weight: .black))
+                .accessibilityHidden(true)
+            Text(l.tr(zh: "导出 Markdown", en: "Export Markdown", de: "Markdown exportieren"))
+                .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
+                .lineLimit(1)
+                .minimumScaleFactor(0.78)
+        }
+        .foregroundStyle(Color.arkInk)
+        .frame(minHeight: 44)
+        .padding(.horizontal, 12)
+        .background(Color.goPrimary, in: Capsule())
+    }
+
     var emptyPhotoGalleryHint: some View {
         HStack(alignment: .top, spacing: 10) {
             Image(systemName: "photo.on.rectangle.angled") // a11y: allow decorative photo hint glyph; text explains the empty gallery.
@@ -324,9 +337,12 @@ extension PlantDetailContentView {
                     } label: {
                         VStack(alignment: .leading, spacing: 7) {
                             PlantDetailDecodedImageTile(
-                                imageData: photo.imageData,
+                                imageID: photo.id,
+                                imageSignature: photo.mediaSignature,
+                                imageDataProvider: { await photoImageData(for: photo) },
                                 tint: photo.tint,
-                                fillsContainer: true
+                                fillsContainer: true,
+                                maxPixel: 520
                             )
                             .frame(width: 118, height: 92)
                             .clipShape(RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))

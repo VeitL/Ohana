@@ -141,6 +141,12 @@ scan_rule \
   "Color.ohanaPrimaryText, Color.ohanaCardSurface, Color.arkInk only for intentional ink-on-accent"
 
 scan_rule \
+  "direct-go-lime" \
+  'Color\.goLime\b|(?<![A-Za-z0-9_])\.goLime\b' \
+  "Direct goLime bypasses adaptive primary and stays lime in light mode." \
+  "Color.goPrimary for global primary actions/selection/focus, or a semantic token such as Color.goTeal/Color.goYellow/Color.goRed; allow only real lime effects"
+
+scan_rule \
   "material" \
   '\.(ultraThinMaterial|thinMaterial|regularMaterial)\b|presentationBackground\(\s*\.(ultraThinMaterial|thinMaterial|regularMaterial)' \
   "Native material often creates gray sheets/cards and can hide the V4 clear-glass intent." \

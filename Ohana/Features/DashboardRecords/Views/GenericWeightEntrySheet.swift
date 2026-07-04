@@ -597,7 +597,7 @@ struct GenericWeightEntrySheet: View {
         switch target {
         case let .pet(pet):
             PetAvatarPortraitView(
-                imageData: pet.avatarImageData,
+                pet: pet,
                 fallbackText: pet.avatarEmoji.isEmpty ? pet.speciesEmoji : pet.avatarEmoji,
                 themeColor: Color(hex: pet.safeThemeColorHex),
                 size: 42,

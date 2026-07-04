@@ -125,6 +125,7 @@ struct CoHealthPetSnapshot: Identifiable, Equatable {
     let name: String
     let species: String
     let avatarImageData: Data?
+    let avatarImageSignature: String
     let avatarEmoji: String
     let themeColorHex: String
     let walkEvents: [CoHealthWalkEvent]
@@ -136,11 +137,13 @@ struct CoHealthPetSnapshot: Identifiable, Equatable {
 
     static func load(pet: Pet, context: ModelContext) -> CoHealthPetSnapshot {
         let petID = pet.id
+        let avatarData = pet.hasAvatarImageAttachment ? pet.avatarImageData : nil
         return CoHealthPetSnapshot(
             id: petID,
             name: pet.name,
             species: pet.species,
-            avatarImageData: pet.avatarImageData,
+            avatarImageData: avatarData,
+            avatarImageSignature: pet.avatarThumbnailSignature,
             avatarEmoji: pet.avatarEmoji,
             themeColorHex: pet.safeThemeColorHex,
             walkEvents: fetchWalkEvents(petID: petID, context: context),

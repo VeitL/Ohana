@@ -89,6 +89,12 @@ enum PlantCareType: String, Codable, CaseIterable, Identifiable, Sendable {
     }
 }
 
+enum PlantCarePhotoAttachmentState: String, Codable, Sendable {
+    case unknown
+    case absent
+    case present
+}
+
 @Model
 final class PlantCareLog {
     var id: UUID
@@ -97,6 +103,8 @@ final class PlantCareLog {
     var note: String
     var executorId: String?
     @Attribute(.externalStorage) var photoData: Data?
+    var photoAttachmentStateRaw: String = PlantCarePhotoAttachmentState.unknown.rawValue
+    var photoImageSignature: String = ""
     var healthStatusRaw: String = ""
 
     @Relationship(inverse: \Plant.careLogs) var plant: Plant?
@@ -115,6 +123,8 @@ final class PlantCareLog {
         self.note = note
         self.executorId = executorId
         self.photoData = photoData
+        self.photoAttachmentStateRaw = photoData == nil ? PlantCarePhotoAttachmentState.absent.rawValue : PlantCarePhotoAttachmentState.present.rawValue
+        self.photoImageSignature = photoData.map(MediaPayloadSignature.signature(for:)) ?? ""
         self.healthStatusRaw = healthStatus?.rawValue ?? ""
     }
 
@@ -125,5 +135,61 @@ final class PlantCareLog {
     var healthStatus: PlantHealthStatus? {
         get { PlantHealthStatus(rawValue: healthStatusRaw) }
         set { healthStatusRaw = newValue?.rawValue ?? "" }
+    }
+
+    var photoAttachmentState: PlantCarePhotoAttachmentState {
+        get { PlantCarePhotoAttachmentState(rawValue: photoAttachmentStateRaw) ?? .unknown }
+        set { photoAttachmentStateRaw = newValue.rawValue }
+    }
+
+    var hasPhotoAttachment: Bool {
+        canAttemptPhotoAttachmentLoad
+    }
+
+    var canAttemptPhotoAttachmentLoad: Bool {
+        photoAttachmentState != .absent
+    }
+
+    var photoThumbnailSignature: String {
+        if !photoImageSignature.isEmpty {
+            return photoImageSignature
+        }
+        guard canAttemptPhotoAttachmentLoad else { return "" }
+        return "legacy:\(id.uuidString):photo:\(date.timeIntervalSince1970)"
+    }
+
+    var needsPhotoAttachmentIndexRepair: Bool {
+        photoAttachmentState == .unknown || (hasPhotoAttachment && photoImageSignature.isEmpty)
+    }
+
+    func updatePhotoData(_ data: Data?) {
+        photoData = data
+        updatePhotoAttachmentIndex(for: data)
+    }
+
+    @discardableResult
+    func repairPhotoAttachmentIndexIfNeeded() -> Bool {
+        guard needsPhotoAttachmentIndexRepair else { return false }
+        updatePhotoAttachmentIndex(for: photoData)
+        return true
+    }
+
+    @discardableResult
+    func backfillPhotoAttachmentPresence(hasData: Bool) -> Bool {
+        if hasData {
+            guard photoAttachmentState != .present else { return false }
+            photoAttachmentState = .present
+            return true
+        }
+
+        guard photoAttachmentState != .absent || !photoImageSignature.isEmpty else { return false }
+        photoAttachmentState = .absent
+        photoImageSignature = ""
+        return true
+    }
+
+    private func updatePhotoAttachmentIndex(for data: Data?) {
+        photoAttachmentState = data == nil ? .absent : .present
+        photoImageSignature = data.map(MediaPayloadSignature.signature(for:)) ?? ""
     }
 }

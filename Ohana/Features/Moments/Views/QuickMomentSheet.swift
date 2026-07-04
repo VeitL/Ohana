@@ -138,8 +138,14 @@ struct QuickMomentSheet: View {
             Task {
                 var loaded: [MomentDraftPhoto] = []
                 for item in newItems {
-                    if let data = try? await item.loadTransferable(type: Data.self),
-                       let img = await AttachmentImageDecoder.decode(data) {
+                    guard let data = try? await item.loadTransferable(type: Data.self) else { continue }
+                    let signature = MediaThumbnailProvider.signature(for: data)
+                    let key = MediaThumbnailKey(
+                        id: "quick-moment-import-\(signature)",
+                        sourceSignature: signature,
+                        maxPixel: 1800
+                    )
+                    if let img = await MediaThumbnailProvider.image(for: key, dataProvider: { data }) {
                         loaded.append(MomentDraftPhoto(image: img))
                     }
                 }
@@ -250,13 +256,13 @@ struct QuickMomentSheet: View {
     private var header: some View {
         HStack(spacing: 14) {
             if let pet {
-                PetAvatarPortraitRoundedView(
-                    imageData: pet.avatarImageData,
-                    fallbackText: pet.avatarEmoji,
-                    themeColor: momentAccent,
-                    size: 58,
-                    cornerRadius: OhanaRadius.controlLarge,
-                    backgroundOpacity: 0.15
+                FeatureHubAvatar(
+                    imageCacheID: "quick-moment-pet-\(pet.id.uuidString)",
+                    imageSignature: pet.avatarThumbnailSignature,
+                    petModelID: pet.persistentModelID,
+                    emoji: pet.avatarEmoji,
+                    fallback: pet.speciesEmoji,
+                    tint: momentAccent
                 )
 
                 VStack(alignment: .leading, spacing: 2) {

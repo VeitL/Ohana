@@ -77,12 +77,12 @@
 | 2 | GAP-6 通知交付 | 调度策略、合并、夜间延后、关键用药豁免、通知 action 协调、Observability 面板已测；2026-07-03 已补测关联植物的普通 Calendar 事项会按用户选择时间通知，不被植物护理提醒窗口挪到早晨；普通植物关联 Reminder 完成 / 跳过不会误写植物护理事实。 | 真机权限弹窗、banner、锁屏、Focus/DND、前台展示、通知点击和完成 / 跳过 / 稍后提醒；真机创建一个关联植物的普通 Calendar 事项，确认按选定时间通知。 | 待真机 |
 | 3 | GAP-9 离世退场 | 离世对象活跃入口过滤、冻结钱包、历史可读、未来计划清理、标记 / 撤销 UI 已测；2026-07-01 已复测 Human、Pet 和 Dog 纪念标记 / 撤销的取消 / 确认路径，并复测纪念宠物不再暴露 Home / Function Menu 活跃照护入口，旧 Calendar 宠物事项不会打开活跃照护页。 | 真机标记离世、撤销离世、通知取消 / 恢复、历史资料可读、无活跃照护入口。 | 待真机 |
 | 4 | PhotoAlbum / FamilyReports | 周报非竞赛语义、照片隐私清洗、相册命令边界、密集照片 fixture 已测；2026-07-01 已复测 Settings Debug -> Family Weekly Report GUI，batch L 再次复测周报入口和非竞赛文案。 | PhotosPicker 权限和选择器、真实批量照片、大图 viewer、隐私和性能目检。 | 待真机 |
-| 5 | Memorial / Plants | 植物门禁、历史植物数据、植物提醒 / 照护 / 账本边界、纪念历史可读已测；2026-07-01 已跑通植物解锁、创建、提醒、日历、护理和删除 GUI 长链路；最新复测确认新建植物生成的植物计划可在 Calendar 列表行中找到；2026-07-03 最新 executor 级单测确认添加植物命令会直接物化植物计划 Calendar Event 和 Reminder 行；植物提醒“全部延后一天”业务单测和 existing-plant Settings GUI 路径均已通过；batch K 又完整复跑植物解锁、创建、提醒、Calendar、详情护理、删除撤销和最终删除；batch L 再次复测 existing-plant Settings bulk defer 和 Plant Detail 编辑取消 / 保存；2026-07-03 已复测系统生成植物护理计划仍走植物提醒窗口，同时普通植物关联 Calendar / Reminder 完成或跳过都不污染植物护理日志、last-care 日期和植物护理账本；植物详情 -> 护理日历入口已 GUI 复测为单植物筛选态，并可点 All 回到全部事项；植物 wallet 卡片展开 / 收起已做根因复测，当前实现使用共享 scene 的本地 inactive freeze 锁住非选中卡片 frame / rotation，且不恢复植物页外部 frozen 状态，非选中卡片不应再跳位；8 株植物长列表已 GUI 复测为首屏只有 6 张可点卡片，后续卡片需要向下滚动并仍可展开 / 收起。 | 用真实纪念对象和历史植物样本遍历 Home、Today Focus、Oasis、FunctionMenu；真机点击 Settings -> Plant care reminders -> Defer all by one day 并看反馈；新增植物品种库添加、植物 wallet 卡片展开 / 快捷操作、右侧房间 rail 手感验收；真机创建关联植物的普通 Calendar 事项并确认通知按时到达；从植物详情打开护理日历确认单植物筛选 chip 和列表内容，再点 All 确认可回到全部事项。 | 待真机 |
+| 5 | Memorial / Plants | 植物门禁、历史植物数据、植物提醒 / 照护 / 账本边界、纪念历史可读已测；2026-07-01 已跑通植物解锁、创建、提醒、日历、护理和删除 GUI 长链路；最新复测确认新建植物生成的植物计划可在 Calendar 列表行中找到；2026-07-03 最新 executor 级单测确认添加植物命令会直接物化植物计划 Calendar Event 和 Reminder 行；植物提醒“全部延后一天”业务单测和 existing-plant Settings GUI 路径均已通过；batch K 又完整复跑植物解锁、创建、提醒、Calendar、详情护理、删除撤销和最终删除；batch L 再次复测 existing-plant Settings bulk defer 和 Plant Detail 编辑取消 / 保存；2026-07-03 已复测系统生成植物护理计划仍走植物提醒窗口，同时普通植物关联 Calendar / Reminder 完成或跳过都不污染植物护理日志、last-care 日期和植物护理账本；后续产品口径改为不再提供植物页 / Function Menu 的独立植物日历入口，植物事项只从首页日历 tab 的“植物”聚合筛选查看；植物 wallet 卡片展开 / 收起已做根因复测，当前实现使用共享 scene 的本地 inactive freeze 锁住非选中卡片 frame / rotation，且不恢复植物页外部 frozen 状态，非选中卡片不应再跳位；8 株植物长列表已 GUI 复测为首屏只有 6 张可点卡片，后续卡片需要向下滚动并仍可展开 / 收起。 | 用真实纪念对象和历史植物样本遍历 Home、Today Focus、Oasis、FunctionMenu；真机点击 Settings -> Plant care reminders -> Defer all by one day 并看反馈；新增植物品种库添加、植物 wallet 卡片展开 / 快捷操作、右侧房间 rail 手感验收；真机创建关联植物的普通 Calendar 事项并确认通知按时到达；从首页日历 tab 点“植物”聚合筛选确认可查看植物事项，同时确认植物详情和 Function Menu 植物分组不再出现日历入口。 | 待真机 |
 | 6 | PetCare / CatCare / Hygiene / Moments | 宠物快捷照护、猫砂、护理、quick moment、奖励、账本和重复保护已有广泛模拟器覆盖；遛狗大卡片最小化 / 悬浮窗互斥 / 再点遛狗回当前卡片已复测；2026-07-01 已复测宠物功能中心、猫狗长链路、Feeding 补记、Home 快捷喂食、potty / hygiene / health / walk 记录、walk summary、litter scoop / full-change / plan、Bond Vault、永久删除安全保护和已故宠物入口过滤；首页展开卡内部快捷操作延迟、快捷操作加载前点击卡片无法缩小、底部 FAB 菜单遮挡卡内快捷操作的问题均已修复并复测；batch K 又复测 Pet Feature Hub 日常 / 健康入口和 Dog Home 遛狗快捷操作 -> summary -> feature hub 回读；batch L 再次复测 Water 奖励账本、水计划 Calendar 保存 / 删除、Bond Vault 余额不足 / 解锁支出、Coconut Shop 购买和 Basic Info 编辑取消 / 保存。 | 真机连续点击、历史跨页回读、低性能手感、已故对象只读 / no-op，以及首页展开卡快捷操作手感。 | 待真机 |
 | 7 | Achievements / Milestones / GrowthUnlock / Wishlist | 成就领取、里程碑、成长解锁策略、心愿单兑换业务和 UI 已测；2026-07-01 已复测心愿创建 / 兑换和 Daily Streak sheet 打开 / 关闭，batch L 再次复测两者。 | 成就墙、里程碑、成长路线、心愿兑换的长文案、按钮遮挡和触感。 | 待真机 |
 | 8 | HumanHealth / HumanNotes / Workouts | 添加 / 回读、删除后消失、首发本地查看者可见策略已由模拟器 UI 覆盖；2026-07-01 已复测 Human Feature Hub 多路由、Home 快捷 sheet、weight / expense / medication / note 持久化、note 保存后历史刷新、note 删除和扩展模块创建 / 删除；batch K 又复测 Human extended module 连续写入 body metric / workout / health report / wishlist / profile notes；batch L 再次复测 Human record persistence。 | 真机键盘、长文案、添加 / 删除、本地查看者文案和手感最终签收。 | 待真机 |
 | 9 | Medication / Notifications | 宠物 / 人类用药命令、剂量记录、Human medication 添加 / 回读 UI 已测；2026-07-01 已复测 Reminder Observability 入口和 Human medication 持久化，batch L 再次复测 Observability 面板。 | 真实通知系统行为同编号 2；再确认用药入口、长语言通知和手感。 | 待真机 |
-| 10 | Calendar / DashboardRecords / CareLedger | 日历命令、筛选、深链、水计划读回、密集快照、账本 backfill 已测；手动事项详情 / 编辑 / 删除、系统喂食事项跳 Quick Feed、Add Event 键盘保存、水计划日历保存 / 删除、宠物筛选，以及标题像 feed / water / potty / walk / play / weight / health / hygiene 的宠物关联用户事项打开可编辑详情已复测；最新 6 条策略单测还覆盖普通植物事项不会误跳系统页，生成的喂食 / 饮水 / 植物计划会进相关详情页 / 打卡页；batch E/F/G/H/I/J/K/L 复测系统计划、linked pet 用户事项、植物计划行、宠物筛选、Add Event 键盘保存和手动 Calendar CRUD；2026-07-03 已补测普通植物关联 Calendar 事项的通知时间不会被植物护理窗口改写，且普通植物关联事项 / 提醒完成或跳过不写植物护理账本；植物详情 -> 护理日历已显示单植物 filter chip 并排除普通非植物事项，点 All 后普通事项和植物事项都会恢复显示。 | 真机长列表滚动、趋势图 / 账本筛选、已删除 / 已离世 / legacy 样本目检；创建普通植物关联 Calendar 事项并确认详情 / filter / 通知时间都正确；从植物详情打开护理日历确认 filter 可见且内容只剩该植物相关事项，再点 All 确认全部事项恢复。 | 待真机 |
+| 10 | Calendar / DashboardRecords / CareLedger | 日历命令、筛选、深链、水计划读回、密集快照、账本 backfill 已测；手动事项详情 / 编辑 / 删除、系统喂食事项跳 Quick Feed、Add Event 键盘保存、水计划日历保存 / 删除、宠物筛选，以及标题像 feed / water / potty / walk / play / weight / health / hygiene 的宠物关联用户事项打开可编辑详情已复测；最新 6 条策略单测还覆盖普通植物事项不会误跳系统页，生成的喂食 / 饮水 / 植物计划会进相关详情页 / 打卡页；batch E/F/G/H/I/J/K/L 复测系统计划、linked pet 用户事项、植物计划行、宠物筛选、Add Event 键盘保存和手动 Calendar CRUD；2026-07-03 已补测普通植物关联 Calendar 事项的通知时间不会被植物护理窗口改写，且普通植物关联事项 / 提醒完成或跳过不写植物护理账本；当前全局日历入口收敛为首页日历 tab，植物页不再提供独立植物日历路由。 | 真机长列表滚动、趋势图 / 账本筛选、已删除 / 已离世 / legacy 样本目检；创建普通植物关联 Calendar 事项并确认详情 / filter / 通知时间都正确；从首页日历 tab 进入，确认“植物”聚合筛选能显示植物事项，且没有从植物详情或 Function Menu 进入日历的替代入口。 | 待真机 |
 | 11 | Expenses / Insurance / Documents | 费用、保单、文档、附件隐私清洗、删除级联、人类费用 UI 已测；2026-07-01 已复测 Human expense 添加 / 回读。 | 真实相册 / 文件 picker、附件预览、删除后入口消失和手感。 | 待真机 |
 | 12 | Privacy / Security | 未来 PIN / 隐私字段命令边界、备份排除和不可写保护已测；首发本地 UI 当前隐藏 Human 隐私 / PIN 控制并保持同设备成员资料可见；2026-07-01 已复测 account switcher 不暴露隐私 / PIN 控制、同设备成员资料仍可见，以及 Human 永久删除取消 / 错误名称保护；batch K 再次复测 account switcher 不暴露隐私 / PIN 控制。 | 真机确认当前首发 Settings / 成员切换不会露出误导性隐私 / PIN 入口，锁屏 / 键盘 / 系统权限相关页面不破版。 | 待真机 |
 | 13 | Onboarding / CrewRoster / FunctionMenu | 首启核心链路真机 smoke 已过；一人一宠 Function Menu 模拟器预检已过；Home FAB -> Function Menu -> Coconut Shop 购买路径已复测；2026-07-01 已在 broad GUI 中复测首启建档和 Function Menu 可达；batch K 复跑首启建档、Oasis、Settings、Function Menu；CrewRoster 成员页卡片缩回动画提前掉层的问题已修复并有策略单测覆盖。 | 覆盖安装、reset、第二人 / 第二宠、CrewRoster 卡片放大 / 缩小动画手感、全功能菜单、危险区视觉。 | 待真机 |
@@ -358,7 +358,7 @@
 - 2026-07-03 最新通知策略单测已覆盖：普通植物关联 Calendar 事项保留用户选定通知时间；生成的植物护理计划仍走植物提醒窗口，避免把手动 Calendar 事项误当成植物护理提醒。
 - 2026-07-03 最新植物联动单测已覆盖：普通植物关联 Calendar 事项 / Reminder 的完成或跳过不会误写植物护理日志、last-care 日期或 plant-care ledger；系统生成植物计划的 Calendar / Reminder 完成和跳过仍写正确护理事实或计划反馈。
 - 2026-07-03 最新植物创建联动单测已覆盖：`PlantCreationCommandExecutor` 添加植物后会直接生成植物计划 Calendar Event 和 Reminder 行，避免“保存成功但日历 / 提醒未同步”的回归。
-- 2026-07-03 最新植物详情 -> 护理日历 GUI 复测已覆盖：从植物详情功能中心点击护理日历后，Calendar 显示该植物的单植物 filter chip 为选中态，只显示关联该植物的事项，并排除普通非植物事项；再点 All 后回到全部事项，普通事项和植物事项都会显示。
+- 2026-07-03 后续产品口径已改为移除植物详情 -> 护理日历和 Function Menu -> Plant Calendar 入口；全局日历只保留首页日历 tab，植物事项通过“植物”聚合筛选查看。
 
 真机还要测：
 
@@ -366,9 +366,9 @@
 - 点日历行进入对应详情，再返回。
 - 添加一个普通用户日历事项，确认点击后能查看详情、编辑并删除；再创建标题像“喂食 / 喝水 / walk / health”的普通事项，确认仍进入事项详情而不是打卡页。
 - 添加一个关联植物的普通用户日历事项，确认植物 filter 能筛到它，点击仍进事项详情，通知按用户选的时间到达。
-- 从植物详情页点击“护理日历”，确认 Calendar 顶部显示该植物的单植物 filter chip 且为选中态；列表里只剩该植物相关事项，普通非植物事项不出现；再点 All，确认普通事项重新出现。
+- 从首页日历 tab 进入 Calendar，确认“植物”聚合筛选能显示植物相关事项；确认植物详情页和 Function Menu 植物分组不再出现日历入口。
 - 完成 / 跳过一个普通植物关联提醒，确认只改变提醒状态；完成 / 跳过系统生成植物计划，确认进入对应植物护理事实或跳过反馈。
-- 在 Function Menu 内打开 Calendar，点系统生成的人类用药 / 运动 / 笔记事项，确认进入对应详情页或打卡页。
+- 从首页日历 tab 点系统生成的人类用药 / 运动 / 笔记事项，确认进入对应详情页或打卡页。
 - 对真实系统生成事项，比如喂食、猫砂、铲屎、水计划或植物计划，确认点击后进入对应详情页 / 打卡页，删除相关计划后 Calendar 不再残留旧行。
 - 打开 DashboardRecords 和 CareLedger，切换时间、类型和对象筛选。
 - 检查已删除、已离世、legacy 样本不会以活跃对象混入。
@@ -451,7 +451,7 @@
 - 2026-07-03 最新顺序 GUI 复跑再次确认植物 wallet：6 张卡片展开 / 收起后全部回到原始 frame 附近；8 张植物时首屏只有 6 张处于可点区域，第 7 张以后需要滚动，滚动后的卡片仍可展开 / 收起且后续卡片仍可继续到达。并发跑 UI 测试会抢同一个模拟器 app 进程，已丢弃不作为失败证据。
 - 2026-07-03 植物照护类型文案已做显式语言预检：Dashboard、wallet 快捷操作、护理计划、位置详情、植物详情时间线、通知 intent 标题和成长日记导出都走 `displayName(l:)`，中文 / 英文 / 德文单测和源码守卫通过；真机只需按当前语言目检关键入口文案不串语言。
 - 2026-07-03 右侧房间 rail 已做 GUI 复测：4 株植物分布在 Living room / Balcony，展开 Living room 植物后点击 Balcony rail 会收起展开卡片、只显示 Balcony 植物，并把 Balcony 卡片从原 All deck 位置重新排到过滤后前排；切回 All 后恢复原 All deck 位置。
-- 2026-07-03 植物详情 -> 护理日历已做 GUI 复测：先创建一个普通 Calendar 事项和一个关联该植物的 Calendar 事项，再从植物详情功能中心点击护理日历，确认 Calendar 显示单植物 filter chip 选中、关联植物事项可见、普通事项被过滤；再点 All 后确认普通事项和植物事项都恢复显示。
+- 2026-07-03 后续产品口径已移除植物详情 -> 护理日历入口；植物相关 Calendar 事项改为通过首页日历 tab 的“植物”聚合筛选验收。
 
 真机还要测：
 
@@ -469,8 +469,8 @@
 - [ ] Plants 视图中点击植物卡片能展开为 wallet 卡片；再次点击或上滑能收起；展开 / 收起过程中其他卡片不能跳位；6 张以内按宠物卡片位置铺开，7 张及以上从第 7 张开始需要向下滚动；展开后浇水、施肥、笔记 / 成长记录、详情四个快捷操作都能点到正确页面或记录页。
 - [ ] 植物卡图片优先显示用户照片；没有用户照片时，Pothos / Monstera / 空气凤梨等目录品种显示品种库本地图；手动创建未知 / 非目录品种时使用通用叶子图且不破版。
 - [ ] 用屏幕右边缘房间 rail 切换“全部”和各房间；确认 44pt 命中不难点、不挡底部导航 / FAB；切到不包含当前展开植物的房间时，展开卡片会自动收起。
-- [ ] 从 Home FAB -> More -> Plants 打开 Function Menu 植物分组，依次点 Plant Overview / Plant List / Growth Photos / Plant Calendar；确认前三个切换到对应植物页，Plant Calendar 能进入日历且用于查看植物相关事项。
-- [ ] 从植物详情页点击“护理日历”；确认进入后能清楚看到当前植物的 filter chip 处于选中态，且列表只显示该植物相关事项；再点 All，确认普通事项也恢复显示。
+- [ ] 从 Home FAB -> More -> Plants 打开 Function Menu 植物分组，依次点 Plant Overview / Plant List / Growth Photos；确认三者切换到对应植物页，并确认不再出现 Plant Calendar 分段。
+- [ ] 从植物详情页打开功能中心；确认不再出现“护理日历”卡片；回到首页日历 tab 点“植物”聚合筛选，确认植物事项仍可查看。
 - [ ] 多房间、多植物、空房间、长英文 / 德文 / 中文名称、动态字体放大时不重叠、不挡按钮。
 
 通过标准：
@@ -485,7 +485,7 @@
 
 - 设备 / iOS：
 - 构建：
-- 结果：2026-07-01 周报、植物核心长链路、植物 Settings bulk defer 入口和 Plant Detail 编辑取消 / 保存均已有模拟器 GUI 预检；2026-07-02 植物品种库 / wallet 卡片 / 右侧房间 rail 已有代码预检和 Debug build；2026-07-03 添加植物目录优先无键盘主路径、248 个目录品种本地头像接入、植物 wallet 展开 / 收起、8 张植物长列表滚动、右侧房间 rail、植物详情护理日历单植物筛选和 All 回退均已有模拟器 GUI 或单元预检；真实照片、纪念历史真实样本、历史植物样本和真机手感仍待测。
+- 结果：2026-07-01 周报、植物核心长链路、植物 Settings bulk defer 入口和 Plant Detail 编辑取消 / 保存均已有模拟器 GUI 预检；2026-07-02 植物品种库 / wallet 卡片 / 右侧房间 rail 已有代码预检和 Debug build；2026-07-03 添加植物目录优先无键盘主路径、248 个目录品种本地头像接入、植物 wallet 展开 / 收起、8 张植物长列表滚动、右侧房间 rail、以及“植物页不再提供独立植物日历入口，植物事项只从首页日历 tab 的植物聚合筛选查看”均已有模拟器 GUI 或单元预检；真实照片、纪念历史真实样本、历史植物样本和真机手感仍待测。
 - 预检证据：`DERIVED_DATA_PATH=/tmp/OhanaDerivedData-gui-broad-20260701-a scripts/test-simulator.sh '-only-testing:OhanaUITests/PlantModuleUITests/testPlantModuleUnlockCreateCareReminderCalendarAndDelete' ... '-only-testing:OhanaUITests/OhanaUITests/testFamilyWeeklyReportOpensFromDebugSettingsWithoutCompetitionCopy' ...`，`iPhone 17` simulator，7 条 GUI 用例合跑 `Executed 7 tests, with 0 failures`，xcresult `/tmp/OhanaDerivedData-gui-broad-20260701-a/Logs/Test/Test-Ohana-2026.07.01_00-39-04-+0200.xcresult`。
 - 预检证据：2026-07-01 broad GUI 批次 J 初跑 18 条中 17 条通过，唯一失败为植物 Calendar 首屏查找测试脚本问题；修复后 `PlantModuleUITests.testPlantModuleUnlockCreateCareReminderCalendarAndDelete` 单条复跑通过，覆盖植物解锁、创建、Settings 提醒、Calendar 植物计划行查找、详情护理、删除撤销和永久删除；初跑 xcresult `/tmp/OhanaDerivedData-gui-broad-20260701-j/Logs/Test/Test-Ohana-2026.07.01_06-26-43-+0200.xcresult`，复跑 xcresult `/tmp/OhanaDerivedData-gui-broad-20260701-j/Logs/Test/Test-Ohana-2026.07.01_06-52-42-+0200.xcresult`。
 - 预检证据：`DERIVED_DATA_PATH=/tmp/OhanaDerivedData-gui-broad-20260701-c scripts/test-simulator.sh '-only-testing:OhanaTests/PlantLaunchTests/plantBulkDeferAppliesToMutedVisibleCareTasksWithoutRecreatingReminders()'`，`iPhone 17` simulator，植物 bulk defer 业务单测通过；xcresult `/tmp/OhanaDerivedData-gui-broad-20260701-c/Logs/Test/Test-Ohana-2026.07.01_02-43-45-+0200.xcresult`。
@@ -503,8 +503,8 @@
 - 预检证据：2026-07-03 `scripts/test-simulator.sh '-only-testing:OhanaUITests/PlantModuleUITests/testExistingPlantWalletExpandCollapseReturnsToStableDeckWithoutReset()'`，`iPhone 17` simulator，1 条 GUI 用例通过；测试 seed 6 张植物卡片，展开第一张植物卡、等待 `home-expanded-detail-plant`、点击 `home-expanded-collapse-plant` 收起，并断言 6 张植物卡都恢复到稳定可点击 collapsed frame；最新复跑通过，xcresult `/var/folders/9j/7ldcxzn91d947mg4p_7wxmz40000gn/T/OhanaDerivedData/main-b6cf423d5931-tests/Logs/Test/Test-Ohana-2026.07.03_07-46-12-+0200.xcresult`。
 - 预检证据：2026-07-03 `scripts/test-simulator.sh '-only-testing:OhanaUITests/PlantModuleUITests/testPlantWalletLongListScrollsPastSixCardsWithoutCrowdingTopViewport()'`，`iPhone 17` simulator，1 条 GUI 用例通过；测试 seed 8 张植物卡片，断言首屏顶部可点击区域正好 6 张卡片、至少 1 张卡片需要滚动才能到达，滚动到第 7 张以后仍能展开 / 收起，且另一张后续卡片仍可继续滚动到达；xcresult `/var/folders/9j/7ldcxzn91d947mg4p_7wxmz40000gn/T/OhanaDerivedData/main-b6cf423d5931-tests/Logs/Test/Test-Ohana-2026.07.03_07-42-52-+0200.xcresult`。
 - 预检证据：2026-07-03 `scripts/test-simulator.sh '-only-testing:OhanaUITests/PlantModuleUITests/testPlantRoomRailFiltersAndCollapsesExpandedCard'`，`iPhone 17` simulator，1 条 GUI 用例通过；测试 seed 4 张植物卡片，点击右侧 Balcony rail 后确认展开卡片收起、Living room 植物隐藏、Balcony 植物显示并从 All deck 旧位置重排到过滤后前排，再点击 All rail 恢复原 All deck frame；xcresult `/var/folders/9j/7ldcxzn91d947mg4p_7wxmz40000gn/T/OhanaDerivedData/main-b6cf423d5931-tests/Logs/Test/Test-Ohana-2026.07.03_05-00-34-+0200.xcresult`。
-- 预检证据：2026-07-03 `scripts/test-simulator.sh '-only-testing:OhanaTests/PlantDetailExperienceTests/testPlantCareCalendarOpensFilteredCalendarRoute'`，`iPhone 17` simulator，1 条源码 / 路由守卫测试通过，确认植物详情护理日历 route 使用单植物筛选态并让 Calendar chip / effective filter 跟随当前路由默认值；xcresult `/var/folders/9j/7ldcxzn91d947mg4p_7wxmz40000gn/T/OhanaDerivedData/main-b6cf423d5931-tests/Logs/Test/Test-Ohana-2026.07.03_05-33-05-+0200.xcresult`。
-- 预检证据：2026-07-03 `scripts/test-simulator.sh '-only-testing:OhanaUITests/PlantModuleUITests/testPlantDetailCareCalendarOpensSinglePlantFilteredCalendarWithoutReset'`，`iPhone 17` simulator，1 条 GUI 用例通过；测试创建普通 Calendar 事项和关联植物事项，从 Plant Detail -> All plant features -> Care calendar 打开后，断言单植物 chip 为 `Selected`、植物事项可见、普通事项被过滤；随后点 All 并确认 All chip 选中、普通事项和植物事项都恢复显示；xcresult `/var/folders/9j/7ldcxzn91d947mg4p_7wxmz40000gn/T/OhanaDerivedData/main-b6cf423d5931-tests/Logs/Test/Test-Ohana-2026.07.03_05-33-21-+0200.xcresult`。
+- 预检证据：2026-07-03 `scripts/test-simulator.sh '-only-testing:OhanaTests/PlantDetailExperienceTests' '-only-testing:OhanaTests/PlantLaunchTests' '-only-testing:OhanaTests/AppRouteCoordinatorTests' '-only-testing:OhanaTests/HomeRouteCoordinatorTests' '-only-testing:OhanaTests/VerticalHomeTabMountPolicyTests'`，`iPhone 17` simulator，176 条 selected 源码 / 路由 / 植物策略测试通过；其中 `PlantDetailExperienceTests/testPlantCalendarEntrypointsAreRemovedButGlobalFilterRemains` 确认植物详情 / Function Menu 植物日历入口已移除，首页日历的“植物”聚合筛选仍保留；xcresult `/var/folders/9j/7ldcxzn91d947mg4p_7wxmz40000gn/T/OhanaDerivedData/main-b6cf423d5931-tests/Logs/Test/Test-Ohana-2026.07.03_13-48-26-+0200.xcresult`。
+- 预检证据：2026-07-03 `scripts/test-simulator.sh '-only-testing:OhanaUITests/PlantModuleUITests/testPlantDetailDoesNotExposeCareCalendarEntrypointWithoutReset'`，`iPhone 17` simulator，1 条 GUI 用例通过；测试 seed 植物后进入植物详情，确认 `plant-detail-action-tool-calendar` 不存在，打开功能中心后确认 `feature-hub-plan-calendar` 不存在；xcresult `/var/folders/9j/7ldcxzn91d947mg4p_7wxmz40000gn/T/OhanaDerivedData/main-b6cf423d5931-tests/Logs/Test/Test-Ohana-2026.07.03_13-48-48-+0200.xcresult`。
 - 问题：
 
 ## RC 收尾

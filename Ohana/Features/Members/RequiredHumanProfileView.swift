@@ -170,7 +170,7 @@ struct RequiredHumanProfileView: View {
                     .fill(Color(hex: "0C1640"))
                 Image(systemName: "heart.text.square.fill").accessibilityHidden(true)
                     .font(OhanaFont.adaptive(size: 18, weight: .black))
-                    .foregroundStyle(Color.goLime)
+                    .foregroundStyle(Color.goPrimary)
             }
             .frame(width: 44, height: 44)
             .accessibilityHidden(true)
@@ -230,7 +230,7 @@ struct RequiredHumanProfileView: View {
                 .font(OhanaFont.callout(.black))
                 .foregroundStyle(RequiredHumanIntroPalette.selectedText)
                 .frame(width: width, height: 54)
-                .background(Color.goLime, in: Capsule())
+                .background(Color.goPrimary, in: Capsule())
             }
             .buttonStyle(ScaleButtonStyle())
             .disabled(isFlippingToProfile)
@@ -291,7 +291,7 @@ struct RequiredHumanProfileView: View {
                     de: "Pflege bringt Kokosnüsse und lässt Lebensbaum und Oase wachsen."
                 ),
                 heroIcon: "tree.fill",
-                tint: Color.goLime,
+                tint: Color.goPrimary,
                 badges: [
                     (icon: "bolt.fill", title: localized(zh: "椰子", en: "Coconuts", de: "Kokos")),
                     (icon: "arrow.up.forward.circle.fill", title: localized(zh: "等级", en: "Levels", de: "Level")),
@@ -455,7 +455,7 @@ struct RequiredHumanProfileView: View {
         HStack(spacing: 7) {
             ForEach(0 ..< introPageCount, id: \.self) { index in
                 Capsule()
-                    .fill(index == introPageIndex ? Color.goLime : RequiredHumanIntroPalette.mutedFill)
+                    .fill(index == introPageIndex ? Color.goPrimary : RequiredHumanIntroPalette.mutedFill)
                     .frame(width: index == introPageIndex ? 24 : 7, height: 7)
                     .animation(GoMotion.feedback, value: introPageIndex)
             }

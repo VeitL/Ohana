@@ -286,7 +286,7 @@ private extension CareLedgerEventKind {
         switch self {
         case .expense: .goYellow
         case .reminder: .goOrange
-        case .coconut: .goLime
+        case .coconut: .goPrimary
         case .health, .medication: .goRed
         case .walk, .workout: .goTeal
         default: .goPrimary

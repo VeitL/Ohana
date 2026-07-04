@@ -7,6 +7,7 @@
 //
 
 import Foundation
+import SwiftData
 
 nonisolated struct VerticalSolidHomeSourceState {
     let pets: [Pet]
@@ -242,17 +243,40 @@ nonisolated enum VerticalSolidHomeSnapshotBuilder {
             firstPetEmptyState: firstPetEmptyState(activePets: activePets, activeHumans: activeHumans, l: l),
             plants: visiblePlants.sorted { $0.createdAt > $1.createdAt }.map { plant in
                 let plantTasks = PlantCarePlanService.tasks(for: plant, now: now)
-                let needsCare = plantTasks.contains { task in
-                    (task.careType == .watering || task.careType == .fertilizing) && task.daysUntilDue <= 0
+                let hasDueWatering = plantTasks.contains { task in
+                    task.careType == .watering && task.daysUntilDue <= 0
                 }
+                let hasDueFertilizing = plantTasks.contains { task in
+                    task.careType == .fertilizing && task.daysUntilDue <= 0
+                }
+                let needsCare = hasDueWatering || hasDueFertilizing
+                let catalog = PlantCatalog.entry(id: plant.catalogSpeciesId)
+                let dueTaskNames = plantTasks
+                    .filter { task in
+                        (task.careType == .watering || task.careType == .fertilizing) && task.daysUntilDue <= 0
+                    }
+                    .map { $0.careType.displayName(l: l) }
+                let assetName = catalog?.catalogImageAssetName ?? PlantCatalogMedia.localFoliage.assetName
                 return VerticalSolidHomePlantSnapshot(
                     id: plant.id,
+                    modelID: plant.persistentModelID,
                     name: plant.name.isEmpty ? l.tr(zh: "植物", en: "Plant", de: "Pflanze") : plant.name,
                     subtitle: plant.species.isEmpty ? plant.location : plant.species,
                     emoji: plant.avatarEmoji.isEmpty ? "🌱" : plant.avatarEmoji,
                     themeHex: plant.themeColorHex,
                     roomName: plant.roomName,
-                    needsCare: needsCare
+                    avatarImageSignature: plant.hasAvatarImageAttachment ? plant.avatarThumbnailSignature : "asset:\(assetName)",
+                    avatarImageAssetName: plant.hasAvatarImageAttachment ? nil : assetName,
+                    needsCare: needsCare,
+                    hasDueWatering: hasDueWatering,
+                    hasDueFertilizing: hasDueFertilizing,
+                    careDifficultyText: catalog?.localizedCareDifficulty ?? l.tr(zh: "常规", en: "Routine", de: "Routine"),
+                    attentionText: plant.healthStatus == .stable
+                        ? (catalog?.lightRequirement.displayName ?? plant.lightLevel.displayName)
+                        : plant.healthStatus.displayName,
+                    todoText: dueTaskNames.isEmpty
+                        ? l.tr(zh: "今日清爽", en: "Clear today", de: "Heute frei")
+                        : dueTaskNames.prefix(2).joined(separator: " / ")
                 )
             },
             heroPreparationRevision: heroPreparationRevision(for: cards)
@@ -338,13 +362,13 @@ nonisolated enum VerticalSolidHomeSnapshotBuilder {
         cards.map { card in
             var copy = card
             if let pet = pets.first(where: { $0.id == card.id }) {
-                copy.avatarImageData = pet.avatarImageData
-                copy.avatarImageSignature = pet.avatarImageData.map(FocusWalletAvatarCache.signature(for:)) ?? ""
-                let popoutImageData = pet.cardStyleRaw == "popout"
-                    ? (pet.cardPopoutImageData ?? pet.avatarImageData)
-                    : nil
-                copy.cardPopoutImageData = popoutImageData
-                copy.cardPopoutImageSignature = popoutImageData.map(FocusWalletAvatarCache.signature(for:)) ?? ""
+                copy.modelID = pet.persistentModelID
+                copy.avatarImageData = nil
+                copy.avatarImageSignature = pet.avatarThumbnailSignature
+                copy.cardPopoutImageData = nil
+                copy.cardPopoutImageSignature = pet.cardStyleRaw == "popout"
+                    ? (pet.hasCardPopoutImageAttachment ? pet.cardPopoutThumbnailSignature : copy.avatarImageSignature)
+                    : ""
                 copy.cardPopoutSourceRaw = pet.cardPopoutSourceRaw ?? ""
                 copy.petBondCardBorderActive = PetBondVaultStore.isUnlocked(.cardBorder, for: pet.id)
                 copy.petBondNameplateActive = PetBondVaultStore.isUnlocked(.nameplate, for: pet.id)
@@ -353,8 +377,9 @@ nonisolated enum VerticalSolidHomeSnapshotBuilder {
                     : nil
                 copy.isShownOnHome = HomeCardVisibility.isPetVisible(pet, raw: hiddenPetIDsRaw)
             } else if let human = humans.first(where: { $0.id == card.id }) {
-                copy.avatarImageData = human.avatarImageData
-                copy.avatarImageSignature = human.avatarImageData.map(FocusWalletAvatarCache.signature(for:)) ?? ""
+                copy.modelID = human.persistentModelID
+                copy.avatarImageData = nil
+                copy.avatarImageSignature = human.avatarThumbnailSignature
                 copy.isShownOnHome = human.shouldShowOnHome
                 if human.id.uuidString == activeHumanIdRaw {
                     copy.equippedTitleBadgeText = equippedTitleBadgeText(for: equippedTitleRaw)
@@ -425,6 +450,8 @@ nonisolated enum VerticalSolidHomeSnapshotBuilder {
                 plant.species,
                 plant.location,
                 plant.avatarEmoji,
+                plant.avatarThumbnailSignature,
+                plant.catalogSpeciesId,
                 plant.themeColorHex,
                 String(timestamp(plant.lastWateredDate)),
                 String(timestamp(plant.lastFertilizedDate)),
@@ -752,7 +779,97 @@ nonisolated enum VerticalSolidHomeSnapshotBuilder {
     }
 }
 
+nonisolated enum VerticalSolidHomeMediaSource: String, Sendable {
+    case pet
+    case human
+}
+
+nonisolated struct VerticalSolidHomeMediaPreloadRequest: Identifiable, Equatable, Sendable {
+    let id: UUID
+    let modelID: PersistentIdentifier
+    let source: VerticalSolidHomeMediaSource
+    let avatarSignature: String
+    let popoutSignature: String
+    let wantsAvatar: Bool
+    let wantsPopout: Bool
+}
+
 nonisolated enum VerticalSolidHomePreloadPlanner {
+    static func mediaSignature(for requests: [VerticalSolidHomeMediaPreloadRequest]) -> String {
+        requests.map { request in
+            [
+                request.id.uuidString,
+                String(describing: request.modelID),
+                request.source.rawValue,
+                request.wantsAvatar ? request.avatarSignature : "",
+                request.wantsPopout ? request.popoutSignature : ""
+            ].joined(separator: ":")
+        }
+        .joined(separator: "|")
+    }
+
+    static func mediaRequests(
+        snapshot: VerticalSolidHomeSnapshot,
+        pets: [Pet],
+        humans: [Human],
+        activeHuman: Human?
+    ) -> [VerticalSolidHomeMediaPreloadRequest] {
+        let petsById = Dictionary(uniqueKeysWithValues: pets.map { ($0.id, $0) })
+        let humansById = Dictionary(uniqueKeysWithValues: humans.map { ($0.id, $0) })
+        var requests: [VerticalSolidHomeMediaPreloadRequest] = []
+        var seenIds = Set<UUID>()
+
+        func appendPet(_ pet: Pet, cardStyleRaw: String) {
+            guard seenIds.insert(pet.id).inserted else { return }
+            let avatarSignature = pet.avatarThumbnailSignature
+            let popoutSignature = cardStyleRaw == "popout"
+                ? (pet.hasCardPopoutImageAttachment ? pet.cardPopoutThumbnailSignature : avatarSignature)
+                : ""
+            guard !avatarSignature.isEmpty || !popoutSignature.isEmpty else { return }
+            requests.append(
+                VerticalSolidHomeMediaPreloadRequest(
+                    id: pet.id,
+                    modelID: pet.persistentModelID,
+                    source: .pet,
+                    avatarSignature: avatarSignature,
+                    popoutSignature: popoutSignature,
+                    wantsAvatar: !avatarSignature.isEmpty,
+                    wantsPopout: !popoutSignature.isEmpty
+                )
+            )
+        }
+
+        func appendHuman(_ human: Human) {
+            guard seenIds.insert(human.id).inserted,
+                  human.hasAvatarImageAttachment else { return }
+            requests.append(
+                VerticalSolidHomeMediaPreloadRequest(
+                    id: human.id,
+                    modelID: human.persistentModelID,
+                    source: .human,
+                    avatarSignature: human.avatarThumbnailSignature,
+                    popoutSignature: "",
+                    wantsAvatar: true,
+                    wantsPopout: false
+                )
+            )
+        }
+
+        for card in snapshot.cards.prefix(FocusHomeCardDataSource.maxCardsPerPage) {
+            if let pet = petsById[card.id] {
+                appendPet(pet, cardStyleRaw: card.cardStyleRaw)
+            } else if let human = humansById[card.id] {
+                appendHuman(human)
+            }
+        }
+
+        if let activeHuman {
+            appendHuman(activeHuman)
+        }
+
+        return requests
+    }
+
     static func avatarSignature(for payloads: [FocusWalletAvatarCache.Payload]) -> String {
         payloads.map { payload in
             [

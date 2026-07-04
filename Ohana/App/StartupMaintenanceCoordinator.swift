@@ -49,6 +49,10 @@ final class StartupMaintenanceCoordinator: ObservableObject {
                 InputLatencyWarmupService.warmUpOnce()
             }
 
+            await runStep("media_attachment_presence_backfill", delayMilliseconds: 2500) {
+                self.backfillMediaAttachmentPresenceIfNeeded(context: context)
+            }
+
             await runStep("member_theme_and_auto_feeder", delayMilliseconds: 16000) {
                 MemberThemeColorMaintenanceService.normalizeReservedColors(context: context)
                 FamilyWeeklyReportService().scheduleWeeklyReminder()
@@ -150,6 +154,17 @@ final class StartupMaintenanceCoordinator: ObservableObject {
         }
     }
 
+    private func backfillMediaAttachmentPresenceIfNeeded(context: ModelContext) {
+        guard !defaults.bool(forKey: Keys.mediaAttachmentPresenceBackfillCompleted) else { return }
+        let result = MediaAttachmentPresenceBackfillService.run(context: context)
+        defaults.set(true, forKey: Keys.mediaAttachmentPresenceBackfillCompleted)
+        AppPerformanceMonitor.shared.record(
+            "startup_media_attachment_presence_backfill",
+            valueMS: 0,
+            note: result.performanceNote
+        )
+    }
+
     private func cleanLegacySharedCareNotesIfNeeded(context: ModelContext) {
         let result = SharedCareLegacyNoteMaintenanceService.runIfNeeded(
             context: context,
@@ -200,6 +215,7 @@ final class StartupMaintenanceCoordinator: ObservableObject {
         static let reminderMaintenanceLastRunAt = "ohana_startup_maintenance_last_run_at"
         static let avatarAssetCompactionCompleted = "ohana_avatar_asset_compaction_v1_completed"
         static let careLedgerBackfillCompleted = "careLedgerBackfill_v1_completed"
+        static let mediaAttachmentPresenceBackfillCompleted = "ohana_media_attachment_presence_backfill_v1_completed"
     }
 }
 

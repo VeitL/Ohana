@@ -1,3 +1,4 @@
+import SwiftData
 import SwiftUI
 
 struct HumanAvatarPipelineView: View {
@@ -8,10 +9,11 @@ struct HumanAvatarPipelineView: View {
     var backgroundOpacity: Double = 0.22
     var clipsToCircle: Bool = true
 
+    @Environment(\.modelContext) private var modelContext
     @ObservedObject private var avatarPipeline = AvatarPipelineRegistry.current
 
     private var signature: String? {
-        human.avatarImageData.map { FocusWalletAvatarCache.signature(for: $0) }
+        human.hasAvatarImageAttachment ? human.avatarThumbnailSignature : nil
     }
 
     private var pipelineKey: String {
@@ -25,8 +27,7 @@ struct HumanAvatarPipelineView: View {
                     .fill(Color(hex: human.themeColor).opacity(backgroundOpacity))
             }
 
-            if human.avatarImageData != nil,
-               let signature,
+            if let signature,
                let image = avatarPipeline.cachedImage(for: human.id, signature: signature) {
                 Image(uiImage: image)
                     .resizable()
@@ -41,16 +42,37 @@ struct HumanAvatarPipelineView: View {
         }
         .frame(width: size, height: size)
         .contentShape(Circle())
-        .task(id: signature) {
-            guard let data = human.avatarImageData else { return }
-            AvatarPipelineRegistry.current.preload(
-                payloads: [FocusWalletAvatarCache.Payload(id: human.id, data: data)],
-                key: pipelineKey,
-                delayMilliseconds: 24
-            )
+        .task(id: pipelineKey) {
+            await prepareAvatarImage()
         }
         .onDisappear {
             AvatarPipelineRegistry.current.cancel(key: pipelineKey)
         }
+    }
+
+    @MainActor
+    private func prepareAvatarImage() async {
+        guard let signature,
+              human.hasAvatarImageAttachment else {
+            AvatarPipelineRegistry.current.cancel(key: pipelineKey)
+            return
+        }
+
+        let humanID = human.id
+        let modelID = human.persistentModelID
+        let key = pipelineKey
+        let loader = SwiftDataMediaBlobLoader(modelContainer: modelContext.container)
+        guard let data = await loader.humanAvatarImageData(modelID: modelID),
+              !Task.isCancelled,
+              human.id == humanID,
+              self.signature == signature else {
+            return
+        }
+
+        AvatarPipelineRegistry.current.preload(
+            payloads: [FocusWalletAvatarCache.Payload(id: humanID, data: data)],
+            key: key,
+            delayMilliseconds: 24
+        )
     }
 }

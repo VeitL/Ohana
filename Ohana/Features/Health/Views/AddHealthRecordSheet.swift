@@ -105,7 +105,7 @@ struct AddHealthRecordSheet: View {
                         // 宠物信息行
                         HStack(spacing: 12) {
                             PetAvatarPortraitView(
-                                imageData: pet.avatarImageData,
+                                pet: pet,
                                 fallbackText: pet.avatarEmoji,
                                 themeColor: Color(hex: pet.safeThemeColorHex),
                                 size: 48,

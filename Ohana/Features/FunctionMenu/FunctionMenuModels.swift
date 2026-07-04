@@ -81,9 +81,7 @@ enum FMDest: Hashable {
     case plantsDashboard
     case plantsList
     case plantsPhotos
-    case plantsCalendar
     case plantDetail(UUID)
-    case plantCalendar(UUID)
     case growthRoadmap
     case wealthDashboard
     case bountyBoard
@@ -92,7 +90,6 @@ enum FMDest: Hashable {
     case reminderObservability
     case coconutShop
     case gacha
-    case calendar
 }
 
 enum PetFeature: String, Hashable, CaseIterable {
@@ -160,7 +157,7 @@ struct FMPetAvatar: View {
 
     var body: some View {
         PetAvatarPortraitView(
-            imageData: pet.avatarImageData,
+            pet: pet,
             fallbackText: pet.avatarEmoji.isEmpty ? String(pet.name.prefix(1)) : pet.avatarEmoji,
             themeColor: Color(hex: pet.safeThemeColorHex),
             size: size,

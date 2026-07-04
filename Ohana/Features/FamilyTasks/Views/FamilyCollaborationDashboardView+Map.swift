@@ -241,14 +241,15 @@ extension FamilyCollaborationDashboardView {
         var signatures: [UUID: String] = [:]
         var payloads: [FocusWalletAvatarCache.Payload] = []
         for pet in activePets {
-            guard let data = pet.avatarImageData else { continue }
-            let signature = FocusWalletAvatarCache.signature(for: data)
+            guard pet.hasAvatarImageAttachment,
+                  let data = pet.avatarImageData else { continue }
+            let signature = pet.avatarThumbnailSignature
             signatures[pet.id] = signature
             payloads.append(FocusWalletAvatarCache.Payload(id: pet.id, data: data))
         }
 
         let rawKey = payloads
-            .map { "\($0.id.uuidString):\($0.data?.count ?? 0)" }
+            .map { "\($0.id.uuidString):\(signatures[$0.id] ?? "")" }
             .joined(separator: "|")
         let nextKey = rawKey.isEmpty ? "family-collaboration-pet-avatar-empty" : "family-collaboration-\(rawKey)"
         if petAvatarCacheKey != nextKey {

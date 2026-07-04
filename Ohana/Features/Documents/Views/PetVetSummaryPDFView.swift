@@ -99,7 +99,7 @@ struct PetVetSummaryPDFSnapshot: Equatable {
             microchipID: pet.microchipID,
             allergies: pet.allergies,
             notes: pet.notes,
-            avatarImageData: pet.avatarImageData,
+            avatarImageData: pet.hasAvatarImageAttachment ? pet.avatarImageData : nil,
             avatarEmoji: pet.avatarEmoji,
             themeColorHex: pet.safeThemeColorHex,
             recentHealthLogs: healthRows,

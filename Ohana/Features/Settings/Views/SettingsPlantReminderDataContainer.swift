@@ -140,7 +140,7 @@ private struct SettingsPlantReminderPanelContent: View {
                     icon: "leaf.fill",
                     title: l.tr(zh: "覆盖植物", en: "Covered", de: "Abgedeckt"),
                     value: "\(enabledPlantReminderCount)/\(plants.count)",
-                    tint: enabledPlantReminderCount == plants.count ? Color.goLime : Color.goYellow
+                    tint: enabledPlantReminderCount == plants.count ? Color.goPrimary : Color.goYellow
                 )
                 reminderOverviewMetric(
                     id: "types",
@@ -234,9 +234,9 @@ private struct SettingsPlantReminderPanelContent: View {
                 de: "Pflanzenpflege-Erinnerungen"
             ),
             subtitle: l.tr(
-                zh: "控制植物日历、提醒和系统通知",
-                en: "Controls plant calendar, reminders, and notifications",
-                de: "Steuert Pflanzenkalender, Erinnerungen und Mitteilungen"
+                zh: "控制植物护理计划、提醒和系统通知",
+                en: "Controls plant care plans, reminders, and notifications",
+                de: "Steuert Pflanzenpflegepläne, Erinnerungen und Mitteilungen"
             ),
             isOn: Binding(
                 get: { NotificationPreferenceStore.isEnabled(.plantCare) },
@@ -504,7 +504,7 @@ private struct SettingsPlantReminderPanelContent: View {
         if mutedPlantReminderCount > 0 || enabledCareTypeReminderCount < PlantReminderPreferenceStore.controllableCareTypes.count {
             return Color.goTeal
         }
-        return Color.goLime
+        return Color.goPrimary
     }
 
     private var reminderOverviewIcon: String {
@@ -567,9 +567,9 @@ private struct SettingsPlantReminderPanelContent: View {
     private var reminderEffectText: String {
         if !NotificationPreferenceStore.isEnabled(.plantCare) {
             return l.tr(
-                zh: "系统推送和植物日历提醒会暂停；App 内护理任务仍保留。",
-                en: "System pushes and plant calendar reminders pause; in-app care tasks remain.",
-                de: "Systemmitteilungen und Pflanzenkalender pausieren; In-App-Aufgaben bleiben erhalten."
+                zh: "系统推送和植物护理提醒会暂停；App 内护理任务仍保留。",
+                en: "System pushes and plant care reminders pause; in-app care tasks remain.",
+                de: "Systemmitteilungen und Pflanzenpflege-Erinnerungen pausieren; In-App-Aufgaben bleiben erhalten."
             )
         }
         if PlantReminderPreferenceStore.isTravelModeEnabled() {
@@ -587,8 +587,8 @@ private struct SettingsPlantReminderPanelContent: View {
             )
         }
         return l.tr(
-            zh: "到期提醒会在 \(windowSubtitle(PlantReminderPreferenceStore.timeWindow())) 发送，并同步植物护理日历。",
-            en: "Due reminders send during \(windowSubtitle(PlantReminderPreferenceStore.timeWindow())) and sync with the plant care calendar.",
+            zh: "到期提醒会在 \(windowSubtitle(PlantReminderPreferenceStore.timeWindow())) 发送，并同步到首页日历。",
+            en: "Due reminders send during \(windowSubtitle(PlantReminderPreferenceStore.timeWindow())) and sync to the Home calendar.",
             de: "Fällige Erinnerungen kommen zwischen \(windowSubtitle(PlantReminderPreferenceStore.timeWindow())) und synchronisieren den Pflegekalender."
         )
     }
@@ -601,7 +601,7 @@ private struct SettingsPlantReminderPanelContent: View {
 
     private func plantReminderAvatar(for plant: Plant) -> some View {
         let isOn = plantRemindersEnabled(for: plant)
-        let tint = isOn ? Color.goLime : Color.goYellow
+        let tint = isOn ? Color.goPrimary : Color.goYellow
         return ZStack {
             Circle().fill(tint.opacity(0.14))
             Image(systemName: isOn ? "leaf.fill" : "bell.slash.fill")
@@ -854,7 +854,7 @@ private struct SettingsPlantReminderPanelContent: View {
         case .watering, .misting:
             Color.goTeal
         case .fertilizing, .newLeaf:
-            Color.goLime
+            Color.goPrimary
         case .repotting, .pruning, .rotating, .leafCleaning, .pestCheck, .photo, .customNote:
             Color.goYellow
         case .yellowLeaf, .pestFound:

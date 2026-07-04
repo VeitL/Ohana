@@ -359,7 +359,7 @@ struct IslandPottyDashboardContentView: View {
             .foregroundStyle(isSelected ? .black : .white)
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
-            .background(isSelected ? Color.goLime : Color.goCardWhite.opacity(0.12), in: Capsule())
+            .background(isSelected ? Color.goPrimary : Color.goCardWhite.opacity(0.12), in: Capsule())
         }
         .buttonStyle(ScaleButtonStyle())
     }

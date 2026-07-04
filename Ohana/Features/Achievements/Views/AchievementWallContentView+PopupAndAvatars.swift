@@ -351,14 +351,15 @@ extension AchievementWallContentView {
         var signatures: [UUID: String] = [:]
         var payloads: [FocusWalletAvatarCache.Payload] = []
         for human in humans {
-            guard let data = human.avatarImageData else { continue }
-            let signature = FocusWalletAvatarCache.signature(for: data)
+            guard human.hasAvatarImageAttachment,
+                  let data = human.avatarImageData else { continue }
+            let signature = human.avatarThumbnailSignature
             signatures[human.id] = signature
             payloads.append(FocusWalletAvatarCache.Payload(id: human.id, data: data))
         }
 
         let nextKey = payloads
-            .map { "\($0.id.uuidString):\($0.data?.count ?? 0)" }
+            .map { "\($0.id.uuidString):\(signatures[$0.id] ?? "")" }
             .joined(separator: "|")
         let cacheKey = nextKey.isEmpty ? "achievement-wall-human-avatar-empty" : "achievement-wall-\(nextKey)"
         if humanAvatarCacheKey != cacheKey {

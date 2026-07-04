@@ -10,16 +10,13 @@ import SwiftUI
 struct AppRouteDestination: View {
     let route: AppRoute
     let onPresentCoconutLog: ((CoconutLogSubject?) -> Void)?
-    let onPresentPlantCalendar: ((String?) -> Void)?
 
     init(
         route: AppRoute,
-        onPresentCoconutLog: ((CoconutLogSubject?) -> Void)? = nil,
-        onPresentPlantCalendar: ((String?) -> Void)? = nil
+        onPresentCoconutLog: ((CoconutLogSubject?) -> Void)? = nil
     ) {
         self.route = route
         self.onPresentCoconutLog = onPresentCoconutLog
-        self.onPresentPlantCalendar = onPresentPlantCalendar
     }
 
     var body: some View {
@@ -33,12 +30,7 @@ struct AppRouteDestination: View {
             )
         case let .plantProfile(id):
             if AppFeatureRouteGuard.allowsAppRoute(route) {
-                AppPlantRouteContainer(
-                    id: id,
-                    onOpenCalendar: { plantId in
-                        onPresentPlantCalendar?(plantId.uuidString)
-                    }
-                )
+                AppPlantRouteContainer(id: id)
             } else {
                 HiddenRouteInterceptView(note: route.id)
             }
@@ -308,11 +300,10 @@ private struct AppSheetRouteDestination: View {
                 HiddenRouteInterceptView(note: "addEntity:\(type.rawValue)")
                     .onAppear(perform: onDismiss)
             }
-        case let .calendar(entityID, humanID, plantID):
+        case let .calendar(entityID, humanID, _):
             CalendarRouteContainer(
                 preselectedPetId: entityID,
                 preselectedHumanId: humanID,
-                preselectedPlantId: plantID,
                 onOpenEventDestination: onCalendarEventDestination,
                 onPresentCoconutLog: { subject in
                     coordinator.presentCoconutLog(subject)

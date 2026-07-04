@@ -100,8 +100,18 @@ extension VerticalSolidHomeView {
         }
         if tab == .calendar {
             prepareEmbeddedCalendarFilterForCurrentContext()
+            resetCalendarBottomChromeForTabSelection()
         }
         controller.select(tab)
+    }
+
+    func resetCalendarBottomChromeForTabSelection() {
+        guard calendarBottomChromeHidden else { return }
+        var transaction = Transaction(animation: nil)
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            calendarBottomChromeHidden = false
+        }
     }
 
     func prepareEmbeddedCalendarFilterForCurrentContext() {
@@ -143,6 +153,7 @@ extension VerticalSolidHomeView {
 
     func updateCalendarBottomChromeVisibility(_ scrollOffset: CGFloat) {
         guard controller.selectedTab == .calendar else { return }
+        guard controller.outgoingTab == nil else { return }
         let next = VerticalSolidHomeBottomChromeScrollPolicy.hidesBottomChrome(
             scrollOffset: scrollOffset,
             currentHidden: calendarBottomChromeHidden

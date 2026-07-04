@@ -68,7 +68,7 @@ extension AchievementWallContentView {
                 emoji: "✅",
                 title: "按时吃药",
                 description: "累计完成 7 次用药打卡",
-                color: Color.goLime,
+                color: Color.goPrimary,
                 isUnlocked: takenMedicationCount >= 7
             ),
             Achievement(
@@ -108,7 +108,7 @@ extension AchievementWallContentView {
                 emoji: "🏦",
                 title: "椰子金库",
                 description: "个人椰子余额达到 2000",
-                color: Color.goLime,
+                color: Color.goPrimary,
                 isUnlocked: coconutBalance >= 2000
             ),
             Achievement(

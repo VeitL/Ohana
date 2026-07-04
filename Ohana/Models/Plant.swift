@@ -121,6 +121,12 @@ enum PlantTemperaturePreference: String, Codable, CaseIterable, Identifiable, Se
     }
 }
 
+enum PlantAvatarAttachmentState: String, Codable, Sendable {
+    case unknown
+    case absent
+    case present
+}
+
 @Model
 final class Plant {
     var id: UUID
@@ -130,6 +136,8 @@ final class Plant {
     var avatarEmoji: String
     var themeColorHex: String
     @Attribute(.externalStorage) var avatarImageData: Data?
+    var avatarAttachmentStateRaw: String = PlantAvatarAttachmentState.unknown.rawValue
+    var avatarImageSignature: String = ""
     var wateringIntervalDays: Int
     var fertilizingIntervalDays: Int
     var lastWateredDate: Date?
@@ -214,6 +222,8 @@ final class Plant {
         self.avatarEmoji = avatarEmoji
         self.themeColorHex = themeColorHex
         self.avatarImageData = nil
+        self.avatarAttachmentStateRaw = PlantAvatarAttachmentState.absent.rawValue
+        self.avatarImageSignature = ""
         self.wateringIntervalDays = wateringIntervalDays
         self.fertilizingIntervalDays = fertilizingIntervalDays
         self.lastWateredDate = nil
@@ -248,6 +258,62 @@ final class Plant {
         self.notes = ""
         self.createdAt = Date()
         self.careLogs = []
+    }
+
+    var avatarAttachmentState: PlantAvatarAttachmentState {
+        get { PlantAvatarAttachmentState(rawValue: avatarAttachmentStateRaw) ?? .unknown }
+        set { avatarAttachmentStateRaw = newValue.rawValue }
+    }
+
+    var hasAvatarImageAttachment: Bool {
+        canAttemptAvatarImageAttachmentLoad
+    }
+
+    var canAttemptAvatarImageAttachmentLoad: Bool {
+        avatarAttachmentState != .absent
+    }
+
+    var avatarThumbnailSignature: String {
+        if !avatarImageSignature.isEmpty {
+            return avatarImageSignature
+        }
+        guard canAttemptAvatarImageAttachmentLoad else { return "" }
+        return "legacy:\(id.uuidString):avatar:\(createdAt.timeIntervalSince1970)"
+    }
+
+    var needsAvatarAttachmentIndexRepair: Bool {
+        avatarAttachmentState == .unknown || (hasAvatarImageAttachment && avatarImageSignature.isEmpty)
+    }
+
+    func updateAvatarImageData(_ data: Data?) {
+        avatarImageData = data
+        updateAvatarAttachmentIndex(for: data)
+    }
+
+    @discardableResult
+    func repairAvatarAttachmentIndexIfNeeded() -> Bool {
+        guard needsAvatarAttachmentIndexRepair else { return false }
+        updateAvatarAttachmentIndex(for: avatarImageData)
+        return true
+    }
+
+    @discardableResult
+    func backfillAvatarAttachmentPresence(hasData: Bool) -> Bool {
+        if hasData {
+            guard avatarAttachmentState != .present else { return false }
+            avatarAttachmentState = .present
+            return true
+        }
+
+        guard avatarAttachmentState != .absent || !avatarImageSignature.isEmpty else { return false }
+        avatarAttachmentState = .absent
+        avatarImageSignature = ""
+        return true
+    }
+
+    private func updateAvatarAttachmentIndex(for data: Data?) {
+        avatarAttachmentState = data == nil ? .absent : .present
+        avatarImageSignature = data.map(MediaPayloadSignature.signature(for:)) ?? ""
     }
 
     var lightLevel: PlantLightLevel {

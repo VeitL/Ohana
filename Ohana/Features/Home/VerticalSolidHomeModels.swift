@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import SwiftData
 import SwiftUI
 
 enum VerticalSolidHomeTab: String, CaseIterable, Identifiable, Hashable {
@@ -50,12 +51,20 @@ enum VerticalSolidHomeTab: String, CaseIterable, Identifiable, Hashable {
 
 nonisolated struct VerticalSolidHomePlantSnapshot: Identifiable, Equatable, Sendable {
     let id: UUID
+    let modelID: PersistentIdentifier
     let name: String
     let subtitle: String
     let emoji: String
     let themeHex: String
     let roomName: String
+    let avatarImageSignature: String
+    let avatarImageAssetName: String?
     let needsCare: Bool
+    let hasDueWatering: Bool
+    let hasDueFertilizing: Bool
+    let careDifficultyText: String
+    let attentionText: String
+    let todoText: String
 }
 
 nonisolated enum VerticalSolidHomePlantQuickAction: String, CaseIterable, Identifiable, Sendable {

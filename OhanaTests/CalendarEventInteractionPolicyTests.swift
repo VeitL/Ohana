@@ -214,6 +214,25 @@ struct CalendarEventInteractionPolicyTests {
         #expect(!listSource.contains("guard isCalendarPrepared else { return }\n                    scheduleVisibleCalendarMonthUpdate(from: dateID)"))
     }
 
+    @Test func calendarMemberFilterPreservesTimelinePositionInsteadOfResettingToToday() throws {
+        let contentSource = try source("Ohana/Features/Calendar/Views/CalendarView+Content.swift")
+        let listSource = try source("Ohana/Features/Calendar/Views/CalendarView+List.swift")
+        let viewSource = try source("Ohana/Features/Calendar/Views/CalendarView.swift")
+
+        #expect(viewSource.contains("@State var pendingFilterTimelineAnchorDate"))
+        #expect(contentSource.contains("prepareCalendarListForFilterChange()"))
+        #expect(contentSource.contains("pendingFilterTimelineAnchorDate = listVisibleTopDate"))
+        #expect(contentSource.contains("didScrollListToToday = true"))
+        #expect(contentSource.contains("timelinePositionCoordinator.cancel()"))
+        #expect(!contentSource.contains("if viewMode == .list {\n                resetCalendarListPositionForModeSwitch()"))
+        #expect(listSource.contains("handleTimelineDateSignatureChange(proxy: proxy)"))
+        #expect(listSource.contains("stabilizeVisibleTimelinePositionAfterFilterChange(proxy: proxy)"))
+        #expect(listSource.contains("stabilizeVisibleTimelinePositionAfterDateSetChange(proxy: proxy)"))
+        #expect(listSource.contains("scrollTimeline(proxy, to: fallbackID, animated: false)"))
+        #expect(listSource.contains("guard pendingFilterTimelineAnchorDate == nil else"))
+        #expect(listSource.contains("pendingFilterTimelineAnchorDate = nil"))
+    }
+
     private func source(_ path: String) throws -> String {
         let rootURL = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()

@@ -133,25 +133,10 @@ struct FunctionMenuDestinationRouter: View {
                     parentPath.append(FMDest.plantDetail(plantID))
                 }
             )
-        case .plantsCalendar:
-            CalendarRouteContainer(
-                preselectedPlantId: CalendarFilterSelection.allPlants.plantId,
-                onOpenEventDestination: openCalendarEventDestination
-            )
         case let .plantDetail(id):
             if let plant = plant(for: id) {
-                PlantDetailView(
-                    plant: plant,
-                    onOpenCalendar: { plantID in
-                        parentPath.append(FMDest.plantCalendar(plantID))
-                    }
-                )
+                PlantDetailView(plant: plant)
             }
-        case let .plantCalendar(id):
-            CalendarRouteContainer(
-                preselectedPlantId: id.uuidString,
-                onOpenEventDestination: openCalendarEventDestination
-            )
         case .wealthDashboard:
             IslandWealthDashboardView()
         case .bountyBoard:
@@ -168,8 +153,6 @@ struct FunctionMenuDestinationRouter: View {
             CoconutShopRouteContainer()
         case .gacha:
             GachaRouteContainer()
-        case .calendar:
-            CalendarRouteContainer(onOpenEventDestination: openCalendarEventDestination)
         }
     }
 

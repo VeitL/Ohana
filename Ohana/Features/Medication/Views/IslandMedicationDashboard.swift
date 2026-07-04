@@ -295,7 +295,7 @@ struct IslandMedicationDashboardContentView: View {
                         Spacer()
                         Text(summary.dueDoses == 0 ? "--" : "\(summary.takenDoses)/\(summary.dueDoses)")
                             .font(OhanaFont.adaptive(size: 16, weight: .black, design: .rounded))
-                            .foregroundStyle(summary.dueDoses > 0 && summary.takenDoses >= summary.dueDoses ? Color.goLime : medAccent)
+                            .foregroundStyle(summary.dueDoses > 0 && summary.takenDoses >= summary.dueDoses ? Color.goPrimary : medAccent)
                         Image(systemName: "chevron.right").accessibilityHidden(true)
                             .font(OhanaFont.adaptive(size: 11, weight: .black))
                             .foregroundStyle(Color.goCardWhite.opacity(0.3))
@@ -319,7 +319,7 @@ struct IslandMedicationDashboardContentView: View {
             .foregroundStyle(isSelected ? Color.arkInk : Color.goCardWhite)
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
-            .background(isSelected ? Color.goLime : Color.ohanaControlFill, in: Capsule())
+            .background(isSelected ? Color.goPrimary : Color.ohanaControlFill, in: Capsule())
         }
         .buttonStyle(ScaleButtonStyle())
     }

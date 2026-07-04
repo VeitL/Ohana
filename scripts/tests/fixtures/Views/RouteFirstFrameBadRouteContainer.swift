@@ -16,3 +16,10 @@ struct RouteFirstFrameBadRouteContainer: View {
         Text("\(balance)")
     }
 }
+
+@ModelActor
+private actor RouteFirstFrameBadRouteDataActor {
+    func loadPets() throws -> [Pet] {
+        try modelContext.fetch(FetchDescriptor<Pet>())
+    }
+}

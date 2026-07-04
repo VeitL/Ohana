@@ -222,7 +222,7 @@ struct HomeRouteCoordinatorTests {
         #expect(coordinator.modal == nil)
     }
 
-    @Test func appSheetSinkKeepsPlantCalendarIdInPlantSlot() {
+    @Test func appSheetSinkIgnoresLegacyPlantCalendarSlot() {
         let plantID = UUID().uuidString
         let coordinator = HomeRouteCoordinator()
         var appSheets: [HomeAppSheetRoute] = []
@@ -233,7 +233,7 @@ struct HomeRouteCoordinatorTests {
 
         coordinator.openCalendar(plantID: plantID)
 
-        #expect(appSheets == [.appSheet(.calendar(entityID: nil, humanID: nil, plantID: plantID))])
+        #expect(appSheets == [.appSheet(.calendar(entityID: nil, humanID: nil, plantID: nil))])
         #expect(coordinator.modal == nil)
     }
 

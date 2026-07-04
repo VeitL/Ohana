@@ -69,10 +69,7 @@ extension CalendarView {
                         let isToday = Calendar.current.isDateInToday(date)
                         let isSelected = Calendar.current.isDate(date, inSameDayAs: selectedDate)
                         let dayNumber = Calendar.current.component(.day, from: date)
-                        let hasEvents = filteredEvents.contains {
-                            eventOccursOnDate($0, date: date) &&
-                                shouldShowEventOccurrence($0, occurrenceDate: date)
-                        }
+                        let hasEvents = preparedCalendarSnapshot.monthEventDayIDs.contains(timelineDateID(date))
 
                         Button {
                             withAnimation(GoMotion.feedback) {

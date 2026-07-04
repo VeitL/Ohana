@@ -111,7 +111,9 @@ struct PetMedicationDetailContentSheet: View {
     private var detailChrome: some View {
         HStack(spacing: 12) {
             FeatureHubAvatar(
-                imageData: pet.avatarImageData,
+                imageCacheID: "pet-medication-detail-\(pet.id.uuidString)",
+                imageSignature: pet.avatarThumbnailSignature,
+                petModelID: pet.persistentModelID,
                 emoji: pet.avatarEmoji,
                 fallback: "🐾",
                 tint: themeColor

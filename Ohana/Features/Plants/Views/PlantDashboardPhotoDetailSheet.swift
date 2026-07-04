@@ -10,6 +10,7 @@ import UIKit
 
 struct PlantDashboardPhotoDetailSheet: View {
     let item: PlantDashboardPhotoItem
+    let imageDataProvider: @Sendable (PlantDashboardPhotoItem) async -> Data?
     let onOpenPlant: (UUID) -> Void
 
     @Environment(\.dismiss) private var dismiss
@@ -34,7 +35,9 @@ struct PlantDashboardPhotoDetailSheet: View {
 
     private var photoPreview: some View {
         PlantDashboardPhotoPreviewTile(
-            imageData: item.imageData,
+            imageID: item.id,
+            imageSignature: item.mediaSignature,
+            imageDataProvider: { await imageDataProvider(item) },
             tint: item.tint
         )
         .frame(maxWidth: .infinity)
@@ -51,11 +54,11 @@ struct PlantDashboardPhotoDetailSheet: View {
     private var contextCard: some View {
         VStack(alignment: .leading, spacing: 9) {
             HStack(spacing: 8) {
-                Image(systemName: item.imageData == nil ? "camera.badge.ellipsis" : "photo.fill") // a11y: allow decorative photo context glyph; text names the state.
+                Image(systemName: item.hasRealPhoto ? "photo.fill" : "camera.badge.ellipsis") // a11y: allow decorative photo context glyph; text names the state.
                     .font(OhanaFont.adaptive(size: 12, weight: .black))
-                    .foregroundStyle(item.imageData == nil ? Color.goYellow : Color.goTeal)
+                    .foregroundStyle(item.hasRealPhoto ? Color.goTeal : Color.goYellow)
                     .frame(width: 28, height: 28) // a11y: allow non-interactive context glyph; adjacent text names the photo state.
-                    .background((item.imageData == nil ? Color.goYellow : Color.goTeal).opacity(0.16), in: Circle())
+                    .background((item.hasRealPhoto ? Color.goTeal : Color.goYellow).opacity(0.16), in: Circle())
                     .accessibilityHidden(true)
 
                 VStack(alignment: .leading, spacing: 2) {
@@ -99,14 +102,14 @@ struct PlantDashboardPhotoDetailSheet: View {
             .foregroundStyle(Color.arkInk)
             .frame(maxWidth: .infinity)
             .frame(minHeight: 48)
-            .background(Color.goLime, in: Capsule())
+            .background(Color.goPrimary, in: Capsule())
         }
         .buttonStyle(ScaleButtonStyle())
         .accessibilityIdentifier("plant-dashboard-photo-detail-open-plant")
     }
 
     private var detailText: String {
-        if item.imageData == nil {
+        if !item.hasRealPhoto {
             return l.tr(
                 zh: "这株植物还没有真实照片。打开详情后可补档案照或记录带照片的护理。",
                 en: "This plant does not have a real photo yet. Open detail to add a profile image or photo care log.",
@@ -124,48 +127,34 @@ struct PlantDashboardPhotoDetailSheet: View {
         [
             item.title,
             item.subtitle,
-            item.imageData == nil
-                ? l.tr(zh: "没有真实照片", en: "No real photo", de: "Kein echtes Foto")
-                : l.tr(zh: "植物照片", en: "Plant photo", de: "Pflanzenfoto")
+            item.hasRealPhoto
+                ? l.tr(zh: "植物照片", en: "Plant photo", de: "Pflanzenfoto")
+                : l.tr(zh: "没有真实照片", en: "No real photo", de: "Kein echtes Foto")
         ].joined(separator: ", ")
     }
 }
 
 private struct PlantDashboardPhotoPreviewTile: View {
-    let imageData: Data?
+    let imageID: String
+    let imageSignature: String
+    let imageDataProvider: @Sendable () async -> Data?
     let tint: Color
-
-    @State private var image: UIImage?
-
-    private var imageSignature: String {
-        guard let imageData else { return "none" }
-        return "\(imageData.count)-\(imageData.first ?? 0)-\(imageData.last ?? 0)"
-    }
 
     var body: some View {
         ZStack {
             Rectangle()
                 .fill(tint.opacity(0.18))
 
-            if let image {
-                Image(uiImage: image)
-                    .resizable()
-                    .aspectRatio(contentMode: .fit)
-            } else {
-                Image(systemName: "leaf.fill") // a11y: allow decorative fallback image glyph; parent labels describe the photo state.
-                    .font(OhanaFont.adaptive(size: 30, weight: .black))
-                    .foregroundStyle(tint)
-                    .accessibilityHidden(true)
-            }
+            PlantDetailDecodedImageTile(
+                imageID: imageID,
+                imageSignature: imageSignature,
+                imageDataProvider: { await imageDataProvider() },
+                tint: tint,
+                fillsContainer: false,
+                maxPixel: 900
+            )
         }
         .clipped()
-        .task(id: imageSignature) {
-            guard let imageData else {
-                image = nil
-                return
-            }
-            image = await AttachmentImageDecoder.decode(imageData)
-        }
         .accessibilityHidden(true)
     }
 }

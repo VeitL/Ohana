@@ -75,7 +75,7 @@ final class CalendarTimelinePositionCoordinator: ObservableObject {
     }
 }
 
-struct CalendarFilterSelection: Equatable {
+nonisolated struct CalendarFilterSelection: Equatable, Sendable {
     static let allPlantsToken = "__all_plants__"
 
     var petId: String
@@ -116,17 +116,25 @@ struct CalendarFilterSelection: Equatable {
     }
 }
 
-struct CalendarContentHandoffState: Equatable {
+nonisolated struct CalendarContentHandoffState: Equatable, Sendable {
     var viewModeRaw: String
     var filter: CalendarFilterSelection
 }
 
+nonisolated struct CalendarPreparedSnapshotTriggerKey: Equatable, Sendable {
+    var selectedDay: Date
+    var monthKey: String
+    var filter: CalendarFilterSelection
+    var dataRevision: Int
+}
+
 nonisolated enum CalendarEmbeddedContentMountPolicy {
-    static let inactiveEmbeddedDataLoadDelayMilliseconds: UInt64 = 220
+    static let inactiveEmbeddedDataLoadDelayMilliseconds: UInt64 = 24
     static let visibleEmbeddedDataLoadDelayMilliseconds: UInt64 = 24
     static let activeEmbeddedDataLoadDelayMilliseconds: UInt64 = 120
-    static let inactiveEmbeddedContentDelayMilliseconds: UInt64 = 220
+    static let inactiveEmbeddedContentDelayMilliseconds: UInt64 = 24
     static let activeEmbeddedContentDelayMilliseconds: UInt64 = 96
+    static let revisionReloadDebounceMilliseconds: UInt64 = 180
 
     static func shouldRenderMainContent(
         hideToolbar: Bool,

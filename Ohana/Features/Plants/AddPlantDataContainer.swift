@@ -10,28 +10,62 @@ import SwiftUI
 
 struct AddPlantDataContainer: View {
     let onComplete: () -> Void
+    var onPlantSaved: ((UUID) -> Void)?
     @Environment(\.modelContext) private var modelContext
+    @State private var existingPlantSnapshots: [PlantDuplicateScanSnapshot] = []
+    @State private var snapshotLoadTask: Task<Void, Never>?
+    @State private var didLoadSnapshots = false
 
     var body: some View {
-        RouteFirstFrameDeferredLoad(
-            initialData: [PlantDuplicateScanSnapshot](),
-            loadDelayMilliseconds: 48,
-            shouldLoad: { $0.isEmpty },
-            load: { Self.loadSnapshots(from: modelContext) }
-        ) { snapshots in
-            AddPlantView(
-                onComplete: onComplete,
-                existingPlantSnapshots: snapshots
-            )
+        AddPlantView(
+            onComplete: onComplete,
+            onPlantSaved: onPlantSaved,
+            existingPlantSnapshots: existingPlantSnapshots
+        )
+        .onAppear {
+            scheduleSnapshotLoad()
+        }
+        .onDisappear {
+            snapshotLoadTask?.cancel()
+            snapshotLoadTask = nil
         }
     }
 
-    private static func loadSnapshots(from context: ModelContext) -> [PlantDuplicateScanSnapshot] {
+    private func scheduleSnapshotLoad() {
+        guard !didLoadSnapshots, snapshotLoadTask == nil else { return }
+        let container = modelContext.container
+        snapshotLoadTask = Task { @MainActor in
+            defer { snapshotLoadTask = nil }
+            await OhanaFrameScheduler.waitAfterNextFrame(milliseconds: 240)
+            guard !Task.isCancelled else { return }
+            let actor = AddPlantDuplicateSnapshotActor(modelContainer: container)
+            do {
+                let snapshots = try await actor.loadSnapshots()
+                guard !Task.isCancelled else { return }
+                existingPlantSnapshots = snapshots
+                didLoadSnapshots = true
+            } catch is CancellationError {
+                return
+            } catch {
+                OhanaLog.warning(
+                    "Add plant duplicate snapshot actor load failed: \(error.localizedDescription)",
+                    category: "Plants"
+                )
+            }
+        }
+    }
+}
+
+@ModelActor
+private actor AddPlantDuplicateSnapshotActor {
+    func loadSnapshots() throws -> [PlantDuplicateScanSnapshot] {
+        try Task.checkCancellation()
         do {
             let descriptor = FetchDescriptor<Plant>(
                 sortBy: [SortDescriptor(\.createdAt, order: .reverse)]
             )
-            let plants = try context.fetch(descriptor) // route-first-frame: allow deferred-fetch
+            let plants = try modelContext.fetch(descriptor)
+            try Task.checkCancellation()
             return plants.map {
                 PlantDuplicateScanSnapshot(
                     id: $0.id,
@@ -47,7 +81,7 @@ struct AddPlantDataContainer: View {
                 "Add plant duplicate snapshot fetch failed: \(error.localizedDescription)",
                 category: "Plants"
             )
-            return []
+            throw error
         }
     }
 }

@@ -261,7 +261,7 @@ struct WeeklyReportCard: View {
             // 宠物 Hero
             HStack(spacing: 14) {
                 PetAvatarPortraitView(
-                    imageData: pet.avatarImageData,
+                    pet: pet,
                     fallbackText: pet.avatarEmoji,
                     themeColor: Color(hex: pet.safeThemeColorHex),
                     size: 64,

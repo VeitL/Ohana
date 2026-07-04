@@ -101,7 +101,7 @@ enum WaterCareSettingsStore {
     private nonisolated static func waterChangeCycleAnchorKey(_ petKey: String) -> String { "waterChangeCycleAnchor_\(petKey)" }
 }
 
-struct LitterCareSettingsSnapshot {
+nonisolated struct LitterCareSettingsSnapshot {
     let scoopIntervalDays: Int
     let scoopReminderOn: Bool
     let scoopAnchorDate: Date
@@ -114,7 +114,7 @@ struct LitterCareSettingsSnapshot {
 }
 
 enum LitterCareSettingsStore {
-    static func snapshot(
+    nonisolated static func snapshot(
         petKey: String,
         now: Date = Date(),
         calendar: Calendar = .current,
@@ -175,20 +175,20 @@ enum LitterCareSettingsStore {
         defaults.set(cycleAnchor.timeIntervalSince1970, forKey: litterChangeCycleAnchorKey(petKey))
     }
 
-    static func lastFullChangeDate(petKey: String, defaults: UserDefaults = .standard) -> Date? {
+    nonisolated static func lastFullChangeDate(petKey: String, defaults: UserDefaults = .standard) -> Date? {
         let timestamp = defaults.double(forKey: lastLitterChangeKey(petKey))
         return timestamp > 0 ? Date(timeIntervalSince1970: timestamp) : nil
     }
 
-    private static func positiveInteger(_ value: Int, fallback: Int) -> Int {
+    private nonisolated static func positiveInteger(_ value: Int, fallback: Int) -> Int {
         max(value > 0 ? value : fallback, 1)
     }
 
-    private static func scoopIntervalKey(_ petKey: String) -> String { "scoopIntervalDays_\(petKey)" }
-    private static func scoopAnchorKey(_ petKey: String) -> String { "scoopAnchorDate_\(petKey)" }
-    private static func scoopReminderKey(_ petKey: String) -> String { "scoopReminder_\(petKey)" }
-    private static func litterChangeIntervalKey(_ petKey: String) -> String { "litterChangeInterval_\(petKey)" }
-    private static func litterChangeCycleAnchorKey(_ petKey: String) -> String { "litterChangeCycleAnchor_\(petKey)" }
-    private static func litterReminderKey(_ petKey: String) -> String { "litterReminder_\(petKey)" }
-    private static func lastLitterChangeKey(_ petKey: String) -> String { "lastLitterChangeDate_\(petKey)" }
+    private nonisolated static func scoopIntervalKey(_ petKey: String) -> String { "scoopIntervalDays_\(petKey)" }
+    private nonisolated static func scoopAnchorKey(_ petKey: String) -> String { "scoopAnchorDate_\(petKey)" }
+    private nonisolated static func scoopReminderKey(_ petKey: String) -> String { "scoopReminder_\(petKey)" }
+    private nonisolated static func litterChangeIntervalKey(_ petKey: String) -> String { "litterChangeInterval_\(petKey)" }
+    private nonisolated static func litterChangeCycleAnchorKey(_ petKey: String) -> String { "litterChangeCycleAnchor_\(petKey)" }
+    private nonisolated static func litterReminderKey(_ petKey: String) -> String { "litterReminder_\(petKey)" }
+    private nonisolated static func lastLitterChangeKey(_ petKey: String) -> String { "lastLitterChangeDate_\(petKey)" }
 }

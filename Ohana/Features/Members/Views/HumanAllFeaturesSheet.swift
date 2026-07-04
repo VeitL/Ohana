@@ -164,21 +164,22 @@ struct HumanAllFeaturesSheet: View {
     }
 
     private var avatarSourceKey: String {
-        "\(human.id.uuidString):\(human.avatarImageData?.count ?? 0)"
+        "\(human.id.uuidString):\(human.avatarThumbnailSignature)"
     }
 
     private func prepareAvatar() async {
         await OhanaFrameScheduler.waitAfterNextFrame(milliseconds: 24)
         guard !Task.isCancelled else { return }
-        guard let data = human.avatarImageData else {
+        guard human.hasAvatarImageAttachment,
+              let data = human.avatarImageData else {
             avatarPipeline.cancel(key: avatarCacheKey)
             avatarSignature = ""
             avatarCacheKey = "human-feature-avatar-empty"
             return
         }
 
-        let signature = FocusWalletAvatarCache.signature(for: data)
-        let nextKey = "human-feature-avatar-\(human.id.uuidString)-\(data.count)"
+        let signature = human.avatarThumbnailSignature
+        let nextKey = "human-feature-avatar-\(human.id.uuidString)-\(signature)"
         if avatarCacheKey != nextKey {
             avatarPipeline.cancel(key: avatarCacheKey)
             avatarCacheKey = nextKey

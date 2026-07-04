@@ -11,7 +11,6 @@ import SwiftUI
 struct CalendarView: View {
     var preselectedPetId: String?
     var preselectedHumanId: String?
-    var preselectedPlantId: String?
     var hideToolbar: Bool = false
     var showsEmbeddedControls: Bool = false
     var addEventTrigger: Int = 0
@@ -29,6 +28,8 @@ struct CalendarView: View {
     var insurances: [PetInsurance] = []
     var petMedications: [PetMedication] = []
     var humanMedications: [HumanMedication] = []
+    var dataRevision = 0
+    var routePreparedSnapshot: CalendarRoutePreparedSnapshot?
 
     @Environment(\.dismiss) var dismiss
     @Environment(\.modelContext) var modelContext
@@ -59,6 +60,7 @@ struct CalendarView: View {
     @State var visibleTimelineDateID: String? = CalendarView.todayTimelineDateID
     @State var timelineTodayScrollRequest = 0
     @State var didScrollListToToday = false
+    @State var pendingFilterTimelineAnchorDate: Date?
     @State var viewModeCommitTask: Task<Void, Never>?
     @State var filterApplyTask: Task<Void, Never>?
     @State var filterStorageCommitTask: Task<Void, Never>?
@@ -68,6 +70,9 @@ struct CalendarView: View {
     @State var addEventContentMountTask: Task<Void, Never>?
     @State var isCalendarMainContentMounted = false
     @State var calendarMainContentMountTask: Task<Void, Never>?
+    @State var preparedCalendarSnapshot = CalendarPreparedSnapshot.empty
+    @State var preparedCalendarSnapshotKey: CalendarPreparedSnapshotTriggerKey?
+    @State var preparedCalendarSnapshotTask: Task<Void, Never>?
     @State var embeddedBottomChromeBaselineOffset: CGFloat?
     @State var didScheduleCalendarMaintenance = false
     @State var calendarOpenStartedAt: CFAbsoluteTime?
@@ -134,11 +139,8 @@ struct CalendarView: View {
     }
 
     var routeFilterSelection: CalendarFilterSelection? {
-        if let preselectedPlantId {
-            return .plant(preselectedPlantId)
-        }
         if let preselectedPetId {
-            return preselectedEntityIsPlant(preselectedPetId) ? .plant(preselectedPetId) : .pet(preselectedPetId)
+            return .pet(preselectedPetId)
         }
         if let preselectedHumanId {
             return .human(preselectedHumanId)
@@ -202,6 +204,10 @@ struct CalendarView: View {
     }
 
     var filteredEvents: [Event] {
+        preparedCalendarSnapshot.filteredEvents
+    }
+
+    func buildFilteredEventsForPreparedSnapshot() -> [Event] {
         var result = events.filter {
             !CarePlanCalendarSync.isDefaultGeneratedCalendarPlan($0, pets: pets) &&
                 !MemberLifecycleActiveScheduleResolver.eventTargetsDeceasedActiveSchedule(
@@ -227,8 +233,13 @@ struct CalendarView: View {
         return result
     }
 
-    func preselectedEntityIsPlant(_ entityId: String) -> Bool {
-        plants.contains { $0.id.uuidString == entityId }
+    var preparedCalendarSnapshotTriggerKey: CalendarPreparedSnapshotTriggerKey {
+        CalendarPreparedSnapshotTriggerKey(
+            selectedDay: Calendar.current.startOfDay(for: selectedDate),
+            monthKey: calendarMonthKey,
+            filter: effectiveFilterSelection,
+            dataRevision: dataRevision
+        )
     }
 
     func eventIsRelatedToDeceasedMember(_ event: Event) -> Bool {
@@ -276,7 +287,7 @@ struct CalendarView: View {
     var overviewCalendarEmbedTopInset: CGFloat { 98 }
 
     var shouldShowInlinePetChips: Bool {
-        if preselectedPetId != nil || preselectedHumanId != nil || preselectedPlantId != nil {
+        if preselectedPetId != nil || preselectedHumanId != nil {
             return !hideToolbar || isMaterial
         }
         return !hideToolbar || showsEmbeddedControls || isMaterial
@@ -286,11 +297,7 @@ struct CalendarView: View {
     typealias TimelineDateSection = CalendarTimelineDateSection
 
     var calendarTimelineSnapshot: CalendarTimelineSnapshot {
-        CalendarSnapshotBuilder.buildTimeline(
-            events: filteredEvents,
-            allEvents: events,
-            pets: pets
-        )
+        preparedCalendarSnapshot.timeline
     }
 
     var expandedOccurrences: [EventOccurrence] {
@@ -314,12 +321,7 @@ struct CalendarView: View {
     }
 
     var eventsForSelectedDate: [Event] {
-        CalendarSnapshotBuilder.eventsForDate(
-            filteredEvents,
-            date: selectedDate,
-            allEvents: events,
-            pets: pets
-        )
+        preparedCalendarSnapshot.selectedDateEvents
     }
 
     func shouldShowEventOccurrence(_ event: Event, occurrenceDate: Date) -> Bool {
@@ -366,6 +368,7 @@ struct CalendarView: View {
                 allowsEditing: presentation.allowsEditing,
                 onDelete: {
                     eventDetailPresentation = nil
+                    schedulePreparedCalendarSnapshotRebuild(delayMilliseconds: 220, force: true)
                 },
                 onComplete: {
                     toggleEventCompletion(

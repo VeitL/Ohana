@@ -9,6 +9,7 @@ struct UiV4BadFixture: View {
             ArkBackgroundView() // rule: background
             Text("hello").foregroundStyle(.primary) // rule: system-text-color
             Text("hi").foregroundColor(.white) // rule: hardcoded-white-black
+            Text("lime").foregroundStyle(Color.goLime) // rule: direct-go-lime
             RoundedRectangle(cornerRadius: 8).fill(.ultraThinMaterial) // rule: material
             Text("card").shadow(radius: 4) // rule: shadow
             Button("tap") {}.buttonStyle(.plain) // rule: plain-button

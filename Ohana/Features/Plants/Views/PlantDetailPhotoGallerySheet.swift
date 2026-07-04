@@ -11,10 +11,12 @@ import UIKit
 struct PlantPhotoGallerySheet: View {
     let plantName: String
     let photos: [PlantDetailPhotoItem]
+    let imageRevision: Int
+    let imageDataProvider: @Sendable (PlantDetailPhotoItem) async -> Data?
 
     @Environment(\.dismiss) private var dismiss
     @AppStorage("appLanguage") private var appLanguage = "zh"
-    @State private var selectedPhoto: PlantDetailPhotoItem?
+    @State private var selectedPhoto: SelectedPlantDetailPhoto?
 
     private var l: L10n { L10n(appLanguage) }
     private let columns = [
@@ -43,10 +45,12 @@ struct PlantPhotoGallerySheet: View {
             .padding(.vertical, 16)
         }
         .accessibilityIdentifier("plant-detail-photo-gallery-sheet")
-        .sheet(item: $selectedPhoto) { photo in
+        .sheet(item: $selectedPhoto) { selection in
             PlantPhotoDetailSheet(
                 plantName: plantName,
-                photo: photo
+                photo: selection.photo,
+                imageRevision: imageRevision,
+                imageDataProvider: { await imageDataProvider(selection.photo) }
             )
         }
     }
@@ -81,7 +85,7 @@ struct PlantPhotoGallerySheet: View {
                 .foregroundStyle(Color.arkInk)
                 .padding(.horizontal, 11)
                 .frame(minHeight: 30)
-                .background(Color.goLime, in: Capsule())
+                .background(Color.goPrimary, in: Capsule())
                 .accessibilityLabel(l.tr(zh: "\(photos.count) 张照片", en: "\(photos.count) photos", de: "\(photos.count) Fotos"))
         }
         .accessibilityElement(children: .combine)
@@ -117,13 +121,16 @@ struct PlantPhotoGallerySheet: View {
 
     private func galleryCard(_ photo: PlantDetailPhotoItem) -> some View {
         Button {
-            selectedPhoto = photo
+            selectedPhoto = SelectedPlantDetailPhoto(photo: photo)
         } label: {
             VStack(alignment: .leading, spacing: 8) {
                 PlantDetailDecodedImageTile(
-                    imageData: photo.imageData,
+                    imageID: photo.id,
+                    imageSignature: photo.mediaSignature,
+                    imageDataProvider: { await imageDataProvider(photo) },
                     tint: photo.tint,
-                    fillsContainer: true
+                    fillsContainer: true,
+                    maxPixel: 720
                 )
                 .frame(height: 146)
                 .clipShape(RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
@@ -152,9 +159,17 @@ struct PlantPhotoGallerySheet: View {
     }
 }
 
+private struct SelectedPlantDetailPhoto: Identifiable, Sendable {
+    let photo: PlantDetailPhotoItem
+
+    var id: String { photo.id }
+}
+
 private struct PlantPhotoDetailSheet: View {
     let plantName: String
     let photo: PlantDetailPhotoItem
+    let imageRevision: Int
+    let imageDataProvider: @Sendable () async -> Data?
 
     @Environment(\.dismiss) private var dismiss
     @AppStorage("appLanguage") private var appLanguage = "zh"
@@ -168,9 +183,12 @@ private struct PlantPhotoDetailSheet: View {
         ) {
             VStack(alignment: .leading, spacing: 14) {
                 PlantDetailDecodedImageTile(
-                    imageData: photo.imageData,
+                    imageID: photo.id,
+                    imageSignature: photo.mediaSignature,
+                    imageDataProvider: { await imageDataProvider() },
                     tint: photo.tint,
-                    fillsContainer: false
+                    fillsContainer: false,
+                    maxPixel: 1600
                 )
                 .frame(maxWidth: .infinity)
                 .frame(height: 360)
@@ -200,7 +218,7 @@ private struct PlantPhotoDetailSheet: View {
                         .foregroundStyle(Color.arkInk)
                         .frame(maxWidth: .infinity)
                         .frame(minHeight: 44)
-                        .background(Color.goLime, in: Capsule())
+                        .background(Color.goPrimary, in: Capsule())
                 }
                 .buttonStyle(ScaleButtonStyle())
                 .accessibilityIdentifier("plant-detail-photo-detail-done")
@@ -212,14 +230,25 @@ private struct PlantPhotoDetailSheet: View {
 }
 
 struct PlantDetailDecodedImageTile: View {
-    let imageData: Data
+    let imageID: String
+    let imageSignature: String
+    let imageDataProvider: @Sendable () async -> Data?
     let tint: Color
     let fillsContainer: Bool
+    let maxPixel: CGFloat
 
     @State private var image: UIImage?
+    @State private var loadedKey: MediaThumbnailKey?
 
-    private var imageSignature: String {
-        "\(imageData.count)-\(imageData.first ?? 0)-\(imageData.last ?? 0)"
+    private var thumbnailKey: MediaThumbnailKey {
+        MediaThumbnailKey(id: imageID, sourceSignature: imageSignature, maxPixel: maxPixel)
+    }
+
+    private var resolvedImage: UIImage? {
+        if loadedKey == thumbnailKey, let image {
+            return image
+        }
+        return MediaThumbnailProvider.cachedImage(for: thumbnailKey)
     }
 
     var body: some View {
@@ -227,7 +256,7 @@ struct PlantDetailDecodedImageTile: View {
             Rectangle()
                 .fill(tint.opacity(0.18))
 
-            if let image {
+            if let image = resolvedImage {
                 Image(uiImage: image)
                     .resizable()
                     .aspectRatio(contentMode: fillsContainer ? .fill : .fit)
@@ -239,8 +268,23 @@ struct PlantDetailDecodedImageTile: View {
             }
         }
         .clipped()
-        .task(id: imageSignature) {
-            image = await AttachmentImageDecoder.decode(imageData)
+        .task(id: thumbnailKey) {
+            if let cached = MediaThumbnailProvider.cachedImage(for: thumbnailKey) {
+                await MainActor.run {
+                    loadedKey = thumbnailKey
+                    image = cached
+                }
+                return
+            }
+            let decoded = await MediaThumbnailProvider.image(
+                for: thumbnailKey,
+                asyncDataProvider: imageDataProvider
+            )
+            guard !Task.isCancelled else { return }
+            await MainActor.run {
+                loadedKey = thumbnailKey
+                image = decoded
+            }
         }
         .accessibilityHidden(true)
     }

@@ -215,6 +215,7 @@ struct PlantCreationCommandInput: Equatable {
     let species: String
     let location: String
     let avatarEmoji: String
+    let avatarImageData: Data?
     let wateringIntervalDays: Int
     let fertilizingIntervalDays: Int
     let roomNameRaw: String
@@ -251,6 +252,7 @@ struct PlantCreationCommandInput: Equatable {
         species: String,
         location: String,
         avatarEmoji: String,
+        avatarImageData: Data? = nil,
         wateringIntervalDays: Int,
         fertilizingIntervalDays: Int,
         roomNameRaw: String = "",
@@ -286,6 +288,7 @@ struct PlantCreationCommandInput: Equatable {
         self.species = species
         self.location = location
         self.avatarEmoji = avatarEmoji
+        self.avatarImageData = avatarImageData
         self.wateringIntervalDays = wateringIntervalDays
         self.fertilizingIntervalDays = fertilizingIntervalDays
         self.roomNameRaw = roomNameRaw
@@ -655,6 +658,7 @@ enum PlantCreationCommandService {
             remindersEnabled: input.remindersEnabled
         )
         plant.id = input.id
+        plant.updateAvatarImageData(input.avatarImageData)
         plant.notes = input.notes.trimmingCharacters(in: .whitespacesAndNewlines)
         context.insert(plant)
         PlantUnlockPolicy.noteExistingPlantData()

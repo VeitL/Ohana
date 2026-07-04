@@ -105,8 +105,10 @@ private struct FamilyWeeklyReportRouteData {
                       let petName = activePetNames[petID] else { return nil }
                 return FamilyWeeklyPhotoMemory(
                     id: log.id,
+                    modelID: log.persistentModelID,
                     petName: petName,
-                    imageData: log.imageData,
+                    imageSignature: log.imageThumbnailSignature,
+                    canAttemptImageAttachmentLoad: log.canAttemptImageAttachmentLoad,
                     note: log.note,
                     date: log.date
                 )

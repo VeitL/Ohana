@@ -893,16 +893,12 @@ struct ExpandedHumanFeaturesContentSheet: View {
             Circle()
                 .fill(Color.ohanaControlFill)
                 .frame(width: size, height: size)
-            if let data = human.avatarImageData, let ui = UIImage(data: data) { // smoothness: allow legacy prepared-avatar decode path; media service migration tracked after P1 baseline
-                Image(uiImage: ui)
-                    .resizable()
-                    .scaledToFill()
-                    .frame(width: size, height: size)
-                    .clipShape(Circle())
-            } else {
-                Text(human.avatarEmoji.isEmpty ? "👤" : human.avatarEmoji)
-                    .font(.system(size: size * 0.48))
-            }
+            HumanAvatarPipelineView(
+                human: human,
+                size: size,
+                fallbackScale: 0.48,
+                showsBackground: false
+            )
         }
     }
 

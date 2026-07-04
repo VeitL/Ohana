@@ -2,34 +2,43 @@
 //  AddPlantView.swift
 //  Ohana
 //
-//  GO UI：由 `AddEntityView` 提供 `GoIslandWizardBackdrop`，本页使用岛景上的玻璃卡与青柠强调。
+//  GO UI：由 `AddEntityView` 提供 `GoIslandWizardBackdrop`，本页使用岛景上的玻璃卡与自适应主色强调。
 //
 
+import PhotosUI
 import SwiftData
 import SwiftUI
+import UIKit
 
 struct AddPlantView: View {
     let onComplete: () -> Void
+    var onPlantSaved: ((UUID) -> Void)?
     let existingPlantSnapshots: [PlantDuplicateScanSnapshot]
-    @Environment(\.modelContext) private var modelContext
-    @Environment(AppServices.self) private var appServices
-    @AppStorage("appLanguage") private var appLanguage = "zh"
+    @Environment(\.modelContext) var modelContext
+    @Environment(\.accessibilityReduceMotion) var reduceMotion
+    @Environment(AppServices.self) var appServices
+    @AppStorage("appLanguage") var appLanguage = "zh"
 
-    @StateObject private var commandQueue = DeferredDomainCommandQueue()
-    @State private var name = ""
-    @State private var isCustomizingName = false
-    @State private var species = ""
-    @State private var roomName = ""
-    @State private var location = ""
-    @State private var avatarEmoji = "🌱"
-    @State private var catalogQuery = ""
-    @State private var selectedCatalogID = ""
-    @State private var selectedCatalogGroup: PlantCatalogBrowsingGroup = .recommended
-    @State private var wateringInterval = 7
-    @State private var fertilizingInterval = 30
-    @State private var potDiameterCm = 0.0
-    @State private var potMaterial = ""
-    @State private var soilType = ""
+    @StateObject var commandQueue = DeferredDomainCommandQueue()
+    @StateObject var media = MemberAvatarMediaCoordinator()
+    @State var currentStep: AddPlantCreationStep = .plant
+    @State var name = ""
+    @State var isCustomizingName = false
+    @State var species = ""
+    @State var roomName = ""
+    @State var location = ""
+    @State var avatarEmoji = "🌱"
+    @State var avatarImageData: Data?
+    @State var decodedAvatarImage: UIImage?
+    @State var selectedAvatarSource: PlantCreationAvatarSource = .builtIn
+    @State var catalogQuery = ""
+    @State var selectedCatalogID = ""
+    @State var selectedCatalogGroup: PlantCatalogBrowsingGroup = .recommended
+    @State var wateringInterval = 7
+    @State var fertilizingInterval = 30
+    @State var potDiameterCm = 0.0
+    @State var potMaterial = ""
+    @State var soilType = ""
     @State var isIndoor = true
     @State var windowDirection: PlantWindowDirection = .unknown
     @State var lightLevel: PlantLightLevel = .medium
@@ -37,211 +46,108 @@ struct AddPlantView: View {
     @State var humidityPreference: PlantHumidityPreference = .standard
     @State var temperaturePreference: PlantTemperaturePreference = .standard
     @State var isNearClimateSource = false
-    @State private var potHasDrainage = true
-    @State private var hasAcquiredDate = false
-    @State private var acquiredDate = Date()
-    @State private var acquisitionSource = ""
-    @State private var currentHeightCm = 0.0
-    @State private var currentSpreadCm = 0.0
+    @State var potHasDrainage = true
+    @State var hasAcquiredDate = false
+    @State var acquiredDate = Date()
+    @State var acquisitionSource = ""
+    @State var currentHeightCm = 0.0
+    @State var currentSpreadCm = 0.0
     @State var isHydroponic = false
     @State var isSucculent = false
     @State var healthStatus: PlantHealthStatus = .stable
-    @State private var remindersEnabled = true
-    @State private var isSaving = false
-    @State private var showDuplicateAlert = false
-    @State private var showingOptionalPlantDetails = false
-    @State private var showingCustomRoomField = false
-    @State private var showingCustomLocationField = false
+    @State var isToxicToCats = false
+    @State var isToxicToDogs = false
+    @State var isToxicToChildren = false
+    @State var remindersEnabled = true
+    @State var isSaving = false
+    @State var showDuplicateAlert = false
+    @State var showingOptionalPlantDetails = false
+    @State var showingCustomRoomField = false
+    @State var showingCustomLocationField = false
+    @State var didShowSuccess = false
+    @State var isPreparingCamera = false
+    @State var cropPresentationTask: Task<Void, Never>?
     @State var duplicateAcknowledgementKey = ""
-    @FocusState private var focusedField: AddPlantFocusField?
-
-    private let plantEmojis = ["🌱", "🌿", "🍀", "🌵", "🌻", "🌹", "🌺", "🪴", "🌳", "🎋", "🌾", "💐"]
-
-    private enum AddPlantFocusField: Hashable {
-        case name
-        case species
-        case catalogSearch
-        case room
-        case location
-        case potMaterial
-        case soil
-        case source
-    }
-
-    var selectedCatalog: PlantCatalogEntry? {
-        selectedCatalogID.isEmpty ? nil : PlantCatalog.entry(id: selectedCatalogID)
-    }
-    var l: L10n { L10n(appLanguage) }
-
-    private var groupedCatalogEntries: [PlantCatalogEntry] {
-        AddPlantCatalogPickerModel.entries(for: selectedCatalogGroup)
-    }
-
-    private var commonRoomOptions: [String] {
-        AddPlantChoiceLibrary.roomOptions(l)
-    }
-
-    private var commonSpotOptions: [String] {
-        AddPlantChoiceLibrary.spotOptions(l)
-    }
-
-    private var commonPotMaterialOptions: [String] {
-        AddPlantChoiceLibrary.potMaterialOptions(l)
-    }
-
-    private var commonSoilOptions: [String] {
-        AddPlantChoiceLibrary.soilOptions(l)
-    }
-
-    private var commonSourceOptions: [String] {
-        AddPlantChoiceLibrary.sourceOptions(l)
-    }
-
-    private var trimmedName: String {
-        name.trimmingCharacters(in: .whitespacesAndNewlines)
-    }
-
-    private var trimmedSpecies: String {
-        species.trimmingCharacters(in: .whitespacesAndNewlines)
-    }
-
-    private var trimmedRoomName: String {
-        roomName.trimmingCharacters(in: .whitespacesAndNewlines)
-    }
-
-    private var trimmedLocation: String {
-        location.trimmingCharacters(in: .whitespacesAndNewlines)
-    }
-
-    private var usesCustomRoomEntry: Bool {
-        !trimmedRoomName.isEmpty && !commonRoomOptions.contains(trimmedRoomName)
-    }
-
-    private var usesCustomLocationEntry: Bool {
-        !trimmedLocation.isEmpty && !commonSpotOptions.contains(trimmedLocation)
-    }
-
-    private var catalogMatches: [PlantCatalogSearchResult] {
-        PlantCatalog.searchResults(catalogQuery, limit: 8)
-    }
-
-    private var profilePreviewName: String {
-        trimmedName.isEmpty ? l.tr(zh: "新植物", en: "New plant", de: "Neue Pflanze") : trimmedName
-    }
-
-    private var profilePreviewSpecies: String {
-        if let selectedCatalog {
-            return selectedCatalog.localizedCommonName
-        }
-        if !trimmedSpecies.isEmpty {
-            return trimmedSpecies
-        }
-        return l.tr(zh: "品种可选", en: "Species optional", de: "Art optional")
-    }
-
-    private var carePlanPreviewSummary: String {
-        l.tr(
-            zh: "浇水 \(wateringInterval) 天 · 施肥 \(fertilizingInterval) 天 · \(lightLevel.displayName)",
-            en: "Water \(wateringInterval)d · fertilize \(fertilizingInterval)d · \(lightLevel.displayName)",
-            de: "Gießen \(wateringInterval) T. · düngen \(fertilizingInterval) T. · \(lightLevel.displayName)"
-        )
-    }
-
-    private var carePlanPreviewDetail: String {
-        if let selectedCatalog {
-            return l.tr(
-                zh: "已使用资料库默认值：\(selectedCatalog.localizedCommonName)",
-                en: "Using catalog defaults for \(selectedCatalog.localizedCommonName)",
-                de: "Katalogwerte für \(selectedCatalog.localizedCommonName) aktiv"
-            )
-        }
-        return l.tr(
-            zh: "不知道品种也可以先用默认节奏，之后按记录调整。",
-            en: "If the species is unknown, start with this simple cadence and adjust from later logs.",
-            de: "Ist die Art unbekannt, starte mit diesem einfachen Rhythmus und passe ihn später an."
-        )
-    }
-
-    private var duplicateDraft: PlantDuplicateScanDraft {
-        PlantDuplicateScanDraft(
-            name: name,
-            species: species,
-            roomName: roomName,
-            location: location,
-            catalogSpeciesId: selectedCatalogID
-        )
-    }
-
-    var duplicateCandidates: [PlantDuplicateCandidate] {
-        PlantProfileUXPolicy.duplicateCandidates(
-            draft: duplicateDraft,
-            existingPlants: existingPlantSnapshots
-        )
-    }
-
-    var currentDuplicateAcknowledgementKey: String {
-        PlantProfileUXPolicy.duplicateAcknowledgementKey(for: duplicateDraft)
-    }
-
-    private var requiresDuplicateAcknowledgement: Bool {
-        !duplicateCandidates.isEmpty && duplicateAcknowledgementKey != currentDuplicateAcknowledgementKey
-    }
+    @State var inlineFocusField: AddPlantFocusField?
+    @State var inlineFocusRequestID = 0
+    @FocusState var focusedField: AddPlantFocusField?
 
     var body: some View {
-        ScrollView(showsIndicators: false) {
-            VStack(spacing: 18) {
-                Spacer(minLength: 12)
-
-                addPlantSimpleHeader
-                    .padding(.horizontal, 20)
-
-                VStack(spacing: 14) {
-                    plantSpeciesPickerSection
-                    nameAndPlaceSection
-                    duplicateWarningSection
-                    essentialCareSection
-                    optionalPlantDetailsSection
-                }
-                .padding(.horizontal, 20)
-
-                Button {
-                    savePlant()
-                } label: {
-                    HStack(spacing: 8) {
-                        Image(systemName: trimmedName.isEmpty ? "text.cursor" : (isSaving ? "hourglass" : "leaf.fill"))
-                            .accessibilityHidden(true)
-                        Text(trimmedName.isEmpty ? l.tr(zh: "请选择品种或填写名称", en: "Choose a species or enter a name", de: "Art wählen oder Namen eingeben") : (isSaving ? l.tr(zh: "正在添加…", en: "Adding...", de: "Wird hinzugefügt...") : l.tr(zh: "添加植物", en: "Add plant", de: "Pflanze hinzufügen")))
-                    }
-                    .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
-                    .foregroundStyle(trimmedName.isEmpty ? Color.ohanaTertiaryText : Color.arkInk)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 15)
-                    .background(
-                        trimmedName.isEmpty ? Color.ohanaControlFill.opacity(0.72) : Color.goLime,
-                        in: Capsule()
-                    )
-                }
-                .buttonStyle(ScaleButtonStyle())
-                .disabled(trimmedName.isEmpty || isSaving)
-                .accessibilityIdentifier("add-plant-save-action")
-                .padding(.horizontal, 24)
-                .padding(.top, 4)
-
-                Spacer(minLength: 36)
-            }
-        }
-        .scrollDismissesKeyboard(.interactively)
-        .safeAreaInset(edge: .bottom) {
-            keyboardFocusSpacer
-        }
+        plantCreationFlow
         .toolbar {
             ToolbarItemGroup(placement: .keyboard) {
                 Spacer()
                 Button(l.tr(zh: "完成", en: "Done", de: "Fertig")) {
+                    GoKeyboard.dismiss()
                     focusedField = nil
                 }
                 .accessibilityIdentifier("add-plant-keyboard-done")
             }
+        }
+        .onChange(of: media.photoItem) { _, item in
+            handlePlantPhotoPickerItem(item)
+        }
+        .photosPicker(
+            isPresented: Binding(
+                get: { media.isPhotoPickerPresented },
+                set: { isPresented in
+                    if !isPresented, media.isPhotoPickerPresented {
+                        media.route = nil
+                        finishPlantAvatarMediaPresentation()
+                    }
+                }
+            ),
+            selection: $media.photoItem,
+            matching: .images
+        )
+        .fullScreenCover(
+            isPresented: Binding(
+                get: { media.isCameraPresented },
+                set: { isPresented in
+                    if !isPresented, media.isCameraPresented {
+                        media.route = nil
+                        finishPlantAvatarMediaPresentation()
+                    }
+                }
+            )
+        ) {
+            MemberCameraCaptureView(maxPixel: 2000) { image in
+                media.route = nil
+                Task {
+                    let prepared = await Task.detached(priority: .userInitiated) { // smoothness: allow route-scoped camera image normalization matching member avatar capture; result returns to this sheet before crop presentation.
+                        MemberAvatarImageProcessor.normalized(image)
+                    }.value
+                    await MainActor.run {
+                        presentPlantAvatarCrop(
+                            MemberPortraitCropItem(source: .image(prepared)),
+                            delayMilliseconds: 320
+                        )
+                    }
+                }
+            } onCancel: {
+                media.route = nil
+                finishPlantAvatarMediaPresentation()
+            }
+        }
+        .sheet(
+            item: Binding<MemberPortraitCropItem?>(
+                get: { media.cropItem },
+                set: { item in
+                    if item == nil, media.cropItem != nil {
+                        media.route = nil
+                    }
+                }
+            )
+        ) { item in
+            MemberPortraitCropView(item: item) { data in
+                applyPlantAvatarImageData(data)
+                media.route = nil
+                finishPlantAvatarMediaPresentation()
+            } onCancel: {
+                media.route = nil
+                finishPlantAvatarMediaPresentation()
+            }
+            .presentationDetents([.large]) // ui-v4: allow portrait crop editor needs full-height working area
         }
         .onChange(of: roomName) { _, newValue in
             if commonRoomOptions.contains(newValue.trimmingCharacters(in: .whitespacesAndNewlines)) {
@@ -257,6 +163,16 @@ struct AddPlantView: View {
         }
         .onDisappear {
             commandQueue.cancelAll()
+            cropPresentationTask?.cancel()
+            cropPresentationTask = nil
+        }
+        .alert(l.tr(zh: "无法打开相机", en: "Camera unavailable", de: "Kamera nicht verfügbar"), isPresented: plantPermissionAlertBinding) {
+            Button(l.done, role: .cancel) {
+                media.route = nil
+                finishPlantAvatarMediaPresentation()
+            }
+        } message: {
+            Text(l.tr(zh: "请在系统设置中允许 Ohana 访问相机，或在支持相机的设备上使用。", en: "Allow camera access in Settings, or use a device with a camera.", de: "Erlaube den Kamerazugriff in den Einstellungen oder nutze ein Gerät mit Kamera."))
         }
         .alert(l.tr(zh: "可能已经建过档", en: "This may already exist", de: "Vielleicht schon angelegt"), isPresented: $showDuplicateAlert) {
             Button(l.tr(zh: "返回检查", en: "Go back and check", de: "Zurück und prüfen"), role: .cancel) {}
@@ -361,7 +277,7 @@ struct AddPlantView: View {
         .accessibilityIdentifier("add-plant-species-picker")
     }
 
-    private func catalogGroupButton(_ group: PlantCatalogBrowsingGroup) -> some View {
+    func catalogGroupButton(_ group: PlantCatalogBrowsingGroup) -> some View {
         let isSelected = selectedCatalogGroup == group
         return Button {
             selectedCatalogGroup = group
@@ -373,7 +289,7 @@ struct AddPlantView: View {
                 .foregroundStyle(isSelected ? Color.arkInk : Color.ohanaPrimaryText)
                 .padding(.horizontal, 12)
                 .frame(minHeight: 34)
-                .background(isSelected ? Color.goLime : Color.ohanaControlFill.opacity(0.62), in: Capsule())
+                .background(isSelected ? Color.goPrimary : Color.ohanaControlFill.opacity(0.62), in: Capsule())
         }
         .buttonStyle(ScaleButtonStyle())
         .accessibilityLabel(group.title(l))
@@ -381,7 +297,7 @@ struct AddPlantView: View {
         .accessibilityIdentifier("add-plant-catalog-group-\(group.rawValue)")
     }
 
-    private func commonPlantChoiceButton(_ entry: PlantCatalogEntry) -> some View {
+    func commonPlantChoiceButton(_ entry: PlantCatalogEntry) -> some View {
         let isSelected = selectedCatalogID == entry.id
         return Button {
             applyCatalog(entry)
@@ -406,7 +322,7 @@ struct AddPlantView: View {
             .frame(minHeight: 54, alignment: .leading)
             .padding(.horizontal, 12)
             .padding(.vertical, 10)
-            .background(isSelected ? Color.goLime : Color.ohanaControlFill.opacity(0.62), in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
+            .background(isSelected ? Color.goPrimary : Color.ohanaControlFill.opacity(0.62), in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
             .overlay(
                 RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous)
                     .strokeBorder(isSelected ? Color.clear : Color.ohanaCardSurface.opacity(0.18), lineWidth: 1)
@@ -485,7 +401,7 @@ struct AddPlantView: View {
     }
 
     @ViewBuilder
-    private var plantNameSummarySection: some View {
+    var plantNameSummarySection: some View {
         if selectedCatalog != nil, !isCustomizingName {
             HStack(spacing: 12) {
                 VStack(alignment: .leading, spacing: 5) {
@@ -506,7 +422,7 @@ struct AddPlantView: View {
 
                 Button {
                     isCustomizingName = true
-                    focusedField = .name
+                    requestInlineFocusAfterMount(.name)
                     UISelectionFeedbackGenerator().selectionChanged()
                 } label: {
                     Label(l.tr(zh: "编辑", en: "Edit", de: "Bearbeiten"), systemImage: "pencil")
@@ -567,9 +483,9 @@ struct AddPlantView: View {
             HStack(alignment: .top, spacing: 12) {
                 Image(systemName: selectedCatalog == nil ? "sparkles" : "checkmark.seal.fill") // a11y: allow decorative care-plan glyph; adjacent text describes the generated plan.
                     .font(OhanaFont.adaptive(size: 15, weight: .black))
-                    .foregroundStyle(selectedCatalog == nil ? Color.goTeal : Color.goLime)
+                    .foregroundStyle(selectedCatalog == nil ? Color.goTeal : Color.goPrimary)
                     .frame(width: 44, height: 44)
-                    .background((selectedCatalog == nil ? Color.goTeal : Color.goLime).opacity(0.14), in: Circle())
+                    .background((selectedCatalog == nil ? Color.goTeal : Color.goPrimary).opacity(0.14), in: Circle())
                     .accessibilityHidden(true)
 
                 VStack(alignment: .leading, spacing: 4) {
@@ -587,7 +503,7 @@ struct AddPlantView: View {
             Toggle(l.tr(zh: "植物提醒", en: "Plant reminders", de: "Pflanzenerinnerungen"), isOn: $remindersEnabled)
                 .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .rounded))
                 .foregroundStyle(Color.ohanaPrimaryText)
-                .tint(Color.goLime)
+                .tint(Color.goPrimary)
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -692,11 +608,11 @@ struct AddPlantView: View {
 
             Stepper(l.tr(zh: "浇水：每 \(wateringInterval) 天", en: "Water: every \(wateringInterval) days", de: "Gießen: alle \(wateringInterval) Tage"), value: $wateringInterval, in: 1 ... 90)
                 .foregroundStyle(Color.ohanaPrimaryText)
-                .tint(Color.goLime)
+                .tint(Color.goPrimary)
 
             Stepper(l.tr(zh: "施肥：每 \(fertilizingInterval) 天", en: "Fertilize: every \(fertilizingInterval) days", de: "Düngen: alle \(fertilizingInterval) Tage"), value: $fertilizingInterval, in: 1 ... 365)
                 .foregroundStyle(Color.ohanaPrimaryText)
-                .tint(Color.goLime)
+                .tint(Color.goPrimary)
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -723,14 +639,14 @@ struct AddPlantView: View {
                             .frame(width: 46, height: 46)
                             .background(
                                 avatarEmoji == emoji
-                                    ? Color.goLime.opacity(0.22)
+                                    ? Color.goPrimary.opacity(0.22)
                                     : Color.ohanaControlFill.opacity(0.68),
                                 in: RoundedRectangle(cornerRadius: OhanaRadius.chip, style: .continuous)
                             )
                             .overlay(
                                 RoundedRectangle(cornerRadius: OhanaRadius.chip, style: .continuous)
                                     .strokeBorder(
-                                        avatarEmoji == emoji ? Color.goLime.opacity(0.55) : Color.ohanaCardSurface.opacity(0.16),
+                                        avatarEmoji == emoji ? Color.goPrimary.opacity(0.55) : Color.ohanaCardSurface.opacity(0.16),
                                         lineWidth: avatarEmoji == emoji ? 1.5 : 1
                                     )
                             )
@@ -746,7 +662,7 @@ struct AddPlantView: View {
         .accessibilityIdentifier("add-plant-avatar-picker")
     }
 
-    private var catalogSearchField: some View {
+    var catalogSearchField: some View {
         HStack(spacing: 10) {
             Image(systemName: "magnifyingglass") // a11y: allow decorative search glyph; text field placeholder labels the search input.
                 .font(OhanaFont.adaptive(size: 14, weight: .black))
@@ -782,7 +698,7 @@ struct AddPlantView: View {
         .background(Color.ohanaControlFill.opacity(0.68), in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
     }
 
-    private var catalogSearchResultsList: some View {
+    var catalogSearchResultsList: some View {
         VStack(spacing: 8) {
             if catalogMatches.isEmpty {
                 VStack(alignment: .leading, spacing: 4) {
@@ -810,7 +726,7 @@ struct AddPlantView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    private func catalogMatchButton(_ result: PlantCatalogSearchResult) -> some View {
+    func catalogMatchButton(_ result: PlantCatalogSearchResult) -> some View {
         let entry = result.entry
         return Button {
             applyCatalog(entry)
@@ -818,7 +734,7 @@ struct AddPlantView: View {
             HStack(spacing: 10) {
                 Image(systemName: selectedCatalogID == entry.id ? "checkmark.circle.fill" : "leaf.circle")
                     .font(OhanaFont.adaptive(size: 17, weight: .black))
-                    .foregroundStyle(selectedCatalogID == entry.id ? Color.goLime : Color.ohanaSecondaryText)
+                    .foregroundStyle(selectedCatalogID == entry.id ? Color.goPrimary : Color.ohanaSecondaryText)
                     .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 3) {
                     Text(entry.localizedCommonName)
@@ -853,7 +769,7 @@ struct AddPlantView: View {
         .accessibilityIdentifier("add-plant-catalog-result-\(entry.id)")
     }
 
-    private func catalogChip(_ title: String, foreground: Color, background: Color) -> some View {
+    func catalogChip(_ title: String, foreground: Color, background: Color) -> some View {
         Text(title)
             .font(OhanaFont.adaptive(size: 10, weight: .bold, design: .rounded))
             .foregroundStyle(foreground)
@@ -873,11 +789,11 @@ struct AddPlantView: View {
                 .tracking(0.6)
             Stepper(l.tr(zh: "盆径 \(Int(potDiameterCm)) cm", en: "Pot diameter \(Int(potDiameterCm)) cm", de: "Topfdurchmesser \(Int(potDiameterCm)) cm"), value: $potDiameterCm, in: 0 ... 80, step: 1)
                 .foregroundStyle(Color.ohanaPrimaryText)
-                .tint(Color.goLime)
+                .tint(Color.goPrimary)
             Toggle(l.tr(zh: "花盆有排水孔", en: "Pot has drainage hole", de: "Topf hat Abzugsloch"), isOn: $potHasDrainage)
                 .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .rounded))
                 .foregroundStyle(Color.ohanaPrimaryText)
-                .tint(Color.goLime)
+                .tint(Color.goPrimary)
             OhanaChoiceChipRow(
                 title: l.tr(zh: "常见盆材质", en: "Common pot materials", de: "Häufige Topfmaterialien"),
                 options: commonPotMaterialOptions,
@@ -923,11 +839,11 @@ struct AddPlantView: View {
             Toggle(l.tr(zh: "记录购入日期", en: "Record acquired date", de: "Kaufdatum erfassen"), isOn: $hasAcquiredDate)
                 .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .rounded))
                 .foregroundStyle(Color.ohanaPrimaryText)
-                .tint(Color.goLime)
+                .tint(Color.goPrimary)
             if hasAcquiredDate {
                 DatePicker(l.tr(zh: "购入日期", en: "Acquired date", de: "Kaufdatum"), selection: $acquiredDate, displayedComponents: .date)
                     .foregroundStyle(Color.ohanaPrimaryText)
-                    .tint(Color.goLime)
+                    .tint(Color.goPrimary)
             }
             OhanaChoiceChipRow(
                 title: l.tr(zh: "常见来源", en: "Common sources", de: "Häufige Quellen"),
@@ -946,25 +862,25 @@ struct AddPlantView: View {
                 .accessibilityIdentifier("add-plant-source-input")
             Stepper(l.tr(zh: "当前高度 \(Int(currentHeightCm)) cm", en: "Current height \(Int(currentHeightCm)) cm", de: "Aktuelle Höhe \(Int(currentHeightCm)) cm"), value: $currentHeightCm, in: 0 ... 300, step: 1)
                 .foregroundStyle(Color.ohanaPrimaryText)
-                .tint(Color.goLime)
+                .tint(Color.goPrimary)
             Stepper(l.tr(zh: "冠幅 \(Int(currentSpreadCm)) cm", en: "Spread \(Int(currentSpreadCm)) cm", de: "Breite \(Int(currentSpreadCm)) cm"), value: $currentSpreadCm, in: 0 ... 300, step: 1)
                 .foregroundStyle(Color.ohanaPrimaryText)
-                .tint(Color.goLime)
+                .tint(Color.goPrimary)
             Toggle(l.tr(zh: "水培", en: "Hydroponic", de: "Hydrokultur"), isOn: $isHydroponic)
                 .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .rounded))
                 .foregroundStyle(Color.ohanaPrimaryText)
-                .tint(Color.goLime)
+                .tint(Color.goPrimary)
             Toggle(l.tr(zh: "多肉/仙人掌类", en: "Succulent/cactus", de: "Sukkulente/Kaktus"), isOn: $isSucculent)
                 .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .rounded))
                 .foregroundStyle(Color.ohanaPrimaryText)
-                .tint(Color.goLime)
+                .tint(Color.goPrimary)
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
         .goTranslucentCard(cornerRadius: OhanaRadius.controlLarge)
     }
 
-    private func inlineFormField(
+    func inlineFormField(
         _ title: String,
         text: Binding<String>,
         placeholder: String,
@@ -972,35 +888,19 @@ struct AddPlantView: View {
         focusField: AddPlantFocusField,
         submitLabel: SubmitLabel
     ) -> some View {
-        VStack(alignment: .leading, spacing: 7) {
-            Text(title)
-                .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded))
-                .foregroundStyle(Color.ohanaSecondaryText)
-                .lineLimit(1)
-
-            TextField(placeholder, text: text) // ui-v4: allow existing form input; add-plant now keeps text fields off the primary path where choices exist.
-                .textFieldStyle(.plain)
-                .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .rounded))
-                .foregroundStyle(Color.ohanaPrimaryText)
-                .padding(.horizontal, 14)
-                .frame(minHeight: 48)
-                .background(Color.ohanaControlFill.opacity(0.68), in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
-                .overlay(
-                    RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous)
-                        .strokeBorder(
-                            focusedField == focusField ? Color.goTeal.opacity(0.58) : Color.ohanaCardSurface.opacity(0.18),
-                            lineWidth: focusedField == focusField ? 1.5 : 1
-                        )
-                )
-                .focused($focusedField, equals: focusField)
-                .submitLabel(submitLabel)
-                .onSubmit { focusAfterSubmit(focusField) }
-                .accessibilityIdentifier(identifier)
+        PlantCreationBufferedTextField(
+            title: title,
+            text: text,
+            placeholder: placeholder,
+            identifier: identifier,
+            focusRequestID: inlineFocusRequestID(for: focusField),
+            submitLabel: submitLabel
+        ) {
+            focusAfterSubmit(focusField)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    private func customInlineEntryButton(
+    func customInlineEntryButton(
         title: String,
         identifier: String,
         action: @escaping () -> Void
@@ -1059,7 +959,7 @@ struct AddPlantView: View {
     }
 
     @ViewBuilder
-    private var keyboardFocusSpacer: some View {
+    var keyboardFocusSpacer: some View {
         if focusedField != nil {
             Color.clear
                 .frame(height: 74)
@@ -1068,40 +968,78 @@ struct AddPlantView: View {
         }
     }
 
-    private func focusAfterSubmit(_ field: AddPlantFocusField) {
+    func inlineFocusRequestID(for field: AddPlantFocusField) -> Int {
+        inlineFocusField == field ? inlineFocusRequestID : 0
+    }
+
+    func requestInlineFocusAfterMount(_ field: AddPlantFocusField) {
+        focusedField = nil
+        OhanaFrameScheduler.runAfterNextFrame {
+            requestInlineFocus(field)
+        }
+    }
+
+    func requestInlineFocus(_ field: AddPlantFocusField) {
+        inlineFocusField = field
+        inlineFocusRequestID += 1
+    }
+
+    func focusBinding(for field: AddPlantFocusField) -> Binding<Bool> {
+        Binding(
+            get: { focusedField == field },
+            set: { isFocused in
+                if isFocused {
+                    focusedField = field
+                } else if focusedField == field {
+                    focusedField = nil
+                }
+            }
+        )
+    }
+
+    func focusAfterSubmit(_ field: AddPlantFocusField) {
         switch field {
         case .name:
-            focusedField = .room
+            if showingCustomRoomField || usesCustomRoomEntry {
+                requestInlineFocusAfterMount(.room)
+            } else if showingCustomLocationField || usesCustomLocationEntry {
+                requestInlineFocusAfterMount(.location)
+            } else {
+                GoKeyboard.dismiss()
+                focusedField = nil
+            }
         case .species:
             focusedField = .room
         case .catalogSearch:
             focusedField = nil
         case .room:
-            focusedField = .location
+            if showingCustomLocationField || usesCustomLocationEntry {
+                requestInlineFocusAfterMount(.location)
+            } else {
+                GoKeyboard.dismiss()
+                focusedField = nil
+            }
         case .location, .soil, .source:
+            GoKeyboard.dismiss()
             focusedField = nil
         case .potMaterial:
             focusedField = .soil
         }
     }
 
-    private func revealCustomRoomField() {
+    func revealCustomRoomField() {
         showingCustomRoomField = true
         focusedField = nil
-        OhanaFrameScheduler.runAfterNextFrame {
-            focusedField = .room
-        }
+        requestInlineFocusAfterMount(.room)
     }
 
-    private func revealCustomLocationField() {
+    func revealCustomLocationField() {
         showingCustomLocationField = true
         focusedField = nil
-        OhanaFrameScheduler.runAfterNextFrame {
-            focusedField = .location
-        }
+        requestInlineFocusAfterMount(.location)
     }
 
-    private func applyCatalog(_ entry: PlantCatalogEntry) {
+    func applyCatalog(_ entry: PlantCatalogEntry) {
         let previousCatalogName = selectedCatalog?.localizedCommonName ?? ""
         let shouldUseCatalogName = trimmedName.isEmpty || (!previousCatalogName.isEmpty && trimmedName == previousCatalogName)
         let defaults = PlantProfileUXPolicy.catalogDefaults(for: entry)
@@ -1122,13 +1060,26 @@ struct AddPlantView: View {
         potHasDrainage = defaults.potHasDrainage
         isHydroponic = defaults.isHydroponic
         isSucculent = defaults.isSucculent
+        isToxicToCats = entry.isToxicToCats
+        isToxicToDogs = entry.isToxicToDogs
+        isToxicToChildren = entry.isToxicToChildren
         focusedField = nil
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
     }
 
-    private func savePlant() {
-        let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmedName.isEmpty, !isSaving else { return }
+    func clearSelectedPlantCatalog() {
+        selectedCatalogID = ""
+        catalogQuery = ""
+        name = ""
+        species = ""
+        isCustomizingName = false
+        focusedField = nil
+        UISelectionFeedbackGenerator().selectionChanged()
+    }
+
+    func savePlant() {
+        let finalName = resolvedPlantName
+        guard !finalName.isEmpty, !isSaving else { return }
         if requiresDuplicateAcknowledgement {
             showDuplicateAlert = true
             return
@@ -1136,10 +1087,11 @@ struct AddPlantView: View {
         let catalog = selectedCatalog
 
         let input = PlantCreationCommandInput(
-            name: name,
+            name: finalName,
             species: species,
             location: location,
             avatarEmoji: avatarEmoji,
+            avatarImageData: avatarImageData,
             wateringIntervalDays: wateringInterval,
             fertilizingIntervalDays: fertilizingInterval,
             roomNameRaw: roomName,
@@ -1163,9 +1115,9 @@ struct AddPlantView: View {
             isSucculent: isSucculent,
             healthStatus: healthStatus,
             catalogSpeciesId: selectedCatalogID,
-            isToxicToCats: catalog?.isToxicToCats ?? false,
-            isToxicToDogs: catalog?.isToxicToDogs ?? false,
-            isToxicToChildren: catalog?.isToxicToChildren ?? false,
+            isToxicToCats: isToxicToCats,
+            isToxicToDogs: isToxicToDogs,
+            isToxicToChildren: isToxicToChildren,
             isIndoorSuitable: catalog?.isIndoorSuitable ?? true,
             remindersEnabled: remindersEnabled
         )
@@ -1174,16 +1126,22 @@ struct AddPlantView: View {
         isSaving = true
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
         commandQueue.enqueue(command) {
-            PlantCreationCommandExecutor(context: modelContext, services: appServices).createPlant(
+            let result = PlantCreationCommandExecutor(context: modelContext, services: appServices).createPlant(
                 input: input,
                 note: "plant.creation"
             )
             UINotificationFeedbackGenerator().notificationOccurred(.success)
-            onComplete()
+            onPlantSaved?(result.plantID)
+            withAnimation(GoMotion.sheetEnter) {
+                didShowSuccess = true
+            }
+            OhanaFrameScheduler.runAfterNextFrame(milliseconds: reduceMotion ? 260 : 620) {
+                onComplete()
+            }
         }
     }
 
-    private var duplicateAlertMessage: String {
+    var duplicateAlertMessage: String {
         guard let first = duplicateCandidates.first else {
             return l.tr(zh: "Ohana 没找到明显重复项，可以继续添加。", en: "Ohana did not find an obvious duplicate. You can keep adding it.", de: "Ohana hat kein offensichtliches Duplikat gefunden. Du kannst fortfahren.")
         }

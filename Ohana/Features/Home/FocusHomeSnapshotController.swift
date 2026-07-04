@@ -75,7 +75,8 @@ final class FocusHomeSnapshotController: ObservableObject {
         guard !isExpanded, walletTransitionCardId == nil else { return }
 
         let sourceCards = source ?? cards(fallback: [])
-        let targetIds = Array(sourceCards.prefix(FocusHomeCardDataSource.maxCardsPerPage)).map(\.id)
+        let targetCards = Array(sourceCards.prefix(FocusHomeCardDataSource.maxCardsPerPage))
+        let targetIds = targetCards.map(\.id)
         let targetIdSet = Set(targetIds)
         if !targetIdSet.isEmpty {
             avatarDataById = avatarDataById.filter { targetIdSet.contains($0.key) }
@@ -88,44 +89,24 @@ final class FocusHomeSnapshotController: ObservableObject {
 
             var payloads: [FocusWalletAvatarCache.Payload] = []
             var popoutPayloads: [FocusWalletAvatarCache.Payload] = []
-            for id in targetIds {
+            for card in targetCards {
                 guard !Task.isCancelled else { return }
-                let data = FocusHomeCardDataSource.avatarDataForHomeCard(id: id, pets: pets, humans: humans)
-                if let data, !data.isEmpty {
-                    if avatarDataById[id] != data {
-                        avatarDataById[id] = data
+                if let data = card.avatarImageData, !data.isEmpty {
+                    if avatarDataById[card.id] != data {
+                        avatarDataById[card.id] = data
                     }
-                    payloads.append(FocusWalletAvatarCache.Payload(id: id, data: data))
-                } else {
-                    avatarDataById.removeValue(forKey: id)
-                    payloads.append(FocusWalletAvatarCache.Payload(id: id, data: nil))
+                    payloads.append(FocusWalletAvatarCache.Payload(id: card.id, data: data))
                 }
 
-                let popout = FocusHomeCardDataSource.popoutDataForHomeCard(
-                    id: id,
-                    pets: pets,
-                    equipFxPopoutCard: equipFxPopoutCard
-                )
-                if let popout, !popout.isEmpty {
-                    popoutDataById[id] = popout
-                    popoutPayloads.append(FocusWalletAvatarCache.Payload(id: id, data: popout))
-                } else {
-                    popoutDataById.removeValue(forKey: id)
-                    popoutPayloads.append(FocusWalletAvatarCache.Payload(id: id, data: nil))
+                if equipFxPopoutCard,
+                   let popout = card.cardPopoutImageData,
+                   !popout.isEmpty {
+                    popoutDataById[card.id] = popout
+                    popoutPayloads.append(FocusWalletAvatarCache.Payload(id: card.id, data: popout))
                 }
                 await Task.yield()
             }
-
-            if payloads.isEmpty {
-                payloads = targetIds.compactMap { id in
-                    guard let data = avatarDataById[id] ?? FocusHomeCardDataSource.avatarDataForHomeCard(
-                        id: id,
-                        pets: pets,
-                        humans: humans
-                    ) else { return nil }
-                    return FocusWalletAvatarCache.Payload(id: id, data: data)
-                }
-            }
+            guard !payloads.isEmpty || !popoutPayloads.isEmpty else { return }
 
             let avatarDidRefresh = await FocusWalletAvatarCache.preload(payloads: payloads)
             guard !Task.isCancelled else { return }

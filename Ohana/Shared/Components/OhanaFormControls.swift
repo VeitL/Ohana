@@ -180,7 +180,7 @@ struct OhanaChoiceChipRow: View {
                 .padding(.horizontal, 12)
                 .frame(minHeight: 44)
                 .background(
-                    isSelected ? Color.goLime : Color.ohanaControlFill.opacity(0.62),
+                    isSelected ? Color.goPrimary : Color.ohanaControlFill.opacity(0.62),
                     in: Capsule()
                 )
                 .overlay(

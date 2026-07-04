@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import SwiftData
 import SwiftUI
 
 extension FocusCard {
@@ -13,7 +14,7 @@ extension FocusCard {
         _ plant: Plant,
         catalog: PlantCatalogEntry? = nil,
         nextTask: PlantCareTaskSnapshot? = nil,
-        includeAvatarData: Bool = true,
+        includeAvatarData: Bool = false,
         localization l: L10n = L10n.current
     ) -> FocusCard {
         let safeName = plant.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
@@ -27,8 +28,9 @@ extension FocusCard {
         let status = needsCare
             ? l.tr(zh: "待照护", en: "Needs care", de: "Braucht Pflege")
             : plant.healthStatus.displayName
-        let avatarData = includeAvatarData ? plant.avatarImageData : nil
         let assetName = catalog?.catalogImageAssetName ?? PlantCatalogMedia.localFoliage.assetName
+        let hasAvatarAttachment = plant.hasAvatarImageAttachment
+        let avatarData = includeAvatarData && hasAvatarAttachment ? plant.avatarImageData : nil
         let theme = plant.themeColorHex.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             ? "2ED3B7"
             : plant.themeColorHex
@@ -42,6 +44,7 @@ extension FocusCard {
 
         return FocusCard(
             id: plant.id,
+            modelID: plant.persistentModelID,
             name: safeName,
             kind: safeSpecies,
             emoji: plant.avatarEmoji.isEmpty ? "leaf.fill" : plant.avatarEmoji,
@@ -54,8 +57,8 @@ extension FocusCard {
             ageText: status,
             personalityHint: plant.location.isEmpty ? plant.roomName : plant.location,
             avatarImageData: avatarData,
-            avatarImageSignature: avatarData.map(FocusWalletAvatarCache.signature(for:)) ?? "asset:\(assetName)",
-            avatarImageAssetName: avatarData == nil ? assetName : nil,
+            avatarImageSignature: hasAvatarAttachment ? plant.avatarThumbnailSignature : "asset:\(assetName)",
+            avatarImageAssetName: hasAvatarAttachment ? nil : assetName,
             cardStyleRaw: "classic",
             petSpecies: safeSpecies,
             themeColorHex: theme,

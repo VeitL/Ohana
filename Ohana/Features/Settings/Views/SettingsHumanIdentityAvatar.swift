@@ -35,7 +35,7 @@ struct SettingsHumanIdentityAvatar: View {
     }
 
     var avatarSignature: String {
-        human.avatarImageData.map(FocusWalletAvatarCache.signature(for:)) ?? ""
+        human.avatarThumbnailSignature
     }
 
     @MainActor
@@ -49,7 +49,7 @@ struct SettingsHumanIdentityAvatar: View {
             return
         }
         await FocusWalletAvatarCache.preload(payloads: [
-            FocusWalletAvatarCache.Payload(id: human.id, data: human.avatarImageData)
+            FocusWalletAvatarCache.Payload(id: human.id, data: human.hasAvatarImageAttachment ? human.avatarImageData : nil)
         ])
         guard !Task.isCancelled else { return }
         avatarImage = FocusWalletAvatarCache.cachedEntry(for: human.id, signature: avatarSignature)?.image

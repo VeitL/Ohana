@@ -363,7 +363,7 @@ enum GrowthUnlockPolicy {
             stageID(for: group)
         case let .featureAggregate(feature):
             stageID(for: feature)
-        case .petFood, .petPotty, .petBasicInfo, .calendar,
+        case .petFood, .petPotty, .petBasicInfo,
              .petHealth, .petHygiene, .petWeight, .humanWeight,
              .humanWorkout, .humanMedication, .humanNote,
              .petMedications, .petWalks, .petDocuments, .petInsurance,
@@ -377,7 +377,7 @@ enum GrowthUnlockPolicy {
             .advancedInsights
         case .wealthDashboard:
             .oasisPlants
-        case .plantsDashboard, .plantsList, .plantsPhotos, .plantsCalendar, .plantDetail, .plantCalendar:
+        case .plantsDashboard, .plantsList, .plantsPhotos, .plantDetail:
             .household
         case .familyWeeklyReport, .coconutShop:
             .rewards

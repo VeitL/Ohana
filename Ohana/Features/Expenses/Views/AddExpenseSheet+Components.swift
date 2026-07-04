@@ -173,7 +173,7 @@ extension AddExpenseSheetContent {
     @ViewBuilder
     func petAvatar(size: CGFloat) -> some View {
         PetAvatarPortraitView(
-            imageData: pet.avatarImageData,
+            pet: pet,
             fallbackText: pet.avatarEmoji.isEmpty ? String(pet.name.prefix(1)) : pet.avatarEmoji,
             themeColor: petThemeColor,
             size: size,

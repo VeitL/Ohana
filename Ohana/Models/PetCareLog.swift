@@ -9,7 +9,7 @@ import Foundation
 import SwiftData
 
 // MARK: - Care Type
-enum CareType: String, CaseIterable, Codable {
+nonisolated enum CareType: String, CaseIterable, Codable {
     // 基础
     case feeding = "喂食"
     case watering = "喂水"

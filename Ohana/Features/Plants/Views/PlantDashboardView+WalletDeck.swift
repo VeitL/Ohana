@@ -5,6 +5,7 @@
 //  Wallet-card deck and expanded-card interactions for Plants mode.
 //
 
+import SwiftData
 import SwiftUI
 
 extension PlantDashboardView {
@@ -54,6 +55,9 @@ extension PlantDashboardView {
                 freezesInactiveCollapsedGeometryDuringHero: true,
                 collapsedTopInset: 0,
                 collapsedVerticalBias: FocusHomeVerticalSolidCollapsedLayoutPolicy.bottomExtendedVerticalBias,
+                collapsedLayoutMode: .scrollExtended,
+                expandedVerticalPlacement: .sceneCenter,
+                avatarCacheRevision: plantAvatarCacheRevision,
                 quickActions: { card in
                     plantEmbeddedQuickActions(for: card)
                 },
@@ -76,12 +80,8 @@ extension PlantDashboardView {
     }
 
     func plantWalletCardSections(from cards: [FocusCard]) -> [PlantDashboardWalletCardSection] {
-        let sectionSize = PlantDashboardWalletSectionPolicy.maxCardsPerSection
-        guard !cards.isEmpty, sectionSize > 0 else { return [] }
-        return stride(from: 0, to: cards.count, by: sectionSize).enumerated().map { ordinal, start in
-            let end = min(start + sectionSize, cards.count)
-            return PlantDashboardWalletCardSection(ordinal: ordinal, cards: Array(cards[start ..< end]))
-        }
+        guard !cards.isEmpty else { return [] }
+        return [PlantDashboardWalletCardSection(ordinal: 0, cards: cards)]
     }
 
     func plantWalletCardsSignature(_ cards: [FocusCard]) -> String {
@@ -341,6 +341,59 @@ extension PlantDashboardView {
         reduceMotion ? HeroAnim.walletReduced : GoMotion.zStackHero
     }
 
+    var plantAvatarPreloadSignature: String {
+        visiblePlants.map { plant in
+            [
+                plant.id.uuidString,
+                String(describing: plant.persistentModelID),
+                plant.avatarThumbnailSignature
+            ].joined(separator: ":")
+        }.joined(separator: "|")
+    }
+
+    func scheduleVisiblePlantAvatarPreload() {
+        plantAvatarPreloadTask?.cancel()
+        let requests = visiblePlants.compactMap { plant -> PlantDashboardAvatarPreloadRequest? in
+            guard plant.hasAvatarImageAttachment,
+                  !plant.avatarThumbnailSignature.isEmpty,
+                  FocusWalletAvatarCache.cachedEntry(for: plant.id, signature: plant.avatarThumbnailSignature) == nil
+            else { return nil }
+            return PlantDashboardAvatarPreloadRequest(
+                id: plant.id,
+                modelID: plant.persistentModelID,
+                signature: plant.avatarThumbnailSignature
+            )
+        }
+        guard !requests.isEmpty else { return }
+
+        let loader = SwiftDataMediaBlobLoader(modelContainer: modelContext.container)
+        plantAvatarPreloadTask = Task { @MainActor in
+            await OhanaFrameScheduler.waitAfterNextFrame()
+            guard !Task.isCancelled else { return }
+
+            var payloads: [FocusWalletAvatarCache.Payload] = []
+            payloads.reserveCapacity(requests.count)
+            for request in requests {
+                guard !Task.isCancelled else { return }
+                guard FocusWalletAvatarCache.cachedEntry(for: request.id, signature: request.signature) == nil,
+                      let data = await loader.plantAvatarImageData(modelID: request.modelID),
+                      !data.isEmpty
+                else {
+                    await Task.yield()
+                    continue
+                }
+                payloads.append(FocusWalletAvatarCache.Payload(id: request.id, data: data))
+                await Task.yield()
+            }
+
+            guard !Task.isCancelled, !payloads.isEmpty else { return }
+            let didRefresh = await FocusWalletAvatarCache.preload(payloads: payloads)
+            guard !Task.isCancelled, didRefresh else { return }
+            plantAvatarCacheRevision &+= 1
+            preparePlantHeroSnapshots(for: plantWalletCards)
+        }
+    }
+
     func plantListRow(_ plant: Plant) -> some View {
         let nextTask = appServices.plantCarePlans.nextTask(for: plant)
         let isExpanded = expandedPlantCardID == plant.id
@@ -358,7 +411,7 @@ extension PlantDashboardView {
                 expandedId: expandedPlantCardID,
                 isHeroExpanded: isExpanded,
                 heroProgress: isExpanded ? 1 : 0,
-                avatarCacheRevision: 0,
+                avatarCacheRevision: plantAvatarCacheRevision,
                 walkTrackingPet: nil,
                 usesMatchedGeometry: false,
                 reduceMotion: false,
@@ -435,7 +488,7 @@ extension PlantDashboardView {
                     id: "fertilize",
                     icon: "leaf.fill",
                     title: l.tr(zh: "施肥", en: "Fertilize", de: "Düngen"),
-                    tint: Color.goLime
+                    tint: Color.goPrimary
                 ) {
                     openCareLogSheet(for: plant, type: .fertilizing)
                 }
@@ -549,13 +602,13 @@ extension PlantDashboardView {
             plantListBadge(
                 icon: "info.circle.fill",
                 text: "\(plantCareScore(for: plant))%",
-                tint: plant.healthStatus == .stressed ? Color.goRed : Color.goLime
+                tint: plant.healthStatus == .stressed ? Color.goRed : Color.goPrimary
             )
 
             plantListBadge(
                 icon: "checkmark.seal.fill",
                 text: "\(profilePercent)%",
-                tint: profilePercent >= 80 ? Color.goLime : Color.goYellow
+                tint: profilePercent >= 80 ? Color.goPrimary : Color.goYellow
             )
         }
         .lineLimit(1)

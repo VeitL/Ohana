@@ -15,8 +15,10 @@ struct FamilyWeeklyReportDashboardContentView: View {
     let photoMemories: [FamilyWeeklyPhotoMemory]
     let healthAlertSources: [PetHealthAlertSource]
 
+    @Environment(\.modelContext) private var modelContext
     @Environment(AppServices.self) private var appServices
     @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
+    @State private var preparedShareText: String?
 
     private var l: L10n { L10n(appLanguage) }
 
@@ -167,6 +169,19 @@ struct FamilyWeeklyReportDashboardContentView: View {
         return "Ohana 本周家庭周报\n\(storyHeadline)\n\(storyBody)\n总照护 \(allEntries.count) 次\n\(leaderLabel)：\(leader)\n最受关注：\(petLine)"
     }
 
+    private var sharePreparationSignature: String {
+        [
+            "\(weekInterval.start.timeIntervalSince1970)",
+            "\(weekInterval.end.timeIntervalSince1970)",
+            "\(allEntries.count)",
+            rankedMembers.first.map { "\($0.id):\($0.count):\($0.coconuts)" } ?? "none",
+            topPet.map { "\($0.name):\($0.count)" } ?? "none",
+            healthAlerts.first.map { "\($0.title):\($0.severity.rawValue)" } ?? "none",
+            "\(weekPhotoMemories.count)",
+            appLanguage
+        ].joined(separator: "|")
+    }
+
     var body: some View {
         ZStack {
             OhanaAppBackground()
@@ -186,7 +201,27 @@ struct FamilyWeeklyReportDashboardContentView: View {
         }
         .navigationTitle("家庭周报")
         .navigationBarTitleDisplayMode(.inline)
+        .task(id: sharePreparationSignature) {
+            await prepareShareText()
+        }
         .accessibilityIdentifier("family-weekly-report-screen")
+    }
+
+    @MainActor
+    private func prepareShareText() async {
+        preparedShareText = nil
+        await OhanaFrameScheduler.waitAfterNextFrame(milliseconds: 24)
+        guard !Task.isCancelled else { return }
+        preparedShareText = shareText
+    }
+
+    private var shareButtonLabel: some View {
+        Label("分享", systemImage: "square.and.arrow.up")
+            .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+            .foregroundStyle(Color.arkInk)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(Color.goPrimary, in: Capsule())
     }
 
     private var headerCard: some View {
@@ -200,13 +235,16 @@ struct FamilyWeeklyReportDashboardContentView: View {
                         .foregroundStyle(Color.ohanaSecondaryText)
                 }
                 Spacer()
-                ShareLink(item: shareText) {
-                    Label("分享", systemImage: "square.and.arrow.up")
-                        .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                        .foregroundStyle(Color.arkInk)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 8)
-                        .background(Color.goPrimary, in: Capsule())
+                if let preparedShareText {
+                    ShareLink(item: preparedShareText) { // smoothness: allow prepared export payload built after visual handoff
+                        shareButtonLabel
+                    }
+                } else {
+                    Button {} label: {
+                        shareButtonLabel
+                    }
+                    .disabled(true)
+                    .accessibilityLabel("周报分享内容准备中")
                 }
             }
 
@@ -300,7 +338,14 @@ struct FamilyWeeklyReportDashboardContentView: View {
             sectionHeader("成长回忆与健康提醒", icon: "heart.text.square.fill")
             if let memory = weekPhotoMemories.first {
                 HStack(spacing: 12) {
-                    AsyncDecodedImageView(data: memory.imageData) { image in
+                    AsyncDecodedImageView(
+                        cacheID: "family-weekly-photo-memory-\(memory.id.uuidString)",
+                        sourceSignature: memory.imageSignature,
+                        maxPixel: 160,
+                        asyncDataProvider: {
+                            await imageData(for: memory)
+                        }
+                    ) { image in
                         Image(uiImage: image)
                             .resizable()
                             .scaledToFill()
@@ -342,6 +387,14 @@ struct FamilyWeeklyReportDashboardContentView: View {
         .padding(16)
         .goTranslucentCard(cornerRadius: OhanaRadius.cardSoft)
         .accessibilityIdentifier("family-weekly-report-memory-health-card")
+    }
+
+    private func imageData(for memory: FamilyWeeklyPhotoMemory) async -> Data? {
+        guard memory.canAttemptImageAttachmentLoad else {
+            return nil
+        }
+        let loader = SwiftDataMediaBlobLoader(modelContainer: modelContext.container)
+        return await loader.petPhotoLogImageData(modelID: memory.modelID)
     }
 
     private var petCoverageCard: some View {
@@ -556,8 +609,10 @@ private struct WeightSample {
 
 struct FamilyWeeklyPhotoMemory: Identifiable, Equatable {
     let id: UUID
+    let modelID: PersistentIdentifier
     let petName: String
-    let imageData: Data
+    let imageSignature: String
+    let canAttemptImageAttachmentLoad: Bool
     let note: String
     let date: Date
 }

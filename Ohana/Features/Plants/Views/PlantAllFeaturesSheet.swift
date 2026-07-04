@@ -5,6 +5,7 @@
 //  Feature hub for plant detail pages.
 //
 
+import SwiftData
 import SwiftUI
 
 enum PlantFeatureDestination: Hashable {
@@ -13,7 +14,6 @@ enum PlantFeatureDestination: Hashable {
     case pestCheck
     case leafCleaning
     case carePlan
-    case calendar
     case reminders
     case healthReview
     case profile
@@ -102,7 +102,9 @@ struct PlantAllFeaturesSheet: View {
                     onClose: { dismiss() },
                     avatar: {
                         FeatureHubAvatar(
-                            imageData: plant.avatarImageData,
+                            imageCacheID: "plant-all-features-\(plant.id.uuidString)",
+                            imageSignature: plant.avatarThumbnailSignature,
+                            plantModelID: plant.persistentModelID,
                             emoji: plant.avatarEmoji,
                             fallback: "leaf",
                             tint: themeColor
@@ -240,7 +242,7 @@ struct PlantAllFeaturesSheet: View {
                 de: "Die Pflanze wirkt stabil. Der Pflegeplan zeigt den nächsten Schritt."
             ),
             icon: "slider.horizontal.3",
-            tint: Color.goLime,
+            tint: Color.goPrimary,
             destination: .carePlan
         )
     }
@@ -361,7 +363,7 @@ struct PlantAllFeaturesSheet: View {
                 value: dueValue(for: .fertilizing),
                 subtitle: dueSubtitle(for: .fertilizing),
                 icon: "leaf.fill",
-                tint: Color.goLime,
+                tint: Color.goPrimary,
                 destination: .fertilize
             ),
             item(
@@ -395,19 +397,8 @@ struct PlantAllFeaturesSheet: View {
                 value: nextTask.map(dueText) ?? l.tr(zh: "无计划", en: "None", de: "Kein"),
                 subtitle: nextTask?.title ?? l.tr(zh: "查看计划依据", en: "Review plan reasoning", de: "Planlogik ansehen"),
                 icon: "slider.horizontal.3",
-                tint: Color.goLime,
+                tint: Color.goPrimary,
                 destination: .carePlan
-            ),
-            item(
-                id: "calendar",
-                title: l.tr(zh: "护理日历", en: "Care calendar", de: "Pflegekalender"),
-                value: dueTaskCount == 0 ? "7d" : "\(dueTaskCount)",
-                subtitle: plant.remindersEnabled
-                    ? l.tr(zh: "计划会同步到日历和本地提醒", en: "Plans sync to Calendar and local alerts", de: "Pläne werden mit Kalender und lokalen Hinweisen synchronisiert")
-                    : l.tr(zh: "开启提醒后恢复日历计划", en: "Turn reminders on to restore calendar plans", de: "Aktiviere Hinweise, um Kalenderpläne wiederherzustellen"),
-                icon: "calendar.badge.clock",
-                tint: plant.remindersEnabled ? Color.goLime : Color.goYellow,
-                destination: .calendar
             ),
             item(
                 id: "reminders",
@@ -563,7 +554,7 @@ struct PlantAllFeaturesSheet: View {
         case .watering, .misting:
             Color.goTeal
         case .fertilizing, .newLeaf:
-            Color.goLime
+            Color.goPrimary
         case .pestCheck, .pestFound, .yellowLeaf:
             Color.goYellow
         default:

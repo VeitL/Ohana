@@ -34,12 +34,12 @@ private struct OhanaIconView: View {
                 .frame(width: size, height: size)
 
             HeartbeatPath()
-                .stroke(Color.goLime, style: StrokeStyle(lineWidth: size * 0.063,
+                .stroke(Color.goPrimary, style: StrokeStyle(lineWidth: size * 0.063,
                                                          lineCap: .round, lineJoin: .round))
                 .frame(width: size * 0.531, height: size * 0.25)
 
             Circle()
-                .fill(Color.goLime)
+                .fill(Color.goPrimary)
                 .frame(width: size * 0.094, height: size * 0.094)
         }
     }
@@ -371,7 +371,7 @@ struct OnboardingView: View {
                     .foregroundStyle(OnboardingPalette.selectedText)
                     .frame(maxWidth: .infinity)
                     .frame(height: 54)
-                    .background(Color.goLime, in: Capsule())
+                    .background(Color.goPrimary, in: Capsule())
                 }
                 .buttonStyle(ScaleButtonStyle())
                 .accessibilityIdentifier("onboarding-intro-primary-action")
@@ -430,7 +430,7 @@ struct OnboardingView: View {
                 title: localized(zh: "游戏化成长", en: "Playful growth", de: "Spielerisches Wachstum"),
                 subtitle: localized(zh: "照顾会获得椰子，推动生命之树和 Oasis 成长。", en: "Care earns coconuts and grows the Life Tree and Oasis.", de: "Pflege bringt Kokosnüsse und lässt Lebensbaum und Oase wachsen."),
                 heroIcon: "tree.fill",
-                tint: Color.goLime,
+                tint: Color.goPrimary,
                 badges: [
                     (icon: "bolt.fill", title: localized(zh: "椰子", en: "Coconuts", de: "Kokos")),
                     (icon: "arrow.up.forward.circle.fill", title: localized(zh: "等级", en: "Levels", de: "Level")),
@@ -471,7 +471,7 @@ struct OnboardingView: View {
             VStack(spacing: 8) {
                 Image(systemName: "leaf.circle.fill") // a11y: allow decorative onboarding glyph; heading names the page.
                     .font(OhanaFont.adaptive(size: 64, weight: .black))
-                    .foregroundStyle(Color.goLime)
+                    .foregroundStyle(Color.goPrimary)
                     .accessibilityHidden(true)
                 Text(localized(zh: "植物照护偏好", en: "Plant care preferences", de: "Pflanzenpflege"))
                     .font(OhanaFont.title2(.black))
@@ -497,13 +497,13 @@ struct OnboardingView: View {
                     .background(OnboardingPalette.mutedFill, in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
 
                 Toggle(localized(zh: "愿意接收护理通知", en: "Allow care reminders", de: "Pflege-Erinnerungen erlauben"), isOn: $onboardingNotificationsIntent)
-                    .tint(Color.goLime)
+                    .tint(Color.goPrimary)
                 Toggle(localized(zh: "家里有宠物", en: "Pets at home", de: "Tiere zu Hause"), isOn: $onboardingHasPets)
-                    .tint(Color.goLime)
+                    .tint(Color.goPrimary)
                 Toggle(localized(zh: "家里有小孩", en: "Children at home", de: "Kinder zu Hause"), isOn: $onboardingHasChildren)
-                    .tint(Color.goLime)
+                    .tint(Color.goPrimary)
                 Toggle(localized(zh: "家里有植物", en: "Plants at home", de: "Pflanzen zu Hause"), isOn: $onboardingHasPlants)
-                    .tint(Color.goLime)
+                    .tint(Color.goPrimary)
 
                 Picker(localized(zh: "植物经验", en: "Plant experience", de: "Pflanzenerfahrung"), selection: $onboardingPlantExperience) {
                     Text(localized(zh: "新手", en: "Beginner", de: "Anfänger")).tag(PlantExperienceLevel.beginner.rawValue)
@@ -656,7 +656,7 @@ struct OnboardingView: View {
         HStack(spacing: 7) {
             ForEach(0 ..< introPageCount, id: \.self) { index in
                 Capsule()
-                    .fill(index == introPageIndex ? Color.goLime : OnboardingPalette.mutedFill)
+                    .fill(index == introPageIndex ? Color.goPrimary : OnboardingPalette.mutedFill)
                     .frame(width: index == introPageIndex ? 24 : 7, height: 7)
                     .animation(GoMotion.feedback, value: introPageIndex)
             }

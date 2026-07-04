@@ -220,7 +220,7 @@ struct ProtectionPetAvatar: View {
 
     var body: some View {
         PetAvatarPortraitView(
-            imageData: pet.avatarImageData,
+            pet: pet,
             fallbackText: pet.avatarEmoji.isEmpty ? pet.speciesEmoji : pet.avatarEmoji,
             themeColor: Color(hex: pet.safeThemeColorHex),
             size: size,
@@ -236,7 +236,6 @@ struct DocumentDetailRow: View {
     let onDelete: () -> Void
 
     @State private var showingPreview = false
-    @State private var decodedPreview: UIImage?
 
     private var expiryColor: Color {
         if doc.isExpired { return Color.goRed }
@@ -275,10 +274,24 @@ struct DocumentDetailRow: View {
 
                 Spacer()
 
-                if let preview = decodedPreview {
-                    Image(uiImage: preview)
-                        .resizable()
-                        .scaledToFill()
+                if let previewSource {
+                    AsyncDecodedImageView(
+                        cacheID: previewSource.cacheID,
+                        sourceSignature: previewSource.sourceSignature,
+                        maxPixel: 160,
+                        dataProvider: {
+                            previewSource.dataProvider()
+                        }
+                    ) { image in
+                        Image(uiImage: image)
+                            .resizable()
+                            .scaledToFill()
+                    } placeholder: {
+                        Image(systemName: "photo.fill") // a11y: allow decorative thumbnail placeholder; row title names the document.
+                            .font(OhanaFont.adaptive(size: 17, weight: .black))
+                            .foregroundStyle(Color.ohanaSecondaryText)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    }
                         .frame(width: 42, height: 42) // a11y: allow decorative non-interactive frame; hit area handled by parent
                         .clipShape(RoundedRectangle(cornerRadius: OhanaRadius.chip, style: .continuous))
                         .onTapGesture { showingPreview = true }
@@ -295,9 +308,6 @@ struct DocumentDetailRow: View {
             .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous))
         }
         .buttonStyle(ScaleButtonStyle())
-        .task(id: previewDataKey) {
-            await decodePreview()
-        }
         .contextMenu {
             Button { onDetail() } label: {
                 Label("查看详情", systemImage: "doc.text.magnifyingglass")
@@ -310,12 +320,24 @@ struct DocumentDetailRow: View {
             }
         }
         .fullScreenCover(isPresented: $showingPreview) {
-            if let preview = decodedPreview {
+            if let previewSource {
                 ZStack {
                     Color.arkInk.ignoresSafeArea()
-                    Image(uiImage: preview)
-                        .resizable()
-                        .scaledToFit()
+                    AsyncDecodedImageView(
+                        cacheID: "\(previewSource.cacheID)-preview",
+                        sourceSignature: previewSource.sourceSignature,
+                        maxPixel: 2200,
+                        dataProvider: {
+                            previewSource.dataProvider()
+                        }
+                    ) { image in
+                        Image(uiImage: image)
+                            .resizable()
+                            .scaledToFit()
+                    } placeholder: {
+                        ProgressView()
+                            .tint(Color.ohanaPrimaryActionText)
+                    }
                         .ignoresSafeArea()
                     VStack {
                         HStack {
@@ -336,24 +358,30 @@ struct DocumentDetailRow: View {
         }
     }
 
-    private var previewData: Data? {
-        if let data = doc.attachmentData { return data }
-        return doc.attachments.first(where: { $0.isImage })?.data
-    }
-
-    private var previewDataKey: String {
-        guard let previewData else { return "none" }
-        return "\(previewData.count)-\(previewData.hashValue)"
-    }
-
-    @MainActor
-    private func decodePreview() async {
-        guard let previewData else {
-            decodedPreview = nil
-            return
+    private var previewSource: ProtectionDocumentPreviewSource? {
+        if let attachment = doc.attachments.first(where: { $0.isImage && $0.canAttemptDataAttachmentLoad }) {
+            return ProtectionDocumentPreviewSource(
+                cacheID: "protection-document-\(attachment.id.uuidString)",
+                sourceSignature: attachment.dataThumbnailSignature,
+                dataProvider: { attachment.canAttemptDataAttachmentLoad ? attachment.data : nil }
+            )
         }
-        decodedPreview = await AttachmentImageDecoder.decode(previewData)
+        guard doc.shouldDisplayLegacyAttachmentSlot,
+              doc.attachmentFilename.isEmpty || AttachmentPrivacySanitizer.isImageFilename(doc.attachmentFilename) else {
+            return nil
+        }
+        return ProtectionDocumentPreviewSource(
+            cacheID: "protection-document-legacy-\(doc.id.uuidString)",
+            sourceSignature: doc.legacyAttachmentThumbnailSignature,
+            dataProvider: { doc.canAttemptLegacyAttachmentLoad ? doc.attachmentData : nil }
+        )
     }
+}
+
+private struct ProtectionDocumentPreviewSource {
+    let cacheID: String
+    let sourceSignature: String
+    let dataProvider: @MainActor () -> Data?
 }
 
 struct ProtectionInsuranceRow: View {

@@ -190,16 +190,16 @@ extension PetBasicInfoDetailView {
                     .font(OhanaFont.adaptive(size: 15, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Spacer()
-                ShareLink(item: vetVisitSummaryText) {
-                    HStack(spacing: 5) {
-                        Image(systemName: "square.and.arrow.up") // a11y: allow decorative icon covered by surrounding text or control
-                        Text("给兽医")
+                if let preparedVetVisitSummaryText {
+                    ShareLink(item: preparedVetVisitSummaryText) { // smoothness: allow prepared export payload built after visual handoff
+                        vetVisitSummaryShareLabel
                     }
-                    .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                    .foregroundStyle(Color.arkInk)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 7)
-                    .background(Color.goPrimary, in: Capsule())
+                } else {
+                    Button {} label: {
+                        vetVisitSummaryShareLabel
+                    }
+                    .disabled(true)
+                    .accessibilityLabel("就诊摘要准备中")
                 }
             }
 
@@ -214,6 +214,18 @@ extension PetBasicInfoDetailView {
         }
         .padding(16)
         .goTranslucentCard(cornerRadius: OhanaRadius.input)
+    }
+
+    var vetVisitSummaryShareLabel: some View {
+        HStack(spacing: 5) {
+            Image(systemName: "square.and.arrow.up") // a11y: allow decorative icon covered by surrounding text or control
+            Text("给兽医")
+        }
+        .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+        .foregroundStyle(Color.arkInk)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 7)
+        .background(Color.goPrimary, in: Capsule())
     }
 
     func compactSummaryRow(_ label: String, _ value: String) -> some View {
@@ -248,6 +260,31 @@ extension PetBasicInfoDetailView {
 
     var recentWeightSummaryText: String {
         healthSummary.recentWeightSummaryText
+    }
+
+    var vetVisitSummaryPreparationSignature: String {
+        [
+            pet.id.uuidString,
+            pet.name,
+            pet.species,
+            pet.breed,
+            pet.ageText,
+            pet.allergies,
+            pet.microchipID,
+            vaccineSummaryText,
+            activeMedicationSummaryText,
+            recentSymptomSummaryText,
+            insuranceSummaryText,
+            recentWeightSummaryText
+        ].joined(separator: "|")
+    }
+
+    @MainActor
+    func prepareVetVisitSummaryText() async {
+        preparedVetVisitSummaryText = nil
+        await OhanaFrameScheduler.waitAfterNextFrame(milliseconds: 24)
+        guard !Task.isCancelled else { return }
+        preparedVetVisitSummaryText = vetVisitSummaryText
     }
 
     var vetVisitSummaryText: String {

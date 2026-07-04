@@ -457,7 +457,7 @@ extension WalkTrackingCard {
 
     func petAvatar(pet: Pet, size: CGFloat) -> some View {
         PetAvatarPortraitView(
-            imageData: pet.avatarImageData,
+            pet: pet,
             fallbackText: pet.speciesEmoji,
             themeColor: Color(hex: pet.safeThemeColorHex),
             size: size,

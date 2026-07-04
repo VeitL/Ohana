@@ -81,7 +81,7 @@ struct PlantLockedPreviewCard: View {
             Image(systemName: "leaf.fill") // a11y: allow decorative locked-preview glyph; card title owns the label.
                 .accessibilityHidden(true)
                 .font(OhanaFont.adaptive(size: 16, weight: .black))
-                .foregroundStyle(Color.goLime)
+                .foregroundStyle(Color.goPrimary)
                 .frame(width: 42, height: 42) // a11y: allow decorative non-interactive frame; parent card text carries meaning.
                 .background(Color.ohanaControlFill, in: Circle())
 
@@ -137,7 +137,7 @@ struct PlantLockedPreviewCard: View {
             Image(systemName: icon)
                 .accessibilityHidden(true)
                 .font(OhanaFont.adaptive(size: 11, weight: .black))
-                .foregroundStyle(Color.goLime)
+                .foregroundStyle(Color.goPrimary)
                 .frame(width: 20, height: 20) // a11y: allow decorative non-interactive checklist glyph; row text carries meaning.
             Text(text)
                 .font(OhanaFont.caption2(.semibold))
@@ -166,7 +166,7 @@ private struct PlantLockedPreviewCatalogRow: View {
             Image(systemName: entry.isIndoorSuitable ? "house.fill" : "sun.max.fill") // a11y: allow decorative catalog glyph; row text carries meaning.
                 .accessibilityHidden(true)
                 .font(OhanaFont.adaptive(size: 12, weight: .black))
-                .foregroundStyle(Color.goLime)
+                .foregroundStyle(Color.goPrimary)
                 .frame(width: 30, height: 30) // a11y: allow decorative non-interactive frame; bookmark is the only row control.
                 .background(Color.ohanaControlFill, in: Circle())
 

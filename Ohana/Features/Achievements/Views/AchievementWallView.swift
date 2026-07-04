@@ -207,7 +207,7 @@ struct AchievementWallContentView: View {
 
     var humanAvatarSourceKey: String {
         let key = humans
-            .map { "\($0.id.uuidString):\($0.avatarImageData?.count ?? 0)" }
+            .map { "\($0.id.uuidString):\($0.avatarThumbnailSignature)" }
             .joined(separator: "|")
         return key.isEmpty ? "achievement-wall-human-avatar-empty" : key
     }

@@ -1,6 +1,6 @@
 {
   "schema": "ohana.governance.cache-ownership.v1",
-  "updated": "2026-06-10",
+  "updated": "2026-07-04",
   "policyDocuments": [
     "AGENTS.md",
     "docs/data-cache-sync-policy.md",
@@ -51,15 +51,17 @@
       ]
     },
     {
-      "id": "pet-avatar-transparency-cache",
-      "owner": "Shared avatar component owner",
+      "id": "media-thumbnail-provider",
+      "owner": "Shared media owner",
       "scope": "process",
-      "sourceOfTruth": "Pet avatar image bytes; cached value is only a derived transparent-PNG boolean keyed by payload size and edge bytes.",
-      "invalidation": "Avatar payload signature changes create a new key; UIApplication memory warnings clear the NSCache through MemoryWarningEvictionRegistry.",
-      "expiry": "Process lifetime or memory pressure; values are cheap to rederive.",
-      "recovery": "Recompute transparency lazily the next time the avatar renders.",
+      "sourceOfTruth": "User-imported media bytes resolved by visible routes and keyed by a stable item id, source payload signature, and requested max pixel size.",
+      "invalidation": "Source payload signature changes create a new thumbnail key; UIApplication memory warnings cancel in-flight decode tasks and clear decoded UIImage and transparency-flag entries through MemoryWarningEvictionRegistry.",
+      "expiry": "Decoded thumbnail and transparency entries live only while process memory pressure allows; routes recover by showing placeholders and lazily requesting thumbnails for visible media.",
+      "recovery": "Render lightweight placeholders, then rebuild downsampled thumbnails and derived transparency flags through MediaThumbnailProvider when tiles appear.",
       "paths": [
-        "Ohana/Shared/Components/PetAvatarPortraitView.swift"
+        "Ohana/Shared/Media/MediaThumbnailProvider.swift",
+        "Ohana/Shared/Media/AttachmentImageDecoder.swift",
+        "OhanaTests/DecodedImageCacheMemoryWarningTests.swift"
       ]
     },
     {

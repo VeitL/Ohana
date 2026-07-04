@@ -2936,17 +2936,36 @@ struct HomeCommandExecutorTests {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
         let plant = Plant(name: "Fern")
+        let plantID = plant.id
+        let plantEvent = Event(
+            title: "Water Fern",
+            eventType: EventType.watering.rawValue,
+            relatedEntityType: EntityKind.plant.rawValue,
+            relatedEntityId: plantID.uuidString
+        )
+        let unrelatedEventID = UUID()
+        let unrelatedEvent = Event(
+            title: "Other event",
+            eventType: EventType.daily.rawValue,
+            relatedEntityType: EntityKind.plant.rawValue,
+            relatedEntityId: unrelatedEventID.uuidString
+        )
         context.insert(plant)
+        context.insert(plantEvent)
+        context.insert(unrelatedEvent)
         try context.save()
 
         let result = MemberDeletionCommandService.deletePlant(plant, context: context)
 
         let plants = try context.fetch(FetchDescriptor<Plant>())
-        #expect(result.entityID == plant.id)
+        let events = try context.fetch(FetchDescriptor<Event>())
+        #expect(result.entityID == plantID)
         #expect(result.kind == EntityKind.plant.rawValue)
-        #expect(result.removedRelatedEventIDs.isEmpty)
+        #expect(result.removedRelatedEventIDs == [plantEvent.id])
         #expect(plants.isEmpty)
-        #expect(try cloudSyncState(entityName: String(describing: Plant.self), id: plant.id, context: context)?.isDeletionTombstone == true)
+        #expect(events.map(\.id) == [unrelatedEvent.id])
+        #expect(try cloudSyncState(entityName: String(describing: Plant.self), id: plantID, context: context)?.isDeletionTombstone == true)
+        #expect(try cloudSyncState(entityName: String(describing: Event.self), id: plantEvent.id, context: context)?.isDeletionTombstone == true)
     }
 
     @MainActor
@@ -7117,6 +7136,10 @@ struct HomeCommandExecutorTests {
         #expect(createdMilestone.title == "First beach day")
         #expect(createdMilestone.emoji == "🎉")
         #expect(createdMilestone.pet?.id == pet.id)
+        #expect(createdMilestone.hasPhotoAttachment)
+        #expect(createdMilestone.canAttemptPhotoAttachmentLoad)
+        #expect(createdMilestone.photoImageSignature == MediaPayloadSignature.signature(for: Data([1, 2, 3])))
+        #expect(createdMilestone.photoThumbnailSignature == createdMilestone.photoImageSignature)
         #expect(ledgerEvents.isEmpty)
         let matchingLegacyLedger = CareLedgerEvent(
             occurredAt: createdMilestone.date,
@@ -7262,7 +7285,10 @@ struct HomeCommandExecutorTests {
         #expect(document.title == "Passport")
         #expect(document.documentCategory == .passport)
         #expect(document.attachmentFilename == "image.jpg")
+        #expect(document.hasLegacyAttachment)
+        #expect(!document.legacyAttachmentSignature.isEmpty)
         #expect(document.attachments.count == 2)
+        #expect(document.attachments.allSatisfy { $0.hasDataAttachment && !$0.dataSignature.isEmpty })
         #expect(pet.passportNumber == "P-123")
         #expect(expense.pet?.id == pet.id)
         #expect(expense.executorId == human.id.uuidString)
@@ -7326,6 +7352,8 @@ struct HomeCommandExecutorTests {
         #expect(document.cost == 0)
         #expect(document.attachmentData == nil)
         #expect(document.attachmentFilename.isEmpty)
+        #expect(document.legacyAttachmentState == .absent)
+        #expect(document.legacyAttachmentSignature.isEmpty)
 
         let deleteResult = PetDocumentCommandService.deleteDocument(document, pet: pet, context: context)
 
@@ -7379,9 +7407,13 @@ struct HomeCommandExecutorTests {
         #expect(result.documentID == document.id)
         #expect(document.attachmentData == Data([9, 8, 7]))
         #expect(document.attachmentFilename == "new.pdf")
+        #expect(document.hasLegacyAttachment)
+        #expect(!document.legacyAttachmentSignature.isEmpty)
         #expect(document.attachments.count == 1)
         #expect(document.attachments.first?.filename == "new.pdf")
         #expect(document.attachments.first?.isImage == false)
+        #expect(document.attachments.first?.hasDataAttachment == true)
+        #expect(document.attachments.first?.dataSignature.isEmpty == false)
         #expect(attachments.count == 1)
     }
 
@@ -9024,6 +9056,8 @@ struct HomeCommandExecutorTests {
         #expect(enabled.action == "enablePopout")
         #expect(pet.cardStyleRaw == "popout")
         #expect(pet.cardPopoutImageData == Data([1, 2, 3]))
+        #expect(pet.hasCardPopoutImageAttachment == true)
+        #expect(pet.cardPopoutImageSignature == MediaPayloadSignature.signature(for: Data([1, 2, 3])))
         #expect(pet.cardPopoutSourceRaw == "avatar2d")
 
         let restored = PetCardAppearanceCommandService.restoreClassic(pet: pet, context: context)
@@ -9063,6 +9097,8 @@ struct HomeCommandExecutorTests {
         #expect(result.failure == nil)
         #expect(Avatar2DAccess.extraPassCount == 0)
         #expect(human.avatarImageData != nil)
+        #expect(human.hasAvatarImageAttachment == true)
+        #expect(!human.avatarImageSignature.isEmpty)
         #expect(human.avatarEmoji == HumanGenderIdentity.fallbackAvatarEmoji(for: "女"))
     }
 
@@ -9275,6 +9311,8 @@ struct HomeCommandExecutorTests {
         mutation = try #require(revisionCenter.lastMutation)
         #expect(upgraded.didUpgrade == true)
         #expect(human.avatarImageData != nil)
+        #expect(human.hasAvatarImageAttachment == true)
+        #expect(!human.avatarImageSignature.isEmpty)
         #expect(mutation.command == .avatar2DUpgrade(entityID: human.id, kind: EntityKind.human.rawValue))
         #expect(mutation.note == "test.reward.avatar.human")
         #expect(revisionCenter.homeRevision.value == beforeRevision + 3)
@@ -9557,7 +9595,7 @@ struct HomeCommandExecutorTests {
     }
 
     private func makeInMemoryContainer() throws -> ModelContainer {
-        let schema = Schema(ArkSchemaV74.models)
+        let schema = Schema(ArkSchemaV82.models)
         let config = ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)
         return try ModelContainer(for: schema, configurations: [config])
     }

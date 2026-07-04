@@ -20,6 +20,7 @@ struct FocusHomeRouteSheetModifier: ViewModifier {
     let onAddEntityDismissed: () -> Void
     let onPetSavedFromAddEntity: (Pet) -> Void
     let onHumanSavedFromAddEntity: (Human) -> Void
+    let onPlantSavedFromAddEntity: (UUID) -> Void
     let onCrewPetSelected: (Pet) -> Void
     let onCrewHumanSelected: (Human) -> Void
     let onFirstSuccessMomentCompleted: (Pet) -> Void
@@ -155,7 +156,8 @@ struct FocusHomeRouteSheetModifier: ViewModifier {
                             createdHumanId: human.id
                         )
                         onHumanSavedFromAddEntity(human)
-                    }
+                    },
+                    onPlantSaved: onPlantSavedFromAddEntity
                 )
                 .ohanaSheetPagePresentation() // ui-v4: allow role creation flow as long sheet
             } else {
@@ -210,11 +212,10 @@ struct FocusHomeRouteSheetModifier: ViewModifier {
         case .accountSwitcher:
             AppAccountSwitcherRouteContainer(onSwitched: { routes.dismissModal() })
             .ohanaCompactSheetPresentation(detents: [.medium, .large])
-        case let .calendar(entityID, humanID, plantID):
+        case let .calendar(entityID, humanID, _):
             CalendarRouteContainer(
                 preselectedPetId: entityID,
                 preselectedHumanId: humanID,
-                preselectedPlantId: plantID,
                 onOpenEventDestination: openCalendarEventDestination,
                 onPresentCoconutLog: { subject in
                     routes.openCoconutLog(subject)

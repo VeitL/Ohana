@@ -16,9 +16,10 @@ Usage:
 
 Purpose:
   Catch common mature-app smoothness risks in high-frequency SwiftUI surfaces:
-  broad @Query usage, synchronous image/file decoding in views, runtime loops,
-  main-actor read-model aggregation, imperative SwiftData fetches in views,
-  and unscoped detached tasks.
+  broad @Query usage, synchronous image/file decoding in views, render-path
+  external-storage probes, eager ShareLink exports, runtime loops, main-actor
+  read-model aggregation, imperative SwiftData fetches in views, and unscoped
+  detached tasks.
 
 Scope note:
   The scan root is the whole Ohana/ tree. Never narrow this back to a
@@ -142,6 +143,108 @@ scan \
   '(^|/)Views/|^Ohana/Shared/'
 
 scan \
+  "direct-attachment-image-decode-in-view" \
+  'AttachmentImageDecoder\.decode\s*\(' \
+  "Views should not call the low-level attachment decoder directly; use AsyncDecodedImageView or MediaThumbnailProvider so thumbnails are downsampled, cached, coalesced, and memory-warning evicted." \
+  '(^|/)Views/|^Ohana/Shared/'
+
+scan \
+  "render-external-storage-signature" \
+  '\.(avatarImageData|cardPopoutImageData|photoData|imageData|attachmentData|mapSnapshotData|routeLocationsData)\?\.(count|prefix|suffix|first|last|base64EncodedString)(\(|\b)' \
+  "SwiftUI render paths and task/onChange keys must not probe external-storage Data for signatures, counts, or exports; build light revision keys/snapshots at explicit invalidation points or in media services." \
+  '(^|/)Views/|^Ohana/Shared/'
+
+scan \
+  "render-local-media-data-key" \
+  '\b(avatarImageData|selectedPhotoData|photoData|imageData|attachmentData)\?\.(count|prefix|suffix|first|last|base64EncodedString)(\(|\b)' \
+  "SwiftUI render paths and task/onChange keys must not probe local media Data for identity or signatures; maintain an explicit revision/signature at the mutation boundary." \
+  '(^|/)Views/|^Ohana/Shared/'
+
+scan \
+  "render-external-storage-signature-map" \
+  '\.(avatarImageData|cardPopoutImageData|photoData|imageData|attachmentData|mapSnapshotData|routeLocationsData)\.map\s*(\(\s*FocusWalletAvatarCache\.signature|\{[^\n}]*FocusWalletAvatarCache\.signature)' \
+  "SwiftUI render paths and task/onChange keys must not derive media signatures by mapping external-storage Data; use persisted lightweight signatures or prepared media snapshots." \
+  '(^|/)Views/|^Ohana/Shared/'
+
+scan \
+  "render-live-avatar-data-parameter" \
+  '(^|[^A-Za-z0-9_])imageData:\s*(isEditing\s*\?\s*avatarImageData\s*:\s*)?(pet|human|plant)\.avatarImageData|(^|[^A-Za-z0-9_])imageData:\s*(pet|human|plant)\.hasAvatarImageAttachment\s*\?\s*(pet|human|plant)\.avatarImageData\s*:\s*nil' \
+  "SwiftUI render paths must not pass live avatarImageData through imageData parameters; pass lightweight signatures plus a route-scoped media provider or prepared snapshot instead." \
+  '(^|/)Views/|^Ohana/Shared/'
+
+scan \
+  "feature-hub-live-avatar-provider" \
+  '(pet|human|plant)\.hasAvatarImageAttachment\s*\?\s*(pet|human|plant)\.avatarImageData\s*:\s*nil' \
+  "FeatureHub avatar entry points must pass a lightweight signature plus persistent model id; do not hide live external-storage avatar reads inside imageDataProvider closures." \
+  '(^|/)(FeatureHubComponents|HumanModuleV4Components|PetRetentionHubView|PetBondVaultView|PetMomentsHubView|QuickMomentSheet|PetMedicationDetailSheet|PetMedicationView|HumanWeightDashboardContent|PetWeightDashboardContent|HumanExpenseDashboardContent|PetExpenseDashboardContent|PetAllFeaturesSheet|PlantAllFeaturesSheet|SmoothnessBadSnapshotBuilder)\.swift$'
+
+scan \
+  "avatar-pipeline-direct-human-blob-read" \
+  'human\.avatarImageData' \
+  "High-reuse human avatar pipeline components must load persisted avatar blobs through SwiftDataMediaBlobLoader, keyed by lightweight avatarImageSignature, not by reading external-storage data on the main actor." \
+  '(^|/)(HumanAvatarPipelineView|ExecutorPickerBar|SmoothnessBadSnapshotBuilder)\.swift$'
+
+scan \
+  "pet-avatar-portrait-direct-blob-read" \
+  'pet\.avatarImageData' \
+  "PetAvatarPortraitView must load persisted avatar blobs through SwiftDataMediaBlobLoader, keyed by lightweight avatarImageSignature, not by reading external-storage data on the main actor." \
+  '(^|/)(PetAvatarPortraitView|SmoothnessBadSnapshotBuilder)\.swift$'
+
+scan \
+  "weekly-photo-memory-eager-blob" \
+  'AsyncDecodedImageView\s*\(\s*data:\s*memory\.imageData|imageData:\s*log\.imageData|let\s+imageData:\s*Data' \
+  "Family weekly photo memories must carry a persistent id plus lightweight media signature, not original image Data; fetch the blob only from a visible thumbnail provider." \
+  '(^|/)Views/|^Ohana/Features/FamilyReports/'
+
+scan \
+  "milestone-photo-eager-blob" \
+  'if\s+let\s+[A-Za-z_][A-Za-z0-9_]*\s*=\s*milestone\.photoData|AsyncDecodedImageView\s*\(\s*data:\s*milestone\.photoData' \
+  "Milestone views must not eagerly unwrap persisted milestone photoData; use photoThumbnailSignature plus a visible thumbnail provider." \
+  '(^|/)Views/|^Ohana/Features/Milestones/'
+
+scan \
+  "pet-photo-log-eager-blob" \
+  'if\s+let\s+[A-Za-z_][A-Za-z0-9_]*\s*=\s*(log|photoLog)\.imageData|return\s+(log|photoLog)\.imageData|AsyncDecodedImageView\s*\(\s*data:\s*(log|photoLog)\.imageData' \
+  "Pet photo views must not eagerly unwrap persisted PetPhotoLog.imageData; use imageThumbnailSignature plus a visible thumbnail provider." \
+  '(^|/)Views/|^Ohana/Features/(Moments|PhotoAlbum|FamilyReports)/'
+
+scan \
+  "plant-care-log-eager-blob" \
+  'if\s+let\s+[A-Za-z_][A-Za-z0-9_]*\s*=\s*log\.photoData|AsyncDecodedImageView\s*\(\s*data:\s*log\.photoData' \
+  "Plant care views must not eagerly unwrap persisted PlantCareLog.photoData; use photoImageSignature plus a visible thumbnail provider." \
+  '(^|/)Views/|^Ohana/Features/Plants/'
+
+scan \
+  "render-avatar-transparency-probe" \
+  'PetAvatarTransparencyCache\.isTransparentAvatar\s*\(' \
+  "SwiftUI render paths must not inspect avatar blobs to decide transparency; persist lightweight transparency state at avatar write/repair time or use a route-scoped media result cache." \
+  '(^|/)Views/|^Ohana/Shared/'
+
+scan \
+  "render-photo-data-presence-probe" \
+  '\.photoData\s*(==|!=)\s*nil|first\s*\{\s*\$0\.photoData\s*(==|!=)\s*nil\s*\}' \
+  "Render paths must not read external-storage photoData just to determine attachment presence; persist a lightweight photo-presence index and fetch the blob only when a visible image needs it." \
+  '(^|/)Views/|^Ohana/Shared/'
+
+scan \
+  "render-image-data-presence-probe" \
+  '\.imageData\.isEmpty|\!\s*\$0\.imageData\.isEmpty|first\s*\{\s*\$0\.imageData\.isEmpty\s*(==|!=)\s*(true|false)\s*\}' \
+  "Render paths must not read external-storage imageData just to determine attachment presence; persist a lightweight image-presence index and fetch the blob only when a visible image needs it." \
+  '(^|/)Views/|^Ohana/Shared/'
+
+scan \
+  "render-document-attachment-data-probe" \
+  '\.attachments\.(filter|map)[^\n]*\.data|\.attachments\.first\s*(\([^\n]*\))?\?\.data|\.(attachmentData)\s*(==|!=)\s*nil|if\s+let\s+[A-Za-z_][A-Za-z0-9_]*\s*=\s*[^,\n]*\.attachmentData' \
+  "Render paths must not read document attachment blobs to count, preview, or determine presence; use lightweight document attachment signatures/states and fetch the blob only for a visible thumbnail or explicit preview." \
+  '(^|/)Views/|^Ohana/Shared/'
+
+scan \
+  "eager-sharelink-export" \
+  'ShareLink\s*\(\s*item:\s*[A-Za-z_][A-Za-z0-9_]*(Markdown|Summary|Report|Export|shareText|ShareText|Text)' \
+  "ShareLink(item:) should not eagerly bind heavy computed export text from a render path; use a cached prepared value, lazy Transferable, or add a measured smoothness allow comment." \
+  '(^|/)Views/|^Ohana/Shared/'
+
+scan \
   "runtime-loop-in-view" \
   'Timer\.publish\s*\(|TimelineView\s*\(\s*\.animation|repeatForever\s*\(' \
   "Timers, TimelineView(.animation), and repeatForever loops must be visible, policy-gated, and paused when hidden or reduced-work." \
@@ -152,6 +255,12 @@ scan \
   'Task\s*\{\s*@MainActor' \
   "Read-model/snapshot refresh must aggregate off the main actor (@ModelActor or background context) and deliver small Equatable snapshots back to the MainActor; deferred work that still runs on main steals scroll frames as data grows." \
   '(ReadModel|SnapshotStore|SnapshotBuilder)[^/]*\.swift$'
+
+scan \
+  "plant-detail-view-aggregation" \
+  'plant\.careLogs\s*(\.sorted|\.filter|\.map)|appServices\.plantCarePlans\.tasks\(for:\s*plant\)' \
+  "PlantDetailContentView must render from PlantDetailRenderDataActor snapshots; direct care-log traversal or care-plan aggregation in the view steals scroll frames as history grows." \
+  '^Ohana/Features/Plants/Views/PlantDetailView\.swift$'
 
 scan \
   "view-imperative-fetch" \

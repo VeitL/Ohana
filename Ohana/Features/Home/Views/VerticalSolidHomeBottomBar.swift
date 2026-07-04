@@ -838,9 +838,6 @@ private struct VerticalSolidHomeHomeFabShortcutButton: View {
         if case let .featureAggregate(feature)? = shortcut.destination {
             return feature.rawValue
         }
-        if case .calendar? = shortcut.destination {
-            return "calendar"
-        }
         return shortcut.id
     }
 }
@@ -856,8 +853,6 @@ private extension HomeFabFunctionShortcut {
                 return "feature-\(feature.rawValue)"
             case let .featureGroup(group):
                 return "feature-group-\(group.rawValue)"
-            case .calendar:
-                return "calendar"
             case .coconutShop:
                 return "coconutShop"
             case .gacha:

@@ -1,6 +1,7 @@
 import Foundation
 import SwiftData
 import Testing
+import UIKit
 @testable import Ohana
 
 @MainActor
@@ -21,8 +22,69 @@ struct MemberCreationServiceTests {
 
         #expect(result.pet?.name == "Momo")
         #expect(result.pet?.avatarImageData == avatarData)
+        #expect(result.pet?.hasAvatarImageAttachment == true)
+        #expect(result.pet?.avatarImageSignature == MediaPayloadSignature.signature(for: avatarData))
+        #expect(result.pet?.hasTransparentAvatarImage == false)
         #expect(Avatar2DAccess.extraPassCount == 0)
         #expect(try context.fetch(FetchDescriptor<Pet>()).count == 1)
+    }
+
+    @Test func memberMediaAttachmentRepairIndexesLegacyAvatarBlobs() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let avatarData = transparentPNGData()
+        let popoutData = Data([5, 6, 7, 8])
+        let petPhotoData = Data([9, 10, 11, 12, 13, 14, 15, 16, 17])
+        let documentData = Data([21, 22, 23, 24])
+        let attachmentData = Data([31, 32, 33, 34])
+        let pet = Pet(name: "Momo", species: "猫")
+        pet.avatarImageData = avatarData
+        pet.avatarAttachmentStateRaw = MemberAvatarAttachmentState.unknown.rawValue
+        pet.avatarImageSignature = ""
+        pet.avatarTransparencyStateRaw = MemberAvatarTransparencyState.unknown.rawValue
+        pet.cardPopoutImageData = popoutData
+        pet.cardPopoutAttachmentStateRaw = MemberAvatarAttachmentState.unknown.rawValue
+        pet.cardPopoutImageSignature = ""
+        let photoLog = PetPhotoLog(imageData: petPhotoData, pet: pet)
+        photoLog.imageAttachmentStateRaw = PetPhotoAttachmentState.unknown.rawValue
+        photoLog.imageSignature = ""
+        let document = PetDocument(title: "Passport", category: .passport, pet: pet)
+        document.attachmentData = documentData
+        document.attachmentFilename = "passport.jpg"
+        document.legacyAttachmentStateRaw = PetDocumentAttachmentState.unknown.rawValue
+        document.legacyAttachmentSignature = ""
+        let documentAttachment = PetDocumentAttachment(data: attachmentData, filename: "scan.jpg", isImage: true)
+        documentAttachment.dataAttachmentStateRaw = PetDocumentAttachmentState.unknown.rawValue
+        documentAttachment.dataSignature = ""
+        document.attachments.append(documentAttachment)
+        let human = Human(name: "Nico")
+        human.avatarImageData = avatarData
+        human.avatarAttachmentStateRaw = MemberAvatarAttachmentState.unknown.rawValue
+        human.avatarImageSignature = ""
+        context.insert(pet)
+        context.insert(photoLog)
+        context.insert(document)
+        context.insert(documentAttachment)
+        context.insert(human)
+        try context.save()
+
+        let repaired = MemberMediaAttachmentIndexRepair.repair(modelContext: context, maxBlobReads: 6)
+
+        #expect(repaired == true)
+        #expect(pet.hasAvatarImageAttachment == true)
+        #expect(pet.avatarImageSignature == MediaPayloadSignature.signature(for: avatarData))
+        #expect(pet.hasTransparentAvatarImage == true)
+        #expect(pet.shouldShowAvatarBackground == false)
+        #expect(pet.hasCardPopoutImageAttachment == true)
+        #expect(pet.cardPopoutImageSignature == MediaPayloadSignature.signature(for: popoutData))
+        #expect(photoLog.hasImageAttachment == true)
+        #expect(photoLog.imageSignature == MediaPayloadSignature.signature(for: petPhotoData))
+        #expect(document.hasLegacyAttachment == true)
+        #expect(document.legacyAttachmentSignature == MediaPayloadSignature.signature(for: documentData))
+        #expect(documentAttachment.hasDataAttachment == true)
+        #expect(documentAttachment.dataSignature == MediaPayloadSignature.signature(for: attachmentData))
+        #expect(human.hasAvatarImageAttachment == true)
+        #expect(human.avatarImageSignature == MediaPayloadSignature.signature(for: avatarData))
     }
 
     @Test func firstPetDoesNotAwardStarterGiftBeforeFirstCare() throws {
@@ -122,6 +184,8 @@ struct MemberCreationServiceTests {
         )
 
         #expect(result.human?.name == "Nico")
+        #expect(result.human?.hasAvatarImageAttachment == true)
+        #expect(result.human?.avatarImageSignature == MediaPayloadSignature.signature(for: avatarData))
         #expect(Avatar2DAccess.extraPassCount == 0)
     }
 
@@ -575,6 +639,12 @@ struct MemberCreationServiceTests {
     private var avatarData: Data { Data([0x89, 0x50, 0x4E, 0x47]) }
     private var avatarPassCost: Int { makeMemberCreationService().avatarPassCost }
 
+    private func transparentPNGData() -> Data {
+        let format = UIGraphicsImageRendererFormat()
+        format.opaque = false
+        return UIGraphicsImageRenderer(size: CGSize(width: 2, height: 2), format: format).pngData { _ in }
+    }
+
     private func petDraft(name: String, source: MemberAvatarSource) -> MemberCreationDraft {
         var draft = MemberCreationDraft(kind: .pet)
         draft.name = name
@@ -647,7 +717,7 @@ struct MemberCreationServiceTests {
     }
 
     private func makeContainer() throws -> ModelContainer {
-        let schema = Schema(ArkSchemaV71.models)
+        let schema = Schema(ArkSchemaV82.models)
         let config = ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)
         return try ModelContainer(for: schema, configurations: [config])
     }

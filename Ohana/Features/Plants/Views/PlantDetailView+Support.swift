@@ -28,7 +28,7 @@ extension PlantDetailContentView {
     func detailHeader(icon: String, title: String) -> some View {
         HStack {
             Image(systemName: icon)
-                .foregroundStyle(Color.goLime)
+                .foregroundStyle(Color.goPrimary)
                 .accessibilityHidden(true)
             Text(title)
                 .font(OhanaFont.adaptive(size: 16, weight: .bold, design: .rounded))

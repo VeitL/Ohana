@@ -224,7 +224,7 @@ final class VerticalSolidHomeController: ObservableObject {
     private func warmupDelay(for tab: VerticalSolidHomeTab) -> UInt64 {
         switch tab {
         case .home: 0
-        case .calendar: 80
+        case .calendar: 0
         case .oasis: 220
         case .plants: 360
         }

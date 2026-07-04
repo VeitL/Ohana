@@ -104,7 +104,7 @@ struct ReminderObservabilityContentView: View {
                 metric("失败", "\(failed.count)", failed.isEmpty ? .goTeal : .goRed)
             }
             HStack(spacing: 10) {
-                metric("本周完成", "\(completedThisWeek.count)", .goLime)
+                metric("本周完成", "\(completedThisWeek.count)", .goPrimary)
                 metric("总提醒", "\(reminders.count)", .secondary)
             }
         }

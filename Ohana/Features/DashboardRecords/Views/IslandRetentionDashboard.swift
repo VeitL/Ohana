@@ -209,11 +209,11 @@ struct IslandRetentionDashboardContentView: View {
         HStack(spacing: 16) {
             ZStack(alignment: .bottom) {
                 RoundedRectangle(cornerRadius: OhanaRadius.badge, style: .continuous)
-                    .fill(Color.goLime.opacity(0.72))
+                    .fill(Color.goPrimary.opacity(0.72))
                     .frame(width: 18, height: 64 * growProgress)
                 ForEach(0 ..< 5, id: \.self) { index in
                     Circle()
-                        .fill(index < Int(averageScore.rounded()) ? Color.goLime.opacity(0.82) : Color.white.opacity(0.12)) // ui-v4: allow pre-existing visual token debt surfaced by accessibility font migration; tracked by full-scope ratchet.
+                        .fill(index < Int(averageScore.rounded()) ? Color.goPrimary.opacity(0.82) : Color.white.opacity(0.12)) // ui-v4: allow pre-existing visual token debt surfaced by accessibility font migration; tracked by full-scope ratchet.
                         .frame(width: 22 + CGFloat(index) * 9, height: 22 + CGFloat(index) * 9)
                         .offset(x: index.isMultiple(of: 2) ? -22 : 22, y: -CGFloat(index) * 13 * growProgress)
                         .scaleEffect(growProgress)
@@ -231,7 +231,7 @@ struct IslandRetentionDashboardContentView: View {
                         .foregroundStyle(.white) // ui-v4: allow pre-existing visual token debt surfaced by accessibility font migration; tracked by full-scope ratchet.
                     Text("/ 5")
                         .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
-                        .foregroundStyle(Color.goLime)
+                        .foregroundStyle(Color.goPrimary)
                 }
                 Text(l.tr(
                     zh: "\(totalMemories) 个记忆点 · \(totalAchievements.unlocked)/\(totalAchievements.total) 枚成就",
@@ -246,7 +246,7 @@ struct IslandRetentionDashboardContentView: View {
         }
         .padding(18)
         .background(
-            LinearGradient(colors: [Color.goLime.opacity(0.19), Color.white.opacity(0.07)], startPoint: .topLeading, endPoint: .bottomTrailing), // ui-v4: allow pre-existing visual token debt surfaced by accessibility font migration; tracked by full-scope ratchet.
+            LinearGradient(colors: [Color.goPrimary.opacity(0.19), Color.white.opacity(0.07)], startPoint: .topLeading, endPoint: .bottomTrailing), // ui-v4: allow pre-existing visual token debt surfaced by accessibility font migration; tracked by full-scope ratchet.
             in: RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous)
         )
     }
@@ -292,13 +292,13 @@ struct IslandRetentionDashboardContentView: View {
                                 Spacer()
                                 Text("\(summary.score)/5")
                                     .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
-                                    .foregroundStyle(Color.goLime)
+                                    .foregroundStyle(Color.goPrimary)
                             }
                             GeometryReader { geo in
                                 ZStack(alignment: .leading) {
                                     Capsule().fill(Color.white.opacity(0.1)) // ui-v4: allow pre-existing visual token debt surfaced by accessibility font migration; tracked by full-scope ratchet.
                                     Capsule()
-                                        .fill(Color.goLime)
+                                        .fill(Color.goPrimary)
                                         .frame(width: geo.size.width * CGFloat(summary.score) / 5 * growProgress)
                                 }
                             }
@@ -335,7 +335,7 @@ struct IslandRetentionDashboardContentView: View {
             .foregroundStyle(isSelected ? .black : .white)
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
-            .background(isSelected ? Color.goLime : Color.white.opacity(0.12), in: Capsule()) // ui-v4: allow pre-existing visual token debt surfaced by accessibility font migration; tracked by full-scope ratchet.
+            .background(isSelected ? Color.goPrimary : Color.white.opacity(0.12), in: Capsule()) // ui-v4: allow pre-existing visual token debt surfaced by accessibility font migration; tracked by full-scope ratchet.
         }
         .buttonStyle(ScaleButtonStyle())
     }

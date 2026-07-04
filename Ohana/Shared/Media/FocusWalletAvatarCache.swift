@@ -133,9 +133,7 @@ enum FocusWalletAvatarCache {
     }
 
     nonisolated static func signature(for data: Data) -> String {
-        let head = data.prefix(12).map { String(format: "%02x", $0) }.joined()
-        let tail = data.suffix(12).map { String(format: "%02x", $0) }.joined()
-        return "\(data.count)-\(head)-\(tail)"
+        MediaPayloadSignature.signature(for: data)
     }
 
     private static func ensureMemoryWarningEvictionRegistered() {

@@ -195,7 +195,7 @@ struct IslandWealthDashboardContentView: View {
             summaryCell(
                 label: l.tr(zh: "本期收入", en: "Income", de: "Einnahmen"),
                 value: "+\(vm.periodIncome)",
-                valueColor: Color.goLime,
+                valueColor: Color.goPrimary,
                 icon: "arrow.down.circle.fill"
             )
             summaryCell(

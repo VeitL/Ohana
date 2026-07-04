@@ -53,7 +53,7 @@ struct FeatureAggregateView: View {
 
     private var humanAvatarSourceKey: String {
         let key = humansForFeature
-            .map { "\($0.id.uuidString):\($0.avatarImageData?.count ?? 0)" }
+            .map { "\($0.id.uuidString):\($0.avatarThumbnailSignature)" }
             .joined(separator: "|")
         return key.isEmpty ? "feature-aggregate-human-avatar-empty" : key
     }
@@ -175,14 +175,15 @@ struct FeatureAggregateView: View {
         var signatures: [UUID: String] = [:]
         var payloads: [FocusWalletAvatarCache.Payload] = []
         for human in humansForFeature {
-            guard let data = human.avatarImageData else { continue }
-            let signature = FocusWalletAvatarCache.signature(for: data)
+            guard human.hasAvatarImageAttachment,
+                  let data = human.avatarImageData else { continue }
+            let signature = human.avatarThumbnailSignature
             signatures[human.id] = signature
             payloads.append(FocusWalletAvatarCache.Payload(id: human.id, data: data))
         }
 
         let rawKey = payloads
-            .map { "\($0.id.uuidString):\($0.data?.count ?? 0)" }
+            .map { "\($0.id.uuidString):\(signatures[$0.id] ?? "")" }
             .joined(separator: "|")
         let nextKey = rawKey.isEmpty ? "feature-aggregate-human-avatar-empty" : "feature-aggregate-\(rawKey)"
         if humanAvatarCacheKey != nextKey {

@@ -54,9 +54,6 @@ struct ContentView: View {
                                 route: route,
                                 onPresentCoconutLog: { subject in
                                     appRoutes.presentCoconutLog(subject)
-                                },
-                                onPresentPlantCalendar: { entityID in
-                                    appRoutes.presentCalendar(plantID: entityID)
                                 }
                             )
                         }

@@ -8,76 +8,9 @@
 import SwiftData
 import SwiftUI
 
-struct PlantDetailActionItem: Identifiable {
-    let id: String
-    let icon: String
-    let title: String
-    let detail: String
-    let tint: Color
-    let primaryTitle: String
-    let careType: PlantCareType?
-    let task: PlantCareTaskSnapshot?
-    let opensEdit: Bool
-}
-
-struct PlantCarePlanInsight: Identifiable {
-    let id: String
-    let icon: String
-    let title: String
-    let detail: String
-    let tint: Color
-}
-
-struct PlantPlacementFitItem: Identifiable {
-    let id: String
-    let icon: String
-    let title: String
-    let detail: String
-    let tint: Color
-}
-
-struct PlantSeasonalCareItem: Identifiable {
-    let id: String
-    let icon: String
-    let title: String
-    let detail: String
-    let tint: Color
-}
-
-struct PlantHealthReviewSignal: Identifiable {
-    let id: String
-    let icon: String
-    let title: String
-    let detail: String
-    let tint: Color
-    let priority: Int
-}
-
-enum PlantDetailFeatureAnchor: Hashable {
-    case overview
-    case todayCare
-    case carePlan
-    case profile
-    case safety
-    case knowledge
-    case healthReview
-    case growthDiary
-    case timeline
-}
-
-struct PlantDetailPhotoItem: Identifiable {
-    let id: String
-    let title: String
-    let subtitle: String
-    let detail: String
-    let imageData: Data
-    let tint: Color
-}
-
 struct PlantDetailContentView: View {
     let plant: Plant
     let households: [Household]
-    let onOpenCalendar: (UUID) -> Void
 
     @Environment(\.modelContext) var modelContext
     @Environment(\.dismiss) var dismiss
@@ -95,30 +28,45 @@ struct PlantDetailContentView: View {
     @State var showingPhotoGallery = false
     @State var careLogDraftType: PlantCareType?
     @State var isDeletePending = false
+    @State var isDeleteCommitting = false
     @State var deleteUndoTask: Task<Void, Never>?
     @State var diagnosisResult: PlantDiagnosisResult?
     @State var pendingFeatureScrollTarget: PlantDetailFeatureAnchor?
+    @State private var renderDataRefreshTask: Task<Void, Never>?
+    @State private var renderDataRefreshGeneration = 0
+    @State private var mediaAttachmentIndexRepairTask: Task<Void, Never>?
+    @State private var renderData: PlantDetailRenderData?
     var catalogEntry: PlantCatalogEntry? { PlantCatalog.entry(id: plant.catalogSpeciesId) }
     var l: L10n { L10n(appLanguage) }
-    var careTasks: [PlantCareTaskSnapshot] { appServices.plantCarePlans.tasks(for: plant) }
+    var isRenderDataReady: Bool { renderData != nil }
+    var renderDataRevision: Int { renderData?.revision ?? 0 }
+    var careTasks: [PlantCareTaskSnapshot] {
+        renderData?.careTasks ?? []
+    }
+    var taskSummary: PlantDetailTaskSummary? {
+        renderData?.taskSummary
+    }
+    var logSummary: PlantDetailLogSummary? {
+        renderData?.logSummary
+    }
     var isWateringDue: Bool {
-        careTasks.contains { $0.careType == .watering && $0.daysUntilDue <= 0 }
+        taskSummary?.isWateringDue ?? false
     }
     var isFertilizingDue: Bool {
-        careTasks.contains { $0.careType == .fertilizing && $0.daysUntilDue <= 0 }
+        taskSummary?.isFertilizingDue ?? false
     }
     var wateringIntervalDays: Int {
-        careTasks.first { $0.careType == .watering }?.effectiveIntervalDays ?? plant.wateringIntervalDays
+        taskSummary?.wateringIntervalDays ?? plant.wateringIntervalDays
     }
     var fertilizingIntervalDays: Int {
-        careTasks.first { $0.careType == .fertilizing }?.effectiveIntervalDays ?? plant.fertilizingIntervalDays
+        taskSummary?.fertilizingIntervalDays ?? plant.fertilizingIntervalDays
     }
     var commandExecutor: HomeCommandExecutor { HomeCommandExecutor(modelContext: modelContext, services: appServices) }
-    var recentLogs: [PlantCareLog] {
-        plant.careLogs.sorted { $0.date > $1.date }
+    var recentLogs: [PlantDetailLogSnapshot] {
+        renderData?.recentLogs ?? []
     }
-    var nextTask: PlantCareTaskSnapshot? { careTasks.first }
-    var dueTaskCount: Int { careTasks.count { $0.daysUntilDue <= 0 } }
+    var nextTask: PlantCareTaskSnapshot? { taskSummary?.nextTask }
+    var dueTaskCount: Int { taskSummary?.dueTaskCount ?? 0 }
     var placementSummary: String {
         let room = plant.roomName.trimmingCharacters(in: .whitespacesAndNewlines)
         let exactSpot = plant.location.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -132,7 +80,7 @@ struct PlantDetailContentView: View {
     var healthTone: Color {
         switch plant.healthStatus {
         case .thriving:
-            Color.goLime
+            Color.goPrimary
         case .stable:
             Color.goTeal
         case .watching:
@@ -174,43 +122,19 @@ struct PlantDetailContentView: View {
         ].count { $0 }
     }
     var growthDiaryPhotoCount: Int {
-        recentLogs.count { $0.photoData != nil }
+        renderData?.growthDiaryPhotoCount ?? 0
     }
-    var recentObservationWindowStart: Date {
-        Calendar.current.date(byAdding: .day, value: -30, to: Date()) ?? Date().addingTimeInterval(-30 * 86400)
+    var latestHealthReviewLog: PlantDetailLogSnapshot? {
+        logSummary?.latestHealthReviewLog
     }
-    var latestHealthReviewLog: PlantCareLog? {
-        recentLogs.first { log in
-            [
-                PlantCareType.pestCheck,
-                .pestFound,
-                .yellowLeaf,
-                .newLeaf,
-                .leafCleaning,
-                .photo,
-                .customNote
-            ].contains(log.careType)
-        }
+    var recentStressSignalCount: Int {
+        logSummary?.recentStressSignalCount ?? 0
     }
-    var recentStressSignalLogs: [PlantCareLog] {
-        recentLogs.filter { log in
-            log.date >= recentObservationWindowStart &&
-                (log.careType == .yellowLeaf || log.careType == .pestFound)
-        }
+    var hasRecentStressSignals: Bool {
+        logSummary?.hasRecentStressSignals ?? false
     }
     var recentObservationLogCount: Int {
-        recentLogs.count { log in
-            log.date >= recentObservationWindowStart &&
-                [
-                    PlantCareType.pestCheck,
-                    .pestFound,
-                    .yellowLeaf,
-                    .newLeaf,
-                    .leafCleaning,
-                    .photo,
-                    .customNote
-                ].contains(log.careType)
-        }
+        logSummary?.recentObservationLogCount ?? 0
     }
     var healthReviewSignals: [PlantHealthReviewSignal] {
         var signals: [PlantHealthReviewSignal] = []
@@ -230,16 +154,16 @@ struct PlantDetailContentView: View {
             )
         }
 
-        if !recentStressSignalLogs.isEmpty {
+        if hasRecentStressSignals {
             signals.append(
                 PlantHealthReviewSignal(
                     id: "recent-stress",
                     icon: "waveform.path.ecg",
                     title: l.tr(zh: "30 天内有异常信号", en: "Recent stress signals", de: "Aktuelle Stresssignale"),
                     detail: l.tr(
-                        zh: "\(recentStressSignalLogs.count) 条黄叶/虫害记录，建议先复查叶背、土面和新芽。",
-                        en: "\(recentStressSignalLogs.count) yellow-leaf or pest notes in 30 days. Recheck leaf undersides, soil, and new growth.",
-                        de: "\(recentStressSignalLogs.count) Gelbblatt- oder Schädlingsnotizen in 30 Tagen. Blattunterseiten, Erde und Neutriebe prüfen."
+                        zh: "\(recentStressSignalCount) 条黄叶/虫害记录，建议先复查叶背、土面和新芽。",
+                        en: "\(recentStressSignalCount) yellow-leaf or pest notes in 30 days. Recheck leaf undersides, soil, and new growth.",
+                        de: "\(recentStressSignalCount) Gelbblatt- oder Schädlingsnotizen in 30 Tagen. Blattunterseiten, Erde und Neutriebe prüfen."
                     ),
                     tint: Color.goRed,
                     priority: 1
@@ -309,7 +233,7 @@ struct PlantDetailContentView: View {
                         en: "Keep the current plan and watch new leaves, color, and soil moisture.",
                         de: "Plan beibehalten und neue Blätter, Farbe und Erdfeuchte beobachten."
                     ),
-                    tint: Color.goLime,
+                    tint: Color.goPrimary,
                     priority: 9
                 )
             )
@@ -326,7 +250,7 @@ struct PlantDetailContentView: View {
         if plant.healthStatus == .stressed {
             return l.tr(zh: "先排查浇水、光照、虫害，再考虑施肥。", en: "Check water, light, and pests before fertilizing.", de: "Wasser, Licht und Schädlinge vor dem Düngen prüfen.")
         }
-        if plant.healthStatus == .watching || !recentStressSignalLogs.isEmpty {
+        if plant.healthStatus == .watching || hasRecentStressSignals {
             return l.tr(zh: "把最近异常和复查动作放在同一张卡里，避免只看流水记录。", en: "Recent issues and rechecks are grouped here instead of buried in the log.", de: "Auffälligkeiten und Checks stehen hier statt nur im Verlauf.")
         }
         if latestHealthReviewLog == nil {
@@ -341,54 +265,23 @@ struct PlantDetailContentView: View {
         return "\(latestHealthReviewLog.careType.displayName(l: l)) · \(shortDate(latestHealthReviewLog.date))"
     }
     var galleryPhotoItems: [PlantDetailPhotoItem] {
-        var items: [PlantDetailPhotoItem] = []
-
-        if let avatarImageData = plant.avatarImageData {
-            items.append(
-                PlantDetailPhotoItem(
-                    id: "\(plant.id.uuidString)-profile",
-                    title: plant.name,
-                    subtitle: l.tr(zh: "档案照片", en: "Profile photo", de: "Profilfoto"),
-                    detail: placementSummary,
-                    imageData: avatarImageData,
-                    tint: healthTone
-                )
-            )
-        }
-
-        items += recentLogs.compactMap { log -> PlantDetailPhotoItem? in
-            guard let photoData = log.photoData else { return nil }
-            return PlantDetailPhotoItem(
-                id: "\(plant.id.uuidString)-log-\(log.id.uuidString)",
-                title: log.careType.displayName(l: l),
-                subtitle: timelineDateText(for: log),
-                detail: timelineNoteText(for: log) ?? plant.name,
-                imageData: photoData,
-                tint: careTint(for: log.careType)
-            )
-        }
-
-        return items
+        renderData?.galleryPhotoItems ?? []
     }
     var growthDiaryMarkdown: String {
-        appServices.plantGrowthDiaryExports.markdown(
-            for: plant,
-            exportedAt: Date(),
-            includePhotoPlaceholders: true,
-            languageCode: appLanguage
-        )
+        renderData?.growthDiaryMarkdown ?? ""
     }
     var growthDiaryDateRangeText: String {
-        guard let first = recentLogs.last?.date else {
+        guard let first = logSummary?.firstLogDate else {
             return l.tr(zh: "还没有记录", en: "No logs yet", de: "Noch keine Protokolle")
         }
-        guard let latest = recentLogs.first?.date, latest != first else {
+        guard let latest = logSummary?.latestLogDate, latest != first else {
             return shortDate(first)
         }
         return "\(shortDate(first)) - \(shortDate(latest))"
     }
     var growthDiarySummaryText: String {
-        if recentLogs.isEmpty {
+        let logCount = logSummary?.logCount ?? 0
+        if logCount == 0 {
             return l.tr(
                 zh: "完成一次照护或观察后，这里会生成可分享的成长档案。",
                 en: "Log one care action or observation to create a shareable growth diary.",
@@ -396,9 +289,9 @@ struct PlantDetailContentView: View {
             )
         }
         return l.tr(
-            zh: "\(recentLogs.count) 条记录，\(growthDiaryPhotoCount) 张照片线索，覆盖 \(growthDiaryDateRangeText)。",
-            en: "\(recentLogs.count) logs, \(growthDiaryPhotoCount) photo notes, covering \(growthDiaryDateRangeText).",
-            de: "\(recentLogs.count) Protokolle, \(growthDiaryPhotoCount) Foto-Hinweise, Zeitraum \(growthDiaryDateRangeText)."
+            zh: "\(logCount) 条记录，\(growthDiaryPhotoCount) 张照片线索，覆盖 \(growthDiaryDateRangeText)。",
+            en: "\(logCount) logs, \(growthDiaryPhotoCount) photo notes, covering \(growthDiaryDateRangeText).",
+            de: "\(logCount) Protokolle, \(growthDiaryPhotoCount) Foto-Hinweise, Zeitraum \(growthDiaryDateRangeText)."
         )
     }
     var profileMissingItems: [String] {
@@ -416,7 +309,7 @@ struct PlantDetailContentView: View {
         if catalogEntry == nil {
             items.append(l.tr(zh: "资料库匹配", en: "catalog match", de: "Katalogabgleich"))
         }
-        if recentLogs.isEmpty {
+        if (logSummary?.logCount ?? 0) == 0 {
             items.append(l.tr(zh: "首条护理记录", en: "first care log", de: "erstes Pflegeprotokoll"))
         }
         return items
@@ -440,7 +333,7 @@ struct PlantDetailContentView: View {
                         en: "\(catalogEntry.localizedCommonName) · \(catalogEntry.localizedCareDifficulty) · baseline watering \(catalogEntry.defaultWateringDays)d",
                         de: "\(catalogEntry.localizedCommonName) · \(catalogEntry.localizedCareDifficulty) · Basis-Gießen \(catalogEntry.defaultWateringDays) T."
                     ),
-                    tint: Color.goLime
+                    tint: Color.goPrimary
                 )
             )
         } else {
@@ -461,7 +354,7 @@ struct PlantDetailContentView: View {
 
         insights.append(environmentCarePlanInsight)
 
-        if let learned = careTasks.first(where: { !$0.learningSummary.isEmpty })?.learningSummary {
+        if let learned = taskSummary?.learningSummary {
             insights.append(
                 PlantCarePlanInsight(
                     id: "history-learning",
@@ -477,9 +370,9 @@ struct PlantDetailContentView: View {
                     id: "history-building",
                     icon: "clock.badge.checkmark.fill",
                     title: l.tr(zh: "正在建立历史节奏", en: "Building care history", de: "Pflegeverlauf wird aufgebaut"),
-                    detail: recentLogs.isEmpty
+                    detail: (logSummary?.logCount ?? 0) == 0
                         ? l.tr(zh: "先完成几次护理记录，Ohana 才能判断你是否经常提前或延后。", en: "Log a few care actions so Ohana can see whether you often act early or late.", de: "Einige Pflegeaktionen protokollieren, damit Ohana frühe oder späte Muster erkennt.")
-                        : l.tr(zh: "\(recentLogs.count) 条记录已进入档案，继续记录会让节奏更稳。", en: "\(recentLogs.count) logs are in the profile; more logs make the rhythm steadier.", de: "\(recentLogs.count) Protokolle sind im Profil; mehr Verlauf stabilisiert den Rhythmus."),
+                        : l.tr(zh: "\(logSummary?.logCount ?? 0) 条记录已进入档案，继续记录会让节奏更稳。", en: "\(logSummary?.logCount ?? 0) logs are in the profile; more logs make the rhythm steadier.", de: "\(logSummary?.logCount ?? 0) Protokolle sind im Profil; mehr Verlauf stabilisiert den Rhythmus."),
                     tint: Color.goTeal
                 )
             )
@@ -590,7 +483,7 @@ struct PlantDetailContentView: View {
                 en: "Based on this profile, the placement and light preference do not conflict.",
                 de: "Laut Profil widersprechen Standort und Lichtbedarf sich nicht."
             ),
-            tint: Color.goLime
+            tint: Color.goPrimary
         )
     }
 
@@ -671,7 +564,7 @@ struct PlantDetailContentView: View {
                 en: "The profile is enough for a simple care plan; tune later with leaf and soil feedback.",
                 de: "Das Profil reicht für einen einfachen Pflegeplan; später mit Blatt- und Erdfeedback anpassen."
             ),
-            tint: Color.goLime
+            tint: Color.goPrimary
         )
     }
 
@@ -705,7 +598,7 @@ struct PlantDetailContentView: View {
                 icon: "leaf.fill",
                 title: l.tr(zh: "观察新叶", en: "Watch new growth", de: "Neue Triebe beobachten"),
                 detail: l.tr(zh: "可以逐步恢复薄肥，但状态紧张时先别急。", en: "Light feeding can resume gradually, but wait if the plant is stressed.", de: "Schwache Düngung langsam starten, bei Stress aber warten."),
-                tint: Color.goLime
+                tint: Color.goPrimary
             ))
         case 6 ... 8:
             items.append(PlantSeasonalCareItem(
@@ -740,7 +633,7 @@ struct PlantDetailContentView: View {
                     icon: "house.fill",
                     title: l.tr(zh: "室内先看小环境", en: "Indoor microclimate first", de: "Innenklima zuerst"),
                     detail: l.tr(zh: "室内不必追天气预报，重点看窗边温度、空调暖气和盆土。", en: "No need to chase forecasts indoors; watch window temperature, AC/heater, and soil.", de: "Innen nicht dem Wetterbericht folgen; Fensterwärme, Klima/Heizung und Erde beobachten."),
-                    tint: Color.goLime
+                    tint: Color.goPrimary
                 )
                 : PlantSeasonalCareItem(
                     id: "weather-outdoor",
@@ -780,7 +673,7 @@ struct PlantDetailContentView: View {
                 icon: "leaf.circle.fill",
                 title: l.tr(zh: "健康状态支持当前节奏", en: "Health supports this rhythm", de: "Gesundheit stützt diesen Rhythmus"),
                 detail: l.tr(zh: "状态很好时，计划会保持稳定，不频繁打断。", en: "When the plant is thriving, the plan stays steady and avoids noisy interruptions.", de: "Bei gutem Zustand bleibt der Plan stabil und stört weniger."),
-                tint: Color.goLime
+                tint: Color.goPrimary
             )
         case .stable:
             PlantCarePlanInsight(
@@ -811,7 +704,7 @@ struct PlantDetailContentView: View {
     var careActionItems: [PlantDetailActionItem] {
         var items: [PlantDetailActionItem] = []
 
-        for task in careTasks.filter({ $0.daysUntilDue <= 0 }).prefix(2) {
+        for task in taskSummary?.dueTasksForActionQueue ?? [] {
             items.append(
                 PlantDetailActionItem(
                     id: "due-\(task.careType.rawValue)",
@@ -912,7 +805,7 @@ struct PlantDetailContentView: View {
                         en: "When things are calm, log new leaves, clean leaves, or add a photo note.",
                         de: "Wenn alles ruhig ist, neue Blätter, Blattpflege oder Foto-Notiz erfassen."
                     ),
-                    tint: Color.goLime,
+                    tint: Color.goPrimary,
                     primaryTitle: PlantCareType.newLeaf.displayName(l: l),
                     careType: .newLeaf,
                     task: nil,
@@ -930,7 +823,7 @@ struct PlantDetailContentView: View {
 
             ScrollViewReader { proxy in
                 ScrollView(.vertical, showsIndicators: false) {
-                    VStack(spacing: 20) {
+                    LazyVStack(spacing: 20) {
                         heroCard
                         careOverviewCard
                             .id(PlantDetailFeatureAnchor.overview)
@@ -975,6 +868,17 @@ struct PlantDetailContentView: View {
                 }
             }
         }
+        .onAppear {
+            schedulePlantDetailRenderDataRebuild(delayMilliseconds: 24)
+            scheduleMediaAttachmentIndexRepair()
+        }
+        .onChange(of: appLanguage) { _, _ in
+            schedulePlantDetailRenderDataRebuild(delayMilliseconds: 24)
+        }
+        .onReceive(appServices.domainRevisions.homeRevisionUpdates) { _ in
+            guard shouldRefreshPlantDetailRenderDataForLatestMutation else { return }
+            schedulePlantDetailRenderDataRebuild(delayMilliseconds: 24)
+        }
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
@@ -1000,7 +904,7 @@ struct PlantDetailContentView: View {
             PlantAllFeaturesSheet(
                 plant: plant,
                 careTasks: careTasks,
-                logCount: recentLogs.count,
+                logCount: logSummary?.logCount ?? 0,
                 photoCount: galleryPhotoItems.count,
                 profileCompletionPercent: profileCompletionPercent,
                 safetyWarningCount: activeSafetyWarningCount,
@@ -1013,7 +917,9 @@ struct PlantDetailContentView: View {
         .sheet(isPresented: $showingPhotoGallery) {
             PlantPhotoGallerySheet(
                 plantName: plant.name,
-                photos: galleryPhotoItems
+                photos: galleryPhotoItems,
+                imageRevision: renderDataRevision,
+                imageDataProvider: { await photoImageData(for: $0) }
             )
         }
         .sheet(item: $careLogDraftType) { type in
@@ -1040,14 +946,102 @@ struct PlantDetailContentView: View {
             ))
         }
         .onDisappear {
+            renderDataRefreshTask?.cancel()
+            mediaAttachmentIndexRepairTask?.cancel()
             deleteUndoTask?.cancel()
-            commandQueue.cancelAll()
+            if !isDeleteCommitting {
+                commandQueue.cancelAll()
+            }
         }
         .task(id: plant.healthStatusRaw) {
             diagnosisResult = await appServices.plantIntelligence.diagnosePlant(
                 imageData: nil,
                 symptoms: diagnosisSymptoms
             )
+        }
+    }
+
+    var shouldRefreshPlantDetailRenderDataForLatestMutation: Bool {
+        guard let mutation = appServices.domainRevisions.lastMutation else {
+            return false
+        }
+        return mutation.affectedEntityIDs.contains(plant.id)
+    }
+
+    func schedulePlantDetailRenderDataRebuild(delayMilliseconds: UInt64 = 24) {
+        renderDataRefreshTask?.cancel()
+        renderDataRefreshGeneration += 1
+        let generation = renderDataRefreshGeneration
+        let container = modelContext.container
+        let plantModelID = plant.persistentModelID
+        let languageCode = appLanguage
+        let nextRevision = (renderData?.revision ?? 0) + 1
+        renderDataRefreshTask = Task { @MainActor in
+            await OhanaFrameScheduler.waitAfterNextFrame(milliseconds: delayMilliseconds)
+            guard !Task.isCancelled,
+                  generation == renderDataRefreshGeneration else {
+                return
+            }
+            let builder = PlantDetailRenderDataActor(modelContainer: container)
+            do {
+                let data = try await builder.build(
+                    request: PlantDetailRenderDataRequest(
+                        plantModelID: plantModelID,
+                        revision: nextRevision,
+                        languageCode: languageCode,
+                        now: Date()
+                    )
+                )
+                guard !Task.isCancelled,
+                      generation == renderDataRefreshGeneration else {
+                    return
+                }
+                applyPlantDetailRenderData(data)
+            } catch is CancellationError {
+                return
+            } catch {
+                OhanaLog.warning("Plant detail render data build failed: \(error)", category: "Plants")
+            }
+            clearPlantDetailRenderDataRefreshTask(generation: generation)
+        }
+    }
+
+    func applyPlantDetailRenderData(_ data: PlantDetailRenderData) {
+        var transaction = Transaction(animation: nil)
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            renderData = data
+        }
+    }
+
+    func clearPlantDetailRenderDataRefreshTask(generation: Int) {
+        guard generation == renderDataRefreshGeneration else { return }
+        renderDataRefreshTask = nil
+    }
+
+    func scheduleMediaAttachmentIndexRepair() {
+        mediaAttachmentIndexRepairTask?.cancel()
+        mediaAttachmentIndexRepairTask = Task { @MainActor in
+            await OhanaFrameScheduler.waitAfterNextFrame(milliseconds: 96)
+            guard !Task.isCancelled else { return }
+            let didRepair = PlantMediaAttachmentIndexRepair.repair(
+                plants: [plant],
+                modelContext: modelContext
+            )
+            if didRepair {
+                schedulePlantDetailRenderDataRebuild(delayMilliseconds: 0)
+            }
+            mediaAttachmentIndexRepairTask = nil
+        }
+    }
+
+    func photoImageData(for photo: PlantDetailPhotoItem) async -> Data? {
+        let loader = SwiftDataMediaBlobLoader(modelContainer: modelContext.container)
+        switch photo.source {
+        case .profile:
+            return await loader.plantAvatarImageData(modelID: plant.persistentModelID)
+        case let .careLog(logModelID, _):
+            return await loader.plantCareLogPhotoData(modelID: logModelID)
         }
     }
 

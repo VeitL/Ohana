@@ -131,7 +131,7 @@ struct VaccinePassportView: View {
     private var pageHeader: some View {
         HStack(spacing: 12) {
             PetAvatarPortraitView(
-                imageData: pet.avatarImageData,
+                pet: pet,
                 fallbackText: pet.avatarEmoji,
                 themeColor: Color(hex: pet.safeThemeColorHex),
                 size: 46,
@@ -485,7 +485,7 @@ struct AddVaccineSheet: View {
     private var header: some View {
         HStack(spacing: 12) {
             PetAvatarPortraitView(
-                imageData: pet.avatarImageData,
+                pet: pet,
                 fallbackText: pet.avatarEmoji,
                 themeColor: Color(hex: pet.safeThemeColorHex),
                 size: 46,

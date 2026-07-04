@@ -128,7 +128,7 @@ enum CarePlanCalendarSync {
     /// Calendar display boundary:
     /// default recommendation events are implementation scaffolding, not user-created calendar items.
     /// Explicit plans created from feature settings use non-default keys or reminder-backed events and remain visible.
-    static func isDefaultGeneratedCalendarPlan(_ event: Event, pets: [Pet]) -> Bool {
+    nonisolated static func isDefaultGeneratedCalendarPlan(_ event: Event, pets: [Pet]) -> Bool {
         guard let pet = MemberLifecycleActiveScheduleResolver.petTarget(for: event, pets: pets) else { return false }
         let petKey = pet.id.uuidString
         if knownDefaultPlanKinds.contains(where: { kind in
@@ -517,15 +517,15 @@ enum CarePlanCalendarSync {
         case playPlan
     }
 
-    private static func eventTitle(pet: Pet, title: String) -> String {
+    private nonisolated static func eventTitle(pet: Pet, title: String) -> String {
         "\(pet.name) \(title)"
     }
 
-    private static func localizedPlanTitleCandidates(_ token: CarePlanTitleToken) -> Set<String> {
+    private nonisolated static func localizedPlanTitleCandidates(_ token: CarePlanTitleToken) -> Set<String> {
         Set(AppLanguage.supported.map { localizedPlanTitle(token, l: L10n($0.code)) })
     }
 
-    private static func localizedPlanTitle(_ token: CarePlanTitleToken, l: L10n = .current) -> String {
+    private nonisolated static func localizedPlanTitle(_ token: CarePlanTitleToken, l: L10n = .current) -> String {
         switch token {
         case .feed:
             l.tr(zh: "喂食", en: "Feeding", de: "Fütterung")
@@ -636,7 +636,7 @@ enum CarePlanCalendarSync {
         }
     }
 
-    private static let knownDefaultPlanKinds: Set<String> = [
+    private nonisolated static let knownDefaultPlanKinds: Set<String> = [
         "default_feed",
         "default_drink",
         "default_walk",
@@ -665,7 +665,7 @@ enum CarePlanCalendarSync {
         "default_breedRiskWaterQuality"
     ]
 
-    private static let storedGeneratedPlanKinds: Set<String> = [
+    private nonisolated static let storedGeneratedPlanKinds: Set<String> = [
         "waterChange",
         "filterClean",
         "filterReplace",
@@ -674,7 +674,7 @@ enum CarePlanCalendarSync {
         "play"
     ]
 
-    private static func defaultPlanItems(for pet: Pet) -> [DefaultPlanItem] {
+    private nonisolated static func defaultPlanItems(for pet: Pet) -> [DefaultPlanItem] {
         switch normalizedSpecies(for: pet) {
         case "dog":
             let exercise = dogExercisePlan(for: pet)
@@ -734,7 +734,7 @@ enum CarePlanCalendarSync {
         }
     }
 
-    private static func normalizedSpecies(for pet: Pet) -> String {
+    private nonisolated static func normalizedSpecies(for pet: Pet) -> String {
         let text = "\(pet.species) \(pet.breed)".lowercased()
         if text.contains("狗") || text.contains("dog") { return "dog" }
         if text.contains("猫") || text.contains("cat") { return "cat" }
@@ -745,7 +745,7 @@ enum CarePlanCalendarSync {
         return "generic"
     }
 
-    private static func dogExercisePlan(for pet: Pet) -> (title: String, recurrenceDays: Int) {
+    private nonisolated static func dogExercisePlan(for pet: Pet) -> (title: String, recurrenceDays: Int) {
         let text = pet.breed.lowercased()
         if containsAny(text, ["边境牧羊", "哈士奇", "阿拉斯加", "澳大利亚牧羊", "拉布拉多", "金毛", "牧羊犬", "working", "husky", "retriever", "collie"]) {
             return (localizedPlanTitle(.dogHighEnergyExercise), 1)
@@ -759,7 +759,7 @@ enum CarePlanCalendarSync {
         return (localizedPlanTitle(.walk), 1)
     }
 
-    private static func groomingInterval(for pet: Pet, fallback: Int) -> Int {
+    private nonisolated static func groomingInterval(for pet: Pet, fallback: Int) -> Int {
         let text = "\(pet.breed) \(pet.coatColor)".lowercased()
         if containsAny(text, ["长毛", "long", "缅因", "布偶", "贵宾", "比熊", "波斯", "挪威森林", "安哥拉"]) {
             return max(3, fallback / 2)
@@ -770,20 +770,20 @@ enum CarePlanCalendarSync {
         return fallback
     }
 
-    private static func fishWaterChangeInterval(for pet: Pet) -> Int {
+    private nonisolated static func fishWaterChangeInterval(for pet: Pet) -> Int {
         let text = "\(pet.species) \(pet.breed)".lowercased()
         if containsAny(text, ["金鱼", "锦鲤", "goldfish", "koi"]) { return 5 }
         return 7
     }
 
-    private static func reptileFeedingInterval(for pet: Pet) -> Int {
+    private nonisolated static func reptileFeedingInterval(for pet: Pet) -> Int {
         let text = pet.breed.lowercased()
         if text.contains("蛇") || text.contains("python") || text.contains("snake") { return 7 }
         if text.contains("龟") || text.contains("turtle") { return 2 }
         return 3
     }
 
-    private static func breedRiskPlanItems(for pet: Pet) -> [DefaultPlanItem] {
+    private nonisolated static func breedRiskPlanItems(for pet: Pet) -> [DefaultPlanItem] {
         let text = "\(pet.species) \(pet.breed)".lowercased()
         var items: [DefaultPlanItem] = []
 
@@ -818,7 +818,7 @@ enum CarePlanCalendarSync {
         return items
     }
 
-    private static func containsAny(_ text: String, _ needles: [String]) -> Bool {
+    private nonisolated static func containsAny(_ text: String, _ needles: [String]) -> Bool {
         needles.contains { text.contains($0.lowercased()) }
     }
 

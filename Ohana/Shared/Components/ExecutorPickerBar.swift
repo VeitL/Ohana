@@ -9,6 +9,7 @@
 //  - 切换后立刻生效于该 Sheet 后续 commit
 //
 
+import SwiftData
 import SwiftUI
 
 struct ExecutorPickerBar: View {
@@ -16,6 +17,7 @@ struct ExecutorPickerBar: View {
     var tint: Color = .goPrimary
     var compact: Bool = false
 
+    @Environment(\.modelContext) private var modelContext
     @AppStorage("currentActiveHumanId") private var activeHumanId: String = ""
     @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
     @ObservedObject private var avatarPipeline = AvatarPipelineRegistry.current
@@ -129,7 +131,7 @@ struct ExecutorPickerBar: View {
 
     private var avatarSourceKey: String {
         guard let human = currentHuman else { return "executor-picker-avatar-empty" }
-        return "\(human.id.uuidString):\(human.avatarImageData?.count ?? 0)"
+        return "\(human.id.uuidString):\(human.avatarThumbnailSignature)"
     }
 
     private func preparedAvatarImage(for human: Human) -> UIImage? {
@@ -141,21 +143,33 @@ struct ExecutorPickerBar: View {
     private func prepareAvatar() async {
         await OhanaFrameScheduler.waitAfterNextFrame(milliseconds: 24)
         guard !Task.isCancelled else { return }
-        guard let human = currentHuman, let data = human.avatarImageData else {
+        guard let human = currentHuman,
+              human.hasAvatarImageAttachment else {
             avatarPipeline.cancel(key: avatarCacheKey)
             avatarSignature = ""
             avatarCacheKey = "executor-picker-avatar-empty"
             return
         }
 
-        let signature = FocusWalletAvatarCache.signature(for: data)
+        let expectedSourceKey = avatarSourceKey
+        let humanID = human.id
+        let modelID = human.persistentModelID
+        let signature = human.avatarThumbnailSignature
         let nextKey = "executor-picker-avatar-\(human.id.uuidString)-\(signature)"
         if avatarCacheKey != nextKey {
             avatarPipeline.cancel(key: avatarCacheKey)
             avatarCacheKey = nextKey
         }
         avatarSignature = signature
-        let payload = FocusWalletAvatarCache.Payload(id: human.id, data: data)
+
+        let loader = SwiftDataMediaBlobLoader(modelContainer: modelContext.container)
+        guard let data = await loader.humanAvatarImageData(modelID: modelID),
+              !Task.isCancelled,
+              avatarSourceKey == expectedSourceKey else {
+            return
+        }
+
+        let payload = FocusWalletAvatarCache.Payload(id: humanID, data: data)
         avatarPipeline.seedPreviewEntries([payload])
         avatarPipeline.preload(
             payloads: [payload],

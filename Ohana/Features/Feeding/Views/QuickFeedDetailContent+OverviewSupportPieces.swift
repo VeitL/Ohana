@@ -123,7 +123,7 @@ extension QuickFeedDetailContent {
 
     func avatarView(size: CGFloat) -> some View {
         PetAvatarPortraitView(
-            imageData: pet.avatarImageData,
+            pet: pet,
             fallbackText: pet.avatarEmoji,
             themeColor: themeColor,
             size: size,

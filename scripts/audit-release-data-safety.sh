@@ -70,8 +70,8 @@ reject_backup_pattern() {
   fi
 }
 
-require_pattern "$shared_container" 'Schema\(ArkSchemaV74\.models\)' \
-  "SharedModelContainer should open the current ArkSchemaV74 model set."
+require_pattern "$shared_container" 'Schema\(ArkSchemaV82\.models\)' \
+  "SharedModelContainer should open the current ArkSchemaV82 model set."
 
 require_pattern "$data_backup_dtos" 'var schemaVersion: Int = 28' \
   "OhanaBackup.schemaVersion should be 28 after adding plant reminder preference backups."
@@ -147,6 +147,30 @@ reject_backup_pattern '\b(pinHash|pinSalt|pinFailedAttempts|pinLockedUntil)\s*:'
 
 reject_backup_pattern '\bh\.pin(Hash|Salt|FailedAttempts|LockedUntil)\b|\bdto\.pin(Hash|Salt|FailedAttempts|LockedUntil)\b' \
   "DataBackupManager must not read or restore Human PIN hash/salt/lockout fields."
+
+require_pattern "Ohana/Models/Pet.swift" 'canAttemptAvatarImageAttachmentLoad' \
+  "Pet legacy avatar reads should use tolerant attachment semantics for upgraded stores."
+
+require_pattern "Ohana/Models/Human.swift" 'canAttemptAvatarImageAttachmentLoad' \
+  "Human legacy avatar reads should use tolerant attachment semantics for upgraded stores."
+
+require_pattern "Ohana/Models/Plant.swift" 'canAttemptAvatarImageAttachmentLoad' \
+  "Plant legacy avatar reads should use tolerant attachment semantics for upgraded stores."
+
+require_pattern "Ohana/Models/PlantCareLog.swift" 'canAttemptPhotoAttachmentLoad' \
+  "Plant care log legacy photos should remain loadable when state is unknown after upgrade."
+
+require_pattern "Ohana/Shared/Media/SwiftDataMediaBlobLoader.swift" 'persistRepairIfNeeded' \
+  "SwiftDataMediaBlobLoader should persist lazy attachment index repairs after blob loads."
+
+require_pattern "Ohana/Shared/Media/MediaAttachmentPresenceBackfillService.swift" 'avatarImageData != nil' \
+  "MediaAttachmentPresenceBackfillService should backfill upgraded avatar presence using store-level nil checks."
+
+require_pattern "Ohana/App/StartupMaintenanceCoordinator.swift" 'media_attachment_presence_backfill' \
+  "Startup maintenance should run the one-time media attachment presence backfill after first render."
+
+require_pattern "OhanaTests/MediaAttachmentUpgradeCompatibilityTests.swift" 'unknownAttachmentStatesRemainLoadableAfterLightweightMigrationDefaults' \
+  "Release data safety should cover upgraded stores whose attachment states default to unknown."
 
 if [[ ${#failures[@]} -eq 0 ]]; then
   echo "Release data safety audit: passed."

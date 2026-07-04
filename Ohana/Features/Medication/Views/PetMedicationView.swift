@@ -221,7 +221,9 @@ struct PetMedicationContentView: View {
     private var header: some View {
         HStack(spacing: 12) {
             FeatureHubAvatar(
-                imageData: pet.avatarImageData,
+                imageCacheID: "pet-medication-\(pet.id.uuidString)",
+                imageSignature: pet.avatarThumbnailSignature,
+                petModelID: pet.persistentModelID,
                 emoji: pet.avatarEmoji,
                 fallback: "🐾",
                 tint: Color(hex: pet.safeThemeColorHex)

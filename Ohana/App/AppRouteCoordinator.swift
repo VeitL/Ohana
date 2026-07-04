@@ -332,8 +332,8 @@ final class AppRouteCoordinator: ObservableObject {
         applySheetDecision(functionMenuPresentationDecision(destination: destination))
     }
 
-    func presentCalendar(entityID: String? = nil, humanID: String? = nil, plantID: String? = nil) {
-        presentSheet(.calendar(entityID: entityID, humanID: humanID, plantID: plantID))
+    func presentCalendar(entityID: String? = nil, humanID: String? = nil, plantID _: String? = nil) {
+        presentSheet(.calendar(entityID: entityID, humanID: humanID, plantID: nil))
     }
 
     func presentCoconutShop(category: ShopItem.ShopCategory = .appIcon) {

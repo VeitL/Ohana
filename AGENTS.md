@@ -41,7 +41,7 @@ step, and close condition. Do not add noise when no meaningful follow-up remains
   app-group identifiers.
 - The latest SwiftData schema lives in
   `Ohana/Models/SharedModelContainer.swift`. As of this consolidation it is
-  `ArkSchemaV74`, but always verify the current `ArkSchemaV*` in that file and
+  `ArkSchemaV82`, but always verify the current `ArkSchemaV*` in that file and
   update this line whenever a schema version lands.
 - Before changing a SwiftData model or adding one, inspect the latest
   `ArkSchemaV*`, add the next schema version, append it to
@@ -174,6 +174,9 @@ user work. Do not use destructive git commands such as `git reset --hard` or
 Use stable per-worktree/per-task DerivedData paths and the repository scripts'
 locks. Only choose a new build cache path for real lock conflicts, cache
 corruption, signing-risk xattrs, or an explicitly isolated validation need.
+For long-session dogfood simulator checks, use
+`scripts/run-dogfood-simulator.sh`; it preserves app data on the pinned
+simulator and stores build products under `.build/DerivedData/dogfood`.
 
 ## iOS Agent Workflow
 
@@ -327,6 +330,14 @@ New high-frequency read models or snapshot builders should fetch and aggregate
 off the main actor with `@ModelActor` or a background `ModelContext`, then send
 small value snapshots back to `MainActor`. Do not add new main-actor
 fetch-and-aggregate loops in read-model stores.
+
+SwiftData `@ModelActor` boundaries must return `Sendable` values only. A
+`@ModelActor` may fetch and aggregate `PersistentModel` objects internally, but
+must not return live SwiftData models, model arrays, or result structs/snapshots
+that contain them across the actor boundary. Return `PersistentIdentifier`,
+UUID/string/date/number fields, or explicit value DTOs instead; `MainActor`
+code may rehydrate a single model from its own `ModelContext` for detail, edit,
+or delete flows.
 
 Core Location stays centralized in `LocationManager` and `PetWalkingManager`.
 Only a running dog walk may keep background location active. Do not create a

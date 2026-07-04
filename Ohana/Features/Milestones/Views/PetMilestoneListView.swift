@@ -89,7 +89,7 @@ struct PetMilestoneListContentView: View {
     private var headerSection: some View {
         HStack(spacing: 16) {
             PetAvatarPortraitView(
-                imageData: pet.avatarImageData,
+                pet: pet,
                 fallbackText: pet.avatarEmoji,
                 themeColor: Color(hex: pet.safeThemeColorHex),
                 size: 56,
@@ -162,8 +162,15 @@ struct PetMilestoneListContentView: View {
                                     .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                                     .lineLimit(1)
                             }
-                            if let photoData = milestone.photoData {
-                                AsyncDecodedImageView(data: photoData) { image in
+                            if milestone.canAttemptPhotoAttachmentLoad {
+                                AsyncDecodedImageView(
+                                    cacheID: "pet-milestone-card-\(milestone.id.uuidString)",
+                                    sourceSignature: milestone.photoThumbnailSignature,
+                                    maxPixel: 520,
+                                    dataProvider: {
+                                        milestonePhotoData(for: milestone)
+                                    }
+                                ) { image in
                                     Image(uiImage: image)
                                         .resizable().scaledToFill()
                                         .frame(maxWidth: .infinity).frame(height: 120)
@@ -184,6 +191,16 @@ struct PetMilestoneListContentView: View {
                 }
             }
         }
+    }
+
+    @MainActor
+    private func milestonePhotoData(for milestone: PetMilestone) -> Data? {
+        guard milestone.canAttemptPhotoAttachmentLoad,
+              let rehydrated = modelContext.model(for: milestone.persistentModelID) as? PetMilestone,
+              rehydrated.canAttemptPhotoAttachmentLoad else {
+            return nil
+        }
+        return rehydrated.photoData
     }
 
     // MARK: - Empty State
@@ -553,7 +570,7 @@ struct MapLocationPickerSheet: View {
                         GoKeyboard.dismiss()
                     }
                     .font(OhanaFont.adaptive(size: 15, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                    .foregroundStyle(Color.goLime)
+                    .foregroundStyle(Color.goPrimary)
                 }
             }
             .onChange(of: searchText) { _, new in
@@ -642,9 +659,16 @@ private struct MilestoneDetailSheet: View {
                         .padding(.top, 8)
 
                         // 照片（可点击全屏预览）
-                        if let data = milestone.photoData {
+                        if milestone.canAttemptPhotoAttachmentLoad {
                             Button { showingPhoto = true } label: {
-                                AsyncDecodedImageView(data: data) { image in
+                                AsyncDecodedImageView(
+                                    cacheID: "pet-milestone-detail-\(milestone.id.uuidString)",
+                                    sourceSignature: milestone.photoThumbnailSignature,
+                                    maxPixel: 720,
+                                    dataProvider: {
+                                        photoData()
+                                    }
+                                ) { image in
                                     Image(uiImage: image)
                                         .resizable().scaledToFill()
                                         .frame(maxWidth: .infinity).frame(height: 220)
@@ -668,7 +692,14 @@ private struct MilestoneDetailSheet: View {
                             .fullScreenCover(isPresented: $showingPhoto) {
                                 ZStack {
                                     Color.arkInk.ignoresSafeArea()
-                                    AsyncDecodedImageView(data: data) { image in
+                                    AsyncDecodedImageView(
+                                        cacheID: "pet-milestone-fullscreen-\(milestone.id.uuidString)",
+                                        sourceSignature: milestone.photoThumbnailSignature,
+                                        maxPixel: 2400,
+                                        dataProvider: {
+                                            photoData()
+                                        }
+                                    ) { image in
                                         Image(uiImage: image).resizable().scaledToFit().ignoresSafeArea()
                                     } placeholder: {
                                         ProgressView()
@@ -759,5 +790,15 @@ private struct MilestoneDetailSheet: View {
                 }
             } message: { Text("「\(milestone.title)」将被永久删除。") }
         }
+    }
+
+    @MainActor
+    private func photoData() -> Data? {
+        guard milestone.canAttemptPhotoAttachmentLoad,
+              let rehydrated = modelContext.model(for: milestone.persistentModelID) as? PetMilestone,
+              rehydrated.canAttemptPhotoAttachmentLoad else {
+            return nil
+        }
+        return rehydrated.photoData
     }
 }

@@ -316,8 +316,8 @@ nonisolated enum FocusHomeReminderDeepLinkRouter {
             return .calendar(entityId: petId.uuidString, humanId: nil, plantId: nil)
         }
         if role.isPlantScoped,
-           let plantId = DomainEntityLinkRegistry.plantId(for: link) {
-            return .calendar(entityId: nil, humanId: nil, plantId: plantId.uuidString)
+           DomainEntityLinkRegistry.plantId(for: link) != nil {
+            return .calendar(entityId: nil, humanId: nil, plantId: nil)
         }
         return .calendar(entityId: nil, humanId: nil, plantId: nil)
     }

@@ -23,6 +23,7 @@ struct PetBasicInfoDetailView: View {
     @State var rainbowBridgeDate = Date()
     @State var healthSummary = PetBasicInfoHealthSummary.empty
     @State var healthSummaryLoadTask: Task<Void, Never>?
+    @State var preparedVetVisitSummaryText: String?
 
     // Edit state mirrors
     @State var eName = ""
@@ -119,6 +120,9 @@ struct PetBasicInfoDetailView: View {
         }
         .onAppear {
             scheduleHealthSummaryLoad()
+        }
+        .task(id: vetVisitSummaryPreparationSignature) {
+            await prepareVetVisitSummaryText()
         }
         .onDisappear {
             healthSummaryLoadTask?.cancel()

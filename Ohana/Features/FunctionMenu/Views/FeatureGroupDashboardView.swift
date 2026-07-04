@@ -197,15 +197,6 @@ struct FeatureGroupDashboardView: View {
                     parentPath.append(FMDest.plantDetail(plantID))
                 }
             )
-        case .plantsCalendar:
-            FunctionMenuDestinationRouter(
-                destination: item.destination,
-                parentPath: $parentPath,
-                pets: pets,
-                humans: humans,
-                petAggregateSummaries: petAggregateSummaries,
-                plants: plants
-            )
         default:
             EmptyView()
         }
@@ -317,12 +308,6 @@ private struct FeatureGroupItem: Identifiable {
                     title: l.tr(zh: "成长照片", en: "Growth Photos", de: "Wachstumsfotos"),
                     icon: "photo.stack.fill",
                     .plantsPhotos
-                ),
-                destination(
-                    id: "plants-calendar",
-                    title: l.tr(zh: "植物日历", en: "Plant Calendar", de: "Pflanzenkalender"),
-                    icon: "calendar",
-                    .plantsCalendar
                 )
             ]
         case .oasisRewards:

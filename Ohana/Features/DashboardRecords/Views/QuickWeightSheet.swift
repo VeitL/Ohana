@@ -39,7 +39,7 @@ struct QuickWeightSheet: View {
                 // 宠物头像 + 名字
                 HStack(spacing: 10) {
                     PetAvatarPortraitView(
-                        imageData: pet.avatarImageData,
+                        pet: pet,
                         fallbackText: pet.avatarEmoji.isEmpty ? String(pet.name.prefix(1)) : pet.avatarEmoji,
                         themeColor: themeColor,
                         size: 40,

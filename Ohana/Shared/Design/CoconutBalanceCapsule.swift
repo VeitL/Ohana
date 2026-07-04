@@ -80,7 +80,7 @@ struct CoconutBalanceCapsule: View {
     }
 
     private func floatingDeltaLabel(_ delta: Int) -> some View {
-        let tint = delta > 0 ? Color.goLime : Color.goRed
+        let tint = delta > 0 ? Color.goPrimary : Color.goRed
         return HStack(alignment: .firstTextBaseline, spacing: 2) {
             Text(delta > 0 ? "+\(delta)" : "\(delta)")
                 .font(OhanaFont.subheadline(.black))

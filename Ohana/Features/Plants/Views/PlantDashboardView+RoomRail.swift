@@ -8,6 +8,66 @@
 import SwiftUI
 
 extension PlantDashboardView {
+    @ViewBuilder
+    var plantFloatingEdgeControls: some View {
+        if showsPlantViewSwitcherRail || showsRoomEdgeRail {
+            VStack(spacing: 10) {
+                if showsPlantViewSwitcherRail {
+                    plantViewSwitcherRail
+                }
+
+                if showsRoomEdgeRail {
+                    roomEdgeRail
+                }
+            }
+            .padding(.trailing, 4)
+            .padding(.top, 132)
+            .padding(.bottom, 112)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)
+            .transition(.opacity.combined(with: .move(edge: .trailing)))
+            .zIndex(45)
+        }
+    }
+
+    var plantViewSwitcherRail: some View {
+        VStack(spacing: 8) {
+            ForEach(PlantDashboardPlantsViewStyle.allCases) { style in
+                plantViewSwitcherButton(style)
+            }
+        }
+        .padding(.vertical, 8)
+        .padding(.horizontal, 5)
+        .background(roomEdgeRailBackground)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("plant-dashboard-view-switcher-rail")
+    }
+
+    func plantViewSwitcherButton(_ style: PlantDashboardPlantsViewStyle) -> some View {
+        let isSelected = selectedPlantsViewStyle == style
+        return Button {
+            selectPlantViewStyle(style)
+        } label: {
+            VStack(spacing: 2) {
+                Image(systemName: style.icon)
+                    .font(OhanaFont.adaptive(size: 12, weight: .black))
+                    .foregroundStyle(isSelected ? Color.arkInk : Color.ohanaPrimaryText)
+                    .frame(height: 14)
+                    .accessibilityHidden(true)
+                Text(style.shortTitle(l))
+                    .font(OhanaFont.adaptive(size: 8, weight: .black, design: .rounded))
+                    .foregroundStyle(isSelected ? Color.arkInk.opacity(0.74) : Color.ohanaSecondaryText)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.62)
+            }
+            .frame(width: 44, height: 44)
+            .background(isSelected ? Color.goPrimary : Color.ohanaControlFill.opacity(0.62), in: Circle())
+        }
+        .buttonStyle(ScaleButtonStyle())
+        .accessibilityLabel(style.title(l))
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+        .accessibilityIdentifier("plant-dashboard-view-\(style.rawValue)")
+    }
+
     var roomEdgeRail: some View {
         VStack(spacing: 8) {
             roomEdgeRailButton(
@@ -97,7 +157,7 @@ extension PlantDashboardView {
                     .lineLimit(1)
             }
             .frame(width: 44, height: 44)
-            .background(isSelected ? Color.goLime : Color.ohanaControlFill.opacity(0.62), in: Circle())
+            .background(isSelected ? Color.goPrimary : Color.ohanaControlFill.opacity(0.62), in: Circle())
             .overlay(alignment: .topTrailing) {
                 if dueCount > 0 {
                     Circle()

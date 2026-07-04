@@ -1,6 +1,6 @@
 import Foundation
 
-enum DomainColorToken: Equatable, Hashable {
+nonisolated enum DomainColorToken: Equatable, Hashable, Sendable {
     case hex(String)
     case goPrimary
     case goPurple

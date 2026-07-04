@@ -300,7 +300,7 @@ struct IslandWeightDashboardContentView: View {
                 weightEntityChip(
                     title: l.tr(zh: "全部", en: "All", de: "Alle"),
                     icon: "sparkles",
-                    tint: Color.goLime,
+                    tint: Color.goPrimary,
                     isSelected: selectedSeriesID == nil
                 ) {
                     selectedSeriesID = nil

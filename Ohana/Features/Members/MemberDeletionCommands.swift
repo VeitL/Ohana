@@ -192,7 +192,17 @@ enum MemberDeletionCommandService {
 
     @MainActor
     private static func fetchPlantEvents(_ plant: Plant, context: ModelContext) -> [Event] {
-        fetchEvents(context: context, operation: "fetch plant-related events for deletion").filter { event in
+        let plantId = plant.id.uuidString
+        let descriptor = FetchDescriptor<Event>(
+            predicate: #Predicate<Event> { event in
+                event.relatedEntityId == plantId
+            }
+        )
+        return fetchMemberDeletionModelsOrLog(
+            descriptor,
+            context: context,
+            operation: "fetch plant-related events for deletion"
+        ).filter { event in
             eventBelongsToPlant(event, plantId: plant.id.uuidString)
         }
     }

@@ -86,7 +86,9 @@ struct PetBondVaultContentView: View {
     private var header: some View {
         HStack(spacing: 12) {
             FeatureHubAvatar(
-                imageData: pet.avatarImageData,
+                imageCacheID: "pet-bond-vault-\(pet.id.uuidString)",
+                imageSignature: pet.avatarThumbnailSignature,
+                petModelID: pet.persistentModelID,
                 emoji: pet.avatarEmoji,
                 fallback: pet.speciesEmoji,
                 tint: Color(hex: pet.safeThemeColorHex)

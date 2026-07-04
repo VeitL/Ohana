@@ -182,7 +182,9 @@ struct CoHealthDashboardFullContentView: View {
             ForEach(associatedPets) { pet in
                 HStack(spacing: 14) {
                     PetAvatarPortraitView(
-                        imageData: pet.avatarImageData,
+                        cacheID: pet.id,
+                        imageSignature: pet.avatarImageSignature,
+                        imageDataProvider: { pet.avatarImageData },
                         fallbackText: pet.avatarEmoji,
                         themeColor: Color(hex: pet.themeColorHex),
                         size: 44,

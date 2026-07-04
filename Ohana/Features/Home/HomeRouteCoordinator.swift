@@ -322,13 +322,13 @@ final class HomeRouteCoordinator: ObservableObject {
         modal = .accountSwitcher
     }
 
-    func openCalendar(entityID: String? = nil, humanID: String? = nil, plantID: String? = nil) {
+    func openCalendar(entityID: String? = nil, humanID: String? = nil, plantID _: String? = nil) {
         if let appSheetRouteSink {
-            appSheetRouteSink(.appSheet(.calendar(entityID: entityID, humanID: humanID, plantID: plantID)))
+            appSheetRouteSink(.appSheet(.calendar(entityID: entityID, humanID: humanID, plantID: nil)))
             modal = nil
             return
         }
-        modal = .calendar(entityID: entityID, humanID: humanID, plantID: plantID)
+        modal = .calendar(entityID: entityID, humanID: humanID, plantID: nil)
     }
 
     func openFullScreen(_ route: HomeFullScreenRoute) {

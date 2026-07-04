@@ -26,7 +26,6 @@ struct FunctionMenuSheet: View {
         case .featureGroup,
              .featureAggregate,
              .growthRoadmap,
-             .calendar,
              .familyWeeklyReport,
              .careLedgerAnalysis,
              .reminderObservability,
@@ -185,7 +184,6 @@ struct FunctionMenuSheet: View {
         case .featureGroup,
              .featureAggregate,
              .growthRoadmap,
-             .calendar,
              .familyWeeklyReport,
              .careLedgerAnalysis,
              .reminderObservability,
@@ -223,8 +221,6 @@ struct FunctionMenuSheet: View {
             (group.title(l: l), group.icon)
         case let .featureAggregate(feature):
             (feature.title(l: l), feature.icon)
-        case .calendar:
-            (l.tr(zh: "日历", en: "Calendar", de: "Kalender"), "calendar")
         case .familyWeeklyReport:
             (l.tr(zh: "家庭周报", en: "Weekly Report", de: "Wochenbericht"), "chart.bar.xaxis")
         case .careLedgerAnalysis:
@@ -245,10 +241,6 @@ struct FunctionMenuSheet: View {
             (l.tr(zh: "植物列表", en: "Plant List", de: "Pflanzenliste"), "list.bullet.rectangle.fill")
         case .plantsPhotos:
             (l.tr(zh: "成长照片", en: "Growth Photos", de: "Wachstumsfotos"), "photo.stack.fill")
-        case .plantsCalendar:
-            (l.tr(zh: "植物日历", en: "Plant Calendar", de: "Pflanzenkalender"), "calendar")
-        case .plantCalendar:
-            (l.tr(zh: "植物日历", en: "Plant Calendar", de: "Pflanzenkalender"), "calendar")
         default:
             (l.tr(zh: "详情", en: "Details", de: "Details"), "square.grid.2x2.fill")
         }

@@ -87,9 +87,10 @@ struct FocusHomeVerticalSolidCardSurface: View {
                 rightInfoColumn(width: w, height: h, progress: p)
                     .zIndex(5)
             }
+            .compositingGroup() // smoothness: collapse internal text/avatar shadows into one card surface before hero scaling.
             .clipShape(shape)
             .saturation(card.hasPassedAway ? 0 : 1)
-            .shadow(color: Color.arkInk.opacity(lerp(0.20, 0.28, p)), radius: lerp(15, 24, p), x: 0, y: lerp(10, 18, p)) // ui-v4: allow intentional home card depth
+            .shadow(color: Color.arkInk.opacity(card.hasPassedAway ? 0.14 : 0.22), radius: 16, x: 0, y: 11) // ui-v4: allow stable home card depth without animating shadow rasterization
             .accessibilityElement(children: .combine)
             .accessibilityLabel("\(card.name), \(card.kind)")
         }
@@ -179,7 +180,7 @@ struct FocusHomeVerticalSolidCardSurface: View {
                 )
                 .offset(y: card.isHuman ? lerp(0, -20, visualProgress) : lerp(0, -34, visualProgress))
                 .shadow(color: Color.goCardWhite.opacity(transparent ? 0.20 : 0.08), radius: 3, y: 0) // ui-v4: allow intentional avatar cutout crispness
-                .shadow(color: Color.arkInk.opacity(transparent ? 0.28 : 0.16), radius: 18, y: 12) // ui-v4: allow intentional avatar depth
+                .shadow(color: Color.arkInk.opacity(transparent ? 0.24 : 0.14), radius: 12, y: 8) // ui-v4: allow stable avatar depth during card hero motion
         } else {
             Image(systemName: avatarSymbol)
                 .font(.system(size: width * lerp(0.43, 0.47, visualProgress), weight: .regular))

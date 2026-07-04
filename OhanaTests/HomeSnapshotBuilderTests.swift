@@ -329,9 +329,9 @@ struct HomeSnapshotBuilderTests {
 
     @Test func avatarPreloadSignatureUsesPreparedSnapshotCardsOnly() {
         let visiblePet = Pet(name: "Momo", species: "猫")
-        visiblePet.avatarImageData = Data([1, 2, 3, 4])
+        visiblePet.updateAvatarImageData(Data([1, 2, 3, 4]))
         let hiddenPet = Pet(name: "Hidden", species: "狗")
-        hiddenPet.avatarImageData = Data([8, 7, 6, 5])
+        hiddenPet.updateAvatarImageData(Data([8, 7, 6, 5]))
 
         let snapshot = makeVerticalSnapshot(
             from: makeVerticalSource(
@@ -339,10 +339,15 @@ struct HomeSnapshotBuilderTests {
                 hiddenPetIDsRaw: hiddenPet.id.uuidString
             )
         )
-        let payloads = VerticalSolidHomePreloadPlanner.avatarPayloads(snapshot: snapshot)
-        let signature = VerticalSolidHomePreloadPlanner.avatarSignature(for: payloads)
+        let requests = VerticalSolidHomePreloadPlanner.mediaRequests(
+            snapshot: snapshot,
+            pets: [visiblePet, hiddenPet],
+            humans: [],
+            activeHuman: nil
+        )
+        let signature = VerticalSolidHomePreloadPlanner.mediaSignature(for: requests)
 
-        #expect(payloads.map(\.id) == [visiblePet.id])
+        #expect(requests.map(\.id) == [visiblePet.id])
         #expect(signature.contains(visiblePet.id.uuidString))
         #expect(!signature.contains(hiddenPet.id.uuidString))
     }
@@ -350,7 +355,7 @@ struct HomeSnapshotBuilderTests {
     @Test func verticalSnapshotCardsCarryAvatarSignature() throws {
         let avatarData = Data([2, 4, 6, 8, 10])
         let pet = Pet(name: "Momo", species: "猫")
-        pet.avatarImageData = avatarData
+        pet.updateAvatarImageData(avatarData)
 
         let snapshot = makeVerticalSnapshot(
             from: makeVerticalSource(pets: [pet])
@@ -358,15 +363,36 @@ struct HomeSnapshotBuilderTests {
         let card = try #require(snapshot.cards.first)
 
         #expect(card.avatarImageSignature == FocusWalletAvatarCache.signature(for: avatarData))
+        #expect(card.avatarImageData == nil)
+    }
+
+    @Test func focusCardsKeepMemberAvatarSignatureWithoutEmbeddingDataByDefault() {
+        let petAvatarData = Data([1, 1, 2, 3, 5])
+        let pet = Pet(name: "Momo", species: "猫")
+        pet.updateAvatarImageData(petAvatarData)
+
+        let humanAvatarData = Data([8, 13, 21, 34])
+        let human = Human(name: "Owner")
+        human.updateAvatarImageData(humanAvatarData)
+
+        let petCard = FocusCard.from(pet)
+        let humanCard = FocusCard.from(human)
+
+        #expect(petCard.avatarImageData == nil)
+        #expect(petCard.avatarImageSignature == MediaPayloadSignature.signature(for: petAvatarData))
+        #expect(petCard.modelID == pet.persistentModelID)
+        #expect(humanCard.avatarImageData == nil)
+        #expect(humanCard.avatarImageSignature == MediaPayloadSignature.signature(for: humanAvatarData))
+        #expect(humanCard.modelID == human.persistentModelID)
     }
 
     @Test func popoutPreloadSignatureUsesPreparedSnapshotCardsOnly() {
         let visiblePet = Pet(name: "Momo", species: "猫")
         visiblePet.cardStyleRaw = "popout"
-        visiblePet.cardPopoutImageData = Data([1, 3, 5, 7])
+        visiblePet.updateCardPopoutImageData(Data([1, 3, 5, 7]))
         let hiddenPet = Pet(name: "Hidden", species: "狗")
         hiddenPet.cardStyleRaw = "popout"
-        hiddenPet.cardPopoutImageData = Data([2, 4, 6, 8])
+        hiddenPet.updateCardPopoutImageData(Data([2, 4, 6, 8]))
 
         let snapshot = makeVerticalSnapshot(
             from: makeVerticalSource(
@@ -374,10 +400,16 @@ struct HomeSnapshotBuilderTests {
                 hiddenPetIDsRaw: hiddenPet.id.uuidString
             )
         )
-        let payloads = VerticalSolidHomePreloadPlanner.popoutPayloads(snapshot: snapshot)
-        let signature = VerticalSolidHomePreloadPlanner.popoutSignature(for: payloads)
+        let requests = VerticalSolidHomePreloadPlanner.mediaRequests(
+            snapshot: snapshot,
+            pets: [visiblePet, hiddenPet],
+            humans: [],
+            activeHuman: nil
+        )
+        let signature = VerticalSolidHomePreloadPlanner.mediaSignature(for: requests)
 
-        #expect(payloads.map(\.id) == [visiblePet.id])
+        #expect(requests.map(\.id) == [visiblePet.id])
+        #expect(requests.first?.wantsPopout == true)
         #expect(signature.contains(visiblePet.id.uuidString))
         #expect(!signature.contains(hiddenPet.id.uuidString))
     }
@@ -386,7 +418,7 @@ struct HomeSnapshotBuilderTests {
         let popoutData = Data([9, 7, 5, 3])
         let pet = Pet(name: "Momo", species: "猫")
         pet.cardStyleRaw = "popout"
-        pet.cardPopoutImageData = popoutData
+        pet.updateCardPopoutImageData(popoutData)
 
         let snapshot = makeVerticalSnapshot(
             from: makeVerticalSource(pets: [pet])
@@ -394,6 +426,7 @@ struct HomeSnapshotBuilderTests {
         let card = try #require(snapshot.cards.first)
 
         #expect(card.cardPopoutImageSignature == FocusWalletAvatarCache.signature(for: popoutData))
+        #expect(card.cardPopoutImageData == nil)
     }
 
     @Test func verticalSourceSignatureIncludesPetBondRevision() {
@@ -533,7 +566,7 @@ struct HomeSnapshotBuilderTests {
     @MainActor
     @Test func liveAvatarSourceDoesNotCreateEntryFromRawCardData() {
         let pet = Pet(name: "Momo", species: "猫")
-        pet.avatarImageData = Data([3, 1, 4, 1, 5, 9])
+        pet.updateAvatarImageData(Data([3, 1, 4, 1, 5, 9]))
         let card = FocusCard.from(pet)
 
         let source = FocusHomeFrozenAvatarSource.live(for: card)

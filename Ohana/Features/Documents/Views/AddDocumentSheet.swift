@@ -94,7 +94,7 @@ struct AddDocumentContentSheet: View {
                     VStack(spacing: 14) {
                         HStack(spacing: 12) {
                             PetAvatarPortraitView(
-                                imageData: pet.avatarImageData,
+                                pet: pet,
                                 fallbackText: pet.avatarEmoji.isEmpty ? String(pet.name.prefix(1)) : pet.avatarEmoji,
                                 themeColor: petThemeColor,
                                 size: 48,
@@ -412,7 +412,7 @@ struct AddDocumentContentSheet: View {
                         GoKeyboard.dismiss()
                     }
                     .font(OhanaFont.adaptive(size: 15, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                    .foregroundStyle(Color.goLime)
+                    .foregroundStyle(Color.goPrimary)
                 }
             }
         }

@@ -8,7 +8,7 @@
 
 import Foundation
 
-struct PlantGrowthDiaryExportPayload: Codable, Equatable {
+nonisolated struct PlantGrowthDiaryExportPayload: Codable, Equatable {
     var schemaVersion: Int
     var exportedAt: Date
     var plantID: UUID
@@ -21,7 +21,7 @@ struct PlantGrowthDiaryExportPayload: Codable, Equatable {
     var entries: [PlantGrowthDiaryExportEntry]
 }
 
-struct PlantGrowthDiaryExportEntry: Codable, Equatable, Identifiable {
+nonisolated struct PlantGrowthDiaryExportEntry: Codable, Equatable, Identifiable {
     var id: UUID
     var date: Date
     var careTypeRaw: String
@@ -71,16 +71,18 @@ enum PlantGrowthDiaryExportService {
         let entries = plant.careLogs
             .sorted { $0.date < $1.date }
             .map { log in
-                PlantGrowthDiaryExportEntry(
+                let embeddedPhotoData = includePhotos ? log.photoData : nil
+                let hasPhoto = log.hasPhotoAttachment || embeddedPhotoData != nil
+                return PlantGrowthDiaryExportEntry(
                     id: log.id,
                     date: log.date,
                     careTypeRaw: log.careType.rawValue,
                     careTypeTitle: log.careType.displayName(l: l),
                     note: log.note,
                     healthStatusRaw: log.healthStatusRaw.isEmpty ? nil : log.healthStatusRaw,
-                    hasPhoto: log.photoData != nil,
-                    photoByteCount: log.photoData?.count ?? 0,
-                    photoBase64: includePhotos ? log.photoData?.base64EncodedString() : nil
+                    hasPhoto: hasPhoto,
+                    photoByteCount: embeddedPhotoData?.count ?? 0,
+                    photoBase64: embeddedPhotoData?.base64EncodedString()
                 )
             }
 
@@ -123,7 +125,7 @@ enum PlantGrowthDiaryExportService {
         )
     }
 
-    static func markdown(
+    nonisolated static func markdown(
         for payload: PlantGrowthDiaryExportPayload,
         includePhotoPlaceholders: Bool = true,
         languageCode: String = AppLanguage.code
@@ -157,7 +159,11 @@ enum PlantGrowthDiaryExportService {
                     en: "kept in the Ohana backup/export source",
                     de: "in der Ohana-Backup-/Exportquelle enthalten"
                 )
-                lines.append("- \(photoLabel): \(entry.photoByteCount) bytes, \(sourceCopy)")
+                if entry.photoByteCount > 0 {
+                    lines.append("- \(photoLabel): \(entry.photoByteCount) bytes, \(sourceCopy)")
+                } else {
+                    lines.append("- \(photoLabel): \(sourceCopy)")
+                }
             }
             lines.append("")
         }

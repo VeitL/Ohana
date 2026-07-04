@@ -22,8 +22,9 @@ private struct DailyStreakAvatarIndex {
         var signatures: [UUID: String] = [:]
         var payloads: [FocusWalletAvatarCache.Payload] = []
         for human in humans {
-            guard let data = human.avatarImageData else { continue }
-            let signature = FocusWalletAvatarCache.signature(for: data)
+            guard human.hasAvatarImageAttachment,
+                  let data = human.avatarImageData else { continue }
+            let signature = human.avatarThumbnailSignature
             signatures[human.id] = signature
             payloads.append(FocusWalletAvatarCache.Payload(id: human.id, data: data))
         }
@@ -759,7 +760,7 @@ struct DailyStreakDetailView: View {
 
     private var avatarSourceKey: String {
         humans.map { human in
-            "\(human.id.uuidString):\(human.avatarImageData?.count ?? 0)"
+            "\(human.id.uuidString):\(human.avatarThumbnailSignature)"
         }
         .joined(separator: "|")
     }

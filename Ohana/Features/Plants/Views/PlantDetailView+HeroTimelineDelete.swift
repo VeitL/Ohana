@@ -15,7 +15,7 @@ extension PlantDetailContentView {
                 Circle()
                     .fill(
                         LinearGradient(
-                            colors: [Color.arkMint.opacity(0.58), Color.goLime.opacity(0.92)],
+                            colors: [Color.arkMint.opacity(0.58), Color.goPrimary.opacity(0.92)],
                             startPoint: .topLeading,
                             endPoint: .bottomTrailing
                         )
@@ -73,7 +73,7 @@ extension PlantDetailContentView {
         .padding(.horizontal, 16)
     }
 
-    func profileChip(icon: String, text: String, tint: Color = Color.goLime) -> some View {
+    func profileChip(icon: String, text: String, tint: Color = Color.goPrimary) -> some View {
         HStack(spacing: 6) {
             Image(systemName: icon)
                 .font(OhanaFont.adaptive(size: 11, weight: .bold))
@@ -235,7 +235,7 @@ extension PlantDetailContentView {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Image(systemName: "leaf.fill").accessibilityHidden(true)
-                    .foregroundStyle(Color.goLime)
+                    .foregroundStyle(Color.goPrimary)
                 Text(l.tr(zh: "施肥状态", en: "Fertilizing status", de: "Düngestatus"))
                     .font(OhanaFont.adaptive(size: 16, weight: .bold, design: .rounded))
                 Spacer()
@@ -243,7 +243,7 @@ extension PlantDetailContentView {
 
             if let days = plant.daysSinceFertilized {
                 let progress = min(1.0, Double(days) / Double(max(fertilizingIntervalDays, 1)))
-                let color: Color = progress < 0.5 ? Color.goLime : (progress < 0.8 ? Color.goYellow : Color.goRed)
+                let color: Color = progress < 0.5 ? Color.goPrimary : (progress < 0.8 ? Color.goYellow : Color.goRed)
 
                 HStack {
                     Text(l.tr(zh: "距上次施肥 \(days) 天", en: "\(days) days since fertilizing", de: "\(days) Tage seit dem Düngen"))
@@ -311,7 +311,7 @@ extension PlantDetailContentView {
                 .foregroundStyle(Color.ohanaPrimaryText)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 14)
-                .background(Color.goLime.opacity(0.6), in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
+                .background(Color.goPrimary.opacity(0.6), in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
                 .overlay {
                     RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous)
                         .strokeBorder(Color.ohanaCardSurface.opacity(0.24), lineWidth: 1)
@@ -350,7 +350,7 @@ extension PlantDetailContentView {
     var historyCard: some View {
         VStack(alignment: .leading, spacing: 12) {
             detailHeader(icon: "clock.arrow.circlepath", title: l.tr(zh: "护理历史", en: "Care history", de: "Pflegeverlauf"))
-            if recentLogs.isEmpty {
+            if (logSummary?.logCount ?? 0) == 0 {
                 HStack(alignment: .top, spacing: 10) {
                     Image(systemName: "leaf.arrow.circlepath") // a11y: allow decorative empty timeline glyph; adjacent text explains the state.
                         .accessibilityHidden(true)
@@ -377,7 +377,7 @@ extension PlantDetailContentView {
 
                 VStack(spacing: 0) {
                     ForEach(Array(recentLogs.prefix(6).enumerated()), id: \.element.id) { index, log in
-                        timelineLogRow(log, isLast: index == min(recentLogs.count, 6) - 1)
+                        timelineLogRow(log, isLast: index == min(logSummary?.logCount ?? 0, 6) - 1)
                     }
                 }
             }
@@ -393,10 +393,10 @@ extension PlantDetailContentView {
             timelineSummaryPill(
                 icon: "tray.full.fill",
                 title: l.tr(zh: "记录", en: "Logs", de: "Protokolle"),
-                value: "\(recentLogs.count)",
-                tint: Color.goLime
+                value: "\(logSummary?.logCount ?? 0)",
+                tint: Color.goPrimary
             )
-            if let latest = recentLogs.first {
+            if let latest = logSummary?.latestLog {
                 timelineSummaryPill(
                     icon: careSymbol(for: latest.careType),
                     title: l.tr(zh: "最近", en: "Latest", de: "Zuletzt"),
@@ -433,7 +433,7 @@ extension PlantDetailContentView {
         .accessibilityElement(children: .combine)
     }
 
-    func timelineLogRow(_ log: PlantCareLog, isLast: Bool) -> some View {
+    func timelineLogRow(_ log: PlantDetailLogSnapshot, isLast: Bool) -> some View {
         HStack(alignment: .top, spacing: 10) {
             VStack(spacing: 0) {
                 Image(systemName: careSymbol(for: log.careType)) // a11y: allow decorative timeline glyph; row text names the care action.
@@ -470,11 +470,11 @@ extension PlantDetailContentView {
         .accessibilityElement(children: .combine)
     }
 
-    func timelineDateText(for log: PlantCareLog) -> String {
+    func timelineDateText(for log: PlantDetailLogSnapshot) -> String {
         log.date.formatted(date: .abbreviated, time: .shortened)
     }
 
-    func timelineNoteText(for log: PlantCareLog) -> String? {
+    func timelineNoteText(for log: PlantDetailLogSnapshot) -> String? {
         let note = log.note.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !note.isEmpty,
               !note.hasPrefix("defer:"),
@@ -487,7 +487,7 @@ extension PlantDetailContentView {
         case .watering, .misting:
             Color.goTeal
         case .fertilizing, .newLeaf:
-            Color.goLime
+            Color.goPrimary
         case .repotting, .pruning, .rotating, .leafCleaning, .pestCheck, .photo, .customNote:
             Color.goYellow
         case .yellowLeaf, .pestFound:
@@ -551,7 +551,7 @@ extension PlantDetailContentView {
                     cancelPendingDelete()
                 }
                 .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
-                .foregroundStyle(Color.goLime)
+                .foregroundStyle(Color.goPrimary)
                 .accessibilityIdentifier("plant-detail-delete-undo")
 
                 Button(l.tr(zh: "立即删除", en: "Delete now", de: "Jetzt löschen"), role: .destructive) {
@@ -590,8 +590,8 @@ extension PlantDetailContentView {
                     .strokeBorder(Color.goRed.opacity(0.2), lineWidth: 1)
             }
         }
-        .disabled(isDeletePending)
-        .opacity(isDeletePending ? 0.55 : 1)
+        .disabled(isDeletePending || isDeleteCommitting)
+        .opacity(isDeletePending || isDeleteCommitting ? 0.55 : 1)
         .accessibilityIdentifier("plant-detail-delete-action")
         .padding(.horizontal, 16)
     }

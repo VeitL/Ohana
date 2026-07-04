@@ -76,9 +76,9 @@ struct PlantDashboardCarePlanSheet: View {
             HStack(alignment: .top, spacing: 12) {
                 Image(systemName: "calendar.badge.clock") // a11y: allow decorative care-plan glyph; heading and metrics name this sheet.
                     .font(OhanaFont.adaptive(size: 18, weight: .black))
-                    .foregroundStyle(Color.goLime)
+                    .foregroundStyle(Color.goPrimary)
                     .frame(width: 44, height: 44)
-                    .background(Color.goLime.opacity(0.16), in: Circle())
+                    .background(Color.goPrimary.opacity(0.16), in: Circle())
                     .accessibilityHidden(true)
 
                 VStack(alignment: .leading, spacing: 4) {
@@ -116,7 +116,7 @@ struct PlantDashboardCarePlanSheet: View {
                     icon: "calendar",
                     value: "\(upcomingTasks.count)",
                     label: l.tr(zh: "即将", en: "Upcoming", de: "Bald"),
-                    tint: Color.goLime
+                    tint: Color.goPrimary
                 )
             }
 
@@ -131,7 +131,7 @@ struct PlantDashboardCarePlanSheet: View {
                             .foregroundStyle(Color.arkInk)
                             .frame(maxWidth: .infinity)
                             .frame(minHeight: 44)
-                            .background(Color.goLime, in: Capsule())
+                            .background(Color.goPrimary, in: Capsule())
                     }
                     .buttonStyle(ScaleButtonStyle())
                     .accessibilityIdentifier("plant-dashboard-care-plan-complete-all")
@@ -283,7 +283,7 @@ struct PlantDashboardCarePlanSheet: View {
                         .font(OhanaFont.adaptive(size: 12, weight: .black))
                         .foregroundStyle(Color.arkInk)
                         .frame(width: 44, height: 44)
-                        .background(Color.goLime, in: Circle())
+                        .background(Color.goPrimary, in: Circle())
                         .accessibilityHidden(true)
                 }
                 .buttonStyle(ScaleButtonStyle())
@@ -384,7 +384,7 @@ struct PlantDashboardCarePlanSheet: View {
         case .watering, .misting:
             Color.goTeal
         case .fertilizing, .newLeaf:
-            Color.goLime
+            Color.goPrimary
         case .repotting, .pruning, .rotating, .leafCleaning, .pestCheck, .photo, .customNote:
             Color.goYellow
         case .yellowLeaf, .pestFound:

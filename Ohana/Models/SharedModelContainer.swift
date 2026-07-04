@@ -912,6 +912,54 @@ enum ArkSchemaV74: VersionedSchema {
     static var models: [any PersistentModel.Type] { ArkSchemaV73.models }
 }
 
+// MARK: - Schema V75（植物护理日志照片轻量索引）
+enum ArkSchemaV75: VersionedSchema {
+    static var versionIdentifier = Schema.Version(75, 0, 0)
+    static var models: [any PersistentModel.Type] { ArkSchemaV74.models }
+}
+
+// MARK: - Schema V76（植物头像轻量索引）
+enum ArkSchemaV76: VersionedSchema {
+    static var versionIdentifier = Schema.Version(76, 0, 0)
+    static var models: [any PersistentModel.Type] { ArkSchemaV75.models }
+}
+
+// MARK: - Schema V77（成员头像与宠物破框图轻量索引）
+enum ArkSchemaV77: VersionedSchema {
+    static var versionIdentifier = Schema.Version(77, 0, 0)
+    static var models: [any PersistentModel.Type] { ArkSchemaV76.models }
+}
+
+// MARK: - Schema V78（植物护理日志照片签名轻量索引）
+enum ArkSchemaV78: VersionedSchema {
+    static var versionIdentifier = Schema.Version(78, 0, 0)
+    static var models: [any PersistentModel.Type] { ArkSchemaV77.models }
+}
+
+// MARK: - Schema V79（宠物相册照片轻量索引）
+enum ArkSchemaV79: VersionedSchema {
+    static var versionIdentifier = Schema.Version(79, 0, 0)
+    static var models: [any PersistentModel.Type] { ArkSchemaV78.models }
+}
+
+// MARK: - Schema V80（宠物证件附件轻量索引）
+enum ArkSchemaV80: VersionedSchema {
+    static var versionIdentifier = Schema.Version(80, 0, 0)
+    static var models: [any PersistentModel.Type] { ArkSchemaV79.models }
+}
+
+// MARK: - Schema V81（宠物头像透明度轻量索引）
+enum ArkSchemaV81: VersionedSchema {
+    static var versionIdentifier = Schema.Version(81, 0, 0)
+    static var models: [any PersistentModel.Type] { ArkSchemaV80.models }
+}
+
+// MARK: - Schema V82（宠物里程碑照片轻量索引）
+enum ArkSchemaV82: VersionedSchema {
+    static var versionIdentifier = Schema.Version(82, 0, 0)
+    static var models: [any PersistentModel.Type] { ArkSchemaV81.models }
+}
+
 // MARK: - Migration Plan
 // 只保留有真实 custom logic 的 stage；轻量新增字段/模型不需要显式 stage。
 // 相邻 schema hash 相同时，显式 stage 会触发 iOS 26 "model reference cannot be equal"。
@@ -932,7 +980,9 @@ enum ArkMigrationPlan: SchemaMigrationPlan {
          ArkSchemaV55.self, ArkSchemaV56.self, ArkSchemaV57.self, ArkSchemaV58.self, ArkSchemaV59.self,
          ArkSchemaV60.self, ArkSchemaV61.self, ArkSchemaV62.self, ArkSchemaV63.self, ArkSchemaV64.self,
          ArkSchemaV65.self, ArkSchemaV66.self, ArkSchemaV67.self, ArkSchemaV68.self, ArkSchemaV69.self,
-         ArkSchemaV70.self, ArkSchemaV71.self, ArkSchemaV72.self, ArkSchemaV73.self, ArkSchemaV74.self]
+         ArkSchemaV70.self, ArkSchemaV71.self, ArkSchemaV72.self, ArkSchemaV73.self, ArkSchemaV74.self,
+         ArkSchemaV75.self, ArkSchemaV76.self, ArkSchemaV77.self, ArkSchemaV78.self, ArkSchemaV79.self,
+         ArkSchemaV80.self, ArkSchemaV81.self, ArkSchemaV82.self]
     }
 
     static var stages: [MigrationStage] { [] }
@@ -962,7 +1012,7 @@ enum SharedModelContainer {
 
     private static func createPersistentContainer() -> ModelContainer {
         ensureApplicationSupportDirectory()
-        let schema = Schema(ArkSchemaV74.models)
+        let schema = Schema(ArkSchemaV82.models)
         let defaultConfig = ModelConfiguration(
             isStoredInMemoryOnly: false,
             cloudKitDatabase: .none

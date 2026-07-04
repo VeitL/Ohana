@@ -25,7 +25,6 @@ struct EquipPopoutCardSheet: View {
     @StateObject private var commandQueue = DeferredDomainCommandQueue()
     @State private var selectedPhoto: PhotosPickerItem?
     @State private var previewData: Data?
-    @State private var previewImage: UIImage?
     @State private var previewSource: PetPopoutCardSource?
     @State private var isProcessing = false
     @State private var toast: Toast?
@@ -39,10 +38,6 @@ struct EquipPopoutCardSheet: View {
 
     private var l: L10n { L10n(appLanguage) }
     private var currentPreviewData: Data? { previewData ?? pet.cardPopoutImageData ?? pet.avatarImageData }
-    private var currentPreviewSignature: String {
-        currentPreviewData.map { FocusWalletAvatarCache.signature(for: $0) } ?? "empty"
-    }
-
     private var isPopoutActive: Bool { pet.cardStyleRaw == "popout" }
 
     var body: some View {
@@ -84,13 +79,6 @@ struct EquipPopoutCardSheet: View {
         .onChange(of: selectedPhoto) { _, item in
             guard let item else { return }
             processPhoto(item)
-        }
-        .task(id: currentPreviewSignature) {
-            guard let data = currentPreviewData else {
-                previewImage = nil
-                return
-            }
-            previewImage = await AttachmentImageDecoder.decode(data)
         }
     }
 
@@ -143,27 +131,31 @@ struct EquipPopoutCardSheet: View {
                         .padding(14)
                 }
 
-            if let image = previewImage {
+            if let data = currentPreviewData {
                 ZStack(alignment: .bottomLeading) {
                     Ellipse()
                         .fill(Color.arkInk.opacity(0.32))
                         .frame(width: 160, height: 30)
                         .blur(radius: 16)
                         .offset(x: 26, y: -8)
-                    Image(uiImage: image)
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: 180, height: 218, alignment: .bottom)
-                        .rotation3DEffect(.degrees(-4), axis: (x: 0, y: 1, z: 0), anchor: .bottomLeading, perspective: 0.55)
-                        .offset(x: 4, y: -28)
-                        .shadow(color: Color.arkInk.opacity(0.34), radius: 20, x: 0, y: 14) // ui-v4: allow popout preview depth
+                    AsyncDecodedImageView(
+                        data: data,
+                        cacheID: "pet-popout-preview-\(pet.id.uuidString)",
+                        maxPixel: 1200
+                    ) { image in
+                        Image(uiImage: image)
+                            .resizable()
+                            .scaledToFit()
+                    } placeholder: {
+                        popoutPreviewPlaceholder
+                    }
+                    .frame(width: 180, height: 218, alignment: .bottom)
+                    .rotation3DEffect(.degrees(-4), axis: (x: 0, y: 1, z: 0), anchor: .bottomLeading, perspective: 0.55)
+                    .offset(x: 4, y: -28)
+                    .shadow(color: Color.arkInk.opacity(0.34), radius: 20, x: 0, y: 14) // ui-v4: allow popout preview depth
                 }
             } else {
-                Image(systemName: "sparkles.rectangle.stack.fill") // a11y: allow decorative icon covered by surrounding text or control
-                    .font(OhanaFont.adaptive(size: 52, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                    .foregroundStyle(Color.goPrimary)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .offset(y: -16)
+                popoutPreviewPlaceholder
             }
 
             VStack(alignment: .leading, spacing: 4) {
@@ -178,6 +170,14 @@ struct EquipPopoutCardSheet: View {
             .padding(.leading, 150)
         }
         .frame(maxWidth: .infinity)
+    }
+
+    private var popoutPreviewPlaceholder: some View {
+        Image(systemName: "sparkles.rectangle.stack.fill") // a11y: allow decorative icon covered by surrounding text or control
+            .font(OhanaFont.adaptive(size: 52, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+            .foregroundStyle(Color.goPrimary)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .offset(y: -16)
     }
 
     private var sourceActions: some View {
@@ -308,8 +308,17 @@ struct EquipPopoutCardSheet: View {
         isProcessing = true
         Task {
             defer { Task { @MainActor in isProcessing = false } }
-            guard let rawData = try? await item.loadTransferable(type: Data.self),
-                  let image = await AttachmentImageDecoder.decode(rawData) else {
+            guard let rawData = try? await item.loadTransferable(type: Data.self) else {
+                showError(l.tr(zh: "无法读取这张图片。", en: "Could not read this photo.", de: "Dieses Foto konnte nicht gelesen werden."))
+                return
+            }
+            let signature = MediaThumbnailProvider.signature(for: rawData)
+            let key = MediaThumbnailKey(
+                id: "pet-popout-source-\(signature)",
+                sourceSignature: signature,
+                maxPixel: 2400
+            )
+            guard let image = await MediaThumbnailProvider.image(for: key, dataProvider: { rawData }) else {
                 showError(l.tr(zh: "无法读取这张图片。", en: "Could not read this photo.", de: "Dieses Foto konnte nicht gelesen werden."))
                 return
             }

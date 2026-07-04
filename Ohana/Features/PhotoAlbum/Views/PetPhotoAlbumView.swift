@@ -11,7 +11,7 @@ import SwiftUI
 
 struct PetPhotoAlbumView: View {
     let pet: Pet
-    let photoLogs: [PetPhotoLog]
+    let renderData: PetPhotoAlbumRenderData
     /// 嵌入 `PetMomentsHubView` 时传入，由外层工具栏与 onChange 负责选图入库
     var hubPickerSelection: Binding<[PhotosPickerItem]>?
 
@@ -19,9 +19,19 @@ struct PetPhotoAlbumView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(AppServices.self) private var appServices
     @State private var internalPickerItems: [PhotosPickerItem] = []
-    @State private var selectedPhoto: PetPhotoLog? = nil
+    @State private var selectedPhoto: PetPhotoAlbumPhotoItem? = nil
     @State private var showingPhotoDetail = false
     @StateObject private var commandQueue = DeferredDomainCommandQueue()
+
+    init(
+        pet: Pet,
+        renderData: PetPhotoAlbumRenderData,
+        hubPickerSelection: Binding<[PhotosPickerItem]>? = nil
+    ) {
+        self.pet = pet
+        self.renderData = renderData
+        self.hubPickerSelection = hubPickerSelection
+    }
 
     private var isHubEmbedded: Bool { hubPickerSelection != nil }
 
@@ -31,29 +41,6 @@ struct PetPhotoAlbumView: View {
     }
 
     private let columns = [GridItem(.flexible(), spacing: 3), GridItem(.flexible(), spacing: 3), GridItem(.flexible(), spacing: 3)]
-
-    private var sortedPhotos: [PetPhotoLog] {
-        photoLogs.sorted { $0.date > $1.date }
-    }
-
-    private var grouped: [(String, [PetPhotoLog])] {
-        var dict: [String: [PetPhotoLog]] = [:]
-        let formatter = DateFormatter()
-        formatter.locale = AppLanguage.effectiveLocale
-        formatter.dateFormat = AppLanguage.fullMonthYearFormat
-        for log in sortedPhotos {
-            let key = formatter.string(from: log.date)
-            dict[key, default: []].append(log)
-        }
-        return dict.sorted { a, b in
-            let df = DateFormatter()
-            df.locale = AppLanguage.effectiveLocale
-            df.dateFormat = AppLanguage.fullMonthYearFormat
-            let da = df.date(from: a.key) ?? .distantPast
-            let db = df.date(from: b.key) ?? .distantPast
-            return da > db
-        }
-    }
 
     private var albumNavigationTitle: String {
         L10n(AppLanguage.code).tr(
@@ -135,20 +122,20 @@ struct PetPhotoAlbumView: View {
                 OhanaAppBackground()
             }
 
-            if sortedPhotos.isEmpty {
+            if renderData.isEmpty {
                 emptyState
             } else {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 20) {
-                        ForEach(grouped, id: \.0) { month, photos in
+                        ForEach(renderData.groups) { group in
                             VStack(alignment: .leading, spacing: 8) {
-                                Text(month)
+                                Text(group.title)
                                     .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                     .foregroundStyle(Color.ohanaPrimaryText.opacity(0.5))
                                     .padding(.horizontal, 16)
 
                                 LazyVGrid(columns: columns, spacing: 3) {
-                                    ForEach(photos) { photo in
+                                    ForEach(group.photos) { photo in
                                         Button {
                                             selectedPhoto = photo
                                             showingPhotoDetail = true
@@ -158,12 +145,7 @@ struct PetPhotoAlbumView: View {
                                         .buttonStyle(ScaleButtonStyle())
                                         .contextMenu {
                                             Button {
-                                                Task {
-                                                    guard let image = await AttachmentImageDecoder.decode(photo.imageData) else { return }
-                                                    await MainActor.run {
-                                                        shareImage(image)
-                                                    }
-                                                }
+                                                sharePhoto(photo)
                                             } label: {
                                                 Label("分享", systemImage: "square.and.arrow.up")
                                             }
@@ -216,12 +198,28 @@ struct PetPhotoAlbumView: View {
         }
     }
 
-    private func deletePhoto(_ photo: PetPhotoLog) {
+    private func sharePhoto(_ photo: PetPhotoAlbumPhotoItem) {
+        let key = MediaThumbnailKey(
+            id: "pet-photo-share-\(photo.id.uuidString)",
+            sourceSignature: photo.imageSignature,
+            maxPixel: 2400
+        )
+        Task { @MainActor in
+            guard let image = await MediaThumbnailProvider.image(
+                for: key,
+                asyncDataProvider: { await imageData(for: photo) }
+            ) else { return }
+            shareImage(image)
+        }
+    }
+
+    private func deletePhoto(_ photo: PetPhotoAlbumPhotoItem) {
         let command = DomainCommand.petPhotoDelete(petID: pet.id, photoID: photo.id)
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
         commandQueue.enqueue(command) {
+            guard let photoLog = photoLog(for: photo) else { return }
             PetPhotoAlbumCommandExecutor(context: modelContext, services: appServices).deletePhoto(
-                photo,
+                photoLog,
                 pet: pet,
                 note: "petPhoto.delete"
             )
@@ -229,9 +227,16 @@ struct PetPhotoAlbumView: View {
     }
 
     @ViewBuilder
-    private func photoThumbnail(_ photo: PetPhotoLog) -> some View {
+    private func photoThumbnail(_ photo: PetPhotoAlbumPhotoItem) -> some View {
         let side = (ScreenCompat.width - 6) / 3
-        AsyncDecodedImageView(data: photo.imageData) { image in
+        AsyncDecodedImageView(
+            cacheID: "pet-photo-thumbnail-\(photo.id.uuidString)",
+            sourceSignature: photo.imageSignature,
+            maxPixel: side * 2,
+            asyncDataProvider: {
+                await imageData(for: photo)
+            }
+        ) { image in
             Image(uiImage: image)
                 .resizable()
                 .scaledToFill()
@@ -244,17 +249,94 @@ struct PetPhotoAlbumView: View {
                 .overlay(Image(systemName: "photo").foregroundStyle(Color.ohanaSecondaryText)) // a11y: allow decorative icon covered by surrounding text or control
         }
     }
+
+    private func imageData(for photo: PetPhotoAlbumPhotoItem) async -> Data? {
+        guard photo.canAttemptImageAttachmentLoad else {
+            return nil
+        }
+        let loader = SwiftDataMediaBlobLoader(modelContainer: modelContext.container)
+        return await loader.petPhotoLogImageData(modelID: photo.modelID)
+    }
+
+    private func photoLog(for photo: PetPhotoAlbumPhotoItem) -> PetPhotoLog? {
+        modelContext.model(for: photo.modelID) as? PetPhotoLog
+    }
+}
+
+nonisolated struct PetPhotoAlbumPhotoItem: Identifiable, Sendable {
+    let id: UUID
+    let modelID: PersistentIdentifier
+    let date: Date
+    let note: String
+    let imageSignature: String
+    let canAttemptImageAttachmentLoad: Bool
+
+    init(log: PetPhotoLog) {
+        id = log.id
+        modelID = log.persistentModelID
+        date = log.date
+        note = log.note
+        imageSignature = log.imageThumbnailSignature
+        canAttemptImageAttachmentLoad = log.canAttemptImageAttachmentLoad
+    }
+}
+
+nonisolated struct PetPhotoAlbumRenderData: Sendable {
+    struct MonthGroup: Identifiable, Sendable {
+        let monthStart: Date
+        let title: String
+        let photos: [PetPhotoAlbumPhotoItem]
+
+        var id: TimeInterval { monthStart.timeIntervalSinceReferenceDate }
+    }
+
+    static let empty = PetPhotoAlbumRenderData(groups: [])
+
+    let groups: [MonthGroup]
+
+    var isEmpty: Bool {
+        groups.allSatisfy(\.photos.isEmpty)
+    }
+
+    static func build(photoLogs: [PetPhotoLog], languageCode: String = AppLanguage.code) -> PetPhotoAlbumRenderData {
+        guard !photoLogs.isEmpty else { return .empty }
+        let calendar = Calendar.current
+        let formatter = DateFormatter()
+        let normalizedLanguageCode = AppLanguage.normalize(languageCode)
+        formatter.locale = Locale(identifier: AppLanguage.option(for: normalizedLanguageCode).localeIdentifier)
+        formatter.dateFormat = normalizedLanguageCode == "zh" ? "yyyy年 M月" : "MMMM yyyy"
+
+        var grouped: [Date: [PetPhotoAlbumPhotoItem]] = [:]
+        for log in photoLogs {
+            let components = calendar.dateComponents([.year, .month], from: log.date)
+            let monthStart = calendar.date(from: components) ?? calendar.startOfDay(for: log.date)
+            grouped[monthStart, default: []].append(PetPhotoAlbumPhotoItem(log: log))
+        }
+
+        let groups = grouped
+            .map { monthStart, logs in
+                MonthGroup(
+                    monthStart: monthStart,
+                    title: formatter.string(from: monthStart),
+                    photos: logs.sorted { $0.date > $1.date }
+                )
+            }
+            .sorted { $0.monthStart > $1.monthStart }
+
+        return PetPhotoAlbumRenderData(groups: groups)
+    }
 }
 
 // MARK: - Photo Detail Sheet
 
 private struct PhotoDetailSheet: View {
-    let photo: PetPhotoLog
+    let photo: PetPhotoAlbumPhotoItem
     let pet: Pet
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
     @Environment(AppServices.self) private var appServices
     @State private var noteText: String = ""
+    @State private var displayedNote: String = ""
     @State private var isEditingNote = false
     @StateObject private var commandQueue = DeferredDomainCommandQueue()
 
@@ -263,7 +345,14 @@ private struct PhotoDetailSheet: View {
             ZStack {
                 Color.black.ignoresSafeArea() // ui-v4: allow fullScreenPhotoViewer
                 VStack(spacing: 0) {
-                    AsyncDecodedImageView(data: photo.imageData) { image in
+                    AsyncDecodedImageView(
+                        cacheID: "pet-photo-detail-\(photo.id.uuidString)",
+                        sourceSignature: photo.imageSignature,
+                        maxPixel: 2400,
+                        asyncDataProvider: {
+                            await imageData()
+                        }
+                    ) { image in
                         Image(uiImage: image)
                             .resizable()
                             .scaledToFit()
@@ -289,12 +378,12 @@ private struct PhotoDetailSheet: View {
                                     saveNote()
                                 }
                         } else {
-                            Text(photo.note.isEmpty ? "轻触添加备注" : photo.note)
+                            Text(displayedNote.isEmpty ? "轻触添加备注" : displayedNote)
                                 .font(OhanaFont.adaptive(size: 14, weight: .medium, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                                .foregroundStyle(photo.note.isEmpty ? .white.opacity(0.3) : .white.opacity(0.8)) // ui-v4: allow fullScreenPhotoViewer
+                                .foregroundStyle(displayedNote.isEmpty ? .white.opacity(0.3) : .white.opacity(0.8)) // ui-v4: allow fullScreenPhotoViewer
                                 .multilineTextAlignment(.center)
                                 .onTapGesture {
-                                    noteText = photo.note
+                                    noteText = displayedNote
                                     isEditingNote = true
                                 }
                         }
@@ -313,20 +402,38 @@ private struct PhotoDetailSheet: View {
                 }
             }
         }
-        .onAppear { noteText = photo.note }
+        .onAppear {
+            displayedNote = photo.note
+            noteText = photo.note
+        }
         .onDisappear { commandQueue.cancelAll() }
     }
 
     private func saveNote() {
         let command = DomainCommand.petPhotoUpdate(petID: pet.id, photoID: photo.id)
         isEditingNote = false
+        let cleanNote = noteText.trimmingCharacters(in: .whitespacesAndNewlines)
+        displayedNote = cleanNote
         commandQueue.enqueue(command) {
+            guard let photoLog else { return }
             PetPhotoAlbumCommandExecutor(context: modelContext, services: appServices).updateNote(
-                noteText,
-                photo: photo,
+                cleanNote,
+                photo: photoLog,
                 pet: pet,
                 note: "petPhoto.updateNote"
             )
         }
+    }
+
+    private func imageData() async -> Data? {
+        guard photo.canAttemptImageAttachmentLoad else {
+            return nil
+        }
+        let loader = SwiftDataMediaBlobLoader(modelContainer: modelContext.container)
+        return await loader.petPhotoLogImageData(modelID: photo.modelID)
+    }
+
+    private var photoLog: PetPhotoLog? {
+        modelContext.model(for: photo.modelID) as? PetPhotoLog
     }
 }

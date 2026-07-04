@@ -114,7 +114,7 @@ struct PlantCareLogSheet: View {
                 icon: "leaf.fill",
                 title: l.tr(zh: "上次施肥", en: "Last feed", de: "Letztes Düngen"),
                 value: fertilizerContextText,
-                tint: Color.goLime
+                tint: Color.goPrimary
             )
         ]
     }
@@ -697,7 +697,7 @@ struct PlantCareLogSheet: View {
         case .watering, .misting:
             Color.goTeal
         case .fertilizing, .newLeaf:
-            Color.goLime
+            Color.goPrimary
         case .repotting, .pruning, .rotating, .leafCleaning, .pestCheck, .photo, .customNote:
             Color.goYellow
         case .yellowLeaf, .pestFound:
@@ -739,7 +739,7 @@ struct PlantCareLogSheet: View {
     private func healthTint(for status: PlantHealthStatus) -> Color {
         switch status {
         case .thriving:
-            Color.goLime
+            Color.goPrimary
         case .stable:
             Color.goTeal
         case .watching:

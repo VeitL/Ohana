@@ -106,8 +106,10 @@ enum ExpenseCommandService {
                     receiptDocument.issueDate = draft.issueDate
                     receiptDocument.cost = draft.cost
                     receiptDocument.notes = draft.notes
-                    receiptDocument.attachmentData = draft.attachmentData
-                    receiptDocument.attachmentFilename = draft.attachmentFilename
+                    receiptDocument.updateLegacyAttachment(
+                        data: draft.attachmentData,
+                        filename: draft.attachmentFilename
+                    )
                     for attachment in draft.attachments {
                         _ = DomainMemberFactWriter.createPetDocumentAttachment(
                             plan: documentWrite,

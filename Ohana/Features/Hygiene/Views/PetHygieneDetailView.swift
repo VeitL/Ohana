@@ -200,7 +200,7 @@ struct PetHygieneDetailContentView: View {
     private var hygieneHeader: some View {
         HStack(spacing: 12) {
             PetAvatarPortraitView(
-                imageData: pet.avatarImageData,
+                pet: pet,
                 fallbackText: pet.avatarEmoji,
                 themeColor: chromeAccent,
                 size: 46,

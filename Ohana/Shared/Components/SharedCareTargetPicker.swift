@@ -59,7 +59,7 @@ struct SharedCareTargetPicker: View {
                 PetAvatarPortraitView(
                     pet: pet,
                     size: 28,
-                    showsBackground: !(pet.avatarImageData.map { PetAvatarTransparencyCache.isTransparentAvatar($0) } ?? false),
+                    showsBackground: pet.shouldShowAvatarBackground,
                     backgroundOpacity: 0.14,
                     transparentScale: 0.92,
                     transparentYOffset: 0.04

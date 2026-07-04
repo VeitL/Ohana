@@ -158,7 +158,7 @@ struct WalkDetailView: View {
     private var heroSummary: some View {
         HStack(spacing: 14) {
             PetAvatarPortraitView(
-                imageData: pet.avatarImageData,
+                pet: pet,
                 fallbackText: pet.avatarEmoji,
                 themeColor: Color(hex: pet.safeThemeColorHex),
                 size: 58,

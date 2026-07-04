@@ -316,7 +316,7 @@ enum MemberProfileCommandService {
         }
         let trimmedName = input.name.trimmingCharacters(in: .whitespacesAndNewlines)
         pet.name = trimmedName.isEmpty ? pet.name : trimmedName
-        pet.avatarImageData = input.avatarImageData
+        pet.updateAvatarImageData(input.avatarImageData)
         if let avatarEmoji = input.avatarEmoji {
             let trimmedEmoji = avatarEmoji.trimmingCharacters(in: .whitespacesAndNewlines)
             pet.avatarEmoji = trimmedEmoji.isEmpty ? "🐾" : trimmedEmoji
@@ -425,7 +425,7 @@ enum MemberProfileCommandService {
         }
         let trimmedName = input.name.trimmingCharacters(in: .whitespacesAndNewlines)
         human.name = trimmedName.isEmpty ? human.name : trimmedName
-        human.avatarImageData = input.avatarImageData
+        human.updateAvatarImageData(input.avatarImageData)
         human.avatarEmoji = input.avatarEmoji.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             ? "👤"
             : input.avatarEmoji.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -484,7 +484,7 @@ enum MemberProfileCommandService {
     ) -> MemberProfileCommandResult {
         let trimmedName = input.name.trimmingCharacters(in: .whitespacesAndNewlines)
         plant.name = trimmedName.isEmpty ? plant.name : trimmedName
-        plant.avatarImageData = input.avatarImageData
+        plant.updateAvatarImageData(input.avatarImageData)
         plant.avatarEmoji = input.avatarEmoji.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             ? "🌱"
             : input.avatarEmoji.trimmingCharacters(in: .whitespacesAndNewlines)

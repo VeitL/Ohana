@@ -1,9 +1,13 @@
+import SwiftData
 import SwiftUI
 import UIKit
 
 struct PetAvatarPortraitView: View {
     var cacheID: UUID?
     let imageData: Data?
+    let imageSignature: String
+    private let petModelID: PersistentIdentifier?
+    private let imageDataProvider: (@MainActor () -> Data?)?
     let fallbackText: String
     let themeColor: Color
     let size: CGFloat
@@ -12,7 +16,88 @@ struct PetAvatarPortraitView: View {
     var transparentScale: CGFloat = 0.84
     var transparentYOffset: CGFloat = 0.12
 
+    @Environment(\.modelContext) private var modelContext
+
+    init(
+        cacheID: UUID? = nil,
+        imageData: Data?,
+        fallbackText: String,
+        themeColor: Color,
+        size: CGFloat,
+        showsBackground: Bool = true,
+        backgroundOpacity: Double = 0.18,
+        transparentScale: CGFloat = 0.84,
+        transparentYOffset: CGFloat = 0.12
+    ) {
+        self.cacheID = cacheID
+        self.imageData = imageData
+        self.imageSignature = imageData.map(MediaPayloadSignature.signature(for:)) ?? ""
+        petModelID = nil
+        self.imageDataProvider = nil
+        self.fallbackText = fallbackText
+        self.themeColor = themeColor
+        self.size = size
+        self.showsBackground = showsBackground
+        self.backgroundOpacity = backgroundOpacity
+        self.transparentScale = transparentScale
+        self.transparentYOffset = transparentYOffset
+    }
+
+    init(
+        cacheID: UUID? = nil,
+        imageSignature: String,
+        imageDataProvider: @escaping @MainActor () -> Data?,
+        fallbackText: String,
+        themeColor: Color,
+        size: CGFloat,
+        showsBackground: Bool = true,
+        backgroundOpacity: Double = 0.18,
+        transparentScale: CGFloat = 0.84,
+        transparentYOffset: CGFloat = 0.12
+    ) {
+        self.cacheID = cacheID
+        self.imageData = nil
+        self.imageSignature = imageSignature
+        petModelID = nil
+        self.imageDataProvider = imageDataProvider
+        self.fallbackText = fallbackText
+        self.themeColor = themeColor
+        self.size = size
+        self.showsBackground = showsBackground
+        self.backgroundOpacity = backgroundOpacity
+        self.transparentScale = transparentScale
+        self.transparentYOffset = transparentYOffset
+    }
+
+    init(
+        cacheID: UUID? = nil,
+        imageSignature: String,
+        petModelID: PersistentIdentifier,
+        fallbackText: String,
+        themeColor: Color,
+        size: CGFloat,
+        showsBackground: Bool = true,
+        backgroundOpacity: Double = 0.18,
+        transparentScale: CGFloat = 0.84,
+        transparentYOffset: CGFloat = 0.12
+    ) {
+        self.cacheID = cacheID
+        imageData = nil
+        self.imageSignature = imageSignature
+        self.petModelID = petModelID
+        imageDataProvider = nil
+        self.fallbackText = fallbackText
+        self.themeColor = themeColor
+        self.size = size
+        self.showsBackground = showsBackground
+        self.backgroundOpacity = backgroundOpacity
+        self.transparentScale = transparentScale
+        self.transparentYOffset = transparentYOffset
+    }
+
     var body: some View {
+        let asyncProvider = resolvedAsyncImageDataProvider
+
         ZStack {
             if showsBackground {
                 Circle()
@@ -28,6 +113,18 @@ struct PetAvatarPortraitView: View {
                     transparentScale: transparentScale,
                     transparentYOffset: transparentYOffset
                 )
+            } else if imageDataProvider != nil || asyncProvider != nil, !imageSignature.isEmpty {
+                PetAvatarPortraitLazyImage(
+                    style: .circle,
+                    cacheID: cacheID,
+                    imageSignature: imageSignature,
+                    imageDataProvider: imageDataProvider,
+                    asyncImageDataProvider: asyncProvider,
+                    fallbackText: fallbackText,
+                    size: size,
+                    transparentScale: transparentScale,
+                    transparentYOffset: transparentYOffset
+                )
             } else {
                 PetAvatarPortraitFallbackText(text: fallbackText, size: size)
             }
@@ -36,11 +133,24 @@ struct PetAvatarPortraitView: View {
         .contentShape(Circle())
         .accessibilityHidden(fallbackText.isEmpty)
     }
+
+    private var resolvedAsyncImageDataProvider: (@Sendable () async -> Data?)? {
+        guard let petModelID else {
+            return nil
+        }
+        let container = modelContext.container
+        return {
+            let loader = SwiftDataMediaBlobLoader(modelContainer: container)
+            return await loader.petAvatarImageData(modelID: petModelID)
+        }
+    }
 }
 
 extension PetAvatarPortraitView {
     init(
         pet: Pet,
+        fallbackText: String? = nil,
+        themeColor: Color? = nil,
         size: CGFloat,
         showsBackground: Bool = true,
         backgroundOpacity: Double = 0.18,
@@ -49,9 +159,10 @@ extension PetAvatarPortraitView {
     ) {
         self.init(
             cacheID: pet.id,
-            imageData: pet.avatarImageData,
-            fallbackText: pet.avatarEmoji.isEmpty ? pet.speciesEmoji : pet.avatarEmoji,
-            themeColor: Color(hex: pet.safeThemeColorHex),
+            imageSignature: pet.avatarThumbnailSignature,
+            petModelID: pet.persistentModelID,
+            fallbackText: fallbackText ?? (pet.avatarEmoji.isEmpty ? pet.speciesEmoji : pet.avatarEmoji),
+            themeColor: themeColor ?? Color(hex: pet.safeThemeColorHex),
             size: size,
             showsBackground: showsBackground,
             backgroundOpacity: backgroundOpacity,
@@ -90,6 +201,9 @@ struct PetAvatarPortraitImage: View {
 struct PetAvatarPortraitRoundedView: View {
     var cacheID: UUID?
     let imageData: Data?
+    let imageSignature: String
+    private let petModelID: PersistentIdentifier?
+    private let imageDataProvider: (@MainActor () -> Data?)?
     let fallbackText: String
     let themeColor: Color
     let size: CGFloat
@@ -98,7 +212,112 @@ struct PetAvatarPortraitRoundedView: View {
     var transparentScale: CGFloat = 0.84
     var transparentYOffset: CGFloat = 0.12
 
+    @Environment(\.modelContext) private var modelContext
+
+    init(
+        cacheID: UUID? = nil,
+        imageData: Data?,
+        fallbackText: String,
+        themeColor: Color,
+        size: CGFloat,
+        cornerRadius: CGFloat = 18,
+        backgroundOpacity: Double = 0.18,
+        transparentScale: CGFloat = 0.84,
+        transparentYOffset: CGFloat = 0.12
+    ) {
+        self.cacheID = cacheID
+        self.imageData = imageData
+        self.imageSignature = imageData.map(MediaPayloadSignature.signature(for:)) ?? ""
+        petModelID = nil
+        self.imageDataProvider = nil
+        self.fallbackText = fallbackText
+        self.themeColor = themeColor
+        self.size = size
+        self.cornerRadius = cornerRadius
+        self.backgroundOpacity = backgroundOpacity
+        self.transparentScale = transparentScale
+        self.transparentYOffset = transparentYOffset
+    }
+
+    init(
+        cacheID: UUID? = nil,
+        imageSignature: String,
+        imageDataProvider: @escaping @MainActor () -> Data?,
+        fallbackText: String,
+        themeColor: Color,
+        size: CGFloat,
+        cornerRadius: CGFloat = 18,
+        backgroundOpacity: Double = 0.18,
+        transparentScale: CGFloat = 0.84,
+        transparentYOffset: CGFloat = 0.12
+    ) {
+        self.cacheID = cacheID
+        self.imageData = nil
+        self.imageSignature = imageSignature
+        petModelID = nil
+        self.imageDataProvider = imageDataProvider
+        self.fallbackText = fallbackText
+        self.themeColor = themeColor
+        self.size = size
+        self.cornerRadius = cornerRadius
+        self.backgroundOpacity = backgroundOpacity
+        self.transparentScale = transparentScale
+        self.transparentYOffset = transparentYOffset
+    }
+
+    init(
+        cacheID: UUID? = nil,
+        imageSignature: String,
+        petModelID: PersistentIdentifier,
+        fallbackText: String,
+        themeColor: Color,
+        size: CGFloat,
+        cornerRadius: CGFloat = 18,
+        backgroundOpacity: Double = 0.18,
+        transparentScale: CGFloat = 0.84,
+        transparentYOffset: CGFloat = 0.12
+    ) {
+        self.cacheID = cacheID
+        imageData = nil
+        self.imageSignature = imageSignature
+        self.petModelID = petModelID
+        imageDataProvider = nil
+        self.fallbackText = fallbackText
+        self.themeColor = themeColor
+        self.size = size
+        self.cornerRadius = cornerRadius
+        self.backgroundOpacity = backgroundOpacity
+        self.transparentScale = transparentScale
+        self.transparentYOffset = transparentYOffset
+    }
+
+    init(
+        pet: Pet,
+        fallbackText: String? = nil,
+        themeColor: Color? = nil,
+        size: CGFloat,
+        cornerRadius: CGFloat = 18,
+        backgroundOpacity: Double = 0.18,
+        transparentScale: CGFloat = 0.84,
+        transparentYOffset: CGFloat = 0.12
+    ) {
+        self.init(
+            cacheID: pet.id,
+            imageSignature: pet.avatarThumbnailSignature,
+            petModelID: pet.persistentModelID,
+            fallbackText: fallbackText ?? (pet.avatarEmoji.isEmpty ? pet.speciesEmoji : pet.avatarEmoji),
+            themeColor: themeColor ?? Color(hex: pet.safeThemeColorHex),
+            size: size,
+            cornerRadius: cornerRadius,
+            backgroundOpacity: backgroundOpacity,
+            transparentScale: transparentScale,
+            transparentYOffset: transparentYOffset
+        )
+    }
+
     var body: some View {
+        let asyncProvider = resolvedAsyncImageDataProvider
+
         ZStack {
             RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                 .fill(themeColor.opacity(backgroundOpacity))
@@ -112,12 +331,35 @@ struct PetAvatarPortraitRoundedView: View {
                     transparentScale: transparentScale,
                     transparentYOffset: transparentYOffset
                 )
+            } else if imageDataProvider != nil || asyncProvider != nil, !imageSignature.isEmpty {
+                PetAvatarPortraitLazyImage(
+                    style: .rounded,
+                    cacheID: cacheID,
+                    imageSignature: imageSignature,
+                    imageDataProvider: imageDataProvider,
+                    asyncImageDataProvider: asyncProvider,
+                    fallbackText: fallbackText,
+                    size: size,
+                    transparentScale: transparentScale,
+                    transparentYOffset: transparentYOffset
+                )
             } else {
                 PetAvatarPortraitFallbackText(text: fallbackText, size: size, scale: 0.52)
             }
         }
         .frame(width: size, height: size)
         .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+    }
+
+    private var resolvedAsyncImageDataProvider: (@Sendable () async -> Data?)? {
+        guard let petModelID else {
+            return nil
+        }
+        let container = modelContext.container
+        return {
+            let loader = SwiftDataMediaBlobLoader(modelContainer: container)
+            return await loader.petAvatarImageData(modelID: petModelID)
+        }
     }
 }
 
@@ -217,6 +459,128 @@ private struct PetAvatarPortraitCachedRoundedImage: View {
     }
 }
 
+private enum PetAvatarPortraitLazyStyle {
+    case circle
+    case rounded
+}
+
+private struct PetAvatarPortraitLazyImage: View {
+    let style: PetAvatarPortraitLazyStyle
+    let cacheID: UUID?
+    let imageSignature: String
+    let imageDataProvider: (@MainActor () -> Data?)?
+    let asyncImageDataProvider: (@Sendable () async -> Data?)?
+    let fallbackText: String
+    let size: CGFloat
+    let transparentScale: CGFloat
+    let transparentYOffset: CGFloat
+
+    @State private var image: UIImage?
+    @State private var isTransparent = false
+    @State private var loadedKey: MediaThumbnailKey?
+
+    init(
+        style: PetAvatarPortraitLazyStyle,
+        cacheID: UUID?,
+        imageSignature: String,
+        imageDataProvider: (@MainActor () -> Data?)?,
+        asyncImageDataProvider: (@Sendable () async -> Data?)?,
+        fallbackText: String,
+        size: CGFloat,
+        transparentScale: CGFloat,
+        transparentYOffset: CGFloat
+    ) {
+        self.style = style
+        self.cacheID = cacheID
+        self.imageSignature = imageSignature
+        self.imageDataProvider = imageDataProvider
+        self.asyncImageDataProvider = asyncImageDataProvider
+        self.fallbackText = fallbackText
+        self.size = size
+        self.transparentScale = transparentScale
+        self.transparentYOffset = transparentYOffset
+    }
+
+    private var thumbnailKey: MediaThumbnailKey {
+        let cacheNamespace: String = switch style {
+        case .circle:
+            "pet-avatar-circle"
+        case .rounded:
+            "pet-avatar-rounded"
+        }
+        return MediaThumbnailKey(
+            id: "\(cacheNamespace)-\(cacheID?.uuidString ?? imageSignature)",
+            sourceSignature: imageSignature,
+            maxPixel: max(160, size * 3)
+        )
+    }
+
+    var body: some View {
+        Group {
+            if loadedKey == thumbnailKey, let image {
+                avatarImage(image)
+            } else {
+                fallback
+            }
+        }
+        .task(id: thumbnailKey) {
+            await loadImage(for: thumbnailKey)
+        }
+    }
+
+    @ViewBuilder
+    private func avatarImage(_ image: UIImage) -> some View {
+        switch style {
+        case .circle:
+            PetAvatarPortraitImage(
+                image: image,
+                isTransparentAvatar: isTransparent,
+                size: size,
+                transparentScale: transparentScale,
+                transparentYOffset: transparentYOffset
+            )
+        case .rounded:
+            PetAvatarPortraitRoundedImage(
+                image: image,
+                isTransparentAvatar: isTransparent,
+                size: size,
+                transparentScale: transparentScale,
+                transparentYOffset: transparentYOffset
+            )
+        }
+    }
+
+    private var fallback: some View {
+        PetAvatarPortraitFallbackText(
+            text: fallbackText,
+            size: size,
+            scale: style == .rounded ? 0.52 : 0.48
+        )
+    }
+
+    @MainActor
+    private func loadImage(for key: MediaThumbnailKey) async {
+        let result: MediaThumbnailProvider.Result? = if let asyncImageDataProvider {
+            await MediaThumbnailProvider.imageWithTransparency(for: key, asyncDataProvider: asyncImageDataProvider)
+        } else if let imageDataProvider {
+            await MediaThumbnailProvider.imageWithTransparency(for: key, dataProvider: imageDataProvider)
+        } else {
+            nil
+        }
+
+        guard let result,
+              !Task.isCancelled else {
+            image = nil
+            loadedKey = key
+            isTransparent = false
+            return
+        }
+        image = result.image
+        isTransparent = result.isTransparent
+        loadedKey = key
+    }
+}
+
 private struct PetAvatarPortraitRoundedImage: View {
     let image: UIImage
     let isTransparentAvatar: Bool
@@ -266,32 +630,5 @@ private enum PetAvatarPortraitCacheKey {
             bytes[8], bytes[9], bytes[10], bytes[11],
             bytes[12], bytes[13], bytes[14], bytes[15]
         ))
-    }
-}
-
-enum PetAvatarTransparencyCache {
-    private static let cache = NSCache<NSString, NSNumber>()
-    private static var didRegisterMemoryWarningObserver = false
-
-    static func isTransparentAvatar(_ data: Data) -> Bool {
-        bootstrapMemoryWarningObserver()
-        let prefix = Data(data.prefix(16)).base64EncodedString()
-        let suffix = Data(data.suffix(16)).base64EncodedString()
-        let key = "\(data.count)-\(prefix)-\(suffix)" as NSString
-        if let cached = cache.object(forKey: key) {
-            return cached.boolValue
-        }
-
-        let value = ImageSubjectCutoutProcessor.isTransparentPNG(data)
-        cache.setObject(NSNumber(value: value), forKey: key)
-        return value
-    }
-
-    private static func bootstrapMemoryWarningObserver() {
-        guard !didRegisterMemoryWarningObserver else { return }
-        didRegisterMemoryWarningObserver = true
-        MemoryWarningEvictionRegistry.register(ownerID: "pet-avatar-transparency-cache") {
-            cache.removeAllObjects()
-        }
     }
 }

@@ -91,7 +91,7 @@ struct HomeReadModelStoreTests {
         let container = try makeContainer()
         let store = HomeReadModelStore()
         let human = Human(name: "Owner")
-        human.avatarImageData = Data([0, 1, 2, 3, 4, 5, 6, 7])
+        human.updateAvatarImageData(Data([0, 1, 2, 3, 4, 5, 6, 7]))
         container.mainContext.insert(human)
         try container.mainContext.save()
 
@@ -108,7 +108,9 @@ struct HomeReadModelStoreTests {
 
         #expect(store.payload.avatarPreloadSignature.contains(human.id.uuidString))
         #expect(store.payload.avatarPreloadSignature.contains("8-"))
-        #expect(store.payload.avatarPreloadPayloads.map(\.id) == [human.id])
+        #expect(store.payload.mediaPreloadRequests.map(\.id) == [human.id])
+        #expect(store.payload.mediaPreloadRequests.first?.source == .human)
+        #expect(store.payload.avatarPreloadPayloads.isEmpty)
     }
 
     @Test func forcedRefreshProjectsPetPhotoLogsIntoMomentInteractionState() async throws {
@@ -152,7 +154,7 @@ struct HomeReadModelStoreTests {
         let store = HomeReadModelStore()
         let human = Human(name: "Hidden Owner")
         let avatarData = Data([9, 8, 7, 6, 5, 4])
-        human.avatarImageData = avatarData
+        human.updateAvatarImageData(avatarData)
         human.shouldShowOnHome = false
         container.mainContext.insert(human)
         try container.mainContext.save()
@@ -171,7 +173,8 @@ struct HomeReadModelStoreTests {
         #expect(store.payload.snapshot.cards.isEmpty)
         #expect(store.payload.activeHumanAvatar.id == human.id)
         #expect(store.payload.activeHumanAvatar.signature == FocusWalletAvatarCache.signature(for: avatarData))
-        #expect(store.payload.avatarPreloadPayloads.map(\.id) == [human.id])
+        #expect(store.payload.mediaPreloadRequests.map(\.id) == [human.id])
+        #expect(store.payload.avatarPreloadPayloads.isEmpty)
     }
 
     @Test func actorPayloadMatchesMainThreadSnapshotBuilder() async throws {

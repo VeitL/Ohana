@@ -82,8 +82,6 @@ extension PlantDetailContentView {
             }
         case .carePlan:
             revealPlantDetailExtrasAndScroll(to: .carePlan)
-        case .calendar:
-            openCareCalendar()
         case .reminders:
             openReminderSettings()
         case .healthReview:
@@ -110,13 +108,6 @@ extension PlantDetailContentView {
         Task { @MainActor in
             await OhanaFrameScheduler.waitAfterNextFrame()
             pendingFeatureScrollTarget = anchor
-        }
-    }
-
-    func openCareCalendar() {
-        showingAllFeaturesHub = false
-        OhanaFrameScheduler.runAfterNextFrame {
-            onOpenCalendar(plant.id)
         }
     }
 
@@ -160,6 +151,7 @@ extension PlantDetailContentView {
                 photoData: photoData,
                 healthStatus: healthStatus
             )
+            schedulePlantDetailRenderDataRebuild(delayMilliseconds: 24)
         }
     }
 
@@ -182,7 +174,7 @@ extension PlantDetailContentView {
     }
 
     func stagePlantDelete() {
-        guard !isDeletePending else { return }
+        guard !isDeletePending, !isDeleteCommitting else { return }
         isDeletePending = true
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         deleteUndoTask?.cancel()
@@ -196,6 +188,7 @@ extension PlantDetailContentView {
     }
 
     func cancelPendingDelete() {
+        guard !isDeleteCommitting else { return }
         deleteUndoTask?.cancel()
         deleteUndoTask = nil
         isDeletePending = false
@@ -203,7 +196,7 @@ extension PlantDetailContentView {
     }
 
     func commitPendingDelete() {
-        guard isDeletePending else { return }
+        guard isDeletePending, !isDeleteCommitting else { return }
         deleteUndoTask?.cancel()
         deleteUndoTask = nil
         isDeletePending = false
@@ -211,15 +204,18 @@ extension PlantDetailContentView {
     }
 
     func deletePlant() {
+        guard !isDeleteCommitting else { return }
+        isDeleteCommitting = true
+        let targetPlant = plant
         let command = DomainCommand.memberDeletion(entityID: plant.id, kind: EntityKind.plant.rawValue)
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-        commandQueue.enqueue(command) {
+        dismiss()
+        commandQueue.enqueue(command, delayMilliseconds: DeferredDomainCommandQueue.destructiveRouteDismissDelayMilliseconds) {
             MemberCommandExecutor(context: modelContext, services: appServices).deletePlant(
-                plant,
+                targetPlant,
                 note: "plant.detail.delete"
             )
             UINotificationFeedbackGenerator().notificationOccurred(.success)
-            dismiss()
         }
     }
 }

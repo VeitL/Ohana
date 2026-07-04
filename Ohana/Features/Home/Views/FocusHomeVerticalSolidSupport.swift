@@ -16,11 +16,13 @@ struct FocusHomeVerticalSolidQuickActionLayer<Content: View>: View {
     let isReady: Bool
 
     var body: some View {
-        content
-            .transaction { transaction in
-                transaction.animation = nil
-                transaction.disablesAnimations = true
-            }
+        ZStack(alignment: .top) {
+            content
+                .transaction { transaction in
+                    transaction.animation = nil
+                    transaction.disablesAnimations = true
+                }
+        }
             .frame(width: width, alignment: .top)
             .frame(height: height, alignment: .top)
             .contentShape(Rectangle())

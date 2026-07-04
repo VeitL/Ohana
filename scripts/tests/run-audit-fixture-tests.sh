@@ -115,7 +115,7 @@ trap 'cleanup_architecture_fixture; cleanup_governance_fixture' EXIT
 
 assert_bad scripts/audit-ui-v4.sh "$fixtures/UiV4Bad.swift" \
   background system-text-color hardcoded-white-black material shadow \
-  hardcoded-motion plain-button regular-sheet \
+  direct-go-lime hardcoded-motion plain-button regular-sheet \
   raw-textfield hardcoded-detent-height hardcoded-corner-radius
 assert_good scripts/audit-ui-v4.sh "$fixtures/UiV4Good.swift"
 
@@ -125,12 +125,21 @@ assert_bad scripts/audit-accessibility.sh "$fixtures/A11yBad.swift" \
 assert_good scripts/audit-accessibility.sh "$fixtures/A11yGood.swift"
 
 assert_bad scripts/audit-smoothness-risk.sh "$fixtures/SmoothnessBadSnapshotBuilder.swift" \
-  broad-query-high-frequency sync-image-decode-in-view runtime-loop-in-view \
-  main-actor-aggregation view-imperative-fetch detached-task-in-view
+  broad-query-high-frequency sync-image-decode-in-view direct-attachment-image-decode-in-view \
+  render-external-storage-signature render-external-storage-signature-map \
+  render-live-avatar-data-parameter avatar-pipeline-direct-human-blob-read \
+  feature-hub-live-avatar-provider pet-avatar-portrait-direct-blob-read \
+  weekly-photo-memory-eager-blob milestone-photo-eager-blob \
+  pet-photo-log-eager-blob plant-care-log-eager-blob \
+  render-avatar-transparency-probe \
+  render-photo-data-presence-probe render-image-data-presence-probe render-document-attachment-data-probe \
+  eager-sharelink-export \
+  runtime-loop-in-view main-actor-aggregation view-imperative-fetch detached-task-in-view
 assert_good scripts/audit-smoothness-risk.sh "$fixtures/SmoothnessGood.swift"
 
 assert_bad scripts/audit-route-first-frame.sh "$fixtures/RouteFirstFrameBadRouteContainer.swift" \
-  route-first-frame-query route-first-frame-sync-fetch route-first-frame-service-fetch
+  route-first-frame-query route-first-frame-sync-fetch route-first-frame-service-fetch \
+  route-first-frame-modelactor-live-model-return
 assert_good scripts/audit-route-first-frame.sh "$fixtures/RouteFirstFrameGoodRouteContainer.swift"
 
 assert_bad scripts/audit-runtime-guardrails.sh "$fixtures/RuntimeBad.swift" \

@@ -62,6 +62,34 @@ enum PlantDashboardFilter: String, CaseIterable, Identifiable {
     }
 }
 
+enum PlantDashboardPlantsViewStyle: String, CaseIterable, Identifiable {
+    case deck
+    case list
+
+    var id: String { rawValue }
+
+    func title(_ l: L10n) -> String {
+        switch self {
+        case .deck: l.tr(zh: "卡牌堆", en: "Card stack", de: "Kartenstapel")
+        case .list: l.tr(zh: "列表", en: "List", de: "Liste")
+        }
+    }
+
+    func shortTitle(_ l: L10n) -> String {
+        switch self {
+        case .deck: l.tr(zh: "卡", en: "Cards", de: "Karten")
+        case .list: l.tr(zh: "列", en: "List", de: "Liste")
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .deck: "square.stack.3d.up.fill"
+        case .list: "list.bullet"
+        }
+    }
+}
+
 struct PlantDashboardRoomSummary: Identifiable {
     let id: String
     let title: String
@@ -71,15 +99,31 @@ struct PlantDashboardRoomSummary: Identifiable {
     let watchCount: Int
 }
 
+enum PlantDashboardPhotoSource: Equatable, Sendable {
+    case profile
+    case careLog(PersistentIdentifier, UUID, String)
+    case fallback
+
+    var hasRealPhoto: Bool {
+        self != .fallback
+    }
+}
+
 struct PlantDashboardPhotoItem: Identifiable {
     let id: String
     let plant: Plant
-    let imageData: Data?
+    let plantModelID: PersistentIdentifier
+    let source: PlantDashboardPhotoSource
+    let mediaSignature: String
     let fallbackEmoji: String
     let title: String
     let subtitle: String
     let photoDate: Date?
     let tint: Color
+
+    var hasRealPhoto: Bool {
+        source.hasRealPhoto
+    }
 }
 
 struct PlantDashboardReadinessItem: Identifiable {
@@ -105,6 +149,12 @@ struct PlantDashboardCareLogDraft: Identifiable {
     var id: String { "\(plant.id.uuidString)-\(careType.rawValue)" }
 }
 
+struct PlantDashboardAvatarPreloadRequest: Sendable {
+    let id: UUID
+    let modelID: PersistentIdentifier
+    let signature: String
+}
+
 struct PlantDashboardView: View {
     let plants: [Plant]
     let onOpenPlant: (UUID) -> Void
@@ -123,6 +173,7 @@ struct PlantDashboardView: View {
     @State var showingAddPlant = false
     @State var selectedDashboardMode: PlantDashboardMode = .sites
     @State var selectedFilter: PlantDashboardFilter = .all
+    @State var selectedPlantsViewStyle: PlantDashboardPlantsViewStyle = .deck
     @State var selectedLocation: String?
     @State var selectedSiteSummary: PlantDashboardRoomSummary?
     @State var selectedDashboardPhoto: PlantDashboardPhotoItem?
@@ -135,8 +186,11 @@ struct PlantDashboardView: View {
     @State var plantHeroProgress: CGFloat = 0
     @State var plantHeroDirection: Int = 0
     @State var plantHeroGeneration = 0
+    @State var plantAvatarCacheRevision = 0
+    @State var plantAvatarPreloadTask: Task<Void, Never>?
     @State var plantPreparedHeroSnapshots: [UUID: FocusHomeVerticalSolidHeroSnapshot] = [:]
     @State var plantCollapseCleanupTask: Task<Void, Never>?
+    @State var mediaAttachmentIndexRepairTask: Task<Void, Never>?
     @Namespace var plantWalletNamespace
     @Namespace var plantWalletHeroNamespace
 
@@ -202,7 +256,19 @@ struct PlantDashboardView: View {
     }
 
     var roomCareSummaries: [PlantDashboardRoomSummary] {
-        Dictionary(grouping: plants, by: locationFilterValue(for:))
+        roomCareSummaries(for: plants)
+    }
+
+    var plantListModePlants: [Plant] {
+        filteredPlants(ignoresLocation: true)
+    }
+
+    var plantListModeRoomSummaries: [PlantDashboardRoomSummary] {
+        roomCareSummaries(for: plantListModePlants)
+    }
+
+    func roomCareSummaries(for sourcePlants: [Plant]) -> [PlantDashboardRoomSummary] {
+        Dictionary(grouping: sourcePlants, by: locationFilterValue(for:))
             .compactMap { location, roomPlants in
                 let title = location.trimmingCharacters(in: .whitespacesAndNewlines)
                 guard !title.isEmpty else { return nil }
@@ -239,6 +305,10 @@ struct PlantDashboardView: View {
     }
 
     var visiblePlants: [Plant] {
+        filteredPlants(ignoresLocation: false)
+    }
+
+    func filteredPlants(ignoresLocation: Bool) -> [Plant] {
         let filtered: [Plant]
         switch selectedFilter {
         case .all:
@@ -251,7 +321,7 @@ struct PlantDashboardView: View {
         case .indoor:
             filtered = plants.filter(\.isIndoor)
         }
-        let locationFiltered: [Plant] = if let selectedLocation {
+        let locationFiltered: [Plant] = if !ignoresLocation, let selectedLocation {
             filtered.filter {
                 locationFilterValue(for: $0) == selectedLocation
             }
@@ -267,7 +337,15 @@ struct PlantDashboardView: View {
 
     var showsRoomEdgeRail: Bool {
         selectedDashboardMode == .plants
+            && selectedPlantsViewStyle == .deck
             && roomCareSummaries.count >= 2
+            && !plants.isEmpty
+            && expandedPlantCardID == nil
+            && plantHeroDirection == 0
+    }
+
+    var showsPlantViewSwitcherRail: Bool {
+        selectedDashboardMode == .plants
             && !plants.isEmpty
             && expandedPlantCardID == nil
             && plantHeroDirection == 0
@@ -277,12 +355,14 @@ struct PlantDashboardView: View {
         let items = plants.flatMap { plant -> [PlantDashboardPhotoItem] in
             var items: [PlantDashboardPhotoItem] = []
 
-            if let avatarImageData = plant.avatarImageData {
+            if plant.hasAvatarImageAttachment {
                 items.append(
                     PlantDashboardPhotoItem(
                         id: "\(plant.id.uuidString)-profile",
                         plant: plant,
-                        imageData: avatarImageData,
+                        plantModelID: plant.persistentModelID,
+                        source: .profile,
+                        mediaSignature: plant.avatarThumbnailSignature,
                         fallbackEmoji: plant.avatarEmoji,
                         title: plant.name,
                         subtitle: locationSummary(for: plant),
@@ -298,11 +378,14 @@ struct PlantDashboardView: View {
 
             var logPhotoItems: [PlantDashboardPhotoItem] = []
             for log in recentLogs {
-                guard let photoData = log.photoData else { continue }
+                guard log.hasPhotoAttachment else { continue }
+                let mediaSignature = log.photoThumbnailSignature
                 logPhotoItems.append(PlantDashboardPhotoItem(
                     id: "\(plant.id.uuidString)-log-\(log.id.uuidString)",
                     plant: plant,
-                    imageData: photoData,
+                    plantModelID: plant.persistentModelID,
+                    source: .careLog(log.persistentModelID, log.id, mediaSignature),
+                    mediaSignature: mediaSignature,
                     fallbackEmoji: plant.avatarEmoji,
                     title: plant.name,
                     subtitle: "\(log.careType.displayName(l: l)) · \(shortDate(log.date))",
@@ -320,7 +403,9 @@ struct PlantDashboardView: View {
                     PlantDashboardPhotoItem(
                         id: "\(plant.id.uuidString)-fallback",
                         plant: plant,
-                        imageData: nil,
+                        plantModelID: plant.persistentModelID,
+                        source: .fallback,
+                        mediaSignature: "",
                         fallbackEmoji: plant.avatarEmoji,
                         title: plant.name,
                         subtitle: locationSummary(for: plant),
@@ -333,8 +418,8 @@ struct PlantDashboardView: View {
             return Array(items.prefix(3))
         }
         .sorted { lhs, rhs in
-            if (lhs.imageData != nil) != (rhs.imageData != nil) {
-                return lhs.imageData != nil
+            if lhs.hasRealPhoto != rhs.hasRealPhoto {
+                return lhs.hasRealPhoto
             }
             switch (lhs.photoDate, rhs.photoDate) {
             case let (lhsDate?, rhsDate?):
@@ -362,7 +447,7 @@ struct PlantDashboardView: View {
     }
 
     var dashboardLeadPlant: Plant? {
-        plants.first { previewImageData(for: $0) != nil } ?? plants.first
+        plants.first { plantHasPreviewImage($0) } ?? plants.first
     }
 
     var body: some View {
@@ -384,14 +469,7 @@ struct PlantDashboardView: View {
                 }
             }
 
-            if showsRoomEdgeRail {
-                roomEdgeRail
-                    .padding(.trailing, 4)
-                    .padding(.top, 132)
-                    .padding(.bottom, 112)
-                    .transition(.opacity.combined(with: .move(edge: .trailing)))
-                    .zIndex(40)
-            }
+            plantFloatingEdgeControls
         }
         .sheet(isPresented: $showingAddPlant) {
             AddPlantDataContainer {
@@ -411,6 +489,7 @@ struct PlantDashboardView: View {
         .sheet(item: $selectedDashboardPhoto) { item in
             PlantDashboardPhotoDetailSheet(
                 item: item,
+                imageDataProvider: photoImageData(for:),
                 onOpenPlant: openPlantFromPhoto
             )
         }
@@ -445,173 +524,21 @@ struct PlantDashboardView: View {
         .onChange(of: searchText) { _, _ in
             collapseExpandedPlantIfNeeded()
         }
+        .onAppear {
+            scheduleMediaAttachmentIndexRepair()
+            scheduleVisiblePlantAvatarPreload()
+        }
+        .onChange(of: plants.count) { _, _ in
+            scheduleMediaAttachmentIndexRepair()
+        }
+        .onChange(of: plantAvatarPreloadSignature) { _, _ in
+            scheduleVisiblePlantAvatarPreload()
+        }
         .onDisappear {
+            mediaAttachmentIndexRepairTask?.cancel()
+            plantAvatarPreloadTask?.cancel()
             commandQueue.cancelAll()
         }
-    }
-
-    // MARK: - Empty State
-
-    var emptyState: some View {
-        VStack(spacing: 24) {
-            Spacer().frame(height: 80)
-
-            Image(systemName: "leaf.circle.fill") // a11y: allow decorative empty-state glyph; following title describes the state.
-                .accessibilityHidden(true)
-                .font(OhanaFont.adaptive(size: 72, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                .foregroundStyle(Color.goTeal)
-
-            Text(l.tr(zh: "还没有植物", en: "No plants yet", de: "Noch keine Pflanzen"))
-                .font(OhanaFont.adaptive(size: 24, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                .foregroundStyle(Color.ohanaPrimaryText)
-
-            Text(l.tr(
-                zh: "添加你的第一棵植物，开始记录浇水和施肥",
-                en: "Add your first plant and start tracking watering and fertilizing",
-                de: "Füge deine erste Pflanze hinzu und tracke Gießen und Düngen"
-            ))
-            .font(OhanaFont.adaptive(size: 15, weight: .medium, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-            .foregroundStyle(Color.ohanaSecondaryText)
-            .multilineTextAlignment(.center)
-            .padding(.horizontal, 40)
-
-            Button {
-                showingAddPlant = true
-            } label: {
-                HStack(spacing: 8) {
-                    Image(systemName: "plus.circle.fill") // a11y: allow decorative icon covered by surrounding text or control
-                        .font(OhanaFont.adaptive(size: 16, weight: .bold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                    Text(l.tr(zh: "添加植物", en: "Add plant", de: "Pflanze hinzufügen"))
-                        .font(OhanaFont.adaptive(size: 16, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                }
-                .foregroundStyle(Color.arkInk)
-                .padding(.horizontal, 28)
-                .padding(.vertical, 14)
-                .background(Color.goPrimary, in: Capsule())
-            }
-            .buttonStyle(ScaleButtonStyle())
-            .accessibilityIdentifier("plant-dashboard-empty-add-action")
-
-            Spacer()
-        }
-    }
-
-    // MARK: - Urgent Section
-
-    var urgentSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 6) {
-                Image(systemName: "drop.fill") // a11y: allow decorative icon covered by surrounding text or control
-                    .font(OhanaFont.adaptive(size: 14, weight: .bold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                    .foregroundStyle(Color.goTeal)
-                Text(l.tr(zh: "需要浇水", en: "Needs watering", de: "Braucht Wasser"))
-                    .font(OhanaFont.adaptive(size: 15, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                    .foregroundStyle(Color.ohanaPrimaryText)
-                Spacer()
-                Button {
-                    waterAll()
-                } label: {
-                    Text(l.tr(zh: "全部浇水", en: "Water all", de: "Alle gießen"))
-                        .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                        .foregroundStyle(Color.arkInk)
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 6)
-                        .background(Color.goPrimary, in: Capsule())
-                }
-                .buttonStyle(ScaleButtonStyle())
-            }
-
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 10) {
-                    ForEach(plantsNeedingWater) { plant in
-                        urgentPlantChip(plant)
-                    }
-                }
-            }
-        }
-        .padding(16)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous))
-    }
-
-    func urgentPlantChip(_ plant: Plant) -> some View {
-        HStack(spacing: 8) {
-            Text(plant.avatarEmoji)
-                .font(OhanaFont.adaptive(size: 20)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-            VStack(alignment: .leading, spacing: 2) {
-                Text(plant.name)
-                    .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                    .foregroundStyle(Color.ohanaPrimaryText)
-                    .lineLimit(1)
-                if let days = plant.daysSinceWatered {
-                    Text(l.tr(
-                        zh: "\(days)天未浇水",
-                        en: "\(days)d overdue",
-                        de: "\(days) T. überfällig"
-                    ))
-                    .font(OhanaFont.adaptive(size: 10, weight: .medium, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                    .foregroundStyle(Color.goRed)
-                }
-            }
-            Button {
-                waterPlant(plant)
-            } label: {
-                Image(systemName: "drop.fill") // a11y: allow decorative icon covered by surrounding text or control
-                    .font(OhanaFont.adaptive(size: 12, weight: .bold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                    .foregroundStyle(Color.arkInk)
-                    .frame(width: 44, height: 44)
-                    .background(Color.goTeal, in: Circle())
-                    .accessibilityHidden(true)
-            }
-            .buttonStyle(ScaleButtonStyle())
-            .accessibilityLabel(l.tr(zh: "给\(plant.name)浇水", en: "Water \(plant.name)", de: "\(plant.name) gießen"))
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .background(Color.ohanaCardSurface, in: Capsule())
-    }
-
-    // MARK: - Search Empty State
-
-    var plantSearchEmptyState: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 10) {
-                Image(systemName: isSearchingPlants ? "magnifyingglass.circle.fill" : "line.3.horizontal.decrease.circle.fill") // a11y: allow decorative empty-search glyph; adjacent text states the result.
-                    .font(OhanaFont.adaptive(size: 22, weight: .black))
-                    .foregroundStyle(Color.goTeal)
-                    .frame(width: 44, height: 44)
-                    .accessibilityHidden(true)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(isSearchingPlants
-                        ? l.tr(zh: "没有匹配的植物", en: "No matching plants", de: "Keine passenden Pflanzen")
-                        : l.tr(zh: "当前筛选没有植物", en: "No plants in this filter", de: "Keine Pflanzen in diesem Filter"))
-                        .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
-                        .foregroundStyle(Color.ohanaPrimaryText)
-                    Text(isSearchingPlants
-                        ? l.tr(zh: "换个名字、品种或房间试试", en: "Try another name, species, or room", de: "Anderen Namen, Art oder Raum versuchen")
-                        : l.tr(zh: "清空筛选即可回到完整植物列表", en: "Clear filters to return to the full plant list", de: "Filter leeren, um alle Pflanzen zu sehen"))
-                        .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded))
-                        .foregroundStyle(Color.ohanaSecondaryText)
-                        .lineLimit(2)
-                }
-            }
-
-            Button {
-                clearPlantSearchAndFilters()
-            } label: {
-                Text(l.tr(zh: "显示全部植物", en: "Show all plants", de: "Alle Pflanzen anzeigen"))
-                    .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
-                    .foregroundStyle(Color.arkInk)
-                    .frame(maxWidth: .infinity)
-                    .frame(minHeight: 44)
-                    .background(Color.goLime, in: Capsule())
-            }
-            .buttonStyle(ScaleButtonStyle())
-            .accessibilityIdentifier("plant-dashboard-search-reset")
-        }
-        .padding(16)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous))
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("plant-dashboard-search-empty")
     }
 
     func locationFilterValue(for plant: Plant) -> String {
@@ -682,7 +609,7 @@ struct PlantDashboardView: View {
                     de: "Ein Katalogtreffer verbessert Gießen, Düngen und Sicherheit."
                 ),
                 icon: "books.vertical.fill",
-                tint: Color.goLime,
+                tint: Color.goPrimary,
                 priority: 1
             )
         }
@@ -721,7 +648,7 @@ struct PlantDashboardView: View {
             )
         }
 
-        if previewImageData(for: plant) == nil {
+        if !plantHasPreviewImage(plant) {
             return PlantDashboardReadinessItem(
                 id: "\(plantID)-photo",
                 plant: plant,
@@ -748,7 +675,7 @@ struct PlantDashboardView: View {
                     de: "Der erste Eintrag startet Zeitachse und Pflegerhythmus."
                 ),
                 icon: "clock.badge.checkmark.fill",
-                tint: Color.goLime,
+                tint: Color.goPrimary,
                 priority: 5
             )
         }
@@ -781,11 +708,72 @@ struct PlantDashboardView: View {
         locationFilterValue(for: plant)
     }
 
-    func previewImageData(for plant: Plant) -> Data? {
-        plant.avatarImageData ?? plant.careLogs
-            .sorted { $0.date > $1.date }
-            .first { $0.photoData != nil }?
-            .photoData
+    func previewImageData(for plantModelID: PersistentIdentifier, source: PlantDashboardPhotoSource) async -> Data? {
+        let loader = SwiftDataMediaBlobLoader(modelContainer: modelContext.container)
+        switch source {
+        case .profile:
+            return await loader.plantAvatarImageData(modelID: plantModelID)
+        case let .careLog(logModelID, _, _):
+            return await loader.plantCareLogPhotoData(modelID: logModelID)
+        case .fallback:
+            return nil
+        }
+    }
+
+    func previewImageID(for plant: Plant, source: PlantDashboardPhotoSource) -> String {
+        switch source {
+        case .profile:
+            "\(plant.id.uuidString)-profile"
+        case let .careLog(_, logID, _):
+            "\(plant.id.uuidString)-log-\(logID.uuidString)"
+        case .fallback:
+            "\(plant.id.uuidString)-fallback"
+        }
+    }
+
+    func previewImageSignature(for plant: Plant, source: PlantDashboardPhotoSource) -> String {
+        switch source {
+        case .profile:
+            plant.avatarThumbnailSignature
+        case let .careLog(_, _, mediaSignature):
+            mediaSignature
+        case .fallback:
+            ""
+        }
+    }
+
+    func previewImageSource(for plant: Plant) -> PlantDashboardPhotoSource {
+        if plant.hasAvatarImageAttachment {
+            return .profile
+        }
+        if let log = plant.careLogs
+            .sorted(by: { $0.date > $1.date })
+            .first(where: { $0.hasPhotoAttachment }) {
+            let mediaSignature = log.photoThumbnailSignature
+            return .careLog(log.persistentModelID, log.id, mediaSignature)
+        }
+        return .fallback
+    }
+
+    func plantHasPreviewImage(_ plant: Plant) -> Bool {
+        plant.hasAvatarImageAttachment || plant.careLogs.contains { $0.hasPhotoAttachment }
+    }
+
+    func photoImageData(for item: PlantDashboardPhotoItem) async -> Data? {
+        await previewImageData(for: item.plantModelID, source: item.source)
+    }
+
+    @ViewBuilder
+    func plantPreviewTile(for plant: Plant) -> some View {
+        let source = previewImageSource(for: plant)
+        let plantModelID = plant.persistentModelID
+        PlantDashboardPhotoTile(
+            imageID: previewImageID(for: plant, source: source),
+            imageSignature: previewImageSignature(for: plant, source: source),
+            imageDataProvider: { await previewImageData(for: plantModelID, source: source) },
+            fallbackEmoji: plant.avatarEmoji,
+            tint: siteTint(for: plant)
+        )
     }
 
     func shortDate(_ date: Date) -> String {
@@ -851,7 +839,7 @@ struct PlantDashboardView: View {
         case .watching:
             return Color.goYellow
         case .thriving:
-            return Color.goLime
+            return Color.goPrimary
         case .stable:
             return Color.goTeal
         }
@@ -862,7 +850,7 @@ struct PlantDashboardView: View {
         case .watering, .misting:
             Color.goTeal
         case .fertilizing, .newLeaf:
-            Color.goLime
+            Color.goPrimary
         case .repotting, .pruning, .rotating, .leafCleaning, .pestCheck, .photo, .customNote:
             Color.goYellow
         case .yellowLeaf, .pestFound:
@@ -956,6 +944,32 @@ struct PlantDashboardView: View {
             selectedLocation = location
         }
         UISelectionFeedbackGenerator().selectionChanged()
+    }
+
+    func selectPlantViewStyle(_ style: PlantDashboardPlantsViewStyle) {
+        guard selectedPlantsViewStyle != style else { return }
+        collapseExpandedPlantIfNeeded()
+        withAnimation(GoMotion.quick) {
+            selectedPlantsViewStyle = style
+            if style == .list {
+                selectedLocation = nil
+            }
+        }
+        UISelectionFeedbackGenerator().selectionChanged()
+    }
+
+    func scheduleMediaAttachmentIndexRepair() {
+        guard !plants.isEmpty else { return }
+        mediaAttachmentIndexRepairTask?.cancel()
+        mediaAttachmentIndexRepairTask = Task { @MainActor in
+            await OhanaFrameScheduler.waitAfterNextFrame(milliseconds: 140)
+            guard !Task.isCancelled else { return }
+            _ = PlantMediaAttachmentIndexRepair.repair(
+                plants: plants,
+                modelContext: modelContext
+            )
+            mediaAttachmentIndexRepairTask = nil
+        }
     }
 
     func openDashboardFilters() {
@@ -1093,15 +1107,24 @@ struct PlantDashboardView: View {
 }
 
 struct PlantDashboardPhotoTile: View {
-    let imageData: Data?
+    let imageID: String
+    let imageSignature: String
+    let imageDataProvider: @Sendable () async -> Data?
     let fallbackEmoji: String
     let tint: Color
 
-    @State var image: UIImage?
-
-    var imageSignature: String {
-        guard let imageData else { return "none" }
-        return "\(imageData.count)-\(imageData.first ?? 0)-\(imageData.last ?? 0)"
+    init(
+        imageID: String,
+        imageSignature: String,
+        imageDataProvider: @escaping @Sendable () async -> Data?,
+        fallbackEmoji: String,
+        tint: Color
+    ) {
+        self.imageID = imageID
+        self.imageSignature = imageSignature
+        self.imageDataProvider = imageDataProvider
+        self.fallbackEmoji = fallbackEmoji
+        self.tint = tint
     }
 
     var body: some View {
@@ -1109,24 +1132,22 @@ struct PlantDashboardPhotoTile: View {
             Rectangle()
                 .fill(tint.opacity(0.18))
 
-            if let image {
-                Image(uiImage: image)
-                    .resizable()
-                    .scaledToFill()
-            } else {
+            PlantDetailDecodedImageTile(
+                imageID: imageID,
+                imageSignature: imageSignature,
+                imageDataProvider: { await imageDataProvider() },
+                tint: tint,
+                fillsContainer: true,
+                maxPixel: 720
+            )
+
+            if imageSignature.isEmpty {
                 Text(fallbackEmoji.isEmpty ? "🌱" : fallbackEmoji)
                     .font(OhanaFont.adaptive(size: 30, weight: .black))
                     .minimumScaleFactor(0.72)
             }
         }
         .clipped()
-        .task(id: imageSignature) {
-            guard let imageData else {
-                image = nil
-                return
-            }
-            image = await AttachmentImageDecoder.decode(imageData)
-        }
         .accessibilityHidden(true)
     }
 }

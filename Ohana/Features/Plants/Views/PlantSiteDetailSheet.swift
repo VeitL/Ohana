@@ -5,6 +5,7 @@
 //  Site-level plant overview for the Plants dashboard.
 //
 
+import SwiftData
 import SwiftUI
 import UIKit
 
@@ -17,6 +18,7 @@ struct PlantSiteDetailSheet: View {
     let onOpenCareLog: (Plant, PlantCareType) -> Void
 
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.modelContext) private var modelContext
     @AppStorage("appLanguage") private var appLanguage = "zh"
 
     private var l: L10n { L10n(appLanguage) }
@@ -61,9 +63,9 @@ struct PlantSiteDetailSheet: View {
             HStack(alignment: .top, spacing: 12) {
                 Image(systemName: "square.grid.2x2.fill") // a11y: allow decorative site glyph; heading and stats name this sheet.
                     .font(OhanaFont.adaptive(size: 19, weight: .black))
-                    .foregroundStyle(Color.goLime)
+                    .foregroundStyle(Color.goPrimary)
                     .frame(width: 44, height: 44)
-                    .background(Color.goLime.opacity(0.16), in: Circle())
+                    .background(Color.goPrimary.opacity(0.16), in: Circle())
                     .accessibilityHidden(true)
 
                 VStack(alignment: .leading, spacing: 4) {
@@ -163,7 +165,7 @@ struct PlantSiteDetailSheet: View {
             .foregroundStyle(Color.arkInk)
             .frame(maxWidth: .infinity)
             .frame(minHeight: 48)
-            .background(Color.goLime, in: Capsule())
+            .background(Color.goPrimary, in: Capsule())
         }
         .buttonStyle(ScaleButtonStyle())
         .accessibilityIdentifier("plant-site-detail-view-plants")
@@ -201,7 +203,7 @@ struct PlantSiteDetailSheet: View {
                     .font(OhanaFont.adaptive(size: 12, weight: .black))
                     .foregroundStyle(Color.arkInk)
                     .frame(width: 44, height: 44)
-                    .background(Color.goLime, in: Circle())
+                    .background(Color.goPrimary, in: Circle())
                     .accessibilityHidden(true)
             }
             .buttonStyle(ScaleButtonStyle())
@@ -213,13 +215,18 @@ struct PlantSiteDetailSheet: View {
         .accessibilityIdentifier("plant-site-detail-care-task-\(task.id)")
     }
 
+    @ViewBuilder
     private func plantRow(_ plant: Plant) -> some View {
+        let imageSource = previewImageSource(for: plant)
+        let plantModelID = plant.persistentModelID
         Button {
             onOpenPlant(plant.id)
         } label: {
             HStack(spacing: 12) {
                 PlantSiteImageTile(
-                    imageData: previewImageData(for: plant),
+                    imageID: previewImageID(for: plant, source: imageSource),
+                    imageSignature: previewImageSignature(for: plant, source: imageSource),
+                    imageDataProvider: { await previewImageData(for: plantModelID, source: imageSource) },
                     tint: statusTint(for: plant)
                 )
                 .frame(width: 52, height: 52)
@@ -305,17 +312,57 @@ struct PlantSiteDetailSheet: View {
         .background(Color.ohanaCardSurface.opacity(0.78), in: Capsule())
     }
 
-    private func previewImageData(for plant: Plant) -> Data? {
-        plant.avatarImageData ?? plant.careLogs
-            .sorted { $0.date > $1.date }
-            .first { $0.photoData != nil }?
-            .photoData
+    private func previewImageData(for plantModelID: PersistentIdentifier, source: PlantDashboardPhotoSource) async -> Data? {
+        let loader = SwiftDataMediaBlobLoader(modelContainer: modelContext.container)
+        switch source {
+        case .profile:
+            return await loader.plantAvatarImageData(modelID: plantModelID)
+        case let .careLog(logModelID, _, _):
+            return await loader.plantCareLogPhotoData(modelID: logModelID)
+        case .fallback:
+            return nil
+        }
+    }
+
+    private func previewImageID(for plant: Plant, source: PlantDashboardPhotoSource) -> String {
+        switch source {
+        case .profile:
+            "\(plant.id.uuidString)-profile"
+        case let .careLog(_, logID, _):
+            "\(plant.id.uuidString)-log-\(logID.uuidString)"
+        case .fallback:
+            "\(plant.id.uuidString)-fallback"
+        }
+    }
+
+    private func previewImageSignature(for plant: Plant, source: PlantDashboardPhotoSource) -> String {
+        switch source {
+        case .profile:
+            plant.avatarThumbnailSignature
+        case let .careLog(_, _, mediaSignature):
+            mediaSignature
+        case .fallback:
+            ""
+        }
+    }
+
+    private func previewImageSource(for plant: Plant) -> PlantDashboardPhotoSource {
+        if plant.hasAvatarImageAttachment {
+            return .profile
+        }
+        if let log = plant.careLogs
+            .sorted(by: { $0.date > $1.date })
+            .first(where: { $0.hasPhotoAttachment }) {
+            let mediaSignature = log.photoThumbnailSignature
+            return .careLog(log.persistentModelID, log.id, mediaSignature)
+        }
+        return .fallback
     }
 
     private func statusTint(for plant: Plant) -> Color {
         switch plant.healthStatus {
         case .thriving:
-            Color.goLime
+            Color.goPrimary
         case .stable:
             Color.goTeal
         case .watching:
@@ -330,7 +377,7 @@ struct PlantSiteDetailSheet: View {
         case .watering, .misting:
             Color.goTeal
         case .fertilizing, .newLeaf:
-            Color.goLime
+            Color.goPrimary
         case .repotting, .pruning, .rotating, .leafCleaning, .pestCheck, .photo, .customNote:
             Color.goYellow
         case .yellowLeaf, .pestFound:
@@ -371,39 +418,26 @@ struct PlantSiteDetailSheet: View {
 }
 
 private struct PlantSiteImageTile: View {
-    let imageData: Data?
+    let imageID: String
+    let imageSignature: String
+    let imageDataProvider: @Sendable () async -> Data?
     let tint: Color
-
-    @State private var image: UIImage?
-
-    private var imageSignature: String {
-        guard let imageData else { return "none" }
-        return "\(imageData.count)-\(imageData.first ?? 0)-\(imageData.last ?? 0)"
-    }
 
     var body: some View {
         ZStack {
             Circle()
                 .fill(tint.opacity(0.18))
 
-            if let image {
-                Image(uiImage: image)
-                    .resizable()
-                    .scaledToFill()
-            } else {
-                Image(systemName: "leaf.fill") // a11y: allow decorative fallback plant glyph; parent row names the plant.
-                    .font(OhanaFont.adaptive(size: 20, weight: .black))
-                    .foregroundStyle(tint)
-            }
+            PlantDetailDecodedImageTile(
+                imageID: imageID,
+                imageSignature: imageSignature,
+                imageDataProvider: { await imageDataProvider() },
+                tint: tint,
+                fillsContainer: true,
+                maxPixel: 360
+            )
         }
         .clipped()
-        .task(id: imageSignature) {
-            guard let imageData else {
-                image = nil
-                return
-            }
-            image = await AttachmentImageDecoder.decode(imageData)
-        }
         .accessibilityHidden(true)
     }
 }

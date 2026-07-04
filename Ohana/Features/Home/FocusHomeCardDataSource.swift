@@ -101,7 +101,11 @@ nonisolated enum FocusHomeCardDataSource {
         currentAvatarData: [UUID: Data],
         currentPopoutData: [UUID: Data]
     ) -> (avatarData: [UUID: Data], popoutData: [UUID: Data]) {
-        let targetIds = Array(source.prefix(maxCardsPerPage)).map(\.id)
+        _ = pets
+        _ = humans
+        _ = equipFxPopoutCard
+        let targetCards = Array(source.prefix(maxCardsPerPage))
+        let targetIds = targetCards.map(\.id)
         let targetIdSet = Set(targetIds)
         var avatarData = currentAvatarData
         var popoutData = currentPopoutData
@@ -111,37 +115,16 @@ nonisolated enum FocusHomeCardDataSource {
             popoutData = popoutData.filter { targetIdSet.contains($0.key) }
         }
 
-        for id in targetIds {
-            if let data = avatarDataForHomeCard(id: id, pets: pets, humans: humans), !data.isEmpty {
-                avatarData[id] = data
-            } else {
-                avatarData.removeValue(forKey: id)
+        for card in targetCards {
+            if let data = card.avatarImageData, !data.isEmpty {
+                avatarData[card.id] = data
             }
-            if let popout = popoutDataForHomeCard(id: id, pets: pets, equipFxPopoutCard: equipFxPopoutCard), !popout.isEmpty {
-                popoutData[id] = popout
-            } else {
-                popoutData.removeValue(forKey: id)
+            if let popout = card.cardPopoutImageData, !popout.isEmpty {
+                popoutData[card.id] = popout
             }
         }
 
         return (avatarData, popoutData)
-    }
-
-    static func avatarDataForHomeCard(id: UUID, pets: [Pet], humans: [Human]) -> Data? {
-        if let pet = pets.first(where: { $0.id == id }) {
-            return pet.avatarImageData
-        }
-        if let human = humans.first(where: { $0.id == id }) {
-            return human.avatarImageData
-        }
-        return nil
-    }
-
-    static func popoutDataForHomeCard(id: UUID, pets: [Pet], equipFxPopoutCard: Bool) -> Data? {
-        guard equipFxPopoutCard,
-              let pet = pets.first(where: { $0.id == id }),
-              pet.cardStyleRaw == "popout" else { return nil }
-        return pet.cardPopoutImageData ?? pet.avatarImageData
     }
 
     static func visibleCards(
@@ -177,9 +160,13 @@ nonisolated enum FocusHomeCardDataSource {
         cards.map { card in
             var copy = card
             copy.avatarImageData = avatarData[card.id] ?? card.avatarImageData
-            copy.avatarImageSignature = copy.avatarImageData.map(FocusWalletAvatarCache.signature(for:)) ?? ""
+            if let avatarData = copy.avatarImageData {
+                copy.avatarImageSignature = FocusWalletAvatarCache.signature(for: avatarData)
+            }
             copy.cardPopoutImageData = popoutData[card.id] ?? copy.cardPopoutImageData
-            copy.cardPopoutImageSignature = copy.cardPopoutImageData.map(FocusWalletAvatarCache.signature(for:)) ?? ""
+            if let popoutData = copy.cardPopoutImageData {
+                copy.cardPopoutImageSignature = FocusWalletAvatarCache.signature(for: popoutData)
+            }
             return copy
         }
     }

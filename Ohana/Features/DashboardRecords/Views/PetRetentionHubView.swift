@@ -144,7 +144,9 @@ struct PetRetentionHubView: View {
     private var header: some View {
         HStack(spacing: 12) {
             FeatureHubAvatar(
-                imageData: pet.avatarImageData,
+                imageCacheID: "pet-retention-hub-\(pet.id.uuidString)",
+                imageSignature: pet.avatarThumbnailSignature,
+                petModelID: pet.persistentModelID,
                 emoji: pet.avatarEmoji,
                 fallback: pet.speciesEmoji,
                 tint: themeColor

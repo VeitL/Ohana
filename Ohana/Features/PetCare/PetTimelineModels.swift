@@ -5,28 +5,29 @@
 //  统一时间轴条目（岁月史书 / 详情页摘要 / 重要时刻页共用）
 //
 
-import SwiftUI
+import Foundation
+import SwiftData
 
-struct UnifiedLogItem: Identifiable {
+nonisolated struct UnifiedLogItem: Identifiable {
     let id: UUID
     let date: Date
     let type: String
     let title: String
     let subtitle: String
     let iconName: String
-    let color: Color
+    let colorToken: DomainColorToken
     var photos: [PetPhotoLog] = []
     var style: PetTimelineItemStyle = .rail
     var isHighlight: Bool = false
     var sharedSessionID: UUID?
 }
 
-enum PetTimelineItemStyle {
+nonisolated enum PetTimelineItemStyle: Sendable {
     case story
     case rail
 }
 
-enum PetTimelineDisplayMode: String, CaseIterable, Identifiable {
+nonisolated enum PetTimelineDisplayMode: String, CaseIterable, Identifiable, Sendable {
     case highlights
     case memories
     case health
@@ -48,7 +49,7 @@ enum PetTimelineDisplayMode: String, CaseIterable, Identifiable {
     }
 }
 
-enum PetTimelineMilestoneKind {
+nonisolated enum PetTimelineMilestoneKind {
     case birthday
     case together
     case remembrance
@@ -58,14 +59,14 @@ enum PetTimelineMilestoneKind {
     case weight
 }
 
-struct PetTimelineArchiveSection: Identifiable {
+nonisolated struct PetTimelineArchiveSection: Identifiable {
     let id: String
     let title: String
     let subtitle: String
     let items: [UnifiedLogItem]
 }
 
-struct PetTimelineSourceRows {
+nonisolated struct PetTimelineSourceRows {
     var careLogs: [PetCareLog] = []
     var pottyLogs: [PetPottyLog] = []
     var walkLogs: [PetWalkLog] = []
@@ -78,7 +79,96 @@ struct PetTimelineSourceRows {
     static let empty = PetTimelineSourceRows()
 }
 
-enum PetTimelineItemsBuilder {
+nonisolated struct PetTimelinePhotoReference: Identifiable, Sendable {
+    let id: UUID
+    let modelID: PersistentIdentifier
+    let sourceSignature: String
+    let canAttemptImageAttachmentLoad: Bool
+}
+
+nonisolated struct PetTimelineRenderItem: Identifiable, Sendable {
+    let id: UUID
+    let date: Date
+    let type: String
+    let title: String
+    let subtitle: String
+    let iconName: String
+    let colorToken: DomainColorToken
+    var photos: [PetTimelinePhotoReference] = []
+    var style: PetTimelineItemStyle = .rail
+    var isHighlight: Bool = false
+    var sharedSessionID: UUID?
+}
+
+nonisolated struct PetTimelineRenderSection: Identifiable, Sendable {
+    let id: String
+    let title: String
+    let subtitle: String
+    let items: [PetTimelineRenderItem]
+}
+
+nonisolated struct PetMomentsHubRenderData: Sendable {
+    static let empty = PetMomentsHubRenderData(
+        highlightCount: 0,
+        memoryCount: 0,
+        realPhotoCount: 0,
+        highlightSections: [],
+        timelineSectionsByMode: [:]
+    )
+
+    let highlightCount: Int
+    let memoryCount: Int
+    let realPhotoCount: Int
+    let highlightSections: [PetTimelineRenderSection]
+    let timelineSectionsByMode: [PetTimelineDisplayMode: [PetTimelineRenderSection]]
+
+    func sections(for mode: PetTimelineDisplayMode) -> [PetTimelineRenderSection] {
+        timelineSectionsByMode[mode] ?? []
+    }
+
+    static func build(
+        pet: Pet,
+        timelineRows: PetTimelineSourceRows,
+        sharedCareSessions: [SharedCareSession],
+        l: L10n
+    ) -> PetMomentsHubRenderData {
+        let highlightSections = PetTimelineItemsBuilder.archiveSections(
+            for: pet,
+            mode: .highlights,
+            sourceRows: timelineRows,
+            l: l,
+            sharedCareSessions: sharedCareSessions
+        ).map(\.renderSnapshot)
+        let memoryItems = PetTimelineItemsBuilder.archiveItems(
+            for: pet,
+            mode: .memories,
+            sourceRows: timelineRows,
+            l: l,
+            sharedCareSessions: sharedCareSessions
+        )
+
+        var timelineSectionsByMode: [PetTimelineDisplayMode: [PetTimelineRenderSection]] = [:]
+        for mode in PetTimelineDisplayMode.allCases {
+            timelineSectionsByMode[mode] = PetTimelineItemsBuilder.archiveSections(
+                for: pet,
+                mode: mode,
+                sourceRows: timelineRows,
+                l: l,
+                sharedCareSessions: sharedCareSessions
+            ).map(\.renderSnapshot)
+        }
+
+        return PetMomentsHubRenderData(
+            highlightCount: highlightSections.reduce(0) { $0 + $1.items.count },
+            memoryCount: memoryItems.count,
+            realPhotoCount: timelineRows.photoLogs.lazy.filter(\.canAttemptImageAttachmentLoad).count,
+            highlightSections: highlightSections,
+            timelineSectionsByMode: timelineSectionsByMode
+        )
+    }
+}
+
+nonisolated enum PetTimelineItemsBuilder {
     /// 构建统一时间轴；`limit` 为 nil 时不截断
     static func items(
         for pet: Pet,
@@ -95,21 +185,21 @@ enum PetTimelineItemsBuilder {
             list.append(UnifiedLogItem(id: session?.id ?? w.id, date: w.startDate, type: "walk",
                                        title: walkTitle(for: w, session: session, l: l),
                                        subtitle: walkSubtitle(for: w, session: session, l: l),
-                                       iconName: "figure.walk", color: .goPrimary,
+                                       iconName: "figure.walk", colorToken: .goPrimary,
                                        sharedSessionID: session?.id))
         }
         for p in sourceRows.pottyLogs {
             let session = sharedSession(for: p.sharedSessionId, in: sessionsById)
             list.append(UnifiedLogItem(id: session?.id ?? p.id, date: p.date, type: "potty",
                                        title: "噗噗 · \(p.pottyType.emoji)\(p.pottyType.rawValue)", subtitle: "",
-                                       iconName: "drop.fill", color: .goOrange,
+                                       iconName: "drop.fill", colorToken: .goOrange,
                                        sharedSessionID: session?.id))
         }
         for h in sourceRows.healthLogs {
             list.append(UnifiedLogItem(id: h.id, date: h.date, type: "health",
                                        title: "\(h.healthLogType.emoji) \(h.type)",
                                        subtitle: h.note.isEmpty ? (h.vetName.isEmpty ? "" : h.vetName) : h.note,
-                                       iconName: "heart.text.clipboard", color: .goTeal))
+                                       iconName: "heart.text.clipboard", colorToken: .goTeal))
         }
         for e in sourceRows.expenseLogs {
             let session = sharedSession(for: e.sharedSessionId, in: sessionsById)
@@ -117,20 +207,20 @@ enum PetTimelineItemsBuilder {
             list.append(UnifiedLogItem(id: session?.id ?? e.id, date: e.date, type: "expense",
                                        title: expenseTitle(for: e, session: session, visibleNote: visibleNote, l: l),
                                        subtitle: expenseSubtitle(for: e, session: session, visibleNote: visibleNote, l: l),
-                                       iconName: "\(AppCurrency.systemIconName).fill", color: .goYellow,
+                                       iconName: "\(AppCurrency.systemIconName).fill", colorToken: .goYellow,
                                        sharedSessionID: session?.id))
         }
         for w in sourceRows.weightLogs {
             list.append(UnifiedLogItem(id: w.id, date: w.date, type: "weight",
                                        title: String(format: "体重 %.1f kg", w.weight), subtitle: "",
-                                       iconName: "scalemass.fill", color: .goTeal))
+                                       iconName: "scalemass.fill", colorToken: .goTeal))
         }
         for c in sourceRows.careLogs {
             let session = sharedSession(for: c.sharedSessionId, in: sessionsById)
             list.append(UnifiedLogItem(id: session?.id ?? c.id, date: c.date, type: "care",
                                        title: careTitle(for: c, session: session, l: l),
                                        subtitle: careSubtitle(for: c, session: session, l: l),
-                                       iconName: "sparkles", color: .goPurple,
+                                       iconName: "sparkles", colorToken: .goPurple,
                                        sharedSessionID: session?.id))
         }
 
@@ -364,10 +454,11 @@ enum PetTimelineItemsBuilder {
         let photoItems = photoGroups.map { group -> UnifiedLogItem in
             let first = group[0]
             let note = first.note.trimmingCharacters(in: .whitespacesAndNewlines)
-            let hasImage = group.contains { renderableImageData($0.imageData) }
+            let imageLogs = group.filter(\.hasImageAttachment)
+            let hasImage = !imageLogs.isEmpty
             let title: String = if hasImage {
-                group.count > 1
-                    ? l.tr(zh: "\(group.count) 张照片", en: "\(group.count) photos", de: "\(group.count) Fotos")
+                imageLogs.count > 1
+                    ? l.tr(zh: "\(imageLogs.count) 张照片", en: "\(imageLogs.count) photos", de: "\(imageLogs.count) Fotos")
                     : l.tr(zh: "照片时刻", en: "Photo moment", de: "Foto-Moment")
             } else {
                 l.tr(zh: "文字时刻", en: "Note moment", de: "Notiz-Moment")
@@ -379,8 +470,8 @@ enum PetTimelineItemsBuilder {
                 title: title,
                 subtitle: note,
                 iconName: hasImage ? "photo.on.rectangle.angled" : "text.quote",
-                color: .goPurple,
-                photos: group.filter { renderableImageData($0.imageData) },
+                colorToken: .goPurple,
+                photos: imageLogs,
                 style: .story,
                 isHighlight: true
             )
@@ -396,7 +487,7 @@ enum PetTimelineItemsBuilder {
                     title: milestone.title.isEmpty ? "\(milestone.emoji) \(l.tr(zh: "重要时刻", en: "Milestone", de: "Meilenstein"))" : "\(milestone.emoji) \(milestone.title)",
                     subtitle: milestone.notes,
                     iconName: "sparkles",
-                    color: .goPrimary,
+                    colorToken: .goPrimary,
                     style: .story,
                     isHighlight: true
                 )
@@ -454,7 +545,7 @@ enum PetTimelineItemsBuilder {
                     title: birthdayTitle(age, l: l),
                     subtitle: l.tr(zh: "\(pet.name) 的生日", en: "\(pet.name)'s birthday", de: "\(pet.name)s Geburtstag"),
                     emoji: "🎂",
-                    color: .goYellow,
+                    colorToken: .goYellow,
                     idSeed: "birthday-\(year)"
                 ))
             }
@@ -472,7 +563,7 @@ enum PetTimelineItemsBuilder {
                     title: togetherTitle(days, l: l),
                     subtitle: l.tr(zh: "从到家那天开始计算", en: "Counted from home day", de: "Seit dem Einzug gezählt"),
                     emoji: days >= 1000 ? "🏆" : "🎉",
-                    color: days >= 1000 ? .goYellow : .goPrimary,
+                    colorToken: days >= 1000 ? .goYellow : .goPrimary,
                     idSeed: "together-\(days)"
                 ))
             }
@@ -489,7 +580,7 @@ enum PetTimelineItemsBuilder {
                     title: remembranceTitle(days, l: l),
                     subtitle: l.tr(zh: "彩虹桥后的思念", en: "Remembering after the rainbow bridge", de: "Erinnerung nach der Regenbogenbrücke"),
                     emoji: "🌈",
-                    color: .goPurple,
+                    colorToken: .goPurple,
                     idSeed: "remembrance-\(days)"
                 ))
             }
@@ -498,7 +589,14 @@ enum PetTimelineItemsBuilder {
         return entries
     }
 
-    private static func generatedItem(date: Date, title: String, subtitle: String, emoji: String, color: Color, idSeed: String) -> UnifiedLogItem {
+    private static func generatedItem(
+        date: Date,
+        title: String,
+        subtitle: String,
+        emoji: String,
+        colorToken: DomainColorToken,
+        idSeed: String
+    ) -> UnifiedLogItem {
         UnifiedLogItem(
             id: UUID(uuidString: deterministicUUIDSeed(idSeed)) ?? UUID(),
             date: date,
@@ -506,7 +604,7 @@ enum PetTimelineItemsBuilder {
             title: "\(emoji) \(title)",
             subtitle: subtitle,
             iconName: "sparkles",
-            color: color,
+            colorToken: colorToken,
             style: .story,
             isHighlight: true
         )
@@ -550,10 +648,6 @@ enum PetTimelineItemsBuilder {
             log.note.trimmingCharacters(in: .whitespacesAndNewlines),
             log.locationPlacename.trimmingCharacters(in: .whitespacesAndNewlines)
         ].joined(separator: "|")
-    }
-
-    private static func renderableImageData(_ data: Data) -> Bool {
-        data.count > 8
     }
 
     private static func isVisiblePast(_ date: Date, now: Date) -> Bool {
@@ -635,8 +729,48 @@ enum PetTimelineItemsBuilder {
     }
 }
 
+private extension PetTimelineArchiveSection {
+    nonisolated var renderSnapshot: PetTimelineRenderSection {
+        PetTimelineRenderSection(
+            id: id,
+            title: title,
+            subtitle: subtitle,
+            items: items.map(\.renderSnapshot)
+        )
+    }
+}
+
+private extension UnifiedLogItem {
+    nonisolated var renderSnapshot: PetTimelineRenderItem {
+        PetTimelineRenderItem(
+            id: id,
+            date: date,
+            type: type,
+            title: title,
+            subtitle: subtitle,
+            iconName: iconName,
+            colorToken: colorToken,
+            photos: photos.map(\.timelinePhotoReference),
+            style: style,
+            isHighlight: isHighlight,
+            sharedSessionID: sharedSessionID
+        )
+    }
+}
+
+private extension PetPhotoLog {
+    nonisolated var timelinePhotoReference: PetTimelinePhotoReference {
+        PetTimelinePhotoReference(
+            id: id,
+            modelID: persistentModelID,
+            sourceSignature: imageThumbnailSignature,
+            canAttemptImageAttachmentLoad: canAttemptImageAttachmentLoad
+        )
+    }
+}
+
 private extension [UnifiedLogItem] {
-    func deduplicatedByDayTitle() -> [UnifiedLogItem] {
+    nonisolated func deduplicatedByDayTitle() -> [UnifiedLogItem] {
         var seen = Set<String>()
         return filter { item in
             let day = Calendar.current.startOfDay(for: item.date).timeIntervalSince1970

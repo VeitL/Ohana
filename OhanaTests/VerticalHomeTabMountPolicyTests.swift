@@ -123,6 +123,17 @@ struct VerticalHomeTabMountPolicyTests {
             isEmbeddedActive: lifecycle.isLive,
             isContentMounted: false
         ))
+        #expect(
+            CalendarEmbeddedContentMountPolicy.routeDataLoadDelayMilliseconds(
+                hideToolbar: true,
+                isEmbeddedVisible: lifecycle.isVisible,
+                isEmbeddedActive: lifecycle.isLive
+            ) == CalendarEmbeddedContentMountPolicy.inactiveEmbeddedDataLoadDelayMilliseconds
+        )
+        #expect(
+            CalendarEmbeddedContentMountPolicy.inactiveEmbeddedContentDelayMilliseconds
+            == CalendarEmbeddedContentMountPolicy.visibleEmbeddedDataLoadDelayMilliseconds
+        )
         #expect(!CalendarEmbeddedContentMountPolicy.shouldRenderMainContent(
             hideToolbar: true,
             isEmbeddedPrepared: lifecycle.isPrepared,
@@ -304,46 +315,39 @@ struct VerticalHomeTabMountPolicyTests {
         )
     }
 
-    @Test func embeddedQuickActionsThawDuringHeroExpansion() {
+    @Test func embeddedQuickActionsMountWhenPreloadedForHeroTail() {
         #expect(!FocusHomeEmbeddedQuickActionThawPolicy.isMounted(
-            progress: 0.35,
-            heroDirection: 1,
-            reduceMotion: false
+            isExpandedInteractionMounted: false
         ))
 
         #expect(FocusHomeEmbeddedQuickActionThawPolicy.isMounted(
-            progress: 0.45,
-            heroDirection: 1,
-            reduceMotion: false
+            isExpandedInteractionMounted: true
         ))
 
-        let midReveal = FocusHomeEmbeddedQuickActionThawPolicy.reveal(
-            progress: 0.55,
-            heroDirection: 1,
-            reduceMotion: false
-        )
-        #expect(midReveal > 0)
-        #expect(midReveal < 1)
-
-        #expect(FocusHomeEmbeddedQuickActionThawPolicy.reveal(
-            progress: 0.74,
-            heroDirection: 1,
-            reduceMotion: false
-        ) == 1)
+        #expect(FocusHomeEmbeddedQuickActionThawPolicy.reveal(isMounted: false, postHeroReveal: 1) == 0)
+        #expect(FocusHomeEmbeddedQuickActionThawPolicy.reveal(isMounted: true, postHeroReveal: 0) == 0)
+        #expect(FocusHomeEmbeddedQuickActionThawPolicy.reveal(isMounted: true, postHeroReveal: 1) == 1)
     }
 
-    @Test func embeddedQuickActionsUseShortReducedMotionThaw() {
-        #expect(!FocusHomeEmbeddedQuickActionThawPolicy.isMounted(
-            progress: 0.49,
-            heroDirection: 1,
-            reduceMotion: true
-        ))
+    @Test func embeddedQuickActionsRevealBeforeHeroSettlesButInteractAfterward() throws {
+        let supportSource = try source("Ohana/Features/Home/Views/FocusHomeVerticalSolidSupport.swift")
 
-        #expect(FocusHomeEmbeddedQuickActionThawPolicy.isMounted(
-            progress: 0.5,
-            heroDirection: 1,
-            reduceMotion: true
-        ))
+        #expect(FocusHomePostHeroControlRevealPolicy.fullMotionPreloadDelayMilliseconds <= 240)
+        #expect(
+            FocusHomePostHeroControlRevealPolicy.fullMotionPreloadDelayMilliseconds
+                + UInt64(FocusHomePostHeroControlRevealPolicy.animationDuration * 1000)
+                <= 420
+        )
+        #expect(supportSource.contains("ZStack(alignment: .top)"))
+        #expect(supportSource.contains(".opacity(Double(reveal))"))
+    }
+
+    @Test func embeddedQuickActionsAvoidProgressThresholdMounts() throws {
+        let sceneSource = try source("Ohana/Features/Home/Views/FocusHomeVerticalSolidScene.swift")
+
+        #expect(!sceneSource.contains("openingMountProgress"))
+        #expect(!sceneSource.contains("progress > 0.58"))
+        #expect(sceneSource.contains("isExpandedInteractionReady"))
     }
 
     @Test func embeddedQuickActionsCanRenderBeforeExpandedInteractionSettles() {
@@ -379,17 +383,9 @@ struct VerticalHomeTabMountPolicyTests {
         ))
     }
 
-    @Test func embeddedQuickActionsRemainMountedDuringEarlyCollapseExit() {
-        #expect(FocusHomeEmbeddedQuickActionThawPolicy.isMounted(
-            progress: 0.9,
-            heroDirection: -1,
-            reduceMotion: false
-        ))
-
+    @Test func embeddedQuickActionsUnmountWhenPreloadIsNotMounted() {
         #expect(!FocusHomeEmbeddedQuickActionThawPolicy.isMounted(
-            progress: 0.7,
-            heroDirection: -1,
-            reduceMotion: false
+            isExpandedInteractionMounted: false
         ))
     }
 
@@ -399,9 +395,7 @@ struct VerticalHomeTabMountPolicyTests {
             hasWalkTrackingCard: false
         ))
         #expect(!FocusHomeEmbeddedQuickActionThawPolicy.isMounted(
-            progress: 0.2,
-            heroDirection: 1,
-            reduceMotion: false
+            isExpandedInteractionMounted: false
         ))
         #expect(!FocusHomeEmbeddedCardCollapseHitPolicy.protectsQuickActionDock(
             quickActionsAreVisible: false
@@ -438,6 +432,39 @@ struct VerticalHomeTabMountPolicyTests {
         #expect(FocusHomeWalkCardIdentityPolicy.phaseKey(.running) == FocusHomeWalkCardIdentityPolicy.phaseKey(.paused))
         #expect(FocusHomeWalkCardIdentityPolicy.phaseKey(.paused) != FocusHomeWalkCardIdentityPolicy.phaseKey(.finished(elapsed: 12, poopCount: 1)))
         #expect(FocusHomeWalkCardIdentityPolicy.phaseKey(.idle) != FocusHomeWalkCardIdentityPolicy.phaseKey(.running))
+
+        let cardID = UUID()
+        let petID = UUID()
+        let runningIdentity = FocusHomeWalkCardIdentityPolicy.identity(
+            cardID: cardID,
+            walkPetID: petID,
+            phase: .running,
+            presentationRevision: 4
+        )
+        #expect(runningIdentity == FocusHomeWalkCardIdentityPolicy.identity(
+            cardID: cardID,
+            walkPetID: petID,
+            phase: .paused,
+            presentationRevision: 4
+        ))
+        #expect(runningIdentity != FocusHomeWalkCardIdentityPolicy.identity(
+            cardID: cardID,
+            walkPetID: petID,
+            phase: .finished(elapsed: 12, poopCount: 1),
+            presentationRevision: 4
+        ))
+        #expect(runningIdentity != FocusHomeWalkCardIdentityPolicy.identity(
+            cardID: cardID,
+            walkPetID: petID,
+            phase: .running,
+            presentationRevision: 5
+        ))
+        #expect(FocusHomeWalkCardIdentityPolicy.identity(
+            cardID: cardID,
+            walkPetID: nil,
+            phase: .running,
+            presentationRevision: 5
+        ) == cardID.uuidString)
     }
 
     @Test func ambientFloatOnlyRunsForVisibleCollapsedHomeCards() {
@@ -549,9 +576,16 @@ struct VerticalHomeTabMountPolicyTests {
             bottomChromeHeight: bottomChromeHeight
         ) == 798)
         #expect(VerticalSolidHomePlantWalletScrollPolicy.bottomContentInset <= 32)
+        #expect(VerticalSolidHomePlantWalletScrollPolicy.topContentInset == 0)
         #expect(
             VerticalSolidHomePlantWalletScrollPolicy.roomRailVisibleBottomInset
             < bottomChromeHeight
+        )
+        #expect(
+            VerticalSolidHomePlantWalletScrollPolicy.roomRailCenterY(
+                containerHeight: 798,
+                topChromeHeight: topChromeHeight
+            ) == 376
         )
         #expect(FocusHomeVerticalSolidCollapsedLayoutPolicy.defaultVerticalBias == 0)
         #expect(
@@ -572,6 +606,8 @@ struct VerticalHomeTabMountPolicyTests {
         #expect(homeSource.contains("@State var calendarBottomChromeHidden = false"))
         #expect(homeSource.contains("onEmbeddedScrollOffsetChange: updateCalendarBottomChromeVisibility"))
         #expect(routingSource.contains("VerticalSolidHomeBottomChromeScrollPolicy.hidesBottomChrome"))
+        #expect(routingSource.contains("resetCalendarBottomChromeForTabSelection()"))
+        #expect(routingSource.contains("guard controller.outgoingTab == nil else { return }"))
         #expect(routeSource.contains("var onEmbeddedScrollOffsetChange: ((CGFloat) -> Void)?"))
         #expect(calendarSource.contains("@State var embeddedBottomChromeBaselineOffset: CGFloat?"))
         #expect(calendarListSource.contains("reportEmbeddedBottomChromeScrollOffset(offsetY, canEstablishBaseline: didScrollListToToday)"))
@@ -587,7 +623,9 @@ struct VerticalHomeTabMountPolicyTests {
         ])
     }
 
-    @Test func plantWalletKeepsFirstSixPlantsInOneScene() {
+    @Test func plantWalletKeepsAllVisiblePlantsInOneScene() throws {
+        let plantPageSource = try source("Ohana/Features/Home/Views/VerticalSolidHomePlantsPage.swift")
+
         #expect(VerticalSolidHomePlantWalletScrollPolicy.sectionCount(cardCount: 0) == 0)
         #expect(VerticalSolidHomePlantWalletScrollPolicy.sectionCount(cardCount: 1) == 1)
         #expect(VerticalSolidHomePlantWalletScrollPolicy.sectionCount(cardCount: 2) == 1)
@@ -595,26 +633,120 @@ struct VerticalHomeTabMountPolicyTests {
         #expect(VerticalSolidHomePlantWalletScrollPolicy.sectionCount(cardCount: 4) == 1)
         #expect(VerticalSolidHomePlantWalletScrollPolicy.sectionCount(cardCount: 5) == 1)
         #expect(VerticalSolidHomePlantWalletScrollPolicy.sectionCount(cardCount: 6) == 1)
-        #expect(VerticalSolidHomePlantWalletScrollPolicy.sectionCount(cardCount: 7) == 2)
-        #expect(VerticalSolidHomePlantWalletScrollPolicy.sectionCount(cardCount: 12) == 2)
-        #expect(VerticalSolidHomePlantWalletScrollPolicy.sectionCount(cardCount: 13) == 3)
+        #expect(VerticalSolidHomePlantWalletScrollPolicy.sectionCount(cardCount: 7) == 1)
+        #expect(VerticalSolidHomePlantWalletScrollPolicy.sectionCount(cardCount: 12) == 1)
+        #expect(VerticalSolidHomePlantWalletScrollPolicy.sectionCount(cardCount: 13) == 1)
+        #expect(plantPageSource.contains("return [VerticalSolidHomePlantCardSection(cards: cards)]"))
+        #expect(!plantPageSource.contains("stride(from: 0, to: cards.count"))
     }
 
-    @Test func plantDashboardWalletKeepsFirstSixPlantsInOneScene() {
+    @Test func plantWalletCollapsedLayoutSpreadsSevenPlantsInOneBalancedCluster() {
+        let offsets = FocusHomeVerticalSolidCollapsedLayoutPolicy.offsets(count: 7)
+        let xValues = offsets.map(\.width)
+        let yValues = offsets.map(\.height).sorted()
+        let xSpan = (xValues.max() ?? 0) - (xValues.min() ?? 0)
+        let ySpan = (yValues.max() ?? 0) - (yValues.min() ?? 0)
+        let maxVerticalGap = zip(yValues.dropFirst(), yValues)
+            .map { next, previous in next - previous }
+            .max() ?? 0
+        let leftCount = offsets.count { $0.width < 0 }
+        let rightCount = offsets.count { $0.width > 0 }
+
+        #expect(offsets.count == 7)
+        #expect(offsets[5] != offsets[6])
+        #expect(xSpan > 1.7)
+        #expect(ySpan > 2.25)
+        #expect(ySpan < 2.65)
+        #expect(maxVerticalGap < 0.9)
+        #expect(maximumCollapsedCardOverlapRatio(offsets: offsets) < 0.38)
+        #expect(abs(leftCount - rightCount) <= 1)
+    }
+
+    @Test func plantWalletCollapsedLayoutAvoidsTallPilesForDenseCounts() {
+        for count in [5, 6, 8, 9, 10, 13] {
+            let offsets = FocusHomeVerticalSolidCollapsedLayoutPolicy.offsets(count: count)
+            let xValues = offsets.map(\.width)
+            let yValues = offsets.map(\.height)
+            let xSpan = (xValues.max() ?? 0) - (xValues.min() ?? 0)
+            let ySpan = (yValues.max() ?? 0) - (yValues.min() ?? 0)
+
+            #expect(offsets.count == count)
+            #expect(xSpan > 1.65)
+            #expect(ySpan > 1.9)
+            #expect(maximumCollapsedCardOverlapRatio(offsets: offsets) < 0.42)
+        }
+    }
+
+    @Test func plantWalletScrollExtendedLayoutFlowsDensePlantsDownward() {
+        let offsets = FocusHomeVerticalSolidCollapsedLayoutPolicy.offsets(count: 8, mode: .scrollExtended)
+        let xValues = offsets.map(\.width)
+        let yValues = offsets.map(\.height)
+        let xSpan = (xValues.max() ?? 0) - (xValues.min() ?? 0)
+        let ySpan = (yValues.max() ?? 0) - (yValues.min() ?? 0)
+        let minimumSceneHeight = FocusHomeVerticalSolidCollapsedLayoutPolicy.scrollExtendedMinimumSceneHeight(cardCount: 8)
+        let sectionHeight = VerticalSolidHomePlantWalletScrollPolicy.sectionHeight(
+            cardCount: 8,
+            isExpanded: false,
+            availableHeight: 520
+        )
+        let expandedHeight = VerticalSolidHomePlantWalletScrollPolicy.sectionHeight(
+            cardCount: 8,
+            isExpanded: true,
+            availableHeight: 520
+        )
+
+        #expect(offsets.count == 8)
+        #expect(xSpan > 1.35)
+        #expect(ySpan > 4.0)
+        #expect(maximumCollapsedCardOverlapRatio(offsets: offsets) < 0.18)
+        #expect(minimumSceneHeight > 840)
+        #expect(sectionHeight == minimumSceneHeight)
+        #expect(expandedHeight == sectionHeight)
+    }
+
+    @Test func plantDashboardWalletKeepsAllPlantsInOneScene() throws {
+        let source = try source("Ohana/Features/Plants/Views/PlantDashboardView+WalletDeck.swift")
+
         #expect(PlantDashboardWalletSectionPolicy.sectionCount(cardCount: 0) == 0)
         #expect(PlantDashboardWalletSectionPolicy.sectionCount(cardCount: 1) == 1)
         #expect(PlantDashboardWalletSectionPolicy.sectionCount(cardCount: 6) == 1)
-        #expect(PlantDashboardWalletSectionPolicy.sectionCount(cardCount: 7) == 2)
-        #expect(PlantDashboardWalletSectionPolicy.sectionCount(cardCount: 12) == 2)
-        #expect(PlantDashboardWalletSectionPolicy.sectionCount(cardCount: 13) == 3)
+        #expect(PlantDashboardWalletSectionPolicy.sectionCount(cardCount: 7) == 1)
+        #expect(PlantDashboardWalletSectionPolicy.sectionCount(cardCount: 12) == 1)
+        #expect(PlantDashboardWalletSectionPolicy.sectionCount(cardCount: 13) == 1)
         #expect(PlantDashboardWalletSectionPolicy.sectionHeight(cardCount: 1) == 420)
         #expect(PlantDashboardWalletSectionPolicy.sectionHeight(cardCount: 6) == 620)
+        #expect(PlantDashboardWalletSectionPolicy.sectionHeight(cardCount: 8) > 840)
+        #expect(source.contains("return [PlantDashboardWalletCardSection(ordinal: 0, cards: cards)]"))
+        #expect(!source.contains("stride(from: 0, to: cards.count"))
+        #expect(source.contains("collapsedLayoutMode: .scrollExtended"))
+        #expect(source.contains("expandedVerticalPlacement: .sceneCenter"))
     }
 
     @Test func plantDashboardWalletUsesHomePlantCollapsedBias() throws {
         let source = try source("Ohana/Features/Plants/Views/PlantDashboardView+WalletDeck.swift")
 
         #expect(source.contains("collapsedVerticalBias: FocusHomeVerticalSolidCollapsedLayoutPolicy.bottomExtendedVerticalBias"))
+    }
+
+    @Test func homePlantRailFloatsAndCardsCenterBetweenChrome() throws {
+        let homeSource = try source("Ohana/Features/Home/Views/VerticalSolidHomeView.swift")
+        let plantPageSource = try source("Ohana/Features/Home/Views/VerticalSolidHomePlantsPage.swift")
+
+        #expect(homeSource.contains("topChromeHeight: topChromeHeight"))
+        #expect(plantPageSource.contains("roomRailCenterY("))
+        #expect(plantPageSource.contains(".position("))
+        #expect(plantPageSource.contains("roomRailTrailingCenterInset"))
+        #expect(plantPageSource.contains("collapsedVerticalBias: FocusHomeVerticalSolidCollapsedLayoutPolicy.defaultVerticalBias"))
+        #expect(!plantPageSource.contains(".padding(.top, 22)"))
+
+        #expect(VerticalSolidHomePlantWalletScrollPolicy.cardViewportHeight(
+            containerHeight: 798,
+            bottomChromeHeight: 104
+        ) == 694)
+        #expect(VerticalSolidHomePlantWalletScrollPolicy.roomRailCenterY(
+            containerHeight: 798,
+            topChromeHeight: 46
+        ) == 376)
     }
 
     @Test func plantWalletSectionHeightStaysStableDuringCardHeroMotion() {
@@ -667,6 +799,12 @@ struct VerticalHomeTabMountPolicyTests {
             containerHeight: 798,
             bottomChromeHeight: 104
         ) == 694)
+
+        #expect(VerticalSolidHomePlantWalletScrollPolicy.sectionHeight(
+            cardCount: 8,
+            isExpanded: false,
+            availableHeight: 694
+        ) > 840)
     }
 
     @Test func plantWalletInactiveCardGeometryCanBeFrozenDuringHeroMotion() {
@@ -954,6 +1092,35 @@ struct VerticalHomeTabMountPolicyTests {
         #expect(!VerticalSolidHomePlantRoomRailPolicy.shouldShow(plantCount: 8, selectedCardId: nil, heroDirection: 1))
     }
 
+    @Test func homePlantPageOwnsViewSwitcherAndListMode() throws {
+        let plantPage = try source("Ohana/Features/Home/Views/VerticalSolidHomePlantsPage.swift")
+        let models = try source("Ohana/Features/Home/VerticalSolidHomeModels.swift")
+        let builder = try source("Ohana/Features/Home/VerticalSolidHomeSnapshotBuilder.swift")
+        let uiTestSource = try source("OhanaUITests/PlantModuleUITests.swift")
+
+        #expect(plantPage.contains("VerticalSolidHomePlantViewStyle"))
+        #expect(plantPage.contains("@State private var selectedViewStyle"))
+        #expect(plantPage.contains("home-plants-view-switcher-rail"))
+        #expect(plantPage.contains("home-plants-view-deck"))
+        #expect(plantPage.contains("home-plants-view-list"))
+        #expect(plantPage.contains("home-plants-room-list-view"))
+        #expect(plantPage.contains("selectedViewStyle == .deck &&"))
+        #expect(plantPage.contains("viewSwitcherCenterY(roomRailCenterY: roomRailCenterY)"))
+        #expect(plantPage.contains("collapsedLayoutMode: .scrollExtended"))
+        #expect(plantPage.contains("expandedVerticalPlacement: .collapsedCardCenter"))
+        #expect(models.contains("let careDifficultyText: String"))
+        #expect(models.contains("let attentionText: String"))
+        #expect(models.contains("let todoText: String"))
+        #expect(models.contains("let hasDueWatering: Bool"))
+        #expect(models.contains("let hasDueFertilizing: Bool"))
+        #expect(builder.contains("careDifficultyText:"))
+        #expect(builder.contains("attentionText:"))
+        #expect(builder.contains("todoText:"))
+        #expect(builder.contains("hasDueWatering: hasDueWatering"))
+        #expect(builder.contains("hasDueFertilizing: hasDueFertilizing"))
+        #expect(uiTestSource.contains("testHomePlantViewSwitcherRailSwitchesToListMode"))
+    }
+
     @Test func homeQuickActionsAndFabShortcutsExposeMinimumHitAreas() {
         let minimumHitSize = VerticalHomeEmbeddedQuickActionHitAreaPolicy.minimumHitSize
 
@@ -1050,6 +1217,95 @@ struct VerticalHomeTabMountPolicyTests {
         #expect(StarterGiftPolicy.giftAmount / OasisTreeEnergyInjectionPolicy.starterPackageCost == 5)
         #expect(OasisTreeManager.treeLevel(forTotalEnergy: 4 * OasisTreeEnergyInjectionPolicy.starterPackageXP) == .lv0)
         #expect(OasisTreeManager.treeLevel(forTotalEnergy: 5 * OasisTreeEnergyInjectionPolicy.starterPackageXP) == .lv1)
+    }
+
+    @Test func cardHeroKeepsAmbientFloatOffTheTimelineBodyLoop() throws {
+        let sceneSource = try source("Ohana/Features/Home/Views/FocusHomeVerticalSolidScene.swift")
+        let policySource = try source("Ohana/Features/Home/Views/FocusHomeVerticalSolidScenePolicies.swift")
+
+        #expect(!sceneSource.contains("TimelineView(.animation("))
+        #expect(!sceneSource.contains("if canFloatCards {\n                    TimelineView"))
+        #expect(sceneSource.contains("@State private var ambientFloatCycleTask: Task<Void, Never>?"))
+        #expect(sceneSource.contains("Task.sleep(nanoseconds: FocusHomeAmbientFloatPolicy.phaseDurationNanoseconds)"))
+        #expect(sceneSource.contains("withAnimation(FocusHomeAmbientFloatPolicy.phaseAnimation)"))
+        #expect(policySource.contains("static let cycleDuration: TimeInterval = 8.7"))
+        #expect(policySource.contains("static let phaseDuration: TimeInterval = cycleDuration / 2"))
+        #expect(sceneSource.contains("FocusHomeWalkCardIdentityPolicy.identity("))
+        #expect(!sceneSource.contains("appServices.walkingPresentationRevision"))
+    }
+
+    @Test func homeCardHeroAvoidsAnimatedLargeShadowRasterization() throws {
+        let surfaceSource = try source("Ohana/Features/Home/Views/FocusHomeVerticalSolidCardSurface.swift")
+
+        #expect(!surfaceSource.contains("radius: lerp(15, 24, p)"))
+        #expect(surfaceSource.contains("stable home card depth without animating shadow rasterization"))
+        #expect(surfaceSource.contains("collapse internal text/avatar shadows into one card surface before hero scaling"))
+    }
+
+    @Test func calendarRouteDataUsesWindowedFetchAndRevisionDebounce() throws {
+        let routeSource = try source("Ohana/Features/Calendar/CalendarRouteContainer.swift")
+        let policySource = try source("Ohana/Features/Calendar/Views/CalendarViewSupport.swift")
+
+        #expect(routeSource.contains("scheduleRouteDataReloadAfterRevision()"))
+        #expect(routeSource.contains("@ModelActor"))
+        #expect(routeSource.contains("CalendarRouteDataActor"))
+        #expect(routeSource.contains("try await actor.load(input: input)"))
+        #expect(routeSource.contains("let events = fetchVisibleEvents()"))
+        #expect(routeSource.contains("FetchDescriptor<Event>(\n                predicate: #Predicate<Event>"))
+        #expect(routeSource.contains("event.startDate >= windowStart && event.startDate <= windowEnd"))
+        #expect(routeSource.contains("event.recurrenceDays > 0 && event.startDate <= windowEnd"))
+        #expect(routeSource.contains("recurringDescriptor.fetchLimit = Self.recurringEventFetchLimit"))
+        #expect(!routeSource.contains("CalendarRouteData.load(from:"))
+        #expect(!routeSource.contains("FetchDescriptor<Event>(sortBy: [SortDescriptor(\\.startDate"))
+        #expect(!routeSource.contains("route-first-frame: allow deferred-fetch"))
+        #expect(policySource.contains("revisionReloadDebounceMilliseconds"))
+    }
+
+    @Test func calendarViewRendersPreparedSnapshotInsteadOfBodyAggregation() throws {
+        let calendarSource = try source("Ohana/Features/Calendar/Views/CalendarView.swift")
+        let contentSource = try source("Ohana/Features/Calendar/Views/CalendarView+Content.swift")
+        let headerSource = try source("Ohana/Features/Calendar/Views/CalendarView+Header.swift")
+        let monthSource = try source("Ohana/Features/Calendar/Views/CalendarView+Month.swift")
+
+        #expect(calendarSource.contains("@State var preparedCalendarSnapshot = CalendarPreparedSnapshot.empty"))
+        #expect(calendarSource.contains("@State var preparedCalendarSnapshotKey: CalendarPreparedSnapshotTriggerKey?"))
+        #expect(calendarSource.contains("func buildFilteredEventsForPreparedSnapshot() -> [Event]"))
+        #expect(calendarSource.contains("preparedCalendarSnapshotTriggerKey"))
+        #expect(!calendarSource.contains("preparedCalendarSnapshotInputKey"))
+        #expect(!contentSource.contains(".onChange(of: preparedCalendarSnapshotInputKey)"))
+        #expect(contentSource.contains(".onChange(of: preparedCalendarSnapshotTriggerKey)"))
+        #expect(contentSource.contains("applyRoutePreparedSnapshotIfAvailable()"))
+        #expect(calendarSource.contains("routePreparedSnapshot: CalendarRoutePreparedSnapshot?"))
+        #expect(calendarSource.contains("preparedCalendarSnapshot.timeline"))
+        #expect(calendarSource.contains("preparedCalendarSnapshot.selectedDateEvents"))
+        #expect(contentSource.contains("CalendarSnapshotBuilder.preparedSnapshot("))
+        #expect(headerSource.contains("preparedCalendarSnapshot.weekEventsByDay"))
+        #expect(monthSource.contains("preparedCalendarSnapshot.monthEventDayIDs"))
+        #expect(!monthSource.contains("let hasEvents = filteredEvents.contains"))
+    }
+
+    private func maximumCollapsedCardOverlapRatio(offsets: [CGSize]) -> CGFloat {
+        let cardWidth: CGFloat = 1
+        let cardHeight: CGFloat = 1.58
+        let cardArea = cardWidth * cardHeight
+        let frames = offsets.map { offset in
+            CGRect(
+                x: offset.width - cardWidth / 2,
+                y: offset.height - cardHeight / 2,
+                width: cardWidth,
+                height: cardHeight
+            )
+        }
+
+        var maximumOverlap: CGFloat = 0
+        for lhs in frames.indices {
+            for rhs in frames.indices where rhs > lhs {
+                let intersection = frames[lhs].intersection(frames[rhs])
+                guard !intersection.isNull else { continue }
+                maximumOverlap = max(maximumOverlap, intersection.width * intersection.height / cardArea)
+            }
+        }
+        return maximumOverlap
     }
 
     private func source(_ path: String) throws -> String {

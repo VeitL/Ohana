@@ -126,6 +126,10 @@ enum PlantCatalogBrowsingGroup: String, CaseIterable, Identifiable {
 }
 
 enum AddPlantCatalogPickerModel {
+    private static let entriesByBrowsingGroup: [PlantCatalogBrowsingGroup: [PlantCatalogEntry]] = Dictionary(uniqueKeysWithValues: PlantCatalogBrowsingGroup.allCases.map { group in
+            (group, makeEntries(for: group))
+        })
+
     static func commonEntries(for filter: PlantCatalogQuickFilter) -> [PlantCatalogEntry] {
         let preferredIDs = [
             "epipremnum-aureum",
@@ -147,7 +151,20 @@ enum AddPlantCatalogPickerModel {
     }
 
     static func entries(for group: PlantCatalogBrowsingGroup) -> [PlantCatalogEntry] {
-        let preferredIDs: [String] = switch group {
+        entriesByBrowsingGroup[group] ?? []
+    }
+
+    private static func makeEntries(for group: PlantCatalogBrowsingGroup) -> [PlantCatalogEntry] {
+        let preferredIDs = preferredIDs(for: group)
+        let preferred = preferredIDs
+            .compactMap { PlantCatalog.entry(id: $0) }
+            .filter(group.includes)
+        let expanded = PlantCatalogStore.shared.entries.filter(group.includes)
+        return Array((preferred + expanded).uniquedByID().prefix(18))
+    }
+
+    private static func preferredIDs(for group: PlantCatalogBrowsingGroup) -> [String] {
+        switch group {
         case .recommended:
             [
                 "epipremnum-aureum",
@@ -201,12 +218,6 @@ enum AddPlantCatalogPickerModel {
                 "salvia-rosmarinus"
             ]
         }
-
-        let preferred = preferredIDs
-            .compactMap { PlantCatalog.entry(id: $0) }
-            .filter(group.includes)
-        let expanded = PlantCatalogStore.shared.entries.filter(group.includes)
-        return Array((preferred + expanded).uniquedByID().prefix(18))
     }
 }
 

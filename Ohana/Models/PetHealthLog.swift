@@ -8,7 +8,7 @@
 import Foundation
 import SwiftData
 
-enum HealthLogType: String, Codable, CaseIterable, Identifiable {
+nonisolated enum HealthLogType: String, Codable, CaseIterable, Identifiable {
     var id: String { rawValue }
     case general = "常规"
     case vaccine = "疫苗"

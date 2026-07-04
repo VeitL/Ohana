@@ -77,7 +77,9 @@ struct VerticalSolidHomeView: View {
     @State var isHomeCardHeroAnimating = false
     @State var homeCardHeroProgress: CGFloat = 0
     @State var arrivingHomeCardId: UUID?
+    @State var arrivingPlantCardId: UUID?
     @State var arrivalClearTask: Task<Void, Never>?
+    @State var plantArrivalClearTask: Task<Void, Never>?
     var treeManager: OasisTreeManaging { appServices.oasisTree }
     @State var showGrowthOnboarding = false
     @State var growthOnboardingTask: Task<Void, Never>?
@@ -90,6 +92,7 @@ struct VerticalSolidHomeView: View {
     @State var todayFocusDailyCompletionTask: Task<Void, Never>?
     @State var snapshotRefreshGate = HomeSnapshotRefreshGate()
     @State var homeAppearHandoffTask: Task<Void, Never>?
+    @State var memberMediaAttachmentIndexRepairTask: Task<Void, Never>?
     @State var handledCreatedEntityToken: UUID?
     @State var walkCardPresentationRevision = 0
 
@@ -357,7 +360,9 @@ struct VerticalSolidHomeView: View {
                         plants: controller.snapshot.plants,
                         localization: l,
                         hidesBottomChrome: $plantBottomChromeHidden,
+                        topChromeHeight: topChromeHeight,
                         bottomChromeHeight: bottomHeight,
+                        arrivingPlantCardId: arrivingPlantCardId,
                         onOpenPlant: openPlant,
                         onQuickAction: { plant, action in
                             performPlantQuickAction(action, plant: plant)
@@ -503,6 +508,7 @@ struct VerticalSolidHomeView: View {
         .toolbar(.hidden, for: .navigationBar)
         .onAppear {
             scheduleHomeAppearHandoff()
+            scheduleMemberMediaAttachmentIndexRepair()
             handleCreatedEntitySignalIfNeeded(createdEntitySignal)
         }
         .onChange(of: dataSignature) { _, _ in
@@ -532,9 +538,11 @@ struct VerticalSolidHomeView: View {
             growthLoopSyncTask?.cancel()
             growthLoopPulseDismissTask?.cancel()
             todayFocusDailyCompletionTask?.cancel()
+            memberMediaAttachmentIndexRepairTask?.cancel()
             oasisEnergyInjectionTask?.cancel()
             pendingOasisEnergyInjectionCount = 0
             todayFocusDailyCompletionTask = nil
+            memberMediaAttachmentIndexRepairTask = nil
             growthLoopPulseStatus = nil
             avatarPipeline.cancel(key: avatarPreloadSignature)
             commandQueue.cancelAll()
@@ -562,6 +570,9 @@ struct VerticalSolidHomeView: View {
             onHumanSavedFromAddEntity: { human in
                 handleNewHomeMemberSaved(id: human.id)
             },
+            onPlantSavedFromAddEntity: { plantID in
+                handleNewHomePlantSaved(id: plantID)
+            },
             onCrewPetSelected: { pet in
                 onOpenPet(pet.id, .overview)
             },
@@ -585,9 +596,7 @@ struct VerticalSolidHomeView: View {
                 }
             }
             if calendarBottomChromeHidden {
-                withAnimation(canAnimate ? GoMotion.quick : GoMotion.reduced) {
-                    calendarBottomChromeHidden = false
-                }
+                resetCalendarBottomChromeForTabSelection()
             }
         }
         .onChange(of: starterGiftCeremonySeen) { _, _ in

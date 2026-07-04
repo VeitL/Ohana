@@ -71,8 +71,10 @@ private struct PendingSharedSessionDelete: Identifiable {
 
 struct PetMomentsHubView: View {
     let pet: Pet
-    let timelineRows: PetTimelineSourceRows
     let sharedCareSessions: [SharedCareSession]
+    let renderData: PetMomentsHubRenderData
+    let albumRenderData: PetPhotoAlbumRenderData
+    let dataRevision: Int
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
@@ -86,29 +88,41 @@ struct PetMomentsHubView: View {
     @State private var showingQuickMoment = false
     @State private var pendingSharedSessionDelete: PendingSharedSessionDelete?
 
+    init(
+        pet: Pet,
+        sharedCareSessions: [SharedCareSession],
+        renderData: PetMomentsHubRenderData = .empty,
+        albumRenderData: PetPhotoAlbumRenderData = .empty,
+        dataRevision: Int = 0
+    ) {
+        self.pet = pet
+        self.sharedCareSessions = sharedCareSessions
+        self.renderData = renderData
+        self.albumRenderData = albumRenderData
+        self.dataRevision = dataRevision
+    }
+
     private var l: L10n { L10n(appLanguage) }
     private var themeColor: Color { Color(hex: pet.safeThemeColorHex) }
 
     private var highlightCount: Int {
-        PetTimelineItemsBuilder.archiveItems(for: pet, mode: .highlights, sourceRows: timelineRows, l: l, sharedCareSessions: sharedCareSessions).count
+        renderData.highlightCount
     }
 
     private var memoryCount: Int {
-        PetTimelineItemsBuilder.archiveItems(for: pet, mode: .memories, sourceRows: timelineRows, l: l, sharedCareSessions: sharedCareSessions).count
+        renderData.memoryCount
     }
 
-    private var realPhotos: [PetPhotoLog] {
-        timelineRows.photoLogs
-            .filter { !$0.imageData.isEmpty }
-            .sorted { $0.date > $1.date }
+    private var realPhotoCount: Int {
+        renderData.realPhotoCount
     }
 
-    private var currentSections: [PetTimelineArchiveSection] {
+    private var currentSections: [PetTimelineRenderSection] {
         switch tab {
         case .highlights:
-            PetTimelineItemsBuilder.archiveSections(for: pet, mode: .highlights, sourceRows: timelineRows, l: l, sharedCareSessions: sharedCareSessions)
+            renderData.highlightSections
         case .timeline:
-            PetTimelineItemsBuilder.archiveSections(for: pet, mode: archiveFilter.mode, sourceRows: timelineRows, l: l, sharedCareSessions: sharedCareSessions)
+            renderData.sections(for: archiveFilter.mode)
         case .photos:
             []
         }
@@ -140,7 +154,7 @@ struct PetMomentsHubView: View {
                     }
 
                     if tab == .photos {
-                        PetPhotoAlbumView(pet: pet, photoLogs: timelineRows.photoLogs, hubPickerSelection: $photosPickerItems)
+                        PetPhotoAlbumView(pet: pet, renderData: albumRenderData, hubPickerSelection: $photosPickerItems)
                     } else {
                         archiveScroll
                     }
@@ -198,7 +212,9 @@ struct PetMomentsHubView: View {
     private var header: some View {
         HStack(spacing: 12) {
             FeatureHubAvatar(
-                imageData: pet.avatarImageData,
+                imageCacheID: "pet-moments-hub-\(pet.id.uuidString)",
+                imageSignature: pet.avatarThumbnailSignature,
+                petModelID: pet.persistentModelID,
                 emoji: pet.avatarEmoji,
                 fallback: pet.speciesEmoji,
                 tint: themeColor
@@ -231,7 +247,7 @@ struct PetMomentsHubView: View {
     private var overview: some View {
         HStack(spacing: 10) {
             metric(l.tr(zh: "故事", en: "Stories", de: "Storys"), "\(memoryCount)")
-            metric(l.tr(zh: "照片", en: "Photos", de: "Fotos"), "\(realPhotos.count)")
+            metric(l.tr(zh: "照片", en: "Photos", de: "Fotos"), "\(realPhotoCount)")
             metric(l.tr(zh: "高光", en: "Highlights", de: "Highlights"), "\(highlightCount)")
         }
     }
@@ -346,12 +362,12 @@ struct PetMomentsHubView: View {
         }
     }
 
-    private func storyRow(_ item: UnifiedLogItem) -> some View {
+    private func storyRow(_ item: PetTimelineRenderItem) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 9) {
                 Image(systemName: item.iconName)
                     .font(OhanaFont.adaptive(size: 14, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                    .foregroundStyle(item.color)
+                    .foregroundStyle(item.colorToken.color)
                     .frame(width: 22, height: 22) // a11y: allow decorative non-interactive frame; hit area handled by parent
                 Text(item.title)
                     .font(OhanaFont.callout(.black))
@@ -382,15 +398,15 @@ struct PetMomentsHubView: View {
         .padding(.horizontal, 16)
     }
 
-    private func railRow(_ item: UnifiedLogItem, isLast: Bool) -> some View {
+    private func railRow(_ item: PetTimelineRenderItem, isLast: Bool) -> some View {
         HStack(alignment: .top, spacing: 12) {
             VStack(spacing: 0) {
                 ZStack {
                     Circle()
-                        .fill(item.color.opacity(0.18))
+                        .fill(item.colorToken.color.opacity(0.18))
                     Image(systemName: item.iconName)
                         .font(OhanaFont.adaptive(size: 12, weight: .bold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                        .foregroundStyle(item.color)
+                        .foregroundStyle(item.colorToken.color)
                 }
                 .frame(width: 30, height: 30) // a11y: allow decorative non-interactive frame; hit area handled by parent
 
@@ -424,7 +440,7 @@ struct PetMomentsHubView: View {
     }
 
     @ViewBuilder
-    private func sharedSessionActionMenu(for item: UnifiedLogItem) -> some View {
+    private func sharedSessionActionMenu(for item: PetTimelineRenderItem) -> some View {
         if item.sharedSessionID != nil {
             Menu {
                 Button(role: .destructive) {
@@ -455,7 +471,7 @@ struct PetMomentsHubView: View {
         )
     }
 
-    private func requestDeleteSharedSession(_ item: UnifiedLogItem) {
+    private func requestDeleteSharedSession(_ item: PetTimelineRenderItem) {
         guard let sharedSessionID = item.sharedSessionID else { return }
         pendingSharedSessionDelete = PendingSharedSessionDelete(id: sharedSessionID, title: item.title)
     }
@@ -481,10 +497,17 @@ struct PetMomentsHubView: View {
     }
 
     @ViewBuilder
-    private func photoCollage(_ photos: [PetPhotoLog]) -> some View {
-        let validPhotos = photos.filter { !$0.imageData.isEmpty }
+    private func photoCollage(_ photos: [PetTimelinePhotoReference]) -> some View {
+        let validPhotos = photos.filter(\.canAttemptImageAttachmentLoad)
         if validPhotos.count == 1, let photo = validPhotos.first {
-            AsyncDecodedImageView(data: photo.imageData) { image in
+            AsyncDecodedImageView(
+                cacheID: "pet-moment-collage-\(photo.id.uuidString)",
+                sourceSignature: photo.sourceSignature,
+                maxPixel: 420,
+                asyncDataProvider: {
+                    await photoData(for: photo)
+                }
+            ) { image in
                 Image(uiImage: image)
                     .resizable()
                     .scaledToFill()
@@ -498,7 +521,14 @@ struct PetMomentsHubView: View {
         } else if !validPhotos.isEmpty {
             HStack(spacing: 6) {
                 ForEach(Array(validPhotos.prefix(3).enumerated()), id: \.element.id) { _, photo in
-                    AsyncDecodedImageView(data: photo.imageData) { image in
+                    AsyncDecodedImageView(
+                        cacheID: "pet-moment-collage-\(photo.id.uuidString)",
+                        sourceSignature: photo.sourceSignature,
+                        maxPixel: 320,
+                        asyncDataProvider: {
+                            await photoData(for: photo)
+                        }
+                    ) { image in
                         Image(uiImage: image)
                             .resizable()
                             .scaledToFill()
@@ -514,6 +544,14 @@ struct PetMomentsHubView: View {
                 }
             }
         }
+    }
+
+    private func photoData(for photo: PetTimelinePhotoReference) async -> Data? {
+        guard photo.canAttemptImageAttachmentLoad else {
+            return nil
+        }
+        let loader = SwiftDataMediaBlobLoader(modelContainer: modelContext.container)
+        return await loader.petPhotoLogImageData(modelID: photo.modelID)
     }
 
     private var emptyState: some View {

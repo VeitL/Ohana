@@ -8,20 +8,19 @@
 import SwiftUI
 
 nonisolated enum PlantDashboardWalletSectionPolicy {
-    static let maxCardsPerSection = 6
     static let sectionSpacing: CGFloat = 18
 
-    static func sectionCount(
-        cardCount: Int,
-        maxCardsPerSection: Int = Self.maxCardsPerSection
-    ) -> Int {
-        guard cardCount > 0, maxCardsPerSection > 0 else { return 0 }
-        return Int(ceil(Double(cardCount) / Double(maxCardsPerSection)))
+    static func sectionCount(cardCount: Int) -> Int {
+        cardCount > 0 ? 1 : 0
     }
 
     static func sectionHeight(cardCount: Int) -> CGFloat {
         guard cardCount > 0 else { return 0 }
-        return cardCount <= 1 ? 420 : min(620, max(500, CGFloat(cardCount) * 86 + 310))
+        let legacyHeight = cardCount <= 1 ? CGFloat(420) : min(620, max(500, CGFloat(cardCount) * 86 + 310))
+        return max(
+            legacyHeight,
+            FocusHomeVerticalSolidCollapsedLayoutPolicy.scrollExtendedMinimumSceneHeight(cardCount: cardCount)
+        )
     }
 }
 
@@ -66,7 +65,7 @@ extension PlantDashboardView {
                     .foregroundStyle(Color.arkInk)
                     .padding(.horizontal, 11)
                     .frame(minHeight: 30)
-                    .background(Color.goLime, in: Capsule())
+                    .background(Color.goPrimary, in: Capsule())
             }
 
             photoJournalSummaryCard(items)
@@ -85,9 +84,9 @@ extension PlantDashboardView {
     }
 
     func photoJournalSummaryCard(_ items: [PlantDashboardPhotoItem]) -> some View {
-        let realPhotoItems = items.filter { $0.imageData != nil }
+        let realPhotoItems = items.filter(\.hasRealPhoto)
         let plantsWithPhotos = Set(realPhotoItems.map(\.plant.id)).count
-        let missingPhotoPlants = plants.filter { previewImageData(for: $0) == nil }
+        let missingPhotoPlants = plants.filter { !plantHasPreviewImage($0) }
         let latestPhoto = realPhotoItems.first
 
         return VStack(alignment: .leading, spacing: 14) {
@@ -126,14 +125,14 @@ extension PlantDashboardView {
                     icon: "leaf.circle.fill",
                     title: l.tr(zh: "已覆盖", en: "Covered", de: "Erfasst"),
                     value: "\(plantsWithPhotos)/\(plants.count)",
-                    tint: plantsWithPhotos == plants.count ? Color.goLime : Color.goYellow
+                    tint: plantsWithPhotos == plants.count ? Color.goPrimary : Color.goYellow
                 )
                 photoJournalMetric(
                     id: "missing",
                     icon: "camera.badge.ellipsis",
                     title: l.tr(zh: "待补", en: "Missing", de: "Fehlt"),
                     value: "\(missingPhotoPlants.count)",
-                    tint: missingPhotoPlants.isEmpty ? Color.goLime : Color.goYellow
+                    tint: missingPhotoPlants.isEmpty ? Color.goPrimary : Color.goYellow
                 )
             }
 
@@ -153,7 +152,7 @@ extension PlantDashboardView {
                     .foregroundStyle(Color.arkInk)
                     .frame(maxWidth: .infinity)
                     .frame(minHeight: 44)
-                    .background(Color.goLime, in: Capsule())
+                    .background(Color.goPrimary, in: Capsule())
                 }
                 .buttonStyle(ScaleButtonStyle())
                 .accessibilityIdentifier("plant-dashboard-photo-log-missing")
@@ -171,7 +170,7 @@ extension PlantDashboardView {
                     .foregroundStyle(Color.arkInk)
                     .frame(maxWidth: .infinity)
                     .frame(minHeight: 44)
-                    .background(Color.goLime, in: Capsule())
+                    .background(Color.goPrimary, in: Capsule())
                 }
                 .buttonStyle(ScaleButtonStyle())
                 .accessibilityIdentifier("plant-dashboard-photo-open-latest")
@@ -242,7 +241,9 @@ extension PlantDashboardView {
         } label: {
             ZStack(alignment: .bottomLeading) {
                 PlantDashboardPhotoTile(
-                    imageData: item.imageData,
+                    imageID: item.id,
+                    imageSignature: item.mediaSignature,
+                    imageDataProvider: { await photoImageData(for: item) },
                     fallbackEmoji: item.fallbackEmoji,
                     tint: item.tint
                 )
@@ -318,28 +319,16 @@ extension PlantDashboardView {
                 .accessibilityHidden(true)
         } else {
             HStack(spacing: 3) {
-                PlantDashboardPhotoTile(
-                    imageData: previewImageData(for: previewPlants[0]),
-                    fallbackEmoji: previewPlants[0].avatarEmoji,
-                    tint: siteTint(for: previewPlants[0])
-                )
+                plantPreviewTile(for: previewPlants[0])
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
 
                 if previewPlants.count > 1 {
                     VStack(spacing: 3) {
-                        PlantDashboardPhotoTile(
-                            imageData: previewImageData(for: previewPlants[1]),
-                            fallbackEmoji: previewPlants[1].avatarEmoji,
-                            tint: siteTint(for: previewPlants[1])
-                        )
+                        plantPreviewTile(for: previewPlants[1])
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
 
                         if previewPlants.count > 2 {
-                            PlantDashboardPhotoTile(
-                                imageData: previewImageData(for: previewPlants[2]),
-                                fallbackEmoji: previewPlants[2].avatarEmoji,
-                                tint: siteTint(for: previewPlants[2])
-                            )
+                            plantPreviewTile(for: previewPlants[2])
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
                         }
                     }
@@ -347,11 +336,7 @@ extension PlantDashboardView {
                 }
 
                 if previewPlants.count > 3 {
-                    PlantDashboardPhotoTile(
-                        imageData: previewImageData(for: previewPlants[3]),
-                        fallbackEmoji: previewPlants[3].avatarEmoji,
-                        tint: siteTint(for: previewPlants[3])
-                    )
+                    plantPreviewTile(for: previewPlants[3])
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
             }
@@ -382,24 +367,28 @@ extension PlantDashboardView {
     }
 
     var plantListSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        let displayedPlants = currentPlantViewPlants
+        return VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Text(l.tr(zh: "植物", en: "Plants", de: "Pflanzen"))
+                Text(selectedPlantsViewStyle == .list
+                    ? l.tr(zh: "植物列表", en: "Plant list", de: "Pflanzenliste")
+                    : l.tr(zh: "植物", en: "Plants", de: "Pflanzen"))
                     .font(OhanaFont.adaptive(size: 17, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Spacer()
-                Text(isNarrowingPlants ? "\(visiblePlants.count)/\(plants.count)" : "\(plants.count)")
+                Text(isNarrowingPlants ? "\(displayedPlants.count)/\(plants.count)" : "\(displayedPlants.count)")
                     .font(OhanaFont.adaptive(size: 14, weight: .bold, design: .rounded))
                     .foregroundStyle(Color.ohanaSecondaryText)
             }
 
-            if visiblePlants.isEmpty {
+            if displayedPlants.isEmpty {
                 plantSearchEmptyState
             } else {
-                VStack(spacing: 12) {
+                if selectedPlantsViewStyle == .deck {
                     plantWalletDeck
-
                     addPlantListButton
+                } else {
+                    plantRoomListView
                 }
             }
         }
@@ -422,9 +411,9 @@ extension PlantDashboardView {
             HStack(alignment: .top, spacing: 10) {
                 Image(systemName: "checklist.checked") // a11y: allow decorative section glyph; heading names the checklist.
                     .font(OhanaFont.adaptive(size: 15, weight: .black))
-                    .foregroundStyle(Color.goLime)
+                    .foregroundStyle(Color.goPrimary)
                     .frame(width: 28, height: 28) // a11y: allow non-interactive section glyph; heading names the checklist.
-                    .background(Color.goLime.opacity(0.14), in: Circle())
+                    .background(Color.goPrimary.opacity(0.14), in: Circle())
                     .accessibilityHidden(true)
 
                 VStack(alignment: .leading, spacing: 2) {
@@ -448,7 +437,7 @@ extension PlantDashboardView {
                     .foregroundStyle(Color.arkInk)
                     .padding(.horizontal, 10)
                     .frame(minHeight: 30)
-                    .background(Color.goLime, in: Capsule())
+                    .background(Color.goPrimary, in: Capsule())
             }
 
             VStack(spacing: 8) {
@@ -516,7 +505,7 @@ extension PlantDashboardView {
                     .font(OhanaFont.adaptive(size: 14, weight: .black))
                     .foregroundStyle(Color.arkInk)
                     .frame(width: 44, height: 44)
-                    .background(Color.goLime, in: Circle())
+                    .background(Color.goPrimary, in: Circle())
                     .accessibilityHidden(true)
                 Text(l.tr(zh: "添加植物", en: "Add plant", de: "Pflanze hinzufügen"))
                     .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
@@ -636,7 +625,7 @@ extension PlantDashboardView {
             .frame(minHeight: 106, alignment: .topLeading)
             .padding(12)
             .background(
-                isSelected ? Color.goLime : Color.ohanaControlFill.opacity(0.6),
+                isSelected ? Color.goPrimary : Color.ohanaControlFill.opacity(0.6),
                 in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous)
             )
         }
@@ -692,7 +681,7 @@ extension PlantDashboardView {
             .frame(minHeight: 106, alignment: .topLeading)
             .padding(12)
             .background(
-                isSelected ? Color.goLime : Color.ohanaControlFill.opacity(0.6),
+                isSelected ? Color.goPrimary : Color.ohanaControlFill.opacity(0.6),
                 in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous)
             )
         }

@@ -86,19 +86,24 @@ extension CalendarView {
         .onChange(of: calendarFilterPlantId) { _, _ in
             syncCalendarFilterFromStorage(animated: true)
         }
+        .onChange(of: preparedCalendarSnapshotTriggerKey) { _, _ in
+            if !applyRoutePreparedSnapshotIfAvailable() {
+                schedulePreparedCalendarSnapshotRebuild()
+            }
+        }
         .onChange(of: preselectedPetId) { _, _ in
             resetRouteFilterOverride()
         }
         .onChange(of: preselectedHumanId) { _, _ in
             resetRouteFilterOverride()
         }
-        .onChange(of: preselectedPlantId) { _, _ in
-            resetRouteFilterOverride()
-        }
         .onAppear {
             recordCalendarOpen()
             syncCalendarViewModeFromStorage(viewModeRaw)
             syncCalendarFilterFromStorage(animated: false)
+            if !applyRoutePreparedSnapshotIfAvailable() {
+                rebuildPreparedCalendarSnapshotIfNeeded()
+            }
             scheduleCalendarMainContentMountIfNeeded()
             if isCalendarPrepared, viewMode == .list {
                 scheduleInitialListPositionIfNeeded()
@@ -117,10 +122,13 @@ extension CalendarView {
             timelinePositionCoordinator.cancel()
             addEventPresentationTask?.cancel()
             addEventContentMountTask?.cancel()
+            preparedCalendarSnapshotTask?.cancel()
+            preparedCalendarSnapshotTask = nil
             cancelPendingCalendarMainContentMount(resetMountedState: true)
         }
         .onChange(of: isEmbeddedActive) { _, isActive in
             if isActive {
+                schedulePreparedCalendarSnapshotRebuild()
                 scheduleCalendarMainContentMountIfNeeded()
                 scheduleCalendarMaintenance()
                 if viewMode == .list {
@@ -136,6 +144,7 @@ extension CalendarView {
         }
         .onChange(of: isEmbeddedPrepared) { _, isPrepared in
             if isPrepared {
+                schedulePreparedCalendarSnapshotRebuild()
                 scheduleCalendarMainContentMountIfNeeded()
                 scheduleCalendarMaintenance()
                 if viewMode == .list {
@@ -152,6 +161,7 @@ extension CalendarView {
         .onChange(of: isEmbeddedVisible) { _, isVisible in
             if isVisible {
                 syncCalendarViewModeFromStorage(viewModeRaw)
+                schedulePreparedCalendarSnapshotRebuild()
                 scheduleCalendarMainContentMountIfNeeded()
                 scheduleCalendarMaintenance()
                 if viewMode == .list {
@@ -263,6 +273,7 @@ extension CalendarView {
         guard showingAddEvent || addEventPresentationProgress > 0.001 else { return }
         addEventContentMountTask?.cancel()
         isAddEventContentMounted = false
+        schedulePreparedCalendarSnapshotRebuild(delayMilliseconds: 220, force: true)
         withAnimation(GoMotion.sheetEnter) {
             addEventPresentationProgress = 0
         }
@@ -510,8 +521,9 @@ extension CalendarView {
                 appliedFilterSelection = selection
             }
             if viewMode == .list {
-                resetCalendarListPositionForModeSwitch()
+                prepareCalendarListForFilterChange()
             }
+            schedulePreparedCalendarSnapshotRebuild()
             filterApplyTask = nil
             scheduleCalendarFilterStorageCommit(selection)
         }
@@ -537,6 +549,7 @@ extension CalendarView {
 
     func resetCalendarListPositionForModeSwitch() {
         resetEmbeddedBottomChromeScrollBaseline()
+        pendingFilterTimelineAnchorDate = nil
         listInitialPositionTask?.cancel()
         listInitialPositionTask = nil
         let today = Calendar.current.startOfDay(for: Date())
@@ -546,5 +559,66 @@ extension CalendarView {
             visibleTimelineDateID = todayID
         }
         listVisibleTopDate = today
+    }
+
+    func prepareCalendarListForFilterChange() {
+        resetEmbeddedBottomChromeScrollBaseline()
+        pendingFilterTimelineAnchorDate = listVisibleTopDate
+        didScrollListToToday = true
+        listInitialPositionTask?.cancel()
+        listInitialPositionTask = nil
+        timelinePositionCoordinator.cancel()
+    }
+
+    func rebuildPreparedCalendarSnapshotIfNeeded(force: Bool = false) {
+        let snapshotKey = preparedCalendarSnapshotTriggerKey
+        guard force || preparedCalendarSnapshotKey != snapshotKey else { return }
+        if !force, applyRoutePreparedSnapshotIfAvailable(snapshotKey: snapshotKey) {
+            return
+        }
+        let filtered = buildFilteredEventsForPreparedSnapshot()
+        let snapshot = CalendarSnapshotBuilder.preparedSnapshot(
+            filteredEvents: filtered,
+            allEvents: events,
+            pets: pets,
+            selectedDate: selectedDate,
+            weekDays: thisWeekDays,
+            monthDays: calendarDays().compactMap(\.self)
+        )
+        var transaction = Transaction(animation: nil)
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            preparedCalendarSnapshot = snapshot
+            preparedCalendarSnapshotKey = snapshotKey
+        }
+    }
+
+    @discardableResult
+    func applyRoutePreparedSnapshotIfAvailable(
+        snapshotKey: CalendarPreparedSnapshotTriggerKey? = nil
+    ) -> Bool {
+        let key = snapshotKey ?? preparedCalendarSnapshotTriggerKey
+        guard let routePreparedSnapshot,
+              routePreparedSnapshot.key == key else {
+            return false
+        }
+        guard preparedCalendarSnapshotKey != key else { return true }
+
+        var transaction = Transaction(animation: nil)
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            preparedCalendarSnapshot = routePreparedSnapshot.snapshot
+            preparedCalendarSnapshotKey = key
+        }
+        return true
+    }
+
+    func schedulePreparedCalendarSnapshotRebuild(delayMilliseconds: UInt64 = 0, force: Bool = false) {
+        guard isCalendarPrepared || !hideToolbar else { return }
+        preparedCalendarSnapshotTask?.cancel()
+        preparedCalendarSnapshotTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: delayMilliseconds) {
+            rebuildPreparedCalendarSnapshotIfNeeded(force: force)
+            preparedCalendarSnapshotTask = nil
+        }
     }
 }

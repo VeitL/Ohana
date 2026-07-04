@@ -126,6 +126,7 @@ struct CrewRosterProfilePanel: View {
     @ObservedObject private var avatarPipeline = AvatarPipelineRegistry.current
     @State private var humanAvatarSignature = ""
     @State private var humanAvatarCacheKey = "crew-roster-profile-human-avatar-empty"
+    @State private var avatarImageRevision = 0
 
     private let speciesOptions = ["狗", "猫", "鱼", "鸟", "兔子", "爬宠", "仓鼠", "其他"]
     private let bloodTypeOptions = ["未填写", "A", "B", "AB", "O"]
@@ -168,7 +169,9 @@ struct CrewRosterProfilePanel: View {
                 .allowsHitTesting(detailProgress > 0.985)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .onAppear(perform: loadEditState)
+        .onAppear {
+            loadEditState(includeAvatarData: false)
+        }
         .task(id: humanAvatarSourceKey) {
             await prepareHumanAvatar()
         }
@@ -275,7 +278,7 @@ struct CrewRosterProfilePanel: View {
                 if isEditing {
                     saveChanges()
                 } else {
-                    loadEditState()
+                    loadEditState(includeAvatarData: true)
                     withAnimation(GoMotion.feedback) { isEditing = true }
                 }
             } label: {
@@ -425,7 +428,7 @@ struct CrewRosterProfilePanel: View {
             HStack(spacing: 14) {
                 profileAvatar(size: 72)
                 EditableProfileAvatarPicker(
-                    avatarImageData: $avatarImageData,
+                    avatarImageData: editableAvatarImageData,
                     fallbackEmoji: avatarEmoji.isEmpty ? fallbackEmoji : avatarEmoji,
                     accentColor: tint,
                     cropSpecies: pet == nil ? "" : species,
@@ -599,14 +602,25 @@ struct CrewRosterProfilePanel: View {
     @ViewBuilder
     private func profileAvatar(size: CGFloat) -> some View {
         if let pet {
-            PetAvatarPortraitView(
-                imageData: isEditing ? avatarImageData : pet.avatarImageData,
-                fallbackText: pet.avatarEmoji.isEmpty ? "🐾" : pet.avatarEmoji,
-                themeColor: tint,
-                size: size,
-                backgroundOpacity: 0.25,
-                transparentScale: 0.78
-            )
+            if isEditing {
+                PetAvatarPortraitView(
+                    imageData: avatarImageData,
+                    fallbackText: pet.avatarEmoji.isEmpty ? "🐾" : pet.avatarEmoji,
+                    themeColor: tint,
+                    size: size,
+                    backgroundOpacity: 0.25,
+                    transparentScale: 0.78
+                )
+            } else {
+                PetAvatarPortraitView(
+                    pet: pet,
+                    fallbackText: pet.avatarEmoji.isEmpty ? "🐾" : pet.avatarEmoji,
+                    themeColor: tint,
+                    size: size,
+                    backgroundOpacity: 0.25,
+                    transparentScale: 0.78
+                )
+            }
         } else if human != nil {
             ZStack {
                 Circle()
@@ -654,6 +668,16 @@ struct CrewRosterProfilePanel: View {
         return value.isEmpty ? "👤" : value
     }
 
+    private var editableAvatarImageData: Binding<Data?> {
+        Binding(
+            get: { avatarImageData },
+            set: { newValue in
+                avatarImageData = newValue
+                avatarImageRevision &+= 1
+            }
+        )
+    }
+
     private var preparedHumanAvatarImage: UIImage? {
         guard let human, !humanAvatarSignature.isEmpty else { return nil }
         return avatarPipeline.cachedImage(for: human.id, signature: humanAvatarSignature)
@@ -661,8 +685,11 @@ struct CrewRosterProfilePanel: View {
 
     private var humanAvatarSourceKey: String {
         guard let human else { return "crew-roster-profile-human-avatar-none" }
-        let dataCount = selectedHumanAvatarData?.count ?? 0
-        return "\(human.id.uuidString):\(isEditing):\(dataCount)"
+        if isEditing {
+            return "\(human.id.uuidString):editing:\(avatarImageRevision)"
+        }
+        let signature = human.hasAvatarImageAttachment ? human.avatarThumbnailSignature : "empty"
+        return "\(human.id.uuidString):view:\(signature)"
     }
 
     private func emptyText(_ value: String) -> String {
@@ -739,10 +766,11 @@ struct CrewRosterProfilePanel: View {
         }
     }
 
-    private func loadEditState() {
+    private func loadEditState(includeAvatarData: Bool) {
         if let pet {
             name = pet.name
-            avatarImageData = pet.avatarImageData
+            avatarImageData = includeAvatarData ? pet.avatarImageData : nil
+            avatarImageRevision &+= 1
             avatarEmoji = pet.avatarEmoji
             species = pet.species.isEmpty ? "其他" : pet.species
             breed = pet.breed
@@ -757,7 +785,8 @@ struct CrewRosterProfilePanel: View {
             passedDate = pet.passedAwayDate ?? Date()
         } else if let human {
             name = human.name
-            avatarImageData = human.avatarImageData
+            avatarImageData = includeAvatarData ? human.avatarImageData : nil
+            avatarImageRevision &+= 1
             avatarEmoji = human.avatarEmoji
             role = HumanProfileOptions.normalizedRole(human.role)
             gender = HumanProfileOptions.normalizedGender(human.genderRaw)
@@ -773,7 +802,8 @@ struct CrewRosterProfilePanel: View {
             passedDate = human.passedAwayDate ?? Date()
         } else if let plant {
             name = plant.name
-            avatarImageData = plant.avatarImageData
+            avatarImageData = includeAvatarData ? plant.avatarImageData : nil
+            avatarImageRevision &+= 1
             avatarEmoji = plant.avatarEmoji
             species = plant.species
             location = plant.location

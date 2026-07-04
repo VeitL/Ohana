@@ -32,6 +32,20 @@ extension VerticalSolidHomeView {
         }
     }
 
+    func handleNewHomePlantSaved(id: UUID) {
+        plantArrivalClearTask?.cancel()
+        var transaction = Transaction(animation: nil)
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            arrivingPlantCardId = id
+        }
+        plantArrivalClearTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: newMemberArrivalClearDelayMilliseconds) {
+            guard arrivingPlantCardId == id else { return }
+            arrivingPlantCardId = nil
+            plantArrivalClearTask = nil
+        }
+    }
+
     func handleCreatedEntitySignalIfNeeded(_ signal: HomeCreatedEntitySignal?) {
         guard let signal,
               handledCreatedEntityToken != signal.token else { return }
@@ -48,6 +62,9 @@ extension VerticalSolidHomeView {
         arrivalClearTask?.cancel()
         arrivalClearTask = nil
         arrivingHomeCardId = nil
+        plantArrivalClearTask?.cancel()
+        plantArrivalClearTask = nil
+        arrivingPlantCardId = nil
     }
 
     func openCard(_ card: FocusCard) {

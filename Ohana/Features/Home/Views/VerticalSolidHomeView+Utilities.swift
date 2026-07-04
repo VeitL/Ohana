@@ -22,6 +22,21 @@ extension VerticalSolidHomeView {
         }
     }
 
+    func scheduleMemberMediaAttachmentIndexRepair() {
+        memberMediaAttachmentIndexRepairTask?.cancel()
+        memberMediaAttachmentIndexRepairTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: 180) {
+            let repaired = MemberMediaAttachmentIndexRepair.repair(
+                modelContext: modelContext,
+                maxBlobReads: 24
+            )
+            if repaired {
+                requestHomeSnapshotRefresh()
+                bumpAvatarCacheRevision()
+            }
+            memberMediaAttachmentIndexRepairTask = nil
+        }
+    }
+
     func closeVerticalFabMenu(immediate: Bool) {
         guard fabExpanded || fabMenuItemsVisible else { return }
         if immediate || !canAnimate {
@@ -138,17 +153,57 @@ extension VerticalSolidHomeView {
     }
 
     func preloadFirstScreenAvatars() async {
-        let payloads = avatarPreloadPayloads()
-        let popoutPayloads = popoutPreloadPayloads()
-        guard !payloads.isEmpty || !popoutPayloads.isEmpty else { return }
-        if avatarPipeline.seedPreviewEntries(payloads) {
+        let requests = payload.mediaPreloadRequests
+        let legacyPayloads = avatarPreloadPayloads()
+        let legacyPopoutPayloads = popoutPreloadPayloads()
+        guard !requests.isEmpty || !legacyPayloads.isEmpty || !legacyPopoutPayloads.isEmpty else { return }
+
+        if !legacyPayloads.isEmpty || !legacyPopoutPayloads.isEmpty {
+            if avatarPipeline.seedPreviewEntries(legacyPayloads) {
+                bumpAvatarCacheRevision()
+            }
+            avatarPipeline.preload(
+                payloads: legacyPayloads,
+                popoutPayloads: legacyPopoutPayloads,
+                key: avatarPreloadSignature
+            )
+        }
+
+        guard !requests.isEmpty else { return }
+        await OhanaFrameScheduler.waitAfterNextFrame(milliseconds: 72)
+        guard !Task.isCancelled else { return }
+
+        let loader = SwiftDataMediaBlobLoader(modelContainer: modelContext.container)
+        var avatarPayloads: [FocusWalletAvatarCache.Payload] = []
+        var popoutPayloads: [FocusWalletAvatarCache.Payload] = []
+
+        for request in requests {
+            guard !Task.isCancelled else { return }
+            let avatarData: Data? = if request.wantsAvatar {
+                await mediaAvatarData(for: request, loader: loader)
+            } else {
+                nil
+            }
+
+            if request.wantsAvatar {
+                avatarPayloads.append(FocusWalletAvatarCache.Payload(id: request.id, data: avatarData))
+            }
+
+            if request.wantsPopout {
+                let popoutData = await mediaPopoutData(for: request, avatarData: avatarData, loader: loader)
+                popoutPayloads.append(FocusWalletAvatarCache.Payload(id: request.id, data: popoutData))
+            }
+
+            await Task.yield()
+        }
+
+        let avatarDidRefresh = await FocusWalletAvatarCache.preload(payloads: avatarPayloads)
+        guard !Task.isCancelled else { return }
+        let popoutDidRefresh = await FocusPopoutImageCache.preload(payloads: popoutPayloads)
+        guard !Task.isCancelled else { return }
+        if avatarDidRefresh || popoutDidRefresh {
             bumpAvatarCacheRevision()
         }
-        avatarPipeline.preload(
-            payloads: payloads,
-            popoutPayloads: popoutPayloads,
-            key: avatarPreloadSignature
-        )
     }
 
     func bumpAvatarCacheRevision() {
@@ -165,6 +220,31 @@ extension VerticalSolidHomeView {
 
     func popoutPreloadPayloads() -> [FocusWalletAvatarCache.Payload] {
         payload.popoutPreloadPayloads
+    }
+
+    func mediaAvatarData(
+        for request: VerticalSolidHomeMediaPreloadRequest,
+        loader: SwiftDataMediaBlobLoader
+    ) async -> Data? {
+        switch request.source {
+        case .pet:
+            await loader.petAvatarImageData(modelID: request.modelID)
+        case .human:
+            await loader.humanAvatarImageData(modelID: request.modelID)
+        }
+    }
+
+    func mediaPopoutData(
+        for request: VerticalSolidHomeMediaPreloadRequest,
+        avatarData: Data?,
+        loader: SwiftDataMediaBlobLoader
+    ) async -> Data? {
+        guard request.source == .pet else { return nil }
+        if let data = await loader.petCardPopoutImageData(modelID: request.modelID) {
+            return data
+        }
+        guard request.popoutSignature == request.avatarSignature else { return nil }
+        return avatarData
     }
 
     func enqueueHomeCommand(

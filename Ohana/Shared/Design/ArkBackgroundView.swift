@@ -435,7 +435,7 @@ struct GoIslandWizardBackdrop: View {
             GeometryReader { geo in
                 ZStack {
                     Circle()
-                        .fill(Color.goLime)
+                        .fill(Color.goPrimary)
                         .frame(width: 260, height: 260)
                         .blur(radius: 80)
                         .opacity(shouldReduceWork ? 0.10 : 0.18)

@@ -53,6 +53,7 @@ struct AddEntityDestinationView: View {
     let onComplete: () -> Void
     var onPetSaved: ((Pet) -> Void)?
     var onHumanSaved: ((Human) -> Void)?
+    var onPlantSaved: ((UUID) -> Void)?
 
     @AppStorage("currentActiveHumanId") private var currentActiveHumanId = ""
 
@@ -77,7 +78,10 @@ struct AddEntityDestinationView: View {
                 }
             )
         case .plant:
-            AddPlantDataContainer(onComplete: onComplete)
+            AddPlantDataContainer(
+                onComplete: onComplete,
+                onPlantSaved: onPlantSaved
+            )
         }
     }
 }

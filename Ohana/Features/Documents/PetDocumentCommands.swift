@@ -224,19 +224,18 @@ enum PetDocumentCommandService {
         document.expiryDate = input.expiryDate
         document.cost = max(0, input.cost)
         if input.clearsAttachment {
-            document.attachmentData = nil
-            document.attachmentFilename = ""
+            document.updateLegacyAttachment(data: nil, filename: "")
             document.attachments.removeAll()
         } else if !input.attachments.isEmpty {
             applyAttachments(input.attachments, to: document, write: write, context: context)
         } else if let data = input.attachmentData {
             let filename = document.attachmentFilename.isEmpty ? "image.jpg" : document.attachmentFilename
-            document.attachmentData = AttachmentPrivacySanitizer.sanitizedData(
+            let sanitizedData = AttachmentPrivacySanitizer.sanitizedData(
                 data,
                 filename: filename,
                 isImage: AttachmentPrivacySanitizer.isImageFilename(filename)
             )
-            document.attachmentFilename = filename
+            document.updateLegacyAttachment(data: sanitizedData, filename: filename)
         }
         CloudSyncMutationRecorder.markModified(document, context: context)
         context.safeSave()
@@ -281,10 +280,10 @@ enum PetDocumentCommandService {
         guard let first = attachments.first else { return }
         let sanitizedAttachments = attachments.map(sanitizedAttachment)
         let sanitizedFirst = sanitizedAttachments[0]
-        document.attachmentData = sanitizedFirst.data
-        document.attachmentFilename = first.filename.isEmpty
+        let legacyFilename = first.filename.isEmpty
             ? (first.isImage ? "image.jpg" : "attachment")
             : first.filename
+        document.updateLegacyAttachment(data: sanitizedFirst.data, filename: legacyFilename)
         document.attachments.removeAll()
         for input in sanitizedAttachments {
             _ = DomainMemberFactWriter.createPetDocumentAttachment(

@@ -64,6 +64,7 @@ struct LayeredAvatarView: View {
     @State private var eyePressScale: CGFloat = 1
     @State private var bodyPressScale: CGFloat = 1
     @State private var decodedAvatarImage: UIImage?
+    @State private var decodedAvatarIsTransparent = false
 
     private var furColor: Color { Color(hex: furHex.isEmpty ? "D4A847" : furHex) }
     private var eyeColor: Color { Color(hex: eyeHex.isEmpty ? "D4A017" : eyeHex) }
@@ -107,9 +108,21 @@ struct LayeredAvatarView: View {
         .task(id: avatarSignature) {
             guard let imageData else {
                 decodedAvatarImage = nil
+                decodedAvatarIsTransparent = false
                 return
             }
-            decodedAvatarImage = await AttachmentImageDecoder.decode(imageData)
+            let key = MediaThumbnailKey(
+                id: "layered-avatar-\(avatarSignature)",
+                sourceSignature: MediaThumbnailProvider.signature(for: imageData),
+                maxPixel: 1800
+            )
+            if let result = await MediaThumbnailProvider.imageWithTransparency(for: key, dataProvider: { imageData }) {
+                decodedAvatarImage = result.image
+                decodedAvatarIsTransparent = result.isTransparent
+            } else {
+                decodedAvatarImage = nil
+                decodedAvatarIsTransparent = false
+            }
         }
     }
 
@@ -120,7 +133,7 @@ struct LayeredAvatarView: View {
                 let size = min(geo.size.width, geo.size.height)
                 PetAvatarPortraitImage(
                     image: img,
-                    isTransparentAvatar: imageData.map { PetAvatarTransparencyCache.isTransparentAvatar($0) } ?? false,
+                    isTransparentAvatar: decodedAvatarIsTransparent,
                     size: size
                 )
                 .frame(width: geo.size.width, height: geo.size.height)

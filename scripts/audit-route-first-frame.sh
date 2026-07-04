@@ -8,8 +8,8 @@ set -euo pipefail
 # that repeatedly regress into first-frame stalls:
 #
 #   - first-frame @Query subscriptions inside a route/data container
-#   - direct SwiftData fetch calls in route/data containers without an explicit
-#     deferred-load marker
+#   - direct SwiftData fetch calls in route/data containers outside a
+#     route-scoped @ModelActor loader
 #
 # Existing route/data @Query debt is frozen in
 # docs/governance/manifests/route-first-frame-baseline.json. New files default
@@ -31,9 +31,9 @@ Rule IDs:
   route-first-frame-query
   route-first-frame-sync-fetch
   route-first-frame-service-fetch
+  route-first-frame-modelactor-live-model-return
 
-Allow a deferred fetch line with:
-  // route-first-frame: allow deferred-fetch
+SwiftData fetches owned by a route-scoped @ModelActor loader are allowed.
 USAGE
 }
 
@@ -116,9 +116,9 @@ else
     add_file "$file"
   done < <(
     {
-      git diff --name-only --diff-filter=ACMR -- '*.swift'
-      git diff --cached --name-only --diff-filter=ACMR -- '*.swift'
-      git ls-files --others --exclude-standard -- '*.swift'
+      git diff --name-only --diff-filter=ACMR HEAD -- Ohana 2>/dev/null || true
+      git diff --cached --name-only --diff-filter=ACMR -- Ohana 2>/dev/null || true
+      git ls-files --others --exclude-standard -- Ohana 2>/dev/null || true
     } | sort -u
   )
 fi
@@ -184,8 +184,132 @@ scan_file() {
       continue
     fi
     warn "route-first-frame-sync-fetch" "$file" "$line_number" \
-      "route/data containers must not fetch SwiftData on the first frame; defer through a route-scoped loader and mark the deferred fetch."
-  done < <(grep -nE '([[:alnum:]_]+Context|context|modelContext)\.fetch\(' "$file" || true)
+      "route/data containers must not fetch SwiftData on the first frame; move fetch work into a route-scoped @ModelActor loader."
+  done < <(
+    python3 - "$file" <<'PY'
+import re
+import sys
+
+path = sys.argv[1]
+with open(path, encoding="utf-8") as handle:
+    lines = handle.read().splitlines()
+
+brace_depth = 0
+pending_model_actor = False
+pending_actor_declaration = False
+model_actor_body_depth = None
+fetch_pattern = re.compile(r"([A-Za-z0-9_]+Context|context|modelContext)\.fetch\(")
+
+for line_number, line in enumerate(lines, start=1):
+    if model_actor_body_depth is not None and brace_depth < model_actor_body_depth:
+        model_actor_body_depth = None
+
+    if "@ModelActor" in line:
+        pending_model_actor = True
+
+    if pending_model_actor and re.search(r"\bactor\b", line):
+        pending_actor_declaration = True
+
+    opens = line.count("{")
+    closes = line.count("}")
+    if pending_actor_declaration and opens > 0:
+        model_actor_body_depth = brace_depth + 1
+        pending_actor_declaration = False
+        pending_model_actor = False
+
+    in_model_actor = model_actor_body_depth is not None and brace_depth >= model_actor_body_depth
+    if (
+        fetch_pattern.search(line)
+        and "route-first-frame: allow" not in line
+        and not in_model_actor
+    ):
+        print(f"{line_number}:{line}")
+
+    brace_depth += opens - closes
+PY
+  )
+
+  while IFS= read -r match; do
+    [[ -n "$match" ]] || continue
+    local line_number="${match%%:*}"
+    warn "route-first-frame-modelactor-live-model-return" "$file" "$line_number" \
+      "@ModelActor loaders must not return SwiftData models or result structs containing SwiftData models across actor boundaries; return Sendable IDs or value snapshots."
+  done < <(
+    python3 - "$file" <<'PY'
+import pathlib
+import re
+import sys
+
+path = pathlib.Path(sys.argv[1])
+lines = path.read_text(encoding="utf-8").splitlines()
+
+model_names = set()
+for model_path in pathlib.Path("Ohana/Models").rglob("*.swift"):
+    text = model_path.read_text(encoding="utf-8")
+    model_names.update(re.findall(r"@Model\s+(?:final\s+)?class\s+([A-Za-z0-9_]+)", text))
+
+def contains_model_type(type_expr):
+    return any(re.search(rf"(?<![A-Za-z0-9_]){re.escape(name)}(?![A-Za-z0-9_])", type_expr) for name in model_names)
+
+struct_contains_model = {}
+pending_struct = None
+struct_depth = None
+brace_depth = 0
+property_pattern = re.compile(r"\b(?:let|var)\s+[A-Za-z0-9_]+\s*:\s*([^=]+)")
+
+for line in lines:
+    if struct_depth is not None and brace_depth < struct_depth:
+        pending_struct = None
+        struct_depth = None
+
+    struct_match = re.search(r"\bstruct\s+([A-Za-z0-9_]+)", line)
+    if struct_match and "{" in line:
+        pending_struct = struct_match.group(1)
+        struct_depth = brace_depth + line.count("{")
+        struct_contains_model.setdefault(pending_struct, False)
+
+    if pending_struct is not None:
+        property_match = property_pattern.search(line)
+        if property_match and contains_model_type(property_match.group(1)):
+            struct_contains_model[pending_struct] = True
+
+    brace_depth += line.count("{") - line.count("}")
+
+brace_depth = 0
+pending_model_actor = False
+pending_actor_declaration = False
+model_actor_body_depth = None
+function_return_pattern = re.compile(r"^\s*(?!private\b)(?:public\s+|internal\s+|fileprivate\s+)?(?:nonisolated\s+)?func\b.*->\s*([^\{]+)")
+
+for line_number, line in enumerate(lines, start=1):
+    if model_actor_body_depth is not None and brace_depth < model_actor_body_depth:
+        model_actor_body_depth = None
+
+    if "@ModelActor" in line:
+        pending_model_actor = True
+
+    if pending_model_actor and re.search(r"\bactor\b", line):
+        pending_actor_declaration = True
+
+    opens = line.count("{")
+    closes = line.count("}")
+    if pending_actor_declaration and opens > 0:
+        model_actor_body_depth = brace_depth + 1
+        pending_actor_declaration = False
+        pending_model_actor = False
+
+    in_model_actor = model_actor_body_depth is not None and brace_depth >= model_actor_body_depth
+    if in_model_actor:
+        match = function_return_pattern.search(line)
+        if match:
+            return_type = match.group(1).strip()
+            bare_return_type = re.sub(r"[\[\]\?\!<>,:\s]+", " ", return_type).strip().split()
+            if contains_model_type(return_type) or any(struct_contains_model.get(token, False) for token in bare_return_type):
+                print(f"{line_number}:{line}")
+
+    brace_depth += opens - closes
+PY
+  )
 }
 
 for file in "${files[@]}"; do
