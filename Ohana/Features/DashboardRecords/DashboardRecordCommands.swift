@@ -158,8 +158,10 @@ enum WeightCommandService {
         weight: Double,
         date: Date,
         context: ModelContext,
-        executorId: String? = nil
+        executorId: String? = nil,
+        questManager providedQuestManager: QuestManager? = nil
     ) -> WeightCommandResult {
+        let questManager = providedQuestManager ?? QuestManager()
         guard let write = DomainMemberFactWriteAuthorizer.authorizeHumanFact(
             human: human,
             occurredAt: date,
@@ -182,8 +184,24 @@ enum WeightCommandService {
             weight: weight,
             context: context
         )
+        var reward: (humanGot: Int, petGot: Int)?
+        DomainMemberFactEffectsDispatcher.run(plan: write) { actor in
+            reward = EconomyRewardDiscipline.awardNonCareReward(
+                type: .weight,
+                pet: nil,
+                context: context,
+                date: date,
+                executorId: actor.rewardExecutorId,
+                questManager: questManager
+            )
+        }
         context.safeSave()
-        return WeightCommandResult(logID: log.id, subjectID: human.id, coconutDelta: 0)
+        return WeightCommandResult(
+            logID: log.id,
+            subjectID: human.id,
+            coconutDelta: CareLedgerService.rewardDelta(reward),
+            allowsDerivedEffects: write.allowsDerivedEffects
+        )
     }
 }
 
@@ -285,7 +303,8 @@ struct DashboardRecordCommandExecutor {
             weight: weight,
             date: date,
             context: context,
-            executorId: executorId
+            executorId: executorId,
+            questManager: questManager
         )
         guard result.didRecord else { return result }
         revisions.publishWeightEntry(command: command, subjectID: human.id, result: result, note: note)

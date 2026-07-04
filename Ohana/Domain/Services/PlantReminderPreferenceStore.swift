@@ -41,6 +41,8 @@ nonisolated enum PlantReminderPreferenceStore {
     static let travelModeStorageName = "plantReminder.travelMode.v1"
     static let generatedPlanTitleMarker = "植物计划"
     private static let careTypeStoragePrefix = "plantReminder.careTypeEnabled.v1."
+    private static let plantCareLeadDaysPrefix = "plantReminder.plantCareLeadDays.v1."
+    private static let plantCareRecurrenceEndPrefix = "plantReminder.plantCareRecurrenceEnd.v1."
 
     static let controllableCareTypes: [PlantCareType] = [
         .watering,
@@ -93,6 +95,52 @@ nonisolated enum PlantReminderPreferenceStore {
         defaults.set(value, forKey: careTypeKey(type))
     }
 
+    static func reminderLeadDays(
+        forPlantID plantID: UUID,
+        careType: PlantCareType,
+        defaults: UserDefaults = .standard
+    ) -> Int {
+        let key = plantCareKey(prefix: plantCareLeadDaysPrefix, plantID: plantID, careType: careType)
+        guard defaults.object(forKey: key) != nil else { return 0 }
+        return min(max(defaults.integer(forKey: key), 0), 14)
+    }
+
+    static func setReminderLeadDays(
+        _ days: Int,
+        forPlantID plantID: UUID,
+        careType: PlantCareType,
+        defaults: UserDefaults = .standard
+    ) {
+        let key = plantCareKey(prefix: plantCareLeadDaysPrefix, plantID: plantID, careType: careType)
+        defaults.set(min(max(days, 0), 14), forKey: key)
+    }
+
+    static func recurrenceEndDate(
+        forPlantID plantID: UUID,
+        careType: PlantCareType,
+        defaults: UserDefaults = .standard
+    ) -> Date? {
+        let key = plantCareKey(prefix: plantCareRecurrenceEndPrefix, plantID: plantID, careType: careType)
+        guard defaults.object(forKey: key) != nil else { return nil }
+        let timestamp = defaults.double(forKey: key)
+        guard timestamp > 0 else { return nil }
+        return Date(timeIntervalSince1970: timestamp)
+    }
+
+    static func setRecurrenceEndDate(
+        _ date: Date?,
+        forPlantID plantID: UUID,
+        careType: PlantCareType,
+        defaults: UserDefaults = .standard
+    ) {
+        let key = plantCareKey(prefix: plantCareRecurrenceEndPrefix, plantID: plantID, careType: careType)
+        if let date {
+            defaults.set(date.timeIntervalSince1970, forKey: key)
+        } else {
+            defaults.removeObject(forKey: key)
+        }
+    }
+
     static func shouldDeliverNotification(for event: Event, defaults: UserDefaults = .standard) -> Bool {
         guard !isTravelModeEnabled(defaults: defaults) else { return false }
         guard let type = careType(forEventType: event.eventType) else { return true }
@@ -140,11 +188,13 @@ nonisolated enum PlantReminderPreferenceStore {
         for dueDate: Date,
         now: Date,
         calendar: Calendar = .current,
-        defaults: UserDefaults = .standard
+        defaults: UserDefaults = .standard,
+        leadDays: Int = 0
     ) -> Date {
         let dueDay = calendar.startOfDay(for: dueDate)
         let today = calendar.startOfDay(for: now)
-        let targetDay = dueDay < today ? today : dueDate
+        let preferredLeadDay = calendar.date(byAdding: .day, value: -min(max(leadDays, 0), 14), to: dueDay) ?? dueDay
+        let targetDay = preferredLeadDay < today ? today : preferredLeadDay
         let preferred = deliveryDate(for: targetDay, calendar: calendar, defaults: defaults)
         guard preferred <= now else { return preferred }
         return now.addingTimeInterval(5 * 60)
@@ -180,5 +230,9 @@ nonisolated enum PlantReminderPreferenceStore {
 
     private static func careTypeKey(_ type: PlantCareType) -> String {
         "\(careTypeStoragePrefix)\(type.rawValue)"
+    }
+
+    private static func plantCareKey(prefix: String, plantID: UUID, careType: PlantCareType) -> String {
+        "\(prefix)\(plantID.uuidString).\(careType.rawValue)"
     }
 }

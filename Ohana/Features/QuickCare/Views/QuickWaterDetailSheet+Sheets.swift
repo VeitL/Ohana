@@ -347,6 +347,36 @@ extension QuickWaterDetailSheet {
     @ViewBuilder
     func waterSheetChromeTitle(_ sheet: ActiveSheet) -> some View {
         switch sheet {
+        case .waterSettings:
+            waterSheetChromeTitleContent(
+                icon: "arrow.2.circlepath",
+                title: l.tr(zh: "换水计划", en: "Water change plan", de: "Wasserwechselplan"),
+                tint: waterChangeTint
+            )
+        case .waterAmount:
+            waterSheetChromeTitleContent(
+                icon: "drop.fill",
+                title: l.tr(zh: "默认水量", en: "Default amount", de: "Standardmenge"),
+                tint: chromeTint
+            )
+        case .waterPlan:
+            waterSheetChromeTitleContent(
+                icon: "bell.badge.fill",
+                title: l.tr(zh: "喂水计划", en: "Water plan", de: "Trinkplan"),
+                tint: Color.goTeal
+            )
+        case .filterSettings:
+            waterSheetChromeTitleContent(
+                icon: "sparkles",
+                title: l.tr(zh: "滤芯计划", en: "Filter plan", de: "Filterplan"),
+                tint: filterTint
+            )
+        case .history:
+            waterSheetChromeTitleContent(
+                icon: "clock.arrow.circlepath",
+                title: l.tr(zh: "浇水记录", en: "Water history", de: "Trinkhistorie"),
+                tint: chromeTint
+            )
         case .waterOverview:
             waterSheetChromeTitleContent(
                 icon: "drop.fill",
@@ -357,8 +387,6 @@ extension QuickWaterDetailSheet {
             waterSheetChromeTitleContent(icon: "arrow.2.circlepath", title: l.tr(zh: "换水总览", en: "Water change overview", de: "Wasserwechsel-Übersicht"), tint: waterChangeTint)
         case .filterOverview:
             waterSheetChromeTitleContent(icon: "sparkles", title: l.tr(zh: "滤芯总览", en: "Filter overview", de: "Filterübersicht"), tint: filterTint)
-        default:
-            EmptyView()
         }
     }
 

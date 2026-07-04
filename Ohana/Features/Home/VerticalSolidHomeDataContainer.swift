@@ -50,7 +50,9 @@ struct VerticalSolidHomeDataContainer: View {
     let onPresentCoconutLog: (CoconutLogSubject?) -> Void
     let onPresentCrewRoster: (CrewRosterMode) -> Void
     let onPresentFunctionMenu: (FMDest?) -> Void
+    let onPresentHumanWeightQuick: (UUID) -> Void
     let onPresentOasisReward: () -> Void
+    let onPresentPetWeightQuick: (UUID) -> Void
     let onPresentQuickMoment: (UUID) -> Void
     let onPresentSettings: () -> Void
     let onPresentStreakDetail: () -> Void
@@ -89,7 +91,9 @@ struct VerticalSolidHomeDataContainer: View {
         onPresentCoconutLog: @escaping (CoconutLogSubject?) -> Void,
         onPresentCrewRoster: @escaping (CrewRosterMode) -> Void,
         onPresentFunctionMenu: @escaping (FMDest?) -> Void,
+        onPresentHumanWeightQuick: @escaping (UUID) -> Void,
         onPresentOasisReward: @escaping () -> Void,
+        onPresentPetWeightQuick: @escaping (UUID) -> Void,
         onPresentQuickMoment: @escaping (UUID) -> Void,
         onPresentSettings: @escaping () -> Void,
         onPresentStreakDetail: @escaping () -> Void,
@@ -107,7 +111,9 @@ struct VerticalSolidHomeDataContainer: View {
         self.onPresentCoconutLog = onPresentCoconutLog
         self.onPresentCrewRoster = onPresentCrewRoster
         self.onPresentFunctionMenu = onPresentFunctionMenu
+        self.onPresentHumanWeightQuick = onPresentHumanWeightQuick
         self.onPresentOasisReward = onPresentOasisReward
+        self.onPresentPetWeightQuick = onPresentPetWeightQuick
         self.onPresentQuickMoment = onPresentQuickMoment
         self.onPresentSettings = onPresentSettings
         self.onPresentStreakDetail = onPresentStreakDetail
@@ -129,7 +135,9 @@ struct VerticalSolidHomeDataContainer: View {
             onPresentCoconutLog: onPresentCoconutLog,
             onPresentCrewRoster: onPresentCrewRoster,
             onPresentFunctionMenu: onPresentFunctionMenu,
+            onPresentHumanWeightQuick: onPresentHumanWeightQuick,
             onPresentOasisReward: onPresentOasisReward,
+            onPresentPetWeightQuick: onPresentPetWeightQuick,
             onPresentQuickMoment: onPresentQuickMoment,
             onPresentSettings: onPresentSettings,
             onPresentStreakDetail: onPresentStreakDetail,

@@ -927,6 +927,76 @@ struct HomeExpensePreviewStoreTests {
         #expect(hygieneView.contains("executor.hygieneLog(id: logId)"))
     }
 
+    @Test func quickWaterDetailSeedsFirstFrameStateFromRouteData() throws {
+        let rootURL = repositoryRootURL()
+        let routeContainer = try source("Ohana/Features/QuickCare/QuickCareRouteContainer.swift", rootURL: rootURL)
+        let waterSheet = try source("Ohana/Features/QuickCare/Views/QuickWaterDetailSheet.swift", rootURL: rootURL)
+        let waterHost = try source("Ohana/Features/QuickCare/Views/QuickWaterDetailSheetHost.swift", rootURL: rootURL)
+
+        #expect(waterSheet.contains("@State var waterSnapshot: QuickWaterRenderSnapshot"))
+        #expect(!waterSheet.contains("@State var waterSnapshot = QuickWaterRenderSnapshot.empty"))
+        #expect(waterSheet.contains("let initialSettings = WaterCareSettingsStore.snapshot(petKey: pet.id.uuidString)"))
+        #expect(waterSheet.contains("_waterSnapshot = State(initialValue: QuickWaterRenderSnapshot.build("))
+        #expect(waterSheet.contains("_selectedSharedWaterPetIds = State(initialValue: SharedPetSelectionMemory.restoredSelection("))
+        #expect(!waterSheet.contains(".onChange(of: allEvents.count)"))
+        #expect(!waterSheet.contains(".onChange(of: waterEntries.count)"))
+        #expect(waterSheet.contains(".onChange(of: waterPlanRevisionKey)"))
+        #expect(waterSheet.contains(".onChange(of: waterEntriesRevisionKey)"))
+
+        let waterRoute = try routeContainerSlice(
+            in: routeContainer,
+            start: "struct QuickWaterDetailRouteContainer: View",
+            end: "struct QuickPottyDetailRouteContainer: View"
+        )
+        #expect(waterRoute.contains("QuickWaterDetailSheetHost("))
+        #expect(!waterRoute.contains("@Query"))
+        #expect(!waterRoute.contains("private var routeData: QuickWaterRouteData"))
+        #expect(!waterRoute.contains("@State private var routeData"))
+        #expect(!waterRoute.contains("scheduleRouteDataLoad"))
+        #expect(!waterRoute.contains("QuickCareLoadingRouteEntityView"))
+        #expect(!waterHost.contains("@Query"))
+        #expect(waterHost.contains("RouteFirstFrameDeferredLoad("))
+        #expect(waterHost.contains("loadDelayMilliseconds: 0"))
+        #expect(waterHost.contains("QuickWaterRouteData.load(id: id, from: modelContext)"))
+        #expect(waterHost.contains("refreshToken += 1"))
+    }
+
+    @Test func quickActionInlineMenusDoNotLeakHitsToCoveredRows() throws {
+        let rootURL = repositoryRootURL()
+        let menuSource = try source(
+            "Ohana/Features/Home/Views/VerticalHomeEmbeddedQuickActions.swift",
+            rootURL: rootURL
+        )
+
+        #expect(menuSource.contains("private var hasOpenActionMenu"))
+        #expect(menuSource.contains(#".allowsHitTesting(!isEditMode && (!hasOpenActionMenu || openActionId == item.id))"#))
+        #expect(menuSource.contains(#""home-quick-action-menu-\(item.id)-\(option.id)""#))
+        #expect(menuSource.contains(#""home-quick-action-menu-\(item.id)-detail""#))
+    }
+
+    @Test func quickWeightPopupUsesDirectInlineRouteWithoutFirstFrameBlank() throws {
+        let rootURL = repositoryRootURL()
+        let appRoutes = try source("Ohana/App/RouteContainers/AppRouteDestinationContainers.swift", rootURL: rootURL)
+        let homeRoutes = try source("Ohana/Features/Home/FocusHomeRouteSheetModifier.swift", rootURL: rootURL)
+        let petRoute = try source("Ohana/Features/Members/PetDetailSheetRouteContainer.swift", rootURL: rootURL)
+        let humanRoute = try source("Ohana/Features/Members/HumanDetailSheetRouteContainer.swift", rootURL: rootURL)
+        let weightHosts = try source("Ohana/Features/Members/QuickWeightEntrySheetHosts.swift", rootURL: rootURL)
+        let weightSheet = try source("Ohana/Features/DashboardRecords/Views/GenericWeightEntrySheet.swift", rootURL: rootURL)
+
+        #expect(appRoutes.contains("AppPetWeightQuickSheetHost("))
+        #expect(appRoutes.contains("AppHumanWeightQuickSheetHost("))
+        #expect(homeRoutes.contains("AppPetWeightQuickSheetHost("))
+        #expect(homeRoutes.contains("AppHumanWeightQuickSheetHost("))
+        #expect(!petRoute.contains("struct AppPetWeightQuickRouteContainer"))
+        #expect(!humanRoute.contains("struct AppHumanWeightQuickRouteContainer"))
+        #expect(weightHosts.contains("struct AppPetWeightQuickSheetHost"))
+        #expect(weightHosts.contains("struct AppHumanWeightQuickSheetHost"))
+        #expect(weightHosts.contains("@Query private var pets"))
+        #expect(weightHosts.contains("@Query private var humans"))
+        #expect(weightSheet.contains("@State private var popupVisible = true"))
+        #expect(!weightSheet.contains("DispatchQueue.main.async {\n                withAnimation(popupAnimation)"))
+    }
+
     @Test func quickPottyUnknownClaimUsesRoutePureEntriesAndActionTimeFetches() throws {
         let rootURL = repositoryRootURL()
         let routeContainer = try source("Ohana/Features/QuickCare/QuickCareRouteContainer.swift", rootURL: rootURL)
@@ -978,6 +1048,14 @@ struct HomeExpensePreviewStoreTests {
 
     private func source(_ path: String, rootURL: URL) throws -> String {
         try String(contentsOf: rootURL.appendingPathComponent(path), encoding: .utf8)
+    }
+
+    private func routeContainerSlice(in source: String, start: String, end: String) throws -> String {
+        guard let startRange = source.range(of: start),
+              let endRange = source.range(of: end, range: startRange.upperBound ..< source.endIndex) else {
+            throw CocoaError(.fileReadCorruptFile)
+        }
+        return String(source[startRange.lowerBound ..< endRange.lowerBound])
     }
 
     private func makeContainer() throws -> ModelContainer {

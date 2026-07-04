@@ -181,8 +181,14 @@ struct ContentView: View {
             onPresentFunctionMenu: { destination in
                 appRoutes.presentFunctionMenu(destination: destination)
             },
+            onPresentHumanWeightQuick: { humanID in
+                appRoutes.presentHumanWeightQuick(humanID: humanID)
+            },
             onPresentOasisReward: {
                 appRoutes.presentOasisReward()
+            },
+            onPresentPetWeightQuick: { petID in
+                appRoutes.presentPetWeightQuick(petID: petID)
             },
             onPresentQuickMoment: { petID in
                 appRoutes.presentQuickMoment(petID: petID)

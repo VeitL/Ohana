@@ -129,7 +129,7 @@ extension VerticalSolidHomeView {
             case "waterChange", "filterClean":
                 routeCoordinator.openSheet(.petWater(pet.id))
             case "weight":
-                routeCoordinator.openSheet(.petWeightQuick(pet.id))
+                routeCoordinator.openPetWeightQuick(pet.id)
             case "expense":
                 routeCoordinator.openSheet(.petExpenseQuick(pet.id))
             case "moment":
@@ -227,10 +227,26 @@ extension VerticalSolidHomeView {
         case .fertilize:
             recordPlantQuickCare(.fertilizing, plantID: plant.id)
         case .log:
-            routeCoordinator.openSheet(.plantCareLog(plant.id, initialCareType: .customNote))
+            openPlantCareFeature(.log, plant: plant)
         case .detail:
-            openPlant(plant)
+            openPlantFeature(.profile, plant: plant)
         }
+    }
+
+    func openPlantCareFeature(_ destination: PlantCareFeatureDestination, plant: VerticalSolidHomePlantSnapshot) {
+        guard isPlantCareUnlockedForHome else {
+            AppFeatureRouteGuard.recordIntercept("plantGate:homePlantCareFeature")
+            return
+        }
+        openFunctionMenu(destination: .plantCare(plant.id, destination))
+    }
+
+    func openPlantFeature(_ destination: PlantFeatureDestination, plant: VerticalSolidHomePlantSnapshot) {
+        guard isPlantCareUnlockedForHome else {
+            AppFeatureRouteGuard.recordIntercept("plantGate:homePlantFeature")
+            return
+        }
+        openFunctionMenu(destination: .plantFeature(plant.id, destination))
     }
 
     func recordPlantQuickCare(_ type: PlantCareType, plantID: UUID) {
@@ -258,7 +274,7 @@ extension VerticalSolidHomeView {
 
         switch route {
         case .weightQuick:
-            routeCoordinator.openSheet(.humanWeightQuick(humanID))
+            routeCoordinator.openHumanWeightQuick(humanID)
         case .weightDetail:
             routeCoordinator.openSheet(.humanWeight(humanID))
         case .workoutQuick:
@@ -407,7 +423,7 @@ extension VerticalSolidHomeView {
         case "litter":
             routeCoordinator.openSheet(.petLitter(petID))
         case "walk":
-            startWalkFromQuickAction(petID: petID)
+            routeCoordinator.openSheet(.petWalkSummary(petID))
         case "play":
             routeCoordinator.openSheet(.petPlay(petID))
         case "health":
@@ -446,6 +462,10 @@ extension VerticalSolidHomeView {
             routeCoordinator.openSheet(.humanBasicInfo(human.id))
         case let .plant(plant):
             openFunctionMenu(destination: .plantDetail(plant.id))
+        case let .plantFeature(plant, destination):
+            openFunctionMenu(destination: .plantFeature(plant.id, destination))
+        case let .plantCare(plant, destination):
+            openFunctionMenu(destination: .plantCare(plant.id, destination))
         case let .functionMenu(destination):
             openFunctionMenu(destination: destination)
         case let .calendar(entityId, humanId, plantId):
@@ -467,6 +487,10 @@ extension VerticalSolidHomeView {
             routeCoordinator.openSheet(.humanBasicInfo(humanID))
         case let .plant(plantID):
             openFunctionMenu(destination: .plantDetail(plantID))
+        case let .plantFeature(plantID, destination):
+            openFunctionMenu(destination: .plantFeature(plantID, destination))
+        case let .plantCare(plantID, destination):
+            openFunctionMenu(destination: .plantCare(plantID, destination))
         case let .functionMenu(destination):
             openFunctionMenu(destination: destination)
         case let .calendar(entityId, humanId, plantId):

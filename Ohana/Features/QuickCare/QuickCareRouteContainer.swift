@@ -144,11 +144,6 @@ struct QuickFeedDetailRouteContainer: View {
 }
 
 struct QuickWaterDetailRouteContainer: View {
-    @Environment(\.modelContext) private var modelContext
-    @Environment(AppServices.self) private var appServices
-    @State private var routeData = QuickWaterRouteData()
-    @State private var dataLoadTask: Task<Void, Never>?
-
     let id: UUID
     let onRemove: () -> Void
     let onClose: (() -> Void)?
@@ -164,45 +159,11 @@ struct QuickWaterDetailRouteContainer: View {
     }
 
     var body: some View {
-        Group {
-            if let pet = routeData.pet {
-                QuickWaterDetailSheet(
-                    pet: pet,
-                    onRemove: onRemove,
-                    onClose: onClose,
-                    allEvents: routeData.allEvents,
-                    allPets: routeData.allPets,
-                    waterEntries: routeData.waterEntries,
-                    onRecordChanged: {
-                        scheduleRouteDataLoad(delayMilliseconds: 120, force: true)
-                    }
-                )
-            } else if routeData.hasLoaded {
-                QuickCareMissingRouteEntityView(kind: "pet")
-                    .onAppear(perform: onRemove)
-            } else {
-                QuickCareLoadingRouteEntityView(kind: "pet")
-            }
-        }
-        .onAppear {
-            scheduleRouteDataLoad()
-        }
-        .onReceive(appServices.domainRevisions.homeRevisionUpdates) { _ in
-            scheduleRouteDataLoad(delayMilliseconds: 120, force: true)
-        }
-        .onDisappear {
-            dataLoadTask?.cancel()
-            dataLoadTask = nil
-        }
-    }
-
-    private func scheduleRouteDataLoad(delayMilliseconds: UInt64 = 120, force: Bool = false) {
-        guard force || !routeData.hasLoaded else { return }
-        guard dataLoadTask == nil else { return }
-        dataLoadTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: delayMilliseconds) {
-            routeData = QuickWaterRouteData.load(id: id, from: modelContext)
-            dataLoadTask = nil
-        }
+        QuickWaterDetailSheetHost(
+            id: id,
+            onRemove: onRemove,
+            onClose: onClose
+        )
     }
 }
 
@@ -415,7 +376,7 @@ private struct QuickFeedRouteData {
     }
 }
 
-private struct QuickWaterRouteData {
+struct QuickWaterRouteData {
     var pet: Pet?
     var allEvents: [Event] = []
     var allPets: [Pet] = []
@@ -570,7 +531,7 @@ private func fetch<T: PersistentModel>(
     }
 }
 
-private struct QuickCareMissingRouteEntityView: View {
+struct QuickCareMissingRouteEntityView: View {
     let kind: String
 
     var body: some View {

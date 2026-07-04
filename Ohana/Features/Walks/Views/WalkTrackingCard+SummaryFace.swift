@@ -16,8 +16,10 @@ extension WalkTrackingCard {
             let elapsed = finishedElapsed
             let distance = finishedDistance(walk)
             let poop = finishedPoopCount
+            let coconutDelta = finishedCoconutDelta(for: walk)
             let contentHeight = max(0, geo.size.height - 28)
-            let mapHeight = max(160, contentHeight - 74)
+            let footerHeight: CGFloat = coconutDelta > 0 ? 116 : 74
+            let mapHeight = max(144, contentHeight - footerHeight)
 
             ZStack {
                 LinearGradient(
@@ -29,6 +31,10 @@ extension WalkTrackingCard {
                 VStack(spacing: 12) {
                     summaryMapPanel(walk: walk, distance: distance)
                         .frame(height: mapHeight)
+
+                    if coconutDelta > 0 {
+                        summaryRewardBadge(delta: coconutDelta)
+                    }
 
                     HStack(spacing: 8) {
                         summaryStatCell(label: "时间", value: formatElapsed(elapsed), accent: .goPrimary, identifier: "walk-tracking-summary-duration")
@@ -45,6 +51,26 @@ extension WalkTrackingCard {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .clipped()
+    }
+
+    func summaryRewardBadge(delta: Int) -> some View {
+        Label {
+            Text(L10n(appLanguage).tr(zh: "+\(delta) 椰子", en: "+\(delta) coconuts", de: "+\(delta) Kokosnüsse"))
+                .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+        } icon: {
+            Image(systemName: "plus.circle.fill") // a11y: allow decorative reward glyph; label text names the reward.
+                .font(OhanaFont.adaptive(size: 13, weight: .black))
+        }
+        .foregroundStyle(Color.arkInk)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .frame(maxWidth: .infinity)
+        .background(Color.goPrimary, in: Capsule())
+        .ohanaNumericMotion(delta)
+        .transition(.opacity.combined(with: .scale(scale: 0.96)))
+        .accessibilityIdentifier("walk-tracking-summary-coconut-reward")
     }
 
     func summaryMapPanel(walk: PetWalkLog?, distance: Double) -> some View {
@@ -365,6 +391,14 @@ extension WalkTrackingCard {
 
     var latestWalk: PetWalkLog? {
         snapshot.latestWalk
+    }
+
+    func finishedCoconutDelta(for walk: PetWalkLog?) -> Int {
+        if let summary = lastStopRewardSummary,
+           summary.walkLogID == nil || summary.walkLogID == walk?.id {
+            return summary.coconutDelta
+        }
+        return walk?.coconutsEarned ?? 0
     }
 
     var finishedElapsed: TimeInterval {

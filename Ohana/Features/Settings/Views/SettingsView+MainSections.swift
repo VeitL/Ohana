@@ -40,6 +40,8 @@ extension SettingsView {
             OhanaDashedDivider(color: dividerLine).padding(.leading, 44)
             performanceToggleRow
             OhanaDashedDivider(color: dividerLine).padding(.leading, 44)
+            reducedVisualEffectsToggleRow
+            OhanaDashedDivider(color: dividerLine).padding(.leading, 44)
             settingsReplayOnboardingRow
         }
     }

@@ -13,9 +13,15 @@ import UIKit
 
 enum AppPerformanceMode {
     static let powerSavingKey = "appPowerSavingMode"
+    static let reducedVisualEffectsKey = "appReducedVisualEffectsExperiment"
 
     static var systemPrefersReducedWork: Bool {
         ProcessInfo.processInfo.isLowPowerModeEnabled || UIAccessibility.isReduceMotionEnabled
+    }
+
+    static var userPrefersReducedVisualEffects: Bool {
+        UserDefaults.standard.bool(forKey: reducedVisualEffectsKey)
+            || ProcessInfo.processInfo.arguments.contains("-OHANA_REDUCED_VISUAL_EFFECTS")
     }
 }
 
@@ -32,6 +38,13 @@ enum OhanaRefreshBudget: Equatable {
     case live
     case throttled
     case paused
+}
+
+enum OhanaVisualEffectsBudget: Equatable {
+    case full
+    case efficient
+
+    var usesFullEffects: Bool { self == .full }
 }
 
 enum OhanaFrameScheduler {
@@ -150,6 +163,7 @@ final class AppWorkloadPolicy: ObservableObject {
     @Published private(set) var isLowPowerModeEnabled: Bool
     @Published private(set) var isReduceMotionEnabled: Bool
     @Published private(set) var isUserPowerSavingMode: Bool
+    @Published private(set) var isUserReducedVisualEffectsMode: Bool
     @Published private(set) var thermalState: ProcessInfo.ThermalState
     @Published private(set) var lastReductionReason = "foreground"
 
@@ -158,6 +172,7 @@ final class AppWorkloadPolicy: ObservableObject {
     private let lowPowerModeProvider: @MainActor () -> Bool
     private let reduceMotionProvider: @MainActor () -> Bool
     private let userPowerSavingProvider: @MainActor () -> Bool
+    private let userReducedVisualEffectsProvider: @MainActor () -> Bool
     private let thermalStateProvider: @MainActor () -> ProcessInfo.ThermalState
     private var cancellables: Set<AnyCancellable> = []
 
@@ -166,6 +181,7 @@ final class AppWorkloadPolicy: ObservableObject {
         lowPowerModeProvider: (@MainActor () -> Bool)? = nil,
         reduceMotionProvider: (@MainActor () -> Bool)? = nil,
         userPowerSavingProvider: (@MainActor () -> Bool)? = nil,
+        userReducedVisualEffectsProvider: (@MainActor () -> Bool)? = nil,
         thermalStateProvider: (@MainActor () -> ProcessInfo.ThermalState)? = nil
     ) {
         let lowPowerModeProvider = lowPowerModeProvider ?? { ProcessInfo.processInfo.isLowPowerModeEnabled }
@@ -173,16 +189,21 @@ final class AppWorkloadPolicy: ObservableObject {
         let userPowerSavingProvider = userPowerSavingProvider ?? {
             UserDefaults.standard.bool(forKey: AppPerformanceMode.powerSavingKey)
         }
+        let userReducedVisualEffectsProvider = userReducedVisualEffectsProvider ?? {
+            AppPerformanceMode.userPrefersReducedVisualEffects
+        }
         let thermalStateProvider = thermalStateProvider ?? { ProcessInfo.processInfo.thermalState }
 
         self.lowPowerModeProvider = lowPowerModeProvider
         self.reduceMotionProvider = reduceMotionProvider
         self.userPowerSavingProvider = userPowerSavingProvider
+        self.userReducedVisualEffectsProvider = userReducedVisualEffectsProvider
         self.thermalStateProvider = thermalStateProvider
         isForeground = true
         isLowPowerModeEnabled = lowPowerModeProvider()
         isReduceMotionEnabled = reduceMotionProvider()
         isUserPowerSavingMode = userPowerSavingProvider()
+        isUserReducedVisualEffectsMode = userReducedVisualEffectsProvider()
         thermalState = thermalStateProvider()
 
         notificationCenter.publisher(for: Notification.Name.NSProcessInfoPowerStateDidChange)
@@ -233,6 +254,7 @@ final class AppWorkloadPolicy: ObservableObject {
         isLowPowerModeEnabled = lowPowerModeProvider()
         isReduceMotionEnabled = reduceMotionProvider()
         isUserPowerSavingMode = userPowerSavingProvider()
+        isUserReducedVisualEffectsMode = userReducedVisualEffectsProvider()
         thermalState = thermalStateProvider()
         recordPolicySample(reason: reason)
     }
@@ -291,6 +313,24 @@ final class AppWorkloadPolicy: ObservableObject {
             .live
         }
         return stricterRefreshBudget(base, thermalRefreshBudget)
+    }
+
+    func visualEffectsBudget(isVisible: Bool = true) -> OhanaVisualEffectsBudget {
+        guard isVisible, isForeground else { return .efficient }
+        if isLowPowerModeEnabled ||
+            isReduceMotionEnabled ||
+            userPowerSavingMode ||
+            isUserReducedVisualEffectsMode {
+            return .efficient
+        }
+        switch thermalState {
+        case .serious, .critical:
+            return .efficient
+        case .nominal, .fair:
+            return .full
+        @unknown default:
+            return .efficient
+        }
     }
 
     func refreshInterval(
@@ -383,7 +423,7 @@ final class AppWorkloadPolicy: ObservableObject {
         AppPerformanceMonitor.shared.record(
             "能耗策略",
             valueMS: 0,
-            note: "reason=\(reason), foreground=\(isForeground), lowPower=\(isLowPowerModeEnabled), reduceMotion=\(isReduceMotionEnabled), appPowerSaving=\(userPowerSavingMode), thermal=\(thermalState), walk=\(hasRunningWalk)"
+            note: "reason=\(reason), foreground=\(isForeground), lowPower=\(isLowPowerModeEnabled), reduceMotion=\(isReduceMotionEnabled), appPowerSaving=\(userPowerSavingMode), reducedVisualEffects=\(isUserReducedVisualEffectsMode), thermal=\(thermalState), walk=\(hasRunningWalk)"
         )
     }
 }

@@ -137,6 +137,22 @@ struct FunctionMenuDestinationRouter: View {
             if let plant = plant(for: id) {
                 PlantDetailView(plant: plant)
             }
+        case let .plantFeature(id, destination):
+            if let plant = plant(for: id) {
+                PlantDetailView(plant: plant, initialFeatureDestination: destination)
+            }
+        case let .plantCare(id, feature):
+            PlantCareFeatureDetailView(
+                plants: plants,
+                feature: feature,
+                focusedPlantID: id
+            )
+        case let .plantCareAggregate(feature):
+            PlantCareFeatureDetailView(
+                plants: plants,
+                feature: feature,
+                focusedPlantID: nil
+            )
         case .wealthDashboard:
             IslandWealthDashboardView()
         case .bountyBoard:
@@ -174,6 +190,10 @@ struct FunctionMenuDestinationRouter: View {
             parentPath.append(FMDest.featureGroup(.householdHub))
         case let .plant(plant):
             parentPath.append(FMDest.plantDetail(plant.id))
+        case let .plantFeature(plant, destination):
+            parentPath.append(FMDest.plantFeature(plant.id, destination))
+        case let .plantCare(plant, feature):
+            parentPath.append(FMDest.plantCare(plant.id, feature))
         case let .functionMenu(destination):
             parentPath.append(destination)
         case .calendar:

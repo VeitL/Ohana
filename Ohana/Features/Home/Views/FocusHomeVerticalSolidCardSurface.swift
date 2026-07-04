@@ -15,6 +15,7 @@ struct FocusHomeVerticalSolidCardSurface: View {
     let localization: L10n
     let frozenAvatarSource: FocusHomeFrozenAvatarSource?
     var allowsLiveAvatarFallback: Bool = true
+    @ObservedObject private var workloadPolicy = AppWorkloadPolicy.shared
 
     private var accent: Color {
         card.themeColorHex.isEmpty ? card.color : Color(hex: card.themeColorHex)
@@ -26,6 +27,10 @@ struct FocusHomeVerticalSolidCardSurface: View {
 
     private var l: L10n {
         localization
+    }
+
+    private var usesFullVisualEffects: Bool {
+        workloadPolicy.visualEffectsBudget(isVisible: true).usesFullEffects
     }
 
     private var cornerRadius: CGFloat {
@@ -90,7 +95,12 @@ struct FocusHomeVerticalSolidCardSurface: View {
             .compositingGroup() // smoothness: collapse internal text/avatar shadows into one card surface before hero scaling.
             .clipShape(shape)
             .saturation(card.hasPassedAway ? 0 : 1)
-            .shadow(color: Color.arkInk.opacity(card.hasPassedAway ? 0.14 : 0.22), radius: 16, x: 0, y: 11) // ui-v4: allow stable home card depth without animating shadow rasterization
+            .shadow( // ui-v4: allow stable home card depth without animating shadow rasterization; reduced visual mode lowers raster cost.
+                color: Color.arkInk.opacity(usesFullVisualEffects ? (card.hasPassedAway ? 0.14 : 0.22) : 0.08),
+                radius: usesFullVisualEffects ? 16 : 6,
+                x: 0,
+                y: usesFullVisualEffects ? 11 : 3
+            )
             .accessibilityElement(children: .combine)
             .accessibilityLabel("\(card.name), \(card.kind)")
         }
@@ -131,14 +141,14 @@ struct FocusHomeVerticalSolidCardSurface: View {
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(1)
                     .minimumScaleFactor(0.70)
-                    .shadow(color: Color.arkInk.opacity(0.58), radius: 5, x: 0, y: 2) // ui-v4: allow requested legibility shadow on card text
+                    .homeCardTextShadow(usesFullVisualEffects: usesFullVisualEffects, opacity: 0.58, radius: 5, y: 2) // ui-v4: allow requested legibility shadow on card text
 
                 Text(card.kind)
                     .font(.system(size: lerp(9, 12, p), weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaSecondaryText)
                     .lineLimit(1)
                     .minimumScaleFactor(0.70)
-                    .shadow(color: Color.arkInk.opacity(0.46), radius: 4, x: 0, y: 1) // ui-v4: allow requested legibility shadow on card text
+                    .homeCardTextShadow(usesFullVisualEffects: usesFullVisualEffects, opacity: 0.46, radius: 4, y: 1) // ui-v4: allow requested legibility shadow on card text
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .opacity(compactHeaderOpacity)
@@ -151,7 +161,7 @@ struct FocusHomeVerticalSolidCardSurface: View {
                 .padding(.horizontal, lerp(9, 12, p))
                 .padding(.vertical, lerp(5, 7, p))
                 .background(statusBadgeBackground, in: Capsule())
-                .shadow(color: Color.arkInk.opacity(0.58), radius: 5, x: 0, y: 2) // ui-v4: allow requested legibility shadow on card text
+                .homeCardTextShadow(usesFullVisualEffects: usesFullVisualEffects, opacity: 0.58, radius: 5, y: 2) // ui-v4: allow requested legibility shadow on card text
                 .opacity(compactHeaderOpacity)
         }
     }
@@ -179,8 +189,8 @@ struct FocusHomeVerticalSolidCardSurface: View {
                     alignment: .bottom
                 )
                 .offset(y: card.isHuman ? lerp(0, -20, visualProgress) : lerp(0, -34, visualProgress))
-                .shadow(color: Color.goCardWhite.opacity(transparent ? 0.20 : 0.08), radius: 3, y: 0) // ui-v4: allow intentional avatar cutout crispness
-                .shadow(color: Color.arkInk.opacity(transparent ? 0.24 : 0.14), radius: 12, y: 8) // ui-v4: allow stable avatar depth during card hero motion
+                .shadow(color: Color.goCardWhite.opacity(usesFullVisualEffects ? (transparent ? 0.20 : 0.08) : 0), radius: usesFullVisualEffects ? 3 : 0, y: 0) // ui-v4: allow intentional avatar cutout crispness
+                .shadow(color: Color.arkInk.opacity(usesFullVisualEffects ? (transparent ? 0.24 : 0.14) : 0.06), radius: usesFullVisualEffects ? 12 : 4, y: usesFullVisualEffects ? 8 : 2) // ui-v4: allow stable avatar depth during card hero motion
         } else {
             Image(systemName: avatarSymbol)
                 .font(.system(size: width * lerp(0.43, 0.47, visualProgress), weight: .regular))
@@ -231,7 +241,7 @@ struct FocusHomeVerticalSolidCardSurface: View {
                 .foregroundStyle(cardPrimaryText)
                 .lineLimit(1)
                 .minimumScaleFactor(0.55)
-                .shadow(color: Color.arkInk.opacity(0.55), radius: 5, x: 0, y: 2) // ui-v4: allow readability shadow on image card text
+                .homeCardTextShadow(usesFullVisualEffects: usesFullVisualEffects, opacity: 0.55, radius: 5, y: 2) // ui-v4: allow readability shadow on image card text
 
             if details.count > 1 {
                 Text(details.dropFirst().joined(separator: " · "))
@@ -239,7 +249,7 @@ struct FocusHomeVerticalSolidCardSurface: View {
                     .foregroundStyle(cardSecondaryText(opacity: 0.78))
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
-                    .shadow(color: Color.arkInk.opacity(0.42), radius: 4, x: 0, y: 1) // ui-v4: allow readability shadow on image card text
+                    .homeCardTextShadow(usesFullVisualEffects: usesFullVisualEffects, opacity: 0.42, radius: 4, y: 1) // ui-v4: allow readability shadow on image card text
             }
         }
     }
@@ -256,7 +266,7 @@ struct FocusHomeVerticalSolidCardSurface: View {
                 .foregroundStyle(cardPrimaryText)
                 .lineLimit(1)
                 .minimumScaleFactor(0.5)
-                .shadow(color: Color.arkInk.opacity(0.55), radius: 5, x: 0, y: 2) // ui-v4: allow readability shadow on image card text
+                .homeCardTextShadow(usesFullVisualEffects: usesFullVisualEffects, opacity: 0.55, radius: 5, y: 2) // ui-v4: allow readability shadow on image card text
 
             if let hint = card.personalityHint?.trimmingCharacters(in: .whitespacesAndNewlines),
                !hint.isEmpty {
@@ -266,7 +276,7 @@ struct FocusHomeVerticalSolidCardSurface: View {
                     .lineLimit(p > 0.72 ? 2 : 1)
                     .multilineTextAlignment(.trailing)
                     .minimumScaleFactor(0.62)
-                    .shadow(color: Color.arkInk.opacity(0.42), radius: 4, x: 0, y: 1) // ui-v4: allow readability shadow on image card text
+                    .homeCardTextShadow(usesFullVisualEffects: usesFullVisualEffects, opacity: 0.42, radius: 4, y: 1) // ui-v4: allow readability shadow on image card text
             }
 
             if !meta.isEmpty {
@@ -276,7 +286,7 @@ struct FocusHomeVerticalSolidCardSurface: View {
                     .lineLimit(p > 0.72 ? 2 : 1)
                     .multilineTextAlignment(.trailing)
                     .minimumScaleFactor(0.62)
-                    .shadow(color: Color.arkInk.opacity(0.42), radius: 4, x: 0, y: 1) // ui-v4: allow readability shadow on image card text
+                    .homeCardTextShadow(usesFullVisualEffects: usesFullVisualEffects, opacity: 0.42, radius: 4, y: 1) // ui-v4: allow readability shadow on image card text
             }
         }
     }
@@ -297,7 +307,7 @@ struct FocusHomeVerticalSolidCardSurface: View {
                     .minimumScaleFactor(0.72)
             }
             .foregroundStyle(cardPrimaryText)
-            .shadow(color: Color.arkInk.opacity(0.55), radius: 5, x: 0, y: 2) // ui-v4: allow readability shadow on image card text
+            .homeCardTextShadow(usesFullVisualEffects: usesFullVisualEffects, opacity: 0.55, radius: 5, y: 2) // ui-v4: allow readability shadow on image card text
         }
     }
 
@@ -328,7 +338,7 @@ struct FocusHomeVerticalSolidCardSurface: View {
                 .font(.system(size: lerp(15, 20, p), weight: .black, design: .rounded))
                 .foregroundStyle(cardPrimaryText)
                 .lineLimit(1)
-                .shadow(color: Color.arkInk.opacity(0.55), radius: 5, x: 0, y: 2) // ui-v4: allow readability shadow on image card text
+                .homeCardTextShadow(usesFullVisualEffects: usesFullVisualEffects, opacity: 0.55, radius: 5, y: 2) // ui-v4: allow readability shadow on image card text
 
             if let hint = card.personalityHint?.trimmingCharacters(in: .whitespacesAndNewlines),
                !hint.isEmpty {
@@ -337,7 +347,7 @@ struct FocusHomeVerticalSolidCardSurface: View {
                     .foregroundStyle(cardSecondaryText(opacity: 0.82))
                     .lineLimit(1)
                     .minimumScaleFactor(0.72)
-                    .shadow(color: Color.arkInk.opacity(0.42), radius: 4, x: 0, y: 1) // ui-v4: allow readability shadow on image card text
+                    .homeCardTextShadow(usesFullVisualEffects: usesFullVisualEffects, opacity: 0.42, radius: 4, y: 1) // ui-v4: allow readability shadow on image card text
             }
 
             if let ageText = card.ageText {
@@ -345,7 +355,7 @@ struct FocusHomeVerticalSolidCardSurface: View {
                     .font(.system(size: lerp(8.5, 10, p), weight: .bold, design: .rounded))
                     .foregroundStyle(cardSecondaryText(opacity: 0.76))
                     .lineLimit(1)
-                    .shadow(color: Color.arkInk.opacity(0.42), radius: 4, x: 0, y: 1) // ui-v4: allow readability shadow on image card text
+                    .homeCardTextShadow(usesFullVisualEffects: usesFullVisualEffects, opacity: 0.42, radius: 4, y: 1) // ui-v4: allow readability shadow on image card text
             }
         }
     }
@@ -365,12 +375,12 @@ struct FocusHomeVerticalSolidCardSurface: View {
                 .lineLimit(1)
                 .minimumScaleFactor(0.62)
                 .contentTransition(.numericText())
-                .shadow(color: Color.arkInk.opacity(0.60), radius: 5, x: 0, y: 2) // ui-v4: allow requested legibility shadow on card text
+                .homeCardTextShadow(usesFullVisualEffects: usesFullVisualEffects, opacity: 0.60, radius: 5, y: 2) // ui-v4: allow requested legibility shadow on card text
             Text(metricUnit)
                 .font(.system(size: lerp(11, 15, p), weight: .black, design: .rounded))
                 .foregroundStyle(Color.ohanaSecondaryText)
                 .lineLimit(1)
-                .shadow(color: Color.arkInk.opacity(0.46), radius: 4, x: 0, y: 1) // ui-v4: allow requested legibility shadow on card text
+                .homeCardTextShadow(usesFullVisualEffects: usesFullVisualEffects, opacity: 0.46, radius: 4, y: 1) // ui-v4: allow requested legibility shadow on card text
             Spacer(minLength: 0)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -468,5 +478,21 @@ struct FocusHomeVerticalSolidCardSurface: View {
     private func smooth(_ value: CGFloat, _ start: CGFloat, _ end: CGFloat) -> CGFloat {
         guard end > start else { return value >= end ? 1 : 0 }
         return eased((value - start) / (end - start))
+    }
+}
+
+private extension View {
+    func homeCardTextShadow(
+        usesFullVisualEffects: Bool,
+        opacity: Double,
+        radius: CGFloat,
+        y: CGFloat
+    ) -> some View {
+        shadow(
+            color: usesFullVisualEffects ? Color.arkInk.opacity(opacity) : Color.clear,
+            radius: usesFullVisualEffects ? radius : 0,
+            x: 0,
+            y: usesFullVisualEffects ? y : 0
+        )
     }
 }

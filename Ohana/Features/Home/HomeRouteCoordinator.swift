@@ -150,18 +150,47 @@ enum HomeFullScreenRoute: Identifiable {
 
 enum HomeOverlayRoute: Identifiable {
     case quickMoment(routeID: UUID = UUID(), petID: UUID)
+    case petWeightQuick(routeID: UUID = UUID(), petID: UUID)
+    case petExpenseQuick(routeID: UUID = UUID(), petID: UUID)
+    case humanMedicationQuick(routeID: UUID = UUID(), humanID: UUID)
+    case humanWeightQuick(routeID: UUID = UUID(), humanID: UUID)
+    case humanWorkoutQuick(routeID: UUID = UUID(), humanID: UUID)
+    case humanExpenseQuick(routeID: UUID = UUID(), humanID: UUID)
+    case humanNoteQuick(routeID: UUID = UUID(), humanID: UUID)
 
     var id: UUID {
         switch self {
         case let .quickMoment(routeID, _):
+            routeID
+        case let .petWeightQuick(routeID, _):
+            routeID
+        case let .petExpenseQuick(routeID, _):
+            routeID
+        case let .humanMedicationQuick(routeID, _):
+            routeID
+        case let .humanWeightQuick(routeID, _):
+            routeID
+        case let .humanWorkoutQuick(routeID, _):
+            routeID
+        case let .humanExpenseQuick(routeID, _):
+            routeID
+        case let .humanNoteQuick(routeID, _):
             routeID
         }
     }
 
     var petID: UUID? {
         switch self {
-        case let .quickMoment(_, petID):
+        case let .quickMoment(_, petID),
+             let .petWeightQuick(_, petID),
+             let .petExpenseQuick(_, petID):
             petID
+        case .humanMedicationQuick,
+             .humanWeightQuick,
+             .humanWorkoutQuick,
+             .humanExpenseQuick,
+             .humanNoteQuick:
+            nil
         }
     }
 }
@@ -203,6 +232,13 @@ enum HomeAppFullScreenRoute: Equatable {
 
 enum HomeAppOverlayRoute: Equatable {
     case quickMoment(petID: UUID)
+    case petWeightQuick(petID: UUID)
+    case petExpenseQuick(petID: UUID)
+    case humanMedicationQuick(humanID: UUID)
+    case humanWeightQuick(humanID: UUID)
+    case humanWorkoutQuick(humanID: UUID)
+    case humanExpenseQuick(humanID: UUID)
+    case humanNoteQuick(humanID: UUID)
 }
 
 @MainActor
@@ -422,6 +458,24 @@ final class HomeRouteCoordinator: ObservableObject {
         openQuickMoment(pet.id)
     }
 
+    func openPetWeightQuick(_ petID: UUID) {
+        if let appOverlayRouteSink {
+            appOverlayRouteSink(.petWeightQuick(petID: petID))
+            overlay = nil
+            return
+        }
+        overlay = .petWeightQuick(petID: petID)
+    }
+
+    func openHumanWeightQuick(_ humanID: UUID) {
+        if let appOverlayRouteSink {
+            appOverlayRouteSink(.humanWeightQuick(humanID: humanID))
+            overlay = nil
+            return
+        }
+        overlay = .humanWeightQuick(humanID: humanID)
+    }
+
     func dismissOverlay(routeID: UUID) {
         guard overlay?.id == routeID else { return }
         overlay = nil
@@ -466,6 +520,18 @@ final class HomeRouteCoordinator: ObservableObject {
                 return
             }
         }
+        if let appOverlayRoute = route.appOverlayRoute,
+           let homeOverlayRoute = route.homeOverlayRoute {
+            if let appOverlayRouteSink {
+                appOverlayRouteSink(appOverlayRoute)
+                overlay = nil
+                sheet = nil
+                return
+            }
+            overlay = homeOverlayRoute
+            sheet = nil
+            return
+        }
         if let appSheetRoute = route.appSheetRoute,
            let appSheetRouteSink {
             appSheetRouteSink(.appSheet(appSheetRoute))
@@ -497,6 +563,108 @@ final class HomeRouteCoordinator: ObservableObject {
 }
 
 private extension HomeSheetRoute {
+    var appOverlayRoute: HomeAppOverlayRoute? {
+        switch self {
+        case let .petWeightQuick(id):
+            .petWeightQuick(petID: id)
+        case let .petExpenseQuick(id):
+            .petExpenseQuick(petID: id)
+        case let .humanMedicationQuick(id):
+            .humanMedicationQuick(humanID: id)
+        case let .humanWeightQuick(id):
+            .humanWeightQuick(humanID: id)
+        case let .humanWorkoutQuick(id):
+            .humanWorkoutQuick(humanID: id)
+        case let .humanExpenseQuick(id):
+            .humanExpenseQuick(humanID: id)
+        case let .humanNoteQuick(id):
+            .humanNoteQuick(humanID: id)
+        case .petAllFeatures,
+             .petBasicInfo,
+             .petFood,
+             .petWeight,
+             .petExpense,
+             .petFeed,
+             .petWater,
+             .petPotty,
+             .petLitter,
+             .petPlay,
+             .petHygiene,
+             .petWalkSummary,
+             .petHealth,
+             .petMedication,
+             .petMomentHistory,
+             .petDocuments,
+             .petAchievements,
+             .petRetention,
+             .petBondVault,
+             .humanAllFeatures,
+             .humanBasicInfo,
+             .humanMedication,
+             .humanWeight,
+             .humanWorkout,
+             .humanWorkoutDashboard,
+             .humanMetrics,
+             .humanReport,
+             .humanExpense,
+             .humanWishlist,
+             .humanNote,
+             .plantCareLog:
+            nil
+        }
+    }
+
+    var homeOverlayRoute: HomeOverlayRoute? {
+        switch self {
+        case let .petWeightQuick(id):
+            .petWeightQuick(petID: id)
+        case let .petExpenseQuick(id):
+            .petExpenseQuick(petID: id)
+        case let .humanMedicationQuick(id):
+            .humanMedicationQuick(humanID: id)
+        case let .humanWeightQuick(id):
+            .humanWeightQuick(humanID: id)
+        case let .humanWorkoutQuick(id):
+            .humanWorkoutQuick(humanID: id)
+        case let .humanExpenseQuick(id):
+            .humanExpenseQuick(humanID: id)
+        case let .humanNoteQuick(id):
+            .humanNoteQuick(humanID: id)
+        case .petAllFeatures,
+             .petBasicInfo,
+             .petFood,
+             .petWeight,
+             .petExpense,
+             .petFeed,
+             .petWater,
+             .petPotty,
+             .petLitter,
+             .petPlay,
+             .petHygiene,
+             .petWalkSummary,
+             .petHealth,
+             .petMedication,
+             .petMomentHistory,
+             .petDocuments,
+             .petAchievements,
+             .petRetention,
+             .petBondVault,
+             .humanAllFeatures,
+             .humanBasicInfo,
+             .humanMedication,
+             .humanWeight,
+             .humanWorkout,
+             .humanWorkoutDashboard,
+             .humanMetrics,
+             .humanReport,
+             .humanExpense,
+             .humanWishlist,
+             .humanNote,
+             .plantCareLog:
+            nil
+        }
+    }
+
     var appRoute: HomeAppRoute? {
         switch self {
         case let .petBasicInfo(id):
@@ -594,12 +762,12 @@ private extension HomeSheetRoute {
             .petAllFeatures(id)
         case let .petFood(id):
             .petFood(id)
-        case let .petWeightQuick(id):
-            .petWeightQuick(id)
+        case .petWeightQuick:
+            nil
         case let .petWeight(id):
             .petWeight(id)
-        case let .petExpenseQuick(id):
-            .petExpenseQuick(id)
+        case .petExpenseQuick:
+            nil
         case let .petExpense(id):
             .petExpense(id)
         case let .petFeed(id, opensManualSheet):
@@ -636,8 +804,8 @@ private extension HomeSheetRoute {
             .humanMedicationQuick(id)
         case let .humanMedication(id):
             .humanMedication(id)
-        case let .humanWeightQuick(id):
-            .humanWeightQuick(id)
+        case .humanWeightQuick:
+            nil
         case let .humanWeight(id):
             .humanWeight(id)
         case let .humanWorkoutQuick(id):
@@ -650,8 +818,8 @@ private extension HomeSheetRoute {
             .humanMetrics(id)
         case let .humanReport(id):
             .humanReport(id)
-        case let .humanExpenseQuick(id):
-            .humanExpenseQuick(id)
+        case .humanExpenseQuick:
+            nil
         case let .humanExpense(id):
             .humanExpense(id)
         case let .humanWishlist(id):

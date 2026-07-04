@@ -328,7 +328,7 @@ private func fetch<T: PersistentModel>(
     }
 }
 
-private struct HumanRouteMissingEntityView: View {
+struct HumanRouteMissingEntityView: View {
     @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
     let kind: String
     private var l: L10n { L10n(appLanguage) }

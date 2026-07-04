@@ -4198,31 +4198,62 @@ struct HomeCommandExecutorTests {
     }
 
     @MainActor
-    @Test func weightServiceWritesOneHumanWeightFact() throws {
+    @Test func weightServiceWritesOneHumanWeightFactAndReward() throws {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
         let human = Human(name: "Guan")
         context.insert(human)
         try context.save()
 
+        let previousActiveHumanID = UserDefaults.standard.string(forKey: "currentActiveHumanId")
+        let previousCooldownLogs = UserDefaults.standard.object(forKey: QuestManager.Keys.cooldownLogs)
+        defer {
+            if let previousActiveHumanID {
+                UserDefaults.standard.set(previousActiveHumanID, forKey: "currentActiveHumanId")
+            } else {
+                UserDefaults.standard.removeObject(forKey: "currentActiveHumanId")
+            }
+            if let previousCooldownLogs {
+                UserDefaults.standard.set(previousCooldownLogs, forKey: QuestManager.Keys.cooldownLogs)
+            } else {
+                UserDefaults.standard.removeObject(forKey: QuestManager.Keys.cooldownLogs)
+            }
+            EconomyDailyBudgetStore.resetAll()
+        }
+        UserDefaults.standard.set(human.id.uuidString, forKey: "currentActiveHumanId")
+        UserDefaults.standard.removeObject(forKey: QuestManager.Keys.cooldownLogs)
+        EconomyDailyBudgetStore.resetAll()
+        let questManager = QuestManager()
         let date = Date(timeIntervalSince1970: 1_800_000_000)
         let result = WeightCommandService.recordHumanWeight(
             human: human,
             weight: 62.5,
             date: date,
             context: context,
-            executorId: "human-1"
+            executorId: human.id.uuidString,
+            questManager: questManager
         )
 
         let logs = try context.fetch(FetchDescriptor<HumanWeightLog>())
+        let walletEntries = try context.fetch(FetchDescriptor<CoconutLedgerEntry>())
         #expect(logs.count == 1)
         #expect(logs.first?.id == result.logID)
         #expect(logs.first?.human?.id == human.id)
         #expect(logs.first?.weight == 62.5)
         #expect(logs.first?.date == date)
-        #expect(logs.first?.executorId == "human-1")
+        #expect(logs.first?.executorId == human.id.uuidString)
         #expect(result.subjectID == human.id)
-        #expect(result.coconutDelta == 0)
+        #expect(result.coconutDelta >= 4)
+        #expect(human.coconutBalance == result.coconutDelta)
+        #expect(questManager.coconutCount == result.coconutDelta)
+        #expect(walletEntries.count == 1)
+        #expect(walletEntries.first?.ownerKind == .human)
+        #expect(walletEntries.first?.ownerId == human.id.uuidString)
+        #expect(walletEntries.first?.subjectKindRaw == CareLedgerSubjectKind.human.rawValue)
+        #expect(walletEntries.first?.subjectId == human.id.uuidString)
+        #expect(walletEntries.first?.entryKind == .reward)
+        #expect(walletEntries.first?.source == .careEvent)
+        #expect(walletEntries.first?.delta == result.coconutDelta)
     }
 
     @MainActor

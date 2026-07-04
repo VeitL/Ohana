@@ -19,13 +19,12 @@ enum VerticalHomeTabMountPolicy {
     static func mountedTabs(
         active: VerticalSolidHomeTab,
         outgoing: VerticalSolidHomeTab?,
-        prepared: Set<VerticalSolidHomeTab> = []
+        prepared _: Set<VerticalSolidHomeTab> = []
     ) -> Set<VerticalSolidHomeTab> {
         var mounted: Set<VerticalSolidHomeTab> = [active]
         if let outgoing {
             mounted.insert(outgoing)
         }
-        mounted.formUnion(prepared)
         return mounted
     }
 

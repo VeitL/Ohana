@@ -323,6 +323,16 @@ private extension PlantCarePlanScheduleService {
         defaults: UserDefaults
     ) -> DomainScheduleCreateIntent {
         let dueDay = calendar.startOfDay(for: task.dueDate)
+        let leadDays = PlantReminderPreferenceStore.reminderLeadDays(
+            forPlantID: plant.id,
+            careType: task.careType,
+            defaults: defaults
+        )
+        let recurrenceEndDate = PlantReminderPreferenceStore.recurrenceEndDate(
+            forPlantID: plant.id,
+            careType: task.careType,
+            defaults: defaults
+        )
         let l = L10n.current
         return DomainScheduleCreateIntent(
             title: "\(task.careType.emoji) \(plant.name) · \(task.careType.displayName(l: l))\(planTitleMarker)\(safetyReminderSuffix(for: plant, defaults: defaults))",
@@ -332,7 +342,8 @@ private extension PlantCarePlanScheduleService {
             relatedEntityType: EntityKind.plant.rawValue,
             relatedEntityId: plant.id.uuidString,
             recurrenceDays: task.effectiveIntervalDays,
-            reminderDates: [reminderDate(for: dueDay, now: now, calendar: calendar, defaults: defaults)],
+            recurrenceEndDate: recurrenceEndDate,
+            reminderDates: [reminderDate(for: dueDay, now: now, calendar: calendar, defaults: defaults, leadDays: leadDays)],
             writeKind: .care,
             source: .domainService
         )
@@ -342,13 +353,15 @@ private extension PlantCarePlanScheduleService {
         for dueDate: Date,
         now: Date,
         calendar: Calendar,
-        defaults: UserDefaults
+        defaults: UserDefaults,
+        leadDays: Int = 0
     ) -> Date {
         PlantReminderPreferenceStore.reminderDate(
             for: dueDate,
             now: now,
             calendar: calendar,
-            defaults: defaults
+            defaults: defaults,
+            leadDays: leadDays
         )
     }
 

@@ -19,6 +19,31 @@ extension PlantDetailContentView {
         }
     }
 
+    func scheduleInitialPlantFeatureDestinationIfNeeded() {
+        guard initialFeatureDestination != nil, !didOpenInitialFeatureDestination else { return }
+        Task { @MainActor in
+            await OhanaFrameScheduler.waitAfterNextFrame(milliseconds: 180)
+            openInitialPlantFeatureDestinationIfReady()
+        }
+    }
+
+    func openInitialPlantFeatureDestinationIfReady() {
+        guard let destination = initialFeatureDestination,
+              !didOpenInitialFeatureDestination else { return }
+        guard !initialDestinationNeedsRenderData(destination) || isRenderDataReady else { return }
+        didOpenInitialFeatureDestination = true
+        openPlantFeatureDestination(destination)
+    }
+
+    private func initialDestinationNeedsRenderData(_ destination: PlantFeatureDestination) -> Bool {
+        switch destination {
+        case .water, .fertilize, .pestCheck, .leafCleaning, .profile, .reminders:
+            false
+        case .carePlan, .healthReview, .photos, .timeline, .catalog, .safety:
+            true
+        }
+    }
+
     func waterPlant() {
         openCareLogSheet(.watering)
     }
@@ -87,7 +112,7 @@ extension PlantDetailContentView {
         case .healthReview:
             revealPlantDetailExtrasAndScroll(to: .healthReview)
         case .timeline:
-            pendingFeatureScrollTarget = .timeline
+            revealPlantDetailExtrasAndScroll(to: .timeline)
         case .catalog:
             revealPlantDetailExtrasAndScroll(to: .knowledge)
         case .safety:

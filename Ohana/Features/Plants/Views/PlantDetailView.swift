@@ -11,6 +11,7 @@ import SwiftUI
 struct PlantDetailContentView: View {
     let plant: Plant
     let households: [Household]
+    let initialFeatureDestination: PlantFeatureDestination?
 
     @Environment(\.modelContext) var modelContext
     @Environment(\.dismiss) var dismiss
@@ -32,6 +33,7 @@ struct PlantDetailContentView: View {
     @State var deleteUndoTask: Task<Void, Never>?
     @State var diagnosisResult: PlantDiagnosisResult?
     @State var pendingFeatureScrollTarget: PlantDetailFeatureAnchor?
+    @State var didOpenInitialFeatureDestination = false
     @State private var renderDataRefreshTask: Task<Void, Never>?
     @State private var renderDataRefreshGeneration = 0
     @State private var mediaAttachmentIndexRepairTask: Task<Void, Never>?
@@ -248,15 +250,15 @@ struct PlantDetailContentView: View {
     }
     var healthReviewSummaryText: String {
         if plant.healthStatus == .stressed {
-            return l.tr(zh: "先排查浇水、光照、虫害，再考虑施肥。", en: "Check water, light, and pests before fertilizing.", de: "Wasser, Licht und Schädlinge vor dem Düngen prüfen.")
+            return l.tr(zh: "先查水、光、虫。", en: "Check water, light, pests.", de: "Wasser, Licht, Schädlinge prüfen.")
         }
         if plant.healthStatus == .watching || hasRecentStressSignals {
-            return l.tr(zh: "把最近异常和复查动作放在同一张卡里，避免只看流水记录。", en: "Recent issues and rechecks are grouped here instead of buried in the log.", de: "Auffälligkeiten und Checks stehen hier statt nur im Verlauf.")
+            return l.tr(zh: "近期异常优先复查。", en: "Review recent signals first.", de: "Aktuelle Signale zuerst prüfen.")
         }
         if latestHealthReviewLog == nil {
-            return l.tr(zh: "补一次健康观察后，这里会形成植物的简版病历摘要。", en: "Add one health review to build a compact plant medical summary.", de: "Ein Gesundheitscheck baut hier eine kompakte Pflanzenakte auf.")
+            return l.tr(zh: "还没有健康观察。", en: "No health review yet.", de: "Noch kein Gesundheitscheck.")
         }
-        return l.tr(zh: "状态稳定，继续按计划护理并定期复查。", en: "Stable now; keep the plan and recheck routinely.", de: "Aktuell stabil; Plan beibehalten und regelmäßig prüfen.")
+        return l.tr(zh: "状态稳定。", en: "Stable.", de: "Stabil.")
     }
     var latestHealthReviewText: String {
         guard let latestHealthReviewLog else {
@@ -283,15 +285,15 @@ struct PlantDetailContentView: View {
         let logCount = logSummary?.logCount ?? 0
         if logCount == 0 {
             return l.tr(
-                zh: "完成一次照护或观察后，这里会生成可分享的成长档案。",
-                en: "Log one care action or observation to create a shareable growth diary.",
-                de: "Eine Pflegeaktion oder Beobachtung erstellt hier ein teilbares Wachstumstagebuch."
+                zh: "暂无成长记录。",
+                en: "No growth record yet.",
+                de: "Noch keine Wachstumsakte."
             )
         }
         return l.tr(
-            zh: "\(logCount) 条记录，\(growthDiaryPhotoCount) 张照片线索，覆盖 \(growthDiaryDateRangeText)。",
-            en: "\(logCount) logs, \(growthDiaryPhotoCount) photo notes, covering \(growthDiaryDateRangeText).",
-            de: "\(logCount) Protokolle, \(growthDiaryPhotoCount) Foto-Hinweise, Zeitraum \(growthDiaryDateRangeText)."
+            zh: "\(logCount) 条 · \(growthDiaryPhotoCount) 图 · \(growthDiaryDateRangeText)",
+            en: "\(logCount) logs · \(growthDiaryPhotoCount) photos · \(growthDiaryDateRangeText)",
+            de: "\(logCount) Protokolle · \(growthDiaryPhotoCount) Fotos · \(growthDiaryDateRangeText)"
         )
     }
     var profileMissingItems: [String] {
@@ -583,9 +585,9 @@ struct PlantDetailContentView: View {
 
     var seasonalGuidanceSummary: String {
         l.tr(
-            zh: "本地季节提示，不依赖实时天气；护理前仍以土壤、叶片和你的观察为准。",
-            en: "Local seasonal guidance without live weather; still check soil, leaves, and your own observation before care.",
-            de: "Lokaler Saisonhinweis ohne Live-Wetter; vor Pflege trotzdem Erde, Blätter und eigene Beobachtung prüfen."
+            zh: "以土壤和叶片为准。",
+            en: "Soil and leaves come first.",
+            de: "Erde und Blätter zuerst."
         )
     }
 
@@ -828,23 +830,14 @@ struct PlantDetailContentView: View {
                         careOverviewCard
                             .id(PlantDetailFeatureAnchor.overview)
                         actionQueueCard
-                        plantSectionHeader(
-                            l.tr(zh: "今日护理", en: "Today care", de: "Pflege heute"),
-                            subtitle: l.tr(zh: "先处理最重要的动作，再记录日常护理。", en: "Handle the most important task first, then log routine care.", de: "Zuerst die wichtigste Aufgabe erledigen, dann Routinepflege protokollieren.")
-                        )
+                        plantSectionHeader(l.tr(zh: "今日护理", en: "Today care", de: "Pflege heute"))
                         .id(PlantDetailFeatureAnchor.todayCare)
                         nextTaskCard
                         quickActions
-                        plantSectionHeader(
-                            l.tr(zh: "成长记录", en: "Growth record", de: "Wachstumsakte"),
-                            subtitle: l.tr(zh: "照片、笔记和护理历史放在默认视图，方便日常回看。", en: "Photos, notes, and care history stay in the default view for daily review.", de: "Fotos, Notizen und Pflegeverlauf bleiben in der Standardansicht.")
-                        )
+                        plantSectionHeader(l.tr(zh: "成长记录", en: "Growth record", de: "Wachstumsakte"))
                         .id(PlantDetailFeatureAnchor.growthDiary)
                         growthDiaryCard
-                        plantSectionHeader(
-                            l.tr(zh: "时间线", en: "Timeline", de: "Zeitachse"),
-                            subtitle: l.tr(zh: "护理、观察和备注都沉淀到这里。", en: "Care, observations, and notes settle here.", de: "Pflege, Beobachtungen und Notizen sammeln sich hier.")
-                        )
+                        plantSectionHeader(l.tr(zh: "时间线", en: "Timeline", de: "Zeitachse"))
                         .id(PlantDetailFeatureAnchor.timeline)
                         historyCard
                         notesCard
@@ -871,9 +864,13 @@ struct PlantDetailContentView: View {
         .onAppear {
             schedulePlantDetailRenderDataRebuild(delayMilliseconds: 24)
             scheduleMediaAttachmentIndexRepair()
+            scheduleInitialPlantFeatureDestinationIfNeeded()
         }
         .onChange(of: appLanguage) { _, _ in
             schedulePlantDetailRenderDataRebuild(delayMilliseconds: 24)
+        }
+        .onChange(of: renderDataRevision) { _, _ in
+            openInitialPlantFeatureDestinationIfReady()
         }
         .onReceive(appServices.domainRevisions.homeRevisionUpdates) { _ in
             guard shouldRefreshPlantDetailRenderDataForLatestMutation else { return }
@@ -1065,14 +1062,10 @@ struct PlantDetailContentView: View {
                         Text(l.tr(zh: "更多植物资料", en: "More plant details", de: "Weitere Pflanzendetails"))
                             .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
                             .foregroundStyle(Color.ohanaPrimaryText)
-                        Text(l.tr(
-                            zh: "护理节奏、位置适配、季节建议、资料库和安全复查收在这里。",
-                            en: "Care rhythm, placement, season notes, catalog, and safety checks live here.",
-                            de: "Pflegerhythmus, Standort, Saisonhinweise, Katalog und Sicherheit liegen hier."
-                        ))
+                        Text(l.tr(zh: "节奏 · 位置 · 安全", en: "Rhythm · Place · Safety", de: "Rhythmus · Ort · Sicherheit"))
                             .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded))
                             .foregroundStyle(Color.ohanaSecondaryText)
-                            .fixedSize(horizontal: false, vertical: true)
+                            .lineLimit(1)
                     }
 
                     Spacer(minLength: 8)
@@ -1095,28 +1088,19 @@ struct PlantDetailContentView: View {
 
             if showingPlantDetailExtras {
                 VStack(spacing: 20) {
-                    plantSectionHeader(
-                        l.tr(zh: "护理节奏", en: "Care rhythm", de: "Pflegerhythmus"),
-                        subtitle: l.tr(zh: "Ohana 会结合环境、品种和历史记录调整节奏。", en: "Ohana adjusts the rhythm with environment, species, and care history.", de: "Ohana passt den Rhythmus mit Umgebung, Art und Pflegeverlauf an.")
-                    )
+                    plantSectionHeader(l.tr(zh: "护理节奏", en: "Care rhythm", de: "Pflegerhythmus"))
                     .id(PlantDetailFeatureAnchor.carePlan)
                     careRhythmCard
                     carePlanInsightCard
                     placementFitCard
                     seasonalGuidanceCard
-                    plantSectionHeader(
-                        l.tr(zh: "档案", en: "Profile", de: "Profil"),
-                        subtitle: l.tr(zh: "像宠物/人类档案一样记录摆放、盆土和成长线索。", en: "Track placement, potting, and growth like other household profiles.", de: "Standort, Topf und Wachstum wie bei anderen Haushaltsprofilen festhalten.")
-                    )
+                    plantSectionHeader(l.tr(zh: "档案", en: "Profile", de: "Profil"))
                     .id(PlantDetailFeatureAnchor.profile)
                     environmentCard
                     growthProfileCard
                     safetyCard
                         .id(PlantDetailFeatureAnchor.safety)
-                    plantSectionHeader(
-                        l.tr(zh: "资料与诊断", en: "Knowledge and checks", de: "Wissen und Checks"),
-                        subtitle: l.tr(zh: "本地资料库和谨慎诊断一起给出可执行建议。", en: "Local catalog notes and cautious checks provide actionable guidance.", de: "Lokale Katalogdaten und vorsichtige Checks geben umsetzbare Hinweise.")
-                    )
+                    plantSectionHeader(l.tr(zh: "资料与诊断", en: "Knowledge and checks", de: "Wissen und Checks"))
                     .id(PlantDetailFeatureAnchor.knowledge)
                     catalogCard
                     diagnosisCard

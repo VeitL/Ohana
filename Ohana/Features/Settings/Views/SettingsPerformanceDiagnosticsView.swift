@@ -9,6 +9,12 @@ import SwiftUI
 
 struct PerformanceDiagnosticsView: View {
     @ObservedObject private var monitor = AppPerformanceMonitor.shared
+    @AppStorage("appLanguage") private var appLanguage: String = AppLanguage.code
+    @AppStorage(AppPerformanceMode.reducedVisualEffectsKey) private var reducedVisualEffectsMode = false
+
+    private var l: L10n {
+        L10n(appLanguage)
+    }
 
     private var primaryText: Color {
         Color.ohanaPrimaryText
@@ -37,6 +43,8 @@ struct PerformanceDiagnosticsView: View {
                         metricSummaryCard(title: "样本", value: "\(monitor.samples.count)", icon: "chart.bar.fill")
                         metricSummaryCard(title: "最近", value: latestMetricText, icon: "timer")
                     }
+
+                    visualEffectsExperimentCard
 
                     VStack(spacing: 0) {
                         if monitor.samples.isEmpty {
@@ -121,6 +129,52 @@ struct PerformanceDiagnosticsView: View {
         .frame(maxWidth: .infinity)
         .background(Color.ohanaCardSurface,
                     in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
+    }
+
+    private var visualEffectsExperimentCard: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "speedometer") // a11y: allow decorative diagnostics glyph; adjacent text names the control.
+                .font(OhanaFont.adaptive(size: 16, weight: .bold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                .foregroundStyle(Color.goPrimary)
+                .frame(width: 44, height: 44)
+                .background(Color.goPrimary.opacity(0.16), in: Circle())
+                .accessibilityHidden(true)
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(l.tr(zh: "轻量视觉 A/B", en: "Reduced visual effects A/B", de: "Reduzierte Effekte A/B"))
+                    .font(OhanaFont.adaptive(size: 14, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                    .foregroundStyle(primaryText)
+                Text(l.tr(
+                    zh: "关闭常驻玻璃、噪点和文字投影，用于真机丝滑度对比。",
+                    en: "Disables persistent glass, noise, and text shadows for device smoothness comparison.",
+                    de: "Deaktiviert dauerhaftes Glas, Rauschen und Textschatten fuer Geraetevergleiche."
+                ))
+                .font(OhanaFont.adaptive(size: 11, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                .foregroundStyle(secondaryText)
+            }
+
+            Spacer(minLength: 8)
+
+            Toggle("", isOn: $reducedVisualEffectsMode)
+                .tint(Color.goPrimary)
+                .labelsHidden()
+                .accessibilityLabel(l.tr(zh: "轻量视觉 A/B", en: "Reduced visual effects A/B", de: "Reduzierte Effekte A/B"))
+        }
+        .padding(14)
+        .background(Color.ohanaCardSurface,
+                    in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous)
+                .strokeBorder(Color.ohanaCardStroke, lineWidth: 1)
+        )
+        .onChange(of: reducedVisualEffectsMode) { _, enabled in
+            AppWorkloadPolicy.shared.refresh(reason: "settingsReducedVisualEffectsChanged")
+            AppPerformanceMonitor.shared.record(
+                "visual_effects_ab_mode",
+                valueMS: 0,
+                note: enabled ? "efficient" : "full"
+            )
+        }
     }
 
     private func performanceSampleRow(_ sample: AppPerformanceMonitor.Sample) -> some View {

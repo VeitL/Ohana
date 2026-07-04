@@ -101,31 +101,50 @@ extension PlantDashboardView {
         .accessibilityIdentifier("plant-dashboard-room-edge-rail")
     }
 
+    @ViewBuilder
     var roomEdgeRailBackground: some View {
+        if usesFullVisualEffects && !reduceTransparency {
+            Capsule()
+                .fill(Color.clear)
+                .glassEffect(.regular.tint(roomEdgeRailGlassTint).interactive(true), in: Capsule()) // ui-v4: allow Liquid Glass room rail matching home navigation
+                .overlay(roomEdgeRailStroke)
+                .shadow( // ui-v4: allow floating glass room rail depth above plant wallet cards
+                    color: Color.arkInk.opacity(colorScheme == .dark ? 0.22 : 0.10),
+                    radius: 18,
+                    x: 0,
+                    y: 10
+                )
+        } else {
+            Capsule()
+                .fill(Color.ohanaCardSurface.opacity(colorScheme == .dark ? 0.88 : 0.94))
+                .overlay(roomEdgeRailStroke)
+                .shadow( // ui-v4: allow reduced-mode plant room rail separation without Liquid Glass.
+                    color: Color.arkInk.opacity(colorScheme == .dark ? 0.08 : 0.04),
+                    radius: 6,
+                    x: 0,
+                    y: 3
+                )
+        }
+    }
+
+    var roomEdgeRailStroke: some View {
         Capsule()
-            .fill(reduceTransparency ? Color.ohanaCardSurface.opacity(0.94) : Color.clear)
-            .glassEffect(.regular.tint(roomEdgeRailGlassTint).interactive(true), in: Capsule()) // ui-v4: allow Liquid Glass room rail matching home navigation
-            .overlay {
-                Capsule()
-                    .strokeBorder(
-                        LinearGradient(
-                            colors: [
-                                Color.ohanaPrimaryText.opacity(colorScheme == .dark ? 0.18 : 0.14),
-                                Color.ohanaSecondaryText.opacity(colorScheme == .dark ? 0.18 : 0.10),
-                                Color.ohanaGlassStroke.opacity(0.20)
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        ),
-                        lineWidth: 1
-                    )
-            }
-            .shadow( // ui-v4: allow floating glass room rail depth above plant wallet cards
-                color: Color.arkInk.opacity(colorScheme == .dark ? 0.22 : 0.10),
-                radius: 18,
-                x: 0,
-                y: 10
+            .strokeBorder(
+                LinearGradient(
+                    colors: [
+                        Color.ohanaPrimaryText.opacity(colorScheme == .dark ? 0.18 : 0.14),
+                        Color.ohanaSecondaryText.opacity(colorScheme == .dark ? 0.18 : 0.10),
+                        Color.ohanaGlassStroke.opacity(usesFullVisualEffects ? 0.20 : 0.12)
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                ),
+                lineWidth: 1
             )
+    }
+
+    var usesFullVisualEffects: Bool {
+        workloadPolicy.visualEffectsBudget(isVisible: true).usesFullEffects
     }
 
     var roomEdgeRailGlassTint: Color {

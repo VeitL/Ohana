@@ -86,6 +86,8 @@ nonisolated enum HomeReminderRouteSnapshot: @unchecked Sendable {
     case humanQuick(String, UUID)
     case humanDetail(UUID)
     case plant(UUID)
+    case plantFeature(UUID, PlantFeatureDestination)
+    case plantCare(UUID, PlantCareFeatureDestination)
     case functionMenu(FMDest)
     case calendar(entityId: String?, humanId: String?, plantId: String?)
 }
@@ -359,6 +361,10 @@ private extension HomeReminderRouteSnapshot {
             self = .humanDetail(human.id)
         case let .plant(plant):
             self = .plant(plant.id)
+        case let .plantFeature(plant, destination):
+            self = .plantFeature(plant.id, destination)
+        case let .plantCare(plant, destination):
+            self = .plantCare(plant.id, destination)
         case let .functionMenu(destination):
             self = .functionMenu(destination)
         case let .calendar(entityId, humanId, plantId):

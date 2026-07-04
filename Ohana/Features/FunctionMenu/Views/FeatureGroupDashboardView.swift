@@ -197,6 +197,12 @@ struct FeatureGroupDashboardView: View {
                     parentPath.append(FMDest.plantDetail(plantID))
                 }
             )
+        case let .plantCareAggregate(feature):
+            PlantCareFeatureDetailView(
+                plants: plants,
+                feature: feature,
+                focusedPlantID: nil
+            )
         default:
             EmptyView()
         }
@@ -308,6 +314,24 @@ private struct FeatureGroupItem: Identifiable {
                     title: l.tr(zh: "成长照片", en: "Growth Photos", de: "Wachstumsfotos"),
                     icon: "photo.stack.fill",
                     .plantsPhotos
+                ),
+                destination(
+                    id: "plants-water",
+                    title: PlantCareFeatureDestination.water.title(l: l),
+                    icon: PlantCareFeatureDestination.water.icon,
+                    .plantCareAggregate(.water)
+                ),
+                destination(
+                    id: "plants-fertilize",
+                    title: PlantCareFeatureDestination.fertilize.title(l: l),
+                    icon: PlantCareFeatureDestination.fertilize.icon,
+                    .plantCareAggregate(.fertilize)
+                ),
+                destination(
+                    id: "plants-log",
+                    title: PlantCareFeatureDestination.log.title(l: l),
+                    icon: PlantCareFeatureDestination.log.icon,
+                    .plantCareAggregate(.log)
                 )
             ]
         case .oasisRewards:

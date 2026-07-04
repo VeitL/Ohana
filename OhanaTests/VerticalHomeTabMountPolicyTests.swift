@@ -19,14 +19,16 @@ struct VerticalHomeTabMountPolicyTests {
         #expect(!mounted.contains(.plants))
     }
 
-    @Test func mountedTabsIncludePreparedTabsAfterWarmup() {
+    @Test func mountedTabsDoNotKeepPreparedTabsMountedAfterWarmup() {
         let mounted = VerticalHomeTabMountPolicy.mountedTabs(
             active: .home,
             outgoing: nil,
             prepared: Set([.calendar, .oasis])
         )
 
-        #expect(mounted == Set([.home, .calendar, .oasis]))
+        #expect(mounted == Set([.home]))
+        #expect(!mounted.contains(.calendar))
+        #expect(!mounted.contains(.oasis))
     }
 
     @Test func incomingTabIsPreparedButNotLiveDuringTransition() {
@@ -105,7 +107,7 @@ struct VerticalHomeTabMountPolicyTests {
         )
     }
 
-    @Test func preparedHiddenCalendarPrewarmsOffscreenBeforeSelection() {
+    @Test func preparedHiddenCalendarKeepsLifecycleStateWithoutMountingOffscreen() {
         let lifecycle = VerticalHomeTabMountPolicy.lifecycle(
             for: .calendar,
             active: .home,
@@ -113,41 +115,16 @@ struct VerticalHomeTabMountPolicyTests {
             selected: .home,
             prepared: Set([.calendar])
         )
+        let mounted = VerticalHomeTabMountPolicy.mountedTabs(
+            active: .home,
+            outgoing: nil,
+            prepared: Set([.calendar])
+        )
 
         #expect(lifecycle.isPrepared)
         #expect(!lifecycle.isVisible)
-        #expect(CalendarEmbeddedContentMountPolicy.shouldScheduleDeferredMount(
-            hideToolbar: true,
-            isEmbeddedPrepared: lifecycle.isPrepared,
-            isEmbeddedVisible: lifecycle.isVisible,
-            isEmbeddedActive: lifecycle.isLive,
-            isContentMounted: false
-        ))
-        #expect(
-            CalendarEmbeddedContentMountPolicy.routeDataLoadDelayMilliseconds(
-                hideToolbar: true,
-                isEmbeddedVisible: lifecycle.isVisible,
-                isEmbeddedActive: lifecycle.isLive
-            ) == CalendarEmbeddedContentMountPolicy.inactiveEmbeddedDataLoadDelayMilliseconds
-        )
-        #expect(
-            CalendarEmbeddedContentMountPolicy.inactiveEmbeddedContentDelayMilliseconds
-            == CalendarEmbeddedContentMountPolicy.visibleEmbeddedDataLoadDelayMilliseconds
-        )
-        #expect(!CalendarEmbeddedContentMountPolicy.shouldRenderMainContent(
-            hideToolbar: true,
-            isEmbeddedPrepared: lifecycle.isPrepared,
-            isEmbeddedVisible: lifecycle.isVisible,
-            isEmbeddedActive: lifecycle.isLive,
-            isContentMounted: false
-        ))
-        #expect(CalendarEmbeddedContentMountPolicy.shouldRenderMainContent(
-            hideToolbar: true,
-            isEmbeddedPrepared: lifecycle.isPrepared,
-            isEmbeddedVisible: lifecycle.isVisible,
-            isEmbeddedActive: lifecycle.isLive,
-            isContentMounted: true
-        ))
+        #expect(!lifecycle.isLive)
+        #expect(!mounted.contains(.calendar))
     }
 
     @Test func preparedInactiveTabIsPreparedButNotLive() {
@@ -329,8 +306,9 @@ struct VerticalHomeTabMountPolicyTests {
         #expect(FocusHomeEmbeddedQuickActionThawPolicy.reveal(isMounted: true, postHeroReveal: 1) == 1)
     }
 
-    @Test func embeddedQuickActionsRevealBeforeHeroSettlesButInteractAfterward() throws {
+    @Test func embeddedQuickActionsRevealAndInteractBeforeHeroSettles() throws {
         let supportSource = try source("Ohana/Features/Home/Views/FocusHomeVerticalSolidSupport.swift")
+        let sceneSource = try source("Ohana/Features/Home/Views/FocusHomeVerticalSolidScene.swift")
 
         #expect(FocusHomePostHeroControlRevealPolicy.fullMotionPreloadDelayMilliseconds <= 240)
         #expect(
@@ -338,8 +316,12 @@ struct VerticalHomeTabMountPolicyTests {
                 + UInt64(FocusHomePostHeroControlRevealPolicy.animationDuration * 1000)
                 <= 420
         )
+        #expect(FocusHomeExpandedInteractionPolicy.expandedControlReadyProgress < 0.25)
+        #expect(FocusHomeExpandedInteractionPolicy.visibleControlInteractionProgress < 0.25)
         #expect(supportSource.contains("ZStack(alignment: .top)"))
         #expect(supportSource.contains(".opacity(Double(reveal))"))
+        #expect(!sceneSource.contains("heroDirection == 0 && progress > 0.985"))
+        #expect(!sceneSource.contains("reveal > 0.98"))
     }
 
     @Test func embeddedQuickActionsAvoidProgressThresholdMounts() throws {
@@ -366,20 +348,44 @@ struct VerticalHomeTabMountPolicyTests {
         ))
     }
 
-    @Test func embeddedQuickActionsBecomeInteractiveOnlyAfterHeroSettles() {
+    @Test func embeddedQuickActionsBecomeInteractiveWhenMountedAndVisible() {
         #expect(!FocusHomeEmbeddedQuickActionPresentationPolicy.isInteractive(
-            isExpandedInteractionReady: false,
+            isExpandedInteractionMounted: false,
             reveal: 1
         ))
 
         #expect(!FocusHomeEmbeddedQuickActionPresentationPolicy.isInteractive(
-            isExpandedInteractionReady: true,
-            reveal: 0.8
+            isExpandedInteractionMounted: true,
+            reveal: 0.1
         ))
 
         #expect(FocusHomeEmbeddedQuickActionPresentationPolicy.isInteractive(
-            isExpandedInteractionReady: true,
-            reveal: 1
+            isExpandedInteractionMounted: true,
+            reveal: FocusHomeExpandedInteractionPolicy.visibleControlInteractionProgress
+        ))
+    }
+
+    @Test func expandedCardInteractionsDoNotWaitForHeroCompletion() {
+        let selectedCardId = UUID()
+
+        #expect(FocusHomeExpandedInteractionPolicy.isExpandedControlReady(
+            selectedCardId: selectedCardId,
+            heroDirection: 1,
+            progress: FocusHomeExpandedInteractionPolicy.expandedControlReadyProgress
+        ))
+        #expect(FocusHomeExpandedInteractionPolicy.isExpandedCollapseReady(
+            selectedCardId: selectedCardId,
+            progress: FocusHomeExpandedInteractionPolicy.expandedControlReadyProgress
+        ))
+        #expect(FocusHomeExpandedInteractionPolicy.canHitCollapsedCards(
+            selectedCardId: selectedCardId,
+            heroDirection: -1,
+            progress: 0.8
+        ))
+        #expect(!FocusHomeExpandedInteractionPolicy.isExpandedControlReady(
+            selectedCardId: selectedCardId,
+            heroDirection: -1,
+            progress: 1
         ))
     }
 
@@ -738,6 +744,7 @@ struct VerticalHomeTabMountPolicyTests {
         #expect(plantPageSource.contains("roomRailTrailingCenterInset"))
         #expect(plantPageSource.contains("collapsedVerticalBias: FocusHomeVerticalSolidCollapsedLayoutPolicy.defaultVerticalBias"))
         #expect(!plantPageSource.contains(".padding(.top, 22)"))
+        #expect(VerticalSolidHomePlantWalletScrollPolicy.expandedCardViewportTopInset == 36)
 
         #expect(VerticalSolidHomePlantWalletScrollPolicy.cardViewportHeight(
             containerHeight: 798,
@@ -805,6 +812,16 @@ struct VerticalHomeTabMountPolicyTests {
             isExpanded: false,
             availableHeight: 694
         ) > 840)
+        #expect(VerticalSolidHomePlantWalletScrollPolicy.anchoredExpandedSceneHeight(
+            baseHeight: 520,
+            isExpanded: false,
+            scrollOffsetY: 420
+        ) == 520)
+        #expect(VerticalSolidHomePlantWalletScrollPolicy.anchoredExpandedSceneHeight(
+            baseHeight: 520,
+            isExpanded: true,
+            scrollOffsetY: 420
+        ) > 1080)
     }
 
     @Test func plantWalletInactiveCardGeometryCanBeFrozenDuringHeroMotion() {
@@ -1107,7 +1124,12 @@ struct VerticalHomeTabMountPolicyTests {
         #expect(plantPage.contains("selectedViewStyle == .deck &&"))
         #expect(plantPage.contains("viewSwitcherCenterY(roomRailCenterY: roomRailCenterY)"))
         #expect(plantPage.contains("collapsedLayoutMode: .scrollExtended"))
-        #expect(plantPage.contains("expandedVerticalPlacement: .collapsedCardCenter"))
+        #expect(plantPage.contains("expandedVerticalPlacement: .viewportTop("))
+        #expect(plantPage.contains("deckScrollOffsetTracker.offsetY"))
+        #expect(plantPage.contains("expandedDeckScrollOffsetY = frozenScrollOffsetY"))
+        #expect(plantPage.contains("anchoredExpandedSceneHeight("))
+        #expect(plantPage.contains(".scrollDisabled(selectedCardId != nil)"))
+        #expect(!plantPage.contains("expandedVerticalPlacement: .collapsedCardCenter"))
         #expect(models.contains("let careDifficultyText: String"))
         #expect(models.contains("let attentionText: String"))
         #expect(models.contains("let todoText: String"))

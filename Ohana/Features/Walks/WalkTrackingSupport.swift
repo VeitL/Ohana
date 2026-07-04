@@ -105,9 +105,10 @@ struct WalkTrackingCommandExecutor {
     let modelContext: ModelContext
     let services: AppServices
 
-    func stopWalk(manager: PetWalkingManaging, sharedTargets: [Pet], executorIds: [String]) {
-        manager.stop(modelContext: modelContext, sharedTargets: sharedTargets, executorIds: executorIds)
+    func stopWalk(manager: PetWalkingManaging, sharedTargets: [Pet], executorIds: [String]) -> WalkStopRewardSummary {
+        let rewardSummary = manager.stop(modelContext: modelContext, sharedTargets: sharedTargets, executorIds: executorIds)
         services.publishWalkingPresentationChange()
+        return rewardSummary
     }
 
     func saveWeeklyGoal(_ goal: Double, for pet: Pet) {

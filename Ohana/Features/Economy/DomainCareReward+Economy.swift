@@ -102,6 +102,9 @@ extension DomainCareRewardAction {
         case .expense:
             return l.tr(zh: "记账奖励", en: "Expense reward", de: "Ausgaben-Bonus")
         case .weight:
+            guard !name.isEmpty else {
+                return l.tr(zh: "体重记录奖励", en: "Weight log reward", de: "Gewichtslog-Bonus")
+            }
             return l.tr(zh: "\(name) 体重记录奖励", en: "\(name) weight log reward", de: "\(name) Gewichtslog-Bonus")
         case .milestone:
             return l.tr(zh: "\(name) 里程碑达成", en: "\(name) milestone reached", de: "\(name) Meilenstein erreicht")

@@ -204,11 +204,32 @@ enum AppFullScreenRoute: Hashable, Identifiable {
 
 enum AppOverlayRoute: Hashable, Identifiable {
     case quickMoment(routeID: UUID = UUID(), petID: UUID)
+    case petWeightQuick(routeID: UUID = UUID(), petID: UUID)
+    case petExpenseQuick(routeID: UUID = UUID(), petID: UUID)
+    case humanMedicationQuick(routeID: UUID = UUID(), humanID: UUID)
+    case humanWeightQuick(routeID: UUID = UUID(), humanID: UUID)
+    case humanWorkoutQuick(routeID: UUID = UUID(), humanID: UUID)
+    case humanExpenseQuick(routeID: UUID = UUID(), humanID: UUID)
+    case humanNoteQuick(routeID: UUID = UUID(), humanID: UUID)
 
     var id: String {
         switch self {
         case let .quickMoment(routeID, _):
             "quick-moment-\(routeID.uuidString)"
+        case let .petWeightQuick(routeID, _):
+            "pet-weight-quick-\(routeID.uuidString)"
+        case let .petExpenseQuick(routeID, _):
+            "pet-expense-quick-\(routeID.uuidString)"
+        case let .humanMedicationQuick(routeID, _):
+            "human-medication-quick-\(routeID.uuidString)"
+        case let .humanWeightQuick(routeID, _):
+            "human-weight-quick-\(routeID.uuidString)"
+        case let .humanWorkoutQuick(routeID, _):
+            "human-workout-quick-\(routeID.uuidString)"
+        case let .humanExpenseQuick(routeID, _):
+            "human-expense-quick-\(routeID.uuidString)"
+        case let .humanNoteQuick(routeID, _):
+            "human-note-quick-\(routeID.uuidString)"
         }
     }
 }
@@ -364,13 +385,15 @@ final class AppRouteCoordinator: ObservableObject {
     }
 
     func presentQuickMoment(petID: UUID) {
-        if sheet != nil {
-            sheet = nil
-        }
-        if fullScreen != nil {
-            fullScreen = nil
-        }
-        overlay = .quickMoment(petID: petID)
+        setOverlay(.quickMoment(petID: petID))
+    }
+
+    func presentPetWeightQuick(petID: UUID) {
+        setOverlay(.petWeightQuick(petID: petID))
+    }
+
+    func presentHumanWeightQuick(humanID: UUID) {
+        setOverlay(.humanWeightQuick(humanID: humanID))
     }
 
     func presentSettings() {
@@ -484,6 +507,10 @@ private extension AppRouteCoordinator {
     }
 
     func setSheet(_ route: AppSheetRoute) {
+        if let overlayRoute = route.quickEntryOverlayRoute {
+            setOverlay(overlayRoute)
+            return
+        }
         guard sheet != route || fullScreen != nil || overlay != nil else { return }
         if fullScreen != nil {
             fullScreen = nil
@@ -493,6 +520,19 @@ private extension AppRouteCoordinator {
         }
         if sheet != route {
             sheet = route
+        }
+    }
+
+    func setOverlay(_ route: AppOverlayRoute) {
+        guard overlay != route || sheet != nil || fullScreen != nil else { return }
+        if sheet != nil {
+            sheet = nil
+        }
+        if fullScreen != nil {
+            fullScreen = nil
+        }
+        if overlay != route {
+            overlay = route
         }
     }
 
@@ -511,6 +551,68 @@ private extension AppRouteCoordinator {
 
     var currentFeatureLevel: Int {
         OasisTreeManagerRegistry.current.treeLevel.rawValue
+    }
+}
+
+private extension AppSheetRoute {
+    var quickEntryOverlayRoute: AppOverlayRoute? {
+        switch self {
+        case let .petWeightQuick(id):
+            .petWeightQuick(petID: id)
+        case let .petExpenseQuick(id):
+            .petExpenseQuick(petID: id)
+        case let .humanMedicationQuick(id):
+            .humanMedicationQuick(humanID: id)
+        case let .humanWeightQuick(id):
+            .humanWeightQuick(humanID: id)
+        case let .humanWorkoutQuick(id):
+            .humanWorkoutQuick(humanID: id)
+        case let .humanExpenseQuick(id):
+            .humanExpenseQuick(humanID: id)
+        case let .humanNoteQuick(id):
+            .humanNoteQuick(humanID: id)
+        case .accountSwitcher,
+             .addEntity,
+             .calendar,
+             .coconutLog,
+             .coconutShop,
+             .crewRoster,
+             .functionMenu,
+             .petAllFeatures,
+             .petBasicInfo,
+             .petFood,
+             .petWeight,
+             .petExpense,
+             .petFeed,
+             .petWater,
+             .petPotty,
+             .petLitter,
+             .petPlay,
+             .petHygiene,
+             .petWalkSummary,
+             .petHealth,
+             .petMedication,
+             .petMomentHistory,
+             .petDocuments,
+             .petAchievements,
+             .petRetention,
+             .petBondVault,
+             .humanAllFeatures,
+             .humanBasicInfo,
+             .humanMedication,
+             .humanWeight,
+             .humanWorkout,
+             .humanWorkoutDashboard,
+             .humanMetrics,
+             .humanReport,
+             .humanExpense,
+             .humanWishlist,
+             .humanNote,
+             .requiredAccountSwitch,
+             .settings,
+             .streakDetail:
+            nil
+        }
     }
 }
 

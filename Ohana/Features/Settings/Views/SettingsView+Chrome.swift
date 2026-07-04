@@ -202,6 +202,43 @@ extension SettingsView {
         }
     }
 
+    var reducedVisualEffectsToggleRow: some View {
+        HStack(spacing: 12) {
+            settingsIcon("speedometer", color: Color.goTeal)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(l.tr(zh: "轻量视觉 A/B", en: "Reduced visual effects A/B", de: "Reduzierte Effekte A/B"))
+                    .font(OhanaFont.body(.semibold))
+                    .foregroundStyle(primaryText)
+                Text(l.tr(
+                    zh: "关闭常驻玻璃、噪点和文字投影，用于真机丝滑度对比",
+                    en: "Disables persistent glass, noise, and text shadows for device smoothness comparison",
+                    de: "Deaktiviert dauerhaftes Glas, Rauschen und Textschatten fuer Geraetevergleiche"
+                ))
+                .font(OhanaFont.footnote())
+                .foregroundStyle(tertiaryText)
+            }
+            Spacer()
+            Toggle("", isOn: $reducedVisualEffectsMode)
+                .tint(Color.goTeal)
+                .labelsHidden()
+                .accessibilityLabel(l.tr(
+                    zh: "轻量视觉 A/B",
+                    en: "Reduced visual effects A/B",
+                    de: "Reduzierte Effekte A/B"
+                ))
+        }
+        .frame(minHeight: 44)
+        .animation(GoMotion.feedback, value: reducedVisualEffectsMode)
+        .onChange(of: reducedVisualEffectsMode) { _, enabled in
+            AppWorkloadPolicy.shared.refresh(reason: "settingsReducedVisualEffectsChanged")
+            AppPerformanceMonitor.shared.record(
+                "visual_effects_ab_mode",
+                valueMS: 0,
+                note: enabled ? "efficient" : "full"
+            )
+        }
+    }
+
     var privacySecuritySection: some View {
         settingsSection(title: l.tr(zh: "隐私与安全", en: "Privacy & Security", de: "Datenschutz & Sicherheit")) {
             appSwitcherSnapshotPrivacyRow

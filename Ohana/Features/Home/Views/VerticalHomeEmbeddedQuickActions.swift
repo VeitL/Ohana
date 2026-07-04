@@ -157,6 +157,10 @@ struct VerticalHomeEmbeddedQuickActions: View {
         activeDraggingItemId != nil
     }
 
+    private var hasOpenActionMenu: Bool {
+        openActionId != nil
+    }
+
     private var motion: Animation {
         shouldReduceWork ? GoMotion.reduced : GoMotion.fab
     }
@@ -272,7 +276,7 @@ struct VerticalHomeEmbeddedQuickActions: View {
                 in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous)
             ) // ui-v4: allow invisible quick-action hit surface so the full 72pt cell activates, including label/icon gaps.
             .contentShape(RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
-            .allowsHitTesting(!isEditMode)
+            .allowsHitTesting(!isEditMode && (!hasOpenActionMenu || openActionId == item.id))
             .accessibilityLabel(accessibilityLabel(for: item, statusText: statusText(for: item)))
             .accessibilityIdentifier("home-quick-action-\(item.actionType)")
             .highPriorityGesture(detailLongPressGesture(for: item))
@@ -402,6 +406,7 @@ struct VerticalHomeEmbeddedQuickActions: View {
                         tint: item.isPrimaryDisabled ? Color.goCardWhite.opacity(0.16) : Color.goPrimary,
                         foreground: item.isPrimaryDisabled ? Color.goCardWhite.opacity(0.42) : Color.arkInk,
                         accessibility: item.quickAccessibilityLabel,
+                        accessibilityIdentifier: "home-quick-action-menu-\(item.id)-quick",
                         isDisabled: item.isPrimaryDisabled,
                         buttonWidth: buttonWidth,
                         action: item.action
@@ -415,6 +420,7 @@ struct VerticalHomeEmbeddedQuickActions: View {
                         tint: option.tint.opacity(0.92),
                         foreground: Color.arkInk,
                         accessibility: option.title,
+                        accessibilityIdentifier: "home-quick-action-menu-\(item.id)-\(option.id)",
                         isDisabled: false,
                         buttonWidth: buttonWidth,
                         action: { item.optionAction(option.id) }
@@ -429,6 +435,7 @@ struct VerticalHomeEmbeddedQuickActions: View {
                     tint: Color.goCardWhite.opacity(0.16),
                     foreground: Color.goCardWhite,
                     accessibility: item.detailAccessibilityLabel,
+                    accessibilityIdentifier: "home-quick-action-menu-\(item.id)-detail",
                     isDisabled: false,
                     buttonWidth: buttonWidth,
                     action: detailAction
@@ -482,6 +489,7 @@ struct VerticalHomeEmbeddedQuickActions: View {
         tint: Color,
         foreground: Color,
         accessibility: String,
+        accessibilityIdentifier: String,
         isDisabled: Bool,
         buttonWidth: CGFloat,
         action: @escaping () -> Void
@@ -517,7 +525,7 @@ struct VerticalHomeEmbeddedQuickActions: View {
         .buttonStyle(ScaleButtonStyle())
         .disabled(isDisabled)
         .accessibilityLabel(accessibility)
-        .accessibilityIdentifier("home-quick-action-menu-\(actionType)")
+        .accessibilityIdentifier(accessibilityIdentifier)
     }
 
     private var addLauncherCell: some View {

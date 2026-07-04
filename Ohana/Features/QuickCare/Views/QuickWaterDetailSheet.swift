@@ -46,7 +46,7 @@ struct QuickWaterDetailSheet: View {
     @State var adaptiveSheetHeight: CGFloat = 430
     @State var waterModeStorageTick = 0
     @State var displayedWaterMode: WaterOperatingMode
-    @State var waterSnapshot = QuickWaterRenderSnapshot.empty
+    @State var waterSnapshot: QuickWaterRenderSnapshot
     @State var pendingWaterRefreshRequest = QuickWaterRefreshRequest()
     @State var waterSnapshotRefreshTask: Task<Void, Never>?
     @State var waterRefreshDelayMilliseconds: UInt64?
@@ -87,7 +87,27 @@ struct QuickWaterDetailSheet: View {
         self.allPets = allPets
         self.waterEntries = waterEntries
         self.onRecordChanged = onRecordChanged
+        let initialSettings = WaterCareSettingsStore.snapshot(petKey: pet.id.uuidString)
+        _waterIntervalDays = State(initialValue: initialSettings.waterIntervalDays)
+        _waterChangeAnchorDate = State(initialValue: initialSettings.waterChangeAnchorDate)
+        _filterCleanIntervalDays = State(initialValue: initialSettings.filterCleanIntervalDays)
+        _filterReplaceIntervalDays = State(initialValue: initialSettings.filterReplaceIntervalDays)
+        _waterAmountEnabled = State(initialValue: initialSettings.waterAmountEnabled)
+        _waterAmountMlText = State(initialValue: String(format: "%.0f", initialSettings.waterAmountMl))
+        _waterReminderOn = State(initialValue: initialSettings.waterReminderOn)
+        _filterReminderOn = State(initialValue: initialSettings.filterReminderOn)
         _displayedWaterMode = State(initialValue: WaterOperatingMode.stored(pet.id) ?? .manual)
+        _waterSnapshot = State(initialValue: QuickWaterRenderSnapshot.build(
+            pet: pet,
+            allEvents: allEvents,
+            waterEntries: waterEntries
+        ))
+        _selectedSharedWaterPetIds = State(initialValue: SharedPetSelectionMemory.restoredSelection(
+            sourcePet: pet,
+            scope: "quickCare.water",
+            candidates: Self.sameSpeciesWaterPets(sourcePet: pet, allPets: allPets),
+            defaultToAll: true
+        ))
     }
 
     var themeColor: Color { Color(hex: pet.safeThemeColorHex) }
@@ -97,14 +117,15 @@ struct QuickWaterDetailSheet: View {
     var isAquatic: Bool { WaterQuickActionPolicy.isAquatic(species: pet.species) }
     var l: L10n { L10n(appLanguage) }
     var sameSpeciesWaterPets: [Pet] {
-        let species = normalizedSpecies(pet.species)
-        return allPets
-            .filter { !$0.hasPassedAway && normalizedSpecies($0.species) == species }
-            .sorted { lhs, rhs in
-                if lhs.id == pet.id { return true }
-                if rhs.id == pet.id { return false }
-                return lhs.createdAt < rhs.createdAt
-            }
+        Self.sameSpeciesWaterPets(sourcePet: pet, allPets: allPets)
+    }
+
+    var waterEntriesRevisionKey: String {
+        Self.waterEntriesRevisionKey(waterEntries)
+    }
+
+    var waterPlanRevisionKey: String {
+        Self.waterPlanRevisionKey(pet: pet, allEvents: allEvents)
     }
 
     var selectedWaterTargets: [Pet] {
@@ -281,7 +302,7 @@ struct QuickWaterDetailSheet: View {
                 }
             }
         }
-        .onChange(of: allEvents.count) { _, _ in
+        .onChange(of: waterPlanRevisionKey) { _, _ in
             let refreshDelay = activeWaterModeTransitionID == nil
                 ? UInt64(96)
                 : waterModeTransitionDelayMilliseconds + 140
@@ -291,7 +312,7 @@ struct QuickWaterDetailSheet: View {
             scheduleWaterSnapshotRefresh(milliseconds: refreshDelay, syncModeAfterRefresh: true)
             scheduleWaterPlanMaintenance(delayMilliseconds: maintenanceDelay)
         }
-        .onChange(of: waterEntries.count) { _, _ in
+        .onChange(of: waterEntriesRevisionKey) { _, _ in
             scheduleWaterSnapshotRefresh()
         }
         .onChange(of: activeSheet?.id) { _, _ in
@@ -480,16 +501,16 @@ struct QuickWaterDetailSheet: View {
                 pet: pet,
                 fallbackText: pet.avatarEmoji,
                 themeColor: themeColor,
-                size: 48,
+                size: 46,
                 backgroundOpacity: 0.16
             )
 
             VStack(alignment: .leading, spacing: 3) {
                 Text(pet.name)
-                    .font(OhanaFont.adaptive(size: 17, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                    .font(OhanaFont.adaptive(size: 18, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Text(isAquatic ? l.tr(zh: "水体 / 换水 / 滤芯", en: "Water tank / Changes / Filter", de: "Wasserbecken / Wechsel / Filter") : l.tr(zh: "喂水 / 换水 / 滤芯", en: "Water / Changes / Filter", de: "Trinken / Wechsel / Filter"))
-                    .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                    .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaSecondaryText)
             }
 
@@ -504,6 +525,8 @@ struct QuickWaterDetailSheet: View {
             }
             .frame(width: 44, height: 44)
             .buttonStyle(ScaleButtonStyle())
+            .accessibilityLabel(l.tr(zh: "关闭", en: "Close", de: "Schließen"))
+            .accessibilityIdentifier("quick-water-detail-close-action")
         }
     }
 
@@ -939,6 +962,59 @@ struct QuickWaterDetailSheet: View {
             en: "Log \(amountMl) ml",
             de: "\(amountMl) ml eintragen"
         )
+    }
+
+    private static func sameSpeciesWaterPets(sourcePet: Pet, allPets: [Pet]) -> [Pet] {
+        let species = SharedPetTargetResolver.normalizedSpecies(sourcePet.species)
+        return allPets
+            .filter { !$0.hasPassedAway && SharedPetTargetResolver.normalizedSpecies($0.species) == species }
+            .sorted { lhs, rhs in
+                if lhs.id == sourcePet.id { return true }
+                if rhs.id == sourcePet.id { return false }
+                return lhs.createdAt < rhs.createdAt
+            }
+    }
+
+    private static func waterEntriesRevisionKey(_ entries: [QuickWaterLedgerEntry]) -> String {
+        entries
+            .sorted { $0.date > $1.date }
+            .map {
+                [
+                    $0.id.uuidString,
+                    $0.careType.rawValue,
+                    String($0.date.timeIntervalSince1970),
+                    String($0.amountMl)
+                ].joined(separator: ":")
+            }
+            .joined(separator: "|")
+    }
+
+    private static func waterPlanRevisionKey(pet: Pet, allEvents: [Event]) -> String {
+        WaterPlanWriter.planEvents(pet: pet, allEvents: allEvents)
+            .map { event in
+                let reminderKey = event.reminders
+                    .sorted { $0.scheduledAt < $1.scheduledAt }
+                    .map {
+                        [
+                            $0.id.uuidString,
+                            String($0.scheduledAt.timeIntervalSince1970),
+                            $0.status,
+                            $0.completedAt.map { String($0.timeIntervalSince1970) } ?? ""
+                        ].joined(separator: "#")
+                    }
+                    .joined(separator: ",")
+                return [
+                    event.id.uuidString,
+                    String(event.startDate.timeIntervalSince1970),
+                    String(event.recurrenceDays),
+                    event.recurrenceEndDate.map { String($0.timeIntervalSince1970) } ?? "",
+                    event.relatedEntityType,
+                    event.relatedEntityId,
+                    event.isCompleted ? "1" : "0",
+                    reminderKey
+                ].joined(separator: ":")
+            }
+            .joined(separator: "|")
     }
 
     func localizedDayCycle(_ days: Int) -> String {

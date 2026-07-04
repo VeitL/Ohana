@@ -17,7 +17,8 @@ extension PlantDetailContentView {
                 Text(subtitle)
                     .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded))
                     .foregroundStyle(Color.ohanaSecondaryText)
-                    .fixedSize(horizontal: false, vertical: true)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.78)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)

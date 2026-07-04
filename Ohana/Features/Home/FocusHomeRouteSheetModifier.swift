@@ -249,6 +249,10 @@ struct FocusHomeRouteSheetModifier: ViewModifier {
             routes.openSheet(.humanBasicInfo(human.id))
         case let .plant(plant):
             openFunctionMenu(destination: .plantDetail(plant.id))
+        case let .plantFeature(plant, destination):
+            openFunctionMenu(destination: .plantFeature(plant.id, destination))
+        case let .plantCare(plant, destination):
+            openFunctionMenu(destination: .plantCare(plant.id, destination))
         case let .functionMenu(destination):
             openFunctionMenu(destination: destination)
         case let .calendar(entityId, humanId, plantId):
@@ -283,7 +287,7 @@ struct FocusHomeRouteSheetModifier: ViewModifier {
         case "litter":
             routes.openSheet(.petLitter(petID))
         case "walk":
-            onStartWalkFromQuickAction(petID)
+            routes.openSheet(.petWalkSummary(petID))
         case "play":
             routes.openSheet(.petPlay(petID))
         case "health":
@@ -381,6 +385,59 @@ struct FocusHomeRouteSheetModifier: ViewModifier {
                             onDismiss: requestClose
                         )
                     }
+                case let .petWeightQuick(routeID, petID):
+                    AppPetWeightQuickSheetHost(
+                        id: petID,
+                        onMissing: { routes.dismissOverlay(routeID: routeID) },
+                        onDismiss: { routes.dismissOverlay(routeID: routeID) }
+                    )
+                case let .petExpenseQuick(routeID, petID):
+                    AppPetDetailSheetRouteContainer(
+                        id: petID,
+                        destination: .expenseQuick,
+                        onMissing: { routes.dismissOverlay(routeID: routeID) },
+                        onDismiss: { routes.dismissOverlay(routeID: routeID) }
+                    )
+                case let .humanMedicationQuick(routeID, humanID):
+                    AppHumanDetailSheetRouteContainer(
+                        id: humanID,
+                        destination: .medicationQuick,
+                        onMissing: { routes.dismissOverlay(routeID: routeID) },
+                        onDismiss: { routes.dismissOverlay(routeID: routeID) },
+                        onOpenDestination: { id, destination in
+                            routes.dismissOverlay(routeID: routeID)
+                            OhanaFrameScheduler.runAfterNextFrame {
+                                routes.openSheet(homeHumanDetailRoute(humanID: id, destination: destination))
+                            }
+                        }
+                    )
+                case let .humanWeightQuick(routeID, humanID):
+                    AppHumanWeightQuickSheetHost(
+                        id: humanID,
+                        onMissing: { routes.dismissOverlay(routeID: routeID) },
+                        onDismiss: { routes.dismissOverlay(routeID: routeID) }
+                    )
+                case let .humanWorkoutQuick(routeID, humanID):
+                    AppHumanDetailSheetRouteContainer(
+                        id: humanID,
+                        destination: .workoutQuick,
+                        onMissing: { routes.dismissOverlay(routeID: routeID) },
+                        onDismiss: { routes.dismissOverlay(routeID: routeID) }
+                    )
+                case let .humanExpenseQuick(routeID, humanID):
+                    AppHumanDetailSheetRouteContainer(
+                        id: humanID,
+                        destination: .expenseQuick,
+                        onMissing: { routes.dismissOverlay(routeID: routeID) },
+                        onDismiss: { routes.dismissOverlay(routeID: routeID) }
+                    )
+                case let .humanNoteQuick(routeID, humanID):
+                    AppHumanDetailSheetRouteContainer(
+                        id: humanID,
+                        destination: .noteQuick,
+                        onMissing: { routes.dismissOverlay(routeID: routeID) },
+                        onDismiss: { routes.dismissOverlay(routeID: routeID) }
+                    )
                 }
             }
             .ignoresSafeArea()
@@ -530,7 +587,11 @@ struct FocusHomeRouteSheetModifier: ViewModifier {
             petRouteContainer(id: id, destination: .food)
                 .ohanaSheetPagePresentation() // ui-v4: allow long overview/detail sheet
         case let .petWeightQuick(id):
-            petRouteContainer(id: id, destination: .weightQuick)
+            AppPetWeightQuickSheetHost(
+                id: id,
+                onMissing: { routes.dismissSheet() },
+                onDismiss: { routes.dismissSheet() }
+            )
         case let .petWeight(id):
             petRouteContainer(id: id, destination: .weight)
                 .ohanaSheetPagePresentation() // ui-v4: allow long overview/detail sheet
@@ -587,7 +648,11 @@ struct FocusHomeRouteSheetModifier: ViewModifier {
             humanRouteContainer(id: id, destination: .medication)
                 .ohanaSheetPagePresentation() // ui-v4: allow long overview/detail sheet
         case let .humanWeightQuick(id):
-            humanRouteContainer(id: id, destination: .weightQuick)
+            AppHumanWeightQuickSheetHost(
+                id: id,
+                onMissing: { routes.dismissSheet() },
+                onDismiss: { routes.dismissSheet() }
+            )
         case let .humanWeight(id):
             humanRouteContainer(id: id, destination: .weight)
                 .ohanaSheetPagePresentation() // ui-v4: allow long overview/detail sheet

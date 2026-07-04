@@ -369,6 +369,20 @@ private extension AppOverlayRoute {
         switch self {
         case .quickMoment:
             "quickMoment"
+        case .petWeightQuick:
+            "petWeightQuick"
+        case .petExpenseQuick:
+            "petExpenseQuick"
+        case .humanMedicationQuick:
+            "humanMedicationQuick"
+        case .humanWeightQuick:
+            "humanWeightQuick"
+        case .humanWorkoutQuick:
+            "humanWorkoutQuick"
+        case .humanExpenseQuick:
+            "humanExpenseQuick"
+        case .humanNoteQuick:
+            "humanNoteQuick"
         }
     }
 }

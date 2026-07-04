@@ -257,7 +257,7 @@ private func fetch<T: PersistentModel>(
     }
 }
 
-private struct PetRouteMissingEntityView: View {
+struct PetRouteMissingEntityView: View {
     let kind: String
 
     var body: some View {

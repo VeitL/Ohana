@@ -79,7 +79,7 @@ struct HomeRouteCoordinatorTests {
         #expect(petID == pet.id)
     }
 
-    @Test func appSheetSinkInterceptsDetailSheets() {
+    @Test func appSheetSinkInterceptsLongDetailSheets() {
         let pet = Pet(name: "Momo", species: "猫")
         let human = Human(name: "Guan")
         let coordinator = HomeRouteCoordinator()
@@ -91,9 +91,7 @@ struct HomeRouteCoordinatorTests {
 
         coordinator.openSheet(.petAllFeatures(pet.id))
         coordinator.openSheet(.petFood(pet.id))
-        coordinator.openSheet(.petWeightQuick(pet.id))
         coordinator.openSheet(.petFeed(pet.id, opensManualSheet: true))
-        coordinator.openSheet(.petExpenseQuick(pet.id))
         coordinator.openSheet(.petWater(pet.id))
         coordinator.openSheet(.petHealth(pet.id, initialSection: .preventive))
         coordinator.openSheet(.petDocuments(pet.id))
@@ -101,24 +99,17 @@ struct HomeRouteCoordinatorTests {
         coordinator.openSheet(.petRetention(pet.id))
         coordinator.openSheet(.petBondVault(pet.id))
         coordinator.openSheet(.humanAllFeatures(human.id))
-        coordinator.openSheet(.humanMedicationQuick(human.id))
         coordinator.openSheet(.humanMedication(human.id))
-        coordinator.openSheet(.humanWeightQuick(human.id))
         coordinator.openSheet(.humanWeight(human.id))
-        coordinator.openSheet(.humanWorkoutQuick(human.id))
         coordinator.openSheet(.humanWorkoutDashboard(human.id))
         coordinator.openSheet(.humanMetrics(human.id))
         coordinator.openSheet(.humanReport(human.id))
-        coordinator.openSheet(.humanExpenseQuick(human.id))
-        coordinator.openSheet(.humanNoteQuick(human.id))
         coordinator.openSheet(.humanWishlist(human.id))
 
         let expectedRoutes: [HomeAppSheetRoute] = [
             .appSheet(.petAllFeatures(pet.id)),
             .appSheet(.petFood(pet.id)),
-            .appSheet(.petWeightQuick(pet.id)),
             .appSheet(.petFeed(pet.id, opensManualSheet: true)),
-            .appSheet(.petExpenseQuick(pet.id)),
             .appSheet(.petWater(pet.id)),
             .appSheet(.petHealth(pet.id, initialSection: .preventive)),
             .appSheet(.petDocuments(pet.id)),
@@ -126,16 +117,11 @@ struct HomeRouteCoordinatorTests {
             .appSheet(.petRetention(pet.id)),
             .appSheet(.petBondVault(pet.id)),
             .appSheet(.humanAllFeatures(human.id)),
-            .appSheet(.humanMedicationQuick(human.id)),
             .appSheet(.humanMedication(human.id)),
-            .appSheet(.humanWeightQuick(human.id)),
             .appSheet(.humanWeight(human.id)),
-            .appSheet(.humanWorkoutQuick(human.id)),
             .appSheet(.humanWorkoutDashboard(human.id)),
             .appSheet(.humanMetrics(human.id)),
             .appSheet(.humanReport(human.id)),
-            .appSheet(.humanExpenseQuick(human.id)),
-            .appSheet(.humanNoteQuick(human.id)),
             .appSheet(.humanWishlist(human.id))
         ]
         #expect(appSheets.count == expectedRoutes.count)
@@ -489,6 +475,37 @@ struct HomeRouteCoordinatorTests {
         #expect(coordinator.overlay == nil)
     }
 
+    @Test func appOverlaySinkInterceptsQuickEntryPopups() {
+        let pet = Pet(name: "Momo", species: "猫")
+        let human = Human(name: "Guan")
+        let coordinator = HomeRouteCoordinator()
+        var appOverlays: [HomeAppOverlayRoute] = []
+
+        coordinator.bindAppOverlayRouteSink { route in
+            appOverlays.append(route)
+        }
+
+        coordinator.openPetWeightQuick(pet.id)
+        coordinator.openSheet(.petExpenseQuick(pet.id))
+        coordinator.openSheet(.humanMedicationQuick(human.id))
+        coordinator.openHumanWeightQuick(human.id)
+        coordinator.openSheet(.humanWorkoutQuick(human.id))
+        coordinator.openSheet(.humanExpenseQuick(human.id))
+        coordinator.openSheet(.humanNoteQuick(human.id))
+
+        #expect(appOverlays == [
+            .petWeightQuick(petID: pet.id),
+            .petExpenseQuick(petID: pet.id),
+            .humanMedicationQuick(humanID: human.id),
+            .humanWeightQuick(humanID: human.id),
+            .humanWorkoutQuick(humanID: human.id),
+            .humanExpenseQuick(humanID: human.id),
+            .humanNoteQuick(humanID: human.id)
+        ])
+        #expect(coordinator.overlay == nil)
+        #expect(coordinator.sheet == nil)
+    }
+
     @Test func appSheetSinkInterceptsSettings() {
         let coordinator = HomeRouteCoordinator()
         var appSheets: [HomeAppSheetRoute] = []
@@ -635,6 +652,14 @@ struct HomeRouteCoordinatorTests {
             return
         }
         #expect(petID == pet.id)
+
+        coordinator.openPetWeightQuick(pet.id)
+
+        guard case let .petWeightQuick(_, weightPetID) = coordinator.overlay else {
+            Issue.record("Expected pet weight quick overlay route")
+            return
+        }
+        #expect(weightPetID == pet.id)
     }
 
     @Test func antiRepeatAlertOwnsPendingActionUntilConfirmedOrDismissed() async {

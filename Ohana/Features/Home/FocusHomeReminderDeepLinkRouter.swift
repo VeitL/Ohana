@@ -79,6 +79,8 @@ nonisolated enum FocusHomeReminderDestination {
     case humanQuick(String, Human)
     case humanDetail(Human)
     case plant(Plant)
+    case plantFeature(Plant, PlantFeatureDestination)
+    case plantCare(Plant, PlantCareFeatureDestination)
     case functionMenu(FMDest)
     case calendar(entityId: String?, humanId: String?, plantId: String?)
 }
@@ -149,7 +151,7 @@ nonisolated enum FocusHomeReminderDeepLinkRouter {
 
         if let plantId = DomainEntityLinkRegistry.plantId(for: event),
            let plant = plants.first(where: { $0.id == plantId }) {
-            return .plant(plant)
+            return plantDestination(for: event, plant: plant)
         }
 
         if let pet = MemberLifecycleActiveScheduleResolver.petTarget(
@@ -181,6 +183,9 @@ nonisolated enum FocusHomeReminderDeepLinkRouter {
     ) -> FocusHomeReminderDestination? {
         if let plantId = payload.plantId,
            let plant = plants.first(where: { $0.id == plantId }) {
+            if let destination = plantCareFeatureDestination(for: payload) {
+                return .plantCare(plant, destination)
+            }
             return .plant(plant)
         }
         if let humanMedicationId = payload.humanMedicationId,
@@ -303,6 +308,65 @@ nonisolated enum FocusHomeReminderDeepLinkRouter {
             return .humanQuick("humanNote", human)
         }
         return .humanDetail(human)
+    }
+
+    private static func plantDestination(for event: Event, plant: Plant) -> FocusHomeReminderDestination {
+        let text = normalizedText(for: event)
+        if let careType = PlantReminderPreferenceStore.careType(forEventType: event.eventType) {
+            return .plantCare(plant, plantCareFeatureDestination(for: careType, text: text))
+        }
+        if matchesAny(text, ["浇水", "喷水", "喷雾", "water", "misting", "gieß", "giessen", "wasser"]) {
+            return .plantCare(plant, .water)
+        }
+        if matchesAny(text, ["施肥", "肥", "fertiliz", "fertilis", "düng"]) {
+            return .plantCare(plant, .fertilize)
+        }
+        if matchesAny(text, ["虫", "黄叶", "病", "pest", "yellow leaf", "schädl", "schaedl"]) {
+            return .plantCare(plant, .log)
+        }
+        if matchesAny(text, ["清洁叶", "擦叶", "clean leaves", "leaf clean", "blätter reinigen"]) {
+            return .plantCare(plant, .log)
+        }
+        if matchesAny(text, ["照片", "拍照", "photo", "foto"]) {
+            return .plantCare(plant, .log)
+        }
+        if matchesAny(text, ["记录", "备注", "note", "timeline", "notiz"]) {
+            return .plantCare(plant, .log)
+        }
+        return .plant(plant)
+    }
+
+    private static func plantCareFeatureDestination(for payload: OhanaReminderRoutePayload) -> PlantCareFeatureDestination? {
+        let text = "\(payload.plantCareType ?? "") \(payload.eventType ?? "")".lowercased()
+        if let rawCareType = payload.plantCareType,
+           let careType = PlantCareType(rawValue: rawCareType) {
+            return plantCareFeatureDestination(for: careType, text: text)
+        }
+        if let eventType = payload.eventType,
+           let careType = PlantReminderPreferenceStore.careType(forEventType: eventType) {
+            return plantCareFeatureDestination(for: careType, text: text)
+        }
+        return nil
+    }
+
+    private static func plantCareFeatureDestination(
+        for careType: PlantCareType,
+        text: String
+    ) -> PlantCareFeatureDestination {
+        switch careType {
+        case .watering, .misting:
+            .water
+        case .fertilizing:
+            .fertilize
+        case .customNote:
+            if matchesAny(text, ["照片", "拍照", "photo", "foto"]) {
+                .log
+            } else {
+                .log
+            }
+        case .repotting, .pruning, .rotating, .leafCleaning, .pestCheck, .photo, .newLeaf, .yellowLeaf, .pestFound:
+            .log
+        }
     }
 
     private static func calendarDestination(for event: Event) -> FocusHomeReminderDestination {

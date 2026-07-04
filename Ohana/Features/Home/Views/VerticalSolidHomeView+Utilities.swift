@@ -159,13 +159,23 @@ extension VerticalSolidHomeView {
         guard !requests.isEmpty || !legacyPayloads.isEmpty || !legacyPopoutPayloads.isEmpty else { return }
 
         if !legacyPayloads.isEmpty || !legacyPopoutPayloads.isEmpty {
-            if avatarPipeline.seedPreviewEntries(legacyPayloads) {
+            if FocusWalletAvatarCache.seedPreviewEntries(payloads: legacyPayloads) {
                 bumpAvatarCacheRevision()
             }
-            avatarPipeline.preload(
-                payloads: legacyPayloads,
-                popoutPayloads: legacyPopoutPayloads,
-                key: avatarPreloadSignature
+            await OhanaFrameScheduler.waitAfterNextFrame(milliseconds: 72)
+            guard !Task.isCancelled else { return }
+            let startedAt = CFAbsoluteTimeGetCurrent()
+            let avatarDidRefresh = await FocusWalletAvatarCache.preload(payloads: legacyPayloads)
+            guard !Task.isCancelled else { return }
+            let popoutDidRefresh = await FocusPopoutImageCache.preload(payloads: legacyPopoutPayloads)
+            guard !Task.isCancelled else { return }
+            if avatarDidRefresh || popoutDidRefresh {
+                bumpAvatarCacheRevision()
+            }
+            AppPerformanceMonitor.shared.record(
+                "home_avatar_preload_decode",
+                startedAt: startedAt,
+                note: "\(legacyPayloads.count) avatars, \(legacyPopoutPayloads.count) popouts"
             )
         }
 

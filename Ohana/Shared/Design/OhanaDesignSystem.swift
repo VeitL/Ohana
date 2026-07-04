@@ -465,24 +465,28 @@ struct OhanaDashedDivider: View {
 
 // MARK: - Noise Texture View
 struct NoiseTextureView: View {
-    var body: some View {
-        Canvas(opaque: false, colorMode: .linear, rendersAsynchronously: true) { context, size in
-            let area = max(1, size.width * size.height)
-            let baselineArea: CGFloat = 390 * 844
-            let density = min(1.25, max(0.45, area / baselineArea))
-            let pointCount = Int(640 * density)
+    @ObservedObject private var workloadPolicy = AppWorkloadPolicy.shared
 
-            for index in 0 ..< pointCount {
-                let x = CGFloat(Self.unitNoise(index, salt: 17)) * size.width
-                let y = CGFloat(Self.unitNoise(index, salt: 71)) * size.height
-                let opacity = 0.018 + Self.unitNoise(index, salt: 131) * 0.045
-                context.fill(
-                    Path(CGRect(x: x, y: y, width: 1, height: 1)),
-                    with: .color(.white.opacity(opacity))
-                )
+    var body: some View {
+        if workloadPolicy.visualEffectsBudget(isVisible: true).usesFullEffects {
+            Canvas(opaque: false, colorMode: .linear, rendersAsynchronously: true) { context, size in
+                let area = max(1, size.width * size.height)
+                let baselineArea: CGFloat = 390 * 844
+                let density = min(1.25, max(0.45, area / baselineArea))
+                let pointCount = Int(640 * density)
+
+                for index in 0 ..< pointCount {
+                    let x = CGFloat(Self.unitNoise(index, salt: 17)) * size.width
+                    let y = CGFloat(Self.unitNoise(index, salt: 71)) * size.height
+                    let opacity = 0.018 + Self.unitNoise(index, salt: 131) * 0.045
+                    context.fill(
+                        Path(CGRect(x: x, y: y, width: 1, height: 1)),
+                        with: .color(.white.opacity(opacity))
+                    )
+                }
             }
+            .allowsHitTesting(false)
         }
-        .allowsHitTesting(false)
     }
 
     private static func unitNoise(_ index: Int, salt: UInt64) -> Double {

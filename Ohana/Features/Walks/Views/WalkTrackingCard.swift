@@ -15,7 +15,7 @@ struct WalkTrackingCard: View {
     let allHumans: [Human]
     let snapshot: WalkTrackingSnapshot
     var onCloseSummaryToPetCard: (() -> Void)?
-    var onStopWalk: ([Pet], [String]) -> Void
+    var onStopWalk: ([Pet], [String]) -> WalkStopRewardSummary
     var onSaveWeeklyGoal: (Double) -> Void
 
     @Environment(AppServices.self) var appServices
@@ -34,6 +34,7 @@ struct WalkTrackingCard: View {
     @State var summaryRotation: Double = 0
     @State var showingGoalSetter = false
     @State var goalDraft: Double = 0
+    @State var lastStopRewardSummary: WalkStopRewardSummary?
     @State var selectedSharedWalkPetIds: Set<UUID> = []
     @State var selectedSharedWalkExecutorIds: Set<String> = []
     @State var cameraPosition: MapCameraPosition = .userLocation(fallback: .automatic)
@@ -162,6 +163,8 @@ struct WalkTrackingCard: View {
         .onChange(of: mgr.phase) { _, newPhase in
             if case .finished = newPhase, mgr.currentPet?.id == pet.id {
                 presentSummaryBack()
+            } else if case .running = newPhase {
+                lastStopRewardSummary = nil
             }
         }
         .onAppear {

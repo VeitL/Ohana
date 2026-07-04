@@ -18,6 +18,24 @@ enum WalkPhase: Equatable {
     case finished(elapsed: TimeInterval, poopCount: Int)
 }
 
+struct WalkStopRewardSummary: Equatable {
+    let walkLogID: UUID?
+    let coconutDelta: Int
+    let walkCoconutDelta: Int
+    let pottyCoconutDelta: Int
+
+    static let empty = WalkStopRewardSummary(
+        walkLogID: nil,
+        coconutDelta: 0,
+        walkCoconutDelta: 0,
+        pottyCoconutDelta: 0
+    )
+
+    var hasReward: Bool {
+        coconutDelta > 0
+    }
+}
+
 struct WalkPoopMarker: Identifiable, Equatable {
     let id: UUID
     let date: Date
@@ -165,7 +183,8 @@ final class PetWalkingManager {
         startTimer()
     }
 
-    func stop(modelContext: ModelContext, sharedTargets: [Pet] = [], executorIds sharedExecutorIds: [String] = []) {
+    @discardableResult
+    func stop(modelContext: ModelContext, sharedTargets: [Pet] = [], executorIds sharedExecutorIds: [String] = []) -> WalkStopRewardSummary {
         walkStopStartedAt = CFAbsoluteTimeGetCurrent()
         // 最终elapsed：已暂停部分 + 本次跑步部分
         if let r = resumeTime {
@@ -184,7 +203,7 @@ final class PetWalkingManager {
         guard let pet = currentPet, WalkFeaturePolicy.canStartWalk(for: pet) else {
             reset()
             walkStopStartedAt = nil
-            return
+            return .empty
         }
 
         // 隐式读取当前设备执行者（静默，不弹窗）
@@ -206,6 +225,8 @@ final class PetWalkingManager {
         let isTooShortForReward = !CoconutWalkRewardPolicy.isRewardable(distanceMeters: distanceMeters)
         let normalizedTargets = WalkFeaturePolicy.normalizedWalkTargets(sharedTargets, fallback: pet)
         let walkLogs: [PetWalkLog]
+        var walkCoconutDelta = 0
+        var pottyCoconutDelta = 0
         if normalizedTargets.count > 1 {
             let result = walkCareEvents.recordSharedWalk(
                 sourcePet: pet,
@@ -218,6 +239,7 @@ final class PetWalkingManager {
                 startDate: startedAt
             )
             walkLogs = result.walkLogs
+            walkCoconutDelta = result.coconutDelta
         } else {
             let intent = DomainCareFactCreateIntent(
                 kind: .walk(
@@ -242,7 +264,7 @@ final class PetWalkingManager {
             ) else {
                 reset()
                 walkStopStartedAt = nil
-                return
+                return .empty
             }
             let walkLog = DomainCareFactWriter.createWalkLog(plan: write, context: modelContext)
             modelContext.safeSave()
@@ -285,6 +307,7 @@ final class PetWalkingManager {
                 CloudSyncMutationRecorder.markModified(ledgerEvent, context: modelContext, modifiedAt: endedAt)
                 careLedger.syncLedgerEnergyIfNeeded(metadataJSON: metadataJSON, context: modelContext)
                 let earnedCoconuts = reward.map { $0.humanGot + $0.petGot } ?? 0
+                walkCoconutDelta = earnedCoconuts
                 walkLog.coconutsEarned = earnedCoconuts
             }
             walkLogs = [walkLog]
@@ -367,6 +390,7 @@ final class PetWalkingManager {
                     )
                     CloudSyncMutationRecorder.markModified(ledgerEvent, context: modelContext, modifiedAt: endedAt)
                     careLedger.syncLedgerEnergyIfNeeded(metadataJSON: metadataJSON, context: modelContext)
+                    pottyCoconutDelta += careLedger.rewardDelta(reward)
                 }
             }
         }
@@ -389,6 +413,12 @@ final class PetWalkingManager {
             ]
         )
         walkStopStartedAt = nil
+        return WalkStopRewardSummary(
+            walkLogID: sourceWalkLog?.id,
+            coconutDelta: walkCoconutDelta + pottyCoconutDelta,
+            walkCoconutDelta: walkCoconutDelta,
+            pottyCoconutDelta: pottyCoconutDelta
+        )
     }
 
     func reset() {

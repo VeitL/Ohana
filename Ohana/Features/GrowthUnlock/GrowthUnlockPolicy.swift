@@ -377,7 +377,7 @@ enum GrowthUnlockPolicy {
             .advancedInsights
         case .wealthDashboard:
             .oasisPlants
-        case .plantsDashboard, .plantsList, .plantsPhotos, .plantDetail:
+        case .plantsDashboard, .plantsList, .plantsPhotos, .plantDetail, .plantFeature, .plantCare, .plantCareAggregate:
             .household
         case .familyWeeklyReport, .coconutShop:
             .rewards

@@ -98,6 +98,7 @@ struct AppRoutePresentationHost: ViewModifier {
                             onFirstSuccessMomentCompleted: onFirstSuccessMomentCompleted,
                             onOpenPet: { id, tab in coordinator.openPet(id, initialTab: tab) },
                             onOpenHuman: { id in coordinator.openHuman(id) },
+                            onPresentSheet: { route in coordinator.presentSheet(route) },
                             onPresentCoconutLog: { subject in
                                 coordinator.presentCoconutLog(subject)
                             }
@@ -137,6 +138,10 @@ struct AppRoutePresentationHost: ViewModifier {
             coordinator.openHuman(human.id)
         case let .plant(plant):
             coordinator.openPlant(plant.id)
+        case let .plantFeature(plant, destination):
+            coordinator.presentFunctionMenu(destination: .plantFeature(plant.id, destination))
+        case let .plantCare(plant, destination):
+            coordinator.presentFunctionMenu(destination: .plantCare(plant.id, destination))
         case let .functionMenu(destination):
             coordinator.presentFunctionMenu(destination: destination)
         case let .calendar(entityID, humanID, plantID):
@@ -389,9 +394,8 @@ private struct AppSheetRouteDestination: View {
             )
             .ohanaSheetPagePresentation()
         case let .petWeightQuick(id):
-            AppPetDetailSheetRouteContainer(
+            AppPetWeightQuickSheetHost(
                 id: id,
-                destination: .weightQuick,
                 onMissing: onDismiss,
                 onDismiss: onDismiss
             )
@@ -554,9 +558,8 @@ private struct AppSheetRouteDestination: View {
             )
             .ohanaSheetPagePresentation()
         case let .humanWeightQuick(id):
-            AppHumanDetailSheetRouteContainer(
+            AppHumanWeightQuickSheetHost(
                 id: id,
-                destination: .weightQuick,
                 onMissing: onDismiss,
                 onDismiss: onDismiss
             )
@@ -774,6 +777,7 @@ private struct AppOverlayRouteDestination: View {
     let onFirstSuccessMomentCompleted: (Pet) -> Void
     let onOpenPet: (UUID, PetDetailTab) -> Void
     let onOpenHuman: (UUID) -> Void
+    let onPresentSheet: (AppSheetRoute) -> Void
     let onPresentCoconutLog: (CoconutLogSubject?) -> Void
 
     var body: some View {
@@ -786,6 +790,97 @@ private struct AppOverlayRouteDestination: View {
                     onDismiss: requestClose
                 )
             }
+        case let .petWeightQuick(_, petID):
+            AppPetWeightQuickSheetHost(
+                id: petID,
+                onMissing: onDismiss,
+                onDismiss: onDismiss
+            )
+        case let .petExpenseQuick(_, petID):
+            AppPetDetailSheetRouteContainer(
+                id: petID,
+                destination: .expenseQuick,
+                onMissing: onDismiss,
+                onDismiss: onDismiss
+            )
+        case let .humanMedicationQuick(_, humanID):
+            AppHumanDetailSheetRouteContainer(
+                id: humanID,
+                destination: .medicationQuick,
+                onMissing: onDismiss,
+                onDismiss: onDismiss,
+                onOpenDestination: { id, destination in
+                    onDismiss()
+                    OhanaFrameScheduler.runAfterNextFrame {
+                        onPresentSheet(humanDetailRoute(humanID: id, destination: destination))
+                    }
+                }
+            )
+        case let .humanWeightQuick(_, humanID):
+            AppHumanWeightQuickSheetHost(
+                id: humanID,
+                onMissing: onDismiss,
+                onDismiss: onDismiss
+            )
+        case let .humanWorkoutQuick(_, humanID):
+            AppHumanDetailSheetRouteContainer(
+                id: humanID,
+                destination: .workoutQuick,
+                onMissing: onDismiss,
+                onDismiss: onDismiss
+            )
+        case let .humanExpenseQuick(_, humanID):
+            AppHumanDetailSheetRouteContainer(
+                id: humanID,
+                destination: .expenseQuick,
+                onMissing: onDismiss,
+                onDismiss: onDismiss
+            )
+        case let .humanNoteQuick(_, humanID):
+            AppHumanDetailSheetRouteContainer(
+                id: humanID,
+                destination: .noteQuick,
+                onMissing: onDismiss,
+                onDismiss: onDismiss
+            )
+        }
+    }
+
+    private func humanDetailRoute(
+        humanID: UUID,
+        destination: AppHumanDetailSheetDestination
+    ) -> AppSheetRoute {
+        switch destination {
+        case .basicInfo:
+            .humanBasicInfo(humanID)
+        case .medicationQuick:
+            .humanMedicationQuick(humanID)
+        case .medication:
+            .humanMedication(humanID)
+        case .weightQuick:
+            .humanWeightQuick(humanID)
+        case .weight:
+            .humanWeight(humanID)
+        case .workoutQuick:
+            .humanWorkoutQuick(humanID)
+        case .workout:
+            .humanWorkout(humanID)
+        case .workoutDashboard:
+            .humanWorkoutDashboard(humanID)
+        case .metrics:
+            .humanMetrics(humanID)
+        case .report:
+            .humanReport(humanID)
+        case .expenseQuick:
+            .humanExpenseQuick(humanID)
+        case .expense:
+            .humanExpense(humanID)
+        case .wishlist:
+            .humanWishlist(humanID)
+        case .noteQuick:
+            .humanNoteQuick(humanID)
+        case .note:
+            .humanNote(humanID)
         }
     }
 }

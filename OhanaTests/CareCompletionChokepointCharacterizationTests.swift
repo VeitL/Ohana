@@ -171,7 +171,7 @@ struct CareCompletionChokepointCharacterizationTests {
 
         manager.start(pet: pet)
         manager.addPoop(type: .perfectPoop)
-        manager.stop(modelContext: context)
+        let stopSummary = manager.stop(modelContext: context)
 
         let walkLog = try #require(try context.fetch(FetchDescriptor<PetWalkLog>()).first)
         let pottyLog = try #require(try context.fetch(FetchDescriptor<PetPottyLog>()).first)
@@ -179,6 +179,10 @@ struct CareCompletionChokepointCharacterizationTests {
         let budgetEvents = try context.fetch(FetchDescriptor<EconomyBudgetUsageEvent>())
 
         #expect(wallet.factCountSeenDuringReward > 0)
+        #expect(stopSummary.walkLogID == walkLog.id)
+        #expect(stopSummary.coconutDelta > 0)
+        #expect(stopSummary.walkCoconutDelta > 0)
+        #expect(stopSummary.pottyCoconutDelta > 0)
         #expect(walkLog.distanceMeters == 900)
         #expect(walkLog.coconutsEarned > 0)
         #expect(pottyLog.walkLogId == walkLog.id.uuidString)

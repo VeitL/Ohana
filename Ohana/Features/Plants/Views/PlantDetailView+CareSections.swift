@@ -111,29 +111,29 @@ extension PlantDetailContentView {
     var actionQueueSummary: String {
         if dueTaskCount > 0 {
             return l.tr(
-                zh: "\(dueTaskCount) 项照护到期，先完成高优先级动作。",
-                en: "\(dueTaskCount) care tasks are due; start with the highest priority actions.",
-                de: "\(dueTaskCount) Pflegeaufgaben sind fällig; mit hoher Priorität beginnen."
+                zh: "\(dueTaskCount) 项到期。",
+                en: "\(dueTaskCount) due.",
+                de: "\(dueTaskCount) fällig."
             )
         }
         if plant.healthStatus == .watching || plant.healthStatus == .stressed {
             return l.tr(
-                zh: "当前重点是观察和复查，避免问题拖到下一次提醒。",
-                en: "Focus on observation and checks before the next reminder.",
-                de: "Beobachtung und Checks vor der nächsten Erinnerung priorisieren."
+                zh: "优先复查。",
+                en: "Review first.",
+                de: "Zuerst prüfen."
             )
         }
         if !profileMissingItems.isEmpty {
             return l.tr(
-                zh: "没有紧急照护，适合补齐档案让计划更准确。",
-                en: "No urgent care; complete the profile so the plan gets smarter.",
-                de: "Keine dringende Pflege; Profil ergänzen, damit der Plan genauer wird."
+                zh: "档案可补齐。",
+                en: "Profile can improve.",
+                de: "Profil ergänzen."
             )
         }
         return l.tr(
-            zh: "节奏稳定，可以做一次轻量观察或提前处理下一项。",
-            en: "The rhythm is stable; log a small observation or handle the next item early.",
-            de: "Der Rhythmus ist stabil; kleine Beobachtung oder nächste Aufgabe vorziehen."
+            zh: "节奏稳定。",
+            en: "Rhythm stable.",
+            de: "Rhythmus stabil."
         )
     }
 

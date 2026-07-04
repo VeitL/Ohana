@@ -30,6 +30,7 @@ struct SettingsView: View {
     @AppStorage("appThemePreference") var appThemePreference: String = "dark"
     @AppStorage("appBackgroundStyle") var appBackgroundStyle: String = AppBackgroundStyle.goIsland.rawValue
     @AppStorage(AppPerformanceMode.powerSavingKey) var powerSavingMode = false
+    @AppStorage(AppPerformanceMode.reducedVisualEffectsKey) var reducedVisualEffectsMode = false
     @AppStorage(AppPrivacySnapshotProtectionStore.hideSnapshotKey) var hideAppSwitcherSnapshot = AppPrivacySnapshotProtectionStore.defaultHideSnapshot
     @AppStorage(MemberGateBiometricAuthStore.enabledKey) var enableMemberGateBiometrics = MemberGateBiometricAuthStore.defaultEnabled
     @AppStorage(MedicationNotificationPrivacyStore.hidePetDetailsKey) var hidePetMedicationNotificationDetails = false
@@ -71,6 +72,7 @@ struct SettingsView: View {
     @State var biometricGateAvailability = MemberGateBiometricAvailability.unavailable
     @State var showingCoconutBalanceTest = false
     @State var showingReminderObservability = false
+    @State var showingUISpecShowcase = false
     @State var showingFamilyWeeklyReportDebug = false
     @State var showAdvancedNotificationSettings = false
     @State var notificationPreferenceRevision = 0
@@ -239,6 +241,12 @@ struct SettingsView: View {
                     }
             }
             .ohanaSheetPagePresentation() // ui-v4: allow developer reminder observability console as long sheet
+        }
+        .sheet(isPresented: $showingUISpecShowcase) {
+            NavigationStack {
+                OhanaUISpecShowcaseView()
+            }
+            .ohanaSheetPagePresentation() // ui-v4: allow developer UI specification console as long sheet
         }
         .sheet(isPresented: $showingFamilyWeeklyReportDebug) {
             NavigationStack {

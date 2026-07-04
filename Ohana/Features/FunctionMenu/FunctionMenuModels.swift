@@ -82,6 +82,9 @@ enum FMDest: Hashable {
     case plantsList
     case plantsPhotos
     case plantDetail(UUID)
+    case plantFeature(UUID, PlantFeatureDestination)
+    case plantCare(UUID, PlantCareFeatureDestination)
+    case plantCareAggregate(PlantCareFeatureDestination)
     case growthRoadmap
     case wealthDashboard
     case bountyBoard
@@ -90,6 +93,82 @@ enum FMDest: Hashable {
     case reminderObservability
     case coconutShop
     case gacha
+}
+
+enum PlantCareFeatureDestination: String, Hashable, CaseIterable, Sendable {
+    case water
+    case fertilize
+    case log
+
+    var title: String {
+        title(l: L10n("zh"))
+    }
+
+    func title(l: L10n) -> String {
+        switch self {
+        case .water:
+            l.tr(zh: "浇水", en: "Water", de: "Gießen")
+        case .fertilize:
+            l.tr(zh: "施肥", en: "Fertilize", de: "Düngen")
+        case .log:
+            l.tr(zh: "记录", en: "Logs", de: "Notizen")
+        }
+    }
+
+    func aggregateTitle(l: L10n) -> String {
+        switch self {
+        case .water:
+            l.tr(zh: "全部浇水记录", en: "All Water Logs", de: "Alle Gießprotokolle")
+        case .fertilize:
+            l.tr(zh: "全部施肥记录", en: "All Fertilizer Logs", de: "Alle Düngeprotokolle")
+        case .log:
+            l.tr(zh: "全部植物记录", en: "All Plant Logs", de: "Alle Pflanzennotizen")
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .water:
+            "drop.fill"
+        case .fertilize:
+            "leaf.fill"
+        case .log:
+            "note.text"
+        }
+    }
+
+    var primaryCareType: PlantCareType {
+        switch self {
+        case .water:
+            .watering
+        case .fertilize:
+            .fertilizing
+        case .log:
+            .customNote
+        }
+    }
+
+    var tint: Color {
+        switch self {
+        case .water:
+            Color.goTeal
+        case .fertilize:
+            Color.goPrimary
+        case .log:
+            Color.goYellow
+        }
+    }
+
+    func matches(_ careType: PlantCareType) -> Bool {
+        switch self {
+        case .water:
+            careType == .watering || careType == .misting
+        case .fertilize:
+            careType == .fertilizing
+        case .log:
+            !Self.water.matches(careType) && !Self.fertilize.matches(careType)
+        }
+    }
 }
 
 enum PetFeature: String, Hashable, CaseIterable {

@@ -2,6 +2,8 @@
 
 Use this when creating or heavily refactoring an app view. The machine source of truth is always `ui规范.selection.json`; this template is only a practical starting point.
 
+Before using the code shape below, read `docs/design/ohana-ui-spec.md` and declare the local UI contract you are following. If a mature sibling surface exists, copy its information architecture and interaction pattern before adjusting visuals.
+
 ## Before Creating Local UI
 
 Before adding a page-local button, card, row, popup, metric, chart, avatar treatment, close control, or motion helper, check whether an existing shared component or V4 pattern already exists.
@@ -210,6 +212,7 @@ Rules:
 - Do not insert/remove the active visual layers mid-transition.
 - Prefer reveal masks and transforms over delayed fade-ins.
 - No image decoding, SwiftData scans, reward writes, or heavy state aggregation on the tap-to-first-frame path.
+- Visible first-screen content must be seeded from route data or value snapshots before the first body pass; do not initialize primary modules from empty `@State` and rely on `onAppear` to backfill them.
 - Reduce Motion should keep the same final states but use short fade/scale.
 
 ## Required Checklist

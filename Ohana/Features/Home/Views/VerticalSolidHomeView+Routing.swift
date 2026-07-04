@@ -42,6 +42,20 @@ extension VerticalSolidHomeView {
             switch route {
             case let .quickMoment(petID):
                 onPresentQuickMoment(petID)
+            case let .petWeightQuick(petID):
+                onPresentPetWeightQuick(petID)
+            case let .petExpenseQuick(petID):
+                onPresentAppSheet(.petExpenseQuick(petID))
+            case let .humanMedicationQuick(humanID):
+                onPresentAppSheet(.humanMedicationQuick(humanID))
+            case let .humanWeightQuick(humanID):
+                onPresentHumanWeightQuick(humanID)
+            case let .humanWorkoutQuick(humanID):
+                onPresentAppSheet(.humanWorkoutQuick(humanID))
+            case let .humanExpenseQuick(humanID):
+                onPresentAppSheet(.humanExpenseQuick(humanID))
+            case let .humanNoteQuick(humanID):
+                onPresentAppSheet(.humanNoteQuick(humanID))
             }
         }
     }

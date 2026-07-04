@@ -17,6 +17,7 @@ struct VerticalSolidHomePlantsPage: View {
     let bottomChromeHeight: CGFloat
     let arrivingPlantCardId: UUID?
     let onOpenPlant: (VerticalSolidHomePlantSnapshot) -> Void
+    let onOpenFeature: (VerticalSolidHomePlantSnapshot, PlantCareFeatureDestination) -> Void
     let onQuickAction: (VerticalSolidHomePlantSnapshot, VerticalSolidHomePlantQuickAction) -> Void
     let onAddPlant: () -> Void
 
@@ -24,6 +25,7 @@ struct VerticalSolidHomePlantsPage: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     @Environment(\.colorScheme) private var colorScheme
+    @ObservedObject private var workloadPolicy = AppWorkloadPolicy.shared
     @State private var selectedCardId: UUID?
     @State private var selectedRoomId: String?
     @State private var selectedViewStyle: VerticalSolidHomePlantViewStyle = .deck
@@ -35,6 +37,12 @@ struct VerticalSolidHomePlantsPage: View {
     @State private var plantAvatarCacheRevision = 0
     @State private var plantAvatarPreloadTask: Task<Void, Never>?
     @State private var collapseCleanupTask: Task<Void, Never>?
+    @State private var deckScrollOffsetTracker = VerticalSolidHomePlantDeckScrollOffsetTracker()
+    @State private var expandedDeckScrollOffsetY: CGFloat = 0
+
+    private var usesFullVisualEffects: Bool {
+        workloadPolicy.visualEffectsBudget(isVisible: true).usesFullEffects
+    }
 
     private var l: L10n { localization }
 
@@ -76,10 +84,13 @@ struct VerticalSolidHomePlantsPage: View {
                                 .padding(.bottom, bottomChromeHeight + VerticalSolidHomePlantWalletScrollPolicy.bottomContentInset)
                             }
                             .scrollBounceBehavior(.basedOnSize)
+                            .scrollDisabled(selectedCardId != nil)
                             .onScrollGeometryChange(for: CGFloat.self) { geometry in
                                 geometry.contentOffset.y
                             } action: { _, offsetY in
-                                updateBottomChromeVisibility(offsetY)
+                                let normalizedOffsetY = max(0, offsetY)
+                                deckScrollOffsetTracker.offsetY = normalizedOffsetY
+                                updateBottomChromeVisibility(normalizedOffsetY)
                             }
                             .onChange(of: selectedRoomId) { _, _ in
                                 scrollToFirstPlantSection(using: scrollProxy)
@@ -334,7 +345,8 @@ struct VerticalSolidHomePlantsPage: View {
         isDue: Bool,
         quickAccessibilityLabel: String
     ) -> VerticalHomeEmbeddedAction {
-        VerticalHomeEmbeddedAction(
+        let featureDestination = plantCareFeatureDestination(for: quickAction) ?? .log
+        return VerticalHomeEmbeddedAction(
             id: id,
             title: title,
             icon: icon,
@@ -349,13 +361,13 @@ struct VerticalSolidHomePlantsPage: View {
             showsMenu: isDue,
             showsQuickButton: isDue,
             quickAccessibilityLabel: quickAccessibilityLabel,
-            detailAccessibilityLabel: l.tr(zh: "查看植物详情", en: "View plant details", de: "Pflanzendetails ansehen"),
-            detailAction: { openPlant(plant) },
+            detailAccessibilityLabel: featureDestination.title(l: l),
+            detailAction: { openPlantFeature(featureDestination, plant: plant) },
             action: {
                 if isDue {
                     performPlantAction(quickAction, plant: plant)
                 } else {
-                    openPlant(plant)
+                    openPlantFeature(featureDestination, plant: plant)
                 }
             }
         )
@@ -374,7 +386,14 @@ struct VerticalSolidHomePlantsPage: View {
         quickAccessibilityLabel: String,
         detailAccessibilityLabel: String
     ) -> VerticalHomeEmbeddedAction {
-        VerticalHomeEmbeddedAction(
+        let openRoute: () -> Void = {
+            if quickAction == .detail {
+                openPlant(plant)
+            } else if let featureDestination = plantCareFeatureDestination(for: quickAction) {
+                openPlantFeature(featureDestination, plant: plant)
+            }
+        }
+        return VerticalHomeEmbeddedAction(
             id: id,
             title: title,
             icon: icon,
@@ -387,8 +406,8 @@ struct VerticalSolidHomePlantsPage: View {
             showsQuickButton: false,
             quickAccessibilityLabel: quickAccessibilityLabel,
             detailAccessibilityLabel: detailAccessibilityLabel,
-            detailAction: { performPlantAction(quickAction, plant: plant) },
-            action: { performPlantAction(quickAction, plant: plant) }
+            detailAction: openRoute,
+            action: openRoute
         )
     }
 
@@ -507,30 +526,45 @@ struct VerticalSolidHomePlantsPage: View {
         .accessibilityIdentifier("home-plants-room-edge-\(roomRailIdentifier(id))")
     }
 
+    @ViewBuilder
     private var roomRailBackground: some View {
+        if usesFullVisualEffects && !reduceTransparency {
+            Capsule()
+                .fill(Color.clear)
+                .glassEffect(.regular.tint(roomRailGlassTint).interactive(true), in: Capsule()) // ui-v4: allow Liquid Glass room rail above plant cards
+                .overlay(roomRailStroke)
+                .shadow( // ui-v4: allow floating glass room rail depth
+                    color: Color.arkInk.opacity(0.16),
+                    radius: 16,
+                    x: 0,
+                    y: 8
+                )
+        } else {
+            Capsule()
+                .fill(Color.ohanaCardSurface.opacity(colorScheme == .dark ? 0.88 : 0.94))
+                .overlay(roomRailStroke)
+                .shadow( // ui-v4: allow reduced-mode room rail separation without Liquid Glass.
+                    color: Color.arkInk.opacity(colorScheme == .dark ? 0.08 : 0.04),
+                    radius: 6,
+                    x: 0,
+                    y: 3
+                )
+        }
+    }
+
+    private var roomRailStroke: some View {
         Capsule()
-            .fill(reduceTransparency ? Color.ohanaCardSurface.opacity(0.94) : Color.clear)
-            .glassEffect(.regular.tint(roomRailGlassTint).interactive(true), in: Capsule()) // ui-v4: allow Liquid Glass room rail above plant cards
-            .overlay {
-                Capsule()
-                    .strokeBorder(
-                        LinearGradient(
-                            colors: [
-                                Color.ohanaPrimaryText.opacity(colorScheme == .dark ? 0.18 : 0.14),
-                                Color.ohanaSecondaryText.opacity(colorScheme == .dark ? 0.18 : 0.10),
-                                Color.ohanaGlassStroke.opacity(0.20)
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        ),
-                        lineWidth: 1
-                    )
-            }
-            .shadow( // ui-v4: allow floating glass room rail depth
-                color: Color.arkInk.opacity(0.16),
-                radius: 16,
-                x: 0,
-                y: 8
+            .strokeBorder(
+                LinearGradient(
+                    colors: [
+                        Color.ohanaPrimaryText.opacity(colorScheme == .dark ? 0.18 : 0.14),
+                        Color.ohanaSecondaryText.opacity(colorScheme == .dark ? 0.18 : 0.10),
+                        Color.ohanaGlassStroke.opacity(usesFullVisualEffects ? 0.20 : 0.12)
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                ),
+                lineWidth: 1
             )
     }
 
@@ -719,16 +753,23 @@ struct VerticalSolidHomePlantsPage: View {
         let sectionHeroSnapshot = section.contains(cardId: activeHeroSnapshot?.card.id) ? activeHeroSnapshot : nil
         let sectionProgress = sectionSelectedCardId == nil ? 0 : heroProgress
         let sectionHeroDirection = sectionSelectedCardId == nil ? 0 : heroDirection
-        let sectionHeight = VerticalSolidHomePlantWalletScrollPolicy.sectionHeight(
+        let isSectionExpanded = sectionSelectedCardId != nil
+        let baseSectionHeight = VerticalSolidHomePlantWalletScrollPolicy.sectionHeight(
             cardCount: section.cards.count,
-            isExpanded: sectionSelectedCardId != nil,
+            isExpanded: isSectionExpanded,
             availableHeight: availableHeight
         )
-        let sceneHeight = VerticalSolidHomePlantWalletScrollPolicy.sceneHeight(
+        let baseSceneHeight = VerticalSolidHomePlantWalletScrollPolicy.sceneHeight(
             cardCount: section.cards.count,
-            isExpanded: sectionSelectedCardId != nil,
+            isExpanded: isSectionExpanded,
             availableHeight: availableHeight
         )
+        let sceneHeight = VerticalSolidHomePlantWalletScrollPolicy.anchoredExpandedSceneHeight(
+            baseHeight: baseSceneHeight,
+            isExpanded: isSectionExpanded,
+            scrollOffsetY: expandedDeckScrollOffsetY
+        )
+        let sectionHeight = max(baseSectionHeight, sceneHeight)
 
         return FocusHomeVerticalSolidScene(
             cards: section.cards,
@@ -749,7 +790,10 @@ struct VerticalSolidHomePlantsPage: View {
             collapsedTopInset: 0,
             collapsedVerticalBias: FocusHomeVerticalSolidCollapsedLayoutPolicy.defaultVerticalBias,
             collapsedLayoutMode: .scrollExtended,
-            expandedVerticalPlacement: .collapsedCardCenter,
+            expandedVerticalPlacement: .viewportTop(
+                topInset: VerticalSolidHomePlantWalletScrollPolicy.expandedCardViewportTopInset,
+                scrollOffsetY: expandedDeckScrollOffsetY
+            ),
             avatarCacheRevision: plantAvatarCacheRevision,
             quickActions: { card in
                 VerticalHomeEmbeddedQuickActions(
@@ -782,8 +826,10 @@ struct VerticalSolidHomePlantsPage: View {
         collapseCleanupTask = nil
         heroGeneration += 1
         let generation = heroGeneration
+        let frozenScrollOffsetY = deckScrollOffsetTracker.offsetY
         OhanaFeedback.light()
         withoutAnimation {
+            expandedDeckScrollOffsetY = frozenScrollOffsetY
             selectedCardId = card.id
             activeHeroSnapshot = snapshot
             heroDirection = 1
@@ -873,8 +919,25 @@ struct VerticalSolidHomePlantsPage: View {
         onOpenPlant(plant)
     }
 
+    private func openPlantFeature(_ destination: PlantCareFeatureDestination, plant: VerticalSolidHomePlantSnapshot) {
+        onOpenFeature(plant, destination)
+    }
+
     private func performPlantAction(_ action: VerticalSolidHomePlantQuickAction, plant: VerticalSolidHomePlantSnapshot) {
         onQuickAction(plant, action)
+    }
+
+    private func plantCareFeatureDestination(for action: VerticalSolidHomePlantQuickAction) -> PlantCareFeatureDestination? {
+        switch action {
+        case .water:
+            .water
+        case .fertilize:
+            .fertilize
+        case .log:
+            .log
+        case .detail:
+            nil
+        }
     }
 
     private func plantSnapshot(for card: FocusCard) -> VerticalSolidHomePlantSnapshot? {
@@ -1096,4 +1159,8 @@ struct VerticalSolidHomePlantsPage: View {
             de: "\(title), \(count) Pflanzen, \(due), \(state)"
         )
     }
+}
+
+private final class VerticalSolidHomePlantDeckScrollOffsetTracker {
+    var offsetY: CGFloat = 0
 }

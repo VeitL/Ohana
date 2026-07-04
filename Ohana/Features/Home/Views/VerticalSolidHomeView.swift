@@ -20,7 +20,9 @@ struct VerticalSolidHomeView: View {
     let onPresentCoconutLog: (CoconutLogSubject?) -> Void
     let onPresentCrewRoster: (CrewRosterMode) -> Void
     let onPresentFunctionMenu: (FMDest?) -> Void
+    let onPresentHumanWeightQuick: (UUID) -> Void
     let onPresentOasisReward: () -> Void
+    let onPresentPetWeightQuick: (UUID) -> Void
     let onPresentQuickMoment: (UUID) -> Void
     let onPresentSettings: () -> Void
     let onPresentStreakDetail: () -> Void
@@ -51,7 +53,6 @@ struct VerticalSolidHomeView: View {
     @Environment(\.accessibilityReduceMotion) var reduceMotion
     @Environment(\.scenePhase) var scenePhase
     @ObservedObject var workloadPolicy = AppWorkloadPolicy.shared
-    @ObservedObject var avatarPipeline = AvatarPipelineRegistry.current
 
     @State var headerContextCardId: UUID?
     @State var fabExpanded = false
@@ -108,7 +109,9 @@ struct VerticalSolidHomeView: View {
         onPresentCoconutLog: @escaping (CoconutLogSubject?) -> Void,
         onPresentCrewRoster: @escaping (CrewRosterMode) -> Void,
         onPresentFunctionMenu: @escaping (FMDest?) -> Void,
+        onPresentHumanWeightQuick: @escaping (UUID) -> Void,
         onPresentOasisReward: @escaping () -> Void,
+        onPresentPetWeightQuick: @escaping (UUID) -> Void,
         onPresentQuickMoment: @escaping (UUID) -> Void,
         onPresentSettings: @escaping () -> Void,
         onPresentStreakDetail: @escaping () -> Void,
@@ -127,7 +130,9 @@ struct VerticalSolidHomeView: View {
         self.onPresentCoconutLog = onPresentCoconutLog
         self.onPresentCrewRoster = onPresentCrewRoster
         self.onPresentFunctionMenu = onPresentFunctionMenu
+        self.onPresentHumanWeightQuick = onPresentHumanWeightQuick
         self.onPresentOasisReward = onPresentOasisReward
+        self.onPresentPetWeightQuick = onPresentPetWeightQuick
         self.onPresentQuickMoment = onPresentQuickMoment
         self.onPresentSettings = onPresentSettings
         self.onPresentStreakDetail = onPresentStreakDetail
@@ -224,7 +229,7 @@ struct VerticalSolidHomeView: View {
 
     var activeHumanAvatarImage: UIImage? {
         guard let id = payload.activeHumanAvatar.id else { return nil }
-        return avatarPipeline.cachedImage(for: id, signature: payload.activeHumanAvatar.signature)
+        return FocusWalletAvatarCache.cachedEntry(for: id, signature: payload.activeHumanAvatar.signature)?.image
     }
 
     var body: some View {
@@ -287,7 +292,7 @@ struct VerticalSolidHomeView: View {
                     VerticalSolidHomeDashboardPage(
                         snapshot: controller.snapshot,
                         interaction: interaction,
-                        avatarCacheRevision: avatarCacheRevision + avatarPipeline.revision,
+                        avatarCacheRevision: avatarCacheRevision,
                         isLive: lifecycle.isLive,
                         walkPresentationRevision: walkCardPresentationRevision,
                         collapsedTopInset: homeCollapsedTopInset,
@@ -364,6 +369,9 @@ struct VerticalSolidHomeView: View {
                         bottomChromeHeight: bottomHeight,
                         arrivingPlantCardId: arrivingPlantCardId,
                         onOpenPlant: openPlant,
+                        onOpenFeature: { plant, destination in
+                            openPlantCareFeature(destination, plant: plant)
+                        },
                         onQuickAction: { plant, action in
                             performPlantQuickAction(action, plant: plant)
                         },
@@ -544,7 +552,6 @@ struct VerticalSolidHomeView: View {
             todayFocusDailyCompletionTask = nil
             memberMediaAttachmentIndexRepairTask = nil
             growthLoopPulseStatus = nil
-            avatarPipeline.cancel(key: avatarPreloadSignature)
             commandQueue.cancelAll()
             snapshotRefreshGate.cancel()
             controller.cancel()

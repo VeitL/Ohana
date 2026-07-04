@@ -44,7 +44,8 @@ protocol PetWalkingManaging: AnyObject {
     func start(pet: Pet)
     func pause()
     func resume()
-    func stop(modelContext: ModelContext, sharedTargets: [Pet], executorIds: [String])
+    @discardableResult
+    func stop(modelContext: ModelContext, sharedTargets: [Pet], executorIds: [String]) -> WalkStopRewardSummary
     func addPoop(type: PottyType)
     func reset()
 }
@@ -54,11 +55,13 @@ extension PetWalkingManaging {
         addPoop(type: .perfectPoop)
     }
 
-    func stop(modelContext: ModelContext) {
+    @discardableResult
+    func stop(modelContext: ModelContext) -> WalkStopRewardSummary {
         stop(modelContext: modelContext, sharedTargets: [], executorIds: [])
     }
 
-    func stop(modelContext: ModelContext, sharedTargets: [Pet]) {
+    @discardableResult
+    func stop(modelContext: ModelContext, sharedTargets: [Pet]) -> WalkStopRewardSummary {
         stop(modelContext: modelContext, sharedTargets: sharedTargets, executorIds: [])
     }
 }
@@ -137,7 +140,8 @@ final class SharedPetWalkingManager: PetWalkingManaging {
         manager.resume()
     }
 
-    func stop(modelContext: ModelContext, sharedTargets: [Pet], executorIds: [String]) {
+    @discardableResult
+    func stop(modelContext: ModelContext, sharedTargets: [Pet], executorIds: [String]) -> WalkStopRewardSummary {
         manager.stop(modelContext: modelContext, sharedTargets: sharedTargets, executorIds: executorIds)
     }
 

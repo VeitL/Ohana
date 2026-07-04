@@ -40,7 +40,7 @@ struct GenericWeightEntrySheet: View {
     @State private var weightUnit: String = "kg"
     @State private var adaptiveSheetHeight: CGFloat = 500
     @State private var scrollContentHeight: CGFloat = 0
-    @State private var popupVisible = false
+    @State private var popupVisible = true
     @State private var isClosing = false
     @State private var isSaving = false
     @State private var popupDragOffset: CGFloat = 0
@@ -190,13 +190,7 @@ struct GenericWeightEntrySheet: View {
         .presentationDragIndicator(.hidden)
         .presentationContentInteraction(.scrolls)
         .onAppear {
-            popupVisible = false
             isClosing = false
-            DispatchQueue.main.async {
-                withAnimation(popupAnimation) {
-                    popupVisible = true
-                }
-            }
             scheduleLatestPetWeightLoad()
         }
         .onChange(of: weightText) { _, newValue in

@@ -95,6 +95,7 @@ nonisolated enum FocusHomeVerticalSolidCollapsedLayoutMode {
 nonisolated enum FocusHomeVerticalSolidExpandedVerticalPlacement {
     case sceneCenter
     case collapsedCardCenter
+    case viewportTop(topInset: CGFloat, scrollOffsetY: CGFloat)
 }
 
 nonisolated enum FocusHomeVerticalSolidCollapsedLayoutPolicy {
@@ -367,10 +368,49 @@ enum FocusHomeEmbeddedQuickActionPresentationPolicy {
     }
 
     static func isInteractive(
-        isExpandedInteractionReady: Bool,
+        isExpandedInteractionMounted: Bool,
         reveal: CGFloat
     ) -> Bool {
-        isExpandedInteractionReady && reveal > 0.98
+        isExpandedInteractionMounted && reveal >= FocusHomeExpandedInteractionPolicy.visibleControlInteractionProgress
+    }
+}
+
+enum FocusHomeExpandedInteractionPolicy {
+    static let expandedControlReadyProgress: CGFloat = 0.18
+    static let visibleControlInteractionProgress: CGFloat = 0.18
+
+    static func isExpandedControlReady(
+        selectedCardId: UUID?,
+        heroDirection: Int,
+        progress: CGFloat
+    ) -> Bool {
+        guard selectedCardId != nil, heroDirection >= 0 else { return false }
+        return progress >= expandedControlReadyProgress
+    }
+
+    static func isExpandedCollapseReady(
+        selectedCardId: UUID?,
+        progress: CGFloat
+    ) -> Bool {
+        guard selectedCardId != nil else { return false }
+        return progress >= expandedControlReadyProgress
+    }
+
+    static func canHitCollapsedCards(
+        selectedCardId: UUID?,
+        heroDirection: Int,
+        progress: CGFloat
+    ) -> Bool {
+        guard selectedCardId != nil else { return true }
+        if heroDirection < 0 { return true }
+        return heroDirection == 0 && progress <= 0.06
+    }
+
+    static func isDetailButtonInteractive(
+        isExpandedInteractionMounted: Bool,
+        reveal: CGFloat
+    ) -> Bool {
+        isExpandedInteractionMounted && reveal >= visibleControlInteractionProgress
     }
 }
 

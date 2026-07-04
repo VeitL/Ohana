@@ -92,7 +92,11 @@ struct FocusHomeVerticalSolidScene<QuickActions: View, ContextMenuContent: View>
     }
 
     private var isExpandedInteractionReady: Bool {
-        selectedCardId != nil && heroDirection == 0 && progress > 0.985
+        FocusHomeExpandedInteractionPolicy.isExpandedControlReady(
+            selectedCardId: selectedCardId,
+            heroDirection: heroDirection,
+            progress: progress
+        )
     }
 
     private var isExpandedInteractionMounted: Bool {
@@ -101,11 +105,18 @@ struct FocusHomeVerticalSolidScene<QuickActions: View, ContextMenuContent: View>
     }
 
     private var isExpandedCollapseReady: Bool {
-        selectedCardId != nil && progress > 0.92
+        FocusHomeExpandedInteractionPolicy.isExpandedCollapseReady(
+            selectedCardId: selectedCardId,
+            progress: progress
+        )
     }
 
     private var canHitCollapsedCards: Bool {
-        selectedCardId == nil || (heroDirection <= 0 && progress <= 0.06)
+        FocusHomeExpandedInteractionPolicy.canHitCollapsedCards(
+            selectedCardId: selectedCardId,
+            heroDirection: heroDirection,
+            progress: progress
+        )
     }
 
     var body: some View {
@@ -359,7 +370,7 @@ struct FocusHomeVerticalSolidScene<QuickActions: View, ContextMenuContent: View>
             postHeroReveal: expandedInteractionReveal
         )
         let embeddedQuickActionsReady = FocusHomeEmbeddedQuickActionPresentationPolicy.isInteractive(
-            isExpandedInteractionReady: isExpandedInteractionReady,
+            isExpandedInteractionMounted: isExpandedInteractionMounted,
             reveal: embeddedQuickActionReveal
         )
         let showsEmbeddedQuickActions = FocusHomeEmbeddedQuickActionPresentationPolicy.isVisible(
@@ -416,7 +427,7 @@ struct FocusHomeVerticalSolidScene<QuickActions: View, ContextMenuContent: View>
                     if showsDetailButton(
                         for: renderCard,
                         isExpandedSurface: isExpandedSurface,
-                        isExpandedInteractionReady: isExpandedInteractionReady,
+                        isExpandedControlReady: isExpandedInteractionReady,
                         walkTrackingPet: walkTrackingPet
                     ) {
                         expandedDetailButton(for: renderCard, frame: frame, reveal: embeddedQuickActionReveal)
@@ -573,7 +584,10 @@ struct FocusHomeVerticalSolidScene<QuickActions: View, ContextMenuContent: View>
             width: width,
             height: quickHeight,
             reveal: reveal,
-            isReady: isExpandedInteractionReady
+            isReady: FocusHomeEmbeddedQuickActionPresentationPolicy.isInteractive(
+                isExpandedInteractionMounted: isExpandedInteractionMounted,
+                reveal: reveal
+            )
         )
         .position(x: frame.midX, y: y)
     }
@@ -701,11 +715,11 @@ struct FocusHomeVerticalSolidScene<QuickActions: View, ContextMenuContent: View>
     private func showsDetailButton(
         for card: FocusCard,
         isExpandedSurface: Bool,
-        isExpandedInteractionReady: Bool,
+        isExpandedControlReady: Bool,
         walkTrackingPet: Pet?
     ) -> Bool {
         isExpandedSurface
-            && isExpandedInteractionReady
+            && isExpandedControlReady
             && walkTrackingPet == nil
             && !card.isElectronicPet
     }
@@ -749,7 +763,10 @@ struct FocusHomeVerticalSolidScene<QuickActions: View, ContextMenuContent: View>
         .frame(width: frame.width, height: frame.height, alignment: .topTrailing)
         .opacity(Double(reveal))
         .offset(y: -(1 - reveal) * FocusHomePostHeroControlRevealPolicy.detailButtonOffset)
-        .allowsHitTesting(isExpandedCollapseReady && reveal > 0.98)
+        .allowsHitTesting(FocusHomeExpandedInteractionPolicy.isDetailButtonInteractive(
+            isExpandedInteractionMounted: isExpandedInteractionMounted,
+            reveal: reveal
+        ))
     }
 
     private func detailButtonIcon(for card: FocusCard) -> String {
@@ -984,21 +1001,24 @@ struct FocusHomeVerticalSolidScene<QuickActions: View, ContextMenuContent: View>
         let aspectRatio = FocusHomeVerticalSolidCollapsedLayoutPolicy.cardAspectRatio
         let maxWidth: CGFloat = embedsQuickActionsInCard ? 386 : 390
         let horizontalInset: CGFloat = embedsQuickActionsInCard ? 18 : 22
-        let topInset = safeTop
+        let safeTopInset = safeTop
         let bottomInset = embedsQuickActionsInCard ? CGFloat(0) : safeBottom + 28
         let availableWidth = max(220, size.width - horizontalInset)
-        let availableHeight = max(320, size.height - topInset - bottomInset)
+        let availableHeight = max(320, size.height - safeTopInset - bottomInset)
         let width = min(availableWidth, maxWidth, availableHeight / aspectRatio)
         let height = width * aspectRatio
-        let centeredTargetY = topInset + availableHeight / 2 - (embedsQuickActionsInCard ? 2 : 0)
+        let centeredTargetY = safeTopInset + availableHeight / 2 - (embedsQuickActionsInCard ? 2 : 0)
+        let minimumY = safeTopInset + height / 2
+        let maximumY = safeTopInset + availableHeight - height / 2
         let targetY: CGFloat
         switch expandedVerticalPlacement {
         case .sceneCenter:
             targetY = centeredTargetY
         case .collapsedCardCenter:
-            let minimumY = topInset + height / 2
-            let maximumY = topInset + availableHeight - height / 2
             let anchoredY = collapsedFrame?.midY ?? centeredTargetY
+            targetY = min(max(anchoredY, minimumY), max(minimumY, maximumY))
+        case let .viewportTop(topInset, scrollOffsetY):
+            let anchoredY = max(0, scrollOffsetY) + max(0, topInset) + height / 2
             targetY = min(max(anchoredY, minimumY), max(minimumY, maximumY))
         }
         return CGRect(

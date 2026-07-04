@@ -8,7 +8,7 @@
 import SwiftData
 import SwiftUI
 
-enum PlantFeatureDestination: Hashable {
+enum PlantFeatureDestination: Hashable, Sendable {
     case water
     case fertilize
     case pestCheck
@@ -21,6 +21,66 @@ enum PlantFeatureDestination: Hashable {
     case timeline
     case catalog
     case safety
+}
+
+extension PlantFeatureDestination {
+    func title(l: L10n) -> String {
+        switch self {
+        case .water:
+            l.tr(zh: "浇水", en: "Water", de: "Gießen")
+        case .fertilize:
+            l.tr(zh: "施肥", en: "Fertilize", de: "Düngen")
+        case .pestCheck:
+            l.tr(zh: "病虫复查", en: "Pest check", de: "Schädlingscheck")
+        case .leafCleaning:
+            l.tr(zh: "清洁叶片", en: "Clean leaves", de: "Blätter reinigen")
+        case .carePlan:
+            l.tr(zh: "护理计划", en: "Care plan", de: "Pflegeplan")
+        case .reminders:
+            l.tr(zh: "植物提醒", en: "Reminders", de: "Erinnerungen")
+        case .healthReview:
+            l.tr(zh: "健康观察", en: "Health review", de: "Gesundheitscheck")
+        case .profile:
+            l.tr(zh: "植物档案", en: "Profile", de: "Profil")
+        case .photos:
+            l.tr(zh: "成长照片", en: "Photos", de: "Fotos")
+        case .timeline:
+            l.tr(zh: "护理时间线", en: "Timeline", de: "Zeitachse")
+        case .catalog:
+            l.tr(zh: "资料库", en: "Catalog", de: "Katalog")
+        case .safety:
+            l.tr(zh: "家庭安全", en: "Safety", de: "Sicherheit")
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .water:
+            "drop.fill"
+        case .fertilize:
+            "leaf.fill"
+        case .pestCheck:
+            "ladybug.fill"
+        case .leafCleaning:
+            "sparkles"
+        case .carePlan:
+            "slider.horizontal.3"
+        case .reminders:
+            "bell.badge.fill"
+        case .healthReview:
+            "waveform.path.ecg"
+        case .profile:
+            "list.clipboard.fill"
+        case .photos:
+            "photo.stack.fill"
+        case .timeline:
+            "clock.arrow.circlepath"
+        case .catalog:
+            "books.vertical.fill"
+        case .safety:
+            "shield.checkered"
+        }
+    }
 }
 
 private struct PlantHubFocusAction {

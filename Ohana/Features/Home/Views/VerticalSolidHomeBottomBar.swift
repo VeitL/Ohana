@@ -107,6 +107,7 @@ struct VerticalSolidHomeBottomBar: View {
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    @ObservedObject private var workloadPolicy = AppWorkloadPolicy.shared
 
     private var l: L10n { localization }
     private var visibleTabs: [VerticalSolidHomeTab] {
@@ -117,6 +118,9 @@ struct VerticalSolidHomeBottomBar: View {
             tabCount: visibleTabs.count,
             isAccessibilitySize: dynamicTypeSize.isAccessibilitySize
         )
+    }
+    private var usesFullVisualEffects: Bool {
+        workloadPolicy.visualEffectsBudget(isVisible: true).usesFullEffects
     }
 
     var body: some View {
@@ -156,6 +160,7 @@ struct VerticalSolidHomeBottomBar: View {
                     isExpanded: isFabExpanded,
                     diameter: metrics.actionDiameter,
                     hitSize: metrics.actionHitSize,
+                    usesFullVisualEffects: usesFullVisualEffects,
                     accessibilityLabel: centerButtonAccessibilityLabel
                 ) {
                     OhanaFeedback.medium()
@@ -238,30 +243,45 @@ struct VerticalSolidHomeBottomBar: View {
         }
     }
 
+    @ViewBuilder
     private var navBackground: some View {
+        if usesFullVisualEffects && !reduceTransparency {
+            Capsule()
+                .fill(Color.clear)
+                .glassEffect(.regular.tint(navGlassTint).interactive(true), in: Capsule()) // ui-v4: allow app-level Liquid Glass bottom navigation background
+                .overlay(navStroke)
+                .shadow( // ui-v4: allow floating Instagram-style glass navigation depth
+                    color: Color.arkInk.opacity(colorScheme == .dark ? 0.22 : 0.10),
+                    radius: 18,
+                    x: 0,
+                    y: 10
+                )
+        } else {
+            Capsule()
+                .fill(Color.ohanaCardSurface.opacity(colorScheme == .dark ? 0.88 : 0.94))
+                .overlay(navStroke)
+                .shadow( // ui-v4: allow reduced-mode floating nav separation without Liquid Glass.
+                    color: Color.arkInk.opacity(colorScheme == .dark ? 0.08 : 0.04),
+                    radius: 6,
+                    x: 0,
+                    y: 3
+                )
+        }
+    }
+
+    private var navStroke: some View {
         Capsule()
-            .fill(reduceTransparency ? Color.ohanaCardSurface.opacity(0.94) : Color.clear)
-            .glassEffect(.regular.tint(navGlassTint).interactive(true), in: Capsule()) // ui-v4: allow app-level Liquid Glass bottom navigation background
-            .overlay {
-                Capsule()
-                    .strokeBorder(
-                        LinearGradient(
-                            colors: [
-                                Color.ohanaPrimaryText.opacity(colorScheme == .dark ? 0.18 : 0.14),
-                                navSpecularStroke,
-                                Color.ohanaGlassStroke.opacity(0.20)
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        ),
-                        lineWidth: 1
-                    )
-            }
-            .shadow( // ui-v4: allow floating Instagram-style glass navigation depth
-                color: Color.arkInk.opacity(colorScheme == .dark ? 0.22 : 0.10),
-                radius: 18,
-                x: 0,
-                y: 10
+            .strokeBorder(
+                LinearGradient(
+                    colors: [
+                        Color.ohanaPrimaryText.opacity(colorScheme == .dark ? 0.18 : 0.14),
+                        navSpecularStroke,
+                        Color.ohanaGlassStroke.opacity(usesFullVisualEffects ? 0.20 : 0.12)
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                ),
+                lineWidth: 1
             )
     }
 
@@ -647,6 +667,7 @@ private struct HomeBottomNavigationPrimaryAction: View {
     let isExpanded: Bool
     let diameter: CGFloat
     let hitSize: CGFloat
+    let usesFullVisualEffects: Bool
     let accessibilityLabel: String
     let action: () -> Void
 
@@ -676,10 +697,10 @@ private struct HomeBottomNavigationPrimaryAction: View {
                     .strokeBorder(Color.ohanaPrimaryActionText.opacity(0.22), lineWidth: 1)
             }
             .shadow( // ui-v4: allow detached primary FAB depth
-                color: Color.goPrimary.opacity(0.28),
-                radius: 16,
+                color: Color.goPrimary.opacity(usesFullVisualEffects ? 0.28 : 0.12),
+                radius: usesFullVisualEffects ? 16 : 6,
                 x: 0,
-                y: 8
+                y: usesFullVisualEffects ? 8 : 3
             )
     }
 }

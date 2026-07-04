@@ -168,6 +168,7 @@ struct PlantDashboardView: View {
     @Environment(\.accessibilityReduceMotion) var reduceMotion
     @Environment(\.accessibilityReduceTransparency) var reduceTransparency
     @Environment(\.colorScheme) var colorScheme
+    @ObservedObject var workloadPolicy = AppWorkloadPolicy.shared
 
     @StateObject var commandQueue = DeferredDomainCommandQueue()
     @State var showingAddPlant = false

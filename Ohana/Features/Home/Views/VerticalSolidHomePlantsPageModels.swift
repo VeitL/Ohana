@@ -18,6 +18,8 @@ enum VerticalSolidHomePlantWalletScrollPolicy {
     static let roomRailVisibleBottomInset: CGFloat = 72
     static let roomRailHiddenBottomInset: CGFloat = 24
     static let roomRailTrailingCenterInset: CGFloat = 31
+    static let expandedCardViewportTopInset: CGFloat = 36
+    static let expandedCardHeightEstimate: CGFloat = 386 * FocusHomeVerticalSolidCollapsedLayoutPolicy.cardAspectRatio
 
     static func cardViewportHeight(
         containerHeight: CGFloat,
@@ -69,6 +71,22 @@ enum VerticalSolidHomePlantWalletScrollPolicy {
             minimumSceneHeight,
             availableHeight,
             FocusHomeVerticalSolidCollapsedLayoutPolicy.scrollExtendedMinimumSceneHeight(cardCount: cardCount)
+        )
+    }
+
+    static func anchoredExpandedSceneHeight(
+        baseHeight: CGFloat,
+        isExpanded: Bool,
+        scrollOffsetY: CGFloat
+    ) -> CGFloat {
+        guard isExpanded else { return baseHeight }
+
+        return max(
+            baseHeight,
+            max(0, scrollOffsetY)
+                + expandedCardViewportTopInset
+                + expandedCardHeightEstimate
+                + bottomContentInset
         )
     }
 }

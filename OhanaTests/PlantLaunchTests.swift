@@ -1135,7 +1135,7 @@ struct PlantLaunchTests {
         #expect(reminders.isEmpty)
     }
 
-    @Test func explicitPlantReminderPayloadDeepLinksToPlant() {
+    @Test func explicitPlantReminderPayloadDeepLinksToPlantCareFeature() {
         let plant = Plant(name: "Fern")
         let payload = OhanaReminderRoutePayload(userInfo: [
             "plantId": plant.id.uuidString,
@@ -1152,10 +1152,11 @@ struct PlantLaunchTests {
             humanMedications: []
         )
 
-        if case let .plant(routedPlant) = destination {
+        if case let .plantCare(routedPlant, featureDestination) = destination {
             #expect(routedPlant.id == plant.id)
+            #expect(featureDestination == .water)
         } else {
-            Issue.record("Expected explicit plant notification payload to route to plant detail")
+            Issue.record("Expected explicit plant notification payload to route to plant care feature detail")
         }
     }
 

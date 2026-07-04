@@ -52,6 +52,30 @@ struct WalksLogicTests {
         #expect(abs(snapshot.thisWeekDistanceKm - 1.2) < 0.001)
     }
 
+    @Test func walkSummaryBackFaceSurfacesStopCoconutReward() throws {
+        let rootURL = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+        let cardSource = try String(
+            contentsOf: rootURL.appending(path: "Ohana/Features/Walks/Views/WalkTrackingCard.swift"),
+            encoding: .utf8
+        )
+        let actionsSource = try String(
+            contentsOf: rootURL.appending(path: "Ohana/Features/Walks/Views/WalkTrackingCard+Actions.swift"),
+            encoding: .utf8
+        )
+        let summarySource = try String(
+            contentsOf: rootURL.appending(path: "Ohana/Features/Walks/Views/WalkTrackingCard+SummaryFace.swift"),
+            encoding: .utf8
+        )
+
+        #expect(cardSource.contains("var onStopWalk: ([Pet], [String]) -> WalkStopRewardSummary"))
+        #expect(cardSource.contains("@State var lastStopRewardSummary: WalkStopRewardSummary?"))
+        #expect(actionsSource.contains("let rewardSummary = onStopWalk(selectedWalkTargets, selectedWalkExecutorIds)"))
+        #expect(actionsSource.contains("lastStopRewardSummary = rewardSummary.hasReward ? rewardSummary : nil"))
+        #expect(summarySource.contains("summaryRewardBadge(delta: coconutDelta)"))
+        #expect(summarySource.contains("walk-tracking-summary-coconut-reward"))
+        #expect(summarySource.contains("finishedCoconutDelta(for:"))
+    }
+
     @Test func managerStartNoOpsForIneligiblePetsBeforeStartingLocation() {
         let location = FakeWalkLocationManager()
         let manager = PetWalkingManager(locationManager: location, questManager: QuestManager())
@@ -175,8 +199,9 @@ private final class FakeWalkManager: PetWalkingManaging {
         phase = .running
     }
 
-    func stop(modelContext _: ModelContext, sharedTargets _: [Pet], executorIds _: [String]) {
+    func stop(modelContext _: ModelContext, sharedTargets _: [Pet], executorIds _: [String]) -> WalkStopRewardSummary {
         phase = .finished(elapsed: elapsedTime, poopCount: poopCount)
+        return .empty
     }
 
     func addPoop(type: PottyType) {

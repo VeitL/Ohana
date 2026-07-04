@@ -212,7 +212,11 @@ extension WalkTrackingCard {
             scope: "walk.shared",
             candidates: sameSpeciesWalkPets
         )
-        onStopWalk(selectedWalkTargets, selectedWalkExecutorIds)
+        let rewardSummary = onStopWalk(selectedWalkTargets, selectedWalkExecutorIds)
+        lastStopRewardSummary = rewardSummary.hasReward ? rewardSummary : nil
+        if rewardSummary.hasReward {
+            OhanaFeedback.success()
+        }
         presentSummaryBack()
     }
 
