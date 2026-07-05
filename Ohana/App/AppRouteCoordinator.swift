@@ -237,6 +237,7 @@ enum AppOverlayRoute: Hashable, Identifiable {
 enum AppRouteNotificationEvent: Equatable {
     case humanDeleted(requiresReplacementHuman: Bool, requiresAccountSwitch: Bool)
     case reminderRouteRequested
+    case plantBatchCareRouteRequested(careType: PlantCareType?)
 }
 
 enum AppRouteNotificationOutcome: Equatable {
@@ -470,6 +471,14 @@ final class AppRouteCoordinator: ObservableObject {
             return .reconcileHumanRequirement
         case .reminderRouteRequested:
             resetToHome()
+            return .none
+        case let .plantBatchCareRouteRequested(careType):
+            resetToHome()
+            if let careType {
+                presentFunctionMenu(destination: .plantsBatchCareFiltered(careType))
+            } else {
+                presentFunctionMenu(destination: .plantsBatchCare)
+            }
             return .none
         }
     }

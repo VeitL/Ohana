@@ -12,14 +12,16 @@ import SwiftUI
 struct VerticalSolidHomePlantsPage: View {
     let plants: [VerticalSolidHomePlantSnapshot]
     let localization: L10n
+    @Binding var plantQuickActionItemsRaw: String
     @Binding var hidesBottomChrome: Bool
     let topChromeHeight: CGFloat
     let bottomChromeHeight: CGFloat
     let arrivingPlantCardId: UUID?
     let onOpenPlant: (VerticalSolidHomePlantSnapshot) -> Void
     let onOpenFeature: (VerticalSolidHomePlantSnapshot, PlantCareFeatureDestination) -> Void
-    let onQuickAction: (VerticalSolidHomePlantSnapshot, VerticalSolidHomePlantQuickAction) -> Void
+    let onCareQuickAction: (VerticalSolidHomePlantSnapshot, PlantCareType) -> Void
     let onAddPlant: () -> Void
+    let onOpenBatchCare: () -> Void
 
     @Environment(\.modelContext) private var modelContext
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -120,6 +122,14 @@ struct VerticalSolidHomePlantsPage: View {
                             .transition(.opacity.combined(with: .move(edge: .trailing)))
                             .zIndex(30)
                     }
+
+                    if showsDueCareBanner {
+                        plantDueCareBanner
+                            .padding(.horizontal, 16)
+                            .padding(.top, 12)
+                            .transition(.opacity.combined(with: .move(edge: .top)))
+                            .zIndex(32)
+                    }
                 }
             }
         }
@@ -190,6 +200,68 @@ struct VerticalSolidHomePlantsPage: View {
     private var visiblePlants: [VerticalSolidHomePlantSnapshot] {
         guard let selectedRoomId else { return plants }
         return plants.filter { roomIdentifier(for: $0) == selectedRoomId }
+    }
+
+    private var dueCarePlantCount: Int {
+        plants.count(where: \.needsCare)
+    }
+
+    private var showsDueCareBanner: Bool {
+        dueCarePlantCount > 0 && selectedCardId == nil && heroDirection == 0
+    }
+
+    private var plantDueCareBanner: some View {
+        Button {
+            OhanaFeedback.light()
+            onOpenBatchCare()
+        } label: {
+            HStack(spacing: 10) {
+                Image(systemName: "checkmark.circle.fill") // a11y: allow decorative icon; button label names the batch-care action.
+                    .font(OhanaFont.adaptive(size: 14, weight: .black))
+                    .foregroundStyle(Color.arkInk)
+                    .frame(width: 34, height: 34) // a11y: allow decorative glyph inside a 50pt labeled batch-care button.
+                    .background(Color.goYellow, in: Circle())
+                    .accessibilityHidden(true)
+
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(l.tr(
+                        zh: "今日 \(dueCarePlantCount) 株待照护",
+                        en: "\(dueCarePlantCount) plants need care today",
+                        de: "\(dueCarePlantCount) Pflanzen brauchen heute Pflege"
+                    ))
+                    .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
+                    .foregroundStyle(Color.ohanaPrimaryText)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.76)
+
+                    Text(l.tr(zh: "批量处理", en: "Open batch care", de: "Batch-Pflege öffnen"))
+                        .font(OhanaFont.adaptive(size: 10, weight: .semibold, design: .rounded))
+                        .foregroundStyle(Color.ohanaSecondaryText)
+                        .lineLimit(1)
+                }
+
+                Spacer(minLength: 6)
+
+                Image(systemName: "chevron.right") // a11y: allow decorative disclosure glyph; button label names the action.
+                    .font(OhanaFont.adaptive(size: 11, weight: .black))
+                    .foregroundStyle(Color.ohanaTertiaryText)
+                    .frame(width: 24, height: 24) // a11y: allow non-interactive glyph inside a 50pt labeled button.
+                    .accessibilityHidden(true)
+            }
+            .padding(.leading, 8)
+            .padding(.trailing, 10)
+            .frame(maxWidth: .infinity)
+            .frame(minHeight: 50)
+            .background(Color.ohanaCardSurface.opacity(0.94), in: Capsule())
+            .overlay(Capsule().strokeBorder(Color.ohanaCardStroke.opacity(0.66), lineWidth: 1))
+        }
+        .buttonStyle(ScaleButtonStyle())
+        .accessibilityLabel(l.tr(
+            zh: "今日 \(dueCarePlantCount) 株植物待照护，打开批量照护",
+            en: "\(dueCarePlantCount) plants need care today, open batch care",
+            de: "\(dueCarePlantCount) Pflanzen brauchen heute Pflege, Batch-Pflege öffnen"
+        ))
+        .accessibilityIdentifier("home-plants-due-care-banner")
     }
 
     private var plantCardSections: [VerticalSolidHomePlantCardSection] {
@@ -283,132 +355,33 @@ struct VerticalSolidHomePlantsPage: View {
         return max(56, roomRailCenterY - roomRailHeight / 2 - 10 - viewSwitcherRailHeight / 2)
     }
 
-    private func plantQuickActionItems(for card: FocusCard) -> [VerticalHomeEmbeddedAction] {
-        guard let plant = plantSnapshot(for: card) else { return [] }
-        return [
-            plantCareQuickAction(
-                plant,
-                quickAction: .water,
-                id: "home-plant-\(card.id.uuidString)-water",
-                title: l.tr(zh: "浇水", en: "Water", de: "Gießen"),
-                icon: "drop.fill",
-                actionType: "plantWater",
-                isDue: plant.hasDueWatering,
-                quickAccessibilityLabel: l.tr(zh: "记录植物浇水", en: "Log plant watering", de: "Pflanze gegossen erfassen")
-            ),
-            plantCareQuickAction(
-                plant,
-                quickAction: .fertilize,
-                id: "home-plant-\(card.id.uuidString)-fertilize",
-                title: l.tr(zh: "施肥", en: "Fertilize", de: "Düngen"),
-                icon: "leaf.fill",
-                actionType: "fertilizePlant",
-                isDue: plant.hasDueFertilizing,
-                quickAccessibilityLabel: l.tr(zh: "记录植物施肥", en: "Log plant fertilizing", de: "Pflanze gedüngt erfassen")
-            ),
-            plantRouteQuickAction(
-                plant,
-                quickAction: .log,
-                id: "home-plant-\(card.id.uuidString)-log",
-                title: l.tr(zh: "记录", en: "Log", de: "Notiz"),
-                icon: "note.text",
-                actionType: "plantNote",
-                primaryIcon: "square.and.pencil",
-                detailIcon: "note.text",
-                statusText: l.tr(zh: "备注/照片", en: "Note/photo", de: "Notiz/Foto"),
-                quickAccessibilityLabel: l.tr(zh: "打开植物记录", en: "Open plant log", de: "Pflanzennotiz öffnen"),
-                detailAccessibilityLabel: l.tr(zh: "打开植物记录", en: "Open plant log", de: "Pflanzennotiz öffnen")
-            ),
-            plantRouteQuickAction(
-                plant,
-                quickAction: .detail,
-                id: "home-plant-\(card.id.uuidString)-detail",
-                title: l.tr(zh: "详情", en: "Detail", de: "Detail"),
-                icon: "info.circle.fill",
-                actionType: "plantDetail",
-                primaryIcon: "arrow.right",
-                detailIcon: "info.circle.fill",
-                statusText: l.tr(zh: "资料页", en: "Profile", de: "Profil"),
-                quickAccessibilityLabel: l.tr(zh: "打开植物详情", en: "Open plant details", de: "Pflanzendetails öffnen"),
-                detailAccessibilityLabel: l.tr(zh: "打开植物详情", en: "Open plant details", de: "Pflanzendetails öffnen")
-            )
-        ]
-    }
-
-    private func plantCareQuickAction(
-        _ plant: VerticalSolidHomePlantSnapshot,
-        quickAction: VerticalSolidHomePlantQuickAction,
-        id: String,
-        title: String,
-        icon: String,
-        actionType: String,
-        isDue: Bool,
-        quickAccessibilityLabel: String
-    ) -> VerticalHomeEmbeddedAction {
-        let featureDestination = plantCareFeatureDestination(for: quickAction) ?? .log
-        return VerticalHomeEmbeddedAction(
-            id: id,
-            title: title,
-            icon: icon,
-            actionType: actionType,
-            statusText: isDue
-                ? l.tr(zh: "待打卡", en: "Due", de: "Fällig")
-                : l.tr(zh: "看详情", en: "Details", de: "Details"),
-            isCompleted: false,
-            showsAttention: isDue,
-            primaryIcon: "checkmark",
-            detailIcon: "info.circle.fill",
-            showsMenu: isDue,
-            showsQuickButton: isDue,
-            quickAccessibilityLabel: quickAccessibilityLabel,
-            detailAccessibilityLabel: featureDestination.title(l: l),
-            detailAction: { openPlantFeature(featureDestination, plant: plant) },
-            action: {
-                if isDue {
-                    performPlantAction(quickAction, plant: plant)
-                } else {
-                    openPlantFeature(featureDestination, plant: plant)
+    @ViewBuilder
+    private func plantDockQuickActions(for card: FocusCard) -> some View {
+        if let plant = plantSnapshot(for: card) {
+            PlantDockQuickActionsView(
+                plantID: plant.id,
+                plantName: plant.name,
+                dueCareTypes: plantDueCareTypes(for: plant),
+                localization: localization,
+                quickActionItemsRaw: $plantQuickActionItemsRaw,
+                shouldReduceWork: reduceMotion,
+                forcesSubmenusBelow: false,
+                onAction: { action in
+                    performPlantDockAction(action, plant: plant)
+                },
+                onDetail: { action in
+                    openPlantDockDetail(action, plant: plant)
                 }
-            }
-        )
-    }
-
-    private func plantRouteQuickAction(
-        _ plant: VerticalSolidHomePlantSnapshot,
-        quickAction: VerticalSolidHomePlantQuickAction,
-        id: String,
-        title: String,
-        icon: String,
-        actionType: String,
-        primaryIcon: String,
-        detailIcon: String,
-        statusText: String,
-        quickAccessibilityLabel: String,
-        detailAccessibilityLabel: String
-    ) -> VerticalHomeEmbeddedAction {
-        let openRoute: () -> Void = {
-            if quickAction == .detail {
-                openPlant(plant)
-            } else if let featureDestination = plantCareFeatureDestination(for: quickAction) {
-                openPlantFeature(featureDestination, plant: plant)
-            }
+            )
+        } else {
+            VerticalHomeEmbeddedQuickActions(
+                title: l.tr(zh: "快捷", en: "Quick", de: "Schnell"),
+                items: [],
+                localization: localization,
+                shouldReduceWork: reduceMotion,
+                forcesSubmenusBelow: false
+            )
         }
-        return VerticalHomeEmbeddedAction(
-            id: id,
-            title: title,
-            icon: icon,
-            actionType: actionType,
-            statusText: statusText,
-            isCompleted: false,
-            primaryIcon: primaryIcon,
-            detailIcon: detailIcon,
-            showsMenu: false,
-            showsQuickButton: false,
-            quickAccessibilityLabel: quickAccessibilityLabel,
-            detailAccessibilityLabel: detailAccessibilityLabel,
-            detailAction: openRoute,
-            action: openRoute
-        )
     }
 
     private var plantViewSwitcherRail: some View {
@@ -796,14 +769,7 @@ struct VerticalSolidHomePlantsPage: View {
             ),
             avatarCacheRevision: plantAvatarCacheRevision,
             quickActions: { card in
-                VerticalHomeEmbeddedQuickActions(
-                    title: l.tr(zh: "快捷", en: "Quick", de: "Schnell"),
-                    items: plantQuickActionItems(for: card),
-                    localization: localization,
-                    itemsRevision: card.id.uuidString,
-                    shouldReduceWork: reduceMotion,
-                    forcesSubmenusBelow: false
-                )
+                plantDockQuickActions(for: card)
             },
             contextMenu: { _ in EmptyView() },
             onSelect: expandCard,
@@ -910,11 +876,6 @@ struct VerticalSolidHomePlantsPage: View {
         openPlant(plant)
     }
 
-    private func performPlantAction(_ action: VerticalSolidHomePlantQuickAction, card: FocusCard) {
-        guard let plant = plantSnapshot(for: card) else { return }
-        performPlantAction(action, plant: plant)
-    }
-
     private func openPlant(_ plant: VerticalSolidHomePlantSnapshot) {
         onOpenPlant(plant)
     }
@@ -923,21 +884,36 @@ struct VerticalSolidHomePlantsPage: View {
         onOpenFeature(plant, destination)
     }
 
-    private func performPlantAction(_ action: VerticalSolidHomePlantQuickAction, plant: VerticalSolidHomePlantSnapshot) {
-        onQuickAction(plant, action)
+    private func performPlantDockAction(_ action: PlantDockQuickAction, plant: VerticalSolidHomePlantSnapshot) {
+        guard let careType = action.careType else {
+            openPlant(plant)
+            return
+        }
+        onCareQuickAction(plant, careType)
     }
 
-    private func plantCareFeatureDestination(for action: VerticalSolidHomePlantQuickAction) -> PlantCareFeatureDestination? {
+    private func openPlantDockDetail(_ action: PlantDockQuickAction, plant: VerticalSolidHomePlantSnapshot) {
         switch action {
-        case .water:
-            .water
-        case .fertilize:
-            .fertilize
-        case .log:
-            .log
         case .detail:
-            nil
+            openPlant(plant)
+        case .water:
+            openPlantFeature(.water, plant: plant)
+        case .fertilize:
+            openPlantFeature(.fertilize, plant: plant)
+        default:
+            openPlantFeature(.log, plant: plant)
         }
+    }
+
+    private func plantDueCareTypes(for plant: VerticalSolidHomePlantSnapshot) -> Set<PlantCareType> {
+        var types = Set<PlantCareType>()
+        if plant.hasDueWatering {
+            types.insert(.watering)
+        }
+        if plant.hasDueFertilizing {
+            types.insert(.fertilizing)
+        }
+        return types
     }
 
     private func plantSnapshot(for card: FocusCard) -> VerticalSolidHomePlantSnapshot? {

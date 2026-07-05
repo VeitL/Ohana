@@ -181,6 +181,25 @@ struct FeatureGroupDashboardView: View {
                     parentPath.append(FMDest.plantDetail(plantID))
                 }
             )
+        case .plantsBatchCare:
+            PlantDashboardView(
+                plants: plants,
+                initialMode: .plants,
+                opensBatchCareOnAppear: true,
+                onOpenPlant: { plantID in
+                    parentPath.append(FMDest.plantDetail(plantID))
+                }
+            )
+        case let .plantsBatchCareFiltered(careType):
+            PlantDashboardView(
+                plants: plants,
+                initialMode: .plants,
+                opensBatchCareOnAppear: true,
+                initialBatchCareType: careType,
+                onOpenPlant: { plantID in
+                    parentPath.append(FMDest.plantDetail(plantID))
+                }
+            )
         case .plantsList:
             PlantDashboardView(
                 plants: plants,

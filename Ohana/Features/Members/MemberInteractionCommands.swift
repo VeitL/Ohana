@@ -302,6 +302,57 @@ struct PlantCareCommandExecutor {
         revisions.publishPlantCare(result, note: note)
         return result
     }
+
+    @discardableResult
+    func completeBatchCare(
+        selections: [PlantBatchCareSelection],
+        executorId: String?,
+        note: String,
+        now: Date = Date(),
+        calendar: Calendar = .current
+    ) -> PlantBatchCareCommandResult {
+        let result = PlantBatchCareCommandService.completeDueCare(
+            selections: selections,
+            context: context,
+            executorId: executorId,
+            now: now,
+            calendar: calendar
+        )
+        revisions.publishPlantBatchCare(result, note: note)
+        return result
+    }
+
+    @discardableResult
+    func undoBatchCare(
+        _ token: PlantBatchCareUndoToken,
+        note: String,
+        now: Date = Date(),
+        calendar: Calendar = .current
+    ) -> PlantBatchCareUndoResult {
+        let result = PlantBatchCareCommandService.undo(
+            token,
+            context: context,
+            now: now,
+            calendar: calendar
+        )
+        revisions.publishPlantBatchCareUndo(result, note: note)
+        return result
+    }
+
+    @discardableResult
+    func commitBatchCareRewards(
+        for token: PlantBatchCareUndoToken,
+        note: String,
+        now: Date = Date()
+    ) -> PlantBatchCareRewardCommitResult {
+        let result = PlantBatchCareCommandService.commitRewards(
+            for: token,
+            context: context,
+            now: now
+        )
+        revisions.publishPlantBatchCareRewardCommit(result, note: note)
+        return result
+    }
 }
 
 @MainActor

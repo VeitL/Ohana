@@ -67,15 +67,6 @@ nonisolated struct VerticalSolidHomePlantSnapshot: Identifiable, Equatable, Send
     let todoText: String
 }
 
-nonisolated enum VerticalSolidHomePlantQuickAction: String, CaseIterable, Identifiable, Sendable {
-    case water
-    case fertilize
-    case log
-    case detail
-
-    var id: String { rawValue }
-}
-
 nonisolated struct VerticalSolidHomeFirstPetEmptyState: Equatable, Sendable {
     let eyebrow: String
     let title: String

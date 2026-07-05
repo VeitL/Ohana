@@ -874,6 +874,12 @@ private extension HomeFabFunctionShortcut {
                 return "feature-\(feature.rawValue)"
             case let .featureGroup(group):
                 return "feature-group-\(group.rawValue)"
+            case .plantsBatchCare:
+                return "plants-batch-care"
+            case let .plantsBatchCareFiltered(careType):
+                return "plants-batch-care-\(careType.rawValue)"
+            case let .plantCareAggregate(feature):
+                return "plant-care-\(feature.rawValue)"
             case .coconutShop:
                 return "coconutShop"
             case .gacha:

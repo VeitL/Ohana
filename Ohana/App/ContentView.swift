@@ -461,7 +461,7 @@ struct ContentView: View {
         switch event {
         case .humanDeleted:
             homeCardStateResetToken = UUID()
-        case .reminderRouteRequested:
+        case .reminderRouteRequested, .plantBatchCareRouteRequested:
             break
         }
     }

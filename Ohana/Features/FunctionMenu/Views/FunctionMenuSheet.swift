@@ -25,6 +25,8 @@ struct FunctionMenuSheet: View {
         switch dest {
         case .featureGroup,
              .featureAggregate,
+             .plantsBatchCare,
+             .plantsBatchCareFiltered,
              .plantCareAggregate,
              .growthRoadmap,
              .familyWeeklyReport,
@@ -184,6 +186,8 @@ struct FunctionMenuSheet: View {
         switch dest {
         case .featureGroup,
              .featureAggregate,
+             .plantsBatchCare,
+             .plantsBatchCareFiltered,
              .plantCareAggregate,
              .growthRoadmap,
              .familyWeeklyReport,
@@ -239,6 +243,14 @@ struct FunctionMenuSheet: View {
             (l.tr(zh: "椰子树路线", en: "Tree Roadmap", de: "Baum-Roadmap"), "tree.fill")
         case .plantsDashboard:
             (l.tr(zh: "植物总览", en: "Plant Overview", de: "Pflanzenübersicht"), "leaf.fill")
+        case .plantsBatchCare:
+            (l.tr(zh: "今日照护", en: "Today Care", de: "Heutige Pflege"), "checkmark.circle.fill")
+        case let .plantsBatchCareFiltered(careType):
+            (l.tr(
+                zh: "今日\(careType.displayName(l: l))",
+                en: "Today \(careType.displayName(l: l))",
+                de: "Heute \(careType.displayName(l: l))"
+            ), "checkmark.circle.fill")
         case .plantsList:
             (l.tr(zh: "植物列表", en: "Plant List", de: "Pflanzenliste"), "list.bullet.rectangle.fill")
         case .plantsPhotos:

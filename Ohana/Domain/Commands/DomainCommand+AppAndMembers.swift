@@ -13,6 +13,10 @@ extension DomainCommand {
         command("plants", action, ["plantID": plantID.uuidString])
     }
 
+    static func plantBatchCare(batchID: UUID, action: String, count: Int) -> DomainCommand {
+        command("plants", action, ["batchID": batchID.uuidString, "count": String(count)])
+    }
+
     static func quickMoment(petID: UUID?) -> DomainCommand {
         command("moments", "quickMoment", ["petID": petID?.uuidString ?? "none"])
     }

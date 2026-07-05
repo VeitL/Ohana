@@ -157,12 +157,15 @@ struct PlantDashboardAvatarPreloadRequest: Sendable {
 
 struct PlantDashboardView: View {
     let plants: [Plant]
+    let opensBatchCareOnAppear: Bool
+    let initialBatchCareType: PlantCareType?
     let onOpenPlant: (UUID) -> Void
 
     @Environment(\.modelContext) var modelContext
     @Environment(AppServices.self) var appServices
     @AppStorage("appLanguage") var appLanguage = "zh"
     @AppStorage("currentActiveHumanId") var activeHumanIdRaw = ""
+    @AppStorage("plantQuickActionItems_v1") var plantQuickActionItemsRaw = ""
     @AppStorage("ohana_onboarding_has_pets") var onboardingHasPets = true
     @AppStorage("ohana_onboarding_has_children") var onboardingHasChildren = false
     @Environment(\.accessibilityReduceMotion) var reduceMotion
@@ -179,6 +182,15 @@ struct PlantDashboardView: View {
     @State var selectedSiteSummary: PlantDashboardRoomSummary?
     @State var selectedDashboardPhoto: PlantDashboardPhotoItem?
     @State var showingCarePlanSheet = false
+    @State var showingBatchCareSheet = false
+    @State var didOpenInitialBatchCareSheet = false
+    @State var batchCareInitialType: PlantCareType?
+    @State var batchCareRoomFilter: String?
+    @State var batchCareSheetSnapshot: PlantBatchCareSheetSnapshot = .empty
+    @State var batchCareRouteSnapshotTask: Task<Void, Never>?
+    @State var batchCareRouteSnapshotGeneration = 0
+    @State var pendingBatchCareUndoToken: PlantBatchCareUndoToken?
+    @State var pendingBatchCareRewardTask: Task<Void, Never>?
     @State var careLogDraft: PlantDashboardCareLogDraft?
     @State var searchText = ""
     @FocusState var searchFocused: Bool
@@ -198,9 +210,13 @@ struct PlantDashboardView: View {
     init(
         plants: [Plant] = [],
         initialMode: PlantDashboardEntryMode = .sites,
+        opensBatchCareOnAppear: Bool = false,
+        initialBatchCareType: PlantCareType? = nil,
         onOpenPlant: @escaping (UUID) -> Void = { _ in }
     ) {
         self.plants = plants
+        self.opensBatchCareOnAppear = opensBatchCareOnAppear
+        self.initialBatchCareType = initialBatchCareType
         self.onOpenPlant = onOpenPlant
         _selectedDashboardMode = State(initialValue: PlantDashboardMode(entryMode: initialMode))
     }
@@ -261,7 +277,7 @@ struct PlantDashboardView: View {
     }
 
     var plantListModePlants: [Plant] {
-        filteredPlants(ignoresLocation: true)
+        plantsSortedByCareUrgency(filteredPlants(ignoresLocation: true))
     }
 
     var plantListModeRoomSummaries: [PlantDashboardRoomSummary] {
@@ -283,9 +299,7 @@ struct PlantDashboardView: View {
                 return PlantDashboardRoomSummary(
                     id: title,
                     title: title,
-                    plants: roomPlants.sorted { lhs, rhs in
-                        lhs.name.localizedStandardCompare(rhs.name) == .orderedAscending
-                    },
+                    plants: plantsSortedByCareUrgency(roomPlants),
                     plantCount: roomPlants.count,
                     dueTaskCount: dueTaskCount,
                     watchCount: watchCount
@@ -333,6 +347,40 @@ struct PlantDashboardView: View {
         let query = normalizedForPlantSearch(normalizedSearchText)
         return locationFiltered.filter {
             plantMatchesSearch($0, normalizedQuery: query)
+        }
+    }
+
+    func plantsSortedByCareUrgency(_ sourcePlants: [Plant]) -> [Plant] {
+        let dueByPlantID = Dictionary(
+            upcomingTasks.map { ($0.plantID, $0.daysUntilDue) },
+            uniquingKeysWith: min
+        )
+
+        return sourcePlants.sorted { lhs, rhs in
+            let lhsDue = dueByPlantID[lhs.id] ?? Int.max
+            let rhsDue = dueByPlantID[rhs.id] ?? Int.max
+            if lhsDue != rhsDue {
+                return lhsDue < rhsDue
+            }
+
+            let lhsHealthPriority = plantHealthSortPriority(lhs)
+            let rhsHealthPriority = plantHealthSortPriority(rhs)
+            if lhsHealthPriority != rhsHealthPriority {
+                return lhsHealthPriority < rhsHealthPriority
+            }
+
+            return lhs.name.localizedStandardCompare(rhs.name) == .orderedAscending
+        }
+    }
+
+    func plantHealthSortPriority(_ plant: Plant) -> Int {
+        switch plant.healthStatus {
+        case .stressed:
+            0
+        case .watching:
+            1
+        default:
+            2
         }
     }
 
@@ -471,6 +519,7 @@ struct PlantDashboardView: View {
             }
 
             plantFloatingEdgeControls
+            batchCareUndoBanner
         }
         .sheet(isPresented: $showingAddPlant) {
             AddPlantDataContainer {
@@ -506,6 +555,22 @@ struct PlantDashboardView: View {
                 onSkipTask: skipTask
             )
         }
+        .sheet(isPresented: $showingBatchCareSheet) {
+            PlantBatchCareSheet(
+                snapshot: batchCareSheetSnapshot,
+                initialCareType: batchCareInitialType,
+                imageDataProvider: { plantModelID in
+                    await previewImageData(for: plantModelID, source: .profile)
+                },
+                onComplete: completeBatchCare,
+                onOpenCareLog: openCareLogFromBatchCare,
+                onDeferTask: deferTaskFromBatchCare,
+                onSkipTask: skipTaskFromBatchCare
+            )
+            .onDisappear {
+                batchCareRoomFilter = nil
+            }
+        }
         .sheet(item: $careLogDraft) { draft in
             PlantCareLogSheet(
                 plant: draft.plant,
@@ -528,6 +593,7 @@ struct PlantDashboardView: View {
         .onAppear {
             scheduleMediaAttachmentIndexRepair()
             scheduleVisiblePlantAvatarPreload()
+            openInitialBatchCareSheetIfNeeded()
         }
         .onChange(of: plants.count) { _, _ in
             scheduleMediaAttachmentIndexRepair()
@@ -538,6 +604,8 @@ struct PlantDashboardView: View {
         .onDisappear {
             mediaAttachmentIndexRepairTask?.cancel()
             plantAvatarPreloadTask?.cancel()
+            batchCareRouteSnapshotTask?.cancel()
+            pendingBatchCareRewardTask?.cancel()
             commandQueue.cancelAll()
         }
     }
@@ -897,9 +965,7 @@ struct PlantDashboardView: View {
     }
 
     func waterAll() {
-        for plant in plantsNeedingWater {
-            recordPlantCare(.watering, plant: plant)
-        }
+        openBatchCareSheet(careType: .watering)
     }
 
     func clearPlantSearchAndFilters() {
@@ -983,6 +1049,64 @@ struct PlantDashboardView: View {
         showingCarePlanSheet = true
     }
 
+    func openBatchCareSheet(careType: PlantCareType? = nil, roomID: String? = nil) {
+        guard !dueTasks.isEmpty else { return }
+        batchCareInitialType = careType
+        batchCareRoomFilter = roomID
+        prepareBatchCareSheetSnapshot(careType: careType, roomID: roomID)
+
+        if showingCarePlanSheet {
+            showingCarePlanSheet = false
+            Task { @MainActor in
+                await OhanaFrameScheduler.waitAfterNextFrame()
+                showingBatchCareSheet = true
+            }
+        } else {
+            showingBatchCareSheet = true
+        }
+    }
+
+    func prepareBatchCareSheetSnapshot(careType: PlantCareType?, roomID: String?) {
+        batchCareSheetSnapshot = makeBatchCareSheetSnapshot(careType: careType, roomID: roomID)
+        batchCareRouteSnapshotTask?.cancel()
+        batchCareRouteSnapshotGeneration += 1
+        let generation = batchCareRouteSnapshotGeneration
+        let container = modelContext.container
+        let input = PlantBatchCareRouteSnapshotInput(
+            careType: careType,
+            roomID: roomID,
+            now: Date(),
+            days: 7,
+            unassignedIndoorTitle: l.tr(zh: "未设置室内位置", en: "Unassigned indoor", de: "Innen ohne Ort"),
+            unassignedOutdoorTitle: l.tr(zh: "未设置户外位置", en: "Unassigned outdoor", de: "Außen ohne Ort")
+        )
+        batchCareRouteSnapshotTask = Task { @MainActor in
+            await OhanaFrameScheduler.waitAfterNextFrame()
+            guard !Task.isCancelled else { return }
+            let actor = PlantBatchCareRouteSnapshotActor(modelContainer: container)
+            do {
+                let snapshot = try await actor.load(input: input)
+                guard !Task.isCancelled, generation == batchCareRouteSnapshotGeneration else { return }
+                batchCareSheetSnapshot = snapshot
+            } catch is CancellationError {
+                return
+            } catch {
+                OhanaLog.warning("Plant batch-care route snapshot load failed: \(error.localizedDescription)", category: "Plants")
+            }
+            guard generation == batchCareRouteSnapshotGeneration else { return }
+            batchCareRouteSnapshotTask = nil
+        }
+    }
+
+    func openInitialBatchCareSheetIfNeeded() {
+        guard opensBatchCareOnAppear, !didOpenInitialBatchCareSheet else { return }
+        didOpenInitialBatchCareSheet = true
+        Task { @MainActor in
+            await OhanaFrameScheduler.waitAfterNextFrame()
+            openBatchCareSheet(careType: initialBatchCareType)
+        }
+    }
+
     func openDashboardProfileQueue() {
         selectedDashboardMode = .plants
         selectedFilter = .all
@@ -1032,6 +1156,15 @@ struct PlantDashboardView: View {
         }
     }
 
+    func openCareLogFromBatchCare(plantID: UUID, type: PlantCareType) {
+        showingBatchCareSheet = false
+        Task { @MainActor in
+            await OhanaFrameScheduler.waitAfterNextFrame()
+            guard let plant = plants.first(where: { $0.id == plantID }) else { return }
+            openCareLogSheet(for: plant, type: type)
+        }
+    }
+
     func savePlantCareLog(
         for plant: Plant,
         type: PlantCareType,
@@ -1063,9 +1196,85 @@ struct PlantDashboardView: View {
     }
 
     func completeDueTasks() {
-        for task in dueTasks {
-            guard let plant = plants.first(where: { $0.id == task.plantID }) else { continue }
-            recordPlantCare(task.careType, plant: plant)
+        openBatchCareSheet()
+    }
+
+    func completeBatchCare(_ selections: [PlantBatchCareSelection]) {
+        guard !selections.isEmpty else { return }
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        let executorId = currentExecutorId()
+        Task { @MainActor in
+            await OhanaFrameScheduler.waitAfterNextFrame()
+            let result = commandExecutor.completePlantBatchCare(
+                selections: selections,
+                executorId: executorId
+            )
+            guard let token = result.undoToken else { return }
+            PlantBatchCarePendingRewardStore.upsert(token)
+            pendingBatchCareUndoToken = token
+            publishBatchCareVisualReward(result)
+            scheduleBatchCareRewardCommit(for: token)
+        }
+    }
+
+    func undoPendingBatchCare() {
+        guard let token = pendingBatchCareUndoToken else { return }
+        pendingBatchCareRewardTask?.cancel()
+        pendingBatchCareRewardTask = nil
+        pendingBatchCareUndoToken = nil
+        PlantBatchCarePendingRewardStore.remove(batchID: token.batchID)
+        _ = commandExecutor.undoPlantBatchCare(token)
+        UINotificationFeedbackGenerator().notificationOccurred(.warning)
+    }
+
+    func scheduleBatchCareRewardCommit(for token: PlantBatchCareUndoToken) {
+        pendingBatchCareRewardTask?.cancel()
+        pendingBatchCareRewardTask = Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 6_000_000_000)
+            guard !Task.isCancelled,
+                  pendingBatchCareUndoToken?.id == token.id else { return }
+            pendingBatchCareUndoToken = nil
+            let result = commandExecutor.commitPlantBatchCareRewards(for: token)
+            PlantBatchCarePendingRewardStore.remove(batchID: token.batchID)
+            if result.didCommit {
+                UINotificationFeedbackGenerator().notificationOccurred(.success)
+            }
+            pendingBatchCareRewardTask = nil
+        }
+    }
+
+    func publishBatchCareVisualReward(_ result: PlantBatchCareCommandResult) {
+        guard result.estimatedCoconutDelta > 0 else { return }
+        appServices.domainRevisions.publishCoconutRewardFeedback(
+            OhanaCoconutRewardEvent(
+                id: result.batchID,
+                amount: result.estimatedCoconutDelta,
+                growthXP: 0,
+                emoji: "🥥",
+                title: l.tr(zh: "批量照护", en: "Batch care", de: "Sammelpflege"),
+                actorId: currentExecutorId(),
+                date: Date()
+            )
+        )
+    }
+
+    func deferTaskFromBatchCare(_ task: PlantBatchCareSheetTask) {
+        showingBatchCareSheet = false
+        Task { @MainActor in
+            await OhanaFrameScheduler.waitAfterNextFrame()
+            if let source = dueTasks.first(where: { $0.id == task.id }) {
+                deferTaskOneDay(source)
+            }
+        }
+    }
+
+    func skipTaskFromBatchCare(_ task: PlantBatchCareSheetTask) {
+        showingBatchCareSheet = false
+        Task { @MainActor in
+            await OhanaFrameScheduler.waitAfterNextFrame()
+            if let source = dueTasks.first(where: { $0.id == task.id }) {
+                skipTask(source)
+            }
         }
     }
 

@@ -16,6 +16,7 @@ final class NotificationManager: NSObject, @unchecked Sendable {
 
     private let center = UNUserNotificationCenter.current()
     private let categoryID = "OHANA_REMINDER"
+    private let plantBatchCareCategoryID = "OHANA_PLANT_BATCH_CARE"
     private let petMedicationCategoryID = "MED_REMINDER"
     private let humanMedicationCategoryID = "HUMAN_MED_REMINDER"
     private let routeCenter: OhanaNotificationRouteCenter
@@ -55,10 +56,21 @@ final class NotificationManager: NSObject, @unchecked Sendable {
             title: l.tr(zh: "明天再说 🕐", en: "Tomorrow 🕐", de: "Morgen 🕐"),
             options: []
         )
+        let openPlantBatchCareAction = UNNotificationAction(
+            identifier: "OPEN_PLANT_BATCH_CARE",
+            title: l.tr(zh: "全部完成", en: "Complete all", de: "Alle erledigen"),
+            options: [.foreground]
+        )
 
         let category = UNNotificationCategory(
             identifier: categoryID,
             actions: [completeAction, skipAction, snoozeAction],
+            intentIdentifiers: [],
+            options: []
+        )
+        let plantBatchCareCategory = UNNotificationCategory(
+            identifier: plantBatchCareCategoryID,
+            actions: [openPlantBatchCareAction],
             intentIdentifiers: [],
             options: []
         )
@@ -76,7 +88,7 @@ final class NotificationManager: NSObject, @unchecked Sendable {
             options: []
         )
 
-        center.setNotificationCategories([category, petMedicationCategory, humanMedicationCategory])
+        center.setNotificationCategories([category, plantBatchCareCategory, petMedicationCategory, humanMedicationCategory])
     }
 
     // MARK: - 滚动窗口常量
@@ -247,6 +259,35 @@ final class NotificationManager: NSObject, @unchecked Sendable {
         }
     }
 
+    func schedulePlantBatchCareSummary(_ summary: PlantBatchCareNotificationSummary) {
+        guard summary.deliveryDate > Date() else { return }
+        let l = L10n()
+        let content = UNMutableNotificationContent()
+        content.title = l.tr(zh: "植物照护提醒", en: "Plant care reminder", de: "Pflanzenpflege-Erinnerung")
+        content.body = plantBatchCareSummaryBody(summary, l: l)
+        content.sound = .default
+        content.categoryIdentifier = plantBatchCareCategoryID
+        content.userInfo = [
+            "plantBatchCareSummary": true,
+            "plantCareType": summary.careType.rawValue,
+            "plantBatchCarePlantCount": summary.plantCount,
+            "plantBatchCareTaskCount": summary.taskCount,
+            "notificationTier": NotificationDeliveryTier.routine.rawValue,
+            "notificationCategory": NotificationDeliveryCategory.plantCare.rawValue
+        ]
+
+        let trigger = UNCalendarNotificationTrigger(
+            dateMatching: Self.triggerDateComponents(for: summary.deliveryDate),
+            repeats: false
+        )
+        let request = UNNotificationRequest(
+            identifier: summary.notificationId,
+            content: content,
+            trigger: trigger
+        )
+        center.add(request)
+    }
+
     // MARK: - Cancel
     func cancel(notificationId: String) {
         center.removePendingNotificationRequests(withIdentifiers: [notificationId])
@@ -328,6 +369,15 @@ final class NotificationManager: NSObject, @unchecked Sendable {
             .trimmingCharacters(in: .whitespacesAndNewlines)
         return "\(event.emoji) \(title)"
     }
+
+    private func plantBatchCareSummaryBody(_ summary: PlantBatchCareNotificationSummary, l: L10n) -> String {
+        let careName = summary.careType.displayName(l: l)
+        return l.tr(
+            zh: "\(summary.plantCount) 棵植物今天要\(careName)",
+            en: "\(summary.plantCount) plants need \(careName.lowercased()) today",
+            de: "\(summary.plantCount) Pflanzen brauchen heute \(careName.lowercased())"
+        )
+    }
 }
 
 struct ReminderNotificationActionEvent: Identifiable {
@@ -363,6 +413,10 @@ final class OhanaNotificationRouteCenter: ObservableObject {
     func requestReminderRoute(_ payload: [String: Any]) {
         pendingReminderRoute = payload
         publishRouteEvent(.reminderRouteRequested)
+    }
+
+    func requestPlantBatchCareRoute(careType: PlantCareType?) {
+        publishRouteEvent(.plantBatchCareRouteRequested(careType: careType))
     }
 
     func publishRouteEvent(_ event: AppRouteNotificationEvent) {
@@ -426,6 +480,10 @@ extension NotificationManager: UNUserNotificationCenterDelegate {
         if let plantCareType = userInfo["plantCareType"] as? String {
             payload["plantCareType"] = plantCareType
         }
+        let isPlantBatchCareSummary = userInfo["plantBatchCareSummary"] as? Bool == true
+        if isPlantBatchCareSummary {
+            payload["plantBatchCareSummary"] = true
+        }
         if let petId = userInfo["petId"] as? String {
             payload["petId"] = petId
         }
@@ -448,7 +506,19 @@ extension NotificationManager: UNUserNotificationCenterDelegate {
         switch action {
         case UNNotificationDefaultActionIdentifier:
             DispatchQueue.main.async {
-                self.routeCenter.requestReminderRoute(payload)
+                if isPlantBatchCareSummary {
+                    self.routeCenter.requestPlantBatchCareRoute(
+                        careType: (payload["plantCareType"] as? String).flatMap(PlantCareType.init(rawValue:))
+                    )
+                } else {
+                    self.routeCenter.requestReminderRoute(payload)
+                }
+            }
+        case "OPEN_PLANT_BATCH_CARE":
+            DispatchQueue.main.async {
+                self.routeCenter.requestPlantBatchCareRoute(
+                    careType: (payload["plantCareType"] as? String).flatMap(PlantCareType.init(rawValue:))
+                )
             }
         case "COMPLETE", "SKIP", "SNOOZE":
             DispatchQueue.main.async {

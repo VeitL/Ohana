@@ -47,6 +47,7 @@ struct VerticalSolidHomeView: View {
     @AppStorage("ohanaGrowthOnboardingCompletedV1") var growthOnboardingCompleted = false
     @AppStorage("ohanaGrowthLastSeenTreeLevelV1") var growthLastSeenTreeLevel = 0
     @AppStorage("quickActionItems_v2") var quickActionItemsRaw = ""
+    @AppStorage("plantQuickActionItems_v1") var plantQuickActionItemsRaw = ""
     @AppStorage("home_cards_enable_ambient_float") var enablesHomeCardAmbientFloat = false
     @Environment(\.modelContext) var modelContext
     @Environment(AppServices.self) var appServices
@@ -364,6 +365,7 @@ struct VerticalSolidHomeView: View {
                     VerticalSolidHomePlantsPage(
                         plants: controller.snapshot.plants,
                         localization: l,
+                        plantQuickActionItemsRaw: $plantQuickActionItemsRaw,
                         hidesBottomChrome: $plantBottomChromeHidden,
                         topChromeHeight: topChromeHeight,
                         bottomChromeHeight: bottomHeight,
@@ -372,10 +374,16 @@ struct VerticalSolidHomeView: View {
                         onOpenFeature: { plant, destination in
                             openPlantCareFeature(destination, plant: plant)
                         },
-                        onQuickAction: { plant, action in
-                            performPlantQuickAction(action, plant: plant)
+                        onCareQuickAction: { plant, type in
+                            recordPlantQuickCare(type, plantID: plant.id)
                         },
-                        onAddPlant: { routeCoordinator.openAddEntity(.plant) }
+                        onAddPlant: { routeCoordinator.openAddEntity(.plant) },
+                        onOpenBatchCare: {
+                            routeCoordinator.openFunctionMenu(
+                                destination: .plantsBatchCare,
+                                currentLevel: treeManager.treeLevel.rawValue
+                            )
+                        }
                     )
                 }
                 .frame(width: proxy.size.width, height: contentHeight)
@@ -432,7 +440,10 @@ struct VerticalSolidHomeView: View {
                     itemsVisible: $fabMenuItemsVisible,
                     activeCard: expandedBottomBarCard,
                     homeShortcuts: HomeFabShortcutCatalog.primaryShortcuts,
-                    plantShortcuts: HomeFabShortcutCatalog.plantShortcuts(l: l),
+                    plantShortcuts: HomeFabShortcutCatalog.plantShortcuts(
+                        l: l,
+                        dueTaskCount: controller.snapshot.plants.count(where: \.needsCare)
+                    ),
                     expandedShortcuts: expandedBottomBarShortcuts,
                     safeBottom: safeBottom,
                     treeLevel: treeManager.treeLevel.rawValue,

@@ -96,9 +96,27 @@ extension PlantDashboardView {
         }.joined(separator: "|")
     }
 
+    @ViewBuilder
     func plantEmbeddedQuickActions(for card: FocusCard) -> some View {
-        guard let plant = visiblePlants.first(where: { $0.id == card.id }) else {
-            return VerticalHomeEmbeddedQuickActions(
+        if let plant = visiblePlants.first(where: { $0.id == card.id }) {
+            let nextTask = appServices.plantCarePlans.nextTask(for: plant)
+            PlantDockQuickActionsView(
+                plantID: plant.id,
+                plantName: plant.name,
+                dueCareTypes: plantDueCareTypes(nextTask: nextTask),
+                localization: l,
+                quickActionItemsRaw: $plantQuickActionItemsRaw,
+                shouldReduceWork: reduceMotion,
+                forcesSubmenusBelow: false,
+                onAction: { action in
+                    performPlantDockQuickAction(action, plant: plant)
+                },
+                onDetail: { action in
+                    openPlantDockDetail(action, plant: plant)
+                }
+            )
+        } else {
+            VerticalHomeEmbeddedQuickActions(
                 title: l.tr(zh: "快捷", en: "Quick", de: "Schnell"),
                 items: [],
                 localization: l,
@@ -106,89 +124,6 @@ extension PlantDashboardView {
                 forcesSubmenusBelow: false
             )
         }
-        let nextTask = appServices.plantCarePlans.nextTask(for: plant)
-        return VerticalHomeEmbeddedQuickActions(
-            title: l.tr(zh: "快捷", en: "Quick", de: "Schnell"),
-            items: plantEmbeddedActionItems(for: plant, nextTask: nextTask),
-            localization: l,
-            itemsRevision: "\(plant.id.uuidString)-\(nextTask?.careType.rawValue ?? "none")-\(nextTask?.daysUntilDue ?? 999)",
-            shouldReduceWork: reduceMotion,
-            forcesSubmenusBelow: false
-        )
-    }
-
-    func plantEmbeddedActionItems(
-        for plant: Plant,
-        nextTask: PlantCareTaskSnapshot?
-    ) -> [VerticalHomeEmbeddedAction] {
-        let wateringStatus = nextTask?.careType == .watering ? nextTask.map { dueText(for: $0) } : nil
-        let fertilizingStatus = nextTask?.careType == .fertilizing ? nextTask.map { dueText(for: $0) } : nil
-        return [
-            VerticalHomeEmbeddedAction(
-                id: "plant-\(plant.id.uuidString)-water",
-                title: l.tr(zh: "浇水", en: "Water", de: "Gießen"),
-                icon: "drop.fill",
-                actionType: "plantWater",
-                statusText: wateringStatus,
-                isCompleted: false,
-                showsAttention: nextTask?.careType == .watering && (nextTask?.daysUntilDue ?? 1) <= 0,
-                primaryIcon: "checkmark",
-                detailIcon: "clock.arrow.circlepath",
-                showsMenu: false,
-                showsQuickButton: true,
-                quickAccessibilityLabel: l.tr(zh: "记录浇水", en: "Log watering", de: "Gießen erfassen"),
-                detailAccessibilityLabel: l.tr(zh: "查看植物详情", en: "View plant details", de: "Pflanzendetails ansehen"),
-                detailAction: { onOpenPlant(plant.id) },
-                action: { openCareLogSheet(for: plant, type: .watering) }
-            ),
-            VerticalHomeEmbeddedAction(
-                id: "plant-\(plant.id.uuidString)-fertilize",
-                title: l.tr(zh: "施肥", en: "Fertilize", de: "Düngen"),
-                icon: "leaf.fill",
-                actionType: "plantFertilize",
-                statusText: fertilizingStatus,
-                isCompleted: false,
-                showsAttention: nextTask?.careType == .fertilizing && (nextTask?.daysUntilDue ?? 1) <= 0,
-                primaryIcon: "checkmark",
-                detailIcon: "calendar",
-                showsMenu: false,
-                showsQuickButton: true,
-                quickAccessibilityLabel: l.tr(zh: "记录施肥", en: "Log fertilizing", de: "Düngen erfassen"),
-                detailAccessibilityLabel: l.tr(zh: "查看植物详情", en: "View plant details", de: "Pflanzendetails ansehen"),
-                detailAction: { onOpenPlant(plant.id) },
-                action: { openCareLogSheet(for: plant, type: .fertilizing) }
-            ),
-            VerticalHomeEmbeddedAction(
-                id: "plant-\(plant.id.uuidString)-growth",
-                title: l.tr(zh: "成长", en: "Growth", de: "Wachstum"),
-                icon: "camera.fill",
-                actionType: "plantGrowth",
-                isCompleted: false,
-                primaryIcon: "plus",
-                detailIcon: "photo.stack.fill",
-                showsMenu: false,
-                showsQuickButton: true,
-                quickAccessibilityLabel: l.tr(zh: "记录成长", en: "Log growth", de: "Wachstum erfassen"),
-                detailAccessibilityLabel: l.tr(zh: "查看植物详情", en: "View plant details", de: "Pflanzendetails ansehen"),
-                detailAction: { onOpenPlant(plant.id) },
-                action: { openCareLogSheet(for: plant, type: nextTask?.careType == .photo ? .photo : .newLeaf) }
-            ),
-            VerticalHomeEmbeddedAction(
-                id: "plant-\(plant.id.uuidString)-detail",
-                title: l.tr(zh: "详情", en: "Detail", de: "Detail"),
-                icon: "arrow.right.circle.fill",
-                actionType: "plantDetail",
-                isCompleted: false,
-                primaryIcon: "arrow.right",
-                detailIcon: "info.circle.fill",
-                showsMenu: false,
-                showsQuickButton: true,
-                quickAccessibilityLabel: l.tr(zh: "打开植物详情", en: "Open plant details", de: "Pflanzendetails öffnen"),
-                detailAccessibilityLabel: l.tr(zh: "打开植物详情", en: "Open plant details", de: "Pflanzendetails öffnen"),
-                detailAction: { onOpenPlant(plant.id) },
-                action: { onOpenPlant(plant.id) }
-            )
-        ]
     }
 
     func expandPlantWalletCard(_ snapshot: FocusHomeVerticalSolidHeroSnapshot) {
@@ -474,45 +409,18 @@ extension PlantDashboardView {
             .accessibilityIdentifier("plant-dashboard-plant-detail-handle-\(plant.id.uuidString)")
 
             HStack(spacing: 8) {
-                plantWalletQuickActionButton(
-                    id: "water",
-                    icon: "drop.fill",
-                    title: l.tr(zh: "浇水", en: "Water", de: "Gießen"),
-                    tint: Color.goTeal
-                ) {
-                    openCareLogSheet(for: plant, type: .watering)
+                ForEach(plantStoredDockActions(for: plant)) { action in
+                    plantWalletQuickActionButton(
+                        id: action.rawValue,
+                        icon: action.icon,
+                        title: action.title(l: l),
+                        tint: action.tint,
+                        showsAttention: plantDockActionIsDue(action, nextTask: nextTask)
+                    ) {
+                        performPlantDockQuickAction(action, plant: plant)
+                    }
+                    .accessibilityIdentifier("plant-dashboard-plant-\(action.rawValue)-\(plant.id.uuidString)")
                 }
-                .accessibilityIdentifier("plant-dashboard-plant-quick-care-\(plant.id.uuidString)")
-
-                plantWalletQuickActionButton(
-                    id: "fertilize",
-                    icon: "leaf.fill",
-                    title: l.tr(zh: "施肥", en: "Fertilize", de: "Düngen"),
-                    tint: Color.goPrimary
-                ) {
-                    openCareLogSheet(for: plant, type: .fertilizing)
-                }
-                .accessibilityIdentifier("plant-dashboard-plant-quick-fertilize-\(plant.id.uuidString)")
-
-                plantWalletQuickActionButton(
-                    id: "growth",
-                    icon: "camera.fill",
-                    title: l.tr(zh: "成长", en: "Growth", de: "Wachstum"),
-                    tint: Color.goYellow
-                ) {
-                    openCareLogSheet(for: plant, type: nextTask?.careType == .photo ? .photo : .newLeaf)
-                }
-                .accessibilityIdentifier("plant-dashboard-plant-growth-\(plant.id.uuidString)")
-
-                plantWalletQuickActionButton(
-                    id: "detail",
-                    icon: "arrow.right.circle.fill",
-                    title: l.tr(zh: "详情", en: "Detail", de: "Detail"),
-                    tint: Color.goTeal
-                ) {
-                    onOpenPlant(plant.id)
-                }
-                .accessibilityIdentifier("plant-dashboard-plant-detail-\(plant.id.uuidString)")
             }
         }
         .padding(10)
@@ -525,21 +433,41 @@ extension PlantDashboardView {
         .accessibilityIdentifier("plant-dashboard-wallet-actions-\(plant.id.uuidString)")
     }
 
+    func plantStoredDockActions(for plant: Plant) -> [PlantDockQuickAction] {
+        let storedItems = ExpandedQuickActionStore.plantItems(
+            raw: plantQuickActionItemsRaw,
+            plantID: plant.id,
+            localization: l
+        )
+        return storedItems.compactMap { PlantDockQuickAction(actionType: $0.actionType) }
+    }
+
     func plantWalletQuickActionButton(
         id: String,
         icon: String,
         title: String,
         tint: Color,
+        showsAttention: Bool = false,
         action: @escaping () -> Void
     ) -> some View {
         Button(action: action) {
             VStack(spacing: 5) {
-                Image(systemName: icon)
-                    .font(OhanaFont.adaptive(size: 13, weight: .black))
-                    .foregroundStyle(id == "water" || id == "fertilize" ? Color.arkInk : tint)
-                    .frame(width: 44, height: 44)
-                    .background(tint, in: Circle())
-                    .accessibilityHidden(true)
+                ZStack(alignment: .topTrailing) {
+                    Image(systemName: icon)
+                        .font(OhanaFont.adaptive(size: 13, weight: .black))
+                        .foregroundStyle(Color.arkInk)
+                        .frame(width: 44, height: 44)
+                        .background(tint, in: Circle())
+                        .accessibilityHidden(true)
+
+                    if showsAttention {
+                        Circle()
+                            .fill(Color.goYellow)
+                            .frame(width: 9, height: 9) // a11y: allow non-interactive due-status dot inside a labeled 44pt action button.
+                            .overlay(Circle().strokeBorder(Color.ohanaCardSurface, lineWidth: 1.5))
+                            .accessibilityHidden(true)
+                    }
+                }
                 Text(title)
                     .font(OhanaFont.adaptive(size: 10, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
@@ -552,6 +480,45 @@ extension PlantDashboardView {
         .buttonStyle(ScaleButtonStyle())
         .accessibilityLabel(title)
         .accessibilityIdentifier("plant-dashboard-wallet-action-\(id)")
+    }
+
+    func plantDockActionIsDue(_ action: PlantDockQuickAction, nextTask: PlantCareTaskSnapshot?) -> Bool {
+        guard let careType = action.careType else { return false }
+        return plantDueCareTypes(nextTask: nextTask).contains(careType)
+    }
+
+    func performPlantDockQuickAction(_ action: PlantDockQuickAction, plant: Plant) {
+        guard let careType = action.careType else {
+            onOpenPlant(plant.id)
+            return
+        }
+        openCareLogSheet(for: plant, type: careType)
+    }
+
+    func openPlantDockDetail(_ action: PlantDockQuickAction, plant: Plant) {
+        switch action {
+        case .detail:
+            onOpenPlant(plant.id)
+        default:
+            guard let careType = action.careType else {
+                onOpenPlant(plant.id)
+                return
+            }
+            openCareLogSheet(for: plant, type: careType)
+        }
+    }
+
+    func plantDueCareTypes(nextTask: PlantCareTaskSnapshot?) -> Set<PlantCareType> {
+        guard let nextTask, nextTask.daysUntilDue <= 0 else { return [] }
+        return [nextTask.careType]
+    }
+
+    func plantDockQuickAccessibilityLabel(_ action: PlantDockQuickAction, plant: Plant) -> String {
+        if action == .detail {
+            l.tr(zh: "打开\(plant.name)详情", en: "Open details for \(plant.name)", de: "Details für \(plant.name) öffnen")
+        } else {
+            l.tr(zh: "记录\(plant.name)\(action.title(l: l))", en: "Log \(action.title(l: l)) for \(plant.name)", de: "\(action.title(l: l)) für \(plant.name) erfassen")
+        }
     }
 
     func plantListMetricPill(icon: String, title: String, value: String, tint: Color) -> some View {

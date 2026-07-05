@@ -260,11 +260,49 @@ enum ReminderSchedulingService {
         guard !remindersToKeep.isEmpty else { return }
 
         let policyDecisions = NotificationDeliveryPolicy.plan(reminders: remindersToKeep)
+        let plantBatchCareSummaries = plantBatchCareSummaries(
+            reminders: remindersToKeep,
+            policyDecisions: policyDecisions
+        )
+        let plantBatchScheduler = OhanaNotifications.current as? PlantBatchCareSummaryNotificationScheduling
+        var plantBatchCareSummaryByReminderID: [UUID: PlantBatchCareNotificationSummary] = [:]
+        if let plantBatchScheduler {
+            let summaries = plantBatchCareSummaries
+            for summary in summaries {
+                plantBatchScheduler.schedulePlantBatchCareSummary(summary)
+            }
+            plantBatchCareSummaryByReminderID = Dictionary(
+                uniqueKeysWithValues: summaries.flatMap { summary in
+                    summary.reminderIDs.map { ($0, summary) }
+                }
+            )
+        }
         var knownNotificationIds = await OhanaNotifications.current.pendingNotificationIds()
         for (index, reminder) in remindersToKeep.enumerated() {
             guard !Task.isCancelled else {
                 context.safeSave()
                 return
+            }
+            if let summary = plantBatchCareSummaryByReminderID[reminder.id],
+               let event = reminder.event {
+                OhanaNotifications.current.cancel(notificationId: reminder.notificationId)
+                knownNotificationIds.remove(reminder.notificationId)
+                let classification = NotificationDeliveryPolicy.classification(for: event)
+                _ = await scheduleIfNeeded(
+                    reminder: reminder,
+                    context: context,
+                    source: source,
+                    existingNotificationIds: knownNotificationIds,
+                    operation: operation,
+                    saveLedger: false,
+                    careLedger: careLedger,
+                    policyDecision: .merged(
+                        classification: classification,
+                        scheduledAt: reminder.scheduledAt,
+                        mergedInto: summary.anchorReminderID
+                    )
+                )
+                continue
             }
             let result = await scheduleIfNeeded(
                 reminder: reminder,
@@ -284,6 +322,73 @@ enum ReminderSchedulingService {
             }
         }
         context.safeSave()
+    }
+
+    private static func plantBatchCareSummaries(
+        reminders: [Reminder],
+        policyDecisions: [UUID: NotificationDeliveryDecision],
+        calendar: Calendar = .current
+    ) -> [PlantBatchCareNotificationSummary] {
+        var buckets: [String: [(reminder: Reminder, deliveryDate: Date, careType: PlantCareType, plantID: UUID?)]] = [:]
+        for reminder in reminders {
+            guard let event = reminder.event,
+                  PlantReminderPreferenceStore.isPlantCareEvent(event),
+                  let careType = PlantReminderPreferenceStore.careType(forEventType: event.eventType),
+                  let decision = policyDecisions[reminder.id],
+                  case let .deliver(deliveryDate, classification, _) = decision,
+                  classification.category == .plantCare else {
+                continue
+            }
+            let key = [
+                dayKey(for: deliveryDate, calendar: calendar),
+                careType.rawValue
+            ].joined(separator: "|")
+            buckets[key, default: []].append((
+                reminder: reminder,
+                deliveryDate: deliveryDate,
+                careType: careType,
+                plantID: DomainEntityLinkRegistry.plantId(for: event)
+            ))
+        }
+
+        return buckets.values.compactMap { items in
+            let sorted = items.sorted {
+                if $0.deliveryDate != $1.deliveryDate {
+                    return $0.deliveryDate < $1.deliveryDate
+                }
+                return $0.reminder.createdAt < $1.reminder.createdAt
+            }
+            guard sorted.count > 1,
+                  let first = sorted.first else { return nil }
+            let dayStart = calendar.startOfDay(for: first.deliveryDate)
+            let plantIDs = Set(sorted.compactMap(\.plantID))
+            let plantCount = plantIDs.isEmpty ? sorted.count : plantIDs.count
+            return PlantBatchCareNotificationSummary(
+                notificationId: "plant-batch-care-\(first.careType.rawValue)-\(Int(dayStart.timeIntervalSince1970))",
+                deliveryDate: first.deliveryDate,
+                careType: first.careType,
+                plantCount: plantCount,
+                taskCount: sorted.count,
+                anchorReminderID: first.reminder.id,
+                reminderIDs: sorted.map(\.reminder.id)
+            )
+        }
+        .sorted {
+            if $0.deliveryDate != $1.deliveryDate {
+                return $0.deliveryDate < $1.deliveryDate
+            }
+            return $0.careType.rawValue < $1.careType.rawValue
+        }
+    }
+
+    private static func dayKey(for date: Date, calendar: Calendar) -> String {
+        let components = calendar.dateComponents([.year, .month, .day], from: date)
+        return String(
+            format: "%04d-%02d-%02d",
+            components.year ?? 0,
+            components.month ?? 0,
+            components.day ?? 0
+        )
     }
 
     @MainActor

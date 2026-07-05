@@ -79,6 +79,8 @@ enum FMDest: Hashable {
     case humanNote(PersistentIdentifier)
     case humanExpense(PersistentIdentifier)
     case plantsDashboard
+    case plantsBatchCare
+    case plantsBatchCareFiltered(PlantCareType)
     case plantsList
     case plantsPhotos
     case plantDetail(UUID)

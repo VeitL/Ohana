@@ -571,6 +571,48 @@ struct HomeCommandExecutor {
     }
 
     @discardableResult
+    func completePlantBatchCare(
+        selections: [PlantBatchCareSelection],
+        executorId: String?,
+        now: Date = Date(),
+        calendar: Calendar = .current
+    ) -> PlantBatchCareCommandResult {
+        PlantCareCommandExecutor(context: modelContext, revisions: revisions).completeBatchCare(
+            selections: selections,
+            executorId: resolvedExecutorId(executorId),
+            note: "home.plantCare.batchCare",
+            now: now,
+            calendar: calendar
+        )
+    }
+
+    @discardableResult
+    func undoPlantBatchCare(
+        _ token: PlantBatchCareUndoToken,
+        now: Date = Date(),
+        calendar: Calendar = .current
+    ) -> PlantBatchCareUndoResult {
+        PlantCareCommandExecutor(context: modelContext, revisions: revisions).undoBatchCare(
+            token,
+            note: "home.plantCare.batchCareUndo",
+            now: now,
+            calendar: calendar
+        )
+    }
+
+    @discardableResult
+    func commitPlantBatchCareRewards(
+        for token: PlantBatchCareUndoToken,
+        now: Date = Date()
+    ) -> PlantBatchCareRewardCommitResult {
+        PlantCareCommandExecutor(context: modelContext, revisions: revisions).commitBatchCareRewards(
+            for: token,
+            note: "home.plantCare.batchCareRewardCommit",
+            now: now
+        )
+    }
+
+    @discardableResult
     func deferPlantDueTasksOneDay(
         plants: [Plant],
         executorId: String?,

@@ -19,8 +19,19 @@ enum HomeFabShortcutCatalog {
         ]
     }
 
-    static func plantShortcuts(l: L10n) -> [HomeFabFunctionShortcut] {
-        [
+    static func plantShortcuts(l: L10n, dueTaskCount: Int) -> [HomeFabFunctionShortcut] {
+        var shortcuts: [HomeFabFunctionShortcut] = []
+
+        if dueTaskCount > 0 {
+            shortcuts.append(HomeFabFunctionShortcut(
+                label: l.tr(zh: "完成今日照护", en: "Complete today", de: "Heute erledigen"),
+                icon: "checkmark.circle.fill",
+                badge: "\(dueTaskCount)",
+                destination: .plantsBatchCare
+            ))
+        }
+
+        shortcuts.append(contentsOf: [
             HomeFabFunctionShortcut(
                 label: l.tr(zh: "添加植物", en: "Add plant", de: "Pflanze hinzufügen"),
                 icon: "plus",
@@ -28,11 +39,28 @@ enum HomeFabShortcutCatalog {
                 entityToAdd: .plant
             ),
             HomeFabFunctionShortcut(
+                label: l.tr(zh: "记一笔照护", en: "Log care", de: "Pflege erfassen"),
+                icon: "square.and.pencil",
+                destination: .plantCareAggregate(.log)
+            ),
+            HomeFabFunctionShortcut(
+                label: l.tr(zh: "植物诊断", en: "Diagnosis", de: "Diagnose"),
+                icon: "stethoscope",
+                isAvailable: false
+            ),
+            HomeFabFunctionShortcut(
+                label: l.tr(zh: "测光照", en: "Light meter", de: "Licht messen"),
+                icon: "sun.max.fill",
+                isAvailable: false
+            ),
+            HomeFabFunctionShortcut(
                 label: l.tr(zh: "更多", en: "More", de: "Mehr"),
                 icon: "ellipsis.circle.fill",
                 destination: .featureGroup(.plants)
             )
-        ]
+        ])
+
+        return shortcuts
     }
 }
 

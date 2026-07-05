@@ -622,4 +622,19 @@ struct AppRouteCoordinatorTests {
         #expect(coordinator.sheet == nil)
         #expect(coordinator.rootIdentity == initialRoot)
     }
+
+    @Test func plantBatchCareNotificationOpensFilteredBatchSheetRoute() {
+        let coordinator = AppRouteCoordinator()
+
+        coordinator.openHuman(UUID())
+        let outcome = coordinator.handleNotificationEvent(.plantBatchCareRouteRequested(careType: .watering))
+
+        #expect(outcome == .none)
+        #expect(coordinator.path.isEmpty)
+        if case let .functionMenu(destination) = coordinator.sheet {
+            #expect(destination == .plantsBatchCareFiltered(.watering))
+        } else {
+            Issue.record("Expected plant batch notification to open the function menu batch-care route")
+        }
+    }
 }

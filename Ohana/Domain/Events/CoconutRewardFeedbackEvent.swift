@@ -16,6 +16,24 @@ struct OhanaCoconutRewardEvent: Identifiable, Equatable {
     let actorId: String?
     let date: Date
 
+    init(
+        id: UUID = UUID(),
+        amount: Int,
+        growthXP: Int = 0,
+        emoji: String,
+        title: String,
+        actorId: String?,
+        date: Date = Date()
+    ) {
+        self.id = id
+        self.amount = amount
+        self.growthXP = growthXP
+        self.emoji = emoji
+        self.title = title
+        self.actorId = actorId
+        self.date = date
+    }
+
     init(entry: CoconutLogEntry) {
         id = entry.id
         amount = entry.amount

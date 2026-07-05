@@ -33,7 +33,9 @@ enum PlantCareCommandService {
         economy providedEconomy: CareEventEconomyAwarding? = nil,
         syncCarePlan: Bool = true,
         scheduleNotifications: Bool = true,
-        reminderScheduling providedReminderScheduling: ReminderSchedulingManaging? = nil
+        reminderScheduling providedReminderScheduling: ReminderSchedulingManaging? = nil,
+        saveChanges: Bool = true,
+        awardRewards: Bool = true
     ) -> PlantCareCommandResult {
         let careLedger = providedCareLedger ?? CareLedgerService()
         let l = L10n.current
@@ -102,11 +104,13 @@ enum PlantCareCommandService {
         CloudSyncMutationRecorder.markModified(plant, context: context, modifiedAt: now)
 
         let event = DomainScheduleWriter.createEvent(plan: plan, context: context).event
-        context.safeSave()
+        if saveChanges {
+            context.safeSave()
+        }
         let rewardAction = rewardAction(for: type)
         let reward: (humanGot: Int, petGot: Int)
         let rewardMetadata: String
-        if wasRewardEligible, let rewardAction {
+        if awardRewards, wasRewardEligible, let rewardAction {
             let economy = providedEconomy ?? DomainServiceDependencyRegistry.careEventEconomy()
             reward = economy.awardCareAction(
                 type: rewardAction,
@@ -151,14 +155,17 @@ enum PlantCareCommandService {
             context: context,
             save: false
         )
-        context.safeSave()
+        if saveChanges {
+            context.safeSave()
+        }
         if syncCarePlan {
             PlantCarePlanScheduleService.sync(
                 plant: plant,
                 context: context,
                 now: now,
                 scheduleNotifications: scheduleNotifications,
-                reminderScheduling: providedReminderScheduling
+                reminderScheduling: providedReminderScheduling,
+                saveChanges: saveChanges
             )
         }
 
@@ -172,7 +179,7 @@ enum PlantCareCommandService {
         )
     }
 
-    private static func rewardAction(for type: PlantCareType) -> DomainCareRewardAction? {
+    static func rewardAction(for type: PlantCareType) -> DomainCareRewardAction? {
         switch type {
         case .watering:
             .plantWatering

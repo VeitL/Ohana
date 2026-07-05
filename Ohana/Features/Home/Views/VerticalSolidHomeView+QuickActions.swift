@@ -217,22 +217,6 @@ extension VerticalSolidHomeView {
         scheduleTodayFocusDailyCompletion(afterCompleting: feedback.cardId)
     }
 
-    func performPlantQuickAction(
-        _ action: VerticalSolidHomePlantQuickAction,
-        plant: VerticalSolidHomePlantSnapshot
-    ) {
-        switch action {
-        case .water:
-            recordPlantQuickCare(.watering, plantID: plant.id)
-        case .fertilize:
-            recordPlantQuickCare(.fertilizing, plantID: plant.id)
-        case .log:
-            openPlantCareFeature(.log, plant: plant)
-        case .detail:
-            openPlantFeature(.profile, plant: plant)
-        }
-    }
-
     func openPlantCareFeature(_ destination: PlantCareFeatureDestination, plant: VerticalSolidHomePlantSnapshot) {
         guard isPlantCareUnlockedForHome else {
             AppFeatureRouteGuard.recordIntercept("plantGate:homePlantCareFeature")

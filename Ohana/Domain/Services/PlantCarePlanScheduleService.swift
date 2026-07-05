@@ -52,7 +52,8 @@ enum PlantCarePlanScheduleService {
         scheduleNotifications: Bool = true,
         reminderScheduling providedReminderScheduling: ReminderSchedulingManaging? = nil,
         notifications: ReminderNotificationScheduling = ReminderNotificationSchedulerRegistry.current,
-        defaults: UserDefaults = .standard
+        defaults: UserDefaults = .standard,
+        saveChanges: Bool = true
     ) -> PlantCarePlanScheduleResult {
         guard plant.remindersEnabled else {
             let removed = removeScheduledTasks(
@@ -62,7 +63,7 @@ enum PlantCarePlanScheduleService {
                 notifications: notifications,
                 defaults: defaults
             )
-            if !removed.removedEventIDs.isEmpty || !removed.removedReminderIDs.isEmpty {
+            if saveChanges, !removed.removedEventIDs.isEmpty || !removed.removedReminderIDs.isEmpty {
                 context.safeSave()
             }
             return removed
@@ -114,7 +115,9 @@ enum PlantCarePlanScheduleService {
             removedReminderIDs.append(contentsOf: removed.removedReminderIDs)
         }
 
-        context.safeSave()
+        if saveChanges {
+            context.safeSave()
+        }
 
         let shouldScheduleReminders = scheduleNotifications && !remindersToSchedule.isEmpty
         if shouldScheduleReminders {

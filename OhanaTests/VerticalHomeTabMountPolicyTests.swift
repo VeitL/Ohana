@@ -620,13 +620,41 @@ struct VerticalHomeTabMountPolicyTests {
         #expect(calendarMonthSource.contains("reportEmbeddedBottomChromeScrollOffset(offsetY)"))
     }
 
-    @Test func plantWalletQuickActionsStaySimpleAndComplete() {
-        #expect(VerticalSolidHomePlantQuickAction.allCases.map(\.id) == [
+    @Test func plantWalletQuickActionsUseSharedEditablePolicy() throws {
+        let plantPageSource = try source("Ohana/Features/Home/Views/VerticalSolidHomePlantsPage.swift")
+        let dashboardSource = try source("Ohana/Features/Plants/Views/PlantDashboardView+WalletDeck.swift")
+
+        #expect(PlantDockQuickAction.defaultItems.map(\.id) == [
             "water",
             "fertilize",
-            "log",
+            "photo",
             "detail"
         ])
+        #expect(PlantDockQuickAction.editableItems.count == 14)
+        #expect(PlantDockQuickAction.maxVisibleItems == 5)
+        #expect(plantPageSource.contains("PlantDockQuickActionsView("))
+        #expect(dashboardSource.contains("PlantDockQuickActionsView("))
+        #expect(dashboardSource.contains("plantStoredDockActions(for: plant)"))
+    }
+
+    @Test func plantBatchCareSheetUsesRouteSnapshotInsteadOfBodyAggregation() throws {
+        let dashboardSource = try source("Ohana/Features/Plants/Views/PlantDashboardView.swift")
+        let sheetSource = try source("Ohana/Features/Plants/Views/PlantBatchCareSheet.swift")
+        let snapshotSource = try source("Ohana/Features/Plants/PlantBatchCareRouteSnapshot.swift")
+
+        #expect(snapshotSource.contains("@ModelActor"))
+        #expect(snapshotSource.contains("actor PlantBatchCareRouteSnapshotActor"))
+        #expect(snapshotSource.contains("PlantBatchCareSheetSnapshot"))
+        #expect(snapshotSource.contains("PlantBatchCareSheetRoomSection"))
+        #expect(snapshotSource.contains("PlantBatchCareRouteSnapshotInput"))
+        #expect(dashboardSource.contains("@State var batchCareSheetSnapshot: PlantBatchCareSheetSnapshot"))
+        #expect(dashboardSource.contains("prepareBatchCareSheetSnapshot(careType: careType, roomID: roomID)"))
+        #expect(dashboardSource.contains("PlantBatchCareRouteSnapshotActor(modelContainer: container)"))
+        #expect(sheetSource.contains("let snapshot: PlantBatchCareSheetSnapshot"))
+        #expect(sheetSource.contains("ForEach(snapshot.careTypeFilters)"))
+        #expect(sheetSource.contains("ForEach(visibleSnapshot.roomSections)"))
+        #expect(!sheetSource.contains("Dictionary(grouping: visibleTasks"))
+        #expect(!sheetSource.contains("Self.filteredTasks(tasks"))
     }
 
     @Test func plantWalletKeepsAllVisiblePlantsInOneScene() throws {

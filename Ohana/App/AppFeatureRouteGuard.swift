@@ -274,7 +274,7 @@ enum AppFeatureRouteGuard {
 
     private static func requiresPlantFeature(_ destination: FMDest) -> Bool {
         switch destination {
-        case .plantsDashboard, .plantsList, .plantsPhotos, .plantDetail, .plantFeature, .plantCare, .plantCareAggregate:
+        case .plantsDashboard, .plantsBatchCare, .plantsBatchCareFiltered, .plantsList, .plantsPhotos, .plantDetail, .plantFeature, .plantCare, .plantCareAggregate:
             true
         case .featureGroup(.plants):
             true

@@ -63,6 +63,28 @@ nonisolated enum ExpandedQuickActionStore {
         return stored.isEmpty ? defaultItems : stored
     }
 
+    static func plantItems(raw: String, plantID: UUID, localization l: L10n) -> [QuickActionItem] {
+        let stored = decode(raw).filter {
+            $0.entityId == plantID &&
+                $0.entityKind == .plant &&
+                PlantDockQuickAction(actionType: $0.actionType) != nil
+        }
+        let defaults = PlantDockQuickAction.quickActionItems(
+            for: plantID,
+            localization: l,
+            actions: PlantDockQuickAction.defaultItems
+        )
+        return Array((stored.isEmpty ? defaults : stored).prefix(PlantDockQuickAction.maxVisibleItems))
+    }
+
+    static func plantCandidateItems(plantID: UUID, localization l: L10n) -> [QuickActionItem] {
+        PlantDockQuickAction.quickActionItems(
+            for: plantID,
+            localization: l,
+            actions: PlantDockQuickAction.editableItems
+        )
+    }
+
     static func savingPetItems(
         _ edited: [QuickActionItem],
         pet: Pet,
@@ -154,6 +176,26 @@ nonisolated enum ExpandedQuickActionStore {
         saved.removeAll { $0.entityId == humanID && $0.entityKind == .human }
         let cleaned = edited.filter { $0.actionType != "humanAllFeatures" }
         saved.insert(contentsOf: Array(cleaned.prefix(QuickActionLimit.maxItemsPerEntity)), at: min(insertionIdx, saved.count))
+        return encode(saved) ?? raw
+    }
+
+    static func savingPlantItems(
+        _ edited: [QuickActionItem],
+        plantID: UUID,
+        currentItems: [QuickActionItem],
+        raw: String
+    ) -> String {
+        var saved = decode(raw)
+        let currentItemIds = Set(currentItems.map(\.id))
+        let insertionIdx = saved.firstIndex(where: { currentItemIds.contains($0.id) }) ?? saved.count
+        saved.removeAll { $0.entityId == plantID && $0.entityKind == .plant }
+        let cleaned = edited
+            .filter { item in
+                item.entityId == plantID &&
+                    item.entityKind == .plant &&
+                    PlantDockQuickAction(actionType: item.actionType) != nil
+            }
+        saved.insert(contentsOf: Array(cleaned.prefix(PlantDockQuickAction.maxVisibleItems)), at: min(insertionIdx, saved.count))
         return encode(saved) ?? raw
     }
 

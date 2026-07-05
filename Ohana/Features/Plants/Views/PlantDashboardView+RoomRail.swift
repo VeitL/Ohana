@@ -79,6 +79,8 @@ extension PlantDashboardView {
                 dueCount: dueTasks.count
             ) {
                 selectRoomFromEdgeRail(nil)
+            } batchCareAction: {
+                openBatchCareSheet()
             }
 
             ForEach(roomCareSummaries.prefix(7)) { summary in
@@ -91,6 +93,8 @@ extension PlantDashboardView {
                     dueCount: summary.dueTaskCount
                 ) {
                     selectRoomFromEdgeRail(selectedLocation == summary.id ? nil : summary.id)
+                } batchCareAction: {
+                    openBatchCareSheet(roomID: summary.id)
                 }
             }
         }
@@ -161,7 +165,8 @@ extension PlantDashboardView {
         count: Int,
         isSelected: Bool,
         dueCount: Int,
-        action: @escaping () -> Void
+        action: @escaping () -> Void,
+        batchCareAction: (() -> Void)? = nil
     ) -> some View {
         Button(action: action) {
             VStack(spacing: 2) {
@@ -194,6 +199,20 @@ extension PlantDashboardView {
         .accessibilityLabel(roomEdgeRailAccessibilityLabel(title: title, count: count, dueCount: dueCount, isSelected: isSelected))
         .accessibilityAddTraits(isSelected ? .isSelected : [])
         .accessibilityIdentifier("plant-dashboard-room-edge-\(roomEdgeRailIdentifier(id))")
+        .contextMenu {
+            if dueCount > 0, let batchCareAction {
+                Button {
+                    batchCareAction()
+                } label: {
+                    Label(
+                        id == "all"
+                            ? l.tr(zh: "完成全部待照护", en: "Complete all due care", de: "Alle fällige Pflege erledigen")
+                            : l.tr(zh: "照护这间", en: "Care for this room", de: "Diesen Raum pflegen"),
+                        systemImage: "checkmark.circle.fill"
+                    )
+                }
+            }
+        }
     }
 
     func roomEdgeRailShortTitle(_ value: String) -> String {

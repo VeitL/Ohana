@@ -5,6 +5,7 @@
 //  Extracted Plant view sections.
 //
 
+import SwiftData
 import SwiftUI
 
 extension PlantDashboardView {
@@ -538,6 +539,97 @@ extension PlantDashboardView {
             en: "Open the care plan here or complete items from the list",
             de: "Plan hier öffnen oder Aufgaben in der Liste erledigen"
         )
+    }
+
+    var batchCareSheetTasks: [PlantBatchCareSheetTask] {
+        makeBatchCareSheetTasks(careType: batchCareInitialType, roomID: batchCareRoomFilter)
+    }
+
+    func makeBatchCareSheetSnapshot(careType: PlantCareType?, roomID: String?) -> PlantBatchCareSheetSnapshot {
+        PlantBatchCareSheetSnapshot(tasks: makeBatchCareSheetTasks(careType: careType, roomID: roomID))
+    }
+
+    func makeBatchCareSheetTasks(careType: PlantCareType?, roomID: String?) -> [PlantBatchCareSheetTask] {
+        dueTasks.compactMap { task in
+            guard careType == nil || task.careType == careType else { return nil }
+            guard let plant = plants.first(where: { $0.id == task.plantID }) else { return nil }
+            let roomName = locationFilterValue(for: plant)
+            if let roomID, roomName != roomID {
+                return nil
+            }
+            return PlantBatchCareSheetTask(
+                id: task.id,
+                plantID: plant.id,
+                plantModelID: plant.persistentModelID,
+                plantName: plant.name,
+                roomName: roomName,
+                careType: task.careType,
+                subtitle: task.subtitle,
+                dueText: dueText(for: task),
+                avatarSignature: plant.avatarThumbnailSignature,
+                tintHex: plant.themeColorHex
+            )
+        }
+    }
+
+    @ViewBuilder
+    var batchCareUndoBanner: some View {
+        if let token = pendingBatchCareUndoToken {
+            VStack {
+                Spacer()
+                HStack(spacing: 12) {
+                    Image(systemName: "checkmark.seal.fill") // a11y: allow decorative glyph; adjacent text names the completed batch.
+                        .font(OhanaFont.adaptive(size: 16, weight: .black))
+                        .foregroundStyle(Color.goPrimary)
+                        .frame(width: 44, height: 44)
+                        .background(Color.goPrimary.opacity(0.16), in: Circle())
+                        .accessibilityHidden(true)
+
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(l.tr(
+                            zh: "已完成 \(token.items.count) 项照护",
+                            en: "Completed \(token.items.count) care tasks",
+                            de: "\(token.items.count) Pflegeaufgaben erledigt"
+                        ))
+                        .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
+                        .foregroundStyle(Color.ohanaPrimaryText)
+
+                        Text(l.tr(
+                            zh: "6 秒内可撤销；奖励会在窗口结束后结算。",
+                            en: "Undo within 6 seconds; rewards settle after the window.",
+                            de: "6 Sekunden widerrufbar; Belohnungen folgen danach."
+                        ))
+                        .font(OhanaFont.adaptive(size: 11, weight: .semibold, design: .rounded))
+                        .foregroundStyle(Color.ohanaSecondaryText)
+                        .lineLimit(2)
+                    }
+
+                    Spacer(minLength: 8)
+
+                    Button(l.tr(zh: "撤销", en: "Undo", de: "Widerrufen")) {
+                        undoPendingBatchCare()
+                    }
+                    .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
+                    .foregroundStyle(Color.goPrimary)
+                    .frame(minWidth: 44, minHeight: 44)
+                    .accessibilityIdentifier("plant-batch-care-undo")
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 12)
+                .background(Color.ohanaCardSurface.opacity(0.96), in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
+                .overlay {
+                    RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous)
+                        .strokeBorder(Color.goPrimary.opacity(0.22), lineWidth: 1)
+                }
+                .padding(.horizontal, 16)
+                .padding(.bottom, 110)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .transition(.move(edge: .bottom).combined(with: .opacity))
+            .zIndex(60)
+            .accessibilityElement(children: .contain)
+            .accessibilityIdentifier("plant-batch-care-undo-banner")
+        }
     }
 
     var taskSummarySection: some View {

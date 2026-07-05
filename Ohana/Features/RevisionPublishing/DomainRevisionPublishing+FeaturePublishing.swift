@@ -98,6 +98,39 @@ extension DomainRevisionPublishing {
         )
     }
 
+    func publishPlantBatchCare(_ result: PlantBatchCareCommandResult, note: String) {
+        publish(
+            DomainMutationResult(
+                command: .plantBatchCare(batchID: result.batchID, action: "batchCare", count: result.completedCount),
+                affectedEntityIDs: result.affectedEntityIDs,
+                wroteBusinessFact: result.didWrite,
+                note: note
+            )
+        )
+    }
+
+    func publishPlantBatchCareUndo(_ result: PlantBatchCareUndoResult, note: String) {
+        publish(
+            DomainMutationResult(
+                command: .plantBatchCare(batchID: result.batchID, action: "batchCareUndo", count: result.removedLogIDs.count),
+                affectedEntityIDs: result.affectedEntityIDs,
+                wroteBusinessFact: result.didUndo,
+                note: note
+            )
+        )
+    }
+
+    func publishPlantBatchCareRewardCommit(_ result: PlantBatchCareRewardCommitResult, note: String) {
+        publish(
+            DomainMutationResult(
+                command: .plantBatchCare(batchID: result.batchID, action: "batchCareRewardCommit", count: result.ledgerEventIDs.count),
+                affectedEntityIDs: result.affectedEntityIDs,
+                wroteBusinessFact: result.didCommit,
+                note: note
+            )
+        )
+    }
+
     func publishCalendarEventPlan(
         _ result: CalendarEventPlanCommandResult,
         note: String

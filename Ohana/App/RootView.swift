@@ -22,6 +22,7 @@ struct RootView: View {
     @State private var onboardingPrimaryHumanID: String?
     @State private var onlineGateNoticeReason: OnlineFeatureGateNoticeReason?
     @StateObject private var startupMaintenance = StartupMaintenanceCoordinator()
+    @State private var plantBatchCareRewardSettlementTask: Task<Void, Never>?
     @Environment(\.modelContext) private var modelContext
     @Environment(AppServices.self) private var appServices
 
@@ -53,9 +54,12 @@ struct RootView: View {
         .toggleStyle(OhanaPillToggleStyle())
         .onAppear {
             startupMaintenance.startAfterFirstRender(context: modelContext)
+            schedulePlantBatchCareRewardSettlement()
         }
         .onDisappear {
             startupMaintenance.cancel()
+            plantBatchCareRewardSettlementTask?.cancel()
+            plantBatchCareRewardSettlementTask = nil
         }
         .onReceive(appServices.notificationRoutes.reminderActionEvents) { event in
             appServices.reminderActions.handle(
@@ -75,6 +79,10 @@ struct RootView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
             appSwitcherSnapshotCoverRequested = false
+            schedulePlantBatchCareRewardSettlement()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .plantBatchCarePendingRewardsChanged)) { _ in
+            schedulePlantBatchCareRewardSettlement()
         }
         .onReceive(OnlineFeatureGateNoticeCenter.notices) { reason in
             onlineGateNoticeReason = reason
@@ -111,6 +119,44 @@ struct RootView: View {
         // Onboarding owns the visual handoff. Mounting the full Home stack before
         // the member save commits pulls navigation and read-model work into the
         // tap frame on real devices with retained data.
+    }
+
+    private func schedulePlantBatchCareRewardSettlement(now: Date = Date()) {
+        plantBatchCareRewardSettlementTask?.cancel()
+        let expiredTokens = PlantBatchCarePendingRewardStore.expiredTokens(now: now)
+        if !expiredTokens.isEmpty {
+            plantBatchCareRewardSettlementTask = Task { @MainActor in
+                await OhanaFrameScheduler.waitAfterNextFrame(milliseconds: 180)
+                guard !Task.isCancelled else { return }
+                settleExpiredPlantBatchCareRewards()
+            }
+            return
+        }
+
+        guard let nextDate = PlantBatchCarePendingRewardStore.nextSettlementDate(now: now) else {
+            plantBatchCareRewardSettlementTask = nil
+            return
+        }
+        let delayNanoseconds = UInt64(max(0.1, nextDate.timeIntervalSince(now) + 0.1) * 1_000_000_000)
+        plantBatchCareRewardSettlementTask = Task { @MainActor in
+            try? await Task.sleep(nanoseconds: delayNanoseconds)
+            guard !Task.isCancelled else { return }
+            settleExpiredPlantBatchCareRewards()
+        }
+    }
+
+    private func settleExpiredPlantBatchCareRewards(now: Date = Date()) {
+        let tokens = PlantBatchCarePendingRewardStore.expiredTokens(now: now)
+        guard !tokens.isEmpty else {
+            schedulePlantBatchCareRewardSettlement(now: now)
+            return
+        }
+        let executor = HomeCommandExecutor(modelContext: modelContext, services: appServices)
+        for token in tokens {
+            _ = executor.commitPlantBatchCareRewards(for: token)
+            PlantBatchCarePendingRewardStore.remove(batchID: token.batchID)
+        }
+        schedulePlantBatchCareRewardSettlement(now: now)
     }
 
     private var l: L10n {
