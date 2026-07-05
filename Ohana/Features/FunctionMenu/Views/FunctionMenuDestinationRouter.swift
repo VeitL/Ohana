@@ -8,6 +8,7 @@ struct FunctionMenuDestinationRouter: View {
     let humans: [Human]
     var petAggregateSummaries: [UUID: FunctionMenuPetAggregateSummary] = [:]
     let plants: [Plant]
+    var isRouteDataLoaded = true
 
     @Environment(AppServices.self) private var appServices
     @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
@@ -58,6 +59,7 @@ struct FunctionMenuDestinationRouter: View {
                 pets: pets,
                 humans: humans,
                 plants: plants,
+                isRouteDataLoaded: isRouteDataLoaded,
                 petAggregateSummaries: petAggregateSummaries
             )
         case let .featureAggregate(feature):
@@ -112,6 +114,7 @@ struct FunctionMenuDestinationRouter: View {
         case .plantsDashboard:
             PlantDashboardView(
                 plants: plants,
+                isPlantDataLoaded: isRouteDataLoaded,
                 initialMode: .sites,
                 onOpenPlant: { plantID in
                     parentPath.append(FMDest.plantDetail(plantID))
@@ -120,6 +123,7 @@ struct FunctionMenuDestinationRouter: View {
         case .plantsBatchCare:
             PlantDashboardView(
                 plants: plants,
+                isPlantDataLoaded: isRouteDataLoaded,
                 initialMode: .plants,
                 opensBatchCareOnAppear: true,
                 onOpenPlant: { plantID in
@@ -129,6 +133,7 @@ struct FunctionMenuDestinationRouter: View {
         case let .plantsBatchCareFiltered(careType):
             PlantDashboardView(
                 plants: plants,
+                isPlantDataLoaded: isRouteDataLoaded,
                 initialMode: .plants,
                 opensBatchCareOnAppear: true,
                 initialBatchCareType: careType,
@@ -139,6 +144,7 @@ struct FunctionMenuDestinationRouter: View {
         case .plantsList:
             PlantDashboardView(
                 plants: plants,
+                isPlantDataLoaded: isRouteDataLoaded,
                 initialMode: .plants,
                 onOpenPlant: { plantID in
                     parentPath.append(FMDest.plantDetail(plantID))
@@ -147,6 +153,7 @@ struct FunctionMenuDestinationRouter: View {
         case .plantsPhotos:
             PlantDashboardView(
                 plants: plants,
+                isPlantDataLoaded: isRouteDataLoaded,
                 initialMode: .photos,
                 onOpenPlant: { plantID in
                     parentPath.append(FMDest.plantDetail(plantID))

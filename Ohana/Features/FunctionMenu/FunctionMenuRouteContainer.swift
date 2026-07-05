@@ -17,7 +17,8 @@ struct FunctionMenuDestinationRouteContainer: View {
             pets: routeData.pets,
             humans: routeData.humans,
             petAggregateSummaries: routeData.petAggregateSummaries,
-            plants: routeData.plants
+            plants: routeData.plants,
+            isRouteDataLoaded: routeData.hasLoaded
         )
         .onAppear {
             scheduleRouteDataLoad()

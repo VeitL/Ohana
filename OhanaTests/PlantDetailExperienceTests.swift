@@ -697,6 +697,9 @@ final class PlantDetailExperienceTests: XCTestCase {
         XCTAssertTrue(groupSource.contains("initialMode: .plants"))
         XCTAssertTrue(groupSource.contains("initialMode: .photos"))
         XCTAssertTrue(routerSource.contains("plants: plants"))
+        XCTAssertTrue(routerSource.contains("isPlantDataLoaded: isRouteDataLoaded"))
+        XCTAssertTrue(groupSource.contains("var isRouteDataLoaded = true"))
+        XCTAssertTrue(groupSource.contains("isPlantDataLoaded: isRouteDataLoaded"))
         XCTAssertTrue(routerSource.contains("case .plantsList"))
         XCTAssertTrue(routerSource.contains("case .plantsPhotos"))
         XCTAssertTrue(routerSource.contains("case let .plantCare(id, feature)"))
@@ -705,13 +708,31 @@ final class PlantDetailExperienceTests: XCTestCase {
         XCTAssertFalse(groupSource.contains("case .plantsCalendar:"))
         XCTAssertFalse(routerSource.contains("case .plantsCalendar"))
         XCTAssertFalse(routerSource.contains("case let .plantCalendar"))
-        XCTAssertTrue(guardSource.contains("case .plantsDashboard, .plantsList, .plantsPhotos, .plantDetail, .plantFeature, .plantCare, .plantCareAggregate"))
-        XCTAssertTrue(unlockSource.contains("case .plantsDashboard, .plantsList, .plantsPhotos, .plantDetail, .plantFeature, .plantCare, .plantCareAggregate"))
+        XCTAssertTrue(guardSource.contains("case .plantsDashboard, .plantsBatchCare, .plantsBatchCareFiltered, .plantsList, .plantsPhotos, .plantDetail, .plantFeature, .plantCare, .plantCareAggregate"))
+        XCTAssertTrue(unlockSource.contains("case .plantsDashboard, .plantsBatchCare, .plantsBatchCareFiltered, .plantsList, .plantsPhotos, .plantDetail, .plantFeature, .plantCare, .plantCareAggregate"))
         XCTAssertTrue(sheetSource.contains("case .plantsList"))
         XCTAssertTrue(sheetSource.contains("case .plantsPhotos"))
         XCTAssertTrue(sheetSource.contains("case let .plantCare(_, feature)"))
         XCTAssertTrue(sheetSource.contains("case let .plantCareAggregate(feature)"))
         XCTAssertFalse(sheetSource.contains("case .plantsCalendar"))
+    }
+
+    func testPlantDashboardDoesNotShowEmptyStateBeforeRouteDataLoads() throws {
+        let rootURL = repositoryRootURL()
+        let dashboardSource = try source("Ohana/Features/Plants/Views/PlantDashboardView.swift", rootURL: rootURL)
+        let emptyStateSource = try source("Ohana/Features/Plants/Views/PlantDashboardView+EmptyStates.swift", rootURL: rootURL)
+        let routeContainerSource = try source("Ohana/Features/FunctionMenu/FunctionMenuRouteContainer.swift", rootURL: rootURL)
+
+        XCTAssertTrue(routeContainerSource.contains("isRouteDataLoaded: routeData.hasLoaded"))
+        XCTAssertTrue(dashboardSource.contains("let isPlantDataLoaded: Bool"))
+        XCTAssertTrue(dashboardSource.contains("if plants.isEmpty, !isPlantDataLoaded"))
+        XCTAssertTrue(dashboardSource.contains("loadingState"))
+        XCTAssertTrue(dashboardSource.contains("} else if plants.isEmpty {"))
+        XCTAssertTrue(dashboardSource.contains("emptyState"))
+        XCTAssertTrue(emptyStateSource.contains("accessibilityIdentifier(\"plant-dashboard-loading\")"))
+        XCTAssertTrue(emptyStateSource.contains("Text(l.tr("))
+        XCTAssertTrue(emptyStateSource.contains("zh: \"正在加载植物\""))
+        XCTAssertTrue(emptyStateSource.contains("en: \"Loading plants\""))
     }
 
     func testPlantReminderSettingsReadsLikeReminderHub() throws {

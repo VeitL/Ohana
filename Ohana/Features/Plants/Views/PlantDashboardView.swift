@@ -157,6 +157,7 @@ struct PlantDashboardAvatarPreloadRequest: Sendable {
 
 struct PlantDashboardView: View {
     let plants: [Plant]
+    let isPlantDataLoaded: Bool
     let opensBatchCareOnAppear: Bool
     let initialBatchCareType: PlantCareType?
     let onOpenPlant: (UUID) -> Void
@@ -209,12 +210,14 @@ struct PlantDashboardView: View {
 
     init(
         plants: [Plant] = [],
+        isPlantDataLoaded: Bool = true,
         initialMode: PlantDashboardEntryMode = .sites,
         opensBatchCareOnAppear: Bool = false,
         initialBatchCareType: PlantCareType? = nil,
         onOpenPlant: @escaping (UUID) -> Void = { _ in }
     ) {
         self.plants = plants
+        self.isPlantDataLoaded = isPlantDataLoaded
         self.opensBatchCareOnAppear = opensBatchCareOnAppear
         self.initialBatchCareType = initialBatchCareType
         self.onOpenPlant = onOpenPlant
@@ -504,7 +507,9 @@ struct PlantDashboardView: View {
             ScrollView(.vertical, showsIndicators: false) {
                 Spacer().frame(height: 70)
 
-                if plants.isEmpty {
+                if plants.isEmpty, !isPlantDataLoaded {
+                    loadingState
+                } else if plants.isEmpty {
                     emptyState
                 } else {
                     VStack(spacing: 18) {

@@ -8,6 +8,33 @@
 import SwiftUI
 
 extension PlantDashboardView {
+    var loadingState: some View {
+        VStack(spacing: 18) {
+            Spacer().frame(height: 110)
+
+            ProgressView()
+                .controlSize(.large)
+                .tint(Color.goTeal)
+                .accessibilityLabel(l.tr(
+                    zh: "正在加载植物",
+                    en: "Loading plants",
+                    de: "Pflanzen werden geladen"
+                ))
+
+            Text(l.tr(
+                zh: "正在加载植物",
+                en: "Loading plants",
+                de: "Pflanzen werden geladen"
+            ))
+            .font(OhanaFont.body(.semibold))
+            .foregroundStyle(Color.ohanaSecondaryText)
+
+            Spacer()
+        }
+        .frame(maxWidth: .infinity)
+        .accessibilityIdentifier("plant-dashboard-loading")
+    }
+
     var emptyState: some View {
         VStack(spacing: 24) {
             Spacer().frame(height: 80)

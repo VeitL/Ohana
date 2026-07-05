@@ -14,6 +14,7 @@ struct FeatureGroupDashboardView: View {
     let pets: [Pet]
     let humans: [Human]
     let plants: [Plant]
+    var isRouteDataLoaded = true
     var petAggregateSummaries: [UUID: FunctionMenuPetAggregateSummary] = [:]
 
     @Environment(AppServices.self) private var appServices
@@ -176,6 +177,7 @@ struct FeatureGroupDashboardView: View {
         case .plantsDashboard:
             PlantDashboardView(
                 plants: plants,
+                isPlantDataLoaded: isRouteDataLoaded,
                 initialMode: .sites,
                 onOpenPlant: { plantID in
                     parentPath.append(FMDest.plantDetail(plantID))
@@ -184,6 +186,7 @@ struct FeatureGroupDashboardView: View {
         case .plantsBatchCare:
             PlantDashboardView(
                 plants: plants,
+                isPlantDataLoaded: isRouteDataLoaded,
                 initialMode: .plants,
                 opensBatchCareOnAppear: true,
                 onOpenPlant: { plantID in
@@ -193,6 +196,7 @@ struct FeatureGroupDashboardView: View {
         case let .plantsBatchCareFiltered(careType):
             PlantDashboardView(
                 plants: plants,
+                isPlantDataLoaded: isRouteDataLoaded,
                 initialMode: .plants,
                 opensBatchCareOnAppear: true,
                 initialBatchCareType: careType,
@@ -203,6 +207,7 @@ struct FeatureGroupDashboardView: View {
         case .plantsList:
             PlantDashboardView(
                 plants: plants,
+                isPlantDataLoaded: isRouteDataLoaded,
                 initialMode: .plants,
                 onOpenPlant: { plantID in
                     parentPath.append(FMDest.plantDetail(plantID))
@@ -211,6 +216,7 @@ struct FeatureGroupDashboardView: View {
         case .plantsPhotos:
             PlantDashboardView(
                 plants: plants,
+                isPlantDataLoaded: isRouteDataLoaded,
                 initialMode: .photos,
                 onOpenPlant: { plantID in
                     parentPath.append(FMDest.plantDetail(plantID))
