@@ -663,6 +663,8 @@ final class PlantDetailExperienceTests: XCTestCase {
         XCTAssertTrue(carePlanSheetSource.contains("plant-dashboard-care-plan-task-skip-\\(task.id)"))
         XCTAssertTrue(carePlanSheetSource.contains("onDeferTask(task)"))
         XCTAssertTrue(carePlanSheetSource.contains("onSkipTask(task)"))
+        XCTAssertFalse(carePlanSheetSource.contains("onDeferTask(task)\n                    dismiss()"))
+        XCTAssertFalse(carePlanSheetSource.contains("onSkipTask(task)\n                    dismiss()"))
         XCTAssertTrue(carePlanSheetSource.contains("taskFeedbackButton("))
         XCTAssertTrue(carePlanSheetSource.contains("onOpenCareLog(plant, task.careType)"))
         XCTAssertTrue(carePlanSheetSource.contains("onOpenPlant(plant.id)"))

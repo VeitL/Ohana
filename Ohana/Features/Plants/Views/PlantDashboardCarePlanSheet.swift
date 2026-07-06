@@ -298,7 +298,6 @@ struct PlantDashboardCarePlanSheet: View {
                     accessibilityLabel: l.tr(zh: "延后\(plant.name)的\(careTypeName)一天", en: "Defer \(careTypeName) for \(plant.name) by one day", de: "\(careTypeName) für \(plant.name) um einen Tag verschieben")
                 ) {
                     onDeferTask(task)
-                    dismiss()
                 }
 
                 taskFeedbackButton(
@@ -307,7 +306,6 @@ struct PlantDashboardCarePlanSheet: View {
                     accessibilityLabel: l.tr(zh: "跳过\(plant.name)的\(careTypeName)", en: "Skip \(careTypeName) for \(plant.name)", de: "\(careTypeName) für \(plant.name) überspringen")
                 ) {
                     onSkipTask(task)
-                    dismiss()
                 }
             }
         }
