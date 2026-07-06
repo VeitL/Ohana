@@ -82,6 +82,10 @@ struct VerticalSolidHomeView: View {
     @State var arrivingPlantCardId: UUID?
     @State var arrivalClearTask: Task<Void, Never>?
     @State var plantArrivalClearTask: Task<Void, Never>?
+    @State var pendingPlantQuickCareKeys: Set<String> = []
+    @State var completedPlantQuickCareKeys: Set<String> = []
+    @State var failedPlantQuickCareKeys: Set<String> = []
+    @State var plantQuickCareFeedbackClearTasks: [String: Task<Void, Never>] = [:]
     var treeManager: OasisTreeManaging { appServices.oasisTree }
     @State var showGrowthOnboarding = false
     @State var growthOnboardingTask: Task<Void, Never>?
@@ -367,6 +371,9 @@ struct VerticalSolidHomeView: View {
                         localization: l,
                         plantQuickActionItemsRaw: $plantQuickActionItemsRaw,
                         hidesBottomChrome: $plantBottomChromeHidden,
+                        pendingQuickCareKeys: pendingPlantQuickCareKeys,
+                        completedQuickCareKeys: completedPlantQuickCareKeys,
+                        failedQuickCareKeys: failedPlantQuickCareKeys,
                         topChromeHeight: topChromeHeight,
                         bottomChromeHeight: bottomHeight,
                         arrivingPlantCardId: arrivingPlantCardId,
@@ -559,7 +566,12 @@ struct VerticalSolidHomeView: View {
             todayFocusDailyCompletionTask?.cancel()
             memberMediaAttachmentIndexRepairTask?.cancel()
             oasisEnergyInjectionTask?.cancel()
+            plantQuickCareFeedbackClearTasks.values.forEach { $0.cancel() }
             pendingOasisEnergyInjectionCount = 0
+            pendingPlantQuickCareKeys.removeAll()
+            completedPlantQuickCareKeys.removeAll()
+            failedPlantQuickCareKeys.removeAll()
+            plantQuickCareFeedbackClearTasks.removeAll()
             todayFocusDailyCompletionTask = nil
             memberMediaAttachmentIndexRepairTask = nil
             growthLoopPulseStatus = nil

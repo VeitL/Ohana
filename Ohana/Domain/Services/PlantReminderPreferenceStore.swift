@@ -41,19 +41,13 @@ nonisolated enum PlantReminderPreferenceStore {
     static let travelModeStorageName = "plantReminder.travelMode.v1"
     static let generatedPlanTitleMarker = "植物计划"
     private static let careTypeStoragePrefix = "plantReminder.careTypeEnabled.v1."
+    private static let plantCarePlanCalendarPrefix = "plantReminder.plantCarePlanCalendarEnabled.v1."
+    private static let plantCareSystemReminderPrefix = "plantReminder.plantCareSystemReminderEnabled.v1."
+    private static let plantCareCompletionCalendarPrefix = "plantReminder.plantCareCompletionCalendarEnabled.v1."
     private static let plantCareLeadDaysPrefix = "plantReminder.plantCareLeadDays.v1."
     private static let plantCareRecurrenceEndPrefix = "plantReminder.plantCareRecurrenceEnd.v1."
 
-    static let controllableCareTypes: [PlantCareType] = [
-        .watering,
-        .fertilizing,
-        .repotting,
-        .pruning,
-        .misting,
-        .rotating,
-        .leafCleaning,
-        .pestCheck
-    ]
+    static let controllableCareTypes = PlantCareCategory.schedulableCareTypes
 
     static func timeWindow(defaults: UserDefaults = .standard) -> PlantReminderTimeWindow {
         defaults.string(forKey: timeWindowStorageName)
@@ -95,6 +89,102 @@ nonisolated enum PlantReminderPreferenceStore {
         defaults.set(value, forKey: careTypeKey(type))
     }
 
+    static func planCalendarFallback(
+        for careType: PlantCareType,
+        plantRemindersEnabled: Bool,
+        defaults: UserDefaults = .standard
+    ) -> Bool {
+        plantRemindersEnabled && isCareTypeReminderEnabled(careType, defaults: defaults)
+    }
+
+    static func isPlanCalendarEnabled(
+        forPlantID plantID: UUID,
+        careType: PlantCareType,
+        fallback: Bool,
+        defaults: UserDefaults = .standard
+    ) -> Bool {
+        guard controllableCareTypes.contains(careType) else { return fallback }
+        let key = plantCareKey(prefix: plantCarePlanCalendarPrefix, plantID: plantID, careType: careType)
+        return defaults.object(forKey: key) == nil ? fallback : defaults.bool(forKey: key)
+    }
+
+    static func setPlanCalendarEnabled(
+        _ value: Bool,
+        forPlantID plantID: UUID,
+        careType: PlantCareType,
+        defaults: UserDefaults = .standard
+    ) {
+        guard controllableCareTypes.contains(careType) else { return }
+        let key = plantCareKey(prefix: plantCarePlanCalendarPrefix, plantID: plantID, careType: careType)
+        defaults.set(value, forKey: key)
+    }
+
+    static func planCalendarOverride(
+        forPlantID plantID: UUID,
+        careType: PlantCareType,
+        defaults: UserDefaults = .standard
+    ) -> Bool? {
+        boolOverride(prefix: plantCarePlanCalendarPrefix, plantID: plantID, careType: careType, defaults: defaults)
+    }
+
+    static func isSystemReminderEnabled(
+        forPlantID plantID: UUID,
+        careType: PlantCareType,
+        defaults: UserDefaults = .standard
+    ) -> Bool {
+        guard controllableCareTypes.contains(careType) else { return true }
+        let key = plantCareKey(prefix: plantCareSystemReminderPrefix, plantID: plantID, careType: careType)
+        return defaults.object(forKey: key) == nil
+            ? isCareTypeReminderEnabled(careType, defaults: defaults)
+            : defaults.bool(forKey: key)
+    }
+
+    static func setSystemReminderEnabled(
+        _ value: Bool,
+        forPlantID plantID: UUID,
+        careType: PlantCareType,
+        defaults: UserDefaults = .standard
+    ) {
+        guard controllableCareTypes.contains(careType) else { return }
+        let key = plantCareKey(prefix: plantCareSystemReminderPrefix, plantID: plantID, careType: careType)
+        defaults.set(value, forKey: key)
+    }
+
+    static func systemReminderOverride(
+        forPlantID plantID: UUID,
+        careType: PlantCareType,
+        defaults: UserDefaults = .standard
+    ) -> Bool? {
+        boolOverride(prefix: plantCareSystemReminderPrefix, plantID: plantID, careType: careType, defaults: defaults)
+    }
+
+    static func isCompletionCalendarEnabled(
+        forPlantID plantID: UUID,
+        careType: PlantCareType,
+        defaults: UserDefaults = .standard
+    ) -> Bool {
+        let key = plantCareKey(prefix: plantCareCompletionCalendarPrefix, plantID: plantID, careType: careType)
+        return defaults.object(forKey: key) == nil ? true : defaults.bool(forKey: key)
+    }
+
+    static func setCompletionCalendarEnabled(
+        _ value: Bool,
+        forPlantID plantID: UUID,
+        careType: PlantCareType,
+        defaults: UserDefaults = .standard
+    ) {
+        let key = plantCareKey(prefix: plantCareCompletionCalendarPrefix, plantID: plantID, careType: careType)
+        defaults.set(value, forKey: key)
+    }
+
+    static func completionCalendarOverride(
+        forPlantID plantID: UUID,
+        careType: PlantCareType,
+        defaults: UserDefaults = .standard
+    ) -> Bool? {
+        boolOverride(prefix: plantCareCompletionCalendarPrefix, plantID: plantID, careType: careType, defaults: defaults)
+    }
+
     static func reminderLeadDays(
         forPlantID plantID: UUID,
         careType: PlantCareType,
@@ -113,6 +203,16 @@ nonisolated enum PlantReminderPreferenceStore {
     ) {
         let key = plantCareKey(prefix: plantCareLeadDaysPrefix, plantID: plantID, careType: careType)
         defaults.set(min(max(days, 0), 14), forKey: key)
+    }
+
+    static func reminderLeadDaysOverride(
+        forPlantID plantID: UUID,
+        careType: PlantCareType,
+        defaults: UserDefaults = .standard
+    ) -> Int? {
+        let key = plantCareKey(prefix: plantCareLeadDaysPrefix, plantID: plantID, careType: careType)
+        guard defaults.object(forKey: key) != nil else { return nil }
+        return min(max(defaults.integer(forKey: key), 0), 14)
     }
 
     static func recurrenceEndDate(
@@ -144,7 +244,10 @@ nonisolated enum PlantReminderPreferenceStore {
     static func shouldDeliverNotification(for event: Event, defaults: UserDefaults = .standard) -> Bool {
         guard !isTravelModeEnabled(defaults: defaults) else { return false }
         guard let type = careType(forEventType: event.eventType) else { return true }
-        return isCareTypeReminderEnabled(type, defaults: defaults)
+        guard let plantID = DomainEntityLinkRegistry.plantId(for: event) else {
+            return isCareTypeReminderEnabled(type, defaults: defaults)
+        }
+        return isSystemReminderEnabled(forPlantID: plantID, careType: type, defaults: defaults)
     }
 
     static func isPlantCareEvent(_ event: Event) -> Bool {
@@ -157,6 +260,13 @@ nonisolated enum PlantReminderPreferenceStore {
             event.isAllDay &&
             event.recurrenceDays > 0 &&
             event.title.contains(generatedPlanTitleMarker)
+    }
+
+    static func isPlantCareCompletionEvent(_ event: Event) -> Bool {
+        DomainEntityLinkRegistry.plantId(for: event) != nil &&
+            careType(forEventType: event.eventType) != nil &&
+            !event.isAllDay &&
+            event.recurrenceDays == 0
     }
 
     static func careType(forEventType rawValue: String) -> PlantCareType? {
@@ -234,5 +344,17 @@ nonisolated enum PlantReminderPreferenceStore {
 
     private static func plantCareKey(prefix: String, plantID: UUID, careType: PlantCareType) -> String {
         "\(prefix)\(plantID.uuidString).\(careType.rawValue)"
+    }
+
+    private static func boolOverride(
+        prefix: String,
+        plantID: UUID,
+        careType: PlantCareType,
+        defaults: UserDefaults
+    ) -> Bool? {
+        guard controllableCareTypes.contains(careType) else { return nil }
+        let key = plantCareKey(prefix: prefix, plantID: plantID, careType: careType)
+        guard defaults.object(forKey: key) != nil else { return nil }
+        return defaults.bool(forKey: key)
     }
 }

@@ -507,6 +507,13 @@ nonisolated enum CalendarSnapshotBuilder {
         visibilityContext: VisibilityContext
     ) -> Bool {
         let calendar = visibilityContext.calendar
+        if PlantReminderPreferenceStore.isPlantCareCompletionEvent(event),
+           let plantID = DomainEntityLinkRegistry.plantId(for: event),
+           let careType = PlantReminderPreferenceStore.careType(forEventType: event.eventType),
+           !PlantReminderPreferenceStore.isCompletionCalendarEnabled(forPlantID: plantID, careType: careType) {
+            return false
+        }
+
         guard let pet = visibilityContext.pet(for: event) else {
             return true
         }

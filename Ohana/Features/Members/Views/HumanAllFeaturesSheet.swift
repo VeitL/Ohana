@@ -64,11 +64,135 @@ extension HumanAllFeatureDestination: Identifiable {
     }
 }
 
+struct HumanAllFeaturesActivitySummary: Equatable {
+    var weightChartPoints: [OhanaMinimalChartPoint] = []
+    var workoutChartPoints: [OhanaMinimalChartPoint] = []
+    var metricsChartPoints: [OhanaMinimalChartPoint] = []
+    var reportChartPoints: [OhanaMinimalChartPoint] = []
+    var medicationChartPoints: [OhanaMinimalChartPoint] = []
+    var expenseChartPoints: [OhanaMinimalChartPoint] = []
+    var coconutChartPoints: [OhanaMinimalChartPoint] = []
+    var noteChartPoints: [OhanaMinimalChartPoint] = []
+    var profileChartPoints: [OhanaMinimalChartPoint] = []
+
+    static let empty = HumanAllFeaturesActivitySummary()
+
+    @MainActor
+    static func load(
+        human: Human,
+        allMeds: [HumanMedication],
+        allReports: [HumanHealthReport],
+        allExpenses: [PetExpenseLog],
+        now: Date = Date(),
+        calendar: Calendar = .current
+    ) -> HumanAllFeaturesActivitySummary {
+        let todayStart = calendar.startOfDay(for: now)
+        let recentDays = (0 ..< 7).compactMap {
+            calendar.date(byAdding: .day, value: $0 - 6, to: todayStart)
+        }
+        let humanID = human.id.uuidString
+        let myMeds = allMeds.filter { $0.humanId == humanID }
+        let myReports = allReports.filter { $0.humanId == humanID }
+        let myExpenses = allExpenses.filter { $0.executorId == humanID }
+        let visibleNotes = HumanProfileOptions.visibleNoteParts(from: human.notes)
+        let profileCompletion = [
+            !human.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+            human.birthday != nil,
+            !human.role.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+            !visibleNotes.isEmpty
+        ].count { $0 }
+
+        return HumanAllFeaturesActivitySummary(
+            weightChartPoints: human.weightLogs
+                .sorted { $0.date < $1.date }
+                .suffix(7)
+                .map { OhanaMinimalChartPoint(date: $0.date, value: max(0, $0.weight), id: "human-all-weight-\($0.id.uuidString)") },
+            workoutChartPoints: dailyPoints(
+                days: recentDays,
+                idPrefix: "human-all-workout",
+                values: human.workoutLogs,
+                date: \.date,
+                value: { Double(max(0, $0.durationMinutes)) },
+                calendar: calendar
+            ),
+            metricsChartPoints: dailyPoints(
+                days: recentDays,
+                idPrefix: "human-all-metrics",
+                values: human.healthMetricLogs,
+                date: \.date,
+                value: { _ in 1 },
+                calendar: calendar
+            ),
+            reportChartPoints: dailyPoints(
+                days: recentDays,
+                idPrefix: "human-all-reports",
+                values: myReports,
+                date: \.reportDate,
+                value: { _ in 1 },
+                calendar: calendar
+            ),
+            medicationChartPoints: FeatureHubChartPointFactory.bars(
+                [
+                    Double(myMeds.count { $0.isActive && $0.isActiveToday }),
+                    Double(myMeds.count { !$0.isActive || !$0.isActiveToday })
+                ],
+                idPrefix: "human-all-medication"
+            ),
+            expenseChartPoints: dailyPoints(
+                days: recentDays,
+                idPrefix: "human-all-expense",
+                values: myExpenses,
+                date: \.date,
+                value: { max(0, $0.amount) },
+                calendar: calendar
+            ),
+            coconutChartPoints: FeatureHubChartPointFactory.quietPlaceholder(
+                seed: Double(max(1, human.coconutBalance)),
+                idPrefix: "human-all-coconuts"
+            ),
+            noteChartPoints: FeatureHubChartPointFactory.level(
+                current: Double(visibleNotes.count),
+                total: Double(max(visibleNotes.count, 1)),
+                idPrefix: "human-all-notes"
+            ),
+            profileChartPoints: FeatureHubChartPointFactory.level(
+                current: Double(profileCompletion),
+                total: 4,
+                idPrefix: "human-all-profile"
+            )
+        )
+    }
+
+    private static func dailyPoints<T>(
+        days: [Date],
+        idPrefix: String,
+        values: [T],
+        date: KeyPath<T, Date>,
+        value: (T) -> Double,
+        calendar: Calendar
+    ) -> [OhanaMinimalChartPoint] {
+        days.enumerated().map { index, day in
+            let total = values.reduce(0.0) { partial, item in
+                guard calendar.isDate(item[keyPath: date], inSameDayAs: day) else {
+                    return partial
+                }
+                return partial + max(0, value(item))
+            }
+            return OhanaMinimalChartPoint(
+                date: day,
+                value: total,
+                id: "\(idPrefix)-\(index)-\(Int((total * 1000).rounded()))"
+            )
+        }
+    }
+}
+
 struct HumanAllFeaturesSheet: View {
     let human: Human
     let allMeds: [HumanMedication]
     let allReports: [HumanHealthReport]
     let allExpenses: [PetExpenseLog]
+    let summary: HumanAllFeaturesActivitySummary
     let onOpenDestination: (HumanAllFeatureDestination) -> Void
 
     @Environment(\.dismiss) private var dismiss
@@ -86,12 +210,14 @@ struct HumanAllFeaturesSheet: View {
         allMeds: [HumanMedication] = [],
         allReports: [HumanHealthReport] = [],
         allExpenses: [PetExpenseLog] = [],
+        summary: HumanAllFeaturesActivitySummary = .empty,
         onOpenDestination: @escaping (HumanAllFeatureDestination) -> Void
     ) {
         self.human = human
         self.allMeds = allMeds
         self.allReports = allReports
         self.allExpenses = allExpenses
+        self.summary = summary
         self.onOpenDestination = onOpenDestination
     }
 
@@ -300,6 +426,7 @@ struct HumanAllFeaturesSheet: View {
                 subtitle: lockedSubtitle(.weight, visible: latestWeightSubtitle),
                 icon: "scalemass.fill",
                 tint: Color(hex: "16A34A"),
+                chart: privacyChart(.weight, points: summary.weightChartPoints, style: .trend),
                 destination: .weight
             ),
             item(
@@ -309,6 +436,7 @@ struct HumanAllFeaturesSheet: View {
                 subtitle: lockedSubtitle(.weight, visible: healthMetricSubtitle),
                 icon: "waveform.path.ecg.rectangle.fill",
                 tint: Color.goTeal,
+                chart: privacyChart(.weight, points: summary.metricsChartPoints),
                 destination: .metrics
             ),
             item(
@@ -318,6 +446,7 @@ struct HumanAllFeaturesSheet: View {
                 subtitle: lockedSubtitle(.workout, visible: workoutSubtitle),
                 icon: "figure.run",
                 tint: Color.goOrange,
+                chart: privacyChart(.workout, points: summary.workoutChartPoints),
                 destination: .workout
             ),
             item(
@@ -327,6 +456,7 @@ struct HumanAllFeaturesSheet: View {
                 subtitle: lockedSubtitle(.weight, visible: reportSubtitle),
                 icon: "cross.case.fill",
                 tint: Color.goRed,
+                chart: privacyChart(.weight, points: summary.reportChartPoints),
                 destination: .report
             )
         ]
@@ -341,6 +471,7 @@ struct HumanAllFeaturesSheet: View {
                 subtitle: lockedSubtitle(.medication, visible: medicationSubtitle),
                 icon: "pills.fill",
                 tint: Color.goPurple,
+                chart: privacyChart(.medication, points: summary.medicationChartPoints),
                 destination: .medication
             ),
             item(
@@ -350,6 +481,7 @@ struct HumanAllFeaturesSheet: View {
                 subtitle: l.tr(zh: "身份、头像、隐私", en: "Identity, avatar, privacy", de: "Identität, Avatar, Datenschutz"),
                 icon: "person.crop.circle.fill",
                 tint: themeColor,
+                chart: FeatureHubMiniChartData(style: .bar, points: summary.profileChartPoints),
                 destination: .basicInfo
             )
         ]
@@ -364,6 +496,7 @@ struct HumanAllFeaturesSheet: View {
                 subtitle: lockedSubtitle(.expense, visible: expenseSubtitle),
                 icon: "creditcard.fill",
                 tint: Color(hex: "F59E0B"),
+                chart: privacyChart(.expense, points: summary.expenseChartPoints),
                 destination: .expense
             ),
             item(
@@ -373,6 +506,7 @@ struct HumanAllFeaturesSheet: View {
                 subtitle: lockedSubtitle(.wishlist, visible: l.tr(zh: "愿望清单和资产", en: "Wishlist and rewards", de: "Wünsche und Belohnungen")),
                 icon: "gift.fill",
                 tint: Color(hex: "EC4899"),
+                chart: privacyChart(.wishlist, points: summary.coconutChartPoints),
                 destination: .wishlist
             ),
             item(
@@ -382,6 +516,7 @@ struct HumanAllFeaturesSheet: View {
                 subtitle: lockedSubtitle(.note, visible: noteSubtitle),
                 icon: "note.text",
                 tint: Color(hex: "A78BFA"),
+                chart: privacyChart(.note, points: summary.noteChartPoints),
                 destination: .notes
             )
         ]
@@ -396,6 +531,7 @@ struct HumanAllFeaturesSheet: View {
                 subtitle: accountSubtitle,
                 icon: accountIcon,
                 tint: Color(hex: "64748B"),
+                chart: FeatureHubMiniChartData(style: .bar, points: summary.profileChartPoints),
                 destination: .basicInfo
             )
         ]
@@ -408,6 +544,7 @@ struct HumanAllFeaturesSheet: View {
         subtitle: String,
         icon: String,
         tint: Color,
+        chart: FeatureHubMiniChartData? = nil,
         destination: HumanAllFeatureDestination
     ) -> FeatureHubDestinationItem<HumanAllFeatureDestination> {
         FeatureHubDestinationItem(
@@ -417,10 +554,22 @@ struct HumanAllFeaturesSheet: View {
                 value: value,
                 subtitle: subtitle,
                 icon: icon,
-                tint: tint
+                tint: tint,
+                chart: chart
             ),
             destination: destination
         )
+    }
+
+    private func privacyChart(
+        _ field: HumanPrivateField,
+        points: [OhanaMinimalChartPoint],
+        style: FeatureHubMiniChartData.Style = .bar
+    ) -> FeatureHubMiniChartData? {
+        guard !appServices.privacy.isLocked(field, for: human, viewedBy: activeHumanId) else {
+            return nil
+        }
+        return FeatureHubMiniChartData(style: style, points: points)
     }
 
     private func lockedValue(_ field: HumanPrivateField, visible: String) -> String {

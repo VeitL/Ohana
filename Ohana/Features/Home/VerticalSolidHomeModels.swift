@@ -62,6 +62,10 @@ nonisolated struct VerticalSolidHomePlantSnapshot: Identifiable, Equatable, Send
     let needsCare: Bool
     let hasDueWatering: Bool
     let hasDueFertilizing: Bool
+    let dueCareTypes: [PlantCareType]
+    let overdueCareTypes: [PlantCareType]
+    let dueCareCount: Int
+    let overdueCareCount: Int
     let careDifficultyText: String
     let attentionText: String
     let todoText: String

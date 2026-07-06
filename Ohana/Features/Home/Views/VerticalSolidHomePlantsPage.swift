@@ -14,6 +14,9 @@ struct VerticalSolidHomePlantsPage: View {
     let localization: L10n
     @Binding var plantQuickActionItemsRaw: String
     @Binding var hidesBottomChrome: Bool
+    let pendingQuickCareKeys: Set<String>
+    let completedQuickCareKeys: Set<String>
+    let failedQuickCareKeys: Set<String>
     let topChromeHeight: CGFloat
     let bottomChromeHeight: CGFloat
     let arrivingPlantCardId: UUID?
@@ -185,8 +188,9 @@ struct VerticalSolidHomePlantsPage: View {
                 avatarImageAssetName: plant.avatarImageAssetName,
                 petSpecies: plant.subtitle,
                 themeColorHex: plant.themeHex,
-                statusBadgeText: plant.needsCare ? l.tr(zh: "待照护", en: "Care due", de: "Pflege fällig") : nil,
-                statusBadgeIsWarning: plant.needsCare,
+                statusBadgeText: plantCardStatusText(for: plant),
+                statusBadgeIsWarning: plant.overdueCareCount > 0,
+                statusBadgeToneRaw: plantCardStatusTone(for: plant).rawValue,
                 isPlant: true,
                 isReal: true,
                 actions: [
@@ -362,6 +366,10 @@ struct VerticalSolidHomePlantsPage: View {
                 plantID: plant.id,
                 plantName: plant.name,
                 dueCareTypes: plantDueCareTypes(for: plant),
+                overdueCareTypes: plantOverdueCareTypes(for: plant),
+                pendingCareTypes: plantQuickCareTypes(in: pendingQuickCareKeys, for: plant.id),
+                completedCareTypes: plantQuickCareTypes(in: completedQuickCareKeys, for: plant.id),
+                failedCareTypes: plantQuickCareTypes(in: failedQuickCareKeys, for: plant.id),
                 localization: localization,
                 quickActionItemsRaw: $plantQuickActionItemsRaw,
                 shouldReduceWork: reduceMotion,
@@ -896,24 +904,47 @@ struct VerticalSolidHomePlantsPage: View {
         switch action {
         case .detail:
             openPlant(plant)
-        case .water:
-            openPlantFeature(.water, plant: plant)
-        case .fertilize:
-            openPlantFeature(.fertilize, plant: plant)
         default:
-            openPlantFeature(.log, plant: plant)
+            if let destination = action.detailFeatureDestination {
+                openPlantFeature(destination, plant: plant)
+            } else {
+                openPlant(plant)
+            }
         }
     }
 
     private func plantDueCareTypes(for plant: VerticalSolidHomePlantSnapshot) -> Set<PlantCareType> {
-        var types = Set<PlantCareType>()
-        if plant.hasDueWatering {
-            types.insert(.watering)
+        Set(plant.dueCareTypes)
+    }
+
+    private func plantOverdueCareTypes(for plant: VerticalSolidHomePlantSnapshot) -> Set<PlantCareType> {
+        Set(plant.overdueCareTypes)
+    }
+
+    private func plantCardStatusText(for plant: VerticalSolidHomePlantSnapshot) -> String? {
+        if plant.overdueCareCount > 0 {
+            return plant.overdueCareCount > 99 ? "99+" : "\(plant.overdueCareCount)"
         }
-        if plant.hasDueFertilizing {
-            types.insert(.fertilizing)
+        if plant.dueCareCount > 0 {
+            return plant.dueCareCount > 99 ? "99+" : "\(plant.dueCareCount)"
         }
-        return types
+        return nil
+    }
+
+    private func plantCardStatusTone(for plant: VerticalSolidHomePlantSnapshot) -> FocusCardStatusBadgeTone {
+        if plant.overdueCareCount > 0 {
+            return .urgent
+        }
+        if plant.dueCareCount > 0 {
+            return .due
+        }
+        return .ok
+    }
+
+    private func plantQuickCareTypes(in keys: Set<String>, for plantID: UUID) -> Set<PlantCareType> {
+        Set(PlantCareType.allCases.filter { careType in
+            keys.contains(PlantQuickCareFeedbackKey.key(plantID: plantID, careType: careType))
+        })
     }
 
     private func plantSnapshot(for card: FocusCard) -> VerticalSolidHomePlantSnapshot? {

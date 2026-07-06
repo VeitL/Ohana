@@ -234,15 +234,70 @@ extension VerticalSolidHomeView {
     }
 
     func recordPlantQuickCare(_ type: PlantCareType, plantID: UUID) {
+        let key = PlantQuickCareFeedbackKey.key(plantID: plantID, careType: type)
+        guard !pendingPlantQuickCareKeys.contains(key) else { return }
+
         OhanaFeedback.light()
+        setPlantQuickCarePending(key)
         enqueueHomeCommand(.plantCare(plantID: plantID, action: type.rawValue)) {
-            commandExecutor.recordPlantCare(
+            guard let result = commandExecutor.recordPlantCare(
                 type,
                 plantID: plantID,
                 executorId: currentExecutorId()
-            )
+            ) else {
+                setPlantQuickCareFailed(key)
+                UINotificationFeedbackGenerator().notificationOccurred(.error)
+                return
+            }
+            setPlantQuickCareCompleted(key)
             UINotificationFeedbackGenerator().notificationOccurred(.success)
+            applyPlantQuickCareRewardFeedback(result)
             applyTodayFocusMutationFeedback(entityId: plantID)
+        }
+    }
+
+    func setPlantQuickCarePending(_ key: String) {
+        plantQuickCareFeedbackClearTasks[key]?.cancel()
+        plantQuickCareFeedbackClearTasks[key] = nil
+        withAnimation(GoMotion.feedback) {
+            pendingPlantQuickCareKeys.insert(key)
+            completedPlantQuickCareKeys.remove(key)
+            failedPlantQuickCareKeys.remove(key)
+        }
+    }
+
+    func setPlantQuickCareCompleted(_ key: String) {
+        withAnimation(GoMotion.feedback) {
+            pendingPlantQuickCareKeys.remove(key)
+            failedPlantQuickCareKeys.remove(key)
+            completedPlantQuickCareKeys.insert(key)
+        }
+        schedulePlantQuickCareFeedbackClear(key)
+    }
+
+    func setPlantQuickCareFailed(_ key: String) {
+        withAnimation(GoMotion.feedback) {
+            pendingPlantQuickCareKeys.remove(key)
+            completedPlantQuickCareKeys.remove(key)
+            failedPlantQuickCareKeys.insert(key)
+        }
+        schedulePlantQuickCareFeedbackClear(key)
+    }
+
+    func schedulePlantQuickCareFeedbackClear(_ key: String) {
+        plantQuickCareFeedbackClearTasks[key]?.cancel()
+        plantQuickCareFeedbackClearTasks[key] = OhanaFrameScheduler.runAfterNextFrame(milliseconds: 1800) {
+            withAnimation(GoMotion.selection) {
+                completedPlantQuickCareKeys.remove(key)
+                failedPlantQuickCareKeys.remove(key)
+            }
+            plantQuickCareFeedbackClearTasks[key] = nil
+        }
+    }
+
+    func applyPlantQuickCareRewardFeedback(_ result: PlantCareCommandResult) {
+        if result.coconutDelta > 0 {
+            OhanaFeedback.success()
         }
     }
 

@@ -53,13 +53,25 @@ struct PetFeatureCollectionView: View {
                 pageHeader
 
                 ScrollView(showsIndicators: false) {
-                    LazyVGrid(columns: columns, spacing: 12) {
-                        ForEach(items) { item in
-                            PetFeatureCollectionCard(
-                                item: item,
-                                summary: cardSummary(for: item.feature)
-                            ) {
-                                parentPath.append(FMDest.featureAggregate(item.feature))
+                    VStack(alignment: .leading, spacing: 12) {
+                        summaryPanel
+
+                        Button {
+                            parentPath.append(FMDest.petSharedCheckIn)
+                        } label: {
+                            FeatureSummaryChartCard(data: sharedCheckInActionData)
+                        }
+                        .buttonStyle(ScaleButtonStyle())
+                        .accessibilityIdentifier("pet-feature-collection-shared-check-in")
+
+                        LazyVGrid(columns: columns, spacing: 12) {
+                            ForEach(items) { item in
+                                PetFeatureCollectionCard(
+                                    item: item,
+                                    summary: cardSummary(for: item.feature)
+                                ) {
+                                    parentPath.append(FMDest.featureAggregate(item.feature))
+                                }
                             }
                         }
                     }
@@ -70,6 +82,60 @@ struct PetFeatureCollectionView: View {
             }
         }
         .accessibilityIdentifier("pet-feature-collection")
+    }
+
+    private var summaryPanel: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(l.tr(zh: "家庭宠物摘要", en: "Pet Summary", de: "Tierübersicht"))
+                    .font(OhanaFont.callout(.black))
+                    .foregroundStyle(Color.ohanaPrimaryText)
+                Spacer(minLength: 8)
+                Text(summary.healthSignalCount > 0
+                    ? l.tr(zh: "\(summary.healthSignalCount) 项需关注", en: "\(summary.healthSignalCount) signals", de: "\(summary.healthSignalCount) Signale")
+                    : l.tr(zh: "状态稳定", en: "Steady", de: "Stabil"))
+                    .font(OhanaFont.caption(.black))
+                    .foregroundStyle(summary.healthSignalCount > 0 ? Color.goYellow : Color.goTeal)
+            }
+
+            FeatureHubMetricStrip(metrics: [
+                FeatureHubMetric(id: "pets", title: l.tr(zh: "活跃宠物", en: "Active pets", de: "Aktive Tiere"), value: "\(summary.activePetCount)"),
+                FeatureHubMetric(id: "today", title: l.tr(zh: "今日记录", en: "Today logs", de: "Heute"), value: "\(summary.todayFoodLogs + summary.todayPottyLogs + summary.todayWalkCount)"),
+                FeatureHubMetric(id: "expense", title: l.tr(zh: "本月花费", en: "This month", de: "Diesen Monat"), value: expenseAmountText),
+                FeatureHubMetric(id: "archive", title: l.tr(zh: "成长档案", en: "Archive", de: "Archiv"), value: "\(summary.archiveItemCount)")
+            ])
+        }
+        .padding(14)
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous))
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("pet-feature-collection-summary")
+    }
+
+    private var sharedCheckInActionData: FeatureHubTileData {
+        FeatureHubTileData(
+            id: "pet-shared-check-in",
+            title: l.tr(zh: "多宠物打卡", en: "Multi-Pet Check-in", de: "Mehrere Tiere"),
+            value: "\(summary.activePetCount)",
+            subtitle: l.tr(
+                zh: "共同喂食、喂水、猫砂等动作入口",
+                en: "Shared feeding, water, litter and care actions",
+                de: "Gemeinsame Futter-, Wasser- und Streuaktionen"
+            ),
+            icon: "checklist.checked",
+            tint: Color.goPrimary,
+            chart: FeatureHubMiniChartData(
+                style: .bar,
+                points: FeatureHubChartPointFactory.bars(
+                    [
+                        Double(summary.todayFoodLogs),
+                        Double(summary.todayPottyLogs),
+                        Double(summary.todayWalkCount),
+                        Double(summary.hygieneLogsLast7Days)
+                    ],
+                    idPrefix: "pet-feature-shared-check-in"
+                )
+            )
+        )
     }
 
     private var pageHeader: some View {
@@ -113,28 +179,56 @@ struct PetFeatureCollectionView: View {
                     en: "\(summary.todayFoodPetCount)/\(max(summary.activePetCount, 1)) pets covered",
                     de: "\(summary.todayFoodPetCount)/\(max(summary.activePetCount, 1)) Tiere versorgt"
                 ),
-                caption: l.tr(zh: "饮食聚合", en: "Food aggregate", de: "Futterübersicht")
+                caption: l.tr(zh: "饮食聚合", en: "Food aggregate", de: "Futterübersicht"),
+                chart: FeatureHubMiniChartData(
+                    points: FeatureHubChartPointFactory.bars(
+                        [Double(summary.todayFoodLogs), Double(summary.todayFoodPetCount), Double(summary.activePetCount)],
+                        idPrefix: "pet-feature-food"
+                    )
+                ),
+                tint: Color(hex: "F59E0B")
             )
         case .hygiene:
             PetFeatureCardSummary(
                 value: "\(summary.hygieneLogsLast7Days)",
                 label: l.tr(zh: "近 7 天", en: "last 7 days", de: "7 Tage"),
                 detail: l.tr(zh: "清洁与护理记录", en: "hygiene and care logs", de: "Pflegeeinträge"),
-                caption: l.tr(zh: "护理节奏", en: "Care rhythm", de: "Pflegerhythmus")
+                caption: l.tr(zh: "护理节奏", en: "Care rhythm", de: "Pflegerhythmus"),
+                chart: FeatureHubMiniChartData(
+                    points: FeatureHubChartPointFactory.quietPlaceholder(
+                        seed: Double(max(1, summary.hygieneLogsLast7Days)),
+                        idPrefix: "pet-feature-hygiene"
+                    )
+                ),
+                tint: Color.goTeal
             )
         case .walks:
             PetFeatureCardSummary(
                 value: summary.todayWalkCount > 0 ? "\(summary.todayWalkCount)" : "0",
                 label: l.tr(zh: "今日遛狗", en: "walks today", de: "heute"),
                 detail: walkDistanceText,
-                caption: l.tr(zh: "遛狗聚合", en: "Walk aggregate", de: "Gassi-Übersicht")
+                caption: l.tr(zh: "遛狗聚合", en: "Walk aggregate", de: "Gassi-Übersicht"),
+                chart: FeatureHubMiniChartData(
+                    points: FeatureHubChartPointFactory.bars(
+                        [Double(summary.todayWalkCount), max(0, summary.todayWalkDistanceMeters / 1000.0)],
+                        idPrefix: "pet-feature-walk"
+                    )
+                ),
+                tint: Color(hex: "14B8A6")
             )
         case .potty:
             PetFeatureCardSummary(
                 value: "\(summary.todayPottyLogs)",
                 label: l.tr(zh: "今日记录", en: "today logs", de: "heute"),
                 detail: l.tr(zh: "便便与猫砂相关记录", en: "potty and litter logs", de: "Toilette und Streu"),
-                caption: l.tr(zh: "排便观察", en: "Potty signals", de: "Toiletten-Signale")
+                caption: l.tr(zh: "排便观察", en: "Potty signals", de: "Toiletten-Signale"),
+                chart: FeatureHubMiniChartData(
+                    points: FeatureHubChartPointFactory.bars(
+                        [Double(summary.todayPottyLogs), Double(summary.activePetCount)],
+                        idPrefix: "pet-feature-potty"
+                    )
+                ),
+                tint: Color(hex: "D97706")
             )
         case .health:
             PetFeatureCardSummary(
@@ -143,7 +237,15 @@ struct PetFeatureCollectionView: View {
                 detail: summary.healthSignalCount == 0
                     ? l.tr(zh: "暂无异常", en: "No issues", de: "Keine Auffälligkeiten")
                     : l.tr(zh: "有项目需要关注", en: "Needs attention", de: "Braucht Aufmerksamkeit"),
-                caption: l.tr(zh: "健康档案", en: "Health records", de: "Gesundheitsakte")
+                caption: l.tr(zh: "健康档案", en: "Health records", de: "Gesundheitsakte"),
+                chart: FeatureHubMiniChartData(
+                    points: FeatureHubChartPointFactory.level(
+                        current: Double(summary.healthSignalCount),
+                        total: Double(max(summary.activePetCount, summary.healthSignalCount, 1)),
+                        idPrefix: "pet-feature-health"
+                    )
+                ),
+                tint: Color.goRed
             )
         case .medications:
             PetFeatureCardSummary(
@@ -152,35 +254,72 @@ struct PetFeatureCollectionView: View {
                 detail: summary.activeMedicationCount == 0
                     ? l.tr(zh: "暂无用药", en: "No medications", de: "Keine Medikamente")
                     : l.tr(zh: "用药计划进行中", en: "Medication plans active", de: "Medikation aktiv"),
-                caption: l.tr(zh: "用药管理", en: "Medication", de: "Medikamente")
+                caption: l.tr(zh: "用药管理", en: "Medication", de: "Medikamente"),
+                chart: FeatureHubMiniChartData(
+                    points: FeatureHubChartPointFactory.level(
+                        current: Double(summary.activeMedicationCount),
+                        total: Double(max(summary.activeMedicationCount, summary.activePetCount, 1)),
+                        idPrefix: "pet-feature-medication"
+                    )
+                ),
+                tint: Color.goPurple
             )
         case .weight:
             PetFeatureCardSummary(
                 value: "\(summary.weightMemberCount)",
                 label: l.tr(zh: "有记录成员", en: "tracked members", de: "mit Verlauf"),
                 detail: recentDateText(summary.latestWeightDate),
-                caption: l.tr(zh: "体重趋势", en: "Weight trend", de: "Gewichtstrend")
+                caption: l.tr(zh: "体重趋势", en: "Weight trend", de: "Gewichtstrend"),
+                chart: FeatureHubMiniChartData(
+                    points: FeatureHubChartPointFactory.level(
+                        current: Double(summary.weightMemberCount),
+                        total: Double(max(summary.activePetCount, 1)),
+                        idPrefix: "pet-feature-weight"
+                    )
+                ),
+                tint: Color(hex: "16A34A")
             )
         case .expense:
             PetFeatureCardSummary(
                 value: "\(summary.monthExpenseCount)",
                 label: l.tr(zh: "本月记录", en: "this month", de: "diesen Monat"),
                 detail: expenseAmountText,
-                caption: l.tr(zh: "花费聚合", en: "Expense aggregate", de: "Ausgabenübersicht")
+                caption: l.tr(zh: "花费聚合", en: "Expense aggregate", de: "Ausgabenübersicht"),
+                chart: FeatureHubMiniChartData(
+                    points: FeatureHubChartPointFactory.bars(
+                        [Double(summary.monthExpenseCount), max(0, summary.monthExpenseAmount)],
+                        idPrefix: "pet-feature-expense"
+                    )
+                ),
+                tint: Color.goOrange
             )
         case .retention:
             PetFeatureCardSummary(
                 value: "\(summary.archiveItemCount)",
                 label: l.tr(zh: "档案项目", en: "archive items", de: "Archivstücke"),
                 detail: l.tr(zh: "照片、证件与里程碑", en: "Photos, documents and milestones", de: "Fotos, Dokumente und Meilensteine"),
-                caption: l.tr(zh: "成长档案", en: "Growth records", de: "Wachstumsakte")
+                caption: l.tr(zh: "成长档案", en: "Growth records", de: "Wachstumsakte"),
+                chart: FeatureHubMiniChartData(
+                    points: FeatureHubChartPointFactory.quietPlaceholder(
+                        seed: Double(max(1, summary.archiveItemCount)),
+                        idPrefix: "pet-feature-retention"
+                    )
+                ),
+                tint: Color(hex: "EC4899")
             )
         case .basicInfo, .documents, .moments, .achievements:
             PetFeatureCardSummary(
                 value: "\(summary.archiveItemCount)",
                 label: l.tr(zh: "档案项目", en: "archive items", de: "Archivstücke"),
                 detail: l.tr(zh: "已收进成长档案", en: "Included in growth records", de: "In der Wachstumsakte"),
-                caption: feature.title(l: l)
+                caption: feature.title(l: l),
+                chart: FeatureHubMiniChartData(
+                    points: FeatureHubChartPointFactory.quietPlaceholder(
+                        seed: Double(max(1, summary.archiveItemCount)),
+                        idPrefix: "pet-feature-\(feature.rawValue)"
+                    )
+                ),
+                tint: Color(hex: "94A3B8")
             )
         }
     }
@@ -237,6 +376,8 @@ private struct PetFeatureCardSummary: Equatable {
     let label: String
     let detail: String
     let caption: String
+    let chart: FeatureHubMiniChartData
+    let tint: Color
 }
 
 private struct PetFeatureCollectionCard: View {
@@ -246,60 +387,17 @@ private struct PetFeatureCollectionCard: View {
 
     var body: some View {
         Button(action: action) {
-            VStack(alignment: .leading, spacing: 12) {
-                HStack(alignment: .top, spacing: 8) {
-                    Image(systemName: item.icon)
-                        .font(OhanaFont.adaptive(size: 17, weight: .black)) // a11y: allow decorative card glyph; button label text carries meaning.
-                        .foregroundStyle(Color.ohanaFunctionalIcon)
-                        .frame(width: 28, height: 28) // a11y: allow decorative non-interactive frame.
-
-                    Spacer(minLength: 4)
-
-                    Image(systemName: "chevron.right") // a11y: allow decorative navigation glyph; card button text owns meaning.
-                        .font(OhanaFont.adaptive(size: 10, weight: .black)) // a11y: allow decorative navigation glyph.
-                        .foregroundStyle(Color.ohanaTertiaryText)
-                        .accessibilityHidden(true)
-                }
-
-                VStack(alignment: .leading, spacing: 5) {
-                    Text(item.title)
-                        .font(OhanaFont.callout(.black))
-                        .foregroundStyle(Color.ohanaPrimaryText)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.75)
-
-                    HStack(alignment: .firstTextBaseline, spacing: 5) {
-                        Text(summary.value)
-                            .font(OhanaFont.adaptive(size: 28, weight: .black, design: .rounded))
-                            .foregroundStyle(Color.goPrimary)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.6)
-                            .ohanaNumericMotion(summary.value)
-
-                        Text(summary.label)
-                            .font(OhanaFont.caption2(.black))
-                            .foregroundStyle(Color.ohanaSecondaryText)
-                            .lineLimit(2)
-                            .minimumScaleFactor(0.7)
-                    }
-
-                    Text(summary.detail)
-                        .font(OhanaFont.caption(.black))
-                        .foregroundStyle(Color.ohanaPrimaryText)
-                        .lineLimit(2)
-                        .minimumScaleFactor(0.72)
-
-                    Text(summary.caption)
-                        .font(OhanaFont.caption2(.bold))
-                        .foregroundStyle(Color.ohanaTertiaryText)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.72)
-                }
-            }
-            .frame(maxWidth: .infinity, minHeight: 164, alignment: .topLeading)
-            .padding(14)
-            .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous))
-            .contentShape(RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous))
+            FeatureSummaryChartCard(
+                data: FeatureHubTileData(
+                    id: item.id,
+                    title: item.title,
+                    value: summary.value,
+                    subtitle: "\(summary.label) · \(summary.detail)",
+                    icon: item.icon,
+                    tint: summary.tint,
+                    chart: summary.chart
+                )
+            )
         }
         .buttonStyle(ScaleButtonStyle())
         .accessibilityElement(children: .combine)

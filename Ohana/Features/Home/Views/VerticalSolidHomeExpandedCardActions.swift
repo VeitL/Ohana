@@ -177,6 +177,7 @@ struct VerticalSolidHomeExpandedCardActions: View {
             statusText: state.status,
             isCompleted: state.isCompleted,
             showsAttention: state.showsAttention,
+            attentionLevel: state.attentionLevel,
             isLocked: state.isLocked,
             primaryIcon: primaryIcon(for: item),
             isPrimaryDisabled: isPrimaryDisabled(item: item, state: state),

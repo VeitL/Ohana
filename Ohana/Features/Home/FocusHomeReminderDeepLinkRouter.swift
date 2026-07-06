@@ -322,16 +322,16 @@ nonisolated enum FocusHomeReminderDeepLinkRouter {
             return .plantCare(plant, .fertilize)
         }
         if matchesAny(text, ["虫", "黄叶", "病", "pest", "yellow leaf", "schädl", "schaedl"]) {
-            return .plantCare(plant, .log)
+            return .plantCare(plant, .health)
         }
         if matchesAny(text, ["清洁叶", "擦叶", "clean leaves", "leaf clean", "blätter reinigen"]) {
-            return .plantCare(plant, .log)
+            return .plantCare(plant, .maintenance)
         }
         if matchesAny(text, ["照片", "拍照", "photo", "foto"]) {
-            return .plantCare(plant, .log)
+            return .plantCare(plant, .growth)
         }
         if matchesAny(text, ["记录", "备注", "note", "timeline", "notiz"]) {
-            return .plantCare(plant, .log)
+            return .plantCare(plant, .growth)
         }
         return .plant(plant)
     }
@@ -354,18 +354,14 @@ nonisolated enum FocusHomeReminderDeepLinkRouter {
         text: String
     ) -> PlantCareFeatureDestination {
         switch careType {
-        case .watering, .misting:
-            .water
-        case .fertilizing:
-            .fertilize
         case .customNote:
             if matchesAny(text, ["照片", "拍照", "photo", "foto"]) {
-                .log
+                .growth
             } else {
-                .log
+                .growth
             }
-        case .repotting, .pruning, .rotating, .leafCleaning, .pestCheck, .photo, .newLeaf, .yellowLeaf, .pestFound:
-            .log
+        default:
+            PlantCareFeatureDestination.categoryDestination(for: careType)
         }
     }
 

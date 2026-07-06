@@ -640,6 +640,7 @@ struct VerticalHomeTabMountPolicyTests {
     @Test func plantWalletQuickActionsUseSharedEditablePolicy() throws {
         let plantPageSource = try source("Ohana/Features/Home/Views/VerticalSolidHomePlantsPage.swift")
         let dashboardSource = try source("Ohana/Features/Plants/Views/PlantDashboardView+WalletDeck.swift")
+        let policySource = try source("Ohana/Features/Plants/PlantDockQuickActionPolicy.swift")
 
         #expect(PlantDockQuickAction.defaultItems.map(\.id) == [
             "water",
@@ -648,10 +649,23 @@ struct VerticalHomeTabMountPolicyTests {
             "detail"
         ])
         #expect(PlantDockQuickAction.editableItems.count == 14)
-        #expect(PlantDockQuickAction.maxVisibleItems == 5)
+        #expect(PlantDockQuickAction.editableSections.map(\.category) == [
+            .hydration,
+            .nutrition,
+            .maintenance,
+            .health,
+            .growth
+        ])
+        #expect(PlantDockQuickAction.maxVisibleItems == 8)
+        #expect(policySource.contains("var detailFeatureDestination: PlantCareFeatureDestination?"))
+        #expect(plantPageSource.contains("action.detailFeatureDestination"))
         #expect(plantPageSource.contains("PlantDockQuickActionsView("))
+        #expect(plantPageSource.contains("overdueCareTypes: plantOverdueCareTypes(for: plant)"))
         #expect(dashboardSource.contains("PlantDockQuickActionsView("))
+        #expect(dashboardSource.contains("overdueCareTypes: plantOverdueCareTypes(tasks: careTasks)"))
+        #expect(dashboardSource.contains("focusedCareType: careType"))
         #expect(dashboardSource.contains("plantStoredDockActions(for: plant)"))
+        #expect(dashboardSource.contains("plantDockActionAttentionLevel"))
     }
 
     @Test func plantBatchCareSheetUsesRouteSnapshotInsteadOfBodyAggregation() throws {
@@ -1198,11 +1212,19 @@ struct VerticalHomeTabMountPolicyTests {
         #expect(models.contains("let todoText: String"))
         #expect(models.contains("let hasDueWatering: Bool"))
         #expect(models.contains("let hasDueFertilizing: Bool"))
+        #expect(models.contains("let dueCareTypes: [PlantCareType]"))
+        #expect(models.contains("let overdueCareTypes: [PlantCareType]"))
+        #expect(models.contains("let dueCareCount: Int"))
+        #expect(models.contains("let overdueCareCount: Int"))
         #expect(builder.contains("careDifficultyText:"))
         #expect(builder.contains("attentionText:"))
         #expect(builder.contains("todoText:"))
         #expect(builder.contains("hasDueWatering: hasDueWatering"))
         #expect(builder.contains("hasDueFertilizing: hasDueFertilizing"))
+        #expect(builder.contains("dueCareTypes: dueCareTypes"))
+        #expect(builder.contains("overdueCareTypes: overdueCareTypes"))
+        #expect(builder.contains("dueCareCount: todayDueCareCount"))
+        #expect(builder.contains("overdueCareCount: overdueCareCount"))
         #expect(uiTestSource.contains("testHomePlantViewSwitcherRailSwitchesToListMode"))
     }
 
@@ -1286,12 +1308,24 @@ struct VerticalHomeTabMountPolicyTests {
         #expect(routerSource.contains("summary: plantFeatureCollectionSummary"))
         #expect(routeDataSource.contains("var plantFeatureCollectionSummary: PlantFeatureCollectionSummary"))
         #expect(routeDataSource.contains("PlantFeatureCollectionSummary.load("))
+        #expect(routeDataSource.contains("var calendarPlanEnabledCount"))
+        #expect(routeDataSource.contains("var systemReminderEnabledCount"))
+        #expect(collectionSource.contains("commandCenterPanel"))
+        #expect(collectionSource.contains("plant-feature-collection-command-center"))
+        #expect(collectionSource.contains("summary.systemReminderEnabledCount"))
+        #expect(collectionSource.contains("summary.maintenanceDueCount"))
+        #expect(collectionSource.contains("summary.healthDueCount"))
+        #expect(collectionSource.contains("summary.growthLogCount"))
         #expect(collectionSource.contains("parentPath.append(item.destination)"))
         #expect(collectionSource.contains(".plantsBatchCare"))
         #expect(collectionSource.contains(".plantsDashboard"))
         #expect(collectionSource.contains(".plantCareAggregate(.water)"))
         #expect(collectionSource.contains(".plantCareAggregate(.fertilize)"))
-        #expect(collectionSource.contains(".plantCareAggregate(.log)"))
+        #expect(collectionSource.contains(".plantCareAggregate(.maintenance)"))
+        #expect(collectionSource.contains(".plantCareAggregate(.health)"))
+        #expect(collectionSource.contains(".plantCareAggregate(.growth)"))
+        #expect(!collectionSource.contains(".plantCareAggregate(.log)"))
+        #expect(collectionSource.contains("title: l.tr(zh: \"植物管理\", en: \"Plant Management\""))
         #expect(!collectionSource.contains("FetchDescriptor<"))
         #expect(sheetSource.contains(".plantFeatureCollection,"))
         #expect(sheetSource.contains("Alle Pflanzenfunktionen"))

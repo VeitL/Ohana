@@ -22,7 +22,6 @@ nonisolated enum HomeSnapshotBuilder {
         now: Date = Date(),
         l: L10n = .current
     ) -> [FocusCard] {
-        let statusEvents = actionableOverdueEvents(from: events, now: now)
         let medicationLogs = recentHumanMedicationLogs(from: humanMedicationLogs, now: now)
         return FocusHomeCardDataSource.buildSnapshot(
             pets: pets,
@@ -37,7 +36,7 @@ nonisolated enum HomeSnapshotBuilder {
                 $0,
                 pets: pets,
                 humans: humans,
-                events: statusEvents,
+                events: events,
                 humanMedications: humanMedications,
                 humanMedicationLogs: medicationLogs,
                 careLedgerEntries: careLedgerEntries,
@@ -74,36 +73,64 @@ nonisolated enum HomeSnapshotBuilder {
         humanMedicationLogs: [HumanMedicationLog],
         careLedgerEntries: [HomeCareQuickActionEntry]? = nil,
         now: Date = Date(),
-        l: L10n = .current
+        l _: L10n = .current
     ) -> FocusCard {
         guard !card.isElectronicPet else {
             return card
         }
 
-        let warning: CarePlanOverdueStatus? = if card.isHuman, let human = humans.first(where: { $0.id == card.id }) {
-            CarePlanOverdueStatusCalculator.humanWarning(
+        let urgentCount: Int
+        let dueCount: Int
+        if card.isHuman, let human = humans.first(where: { $0.id == card.id }) {
+            urgentCount = CarePlanOverdueStatusCalculator.humanWarningCount(
                 for: human,
                 events: events,
                 medications: humanMedications,
                 logs: humanMedicationLogs,
                 now: now
             )
+            dueCount = CarePlanOverdueStatusCalculator.humanDueTodayCount(
+                human: human,
+                events: events,
+                medications: humanMedications,
+                logs: humanMedicationLogs,
+                now: now
+            )
         } else if let pet = pets.first(where: { $0.id == card.id }) {
-            CarePlanOverdueStatusCalculator.petWarning(
+            let waterCycleSnapshot = careLedgerEntries.map { waterCycleLogSnapshot(for: pet, careLedgerEntries: $0) }
+            urgentCount = CarePlanOverdueStatusCalculator.petWarningCount(
                 for: pet,
                 events: events,
                 now: now,
-                waterCycleLogSnapshot: careLedgerEntries.map { waterCycleLogSnapshot(for: pet, careLedgerEntries: $0) }
+                waterCycleLogSnapshot: waterCycleSnapshot
+            )
+            dueCount = CarePlanOverdueStatusCalculator.petDueTodayCount(
+                pet: pet,
+                events: events,
+                now: now,
+                waterCycleLogSnapshot: waterCycleSnapshot
             )
         } else {
-            nil
+            urgentCount = 0
+            dueCount = 0
         }
 
-        guard let warning else { return card }
         var copy = card
-        copy.statusBadgeText = warning.localizedTitle(l: l)
-        copy.statusBadgeIsWarning = true
+        if urgentCount > 0 {
+            copy.statusBadgeText = badgeCountText(urgentCount)
+            copy.statusBadgeTone = .urgent
+        } else if dueCount > 0 {
+            copy.statusBadgeText = badgeCountText(dueCount)
+            copy.statusBadgeTone = .due
+        } else {
+            copy.statusBadgeText = nil
+            copy.statusBadgeTone = .ok
+        }
         return copy
+    }
+
+    private static func badgeCountText(_ count: Int) -> String {
+        count > 99 ? "99+" : "\(count)"
     }
 
     private static func waterCycleLogSnapshot(

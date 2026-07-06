@@ -54,7 +54,7 @@ nonisolated enum HomeQuickActionRenderStateLogic {
                 petWeightLedgerEntries: source.petWeightLedgerEntries,
                 now: now
             ),
-            showsAttention: ExpandedQuickActionLogic.showsAttentionDot(
+            attentionLevel: ExpandedQuickActionLogic.attentionLevel(
                 item: item,
                 pet: pet,
                 allEvents: source.events,
@@ -74,14 +74,38 @@ nonisolated enum HomeQuickActionRenderStateLogic {
         human: Human,
         activeHumanID: UUID?,
         source: VerticalSolidHomeSourceState,
-        localization l: L10n
+        localization l: L10n,
+        now: Date
     ) -> HomeQuickActionRenderSnapshot {
         let isLocked = isHumanQuickActionLocked(item, human: human, viewedBy: activeHumanID)
-        let medicationWarning = item.actionType == "humanMedication"
+        let warningCount = CarePlanOverdueStatusCalculator.humanWarningCount(
+            matching: item.actionType,
+            for: human,
+            events: source.events,
+            medications: source.humanMedications,
+            logs: source.humanMedicationLogs,
+            now: now
+        )
+        let attentionLevel: HomeQuickActionAttentionLevel = if warningCount > 0 {
+            .urgent
+        } else if CarePlanOverdueStatusCalculator.humanDueTodayCount(
+            for: item.actionType,
+            human: human,
+            events: source.events,
+            medications: source.humanMedications,
+            logs: source.humanMedicationLogs,
+            now: now
+        ) > 0 {
+            .due
+        } else {
+            .none
+        }
+        let medicationWarning = item.actionType == "humanMedication" && attentionLevel == .urgent
             ? CarePlanOverdueStatusCalculator.humanMedicationWarning(
                 for: human,
                 medications: source.humanMedications,
-                logs: source.humanMedicationLogs
+                logs: source.humanMedicationLogs,
+                now: now
             )
             : nil
         let status = medicationWarning?.compactText(l: l) ?? ExpandedQuickActionLogic.humanCountText(
@@ -99,7 +123,7 @@ nonisolated enum HomeQuickActionRenderStateLogic {
                 isLocked: isLocked,
                 todayMedicationLogs: source.humanMedicationLogs
             ),
-            showsAttention: medicationWarning != nil,
+            attentionLevel: attentionLevel,
             isLocked: isLocked,
             menuPolicy: HomeQuickActionMenuPolicySnapshot(ExpandedQuickActionLogic.humanMenuPolicy(actionType: item.actionType))
         )

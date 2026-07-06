@@ -944,6 +944,8 @@ private extension HomeFabFunctionShortcut {
             switch destination {
             case .petFeatureCollection:
                 return "pet-feature-collection"
+            case .petSharedCheckIn:
+                return "pet-shared-check-in"
             case .plantFeatureCollection:
                 return "plant-feature-collection"
             case let .featureAggregate(feature):
@@ -954,6 +956,8 @@ private extension HomeFabFunctionShortcut {
                 return "plants-batch-care"
             case let .plantsBatchCareFiltered(careType):
                 return "plants-batch-care-\(careType.rawValue)"
+            case .plantsBatchQuickRecord:
+                return "plants-batch-quick-record"
             case let .plantCareAggregate(feature):
                 return "plant-care-\(feature.rawValue)"
             case .coconutShop:

@@ -273,9 +273,89 @@ enum ExpandedQuickActionLogic {
                 now: now,
                 calendar: cal
             ) > 0
-            return !todayDone && cal.startOfDay(for: event.startDate) <= cal.startOfDay(for: now)
+            return !todayDone && cal.startOfDay(for: event.startDate) < cal.startOfDay(for: now)
         }
         return false
+    }
+
+    nonisolated static func attentionLevel(
+        item: QuickActionItem,
+        pet: Pet,
+        allEvents: [Event],
+        feedingLedgerEntries: [HomeFeedQuickActionEntry],
+        careLedgerEntries: [HomeCareQuickActionEntry],
+        walkLedgerEntries: [HomeWalkQuickActionEntry],
+        pottyLedgerEntries: [HomePottyQuickActionEntry],
+        now: Date
+    ) -> HomeQuickActionAttentionLevel {
+        if showsAttentionDot(
+            item: item,
+            pet: pet,
+            allEvents: allEvents,
+            feedingLedgerEntries: feedingLedgerEntries,
+            careLedgerEntries: careLedgerEntries,
+            walkLedgerEntries: walkLedgerEntries,
+            pottyLedgerEntries: pottyLedgerEntries,
+            now: now
+        ) {
+            return .urgent
+        }
+
+        let waterCycleSnapshot = waterCycleLogSnapshot(for: pet, careLedgerEntries: careLedgerEntries)
+        switch item.actionType {
+        case "feed":
+            let state = HomeFeedQuickActionState(
+                pet: pet,
+                allEvents: allEvents,
+                feedingLedgerEntries: feedingLedgerEntries,
+                now: now,
+                calendar: .current
+            )
+            if state.operatingMode == .manualReminder,
+               state.completedTodayPlanCount < state.todayManualPlanTotalCount,
+               state.nextManualReminder.map({ Calendar.current.isDate($0.scheduledAt, inSameDayAs: now) && $0.scheduledAt >= now }) == true {
+                return .due
+            }
+        case "waterChange":
+            if WaterCareCycleStatusCalculator.waterChangeStatus(for: pet, now: now, logSnapshot: waterCycleSnapshot)?.isDueToday == true {
+                return .due
+            }
+        case "filterClean":
+            if WaterCareCycleStatusCalculator.filterCleanStatus(for: pet, now: now, logSnapshot: waterCycleSnapshot)?.isDueToday == true ||
+                WaterCareCycleStatusCalculator.filterReplaceStatus(for: pet, now: now, logSnapshot: waterCycleSnapshot)?.isDueToday == true {
+                return .due
+            }
+        case "water" where WaterQuickActionPolicy.isAquatic(species: pet.species):
+            if WaterCareCycleStatusCalculator.waterChangeStatus(for: pet, now: now, logSnapshot: waterCycleSnapshot)?.isDueToday == true ||
+                WaterCareCycleStatusCalculator.filterCleanStatus(for: pet, now: now, logSnapshot: waterCycleSnapshot)?.isDueToday == true ||
+                WaterCareCycleStatusCalculator.filterReplaceStatus(for: pet, now: now, logSnapshot: waterCycleSnapshot)?.isDueToday == true {
+                return .due
+            }
+        case "play":
+            if let event = playPlanEvent(for: pet, allEvents: allEvents) {
+                let cal = Calendar.current
+                let todayDone = todayCareEntryCount(
+                    .play,
+                    pet: pet,
+                    careLedgerEntries: careLedgerEntries,
+                    now: now,
+                    calendar: cal
+                ) > 0
+                if !todayDone && cal.isDate(event.startDate, inSameDayAs: now) {
+                    return .due
+                }
+            }
+        default:
+            break
+        }
+
+        return CarePlanOverdueStatusCalculator.petDueTodayCount(
+            for: item.actionType,
+            pet: pet,
+            events: allEvents,
+            now: now,
+            waterCycleLogSnapshot: waterCycleSnapshot
+        ) > 0 ? .due : .none
     }
 
     nonisolated static func isCompleted(

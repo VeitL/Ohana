@@ -2608,6 +2608,49 @@ struct HomeCommandExecutorTests {
     }
 
     @MainActor
+    @Test func homePlantQuickCareByIdReturnsResultAndWritesWaterFact() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let plant = Plant(name: "Fern")
+        context.insert(plant)
+        try context.save()
+
+        let executor = HomeCommandExecutor(modelContext: context)
+        let result = try #require(executor.recordPlantCare(.watering, plantID: plant.id, executorId: "human-1"))
+
+        let logs = try context.fetch(FetchDescriptor<PlantCareLog>())
+        #expect(result.plantID == plant.id)
+        #expect(result.careType == .watering)
+        #expect(logs.count == 1)
+        #expect(logs.first?.id == result.logID)
+        #expect(logs.first?.plant?.id == plant.id)
+        #expect(plant.lastWateredDate != nil)
+    }
+
+    @Test func plantQuickCareHomeSurfaceTracksPendingCompletedAndRewardFeedback() throws {
+        let rootURL = repositoryRootURL()
+        let quickActionSource = try source("Ohana/Features/Home/Views/VerticalSolidHomeView+QuickActions.swift", rootURL: rootURL)
+        let viewSource = try source("Ohana/Features/Home/Views/VerticalSolidHomeView.swift", rootURL: rootURL)
+        let plantPageSource = try source("Ohana/Features/Home/Views/VerticalSolidHomePlantsPage.swift", rootURL: rootURL)
+        let embeddedSource = try source("Ohana/Features/Home/Views/VerticalHomeEmbeddedQuickActions.swift", rootURL: rootURL)
+        let dockSource = try source("Ohana/Features/Plants/Views/PlantDockQuickActionsView.swift", rootURL: rootURL)
+
+        #expect(quickActionSource.contains("guard !pendingPlantQuickCareKeys.contains(key) else { return }"))
+        #expect(quickActionSource.contains("setPlantQuickCarePending(key)"))
+        #expect(quickActionSource.contains("setPlantQuickCareCompleted(key)"))
+        #expect(quickActionSource.contains("setPlantQuickCareFailed(key)"))
+        #expect(quickActionSource.contains("applyPlantQuickCareRewardFeedback(result)"))
+        #expect(quickActionSource.contains("if result.coconutDelta > 0"))
+        #expect(viewSource.contains("@State var pendingPlantQuickCareKeys"))
+        #expect(plantPageSource.contains("pendingCareTypes: plantQuickCareTypes(in: pendingQuickCareKeys"))
+        #expect(dockSource.contains("statusText(for: dockAction, isDue: isDue, isPending: isPending, didComplete: didComplete, didFail: didFail)"))
+        #expect(dockSource.contains("isPrimaryDisabled: isPending"))
+        #expect(embeddedSource.contains("\"plant\""))
+        #expect(embeddedSource.contains("\"repotting\""))
+        #expect(embeddedSource.contains("\"yellowleaf\""))
+    }
+
+    @MainActor
     @Test func plantCareCommandServiceWritesEveryLaunchCareType() throws {
         let container = try makeInMemoryContainer()
         let context = container.mainContext

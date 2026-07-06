@@ -24,11 +24,11 @@ extension SettingsView {
     }
 
     func applyCountryDefaults(_ country: AppCountry.Option) {
-        AppCountry.applyDefaults(for: country.code)
         appCountry = country.code
-        appLanguage = AppLanguage.normalize(country.defaultLanguageCode)
         appMeasurementSystem = AppMeasurementSystem.normalize(country.defaultMeasurementSystemCode)
         appCurrency = AppCurrency.normalize(country.defaultCurrencyCode)
+        languageSelectionCode = AppLanguage.normalize(country.defaultLanguageCode)
+        scheduleLanguageCommit(languageSelectionCode)
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
     }
 
@@ -44,7 +44,51 @@ extension SettingsView {
             appCurrency = AppCurrency.code
         }
         if appLanguage != AppLanguage.code {
-            appLanguage = AppLanguage.code
+            commitLanguageChange(AppLanguage.code, emitFeedback: false)
+        }
+    }
+
+    func syncLanguageSelectionFromStorage() {
+        let normalized = AppLanguage.normalize(appLanguage)
+        guard languageSelectionCode != normalized else { return }
+
+        var transaction = Transaction(animation: nil)
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            languageSelectionCode = normalized
+        }
+    }
+
+    func scheduleLanguageCommit(_ rawLanguageCode: String) {
+        let normalized = AppLanguage.normalize(rawLanguageCode)
+        guard normalized != AppLanguage.normalize(appLanguage) else {
+            languageCommitTask?.cancel()
+            languageCommitTask = nil
+            return
+        }
+
+        languageCommitTask?.cancel()
+        languageCommitTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: 96) {
+            commitLanguageChange(normalized)
+        }
+    }
+
+    func commitLanguageChange(_ languageCode: String, emitFeedback: Bool = true) {
+        let normalized = AppLanguage.normalize(languageCode)
+        guard AppLanguage.normalize(appLanguage) != normalized else {
+            languageCommitTask = nil
+            return
+        }
+
+        var transaction = Transaction(animation: nil)
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            appLanguage = normalized
+        }
+        languageCommitTask = nil
+
+        if emitFeedback {
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
         }
     }
 

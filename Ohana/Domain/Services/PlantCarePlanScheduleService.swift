@@ -32,16 +32,7 @@ struct PlantCarePlanScheduleResult: Equatable {
 @MainActor
 enum PlantCarePlanScheduleService {
     private static let storagePrefix = "ohana_plant_care_plan_event_v1"
-    private static let scheduledCareTypes: [PlantCareType] = [
-        .watering,
-        .fertilizing,
-        .repotting,
-        .pruning,
-        .misting,
-        .rotating,
-        .leafCleaning,
-        .pestCheck
-    ]
+    private static let scheduledCareTypes = PlantCareCategory.schedulableCareTypes
 
     @discardableResult
     static func sync(
@@ -55,22 +46,17 @@ enum PlantCarePlanScheduleService {
         defaults: UserDefaults = .standard,
         saveChanges: Bool = true
     ) -> PlantCarePlanScheduleResult {
-        guard plant.remindersEnabled else {
-            let removed = removeScheduledTasks(
-                plant: plant,
-                context: context,
-                now: now,
-                notifications: notifications,
+        let enabledScheduledCareTypes = scheduledCareTypes.filter {
+            PlantReminderPreferenceStore.isPlanCalendarEnabled(
+                forPlantID: plant.id,
+                careType: $0,
+                fallback: PlantReminderPreferenceStore.planCalendarFallback(
+                    for: $0,
+                    plantRemindersEnabled: plant.remindersEnabled,
+                    defaults: defaults
+                ),
                 defaults: defaults
             )
-            if saveChanges, !removed.removedEventIDs.isEmpty || !removed.removedReminderIDs.isEmpty {
-                context.safeSave()
-            }
-            return removed
-        }
-
-        let enabledScheduledCareTypes = scheduledCareTypes.filter {
-            PlantReminderPreferenceStore.isCareTypeReminderEnabled($0, defaults: defaults)
         }
         let scheduledRawTypes = Set(enabledScheduledCareTypes.map(\.rawValue))
         let tasks = PlantCarePlanService.tasks(for: plant, now: now, calendar: calendar)
@@ -186,7 +172,19 @@ private extension PlantCarePlanScheduleService {
         notifications: ReminderNotificationScheduling,
         defaults: UserDefaults
     ) -> UpsertOutcome? {
-        let intent = makeIntent(task: task, plant: plant, now: now, calendar: calendar, defaults: defaults)
+        let systemReminderEnabled = PlantReminderPreferenceStore.isSystemReminderEnabled(
+            forPlantID: plant.id,
+            careType: task.careType,
+            defaults: defaults
+        )
+        let intent = makeIntent(
+            task: task,
+            plant: plant,
+            now: now,
+            calendar: calendar,
+            defaults: defaults,
+            includesReminder: systemReminderEnabled
+        )
         let key = storageKey(plant: plant, type: task.careType)
         let existing = storedPlanEvent(defaults.string(forKey: key), context: context)
             ?? matchingPlanEvent(plant: plant, type: task.careType, context: context)
@@ -207,14 +205,22 @@ private extension PlantCarePlanScheduleService {
             existing.completedOccurrences.removeAll()
             CloudSyncMutationRecorder.markModified(existing, context: context, modifiedAt: now)
 
-            let reminderOutcome = ensureSinglePendingReminder(
-                for: existing,
-                scheduledAt: reminderDate,
-                mutation: mutation,
-                context: context,
-                now: now,
-                notifications: notifications
-            )
+            let reminderOutcome = systemReminderEnabled
+                ? ensureSinglePendingReminder(
+                    for: existing,
+                    scheduledAt: reminderDate,
+                    mutation: mutation,
+                    context: context,
+                    now: now,
+                    notifications: notifications
+                )
+                : removeReminders(
+                    for: existing,
+                    mutation: mutation,
+                    context: context,
+                    now: now,
+                    notifications: notifications
+                )
             return UpsertOutcome(
                 event: existing,
                 pendingReminder: reminderOutcome.pendingReminder,
@@ -318,12 +324,29 @@ private extension PlantCarePlanScheduleService {
         return (pendingReminder, removedReminderIDs)
     }
 
+    static func removeReminders(
+        for event: Event,
+        mutation: AuthorizedDomainScheduleMutation,
+        context: ModelContext,
+        now: Date,
+        notifications: ReminderNotificationScheduling
+    ) -> (pendingReminder: Reminder?, removedReminderIDs: [UUID]) {
+        var removedReminderIDs: [UUID] = []
+        for reminder in Array(event.reminders) {
+            let result = DomainScheduleWriter.deleteReminder(reminder, mutation: mutation, context: context, deletedAt: now)
+            DomainScheduleEffectsDispatcher.dispatch(delete: result, notifications: notifications)
+            removedReminderIDs.append(contentsOf: result.reminderIDs)
+        }
+        return (nil, removedReminderIDs)
+    }
+
     static func makeIntent(
         task: PlantCareTaskSnapshot,
         plant: Plant,
         now: Date,
         calendar: Calendar,
-        defaults: UserDefaults
+        defaults: UserDefaults,
+        includesReminder: Bool = true
     ) -> DomainScheduleCreateIntent {
         let dueDay = calendar.startOfDay(for: task.dueDate)
         let leadDays = PlantReminderPreferenceStore.reminderLeadDays(
@@ -346,7 +369,9 @@ private extension PlantCarePlanScheduleService {
             relatedEntityId: plant.id.uuidString,
             recurrenceDays: task.effectiveIntervalDays,
             recurrenceEndDate: recurrenceEndDate,
-            reminderDates: [reminderDate(for: dueDay, now: now, calendar: calendar, defaults: defaults, leadDays: leadDays)],
+            reminderDates: includesReminder
+                ? [reminderDate(for: dueDay, now: now, calendar: calendar, defaults: defaults, leadDays: leadDays)]
+                : [],
             writeKind: .care,
             source: .domainService
         )

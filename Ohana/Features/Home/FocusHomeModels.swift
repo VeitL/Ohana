@@ -9,6 +9,12 @@ import Foundation
 import SwiftData
 import SwiftUI
 
+nonisolated enum FocusCardStatusBadgeTone: String, Equatable, Sendable {
+    case ok
+    case due
+    case urgent
+}
+
 nonisolated struct FocusCard: Identifiable, @unchecked Sendable {
     let id: UUID
     var modelID: PersistentIdentifier? = nil
@@ -52,6 +58,7 @@ nonisolated struct FocusCard: Identifiable, @unchecked Sendable {
     var equippedTitleBadgeText: String?
     var statusBadgeText: String?
     var statusBadgeIsWarning: Bool = false
+    var statusBadgeToneRaw: String = FocusCardStatusBadgeTone.ok.rawValue
     var isHuman: Bool = false
     var isPlant: Bool = false
     var isElectronicPet: Bool = false
@@ -72,6 +79,19 @@ nonisolated struct FocusCard: Identifiable, @unchecked Sendable {
 }
 
 extension FocusCard {
+    nonisolated var statusBadgeTone: FocusCardStatusBadgeTone {
+        get {
+            if statusBadgeIsWarning {
+                return .urgent
+            }
+            return FocusCardStatusBadgeTone(rawValue: statusBadgeToneRaw) ?? .ok
+        }
+        set {
+            statusBadgeToneRaw = newValue.rawValue
+            statusBadgeIsWarning = newValue == .urgent
+        }
+    }
+
     nonisolated var homePrimaryMetricValue: String {
         if isElectronicPet {
             return electronicPetLevelMetricValue

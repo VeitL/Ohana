@@ -108,6 +108,14 @@ struct PetAllFeaturesActivitySummary: Equatable {
     let insuranceCount: Int
     let medicationCount: Int
     let activeMedicationCount: Int
+    let foodChartPoints: [OhanaMinimalChartPoint]
+    let careChartPoints: [OhanaMinimalChartPoint]
+    let pottyChartPoints: [OhanaMinimalChartPoint]
+    let walkChartPoints: [OhanaMinimalChartPoint]
+    let healthChartPoints: [OhanaMinimalChartPoint]
+    let weightChartPoints: [OhanaMinimalChartPoint]
+    let expenseChartPoints: [OhanaMinimalChartPoint]
+    let archiveChartPoints: [OhanaMinimalChartPoint]
 
     static let empty = PetAllFeaturesActivitySummary()
 
@@ -130,7 +138,15 @@ struct PetAllFeaturesActivitySummary: Equatable {
         protectionDocumentCount: Int = 0,
         insuranceCount: Int = 0,
         medicationCount: Int = 0,
-        activeMedicationCount: Int = 0
+        activeMedicationCount: Int = 0,
+        foodChartPoints: [OhanaMinimalChartPoint] = [],
+        careChartPoints: [OhanaMinimalChartPoint] = [],
+        pottyChartPoints: [OhanaMinimalChartPoint] = [],
+        walkChartPoints: [OhanaMinimalChartPoint] = [],
+        healthChartPoints: [OhanaMinimalChartPoint] = [],
+        weightChartPoints: [OhanaMinimalChartPoint] = [],
+        expenseChartPoints: [OhanaMinimalChartPoint] = [],
+        archiveChartPoints: [OhanaMinimalChartPoint] = []
     ) {
         self.todayFeedCount = todayFeedCount
         self.todayNonFeedingCareCount = todayNonFeedingCareCount
@@ -151,6 +167,14 @@ struct PetAllFeaturesActivitySummary: Equatable {
         self.insuranceCount = insuranceCount
         self.medicationCount = medicationCount
         self.activeMedicationCount = activeMedicationCount
+        self.foodChartPoints = foodChartPoints
+        self.careChartPoints = careChartPoints
+        self.pottyChartPoints = pottyChartPoints
+        self.walkChartPoints = walkChartPoints
+        self.healthChartPoints = healthChartPoints
+        self.weightChartPoints = weightChartPoints
+        self.expenseChartPoints = expenseChartPoints
+        self.archiveChartPoints = archiveChartPoints
     }
 
     var todayCareCount: Int {
@@ -222,6 +246,7 @@ struct PetAllFeaturesActivitySummary: Equatable {
             event.eventKind == expenseKind
         }
         let latestWeightKg = weightEvents.max(by: { $0.occurredAt < $1.occurredAt })?.amountValue
+        let recentDays = recentDays(endingAt: todayStart, calendar: calendar)
         let documents = fetch(
             FetchDescriptor<PetDocument>(
                 predicate: #Predicate<PetDocument> { document in
@@ -291,8 +316,76 @@ struct PetAllFeaturesActivitySummary: Equatable {
             protectionDocumentCount: protectionDocumentCount,
             insuranceCount: insuranceCount,
             medicationCount: medications.count,
-            activeMedicationCount: medications.count { $0.isActive(on: now) }
+            activeMedicationCount: medications.count { $0.isActive(on: now) },
+            foodChartPoints: dailyEventPoints(
+                days: recentDays,
+                events: weekLedgerEvents,
+                idPrefix: "pet-all-food"
+            ) { $0.eventKind == careKind && $0.actionType == feedingType },
+            careChartPoints: dailyEventPoints(
+                days: recentDays,
+                events: weekLedgerEvents,
+                idPrefix: "pet-all-care"
+            ) { $0.eventKind == careKind && $0.actionType != feedingType },
+            pottyChartPoints: dailyEventPoints(
+                days: recentDays,
+                events: weekLedgerEvents,
+                idPrefix: "pet-all-potty"
+            ) { $0.eventKind == pottyKind },
+            walkChartPoints: dailyEventPoints(
+                days: recentDays,
+                events: weekLedgerEvents,
+                idPrefix: "pet-all-walk",
+                value: { max(0, $0.amountValue) / 1000.0 }
+            ) { $0.eventKind == walkKind },
+            healthChartPoints: dailyEventPoints(
+                days: recentDays,
+                events: weekLedgerEvents,
+                idPrefix: "pet-all-health"
+            ) { $0.eventKind == healthKind },
+            weightChartPoints: weightEvents.suffix(7).map {
+                OhanaMinimalChartPoint(date: $0.occurredAt, value: max(0, $0.amountValue), id: "pet-all-weight-\($0.id.uuidString)")
+            },
+            expenseChartPoints: dailyEventPoints(
+                days: recentDays,
+                events: expenseEvents.filter { $0.occurredAt >= weekStart && $0.occurredAt < todayEnd },
+                idPrefix: "pet-all-expense",
+                value: { max(0, $0.amountValue) }
+            ) { $0.eventKind == expenseKind },
+            archiveChartPoints: FeatureHubChartPointFactory.bars(
+                [Double(documents.count), Double(photoCount), Double(milestoneCount), Double(insuranceCount)],
+                idPrefix: "pet-all-archive"
+            )
         )
+    }
+
+    private static func recentDays(endingAt todayStart: Date, calendar: Calendar) -> [Date] {
+        (0 ..< 7).compactMap { offset in
+            calendar.date(byAdding: .day, value: offset - 6, to: todayStart)
+        }
+    }
+
+    private static func dailyEventPoints(
+        days: [Date],
+        events: [CareLedgerEvent],
+        idPrefix: String,
+        value: (CareLedgerEvent) -> Double = { _ in 1 },
+        matches: (CareLedgerEvent) -> Bool
+    ) -> [OhanaMinimalChartPoint] {
+        let calendar = Calendar.current
+        return days.enumerated().map { index, day in
+            let total = events.reduce(0.0) { partial, event in
+                guard matches(event), calendar.isDate(event.occurredAt, inSameDayAs: day) else {
+                    return partial
+                }
+                return partial + max(0, value(event))
+            }
+            return OhanaMinimalChartPoint(
+                date: day,
+                value: total,
+                id: "\(idPrefix)-\(index)-\(Int((total * 1000).rounded()))"
+            )
+        }
     }
 
     @MainActor
@@ -449,6 +542,7 @@ struct PetAllFeaturesSheet: View {
                 subtitle: foodSub,
                 icon: "fork.knife",
                 tint: Color(hex: "F59E0B"),
+                chart: FeatureHubMiniChartData(style: .bar, points: activitySummary.foodChartPoints),
                 destination: .food
             ),
             item(
@@ -458,6 +552,7 @@ struct PetAllFeaturesSheet: View {
                 subtitle: hygieneSub,
                 icon: "bubbles.and.sparkles.fill",
                 tint: Color.goTeal,
+                chart: FeatureHubMiniChartData(style: .bar, points: activitySummary.careChartPoints),
                 destination: .hygiene
             ),
             item(
@@ -467,6 +562,7 @@ struct PetAllFeaturesSheet: View {
                 subtitle: pottySub,
                 icon: "drop.fill",
                 tint: Color(hex: "D97706"),
+                chart: FeatureHubMiniChartData(style: .bar, points: activitySummary.pottyChartPoints),
                 destination: .potty
             )
         ]
@@ -479,6 +575,7 @@ struct PetAllFeaturesSheet: View {
                     subtitle: walkSub,
                     icon: "figure.walk",
                     tint: Color(hex: "14B8A6"),
+                    chart: FeatureHubMiniChartData(style: .bar, points: activitySummary.walkChartPoints),
                     destination: .walks
                 ),
                 at: 2
@@ -496,6 +593,7 @@ struct PetAllFeaturesSheet: View {
                 subtitle: healthSub,
                 icon: "cross.fill",
                 tint: Color.goRed,
+                chart: FeatureHubMiniChartData(style: .bar, points: activitySummary.healthChartPoints),
                 destination: .health
             ),
             item(
@@ -505,6 +603,7 @@ struct PetAllFeaturesSheet: View {
                 subtitle: weightSub,
                 icon: "scalemass.fill",
                 tint: Color(hex: "16A34A"),
+                chart: FeatureHubMiniChartData(style: .trend, points: activitySummary.weightChartPoints),
                 destination: .weight
             )
         ]
@@ -519,6 +618,14 @@ struct PetAllFeaturesSheet: View {
                 subtitle: basicInfoSub,
                 icon: "pawprint.circle.fill",
                 tint: Color(hex: pet.safeThemeColorHex),
+                chart: FeatureHubMiniChartData(
+                    style: .bar,
+                    points: FeatureHubChartPointFactory.level(
+                        current: hasCompleteBasicInfo ? 1 : 0,
+                        total: 1,
+                        idPrefix: "pet-all-basic"
+                    )
+                ),
                 destination: .basicInfo
             ),
             item(
@@ -528,6 +635,7 @@ struct PetAllFeaturesSheet: View {
                 subtitle: archiveSnapshot.nextStep.title,
                 icon: "sparkles.rectangle.stack.fill",
                 tint: Color(hex: pet.safeThemeColorHex),
+                chart: FeatureHubMiniChartData(style: .bar, points: activitySummary.archiveChartPoints),
                 destination: .retention
             ),
             item(
@@ -537,6 +645,13 @@ struct PetAllFeaturesSheet: View {
                 subtitle: momentsSub,
                 icon: "sparkles",
                 tint: Color(hex: "EC4899"),
+                chart: FeatureHubMiniChartData(
+                    style: .bar,
+                    points: FeatureHubChartPointFactory.bars(
+                        [Double(activitySummary.photoCount), Double(activitySummary.milestoneCount)],
+                        idPrefix: "pet-all-moments"
+                    )
+                ),
                 destination: .moments
             ),
             item(
@@ -546,6 +661,13 @@ struct PetAllFeaturesSheet: View {
                 subtitle: documentsSub,
                 icon: "doc.fill",
                 tint: Color(hex: "94A3B8"),
+                chart: FeatureHubMiniChartData(
+                    style: .bar,
+                    points: FeatureHubChartPointFactory.bars(
+                        [Double(activitySummary.protectionDocumentCount), Double(activitySummary.insuranceCount)],
+                        idPrefix: "pet-all-documents"
+                    )
+                ),
                 destination: .documents
             )
         ]
@@ -560,6 +682,13 @@ struct PetAllFeaturesSheet: View {
                 subtitle: l.tr(zh: "宠物专属成长资产", en: "Pet-only bond assets", de: "Nur Haustier-Bindung"),
                 icon: "pawprint.circle.fill",
                 tint: Color.goYellow,
+                chart: FeatureHubMiniChartData(
+                    style: .bar,
+                    points: FeatureHubChartPointFactory.quietPlaceholder(
+                        seed: Double(max(1, pet.coconutBalance)),
+                        idPrefix: "pet-all-bond"
+                    )
+                ),
                 destination: .bondVault
             ),
             item(
@@ -569,6 +698,7 @@ struct PetAllFeaturesSheet: View {
                 subtitle: expenseSub,
                 icon: "creditcard.fill",
                 tint: Color.goOrange,
+                chart: FeatureHubMiniChartData(style: .bar, points: activitySummary.expenseChartPoints),
                 destination: .expense
             )
         ]
@@ -581,6 +711,7 @@ struct PetAllFeaturesSheet: View {
         subtitle: String,
         icon: String,
         tint: Color,
+        chart: FeatureHubMiniChartData? = nil,
         destination: PetAllFeatureDestination
     ) -> FeatureHubDestinationItem<PetAllFeatureDestination> {
         let showsNewFeature: Bool = {
@@ -596,6 +727,7 @@ struct PetAllFeaturesSheet: View {
                 subtitle: subtitle,
                 icon: icon,
                 tint: tint,
+                chart: chart,
                 showsNewFeature: showsNewFeature
             ),
             destination: destination

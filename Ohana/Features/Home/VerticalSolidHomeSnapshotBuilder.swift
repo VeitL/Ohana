@@ -243,19 +243,23 @@ nonisolated enum VerticalSolidHomeSnapshotBuilder {
             firstPetEmptyState: firstPetEmptyState(activePets: activePets, activeHumans: activeHumans, l: l),
             plants: visiblePlants.sorted { $0.createdAt > $1.createdAt }.map { plant in
                 let plantTasks = PlantCarePlanService.tasks(for: plant, now: now)
+                let dueCareTypes = plantTasks
+                    .filter { $0.daysUntilDue <= 0 }
+                    .map(\.careType)
+                let overdueCareTypes = plantTasks
+                    .filter { $0.daysUntilDue < 0 }
+                    .map(\.careType)
+                let todayDueCareCount = plantTasks.count { $0.daysUntilDue == 0 }
+                let overdueCareCount = overdueCareTypes.count
                 let hasDueWatering = plantTasks.contains { task in
                     task.careType == .watering && task.daysUntilDue <= 0
                 }
                 let hasDueFertilizing = plantTasks.contains { task in
                     task.careType == .fertilizing && task.daysUntilDue <= 0
                 }
-                let needsCare = hasDueWatering || hasDueFertilizing
+                let needsCare = !dueCareTypes.isEmpty
                 let catalog = PlantCatalog.entry(id: plant.catalogSpeciesId)
-                let dueTaskNames = plantTasks
-                    .filter { task in
-                        (task.careType == .watering || task.careType == .fertilizing) && task.daysUntilDue <= 0
-                    }
-                    .map { $0.careType.displayName(l: l) }
+                let dueTaskNames = dueCareTypes.map { $0.displayName(l: l) }
                 let assetName = catalog?.catalogImageAssetName ?? PlantCatalogMedia.localFoliage.assetName
                 return VerticalSolidHomePlantSnapshot(
                     id: plant.id,
@@ -270,6 +274,10 @@ nonisolated enum VerticalSolidHomeSnapshotBuilder {
                     needsCare: needsCare,
                     hasDueWatering: hasDueWatering,
                     hasDueFertilizing: hasDueFertilizing,
+                    dueCareTypes: dueCareTypes,
+                    overdueCareTypes: overdueCareTypes,
+                    dueCareCount: todayDueCareCount,
+                    overdueCareCount: overdueCareCount,
                     careDifficultyText: catalog?.localizedCareDifficulty ?? l.tr(zh: "常规", en: "Routine", de: "Routine"),
                     attentionText: plant.healthStatus == .stable
                         ? (catalog?.lightRequirement.displayName ?? plant.lightLevel.displayName)

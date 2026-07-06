@@ -22,7 +22,78 @@ struct FeatureHubTileData: Identifiable, Hashable {
     let subtitle: String
     let icon: String
     let tint: Color
+    var chart: FeatureHubMiniChartData?
     var showsNewFeature: Bool = false
+}
+
+struct FeatureHubMiniChartData: Hashable {
+    enum Style: Hashable {
+        case bar
+        case trend
+    }
+
+    let style: Style
+    let points: [OhanaMinimalChartPoint]
+    let emptyText: String
+
+    init(style: Style = .bar, points: [OhanaMinimalChartPoint], emptyText: String = "") {
+        self.style = style
+        self.points = points
+        self.emptyText = emptyText
+    }
+}
+
+enum FeatureHubChartPointFactory {
+    private static let baseDate = Date(timeIntervalSinceReferenceDate: 0)
+
+    static func bars(
+        _ values: [Double],
+        labels: [String] = [],
+        idPrefix: String
+    ) -> [OhanaMinimalChartPoint] {
+        values.enumerated().compactMap { index, value in
+            guard value.isFinite else { return nil }
+            let label = index < labels.count ? labels[index] : nil
+            return OhanaMinimalChartPoint(
+                date: baseDate.addingTimeInterval(Double(index) * 86400),
+                value: max(0, value),
+                label: label,
+                id: "\(idPrefix)-bar-\(index)-\(Int((value * 1000).rounded()))"
+            )
+        }
+    }
+
+    static func trend(
+        _ values: [Double],
+        idPrefix: String
+    ) -> [OhanaMinimalChartPoint] {
+        values.enumerated().compactMap { index, value in
+            guard value.isFinite else { return nil }
+            return OhanaMinimalChartPoint(
+                date: baseDate.addingTimeInterval(Double(index) * 86400),
+                value: value,
+                id: "\(idPrefix)-trend-\(index)-\(Int((value * 1000).rounded()))"
+            )
+        }
+    }
+
+    static func level(
+        current: Double,
+        total: Double,
+        idPrefix: String
+    ) -> [OhanaMinimalChartPoint] {
+        let safeTotal = max(total, 1)
+        let safeCurrent = min(max(current, 0), safeTotal)
+        return bars([safeCurrent, max(0, safeTotal - safeCurrent)], labels: ["", ""], idPrefix: idPrefix)
+    }
+
+    static func quietPlaceholder(seed: Double, idPrefix: String) -> [OhanaMinimalChartPoint] {
+        let value = max(0, seed)
+        return bars(
+            [value * 0.35, value * 0.58, value * 0.42, value * 0.74, value * 0.52, value],
+            idPrefix: idPrefix
+        )
+    }
 }
 
 struct FeatureHubDestinationItem<Destination: Hashable>: Identifiable {
@@ -420,13 +491,116 @@ struct FeatureHubSectionActionView<Destination: Hashable>: View {
                         UIImpactFeedbackGenerator(style: .light).impactOccurred()
                         onSelect(item.destination)
                     } label: {
-                        FeatureHubTile(data: item.data)
+                        if item.data.chart != nil {
+                            FeatureSummaryChartCard(data: item.data)
+                        } else {
+                            FeatureHubTile(data: item.data)
+                        }
                     }
                     .buttonStyle(ScaleButtonStyle())
                     .ohanaSmoothAppear(index: index)
                     .accessibilityIdentifier("feature-hub-\(section.id)-\(item.id)")
                 }
             }
+        }
+    }
+}
+
+struct FeatureSummaryChartCard: View {
+    let data: FeatureHubTileData
+
+    private var chart: FeatureHubMiniChartData? { data.chart }
+
+    var body: some View {
+        ZStack(alignment: .topTrailing) {
+            VStack(alignment: .leading, spacing: 11) {
+                HStack(alignment: .top, spacing: 8) {
+                    Image(systemName: data.icon) // a11y: allow decorative card glyph; combined card label owns meaning.
+                        .font(OhanaFont.adaptive(size: 16, weight: .black))
+                        .foregroundStyle(data.tint)
+                        .frame(width: 28, height: 28) // a11y: allow decorative non-interactive glyph inside larger button card.
+                        .background(data.tint.opacity(0.13), in: Circle())
+                        .accessibilityHidden(true)
+
+                    Spacer(minLength: 4)
+
+                    Image(systemName: "chevron.right") // a11y: allow decorative navigation glyph; card button label owns action.
+                        .font(OhanaFont.adaptive(size: 10, weight: .black))
+                        .foregroundStyle(Color.ohanaTertiaryText)
+                        .accessibilityHidden(true)
+                }
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(data.title)
+                        .font(OhanaFont.callout(.black))
+                        .foregroundStyle(Color.ohanaPrimaryText)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.75)
+
+                    HStack(alignment: .firstTextBaseline, spacing: 5) {
+                        Text(data.value)
+                            .font(OhanaFont.adaptive(size: 28, weight: .black, design: .rounded))
+                            .foregroundStyle(data.tint)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.58)
+                            .ohanaNumericMotion(data.value)
+                    }
+
+                    Text(data.subtitle)
+                        .font(OhanaFont.caption2(.bold))
+                        .foregroundStyle(Color.ohanaSecondaryText)
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.72)
+                }
+
+                chartView
+                    .frame(height: 62)
+                    .allowsHitTesting(false)
+            }
+
+            if data.showsNewFeature {
+                GrowthNewFeatureDot()
+                    .offset(x: 4, y: -4)
+            }
+        }
+        .frame(maxWidth: .infinity, minHeight: 186, alignment: .topLeading)
+        .padding(14)
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous)
+                .strokeBorder(Color.ohanaCardStroke, lineWidth: 1)
+        }
+        .contentShape(RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous))
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(data.title), \(data.value), \(data.subtitle)")
+        .ohanaStateMotion(data)
+    }
+
+    @ViewBuilder
+    private var chartView: some View {
+        if let chart, !chart.points.isEmpty {
+            switch chart.style {
+            case .bar:
+                OhanaMinimalBarChart(
+                    points: chart.points,
+                    tint: data.tint,
+                    showsLabels: false,
+                    maxBarHeight: 54,
+                    emptyBarColor: Color.ohanaControlFill.opacity(0.72)
+                )
+            case .trend:
+                OhanaMinimalTrendChart(
+                    points: chart.points,
+                    tint: data.tint,
+                    showsLatestPoint: false
+                )
+            }
+        } else {
+            Text(chart?.emptyText.isEmpty == false ? chart?.emptyText ?? "" : L10n.current.tr(zh: "暂无数据", en: "No data", de: "Keine Daten"))
+                .font(OhanaFont.caption2(.bold))
+                .foregroundStyle(Color.ohanaTertiaryText)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(Color.ohanaControlFill.opacity(0.58), in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
         }
     }
 }

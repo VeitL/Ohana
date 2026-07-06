@@ -361,11 +361,11 @@ enum GrowthUnlockPolicy {
             .dailyCare
         case let .featureGroup(group):
             stageID(for: group)
-        case .petFeatureCollection:
+        case .petFeatureCollection, .petSharedCheckIn:
             .dailyCare
         case let .featureAggregate(feature):
             stageID(for: feature)
-        case .petFood, .petPotty, .petBasicInfo,
+        case .petFood, .petWater, .petPotty, .petBasicInfo,
              .petHealth, .petHygiene, .petWeight, .humanWeight,
              .humanWorkout, .humanMedication, .humanNote,
              .petMedications, .petWalks, .petDocuments, .petInsurance,
@@ -379,7 +379,7 @@ enum GrowthUnlockPolicy {
             .advancedInsights
         case .wealthDashboard:
             .oasisPlants
-        case .plantsDashboard, .plantsBatchCare, .plantsBatchCareFiltered, .plantFeatureCollection, .plantsList, .plantsPhotos, .plantDetail, .plantFeature, .plantCare, .plantCareAggregate:
+        case .plantsDashboard, .plantsBatchCare, .plantsBatchCareFiltered, .plantsBatchQuickRecord, .plantFeatureCollection, .plantsList, .plantsPhotos, .plantDetail, .plantFeature, .plantCare, .plantCareAggregate:
             .household
         case .familyWeeklyReport, .coconutShop:
             .rewards

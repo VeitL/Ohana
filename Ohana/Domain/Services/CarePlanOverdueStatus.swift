@@ -51,7 +51,7 @@ nonisolated struct CarePlanOverdueStatus: Equatable {
     }
 }
 
-private enum CarePlanOverdueStatusCopy {
+private nonisolated enum CarePlanOverdueStatusCopy {
     static func title(for actionType: String, fallback: String, l: L10n) -> String {
         switch actionType {
         case "feed":
@@ -119,6 +119,22 @@ nonisolated enum CarePlanOverdueStatusCalculator {
         ).first
     }
 
+    static func petWarningCount(
+        for pet: Pet,
+        events: [Event],
+        now: Date = Date(),
+        calendar: Calendar = .current,
+        waterCycleLogSnapshot: WaterCareCycleLogSnapshot? = nil
+    ) -> Int {
+        allWarnings(
+            for: pet,
+            events: events,
+            now: now,
+            calendar: calendar,
+            waterCycleLogSnapshot: waterCycleLogSnapshot
+        ).count
+    }
+
     static func warning(
         for actionType: String,
         pet: Pet,
@@ -136,6 +152,27 @@ nonisolated enum CarePlanOverdueStatusCalculator {
             waterCycleLogSnapshot: waterCycleLogSnapshot
         )
             .first { accepted.contains($0.actionType) }
+    }
+
+    static func petDueTodayCount(
+        for actionType: String? = nil,
+        pet: Pet,
+        events: [Event],
+        now: Date = Date(),
+        calendar: Calendar = .current,
+        waterCycleLogSnapshot: WaterCareCycleLogSnapshot? = nil
+    ) -> Int {
+        let accepted = actionType.map(acceptedActionTypes(for:))
+        return petDueTodayStatuses(
+            for: pet,
+            events: events,
+            now: now,
+            calendar: calendar,
+            waterCycleLogSnapshot: waterCycleLogSnapshot
+        )
+        .count(where: { status in
+            accepted.map { $0.contains(status.actionType) } ?? true
+        })
     }
 
     static func homeSignature(
@@ -172,6 +209,44 @@ nonisolated enum CarePlanOverdueStatusCalculator {
         ).first
     }
 
+    static func humanWarningCount(
+        for human: Human,
+        events: [Event],
+        medications: [HumanMedication],
+        logs: [HumanMedicationLog],
+        now: Date = Date(),
+        calendar: Calendar = .current
+    ) -> Int {
+        humanWarnings(
+            for: human,
+            events: events,
+            medications: medications,
+            logs: logs,
+            now: now,
+            calendar: calendar
+        ).count
+    }
+
+    static func humanWarningCount(
+        matching actionType: String,
+        for human: Human,
+        events: [Event],
+        medications: [HumanMedication],
+        logs: [HumanMedicationLog],
+        now: Date = Date(),
+        calendar: Calendar = .current
+    ) -> Int {
+        humanWarnings(
+            for: human,
+            events: events,
+            medications: medications,
+            logs: logs,
+            now: now,
+            calendar: calendar
+        )
+        .count { $0.actionType == actionType }
+    }
+
     static func humanMedicationWarning(
         for human: Human,
         medications: [HumanMedication],
@@ -180,6 +255,29 @@ nonisolated enum CarePlanOverdueStatusCalculator {
         calendar: Calendar = .current
     ) -> CarePlanOverdueStatus? {
         humanMedicationWarnings(for: human, medications: medications, logs: logs, now: now, calendar: calendar).first
+    }
+
+    static func humanDueTodayCount(
+        for actionType: String? = nil,
+        human: Human,
+        events: [Event],
+        medications: [HumanMedication],
+        logs: [HumanMedicationLog],
+        now: Date = Date(),
+        calendar: Calendar = .current
+    ) -> Int {
+        let accepted = actionType.map { Set([$0]) }
+        return humanDueTodayStatuses(
+            for: human,
+            events: events,
+            medications: medications,
+            logs: logs,
+            now: now,
+            calendar: calendar
+        )
+        .count(where: { status in
+            accepted.map { $0.contains(status.actionType) } ?? true
+        })
     }
 
     static func homeSignature(
@@ -280,6 +378,63 @@ nonisolated enum CarePlanOverdueStatusCalculator {
             }
     }
 
+    private static func petDueTodayStatuses(
+        for pet: Pet,
+        events: [Event],
+        now: Date,
+        calendar: Calendar,
+        waterCycleLogSnapshot: WaterCareCycleLogSnapshot? = nil
+    ) -> [CarePlanOverdueStatus] {
+        let feedRules = FeedRuleState(pet: pet, allEvents: events, now: now, calendar: calendar)
+        let reminderStatuses = events.flatMap { event -> [CarePlanOverdueStatus] in
+            guard event.isActionableTask,
+                  MemberLifecycleActiveScheduleResolver.eventBelongsToPet(
+                      event,
+                      petId: pet.id.uuidString,
+                      petMedications: pet.medications,
+                      insurances: pet.insurances
+                  ),
+                  !FeedRuleMetadata.isAutoFeederEvent(event, pet: pet),
+                  let actionType = planActionType(for: event),
+                  let title = warningTitle(for: actionType) else {
+                return []
+            }
+
+            if actionType == "feed", feedRules.operatingMode != .manualReminder {
+                return []
+            }
+
+            return event.reminders.compactMap { reminder in
+                guard reminder.isPending,
+                      reminder.scheduledAt >= now,
+                      calendar.isDate(reminder.scheduledAt, inSameDayAs: now) else {
+                    return nil
+                }
+                return CarePlanOverdueStatus(
+                    title: title,
+                    actionType: actionType,
+                    scheduledAt: reminder.scheduledAt,
+                    daysOverdue: 0,
+                    reminderId: reminder.id,
+                    eventId: event.id
+                )
+            }
+        }
+
+        return (reminderStatuses + waterCycleDueTodayStatuses(
+            for: pet,
+            now: now,
+            calendar: calendar,
+            logSnapshot: waterCycleLogSnapshot
+        ))
+        .sorted {
+            if $0.scheduledAt == $1.scheduledAt {
+                return $0.actionType < $1.actionType
+            }
+            return $0.scheduledAt < $1.scheduledAt
+        }
+    }
+
     private static func humanWarnings(
         for human: Human,
         events: [Event],
@@ -324,6 +479,52 @@ nonisolated enum CarePlanOverdueStatusCalculator {
             }
     }
 
+    private static func humanDueTodayStatuses(
+        for human: Human,
+        events: [Event],
+        medications: [HumanMedication],
+        logs: [HumanMedicationLog],
+        now: Date,
+        calendar: Calendar
+    ) -> [CarePlanOverdueStatus] {
+        let eventStatuses = events.flatMap { event -> [CarePlanOverdueStatus] in
+            guard event.isActionableTask,
+                  MemberLifecycleActiveScheduleResolver.eventBelongsToHuman(
+                      event,
+                      humanId: human.id.uuidString,
+                      humanMedications: medications
+                  ),
+                  let actionType = humanPlanActionType(for: event),
+                  let title = humanWarningTitle(for: actionType) else {
+                return []
+            }
+
+            return event.reminders.compactMap { reminder in
+                guard reminder.isPending,
+                      reminder.scheduledAt >= now,
+                      calendar.isDate(reminder.scheduledAt, inSameDayAs: now) else {
+                    return nil
+                }
+                return CarePlanOverdueStatus(
+                    title: title,
+                    actionType: actionType,
+                    scheduledAt: reminder.scheduledAt,
+                    daysOverdue: 0,
+                    reminderId: reminder.id,
+                    eventId: event.id
+                )
+            }
+        }
+
+        return (eventStatuses + humanMedicationDueTodayStatuses(for: human, medications: medications, logs: logs, now: now, calendar: calendar))
+            .sorted {
+                if $0.scheduledAt == $1.scheduledAt {
+                    return $0.actionType < $1.actionType
+                }
+                return $0.scheduledAt < $1.scheduledAt
+            }
+    }
+
     private static func humanMedicationWarnings(
         for human: Human,
         medications: [HumanMedication],
@@ -356,6 +557,47 @@ nonisolated enum CarePlanOverdueStatusCalculator {
                     actionType: "humanMedication",
                     scheduledAt: dose.scheduledTime,
                     daysOverdue: overdueDays(from: dose.scheduledTime, to: now, calendar: calendar),
+                    reminderId: nil,
+                    eventId: nil
+                )
+            }
+        }
+    }
+
+    private static func humanMedicationDueTodayStatuses(
+        for human: Human,
+        medications: [HumanMedication],
+        logs: [HumanMedicationLog],
+        now: Date,
+        calendar: Calendar
+    ) -> [CarePlanOverdueStatus] {
+        let humanId = human.id.uuidString
+        let relevantMeds = medications.filter {
+            $0.humanId == humanId && $0.isActive && !$0.frequency.isManualEntry
+        }
+        guard !relevantMeds.isEmpty else { return [] }
+
+        return relevantMeds.flatMap { medication -> [CarePlanOverdueStatus] in
+            HumanMedicationSchedulePlan.doses(on: now, for: medication, calendar: calendar).compactMap { dose in
+                guard dose.scheduledTime >= now,
+                      calendar.isDate(dose.scheduledTime, inSameDayAs: now) else {
+                    return nil
+                }
+                let matching = HumanMedicationLogStore.matchingLog(
+                    in: logs,
+                    humanId: humanId,
+                    medicationId: medication.id.uuidString,
+                    scheduledTime: dose.scheduledTime,
+                    calendar: calendar
+                )
+                guard matching?.status != .taken, matching?.status != .skipped else {
+                    return nil
+                }
+                return CarePlanOverdueStatus(
+                    title: "用药",
+                    actionType: "humanMedication",
+                    scheduledAt: dose.scheduledTime,
+                    daysOverdue: 0,
                     reminderId: nil,
                     eventId: nil
                 )
@@ -448,6 +690,53 @@ nonisolated enum CarePlanOverdueStatusCalculator {
         .compactMap(\.self)
     }
 
+    private static func waterCycleDueTodayStatuses(
+        for pet: Pet,
+        now: Date,
+        calendar: Calendar,
+        logSnapshot: WaterCareCycleLogSnapshot? = nil
+    ) -> [CarePlanOverdueStatus] {
+        [
+            cycleDueTodayStatus(
+                title: "换水",
+                actionType: "waterChange",
+                status: WaterCareCycleStatusCalculator.waterChangeStatus(
+                    for: pet,
+                    now: now,
+                    calendar: calendar,
+                    logSnapshot: logSnapshot
+                ),
+                now: now,
+                calendar: calendar
+            ),
+            cycleDueTodayStatus(
+                title: "滤芯",
+                actionType: "filterClean",
+                status: WaterCareCycleStatusCalculator.filterCleanStatus(
+                    for: pet,
+                    now: now,
+                    calendar: calendar,
+                    logSnapshot: logSnapshot
+                ),
+                now: now,
+                calendar: calendar
+            ),
+            cycleDueTodayStatus(
+                title: "更换",
+                actionType: "filterClean",
+                status: WaterCareCycleStatusCalculator.filterReplaceStatus(
+                    for: pet,
+                    now: now,
+                    calendar: calendar,
+                    logSnapshot: logSnapshot
+                ),
+                now: now,
+                calendar: calendar
+            )
+        ]
+        .compactMap(\.self)
+    }
+
     private static func cycleWarning(
         title: String,
         actionType: String,
@@ -463,6 +752,24 @@ nonisolated enum CarePlanOverdueStatusCalculator {
             actionType: actionType,
             scheduledAt: scheduledAt,
             daysOverdue: status.overdueDays,
+            reminderId: nil,
+            eventId: nil
+        )
+    }
+
+    private static func cycleDueTodayStatus(
+        title: String,
+        actionType: String,
+        status: WaterCareCycleStatus?,
+        now: Date,
+        calendar: Calendar
+    ) -> CarePlanOverdueStatus? {
+        guard let status, status.isDueToday else { return nil }
+        return CarePlanOverdueStatus(
+            title: title,
+            actionType: actionType,
+            scheduledAt: calendar.startOfDay(for: now),
+            daysOverdue: 0,
             reminderId: nil,
             eventId: nil
         )

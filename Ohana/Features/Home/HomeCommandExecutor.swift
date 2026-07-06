@@ -515,6 +515,7 @@ struct HomeCommandExecutor {
         return stored.isEmpty ? nil : stored
     }
 
+    @discardableResult
     func recordPlantCare(
         _ type: PlantCareType,
         plant: Plant,
@@ -522,7 +523,7 @@ struct HomeCommandExecutor {
         careNote: String = "",
         photoData: Data? = nil,
         healthStatus: PlantHealthStatus? = nil
-    ) {
+    ) -> PlantCareCommandResult {
         PlantCareCommandExecutor(context: modelContext, revisions: revisions).recordCare(
             type,
             plant: plant,
@@ -534,6 +535,7 @@ struct HomeCommandExecutor {
         )
     }
 
+    @discardableResult
     func recordPlantCare(
         _ type: PlantCareType,
         plantID: UUID,
@@ -541,12 +543,12 @@ struct HomeCommandExecutor {
         careNote: String = "",
         photoData: Data? = nil,
         healthStatus: PlantHealthStatus? = nil
-    ) {
+    ) -> PlantCareCommandResult? {
         guard let plant = fetchPlant(id: plantID) else {
             publishNoop(.plantCare(plantID: plantID, action: type.rawValue), note: "home.plantCare.missingPlant")
-            return
+            return nil
         }
-        recordPlantCare(type, plant: plant, executorId: executorId, careNote: careNote, photoData: photoData, healthStatus: healthStatus)
+        return recordPlantCare(type, plant: plant, executorId: executorId, careNote: careNote, photoData: photoData, healthStatus: healthStatus)
     }
 
     @discardableResult
@@ -564,7 +566,7 @@ struct HomeCommandExecutor {
                 publishNoop(.plantCare(plantID: plantID, action: type.rawValue), note: "home.plantCare.missingPlant")
                 continue
             }
-            recordPlantCare(type, plant: plant, executorId: executorId, careNote: careNote, photoData: photoData, healthStatus: healthStatus)
+            _ = recordPlantCare(type, plant: plant, executorId: executorId, careNote: careNote, photoData: photoData, healthStatus: healthStatus)
             recordedIDs.append(plantID)
         }
         return recordedIDs
@@ -581,6 +583,22 @@ struct HomeCommandExecutor {
             selections: selections,
             executorId: resolvedExecutorId(executorId),
             note: "home.plantCare.batchCare",
+            now: now,
+            calendar: calendar
+        )
+    }
+
+    @discardableResult
+    func recordPlantBatchQuickCare(
+        selections: [PlantBatchCareSelection],
+        executorId: String?,
+        now: Date = Date(),
+        calendar: Calendar = .current
+    ) -> PlantBatchCareCommandResult {
+        PlantCareCommandExecutor(context: modelContext, revisions: revisions).recordBatchQuickCare(
+            selections: selections,
+            executorId: resolvedExecutorId(executorId),
+            note: "home.plantCare.batchQuickRecord",
             now: now,
             calendar: calendar
         )

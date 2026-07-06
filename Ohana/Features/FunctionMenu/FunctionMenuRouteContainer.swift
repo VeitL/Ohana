@@ -19,6 +19,7 @@ struct FunctionMenuDestinationRouteContainer: View {
             petAggregateSummaries: routeData.petAggregateSummaries,
             petFeatureCollectionSummary: routeData.petFeatureCollectionSummary,
             plants: routeData.plants,
+            plantFeatureCollectionSummary: routeData.plantFeatureCollectionSummary,
             isRouteDataLoaded: routeData.hasLoaded
         )
         .onAppear {
@@ -152,11 +153,16 @@ struct PlantFeatureCollectionSummary: Equatable {
     var duePlantCount: Int = 0
     var wateringDueCount: Int = 0
     var fertilizingDueCount: Int = 0
+    var maintenanceDueCount: Int = 0
+    var healthDueCount: Int = 0
+    var growthLogCount: Int = 0
     var recentLogCount: Int = 0
     var photoCount: Int = 0
     var roomCount: Int = 0
     var healthSignalCount: Int = 0
     var reminderEnabledCount: Int = 0
+    var calendarPlanEnabledCount: Int = 0
+    var systemReminderEnabledCount: Int = 0
     var latestLogDate: Date?
 
     static let empty = PlantFeatureCollectionSummary()
@@ -171,10 +177,13 @@ struct PlantFeatureCollectionSummary: Equatable {
         let dueTasks = tasks.filter { $0.daysUntilDue <= 0 }
 
         var recentLogCount = 0
+        var growthLogCount = 0
         var photoCount = 0
         var roomNames = Set<String>()
         var healthSignalCount = 0
         var latestLogDate: Date?
+        var calendarPlanEnabledCount = 0
+        var systemReminderEnabledCount = 0
 
         for plant in plants {
             let room = plant.roomName.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -193,10 +202,31 @@ struct PlantFeatureCollectionSummary: Equatable {
             if !plant.potHasDrainage {
                 healthSignalCount += 1
             }
+            let enabledPlanTypes = PlantReminderPreferenceStore.controllableCareTypes.filter {
+                PlantReminderPreferenceStore.isPlanCalendarEnabled(
+                    forPlantID: plant.id,
+                    careType: $0,
+                    fallback: PlantReminderPreferenceStore.planCalendarFallback(
+                        for: $0,
+                        plantRemindersEnabled: plant.remindersEnabled
+                    )
+                )
+            }
+            if !enabledPlanTypes.isEmpty {
+                calendarPlanEnabledCount += 1
+            }
+            if enabledPlanTypes.contains(where: {
+                PlantReminderPreferenceStore.isSystemReminderEnabled(forPlantID: plant.id, careType: $0)
+            }) {
+                systemReminderEnabledCount += 1
+            }
 
             for log in plant.careLogs {
                 if log.date >= recentWindowStart {
                     recentLogCount += 1
+                    if log.careType.careCategory == .growth {
+                        growthLogCount += 1
+                    }
                     if log.careType == .yellowLeaf || log.careType == .pestFound {
                         healthSignalCount += 1
                     }
@@ -214,11 +244,16 @@ struct PlantFeatureCollectionSummary: Equatable {
             duePlantCount: Set(dueTasks.map(\.plantID)).count,
             wateringDueCount: dueTasks.count { PlantCareFeatureDestination.water.matches($0.careType) },
             fertilizingDueCount: dueTasks.count { PlantCareFeatureDestination.fertilize.matches($0.careType) },
+            maintenanceDueCount: dueTasks.count { PlantCareFeatureDestination.maintenance.matches($0.careType) },
+            healthDueCount: dueTasks.count { PlantCareFeatureDestination.health.matches($0.careType) },
+            growthLogCount: growthLogCount,
             recentLogCount: recentLogCount,
             photoCount: photoCount,
             roomCount: roomNames.count,
             healthSignalCount: healthSignalCount,
             reminderEnabledCount: plants.count { $0.remindersEnabled },
+            calendarPlanEnabledCount: calendarPlanEnabledCount,
+            systemReminderEnabledCount: systemReminderEnabledCount,
             latestLogDate: latestLogDate
         )
     }

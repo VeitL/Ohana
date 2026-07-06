@@ -11,6 +11,10 @@ struct PlantDockQuickActionsView: View {
     let plantID: UUID
     let plantName: String
     let dueCareTypes: Set<PlantCareType>
+    var overdueCareTypes: Set<PlantCareType> = []
+    var pendingCareTypes: Set<PlantCareType> = []
+    var completedCareTypes: Set<PlantCareType> = []
+    var failedCareTypes: Set<PlantCareType> = []
     let localization: L10n
     @Binding var quickActionItemsRaw: String
     var shouldReduceWork = false
@@ -74,7 +78,11 @@ struct PlantDockQuickActionsView: View {
             plantID.uuidString,
             quickActionItemsRaw,
             localization.languageCode,
-            dueCareTypes.map(\.rawValue).sorted().joined(separator: ",")
+            dueCareTypes.map(\.rawValue).sorted().joined(separator: ","),
+            overdueCareTypes.map(\.rawValue).sorted().joined(separator: ","),
+            pendingCareTypes.map(\.rawValue).sorted().joined(separator: ","),
+            completedCareTypes.map(\.rawValue).sorted().joined(separator: ","),
+            failedCareTypes.map(\.rawValue).sorted().joined(separator: ",")
         ].joined(separator: "|")
     }
 
@@ -121,22 +129,28 @@ struct PlantDockQuickActionsView: View {
     private func makeEmbeddedAction(_ item: QuickActionItem) -> VerticalHomeEmbeddedAction? {
         guard let dockAction = PlantDockQuickAction(actionType: item.actionType) else { return nil }
         let isDue = dockAction.careType.map { dueCareTypes.contains($0) } ?? false
+        let isOverdue = dockAction.careType.map { overdueCareTypes.contains($0) } ?? false
+        let isPending = dockAction.careType.map { pendingCareTypes.contains($0) } ?? false
+        let didComplete = dockAction.careType.map { completedCareTypes.contains($0) } ?? false
+        let didFail = dockAction.careType.map { failedCareTypes.contains($0) } ?? false
         return VerticalHomeEmbeddedAction(
             id: item.id,
             title: item.label,
             icon: item.icon,
             actionType: item.actionType,
-            statusText: statusText(for: dockAction, isDue: isDue),
-            isCompleted: false,
-            showsAttention: isDue,
-            primaryIcon: dockAction.primaryIcon,
+            statusText: statusText(for: dockAction, isDue: isDue, isPending: isPending, didComplete: didComplete, didFail: didFail),
+            isCompleted: didComplete,
+            showsAttention: (isDue || didFail) && !didComplete && !isPending,
+            attentionLevel: attentionLevel(isDue: isDue, isOverdue: isOverdue, didFail: didFail, didComplete: didComplete, isPending: isPending),
+            primaryIcon: isPending ? "hourglass" : dockAction.primaryIcon,
+            isPrimaryDisabled: isPending,
             detailIcon: dockAction.detailIcon,
             showsMenu: dockAction.careType != nil,
             showsQuickButton: dockAction.careType != nil,
             quickAccessibilityLabel: quickAccessibilityLabel(for: dockAction),
             detailAccessibilityLabel: detailAccessibilityLabel(for: dockAction),
-            detailAction: { onDetail(dockAction) },
-            action: { onAction(dockAction) }
+            detailAction: isPending ? nil : { onDetail(dockAction) },
+            action: isPending ? {} : { onAction(dockAction) }
         )
     }
 
@@ -150,6 +164,9 @@ struct PlantDockQuickActionsView: View {
             title: item.label,
             icon: item.icon,
             actionType: item.actionType,
+            statusText: PlantDockQuickAction(actionType: item.actionType)?
+                .careCategory?
+                .shortTitle(l: l),
             isCompleted: false,
             isAddDisabled: isAlreadyAdded,
             quickAccessibilityLabel: l.tr(zh: "添加快捷操作", en: "Add quick action", de: "Schnellaktion hinzufügen"),
@@ -261,7 +278,22 @@ struct PlantDockQuickActionsView: View {
         }
     }
 
-    private func statusText(for action: PlantDockQuickAction, isDue: Bool) -> String {
+    private func statusText(
+        for action: PlantDockQuickAction,
+        isDue: Bool,
+        isPending: Bool,
+        didComplete: Bool,
+        didFail: Bool
+    ) -> String {
+        if isPending {
+            return l.tr(zh: "记录中", en: "Logging", de: "Erfasst")
+        }
+        if didComplete {
+            return l.tr(zh: "已记录", en: "Logged", de: "Erfasst")
+        }
+        if didFail {
+            return l.tr(zh: "未记录", en: "Not logged", de: "Nicht erfasst")
+        }
         if isDue {
             return l.tr(zh: "待打卡", en: "Due", de: "Fällig")
         }
@@ -275,6 +307,20 @@ struct PlantDockQuickActionsView: View {
         default:
             return l.tr(zh: "快速记录", en: "Quick log", de: "Schnell erfassen")
         }
+    }
+
+    private func attentionLevel(
+        isDue: Bool,
+        isOverdue: Bool,
+        didFail: Bool,
+        didComplete: Bool,
+        isPending: Bool
+    ) -> HomeQuickActionAttentionLevel {
+        guard !didComplete, !isPending else { return .none }
+        if didFail || isOverdue {
+            return .urgent
+        }
+        return isDue ? .due : .none
     }
 
     private func quickAccessibilityLabel(for action: PlantDockQuickAction) -> String {

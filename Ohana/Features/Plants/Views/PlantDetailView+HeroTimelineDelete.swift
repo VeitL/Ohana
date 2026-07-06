@@ -278,53 +278,6 @@ extension PlantDetailContentView {
         .padding(.horizontal, 16)
     }
 
-    // MARK: - Quick Actions
-    var quickActions: some View {
-        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
-            Button {
-                waterPlant()
-            } label: {
-                HStack(spacing: 8) {
-                    Image(systemName: "drop.fill").accessibilityHidden(true)
-                    Text(l.tr(zh: "浇水", en: "Water", de: "Gießen"))
-                }
-                .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .rounded))
-                .foregroundStyle(Color.ohanaPrimaryText)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 14)
-                .background(Color.goTeal.opacity(0.42), in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
-                .overlay {
-                    RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous)
-                        .strokeBorder(Color.ohanaCardSurface.opacity(0.24), lineWidth: 1)
-                }
-            }
-            .accessibilityIdentifier("plant-detail-water-action")
-
-            Button {
-                fertilizePlant()
-            } label: {
-                HStack(spacing: 8) {
-                    Image(systemName: "leaf.fill").accessibilityHidden(true)
-                    Text(l.tr(zh: "施肥", en: "Fertilize", de: "Düngen"))
-                }
-                .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .rounded))
-                .foregroundStyle(Color.ohanaPrimaryText)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 14)
-                .background(Color.goPrimary.opacity(0.6), in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
-                .overlay {
-                    RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous)
-                        .strokeBorder(Color.ohanaCardSurface.opacity(0.24), lineWidth: 1)
-                }
-            }
-            .accessibilityIdentifier("plant-detail-fertilize-action")
-
-            careActionButton(type: .pestCheck, icon: "ladybug.fill", color: Color.goYellow)
-            careActionButton(type: .leafCleaning, icon: "sparkles", color: Color.goTeal)
-        }
-        .padding(.horizontal, 16)
-    }
-
     // MARK: - Notes Card
     var notesCard: some View {
         Group {

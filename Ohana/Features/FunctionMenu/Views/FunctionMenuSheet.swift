@@ -25,10 +25,12 @@ struct FunctionMenuSheet: View {
         switch dest {
         case .featureGroup,
              .petFeatureCollection,
+             .petSharedCheckIn,
              .plantFeatureCollection,
              .featureAggregate,
              .plantsBatchCare,
              .plantsBatchCareFiltered,
+             .plantsBatchQuickRecord,
              .plantCareAggregate,
              .growthRoadmap,
              .familyWeeklyReport,
@@ -188,10 +190,12 @@ struct FunctionMenuSheet: View {
         switch dest {
         case .featureGroup,
              .petFeatureCollection,
+             .petSharedCheckIn,
              .plantFeatureCollection,
              .featureAggregate,
              .plantsBatchCare,
              .plantsBatchCareFiltered,
+             .plantsBatchQuickRecord,
              .plantCareAggregate,
              .growthRoadmap,
              .familyWeeklyReport,
@@ -231,6 +235,8 @@ struct FunctionMenuSheet: View {
             (group.title(l: l), group.icon)
         case .petFeatureCollection:
             (l.tr(zh: "全部功能", en: "All Features", de: "Alle Funktionen"), "square.grid.2x2.fill")
+        case .petSharedCheckIn:
+            (l.tr(zh: "多宠物打卡", en: "Multi-pet check-in", de: "Mehrere Tiere erfassen"), "person.2.fill")
         case .plantFeatureCollection:
             (l.tr(zh: "植物全部功能", en: "All Plant Features", de: "Alle Pflanzenfunktionen"), "square.grid.2x2.fill")
         case let .featureAggregate(feature):
@@ -259,6 +265,8 @@ struct FunctionMenuSheet: View {
                 en: "Today \(careType.displayName(l: l))",
                 de: "Heute \(careType.displayName(l: l))"
             ), "checkmark.circle.fill")
+        case .plantsBatchQuickRecord:
+            (l.tr(zh: "多植物快速记录", en: "Multi-plant quick log", de: "Mehrere Pflanzen erfassen"), "checklist")
         case .plantsList:
             (l.tr(zh: "植物列表", en: "Plant List", de: "Pflanzenliste"), "list.bullet.rectangle.fill")
         case .plantsPhotos:

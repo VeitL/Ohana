@@ -323,6 +323,25 @@ struct PlantCareCommandExecutor {
     }
 
     @discardableResult
+    func recordBatchQuickCare(
+        selections: [PlantBatchCareSelection],
+        executorId: String?,
+        note: String,
+        now: Date = Date(),
+        calendar: Calendar = .current
+    ) -> PlantBatchCareCommandResult {
+        let result = PlantBatchCareCommandService.recordQuickCare(
+            selections: selections,
+            context: context,
+            executorId: executorId,
+            now: now,
+            calendar: calendar
+        )
+        revisions.publishPlantBatchQuickRecord(result, note: note)
+        return result
+    }
+
+    @discardableResult
     func undoBatchCare(
         _ token: PlantBatchCareUndoToken,
         note: String,

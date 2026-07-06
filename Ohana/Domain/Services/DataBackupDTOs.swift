@@ -87,6 +87,17 @@ nonisolated struct PlantReminderPreferencesBackup: Codable {
     var weekendQuietEnabled: Bool?
     var travelModeEnabled: Bool?
     var disabledCareTypesRaw: [String]?
+    var plantCareOverrides: [PlantCarePreferenceOverrideBackup]?
+}
+
+nonisolated struct PlantCarePreferenceOverrideBackup: Codable {
+    var plantID: String
+    var careTypeRaw: String
+    var planCalendarEnabled: Bool?
+    var systemReminderEnabled: Bool?
+    var completionCalendarEnabled: Bool?
+    var reminderLeadDays: Int?
+    var recurrenceEndDate: String?
 }
 
 // MARK: - 实体 Backup DTOs

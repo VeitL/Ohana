@@ -58,10 +58,12 @@ enum FeatureGroup: String, Hashable, CaseIterable {
 enum FMDest: Hashable {
     case featureGroup(FeatureGroup)
     case petFeatureCollection
+    case petSharedCheckIn
     case featureAggregate(PetFeature)
     case petHealth(PersistentIdentifier)
     case petMedications(PersistentIdentifier)
     case petFood(PersistentIdentifier)
+    case petWater(PersistentIdentifier)
     case petHygiene(PersistentIdentifier)
     case petWalks(PersistentIdentifier)
     case petPotty(PersistentIdentifier)
@@ -82,6 +84,7 @@ enum FMDest: Hashable {
     case plantsDashboard
     case plantsBatchCare
     case plantsBatchCareFiltered(PlantCareType)
+    case plantsBatchQuickRecord
     case plantFeatureCollection
     case plantsList
     case plantsPhotos
@@ -99,10 +102,30 @@ enum FMDest: Hashable {
     case gacha
 }
 
-enum PlantCareFeatureDestination: String, Hashable, CaseIterable, Sendable {
+nonisolated enum PlantCareFeatureDestination: String, Hashable, CaseIterable, Sendable {
     case water
     case fertilize
+    case maintenance
+    case health
+    case growth
     case log
+
+    var category: PlantCareCategory? {
+        switch self {
+        case .water:
+            .hydration
+        case .fertilize:
+            .nutrition
+        case .maintenance:
+            .maintenance
+        case .health:
+            .health
+        case .growth:
+            .growth
+        case .log:
+            nil
+        }
+    }
 
     var title: String {
         title(l: L10n("zh"))
@@ -114,6 +137,12 @@ enum PlantCareFeatureDestination: String, Hashable, CaseIterable, Sendable {
             l.tr(zh: "浇水", en: "Water", de: "Gießen")
         case .fertilize:
             l.tr(zh: "施肥", en: "Fertilize", de: "Düngen")
+        case .maintenance:
+            PlantCareCategory.maintenance.title(l: l)
+        case .health:
+            PlantCareCategory.health.title(l: l)
+        case .growth:
+            PlantCareCategory.growth.title(l: l)
         case .log:
             l.tr(zh: "记录", en: "Logs", de: "Notizen")
         }
@@ -122,55 +151,48 @@ enum PlantCareFeatureDestination: String, Hashable, CaseIterable, Sendable {
     func aggregateTitle(l: L10n) -> String {
         switch self {
         case .water:
-            l.tr(zh: "全部浇水记录", en: "All Water Logs", de: "Alle Gießprotokolle")
+            l.tr(zh: "全部水分与湿度", en: "All Water & Humidity", de: "Wasser & Feuchte")
         case .fertilize:
-            l.tr(zh: "全部施肥记录", en: "All Fertilizer Logs", de: "Alle Düngeprotokolle")
+            l.tr(zh: "全部营养与盆土", en: "All Nutrition & Soil", de: "Nährstoffe & Erde")
+        case .maintenance:
+            l.tr(zh: "全部整理养护", en: "All Care & Grooming", de: "Alle Pflegeaktionen")
+        case .health:
+            l.tr(zh: "全部健康复查", en: "All Health Reviews", de: "Alle Gesundheitschecks")
+        case .growth:
+            l.tr(zh: "全部成长记录", en: "All Growth Notes", de: "Alle Wachstumsnotizen")
         case .log:
             l.tr(zh: "全部植物记录", en: "All Plant Logs", de: "Alle Pflanzennotizen")
         }
     }
 
     var icon: String {
-        switch self {
-        case .water:
-            "drop.fill"
-        case .fertilize:
-            "leaf.fill"
-        case .log:
-            "note.text"
-        }
+        category?.icon ?? "note.text"
     }
 
     var primaryCareType: PlantCareType {
-        switch self {
-        case .water:
-            .watering
-        case .fertilize:
-            .fertilizing
-        case .log:
-            .customNote
-        }
+        category?.defaultCareType ?? .customNote
     }
 
-    var tint: Color {
-        switch self {
-        case .water:
-            Color.goTeal
-        case .fertilize:
-            Color.goPrimary
-        case .log:
-            Color.goYellow
-        }
+    @MainActor var tint: Color {
+        category?.tint ?? Color.goYellow
     }
 
     func matches(_ careType: PlantCareType) -> Bool {
-        switch self {
-        case .water:
-            careType == .watering || careType == .misting
-        case .fertilize:
-            careType == .fertilizing
-        case .log:
-            !Self.water.matches(careType) && !Self.fertilize.matches(careType)
+        category?.contains(careType) ?? true
+    }
+
+    static func categoryDestination(for careType: PlantCareType) -> PlantCareFeatureDestination {
+        switch careType.careCategory {
+        case .hydration:
+            .water
+        case .nutrition:
+            .fertilize
+        case .maintenance:
+            .maintenance
+        case .health:
+            .health
+        case .growth:
+            .growth
         }
     }
 }

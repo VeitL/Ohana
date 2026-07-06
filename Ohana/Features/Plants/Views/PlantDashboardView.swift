@@ -151,8 +151,11 @@ struct PlantDashboardCareLogDraft: Identifiable {
 
 struct PlantDashboardCareAggregateDraft: Identifiable, Hashable {
     let feature: PlantCareFeatureDestination
+    let focusedCareType: PlantCareType?
 
-    var id: String { feature.rawValue }
+    var id: String {
+        [feature.rawValue, focusedCareType?.rawValue].compactMap(\.self).joined(separator: "-")
+    }
 }
 
 struct PlantDashboardAvatarPreloadRequest: Sendable {
@@ -165,6 +168,7 @@ struct PlantDashboardView: View {
     let plants: [Plant]
     let isPlantDataLoaded: Bool
     let opensBatchCareOnAppear: Bool
+    let opensBatchQuickRecordOnAppear: Bool
     let initialBatchCareType: PlantCareType?
     let onOpenPlant: (UUID) -> Void
 
@@ -190,7 +194,9 @@ struct PlantDashboardView: View {
     @State var selectedDashboardPhoto: PlantDashboardPhotoItem?
     @State var showingCarePlanSheet = false
     @State var showingBatchCareSheet = false
+    @State var showingBatchQuickRecordSheet = false
     @State var didOpenInitialBatchCareSheet = false
+    @State var didOpenInitialBatchQuickRecordSheet = false
     @State var batchCareInitialType: PlantCareType?
     @State var batchCareRoomFilter: String?
     @State var batchCareSheetSnapshot: PlantBatchCareSheetSnapshot = .empty
@@ -220,12 +226,14 @@ struct PlantDashboardView: View {
         isPlantDataLoaded: Bool = true,
         initialMode: PlantDashboardEntryMode = .sites,
         opensBatchCareOnAppear: Bool = false,
+        opensBatchQuickRecordOnAppear: Bool = false,
         initialBatchCareType: PlantCareType? = nil,
         onOpenPlant: @escaping (UUID) -> Void = { _ in }
     ) {
         self.plants = plants
         self.isPlantDataLoaded = isPlantDataLoaded
         self.opensBatchCareOnAppear = opensBatchCareOnAppear
+        self.opensBatchQuickRecordOnAppear = opensBatchQuickRecordOnAppear
         self.initialBatchCareType = initialBatchCareType
         self.onOpenPlant = onOpenPlant
         _selectedDashboardMode = State(initialValue: PlantDashboardMode(entryMode: initialMode))
@@ -583,6 +591,16 @@ struct PlantDashboardView: View {
                 batchCareRoomFilter = nil
             }
         }
+        .sheet(isPresented: $showingBatchQuickRecordSheet) {
+            PlantBatchQuickRecordSheet(
+                plants: plants,
+                initialCareType: initialBatchCareType,
+                imageDataProvider: { plantModelID in
+                    await previewImageData(for: plantModelID, source: .profile)
+                },
+                onRecord: recordBatchQuickCare
+            )
+        }
         .sheet(item: $careLogDraft) { draft in
             PlantCareLogSheet(
                 plant: draft.plant,
@@ -596,7 +614,8 @@ struct PlantDashboardView: View {
             PlantCareFeatureDetailView(
                 plants: plants,
                 feature: draft.feature,
-                focusedPlantID: nil
+                focusedPlantID: nil,
+                focusedCareType: draft.focusedCareType
             )
         }
         .accessibilityIdentifier("plant-dashboard-screen")
@@ -613,6 +632,7 @@ struct PlantDashboardView: View {
             scheduleMediaAttachmentIndexRepair()
             scheduleVisiblePlantAvatarPreload()
             openInitialBatchCareSheetIfNeeded()
+            openInitialBatchQuickRecordSheetIfNeeded()
         }
         .onChange(of: plants.count) { _, _ in
             scheduleMediaAttachmentIndexRepair()
@@ -994,22 +1014,25 @@ struct PlantDashboardView: View {
         if careWindowTasks.contains(where: { $0.careType == .fertilizing }) {
             return .fertilize
         }
-        return .log
+        if let next = careWindowTasks.first {
+            return PlantCareFeatureDestination.categoryDestination(for: next.careType)
+        }
+        return .growth
     }
 
-    func openCareAggregate(_ feature: PlantCareFeatureDestination? = nil) {
-        careAggregateDraft = PlantDashboardCareAggregateDraft(feature: feature ?? preferredCareAggregateFeature)
+    func openCareAggregate(
+        _ feature: PlantCareFeatureDestination? = nil,
+        focusedCareType: PlantCareType? = nil
+    ) {
+        careAggregateDraft = PlantDashboardCareAggregateDraft(
+            feature: feature ?? preferredCareAggregateFeature,
+            focusedCareType: focusedCareType
+        )
         UISelectionFeedbackGenerator().selectionChanged()
     }
 
     func careAggregateFeature(for careType: PlantCareType) -> PlantCareFeatureDestination {
-        if PlantCareFeatureDestination.water.matches(careType) {
-            return .water
-        }
-        if PlantCareFeatureDestination.fertilize.matches(careType) {
-            return .fertilize
-        }
-        return .log
+        PlantCareFeatureDestination.categoryDestination(for: careType)
     }
 
     func clearPlantSearchAndFilters() {
@@ -1151,6 +1174,20 @@ struct PlantDashboardView: View {
         }
     }
 
+    func openBatchQuickRecordSheet() {
+        guard !plants.isEmpty else { return }
+        showingBatchQuickRecordSheet = true
+    }
+
+    func openInitialBatchQuickRecordSheetIfNeeded() {
+        guard opensBatchQuickRecordOnAppear, !didOpenInitialBatchQuickRecordSheet else { return }
+        didOpenInitialBatchQuickRecordSheet = true
+        Task { @MainActor in
+            await OhanaFrameScheduler.waitAfterNextFrame()
+            openBatchQuickRecordSheet()
+        }
+    }
+
     func openDashboardProfileQueue() {
         selectedDashboardMode = .plants
         selectedFilter = .all
@@ -1256,6 +1293,25 @@ struct PlantDashboardView: View {
             guard let token = result.undoToken else { return }
             PlantBatchCarePendingRewardStore.upsert(token)
             publishPendingBatchCareRewardStoreChanged(batchID: token.batchID, action: "batchCarePendingRewardsChanged")
+            pendingBatchCareUndoToken = token
+            publishBatchCareVisualReward(result)
+            scheduleBatchCareRewardCommit(for: token)
+        }
+    }
+
+    func recordBatchQuickCare(_ selections: [PlantBatchCareSelection]) {
+        guard !selections.isEmpty else { return }
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        let executorId = currentExecutorId()
+        Task { @MainActor in
+            await OhanaFrameScheduler.waitAfterNextFrame()
+            let result = commandExecutor.recordPlantBatchQuickCare(
+                selections: selections,
+                executorId: executorId
+            )
+            guard let token = result.undoToken else { return }
+            PlantBatchCarePendingRewardStore.upsert(token)
+            publishPendingBatchCareRewardStoreChanged(batchID: token.batchID, action: "batchQuickRecordPendingRewardsChanged")
             pendingBatchCareUndoToken = token
             publishBatchCareVisualReward(result)
             scheduleBatchCareRewardCommit(for: token)

@@ -78,7 +78,7 @@ actor PlantDetailRenderDataActor {
         PlantDetailTaskSummary(
             nextTask: tasks.first,
             dueTaskCount: tasks.count { $0.daysUntilDue <= 0 },
-            dueTasksForActionQueue: Array(tasks.lazy.filter { $0.daysUntilDue <= 0 }.prefix(2)),
+            todayCareTasks: Array(tasks.lazy.filter { $0.daysUntilDue <= 0 }.prefix(4)),
             isWateringDue: tasks.contains { $0.careType == .watering && $0.daysUntilDue <= 0 },
             isFertilizingDue: tasks.contains { $0.careType == .fertilizing && $0.daysUntilDue <= 0 },
             wateringIntervalDays: tasks.first { $0.careType == .watering }?.effectiveIntervalDays ?? plant.wateringIntervalDays,

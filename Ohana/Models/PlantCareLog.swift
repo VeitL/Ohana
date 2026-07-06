@@ -89,6 +89,132 @@ enum PlantCareType: String, Codable, CaseIterable, Identifiable, Sendable {
     }
 }
 
+enum PlantCareCategory: String, CaseIterable, Identifiable, Sendable {
+    case hydration
+    case nutrition
+    case maintenance
+    case health
+    case growth
+
+    nonisolated var id: String { rawValue }
+
+    nonisolated func title(l: L10n) -> String {
+        switch self {
+        case .hydration:
+            l.tr(zh: "水分与湿度", en: "Water & Humidity", de: "Wasser & Feuchte")
+        case .nutrition:
+            l.tr(zh: "营养与盆土", en: "Nutrition & Soil", de: "Nährstoffe & Erde")
+        case .maintenance:
+            l.tr(zh: "整理与养护", en: "Care & Grooming", de: "Pflege & Ordnung")
+        case .health:
+            l.tr(zh: "健康复查", en: "Health Review", de: "Gesundheitscheck")
+        case .growth:
+            l.tr(zh: "成长记录", en: "Growth Notes", de: "Wachstum")
+        }
+    }
+
+    nonisolated func shortTitle(l: L10n) -> String {
+        switch self {
+        case .hydration:
+            l.tr(zh: "水分", en: "Water", de: "Wasser")
+        case .nutrition:
+            l.tr(zh: "营养", en: "Feed", de: "Nährstoff")
+        case .maintenance:
+            l.tr(zh: "养护", en: "Care", de: "Pflege")
+        case .health:
+            l.tr(zh: "健康", en: "Health", de: "Gesundheit")
+        case .growth:
+            l.tr(zh: "成长", en: "Growth", de: "Wachstum")
+        }
+    }
+
+    nonisolated var icon: String {
+        switch self {
+        case .hydration:
+            "drop.fill"
+        case .nutrition:
+            "leaf.fill"
+        case .maintenance:
+            "sparkles"
+        case .health:
+            "stethoscope"
+        case .growth:
+            "camera.macro"
+        }
+    }
+
+    nonisolated var careTypes: [PlantCareType] {
+        switch self {
+        case .hydration:
+            [.watering, .misting]
+        case .nutrition:
+            [.fertilizing, .repotting]
+        case .maintenance:
+            [.pruning, .leafCleaning, .rotating]
+        case .health:
+            [.pestCheck, .yellowLeaf, .pestFound]
+        case .growth:
+            [.photo, .newLeaf, .customNote]
+        }
+    }
+
+    nonisolated var schedulableCareTypes: [PlantCareType] {
+        switch self {
+        case .hydration:
+            [.watering, .misting]
+        case .nutrition:
+            [.fertilizing, .repotting]
+        case .maintenance:
+            [.pruning, .leafCleaning, .rotating]
+        case .health:
+            [.pestCheck]
+        case .growth:
+            []
+        }
+    }
+
+    nonisolated var isSchedulable: Bool {
+        !schedulableCareTypes.isEmpty
+    }
+
+    nonisolated var defaultCareType: PlantCareType {
+        switch self {
+        case .hydration:
+            .watering
+        case .nutrition:
+            .fertilizing
+        case .maintenance:
+            .pruning
+        case .health:
+            .pestCheck
+        case .growth:
+            .photo
+        }
+    }
+
+    nonisolated func contains(_ careType: PlantCareType) -> Bool {
+        careTypes.contains(careType)
+    }
+
+    nonisolated static func category(for careType: PlantCareType) -> PlantCareCategory {
+        allCases.first { $0.contains(careType) } ?? .growth
+    }
+
+    nonisolated static var schedulableCareTypes: [PlantCareType] {
+        allCases.flatMap(\.schedulableCareTypes)
+    }
+}
+
+extension PlantCareType {
+    nonisolated var careCategory: PlantCareCategory {
+        PlantCareCategory.category(for: self)
+    }
+
+    nonisolated var isSchedulablePlantCare: Bool {
+        careCategory.schedulableCareTypes.contains(self)
+    }
+}
+
 enum PlantCarePhotoAttachmentState: String, Codable, Sendable {
     case unknown
     case absent

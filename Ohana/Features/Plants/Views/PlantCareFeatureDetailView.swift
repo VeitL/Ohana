@@ -105,13 +105,16 @@ struct PlantCareFeatureDetailView: View {
     let plants: [Plant]
     let feature: PlantCareFeatureDestination
     let focusedPlantID: UUID?
+    let focusedCareType: PlantCareType?
 
     @Environment(\.modelContext) private var modelContext
     @Environment(AppServices.self) private var appServices
     @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
     @AppStorage("currentActiveHumanId") private var activeHumanIdRaw = ""
     @State private var logDraft: PlantCareFeatureLogDraft?
-    @State private var waterTypeRemindersEnabled = PlantReminderPreferenceStore.isCareTypeReminderEnabled(.watering)
+    @State private var waterPlanCalendarEnabled = true
+    @State private var waterSystemReminderEnabled = true
+    @State private var waterCompletionCalendarEnabled = true
     @State private var waterReminderLeadDays = 0
     @State private var waterScheduleEndEnabled = false
     @State private var waterScheduleEndDate = Date()
@@ -138,7 +141,7 @@ struct PlantCareFeatureDetailView: View {
         scopedPlants
             .flatMap { plant in
                 plant.careLogs
-                    .filter { feature.matches($0.careType) }
+                    .filter { matchesFocusedFeature($0.careType) }
                     .map { log in
                         PlantCareFeatureRecord(
                             id: log.id,
@@ -154,7 +157,10 @@ struct PlantCareFeatureDetailView: View {
             .sorted { $0.date > $1.date }
     }
     private var pageTitle: String {
-        isAggregate ? feature.aggregateTitle(l: l) : feature.title(l: l)
+        if let focusedCareType {
+            return focusedCareType.displayName(l: l)
+        }
+        return isAggregate ? feature.aggregateTitle(l: l) : feature.title(l: l)
     }
     private var subtitle: String {
         if let focusedPlant {
@@ -168,6 +174,13 @@ struct PlantCareFeatureDetailView: View {
     private var waterReminderLeadTitle: String {
         (WaterReminderLeadOption(rawValue: waterReminderLeadDays) ?? .sameDay).title(l: l)
     }
+    private var primaryCareType: PlantCareType {
+        focusedCareType ?? feature.primaryCareType
+    }
+
+    private func matchesFocusedFeature(_ careType: PlantCareType) -> Bool {
+        focusedCareType.map { $0 == careType } ?? feature.matches(careType)
+    }
 
     var body: some View {
         ZStack {
@@ -180,7 +193,9 @@ struct PlantCareFeatureDetailView: View {
 
                     if scopedPlants.isEmpty {
                         emptyPlantsState
-                    } else if let focusedPlant, feature == .water {
+                    } else if let focusedPlant,
+                              feature == .water,
+                              focusedCareType == nil || focusedCareType == .watering {
                         waterGuidedHome(for: focusedPlant)
                     } else {
                         summaryBand
@@ -219,7 +234,6 @@ struct PlantCareFeatureDetailView: View {
             }
         }
         .onAppear {
-            waterTypeRemindersEnabled = PlantReminderPreferenceStore.isCareTypeReminderEnabled(.watering)
             refreshWaterScheduleControls()
         }
         .onChange(of: focusedPlantID) {
@@ -303,14 +317,7 @@ struct PlantCareFeatureDetailView: View {
     }
 
     private var duePlantCount: Int {
-        switch feature {
-        case .water:
-            scopedPlants.count(where: \.needsWatering)
-        case .fertilize:
-            scopedPlants.count(where: \.needsFertilizing)
-        case .log:
-            0
-        }
+        duePlantsForFeature.count
     }
 
     private var aggregateComparisonSection: some View {
@@ -926,13 +933,13 @@ struct PlantCareFeatureDetailView: View {
             }
 
             Toggle(isOn: Binding(
-                get: { plant.remindersEnabled },
-                set: { setPlantReminderEnabled($0, for: plant) }
+                get: { waterPlanCalendarEnabled },
+                set: { setWaterPlanCalendarEnabled($0, for: plant) }
             )) {
                 scheduleControlText(
-                    title: l.tr(zh: "加入日历与提醒", en: "Add to calendar and reminders", de: "Zum Kalender und zu Erinnerungen"),
-                    value: plant.remindersEnabled ? l.tr(zh: "已加入", en: "On", de: "Aktiv") : l.tr(zh: "未加入", en: "Off", de: "Aus"),
-                    footnote: l.tr(zh: "关闭后会移除这株植物的浇水计划提醒。", en: "Turning this off removes this plant's watering plan reminders.", de: "Beim Ausschalten werden Gießplan-Erinnerungen entfernt.")
+                    title: l.tr(zh: "显示计划到日历", en: "Show plan in calendar", de: "Plan im Kalender zeigen"),
+                    value: waterPlanCalendarEnabled ? l.tr(zh: "已显示", en: "Shown", de: "Angezeigt") : l.tr(zh: "不显示", en: "Hidden", de: "Ausgeblendet"),
+                    footnote: l.tr(zh: "只控制未来循环计划；不会删除已经完成的护理记录。", en: "Controls only the future recurring plan; completed care logs stay intact.", de: "Steuert nur den zukünftigen Plan; erledigte Einträge bleiben erhalten.")
                 )
             }
             .tint(Color.goTeal)
@@ -940,6 +947,22 @@ struct PlantCareFeatureDetailView: View {
             .padding(12)
             .feedFlatBlockSurface(cornerRadius: OhanaRadius.control)
             .accessibilityIdentifier("plant-care-feature-water-calendar-toggle")
+
+            Toggle(isOn: Binding(
+                get: { waterSystemReminderEnabled },
+                set: { setWaterSystemReminderEnabled($0, for: plant) }
+            )) {
+                scheduleControlText(
+                    title: l.tr(zh: "系统提醒", en: "System alerts", de: "Systemhinweise"),
+                    value: waterSystemReminderEnabled ? l.tr(zh: "开启", en: "On", de: "Ein") : l.tr(zh: "关闭", en: "Off", de: "Aus"),
+                    footnote: l.tr(zh: "关闭后日历计划仍保留，但不会生成提醒或推送。", en: "When off, the calendar plan remains without reminders or push alerts.", de: "Bei Aus bleibt der Kalenderplan ohne Erinnerungen oder Push.")
+                )
+            }
+            .tint(Color.goTeal)
+            .frame(minHeight: 58)
+            .padding(12)
+            .feedFlatBlockSurface(cornerRadius: OhanaRadius.control)
+            .accessibilityIdentifier("plant-care-feature-water-system-reminder-toggle")
 
             VStack(alignment: .leading, spacing: 10) {
                 scheduleControlText(
@@ -964,25 +987,27 @@ struct PlantCareFeatureDetailView: View {
                 .labelsHidden()
             }
             .tint(Color.goTeal)
+            .opacity(waterSystemReminderEnabled ? 1 : 0.52)
+            .disabled(!waterSystemReminderEnabled)
             .padding(12)
             .feedFlatBlockSurface(cornerRadius: OhanaRadius.control)
             .accessibilityIdentifier("plant-care-feature-water-lead-picker")
 
             Toggle(isOn: Binding(
-                get: { waterTypeRemindersEnabled },
-                set: { setWaterTypeReminderEnabled($0) }
+                get: { waterCompletionCalendarEnabled },
+                set: { setWaterCompletionCalendarEnabled($0, for: plant) }
             )) {
                 scheduleControlText(
-                    title: l.tr(zh: "全局浇水类型", en: "Global watering type", de: "Globaler Gießtyp"),
-                    value: waterTypeRemindersEnabled ? l.tr(zh: "开启", en: "On", de: "Aktiv") : l.tr(zh: "关闭", en: "Off", de: "Aus"),
-                    footnote: l.tr(zh: "影响所有植物的浇水提醒。", en: "Affects watering reminders for all plants.", de: "Gilt für Gießerinnerungen aller Pflanzen.")
+                    title: l.tr(zh: "护理记录显示在日历", en: "Show completed logs in calendar", de: "Erledigte Einträge im Kalender"),
+                    value: waterCompletionCalendarEnabled ? l.tr(zh: "显示", en: "Shown", de: "Angezeigt") : l.tr(zh: "隐藏", en: "Hidden", de: "Ausgeblendet"),
+                    footnote: l.tr(zh: "只影响浇水完成记录是否出现在日历；不会删除护理日志。", en: "Controls whether completed watering logs appear in Calendar; care logs are not deleted.", de: "Steuert nur Kalenderanzeige erledigter Einträge; Pflegeprotokolle bleiben erhalten.")
                 )
             }
             .tint(Color.goTeal)
             .frame(minHeight: 58)
             .padding(12)
             .feedFlatBlockSurface(cornerRadius: OhanaRadius.control)
-            .accessibilityIdentifier("plant-care-feature-water-reminder-type-toggle")
+            .accessibilityIdentifier("plant-care-feature-water-completion-calendar-toggle")
 
             Button {
                 resyncWaterReminder(for: plant)
@@ -991,7 +1016,7 @@ struct PlantCareFeatureDetailView: View {
                     Image(systemName: "arrow.triangle.2.circlepath") // a11y: allow decorative sync glyph; button text names the action.
                         .font(OhanaFont.adaptive(size: 12, weight: .black))
                         .accessibilityHidden(true)
-                    Text(l.tr(zh: "同步浇水提醒计划", en: "Sync watering reminder plan", de: "Gießplan synchronisieren"))
+                    Text(l.tr(zh: "同步浇水日历计划", en: "Sync watering calendar plan", de: "Gießkalender synchronisieren"))
                         .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
                         .lineLimit(1)
                         .minimumScaleFactor(0.78)
@@ -1207,11 +1232,18 @@ struct PlantCareFeatureDetailView: View {
 
     private func waterPlanSummaryText(for plant: Plant, task: PlantCareTaskSnapshot?) -> String {
         let interval = task?.effectiveIntervalDays ?? appServices.plantCarePlans.intervalDays(for: .watering, plant: plant)
-        if !plant.remindersEnabled || !waterTypeRemindersEnabled {
+        guard waterPlanCalendarEnabled else {
             return l.tr(
-                zh: "每 \(interval) 天 · 提醒暂停",
-                en: "Every \(interval)d · reminders off",
-                de: "Alle \(interval) T. · Erinnerungen aus"
+                zh: "每 \(interval) 天 · 不显示到日历",
+                en: "Every \(interval)d · calendar off",
+                de: "Alle \(interval) T. · Kalender aus"
+            )
+        }
+        guard waterSystemReminderEnabled else {
+            return l.tr(
+                zh: "每 \(interval) 天 · 无系统提醒",
+                en: "Every \(interval)d · no alerts",
+                de: "Alle \(interval) T. · ohne Hinweis"
             )
         }
         return l.tr(
@@ -1404,7 +1436,13 @@ struct PlantCareFeatureDetailView: View {
         case .water:
             l.tr(zh: "记录第一次浇水后，这里会显示浇水和喷雾历史。", en: "After the first water log, watering and misting history appears here.", de: "Nach dem ersten Gießen erscheinen Gieß- und Sprühverlauf hier.")
         case .fertilize:
-            l.tr(zh: "记录第一次施肥后，这里会显示施肥历史。", en: "After the first fertilizer log, fertilizer history appears here.", de: "Nach dem ersten Düngen erscheint der Düngeverlauf hier.")
+            l.tr(zh: "记录第一次施肥或换盆后，这里会显示营养与盆土历史。", en: "After the first feed or repotting log, nutrition and soil history appears here.", de: "Nach dem ersten Düngen oder Umtopfen erscheint der Verlauf hier.")
+        case .maintenance:
+            l.tr(zh: "记录修剪、擦叶或转盆后，这里会显示整理养护历史。", en: "Pruning, leaf cleaning, and pot rotation logs appear here.", de: "Schnitt, Blattpflege und Drehungen erscheinen hier.")
+        case .health:
+            l.tr(zh: "记录查虫、黄叶或虫害后，这里会形成健康复查历史。", en: "Pest checks, yellow leaves, and pest findings build this health history.", de: "Schädlingschecks, gelbe Blätter und Befall bilden diesen Verlauf.")
+        case .growth:
+            l.tr(zh: "拍照、新叶和备注会形成成长记录。", en: "Photos, new leaves, and notes build the growth record.", de: "Fotos, neue Blätter und Notizen bilden den Wachstumsverlauf.")
         case .log:
             l.tr(zh: "记录备注、照片、黄叶、虫害或换盆后，这里会形成植物时间线。", en: "Notes, photos, leaf changes, pest checks, and repotting build this timeline.", de: "Notizen, Fotos, Blattwechsel, Schädlingschecks und Umtopfen bilden diese Zeitachse.")
         }
@@ -1416,6 +1454,12 @@ struct PlantCareFeatureDetailView: View {
             l.tr(zh: "新增浇水记录", en: "Add water log", de: "Gießen erfassen")
         case .fertilize:
             l.tr(zh: "新增施肥记录", en: "Add fertilizer log", de: "Düngen erfassen")
+        case .maintenance:
+            l.tr(zh: "新增养护记录", en: "Add care log", de: "Pflege erfassen")
+        case .health:
+            l.tr(zh: "新增复查记录", en: "Add health review", de: "Gesundheitscheck erfassen")
+        case .growth:
+            l.tr(zh: "新增成长记录", en: "Add growth note", de: "Wachstum erfassen")
         case .log:
             l.tr(zh: "新增植物记录", en: "Add plant log", de: "Pflanzennotiz erfassen")
         }
@@ -1644,14 +1688,14 @@ struct PlantCareFeatureDetailView: View {
     }
 
     private func waterReminderSummary(for plant: Plant, task: PlantCareTaskSnapshot?) -> String {
-        guard plant.remindersEnabled else {
-            return l.tr(zh: "提醒暂停", en: "Reminders paused", de: "Erinnerungen pausiert")
+        guard waterPlanCalendarEnabled else {
+            return l.tr(zh: "计划不显示在日历", en: "Calendar plan is off", de: "Kalenderplan ist aus")
         }
-        guard waterTypeRemindersEnabled else {
-            return l.tr(zh: "全局浇水关闭", en: "Watering type off", de: "Gießtyp aus")
+        guard waterSystemReminderEnabled else {
+            return l.tr(zh: "系统提醒关闭，日历计划保留", en: "Alerts off, calendar plan kept", de: "Hinweise aus, Kalenderplan bleibt")
         }
         if PlantReminderPreferenceStore.isTravelModeEnabled() {
-            return l.tr(zh: "旅行模式", en: "Travel mode", de: "Reisemodus")
+            return l.tr(zh: "旅行模式暂停通知，今日照护保留", en: "Travel mode pauses alerts only", de: "Reisemodus pausiert nur Hinweise")
         }
         if let task {
             return l.tr(
@@ -1665,6 +1709,22 @@ struct PlantCareFeatureDetailView: View {
 
     private func refreshWaterScheduleControls() {
         guard feature == .water, let focusedPlant else { return }
+        waterPlanCalendarEnabled = PlantReminderPreferenceStore.isPlanCalendarEnabled(
+            forPlantID: focusedPlant.id,
+            careType: .watering,
+            fallback: PlantReminderPreferenceStore.planCalendarFallback(
+                for: .watering,
+                plantRemindersEnabled: focusedPlant.remindersEnabled
+            )
+        )
+        waterSystemReminderEnabled = PlantReminderPreferenceStore.isSystemReminderEnabled(
+            forPlantID: focusedPlant.id,
+            careType: .watering
+        )
+        waterCompletionCalendarEnabled = PlantReminderPreferenceStore.isCompletionCalendarEnabled(
+            forPlantID: focusedPlant.id,
+            careType: .watering
+        )
         waterReminderLeadDays = PlantReminderPreferenceStore.reminderLeadDays(
             forPlantID: focusedPlant.id,
             careType: .watering
@@ -1739,23 +1799,43 @@ struct PlantCareFeatureDetailView: View {
         return l.tr(zh: "\(task.daysUntilDue) 天后", en: "In \(task.daysUntilDue)d", de: "In \(task.daysUntilDue) T.")
     }
 
-    private func setPlantReminderEnabled(_ enabled: Bool, for plant: Plant) {
-        let changed = appServices.plantReminderControls.setPlantRemindersEnabled(enabled, plant: plant, context: modelContext)
-        if changed {
-            UINotificationFeedbackGenerator().notificationOccurred(.success)
-        }
+    private func setWaterPlanCalendarEnabled(_ enabled: Bool, for plant: Plant) {
+        waterPlanCalendarEnabled = enabled
+        PlantReminderPreferenceStore.setPlanCalendarEnabled(enabled, forPlantID: plant.id, careType: .watering)
+        resyncWaterSchedule(for: plant)
+        publishWaterPreferenceRefresh(for: plant, action: "waterPlanCalendar")
+        UINotificationFeedbackGenerator().notificationOccurred(.success)
     }
 
-    private func setWaterTypeReminderEnabled(_ enabled: Bool) {
-        waterTypeRemindersEnabled = enabled
-        PlantReminderPreferenceStore.setCareTypeReminderEnabled(enabled, for: .watering)
-        appServices.plantReminderControls.resyncPlans(plants: plants, context: modelContext)
+    private func setWaterSystemReminderEnabled(_ enabled: Bool, for plant: Plant) {
+        waterSystemReminderEnabled = enabled
+        PlantReminderPreferenceStore.setSystemReminderEnabled(enabled, forPlantID: plant.id, careType: .watering)
+        resyncWaterSchedule(for: plant)
+        publishWaterPreferenceRefresh(for: plant, action: "waterSystemReminder")
+        UINotificationFeedbackGenerator().notificationOccurred(.success)
+    }
+
+    private func setWaterCompletionCalendarEnabled(_ enabled: Bool, for plant: Plant) {
+        waterCompletionCalendarEnabled = enabled
+        PlantReminderPreferenceStore.setCompletionCalendarEnabled(enabled, forPlantID: plant.id, careType: .watering)
+        publishWaterPreferenceRefresh(for: plant, action: "waterCompletionCalendar")
         UINotificationFeedbackGenerator().notificationOccurred(.success)
     }
 
     private func resyncWaterReminder(for plant: Plant) {
         appServices.plantReminderControls.resyncPlans(plants: [plant], context: modelContext)
         UINotificationFeedbackGenerator().notificationOccurred(.success)
+    }
+
+    private func publishWaterPreferenceRefresh(for plant: Plant, action: String) {
+        appServices.domainRevisions.publish(
+            DomainMutationResult(
+                command: .plantCare(plantID: plant.id, action: action),
+                affectedEntityIDs: [plant.id],
+                wroteBusinessFact: false,
+                note: "plant.water.preference"
+            )
+        )
     }
 
     private func quickRecordWater(for plant: Plant) {
@@ -1785,26 +1865,24 @@ struct PlantCareFeatureDetailView: View {
                 return l.tr(zh: "上次施肥 \(days) 天前", en: "Last fertilized \(days)d ago", de: "Zuletzt vor \(days) T. gedüngt")
             }
             return l.tr(zh: "还没有施肥记录", en: "No fertilizer log yet", de: "Noch kein Düngeprotokoll")
-        case .log:
+        case .maintenance, .health, .growth, .log:
             let count = featureRecords(for: plant).count
             return count == 0
-                ? l.tr(zh: "还没有观察记录", en: "No observation logs yet", de: "Noch keine Beobachtungen")
-                : l.tr(zh: "\(count) 条观察记录", en: "\(count) observation logs", de: "\(count) Beobachtungen")
+                ? l.tr(zh: "还没有相关记录", en: "No matching logs yet", de: "Noch keine passenden Einträge")
+                : l.tr(zh: "\(count) 条相关记录", en: "\(count) matching logs", de: "\(count) passende Einträge")
         }
     }
 
     private func featureRecords(for plant: Plant) -> [PlantCareLog] {
-        plant.careLogs.filter { feature.matches($0.careType) }
+        plant.careLogs.filter { matchesFocusedFeature($0.careType) }
     }
 
     private var duePlantsForFeature: [Plant] {
-        switch feature {
-        case .water:
-            scopedPlants.filter(\.needsWatering)
-        case .fertilize:
-            scopedPlants.filter(\.needsFertilizing)
-        case .log:
-            []
+        guard feature.category?.isSchedulable == true else { return [] }
+        return scopedPlants.filter { plant in
+            appServices.plantCarePlans.tasks(for: plant).contains {
+                matchesFocusedFeature($0.careType) && $0.daysUntilDue <= 0
+            }
         }
     }
 
@@ -1822,7 +1900,7 @@ struct PlantCareFeatureDetailView: View {
             plant.daysSinceWatered
         case .fertilize:
             plant.daysSinceFertilized
-        case .log:
+        case .maintenance, .health, .growth, .log:
             lastFeatureCareDate(for: plant).flatMap {
                 Calendar.current.dateComponents([.day], from: Calendar.current.startOfDay(for: $0), to: Calendar.current.startOfDay(for: Date())).day
             }
@@ -1835,6 +1913,10 @@ struct PlantCareFeatureDetailView: View {
             max(1, appServices.plantCarePlans.intervalDays(for: .watering, plant: plant))
         case .fertilize:
             max(1, appServices.plantCarePlans.intervalDays(for: .fertilizing, plant: plant))
+        case .maintenance, .health:
+            max(1, appServices.plantCarePlans.intervalDays(for: primaryCareType, plant: plant))
+        case .growth:
+            30
         case .log:
             30
         }
@@ -1851,11 +1933,11 @@ struct PlantCareFeatureDetailView: View {
             .filter { log in
                 switch feature {
                 case .water:
-                    log.careType == .watering
+                    matchesFocusedFeature(log.careType)
                 case .fertilize:
-                    log.careType == .fertilizing
-                case .log:
-                    feature.matches(log.careType)
+                    matchesFocusedFeature(log.careType)
+                case .maintenance, .health, .growth, .log:
+                    matchesFocusedFeature(log.careType)
                 }
             }
             .map(\.date)
@@ -1882,7 +1964,7 @@ struct PlantCareFeatureDetailView: View {
     }
 
     private func openLog(for plant: Plant) {
-        logDraft = PlantCareFeatureLogDraft(plantID: plant.id, careType: feature.primaryCareType)
+        logDraft = PlantCareFeatureLogDraft(plantID: plant.id, careType: primaryCareType)
     }
 
     private func saveCareLog(

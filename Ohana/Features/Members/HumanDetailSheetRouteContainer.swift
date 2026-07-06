@@ -65,6 +65,7 @@ struct HumanAllFeaturesRouteContainer: View {
                 allMeds: routeData.allMeds,
                 allReports: routeData.allReports,
                 allExpenses: routeData.allExpenses,
+                summary: routeData.summary,
                 onOpenDestination: { destination in
                     guard !human.hasPassedAway || destination.isAvailableInMemorialMode else {
                         return
@@ -245,42 +246,56 @@ private struct HumanAllFeaturesRouteData {
     var allMeds: [HumanMedication] = []
     var allReports: [HumanHealthReport] = []
     var allExpenses: [PetExpenseLog] = []
+    var summary: HumanAllFeaturesActivitySummary = .empty
     var hasLoaded = false
 
+    @MainActor
     static func load(id: UUID, from context: ModelContext) -> HumanAllFeaturesRouteData {
         let humanKey = id.uuidString
+        let human = fetchOne(
+            FetchDescriptor<Human>(
+                predicate: #Predicate<Human> { $0.id == id }
+            ),
+            context: context,
+            name: "Human"
+        )
+        let allMeds = fetch(
+            FetchDescriptor<HumanMedication>(
+                predicate: #Predicate<HumanMedication> { $0.humanId == humanKey },
+                sortBy: [SortDescriptor(\.createdAt)]
+            ),
+            context: context,
+            name: "HumanMedication"
+        )
+        let allReports = fetch(
+            FetchDescriptor<HumanHealthReport>(
+                predicate: #Predicate<HumanHealthReport> { $0.humanId == humanKey },
+                sortBy: [SortDescriptor(\.reportDate, order: .reverse)]
+            ),
+            context: context,
+            name: "HumanHealthReport"
+        )
+        let allExpenses = fetch(
+            FetchDescriptor<PetExpenseLog>(
+                predicate: #Predicate<PetExpenseLog> { $0.executorId == humanKey },
+                sortBy: [SortDescriptor(\.date, order: .reverse)]
+            ),
+            context: context,
+            name: "PetExpenseLog"
+        )
         return HumanAllFeaturesRouteData(
-            human: fetchOne(
-                FetchDescriptor<Human>(
-                    predicate: #Predicate<Human> { $0.id == id }
-                ),
-                context: context,
-                name: "Human"
-            ),
-            allMeds: fetch(
-                FetchDescriptor<HumanMedication>(
-                    predicate: #Predicate<HumanMedication> { $0.humanId == humanKey },
-                    sortBy: [SortDescriptor(\.createdAt)]
-                ),
-                context: context,
-                name: "HumanMedication"
-            ),
-            allReports: fetch(
-                FetchDescriptor<HumanHealthReport>(
-                    predicate: #Predicate<HumanHealthReport> { $0.humanId == humanKey },
-                    sortBy: [SortDescriptor(\.reportDate, order: .reverse)]
-                ),
-                context: context,
-                name: "HumanHealthReport"
-            ),
-            allExpenses: fetch(
-                FetchDescriptor<PetExpenseLog>(
-                    predicate: #Predicate<PetExpenseLog> { $0.executorId == humanKey },
-                    sortBy: [SortDescriptor(\.date, order: .reverse)]
-                ),
-                context: context,
-                name: "PetExpenseLog"
-            ),
+            human: human,
+            allMeds: allMeds,
+            allReports: allReports,
+            allExpenses: allExpenses,
+            summary: human.map {
+                HumanAllFeaturesActivitySummary.load(
+                    human: $0,
+                    allMeds: allMeds,
+                    allReports: allReports,
+                    allExpenses: allExpenses
+                )
+            } ?? .empty,
             hasLoaded: true
         )
     }

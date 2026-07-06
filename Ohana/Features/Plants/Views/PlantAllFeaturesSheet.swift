@@ -11,6 +11,9 @@ import SwiftUI
 enum PlantFeatureDestination: Hashable, Sendable {
     case water
     case fertilize
+    case maintenance
+    case health
+    case growth
     case pestCheck
     case leafCleaning
     case carePlan
@@ -30,7 +33,13 @@ extension PlantFeatureDestination {
             .water
         case .fertilize:
             .fertilize
-        case .pestCheck, .leafCleaning, .carePlan, .reminders, .healthReview, .profile, .photos, .timeline, .catalog, .safety:
+        case .maintenance, .leafCleaning:
+            .maintenance
+        case .health, .pestCheck:
+            .health
+        case .growth:
+            .growth
+        case .carePlan, .reminders, .healthReview, .profile, .photos, .timeline, .catalog, .safety:
             nil
         }
     }
@@ -41,6 +50,12 @@ extension PlantFeatureDestination {
             l.tr(zh: "浇水", en: "Water", de: "Gießen")
         case .fertilize:
             l.tr(zh: "施肥", en: "Fertilize", de: "Düngen")
+        case .maintenance:
+            PlantCareCategory.maintenance.title(l: l)
+        case .health:
+            PlantCareCategory.health.title(l: l)
+        case .growth:
+            PlantCareCategory.growth.title(l: l)
         case .pestCheck:
             l.tr(zh: "病虫复查", en: "Pest check", de: "Schädlingscheck")
         case .leafCleaning:
@@ -70,6 +85,12 @@ extension PlantFeatureDestination {
             "drop.fill"
         case .fertilize:
             "leaf.fill"
+        case .maintenance:
+            PlantCareCategory.maintenance.icon
+        case .health:
+            PlantCareCategory.health.icon
+        case .growth:
+            PlantCareCategory.growth.icon
         case .pestCheck:
             "ladybug.fill"
         case .leafCleaning:
@@ -235,7 +256,7 @@ struct PlantAllFeaturesSheet: View {
                 ),
                 icon: "waveform.path.ecg",
                 tint: Color.goYellow,
-                destination: .healthReview
+                destination: .health
             )
         }
 
@@ -283,7 +304,7 @@ struct PlantAllFeaturesSheet: View {
                 ),
                 icon: "photo.stack.fill",
                 tint: Color.goTeal,
-                destination: .photos
+                destination: .growth
             )
         }
 
@@ -398,20 +419,20 @@ struct PlantAllFeaturesSheet: View {
         [
             FeatureHubSectionData(
                 id: "daily",
-                title: l.tr(zh: "高频照护", en: "Daily Care", de: "Tägliche Pflege"),
-                subtitle: l.tr(zh: "打卡、复查和日常动作", en: "Logs, checks, and routine actions", de: "Einträge, Checks und Routinen"),
+                title: l.tr(zh: "护理分类", en: "Care Categories", de: "Pflegekategorien"),
+                subtitle: l.tr(zh: "先选大类，再进入具体护理", en: "Pick a category before the exact care type", de: "Erst Kategorie, dann Pflegetyp"),
                 items: dailyItems
             ),
             FeatureHubSectionData(
                 id: "plan",
-                title: l.tr(zh: "计划与诊断", en: "Plan and Checks", de: "Plan und Checks"),
-                subtitle: l.tr(zh: "护理节奏、资料库和安全", en: "Cadence, catalog, and safety", de: "Rhythmus, Katalog und Sicherheit"),
+                title: l.tr(zh: "护理计划", en: "Care Plan", de: "Pflegeplan"),
+                subtitle: l.tr(zh: "节奏、提醒、资料库和安全", en: "Cadence, reminders, catalog, and safety", de: "Rhythmus, Hinweise, Katalog und Sicherheit"),
                 items: planItems
             ),
             FeatureHubSectionData(
                 id: "archive",
-                title: l.tr(zh: "档案与回顾", en: "Archive", de: "Archiv"),
-                subtitle: l.tr(zh: "档案、照片和时间线", en: "Profile, photos, and timeline", de: "Profil, Fotos und Zeitachse"),
+                title: l.tr(zh: "植物档案", en: "Plant Profile", de: "Pflanzenprofil"),
+                subtitle: l.tr(zh: "身份、照片和历史回顾", en: "Identity, photos, and history", de: "Identität, Fotos und Verlauf"),
                 items: archiveItems
             )
         ]
@@ -421,41 +442,50 @@ struct PlantAllFeaturesSheet: View {
         [
             item(
                 id: "water",
-                title: l.tr(zh: "浇水", en: "Water", de: "Gießen"),
-                value: dueValue(for: .watering),
-                subtitle: dueSubtitle(for: .watering),
+                title: PlantCareCategory.hydration.title(l: l),
+                value: dueValue(for: .hydration),
+                subtitle: categorySubtitle(for: .hydration),
                 icon: "drop.fill",
                 tint: Color.goTeal,
                 destination: .water
             ),
             item(
                 id: "fertilize",
-                title: l.tr(zh: "施肥", en: "Fertilize", de: "Düngen"),
-                value: dueValue(for: .fertilizing),
-                subtitle: dueSubtitle(for: .fertilizing),
+                title: PlantCareCategory.nutrition.title(l: l),
+                value: dueValue(for: .nutrition),
+                subtitle: categorySubtitle(for: .nutrition),
                 icon: "leaf.fill",
                 tint: Color.goPrimary,
                 destination: .fertilize
             ),
             item(
-                id: "pest",
-                title: l.tr(zh: "病虫复查", en: "Pest check", de: "Schädlingscheck"),
-                value: dueValue(for: .pestCheck),
-                subtitle: plant.healthStatus == .stressed
-                    ? l.tr(zh: "优先排查", en: "Inspect first", de: "Zuerst prüfen")
-                    : dueSubtitle(for: .pestCheck),
-                icon: "ladybug.fill",
+                id: "maintenance",
+                title: PlantCareCategory.maintenance.title(l: l),
+                value: dueValue(for: .maintenance),
+                subtitle: categorySubtitle(for: .maintenance),
+                icon: PlantCareCategory.maintenance.icon,
                 tint: Color.goYellow,
-                destination: .pestCheck
+                destination: .maintenance
             ),
             item(
-                id: "clean",
-                title: l.tr(zh: "清洁叶片", en: "Clean leaves", de: "Blätter reinigen"),
-                value: dueValue(for: .leafCleaning),
-                subtitle: dueSubtitle(for: .leafCleaning),
-                icon: "sparkles",
-                tint: Color.goTeal,
-                destination: .leafCleaning
+                id: "health",
+                title: PlantCareCategory.health.title(l: l),
+                value: healthReviewSignalCount == 0 ? dueValue(for: .health) : "\(healthReviewSignalCount)",
+                subtitle: plant.healthStatus == .stressed
+                    ? l.tr(zh: "优先排查", en: "Inspect first", de: "Zuerst prüfen")
+                    : categorySubtitle(for: .health),
+                icon: PlantCareCategory.health.icon,
+                tint: healthReviewSignalCount == 0 ? Color.goTeal : Color.goYellow,
+                destination: .health
+            ),
+            item(
+                id: "growth",
+                title: PlantCareCategory.growth.title(l: l),
+                value: "\(photoCount)",
+                subtitle: categorySubtitle(for: .growth),
+                icon: PlantCareCategory.growth.icon,
+                tint: Color.goPurple,
+                destination: .growth
             )
         ]
     }
@@ -578,6 +608,43 @@ struct PlantAllFeaturesSheet: View {
         careTasks.first { $0.careType == type }
     }
 
+    private func tasks(for category: PlantCareCategory) -> [PlantCareTaskSnapshot] {
+        careTasks.filter { category.contains($0.careType) }
+    }
+
+    private func dueValue(for category: PlantCareCategory) -> String {
+        let categoryTasks = tasks(for: category)
+        let dueCount = categoryTasks.count { $0.daysUntilDue <= 0 }
+        if dueCount > 0 {
+            return "\(dueCount)"
+        }
+        guard let next = categoryTasks.first else {
+            return category == .growth ? "\(photoCount)" : "--"
+        }
+        if next.daysUntilDue == 0 {
+            return l.tr(zh: "今天", en: "Today", de: "Heute")
+        }
+        return "\(next.daysUntilDue)d"
+    }
+
+    private func categorySubtitle(for category: PlantCareCategory) -> String {
+        let categoryTasks = tasks(for: category)
+        let dueCount = categoryTasks.count { $0.daysUntilDue <= 0 }
+        if dueCount > 0 {
+            return l.tr(zh: "\(dueCount) 项今天到期", en: "\(dueCount) due today", de: "\(dueCount) heute fällig")
+        }
+        if let next = categoryTasks.first {
+            return next.subtitle
+        }
+        if category == .growth {
+            return l.tr(zh: "拍照、新叶、备注观察", en: "Photos, new leaves, and notes", de: "Fotos, neue Blätter und Notizen")
+        }
+        let names = category.careTypes
+            .map { $0.displayName(l: l) }
+            .joined(separator: " / ")
+        return names
+    }
+
     private func dueValue(for type: PlantCareType) -> String {
         guard let task = task(for: type) else {
             return "--"
@@ -606,31 +673,22 @@ struct PlantAllFeaturesSheet: View {
     }
 
     private func destination(for task: PlantCareTaskSnapshot) -> PlantFeatureDestination {
-        switch task.careType {
-        case .watering, .misting:
+        switch task.careType.careCategory {
+        case .hydration:
             .water
-        case .fertilizing, .newLeaf:
+        case .nutrition:
             .fertilize
-        case .pestCheck, .pestFound, .yellowLeaf:
-            .pestCheck
-        case .leafCleaning:
-            .leafCleaning
-        default:
-            .carePlan
+        case .maintenance:
+            .maintenance
+        case .health:
+            .health
+        case .growth:
+            .growth
         }
     }
 
     private func careTint(for careType: PlantCareType) -> Color {
-        switch careType {
-        case .watering, .misting:
-            Color.goTeal
-        case .fertilizing, .newLeaf:
-            Color.goPrimary
-        case .pestCheck, .pestFound, .yellowLeaf:
-            Color.goYellow
-        default:
-            Color.goYellow
-        }
+        careType.careCategory.tint
     }
 
     private func careSymbol(for careType: PlantCareType) -> String {
@@ -649,8 +707,16 @@ struct PlantAllFeaturesSheet: View {
             "sparkles"
         case .newLeaf:
             "leaf.circle.fill"
-        default:
-            "slider.horizontal.3"
+        case .repotting:
+            "shippingbox.fill"
+        case .pruning:
+            "scissors"
+        case .rotating:
+            "arrow.triangle.2.circlepath"
+        case .photo:
+            "camera.fill"
+        case .customNote:
+            "note.text"
         }
     }
 }

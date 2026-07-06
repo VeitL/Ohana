@@ -8,25 +8,59 @@
 import PhotosUI
 import SwiftUI
 
-private struct PlantCareLogContextItem: Identifiable {
-    let id: String
-    let icon: String
-    let title: String
-    let value: String
-    let tint: Color
-}
-
-private struct PlantCareLogImpactItem: Identifiable {
-    let id: String
-    let icon: String
-    let title: String
-    let detail: String
-    let tint: Color
-}
-
 private struct PlantCareLogNoteSuggestion: Identifiable {
     let id: String
     let text: String
+}
+
+private struct PlantCareLogCompactNotice: View {
+    let icon: String
+    let text: String
+    let tint: Color
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 9) {
+            Image(systemName: icon)
+                .font(OhanaFont.adaptive(size: 13, weight: .black))
+                .foregroundStyle(tint)
+                .frame(width: 18)
+                .accessibilityHidden(true)
+            Text(text)
+                .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
+                .foregroundStyle(Color.ohanaSecondaryText)
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 0)
+        }
+        .padding(12)
+        .plantCareLogFlatBlockSurface(cornerRadius: OhanaRadius.control)
+        .accessibilityElement(children: .combine)
+    }
+}
+
+private struct PlantCareLogPrimaryButton: View {
+    let title: String
+    let icon: String
+    let tint: Color
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Label(title, systemImage: icon)
+                .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
+                .foregroundStyle(Color.arkInk)
+                .frame(maxWidth: .infinity)
+                .frame(minHeight: 44)
+                .padding(.horizontal, 16)
+                .background(tint, in: Capsule())
+        }
+        .buttonStyle(ScaleButtonStyle())
+    }
+}
+
+private extension View {
+    func plantCareLogFlatBlockSurface(cornerRadius: CGFloat) -> some View {
+        background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+    }
 }
 
 struct PlantCareLogSheet: View {
@@ -35,140 +69,20 @@ struct PlantCareLogSheet: View {
 
     @Environment(\.dismiss) private var dismiss
     @AppStorage("appLanguage") private var appLanguage = "zh"
+    @State private var selectedCareCategory: PlantCareCategory
     @State private var selectedCareType: PlantCareType
     @State private var selectedHealthStatus: PlantHealthStatus
     @State private var selectedPhotoItem: PhotosPickerItem?
     @State private var selectedPhotoData: Data?
     @State private var isLoadingPhoto = false
+    @State private var showsAdvancedOptions = false
     @State private var note = ""
 
     private var l: L10n { L10n(appLanguage) }
     private var tint: Color { careTint(for: selectedCareType) }
     private var trimmedNote: String { note.trimmingCharacters(in: .whitespacesAndNewlines) }
-    private let careTypes: [PlantCareType] = [
-        .watering,
-        .fertilizing,
-        .pestCheck,
-        .photo,
-        .leafCleaning,
-        .newLeaf,
-        .yellowLeaf,
-        .pestFound,
-        .misting,
-        .rotating,
-        .pruning,
-        .repotting,
-        .customNote
-    ]
-
-    private var placementSummary: String {
-        let room = plant.roomName.trimmingCharacters(in: .whitespacesAndNewlines)
-        let exactSpot = plant.location.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !room.isEmpty, !exactSpot.isEmpty, room != exactSpot {
-            return "\(room) · \(exactSpot)"
-        }
-        if !room.isEmpty { return room }
-        if !exactSpot.isEmpty { return exactSpot }
-        return l.tr(zh: "位置未设置", en: "Place unset", de: "Standort fehlt")
-    }
-
-    private var waterContextText: String {
-        guard let days = plant.daysSinceWatered else {
-            return l.tr(zh: "未记录", en: "No log", de: "Kein Eintrag")
-        }
-        return l.tr(zh: "\(days) 天前", en: "\(days)d ago", de: "vor \(days) T.")
-    }
-
-    private var fertilizerContextText: String {
-        guard let days = plant.daysSinceFertilized else {
-            return l.tr(zh: "未记录", en: "No log", de: "Kein Eintrag")
-        }
-        return l.tr(zh: "\(days) 天前", en: "\(days)d ago", de: "vor \(days) T.")
-    }
-
-    private var checkInContextItems: [PlantCareLogContextItem] {
-        [
-            PlantCareLogContextItem(
-                id: "status",
-                icon: healthSymbol(for: selectedHealthStatus),
-                title: l.tr(zh: "状态", en: "Status", de: "Status"),
-                value: selectedHealthStatus.displayName,
-                tint: healthTint(for: selectedHealthStatus)
-            ),
-            PlantCareLogContextItem(
-                id: "place",
-                icon: "mappin.and.ellipse",
-                title: l.tr(zh: "位置", en: "Place", de: "Ort"),
-                value: placementSummary,
-                tint: Color.goTeal
-            ),
-            PlantCareLogContextItem(
-                id: "water",
-                icon: "drop.fill",
-                title: l.tr(zh: "上次浇水", en: "Last water", de: "Letztes Gießen"),
-                value: waterContextText,
-                tint: Color.goTeal
-            ),
-            PlantCareLogContextItem(
-                id: "fertilizer",
-                icon: "leaf.fill",
-                title: l.tr(zh: "上次施肥", en: "Last feed", de: "Letztes Düngen"),
-                value: fertilizerContextText,
-                tint: Color.goPrimary
-            )
-        ]
-    }
-
-    private var saveImpactItems: [PlantCareLogImpactItem] {
-        [
-            PlantCareLogImpactItem(
-                id: "timeline",
-                icon: "clock.arrow.circlepath",
-                title: l.tr(zh: "进入时间线", en: "Adds to timeline", de: "In die Zeitachse"),
-                detail: selectedCareType.displayName(l: l),
-                tint: tint
-            ),
-            PlantCareLogImpactItem(
-                id: "health",
-                icon: healthSymbol(for: selectedHealthStatus),
-                title: l.tr(zh: "更新健康状态", en: "Updates health", de: "Aktualisiert Status"),
-                detail: selectedHealthStatus.displayName,
-                tint: healthTint(for: selectedHealthStatus)
-            ),
-            PlantCareLogImpactItem(
-                id: "cadence",
-                icon: selectedCareType == .watering ? "drop.fill" : "calendar.badge.clock",
-                title: l.tr(zh: "影响护理节奏", en: "Shapes care rhythm", de: "Prägt Rhythmus"),
-                detail: careLogImpactDetail,
-                tint: tint
-            ),
-            PlantCareLogImpactItem(
-                id: "photo",
-                icon: selectedPhotoData == nil ? "photo.badge.plus" : "photo.fill",
-                title: l.tr(zh: "成长图库", en: "Growth gallery", de: "Wachstumsgalerie"),
-                detail: selectedPhotoData == nil
-                    ? l.tr(zh: "无照片", en: "No photo", de: "Kein Foto")
-                    : l.tr(zh: "会加入图库", en: "Added to gallery", de: "Kommt in Galerie"),
-                tint: selectedPhotoData == nil ? Color.goYellow : Color.goTeal
-            )
-        ]
-    }
-
-    private var careLogImpactDetail: String {
-        switch selectedCareType {
-        case .watering:
-            l.tr(zh: "重置浇水判断", en: "Resets water timing", de: "Setzt Gießrhythmus")
-        case .fertilizing:
-            l.tr(zh: "重置施肥判断", en: "Resets feed timing", de: "Setzt Düngeplan")
-        case .pestCheck, .pestFound, .yellowLeaf:
-            l.tr(zh: "强化健康复查", en: "Improves health review", de: "Stärkt Gesundheitscheck")
-        case .photo, .newLeaf:
-            l.tr(zh: "补充成长档案", en: "Builds growth record", de: "Ergänzt Wachstum")
-        case .repotting:
-            l.tr(zh: "影响盆土判断", en: "Affects potting context", de: "Beeinflusst Topfkontext")
-        default:
-            l.tr(zh: "沉淀日常护理", en: "Captures routine care", de: "Erfasst Routinepflege")
-        }
+    private var visibleCareTypes: [PlantCareType] {
+        selectedCareCategory.careTypes
     }
 
     private var suggestedNotes: [PlantCareLogNoteSuggestion] {
@@ -225,6 +139,7 @@ struct PlantCareLogSheet: View {
     ) {
         self.plant = plant
         self.onSave = onSave
+        _selectedCareCategory = State(initialValue: initialCareType.careCategory)
         _selectedCareType = State(initialValue: initialCareType)
         _selectedHealthStatus = State(initialValue: currentHealthStatus)
     }
@@ -234,159 +149,64 @@ struct PlantCareLogSheet: View {
             title: l.tr(zh: "记录植物护理", en: "Log plant care", de: "Pflanzenpflege erfassen"),
             onDismiss: { dismiss() }
         ) {
-            VStack(alignment: .leading, spacing: 16) {
-                header
-                checkInContextCard
-                saveImpactPreview
+            VStack(alignment: .leading, spacing: 14) {
+                plantCareSheetHero
                 careTypePicker
-                healthStatusPicker
-                photoAttachmentSection
-                suggestedNotesSection
-                noteSection
+                compactSaveNotice
+                advancedOptionsToggle
+                if showsAdvancedOptions {
+                    advancedOptionsSection
+                        .transition(.opacity.combined(with: .move(edge: .top)))
+                }
                 saveButton
             }
-            .padding(.vertical, 16)
+            .padding(.top, 18)
+            .padding(.bottom, 24)
         }
         .accessibilityIdentifier("plant-care-log-sheet")
         .onChange(of: selectedPhotoItem) { _, item in
             loadPhoto(from: item)
         }
+        .onChange(of: selectedCareType) { _, type in
+            selectedCareCategory = type.careCategory
+        }
     }
 
-    private var header: some View {
-        HStack(alignment: .top, spacing: 12) {
+    private var plantCareSheetHero: some View {
+        HStack(spacing: 12) {
             Image(systemName: careSymbol(for: selectedCareType)) // a11y: allow decorative sheet glyph; heading names the log.
                 .font(OhanaFont.adaptive(size: 18, weight: .black))
-                .foregroundStyle(tint)
+                .foregroundStyle(Color.arkInk)
                 .frame(width: 44, height: 44)
-                .background(tint.opacity(0.16), in: Circle())
+                .background(tint, in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
                 .accessibilityHidden(true)
 
             VStack(alignment: .leading, spacing: 4) {
-                Text(plant.name)
-                    .font(OhanaFont.adaptive(size: 18, weight: .black, design: .rounded))
+                Text(l.tr(zh: "记录护理", en: "Log care", de: "Pflege erfassen"))
+                    .font(OhanaFont.adaptive(size: 20, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(1)
-                    .minimumScaleFactor(0.78)
-                Text(careTypeHint(selectedCareType))
+                    .minimumScaleFactor(0.72)
+                Text("\(plant.name) · \(selectedCareType.displayName(l: l))")
                     .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded))
                     .foregroundStyle(Color.ohanaSecondaryText)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-
-            Spacer(minLength: 8)
-        }
-        .accessibilityElement(children: .combine)
-    }
-
-    private var checkInContextCard: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            sectionTitle(l.tr(zh: "本次 Check-in", en: "This check-in", de: "Dieser Check-in"))
-            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
-                ForEach(checkInContextItems) { item in
-                    contextMetric(item)
-                }
-            }
-        }
-        .padding(14)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous))
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("plant-care-log-context")
-    }
-
-    private func contextMetric(_ item: PlantCareLogContextItem) -> some View {
-        HStack(alignment: .top, spacing: 8) {
-            Image(systemName: item.icon) // a11y: allow decorative context glyph; adjacent text carries the metric.
-                .font(OhanaFont.adaptive(size: 11, weight: .black))
-                .foregroundStyle(item.tint)
-                .frame(width: 28, height: 28) // a11y: allow non-interactive metric glyph; row text is accessible.
-                .background(item.tint.opacity(0.14), in: Circle())
-                .accessibilityHidden(true)
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text(item.title)
-                    .font(OhanaFont.adaptive(size: 10, weight: .black, design: .rounded))
-                    .foregroundStyle(Color.ohanaTertiaryText)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.75)
-                Text(item.value)
-                    .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
-                    .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(1)
                     .minimumScaleFactor(0.72)
             }
 
             Spacer(minLength: 0)
         }
-        .padding(10)
-        .background(Color.ohanaControlFill.opacity(0.48), in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(item.title), \(item.value)")
-        .accessibilityIdentifier("plant-care-log-context-\(item.id)")
+        .accessibilityIdentifier("plant-care-log-hero")
     }
 
-    private var saveImpactPreview: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .top, spacing: 10) {
-                Image(systemName: "arrow.triangle.2.circlepath") // a11y: allow decorative save-impact glyph; heading names the section.
-                    .font(OhanaFont.adaptive(size: 14, weight: .black))
-                    .foregroundStyle(tint)
-                    .frame(width: 34, height: 34) // a11y: allow non-interactive impact glyph; adjacent text is accessible.
-                    .background(tint.opacity(0.16), in: Circle())
-                    .accessibilityHidden(true)
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(l.tr(zh: "保存后会更新", en: "After saving", de: "Nach dem Speichern"))
-                        .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
-                        .foregroundStyle(Color.ohanaPrimaryText)
-                    Text(l.tr(
-                        zh: "这条记录会同步到时间线、健康摘要、护理节奏和成长图库。",
-                        en: "This log feeds the timeline, health summary, care rhythm, and growth gallery.",
-                        de: "Dieser Eintrag fließt in Zeitachse, Status, Rhythmus und Galerie."
-                    ))
-                    .font(OhanaFont.adaptive(size: 11, weight: .semibold, design: .rounded))
-                    .foregroundStyle(Color.ohanaSecondaryText)
-                    .fixedSize(horizontal: false, vertical: true)
-                }
-            }
-
-            VStack(spacing: 8) {
-                ForEach(saveImpactItems) { item in
-                    saveImpactRow(item)
-                }
-            }
-        }
-        .padding(14)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous))
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("plant-care-log-save-impact")
-    }
-
-    private func saveImpactRow(_ item: PlantCareLogImpactItem) -> some View {
-        HStack(spacing: 10) {
-            Image(systemName: item.icon) // a11y: allow decorative impact glyph; row text describes the effect.
-                .font(OhanaFont.adaptive(size: 12, weight: .black))
-                .foregroundStyle(item.tint)
-                .frame(width: 30, height: 30) // a11y: allow non-interactive impact glyph; adjacent text is accessible.
-                .background(item.tint.opacity(0.14), in: Circle())
-                .accessibilityHidden(true)
-            Text(item.title)
-                .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
-                .foregroundStyle(Color.ohanaPrimaryText)
-                .lineLimit(1)
-                .minimumScaleFactor(0.76)
-            Spacer(minLength: 8)
-            Text(item.detail)
-                .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded))
-                .foregroundStyle(Color.ohanaSecondaryText)
-                .lineLimit(1)
-                .minimumScaleFactor(0.7)
-        }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 8)
-        .background(Color.ohanaControlFill.opacity(0.42), in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(item.title), \(item.detail)")
-        .accessibilityIdentifier("plant-care-log-impact-\(item.id)")
+    private var compactSaveNotice: some View {
+        PlantCareLogCompactNotice(
+            icon: "clock.arrow.circlepath",
+            text: careTypeHint(selectedCareType),
+            tint: tint
+        )
+        .accessibilityIdentifier("plant-care-log-summary")
     }
 
     private var careTypePicker: some View {
@@ -394,45 +214,123 @@ struct PlantCareLogSheet: View {
             sectionTitle(l.tr(zh: "护理类型", en: "Care type", de: "Pflegetyp"))
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
-                    ForEach(careTypes) { type in
-                        chipButton(
-                            title: type.displayName(l: l),
-                            icon: careSymbol(for: type),
-                            tint: careTint(for: type),
-                            isSelected: selectedCareType == type
-                        ) {
-                            selectedCareType = type
-                        }
-                        .accessibilityIdentifier("plant-care-log-type-\(type.rawValue)")
+                    ForEach(PlantCareCategory.allCases) { category in
+                        categoryChip(category)
+                            .accessibilityIdentifier("plant-care-log-category-\(category.rawValue)")
                     }
                 }
                 .padding(.vertical, 2)
             }
             .accessibilityElement(children: .contain)
-        }
-        .padding(14)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous))
-    }
 
-    private var healthStatusPicker: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            sectionTitle(l.tr(zh: "记录后的状态", en: "Status after log", de: "Status nach Eintrag"))
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
-                ForEach(PlantHealthStatus.allCases) { status in
+                ForEach(visibleCareTypes) { type in
                     chipButton(
-                        title: status.displayName,
-                        icon: healthSymbol(for: status),
-                        tint: healthTint(for: status),
-                        isSelected: selectedHealthStatus == status
+                        title: type.displayName(l: l),
+                        icon: careSymbol(for: type),
+                        tint: careTint(for: type),
+                        isSelected: selectedCareType == type
                     ) {
-                        selectedHealthStatus = status
+                        selectedCareType = type
                     }
-                    .accessibilityIdentifier("plant-care-log-health-\(status.rawValue)")
+                    .accessibilityIdentifier("plant-care-log-type-\(type.rawValue)")
                 }
             }
         }
         .padding(14)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous))
+        .plantCareLogFlatBlockSurface(cornerRadius: OhanaRadius.controlLarge)
+        .accessibilityIdentifier("plant-care-log-type-picker")
+    }
+
+    private func categoryChip(_ category: PlantCareCategory) -> some View {
+        let isSelected = selectedCareCategory == category
+        return Button {
+            selectedCareCategory = category
+            if !category.contains(selectedCareType) {
+                selectedCareType = category.defaultCareType
+            }
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: category.icon)
+                    .font(OhanaFont.adaptive(size: 11, weight: .black))
+                    .accessibilityHidden(true)
+                Text(category.shortTitle(l: l))
+                    .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.72)
+            }
+            .foregroundStyle(isSelected ? Color.arkInk : Color.ohanaPrimaryText)
+            .frame(minWidth: 86)
+            .frame(minHeight: 44)
+            .padding(.horizontal, 10)
+            .background(
+                isSelected ? category.tint : Color.ohanaControlFill.opacity(0.72),
+                in: Capsule()
+            )
+        }
+        .buttonStyle(ScaleButtonStyle())
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+    }
+
+    private var advancedOptionsToggle: some View {
+        Button {
+            withAnimation(GoMotion.feedback) {
+                showsAdvancedOptions.toggle()
+            }
+            UISelectionFeedbackGenerator().selectionChanged()
+        } label: {
+            HStack(spacing: 10) {
+                Image(systemName: "slider.horizontal.3") // a11y: allow decorative options glyph; button text names the action.
+                    .font(OhanaFont.adaptive(size: 13, weight: .black))
+                    .foregroundStyle(tint)
+                    .frame(width: 28, height: 28) // a11y: allow visual glyph frame; button text names the action.
+                    .accessibilityHidden(true)
+                Text(l.tr(zh: "更多记录选项", en: "More log options", de: "Mehr Eintragsoptionen"))
+                    .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
+                    .foregroundStyle(Color.ohanaPrimaryText)
+                Spacer(minLength: 8)
+                Text(advancedSummaryText)
+                    .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded))
+                    .foregroundStyle(Color.ohanaSecondaryText)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.72)
+                Image(systemName: "chevron.down") // a11y: allow decorative disclosure glyph; button value exposes expanded state.
+                    .font(OhanaFont.adaptive(size: 12, weight: .black))
+                    .foregroundStyle(Color.ohanaTertiaryText)
+                    .rotationEffect(.degrees(showsAdvancedOptions ? 180 : 0))
+                    .accessibilityHidden(true)
+            }
+            .frame(maxWidth: .infinity, minHeight: 48)
+            .padding(.horizontal, 12)
+            .plantCareLogFlatBlockSurface(cornerRadius: OhanaRadius.control)
+        }
+        .buttonStyle(ScaleButtonStyle())
+        .accessibilityLabel(l.tr(zh: showsAdvancedOptions ? "收起更多记录选项" : "展开更多记录选项", en: showsAdvancedOptions ? "Collapse more log options" : "Expand more log options", de: showsAdvancedOptions ? "Mehr Optionen einklappen" : "Mehr Optionen ausklappen"))
+        .accessibilityValue(showsAdvancedOptions ? l.tr(zh: "已展开", en: "Expanded", de: "Geöffnet") : l.tr(zh: "已收起", en: "Collapsed", de: "Geschlossen"))
+        .accessibilityIdentifier("plant-care-log-advanced-toggle")
+    }
+
+    private var advancedOptionsSection: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            photoAttachmentSection
+            suggestedNotesSection
+            noteSection
+        }
+        .padding(14)
+        .plantCareLogFlatBlockSurface(cornerRadius: OhanaRadius.controlLarge)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("plant-care-log-advanced-options")
+    }
+
+    private var advancedSummaryText: String {
+        var parts: [String] = []
+        if selectedPhotoData != nil {
+            parts.append(l.tr(zh: "有照片", en: "Photo", de: "Foto"))
+        }
+        if !trimmedNote.isEmpty {
+            parts.append(l.tr(zh: "有备注", en: "Note", de: "Notiz"))
+        }
+        return parts.isEmpty ? l.tr(zh: "可选", en: "Optional", de: "Optional") : parts.joined(separator: " · ")
     }
 
     private var suggestedNotesSection: some View {
@@ -465,8 +363,6 @@ struct PlantCareLogSheet: View {
             .scrollClipDisabled()
             .accessibilityElement(children: .contain)
         }
-        .padding(14)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous))
         .accessibilityIdentifier("plant-care-log-suggested-notes")
     }
 
@@ -482,8 +378,6 @@ struct PlantCareLogSheet: View {
             .background(Color.ohanaControlFill.opacity(0.68), in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
             .accessibilityIdentifier("plant-care-log-note")
         }
-        .padding(14)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous))
     }
 
     private var photoAttachmentSection: some View {
@@ -555,29 +449,19 @@ struct PlantCareLogSheet: View {
                 .accessibilityIdentifier("plant-care-log-photo-picker")
             }
         }
-        .padding(14)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous))
     }
 
     private var saveButton: some View {
-        Button {
+        PlantCareLogPrimaryButton(
+            title: l.tr(zh: "保存记录", en: "Save log", de: "Eintrag speichern"),
+            icon: "checkmark.circle.fill",
+            tint: tint
+        ) {
             onSave(selectedCareType, trimmedNote, selectedHealthStatus, selectedPhotoData)
             dismiss()
-        } label: {
-            HStack(spacing: 8) {
-                Image(systemName: "checkmark.circle.fill") // a11y: allow decorative save glyph; button text names the action.
-                    .font(OhanaFont.adaptive(size: 13, weight: .black))
-                    .accessibilityHidden(true)
-                Text(l.tr(zh: "保存记录", en: "Save log", de: "Eintrag speichern"))
-                    .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
-            }
-            .foregroundStyle(Color.arkInk)
-            .frame(maxWidth: .infinity)
-            .frame(minHeight: 48)
-            .background(tint, in: Capsule())
         }
-        .buttonStyle(ScaleButtonStyle())
         .disabled(isLoadingPhoto)
+        .opacity(isLoadingPhoto ? 0.62 : 1)
         .accessibilityIdentifier("plant-care-log-save")
     }
 
@@ -733,32 +617,6 @@ struct PlantCareLogSheet: View {
             "ant.fill"
         case .customNote:
             "note.text"
-        }
-    }
-
-    private func healthTint(for status: PlantHealthStatus) -> Color {
-        switch status {
-        case .thriving:
-            Color.goPrimary
-        case .stable:
-            Color.goTeal
-        case .watching:
-            Color.goYellow
-        case .stressed:
-            Color.goRed
-        }
-    }
-
-    private func healthSymbol(for status: PlantHealthStatus) -> String {
-        switch status {
-        case .thriving:
-            "leaf.circle.fill"
-        case .stable:
-            "checkmark.seal.fill"
-        case .watching:
-            "eye.fill"
-        case .stressed:
-            "exclamationmark.triangle.fill"
         }
     }
 }

@@ -109,6 +109,17 @@ extension DomainRevisionPublishing {
         )
     }
 
+    func publishPlantBatchQuickRecord(_ result: PlantBatchCareCommandResult, note: String) {
+        publish(
+            DomainMutationResult(
+                command: .plantBatchCare(batchID: result.batchID, action: "batchQuickRecord", count: result.completedCount),
+                affectedEntityIDs: result.affectedEntityIDs,
+                wroteBusinessFact: result.didWrite,
+                note: note
+            )
+        )
+    }
+
     func publishPlantBatchCareUndo(_ result: PlantBatchCareUndoResult, note: String) {
         publish(
             DomainMutationResult(

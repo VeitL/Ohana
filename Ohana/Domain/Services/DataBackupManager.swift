@@ -230,7 +230,7 @@ final nonisolated class DataBackupManager: @unchecked Sendable {
                 doubleRewardBoostActive: ud.bool(forKey: ShopInventoryDefaultsKeys.doubleRewardBoost),
                 streakShieldExpiry: d(ud.object(forKey: ShopInventoryDefaultsKeys.streakShieldExpiry) as? Date)
             ),
-            plantReminderPreferences: makePlantReminderPreferencesBackup(defaults: ud)
+            plantReminderPreferences: makePlantReminderPreferencesBackup(defaults: ud, plants: plants)
         )
 
         return OhanaBackup(
@@ -696,17 +696,73 @@ final nonisolated class DataBackupManager: @unchecked Sendable {
         }
     }
 
-    private func makePlantReminderPreferencesBackup(defaults: UserDefaults) -> PlantReminderPreferencesBackup {
+    private func makePlantReminderPreferencesBackup(
+        defaults: UserDefaults,
+        plants: [Plant]
+    ) -> PlantReminderPreferencesBackup {
         let disabledCareTypes = PlantReminderPreferenceStore.controllableCareTypes
             .filter { !PlantReminderPreferenceStore.isCareTypeReminderEnabled($0, defaults: defaults) }
             .map(\.rawValue)
+        let plantCareOverrides = makePlantCarePreferenceOverrides(defaults: defaults, plants: plants)
 
         return PlantReminderPreferencesBackup(
             timeWindowRaw: PlantReminderPreferenceStore.timeWindow(defaults: defaults).rawValue,
             weekendQuietEnabled: PlantReminderPreferenceStore.isWeekendQuietEnabled(defaults: defaults),
             travelModeEnabled: PlantReminderPreferenceStore.isTravelModeEnabled(defaults: defaults),
-            disabledCareTypesRaw: disabledCareTypes
+            disabledCareTypesRaw: disabledCareTypes,
+            plantCareOverrides: plantCareOverrides.isEmpty ? nil : plantCareOverrides
         )
+    }
+
+    private func makePlantCarePreferenceOverrides(
+        defaults: UserDefaults,
+        plants: [Plant]
+    ) -> [PlantCarePreferenceOverrideBackup] {
+        plants.flatMap { plant in
+            PlantReminderPreferenceStore.controllableCareTypes.compactMap { careType in
+                let planCalendarEnabled = PlantReminderPreferenceStore.planCalendarOverride(
+                    forPlantID: plant.id,
+                    careType: careType,
+                    defaults: defaults
+                )
+                let systemReminderEnabled = PlantReminderPreferenceStore.systemReminderOverride(
+                    forPlantID: plant.id,
+                    careType: careType,
+                    defaults: defaults
+                )
+                let completionCalendarEnabled = PlantReminderPreferenceStore.completionCalendarOverride(
+                    forPlantID: plant.id,
+                    careType: careType,
+                    defaults: defaults
+                )
+                let reminderLeadDays = PlantReminderPreferenceStore.reminderLeadDaysOverride(
+                    forPlantID: plant.id,
+                    careType: careType,
+                    defaults: defaults
+                )
+                let recurrenceEndDate = PlantReminderPreferenceStore.recurrenceEndDate(
+                    forPlantID: plant.id,
+                    careType: careType,
+                    defaults: defaults
+                )
+                guard planCalendarEnabled != nil ||
+                    systemReminderEnabled != nil ||
+                    completionCalendarEnabled != nil ||
+                    reminderLeadDays != nil ||
+                    recurrenceEndDate != nil else {
+                    return nil
+                }
+                return PlantCarePreferenceOverrideBackup(
+                    plantID: plant.id.uuidString,
+                    careTypeRaw: careType.rawValue,
+                    planCalendarEnabled: planCalendarEnabled,
+                    systemReminderEnabled: systemReminderEnabled,
+                    completionCalendarEnabled: completionCalendarEnabled,
+                    reminderLeadDays: reminderLeadDays,
+                    recurrenceEndDate: recurrenceEndDate.map { iso.string(from: $0) }
+                )
+            }
+        }
     }
 
     private func applyPlantReminderPreferences(
@@ -723,15 +779,67 @@ final nonisolated class DataBackupManager: @unchecked Sendable {
         if let travelModeEnabled = preferences.travelModeEnabled {
             PlantReminderPreferenceStore.setTravelModeEnabled(travelModeEnabled, defaults: defaults)
         }
-        guard let disabledCareTypesRaw = preferences.disabledCareTypesRaw else { return }
-        let disabledCareTypes = Set(disabledCareTypesRaw)
-        for careType in PlantReminderPreferenceStore.controllableCareTypes {
-            PlantReminderPreferenceStore.setCareTypeReminderEnabled(
-                !disabledCareTypes.contains(careType.rawValue),
-                for: careType,
+        if let disabledCareTypesRaw = preferences.disabledCareTypesRaw {
+            let disabledCareTypes = Set(disabledCareTypesRaw)
+            for careType in PlantReminderPreferenceStore.controllableCareTypes {
+                PlantReminderPreferenceStore.setCareTypeReminderEnabled(
+                    !disabledCareTypes.contains(careType.rawValue),
+                    for: careType,
+                    defaults: defaults
+                )
+            }
+        }
+        for override in preferences.plantCareOverrides ?? [] {
+            applyPlantCarePreferenceOverride(override, defaults: defaults)
+        }
+    }
+
+    private func applyPlantCarePreferenceOverride(
+        _ override: PlantCarePreferenceOverrideBackup,
+        defaults: UserDefaults
+    ) {
+        guard let plantID = UUID(uuidString: override.plantID),
+              let careType = PlantCareType(rawValue: override.careTypeRaw) else {
+            return
+        }
+        if let planCalendarEnabled = override.planCalendarEnabled {
+            PlantReminderPreferenceStore.setPlanCalendarEnabled(
+                planCalendarEnabled,
+                forPlantID: plantID,
+                careType: careType,
                 defaults: defaults
             )
         }
+        if let systemReminderEnabled = override.systemReminderEnabled {
+            PlantReminderPreferenceStore.setSystemReminderEnabled(
+                systemReminderEnabled,
+                forPlantID: plantID,
+                careType: careType,
+                defaults: defaults
+            )
+        }
+        if let completionCalendarEnabled = override.completionCalendarEnabled {
+            PlantReminderPreferenceStore.setCompletionCalendarEnabled(
+                completionCalendarEnabled,
+                forPlantID: plantID,
+                careType: careType,
+                defaults: defaults
+            )
+        }
+        if let reminderLeadDays = override.reminderLeadDays {
+            PlantReminderPreferenceStore.setReminderLeadDays(
+                reminderLeadDays,
+                forPlantID: plantID,
+                careType: careType,
+                defaults: defaults
+            )
+        }
+        PlantReminderPreferenceStore.setRecurrenceEndDate(
+            override.recurrenceEndDate.flatMap { parseDate($0) },
+            forPlantID: plantID,
+            careType: careType,
+            defaults: defaults
+        )
     }
 
     private func insertLegacyShopPurchaseRecords(

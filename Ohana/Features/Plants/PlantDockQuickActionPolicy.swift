@@ -7,6 +7,36 @@
 
 import SwiftUI
 
+nonisolated enum PlantQuickCareFeedbackKey {
+    static func key(plantID: UUID, careType: PlantCareType) -> String {
+        "\(plantID.uuidString)|\(careType.rawValue)"
+    }
+}
+
+extension PlantCareCategory {
+    @MainActor var tint: Color {
+        switch self {
+        case .hydration:
+            Color.goTeal
+        case .nutrition:
+            Color.goPrimary
+        case .maintenance:
+            Color.goYellow
+        case .health:
+            Color.goOrange
+        case .growth:
+            Color.goPurple
+        }
+    }
+}
+
+struct PlantDockQuickActionCategorySection: Identifiable, Sendable {
+    let category: PlantCareCategory
+    let actions: [PlantDockQuickAction]
+
+    var id: String { category.rawValue }
+}
+
 nonisolated enum PlantDockQuickAction: String, CaseIterable, Identifiable, Sendable {
     case water
     case fertilize
@@ -23,28 +53,23 @@ nonisolated enum PlantDockQuickAction: String, CaseIterable, Identifiable, Senda
     case note
     case detail
 
-    static let maxVisibleItems = 5
+    static let maxVisibleItems = 8
 
     static var defaultItems: [PlantDockQuickAction] {
         [.water, .fertilize, .photo, .detail]
     }
 
     static var editableItems: [PlantDockQuickAction] {
+        editableSections.flatMap(\.actions) + [.detail]
+    }
+
+    static var editableSections: [PlantDockQuickActionCategorySection] {
         [
-            .water,
-            .fertilize,
-            .photo,
-            .mist,
-            .prune,
-            .cleanLeaves,
-            .pestCheck,
-            .rotate,
-            .repot,
-            .newLeaf,
-            .yellowLeaf,
-            .pestFound,
-            .note,
-            .detail
+            PlantDockQuickActionCategorySection(category: .hydration, actions: [.water, .mist]),
+            PlantDockQuickActionCategorySection(category: .nutrition, actions: [.fertilize, .repot]),
+            PlantDockQuickActionCategorySection(category: .maintenance, actions: [.prune, .cleanLeaves, .rotate]),
+            PlantDockQuickActionCategorySection(category: .health, actions: [.pestCheck, .yellowLeaf, .pestFound]),
+            PlantDockQuickActionCategorySection(category: .growth, actions: [.photo, .newLeaf, .note])
         ]
     }
 
@@ -190,27 +215,17 @@ nonisolated enum PlantDockQuickAction: String, CaseIterable, Identifiable, Senda
         }
     }
 
+    var careCategory: PlantCareCategory? {
+        careType?.careCategory
+    }
+
+    var detailFeatureDestination: PlantCareFeatureDestination? {
+        guard let careType else { return nil }
+        return PlantCareFeatureDestination.categoryDestination(for: careType)
+    }
+
     @MainActor var tint: Color {
-        switch self {
-        case .water:
-            Color.goTeal
-        case .fertilize:
-            Color.goPrimary
-        case .photo:
-            Color.goYellow
-        case .mist, .cleanLeaves, .rotate:
-            Color.goTeal
-        case .prune, .repot, .note:
-            Color.goPurple
-        case .pestCheck, .newLeaf:
-            Color.goPrimary
-        case .yellowLeaf:
-            Color.goYellow
-        case .pestFound:
-            Color.goRed
-        case .detail:
-            Color.goTeal
-        }
+        careCategory?.tint ?? Color.goTeal
     }
 
     var primaryIcon: String {
@@ -254,17 +269,19 @@ nonisolated enum PlantDockQuickAction: String, CaseIterable, Identifiable, Senda
     }
 
     private var colorHex: String {
-        switch self {
-        case .water, .mist, .cleanLeaves, .rotate, .detail:
+        switch careCategory {
+        case .hydration:
             "00D4AA"
-        case .fertilize, .pestCheck, .newLeaf:
+        case .nutrition:
             "C8FF00"
-        case .photo, .yellowLeaf:
+        case .maintenance:
             "FFDD44"
-        case .prune, .repot, .note:
+        case .health:
+            "F97316"
+        case .growth:
             "A78BFA"
-        case .pestFound:
-            "FF4757"
+        case nil:
+            "00D4AA"
         }
     }
 }

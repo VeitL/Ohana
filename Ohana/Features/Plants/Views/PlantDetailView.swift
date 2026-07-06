@@ -29,6 +29,11 @@ struct PlantDetailContentView: View {
     @State var showingPhotoGallery = false
     @State var careLogDraftType: PlantCareType?
     @State var careFeatureDraft: PlantDetailCareFeatureDraft?
+    @State var quickCareConfirmDraft: PlantQuickCareConfirmDraft?
+    @State var quickCareToast: PlantQuickCareToast?
+    @State var pendingDetailQuickCareTypes: Set<PlantCareType> = []
+    @State var completedDetailQuickCareTypes: Set<PlantCareType> = []
+    @State var failedDetailQuickCareTypes: Set<PlantCareType> = []
     @State var isDeletePending = false
     @State var isDeleteCommitting = false
     @State var deleteUndoTask: Task<Void, Never>?
@@ -38,6 +43,7 @@ struct PlantDetailContentView: View {
     @State private var renderDataRefreshTask: Task<Void, Never>?
     @State private var renderDataRefreshGeneration = 0
     @State private var mediaAttachmentIndexRepairTask: Task<Void, Never>?
+    @State var quickCareToastClearTask: Task<Void, Never>?
     @State private var renderData: PlantDetailRenderData?
     var catalogEntry: PlantCatalogEntry? { PlantCatalog.entry(id: plant.catalogSpeciesId) }
     var l: L10n { L10n(appLanguage) }
@@ -704,122 +710,6 @@ struct PlantDetailContentView: View {
             )
         }
     }
-    var careActionItems: [PlantDetailActionItem] {
-        var items: [PlantDetailActionItem] = []
-
-        for task in taskSummary?.dueTasksForActionQueue ?? [] {
-            items.append(
-                PlantDetailActionItem(
-                    id: "due-\(task.careType.rawValue)",
-                    icon: careSymbol(for: task.careType),
-                    title: task.title,
-                    detail: "\(dueText(for: task)) · \(task.subtitle)",
-                    tint: careTint(for: task.careType),
-                    primaryTitle: l.tr(zh: "完成", en: "Done", de: "Erledigt"),
-                    careType: task.careType,
-                    task: task,
-                    opensEdit: false
-                )
-            )
-        }
-
-        if plant.healthStatus == .watching || plant.healthStatus == .stressed {
-            items.append(
-                PlantDetailActionItem(
-                    id: "health-pest-check",
-                    icon: "stethoscope",
-                    title: plant.healthStatus == .stressed
-                        ? l.tr(zh: "先做一次病虫害复查", en: "Run a pest recheck first", de: "Zuerst Schädlingscheck machen")
-                        : l.tr(zh: "观察叶片和土壤", en: "Check leaves and soil", de: "Blätter und Erde prüfen"),
-                    detail: healthSummaryText,
-                    tint: plant.healthStatus == .stressed ? Color.goRed : Color.goYellow,
-                    primaryTitle: PlantCareType.pestCheck.displayName(l: l),
-                    careType: .pestCheck,
-                    task: nil,
-                    opensEdit: false
-                )
-            )
-        }
-
-        if activeSafetyWarningCount > 0 {
-            items.append(
-                PlantDetailActionItem(
-                    id: "safety-placement",
-                    icon: "exclamationmark.triangle.fill",
-                    title: l.tr(zh: "复核安全摆放", en: "Review safe placement", de: "Sicheren Standort prüfen"),
-                    detail: l.tr(
-                        zh: "\(activeSafetyWarningCount) 个安全提示需要确认，尤其是宠物/儿童够不到的位置。",
-                        en: "\(activeSafetyWarningCount) safety notes need review, especially reach from pets or children.",
-                        de: "\(activeSafetyWarningCount) Sicherheitshinweise prüfen, besonders Reichweite von Tieren oder Kindern."
-                    ),
-                    tint: Color.goYellow,
-                    primaryTitle: l.tr(zh: "编辑位置", en: "Edit placement", de: "Standort bearbeiten"),
-                    careType: nil,
-                    task: nil,
-                    opensEdit: true
-                )
-            )
-        }
-
-        if !profileMissingItems.isEmpty {
-            items.append(
-                PlantDetailActionItem(
-                    id: "profile-completion",
-                    icon: "list.clipboard.fill",
-                    title: l.tr(zh: "补齐植物档案", en: "Complete plant profile", de: "Pflanzenprofil vervollständigen"),
-                    detail: l.tr(
-                        zh: "还缺：\(profileMissingItems.prefix(3).joined(separator: "、"))",
-                        en: "Missing: \(profileMissingItems.prefix(3).joined(separator: ", "))",
-                        de: "Fehlt: \(profileMissingItems.prefix(3).joined(separator: ", "))"
-                    ),
-                    tint: Color.goTeal,
-                    primaryTitle: l.tr(zh: "去完善", en: "Complete", de: "Ergänzen"),
-                    careType: nil,
-                    task: nil,
-                    opensEdit: true
-                )
-            )
-        }
-
-        if items.isEmpty, let task = nextTask {
-            items.append(
-                PlantDetailActionItem(
-                    id: "next-\(task.careType.rawValue)",
-                    icon: careSymbol(for: task.careType),
-                    title: l.tr(zh: "下一项可以提前处理", en: "Next care can be handled early", de: "Nächste Pflege kann vorgezogen werden"),
-                    detail: "\(dueText(for: task)) · \(task.subtitle)",
-                    tint: careTint(for: task.careType),
-                    primaryTitle: l.tr(zh: "现在完成", en: "Do now", de: "Jetzt erledigen"),
-                    careType: task.careType,
-                    task: task,
-                    opensEdit: false
-                )
-            )
-        }
-
-        if items.isEmpty {
-            items.append(
-                PlantDetailActionItem(
-                    id: "growth-check",
-                    icon: "leaf.circle.fill",
-                    title: l.tr(zh: "记录一次成长观察", en: "Log a growth check", de: "Wachstumscheck protokollieren"),
-                    detail: l.tr(
-                        zh: "状态稳定时，可以记录新叶、清洁叶片或补照片。",
-                        en: "When things are calm, log new leaves, clean leaves, or add a photo note.",
-                        de: "Wenn alles ruhig ist, neue Blätter, Blattpflege oder Foto-Notiz erfassen."
-                    ),
-                    tint: Color.goPrimary,
-                    primaryTitle: PlantCareType.newLeaf.displayName(l: l),
-                    careType: .newLeaf,
-                    task: nil,
-                    opensEdit: false
-                )
-            )
-        }
-
-        return Array(items.prefix(4))
-    }
-
     var body: some View {
         ZStack {
             OhanaAppBackground()
@@ -830,11 +720,9 @@ struct PlantDetailContentView: View {
                         heroCard
                         careOverviewCard
                             .id(PlantDetailFeatureAnchor.overview)
-                        actionQueueCard
                         plantSectionHeader(l.tr(zh: "今日护理", en: "Today care", de: "Pflege heute"))
                         .id(PlantDetailFeatureAnchor.todayCare)
-                        nextTaskCard
-                        quickActions
+                        todayCarePanel
                         plantSectionHeader(l.tr(zh: "成长记录", en: "Growth record", de: "Wachstumsakte"))
                         .id(PlantDetailFeatureAnchor.growthDiary)
                         growthDiaryCard
@@ -898,6 +786,9 @@ struct PlantDetailContentView: View {
             }
         }
         .accessibilityIdentifier("plant-detail-screen")
+        .overlay(alignment: .bottom) {
+            plantQuickCareOverlay
+        }
         .sheet(isPresented: $showingAllFeaturesHub) {
             PlantAllFeaturesSheet(
                 plant: plant,
@@ -932,7 +823,8 @@ struct PlantDetailContentView: View {
             PlantCareFeatureDetailView(
                 plants: [plant],
                 feature: draft.feature,
-                focusedPlantID: plant.id
+                focusedPlantID: plant.id,
+                focusedCareType: draft.focusedCareType
             )
         }
         .safeAreaInset(edge: .bottom) {
@@ -953,6 +845,7 @@ struct PlantDetailContentView: View {
         .onDisappear {
             renderDataRefreshTask?.cancel()
             mediaAttachmentIndexRepairTask?.cancel()
+            quickCareToastClearTask?.cancel()
             deleteUndoTask?.cancel()
             if !isDeleteCommitting {
                 commandQueue.cancelAll()
@@ -1096,20 +989,20 @@ struct PlantDetailContentView: View {
 
             if showingPlantDetailExtras {
                 VStack(spacing: 20) {
-                    plantSectionHeader(l.tr(zh: "护理节奏", en: "Care rhythm", de: "Pflegerhythmus"))
+                    plantSectionHeader(l.tr(zh: "护理计划", en: "Care plan", de: "Pflegeplan"))
                     .id(PlantDetailFeatureAnchor.carePlan)
                     careRhythmCard
                     carePlanInsightCard
-                    placementFitCard
                     seasonalGuidanceCard
-                    plantSectionHeader(l.tr(zh: "档案", en: "Profile", de: "Profil"))
+                    plantSectionHeader(l.tr(zh: "植物档案", en: "Plant profile", de: "Pflanzenprofil"))
                     .id(PlantDetailFeatureAnchor.profile)
                     environmentCard
                     growthProfileCard
+                    placementFitCard
+                    plantSectionHeader(l.tr(zh: "健康与资料", en: "Health and knowledge", de: "Gesundheit und Wissen"))
+                    .id(PlantDetailFeatureAnchor.knowledge)
                     safetyCard
                         .id(PlantDetailFeatureAnchor.safety)
-                    plantSectionHeader(l.tr(zh: "资料与诊断", en: "Knowledge and checks", de: "Wissen und Checks"))
-                    .id(PlantDetailFeatureAnchor.knowledge)
                     catalogCard
                     diagnosisCard
                     healthReviewCard

@@ -71,6 +71,11 @@ struct FunctionMenuDestinationRouter: View {
                 humans: humans,
                 summary: petFeatureCollectionSummary
             )
+        case .petSharedCheckIn:
+            PetSharedCheckInView(
+                parentPath: $parentPath,
+                pets: pets
+            )
         case .plantFeatureCollection:
             PlantFeatureCollectionView(
                 parentPath: $parentPath,
@@ -92,6 +97,8 @@ struct FunctionMenuDestinationRouter: View {
             if let pet = pet(for: id) { PetMedicationView(pet: pet) }
         case let .petFood(id):
             if let pet = pet(for: id) { PetFoodManagementView(pet: pet) }
+        case let .petWater(id):
+            if let pet = pet(for: id) { QuickWaterDetailRouteContainer(id: pet.id, onRemove: {}, onClose: nil) }
         case let .petHygiene(id):
             if let pet = pet(for: id) { PetHygieneDetailView(pet: pet) }
         case let .petWalks(id):
@@ -156,6 +163,16 @@ struct FunctionMenuDestinationRouter: View {
                     parentPath.append(FMDest.plantDetail(plantID))
                 }
             )
+        case .plantsBatchQuickRecord:
+            PlantDashboardView(
+                plants: plants,
+                isPlantDataLoaded: isRouteDataLoaded,
+                initialMode: .plants,
+                opensBatchQuickRecordOnAppear: true,
+                onOpenPlant: { plantID in
+                    parentPath.append(FMDest.plantDetail(plantID))
+                }
+            )
         case .plantsList:
             PlantDashboardView(
                 plants: plants,
@@ -183,7 +200,8 @@ struct FunctionMenuDestinationRouter: View {
                 PlantCareFeatureDetailView(
                     plants: plants,
                     feature: careFeatureDestination,
-                    focusedPlantID: id
+                    focusedPlantID: id,
+                    focusedCareType: nil
                 )
             } else if let plant = plant(for: id) {
                 PlantDetailView(plant: plant, initialFeatureDestination: destination)
@@ -192,13 +210,15 @@ struct FunctionMenuDestinationRouter: View {
             PlantCareFeatureDetailView(
                 plants: plants,
                 feature: feature,
-                focusedPlantID: id
+                focusedPlantID: id,
+                focusedCareType: nil
             )
         case let .plantCareAggregate(feature):
             PlantCareFeatureDetailView(
                 plants: plants,
                 feature: feature,
-                focusedPlantID: nil
+                focusedPlantID: nil,
+                focusedCareType: nil
             )
         case .wealthDashboard:
             IslandWealthDashboardView()
@@ -252,7 +272,9 @@ struct FunctionMenuDestinationRouter: View {
         switch key {
         case "feed":
             .petFood(pet.persistentModelID)
-        case "water", "waterChange", "filterClean", "groom", "cageCleaning",
+        case "water":
+            .petWater(pet.persistentModelID)
+        case "waterChange", "filterClean", "groom", "cageCleaning",
              "freeFlight", "misting", "substrateChange":
             .petHygiene(pet.persistentModelID)
         case "potty", "litter":

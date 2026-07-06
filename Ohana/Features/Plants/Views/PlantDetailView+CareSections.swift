@@ -62,21 +62,51 @@ extension PlantDetailContentView {
         .padding(.horizontal, 16)
     }
 
-    var actionQueueCard: some View {
+    var todayCarePanelTasks: [PlantCareTaskSnapshot] {
+        if let tasks = taskSummary?.todayCareTasks, !tasks.isEmpty {
+            return tasks
+        }
+        if let nextTask {
+            return [nextTask]
+        }
+        return []
+    }
+
+    var todayCarePanelSubtitle: String {
+        if dueTaskCount > 0 {
+            return l.tr(
+                zh: "\(dueTaskCount) 项待办，点名称看详情，点右侧快速记录。",
+                en: "\(dueTaskCount) due. Tap a name for details or the right button to quick log.",
+                de: "\(dueTaskCount) fällig. Name öffnet Details, rechter Button erfasst schnell."
+            )
+        }
+        if let nextTask {
+            return l.tr(
+                zh: "今天清爽。下一项是 \(nextTask.careType.displayName(l: l))。",
+                en: "Clear today. Next is \(nextTask.careType.displayName(l: l)).",
+                de: "Heute frei. Als Nächstes: \(nextTask.careType.displayName(l: l))."
+            )
+        }
+        return l.tr(zh: "还没有护理计划。", en: "No care plan yet.", de: "Noch kein Pflegeplan.")
+    }
+
+    var todayCarePanel: some View {
         VStack(alignment: .leading, spacing: 14) {
-            HStack(alignment: .top, spacing: 10) {
-                Image(systemName: "checklist.checked") // a11y: allow decorative queue glyph; heading names the card.
+            HStack(alignment: .center, spacing: 10) {
+                Image(systemName: dueTaskCount > 0 ? "calendar.badge.clock" : "checkmark.seal.fill") // a11y: allow decorative today-care status glyph; heading and count describe the state.
                     .font(OhanaFont.adaptive(size: 16, weight: .black))
-                    .foregroundStyle(Color.goPrimary)
-                    .frame(width: 34, height: 34) // a11y: allow non-interactive queue glyph; text carries the accessible content.
-                    .background(Color.goPrimary.opacity(0.16), in: Circle())
+                    .foregroundStyle(dueTaskCount > 0 ? Color.goYellow : Color.goTeal)
+                    .frame(width: 44, height: 44)
+                    .background((dueTaskCount > 0 ? Color.goYellow : Color.goTeal).opacity(0.16), in: Circle())
                     .accessibilityHidden(true)
 
                 VStack(alignment: .leading, spacing: 3) {
-                    Text(l.tr(zh: "今日行动队列", en: "Today's action queue", de: "Aktionsliste heute"))
+                    Text(dueTaskCount > 0
+                        ? l.tr(zh: "今日待护理", en: "Due today", de: "Heute fällig")
+                        : l.tr(zh: "今日护理", en: "Today care", de: "Pflege heute"))
                         .font(OhanaFont.adaptive(size: 16, weight: .heavy, design: .rounded))
                         .foregroundStyle(Color.ohanaPrimaryText)
-                    Text(actionQueueSummary)
+                    Text(todayCarePanelSubtitle)
                         .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded))
                         .foregroundStyle(Color.ohanaSecondaryText)
                         .fixedSize(horizontal: false, vertical: true)
@@ -84,209 +114,221 @@ extension PlantDetailContentView {
 
                 Spacer(minLength: 8)
 
-                Text("\(profileCompletionPercent)%")
+                Text(dueTaskCount > 0 ? "\(dueTaskCount)" : "0")
                     .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
-                    .foregroundStyle(Color.arkInk)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 7)
-                    .background(Color.goPrimary, in: Capsule())
-                    .accessibilityLabel(l.tr(zh: "档案完成度 \(profileCompletionPercent)%", en: "Profile \(profileCompletionPercent)% complete", de: "Profil zu \(profileCompletionPercent)% vollständig"))
+                    .foregroundStyle(dueTaskCount > 0 ? Color.arkInk : Color.ohanaPrimaryText)
+                    .frame(minWidth: 36, minHeight: 36)
+                    .background(dueTaskCount > 0 ? Color.goYellow : Color.ohanaControlFill.opacity(0.72), in: Circle())
+                    .accessibilityLabel(l.tr(zh: "今日到期 \(dueTaskCount) 项", en: "\(dueTaskCount) due today", de: "\(dueTaskCount) heute fällig"))
             }
 
-            VStack(spacing: 10) {
-                ForEach(careActionItems) { item in
-                    actionQueueRow(item)
+            if todayCarePanelTasks.isEmpty {
+                todayCareEmptyRow
+            } else {
+                VStack(spacing: 8) {
+                    ForEach(todayCarePanelTasks) { task in
+                        todayCareTaskRow(task)
+                    }
                 }
             }
-
-            actionQueueToolRail
         }
         .padding(16)
         .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous))
         .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("plant-detail-action-queue")
+        .accessibilityIdentifier("plant-detail-today-care-panel")
         .padding(.horizontal, 16)
     }
 
-    var actionQueueSummary: String {
-        if dueTaskCount > 0 {
-            return l.tr(
-                zh: "\(dueTaskCount) 项到期。",
-                en: "\(dueTaskCount) due.",
-                de: "\(dueTaskCount) fällig."
-            )
+    var todayCareEmptyRow: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "leaf.circle.fill") // a11y: allow decorative empty-care glyph; row text describes the state.
+                .font(OhanaFont.adaptive(size: 14, weight: .black))
+                .foregroundStyle(Color.goPrimary)
+                .frame(width: 44, height: 44)
+                .background(Color.goPrimary.opacity(0.14), in: Circle())
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(l.tr(zh: "没有待办", en: "Nothing due", de: "Nichts fällig"))
+                    .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
+                    .foregroundStyle(Color.ohanaPrimaryText)
+                Text(l.tr(zh: "需要补充观察时，可以从成长记录进入。", en: "Use growth record when you want to add an observation.", de: "Für Beobachtungen die Wachstumsakte nutzen."))
+                    .font(OhanaFont.adaptive(size: 11, weight: .semibold, design: .rounded))
+                    .foregroundStyle(Color.ohanaSecondaryText)
+            }
+            Spacer(minLength: 0)
+            Button {
+                openPlantCareFeatureDetail(for: .newLeaf)
+            } label: {
+                Image(systemName: "arrow.right") // a11y: allow decorative arrow; button label names the destination.
+                    .font(OhanaFont.adaptive(size: 13, weight: .black))
+                    .foregroundStyle(Color.arkInk)
+                    .frame(width: 44, height: 44)
+                    .background(Color.goPrimary, in: Circle())
+                    .accessibilityHidden(true)
+            }
+            .buttonStyle(ScaleButtonStyle())
+            .accessibilityLabel(l.tr(zh: "打开成长记录详情", en: "Open growth record details", de: "Wachstumsdetails öffnen"))
         }
-        if plant.healthStatus == .watching || plant.healthStatus == .stressed {
-            return l.tr(
-                zh: "优先复查。",
-                en: "Review first.",
-                de: "Zuerst prüfen."
-            )
-        }
-        if !profileMissingItems.isEmpty {
-            return l.tr(
-                zh: "档案可补齐。",
-                en: "Profile can improve.",
-                de: "Profil ergänzen."
-            )
-        }
-        return l.tr(
-            zh: "节奏稳定。",
-            en: "Rhythm stable.",
-            de: "Rhythmus stabil."
-        )
+        .padding(10)
+        .background(Color.ohanaControlFill.opacity(0.5), in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
+        .accessibilityIdentifier("plant-detail-today-care-empty")
     }
 
-    func actionQueueRow(_ item: PlantDetailActionItem) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .top, spacing: 10) {
-                Image(systemName: item.icon) // a11y: allow decorative row glyph; row text and buttons carry context.
+    func todayCareTaskRow(_ task: PlantCareTaskSnapshot) -> some View {
+        let isPending = pendingDetailQuickCareTypes.contains(task.careType)
+        let didComplete = completedDetailQuickCareTypes.contains(task.careType)
+        let didFail = failedDetailQuickCareTypes.contains(task.careType)
+        return HStack(spacing: 10) {
+            Button {
+                openPlantCareFeatureDetail(for: task.careType)
+            } label: {
+                HStack(spacing: 10) {
+                    Image(systemName: careSymbol(for: task.careType)) // a11y: allow decorative care glyph inside labeled row button.
+                        .font(OhanaFont.adaptive(size: 13, weight: .black))
+                        .foregroundStyle(Color.arkInk)
+                        .frame(width: 44, height: 44)
+                        .background(careTint(for: task.careType), in: Circle())
+                        .accessibilityHidden(true)
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(task.careType.displayName(l: l))
+                            .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
+                            .foregroundStyle(Color.ohanaPrimaryText)
+                            .lineLimit(1)
+                        Text("\(dueText(for: task)) · \(task.subtitle)")
+                            .font(OhanaFont.adaptive(size: 11, weight: .semibold, design: .rounded))
+                            .foregroundStyle(Color.ohanaSecondaryText)
+                            .lineLimit(2)
+                    }
+                }
+                .frame(maxWidth: .infinity, minHeight: 50, alignment: .leading)
+            }
+            .buttonStyle(ScaleButtonStyle())
+            .accessibilityLabel(l.tr(zh: "打开\(task.careType.displayName(l: l))详情", en: "Open \(task.careType.displayName(l: l)) details", de: "\(task.careType.displayName(l: l))-Details öffnen"))
+            .accessibilityIdentifier("plant-detail-today-care-detail-\(task.careType.rawValue)")
+
+            Button {
+                presentQuickCareConfirm(for: task)
+            } label: {
+                Image(systemName: isPending ? "hourglass" : didComplete ? "checkmark" : didFail ? "exclamationmark" : "bolt.fill")
+                    .font(OhanaFont.adaptive(size: 13, weight: .black))
+                    .foregroundStyle(isPending ? Color.ohanaTertiaryText : Color.arkInk)
+                    .frame(width: 44, height: 44)
+                    .background(isPending ? Color.ohanaControlFill.opacity(0.72) : careTint(for: task.careType), in: Circle())
+            }
+            .buttonStyle(ScaleButtonStyle())
+            .disabled(isPending)
+            .accessibilityLabel(l.tr(zh: "快速记录\(task.careType.displayName(l: l))", en: "Quick log \(task.careType.displayName(l: l))", de: "\(task.careType.displayName(l: l)) schnell erfassen"))
+            .accessibilityIdentifier("plant-detail-today-care-quick-\(task.careType.rawValue)")
+        }
+        .padding(10)
+        .background(Color.ohanaControlFill.opacity(0.5), in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("plant-detail-today-care-row-\(task.careType.rawValue)")
+    }
+
+    @ViewBuilder
+    var plantQuickCareOverlay: some View {
+        VStack(spacing: 10) {
+            if let toast = quickCareToast {
+                HStack(spacing: 8) {
+                    Image(systemName: "checkmark.circle.fill") // a11y: allow decorative success glyph; toast text announces the result.
+                        .foregroundStyle(Color.goPrimary)
+                        .accessibilityHidden(true)
+                    Text(toast.message)
+                        .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
+                        .foregroundStyle(Color.ohanaPrimaryText)
+                        .lineLimit(2)
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
+                .goGlassBackground(Capsule())
+                .accessibilityIdentifier("plant-detail-quick-care-toast")
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+
+            if let draft = quickCareConfirmDraft {
+                quickCareConfirmCard(draft)
+                    .transition(.move(edge: .bottom).combined(with: .opacity).combined(with: .scale(scale: 0.96, anchor: .bottom)))
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.bottom, 14)
+        .animation(GoMotion.feedback, value: quickCareConfirmDraft?.id)
+        .animation(GoMotion.feedback, value: quickCareToast?.id)
+    }
+
+    func quickCareConfirmCard(_ draft: PlantQuickCareConfirmDraft) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 10) {
+                Image(systemName: careSymbol(for: draft.careType)) // a11y: allow decorative quick-care glyph; card text names the care type.
                     .font(OhanaFont.adaptive(size: 14, weight: .black))
                     .foregroundStyle(Color.arkInk)
-                    .frame(width: 34, height: 34) // a11y: allow non-interactive action glyph; row label carries content.
-                    .background(item.tint, in: Circle())
+                    .frame(width: 44, height: 44)
+                    .background(careTint(for: draft.careType), in: Circle())
                     .accessibilityHidden(true)
 
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(item.title)
-                        .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(draft.title)
+                        .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
                         .foregroundStyle(Color.ohanaPrimaryText)
-                        .fixedSize(horizontal: false, vertical: true)
-                    Text(item.detail)
-                        .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded))
+                    Text(draft.detail)
+                        .font(OhanaFont.adaptive(size: 11, weight: .semibold, design: .rounded))
                         .foregroundStyle(Color.ohanaSecondaryText)
-                        .lineLimit(3)
+                        .lineLimit(2)
                 }
 
-                Spacer(minLength: 0)
+                Spacer(minLength: 8)
+
+                Button {
+                    quickCareConfirmDraft = nil
+                } label: {
+                    Image(systemName: "xmark") // a11y: allow decorative close glyph; button label names the action.
+                        .font(OhanaFont.adaptive(size: 12, weight: .black))
+                        .foregroundStyle(Color.ohanaSecondaryText)
+                        .frame(width: 44, height: 44)
+                        .background(Color.ohanaControlFill.opacity(0.72), in: Circle())
+                        .accessibilityHidden(true)
+                }
+                .buttonStyle(ScaleButtonStyle())
+                .accessibilityLabel(l.tr(zh: "关闭快速记录", en: "Close quick log", de: "Schnellerfassung schließen"))
             }
 
             HStack(spacing: 8) {
                 Button {
-                    performActionQueueItem(item)
+                    recordQuickCare(draft.careType)
                 } label: {
-                    Text(item.primaryTitle)
-                        .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
+                    Label(l.tr(zh: "快速记录", en: "Quick log", de: "Schnell erfassen"), systemImage: "bolt.fill")
+                        .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
                         .foregroundStyle(Color.arkInk)
                         .lineLimit(1)
                         .minimumScaleFactor(0.78)
-                        .frame(minWidth: 92, minHeight: 44)
-                        .padding(.horizontal, 10)
-                        .background(item.tint, in: Capsule())
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                        .background(Color.goPrimary, in: Capsule())
                 }
                 .buttonStyle(ScaleButtonStyle())
-                .accessibilityLabel(actionQueuePrimaryAccessibilityLabel(item))
-                .accessibilityIdentifier("plant-detail-action-primary-\(item.id)")
+                .accessibilityIdentifier("plant-detail-quick-care-quick-log")
 
-                if let task = item.task, task.daysUntilDue <= 0 {
-                    Button {
-                        deferTaskOneDay(task)
-                    } label: {
-                        Text(l.tr(zh: "延后一天", en: "Defer 1 day", de: "1 Tag später"))
-                            .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
-                            .foregroundStyle(Color.ohanaPrimaryText)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.78)
-                            .frame(minWidth: 92, minHeight: 44)
-                            .padding(.horizontal, 10)
-                            .background(Color.ohanaControlFill.opacity(0.72), in: Capsule())
-                    }
-                    .buttonStyle(ScaleButtonStyle())
-                    .accessibilityLabel(l.tr(zh: "延后\(task.title)一天", en: "Defer \(task.title) by one day", de: "\(task.title) um einen Tag verschieben"))
-                    .accessibilityIdentifier("plant-detail-action-defer-\(item.id)")
-
-                    Button {
-                        skipTask(task)
-                    } label: {
-                        Text(l.tr(zh: "跳过", en: "Skip", de: "Überspringen"))
-                            .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
-                            .foregroundStyle(Color.ohanaPrimaryText)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.78)
-                            .frame(minWidth: 68, minHeight: 44)
-                            .padding(.horizontal, 10)
-                            .background(Color.ohanaControlFill.opacity(0.72), in: Capsule())
-                    }
-                    .buttonStyle(ScaleButtonStyle())
-                    .accessibilityLabel(l.tr(zh: "跳过\(task.title)", en: "Skip \(task.title)", de: "\(task.title) überspringen"))
-                    .accessibilityIdentifier("plant-detail-action-skip-\(item.id)")
+                Button {
+                    quickCareConfirmDraft = nil
+                    openPlantCareFeatureDetail(for: draft.careType)
+                } label: {
+                    Label(l.tr(zh: "查看详情", en: "Details", de: "Details"), systemImage: "info.circle.fill")
+                        .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
+                        .foregroundStyle(Color.ohanaPrimaryText)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.78)
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                        .background(Color.ohanaControlFill.opacity(0.72), in: Capsule())
                 }
-
-                Spacer(minLength: 0)
+                .buttonStyle(ScaleButtonStyle())
+                .accessibilityIdentifier("plant-detail-quick-care-detail")
             }
         }
-        .padding(12)
-        .background(Color.ohanaControlFill.opacity(0.5), in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
+        .padding(14)
+        .goGlassBackground(RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
         .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("plant-detail-action-item-\(item.id)")
-    }
-
-    var actionQueueToolRail: some View {
-        HStack(spacing: 8) {
-            actionQueueToolButton(
-                id: "reminders",
-                icon: plant.remindersEnabled ? "bell.badge.fill" : "bell.slash.fill",
-                title: l.tr(zh: "提醒", en: "Reminders", de: "Hinweise"),
-                subtitle: plant.remindersEnabled
-                    ? l.tr(zh: "开启", en: "On", de: "An")
-                    : l.tr(zh: "关闭", en: "Off", de: "Aus"),
-                tint: plant.remindersEnabled ? Color.goPrimary : Color.goYellow,
-                action: openReminderSettings
-            )
-
-            actionQueueToolButton(
-                id: "photos",
-                icon: "photo.on.rectangle.angled",
-                title: l.tr(zh: "照片", en: "Photos", de: "Fotos"),
-                subtitle: galleryPhotoItems.isEmpty
-                    ? l.tr(zh: "补照片", en: "Add", de: "Ergänzen")
-                    : l.tr(zh: "\(galleryPhotoItems.count) 张", en: "\(galleryPhotoItems.count)", de: "\(galleryPhotoItems.count)"),
-                tint: galleryPhotoItems.isEmpty ? Color.goYellow : Color.goTeal,
-                action: openPlantPhotos
-            )
-        }
-        .padding(.top, 2)
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("plant-detail-action-tools")
-    }
-
-    func actionQueueToolButton(
-        id: String,
-        icon: String,
-        title: String,
-        subtitle: String,
-        tint: Color,
-        action: @escaping () -> Void
-    ) -> some View {
-        Button(action: action) {
-            VStack(alignment: .leading, spacing: 5) {
-                Image(systemName: icon) // a11y: allow decorative tool glyph; button text names the action.
-                    .font(OhanaFont.adaptive(size: 12, weight: .black))
-                    .foregroundStyle(tint)
-                    .accessibilityHidden(true)
-                Text(title)
-                    .font(OhanaFont.adaptive(size: 11, weight: .black, design: .rounded))
-                    .foregroundStyle(Color.ohanaPrimaryText)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.75)
-                Text(subtitle)
-                    .font(OhanaFont.adaptive(size: 10, weight: .bold, design: .rounded))
-                    .foregroundStyle(Color.ohanaSecondaryText)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.72)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .frame(minHeight: 72, alignment: .center)
-            .padding(.horizontal, 10)
-            .background(Color.ohanaControlFill.opacity(0.5), in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
-        }
-        .buttonStyle(ScaleButtonStyle())
-        .accessibilityLabel("\(title), \(subtitle)")
-        .accessibilityIdentifier("plant-detail-action-tool-\(id)")
-    }
-
-    func actionQueuePrimaryAccessibilityLabel(_ item: PlantDetailActionItem) -> String {
-        "\(item.primaryTitle), \(item.title)"
+        .accessibilityIdentifier("plant-detail-quick-care-popup")
     }
 
     var nextTaskCard: some View {

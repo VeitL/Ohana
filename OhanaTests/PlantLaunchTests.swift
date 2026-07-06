@@ -94,6 +94,9 @@ struct PlantLaunchTests {
         #expect(storedPlantItems.count == PlantDockQuickAction.maxVisibleItems)
         #expect(Set(storedPlantItems.map(\.entityKind)) == [.plant])
         #expect(storedPlantItems.map(\.actionType) == Array(allPlantItems.prefix(PlantDockQuickAction.maxVisibleItems)).map(\.actionType))
+        #expect(PlantDockQuickAction.allCases.allSatisfy { action in
+            action == .detail || action.detailFeatureDestination != nil
+        })
 
         let petItems = ExpandedQuickActionStore.petItems(
             raw: raw,
@@ -105,6 +108,26 @@ struct PlantLaunchTests {
         let humanItems = ExpandedQuickActionStore.humanItems(raw: raw, human: human, localization: l)
         #expect(!petItems.contains { $0.entityKind == .plant })
         #expect(!humanItems.contains { $0.entityKind == .plant })
+    }
+
+    @Test func plantCareCategoriesCoverEveryCareTypeAndProtectScheduleSemantics() {
+        let groupedCareTypes = PlantCareCategory.allCases.flatMap(\.careTypes)
+
+        #expect(groupedCareTypes.count == PlantCareType.allCases.count)
+        #expect(Set(groupedCareTypes) == Set(PlantCareType.allCases))
+        #expect(PlantCareCategory.hydration.careTypes == [.watering, .misting])
+        #expect(PlantCareCategory.nutrition.careTypes == [.fertilizing, .repotting])
+        #expect(PlantCareCategory.maintenance.careTypes == [.pruning, .leafCleaning, .rotating])
+        #expect(PlantCareCategory.health.careTypes == [.pestCheck, .yellowLeaf, .pestFound])
+        #expect(PlantCareCategory.growth.careTypes == [.photo, .newLeaf, .customNote])
+        #expect(Set(PlantCareCategory.schedulableCareTypes) == Set(PlantReminderPreferenceStore.controllableCareTypes))
+        #expect(PlantCareCategory.growth.schedulableCareTypes.isEmpty)
+        #expect(!PlantCareType.photo.isSchedulablePlantCare)
+        #expect(!PlantCareType.newLeaf.isSchedulablePlantCare)
+        #expect(!PlantCareType.customNote.isSchedulablePlantCare)
+        #expect(!PlantCareType.yellowLeaf.isSchedulablePlantCare)
+        #expect(!PlantCareType.pestFound.isSchedulablePlantCare)
+        #expect(PlantCareType.pestCheck.isSchedulablePlantCare)
     }
 
     @Test func carePlanReadsOneDayDeferralLog() throws {
@@ -728,12 +751,17 @@ struct PlantLaunchTests {
         let calendar = Calendar.current
         let now = Date()
         let fertilizingDueDate = calendar.date(byAdding: .day, value: 4, to: now) ?? now.addingTimeInterval(4 * 86400)
+        let recurrenceEndDate = calendar.date(byAdding: .day, value: 30, to: now) ?? now.addingTimeInterval(30 * 86400)
         let plant = Plant(name: "Fern", wateringIntervalDays: 1, fertilizingIntervalDays: 14)
         plant.createdAt = calendar.date(byAdding: .day, value: -10, to: now) ?? now
         plant.lastWateredDate = calendar.date(byAdding: .day, value: -2, to: now)
         plant.lastFertilizedDate = calendar.date(byAdding: .day, value: -14, to: fertilizingDueDate)
         sourceContext.insert(plant)
         try sourceContext.save()
+        PlantReminderPreferenceStore.setReminderLeadDays(2, forPlantID: plant.id, careType: .fertilizing, defaults: sourceDefaults)
+        PlantReminderPreferenceStore.setRecurrenceEndDate(recurrenceEndDate, forPlantID: plant.id, careType: .fertilizing, defaults: sourceDefaults)
+        PlantReminderPreferenceStore.setSystemReminderEnabled(false, forPlantID: plant.id, careType: .misting, defaults: sourceDefaults)
+        PlantReminderPreferenceStore.setCompletionCalendarEnabled(false, forPlantID: plant.id, careType: .watering, defaults: sourceDefaults)
 
         let sourceManager = DataBackupManager(defaults: sourceDefaults)
         let backup = try sourceManager.buildBackup(context: sourceContext)
@@ -760,6 +788,15 @@ struct PlantLaunchTests {
         #expect(PlantReminderPreferenceStore.isTravelModeEnabled(defaults: targetDefaults))
         #expect(!PlantReminderPreferenceStore.isCareTypeReminderEnabled(.watering, defaults: targetDefaults))
         #expect(PlantReminderPreferenceStore.isCareTypeReminderEnabled(.fertilizing, defaults: targetDefaults))
+        #expect(PlantReminderPreferenceStore.reminderLeadDays(forPlantID: plant.id, careType: .fertilizing, defaults: targetDefaults) == 2)
+        #expect(!PlantReminderPreferenceStore.isSystemReminderEnabled(forPlantID: plant.id, careType: .misting, defaults: targetDefaults))
+        #expect(!PlantReminderPreferenceStore.isCompletionCalendarEnabled(forPlantID: plant.id, careType: .watering, defaults: targetDefaults))
+        let restoredRecurrenceEndDate = try #require(PlantReminderPreferenceStore.recurrenceEndDate(
+            forPlantID: plant.id,
+            careType: .fertilizing,
+            defaults: targetDefaults
+        ))
+        #expect(abs(restoredRecurrenceEndDate.timeIntervalSince1970 - recurrenceEndDate.timeIntervalSince1970) < 1)
         #expect(!planEvents.contains { $0.eventType == EventType.watering.rawValue })
         #expect(planEvents.contains { $0.eventType == EventType.fertilizing.rawValue })
         #expect(!restoredReminders.contains { $0.event?.eventType == EventType.watering.rawValue })
@@ -980,7 +1017,7 @@ struct PlantLaunchTests {
         #expect(Set(notifications.cancelledNotificationIDs) == notificationIDs)
     }
 
-    @Test func mutedPlantReminderCareTypeRemovesOnlyThatMaterializedPlan() throws {
+    @Test func mutedPlantSystemReminderKeepsPlanButRemovesReminder() throws {
         let (defaults, suiteName) = try makePlantReminderDefaults()
         defer { defaults.removePersistentDomain(forName: suiteName) }
         let container = try makeInMemoryContainer()
@@ -1000,7 +1037,46 @@ struct PlantLaunchTests {
             scheduleNotifications: false,
             defaults: defaults
         )
-        PlantReminderPreferenceStore.setCareTypeReminderEnabled(false, for: .watering, defaults: defaults)
+        PlantReminderPreferenceStore.setSystemReminderEnabled(false, forPlantID: plant.id, careType: .watering, defaults: defaults)
+        let result = PlantCarePlanScheduleService.sync(
+            plant: plant,
+            context: context,
+            now: now,
+            scheduleNotifications: false,
+            defaults: defaults
+        )
+
+        let events = try context.fetch(FetchDescriptor<Event>())
+        let reminders = try context.fetch(FetchDescriptor<Reminder>())
+        #expect(result.removedEventIDs.isEmpty)
+        #expect(!result.removedReminderIDs.isEmpty)
+        #expect(events.contains { $0.eventType == EventType.watering.rawValue && $0.title.contains("植物计划") })
+        #expect(events.contains { $0.eventType == EventType.fertilizing.rawValue && $0.title.contains("植物计划") })
+        #expect(!reminders.contains { $0.event?.eventType == EventType.watering.rawValue })
+        #expect(reminders.contains { $0.event?.eventType == EventType.fertilizing.rawValue })
+    }
+
+    @Test func disabledPlantCalendarPlanRemovesOnlyThatMaterializedPlan() throws {
+        let (defaults, suiteName) = try makePlantReminderDefaults()
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let now = makeDate(year: 2026, month: 6, day: 18, hour: 8)
+        let plant = Plant(name: "Fern", wateringIntervalDays: 1, fertilizingIntervalDays: 14)
+        plant.createdAt = Calendar.current.date(byAdding: .day, value: -10, to: now) ?? now
+        plant.lastWateredDate = Calendar.current.date(byAdding: .day, value: -2, to: now)
+        plant.lastFertilizedDate = Calendar.current.date(byAdding: .day, value: -20, to: now)
+        context.insert(plant)
+        try context.save()
+
+        PlantCarePlanScheduleService.sync(
+            plant: plant,
+            context: context,
+            now: now,
+            scheduleNotifications: false,
+            defaults: defaults
+        )
+        PlantReminderPreferenceStore.setPlanCalendarEnabled(false, forPlantID: plant.id, careType: .watering, defaults: defaults)
         let result = PlantCarePlanScheduleService.sync(
             plant: plant,
             context: context,
@@ -1016,6 +1092,52 @@ struct PlantLaunchTests {
         #expect(events.contains { $0.eventType == EventType.fertilizing.rawValue && $0.title.contains("植物计划") })
         #expect(!reminders.contains { $0.event?.eventType == EventType.watering.rawValue })
         #expect(reminders.contains { $0.event?.eventType == EventType.fertilizing.rawValue })
+    }
+
+    @Test func disabledPlantCompletionCalendarPreferenceHidesCompletedCareEvents() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let now = makeDate(year: 2026, month: 6, day: 18, hour: 9)
+        let plant = Plant(name: "Fern", wateringIntervalDays: 1)
+        context.insert(plant)
+        try context.save()
+        defer {
+            PlantReminderPreferenceStore.setCompletionCalendarEnabled(true, forPlantID: plant.id, careType: .watering)
+        }
+
+        PlantCareCommandService.recordCare(
+            .watering,
+            plant: plant,
+            executorId: nil,
+            context: context,
+            now: now,
+            syncCarePlan: false,
+            awardRewards: false
+        )
+        let events = try context.fetch(FetchDescriptor<Event>())
+        let dayID = CalendarSnapshotBuilder.timelineDateID(now)
+
+        let visibleSnapshot = CalendarSnapshotBuilder.preparedSnapshot(
+            filteredEvents: events,
+            allEvents: events,
+            pets: [],
+            weekDays: [now],
+            monthDays: [now],
+            now: now
+        )
+        #expect(visibleSnapshot.events(forDayID: dayID).count == 1)
+
+        PlantReminderPreferenceStore.setCompletionCalendarEnabled(false, forPlantID: plant.id, careType: .watering)
+        let hiddenSnapshot = CalendarSnapshotBuilder.preparedSnapshot(
+            filteredEvents: events,
+            allEvents: events,
+            pets: [],
+            weekDays: [now],
+            monthDays: [now],
+            now: now
+        )
+        #expect(hiddenSnapshot.events(forDayID: dayID).isEmpty)
+        #expect(!hiddenSnapshot.monthEventDayIDs.contains(dayID))
     }
 
     @Test func plantReminderTimeWindowControlsMaterializedReminderTime() throws {

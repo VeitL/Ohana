@@ -8,24 +8,26 @@
 import SwiftData
 import SwiftUI
 
-struct PlantDetailActionItem: Identifiable {
-    let id: String
-    let icon: String
-    let title: String
-    let detail: String
-    let tint: Color
-    let primaryTitle: String
-    let careType: PlantCareType?
-    let task: PlantCareTaskSnapshot?
-    let opensEdit: Bool
-}
-
 struct PlantCarePlanInsight: Identifiable {
     let id: String
     let icon: String
     let title: String
     let detail: String
     let tint: Color
+}
+
+struct PlantQuickCareConfirmDraft: Identifiable, Hashable {
+    let careType: PlantCareType
+    let title: String
+    let detail: String
+
+    var id: String { careType.rawValue }
+}
+
+struct PlantQuickCareToast: Identifiable, Hashable {
+    let id = UUID()
+    let careType: PlantCareType
+    let message: String
 }
 
 struct PlantPlacementFitItem: Identifiable {
@@ -131,7 +133,7 @@ nonisolated struct PlantDetailLogSnapshot: Identifiable, Equatable, Sendable {
 nonisolated struct PlantDetailTaskSummary: Equatable, Sendable {
     let nextTask: PlantCareTaskSnapshot?
     let dueTaskCount: Int
-    let dueTasksForActionQueue: [PlantCareTaskSnapshot]
+    let todayCareTasks: [PlantCareTaskSnapshot]
     let isWateringDue: Bool
     let isFertilizingDue: Bool
     let wateringIntervalDays: Int

@@ -76,6 +76,8 @@ struct SettingsView: View {
     @State var showingFamilyWeeklyReportDebug = false
     @State var showAdvancedNotificationSettings = false
     @State var notificationPreferenceRevision = 0
+    @State var languageSelectionCode = AppLanguage.code
+    @State var languageCommitTask: Task<Void, Never>?
 
     init(
         homeHouseholds: [Household]? = nil,
@@ -176,11 +178,17 @@ struct SettingsView: View {
         }
         .onAppear {
             syncStoredRegionalDefaultsIfNeeded()
+            syncLanguageSelectionFromStorage()
             refreshBiometricGateAvailability()
             scheduleDataSectionsMount()
         }
         .onDisappear {
             dataSectionsMountTask?.cancel()
+            languageCommitTask?.cancel()
+            languageCommitTask = nil
+        }
+        .onChange(of: appLanguage) { _, _ in
+            syncLanguageSelectionFromStorage()
         }
         .fullScreenCover(isPresented: $showingOnboardingReplay) {
             ZStack(alignment: .topTrailing) {

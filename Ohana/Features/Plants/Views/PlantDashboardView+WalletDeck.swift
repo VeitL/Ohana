@@ -99,11 +99,12 @@ extension PlantDashboardView {
     @ViewBuilder
     func plantEmbeddedQuickActions(for card: FocusCard) -> some View {
         if let plant = visiblePlants.first(where: { $0.id == card.id }) {
-            let nextTask = appServices.plantCarePlans.nextTask(for: plant)
+            let careTasks = appServices.plantCarePlans.tasks(for: plant)
             PlantDockQuickActionsView(
                 plantID: plant.id,
                 plantName: plant.name,
-                dueCareTypes: plantDueCareTypes(nextTask: nextTask),
+                dueCareTypes: plantDueCareTypes(tasks: careTasks),
+                overdueCareTypes: plantOverdueCareTypes(tasks: careTasks),
                 localization: l,
                 quickActionItemsRaw: $plantQuickActionItemsRaw,
                 shouldReduceWork: reduceMotion,
@@ -330,7 +331,8 @@ extension PlantDashboardView {
     }
 
     func plantListRow(_ plant: Plant) -> some View {
-        let nextTask = appServices.plantCarePlans.nextTask(for: plant)
+        let careTasks = appServices.plantCarePlans.tasks(for: plant)
+        let nextTask = careTasks.first
         let isExpanded = expandedPlantCardID == plant.id
         let card = FocusCard.fromPlant(
             plant,
@@ -374,7 +376,7 @@ extension PlantDashboardView {
             .accessibilityIdentifier("plant-dashboard-plant-open-\(plant.id.uuidString)")
 
             if isExpanded {
-                plantWalletQuickActions(for: plant, nextTask: nextTask)
+                plantWalletQuickActions(for: plant, careTasks: careTasks)
                     .transition(.opacity.combined(with: .move(edge: .top)))
             }
         }
@@ -382,7 +384,7 @@ extension PlantDashboardView {
         .accessibilityIdentifier("plant-dashboard-plant-row-\(plant.name)")
     }
 
-    func plantWalletQuickActions(for plant: Plant, nextTask: PlantCareTaskSnapshot?) -> some View {
+    func plantWalletQuickActions(for plant: Plant, careTasks: [PlantCareTaskSnapshot]) -> some View {
         VStack(spacing: 8) {
             Button {
                 onOpenPlant(plant.id)
@@ -415,7 +417,7 @@ extension PlantDashboardView {
                         icon: action.icon,
                         title: action.title(l: l),
                         tint: action.tint,
-                        showsAttention: plantDockActionIsDue(action, nextTask: nextTask)
+                        attentionLevel: plantDockActionAttentionLevel(action, tasks: careTasks)
                     ) {
                         performPlantDockQuickAction(action, plant: plant)
                     }
@@ -448,9 +450,11 @@ extension PlantDashboardView {
         title: String,
         tint: Color,
         showsAttention: Bool = false,
+        attentionLevel: HomeQuickActionAttentionLevel? = nil,
         action: @escaping () -> Void
     ) -> some View {
-        Button(action: action) {
+        let resolvedAttention = attentionLevel ?? (showsAttention ? .due : .none)
+        return Button(action: action) {
             VStack(spacing: 5) {
                 ZStack(alignment: .topTrailing) {
                     Image(systemName: icon)
@@ -460,9 +464,9 @@ extension PlantDashboardView {
                         .background(tint, in: Circle())
                         .accessibilityHidden(true)
 
-                    if showsAttention {
+                    if resolvedAttention != .none {
                         Circle()
-                            .fill(Color.goYellow)
+                            .fill(plantAttentionTint(for: resolvedAttention))
                             .frame(width: 9, height: 9) // a11y: allow non-interactive due-status dot inside a labeled 44pt action button.
                             .overlay(Circle().strokeBorder(Color.ohanaCardSurface, lineWidth: 1.5))
                             .accessibilityHidden(true)
@@ -482,9 +486,28 @@ extension PlantDashboardView {
         .accessibilityIdentifier("plant-dashboard-wallet-action-\(id)")
     }
 
-    func plantDockActionIsDue(_ action: PlantDockQuickAction, nextTask: PlantCareTaskSnapshot?) -> Bool {
+    func plantDockActionIsDue(_ action: PlantDockQuickAction, tasks: [PlantCareTaskSnapshot]) -> Bool {
         guard let careType = action.careType else { return false }
-        return plantDueCareTypes(nextTask: nextTask).contains(careType)
+        return plantDueCareTypes(tasks: tasks).contains(careType)
+    }
+
+    func plantDockActionAttentionLevel(_ action: PlantDockQuickAction, tasks: [PlantCareTaskSnapshot]) -> HomeQuickActionAttentionLevel {
+        guard let careType = action.careType else { return .none }
+        if plantOverdueCareTypes(tasks: tasks).contains(careType) {
+            return .urgent
+        }
+        return plantDueCareTypes(tasks: tasks).contains(careType) ? .due : .none
+    }
+
+    func plantAttentionTint(for level: HomeQuickActionAttentionLevel) -> Color {
+        switch level {
+        case .none:
+            Color.clear
+        case .due:
+            Color.goYellow
+        case .urgent:
+            Color.goRed
+        }
     }
 
     func performPlantDockQuickAction(_ action: PlantDockQuickAction, plant: Plant) {
@@ -492,7 +515,7 @@ extension PlantDashboardView {
             onOpenPlant(plant.id)
             return
         }
-        openCareLogSheet(for: plant, type: careType)
+        recordPlantCare(careType, plant: plant)
     }
 
     func openPlantDockDetail(_ action: PlantDockQuickAction, plant: Plant) {
@@ -504,13 +527,19 @@ extension PlantDashboardView {
                 onOpenPlant(plant.id)
                 return
             }
-            openCareLogSheet(for: plant, type: careType)
+            openCareAggregate(
+                PlantCareFeatureDestination.categoryDestination(for: careType),
+                focusedCareType: careType
+            )
         }
     }
 
-    func plantDueCareTypes(nextTask: PlantCareTaskSnapshot?) -> Set<PlantCareType> {
-        guard let nextTask, nextTask.daysUntilDue <= 0 else { return [] }
-        return [nextTask.careType]
+    func plantDueCareTypes(tasks: [PlantCareTaskSnapshot]) -> Set<PlantCareType> {
+        Set(tasks.filter { $0.daysUntilDue <= 0 }.map(\.careType))
+    }
+
+    func plantOverdueCareTypes(tasks: [PlantCareTaskSnapshot]) -> Set<PlantCareType> {
+        Set(tasks.filter(\.isOverdue).map(\.careType))
     }
 
     func plantDockQuickAccessibilityLabel(_ action: PlantDockQuickAction, plant: Plant) -> String {

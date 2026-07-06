@@ -16,6 +16,7 @@ struct VerticalHomeEmbeddedAction: Identifiable {
     let statusText: String?
     let isCompleted: Bool
     let showsAttention: Bool
+    let attentionLevel: HomeQuickActionAttentionLevel
     let isLocked: Bool
     let isAddDisabled: Bool
     let primaryIcon: String
@@ -38,6 +39,7 @@ struct VerticalHomeEmbeddedAction: Identifiable {
         statusText: String? = nil,
         isCompleted: Bool,
         showsAttention: Bool = false,
+        attentionLevel: HomeQuickActionAttentionLevel? = nil,
         isLocked: Bool = false,
         isAddDisabled: Bool = false,
         primaryIcon: String = "bolt.fill",
@@ -58,7 +60,9 @@ struct VerticalHomeEmbeddedAction: Identifiable {
         self.actionType = actionType ?? Self.inferredActionType(id: id, icon: icon)
         self.statusText = statusText
         self.isCompleted = isCompleted
-        self.showsAttention = showsAttention
+        let resolvedAttention = attentionLevel ?? (showsAttention ? .urgent : .none)
+        self.showsAttention = showsAttention || resolvedAttention != .none
+        self.attentionLevel = resolvedAttention
         self.isLocked = isLocked
         self.isAddDisabled = isAddDisabled
         self.primaryIcon = primaryIcon
@@ -338,9 +342,9 @@ struct VerticalHomeEmbeddedQuickActions: View {
                     animationTrigger: iconAnimationTokens[item.id, default: 0],
                     animatesStateChanges: !shouldReduceWork
                 )
-                if item.showsAttention, !isEditMode {
+                if item.attentionLevel != .none, !isEditMode {
                     Circle()
-                        .fill(Color.goRed)
+                        .fill(attentionDotColor(for: item.attentionLevel))
                         .frame(width: 7, height: 7) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
                         .offset(x: 3, y: -3)
                 }
@@ -634,6 +638,13 @@ struct VerticalHomeEmbeddedQuickActions: View {
                     .foregroundStyle(item.isAddDisabled ? Color.ohanaSecondaryText : Color.ohanaPrimaryText)
                     .lineLimit(1)
                     .minimumScaleFactor(0.58)
+                if let status = item.statusText, !status.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    Text(status)
+                        .font(OhanaFont.adaptive(size: 7.6, weight: .black, design: .rounded))
+                        .foregroundStyle(item.isAddDisabled ? Color.ohanaTertiaryText : Color.ohanaSecondaryText)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.58)
+                }
             }
             .frame(maxWidth: .infinity)
             .frame(height: VerticalHomeEmbeddedQuickActionHitAreaPolicy.addOptionCellHeight)
@@ -784,10 +795,22 @@ struct VerticalHomeEmbeddedQuickActions: View {
         if completed {
             return (true, Color.goPrimary, Color.goPrimary.opacity(0.9))
         }
-        if item.showsAttention, !isEditMode {
-            return (false, Color.goCardWhite, Color.goRed.mix(with: Color.goCardWhite, by: 0.18))
+        if item.attentionLevel != .none, !isEditMode {
+            let tint = attentionDotColor(for: item.attentionLevel)
+            return (false, Color.goCardWhite, tint.mix(with: Color.goCardWhite, by: 0.18))
         }
         return (false, Color.goCardWhite, Color.goCardWhite.opacity(0.58))
+    }
+
+    private func attentionDotColor(for level: HomeQuickActionAttentionLevel) -> Color {
+        switch level {
+        case .none:
+            Color.clear
+        case .due:
+            Color.goYellow
+        case .urgent:
+            Color.goRed
+        }
     }
 
     private func statusText(for item: VerticalHomeEmbeddedAction) -> String {
@@ -802,7 +825,10 @@ struct VerticalHomeEmbeddedQuickActions: View {
         if item.isCompleted {
             return l.tr(zh: "已打卡", en: "Done", de: "Erledigt")
         }
-        if item.showsAttention {
+        if item.attentionLevel == .urgent {
+            return l.tr(zh: "紧急", en: "Urgent", de: "Dringend")
+        }
+        if item.attentionLevel == .due {
             return l.tr(zh: "待处理", en: "Needs care", de: "Offen")
         }
         if showsCheckInStatus(for: item) {
@@ -823,9 +849,18 @@ struct VerticalHomeEmbeddedQuickActions: View {
             "health",
             "medication",
             "play",
+            "plant",
+            "fertilize",
             "cagecleaning",
             "freeflight",
             "misting",
+            "pruning",
+            "leafcleaning",
+            "pest",
+            "rotating",
+            "repotting",
+            "newleaf",
+            "yellowleaf",
             "substratechange",
             "humanworkout"
         ].contains { action.contains($0) }

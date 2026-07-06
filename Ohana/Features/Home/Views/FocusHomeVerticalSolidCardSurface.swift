@@ -157,11 +157,11 @@ struct FocusHomeVerticalSolidCardSurface: View {
 
             Text(statusBadge)
                 .font(.system(size: lerp(10, 12, p), weight: .black, design: .rounded))
-                .foregroundStyle(Color.ohanaPrimaryActionText)
+                .foregroundStyle(statusBadgeForeground)
                 .padding(.horizontal, lerp(9, 12, p))
                 .padding(.vertical, lerp(5, 7, p))
                 .background(statusBadgeBackground, in: Capsule())
-                .homeCardTextShadow(usesFullVisualEffects: usesFullVisualEffects, opacity: 0.58, radius: 5, y: 2) // ui-v4: allow requested legibility shadow on card text
+                .homeCardTextShadow(usesFullVisualEffects: usesFullVisualEffects && card.statusBadgeTone == .urgent, opacity: 0.58, radius: 5, y: 2) // ui-v4: allow requested legibility shadow on urgent card status text
                 .opacity(compactHeaderOpacity)
         }
     }
@@ -433,13 +433,29 @@ struct FocusHomeVerticalSolidCardSurface: View {
         if let statusBadgeText = card.statusBadgeText {
             return statusBadgeText
         }
-        if card.isHuman { return "🥥" }
+        if card.isHuman || card.isPlant || (!card.isElectronicPet && !card.isDummy) { return "OK" }
         if card.streak > 0 { return "\(card.streak)" }
         return "OK"
     }
 
     private var statusBadgeBackground: Color {
-        card.statusBadgeIsWarning ? Color.goRed : accent
+        switch card.statusBadgeTone {
+        case .ok:
+            Color.goTeal
+        case .due:
+            Color.goYellow
+        case .urgent:
+            Color.goRed
+        }
+    }
+
+    private var statusBadgeForeground: Color {
+        switch card.statusBadgeTone {
+        case .ok, .due:
+            Color.arkInk
+        case .urgent:
+            Color.ohanaPrimaryActionText
+        }
     }
 
     private var primaryMetric: String {

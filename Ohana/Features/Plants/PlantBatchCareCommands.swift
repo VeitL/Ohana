@@ -172,6 +172,51 @@ enum PlantBatchCareCommandService {
         syncCarePlan: Bool = true,
         scheduleNotifications: Bool = false
     ) -> PlantBatchCareCommandResult {
+        recordBatchCare(
+            selections: rawSelections,
+            context: context,
+            executorId: executorId,
+            now: now,
+            calendar: calendar,
+            requiresDueTask: true,
+            syncCarePlan: syncCarePlan,
+            scheduleNotifications: scheduleNotifications
+        )
+    }
+
+    @discardableResult
+    static func recordQuickCare(
+        selections rawSelections: [PlantBatchCareSelection],
+        context: ModelContext,
+        executorId: String?,
+        now: Date = Date(),
+        calendar: Calendar = .current,
+        syncCarePlan: Bool = true,
+        scheduleNotifications: Bool = false
+    ) -> PlantBatchCareCommandResult {
+        recordBatchCare(
+            selections: rawSelections,
+            context: context,
+            executorId: executorId,
+            now: now,
+            calendar: calendar,
+            requiresDueTask: false,
+            syncCarePlan: syncCarePlan,
+            scheduleNotifications: scheduleNotifications
+        )
+    }
+
+    @discardableResult
+    private static func recordBatchCare(
+        selections rawSelections: [PlantBatchCareSelection],
+        context: ModelContext,
+        executorId: String?,
+        now: Date,
+        calendar: Calendar,
+        requiresDueTask: Bool,
+        syncCarePlan: Bool,
+        scheduleNotifications: Bool
+    ) -> PlantBatchCareCommandResult {
         let batchID = UUID()
         let selections = normalizedSelections(rawSelections)
         var skipped = skippedDuplicates(in: rawSelections)
@@ -190,7 +235,8 @@ enum PlantBatchCareCommandService {
                 skipped.append(PlantBatchCareSkippedSelection(selection: selection, reason: .missingPlant))
                 continue
             }
-            guard isDue(selection.careType, for: plant, now: now, calendar: calendar) else {
+            let due = isDue(selection.careType, for: plant, now: now, calendar: calendar)
+            guard !requiresDueTask || due else {
                 skipped.append(PlantBatchCareSkippedSelection(selection: selection, reason: .notDue))
                 continue
             }
@@ -213,7 +259,7 @@ enum PlantBatchCareCommandService {
                 saveChanges: false,
                 awardRewards: false
             )
-            let wasRewardEligible = PlantCareCommandService.rewardAction(for: selection.careType) != nil
+            let wasRewardEligible = due && PlantCareCommandService.rewardAction(for: selection.careType) != nil
             if wasRewardEligible, let action = PlantCareCommandService.rewardAction(for: selection.careType) {
                 let rewards = action.baseRewards
                 estimatedCoconutDelta += max(0, rewards.human) + max(0, rewards.pet)

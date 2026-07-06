@@ -45,12 +45,36 @@ nonisolated struct HomeQuickActionMenuPolicySnapshot: Equatable, Sendable {
     }
 }
 
+nonisolated enum HomeQuickActionAttentionLevel: String, Equatable, Sendable {
+    case none
+    case due
+    case urgent
+}
+
 nonisolated struct HomeQuickActionRenderSnapshot: Equatable, Sendable {
     let status: String?
     let isCompleted: Bool
     let showsAttention: Bool
+    let attentionLevel: HomeQuickActionAttentionLevel
     let isLocked: Bool
     let menuPolicy: HomeQuickActionMenuPolicySnapshot
+
+    init(
+        status: String?,
+        isCompleted: Bool,
+        showsAttention: Bool = false,
+        attentionLevel: HomeQuickActionAttentionLevel? = nil,
+        isLocked: Bool,
+        menuPolicy: HomeQuickActionMenuPolicySnapshot
+    ) {
+        let resolvedAttention = attentionLevel ?? (showsAttention ? .urgent : .none)
+        self.status = status
+        self.isCompleted = isCompleted
+        self.showsAttention = showsAttention || resolvedAttention != .none
+        self.attentionLevel = resolvedAttention
+        self.isLocked = isLocked
+        self.menuPolicy = menuPolicy
+    }
 }
 
 nonisolated struct HomeExpandedActionSnapshot: @unchecked Sendable {
@@ -189,7 +213,8 @@ nonisolated enum HomeInteractionSnapshotBuilder {
                 activeHumanID: activeHumanID,
                 source: source,
                 quickActionItemsRaw: quickActionItemsRaw,
-                localization: l
+                localization: l,
+                now: now
             )
         }
         return HomeInteractionSnapshot(
@@ -268,7 +293,8 @@ nonisolated enum HomeInteractionSnapshotBuilder {
         activeHumanID: UUID?,
         source: VerticalSolidHomeSourceState,
         quickActionItemsRaw: String,
-        localization l: L10n
+        localization l: L10n,
+        now: Date
     ) -> HomeExpandedActionSnapshot {
         let currentItems = stableItems(
             ExpandedQuickActionStore.humanItems(
@@ -291,7 +317,8 @@ nonisolated enum HomeInteractionSnapshotBuilder {
                 human: human,
                 activeHumanID: activeHumanID,
                 source: source,
-                localization: l
+                localization: l,
+                now: now
             )
         }
         return HomeExpandedActionSnapshot(

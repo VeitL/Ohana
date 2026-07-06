@@ -226,7 +226,8 @@ struct FeatureGroupDashboardView: View {
             PlantCareFeatureDetailView(
                 plants: plants,
                 feature: feature,
-                focusedPlantID: nil
+                focusedPlantID: nil,
+                focusedCareType: nil
             )
         default:
             EmptyView()
@@ -342,21 +343,33 @@ private struct FeatureGroupItem: Identifiable {
                 ),
                 destination(
                     id: "plants-water",
-                    title: PlantCareFeatureDestination.water.title(l: l),
+                    title: PlantCareCategory.hydration.title(l: l),
                     icon: PlantCareFeatureDestination.water.icon,
                     .plantCareAggregate(.water)
                 ),
                 destination(
                     id: "plants-fertilize",
-                    title: PlantCareFeatureDestination.fertilize.title(l: l),
+                    title: PlantCareCategory.nutrition.title(l: l),
                     icon: PlantCareFeatureDestination.fertilize.icon,
                     .plantCareAggregate(.fertilize)
                 ),
                 destination(
-                    id: "plants-log",
-                    title: PlantCareFeatureDestination.log.title(l: l),
-                    icon: PlantCareFeatureDestination.log.icon,
-                    .plantCareAggregate(.log)
+                    id: "plants-maintenance",
+                    title: PlantCareFeatureDestination.maintenance.title(l: l),
+                    icon: PlantCareFeatureDestination.maintenance.icon,
+                    .plantCareAggregate(.maintenance)
+                ),
+                destination(
+                    id: "plants-health",
+                    title: PlantCareFeatureDestination.health.title(l: l),
+                    icon: PlantCareFeatureDestination.health.icon,
+                    .plantCareAggregate(.health)
+                ),
+                destination(
+                    id: "plants-growth",
+                    title: PlantCareFeatureDestination.growth.title(l: l),
+                    icon: PlantCareFeatureDestination.growth.icon,
+                    .plantCareAggregate(.growth)
                 )
             ]
         case .oasisRewards:

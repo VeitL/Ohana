@@ -234,8 +234,9 @@ struct HomeSnapshotBuilderTests {
             l: L10n("zh")
         ).first)
 
-        #expect(card.statusBadgeText == "喂食")
+        #expect(card.statusBadgeText == "1")
         #expect(card.statusBadgeIsWarning)
+        #expect(card.statusBadgeTone == .urgent)
 
         let englishCard = try #require(HomeSnapshotBuilder.buildCards(
             pets: [pet],
@@ -250,8 +251,43 @@ struct HomeSnapshotBuilderTests {
             now: now,
             l: L10n("en")
         ).first)
-        #expect(englishCard.statusBadgeText == "Feeding")
+        #expect(englishCard.statusBadgeText == "1")
         #expect(englishCard.statusBadgeIsWarning)
+        #expect(englishCard.statusBadgeTone == .urgent)
+    }
+
+    @Test func snapshotDecoratesDuePetStatusWithoutWarningTone() throws {
+        let calendar = Calendar(identifier: .gregorian)
+        let now = try #require(calendar.date(from: DateComponents(year: 2026, month: 7, day: 6, hour: 10)))
+        let pet = Pet(name: "Momo", species: "猫")
+        let event = Event(
+            title: "喂食",
+            startDate: now.addingTimeInterval(3600),
+            eventType: EventType.foodChange.rawValue,
+            relatedEntityType: "pet",
+            relatedEntityId: pet.id.uuidString
+        )
+        event.feedRuleKindRaw = FeedRuleKind.manualReminder.rawValue
+        let reminder = Reminder(event: event, scheduledAt: now.addingTimeInterval(3600))
+        event.reminders = [reminder]
+
+        let card = try #require(HomeSnapshotBuilder.buildCards(
+            pets: [pet],
+            humans: [],
+            electronicPets: [],
+            events: [event],
+            humanMedications: [],
+            humanMedicationLogs: [],
+            hiddenPetIDsRaw: "",
+            homeCardOrderRaw: "",
+            showDummyCards: false,
+            now: now,
+            l: L10n("zh")
+        ).first)
+
+        #expect(card.statusBadgeText == "1")
+        #expect(card.statusBadgeTone == .due)
+        #expect(card.statusBadgeIsWarning == false)
     }
 
     @Test func snapshotWaterCycleStatusUsesReadModelEntriesInsteadOfPetCareLogRelationship() throws {
@@ -305,8 +341,9 @@ struct HomeSnapshotBuilderTests {
 
         #expect(emptyCard.statusBadgeText == nil)
         #expect(emptyCard.statusBadgeIsWarning == false)
-        #expect(readModelCard.statusBadgeText == "换水")
+        #expect(readModelCard.statusBadgeText == "1")
         #expect(readModelCard.statusBadgeIsWarning == true)
+        #expect(readModelCard.statusBadgeTone == .urgent)
     }
 
     @Test func verticalSnapshotPrecomputesHeroPreparationRevision() {

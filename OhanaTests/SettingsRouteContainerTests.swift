@@ -79,6 +79,31 @@ struct SettingsRouteContainerTests {
 """))
     }
 
+    @Test func settingsLanguageSwitchDefersGlobalLocaleCommitOffTapFrame() throws {
+        let settingsSource = try source(
+            "Ohana/Features/Settings/Views/SettingsView.swift",
+            rootURL: repositoryRootURL()
+        )
+        let mainSource = try source(
+            "Ohana/Features/Settings/Views/SettingsView+MainSections.swift",
+            rootURL: repositoryRootURL()
+        )
+        let regionalSource = try source(
+            "Ohana/Features/Settings/Views/SettingsView+RegionalDefaults.swift",
+            rootURL: repositoryRootURL()
+        )
+
+        #expect(settingsSource.contains("@State var languageSelectionCode = AppLanguage.code"))
+        #expect(settingsSource.contains("@State var languageCommitTask: Task<Void, Never>?"))
+        #expect(mainSource.contains("Picker(\"\", selection: $languageSelectionCode)"))
+        #expect(!mainSource.contains("Picker(\"\", selection: $appLanguage)"))
+        #expect(mainSource.contains("scheduleLanguageCommit(newValue)"))
+        #expect(regionalSource.contains("languageCommitTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: 96)"))
+        #expect(regionalSource.contains("transaction.disablesAnimations = true"))
+        #expect(regionalSource.contains("commitLanguageChange(AppLanguage.code, emitFeedback: false)"))
+        #expect(!regionalSource.contains("AppCountry.applyDefaults(for: country.code)"))
+    }
+
     @Test func notificationSettingsKeepCategoryControlsBehindAdvancedDisclosure() throws {
         let settingsSource = try source(
             "Ohana/Features/Settings/Views/SettingsView.swift",

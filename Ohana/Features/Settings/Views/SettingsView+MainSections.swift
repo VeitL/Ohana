@@ -83,12 +83,16 @@ extension SettingsView {
             Text(l.language)
                 .font(OhanaFont.body(.semibold))
             Spacer()
-            Picker("", selection: $appLanguage) {
+            Picker("", selection: $languageSelectionCode) {
                 ForEach(AppLanguage.supported) { language in
                     Text(language.displayName).tag(language.code)
                 }
             }
             .pickerStyle(.menu)
+            .accessibilityIdentifier("settings-language-picker")
+            .onChange(of: languageSelectionCode) { _, newValue in
+                scheduleLanguageCommit(newValue)
+            }
         }
         .foregroundStyle(primaryText)
         .frame(minHeight: 44)
