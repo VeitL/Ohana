@@ -186,19 +186,38 @@ final class NotificationManager: NSObject, @unchecked Sendable {
             return
         }
 
-        let content = makeContent(event: event, reminder: reminder)
-        let components = Self.triggerDateComponents(for: fireDate)
-        let trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: false)
-        let request = UNNotificationRequest(
-            identifier: reminder.notificationId,
-            content: content,
-            trigger: trigger
-        )
-        center.add(request) { error in
-            if let error {
-                completion?(.failed(error.localizedDescription))
-            } else {
-                completion?(.scheduled)
+        let scheduleIfCapacityAllows: (Set<String>) -> Void = { [self] knownIds in
+            if knownIds.contains(reminder.notificationId) {
+                completion?(.skippedDuplicate)
+                return
+            }
+            guard NotificationPendingBudget.hasCapacity(existingPendingCount: knownIds.count) else {
+                completion?(.skippedBudget(NotificationPendingBudget.skippedBudgetMetadataJSON(existingPendingCount: knownIds.count)))
+                return
+            }
+
+            let content = makeContent(event: event, reminder: reminder)
+            let components = Self.triggerDateComponents(for: fireDate)
+            let trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: false)
+            let request = UNNotificationRequest(
+                identifier: reminder.notificationId,
+                content: content,
+                trigger: trigger
+            )
+            center.add(request) { error in
+                if let error {
+                    completion?(.failed(error.localizedDescription))
+                } else {
+                    completion?(.scheduled)
+                }
+            }
+        }
+
+        if let existingNotificationIds {
+            scheduleIfCapacityAllows(existingNotificationIds)
+        } else {
+            center.getPendingNotificationRequests { requests in
+                scheduleIfCapacityAllows(Set(requests.map(\.identifier)))
             }
         }
     }
@@ -226,9 +245,31 @@ final class NotificationManager: NSObject, @unchecked Sendable {
             reminder.isPending && reminder.scheduledAt > now && reminder.scheduledAt <= windowEnd
         }
         let policyDecisions = NotificationDeliveryPolicy.plan(reminders: candidates)
-        for reminder in candidates {
-            guard case let .deliver(deliveryDate, _, _) = policyDecisions[reminder.id] else { continue }
-            scheduleDirect(reminder: reminder, deliveryDate: deliveryDate)
+        let deliverable = candidates.compactMap { reminder -> (reminder: Reminder, deliveryDate: Date, classification: NotificationDeliveryClassification)? in
+            guard case let .deliver(deliveryDate, classification, _) = policyDecisions[reminder.id] else { return nil }
+            return (reminder, deliveryDate, classification)
+        }.sorted {
+            NotificationPendingBudget.shouldScheduleBefore(
+                lhsDeliveryDate: $0.deliveryDate,
+                lhsClassification: $0.classification,
+                lhsCreatedAt: $0.reminder.createdAt,
+                rhsDeliveryDate: $1.deliveryDate,
+                rhsClassification: $1.classification,
+                rhsCreatedAt: $1.reminder.createdAt
+            )
+        }
+        center.getPendingNotificationRequests { existing in
+            var knownIds = Set(existing.map(\.identifier))
+            for entry in deliverable {
+                guard NotificationPendingBudget.hasCapacity(existingPendingCount: knownIds.count) else { break }
+                let existingIdsForRequest = knownIds
+                knownIds.insert(entry.reminder.notificationId)
+                self.scheduleDirect(
+                    reminder: entry.reminder,
+                    deliveryDate: entry.deliveryDate,
+                    existingNotificationIds: existingIdsForRequest
+                )
+            }
         }
     }
 
@@ -244,22 +285,38 @@ final class NotificationManager: NSObject, @unchecked Sendable {
 
         center.getPendingNotificationRequests { existing in
             let existingIds = Set(existing.map(\.identifier))
+            var knownIds = existingIds
             let toSchedule = candidates.filter { reminder in
-                !existingIds.contains(reminder.notificationId)
+                !knownIds.contains(reminder.notificationId)
             }
             let policyDecisions = NotificationDeliveryPolicy.plan(reminders: toSchedule)
+            let deliverable = toSchedule.compactMap { reminder -> (reminder: Reminder, deliveryDate: Date, classification: NotificationDeliveryClassification)? in
+                guard case let .deliver(deliveryDate, classification, _) = policyDecisions[reminder.id] else { return nil }
+                return (reminder, deliveryDate, classification)
+            }.sorted {
+                NotificationPendingBudget.shouldScheduleBefore(
+                    lhsDeliveryDate: $0.deliveryDate,
+                    lhsClassification: $0.classification,
+                    lhsCreatedAt: $0.reminder.createdAt,
+                    rhsDeliveryDate: $1.deliveryDate,
+                    rhsClassification: $1.classification,
+                    rhsCreatedAt: $1.reminder.createdAt
+                )
+            }
             var added = 0
-            for reminder in toSchedule {
-                guard case let .deliver(deliveryDate, _, _) = policyDecisions[reminder.id] else { continue }
+            for entry in deliverable {
+                guard NotificationPendingBudget.hasCapacity(existingPendingCount: knownIds.count) else { break }
+                let existingIdsForRequest = knownIds
+                knownIds.insert(entry.reminder.notificationId)
                 self.scheduleDirect(
-                    reminder: reminder,
-                    deliveryDate: deliveryDate,
-                    existingNotificationIds: existingIds
+                    reminder: entry.reminder,
+                    deliveryDate: entry.deliveryDate,
+                    existingNotificationIds: existingIdsForRequest
                 )
                 added += 1
             }
             #if DEBUG
-                OhanaLog.debug("refillWindow: existing=\(existingIds.count), added=\(added)", category: "Notifications")
+                OhanaLog.debug("refillWindow: existing=\(existingIds.count), added=\(added), budget=\(NotificationPendingBudget.managedPendingRequestLimit)", category: "Notifications")
             #endif
         }
     }
@@ -290,7 +347,12 @@ final class NotificationManager: NSObject, @unchecked Sendable {
             content: content,
             trigger: trigger
         )
-        center.add(request)
+        center.getPendingNotificationRequests { existing in
+            let existingIds = Set(existing.map(\.identifier))
+            guard !existingIds.contains(summary.notificationId) else { return }
+            guard NotificationPendingBudget.hasCapacity(existingPendingCount: existingIds.count) else { return }
+            self.center.add(request)
+        }
     }
 
     // MARK: - Cancel

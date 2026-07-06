@@ -12,10 +12,17 @@ struct OhanaNotificationsSchedulingTests {
         private(set) var cancelledIds: [String] = []
         private(set) var scheduledIds: [String] = []
         private(set) var scheduledDeliveryDates: [Date] = []
+        private var pendingIds: Set<String>
+
+        init(pendingNotificationIds: Set<String> = []) {
+            pendingIds = pendingNotificationIds
+        }
 
         func schedule(reminder: Reminder) {
+            guard NotificationPendingBudget.hasCapacity(existingPendingCount: pendingIds.count) else { return }
             scheduledIds.append(reminder.notificationId)
             scheduledDeliveryDates.append(reminder.scheduledAt)
+            pendingIds.insert(reminder.notificationId)
         }
 
         func schedule(
@@ -23,12 +30,18 @@ struct OhanaNotificationsSchedulingTests {
             existingNotificationIds: Set<String>?,
             completion: ((ReminderNotificationScheduleResult) -> Void)?
         ) {
-            guard existingNotificationIds?.contains(reminder.notificationId) != true else {
+            let knownIds = existingNotificationIds ?? pendingIds
+            guard knownIds.contains(reminder.notificationId) != true else {
                 completion?(.skippedDuplicate)
+                return
+            }
+            guard NotificationPendingBudget.hasCapacity(existingPendingCount: knownIds.count) else {
+                completion?(.skippedBudget(NotificationPendingBudget.skippedBudgetMetadataJSON(existingPendingCount: knownIds.count)))
                 return
             }
             scheduledIds.append(reminder.notificationId)
             scheduledDeliveryDates.append(reminder.scheduledAt)
+            pendingIds.insert(reminder.notificationId)
             completion?(.scheduled)
         }
 
@@ -38,19 +51,28 @@ struct OhanaNotificationsSchedulingTests {
             existingNotificationIds: Set<String>?,
             completion: ((ReminderNotificationScheduleResult) -> Void)?
         ) {
-            guard existingNotificationIds?.contains(reminder.notificationId) != true else {
+            let knownIds = existingNotificationIds ?? pendingIds
+            guard knownIds.contains(reminder.notificationId) != true else {
                 completion?(.skippedDuplicate)
+                return
+            }
+            guard NotificationPendingBudget.hasCapacity(existingPendingCount: knownIds.count) else {
+                completion?(.skippedBudget(NotificationPendingBudget.skippedBudgetMetadataJSON(existingPendingCount: knownIds.count)))
                 return
             }
             scheduledIds.append(reminder.notificationId)
             scheduledDeliveryDates.append(deliveryDate ?? reminder.scheduledAt)
+            pendingIds.insert(reminder.notificationId)
             completion?(.scheduled)
         }
 
-        func pendingNotificationIds() async -> Set<String> { [] }
+        func pendingNotificationIds() async -> Set<String> { pendingIds }
         func scheduleRollingWindow(reminders _: [Reminder]) {}
         func refillWindowIfNeeded(allReminders _: [Reminder]) {}
-        func cancel(notificationId: String) { cancelledIds.append(notificationId) }
+        func cancel(notificationId: String) {
+            cancelledIds.append(notificationId)
+            pendingIds.remove(notificationId)
+        }
         func cancelAll(for _: Pet, reminders _: [Reminder]) {}
         func compensate(reminders _: [Reminder]) {}
     }
@@ -141,6 +163,43 @@ struct OhanaNotificationsSchedulingTests {
         #expect(fake.scheduledIds.count == 4)
         let ledgerActions = try context.fetch(FetchDescriptor<CareLedgerEvent>()).map(\.actionType)
         #expect(ledgerActions.contains("scheduleSkippedBudget"))
+    }
+
+    @Test func pendingNotificationBudgetReservesSystemCapacity() {
+        #expect(NotificationPendingBudget.iosPendingRequestLimit == 64)
+        #expect(NotificationPendingBudget.managedPendingRequestLimit == 55)
+        #expect(NotificationPendingBudget.hasCapacity(existingPendingCount: 54))
+        #expect(!NotificationPendingBudget.hasCapacity(existingPendingCount: 55))
+        #expect(NotificationPendingBudget.skippedBudgetMetadataJSON(existingPendingCount: 55).contains("\"reason\":\"iosPendingLimit\""))
+    }
+
+    @Test func scheduleBatchRecordsBudgetSkipWhenPendingNotificationsAreFull() async throws {
+        let existingIds = Set((0 ..< NotificationPendingBudget.managedPendingRequestLimit).map { "existing-\($0)" })
+        let container = try makeContainer()
+        let context = container.mainContext
+        let fake = FakeScheduler(pendingNotificationIds: existingIds)
+        OhanaNotifications.current = fake
+        defer { OhanaNotifications.useLive() }
+
+        let scheduledAt = futureDate(dayOffset: 2, hour: 10, minute: 0)
+        let event = Event(
+            title: "Medication",
+            startDate: scheduledAt,
+            eventType: EventType.medication.rawValue,
+            relatedEntityType: EntityKind.human.rawValue,
+            relatedEntityId: UUID().uuidString
+        )
+        let reminder = Reminder(event: event, scheduledAt: scheduledAt)
+        context.insert(event)
+        context.insert(reminder)
+        try context.save()
+
+        await ReminderSchedulingService.scheduleManyIfNeeded(reminders: [reminder], context: context)
+
+        #expect(fake.scheduledIds.isEmpty)
+        let ledgerEvents = try context.fetch(FetchDescriptor<CareLedgerEvent>())
+        #expect(ledgerEvents.map(\.actionType) == ["scheduleSkippedBudget"])
+        #expect(ledgerEvents.first?.metadataJSON.contains("\"managedPendingLimit\":55") == true)
     }
 
     @Test func nonCriticalReminderInQuietHoursIsDeferredButAppReminderStaysPending() async throws {

@@ -127,6 +127,55 @@ enum NotificationDeliveryDecision: Equatable {
     }
 }
 
+nonisolated enum NotificationPendingBudget {
+    static let iosPendingRequestLimit = 64
+    static let reservedSystemRequestSlots = 9
+
+    static var managedPendingRequestLimit: Int {
+        iosPendingRequestLimit - reservedSystemRequestSlots
+    }
+
+    static func hasCapacity(existingPendingCount: Int) -> Bool {
+        existingPendingCount < managedPendingRequestLimit
+    }
+
+    static func skippedBudgetMetadataJSON(existingPendingCount: Int) -> String {
+        """
+        {"reason":"iosPendingLimit","existingPendingCount":\(existingPendingCount),"managedPendingLimit":\(managedPendingRequestLimit),"iosPendingLimit":\(iosPendingRequestLimit),"reservedSystemRequestSlots":\(reservedSystemRequestSlots)}
+        """
+    }
+
+    static func shouldScheduleBefore(
+        lhsDeliveryDate: Date,
+        lhsClassification: NotificationDeliveryClassification,
+        lhsCreatedAt: Date,
+        rhsDeliveryDate: Date,
+        rhsClassification: NotificationDeliveryClassification,
+        rhsCreatedAt: Date
+    ) -> Bool {
+        let lhsPriority = priority(for: lhsClassification)
+        let rhsPriority = priority(for: rhsClassification)
+        if lhsPriority != rhsPriority {
+            return lhsPriority < rhsPriority
+        }
+        if lhsDeliveryDate != rhsDeliveryDate {
+            return lhsDeliveryDate < rhsDeliveryDate
+        }
+        return lhsCreatedAt < rhsCreatedAt
+    }
+
+    private static func priority(for classification: NotificationDeliveryClassification) -> Int {
+        switch classification.tier {
+        case .healthCritical:
+            0
+        case .routine:
+            1
+        case .ambient:
+            2
+        }
+    }
+}
+
 nonisolated enum NotificationDeliveryPolicy {
     static let routineDailyLimit = 4
     static let ambientDailyLimit = 1

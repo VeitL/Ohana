@@ -260,6 +260,18 @@ enum ReminderSchedulingService {
         guard !remindersToKeep.isEmpty else { return }
 
         let policyDecisions = NotificationDeliveryPolicy.plan(reminders: remindersToKeep)
+        let orderedReminders = remindersToKeep.sorted {
+            let lhsDecision = policyDecisions[$0.id]
+            let rhsDecision = policyDecisions[$1.id]
+            return NotificationPendingBudget.shouldScheduleBefore(
+                lhsDeliveryDate: lhsDecision?.deliveryDate ?? $0.scheduledAt,
+                lhsClassification: schedulingClassification(for: $0, decision: lhsDecision),
+                lhsCreatedAt: $0.createdAt,
+                rhsDeliveryDate: rhsDecision?.deliveryDate ?? $1.scheduledAt,
+                rhsClassification: schedulingClassification(for: $1, decision: rhsDecision),
+                rhsCreatedAt: $1.createdAt
+            )
+        }
         let plantBatchCareSummaries = plantBatchCareSummaries(
             reminders: remindersToKeep,
             policyDecisions: policyDecisions
@@ -278,7 +290,7 @@ enum ReminderSchedulingService {
             )
         }
         var knownNotificationIds = await OhanaNotifications.current.pendingNotificationIds()
-        for (index, reminder) in remindersToKeep.enumerated() {
+        for (index, reminder) in orderedReminders.enumerated() {
             guard !Task.isCancelled else {
                 context.safeSave()
                 return
@@ -322,6 +334,19 @@ enum ReminderSchedulingService {
             }
         }
         context.safeSave()
+    }
+
+    private static func schedulingClassification(
+        for reminder: Reminder,
+        decision: NotificationDeliveryDecision?
+    ) -> NotificationDeliveryClassification {
+        if let decision {
+            return decision.classification
+        }
+        guard let event = reminder.event else {
+            return NotificationDeliveryClassification(tier: .ambient, category: .calendar, mergeAllowed: false)
+        }
+        return NotificationDeliveryPolicy.classification(for: event)
     }
 
     private static func plantBatchCareSummaries(
