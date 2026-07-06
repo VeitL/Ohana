@@ -243,7 +243,7 @@ struct MemberCardCreationContentView: View {
 
     var body: some View {
         ZStack {
-            if !usesTransparentHomeJoinHandoffBackdrop {
+            if presentationStyle != .onboarding && !usesTransparentHomeJoinHandoffBackdrop {
                 OhanaAppBackground()
             }
             GeometryReader { proxy in

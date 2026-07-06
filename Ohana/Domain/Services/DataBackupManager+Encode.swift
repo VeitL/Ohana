@@ -314,7 +314,13 @@ nonisolated extension DataBackupManager {
 
     func encodeHumanWorkout(_ l: HumanWorkoutLog) -> HumanWorkoutLogBackup {
         HumanWorkoutLogBackup(id: l.id.uuidString, date: d(l.date), typeRaw: l.typeRaw,
-                              durationMinutes: l.durationMinutes, notes: l.notes,
+                              durationMinutes: l.durationMinutes, distanceKm: l.distanceKm,
+                              calories: l.calories, steps: l.steps, notes: l.notes,
+                              sourceHealthKit: l.sourceHealthKit,
+                              healthKitWorkoutUUID: l.healthKitWorkoutUUID,
+                              healthKitSourceBundleID: l.healthKitSourceBundleID,
+                              healthKitSourceName: l.healthKitSourceName,
+                              sourcePetWalkLogID: l.sourcePetWalkLogID,
                               humanId: l.human?.id.uuidString)
     }
 

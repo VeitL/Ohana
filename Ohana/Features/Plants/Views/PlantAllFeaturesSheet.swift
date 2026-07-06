@@ -24,6 +24,17 @@ enum PlantFeatureDestination: Hashable, Sendable {
 }
 
 extension PlantFeatureDestination {
+    var careFeatureDestination: PlantCareFeatureDestination? {
+        switch self {
+        case .water:
+            .water
+        case .fertilize:
+            .fertilize
+        case .pestCheck, .leafCleaning, .carePlan, .reminders, .healthReview, .profile, .photos, .timeline, .catalog, .safety:
+            nil
+        }
+    }
+
     func title(l: L10n) -> String {
         switch self {
         case .water:

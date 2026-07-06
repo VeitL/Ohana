@@ -19,15 +19,15 @@ struct VerticalHomeTabMountPolicyTests {
         #expect(!mounted.contains(.plants))
     }
 
-    @Test func mountedTabsDoNotKeepPreparedTabsMountedAfterWarmup() {
+    @Test func mountedTabsKeepPreparedCalendarMountedForWarmupOnly() {
         let mounted = VerticalHomeTabMountPolicy.mountedTabs(
             active: .home,
             outgoing: nil,
             prepared: Set([.calendar, .oasis])
         )
 
-        #expect(mounted == Set([.home]))
-        #expect(!mounted.contains(.calendar))
+        #expect(mounted == Set([.home, .calendar]))
+        #expect(mounted.contains(.calendar))
         #expect(!mounted.contains(.oasis))
     }
 
@@ -107,7 +107,7 @@ struct VerticalHomeTabMountPolicyTests {
         )
     }
 
-    @Test func preparedHiddenCalendarKeepsLifecycleStateWithoutMountingOffscreen() {
+    @Test func preparedHiddenCalendarMountsOffscreenForWarmupWithoutBecomingLive() {
         let lifecycle = VerticalHomeTabMountPolicy.lifecycle(
             for: .calendar,
             active: .home,
@@ -124,7 +124,24 @@ struct VerticalHomeTabMountPolicyTests {
         #expect(lifecycle.isPrepared)
         #expect(!lifecycle.isVisible)
         #expect(!lifecycle.isLive)
-        #expect(!mounted.contains(.calendar))
+        #expect(mounted.contains(.calendar))
+    }
+
+    @Test func calendarContentHandoffStateIgnoresFilterChanges() {
+        let listState = CalendarContentHandoffState(viewModeRaw: CalendarViewMode.list.rawValue)
+        let sameListState = CalendarContentHandoffState(viewModeRaw: CalendarViewMode.list.rawValue)
+        let monthState = CalendarContentHandoffState(viewModeRaw: CalendarViewMode.month.rawValue)
+
+        #expect(listState == sameListState)
+        #expect(listState != monthState)
+    }
+
+    @Test func calendarInitialPositioningAvoidsProxyScrollToDuringFingerWindow() throws {
+        let listSource = try source("Ohana/Features/Calendar/Views/CalendarView+List.swift")
+
+        #expect(listSource.contains("func scheduleInitialTimelineScrollIfNeeded(proxy _: ScrollViewProxy)"))
+        #expect(listSource.contains("cancelInitialTimelinePositioningForUserInteraction()"))
+        #expect(!listSource.contains("scrollTimeline(proxy, to: targetID"))
     }
 
     @Test func preparedInactiveTabIsPreparedButNotLive() {
@@ -652,9 +669,27 @@ struct VerticalHomeTabMountPolicyTests {
         #expect(dashboardSource.contains("PlantBatchCareRouteSnapshotActor(modelContainer: container)"))
         #expect(sheetSource.contains("let snapshot: PlantBatchCareSheetSnapshot"))
         #expect(sheetSource.contains("ForEach(snapshot.careTypeFilters)"))
-        #expect(sheetSource.contains("ForEach(visibleSnapshot.roomSections)"))
+        #expect(sheetSource.contains("ForEach(visibleRoomSections)"))
         #expect(!sheetSource.contains("Dictionary(grouping: visibleTasks"))
         #expect(!sheetSource.contains("Self.filteredTasks(tasks"))
+    }
+
+    @Test func plantBatchCareSheetKeepsExceptionActionsInFlow() throws {
+        let sheetSource = try source("Ohana/Features/Plants/Views/PlantBatchCareSheet.swift")
+        let dashboardSource = try source("Ohana/Features/Plants/Views/PlantDashboardView.swift")
+
+        #expect(sheetSource.contains("PlantBatchCareActionRevealRow"))
+        #expect(sheetSource.contains("@State private var resolvedTaskIDs"))
+        #expect(sheetSource.contains("visibleRoomSections"))
+        #expect(sheetSource.contains("resolveTask(task, using: onDeferTask)"))
+        #expect(sheetSource.contains("resolveTask(task, using: onSkipTask)"))
+        #expect(sheetSource.contains("全部处理完"))
+        #expect(!sheetSource.contains("rowActionButton("))
+        #expect(!sheetSource.contains("metricPill("))
+        #expect(!sheetSource.contains("onDeferTask(task)\n                    dismiss()"))
+        #expect(!sheetSource.contains("onSkipTask(task)\n                    dismiss()"))
+        #expect(!dashboardSource.contains("func deferTaskFromBatchCare(_ task: PlantBatchCareSheetTask) {\n        showingBatchCareSheet = false"))
+        #expect(!dashboardSource.contains("func skipTaskFromBatchCare(_ task: PlantBatchCareSheetTask) {\n        showingBatchCareSheet = false"))
     }
 
     @Test func plantWalletKeepsAllVisiblePlantsInOneScene() throws {
@@ -1182,6 +1217,86 @@ struct VerticalHomeTabMountPolicyTests {
         #expect(HomeFabShortcutHitAreaPolicy.minimumHitSize >= 44)
     }
 
+    @Test func homeFabUsesAddMemberAndAllFeatureRoots() throws {
+        let sharedSource = try source("Ohana/Features/Home/Views/HomeFabSharedControls.swift")
+        let modelsSource = try source("Ohana/Features/Home/FocusHomeModels.swift")
+        let bottomBarSource = try source("Ohana/Features/Home/Views/VerticalSolidHomeBottomBar.swift")
+        let routingSource = try source("Ohana/Features/Home/Views/VerticalSolidHomeView+TodayFocus.swift")
+
+        #expect(modelsSource.contains("enum HomeFabFunctionShortcutAction"))
+        #expect(modelsSource.contains("case addEntity(EntityType)"))
+        #expect(modelsSource.contains("case destination(FMDest)"))
+        #expect(modelsSource.contains("case submenu(HomeFabShortcutSubmenu)"))
+        #expect(sharedSource.contains("primaryShortcuts(l:"))
+        #expect(sharedSource.contains("action: .submenu(.addMember)"))
+        #expect(sharedSource.contains("destination: .petFeatureCollection"))
+        #expect(sharedSource.contains("addMemberShortcuts(l:"))
+        #expect(sharedSource.contains("entityToAdd: .pet"))
+        #expect(sharedSource.contains("entityToAdd: .human"))
+        #expect(!sharedSource.contains("destination: .featureAggregate(.food)"))
+        #expect(!sharedSource.contains("destination: .featureAggregate(.hygiene)"))
+        #expect(!sharedSource.contains("destination: .featureAggregate(.health)"))
+        #expect(bottomBarSource.contains("@State private var activeHomeSubmenu: HomeFabShortcutSubmenu?"))
+        #expect(bottomBarSource.contains("@State private var submenuItemsVisible = false"))
+        #expect(bottomBarSource.contains("HomeFabShortcutCatalog.addMemberShortcuts(l: l)"))
+        #expect(bottomBarSource.contains("submenuItemsVisible && itemsVisible"))
+        #expect(bottomBarSource.contains("case .submenu(.addMember):"))
+        #expect(bottomBarSource.contains("isDimmed: activeHomeSubmenu == .addMember"))
+        #expect(bottomBarSource.contains("isDimmed ? 0.42 : 1"))
+        #expect(bottomBarSource.contains("return \"add-\\(type.rawValue)\""))
+        #expect(bottomBarSource.contains("return \"pet-feature-collection\""))
+        #expect(routingSource.contains("case let .addEntity(type):"))
+        #expect(routingSource.contains("case let .destination(destination):"))
+    }
+
+    @Test func petFeatureCollectionRoutesToAggregateCards() throws {
+        let modelSource = try source("Ohana/Features/FunctionMenu/FunctionMenuModels.swift")
+        let routerSource = try source("Ohana/Features/FunctionMenu/Views/FunctionMenuDestinationRouter.swift")
+        let routeDataSource = try source("Ohana/Features/FunctionMenu/FunctionMenuRouteContainer.swift")
+        let collectionSource = try source("Ohana/Features/FunctionMenu/Views/PetFeatureCollectionView.swift")
+        let sheetSource = try source("Ohana/Features/FunctionMenu/Views/FunctionMenuSheet.swift")
+
+        #expect(modelSource.contains("case petFeatureCollection"))
+        #expect(routerSource.contains("case .petFeatureCollection:"))
+        #expect(routerSource.contains("PetFeatureCollectionView("))
+        #expect(routerSource.contains("summary: petFeatureCollectionSummary"))
+        #expect(routeDataSource.contains("var petFeatureCollectionSummary: PetFeatureCollectionSummary"))
+        #expect(routeDataSource.contains("PetFeatureCollectionSummary.load("))
+        #expect(
+            collectionSource.contains("parentPath.append(.featureAggregate(item.feature))") ||
+                collectionSource.contains("parentPath.append(FMDest.featureAggregate(item.feature))")
+        )
+        #expect(!collectionSource.contains("parentPath.append(.petFood"))
+        #expect(!collectionSource.contains("parentPath.append(.petHealth"))
+        #expect(!collectionSource.contains("FetchDescriptor<"))
+        #expect(sheetSource.contains(".petFeatureCollection,"))
+        #expect(sheetSource.contains("Alle Funktionen"))
+    }
+
+    @Test func plantFeatureCollectionRoutesToAggregateCards() throws {
+        let modelSource = try source("Ohana/Features/FunctionMenu/FunctionMenuModels.swift")
+        let routerSource = try source("Ohana/Features/FunctionMenu/Views/FunctionMenuDestinationRouter.swift")
+        let routeDataSource = try source("Ohana/Features/FunctionMenu/FunctionMenuRouteContainer.swift")
+        let collectionSource = try source("Ohana/Features/FunctionMenu/Views/PlantFeatureCollectionView.swift")
+        let sheetSource = try source("Ohana/Features/FunctionMenu/Views/FunctionMenuSheet.swift")
+
+        #expect(modelSource.contains("case plantFeatureCollection"))
+        #expect(routerSource.contains("case .plantFeatureCollection:"))
+        #expect(routerSource.contains("PlantFeatureCollectionView("))
+        #expect(routerSource.contains("summary: plantFeatureCollectionSummary"))
+        #expect(routeDataSource.contains("var plantFeatureCollectionSummary: PlantFeatureCollectionSummary"))
+        #expect(routeDataSource.contains("PlantFeatureCollectionSummary.load("))
+        #expect(collectionSource.contains("parentPath.append(item.destination)"))
+        #expect(collectionSource.contains(".plantsBatchCare"))
+        #expect(collectionSource.contains(".plantsDashboard"))
+        #expect(collectionSource.contains(".plantCareAggregate(.water)"))
+        #expect(collectionSource.contains(".plantCareAggregate(.fertilize)"))
+        #expect(collectionSource.contains(".plantCareAggregate(.log)"))
+        #expect(!collectionSource.contains("FetchDescriptor<"))
+        #expect(sheetSource.contains(".plantFeatureCollection,"))
+        #expect(sheetSource.contains("Alle Pflanzenfunktionen"))
+    }
+
     @Test func plantsTabFabOwnsPlantModuleShortcuts() throws {
         let sharedSource = try source("Ohana/Features/Home/Views/HomeFabSharedControls.swift")
         let bottomBarSource = try source("Ohana/Features/Home/Views/VerticalSolidHomeBottomBar.swift")
@@ -1190,12 +1305,13 @@ struct VerticalHomeTabMountPolicyTests {
 
         #expect(sharedSource.contains("plantShortcuts(l:"))
         #expect(sharedSource.contains("entityToAdd: .plant"))
-        #expect(sharedSource.contains("destination: .featureGroup(.plants)"))
+        #expect(sharedSource.contains("destination: .plantFeatureCollection"))
+        #expect(!sharedSource.contains("destination: .featureGroup(.plants)"))
         #expect(bottomBarSource.contains("plantShortcuts: [HomeFabFunctionShortcut]"))
         #expect(bottomBarSource.contains("selectedTab == .plants"))
-        #expect(bottomBarSource.contains("return \"add-\\(entityToAdd.rawValue)\""))
-        #expect(bottomBarSource.contains("return \"feature-group-\\(group.rawValue)\""))
-        #expect(routingSource.contains("if let entityToAdd = shortcut.entityToAdd"))
+        #expect(bottomBarSource.contains("return \"add-\\(type.rawValue)\""))
+        #expect(bottomBarSource.contains("return \"plant-feature-collection\""))
+        #expect(routingSource.contains("case let .addEntity(type):"))
         #expect(functionRootSource.contains("from: [.dailyCare, .healthBody, .archiveMemory, .householdHub]"))
         #expect(!functionRootSource.contains(".householdHub, .plants"))
     }
@@ -1316,21 +1432,32 @@ struct VerticalHomeTabMountPolicyTests {
         let contentSource = try source("Ohana/Features/Calendar/Views/CalendarView+Content.swift")
         let headerSource = try source("Ohana/Features/Calendar/Views/CalendarView+Header.swift")
         let monthSource = try source("Ohana/Features/Calendar/Views/CalendarView+Month.swift")
+        let supportSource = try source("Ohana/Features/Calendar/Views/CalendarViewSupport.swift")
+        let routeSource = try source("Ohana/Features/Calendar/CalendarRouteContainer.swift")
+        let snapshotSource = try source("Ohana/Features/Calendar/CalendarSnapshotBuilder.swift")
 
         #expect(calendarSource.contains("@State var preparedCalendarSnapshot = CalendarPreparedSnapshot.empty"))
         #expect(calendarSource.contains("@State var preparedCalendarSnapshotKey: CalendarPreparedSnapshotTriggerKey?"))
-        #expect(calendarSource.contains("func buildFilteredEventsForPreparedSnapshot() -> [Event]"))
         #expect(calendarSource.contains("preparedCalendarSnapshotTriggerKey"))
+        #expect(!calendarSource.contains("func buildFilteredEventsForPreparedSnapshot() -> [Event]"))
+        #expect(!calendarSource.contains("func eventOccursOnDate(_ event: Event, date: Date) -> Bool"))
         #expect(!calendarSource.contains("preparedCalendarSnapshotInputKey"))
         #expect(!contentSource.contains(".onChange(of: preparedCalendarSnapshotInputKey)"))
         #expect(contentSource.contains(".onChange(of: preparedCalendarSnapshotTriggerKey)"))
         #expect(contentSource.contains("applyRoutePreparedSnapshotIfAvailable()"))
+        #expect(contentSource.contains("CalendarPreparedSnapshotActor(modelContainer: modelContext.container)"))
+        #expect(contentSource.contains("applyPreparedSnapshotReference"))
+        #expect(!contentSource.contains("CalendarSnapshotBuilder.preparedSnapshot("))
         #expect(calendarSource.contains("routePreparedSnapshot: CalendarRoutePreparedSnapshot?"))
         #expect(calendarSource.contains("preparedCalendarSnapshot.timeline"))
-        #expect(calendarSource.contains("preparedCalendarSnapshot.selectedDateEvents"))
-        #expect(contentSource.contains("CalendarSnapshotBuilder.preparedSnapshot("))
+        #expect(calendarSource.contains("preparedCalendarSnapshot.events(forDayID: timelineDateID(selectedDate))"))
         #expect(headerSource.contains("preparedCalendarSnapshot.weekEventsByDay"))
         #expect(monthSource.contains("preparedCalendarSnapshot.monthEventDayIDs"))
+        #expect(!supportSource.contains("var selectedDay: Date"))
+        #expect(routeSource.contains("actor CalendarPreparedSnapshotActor"))
+        #expect(snapshotSource.contains("let eventsByDay: [String: [Event]]"))
+        #expect(snapshotSource.contains("private static func buildEventsByDay("))
+        #expect(!snapshotSource.contains("selectedDateEvents"))
         #expect(!monthSource.contains("let hasEvents = filteredEvents.contains"))
     }
 

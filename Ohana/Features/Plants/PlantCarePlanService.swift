@@ -43,6 +43,8 @@ protocol PlantCarePlanReading {
         now: Date,
         calendar: Calendar
     ) -> PlantCareTaskSnapshot?
+
+    func intervalDays(for type: PlantCareType, plant: Plant) -> Int
 }
 
 extension PlantCarePlanReading {
@@ -96,6 +98,10 @@ struct StaticPlantCarePlanReader: PlantCarePlanReading {
         calendar: Calendar
     ) -> PlantCareTaskSnapshot? {
         PlantCarePlanService.nextTask(for: plant, now: now, calendar: calendar)
+    }
+
+    func intervalDays(for type: PlantCareType, plant: Plant) -> Int {
+        PlantCarePlanService.intervalDays(for: type, plant: plant)
     }
 }
 

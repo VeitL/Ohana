@@ -1,6 +1,7 @@
 import Combine
 import Foundation
 import SwiftData
+import UserNotifications
 
 @MainActor
 protocol AppIconManaging {
@@ -112,8 +113,15 @@ final class StaticAppResetter: AppResetting {
 
 @MainActor
 protocol UserNotificationManaging {
+    func authorizationStatus() async -> UNAuthorizationStatus
     func requestPermission() async -> Bool
     func pendingNotificationIds() async -> Set<String>
+}
+
+extension UserNotificationManaging {
+    func authorizationStatus() async -> UNAuthorizationStatus {
+        .notDetermined
+    }
 }
 
 @MainActor
@@ -126,6 +134,10 @@ final class SharedUserNotificationManager: UserNotificationManaging {
 
     init(manager: NotificationManager) {
         self.manager = manager
+    }
+
+    func authorizationStatus() async -> UNAuthorizationStatus {
+        await manager.authorizationStatus()
     }
 
     func requestPermission() async -> Bool {

@@ -2,7 +2,7 @@
 //  HumanWorkoutCard.swift
 //  Ohana
 //
-//  U14: 人类运动卡片 + Apple Health 同步 (优雅降级 - 待开发)
+//  U14: 人类运动卡片 + Apple Health-backed summary entry
 
 import Combine
 import SwiftData
@@ -13,12 +13,8 @@ struct HumanWorkoutCard: View {
     let human: Human
     var pets: [Pet] = []
     @Environment(\.modelContext) private var modelContext
-    @StateObject private var hkManager = HumanHealthKitManager()
     @State private var showAddSheet = false
     @State private var showWorkoutHistory = false
-    @State private var toastVisible = false
-    @State private var toastMessage = ""
-    @State private var toastColor: Color = .goPrimary
     @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
 
     private var sortedLogs: [HumanWorkoutLog] {
@@ -81,43 +77,12 @@ struct HumanWorkoutCard: View {
             }
         }
         .goIslandModuleCard(cornerRadius: OhanaRadius.input)
-        .overlay(alignment: .top) {
-            if toastVisible {
-                rewardToastBanner
-                    .transition(.move(edge: .top).combined(with: .opacity))
-            }
-        }
-        .task {
-            await hkManager.requestAuthorization()
-            await hkManager.fetchTodayStats(pets: pets)
-        }
-        .onReceive(hkManager.$rewardToast.compactMap(\.self)) { toast in
-            toastMessage = toast.message
-            toastColor = toast.color
-            withAnimation(GoMotion.feedback) { toastVisible = true }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
-                withAnimation(GoMotion.quick) { toastVisible = false }
-                hkManager.rewardToast = nil
-            }
-        }
         .sheet(isPresented: $showAddSheet) {
             AddWorkoutSheet(human: human)
         }
         .sheet(isPresented: $showWorkoutHistory) {
-            HumanWorkoutHistoryView(human: human)
+            HumanWorkoutSummaryView(human: human)
         }
-    }
-
-    private var rewardToastBanner: some View {
-        HStack(spacing: 8) {
-            Text(toastMessage)
-                .font(OhanaFont.subheadline(.bold))
-                .foregroundStyle(Color.arkInk)
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 10)
-        .background(toastColor, in: Capsule())
-        .padding(.top, 8)
     }
 
     // MARK: - Recent Logs (仅手动记录)
@@ -132,7 +97,8 @@ struct HumanWorkoutCard: View {
                     calories: log.calories,
                     date: log.date,
                     colorHex: log.workoutType.colorHex,
-                    isHealthKit: false // 手动记录始终为 false
+                    isHealthKit: log.sourceHealthKit,
+                    isPetWalk: !log.sourcePetWalkLogID.isEmpty
                 )
                 if log.id != sortedLogs.prefix(3).last?.id {
                     GoDashedDivider().padding(.horizontal, 16)
@@ -156,7 +122,17 @@ struct HumanWorkoutCard: View {
         }
     }
 
-    private func workoutRow(icon: String, name: String, duration: Int, distance: Double, calories: Int, date: Date, colorHex: String, isHealthKit _: Bool) -> some View {
+    private func workoutRow(
+        icon: String,
+        name: String,
+        duration: Int,
+        distance: Double,
+        calories: Int,
+        date: Date,
+        colorHex: String,
+        isHealthKit: Bool,
+        isPetWalk: Bool
+    ) -> some View {
         HStack(spacing: 12) {
             ZStack {
                 Circle()
@@ -171,7 +147,22 @@ struct HumanWorkoutCard: View {
                     Text(name)
                         .font(OhanaFont.subheadline(.bold))
                         .foregroundStyle(Color.ohanaPrimaryText)
-                    // Mock: 不显示 HealthKit 标记
+                    if isHealthKit {
+                        Text(l.tr(zh: "健康", en: "Health", de: "Health"))
+                            .font(OhanaFont.caption2(.black))
+                            .foregroundStyle(Color.arkInk)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(Color.goPrimary, in: Capsule())
+                    }
+                    if isPetWalk {
+                        Text(l.tr(zh: "遛狗", en: "Dog Walk", de: "Hundegang"))
+                            .font(OhanaFont.caption2(.black))
+                            .foregroundStyle(Color.arkInk)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(Color.goCardCyan, in: Capsule())
+                    }
                 }
                 Text(date, format: .dateTime.month().day().hour().minute())
                     .font(OhanaFont.caption())
@@ -493,7 +484,6 @@ struct HumanWorkoutHistoryView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(AppServices.self) private var appServices
     @AppStorage("currentActiveHumanId") private var activeHumanIdStr = ""
-    @StateObject private var hkManager = HumanHealthKitManager()
     @StateObject private var commandQueue = DeferredDomainCommandQueue()
 
     @State private var showAddSheet = false
@@ -538,7 +528,7 @@ struct HumanWorkoutHistoryView: View {
                                         Image(systemName: "hammer.fill").accessibilityHidden(true)
                                             .font(OhanaFont.callout())
                                             .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
-                                        Text(l.tr(zh: "Apple Health 同步功能开发中", en: "Apple Health sync is in development", de: "Apple Health-Sync ist in Entwicklung"))
+                                        Text(l.tr(zh: "可在运动摘要中连接 Apple Health", en: "Connect Apple Health from Workout Summary", de: "Apple Health in der Trainingsübersicht verbinden"))
                                             .font(OhanaFont.subheadline(.medium))
                                             .foregroundStyle(Color.ohanaPrimaryText.opacity(0.5))
                                     }
@@ -701,7 +691,7 @@ struct HumanWorkoutHistoryView: View {
     }
 }
 
-private extension WorkoutType {
+extension WorkoutType {
     func localizedTitle(_ l: L10n) -> String {
         switch self {
         case .running:

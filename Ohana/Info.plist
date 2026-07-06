@@ -55,6 +55,8 @@
 	<string>用于在你主动拍照时创建成员或宠物头像、时刻照片或收据附件。</string>
 	<key>NSFaceIDUsageDescription</key>
 	<string>用于在切换受保护成员或访问成员门禁时，通过系统 Face ID 代替输入本地 PIN。</string>
+	<key>NSHealthShareUsageDescription</key>
+	<string>用于在你主动连接 Apple Health 时读取步数、距离、活动能量和运动记录，并在本机生成此成员的运动摘要。</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>用于导入你选择的头像、时刻图片或收据附件；Ohana 只处理你选中的项目。</string>
 	<key>NSLocationWhenInUseUsageDescription</key>

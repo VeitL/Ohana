@@ -81,8 +81,11 @@ struct RootView: View {
             appSwitcherSnapshotCoverRequested = false
             schedulePlantBatchCareRewardSettlement()
         }
-        .onReceive(NotificationCenter.default.publisher(for: .plantBatchCarePendingRewardsChanged)) { _ in
-            schedulePlantBatchCareRewardSettlement()
+        .onReceive(appServices.domainRevisions.homeRevisionUpdates) { revision in
+            if revision.lastCommand?.feature == "plants",
+               revision.lastCommand?.action == "batchCarePendingRewardsChanged" {
+                schedulePlantBatchCareRewardSettlement()
+            }
         }
         .onReceive(OnlineFeatureGateNoticeCenter.notices) { reason in
             onlineGateNoticeReason = reason

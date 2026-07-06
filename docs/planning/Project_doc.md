@@ -73,7 +73,7 @@
 - **隐私清单**：`Ohana/PrivacyInfo.xcprivacy`（随 `PBXFileSystemSynchronizedRootGroup` 自动打包，构建时 `CpResource` 进 `.app`）。声明唯一实际使用的 required-reason API：`NSPrivacyAccessedAPICategoryUserDefaults` / `CA92.1`。`NSPrivacyTracking=false`，`NSPrivacyTrackingDomains` 与 `NSPrivacyCollectedDataTypes` 为空（数据全本地，不联网收集/不做跟踪）。
   - 复核结论：代码仅用 `URLResourceValues.fileSizeKey` / `.contentTypeKey` / `FileManager.attributesOfItem[.size]`，均**不属于**文件时间戳（C617.x）、磁盘卷容量（E174.x）或系统启动时间（35F9.x）受限类别，故不需额外声明。
 - **权限声明唯一来源**：权限文案以 `Ohana/Info.plist` + `en.lproj` / `de.lproj` 的 `InfoPlist.strings` 三语为准。已从 `project.pbxproj`（Debug+Release 两处）移除：
-  - `INFOPLIST_KEY_NSHealthShareUsageDescription` / `INFOPLIST_KEY_NSHealthUpdateUsageDescription`——HealthKit 全是 mock（`HumanHealthKitManager`，无 `import HealthKit`、无 entitlement），声明属未使用权限。
+  - 旧的 build-setting 注入式 HealthKit 文案——当时 HealthKit 仍是 mock，声明属未使用权限。当前真实只读 HealthKit 入口改由 `Info.plist` + `InfoPlist.strings` 声明 `NSHealthShareUsageDescription`，仍不声明 `NSHealthUpdateUsageDescription`。
   - 重复的 `INFOPLIST_KEY_NSCamera/PhotoLibrary/Location*`——这些键与 `Info.plist` 文件重复且文案不同，`GENERATE_INFOPLIST_FILE` 注入会覆盖本地化 `InfoPlist.strings`，导致英/德用户看到中文文案。移除后三语本地化生效。
   - 实际用到的权限：相机（`UIImagePickerController` 拍摄，`QuickHumanNoteSheet`）、相册（`PhotosUI.PhotosPicker`，out-of-process）、定位（遛狗路线 `LocationManager`/`PetWalkingManager`），均由 `Info.plist` 保留。
 - **备份导出安全（`DataBackupManager`）**：

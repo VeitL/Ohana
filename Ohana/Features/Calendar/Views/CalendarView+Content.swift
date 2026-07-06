@@ -497,7 +497,9 @@ extension CalendarView {
             withAnimation(GoMotion.selection) {
                 visualFilterSelection = selection
             }
-            withAnimation(GoMotion.stateChange) {
+            var transaction = Transaction(animation: nil)
+            transaction.disablesAnimations = true
+            withTransaction(transaction) {
                 appliedFilterSelection = selection
             }
         } else {
@@ -517,7 +519,9 @@ extension CalendarView {
                 filterApplyTask = nil
                 return
             }
-            withAnimation(GoMotion.stateChange) {
+            var transaction = Transaction(animation: nil)
+            transaction.disablesAnimations = true
+            withTransaction(transaction) {
                 appliedFilterSelection = selection
             }
             if viewMode == .list {
@@ -576,21 +580,7 @@ extension CalendarView {
         if !force, applyRoutePreparedSnapshotIfAvailable(snapshotKey: snapshotKey) {
             return
         }
-        let filtered = buildFilteredEventsForPreparedSnapshot()
-        let snapshot = CalendarSnapshotBuilder.preparedSnapshot(
-            filteredEvents: filtered,
-            allEvents: events,
-            pets: pets,
-            selectedDate: selectedDate,
-            weekDays: thisWeekDays,
-            monthDays: calendarDays().compactMap(\.self)
-        )
-        var transaction = Transaction(animation: nil)
-        transaction.disablesAnimations = true
-        withTransaction(transaction) {
-            preparedCalendarSnapshot = snapshot
-            preparedCalendarSnapshotKey = snapshotKey
-        }
+        schedulePreparedCalendarSnapshotRebuild(force: force)
     }
 
     @discardableResult
@@ -615,10 +605,65 @@ extension CalendarView {
 
     func schedulePreparedCalendarSnapshotRebuild(delayMilliseconds: UInt64 = 0, force: Bool = false) {
         guard isCalendarPrepared || !hideToolbar else { return }
+        let snapshotKey = preparedCalendarSnapshotTriggerKey
+        guard force || preparedCalendarSnapshotKey != snapshotKey else { return }
         preparedCalendarSnapshotTask?.cancel()
-        preparedCalendarSnapshotTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: delayMilliseconds) {
-            rebuildPreparedCalendarSnapshotIfNeeded(force: force)
-            preparedCalendarSnapshotTask = nil
+        preparedCalendarSnapshotGeneration += 1
+        let generation = preparedCalendarSnapshotGeneration
+        preparedCalendarSnapshotTask = Task { @MainActor in
+            await OhanaFrameScheduler.waitAfterNextFrame(milliseconds: delayMilliseconds)
+            guard !Task.isCancelled else {
+                clearPreparedCalendarSnapshotTask(generation: generation)
+                return
+            }
+            if !force, applyRoutePreparedSnapshotIfAvailable(snapshotKey: snapshotKey) {
+                clearPreparedCalendarSnapshotTask(generation: generation)
+                return
+            }
+
+            let input = CalendarPreparedSnapshotLoadInput(
+                selectedDate: selectedDate,
+                filterSelection: effectiveFilterSelection,
+                dataRevision: snapshotKey.dataRevision,
+                loadPlants: AppFeatureRouteGuard.shouldLoadPlantData
+            )
+            let actor = CalendarPreparedSnapshotActor(modelContainer: modelContext.container)
+            do {
+                let reference = try await actor.load(input: input)
+                guard !Task.isCancelled,
+                      generation == preparedCalendarSnapshotGeneration,
+                      reference.key == snapshotKey,
+                      preparedCalendarSnapshotTriggerKey == snapshotKey else {
+                    clearPreparedCalendarSnapshotTask(generation: generation)
+                    return
+                }
+                applyPreparedSnapshotReference(reference)
+            } catch is CancellationError {
+                clearPreparedCalendarSnapshotTask(generation: generation)
+                return
+            } catch {
+                OhanaLog.warning(
+                    "Calendar prepared snapshot load failed: \(error.localizedDescription)",
+                    category: "Calendar"
+                )
+            }
+            clearPreparedCalendarSnapshotTask(generation: generation)
         }
+    }
+
+    func applyPreparedSnapshotReference(_ reference: CalendarRoutePreparedSnapshotReference) {
+        let eventByModelID = Dictionary(uniqueKeysWithValues: events.map { ($0.persistentModelID, $0) })
+        let prepared = reference.rehydrated(eventByModelID: eventByModelID)
+        var transaction = Transaction(animation: nil)
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            preparedCalendarSnapshot = prepared.snapshot
+            preparedCalendarSnapshotKey = prepared.key
+        }
+    }
+
+    func clearPreparedCalendarSnapshotTask(generation: Int) {
+        guard generation == preparedCalendarSnapshotGeneration else { return }
+        preparedCalendarSnapshotTask = nil
     }
 }

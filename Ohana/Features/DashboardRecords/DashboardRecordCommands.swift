@@ -159,9 +159,11 @@ enum WeightCommandService {
         date: Date,
         context: ModelContext,
         executorId: String? = nil,
-        questManager providedQuestManager: QuestManager? = nil
+        questManager providedQuestManager: QuestManager? = nil,
+        careLedger providedCareLedger: CareLedgerRecording? = nil
     ) -> WeightCommandResult {
         let questManager = providedQuestManager ?? QuestManager()
+        let careLedger: CareLedgerRecording = providedCareLedger ?? CareLedgerService()
         guard let write = DomainMemberFactWriteAuthorizer.authorizeHumanFact(
             human: human,
             occurredAt: date,
@@ -199,7 +201,7 @@ enum WeightCommandService {
         return WeightCommandResult(
             logID: log.id,
             subjectID: human.id,
-            coconutDelta: CareLedgerService.rewardDelta(reward),
+            coconutDelta: careLedger.rewardDelta(reward),
             allowsDerivedEffects: write.allowsDerivedEffects
         )
     }

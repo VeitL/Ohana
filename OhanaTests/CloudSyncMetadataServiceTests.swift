@@ -335,7 +335,7 @@ struct CloudSyncMetadataServiceTests {
 
     @MainActor
     @Test func entityRegistryCoversCurrentSwiftDataSchema() {
-        let schemaNames = Set(ArkSchemaV82.models.map { String(describing: $0) })
+        let schemaNames = Set(ArkSchemaV84.models.map { String(describing: $0) })
             .subtracting(CloudSyncEntityRegistry.localOnlySchemaEntityNames)
         let descriptorNames = Set(CloudSyncEntityRegistry.descriptors.map(\.entityName))
 

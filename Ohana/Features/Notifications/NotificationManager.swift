@@ -29,6 +29,11 @@ final class NotificationManager: NSObject, @unchecked Sendable {
     }
 
     // MARK: - Permission
+    func authorizationStatus() async -> UNAuthorizationStatus {
+        let settings = await center.notificationSettings()
+        return settings.authorizationStatus
+    }
+
     func requestPermission() async -> Bool {
         do {
             let granted = try await center.requestAuthorization(options: [.alert, .badge, .sound])

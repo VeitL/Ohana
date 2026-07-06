@@ -1,6 +1,7 @@
 /* Localized Info.plist strings (German) */
 "NSCameraUsageDescription" = "Wird verwendet, wenn du einen Mitglieder- oder Haustier-Avatar, ein Moment-Foto oder einen Beleganhang aufnehmen möchtest.";
 "NSPhotoLibraryUsageDescription" = "Wird verwendet, um von dir ausgewählte Avatare, Moment-Bilder oder Beleganhänge zu importieren.";
+"NSHealthShareUsageDescription" = "Wird verwendet, wenn du Apple Health verbindest, um Schritte, Distanz, Aktivenergie und Trainings für diese lokale Mitgliederübersicht zu lesen.";
 "NSLocationWhenInUseUsageDescription" = "Wird verwendet, wenn du einem Moment einen Standort hinzufügst oder einen Spaziergang startest, damit Ohana diese Route aufzeichnen kann.";
 "NSLocationAlwaysAndWhenInUseUsageDescription" = "Wird nur während eines aktiven Spaziergangs verwendet, um die aktuelle Route im Hintergrund oder bei gesperrtem Bildschirm weiter aufzuzeichnen.";
 "NSLocationAlwaysUsageDescription" = "Wird nur während eines aktiven Spaziergangs verwendet, um die aktuelle Route im Hintergrund oder bei gesperrtem Bildschirm weiter aufzuzeichnen.";

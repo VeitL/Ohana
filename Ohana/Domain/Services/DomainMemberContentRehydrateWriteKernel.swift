@@ -154,7 +154,15 @@ nonisolated struct DomainHumanWorkoutLogRehydrateSnapshot: Equatable {
     let date: Date
     let typeRaw: String
     let durationMinutes: Int
+    let distanceKm: Double
+    let calories: Int
+    let steps: Int
     let notes: String
+    let sourceHealthKit: Bool
+    let healthKitWorkoutUUID: String
+    let healthKitSourceBundleID: String
+    let healthKitSourceName: String
+    let sourcePetWalkLogID: String
     let humanId: UUID?
 }
 
@@ -511,7 +519,15 @@ nonisolated enum DomainMemberContentRehydrateWriter {
             date: snapshot.date,
             type: WorkoutType(rawValue: snapshot.typeRaw) ?? .walking,
             durationMinutes: snapshot.durationMinutes,
+            distanceKm: snapshot.distanceKm,
+            calories: snapshot.calories,
+            steps: snapshot.steps,
             notes: snapshot.notes,
+            sourceHealthKit: snapshot.sourceHealthKit,
+            healthKitWorkoutUUID: snapshot.healthKitWorkoutUUID,
+            healthKitSourceBundleID: snapshot.healthKitSourceBundleID,
+            healthKitSourceName: snapshot.healthKitSourceName,
+            sourcePetWalkLogID: snapshot.sourcePetWalkLogID,
             human: try humanReference(id: snapshot.humanId, context: context)
         )
         log.id = snapshot.id

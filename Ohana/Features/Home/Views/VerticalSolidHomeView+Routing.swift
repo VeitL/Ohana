@@ -8,6 +8,7 @@ import SwiftUI
 
 extension VerticalSolidHomeView {
     func bindHomeAppRouteSink() {
+        routeCoordinator.preferLocalHumanQuickOverlays()
         routeCoordinator.bindAppRouteSink { route in
             switch route {
             case let .petProfile(id, initialTab):
@@ -47,15 +48,15 @@ extension VerticalSolidHomeView {
             case let .petExpenseQuick(petID):
                 onPresentAppSheet(.petExpenseQuick(petID))
             case let .humanMedicationQuick(humanID):
-                onPresentAppSheet(.humanMedicationQuick(humanID))
+                routeCoordinator.overlay = .humanMedicationQuick(humanID: humanID)
             case let .humanWeightQuick(humanID):
-                onPresentHumanWeightQuick(humanID)
+                routeCoordinator.overlay = .humanWeightQuick(humanID: humanID)
             case let .humanWorkoutQuick(humanID):
-                onPresentAppSheet(.humanWorkoutQuick(humanID))
+                routeCoordinator.overlay = .humanWorkoutQuick(humanID: humanID)
             case let .humanExpenseQuick(humanID):
-                onPresentAppSheet(.humanExpenseQuick(humanID))
+                routeCoordinator.overlay = .humanExpenseQuick(humanID: humanID)
             case let .humanNoteQuick(humanID):
-                onPresentAppSheet(.humanNoteQuick(humanID))
+                routeCoordinator.overlay = .humanNoteQuick(humanID: humanID)
             }
         }
     }

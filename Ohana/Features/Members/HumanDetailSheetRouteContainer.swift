@@ -203,9 +203,9 @@ struct AppHumanDetailSheetRouteContainer: View {
                     onDismiss: onDismiss
                 )
             case .workout:
-                HumanWorkoutHistoryView(human: human)
+                HumanWorkoutSummaryView(human: human)
             case .workoutDashboard:
-                CoHealthDashboardFullView(human: human)
+                HumanWorkoutSummaryView(human: human)
             case .metrics:
                 NavigationStack { HumanHealthCheckupView(human: human) }
             case .report:

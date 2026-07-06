@@ -116,6 +116,18 @@
       "lines": 877
     },
     {
+      "path": "Ohana/Features/Onboarding/Views/OnboardingView.swift",
+      "lines": 1356
+    },
+    {
+      "path": "Ohana/Features/Plants/Views/PlantCareFeatureDetailView.swift",
+      "lines": 1989
+    },
+    {
+      "path": "Ohana/Features/Plants/Views/PlantDashboardView.swift",
+      "lines": 1405
+    },
+    {
       "path": "Ohana/Features/QuickCare/Views/QuickPlayDetailSheet.swift",
       "lines": 886
     },

@@ -349,7 +349,15 @@ nonisolated extension DataBackupManager {
             date: parseDate(dto.date) ?? Date(),
             typeRaw: dto.typeRaw,
             durationMinutes: dto.durationMinutes,
+            distanceKm: dto.distanceKm ?? 0,
+            calories: dto.calories ?? 0,
+            steps: dto.steps ?? 0,
             notes: dto.notes,
+            sourceHealthKit: dto.sourceHealthKit ?? false,
+            healthKitWorkoutUUID: dto.healthKitWorkoutUUID ?? "",
+            healthKitSourceBundleID: dto.healthKitSourceBundleID ?? "",
+            healthKitSourceName: dto.healthKitSourceName ?? "",
+            sourcePetWalkLogID: dto.sourcePetWalkLogID ?? "",
             humanId: dto.humanId.flatMap(UUID.init(uuidString:))
         )
     }

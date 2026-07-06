@@ -108,6 +108,8 @@ struct VerticalSolidHomeBottomBar: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     @ObservedObject private var workloadPolicy = AppWorkloadPolicy.shared
+    @State private var activeHomeSubmenu: HomeFabShortcutSubmenu?
+    @State private var submenuItemsVisible = false
 
     private var l: L10n { localization }
     private var visibleTabs: [VerticalSolidHomeTab] {
@@ -122,7 +124,6 @@ struct VerticalSolidHomeBottomBar: View {
     private var usesFullVisualEffects: Bool {
         workloadPolicy.visualEffectsBudget(isVisible: true).usesFullEffects
     }
-
     var body: some View {
         let barBottomInset = max(safeBottom - 2, 4)
 
@@ -139,6 +140,16 @@ struct VerticalSolidHomeBottomBar: View {
         }
         .animation(canAnimate ? HeroAnim.fabSpring : GoMotion.reduced, value: isFabExpanded)
         .animation(canAnimate ? HeroAnim.fabSpring : GoMotion.reduced, value: itemsVisible)
+        .animation(canAnimate ? HeroAnim.fabSpring : GoMotion.reduced, value: activeHomeSubmenu)
+        .onChange(of: isFabExpanded) { _, expanded in
+            if !expanded { resetHomeSubmenu() }
+        }
+        .onChange(of: selectedTab) { _, _ in
+            resetHomeSubmenu()
+        }
+        .onChange(of: activeCard?.id) { _, _ in
+            resetHomeSubmenu()
+        }
     }
 
     private func navigationChrome(metrics: HomeBottomNavigationLayoutMetrics) -> some View {
@@ -321,13 +332,38 @@ struct VerticalSolidHomeBottomBar: View {
             .padding(.vertical, 2)
         } else if isFabExpanded, selectedTab == .home {
             VStack(spacing: 10) {
+                if activeHomeSubmenu == .addMember {
+                    let childShortcuts = HomeFabShortcutCatalog.addMemberShortcuts(l: l)
+                    ForEach(Array(childShortcuts.enumerated()), id: \.element.id) { index, shortcut in
+                        VerticalSolidHomeHomeFabShortcutButton(shortcut: shortcut) {
+                            guard shortcut.isAvailable else {
+                                OhanaFeedback.light()
+                                return
+                            }
+                            resetHomeSubmenu()
+                            onHomeShortcut(shortcut)
+                        }
+                        .ohanaStaggeredMenuItem(
+                            isVisible: submenuItemsVisible && itemsVisible,
+                            index: index,
+                            total: childShortcuts.count,
+                            anchor: .bottom
+                        )
+                        .allowsHitTesting(submenuItemsVisible && itemsVisible)
+                        .accessibilityHidden(!(submenuItemsVisible && itemsVisible))
+                    }
+                }
+
                 ForEach(Array(homeShortcuts.enumerated()), id: \.element.id) { index, shortcut in
-                    VerticalSolidHomeHomeFabShortcutButton(shortcut: shortcut) {
+                    VerticalSolidHomeHomeFabShortcutButton(
+                        shortcut: shortcut,
+                        isDimmed: activeHomeSubmenu == .addMember && shortcut.action == .submenu(.addMember)
+                    ) {
                         guard shortcut.isAvailable else {
                             OhanaFeedback.light()
                             return
                         }
-                        onHomeShortcut(shortcut)
+                        handleHomeShortcut(shortcut)
                     }
                     .ohanaStaggeredMenuItem(
                         isVisible: itemsVisible,
@@ -370,6 +406,7 @@ struct VerticalSolidHomeBottomBar: View {
 
     private func toggleFab() {
         if isFabExpanded {
+            resetHomeSubmenu()
             withAnimation(canAnimate ? HeroAnim.fabSpring : GoMotion.reduced) {
                 itemsVisible = false
             }
@@ -390,6 +427,38 @@ struct VerticalSolidHomeBottomBar: View {
                 }
             }
         }
+    }
+
+    private func handleHomeShortcut(_ shortcut: HomeFabFunctionShortcut) {
+        switch shortcut.action {
+        case .submenu(.addMember):
+            OhanaFeedback.light()
+            if activeHomeSubmenu == .addMember {
+                withAnimation(canAnimate ? HeroAnim.fabSpring : GoMotion.reduced) {
+                    submenuItemsVisible = false
+                    activeHomeSubmenu = nil
+                }
+                return
+            }
+            submenuItemsVisible = false
+            withAnimation(canAnimate ? HeroAnim.fabSpring : GoMotion.reduced) {
+                activeHomeSubmenu = .addMember
+            }
+            OhanaFrameScheduler.runAfterNextFrame(milliseconds: 16) {
+                guard activeHomeSubmenu == .addMember else { return }
+                withAnimation(canAnimate ? HeroAnim.fabSpring : GoMotion.reduced) {
+                    submenuItemsVisible = true
+                }
+            }
+        case .addEntity, .destination, .unavailable:
+            resetHomeSubmenu()
+            onHomeShortcut(shortcut)
+        }
+    }
+
+    private func resetHomeSubmenu() {
+        submenuItemsVisible = false
+        activeHomeSubmenu = nil
     }
 }
 
@@ -796,6 +865,7 @@ private extension ExpandedCardFabAction {
 
 private struct VerticalSolidHomeHomeFabShortcutButton: View {
     let shortcut: HomeFabFunctionShortcut
+    var isDimmed = false
     let action: () -> Void
     @AppStorage(GrowthNewFeatureStore.revisionKey) private var newFeatureRevision = 0
 
@@ -843,7 +913,7 @@ private struct VerticalSolidHomeHomeFabShortcutButton: View {
                     .minimumScaleFactor(0.62)
                     .frame(width: 46)
             }
-            .opacity(shortcut.isAvailable ? 1 : 0.55)
+            .opacity(shortcut.isAvailable ? (isDimmed ? 0.42 : 1) : 0.55)
             .frame(
                 minWidth: HomeFabShortcutHitAreaPolicy.minimumHitSize,
                 minHeight: HomeFabShortcutHitAreaPolicy.minimumHitSize
@@ -856,7 +926,7 @@ private struct VerticalSolidHomeHomeFabShortcutButton: View {
     }
 
     private var iconActionType: String {
-        if case let .featureAggregate(feature)? = shortcut.destination {
+        if case let .destination(.featureAggregate(feature)) = shortcut.action {
             return feature.rawValue
         }
         return shortcut.id
@@ -865,11 +935,17 @@ private struct VerticalSolidHomeHomeFabShortcutButton: View {
 
 private extension HomeFabFunctionShortcut {
     var accessibilityIdentifierFragment: String {
-        if let entityToAdd {
-            return "add-\(entityToAdd.rawValue)"
-        }
-        if let destination {
+        switch action {
+        case let .addEntity(type):
+            return "add-\(type.rawValue)"
+        case let .submenu(submenu):
+            return "submenu-\(submenu.rawValue.dashSeparatedIdentifier)"
+        case let .destination(destination):
             switch destination {
+            case .petFeatureCollection:
+                return "pet-feature-collection"
+            case .plantFeatureCollection:
+                return "plant-feature-collection"
             case let .featureAggregate(feature):
                 return "feature-\(feature.rawValue)"
             case let .featureGroup(group):
@@ -895,7 +971,24 @@ private extension HomeFabFunctionShortcut {
             default:
                 break
             }
+        case .unavailable:
+            break
         }
         return "more"
+    }
+}
+
+private extension String {
+    var dashSeparatedIdentifier: String {
+        reduce(into: "") { result, character in
+            if character.isUppercase {
+                if !result.isEmpty {
+                    result.append("-")
+                }
+                result.append(character.lowercased())
+            } else {
+                result.append(character)
+            }
+        }
     }
 }

@@ -13,6 +13,16 @@ import SwiftUI
 import UIKit
 
 extension MemberCardCreationContentView {
+    func humanNameInput(width: CGFloat) -> some View {
+        OhanaTextField(
+            placeholder: l.tr(zh: "名字", en: "Name", de: "Name"),
+            text: $draft.name,
+            style: .compactCapsule
+        )
+        .frame(width: width, height: 44)
+        .accessibilityIdentifier("member-name-input")
+    }
+
     func compactNameInput(width: CGFloat) -> some View {
         MemberNameInputField(
             text: $draft.name,

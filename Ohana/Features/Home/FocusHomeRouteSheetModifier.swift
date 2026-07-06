@@ -338,15 +338,15 @@ struct FocusHomeRouteSheetModifier: ViewModifier {
     private func openHumanQuickKey(_ key: String, humanID: UUID) {
         switch key {
         case "humanWeight":
-            routes.openSheet(.humanWeight(humanID))
+            routes.openHumanWeightQuick(humanID)
         case "humanWorkout":
-            routes.openSheet(.humanWorkout(humanID))
+            routes.openSheet(.humanWorkoutQuick(humanID))
         case "humanMedication":
-            routes.openSheet(.humanMedication(humanID))
+            routes.openSheet(.humanMedicationQuick(humanID))
         case "humanExpense":
-            routes.openSheet(.humanExpense(humanID))
+            routes.openSheet(.humanExpenseQuick(humanID))
         case "humanNote":
-            routes.openSheet(.humanNote(humanID))
+            routes.openSheet(.humanNoteQuick(humanID))
         default:
             routes.openSheet(.humanAllFeatures(humanID))
         }

@@ -613,6 +613,18 @@ extension PlantDashboardView {
                     .foregroundStyle(Color.goPrimary)
                     .frame(minWidth: 44, minHeight: 44)
                     .accessibilityIdentifier("plant-batch-care-undo")
+
+                    Button(l.tr(zh: "统计", en: "Stats", de: "Statistik")) {
+                        let feature = token.items.first.map { careAggregateFeature(for: $0.careType) }
+                        openCareAggregate(feature)
+                    }
+                    .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
+                    .foregroundStyle(Color.arkInk)
+                    .frame(minWidth: 50, minHeight: 44)
+                    .background(Color.goPrimary, in: Capsule())
+                    .buttonStyle(ScaleButtonStyle())
+                    .accessibilityLabel(l.tr(zh: "查看刚完成的植物照护统计", en: "View care statistics for completed plants", de: "Statistik der erledigten Pflanzenpflege anzeigen"))
+                    .accessibilityIdentifier("plant-batch-care-view-stats")
                 }
                 .padding(.horizontal, 14)
                 .padding(.vertical, 12)
@@ -642,6 +654,18 @@ extension PlantDashboardView {
                     .font(OhanaFont.adaptive(size: 16, weight: .bold, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Spacer()
+
+                Button(l.tr(zh: "统计", en: "Stats", de: "Statistik")) {
+                    openCareAggregate()
+                }
+                .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
+                .foregroundStyle(Color.ohanaPrimaryText)
+                .padding(.horizontal, 11)
+                .frame(minHeight: 34)
+                .background(Color.ohanaControlFill.opacity(0.72), in: Capsule())
+                .buttonStyle(ScaleButtonStyle())
+                .accessibilityLabel(l.tr(zh: "查看植物照护统计", en: "View plant care statistics", de: "Pflanzenpflege-Statistik anzeigen"))
+                .accessibilityIdentifier("plant-dashboard-care-stats-open")
 
                 if !careWindowTasks.isEmpty {
                     Button {

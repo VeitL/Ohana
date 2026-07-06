@@ -467,7 +467,15 @@ nonisolated struct HumanWorkoutLogBackup: Codable {
     var date: String
     var typeRaw: String
     var durationMinutes: Int
+    var distanceKm: Double?
+    var calories: Int?
+    var steps: Int?
     var notes: String
+    var sourceHealthKit: Bool?
+    var healthKitWorkoutUUID: String?
+    var healthKitSourceBundleID: String?
+    var healthKitSourceName: String?
+    var sourcePetWalkLogID: String?
     var humanId: String?
 }
 

@@ -22,6 +22,11 @@ private enum OnboardingPalette {
     static let selectedText = Color.arkInk
 }
 
+private enum OnboardingPreferenceButtonTone {
+    case primary
+    case secondary
+}
+
 // MARK: - Ohana App Icon Shape (matches SVG in design system)
 
 private struct OhanaIconView: View {
@@ -81,13 +86,8 @@ struct OnboardingView: View {
     @AppStorage("appLanguage") private var appLanguage: String = AppLanguage.detectedCode
     @AppStorage(AppCountry.storageKey) private var appCountry = AppCountry.detectedCode
     @AppStorage(AppPerformanceMode.powerSavingKey) private var powerSavingMode = false
-    @AppStorage("ohana_onboarding_city") private var onboardingCity = ""
-    @AppStorage("ohana_onboarding_notifications_intent") private var onboardingNotificationsIntent = true
     @AppStorage("ohana_onboarding_has_pets") private var onboardingHasPets = true
     @AppStorage("ohana_onboarding_has_children") private var onboardingHasChildren = false
-    @AppStorage(PlantLockedPreviewPolicy.onboardingHasPlantsKey) private var onboardingHasPlants = false
-    @AppStorage("ohana_onboarding_plant_experience") private var onboardingPlantExperience = PlantExperienceLevel.beginner.rawValue
-    @AppStorage("ohana_onboarding_plant_scene") private var onboardingPlantScene = PlantCareScene.indoor.rawValue
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.modelContext) private var modelContext
     @Environment(AppServices.self) private var appServices
@@ -116,6 +116,7 @@ struct OnboardingView: View {
     @State private var isHomeJoinHandoffPresentationActive = false
     @State private var isSkippingProfile = false
     @State private var skipProfileError = ""
+    @State private var preferenceCoordinator = OnboardingPreferenceCoordinator()
     private let introPageCount = 4
 
     private var languageCode: String { AppLanguage.normalize(appLanguage) }
@@ -170,12 +171,16 @@ struct OnboardingView: View {
         .preferredColorScheme(isHomeJoinHandoffPreflightActive ? nil : .dark)
         .environment(\.colorScheme, .dark)
         .onAppear {
+            preferenceCoordinator.syncLocationAuthorizationStatus(appServices.location.authorizationStatus)
             if shouldReduceWork {
                 iconPulse = false
             } else {
                 withAnimation(.easeInOut(duration: 2.2).repeatForever(autoreverses: true)) { iconPulse = true } // ui-v4: allow gated onboarding icon pulse; smoothness: allow reduce-work gated onboarding pulse.
             }
             recoverInterruptedOnboardingIfNeeded()
+        }
+        .task {
+            await preferenceCoordinator.refreshNotificationStatus(appServices.userNotifications)
         }
         .onDisappear {
             flipTask?.cancel()
@@ -341,11 +346,13 @@ struct OnboardingView: View {
                     .buttonStyle(ScaleButtonStyle())
                 } else if introPageIndex == introPageCount - 1 {
                     Button {
-                        skipProfileSetup()
+                        if preferenceCoordinator.validateBeforeLeavingPreferencePage() {
+                            skipProfileSetup()
+                        }
                     } label: {
                         Text(isSkippingProfile
                             ? localized(zh: "准备中", en: "Preparing", de: "Bereit")
-                            : localized(zh: "跳过身份", en: "Skip identity", de: "Überspringen"))
+                            : localized(zh: "暂时跳过", en: "Skip for now", de: "Vorerst überspringen"))
                             .lineLimit(1)
                             .minimumScaleFactor(0.72)
                             .font(OhanaFont.callout(.black))
@@ -427,14 +434,14 @@ struct OnboardingView: View {
         switch index {
         case 1:
             introPage(
-                title: localized(zh: "游戏化成长", en: "Playful growth", de: "Spielerisches Wachstum"),
-                subtitle: localized(zh: "照顾会获得椰子，推动生命之树和 Oasis 成长。", en: "Care earns coconuts and grows the Life Tree and Oasis.", de: "Pflege bringt Kokosnüsse und lässt Lebensbaum und Oase wachsen."),
+                title: localized(zh: "升级解锁更多", en: "Unlock as you grow", de: "Mehr freischalten"),
+                subtitle: localized(zh: "照护获得椰子，升级后开启商店、植物管理和更多工具。", en: "Care earns coconuts. Level up to unlock the Shop, plant management, and more.", de: "Pflege bringt Kokosnüsse. Mit Leveln schaltest du Shop, Pflanzenverwaltung und mehr frei."),
                 heroIcon: "tree.fill",
                 tint: Color.goPrimary,
                 badges: [
-                    (icon: "bolt.fill", title: localized(zh: "椰子", en: "Coconuts", de: "Kokos")),
-                    (icon: "arrow.up.forward.circle.fill", title: localized(zh: "等级", en: "Levels", de: "Level")),
-                    (icon: "sparkles", title: localized(zh: "Oasis", en: "Oasis", de: "Oase"))
+                    (icon: "cart.fill", title: localized(zh: "商店", en: "Shop", de: "Shop")),
+                    (icon: "leaf.fill", title: localized(zh: "植物管理", en: "Plants", de: "Pflanzen")),
+                    (icon: "sparkles", title: localized(zh: "更多功能", en: "More", de: "Mehr"))
                 ]
             )
         case 2:
@@ -450,7 +457,7 @@ struct OnboardingView: View {
                 ]
             )
         case 3:
-            onboardingPlantPreferencePage
+            onboardingPermissionPreferencePage
         default:
             introPage(
                 title: localized(zh: "家中所有生命", en: "Every life at home", de: "Alles Leben zu Hause"),
@@ -466,65 +473,489 @@ struct OnboardingView: View {
         }
     }
 
-    private var onboardingPlantPreferencePage: some View {
-        VStack(spacing: 16) {
-            VStack(spacing: 8) {
-                Image(systemName: "leaf.circle.fill") // a11y: allow decorative onboarding glyph; heading names the page.
-                    .font(OhanaFont.adaptive(size: 64, weight: .black))
-                    .foregroundStyle(Color.goPrimary)
-                    .accessibilityHidden(true)
-                Text(localized(zh: "植物照护偏好", en: "Plant care preferences", de: "Pflanzenpflege"))
-                    .font(OhanaFont.title2(.black))
-                    .foregroundStyle(OnboardingPalette.primaryText)
-                Text(localized(
-                    zh: "这些偏好会影响植物安全提示和提醒文案；不授权定位也可以手动填写城市。",
-                    en: "These preferences tune plant safety notes and reminders. You can type a city without location access.",
-                    de: "Diese Angaben steuern Sicherheitshinweise und Erinnerungen. Du kannst die Stadt manuell eintragen."
-                ))
-                .font(OhanaFont.caption(.semibold))
-                .foregroundStyle(OnboardingPalette.secondaryText)
-                .multilineTextAlignment(.center)
-                .fixedSize(horizontal: false, vertical: true)
+    private var onboardingPermissionPreferencePage: some View {
+        ScrollView(.vertical, showsIndicators: false) {
+            VStack(spacing: 12) {
+                onboardingPreferenceHeader
+
+                onboardingLocationPreferenceCard
+                onboardingNotificationPreferenceCard
+                onboardingHouseholdPreferenceCard
             }
-
-            VStack(spacing: 10) {
-                TextField(localized(zh: "城市/地区", en: "City or region", de: "Stadt oder Region"), text: $onboardingCity) // ui-v4: allow compact onboarding city input until shared onboarding input token lands.
-                    .textFieldStyle(.plain)
-                    .font(OhanaFont.callout(.semibold))
-                    .foregroundStyle(OnboardingPalette.primaryText)
-                    .padding(.horizontal, 14)
-                    .frame(height: 44)
-                    .background(OnboardingPalette.mutedFill, in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
-
-                Toggle(localized(zh: "愿意接收护理通知", en: "Allow care reminders", de: "Pflege-Erinnerungen erlauben"), isOn: $onboardingNotificationsIntent)
-                    .tint(Color.goPrimary)
-                Toggle(localized(zh: "家里有宠物", en: "Pets at home", de: "Tiere zu Hause"), isOn: $onboardingHasPets)
-                    .tint(Color.goPrimary)
-                Toggle(localized(zh: "家里有小孩", en: "Children at home", de: "Kinder zu Hause"), isOn: $onboardingHasChildren)
-                    .tint(Color.goPrimary)
-                Toggle(localized(zh: "家里有植物", en: "Plants at home", de: "Pflanzen zu Hause"), isOn: $onboardingHasPlants)
-                    .tint(Color.goPrimary)
-
-                Picker(localized(zh: "植物经验", en: "Plant experience", de: "Pflanzenerfahrung"), selection: $onboardingPlantExperience) {
-                    Text(localized(zh: "新手", en: "Beginner", de: "Anfänger")).tag(PlantExperienceLevel.beginner.rawValue)
-                    Text(localized(zh: "熟悉", en: "Comfortable", de: "Vertraut")).tag(PlantExperienceLevel.intermediate.rawValue)
-                    Text(localized(zh: "进阶", en: "Experienced", de: "Erfahren")).tag(PlantExperienceLevel.experienced.rawValue)
-                }
-                .pickerStyle(.segmented)
-
-                Picker(localized(zh: "主要场景", en: "Main plant area", de: "Pflanzenbereich"), selection: $onboardingPlantScene) {
-                    Text(localized(zh: "室内", en: "Indoor", de: "Innen")).tag(PlantCareScene.indoor.rawValue)
-                    Text(localized(zh: "阳台", en: "Balcony", de: "Balkon")).tag(PlantCareScene.balcony.rawValue)
-                    Text(localized(zh: "花园", en: "Garden", de: "Garten")).tag(PlantCareScene.garden.rawValue)
-                }
-                .pickerStyle(.segmented)
-            }
-            .font(OhanaFont.caption(.bold))
-            .foregroundStyle(OnboardingPalette.primaryText)
+            .padding(.horizontal, 20)
+            .padding(.vertical, 10)
         }
-        .padding(.horizontal, 24)
-        .padding(.vertical, 12)
+        .scrollClipDisabled()
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private var onboardingPreferenceHeader: some View {
+        VStack(spacing: 8) {
+            Image(systemName: "slider.horizontal.3") // a11y: allow decorative onboarding heading glyph; heading text names the page.
+                .font(OhanaFont.adaptive(size: 50, weight: .black))
+                .foregroundStyle(Color.goPrimary)
+                .accessibilityHidden(true)
+            Text(localized(zh: "照护设置", en: "Care setup", de: "Pflege-Setup"))
+                .font(OhanaFont.title3(.black))
+                .foregroundStyle(OnboardingPalette.primaryText)
+                .multilineTextAlignment(.center)
+            Text(localized(
+                zh: "位置、提醒、家庭安全。",
+                en: "Location, reminders, home safety.",
+                de: "Standort, Erinnerungen, Sicherheit."
+            ))
+            .font(OhanaFont.caption(.semibold))
+            .foregroundStyle(OnboardingPalette.secondaryText)
+            .multilineTextAlignment(.center)
+            .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private var onboardingLocationPreferenceCard: some View {
+        onboardingPreferenceCard(
+            icon: "location.fill.viewfinder",
+            title: localized(zh: "位置", en: "Location", de: "Standort"),
+            subtitle: localized(zh: "用于本地天气风险。", en: "For local weather risk.", de: "Für lokale Wetterrisiken."),
+            tint: Color.goBlue
+        ) {
+            VStack(spacing: 8) {
+                if preferenceCoordinator.hasResolvedAutomaticLocation {
+                    onboardingStatusRow(
+                        icon: "checkmark.seal.fill",
+                        title: localized(zh: "位置已开启", en: "Location allowed", de: "Standort erlaubt"),
+                        detail: "\(preferenceCoordinator.countryDisplayName(languageCode: languageCode)) · \(preferenceCoordinator.cityDisplayName(languageCode: languageCode))",
+                        tint: Color.goPrimary
+                    )
+
+                    HStack(spacing: 8) {
+                        onboardingPreferenceActionButton(
+                            title: localized(zh: "更新位置", en: "Update location", de: "Standort aktualisieren"),
+                            icon: "location.fill",
+                            tone: .secondary
+                        ) {
+                            Task {
+                                await preferenceCoordinator.requestAutomaticLocation(locationProvider: appServices.location)
+                            }
+                        }
+
+                        onboardingPreferenceActionButton(
+                            title: localized(zh: "手动更改", en: "Edit manually", de: "Manuell ändern"),
+                            icon: "pencil",
+                            tone: .secondary
+                        ) {
+                            preferenceCoordinator.useManualLocation()
+                        }
+                    }
+                } else if preferenceCoordinator.isResolvingLocation {
+                    VStack(spacing: 8) {
+                        HStack(spacing: 10) {
+                            ProgressView()
+                                .tint(Color.goPrimary)
+                            Text(localized(zh: "定位中", en: "Allowing location", de: "Standort wird erlaubt"))
+                                .font(OhanaFont.caption(.black))
+                                .foregroundStyle(OnboardingPalette.primaryText)
+                            Spacer(minLength: 0)
+                        }
+                        .frame(minHeight: 44)
+
+                        onboardingPreferenceActionButton(
+                            title: localized(zh: "手动填写", en: "Enter manually", de: "Manuell"),
+                            icon: "square.and.pencil",
+                            tone: .secondary
+                        ) {
+                            preferenceCoordinator.useManualLocation()
+                        }
+                    }
+                } else {
+                    HStack(spacing: 8) {
+                        onboardingPreferenceActionButton(
+                            title: localized(zh: "允许位置", en: "Allow location", de: "Standort erlauben"),
+                            icon: "location.fill",
+                            tone: .primary
+                        ) {
+                            Task {
+                                await preferenceCoordinator.requestAutomaticLocation(locationProvider: appServices.location)
+                            }
+                        }
+
+                        onboardingPreferenceActionButton(
+                            title: localized(zh: "手动填写", en: "Enter manually", de: "Manuell"),
+                            icon: "square.and.pencil",
+                            tone: .secondary
+                        ) {
+                            preferenceCoordinator.useManualLocation()
+                        }
+                    }
+                }
+
+                if preferenceCoordinator.locationError != nil {
+                    onboardingInlineNotice(
+                        icon: "exclamationmark.triangle.fill",
+                        text: localized(
+                            zh: "无法获取位置，请手动填写。",
+                            en: "Couldn't get location. Enter it manually.",
+                            de: "Standort nicht verfügbar. Bitte manuell eintragen."
+                        ),
+                        tint: Color.goOrange
+                    )
+                }
+
+                if preferenceCoordinator.showsManualLocationFields {
+                    onboardingManualLocationFields
+                }
+
+                if preferenceCoordinator.shouldShowLocationSettings {
+                    onboardingPreferenceActionButton(
+                        title: localized(zh: "打开系统设置", en: "Open Settings", de: "Einstellungen öffnen"),
+                        icon: "gearshape.fill",
+                        tone: .secondary,
+                        action: openSystemSettings
+                    )
+                }
+
+                if preferenceCoordinator.shouldShowLocationValidation {
+                    onboardingInlineNotice(
+                        icon: "info.circle.fill",
+                        text: localized(
+                            zh: "允许位置，或填写国家和城市。",
+                            en: "Allow location, or enter country and city.",
+                            de: "Standort erlauben oder Land und Stadt eintragen."
+                        ),
+                        tint: Color.goRed
+                    )
+                }
+            }
+        }
+    }
+
+    private var onboardingManualLocationFields: some View {
+        VStack(spacing: 8) {
+            onboardingPreferenceMenuRow(
+                title: localized(zh: "国家/地区", en: "Country or region", de: "Land oder Region"),
+                value: preferenceCoordinator.usesCustomCountry ? localized(zh: "自定义", en: "Custom", de: "Eigener Eintrag") : preferenceCoordinator.countryDisplayName(languageCode: languageCode),
+                placeholder: localized(zh: "选择国家/地区", en: "Choose country", de: "Land wählen"),
+                options: preferenceCoordinator.countryMenuOptions,
+                action: { option in
+                    preferenceCoordinator.selectCountry(option, languageCode: languageCode)
+                }
+            )
+
+            if preferenceCoordinator.usesCustomCountry {
+                OhanaTextField(
+                    placeholder: localized(zh: "输入国家/地区", en: "Enter country or region", de: "Land eingeben"),
+                    text: onboardingCountryBinding,
+                    style: .compactCapsule
+                )
+                .accessibilityIdentifier("onboarding-custom-country-input")
+            }
+
+            if !preferenceCoordinator.usesCustomCountry {
+                onboardingPreferenceMenuRow(
+                    title: localized(zh: "城市", en: "City", de: "Stadt"),
+                    value: preferenceCoordinator.usesCustomCity ? localized(zh: "自定义", en: "Custom", de: "Eigener Eintrag") : preferenceCoordinator.cityDisplayName(languageCode: languageCode),
+                    placeholder: localized(zh: "选择城市", en: "Choose city", de: "Stadt wählen"),
+                    options: preferenceCoordinator.cityMenuOptions,
+                    action: { option in
+                        preferenceCoordinator.selectCity(option, languageCode: languageCode)
+                    }
+                )
+            }
+
+            if preferenceCoordinator.usesCustomCity {
+                OhanaTextField(
+                    placeholder: localized(zh: "输入城市", en: "Enter city", de: "Stadt eingeben"),
+                    text: onboardingCityBinding,
+                    style: .compactCapsule
+                )
+                .accessibilityIdentifier("onboarding-custom-city-input")
+            }
+        }
+    }
+
+    private var onboardingNotificationPreferenceCard: some View {
+        onboardingPreferenceCard(
+            icon: "bell.badge.fill",
+            title: localized(zh: "通知", en: "Notifications", de: "Mitteilungen"),
+            subtitle: localized(zh: "用于护理提醒。", en: "For care reminders.", de: "Für Pflegeerinnerungen."),
+            tint: Color.goOrange
+        ) {
+            VStack(spacing: 8) {
+                switch preferenceCoordinator.notificationPreferenceState {
+                case .enabled:
+                    onboardingStatusRow(
+                        icon: "checkmark.seal.fill",
+                        title: localized(zh: "通知已开启", en: "Notifications allowed", de: "Mitteilungen erlaubt"),
+                        detail: localized(zh: "护理提醒可发送。", en: "Care reminders can send.", de: "Pflegeerinnerungen sind aktiv."),
+                        tint: Color.goPrimary
+                    )
+                case .requestable:
+                    if preferenceCoordinator.isRequestingNotificationPermission {
+                        HStack(spacing: 10) {
+                            ProgressView()
+                                .tint(Color.goPrimary)
+                            Text(localized(zh: "请求通知中", en: "Requesting notifications", de: "Mitteilungen werden angefragt"))
+                                .font(OhanaFont.caption(.black))
+                                .foregroundStyle(OnboardingPalette.primaryText)
+                            Spacer(minLength: 0)
+                        }
+                        .frame(minHeight: 44)
+                    } else {
+                        onboardingPreferenceActionButton(
+                            title: localized(zh: "允许通知", en: "Allow notifications", de: "Mitteilungen erlauben"),
+                            icon: "bell.fill",
+                            tone: .primary
+                        ) {
+                            Task {
+                                await preferenceCoordinator.requestNotificationPermission(appServices.userNotifications)
+                            }
+                        }
+                    }
+                case .settingsRequired:
+                    OnboardingNotificationOffRow(
+                        title: localized(zh: "通知关闭", en: "Notifications off", de: "Mitteilungen aus"),
+                        subtitle: localized(zh: "开启后发送护理提醒。", en: "Turn on for care reminders.", de: "Für Pflegeerinnerungen aktivieren."),
+                        isOn: notificationRetryBinding
+                    )
+                    onboardingInlineNotice(
+                        icon: "info.circle.fill",
+                        text: localized(
+                            zh: "通知已在系统中关闭。",
+                            en: "Notifications are off in iOS Settings.",
+                            de: "Mitteilungen sind in iOS deaktiviert."
+                        ),
+                        tint: Color.goOrange
+                    )
+                    onboardingPreferenceActionButton(
+                        title: localized(zh: "打开系统设置", en: "Open Settings", de: "Einstellungen öffnen"),
+                        icon: "gearshape.fill",
+                        tone: .secondary,
+                        action: openSystemSettings
+                    )
+                }
+            }
+        }
+    }
+
+    private var onboardingHouseholdPreferenceCard: some View {
+        onboardingPreferenceCard(
+            icon: "house.and.flag.fill",
+            title: localized(zh: "家庭环境", en: "Home environment", de: "Zuhause"),
+            subtitle: localized(zh: "用于误食和摆放风险。", en: "For ingestion and placement risk.", de: "Für Verschluck- und Standortrisiken."),
+            tint: Color.goTeal
+        ) {
+            VStack(spacing: 6) {
+                OnboardingPreferenceToggleRow(
+                    icon: "pawprint.fill",
+                    title: localized(zh: "家里有宠物", en: "Pets at home", de: "Tiere zu Hause"),
+                    subtitle: localized(zh: "提示宠物误食风险。", en: "Flags pet ingestion risk.", de: "Warnt vor Tier-Risiken."),
+                    tint: Color.goOrange,
+                    isOn: $onboardingHasPets
+                )
+
+                OnboardingPreferenceToggleRow(
+                    icon: "figure.2.and.child.holdinghands",
+                    title: localized(zh: "家里有小孩", en: "Children at home", de: "Kinder zu Hause"),
+                    subtitle: localized(zh: "提示儿童安全风险。", en: "Flags child safety risk.", de: "Warnt vor Kinderrisiken."),
+                    tint: Color.goBlue,
+                    isOn: $onboardingHasChildren
+                )
+            }
+        }
+    }
+
+    private func onboardingPreferenceCard(
+        icon: String,
+        title: String,
+        subtitle: String,
+        tint: Color,
+        @ViewBuilder content: () -> some View
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 10) {
+                Image(systemName: icon)
+                    .font(OhanaFont.adaptive(size: 15, weight: .black))
+                    .foregroundStyle(tint)
+                    .frame(width: 44, height: 44)
+                    .background(tint.opacity(0.16), in: Circle())
+                    .accessibilityHidden(true)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title)
+                        .font(OhanaFont.callout(.black))
+                        .foregroundStyle(OnboardingPalette.primaryText)
+                    Text(subtitle)
+                        .font(OhanaFont.caption2(.semibold))
+                        .foregroundStyle(OnboardingPalette.secondaryText)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 0)
+            }
+
+            content()
+        }
+        .padding(12)
+        .background(OnboardingPalette.mutedFill, in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous)
+                .strokeBorder(OnboardingPalette.panelStroke, lineWidth: 1)
+        )
+        .accessibilityElement(children: .contain)
+    }
+
+    private func onboardingStatusRow(
+        icon: String,
+        title: String,
+        detail: String,
+        tint: Color
+    ) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: icon)
+                .font(OhanaFont.adaptive(size: 15, weight: .black))
+                .foregroundStyle(tint)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(OhanaFont.caption(.black))
+                    .foregroundStyle(OnboardingPalette.primaryText)
+                Text(detail)
+                    .font(OhanaFont.caption2(.semibold))
+                    .foregroundStyle(OnboardingPalette.secondaryText)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 12)
+        .frame(minHeight: 48)
+        .background(tint.opacity(0.12), in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
+        .accessibilityElement(children: .combine)
+    }
+
+    private func onboardingInlineNotice(icon: String, text: String, tint: Color) -> some View {
+        HStack(alignment: .top, spacing: 8) {
+            Image(systemName: icon)
+                .font(OhanaFont.adaptive(size: 12, weight: .black))
+                .foregroundStyle(tint)
+                .padding(.top, 1)
+                .accessibilityHidden(true)
+            Text(text)
+                .font(OhanaFont.caption2(.semibold))
+                .foregroundStyle(OnboardingPalette.secondaryText)
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .background(tint.opacity(0.1), in: RoundedRectangle(cornerRadius: OhanaRadius.chip, style: .continuous))
+        .accessibilityElement(children: .combine)
+    }
+
+    private func onboardingPreferenceActionButton(
+        title: String,
+        icon: String,
+        tone: OnboardingPreferenceButtonTone,
+        action: @escaping () -> Void
+    ) -> some View {
+        let isPrimary = tone == .primary
+        return Button(action: action) {
+            HStack(spacing: 6) {
+                Image(systemName: icon)
+                    .font(OhanaFont.adaptive(size: 12, weight: .black))
+                Text(title)
+                    .font(OhanaFont.caption(.black))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.72)
+            }
+            .foregroundStyle(isPrimary ? OnboardingPalette.selectedText : OnboardingPalette.primaryText)
+            .frame(maxWidth: .infinity)
+            .frame(minHeight: 44)
+            .padding(.horizontal, 10)
+            .background(isPrimary ? Color.goPrimary : OnboardingPalette.mutedFill, in: Capsule())
+            .overlay(
+                Capsule()
+                    .strokeBorder(isPrimary ? Color.clear : OnboardingPalette.panelStroke, lineWidth: 1)
+            )
+        }
+        .buttonStyle(ScaleButtonStyle())
+        .accessibilityLabel(title)
+    }
+
+    private func onboardingPreferenceMenuRow(
+        title: String,
+        value: String,
+        placeholder: String,
+        options: [OnboardingPlaceOption],
+        action: @escaping (OnboardingPlaceOption) -> Void
+    ) -> some View {
+        Menu {
+            ForEach(options) { option in
+                Button(option.title(languageCode: languageCode)) {
+                    action(option)
+                }
+            }
+        } label: {
+            HStack(spacing: 10) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title)
+                        .font(OhanaFont.caption2(.black))
+                        .foregroundStyle(OnboardingPalette.secondaryText)
+                    Text(value.isEmpty ? placeholder : value)
+                        .font(OhanaFont.caption(.black))
+                        .foregroundStyle(value.isEmpty ? OnboardingPalette.tertiaryText : OnboardingPalette.primaryText)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.72)
+                }
+                Spacer(minLength: 0)
+                Image(systemName: "chevron.down") // a11y: allow decorative menu disclosure; Menu exposes label and value.
+                    .font(OhanaFont.adaptive(size: 11, weight: .black))
+                    .foregroundStyle(OnboardingPalette.secondaryText)
+                    .accessibilityHidden(true)
+            }
+            .padding(.horizontal, 12)
+            .frame(minHeight: 44)
+            .background(OnboardingPalette.mutedFill, in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous)
+                    .strokeBorder(OnboardingPalette.panelStroke, lineWidth: 1)
+            )
+        }
+        .accessibilityLabel(title)
+        .accessibilityValue(value.isEmpty ? placeholder : value)
+    }
+
+    private var onboardingCountryBinding: Binding<String> {
+        Binding(
+            get: { preferenceCoordinator.country },
+            set: { newValue in
+                preferenceCoordinator.updateCustomCountry(newValue)
+            }
+        )
+    }
+
+    private var onboardingCityBinding: Binding<String> {
+        Binding(
+            get: { preferenceCoordinator.city },
+            set: { newValue in
+                preferenceCoordinator.updateCustomCity(newValue)
+            }
+        )
+    }
+
+    private var notificationRetryBinding: Binding<Bool> {
+        Binding(
+            get: { false },
+            set: { newValue in
+                guard newValue else { return }
+                Task {
+                    await preferenceCoordinator.requestNotificationPermission(appServices.userNotifications)
+                }
+            }
+        )
+    }
+
+    private func openSystemSettings() {
+        guard let url = URL(string: UIApplication.openSettingsURLString) else { return }
+        UIApplication.shared.open(url)
     }
 
     private func introPage(
@@ -669,6 +1100,9 @@ struct OnboardingView: View {
             withAnimation(GoMotion.page) {
                 introPageIndex += 1
             }
+            return
+        }
+        guard preferenceCoordinator.validateBeforeLeavingPreferencePage() else {
             return
         }
         startProfileSetup()
@@ -829,6 +1263,88 @@ struct OnboardingView: View {
         withTransaction(transaction) {
             hasOnboarded = true
         }
+    }
+}
+
+private struct OnboardingPreferenceToggleRow: View {
+    let icon: String
+    let title: String
+    let subtitle: String
+    let tint: Color
+    @Binding var isOn: Bool
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: icon)
+                .font(OhanaFont.adaptive(size: 15, weight: .black))
+                .foregroundStyle(tint)
+                .frame(width: 44, height: 44)
+                .background(tint.opacity(0.16), in: Circle())
+                .accessibilityHidden(true)
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title)
+                    .font(OhanaFont.caption(.black))
+                    .foregroundStyle(OnboardingPalette.primaryText)
+                    .fixedSize(horizontal: false, vertical: true)
+                Text(subtitle)
+                    .font(OhanaFont.caption2(.semibold))
+                    .foregroundStyle(OnboardingPalette.secondaryText)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            Spacer(minLength: 8)
+
+            Toggle("", isOn: $isOn)
+                .labelsHidden()
+                .tint(Color.goPrimary)
+        }
+        .padding(.vertical, 4)
+        .frame(minHeight: 50)
+        .contentShape(Rectangle())
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(title)
+    }
+}
+
+private struct OnboardingNotificationOffRow: View {
+    let title: String
+    let subtitle: String
+    @Binding var isOn: Bool
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "bell.slash.fill") // a11y: allow decorative notification-off glyph; row label names the state.
+                .font(OhanaFont.adaptive(size: 15, weight: .black))
+                .foregroundStyle(Color.goOrange)
+                .frame(width: 44, height: 44)
+                .background(Color.goOrange.opacity(0.16), in: Circle())
+                .accessibilityHidden(true)
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title)
+                    .font(OhanaFont.caption(.black))
+                    .foregroundStyle(OnboardingPalette.primaryText)
+                    .fixedSize(horizontal: false, vertical: true)
+                Text(subtitle)
+                    .font(OhanaFont.caption2(.semibold))
+                    .foregroundStyle(OnboardingPalette.secondaryText)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            Spacer(minLength: 8)
+
+            Toggle("", isOn: $isOn)
+                .labelsHidden()
+                .tint(Color.goPrimary)
+        }
+        .padding(.vertical, 4)
+        .frame(minHeight: 50)
+        .contentShape(Rectangle())
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(title)
+        .accessibilityHint(subtitle)
+        .accessibilityIdentifier("onboarding-notification-off-row")
     }
 }
 

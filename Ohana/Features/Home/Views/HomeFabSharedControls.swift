@@ -9,58 +9,62 @@ import SwiftUI
 
 enum HomeFabShortcutCatalog {
     static var primaryShortcuts: [HomeFabFunctionShortcut] {
+        primaryShortcuts(l: L10n("zh"))
+    }
+
+    static func primaryShortcuts(l: L10n) -> [HomeFabFunctionShortcut] {
         [
-            HomeFabFunctionShortcut(label: PetFeature.food.title, icon: PetFeature.food.icon, destination: .featureAggregate(.food)),
-            HomeFabFunctionShortcut(label: PetFeature.hygiene.title, icon: PetFeature.hygiene.icon, destination: .featureAggregate(.hygiene)),
-            HomeFabFunctionShortcut(label: PetFeature.health.title, icon: PetFeature.health.icon, destination: .featureAggregate(.health)),
-            HomeFabFunctionShortcut(label: PetFeature.weight.title, icon: PetFeature.weight.icon, destination: .featureAggregate(.weight)),
-            HomeFabFunctionShortcut(label: PetFeature.expense.title, icon: PetFeature.expense.icon, destination: .featureAggregate(.expense)),
-            HomeFabFunctionShortcut(label: "更多", icon: "ellipsis.circle.fill", destination: nil)
+            HomeFabFunctionShortcut(
+                label: l.tr(zh: "添加成员", en: "Add member", de: "Mitglied hinzufügen"),
+                icon: "person.badge.plus.fill",
+                action: .submenu(.addMember)
+            ),
+            allPetFeaturesShortcut(l: l)
+        ]
+    }
+
+    static func addMemberShortcuts(l: L10n) -> [HomeFabFunctionShortcut] {
+        [
+            HomeFabFunctionShortcut(
+                label: l.tr(zh: "添加宠物", en: "Add pet", de: "Tier hinzufügen"),
+                icon: EntityType.pet.icon,
+                entityToAdd: .pet
+            ),
+            HomeFabFunctionShortcut(
+                label: l.tr(zh: "添加人类", en: "Add human", de: "Mensch hinzufügen"),
+                icon: EntityType.human.icon,
+                entityToAdd: .human
+            )
         ]
     }
 
     static func plantShortcuts(l: L10n, dueTaskCount: Int) -> [HomeFabFunctionShortcut] {
-        var shortcuts: [HomeFabFunctionShortcut] = []
-
-        if dueTaskCount > 0 {
-            shortcuts.append(HomeFabFunctionShortcut(
-                label: l.tr(zh: "完成今日照护", en: "Complete today", de: "Heute erledigen"),
-                icon: "checkmark.circle.fill",
-                badge: "\(dueTaskCount)",
-                destination: .plantsBatchCare
-            ))
-        }
-
-        shortcuts.append(contentsOf: [
+        [
             HomeFabFunctionShortcut(
                 label: l.tr(zh: "添加植物", en: "Add plant", de: "Pflanze hinzufügen"),
                 icon: "plus",
                 destination: nil,
                 entityToAdd: .plant
             ),
-            HomeFabFunctionShortcut(
-                label: l.tr(zh: "记一笔照护", en: "Log care", de: "Pflege erfassen"),
-                icon: "square.and.pencil",
-                destination: .plantCareAggregate(.log)
-            ),
-            HomeFabFunctionShortcut(
-                label: l.tr(zh: "植物诊断", en: "Diagnosis", de: "Diagnose"),
-                icon: "stethoscope",
-                isAvailable: false
-            ),
-            HomeFabFunctionShortcut(
-                label: l.tr(zh: "测光照", en: "Light meter", de: "Licht messen"),
-                icon: "sun.max.fill",
-                isAvailable: false
-            ),
-            HomeFabFunctionShortcut(
-                label: l.tr(zh: "更多", en: "More", de: "Mehr"),
-                icon: "ellipsis.circle.fill",
-                destination: .featureGroup(.plants)
-            )
-        ])
+            allPlantFeaturesShortcut(l: l, dueTaskCount: dueTaskCount)
+        ]
+    }
 
-        return shortcuts
+    private static func allPetFeaturesShortcut(l: L10n) -> HomeFabFunctionShortcut {
+        HomeFabFunctionShortcut(
+            label: l.tr(zh: "全部", en: "All", de: "Alle"),
+            icon: "square.grid.2x2.fill",
+            destination: .petFeatureCollection
+        )
+    }
+
+    private static func allPlantFeaturesShortcut(l: L10n, dueTaskCount: Int) -> HomeFabFunctionShortcut {
+        HomeFabFunctionShortcut(
+            label: l.tr(zh: "全部", en: "All", de: "Alle"),
+            icon: "square.grid.2x2.fill",
+            badge: dueTaskCount > 0 ? "\(dueTaskCount)" : nil,
+            destination: .plantFeatureCollection
+        )
     }
 }
 

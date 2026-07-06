@@ -149,6 +149,12 @@ struct PlantDashboardCareLogDraft: Identifiable {
     var id: String { "\(plant.id.uuidString)-\(careType.rawValue)" }
 }
 
+struct PlantDashboardCareAggregateDraft: Identifiable, Hashable {
+    let feature: PlantCareFeatureDestination
+
+    var id: String { feature.rawValue }
+}
+
 struct PlantDashboardAvatarPreloadRequest: Sendable {
     let id: UUID
     let modelID: PersistentIdentifier
@@ -193,6 +199,7 @@ struct PlantDashboardView: View {
     @State var pendingBatchCareUndoToken: PlantBatchCareUndoToken?
     @State var pendingBatchCareRewardTask: Task<Void, Never>?
     @State var careLogDraft: PlantDashboardCareLogDraft?
+    @State var careAggregateDraft: PlantDashboardCareAggregateDraft?
     @State var searchText = ""
     @FocusState var searchFocused: Bool
     @State var expandedPlantCardID: UUID?
@@ -585,6 +592,13 @@ struct PlantDashboardView: View {
                 savePlantCareLog(for: draft.plant, type: type, careNote: careNote, photoData: photoData, healthStatus: healthStatus)
             }
         }
+        .sheet(item: $careAggregateDraft) { draft in
+            PlantCareFeatureDetailView(
+                plants: plants,
+                feature: draft.feature,
+                focusedPlantID: nil
+            )
+        }
         .accessibilityIdentifier("plant-dashboard-screen")
         .onChange(of: selectedDashboardMode) { _, _ in
             collapseExpandedPlantIfNeeded()
@@ -973,6 +987,31 @@ struct PlantDashboardView: View {
         openBatchCareSheet(careType: .watering)
     }
 
+    var preferredCareAggregateFeature: PlantCareFeatureDestination {
+        if careWindowTasks.contains(where: { $0.careType == .watering || $0.careType == .misting }) {
+            return .water
+        }
+        if careWindowTasks.contains(where: { $0.careType == .fertilizing }) {
+            return .fertilize
+        }
+        return .log
+    }
+
+    func openCareAggregate(_ feature: PlantCareFeatureDestination? = nil) {
+        careAggregateDraft = PlantDashboardCareAggregateDraft(feature: feature ?? preferredCareAggregateFeature)
+        UISelectionFeedbackGenerator().selectionChanged()
+    }
+
+    func careAggregateFeature(for careType: PlantCareType) -> PlantCareFeatureDestination {
+        if PlantCareFeatureDestination.water.matches(careType) {
+            return .water
+        }
+        if PlantCareFeatureDestination.fertilize.matches(careType) {
+            return .fertilize
+        }
+        return .log
+    }
+
     func clearPlantSearchAndFilters() {
         searchText = ""
         searchFocused = false
@@ -1216,6 +1255,7 @@ struct PlantDashboardView: View {
             )
             guard let token = result.undoToken else { return }
             PlantBatchCarePendingRewardStore.upsert(token)
+            publishPendingBatchCareRewardStoreChanged(batchID: token.batchID, action: "batchCarePendingRewardsChanged")
             pendingBatchCareUndoToken = token
             publishBatchCareVisualReward(result)
             scheduleBatchCareRewardCommit(for: token)
@@ -1228,6 +1268,7 @@ struct PlantDashboardView: View {
         pendingBatchCareRewardTask = nil
         pendingBatchCareUndoToken = nil
         PlantBatchCarePendingRewardStore.remove(batchID: token.batchID)
+        publishPendingBatchCareRewardStoreChanged(batchID: token.batchID, action: "batchCarePendingRewardsChanged")
         _ = commandExecutor.undoPlantBatchCare(token)
         UINotificationFeedbackGenerator().notificationOccurred(.warning)
     }
@@ -1241,6 +1282,7 @@ struct PlantDashboardView: View {
             pendingBatchCareUndoToken = nil
             let result = commandExecutor.commitPlantBatchCareRewards(for: token)
             PlantBatchCarePendingRewardStore.remove(batchID: token.batchID)
+            publishPendingBatchCareRewardStoreChanged(batchID: token.batchID, action: "batchCarePendingRewardsChanged")
             if result.didCommit {
                 UINotificationFeedbackGenerator().notificationOccurred(.success)
             }
@@ -1263,8 +1305,16 @@ struct PlantDashboardView: View {
         )
     }
 
+    func publishPendingBatchCareRewardStoreChanged(batchID: UUID, action: String) {
+        appServices.domainRevisions.publishPlantBatchCarePendingRewardsChanged(
+            batchID: batchID,
+            action: action,
+            pendingCount: PlantBatchCarePendingRewardStore.load().count,
+            note: "plant.batchCare.pendingRewardsChanged"
+        )
+    }
+
     func deferTaskFromBatchCare(_ task: PlantBatchCareSheetTask) {
-        showingBatchCareSheet = false
         Task { @MainActor in
             await OhanaFrameScheduler.waitAfterNextFrame()
             if let source = dueTasks.first(where: { $0.id == task.id }) {
@@ -1274,7 +1324,6 @@ struct PlantDashboardView: View {
     }
 
     func skipTaskFromBatchCare(_ task: PlantBatchCareSheetTask) {
-        showingBatchCareSheet = false
         Task { @MainActor in
             await OhanaFrameScheduler.waitAfterNextFrame()
             if let source = dueTasks.first(where: { $0.id == task.id }) {

@@ -7,7 +7,9 @@ struct FunctionMenuDestinationRouter: View {
     let pets: [Pet]
     let humans: [Human]
     var petAggregateSummaries: [UUID: FunctionMenuPetAggregateSummary] = [:]
+    var petFeatureCollectionSummary: PetFeatureCollectionSummary = .empty
     let plants: [Plant]
+    var plantFeatureCollectionSummary: PlantFeatureCollectionSummary = .empty
     var isRouteDataLoaded = true
 
     @Environment(AppServices.self) private var appServices
@@ -62,6 +64,19 @@ struct FunctionMenuDestinationRouter: View {
                 isRouteDataLoaded: isRouteDataLoaded,
                 petAggregateSummaries: petAggregateSummaries
             )
+        case .petFeatureCollection:
+            PetFeatureCollectionView(
+                parentPath: $parentPath,
+                pets: pets,
+                humans: humans,
+                summary: petFeatureCollectionSummary
+            )
+        case .plantFeatureCollection:
+            PlantFeatureCollectionView(
+                parentPath: $parentPath,
+                plants: plants,
+                summary: plantFeatureCollectionSummary
+            )
         case let .featureAggregate(feature):
             FeatureAggregateView(
                 feature: feature,
@@ -104,7 +119,7 @@ struct FunctionMenuDestinationRouter: View {
         case let .humanWeight(id):
             if let human = human(for: id) { HumanWeightHistoryView(human: human) }
         case let .humanWorkout(id):
-            if let human = human(for: id) { HumanWorkoutHistoryView(human: human) }
+            if let human = human(for: id) { HumanWorkoutSummaryView(human: human) }
         case let .humanMedication(id):
             if let human = human(for: id) { HumanMedicationView(human: human) }
         case let .humanNote(id):
@@ -164,7 +179,13 @@ struct FunctionMenuDestinationRouter: View {
                 PlantDetailView(plant: plant)
             }
         case let .plantFeature(id, destination):
-            if let plant = plant(for: id) {
+            if let careFeatureDestination = destination.careFeatureDestination {
+                PlantCareFeatureDetailView(
+                    plants: plants,
+                    feature: careFeatureDestination,
+                    focusedPlantID: id
+                )
+            } else if let plant = plant(for: id) {
                 PlantDetailView(plant: plant, initialFeatureDestination: destination)
             }
         case let .plantCare(id, feature):

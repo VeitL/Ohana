@@ -65,23 +65,27 @@ nonisolated struct CalendarTimelineSectionReference: Identifiable, Sendable {
 nonisolated struct CalendarPreparedSnapshot {
     let filteredEvents: [Event]
     let timeline: CalendarTimelineSnapshot
-    let selectedDateEvents: [Event]
+    let eventsByDay: [String: [Event]]
     let weekEventsByDay: [String: [Event]]
     let monthEventDayIDs: Set<String>
 
     static let empty = CalendarPreparedSnapshot(
         filteredEvents: [],
         timeline: .empty,
-        selectedDateEvents: [],
+        eventsByDay: [:],
         weekEventsByDay: [:],
         monthEventDayIDs: []
     )
+
+    nonisolated func events(forDayID dayID: String) -> [Event] {
+        eventsByDay[dayID] ?? []
+    }
 }
 
 nonisolated struct CalendarPreparedSnapshotReference: Sendable {
     let filteredEventModelIDs: [PersistentIdentifier]
     let timeline: CalendarTimelineSnapshotReference
-    let selectedDateEventModelIDs: [PersistentIdentifier]
+    let eventModelIDsByDay: [String: [PersistentIdentifier]]
     let weekEventModelIDsByDay: [String: [PersistentIdentifier]]
     let monthEventDayIDs: Set<String>
 }
@@ -110,7 +114,9 @@ extension CalendarPreparedSnapshotReference {
         CalendarPreparedSnapshot(
             filteredEvents: events(for: filteredEventModelIDs, eventByModelID: eventByModelID),
             timeline: timeline.rehydrated(eventByModelID: eventByModelID),
-            selectedDateEvents: events(for: selectedDateEventModelIDs, eventByModelID: eventByModelID),
+            eventsByDay: eventModelIDsByDay.mapValues { modelIDs in
+                events(for: modelIDs, eventByModelID: eventByModelID)
+            },
             weekEventsByDay: weekEventModelIDsByDay.mapValues { modelIDs in
                 events(for: modelIDs, eventByModelID: eventByModelID)
             },
@@ -185,7 +191,6 @@ nonisolated enum CalendarSnapshotBuilder {
         filteredEvents: [Event],
         allEvents: [Event],
         pets: [Pet],
-        selectedDate: Date,
         weekDays: [Date],
         monthDays: [Date],
         now: Date = Date(),
@@ -201,32 +206,24 @@ nonisolated enum CalendarSnapshotBuilder {
             events: filteredEvents,
             visibilityContext: visibilityContext
         )
-        let selectedDateEvents = eventsForDate(
-            filteredEvents,
-            date: selectedDate,
+        let daysToIndex = Array(Set(weekDays + monthDays).map { calendar.startOfDay(for: $0) })
+        let eventsByDay = buildEventsByDay(
+            events: filteredEvents,
+            days: daysToIndex,
             visibilityContext: visibilityContext
         )
         var weekEventsByDay: [String: [Event]] = [:]
         for day in weekDays {
             let dayID = timelineDateID(day)
-            weekEventsByDay[dayID] = eventsForDate(
-                filteredEvents,
-                date: day,
-                visibilityContext: visibilityContext
-            )
+            weekEventsByDay[dayID] = eventsByDay[dayID] ?? []
         }
-        var monthEventDayIDs = Set<String>()
-        for day in monthDays where !eventsForDate(
-            filteredEvents,
-            date: day,
-            visibilityContext: visibilityContext
-        ).isEmpty {
-            monthEventDayIDs.insert(timelineDateID(day))
-        }
+        let monthEventDayIDs = Set(monthDays
+            .map(timelineDateID)
+            .filter { !(eventsByDay[$0] ?? []).isEmpty })
         return CalendarPreparedSnapshot(
             filteredEvents: filteredEvents,
             timeline: timeline,
-            selectedDateEvents: selectedDateEvents,
+            eventsByDay: eventsByDay,
             weekEventsByDay: weekEventsByDay,
             monthEventDayIDs: monthEventDayIDs
         )
@@ -236,7 +233,6 @@ nonisolated enum CalendarSnapshotBuilder {
         filteredEvents: [Event],
         allEvents: [Event],
         pets: [Pet],
-        selectedDate: Date,
         weekDays: [Date],
         monthDays: [Date],
         now: Date = Date(),
@@ -246,7 +242,6 @@ nonisolated enum CalendarSnapshotBuilder {
             filteredEvents: filteredEvents,
             allEvents: allEvents,
             pets: pets,
-            selectedDate: selectedDate,
             weekDays: weekDays,
             monthDays: monthDays,
             now: now,
@@ -315,6 +310,105 @@ nonisolated enum CalendarSnapshotBuilder {
         events.filter {
             eventOccursOnDate($0, date: date, calendar: visibilityContext.calendar) &&
                 shouldShowOccurrence($0, occurrenceDate: date, visibilityContext: visibilityContext)
+        }
+    }
+
+    private static func buildEventsByDay(
+        events: [Event],
+        days: [Date],
+        visibilityContext: VisibilityContext
+    ) -> [String: [Event]] {
+        let calendar = visibilityContext.calendar
+        let dayStarts = Set(days.map { calendar.startOfDay(for: $0) })
+        guard let firstDay = dayStarts.min(),
+              let lastDay = dayStarts.max() else { return [:] }
+
+        var eventsByDay: [String: [Event]] = [:]
+        for event in events {
+            appendEvent(
+                event,
+                firstDay: firstDay,
+                lastDay: lastDay,
+                dayStarts: dayStarts,
+                visibilityContext: visibilityContext,
+                into: &eventsByDay
+            )
+        }
+
+        return eventsByDay.mapValues { events in
+            events.sorted {
+                if $0.startDate == $1.startDate {
+                    return $0.title < $1.title
+                }
+                return $0.startDate < $1.startDate
+            }
+        }
+    }
+
+    private static func appendEvent(
+        _ event: Event,
+        firstDay: Date,
+        lastDay: Date,
+        dayStarts: Set<Date>,
+        visibilityContext: VisibilityContext,
+        into eventsByDay: inout [String: [Event]]
+    ) {
+        let calendar = visibilityContext.calendar
+        let eventStart = calendar.startOfDay(for: event.startDate)
+        if event.recurrenceDays > 0 {
+            appendRecurringEventByDay(
+                event,
+                eventStart: eventStart,
+                firstDay: firstDay,
+                lastDay: lastDay,
+                dayStarts: dayStarts,
+                visibilityContext: visibilityContext,
+                into: &eventsByDay
+            )
+            return
+        }
+
+        let eventEnd = event.endDate.map { calendar.startOfDay(for: $0) } ?? eventStart
+        var cursor = max(eventStart, firstDay)
+        let hardCap = min(eventEnd, lastDay)
+        var safety = 0
+        while cursor <= hardCap, safety < 370 {
+            if dayStarts.contains(cursor),
+               shouldShowOccurrence(event, occurrenceDate: cursor, visibilityContext: visibilityContext) {
+                eventsByDay[timelineDateID(cursor), default: []].append(event)
+            }
+            cursor = calendar.date(byAdding: .day, value: 1, to: cursor) ?? cursor
+            safety += 1
+        }
+    }
+
+    private static func appendRecurringEventByDay(
+        _ event: Event,
+        eventStart: Date,
+        firstDay: Date,
+        lastDay: Date,
+        dayStarts: Set<Date>,
+        visibilityContext: VisibilityContext,
+        into eventsByDay: inout [String: [Event]]
+    ) {
+        let calendar = visibilityContext.calendar
+        let hardCap = min(event.recurrenceEndDate.map { calendar.startOfDay(for: $0) } ?? lastDay, lastDay)
+        var cursor = max(eventStart, firstDay)
+
+        if cursor > eventStart {
+            let diff = calendar.dateComponents([.day], from: eventStart, to: cursor).day ?? 0
+            let steps = Int(ceil(Double(diff) / Double(event.recurrenceDays)))
+            cursor = calendar.date(byAdding: .day, value: steps * event.recurrenceDays, to: eventStart) ?? eventStart
+        }
+
+        var safety = 0
+        while cursor <= hardCap, safety < 370 {
+            if dayStarts.contains(cursor),
+               shouldShowOccurrence(event, occurrenceDate: cursor, visibilityContext: visibilityContext) {
+                eventsByDay[timelineDateID(cursor), default: []].append(event)
+            }
+            cursor = calendar.date(byAdding: .day, value: event.recurrenceDays, to: cursor) ?? cursor
+            safety += 1
         }
     }
 
@@ -537,7 +631,9 @@ private extension CalendarPreparedSnapshot {
         CalendarPreparedSnapshotReference(
             filteredEventModelIDs: filteredEvents.map(\.persistentModelID),
             timeline: timeline.reference,
-            selectedDateEventModelIDs: selectedDateEvents.map(\.persistentModelID),
+            eventModelIDsByDay: eventsByDay.mapValues { events in
+                events.map(\.persistentModelID)
+            },
             weekEventModelIDsByDay: weekEventsByDay.mapValues { events in
                 events.map(\.persistentModelID)
             },

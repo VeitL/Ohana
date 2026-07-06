@@ -28,6 +28,7 @@ struct PlantDetailContentView: View {
     @State var showingDeleteConfirm = false
     @State var showingPhotoGallery = false
     @State var careLogDraftType: PlantCareType?
+    @State var careFeatureDraft: PlantDetailCareFeatureDraft?
     @State var isDeletePending = false
     @State var isDeleteCommitting = false
     @State var deleteUndoTask: Task<Void, Never>?
@@ -925,6 +926,13 @@ struct PlantDetailContentView: View {
                 initialCareType: type,
                 currentHealthStatus: plant.healthStatus,
                 onSave: savePlantCareLog
+            )
+        }
+        .sheet(item: $careFeatureDraft) { draft in
+            PlantCareFeatureDetailView(
+                plants: [plant],
+                feature: draft.feature,
+                focusedPlantID: plant.id
             )
         }
         .safeAreaInset(edge: .bottom) {

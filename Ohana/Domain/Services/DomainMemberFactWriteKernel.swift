@@ -613,6 +613,10 @@ nonisolated enum DomainMemberFactWriter {
         steps: Int = 0,
         notes: String,
         sourceHealthKit: Bool = false,
+        healthKitWorkoutUUID: String = "",
+        healthKitSourceBundleID: String = "",
+        healthKitSourceName: String = "",
+        sourcePetWalkLogID: String = "",
         context: ModelContext
     ) -> HumanWorkoutLog {
         plan.consume()
@@ -625,6 +629,10 @@ nonisolated enum DomainMemberFactWriter {
             steps: steps,
             notes: notes,
             sourceHealthKit: sourceHealthKit,
+            healthKitWorkoutUUID: healthKitWorkoutUUID,
+            healthKitSourceBundleID: healthKitSourceBundleID,
+            healthKitSourceName: healthKitSourceName,
+            sourcePetWalkLogID: sourcePetWalkLogID,
             human: human
         )
         context.insert(log)

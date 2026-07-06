@@ -16,8 +16,8 @@
 - Last compacted: 2026-06-25.
 - Release bar: **Open P0 = 0; first-release-reachable repo-code P1 = 0**.
 - Active phase: **Phase 9A / dogfooding and real-device validation**, status 🟡.
-- Open follow-ups: 11 total in `docs/task-follow-ups.md`.
-- Open P1: 3 total; remaining P1s are CloudKit 1.x deferred work or
+- Open follow-ups: 12 total in `docs/task-follow-ups.md`.
+- Open P1: 4 total; remaining P1s are CloudKit 1.x deferred work or
   real-device validation.
 - Current local validation: Human simulator recheck now passes the four
   targeted Human `OhanaUITests` plus a focused wishlist redeem UITest on the
@@ -287,6 +287,7 @@ in the archive.
 | Domain / CloudSync | TFU-20260614-014 | CloudKit 1.x live-apply policy remains deferred while CloudKit is disabled. |
 | Members | TFU-20260612-020 | Remaining localization coverage. |
 | Notifications / Memorial | TFU-20260612-016, TFU-20260612-017 | Real-device GAP-6 and GAP-9 validation. |
+| Human Workout / HealthKit | TFU-20260706-001 | Real-device HealthKit authorization, Activity Summary, and workout sample import validation. |
 | Settings | TFU-20260612-022 | Final privacy/support URLs and rows. |
 | Walks / Shared Care | TFU-20260611-005 | Shared walk write boundary should move to owning command/service. |
 | Recycle Bin / Future Sync | TFU-20260613-003, TFU-20260613-004 | 1.x soft-delete CloudSync round-trip and restored-pet quick access. |

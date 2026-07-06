@@ -21,6 +21,7 @@ struct PlantBatchCareSheet: View {
     @AppStorage("appLanguage") private var appLanguage = "zh"
     @State private var selectedCareType: PlantCareType?
     @State private var selectedTaskIDs: Set<String>
+    @State private var resolvedTaskIDs: Set<String> = []
 
     init(
         snapshot: PlantBatchCareSheetSnapshot,
@@ -48,8 +49,40 @@ struct PlantBatchCareSheet: View {
         snapshot.filterSnapshot(for: selectedCareType)
     }
 
+    private var activeTaskIDs: Set<String> {
+        Set(snapshot.tasks.map(\.id)).subtracting(resolvedTaskIDs)
+    }
+
+    private var activeTaskCount: Int {
+        activeTaskIDs.count
+    }
+
+    private var activePlantCount: Int {
+        Set(snapshot.tasks.filter { activeTaskIDs.contains($0.id) }.map(\.plantID)).count
+    }
+
+    private var visibleTaskIDs: Set<String> {
+        Set(visibleSnapshot.taskIDs).intersection(activeTaskIDs)
+    }
+
+    private var visibleTaskCount: Int {
+        visibleTaskIDs.count
+    }
+
+    private var visibleRoomSections: [PlantBatchCareSheetRoomSection] {
+        visibleSnapshot.roomSections.compactMap { section in
+            let tasks = section.tasks.filter { activeTaskIDs.contains($0.id) }
+            guard !tasks.isEmpty else { return nil }
+            return PlantBatchCareSheetRoomSection(id: section.id, room: section.room, tasks: tasks)
+        }
+    }
+
+    private var selectedVisibleTaskIDs: Set<String> {
+        selectedTaskIDs.intersection(activeTaskIDs)
+    }
+
     private var selectedTasks: [PlantBatchCareSheetTask] {
-        snapshot.tasks.filter { selectedTaskIDs.contains($0.id) }
+        snapshot.tasks.filter { selectedVisibleTaskIDs.contains($0.id) }
     }
 
     var body: some View {
@@ -67,68 +100,56 @@ struct PlantBatchCareSheet: View {
         }
         .accessibilityIdentifier("plant-batch-care-sheet")
         .onChange(of: snapshot.signature) { _, _ in
+            let currentTaskIDs = Set(snapshot.tasks.map(\.id))
+            resolvedTaskIDs = resolvedTaskIDs.intersection(currentTaskIDs)
             selectedTaskIDs = Set(snapshot.filterSnapshot(for: selectedCareType).taskIDs)
+                .subtracting(resolvedTaskIDs)
         }
     }
 
     private var headerCard: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 12) {
-                Image(systemName: "checklist.checked") // a11y: allow decorative glyph; title and metrics name this sheet.
-                    .font(OhanaFont.adaptive(size: 18, weight: .black))
-                    .foregroundStyle(Color.goPrimary)
-                    .frame(width: 44, height: 44)
-                    .background(Color.goPrimary.opacity(0.16), in: Circle())
-                    .accessibilityHidden(true)
+        HStack(spacing: 12) {
+            Image(systemName: "checklist.checked") // a11y: allow decorative glyph; title and count name this sheet.
+                .font(OhanaFont.adaptive(size: 18, weight: .black))
+                .foregroundStyle(Color.goPrimary)
+                .frame(width: 44, height: 44)
+                .background(Color.goPrimary.opacity(0.16), in: Circle())
+                .accessibilityHidden(true)
 
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(l.tr(zh: "今天到期", en: "Due today", de: "Heute fällig"))
-                        .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
-                        .foregroundStyle(Color.ohanaTertiaryText)
-                        .textCase(.uppercase)
-                    Text(l.tr(
-                        zh: "先勾选，再一次完成；需要细记的项目可进入详记。",
-                        en: "Select items, complete once, or open details for richer logs.",
-                        de: "Auswählen, gesammelt erledigen oder Details erfassen."
-                    ))
+            VStack(alignment: .leading, spacing: 4) {
+                Text(l.tr(zh: "今天到期", en: "Due today", de: "Heute fällig"))
+                    .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
+                    .foregroundStyle(Color.ohanaTertiaryText)
+                    .textCase(.uppercase)
+                Text(headerSummary)
                     .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .rounded))
                     .foregroundStyle(Color.ohanaSecondaryText)
-                    .fixedSize(horizontal: false, vertical: true)
-                }
-                Spacer(minLength: 8)
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.82)
             }
-
-            HStack(spacing: 8) {
-                metricPill(
-                    icon: "leaf.fill",
-                    value: "\(Set(snapshot.tasks.map(\.plantID)).count)",
-                    label: l.tr(zh: "植物", en: "Plants", de: "Pflanzen"),
-                    tint: Color.goTeal
-                )
-                metricPill(
-                    icon: "checkmark.circle.fill",
-                    value: "\(selectedTasks.count)",
-                    label: l.tr(zh: "已选", en: "Selected", de: "Gewählt"),
-                    tint: Color.goPrimary
-                )
-                metricPill(
-                    icon: "calendar.badge.exclamationmark",
-                    value: "\(snapshot.tasks.count)",
-                    label: l.tr(zh: "任务", en: "Tasks", de: "Aufgaben"),
-                    tint: Color.goYellow
-                )
-            }
+            Spacer(minLength: 8)
         }
         .padding(16)
         .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous))
         .accessibilityElement(children: .contain)
     }
 
+    private var headerSummary: String {
+        if activeTaskCount == 0 {
+            return l.tr(zh: "全部处理完", en: "All handled", de: "Alles erledigt")
+        }
+        return l.tr(
+            zh: "\(activePlantCount) 株植物 · 已选 \(selectedTasks.count) / \(activeTaskCount)",
+            en: "\(activePlantCount) plants · \(selectedTasks.count)/\(activeTaskCount) selected",
+            de: "\(activePlantCount) Pflanzen · \(selectedTasks.count)/\(activeTaskCount) gewählt"
+        )
+    }
+
     private var typeChips: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
                 chip(
-                    title: l.tr(zh: "全部 \(snapshot.allFilter.count)", en: "All \(snapshot.allFilter.count)", de: "Alle \(snapshot.allFilter.count)"),
+                    title: l.tr(zh: "全部 \(activeTaskCount)", en: "All \(activeTaskCount)", de: "Alle \(activeTaskCount)"),
                     icon: "checklist",
                     isSelected: selectedCareType == nil,
                     tint: Color.goPrimary
@@ -137,8 +158,9 @@ struct PlantBatchCareSheet: View {
                 }
 
                 ForEach(snapshot.careTypeFilters) { item in
+                    let count = activeCount(for: item)
                     chip(
-                        title: "\(item.careType?.displayName(l: l) ?? "") \(item.count)",
+                        title: "\(item.careType?.displayName(l: l) ?? "") \(count)",
                         icon: item.careType.map(careSymbol(for:)) ?? "checklist",
                         isSelected: selectedCareType == item.careType,
                         tint: item.careType.map(careTint(for:)) ?? Color.goPrimary
@@ -154,10 +176,10 @@ struct PlantBatchCareSheet: View {
 
     private var checklist: some View {
         VStack(alignment: .leading, spacing: 12) {
-            if visibleSnapshot.count == 0 {
+            if visibleTaskCount == 0 {
                 emptyState
             } else {
-                ForEach(visibleSnapshot.roomSections) { section in
+                ForEach(visibleRoomSections) { section in
                     roomSection(section.room, tasks: section.tasks)
                 }
             }
@@ -210,16 +232,28 @@ struct PlantBatchCareSheet: View {
                 .background(Color.goTeal.opacity(0.16), in: Circle())
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 4) {
-                Text(l.tr(zh: "没有匹配的照护", en: "No matching care", de: "Keine passenden Aufgaben"))
+                Text(emptyStateTitle)
                     .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
-                Text(l.tr(zh: "换一个类型，或回到全部查看。", en: "Choose another type or return to all.", de: "Anderen Typ wählen oder alle anzeigen."))
+                Text(emptyStateDetail)
                     .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded))
                     .foregroundStyle(Color.ohanaSecondaryText)
             }
         }
         .padding(14)
         .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous))
+    }
+
+    private var emptyStateTitle: String {
+        activeTaskCount == 0
+            ? l.tr(zh: "全部处理完", en: "All handled", de: "Alles erledigt")
+            : l.tr(zh: "没有匹配的照护", en: "No matching care", de: "Keine passenden Aufgaben")
+    }
+
+    private var emptyStateDetail: String {
+        activeTaskCount == 0
+            ? l.tr(zh: "可以直接关闭，或稍后再回来查看。", en: "You can close this sheet or check back later.", de: "Du kannst schließen oder später erneut prüfen.")
+            : l.tr(zh: "换一个类型，或回到全部查看。", en: "Choose another type or return to all.", de: "Anderen Typ wählen oder alle anzeigen.")
     }
 
     private func roomSection(_ room: String, tasks: [PlantBatchCareSheetTask]) -> some View {
@@ -247,7 +281,20 @@ struct PlantBatchCareSheet: View {
 
     private func taskRow(_ task: PlantBatchCareSheetTask) -> some View {
         let isSelected = selectedTaskIDs.contains(task.id)
-        return VStack(alignment: .leading, spacing: 8) {
+        return PlantBatchCareActionRevealRow(
+            deferTitle: l.tr(zh: "延后", en: "Defer", de: "Später"),
+            skipTitle: l.tr(zh: "跳过", en: "Skip", de: "Überspringen"),
+            deferAccessibilityLabel: l.tr(zh: "延后\(task.plantName)", en: "Defer \(task.plantName)", de: "\(task.plantName) verschieben"),
+            skipAccessibilityLabel: l.tr(zh: "跳过\(task.plantName)", en: "Skip \(task.plantName)", de: "\(task.plantName) überspringen"),
+            deferIdentifier: "plant-batch-care-defer-\(task.id)",
+            skipIdentifier: "plant-batch-care-skip-\(task.id)",
+            onDefer: {
+                resolveTask(task, using: onDeferTask)
+            },
+            onSkip: {
+                resolveTask(task, using: onSkipTask)
+            }
+        ) {
             HStack(spacing: 10) {
                 Button {
                     toggle(task)
@@ -277,42 +324,40 @@ struct PlantBatchCareSheet: View {
                 }
 
                 Spacer(minLength: 6)
-            }
 
-            HStack(spacing: 8) {
-                rowActionButton(
-                    symbol: "clock.arrow.circlepath",
-                    title: l.tr(zh: "延后", en: "Defer", de: "Später"),
-                    label: l.tr(zh: "延后\(task.plantName)", en: "Defer \(task.plantName)", de: "\(task.plantName) verschieben"),
-                    identifier: "plant-batch-care-defer-\(task.id)"
-                ) {
-                    onDeferTask(task)
-                    dismiss()
-                }
-
-                rowActionButton(
-                    symbol: "forward.end.fill",
-                    title: l.tr(zh: "跳过", en: "Skip", de: "Überspringen"),
-                    label: l.tr(zh: "跳过\(task.plantName)", en: "Skip \(task.plantName)", de: "\(task.plantName) überspringen"),
-                    identifier: "plant-batch-care-skip-\(task.id)"
-                ) {
-                    onSkipTask(task)
-                    dismiss()
-                }
-
-                rowActionButton(
-                    symbol: "square.and.pencil",
-                    title: l.tr(zh: "详记", en: "Detail", de: "Details"),
-                    label: l.tr(zh: "详记\(task.plantName)", en: "Detailed log for \(task.plantName)", de: "Details für \(task.plantName)"),
-                    identifier: "plant-batch-care-detail-\(task.id)"
-                ) {
-                    onOpenCareLog(task.plantID, task.careType)
-                    dismiss()
-                }
+                Image(systemName: "ellipsis") // a11y: allow decorative menu hint; context menu and actions are exposed separately.
+                    .font(OhanaFont.adaptive(size: 13, weight: .black))
+                    .foregroundStyle(Color.ohanaTertiaryText)
+                    .frame(width: 24, height: 44)
+                    .accessibilityHidden(true)
             }
         }
-        .padding(8)
-        .background(Color.ohanaControlFill.opacity(0.62), in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
+        .contextMenu {
+            Button {
+                resolveTask(task, using: onDeferTask)
+            } label: {
+                Label(l.tr(zh: "延后", en: "Defer", de: "Später"), systemImage: "clock.arrow.circlepath")
+            }
+            Button {
+                resolveTask(task, using: onSkipTask)
+            } label: {
+                Label(l.tr(zh: "跳过", en: "Skip", de: "Überspringen"), systemImage: "forward.end.fill")
+            }
+            Button {
+                onOpenCareLog(task.plantID, task.careType)
+            } label: {
+                Label(l.tr(zh: "详记", en: "Detail", de: "Details"), systemImage: "square.and.pencil")
+            }
+        }
+        .accessibilityAction(named: Text(l.tr(zh: "延后", en: "Defer", de: "Später"))) {
+            resolveTask(task, using: onDeferTask)
+        }
+        .accessibilityAction(named: Text(l.tr(zh: "跳过", en: "Skip", de: "Überspringen"))) {
+            resolveTask(task, using: onSkipTask)
+        }
+        .accessibilityAction(named: Text(l.tr(zh: "详记", en: "Detail", de: "Details"))) {
+            onOpenCareLog(task.plantID, task.careType)
+        }
         .accessibilityElement(children: .contain)
     }
 
@@ -388,51 +433,9 @@ struct PlantBatchCareSheet: View {
         .buttonStyle(ScaleButtonStyle())
     }
 
-    private func rowActionButton(symbol: String, title: String, label: String, identifier: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            HStack(spacing: 5) {
-                Image(systemName: symbol)
-                    .font(OhanaFont.adaptive(size: 11, weight: .black))
-                    .accessibilityHidden(true)
-                Text(title)
-                    .font(OhanaFont.adaptive(size: 11, weight: .black, design: .rounded))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.78)
-            }
-            .foregroundStyle(Color.ohanaPrimaryText)
-            .frame(maxWidth: .infinity)
-            .frame(minHeight: 44)
-            .background(Color.ohanaCardSurface.opacity(0.74), in: Capsule())
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(ScaleButtonStyle())
-        .accessibilityLabel(label)
-        .accessibilityIdentifier(identifier)
-    }
-
-    private func metricPill(icon: String, value: String, label: String, tint: Color) -> some View {
-        VStack(alignment: .leading, spacing: 5) {
-            Image(systemName: icon)
-                .font(OhanaFont.adaptive(size: 11, weight: .black))
-                .foregroundStyle(tint)
-                .accessibilityHidden(true)
-            Text(value)
-                .font(OhanaFont.adaptive(size: 17, weight: .black, design: .rounded))
-                .foregroundStyle(Color.ohanaPrimaryText)
-            Text(label)
-                .font(OhanaFont.adaptive(size: 10, weight: .bold, design: .rounded))
-                .foregroundStyle(Color.ohanaSecondaryText)
-                .lineLimit(1)
-                .minimumScaleFactor(0.76)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(10)
-        .background(Color.ohanaControlFill.opacity(0.68), in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
-    }
-
     private func selectCareType(_ type: PlantCareType?) {
         selectedCareType = type
-        selectedTaskIDs = Set(snapshot.filterSnapshot(for: type).taskIDs)
+        selectedTaskIDs = Set(snapshot.filterSnapshot(for: type).taskIDs).intersection(activeTaskIDs)
         UISelectionFeedbackGenerator().selectionChanged()
     }
 
@@ -443,6 +446,20 @@ struct PlantBatchCareSheet: View {
             selectedTaskIDs.insert(task.id)
         }
         UISelectionFeedbackGenerator().selectionChanged()
+    }
+
+    private func resolveTask(_ task: PlantBatchCareSheetTask, using action: (PlantBatchCareSheetTask) -> Void) {
+        guard !resolvedTaskIDs.contains(task.id) else { return }
+        withAnimation(GoMotion.quick) {
+            resolvedTaskIDs.insert(task.id)
+            selectedTaskIDs.remove(task.id)
+        }
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        action(task)
+    }
+
+    private func activeCount(for filter: PlantBatchCareSheetFilterSnapshot) -> Int {
+        filter.taskIDs.count { activeTaskIDs.contains($0) }
     }
 
     private func taskTint(for task: PlantBatchCareSheetTask) -> Color {
@@ -473,6 +490,151 @@ struct PlantBatchCareSheet: View {
         case .fertilizing, .newLeaf, .leafCleaning: Color.goYellow
         case .pestCheck, .pestFound, .yellowLeaf: Color.goOrange
         case .repotting, .pruning, .rotating, .photo, .customNote: Color.goPrimary
+        }
+    }
+}
+
+private struct PlantBatchCareActionRevealRow<Content: View>: View {
+    let deferTitle: String
+    let skipTitle: String
+    let deferAccessibilityLabel: String
+    let skipAccessibilityLabel: String
+    let deferIdentifier: String
+    let skipIdentifier: String
+    let onDefer: () -> Void
+    let onSkip: () -> Void
+    @ViewBuilder let content: () -> Content
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var offsetX: CGFloat = 0
+    @State private var dragStartOffsetX: CGFloat = 0
+    @State private var activeDragAxis: DragAxis?
+
+    private enum DragAxis {
+        case horizontal
+        case vertical
+    }
+
+    private let revealWidth: CGFloat = 156
+    private let triggerDistance: CGFloat = 62
+
+    var body: some View {
+        ZStack(alignment: .trailing) {
+            actionButtons
+                .padding(.trailing, 6)
+
+            content()
+                .padding(8)
+                .background(Color.ohanaControlFill.opacity(0.62), in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
+                .contentShape(Rectangle())
+                .offset(x: clampedOffset)
+                .simultaneousGesture(revealGesture)
+        }
+        .clipShape(RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
+    }
+
+    private var clampedOffset: CGFloat {
+        min(0, max(-revealWidth, offsetX))
+    }
+
+    private var actionButtons: some View {
+        HStack(spacing: 6) {
+            revealActionButton(
+                title: deferTitle,
+                symbol: "clock.arrow.circlepath",
+                tint: Color.goYellow,
+                accessibilityLabel: deferAccessibilityLabel,
+                identifier: deferIdentifier,
+                action: onDefer
+            )
+            revealActionButton(
+                title: skipTitle,
+                symbol: "forward.end.fill",
+                tint: Color.goOrange,
+                accessibilityLabel: skipAccessibilityLabel,
+                identifier: skipIdentifier,
+                action: onSkip
+            )
+        }
+    }
+
+    private func revealActionButton(
+        title: String,
+        symbol: String,
+        tint: Color,
+        accessibilityLabel: String,
+        identifier: String,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button {
+            closeActions()
+            action()
+        } label: {
+            VStack(spacing: 4) {
+                Image(systemName: symbol)
+                    .font(OhanaFont.adaptive(size: 13, weight: .black))
+                    .accessibilityHidden(true)
+                Text(title)
+                    .font(OhanaFont.adaptive(size: 10, weight: .black, design: .rounded))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.78)
+            }
+            .foregroundStyle(Color.arkInk)
+            .frame(width: 72)
+            .frame(minHeight: 52)
+            .background(tint, in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(ScaleButtonStyle())
+        .accessibilityLabel(accessibilityLabel)
+        .accessibilityIdentifier(identifier)
+    }
+
+    private var revealGesture: some Gesture {
+        DragGesture(minimumDistance: 12, coordinateSpace: .local)
+            .onChanged { value in
+                let dx = value.translation.width
+                let dy = value.translation.height
+
+                if activeDragAxis == nil {
+                    let absX = abs(dx)
+                    let absY = abs(dy)
+                    guard max(absX, absY) > 10 else { return }
+
+                    if absY > absX * 1.12 {
+                        activeDragAxis = .vertical
+                        closeActions()
+                        return
+                    }
+                    guard absX > absY * 1.35 else { return }
+                    activeDragAxis = .horizontal
+                    dragStartOffsetX = offsetX
+                }
+
+                guard activeDragAxis == .horizontal else { return }
+                offsetX = min(0, max(-revealWidth, dragStartOffsetX + dx))
+            }
+            .onEnded { value in
+                defer {
+                    activeDragAxis = nil
+                    dragStartOffsetX = 0
+                }
+                guard activeDragAxis == .horizontal else {
+                    closeActions()
+                    return
+                }
+
+                let shouldReveal = offsetX < -triggerDistance || value.predictedEndTranslation.width < -revealWidth
+                withAnimation(reduceMotion ? GoMotion.reduced : GoMotion.quick) {
+                    offsetX = shouldReveal ? -revealWidth : 0
+                }
+            }
+    }
+
+    private func closeActions() {
+        guard offsetX != 0 else { return }
+        withAnimation(reduceMotion ? GoMotion.reduced : GoMotion.quick) {
+            offsetX = 0
         }
     }
 }

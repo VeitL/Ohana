@@ -24,6 +24,8 @@ struct FunctionMenuSheet: View {
         guard let dest = initialRoutedDestination else { return nil }
         switch dest {
         case .featureGroup,
+             .petFeatureCollection,
+             .plantFeatureCollection,
              .featureAggregate,
              .plantsBatchCare,
              .plantsBatchCareFiltered,
@@ -185,6 +187,8 @@ struct FunctionMenuSheet: View {
     private func directLandingNeedsHostClose(_ dest: FMDest) -> Bool {
         switch dest {
         case .featureGroup,
+             .petFeatureCollection,
+             .plantFeatureCollection,
              .featureAggregate,
              .plantsBatchCare,
              .plantsBatchCareFiltered,
@@ -225,6 +229,10 @@ struct FunctionMenuSheet: View {
         return switch destination {
         case let .featureGroup(group):
             (group.title(l: l), group.icon)
+        case .petFeatureCollection:
+            (l.tr(zh: "全部功能", en: "All Features", de: "Alle Funktionen"), "square.grid.2x2.fill")
+        case .plantFeatureCollection:
+            (l.tr(zh: "植物全部功能", en: "All Plant Features", de: "Alle Pflanzenfunktionen"), "square.grid.2x2.fill")
         case let .featureAggregate(feature):
             (feature.title(l: l), feature.icon)
         case .familyWeeklyReport:

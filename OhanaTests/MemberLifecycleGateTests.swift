@@ -3980,7 +3980,11 @@ struct MemberLifecycleGateTests {
         for path in migratedSources {
             let fileSource = try source(path, rootURL: rootURL)
             #expect(fileSource.contains("imageSignature:"))
-            #expect(fileSource.contains("imageDataProvider:") || fileSource.contains("asyncImageDataProvider:"))
+            #expect(
+                fileSource.contains("imageDataProvider:")
+                    || fileSource.contains("asyncImageDataProvider:")
+                    || fileSource.contains("ModelID:")
+            )
             for forbidden in forbiddenDirectAvatarReads {
                 #expect(!fileSource.contains(forbidden))
             }
@@ -4491,7 +4495,7 @@ struct MemberLifecycleGateTests {
     }
 
     private func makeInMemoryContainer() throws -> ModelContainer {
-        let schema = Schema(ArkSchemaV82.models)
+        let schema = Schema(ArkSchemaV84.models)
         let config = ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)
         return try ModelContainer(for: schema, configurations: [config])
     }

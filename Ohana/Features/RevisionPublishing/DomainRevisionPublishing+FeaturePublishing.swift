@@ -131,6 +131,22 @@ extension DomainRevisionPublishing {
         )
     }
 
+    func publishPlantBatchCarePendingRewardsChanged(
+        batchID: UUID,
+        action: String,
+        pendingCount: Int,
+        note: String
+    ) {
+        publish(
+            DomainMutationResult(
+                command: .plantBatchCare(batchID: batchID, action: action, count: pendingCount),
+                affectedEntityIDs: [batchID],
+                wroteBusinessFact: false,
+                note: note
+            )
+        )
+    }
+
     func publishCalendarEventPlan(
         _ result: CalendarEventPlanCommandResult,
         note: String

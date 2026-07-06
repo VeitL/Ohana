@@ -4531,6 +4531,279 @@ struct HomeCommandExecutorTests {
     }
 
     @MainActor
+    @Test func healthKitHumanWorkoutImportWritesSourceMetadataAndLedger() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let human = Human(name: "Guan")
+        context.insert(human)
+        try context.save()
+
+        let date = Date(timeIntervalSince1970: 1_800_000_000)
+        let result = WorkoutCommandService.recordHumanWorkout(
+            human: human,
+            type: .running,
+            durationMinutes: 36,
+            date: date,
+            context: context,
+            distanceKm: 6.4,
+            calories: 510,
+            steps: 7300,
+            sourceHealthKit: true,
+            healthKitWorkoutUUID: "hk-workout-001",
+            healthKitSourceBundleID: "com.apple.Health",
+            healthKitSourceName: "Apple Health",
+            source: .importData
+        )
+
+        let log = try #require(try context.fetch(FetchDescriptor<HumanWorkoutLog>()).first)
+        let event = try #require(try context.fetch(FetchDescriptor<CareLedgerEvent>()).first)
+        #expect(log.id == result.logID)
+        #expect(log.sourceHealthKit)
+        #expect(log.healthKitWorkoutUUID == "hk-workout-001")
+        #expect(log.healthKitSourceBundleID == "com.apple.Health")
+        #expect(log.healthKitSourceName == "Apple Health")
+        #expect(log.steps == 7300)
+        #expect(log.distanceKm == 6.4)
+        #expect(log.calories == 510)
+        #expect(event.source == CareLedgerSource.importData.rawValue)
+        #expect(event.coconutDelta == 0)
+        #expect(event.rewardLogId == nil)
+
+        let metadataData = try #require(event.metadataJSON.data(using: .utf8))
+        let metadata = try #require(JSONSerialization.jsonObject(with: metadataData) as? [String: Any])
+        #expect((metadata["steps"] as? NSNumber)?.intValue == 7300)
+        #expect((metadata["sourceHealthKit"] as? NSNumber)?.boolValue == true)
+        #expect(metadata["healthKitWorkoutUUID"] as? String == "hk-workout-001")
+    }
+
+    @MainActor
+    @Test func petWalkHumanWorkoutImportWritesSourceMetadataAndLedger() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let human = Human(name: "Guan")
+        context.insert(human)
+        try context.save()
+
+        let petWalkLogID = UUID().uuidString
+        let date = Date(timeIntervalSince1970: 1_800_000_000)
+        let result = WorkoutCommandService.recordHumanWorkout(
+            human: human,
+            type: .walking,
+            durationMinutes: 28,
+            date: date,
+            context: context,
+            distanceKm: 1.9,
+            sourcePetWalkLogID: petWalkLogID,
+            source: .importData
+        )
+
+        let log = try #require(try context.fetch(FetchDescriptor<HumanWorkoutLog>()).first)
+        let event = try #require(try context.fetch(FetchDescriptor<CareLedgerEvent>()).first)
+        #expect(log.id == result.logID)
+        #expect(log.sourcePetWalkLogID == petWalkLogID)
+        #expect(!log.sourceHealthKit)
+        #expect(event.source == CareLedgerSource.importData.rawValue)
+        #expect(event.coconutDelta == 0)
+
+        let metadataData = try #require(event.metadataJSON.data(using: .utf8))
+        let metadata = try #require(JSONSerialization.jsonObject(with: metadataData) as? [String: Any])
+        #expect(metadata["sourcePetWalkLogID"] as? String == petWalkLogID)
+        #expect((metadata["sourceHealthKit"] as? NSNumber)?.boolValue == false)
+    }
+
+    @MainActor
+    @Test func duplicateHealthKitHumanWorkoutImportReusesExistingFact() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let human = Human(name: "Guan")
+        context.insert(human)
+        try context.save()
+
+        let date = Date(timeIntervalSince1970: 1_800_000_000)
+        let first = WorkoutCommandService.recordHumanWorkout(
+            human: human,
+            type: .walking,
+            durationMinutes: 20,
+            date: date,
+            context: context,
+            distanceKm: 2.2,
+            sourceHealthKit: true,
+            healthKitWorkoutUUID: "hk-workout-dupe",
+            source: .importData
+        )
+        let second = WorkoutCommandService.recordHumanWorkout(
+            human: human,
+            type: .running,
+            durationMinutes: 60,
+            date: date.addingTimeInterval(3600),
+            context: context,
+            distanceKm: 10,
+            calories: 700,
+            sourceHealthKit: true,
+            healthKitWorkoutUUID: "hk-workout-dupe",
+            source: .importData
+        )
+
+        let logs = try context.fetch(FetchDescriptor<HumanWorkoutLog>())
+        let ledgerEvents = try context.fetch(FetchDescriptor<CareLedgerEvent>())
+        #expect(logs.count == 1)
+        #expect(ledgerEvents.count == 1)
+        #expect(first.logID == second.logID)
+        #expect(first.ledgerEventID == second.ledgerEventID)
+        #expect(logs.first?.workoutType == .walking)
+        #expect(logs.first?.distanceKm == 2.2)
+    }
+
+    @MainActor
+    @Test func duplicatePetWalkHumanWorkoutImportReusesExistingFact() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let human = Human(name: "Guan")
+        context.insert(human)
+        try context.save()
+
+        let petWalkLogID = UUID().uuidString
+        let date = Date(timeIntervalSince1970: 1_800_000_000)
+        let first = WorkoutCommandService.recordHumanWorkout(
+            human: human,
+            type: .walking,
+            durationMinutes: 20,
+            date: date,
+            context: context,
+            distanceKm: 1.6,
+            sourcePetWalkLogID: petWalkLogID,
+            source: .importData
+        )
+        let second = WorkoutCommandService.recordHumanWorkout(
+            human: human,
+            type: .walking,
+            durationMinutes: 45,
+            date: date.addingTimeInterval(900),
+            context: context,
+            distanceKm: 4.2,
+            calories: 260,
+            sourcePetWalkLogID: petWalkLogID,
+            source: .importData
+        )
+
+        let logs = try context.fetch(FetchDescriptor<HumanWorkoutLog>())
+        let ledgerEvents = try context.fetch(FetchDescriptor<CareLedgerEvent>())
+        #expect(logs.count == 1)
+        #expect(ledgerEvents.count == 1)
+        #expect(first.logID == second.logID)
+        #expect(first.ledgerEventID == second.ledgerEventID)
+        #expect(logs.first?.durationMinutes == 20)
+        #expect(logs.first?.distanceKm == 1.6)
+        #expect(logs.first?.sourcePetWalkLogID == petWalkLogID)
+    }
+
+    @MainActor
+    @Test func overlappingHealthKitAndPetWalkImportsMergeIntoOneWorkoutFact() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let human = Human(name: "Guan")
+        context.insert(human)
+        try context.save()
+
+        let petWalkLogID = UUID().uuidString
+        let date = Date(timeIntervalSince1970: 1_800_000_000)
+        let petWalkResult = WorkoutCommandService.recordHumanWorkout(
+            human: human,
+            type: .walking,
+            durationMinutes: 30,
+            date: date,
+            context: context,
+            distanceKm: 2.0,
+            sourcePetWalkLogID: petWalkLogID,
+            source: .importData
+        )
+        let healthKitResult = WorkoutCommandService.recordHumanWorkout(
+            human: human,
+            type: .walking,
+            durationMinutes: 32,
+            date: date.addingTimeInterval(120),
+            context: context,
+            distanceKm: 2.1,
+            calories: 180,
+            steps: 3100,
+            sourceHealthKit: true,
+            healthKitWorkoutUUID: "hk-overlap-001",
+            healthKitSourceBundleID: "com.apple.Health",
+            healthKitSourceName: "Apple Health",
+            source: .importData
+        )
+
+        let logs = try context.fetch(FetchDescriptor<HumanWorkoutLog>())
+        let ledgerEvents = try context.fetch(FetchDescriptor<CareLedgerEvent>())
+        let log = try #require(logs.first)
+        let event = try #require(ledgerEvents.first)
+        #expect(logs.count == 1)
+        #expect(ledgerEvents.count == 1)
+        #expect(petWalkResult.logID == healthKitResult.logID)
+        #expect(log.sourcePetWalkLogID == petWalkLogID)
+        #expect(log.sourceHealthKit)
+        #expect(log.healthKitWorkoutUUID == "hk-overlap-001")
+
+        let metadataData = try #require(event.metadataJSON.data(using: .utf8))
+        let metadata = try #require(JSONSerialization.jsonObject(with: metadataData) as? [String: Any])
+        #expect(metadata["sourcePetWalkLogID"] as? String == petWalkLogID)
+        #expect(metadata["healthKitWorkoutUUID"] as? String == "hk-overlap-001")
+        #expect((metadata["sourceHealthKit"] as? NSNumber)?.boolValue == true)
+    }
+
+    @MainActor
+    @Test func overlappingPetWalkImportMergesIntoExistingHealthKitWorkoutFact() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let human = Human(name: "Guan")
+        context.insert(human)
+        try context.save()
+
+        let petWalkLogID = UUID().uuidString
+        let date = Date(timeIntervalSince1970: 1_800_000_000)
+        let healthKitResult = WorkoutCommandService.recordHumanWorkout(
+            human: human,
+            type: .walking,
+            durationMinutes: 31,
+            date: date,
+            context: context,
+            distanceKm: 2.2,
+            calories: 190,
+            steps: 3200,
+            sourceHealthKit: true,
+            healthKitWorkoutUUID: "hk-overlap-002",
+            healthKitSourceBundleID: "com.apple.Health",
+            healthKitSourceName: "Apple Health",
+            source: .importData
+        )
+        let petWalkResult = WorkoutCommandService.recordHumanWorkout(
+            human: human,
+            type: .walking,
+            durationMinutes: 30,
+            date: date.addingTimeInterval(180),
+            context: context,
+            distanceKm: 2.1,
+            sourcePetWalkLogID: petWalkLogID,
+            source: .importData
+        )
+
+        let logs = try context.fetch(FetchDescriptor<HumanWorkoutLog>())
+        let ledgerEvents = try context.fetch(FetchDescriptor<CareLedgerEvent>())
+        let log = try #require(logs.first)
+        let event = try #require(ledgerEvents.first)
+        #expect(logs.count == 1)
+        #expect(ledgerEvents.count == 1)
+        #expect(healthKitResult.logID == petWalkResult.logID)
+        #expect(log.sourcePetWalkLogID == petWalkLogID)
+        #expect(log.healthKitWorkoutUUID == "hk-overlap-002")
+
+        let metadataData = try #require(event.metadataJSON.data(using: .utf8))
+        let metadata = try #require(JSONSerialization.jsonObject(with: metadataData) as? [String: Any])
+        #expect(metadata["sourcePetWalkLogID"] as? String == petWalkLogID)
+        #expect(metadata["healthKitWorkoutUUID"] as? String == "hk-overlap-002")
+    }
+
+    @MainActor
     @Test func humanWorkoutDeleteServiceRemovesFactAndLedger() throws {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
@@ -9626,7 +9899,7 @@ struct HomeCommandExecutorTests {
     }
 
     private func makeInMemoryContainer() throws -> ModelContainer {
-        let schema = Schema(ArkSchemaV82.models)
+        let schema = Schema(ArkSchemaV84.models)
         let config = ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)
         return try ModelContainer(for: schema, configurations: [config])
     }

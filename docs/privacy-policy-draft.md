@@ -3,7 +3,7 @@
 Status: Draft for owner/legal review. This is not the published privacy policy
 URL yet.
 
-Last updated: 2026-06-24
+Last updated: 2026-07-06
 
 Contact: guanchen.li.119@gmail.com
 
@@ -41,6 +41,10 @@ features you use:
   health, weight, notes, and shared-care history.
 - Human wellness records such as weight, workouts, medication, notes, expenses,
   and privacy settings.
+- Apple Health read snapshots such as steps, distance, active energy, Activity
+  Summary values, and imported workout metadata when you connect Apple Health
+  from Human Workout. Daily snapshots are shown in the page; imported workouts
+  become local Human workout logs.
 - Reminders, family tasks, notification preferences, and completion history.
 - Photos or image attachments you choose to add, such as avatars, Moments, and
   receipt images.
@@ -104,11 +108,15 @@ Ohana asks for permissions only when a feature needs them:
   related local notification actions.
 - Face ID / biometrics: optional shortcut for local member PIN gates. Ohana
   receives only success or failure from the system, not biometric data.
+- Apple Health / HealthKit: read-only access used when you connect Apple Health
+  from Human Workout. Ohana reads steps, distance, active energy, Activity
+  Summary values, and workouts for the selected Human's local summary/import; it
+  does not write workouts back to Apple Health.
 - iCloud Drive: used for the automatic backup file if the feature is enabled and
   the device is signed in to iCloud.
 
 Ohana does not currently request Contacts, Microphone, Bluetooth, Local Network,
-App Tracking Transparency, or HealthKit permissions.
+or App Tracking Transparency permissions.
 
 ## Sharing With Others
 

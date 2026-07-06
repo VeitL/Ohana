@@ -19,11 +19,14 @@ enum VerticalHomeTabMountPolicy {
     static func mountedTabs(
         active: VerticalSolidHomeTab,
         outgoing: VerticalSolidHomeTab?,
-        prepared _: Set<VerticalSolidHomeTab> = []
+        prepared: Set<VerticalSolidHomeTab> = []
     ) -> Set<VerticalSolidHomeTab> {
         var mounted: Set<VerticalSolidHomeTab> = [active]
         if let outgoing {
             mounted.insert(outgoing)
+        }
+        if prepared.contains(.calendar) {
+            mounted.insert(.calendar)
         }
         return mounted
     }

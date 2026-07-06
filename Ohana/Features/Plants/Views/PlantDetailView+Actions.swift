@@ -9,6 +9,12 @@ import Foundation
 import SwiftUI
 import UIKit
 
+struct PlantDetailCareFeatureDraft: Identifiable, Hashable {
+    let feature: PlantCareFeatureDestination
+
+    var id: String { feature.rawValue }
+}
+
 extension PlantDetailContentView {
     // MARK: - Actions
 
@@ -88,11 +94,14 @@ extension PlantDetailContentView {
     }
 
     func openPlantFeatureDestination(_ destination: PlantFeatureDestination) {
+        if let careFeatureDestination = destination.careFeatureDestination {
+            openPlantCareFeatureDetail(careFeatureDestination)
+            return
+        }
+
         switch destination {
-        case .water:
-            openCareLogSheet(.watering)
-        case .fertilize:
-            openCareLogSheet(.fertilizing)
+        case .water, .fertilize:
+            return
         case .pestCheck:
             openCareLogSheet(.pestCheck)
         case .leafCleaning:
@@ -122,6 +131,11 @@ extension PlantDetailContentView {
                 showingEditSheet = true
             }
         }
+    }
+
+    func openPlantCareFeatureDetail(_ feature: PlantCareFeatureDestination) {
+        showingAllFeaturesHub = false
+        careFeatureDraft = PlantDetailCareFeatureDraft(feature: feature)
     }
 
     func revealPlantDetailExtrasAndScroll(to anchor: PlantDetailFeatureAnchor) {

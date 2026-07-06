@@ -73,6 +73,7 @@ struct CalendarView: View {
     @State var preparedCalendarSnapshot = CalendarPreparedSnapshot.empty
     @State var preparedCalendarSnapshotKey: CalendarPreparedSnapshotTriggerKey?
     @State var preparedCalendarSnapshotTask: Task<Void, Never>?
+    @State var preparedCalendarSnapshotGeneration = 0
     @State var embeddedBottomChromeBaselineOffset: CGFloat?
     @State var didScheduleCalendarMaintenance = false
     @State var calendarOpenStartedAt: CFAbsoluteTime?
@@ -152,24 +153,6 @@ struct CalendarView: View {
         activeFilterSelection
     }
 
-    var contentHandoffState: CalendarContentHandoffState {
-        CalendarContentHandoffState(
-            viewModeRaw: displayedViewModeRaw ?? viewModeRaw,
-            filter: effectiveFilterSelection
-        )
-    }
-
-    var activeHuman: Human? {
-        if let id = UUID(uuidString: activeHumanIdStr), let human = humans.first(where: { $0.id == id }) {
-            return human
-        }
-        return humans.first
-    }
-
-    var calendarCoconutBalance: Int {
-        activeHuman?.coconutBalance ?? humans.reduce(0) { $0 + $1.coconutBalance }
-    }
-
     var effectivePetFilterId: String? {
         let selection = effectiveFilterSelection
         if !selection.humanId.isEmpty ||
@@ -203,79 +186,29 @@ struct CalendarView: View {
         return selection.isAllPlantsSelected
     }
 
-    var filteredEvents: [Event] {
-        preparedCalendarSnapshot.filteredEvents
+    var contentHandoffState: CalendarContentHandoffState {
+        CalendarContentHandoffState(
+            viewModeRaw: displayedViewModeRaw ?? viewModeRaw
+        )
     }
 
-    func buildFilteredEventsForPreparedSnapshot() -> [Event] {
-        var result = events.filter {
-            !CarePlanCalendarSync.isDefaultGeneratedCalendarPlan($0, pets: pets) &&
-                !MemberLifecycleActiveScheduleResolver.eventTargetsDeceasedActiveSchedule(
-                    $0,
-                    pets: pets,
-                    humans: humans,
-                    petMedications: petMedications,
-                    humanMedications: humanMedications,
-                    insurances: insurances
-                )
+    var activeHuman: Human? {
+        if let id = UUID(uuidString: activeHumanIdStr), let human = humans.first(where: { $0.id == id }) {
+            return human
         }
-        if let petId = effectivePetFilterId {
-            result = result.filter { eventIsRelatedToPet($0, petId: petId) }
-        }
-        if let humanId = effectiveHumanFilterId {
-            result = result.filter { eventIsRelatedToHuman($0, humanId: humanId) }
-        }
-        if effectivePlantFilterIncludesAll {
-            result = result.filter { eventIsRelatedToAnyPlant($0) }
-        } else if let plantId = effectivePlantFilterId {
-            result = result.filter { eventIsRelatedToPlant($0, plantId: plantId) }
-        }
-        return result
+        return humans.first
+    }
+
+    var calendarCoconutBalance: Int {
+        activeHuman?.coconutBalance ?? humans.reduce(0) { $0 + $1.coconutBalance }
     }
 
     var preparedCalendarSnapshotTriggerKey: CalendarPreparedSnapshotTriggerKey {
         CalendarPreparedSnapshotTriggerKey(
-            selectedDay: Calendar.current.startOfDay(for: selectedDate),
             monthKey: calendarMonthKey,
             filter: effectiveFilterSelection,
             dataRevision: dataRevision
         )
-    }
-
-    func eventIsRelatedToDeceasedMember(_ event: Event) -> Bool {
-        MemberLifecycleActiveScheduleResolver.eventTargetsDeceasedActiveSchedule(
-            event,
-            pets: pets,
-            humans: humans,
-            petMedications: petMedications,
-            humanMedications: humanMedications,
-            insurances: insurances
-        )
-    }
-
-    func eventIsActiveSchedule(_ event: Event, now: Date = Date()) -> Bool {
-        MemberLifecycleActiveScheduleResolver.isActiveSchedule(event, now: now)
-    }
-
-    func eventIsRelatedToPet(_ event: Event, petId: String) -> Bool {
-        MemberLifecycleActiveScheduleResolver.eventBelongsToPet(
-            event,
-            petId: petId,
-            petMedications: petMedications,
-            insurances: insurances
-        )
-    }
-
-    func eventIsRelatedToHuman(_ event: Event, humanId: String) -> Bool {
-        MemberLifecycleActiveScheduleResolver.eventBelongsToHuman(
-            event,
-            humanId: humanId,
-            humanMedications: humanMedications
-        )
-    }
-
-    func eventIsRelatedToPlant(_ event: Event, plantId: String) -> Bool {
-        DomainEntityLinkRegistry.plantId(for: event)?.uuidString == plantId
     }
 
     func eventIsRelatedToAnyPlant(_ event: Event) -> Bool {
@@ -321,7 +254,7 @@ struct CalendarView: View {
     }
 
     var eventsForSelectedDate: [Event] {
-        preparedCalendarSnapshot.selectedDateEvents
+        preparedCalendarSnapshot.events(forDayID: timelineDateID(selectedDate))
     }
 
     func shouldShowEventOccurrence(_ event: Event, occurrenceDate: Date) -> Bool {
@@ -331,11 +264,6 @@ struct CalendarView: View {
             allEvents: events,
             pets: pets
         )
-    }
-
-    /// 判断事件是否出现在指定日期（支持多日事件 + 重复事件展开）
-    func eventOccursOnDate(_ event: Event, date: Date) -> Bool {
-        CalendarSnapshotBuilder.eventOccursOnDate(event, date: date)
     }
 
     // 本周 7 天

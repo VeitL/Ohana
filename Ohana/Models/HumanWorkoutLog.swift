@@ -7,7 +7,7 @@
 import Foundation
 import SwiftData
 
-enum WorkoutType: String, Codable, CaseIterable {
+enum WorkoutType: String, Codable, CaseIterable, Sendable {
     case running = "跑步"
     case walking = "步行"
     case cycling = "骑行"
@@ -55,6 +55,10 @@ final class HumanWorkoutLog {
     var steps: Int
     var notes: String
     var sourceHealthKit: Bool
+    var healthKitWorkoutUUID: String = ""
+    var healthKitSourceBundleID: String = ""
+    var healthKitSourceName: String = ""
+    var sourcePetWalkLogID: String = ""
     var human: Human?
 
     init(
@@ -66,6 +70,10 @@ final class HumanWorkoutLog {
         steps: Int = 0,
         notes: String = "",
         sourceHealthKit: Bool = false,
+        healthKitWorkoutUUID: String = "",
+        healthKitSourceBundleID: String = "",
+        healthKitSourceName: String = "",
+        sourcePetWalkLogID: String = "",
         human: Human? = nil
     ) {
         self.id = UUID()
@@ -77,6 +85,10 @@ final class HumanWorkoutLog {
         self.steps = steps
         self.notes = notes
         self.sourceHealthKit = sourceHealthKit
+        self.healthKitWorkoutUUID = healthKitWorkoutUUID
+        self.healthKitSourceBundleID = healthKitSourceBundleID
+        self.healthKitSourceName = healthKitSourceName
+        self.sourcePetWalkLogID = sourcePetWalkLogID
         self.human = human
     }
 

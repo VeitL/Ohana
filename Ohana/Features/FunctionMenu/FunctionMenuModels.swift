@@ -57,6 +57,7 @@ enum FeatureGroup: String, Hashable, CaseIterable {
 
 enum FMDest: Hashable {
     case featureGroup(FeatureGroup)
+    case petFeatureCollection
     case featureAggregate(PetFeature)
     case petHealth(PersistentIdentifier)
     case petMedications(PersistentIdentifier)
@@ -81,6 +82,7 @@ enum FMDest: Hashable {
     case plantsDashboard
     case plantsBatchCare
     case plantsBatchCareFiltered(PlantCareType)
+    case plantFeatureCollection
     case plantsList
     case plantsPhotos
     case plantDetail(UUID)

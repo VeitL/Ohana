@@ -12,7 +12,7 @@
 ## Current Read
 
 - Last compacted: 2026-06-25.
-- Open follow-ups: 11 total: P1 = 3, P2 = 6, P3 = 2.
+- Open follow-ups: 12 total: P1 = 4, P2 = 6, P3 = 2.
 - Open P0: 0.
 - Known first-release-reachable repository-code P1: none.
 - P1 still open because of CloudKit 1.x deferred work or real-device validation.
@@ -37,7 +37,7 @@
 | First-release-reachable repository code | None | No current repository-code P1 blocks the first release bar. | Keep this bucket empty unless a reachable launch blocker is found by current-code evidence. |
 | Review-gate / likely implemented locally | None | No current Domain review-gate P1 remains open after the 2026-06-25 local closure pass. | Keep this bucket empty unless a fresh pure review finds current-code P1 evidence. |
 | Deferred 1.x / first-release-unreachable | TFU-20260614-014 | CloudSync live-apply delete-wins, parent lifecycle, and natural identity are real work, but unreachable while `cloudKitDatabase: .none`. | Keep in CloudKit 1.x planning; do not mix into first-release burn-down unless CloudKit is enabled. |
-| External/manual validation | TFU-20260612-017, TFU-20260612-016 | Real iOS notification/UI behavior must be checked on device. Repo tests cannot close these alone. | Run GAP-9 and GAP-6 manual checklists on a physical device. |
+| External/manual validation | TFU-20260612-017, TFU-20260612-016, TFU-20260706-001 | Real iOS notification/UI/HealthKit behavior must be checked on device. Repo tests cannot close these alone. | Run GAP-9, GAP-6, and Human Workout HealthKit manual checks on a physical device. |
 
 ## Open Items
 
@@ -64,6 +64,14 @@
 - Why still open: repo tests cannot prove permission prompts, banners, lock-screen/background delivery, Focus/DND interaction, or that iOS physically delivers taps/actions from notification UI into the app on device.
 - Next action: run the remaining true-device portions of the GAP-6 checklist in `docs/planning/gap-acceptance-track-list.md#gap-6-通知分级`, using the simulator policy/UI tests as preflight evidence only.
 - Close when: real-device checklist is checked off and any delivery/routing defect is fixed or split into a scoped follow-up.
+
+### TFU-20260706-001 - Validate Human Workout HealthKit On Real Device
+
+- Priority / bucket: P1, external/manual validation.
+- Status: Open; simulator/build coverage can prove unavailable/unauthorized UI and local import persistence, but cannot prove real Apple Health authorization prompts or real HealthKit sample reads.
+- Why still open: HealthKit read access, Activity Summary values, and real workout samples require a physical iPhone with Health data and user-granted permissions.
+- Next action: install a signed build on a real device, open Human Workout, grant Apple Health read access, confirm activity rings/step/distance cards populate from Health data, import one workout, relaunch, and verify the imported Human workout remains local with Health source metadata.
+- Close when: the real-device checklist passes or any device-specific HealthKit defect is fixed or split into a scoped follow-up.
 
 ### TFU-20260613-004 - Restore Pet Quick-Access Derived State
 

@@ -439,7 +439,7 @@ struct VerticalSolidHomeView: View {
                     isFabExpanded: $fabExpanded,
                     itemsVisible: $fabMenuItemsVisible,
                     activeCard: expandedBottomBarCard,
-                    homeShortcuts: HomeFabShortcutCatalog.primaryShortcuts,
+                    homeShortcuts: HomeFabShortcutCatalog.primaryShortcuts(l: l),
                     plantShortcuts: HomeFabShortcutCatalog.plantShortcuts(
                         l: l,
                         dueTaskCount: controller.snapshot.plants.count(where: \.needsCare)

@@ -980,7 +980,7 @@ struct HomeExpensePreviewStoreTests {
         let homeRoutes = try source("Ohana/Features/Home/FocusHomeRouteSheetModifier.swift", rootURL: rootURL)
         let petRoute = try source("Ohana/Features/Members/PetDetailSheetRouteContainer.swift", rootURL: rootURL)
         let humanRoute = try source("Ohana/Features/Members/HumanDetailSheetRouteContainer.swift", rootURL: rootURL)
-        let weightHosts = try source("Ohana/Features/Members/QuickWeightEntrySheetHosts.swift", rootURL: rootURL)
+        let weightHosts = try source("Ohana/Features/Members/QuickWeightEntrySheetDataContainer.swift", rootURL: rootURL)
         let weightSheet = try source("Ohana/Features/DashboardRecords/Views/GenericWeightEntrySheet.swift", rootURL: rootURL)
 
         #expect(appRoutes.contains("AppPetWeightQuickSheetHost("))
@@ -991,8 +991,10 @@ struct HomeExpensePreviewStoreTests {
         #expect(!humanRoute.contains("struct AppHumanWeightQuickRouteContainer"))
         #expect(weightHosts.contains("struct AppPetWeightQuickSheetHost"))
         #expect(weightHosts.contains("struct AppHumanWeightQuickSheetHost"))
-        #expect(weightHosts.contains("@Query private var pets"))
-        #expect(weightHosts.contains("@Query private var humans"))
+        #expect(!weightHosts.contains("@Query"))
+        #expect(weightHosts.contains("RouteFirstFrameDeferredLoad("))
+        #expect(weightHosts.contains("AppPetWeightQuickSheetRouteData.load(id: id, from: modelContext)"))
+        #expect(weightHosts.contains("AppHumanWeightQuickSheetRouteData.load(id: id, from: modelContext)"))
         #expect(weightSheet.contains("@State private var popupVisible = true"))
         #expect(!weightSheet.contains("DispatchQueue.main.async {\n                withAnimation(popupAnimation)"))
     }

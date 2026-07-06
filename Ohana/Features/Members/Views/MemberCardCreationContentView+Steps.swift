@@ -21,7 +21,7 @@ extension MemberCardCreationContentView {
         ) {
             VStack(alignment: .leading, spacing: 12) {
                 HStack(spacing: 10) {
-                    compactNameInput(width: 148)
+                    humanNameInput(width: 148)
                     compactGenderIconRow(
                         options: humanGenderOptions,
                         selection: $draft.humanGender,

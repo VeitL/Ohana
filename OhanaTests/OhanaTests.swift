@@ -2307,7 +2307,20 @@ struct OhanaTests {
         )
         sourceContext.insert(human)
         sourceContext.insert(HumanWeightLog(weight: 55, human: human))
-        sourceContext.insert(HumanWorkoutLog(type: .running, durationMinutes: 30, human: human))
+        sourceContext.insert(HumanWorkoutLog(
+            type: .running,
+            durationMinutes: 30,
+            distanceKm: 5.2,
+            calories: 320,
+            steps: 6400,
+            notes: "park run",
+            sourceHealthKit: true,
+            healthKitWorkoutUUID: "hk-backup-001",
+            healthKitSourceBundleID: "com.apple.Health",
+            healthKitSourceName: "Apple Health",
+            sourcePetWalkLogID: "pet-walk-backup-001",
+            human: human
+        ))
         sourceContext.insert(metricLog)
         CareLedgerService.record(
             actorKind: .human,
@@ -2346,6 +2359,15 @@ struct OhanaTests {
         let healthMetrics = try targetContext.fetch(FetchDescriptor<HumanHealthMetricLog>())
         #expect(weights.first?.human?.id == restored.id)
         #expect(workouts.first?.human?.id == restored.id)
+        #expect(workouts.first?.distanceKm == 5.2)
+        #expect(workouts.first?.calories == 320)
+        #expect(workouts.first?.steps == 6400)
+        #expect(workouts.first?.notes == "park run")
+        #expect(workouts.first?.sourceHealthKit == true)
+        #expect(workouts.first?.healthKitWorkoutUUID == "hk-backup-001")
+        #expect(workouts.first?.healthKitSourceBundleID == "com.apple.Health")
+        #expect(workouts.first?.healthKitSourceName == "Apple Health")
+        #expect(workouts.first?.sourcePetWalkLogID == "pet-walk-backup-001")
         #expect(healthMetrics.first?.human?.id == restored.id)
         #expect(healthMetrics.first?.metricKey == "hba1c")
         #expect(healthMetrics.first?.unitCode == "percent")

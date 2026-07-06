@@ -293,7 +293,13 @@ struct HumanCareCommandExecutor {
         date: Date,
         distanceKm: Double = 0,
         calories: Int = 0,
+        steps: Int = 0,
         notes: String = "",
+        sourceHealthKit: Bool = false,
+        healthKitWorkoutUUID: String = "",
+        healthKitSourceBundleID: String = "",
+        healthKitSourceName: String = "",
+        sourcePetWalkLogID: String = "",
         source: CareLedgerSource = .quickAction,
         command: DomainCommand,
         note: String
@@ -306,7 +312,13 @@ struct HumanCareCommandExecutor {
             context: context,
             distanceKm: distanceKm,
             calories: calories,
+            steps: steps,
             notes: notes,
+            sourceHealthKit: sourceHealthKit,
+            healthKitWorkoutUUID: healthKitWorkoutUUID,
+            healthKitSourceBundleID: healthKitSourceBundleID,
+            healthKitSourceName: healthKitSourceName,
+            sourcePetWalkLogID: sourcePetWalkLogID,
             source: source
         )
         guard result.ledgerEventID != nil else { return result }

@@ -521,15 +521,15 @@ extension VerticalSolidHomeView {
     func openHumanQuickKey(_ key: String, humanID: UUID) {
         switch key {
         case "humanWeight":
-            routeCoordinator.openSheet(.humanWeight(humanID))
+            routeCoordinator.openHumanWeightQuick(humanID)
         case "humanWorkout":
-            routeCoordinator.openSheet(.humanWorkout(humanID))
+            routeCoordinator.openSheet(.humanWorkoutQuick(humanID))
         case "humanMedication":
-            routeCoordinator.openSheet(.humanMedication(humanID))
+            routeCoordinator.openSheet(.humanMedicationQuick(humanID))
         case "humanExpense":
-            routeCoordinator.openSheet(.humanExpense(humanID))
+            routeCoordinator.openSheet(.humanExpenseQuick(humanID))
         case "humanNote":
-            routeCoordinator.openSheet(.humanNote(humanID))
+            routeCoordinator.openSheet(.humanNoteQuick(humanID))
         default:
             routeCoordinator.openSheet(.humanAllFeatures(humanID))
         }

@@ -118,11 +118,9 @@ nonisolated struct CalendarFilterSelection: Equatable, Sendable {
 
 nonisolated struct CalendarContentHandoffState: Equatable, Sendable {
     var viewModeRaw: String
-    var filter: CalendarFilterSelection
 }
 
 nonisolated struct CalendarPreparedSnapshotTriggerKey: Equatable, Sendable {
-    var selectedDay: Date
     var monthKey: String
     var filter: CalendarFilterSelection
     var dataRevision: Int

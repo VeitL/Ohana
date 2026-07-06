@@ -35,6 +35,12 @@ extension CalendarView {
                 } action: { _, offsetY in
                     reportEmbeddedBottomChromeScrollOffset(offsetY, canEstablishBaseline: didScrollListToToday)
                 }
+                .simultaneousGesture(
+                    DragGesture(minimumDistance: 1, coordinateSpace: .local)
+                        .onChanged { _ in
+                            cancelInitialTimelinePositioningForUserInteraction()
+                        }
+                )
                 .onAppear {
                     scheduleInitialTimelineScrollIfNeeded(proxy: proxy)
                 }
@@ -241,18 +247,23 @@ extension CalendarView {
         }
     }
 
-    func scheduleInitialTimelineScrollIfNeeded(proxy: ScrollViewProxy) {
-        guard isCalendarPrepared, !didScrollListToToday else { return }
+    func scheduleInitialTimelineScrollIfNeeded(proxy _: ScrollViewProxy) {
+        guard isCalendarPrepared, !didScrollListToToday, listInitialPositionTask == nil else { return }
         scheduleInitialListPositionIfNeeded()
         guard let targetID = visibleTimelineDateID, timelineDateIDs.contains(targetID) else { return }
-        listInitialPositionTask?.cancel()
         listInitialPositionTask = OhanaFrameScheduler.runAfterNextFrame {
             guard isCalendarPrepared, timelineDateIDs.contains(targetID) else {
                 listInitialPositionTask = nil
                 return
             }
-            scrollTimeline(proxy, to: targetID, animated: false)
-            didScrollListToToday = true
+            var transaction = Transaction(animation: nil)
+            transaction.disablesAnimations = true
+            withTransaction(transaction) {
+                if visibleTimelineDateID != targetID {
+                    visibleTimelineDateID = targetID
+                }
+                didScrollListToToday = true
+            }
             if let calendarOpenStartedAt {
                 AppFlowPerformance.mark(
                     AppPerformanceFlows.calendarOpen,
@@ -263,6 +274,13 @@ extension CalendarView {
             }
             listInitialPositionTask = nil
         }
+    }
+
+    func cancelInitialTimelinePositioningForUserInteraction() {
+        guard !didScrollListToToday else { return }
+        listInitialPositionTask?.cancel()
+        listInitialPositionTask = nil
+        didScrollListToToday = true
     }
 
     func handleTimelineDateSignatureChange(proxy: ScrollViewProxy) {
@@ -310,7 +328,7 @@ extension CalendarView {
         scheduleVisibleCalendarMonthUpdate(from: fallbackID)
     }
 
-    func stabilizeVisibleTimelinePositionAfterDateSetChange(proxy: ScrollViewProxy) {
+    func stabilizeVisibleTimelinePositionAfterDateSetChange(proxy _: ScrollViewProxy) {
         guard isCalendarPrepared,
               let fallbackDate = nearestTimelineDate(to: listVisibleTopDate) else { return }
         let fallbackID = timelineDateID(fallbackDate)
@@ -325,7 +343,6 @@ extension CalendarView {
             visibleTimelineDateID = fallbackID
             didScrollListToToday = true
         }
-        scrollTimeline(proxy, to: fallbackID, animated: false)
         scheduleVisibleCalendarMonthUpdate(from: fallbackID)
     }
 

@@ -168,7 +168,9 @@ final class MediaBlobBoundaryTests: XCTestCase {
         XCTAssertTrue(photoAlbumSource.contains("AsyncDecodedImageView"))
         XCTAssertTrue(photoAlbumSource.contains("SwiftDataMediaBlobLoader(modelContainer: modelContext.container)"))
         XCTAssertTrue(mediaLoaderSource.contains("func petPhotoLogImageData"))
-        XCTAssertTrue(mediaLoaderSource.contains("return log.imageData"))
+        XCTAssertTrue(mediaLoaderSource.contains("let data = log.imageData"))
+        XCTAssertTrue(mediaLoaderSource.contains("persistRepairIfNeeded(log.repairImageAttachmentIndexIfNeeded())"))
+        XCTAssertTrue(mediaLoaderSource.contains("return data"))
         XCTAssertFalse(photoAlbumSource.contains("return log.imageData"))
 
         XCTAssertTrue(petAvatarSource.contains("imageDataProvider: @escaping @MainActor () -> Data?"))

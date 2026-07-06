@@ -168,9 +168,7 @@ struct VerticalSolidHomeExpandedCardActions: View {
         let state = actionSnapshot.state(for: item)
         let options = menuOptions(for: item)
         let menuPolicy = state.isLocked ? .none : state.menuPolicy.expandedPolicy
-        let directActionUsesQuickPath = menuPolicy.showsQuickButton
-        let usesDirectHumanQuickPath = card.isHuman && item.actionType != "humanAllFeatures"
-        let actionUsesQuickPath = usesDirectHumanQuickPath || directActionUsesQuickPath
+        let actionUsesQuickPath = menuPolicy.showsQuickButton
         return VerticalHomeEmbeddedAction(
             id: item.id,
             title: item.label,
@@ -184,7 +182,7 @@ struct VerticalSolidHomeExpandedCardActions: View {
             isPrimaryDisabled: isPrimaryDisabled(item: item, state: state),
             detailIcon: detailIcon(for: item.actionType, isHuman: card.isHuman),
             menuOptions: options,
-            showsMenu: usesDirectHumanQuickPath ? false : menuPolicy.showsMenu,
+            showsMenu: menuPolicy.showsMenu,
             showsQuickButton: menuPolicy.showsQuickButton,
             quickAccessibilityLabel: item.label,
             detailAccessibilityLabel: l.tr(zh: "查看详情", en: "Details", de: "Details"),

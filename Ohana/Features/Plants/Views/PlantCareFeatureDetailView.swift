@@ -40,6 +40,15 @@ private struct PlantWateringSignal: Identifiable {
     let tint: Color
 }
 
+private struct PlantCareAggregateInsight: Identifiable {
+    let id: String
+    let icon: String
+    let title: String
+    let value: String
+    let detail: String
+    let tint: Color
+}
+
 private enum PlantWaterGuidedMode: String, CaseIterable, Identifiable {
     case overview
     case plan
@@ -176,6 +185,7 @@ struct PlantCareFeatureDetailView: View {
                     } else {
                         summaryBand
                         if isAggregate {
+                            aggregateComparisonSection
                             plantCollectionSection
                         } else if let focusedPlant {
                             focusedPlantActionSection(focusedPlant)
@@ -303,6 +313,181 @@ struct PlantCareFeatureDetailView: View {
         }
     }
 
+    private var aggregateComparisonSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            sectionTitle(l.tr(zh: "照护比较", en: "Care comparison", de: "Pflegevergleich"))
+
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
+                ForEach(aggregateInsights) { insight in
+                    aggregateInsightTile(insight)
+                }
+            }
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("plant-care-feature-aggregate-comparison")
+    }
+
+    private var aggregateInsights: [PlantCareAggregateInsight] {
+        var insights: [PlantCareAggregateInsight] = [
+            aggregateDueInsight,
+            aggregateRecentInsight
+        ]
+        if let roomInsight = aggregateRoomPressureInsight {
+            insights.append(roomInsight)
+        }
+        if let outlierInsight = aggregateOutlierInsight {
+            insights.append(outlierInsight)
+        }
+        if let rhythmInsight = aggregateRhythmInsight {
+            insights.append(rhythmInsight)
+        }
+        return Array(insights.prefix(4))
+    }
+
+    private var aggregateDueInsight: PlantCareAggregateInsight {
+        PlantCareAggregateInsight(
+            id: "due",
+            icon: "calendar.badge.clock",
+            title: l.tr(zh: "今日压力", en: "Due now", de: "Jetzt fällig"),
+            value: "\(duePlantCount)",
+            detail: duePlantCount == 0
+                ? l.tr(zh: "当前没有到期植物", en: "No plants are due now", de: "Aktuell nichts fällig")
+                : l.tr(zh: "\(duePlantCount) 株需要处理", en: "\(duePlantCount) plants need care", de: "\(duePlantCount) Pflanzen brauchen Pflege"),
+            tint: duePlantCount > 0 ? Color.goYellow : Color.goTeal
+        )
+    }
+
+    private var aggregateRecentInsight: PlantCareAggregateInsight {
+        let recentCount = records.count { Calendar.current.dateComponents([.day], from: $0.date, to: Date()).day.map { $0 <= 30 } ?? false }
+        return PlantCareAggregateInsight(
+            id: "recent",
+            icon: "chart.line.uptrend.xyaxis",
+            title: l.tr(zh: "30天记录", en: "30-day logs", de: "30-Tage"),
+            value: "\(recentCount)",
+            detail: recentCount == 0
+                ? l.tr(zh: "最近没有记录", en: "No recent logs", de: "Keine aktuellen Einträge")
+                : l.tr(zh: "最近 30 天形成的节奏", en: "Recent 30-day care rhythm", de: "Pflege der letzten 30 Tage"),
+            tint: feature.tint
+        )
+    }
+
+    private var aggregateRoomPressureInsight: PlantCareAggregateInsight? {
+        let plantsForRoom: [Plant] = feature == .log ? scopedPlants.filter { !featureRecords(for: $0).isEmpty } : duePlantsForFeature
+        guard !plantsForRoom.isEmpty else { return nil }
+        let grouped = Dictionary(grouping: plantsForRoom, by: roomName(for:))
+            .sorted {
+                if $0.value.count != $1.value.count { return $0.value.count > $1.value.count }
+                return $0.key.localizedStandardCompare($1.key) == .orderedAscending
+            }
+        guard let top = grouped.first else { return nil }
+        return PlantCareAggregateInsight(
+            id: "room",
+            icon: "house.lodge.fill",
+            title: l.tr(zh: "房间负担", en: "Room load", de: "Raumlast"),
+            value: top.key,
+            detail: l.tr(zh: "\(top.value.count) 株植物", en: "\(top.value.count) plants", de: "\(top.value.count) Pflanzen"),
+            tint: Color.goPrimary
+        )
+    }
+
+    private var aggregateOutlierInsight: PlantCareAggregateInsight? {
+        if feature == .log {
+            let quietPlants = scopedPlants.sorted {
+                (lastFeatureCareDate(for: $0) ?? .distantPast) < (lastFeatureCareDate(for: $1) ?? .distantPast)
+            }
+            guard let quietPlant = quietPlants.first else { return nil }
+            let lastText = lastFeatureCareDate(for: quietPlant).map(relativeDateText) ?? l.tr(zh: "暂无记录", en: "No logs", de: "Keine Einträge")
+            return PlantCareAggregateInsight(
+                id: "quiet",
+                icon: "moon.zzz.fill",
+                title: l.tr(zh: "最少记录", en: "Quietest", de: "Am ruhigsten"),
+                value: quietPlant.name,
+                detail: lastText,
+                tint: Color.goYellow
+            )
+        }
+
+        let ranked = scopedPlants
+            .map { plant in (plant: plant, days: overdueDays(for: plant)) }
+            .sorted {
+                if $0.days != $1.days { return $0.days > $1.days }
+                return $0.plant.name.localizedStandardCompare($1.plant.name) == .orderedAscending
+            }
+        guard let top = ranked.first, top.days > 0 else {
+            let percent = scopedPlants.isEmpty ? 0 : Int((Double(max(0, scopedPlants.count - duePlantCount)) / Double(scopedPlants.count) * 100).rounded())
+            return PlantCareAggregateInsight(
+                id: "on-track",
+                icon: "checkmark.seal.fill",
+                title: l.tr(zh: "按计划", en: "On track", de: "Im Plan"),
+                value: "\(percent)%",
+                detail: l.tr(zh: "没有明显延误", en: "No clear overdue outlier", de: "Keine klare Verzögerung"),
+                tint: Color.goTeal
+            )
+        }
+        return PlantCareAggregateInsight(
+            id: "outlier",
+            icon: "exclamationmark.triangle.fill",
+            title: l.tr(zh: "最需关注", en: "Needs attention", de: "Braucht Blick"),
+            value: top.plant.name,
+            detail: l.tr(zh: "偏离计划 \(top.days) 天", en: "\(top.days)d past cadence", de: "\(top.days) T. über Rhythmus"),
+            tint: Color.goYellow
+        )
+    }
+
+    private var aggregateRhythmInsight: PlantCareAggregateInsight? {
+        guard feature != .log else { return nil }
+        let deltas = scopedPlants.compactMap { plant -> Int? in
+            guard let actual = averageIntervalDays(for: plant) else { return nil }
+            return actual - plannedIntervalDays(for: plant)
+        }
+        guard !deltas.isEmpty else { return nil }
+        let averageDelta = Int((Double(deltas.reduce(0, +)) / Double(deltas.count)).rounded())
+        let prefix = averageDelta > 0 ? "+" : ""
+        return PlantCareAggregateInsight(
+            id: "rhythm",
+            icon: "metronome.fill",
+            title: l.tr(zh: "实际节奏", en: "Actual rhythm", de: "Echter Takt"),
+            value: "\(prefix)\(averageDelta)天",
+            detail: l.tr(zh: "实际间隔 vs 计划", en: "Actual interval vs plan", de: "Echter Abstand vs. Plan"),
+            tint: abs(averageDelta) <= 1 ? Color.goTeal : Color.goYellow
+        )
+    }
+
+    private func aggregateInsightTile(_ insight: PlantCareAggregateInsight) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
+                Image(systemName: insight.icon)
+                    .font(OhanaFont.adaptive(size: 13, weight: .black))
+                    .foregroundStyle(insight.tint)
+                    .frame(width: 32, height: 32) // a11y: allow non-interactive metric glyph; tile text carries the accessible content.
+                    .background(insight.tint.opacity(0.14), in: Circle())
+                    .accessibilityHidden(true)
+                Text(insight.title)
+                    .font(OhanaFont.adaptive(size: 11, weight: .black, design: .rounded))
+                    .foregroundStyle(Color.ohanaSecondaryText)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.72)
+            }
+
+            Text(insight.value)
+                .font(OhanaFont.adaptive(size: 17, weight: .black, design: .rounded))
+                .foregroundStyle(Color.ohanaPrimaryText)
+                .lineLimit(1)
+                .minimumScaleFactor(0.62)
+
+            Text(insight.detail)
+                .font(OhanaFont.adaptive(size: 11, weight: .semibold, design: .rounded))
+                .foregroundStyle(Color.ohanaTertiaryText)
+                .lineLimit(2)
+                .minimumScaleFactor(0.72)
+        }
+        .frame(maxWidth: .infinity, minHeight: 112, alignment: .topLeading)
+        .padding(12)
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous))
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("plant-care-feature-aggregate-\(insight.id)")
+    }
+
     private func metricTile(id: String, icon: String, title: String, value: String, tint: Color) -> some View {
         HStack(spacing: 10) {
             Image(systemName: icon)
@@ -364,15 +549,12 @@ struct PlantCareFeatureDetailView: View {
             switch selectedWaterMode {
             case .overview:
                 waterGuidedMiniChartCard(for: plant)
-                waterDiscoveryDock(for: plant)
-                waterScheduleControlSection(plant)
+                waterCompactDiscoveryDock(for: plant)
             case .plan:
                 waterScheduleControlSection(plant)
-                waterDiscoveryDock(for: plant)
             case .history:
                 waterGuidedMiniChartCard(for: plant)
                 recordSection
-                waterDiscoveryDock(for: plant)
             }
         }
         .accessibilityElement(children: .contain)
@@ -542,10 +724,11 @@ struct PlantCareFeatureDetailView: View {
             }
             return l.tr(zh: "\(days)天", en: "\(days)d", de: "\(days)T")
         }
+        let intervalDays = appServices.plantCarePlans.intervalDays(for: .watering, plant: plant)
         return l.tr(
-            zh: "\(PlantCarePlanService.intervalDays(for: .watering, plant: plant))天",
-            en: "\(PlantCarePlanService.intervalDays(for: .watering, plant: plant))d",
-            de: "\(PlantCarePlanService.intervalDays(for: .watering, plant: plant))T"
+            zh: "\(intervalDays)天",
+            en: "\(intervalDays)d",
+            de: "\(intervalDays)T"
         )
     }
 
@@ -856,7 +1039,7 @@ struct PlantCareFeatureDetailView: View {
     private func waterGuidedMiniChartCard(for plant: Plant) -> some View {
         let points = wateringChartPoints(for: plant)
         let chartPoints = wateringBarChartPoints(for: plant)
-        let targetDays = PlantCarePlanService.intervalDays(for: .watering, plant: plant)
+        let targetDays = appServices.plantCarePlans.intervalDays(for: .watering, plant: plant)
 
         return VStack(alignment: .leading, spacing: 14) {
             HStack(alignment: .firstTextBaseline, spacing: 10) {
@@ -898,12 +1081,12 @@ struct PlantCareFeatureDetailView: View {
         .accessibilityIdentifier("plant-care-feature-water-chart")
     }
 
-    private func waterDiscoveryDock(for plant: Plant) -> some View {
+    private func waterCompactDiscoveryDock(for plant: Plant) -> some View {
         let task = wateringTask(for: plant)
         let adviceItems = waterAdviceItems(for: plant, task: task)
         return VStack(spacing: 10) {
-            HStack(alignment: .top, spacing: 10) {
-                waterDiscoveryLargeDockCard(
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
+                waterCompactDiscoveryCard(
                     id: "habit",
                     icon: "humidity.fill",
                     title: l.tr(zh: "习性", en: "Habit", de: "Vorliebe"),
@@ -911,30 +1094,42 @@ struct PlantCareFeatureDetailView: View {
                     tint: Color.goTeal,
                     action: nil
                 )
-                waterDiscoveryLargeDockCard(
+                waterCompactDiscoveryCard(
+                    id: "plan",
+                    icon: "calendar.badge.clock",
+                    title: l.tr(zh: "计划", en: "Plan", de: "Plan"),
+                    value: waterPlanSummaryText(for: plant, task: task),
+                    tint: Color.goYellow
+                ) {
+                    withAnimation(GoMotion.selection) {
+                        selectedWaterMode = .plan
+                    }
+                }
+                waterCompactDiscoveryCard(
+                    id: "history",
+                    icon: "clock.arrow.circlepath",
+                    title: l.tr(zh: "历史", en: "History", de: "Verlauf"),
+                    value: waterHistorySummaryText(for: plant),
+                    tint: feature.tint
+                ) {
+                    withAnimation(GoMotion.selection) {
+                        selectedWaterMode = .history
+                    }
+                }
+                waterCompactDiscoveryCard(
                     id: "detail",
                     icon: "square.and.pencil",
                     title: l.tr(zh: "详细记录", en: "Detail log", de: "Detailprotokoll"),
-                    value: l.tr(zh: "\(records.count) 条历史", en: "\(records.count) logs", de: "\(records.count) Einträge"),
+                    value: l.tr(zh: "照片/备注", en: "Photo + note", de: "Foto + Notiz"),
                     tint: feature.tint
                 ) {
                     openLog(for: plant)
                 }
             }
 
-            waterDiscoveryCompactDockCard(
-                id: "reminder",
-                icon: "bell.badge.fill",
-                title: l.tr(zh: "提醒", en: "Reminder", de: "Erinnerung"),
-                value: waterReminderSummary(for: plant, task: task),
-                tint: Color.goYellow
-            ) {
-                resyncWaterReminder(for: plant)
-            }
-
             if adviceItems.count > 1 {
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 132), spacing: 8)], spacing: 8) {
-                    ForEach(Array(adviceItems.dropFirst().prefix(3)), id: \.self) { advice in
+                    ForEach(Array(adviceItems.dropFirst().prefix(2)), id: \.self) { advice in
                         waterAdviceChip(advice)
                     }
                 }
@@ -944,7 +1139,7 @@ struct PlantCareFeatureDetailView: View {
         .accessibilityIdentifier("plant-care-feature-water-discovery-dock")
     }
 
-    private func waterDiscoveryLargeDockCard(
+    private func waterCompactDiscoveryCard(
         id: String,
         icon: String,
         title: String,
@@ -958,83 +1153,87 @@ struct PlantCareFeatureDetailView: View {
                     OhanaFeedback.light()
                     action()
                 } label: {
-                    waterDiscoveryLargeDockCardContent(icon: icon, title: title, value: value, tint: tint)
+                    waterCompactDiscoveryCardContent(icon: icon, title: title, value: value, tint: tint, isInteractive: true)
                 }
                 .buttonStyle(ScaleButtonStyle())
             } else {
-                waterDiscoveryLargeDockCardContent(icon: icon, title: title, value: value, tint: tint)
+                waterCompactDiscoveryCardContent(icon: icon, title: title, value: value, tint: tint, isInteractive: false)
             }
         }
         .accessibilityElement(children: .combine)
         .accessibilityIdentifier("plant-care-feature-water-dock-\(id)")
     }
 
-    private func waterDiscoveryLargeDockCardContent(icon: String, title: String, value: String, tint: Color) -> some View {
-        VStack(alignment: .leading, spacing: 9) {
-            Image(systemName: icon)
-                .font(OhanaFont.adaptive(size: 21, weight: .black))
-                .foregroundStyle(tint)
-                .frame(width: 42, height: 42) // a11y: allow visual glyph frame; card content carries the accessible text.
-                .background(tint.opacity(0.13), in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
-                .accessibilityHidden(true)
-            Spacer(minLength: 0)
-            Text(title)
-                .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
-                .foregroundStyle(Color.ohanaPrimaryText)
-                .lineLimit(1)
-                .minimumScaleFactor(0.72)
-            Text(value)
-                .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
-                .foregroundStyle(tint)
-                .lineLimit(2)
-                .minimumScaleFactor(0.62)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .frame(height: 118)
-        .padding(14)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous))
-        .contentShape(RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous))
-    }
-
-    private func waterDiscoveryCompactDockCard(
-        id: String,
+    private func waterCompactDiscoveryCardContent(
         icon: String,
         title: String,
         value: String,
         tint: Color,
-        action: @escaping () -> Void
+        isInteractive: Bool
     ) -> some View {
-        Button {
-            OhanaFeedback.light()
-            action()
-        } label: {
-            HStack(spacing: 11) {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .center, spacing: 8) {
                 Image(systemName: icon)
-                    .font(OhanaFont.adaptive(size: 15, weight: .black))
+                    .font(OhanaFont.adaptive(size: 14, weight: .black))
                     .foregroundStyle(tint)
-                    .frame(width: 36, height: 36) // a11y: allow visual glyph frame; row text names the action.
-                    .background(tint.opacity(0.12), in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
+                    .frame(width: 34, height: 34) // a11y: allow visual glyph frame; card text carries the accessible content.
+                    .background(tint.opacity(0.13), in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
                     .accessibilityHidden(true)
                 Text(title)
                     .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
-                Spacer()
-                Text(value)
-                    .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
-                    .foregroundStyle(Color.ohanaSecondaryText)
                     .lineLimit(1)
-                    .minimumScaleFactor(0.66)
-                Image(systemName: "arrow.triangle.2.circlepath") // a11y: allow decorative sync glyph; row text names the action.
-                    .font(OhanaFont.adaptive(size: 10, weight: .black))
-                    .foregroundStyle(Color.ohanaTertiaryText)
-                    .accessibilityHidden(true)
+                    .minimumScaleFactor(0.72)
+                Spacer(minLength: 0)
+                if isInteractive {
+                    Image(systemName: "chevron.right") // a11y: allow decorative affordance; card label names the action.
+                        .font(OhanaFont.adaptive(size: 9, weight: .black))
+                        .foregroundStyle(Color.ohanaTertiaryText)
+                        .accessibilityHidden(true)
+                }
             }
-            .padding(12)
-            .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous))
-            .contentShape(RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous))
+
+            Text(value)
+                .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
+                .foregroundStyle(tint)
+                .lineLimit(2)
+                .minimumScaleFactor(0.68)
         }
-        .buttonStyle(ScaleButtonStyle())
-        .accessibilityIdentifier("plant-care-feature-water-dock-\(id)")
+        .frame(maxWidth: .infinity, minHeight: 82, alignment: .leading)
+        .padding(12)
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous))
+        .contentShape(RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous))
+    }
+
+    private func waterPlanSummaryText(for plant: Plant, task: PlantCareTaskSnapshot?) -> String {
+        let interval = task?.effectiveIntervalDays ?? appServices.plantCarePlans.intervalDays(for: .watering, plant: plant)
+        if !plant.remindersEnabled || !waterTypeRemindersEnabled {
+            return l.tr(
+                zh: "每 \(interval) 天 · 提醒暂停",
+                en: "Every \(interval)d · reminders off",
+                de: "Alle \(interval) T. · Erinnerungen aus"
+            )
+        }
+        return l.tr(
+            zh: "每 \(interval) 天 · \(waterReminderLeadTitle)",
+            en: "Every \(interval)d · \(waterReminderLeadTitle)",
+            de: "Alle \(interval) T. · \(waterReminderLeadTitle)"
+        )
+    }
+
+    private func waterHistorySummaryText(for _: Plant) -> String {
+        if let latestRecordDate {
+            return l.tr(
+                zh: "\(records.count) 条 · \(relativeDateText(latestRecordDate))",
+                en: "\(records.count) logs · \(relativeDateText(latestRecordDate))",
+                de: "\(records.count) Einträge · \(relativeDateText(latestRecordDate))"
+            )
+        }
+        return l.tr(
+            zh: "暂无记录",
+            en: "No logs yet",
+            de: "Noch keine Einträge"
+        )
     }
 
     private func plantCollectionRow(_ plant: Plant) -> some View {
@@ -1325,7 +1524,7 @@ struct PlantCareFeatureDetailView: View {
     }
 
     private func wateringTask(for plant: Plant) -> PlantCareTaskSnapshot? {
-        PlantCarePlanService.tasks(for: plant).first { $0.careType == .watering }
+        appServices.plantCarePlans.tasks(for: plant).first { $0.careType == .watering }
     }
 
     private func waterSignals(for plant: Plant, task: PlantCareTaskSnapshot?) -> [PlantWateringSignal] {
@@ -1335,9 +1534,9 @@ struct PlantCareFeatureDetailView: View {
                 icon: "calendar.badge.clock",
                 title: l.tr(zh: "周期", en: "Cadence", de: "Rhythmus"),
                 value: l.tr(
-                    zh: "每 \(task?.effectiveIntervalDays ?? PlantCarePlanService.intervalDays(for: .watering, plant: plant)) 天",
-                    en: "Every \(task?.effectiveIntervalDays ?? PlantCarePlanService.intervalDays(for: .watering, plant: plant))d",
-                    de: "Alle \(task?.effectiveIntervalDays ?? PlantCarePlanService.intervalDays(for: .watering, plant: plant)) T."
+                    zh: "每 \(task?.effectiveIntervalDays ?? appServices.plantCarePlans.intervalDays(for: .watering, plant: plant)) 天",
+                    en: "Every \(task?.effectiveIntervalDays ?? appServices.plantCarePlans.intervalDays(for: .watering, plant: plant))d",
+                    de: "Alle \(task?.effectiveIntervalDays ?? appServices.plantCarePlans.intervalDays(for: .watering, plant: plant)) T."
                 ),
                 tint: Color.goTeal
             ),
@@ -1527,7 +1726,7 @@ struct PlantCareFeatureDetailView: View {
     }
 
     private func resyncWaterSchedule(for plant: Plant) {
-        PlantReminderControlService.resyncPlans(plants: [plant], context: modelContext)
+        appServices.plantReminderControls.resyncPlans(plants: [plant], context: modelContext)
     }
 
     private func waterDueText(_ task: PlantCareTaskSnapshot) -> String {
@@ -1541,7 +1740,7 @@ struct PlantCareFeatureDetailView: View {
     }
 
     private func setPlantReminderEnabled(_ enabled: Bool, for plant: Plant) {
-        let changed = PlantReminderControlService.setPlantRemindersEnabled(enabled, plant: plant, context: modelContext)
+        let changed = appServices.plantReminderControls.setPlantRemindersEnabled(enabled, plant: plant, context: modelContext)
         if changed {
             UINotificationFeedbackGenerator().notificationOccurred(.success)
         }
@@ -1550,12 +1749,12 @@ struct PlantCareFeatureDetailView: View {
     private func setWaterTypeReminderEnabled(_ enabled: Bool) {
         waterTypeRemindersEnabled = enabled
         PlantReminderPreferenceStore.setCareTypeReminderEnabled(enabled, for: .watering)
-        PlantReminderControlService.resyncPlans(plants: plants, context: modelContext)
+        appServices.plantReminderControls.resyncPlans(plants: plants, context: modelContext)
         UINotificationFeedbackGenerator().notificationOccurred(.success)
     }
 
     private func resyncWaterReminder(for plant: Plant) {
-        PlantReminderControlService.resyncPlans(plants: [plant], context: modelContext)
+        appServices.plantReminderControls.resyncPlans(plants: [plant], context: modelContext)
         UINotificationFeedbackGenerator().notificationOccurred(.success)
     }
 
@@ -1596,6 +1795,90 @@ struct PlantCareFeatureDetailView: View {
 
     private func featureRecords(for plant: Plant) -> [PlantCareLog] {
         plant.careLogs.filter { feature.matches($0.careType) }
+    }
+
+    private var duePlantsForFeature: [Plant] {
+        switch feature {
+        case .water:
+            scopedPlants.filter(\.needsWatering)
+        case .fertilize:
+            scopedPlants.filter(\.needsFertilizing)
+        case .log:
+            []
+        }
+    }
+
+    private func roomName(for plant: Plant) -> String {
+        let room = plant.roomName.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !room.isEmpty { return room }
+        return plant.isIndoor
+            ? l.tr(zh: "未设置室内位置", en: "Unassigned indoor", de: "Innen ohne Ort")
+            : l.tr(zh: "未设置户外位置", en: "Unassigned outdoor", de: "Außen ohne Ort")
+    }
+
+    private func daysSinceFeatureCare(for plant: Plant) -> Int? {
+        switch feature {
+        case .water:
+            plant.daysSinceWatered
+        case .fertilize:
+            plant.daysSinceFertilized
+        case .log:
+            lastFeatureCareDate(for: plant).flatMap {
+                Calendar.current.dateComponents([.day], from: Calendar.current.startOfDay(for: $0), to: Calendar.current.startOfDay(for: Date())).day
+            }
+        }
+    }
+
+    private func plannedIntervalDays(for plant: Plant) -> Int {
+        switch feature {
+        case .water:
+            max(1, appServices.plantCarePlans.intervalDays(for: .watering, plant: plant))
+        case .fertilize:
+            max(1, appServices.plantCarePlans.intervalDays(for: .fertilizing, plant: plant))
+        case .log:
+            30
+        }
+    }
+
+    private func overdueDays(for plant: Plant) -> Int {
+        let planned = plannedIntervalDays(for: plant)
+        guard let daysSinceFeatureCare = daysSinceFeatureCare(for: plant) else { return planned }
+        return max(0, daysSinceFeatureCare - planned)
+    }
+
+    private func featureCadenceDates(for plant: Plant) -> [Date] {
+        plant.careLogs
+            .filter { log in
+                switch feature {
+                case .water:
+                    log.careType == .watering
+                case .fertilize:
+                    log.careType == .fertilizing
+                case .log:
+                    feature.matches(log.careType)
+                }
+            }
+            .map(\.date)
+            .sorted()
+    }
+
+    private func averageIntervalDays(for plant: Plant) -> Int? {
+        let dates = featureCadenceDates(for: plant)
+        guard dates.count >= 2 else { return nil }
+        var gaps: [Int] = []
+        for index in dates.indices.dropFirst() {
+            let previous = Calendar.current.startOfDay(for: dates[index - 1])
+            let current = Calendar.current.startOfDay(for: dates[index])
+            gaps.append(max(0, Calendar.current.dateComponents([.day], from: previous, to: current).day ?? 0))
+        }
+        guard !gaps.isEmpty else { return nil }
+        return Int((Double(gaps.reduce(0, +)) / Double(gaps.count)).rounded())
+    }
+
+    private func lastFeatureCareDate(for plant: Plant) -> Date? {
+        featureRecords(for: plant)
+            .map(\.date)
+            .max()
     }
 
     private func openLog(for plant: Plant) {

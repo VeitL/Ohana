@@ -130,19 +130,73 @@ extension FocusCard {
     }
 }
 
+enum HomeFabShortcutSubmenu: String, Hashable {
+    case addMember
+}
+
+enum HomeFabFunctionShortcutAction: Hashable {
+    case addEntity(EntityType)
+    case destination(FMDest)
+    case submenu(HomeFabShortcutSubmenu)
+    case unavailable
+}
+
 struct HomeFabFunctionShortcut: Identifiable {
     var label: String
     var icon: String
     var isAvailable: Bool = true
     var badge: String?
-    var destination: FMDest?
-    var entityToAdd: EntityType?
+    var action: HomeFabFunctionShortcutAction = .unavailable
 
     var id: String {
-        if let entityToAdd {
-            return "\(label)-add-\(entityToAdd.rawValue)"
+        switch action {
+        case let .addEntity(type):
+            "\(label)-add-\(type.rawValue)"
+        case let .destination(destination):
+            "\(label)-destination-\(String(describing: destination))"
+        case let .submenu(submenu):
+            "\(label)-submenu-\(submenu.rawValue)"
+        case .unavailable:
+            "\(label)-unavailable"
         }
-        return label
+    }
+
+    var destination: FMDest? {
+        if case let .destination(destination) = action {
+            return destination
+        }
+        return nil
+    }
+
+    var entityToAdd: EntityType? {
+        if case let .addEntity(type) = action {
+            return type
+        }
+        return nil
+    }
+
+    init(
+        label: String,
+        icon: String,
+        isAvailable: Bool = true,
+        badge: String? = nil,
+        destination: FMDest? = nil,
+        entityToAdd: EntityType? = nil,
+        action: HomeFabFunctionShortcutAction? = nil
+    ) {
+        self.label = label
+        self.icon = icon
+        self.isAvailable = isAvailable
+        self.badge = badge
+        if let action {
+            self.action = action
+        } else if let entityToAdd {
+            self.action = .addEntity(entityToAdd)
+        } else if let destination {
+            self.action = .destination(destination)
+        } else {
+            self.action = .unavailable
+        }
     }
 }
 

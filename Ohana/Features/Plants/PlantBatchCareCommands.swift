@@ -59,10 +59,6 @@ nonisolated struct PlantBatchCareUndoToken: Codable, Identifiable, Equatable, Se
     }
 }
 
-extension Notification.Name {
-    static let plantBatchCarePendingRewardsChanged = Notification.Name("ohana.plantBatchCare.pendingRewardsChanged")
-}
-
 nonisolated enum PlantBatchCarePendingRewardStore {
     private static let key = "ohana_pending_plant_batch_care_reward_tokens_v1"
 
@@ -70,13 +66,11 @@ nonisolated enum PlantBatchCarePendingRewardStore {
         var tokens = load(defaults: defaults).filter { $0.batchID != token.batchID }
         tokens.append(token)
         save(tokens, defaults: defaults)
-        notifyChanged()
     }
 
     static func remove(batchID: UUID, defaults: UserDefaults = .standard) {
         let tokens = load(defaults: defaults).filter { $0.batchID != batchID }
         save(tokens, defaults: defaults)
-        notifyChanged()
     }
 
     static func expiredTokens(now: Date = Date(), defaults: UserDefaults = .standard) -> [PlantBatchCareUndoToken] {
@@ -102,7 +96,6 @@ nonisolated enum PlantBatchCarePendingRewardStore {
 
     static func reset(defaults: UserDefaults = .standard) {
         defaults.removeObject(forKey: key)
-        notifyChanged()
     }
 
     private static func save(_ tokens: [PlantBatchCareUndoToken], defaults: UserDefaults) {
@@ -112,10 +105,6 @@ nonisolated enum PlantBatchCarePendingRewardStore {
         }
         guard let data = try? JSONEncoder().encode(tokens) else { return }
         defaults.set(data, forKey: key)
-    }
-
-    private static func notifyChanged() {
-        NotificationCenter.default.post(name: .plantBatchCarePendingRewardsChanged, object: nil)
     }
 }
 

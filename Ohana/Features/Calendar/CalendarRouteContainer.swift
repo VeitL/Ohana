@@ -163,6 +163,13 @@ private nonisolated struct CalendarRouteDataLoadInput {
     let loadPlants: Bool
 }
 
+nonisolated struct CalendarPreparedSnapshotLoadInput: Sendable {
+    let selectedDate: Date
+    let filterSelection: CalendarFilterSelection
+    let dataRevision: Int
+    let loadPlants: Bool
+}
+
 private nonisolated struct CalendarRouteData {
     var events: [Event] = []
     var pets: [Pet] = []
@@ -327,7 +334,6 @@ private actor CalendarRouteDataActor {
         input: CalendarRouteDataLoadInput
     ) -> CalendarRoutePreparedSnapshotReference {
         let key = CalendarPreparedSnapshotTriggerKey(
-            selectedDay: Calendar.current.startOfDay(for: input.selectedDate),
             monthKey: monthKey(for: input.selectedDate),
             filter: input.filterSelection,
             dataRevision: input.dataRevision
@@ -343,7 +349,233 @@ private actor CalendarRouteDataActor {
                 filteredEvents: filtered,
                 allEvents: routeData.events,
                 pets: routeData.pets,
-                selectedDate: input.selectedDate,
+                weekDays: weekDays(),
+                monthDays: monthDays(for: input.selectedDate)
+            )
+        )
+    }
+
+    private func filteredEvents(
+        _ events: [Event],
+        routeData: CalendarActorRouteData,
+        filter: CalendarFilterSelection
+    ) -> [Event] {
+        var result = events.filter {
+            !CarePlanCalendarSync.isDefaultGeneratedCalendarPlan($0, pets: routeData.pets) &&
+                !MemberLifecycleActiveScheduleResolver.eventTargetsDeceasedActiveSchedule(
+                    $0,
+                    pets: routeData.pets,
+                    humans: routeData.humans,
+                    petMedications: routeData.petMedications,
+                    humanMedications: routeData.humanMedications,
+                    insurances: routeData.insurances
+                )
+        }
+        if let petId = effectivePetFilterId(filter) {
+            result = result.filter {
+                MemberLifecycleActiveScheduleResolver.eventBelongsToPet(
+                    $0,
+                    petId: petId,
+                    petMedications: routeData.petMedications,
+                    insurances: routeData.insurances
+                )
+            }
+        }
+        if let humanId = effectiveHumanFilterId(filter) {
+            result = result.filter {
+                MemberLifecycleActiveScheduleResolver.eventBelongsToHuman(
+                    $0,
+                    humanId: humanId,
+                    humanMedications: routeData.humanMedications
+                )
+            }
+        }
+        if effectivePlantFilterIncludesAll(filter) {
+            result = result.filter { eventIsRelatedToAnyPlant($0, plants: routeData.plants) }
+        } else if let plantId = effectivePlantFilterId(filter) {
+            result = result.filter {
+                DomainEntityLinkRegistry.plantId(for: $0)?.uuidString == plantId
+            }
+        }
+        return result
+    }
+
+    private func effectivePetFilterId(_ selection: CalendarFilterSelection) -> String? {
+        if !selection.humanId.isEmpty || !selection.plantId.isEmpty {
+            return nil
+        }
+        return selection.selectedPetId
+    }
+
+    private func effectiveHumanFilterId(_ selection: CalendarFilterSelection) -> String? {
+        if !selection.petId.isEmpty || !selection.plantId.isEmpty {
+            return nil
+        }
+        return selection.selectedHumanId
+    }
+
+    private func effectivePlantFilterId(_ selection: CalendarFilterSelection) -> String? {
+        if !selection.petId.isEmpty || !selection.humanId.isEmpty {
+            return nil
+        }
+        return selection.selectedPlantId
+    }
+
+    private func effectivePlantFilterIncludesAll(_ selection: CalendarFilterSelection) -> Bool {
+        guard selection.petId.isEmpty, selection.humanId.isEmpty else { return false }
+        return selection.isAllPlantsSelected
+    }
+
+    private func eventIsRelatedToAnyPlant(_ event: Event, plants: [Plant]) -> Bool {
+        guard let plantId = DomainEntityLinkRegistry.plantId(for: event) else { return false }
+        return plants.contains { $0.id == plantId }
+    }
+
+    private func weekDays(now: Date = Date()) -> [Date] {
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: now)
+        let weekday = calendar.component(.weekday, from: today)
+        let daysFromSunday = weekday - 1
+        guard let sunday = calendar.date(byAdding: .day, value: -daysFromSunday, to: today) else { return [] }
+        return (0 ..< 7).compactMap { calendar.date(byAdding: .day, value: $0, to: sunday) }
+    }
+
+    private func monthDays(for selectedDate: Date) -> [Date] {
+        let calendar = Calendar.current
+        let components = calendar.dateComponents([.year, .month], from: selectedDate)
+        guard let firstOfMonth = calendar.date(from: components),
+              let range = calendar.range(of: .day, in: .month, for: firstOfMonth) else { return [] }
+        return range.compactMap { day in
+            calendar.date(byAdding: .day, value: day - 1, to: firstOfMonth)
+        }
+    }
+
+    private func monthKey(for selectedDate: Date) -> String {
+        let components = Calendar.current.dateComponents([.year, .month], from: selectedDate)
+        return "\(components.year ?? 0)-\(components.month ?? 0)"
+    }
+}
+
+@ModelActor
+actor CalendarPreparedSnapshotActor {
+    private static let eventFetchPastMonths = -3
+    private static let eventFetchFutureMonths = 3
+    private static let recurringEventFetchLimit = 500
+
+    func load(input: CalendarPreparedSnapshotLoadInput) throws -> CalendarRoutePreparedSnapshotReference {
+        try Task.checkCancellation()
+        let plants = input.loadPlants
+            ? fetch(
+                FetchDescriptor<Plant>(sortBy: [SortDescriptor(\.createdAt)]),
+                name: "Plant"
+            )
+            : []
+        let events = fetchVisibleEvents()
+        let pets = fetch(
+            FetchDescriptor<Pet>(sortBy: [SortDescriptor(\.createdAt)]),
+            name: "Pet"
+        )
+        let humans = fetch(
+            FetchDescriptor<Human>(sortBy: [SortDescriptor(\.createdAt)]),
+            name: "Human"
+        )
+        let insurances = fetch(
+            FetchDescriptor<PetInsurance>(sortBy: [SortDescriptor(\.createdAt)]),
+            name: "PetInsurance"
+        )
+        let petMedications = fetch(
+            FetchDescriptor<PetMedication>(sortBy: [SortDescriptor(\.createdAt)]),
+            name: "PetMedication"
+        )
+        let humanMedications = fetch(
+            FetchDescriptor<HumanMedication>(sortBy: [SortDescriptor(\.createdAt)]),
+            name: "HumanMedication"
+        )
+        let routeData = CalendarActorRouteData(
+            events: events,
+            pets: pets,
+            humans: humans,
+            plants: plants,
+            insurances: insurances,
+            petMedications: petMedications,
+            humanMedications: humanMedications
+        )
+        let preparedSnapshot = preparedSnapshot(for: routeData, input: input)
+        try Task.checkCancellation()
+        return preparedSnapshot
+    }
+
+    private func fetchVisibleEvents(now: Date = Date()) -> [Event] {
+        let calendar = Calendar.current
+        let windowStart = calendar.date(byAdding: .month, value: Self.eventFetchPastMonths, to: now) ?? now
+        let windowEnd = calendar.date(byAdding: .month, value: Self.eventFetchFutureMonths, to: now) ?? now
+        let windowedEvents = fetch(
+            FetchDescriptor<Event>(
+                predicate: #Predicate<Event> { event in
+                    event.startDate >= windowStart && event.startDate <= windowEnd
+                },
+                sortBy: [SortDescriptor(\.startDate, order: .reverse)]
+            ),
+            name: "Event.window"
+        )
+        var recurringDescriptor = FetchDescriptor<Event>(
+            predicate: #Predicate<Event> { event in
+                event.recurrenceDays > 0 && event.startDate <= windowEnd
+            },
+            sortBy: [SortDescriptor(\.startDate, order: .reverse)]
+        )
+        recurringDescriptor.fetchLimit = Self.recurringEventFetchLimit
+        let recurringEvents = fetch(
+            recurringDescriptor,
+            name: "Event.recurring"
+        )
+        .filter { event in
+            guard let recurrenceEndDate = event.recurrenceEndDate else { return true }
+            return recurrenceEndDate >= windowStart
+        }
+
+        var uniqueEvents: [UUID: Event] = [:]
+        for event in windowedEvents + recurringEvents {
+            uniqueEvents[event.id] = event
+        }
+        return uniqueEvents.values.sorted { $0.startDate > $1.startDate }
+    }
+
+    private func fetch<T: PersistentModel>(
+        _ descriptor: FetchDescriptor<T>,
+        name: String
+    ) -> [T] {
+        do {
+            return try modelContext.fetch(descriptor)
+        } catch {
+            OhanaLog.warning(
+                "Calendar prepared snapshot fetch failed for \(name): \(error.localizedDescription)",
+                category: "Calendar"
+            )
+            return []
+        }
+    }
+
+    private func preparedSnapshot(
+        for routeData: CalendarActorRouteData,
+        input: CalendarPreparedSnapshotLoadInput
+    ) -> CalendarRoutePreparedSnapshotReference {
+        let key = CalendarPreparedSnapshotTriggerKey(
+            monthKey: monthKey(for: input.selectedDate),
+            filter: input.filterSelection,
+            dataRevision: input.dataRevision
+        )
+        let filtered = filteredEvents(
+            routeData.events,
+            routeData: routeData,
+            filter: input.filterSelection
+        )
+        return CalendarRoutePreparedSnapshotReference(
+            key: key,
+            snapshot: CalendarSnapshotBuilder.preparedSnapshotReference(
+                filteredEvents: filtered,
+                allEvents: routeData.events,
+                pets: routeData.pets,
                 weekDays: weekDays(),
                 monthDays: monthDays(for: input.selectedDate)
             )

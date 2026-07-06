@@ -17,6 +17,7 @@ struct FunctionMenuDestinationRouteContainer: View {
             pets: routeData.pets,
             humans: routeData.humans,
             petAggregateSummaries: routeData.petAggregateSummaries,
+            petFeatureCollectionSummary: routeData.petFeatureCollectionSummary,
             plants: routeData.plants,
             isRouteDataLoaded: routeData.hasLoaded
         )
@@ -87,6 +88,8 @@ private struct FunctionMenuRouteData {
     var humans: [Human] = []
     var plants: [Plant] = []
     var petAggregateSummaries: [UUID: FunctionMenuPetAggregateSummary] = [:]
+    var petFeatureCollectionSummary: PetFeatureCollectionSummary = .empty
+    var plantFeatureCollectionSummary: PlantFeatureCollectionSummary = .empty
     var hasLoaded = false
 
     static func load(from context: ModelContext) -> FunctionMenuRouteData {
@@ -110,11 +113,18 @@ private struct FunctionMenuRouteData {
         if !plants.isEmpty {
             PlantUnlockPolicy.noteExistingPlantData()
         }
+        let petAggregateSummaries = FunctionMenuPetAggregateSummary.load(pets: pets, context: context)
         return FunctionMenuRouteData(
             pets: pets,
             humans: humans,
             plants: plants,
-            petAggregateSummaries: FunctionMenuPetAggregateSummary.load(pets: pets, context: context),
+            petAggregateSummaries: petAggregateSummaries,
+            petFeatureCollectionSummary: PetFeatureCollectionSummary.load(
+                pets: pets,
+                humans: humans,
+                petAggregateSummaries: petAggregateSummaries
+            ),
+            plantFeatureCollectionSummary: PlantFeatureCollectionSummary.load(plants: plants),
             hasLoaded: true
         )
     }
@@ -133,6 +143,202 @@ private struct FunctionMenuRouteData {
             )
             return []
         }
+    }
+}
+
+struct PlantFeatureCollectionSummary: Equatable {
+    var plantCount: Int = 0
+    var dueTaskCount: Int = 0
+    var duePlantCount: Int = 0
+    var wateringDueCount: Int = 0
+    var fertilizingDueCount: Int = 0
+    var recentLogCount: Int = 0
+    var photoCount: Int = 0
+    var roomCount: Int = 0
+    var healthSignalCount: Int = 0
+    var reminderEnabledCount: Int = 0
+    var latestLogDate: Date?
+
+    static let empty = PlantFeatureCollectionSummary()
+
+    @MainActor
+    static func load(plants: [Plant]) -> PlantFeatureCollectionSummary {
+        let calendar = Calendar.current
+        let now = Date()
+        let todayStart = calendar.startOfDay(for: now)
+        let recentWindowStart = calendar.date(byAdding: .day, value: -30, to: todayStart) ?? todayStart
+        let tasks = PlantCarePlanService.tasks(for: plants, days: 7, now: now, calendar: calendar)
+        let dueTasks = tasks.filter { $0.daysUntilDue <= 0 }
+
+        var recentLogCount = 0
+        var photoCount = 0
+        var roomNames = Set<String>()
+        var healthSignalCount = 0
+        var latestLogDate: Date?
+
+        for plant in plants {
+            let room = plant.roomName.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !room.isEmpty {
+                roomNames.insert(room)
+            }
+            if plant.hasAvatarImageAttachment {
+                photoCount += 1
+            }
+            if plant.healthStatus == .watching || plant.healthStatus == .stressed {
+                healthSignalCount += 1
+            }
+            if plant.isNearClimateSource {
+                healthSignalCount += 1
+            }
+            if !plant.potHasDrainage {
+                healthSignalCount += 1
+            }
+
+            for log in plant.careLogs {
+                if log.date >= recentWindowStart {
+                    recentLogCount += 1
+                    if log.careType == .yellowLeaf || log.careType == .pestFound {
+                        healthSignalCount += 1
+                    }
+                }
+                if log.hasPhotoAttachment {
+                    photoCount += 1
+                }
+                latestLogDate = max(latestLogDate ?? log.date, log.date)
+            }
+        }
+
+        return PlantFeatureCollectionSummary(
+            plantCount: plants.count,
+            dueTaskCount: dueTasks.count,
+            duePlantCount: Set(dueTasks.map(\.plantID)).count,
+            wateringDueCount: dueTasks.count { PlantCareFeatureDestination.water.matches($0.careType) },
+            fertilizingDueCount: dueTasks.count { PlantCareFeatureDestination.fertilize.matches($0.careType) },
+            recentLogCount: recentLogCount,
+            photoCount: photoCount,
+            roomCount: roomNames.count,
+            healthSignalCount: healthSignalCount,
+            reminderEnabledCount: plants.count { $0.remindersEnabled },
+            latestLogDate: latestLogDate
+        )
+    }
+}
+
+struct PetFeatureCollectionSummary: Equatable {
+    var activePetCount: Int = 0
+    var visibleHumanCount: Int = 0
+    var todayFoodLogs: Int = 0
+    var todayFoodPetCount: Int = 0
+    var hygieneLogsLast7Days: Int = 0
+    var todayWalkCount: Int = 0
+    var todayWalkDistanceMeters: Double = 0
+    var todayPottyLogs: Int = 0
+    var healthSignalCount: Int = 0
+    var activeMedicationCount: Int = 0
+    var weightMemberCount: Int = 0
+    var latestWeightDate: Date?
+    var monthExpenseCount: Int = 0
+    var monthExpenseAmount: Double = 0
+    var archiveItemCount: Int = 0
+
+    static let empty = PetFeatureCollectionSummary()
+
+    @MainActor
+    static func load(
+        pets: [Pet],
+        humans: [Human],
+        petAggregateSummaries: [UUID: FunctionMenuPetAggregateSummary]
+    ) -> PetFeatureCollectionSummary {
+        let calendar = Calendar.current
+        let now = Date()
+        let todayStart = calendar.startOfDay(for: now)
+        let tomorrowStart = calendar.date(byAdding: .day, value: 1, to: todayStart) ?? now
+        let sevenDaysAgo = calendar.date(byAdding: .day, value: -7, to: todayStart) ?? todayStart
+        let monthStart = calendar.dateInterval(of: .month, for: now)?.start ?? todayStart
+        let activePets = pets.filter { !$0.hasPassedAway }
+        let visibleHumans = humans.filter { $0.shouldShowOnHome && !$0.hasPassedAway }
+
+        var foodPetIDs = Set<UUID>()
+        var todayFoodLogs = 0
+        var hygieneLogsLast7Days = 0
+        var todayWalkCount = 0
+        var todayWalkDistanceMeters = 0.0
+        var todayPottyLogs = 0
+        var healthSignalCount = 0
+        var activeMedicationCount = 0
+        var latestWeightDate: Date?
+        var petWeightMemberIDs = Set<UUID>()
+        var monthExpenseCount = 0
+        var monthExpenseAmount = 0.0
+
+        for pet in activePets {
+            let todayFood = pet.careLogs.filter {
+                $0.careType == .feeding && $0.date >= todayStart && $0.date < tomorrowStart
+            }
+            todayFoodLogs += todayFood.count
+            if !todayFood.isEmpty {
+                foodPetIDs.insert(pet.id)
+            }
+
+            hygieneLogsLast7Days += pet.hygieneLogs.count { $0.date >= sevenDaysAgo }
+            hygieneLogsLast7Days += pet.careLogs.count {
+                [.waterChange, .filterClean, .cageCleaning, .freeFlight, .misting, .substrateChange]
+                    .contains($0.careType) && $0.date >= sevenDaysAgo
+            }
+
+            let todayWalks = pet.walkLogs.filter { $0.startDate >= todayStart && $0.startDate < tomorrowStart }
+            todayWalkCount += todayWalks.count
+            todayWalkDistanceMeters += todayWalks.reduce(0) { $0 + $1.distanceMeters }
+
+            todayPottyLogs += pet.pottyLogs.count { $0.date >= todayStart && $0.date < tomorrowStart }
+            todayPottyLogs += pet.careLogs.count {
+                $0.careType == .litter && $0.date >= todayStart && $0.date < tomorrowStart
+            }
+
+            healthSignalCount += pet.healthLogs.count {
+                ($0.nextCheckupDate ?? $0.expirationDate ?? .distantFuture) <= tomorrowStart
+            }
+            activeMedicationCount += pet.medications.count { $0.isActive(on: now) }
+
+            if let latestPetWeight = pet.weightLogs.map(\.date).max() {
+                petWeightMemberIDs.insert(pet.id)
+                latestWeightDate = max(latestWeightDate ?? latestPetWeight, latestPetWeight)
+            }
+
+            let monthExpenses = pet.expenseLogs.filter { $0.date >= monthStart }
+            monthExpenseCount += monthExpenses.count
+            monthExpenseAmount += monthExpenses.reduce(0) { $0 + $1.amount }
+        }
+
+        var humanWeightMemberIDs = Set<UUID>()
+        for human in visibleHumans {
+            if let latestHumanWeight = human.weightLogs.map(\.date).max() {
+                humanWeightMemberIDs.insert(human.id)
+                latestWeightDate = max(latestWeightDate ?? latestHumanWeight, latestHumanWeight)
+            }
+        }
+
+        let archiveItemCount = petAggregateSummaries.values.reduce(0) { total, summary in
+            total + summary.documentCount + summary.photoCount + summary.milestoneCount
+        }
+
+        return PetFeatureCollectionSummary(
+            activePetCount: activePets.count,
+            visibleHumanCount: visibleHumans.count,
+            todayFoodLogs: todayFoodLogs,
+            todayFoodPetCount: foodPetIDs.count,
+            hygieneLogsLast7Days: hygieneLogsLast7Days,
+            todayWalkCount: todayWalkCount,
+            todayWalkDistanceMeters: todayWalkDistanceMeters,
+            todayPottyLogs: todayPottyLogs,
+            healthSignalCount: healthSignalCount,
+            activeMedicationCount: activeMedicationCount,
+            weightMemberCount: petWeightMemberIDs.count + humanWeightMemberIDs.count,
+            latestWeightDate: latestWeightDate,
+            monthExpenseCount: monthExpenseCount,
+            monthExpenseAmount: monthExpenseAmount,
+            archiveItemCount: archiveItemCount
+        )
     }
 }
 
