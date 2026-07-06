@@ -451,7 +451,9 @@ final class HumanHealthKitManager: ObservableObject, HumanHealthKitManaging {
     }
 
     private func activitySummary(for date: Date, healthStore: HKHealthStore) async throws -> ActivitySummaryValues? {
-        let components = calendar.dateComponents([.era, .year, .month, .day], from: date)
+        var components = calendar.dateComponents([.era, .year, .month, .day], from: date)
+        components.calendar = calendar
+        components.timeZone = calendar.timeZone
         let predicate = HKQuery.predicateForActivitySummary(with: components)
 
         return try await executeHealthKitQuery(operationName: "Apple Health activity summary", healthStore: healthStore) { finish in

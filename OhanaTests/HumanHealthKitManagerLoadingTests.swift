@@ -21,6 +21,9 @@ struct HumanHealthKitManagerLoadingTests {
         #expect(source.contains("let activeEnergy = resolvedHealthValue"))
         #expect(source.contains("let activity = resolvedHealthValue"))
         #expect(source.contains("errorMessage = firstError.localizedDescription"))
+        #expect(source.contains("var components = calendar.dateComponents([.era, .year, .month, .day], from: date)"))
+        #expect(source.contains("components.calendar = calendar"))
+        #expect(source.contains("components.timeZone = calendar.timeZone"))
 
         let rawContinuationCount = source.components(separatedBy: "withCheckedThrowingContinuation").count - 1
         #expect(rawContinuationCount == 1)
