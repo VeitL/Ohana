@@ -782,7 +782,7 @@ struct PlantLaunchTests {
             $0.event?.eventType == EventType.fertilizing.rawValue
         })
 
-        #expect(backup.schemaVersion == 29)
+        #expect(backup.schemaVersion == 30)
         #expect(PlantReminderPreferenceStore.timeWindow(defaults: targetDefaults) == .evening)
         #expect(PlantReminderPreferenceStore.isWeekendQuietEnabled(defaults: targetDefaults))
         #expect(PlantReminderPreferenceStore.isTravelModeEnabled(defaults: targetDefaults))

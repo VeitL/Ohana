@@ -30,6 +30,9 @@ final nonisolated class DataBackupManager: @unchecked Sendable {
 
     /// Filename prefix for exported backups in the temporary directory.
     static let backupFilePrefix = "ohana_backup_"
+    static let packageFileExtension = "ohanabackup"
+    static let manifestFileName = "manifest.json"
+    static let mediaDirectoryName = "media"
     static let staleExportAge: TimeInterval = 60 * 60
 
     /// Builds and writes a full backup. The unbounded full-table fetch + JSON
@@ -41,22 +44,8 @@ final nonisolated class DataBackupManager: @unchecked Sendable {
             AppFlowPerformance.start(AppPerformanceFlows.backupExport)
         }
         do {
-            let data = try await DataBackupActor(modelContainer: container).exportData()
             let trimmedPassword = password?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
             let shouldEncrypt = !trimmedPassword.isEmpty
-            let exportData: Data = if shouldEncrypt {
-                try DataBackupEncryption.encrypt(data, password: trimmedPassword)
-            } else {
-                data
-            }
-            await MainActor.run {
-                AppFlowPerformance.mark(
-                    AppPerformanceFlows.backupExport,
-                    AppPerformancePhases.dataReady,
-                    startedAt: flowStartedAt,
-                    note: ["bytes": "\(exportData.count)", "encrypted": "\(shouldEncrypt)"]
-                )
-            }
 
             // The export contains full plaintext health / medication / insurance /
             // document / location data, so it must be written atomically and with
@@ -69,16 +58,50 @@ final nonisolated class DataBackupManager: @unchecked Sendable {
             f.dateFormat = "yyyyMMdd_HHmmss"
             let stamp = f.string(from: Date())
             let uniqueId = UUID().uuidString
-            let suffix = shouldEncrypt ? "encrypted.json" : "json"
+            let suffix = shouldEncrypt ? "encrypted.\(Self.packageFileExtension)" : Self.packageFileExtension
             let url = FileManager.default.temporaryDirectory
-                .appendingPathComponent("\(Self.backupFilePrefix)\(stamp)_\(uniqueId).\(suffix)")
-            try exportData.write(to: url, options: [.atomic, .completeFileProtection])
+                .appendingPathComponent("\(Self.backupFilePrefix)\(stamp)_\(uniqueId).\(suffix)", isDirectory: true)
+            if FileManager.default.fileExists(atPath: url.path) {
+                try FileManager.default.removeItem(at: url)
+            }
+            let result = try await DataBackupActor(modelContainer: container).exportPackage(
+                to: url,
+                encryptMedia: shouldEncrypt,
+                password: shouldEncrypt ? trimmedPassword : nil
+            )
+            let manifestData = if shouldEncrypt {
+                try DataBackupEncryption.encrypt(result.manifestData, password: trimmedPassword)
+            } else {
+                result.manifestData
+            }
+            try manifestData.write(
+                to: url.appendingPathComponent(Self.manifestFileName, isDirectory: false),
+                options: [.atomic, .completeFileProtection]
+            )
+            await MainActor.run {
+                AppFlowPerformance.mark(
+                    AppPerformanceFlows.backupExport,
+                    AppPerformancePhases.dataReady,
+                    startedAt: flowStartedAt,
+                    note: [
+                        "bytes": "\(result.mediaBytes)",
+                        "mediaCount": "\(result.mediaCount)",
+                        "encrypted": "\(shouldEncrypt)",
+                        "format": "package"
+                    ]
+                )
+            }
             await MainActor.run {
                 AppFlowPerformance.mark(
                     AppPerformanceFlows.backupExport,
                     AppPerformancePhases.writeSuccess,
                     startedAt: flowStartedAt,
-                    note: ["bytes": "\(exportData.count)", "encrypted": "\(shouldEncrypt)"]
+                    note: [
+                        "bytes": "\(result.mediaBytes)",
+                        "mediaCount": "\(result.mediaCount)",
+                        "encrypted": "\(shouldEncrypt)",
+                        "format": "package"
+                    ]
                 )
             }
             return url
@@ -120,6 +143,17 @@ final nonisolated class DataBackupManager: @unchecked Sendable {
         }
     }
 
+    static func packageURLIfNeeded(_ url: URL) throws -> URL? {
+        let values = try? url.resourceValues(forKeys: [.isDirectoryKey])
+        let isDirectory = values?.isDirectory == true
+        guard isDirectory else { return nil }
+        if url.pathExtension == packageFileExtension {
+            return url
+        }
+        let manifestURL = url.appendingPathComponent(manifestFileName, isDirectory: false)
+        return FileManager.default.fileExists(atPath: manifestURL.path) ? url : nil
+    }
+
     // MARK: - Import
 
     /// Import stays on the main context so SwiftData @Query-backed UI refreshes
@@ -133,12 +167,25 @@ final nonisolated class DataBackupManager: @unchecked Sendable {
         schedulePlantNotifications: Bool = true,
         plantNotifications: ReminderNotificationScheduling = ReminderNotificationSchedulerRegistry.current
     ) async throws {
-        let fileData = try Data(contentsOf: url) // smoothness: allow legacy prepared-avatar decode path; media service migration tracked after P1 baseline
+        let packageURL = try Self.packageURLIfNeeded(url)
+        let fileData: Data
+        let mediaResolver: DataBackupMediaResolving?
+        if let packageURL {
+            let manifestURL = packageURL.appendingPathComponent(Self.manifestFileName, isDirectory: false)
+            guard FileManager.default.fileExists(atPath: manifestURL.path) else {
+                throw BackupError.invalidBackupPackage
+            }
+            fileData = try Data(contentsOf: manifestURL) // smoothness: explicit user restore file read
+            mediaResolver = DataBackupMediaPackageReader(packageURL: packageURL, password: password)
+        } else {
+            fileData = try Data(contentsOf: url) // smoothness: allow legacy prepared-avatar decode path; media service migration tracked after P1 baseline
+            mediaResolver = nil
+        }
         let data = try DataBackupEncryption.decryptIfNeeded(fileData, password: password)
         let decoder = JSONDecoder()
         let backup = try decoder.decode(OhanaBackup.self, from: data)
 
-        guard backup.schemaVersion <= 29 else {
+        guard backup.schemaVersion <= 30 else {
             throw BackupError.unsupportedVersion(backup.schemaVersion)
         }
 
@@ -147,13 +194,18 @@ final nonisolated class DataBackupManager: @unchecked Sendable {
             context: context,
             projectionManager: projectionManager,
             schedulePlantNotifications: schedulePlantNotifications,
-            plantNotifications: plantNotifications
+            plantNotifications: plantNotifications,
+            mediaResolver: mediaResolver
         )
     }
 
     // MARK: - Build Backup
 
-    func buildBackup(context: ModelContext) throws -> OhanaBackup {
+    func buildBackup(
+        context: ModelContext,
+        mediaWriter: DataBackupMediaWriting? = nil,
+        mediaPackageEncrypted: Bool = false
+    ) throws -> OhanaBackup {
         let pets = try context.fetch(FetchDescriptor<Pet>()) // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
         let humans = try context.fetch(FetchDescriptor<Human>()) // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
         let events = try context.fetch(FetchDescriptor<Event>()) // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
@@ -234,15 +286,32 @@ final nonisolated class DataBackupManager: @unchecked Sendable {
             plantReminderPreferences: makePlantReminderPreferencesBackup(defaults: ud, plants: plants)
         )
 
+        let petBackups = try pets.map { try encodePet($0, mediaWriter: mediaWriter) }
+        let humanBackups = try humans.map { try encodeHuman($0, mediaWriter: mediaWriter) }
+        let plantCareLogBackups = try plantCareLogs.map { try encodePlantCareLog($0, mediaWriter: mediaWriter) }
+        let petDocumentBackups = try docs.map { try encodeDocument($0, mediaWriter: mediaWriter) }
+        let petDocumentAttachmentBackups = try docs.flatMap { try encodeDocumentAttachments($0, mediaWriter: mediaWriter) }
+        let petPhotoLogBackups = try photos.map { try encodePhotoLog($0, mediaWriter: mediaWriter) }
+        let symptomLogBackups = try symptoms.map { try encodeSymptomLog($0, mediaWriter: mediaWriter) }
+        let mediaPackage = (mediaWriter as? DataBackupMediaPackageWriter).map {
+            BackupMediaPackageInfo(
+                format: "com.guanchen.li.ohana.backup.package.v1",
+                mediaCount: $0.mediaCount,
+                mediaBytes: $0.mediaBytes,
+                encrypted: mediaPackageEncrypted
+            )
+        }
+
         return OhanaBackup(
             exportedAt: iso.string(from: Date()),
-            pets: pets.map(encodePet),
-            humans: humans.map(encodeHuman),
+            mediaPackage: mediaPackage,
+            pets: petBackups,
+            humans: humanBackups,
             events: events.map(encodeEvent),
             reminders: reminders.map(encodeReminder),
             households: households.map(encodeHousehold),
             plants: plants.map(encodePlant),
-            plantCareLogs: plantCareLogs.map(encodePlantCareLog),
+            plantCareLogs: plantCareLogBackups,
             petCareLogs: careLogs.map(encodeCareLog),
             petPottyLogs: pottyLogs.map(encodePottyLog),
             petWalkLogs: walkLogs.map(encodeWalkLog),
@@ -251,14 +320,14 @@ final nonisolated class DataBackupManager: @unchecked Sendable {
             petHealthLogs: healthLogs.map(encodeHealthLog),
             petHygieneLogs: hygLogs.map(encodeHygieneLog),
             petFoodRecords: foodRecs.map(encodeFoodRecord),
-            petDocuments: docs.map(encodeDocument),
-            petDocumentAttachments: docs.flatMap(encodeDocumentAttachments),
+            petDocuments: petDocumentBackups,
+            petDocumentAttachments: petDocumentAttachmentBackups,
             petMilestones: milestones.map(encodeMilestone),
-            petPhotoLogs: photos.map(encodePhotoLog),
+            petPhotoLogs: petPhotoLogBackups,
             petInsurances: insurances.map(encodeInsurance),
             insuranceClaims: claims.map(encodeInsuranceClaim),
             petMedications: petMeds.map(encodePetMedication),
-            symptomLogs: symptoms.map(encodeSymptomLog),
+            symptomLogs: symptomLogBackups,
             heatCycleLogs: heatCycles.map(encodeHeatCycleLog),
             humanWeightLogs: hWeightLogs.map(encodeHumanWeight),
             humanWorkoutLogs: hWorkouts.map(encodeHumanWorkout),
@@ -312,7 +381,8 @@ final nonisolated class DataBackupManager: @unchecked Sendable {
         context: ModelContext,
         projectionManager: CoconutProjectionManaging?,
         schedulePlantNotifications: Bool = true,
-        plantNotifications: ReminderNotificationScheduling = ReminderNotificationSchedulerRegistry.current
+        plantNotifications: ReminderNotificationScheduling = ReminderNotificationSchedulerRegistry.current,
+        mediaResolver: DataBackupMediaResolving? = nil
     ) throws {
         // 以 UUID 为主键去重：先构建现有 ID 集合，再 upsert。
         // Event/Reminder 不能在 writer 前过滤；rehydrate writer 必须重新解析已有 schedule aggregate。
@@ -321,14 +391,14 @@ final nonisolated class DataBackupManager: @unchecked Sendable {
         let existingSharedCareSessionIds = try existingIds(FetchDescriptor<SharedCareSession>(), context: context, id: \.id, operation: "fetch existing shared care sessions before restore")
         for dto in backup.pets {
             try DomainGeneralRehydrateWriter.upsertPet(
-                snapshot: decodePetSnapshot(dto),
+                snapshot: try decodePetSnapshot(dto, mediaResolver: mediaResolver),
                 source: .backupRestore,
                 context: context
             )
         }
         for dto in backup.humans {
             try DomainGeneralRehydrateWriter.upsertHuman(
-                snapshot: decodeHumanSnapshot(dto),
+                snapshot: try decodeHumanSnapshot(dto, mediaResolver: mediaResolver),
                 source: .backupRestore,
                 context: context
             )
@@ -369,7 +439,7 @@ final nonisolated class DataBackupManager: @unchecked Sendable {
         // 日志类通过 rehydrate writer 插入，避免恢复路径绕过 subject/policy 解析。
         for dto in backup.plantCareLogs ?? [] {
             try DomainCareFactRehydrateWriter.insertPlantCareLogIfNeeded(
-                snapshot: decodePlantCareLogSnapshot(dto),
+                snapshot: try decodePlantCareLogSnapshot(dto, mediaResolver: mediaResolver),
                 source: .backupRestore,
                 context: context
             )
@@ -432,14 +502,14 @@ final nonisolated class DataBackupManager: @unchecked Sendable {
         }
         for dto in backup.petDocuments {
             try DomainMemberContentRehydrateWriter.insertPetDocumentIfNeeded(
-                snapshot: decodeDocumentSnapshot(dto),
+                snapshot: try decodeDocumentSnapshot(dto, mediaResolver: mediaResolver),
                 source: .backupRestore,
                 context: context
             )
         }
         for dto in backup.petPhotoLogs ?? [] {
             try DomainMemberContentRehydrateWriter.insertPetPhotoLogIfNeeded(
-                snapshot: decodePhotoLogSnapshot(dto),
+                snapshot: try decodePhotoLogSnapshot(dto, mediaResolver: mediaResolver),
                 source: .backupRestore,
                 context: context
             )
@@ -467,7 +537,7 @@ final nonisolated class DataBackupManager: @unchecked Sendable {
         }
         for dto in backup.symptomLogs ?? [] {
             try DomainMemberContentRehydrateWriter.insertSymptomLogIfNeeded(
-                snapshot: decodeSymptomLogSnapshot(dto),
+                snapshot: try decodeSymptomLogSnapshot(dto, mediaResolver: mediaResolver),
                 source: .backupRestore,
                 context: context
             )
@@ -483,7 +553,7 @@ final nonisolated class DataBackupManager: @unchecked Sendable {
 
         for dto in backup.petDocumentAttachments ?? [] {
             try DomainMemberContentRehydrateWriter.insertPetDocumentAttachmentIfNeeded(
-                snapshot: decodeDocumentAttachmentSnapshot(dto),
+                snapshot: try decodeDocumentAttachmentSnapshot(dto, mediaResolver: mediaResolver),
                 source: .backupRestore,
                 context: context
             )

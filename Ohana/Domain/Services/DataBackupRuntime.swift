@@ -17,6 +17,7 @@ enum BackupError: LocalizedError {
     case invalidBackupPassword
     case invalidEncryptedBackup
     case encryptionUnavailable
+    case invalidBackupPackage
 
     var errorDescription: String? {
         localizedMessage(l: .current)
@@ -66,6 +67,12 @@ enum BackupError: LocalizedError {
                 en: "This device cannot generate secure random data right now. Try again later.",
                 de: "Dieses Gerät kann derzeit keine sicheren Zufallsdaten erzeugen. Versuche es später erneut."
             )
+        case .invalidBackupPackage:
+            l.tr(
+                zh: "备份包格式无效或媒体文件缺失，请重新选择备份。",
+                en: "The backup package is invalid or missing media files. Choose the backup again.",
+                de: "Das Backup-Paket ist ungültig oder Mediendateien fehlen. Wähle das Backup erneut aus."
+            )
         }
     }
 }
@@ -73,13 +80,31 @@ enum BackupError: LocalizedError {
 // MARK: - Background Export Actor
 //
 // Owns a dedicated background SwiftData context. Running the full-table fetch +
-// JSON encode here keeps the unbounded export work off the main thread; only the
-// resulting Sendable `Data` crosses back to the caller.
+// manifest/media package export here keeps the unbounded backup work off the
+// main thread; only small package metadata crosses back to the caller.
 @ModelActor
 actor DataBackupActor {
-    func exportData() throws -> Data {
+    func exportPackage(
+        to packageURL: URL,
+        encryptMedia: Bool,
+        password: String?
+    ) throws -> DataBackupPackageBuildResult {
+        let mediaWriter = DataBackupMediaPackageWriter(
+            packageURL: packageURL,
+            encryptMedia: encryptMedia,
+            password: password
+        )
+        try mediaWriter.preparePackageDirectory()
         let manager = DataBackupManager()
-        let backup = try manager.buildBackup(context: modelContext)
-        return try manager.encode(backup)
+        let backup = try manager.buildBackup(
+            context: modelContext,
+            mediaWriter: mediaWriter,
+            mediaPackageEncrypted: encryptMedia
+        )
+        return DataBackupPackageBuildResult(
+            manifestData: try manager.encode(backup),
+            mediaCount: mediaWriter.mediaCount,
+            mediaBytes: mediaWriter.mediaBytes
+        )
     }
 }

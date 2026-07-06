@@ -11,10 +11,12 @@ fi
 
 data_backup="Ohana/Domain/Services/DataBackupManager.swift"
 data_backup_dtos="Ohana/Domain/Services/DataBackupDTOs.swift"
+automatic_backup="Ohana/Domain/Services/AutomaticBackupService.swift"
 data_backup_files=(
   "Ohana/Domain/Services/DataBackupManager.swift"
   "Ohana/Domain/Services/DataBackupManager+Encode.swift"
   "Ohana/Domain/Services/DataBackupManager+Decode.swift"
+  "Ohana/Domain/Services/DataBackupMediaPackage.swift"
   "Ohana/Domain/Services/DataBackupDTOs.swift"
 )
 shared_container="Ohana/Models/SharedModelContainer.swift"
@@ -155,11 +157,41 @@ done
 require_pattern "$shared_container" 'Schema\(ArkSchemaV84\.models\)' \
   "SharedModelContainer should open the current ArkSchemaV84 model set."
 
-require_pattern "$data_backup_dtos" 'var schemaVersion: Int = 29' \
-  "OhanaBackup.schemaVersion should be 29 after adding human health report backups."
+require_pattern "$data_backup_dtos" 'var schemaVersion: Int = 30' \
+  "OhanaBackup.schemaVersion should be 30 after externalizing backup media."
 
-require_pattern "$data_backup" 'guard backup\.schemaVersion <= 29' \
-  "DataBackupManager import guard should allow backup schemaVersion 29."
+require_pattern "$data_backup" 'guard backup\.schemaVersion <= 30' \
+  "DataBackupManager import guard should allow backup schemaVersion 30."
+
+require_pattern "$data_backup_dtos" 'struct BackupMediaPackageInfo' \
+  "OhanaBackup should describe the out-of-line backup media package."
+
+require_pattern "$data_backup_dtos" 'struct BackupMediaReference' \
+  "Media-bearing backup DTOs should be able to reference package media instead of inline base64."
+
+require_backup_pattern 'DataBackupMediaPackageWriter' \
+  "DataBackupManager should export media through the package writer instead of a single inline JSON blob."
+
+require_backup_pattern 'DataBackupMediaPackageReader' \
+  "DataBackupManager should import package media references."
+
+require_backup_pattern 'manifestFileName = "manifest\.json"' \
+  "DataBackupManager should keep a manifest file in backup packages."
+
+require_backup_pattern 'mediaDirectoryName = "media"' \
+  "DataBackupManager should keep out-of-line media in a media directory."
+
+require_pattern "$automatic_backup" 'DataBackupManager\.packageFileExtension' \
+  "Automatic backups should write the same .ohanabackup package format as manual exports."
+
+require_pattern "$automatic_backup" 'func exportBackupPackage\(container: ModelContainer\) async throws -> URL' \
+  "Automatic backup exporting should return a package URL, not a single in-memory JSON blob."
+
+require_pattern "$automatic_backup" 'DataBackupManager\(\)\.exportJSON\(container: container\)' \
+  "Live automatic backups should use DataBackupManager package export."
+
+require_pattern "$automatic_backup" 'writeAutomaticBackup\(packageURL: URL, now: Date\)' \
+  "Automatic backup file storage should receive and copy a backup package URL."
 
 require_pattern "$data_backup_dtos" 'struct PlantReminderPreferencesBackup' \
   "Plant reminder preferences should be represented in backup app state."

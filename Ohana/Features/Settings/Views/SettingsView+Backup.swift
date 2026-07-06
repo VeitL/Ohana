@@ -24,7 +24,11 @@ extension SettingsView {
                         Text(l.tr(zh: "导出备份", en: "Export Backup", de: "Backup exportieren"))
                             .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(primaryText)
-                        Text(l.tr(zh: "全量 JSON", en: "Full JSON", de: "Vollständiges JSON"))
+                        Text(l.tr(
+                            zh: "备份包，媒体分离存储",
+                            en: "Backup package with separate media",
+                            de: "Backup-Paket mit separaten Medien"
+                        ))
                             .font(OhanaFont.adaptive(size: 11, weight: .medium)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(tertiaryText)
                     }
@@ -141,7 +145,11 @@ extension SettingsView {
                         Text(l.tr(zh: "从备份恢复", en: "Restore from Backup", de: "Aus Backup wiederherstellen"))
                             .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(primaryText)
-                        Text(l.tr(zh: "选择 .json", en: "Choose .json", de: ".json auswählen"))
+                        Text(l.tr(
+                            zh: "选择 .ohanabackup，旧 .json 仍可恢复",
+                            en: "Choose .ohanabackup; legacy .json is still supported",
+                            de: ".ohanabackup auswählen; alte .json werden weiter unterstützt"
+                        ))
                             .font(OhanaFont.adaptive(size: 11, weight: .medium)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(tertiaryText)
                     }
@@ -176,7 +184,7 @@ extension SettingsView {
         }
         .fileImporter(
             isPresented: $showingImportPicker,
-            allowedContentTypes: [.json]
+            allowedContentTypes: backupImportContentTypes
         ) { result in
             switch result {
             case let .success(url):
@@ -217,6 +225,14 @@ extension SettingsView {
             refreshAutomaticBackupStatus()
             showAutomaticBackupReminderIfNeeded()
         }
+    }
+
+    var backupImportContentTypes: [UTType] {
+        var types: [UTType] = [.json, .directory]
+        if let packageType = UTType(filenameExtension: DataBackupManager.packageFileExtension) {
+            types.append(packageType)
+        }
+        return types
     }
 
     @ViewBuilder

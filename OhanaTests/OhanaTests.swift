@@ -1083,7 +1083,8 @@ struct OhanaTests {
         try sourceContext.save()
 
         let url = try await TestDataBackupManagerProjection.manager.exportJSON(container: source)
-        let exported = try String(contentsOf: url, encoding: .utf8)
+        #expect(url.pathExtension == DataBackupManager.packageFileExtension)
+        let exported = try #require(String(data: backupManifestData(from: url), encoding: .utf8))
         #expect(!exported.contains("pinHash"))
         #expect(!exported.contains("pinSalt"))
         #expect(!exported.contains(human.pinHash))
@@ -1108,7 +1109,7 @@ struct OhanaTests {
             container: source,
             password: "correct horse battery"
         )
-        let encryptedData = try Data(contentsOf: url)
+        let encryptedData = try backupManifestData(from: url)
         let exported = try #require(String(data: encryptedData, encoding: .utf8))
         #expect(DataBackupEncryption.isEncryptedBackup(encryptedData))
         #expect(!exported.contains("Sensitive Ava"))
@@ -2355,6 +2356,18 @@ struct OhanaTests {
         try sourceContext.save()
 
         let url = try await TestDataBackupManagerProjection.manager.exportJSON(container: source)
+        let manifestData = try backupManifestData(from: url)
+        let manifest = try #require(String(data: manifestData, encoding: .utf8))
+        #expect(url.pathExtension == DataBackupManager.packageFileExtension)
+        #expect(FileManager.default.fileExists(atPath: url.appendingPathComponent(DataBackupManager.mediaDirectoryName, isDirectory: true).path))
+        #expect(manifest.contains("\"mediaPackage\""))
+        #expect(manifest.contains("\"imageRef\""))
+        #expect(manifest.contains("\"dataRef\""))
+        #expect(manifest.contains("\"photoRef\""))
+        #expect(!manifest.contains(Data([9, 8, 7]).base64EncodedString()))
+        #expect(!manifest.contains(Data([1, 1, 2]).base64EncodedString()))
+        #expect(!manifest.contains(Data([4, 5]).base64EncodedString()))
+
         let target = try makeInMemoryContainer()
         let targetContext = target.mainContext
         try await TestDataBackupManagerProjection.manager.importJSON(from: url, context: targetContext)
@@ -6060,6 +6073,10 @@ struct OhanaTests {
             .appendingPathComponent("OhanaTests.Backup.\(UUID().uuidString).json")
         try data.write(to: url, options: [.atomic, .completeFileProtection])
         return url
+    }
+
+    private func backupManifestData(from packageURL: URL) throws -> Data {
+        try Data(contentsOf: packageURL.appendingPathComponent(DataBackupManager.manifestFileName, isDirectory: false))
     }
 
     private func clearCareCalendarDefaults(petKey: String, kinds: [String]) {

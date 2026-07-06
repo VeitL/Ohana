@@ -14,7 +14,10 @@ nonisolated extension DataBackupManager {
         return iso.date(from: s)
     }
 
-    func decodePetSnapshot(_ dto: PetBackup) -> DomainPetRehydrateSnapshot {
+    func decodePetSnapshot(
+        _ dto: PetBackup,
+        mediaResolver: DataBackupMediaResolving? = nil
+    ) throws -> DomainPetRehydrateSnapshot {
         DomainPetRehydrateSnapshot(
             id: UUID(uuidString: dto.id) ?? UUID(),
             name: dto.name,
@@ -61,21 +64,32 @@ nonisolated extension DataBackupManager {
             coconutBalance: dto.coconutBalance,
             passedAwayDate: parseDate(dto.passedAwayDate),
             cardStyleRaw: dto.cardStyleRaw ?? "classic",
-            cardPopoutImageData: dto.cardPopoutImageBase64.flatMap { Data(base64Encoded: $0) },
+            cardPopoutImageData: try mediaData(
+                reference: dto.cardPopoutImageRef,
+                legacyBase64: dto.cardPopoutImageBase64,
+                resolver: mediaResolver
+            ),
             cardPopoutSourceRaw: dto.cardPopoutSourceRaw,
             weeklyWalkGoalKm: 0,
             personalityTagsRaw: dto.personalityTagsRaw ?? ""
         )
     }
 
-    func decodeHumanSnapshot(_ dto: HumanBackup) -> DomainHumanRehydrateSnapshot {
+    func decodeHumanSnapshot(
+        _ dto: HumanBackup,
+        mediaResolver: DataBackupMediaResolving? = nil
+    ) throws -> DomainHumanRehydrateSnapshot {
         DomainHumanRehydrateSnapshot(
             id: UUID(uuidString: dto.id) ?? UUID(),
             name: dto.name,
             birthday: parseDate(dto.birthday),
             bloodType: dto.bloodType,
             avatarEmoji: dto.avatarEmoji,
-            avatarImageData: dto.avatarImageBase64.flatMap { Data(base64Encoded: $0) },
+            avatarImageData: try mediaData(
+                reference: dto.avatarImageRef,
+                legacyBase64: dto.avatarImageBase64,
+                resolver: mediaResolver
+            ),
             role: dto.role,
             genderIdentityRaw: dto.genderIdentityRaw ?? HumanProfileOptions.genderMetadata(from: dto.notes),
             notes: HumanProfileOptions.visibleNoteParts(from: dto.notes).joined(separator: "｜"),
@@ -154,7 +168,10 @@ nonisolated extension DataBackupManager {
         )
     }
 
-    func decodePlantCareLogSnapshot(_ dto: PlantCareLogBackup) -> DomainPlantCareLogRehydrateSnapshot {
+    func decodePlantCareLogSnapshot(
+        _ dto: PlantCareLogBackup,
+        mediaResolver: DataBackupMediaResolving? = nil
+    ) throws -> DomainPlantCareLogRehydrateSnapshot {
         DomainPlantCareLogRehydrateSnapshot(
             id: UUID(uuidString: dto.id) ?? UUID(),
             date: parseDate(dto.date) ?? Date(),
@@ -163,7 +180,11 @@ nonisolated extension DataBackupManager {
             executorId: dto.executorId,
             plantId: dto.plantId.flatMap(UUID.init(uuidString:)),
             healthStatusRaw: dto.healthStatusRaw ?? "",
-            photoData: dto.photoBase64.flatMap { Data(base64Encoded: $0) }
+            photoData: try mediaData(
+                reference: dto.photoRef,
+                legacyBase64: dto.photoBase64,
+                resolver: mediaResolver
+            )
         )
     }
 
@@ -295,7 +316,10 @@ nonisolated extension DataBackupManager {
         )
     }
 
-    func decodeDocumentSnapshot(_ dto: PetDocumentBackup) -> DomainPetDocumentRehydrateSnapshot {
+    func decodeDocumentSnapshot(
+        _ dto: PetDocumentBackup,
+        mediaResolver: DataBackupMediaResolving? = nil
+    ) throws -> DomainPetDocumentRehydrateSnapshot {
         DomainPetDocumentRehydrateSnapshot(
             id: UUID(uuidString: dto.id) ?? UUID(),
             title: dto.title,
@@ -307,16 +331,27 @@ nonisolated extension DataBackupManager {
             notes: dto.notes ?? "",
             reminderDate: parseDate(dto.reminderDate),
             cost: dto.cost ?? 0,
-            attachmentData: dto.attachmentBase64.flatMap { Data(base64Encoded: $0) },
+            attachmentData: try mediaData(
+                reference: dto.attachmentRef,
+                legacyBase64: dto.attachmentBase64,
+                resolver: mediaResolver
+            ),
             attachmentFilename: dto.attachmentFilename ?? ""
         )
     }
 
-    func decodeDocumentAttachmentSnapshot(_ dto: PetDocumentAttachmentBackup) -> DomainPetDocumentAttachmentRehydrateSnapshot {
+    func decodeDocumentAttachmentSnapshot(
+        _ dto: PetDocumentAttachmentBackup,
+        mediaResolver: DataBackupMediaResolving? = nil
+    ) throws -> DomainPetDocumentAttachmentRehydrateSnapshot {
         DomainPetDocumentAttachmentRehydrateSnapshot(
             id: UUID(uuidString: dto.id) ?? UUID(),
             documentId: UUID(uuidString: dto.documentId),
-            data: Data(base64Encoded: dto.dataBase64),
+            data: try mediaData(
+                reference: dto.dataRef,
+                legacyBase64: dto.dataBase64,
+                resolver: mediaResolver
+            ),
             filename: dto.filename,
             isImage: dto.isImage
         )
@@ -371,10 +406,17 @@ nonisolated extension DataBackupManager {
         )
     }
 
-    func decodePhotoLogSnapshot(_ dto: PetPhotoLogBackup) -> DomainPetPhotoLogRehydrateSnapshot {
+    func decodePhotoLogSnapshot(
+        _ dto: PetPhotoLogBackup,
+        mediaResolver: DataBackupMediaResolving? = nil
+    ) throws -> DomainPetPhotoLogRehydrateSnapshot {
         DomainPetPhotoLogRehydrateSnapshot(
             id: UUID(uuidString: dto.id) ?? UUID(),
-            imageData: Data(base64Encoded: dto.imageBase64) ?? Data(),
+            imageData: try mediaData(
+                reference: dto.imageRef,
+                legacyBase64: dto.imageBase64,
+                resolver: mediaResolver
+            ) ?? Data(),
             date: parseDate(dto.date) ?? Date(),
             note: dto.note,
             createdAt: parseDate(dto.createdAt) ?? Date(),
@@ -503,7 +545,10 @@ nonisolated extension DataBackupManager {
         )
     }
 
-    func decodeSymptomLogSnapshot(_ dto: SymptomLogBackup) -> DomainSymptomLogRehydrateSnapshot {
+    func decodeSymptomLogSnapshot(
+        _ dto: SymptomLogBackup,
+        mediaResolver: DataBackupMediaResolving? = nil
+    ) throws -> DomainSymptomLogRehydrateSnapshot {
         DomainSymptomLogRehydrateSnapshot(
             id: UUID(uuidString: dto.id) ?? UUID(),
             date: parseDate(dto.date) ?? Date(),
@@ -511,7 +556,11 @@ nonisolated extension DataBackupManager {
             symptomName: dto.symptomName,
             severityRaw: dto.severityRaw,
             note: dto.note,
-            photoData: dto.photoBase64.flatMap { Data(base64Encoded: $0) },
+            photoData: try mediaData(
+                reference: dto.photoRef,
+                legacyBase64: dto.photoBase64,
+                resolver: mediaResolver
+            ),
             petId: dto.petId.flatMap(UUID.init(uuidString:))
         )
     }
@@ -807,5 +856,19 @@ nonisolated extension DataBackupManager {
             isLegacyImport: dto.isLegacyImport,
             createdAt: parseDate(dto.createdAt) ?? parseDate(dto.purchasedAt) ?? Date()
         )
+    }
+
+    private func mediaData(
+        reference: BackupMediaReference?,
+        legacyBase64: String?,
+        resolver: DataBackupMediaResolving?
+    ) throws -> Data? {
+        if let reference {
+            guard let resolver else {
+                throw BackupError.invalidBackupPackage
+            }
+            return try resolver.data(for: reference)
+        }
+        return legacyBase64.flatMap { Data(base64Encoded: $0) }
     }
 }

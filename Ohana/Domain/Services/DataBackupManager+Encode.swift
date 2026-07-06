@@ -13,8 +13,13 @@ nonisolated extension DataBackupManager {
     func d(_ date: Date) -> String { iso.string(from: date) }
     func nilIfEmpty(_ value: String) -> String? { value.isEmpty ? nil : value }
 
-    func encodePet(_ p: Pet) -> PetBackup {
-        PetBackup(
+    func encodePet(_ p: Pet, mediaWriter: DataBackupMediaWriting? = nil) throws -> PetBackup {
+        let cardPopoutImageRef = try mediaWriter?.write(
+            p.cardPopoutImageData,
+            purpose: .petCardPopout,
+            id: p.id.uuidString
+        )
+        return PetBackup(
             id: p.id.uuidString, name: p.name, species: p.species, breed: p.breed,
             birthday: d(p.birthday), gender: p.gender, isNeutered: p.isNeutered,
             avatarEmoji: p.avatarEmoji, microchipID: p.microchipID, vetContact: p.vetContact,
@@ -36,14 +41,20 @@ nonisolated extension DataBackupManager {
             coconutBalance: p.coconutBalance,
             passedAwayDate: d(p.passedAwayDate),
             cardStyleRaw: p.cardStyleRaw.isEmpty ? nil : p.cardStyleRaw,
-            cardPopoutImageBase64: p.cardPopoutImageData?.base64EncodedString(),
+            cardPopoutImageBase64: cardPopoutImageRef == nil ? p.cardPopoutImageData?.base64EncodedString() : nil,
+            cardPopoutImageRef: cardPopoutImageRef,
             cardPopoutSourceRaw: (p.cardPopoutSourceRaw ?? "").isEmpty ? nil : p.cardPopoutSourceRaw,
             personalityTagsRaw: p.personalityTagsRaw.isEmpty ? nil : p.personalityTagsRaw
         )
     }
 
-    func encodeHuman(_ h: Human) -> HumanBackup {
-        HumanBackup(
+    func encodeHuman(_ h: Human, mediaWriter: DataBackupMediaWriting? = nil) throws -> HumanBackup {
+        let avatarImageRef = try mediaWriter?.write(
+            h.avatarImageData,
+            purpose: .humanAvatar,
+            id: h.id.uuidString
+        )
+        return HumanBackup(
             id: h.id.uuidString, name: h.name, birthday: d(h.birthday),
             bloodType: h.bloodType, avatarEmoji: h.avatarEmoji, role: h.role,
             appleUserIdentifier: nil,
@@ -55,7 +66,8 @@ nonisolated extension DataBackupManager {
             privateFieldsRaw: h.privateFieldsRaw.isEmpty ? nil : h.privateFieldsRaw,
             themeColorHex: h.themeColorHex,
             heightCm: h.heightCm,
-            avatarImageBase64: h.avatarImageData?.base64EncodedString(),
+            avatarImageBase64: avatarImageRef == nil ? h.avatarImageData?.base64EncodedString() : nil,
+            avatarImageRef: avatarImageRef,
             passedAwayDate: d(h.passedAwayDate)
         )
     }
@@ -129,8 +141,13 @@ nonisolated extension DataBackupManager {
         )
     }
 
-    func encodePlantCareLog(_ l: PlantCareLog) -> PlantCareLogBackup {
-        PlantCareLogBackup(
+    func encodePlantCareLog(_ l: PlantCareLog, mediaWriter: DataBackupMediaWriting? = nil) throws -> PlantCareLogBackup {
+        let photoRef = try mediaWriter?.write(
+            l.photoData,
+            purpose: .plantCarePhoto,
+            id: l.id.uuidString
+        )
+        return PlantCareLogBackup(
             id: l.id.uuidString,
             date: d(l.date),
             careTypeRaw: l.careTypeRaw,
@@ -138,7 +155,8 @@ nonisolated extension DataBackupManager {
             executorId: l.executorId,
             plantId: l.plant?.id.uuidString,
             healthStatusRaw: l.healthStatusRaw.isEmpty ? nil : l.healthStatusRaw,
-            photoBase64: l.photoData?.base64EncodedString()
+            photoBase64: photoRef == nil ? l.photoData?.base64EncodedString() : nil,
+            photoRef: photoRef
         )
     }
 
@@ -277,24 +295,36 @@ nonisolated extension DataBackupManager {
                             notes: r.notes, executorId: r.executorId)
     }
 
-    func encodeDocument(_ doc: PetDocument) -> PetDocumentBackup {
-        PetDocumentBackup(id: doc.id.uuidString, title: doc.title, categoryRaw: doc.category,
-                          expiryDate: d(doc.expiryDate), petId: doc.pet?.id.uuidString,
-                          issueDate: d(doc.issueDate),
-                          issuingAuthority: doc.issuingAuthority,
-                          notes: doc.notes,
-                          reminderDate: d(doc.reminderDate),
-                          cost: doc.cost,
-                          attachmentBase64: doc.attachmentData?.base64EncodedString(),
-                          attachmentFilename: doc.attachmentFilename.isEmpty ? nil : doc.attachmentFilename)
+    func encodeDocument(_ doc: PetDocument, mediaWriter: DataBackupMediaWriting? = nil) throws -> PetDocumentBackup {
+        let attachmentRef = try mediaWriter?.write(
+            doc.attachmentData,
+            purpose: .petDocumentAttachment,
+            id: doc.id.uuidString
+        )
+        return PetDocumentBackup(id: doc.id.uuidString, title: doc.title, categoryRaw: doc.category,
+                                 expiryDate: d(doc.expiryDate), petId: doc.pet?.id.uuidString,
+                                 issueDate: d(doc.issueDate),
+                                 issuingAuthority: doc.issuingAuthority,
+                                 notes: doc.notes,
+                                 reminderDate: d(doc.reminderDate),
+                                 cost: doc.cost,
+                                 attachmentBase64: attachmentRef == nil ? doc.attachmentData?.base64EncodedString() : nil,
+                                 attachmentRef: attachmentRef,
+                                 attachmentFilename: doc.attachmentFilename.isEmpty ? nil : doc.attachmentFilename)
     }
 
-    func encodeDocumentAttachments(_ doc: PetDocument) -> [PetDocumentAttachmentBackup] {
-        doc.attachments.map {
-            PetDocumentAttachmentBackup(
+    func encodeDocumentAttachments(_ doc: PetDocument, mediaWriter: DataBackupMediaWriting? = nil) throws -> [PetDocumentAttachmentBackup] {
+        try doc.attachments.map {
+            let dataRef = try mediaWriter?.write(
+                $0.data,
+                purpose: .petDocumentAttachmentFile,
+                id: $0.id.uuidString
+            )
+            return PetDocumentAttachmentBackup(
                 id: $0.id.uuidString,
                 documentId: doc.id.uuidString,
-                dataBase64: $0.data.base64EncodedString(),
+                dataBase64: dataRef == nil ? $0.data.base64EncodedString() : nil,
+                dataRef: dataRef,
                 filename: $0.filename,
                 isImage: $0.isImage
             )
@@ -329,13 +359,19 @@ nonisolated extension DataBackupManager {
                        amountMl: l.amountMl, note: l.note)
     }
 
-    func encodePhotoLog(_ l: PetPhotoLog) -> PetPhotoLogBackup {
-        PetPhotoLogBackup(
+    func encodePhotoLog(_ l: PetPhotoLog, mediaWriter: DataBackupMediaWriting? = nil) throws -> PetPhotoLogBackup {
+        let imageRef = try mediaWriter?.write(
+            l.imageData,
+            purpose: .petPhoto,
+            id: l.id.uuidString
+        )
+        return PetPhotoLogBackup(
             id: l.id.uuidString,
             date: d(l.date),
             note: l.note,
             createdAt: d(l.createdAt),
-            imageBase64: l.imageData.base64EncodedString(),
+            imageBase64: imageRef == nil ? l.imageData.base64EncodedString() : nil,
+            imageRef: imageRef,
             petId: l.pet?.id.uuidString,
             locationLatitude: l.locationLatitude,
             locationLongitude: l.locationLongitude,
@@ -461,15 +497,21 @@ nonisolated extension DataBackupManager {
         )
     }
 
-    func encodeSymptomLog(_ l: SymptomLog) -> SymptomLogBackup {
-        SymptomLogBackup(
+    func encodeSymptomLog(_ l: SymptomLog, mediaWriter: DataBackupMediaWriting? = nil) throws -> SymptomLogBackup {
+        let photoRef = try mediaWriter?.write(
+            l.photoData,
+            purpose: .symptomPhoto,
+            id: l.id.uuidString
+        )
+        return SymptomLogBackup(
             id: l.id.uuidString,
             date: d(l.date),
             categoryRaw: l.categoryRaw,
             symptomName: l.symptomName,
             severityRaw: l.severityRaw,
             note: l.note,
-            photoBase64: l.photoData?.base64EncodedString(),
+            photoBase64: photoRef == nil ? l.photoData?.base64EncodedString() : nil,
+            photoRef: photoRef,
             petId: l.pet?.id.uuidString
         )
     }

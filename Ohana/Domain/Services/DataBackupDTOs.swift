@@ -9,8 +9,9 @@ import Foundation
 
 // MARK: - 顶层备份结构
 nonisolated struct OhanaBackup: Codable {
-    var schemaVersion: Int = 29
+    var schemaVersion: Int = 30
     var exportedAt: String
+    var mediaPackage: BackupMediaPackageInfo? = nil
     // 核心实体
     var pets: [PetBackup]
     var humans: [HumanBackup]
@@ -61,6 +62,18 @@ nonisolated struct OhanaBackup: Codable {
     var shopPurchaseRecords: [ShopPurchaseRecordBackup]? = nil
     // App 状态
     var appState: AppStateBackup
+}
+
+nonisolated struct BackupMediaPackageInfo: Codable, Equatable, Sendable {
+    var format: String
+    var mediaCount: Int
+    var mediaBytes: Int
+    var encrypted: Bool
+}
+
+nonisolated struct BackupMediaReference: Codable, Equatable, Sendable {
+    var path: String
+    var byteCount: Int
 }
 
 // MARK: - AppState
@@ -144,6 +157,7 @@ nonisolated struct PetBackup: Codable {
     var passedAwayDate: String?
     var cardStyleRaw: String?
     var cardPopoutImageBase64: String?
+    var cardPopoutImageRef: BackupMediaReference? = nil
     var cardPopoutSourceRaw: String?
     /// ArkSchemaV26：性格标签 id，逗号分隔；旧备份缺省为 nil
     var personalityTagsRaw: String?
@@ -170,6 +184,7 @@ nonisolated struct HumanBackup: Codable {
     var themeColorHex: String?
     var heightCm: Double?
     var avatarImageBase64: String?
+    var avatarImageRef: BackupMediaReference? = nil
     var passedAwayDate: String?
     // Intentionally excluded from backups: pinHash, pinSalt, pinFailedAttempts, pinLockedUntil.
 }
@@ -313,6 +328,7 @@ nonisolated struct PlantCareLogBackup: Codable {
     var plantId: String?
     var healthStatusRaw: String?
     var photoBase64: String?
+    var photoRef: BackupMediaReference? = nil
 }
 
 nonisolated struct PetCareLogBackup: Codable {
@@ -446,13 +462,15 @@ nonisolated struct PetDocumentBackup: Codable {
     var reminderDate: String?
     var cost: Double?
     var attachmentBase64: String?
+    var attachmentRef: BackupMediaReference? = nil
     var attachmentFilename: String?
 }
 
 nonisolated struct PetDocumentAttachmentBackup: Codable {
     var id: String
     var documentId: String
-    var dataBase64: String
+    var dataBase64: String?
+    var dataRef: BackupMediaReference? = nil
     var filename: String
     var isImage: Bool
 }
@@ -496,7 +514,8 @@ nonisolated struct PetPhotoLogBackup: Codable {
     var date: String
     var note: String
     var createdAt: String
-    var imageBase64: String
+    var imageBase64: String?
+    var imageRef: BackupMediaReference? = nil
     var petId: String?
     var locationLatitude: Double
     var locationLongitude: Double
@@ -615,6 +634,7 @@ nonisolated struct SymptomLogBackup: Codable {
     var severityRaw: Int
     var note: String
     var photoBase64: String?
+    var photoRef: BackupMediaReference? = nil
     var petId: String?
 }
 

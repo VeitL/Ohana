@@ -15,7 +15,8 @@ enum AutomaticBackupPolicy {
     static let reminderFailureThreshold = 2
     static let ubiquityContainerIdentifier = "iCloud.com.guanchen.li.Ohana"
     static let directoryName = "Ohana Backups"
-    static let fileName = "Ohana Automatic Backup.json"
+    static let fileName = "Ohana Automatic Backup.\(DataBackupManager.packageFileExtension)"
+    static let legacyFileName = "Ohana Automatic Backup.json"
 }
 
 struct AutomaticBackupFileReference: Codable, Equatable, Sendable {
@@ -237,19 +238,19 @@ final class AutomaticBackupStatusStore {
 
 @MainActor
 protocol AutomaticBackupExporting {
-    func exportPlainJSON(container: ModelContainer) async throws -> Data
+    func exportBackupPackage(container: ModelContainer) async throws -> URL
 }
 
 @MainActor
 struct LiveAutomaticBackupExporter: AutomaticBackupExporting {
-    func exportPlainJSON(container: ModelContainer) async throws -> Data {
-        try await DataBackupActor(modelContainer: container).exportData()
+    func exportBackupPackage(container: ModelContainer) async throws -> URL {
+        try await DataBackupManager().exportJSON(container: container)
     }
 }
 
 @MainActor
 protocol AutomaticBackupFileStoring {
-    func writeAutomaticBackup(data: Data, now: Date) async throws -> AutomaticBackupFileReference
+    func writeAutomaticBackup(packageURL: URL, now: Date) async throws -> AutomaticBackupFileReference
     func removeManagedAutomaticBackups() async throws
 }
 
@@ -257,17 +258,20 @@ struct ICloudDriveAutomaticBackupFileStore: AutomaticBackupFileStoring {
     var containerIdentifier = AutomaticBackupPolicy.ubiquityContainerIdentifier
     var directoryName = AutomaticBackupPolicy.directoryName
     var fileName = AutomaticBackupPolicy.fileName
+    var legacyFileName = AutomaticBackupPolicy.legacyFileName
 
-    func writeAutomaticBackup(data: Data, now _: Date) async throws -> AutomaticBackupFileReference {
+    func writeAutomaticBackup(packageURL: URL, now _: Date) async throws -> AutomaticBackupFileReference {
         let containerIdentifier = containerIdentifier
         let directoryName = directoryName
         let fileName = fileName
+        let legacyFileName = legacyFileName
         return try await Task.detached(priority: .utility) {
             try Self.write(
-                data: data,
+                packageURL: packageURL,
                 containerIdentifier: containerIdentifier,
                 directoryName: directoryName,
-                fileName: fileName
+                fileName: fileName,
+                legacyFileName: legacyFileName
             )
         }.value
     }
@@ -276,24 +280,32 @@ struct ICloudDriveAutomaticBackupFileStore: AutomaticBackupFileStoring {
         let containerIdentifier = containerIdentifier
         let directoryName = directoryName
         let fileName = fileName
+        let legacyFileName = legacyFileName
         try await Task.detached(priority: .utility) {
             try Self.remove(
                 containerIdentifier: containerIdentifier,
                 directoryName: directoryName,
-                fileName: fileName
+                fileName: fileName,
+                legacyFileName: legacyFileName
             )
         }.value
     }
 
     func removeManagedAutomaticBackupsSynchronously() throws {
-        try Self.remove(containerIdentifier: containerIdentifier, directoryName: directoryName, fileName: fileName)
+        try Self.remove(
+            containerIdentifier: containerIdentifier,
+            directoryName: directoryName,
+            fileName: fileName,
+            legacyFileName: legacyFileName
+        )
     }
 
     private nonisolated static func write(
-        data: Data,
+        packageURL: URL,
         containerIdentifier: String,
         directoryName: String,
-        fileName: String
+        fileName: String,
+        legacyFileName: String
     ) throws -> AutomaticBackupFileReference {
         let fileManager = FileManager.default
         guard let containerURL = fileManager.url(forUbiquityContainerIdentifier: containerIdentifier) else {
@@ -304,8 +316,16 @@ struct ICloudDriveAutomaticBackupFileStore: AutomaticBackupFileStoring {
         do {
             try fileManager.createDirectory(at: backupDirectoryURL, withIntermediateDirectories: true)
             let fileURL = backupDirectoryURL.appendingPathComponent(fileName, isDirectory: false)
-            try data.write(to: fileURL, options: [.atomic, .completeFileProtection])
-            return AutomaticBackupFileReference(fileName: fileName, path: fileURL.path, byteCount: data.count)
+            if fileManager.fileExists(atPath: fileURL.path) {
+                try fileManager.removeItem(at: fileURL)
+            }
+            let legacyURL = backupDirectoryURL.appendingPathComponent(legacyFileName, isDirectory: false)
+            if fileManager.fileExists(atPath: legacyURL.path) {
+                try fileManager.removeItem(at: legacyURL)
+            }
+            try fileManager.copyItem(at: packageURL, to: fileURL)
+            let byteCount = try packageByteCount(fileURL)
+            return AutomaticBackupFileReference(fileName: fileName, path: fileURL.path, byteCount: byteCount)
         } catch let error as AutomaticBackupFileStoreError {
             throw error
         } catch {
@@ -316,22 +336,45 @@ struct ICloudDriveAutomaticBackupFileStore: AutomaticBackupFileStoring {
     private nonisolated static func remove(
         containerIdentifier: String,
         directoryName: String,
-        fileName: String
+        fileName: String,
+        legacyFileName: String
     ) throws {
         let fileManager = FileManager.default
         guard let containerURL = fileManager.url(forUbiquityContainerIdentifier: containerIdentifier) else {
             throw AutomaticBackupFileStoreError.iCloudUnavailable
         }
-        let fileURL = containerURL
+        let directoryURL = containerURL
             .appendingPathComponent("Documents", isDirectory: true)
             .appendingPathComponent(directoryName, isDirectory: true)
-            .appendingPathComponent(fileName, isDirectory: false)
-        guard fileManager.fileExists(atPath: fileURL.path) else { return }
+        let managedURLs = [
+            directoryURL.appendingPathComponent(fileName, isDirectory: false),
+            directoryURL.appendingPathComponent(legacyFileName, isDirectory: false)
+        ]
         do {
-            try fileManager.removeItem(at: fileURL)
+            for fileURL in managedURLs where fileManager.fileExists(atPath: fileURL.path) {
+                try fileManager.removeItem(at: fileURL)
+            }
         } catch {
             throw AutomaticBackupFileStoreError.cleanupFailed(error.localizedDescription)
         }
+    }
+
+    private nonisolated static func packageByteCount(_ packageURL: URL) throws -> Int {
+        let fileManager = FileManager.default
+        guard let enumerator = fileManager.enumerator(
+            at: packageURL,
+            includingPropertiesForKeys: [.fileSizeKey, .isRegularFileKey],
+            options: [.skipsHiddenFiles]
+        ) else {
+            throw AutomaticBackupFileStoreError.writeFailed("Unable to enumerate backup package.")
+        }
+        var total = 0
+        for case let fileURL as URL in enumerator {
+            let values = try fileURL.resourceValues(forKeys: [.fileSizeKey, .isRegularFileKey])
+            guard values.isRegularFile == true else { continue }
+            total += values.fileSize ?? 0
+        }
+        return total
     }
 }
 
@@ -403,8 +446,8 @@ final class AutomaticBackupService: AutomaticBackupManaging {
 
         statusStore.markAttempt(now: currentDate)
         do {
-            let data = try await exporter.exportPlainJSON(container: container)
-            let reference = try await fileStore.writeAutomaticBackup(data: data, now: currentDate)
+            let packageURL = try await exporter.exportBackupPackage(container: container)
+            let reference = try await fileStore.writeAutomaticBackup(packageURL: packageURL, now: currentDate)
             statusStore.markSuccess(reference: reference, now: currentDate)
             return .success(reference)
         } catch {
