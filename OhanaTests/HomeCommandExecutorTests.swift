@@ -2675,6 +2675,30 @@ struct HomeCommandExecutorTests {
         #expect(embeddedSource.contains("\"yellowleaf\""))
     }
 
+    @Test func petCareFactsStopDerivedEffectsWhenPersistenceFails() throws {
+        let rootURL = repositoryRootURL()
+        let careServiceSource = try source("Ohana/Domain/Services/CareEventService.swift", rootURL: rootURL)
+        let careFactSource = try source("Ohana/Domain/Services/CareEventService+Care.swift", rootURL: rootURL)
+        let feedFactSource = try source("Ohana/Domain/Services/CareEventService+Feed.swift", rootURL: rootURL)
+        let sharedRecorderSource = try source("Ohana/Domain/Services/SharedPetActionRecorder.swift", rootURL: rootURL)
+        let feedCommandSource = try source("Ohana/Features/Feeding/FeedCommands.swift", rootURL: rootURL)
+        let quickWaterSource = try source("Ohana/Features/QuickCare/QuickWaterCommandExecutor.swift", rootURL: rootURL)
+
+        #expect(careServiceSource.contains("let didPersist: Bool"))
+        #expect(careServiceSource.contains("didPersist && disposition.didWriteFact"))
+        #expect(careServiceSource.contains("didPersist && disposition.allowsDerivedEffects"))
+        #expect(sharedRecorderSource.contains("let didPersist: Bool"))
+        #expect(sharedRecorderSource.contains("context.safeSaveResult()"))
+        #expect(sharedRecorderSource.contains("guard saveResult.didSave else"))
+        #expect(!careFactSource.contains("context.safeSave()"))
+        #expect(!feedFactSource.contains("context.safeSave()"))
+        #expect(!sharedRecorderSource.contains("context.safeSave()"))
+        #expect(careFactSource.contains("guard saveResult.didSave else"))
+        #expect(feedFactSource.contains("guard saveResult.didSave else"))
+        #expect(feedCommandSource.contains("didPersist: recorded.result.didPersist"))
+        #expect(quickWaterSource.contains("didPersist: recorded.result.didPersist"))
+    }
+
     @MainActor
     @Test func plantCareCommandServiceWritesEveryLaunchCareType() throws {
         let container = try makeInMemoryContainer()

@@ -112,13 +112,15 @@ struct PlannedCareCompletionResult {
     let operationDate: Date
     let reward: (humanGot: Int, petGot: Int)
     let disposition: CareFactWriteDisposition
+    var didPersist: Bool = true
+    var persistenceErrorDescription: String?
 
     var didRecord: Bool {
-        disposition.didWriteFact && logID != nil
+        didPersist && disposition.didWriteFact && logID != nil
     }
 
     var allowsDerivedEffects: Bool {
-        disposition.allowsDerivedEffects
+        didPersist && disposition.allowsDerivedEffects
     }
 
     var coconutDelta: Int {
@@ -201,6 +203,8 @@ final class CareEventService: CareEventRecording {
         let linkedPottyLogID: UUID?
         let coconutDelta: Int
         let disposition: CareFactWriteDisposition
+        let didPersist: Bool
+        let persistenceErrorDescription: String?
 
         init(
             logID: UUID,
@@ -208,7 +212,9 @@ final class CareEventService: CareEventRecording {
             careType: CareType,
             linkedPottyLogID: UUID?,
             coconutDelta: Int,
-            disposition: CareFactWriteDisposition = .active
+            disposition: CareFactWriteDisposition = .active,
+            didPersist: Bool = true,
+            persistenceErrorDescription: String? = nil
         ) {
             self.logID = logID
             self.subjectID = subjectID
@@ -216,14 +222,16 @@ final class CareEventService: CareEventRecording {
             self.linkedPottyLogID = linkedPottyLogID
             self.coconutDelta = coconutDelta
             self.disposition = disposition
+            self.didPersist = didPersist
+            self.persistenceErrorDescription = persistenceErrorDescription
         }
 
         var didWriteFact: Bool {
-            disposition.didWriteFact
+            didPersist && disposition.didWriteFact
         }
 
         var allowsDerivedEffects: Bool {
-            disposition.allowsDerivedEffects
+            didPersist && disposition.allowsDerivedEffects
         }
     }
 
@@ -233,13 +241,15 @@ final class CareEventService: CareEventRecording {
         let pottyType: PottyType
         let coconutDelta: Int
         let disposition: CareFactWriteDisposition
+        var didPersist: Bool = true
+        var persistenceErrorDescription: String?
 
         var didWriteFact: Bool {
-            disposition.didWriteFact
+            didPersist && disposition.didWriteFact
         }
 
         var allowsDerivedEffects: Bool {
-            disposition.allowsDerivedEffects
+            didPersist && disposition.allowsDerivedEffects
         }
     }
 
@@ -249,13 +259,15 @@ final class CareEventService: CareEventRecording {
         let healthType: HealthLogType
         let coconutDelta: Int
         let disposition: CareFactWriteDisposition
+        var didPersist: Bool = true
+        var persistenceErrorDescription: String?
 
         var didWriteFact: Bool {
-            disposition.didWriteFact
+            didPersist && disposition.didWriteFact
         }
 
         var allowsDerivedEffects: Bool {
-            disposition.allowsDerivedEffects
+            didPersist && disposition.allowsDerivedEffects
         }
     }
 
@@ -264,13 +276,15 @@ final class CareEventService: CareEventRecording {
         let subjectID: UUID
         let grams: Double
         let disposition: CareFactWriteDisposition
+        var didPersist: Bool = true
+        var persistenceErrorDescription: String?
 
         var didWriteFact: Bool {
-            disposition.didWriteFact
+            didPersist && disposition.didWriteFact
         }
 
         var allowsDerivedEffects: Bool {
-            disposition.allowsDerivedEffects
+            didPersist && disposition.allowsDerivedEffects
         }
     }
 }

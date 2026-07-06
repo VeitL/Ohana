@@ -109,7 +109,23 @@ extension CareEventService {
         )
         let log = careWrite.log
         let pottyLog = careWrite.linkedPottyLog
-        context.safeSave()
+        let saveResult = context.safeSaveResult()
+        guard saveResult.didSave else {
+            return (
+                CareRecordResult(
+                    logID: log.id,
+                    subjectID: pet.id,
+                    careType: type,
+                    linkedPottyLogID: pottyLog?.id,
+                    coconutDelta: 0,
+                    didPersist: false,
+                    persistenceErrorDescription: saveResult.errorDescription
+                ),
+                (0, 0),
+                log,
+                pottyLog
+            )
+        }
 
         let award = DomainCareFactEffectsDispatcher.map(plan: write, default: (0, 0)) { actor in
             let award = dependencies.economy.awardCareAction(
@@ -221,7 +237,22 @@ extension CareEventService {
         }
         let disposition = write.disposition
         let log = DomainCareFactWriter.createPottyLog(plan: write, context: context)
-        context.safeSave()
+        let saveResult = context.safeSaveResult()
+        guard saveResult.didSave else {
+            return (
+                PottyRecordResult(
+                    logID: log.id,
+                    subjectID: pet.id,
+                    pottyType: type,
+                    coconutDelta: 0,
+                    disposition: disposition,
+                    didPersist: false,
+                    persistenceErrorDescription: saveResult.errorDescription
+                ),
+                (0, 0),
+                log
+            )
+        }
 
         let reward = DomainCareFactEffectsDispatcher.map(plan: write, default: (0, 0)) { actor in
             let reward = dependencies.economy.awardCareAction(
@@ -265,27 +296,33 @@ extension CareEventService {
         let hygieneType: HygieneType
         let coconutDelta: Int
         let disposition: CareFactWriteDisposition
+        let didPersist: Bool
+        let persistenceErrorDescription: String?
 
         init(
             logID: UUID,
             subjectID: UUID,
             hygieneType: HygieneType,
             coconutDelta: Int,
-            disposition: CareFactWriteDisposition = .active
+            disposition: CareFactWriteDisposition = .active,
+            didPersist: Bool = true,
+            persistenceErrorDescription: String? = nil
         ) {
             self.logID = logID
             self.subjectID = subjectID
             self.hygieneType = hygieneType
             self.coconutDelta = coconutDelta
             self.disposition = disposition
+            self.didPersist = didPersist
+            self.persistenceErrorDescription = persistenceErrorDescription
         }
 
         var didWriteFact: Bool {
-            disposition.didWriteFact
+            didPersist && disposition.didWriteFact
         }
 
         var allowsDerivedEffects: Bool {
-            disposition.allowsDerivedEffects
+            didPersist && disposition.allowsDerivedEffects
         }
     }
 
@@ -345,7 +382,21 @@ extension CareEventService {
             )
         }
         let log = DomainCareFactWriter.createHygieneLog(plan: write, context: context)
-        context.safeSave()
+        let saveResult = context.safeSaveResult()
+        guard saveResult.didSave else {
+            return (
+                HygieneRecordResult(
+                    logID: log.id,
+                    subjectID: pet.id,
+                    hygieneType: type,
+                    coconutDelta: 0,
+                    didPersist: false,
+                    persistenceErrorDescription: saveResult.errorDescription
+                ),
+                (0, 0),
+                log
+            )
+        }
 
         let reward = DomainCareFactEffectsDispatcher.map(plan: write, default: (0, 0)) { actor in
             let reward = dependencies.economy.awardCareAction(
@@ -458,7 +509,22 @@ extension CareEventService {
         }
         let disposition = write.disposition
         let log = DomainCareFactWriter.createHealthLog(plan: write, context: context)
-        context.safeSave()
+        let saveResult = context.safeSaveResult()
+        guard saveResult.didSave else {
+            return (
+                HealthRecordResult(
+                    logID: log.id,
+                    subjectID: pet.id,
+                    healthType: type,
+                    coconutDelta: 0,
+                    disposition: disposition,
+                    didPersist: false,
+                    persistenceErrorDescription: saveResult.errorDescription
+                ),
+                (0, 0),
+                log
+            )
+        }
 
         let reward = DomainCareFactEffectsDispatcher.map(plan: write, default: (0, 0)) { actor in
             let reward = dependencies.economy.awardCareAction(

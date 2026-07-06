@@ -209,6 +209,8 @@ private func singleCareResult(
         walkLogIDs: [],
         walkLogs: [],
         reward: recorded.reward,
-        disposition: recorded.result.disposition
+        disposition: recorded.result.disposition,
+        didPersist: recorded.result.didPersist,
+        persistenceErrorDescription: recorded.result.persistenceErrorDescription
     )
 }

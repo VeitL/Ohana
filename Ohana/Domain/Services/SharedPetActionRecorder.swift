@@ -154,6 +154,8 @@ struct SharedPetActionResult {
     let walkLogs: [PetWalkLog]
     let reward: (humanGot: Int, petGot: Int)
     let disposition: CareFactWriteDisposition
+    let didPersist: Bool
+    let persistenceErrorDescription: String?
 
     init(
         sessionID: UUID,
@@ -167,7 +169,9 @@ struct SharedPetActionResult {
         walkLogIDs: [UUID],
         walkLogs: [PetWalkLog],
         reward: (humanGot: Int, petGot: Int),
-        disposition: CareFactWriteDisposition
+        disposition: CareFactWriteDisposition,
+        didPersist: Bool = true,
+        persistenceErrorDescription: String? = nil
     ) {
         self.sessionID = sessionID
         self.targetPetIDs = targetPetIDs
@@ -181,16 +185,18 @@ struct SharedPetActionResult {
         self.walkLogs = walkLogs
         self.reward = reward
         self.disposition = disposition
+        self.didPersist = didPersist
+        self.persistenceErrorDescription = persistenceErrorDescription
     }
 
     var coconutDelta: Int { max(0, reward.humanGot) + max(0, reward.petGot) }
 
     var didWriteFact: Bool {
-        disposition.didWriteFact
+        didPersist && disposition.didWriteFact
     }
 
     var allowsDerivedEffects: Bool {
-        disposition.allowsDerivedEffects
+        didPersist && disposition.allowsDerivedEffects
     }
 
     static func noOp() -> SharedPetActionResult {
@@ -431,7 +437,25 @@ enum SharedPetActionRecorder {
             session.primaryLegacyModelId = primary.id
         }
         CloudSyncMutationRecorder.markModified(session, context: context, modifiedAt: descriptor.date)
-        context.safeSave()
+        let saveResult = context.safeSaveResult()
+        guard saveResult.didSave else {
+            return SharedPetActionResult(
+                sessionID: session.id,
+                targetPetIDs: [],
+                careLogIDs: [],
+                pottyLogIDs: [],
+                pottyLogID: pottyLog?.id,
+                pottyLog: pottyLog,
+                hygieneLogIDs: [],
+                expenseLogIDs: [],
+                walkLogIDs: [],
+                walkLogs: [],
+                reward: (0, 0),
+                disposition: .active,
+                didPersist: false,
+                persistenceErrorDescription: saveResult.errorDescription
+            )
+        }
 
         let reward: (humanGot: Int, petGot: Int) = DomainCareFactEffectsDispatcher.map(plans: effectPlans, default: (humanGot: 0, petGot: 0)) { actor in
             if let rewardType = descriptor.reward {

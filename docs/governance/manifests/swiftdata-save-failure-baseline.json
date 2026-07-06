@@ -10,20 +10,6 @@
       "if !ledgers.isEmpty { context.safeSave() }",
       "if !records.isEmpty { context.safeSave() }"
     ],
-    "Ohana/Domain/Services/CareEventService+Care.swift": [
-      "context.safeSave()",
-      "context.safeSave()",
-      "context.safeSave()",
-      "context.safeSave()"
-    ],
-    "Ohana/Domain/Services/CareEventService+Feed.swift": [
-      "context.safeSave()",
-      "context.safeSave()",
-      "context.safeSave()",
-      "context.safeSave()",
-      "context.safeSave()",
-      "context.safeSave()"
-    ],
     "Ohana/Domain/Services/CareLedgerBackfillService.swift": [
       "context.safeSave()"
     ],
@@ -68,9 +54,6 @@
     "Ohana/Domain/Services/SharedCareSessionMaintenance.swift": [
       "context.safeSave()",
       "context.safeSave()",
-      "context.safeSave()"
-    ],
-    "Ohana/Domain/Services/SharedPetActionRecorder.swift": [
       "context.safeSave()"
     ],
     "Ohana/Features/Calendar/CalendarCommands.swift": [

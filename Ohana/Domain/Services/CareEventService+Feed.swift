@@ -103,7 +103,22 @@ extension CareEventService {
             )
         }
         let log = DomainCareFactWriter.createCareLog(plan: write, context: context).log
-        context.safeSave()
+        let saveResult = context.safeSaveResult()
+        guard saveResult.didSave else {
+            return (
+                CareRecordResult(
+                    logID: log.id,
+                    subjectID: pet.id,
+                    careType: .feeding,
+                    linkedPottyLogID: nil,
+                    coconutDelta: 0,
+                    didPersist: false,
+                    persistenceErrorDescription: saveResult.errorDescription
+                ),
+                (0, 0),
+                log
+            )
+        }
 
         let reward = DomainCareFactEffectsDispatcher.map(plan: write, default: (0, 0)) { actor in
             dependencies.economy.recordFirstMeal(actorId: actor.rewardExecutorId, context: context)
@@ -223,7 +238,20 @@ extension CareEventService {
         }
         let disposition = write.disposition
         let log = DomainCareFactWriter.createCareLog(plan: write, context: context).log
-        context.safeSave()
+        let saveResult = context.safeSaveResult()
+        guard saveResult.didSave else {
+            return (
+                result: TreatFeedRecordResult(
+                    logID: log.id,
+                    subjectID: pet.id,
+                    grams: amountGrams,
+                    disposition: disposition,
+                    didPersist: false,
+                    persistenceErrorDescription: saveResult.errorDescription
+                ),
+                log: log
+            )
+        }
         DomainCareFactEffectsDispatcher.run(plan: write) { _ in
             dependencies.careLedger.recordPetCare(
                 log: log,
@@ -329,17 +357,20 @@ extension CareEventService {
         let log = DomainCareFactWriter.createCareLog(plan: write, context: context).log
 
         guard disposition.allowsDerivedEffects else {
-            context.safeSave()
+            let saveResult = context.safeSaveResult()
             return PlannedCareCompletionResult(
                 logID: log.id,
                 subjectID: pet.id,
                 factDate: occurredAt,
                 operationDate: operationDate,
                 reward: (0, 0),
-                disposition: disposition
+                disposition: disposition,
+                didPersist: saveResult.didSave,
+                persistenceErrorDescription: saveResult.errorDescription
             )
         }
 
+        var persistenceErrorDescription: String?
         let reward = DomainCareFactEffectsDispatcher.map(plan: write, default: (0, 0)) { actor in
             guard DomainScheduleWriter.completeReminder(
                 reminder,
@@ -350,8 +381,12 @@ extension CareEventService {
             ) else {
                 return (0, 0)
             }
+            let saveResult = context.safeSaveResult()
+            guard saveResult.didSave else {
+                persistenceErrorDescription = saveResult.errorDescription
+                return (0, 0)
+            }
             dependencies.notifications.cancel(notificationId: reminder.notificationId)
-            context.safeSave()
             dependencies.careLedger.recordReminderState(
                 reminder: reminder,
                 actionType: "completePlannedCare",
@@ -390,7 +425,9 @@ extension CareEventService {
             factDate: occurredAt,
             operationDate: operationDate,
             reward: reward,
-            disposition: disposition
+            disposition: disposition,
+            didPersist: persistenceErrorDescription == nil,
+            persistenceErrorDescription: persistenceErrorDescription
         )
     }
 
@@ -475,17 +512,20 @@ extension CareEventService {
         let log = DomainCareFactWriter.createCareLog(plan: write, context: context).log
 
         guard disposition.allowsDerivedEffects else {
-            context.safeSave()
+            let saveResult = context.safeSaveResult()
             return PlannedCareCompletionResult(
                 logID: log.id,
                 subjectID: pet.id,
                 factDate: occurredAt,
                 operationDate: operationDate,
                 reward: (0, 0),
-                disposition: disposition
+                disposition: disposition,
+                didPersist: saveResult.didSave,
+                persistenceErrorDescription: saveResult.errorDescription
             )
         }
 
+        var persistenceErrorDescription: String?
         let reward = DomainCareFactEffectsDispatcher.map(plan: write, default: (0, 0)) { actor in
             guard DomainScheduleWriter.completeReminder(
                 reminder,
@@ -496,8 +536,12 @@ extension CareEventService {
             ) else {
                 return (0, 0)
             }
+            let saveResult = context.safeSaveResult()
+            guard saveResult.didSave else {
+                persistenceErrorDescription = saveResult.errorDescription
+                return (0, 0)
+            }
             dependencies.notifications.cancel(notificationId: reminder.notificationId)
-            context.safeSave()
             dependencies.careLedger.recordReminderState(
                 reminder: reminder,
                 actionType: "completePlannedCare",
@@ -535,7 +579,9 @@ extension CareEventService {
             factDate: occurredAt,
             operationDate: operationDate,
             reward: reward,
-            disposition: disposition
+            disposition: disposition,
+            didPersist: persistenceErrorDescription == nil,
+            persistenceErrorDescription: persistenceErrorDescription
         )
     }
 
