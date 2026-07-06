@@ -401,9 +401,7 @@ enum FocusHomeExpandedInteractionPolicy {
         heroDirection: Int,
         progress: CGFloat
     ) -> Bool {
-        guard selectedCardId != nil else { return true }
-        if heroDirection < 0 { return true }
-        return heroDirection == 0 && progress <= 0.06
+        true
     }
 
     static func isDetailButtonInteractive(
@@ -411,6 +409,16 @@ enum FocusHomeExpandedInteractionPolicy {
         reveal: CGFloat
     ) -> Bool {
         isExpandedInteractionMounted && reveal >= visibleControlInteractionProgress
+    }
+}
+
+enum FocusHomeCollapsedHitLayerPolicy {
+    static func zIndex(selectedCardId: UUID?) -> Double {
+        selectedCardId == nil ? 80 : 23
+    }
+
+    static func includes(cardId: UUID, selectedCardId: UUID?) -> Bool {
+        selectedCardId != cardId
     }
 }
 

@@ -169,7 +169,7 @@ struct FocusHomeVerticalSolidScene<QuickActions: View, ContextMenuContent: View>
         return ZStack {
             if canHitCollapsedCards {
                 collapsedHitLayer(in: geo.size)
-                    .zIndex(80)
+                    .zIndex(FocusHomeCollapsedHitLayerPolicy.zIndex(selectedCardId: selectedCardId))
             } else {
                 Color.clear
                     .contentShape(Rectangle())
@@ -812,48 +812,50 @@ struct FocusHomeVerticalSolidScene<QuickActions: View, ContextMenuContent: View>
     private func collapsedHitLayer(in size: CGSize) -> some View {
         ZStack {
             ForEach(Array(cards.enumerated()), id: \.element.id) { index, card in
-                let frame = collapsedFrame(index: index, count: cards.count, in: size)
-                let floating = floatingTransform(index: index, isSelected: false)
-                let cornerRadius = CGFloat(30)
-                let inactiveGeometry = freezesInactiveCollapsedGeometryDuringHero
-                    ? inactiveCollapsedGeometry(
-                        size: size,
-                        selectedCardId: card.id,
-                        includesAmbientFloat: true
-                    )
-                    : [:]
+                if FocusHomeCollapsedHitLayerPolicy.includes(cardId: card.id, selectedCardId: selectedCardId) {
+                    let frame = collapsedFrame(index: index, count: cards.count, in: size)
+                    let floating = floatingTransform(index: index, isSelected: false)
+                    let cornerRadius = CGFloat(30)
+                    let inactiveGeometry = freezesInactiveCollapsedGeometryDuringHero
+                        ? inactiveCollapsedGeometry(
+                            size: size,
+                            selectedCardId: card.id,
+                            includesAmbientFloat: true
+                        )
+                        : [:]
 
-                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .fill(Color.ohanaPrimaryText.opacity(0.001)) // ui-v4: allow invisible vertical home card hit zone
-                    .frame(width: frame.width, height: frame.height)
-                    .contentShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
-                    .rotationEffect(.degrees(collapsedRotation(index: index) + floating.rotation))
-                    .position(x: frame.midX + floating.x, y: frame.midY + floating.y)
-                    .zIndex(100 + collapsedZIndex(index: index, count: cards.count))
-                    .highPriorityGesture(
-                        TapGesture()
-                            .onEnded {
-                                if freezesInactiveCollapsedGeometryDuringHero {
-                                    setInactiveHeroCollapsedGeometry(inactiveGeometry, selectionId: card.id)
+                    RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                        .fill(Color.ohanaPrimaryText.opacity(0.001)) // ui-v4: allow invisible vertical home card hit zone
+                        .frame(width: frame.width, height: frame.height)
+                        .contentShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+                        .rotationEffect(.degrees(collapsedRotation(index: index) + floating.rotation))
+                        .position(x: frame.midX + floating.x, y: frame.midY + floating.y)
+                        .zIndex(100 + collapsedZIndex(index: index, count: cards.count))
+                        .highPriorityGesture(
+                            TapGesture()
+                                .onEnded {
+                                    if freezesInactiveCollapsedGeometryDuringHero {
+                                        setInactiveHeroCollapsedGeometry(inactiveGeometry, selectionId: card.id)
+                                    }
+                                    onSelect(
+                                        preparedHeroSnapshot(for: card, index: index)
+                                            .freezingCollapsedGeometry(
+                                                frame: frame.offsetBy(dx: floating.x, dy: floating.y),
+                                                rotation: collapsedRotation(index: index) + floating.rotation,
+                                                inactiveCollapsedGeometry: inactiveGeometry
+                                            )
+                                    )
                                 }
-                                onSelect(
-                                    preparedHeroSnapshot(for: card, index: index)
-                                        .freezingCollapsedGeometry(
-                                            frame: frame.offsetBy(dx: floating.x, dy: floating.y),
-                                            rotation: collapsedRotation(index: index) + floating.rotation,
-                                            inactiveCollapsedGeometry: inactiveGeometry
-                                        )
-                                )
-                            }
-                    )
-                    .accessibilityLabel(card.name)
-                    .accessibilityIdentifier(cardAccessibilityIdentifier(for: card))
-                    .accessibilityHint(l.tr(
-                        zh: "点击放大卡片",
-                        en: "Tap to expand card",
-                        de: "Tippen, um die Karte zu vergrößern"
-                    ))
-                    .accessibilityAddTraits(.isButton)
+                        )
+                        .accessibilityLabel(card.name)
+                        .accessibilityIdentifier(cardAccessibilityIdentifier(for: card))
+                        .accessibilityHint(l.tr(
+                            zh: "点击放大卡片",
+                            en: "Tap to expand card",
+                            de: "Tippen, um die Karte zu vergrößern"
+                        ))
+                        .accessibilityAddTraits(.isButton)
+                }
             }
         }
     }

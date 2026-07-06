@@ -396,6 +396,11 @@ struct VerticalHomeTabMountPolicyTests {
         ))
         #expect(FocusHomeExpandedInteractionPolicy.canHitCollapsedCards(
             selectedCardId: selectedCardId,
+            heroDirection: 1,
+            progress: 0.8
+        ))
+        #expect(FocusHomeExpandedInteractionPolicy.canHitCollapsedCards(
+            selectedCardId: selectedCardId,
             heroDirection: -1,
             progress: 0.8
         ))
@@ -404,6 +409,17 @@ struct VerticalHomeTabMountPolicyTests {
             heroDirection: -1,
             progress: 1
         ))
+    }
+
+    @Test func collapsedHitLayerRedirectsDuringHeroWithoutCoveringSelectedCard() {
+        let selectedCardId = UUID()
+        let inactiveCardId = UUID()
+
+        #expect(FocusHomeCollapsedHitLayerPolicy.includes(cardId: inactiveCardId, selectedCardId: selectedCardId))
+        #expect(!FocusHomeCollapsedHitLayerPolicy.includes(cardId: selectedCardId, selectedCardId: selectedCardId))
+        #expect(FocusHomeCollapsedHitLayerPolicy.includes(cardId: selectedCardId, selectedCardId: nil))
+        #expect(FocusHomeCollapsedHitLayerPolicy.zIndex(selectedCardId: selectedCardId) < 24)
+        #expect(FocusHomeCollapsedHitLayerPolicy.zIndex(selectedCardId: nil) == 80)
     }
 
     @Test func embeddedQuickActionsUnmountWhenPreloadIsNotMounted() {
