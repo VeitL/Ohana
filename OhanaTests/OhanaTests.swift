@@ -2291,6 +2291,8 @@ struct OhanaTests {
         let human = Human(name: "Ava", avatarEmoji: "A")
         let passedAwayDate = dateForTest(year: 2026, month: 5, day: 20, hour: 9)
         let metricDate = dateForTest(year: 2026, month: 5, day: 10, hour: 8)
+        let reportDate = dateForTest(year: 2026, month: 5, day: 11, hour: 10)
+        let nextCheckDate = dateForTest(year: 2026, month: 11, day: 11, hour: 9)
         human.mbti = "INTJ"
         human.themeColorHex = "FF8800"
         human.heightCm = 168
@@ -2304,6 +2306,18 @@ struct OhanaTests {
             date: metricDate,
             notes: "annual check",
             human: human
+        )
+        let report = HumanHealthReport(
+            humanId: human.id.uuidString,
+            reportType: .bloodTest,
+            conclusion: .attention,
+            hospitalName: "City Clinic",
+            doctorName: "Dr Lee",
+            reportDate: reportDate,
+            nextCheckDate: nextCheckDate,
+            summary: "Vitamin D low",
+            notes: "Review supplements",
+            colorHex: "FFAA00"
         )
         sourceContext.insert(human)
         sourceContext.insert(HumanWeightLog(weight: 55, human: human))
@@ -2322,6 +2336,7 @@ struct OhanaTests {
             human: human
         ))
         sourceContext.insert(metricLog)
+        sourceContext.insert(report)
         CareLedgerService.record(
             actorKind: .human,
             actorId: human.id.uuidString,
@@ -2357,6 +2372,7 @@ struct OhanaTests {
         let weights = try targetContext.fetch(FetchDescriptor<HumanWeightLog>())
         let workouts = try targetContext.fetch(FetchDescriptor<HumanWorkoutLog>())
         let healthMetrics = try targetContext.fetch(FetchDescriptor<HumanHealthMetricLog>())
+        let healthReports = try targetContext.fetch(FetchDescriptor<HumanHealthReport>())
         #expect(weights.first?.human?.id == restored.id)
         #expect(workouts.first?.human?.id == restored.id)
         #expect(workouts.first?.distanceKm == 5.2)
@@ -2374,6 +2390,17 @@ struct OhanaTests {
         #expect(healthMetrics.first?.value == 5.4)
         #expect(healthMetrics.first?.date == metricDate)
         #expect(healthMetrics.first?.notes == "annual check")
+        #expect(healthReports.count == 1)
+        #expect(healthReports.first?.humanId == restored.id.uuidString)
+        #expect(healthReports.first?.reportType == .bloodTest)
+        #expect(healthReports.first?.conclusion == .attention)
+        #expect(healthReports.first?.hospitalName == "City Clinic")
+        #expect(healthReports.first?.doctorName == "Dr Lee")
+        #expect(healthReports.first?.reportDate == reportDate)
+        #expect(healthReports.first?.nextCheckDate == nextCheckDate)
+        #expect(healthReports.first?.summary == "Vitamin D low")
+        #expect(healthReports.first?.notes == "Review supplements")
+        #expect(healthReports.first?.colorHex == "FFAA00")
 
         let ledger = try targetContext.fetch(FetchDescriptor<CareLedgerEvent>())
         #expect(ledger.first?.eventKindEnum == .weight)

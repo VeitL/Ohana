@@ -138,7 +138,7 @@ final nonisolated class DataBackupManager: @unchecked Sendable {
         let decoder = JSONDecoder()
         let backup = try decoder.decode(OhanaBackup.self, from: data)
 
-        guard backup.schemaVersion <= 28 else {
+        guard backup.schemaVersion <= 29 else {
             throw BackupError.unsupportedVersion(backup.schemaVersion)
         }
 
@@ -182,6 +182,7 @@ final nonisolated class DataBackupManager: @unchecked Sendable {
         let humanMeds = try context.fetch(FetchDescriptor<HumanMedication>()) // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
         let humanMedLogs = try context.fetch(FetchDescriptor<HumanMedicationLog>()) // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
         let humanHealthMetricLogs = try context.fetch(FetchDescriptor<HumanHealthMetricLog>()) // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
+        let humanHealthReports = try context.fetch(FetchDescriptor<HumanHealthReport>()) // smoothness: explicit backup/export scan only
         let waterLogs = try context.fetch(FetchDescriptor<WaterLog>()) // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
         let wishlist = try context.fetch(FetchDescriptor<WishlistItem>()) // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
         let ledger = try context.fetch(FetchDescriptor<CareLedgerEvent>()) // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
@@ -264,6 +265,7 @@ final nonisolated class DataBackupManager: @unchecked Sendable {
             humanMedications: humanMeds.map(encodeHumanMedication),
             humanMedicationLogs: humanMedLogs.map(encodeHumanMedicationLog),
             humanHealthMetricLogs: humanHealthMetricLogs.map(encodeHumanHealthMetricLog),
+            humanHealthReports: humanHealthReports.map(encodeHumanHealthReport),
             waterLogs: waterLogs.map(encodeWaterLog),
             wishlistItems: wishlist.map(encodeWishlist),
             careLedgerEvents: ledger.map(encodeCareLedgerEvent),
@@ -503,6 +505,13 @@ final nonisolated class DataBackupManager: @unchecked Sendable {
         for dto in backup.humanHealthMetricLogs ?? [] {
             try DomainMemberContentRehydrateWriter.insertHumanHealthMetricLogIfNeeded(
                 snapshot: decodeHumanHealthMetricLogSnapshot(dto),
+                source: .backupRestore,
+                context: context
+            )
+        }
+        for dto in backup.humanHealthReports ?? [] {
+            try DomainMemberContentRehydrateWriter.insertHumanHealthReportIfNeeded(
+                snapshot: decodeHumanHealthReportSnapshot(dto),
                 source: .backupRestore,
                 context: context
             )

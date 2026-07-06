@@ -132,6 +132,21 @@ nonisolated struct DomainHumanHealthMetricLogRehydrateSnapshot: Equatable {
     let createdAt: Date
 }
 
+nonisolated struct DomainHumanHealthReportRehydrateSnapshot: Equatable {
+    let id: UUID
+    let humanId: String
+    let reportTypeRaw: String
+    let conclusionRaw: String
+    let hospitalName: String
+    let doctorName: String
+    let reportDate: Date
+    let nextCheckDate: Date?
+    let summary: String
+    let notes: String
+    let colorHex: String
+    let createdAt: Date
+}
+
 nonisolated struct DomainPetMilestoneRehydrateSnapshot: Equatable {
     let id: UUID
     let date: Date
@@ -458,6 +473,36 @@ nonisolated enum DomainMemberContentRehydrateWriter {
     }
 
     @discardableResult
+    static func insertHumanHealthReportIfNeeded(
+        snapshot: DomainHumanHealthReportRehydrateSnapshot,
+        source: DomainRehydrateSourceKind,
+        context: ModelContext
+    ) throws -> DomainMemberContentRehydrateResult {
+        let plan = authorizeHuman(humanId: snapshot.humanId, source: source, context: context)
+        guard plan.disposition.allowsPersistence else { return DomainMemberContentRehydrateResult(inserted: false, plan: plan) }
+        guard try fetchHumanHealthReport(id: snapshot.id, context: context) == nil else {
+            return DomainMemberContentRehydrateResult(inserted: false, plan: plan)
+        }
+        let report = HumanHealthReport(
+            humanId: snapshot.humanId,
+            reportType: HealthReportType(rawValue: snapshot.reportTypeRaw) ?? .other,
+            conclusion: ReportConclusion(rawValue: snapshot.conclusionRaw) ?? .normal,
+            hospitalName: snapshot.hospitalName,
+            doctorName: snapshot.doctorName,
+            reportDate: snapshot.reportDate,
+            nextCheckDate: snapshot.nextCheckDate,
+            summary: snapshot.summary,
+            notes: snapshot.notes,
+            colorHex: snapshot.colorHex
+        )
+        report.id = snapshot.id
+        report.createdAt = snapshot.createdAt
+        context.insert(report)
+        plan.consumeAuthorization()
+        return DomainMemberContentRehydrateResult(inserted: true, plan: plan)
+    }
+
+    @discardableResult
     static func insertPetMilestoneIfNeeded(
         snapshot: DomainPetMilestoneRehydrateSnapshot,
         source: DomainRehydrateSourceKind,
@@ -701,6 +746,14 @@ nonisolated enum DomainMemberContentRehydrateWriter {
     private static func fetchHumanHealthMetricLog(id: UUID, context: ModelContext) throws -> HumanHealthMetricLog? {
         var descriptor = FetchDescriptor<HumanHealthMetricLog>(
             predicate: #Predicate<HumanHealthMetricLog> { $0.id == id }
+        )
+        descriptor.fetchLimit = 1
+        return try context.fetch(descriptor).first
+    }
+
+    private static func fetchHumanHealthReport(id: UUID, context: ModelContext) throws -> HumanHealthReport? {
+        var descriptor = FetchDescriptor<HumanHealthReport>(
+            predicate: #Predicate<HumanHealthReport> { $0.id == id }
         )
         descriptor.fetchLimit = 1
         return try context.fetch(descriptor).first

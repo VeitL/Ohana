@@ -486,6 +486,23 @@ nonisolated extension DataBackupManager {
         )
     }
 
+    func decodeHumanHealthReportSnapshot(_ dto: HumanHealthReportBackup) -> DomainHumanHealthReportRehydrateSnapshot {
+        DomainHumanHealthReportRehydrateSnapshot(
+            id: UUID(uuidString: dto.id) ?? UUID(),
+            humanId: dto.humanId,
+            reportTypeRaw: dto.reportTypeRaw,
+            conclusionRaw: dto.conclusionRaw,
+            hospitalName: dto.hospitalName,
+            doctorName: dto.doctorName,
+            reportDate: parseDate(dto.reportDate) ?? Date(),
+            nextCheckDate: parseDate(dto.nextCheckDate),
+            summary: dto.summary,
+            notes: dto.notes,
+            colorHex: dto.colorHex,
+            createdAt: parseDate(dto.createdAt) ?? Date()
+        )
+    }
+
     func decodeSymptomLogSnapshot(_ dto: SymptomLogBackup) -> DomainSymptomLogRehydrateSnapshot {
         DomainSymptomLogRehydrateSnapshot(
             id: UUID(uuidString: dto.id) ?? UUID(),

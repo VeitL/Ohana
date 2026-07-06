@@ -310,6 +310,7 @@ enum CloudSyncInitialHouseholdMergeRuntime {
         count += backup.humanMedications?.count ?? 0
         count += backup.humanMedicationLogs?.count ?? 0
         count += backup.humanHealthMetricLogs?.count ?? 0
+        count += backup.humanHealthReports?.count ?? 0
         count += backup.waterLogs.count
         count += backup.wishlistItems.count
         count += backup.careLedgerEvents?.count ?? 0

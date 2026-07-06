@@ -444,6 +444,23 @@ nonisolated extension DataBackupManager {
         )
     }
 
+    func encodeHumanHealthReport(_ report: HumanHealthReport) -> HumanHealthReportBackup {
+        HumanHealthReportBackup(
+            id: report.id.uuidString,
+            humanId: report.humanId,
+            reportTypeRaw: report.reportTypeRaw,
+            conclusionRaw: report.conclusionRaw,
+            hospitalName: report.hospitalName,
+            doctorName: report.doctorName,
+            reportDate: d(report.reportDate),
+            nextCheckDate: d(report.nextCheckDate),
+            summary: report.summary,
+            notes: report.notes,
+            colorHex: report.colorHex,
+            createdAt: d(report.createdAt)
+        )
+    }
+
     func encodeSymptomLog(_ l: SymptomLog) -> SymptomLogBackup {
         SymptomLogBackup(
             id: l.id.uuidString,

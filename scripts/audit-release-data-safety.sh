@@ -70,14 +70,96 @@ reject_backup_pattern() {
   fi
 }
 
+# Every persisted SwiftData model must either have a backup DTO contract or a
+# deliberate exemption. This prevents new @Model types from silently falling out
+# of user-owned export/restore coverage.
+backup_contract_entries=(
+  "CareLedgerEvent|struct CareLedgerEventBackup"
+  "CloudSyncRecordState|EXEMPT:local CloudKit sync metadata, rebuilt by sync runtime"
+  "CoconutAccount|struct CoconutAccountBackup"
+  "CoconutExchangeRequest|struct CoconutExchangeRequestBackup"
+  "CoconutLedgerEntry|struct CoconutLedgerEntryBackup"
+  "EconomyBudgetUsageEvent|EXEMPT:derived daily budget guardrail state, not user-authored history"
+  "Event|struct EventBackup"
+  "FamilyCollaborationTask|struct FamilyCollaborationTaskBackup"
+  "HeatCycleLog|struct HeatCycleLogBackup"
+  "Household|struct HouseholdBackup"
+  "Human|struct HumanBackup"
+  "HumanHealthMetricLog|struct HumanHealthMetricLogBackup"
+  "HumanHealthReport|struct HumanHealthReportBackup"
+  "HumanMedication|struct HumanMedicationBackup"
+  "HumanMedicationLog|struct HumanMedicationLogBackup"
+  "HumanWeightLog|struct HumanWeightLogBackup"
+  "HumanWorkoutLog|struct HumanWorkoutLogBackup"
+  "InsuranceClaim|struct InsuranceClaimBackup"
+  "Pet|struct PetBackup"
+  "PetCareLog|struct PetCareLogBackup"
+  "PetDocument|struct PetDocumentBackup"
+  "PetDocumentAttachment|struct PetDocumentAttachmentBackup"
+  "PetExpenseLog|struct PetExpenseLogBackup"
+  "PetFoodRecord|struct PetFoodRecordBackup"
+  "PetHealthLog|struct PetHealthLogBackup"
+  "PetHygieneLog|struct PetHygieneLogBackup"
+  "PetInsurance|struct PetInsuranceBackup"
+  "PetMedication|struct PetMedicationBackup"
+  "PetMilestone|struct PetMilestoneBackup"
+  "PetPhotoLog|struct PetPhotoLogBackup"
+  "PetPottyLog|struct PetPottyLogBackup"
+  "PetRelationship|EXEMPT:legacy relationship model kept for schema compatibility until cleanup"
+  "PetWalkLog|struct PetWalkLogBackup"
+  "PetWeightLog|struct PetWeightLogBackup"
+  "Plant|struct PlantBackup"
+  "PlantCareLog|struct PlantCareLogBackup"
+  "RecycleBinBatch|EXEMPT:short-lived recycle-bin grouping metadata, not durable user content"
+  "Reminder|struct ReminderBackup"
+  "SharedCareSession|struct SharedCareSessionBackup"
+  "ShopPurchaseRecord|struct ShopPurchaseRecordBackup"
+  "SymptomLog|struct SymptomLogBackup"
+  "WaterLog|struct WaterLogBackup"
+  "WishlistItem|struct WishlistItemBackup"
+)
+
+backup_contract_has_model() {
+  local needle="$1"
+  local entry model pattern
+  for entry in "${backup_contract_entries[@]}"; do
+    IFS='|' read -r model pattern <<< "$entry"
+    if [[ "$model" == "$needle" ]]; then
+      return 0
+    fi
+  done
+  return 1
+}
+
+while IFS= read -r model; do
+  if ! backup_contract_has_model "$model"; then
+    failures+=("SwiftData model $model must have a backup DTO contract or explicit audit exemption.")
+  fi
+done < <(awk '
+  /^[[:space:]]*@Model/ { pending = 1; next }
+  pending && /^[[:space:]]*final[[:space:]]+class[[:space:]]+/ {
+    print $3
+    pending = 0
+  }
+' Ohana/Models/*.swift | sort -u)
+
+for entry in "${backup_contract_entries[@]}"; do
+  IFS='|' read -r model pattern <<< "$entry"
+  if [[ "$pattern" == EXEMPT:* ]]; then
+    continue
+  fi
+  require_pattern "$data_backup_dtos" "$pattern" \
+    "SwiftData model $model should have a matching backup DTO, or a documented exemption if intentionally excluded."
+done
+
 require_pattern "$shared_container" 'Schema\(ArkSchemaV84\.models\)' \
   "SharedModelContainer should open the current ArkSchemaV84 model set."
 
-require_pattern "$data_backup_dtos" 'var schemaVersion: Int = 28' \
-  "OhanaBackup.schemaVersion should be 28 after adding plant reminder preference backups."
+require_pattern "$data_backup_dtos" 'var schemaVersion: Int = 29' \
+  "OhanaBackup.schemaVersion should be 29 after adding human health report backups."
 
-require_pattern "$data_backup" 'guard backup\.schemaVersion <= 28' \
-  "DataBackupManager import guard should allow backup schemaVersion 28."
+require_pattern "$data_backup" 'guard backup\.schemaVersion <= 29' \
+  "DataBackupManager import guard should allow backup schemaVersion 29."
 
 require_pattern "$data_backup_dtos" 'struct PlantReminderPreferencesBackup' \
   "Plant reminder preferences should be represented in backup app state."
@@ -117,6 +199,24 @@ require_backup_pattern 'insertHumanHealthMetricLogIfNeeded' \
 
 require_backup_pattern 'decodeHumanHealthMetricLogSnapshot\(dto\)' \
   "applyBackup should decode human health metric logs into rehydrate snapshots."
+
+require_pattern "$data_backup_dtos" 'struct HumanHealthReportBackup: Codable' \
+  "DataBackupManager should define HumanHealthReportBackup."
+
+require_pattern "$data_backup_dtos" 'var humanHealthReports: \[HumanHealthReportBackup\]\?' \
+  "OhanaBackup should include humanHealthReports."
+
+require_backup_pattern 'FetchDescriptor<HumanHealthReport>' \
+  "DataBackupManager should fetch HumanHealthReport during backup/import."
+
+require_backup_pattern 'humanHealthReports: humanHealthReports\.map\(encodeHumanHealthReport\)' \
+  "buildBackup should encode human health reports."
+
+require_backup_pattern 'insertHumanHealthReportIfNeeded' \
+  "applyBackup should import human health reports through the member-content rehydrate writer."
+
+require_backup_pattern 'decodeHumanHealthReportSnapshot\(dto\)' \
+  "applyBackup should decode human health reports into rehydrate snapshots."
 
 require_pattern "$data_backup_dtos" 'var coconutAccounts: \[CoconutAccountBackup\]\?' \
   "OhanaBackup should include V58 CoconutAccount backups."
