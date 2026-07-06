@@ -34,6 +34,8 @@ struct PlantDetailContentView: View {
     @State var pendingDetailQuickCareTypes: Set<PlantCareType> = []
     @State var completedDetailQuickCareTypes: Set<PlantCareType> = []
     @State var failedDetailQuickCareTypes: Set<PlantCareType> = []
+    @State var showingArchiveConfirm = false
+    @State var showingRestoreConfirm = false
     @State var isDeletePending = false
     @State var isDeleteCommitting = false
     @State var deleteUndoTask: Task<Void, Never>?
@@ -731,6 +733,7 @@ struct PlantDetailContentView: View {
                         historyCard
                         notesCard
                         advancedPlantDetailsSection
+                        archiveSection
                         deleteSection
                         Spacer(minLength: 40)
                     }
@@ -840,6 +843,30 @@ struct PlantDetailContentView: View {
                 zh: "确定要删除 \(plant.name) 吗？确认后会先保留 6 秒，可在本页撤销。",
                 en: "Delete \(plant.name)? After confirming, Ohana keeps it for 6 seconds so you can undo here.",
                 de: "\(plant.name) löschen? Nach der Bestätigung bleibt es 6 Sekunden lang hier widerrufbar."
+            ))
+        }
+        .alert(l.tr(zh: "归档植物", en: "Archive plant", de: "Pflanze archivieren"), isPresented: $showingArchiveConfirm) {
+            Button(l.tr(zh: "取消", en: "Cancel", de: "Abbrechen"), role: .cancel) {}
+            Button(l.tr(zh: "归档", en: "Archive", de: "Archivieren"), role: .destructive) {
+                archivePlant()
+            }
+        } message: {
+            Text(l.tr(
+                zh: "归档会保留 \(plant.name) 的档案和历史记录，并停止未来护理计划、日历事项和系统提醒。",
+                en: "Archiving keeps \(plant.name)'s profile and history, and stops future care plans, calendar items, and system reminders.",
+                de: "Archivieren behält Profil und Verlauf von \(plant.name) und stoppt künftige Pflegepläne, Kalendereinträge und Systemerinnerungen."
+            ))
+        }
+        .alert(l.tr(zh: "恢复植物", en: "Restore plant", de: "Pflanze wiederherstellen"), isPresented: $showingRestoreConfirm) {
+            Button(l.tr(zh: "取消", en: "Cancel", de: "Abbrechen"), role: .cancel) {}
+            Button(l.tr(zh: "恢复活跃", en: "Restore active", de: "Aktiv wiederherstellen")) {
+                restorePlant()
+            }
+        } message: {
+            Text(l.tr(
+                zh: "恢复后会按当前设置重新生成未来护理计划。",
+                en: "After restoring, future care plans are regenerated from the current settings.",
+                de: "Nach der Wiederherstellung werden künftige Pflegepläne aus den aktuellen Einstellungen neu erstellt."
             ))
         }
         .onDisappear {

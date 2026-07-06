@@ -321,6 +321,39 @@ extension PlantDetailContentView {
         deletePlant()
     }
 
+    func archivePlant() {
+        let command = DomainCommand.memberLifecycle(
+            entityID: plant.id,
+            kind: EntityKind.plant.rawValue,
+            action: "archive.mark"
+        )
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        commandQueue.enqueue(command) {
+            _ = MemberCommandExecutor(context: modelContext, services: appServices).archivePlant(
+                plant,
+                date: Date(),
+                note: "plant.detail.archive"
+            )
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+        }
+    }
+
+    func restorePlant() {
+        let command = DomainCommand.memberLifecycle(
+            entityID: plant.id,
+            kind: EntityKind.plant.rawValue,
+            action: "archive.restore"
+        )
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        commandQueue.enqueue(command) {
+            _ = MemberCommandExecutor(context: modelContext, services: appServices).restorePlant(
+                plant,
+                note: "plant.detail.restore"
+            )
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+        }
+    }
+
     func deletePlant() {
         guard !isDeleteCommitting else { return }
         isDeleteCommitting = true

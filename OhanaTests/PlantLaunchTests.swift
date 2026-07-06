@@ -657,6 +657,7 @@ struct PlantLaunchTests {
             remindersEnabled: false
         )
         plant.lastHealthCheckDate = makeDate(year: 2026, month: 6, day: 7)
+        plant.archivedAt = makeDate(year: 2026, month: 6, day: 8)
         sourceContext.insert(plant)
         try sourceContext.save()
 
@@ -692,6 +693,8 @@ struct PlantLaunchTests {
         #expect(restored.catalogSpeciesId == "chlorophytum-comosum")
         #expect(restored.remindersEnabled == false)
         #expect(restored.lastHealthCheckDate == plant.lastHealthCheckDate)
+        #expect(restored.archivedAt == plant.archivedAt)
+        #expect(restored.isArchived)
     }
 
     @Test func plantBackupRoundTripsCareLogsAndPhotos() throws {
@@ -979,6 +982,63 @@ struct PlantLaunchTests {
         #expect(planEvents.contains { $0.eventType == EventType.plantPestCheck.rawValue })
         let remindersArePending = reminders.allSatisfy(\.isPending)
         #expect(remindersArePending)
+    }
+
+    @Test func archivedPlantsDoNotGenerateCareTasks() {
+        let now = makeDate(year: 2026, month: 6, day: 17, hour: 8)
+        let plant = Plant(name: "Archived Fern", wateringIntervalDays: 1, fertilizingIntervalDays: 14)
+        plant.createdAt = Calendar.current.date(byAdding: .day, value: -10, to: now) ?? now
+        plant.lastWateredDate = Calendar.current.date(byAdding: .day, value: -2, to: now)
+        plant.archivedAt = now
+
+        #expect(PlantCarePlanService.tasks(for: plant, now: now).isEmpty)
+        #expect(PlantCarePlanService.nextTask(for: plant, now: now) == nil)
+    }
+
+    @Test func archivingPlantRemovesMaterializedPlansAndRestoreRebuildsThem() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let now = makeDate(year: 2026, month: 6, day: 17, hour: 8)
+        let plant = Plant(name: "Fern", wateringIntervalDays: 1, fertilizingIntervalDays: 14)
+        plant.createdAt = Calendar.current.date(byAdding: .day, value: -10, to: now) ?? now
+        context.insert(plant)
+        try context.save()
+
+        PlantCarePlanScheduleService.sync(
+            plant: plant,
+            context: context,
+            now: now,
+            scheduleNotifications: false
+        )
+        let notificationIDs = Set(try context.fetch(FetchDescriptor<Reminder>()).map(\.notificationId))
+        let notifications = PlantReminderNotificationSchedulerSpy()
+
+        let archive = PlantLifecycleService.archive(
+            plant,
+            archivedAt: now,
+            context: context,
+            notifications: notifications
+        )
+
+        #expect(archive.didWrite)
+        #expect(plant.isArchived)
+        #expect(archive.removedEventIDs.count == 7)
+        #expect(archive.removedReminderIDs.count == 7)
+        #expect(try context.fetch(FetchDescriptor<Event>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<Reminder>()).isEmpty)
+        #expect(Set(notifications.cancelledNotificationIDs) == notificationIDs)
+
+        let restore = PlantLifecycleService.restore(
+            plant,
+            restoredAt: now.addingTimeInterval(60),
+            context: context,
+            scheduleNotifications: false
+        )
+
+        #expect(restore.didWrite)
+        #expect(!plant.isArchived)
+        #expect(try context.fetch(FetchDescriptor<Event>()).count == 7)
+        #expect(try context.fetch(FetchDescriptor<Reminder>()).count == 7)
     }
 
     @Test func disabledPlantRemindersRemoveMaterializedPlantPlansAndNotifications() throws {
@@ -2581,7 +2641,7 @@ struct PlantLaunchTests {
     }
 
     private func makeInMemoryContainer() throws -> ModelContainer {
-        let schema = Schema(ArkSchemaV84.models)
+        let schema = Schema(ArkSchemaV85.models)
         let config = ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)
         return try ModelContainer(for: schema, migrationPlan: ArkMigrationPlan.self, configurations: [config])
     }

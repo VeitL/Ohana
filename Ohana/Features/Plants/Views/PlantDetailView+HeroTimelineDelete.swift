@@ -480,6 +480,55 @@ extension PlantDetailContentView {
     }
 
     // MARK: - Delete Section
+    var archiveSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            if plant.isArchived {
+                HStack(spacing: 10) {
+                    Image(systemName: "archivebox.fill") // a11y: allow decorative archive glyph; adjacent text describes the state.
+                        .foregroundStyle(Color.goYellow)
+                        .accessibilityHidden(true)
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(l.tr(zh: "已归档", en: "Archived", de: "Archiviert"))
+                            .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
+                            .foregroundStyle(Color.ohanaPrimaryText)
+                        if let archivedAt = plant.archivedAt {
+                            Text(archivedAt.formatted(.dateTime.year().month().day()))
+                                .font(OhanaFont.adaptive(size: 11, weight: .semibold, design: .rounded))
+                                .foregroundStyle(Color.ohanaSecondaryText)
+                        }
+                    }
+                    Spacer(minLength: 8)
+                }
+                Button {
+                    showingRestoreConfirm = true
+                } label: {
+                    Label(l.tr(zh: "恢复活跃", en: "Restore active", de: "Aktiv wiederherstellen"), systemImage: "arrow.uturn.backward")
+                        .font(OhanaFont.adaptive(size: 14, weight: .semibold))
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 13)
+                }
+                .buttonStyle(ScaleButtonStyle())
+                .foregroundStyle(Color.goPrimary)
+                .background(Color.goPrimary.opacity(0.08), in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
+                .accessibilityIdentifier("plant-detail-restore-action")
+            } else {
+                Button {
+                    showingArchiveConfirm = true
+                } label: {
+                    Label(l.tr(zh: "归档植物", en: "Archive plant", de: "Pflanze archivieren"), systemImage: "archivebox")
+                        .font(OhanaFont.adaptive(size: 14, weight: .semibold))
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 13)
+                }
+                .buttonStyle(ScaleButtonStyle())
+                .foregroundStyle(Color.goYellow)
+                .background(Color.goYellow.opacity(0.08), in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
+                .accessibilityIdentifier("plant-detail-archive-action")
+            }
+        }
+        .padding(.horizontal, 16)
+    }
+
     @ViewBuilder
     var pendingDeleteBanner: some View {
         if isDeletePending {

@@ -41,7 +41,7 @@ step, and close condition. Do not add noise when no meaningful follow-up remains
   app-group identifiers.
 - The latest SwiftData schema lives in
   `Ohana/Models/SharedModelContainer.swift`. As of this consolidation it is
-  `ArkSchemaV84`, but always verify the current `ArkSchemaV*` in that file and
+  `ArkSchemaV85`, but always verify the current `ArkSchemaV*` in that file and
   update this line whenever a schema version lands.
 - Before changing a SwiftData model or adding one, inspect the latest
   `ArkSchemaV*`, add the next schema version, append it to

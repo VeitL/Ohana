@@ -114,6 +114,35 @@ enum MemberLifecycleCommandService {
             action: "passed.undo"
         )
     }
+
+    @discardableResult
+    @MainActor
+    static func archivePlant(
+        _ plant: Plant,
+        date: Date,
+        context: ModelContext
+    ) -> MemberLifecycleCommandResult {
+        let result = PlantLifecycleService.archive(plant, archivedAt: date, context: context)
+        return MemberLifecycleCommandResult(
+            entityID: plant.id,
+            kind: EntityKind.plant.rawValue,
+            action: result.didWrite ? result.action : "no-op"
+        )
+    }
+
+    @discardableResult
+    @MainActor
+    static func restorePlant(
+        _ plant: Plant,
+        context: ModelContext
+    ) -> MemberLifecycleCommandResult {
+        let result = PlantLifecycleService.restore(plant, context: context)
+        return MemberLifecycleCommandResult(
+            entityID: plant.id,
+            kind: EntityKind.plant.rawValue,
+            action: result.didWrite ? result.action : "no-op"
+        )
+    }
 }
 
 enum MemberHomeVisibilityCommandService {
@@ -485,6 +514,20 @@ struct MemberCommandExecutor {
     @discardableResult
     func undoHumanPassedAway(_ human: Human, note: String) -> MemberLifecycleCommandResult {
         let result = MemberLifecycleCommandService.undoHumanPassedAway(human, context: context)
+        revisions.publishMemberLifecycle(result, note: note)
+        return result
+    }
+
+    @discardableResult
+    func archivePlant(_ plant: Plant, date: Date, note: String) -> MemberLifecycleCommandResult {
+        let result = MemberLifecycleCommandService.archivePlant(plant, date: date, context: context)
+        revisions.publishMemberLifecycle(result, note: note)
+        return result
+    }
+
+    @discardableResult
+    func restorePlant(_ plant: Plant, note: String) -> MemberLifecycleCommandResult {
+        let result = MemberLifecycleCommandService.restorePlant(plant, context: context)
         revisions.publishMemberLifecycle(result, note: note)
         return result
     }

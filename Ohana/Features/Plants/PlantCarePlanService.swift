@@ -129,6 +129,8 @@ nonisolated enum PlantCarePlanService {
         now: Date = Date(),
         calendar: Calendar = .current
     ) -> [PlantCareTaskSnapshot] {
+        guard !plant.isArchived else { return [] }
+
         let wateringPlan = intervalPlan(for: .watering, plant: plant, calendar: calendar)
         let fertilizingPlan = intervalPlan(for: .fertilizing, plant: plant, calendar: calendar)
         let base = plant.createdAt

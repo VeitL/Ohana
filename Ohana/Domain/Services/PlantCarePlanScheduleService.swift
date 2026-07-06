@@ -46,6 +46,20 @@ enum PlantCarePlanScheduleService {
         defaults: UserDefaults = .standard,
         saveChanges: Bool = true
     ) -> PlantCarePlanScheduleResult {
+        guard !plant.isArchived else {
+            let removed = removeScheduledTasks(
+                plant: plant,
+                context: context,
+                now: now,
+                notifications: notifications,
+                defaults: defaults
+            )
+            if saveChanges {
+                context.safeSave()
+            }
+            return removed
+        }
+
         let enabledScheduledCareTypes = scheduledCareTypes.filter {
             PlantReminderPreferenceStore.isPlanCalendarEnabled(
                 forPlantID: plant.id,

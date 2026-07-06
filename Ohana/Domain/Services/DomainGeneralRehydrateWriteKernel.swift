@@ -131,6 +131,7 @@ nonisolated struct DomainPlantRehydrateSnapshot: Equatable {
     let isToxicToChildren: Bool
     let isIndoorSuitable: Bool
     let remindersEnabled: Bool
+    let archivedAt: Date?
 }
 
 nonisolated struct DomainWaterLogRehydrateSnapshot: Equatable {
@@ -497,6 +498,7 @@ nonisolated enum DomainGeneralRehydrateWriter {
         plant.id = snapshot.id
         plant.notes = snapshot.notes
         plant.createdAt = snapshot.createdAt
+        plant.archivedAt = snapshot.archivedAt
         plant.lastWateredDate = snapshot.lastWateredDate
         plant.lastFertilizedDate = snapshot.lastFertilizedDate
         plant.lastHealthCheckDate = snapshot.lastHealthCheckDate

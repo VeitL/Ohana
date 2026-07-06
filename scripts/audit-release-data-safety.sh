@@ -154,8 +154,8 @@ for entry in "${backup_contract_entries[@]}"; do
     "SwiftData model $model should have a matching backup DTO, or a documented exemption if intentionally excluded."
 done
 
-require_pattern "$shared_container" 'Schema\(ArkSchemaV84\.models\)' \
-  "SharedModelContainer should open the current ArkSchemaV84 model set."
+require_pattern "$shared_container" 'Schema\(ArkSchemaV85\.models\)' \
+  "SharedModelContainer should open the current ArkSchemaV85 model set."
 
 require_pattern "$data_backup_dtos" 'var schemaVersion: Int = 30' \
   "OhanaBackup.schemaVersion should be 30 after externalizing backup media."
@@ -213,6 +213,18 @@ require_backup_pattern 'passedAwayDate: parseDate\(dto\.passedAwayDate\)' \
 
 require_pattern "Ohana/Domain/Services/DomainGeneralRehydrateWriteKernel.swift" 'human\.passedAwayDate = snapshot\.passedAwayDate' \
   "DomainGeneralRehydrateWriter should restore Human.passedAwayDate."
+
+require_section_pattern "$data_backup_dtos" 'struct PlantBackup' 'struct PlantCareLogBackup' 'var archivedAt: String\?' \
+  "PlantBackup should include archivedAt so plant archive lifecycle survives backup/restore."
+
+require_backup_pattern 'archivedAt: d\(p\.archivedAt\)' \
+  "encodePlant should export Plant.archivedAt."
+
+require_backup_pattern 'archivedAt: dto\.archivedAt\.flatMap \{ iso\.date\(from: \$0\) \}' \
+  "decodePlantSnapshot should carry Plant.archivedAt into the rehydrate snapshot."
+
+require_pattern "Ohana/Domain/Services/DomainGeneralRehydrateWriteKernel.swift" 'plant\.archivedAt = snapshot\.archivedAt' \
+  "DomainGeneralRehydrateWriter should restore Plant.archivedAt."
 
 require_pattern "$data_backup_dtos" 'struct HumanHealthMetricLogBackup: Codable' \
   "DataBackupManager should define HumanHealthMetricLogBackup."

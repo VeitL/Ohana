@@ -137,7 +137,8 @@ nonisolated extension DataBackupManager {
             isToxicToDogs: p.isToxicToDogs,
             isToxicToChildren: p.isToxicToChildren,
             isIndoorSuitable: p.isIndoorSuitable,
-            remindersEnabled: p.remindersEnabled
+            remindersEnabled: p.remindersEnabled,
+            archivedAt: d(p.archivedAt)
         )
     }
 
@@ -200,7 +201,8 @@ nonisolated extension DataBackupManager {
             isToxicToDogs: dto.isToxicToDogs ?? false,
             isToxicToChildren: dto.isToxicToChildren ?? false,
             isIndoorSuitable: dto.isIndoorSuitable ?? true,
-            remindersEnabled: dto.remindersEnabled ?? true
+            remindersEnabled: dto.remindersEnabled ?? true,
+            archivedAt: dto.archivedAt.flatMap { iso.date(from: $0) }
         )
     }
 

@@ -317,6 +317,7 @@ nonisolated struct PlantBackup: Codable {
     var isToxicToChildren: Bool?
     var isIndoorSuitable: Bool?
     var remindersEnabled: Bool?
+    var archivedAt: String?
 }
 
 nonisolated struct PlantCareLogBackup: Codable {

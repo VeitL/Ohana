@@ -25,7 +25,7 @@ final class SharedModelContainerRecoveryTests: XCTestCase {
     }
 
     func testCloudSyncTombstoneDefaultLandsOnLatestLightweightSchema() {
-        XCTAssertEqual(ObjectIdentifier(ArkMigrationPlan.schemas.last!), ObjectIdentifier(ArkSchemaV84.self))
+        XCTAssertEqual(ObjectIdentifier(ArkMigrationPlan.schemas.last!), ObjectIdentifier(ArkSchemaV85.self))
         XCTAssertTrue(ArkMigrationPlan.stages.isEmpty)
     }
 
@@ -53,7 +53,7 @@ final class SharedModelContainerRecoveryTests: XCTestCase {
         }
 
         do {
-            let schema = Schema(ArkSchemaV84.models)
+            let schema = Schema(ArkSchemaV85.models)
             let config = ModelConfiguration("ModelsMigrationTarget", schema: schema, url: storeURL, cloudKitDatabase: .none)
             let container = try ModelContainer(
                 for: schema,

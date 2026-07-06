@@ -9,6 +9,14 @@
 import Foundation
 import SwiftData
 
+nonisolated enum DataBackupPackageFormat {
+    static let backupFilePrefix = "ohana_backup_"
+    static let packageFileExtension = "ohanabackup"
+    static let manifestFileName = "manifest.json"
+    static let mediaDirectoryName = "media"
+    static let staleExportAge: TimeInterval = 60 * 60
+}
+
 // MARK: - DataBackupManager
 //
 // Isolation-agnostic: the build/encode/apply logic only does ModelContext
@@ -29,11 +37,11 @@ final nonisolated class DataBackupManager: @unchecked Sendable {
     // MARK: - Export
 
     /// Filename prefix for exported backups in the temporary directory.
-    static let backupFilePrefix = "ohana_backup_"
-    static let packageFileExtension = "ohanabackup"
-    static let manifestFileName = "manifest.json"
-    static let mediaDirectoryName = "media"
-    static let staleExportAge: TimeInterval = 60 * 60
+    static let backupFilePrefix = DataBackupPackageFormat.backupFilePrefix
+    static let packageFileExtension = DataBackupPackageFormat.packageFileExtension
+    static let manifestFileName = DataBackupPackageFormat.manifestFileName
+    static let mediaDirectoryName = DataBackupPackageFormat.mediaDirectoryName
+    static let staleExportAge: TimeInterval = DataBackupPackageFormat.staleExportAge
 
     /// Builds and writes a full backup. The unbounded full-table fetch + JSON
     /// encode run on a dedicated background SwiftData context (`DataBackupActor`)

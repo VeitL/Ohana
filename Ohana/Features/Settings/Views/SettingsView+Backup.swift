@@ -229,7 +229,7 @@ extension SettingsView {
 
     var backupImportContentTypes: [UTType] {
         var types: [UTType] = [.json, .directory]
-        if let packageType = UTType(filenameExtension: DataBackupManager.packageFileExtension) {
+        if let packageType = UTType(filenameExtension: DataBackupPackageFormat.packageFileExtension) {
             types.append(packageType)
         }
         return types

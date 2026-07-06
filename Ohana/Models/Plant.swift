@@ -169,6 +169,7 @@ final class Plant {
     var isToxicToChildren: Bool = false
     var isIndoorSuitable: Bool = true
     var remindersEnabled: Bool = true
+    var archivedAt: Date?
     var notes: String
     var createdAt: Date
     // Legacy recycle-bin columns kept only for stores that already migrated through the retired deletion model.
@@ -255,6 +256,7 @@ final class Plant {
         self.isToxicToChildren = isToxicToChildren
         self.isIndoorSuitable = isIndoorSuitable
         self.remindersEnabled = remindersEnabled
+        self.archivedAt = nil
         self.notes = ""
         self.createdAt = Date()
         self.careLogs = []
@@ -356,6 +358,10 @@ final class Plant {
 
     var acquisitionSource: String {
         acquisitionSourceRaw.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    var isArchived: Bool {
+        archivedAt != nil
     }
 
     var daysSinceWatered: Int? {
