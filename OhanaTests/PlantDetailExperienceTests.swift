@@ -1252,6 +1252,16 @@ final class PlantDetailExperienceTests: XCTestCase {
         XCTAssertTrue(detailDeleteSource.contains(".disabled(isDeletePending || isDeleteCommitting)"))
     }
 
+    func testHumanWorkoutDetailUsesFullSheetPageHost() throws {
+        let rootURL = repositoryRootURL()
+        let cardSource = try source("Ohana/Features/Workouts/Views/HumanWorkoutCard.swift", rootURL: rootURL)
+        let summarySource = try source("Ohana/Features/Workouts/Views/HumanWorkoutSummaryView.swift", rootURL: rootURL)
+
+        XCTAssertTrue(cardSource.contains(".sheet(isPresented: $showWorkoutHistory) {\n            HumanWorkoutSummaryView(human: human)\n                .ohanaSheetPagePresentation()"))
+        XCTAssertTrue(summarySource.contains(".frame(maxWidth: .infinity, maxHeight: .infinity)\n            .toolbar(.hidden, for: .navigationBar)"))
+        XCTAssertTrue(summarySource.contains("}\n        .frame(maxWidth: .infinity, maxHeight: .infinity)\n    }"))
+    }
+
     private func repositoryRootURL() -> URL {
         URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()

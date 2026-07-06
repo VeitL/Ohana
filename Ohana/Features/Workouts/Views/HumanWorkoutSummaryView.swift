@@ -122,6 +122,7 @@ struct HumanWorkoutSummaryView: View {
                     .padding(.bottom, 28)
                 }
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
             .toolbar(.hidden, for: .navigationBar)
             .accessibilityIdentifier("human-workout-summary-view")
             .task { await prepareHealthSnapshot() }
@@ -132,6 +133,7 @@ struct HumanWorkoutSummaryView: View {
                 .ohanaSheetPagePresentation() // ui-v4: allow complex workout editor uses full-height system sheet
             }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     private var healthConnectionCard: some View {

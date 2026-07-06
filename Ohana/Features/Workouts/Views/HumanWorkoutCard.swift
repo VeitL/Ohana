@@ -82,6 +82,7 @@ struct HumanWorkoutCard: View {
         }
         .sheet(isPresented: $showWorkoutHistory) {
             HumanWorkoutSummaryView(human: human)
+                .ohanaSheetPagePresentation() // ui-v4: keep legacy workout-card detail entry on the same long sheet page host.
         }
     }
 
