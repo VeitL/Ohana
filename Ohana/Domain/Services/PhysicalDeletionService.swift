@@ -161,6 +161,7 @@ nonisolated enum PhysicalDeletionService {
             deletedAt: deletedAt,
             deletedByHumanId: deletedByHumanId
         )
+        reconcileWalletAfterEconomyDeletion(context: context)
     }
 
     @discardableResult
@@ -195,6 +196,7 @@ nonisolated enum PhysicalDeletionService {
             deletedByHumanId: deletedByHumanId
         )
         context.delete(human)
+        reconcileWalletAfterEconomyDeletion(context: context)
         return childCount
     }
 
@@ -1159,6 +1161,10 @@ nonisolated enum PhysicalDeletionService {
     static func unique<T, ID: Hashable>(_ values: [T], by keyPath: KeyPath<T, ID>) -> [T] {
         var seen: Set<ID> = []
         return values.filter { seen.insert($0[keyPath: keyPath]).inserted }
+    }
+
+    private static func reconcileWalletAfterEconomyDeletion(context: ModelContext) {
+        _ = CoconutWalletService.reconcileFormalAccountBalancesWithLedger(context: context, saveChanges: false)
     }
 }
 

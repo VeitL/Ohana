@@ -256,6 +256,56 @@ struct PhysicalDeletionServiceTests {
         #expect(deletionTombstone(CareLedgerEvent.self, id: careLedger.id, context: context) != nil)
     }
 
+    @Test func deletePetReplaysSurvivingWalletBalancesAfterRemovingPetScopedLedger() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let human = Human(name: "Guan")
+        let deletedPet = Pet(name: "Milo", species: "猫")
+        human.coconutBalance = 10
+        let humanAccount = CoconutAccount(
+            accountKey: CoconutAccountKey.human(human.id),
+            ownerKind: .human,
+            ownerId: human.id.uuidString,
+            displayName: human.name,
+            balance: 10
+        )
+        let petCareReward = CoconutLedgerEntry(
+            transactionKey: "delete-pet-human-reward",
+            accountKey: CoconutAccountKey.human(human.id),
+            ownerKind: .human,
+            ownerId: human.id.uuidString,
+            ownerName: human.name,
+            delta: 10,
+            balanceBefore: 0,
+            balanceAfter: 10,
+            entryKind: .reward,
+            source: .careEvent,
+            title: "Care reward",
+            emoji: "coconut",
+            actorId: human.id.uuidString,
+            actorName: human.name,
+            subjectKind: .pet,
+            subjectId: deletedPet.id.uuidString,
+            sourceModelName: "PetCareLog",
+            sourceModelId: UUID().uuidString
+        )
+        context.insert(human)
+        context.insert(deletedPet)
+        context.insert(humanAccount)
+        context.insert(petCareReward)
+        try context.save()
+
+        PhysicalDeletionService.deletePet(deletedPet, context: context)
+        try context.save()
+
+        let accounts = try context.fetch(FetchDescriptor<CoconutAccount>())
+        let remainingAccount = try #require(accounts.first { $0.accountKey == CoconutAccountKey.human(human.id) })
+        #expect(remainingAccount.balance == 0)
+        #expect(human.coconutBalance == 0)
+        #expect(try context.fetch(FetchDescriptor<CoconutLedgerEntry>()).isEmpty)
+        #expect(deletionTombstone(CoconutLedgerEntry.self, id: petCareReward.id, context: context) != nil)
+    }
+
     @Test func deletePetCascadesFirstReleaseRegisteredOwnedEntities() throws {
         let container = try makeContainer()
         let context = container.mainContext

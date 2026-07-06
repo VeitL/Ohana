@@ -465,7 +465,10 @@ enum CoconutWalletService {
     }
 
     @discardableResult
-    nonisolated static func reconcileFormalAccountBalancesWithLedger(context: ModelContext) -> CoconutWalletReconciliationSummary {
+    nonisolated static func reconcileFormalAccountBalancesWithLedger(
+        context: ModelContext,
+        saveChanges: Bool = true
+    ) -> CoconutWalletReconciliationSummary {
         let entries = fetchOrLog(
             FetchDescriptor<CoconutLedgerEntry>(),
             context: context,
@@ -526,7 +529,7 @@ enum CoconutWalletService {
             correctedAccountCount: correctedCount,
             createdAccountCount: createdCount
         )
-        if summary.didChange {
+        if saveChanges && summary.didChange {
             context.safeSave()
         }
         return summary

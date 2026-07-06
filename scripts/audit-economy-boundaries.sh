@@ -776,6 +776,27 @@ def scan_pet_expense_ledger_boundary(path: pathlib.Path, lines: list[str], warni
         )
 
 
+def scan_physical_deletion_wallet_reconciliation(path: pathlib.Path, lines: list[str], warnings: list[WarningItem]) -> None:
+    path_str = rel(path)
+    if path_str != "Ohana/Domain/Services/PhysicalDeletionService.swift":
+        return
+
+    content = "\n".join(lines)
+    if "CoconutLedgerEntry.self" not in content:
+        return
+    if "reconcileWalletAfterEconomyDeletion" in content and "saveChanges: false" in content:
+        return
+
+    add(
+        warnings,
+        "physical-deletion-wallet-replay",
+        path_str,
+        1,
+        "PhysicalDeletionService",
+        "Physical deletion that removes CoconutLedgerEntry rows must replay surviving wallet balances before the outer save.",
+    )
+
+
 GATE_RULES: list[tuple[str, re.Pattern[str], re.Pattern[str], str]] = [
     (
         "online-feature-gate",
@@ -864,6 +885,7 @@ def scan(files: list[pathlib.Path]) -> list[WarningItem]:
         scan_secondary_executor_write_policy(path, lines, warnings)
         scan_care_derivation_direct_publish(path, lines, warnings)
         scan_pet_expense_ledger_boundary(path, lines, warnings)
+        scan_physical_deletion_wallet_reconciliation(path, lines, warnings)
     scan_service_gate_coverage(files, warnings)
     return sorted(warnings, key=lambda item: (item.rule, item.path, item.line, item.snippet))
 
