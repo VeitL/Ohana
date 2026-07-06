@@ -73,6 +73,25 @@ nonisolated enum CloudSyncMutationRecorder {
     }
 
     @discardableResult
+    static func markDeleted(
+        _ log: PlantCareLog,
+        plant: Plant?,
+        context: ModelContext,
+        deletedAt: Date = Date(),
+        deletedByHumanId: String? = nil
+    ) -> CloudSyncRecordState? {
+        markDeleted(
+            entityName: String(describing: PlantCareLog.self),
+            localRecordId: log.id,
+            householdId: sharedHouseholdId(context: context, now: deletedAt),
+            fallbackHouseholdId: plant?.id ?? log.plant?.id ?? log.id,
+            deletedAt: deletedAt,
+            deletedByHumanId: uuid(from: deletedByHumanId),
+            context: context
+        )
+    }
+
+    @discardableResult
     static func markModified(
         _ event: Event,
         context: ModelContext,

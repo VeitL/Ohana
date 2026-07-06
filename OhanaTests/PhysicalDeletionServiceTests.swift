@@ -5,6 +5,36 @@ import Testing
 
 @MainActor
 struct PhysicalDeletionServiceTests {
+    final class FakeNotificationScheduler: ReminderNotificationScheduling, @unchecked Sendable {
+        private(set) var cancelledIds: [String] = []
+
+        func schedule(reminder _: Reminder) {}
+
+        func schedule(
+            reminder _: Reminder,
+            existingNotificationIds _: Set<String>?,
+            completion: ((ReminderNotificationScheduleResult) -> Void)?
+        ) {
+            completion?(.scheduled)
+        }
+
+        func schedule(
+            reminder _: Reminder,
+            deliveryDate _: Date?,
+            existingNotificationIds _: Set<String>?,
+            completion: ((ReminderNotificationScheduleResult) -> Void)?
+        ) {
+            completion?(.scheduled)
+        }
+
+        func pendingNotificationIds() async -> Set<String> { [] }
+        func scheduleRollingWindow(reminders _: [Reminder]) {}
+        func refillWindowIfNeeded(allReminders _: [Reminder]) {}
+        func cancel(notificationId: String) { cancelledIds.append(notificationId) }
+        func cancelAll(for _: Pet, reminders _: [Reminder]) {}
+        func compensate(reminders _: [Reminder]) {}
+    }
+
     @Test func physicalDeletionCoverageMatchesCloudSyncRegistryOwnershipManifest() {
         #expect(
             PhysicalDeletionService.localPhysicalDeletionCascadeCoverage(parent: .pet) ==
@@ -13,6 +43,10 @@ struct PhysicalDeletionServiceTests {
         #expect(
             PhysicalDeletionService.localPhysicalDeletionCascadeCoverage(parent: .human) ==
                 CloudSyncEntityRegistry.physicalDeletionOwnedEntityNames(parent: .human)
+        )
+        #expect(
+            PhysicalDeletionService.localPhysicalDeletionCascadeCoverage(parent: .plant) ==
+                CloudSyncEntityRegistry.physicalDeletionOwnedEntityNames(parent: .plant)
         )
     }
 
@@ -59,6 +93,69 @@ struct PhysicalDeletionServiceTests {
         #expect(deletionTombstone(Pet.self, id: pet.id, context: context) != nil)
         #expect(deletionTombstone(PetCareLog.self, id: careLog.id, context: context) != nil)
         #expect(deletionTombstone(PetWalkLog.self, id: walkLog.id, context: context) != nil)
+    }
+
+    @Test func deletePlantPhysicallyDeletesCareFactsEventsAndNotifications() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let scheduler = FakeNotificationScheduler()
+        let plant = Plant(name: "Fern")
+        let plantID = plant.id
+        let log = PlantCareLog(
+            date: Date(timeIntervalSinceReferenceDate: 10),
+            careType: .watering
+        )
+        log.plant = plant
+        let event = Event(
+            title: "Water Fern",
+            startDate: Date(timeIntervalSinceReferenceDate: 20),
+            eventType: EventType.watering.rawValue,
+            relatedEntityType: EntityKind.plant.rawValue,
+            relatedEntityId: plantID.uuidString
+        )
+        let reminder = Reminder(event: event, scheduledAt: Date(timeIntervalSinceReferenceDate: 20))
+        reminder.notificationId = "plant-water-reminder"
+        event.reminders = [reminder]
+        let unrelatedEvent = Event(
+            title: "Other Plant",
+            startDate: Date(timeIntervalSinceReferenceDate: 20),
+            eventType: EventType.watering.rawValue,
+            relatedEntityType: EntityKind.plant.rawValue,
+            relatedEntityId: UUID().uuidString
+        )
+        let ledger = CareLedgerEvent(
+            occurredAt: log.date,
+            subjectKind: .plant,
+            subjectId: plantID.uuidString,
+            eventKind: .plantCare,
+            actionType: PlantCareType.watering.rawValue,
+            sourceEventId: event.id.uuidString,
+            legacyModelName: String(describing: PlantCareLog.self),
+            legacyModelId: log.id.uuidString
+        )
+
+        context.insert(plant)
+        context.insert(log)
+        context.insert(event)
+        context.insert(reminder)
+        context.insert(unrelatedEvent)
+        context.insert(ledger)
+        try context.save()
+
+        PhysicalDeletionService.deletePlant(plant, context: context, notifications: scheduler)
+        try context.save()
+
+        #expect(try context.fetch(FetchDescriptor<Plant>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<PlantCareLog>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<Reminder>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<CareLedgerEvent>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<Event>()).map(\.id) == [unrelatedEvent.id])
+        #expect(scheduler.cancelledIds == ["plant-water-reminder"])
+        #expect(deletionTombstone(Plant.self, id: plantID, context: context) != nil)
+        #expect(deletionTombstone(PlantCareLog.self, id: log.id, context: context) != nil)
+        #expect(deletionTombstone(Event.self, id: event.id, context: context) != nil)
+        #expect(deletionTombstone(Reminder.self, id: reminder.id, context: context) != nil)
+        #expect(deletionTombstone(CareLedgerEvent.self, id: ledger.id, context: context) != nil)
     }
 
     @Test func deletePetRemovesWalletLedgerAndSharedSessionReferences() throws {

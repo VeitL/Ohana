@@ -39,6 +39,7 @@ nonisolated struct CloudSyncEntityDescriptor: Equatable {
 nonisolated enum CloudSyncPhysicalDeletionParent: String, Codable, CaseIterable {
     case pet = "Pet"
     case human = "Human"
+    case plant = "Plant"
 }
 
 nonisolated struct CloudSyncPhysicalDeletionOwnership: Equatable {
@@ -184,7 +185,12 @@ nonisolated enum CloudSyncEntityRegistry {
         deletionOwnership(EconomyBudgetUsageEvent.self, parent: .human, reason: "memberKey/scopeKey"),
         deletionOwnership(SharedCareSession.self, parent: .human, reason: "executorIds"),
         deletionOwnership(CoconutExchangeRequest.self, parent: .human, reason: "sender/receiver"),
-        deletionOwnership(FamilyCollaborationTask.self, parent: .human, reason: "human actor fields")
+        deletionOwnership(FamilyCollaborationTask.self, parent: .human, reason: "human actor fields"),
+
+        deletionOwnership(Event.self, parent: .plant, reason: "plant relatedEntityId"),
+        deletionOwnership(Reminder.self, parent: .plant, reason: "event.reminders"),
+        deletionOwnership(PlantCareLog.self, parent: .plant, reason: "plant relationship"),
+        deletionOwnership(CareLedgerEvent.self, parent: .plant, reason: "subject/legacy source")
     ]
 
     static func physicalDeletionOwnedEntityNames(parent: CloudSyncPhysicalDeletionParent) -> Set<String> {
