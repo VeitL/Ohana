@@ -91,8 +91,8 @@ extension DomainRevisionPublishing {
         publish(
             DomainMutationResult(
                 command: .plantCare(plantID: result.plantID, action: result.careType.rawValue),
-                affectedEntityIDs: [result.plantID, result.logID, result.eventID, result.ledgerEventID],
-                wroteBusinessFact: true,
+                affectedEntityIDs: result.affectedEntityIDs,
+                wroteBusinessFact: result.didPersist,
                 note: note
             )
         )

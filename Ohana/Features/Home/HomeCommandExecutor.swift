@@ -566,8 +566,10 @@ struct HomeCommandExecutor {
                 publishNoop(.plantCare(plantID: plantID, action: type.rawValue), note: "home.plantCare.missingPlant")
                 continue
             }
-            _ = recordPlantCare(type, plant: plant, executorId: executorId, careNote: careNote, photoData: photoData, healthStatus: healthStatus)
-            recordedIDs.append(plantID)
+            let result = recordPlantCare(type, plant: plant, executorId: executorId, careNote: careNote, photoData: photoData, healthStatus: healthStatus)
+            if result.didPersist {
+                recordedIDs.append(plantID)
+            }
         }
         return recordedIDs
     }

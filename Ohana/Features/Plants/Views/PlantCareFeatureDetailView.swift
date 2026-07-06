@@ -9,6 +9,7 @@
 import Foundation
 import SwiftData
 import SwiftUI
+import UIKit
 
 private struct PlantCareFeatureLogDraft: Identifiable {
     let id = UUID()
@@ -1974,7 +1975,7 @@ struct PlantCareFeatureDetailView: View {
         healthStatus: PlantHealthStatus,
         photoData: Data?
     ) {
-        HomeCommandExecutor(modelContext: modelContext, services: appServices).recordPlantCare(
+        let result = HomeCommandExecutor(modelContext: modelContext, services: appServices).recordPlantCare(
             careType,
             plant: plant,
             executorId: activeHumanIdRaw.isEmpty ? nil : activeHumanIdRaw,
@@ -1982,7 +1983,7 @@ struct PlantCareFeatureDetailView: View {
             photoData: photoData,
             healthStatus: healthStatus
         )
-        UINotificationFeedbackGenerator().notificationOccurred(.success)
+        UINotificationFeedbackGenerator().notificationOccurred(result.didPersist ? .success : .error)
     }
 
     private func plant(for id: UUID) -> Plant? {

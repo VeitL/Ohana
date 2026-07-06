@@ -782,7 +782,7 @@ struct PlantLaunchTests {
             $0.event?.eventType == EventType.fertilizing.rawValue
         })
 
-        #expect(backup.schemaVersion == 28)
+        #expect(backup.schemaVersion == 29)
         #expect(PlantReminderPreferenceStore.timeWindow(defaults: targetDefaults) == .evening)
         #expect(PlantReminderPreferenceStore.isWeekendQuietEnabled(defaults: targetDefaults))
         #expect(PlantReminderPreferenceStore.isTravelModeEnabled(defaults: targetDefaults))
@@ -2074,6 +2074,7 @@ struct PlantLaunchTests {
         let walletEntries = try context.fetch(FetchDescriptor<CoconutLedgerEntry>())
         let walletTotal = walletEntries.reduce(0) { $0 + $1.delta }
 
+        #expect(result.didPersist)
         #expect(result.coconutDelta >= 2)
         #expect(human.coconutBalance == result.coconutDelta)
         #expect(ledger.coconutDelta == result.coconutDelta)
@@ -2104,6 +2105,7 @@ struct PlantLaunchTests {
             $0.eventKind == CareLedgerEventKind.plantCare.rawValue
         }))
         #expect(economy.awardCalls.isEmpty)
+        #expect(result.didPersist)
         #expect(result.coconutDelta == 0)
         #expect(ledger.coconutDelta == 0)
     }

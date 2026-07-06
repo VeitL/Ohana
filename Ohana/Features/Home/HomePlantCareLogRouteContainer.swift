@@ -7,6 +7,7 @@
 
 import SwiftData
 import SwiftUI
+import UIKit
 
 struct HomePlantCareLogRouteContainer: View {
     let id: UUID
@@ -85,7 +86,7 @@ struct HomePlantCareLogRouteContainer: View {
         healthStatus: PlantHealthStatus,
         photoData: Data?
     ) {
-        HomeCommandExecutor(modelContext: modelContext, services: appServices).recordPlantCare(
+        let result = HomeCommandExecutor(modelContext: modelContext, services: appServices).recordPlantCare(
             type,
             plant: plant,
             executorId: activeHumanIdRaw.isEmpty ? nil : activeHumanIdRaw,
@@ -93,6 +94,7 @@ struct HomePlantCareLogRouteContainer: View {
             photoData: photoData,
             healthStatus: healthStatus
         )
+        UINotificationFeedbackGenerator().notificationOccurred(result.didPersist ? .success : .error)
     }
 }
 

@@ -199,6 +199,14 @@ extension PlantDetailContentView {
                 plant: plant,
                 executorId: currentExecutorId()
             )
+            guard result.didPersist else {
+                withAnimation(GoMotion.feedback) {
+                    pendingDetailQuickCareTypes.remove(type)
+                    failedDetailQuickCareTypes.insert(type)
+                }
+                UINotificationFeedbackGenerator().notificationOccurred(.error)
+                return
+            }
             withAnimation(GoMotion.feedback) {
                 pendingDetailQuickCareTypes.remove(type)
                 completedDetailQuickCareTypes.insert(type)
@@ -249,7 +257,7 @@ extension PlantDetailContentView {
         generator.impactOccurred()
         let plantID = plant.id
         commandQueue.enqueue(.plantCare(plantID: plantID, action: type.rawValue)) {
-            commandExecutor.recordPlantCare(
+            let result = commandExecutor.recordPlantCare(
                 type,
                 plant: plant,
                 executorId: currentExecutorId(),
@@ -257,7 +265,11 @@ extension PlantDetailContentView {
                 photoData: photoData,
                 healthStatus: healthStatus
             )
-            schedulePlantDetailRenderDataRebuild(delayMilliseconds: 24)
+            if result.didPersist {
+                schedulePlantDetailRenderDataRebuild(delayMilliseconds: 24)
+            } else {
+                UINotificationFeedbackGenerator().notificationOccurred(.error)
+            }
         }
     }
 

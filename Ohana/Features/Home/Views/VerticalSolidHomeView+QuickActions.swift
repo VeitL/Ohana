@@ -249,6 +249,11 @@ extension VerticalSolidHomeView {
                 UINotificationFeedbackGenerator().notificationOccurred(.error)
                 return
             }
+            guard result.didPersist else {
+                setPlantQuickCareFailed(key)
+                UINotificationFeedbackGenerator().notificationOccurred(.error)
+                return
+            }
             setPlantQuickCareCompleted(key)
             UINotificationFeedbackGenerator().notificationOccurred(.success)
             applyPlantQuickCareRewardFeedback(result)

@@ -8,13 +8,19 @@
 import Foundation
 import SwiftData
 
-struct PlantCareCommandResult: Equatable {
+struct PlantCareCommandResult: Equatable, Sendable {
     let plantID: UUID
     let logID: UUID
     let eventID: UUID
     let ledgerEventID: UUID
     let careType: PlantCareType
     let coconutDelta: Int
+    let didPersist: Bool
+    let persistenceError: String?
+
+    var affectedEntityIDs: Set<UUID> {
+        didPersist ? [plantID, logID, eventID, ledgerEventID] : []
+    }
 }
 
 enum PlantCareCommandService {
@@ -72,7 +78,9 @@ enum PlantCareCommandService {
                 eventID: UUID(),
                 ledgerEventID: UUID(),
                 careType: type,
-                coconutDelta: 0
+                coconutDelta: 0,
+                didPersist: false,
+                persistenceError: "plantCareAuthorizationDenied"
             )
         }
         let authorizedExecutorId = plan.intent.assigneeId
@@ -104,9 +112,6 @@ enum PlantCareCommandService {
         CloudSyncMutationRecorder.markModified(plant, context: context, modifiedAt: now)
 
         let event = DomainScheduleWriter.createEvent(plan: plan, context: context).event
-        if saveChanges {
-            context.safeSave()
-        }
         let rewardAction = rewardAction(for: type)
         let reward: (humanGot: Int, petGot: Int)
         let rewardMetadata: String
@@ -156,7 +161,19 @@ enum PlantCareCommandService {
             save: false
         )
         if saveChanges {
-            context.safeSave()
+            let saveResult = context.safeSaveResult()
+            guard saveResult.didSave else {
+                return PlantCareCommandResult(
+                    plantID: plant.id,
+                    logID: log.id,
+                    eventID: event.id,
+                    ledgerEventID: ledgerEvent.id,
+                    careType: type,
+                    coconutDelta: 0,
+                    didPersist: false,
+                    persistenceError: saveResult.errorDescription
+                )
+            }
         }
         if syncCarePlan {
             PlantCarePlanScheduleService.sync(
@@ -175,7 +192,9 @@ enum PlantCareCommandService {
             eventID: event.id,
             ledgerEventID: ledgerEvent.id,
             careType: type,
-            coconutDelta: coconutDelta
+            coconutDelta: coconutDelta,
+            didPersist: true,
+            persistenceError: nil
         )
     }
 
