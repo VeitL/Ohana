@@ -209,7 +209,7 @@ extension OasisUpgradeRewardService {
             action: .careEcho,
             xpDelta: xpDelta
         ))
-        try? context.save()
+        context.safeSave()
     }
 
     static func careEchoGain(for type: QuestManager.OhanaActionType) -> (xp: Int, bond: Int, mood: Int, health: Int) {

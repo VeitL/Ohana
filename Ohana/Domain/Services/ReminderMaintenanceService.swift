@@ -54,7 +54,7 @@ enum ReminderMaintenanceService {
         }
 
         reminderScheduling.compensate(reminders: reminders, context: context)
-        try? context.save()
+        context.safeSave()
         return ReminderMaintenanceRunResult(pendingCount: reminders.count, completed: true)
     }
 }

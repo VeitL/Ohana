@@ -71,7 +71,7 @@ enum MemberMediaAttachmentIndexRepair {
         }
 
         guard changed else { return false }
-        try? modelContext.save()
+        modelContext.safeSave()
         return true
     }
 

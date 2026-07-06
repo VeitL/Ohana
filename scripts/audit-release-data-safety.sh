@@ -316,6 +316,10 @@ require_pattern "Ohana/App/StartupMaintenanceCoordinator.swift" 'media_attachmen
 require_pattern "OhanaTests/MediaAttachmentUpgradeCompatibilityTests.swift" 'unknownAttachmentStatesRemainLoadableAfterLightweightMigrationDefaults' \
   "Release data safety should cover upgraded stores whose attachment states default to unknown."
 
+if rg -n --pcre2 '^[[:space:]]*try\?[[:space:]]+(?:modelContext|context)\.save\(\)' Ohana --glob '*.swift' >/tmp/ohana-release-data-safety-silent-save.txt; then
+  failures+=("App code must not silently discard SwiftData save failures with try? context.save(); use safeSave/safeSaveResult or explicit do/catch.")
+fi
+
 if [[ ${#failures[@]} -eq 0 ]]; then
   echo "Release data safety audit: passed."
   exit 0
@@ -323,4 +327,7 @@ fi
 
 echo "Release data safety audit: failed." >&2
 printf ' - %s\n' "${failures[@]}" >&2
+if [[ -s /tmp/ohana-release-data-safety-silent-save.txt ]]; then
+  cat /tmp/ohana-release-data-safety-silent-save.txt >&2
+fi
 exit 1

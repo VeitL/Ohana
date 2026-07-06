@@ -73,6 +73,6 @@ actor SwiftDataMediaBlobLoader {
 
     private func persistRepairIfNeeded(_ didRepair: Bool) {
         guard didRepair else { return }
-        try? modelContext.save()
+        modelContext.safeSave()
     }
 }

@@ -27,7 +27,7 @@ extension OasisUpgradeRewardService {
         }
 
         if lifecycleFingerprint(for: critter) != before, let context {
-            try? context.save()
+            context.safeSave()
         }
     }
 
