@@ -1,0 +1,336 @@
+{
+  "allowedMatches": {
+    "Ohana/Domain/Economy/CoconutWalletService.swift": [
+      "context.safeSave()"
+    ],
+    "Ohana/Domain/Services/CalendarTaskCompletionSyncService.swift": [
+      "context.safeSave()",
+      "context.safeSave()",
+      "context.safeSave()",
+      "if !ledgers.isEmpty { context.safeSave() }",
+      "if !records.isEmpty { context.safeSave() }"
+    ],
+    "Ohana/Domain/Services/CareEventService+Care.swift": [
+      "context.safeSave()",
+      "context.safeSave()",
+      "context.safeSave()",
+      "context.safeSave()"
+    ],
+    "Ohana/Domain/Services/CareEventService+Feed.swift": [
+      "context.safeSave()",
+      "context.safeSave()",
+      "context.safeSave()",
+      "context.safeSave()",
+      "context.safeSave()",
+      "context.safeSave()"
+    ],
+    "Ohana/Domain/Services/CareLedgerBackfillService.swift": [
+      "context.safeSave()"
+    ],
+    "Ohana/Domain/Services/CareLedgerService.swift": [
+      "context.safeSave()"
+    ],
+    "Ohana/Domain/Services/CarePlanCalendarSync.swift": [
+      "context.safeSave()",
+      "context.safeSave()",
+      "context.safeSave()",
+      "context.safeSave()",
+      "context.safeSave()",
+      "context.safeSave()"
+    ],
+    "Ohana/Domain/Services/CloudSyncRecordApplier.swift": [
+      "context.safeSave()"
+    ],
+    "Ohana/Domain/Services/MemberThemeColorMaintenanceService.swift": [
+      "context.safeSave()"
+    ],
+    "Ohana/Domain/Services/PlantCarePlanScheduleService.swift": [
+      "context.safeSave()",
+      "context.safeSave()"
+    ],
+    "Ohana/Domain/Services/PlantCareScheduleSyncService.swift": [
+      "context.safeSave()",
+      "context.safeSave()"
+    ],
+    "Ohana/Domain/Services/PlantLifecycleService.swift": [
+      "context.safeSave()",
+      "context.safeSave()"
+    ],
+    "Ohana/Domain/Services/ReminderCompletionService.swift": [
+      "context.safeSave()",
+      "context.safeSave()",
+      "context.safeSave()",
+      "context.safeSave()"
+    ],
+    "Ohana/Domain/Services/ReminderMaintenanceService.swift": [
+      "context.safeSave()"
+    ],
+    "Ohana/Domain/Services/SharedCareSessionMaintenance.swift": [
+      "context.safeSave()",
+      "context.safeSave()",
+      "context.safeSave()"
+    ],
+    "Ohana/Domain/Services/SharedPetActionRecorder.swift": [
+      "context.safeSave()"
+    ],
+    "Ohana/Features/Calendar/CalendarCommands.swift": [
+      "context.safeSave()",
+      "context.safeSave()",
+      "context.safeSave()",
+      "context.safeSave()"
+    ],
+    "Ohana/Features/CatCare/CatCareCommands.swift": [
+      "context.safeSave()",
+      "context.safeSave()"
+    ],
+    "Ohana/Features/DashboardRecords/DashboardRecordCommands.swift": [
+      "context.safeSave()",
+      "context.safeSave()",
+      "context.safeSave()",
+      "context.safeSave()"
+    ],
+    "Ohana/Features/Documents/PetDocumentCommands.swift": [
+      "context.safeSave()",
+      "context.safeSave()",
+      "context.safeSave()"
+    ],
+    "Ohana/Features/Economy/CoconutEconomyPolicyV2.swift": [
+      "context.safeSave()"
+    ],
+    "Ohana/Features/Economy/RewardEconomyCommands.swift": [
+      "context.safeSave()",
+      "context.safeSave()",
+      "context.safeSave()",
+      "context.safeSave()"
+    ],
+    "Ohana/Features/Economy/StreakManager.swift": [
+      "context.safeSave()"
+    ],
+    "Ohana/Features/FamilyTasks/FamilyTaskService+LegacyBounty.swift": [
+      "context.safeSave()"
+    ],
+    "Ohana/Features/FamilyTasks/FamilyTaskService.swift": [
+      "context.safeSave()",
+      "context.safeSave()",
+      "context.safeSave()",
+      "context.safeSave()",
+      "context.safeSave()",
+      "context.safeSave()",
+      "context.safeSave()",
+      "context.safeSave()",
+      "context.safeSave()",
+      "context.safeSave()",
+      "context.safeSave()",
+      "context.safeSave()"
+    ],
+    "Ohana/Features/Feeding/FeedAutoLogMaterializer.swift": [
+      "context.safeSave()"
+    ],
+    "Ohana/Features/Feeding/FeedCommands.swift": [
+      "context.safeSave()"
+    ],
+    "Ohana/Features/Feeding/FeedPlanAndStockCommands.swift": [
+      "context.safeSave()",
+      "context.safeSave()",
+      "context.safeSave()",
+      "context.safeSave()",
+      "context.safeSave()",
+      "context.safeSave()",
+      "context.safeSave()",
+      "context.safeSave()"
+    ],
+    "Ohana/Features/Feeding/FeedingPlanWriter.swift": [
+      "context.safeSave()",
+      "context.safeSave()",
+      "context.safeSave()",
+      "context.safeSave()",
+      "context.safeSave()",
+      "context.safeSave()",
+      "context.safeSave()",
+      "context.safeSave()"
+    ],
+    "Ohana/Features/Health/PetHealthCommands.swift": [
+      "context.safeSave()",
+      "context.safeSave()",
+      "context.safeSave()",
+      "context.safeSave()",
+      "context.safeSave()",
+      "context.safeSave()"
+    ],
+    "Ohana/Features/Health/PetHeatCycleCommands.swift": [
+      "context.safeSave()"
+    ],
+    "Ohana/Features/HumanHealth/HumanHealthCommands.swift": [
+      "context.safeSave()",
+      "context.safeSave()",
+      "context.safeSave()",
+      "context.safeSave()",
+      "context.safeSave()"
+    ],
+    "Ohana/Features/HumanNotes/HumanNoteCommands.swift": [
+      "context.safeSave()",
+      "context.safeSave()"
+    ],
+    "Ohana/Features/Hygiene/PetHygieneCommands.swift": [
+      "context.safeSave()",
+      "context.safeSave()"
+    ],
+    "Ohana/Features/Insurance/InsuranceCommands.swift": [
+      "context.safeSave()",
+      "context.safeSave()",
+      "context.safeSave()",
+      "context.safeSave()",
+      "context.safeSave()",
+      "context.safeSave()",
+      "context.safeSave()"
+    ],
+    "Ohana/Features/Medication/HumanMedicationCommands.swift": [
+      "context.safeSave()",
+      "context.safeSave()",
+      "context.safeSave()",
+      "context.safeSave()"
+    ],
+    "Ohana/Features/Medication/MedicationCommands.swift": [
+      "context.safeSave()",
+      "context.safeSave()",
+      "context.safeSave()",
+      "context.safeSave()"
+    ],
+    "Ohana/Features/Members/MemberCreationService.swift": [
+      "context.safeSave()"
+    ],
+    "Ohana/Features/Members/MemberDeletionCommands.swift": [
+      "context.safeSave()",
+      "context.safeSave()",
+      "context.safeSave()"
+    ],
+    "Ohana/Features/Members/MemberInteractionCommands.swift": [
+      "context.safeSave()",
+      "context.safeSave()",
+      "context.safeSave()",
+      "context.safeSave()",
+      "context.safeSave()",
+      "context.safeSave()",
+      "context.safeSave()",
+      "context.safeSave()"
+    ],
+    "Ohana/Features/Members/MemberMediaAttachmentIndexRepair.swift": [
+      "modelContext.safeSave()"
+    ],
+    "Ohana/Features/Members/MemberProfileCommands.swift": [
+      "context.safeSave()",
+      "context.safeSave()",
+      "context.safeSave()"
+    ],
+    "Ohana/Features/Memorial/RainbowBridgeService.swift": [
+      "context.safeSave()",
+      "context.safeSave()",
+      "context.safeSave()"
+    ],
+    "Ohana/Features/Milestones/PetMilestoneCommands.swift": [
+      "context.safeSave()",
+      "context.safeSave()",
+      "context.safeSave()"
+    ],
+    "Ohana/Features/Moments/MomentCommands.swift": [
+      "context.safeSave()"
+    ],
+    "Ohana/Features/Notifications/ReminderSchedulingService.swift": [
+      "context.safeSave()",
+      "context.safeSave()",
+      "context.safeSave()",
+      "context.safeSave()"
+    ],
+    "Ohana/Features/Oasis/OasisUpgradeRewardService+Lifecycle.swift": [
+      "context.safeSave()"
+    ],
+    "Ohana/Features/Oasis/OasisUpgradeRewardService+Upgrades.swift": [
+      "context.safeSave()"
+    ],
+    "Ohana/Features/PetCare/PetCareCommands.swift": [
+      "context.safeSave()",
+      "context.safeSave()",
+      "context.safeSave()"
+    ],
+    "Ohana/Features/PhotoAlbum/PetPhotoAlbumCommands.swift": [
+      "context.safeSave()",
+      "context.safeSave()",
+      "context.safeSave()"
+    ],
+    "Ohana/Features/Plants/PlantBatchCareCommands.swift": [
+      "context.safeSave()",
+      "context.safeSave()",
+      "context.safeSave()"
+    ],
+    "Ohana/Features/Plants/PlantCommands.swift": [
+      "context.safeSave()"
+    ],
+    "Ohana/Features/Plants/PlantMediaAttachmentIndexRepair.swift": [
+      "modelContext.safeSave()"
+    ],
+    "Ohana/Features/Plants/PlantReminderControlService.swift": [
+      "context.safeSave()",
+      "context.safeSave()"
+    ],
+    "Ohana/Features/Plants/Views/PlantCareFeatureDetailView.swift": [
+      "modelContext.safeSave()"
+    ],
+    "Ohana/Features/Privacy/HumanPrivacyCommands.swift": [
+      "context.safeSave()",
+      "context.safeSave()",
+      "context.safeSave()",
+      "context.safeSave()",
+      "context.safeSave()",
+      "context.safeSave()"
+    ],
+    "Ohana/Features/QuickCare/QuickWaterCommandExecutor.swift": [
+      "context.safeSave()"
+    ],
+    "Ohana/Features/QuickCare/WaterManagementSupport.swift": [
+      "context.safeSave()",
+      "context.safeSave()",
+      "context.safeSave()",
+      "context.safeSave()"
+    ],
+    "Ohana/Features/Settings/SettingsCommands.swift": [
+      "context.safeSave()",
+      "context.safeSave()",
+      "context.safeSave()"
+    ],
+    "Ohana/Features/Settings/Views/SettingsView+Debug.swift": [
+      "modelContext.safeSave()"
+    ],
+    "Ohana/Features/Walks/PetWalkingManager.swift": [
+      "modelContext.safeSave()",
+      "modelContext.safeSave()",
+      "modelContext.safeSave()"
+    ],
+    "Ohana/Features/Wishlist/HumanWishlistCommands.swift": [
+      "context.safeSave()",
+      "context.safeSave()"
+    ],
+    "Ohana/Features/Workouts/WorkoutCommands.swift": [
+      "context.safeSave()",
+      "context.safeSave()",
+      "context.safeSave()"
+    ],
+    "Ohana/Shared/Media/AvatarAssetMaintenanceService.swift": [
+      "context.safeSave()"
+    ],
+    "Ohana/Shared/Media/MediaAttachmentPresenceBackfillService.swift": [
+      "context.safeSave()"
+    ],
+    "Ohana/Shared/Media/SwiftDataMediaBlobLoader.swift": [
+      "modelContext.safeSave()"
+    ]
+  },
+  "command": "scripts/audit-release-data-safety.sh",
+  "policyDocuments": [
+    "AGENTS.md",
+    "docs/release-quality-gates.md",
+    "docs/data-cache-sync-policy.md"
+  ],
+  "purpose": "Ratcheted baseline for existing bare safeSave() calls that discard save failure details. New writes should use safeSaveResult(), throws, or an explicit user-visible failure contract.",
+  "schema": "ohana.governance.swiftdata-save-failure-baseline.v1",
+  "updated": "2026-07-07"
+}

@@ -4,6 +4,36 @@ set -euo pipefail
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$repo_root"
 
+update_save_baseline=0
+
+usage() {
+  cat <<'USAGE'
+Usage: scripts/audit-release-data-safety.sh [--update-save-baseline]
+
+Checks first-release data safety invariants. Existing bare safeSave() calls are
+ratcheted in docs/governance/manifests/swiftdata-save-failure-baseline.json;
+new silent save-discard sites fail the audit.
+USAGE
+}
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --update-save-baseline)
+      update_save_baseline=1
+      shift
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *)
+      echo "Unknown argument: $1" >&2
+      usage >&2
+      exit 2
+      ;;
+  esac
+done
+
 if ! command -v rg >/dev/null 2>&1; then
   echo "error: ripgrep (rg) is required." >&2
   exit 2
@@ -20,6 +50,7 @@ data_backup_files=(
   "Ohana/Domain/Services/DataBackupDTOs.swift"
 )
 shared_container="Ohana/Models/SharedModelContainer.swift"
+save_failure_baseline="docs/governance/manifests/swiftdata-save-failure-baseline.json"
 
 failures=()
 
@@ -318,6 +349,127 @@ require_pattern "OhanaTests/MediaAttachmentUpgradeCompatibilityTests.swift" 'unk
 
 if rg -n --pcre2 '^[[:space:]]*try\?[[:space:]]+(?:modelContext|context)\.save\(\)' Ohana --glob '*.swift' >/tmp/ohana-release-data-safety-silent-save.txt; then
   failures+=("App code must not silently discard SwiftData save failures with try? context.save(); use safeSave/safeSaveResult or explicit do/catch.")
+fi
+
+if ! python3 - "$save_failure_baseline" "$update_save_baseline" <<'PY'; then
+from __future__ import annotations
+
+import collections
+import datetime as dt
+import json
+import pathlib
+import re
+import sys
+
+ROOT = pathlib.Path.cwd()
+BASELINE = ROOT / sys.argv[1]
+UPDATE_BASELINE = sys.argv[2] == "1"
+ALLOW_MARKER = "save-failure-audit: allow"
+RULE_ID = "swiftdata-silent-safe-save"
+SAFE_SAVE_RE = re.compile(r"\b(?:[A-Za-z0-9_]+Context|context|modelContext)\.safeSave\(\)")
+
+
+def relative(path: pathlib.Path) -> str:
+    return path.relative_to(ROOT).as_posix()
+
+
+def scan_file(path: pathlib.Path) -> list[dict[str, object]]:
+    matches: list[dict[str, object]] = []
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except UnicodeDecodeError:
+        lines = path.read_text(encoding="utf-8", errors="ignore").splitlines()
+    for line_number, line in enumerate(lines, start=1):
+        if ALLOW_MARKER in line:
+            continue
+        if SAFE_SAVE_RE.search(line):
+            matches.append({"line": line_number, "source": line.strip()})
+    return matches
+
+
+def load_baseline(path: pathlib.Path) -> dict[str, list[str]]:
+    if not path.is_file():
+        return {}
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        print(f"SwiftData save failure audit: invalid baseline JSON: {exc}", file=sys.stderr)
+        sys.exit(1)
+    raw = data.get("allowedMatches", {})
+    if not isinstance(raw, dict):
+        print("SwiftData save failure audit: baseline missing allowedMatches.", file=sys.stderr)
+        sys.exit(1)
+    allowed: dict[str, list[str]] = {}
+    for file_path, lines in raw.items():
+        if isinstance(file_path, str) and isinstance(lines, list):
+            allowed[file_path] = [line for line in lines if isinstance(line, str)]
+    return allowed
+
+
+matches_by_file: dict[str, list[dict[str, object]]] = {}
+for path in sorted((ROOT / "Ohana").rglob("*.swift")):
+    matches = scan_file(path)
+    if matches:
+        matches_by_file[relative(path)] = matches
+
+if UPDATE_BASELINE:
+    allowed = {
+        file_path: sorted(str(match["source"]) for match in matches)
+        for file_path, matches in sorted(matches_by_file.items())
+        if matches
+    }
+    payload = {
+        "schema": "ohana.governance.swiftdata-save-failure-baseline.v1",
+        "updated": dt.date.today().isoformat(),
+        "policyDocuments": [
+            "AGENTS.md",
+            "docs/release-quality-gates.md",
+            "docs/data-cache-sync-policy.md",
+        ],
+        "purpose": (
+            "Ratcheted baseline for existing bare safeSave() calls that discard save "
+            "failure details. New writes should use safeSaveResult(), throws, or an "
+            "explicit user-visible failure contract."
+        ),
+        "command": "scripts/audit-release-data-safety.sh",
+        "allowedMatches": allowed,
+    }
+    BASELINE.parent.mkdir(parents=True, exist_ok=True)
+    BASELINE.write_text(json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    print(f"SwiftData save failure baseline updated at {relative(BASELINE)} ({sum(len(v) for v in allowed.values())} match(es), {len(allowed)} file(s)).")
+    sys.exit(0)
+
+allowed = load_baseline(BASELINE)
+violations: list[tuple[str, int, str]] = []
+for file_path, matches in matches_by_file.items():
+    allowed_counts = collections.Counter(allowed.get(file_path, []))
+    seen_counts: collections.Counter[str] = collections.Counter()
+    for match in matches:
+        source = str(match["source"])
+        seen_counts[source] += 1
+        if seen_counts[source] > allowed_counts[source]:
+            violations.append((file_path, int(match["line"]), source))
+
+if violations:
+    for file_path, line_number, source in violations:
+        print(
+            f"[{RULE_ID}] {file_path}:{line_number} "
+            "bare safeSave() discards persistence failure details; use safeSaveResult(), throws, or an explicit allow marker.",
+            file=sys.stderr,
+        )
+        print(f"  {source}", file=sys.stderr)
+    print(
+        f"SwiftData save failure audit: {len(violations)} new match(es) "
+        f"across {len({item[0] for item in violations})} file(s).",
+        file=sys.stderr,
+    )
+    sys.exit(1)
+
+current_debt = sum(len(matches) for matches in matches_by_file.values())
+baseline_debt = sum(len(lines) for lines in allowed.values())
+print(f"SwiftData save failure audit: passed ({current_debt} current baseline match(es), {baseline_debt} allowed).")
+PY
+  failures+=("New bare safeSave() sites must not silently discard SwiftData save failures; use safeSaveResult(), throws, or explicit allow marker.")
 fi
 
 if [[ ${#failures[@]} -eq 0 ]]; then

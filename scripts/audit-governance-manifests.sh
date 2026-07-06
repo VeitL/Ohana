@@ -42,6 +42,7 @@ REQUIRED_FILES = [
     "full-scope-audit-baseline.json",
     "recurring-findings-audit-baseline.json",
     "localization-hardcoded-ui-baseline.json",
+    "swiftdata-save-failure-baseline.json",
 ]
 
 failures: list[str] = []
@@ -319,6 +320,30 @@ if localization_baseline:
                     fail(f"{where} {path} contains an empty allowed line.")
                 elif not re.search(r"[\u3400-\u9fff]", line):
                     fail(f"{where} {path} allowed line no longer contains Chinese text: {line}")
+
+save_failure_baseline = manifests.get("swiftdata-save-failure-baseline.json", {})
+if save_failure_baseline:
+    where = "SwiftData save failure baseline"
+    require_text(save_failure_baseline, "purpose", where)
+    require_text(save_failure_baseline, "command", where)
+    allowed = save_failure_baseline.get("allowedMatches")
+    if not isinstance(allowed, dict):
+        fail(f"{where} must define allowedMatches.")
+    else:
+        for path, lines in allowed.items():
+            if not isinstance(path, str) or not path.endswith(".swift"):
+                fail(f"{where} has invalid Swift path: {path}")
+                continue
+            if not (ROOT / path).is_file():
+                fail(f"{where} references missing Swift file: {path}")
+            if not isinstance(lines, list) or not lines:
+                fail(f"{where} {path} must define non-empty allowed lines.")
+                continue
+            for line in lines:
+                if not isinstance(line, str) or not line.strip():
+                    fail(f"{where} {path} contains an empty allowed line.")
+                elif ".safeSave()" not in line:
+                    fail(f"{where} {path} allowed line no longer contains safeSave(): {line}")
 
 if failures:
     print("Governance manifest audit: failed.", file=sys.stderr)

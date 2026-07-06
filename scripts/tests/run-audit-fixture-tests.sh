@@ -93,6 +93,7 @@ agent_skill_fixtures="scripts/tests/fixtures/AgentSkills"
 architecture_fixture_path="Ohana/Domain/__ArchitectureBoundaryFixture.swift"
 architecture_model_fixture_path="Ohana/Models/__ArchitectureModelBoundaryFixture.swift"
 member_view_revision_fixture_path="Ohana/Features/Members/Views/__MemberProfileRevisionBoundaryFixture.swift"
+save_failure_fixture_path="Ohana/Features/Settings/__SaveFailureBoundaryFixture.swift"
 governance_manifest_path="docs/governance/manifests/feature-ownership.json"
 governance_manifest_backup="$(mktemp "${TMPDIR:-/tmp}/ohana-feature-ownership.XXXXXX")"
 cp "$governance_manifest_path" "$governance_manifest_backup"
@@ -105,6 +106,7 @@ cleanup_architecture_fixture() {
 
 cleanup_governance_fixture() {
   rm -f CONTEXT.md UIRules.md RULES.md INSTRUCTIONS.md CLAUDE.md GEMINI.md .cursorrules
+  rm -f "$save_failure_fixture_path"
   if [[ -f "$governance_manifest_backup" ]]; then
     cp "$governance_manifest_backup" "$governance_manifest_path"
     rm -f "$governance_manifest_backup"
@@ -259,6 +261,23 @@ if [[ "$status" -ne 0 ]]; then
   fail "scripts/audit-governance-manifests.sh: expected current manifests to pass, got $status: $output"
 else
   echo "ok  scripts/audit-governance-manifests.sh passes current manifests"
+fi
+
+cp "$fixtures/SaveFailureBoundaryBad.swift" "$save_failure_fixture_path"
+run_audit scripts/audit-release-data-safety.sh
+if [[ "$status" -ne 1 ]]; then
+  fail "scripts/audit-release-data-safety.sh SaveFailureBoundaryBad.swift: expected strict exit 1, got $status"
+elif ! grep -qF "[swiftdata-silent-safe-save]" <<<"$output"; then
+  fail "scripts/audit-release-data-safety.sh SaveFailureBoundaryBad.swift: rule [swiftdata-silent-safe-save] no longer fires"
+else
+  echo "ok  scripts/audit-release-data-safety.sh catches new bare safeSave"
+fi
+rm -f "$save_failure_fixture_path"
+run_audit scripts/audit-release-data-safety.sh
+if [[ "$status" -ne 0 ]]; then
+  fail "scripts/audit-release-data-safety.sh: expected current data safety audit to pass, got $status: $output"
+else
+  echo "ok  scripts/audit-release-data-safety.sh passes current tree"
 fi
 
 : > CONTEXT.md
