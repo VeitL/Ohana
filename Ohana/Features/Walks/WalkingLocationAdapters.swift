@@ -44,6 +44,8 @@ protocol PetWalkingManaging: AnyObject {
     func start(pet: Pet)
     func pause()
     func resume()
+    func restore(checkpoint: PetWalkLog, modelContext: ModelContext)
+    func discardRecoveryCheckpoint(_ checkpoint: PetWalkLog, modelContext: ModelContext)
     @discardableResult
     func stop(modelContext: ModelContext, sharedTargets: [Pet], executorIds: [String]) -> WalkStopRewardSummary
     func addPoop(type: PottyType)
@@ -51,6 +53,14 @@ protocol PetWalkingManaging: AnyObject {
 }
 
 extension PetWalkingManaging {
+    func start(pet: Pet, modelContext: ModelContext) {
+        start(pet: pet)
+    }
+
+    func restore(checkpoint _: PetWalkLog, modelContext _: ModelContext) {}
+
+    func discardRecoveryCheckpoint(_: PetWalkLog, modelContext _: ModelContext) {}
+
     func addPoop() {
         addPoop(type: .perfectPoop)
     }
@@ -132,12 +142,24 @@ final class SharedPetWalkingManager: PetWalkingManaging {
         manager.start(pet: pet)
     }
 
+    func start(pet: Pet, modelContext: ModelContext) {
+        manager.start(pet: pet, modelContext: modelContext)
+    }
+
     func pause() {
         manager.pause()
     }
 
     func resume() {
         manager.resume()
+    }
+
+    func restore(checkpoint: PetWalkLog, modelContext: ModelContext) {
+        manager.restore(checkpoint: checkpoint, modelContext: modelContext)
+    }
+
+    func discardRecoveryCheckpoint(_ checkpoint: PetWalkLog, modelContext: ModelContext) {
+        manager.discardRecoveryCheckpoint(checkpoint, modelContext: modelContext)
     }
 
     @discardableResult

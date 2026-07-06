@@ -19,7 +19,7 @@ extension WalkTrackingCard {
                 sharedWalkExecutorMenu
                 sharedWalkTargetMenu
                 Button {
-                    mgr.start(pet: pet)
+                    mgr.start(pet: pet, modelContext: modelContext)
                     UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                 } label: {
                     Label("出发", systemImage: "figure.walk")

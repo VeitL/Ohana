@@ -13,7 +13,7 @@ struct IslandExplorationDashboard: View {
             standalone: standalone,
             pets: pets,
             humans: humans,
-            allWalkLogs: allWalkLogs
+            allWalkLogs: allWalkLogs.filter { !$0.isRecoveryCheckpoint }
         )
     }
 }

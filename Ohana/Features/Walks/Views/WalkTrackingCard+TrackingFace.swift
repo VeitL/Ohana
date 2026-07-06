@@ -19,6 +19,9 @@ extension WalkTrackingCard {
                 if isActivePet {
                     walkLocationStatusPill
                 }
+                if !isWalking, let checkpoint = snapshot.recoverableWalkCheckpoint {
+                    walkRecoveryPrompt(checkpoint: checkpoint)
+                }
                 controlPanel
             }
             .background(Color.ohanaCardSurface)
@@ -65,7 +68,7 @@ extension WalkTrackingCard {
                 distanceBadge
             }
         } else if isWalking {
-            let coords = liveRouteCoordinates
+            let coords = liveRouteCoordinates.isEmpty ? snapshot.latestRouteCoordinates : liveRouteCoordinates
             if coords.count >= 2, let region = routeRegion(for: coords) {
                 let routeStyle = WalkTrackingMapPresentationPolicy.routeVisualStyle(for: mgr.phase)
                 Map(initialPosition: .region(region)) {
@@ -233,6 +236,56 @@ extension WalkTrackingCard {
     }
 
     // MARK: - Control Panel
+
+    func walkRecoveryPrompt(checkpoint: PetWalkLog) -> some View {
+        let l = L10n(appLanguage)
+        return HStack(spacing: 10) {
+            Image(systemName: "clock.arrow.circlepath") // a11y: allow decorative icon; adjacent text labels recovery state
+                .font(OhanaFont.caption(.bold))
+                .foregroundStyle(Color.goYellow)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(l.tr(zh: "发现未完成的遛狗", en: "Unfinished walk found", de: "Unvollendeter Spaziergang"))
+                    .font(OhanaFont.caption(.bold))
+                    .foregroundStyle(Color.ohanaPrimaryText)
+                Text(AppMeasurementSystem.formatDistanceMeters(checkpoint.distanceMeters))
+                    .font(OhanaFont.caption2(.bold))
+                    .foregroundStyle(Color.ohanaSecondaryText)
+            }
+            Spacer(minLength: 8)
+            Button {
+                mgr.restore(checkpoint: checkpoint, modelContext: modelContext)
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            } label: {
+                Text(l.tr(zh: "继续", en: "Resume", de: "Fortsetzen"))
+                    .font(OhanaFont.caption(.black))
+                    .foregroundStyle(Color.arkInk)
+                    .frame(minHeight: 36)
+                    .padding(.horizontal, 12)
+                    .background(Color.goPrimary, in: Capsule())
+            }
+            .buttonStyle(ScaleButtonStyle())
+            .accessibilityIdentifier("walk-recovery-resume-action")
+
+            Button {
+                mgr.discardRecoveryCheckpoint(checkpoint, modelContext: modelContext)
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            } label: {
+                Image(systemName: "xmark") // a11y: allow decorative icon; button supplies localized accessibilityLabel
+                    .font(OhanaFont.caption(.bold))
+                    .foregroundStyle(Color.ohanaSecondaryText)
+                    .frame(width: 44, height: 44)
+                    .background(Color.ohanaControlFill, in: Circle())
+                    .accessibilityHidden(true)
+            }
+            .buttonStyle(ScaleButtonStyle())
+            .accessibilityLabel(l.tr(zh: "丢弃未完成遛狗", en: "Discard unfinished walk", de: "Unvollendeten Spaziergang verwerfen"))
+            .accessibilityIdentifier("walk-recovery-discard-action")
+        }
+        .padding(.horizontal, 14)
+        .padding(.top, 10)
+        .accessibilityIdentifier("walk-recovery-prompt")
+    }
 
     var controlPanel: some View {
         HStack(spacing: 0) {

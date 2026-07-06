@@ -15,12 +15,18 @@ struct WalkTrackingSnapshot {
     let latestRouteCoordinates: [CLLocationCoordinate2D]
     let latestPoopMarkers: [WalkPoopMarker]
     let thisWeekDistanceKm: Double
+    let recoverableWalkCheckpoint: PetWalkLog?
+    let hasRecoverableWalkCheckpoint: Bool
 
     @MainActor
     static func make(pet: Pet, manager: PetWalkingManaging) -> WalkTrackingSnapshot {
         let activeWalks = WalkFeaturePolicy.activeWalkLogs(for: pet)
+        let recoverableCheckpoint = WalkFeaturePolicy.recoverableWalkCheckpoints(for: pet)
+            .max { $0.startDate < $1.startDate }
         let latestWalk: PetWalkLog? = if manager.lastCompletedPetId == pet.id, let completed = manager.lastCompletedWalk {
             completed
+        } else if let recoverableCheckpoint {
+            recoverableCheckpoint
         } else {
             activeWalks.max { $0.startDate < $1.startDate }
         }
@@ -44,7 +50,9 @@ struct WalkTrackingSnapshot {
             latestWalkMapData: latestWalk?.mapSnapshotData,
             latestRouteCoordinates: routeCoordinates,
             latestPoopMarkers: poopMarkers,
-            thisWeekDistanceKm: weekDistanceKm
+            thisWeekDistanceKm: weekDistanceKm,
+            recoverableWalkCheckpoint: recoverableCheckpoint,
+            hasRecoverableWalkCheckpoint: recoverableCheckpoint != nil
         )
     }
 

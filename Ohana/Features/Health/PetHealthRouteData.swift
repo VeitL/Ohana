@@ -140,6 +140,7 @@ struct PetHealthRouteData {
         )
         descriptor.fetchLimit = 80
         return fetch(descriptor, context: context, name: "PetWalkLog")
+            .filter { !$0.isRecoveryCheckpoint }
     }
 
     private static func fetchDocuments(petID: UUID, context: ModelContext) -> [PetDocument] {
@@ -234,7 +235,7 @@ nonisolated enum PetHealthAlertSourceRouteData {
                 walkDescriptor(limit: 360),
                 context: context,
                 name: "PetWalkLog"
-            ),
+            ).filter { !$0.isRecoveryCheckpoint },
             petID: { $0.pet?.id },
             allowedPetIDs: petIDs
         )

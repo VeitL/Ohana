@@ -403,7 +403,7 @@ extension VerticalSolidHomeView {
             return
         }
 
-        appServices.walking.start(pet: pet)
+        appServices.walking.start(pet: pet, modelContext: modelContext)
         if appServices.walking.currentPet?.id == pet.id {
             appServices.walking.isWalkCardExpandedSurfaceVisible = true
             appServices.publishWalkingPresentationChange()

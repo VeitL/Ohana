@@ -42,6 +42,7 @@ extension Human {
 
         // 规则 C："🥾 追风少年"（Walk 记录数 > 5）
         let allWalkLogs: [PetWalkLog] = allPets.flatMap(\.walkLogs)
+            .filter { !$0.isRecoveryCheckpoint }
         let myWalks = allWalkLogs.filter { $0.executorIds.contains(myId) }
         if myWalks.count > 5 {
             badges.append(HumanBadge(emoji: "🥾", title: "追风少年", color: "00D4AA"))

@@ -19,6 +19,7 @@ struct WalkTrackingCard: View {
     var onSaveWeeklyGoal: (Double) -> Void
 
     @Environment(AppServices.self) var appServices
+    @Environment(\.modelContext) var modelContext
     var mgr: PetWalkingManaging { appServices.walking }
     var locationMgr: LocationProviding { appServices.location }
     @AppStorage("appLanguage") var appLanguage: String = "zh"
@@ -94,7 +95,9 @@ struct WalkTrackingCard: View {
     }
 
     var liveRouteCoordinates: [CLLocationCoordinate2D] {
-        routeCoordinates(from: locationMgr.collectedLocations, maxCount: 320)
+        let live = routeCoordinates(from: locationMgr.collectedLocations, maxCount: 320)
+        guard isWalking, snapshot.hasRecoverableWalkCheckpoint else { return live }
+        return snapshot.latestRouteCoordinates + live
     }
 
     var livePoopMarkers: [WalkPoopMarker] {

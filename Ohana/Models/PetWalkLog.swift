@@ -10,6 +10,8 @@ import SwiftData
 
 @Model
 final class PetWalkLog {
+    nonisolated static let recoveryCheckpointSessionPrefix = "ohana.walk.checkpoint."
+
     var id: UUID
     var startDate: Date
     var endDate: Date?
@@ -61,6 +63,10 @@ final class PetWalkLog {
 
     var executorIds: [String] {
         SharedCareParticipantIDs.decode(executorIdsRaw, fallback: executorId)
+    }
+
+    var isRecoveryCheckpoint: Bool {
+        sharedSessionId.hasPrefix(Self.recoveryCheckpointSessionPrefix)
     }
 
     func setExecutorIds(_ ids: [String], primaryExecutorId: String? = nil) {

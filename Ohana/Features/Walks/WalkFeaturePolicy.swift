@@ -12,7 +12,11 @@ enum WalkFeaturePolicy {
     }
 
     static func activeWalkLogs(for pet: Pet) -> [PetWalkLog] {
-        pet.walkLogs
+        pet.walkLogs.filter { !$0.isRecoveryCheckpoint }
+    }
+
+    static func recoverableWalkCheckpoints(for pet: Pet) -> [PetWalkLog] {
+        pet.walkLogs.filter(WalkRecoveryCheckpoint.isRecoverable)
     }
 
     static func activePottyLogs(for pet: Pet) -> [PetPottyLog] {

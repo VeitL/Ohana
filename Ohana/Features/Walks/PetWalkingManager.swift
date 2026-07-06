@@ -103,6 +103,12 @@ final class PetWalkingManager {
     private var pausedElapsed: TimeInterval = 0 // 暂停前已累计时间
     private var resumeTime: Date? // 最近一次 resume/start 时间
     private var timer: Timer?
+    private var activeRecoveryCheckpointID: UUID?
+    private var activeWalkModelContext: ModelContext?
+    private var lastRecoveryCheckpointAt: Date?
+    private var recoveredRouteLocations: [CLLocation] = []
+    private var recoveredDistanceMeters: Double = 0
+    private var restoredCheckpointNeedsLocationStart = false
     private var walkStopStartedAt: CFAbsoluteTime?
     private let locationManager: any WalkLocationManaging
     private let questManager: QuestManager
@@ -133,6 +139,10 @@ final class PetWalkingManager {
 
     // MARK: - Actions
     func start(pet: Pet) {
+        start(pet: pet, modelContext: nil)
+    }
+
+    func start(pet: Pet, modelContext: ModelContext?) {
         guard WalkFeaturePolicy.canStartWalk(for: pet) else { return }
 
         currentPet = pet
@@ -149,10 +159,63 @@ final class PetWalkingManager {
         lastCompletedRouteCoordinates = []
         activePoopMarkers = []
         lastCompletedPoopMarkers = []
+        activeWalkModelContext = modelContext
+        activeRecoveryCheckpointID = nil
+        lastRecoveryCheckpointAt = nil
+        recoveredRouteLocations = []
+        recoveredDistanceMeters = 0
+        restoredCheckpointNeedsLocationStart = false
 
         AppFlowPerformance.start(AppPerformanceFlows.walkSession, note: ["action": "start"])
+        createRecoveryCheckpointIfPossible(modelContext: modelContext, pet: pet)
         locationManager.startWalkSession()
         startTimer()
+    }
+
+    func restore(checkpoint: PetWalkLog, modelContext: ModelContext) {
+        guard WalkRecoveryCheckpoint.isRecoverable(checkpoint),
+              let pet = checkpoint.pet,
+              WalkFeaturePolicy.canStartWalk(for: pet)
+        else { return }
+
+        let metadata = WalkRecoveryCheckpoint.decodeMetadata(from: checkpoint)
+        currentPet = pet
+        phase = .paused
+        startTime = checkpoint.startDate
+        elapsedTime = metadata?.elapsedSeconds ?? max(0, Date().timeIntervalSince(checkpoint.startDate))
+        pausedElapsed = elapsedTime
+        resumeTime = nil
+        poopCount = metadata?.poopMarkers.count ?? 0
+        showSummary = false
+        isWalkCardExpandedSurfaceVisible = true
+        lastCompletedPetId = nil
+        lastCompletedWalk = nil
+        lastCompletedRouteCoordinates = []
+        activePoopMarkers = metadata?.poopMarkers.map(WalkPoopMarker.init(checkpoint:)) ?? []
+        lastCompletedPoopMarkers = []
+        activeRecoveryCheckpointID = checkpoint.id
+        activeWalkModelContext = modelContext
+        lastRecoveryCheckpointAt = Date()
+        recoveredRouteLocations = routeLocations(from: checkpoint.routeLocationsData)
+        recoveredDistanceMeters = max(0, checkpoint.distanceMeters)
+        restoredCheckpointNeedsLocationStart = true
+
+        locationManager.stopAllLocationActivity()
+        checkpointActiveWalk(reason: "restore", force: true)
+    }
+
+    func discardRecoveryCheckpoint(_ checkpoint: PetWalkLog, modelContext: ModelContext) {
+        guard WalkRecoveryCheckpoint.isCheckpoint(checkpoint) else { return }
+        modelContext.delete(checkpoint) // derived-state: allow recovery checkpoint cleanup; checkpoint is not a care fact and has no reward/reminder cascade
+        modelContext.safeSave()
+        if activeRecoveryCheckpointID == checkpoint.id {
+            activeRecoveryCheckpointID = nil
+            activeWalkModelContext = nil
+            lastRecoveryCheckpointAt = nil
+            recoveredRouteLocations = []
+            recoveredDistanceMeters = 0
+            restoredCheckpointNeedsLocationStart = false
+        }
     }
 
     func pause() {
@@ -167,6 +230,7 @@ final class PetWalkingManager {
             AppPerformancePhases.sessionPaused,
             note: walkSessionProbeNote(action: "pause")
         )
+        checkpointActiveWalk(reason: "pause", force: true)
         locationManager.pauseWalkSession()
         stopTimer()
     }
@@ -179,7 +243,13 @@ final class PetWalkingManager {
             AppPerformancePhases.sessionResumed,
             note: walkSessionProbeNote(action: "resume")
         )
-        locationManager.resumeWalkSession()
+        if restoredCheckpointNeedsLocationStart {
+            locationManager.startWalkSession()
+            restoredCheckpointNeedsLocationStart = false
+        } else {
+            locationManager.resumeWalkSession()
+        }
+        checkpointActiveWalk(reason: "resume", force: true)
         startTimer()
     }
 
@@ -212,9 +282,9 @@ final class PetWalkingManager {
 
         let startedAt = startTime ?? Date()
         let endedAt = Date()
-        let distanceMeters = locationManager.totalDistance
+        let distanceMeters = recoveredDistanceMeters + locationManager.totalDistance
 
-        let routeLocations = locationManager.routeLocationsForPersistence()
+        let routeLocations = mergedRouteLocationsForPersistence()
         let routeCoordinates = routeLocations.map(\.coordinate)
         let coordinates = routeLocations.map {
             ["lat": $0.coordinate.latitude, "lon": $0.coordinate.longitude]
@@ -267,7 +337,6 @@ final class PetWalkingManager {
                 return .empty
             }
             let walkLog = DomainCareFactWriter.createWalkLog(plan: write, context: modelContext)
-            modelContext.safeSave()
 
             var reward: (humanGot: Int, petGot: Int)?
             DomainCareFactEffectsDispatcher.run(plan: write) { actor in
@@ -397,7 +466,10 @@ final class PetWalkingManager {
 
         CloudSyncMutationRecorder.markModified(walkLogs, context: modelContext, modifiedAt: endedAt)
         CloudSyncMutationRecorder.markModified(pottyLogs, context: modelContext, modifiedAt: endedAt)
-        modelContext.safeSave()
+        let saveResult = modelContext.safeSaveResult()
+        if saveResult.didSave {
+            deleteRecoveryCheckpointIfPossible(modelContext: modelContext)
+        }
 
         phase = .finished(elapsed: elapsed, poopCount: poop)
         showSummary = true
@@ -438,6 +510,12 @@ final class PetWalkingManager {
         lastCompletedRouteCoordinates = []
         activePoopMarkers = []
         lastCompletedPoopMarkers = []
+        activeRecoveryCheckpointID = nil
+        activeWalkModelContext = nil
+        lastRecoveryCheckpointAt = nil
+        recoveredRouteLocations = []
+        recoveredDistanceMeters = 0
+        restoredCheckpointNeedsLocationStart = false
     }
 
     func pauseForAppBackground() {
@@ -451,6 +529,7 @@ final class PetWalkingManager {
             }
             resumeTime = nil
             phase = .paused
+            checkpointActiveWalk(reason: "backgroundPause", force: true)
             stopTimer()
         }
         locationManager.stopAllLocationActivity()
@@ -466,6 +545,7 @@ final class PetWalkingManager {
             return
         }
         updateElapsedFromClock()
+        checkpointActiveWalk(reason: "background", force: true)
         stopTimer()
         locationManager.promoteActiveWalkToBackgroundDelivery()
     }
@@ -488,6 +568,7 @@ final class PetWalkingManager {
         }
         updateElapsedFromClock()
         locationManager.returnActiveWalkToForegroundDelivery()
+        checkpointActiveWalk(reason: "foreground", force: true)
         startTimer()
     }
 
@@ -502,6 +583,7 @@ final class PetWalkingManager {
         poopCount += 1
         let location = locationManager.currentLocation ?? locationManager.collectedLocations.last
         activePoopMarkers.append(WalkPoopMarker(location: location, type: type))
+        checkpointActiveWalk(reason: "poop", force: true)
     }
 
     // MARK: - Timer
@@ -511,6 +593,7 @@ final class PetWalkingManager {
             Task { @MainActor [weak self] in
                 guard let self, let r = self.resumeTime else { return }
                 self.elapsedTime = self.pausedElapsed + Date().timeIntervalSince(r)
+                self.checkpointActiveWalk(reason: "timer", force: false)
             }
         }
     }
@@ -523,6 +606,120 @@ final class PetWalkingManager {
     private func updateElapsedFromClock() {
         guard let r = resumeTime else { return }
         elapsedTime = pausedElapsed + Date().timeIntervalSince(r)
+    }
+
+    private func createRecoveryCheckpointIfPossible(modelContext: ModelContext?, pet: Pet) {
+        guard let modelContext else { return }
+        deleteStaleRecoveryCheckpoints(for: pet, modelContext: modelContext)
+
+        let checkpoint = PetWalkLog(
+            startDate: startTime ?? Date(),
+            pet: pet,
+            executorId: activeHumanSelection.currentHumanId,
+            sharedSessionId: WalkRecoveryCheckpoint.makeSharedSessionID()
+        )
+        checkpoint.behaviorNotes = WalkRecoveryCheckpoint.encodeMetadata(
+            WalkRecoveryCheckpoint.metadata(elapsedTime: elapsedTime, poopMarkers: activePoopMarkers)
+        )
+        modelContext.insert(checkpoint)
+        CloudSyncMutationRecorder.markModified(checkpoint, context: modelContext, modifiedAt: Date())
+        activeRecoveryCheckpointID = checkpoint.id
+        activeWalkModelContext = modelContext
+        let saveResult = modelContext.safeSaveResult()
+        if saveResult.didSave {
+            lastRecoveryCheckpointAt = Date()
+        }
+    }
+
+    private func checkpointActiveWalk(reason _: String, force: Bool) {
+        guard let modelContext = activeWalkModelContext,
+              let checkpoint = activeRecoveryCheckpoint(modelContext: modelContext)
+        else { return }
+
+        let now = Date()
+        if !force, let lastRecoveryCheckpointAt, now.timeIntervalSince(lastRecoveryCheckpointAt) < 15 {
+            return
+        }
+
+        let routeLocations = mergedRouteLocationsForPersistence()
+        checkpoint.distanceMeters = max(0, recoveredDistanceMeters + locationManager.totalDistance)
+        checkpoint.routeLocationsData = routeData(from: routeLocations)
+        checkpoint.behaviorNotes = WalkRecoveryCheckpoint.encodeMetadata(
+            WalkRecoveryCheckpoint.metadata(elapsedTime: elapsedTime, poopMarkers: activePoopMarkers)
+        )
+        CloudSyncMutationRecorder.markModified(checkpoint, context: modelContext, modifiedAt: now)
+        let saveResult = modelContext.safeSaveResult()
+        if saveResult.didSave {
+            lastRecoveryCheckpointAt = now
+        }
+    }
+
+    private func activeRecoveryCheckpoint(modelContext: ModelContext) -> PetWalkLog? {
+        guard let id = activeRecoveryCheckpointID else { return nil }
+        let descriptor = FetchDescriptor<PetWalkLog>(
+            predicate: #Predicate { $0.id == id }
+        )
+        return try? modelContext.fetch(descriptor).first
+    }
+
+    private func deleteRecoveryCheckpointIfPossible(modelContext: ModelContext) {
+        guard let checkpoint = activeRecoveryCheckpoint(modelContext: modelContext) else {
+            activeRecoveryCheckpointID = nil
+            activeWalkModelContext = nil
+            lastRecoveryCheckpointAt = nil
+            recoveredRouteLocations = []
+            recoveredDistanceMeters = 0
+            restoredCheckpointNeedsLocationStart = false
+            return
+        }
+        modelContext.delete(checkpoint) // derived-state: allow recovery checkpoint cleanup after authoritative walk fact is saved
+        let saveResult = modelContext.safeSaveResult()
+        if saveResult.didSave {
+            activeRecoveryCheckpointID = nil
+            activeWalkModelContext = nil
+            lastRecoveryCheckpointAt = nil
+            recoveredRouteLocations = []
+            recoveredDistanceMeters = 0
+            restoredCheckpointNeedsLocationStart = false
+        }
+    }
+
+    private func deleteStaleRecoveryCheckpoints(for pet: Pet, modelContext: ModelContext) {
+        let stale = WalkFeaturePolicy.recoverableWalkCheckpoints(for: pet)
+        guard !stale.isEmpty else { return }
+        for checkpoint in stale {
+            modelContext.delete(checkpoint) // derived-state: allow stale recovery checkpoint replacement before a new walk starts
+        }
+        modelContext.safeSave()
+    }
+
+    private func routeData(from locations: [CLLocation]) -> Data? {
+        let coordinates = locations.map {
+            ["lat": $0.coordinate.latitude, "lon": $0.coordinate.longitude]
+        }
+        return try? JSONSerialization.data(withJSONObject: coordinates)
+    }
+
+    private func routeLocations(from data: Data?) -> [CLLocation] {
+        guard let data,
+              let arr = try? JSONSerialization.jsonObject(with: data) as? [[String: Double]]
+        else { return [] }
+        return arr.compactMap { dict in
+            guard let lat = dict["lat"], let lon = dict["lon"] else { return nil }
+            return CLLocation(latitude: lat, longitude: lon)
+        }
+    }
+
+    private func mergedRouteLocationsForPersistence() -> [CLLocation] {
+        let live = locationManager.routeLocationsForPersistence()
+        guard !recoveredRouteLocations.isEmpty else { return live }
+        guard let firstLive = live.first,
+              let lastRecovered = recoveredRouteLocations.last,
+              firstLive.distance(from: lastRecovered) < 1
+        else {
+            return recoveredRouteLocations + live
+        }
+        return recoveredRouteLocations + live.dropFirst()
     }
 
     private func walkSessionProbeNote(action: String) -> [String: String] {

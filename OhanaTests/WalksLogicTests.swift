@@ -91,6 +91,113 @@ struct WalksLogicTests {
         #expect(location.startWalkSessionCount == 0)
     }
 
+    @Test func startingWalkWithContextPersistsRecoveryCheckpoint() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let pet = Pet(name: "Piper", species: "狗")
+        context.insert(pet)
+        try context.save()
+
+        let location = FakeWalkLocationManager()
+        location.totalDistance = 42
+        location.currentLocation = CLLocation(latitude: 37.1, longitude: -122.1)
+        location.collectedLocations = [
+            CLLocation(latitude: 37.0, longitude: -122.0),
+            CLLocation(latitude: 37.1, longitude: -122.1)
+        ]
+        let manager = PetWalkingManager(locationManager: location, questManager: QuestManager())
+
+        manager.start(pet: pet, modelContext: context)
+        manager.addPoop(type: .perfectPoop)
+
+        let checkpoints = try context.fetch(FetchDescriptor<PetWalkLog>())
+            .filter(WalkRecoveryCheckpoint.isRecoverable)
+        let checkpoint = try #require(checkpoints.first)
+        let metadata = try #require(WalkRecoveryCheckpoint.decodeMetadata(from: checkpoint))
+
+        #expect(checkpoints.count == 1)
+        #expect(checkpoint.pet?.id == pet.id)
+        #expect(checkpoint.distanceMeters == 42)
+        #expect(checkpoint.routeLocationsData != nil)
+        #expect(metadata.poopMarkers.count == 1)
+        #expect(location.startWalkSessionCount == 1)
+    }
+
+    @Test func stoppingWalkDeletesRecoveryCheckpointAndKeepsOneAuthoritativeWalkLog() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let pet = Pet(name: "Piper", species: "狗")
+        context.insert(pet)
+        try context.save()
+
+        let location = FakeWalkLocationManager()
+        location.totalDistance = 80
+        location.collectedLocations = [
+            CLLocation(latitude: 37.0, longitude: -122.0),
+            CLLocation(latitude: 37.1, longitude: -122.1)
+        ]
+        let manager = PetWalkingManager(locationManager: location, questManager: QuestManager())
+
+        manager.start(pet: pet, modelContext: context)
+        manager.stop(modelContext: context)
+
+        let logs = try context.fetch(FetchDescriptor<PetWalkLog>())
+        let checkpoints = logs.filter(WalkRecoveryCheckpoint.isCheckpoint)
+        let authoritativeLogs = logs.filter { !WalkRecoveryCheckpoint.isCheckpoint($0) }
+
+        #expect(checkpoints.isEmpty)
+        #expect(authoritativeLogs.count == 1)
+        #expect(authoritativeLogs.first?.distanceMeters == 80)
+    }
+
+    @Test func restoredWalkMergesCheckpointRouteAndNewRouteOnStop() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let pet = Pet(name: "Piper", species: "狗")
+        let checkpoint = PetWalkLog(
+            startDate: Date().addingTimeInterval(-240),
+            pet: pet,
+            sharedSessionId: WalkRecoveryCheckpoint.makeSharedSessionID()
+        )
+        checkpoint.distanceMeters = 120
+        checkpoint.routeLocationsData = routeData([
+            CLLocation(latitude: 37.0, longitude: -122.0),
+            CLLocation(latitude: 37.1, longitude: -122.1)
+        ])
+        checkpoint.behaviorNotes = WalkRecoveryCheckpoint.encodeMetadata(
+            WalkRecoveryCheckpoint.metadata(
+                elapsedTime: 180,
+                poopMarkers: [WalkPoopMarker(date: Date().addingTimeInterval(-120), location: nil)]
+            )
+        )
+        context.insert(pet)
+        context.insert(checkpoint)
+        try context.save()
+
+        let location = FakeWalkLocationManager()
+        location.totalDistance = 40
+        location.collectedLocations = [
+            CLLocation(latitude: 37.1, longitude: -122.1),
+            CLLocation(latitude: 37.2, longitude: -122.2)
+        ]
+        let manager = PetWalkingManager(locationManager: location, questManager: QuestManager())
+
+        manager.restore(checkpoint: checkpoint, modelContext: context)
+        manager.resume()
+        manager.stop(modelContext: context)
+
+        let logs = try context.fetch(FetchDescriptor<PetWalkLog>())
+        let authoritativeWalk = try #require(logs.first { !WalkRecoveryCheckpoint.isCheckpoint($0) })
+        let coordinates = try #require(routeCoordinates(from: authoritativeWalk.routeLocationsData))
+        let pottyLogs = try context.fetch(FetchDescriptor<PetPottyLog>())
+
+        #expect(logs.filter(WalkRecoveryCheckpoint.isCheckpoint).isEmpty)
+        #expect(authoritativeWalk.distanceMeters == 160)
+        #expect(coordinates.count == 3)
+        #expect(pottyLogs.count == 1)
+        #expect(location.startWalkSessionCount == 1)
+    }
+
     @Test func homeWalkQuickActionRevealsActiveWalkInsteadOfStartingAnotherSession() {
         let requestedPetID = UUID()
         let otherPetID = UUID()
@@ -239,4 +346,16 @@ private func makeContainer() throws -> ModelContainer {
     let schema = Schema(ArkSchemaV71.models)
     let config = ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)
     return try ModelContainer(for: schema, configurations: [config])
+}
+
+private func routeData(_ locations: [CLLocation]) -> Data? {
+    let coordinates = locations.map {
+        ["lat": $0.coordinate.latitude, "lon": $0.coordinate.longitude]
+    }
+    return try? JSONSerialization.data(withJSONObject: coordinates)
+}
+
+private func routeCoordinates(from data: Data?) -> [[String: Double]]? {
+    guard let data else { return nil }
+    return try? JSONSerialization.jsonObject(with: data) as? [[String: Double]]
 }
