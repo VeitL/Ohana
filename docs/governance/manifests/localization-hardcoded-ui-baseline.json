@@ -1,0 +1,596 @@
+{
+  "allowedMatches": {
+    "Ohana/Features/Calendar/Views/CalendarView+List.swift": [
+      "Text(\"今天\")",
+      "Text(\"今天没有安排，保持轻松\")"
+    ],
+    "Ohana/Features/Calendar/Views/CalendarView+Month.swift": [
+      "Text(\"暂无事件\")"
+    ],
+    "Ohana/Features/CrewRoster/Views/CrewRosterOverlayEditors.swift": [
+      ".alert(\"仅清空所有记录\", isPresented: $showingPetClearAlert) {",
+      ".alert(\"撤销离世标记\", isPresented: $showingPetUndoPassedAlert) {",
+      ".alert(\"确认删除植物\", isPresented: $showingPlantDeleteAlert) {",
+      ".alert(\"确认标记离世\", isPresented: $showingPetPassedAlert) {",
+      "Button(\"删除\", role: .destructive) {",
+      "Button(\"取消\", role: .cancel) {}",
+      "Button(\"取消\", role: .cancel) {}",
+      "Button(\"取消\", role: .cancel) {}",
+      "Button(\"取消\", role: .cancel) {}",
+      "Button(\"撤销\", role: .destructive) {",
+      "Button(\"清空记录\", role: .destructive) {",
+      "Button(\"确认\", role: .destructive) {",
+      "DatePicker(\"离世日期\", selection: $passedDate, in: ...Date(), displayedComponents: .date)",
+      "Text(\"将删除护理、体重、花费、健康、散步、喂食、清洁、里程碑、用药与相册等记录；保留名字、头像、品种与证件/保险档案。此操作不可撤销。\")",
+      "Text(\"将清除离世日期，恢复为在世状态。\")",
+      "Text(\"将进入纪念模式，并让未来照护安排退出活跃提醒。原有数据会保留，此操作可撤销。\")",
+      "Text(\"确定要删除 \\(plant?.name ?? \"这株植物\") 吗？\")",
+      "destructiveButton(\"删除植物\", icon: \"trash.fill\", color: Color.goRed) {",
+      "destructiveButton(\"彻底删除 \\(pet.name)\", icon: \"trash.fill\", color: Color.goRed) {",
+      "secondaryButton(\"仅清空所有记录\", icon: \"eraser.fill\", color: Color.goOrange) {",
+      "secondaryButton(\"撤销离世标记\", icon: \"arrow.uturn.backward\", color: Color.goYellow) {",
+      "secondaryButton(\"标记离世\", icon: \"rainbow\", color: Color.goPurple) {"
+    ],
+    "Ohana/Features/Documents/Views/AddDocumentSheet.swift": [
+      ".alert(\"无法打开相机\", isPresented: $showCameraPermissionAlert) {",
+      ".navigationTitle(\"添加证件\")",
+      "Button(\"取消\") { dismiss() }",
+      "Button(\"完成\") {",
+      "Button(\"知道了\", role: .cancel) {}",
+      "Text(\"保存证件\")",
+      "Text(\"未指定\")",
+      "Text(\"证件类型\")",
+      "Text(\"请在系统设置中允许 Ohana 访问相机。\")",
+      "Text(\"谁付的款\")",
+      "Text(\"附件\" + (attachments.isEmpty ? \"\" : \" (\\(attachments.count))\"))"
+    ],
+    "Ohana/Features/Documents/Views/DocumentsListView.swift": [
+      ".alert(\"删除保单？\", isPresented: Binding(",
+      ".alert(\"删除证件？\", isPresented: Binding(",
+      "Button(\"删除\", role: .destructive) {",
+      "Button(\"删除\", role: .destructive) {",
+      "Button(\"取消\", role: .cancel) { deleteDocument = nil }",
+      "Button(\"取消\", role: .cancel) { deleteInsurance = nil }",
+      "Text(\"证件保障\")"
+    ],
+    "Ohana/Features/Documents/Views/PetVetSummaryPDFView.swift": [
+      ".navigationTitle(\"导出健康档案\")",
+      "Button(\"完成\") { dismiss() }",
+      "ShareLink(item: pdfURL, subject: Text(\"\\(pet.name) 兽医档案\"),",
+      "Text(\"A4 · 兽医健康档案\")",
+      "Text(\"\\(pet.name)_兽医档案.pdf\")",
+      "Text(\"兽医档案\")",
+      "Text(\"分享 / 保存 PDF\")",
+      "Text(\"基础信息\")",
+      "Text(\"备注\").frame(maxWidth: .infinity, alignment: .leading)",
+      "Text(\"就诊速览\")",
+      "Text(\"日期\").frame(width: 80, alignment: .leading)",
+      "Text(\"暂无健康记录\")",
+      "Text(\"有效期\").frame(width: 90, alignment: .trailing)",
+      "Text(\"由 Ohana App 生成 · 仅供参考，非正式医疗文件\")",
+      "Text(\"类型\").frame(width: 100, alignment: .leading)",
+      "Text(\"近3个月体重趋势\")",
+      "Text(\"近期健康记录（最近8条）\")",
+      "message: Text(\"由 Ohana App 生成的宠物健康档案\")) {"
+    ],
+    "Ohana/Features/FamilyReports/Views/FamilyWeeklyReportDashboardView.swift": [
+      ".accessibilityLabel(\"周报分享内容准备中\")",
+      ".navigationTitle(\"家庭周报\")",
+      "Label(\"分享\", systemImage: \"square.and.arrow.up\")",
+      "Text(\"\\(memory.petName) 的本周回忆\")",
+      "Text(\"\\(stat.count) 次照护 · +\\(stat.coconuts)🥥\").font(OhanaFont.adaptive(size: 11, weight: .medium, design: .rounded)).foregroundStyle(Color.ohanaSecondaryText) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup",
+      "Text(\"本周 Ohana\")",
+      "emptyText(\"本周还没有照护记录\")",
+      "emptyText(\"本周还没有照片回忆，下一次记录照片后会出现在这里\")"
+    ],
+    "Ohana/Features/FamilyReports/Views/WeeklyReportCard.swift": [
+      "Text(\"分享\")",
+      "Text(\"本周小报\")",
+      "Text(\"本周战绩\")",
+      "Text(\"活跃天\")",
+      "Text(\"活跃天数\")",
+      "Text(\"🏝️ Ohana 周报\")"
+    ],
+    "Ohana/Features/FamilyTasks/Views/AddBountyTaskSheet.swift": [
+      ".navigationTitle(\"发布悬赏\")",
+      "Text(\"任务图标\")",
+      "Text(\"例如：帮我给猫铲屎\")",
+      "Text(\"发布\")",
+      "Text(\"发布人\")",
+      "Text(\"取消\")",
+      "Text(\"奖励 \\(reward)🥥\")",
+      "Text(\"指派给\")",
+      "Text(\"描述任务内容...\")",
+      "Text(\"椰子奖励\")"
+    ],
+    "Ohana/Features/FamilyTasks/Views/BountyBoardView.swift": [
+      ".confirmationDialog(\"确认完成\", isPresented: $showCompleteConfirm, titleVisibility: .visible) {",
+      ".navigationTitle(\"家庭悬赏榜\")",
+      "Button(\"取消\", role: .cancel) {}",
+      "Button(\"完成并领取奖励\") {",
+      "Text(\"关闭\")",
+      "Text(\"历史归档 (\\(archivedCompleted.count))\")",
+      "Text(\"发布\")",
+      "Text(\"完成\")",
+      "Text(\"完成「\\(task.title)」并领取 \\(task.reward)🥥 奖励？\")",
+      "Text(\"完成于 \\(completedAt.formatted(date: .abbreviated, time: .omitted))\")",
+      "Text(\"指派中\")",
+      "Text(\"撤销\")",
+      "Text(\"本周家庭照护周报\")",
+      "Text(\"本周尚未打卡\")",
+      "Text(\"每周日 20:00 会推送本周家庭周报 · 可在系统通知中管理\")",
+      "Text(\"👑 最勤快\")"
+    ],
+    "Ohana/Features/Health/Views/PetHealthDetailContentView+Records.swift": [
+      "Label(\"健康时间轴\", systemImage: \"list.bullet.clipboard.fill\")",
+      "Label(\"健康记录趋势\", systemImage: \"waveform.path.ecg\")",
+      "Label(\"异常症状记录\", systemImage: \"exclamationmark.triangle.fill\")",
+      "Label(\"生理期与繁育\", systemImage: \"heart.text.square.fill\")",
+      "Text(\"\\(healthAlerts.count) 条\")",
+      "Text(\"\\(heatCycleLogs.count) 条\")",
+      "Text(\"\\(sortedLogs.count) 条\")",
+      "Text(\"\\(symptomLogs.count) 条\")",
+      "Text(\"健康预警\")",
+      "Text(\"已交配\")",
+      "Text(\"最近 12 个月\")",
+      "Text(\"未记录\")",
+      "Text(\"防护\")"
+    ],
+    "Ohana/Features/Health/Views/PetImmunityCard.swift": [
+      "Text(\"\\(days)天后\")",
+      "Text(\"\\(urgentCount) 项到期\")",
+      "Text(\"上次: \\(last, style: .date)\")",
+      "Text(\"免疫健康\")",
+      "Text(\"尚未记录\")",
+      "Text(\"已逾期\")"
+    ],
+    "Ohana/Features/Home/Views/FocusHomeCardContextMenu.swift": [
+      "Label(\"喂食 \\(pet.name)\", systemImage: \"fork.knife\")",
+      "Label(\"噗噗打卡\", systemImage: \"drop.circle\")",
+      "Label(\"查看详情\", systemImage: \"arrow.right.circle\")",
+      "Label(\"水管理\", systemImage: \"water.waves\")"
+    ],
+    "Ohana/Features/Home/Views/FocusHomeWalletCardStackItem.swift": [
+      ".accessibilityLabel(\"\\(cardName) 的卡片\")"
+    ],
+    "Ohana/Features/Home/Views/HomeFabSharedControls.swift": [
+      ".accessibilityHint(\"点击展开常用功能\")"
+    ],
+    "Ohana/Features/Hygiene/Views/HygieneTodoSheet.swift": [
+      "Button(\"保存\") { save() }",
+      "Button(\"取消\") { dismiss() }",
+      "DatePicker(\"开始日期\", selection: $startDate, displayedComponents: .date)",
+      "DatePicker(\"提醒时间\", selection: $startTime, displayedComponents: .hourAndMinute)",
+      "DatePicker(\"结束\", selection: $endDate, displayedComponents: .date)",
+      "Text(\"0 表示只提醒一次\")",
+      "Text(\"为 \\(pet.name) 添加护理计划\")",
+      "TextField(\"可选\", text: $customNote, axis: .vertical) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField",
+      "Toggle(\"全天\", isOn: $isAllDay)",
+      "Toggle(\"结束日期\", isOn: $hasEndDate)"
+    ],
+    "Ohana/Features/Hygiene/Views/PetHygieneDetailView.swift": [
+      ".alert(\"今天已经完成了\", isPresented: $showSingleUseNotice) {",
+      "Button(\"知道了\", role: .cancel) {}",
+      "Text(\"今日\")",
+      "Text(\"已设计划\")",
+      "Text(\"打卡\")",
+      "Text(\"护理\")",
+      "Text(\"未记录\")",
+      "Text(\"每\\(effectiveDays)天\\(isCustom ? \" · 已自定义\" : \"\")\")",
+      "Text(\"计划\")",
+      "Text(\"近 28 天\")",
+      "Text(\"重复 · \\(recurrenceLabel(ev.recurrenceDays))\")"
+    ],
+    "Ohana/Features/Insurance/Views/AddInsuranceClaimSheet.swift": [
+      ".navigationTitle(\"新增报销申请\").navigationBarTitleDisplayMode(.inline)",
+      ".navigationTitle(\"选择关联花费\").navigationBarTitleDisplayMode(.inline)",
+      "Button(\"取消\") { dismiss() }.foregroundStyle(Color.ohanaSecondaryText)",
+      "Button(\"取消\") { dismiss() }.foregroundStyle(Color.ohanaSecondaryText)",
+      "DatePicker(\"就诊 / 事故日期\", selection: $incidentDate, in: ...Date(), displayedComponents: .date)",
+      "Text(\"从医疗花费中关联\")",
+      "Text(\"保额 \\(insurance.coverageAmount > 0 ? AppCurrency.format(insurance.coverageAmount, fractionDigits: 0) : \"—\")\")",
+      "Text(\"关联花费记录（可选）\")",
+      "Text(\"报销金额不能超过总花费\")",
+      "Text(\"暂无医疗花费记录\")",
+      "Text(\"申请状态\")",
+      "TextField(\"备注（诊断、病因等，可选）\", text: $noteInput, axis: .vertical) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField"
+    ],
+    "Ohana/Features/Insurance/Views/InsurancePolicyDetailSheet.swift": [
+      "Label(\"删除\", systemImage: \"trash\")",
+      "Label(\"标记为：\\(status.rawValue)\", systemImage: status.sfSymbol)"
+    ],
+    "Ohana/Features/Insurance/Views/PetInsuranceView.swift": [
+      ".navigationTitle(\"🛡️ \\(pet.name)的保险\")",
+      "Button(\"关闭\") { dismiss() }",
+      "Label(\"删除\", systemImage: \"trash\")",
+      "Label(\"查看详情\", systemImage: \"info.circle\")",
+      "Label(\"编辑保单\", systemImage: \"pencil\")",
+      "Text(\"保险\")",
+      "Text(\"暂无保单，可记录续期与保额\")",
+      "Text(\"暂无保险记录\").font(OhanaFont.adaptive(size: 17, weight: .black, design: .rounded))",
+      "Text(\"添加保单\")",
+      "Text(\"添加保单\").font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded)).foregroundStyle(Color.arkInk)",
+      "Text(\"记录宠物保险保单，轻松追踪续期日期\").font(OhanaFont.adaptive(size: 13, weight: .medium, design: .rounded)).foregroundStyle(Color.ohanaSecondaryText).multilineTextAlignment(.center)"
+    ],
+    "Ohana/Features/Insurance/Views/ProtectionDashboardComponents.swift": [
+      "Label(\"删除保单\", systemImage: \"trash\")",
+      "Label(\"删除证件\", systemImage: \"trash\")",
+      "Label(\"查看详情\", systemImage: \"doc.text.magnifyingglass\")",
+      "Label(\"查看详情\", systemImage: \"doc.text.magnifyingglass\")",
+      "Label(\"编辑保单\", systemImage: \"pencil\")",
+      "Label(\"编辑证件\", systemImage: \"pencil\")"
+    ],
+    "Ohana/Features/Insurance/Views/ProtectionInsurancePopup.swift": [
+      "DatePicker(\"生效日期\", selection: $startDate, displayedComponents: .date)",
+      "DatePicker(\"续期日期\", selection: $renewalDate, in: startDate..., displayedComponents: .date)",
+      "Text(\"付款日\")",
+      "Text(\"缴费\")",
+      "TextField(\"产品名称\", text: $productName) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField",
+      "TextField(\"保单号\", text: $policyNumber) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField",
+      "TextField(\"保险公司\", text: $companyName) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField",
+      "TextField(\"备注\", text: $notes, axis: .vertical) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField",
+      "Toggle(\"保单号\", isOn: $hasPolicyNumber)",
+      "Toggle(\"保额\", isOn: $hasCoverage)",
+      "Toggle(\"写入保费记录\", isOn: $autoGenExpenses)",
+      "Toggle(\"日历提醒\", isOn: $showInCalendar)"
+    ],
+    "Ohana/Features/Medication/Views/AddPetMedicationSheet.swift": [
+      "DatePicker(\"开始日期\", selection: $startDate, displayedComponents: .date)",
+      "Text(\"填写后可在详情页查看余量与预估天数\")",
+      "Text(\"疗程天数\")",
+      "Text(\"长期用药：不设置结束日期\")",
+      "Toggle(\"有疗程期限\", isOn: $hasCourseEnd)"
+    ],
+    "Ohana/Features/Medication/Views/PetMedicationDetailSheet.swift": [
+      "Label(\"已喂完\", systemImage: \"checkmark.circle.fill\")",
+      "Label(\"漏喂\", systemImage: \"xmark.circle.fill\")",
+      "Text(\"\\(medication.frequency.rawValue) · 每次 \\(medication.dosage.isEmpty ? \"—\" : medication.dosage)\")",
+      "Text(\"今日状态\")",
+      "Text(\"剩余药量\")",
+      "Text(\"喂药方式\")",
+      "Text(\"备注：\\(noteBody)\")",
+      "Text(\"打卡历史\")",
+      "Text(\"按当前频次，预计还够约 \\(max(estDays, 0)) 天\")",
+      "Text(\"无需记录\")",
+      "Text(\"未设置结束日期\")",
+      "Text(\"疗程进度\")",
+      "Text(\"第 \\(dayIndex) / \\(total) 天\")",
+      "Text(\"约 \\(Int(remainingAmount)) 单位\")",
+      "Text(\"记录今次喂药\")",
+      "Text(\"还需 \\(todayRequired - todayDone) 次\")",
+      "Text(\"长期用药\")"
+    ],
+    "Ohana/Features/Members/PetDetailSheetRouteContainer.swift": [
+      "Text(\"内容已不可用\")"
+    ],
+    "Ohana/Features/Members/Views/EditPetSheet.swift": [
+      ".alert(\"名字已被占用 🏠\", isPresented: $showDuplicateNameAlert) {",
+      "Button(\"好的，我换一个\", role: .cancel) {}",
+      "DatePicker(\"生日\", selection: $birthday, displayedComponents: .date)",
+      "Picker(\"性别\", selection: $gender) {",
+      "Text(\"Ohana 里已经有一个叫「\\(name.trimmingCharacters(in: .whitespaces))」的家人啦，换一个名字吧！\")",
+      "Text(\"♀ 女孩\").tag(\"female\")",
+      "Text(\"♂ 男孩\").tag(\"male\")",
+      "Text(\"保存\")",
+      "Text(\"未知\").tag(\"unknown\")",
+      "Text(\"每日喂食量 (g)\")",
+      "Toggle(\"已绝育\", isOn: $isNeutered)",
+      "Toggle(\"设置生日\", isOn: $hasBirthday)"
+    ],
+    "Ohana/Features/Members/Views/PetBasicInfoDangerZone.swift": [
+      ".alert(\"仅清空所有记录\", isPresented: $showingClearConfirm) {",
+      "Button(\"取消\", role: .cancel) {}",
+      "Button(\"清空记录\", role: .destructive) { onClear() }",
+      "Text(\"仅清空所有记录\")",
+      "Text(\"删除\")",
+      "Text(\"危险区域\")",
+      "Text(\"取消\")",
+      "Text(\"将删除 \\(petName) 的护理、体重、花费、健康、散步、喂食、清洁、里程碑、用药与相册等记录，并移除日历中该宠物的计划；保留名字、头像、品种与证件/保险档案。此操作不可撤销。\")",
+      "Text(\"彻底删除 \\(petName)\")",
+      "Text(\"彻底删除 \\(petName)\")",
+      "Text(\"请输入：\\(petName)\")",
+      "Text(\"输入名字后才能继续\")",
+      "Text(\"这会删除宠物和所有关联记录，无法撤销。\")",
+      "TextField(\"宠物名字\", text: $confirmName) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField"
+    ],
+    "Ohana/Features/Members/Views/PetBasicInfoDetailView+Edit.swift": [
+      "Text(\"♀ 女孩\").tag(\"female\")",
+      "Text(\"♂ 男孩\").tag(\"male\")",
+      "Text(\"未知\").tag(\"unknown\")",
+      "Text(\"编辑中\")",
+      "TextField(\"备注（可选）\", text: $eNotes, axis: .vertical) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField",
+      "editLabel(\"已绝育\")",
+      "editLabel(\"性别\")",
+      "editLabel(\"护照有效期\")",
+      "editLabel(\"物种\")",
+      "editLabel(\"设置到家日\")",
+      "editLabel(\"设置生日\")"
+    ],
+    "Ohana/Features/Members/Views/PetBasicInfoDetailView+HealthSummary.swift": [
+      ".accessibilityLabel(\"就诊摘要准备中\")",
+      "Text(\"就诊卡片\")",
+      "Text(\"给兽医\")"
+    ],
+    "Ohana/Features/Members/Views/PetBasicInfoDetailView+MemorialDanger.swift": [
+      ".alert(\"撤销离世标记\", isPresented: $showingUndoPassingAlert) {",
+      ".alert(\"确认标记离世\", isPresented: $showingRainbowBridgeAlert) {",
+      "Button(\"取消\", role: .cancel) {}",
+      "Button(\"取消\", role: .cancel) {}",
+      "Button(\"撤销\", role: .destructive) {",
+      "Button(\"确认\", role: .destructive) {",
+      "Text(\"将标记 \\(pet.name) 为离世，并让未来照护安排退出活跃提醒。原有数据会保留，此操作可撤销。\")",
+      "Text(\"将清除 \\(pet.name) 的离世记录，恢复为在世状态。\")",
+      "Text(\"撤销离世\")",
+      "Text(\"标记 \\(pet.name) 已离世\")",
+      "Text(\"生命终章\")",
+      "Text(\"相伴 \\(pet.daysTogetherAtPassing) 天 · \\(pet.ageAtPassingText)\")",
+      "Text(\"离世日期：\\(d.formatted(.dateTime.year().month().day()))\")",
+      "Text(\"记录中心 · 彩虹桥彼端\")"
+    ],
+    "Ohana/Features/Members/Views/PetBasicInfoDetailView+Read.swift": [
+      "Text(\"\\(breed) · 护理贴士\")",
+      "Text(\"基于品种特点的个性化建议\")"
+    ],
+    "Ohana/Features/Members/Views/PetBasicInfoDetailView.swift": [
+      ".accessibilityLabel(\"编辑宠物资料\")",
+      ".navigationTitle(\"\\(pet.name) 的信息\")",
+      "Button(\"取消\") { withAnimation { isEditing = false } }",
+      "Text(\"保存\")"
+    ],
+    "Ohana/Features/Members/Views/PetCardBackSettingsSheet.swift": [
+      ".alert(\"仅清空所有记录\", isPresented: $showClearConfirm) {",
+      ".alert(\"删除 \\(pet.name)\", isPresented: $showDeleteConfirm) {",
+      ".alert(\"撤销离世标记\", isPresented: $showUndoPassingAlert) {",
+      ".alert(\"确认标记离世\", isPresented: $showRainbowAlert) {",
+      ".navigationTitle(\"设置\")",
+      "Button { showEditPet = true } label: { Label(\"编辑资料\", systemImage: \"pencil.circle.fill\") }",
+      "Button { showSitterCard = true } label: { Label(\"寄养卡\", systemImage: \"person.crop.rectangle.fill\") }",
+      "Button(\"删除\", role: .destructive) {",
+      "Button(\"取消\", role: .cancel) { deleteNameInput = \"\" }",
+      "Button(\"取消\", role: .cancel) {}",
+      "Button(\"取消\", role: .cancel) {}",
+      "Button(\"取消\", role: .cancel) {}",
+      "Button(\"完成\") { dismiss() }",
+      "Button(\"撤销\", role: .destructive) {",
+      "Button(\"清空记录\", role: .destructive) { clearPetLogs() }",
+      "Button(\"确认\", role: .destructive) {",
+      "DatePicker(\"日期\", selection: $rainbowDate, in: ...Date(), displayedComponents: .date)",
+      "Label(\"仅清空所有记录\", systemImage: \"eraser.fill\")",
+      "Label(\"删除宠物\", systemImage: \"trash.fill\")",
+      "Label(\"撤销离世标记\", systemImage: \"arrow.uturn.backward\")",
+      "Label(\"标记离世\", systemImage: \"rainbow\")",
+      "Section(\"危险区域\") {",
+      "Section(\"宠物信息\") {",
+      "Section(\"生命终章\") {",
+      "Section(\"生命终章\") {",
+      "Text(\"将清空护理、体重、花费、便便、健康、散步、喂食、清洁、里程碑、用药与相册记录，并移除日历中该宠物的计划与提醒；保留名字与证件/保险档案。此操作不可撤销。\")",
+      "Text(\"永远的家人\")",
+      "TextField(\"输入宠物名确认\", text: $deleteNameInput) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField",
+      "} message: { Text(\"标记后将进入「彩虹桥」状态。\") }",
+      "} message: { Text(\"请输入 \\\"\\(pet.name)\\\" 确认删除。\") }"
+    ],
+    "Ohana/Features/Members/Views/SitterCardPreviewSheet.swift": [
+      ".navigationTitle(\"🏷️ 寄养名片\")",
+      "Button(\"关闭\") { dismiss() }",
+      "Label(\"特别说明\", systemImage: \"note.text\")",
+      "Text(\"点击右上角分享按钮，将名片发给宠物保姆\")"
+    ],
+    "Ohana/Features/Milestones/Views/MilestoneCelebrationOverlay.swift": [
+      "Text(\"天\")",
+      "Text(\"太棒了！\")"
+    ],
+    "Ohana/Features/Milestones/Views/PetMilestoneListView.swift": [
+      ".alert(\"删除里程碑？\", isPresented: $showingDeleteAlert) {",
+      ".navigationTitle(\"选择地点\")",
+      ".navigationTitle(\"里程碑\")",
+      ".navigationTitle(\"里程碑详情\")",
+      "Button(\"删除\", role: .destructive) {",
+      "Button(\"取消\") { dismiss() }",
+      "Button(\"取消\", role: .cancel) {}",
+      "Button(\"完成\") {",
+      "Button(\"搜索\") {",
+      "Label(\"备注\", systemImage: \"note.text\")",
+      "Text(\"\\(sortedMilestones.count) 个重要时刻\")",
+      "Text(\"保存里程碑\").font(OhanaFont.adaptive(size: 16, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup",
+      "Text(\"地址\").font(OhanaFont.adaptive(size: 11, weight: .medium)).foregroundStyle(Color.ohanaPrimaryText.opacity(0.4)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup",
+      "Text(\"地点（点此从地图选择）\")",
+      "Text(\"快捷 Emoji\")",
+      "Text(\"日期\")",
+      "Text(\"没有找到匹配地点\")",
+      "Text(\"添加照片（可选）\")",
+      "Text(\"记录 \\(pet.name) 的每一个重要时刻\")",
+      "Text(\"记录里程碑\")",
+      "Text(\"记录里程碑\")",
+      "Text(\"输入地名开始搜索\")",
+      "Text(\"还没有里程碑记录\")",
+      "} message: { Text(\"「\\(milestone.title)」将被永久删除。\") }"
+    ],
+    "Ohana/Features/Moments/QuickMomentOverlayRouteContainer.swift": [
+      "Text(\"内容已不可用\")"
+    ],
+    "Ohana/Features/Notifications/Views/ReminderObservabilityView.swift": [
+      ".navigationTitle(\"提醒健康\")",
+      "Text(\"提醒系统可观测面板\")",
+      "Text(\"通知权限未开启或状态异常，提醒可能只能在 App 内补偿。\")",
+      "emptyText(\"当前没有过期或失败提醒\")",
+      "emptyText(\"暂无调度账本事件\")"
+    ],
+    "Ohana/Features/Oasis/Views/BeautifulCoconutTreeRenderPieces.swift": [
+      "Button(\"升级\") {",
+      "Button(\"重置椰子\") { harvested = [] }",
+      "Text(\"Lv.\\(level) · 点击椰子采摘\")"
+    ],
+    "Ohana/Features/PetCare/Views/IslandPottyDashboard.swift": [
+      "Text(\"10 日节奏条\")"
+    ],
+    "Ohana/Features/PhotoAlbum/Views/PetPhotoAlbumView.swift": [
+      "Label(\"分享\", systemImage: \"square.and.arrow.up\")",
+      "Label(\"删除\", systemImage: \"trash\")",
+      "Text(\"暂无照片\").font(OhanaFont.title3(.black))",
+      "Text(\"添加第一张照片\")",
+      "Text(\"记录\\(pet.name)的每一个精彩瞬间\").font(OhanaFont.subheadline(.medium)).foregroundStyle(Color.ohanaSecondaryText)",
+      "TextField(\"添加备注…\", text: $noteText, axis: .vertical) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField"
+    ],
+    "Ohana/Features/Settings/DesignLab/DesignSpecControlsV4.swift": [
+      "Label(\"设计检查 / Design Audit\", systemImage: \"checkmark.shield.fill\")"
+    ],
+    "Ohana/Features/Settings/DesignLab/DesignSpecPreviewCanvasV4.swift": [
+      "Button(\"关闭\") { dismissSheet() }",
+      "Button(\"删除确认 / Confirm\") {",
+      "Button(\"打卡 / Record\") { play(\"按钮点击 / Button tap\") }",
+      "Button(\"打开弹窗 / Open Sheet\") {",
+      "Button(\"稍后 / Later\") { dismissSheet() }",
+      "Button(\"计划 / Plan\") {",
+      "Text(\"上下滑动预览 / Scroll preview\")",
+      "Text(\"今日 / Today\")",
+      "Text(\"今日照顾\")",
+      "Text(\"克数 / Grams\")",
+      "Text(\"最近记录\")",
+      "Text(\"确认删除\")",
+      "Text(\"进度 / Progress\")",
+      "Text(\"选择标签 / Chips\")"
+    ],
+    "Ohana/Features/Settings/DesignLab/DesignSpecVividGlassBackdrop.swift": [
+      "Text(\"0123456789  文字穿过玻璃  LENS\")"
+    ],
+    "Ohana/Features/Settings/DesignLab/UIGuidelinesSafePreviewCanvasV4.swift": [
+      "Button(\"打卡 / Record\") { play(\"按钮点击 / \\(selection.tap)\") }",
+      "Button(\"打卡 / Record\") { play(\"按钮点击 / \\(selection.tap)\") }",
+      "Button(\"播放 / Preview\") {",
+      "Button(\"稍后 / Later\") { play(\"Bottom CTA\") }",
+      "Text(\"今日照顾\")",
+      "Text(\"关闭\")",
+      "Text(\"关闭\")",
+      "Text(\"关闭\")",
+      "Text(\"安全预览\")",
+      "Text(\"开关\")",
+      "Text(\"提醒 / Banner\")",
+      "Text(\"最近记录\")",
+      "Text(\"确认删除 / Confirm\")",
+      "Text(\"返回\")",
+      "Text(\"进度 / Progress\")"
+    ],
+    "Ohana/Features/Settings/DesignLab/UIGuidelinesView.swift": [
+      "Label(\"复制 JSON\", systemImage: \"curlybraces\")",
+      "Label(\"复制 MD\", systemImage: \"doc.on.doc.fill\")",
+      "Text(\"成长解锁流程 / Growth Unlock\")",
+      "Text(\"新手引导、树等级、功能锁测试\")"
+    ],
+    "Ohana/Features/Settings/Views/SettingsPerformanceDiagnosticsView.swift": [
+      "Label(\"清空样本\", systemImage: \"trash\")",
+      "Text(\"回到首页、点击卡片或进入头像裁剪后，这里会记录链路耗时。\")",
+      "Text(\"性能诊断\")",
+      "Text(\"用于验收启动、首页、头像、点击和相机链路。数值越低越好。\")",
+      "Text(\"还没有性能样本\")"
+    ],
+    "Ohana/Features/Shop/Views/InventoryView.swift": [
+      ".confirmationDialog(\"选择要绑定破框卡片的宠物\", isPresented: $showPetPickerForPopout, titleVisibility: .visible) {",
+      ".navigationTitle(\"我的百宝箱\")",
+      "Button(\"关闭\") { dismiss() }",
+      "Text(\"前往椰子商店兑换更多有趣的道具吧！\")",
+      "Text(\"百宝箱空空如也\")"
+    ],
+    "Ohana/Features/Walks/Views/GlobalWalkBanner.swift": [
+      "Label(\"结束\", systemImage: \"stop.fill\")",
+      "Text(\"在地图中查看\")",
+      "Text(\"地图生成中…\").font(OhanaFont.adaptive(size: 12)).foregroundStyle(Color.ohanaPrimaryText.opacity(0.3))",
+      "Text(\"巡岛中\")",
+      "Text(\"巡岛完成 🎉\")",
+      "Text(\"已暂停\")"
+    ],
+    "Ohana/Features/Walks/Views/IslandExplorationDashboard.swift": [
+      "Text(\"全岛探索\")",
+      "Text(\"探索趋势\")",
+      "Text(\"暂无遛宠记录\")",
+      "Text(\"暂无遛宠记录\")",
+      "Text(\"里程贡献榜\")"
+    ],
+    "Ohana/Features/Walks/Views/RainbowWalkEffects.swift": [
+      ".accessibilityLabel(\"便便位置\")"
+    ],
+    "Ohana/Features/Walks/Views/WalkInProgressPill.swift": [
+      "Text(\"\\(pet.name) 正在巡岛\")"
+    ],
+    "Ohana/Features/Walks/Views/WalkSummarySheet.swift": [
+      "Label(\"本周目标完成！\", systemImage: \"checkmark.circle.fill\")",
+      "Text(\"\\(pet.name) 的路线记录\")",
+      "Text(\"km / 周\")",
+      "Text(\"保存\")",
+      "Text(\"历史记录\")",
+      "Text(\"尚未设定目标\")",
+      "Text(\"本周目标\")",
+      "Text(\"本次心情\")",
+      "Text(\"每次 ±\\(weeklyGoalStepKm == floor(weeklyGoalStepKm) ? String(format: \"%.0f\", weeklyGoalStepKm) : String(format: \"%.1f\", weeklyGoalStepKm)) km\")",
+      "Text(\"目标、总览和历史轨迹\")",
+      "Text(\"设定每周步行目标\")",
+      "Text(\"还没有巡岛记录\")",
+      "Text(\"遛狗详情\")",
+      "TextField(\"记录今天发生的趣事... (可选)\", text: $draftNotes, axis: .vertical) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField"
+    ],
+    "Ohana/Features/Walks/Views/WalkTrackingCard+Actions.swift": [
+      "Label(\"再来\", systemImage: \"arrow.clockwise\")",
+      "Label(\"出发\", systemImage: \"figure.walk\")"
+    ],
+    "Ohana/Features/Walks/Views/WalkTrackingCard+SummaryFace.swift": [
+      ".accessibilityLabel(\"关闭遛狗摘要\")",
+      ".accessibilityLabel(\"编辑遛狗目标\")",
+      "Label(\"本次轨迹\", systemImage: \"map.fill\")",
+      "Text(\"\\(pet.name) 到家啦\")",
+      "Text(\"km / 周\")",
+      "Text(\"本次轨迹生成中\")",
+      "Text(\"本次遛狗\")",
+      "Text(\"每次 ±0.5 km\")",
+      "Text(\"编辑目标\")",
+      "Text(\"设定每周步行目标\")"
+    ],
+    "Ohana/Features/Walks/Views/WalkTrackingCard+TrackingFace.swift": [
+      "Text(\"暂无路线记录\")"
+    ],
+    "Ohana/Features/Walks/Views/WalkTrackingFullScreen.swift": [
+      "Text(\"收起\")"
+    ],
+    "Ohana/Features/Walks/WalkRouteContainer.swift": [
+      "Text(\"内容已不可用\")"
+    ],
+    "Ohana/Shared/Components/FeatureHubComponents.swift": [
+      "Text(\"彩虹桥纪念模式\")"
+    ],
+    "Ohana/Shared/Components/ImageCutoutPreviewSheet.swift": [
+      "Label(\"无法识别主体，仅提供原图\", systemImage: \"exclamationmark.triangle\")",
+      "Text(\"AI 智能抠图中…\")",
+      "Text(\"去除背景\")",
+      "Text(\"去除背景\")",
+      "Text(\"处理中…\")",
+      "Text(\"无法抠图\")",
+      "Text(\"点击任意一张完成选择\")",
+      "Text(\"识别失败\")",
+      "Text(\"选择「去除背景」后，卡片正面将显示带白色描边的贴纸效果。\")",
+      "Text(\"选择头像样式\")"
+    ],
+    "Ohana/Shared/Components/LayeredAvatarView.swift": [
+      "Text(\"点击捏脸\")"
+    ],
+    "Ohana/Shared/Components/PetPickerSheet.swift": [
+      "Text(\"选择一只宠物继续\")"
+    ],
+    "Ohana/Shared/Components/SwipeableEventRow.swift": [
+      "Button(\"仅删除此条\", role: .destructive) { deleteEvent(scope: .singleOccurrence) }",
+      "Button(\"删除\", role: .destructive) { triggerDelete() }",
+      "Button(\"删除此条及之后所有重复\", role: .destructive) { deleteEvent(scope: .thisAndFuture) }",
+      "Button(\"取消\", role: .cancel) {}",
+      "Text(\"全天\")",
+      "Text(\"删除\").font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))",
+      "Text(\"完成\").font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))",
+      "Text(\"逾期\")"
+    ]
+  },
+  "command": "scripts/audit-localization-coverage.sh --all",
+  "policyDocuments": [
+    "AGENTS.md",
+    "docs/specs/product-foundation.md",
+    "docs/design/ohana-ui-spec.md"
+  ],
+  "purpose": "Ratcheted baseline for existing direct hardcoded Chinese user-visible SwiftUI literals. New matches fail scripts/audit-localization-coverage.sh.",
+  "schema": "ohana.governance.localization-hardcoded-ui-baseline.v1",
+  "updated": "2026-07-07"
+}

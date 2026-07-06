@@ -41,6 +41,7 @@ REQUIRED_FILES = [
     "release-resource-ownership.json",
     "full-scope-audit-baseline.json",
     "recurring-findings-audit-baseline.json",
+    "localization-hardcoded-ui-baseline.json",
 ]
 
 failures: list[str] = []
@@ -294,6 +295,30 @@ if recurring:
                 rule_total += file_total
             if isinstance(total, int) and total != rule_total:
                 fail(f"{where} {audit_name} totalWarnings must equal rule totals: {total} != {rule_total}")
+
+localization_baseline = manifests.get("localization-hardcoded-ui-baseline.json", {})
+if localization_baseline:
+    where = "localization hardcoded UI baseline"
+    require_text(localization_baseline, "purpose", where)
+    require_text(localization_baseline, "command", where)
+    allowed = localization_baseline.get("allowedMatches")
+    if not isinstance(allowed, dict):
+        fail(f"{where} must define allowedMatches.")
+    else:
+        for path, lines in allowed.items():
+            if not isinstance(path, str) or not path.endswith(".swift"):
+                fail(f"{where} has invalid Swift path: {path}")
+                continue
+            if not (ROOT / path).is_file():
+                fail(f"{where} references missing Swift file: {path}")
+            if not isinstance(lines, list) or not lines:
+                fail(f"{where} {path} must define non-empty allowed lines.")
+                continue
+            for line in lines:
+                if not isinstance(line, str) or not line.strip():
+                    fail(f"{where} {path} contains an empty allowed line.")
+                elif not re.search(r"[\u3400-\u9fff]", line):
+                    fail(f"{where} {path} allowed line no longer contains Chinese text: {line}")
 
 if failures:
     print("Governance manifest audit: failed.", file=sys.stderr)

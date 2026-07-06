@@ -200,6 +200,7 @@ if [[ ${#ui_swift_files[@]} -gt 0 ]]; then
 fi
 
 if [[ ${#app_swift_files[@]} -gt 0 ]]; then
+  run "Localization hardcoded UI audit for touched app Swift" scripts/audit-localization-coverage.sh --changed "${app_swift_files[@]}"
   run "Smoothness audit for touched app Swift" scripts/audit-smoothness-risk.sh ${audit_mode[@]+"${audit_mode[@]}"} "${app_swift_files[@]}"
   run "Route first-frame audit for touched app Swift" scripts/audit-route-first-frame.sh ${audit_mode[@]+"${audit_mode[@]}"} "${app_swift_files[@]}"
   run "Runtime guardrails for touched app Swift" scripts/audit-runtime-guardrails.sh ${audit_mode[@]+"${audit_mode[@]}"} "${app_swift_files[@]}"

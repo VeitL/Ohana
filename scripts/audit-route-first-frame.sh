@@ -123,6 +123,11 @@ else
   )
 fi
 
+if [[ ${#files[@]} -eq 0 ]]; then
+  echo "Route first-frame audit: passed (0 file(s))."
+  exit 0
+fi
+
 is_route_first_frame_file() {
   local file="$1"
   case "$file" in

@@ -142,6 +142,10 @@ assert_bad scripts/audit-route-first-frame.sh "$fixtures/RouteFirstFrameBadRoute
   route-first-frame-modelactor-live-model-return
 assert_good scripts/audit-route-first-frame.sh "$fixtures/RouteFirstFrameGoodRouteContainer.swift"
 
+assert_bad scripts/audit-localization-coverage.sh "$fixtures/LocalizationHardcodedChineseBad.swift" \
+  localization-hardcoded-ui-chinese
+assert_good scripts/audit-localization-coverage.sh "$fixtures/LocalizationHardcodedChineseGood.swift"
+
 assert_bad scripts/audit-runtime-guardrails.sh "$fixtures/RuntimeBad.swift" \
   location-manager background-location always-location-request idle-timer \
   raw-timer-publisher repeat-forever timeline-animation
