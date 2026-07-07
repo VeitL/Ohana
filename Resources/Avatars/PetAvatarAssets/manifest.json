@@ -1,6 +1,6 @@
 [
   {
-    "filename": "bird_boy_standard.png",
+    "filename": "bird_boy_standard.webp",
     "species": "bird",
     "gender": "boy",
     "coat": "standard",
@@ -9,7 +9,7 @@
     "fallbackScope": "species"
   },
   {
-    "filename": "bird_girl_standard.png",
+    "filename": "bird_girl_standard.webp",
     "species": "bird",
     "gender": "girl",
     "coat": "standard",
@@ -18,7 +18,7 @@
     "fallbackScope": "species"
   },
   {
-    "filename": "cat_abyssinian_boy_blue.png",
+    "filename": "cat_abyssinian_boy_blue.webp",
     "species": "cat",
     "breed": "abyssinian",
     "gender": "boy",
@@ -29,7 +29,7 @@
     "standard": false
   },
   {
-    "filename": "cat_abyssinian_boy_fawn.png",
+    "filename": "cat_abyssinian_boy_fawn.webp",
     "species": "cat",
     "breed": "abyssinian",
     "gender": "boy",
@@ -40,7 +40,7 @@
     "standard": false
   },
   {
-    "filename": "cat_abyssinian_boy_ruddy.png",
+    "filename": "cat_abyssinian_boy_ruddy.webp",
     "species": "cat",
     "breed": "abyssinian",
     "gender": "boy",
@@ -51,7 +51,7 @@
     "standard": false
   },
   {
-    "filename": "cat_abyssinian_boy_sorrel.png",
+    "filename": "cat_abyssinian_boy_sorrel.webp",
     "species": "cat",
     "breed": "abyssinian",
     "gender": "boy",
@@ -62,7 +62,7 @@
     "standard": false
   },
   {
-    "filename": "cat_abyssinian_girl_blue.png",
+    "filename": "cat_abyssinian_girl_blue.webp",
     "species": "cat",
     "breed": "abyssinian",
     "gender": "girl",
@@ -73,7 +73,7 @@
     "standard": false
   },
   {
-    "filename": "cat_abyssinian_girl_fawn.png",
+    "filename": "cat_abyssinian_girl_fawn.webp",
     "species": "cat",
     "breed": "abyssinian",
     "gender": "girl",
@@ -84,7 +84,7 @@
     "standard": false
   },
   {
-    "filename": "cat_abyssinian_girl_ruddy.png",
+    "filename": "cat_abyssinian_girl_ruddy.webp",
     "species": "cat",
     "breed": "abyssinian",
     "gender": "girl",
@@ -95,7 +95,7 @@
     "standard": false
   },
   {
-    "filename": "cat_abyssinian_girl_sorrel.png",
+    "filename": "cat_abyssinian_girl_sorrel.webp",
     "species": "cat",
     "breed": "abyssinian",
     "gender": "girl",
@@ -106,7 +106,7 @@
     "standard": false
   },
   {
-    "filename": "cat_american_shorthair_boy_black.png",
+    "filename": "cat_american_shorthair_boy_black.webp",
     "species": "cat",
     "breed": "american_shorthair",
     "gender": "boy",
@@ -117,7 +117,7 @@
     "standard": false
   },
   {
-    "filename": "cat_american_shorthair_boy_blue.png",
+    "filename": "cat_american_shorthair_boy_blue.webp",
     "species": "cat",
     "breed": "american_shorthair",
     "gender": "boy",
@@ -128,7 +128,7 @@
     "standard": false
   },
   {
-    "filename": "cat_american_shorthair_boy_brown_tabby.png",
+    "filename": "cat_american_shorthair_boy_brown_tabby.webp",
     "species": "cat",
     "breed": "american_shorthair",
     "gender": "boy",
@@ -139,7 +139,7 @@
     "standard": false
   },
   {
-    "filename": "cat_american_shorthair_boy_orange_tabby.png",
+    "filename": "cat_american_shorthair_boy_orange_tabby.webp",
     "species": "cat",
     "breed": "american_shorthair",
     "gender": "boy",
@@ -150,7 +150,7 @@
     "standard": false
   },
   {
-    "filename": "cat_american_shorthair_boy_silver_tabby.png",
+    "filename": "cat_american_shorthair_boy_silver_tabby.webp",
     "species": "cat",
     "breed": "american_shorthair",
     "gender": "boy",
@@ -161,7 +161,7 @@
     "standard": false
   },
   {
-    "filename": "cat_american_shorthair_boy_white.png",
+    "filename": "cat_american_shorthair_boy_white.webp",
     "species": "cat",
     "breed": "american_shorthair",
     "gender": "boy",
@@ -172,7 +172,7 @@
     "standard": false
   },
   {
-    "filename": "cat_american_shorthair_girl_black.png",
+    "filename": "cat_american_shorthair_girl_black.webp",
     "species": "cat",
     "breed": "american_shorthair",
     "gender": "girl",
@@ -183,7 +183,7 @@
     "standard": false
   },
   {
-    "filename": "cat_american_shorthair_girl_blue.png",
+    "filename": "cat_american_shorthair_girl_blue.webp",
     "species": "cat",
     "breed": "american_shorthair",
     "gender": "girl",
@@ -194,7 +194,7 @@
     "standard": false
   },
   {
-    "filename": "cat_american_shorthair_girl_brown_tabby.png",
+    "filename": "cat_american_shorthair_girl_brown_tabby.webp",
     "species": "cat",
     "breed": "american_shorthair",
     "gender": "girl",
@@ -205,7 +205,7 @@
     "standard": false
   },
   {
-    "filename": "cat_american_shorthair_girl_orange_tabby.png",
+    "filename": "cat_american_shorthair_girl_orange_tabby.webp",
     "species": "cat",
     "breed": "american_shorthair",
     "gender": "girl",
@@ -216,7 +216,7 @@
     "standard": false
   },
   {
-    "filename": "cat_american_shorthair_girl_silver_tabby.png",
+    "filename": "cat_american_shorthair_girl_silver_tabby.webp",
     "species": "cat",
     "breed": "american_shorthair",
     "gender": "girl",
@@ -227,7 +227,7 @@
     "standard": false
   },
   {
-    "filename": "cat_american_shorthair_girl_white.png",
+    "filename": "cat_american_shorthair_girl_white.webp",
     "species": "cat",
     "breed": "american_shorthair",
     "gender": "girl",
@@ -238,7 +238,7 @@
     "standard": false
   },
   {
-    "filename": "cat_bengal_boy_blue_rosetted.png",
+    "filename": "cat_bengal_boy_blue_rosetted.webp",
     "species": "cat",
     "breed": "bengal",
     "gender": "boy",
@@ -249,7 +249,7 @@
     "standard": false
   },
   {
-    "filename": "cat_bengal_boy_brown_rosetted.png",
+    "filename": "cat_bengal_boy_brown_rosetted.webp",
     "species": "cat",
     "breed": "bengal",
     "gender": "boy",
@@ -260,7 +260,7 @@
     "standard": false
   },
   {
-    "filename": "cat_bengal_boy_silver_rosetted.png",
+    "filename": "cat_bengal_boy_silver_rosetted.webp",
     "species": "cat",
     "breed": "bengal",
     "gender": "boy",
@@ -271,7 +271,7 @@
     "standard": false
   },
   {
-    "filename": "cat_bengal_boy_snow_rosetted.png",
+    "filename": "cat_bengal_boy_snow_rosetted.webp",
     "species": "cat",
     "breed": "bengal",
     "gender": "boy",
@@ -282,7 +282,7 @@
     "standard": false
   },
   {
-    "filename": "cat_bengal_girl_blue_rosetted.png",
+    "filename": "cat_bengal_girl_blue_rosetted.webp",
     "species": "cat",
     "breed": "bengal",
     "gender": "girl",
@@ -293,7 +293,7 @@
     "standard": false
   },
   {
-    "filename": "cat_bengal_girl_brown_rosetted.png",
+    "filename": "cat_bengal_girl_brown_rosetted.webp",
     "species": "cat",
     "breed": "bengal",
     "gender": "girl",
@@ -304,7 +304,7 @@
     "standard": false
   },
   {
-    "filename": "cat_bengal_girl_silver_rosetted.png",
+    "filename": "cat_bengal_girl_silver_rosetted.webp",
     "species": "cat",
     "breed": "bengal",
     "gender": "girl",
@@ -315,7 +315,7 @@
     "standard": false
   },
   {
-    "filename": "cat_bengal_girl_snow_rosetted.png",
+    "filename": "cat_bengal_girl_snow_rosetted.webp",
     "species": "cat",
     "breed": "bengal",
     "gender": "girl",
@@ -326,7 +326,7 @@
     "standard": false
   },
   {
-    "filename": "cat_boy_standard.png",
+    "filename": "cat_boy_standard.webp",
     "species": "cat",
     "gender": "boy",
     "coat": "standard",
@@ -335,7 +335,7 @@
     "fallbackScope": "species"
   },
   {
-    "filename": "cat_british_shorthair_boy_black.png",
+    "filename": "cat_british_shorthair_boy_black.webp",
     "species": "cat",
     "breed": "british_shorthair",
     "gender": "boy",
@@ -346,7 +346,7 @@
     "standard": false
   },
   {
-    "filename": "cat_british_shorthair_boy_blue.png",
+    "filename": "cat_british_shorthair_boy_blue.webp",
     "species": "cat",
     "breed": "british_shorthair",
     "gender": "boy",
@@ -357,7 +357,7 @@
     "standard": false
   },
   {
-    "filename": "cat_british_shorthair_boy_colorpoint.png",
+    "filename": "cat_british_shorthair_boy_colorpoint.webp",
     "species": "cat",
     "breed": "british_shorthair",
     "gender": "boy",
@@ -368,7 +368,7 @@
     "standard": false
   },
   {
-    "filename": "cat_british_shorthair_boy_cream.png",
+    "filename": "cat_british_shorthair_boy_cream.webp",
     "species": "cat",
     "breed": "british_shorthair",
     "gender": "boy",
@@ -379,7 +379,7 @@
     "standard": false
   },
   {
-    "filename": "cat_british_shorthair_boy_golden_shaded.png",
+    "filename": "cat_british_shorthair_boy_golden_shaded.webp",
     "species": "cat",
     "breed": "british_shorthair",
     "gender": "boy",
@@ -390,7 +390,7 @@
     "standard": false
   },
   {
-    "filename": "cat_british_shorthair_boy_silver_tabby.png",
+    "filename": "cat_british_shorthair_boy_silver_tabby.webp",
     "species": "cat",
     "breed": "british_shorthair",
     "gender": "boy",
@@ -401,7 +401,7 @@
     "standard": false
   },
   {
-    "filename": "cat_british_shorthair_boy_white.png",
+    "filename": "cat_british_shorthair_boy_white.webp",
     "species": "cat",
     "breed": "british_shorthair",
     "gender": "boy",
@@ -412,7 +412,7 @@
     "standard": false
   },
   {
-    "filename": "cat_british_shorthair_girl_black.png",
+    "filename": "cat_british_shorthair_girl_black.webp",
     "species": "cat",
     "breed": "british_shorthair",
     "gender": "girl",
@@ -423,7 +423,7 @@
     "standard": false
   },
   {
-    "filename": "cat_british_shorthair_girl_blue.png",
+    "filename": "cat_british_shorthair_girl_blue.webp",
     "species": "cat",
     "breed": "british_shorthair",
     "gender": "girl",
@@ -434,7 +434,7 @@
     "standard": false
   },
   {
-    "filename": "cat_british_shorthair_girl_colorpoint.png",
+    "filename": "cat_british_shorthair_girl_colorpoint.webp",
     "species": "cat",
     "breed": "british_shorthair",
     "gender": "girl",
@@ -445,7 +445,7 @@
     "standard": false
   },
   {
-    "filename": "cat_british_shorthair_girl_cream.png",
+    "filename": "cat_british_shorthair_girl_cream.webp",
     "species": "cat",
     "breed": "british_shorthair",
     "gender": "girl",
@@ -456,7 +456,7 @@
     "standard": false
   },
   {
-    "filename": "cat_british_shorthair_girl_golden_shaded.png",
+    "filename": "cat_british_shorthair_girl_golden_shaded.webp",
     "species": "cat",
     "breed": "british_shorthair",
     "gender": "girl",
@@ -467,7 +467,7 @@
     "standard": false
   },
   {
-    "filename": "cat_british_shorthair_girl_silver_tabby.png",
+    "filename": "cat_british_shorthair_girl_silver_tabby.webp",
     "species": "cat",
     "breed": "british_shorthair",
     "gender": "girl",
@@ -478,7 +478,7 @@
     "standard": false
   },
   {
-    "filename": "cat_british_shorthair_girl_white.png",
+    "filename": "cat_british_shorthair_girl_white.webp",
     "species": "cat",
     "breed": "british_shorthair",
     "gender": "girl",
@@ -489,7 +489,7 @@
     "standard": false
   },
   {
-    "filename": "cat_girl_standard.png",
+    "filename": "cat_girl_standard.webp",
     "species": "cat",
     "gender": "girl",
     "coat": "standard",
@@ -498,7 +498,7 @@
     "fallbackScope": "species"
   },
   {
-    "filename": "cat_golden_shaded_boy_dark_golden.png",
+    "filename": "cat_golden_shaded_boy_dark_golden.webp",
     "species": "cat",
     "breed": "golden_shaded",
     "gender": "boy",
@@ -509,7 +509,7 @@
     "standard": false
   },
   {
-    "filename": "cat_golden_shaded_boy_golden_base_shaded.png",
+    "filename": "cat_golden_shaded_boy_golden_base_shaded.webp",
     "species": "cat",
     "breed": "golden_shaded",
     "gender": "boy",
@@ -520,7 +520,7 @@
     "standard": false
   },
   {
-    "filename": "cat_golden_shaded_girl_dark_golden.png",
+    "filename": "cat_golden_shaded_girl_dark_golden.webp",
     "species": "cat",
     "breed": "golden_shaded",
     "gender": "girl",
@@ -531,7 +531,7 @@
     "standard": false
   },
   {
-    "filename": "cat_golden_shaded_girl_golden_base_shaded.png",
+    "filename": "cat_golden_shaded_girl_golden_base_shaded.webp",
     "species": "cat",
     "breed": "golden_shaded",
     "gender": "girl",
@@ -542,7 +542,7 @@
     "standard": false
   },
   {
-    "filename": "cat_li_hua_boy_brown_mackerel_tabby.png",
+    "filename": "cat_li_hua_boy_brown_mackerel_tabby.webp",
     "species": "cat",
     "breed": "li_hua",
     "gender": "boy",
@@ -553,7 +553,7 @@
     "standard": false
   },
   {
-    "filename": "cat_li_hua_boy_silver_mackerel_tabby.png",
+    "filename": "cat_li_hua_boy_silver_mackerel_tabby.webp",
     "species": "cat",
     "breed": "li_hua",
     "gender": "boy",
@@ -564,7 +564,7 @@
     "standard": false
   },
   {
-    "filename": "cat_li_hua_girl_brown_mackerel_tabby.png",
+    "filename": "cat_li_hua_girl_brown_mackerel_tabby.webp",
     "species": "cat",
     "breed": "li_hua",
     "gender": "girl",
@@ -575,7 +575,7 @@
     "standard": false
   },
   {
-    "filename": "cat_li_hua_girl_silver_mackerel_tabby.png",
+    "filename": "cat_li_hua_girl_silver_mackerel_tabby.webp",
     "species": "cat",
     "breed": "li_hua",
     "gender": "girl",
@@ -586,7 +586,7 @@
     "standard": false
   },
   {
-    "filename": "cat_maine_coon_boy_black.png",
+    "filename": "cat_maine_coon_boy_black.webp",
     "species": "cat",
     "breed": "maine_coon",
     "gender": "boy",
@@ -597,7 +597,7 @@
     "standard": false
   },
   {
-    "filename": "cat_maine_coon_boy_black_smoke.png",
+    "filename": "cat_maine_coon_boy_black_smoke.webp",
     "species": "cat",
     "breed": "maine_coon",
     "gender": "boy",
@@ -608,7 +608,7 @@
     "standard": false
   },
   {
-    "filename": "cat_maine_coon_boy_blue_gray.png",
+    "filename": "cat_maine_coon_boy_blue_gray.webp",
     "species": "cat",
     "breed": "maine_coon",
     "gender": "boy",
@@ -619,7 +619,7 @@
     "standard": false
   },
   {
-    "filename": "cat_maine_coon_boy_brown_tabby.png",
+    "filename": "cat_maine_coon_boy_brown_tabby.webp",
     "species": "cat",
     "breed": "maine_coon",
     "gender": "boy",
@@ -630,7 +630,7 @@
     "standard": false
   },
   {
-    "filename": "cat_maine_coon_boy_calico.png",
+    "filename": "cat_maine_coon_boy_calico.webp",
     "species": "cat",
     "breed": "maine_coon",
     "gender": "boy",
@@ -641,7 +641,7 @@
     "standard": false
   },
   {
-    "filename": "cat_maine_coon_boy_red_tabby.png",
+    "filename": "cat_maine_coon_boy_red_tabby.webp",
     "species": "cat",
     "breed": "maine_coon",
     "gender": "boy",
@@ -652,7 +652,7 @@
     "standard": false
   },
   {
-    "filename": "cat_maine_coon_boy_silver_tabby.png",
+    "filename": "cat_maine_coon_boy_silver_tabby.webp",
     "species": "cat",
     "breed": "maine_coon",
     "gender": "boy",
@@ -663,7 +663,7 @@
     "standard": false
   },
   {
-    "filename": "cat_maine_coon_boy_white.png",
+    "filename": "cat_maine_coon_boy_white.webp",
     "species": "cat",
     "breed": "maine_coon",
     "gender": "boy",
@@ -674,7 +674,7 @@
     "standard": false
   },
   {
-    "filename": "cat_maine_coon_girl_black.png",
+    "filename": "cat_maine_coon_girl_black.webp",
     "species": "cat",
     "breed": "maine_coon",
     "gender": "girl",
@@ -685,7 +685,7 @@
     "standard": false
   },
   {
-    "filename": "cat_maine_coon_girl_black_smoke.png",
+    "filename": "cat_maine_coon_girl_black_smoke.webp",
     "species": "cat",
     "breed": "maine_coon",
     "gender": "girl",
@@ -696,7 +696,7 @@
     "standard": false
   },
   {
-    "filename": "cat_maine_coon_girl_blue_gray.png",
+    "filename": "cat_maine_coon_girl_blue_gray.webp",
     "species": "cat",
     "breed": "maine_coon",
     "gender": "girl",
@@ -707,7 +707,7 @@
     "standard": false
   },
   {
-    "filename": "cat_maine_coon_girl_brown_tabby.png",
+    "filename": "cat_maine_coon_girl_brown_tabby.webp",
     "species": "cat",
     "breed": "maine_coon",
     "gender": "girl",
@@ -718,7 +718,7 @@
     "standard": false
   },
   {
-    "filename": "cat_maine_coon_girl_calico.png",
+    "filename": "cat_maine_coon_girl_calico.webp",
     "species": "cat",
     "breed": "maine_coon",
     "gender": "girl",
@@ -729,7 +729,7 @@
     "standard": false
   },
   {
-    "filename": "cat_maine_coon_girl_red_tabby.png",
+    "filename": "cat_maine_coon_girl_red_tabby.webp",
     "species": "cat",
     "breed": "maine_coon",
     "gender": "girl",
@@ -740,7 +740,7 @@
     "standard": false
   },
   {
-    "filename": "cat_maine_coon_girl_silver_tabby.png",
+    "filename": "cat_maine_coon_girl_silver_tabby.webp",
     "species": "cat",
     "breed": "maine_coon",
     "gender": "girl",
@@ -751,7 +751,7 @@
     "standard": false
   },
   {
-    "filename": "cat_maine_coon_girl_white.png",
+    "filename": "cat_maine_coon_girl_white.webp",
     "species": "cat",
     "breed": "maine_coon",
     "gender": "girl",
@@ -762,7 +762,7 @@
     "standard": false
   },
   {
-    "filename": "cat_persian_boy_black.png",
+    "filename": "cat_persian_boy_black.webp",
     "species": "cat",
     "breed": "persian",
     "gender": "boy",
@@ -773,7 +773,7 @@
     "standard": false
   },
   {
-    "filename": "cat_persian_boy_blue.png",
+    "filename": "cat_persian_boy_blue.webp",
     "species": "cat",
     "breed": "persian",
     "gender": "boy",
@@ -784,7 +784,7 @@
     "standard": false
   },
   {
-    "filename": "cat_persian_boy_white.png",
+    "filename": "cat_persian_boy_white.webp",
     "species": "cat",
     "breed": "persian",
     "gender": "boy",
@@ -795,7 +795,7 @@
     "standard": false
   },
   {
-    "filename": "cat_persian_girl_black.png",
+    "filename": "cat_persian_girl_black.webp",
     "species": "cat",
     "breed": "persian",
     "gender": "girl",
@@ -806,7 +806,7 @@
     "standard": false
   },
   {
-    "filename": "cat_persian_girl_blue.png",
+    "filename": "cat_persian_girl_blue.webp",
     "species": "cat",
     "breed": "persian",
     "gender": "girl",
@@ -817,7 +817,7 @@
     "standard": false
   },
   {
-    "filename": "cat_persian_girl_white.png",
+    "filename": "cat_persian_girl_white.webp",
     "species": "cat",
     "breed": "persian",
     "gender": "girl",
@@ -828,7 +828,7 @@
     "standard": false
   },
   {
-    "filename": "cat_ragdoll_boy_blue_bicolor.png",
+    "filename": "cat_ragdoll_boy_blue_bicolor.webp",
     "species": "cat",
     "breed": "ragdoll",
     "gender": "boy",
@@ -839,7 +839,7 @@
     "standard": false
   },
   {
-    "filename": "cat_ragdoll_boy_blue_point.png",
+    "filename": "cat_ragdoll_boy_blue_point.webp",
     "species": "cat",
     "breed": "ragdoll",
     "gender": "boy",
@@ -850,7 +850,7 @@
     "standard": false
   },
   {
-    "filename": "cat_ragdoll_boy_chocolate_point.png",
+    "filename": "cat_ragdoll_boy_chocolate_point.webp",
     "species": "cat",
     "breed": "ragdoll",
     "gender": "boy",
@@ -861,7 +861,7 @@
     "standard": false
   },
   {
-    "filename": "cat_ragdoll_boy_flame_point.png",
+    "filename": "cat_ragdoll_boy_flame_point.webp",
     "species": "cat",
     "breed": "ragdoll",
     "gender": "boy",
@@ -872,7 +872,7 @@
     "standard": false
   },
   {
-    "filename": "cat_ragdoll_boy_lilac_point.png",
+    "filename": "cat_ragdoll_boy_lilac_point.webp",
     "species": "cat",
     "breed": "ragdoll",
     "gender": "boy",
@@ -883,7 +883,7 @@
     "standard": false
   },
   {
-    "filename": "cat_ragdoll_boy_seal_bicolor.png",
+    "filename": "cat_ragdoll_boy_seal_bicolor.webp",
     "species": "cat",
     "breed": "ragdoll",
     "gender": "boy",
@@ -894,7 +894,7 @@
     "standard": false
   },
   {
-    "filename": "cat_ragdoll_boy_seal_point.png",
+    "filename": "cat_ragdoll_boy_seal_point.webp",
     "species": "cat",
     "breed": "ragdoll",
     "gender": "boy",
@@ -905,7 +905,7 @@
     "standard": false
   },
   {
-    "filename": "cat_ragdoll_girl_blue_bicolor.png",
+    "filename": "cat_ragdoll_girl_blue_bicolor.webp",
     "species": "cat",
     "breed": "ragdoll",
     "gender": "girl",
@@ -916,7 +916,7 @@
     "standard": false
   },
   {
-    "filename": "cat_ragdoll_girl_blue_point.png",
+    "filename": "cat_ragdoll_girl_blue_point.webp",
     "species": "cat",
     "breed": "ragdoll",
     "gender": "girl",
@@ -927,7 +927,7 @@
     "standard": false
   },
   {
-    "filename": "cat_ragdoll_girl_chocolate_point.png",
+    "filename": "cat_ragdoll_girl_chocolate_point.webp",
     "species": "cat",
     "breed": "ragdoll",
     "gender": "girl",
@@ -938,7 +938,7 @@
     "standard": false
   },
   {
-    "filename": "cat_ragdoll_girl_flame_point.png",
+    "filename": "cat_ragdoll_girl_flame_point.webp",
     "species": "cat",
     "breed": "ragdoll",
     "gender": "girl",
@@ -949,7 +949,7 @@
     "standard": false
   },
   {
-    "filename": "cat_ragdoll_girl_lilac_point.png",
+    "filename": "cat_ragdoll_girl_lilac_point.webp",
     "species": "cat",
     "breed": "ragdoll",
     "gender": "girl",
@@ -960,7 +960,7 @@
     "standard": false
   },
   {
-    "filename": "cat_ragdoll_girl_seal_bicolor.png",
+    "filename": "cat_ragdoll_girl_seal_bicolor.webp",
     "species": "cat",
     "breed": "ragdoll",
     "gender": "girl",
@@ -971,7 +971,7 @@
     "standard": false
   },
   {
-    "filename": "cat_ragdoll_girl_seal_point.png",
+    "filename": "cat_ragdoll_girl_seal_point.webp",
     "species": "cat",
     "breed": "ragdoll",
     "gender": "girl",
@@ -982,7 +982,7 @@
     "standard": false
   },
   {
-    "filename": "cat_russian_blue_boy_blue_gray.png",
+    "filename": "cat_russian_blue_boy_blue_gray.webp",
     "species": "cat",
     "breed": "russian_blue",
     "gender": "boy",
@@ -993,7 +993,7 @@
     "standard": false
   },
   {
-    "filename": "cat_russian_blue_girl_blue_gray.png",
+    "filename": "cat_russian_blue_girl_blue_gray.webp",
     "species": "cat",
     "breed": "russian_blue",
     "gender": "girl",
@@ -1004,7 +1004,7 @@
     "standard": false
   },
   {
-    "filename": "cat_siamese_boy_blue_point.png",
+    "filename": "cat_siamese_boy_blue_point.webp",
     "species": "cat",
     "breed": "siamese",
     "gender": "boy",
@@ -1015,7 +1015,7 @@
     "standard": false
   },
   {
-    "filename": "cat_siamese_boy_chocolate_point.png",
+    "filename": "cat_siamese_boy_chocolate_point.webp",
     "species": "cat",
     "breed": "siamese",
     "gender": "boy",
@@ -1026,7 +1026,7 @@
     "standard": false
   },
   {
-    "filename": "cat_siamese_boy_lilac_point.png",
+    "filename": "cat_siamese_boy_lilac_point.webp",
     "species": "cat",
     "breed": "siamese",
     "gender": "boy",
@@ -1037,7 +1037,7 @@
     "standard": false
   },
   {
-    "filename": "cat_siamese_boy_seal_point.png",
+    "filename": "cat_siamese_boy_seal_point.webp",
     "species": "cat",
     "breed": "siamese",
     "gender": "boy",
@@ -1048,7 +1048,7 @@
     "standard": false
   },
   {
-    "filename": "cat_siamese_girl_blue_point.png",
+    "filename": "cat_siamese_girl_blue_point.webp",
     "species": "cat",
     "breed": "siamese",
     "gender": "girl",
@@ -1059,7 +1059,7 @@
     "standard": false
   },
   {
-    "filename": "cat_siamese_girl_chocolate_point.png",
+    "filename": "cat_siamese_girl_chocolate_point.webp",
     "species": "cat",
     "breed": "siamese",
     "gender": "girl",
@@ -1070,7 +1070,7 @@
     "standard": false
   },
   {
-    "filename": "cat_siamese_girl_lilac_point.png",
+    "filename": "cat_siamese_girl_lilac_point.webp",
     "species": "cat",
     "breed": "siamese",
     "gender": "girl",
@@ -1081,7 +1081,7 @@
     "standard": false
   },
   {
-    "filename": "cat_siamese_girl_seal_point.png",
+    "filename": "cat_siamese_girl_seal_point.webp",
     "species": "cat",
     "breed": "siamese",
     "gender": "girl",
@@ -1092,7 +1092,7 @@
     "standard": false
   },
   {
-    "filename": "cat_silver_shaded_boy_light_silver.png",
+    "filename": "cat_silver_shaded_boy_light_silver.webp",
     "species": "cat",
     "breed": "silver_shaded",
     "gender": "boy",
@@ -1103,7 +1103,7 @@
     "standard": false
   },
   {
-    "filename": "cat_silver_shaded_boy_silver_base_shaded.png",
+    "filename": "cat_silver_shaded_boy_silver_base_shaded.webp",
     "species": "cat",
     "breed": "silver_shaded",
     "gender": "boy",
@@ -1114,7 +1114,7 @@
     "standard": false
   },
   {
-    "filename": "cat_silver_shaded_girl_light_silver.png",
+    "filename": "cat_silver_shaded_girl_light_silver.webp",
     "species": "cat",
     "breed": "silver_shaded",
     "gender": "girl",
@@ -1125,7 +1125,7 @@
     "standard": false
   },
   {
-    "filename": "cat_silver_shaded_girl_silver_base_shaded.png",
+    "filename": "cat_silver_shaded_girl_silver_base_shaded.webp",
     "species": "cat",
     "breed": "silver_shaded",
     "gender": "girl",
@@ -1136,7 +1136,7 @@
     "standard": false
   },
   {
-    "filename": "cat_somali_boy_blue.png",
+    "filename": "cat_somali_boy_blue.webp",
     "species": "cat",
     "breed": "somali",
     "gender": "boy",
@@ -1147,7 +1147,7 @@
     "standard": false
   },
   {
-    "filename": "cat_somali_boy_fawn.png",
+    "filename": "cat_somali_boy_fawn.webp",
     "species": "cat",
     "breed": "somali",
     "gender": "boy",
@@ -1158,7 +1158,7 @@
     "standard": false
   },
   {
-    "filename": "cat_somali_boy_ruddy.png",
+    "filename": "cat_somali_boy_ruddy.webp",
     "species": "cat",
     "breed": "somali",
     "gender": "boy",
@@ -1169,7 +1169,7 @@
     "standard": false
   },
   {
-    "filename": "cat_somali_boy_sorrel.png",
+    "filename": "cat_somali_boy_sorrel.webp",
     "species": "cat",
     "breed": "somali",
     "gender": "boy",
@@ -1180,7 +1180,7 @@
     "standard": false
   },
   {
-    "filename": "cat_somali_girl_blue.png",
+    "filename": "cat_somali_girl_blue.webp",
     "species": "cat",
     "breed": "somali",
     "gender": "girl",
@@ -1191,7 +1191,7 @@
     "standard": false
   },
   {
-    "filename": "cat_somali_girl_fawn.png",
+    "filename": "cat_somali_girl_fawn.webp",
     "species": "cat",
     "breed": "somali",
     "gender": "girl",
@@ -1202,7 +1202,7 @@
     "standard": false
   },
   {
-    "filename": "cat_somali_girl_ruddy.png",
+    "filename": "cat_somali_girl_ruddy.webp",
     "species": "cat",
     "breed": "somali",
     "gender": "girl",
@@ -1213,7 +1213,7 @@
     "standard": false
   },
   {
-    "filename": "cat_somali_girl_sorrel.png",
+    "filename": "cat_somali_girl_sorrel.webp",
     "species": "cat",
     "breed": "somali",
     "gender": "girl",
@@ -1224,7 +1224,7 @@
     "standard": false
   },
   {
-    "filename": "dog_afghan_hound_boy_black.png",
+    "filename": "dog_afghan_hound_boy_black.webp",
     "species": "dog",
     "breed": "afghan_hound",
     "gender": "boy",
@@ -1235,7 +1235,7 @@
     "standard": false
   },
   {
-    "filename": "dog_afghan_hound_boy_cream.png",
+    "filename": "dog_afghan_hound_boy_cream.webp",
     "species": "dog",
     "breed": "afghan_hound",
     "gender": "boy",
@@ -1246,7 +1246,7 @@
     "standard": false
   },
   {
-    "filename": "dog_afghan_hound_boy_red_brown.png",
+    "filename": "dog_afghan_hound_boy_red_brown.webp",
     "species": "dog",
     "breed": "afghan_hound",
     "gender": "boy",
@@ -1257,7 +1257,7 @@
     "standard": false
   },
   {
-    "filename": "dog_afghan_hound_girl_black.png",
+    "filename": "dog_afghan_hound_girl_black.webp",
     "species": "dog",
     "breed": "afghan_hound",
     "gender": "girl",
@@ -1268,7 +1268,7 @@
     "standard": false
   },
   {
-    "filename": "dog_afghan_hound_girl_cream.png",
+    "filename": "dog_afghan_hound_girl_cream.webp",
     "species": "dog",
     "breed": "afghan_hound",
     "gender": "girl",
@@ -1279,7 +1279,7 @@
     "standard": false
   },
   {
-    "filename": "dog_afghan_hound_girl_red_brown.png",
+    "filename": "dog_afghan_hound_girl_red_brown.webp",
     "species": "dog",
     "breed": "afghan_hound",
     "gender": "girl",
@@ -1290,7 +1290,7 @@
     "standard": false
   },
   {
-    "filename": "dog_alaskan_malamute_boy_black_white.png",
+    "filename": "dog_alaskan_malamute_boy_black_white.webp",
     "species": "dog",
     "breed": "alaskan_malamute",
     "gender": "boy",
@@ -1301,7 +1301,7 @@
     "standard": false
   },
   {
-    "filename": "dog_alaskan_malamute_boy_gray_white.png",
+    "filename": "dog_alaskan_malamute_boy_gray_white.webp",
     "species": "dog",
     "breed": "alaskan_malamute",
     "gender": "boy",
@@ -1312,7 +1312,7 @@
     "standard": false
   },
   {
-    "filename": "dog_alaskan_malamute_boy_pure_white.png",
+    "filename": "dog_alaskan_malamute_boy_pure_white.webp",
     "species": "dog",
     "breed": "alaskan_malamute",
     "gender": "boy",
@@ -1323,7 +1323,7 @@
     "standard": false
   },
   {
-    "filename": "dog_alaskan_malamute_boy_red_white.png",
+    "filename": "dog_alaskan_malamute_boy_red_white.webp",
     "species": "dog",
     "breed": "alaskan_malamute",
     "gender": "boy",
@@ -1334,7 +1334,7 @@
     "standard": false
   },
   {
-    "filename": "dog_alaskan_malamute_girl_black_white.png",
+    "filename": "dog_alaskan_malamute_girl_black_white.webp",
     "species": "dog",
     "breed": "alaskan_malamute",
     "gender": "girl",
@@ -1345,7 +1345,7 @@
     "standard": false
   },
   {
-    "filename": "dog_alaskan_malamute_girl_gray_white.png",
+    "filename": "dog_alaskan_malamute_girl_gray_white.webp",
     "species": "dog",
     "breed": "alaskan_malamute",
     "gender": "girl",
@@ -1356,7 +1356,7 @@
     "standard": false
   },
   {
-    "filename": "dog_alaskan_malamute_girl_pure_white.png",
+    "filename": "dog_alaskan_malamute_girl_pure_white.webp",
     "species": "dog",
     "breed": "alaskan_malamute",
     "gender": "girl",
@@ -1367,7 +1367,7 @@
     "standard": false
   },
   {
-    "filename": "dog_alaskan_malamute_girl_red_white.png",
+    "filename": "dog_alaskan_malamute_girl_red_white.webp",
     "species": "dog",
     "breed": "alaskan_malamute",
     "gender": "girl",
@@ -1378,7 +1378,7 @@
     "standard": false
   },
   {
-    "filename": "dog_beagle_boy_black_brown_white_tricolor.png",
+    "filename": "dog_beagle_boy_black_brown_white_tricolor.webp",
     "species": "dog",
     "breed": "beagle",
     "gender": "boy",
@@ -1389,7 +1389,7 @@
     "standard": false
   },
   {
-    "filename": "dog_beagle_boy_brown_white.png",
+    "filename": "dog_beagle_boy_brown_white.webp",
     "species": "dog",
     "breed": "beagle",
     "gender": "boy",
@@ -1400,7 +1400,7 @@
     "standard": false
   },
   {
-    "filename": "dog_beagle_boy_lemon_white.png",
+    "filename": "dog_beagle_boy_lemon_white.webp",
     "species": "dog",
     "breed": "beagle",
     "gender": "boy",
@@ -1411,7 +1411,7 @@
     "standard": false
   },
   {
-    "filename": "dog_beagle_girl_black_brown_white_tricolor.png",
+    "filename": "dog_beagle_girl_black_brown_white_tricolor.webp",
     "species": "dog",
     "breed": "beagle",
     "gender": "girl",
@@ -1422,7 +1422,7 @@
     "standard": false
   },
   {
-    "filename": "dog_beagle_girl_brown_white.png",
+    "filename": "dog_beagle_girl_brown_white.webp",
     "species": "dog",
     "breed": "beagle",
     "gender": "girl",
@@ -1433,7 +1433,7 @@
     "standard": false
   },
   {
-    "filename": "dog_beagle_girl_lemon_white.png",
+    "filename": "dog_beagle_girl_lemon_white.webp",
     "species": "dog",
     "breed": "beagle",
     "gender": "girl",
@@ -1444,7 +1444,7 @@
     "standard": false
   },
   {
-    "filename": "dog_bichon_frise_boy_cream_white.png",
+    "filename": "dog_bichon_frise_boy_cream_white.webp",
     "species": "dog",
     "breed": "bichon_frise",
     "gender": "boy",
@@ -1455,7 +1455,7 @@
     "standard": false
   },
   {
-    "filename": "dog_bichon_frise_boy_pure_white.png",
+    "filename": "dog_bichon_frise_boy_pure_white.webp",
     "species": "dog",
     "breed": "bichon_frise",
     "gender": "boy",
@@ -1466,7 +1466,7 @@
     "standard": false
   },
   {
-    "filename": "dog_bichon_frise_girl_cream_white.png",
+    "filename": "dog_bichon_frise_girl_cream_white.webp",
     "species": "dog",
     "breed": "bichon_frise",
     "gender": "girl",
@@ -1477,7 +1477,7 @@
     "standard": false
   },
   {
-    "filename": "dog_bichon_frise_girl_pure_white.png",
+    "filename": "dog_bichon_frise_girl_pure_white.webp",
     "species": "dog",
     "breed": "bichon_frise",
     "gender": "girl",
@@ -1488,7 +1488,7 @@
     "standard": false
   },
   {
-    "filename": "dog_boy_standard.png",
+    "filename": "dog_boy_standard.webp",
     "species": "dog",
     "gender": "boy",
     "coat": "standard",
@@ -1497,7 +1497,7 @@
     "fallbackScope": "species"
   },
   {
-    "filename": "dog_corgi_boy_black_white_tricolor.png",
+    "filename": "dog_corgi_boy_black_white_tricolor.webp",
     "species": "dog",
     "breed": "corgi",
     "gender": "boy",
@@ -1508,7 +1508,7 @@
     "standard": false
   },
   {
-    "filename": "dog_corgi_boy_red_white.png",
+    "filename": "dog_corgi_boy_red_white.webp",
     "species": "dog",
     "breed": "corgi",
     "gender": "boy",
@@ -1519,7 +1519,7 @@
     "standard": false
   },
   {
-    "filename": "dog_corgi_boy_sable_white.png",
+    "filename": "dog_corgi_boy_sable_white.webp",
     "species": "dog",
     "breed": "corgi",
     "gender": "boy",
@@ -1530,7 +1530,7 @@
     "standard": false
   },
   {
-    "filename": "dog_corgi_girl_black_white_tricolor.png",
+    "filename": "dog_corgi_girl_black_white_tricolor.webp",
     "species": "dog",
     "breed": "corgi",
     "gender": "girl",
@@ -1541,7 +1541,7 @@
     "standard": false
   },
   {
-    "filename": "dog_corgi_girl_red_white.png",
+    "filename": "dog_corgi_girl_red_white.webp",
     "species": "dog",
     "breed": "corgi",
     "gender": "girl",
@@ -1552,7 +1552,7 @@
     "standard": false
   },
   {
-    "filename": "dog_corgi_girl_sable_white.png",
+    "filename": "dog_corgi_girl_sable_white.webp",
     "species": "dog",
     "breed": "corgi",
     "gender": "girl",
@@ -1563,7 +1563,7 @@
     "standard": false
   },
   {
-    "filename": "dog_dalmatian_boy_black_spotted.png",
+    "filename": "dog_dalmatian_boy_black_spotted.webp",
     "species": "dog",
     "breed": "dalmatian",
     "gender": "boy",
@@ -1574,7 +1574,7 @@
     "standard": false
   },
   {
-    "filename": "dog_dalmatian_boy_liver_spotted.png",
+    "filename": "dog_dalmatian_boy_liver_spotted.webp",
     "species": "dog",
     "breed": "dalmatian",
     "gender": "boy",
@@ -1585,7 +1585,7 @@
     "standard": false
   },
   {
-    "filename": "dog_dalmatian_girl_black_spotted.png",
+    "filename": "dog_dalmatian_girl_black_spotted.webp",
     "species": "dog",
     "breed": "dalmatian",
     "gender": "girl",
@@ -1596,7 +1596,7 @@
     "standard": false
   },
   {
-    "filename": "dog_dalmatian_girl_liver_spotted.png",
+    "filename": "dog_dalmatian_girl_liver_spotted.webp",
     "species": "dog",
     "breed": "dalmatian",
     "gender": "girl",
@@ -1607,7 +1607,7 @@
     "standard": false
   },
   {
-    "filename": "dog_doberman_boy_black_tan.png",
+    "filename": "dog_doberman_boy_black_tan.webp",
     "species": "dog",
     "breed": "doberman",
     "gender": "boy",
@@ -1618,7 +1618,7 @@
     "standard": false
   },
   {
-    "filename": "dog_doberman_boy_blue_tan.png",
+    "filename": "dog_doberman_boy_blue_tan.webp",
     "species": "dog",
     "breed": "doberman",
     "gender": "boy",
@@ -1629,7 +1629,7 @@
     "standard": false
   },
   {
-    "filename": "dog_doberman_boy_red_tan.png",
+    "filename": "dog_doberman_boy_red_tan.webp",
     "species": "dog",
     "breed": "doberman",
     "gender": "boy",
@@ -1640,7 +1640,7 @@
     "standard": false
   },
   {
-    "filename": "dog_doberman_girl_black_tan.png",
+    "filename": "dog_doberman_girl_black_tan.webp",
     "species": "dog",
     "breed": "doberman",
     "gender": "girl",
@@ -1651,7 +1651,7 @@
     "standard": false
   },
   {
-    "filename": "dog_doberman_girl_blue_tan.png",
+    "filename": "dog_doberman_girl_blue_tan.webp",
     "species": "dog",
     "breed": "doberman",
     "gender": "girl",
@@ -1662,7 +1662,7 @@
     "standard": false
   },
   {
-    "filename": "dog_doberman_girl_red_tan.png",
+    "filename": "dog_doberman_girl_red_tan.webp",
     "species": "dog",
     "breed": "doberman",
     "gender": "girl",
@@ -1673,7 +1673,7 @@
     "standard": false
   },
   {
-    "filename": "dog_french_bulldog_boy_blue_gray.png",
+    "filename": "dog_french_bulldog_boy_blue_gray.webp",
     "species": "dog",
     "breed": "french_bulldog",
     "gender": "boy",
@@ -1684,7 +1684,7 @@
     "standard": false
   },
   {
-    "filename": "dog_french_bulldog_boy_brindle.png",
+    "filename": "dog_french_bulldog_boy_brindle.webp",
     "species": "dog",
     "breed": "french_bulldog",
     "gender": "boy",
@@ -1695,7 +1695,7 @@
     "standard": false
   },
   {
-    "filename": "dog_french_bulldog_boy_chocolate.png",
+    "filename": "dog_french_bulldog_boy_chocolate.webp",
     "species": "dog",
     "breed": "french_bulldog",
     "gender": "boy",
@@ -1706,7 +1706,7 @@
     "standard": false
   },
   {
-    "filename": "dog_french_bulldog_boy_cream.png",
+    "filename": "dog_french_bulldog_boy_cream.webp",
     "species": "dog",
     "breed": "french_bulldog",
     "gender": "boy",
@@ -1717,7 +1717,7 @@
     "standard": false
   },
   {
-    "filename": "dog_french_bulldog_boy_pied.png",
+    "filename": "dog_french_bulldog_boy_pied.webp",
     "species": "dog",
     "breed": "french_bulldog",
     "gender": "boy",
@@ -1728,7 +1728,7 @@
     "standard": false
   },
   {
-    "filename": "dog_french_bulldog_boy_white.png",
+    "filename": "dog_french_bulldog_boy_white.webp",
     "species": "dog",
     "breed": "french_bulldog",
     "gender": "boy",
@@ -1739,7 +1739,7 @@
     "standard": false
   },
   {
-    "filename": "dog_french_bulldog_girl_blue_gray.png",
+    "filename": "dog_french_bulldog_girl_blue_gray.webp",
     "species": "dog",
     "breed": "french_bulldog",
     "gender": "girl",
@@ -1750,7 +1750,7 @@
     "standard": false
   },
   {
-    "filename": "dog_french_bulldog_girl_brindle.png",
+    "filename": "dog_french_bulldog_girl_brindle.webp",
     "species": "dog",
     "breed": "french_bulldog",
     "gender": "girl",
@@ -1761,7 +1761,7 @@
     "standard": false
   },
   {
-    "filename": "dog_french_bulldog_girl_chocolate.png",
+    "filename": "dog_french_bulldog_girl_chocolate.webp",
     "species": "dog",
     "breed": "french_bulldog",
     "gender": "girl",
@@ -1772,7 +1772,7 @@
     "standard": false
   },
   {
-    "filename": "dog_french_bulldog_girl_cream.png",
+    "filename": "dog_french_bulldog_girl_cream.webp",
     "species": "dog",
     "breed": "french_bulldog",
     "gender": "girl",
@@ -1783,7 +1783,7 @@
     "standard": false
   },
   {
-    "filename": "dog_french_bulldog_girl_pied.png",
+    "filename": "dog_french_bulldog_girl_pied.webp",
     "species": "dog",
     "breed": "french_bulldog",
     "gender": "girl",
@@ -1794,7 +1794,7 @@
     "standard": false
   },
   {
-    "filename": "dog_french_bulldog_girl_white.png",
+    "filename": "dog_french_bulldog_girl_white.webp",
     "species": "dog",
     "breed": "french_bulldog",
     "gender": "girl",
@@ -1805,7 +1805,7 @@
     "standard": false
   },
   {
-    "filename": "dog_girl_standard.png",
+    "filename": "dog_girl_standard.webp",
     "species": "dog",
     "gender": "girl",
     "coat": "standard",
@@ -1814,7 +1814,7 @@
     "fallbackScope": "species"
   },
   {
-    "filename": "dog_golden_retriever_boy_light_golden.png",
+    "filename": "dog_golden_retriever_boy_light_golden.webp",
     "species": "dog",
     "breed": "golden_retriever",
     "gender": "boy",
@@ -1825,7 +1825,7 @@
     "standard": false
   },
   {
-    "filename": "dog_golden_retriever_girl_light_golden.png",
+    "filename": "dog_golden_retriever_girl_light_golden.webp",
     "species": "dog",
     "breed": "golden_retriever",
     "gender": "girl",
@@ -1836,7 +1836,7 @@
     "standard": false
   },
   {
-    "filename": "dog_labrador_retriever_boy_black.png",
+    "filename": "dog_labrador_retriever_boy_black.webp",
     "species": "dog",
     "breed": "labrador_retriever",
     "gender": "boy",
@@ -1847,7 +1847,7 @@
     "standard": false
   },
   {
-    "filename": "dog_labrador_retriever_boy_chocolate.png",
+    "filename": "dog_labrador_retriever_boy_chocolate.webp",
     "species": "dog",
     "breed": "labrador_retriever",
     "gender": "boy",
@@ -1858,7 +1858,7 @@
     "standard": false
   },
   {
-    "filename": "dog_labrador_retriever_boy_yellow.png",
+    "filename": "dog_labrador_retriever_boy_yellow.webp",
     "species": "dog",
     "breed": "labrador_retriever",
     "gender": "boy",
@@ -1869,7 +1869,7 @@
     "standard": false
   },
   {
-    "filename": "dog_labrador_retriever_girl_black.png",
+    "filename": "dog_labrador_retriever_girl_black.webp",
     "species": "dog",
     "breed": "labrador_retriever",
     "gender": "girl",
@@ -1880,7 +1880,7 @@
     "standard": false
   },
   {
-    "filename": "dog_labrador_retriever_girl_chocolate.png",
+    "filename": "dog_labrador_retriever_girl_chocolate.webp",
     "species": "dog",
     "breed": "labrador_retriever",
     "gender": "girl",
@@ -1891,7 +1891,7 @@
     "standard": false
   },
   {
-    "filename": "dog_labrador_retriever_girl_yellow.png",
+    "filename": "dog_labrador_retriever_girl_yellow.webp",
     "species": "dog",
     "breed": "labrador_retriever",
     "gender": "girl",
@@ -1902,7 +1902,7 @@
     "standard": false
   },
   {
-    "filename": "dog_maltese_boy_ivory.png",
+    "filename": "dog_maltese_boy_ivory.webp",
     "species": "dog",
     "breed": "maltese",
     "gender": "boy",
@@ -1913,7 +1913,7 @@
     "standard": false
   },
   {
-    "filename": "dog_maltese_boy_pure_white.png",
+    "filename": "dog_maltese_boy_pure_white.webp",
     "species": "dog",
     "breed": "maltese",
     "gender": "boy",
@@ -1924,7 +1924,7 @@
     "standard": false
   },
   {
-    "filename": "dog_maltese_girl_ivory.png",
+    "filename": "dog_maltese_girl_ivory.webp",
     "species": "dog",
     "breed": "maltese",
     "gender": "girl",
@@ -1935,7 +1935,7 @@
     "standard": false
   },
   {
-    "filename": "dog_maltese_girl_pure_white.png",
+    "filename": "dog_maltese_girl_pure_white.webp",
     "species": "dog",
     "breed": "maltese",
     "gender": "girl",
@@ -1946,7 +1946,7 @@
     "standard": false
   },
   {
-    "filename": "dog_miniature_schnauzer_boy_black.png",
+    "filename": "dog_miniature_schnauzer_boy_black.webp",
     "species": "dog",
     "breed": "miniature_schnauzer",
     "gender": "boy",
@@ -1957,7 +1957,7 @@
     "standard": false
   },
   {
-    "filename": "dog_miniature_schnauzer_boy_black_silver.png",
+    "filename": "dog_miniature_schnauzer_boy_black_silver.webp",
     "species": "dog",
     "breed": "miniature_schnauzer",
     "gender": "boy",
@@ -1968,7 +1968,7 @@
     "standard": false
   },
   {
-    "filename": "dog_miniature_schnauzer_boy_salt_pepper.png",
+    "filename": "dog_miniature_schnauzer_boy_salt_pepper.webp",
     "species": "dog",
     "breed": "miniature_schnauzer",
     "gender": "boy",
@@ -1979,7 +1979,7 @@
     "standard": false
   },
   {
-    "filename": "dog_miniature_schnauzer_boy_white.png",
+    "filename": "dog_miniature_schnauzer_boy_white.webp",
     "species": "dog",
     "breed": "miniature_schnauzer",
     "gender": "boy",
@@ -1990,7 +1990,7 @@
     "standard": false
   },
   {
-    "filename": "dog_miniature_schnauzer_girl_black.png",
+    "filename": "dog_miniature_schnauzer_girl_black.webp",
     "species": "dog",
     "breed": "miniature_schnauzer",
     "gender": "girl",
@@ -2001,7 +2001,7 @@
     "standard": false
   },
   {
-    "filename": "dog_miniature_schnauzer_girl_black_silver.png",
+    "filename": "dog_miniature_schnauzer_girl_black_silver.webp",
     "species": "dog",
     "breed": "miniature_schnauzer",
     "gender": "girl",
@@ -2012,7 +2012,7 @@
     "standard": false
   },
   {
-    "filename": "dog_miniature_schnauzer_girl_salt_pepper.png",
+    "filename": "dog_miniature_schnauzer_girl_salt_pepper.webp",
     "species": "dog",
     "breed": "miniature_schnauzer",
     "gender": "girl",
@@ -2023,7 +2023,7 @@
     "standard": false
   },
   {
-    "filename": "dog_miniature_schnauzer_girl_white.png",
+    "filename": "dog_miniature_schnauzer_girl_white.webp",
     "species": "dog",
     "breed": "miniature_schnauzer",
     "gender": "girl",
@@ -2034,7 +2034,7 @@
     "standard": false
   },
   {
-    "filename": "dog_samoyed_boy_cream_white.png",
+    "filename": "dog_samoyed_boy_cream_white.webp",
     "species": "dog",
     "breed": "samoyed",
     "gender": "boy",
@@ -2045,7 +2045,7 @@
     "standard": false
   },
   {
-    "filename": "dog_samoyed_boy_pure_white.png",
+    "filename": "dog_samoyed_boy_pure_white.webp",
     "species": "dog",
     "breed": "samoyed",
     "gender": "boy",
@@ -2056,7 +2056,7 @@
     "standard": false
   },
   {
-    "filename": "dog_samoyed_girl_cream_white.png",
+    "filename": "dog_samoyed_girl_cream_white.webp",
     "species": "dog",
     "breed": "samoyed",
     "gender": "girl",
@@ -2067,7 +2067,7 @@
     "standard": false
   },
   {
-    "filename": "dog_samoyed_girl_pure_white.png",
+    "filename": "dog_samoyed_girl_pure_white.webp",
     "species": "dog",
     "breed": "samoyed",
     "gender": "girl",
@@ -2078,7 +2078,7 @@
     "standard": false
   },
   {
-    "filename": "dog_shiba_inu_boy_black_tan.png",
+    "filename": "dog_shiba_inu_boy_black_tan.webp",
     "species": "dog",
     "breed": "shiba_inu",
     "gender": "boy",
@@ -2089,7 +2089,7 @@
     "standard": false
   },
   {
-    "filename": "dog_shiba_inu_boy_cream.png",
+    "filename": "dog_shiba_inu_boy_cream.webp",
     "species": "dog",
     "breed": "shiba_inu",
     "gender": "boy",
@@ -2100,7 +2100,7 @@
     "standard": false
   },
   {
-    "filename": "dog_shiba_inu_boy_red.png",
+    "filename": "dog_shiba_inu_boy_red.webp",
     "species": "dog",
     "breed": "shiba_inu",
     "gender": "boy",
@@ -2111,7 +2111,7 @@
     "standard": false
   },
   {
-    "filename": "dog_shiba_inu_boy_sesame.png",
+    "filename": "dog_shiba_inu_boy_sesame.webp",
     "species": "dog",
     "breed": "shiba_inu",
     "gender": "boy",
@@ -2122,7 +2122,7 @@
     "standard": false
   },
   {
-    "filename": "dog_shiba_inu_girl_black_tan.png",
+    "filename": "dog_shiba_inu_girl_black_tan.webp",
     "species": "dog",
     "breed": "shiba_inu",
     "gender": "girl",
@@ -2133,7 +2133,7 @@
     "standard": false
   },
   {
-    "filename": "dog_shiba_inu_girl_cream.png",
+    "filename": "dog_shiba_inu_girl_cream.webp",
     "species": "dog",
     "breed": "shiba_inu",
     "gender": "girl",
@@ -2144,7 +2144,7 @@
     "standard": false
   },
   {
-    "filename": "dog_shiba_inu_girl_red.png",
+    "filename": "dog_shiba_inu_girl_red.webp",
     "species": "dog",
     "breed": "shiba_inu",
     "gender": "girl",
@@ -2155,7 +2155,7 @@
     "standard": false
   },
   {
-    "filename": "dog_shiba_inu_girl_sesame.png",
+    "filename": "dog_shiba_inu_girl_sesame.webp",
     "species": "dog",
     "breed": "shiba_inu",
     "gender": "girl",
@@ -2166,7 +2166,7 @@
     "standard": false
   },
   {
-    "filename": "dog_yorkshire_terrier_boy_golden_tan.png",
+    "filename": "dog_yorkshire_terrier_boy_golden_tan.webp",
     "species": "dog",
     "breed": "yorkshire_terrier",
     "gender": "boy",
@@ -2177,7 +2177,7 @@
     "standard": false
   },
   {
-    "filename": "dog_yorkshire_terrier_boy_steel_blue_tan.png",
+    "filename": "dog_yorkshire_terrier_boy_steel_blue_tan.webp",
     "species": "dog",
     "breed": "yorkshire_terrier",
     "gender": "boy",
@@ -2188,7 +2188,7 @@
     "standard": false
   },
   {
-    "filename": "dog_yorkshire_terrier_girl_golden_tan.png",
+    "filename": "dog_yorkshire_terrier_girl_golden_tan.webp",
     "species": "dog",
     "breed": "yorkshire_terrier",
     "gender": "girl",
@@ -2199,7 +2199,7 @@
     "standard": false
   },
   {
-    "filename": "dog_yorkshire_terrier_girl_steel_blue_tan.png",
+    "filename": "dog_yorkshire_terrier_girl_steel_blue_tan.webp",
     "species": "dog",
     "breed": "yorkshire_terrier",
     "gender": "girl",
@@ -2210,7 +2210,7 @@
     "standard": false
   },
   {
-    "filename": "fish_boy_standard.png",
+    "filename": "fish_boy_standard.webp",
     "species": "fish",
     "gender": "boy",
     "coat": "standard",
@@ -2219,7 +2219,7 @@
     "fallbackScope": "species"
   },
   {
-    "filename": "fish_girl_standard.png",
+    "filename": "fish_girl_standard.webp",
     "species": "fish",
     "gender": "girl",
     "coat": "standard",
@@ -2228,7 +2228,7 @@
     "fallbackScope": "species"
   },
   {
-    "filename": "hamster_boy_standard.png",
+    "filename": "hamster_boy_standard.webp",
     "species": "hamster",
     "gender": "boy",
     "coat": "standard",
@@ -2237,7 +2237,7 @@
     "fallbackScope": "species"
   },
   {
-    "filename": "hamster_girl_standard.png",
+    "filename": "hamster_girl_standard.webp",
     "species": "hamster",
     "gender": "girl",
     "coat": "standard",
@@ -2246,7 +2246,7 @@
     "fallbackScope": "species"
   },
   {
-    "filename": "other_boy_standard.png",
+    "filename": "other_boy_standard.webp",
     "species": "other",
     "gender": "boy",
     "coat": "standard",
@@ -2255,7 +2255,7 @@
     "fallbackScope": "entry"
   },
   {
-    "filename": "other_girl_standard.png",
+    "filename": "other_girl_standard.webp",
     "species": "other",
     "gender": "girl",
     "coat": "standard",
@@ -2264,7 +2264,7 @@
     "fallbackScope": "entry"
   },
   {
-    "filename": "rabbit_boy_standard.png",
+    "filename": "rabbit_boy_standard.webp",
     "species": "rabbit",
     "gender": "boy",
     "coat": "standard",
@@ -2273,7 +2273,7 @@
     "fallbackScope": "species"
   },
   {
-    "filename": "rabbit_girl_standard.png",
+    "filename": "rabbit_girl_standard.webp",
     "species": "rabbit",
     "gender": "girl",
     "coat": "standard",
@@ -2282,7 +2282,7 @@
     "fallbackScope": "species"
   },
   {
-    "filename": "reptile_boy_standard.png",
+    "filename": "reptile_boy_standard.webp",
     "species": "reptile",
     "gender": "boy",
     "coat": "standard",
@@ -2291,7 +2291,7 @@
     "fallbackScope": "species"
   },
   {
-    "filename": "reptile_girl_standard.png",
+    "filename": "reptile_girl_standard.webp",
     "species": "reptile",
     "gender": "girl",
     "coat": "standard",
@@ -2300,7 +2300,7 @@
     "fallbackScope": "species"
   },
   {
-    "filename": "cat_burmese_boy_blue.png",
+    "filename": "cat_burmese_boy_blue.webp",
     "species": "cat",
     "breed": "burmese",
     "gender": "boy",
@@ -2311,7 +2311,7 @@
     "standard": false
   },
   {
-    "filename": "cat_burmese_boy_chocolate.png",
+    "filename": "cat_burmese_boy_chocolate.webp",
     "species": "cat",
     "breed": "burmese",
     "gender": "boy",
@@ -2322,7 +2322,7 @@
     "standard": false
   },
   {
-    "filename": "cat_burmese_boy_cream.png",
+    "filename": "cat_burmese_boy_cream.webp",
     "species": "cat",
     "breed": "burmese",
     "gender": "boy",
@@ -2333,7 +2333,7 @@
     "standard": false
   },
   {
-    "filename": "cat_burmese_boy_lilac.png",
+    "filename": "cat_burmese_boy_lilac.webp",
     "species": "cat",
     "breed": "burmese",
     "gender": "boy",
@@ -2344,7 +2344,7 @@
     "standard": false
   },
   {
-    "filename": "cat_burmese_boy_red.png",
+    "filename": "cat_burmese_boy_red.webp",
     "species": "cat",
     "breed": "burmese",
     "gender": "boy",
@@ -2355,7 +2355,7 @@
     "standard": false
   },
   {
-    "filename": "cat_burmese_boy_sable.png",
+    "filename": "cat_burmese_boy_sable.webp",
     "species": "cat",
     "breed": "burmese",
     "gender": "boy",
@@ -2366,7 +2366,7 @@
     "standard": false
   },
   {
-    "filename": "cat_burmese_girl_blue.png",
+    "filename": "cat_burmese_girl_blue.webp",
     "species": "cat",
     "breed": "burmese",
     "gender": "girl",
@@ -2377,7 +2377,7 @@
     "standard": false
   },
   {
-    "filename": "cat_burmese_girl_chocolate.png",
+    "filename": "cat_burmese_girl_chocolate.webp",
     "species": "cat",
     "breed": "burmese",
     "gender": "girl",
@@ -2388,7 +2388,7 @@
     "standard": false
   },
   {
-    "filename": "cat_burmese_girl_cream.png",
+    "filename": "cat_burmese_girl_cream.webp",
     "species": "cat",
     "breed": "burmese",
     "gender": "girl",
@@ -2399,7 +2399,7 @@
     "standard": false
   },
   {
-    "filename": "cat_burmese_girl_lilac.png",
+    "filename": "cat_burmese_girl_lilac.webp",
     "species": "cat",
     "breed": "burmese",
     "gender": "girl",
@@ -2410,7 +2410,7 @@
     "standard": false
   },
   {
-    "filename": "cat_burmese_girl_red.png",
+    "filename": "cat_burmese_girl_red.webp",
     "species": "cat",
     "breed": "burmese",
     "gender": "girl",
@@ -2421,7 +2421,7 @@
     "standard": false
   },
   {
-    "filename": "cat_burmese_girl_sable.png",
+    "filename": "cat_burmese_girl_sable.webp",
     "species": "cat",
     "breed": "burmese",
     "gender": "girl",
@@ -2432,7 +2432,7 @@
     "standard": false
   },
   {
-    "filename": "cat_domestic_shorthair_boy_black.png",
+    "filename": "cat_domestic_shorthair_boy_black.webp",
     "species": "cat",
     "breed": "domestic_shorthair",
     "gender": "boy",
@@ -2443,7 +2443,7 @@
     "standard": false
   },
   {
-    "filename": "cat_domestic_shorthair_boy_black_white.png",
+    "filename": "cat_domestic_shorthair_boy_black_white.webp",
     "species": "cat",
     "breed": "domestic_shorthair",
     "gender": "boy",
@@ -2454,7 +2454,7 @@
     "standard": false
   },
   {
-    "filename": "cat_domestic_shorthair_boy_brown_tabby.png",
+    "filename": "cat_domestic_shorthair_boy_brown_tabby.webp",
     "species": "cat",
     "breed": "domestic_shorthair",
     "gender": "boy",
@@ -2465,7 +2465,7 @@
     "standard": false
   },
   {
-    "filename": "cat_domestic_shorthair_boy_calico.png",
+    "filename": "cat_domestic_shorthair_boy_calico.webp",
     "species": "cat",
     "breed": "domestic_shorthair",
     "gender": "boy",
@@ -2476,7 +2476,7 @@
     "standard": false
   },
   {
-    "filename": "cat_domestic_shorthair_boy_orange_tabby.png",
+    "filename": "cat_domestic_shorthair_boy_orange_tabby.webp",
     "species": "cat",
     "breed": "domestic_shorthair",
     "gender": "boy",
@@ -2487,7 +2487,7 @@
     "standard": false
   },
   {
-    "filename": "cat_domestic_shorthair_boy_tortoiseshell.png",
+    "filename": "cat_domestic_shorthair_boy_tortoiseshell.webp",
     "species": "cat",
     "breed": "domestic_shorthair",
     "gender": "boy",
@@ -2498,7 +2498,7 @@
     "standard": false
   },
   {
-    "filename": "cat_domestic_shorthair_boy_white.png",
+    "filename": "cat_domestic_shorthair_boy_white.webp",
     "species": "cat",
     "breed": "domestic_shorthair",
     "gender": "boy",
@@ -2509,7 +2509,7 @@
     "standard": false
   },
   {
-    "filename": "cat_domestic_shorthair_girl_black.png",
+    "filename": "cat_domestic_shorthair_girl_black.webp",
     "species": "cat",
     "breed": "domestic_shorthair",
     "gender": "girl",
@@ -2520,7 +2520,7 @@
     "standard": false
   },
   {
-    "filename": "cat_domestic_shorthair_girl_black_white.png",
+    "filename": "cat_domestic_shorthair_girl_black_white.webp",
     "species": "cat",
     "breed": "domestic_shorthair",
     "gender": "girl",
@@ -2531,7 +2531,7 @@
     "standard": false
   },
   {
-    "filename": "cat_domestic_shorthair_girl_brown_tabby.png",
+    "filename": "cat_domestic_shorthair_girl_brown_tabby.webp",
     "species": "cat",
     "breed": "domestic_shorthair",
     "gender": "girl",
@@ -2542,7 +2542,7 @@
     "standard": false
   },
   {
-    "filename": "cat_domestic_shorthair_girl_calico.png",
+    "filename": "cat_domestic_shorthair_girl_calico.webp",
     "species": "cat",
     "breed": "domestic_shorthair",
     "gender": "girl",
@@ -2553,7 +2553,7 @@
     "standard": false
   },
   {
-    "filename": "cat_domestic_shorthair_girl_orange_tabby.png",
+    "filename": "cat_domestic_shorthair_girl_orange_tabby.webp",
     "species": "cat",
     "breed": "domestic_shorthair",
     "gender": "girl",
@@ -2564,7 +2564,7 @@
     "standard": false
   },
   {
-    "filename": "cat_domestic_shorthair_girl_tortoiseshell.png",
+    "filename": "cat_domestic_shorthair_girl_tortoiseshell.webp",
     "species": "cat",
     "breed": "domestic_shorthair",
     "gender": "girl",
@@ -2575,7 +2575,7 @@
     "standard": false
   },
   {
-    "filename": "cat_domestic_shorthair_girl_white.png",
+    "filename": "cat_domestic_shorthair_girl_white.webp",
     "species": "cat",
     "breed": "domestic_shorthair",
     "gender": "girl",
@@ -2586,7 +2586,7 @@
     "standard": false
   },
   {
-    "filename": "cat_norwegian_forest_boy_black_white.png",
+    "filename": "cat_norwegian_forest_boy_black_white.webp",
     "species": "cat",
     "breed": "norwegian_forest",
     "gender": "boy",
@@ -2597,7 +2597,7 @@
     "standard": false
   },
   {
-    "filename": "cat_norwegian_forest_boy_blue_white.png",
+    "filename": "cat_norwegian_forest_boy_blue_white.webp",
     "species": "cat",
     "breed": "norwegian_forest",
     "gender": "boy",
@@ -2608,7 +2608,7 @@
     "standard": false
   },
   {
-    "filename": "cat_norwegian_forest_boy_brown_tabby_white.png",
+    "filename": "cat_norwegian_forest_boy_brown_tabby_white.webp",
     "species": "cat",
     "breed": "norwegian_forest",
     "gender": "boy",
@@ -2619,7 +2619,7 @@
     "standard": false
   },
   {
-    "filename": "cat_norwegian_forest_boy_cream.png",
+    "filename": "cat_norwegian_forest_boy_cream.webp",
     "species": "cat",
     "breed": "norwegian_forest",
     "gender": "boy",
@@ -2630,7 +2630,7 @@
     "standard": false
   },
   {
-    "filename": "cat_norwegian_forest_boy_red_white.png",
+    "filename": "cat_norwegian_forest_boy_red_white.webp",
     "species": "cat",
     "breed": "norwegian_forest",
     "gender": "boy",
@@ -2641,7 +2641,7 @@
     "standard": false
   },
   {
-    "filename": "cat_norwegian_forest_girl_black_white.png",
+    "filename": "cat_norwegian_forest_girl_black_white.webp",
     "species": "cat",
     "breed": "norwegian_forest",
     "gender": "girl",
@@ -2652,7 +2652,7 @@
     "standard": false
   },
   {
-    "filename": "cat_norwegian_forest_girl_blue_white.png",
+    "filename": "cat_norwegian_forest_girl_blue_white.webp",
     "species": "cat",
     "breed": "norwegian_forest",
     "gender": "girl",
@@ -2663,7 +2663,7 @@
     "standard": false
   },
   {
-    "filename": "cat_norwegian_forest_girl_brown_tabby_white.png",
+    "filename": "cat_norwegian_forest_girl_brown_tabby_white.webp",
     "species": "cat",
     "breed": "norwegian_forest",
     "gender": "girl",
@@ -2674,7 +2674,7 @@
     "standard": false
   },
   {
-    "filename": "cat_norwegian_forest_girl_cream.png",
+    "filename": "cat_norwegian_forest_girl_cream.webp",
     "species": "cat",
     "breed": "norwegian_forest",
     "gender": "girl",
@@ -2685,7 +2685,7 @@
     "standard": false
   },
   {
-    "filename": "cat_norwegian_forest_girl_red_white.png",
+    "filename": "cat_norwegian_forest_girl_red_white.webp",
     "species": "cat",
     "breed": "norwegian_forest",
     "gender": "girl",
@@ -2696,7 +2696,7 @@
     "standard": false
   },
   {
-    "filename": "cat_scottish_fold_boy_black.png",
+    "filename": "cat_scottish_fold_boy_black.webp",
     "species": "cat",
     "breed": "scottish_fold",
     "gender": "boy",
@@ -2707,7 +2707,7 @@
     "standard": false
   },
   {
-    "filename": "cat_scottish_fold_boy_blue_gray.png",
+    "filename": "cat_scottish_fold_boy_blue_gray.webp",
     "species": "cat",
     "breed": "scottish_fold",
     "gender": "boy",
@@ -2718,7 +2718,7 @@
     "standard": false
   },
   {
-    "filename": "cat_scottish_fold_boy_golden.png",
+    "filename": "cat_scottish_fold_boy_golden.webp",
     "species": "cat",
     "breed": "scottish_fold",
     "gender": "boy",
@@ -2729,7 +2729,7 @@
     "standard": false
   },
   {
-    "filename": "cat_scottish_fold_boy_silver.png",
+    "filename": "cat_scottish_fold_boy_silver.webp",
     "species": "cat",
     "breed": "scottish_fold",
     "gender": "boy",
@@ -2740,7 +2740,7 @@
     "standard": false
   },
   {
-    "filename": "cat_scottish_fold_boy_tabby.png",
+    "filename": "cat_scottish_fold_boy_tabby.webp",
     "species": "cat",
     "breed": "scottish_fold",
     "gender": "boy",
@@ -2751,7 +2751,7 @@
     "standard": false
   },
   {
-    "filename": "cat_scottish_fold_boy_tortoiseshell.png",
+    "filename": "cat_scottish_fold_boy_tortoiseshell.webp",
     "species": "cat",
     "breed": "scottish_fold",
     "gender": "boy",
@@ -2762,7 +2762,7 @@
     "standard": false
   },
   {
-    "filename": "cat_scottish_fold_boy_white.png",
+    "filename": "cat_scottish_fold_boy_white.webp",
     "species": "cat",
     "breed": "scottish_fold",
     "gender": "boy",
@@ -2773,7 +2773,7 @@
     "standard": false
   },
   {
-    "filename": "cat_scottish_fold_girl_black.png",
+    "filename": "cat_scottish_fold_girl_black.webp",
     "species": "cat",
     "breed": "scottish_fold",
     "gender": "girl",
@@ -2784,7 +2784,7 @@
     "standard": false
   },
   {
-    "filename": "cat_scottish_fold_girl_blue_gray.png",
+    "filename": "cat_scottish_fold_girl_blue_gray.webp",
     "species": "cat",
     "breed": "scottish_fold",
     "gender": "girl",
@@ -2795,7 +2795,7 @@
     "standard": false
   },
   {
-    "filename": "cat_scottish_fold_girl_golden.png",
+    "filename": "cat_scottish_fold_girl_golden.webp",
     "species": "cat",
     "breed": "scottish_fold",
     "gender": "girl",
@@ -2806,7 +2806,7 @@
     "standard": false
   },
   {
-    "filename": "cat_scottish_fold_girl_silver.png",
+    "filename": "cat_scottish_fold_girl_silver.webp",
     "species": "cat",
     "breed": "scottish_fold",
     "gender": "girl",
@@ -2817,7 +2817,7 @@
     "standard": false
   },
   {
-    "filename": "cat_scottish_fold_girl_tabby.png",
+    "filename": "cat_scottish_fold_girl_tabby.webp",
     "species": "cat",
     "breed": "scottish_fold",
     "gender": "girl",
@@ -2828,7 +2828,7 @@
     "standard": false
   },
   {
-    "filename": "cat_scottish_fold_girl_tortoiseshell.png",
+    "filename": "cat_scottish_fold_girl_tortoiseshell.webp",
     "species": "cat",
     "breed": "scottish_fold",
     "gender": "girl",
@@ -2839,7 +2839,7 @@
     "standard": false
   },
   {
-    "filename": "cat_scottish_fold_girl_white.png",
+    "filename": "cat_scottish_fold_girl_white.webp",
     "species": "cat",
     "breed": "scottish_fold",
     "gender": "girl",
@@ -2850,7 +2850,7 @@
     "standard": false
   },
   {
-    "filename": "cat_sphynx_boy_black_skin.png",
+    "filename": "cat_sphynx_boy_black_skin.webp",
     "species": "cat",
     "breed": "sphynx",
     "gender": "boy",
@@ -2861,7 +2861,7 @@
     "standard": false
   },
   {
-    "filename": "cat_sphynx_boy_blue_skin.png",
+    "filename": "cat_sphynx_boy_blue_skin.webp",
     "species": "cat",
     "breed": "sphynx",
     "gender": "boy",
@@ -2872,7 +2872,7 @@
     "standard": false
   },
   {
-    "filename": "cat_sphynx_boy_pink_skin.png",
+    "filename": "cat_sphynx_boy_pink_skin.webp",
     "species": "cat",
     "breed": "sphynx",
     "gender": "boy",
@@ -2883,7 +2883,7 @@
     "standard": false
   },
   {
-    "filename": "cat_sphynx_boy_tabby_skin.png",
+    "filename": "cat_sphynx_boy_tabby_skin.webp",
     "species": "cat",
     "breed": "sphynx",
     "gender": "boy",
@@ -2894,7 +2894,7 @@
     "standard": false
   },
   {
-    "filename": "cat_sphynx_girl_black_skin.png",
+    "filename": "cat_sphynx_girl_black_skin.webp",
     "species": "cat",
     "breed": "sphynx",
     "gender": "girl",
@@ -2905,7 +2905,7 @@
     "standard": false
   },
   {
-    "filename": "cat_sphynx_girl_blue_skin.png",
+    "filename": "cat_sphynx_girl_blue_skin.webp",
     "species": "cat",
     "breed": "sphynx",
     "gender": "girl",
@@ -2916,7 +2916,7 @@
     "standard": false
   },
   {
-    "filename": "cat_sphynx_girl_pink_skin.png",
+    "filename": "cat_sphynx_girl_pink_skin.webp",
     "species": "cat",
     "breed": "sphynx",
     "gender": "girl",
@@ -2927,7 +2927,7 @@
     "standard": false
   },
   {
-    "filename": "cat_sphynx_girl_tabby_skin.png",
+    "filename": "cat_sphynx_girl_tabby_skin.webp",
     "species": "cat",
     "breed": "sphynx",
     "gender": "girl",
@@ -2938,7 +2938,7 @@
     "standard": false
   },
   {
-    "filename": "cat_turkish_angora_boy_black.png",
+    "filename": "cat_turkish_angora_boy_black.webp",
     "species": "cat",
     "breed": "turkish_angora",
     "gender": "boy",
@@ -2949,7 +2949,7 @@
     "standard": false
   },
   {
-    "filename": "cat_turkish_angora_boy_blue.png",
+    "filename": "cat_turkish_angora_boy_blue.webp",
     "species": "cat",
     "breed": "turkish_angora",
     "gender": "boy",
@@ -2960,7 +2960,7 @@
     "standard": false
   },
   {
-    "filename": "cat_turkish_angora_boy_red.png",
+    "filename": "cat_turkish_angora_boy_red.webp",
     "species": "cat",
     "breed": "turkish_angora",
     "gender": "boy",
@@ -2971,7 +2971,7 @@
     "standard": false
   },
   {
-    "filename": "cat_turkish_angora_boy_white.png",
+    "filename": "cat_turkish_angora_boy_white.webp",
     "species": "cat",
     "breed": "turkish_angora",
     "gender": "boy",
@@ -2982,7 +2982,7 @@
     "standard": false
   },
   {
-    "filename": "cat_turkish_angora_girl_black.png",
+    "filename": "cat_turkish_angora_girl_black.webp",
     "species": "cat",
     "breed": "turkish_angora",
     "gender": "girl",
@@ -2993,7 +2993,7 @@
     "standard": false
   },
   {
-    "filename": "cat_turkish_angora_girl_blue.png",
+    "filename": "cat_turkish_angora_girl_blue.webp",
     "species": "cat",
     "breed": "turkish_angora",
     "gender": "girl",
@@ -3004,7 +3004,7 @@
     "standard": false
   },
   {
-    "filename": "cat_turkish_angora_girl_red.png",
+    "filename": "cat_turkish_angora_girl_red.webp",
     "species": "cat",
     "breed": "turkish_angora",
     "gender": "girl",
@@ -3015,7 +3015,7 @@
     "standard": false
   },
   {
-    "filename": "cat_turkish_angora_girl_white.png",
+    "filename": "cat_turkish_angora_girl_white.webp",
     "species": "cat",
     "breed": "turkish_angora",
     "gender": "girl",
@@ -3026,7 +3026,7 @@
     "standard": false
   },
   {
-    "filename": "dog_poodle_boy_apricot.png",
+    "filename": "dog_poodle_boy_apricot.webp",
     "species": "dog",
     "breed": "poodle",
     "gender": "boy",
@@ -3037,7 +3037,7 @@
     "standard": false
   },
   {
-    "filename": "dog_poodle_boy_black.png",
+    "filename": "dog_poodle_boy_black.webp",
     "species": "dog",
     "breed": "poodle",
     "gender": "boy",
@@ -3048,7 +3048,7 @@
     "standard": false
   },
   {
-    "filename": "dog_poodle_boy_blue_gray.png",
+    "filename": "dog_poodle_boy_blue_gray.webp",
     "species": "dog",
     "breed": "poodle",
     "gender": "boy",
@@ -3059,7 +3059,7 @@
     "standard": false
   },
   {
-    "filename": "dog_poodle_boy_brown.png",
+    "filename": "dog_poodle_boy_brown.webp",
     "species": "dog",
     "breed": "poodle",
     "gender": "boy",
@@ -3070,7 +3070,7 @@
     "standard": false
   },
   {
-    "filename": "dog_poodle_boy_red.png",
+    "filename": "dog_poodle_boy_red.webp",
     "species": "dog",
     "breed": "poodle",
     "gender": "boy",
@@ -3081,7 +3081,7 @@
     "standard": false
   },
   {
-    "filename": "dog_poodle_boy_silver.png",
+    "filename": "dog_poodle_boy_silver.webp",
     "species": "dog",
     "breed": "poodle",
     "gender": "boy",
@@ -3092,7 +3092,7 @@
     "standard": false
   },
   {
-    "filename": "dog_poodle_boy_white.png",
+    "filename": "dog_poodle_boy_white.webp",
     "species": "dog",
     "breed": "poodle",
     "gender": "boy",
@@ -3103,7 +3103,7 @@
     "standard": false
   },
   {
-    "filename": "dog_poodle_girl_apricot.png",
+    "filename": "dog_poodle_girl_apricot.webp",
     "species": "dog",
     "breed": "poodle",
     "gender": "girl",
@@ -3114,7 +3114,7 @@
     "standard": false
   },
   {
-    "filename": "dog_poodle_girl_black.png",
+    "filename": "dog_poodle_girl_black.webp",
     "species": "dog",
     "breed": "poodle",
     "gender": "girl",
@@ -3125,7 +3125,7 @@
     "standard": false
   },
   {
-    "filename": "dog_poodle_girl_blue_gray.png",
+    "filename": "dog_poodle_girl_blue_gray.webp",
     "species": "dog",
     "breed": "poodle",
     "gender": "girl",
@@ -3136,7 +3136,7 @@
     "standard": false
   },
   {
-    "filename": "dog_poodle_girl_brown.png",
+    "filename": "dog_poodle_girl_brown.webp",
     "species": "dog",
     "breed": "poodle",
     "gender": "girl",
@@ -3147,7 +3147,7 @@
     "standard": false
   },
   {
-    "filename": "dog_poodle_girl_red.png",
+    "filename": "dog_poodle_girl_red.webp",
     "species": "dog",
     "breed": "poodle",
     "gender": "girl",
@@ -3158,7 +3158,7 @@
     "standard": false
   },
   {
-    "filename": "dog_poodle_girl_silver.png",
+    "filename": "dog_poodle_girl_silver.webp",
     "species": "dog",
     "breed": "poodle",
     "gender": "girl",
@@ -3169,7 +3169,7 @@
     "standard": false
   },
   {
-    "filename": "dog_poodle_girl_white.png",
+    "filename": "dog_poodle_girl_white.webp",
     "species": "dog",
     "breed": "poodle",
     "gender": "girl",
@@ -3180,7 +3180,7 @@
     "standard": false
   },
   {
-    "filename": "dog_shih_tzu_boy_golden_white.png",
+    "filename": "dog_shih_tzu_boy_golden_white.webp",
     "species": "dog",
     "breed": "shih_tzu",
     "gender": "boy",
@@ -3191,7 +3191,7 @@
     "standard": false
   },
   {
-    "filename": "dog_shih_tzu_boy_black_white.png",
+    "filename": "dog_shih_tzu_boy_black_white.webp",
     "species": "dog",
     "breed": "shih_tzu",
     "gender": "boy",
@@ -3202,7 +3202,7 @@
     "standard": false
   },
   {
-    "filename": "dog_shih_tzu_boy_red_white.png",
+    "filename": "dog_shih_tzu_boy_red_white.webp",
     "species": "dog",
     "breed": "shih_tzu",
     "gender": "boy",
@@ -3213,7 +3213,7 @@
     "standard": false
   },
   {
-    "filename": "dog_shih_tzu_girl_golden_white.png",
+    "filename": "dog_shih_tzu_girl_golden_white.webp",
     "species": "dog",
     "breed": "shih_tzu",
     "gender": "girl",
@@ -3224,7 +3224,7 @@
     "standard": false
   },
   {
-    "filename": "dog_shih_tzu_girl_black_white.png",
+    "filename": "dog_shih_tzu_girl_black_white.webp",
     "species": "dog",
     "breed": "shih_tzu",
     "gender": "girl",
@@ -3235,7 +3235,7 @@
     "standard": false
   },
   {
-    "filename": "dog_shih_tzu_girl_red_white.png",
+    "filename": "dog_shih_tzu_girl_red_white.webp",
     "species": "dog",
     "breed": "shih_tzu",
     "gender": "girl",
@@ -3246,7 +3246,7 @@
     "standard": false
   },
   {
-    "filename": "dog_chinese_rural_dog_boy_yellow.png",
+    "filename": "dog_chinese_rural_dog_boy_yellow.webp",
     "species": "dog",
     "breed": "chinese_rural_dog",
     "gender": "boy",
@@ -3257,7 +3257,7 @@
     "standard": false
   },
   {
-    "filename": "dog_chinese_rural_dog_boy_black.png",
+    "filename": "dog_chinese_rural_dog_boy_black.webp",
     "species": "dog",
     "breed": "chinese_rural_dog",
     "gender": "boy",
@@ -3268,7 +3268,7 @@
     "standard": false
   },
   {
-    "filename": "dog_chinese_rural_dog_boy_white.png",
+    "filename": "dog_chinese_rural_dog_boy_white.webp",
     "species": "dog",
     "breed": "chinese_rural_dog",
     "gender": "boy",
@@ -3279,7 +3279,7 @@
     "standard": false
   },
   {
-    "filename": "dog_chinese_rural_dog_boy_pied.png",
+    "filename": "dog_chinese_rural_dog_boy_pied.webp",
     "species": "dog",
     "breed": "chinese_rural_dog",
     "gender": "boy",
@@ -3290,7 +3290,7 @@
     "standard": false
   },
   {
-    "filename": "dog_chinese_rural_dog_girl_yellow.png",
+    "filename": "dog_chinese_rural_dog_girl_yellow.webp",
     "species": "dog",
     "breed": "chinese_rural_dog",
     "gender": "girl",
@@ -3301,7 +3301,7 @@
     "standard": false
   },
   {
-    "filename": "dog_chinese_rural_dog_girl_black.png",
+    "filename": "dog_chinese_rural_dog_girl_black.webp",
     "species": "dog",
     "breed": "chinese_rural_dog",
     "gender": "girl",
@@ -3312,7 +3312,7 @@
     "standard": false
   },
   {
-    "filename": "dog_chinese_rural_dog_girl_white.png",
+    "filename": "dog_chinese_rural_dog_girl_white.webp",
     "species": "dog",
     "breed": "chinese_rural_dog",
     "gender": "girl",
@@ -3323,7 +3323,7 @@
     "standard": false
   },
   {
-    "filename": "dog_chinese_rural_dog_girl_pied.png",
+    "filename": "dog_chinese_rural_dog_girl_pied.webp",
     "species": "dog",
     "breed": "chinese_rural_dog",
     "gender": "girl",
@@ -3334,7 +3334,7 @@
     "standard": false
   },
   {
-    "filename": "dog_dachshund_boy_red.png",
+    "filename": "dog_dachshund_boy_red.webp",
     "species": "dog",
     "breed": "dachshund",
     "gender": "boy",
@@ -3345,7 +3345,7 @@
     "standard": false
   },
   {
-    "filename": "dog_dachshund_boy_chocolate_brown.png",
+    "filename": "dog_dachshund_boy_chocolate_brown.webp",
     "species": "dog",
     "breed": "dachshund",
     "gender": "boy",
@@ -3356,7 +3356,7 @@
     "standard": false
   },
   {
-    "filename": "dog_dachshund_boy_black_tan.png",
+    "filename": "dog_dachshund_boy_black_tan.webp",
     "species": "dog",
     "breed": "dachshund",
     "gender": "boy",
@@ -3367,7 +3367,7 @@
     "standard": false
   },
   {
-    "filename": "dog_dachshund_boy_cream.png",
+    "filename": "dog_dachshund_boy_cream.webp",
     "species": "dog",
     "breed": "dachshund",
     "gender": "boy",
@@ -3378,7 +3378,7 @@
     "standard": false
   },
   {
-    "filename": "dog_dachshund_boy_dapple.png",
+    "filename": "dog_dachshund_boy_dapple.webp",
     "species": "dog",
     "breed": "dachshund",
     "gender": "boy",
@@ -3389,7 +3389,7 @@
     "standard": false
   },
   {
-    "filename": "dog_dachshund_girl_red.png",
+    "filename": "dog_dachshund_girl_red.webp",
     "species": "dog",
     "breed": "dachshund",
     "gender": "girl",
@@ -3400,7 +3400,7 @@
     "standard": false
   },
   {
-    "filename": "dog_dachshund_girl_chocolate_brown.png",
+    "filename": "dog_dachshund_girl_chocolate_brown.webp",
     "species": "dog",
     "breed": "dachshund",
     "gender": "girl",
@@ -3411,7 +3411,7 @@
     "standard": false
   },
   {
-    "filename": "dog_dachshund_girl_black_tan.png",
+    "filename": "dog_dachshund_girl_black_tan.webp",
     "species": "dog",
     "breed": "dachshund",
     "gender": "girl",
@@ -3422,7 +3422,7 @@
     "standard": false
   },
   {
-    "filename": "dog_dachshund_girl_cream.png",
+    "filename": "dog_dachshund_girl_cream.webp",
     "species": "dog",
     "breed": "dachshund",
     "gender": "girl",
@@ -3433,7 +3433,7 @@
     "standard": false
   },
   {
-    "filename": "dog_dachshund_girl_dapple.png",
+    "filename": "dog_dachshund_girl_dapple.webp",
     "species": "dog",
     "breed": "dachshund",
     "gender": "girl",
@@ -3444,7 +3444,7 @@
     "standard": false
   },
   {
-    "filename": "dog_west_highland_white_terrier_boy_white.png",
+    "filename": "dog_west_highland_white_terrier_boy_white.webp",
     "species": "dog",
     "breed": "west_highland_white_terrier",
     "gender": "boy",
@@ -3455,7 +3455,7 @@
     "standard": false
   },
   {
-    "filename": "dog_west_highland_white_terrier_girl_white.png",
+    "filename": "dog_west_highland_white_terrier_girl_white.webp",
     "species": "dog",
     "breed": "west_highland_white_terrier",
     "gender": "girl",
@@ -3466,7 +3466,7 @@
     "standard": false
   },
   {
-    "filename": "dog_west_highland_white_terrier_boy_black.png",
+    "filename": "dog_west_highland_white_terrier_boy_black.webp",
     "species": "dog",
     "breed": "west_highland_white_terrier",
     "gender": "boy",
@@ -3477,7 +3477,7 @@
     "standard": false
   },
   {
-    "filename": "dog_west_highland_white_terrier_girl_black.png",
+    "filename": "dog_west_highland_white_terrier_girl_black.webp",
     "species": "dog",
     "breed": "west_highland_white_terrier",
     "gender": "girl",
@@ -3488,7 +3488,7 @@
     "standard": false
   },
   {
-    "filename": "dog_australian_shepherd_boy_blue_gray.png",
+    "filename": "dog_australian_shepherd_boy_blue_gray.webp",
     "species": "dog",
     "breed": "australian_shepherd",
     "gender": "boy",
@@ -3499,7 +3499,7 @@
     "standard": false
   },
   {
-    "filename": "dog_australian_shepherd_boy_red.png",
+    "filename": "dog_australian_shepherd_boy_red.webp",
     "species": "dog",
     "breed": "australian_shepherd",
     "gender": "boy",
@@ -3510,7 +3510,7 @@
     "standard": false
   },
   {
-    "filename": "dog_australian_shepherd_boy_black.png",
+    "filename": "dog_australian_shepherd_boy_black.webp",
     "species": "dog",
     "breed": "australian_shepherd",
     "gender": "boy",
@@ -3521,7 +3521,7 @@
     "standard": false
   },
   {
-    "filename": "dog_australian_shepherd_boy_dapple.png",
+    "filename": "dog_australian_shepherd_boy_dapple.webp",
     "species": "dog",
     "breed": "australian_shepherd",
     "gender": "boy",
@@ -3532,7 +3532,7 @@
     "standard": false
   },
   {
-    "filename": "dog_australian_shepherd_girl_blue_gray.png",
+    "filename": "dog_australian_shepherd_girl_blue_gray.webp",
     "species": "dog",
     "breed": "australian_shepherd",
     "gender": "girl",
@@ -3543,7 +3543,7 @@
     "standard": false
   },
   {
-    "filename": "dog_australian_shepherd_girl_red.png",
+    "filename": "dog_australian_shepherd_girl_red.webp",
     "species": "dog",
     "breed": "australian_shepherd",
     "gender": "girl",
@@ -3554,7 +3554,7 @@
     "standard": false
   },
   {
-    "filename": "dog_australian_shepherd_girl_black.png",
+    "filename": "dog_australian_shepherd_girl_black.webp",
     "species": "dog",
     "breed": "australian_shepherd",
     "gender": "girl",
@@ -3565,7 +3565,7 @@
     "standard": false
   },
   {
-    "filename": "dog_australian_shepherd_girl_dapple.png",
+    "filename": "dog_australian_shepherd_girl_dapple.webp",
     "species": "dog",
     "breed": "australian_shepherd",
     "gender": "girl",
@@ -3576,7 +3576,7 @@
     "standard": false
   },
   {
-    "filename": "dog_border_collie_boy_black_white.png",
+    "filename": "dog_border_collie_boy_black_white.webp",
     "species": "dog",
     "breed": "border_collie",
     "gender": "boy",
@@ -3587,7 +3587,7 @@
     "standard": false
   },
   {
-    "filename": "dog_border_collie_boy_blue_white.png",
+    "filename": "dog_border_collie_boy_blue_white.webp",
     "species": "dog",
     "breed": "border_collie",
     "gender": "boy",
@@ -3598,7 +3598,7 @@
     "standard": false
   },
   {
-    "filename": "dog_border_collie_boy_red_white.png",
+    "filename": "dog_border_collie_boy_red_white.webp",
     "species": "dog",
     "breed": "border_collie",
     "gender": "boy",
@@ -3609,7 +3609,7 @@
     "standard": false
   },
   {
-    "filename": "dog_border_collie_boy_tricolor.png",
+    "filename": "dog_border_collie_boy_tricolor.webp",
     "species": "dog",
     "breed": "border_collie",
     "gender": "boy",
@@ -3620,7 +3620,7 @@
     "standard": false
   },
   {
-    "filename": "dog_border_collie_girl_black_white.png",
+    "filename": "dog_border_collie_girl_black_white.webp",
     "species": "dog",
     "breed": "border_collie",
     "gender": "girl",
@@ -3631,7 +3631,7 @@
     "standard": false
   },
   {
-    "filename": "dog_border_collie_girl_blue_white.png",
+    "filename": "dog_border_collie_girl_blue_white.webp",
     "species": "dog",
     "breed": "border_collie",
     "gender": "girl",
@@ -3642,7 +3642,7 @@
     "standard": false
   },
   {
-    "filename": "dog_border_collie_girl_red_white.png",
+    "filename": "dog_border_collie_girl_red_white.webp",
     "species": "dog",
     "breed": "border_collie",
     "gender": "girl",
@@ -3653,7 +3653,7 @@
     "standard": false
   },
   {
-    "filename": "dog_border_collie_girl_tricolor.png",
+    "filename": "dog_border_collie_girl_tricolor.webp",
     "species": "dog",
     "breed": "border_collie",
     "gender": "girl",
@@ -3664,7 +3664,7 @@
     "standard": false
   },
   {
-    "filename": "dog_pomeranian_boy_orange.png",
+    "filename": "dog_pomeranian_boy_orange.webp",
     "species": "dog",
     "breed": "pomeranian",
     "gender": "boy",
@@ -3675,7 +3675,7 @@
     "standard": false
   },
   {
-    "filename": "dog_pomeranian_boy_white.png",
+    "filename": "dog_pomeranian_boy_white.webp",
     "species": "dog",
     "breed": "pomeranian",
     "gender": "boy",
@@ -3686,7 +3686,7 @@
     "standard": false
   },
   {
-    "filename": "dog_pomeranian_boy_black.png",
+    "filename": "dog_pomeranian_boy_black.webp",
     "species": "dog",
     "breed": "pomeranian",
     "gender": "boy",
@@ -3697,7 +3697,7 @@
     "standard": false
   },
   {
-    "filename": "dog_pomeranian_boy_cream.png",
+    "filename": "dog_pomeranian_boy_cream.webp",
     "species": "dog",
     "breed": "pomeranian",
     "gender": "boy",
@@ -3708,7 +3708,7 @@
     "standard": false
   },
   {
-    "filename": "dog_pomeranian_boy_brown.png",
+    "filename": "dog_pomeranian_boy_brown.webp",
     "species": "dog",
     "breed": "pomeranian",
     "gender": "boy",
@@ -3719,7 +3719,7 @@
     "standard": false
   },
   {
-    "filename": "dog_pomeranian_girl_orange.png",
+    "filename": "dog_pomeranian_girl_orange.webp",
     "species": "dog",
     "breed": "pomeranian",
     "gender": "girl",
@@ -3730,7 +3730,7 @@
     "standard": false
   },
   {
-    "filename": "dog_pomeranian_girl_white.png",
+    "filename": "dog_pomeranian_girl_white.webp",
     "species": "dog",
     "breed": "pomeranian",
     "gender": "girl",
@@ -3741,7 +3741,7 @@
     "standard": false
   },
   {
-    "filename": "dog_pomeranian_girl_black.png",
+    "filename": "dog_pomeranian_girl_black.webp",
     "species": "dog",
     "breed": "pomeranian",
     "gender": "girl",
@@ -3752,7 +3752,7 @@
     "standard": false
   },
   {
-    "filename": "dog_pomeranian_girl_cream.png",
+    "filename": "dog_pomeranian_girl_cream.webp",
     "species": "dog",
     "breed": "pomeranian",
     "gender": "girl",
@@ -3763,7 +3763,7 @@
     "standard": false
   },
   {
-    "filename": "dog_pomeranian_girl_brown.png",
+    "filename": "dog_pomeranian_girl_brown.webp",
     "species": "dog",
     "breed": "pomeranian",
     "gender": "girl",
@@ -3774,7 +3774,7 @@
     "standard": false
   },
   {
-    "filename": "cat_devon_rex_boy_black.png",
+    "filename": "cat_devon_rex_boy_black.webp",
     "species": "cat",
     "breed": "devon_rex",
     "gender": "boy",
@@ -3785,7 +3785,7 @@
     "standard": false
   },
   {
-    "filename": "cat_devon_rex_boy_white.png",
+    "filename": "cat_devon_rex_boy_white.webp",
     "species": "cat",
     "breed": "devon_rex",
     "gender": "boy",
@@ -3796,7 +3796,7 @@
     "standard": false
   },
   {
-    "filename": "cat_devon_rex_boy_blue_gray.png",
+    "filename": "cat_devon_rex_boy_blue_gray.webp",
     "species": "cat",
     "breed": "devon_rex",
     "gender": "boy",
@@ -3807,7 +3807,7 @@
     "standard": false
   },
   {
-    "filename": "cat_devon_rex_boy_cream.png",
+    "filename": "cat_devon_rex_boy_cream.webp",
     "species": "cat",
     "breed": "devon_rex",
     "gender": "boy",
@@ -3818,7 +3818,7 @@
     "standard": false
   },
   {
-    "filename": "cat_devon_rex_boy_brown_tabby.png",
+    "filename": "cat_devon_rex_boy_brown_tabby.webp",
     "species": "cat",
     "breed": "devon_rex",
     "gender": "boy",
@@ -3829,7 +3829,7 @@
     "standard": false
   },
   {
-    "filename": "cat_devon_rex_boy_black_white.png",
+    "filename": "cat_devon_rex_boy_black_white.webp",
     "species": "cat",
     "breed": "devon_rex",
     "gender": "boy",
@@ -3840,7 +3840,7 @@
     "standard": false
   },
   {
-    "filename": "cat_devon_rex_boy_seal_point.png",
+    "filename": "cat_devon_rex_boy_seal_point.webp",
     "species": "cat",
     "breed": "devon_rex",
     "gender": "boy",
@@ -3851,7 +3851,7 @@
     "standard": false
   },
   {
-    "filename": "cat_devon_rex_boy_blue_point.png",
+    "filename": "cat_devon_rex_boy_blue_point.webp",
     "species": "cat",
     "breed": "devon_rex",
     "gender": "boy",
@@ -3862,7 +3862,7 @@
     "standard": false
   },
   {
-    "filename": "cat_devon_rex_boy_chocolate_point.png",
+    "filename": "cat_devon_rex_boy_chocolate_point.webp",
     "species": "cat",
     "breed": "devon_rex",
     "gender": "boy",
@@ -3873,7 +3873,7 @@
     "standard": false
   },
   {
-    "filename": "cat_devon_rex_boy_flame_point.png",
+    "filename": "cat_devon_rex_boy_flame_point.webp",
     "species": "cat",
     "breed": "devon_rex",
     "gender": "boy",
@@ -3884,7 +3884,7 @@
     "standard": false
   },
   {
-    "filename": "cat_devon_rex_girl_black.png",
+    "filename": "cat_devon_rex_girl_black.webp",
     "species": "cat",
     "breed": "devon_rex",
     "gender": "girl",
@@ -3895,7 +3895,7 @@
     "standard": false
   },
   {
-    "filename": "cat_devon_rex_girl_white.png",
+    "filename": "cat_devon_rex_girl_white.webp",
     "species": "cat",
     "breed": "devon_rex",
     "gender": "girl",
@@ -3906,7 +3906,7 @@
     "standard": false
   },
   {
-    "filename": "cat_devon_rex_girl_blue_gray.png",
+    "filename": "cat_devon_rex_girl_blue_gray.webp",
     "species": "cat",
     "breed": "devon_rex",
     "gender": "girl",
@@ -3917,7 +3917,7 @@
     "standard": false
   },
   {
-    "filename": "cat_devon_rex_girl_cream.png",
+    "filename": "cat_devon_rex_girl_cream.webp",
     "species": "cat",
     "breed": "devon_rex",
     "gender": "girl",
@@ -3928,7 +3928,7 @@
     "standard": false
   },
   {
-    "filename": "cat_devon_rex_girl_brown_tabby.png",
+    "filename": "cat_devon_rex_girl_brown_tabby.webp",
     "species": "cat",
     "breed": "devon_rex",
     "gender": "girl",
@@ -3939,7 +3939,7 @@
     "standard": false
   },
   {
-    "filename": "cat_devon_rex_girl_black_white.png",
+    "filename": "cat_devon_rex_girl_black_white.webp",
     "species": "cat",
     "breed": "devon_rex",
     "gender": "girl",
@@ -3950,7 +3950,7 @@
     "standard": false
   },
   {
-    "filename": "cat_devon_rex_girl_seal_point.png",
+    "filename": "cat_devon_rex_girl_seal_point.webp",
     "species": "cat",
     "breed": "devon_rex",
     "gender": "girl",
@@ -3961,7 +3961,7 @@
     "standard": false
   },
   {
-    "filename": "cat_devon_rex_girl_blue_point.png",
+    "filename": "cat_devon_rex_girl_blue_point.webp",
     "species": "cat",
     "breed": "devon_rex",
     "gender": "girl",
@@ -3972,7 +3972,7 @@
     "standard": false
   },
   {
-    "filename": "cat_devon_rex_girl_chocolate_point.png",
+    "filename": "cat_devon_rex_girl_chocolate_point.webp",
     "species": "cat",
     "breed": "devon_rex",
     "gender": "girl",
@@ -3983,7 +3983,7 @@
     "standard": false
   },
   {
-    "filename": "cat_devon_rex_girl_flame_point.png",
+    "filename": "cat_devon_rex_girl_flame_point.webp",
     "species": "cat",
     "breed": "devon_rex",
     "gender": "girl",
@@ -3994,7 +3994,7 @@
     "standard": false
   },
   {
-    "filename": "dog_cavalier_king_charles_spaniel_boy_ruby.png",
+    "filename": "dog_cavalier_king_charles_spaniel_boy_ruby.webp",
     "species": "dog",
     "breed": "cavalier_king_charles_spaniel",
     "gender": "boy",
@@ -4005,7 +4005,7 @@
     "standard": false
   },
   {
-    "filename": "dog_cavalier_king_charles_spaniel_boy_black_tan.png",
+    "filename": "dog_cavalier_king_charles_spaniel_boy_black_tan.webp",
     "species": "dog",
     "breed": "cavalier_king_charles_spaniel",
     "gender": "boy",
@@ -4016,7 +4016,7 @@
     "standard": false
   },
   {
-    "filename": "dog_cavalier_king_charles_spaniel_boy_tricolor.png",
+    "filename": "dog_cavalier_king_charles_spaniel_boy_tricolor.webp",
     "species": "dog",
     "breed": "cavalier_king_charles_spaniel",
     "gender": "boy",
@@ -4027,7 +4027,7 @@
     "standard": false
   },
   {
-    "filename": "dog_cavalier_king_charles_spaniel_boy_blenheim.png",
+    "filename": "dog_cavalier_king_charles_spaniel_boy_blenheim.webp",
     "species": "dog",
     "breed": "cavalier_king_charles_spaniel",
     "gender": "boy",
@@ -4038,7 +4038,7 @@
     "standard": false
   },
   {
-    "filename": "dog_cavalier_king_charles_spaniel_girl_ruby.png",
+    "filename": "dog_cavalier_king_charles_spaniel_girl_ruby.webp",
     "species": "dog",
     "breed": "cavalier_king_charles_spaniel",
     "gender": "girl",
@@ -4049,7 +4049,7 @@
     "standard": false
   },
   {
-    "filename": "dog_cavalier_king_charles_spaniel_girl_black_tan.png",
+    "filename": "dog_cavalier_king_charles_spaniel_girl_black_tan.webp",
     "species": "dog",
     "breed": "cavalier_king_charles_spaniel",
     "gender": "girl",
@@ -4060,7 +4060,7 @@
     "standard": false
   },
   {
-    "filename": "dog_cavalier_king_charles_spaniel_girl_tricolor.png",
+    "filename": "dog_cavalier_king_charles_spaniel_girl_tricolor.webp",
     "species": "dog",
     "breed": "cavalier_king_charles_spaniel",
     "gender": "girl",
@@ -4071,7 +4071,7 @@
     "standard": false
   },
   {
-    "filename": "dog_cavalier_king_charles_spaniel_girl_blenheim.png",
+    "filename": "dog_cavalier_king_charles_spaniel_girl_blenheim.webp",
     "species": "dog",
     "breed": "cavalier_king_charles_spaniel",
     "gender": "girl",
@@ -4082,7 +4082,7 @@
     "standard": false
   },
   {
-    "filename": "dog_german_shepherd_boy_black_tan_saddle.png",
+    "filename": "dog_german_shepherd_boy_black_tan_saddle.webp",
     "species": "dog",
     "breed": "german_shepherd",
     "gender": "boy",
@@ -4093,7 +4093,7 @@
     "standard": false
   },
   {
-    "filename": "dog_german_shepherd_boy_black_red.png",
+    "filename": "dog_german_shepherd_boy_black_red.webp",
     "species": "dog",
     "breed": "german_shepherd",
     "gender": "boy",
@@ -4104,7 +4104,7 @@
     "standard": false
   },
   {
-    "filename": "dog_german_shepherd_boy_solid_black.png",
+    "filename": "dog_german_shepherd_boy_solid_black.webp",
     "species": "dog",
     "breed": "german_shepherd",
     "gender": "boy",
@@ -4115,7 +4115,7 @@
     "standard": false
   },
   {
-    "filename": "dog_german_shepherd_boy_solid_white.png",
+    "filename": "dog_german_shepherd_boy_solid_white.webp",
     "species": "dog",
     "breed": "german_shepherd",
     "gender": "boy",
@@ -4126,7 +4126,7 @@
     "standard": false
   },
   {
-    "filename": "dog_german_shepherd_girl_black_tan_saddle.png",
+    "filename": "dog_german_shepherd_girl_black_tan_saddle.webp",
     "species": "dog",
     "breed": "german_shepherd",
     "gender": "girl",
@@ -4137,7 +4137,7 @@
     "standard": false
   },
   {
-    "filename": "dog_german_shepherd_girl_black_red.png",
+    "filename": "dog_german_shepherd_girl_black_red.webp",
     "species": "dog",
     "breed": "german_shepherd",
     "gender": "girl",
@@ -4148,7 +4148,7 @@
     "standard": false
   },
   {
-    "filename": "dog_german_shepherd_girl_solid_black.png",
+    "filename": "dog_german_shepherd_girl_solid_black.webp",
     "species": "dog",
     "breed": "german_shepherd",
     "gender": "girl",
@@ -4159,7 +4159,7 @@
     "standard": false
   },
   {
-    "filename": "dog_german_shepherd_girl_solid_white.png",
+    "filename": "dog_german_shepherd_girl_solid_white.webp",
     "species": "dog",
     "breed": "german_shepherd",
     "gender": "girl",
@@ -4170,7 +4170,7 @@
     "standard": false
   },
   {
-    "filename": "dog_cocker_spaniel_boy_black.png",
+    "filename": "dog_cocker_spaniel_boy_black.webp",
     "species": "dog",
     "breed": "cocker_spaniel",
     "gender": "boy",
@@ -4181,7 +4181,7 @@
     "standard": false
   },
   {
-    "filename": "dog_cocker_spaniel_boy_golden.png",
+    "filename": "dog_cocker_spaniel_boy_golden.webp",
     "species": "dog",
     "breed": "cocker_spaniel",
     "gender": "boy",
@@ -4192,7 +4192,7 @@
     "standard": false
   },
   {
-    "filename": "dog_cocker_spaniel_boy_chocolate.png",
+    "filename": "dog_cocker_spaniel_boy_chocolate.webp",
     "species": "dog",
     "breed": "cocker_spaniel",
     "gender": "boy",
@@ -4203,7 +4203,7 @@
     "standard": false
   },
   {
-    "filename": "dog_cocker_spaniel_boy_parti.png",
+    "filename": "dog_cocker_spaniel_boy_parti.webp",
     "species": "dog",
     "breed": "cocker_spaniel",
     "gender": "boy",
@@ -4214,7 +4214,7 @@
     "standard": false
   },
   {
-    "filename": "dog_cocker_spaniel_girl_black.png",
+    "filename": "dog_cocker_spaniel_girl_black.webp",
     "species": "dog",
     "breed": "cocker_spaniel",
     "gender": "girl",
@@ -4225,7 +4225,7 @@
     "standard": false
   },
   {
-    "filename": "dog_cocker_spaniel_girl_golden.png",
+    "filename": "dog_cocker_spaniel_girl_golden.webp",
     "species": "dog",
     "breed": "cocker_spaniel",
     "gender": "girl",
@@ -4236,7 +4236,7 @@
     "standard": false
   },
   {
-    "filename": "dog_cocker_spaniel_girl_chocolate.png",
+    "filename": "dog_cocker_spaniel_girl_chocolate.webp",
     "species": "dog",
     "breed": "cocker_spaniel",
     "gender": "girl",
@@ -4247,7 +4247,7 @@
     "standard": false
   },
   {
-    "filename": "dog_cocker_spaniel_girl_parti.png",
+    "filename": "dog_cocker_spaniel_girl_parti.webp",
     "species": "dog",
     "breed": "cocker_spaniel",
     "gender": "girl",
@@ -4258,7 +4258,7 @@
     "standard": false
   },
   {
-    "filename": "dog_siberian_husky_boy_black_white.png",
+    "filename": "dog_siberian_husky_boy_black_white.webp",
     "species": "dog",
     "breed": "siberian_husky",
     "gender": "boy",
@@ -4269,7 +4269,7 @@
     "standard": false
   },
   {
-    "filename": "dog_siberian_husky_boy_gray_white.png",
+    "filename": "dog_siberian_husky_boy_gray_white.webp",
     "species": "dog",
     "breed": "siberian_husky",
     "gender": "boy",
@@ -4280,7 +4280,7 @@
     "standard": false
   },
   {
-    "filename": "dog_siberian_husky_boy_red_white.png",
+    "filename": "dog_siberian_husky_boy_red_white.webp",
     "species": "dog",
     "breed": "siberian_husky",
     "gender": "boy",
@@ -4291,7 +4291,7 @@
     "standard": false
   },
   {
-    "filename": "dog_siberian_husky_boy_solid_white.png",
+    "filename": "dog_siberian_husky_boy_solid_white.webp",
     "species": "dog",
     "breed": "siberian_husky",
     "gender": "boy",
@@ -4302,7 +4302,7 @@
     "standard": false
   },
   {
-    "filename": "dog_siberian_husky_boy_silver_white.png",
+    "filename": "dog_siberian_husky_boy_silver_white.webp",
     "species": "dog",
     "breed": "siberian_husky",
     "gender": "boy",
@@ -4313,7 +4313,7 @@
     "standard": false
   },
   {
-    "filename": "dog_siberian_husky_girl_black_white.png",
+    "filename": "dog_siberian_husky_girl_black_white.webp",
     "species": "dog",
     "breed": "siberian_husky",
     "gender": "girl",
@@ -4324,7 +4324,7 @@
     "standard": false
   },
   {
-    "filename": "dog_siberian_husky_girl_gray_white.png",
+    "filename": "dog_siberian_husky_girl_gray_white.webp",
     "species": "dog",
     "breed": "siberian_husky",
     "gender": "girl",
@@ -4335,7 +4335,7 @@
     "standard": false
   },
   {
-    "filename": "dog_siberian_husky_girl_red_white.png",
+    "filename": "dog_siberian_husky_girl_red_white.webp",
     "species": "dog",
     "breed": "siberian_husky",
     "gender": "girl",
@@ -4346,7 +4346,7 @@
     "standard": false
   },
   {
-    "filename": "dog_siberian_husky_girl_solid_white.png",
+    "filename": "dog_siberian_husky_girl_solid_white.webp",
     "species": "dog",
     "breed": "siberian_husky",
     "gender": "girl",
@@ -4357,7 +4357,7 @@
     "standard": false
   },
   {
-    "filename": "dog_siberian_husky_girl_silver_white.png",
+    "filename": "dog_siberian_husky_girl_silver_white.webp",
     "species": "dog",
     "breed": "siberian_husky",
     "gender": "girl",
@@ -4368,7 +4368,7 @@
     "standard": false
   },
   {
-    "filename": "dog_pug_boy_fawn.png",
+    "filename": "dog_pug_boy_fawn.webp",
     "species": "dog",
     "breed": "pug",
     "gender": "boy",
@@ -4379,7 +4379,7 @@
     "standard": false
   },
   {
-    "filename": "dog_pug_girl_fawn.png",
+    "filename": "dog_pug_girl_fawn.webp",
     "species": "dog",
     "breed": "pug",
     "gender": "girl",
@@ -4390,7 +4390,7 @@
     "standard": false
   },
   {
-    "filename": "dog_pug_boy_black.png",
+    "filename": "dog_pug_boy_black.webp",
     "species": "dog",
     "breed": "pug",
     "gender": "boy",
@@ -4401,7 +4401,7 @@
     "standard": false
   },
   {
-    "filename": "dog_pug_girl_black.png",
+    "filename": "dog_pug_girl_black.webp",
     "species": "dog",
     "breed": "pug",
     "gender": "girl",
@@ -4412,7 +4412,7 @@
     "standard": false
   },
   {
-    "filename": "dog_pug_boy_apricot_fawn.png",
+    "filename": "dog_pug_boy_apricot_fawn.webp",
     "species": "dog",
     "breed": "pug",
     "gender": "boy",
@@ -4423,7 +4423,7 @@
     "standard": false
   },
   {
-    "filename": "dog_pug_girl_apricot_fawn.png",
+    "filename": "dog_pug_girl_apricot_fawn.webp",
     "species": "dog",
     "breed": "pug",
     "gender": "girl",
@@ -4434,7 +4434,7 @@
     "standard": false
   },
   {
-    "filename": "dog_pug_boy_silver_fawn.png",
+    "filename": "dog_pug_boy_silver_fawn.webp",
     "species": "dog",
     "breed": "pug",
     "gender": "boy",
@@ -4445,7 +4445,7 @@
     "standard": false
   },
   {
-    "filename": "dog_pug_girl_silver_fawn.png",
+    "filename": "dog_pug_girl_silver_fawn.webp",
     "species": "dog",
     "breed": "pug",
     "gender": "girl",
@@ -4456,7 +4456,7 @@
     "standard": false
   },
   {
-    "filename": "dog_boston_terrier_boy_black_white.png",
+    "filename": "dog_boston_terrier_boy_black_white.webp",
     "species": "dog",
     "breed": "boston_terrier",
     "gender": "boy",
@@ -4467,7 +4467,7 @@
     "standard": false
   },
   {
-    "filename": "dog_boston_terrier_girl_black_white.png",
+    "filename": "dog_boston_terrier_girl_black_white.webp",
     "species": "dog",
     "breed": "boston_terrier",
     "gender": "girl",
@@ -4478,7 +4478,7 @@
     "standard": false
   },
   {
-    "filename": "dog_boston_terrier_boy_brindle_white.png",
+    "filename": "dog_boston_terrier_boy_brindle_white.webp",
     "species": "dog",
     "breed": "boston_terrier",
     "gender": "boy",
@@ -4489,7 +4489,7 @@
     "standard": false
   },
   {
-    "filename": "dog_boston_terrier_girl_brindle_white.png",
+    "filename": "dog_boston_terrier_girl_brindle_white.webp",
     "species": "dog",
     "breed": "boston_terrier",
     "gender": "girl",
@@ -4500,7 +4500,7 @@
     "standard": false
   },
   {
-    "filename": "dog_boston_terrier_boy_seal_white.png",
+    "filename": "dog_boston_terrier_boy_seal_white.webp",
     "species": "dog",
     "breed": "boston_terrier",
     "gender": "boy",
@@ -4511,7 +4511,7 @@
     "standard": false
   },
   {
-    "filename": "dog_boston_terrier_girl_seal_white.png",
+    "filename": "dog_boston_terrier_girl_seal_white.webp",
     "species": "dog",
     "breed": "boston_terrier",
     "gender": "girl",
@@ -4522,7 +4522,7 @@
     "standard": false
   },
   {
-    "filename": "dog_chihuahua_boy_fawn.png",
+    "filename": "dog_chihuahua_boy_fawn.webp",
     "species": "dog",
     "breed": "chihuahua",
     "gender": "boy",
@@ -4533,7 +4533,7 @@
     "standard": false
   },
   {
-    "filename": "dog_chihuahua_girl_fawn.png",
+    "filename": "dog_chihuahua_girl_fawn.webp",
     "species": "dog",
     "breed": "chihuahua",
     "gender": "girl",
@@ -4544,7 +4544,7 @@
     "standard": false
   },
   {
-    "filename": "dog_chihuahua_boy_cream.png",
+    "filename": "dog_chihuahua_boy_cream.webp",
     "species": "dog",
     "breed": "chihuahua",
     "gender": "boy",
@@ -4555,7 +4555,7 @@
     "standard": false
   },
   {
-    "filename": "dog_chihuahua_girl_cream.png",
+    "filename": "dog_chihuahua_girl_cream.webp",
     "species": "dog",
     "breed": "chihuahua",
     "gender": "girl",
@@ -4566,7 +4566,7 @@
     "standard": false
   },
   {
-    "filename": "dog_chihuahua_boy_black_tan.png",
+    "filename": "dog_chihuahua_boy_black_tan.webp",
     "species": "dog",
     "breed": "chihuahua",
     "gender": "boy",
@@ -4577,7 +4577,7 @@
     "standard": false
   },
   {
-    "filename": "dog_chihuahua_girl_black_tan.png",
+    "filename": "dog_chihuahua_girl_black_tan.webp",
     "species": "dog",
     "breed": "chihuahua",
     "gender": "girl",
@@ -4588,7 +4588,7 @@
     "standard": false
   },
   {
-    "filename": "dog_chihuahua_boy_chocolate.png",
+    "filename": "dog_chihuahua_boy_chocolate.webp",
     "species": "dog",
     "breed": "chihuahua",
     "gender": "boy",
@@ -4599,7 +4599,7 @@
     "standard": false
   },
   {
-    "filename": "dog_chihuahua_girl_chocolate.png",
+    "filename": "dog_chihuahua_girl_chocolate.webp",
     "species": "dog",
     "breed": "chihuahua",
     "gender": "girl",
@@ -4610,7 +4610,7 @@
     "standard": false
   },
   {
-    "filename": "dog_akita_boy_red.png",
+    "filename": "dog_akita_boy_red.webp",
     "species": "dog",
     "breed": "akita",
     "gender": "boy",
@@ -4621,7 +4621,7 @@
     "standard": false
   },
   {
-    "filename": "dog_akita_girl_red.png",
+    "filename": "dog_akita_girl_red.webp",
     "species": "dog",
     "breed": "akita",
     "gender": "girl",
@@ -4632,7 +4632,7 @@
     "standard": false
   },
   {
-    "filename": "dog_akita_boy_white.png",
+    "filename": "dog_akita_boy_white.webp",
     "species": "dog",
     "breed": "akita",
     "gender": "boy",
@@ -4643,7 +4643,7 @@
     "standard": false
   },
   {
-    "filename": "dog_akita_girl_white.png",
+    "filename": "dog_akita_girl_white.webp",
     "species": "dog",
     "breed": "akita",
     "gender": "girl",
@@ -4654,7 +4654,7 @@
     "standard": false
   },
   {
-    "filename": "dog_akita_boy_brindle.png",
+    "filename": "dog_akita_boy_brindle.webp",
     "species": "dog",
     "breed": "akita",
     "gender": "boy",
@@ -4665,7 +4665,7 @@
     "standard": false
   },
   {
-    "filename": "dog_akita_girl_brindle.png",
+    "filename": "dog_akita_girl_brindle.webp",
     "species": "dog",
     "breed": "akita",
     "gender": "girl",
@@ -4676,7 +4676,7 @@
     "standard": false
   },
   {
-    "filename": "dog_akita_boy_sesame.png",
+    "filename": "dog_akita_boy_sesame.webp",
     "species": "dog",
     "breed": "akita",
     "gender": "boy",
@@ -4687,7 +4687,7 @@
     "standard": false
   },
   {
-    "filename": "dog_akita_girl_sesame.png",
+    "filename": "dog_akita_girl_sesame.webp",
     "species": "dog",
     "breed": "akita",
     "gender": "girl",
@@ -4698,7 +4698,7 @@
     "standard": false
   },
   {
-    "filename": "dog_jack_russell_terrier_boy_brown_white.png",
+    "filename": "dog_jack_russell_terrier_boy_brown_white.webp",
     "species": "dog",
     "breed": "jack_russell_terrier",
     "gender": "boy",
@@ -4709,7 +4709,7 @@
     "standard": false
   },
   {
-    "filename": "dog_jack_russell_terrier_girl_brown_white.png",
+    "filename": "dog_jack_russell_terrier_girl_brown_white.webp",
     "species": "dog",
     "breed": "jack_russell_terrier",
     "gender": "girl",
@@ -4720,7 +4720,7 @@
     "standard": false
   },
   {
-    "filename": "dog_jack_russell_terrier_boy_black_white.png",
+    "filename": "dog_jack_russell_terrier_boy_black_white.webp",
     "species": "dog",
     "breed": "jack_russell_terrier",
     "gender": "boy",
@@ -4731,7 +4731,7 @@
     "standard": false
   },
   {
-    "filename": "dog_jack_russell_terrier_girl_black_white.png",
+    "filename": "dog_jack_russell_terrier_girl_black_white.webp",
     "species": "dog",
     "breed": "jack_russell_terrier",
     "gender": "girl",
@@ -4742,7 +4742,7 @@
     "standard": false
   },
   {
-    "filename": "dog_jack_russell_terrier_boy_tricolor.png",
+    "filename": "dog_jack_russell_terrier_boy_tricolor.webp",
     "species": "dog",
     "breed": "jack_russell_terrier",
     "gender": "boy",
@@ -4753,7 +4753,7 @@
     "standard": false
   },
   {
-    "filename": "dog_jack_russell_terrier_girl_tricolor.png",
+    "filename": "dog_jack_russell_terrier_girl_tricolor.webp",
     "species": "dog",
     "breed": "jack_russell_terrier",
     "gender": "girl",
@@ -4764,7 +4764,7 @@
     "standard": false
   },
   {
-    "filename": "dog_rottweiler_boy_standard.png",
+    "filename": "dog_rottweiler_boy_standard.webp",
     "species": "dog",
     "breed": "rottweiler",
     "gender": "boy",
@@ -4775,7 +4775,7 @@
     "standard": false
   },
   {
-    "filename": "dog_rottweiler_girl_standard.png",
+    "filename": "dog_rottweiler_girl_standard.webp",
     "species": "dog",
     "breed": "rottweiler",
     "gender": "girl",
@@ -4786,7 +4786,7 @@
     "standard": false
   },
   {
-    "filename": "dog_shar_pei_boy_fawn.png",
+    "filename": "dog_shar_pei_boy_fawn.webp",
     "species": "dog",
     "breed": "shar_pei",
     "gender": "boy",
@@ -4797,7 +4797,7 @@
     "standard": false
   },
   {
-    "filename": "dog_shar_pei_girl_fawn.png",
+    "filename": "dog_shar_pei_girl_fawn.webp",
     "species": "dog",
     "breed": "shar_pei",
     "gender": "girl",
@@ -4808,7 +4808,7 @@
     "standard": false
   },
   {
-    "filename": "dog_shar_pei_boy_cream.png",
+    "filename": "dog_shar_pei_boy_cream.webp",
     "species": "dog",
     "breed": "shar_pei",
     "gender": "boy",
@@ -4819,7 +4819,7 @@
     "standard": false
   },
   {
-    "filename": "dog_shar_pei_girl_cream.png",
+    "filename": "dog_shar_pei_girl_cream.webp",
     "species": "dog",
     "breed": "shar_pei",
     "gender": "girl",
@@ -4830,7 +4830,7 @@
     "standard": false
   },
   {
-    "filename": "dog_shar_pei_boy_black.png",
+    "filename": "dog_shar_pei_boy_black.webp",
     "species": "dog",
     "breed": "shar_pei",
     "gender": "boy",
@@ -4841,7 +4841,7 @@
     "standard": false
   },
   {
-    "filename": "dog_shar_pei_girl_black.png",
+    "filename": "dog_shar_pei_girl_black.webp",
     "species": "dog",
     "breed": "shar_pei",
     "gender": "girl",
@@ -4852,7 +4852,7 @@
     "standard": false
   },
   {
-    "filename": "dog_chow_chow_boy_red.png",
+    "filename": "dog_chow_chow_boy_red.webp",
     "species": "dog",
     "breed": "chow_chow",
     "gender": "boy",
@@ -4863,7 +4863,7 @@
     "standard": false
   },
   {
-    "filename": "dog_chow_chow_girl_red.png",
+    "filename": "dog_chow_chow_girl_red.webp",
     "species": "dog",
     "breed": "chow_chow",
     "gender": "girl",
@@ -4874,7 +4874,7 @@
     "standard": false
   },
   {
-    "filename": "dog_chow_chow_boy_black.png",
+    "filename": "dog_chow_chow_boy_black.webp",
     "species": "dog",
     "breed": "chow_chow",
     "gender": "boy",
@@ -4885,7 +4885,7 @@
     "standard": false
   },
   {
-    "filename": "dog_chow_chow_girl_black.png",
+    "filename": "dog_chow_chow_girl_black.webp",
     "species": "dog",
     "breed": "chow_chow",
     "gender": "girl",
@@ -4896,7 +4896,7 @@
     "standard": false
   },
   {
-    "filename": "dog_chow_chow_boy_cream.png",
+    "filename": "dog_chow_chow_boy_cream.webp",
     "species": "dog",
     "breed": "chow_chow",
     "gender": "boy",
@@ -4907,7 +4907,7 @@
     "standard": false
   },
   {
-    "filename": "dog_chow_chow_girl_cream.png",
+    "filename": "dog_chow_chow_girl_cream.webp",
     "species": "dog",
     "breed": "chow_chow",
     "gender": "girl",
@@ -4918,7 +4918,7 @@
     "standard": false
   },
   {
-    "filename": "dog_shetland_sheepdog_boy_sable_white.png",
+    "filename": "dog_shetland_sheepdog_boy_sable_white.webp",
     "species": "dog",
     "breed": "shetland_sheepdog",
     "gender": "boy",
@@ -4929,7 +4929,7 @@
     "standard": false
   },
   {
-    "filename": "dog_shetland_sheepdog_girl_sable_white.png",
+    "filename": "dog_shetland_sheepdog_girl_sable_white.webp",
     "species": "dog",
     "breed": "shetland_sheepdog",
     "gender": "girl",
@@ -4940,7 +4940,7 @@
     "standard": false
   },
   {
-    "filename": "dog_shetland_sheepdog_boy_tricolor.png",
+    "filename": "dog_shetland_sheepdog_boy_tricolor.webp",
     "species": "dog",
     "breed": "shetland_sheepdog",
     "gender": "boy",
@@ -4951,7 +4951,7 @@
     "standard": false
   },
   {
-    "filename": "dog_shetland_sheepdog_girl_tricolor.png",
+    "filename": "dog_shetland_sheepdog_girl_tricolor.webp",
     "species": "dog",
     "breed": "shetland_sheepdog",
     "gender": "girl",
@@ -4962,7 +4962,7 @@
     "standard": false
   },
   {
-    "filename": "dog_shetland_sheepdog_boy_blue_merle.png",
+    "filename": "dog_shetland_sheepdog_boy_blue_merle.webp",
     "species": "dog",
     "breed": "shetland_sheepdog",
     "gender": "boy",
@@ -4973,7 +4973,7 @@
     "standard": false
   },
   {
-    "filename": "dog_shetland_sheepdog_girl_blue_merle.png",
+    "filename": "dog_shetland_sheepdog_girl_blue_merle.webp",
     "species": "dog",
     "breed": "shetland_sheepdog",
     "gender": "girl",
@@ -4984,7 +4984,7 @@
     "standard": false
   },
   {
-    "filename": "dog_english_bulldog_boy_fawn_white.png",
+    "filename": "dog_english_bulldog_boy_fawn_white.webp",
     "species": "dog",
     "breed": "english_bulldog",
     "gender": "boy",
@@ -4995,7 +4995,7 @@
     "standard": false
   },
   {
-    "filename": "dog_english_bulldog_girl_fawn_white.png",
+    "filename": "dog_english_bulldog_girl_fawn_white.webp",
     "species": "dog",
     "breed": "english_bulldog",
     "gender": "girl",
@@ -5006,7 +5006,7 @@
     "standard": false
   },
   {
-    "filename": "dog_english_bulldog_boy_brindle_white.png",
+    "filename": "dog_english_bulldog_boy_brindle_white.webp",
     "species": "dog",
     "breed": "english_bulldog",
     "gender": "boy",
@@ -5017,7 +5017,7 @@
     "standard": false
   },
   {
-    "filename": "dog_english_bulldog_girl_brindle_white.png",
+    "filename": "dog_english_bulldog_girl_brindle_white.webp",
     "species": "dog",
     "breed": "english_bulldog",
     "gender": "girl",
@@ -5028,7 +5028,7 @@
     "standard": false
   },
   {
-    "filename": "dog_english_bulldog_boy_red_white.png",
+    "filename": "dog_english_bulldog_boy_red_white.webp",
     "species": "dog",
     "breed": "english_bulldog",
     "gender": "boy",
@@ -5039,7 +5039,7 @@
     "standard": false
   },
   {
-    "filename": "dog_english_bulldog_girl_red_white.png",
+    "filename": "dog_english_bulldog_girl_red_white.webp",
     "species": "dog",
     "breed": "english_bulldog",
     "gender": "girl",
@@ -5050,7 +5050,7 @@
     "standard": false
   },
   {
-    "filename": "cat_exotic_shorthair_boy_white.png",
+    "filename": "cat_exotic_shorthair_boy_white.webp",
     "species": "cat",
     "breed": "exotic_shorthair",
     "gender": "boy",
@@ -5061,7 +5061,7 @@
     "standard": false
   },
   {
-    "filename": "cat_exotic_shorthair_girl_white.png",
+    "filename": "cat_exotic_shorthair_girl_white.webp",
     "species": "cat",
     "breed": "exotic_shorthair",
     "gender": "girl",
@@ -5072,7 +5072,7 @@
     "standard": false
   },
   {
-    "filename": "cat_exotic_shorthair_boy_blue_gray.png",
+    "filename": "cat_exotic_shorthair_boy_blue_gray.webp",
     "species": "cat",
     "breed": "exotic_shorthair",
     "gender": "boy",
@@ -5083,7 +5083,7 @@
     "standard": false
   },
   {
-    "filename": "cat_exotic_shorthair_girl_blue_gray.png",
+    "filename": "cat_exotic_shorthair_girl_blue_gray.webp",
     "species": "cat",
     "breed": "exotic_shorthair",
     "gender": "girl",
@@ -5094,7 +5094,7 @@
     "standard": false
   },
   {
-    "filename": "cat_exotic_shorthair_boy_orange_white.png",
+    "filename": "cat_exotic_shorthair_boy_orange_white.webp",
     "species": "cat",
     "breed": "exotic_shorthair",
     "gender": "boy",
@@ -5105,7 +5105,7 @@
     "standard": false
   },
   {
-    "filename": "cat_exotic_shorthair_girl_orange_white.png",
+    "filename": "cat_exotic_shorthair_girl_orange_white.webp",
     "species": "cat",
     "breed": "exotic_shorthair",
     "gender": "girl",
@@ -5116,7 +5116,7 @@
     "standard": false
   },
   {
-    "filename": "cat_munchkin_boy_silver_tabby.png",
+    "filename": "cat_munchkin_boy_silver_tabby.webp",
     "species": "cat",
     "breed": "munchkin",
     "gender": "boy",
@@ -5127,7 +5127,7 @@
     "standard": false
   },
   {
-    "filename": "cat_munchkin_girl_silver_tabby.png",
+    "filename": "cat_munchkin_girl_silver_tabby.webp",
     "species": "cat",
     "breed": "munchkin",
     "gender": "girl",
@@ -5138,7 +5138,7 @@
     "standard": false
   },
   {
-    "filename": "cat_munchkin_boy_orange_tabby.png",
+    "filename": "cat_munchkin_boy_orange_tabby.webp",
     "species": "cat",
     "breed": "munchkin",
     "gender": "boy",
@@ -5149,7 +5149,7 @@
     "standard": false
   },
   {
-    "filename": "cat_munchkin_girl_orange_tabby.png",
+    "filename": "cat_munchkin_girl_orange_tabby.webp",
     "species": "cat",
     "breed": "munchkin",
     "gender": "girl",
@@ -5160,7 +5160,7 @@
     "standard": false
   },
   {
-    "filename": "cat_munchkin_boy_black_white.png",
+    "filename": "cat_munchkin_boy_black_white.webp",
     "species": "cat",
     "breed": "munchkin",
     "gender": "boy",
@@ -5171,7 +5171,7 @@
     "standard": false
   },
   {
-    "filename": "cat_munchkin_girl_black_white.png",
+    "filename": "cat_munchkin_girl_black_white.webp",
     "species": "cat",
     "breed": "munchkin",
     "gender": "girl",
@@ -5182,7 +5182,7 @@
     "standard": false
   },
   {
-    "filename": "cat_birman_boy_seal_point.png",
+    "filename": "cat_birman_boy_seal_point.webp",
     "species": "cat",
     "breed": "birman",
     "gender": "boy",
@@ -5193,7 +5193,7 @@
     "standard": false
   },
   {
-    "filename": "cat_birman_girl_seal_point.png",
+    "filename": "cat_birman_girl_seal_point.webp",
     "species": "cat",
     "breed": "birman",
     "gender": "girl",
@@ -5204,7 +5204,7 @@
     "standard": false
   },
   {
-    "filename": "cat_birman_boy_blue_point.png",
+    "filename": "cat_birman_boy_blue_point.webp",
     "species": "cat",
     "breed": "birman",
     "gender": "boy",
@@ -5215,7 +5215,7 @@
     "standard": false
   },
   {
-    "filename": "cat_birman_girl_blue_point.png",
+    "filename": "cat_birman_girl_blue_point.webp",
     "species": "cat",
     "breed": "birman",
     "gender": "girl",
@@ -5226,7 +5226,7 @@
     "standard": false
   },
   {
-    "filename": "cat_birman_boy_chocolate_point.png",
+    "filename": "cat_birman_boy_chocolate_point.webp",
     "species": "cat",
     "breed": "birman",
     "gender": "boy",
@@ -5237,7 +5237,7 @@
     "standard": false
   },
   {
-    "filename": "cat_birman_girl_chocolate_point.png",
+    "filename": "cat_birman_girl_chocolate_point.webp",
     "species": "cat",
     "breed": "birman",
     "gender": "girl",
@@ -5248,7 +5248,7 @@
     "standard": false
   },
   {
-    "filename": "cat_siberian_boy_brown_tabby.png",
+    "filename": "cat_siberian_boy_brown_tabby.webp",
     "species": "cat",
     "breed": "siberian",
     "gender": "boy",
@@ -5259,7 +5259,7 @@
     "standard": false
   },
   {
-    "filename": "cat_siberian_girl_brown_tabby.png",
+    "filename": "cat_siberian_girl_brown_tabby.webp",
     "species": "cat",
     "breed": "siberian",
     "gender": "girl",
@@ -5270,7 +5270,7 @@
     "standard": false
   },
   {
-    "filename": "cat_siberian_boy_silver_tabby.png",
+    "filename": "cat_siberian_boy_silver_tabby.webp",
     "species": "cat",
     "breed": "siberian",
     "gender": "boy",
@@ -5281,7 +5281,7 @@
     "standard": false
   },
   {
-    "filename": "cat_siberian_girl_silver_tabby.png",
+    "filename": "cat_siberian_girl_silver_tabby.webp",
     "species": "cat",
     "breed": "siberian",
     "gender": "girl",
@@ -5292,7 +5292,7 @@
     "standard": false
   },
   {
-    "filename": "cat_siberian_boy_colorpoint.png",
+    "filename": "cat_siberian_boy_colorpoint.webp",
     "species": "cat",
     "breed": "siberian",
     "gender": "boy",
@@ -5303,7 +5303,7 @@
     "standard": false
   },
   {
-    "filename": "cat_siberian_girl_colorpoint.png",
+    "filename": "cat_siberian_girl_colorpoint.webp",
     "species": "cat",
     "breed": "siberian",
     "gender": "girl",

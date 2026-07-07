@@ -35,7 +35,7 @@ enum Avatar2DCandidateProvider {
         let groups = HumanAvatarAssetCatalog.AgeGroup.allCases
         let defaultGroup = HumanAvatarAssetCatalog.ageGroup(for: birthday)
         let orderedGroups = ([defaultGroup] + groups.filter { $0 != defaultGroup }).prefix(4)
-        var filenames = orderedGroups.map { "human_\(genderSlug)_\($0.rawValue).png" }
+        var filenames = orderedGroups.map { "human_\(genderSlug)_\($0.rawValue).webp" }
         if let defaultFilename {
             filenames.removeAll { $0 == defaultFilename }
             filenames.insert(defaultFilename, at: 0)
@@ -90,8 +90,8 @@ enum Avatar2DCandidateProvider {
             guard seen.insert(filename).inserted,
                   let data = data(filename: filename, directory: directory)
             else { return nil }
-            let clean = filename
-                .replacingOccurrences(of: ".png", with: "")
+            let clean = (filename as NSString)
+                .deletingPathExtension
                 .split(separator: "_")
                 .suffix(2)
                 .joined(separator: " ")
@@ -116,14 +116,21 @@ enum Avatar2DCandidateProvider {
     private static func bundledFilenames(directory: String) -> [String] {
         let pngURLs = Bundle.main.urls(forResourcesWithExtension: "png", subdirectory: directory) ?? []
         let webpURLs = Bundle.main.urls(forResourcesWithExtension: "webp", subdirectory: directory) ?? []
-        var seen: Set<String> = []
-        return (pngURLs + webpURLs)
-            .map { url in
-                let name = (url.lastPathComponent as NSString).deletingPathExtension
-                return "\(name).png"
+        var filenamesByStem: [String: String] = [:]
+        for url in pngURLs {
+            let name = (url.lastPathComponent as NSString).deletingPathExtension
+            filenamesByStem[name] = "\(name).png"
+        }
+        for url in webpURLs {
+            let name = (url.lastPathComponent as NSString).deletingPathExtension
+            filenamesByStem[name] = "\(name).webp"
+        }
+        return filenamesByStem.values
+            .filter { filename in
+                let name = (filename as NSString).deletingPathExtension
+                return name.contains("_")
+                    && name.trimmingCharacters(in: .whitespacesAndNewlines) == name
             }
-            .filter { $0.contains("_") }
-            .filter { seen.insert($0).inserted }
             .sorted()
     }
 

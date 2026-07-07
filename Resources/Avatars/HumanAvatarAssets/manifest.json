@@ -1,104 +1,104 @@
 [
   {
-    "filename": "human_male_teen.png",
+    "filename": "human_male_teen.webp",
     "gender": "male",
     "genderName": "男",
     "ageGroup": "teen",
     "ageGroupName": "少年"
   },
   {
-    "filename": "human_male_young_adult.png",
+    "filename": "human_male_young_adult.webp",
     "gender": "male",
     "genderName": "男",
     "ageGroup": "young_adult",
     "ageGroupName": "青年"
   },
   {
-    "filename": "human_male_mid_adult.png",
+    "filename": "human_male_mid_adult.webp",
     "gender": "male",
     "genderName": "男",
     "ageGroup": "mid_adult",
     "ageGroupName": "中青年"
   },
   {
-    "filename": "human_male_late_adult.png",
+    "filename": "human_male_late_adult.webp",
     "gender": "male",
     "genderName": "男",
     "ageGroup": "late_adult",
     "ageGroupName": "中老年"
   },
   {
-    "filename": "human_male_senior.png",
+    "filename": "human_male_senior.webp",
     "gender": "male",
     "genderName": "男",
     "ageGroup": "senior",
     "ageGroupName": "老年"
   },
   {
-    "filename": "human_female_teen.png",
+    "filename": "human_female_teen.webp",
     "gender": "female",
     "genderName": "女",
     "ageGroup": "teen",
     "ageGroupName": "少年"
   },
   {
-    "filename": "human_female_young_adult.png",
+    "filename": "human_female_young_adult.webp",
     "gender": "female",
     "genderName": "女",
     "ageGroup": "young_adult",
     "ageGroupName": "青年"
   },
   {
-    "filename": "human_female_mid_adult.png",
+    "filename": "human_female_mid_adult.webp",
     "gender": "female",
     "genderName": "女",
     "ageGroup": "mid_adult",
     "ageGroupName": "中青年"
   },
   {
-    "filename": "human_female_late_adult.png",
+    "filename": "human_female_late_adult.webp",
     "gender": "female",
     "genderName": "女",
     "ageGroup": "late_adult",
     "ageGroupName": "中老年"
   },
   {
-    "filename": "human_female_senior.png",
+    "filename": "human_female_senior.webp",
     "gender": "female",
     "genderName": "女",
     "ageGroup": "senior",
     "ageGroupName": "老年"
   },
   {
-    "filename": "human_nonbinary_teen.png",
+    "filename": "human_nonbinary_teen.webp",
     "gender": "nonbinary",
     "genderName": "非二元",
     "ageGroup": "teen",
     "ageGroupName": "少年"
   },
   {
-    "filename": "human_nonbinary_young_adult.png",
+    "filename": "human_nonbinary_young_adult.webp",
     "gender": "nonbinary",
     "genderName": "非二元",
     "ageGroup": "young_adult",
     "ageGroupName": "青年"
   },
   {
-    "filename": "human_nonbinary_mid_adult.png",
+    "filename": "human_nonbinary_mid_adult.webp",
     "gender": "nonbinary",
     "genderName": "非二元",
     "ageGroup": "mid_adult",
     "ageGroupName": "中青年"
   },
   {
-    "filename": "human_nonbinary_late_adult.png",
+    "filename": "human_nonbinary_late_adult.webp",
     "gender": "nonbinary",
     "genderName": "非二元",
     "ageGroup": "late_adult",
     "ageGroupName": "中老年"
   },
   {
-    "filename": "human_nonbinary_senior.png",
+    "filename": "human_nonbinary_senior.webp",
     "gender": "nonbinary",
     "genderName": "非二元",
     "ageGroup": "senior",

@@ -194,7 +194,7 @@ struct PetAvatarAssetCatalogTests {
                 gender: "male",
                 coatColor: "红柴",
                 eyeColor: "深棕色"
-            ) == "dog_shiba_inu_boy_red.png"
+            ) == "dog_shiba_inu_boy_red.webp"
         )
 
         #expect(
@@ -204,7 +204,7 @@ struct PetAvatarAssetCatalogTests {
                 gender: "female",
                 coatColor: "金黄色",
                 eyeColor: "棕色"
-            ) == "dog_golden_retriever_girl_light_golden.png"
+            ) == "dog_golden_retriever_girl_light_golden.webp"
         )
 
         #expect(
@@ -214,7 +214,7 @@ struct PetAvatarAssetCatalogTests {
                 gender: "female",
                 coatColor: "蓝灰色",
                 eyeColor: "铜色"
-            ) == "cat_british_shorthair_girl_blue.png"
+            ) == "cat_british_shorthair_girl_blue.webp"
         )
 
         #expect(
@@ -224,7 +224,7 @@ struct PetAvatarAssetCatalogTests {
                 gender: "female",
                 coatColor: "海豹重点配白",
                 eyeColor: "蓝色"
-            ) == "cat_ragdoll_girl_seal_bicolor.png"
+            ) == "cat_ragdoll_girl_seal_bicolor.webp"
         )
 
         #expect(
@@ -234,7 +234,7 @@ struct PetAvatarAssetCatalogTests {
                 gender: "male",
                 coatColor: "银色",
                 eyeColor: "绿色"
-            ) == "cat_maine_coon_boy_silver_tabby.png"
+            ) == "cat_maine_coon_boy_silver_tabby.webp"
         )
 
         #expect(
@@ -244,7 +244,7 @@ struct PetAvatarAssetCatalogTests {
                 gender: "female",
                 coatColor: "蓝灰色",
                 eyeColor: "深棕色"
-            ) == "dog_french_bulldog_girl_blue_gray.png"
+            ) == "dog_french_bulldog_girl_blue_gray.webp"
         )
 
         #expect(
@@ -254,7 +254,7 @@ struct PetAvatarAssetCatalogTests {
                 gender: "male",
                 coatColor: "巧克力色",
                 eyeColor: "棕色"
-            ) == "dog_labrador_retriever_boy_chocolate.png"
+            ) == "dog_labrador_retriever_boy_chocolate.webp"
         )
 
         #expect(
@@ -264,7 +264,7 @@ struct PetAvatarAssetCatalogTests {
                 gender: "female",
                 coatColor: "黑白三色",
                 eyeColor: "深棕色"
-            ) == "dog_corgi_girl_black_white_tricolor.png"
+            ) == "dog_corgi_girl_black_white_tricolor.webp"
         )
 
         #expect(
@@ -274,7 +274,7 @@ struct PetAvatarAssetCatalogTests {
                 gender: "male",
                 coatColor: "黑棕白三色",
                 eyeColor: "棕色"
-            ) == "dog_beagle_boy_black_brown_white_tricolor.png"
+            ) == "dog_beagle_boy_black_brown_white_tricolor.webp"
         )
 
         #expect(
@@ -284,7 +284,7 @@ struct PetAvatarAssetCatalogTests {
                 gender: "female",
                 coatColor: "奶白",
                 eyeColor: "黑色"
-            ) == "dog_bichon_frise_girl_cream_white.png"
+            ) == "dog_bichon_frise_girl_cream_white.webp"
         )
 
         #expect(
@@ -294,7 +294,7 @@ struct PetAvatarAssetCatalogTests {
                 gender: "male",
                 coatColor: "白底肝斑",
                 eyeColor: "棕色"
-            ) == "dog_dalmatian_boy_liver_spotted.png"
+            ) == "dog_dalmatian_boy_liver_spotted.webp"
         )
 
         #expect(
@@ -304,7 +304,7 @@ struct PetAvatarAssetCatalogTests {
                 gender: "female",
                 coatColor: "蓝棕色",
                 eyeColor: "深棕色"
-            ) == "dog_doberman_girl_blue_tan.png"
+            ) == "dog_doberman_girl_blue_tan.webp"
         )
 
         #expect(
@@ -314,7 +314,7 @@ struct PetAvatarAssetCatalogTests {
                 gender: "male",
                 coatColor: "乳白",
                 eyeColor: "黑色"
-            ) == "dog_maltese_boy_ivory.png"
+            ) == "dog_maltese_boy_ivory.webp"
         )
 
         #expect(
@@ -324,7 +324,7 @@ struct PetAvatarAssetCatalogTests {
                 gender: "female",
                 coatColor: "红棕色",
                 eyeColor: "深棕色"
-            ) == "dog_afghan_hound_girl_red_brown.png"
+            ) == "dog_afghan_hound_girl_red_brown.webp"
         )
 
         #expect(
@@ -334,7 +334,7 @@ struct PetAvatarAssetCatalogTests {
                 gender: "male",
                 coatColor: "钢蓝背棕腿",
                 eyeColor: "黑色"
-            ) == "dog_yorkshire_terrier_boy_steel_blue_tan.png"
+            ) == "dog_yorkshire_terrier_boy_steel_blue_tan.webp"
         )
 
         #expect(
@@ -344,7 +344,7 @@ struct PetAvatarAssetCatalogTests {
                 gender: "female",
                 coatColor: "奶白色",
                 eyeColor: "黑色"
-            ) == "dog_samoyed_girl_cream_white.png"
+            ) == "dog_samoyed_girl_cream_white.webp"
         )
 
         #expect(
@@ -354,7 +354,7 @@ struct PetAvatarAssetCatalogTests {
                 gender: "female",
                 coatColor: "杏色",
                 eyeColor: "琥珀色"
-            ) == "dog_poodle_girl_apricot.png"
+            ) == "dog_poodle_girl_apricot.webp"
         )
 
         #expect(
@@ -364,7 +364,7 @@ struct PetAvatarAssetCatalogTests {
                 gender: "female",
                 coatColor: "金白色",
                 eyeColor: "深棕色"
-            ) == "dog_shih_tzu_girl_golden_white.png"
+            ) == "dog_shih_tzu_girl_golden_white.webp"
         )
 
         #expect(
@@ -374,7 +374,7 @@ struct PetAvatarAssetCatalogTests {
                 gender: "male",
                 coatColor: "花斑",
                 eyeColor: "棕色"
-            ) == "dog_chinese_rural_dog_boy_pied.png"
+            ) == "dog_chinese_rural_dog_boy_pied.webp"
         )
 
         #expect(
@@ -384,7 +384,7 @@ struct PetAvatarAssetCatalogTests {
                 gender: "male",
                 coatColor: "椒盐色",
                 eyeColor: "深棕色"
-            ) == "dog_miniature_schnauzer_boy_salt_pepper.png"
+            ) == "dog_miniature_schnauzer_boy_salt_pepper.webp"
         )
 
         #expect(
@@ -394,7 +394,7 @@ struct PetAvatarAssetCatalogTests {
                 gender: "female",
                 coatColor: "灰白",
                 eyeColor: "棕色"
-            ) == "dog_alaskan_malamute_girl_gray_white.png"
+            ) == "dog_alaskan_malamute_girl_gray_white.webp"
         )
 
         #expect(
@@ -404,7 +404,7 @@ struct PetAvatarAssetCatalogTests {
                 gender: "male",
                 coatColor: "蓝灰色",
                 eyeColor: "蓝色"
-            ) == "dog_australian_shepherd_boy_blue_gray.png"
+            ) == "dog_australian_shepherd_boy_blue_gray.webp"
         )
 
         #expect(
@@ -414,7 +414,7 @@ struct PetAvatarAssetCatalogTests {
                 gender: "female",
                 coatColor: "花斑色",
                 eyeColor: "异瞳"
-            ) == "dog_australian_shepherd_girl_dapple.png"
+            ) == "dog_australian_shepherd_girl_dapple.webp"
         )
 
         #expect(
@@ -424,7 +424,7 @@ struct PetAvatarAssetCatalogTests {
                 gender: "male",
                 coatColor: "黑白",
                 eyeColor: "棕色"
-            ) == "dog_border_collie_boy_black_white.png"
+            ) == "dog_border_collie_boy_black_white.webp"
         )
 
         #expect(
@@ -434,7 +434,7 @@ struct PetAvatarAssetCatalogTests {
                 gender: "female",
                 coatColor: "三色",
                 eyeColor: "异瞳"
-            ) == "dog_border_collie_girl_tricolor.png"
+            ) == "dog_border_collie_girl_tricolor.webp"
         )
 
         #expect(
@@ -444,7 +444,7 @@ struct PetAvatarAssetCatalogTests {
                 gender: "male",
                 coatColor: "橙色",
                 eyeColor: "深棕色"
-            ) == "dog_pomeranian_boy_orange.png"
+            ) == "dog_pomeranian_boy_orange.webp"
         )
 
         #expect(
@@ -454,7 +454,7 @@ struct PetAvatarAssetCatalogTests {
                 gender: "female",
                 coatColor: "奶油色",
                 eyeColor: "黑色"
-            ) == "dog_pomeranian_girl_cream.png"
+            ) == "dog_pomeranian_girl_cream.webp"
         )
 
         #expect(
@@ -464,7 +464,7 @@ struct PetAvatarAssetCatalogTests {
                 gender: "male",
                 coatColor: "布伦海姆色",
                 eyeColor: "深棕色"
-            ) == "dog_cavalier_king_charles_spaniel_boy_blenheim.png"
+            ) == "dog_cavalier_king_charles_spaniel_boy_blenheim.webp"
         )
 
         #expect(
@@ -474,7 +474,7 @@ struct PetAvatarAssetCatalogTests {
                 gender: "female",
                 coatColor: "黑棕色",
                 eyeColor: "黑色"
-            ) == "dog_cavalier_king_charles_spaniel_girl_black_tan.png"
+            ) == "dog_cavalier_king_charles_spaniel_girl_black_tan.webp"
         )
 
         #expect(
@@ -484,7 +484,7 @@ struct PetAvatarAssetCatalogTests {
                 gender: "male",
                 coatColor: "金色",
                 eyeColor: "棕色"
-            ) == "dog_cocker_spaniel_boy_golden.png"
+            ) == "dog_cocker_spaniel_boy_golden.webp"
         )
 
         #expect(
@@ -494,7 +494,7 @@ struct PetAvatarAssetCatalogTests {
                 gender: "female",
                 coatColor: "花斑",
                 eyeColor: "榛色"
-            ) == "dog_cocker_spaniel_girl_parti.png"
+            ) == "dog_cocker_spaniel_girl_parti.webp"
         )
 
         #expect(
@@ -504,7 +504,7 @@ struct PetAvatarAssetCatalogTests {
                 gender: "male",
                 coatColor: "灰白",
                 eyeColor: "冰蓝色"
-            ) == "dog_siberian_husky_boy_gray_white.png"
+            ) == "dog_siberian_husky_boy_gray_white.webp"
         )
 
         #expect(
@@ -514,7 +514,7 @@ struct PetAvatarAssetCatalogTests {
                 gender: "female",
                 coatColor: "银白",
                 eyeColor: "异瞳"
-            ) == "dog_siberian_husky_girl_silver_white.png"
+            ) == "dog_siberian_husky_girl_silver_white.webp"
         )
 
         #expect(
@@ -524,7 +524,7 @@ struct PetAvatarAssetCatalogTests {
                 gender: "male",
                 coatColor: "黑棕（鞍形）",
                 eyeColor: "棕色"
-            ) == "dog_german_shepherd_boy_black_tan_saddle.png"
+            ) == "dog_german_shepherd_boy_black_tan_saddle.webp"
         )
 
         #expect(
@@ -534,7 +534,7 @@ struct PetAvatarAssetCatalogTests {
                 gender: "female",
                 coatColor: "纯白",
                 eyeColor: "黑色"
-            ) == "dog_german_shepherd_girl_solid_white.png"
+            ) == "dog_german_shepherd_girl_solid_white.webp"
         )
 
         #expect(
@@ -544,7 +544,7 @@ struct PetAvatarAssetCatalogTests {
                 gender: "female",
                 coatColor: "巧克力棕",
                 eyeColor: "棕色"
-            ) == "dog_dachshund_girl_chocolate_brown.png"
+            ) == "dog_dachshund_girl_chocolate_brown.webp"
         )
 
         #expect(
@@ -554,7 +554,7 @@ struct PetAvatarAssetCatalogTests {
                 gender: "male",
                 coatColor: "花斑",
                 eyeColor: "蓝色"
-            ) == "dog_dachshund_boy_dapple.png"
+            ) == "dog_dachshund_boy_dapple.webp"
         )
 
         #expect(
@@ -564,7 +564,7 @@ struct PetAvatarAssetCatalogTests {
                 gender: "female",
                 coatColor: "白色",
                 eyeColor: "深棕色"
-            ) == "dog_west_highland_white_terrier_girl_white.png"
+            ) == "dog_west_highland_white_terrier_girl_white.webp"
         )
 
         #expect(
@@ -574,7 +574,7 @@ struct PetAvatarAssetCatalogTests {
                 gender: "male",
                 coatColor: "白色",
                 eyeColor: "黑色"
-            ) == "dog_west_highland_white_terrier_boy_white.png"
+            ) == "dog_west_highland_white_terrier_boy_white.webp"
         )
 
         #expect(
@@ -584,7 +584,7 @@ struct PetAvatarAssetCatalogTests {
                 gender: "female",
                 coatColor: "黑色",
                 eyeColor: "黑色"
-            ) == "dog_west_highland_white_terrier_girl_black.png"
+            ) == "dog_west_highland_white_terrier_girl_black.webp"
         )
 
         #expect(
@@ -594,7 +594,7 @@ struct PetAvatarAssetCatalogTests {
                 gender: "female",
                 coatColor: "蓝灰色",
                 eyeColor: "翠绿色"
-            ) == "cat_russian_blue_girl_blue_gray.png"
+            ) == "cat_russian_blue_girl_blue_gray.webp"
         )
 
         #expect(
@@ -604,7 +604,7 @@ struct PetAvatarAssetCatalogTests {
                 gender: "male",
                 coatColor: "浅银色",
                 eyeColor: "绿色"
-            ) == "cat_silver_shaded_boy_light_silver.png"
+            ) == "cat_silver_shaded_boy_light_silver.webp"
         )
 
         #expect(
@@ -614,7 +614,7 @@ struct PetAvatarAssetCatalogTests {
                 gender: "female",
                 coatColor: "深金色",
                 eyeColor: "铜绿色"
-            ) == "cat_golden_shaded_girl_dark_golden.png"
+            ) == "cat_golden_shaded_girl_dark_golden.webp"
         )
 
         #expect(
@@ -624,7 +624,7 @@ struct PetAvatarAssetCatalogTests {
                 gender: "male",
                 coatColor: "棕豹纹",
                 eyeColor: "金色"
-            ) == "cat_bengal_boy_brown_rosetted.png"
+            ) == "cat_bengal_boy_brown_rosetted.webp"
         )
 
         #expect(
@@ -634,7 +634,7 @@ struct PetAvatarAssetCatalogTests {
                 gender: "female",
                 coatColor: "栗色",
                 eyeColor: "琥珀色"
-            ) == "cat_somali_girl_fawn.png"
+            ) == "cat_somali_girl_fawn.webp"
         )
     }
 
@@ -646,7 +646,7 @@ struct PetAvatarAssetCatalogTests {
                 gender: "female",
                 coatColor: "虎斑",
                 eyeColor: "金色"
-            ) == "cat_scottish_fold_girl_tabby.png"
+            ) == "cat_scottish_fold_girl_tabby.webp"
         )
 
         #expect(
@@ -656,7 +656,7 @@ struct PetAvatarAssetCatalogTests {
                 gender: "male",
                 coatColor: "棕虎斑白",
                 eyeColor: "绿色"
-            ) == "cat_norwegian_forest_boy_brown_tabby_white.png"
+            ) == "cat_norwegian_forest_boy_brown_tabby_white.webp"
         )
 
         #expect(
@@ -666,7 +666,7 @@ struct PetAvatarAssetCatalogTests {
                 gender: "female",
                 coatColor: "貂褐色",
                 eyeColor: "金色"
-            ) == "cat_burmese_girl_sable.png"
+            ) == "cat_burmese_girl_sable.webp"
         )
 
         #expect(
@@ -676,7 +676,7 @@ struct PetAvatarAssetCatalogTests {
                 gender: "male",
                 coatColor: "虎纹肤色",
                 eyeColor: "蓝色"
-            ) == "cat_sphynx_boy_tabby_skin.png"
+            ) == "cat_sphynx_boy_tabby_skin.webp"
         )
 
         #expect(
@@ -686,7 +686,7 @@ struct PetAvatarAssetCatalogTests {
                 gender: "female",
                 coatColor: "白色",
                 eyeColor: "异瞳"
-            ) == "cat_turkish_angora_girl_white.png"
+            ) == "cat_turkish_angora_girl_white.webp"
         )
 
         #expect(
@@ -696,7 +696,7 @@ struct PetAvatarAssetCatalogTests {
                 gender: "female",
                 coatColor: "奶牛（黑白）",
                 eyeColor: "黄色"
-            ) == "cat_domestic_shorthair_girl_black_white.png"
+            ) == "cat_domestic_shorthair_girl_black_white.webp"
         )
     }
 
@@ -924,7 +924,7 @@ struct PetAvatarAssetCatalogTests {
                 gender: "female",
                 coatColor: "自定义",
                 eyeColor: "蓝色"
-            ) == "cat_girl_standard.png"
+            ) == "cat_girl_standard.webp"
         )
 
         #expect(
@@ -934,7 +934,7 @@ struct PetAvatarAssetCatalogTests {
                 gender: "male",
                 coatColor: "自定义",
                 eyeColor: "黑色"
-            ) == "cat_boy_standard.png"
+            ) == "cat_boy_standard.webp"
         )
 
         #expect(
@@ -944,7 +944,7 @@ struct PetAvatarAssetCatalogTests {
                 gender: "male",
                 coatColor: "蓝重点色",
                 eyeColor: "黑色"
-            ) == "cat_devon_rex_boy_blue_point.png"
+            ) == "cat_devon_rex_boy_blue_point.webp"
         )
 
         #expect(
@@ -954,7 +954,7 @@ struct PetAvatarAssetCatalogTests {
                 gender: "female",
                 coatColor: "金渐层",
                 eyeColor: "蓝色"
-            ) == "cat_british_shorthair_girl_golden_shaded.png"
+            ) == "cat_british_shorthair_girl_golden_shaded.webp"
         )
 
         #expect(
@@ -964,7 +964,7 @@ struct PetAvatarAssetCatalogTests {
                 gender: "male",
                 coatColor: "橘虎斑",
                 eyeColor: "绿色"
-            ) == "cat_american_shorthair_boy_orange_tabby.png"
+            ) == "cat_american_shorthair_boy_orange_tabby.webp"
         )
 
         #expect(
@@ -974,7 +974,7 @@ struct PetAvatarAssetCatalogTests {
                 gender: "female",
                 coatColor: "海豹双色",
                 eyeColor: "蓝色"
-            ) == "cat_ragdoll_girl_seal_bicolor.png"
+            ) == "cat_ragdoll_girl_seal_bicolor.webp"
         )
 
         #expect(
@@ -984,7 +984,7 @@ struct PetAvatarAssetCatalogTests {
                 gender: "male",
                 coatColor: "巧克力重点色",
                 eyeColor: "绿色"
-            ) == "cat_siamese_boy_chocolate_point.png"
+            ) == "cat_siamese_boy_chocolate_point.webp"
         )
 
         #expect(
@@ -994,7 +994,7 @@ struct PetAvatarAssetCatalogTests {
                 gender: "female",
                 coatColor: "黄褐色",
                 eyeColor: "琥珀色"
-            ) == "cat_abyssinian_girl_ruddy.png"
+            ) == "cat_abyssinian_girl_ruddy.webp"
         )
 
         #expect(
@@ -1004,7 +1004,7 @@ struct PetAvatarAssetCatalogTests {
                 gender: "male",
                 coatColor: "黑烟色",
                 eyeColor: "绿色"
-            ) == "cat_maine_coon_boy_black_smoke.png"
+            ) == "cat_maine_coon_boy_black_smoke.webp"
         )
 
         #expect(
@@ -1014,7 +1014,7 @@ struct PetAvatarAssetCatalogTests {
                 gender: "female",
                 coatColor: "蓝色",
                 eyeColor: "铜色"
-            ) == "cat_persian_girl_blue.png"
+            ) == "cat_persian_girl_blue.webp"
         )
 
         #expect(
@@ -1024,7 +1024,7 @@ struct PetAvatarAssetCatalogTests {
                 gender: "male",
                 coatColor: "奶油色",
                 eyeColor: "黑色"
-            ) == "cat_boy_standard.png"
+            ) == "cat_boy_standard.webp"
         )
 
         #expect(
@@ -1034,7 +1034,7 @@ struct PetAvatarAssetCatalogTests {
                 gender: "female",
                 coatColor: "银灰狸花",
                 eyeColor: "绿色"
-            ) == "cat_li_hua_girl_silver_mackerel_tabby.png"
+            ) == "cat_li_hua_girl_silver_mackerel_tabby.webp"
         )
 
         #expect(
@@ -1044,7 +1044,7 @@ struct PetAvatarAssetCatalogTests {
                 gender: "male",
                 coatColor: "赤色",
                 eyeColor: "黑色"
-            ) == "dog_shiba_inu_boy_red.png"
+            ) == "dog_shiba_inu_boy_red.webp"
         )
 
         #expect(
@@ -1054,7 +1054,7 @@ struct PetAvatarAssetCatalogTests {
                 gender: "female",
                 coatColor: "深金色",
                 eyeColor: "黑色"
-            ) == "dog_golden_retriever_girl_light_golden.png"
+            ) == "dog_golden_retriever_girl_light_golden.webp"
         )
     }
 
@@ -1090,7 +1090,7 @@ struct PetAvatarAssetCatalogTests {
                 gender: "female",
                 coatColor: "蓝重点配白",
                 eyeColor: "黑色"
-            ) == "cat_girl_standard.png"
+            ) == "cat_girl_standard.webp"
         )
     }
 
@@ -1102,7 +1102,7 @@ struct PetAvatarAssetCatalogTests {
                 gender: "male",
                 coatColor: "黑白",
                 eyeColor: "黑色"
-            ) == "dog_boy_standard.png"
+            ) == "dog_boy_standard.webp"
         )
 
         #expect(
@@ -1112,7 +1112,7 @@ struct PetAvatarAssetCatalogTests {
                 gender: "female",
                 coatColor: "白色",
                 eyeColor: "黑色"
-            ) == "rabbit_girl_standard.png"
+            ) == "rabbit_girl_standard.webp"
         )
 
         #expect(
@@ -1122,7 +1122,7 @@ struct PetAvatarAssetCatalogTests {
                 gender: "female",
                 coatColor: "红色",
                 eyeColor: "黑色"
-            ) == "fish_girl_standard.png"
+            ) == "fish_girl_standard.webp"
         )
 
         #expect(
@@ -1132,7 +1132,7 @@ struct PetAvatarAssetCatalogTests {
                 gender: "male",
                 coatColor: "灰色",
                 eyeColor: "黑色"
-            ) == "bird_boy_standard.png"
+            ) == "bird_boy_standard.webp"
         )
 
         #expect(
@@ -1142,7 +1142,7 @@ struct PetAvatarAssetCatalogTests {
                 gender: "male",
                 coatColor: "绿色",
                 eyeColor: "棕色"
-            ) == "reptile_boy_standard.png"
+            ) == "reptile_boy_standard.webp"
         )
 
         #expect(
@@ -1152,7 +1152,7 @@ struct PetAvatarAssetCatalogTests {
                 gender: "female",
                 coatColor: "金黄色",
                 eyeColor: "红色（白化）"
-            ) == "hamster_girl_standard.png"
+            ) == "hamster_girl_standard.webp"
         )
 
         #expect(
@@ -1162,7 +1162,7 @@ struct PetAvatarAssetCatalogTests {
                 gender: "female",
                 coatColor: "奶油色",
                 eyeColor: "黑色"
-            ) == "other_girl_standard.png"
+            ) == "other_girl_standard.webp"
         )
     }
 }

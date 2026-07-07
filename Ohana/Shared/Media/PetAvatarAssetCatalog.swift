@@ -1067,15 +1067,15 @@ enum PetAvatarAssetCatalog {
         guard speciesStandardSlugs.contains(speciesSlug) else { return nil }
         let breedSlug = normalizedBreed(breed)
         guard let appearances = breedAppearances(speciesSlug: speciesSlug, breedSlug: breedSlug) else {
-            return "\(speciesSlug)_\(genderSlug)_standard.png"
+            return "\(speciesSlug)_\(genderSlug)_standard.webp"
         }
 
         guard coatColor != "自定义",
               let appearance = appearances.first(where: { $0.matches(coatColor: coatColor) }) else {
-            return "\(speciesSlug)_\(genderSlug)_standard.png"
+            return "\(speciesSlug)_\(genderSlug)_standard.webp"
         }
 
-        return "\(speciesSlug)_\(breedSlug)_\(genderSlug)_\(appearance.coatSlug).png"
+        return "\(speciesSlug)_\(breedSlug)_\(genderSlug)_\(appearance.coatSlug).webp"
     }
 
     private static func breedAppearances(speciesSlug: String, breedSlug: String) -> [Appearance]? {

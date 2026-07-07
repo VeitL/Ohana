@@ -31,6 +31,76 @@ check_dir_budget() {
   fi
 }
 
+check_avatar_manifest() {
+  local label="$1"
+  local directory="$2"
+  local expected_extension="$3"
+  [[ -d "$directory" ]] || return 0
+
+  python3 - "$label" "$directory" "$expected_extension" <<'PY'
+from __future__ import annotations
+
+import json
+import pathlib
+import sys
+
+label = sys.argv[1]
+directory = pathlib.Path(sys.argv[2])
+expected_extension = sys.argv[3]
+manifest_path = directory / "manifest.json"
+errors: list[str] = []
+
+if not manifest_path.exists():
+    errors.append(f"{label}: missing manifest.json")
+else:
+    try:
+        entries = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        errors.append(f"{label}: manifest parse failed: {exc}")
+        entries = []
+
+    referenced: set[str] = set()
+    if not isinstance(entries, list):
+        errors.append(f"{label}: manifest root must be a list")
+        entries = []
+
+    for index, entry in enumerate(entries):
+        filename = entry.get("filename") if isinstance(entry, dict) else None
+        if not isinstance(filename, str) or not filename:
+            errors.append(f"{label}: manifest entry {index} has no filename")
+            continue
+        if filename != filename.strip():
+            errors.append(f"{label}: manifest filename has surrounding whitespace: {filename!r}")
+        if not filename.endswith(expected_extension):
+            errors.append(f"{label}: manifest filename must use {expected_extension}: {filename}")
+        if filename in referenced:
+            errors.append(f"{label}: duplicate manifest filename: {filename}")
+        referenced.add(filename)
+        if not (directory / filename).is_file():
+            errors.append(f"{label}: manifest references missing file: {filename}")
+
+    packaged = {
+        path.name
+        for path in directory.iterdir()
+        if path.is_file() and path.suffix.lower() in {".png", ".webp"}
+    }
+    source_pngs = sorted(name for name in packaged if name.endswith(".png"))
+    if source_pngs:
+        preview = ", ".join(repr(name) for name in source_pngs[:8])
+        errors.append(f"{label}: source PNGs must not live in packaged avatar directory: {preview}")
+
+    unreferenced = sorted(name for name in packaged if name.endswith(expected_extension) and name not in referenced)
+    if unreferenced:
+        preview = ", ".join(repr(name) for name in unreferenced[:8])
+        errors.append(f"{label}: packaged files not referenced by manifest: {preview}")
+
+for error in errors:
+    print(error)
+
+sys.exit(1 if errors else 0)
+PY
+}
+
 load_budget_lines() {
   if [[ ! -f "$budget_manifest" ]]; then
     printf 'error\tResource budget manifest is missing: %s\n' "$budget_manifest"
@@ -77,6 +147,19 @@ while IFS=$'\t' read -r path _limit_mib; do
     du -sh "$path"
   fi
 done < <(load_budget_lines)
+
+echo
+echo "== Avatar manifest integrity =="
+if ! check_avatar_manifest "Human avatars" "Resources/Avatars/HumanAvatarAssets" ".webp"; then
+  fail "Human avatar manifest integrity failed."
+else
+  echo "ok  Human avatars"
+fi
+if ! check_avatar_manifest "Pet avatars" "Resources/Avatars/PetAvatarAssets" ".webp"; then
+  fail "Pet avatar manifest integrity failed."
+else
+  echo "ok  Pet avatars"
+fi
 
 echo
 echo "== Finder / AppleDouble detritus =="

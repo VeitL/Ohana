@@ -288,13 +288,14 @@ teal neckerchief
 
 ---
 
-## 11. 构图与 PNG 交付规范
+## 11. 构图与头像交付规范
 
 | 项目 | 规范 |
 |---|---|
-| 文件格式 | PNG with alpha |
+| 源图格式 | PNG with alpha，仅保存在 `tmp/imagegen/` 或外部素材库 |
+| 正式入库格式 | WebP with alpha，文件后缀 `.webp` |
 | 正式入库画布尺寸 | `450x600` |
-| 源图目标尺寸 | 可直接生成 `600x800` 竖版源图；正式入库前必须通过 `scripts/optimize-pet-avatar-assets.py` 校正并压缩到 `450x600` |
+| 源图目标尺寸 | 可直接生成 `600x800` 竖版源图；正式入库前必须校正并压缩到 `450x600` WebP |
 | 背景 | 最终文件必须为真透明 alpha，不要纯色底、阴影底、渐变底 |
 | 主体 | 全身完整可见，头顶、耳朵、尾巴、脚掌不能裁切 |
 | 脚部 | 禁止鞋子和袜子，脚部必须是符合物种的裸露圆润毛绒脚掌 / 爪爪 |
@@ -305,7 +306,7 @@ teal neckerchief
 | 适配方式 | `scaledToFit` |
 | 禁止 | 不要输出 1:1 方图，不要大面积透明边距 |
 
-### 11.1 严格透明 PNG 生成流程
+### 11.1 严格透明源图生成流程
 
 用于正式入库的头像不要直接依赖生成器返回的“透明背景预览”。复杂毛绒边缘可能被输出成棋盘格、黑底、灰底或伪透明。正式资产必须走以下流程：
 
@@ -314,7 +315,7 @@ teal neckerchief
 3. 将源图保存到 `tmp/imagegen/<breed>_sources/`，文件名后缀使用 `_chroma.png`。
 4. 用本地透明处理脚本移除色键，输出到 `tmp/imagegen/<breed>_alpha/`。
 5. 验证 alpha 源图必须为 `RGBA`，四角 alpha 为 `0`，主体 alpha bbox 高度约占画布 `92% - 98%`，且边缘没有明显色键残留。
-6. 将通过验证的 alpha 源图先校正为 `600x800` RGBA PNG，再通过 `scripts/optimize-pet-avatar-assets.py --apply` 生成 `450x600` 正式入库文件，并使用正式文件名替换旧图。禁止把 `1200x1600` 作为默认中间产物或正式入库文件。
+6. 将通过验证的 alpha 源图先校正为 `600x800` RGBA PNG，再生成 `450x600` WebP 正式入库文件，并使用正式 `.webp` 文件名替换旧图。禁止把 PNG 源图放入 `Resources/Avatars/PetAvatarAssets`，也禁止把 `1200x1600` 作为默认中间产物或正式入库文件。
 7. 禁止用一张或两张底图批量调色生成整套头像；每个 `gender + coat` 组合都必须由生成模型独立渲染。
 
 透明处理建议命令：
@@ -337,15 +338,15 @@ python "${CODEX_HOME:-$HOME/.codex}/skills/.system/imagegen/scripts/remove_chrom
 所有文件使用英文小写和下划线，便于 Swift 侧静态索引。
 
 ```text
-<species>_<breed>_<gender>_<coat>.png
+<species>_<breed>_<gender>_<coat>.webp
 ```
 
 示例：
 
 ```text
-dog_french_bulldog_girl_fawn_black_mask.png
-cat_devon_rex_boy_blue_gray.png
-cat_girl_standard.png
+dog_french_bulldog_girl_fawn_black_mask.webp
+cat_devon_rex_boy_blue_gray.webp
+cat_girl_standard.webp
 ```
 
 ### 12.1 standard 兜底头像
@@ -353,8 +354,8 @@ cat_girl_standard.png
 每个物种额外提供：
 
 ```text
-<species>_boy_standard.png
-<species>_girl_standard.png
+<species>_boy_standard.webp
+<species>_girl_standard.webp
 ```
 
 用于用户选择自定义毛色、品种毛色图缺失或未覆盖品种时的兜底显示。Standard 是物种级 fallback，不属于任何具体品种。
@@ -402,7 +403,7 @@ gender_variation: boy, cooler and more confident
 negative_prompt: <global negative prompt + breed-specific negative prompt>
 eye: black
 eye_cn: 黑色眼睛
-output_filename: cat_devon_rex_boy_blue_gray.png
+output_filename: cat_devon_rex_boy_blue_gray.webp
 ```
 
 ---
@@ -484,9 +485,9 @@ realistic animal photo, hyper-realistic anatomy, ordinary pet photo, scary, aggr
 
 每张图生成后必须检查：
 
-- [ ] 正式入库文件是否为 `450x600` 竖版 PNG。
+- [ ] 正式入库文件是否为 `450x600` 竖版 WebP，且后缀为 `.webp`。
 - [ ] 是否为 `RGBA` 且真透明背景，四角 alpha 为 `0`，不是黑底、灰底、渐变底或棋盘格底。
-- [ ] 是否经过 `600x800` chroma key 源图生成、本地 alpha 移除、透明验证，并通过 `scripts/optimize-pet-avatar-assets.py` 校正到 `450x600` 后再入库。
+- [ ] 是否经过 `600x800` chroma key 源图生成、本地 alpha 移除、透明验证，并校正到 `450x600` WebP 后再入库。
 - [ ] 主体是否全身完整可见，耳朵、尾巴、脚掌未裁切。
 - [ ] 是否完全没有鞋子、袜子、靴子、拖鞋、凉鞋或鞋底，脚部是否为裸露圆润毛绒动物脚掌 / 爪爪。
 - [ ] 主体是否占画布高度约 `92% - 98%`，没有过多透明边距。
@@ -501,7 +502,7 @@ realistic animal photo, hyper-realistic anatomy, ordinary pet photo, scary, aggr
 - [ ] 性别差异是否通过姿势、服装或轻量配饰表达，而不是改变品种体型。
 - [ ] 男生是否更 cool、自信、有态度；女生是否更可爱、灵动、甜，但都不破坏品种特征。
 - [ ] 服装和配饰是否没有遮挡品种特征。
-- [ ] 文件名是否严格符合 `<species>_<breed>_<gender>_<coat>.png`。
+- [ ] 文件名是否严格符合 `<species>_<breed>_<gender>_<coat>.webp`。
 
 ---
 
@@ -522,7 +523,7 @@ Expression: half-lidded side-eye, tiny smug smile, clever curious look
 Pose: arms crossed, one leg crossed, confident stylish standing pose
 Outfit: off-white t-shirt, short charcoal utility vest, deep red shorts, teal neckerchief
 Gender variation: boy, cooler and more confident
-Output: cat_devon_rex_boy_blue_gray.png
+Output: cat_devon_rex_boy_blue_gray.webp
 ```
 
 ### 17.2 Shiba Inu girl, black tan + dark brown
@@ -540,7 +541,7 @@ Expression: bright black cartoon eyes, playful wink or cheeky smile, slightly sm
 Pose: tilted head, one paw near cheek, one paw giving a small wave, lively crossed-leg stance
 Outfit: soft cream top, dusty rose pleated skirt, tiny scarf or small hair clip that does not cover ears
 Gender variation: girl, sweeter and more playful
-Output: dog_shiba_inu_girl_black_tan.png
+Output: dog_shiba_inu_girl_black_tan.webp
 ```
 
 ### 17.3 French Bulldog boy, fawn black mask + dark brown
@@ -558,7 +559,7 @@ Expression: relaxed half-smile, round friendly black eyes, sleepy confident char
 Pose: stable relaxed stance, one paw lightly on belly or chest, shoulders loose
 Outfit: loose off-white t-shirt, soft red shorts, small bow tie or neckerchief, no hat covering ears
 Gender variation: boy, relaxed and confident
-Output: dog_french_bulldog_boy_fawn_black_mask.png
+Output: dog_french_bulldog_boy_fawn_black_mask.webp
 ```
 
 ---
@@ -574,8 +575,8 @@ Output: dog_french_bulldog_boy_fawn_black_mask.png
   "gender": "boy",
   "coat": "blue_gray",
   "eye": "black",
-  "filename": "cat_devon_rex_boy_blue_gray.png",
-  "fallback": "cat_boy_standard.png"
+  "filename": "cat_devon_rex_boy_blue_gray.webp",
+  "fallback": "cat_boy_standard.webp"
 }
 ```
 
@@ -720,13 +721,13 @@ Keep breed-specific silhouette and facial features clearly recognizable.
 Keep the whole batch visually consistent, but make details different across gender and breed: expression, small accessory, clothing detail, and gesture.
 ```
 
-## PNG 构图与留白规范
+## 正式头像构图与留白规范
 
-头像最终会在宠物卡片左半部分渲染，使用 `scaledToFit` 贴近底部展示。因此每张 PNG 必须按以下规则交付：
+头像最终会在宠物卡片左半部分渲染，使用 `scaledToFit` 贴近底部展示。因此每张正式 WebP 必须按以下规则交付：
 
 | 项目 | 规范 |
 |---|---|
-| 正式入库画布尺寸 | `450x600` PNG |
+| 正式入库画布尺寸 | `450x600` WebP |
 | 背景 | 真透明 alpha，不要纯色底、阴影底、渐变底 |
 | 主体高度 | 主体 alpha bbox 高度约占画布 `92% - 98%` |
 | 上下留白 | 顶部和底部各只留约 `2% - 4%` |

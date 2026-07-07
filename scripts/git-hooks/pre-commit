@@ -25,6 +25,11 @@ git diff --cached --name-only --diff-filter=ACMR | while IFS= read -r path; do
             printf '%s\n' "$path" >> "$blocked_paths_file"
             ;;
     esac
+    case "$path" in
+        Resources/Avatars/HumanAvatarAssets/*.png|Resources/Avatars/PetAvatarAssets/*.png)
+            printf '%s\n' "$path" >> "$blocked_paths_file"
+            ;;
+    esac
 
     size=$(git cat-file -s ":$path" 2>/dev/null || printf '0')
     printf '%s\n' "$size" >> "$sizes_file"

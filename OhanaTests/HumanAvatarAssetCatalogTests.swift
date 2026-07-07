@@ -13,7 +13,7 @@ struct HumanAvatarAssetCatalogTests {
                 gender: "男",
                 birthday: date(year: 2011, month: 5, day: 8),
                 now: now
-            ) == "human_male_teen.png"
+            ) == "human_male_teen.webp"
         )
 
         #expect(
@@ -21,7 +21,7 @@ struct HumanAvatarAssetCatalogTests {
                 gender: "女",
                 birthday: date(year: 1996, month: 5, day: 8),
                 now: now
-            ) == "human_female_young_adult.png"
+            ) == "human_female_young_adult.webp"
         )
 
         #expect(
@@ -29,7 +29,7 @@ struct HumanAvatarAssetCatalogTests {
                 gender: "非二元",
                 birthday: date(year: 1986, month: 5, day: 8),
                 now: now
-            ) == "human_nonbinary_mid_adult.png"
+            ) == "human_nonbinary_mid_adult.webp"
         )
 
         #expect(
@@ -37,7 +37,7 @@ struct HumanAvatarAssetCatalogTests {
                 gender: "nonbinary",
                 birthday: date(year: 1966, month: 5, day: 8),
                 now: now
-            ) == "human_nonbinary_late_adult.png"
+            ) == "human_nonbinary_late_adult.webp"
         )
 
         #expect(
@@ -45,7 +45,7 @@ struct HumanAvatarAssetCatalogTests {
                 gender: "male",
                 birthday: date(year: 1956, month: 5, day: 8),
                 now: now
-            ) == "human_male_senior.png"
+            ) == "human_male_senior.webp"
         )
     }
 
@@ -54,7 +54,7 @@ struct HumanAvatarAssetCatalogTests {
             HumanAvatarAssetCatalog.avatarFilename(
                 gender: "女",
                 birthday: nil
-            ) == "human_female_young_adult.png"
+            ) == "human_female_young_adult.webp"
         )
     }
 

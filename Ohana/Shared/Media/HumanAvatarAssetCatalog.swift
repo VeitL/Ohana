@@ -20,7 +20,7 @@ enum HumanAvatarAssetCatalog {
 
     nonisolated static func avatarFilename(gender: String, birthday: Date?, now: Date = Date()) -> String? {
         guard let genderSlug = normalizedGenderSlug(gender) else { return nil }
-        return "human_\(genderSlug)_\(ageGroup(for: birthday, now: now).rawValue).png"
+        return "human_\(genderSlug)_\(ageGroup(for: birthday, now: now).rawValue).webp"
     }
 
     nonisolated static func avatarData(gender: String, birthday: Date?, now: Date = Date(), bundle: Bundle = .main) -> Data? {
