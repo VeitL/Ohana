@@ -99,6 +99,13 @@ final class NotificationManager: NSObject, @unchecked Sendable {
     // MARK: - 滚动窗口常量
     /// 单次最多注册未来 N 天的通知（iOS 硬限制 64 条，14 天 × 合理事件数 = 安全阈值）
     private let rollingWindowDays = 14
+    private struct PreparedReminderNotificationRequest {
+        let notificationId: String
+        let fireDate: Date
+        let classification: NotificationDeliveryClassification
+        let createdAt: Date
+        let content: UNMutableNotificationContent
+    }
 
     // MARK: - Schedule（单条，原有接口保持不变）
     func schedule(reminder: Reminder) {
@@ -186,8 +193,34 @@ final class NotificationManager: NSObject, @unchecked Sendable {
             return
         }
 
+        let classification = NotificationDeliveryPolicy.classification(for: event)
+        guard let prepared = makePreparedRequest(
+            reminder: reminder,
+            deliveryDate: fireDate,
+            classification: classification
+        ) else {
+            completion?(.missingEvent)
+            return
+        }
+        schedulePrepared(
+            prepared,
+            existingNotificationIds: existingNotificationIds,
+            completion: completion
+        )
+    }
+
+    private func schedulePrepared(
+        _ prepared: PreparedReminderNotificationRequest,
+        existingNotificationIds: Set<String>? = nil,
+        completion: ((ReminderNotificationScheduleResult) -> Void)? = nil
+    ) {
+        if existingNotificationIds?.contains(prepared.notificationId) == true {
+            completion?(.skippedDuplicate)
+            return
+        }
+
         let scheduleIfCapacityAllows: (Set<String>) -> Void = { [self] knownIds in
-            if knownIds.contains(reminder.notificationId) {
+            if knownIds.contains(prepared.notificationId) {
                 completion?(.skippedDuplicate)
                 return
             }
@@ -196,12 +229,11 @@ final class NotificationManager: NSObject, @unchecked Sendable {
                 return
             }
 
-            let content = makeContent(event: event, reminder: reminder)
-            let components = Self.triggerDateComponents(for: fireDate)
+            let components = Self.triggerDateComponents(for: prepared.fireDate)
             let trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: false)
             let request = UNNotificationRequest(
-                identifier: reminder.notificationId,
-                content: content,
+                identifier: prepared.notificationId,
+                content: prepared.content,
                 trigger: trigger
             )
             center.add(request) { error in
@@ -245,17 +277,21 @@ final class NotificationManager: NSObject, @unchecked Sendable {
             reminder.isPending && reminder.scheduledAt > now && reminder.scheduledAt <= windowEnd
         }
         let policyDecisions = NotificationDeliveryPolicy.plan(reminders: candidates)
-        let deliverable = candidates.compactMap { reminder -> (reminder: Reminder, deliveryDate: Date, classification: NotificationDeliveryClassification)? in
+        let deliverable = candidates.compactMap { reminder -> PreparedReminderNotificationRequest? in
             guard case let .deliver(deliveryDate, classification, _) = policyDecisions[reminder.id] else { return nil }
-            return (reminder, deliveryDate, classification)
+            return makePreparedRequest(
+                reminder: reminder,
+                deliveryDate: deliveryDate,
+                classification: classification
+            )
         }.sorted {
             NotificationPendingBudget.shouldScheduleBefore(
-                lhsDeliveryDate: $0.deliveryDate,
+                lhsDeliveryDate: $0.fireDate,
                 lhsClassification: $0.classification,
-                lhsCreatedAt: $0.reminder.createdAt,
-                rhsDeliveryDate: $1.deliveryDate,
+                lhsCreatedAt: $0.createdAt,
+                rhsDeliveryDate: $1.fireDate,
                 rhsClassification: $1.classification,
-                rhsCreatedAt: $1.reminder.createdAt
+                rhsCreatedAt: $1.createdAt
             )
         }
         center.getPendingNotificationRequests { existing in
@@ -263,10 +299,9 @@ final class NotificationManager: NSObject, @unchecked Sendable {
             for entry in deliverable {
                 guard NotificationPendingBudget.hasCapacity(existingPendingCount: knownIds.count) else { break }
                 let existingIdsForRequest = knownIds
-                knownIds.insert(entry.reminder.notificationId)
-                self.scheduleDirect(
-                    reminder: entry.reminder,
-                    deliveryDate: entry.deliveryDate,
+                knownIds.insert(entry.notificationId)
+                self.schedulePrepared(
+                    entry,
                     existingNotificationIds: existingIdsForRequest
                 )
             }
@@ -282,35 +317,36 @@ final class NotificationManager: NSObject, @unchecked Sendable {
         let candidates = allReminders.filter { reminder in
             reminder.isPending && reminder.scheduledAt > now && reminder.scheduledAt <= windowEnd
         }
+        let policyDecisions = NotificationDeliveryPolicy.plan(reminders: candidates)
+        let deliverable = candidates.compactMap { reminder -> PreparedReminderNotificationRequest? in
+            guard case let .deliver(deliveryDate, classification, _) = policyDecisions[reminder.id] else { return nil }
+            return makePreparedRequest(
+                reminder: reminder,
+                deliveryDate: deliveryDate,
+                classification: classification
+            )
+        }.sorted {
+            NotificationPendingBudget.shouldScheduleBefore(
+                lhsDeliveryDate: $0.fireDate,
+                lhsClassification: $0.classification,
+                lhsCreatedAt: $0.createdAt,
+                rhsDeliveryDate: $1.fireDate,
+                rhsClassification: $1.classification,
+                rhsCreatedAt: $1.createdAt
+            )
+        }
 
         center.getPendingNotificationRequests { existing in
             let existingIds = Set(existing.map(\.identifier))
             var knownIds = existingIds
-            let toSchedule = candidates.filter { reminder in
-                !knownIds.contains(reminder.notificationId)
-            }
-            let policyDecisions = NotificationDeliveryPolicy.plan(reminders: toSchedule)
-            let deliverable = toSchedule.compactMap { reminder -> (reminder: Reminder, deliveryDate: Date, classification: NotificationDeliveryClassification)? in
-                guard case let .deliver(deliveryDate, classification, _) = policyDecisions[reminder.id] else { return nil }
-                return (reminder, deliveryDate, classification)
-            }.sorted {
-                NotificationPendingBudget.shouldScheduleBefore(
-                    lhsDeliveryDate: $0.deliveryDate,
-                    lhsClassification: $0.classification,
-                    lhsCreatedAt: $0.reminder.createdAt,
-                    rhsDeliveryDate: $1.deliveryDate,
-                    rhsClassification: $1.classification,
-                    rhsCreatedAt: $1.reminder.createdAt
-                )
-            }
             var added = 0
             for entry in deliverable {
+                guard !knownIds.contains(entry.notificationId) else { continue }
                 guard NotificationPendingBudget.hasCapacity(existingPendingCount: knownIds.count) else { break }
                 let existingIdsForRequest = knownIds
-                knownIds.insert(entry.reminder.notificationId)
-                self.scheduleDirect(
-                    reminder: entry.reminder,
-                    deliveryDate: entry.deliveryDate,
+                knownIds.insert(entry.notificationId)
+                self.schedulePrepared(
+                    entry,
                     existingNotificationIds: existingIdsForRequest
                 )
                 added += 1
@@ -395,6 +431,21 @@ final class NotificationManager: NSObject, @unchecked Sendable {
     }
 
     // MARK: - Private helpers
+    private func makePreparedRequest(
+        reminder: Reminder,
+        deliveryDate: Date,
+        classification: NotificationDeliveryClassification
+    ) -> PreparedReminderNotificationRequest? {
+        guard let event = reminder.event else { return nil }
+        return PreparedReminderNotificationRequest(
+            notificationId: reminder.notificationId,
+            fireDate: deliveryDate,
+            classification: classification,
+            createdAt: reminder.createdAt,
+            content: makeContent(event: event, reminder: reminder)
+        )
+    }
+
     private func makeContent(event: Event, reminder: Reminder) -> UNMutableNotificationContent {
         let l = L10n()
         let content = UNMutableNotificationContent()
