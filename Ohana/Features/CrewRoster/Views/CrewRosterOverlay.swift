@@ -739,6 +739,15 @@ struct CrewRosterOverlay: View {
                 visible: visible,
                 note: "crew.member.homeVisibility.human"
             )
+            guard result.didPersist else {
+                var transaction = Transaction()
+                transaction.disablesAnimations = true
+                withTransaction(transaction) {
+                    homeVisibilityOverrides[human.id] = nil
+                }
+                UINotificationFeedbackGenerator().notificationOccurred(.error)
+                return
+            }
             var transaction = Transaction()
             transaction.disablesAnimations = true
             withTransaction(transaction) {

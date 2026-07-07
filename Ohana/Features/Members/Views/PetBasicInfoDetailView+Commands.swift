@@ -71,12 +71,17 @@ extension PetBasicInfoDetailView {
             dailyPortionGrams: pet.dailyPortionGrams
         )
         commandQueue.enqueue(.memberProfile(entityID: pet.id, kind: EntityKind.pet.rawValue)) {
-            MemberCommandExecutor(context: modelContext, services: appServices).updatePetProfile(
+            let result = MemberCommandExecutor(context: modelContext, services: appServices).updatePetProfile(
                 pet,
                 input: input,
                 note: "petBasicInfo.profile"
             )
+            guard result.didPersist else {
+                UINotificationFeedbackGenerator().notificationOccurred(.error)
+                return
+            }
             UINotificationFeedbackGenerator().notificationOccurred(.success)
+            withAnimation { isEditing = false }
         }
     }
 }

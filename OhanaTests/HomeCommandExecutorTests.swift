@@ -2725,6 +2725,42 @@ struct HomeCommandExecutorTests {
         #expect(settingsPetSource.contains("notificationOccurred(result.didPersist ? .success : .error)"))
     }
 
+    @Test func memberProfileVisibilityAndWalkCommandsSurfacePersistenceFailures() throws {
+        let rootURL = repositoryRootURL()
+        let profileSource = try source("Ohana/Features/Members/MemberProfileCommands.swift", rootURL: rootURL)
+        let interactionSource = try source("Ohana/Features/Members/MemberInteractionCommands.swift", rootURL: rootURL)
+        let petBasicSource = try source("Ohana/Features/Members/Views/PetBasicInfoDetailView+Commands.swift", rootURL: rootURL)
+        let humanBasicSource = try source("Ohana/Features/Members/Views/HumanBasicInfoDetailView.swift", rootURL: rootURL)
+        let editPetSource = try source("Ohana/Features/Members/Views/EditPetSheet.swift", rootURL: rootURL)
+        let editHumanSource = try source("Ohana/Features/Members/Views/EditHumanSheet.swift", rootURL: rootURL)
+        let plantEditSource = try source("Ohana/Features/Plants/Views/PlantDetailEditSheet.swift", rootURL: rootURL)
+        let crewEditSource = try source("Ohana/Features/CrewRoster/Views/CrewRosterOverlayEditors.swift", rootURL: rootURL)
+        let crewOverlaySource = try source("Ohana/Features/CrewRoster/Views/CrewRosterOverlay.swift", rootURL: rootURL)
+        let humanVisibilitySource = try source("Ohana/Features/Members/Views/HumanDetailView+PrivacyAssets.swift", rootURL: rootURL)
+        let walkSummarySource = try source("Ohana/Features/Walks/Views/WalkSummarySheet.swift", rootURL: rootURL)
+        let walkCardSource = try source("Ohana/Features/Walks/Views/WalkTrackingCard+SummaryFace.swift", rootURL: rootURL)
+
+        #expect(profileSource.contains("struct MemberProfileCommandResult"))
+        #expect(profileSource.contains("private static func persistProfileMutation"))
+        #expect(profileSource.contains("let saveResult = context.safeSaveResult()"))
+        #expect(profileSource.contains("context.rollback()"))
+        #expect(!profileSource.contains("context.safeSave()"))
+        #expect(interactionSource.contains("return .failed("))
+        #expect(interactionSource.contains("visible: human.shouldShowOnHome"))
+        #expect(interactionSource.contains("PetWalkGoalCommandResult("))
+        #expect(interactionSource.contains("PetWalkSummaryCommandResult("))
+        #expect(petBasicSource.contains("guard result.didPersist else"))
+        #expect(humanBasicSource.contains("guard result.didPersist else"))
+        #expect(editPetSource.contains("guard result.didPersist else"))
+        #expect(editHumanSource.contains("guard result.didPersist else"))
+        #expect(plantEditSource.contains("guard result.didPersist else"))
+        #expect(crewEditSource.contains("guard result.didPersist else"))
+        #expect(crewOverlaySource.contains("guard result.didPersist else"))
+        #expect(humanVisibilitySource.contains("if !result.didPersist"))
+        #expect(walkSummarySource.contains("guard result.didPersist else"))
+        #expect(walkCardSource.contains("guard result.didPersist else"))
+    }
+
     @MainActor
     @Test func plantCareCommandServiceWritesEveryLaunchCareType() throws {
         let container = try makeInMemoryContainer()
@@ -3300,6 +3336,8 @@ struct HomeCommandExecutorTests {
 
         #expect(goalResult.petID == pet.id)
         #expect(goalResult.goalKm == 0)
+        #expect(goalResult.didPersist)
+        #expect(goalResult.persistenceError == nil)
         #expect(pet.weeklyWalkGoalKm == 0)
         #expect(goalMutation.command == .petWalkGoal(petID: pet.id))
         #expect(goalMutation.affectedEntityIDs == [pet.id])
@@ -3318,6 +3356,8 @@ struct HomeCommandExecutorTests {
         #expect(summaryResult.petID == pet.id)
         #expect(summaryResult.walkID == walk.id)
         #expect(summaryResult.moodRating == 5)
+        #expect(summaryResult.didPersist)
+        #expect(summaryResult.persistenceError == nil)
         #expect(summaryResult.hasNotes)
         #expect(walk.moodRating == 5)
         #expect(walk.behaviorNotes == "happy route")
@@ -3363,6 +3403,8 @@ struct HomeCommandExecutorTests {
         )
         let profileMutation = try #require(revisionCenter.lastMutation)
         #expect(profile.entityID == human.id)
+        #expect(profile.didPersist)
+        #expect(profile.persistenceError == nil)
         #expect(human.name == "Alex")
         #expect(profileMutation.command == .memberProfile(entityID: human.id, kind: EntityKind.human.rawValue))
         #expect(profileMutation.note == "test.executor.profile")
@@ -3374,6 +3416,8 @@ struct HomeCommandExecutorTests {
         )
         let visibilityMutation = try #require(revisionCenter.lastMutation)
         #expect(visibility.entityID == human.id)
+        #expect(visibility.didPersist)
+        #expect(visibility.persistenceError == nil)
         #expect(!human.shouldShowOnHome)
         #expect(visibilityMutation.command == .memberHomeVisibility(
             entityID: human.id,

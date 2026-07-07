@@ -270,8 +270,34 @@ struct MemberProfileCommandResult: Equatable {
     let entityID: UUID
     let kind: String
     let changedFields: Set<String>
+    let didPersist: Bool
+    let persistenceError: String?
 
-    var didWrite: Bool { !changedFields.isEmpty }
+    init(
+        entityID: UUID,
+        kind: String,
+        changedFields: Set<String>,
+        didPersist: Bool = true,
+        persistenceError: String? = nil
+    ) {
+        self.entityID = entityID
+        self.kind = kind
+        self.changedFields = changedFields
+        self.didPersist = didPersist
+        self.persistenceError = persistenceError
+    }
+
+    var didWrite: Bool { didPersist && !changedFields.isEmpty }
+
+    static func failed(entityID: UUID, kind: String, error: String?) -> MemberProfileCommandResult {
+        MemberProfileCommandResult(
+            entityID: entityID,
+            kind: kind,
+            changedFields: [],
+            didPersist: false,
+            persistenceError: error
+        )
+    }
 }
 
 struct MemberLifecycleCommandResult: Equatable {
@@ -317,12 +343,57 @@ struct MemberHomeVisibilityCommandResult: Equatable {
     let kind: String
     let visible: Bool
     let didWrite: Bool
+    let didPersist: Bool
+    let persistenceError: String?
+
+    init(
+        entityID: UUID,
+        kind: String,
+        visible: Bool,
+        didWrite: Bool,
+        didPersist: Bool = true,
+        persistenceError: String? = nil
+    ) {
+        self.entityID = entityID
+        self.kind = kind
+        self.visible = visible
+        self.didWrite = didPersist && didWrite
+        self.didPersist = didPersist
+        self.persistenceError = persistenceError
+    }
+
+    static func failed(entityID: UUID, kind: String, visible: Bool, error: String?) -> MemberHomeVisibilityCommandResult {
+        MemberHomeVisibilityCommandResult(
+            entityID: entityID,
+            kind: kind,
+            visible: visible,
+            didWrite: false,
+            didPersist: false,
+            persistenceError: error
+        )
+    }
 }
 
 struct PetWalkGoalCommandResult: Equatable {
     let petID: UUID
     let goalKm: Double
     let didWrite: Bool
+    let didPersist: Bool
+    let persistenceError: String?
+
+    init(
+        petID: UUID,
+        goalKm: Double,
+        didWrite: Bool,
+        didPersist: Bool = true,
+        persistenceError: String? = nil
+    ) {
+        self.petID = petID
+        self.goalKm = goalKm
+        self.didWrite = didPersist && didWrite
+        self.didPersist = didPersist
+        self.persistenceError = persistenceError
+    }
 }
 
 struct PetWalkSummaryCommandResult: Equatable {
@@ -331,9 +402,44 @@ struct PetWalkSummaryCommandResult: Equatable {
     let moodRating: Int
     let hasNotes: Bool
     let didWrite: Bool
+    let didPersist: Bool
+    let persistenceError: String?
+
+    init(
+        petID: UUID,
+        walkID: UUID,
+        moodRating: Int,
+        hasNotes: Bool,
+        didWrite: Bool,
+        didPersist: Bool = true,
+        persistenceError: String? = nil
+    ) {
+        self.petID = petID
+        self.walkID = walkID
+        self.moodRating = moodRating
+        self.hasNotes = hasNotes
+        self.didWrite = didPersist && didWrite
+        self.didPersist = didPersist
+        self.persistenceError = persistenceError
+    }
 }
 
 enum MemberProfileCommandService {
+    @MainActor
+    private static func persistProfileMutation(
+        entityID: UUID,
+        kind: String,
+        changedFields: Set<String>,
+        context: ModelContext
+    ) -> MemberProfileCommandResult {
+        let saveResult = context.safeSaveResult()
+        guard saveResult.didSave else {
+            context.rollback()
+            return .failed(entityID: entityID, kind: kind, error: saveResult.errorDescription)
+        }
+        return MemberProfileCommandResult(entityID: entityID, kind: kind, changedFields: changedFields)
+    }
+
     @discardableResult
     @MainActor
     static func updatePet(
@@ -412,7 +518,6 @@ enum MemberProfileCommandService {
         }
         CarePlanCalendarSync.ensureDefaultPlans(for: pet, context: context)
         CloudSyncMutationRecorder.markModified(pet, context: context)
-        context.safeSave()
 
         var changedFields: Set<String> = [
             "name", "avatarImageData", "species", "breed", "gender",
@@ -436,10 +541,11 @@ enum MemberProfileCommandService {
         if input.foodBrand != nil { changedFields.insert("foodBrand") }
         if input.dailyPortionGrams != nil { changedFields.insert("dailyPortionGrams") }
 
-        return MemberProfileCommandResult(
+        return persistProfileMutation(
             entityID: pet.id,
             kind: EntityKind.pet.rawValue,
-            changedFields: changedFields
+            changedFields: changedFields,
+            context: context
         )
     }
 
@@ -488,7 +594,6 @@ enum MemberProfileCommandService {
             }
         }
         CloudSyncMutationRecorder.markModified(human, context: context)
-        context.safeSave()
 
         var changedFields: Set<String> = [
             "name", "avatarImageData", "avatarEmoji", "role", "birthday",
@@ -498,10 +603,11 @@ enum MemberProfileCommandService {
         if input.shouldShowOnHome != nil { changedFields.insert("shouldShowOnHome") }
         if input.privateFieldsRaw != nil { changedFields.insert("privateFields") }
 
-        return MemberProfileCommandResult(
+        return persistProfileMutation(
             entityID: human.id,
             kind: EntityKind.human.rawValue,
-            changedFields: changedFields
+            changedFields: changedFields,
+            context: context
         )
     }
 
@@ -551,23 +657,26 @@ enum MemberProfileCommandService {
         plant.themeColorHex = input.themeHex
         plant.notes = input.notes.trimmingCharacters(in: .whitespacesAndNewlines)
         CloudSyncMutationRecorder.markModified(plant, context: context)
-        context.safeSave()
-        PlantCarePlanScheduleService.sync(plant: plant, context: context)
-
-        return MemberProfileCommandResult(
+        let changedFields: Set<String> = [
+            "name", "avatarImageData", "avatarEmoji", "species", "location",
+            "wateringIntervalDays", "fertilizingIntervalDays", "roomNameRaw",
+            "potDiameterCm", "potMaterialRaw", "soilTypeRaw", "isIndoor",
+            "windowDirectionRaw", "lightLevelRaw", "lastLightMeasurementLux",
+            "lastLightMeasurementDate", "humidityPreferenceRaw", "temperaturePreferenceRaw",
+            "isNearClimateSource", "potHasDrainage", "acquiredDate", "acquisitionSourceRaw",
+            "currentHeightCm", "currentSpreadCm", "isHydroponic", "isSucculent",
+            "healthStatusRaw", "catalogSpeciesId", "toxicity", "isIndoorSuitable",
+            "remindersEnabled", "themeColorHex", "notes"
+        ]
+        let profileResult = persistProfileMutation(
             entityID: plant.id,
             kind: EntityKind.plant.rawValue,
-            changedFields: [
-                "name", "avatarImageData", "avatarEmoji", "species", "location",
-                "wateringIntervalDays", "fertilizingIntervalDays", "roomNameRaw",
-                "potDiameterCm", "potMaterialRaw", "soilTypeRaw", "isIndoor",
-                "windowDirectionRaw", "lightLevelRaw", "lastLightMeasurementLux",
-                "lastLightMeasurementDate", "humidityPreferenceRaw", "temperaturePreferenceRaw",
-                "isNearClimateSource", "potHasDrainage", "acquiredDate", "acquisitionSourceRaw",
-                "currentHeightCm", "currentSpreadCm", "isHydroponic", "isSucculent",
-                "healthStatusRaw", "catalogSpeciesId", "toxicity", "isIndoorSuitable",
-                "remindersEnabled", "themeColorHex", "notes"
-            ]
+            changedFields: changedFields,
+            context: context
         )
+        guard profileResult.didPersist else { return profileResult }
+        PlantCarePlanScheduleService.sync(plant: plant, context: context)
+
+        return profileResult
     }
 }

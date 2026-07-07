@@ -189,15 +189,20 @@ struct WalkSummarySheet: View {
                 let rating = draftMoodRating
                 let notes = draftNotes
                 UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                withAnimation { moodSaved = true }
                 commandQueue.enqueue(.petWalkSummary(petID: pet.id, walkID: walk.id)) {
-                    PetWalkCommandExecutor(context: modelContext, services: appServices).saveSummary(
+                    let result = PetWalkCommandExecutor(context: modelContext, services: appServices).saveSummary(
                         for: walk,
                         pet: pet,
                         moodRating: rating,
                         notes: notes,
                         note: "walk.summary.mood"
                     )
+                    guard result.didPersist else {
+                        UINotificationFeedbackGenerator().notificationOccurred(.error)
+                        return
+                    }
+                    UINotificationFeedbackGenerator().notificationOccurred(.success)
+                    withAnimation { moodSaved = true }
                 }
             } label: {
                 Text("保存")
@@ -340,13 +345,18 @@ struct WalkSummarySheet: View {
             Button {
                 let goal = goalDraft
                 UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                showingGoalSetter = false
                 commandQueue.enqueue(.petWalkGoal(petID: pet.id)) {
-                    PetWalkCommandExecutor(context: modelContext, services: appServices).saveWeeklyGoal(
+                    let result = PetWalkCommandExecutor(context: modelContext, services: appServices).saveWeeklyGoal(
                         goal,
                         for: pet,
                         note: "walk.summary.goal"
                     )
+                    guard result.didPersist else {
+                        UINotificationFeedbackGenerator().notificationOccurred(.error)
+                        return
+                    }
+                    UINotificationFeedbackGenerator().notificationOccurred(.success)
+                    showingGoalSetter = false
                 }
             } label: {
                 Text(goalDraft == 0 ? "清除目标" : "保存目标")

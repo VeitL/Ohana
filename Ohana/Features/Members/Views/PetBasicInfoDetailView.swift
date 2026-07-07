@@ -85,7 +85,6 @@ struct PetBasicInfoDetailView: View {
                 if isEditing, !pet.hasPassedAway {
                     Button {
                         saveChanges()
-                        withAnimation { isEditing = false }
                     } label: {
                         Text("保存")
                             .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup

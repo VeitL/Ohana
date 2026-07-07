@@ -1066,11 +1066,16 @@ struct EditPlantSheet: View {
         isSaving = true
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
         commandQueue.enqueue(command) {
-            MemberCommandExecutor(context: modelContext, services: appServices).updatePlantProfile(
+            let result = MemberCommandExecutor(context: modelContext, services: appServices).updatePlantProfile(
                 plant,
                 input: input,
                 note: "plant.detail.profile"
             )
+            guard result.didPersist else {
+                isSaving = false
+                UINotificationFeedbackGenerator().notificationOccurred(.error)
+                return
+            }
             UINotificationFeedbackGenerator().notificationOccurred(.success)
             dismiss()
         }

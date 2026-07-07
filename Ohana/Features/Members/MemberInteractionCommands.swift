@@ -182,7 +182,16 @@ enum MemberHomeVisibilityCommandService {
         }
         human.shouldShowOnHome = visible
         CloudSyncMutationRecorder.markModified(human, context: context)
-        context.safeSave()
+        let saveResult = context.safeSaveResult()
+        guard saveResult.didSave else {
+            context.rollback()
+            return .failed(
+                entityID: human.id,
+                kind: EntityKind.human.rawValue,
+                visible: human.shouldShowOnHome,
+                error: saveResult.errorDescription
+            )
+        }
         return MemberHomeVisibilityCommandResult(
             entityID: human.id,
             kind: EntityKind.human.rawValue,
@@ -205,7 +214,17 @@ enum PetWalkCommandService {
         }
         pet.weeklyWalkGoalKm = max(0, goalKm)
         CloudSyncMutationRecorder.markModified(pet, context: context)
-        context.safeSave()
+        let saveResult = context.safeSaveResult()
+        guard saveResult.didSave else {
+            context.rollback()
+            return PetWalkGoalCommandResult(
+                petID: pet.id,
+                goalKm: pet.weeklyWalkGoalKm,
+                didWrite: false,
+                didPersist: false,
+                persistenceError: saveResult.errorDescription
+            )
+        }
         return PetWalkGoalCommandResult(petID: pet.id, goalKm: pet.weeklyWalkGoalKm, didWrite: true)
     }
 
@@ -232,7 +251,19 @@ enum PetWalkCommandService {
         walk.moodRating = normalizedRating
         walk.behaviorNotes = trimmedNotes.isEmpty ? nil : trimmedNotes
         CloudSyncMutationRecorder.markModified(walk, context: context)
-        context.safeSave()
+        let saveResult = context.safeSaveResult()
+        guard saveResult.didSave else {
+            context.rollback()
+            return PetWalkSummaryCommandResult(
+                petID: pet.id,
+                walkID: walk.id,
+                moodRating: walk.moodRating,
+                hasNotes: !(walk.behaviorNotes ?? "").isEmpty,
+                didWrite: false,
+                didPersist: false,
+                persistenceError: saveResult.errorDescription
+            )
+        }
         return PetWalkSummaryCommandResult(
             petID: pet.id,
             walkID: walk.id,

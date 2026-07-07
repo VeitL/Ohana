@@ -40,11 +40,14 @@ extension HumanDetailView {
                         kind: EntityKind.human.rawValue,
                         visible: visible
                     )) {
-                        MemberCommandExecutor(context: modelContext, services: appServices).setHumanHomeVisibility(
+                        let result = MemberCommandExecutor(context: modelContext, services: appServices).setHumanHomeVisibility(
                             human,
                             visible: visible,
                             note: "human.detail.homeVisibility"
                         )
+                        if !result.didPersist {
+                            UINotificationFeedbackGenerator().notificationOccurred(.error)
+                        }
                         homeVisibilityOverride = nil
                     }
                 }

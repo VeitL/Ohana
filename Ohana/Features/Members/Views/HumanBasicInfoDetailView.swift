@@ -80,7 +80,6 @@ struct HumanBasicInfoDetailContentView: View {
                     if isEditing {
                         Button {
                             saveChanges()
-                            withAnimation { isEditing = false }
                         } label: {
                             Text(l.tr(zh: "保存", en: "Save", de: "Speichern"))
                                 .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
@@ -633,12 +632,17 @@ struct HumanBasicInfoDetailContentView: View {
             privateFieldsRaw: HumanLocalPrivacyPolicy.isEnabled ? editedPrivateFieldsRaw : nil
         )
         commandQueue.enqueue(.memberProfile(entityID: human.id, kind: EntityKind.human.rawValue)) {
-            MemberCommandExecutor(context: modelContext, services: appServices).updateHumanProfile(
+            let result = MemberCommandExecutor(context: modelContext, services: appServices).updateHumanProfile(
                 human,
                 input: input,
                 note: "humanBasicInfo.profile"
             )
+            guard result.didPersist else {
+                UINotificationFeedbackGenerator().notificationOccurred(.error)
+                return
+            }
             UINotificationFeedbackGenerator().notificationOccurred(.success)
+            withAnimation { isEditing = false }
         }
     }
 

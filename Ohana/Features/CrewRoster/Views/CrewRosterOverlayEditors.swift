@@ -833,7 +833,13 @@ struct CrewRosterProfilePanel: View {
                     input: input,
                     note: "crew.member.profile.pet"
                 )
+                guard result.didPersist else {
+                    UINotificationFeedbackGenerator().notificationOccurred(.error)
+                    return
+                }
                 warmAvatarCache(id: result.entityID, data: input.avatarImageData)
+                UINotificationFeedbackGenerator().notificationOccurred(.success)
+                withAnimation(GoMotion.feedback) { isEditing = false }
                 onSaved(result.entityID, result.kind)
             }
         } else if let human {
@@ -863,7 +869,13 @@ struct CrewRosterProfilePanel: View {
                     input: input,
                     note: "crew.member.profile.human"
                 )
+                guard result.didPersist else {
+                    UINotificationFeedbackGenerator().notificationOccurred(.error)
+                    return
+                }
                 warmAvatarCache(id: result.entityID, data: input.avatarImageData)
+                UINotificationFeedbackGenerator().notificationOccurred(.success)
+                withAnimation(GoMotion.feedback) { isEditing = false }
                 onSaved(result.entityID, result.kind)
             }
         } else if let plant {
@@ -897,12 +909,16 @@ struct CrewRosterProfilePanel: View {
                     input: input,
                     note: "crew.member.profile.plant"
                 )
+                guard result.didPersist else {
+                    UINotificationFeedbackGenerator().notificationOccurred(.error)
+                    return
+                }
                 warmAvatarCache(id: result.entityID, data: input.avatarImageData)
+                UINotificationFeedbackGenerator().notificationOccurred(.success)
+                withAnimation(GoMotion.feedback) { isEditing = false }
                 onSaved(result.entityID, result.kind)
             }
         }
-        UINotificationFeedbackGenerator().notificationOccurred(.success)
-        withAnimation(GoMotion.feedback) { isEditing = false }
     }
 
     private func markPetPassedAway() {

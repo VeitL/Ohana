@@ -16,7 +16,7 @@ struct WalkTrackingCard: View {
     let snapshot: WalkTrackingSnapshot
     var onCloseSummaryToPetCard: (() -> Void)?
     var onStopWalk: ([Pet], [String]) -> WalkStopRewardSummary
-    var onSaveWeeklyGoal: (Double) -> Void
+    var onSaveWeeklyGoal: (Double) -> PetWalkGoalCommandResult
 
     @Environment(AppServices.self) var appServices
     @Environment(\.modelContext) var modelContext

@@ -150,11 +150,15 @@ struct EditHumanSheet: View {
             privateFieldsRaw: HumanLocalPrivacyPolicy.isEnabled ? editedPrivateFieldsRaw : nil
         )
         commandQueue.enqueue(.memberProfile(entityID: human.id, kind: EntityKind.human.rawValue)) {
-            MemberCommandExecutor(context: modelContext, services: appServices).updateHumanProfile(
+            let result = MemberCommandExecutor(context: modelContext, services: appServices).updateHumanProfile(
                 human,
                 input: input,
                 note: "human.detail.profile"
             )
+            guard result.didPersist else {
+                UINotificationFeedbackGenerator().notificationOccurred(.error)
+                return
+            }
             UINotificationFeedbackGenerator().notificationOccurred(.success)
             dismiss()
         }

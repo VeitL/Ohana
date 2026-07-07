@@ -119,7 +119,7 @@ struct WalkTrackingCommandExecutor {
         return rewardSummary
     }
 
-    func saveWeeklyGoal(_ goal: Double, for pet: Pet) {
+    func saveWeeklyGoal(_ goal: Double, for pet: Pet) -> PetWalkGoalCommandResult {
         PetWalkCommandExecutor(context: modelContext, services: services).saveWeeklyGoal(
             goal,
             for: pet,

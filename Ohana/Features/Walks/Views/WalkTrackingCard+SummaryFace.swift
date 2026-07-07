@@ -354,8 +354,13 @@ extension WalkTrackingCard {
             }
 
             Button {
-                onSaveWeeklyGoal(goalDraft)
                 UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                let result = onSaveWeeklyGoal(goalDraft)
+                guard result.didPersist else {
+                    UINotificationFeedbackGenerator().notificationOccurred(.error)
+                    return
+                }
+                UINotificationFeedbackGenerator().notificationOccurred(.success)
                 showingGoalSetter = false
             } label: {
                 Text(goalDraft == 0 ? "清除目标" : "保存目标")
