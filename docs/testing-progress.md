@@ -16,7 +16,7 @@
 - Last compacted: 2026-06-25.
 - Release bar: **Open P0 = 0; first-release-reachable repo-code P1 = 0**.
 - Active phase: **Phase 9A / dogfooding and real-device validation**, status 🟡.
-- Open follow-ups: 9 total in `docs/task-follow-ups.md`.
+- Open follow-ups: 7 total in `docs/task-follow-ups.md`.
 - Open P1: 4 total; remaining P1s are CloudKit 1.x enablement validation or
   real-device validation.
 - Current local validation: Human simulator recheck now passes the four
@@ -301,7 +301,6 @@ in the archive.
 | Notifications / Memorial | TFU-20260612-016, TFU-20260612-017 | Real-device GAP-6 and GAP-9 validation. |
 | Human Workout / HealthKit | TFU-20260706-001 | Real-device HealthKit authorization, Activity Summary, and workout sample import validation. |
 | Settings | TFU-20260612-022 | Final privacy/support URLs and rows. |
-| Care UI / Analysis | Closed 2026-07-07 | Ledger analysis now has type, actor/family-member, and daily trend dimensions. Hygiene/QuickCare status feedback now shares `CareCycleStatus`, and Home groom quick-action attention reads from the hygiene ledger snapshot instead of view-local date math. |
 | PetCare / Members GUI | TFU-20260629-004 | Pet simulator GUI deep coverage now includes Cat and Dog real-user long-session smokes that keep one Human/Pet dataset alive across first-pet setup, feeding, Water, Potty/litter, Hygiene, Health, Calendar, Bond Vault economy/safeguards, Dog walk start/stop/readback, app relaunch state retention, Basic Info edit cancel/save readback, memorial mark/undo cancel-confirm paths, permanent delete wrong-name/cancel/exact-name safeguards, stale Calendar event live-care blocking after memorial, and stale Calendar cleanup after permanent delete. Existing focused first-pet, quick-care, memorial, delete, Calendar deep-link, litter/scoop/water plan Calendar save-delete, and Bond Vault tests also pass, including Water quick-care reward readback into pet Bond Vault balance plus recent economy log. The latest broad GUI batch F rechecked existing-pet no-reset/relaunch, cat and dog long-session paths, Feeding backdate, walk summary readback, litter scoop/full-change/plan settings, and Human permanent-delete safeguards with 9/9 passing; a follow-up Home fix and UITest now prove card-internal expanded pet quick actions appear without a second tap. Remaining gaps include broader pet calendar care-type/deep-link paths beyond Basic Info/Water/Feeding/Potty/Walk/Play/Weight/Health/Hygiene and generated litter/scoop/water plan rows, broader pet shop/economy purchases beyond Bond Vault, deceased-pet Feature Hub non-memorial route blocking beyond stale Calendar event taps, stale-route protection after memorial/delete beyond stale Calendar event taps, broader edit-negative paths beyond empty-name protection, reminder/task/ledger cross-feature GUI readback beyond the covered Bond Vault ledger path, and final true-device hand-feel confirmation. |
 
 ## Active Manual / External Gates

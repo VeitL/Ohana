@@ -12,7 +12,7 @@
 ## Current Read
 
 - Last compacted: 2026-06-25.
-- Open follow-ups: 9 total: P1 = 4, P2 = 4, P3 = 1.
+- Open follow-ups: 7 total: P1 = 4, P2 = 3, P3 = 0.
 - Open P0: 0.
 - Known first-release-reachable repository-code P1: none.
 - P1 still open because of CloudKit 1.x deferred work or real-device validation.
@@ -81,14 +81,6 @@
 - Next action: continue remaining negative and cross-feature GUI paths through pet calendar care-type deep-linking beyond Basic Info/Water/Feeding/Potty/Walk/Play/Weight/Health/Hygiene and generated litter/scoop/water plan rows, reminders/tasks/ledger readback beyond Bond Vault, deceased-pet Feature Hub non-memorial route blocking beyond stale Calendar event taps, stale routes after memorial/delete beyond stale Calendar event taps, broader pet shop/economy categories and negative purchase paths beyond the covered Lime Glow effect purchase, and invalid-value/broader edit-negative flows. For old-user realism across multiple validation commands, use `scripts/run-dogfood-simulator.sh --status --require-data` around manual dogfood passes so the same pinned simulator, installed app, and persistence store are verified instead of relying on `xcodebuild test` container behavior. Add narrow simulator tests as each real blocker is exposed.
 - Close when: targeted pet GUI coverage proves create/edit/cancel, quick care, reminder/calendar, shop/economy, memorial/deceased, delete-cancel/delete-confirm, stale-route protection, and duplicate-write protection through either one maintainable suite or multiple real-user long sessions with passing xcresult evidence.
 
-### TFU-20260613-003 - Round-Trip Recycle-Bin Soft-Delete Fields In CloudSync
-
-- Priority / bucket: P2, future CloudSync / 1.x.
-- Status: Done 2026-07-08 for the local CloudSync payload/apply contract; true shared-zone enablement validation remains covered by TFU-20260614-014 while CloudKit stays disabled.
-- Why closed: upload-pipeline recoverable entities now serialize `trashedAt`, `trashExpiresAt`, `trashBatchId`, and `trashedByHumanId` as CloudSync payload fields, and live remote apply preserves or clears those legacy fields without turning the row into a deletion tombstone. This does not revive the retired user-facing Recycle Bin product surface.
-- Evidence: `CloudSyncMetadataServiceTests` covers legacy field upload, clear-field upload for restore, remote live apply preserving the legacy fields, and remote live apply clearing them for restore.
-- Close condition: remote soft-delete and remote restore semantics are locally reproducible through CloudSync payload/apply without premature tombstones.
-
 ### TFU-20260612-022 - Add Final Settings Privacy And Support Actions
 
 - Priority / bucket: P2, release links / external content.
@@ -104,14 +96,6 @@
 - Why still open: the 2026-06-28 human slices moved Human detail overview, basic-info edit/read surfaces, feature hubs, privacy placeholders, reminder/notes copy, route fallback/loading/missing copy, dynamic role/age/blood chips, `EditHumanSheet`, human-reachable CrewRoster edit/delete/accessibility copy, and shared avatar/crop controls onto `L10n`. The 2026-07-07 passes also moved pet personality home greetings onto unified `L10n.tr` copy with regression coverage, converted the Pet basic-info vet summary read model from prebuilt Chinese strings into value snapshots rendered through localized helpers, localized Pet breed care-tip output at the `PetBreedDatabase.careTips(for:l:)` source boundary, removed Pet/Human basic-info edit forms' Chinese `未填写` picker sentinel in favor of internal empty values plus localized display text, made Pet Basic Info species picker render localized labels over stable raw values, made new Pet species writes/defaults use canonical keys with legacy Chinese raw-value read compatibility across high-traffic home/profile/health/function-menu/shared-check-in surfaces, made Pet health alert species exceptions consume the same canonical helpers, made new Human gender selection/write/backup-export paths use canonical keys while retaining legacy Chinese raw-value read compatibility, centralized Human role/gender display through `HumanProfileOptions.localized*` helpers across Home snapshots, Human detail, all-features, CrewRoster, and privacy surfaces, moved Pet medication dose units and administration methods to stable keys with localized display plus legacy Chinese read compatibility, localized the sitter-card export watermark, hardened the sitter-card header/rows for long-language wrapping instead of fixed-width label columns, replaced Pet Basic Info read/vet-summary fixed label columns with adaptive horizontal/stacked rows guarded by source tests, replaced Plant Dashboard room-zone fixed cards with adaptive min/ideal/max width cards plus wrap-capable status chips, moved Pet medication list/detail cards onto adaptive long-language layouts, and changed Plant multi-select quick record from a flat care-type strip to a category-then-type picker with adaptive plant cards. The 2026-07-07 localization audit now has zero current direct user-visible hardcoded Chinese matches and the stale 600-line baseline was collapsed to an empty ratchet. The remaining risk is visual: broader Members/Pet/plant dense screens still need a final long-language sweep.
 - Next action: continue the broader Members/Pet/plant visual long-language sweep, especially remaining pet detail layouts and plant high-density cards.
 - Close when: Members user-facing strings pass localization coverage and main long-language screens remain visually clean.
-
-### TFU-20260612-010 - Unify Care Status Read Models And Expand Ledger Analysis
-
-- Priority / bucket: P3, product/read-model polish.
-- Status: Done.
-- Why closed: `CareLedgerAnalysisView` includes event-type distribution, actor/family-member breakdown, and a daily trend card backed by `CareLedgerAnalysisScreenModel`; Hygiene now consumes the shared `CareCycleStatus` due/overdue projection used by water-cycle QuickCare, and Home groom quick-action status/attention reads from the same hygiene ledger snapshot instead of view-local date math.
-- Evidence: 2026-07-07 local targeted simulator run on pinned `iPhone 17` passed `scripts/test-simulator.sh '-only-testing:OhanaTests/HomeExpensePreviewStoreTests' '-only-testing:OhanaTests/LocalizationTests'` with 44 Swift Testing tests, covering water-cycle compatibility, generic care-cycle copy, Hygiene due-vs-overdue attention, and groom quick-action read-model status.
-- Close condition met: Hygiene/QuickCare status feedback shares the same cycle-status source, and ledger analysis includes trend plus executor/family-member breakdowns.
 
 ## Recently Closed Pointers
 
@@ -130,6 +114,8 @@ Use the archive for full detail. High-signal closures already reflected in the c
 - TFU-20260630-001: Coconut Shop Function Menu route blocker closed on 2026-06-30 after the current iPhone 17 simulator revalidation passed the Home FAB -> Function Menu -> Coconut Shop -> Lime Glow purchase UI test plus route, growth, gacha, catalog, and plant-shop guards.
 - TFU-20260629-002: Plants simulator GUI coverage closed on 2026-07-03 after current evidence covered the launch-required simulator paths: full unlock/create/reminder/Calendar/care/delete, no-reset reminder toggle, no-reset detail profile sections, no-reset Settings bulk defer plus edit cancel/save, Calendar plant filter, catalog-first add flow, and wallet expand/collapse position stability including the mid-animation inactive-card jump root fix. Remaining plant work is tracked as true-device/manual acceptance in `docs/release-true-device-test-plan.md` or as non-launch future scope, not as a simulator focus blocker.
 - TFU-20260611-003: sanitized image attachment filename polish closed on 2026-07-07. Document and receipt import paths now consume the shared sanitizer payload, successful JPEG rewrites surface `.jpg` filenames, fallback batch names remain unique, and `scripts/build-debug-fast.sh` passed on the pinned `iPhone 17` simulator.
+- TFU-20260612-010: care status read-model and ledger analysis polish closed on 2026-07-07. `CareLedgerAnalysisView` now includes event-type distribution, actor/family-member breakdown, and a daily trend card; Hygiene/QuickCare status feedback shares `CareCycleStatus`, and Home groom quick-action attention reads from the hygiene ledger snapshot instead of view-local date math.
+- TFU-20260613-003: CloudSync legacy soft-delete field round trip closed on 2026-07-08. Upload-pipeline recoverable entities serialize legacy trash fields, restore uploads clear them, and live remote apply preserves or clears those fields without turning the row into a deletion tombstone; future true shared-zone validation is covered by TFU-20260614-014 while CloudKit stays disabled.
 - TFU-20260629-001: Human automated write-flow coverage closed on 2026-06-29; the combined pinned `iPhone 17` UI run passed route coverage, Home human quick actions, feature-hub record persistence, and extended health/workout/report/wishlist/profile writes.
 - TFU-20260628-001: Home first-pet onboarding accessibility polish closed in the same validation pass; non-front Today Focus compact-stack cards are no longer mounted at rest, and expanded non-selected Home card surfaces are hidden from accessibility.
 - TFU-20260612-018: duplicate Members profile revision publishes closed on 2026-06-28; profile executors own the single publish boundary and `scripts/audit-architecture-boundaries.sh` now guards against direct Members view publishes.
