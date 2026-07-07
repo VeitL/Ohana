@@ -350,6 +350,20 @@ struct PlantCreationCommandInput: Equatable {
 struct PlantCreationCommandResult: Equatable {
     let plantID: UUID
     let kind: String
+    let didPersist: Bool
+    let persistenceErrorDescription: String?
+
+    init(
+        plantID: UUID,
+        kind: String,
+        didPersist: Bool = true,
+        persistenceErrorDescription: String? = nil
+    ) {
+        self.plantID = plantID
+        self.kind = kind
+        self.didPersist = didPersist
+        self.persistenceErrorDescription = persistenceErrorDescription
+    }
 }
 
 nonisolated struct PlantDuplicateScanDraft: Equatable, Sendable {
@@ -687,14 +701,28 @@ enum PlantCreationCommandService {
         plant.updateAvatarImageData(input.avatarImageData)
         plant.notes = input.notes.trimmingCharacters(in: .whitespacesAndNewlines)
         context.insert(plant)
-        PlantUnlockPolicy.noteExistingPlantData()
         CloudSyncMutationRecorder.markModified(plant, context: context)
-        context.safeSave()
-        PlantCarePlanScheduleService.sync(
+        let scheduleResult = PlantCarePlanScheduleService.sync(
             plant: plant,
             context: context,
             scheduleNotifications: scheduleNotifications,
-            reminderScheduling: providedReminderScheduling
+            reminderScheduling: providedReminderScheduling,
+            saveChanges: false
+        )
+        let saveResult = context.safeSaveResult(publishFailureEvent: true)
+        guard saveResult.didSave else {
+            context.rollback()
+            return PlantCreationCommandResult(
+                plantID: plant.id,
+                kind: EntityKind.plant.rawValue,
+                didPersist: false,
+                persistenceErrorDescription: saveResult.errorDescription
+            )
+        }
+        PlantUnlockPolicy.noteExistingPlantData()
+        PlantCarePlanScheduleService.commitSideEffects(
+            for: scheduleResult,
+            context: context
         )
 
         return PlantCreationCommandResult(
@@ -739,7 +767,9 @@ struct PlantCreationCommandExecutor {
             scheduleNotifications: scheduleNotifications,
             reminderScheduling: providedReminderScheduling
         )
-        revisions.publishMemberCreation(result, note: note)
+        if result.didPersist {
+            revisions.publishMemberCreation(result, note: note)
+        }
         return result
     }
 }

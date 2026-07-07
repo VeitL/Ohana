@@ -2977,6 +2977,7 @@ struct HomeCommandExecutorTests {
         #expect(plants.count == 1)
         #expect(result.plantID == id)
         #expect(result.kind == EntityKind.plant.rawValue)
+        #expect(result.didPersist)
         #expect(plant.id == id)
         #expect(plant.name == "Fern")
         #expect(plant.species == "Boston fern")
@@ -3016,11 +3017,13 @@ struct HomeCommandExecutorTests {
                 wateringIntervalDays: 5,
                 fertilizingIntervalDays: 40
             ),
-            note: "test.plant.creation"
+            note: "test.plant.creation",
+            scheduleNotifications: false
         )
         let mutation = try #require(revisionCenter.lastMutation)
 
         #expect(result.plantID == id)
+        #expect(result.didPersist)
         #expect(mutation.command == .memberCreation(entityID: id, kind: EntityKind.plant.rawValue))
         #expect(mutation.affectedEntityIDs == [id])
         #expect(mutation.note == "test.plant.creation")
@@ -3071,6 +3074,26 @@ struct HomeCommandExecutorTests {
         for reminder in plantPlanReminders {
             #expect(reminder.isPending)
         }
+    }
+
+    @Test func plantCreationDefersUnlockScheduleAndRevisionUntilPersistence() throws {
+        let rootURL = repositoryRootURL()
+        let commandsSource = try source("Ohana/Features/Plants/PlantCommands.swift", rootURL: rootURL)
+        let addPlantSource = try source("Ohana/Features/Plants/Views/AddPlantView.swift", rootURL: rootURL)
+
+        #expect(commandsSource.contains("let didPersist: Bool"))
+        #expect(commandsSource.contains("let persistenceErrorDescription: String?"))
+        #expect(!commandsSource.contains("context.safeSave()"))
+        #expect(commandsSource.contains("context.safeSaveResult(publishFailureEvent: true)"))
+        #expect(commandsSource.contains("context.rollback()"))
+        #expect(commandsSource.contains("saveChanges: false"))
+        #expect(commandsSource.contains("if result.didPersist"))
+        let unlockMarkIndex = try #require(commandsSource.range(of: "PlantUnlockPolicy.noteExistingPlantData()")?.lowerBound)
+        let saveGuardIndex = try #require(commandsSource.range(of: "guard saveResult.didSave else")?.lowerBound)
+        #expect(unlockMarkIndex > saveGuardIndex)
+        #expect(commandsSource.contains("PlantCarePlanScheduleService.commitSideEffects("))
+        #expect(addPlantSource.contains("guard result.didPersist else"))
+        #expect(addPlantSource.contains("plantCreationSaveFailureMessage"))
     }
 
     @MainActor

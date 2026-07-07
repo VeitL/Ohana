@@ -875,12 +875,13 @@ struct PlantLaunchTests {
             fertilizingIntervalDays: 30
         )
 
-        PlantCreationCommandService.createPlant(
+        let result = PlantCreationCommandService.createPlant(
             input: input,
             context: container.mainContext,
             scheduleNotifications: false
         )
 
+        #expect(result.didPersist)
         #expect(PlantUnlockPolicy.hasExistingPlantData())
         #expect(AppFeatureRouteGuard.allowsAddEntity(.plant, currentLevel: 3))
     }
@@ -921,12 +922,13 @@ struct PlantLaunchTests {
             catalogSpeciesId: "calathea-orbifolia"
         )
 
-        PlantCreationCommandService.createPlant(
+        let result = PlantCreationCommandService.createPlant(
             input: input,
             context: container.mainContext,
             scheduleNotifications: false
         )
 
+        #expect(result.didPersist)
         let plant = try #require(try container.mainContext.fetch(FetchDescriptor<Plant>()).first)
         #expect(plant.roomNameRaw == "Bedroom")
         #expect(plant.avatarImageData == avatarData)

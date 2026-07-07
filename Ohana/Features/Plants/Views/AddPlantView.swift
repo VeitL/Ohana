@@ -65,6 +65,7 @@ struct AddPlantView: View {
     @State var showingCustomRoomField = false
     @State var showingCustomLocationField = false
     @State var didShowSuccess = false
+    @State var saveFailureMessage: String?
     @State var isPreparingCamera = false
     @State var cropPresentationTask: Task<Void, Never>?
     @State var duplicateAcknowledgementKey = ""
@@ -182,6 +183,13 @@ struct AddPlantView: View {
             }
         } message: {
             Text(duplicateAlertMessage)
+        }
+        .alert(l.tr(zh: "保存失败", en: "Save failed", de: "Speichern fehlgeschlagen"), isPresented: saveFailureAlertBinding) {
+            Button(l.done, role: .cancel) {
+                saveFailureMessage = nil
+            }
+        } message: {
+            Text(saveFailureMessage ?? l.tr(zh: "请稍后重试。", en: "Please try again later.", de: "Bitte später erneut versuchen."))
         }
     }
 
@@ -1130,6 +1138,12 @@ struct AddPlantView: View {
                 input: input,
                 note: "plant.creation"
             )
+            guard result.didPersist else {
+                isSaving = false
+                saveFailureMessage = plantCreationSaveFailureMessage(result.persistenceErrorDescription)
+                UINotificationFeedbackGenerator().notificationOccurred(.error)
+                return
+            }
             UINotificationFeedbackGenerator().notificationOccurred(.success)
             onPlantSaved?(result.plantID)
             withAnimation(GoMotion.sheetEnter) {
@@ -1139,6 +1153,30 @@ struct AddPlantView: View {
                 onComplete()
             }
         }
+    }
+
+    private var saveFailureAlertBinding: Binding<Bool> {
+        Binding(
+            get: { saveFailureMessage != nil },
+            set: { isPresented in
+                if !isPresented { saveFailureMessage = nil }
+            }
+        )
+    }
+
+    private func plantCreationSaveFailureMessage(_ errorDescription: String?) -> String {
+        if let errorDescription, !errorDescription.isEmpty {
+            return l.tr(
+                zh: "无法保存植物档案：\(errorDescription)",
+                en: "Could not save the plant profile: \(errorDescription)",
+                de: "Das Pflanzenprofil konnte nicht gespeichert werden: \(errorDescription)"
+            )
+        }
+        return l.tr(
+            zh: "无法保存植物档案，请稍后重试。",
+            en: "Could not save the plant profile. Please try again later.",
+            de: "Das Pflanzenprofil konnte nicht gespeichert werden. Bitte später erneut versuchen."
+        )
     }
 
     var duplicateAlertMessage: String {
