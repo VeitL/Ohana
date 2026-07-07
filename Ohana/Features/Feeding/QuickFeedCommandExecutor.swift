@@ -229,7 +229,7 @@ struct QuickFeedCommandExecutor {
         deriveFeedMutation(
             .feedLog(petID: pet.id, source: "manual"),
             pets: mutationPets(pet: pet, targets: targets),
-            wroteBusinessFact: result.didRecord && result.allowsDerivedEffects,
+            wroteBusinessFact: result.didPersist && result.didRecord && result.allowsDerivedEffects,
             note: result.targetCount > 1 ? "shared_manual_feed" : "manual_feed"
         )
         return result
@@ -254,8 +254,8 @@ struct QuickFeedCommandExecutor {
         deriveFeedMutation(
             .feedLog(petID: pet.id, source: "planned"),
             pets: [pet],
-            wroteBusinessFact: result.didRecord && result.allowsDerivedEffects,
-            note: result.didRecord && result.allowsDerivedEffects ? "planned_feed_completed" : "planned_feed_noop"
+            wroteBusinessFact: result.didPersist && result.didRecord && result.allowsDerivedEffects,
+            note: result.didPersist && result.didRecord && result.allowsDerivedEffects ? "planned_feed_completed" : "planned_feed_noop"
         )
         return result
     }

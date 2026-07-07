@@ -17,6 +17,8 @@ struct ManualFeedCommandResult {
     let didRecord: Bool
     let allowsDerivedEffects: Bool
     let coconutDelta: Int
+    let didPersist: Bool
+    let persistenceErrorDescription: String?
 }
 
 enum ManualFeedCommand {
@@ -38,8 +40,8 @@ enum ManualFeedCommand {
         pet.mainFoodKind = foodKind
         pet.dailyPortionGrams = defaultEnabled ? grams : 0
         CloudSyncMutationRecorder.markModified(pet, context: context)
-        context.safeSave()
-        return true
+        let saveResult = context.safeSaveResult(publishFailureEvent: true)
+        return saveResult.didSave
     }
 
     @MainActor
@@ -84,6 +86,20 @@ enum ManualFeedCommand {
             ))
         }
 
+        guard recorded.didPersist else {
+            return ManualFeedCommandResult(
+                foodKind: foodKind,
+                grams: grams,
+                targetCount: 0,
+                affectsStock: false,
+                stockReminders: [],
+                didRecord: false,
+                allowsDerivedEffects: false,
+                coconutDelta: 0,
+                didPersist: false,
+                persistenceErrorDescription: recorded.persistenceErrorDescription
+            )
+        }
         guard recorded.didWriteFact else {
             return ManualFeedCommandResult(
                 foodKind: foodKind,
@@ -93,7 +109,9 @@ enum ManualFeedCommand {
                 stockReminders: [],
                 didRecord: false,
                 allowsDerivedEffects: false,
-                coconutDelta: 0
+                coconutDelta: 0,
+                didPersist: true,
+                persistenceErrorDescription: nil
             )
         }
 
@@ -122,7 +140,9 @@ enum ManualFeedCommand {
             stockReminders: stockReminders,
             didRecord: true,
             allowsDerivedEffects: allowsDerivedEffects,
-            coconutDelta: recorded.reward.humanGot + recorded.reward.petGot
+            coconutDelta: recorded.reward.humanGot + recorded.reward.petGot,
+            didPersist: true,
+            persistenceErrorDescription: nil
         )
     }
 
@@ -150,7 +170,9 @@ enum ManualFeedCommand {
                 stockReminders: [],
                 didRecord: false,
                 allowsDerivedEffects: false,
-                coconutDelta: 0
+                coconutDelta: 0,
+                didPersist: true,
+                persistenceErrorDescription: nil
             )
         }
         let completed = careEvents.completePlannedFeedResult(
@@ -162,6 +184,20 @@ enum ManualFeedCommand {
             occurredAt: nil,
             operationDate: date
         )
+        guard completed.didPersist else {
+            return ManualFeedCommandResult(
+                foodKind: foodKind,
+                grams: grams,
+                targetCount: 0,
+                affectsStock: false,
+                stockReminders: [],
+                didRecord: false,
+                allowsDerivedEffects: false,
+                coconutDelta: 0,
+                didPersist: false,
+                persistenceErrorDescription: completed.persistenceErrorDescription
+            )
+        }
         guard completed.didRecord else {
             return ManualFeedCommandResult(
                 foodKind: foodKind,
@@ -171,7 +207,9 @@ enum ManualFeedCommand {
                 stockReminders: [],
                 didRecord: false,
                 allowsDerivedEffects: false,
-                coconutDelta: 0
+                coconutDelta: 0,
+                didPersist: true,
+                persistenceErrorDescription: nil
             )
         }
         let stockReminders = completed.allowsDerivedEffects
@@ -191,7 +229,9 @@ enum ManualFeedCommand {
             stockReminders: stockReminders,
             didRecord: true,
             allowsDerivedEffects: completed.allowsDerivedEffects,
-            coconutDelta: completed.coconutDelta
+            coconutDelta: completed.coconutDelta,
+            didPersist: true,
+            persistenceErrorDescription: nil
         )
     }
 }

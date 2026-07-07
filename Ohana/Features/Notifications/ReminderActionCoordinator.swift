@@ -238,7 +238,7 @@ enum ReminderActionCoordinator {
                 executorId: executorId,
                 careEvents: careEvents
             )
-            guard result.didRecord, result.allowsDerivedEffects else { return .skipped }
+            guard result.didPersist, result.didRecord, result.allowsDerivedEffects else { return .skipped }
             return .completed
         }
 

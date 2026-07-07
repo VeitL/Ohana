@@ -437,7 +437,7 @@ enum SharedPetActionRecorder {
             session.primaryLegacyModelId = primary.id
         }
         CloudSyncMutationRecorder.markModified(session, context: context, modifiedAt: descriptor.date)
-        let saveResult = context.safeSaveResult()
+        let saveResult = context.safeSaveResult(publishFailureEvent: true)
         guard saveResult.didSave else {
             return SharedPetActionResult(
                 sessionID: session.id,

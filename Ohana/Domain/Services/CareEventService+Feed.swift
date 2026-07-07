@@ -103,7 +103,7 @@ extension CareEventService {
             )
         }
         let log = DomainCareFactWriter.createCareLog(plan: write, context: context).log
-        let saveResult = context.safeSaveResult()
+        let saveResult = context.safeSaveResult(publishFailureEvent: true)
         guard saveResult.didSave else {
             return (
                 CareRecordResult(
@@ -238,7 +238,7 @@ extension CareEventService {
         }
         let disposition = write.disposition
         let log = DomainCareFactWriter.createCareLog(plan: write, context: context).log
-        let saveResult = context.safeSaveResult()
+        let saveResult = context.safeSaveResult(publishFailureEvent: true)
         guard saveResult.didSave else {
             return (
                 result: TreatFeedRecordResult(
@@ -357,7 +357,7 @@ extension CareEventService {
         let log = DomainCareFactWriter.createCareLog(plan: write, context: context).log
 
         guard disposition.allowsDerivedEffects else {
-            let saveResult = context.safeSaveResult()
+            let saveResult = context.safeSaveResult(publishFailureEvent: true)
             return PlannedCareCompletionResult(
                 logID: log.id,
                 subjectID: pet.id,
@@ -381,7 +381,7 @@ extension CareEventService {
             ) else {
                 return (0, 0)
             }
-            let saveResult = context.safeSaveResult()
+        let saveResult = context.safeSaveResult(publishFailureEvent: true)
             guard saveResult.didSave else {
                 persistenceErrorDescription = saveResult.errorDescription
                 return (0, 0)
@@ -512,7 +512,7 @@ extension CareEventService {
         let log = DomainCareFactWriter.createCareLog(plan: write, context: context).log
 
         guard disposition.allowsDerivedEffects else {
-            let saveResult = context.safeSaveResult()
+                let saveResult = context.safeSaveResult(publishFailureEvent: true)
             return PlannedCareCompletionResult(
                 logID: log.id,
                 subjectID: pet.id,
@@ -536,7 +536,7 @@ extension CareEventService {
             ) else {
                 return (0, 0)
             }
-            let saveResult = context.safeSaveResult()
+            let saveResult = context.safeSaveResult(publishFailureEvent: true)
             guard saveResult.didSave else {
                 persistenceErrorDescription = saveResult.errorDescription
                 return (0, 0)

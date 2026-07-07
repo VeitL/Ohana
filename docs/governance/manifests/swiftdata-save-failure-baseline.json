@@ -64,9 +64,6 @@
     "Ohana/Features/Feeding/FeedAutoLogMaterializer.swift": [
       "context.safeSave()"
     ],
-    "Ohana/Features/Feeding/FeedCommands.swift": [
-      "context.safeSave()"
-    ],
     "Ohana/Features/Feeding/FeedPlanAndStockCommands.swift": [
       "context.safeSave()",
       "context.safeSave()",

@@ -65,7 +65,9 @@ extension CareEventService {
                 target: target,
                 careLogID: recorded.result.logID,
                 reward: recorded.reward,
-                disposition: recorded.result.disposition
+                disposition: recorded.result.disposition,
+                didPersist: recorded.result.didPersist,
+                persistenceErrorDescription: recorded.result.persistenceErrorDescription
             )
         }
 
@@ -149,7 +151,9 @@ extension CareEventService {
                 target: target,
                 careLogID: recorded.result.logID,
                 reward: recorded.reward,
-                disposition: recorded.result.disposition
+                disposition: recorded.result.disposition,
+                didPersist: recorded.result.didPersist,
+                persistenceErrorDescription: recorded.result.persistenceErrorDescription
             )
         }
 
@@ -225,7 +229,9 @@ extension CareEventService {
                 target: target,
                 careLogID: recorded.result.logID,
                 reward: recorded.reward,
-                disposition: recorded.result.disposition
+                disposition: recorded.result.disposition,
+                didPersist: recorded.result.didPersist,
+                persistenceErrorDescription: recorded.result.persistenceErrorDescription
             )
         }
 
@@ -317,7 +323,9 @@ extension CareEventService {
                 target: target,
                 careLogID: recorded.result.logID,
                 reward: recorded.reward,
-                disposition: recorded.result.disposition
+                disposition: recorded.result.disposition,
+                didPersist: recorded.result.didPersist,
+                persistenceErrorDescription: recorded.result.persistenceErrorDescription
             )
         }
 
@@ -346,19 +354,23 @@ extension CareEventService {
         target: Pet,
         careLogID: UUID,
         reward: (humanGot: Int, petGot: Int),
-        disposition: CareFactWriteDisposition
+        disposition: CareFactWriteDisposition,
+        didPersist: Bool,
+        persistenceErrorDescription: String?
     ) -> SharedPetActionResult {
         SharedPetActionResult(
             sessionID: careLogID,
-            targetPetIDs: disposition.didWriteFact ? [target.id] : [],
-            careLogIDs: disposition.didWriteFact ? [careLogID] : [],
+            targetPetIDs: didPersist && disposition.didWriteFact ? [target.id] : [],
+            careLogIDs: didPersist && disposition.didWriteFact ? [careLogID] : [],
             pottyLogID: nil,
             pottyLog: nil,
             expenseLogIDs: [],
             walkLogIDs: [],
             walkLogs: [],
             reward: reward,
-            disposition: disposition
+            disposition: disposition,
+            didPersist: didPersist,
+            persistenceErrorDescription: persistenceErrorDescription
         )
     }
 

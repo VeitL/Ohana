@@ -61,7 +61,7 @@ enum ExpandedQuickActionExecutor {
                     careEvents: careEvents,
                     date: now
                 )
-                guard result.didRecord, result.allowsDerivedEffects else { return false }
+                guard result.didPersist, result.didRecord, result.allowsDerivedEffects else { return false }
                 let coconutDelta = result.coconutDelta
                 feedback(Feedback(cardId: pet.id, coconutDelta: coconutDelta, label: rewardLabel(actionType: "feed", delta: coconutDelta)))
                 UINotificationFeedbackGenerator().notificationOccurred(.success)

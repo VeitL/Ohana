@@ -59,6 +59,10 @@ extension QuickFeedDetailContent {
                 executorId: currentUserId,
                 date: date
             )
+            guard result.didPersist else {
+                showFeedPersistenceFailure()
+                return
+            }
             guard result.didRecord else { return }
             guard result.allowsDerivedEffects else {
                 reloadFeedSnapshots(forceSnapshot: true)
@@ -101,6 +105,10 @@ extension QuickFeedDetailContent {
                 allEvents: allEvents,
                 executorId: currentUserId
             )
+            guard result.didPersist else {
+                showFeedPersistenceFailure()
+                return
+            }
             guard result.didRecord else {
                 reloadFeedSnapshots(forceSnapshot: true)
                 triggerToast(
@@ -123,6 +131,18 @@ extension QuickFeedDetailContent {
             )
         }
         performWithAntiRepeat(action)
+    }
+
+    func showFeedPersistenceFailure() {
+        reloadFeedSnapshots(forceSnapshot: true)
+        triggerToast(
+            l.tr(
+                zh: "保存失败，请检查存储空间后重试",
+                en: "Couldn't save. Check storage and try again.",
+                de: "Speichern fehlgeschlagen. Speicher pruefen und erneut versuchen."
+            ),
+            tint: Color.goRed
+        )
     }
 
     func completeSelectedPlanOccurrence(_ occurrence: FeedPlanCalendarOccurrence) {

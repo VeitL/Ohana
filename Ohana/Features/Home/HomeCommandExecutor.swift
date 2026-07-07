@@ -325,7 +325,7 @@ struct HomeCommandExecutor {
             careEvents: careEvents,
             date: now
         )
-        if result.didRecord && result.allowsDerivedEffects {
+        if result.didPersist && result.didRecord && result.allowsDerivedEffects {
             publishMutation(QuickCareCommand.plannedFeed(petID: pet.id, reminderID: reminder.id), pet: pet)
         }
         return result
