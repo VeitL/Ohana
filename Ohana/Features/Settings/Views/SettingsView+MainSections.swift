@@ -94,6 +94,8 @@ extension SettingsView {
             }
             .pickerStyle(.menu)
             .accessibilityIdentifier("settings-language-picker")
+            .disabled(isLanguageCommitInFlight)
+            .opacity(isLanguageCommitInFlight ? 0.56 : 1)
             .onChange(of: languageSelectionCode) { _, newValue in
                 scheduleLanguageCommit(newValue)
             }

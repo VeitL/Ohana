@@ -94,6 +94,7 @@ extension SettingsView {
             areDataSectionsMounted = false
             isLanguageCommitInFlight = true
         }
+        scheduleDataSectionsMount(delayMilliseconds: 1200, animated: false)
     }
 
     func commitLanguageChange(_ languageCode: String, emitFeedback: Bool = true) {
@@ -119,13 +120,20 @@ extension SettingsView {
         scheduleDataSectionsMount()
     }
 
-    func scheduleDataSectionsMount() {
+    func scheduleDataSectionsMount(delayMilliseconds: UInt64 = 260, animated: Bool = true) {
         guard !areDataSectionsMounted || isLanguageCommitInFlight else { return }
         dataSectionsMountTask?.cancel()
-        dataSectionsMountTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: 260) {
-            withAnimation(GoMotion.quick) {
+        dataSectionsMountTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: delayMilliseconds) {
+            let updates = {
                 areDataSectionsMounted = true
                 isLanguageCommitInFlight = false
+            }
+            if animated {
+                withAnimation(GoMotion.quick, updates)
+            } else {
+                var transaction = Transaction(animation: nil)
+                transaction.disablesAnimations = true
+                withTransaction(transaction, updates)
             }
             dataSectionsMountTask = nil
         }
