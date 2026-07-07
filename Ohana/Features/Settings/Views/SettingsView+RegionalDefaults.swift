@@ -28,7 +28,7 @@ extension SettingsView {
         appMeasurementSystem = AppMeasurementSystem.normalize(country.defaultMeasurementSystemCode)
         appCurrency = AppCurrency.normalize(country.defaultCurrencyCode)
         languageSelectionCode = AppLanguage.normalize(country.defaultLanguageCode)
-        scheduleLanguageCommit(languageSelectionCode)
+        scheduleLanguageCommit(languageSelectionCode, emitFeedback: false)
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
     }
 
@@ -43,8 +43,14 @@ extension SettingsView {
         if appCurrency != AppCurrency.code {
             appCurrency = AppCurrency.code
         }
-        if appLanguage != AppLanguage.code {
-            commitLanguageChange(AppLanguage.code, emitFeedback: false)
+        let normalizedLanguage = AppLanguage.code
+        if appLanguage != normalizedLanguage {
+            var transaction = Transaction(animation: nil)
+            transaction.disablesAnimations = true
+            withTransaction(transaction) {
+                languageSelectionCode = normalizedLanguage
+            }
+            scheduleLanguageCommit(normalizedLanguage, emitFeedback: false)
         }
     }
 
@@ -59,17 +65,34 @@ extension SettingsView {
         }
     }
 
-    func scheduleLanguageCommit(_ rawLanguageCode: String) {
+    func scheduleLanguageCommit(_ rawLanguageCode: String, emitFeedback: Bool = true) {
         let normalized = AppLanguage.normalize(rawLanguageCode)
         guard normalized != AppLanguage.normalize(appLanguage) else {
             languageCommitTask?.cancel()
             languageCommitTask = nil
+            if isLanguageCommitInFlight {
+                scheduleDataSectionsMount()
+            }
             return
         }
 
+        prepareForLanguageCommit()
         languageCommitTask?.cancel()
         languageCommitTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: 96) {
-            commitLanguageChange(normalized)
+            commitLanguageChange(normalized, emitFeedback: emitFeedback)
+        }
+    }
+
+    func prepareForLanguageCommit() {
+        dataSectionsMountTask?.cancel()
+        dataSectionsMountTask = nil
+
+        guard areDataSectionsMounted || !isLanguageCommitInFlight else { return }
+        var transaction = Transaction(animation: nil)
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            areDataSectionsMounted = false
+            isLanguageCommitInFlight = true
         }
     }
 
@@ -77,6 +100,9 @@ extension SettingsView {
         let normalized = AppLanguage.normalize(languageCode)
         guard AppLanguage.normalize(appLanguage) != normalized else {
             languageCommitTask = nil
+            if isLanguageCommitInFlight {
+                scheduleDataSectionsMount()
+            }
             return
         }
 
@@ -90,14 +116,16 @@ extension SettingsView {
         if emitFeedback {
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
         }
+        scheduleDataSectionsMount()
     }
 
     func scheduleDataSectionsMount() {
-        guard !areDataSectionsMounted else { return }
+        guard !areDataSectionsMounted || isLanguageCommitInFlight else { return }
         dataSectionsMountTask?.cancel()
         dataSectionsMountTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: 260) {
             withAnimation(GoMotion.quick) {
                 areDataSectionsMounted = true
+                isLanguageCommitInFlight = false
             }
             dataSectionsMountTask = nil
         }

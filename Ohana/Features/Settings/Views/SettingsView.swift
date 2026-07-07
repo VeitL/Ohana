@@ -78,6 +78,7 @@ struct SettingsView: View {
     @State var notificationPreferenceRevision = 0
     @State var languageSelectionCode = AppLanguage.code
     @State var languageCommitTask: Task<Void, Never>?
+    @State var isLanguageCommitInFlight = false
 
     init(
         homeHouseholds: [Household]? = nil,

@@ -14,7 +14,6 @@ struct RootView: View {
     @Environment(\.scenePhase) private var scenePhase
     @AppStorage("ohana_has_onboarded") private var hasOnboarded = false
     @AppStorage("currentActiveHumanId") private var currentActiveHumanId = ""
-    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
     @AppStorage(AppPrivacySnapshotProtectionStore.hideSnapshotKey) private var hideAppSwitcherSnapshot = AppPrivacySnapshotProtectionStore.defaultHideSnapshot
     // F3: 数据库降级警告
     @State private var showDBFallbackAlert = DatabaseFallbackPreferenceStore.isFallbackActive()
@@ -182,7 +181,7 @@ struct RootView: View {
     }
 
     private var l: L10n {
-        L10n(appLanguage)
+        L10n(AppLanguage.code)
     }
 
     private var onlineGateNoticeBinding: Binding<Bool> {

@@ -17,11 +17,15 @@ extension SettingsView {
             AnyView(householdSyncSection)
         }
         AnyView(settingsPreferencesSection)
-        AnyView(privacySecuritySection)
-        AnyView(settingsNotificationsSection)
-        AnyView(backupSection)
-        AnyView(settingsAboutSection)
-        AnyView(settingsResetSection)
+        if isLanguageCommitInFlight {
+            AnyView(settingsLanguageCommitPlaceholderSection)
+        } else {
+            AnyView(privacySecuritySection)
+            AnyView(settingsNotificationsSection)
+            AnyView(backupSection)
+            AnyView(settingsAboutSection)
+            AnyView(settingsResetSection)
+        }
         Spacer(minLength: 40)
     }
 
@@ -96,6 +100,36 @@ extension SettingsView {
         }
         .foregroundStyle(primaryText)
         .frame(minHeight: 44)
+    }
+
+    var settingsLanguageCommitPlaceholderSection: some View {
+        settingsSection(title: l.tr(zh: "正在更新语言", en: "Updating Language", de: "Sprache wird aktualisiert")) {
+            HStack(spacing: 10) {
+                ProgressView()
+                    .tint(Color.goPrimary)
+                    .scaleEffect(0.82)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(l.tr(
+                        zh: "正在更新界面文字",
+                        en: "Updating interface text",
+                        de: "Oberflächentexte werden aktualisiert"
+                    ))
+                    .font(OhanaFont.body(.semibold))
+                    .foregroundStyle(primaryText)
+                    Text(l.tr(
+                        zh: "马上就好。",
+                        en: "Almost done.",
+                        de: "Fast fertig."
+                    ))
+                    .font(OhanaFont.footnote())
+                    .foregroundStyle(tertiaryText)
+                    .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 0)
+            }
+            .frame(minHeight: 54)
+            .accessibilityIdentifier("settings-language-commit-placeholder")
+        }
     }
 
     var settingsMeasurementUnitsRow: some View {

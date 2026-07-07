@@ -95,13 +95,42 @@ struct SettingsRouteContainerTests {
 
         #expect(settingsSource.contains("@State var languageSelectionCode = AppLanguage.code"))
         #expect(settingsSource.contains("@State var languageCommitTask: Task<Void, Never>?"))
+        #expect(settingsSource.contains("@State var isLanguageCommitInFlight = false"))
         #expect(mainSource.contains("Picker(\"\", selection: $languageSelectionCode)"))
         #expect(!mainSource.contains("Picker(\"\", selection: $appLanguage)"))
         #expect(mainSource.contains("scheduleLanguageCommit(newValue)"))
+        #expect(mainSource.contains("if isLanguageCommitInFlight"))
+        #expect(mainSource.contains("settingsLanguageCommitPlaceholderSection"))
+        #expect(mainSource.contains("\"settings-language-commit-placeholder\""))
+        #expect(regionalSource.contains("func scheduleLanguageCommit(_ rawLanguageCode: String, emitFeedback: Bool = true)"))
+        #expect(regionalSource.contains("scheduleLanguageCommit(normalizedLanguage, emitFeedback: false)"))
+        #expect(regionalSource.contains("scheduleLanguageCommit(languageSelectionCode, emitFeedback: false)"))
+        #expect(regionalSource.contains("prepareForLanguageCommit()"))
+        #expect(regionalSource.contains("areDataSectionsMounted = false"))
+        #expect(regionalSource.contains("isLanguageCommitInFlight = true"))
+        #expect(regionalSource.contains("isLanguageCommitInFlight = false"))
         #expect(regionalSource.contains("languageCommitTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: 96)"))
         #expect(regionalSource.contains("transaction.disablesAnimations = true"))
-        #expect(regionalSource.contains("commitLanguageChange(AppLanguage.code, emitFeedback: false)"))
+        #expect(!regionalSource.contains("commitLanguageChange(AppLanguage.code, emitFeedback: false)"))
         #expect(!regionalSource.contains("AppCountry.applyDefaults(for: country.code)"))
+    }
+
+    @Test func settingsLanguageSwitchDefersHomeReadModelRefresh() throws {
+        let homeDataSource = try source(
+            "Ohana/Features/Home/VerticalSolidHomeDataContainer.swift",
+            rootURL: repositoryRootURL()
+        )
+        let rootSource = try source(
+            "Ohana/App/RootView.swift",
+            rootURL: repositoryRootURL()
+        )
+
+        #expect(homeDataSource.contains("postLanguageRefreshDelayMilliseconds"))
+        #expect(homeDataSource.contains("@State private var readModelLanguage = AppLanguage.code"))
+        #expect(homeDataSource.contains("scheduleReadModelLanguageSync(newValue)"))
+        #expect(homeDataSource.contains("language: readModelLanguage"))
+        #expect(!homeDataSource.contains("language: appLanguage"))
+        #expect(!rootSource.contains("@AppStorage(\"appLanguage\") private var appLanguage"))
     }
 
     @Test func notificationSettingsKeepCategoryControlsBehindAdvancedDisclosure() throws {

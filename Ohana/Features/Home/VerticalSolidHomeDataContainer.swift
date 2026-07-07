@@ -38,6 +38,7 @@ struct HomeCreatedEntitySignal: Equatable {
 
 struct VerticalSolidHomeDataContainer: View {
     private static let postRevisionRefreshDelayMilliseconds: UInt64 = 260
+    private static let postLanguageRefreshDelayMilliseconds: UInt64 = 720
 
     let onOpenPet: (UUID, PetDetailTab) -> Void
     let onOpenHuman: (UUID) -> Void
@@ -75,6 +76,8 @@ struct VerticalSolidHomeDataContainer: View {
     @State private var observedWalletProjectionRevision = HomeRevision()
     @State private var currentDayToken = HomeReadModelRefreshKey.dayToken(for: Date())
     @State private var refreshKeyStateTask: Task<Void, Never>?
+    @State private var languageRefreshTask: Task<Void, Never>?
+    @State private var readModelLanguage = AppLanguage.code
     @State private var pendingObservedHomeRevision: HomeRevision?
     @State private var pendingObservedWalletProjectionRevision: HomeRevision?
     @State private var pendingDayTokenRefresh = false
@@ -155,7 +158,7 @@ struct VerticalSolidHomeDataContainer: View {
                 petBondVaultRevision: petBondVaultRevision,
                 equippedTitleRaw: equippedTitleRaw,
                 quickActionItemsRaw: quickActionItemsRaw,
-                language: appLanguage,
+                language: readModelLanguage,
                 externalRevision: observedHomeRevision,
                 force: !payload.snapshot.isReady
             )
@@ -181,6 +184,9 @@ struct VerticalSolidHomeDataContainer: View {
                 refreshDayToken: true
             )
         }
+        .onChange(of: appLanguage) { _, newValue in
+            scheduleReadModelLanguageSync(newValue)
+        }
         .onReceive(NotificationCenter.default.publisher(for: .NSCalendarDayChanged)) { _ in
             scheduleRefreshKeyStateSync(revision: nil, walletProjectionRevision: nil, refreshDayToken: true)
         }
@@ -190,6 +196,8 @@ struct VerticalSolidHomeDataContainer: View {
         .onDisappear {
             refreshKeyStateTask?.cancel()
             refreshKeyStateTask = nil
+            languageRefreshTask?.cancel()
+            languageRefreshTask = nil
             readModelStore.cancel()
         }
     }
@@ -206,8 +214,27 @@ struct VerticalSolidHomeDataContainer: View {
             petBondVaultRevision: petBondVaultRevision,
             equippedTitleRaw: equippedTitleRaw,
             quickActionItemsRaw: quickActionItemsRaw,
-            language: appLanguage
+            language: readModelLanguage
         )
+    }
+
+    private func scheduleReadModelLanguageSync(_ rawLanguage: String) {
+        let normalized = AppLanguage.normalize(rawLanguage)
+        guard readModelLanguage != normalized else {
+            languageRefreshTask?.cancel()
+            languageRefreshTask = nil
+            return
+        }
+
+        languageRefreshTask?.cancel()
+        languageRefreshTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: Self.postLanguageRefreshDelayMilliseconds) {
+            guard readModelLanguage != normalized else {
+                languageRefreshTask = nil
+                return
+            }
+            readModelLanguage = normalized
+            languageRefreshTask = nil
+        }
     }
 
     private func refreshCurrentDayToken() {
