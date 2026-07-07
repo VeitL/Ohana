@@ -2779,6 +2779,22 @@ struct HomeCommandExecutorTests {
         #expect(islandToastSource.contains("func islandToastOverlay()"))
     }
 
+    @Test func plantBatchCareCommandsStopFeedbackWhenPersistenceFails() throws {
+        let rootURL = repositoryRootURL()
+        let commandSource = try source("Ohana/Features/Plants/PlantBatchCareCommands.swift", rootURL: rootURL)
+        let dashboardSource = try source("Ohana/Features/Plants/Views/PlantDashboardView.swift", rootURL: rootURL)
+
+        #expect(commandSource.contains("let didPersist: Bool"))
+        #expect(commandSource.contains("let persistenceErrorDescription: String?"))
+        #expect(commandSource.contains("let saveResult = context.safeSaveResult()"))
+        #expect(commandSource.contains("context.rollback()"))
+        #expect(!commandSource.contains("context.safeSave()"))
+        #expect(dashboardSource.contains("guard result.didPersist else"))
+        #expect(dashboardSource.contains("showBatchCarePersistenceFailure(result.persistenceErrorDescription)"))
+        #expect(dashboardSource.contains("PlantBatchCarePendingRewardStore.upsert(token)"))
+        #expect(dashboardSource.contains("PlantBatchCarePendingRewardStore.remove(batchID: token.batchID)"))
+    }
+
     @MainActor
     @Test func plantCareCommandServiceWritesEveryLaunchCareType() throws {
         let container = try makeInMemoryContainer()

@@ -1290,6 +1290,10 @@ struct PlantDashboardView: View {
                 selections: selections,
                 executorId: executorId
             )
+            guard result.didPersist else {
+                showBatchCarePersistenceFailure(result.persistenceErrorDescription)
+                return
+            }
             guard let token = result.undoToken else { return }
             PlantBatchCarePendingRewardStore.upsert(token)
             publishPendingBatchCareRewardStoreChanged(batchID: token.batchID, action: "batchCarePendingRewardsChanged")
@@ -1309,6 +1313,10 @@ struct PlantDashboardView: View {
                 selections: selections,
                 executorId: executorId
             )
+            guard result.didPersist else {
+                showBatchCarePersistenceFailure(result.persistenceErrorDescription)
+                return
+            }
             guard let token = result.undoToken else { return }
             PlantBatchCarePendingRewardStore.upsert(token)
             publishPendingBatchCareRewardStoreChanged(batchID: token.batchID, action: "batchQuickRecordPendingRewardsChanged")
@@ -1323,9 +1331,17 @@ struct PlantDashboardView: View {
         pendingBatchCareRewardTask?.cancel()
         pendingBatchCareRewardTask = nil
         pendingBatchCareUndoToken = nil
+        let result = commandExecutor.undoPlantBatchCare(token)
+        guard result.didPersist else {
+            PlantBatchCarePendingRewardStore.upsert(token)
+            publishPendingBatchCareRewardStoreChanged(batchID: token.batchID, action: "batchCarePendingRewardsChanged")
+            pendingBatchCareUndoToken = token
+            showBatchCarePersistenceFailure(result.persistenceErrorDescription)
+            scheduleBatchCareRewardCommit(for: token)
+            return
+        }
         PlantBatchCarePendingRewardStore.remove(batchID: token.batchID)
         publishPendingBatchCareRewardStoreChanged(batchID: token.batchID, action: "batchCarePendingRewardsChanged")
-        _ = commandExecutor.undoPlantBatchCare(token)
         UINotificationFeedbackGenerator().notificationOccurred(.warning)
     }
 
@@ -1337,6 +1353,13 @@ struct PlantDashboardView: View {
                   pendingBatchCareUndoToken?.id == token.id else { return }
             pendingBatchCareUndoToken = nil
             let result = commandExecutor.commitPlantBatchCareRewards(for: token)
+            guard result.didPersist else {
+                PlantBatchCarePendingRewardStore.upsert(token)
+                publishPendingBatchCareRewardStoreChanged(batchID: token.batchID, action: "batchCarePendingRewardsChanged")
+                showBatchCarePersistenceFailure(result.persistenceErrorDescription)
+                pendingBatchCareRewardTask = nil
+                return
+            }
             PlantBatchCarePendingRewardStore.remove(batchID: token.batchID)
             publishPendingBatchCareRewardStoreChanged(batchID: token.batchID, action: "batchCarePendingRewardsChanged")
             if result.didCommit {
@@ -1368,6 +1391,15 @@ struct PlantDashboardView: View {
             pendingCount: PlantBatchCarePendingRewardStore.load().count,
             note: "plant.batchCare.pendingRewardsChanged"
         )
+    }
+
+    func showBatchCarePersistenceFailure(_ error: String?) {
+        UINotificationFeedbackGenerator().notificationOccurred(.error)
+        appServices.islandToasts.show(l.tr(
+            zh: "保存失败，批量照护未完成",
+            en: "Save failed. Batch care was not completed.",
+            de: "Speichern fehlgeschlagen. Die Batch-Pflege wurde nicht abgeschlossen."
+        ))
     }
 
     func deferTaskFromBatchCare(_ task: PlantBatchCareSheetTask) {

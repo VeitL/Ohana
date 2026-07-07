@@ -2473,6 +2473,8 @@ struct PlantLaunchTests {
         )
         let token = try #require(result.undoToken)
 
+        #expect(result.didPersist)
+        #expect(result.persistenceErrorDescription == nil)
         #expect(result.completedCount == 20)
         #expect(result.skipped.isEmpty)
         #expect(result.estimatedCoconutDelta == 40)
@@ -2520,6 +2522,8 @@ struct PlantLaunchTests {
         )
 
         #expect(undo.didUndo)
+        #expect(undo.didPersist)
+        #expect(undo.persistenceErrorDescription == nil)
         #expect(undo.removedLogIDs.count == 2)
         #expect(undo.removedEventIDs.count == 2)
         #expect(undo.removedLedgerEventIDs.count == 2)
@@ -2559,6 +2563,8 @@ struct PlantLaunchTests {
         let mutation = try #require(revisionCenter.lastMutation)
 
         #expect(result.completedCount == 2)
+        #expect(result.didPersist)
+        #expect(result.persistenceErrorDescription == nil)
         #expect(revisionCenter.homeRevision.value == beforeRevision + 1)
         #expect(mutation.command == .plantBatchCare(batchID: result.batchID, action: "batchCare", count: 2))
         #expect(mutation.affectedEntityIDs.isSuperset(of: [first.id, second.id]))
@@ -2594,6 +2600,8 @@ struct PlantLaunchTests {
 
         let ledger = try #require(try context.fetch(FetchDescriptor<CareLedgerEvent>()).first)
         #expect(commit.didCommit)
+        #expect(commit.didPersist)
+        #expect(commit.persistenceErrorDescription == nil)
         #expect(commit.awardedCoconutDelta == 5)
         #expect(commit.ledgerEventIDs == [ledger.id])
         #expect(economy.awardCalls.count == 1)

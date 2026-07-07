@@ -126,10 +126,12 @@ nonisolated struct PlantBatchCareCommandResult: Equatable, Sendable {
     let skipped: [PlantBatchCareSkippedSelection]
     let undoToken: PlantBatchCareUndoToken?
     let estimatedCoconutDelta: Int
+    let didPersist: Bool
+    let persistenceErrorDescription: String?
 
     var completedCount: Int { items.count }
-    var affectedEntityIDs: Set<UUID> { undoToken?.affectedEntityIDs ?? [] }
-    var didWrite: Bool { !items.isEmpty }
+    var affectedEntityIDs: Set<UUID> { didPersist ? undoToken?.affectedEntityIDs ?? [] : [] }
+    var didWrite: Bool { didPersist && !items.isEmpty }
 }
 
 nonisolated struct PlantBatchCareUndoResult: Equatable, Sendable {
@@ -139,9 +141,11 @@ nonisolated struct PlantBatchCareUndoResult: Equatable, Sendable {
     let removedEventIDs: [UUID]
     let removedLedgerEventIDs: [UUID]
     let restoredPlantIDs: [UUID]
+    let didPersist: Bool
+    let persistenceErrorDescription: String?
 
     var affectedEntityIDs: Set<UUID> {
-        Set(removedLogIDs + removedEventIDs + removedLedgerEventIDs + restoredPlantIDs)
+        didPersist ? Set(removedLogIDs + removedEventIDs + removedLedgerEventIDs + restoredPlantIDs) : []
     }
 }
 
@@ -152,9 +156,11 @@ nonisolated struct PlantBatchCareRewardCommitResult: Equatable, Sendable {
     let ledgerEventIDs: [UUID]
     let walletEntryIDs: [UUID]
     let budgetUsageIDs: [UUID]
+    let didPersist: Bool
+    let persistenceErrorDescription: String?
 
     var affectedEntityIDs: Set<UUID> {
-        Set(ledgerEventIDs + walletEntryIDs + budgetUsageIDs)
+        didPersist ? Set(ledgerEventIDs + walletEntryIDs + budgetUsageIDs) : []
     }
 }
 
@@ -290,7 +296,19 @@ enum PlantBatchCareCommandService {
             }
         }
         if !items.isEmpty {
-            context.safeSave()
+            let saveResult = context.safeSaveResult()
+            guard saveResult.didSave else {
+                context.rollback()
+                return PlantBatchCareCommandResult(
+                    batchID: batchID,
+                    items: [],
+                    skipped: skipped,
+                    undoToken: nil,
+                    estimatedCoconutDelta: 0,
+                    didPersist: false,
+                    persistenceErrorDescription: saveResult.errorDescription
+                )
+            }
         }
 
         let restorePoints = Array(restorePointsByPlantID.values)
@@ -309,7 +327,9 @@ enum PlantBatchCareCommandService {
             items: items,
             skipped: skipped,
             undoToken: token,
-            estimatedCoconutDelta: estimatedCoconutDelta
+            estimatedCoconutDelta: estimatedCoconutDelta,
+            didPersist: true,
+            persistenceErrorDescription: nil
         )
     }
 
@@ -328,7 +348,9 @@ enum PlantBatchCareCommandService {
                 removedLogIDs: [],
                 removedEventIDs: [],
                 removedLedgerEventIDs: [],
-                restoredPlantIDs: []
+                restoredPlantIDs: [],
+                didPersist: true,
+                persistenceErrorDescription: nil
             )
         }
 
@@ -382,17 +404,33 @@ enum PlantBatchCareCommandService {
             restoredPlantIDs.append(point.plantID)
         }
 
-        if !removedLogIDs.isEmpty || !removedEventIDs.isEmpty || !removedLedgerEventIDs.isEmpty || !restoredPlantIDs.isEmpty {
-            context.safeSave()
+        let didChange = !removedLogIDs.isEmpty || !removedEventIDs.isEmpty || !removedLedgerEventIDs.isEmpty || !restoredPlantIDs.isEmpty
+        if didChange {
+            let saveResult = context.safeSaveResult()
+            guard saveResult.didSave else {
+                context.rollback()
+                return PlantBatchCareUndoResult(
+                    batchID: token.batchID,
+                    didUndo: false,
+                    removedLogIDs: [],
+                    removedEventIDs: [],
+                    removedLedgerEventIDs: [],
+                    restoredPlantIDs: [],
+                    didPersist: false,
+                    persistenceErrorDescription: saveResult.errorDescription
+                )
+            }
         }
 
         return PlantBatchCareUndoResult(
             batchID: token.batchID,
-            didUndo: !removedLogIDs.isEmpty || !removedEventIDs.isEmpty || !removedLedgerEventIDs.isEmpty || !restoredPlantIDs.isEmpty,
+            didUndo: didChange,
             removedLogIDs: removedLogIDs,
             removedEventIDs: removedEventIDs,
             removedLedgerEventIDs: removedLedgerEventIDs,
-            restoredPlantIDs: restoredPlantIDs
+            restoredPlantIDs: restoredPlantIDs,
+            didPersist: true,
+            persistenceErrorDescription: nil
         )
     }
 
@@ -446,7 +484,20 @@ enum PlantBatchCareCommandService {
         }
 
         if !ledgerEventIDs.isEmpty {
-            context.safeSave()
+            let saveResult = context.safeSaveResult()
+            guard saveResult.didSave else {
+                context.rollback()
+                return PlantBatchCareRewardCommitResult(
+                    batchID: token.batchID,
+                    didCommit: false,
+                    awardedCoconutDelta: 0,
+                    ledgerEventIDs: [],
+                    walletEntryIDs: [],
+                    budgetUsageIDs: [],
+                    didPersist: false,
+                    persistenceErrorDescription: saveResult.errorDescription
+                )
+            }
         }
 
         return PlantBatchCareRewardCommitResult(
@@ -455,7 +506,9 @@ enum PlantBatchCareCommandService {
             awardedCoconutDelta: awardedCoconutDelta,
             ledgerEventIDs: ledgerEventIDs,
             walletEntryIDs: walletEntryIDs,
-            budgetUsageIDs: budgetUsageIDs
+            budgetUsageIDs: budgetUsageIDs,
+            didPersist: true,
+            persistenceErrorDescription: nil
         )
     }
 
