@@ -162,10 +162,6 @@
       "modelContext.safeSave()",
       "modelContext.safeSave()"
     ],
-    "Ohana/Features/Wishlist/HumanWishlistCommands.swift": [
-      "context.safeSave()",
-      "context.safeSave()"
-    ],
     "Ohana/Shared/Media/AvatarAssetMaintenanceService.swift": [
       "context.safeSave()"
     ],

@@ -31,6 +31,7 @@ enum HumanWishlistCommandError: LocalizedError, Equatable {
     case itemOwnershipMismatch
     case alreadyRedeemed
     case insufficientCoconuts(missing: Int)
+    case persistenceFailed(String?)
 
     var errorDescription: String? {
         let l = L10n.current
@@ -45,6 +46,13 @@ enum HumanWishlistCommandError: LocalizedError, Equatable {
             return l.tr(zh: "这个心愿已经兑换。", en: "This wish has already been redeemed.", de: "Dieser Wunsch wurde bereits eingelöst.")
         case let .insufficientCoconuts(missing):
             return l.tr(zh: "椰子余额不足，还差 \(missing) 个。", en: "Not enough coconuts. Need \(missing) more.", de: "Nicht genug Kokosnüsse. Es fehlen \(missing).")
+        case let .persistenceFailed(reason):
+            let detail = reason.map { "\n\($0)" } ?? ""
+            return l.tr(
+                zh: "心愿保存失败，请稍后重试。\(detail)",
+                en: "Could not save the wish. Try again.\(detail)",
+                de: "Der Wunsch konnte nicht gespeichert werden. Versuche es erneut.\(detail)"
+            )
         }
     }
 }
@@ -105,7 +113,11 @@ enum HumanWishlistCommandService {
             createdAt: input.createdAt,
             context: context
         )
-        context.safeSave()
+        let saveResult = context.safeSaveResult(publishFailureEvent: true)
+        guard saveResult.didSave else {
+            context.rollback()
+            throw HumanWishlistCommandError.persistenceFailed(saveResult.errorDescription)
+        }
         return HumanWishlistCommandResult(
             humanID: human.id,
             itemID: item.id,
@@ -223,7 +235,10 @@ enum HumanWishlistCommandService {
             if let walletApplyError {
                 throw walletApplyError
             }
-            try context.save()
+            let saveResult = context.safeSaveResult(publishFailureEvent: true)
+            guard saveResult.didSave else {
+                throw HumanWishlistCommandError.persistenceFailed(saveResult.errorDescription)
+            }
         } catch {
             context.rollback()
             wallet.refreshQuestProjection(context: context, manager: questManager)
@@ -268,7 +283,11 @@ enum HumanWishlistCommandService {
         }
         let itemID = item.id
         DomainMemberFactWriter.deleteWishlistItem(plan: write, item: item, context: context)
-        context.safeSave()
+        let saveResult = context.safeSaveResult(publishFailureEvent: true)
+        guard saveResult.didSave else {
+            context.rollback()
+            throw HumanWishlistCommandError.persistenceFailed(saveResult.errorDescription)
+        }
         return HumanWishlistDeleteCommandResult(
             humanID: human.id,
             itemID: itemID,

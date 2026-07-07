@@ -8425,6 +8425,16 @@ struct HomeCommandExecutorTests {
 
     @MainActor
     @Test func humanWishlistCommandServiceCreatesAndDeletesItem() throws {
+        let commandSource = try source(
+            "Ohana/Features/Wishlist/HumanWishlistCommands.swift",
+            rootURL: repositoryRootURL()
+        )
+        #expect(commandSource.contains("case persistenceFailed(String?)"))
+        #expect(commandSource.components(separatedBy: "context.safeSaveResult(publishFailureEvent: true)").count - 1 == 3)
+        #expect(commandSource.contains("context.rollback()"))
+        #expect(!commandSource.contains("context.safeSave()"))
+        #expect(!commandSource.contains("try context.save()"))
+
         let container = try makeInMemoryContainer()
         let context = container.mainContext
         let human = Human(name: "Guan")
