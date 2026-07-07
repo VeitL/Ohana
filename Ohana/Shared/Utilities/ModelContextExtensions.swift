@@ -5,6 +5,7 @@
 //  F9: 统一的 ModelContext.save() 错误日志，替代散落各处的 try? context.save()
 //
 
+import Combine
 import Foundation
 import os.log
 import SwiftData
@@ -29,8 +30,8 @@ nonisolated struct ModelContextSaveFailureEvent: Equatable, Identifiable, Sendab
 }
 
 nonisolated enum PersistenceSaveFailureCenter {
-    static let notificationName = Notification.Name("OhanaPersistenceSaveFailed")
-    static let eventUserInfoKey = "ModelContextSaveFailureEvent"
+    private nonisolated(unsafe) static let subject = PassthroughSubject<ModelContextSaveFailureEvent, Never>()
+    nonisolated(unsafe) static let events = subject.eraseToAnyPublisher()
 
     static func publish(error: Error, file: String, line: Int) {
         let event = ModelContextSaveFailureEvent(
@@ -40,11 +41,7 @@ nonisolated enum PersistenceSaveFailureCenter {
             errorDescription: error.localizedDescription,
             occurredAt: Date()
         )
-        NotificationCenter.default.post(
-            name: notificationName,
-            object: nil,
-            userInfo: [eventUserInfoKey: event]
-        )
+        subject.send(event)
     }
 }
 

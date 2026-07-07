@@ -67,11 +67,13 @@ enum HumanMedicationPlanCommandService {
             created = true
         }
 
+        let deferredNotifications = DeferredReminderNotificationCanceller()
         let calendarSync = syncCalendarEvents(
             for: medication,
             human: human,
             appLanguage: input.appLanguage,
-            context: context
+            context: context,
+            notifications: deferredNotifications
         )
         let saveResult = context.safeSaveResult(publishFailureEvent: true)
         guard saveResult.didSave else {
@@ -88,6 +90,7 @@ enum HumanMedicationPlanCommandService {
                 persistenceErrorDescription: saveResult.errorDescription
             )
         }
+        deferredNotifications.commit(to: OhanaNotifications.current)
 
         if scheduleReminders {
             DomainMemberFactEffectsDispatcher.run(plan: write) { _ in
@@ -140,7 +143,12 @@ enum HumanMedicationPlanCommandService {
             )
         }
 
-        let removedEventIDs = removeCalendarEvents(for: medicationID, context: context)
+        let deferredNotifications = DeferredReminderNotificationCanceller()
+        let removedEventIDs = removeCalendarEvents(
+            for: medicationID,
+            context: context,
+            notifications: deferredNotifications
+        )
         DomainMemberFactWriter.deleteHumanMedicationPlan(
             plan: write,
             medication: medication,
@@ -159,6 +167,7 @@ enum HumanMedicationPlanCommandService {
                 persistenceErrorDescription: saveResult.errorDescription
             )
         }
+        deferredNotifications.commit(to: OhanaNotifications.current)
 
         if scheduleReminders {
             DomainMemberFactEffectsDispatcher.run(plan: write) { _ in
@@ -223,11 +232,13 @@ enum HumanMedicationPlanCommandService {
                 context: context
             )
         }
+        let deferredNotifications = DeferredReminderNotificationCanceller()
         let calendarSync = syncCalendarEvents(
             for: medication,
             human: human,
             appLanguage: appLanguage,
-            context: context
+            context: context,
+            notifications: deferredNotifications
         )
         let saveResult = context.safeSaveResult(publishFailureEvent: true)
         guard saveResult.didSave else {
@@ -244,6 +255,7 @@ enum HumanMedicationPlanCommandService {
                 persistenceErrorDescription: saveResult.errorDescription
             )
         }
+        deferredNotifications.commit(to: OhanaNotifications.current)
 
         if scheduleReminders {
             DomainMemberFactEffectsDispatcher.run(plan: write) { _ in
@@ -288,9 +300,14 @@ enum HumanMedicationPlanCommandService {
         for medication: HumanMedication,
         human: Human,
         appLanguage: String,
-        context: ModelContext
+        context: ModelContext,
+        notifications: ReminderNotificationScheduling = ReminderNotificationSchedulerRegistry.current
     ) -> (removedEventIDs: [UUID], createdEventIDs: [UUID]) {
-        let removedEventIDs = removeCalendarEvents(for: medication.id, context: context)
+        let removedEventIDs = removeCalendarEvents(
+            for: medication.id,
+            context: context,
+            notifications: notifications
+        )
         guard medication.isActive, !medication.frequency.isManualEntry else {
             return (removedEventIDs, [])
         }
@@ -359,7 +376,11 @@ enum HumanMedicationPlanCommandService {
     }
 
     @MainActor
-    private static func removeCalendarEvents(for medicationID: UUID, context: ModelContext) -> [UUID] {
+    private static func removeCalendarEvents(
+        for medicationID: UUID,
+        context: ModelContext,
+        notifications: ReminderNotificationScheduling = ReminderNotificationSchedulerRegistry.current
+    ) -> [UUID] {
         let descriptor = FetchDescriptor<Event>()
         let events = fetchMedicationCommandModelsOrLog(
             descriptor,
@@ -377,7 +398,7 @@ enum HumanMedicationPlanCommandService {
                 continue
             }
             let result = DomainScheduleWriter.deleteEvent(event, mutation: mutation, context: context)
-            DomainScheduleEffectsDispatcher.dispatch(delete: result)
+            DomainScheduleEffectsDispatcher.dispatch(delete: result, notifications: notifications)
             if result.didDelete {
                 removedEventIDs.append(event.id)
             }
@@ -421,6 +442,52 @@ enum HumanMedicationPlanCommandService {
             context: context,
             operation: "fetch human medication plans for reminder sync"
         )
+    }
+}
+
+private final class DeferredReminderNotificationCanceller: ReminderNotificationScheduling, @unchecked Sendable {
+    private var cancelledNotificationIds: [String] = []
+
+    func schedule(reminder _: Reminder) {}
+
+    func schedule(
+        reminder _: Reminder,
+        existingNotificationIds _: Set<String>?,
+        completion: ((ReminderNotificationScheduleResult) -> Void)?
+    ) {
+        completion?(.skippedUserDisabled("{}"))
+    }
+
+    func schedule(
+        reminder _: Reminder,
+        deliveryDate _: Date?,
+        existingNotificationIds _: Set<String>?,
+        completion: ((ReminderNotificationScheduleResult) -> Void)?
+    ) {
+        completion?(.skippedUserDisabled("{}"))
+    }
+
+    func pendingNotificationIds() async -> Set<String> { [] }
+
+    func scheduleRollingWindow(reminders _: [Reminder]) {}
+
+    func refillWindowIfNeeded(allReminders _: [Reminder]) {}
+
+    func cancel(notificationId: String) {
+        guard !notificationId.isEmpty else { return }
+        cancelledNotificationIds.append(notificationId)
+    }
+
+    func cancelAll(for _: Pet, reminders: [Reminder]) {
+        cancelledNotificationIds.append(contentsOf: reminders.map(\.notificationId).filter { !$0.isEmpty })
+    }
+
+    func compensate(reminders _: [Reminder]) {}
+
+    func commit(to notifications: ReminderNotificationScheduling) {
+        for notificationId in cancelledNotificationIds {
+            notifications.cancel(notificationId: notificationId)
+        }
     }
 }
 

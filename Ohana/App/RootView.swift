@@ -76,13 +76,7 @@ struct RootView: View {
                 domainRevisions: appServices.domainRevisions
             )
         }
-        .onReceive(
-            NotificationCenter.default.publisher(for: PersistenceSaveFailureCenter.notificationName)
-                .receive(on: RunLoop.main)
-        ) { notification in
-            guard let event = notification.userInfo?[PersistenceSaveFailureCenter.eventUserInfoKey] as? ModelContextSaveFailureEvent else {
-                return
-            }
+        .onReceive(PersistenceSaveFailureCenter.events.receive(on: RunLoop.main)) { event in
             showPersistenceSaveFailureToast(event)
         }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.willResignActiveNotification)) { _ in
