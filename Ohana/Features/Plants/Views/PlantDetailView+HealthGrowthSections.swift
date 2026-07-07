@@ -31,7 +31,7 @@ extension PlantDetailContentView {
                 Spacer(minLength: 8)
             }
 
-            HStack(spacing: 8) {
+            plantDetailMetricGrid {
                 healthReviewMetric(
                     icon: "waveform.path.ecg.rectangle.fill",
                     title: l.tr(zh: "状态", en: "Status", de: "Status"),
@@ -112,11 +112,12 @@ extension PlantDetailContentView {
                     .font(OhanaFont.adaptive(size: 9, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaTertiaryText)
                     .textCase(.uppercase)
+                    .lineLimit(2)
                 Text(value)
                     .font(OhanaFont.adaptive(size: 11, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.7)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: 0)
         }
@@ -125,6 +126,15 @@ extension PlantDetailContentView {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color.ohanaControlFill.opacity(0.5), in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
         .accessibilityElement(children: .combine)
+    }
+
+    func plantDetailMetricGrid(@ViewBuilder content: () -> some View) -> some View {
+        LazyVGrid(
+            columns: [GridItem(.adaptive(minimum: 96), spacing: 8, alignment: .top)],
+            alignment: .leading,
+            spacing: 8,
+            content: content
+        )
     }
 
     func healthReviewSignalRow(_ signal: PlantHealthReviewSignal) -> some View {
@@ -180,7 +190,7 @@ extension PlantDetailContentView {
                 Spacer(minLength: 8)
             }
 
-            HStack(spacing: 8) {
+            plantDetailMetricGrid {
                 diaryStatPill(
                     icon: "tray.full.fill",
                     title: l.tr(zh: "记录", en: "Logs", de: "Protokolle"),
@@ -344,19 +354,21 @@ extension PlantDetailContentView {
                                 fillsContainer: true,
                                 maxPixel: 520
                             )
-                            .frame(width: 118, height: 92)
+                            .frame(width: plantDetailPhotoPreviewWidth, height: plantDetailPhotoPreviewHeight)
                             .clipShape(RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
 
                             Text(photo.title)
                                 .font(OhanaFont.adaptive(size: 11, weight: .black, design: .rounded))
                                 .foregroundStyle(Color.ohanaPrimaryText)
-                                .lineLimit(1)
+                                .lineLimit(2)
+                                .fixedSize(horizontal: false, vertical: true)
                             Text(photo.subtitle)
                                 .font(OhanaFont.adaptive(size: 10, weight: .bold, design: .rounded))
                                 .foregroundStyle(Color.ohanaSecondaryText)
-                                .lineLimit(1)
+                                .lineLimit(2)
+                                .fixedSize(horizontal: false, vertical: true)
                         }
-                        .frame(width: 118, alignment: .leading)
+                        .frame(width: plantDetailPhotoPreviewWidth, alignment: .leading)
                     }
                     .buttonStyle(ScaleButtonStyle())
                     .accessibilityLabel("\(photo.title), \(photo.subtitle)")
@@ -369,6 +381,9 @@ extension PlantDetailContentView {
         .accessibilityIdentifier("plant-detail-photo-gallery-preview")
     }
 
+    var plantDetailPhotoPreviewWidth: CGFloat { 146 }
+    var plantDetailPhotoPreviewHeight: CGFloat { 96 }
+
     func diaryStatPill(icon: String, title: String, value: String, tint: Color) -> some View {
         HStack(spacing: 6) {
             Image(systemName: icon) // a11y: allow decorative stat glyph; pill text carries value.
@@ -380,11 +395,12 @@ extension PlantDetailContentView {
                     .font(OhanaFont.adaptive(size: 9, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaTertiaryText)
                     .textCase(.uppercase)
+                    .lineLimit(2)
                 Text(value)
                     .font(OhanaFont.adaptive(size: 11, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.72)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: 0)
         }

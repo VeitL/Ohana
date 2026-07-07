@@ -133,6 +133,18 @@ struct PhysicalDeletionServiceTests {
             legacyModelName: String(describing: PlantCareLog.self),
             legacyModelId: log.id.uuidString
         )
+        let rewardLedger = CareLedgerEvent(
+            occurredAt: log.date,
+            subjectKind: .plant,
+            subjectId: plantID.uuidString,
+            eventKind: .plantCare,
+            actionType: PlantCareType.watering.rawValue,
+            sourceEventId: event.id.uuidString,
+            legacyModelName: String(describing: PlantCareLog.self),
+            legacyModelId: log.id.uuidString,
+            coconutDelta: 2,
+            rewardLogId: "plant-reward-ledger"
+        )
 
         context.insert(plant)
         context.insert(log)
@@ -140,6 +152,7 @@ struct PhysicalDeletionServiceTests {
         context.insert(reminder)
         context.insert(unrelatedEvent)
         context.insert(ledger)
+        context.insert(rewardLedger)
         try context.save()
 
         PhysicalDeletionService.deletePlant(plant, context: context, notifications: scheduler)
@@ -148,7 +161,14 @@ struct PhysicalDeletionServiceTests {
         #expect(try context.fetch(FetchDescriptor<Plant>()).isEmpty)
         #expect(try context.fetch(FetchDescriptor<PlantCareLog>()).isEmpty)
         #expect(try context.fetch(FetchDescriptor<Reminder>()).isEmpty)
-        #expect(try context.fetch(FetchDescriptor<CareLedgerEvent>()).isEmpty)
+        let retainedLedgers = try context.fetch(FetchDescriptor<CareLedgerEvent>())
+        #expect(retainedLedgers.map(\.id) == [rewardLedger.id])
+        #expect(retainedLedgers.first?.subjectKind == CareLedgerSubjectKind.unknown.rawValue)
+        #expect(retainedLedgers.first?.subjectId == nil)
+        #expect(retainedLedgers.first?.legacyModelName == nil)
+        #expect(retainedLedgers.first?.legacyModelId == nil)
+        #expect(retainedLedgers.first?.metadataJSON.contains("\"deletedOwnerRetention\":true") == true)
+        #expect(retainedLedgers.first?.metadataJSON.contains("\"deletedOwnerKind\":\"plant\"") == true)
         #expect(try context.fetch(FetchDescriptor<Event>()).map(\.id) == [unrelatedEvent.id])
         #expect(scheduler.cancelledIds == ["plant-water-reminder"])
         #expect(deletionTombstone(Plant.self, id: plantID, context: context) != nil)
@@ -156,6 +176,7 @@ struct PhysicalDeletionServiceTests {
         #expect(deletionTombstone(Event.self, id: event.id, context: context) != nil)
         #expect(deletionTombstone(Reminder.self, id: reminder.id, context: context) != nil)
         #expect(deletionTombstone(CareLedgerEvent.self, id: ledger.id, context: context) != nil)
+        #expect(deletionTombstone(CareLedgerEvent.self, id: rewardLedger.id, context: context) == nil)
     }
 
     @Test func deletePetRetiresWalletAccountKeepsLedgerAndScrubsSharedSessionReferences() throws {
@@ -218,6 +239,19 @@ struct PhysicalDeletionServiceTests {
             legacyModelName: "PetCareLog",
             legacyModelId: deletedLog.id.uuidString
         )
+        let rewardCareLedger = CareLedgerEvent(
+            occurredAt: session.date,
+            actorKind: .unknown,
+            subjectKind: .pet,
+            subjectId: deletedPet.id.uuidString,
+            eventKind: .care,
+            actionType: CareType.feeding.rawValue,
+            source: .quickAction,
+            legacyModelName: "PetCareLog",
+            legacyModelId: deletedLog.id.uuidString,
+            coconutDelta: 3,
+            rewardLogId: "delete-pet-reward-ledger"
+        )
         context.insert(deletedPet)
         context.insert(survivor)
         context.insert(session)
@@ -226,6 +260,7 @@ struct PhysicalDeletionServiceTests {
         context.insert(account)
         context.insert(walletEntry)
         context.insert(careLedger)
+        context.insert(rewardCareLedger)
         try context.save()
 
         PhysicalDeletionService.deletePet(deletedPet, context: context)
@@ -241,7 +276,13 @@ struct PhysicalDeletionServiceTests {
         #expect(retiredAccount.balance == 0)
         #expect(CoconutWalletAccountLifecycleMetadata.isDeletedOwner(retiredAccount))
         #expect(walletEntries.map(\.id) == [walletEntry.id])
-        #expect(careLedgers.allSatisfy { $0.subjectId != deletedPet.id.uuidString && $0.legacyModelId != deletedLog.id.uuidString })
+        #expect(careLedgers.map(\.id) == [rewardCareLedger.id])
+        #expect(careLedgers.first?.subjectKind == CareLedgerSubjectKind.unknown.rawValue)
+        #expect(careLedgers.first?.subjectId == nil)
+        #expect(careLedgers.first?.legacyModelName == nil)
+        #expect(careLedgers.first?.legacyModelId == nil)
+        #expect(careLedgers.first?.metadataJSON.contains("\"deletedOwnerRetention\":true") == true)
+        #expect(careLedgers.first?.metadataJSON.contains("\"deletedOwnerKind\":\"pet\"") == true)
         #expect(careLogs.allSatisfy { $0.pet?.id != deletedPet.id })
         #expect(careLogs.contains { $0.pet?.id == survivor.id })
         #expect(sessions.allSatisfy { session in
@@ -256,6 +297,7 @@ struct PhysicalDeletionServiceTests {
         #expect(CoconutWalletService.totalBalance(context: context) == 0)
         #expect(deletionTombstone(CoconutLedgerEntry.self, id: walletEntry.id, context: context) == nil)
         #expect(deletionTombstone(CareLedgerEvent.self, id: careLedger.id, context: context) != nil)
+        #expect(deletionTombstone(CareLedgerEvent.self, id: rewardCareLedger.id, context: context) == nil)
     }
 
     @Test func deletePetRetainsPetScopedHumanRewardsWithoutRollback() throws {

@@ -352,54 +352,36 @@ extension PlantDetailContentView {
                     .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded))
                     .foregroundStyle(Color.ohanaSecondaryText)
                     .fixedSize(horizontal: false, vertical: true)
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack(spacing: 10) {
-                        Button(l.tr(zh: "完成", en: "Done", de: "Erledigt")) {
-                            openCareLogSheet(task.careType)
-                        }
-                        .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
-                        .foregroundStyle(Color.arkInk)
-                        .frame(minHeight: 44)
-                        .padding(.horizontal, 14)
-                        .background(Color.goPrimary, in: Capsule())
-                        .buttonStyle(ScaleButtonStyle())
-                        .accessibilityIdentifier("plant-detail-next-task-complete")
-
-                        Button(l.tr(zh: "延后一天", en: "Defer one day", de: "Um einen Tag verschieben")) {
-                            deferTaskOneDay(task)
-                        }
-                        .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
-                        .foregroundStyle(Color.ohanaPrimaryText)
-                        .frame(minHeight: 44)
-                        .padding(.horizontal, 14)
-                        .background(Color.ohanaControlFill.opacity(0.72), in: Capsule())
-                        .buttonStyle(ScaleButtonStyle())
-                        .accessibilityIdentifier("plant-detail-next-task-defer")
+                plantDetailActionGrid {
+                    plantDetailTextActionButton(
+                        title: l.tr(zh: "完成", en: "Done", de: "Erledigt"),
+                        foreground: Color.arkInk,
+                        background: Color.goPrimary,
+                        identifier: "plant-detail-next-task-complete"
+                    ) {
+                        openCareLogSheet(task.careType)
                     }
 
-                    HStack(spacing: 10) {
-                        Button(l.tr(zh: "跳过这项", en: "Skip task", de: "Aufgabe überspringen")) {
-                            skipTask(task)
-                        }
-                        .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
-                        .foregroundStyle(Color.ohanaPrimaryText)
-                        .frame(minHeight: 44)
-                        .padding(.horizontal, 14)
-                        .background(Color.ohanaControlFill.opacity(0.72), in: Capsule())
-                        .buttonStyle(ScaleButtonStyle())
-                        .accessibilityIdentifier("plant-detail-next-task-skip")
+                    plantDetailTextActionButton(
+                        title: l.tr(zh: "延后一天", en: "Defer one day", de: "Um einen Tag verschieben"),
+                        identifier: "plant-detail-next-task-defer"
+                    ) {
+                        deferTaskOneDay(task)
+                    }
 
-                        if task.careType == .watering {
-                            Button(l.tr(zh: "土还湿，延后", en: "Soil still wet, defer", de: "Erde noch feucht, verschieben")) {
-                                deferTaskOneDay(task, reason: "soilWet")
-                            }
-                            .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
-                            .foregroundStyle(Color.ohanaPrimaryText)
-                            .frame(minHeight: 44)
-                            .padding(.horizontal, 14)
-                            .background(Color.ohanaControlFill.opacity(0.72), in: Capsule())
-                            .buttonStyle(ScaleButtonStyle())
-                            .accessibilityIdentifier("plant-detail-next-task-soil-wet-defer")
+                    plantDetailTextActionButton(
+                        title: l.tr(zh: "跳过这项", en: "Skip task", de: "Aufgabe überspringen"),
+                        identifier: "plant-detail-next-task-skip"
+                    ) {
+                        skipTask(task)
+                    }
+
+                    if task.careType == .watering {
+                        plantDetailTextActionButton(
+                            title: l.tr(zh: "土还湿，延后", en: "Soil still wet, defer", de: "Erde noch feucht, verschieben"),
+                            identifier: "plant-detail-next-task-soil-wet-defer"
+                        ) {
+                            deferTaskOneDay(task, reason: "soilWet")
                         }
                     }
                 }
@@ -839,7 +821,7 @@ extension PlantDetailContentView {
     }
 
     var diagnosisQuickActions: some View {
-        HStack(spacing: 8) {
+        plantDetailActionGrid {
             diagnosisActionButton(
                 type: .pestCheck,
                 icon: "ladybug.fill",
@@ -869,6 +851,37 @@ extension PlantDetailContentView {
         .accessibilityIdentifier("plant-detail-diagnosis-actions")
     }
 
+    func plantDetailActionGrid(@ViewBuilder content: () -> some View) -> some View {
+        LazyVGrid(
+            columns: [GridItem(.adaptive(minimum: 132), spacing: 10)],
+            alignment: .leading,
+            spacing: 10,
+            content: content
+        )
+    }
+
+    func plantDetailTextActionButton(
+        title: String,
+        foreground: Color = Color.ohanaPrimaryText,
+        background: Color = Color.ohanaControlFill.opacity(0.72),
+        identifier: String,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Text(title)
+                .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
+                .foregroundStyle(foreground)
+                .lineLimit(2)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, minHeight: 44)
+                .padding(.horizontal, 12)
+                .background(background, in: Capsule())
+        }
+        .buttonStyle(ScaleButtonStyle())
+        .accessibilityIdentifier(identifier)
+    }
+
     func diagnosisActionButton(
         type: PlantCareType,
         icon: String,
@@ -886,12 +899,13 @@ extension PlantDetailContentView {
                     .accessibilityHidden(true)
                 Text(type.displayName(l: l))
                     .font(OhanaFont.adaptive(size: 11, weight: .black, design: .rounded))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.72)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             .foregroundStyle(isSubtle ? Color.ohanaPrimaryText : Color.arkInk)
             .frame(maxWidth: .infinity)
-            .frame(minHeight: 42)
+            .frame(minHeight: 44)
             .background(tint.opacity(isSubtle ? 0.22 : 1), in: Capsule())
         }
         .buttonStyle(ScaleButtonStyle())

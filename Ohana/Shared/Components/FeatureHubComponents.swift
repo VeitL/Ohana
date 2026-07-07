@@ -43,7 +43,7 @@ struct FeatureHubMiniChartData: Hashable {
     }
 }
 
-enum FeatureHubChartPointFactory {
+nonisolated enum FeatureHubChartPointFactory {
     private static let baseDate = Date(timeIntervalSinceReferenceDate: 0)
 
     static func bars(
@@ -143,29 +143,31 @@ struct FeatureHubHeader<Avatar: View>: View {
     @ViewBuilder var avatar: Avatar
 
     var body: some View {
-        HStack(alignment: .center, spacing: 12) {
+        HStack(alignment: .top, spacing: 12) {
             avatar
             VStack(alignment: .leading, spacing: 3) {
                 Text(eyebrow)
                     .font(OhanaFont.caption2(.black))
                     .foregroundStyle(Color.ohanaSecondaryText)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
                 Text(title)
                     .font(OhanaFont.title2(.black))
                     .foregroundStyle(Color.ohanaPrimaryText)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.75)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
                 Text(subtitle)
                     .font(OhanaFont.caption(.semibold))
                     .foregroundStyle(Color.ohanaSecondaryText)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.75)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
             }
-            Spacer()
+            Spacer(minLength: 8)
             Button(action: onClose) {
                 Image(systemName: "xmark") // a11y: allow decorative icon covered by surrounding text or control
                     .font(OhanaFont.adaptive(size: 15, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaPrimaryText)
-                    .frame(width: 38, height: 38) // a11y: allow decorative non-interactive frame; hit area handled by parent
+                    .frame(width: 44, height: 44)
             }
             .buttonStyle(ScaleButtonStyle())
             .contentShape(Circle())
@@ -451,21 +453,32 @@ private enum FeatureHubAvatarBlobSource: Sendable {
 struct FeatureHubMetricStrip: View {
     let metrics: [FeatureHubMetric]
 
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
+    private var columns: [GridItem] {
+        if dynamicTypeSize.isAccessibilitySize {
+            return [GridItem(.flexible(), spacing: 10, alignment: .top)]
+        }
+        return [GridItem(.adaptive(minimum: 118), spacing: 10, alignment: .top)]
+    }
+
     var body: some View {
-        HStack(spacing: 10) {
+        LazyVGrid(columns: columns, alignment: .leading, spacing: 10) {
             ForEach(Array(metrics.enumerated()), id: \.element.id) { index, metric in
                 VStack(alignment: .leading, spacing: 4) {
                     Text(metric.title)
                         .font(OhanaFont.caption2(.black))
                         .foregroundStyle(Color.ohanaSecondaryText)
+                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
                     Text(metric.value)
                         .font(OhanaFont.headline(.black))
                         .foregroundStyle(Color.ohanaPrimaryText)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.72)
+                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
                         .ohanaNumericMotion(metric.value)
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
+                .frame(maxWidth: .infinity, minHeight: 62, alignment: .topLeading)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 11)
                 .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
@@ -479,13 +492,24 @@ struct FeatureHubSectionActionView<Destination: Hashable>: View {
     let section: FeatureHubSectionData<Destination>
     let onSelect: (Destination) -> Void
 
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
+    private var columns: [GridItem] {
+        if dynamicTypeSize.isAccessibilitySize {
+            return [GridItem(.flexible(), spacing: 10, alignment: .top)]
+        }
+        return [GridItem(.adaptive(minimum: 156), spacing: 10, alignment: .top)]
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text(section.title)
                 .font(OhanaFont.headline(.black))
                 .foregroundStyle(Color.ohanaPrimaryText)
+                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
 
-            LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)], spacing: 10) {
+            LazyVGrid(columns: columns, alignment: .leading, spacing: 10) {
                 ForEach(Array(section.items.enumerated()), id: \.element.id) { index, item in
                     Button {
                         UIImpactFeedbackGenerator(style: .light).impactOccurred()
@@ -534,23 +558,24 @@ struct FeatureSummaryChartCard: View {
                     Text(data.title)
                         .font(OhanaFont.callout(.black))
                         .foregroundStyle(Color.ohanaPrimaryText)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.75)
+                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
 
                     HStack(alignment: .firstTextBaseline, spacing: 5) {
                         Text(data.value)
                             .font(OhanaFont.adaptive(size: 28, weight: .black, design: .rounded))
                             .foregroundStyle(data.tint)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.58)
+                            .lineLimit(2)
+                            .minimumScaleFactor(0.72)
+                            .fixedSize(horizontal: false, vertical: true)
                             .ohanaNumericMotion(data.value)
                     }
 
                     Text(data.subtitle)
                         .font(OhanaFont.caption2(.bold))
                         .foregroundStyle(Color.ohanaSecondaryText)
-                        .lineLimit(2)
-                        .minimumScaleFactor(0.72)
+                        .lineLimit(3)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
 
                 chartView
@@ -563,7 +588,7 @@ struct FeatureSummaryChartCard: View {
                     .offset(x: 4, y: -4)
             }
         }
-        .frame(maxWidth: .infinity, minHeight: 186, alignment: .topLeading)
+        .frame(maxWidth: .infinity, minHeight: 202, alignment: .topLeading)
         .padding(14)
         .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous))
         .overlay {
@@ -620,21 +645,21 @@ private struct FeatureHubTile: View {
                     Text(data.value)
                         .font(OhanaFont.caption(.black))
                         .foregroundStyle(Color.ohanaPrimaryText)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.65)
+                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
                         .ohanaNumericMotion(data.value)
                 }
                 VStack(alignment: .leading, spacing: 3) {
                     Text(data.title)
                         .font(OhanaFont.callout(.black))
                         .foregroundStyle(Color.ohanaPrimaryText)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.75)
+                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
                     Text(data.subtitle)
                         .font(OhanaFont.caption2(.semibold))
                         .foregroundStyle(Color.ohanaSecondaryText)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.75)
+                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
 
@@ -643,7 +668,7 @@ private struct FeatureHubTile: View {
                     .offset(x: 4, y: -4)
             }
         }
-        .frame(maxWidth: .infinity, minHeight: 108, alignment: .topLeading)
+        .frame(maxWidth: .infinity, minHeight: 126, alignment: .topLeading)
         .padding(14)
         .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous))
         .overlay {
@@ -661,21 +686,26 @@ struct PetMemorialBanner: View {
     private var l: L10n { L10n(appLanguage) }
 
     var body: some View {
-        HStack(spacing: 12) {
+        HStack(alignment: .top, spacing: 12) {
             Image(systemName: "sparkles") // a11y: allow decorative icon covered by surrounding text or control
                 .font(OhanaFont.adaptive(size: 18, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(Color.goPurple)
                 .frame(width: 40, height: 40) // a11y: allow decorative non-interactive frame; hit area handled by parent
                 .background(Color.goPurple.opacity(0.16), in: Circle())
+                .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 3) {
                 Text(l.tr(zh: "彩虹桥纪念模式", en: "Rainbow Bridge memorial mode", de: "Regenbogenbruecken-Gedenkmodus"))
                     .font(OhanaFont.callout(.black))
                     .foregroundStyle(Color.ohanaPrimaryText)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
                 Text(memorialDetail)
                     .font(OhanaFont.caption(.semibold))
                     .foregroundStyle(Color.ohanaSecondaryText)
+                    .lineLimit(3)
+                    .fixedSize(horizontal: false, vertical: true)
             }
-            Spacer()
+            Spacer(minLength: 0)
         }
         .padding(14)
         .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous))

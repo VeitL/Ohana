@@ -484,10 +484,18 @@ nonisolated enum PhysicalDeletionService {
         )
         deletedCount += scrubRetainedPetFactsReferencingHuman(humanId: humanId, context: context, modifiedAt: deletedAt)
         deletedCount += retireWalletAccounts(ownerKind: .human, ownerId: humanId, context: context, deletedAt: deletedAt)
-        deletedCount += deleteRows(fetchAll(CareLedgerEvent.self, context: context).filter { event in
+        deletedCount += deleteOrRetainCareLedgerEvents(fetchAll(CareLedgerEvent.self, context: context).filter { event in
             referencesHuman(event, humanId: humanId)
-        }, context: context) {
-            CloudSyncMutationRecorder.markDeleted($0, context: context, deletedAt: deletedAt, deletedByHumanId: deletedByHumanId)
+        }, context: context) { _ in
+            CareLedgerDeletionContext(
+                deletedOwnerKind: .human,
+                deletedOwnerId: humanId,
+                deletedLegacyModelName: nil,
+                deletedLegacyModelId: nil,
+                reason: "humanPhysicalDeletion",
+                deletedAt: deletedAt,
+                deletedByHumanId: deletedByHumanId
+            )
         }
         deletedCount += deleteRows(fetchAll(EconomyBudgetUsageEvent.self, context: context).filter { event in
             referencesHuman(event, humanId: humanId)
@@ -609,10 +617,18 @@ nonisolated enum PhysicalDeletionService {
         deletedAt: Date,
         deletedByHumanId: String?
     ) {
-        _ = deleteRows(fetchAll(CareLedgerEvent.self, context: context).filter { event in
+        _ = deleteOrRetainCareLedgerEvents(fetchAll(CareLedgerEvent.self, context: context).filter { event in
             event.legacyModelName == legacyModelName && idsMatch(event.legacyModelId, legacyModelId)
-        }, context: context) {
-            CloudSyncMutationRecorder.markDeleted($0, context: context, deletedAt: deletedAt, deletedByHumanId: deletedByHumanId)
+        }, context: context) { _ in
+            CareLedgerDeletionContext(
+                deletedOwnerKind: nil,
+                deletedOwnerId: nil,
+                deletedLegacyModelName: legacyModelName,
+                deletedLegacyModelId: legacyModelId,
+                reason: "legacyFactPhysicalDeletion",
+                deletedAt: deletedAt,
+                deletedByHumanId: deletedByHumanId
+            )
         }
     }
 
@@ -701,14 +717,16 @@ nonisolated enum PhysicalDeletionService {
                 deletedByHumanId: deletedByHumanId
             )
         }
-        for ledger in derivedLedgerEvents {
-            CloudSyncMutationRecorder.markDeleted(
-                ledger,
-                context: context,
+        _ = deleteOrRetainCareLedgerEvents(derivedLedgerEvents, context: context) { _ in
+            CareLedgerDeletionContext(
+                deletedOwnerKind: .pet,
+                deletedOwnerId: pet.id.uuidString,
+                deletedLegacyModelName: nil,
+                deletedLegacyModelId: nil,
+                reason: "petHealthDerivedPhysicalDeletion",
                 deletedAt: deletedAt,
                 deletedByHumanId: deletedByHumanId
             )
-            context.delete(ledger)
         }
     }
 
@@ -779,10 +797,19 @@ nonisolated enum PhysicalDeletionService {
     ) {
         _ = retireWalletAccounts(ownerKind: .pet, ownerId: petId, context: context, deletedAt: deletedAt)
 
-        _ = deleteRows(fetchAll(CareLedgerEvent.self, context: context).filter { event in
+        _ = deleteOrRetainCareLedgerEvents(fetchAll(CareLedgerEvent.self, context: context).filter { event in
             referencesPet(event, petId: petId) || legacyModelIds.containsNormalized(event.legacyModelId)
         }, context: context) {
-            CloudSyncMutationRecorder.markDeleted($0, context: context, deletedAt: deletedAt, deletedByHumanId: deletedByHumanId)
+            let deletesLegacyReference = legacyModelIds.containsNormalized($0.legacyModelId)
+            return CareLedgerDeletionContext(
+                deletedOwnerKind: .pet,
+                deletedOwnerId: petId,
+                deletedLegacyModelName: deletesLegacyReference ? $0.legacyModelName : nil,
+                deletedLegacyModelId: deletesLegacyReference ? $0.legacyModelId : nil,
+                reason: "petPhysicalDeletion",
+                deletedAt: deletedAt,
+                deletedByHumanId: deletedByHumanId
+            )
         }
 
         _ = deleteRows(fetchAll(EconomyBudgetUsageEvent.self, context: context).filter { event in
@@ -1097,6 +1124,126 @@ nonisolated enum PhysicalDeletionService {
             context.delete(row)
         }
         return rows.count
+    }
+
+    struct CareLedgerDeletionContext {
+        let deletedOwnerKind: CareLedgerSubjectKind?
+        let deletedOwnerId: String?
+        let deletedLegacyModelName: String?
+        let deletedLegacyModelId: String?
+        let reason: String
+        let deletedAt: Date
+        let deletedByHumanId: String?
+    }
+
+    @discardableResult
+    static func deleteOrRetainCareLedgerEvents(
+        _ events: [CareLedgerEvent],
+        context: ModelContext,
+        deletionContext: (CareLedgerEvent) -> CareLedgerDeletionContext
+    ) -> Int {
+        let uniqueEvents = unique(events, by: \.id)
+        for event in uniqueEvents {
+            let contextForEvent = deletionContext(event)
+            if shouldRetainEconomicCareLedger(event) {
+                retainEconomicCareLedger(
+                    event,
+                    context: context,
+                    deletionContext: contextForEvent
+                )
+            } else {
+                CloudSyncMutationRecorder.markDeleted(
+                    event,
+                    context: context,
+                    deletedAt: contextForEvent.deletedAt,
+                    deletedByHumanId: contextForEvent.deletedByHumanId
+                )
+                context.delete(event)
+            }
+        }
+        return uniqueEvents.count
+    }
+
+    private static func shouldRetainEconomicCareLedger(_ event: CareLedgerEvent) -> Bool {
+        event.coconutDelta != 0 || event.rewardLogId?.isEmpty == false
+    }
+
+    private static func retainEconomicCareLedger(
+        _ event: CareLedgerEvent,
+        context: ModelContext,
+        deletionContext: CareLedgerDeletionContext
+    ) {
+        let originalActorKind = event.actorKind
+        let originalSubjectKind = event.subjectKind
+        let originalLegacyModelName = event.legacyModelName
+        event.note = ""
+
+        if let deletedOwnerId = deletionContext.deletedOwnerId {
+            if idsMatch(event.actorId, deletedOwnerId) {
+                event.actorKind = CareLedgerActorKind.unknown.rawValue
+                event.actorId = nil
+            }
+            if idsMatch(event.subjectId, deletedOwnerId) {
+                event.subjectKind = CareLedgerSubjectKind.unknown.rawValue
+                event.subjectId = nil
+            }
+        }
+
+        if let deletedLegacyModelName = deletionContext.deletedLegacyModelName,
+           let deletedLegacyModelId = deletionContext.deletedLegacyModelId,
+           event.legacyModelName == deletedLegacyModelName,
+           idsMatch(event.legacyModelId, deletedLegacyModelId) {
+            event.legacyModelName = nil
+            event.legacyModelId = nil
+        }
+
+        event.metadataJSON = retainedEconomicCareLedgerMetadata(
+            existingMetadataJSON: event.metadataJSON,
+            reason: deletionContext.reason,
+            deletedOwnerKind: deletionContext.deletedOwnerKind?.rawValue,
+            deletedAt: deletionContext.deletedAt,
+            originalActorKind: originalActorKind,
+            originalSubjectKind: originalSubjectKind,
+            originalLegacyModelName: originalLegacyModelName
+        )
+        CloudSyncMutationRecorder.markModified(event, context: context, modifiedAt: deletionContext.deletedAt)
+    }
+
+    private static func retainedEconomicCareLedgerMetadata(
+        existingMetadataJSON: String,
+        reason: String,
+        deletedOwnerKind: String?,
+        deletedAt: Date,
+        originalActorKind: String,
+        originalSubjectKind: String,
+        originalLegacyModelName: String?
+    ) -> String {
+        var payload: [String: Any] = [
+            "deletedOwnerRetention": true,
+            "retentionReason": reason,
+            "retainedAt": deletedAt.timeIntervalSince1970,
+            "originalActorKind": originalActorKind,
+            "originalSubjectKind": originalSubjectKind
+        ]
+        if let deletedOwnerKind {
+            payload["deletedOwnerKind"] = deletedOwnerKind
+        }
+        if let originalLegacyModelName {
+            payload["originalLegacyModelName"] = originalLegacyModelName
+        }
+        if !existingMetadataJSON.isEmpty,
+           let data = existingMetadataJSON.data(using: .utf8),
+           let existingPayload = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+            payload["previousMetadata"] = existingPayload
+        } else if !existingMetadataJSON.isEmpty {
+            payload["previousMetadataRaw"] = existingMetadataJSON
+        }
+        guard JSONSerialization.isValidJSONObject(payload),
+              let data = try? JSONSerialization.data(withJSONObject: payload, options: [.sortedKeys]),
+              let json = String(data: data, encoding: .utf8) else {
+            return "{\"deletedOwnerRetention\":true,\"retentionReason\":\"\(reason)\"}"
+        }
+        return json
     }
 
     @discardableResult

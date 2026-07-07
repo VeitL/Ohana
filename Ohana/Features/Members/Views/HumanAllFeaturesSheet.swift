@@ -775,16 +775,21 @@ private struct HumanOwnerPrivacyHint: View {
     private var l: L10n { L10n(appLanguage) }
 
     var body: some View {
-        HStack(spacing: 10) {
+        HStack(alignment: .top, spacing: 10) {
             Image(systemName: "lock.shield.fill") // a11y: allow decorative icon covered by surrounding text or control
                 .font(OhanaFont.adaptive(size: 14, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(Color.goYellow)
+                .frame(width: 22, height: 22) // a11y: allow decorative non-interactive glyph; hint text is combined by parent
+                .accessibilityHidden(true)
             Text(l.tr(zh: "已开启隐私的数据仅自己可见", en: "Private fields are visible only to you", de: "Private Felder sind nur für dich sichtbar"))
                 .font(OhanaFont.caption(.bold))
                 .foregroundStyle(Color.ohanaSecondaryText)
+                .lineLimit(3)
+                .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 0)
         }
         .padding(.horizontal, 4)
+        .accessibilityElement(children: .combine)
     }
 }
 
@@ -794,21 +799,26 @@ private struct HumanMemorialBanner: View {
     private var l: L10n { L10n(appLanguage) }
 
     var body: some View {
-        HStack(spacing: 12) {
+        HStack(alignment: .top, spacing: 12) {
             Image(systemName: "sparkles") // a11y: allow decorative icon covered by surrounding text or control
                 .font(OhanaFont.adaptive(size: 18, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(Color.goPurple)
                 .frame(width: 40, height: 40) // a11y: allow decorative non-interactive frame; hit area handled by parent
                 .background(Color.goPurple.opacity(0.16), in: Circle())
+                .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 3) {
                 Text(l.tr(zh: "纪念模式", en: "Memorial mode", de: "Gedenkmodus"))
                     .font(OhanaFont.callout(.black))
                     .foregroundStyle(Color.ohanaPrimaryText)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
                 Text(memorialDetail)
                     .font(OhanaFont.caption(.semibold))
                     .foregroundStyle(Color.ohanaSecondaryText)
+                    .lineLimit(3)
+                    .fixedSize(horizontal: false, vertical: true)
             }
-            Spacer()
+            Spacer(minLength: 0)
         }
         .padding(14)
         .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous))

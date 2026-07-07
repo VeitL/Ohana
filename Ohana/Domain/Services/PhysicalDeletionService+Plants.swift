@@ -8,16 +8,21 @@
 import Foundation
 import SwiftData
 
+struct PhysicalPlantDeletionResult: Equatable, Sendable {
+    let removedRelatedEventIDs: [UUID]
+}
+
 extension PhysicalDeletionService {
+    @discardableResult
     static func deletePlant(
         _ plant: Plant,
         context: ModelContext,
         deletedAt: Date = Date(),
         deletedByHumanId: String? = nil,
         notifications: ReminderNotificationScheduling = ReminderNotificationSchedulerRegistry.current
-    ) {
+    ) -> PhysicalPlantDeletionResult {
         let plantId = plant.id.uuidString
-        _ = deletePlantRelatedEvents(
+        let removedRelatedEventIDs = deletePlantRelatedEvents(
             plantId: plantId,
             context: context,
             deletedAt: deletedAt,
@@ -43,6 +48,9 @@ extension PhysicalDeletionService {
             deletedByHumanId: deletedByHumanId
         )
         context.delete(plant)
+        return PhysicalPlantDeletionResult(
+            removedRelatedEventIDs: removedRelatedEventIDs
+        )
     }
 
     @discardableResult
@@ -80,12 +88,16 @@ extension PhysicalDeletionService {
         deletedAt: Date,
         deletedByHumanId: String?
     ) {
-        _ = deleteRows(fetchAll(CareLedgerEvent.self, context: context).filter { event in
+        _ = deleteOrRetainCareLedgerEvents(fetchAll(CareLedgerEvent.self, context: context).filter { event in
             event.subjectKind == CareLedgerSubjectKind.plant.rawValue && idsMatch(event.subjectId, plantId)
         }, context: context) {
-            CloudSyncMutationRecorder.markDeleted(
-                $0,
-                context: context,
+            let deletesLegacyPlantCare = $0.legacyModelName == String(describing: PlantCareLog.self)
+            return CareLedgerDeletionContext(
+                deletedOwnerKind: .plant,
+                deletedOwnerId: plantId,
+                deletedLegacyModelName: deletesLegacyPlantCare ? $0.legacyModelName : nil,
+                deletedLegacyModelId: deletesLegacyPlantCare ? $0.legacyModelId : nil,
+                reason: "plantPhysicalDeletion",
                 deletedAt: deletedAt,
                 deletedByHumanId: deletedByHumanId
             )
@@ -99,17 +111,19 @@ extension PhysicalDeletionService {
         deletedAt: Date,
         deletedByHumanId: String?,
         notifications: ReminderNotificationScheduling
-    ) -> Int {
+    ) -> [UUID] {
         let events = fetchAll(Event.self, context: context).filter { event in
             eventBelongsToPlant(event, plantId: plantId)
         }
-        return deleteEvents(
+        let eventIDs = events.map(\.id)
+        _ = deleteEvents(
             events,
             context: context,
             deletedAt: deletedAt,
             deletedByHumanId: deletedByHumanId,
             notifications: notifications
         )
+        return eventIDs
     }
 
     private static func eventBelongsToPlant(_ event: Event, plantId: String) -> Bool {

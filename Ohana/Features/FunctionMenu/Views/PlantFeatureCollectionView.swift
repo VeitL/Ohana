@@ -156,8 +156,8 @@ struct PlantFeatureCollectionView: View {
                 Text(l.tr(zh: "植物全部功能", en: "All Plant Features", de: "Alle Pflanzenfunktionen"))
                     .font(OhanaFont.title2(.black))
                     .foregroundStyle(Color.ohanaPrimaryText)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.82)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
                 Text(l.tr(
                     zh: "\(summary.plantCount) 株植物 · 聚合入口",
                     en: "\(summary.plantCount) plants · aggregate tools",
@@ -165,7 +165,8 @@ struct PlantFeatureCollectionView: View {
                 ))
                 .font(OhanaFont.caption(.black))
                 .foregroundStyle(Color.ohanaSecondaryText)
-                .lineLimit(1)
+                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
             }
 
             Spacer(minLength: 54)
@@ -177,20 +178,20 @@ struct PlantFeatureCollectionView: View {
 
     private var commandCenterPanel: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Text(l.tr(zh: "植物中枢", en: "Plant hub", de: "Pflanzenzentrale"))
-                    .font(OhanaFont.callout(.black))
-                    .foregroundStyle(Color.ohanaPrimaryText)
-                    .lineLimit(1)
-                Spacer(minLength: 8)
-                Text(commandCenterStatusText)
-                    .font(OhanaFont.caption(.black))
-                    .foregroundStyle(summary.dueTaskCount > 0 ? Color.goYellow : Color.goTeal)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.72)
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    commandCenterTitle
+                    Spacer(minLength: 8)
+                    commandCenterStatus
+                }
+
+                VStack(alignment: .leading, spacing: 4) {
+                    commandCenterTitle
+                    commandCenterStatus
+                }
             }
 
-            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
+            LazyVGrid(columns: commandCenterMetricColumns, alignment: .leading, spacing: 8) {
                 commandCenterMetric(
                     icon: "leaf.fill",
                     title: l.tr(zh: "植物", en: "Plants", de: "Pflanzen"),
@@ -217,7 +218,7 @@ struct PlantFeatureCollectionView: View {
                 )
             }
 
-            HStack(spacing: 8) {
+            LazyVGrid(columns: commandCenterPillColumns, alignment: .leading, spacing: 8) {
                 commandCenterMiniPill(
                     icon: "drop.fill",
                     text: l.tr(zh: "待水分 \(summary.wateringDueCount)", en: "\(summary.wateringDueCount) water", de: "\(summary.wateringDueCount) Wasser"),
@@ -239,6 +240,36 @@ struct PlantFeatureCollectionView: View {
         .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous))
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("plant-feature-collection-command-center")
+    }
+
+    private var commandCenterMetricColumns: [GridItem] {
+        if dynamicTypeSize.isAccessibilitySize {
+            return [GridItem(.flexible(), spacing: 8, alignment: .top)]
+        }
+        return [GridItem(.adaptive(minimum: 128), spacing: 8, alignment: .top)]
+    }
+
+    private var commandCenterPillColumns: [GridItem] {
+        if dynamicTypeSize.isAccessibilitySize {
+            return [GridItem(.flexible(), spacing: 8, alignment: .top)]
+        }
+        return [GridItem(.adaptive(minimum: 112), spacing: 8, alignment: .top)]
+    }
+
+    private var commandCenterTitle: some View {
+        Text(l.tr(zh: "植物中枢", en: "Plant hub", de: "Pflanzenzentrale"))
+            .font(OhanaFont.callout(.black))
+            .foregroundStyle(Color.ohanaPrimaryText)
+            .lineLimit(2)
+            .fixedSize(horizontal: false, vertical: true)
+    }
+
+    private var commandCenterStatus: some View {
+        Text(commandCenterStatusText)
+            .font(OhanaFont.caption(.black))
+            .foregroundStyle(summary.dueTaskCount > 0 ? Color.goYellow : Color.goTeal)
+            .lineLimit(2)
+            .fixedSize(horizontal: false, vertical: true)
     }
 
     private var commandCenterStatusText: String {
@@ -264,12 +295,13 @@ struct PlantFeatureCollectionView: View {
                 Text(title)
                     .font(OhanaFont.caption2(.black))
                     .foregroundStyle(Color.ohanaSecondaryText)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.72)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
                 Text(value)
                     .font(OhanaFont.callout(.black))
                     .foregroundStyle(Color.ohanaPrimaryText)
-                    .lineLimit(1)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
                     .contentTransition(.numericText())
             }
             Spacer(minLength: 0)
@@ -288,10 +320,10 @@ struct PlantFeatureCollectionView: View {
             Text(text)
                 .font(OhanaFont.caption2(.black))
                 .foregroundStyle(Color.ohanaSecondaryText)
-                .lineLimit(1)
-                .minimumScaleFactor(0.7)
+                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
         }
-        .frame(maxWidth: .infinity)
+        .frame(maxWidth: .infinity, minHeight: 34, alignment: .leading)
         .padding(.horizontal, 8)
         .padding(.vertical, 7)
         .background(tint.opacity(0.11), in: Capsule())

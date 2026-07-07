@@ -220,6 +220,7 @@ final nonisolated class DataBackupManager: @unchecked Sendable {
         let reminders = try context.fetch(FetchDescriptor<Reminder>()) // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
         let households = try context.fetch(FetchDescriptor<Household>()) // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
         let plants = try context.fetch(FetchDescriptor<Plant>()) // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
+        let petRelationships = try context.fetch(FetchDescriptor<PetRelationship>()) // smoothness: explicit backup/export scan only
         let plantCareLogs = try context.fetch(FetchDescriptor<PlantCareLog>()) // smoothness: explicit backup/export scan only
         let careLogs = try context.fetch(FetchDescriptor<PetCareLog>()) // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
         let pottyLogs = try context.fetch(FetchDescriptor<PetPottyLog>()) // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
@@ -248,6 +249,7 @@ final nonisolated class DataBackupManager: @unchecked Sendable {
         let ledger = try context.fetch(FetchDescriptor<CareLedgerEvent>()) // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
         let coconutAccounts = try context.fetch(FetchDescriptor<CoconutAccount>()) // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
         let coconutLedgerEntries = try context.fetch(FetchDescriptor<CoconutLedgerEntry>()) // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
+        let economyBudgetUsageEvents = try context.fetch(FetchDescriptor<EconomyBudgetUsageEvent>()) // smoothness: explicit backup/export scan only
         let familyTasks = try context.fetch(FetchDescriptor<FamilyCollaborationTask>()) // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
         let sharedCareSessions = try context.fetch(FetchDescriptor<SharedCareSession>()) // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
         let exchanges = try context.fetch(FetchDescriptor<CoconutExchangeRequest>()) // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
@@ -319,6 +321,7 @@ final nonisolated class DataBackupManager: @unchecked Sendable {
             reminders: reminders.map(encodeReminder),
             households: households.map(encodeHousehold),
             plants: plants.map(encodePlant),
+            petRelationships: petRelationships.map(encodePetRelationship),
             plantCareLogs: plantCareLogBackups,
             petCareLogs: careLogs.map(encodeCareLog),
             petPottyLogs: pottyLogs.map(encodePottyLog),
@@ -348,6 +351,7 @@ final nonisolated class DataBackupManager: @unchecked Sendable {
             careLedgerEvents: ledger.map(encodeCareLedgerEvent),
             coconutAccounts: coconutAccounts.map(encodeCoconutAccount),
             coconutLedgerEntries: coconutLedgerEntries.map(encodeCoconutLedgerEntry),
+            economyBudgetUsageEvents: economyBudgetUsageEvents.map(encodeEconomyBudgetUsageEvent),
             familyCollaborationTasks: familyTasks.map(encodeFamilyCollaborationTask),
             sharedCareSessions: sharedCareSessions.map(encodeSharedCareSession),
             coconutExchangeRequests: exchanges.map(encodeCoconutExchangeRequest),
@@ -421,6 +425,13 @@ final nonisolated class DataBackupManager: @unchecked Sendable {
         for dto in backup.households {
             try DomainGeneralRehydrateWriter.upsertHousehold(
                 snapshot: decodeHouseholdSnapshot(dto),
+                source: .backupRestore,
+                context: context
+            )
+        }
+        for dto in backup.petRelationships ?? [] {
+            try DomainGeneralRehydrateWriter.insertPetRelationshipIfNeeded(
+                snapshot: decodePetRelationshipSnapshot(dto),
                 source: .backupRestore,
                 context: context
             )
@@ -646,6 +657,13 @@ final nonisolated class DataBackupManager: @unchecked Sendable {
         for dto in backup.coconutLedgerEntries ?? [] {
             try DomainGeneralRehydrateWriter.upsertCoconutLedgerEntry(
                 snapshot: decodeCoconutLedgerEntrySnapshot(dto),
+                source: .backupRestore,
+                context: context
+            )
+        }
+        for dto in backup.economyBudgetUsageEvents ?? [] {
+            try DomainGeneralRehydrateWriter.insertEconomyBudgetUsageEventIfNeeded(
+                snapshot: decodeEconomyBudgetUsageEventSnapshot(dto),
                 source: .backupRestore,
                 context: context
             )

@@ -88,7 +88,7 @@ extension PetAllFeatureDestination: Identifiable {
     }
 }
 
-struct PetAllFeaturesActivitySummary: Equatable {
+nonisolated struct PetAllFeaturesActivitySummary: Equatable, Sendable {
     let todayFeedCount: Int
     let todayNonFeedingCareCount: Int
     let totalNonFeedingCareCount: Int
@@ -181,7 +181,6 @@ struct PetAllFeaturesActivitySummary: Equatable {
         todayFeedCount + todayNonFeedingCareCount + todayPottyCount + todayWalkCount
     }
 
-    @MainActor
     static func load(petID: UUID, context: ModelContext, now: Date = Date()) -> PetAllFeaturesActivitySummary {
         let calendar = Calendar.current
         let todayStart = calendar.startOfDay(for: now)
@@ -388,7 +387,6 @@ struct PetAllFeaturesActivitySummary: Equatable {
         }
     }
 
-    @MainActor
     private static func count(
         _ descriptor: FetchDescriptor<some PersistentModel>,
         context: ModelContext,
@@ -402,7 +400,6 @@ struct PetAllFeaturesActivitySummary: Equatable {
         }
     }
 
-    @MainActor
     private static func fetch<T: PersistentModel>(
         _ descriptor: FetchDescriptor<T>,
         context: ModelContext,

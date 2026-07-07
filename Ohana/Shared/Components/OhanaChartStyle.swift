@@ -174,7 +174,7 @@ enum OhanaChartStyle {
     }
 }
 
-struct OhanaMinimalChartPoint: Identifiable, Hashable {
+nonisolated struct OhanaMinimalChartPoint: Identifiable, Hashable, Sendable {
     let id: String
     let date: Date
     let value: Double

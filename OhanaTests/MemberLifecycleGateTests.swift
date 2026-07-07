@@ -2008,7 +2008,7 @@ struct MemberLifecycleGateTests {
             rootURL: repositoryRootURL()
         )
         let alertSection = try #require(
-            source.components(separatedBy: ".alert(\"确认标记离世\"").dropFirst().first?
+            source.components(separatedBy: ".alert(l.tr(zh: \"确认标记离世\"").dropFirst().first?
                 .components(separatedBy: "// MARK: - Danger Zone").first
         )
 
@@ -2025,6 +2025,7 @@ struct MemberLifecycleGateTests {
         let rootURL = repositoryRootURL()
         let sheetSource = try source("Ohana/Features/Members/Views/PetAllFeaturesSheet.swift", rootURL: rootURL)
         let routeSource = try source("Ohana/Features/Members/PetDetailSheetRouteContainer.swift", rootURL: rootURL)
+        let actorSource = try source("Ohana/Features/Members/PetAllFeaturesActivitySummaryActor.swift", rootURL: rootURL)
         let sheetViewSource = try #require(sheetSource.components(separatedBy: "enum ArchiveMemoryNextStepKind").first)
 
         #expect(!sheetViewSource.contains("pet.careLogs"))
@@ -2051,8 +2052,11 @@ struct MemberLifecycleGateTests {
         #expect(sheetSource.contains("struct PetAllFeaturesActivitySummary"))
         #expect(sheetSource.contains("try context.fetchCount"))
         #expect(routeSource.contains("@State private var allFeaturesActivitySummary"))
-        #expect(routeSource.contains("PetAllFeaturesActivitySummary.load(petID: petID, context: modelContext)"))
-        #expect(routeSource.contains("OhanaFrameScheduler.runAfterNextFrame"))
+        #expect(routeSource.contains("PetAllFeaturesActivitySummaryActor(modelContainer: container)"))
+        #expect(!routeSource.contains("PetAllFeaturesActivitySummary.load(petID: petID, context: modelContext)"))
+        #expect(routeSource.contains("OhanaFrameScheduler.waitAfterNextFrame"))
+        #expect(actorSource.contains("@ModelActor"))
+        #expect(actorSource.contains("PetAllFeaturesActivitySummary.load("))
     }
 
     @Test func petAllFeaturesActivitySummaryUsesLedgerAndRouteScopedCounts() throws {
@@ -2500,7 +2504,7 @@ struct MemberLifecycleGateTests {
         #expect(summary.insurance?.name == "Guard Plan")
         #expect(summary.localizedVaccineSummary(l: en).contains("valid until"))
         #expect(summary.localizedMedicationSummary(l: en).contains("Antibiotic"))
-        #expect(summary.localizedSymptomSummary(l: de).contains("Leicht"))
+        #expect(summary.localizedSymptomSummary(l: de).contains("Mittel"))
         #expect(summary.localizedInsuranceSummary(l: en).contains("Guard Plan"))
         #expect(summary.latestWeight?.kg == 4.6)
         #expect(!summary.localizedWeightSummary(l: en).contains("99"))
@@ -2512,6 +2516,7 @@ struct MemberLifecycleGateTests {
         let cardSource = try source("Ohana/Features/FamilyReports/Views/WeeklyReportCard.swift", rootURL: rootURL)
         let dashboardSource = try source("Ohana/Features/FamilyReports/Views/FamilyWeeklyReportDashboardView.swift", rootURL: rootURL)
         let dataContainerSource = try source("Ohana/Features/FamilyReports/FamilyWeeklyReportDataContainer.swift", rootURL: rootURL)
+        let snapshotSource = try source("Ohana/Features/FamilyReports/FamilyWeeklyReportRouteSnapshot.swift", rootURL: rootURL)
 
         for source in [cardSource, dashboardSource] {
             #expect(!source.contains("pet.careLogs"))
@@ -2523,12 +2528,15 @@ struct MemberLifecycleGateTests {
             #expect(!source.contains("pet.photoLogs"))
         }
         #expect(!dashboardSource.contains("Fallback keeps older local data visible"))
-        #expect(dashboardSource.contains("let photoMemories: [FamilyWeeklyPhotoMemory]"))
-        #expect(dashboardSource.contains("let healthAlertSources: [PetHealthAlertSource]"))
+        #expect(dashboardSource.contains("let snapshot: FamilyWeeklyReportRouteSnapshot"))
+        #expect(!dashboardSource.contains("let pets: [Pet]"))
+        #expect(!dashboardSource.contains("let humans: [Human]"))
+        #expect(!dashboardSource.contains("let ledgerEvents: [CareLedgerEvent]"))
+        #expect(!dashboardSource.contains("let healthAlertSources: [PetHealthAlertSource]"))
         #expect(dashboardSource.contains("private var weekPhotoMemories: [FamilyWeeklyPhotoMemory]"))
-        #expect(dashboardSource.contains("let modelID: PersistentIdentifier"))
-        #expect(dashboardSource.contains("let imageSignature: String"))
-        #expect(dashboardSource.contains("let canAttemptImageAttachmentLoad: Bool"))
+        #expect(snapshotSource.contains("let modelID: PersistentIdentifier"))
+        #expect(snapshotSource.contains("let imageSignature: String"))
+        #expect(snapshotSource.contains("let canAttemptImageAttachmentLoad: Bool"))
         #expect(dashboardSource.contains("@State private var mediaBlobLoader: SwiftDataMediaBlobLoader?"))
         #expect(dashboardSource.contains("private func routeMediaBlobLoader() -> SwiftDataMediaBlobLoader"))
         #expect(dashboardSource.contains("let loader = routeMediaBlobLoader()"))
@@ -2538,21 +2546,23 @@ struct MemberLifecycleGateTests {
         #expect(!dashboardSource.contains("let imageData: Data"))
         #expect(!dashboardSource.contains("AsyncDecodedImageView(data: memory.imageData"))
         #expect(!dashboardSource.contains("return log.imageData"))
-        #expect(dashboardSource.contains("scanAlerts(sources: healthAlertSources, localization: l)"))
+        #expect(dashboardSource.contains("snapshot.healthAlerts"))
         #expect(!dashboardSource.contains("scanAlerts(pets: activePets)"))
-        #expect(dashboardSource.contains("appServices.careLedgerStats.reportEntries"))
-        #expect(dataContainerSource.contains("FamilyWeeklyReportRouteData.load(from: modelContext)"))
-        #expect(dataContainerSource.contains("var photoMemories: [FamilyWeeklyPhotoMemory] = []"))
-        #expect(dataContainerSource.contains("var healthAlertSources: [PetHealthAlertSource] = []"))
-        #expect(dataContainerSource.contains("PetHealthAlertSourceRouteData.load(pets: pets, from: context)"))
-        #expect(dataContainerSource.contains("FetchDescriptor<PetPhotoLog>"))
-        #expect(dataContainerSource.contains("FamilyWeeklyPhotoMemory("))
-        #expect(dataContainerSource.contains("modelID: log.persistentModelID"))
-        #expect(dataContainerSource.contains("imageSignature: log.imageThumbnailSignature"))
-        #expect(dataContainerSource.contains("canAttemptImageAttachmentLoad: log.canAttemptImageAttachmentLoad"))
-        #expect(!dataContainerSource.contains("imageData: log.imageData"))
-        #expect(dataContainerSource.contains("OhanaFrameScheduler.runAfterNextFrame"))
-        #expect(dataContainerSource.contains("descriptor.fetchLimit = 1200"))
+        #expect(!dashboardSource.contains("appServices.careLedgerStats.reportEntries"))
+        #expect(dataContainerSource.contains("FamilyWeeklyReportRouteDataActor(modelContainer: container)"))
+        #expect(dataContainerSource.contains("OhanaFrameScheduler.waitAfterNextFrame"))
+        #expect(!dataContainerSource.contains("FamilyWeeklyReportRouteData.load(from: modelContext)"))
+        #expect(snapshotSource.contains("@ModelActor"))
+        #expect(snapshotSource.contains("nonisolated struct FamilyWeeklyReportRouteSnapshot: Sendable"))
+        #expect(snapshotSource.contains("var entries: [CareLedgerReportEntry]"))
+        #expect(snapshotSource.contains("PetHealthAlertSourceRouteData.load(pets: pets, from: context)"))
+        #expect(snapshotSource.contains("FetchDescriptor<PetPhotoLog>"))
+        #expect(snapshotSource.contains("FamilyWeeklyPhotoMemory("))
+        #expect(snapshotSource.contains("modelID: log.persistentModelID"))
+        #expect(snapshotSource.contains("imageSignature: log.imageThumbnailSignature"))
+        #expect(snapshotSource.contains("canAttemptImageAttachmentLoad: log.canAttemptImageAttachmentLoad"))
+        #expect(!snapshotSource.contains("imageData: log.imageData"))
+        #expect(snapshotSource.contains("descriptor.fetchLimit = 1200"))
         #expect(!dataContainerSource.contains("@Query(sort: \\CareLedgerEvent.occurredAt"))
     }
 
@@ -2567,12 +2577,14 @@ struct MemberLifecycleGateTests {
             rootURL: rootURL
         )
 
-        #expect(dashboardSource.contains("private var visibleHumans: [Human]"))
-        #expect(dashboardSource.contains("humans.filter { !$0.hasPassedAway }"))
-        #expect(dashboardSource.contains("let visibleHumansById = Dictionary(uniqueKeysWithValues: visibleHumans.map"))
-        #expect(dashboardSource.contains("guard id == \"unknown\" || visibleHumansById[id] != nil else { continue }"))
+        #expect(dashboardSource.contains("snapshot.visibleHumanCount"))
+        #expect(dataContainerSource.contains("FamilyWeeklyReportRouteDataActor(modelContainer: container)"))
+        let snapshotSource = try source("Ohana/Features/FamilyReports/FamilyWeeklyReportRouteSnapshot.swift", rootURL: rootURL)
+        #expect(snapshotSource.contains("humans.filter { !$0.hasPassedAway }"))
+        #expect(snapshotSource.contains("let visibleHumansById = Dictionary(uniqueKeysWithValues: visibleHumans.map"))
+        #expect(snapshotSource.contains("guard id == \"unknown\" || visibleHumansById[id] != nil else { continue }"))
         #expect(dashboardSource.contains("humanCount: visibleHumanCount"))
-        #expect(dataContainerSource.contains("pets.filter { !$0.hasPassedAway }"))
+        #expect(snapshotSource.contains("pets.filter { !$0.hasPassedAway }"))
     }
 
     @Test func coconutHistoryKeepsFrozenMemberLedgerReadableWhileActiveTotalsExcludeThem() throws {

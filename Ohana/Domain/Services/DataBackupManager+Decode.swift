@@ -188,6 +188,17 @@ nonisolated extension DataBackupManager {
         )
     }
 
+    func decodePetRelationshipSnapshot(_ dto: PetRelationshipBackup) -> DomainPetRelationshipRehydrateSnapshot {
+        DomainPetRelationshipRehydrateSnapshot(
+            id: UUID(uuidString: dto.id) ?? UUID(),
+            fromPetId: UUID(uuidString: dto.fromPetId) ?? UUID(),
+            toPetId: UUID(uuidString: dto.toPetId) ?? UUID(),
+            relationshipTypeRaw: dto.relationshipTypeRaw,
+            note: dto.note,
+            createdAt: parseDate(dto.createdAt) ?? Date()
+        )
+    }
+
     func decodePottyLogSnapshot(_ dto: PetPottyLogBackup) -> DomainPetPottyLogRehydrateSnapshot {
         DomainPetPottyLogRehydrateSnapshot(
             id: UUID(uuidString: dto.id) ?? UUID(),
@@ -652,6 +663,28 @@ nonisolated extension DataBackupManager {
             sourceModelName: dto.sourceModelName,
             sourceModelId: dto.sourceModelId,
             careLedgerEventId: dto.careLedgerEventId,
+            metadataJSON: dto.metadataJSON,
+            occurredAt: parseDate(dto.occurredAt) ?? Date(),
+            createdAt: parseDate(dto.createdAt) ?? Date()
+        )
+    }
+
+    func decodeEconomyBudgetUsageEventSnapshot(
+        _ dto: EconomyBudgetUsageEventBackup
+    ) -> DomainEconomyBudgetUsageEventRehydrateSnapshot {
+        DomainEconomyBudgetUsageEventRehydrateSnapshot(
+            id: UUID(uuidString: dto.id) ?? UUID(),
+            dayKey: dto.dayKey,
+            householdKey: dto.householdKey,
+            memberKey: dto.memberKey,
+            careObjectKey: dto.careObjectKey,
+            scopeRaw: dto.scopeRaw,
+            scopeKey: dto.scopeKey,
+            growthXPUsed: dto.growthXPUsed,
+            coconutUsed: dto.coconutUsed,
+            luckyCoconutUsed: dto.luckyCoconutUsed,
+            actionKey: dto.actionKey,
+            source: dto.source,
             metadataJSON: dto.metadataJSON,
             occurredAt: parseDate(dto.occurredAt) ?? Date(),
             createdAt: parseDate(dto.createdAt) ?? Date()

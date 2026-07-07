@@ -19,6 +19,7 @@ nonisolated struct OhanaBackup: Codable {
     var reminders: [ReminderBackup]
     var households: [HouseholdBackup]
     var plants: [PlantBackup]
+    var petRelationships: [PetRelationshipBackup]? = nil
     // 日志
     var plantCareLogs: [PlantCareLogBackup]?
     var petCareLogs: [PetCareLogBackup]
@@ -49,6 +50,7 @@ nonisolated struct OhanaBackup: Codable {
     var careLedgerEvents: [CareLedgerEventBackup]?
     var coconutAccounts: [CoconutAccountBackup]?
     var coconutLedgerEntries: [CoconutLedgerEntryBackup]?
+    var economyBudgetUsageEvents: [EconomyBudgetUsageEventBackup]? = nil
     var familyCollaborationTasks: [FamilyCollaborationTaskBackup]?
     var sharedCareSessions: [SharedCareSessionBackup]?
     var coconutExchangeRequests: [CoconutExchangeRequestBackup]?
@@ -267,6 +269,15 @@ nonisolated struct ShopPurchaseRecordBackup: Codable {
     var purchasedAt: String
     var sourceRaw: String
     var isLegacyImport: Bool
+    var createdAt: String
+}
+
+nonisolated struct PetRelationshipBackup: Codable {
+    var id: String
+    var fromPetId: String
+    var toPetId: String
+    var relationshipTypeRaw: String
+    var note: String
     var createdAt: String
 }
 
@@ -724,6 +735,24 @@ nonisolated struct CoconutLedgerEntryBackup: Codable {
     var sourceModelName: String
     var sourceModelId: String
     var careLedgerEventId: String?
+    var metadataJSON: String
+    var occurredAt: String
+    var createdAt: String
+}
+
+nonisolated struct EconomyBudgetUsageEventBackup: Codable {
+    var id: String
+    var dayKey: String
+    var householdKey: String
+    var memberKey: String
+    var careObjectKey: String
+    var scopeRaw: String
+    var scopeKey: String
+    var growthXPUsed: Int
+    var coconutUsed: Int
+    var luckyCoconutUsed: Int
+    var actionKey: String
+    var source: String
     var metadataJSON: String
     var occurredAt: String
     var createdAt: String

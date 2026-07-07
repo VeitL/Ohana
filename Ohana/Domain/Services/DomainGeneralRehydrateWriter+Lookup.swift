@@ -33,6 +33,12 @@ extension DomainGeneralRehydrateWriter {
         return try context.fetch(descriptor).first
     }
 
+    nonisolated static func fetchPetRelationship(id: UUID, context: ModelContext) throws -> PetRelationship? {
+        var descriptor = FetchDescriptor<PetRelationship>(predicate: #Predicate<PetRelationship> { $0.id == id })
+        descriptor.fetchLimit = 1
+        return try context.fetch(descriptor).first
+    }
+
     nonisolated static func fetchWaterLog(id: UUID, context: ModelContext) throws -> WaterLog? {
         var descriptor = FetchDescriptor<WaterLog>(predicate: #Predicate<WaterLog> { $0.id == id })
         descriptor.fetchLimit = 1
@@ -53,6 +59,17 @@ extension DomainGeneralRehydrateWriter {
 
     nonisolated static func fetchCoconutLedgerEntry(id: UUID, context: ModelContext) throws -> CoconutLedgerEntry? {
         var descriptor = FetchDescriptor<CoconutLedgerEntry>(predicate: #Predicate<CoconutLedgerEntry> { $0.id == id })
+        descriptor.fetchLimit = 1
+        return try context.fetch(descriptor).first
+    }
+
+    nonisolated static func fetchEconomyBudgetUsageEvent(
+        id: UUID,
+        context: ModelContext
+    ) throws -> EconomyBudgetUsageEvent? {
+        var descriptor = FetchDescriptor<EconomyBudgetUsageEvent>(
+            predicate: #Predicate<EconomyBudgetUsageEvent> { $0.id == id }
+        )
         descriptor.fetchLimit = 1
         return try context.fetch(descriptor).first
     }

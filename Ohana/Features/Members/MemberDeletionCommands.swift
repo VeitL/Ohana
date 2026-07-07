@@ -187,17 +187,8 @@ enum MemberDeletionCommandService {
     ) -> MemberDeletionCommandResult {
         let now = Date()
         let plantID = plant.id
-        let relatedEvents = fetchPlantEvents(plant, context: context)
         let notificationCancels = DeferredNotificationCancellationScheduler(delegate: notifications)
-        for event in relatedEvents {
-            PhysicalDeletionService.deleteEvent(
-                event,
-                context: context,
-                deletedAt: now,
-                notifications: notificationCancels
-            )
-        }
-        PhysicalDeletionService.deletePlant(
+        let deletionResult = PhysicalDeletionService.deletePlant(
             plant,
             context: context,
             deletedAt: now,
@@ -224,7 +215,7 @@ enum MemberDeletionCommandService {
         return MemberDeletionCommandResult(
             entityID: plantID,
             kind: EntityKind.plant.rawValue,
-            removedRelatedEventIDs: relatedEvents.map(\.id),
+            removedRelatedEventIDs: deletionResult.removedRelatedEventIDs,
             removedQuickActionCount: 0,
             requiresReplacementHuman: false,
             requiresAccountSwitch: false,
@@ -264,36 +255,12 @@ enum MemberDeletionCommandService {
     }
 
     @MainActor
-    private static func fetchPlantEvents(_ plant: Plant, context: ModelContext) -> [Event] {
-        let plantId = plant.id.uuidString
-        let descriptor = FetchDescriptor<Event>(
-            predicate: #Predicate<Event> { event in
-                event.relatedEntityId == plantId
-            }
-        )
-        return fetchMemberDeletionModelsOrLog(
-            descriptor,
-            context: context,
-            operation: "fetch plant-related events for deletion"
-        ).filter { event in
-            eventBelongsToPlant(event, plantId: plant.id.uuidString)
-        }
-    }
-
-    @MainActor
     private static func fetchEvents(context: ModelContext, operation: String) -> [Event] {
         fetchMemberDeletionModelsOrLog(
             FetchDescriptor<Event>(),
             context: context,
             operation: operation
         )
-    }
-
-    private static func eventBelongsToPlant(_ event: Event, plantId: String) -> Bool {
-        let link = DomainEntityLink(event: event)
-        guard DomainEntityLinkRegistry.plantId(for: link)?.uuidString == plantId else { return false }
-        let role = DomainEntityLinkRegistry.role(for: link)
-        return role.isPlantScoped || role == .unscoped
     }
 
     private static func quickAccessRemovalPlan(forPetID petID: UUID, userDefaults: UserDefaults) -> QuickAccessRemovalPlan {

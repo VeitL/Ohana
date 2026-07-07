@@ -8,7 +8,7 @@
 import Foundation
 import SwiftData
 
-enum ExpenseCategory: String, Codable, CaseIterable {
+nonisolated enum ExpenseCategory: String, Codable, CaseIterable {
     case food = "食物"
     case treats = "零食"
     case medical = "医疗"

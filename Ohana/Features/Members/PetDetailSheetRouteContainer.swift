@@ -184,8 +184,25 @@ struct AppPetDetailSheetRouteContainer: View {
         guard destination == .allFeatures else { return }
         guard force || allFeaturesActivitySummary == .empty else { return }
         guard allFeaturesActivitySummaryTask == nil else { return }
-        allFeaturesActivitySummaryTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: delayMilliseconds) {
-            allFeaturesActivitySummary = PetAllFeaturesActivitySummary.load(petID: petID, context: modelContext)
+        let container = modelContext.container
+        let now = Date()
+        allFeaturesActivitySummaryTask = Task { @MainActor in
+            await OhanaFrameScheduler.waitAfterNextFrame(milliseconds: delayMilliseconds)
+            guard !Task.isCancelled else {
+                allFeaturesActivitySummaryTask = nil
+                return
+            }
+            let actor = PetAllFeaturesActivitySummaryActor(modelContainer: container)
+            do {
+                allFeaturesActivitySummary = try await actor.load(petID: petID, now: now)
+            } catch is CancellationError {
+                // The route disappeared or a newer load replaced this one.
+            } catch {
+                OhanaLog.warning(
+                    "Pet all-features activity summary load failed: \(error.localizedDescription)",
+                    category: "Members"
+                )
+            }
             allFeaturesActivitySummaryTask = nil
         }
     }

@@ -38,16 +38,36 @@ extension PlantDetailContentView {
     }
 
     func detailRow(_ title: String, value: String) -> some View {
-        HStack(alignment: .top) {
-            Text(title)
-                .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
-                .foregroundStyle(Color.ohanaSecondaryText)
-            Spacer(minLength: 16)
-            Text(value)
-                .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .rounded))
-                .foregroundStyle(Color.ohanaPrimaryText)
-                .multilineTextAlignment(.trailing)
+        ViewThatFits(in: .horizontal) {
+            HStack(alignment: .top, spacing: 12) {
+                detailRowTitle(title)
+                Spacer(minLength: 16)
+                detailRowValue(value)
+                    .multilineTextAlignment(.trailing)
+            }
+
+            VStack(alignment: .leading, spacing: 4) {
+                detailRowTitle(title)
+                detailRowValue(value)
+                    .multilineTextAlignment(.leading)
+            }
         }
+        .accessibilityElement(children: .combine)
+    }
+
+    func detailRowTitle(_ title: String) -> some View {
+        Text(title)
+            .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
+            .foregroundStyle(Color.ohanaSecondaryText)
+            .lineLimit(2)
+            .fixedSize(horizontal: false, vertical: true)
+    }
+
+    func detailRowValue(_ value: String) -> some View {
+        Text(value)
+            .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .rounded))
+            .foregroundStyle(Color.ohanaPrimaryText)
+            .fixedSize(horizontal: false, vertical: true)
     }
 
     func shortDate(_ date: Date) -> String {

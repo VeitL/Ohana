@@ -9,25 +9,18 @@ import SwiftData
 import SwiftUI
 
 struct FamilyWeeklyReportDashboardContentView: View {
-    let pets: [Pet]
-    let humans: [Human]
-    let ledgerEvents: [CareLedgerEvent]
-    let photoMemories: [FamilyWeeklyPhotoMemory]
-    let healthAlertSources: [PetHealthAlertSource]
+    let snapshot: FamilyWeeklyReportRouteSnapshot
 
     @Environment(\.modelContext) private var modelContext
-    @Environment(AppServices.self) private var appServices
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.ohanaAppLanguageCode) private var appLanguage
+    @State private var mediaBlobLoader: SwiftDataMediaBlobLoader?
     @State private var preparedShareText: String?
 
     private var l: L10n { L10n(appLanguage) }
 
-    private var visibleHumans: [Human] {
-        humans.filter { !$0.hasPassedAway }
-    }
-
     private var visibleHumanCount: Int {
-        visibleHumans.count
+        snapshot.visibleHumanCount
     }
 
     private var isSingleVisibleHumanFamily: Bool {
@@ -35,85 +28,35 @@ struct FamilyWeeklyReportDashboardContentView: View {
     }
 
     private var weekInterval: DateInterval {
-        Calendar.current.dateInterval(of: .weekOfYear, for: Date())
-            ?? DateInterval(start: Date().addingTimeInterval(-6 * 86400), duration: 7 * 86400)
+        snapshot.weekInterval
     }
-
-    private var activePets: [Pet] { pets.filter { !$0.hasPassedAway } }
 
     private var allEntries: [ReportEntry] {
-        entries(for: activePets, in: weekInterval)
+        snapshot.entries
     }
 
-    private var rankedMembers: [MemberStat] {
-        var dict: [String: MemberStat] = [:]
-        let visibleHumansById = Dictionary(uniqueKeysWithValues: visibleHumans.map { ($0.id.uuidString, $0) })
-        for entry in allEntries {
-            let id = entry.actorId ?? "unknown"
-            guard id == "unknown" || visibleHumansById[id] != nil else { continue }
-            let human = visibleHumansById[id]
-            let name = human?.name ?? l.tr(zh: "未指定", en: "Unassigned", de: "Nicht zugewiesen")
-            let emoji = human?.avatarEmoji ?? "👤"
-            var stat = dict[id] ?? MemberStat(id: id, name: name, emoji: emoji, count: 0, coconuts: 0)
-            stat.count += 1
-            stat.coconuts += entry.coconuts
-            dict[id] = stat
-        }
-        return dict.values.sorted {
-            if $0.count == $1.count { return $0.coconuts > $1.coconuts }
-            return $0.count > $1.count
-        }
+    private var rankedMembers: [FamilyWeeklyReportMemberStat] {
+        snapshot.rankedMembers
     }
 
-    private var topPet: (name: String, count: Int)? {
-        let grouped = Dictionary(grouping: allEntries, by: \.petName)
-        return grouped.map { ($0.key, $0.value.count) }.sorted { $0.1 > $1.1 }.first
+    private var topPet: FamilyWeeklyReportTopPet? {
+        snapshot.topPet
     }
 
-    private var mostActiveDay: ActiveDayStat? {
-        let cal = Calendar.current
-        let grouped = Dictionary(grouping: allEntries) { cal.startOfDay(for: $0.date) }
-        return grouped
-            .map { ActiveDayStat(date: $0.key, count: $0.value.count) }
-            .sorted {
-                if $0.count == $1.count { return $0.date > $1.date }
-                return $0.count > $1.count
-            }
-            .first
+    private var mostActiveDay: FamilyWeeklyReportActiveDayStat? {
+        snapshot.mostActiveDay
     }
 
     private var weekPhotoMemories: [FamilyWeeklyPhotoMemory] {
-        photoMemories
+        snapshot.photoMemories
     }
 
-    private var weekWeightTrends: [WeightTrend] {
-        activePets.compactMap { pet in
-            let logs = ledgerEvents
-                .filter {
-                    $0.subjectKind == CareLedgerSubjectKind.pet.rawValue &&
-                        $0.subjectId == pet.id.uuidString &&
-                        $0.eventKindEnum == .weight &&
-                        $0.occurredAt < weekInterval.end &&
-                        $0.amountValue > 0
-                }
-                .map { WeightSample(date: $0.occurredAt, weight: $0.amountValue) }
-                .sorted { $0.date < $1.date }
-            guard let latest = logs.last else { return nil }
-            let baseline = logs.last { $0.date < weekInterval.start } ?? logs.dropLast().last
-            guard let baseline else { return nil }
-            let days = max(1, Calendar.current.dateComponents([.day], from: baseline.date, to: latest.date).day ?? 1)
-            return WeightTrend(
-                id: pet.id,
-                petName: pet.name,
-                latestKg: latest.weight,
-                deltaKg: latest.weight - baseline.weight,
-                days: days
-            )
-        }
+    private var weekWeightTrends: [FamilyWeeklyReportWeightTrend] {
+        snapshot.weightTrends
     }
 
     private var healthAlerts: [HealthAlert] {
-        PetHealthAlertEngine().scanAlerts(sources: healthAlertSources, localization: l)
+        snapshot.healthAlerts
     }
 
     private var storyHeadline: String {
@@ -196,6 +139,20 @@ struct FamilyWeeklyReportDashboardContentView: View {
         ].joined(separator: "|")
     }
 
+    private var reportMetricColumns: [GridItem] {
+        if dynamicTypeSize.isAccessibilitySize {
+            return [GridItem(.flexible(), spacing: 10, alignment: .top)]
+        }
+        return [GridItem(.adaptive(minimum: 96), spacing: 10, alignment: .top)]
+    }
+
+    private var reportPillColumns: [GridItem] {
+        if dynamicTypeSize.isAccessibilitySize {
+            return [GridItem(.flexible(), spacing: 8, alignment: .top)]
+        }
+        return [GridItem(.adaptive(minimum: 102), spacing: 8, alignment: .top)]
+    }
+
     var body: some View {
         ZStack {
             OhanaAppBackground()
@@ -240,29 +197,20 @@ struct FamilyWeeklyReportDashboardContentView: View {
 
     private var headerCard: some View {
         VStack(alignment: .leading, spacing: 14) {
-            HStack {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(l.tr(zh: "本周 Ohana", en: "This week in Ohana", de: "Diese Woche in Ohana"))
-                        .font(OhanaFont.adaptive(size: 22, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                    Text("\(weekInterval.start.formatted(.dateTime.month().day())) - \(weekInterval.end.formatted(.dateTime.month().day()))")
-                        .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                        .foregroundStyle(Color.ohanaSecondaryText)
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .top, spacing: 12) {
+                    headerTitleBlock
+                    Spacer(minLength: 10)
+                    headerShareControl
                 }
-                Spacer()
-                if let preparedShareText {
-                    ShareLink(item: preparedShareText) { // smoothness: allow prepared export payload built after visual handoff
-                        shareButtonLabel
-                    }
-                } else {
-                    Button {} label: {
-                        shareButtonLabel
-                    }
-                    .disabled(true)
-                    .accessibilityLabel(l.tr(zh: "周报分享内容准备中", en: "Weekly report share text is being prepared", de: "Wochenbericht wird zum Teilen vorbereitet"))
+
+                VStack(alignment: .leading, spacing: 10) {
+                    headerTitleBlock
+                    headerShareControl
                 }
             }
 
-            HStack(spacing: 10) {
+            LazyVGrid(columns: reportMetricColumns, alignment: .leading, spacing: 10) {
                 metric(l.tr(zh: "照护", en: "Care", de: "Pflege"), "\(allEntries.count)", .goPrimary)
                 metric(l.tr(zh: "成员", en: "Members", de: "Mitglieder"), "\(rankedMembers.count(where: { $0.id != "unknown" }))", .goTeal)
                 metric(l.tr(zh: "椰子", en: "Coconuts", de: "Kokosnüsse"), "\(allEntries.reduce(0) { $0 + $1.coconuts })", .goYellow)
@@ -271,6 +219,35 @@ struct FamilyWeeklyReportDashboardContentView: View {
         .padding(16)
         .goTranslucentCard(cornerRadius: OhanaRadius.cardSoft)
         .accessibilityIdentifier("family-weekly-report-header-card")
+    }
+
+    private var headerTitleBlock: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(l.tr(zh: "本周 Ohana", en: "This week in Ohana", de: "Diese Woche in Ohana"))
+                .font(OhanaFont.adaptive(size: 22, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
+            Text("\(weekInterval.start.formatted(.dateTime.month().day())) - \(weekInterval.end.formatted(.dateTime.month().day()))")
+                .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                .foregroundStyle(Color.ohanaSecondaryText)
+                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    @ViewBuilder
+    private var headerShareControl: some View {
+        if let preparedShareText {
+            ShareLink(item: preparedShareText) { // smoothness: allow prepared export payload built after visual handoff
+                shareButtonLabel
+            }
+        } else {
+            Button {} label: {
+                shareButtonLabel
+            }
+            .disabled(true)
+            .accessibilityLabel(l.tr(zh: "周报分享内容准备中", en: "Weekly report share text is being prepared", de: "Wochenbericht wird zum Teilen vorbereitet"))
+        }
     }
 
     private var weeklyStoryCard: some View {
@@ -286,7 +263,7 @@ struct FamilyWeeklyReportDashboardContentView: View {
                     .lineSpacing(3)
             }
 
-            HStack(spacing: 8) {
+            LazyVGrid(columns: reportPillColumns, alignment: .leading, spacing: 8) {
                 storyPill(
                     icon: isSingleVisibleHumanFamily ? "person.fill.checkmark" : "crown.fill",
                     title: rankedMembers.first?.name ?? l.tr(zh: "暂无", en: "None yet", de: "Noch nichts"),
@@ -329,12 +306,16 @@ struct FamilyWeeklyReportDashboardContentView: View {
                     .accessibilityIdentifier("family-weekly-report-member-contribution-empty")
             } else {
                 ForEach(Array(rankedMembers.prefix(5).enumerated()), id: \.element.id) { index, stat in
-                    HStack(spacing: 10) {
+                    HStack(alignment: .top, spacing: 10) {
                         memberContributionBadge(index: index)
                         Text(stat.emoji)
                         VStack(alignment: .leading, spacing: 2) {
                             Text(stat.name).font(OhanaFont.adaptive(size: 14, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                                .lineLimit(2)
+                                .fixedSize(horizontal: false, vertical: true)
                             Text(l.tr(zh: "\(stat.count) 次照护 · +\(stat.coconuts)🥥", en: "\(stat.count) care actions · +\(stat.coconuts)🥥", de: "\(stat.count) Pflegeaktionen · +\(stat.coconuts)🥥")).font(OhanaFont.adaptive(size: 11, weight: .medium, design: .rounded)).foregroundStyle(Color.ohanaSecondaryText) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                                .lineLimit(2)
+                                .fixedSize(horizontal: false, vertical: true)
                         }
                         Spacer()
                     }
@@ -351,7 +332,7 @@ struct FamilyWeeklyReportDashboardContentView: View {
         VStack(alignment: .leading, spacing: 12) {
             sectionHeader(l.tr(zh: "成长回忆与健康提醒", en: "Memories and health reminders", de: "Erinnerungen und Gesundheit"), icon: "heart.text.square.fill")
             if let memory = weekPhotoMemories.first {
-                HStack(spacing: 12) {
+                HStack(alignment: .top, spacing: 12) {
                     AsyncDecodedImageView(
                         cacheID: "family-weekly-photo-memory-\(memory.id.uuidString)",
                         sourceSignature: memory.imageSignature,
@@ -375,10 +356,13 @@ struct FamilyWeeklyReportDashboardContentView: View {
                     VStack(alignment: .leading, spacing: 3) {
                         Text(l.tr(zh: "\(memory.petName) 的本周回忆", en: "\(memory.petName)'s weekly memory", de: "\(memory.petName)s Wochenerinnerung"))
                             .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                            .lineLimit(2)
+                            .fixedSize(horizontal: false, vertical: true)
                         Text(memory.note.isEmpty ? memory.date.formatted(.dateTime.weekday().hour().minute()) : memory.note)
                             .font(OhanaFont.adaptive(size: 11, weight: .medium, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(Color.ohanaSecondaryText)
-                            .lineLimit(2)
+                            .lineLimit(3)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
                     Spacer()
                 }
@@ -407,25 +391,48 @@ struct FamilyWeeklyReportDashboardContentView: View {
         guard memory.canAttemptImageAttachmentLoad else {
             return nil
         }
-        let loader = SwiftDataMediaBlobLoader(modelContainer: modelContext.container)
+        let loader = routeMediaBlobLoader()
         return await loader.petPhotoLogImageData(modelID: memory.modelID)
+    }
+
+    private func routeMediaBlobLoader() -> SwiftDataMediaBlobLoader {
+        if let mediaBlobLoader {
+            return mediaBlobLoader
+        }
+        let loader = SwiftDataMediaBlobLoader(modelContainer: modelContext.container)
+        mediaBlobLoader = loader
+        return loader
     }
 
     private var petCoverageCard: some View {
         VStack(alignment: .leading, spacing: 12) {
             sectionHeader(l.tr(zh: "宠物照护覆盖", en: "Pet care coverage", de: "Pflegeabdeckung"), icon: "pawprint.fill")
-            ForEach(activePets) { pet in
-                let count = entries(for: [pet], in: weekInterval).count
-                HStack {
-                    FMPetAvatar(pet: pet, size: 34)
+            ForEach(snapshot.petCoverages) { pet in
+                let count = pet.count
+                HStack(alignment: .top, spacing: 10) {
+                    PetAvatarPortraitView(
+                        cacheID: pet.id,
+                        imageSignature: pet.avatarImageSignature,
+                        petModelID: pet.modelID,
+                        fallbackText: pet.fallbackText,
+                        themeColor: Color(hex: pet.themeColorHex),
+                        size: 34,
+                        backgroundOpacity: 0.3
+                    )
                     VStack(alignment: .leading, spacing: 2) {
                         Text(pet.name).font(OhanaFont.adaptive(size: 14, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                            .lineLimit(2)
+                            .fixedSize(horizontal: false, vertical: true)
                         Text(count > 0 ? l.tr(zh: "本周 \(count) 次记录", en: "\(count) records this week", de: "\(count) Einträge diese Woche") : l.tr(zh: "本周暂无记录", en: "No records this week", de: "Diese Woche keine Einträge")).font(OhanaFont.adaptive(size: 11, weight: .medium, design: .rounded)).foregroundStyle(Color.ohanaSecondaryText) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                            .lineLimit(2)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
                     Spacer()
                     Text(count > 0 ? l.tr(zh: "已照顾", en: "Covered", de: "Versorgt") : l.tr(zh: "待关注", en: "Needs attention", de: "Braucht Aufmerksamkeit"))
                         .font(OhanaFont.adaptive(size: 10, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(count > 0 ? Color.goPrimary : Color.goOrange)
+                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
                         .padding(.horizontal, 8).padding(.vertical, 4)
                         .background((count > 0 ? Color.goPrimary : Color.goOrange).opacity(0.14), in: Capsule())
                 }
@@ -447,7 +454,7 @@ struct FamilyWeeklyReportDashboardContentView: View {
                 .accessibilityIdentifier("family-weekly-report-recent-activity-empty")
             } else {
                 ForEach(allEntries.prefix(8)) { entry in
-                    HStack(spacing: 10) {
+                    HStack(alignment: .top, spacing: 10) {
                         Image(systemName: entry.icon)
                             .font(OhanaFont.adaptive(size: 13, weight: .bold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(entry.color)
@@ -456,9 +463,13 @@ struct FamilyWeeklyReportDashboardContentView: View {
                         VStack(alignment: .leading, spacing: 2) {
                             Text("\(entry.actorName) · \(entry.title)")
                                 .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                                .lineLimit(2)
+                                .fixedSize(horizontal: false, vertical: true)
                             Text("\(entry.petName) · \(entry.date.formatted(.dateTime.weekday().hour().minute()))")
                                 .font(OhanaFont.adaptive(size: 11, weight: .medium, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                 .foregroundStyle(Color.ohanaSecondaryText)
+                                .lineLimit(2)
+                                .fixedSize(horizontal: false, vertical: true)
                         }
                         Spacer()
                     }
@@ -475,7 +486,7 @@ struct FamilyWeeklyReportDashboardContentView: View {
         VStack(alignment: .leading, spacing: 12) {
             sectionHeader(l.tr(zh: "近 4 周趋势", en: "Last 4 weeks", de: "Letzte 4 Wochen"), icon: "chart.bar.fill")
             HStack(alignment: .bottom, spacing: 10) {
-                ForEach(lastFourWeeks(), id: \.label) { week in
+                ForEach(snapshot.previousWeeks, id: \.label) { week in
                     VStack(spacing: 6) {
                         RoundedRectangle(cornerRadius: OhanaRadius.tiny)
                             .fill(Color.goPrimary.opacity(0.75))
@@ -497,17 +508,23 @@ struct FamilyWeeklyReportDashboardContentView: View {
     private func metric(_ label: String, _ value: String, _ color: Color) -> some View {
         VStack(spacing: 4) {
             Text(value).font(OhanaFont.adaptive(size: 24, weight: .black, design: .rounded)).foregroundStyle(color) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
             Text(label).font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded)).foregroundStyle(Color.ohanaSecondaryText) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
         }
-        .frame(maxWidth: .infinity)
+        .frame(maxWidth: .infinity, minHeight: 72)
         .padding(.vertical, 10)
         .background(color.opacity(0.12), in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
     }
 
     private func sectionHeader(_ title: String, icon: String) -> some View {
-        HStack(spacing: 8) {
+        HStack(alignment: .top, spacing: 8) {
             Image(systemName: icon).foregroundStyle(Color.goPrimary)
             Text(title).font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
             Spacer()
         }
     }
@@ -538,19 +555,21 @@ struct FamilyWeeklyReportDashboardContentView: View {
             Text(title)
                 .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(Color.ohanaPrimaryText)
-                .lineLimit(1)
-                .minimumScaleFactor(0.72)
+                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
             Text(subtitle)
                 .font(OhanaFont.adaptive(size: 10, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(Color.ohanaSecondaryText)
+                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(maxWidth: .infinity, minHeight: 88, alignment: .topLeading)
         .padding(10)
         .background(color.opacity(0.11), in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
     }
 
     private func statusLine(icon: String, text: String, color: Color) -> some View {
-        HStack(spacing: 8) {
+        HStack(alignment: .top, spacing: 8) {
             Image(systemName: icon)
                 .font(OhanaFont.adaptive(size: 12, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(color)
@@ -558,7 +577,8 @@ struct FamilyWeeklyReportDashboardContentView: View {
             Text(text)
                 .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(Color.ohanaSecondaryText)
-                .lineLimit(2)
+                .lineLimit(3)
+                .fixedSize(horizontal: false, vertical: true)
             Spacer()
         }
         .padding(.vertical, 7)
@@ -573,60 +593,6 @@ struct FamilyWeeklyReportDashboardContentView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.vertical, 8)
     }
-
-    private func entries(for pets: [Pet], in interval: DateInterval) -> [ReportEntry] {
-        appServices.careLedgerStats.reportEntries(
-            events: ledgerEvents,
-            pets: pets,
-            humans: humans,
-            interval: interval
-        )
-    }
-
-    private func lastFourWeeks() -> [(label: String, count: Int)] {
-        (0 ..< 4).map { offset in
-            let base = Calendar.current.date(byAdding: .weekOfYear, value: -(3 - offset), to: Date()) ?? Date()
-            let interval = Calendar.current.dateInterval(of: .weekOfYear, for: base) ?? weekInterval
-            let count = entries(for: activePets, in: interval).count
-            return ("W\(offset + 1)", count)
-        }
-    }
 }
 
 private typealias ReportEntry = CareLedgerReportEntry
-
-private struct MemberStat: Identifiable {
-    let id: String
-    let name: String
-    let emoji: String
-    var count: Int
-    var coconuts: Int
-}
-
-private struct ActiveDayStat {
-    let date: Date
-    let count: Int
-}
-
-private struct WeightTrend: Identifiable {
-    let id: UUID
-    let petName: String
-    let latestKg: Double
-    let deltaKg: Double
-    let days: Int
-}
-
-private struct WeightSample {
-    let date: Date
-    let weight: Double
-}
-
-struct FamilyWeeklyPhotoMemory: Identifiable, Equatable {
-    let id: UUID
-    let modelID: PersistentIdentifier
-    let petName: String
-    let imageSignature: String
-    let canAttemptImageAttachmentLoad: Bool
-    let note: String
-    let date: Date
-}

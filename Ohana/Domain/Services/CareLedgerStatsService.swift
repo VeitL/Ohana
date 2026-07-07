@@ -7,8 +7,8 @@
 
 import Foundation
 
-struct CareLedgerStatsService {
-    struct ReportEntry: Identifiable {
+nonisolated struct CareLedgerStatsService {
+    struct ReportEntry: Identifiable, Sendable {
         let id: UUID
         let date: Date
         let actorId: String?

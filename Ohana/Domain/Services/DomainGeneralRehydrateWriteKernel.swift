@@ -134,6 +134,15 @@ nonisolated struct DomainPlantRehydrateSnapshot: Equatable {
     let archivedAt: Date?
 }
 
+nonisolated struct DomainPetRelationshipRehydrateSnapshot: Equatable {
+    let id: UUID
+    let fromPetId: UUID
+    let toPetId: UUID
+    let relationshipTypeRaw: String
+    let note: String
+    let createdAt: Date
+}
+
 nonisolated struct DomainWaterLogRehydrateSnapshot: Equatable {
     let id: UUID
     let date: Date
@@ -184,6 +193,24 @@ nonisolated struct DomainCoconutLedgerEntryRehydrateSnapshot: Equatable {
     let sourceModelName: String
     let sourceModelId: String
     let careLedgerEventId: String?
+    let metadataJSON: String
+    let occurredAt: Date
+    let createdAt: Date
+}
+
+nonisolated struct DomainEconomyBudgetUsageEventRehydrateSnapshot: Equatable {
+    let id: UUID
+    let dayKey: String
+    let householdKey: String
+    let memberKey: String
+    let careObjectKey: String
+    let scopeRaw: String
+    let scopeKey: String
+    let growthXPUsed: Int
+    let coconutUsed: Int
+    let luckyCoconutUsed: Int
+    let actionKey: String
+    let source: String
     let metadataJSON: String
     let occurredAt: Date
     let createdAt: Date
@@ -509,6 +536,33 @@ nonisolated enum DomainGeneralRehydrateWriter {
     }
 
     @discardableResult
+    static func insertPetRelationshipIfNeeded(
+        snapshot: DomainPetRelationshipRehydrateSnapshot,
+        source: DomainRehydrateSourceKind,
+        context: ModelContext
+    ) throws -> DomainGeneralRehydrateResult<PetRelationship> {
+        let plan = try authorizePetRelationship(snapshot: snapshot, source: source, context: context)
+        guard plan.disposition.allowsPersistence else {
+            return DomainGeneralRehydrateResult(model: nil, inserted: false, plan: plan)
+        }
+        if let existing = try fetchPetRelationship(id: snapshot.id, context: context) {
+            return DomainGeneralRehydrateResult(model: existing, inserted: false, plan: plan)
+        }
+        let relationship = PetRelationship(
+            fromPetId: snapshot.fromPetId,
+            toPetId: snapshot.toPetId,
+            type: PetRelationshipType(rawValue: snapshot.relationshipTypeRaw) ?? .other,
+            note: snapshot.note
+        )
+        relationship.id = snapshot.id
+        relationship.relationshipTypeRaw = snapshot.relationshipTypeRaw
+        relationship.createdAt = snapshot.createdAt
+        plan.consumeAuthorization()
+        context.insert(relationship)
+        return DomainGeneralRehydrateResult(model: relationship, inserted: true, plan: plan)
+    }
+
+    @discardableResult
     static func insertWaterLogIfNeeded(
         snapshot: DomainWaterLogRehydrateSnapshot,
         source: DomainRehydrateSourceKind,
@@ -624,6 +678,42 @@ nonisolated enum DomainGeneralRehydrateWriter {
         context.insert(entry)
         CoconutWalletService.reconcileFormalAccountBalancesWithLedger(context: context)
         return DomainGeneralRehydrateResult(model: entry, inserted: true, plan: plan)
+    }
+
+    @discardableResult
+    static func insertEconomyBudgetUsageEventIfNeeded(
+        snapshot: DomainEconomyBudgetUsageEventRehydrateSnapshot,
+        source: DomainRehydrateSourceKind,
+        context: ModelContext
+    ) throws -> DomainGeneralRehydrateResult<EconomyBudgetUsageEvent> {
+        let plan = try authorizeEconomyBudgetUsageEvent(snapshot: snapshot, source: source, context: context)
+        guard plan.disposition.allowsPersistence else {
+            return DomainGeneralRehydrateResult(model: nil, inserted: false, plan: plan)
+        }
+        if let existing = try fetchEconomyBudgetUsageEvent(id: snapshot.id, context: context) {
+            return DomainGeneralRehydrateResult(model: existing, inserted: false, plan: plan)
+        }
+        let event = EconomyBudgetUsageEvent(
+            id: snapshot.id,
+            dayKey: snapshot.dayKey,
+            householdKey: snapshot.householdKey,
+            memberKey: snapshot.memberKey,
+            careObjectKey: snapshot.careObjectKey,
+            scope: EconomyBudgetUsageScope(rawValue: snapshot.scopeRaw) ?? .household,
+            scopeKey: snapshot.scopeKey,
+            growthXPUsed: snapshot.growthXPUsed,
+            coconutUsed: snapshot.coconutUsed,
+            luckyCoconutUsed: snapshot.luckyCoconutUsed,
+            actionKey: snapshot.actionKey,
+            source: snapshot.source,
+            metadataJSON: snapshot.metadataJSON,
+            occurredAt: snapshot.occurredAt,
+            createdAt: snapshot.createdAt
+        )
+        event.scopeRaw = snapshot.scopeRaw
+        plan.consumeAuthorization()
+        context.insert(event)
+        return DomainGeneralRehydrateResult(model: event, inserted: true, plan: plan)
     }
 
     @discardableResult
@@ -1110,6 +1200,58 @@ nonisolated enum DomainGeneralRehydrateWriter {
         )
     }
 
+    private static func authorizePetRelationship(
+        snapshot: DomainPetRelationshipRehydrateSnapshot,
+        source: DomainRehydrateSourceKind,
+        context: ModelContext
+    ) throws -> AuthorizedDomainRehydratePlan {
+        guard try fetchPet(id: snapshot.toPetId, context: context) != nil else {
+            return DomainRehydrateAuthorizer.rejectSubject(source: source, reason: "unresolvedRelationshipTargetPet")
+        }
+        return DomainRehydrateAuthorizer.authorizeSubject(
+            request: DomainSubjectResolutionRequest(
+                relatedEntityType: EntityKind.pet.rawValue,
+                relatedEntityId: snapshot.fromPetId.uuidString
+            ),
+            source: source,
+            context: context,
+            requirement: .requiredPet
+        )
+    }
+
+    private static func authorizeEconomyBudgetUsageEvent(
+        snapshot: DomainEconomyBudgetUsageEventRehydrateSnapshot,
+        source: DomainRehydrateSourceKind,
+        context: ModelContext
+    ) throws -> AuthorizedDomainRehydratePlan {
+        if let petId = try firstResolvablePetId(
+            rawIds: [snapshot.careObjectKey, snapshot.scopeKey],
+            context: context
+        ) {
+            return DomainRehydrateAuthorizer.authorizeSubject(
+                request: DomainSubjectResolutionRequest(
+                    relatedEntityType: EntityKind.pet.rawValue,
+                    relatedEntityId: petId.uuidString
+                ),
+                source: source,
+                context: context,
+                requirement: .requiredPet
+            )
+        }
+        if let humanId = try firstResolvableHumanId(
+            rawIds: [snapshot.memberKey, snapshot.scopeKey],
+            context: context
+        ) {
+            return authorizeHumanString(
+                humanId.uuidString,
+                source: source,
+                context: context,
+                requirement: .requiredHuman
+            )
+        }
+        return authorizeHousehold(source: source, context: context)
+    }
+
     private static func authorizeWallet(
         ownerKindRaw: String,
         ownerId: String,
@@ -1181,5 +1323,21 @@ nonisolated enum DomainGeneralRehydrateWriter {
             context: context,
             requirement: .household
         )
+    }
+
+    private static func firstResolvablePetId(rawIds: [String], context: ModelContext) throws -> UUID? {
+        let candidateIds = rawIds.compactMap { UUID(uuidString: $0) }
+        for candidateId in candidateIds where try fetchPet(id: candidateId, context: context) != nil {
+            return candidateId
+        }
+        return nil
+    }
+
+    private static func firstResolvableHumanId(rawIds: [String], context: ModelContext) throws -> UUID? {
+        let candidateIds = rawIds.compactMap { UUID(uuidString: $0) }
+        for candidateId in candidateIds where try fetchHuman(id: candidateId, context: context) != nil {
+            return candidateId
+        }
+        return nil
     }
 }

@@ -161,6 +161,17 @@ nonisolated extension DataBackupManager {
         )
     }
 
+    func encodePetRelationship(_ relationship: PetRelationship) -> PetRelationshipBackup {
+        PetRelationshipBackup(
+            id: relationship.id.uuidString,
+            fromPetId: relationship.fromPetId.uuidString,
+            toPetId: relationship.toPetId.uuidString,
+            relationshipTypeRaw: relationship.relationshipTypeRaw,
+            note: relationship.note,
+            createdAt: d(relationship.createdAt)
+        )
+    }
+
     func decodePlantSnapshot(_ dto: PlantBackup) -> DomainPlantRehydrateSnapshot {
         DomainPlantRehydrateSnapshot(
             id: UUID(uuidString: dto.id) ?? UUID(),
@@ -602,6 +613,26 @@ nonisolated extension DataBackupManager {
             metadataJSON: entry.metadataJSON,
             occurredAt: d(entry.occurredAt),
             createdAt: d(entry.createdAt)
+        )
+    }
+
+    func encodeEconomyBudgetUsageEvent(_ event: EconomyBudgetUsageEvent) -> EconomyBudgetUsageEventBackup {
+        EconomyBudgetUsageEventBackup(
+            id: event.id.uuidString,
+            dayKey: event.dayKey,
+            householdKey: event.householdKey,
+            memberKey: event.memberKey,
+            careObjectKey: event.careObjectKey,
+            scopeRaw: event.scopeRaw,
+            scopeKey: event.scopeKey,
+            growthXPUsed: event.growthXPUsed,
+            coconutUsed: event.coconutUsed,
+            luckyCoconutUsed: event.luckyCoconutUsed,
+            actionKey: event.actionKey,
+            source: event.source,
+            metadataJSON: event.metadataJSON,
+            occurredAt: d(event.occurredAt),
+            createdAt: d(event.createdAt)
         )
     }
 

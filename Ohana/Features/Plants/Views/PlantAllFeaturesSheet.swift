@@ -344,39 +344,25 @@ struct PlantAllFeaturesSheet: View {
         return Button {
             open(action.destination)
         } label: {
-            HStack(spacing: 12) {
-                Image(systemName: action.icon) // a11y: allow decorative priority glyph; the banner label names the action.
-                    .font(OhanaFont.adaptive(size: 18, weight: .black))
-                    .foregroundStyle(action.tint)
-                    .frame(width: 44, height: 44)
-                    .background(action.tint.opacity(0.16), in: Circle())
-                    .accessibilityHidden(true)
-
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(action.eyebrow)
-                        .font(OhanaFont.adaptive(size: 10, weight: .black, design: .rounded))
-                        .foregroundStyle(Color.ohanaTertiaryText)
-                        .textCase(.uppercase)
-                        .lineLimit(1)
-                    Text(action.title)
-                        .font(OhanaFont.adaptive(size: 16, weight: .black, design: .rounded))
-                        .foregroundStyle(Color.ohanaPrimaryText)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.76)
-                    Text(action.detail)
-                        .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded))
-                        .foregroundStyle(Color.ohanaSecondaryText)
-                        .lineLimit(2)
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .top, spacing: 12) {
+                    focusActionIcon(action)
+                    focusActionCopy(action)
+                    Spacer(minLength: 8)
+                    focusActionArrow
                 }
 
-                Spacer(minLength: 8)
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack(alignment: .top, spacing: 12) {
+                        focusActionIcon(action)
+                        focusActionCopy(action)
+                    }
 
-                Image(systemName: "arrow.right") // a11y: allow decorative priority navigation glyph; button label is explicit.
-                    .font(OhanaFont.adaptive(size: 16, weight: .black))
-                    .foregroundStyle(Color.arkInk)
-                    .frame(width: 44, height: 44)
-                    .background(Color.goPrimary, in: Circle())
-                    .accessibilityHidden(true)
+                    HStack {
+                        Spacer(minLength: 0)
+                        focusActionArrow
+                    }
+                }
             }
             .padding(14)
             .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous))
@@ -388,6 +374,45 @@ struct PlantAllFeaturesSheet: View {
         .buttonStyle(ScaleButtonStyle())
         .accessibilityLabel("\(action.eyebrow), \(action.title), \(action.detail)")
         .accessibilityIdentifier("plant-detail-feature-focus-\(action.id)")
+    }
+
+    private func focusActionIcon(_ action: PlantHubFocusAction) -> some View {
+        Image(systemName: action.icon) // a11y: allow decorative priority glyph; the banner label names the action.
+            .font(OhanaFont.adaptive(size: 18, weight: .black))
+            .foregroundStyle(action.tint)
+            .frame(width: 44, height: 44)
+            .background(action.tint.opacity(0.16), in: Circle())
+            .accessibilityHidden(true)
+    }
+
+    private func focusActionCopy(_ action: PlantHubFocusAction) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(action.eyebrow)
+                .font(OhanaFont.adaptive(size: 10, weight: .black, design: .rounded))
+                .foregroundStyle(Color.ohanaTertiaryText)
+                .textCase(.uppercase)
+                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
+            Text(action.title)
+                .font(OhanaFont.adaptive(size: 16, weight: .black, design: .rounded))
+                .foregroundStyle(Color.ohanaPrimaryText)
+                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
+            Text(action.detail)
+                .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded))
+                .foregroundStyle(Color.ohanaSecondaryText)
+                .lineLimit(3)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private var focusActionArrow: some View {
+        Image(systemName: "arrow.right") // a11y: allow decorative priority navigation glyph; button label is explicit.
+            .font(OhanaFont.adaptive(size: 16, weight: .black))
+            .foregroundStyle(Color.arkInk)
+            .frame(width: 44, height: 44)
+            .background(Color.goPrimary, in: Circle())
+            .accessibilityHidden(true)
     }
 
     private var metrics: [FeatureHubMetric] {
