@@ -11,11 +11,14 @@ struct SitterCardPreviewSheet: View {
     let pet: Pet
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
     @State private var shareImage: UIImage? = nil
     @State private var isSharing = false
     @State private var isRendering = false
     @State private var latestWeight: PetProfileLatestWeight?
     @State private var latestWeightLoadTask: Task<Void, Never>?
+
+    private var l: L10n { L10n(appLanguage) }
 
     var body: some View {
         NavigationStack {
@@ -25,7 +28,11 @@ struct SitterCardPreviewSheet: View {
                     VStack(spacing: 16) {
                         sitterCard
                             .padding(.horizontal, 16)
-                        Text("点击右上角分享按钮，将名片发给宠物保姆")
+                        Text(l.tr(
+                            zh: "点击右上角分享按钮，将名片发给宠物保姆",
+                            en: "Tap the share button in the top right to send this card to a sitter.",
+                            de: "Tippe oben rechts auf Teilen, um die Karte an den Sitter zu senden."
+                        ))
                             .font(OhanaFont.adaptive(size: 12, weight: .medium))
                             .foregroundStyle(Color.ohanaPrimaryText.opacity(0.35))
                             .multilineTextAlignment(.center)
@@ -35,11 +42,11 @@ struct SitterCardPreviewSheet: View {
                     .padding(.top, 8)
                 }
             }
-            .navigationTitle("🏷️ 寄养名片")
+            .navigationTitle(l.tr(zh: "寄养名片", en: "Sitter card", de: "Sitter-Karte"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    Button("关闭") { dismiss() }
+                    Button(l.tr(zh: "关闭", en: "Close", de: "Schliessen")) { dismiss() }
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
@@ -90,9 +97,9 @@ struct SitterCardPreviewSheet: View {
                         .font(OhanaFont.adaptive(size: 24, weight: .black, design: .rounded))
                         .foregroundStyle(Color.ohanaPrimaryText)
                     HStack(spacing: 6) {
-                        capsuleTag(pet.species)
+                        capsuleTag(pet.localizedSpeciesName(l: l))
                         if !pet.breed.isEmpty { capsuleTag(pet.breed) }
-                        capsuleTag(pet.genderSymbol + (pet.isNeutered ? " 已绝育" : ""))
+                        capsuleTag(pet.genderSymbol + (pet.isNeutered ? " " + l.tr(zh: "已绝育", en: "Neutered", de: "Kastriert") : ""))
                     }
                 }
                 Spacer()
@@ -105,33 +112,33 @@ struct SitterCardPreviewSheet: View {
             VStack(spacing: 0) {
                 if let birthday = pet.birthday {
                     sitterRow(icon: "birthday.cake.fill", color: Color.goYellow,
-                              label: "生日",
+                              label: l.tr(zh: "生日", en: "Birthday", de: "Geburtstag"),
                               value: birthday.formatted(.dateTime.year().month().day()) + " · \(pet.ageText)")
                     GoDashedDivider().padding(.leading, 52)
                 }
                 if let homeDate = pet.homeDate {
                     sitterRow(icon: "house.fill", color: Color.goMint,
-                              label: "到家日",
-                              value: homeDate.formatted(.dateTime.year().month().day()) + " · \(pet.daysTogether) 天")
+                              label: l.tr(zh: "到家日", en: "Home date", de: "Einzug"),
+                              value: homeDate.formatted(.dateTime.year().month().day()) + " · " + l.tr(zh: "\(pet.daysTogether) 天", en: "\(pet.daysTogether) days", de: "\(pet.daysTogether) Tage"))
                     GoDashedDivider().padding(.leading, 52)
                 }
                 if let latestWeight {
                     sitterRow(icon: "scalemass.fill", color: Color.goCardCyan,
-                              label: "体重",
+                              label: l.tr(zh: "体重", en: "Weight", de: "Gewicht"),
                               value: latestWeight.compactText(fractionDigits: 1, unitSpacing: " "))
                     GoDashedDivider().padding(.leading, 52)
                 }
                 if !pet.birthCountry.isEmpty {
                     sitterRow(icon: "globe", color: Color.goMint,
-                              label: "出生地",
+                              label: l.tr(zh: "出生地", en: "Birthplace", de: "Geburtsort"),
                               value: pet.birthCountry + (pet.birthCity.isEmpty ? "" : " · \(pet.birthCity)"))
                     GoDashedDivider().padding(.leading, 52)
                 }
                 sitterRow(icon: "fork.knife", color: Color.goOrange,
-                          label: "每日喂食",
+                          label: l.tr(zh: "每日喂食", en: "Daily food", de: "Taegliches Futter"),
                           value: pet.dailyPortionGrams > 0
-                              ? "\(Int(pet.dailyPortionGrams))g · \(pet.foodBrand.isEmpty ? "未填写品牌" : pet.foodBrand)"
-                              : "未设置")
+                              ? "\(Int(pet.dailyPortionGrams))g · \(pet.foodBrand.isEmpty ? l.tr(zh: "未填写品牌", en: "No brand added", de: "Keine Marke angegeben") : pet.foodBrand)"
+                              : l.tr(zh: "未设置", en: "Not set", de: "Nicht festgelegt"))
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 8)
@@ -142,16 +149,16 @@ struct SitterCardPreviewSheet: View {
             VStack(spacing: 0) {
                 if !pet.vetContact.isEmpty {
                     sitterRow(icon: "cross.circle.fill", color: Color.goRed,
-                              label: "兽医联系", value: pet.vetContact)
+                              label: l.tr(zh: "兽医联系", en: "Vet contact", de: "Tierarztkontakt"), value: pet.vetContact)
                     GoDashedDivider().padding(.leading, 52)
                 }
                 sitterRow(icon: "exclamationmark.shield.fill", color: Color.goRed,
-                          label: "过敏原",
-                          value: pet.allergies.isEmpty ? "无已知过敏原" : pet.allergies)
+                          label: l.tr(zh: "过敏原", en: "Allergies", de: "Allergien"),
+                          value: pet.allergies.isEmpty ? l.tr(zh: "无已知过敏原", en: "No known allergies", de: "Keine bekannten Allergien") : pet.allergies)
                 if !pet.microchipID.isEmpty {
                     GoDashedDivider().padding(.leading, 52)
                     sitterRow(icon: "cpu.fill", color: Color.goCardCyan,
-                              label: "芯片号", value: pet.microchipID)
+                              label: l.tr(zh: "芯片号", en: "Microchip ID", de: "Mikrochip-ID"), value: pet.microchipID)
                 }
             }
             .padding(.horizontal, 16)
@@ -161,7 +168,7 @@ struct SitterCardPreviewSheet: View {
             if !pet.notes.isEmpty {
                 GoDashedDivider().padding(.horizontal, 16)
                 VStack(alignment: .leading, spacing: 6) {
-                    Label("特别说明", systemImage: "note.text")
+                    Label(l.tr(zh: "特别说明", en: "Special notes", de: "Besondere Hinweise"), systemImage: "note.text")
                         .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
                         .foregroundStyle(Color.ohanaPrimaryText.opacity(0.45))
                     Text(pet.notes)

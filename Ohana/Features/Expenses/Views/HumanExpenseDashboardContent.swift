@@ -17,7 +17,7 @@ struct HumanExpenseDashboardContent: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(AppServices.self) private var appServices
     @AppStorage("currentActiveHumanId") private var activeHumanIdStr = ""
-    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
 
     @State private var selectedRange: ExpenseDashboardRange = .month
     @State private var selectedCategory: ExpenseCategory?

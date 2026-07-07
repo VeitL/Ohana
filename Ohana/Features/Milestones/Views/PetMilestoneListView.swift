@@ -14,7 +14,7 @@ struct PetMilestoneListContentView: View {
     let routeMilestones: [PetMilestone]
     @Environment(\.modelContext) private var modelContext
     @Environment(AppServices.self) private var appServices
-    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
 
     @State private var showAddSheet = false
     @State private var newTitle = ""
@@ -471,7 +471,7 @@ struct PetMilestoneListContentView: View {
 struct MapLocationPickerSheet: View {
     @Binding var selectedLocation: String
     @Environment(\.dismiss) private var dismiss
-    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
 
     @State private var searchText = ""
     @State private var results: [MKMapItem] = []
@@ -651,7 +651,7 @@ private struct MilestoneDetailSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
     @Environment(AppServices.self) private var appServices
-    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
     @State private var showingPhoto = false
     @State private var showingDeleteAlert = false
     @StateObject private var commandQueue = DeferredDomainCommandQueue()

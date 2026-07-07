@@ -9,7 +9,7 @@ import SwiftUI
 
 struct PerformanceDiagnosticsView: View {
     @ObservedObject private var monitor = AppPerformanceMonitor.shared
-    @AppStorage("appLanguage") private var appLanguage: String = AppLanguage.code
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
     @AppStorage(AppPerformanceMode.reducedVisualEffectsKey) private var reducedVisualEffectsMode = false
 
     private var l: L10n {
@@ -31,17 +31,21 @@ struct PerformanceDiagnosticsView: View {
             ScrollView(showsIndicators: false) {
                 VStack(alignment: .leading, spacing: 18) {
                     VStack(alignment: .leading, spacing: 6) {
-                        Text("性能诊断")
+                        Text(l.tr(zh: "性能诊断", en: "Performance diagnostics", de: "Leistungsdiagnose"))
                             .font(OhanaFont.adaptive(size: 30, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(primaryText)
-                        Text("用于验收启动、首页、头像、点击和相机链路。数值越低越好。")
+                        Text(l.tr(
+                            zh: "用于验收启动、首页、头像、点击和相机链路。数值越低越好。",
+                            en: "Use this to check launch, home, avatar, tap, and camera paths. Lower is better.",
+                            de: "Prueft Start, Startseite, Avatar, Tippen und Kamera. Niedriger ist besser."
+                        ))
                             .font(OhanaFont.adaptive(size: 13, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(secondaryText)
                     }
 
                     HStack(spacing: 10) {
-                        metricSummaryCard(title: "样本", value: "\(monitor.samples.count)", icon: "chart.bar.fill")
-                        metricSummaryCard(title: "最近", value: latestMetricText, icon: "timer")
+                        metricSummaryCard(title: l.tr(zh: "样本", en: "Samples", de: "Samples"), value: "\(monitor.samples.count)", icon: "chart.bar.fill")
+                        metricSummaryCard(title: l.tr(zh: "最近", en: "Latest", de: "Neueste"), value: latestMetricText, icon: "timer")
                     }
 
                     visualEffectsExperimentCard
@@ -52,10 +56,14 @@ struct PerformanceDiagnosticsView: View {
                                 Image(systemName: "speedometer") // a11y: allow decorative icon covered by surrounding text or control
                                     .font(OhanaFont.adaptive(size: 28, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                     .foregroundStyle(Color.goPrimary)
-                                Text("还没有性能样本")
+                                Text(l.tr(zh: "还没有性能样本", en: "No performance samples yet", de: "Noch keine Leistungsdaten"))
                                     .font(OhanaFont.adaptive(size: 15, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                     .foregroundStyle(primaryText)
-                                Text("回到首页、点击卡片或进入头像裁剪后，这里会记录链路耗时。")
+                                Text(l.tr(
+                                    zh: "回到首页、点击卡片或进入头像裁剪后，这里会记录链路耗时。",
+                                    en: "Return home, tap a card, or open avatar cropping to record path timing here.",
+                                    de: "Gehe zur Startseite, tippe eine Karte oder oeffne den Avatar-Zuschnitt, um Zeiten zu erfassen."
+                                ))
                                     .font(OhanaFont.adaptive(size: 12, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                     .foregroundStyle(secondaryText)
                                     .multilineTextAlignment(.center)
@@ -82,7 +90,7 @@ struct PerformanceDiagnosticsView: View {
                     Button {
                         monitor.clear()
                     } label: {
-                        Label("清空样本", systemImage: "trash")
+                        Label(l.tr(zh: "清空样本", en: "Clear samples", de: "Samples loeschen"), systemImage: "trash")
                             .font(OhanaFont.adaptive(size: 14, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(Color.ohanaPrimaryActionText)
                             .frame(maxWidth: .infinity)

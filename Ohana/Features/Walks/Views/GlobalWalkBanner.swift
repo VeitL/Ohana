@@ -16,6 +16,7 @@ import UIKit
 struct GlobalWalkBanner: View {
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
     @Environment(AppServices.self) private var appServices
 
     @State private var isMinimized = true
@@ -34,6 +35,7 @@ struct GlobalWalkBanner: View {
 
     private var mgr: PetWalkingManaging { appServices.walking }
     private var locationProvider: LocationProviding { appServices.location }
+    private var l: L10n { L10n(appLanguage) }
     private let flipCardHeight: CGFloat = 272
     private var shouldShowFloatingControl: Bool {
         _ = appServices.walkingPresentationRevision
@@ -170,7 +172,7 @@ struct GlobalWalkBanner: View {
                     VStack(alignment: .leading, spacing: 2) {
                         HStack(spacing: 5) {
                             if case .paused = mgr.phase {
-                                Text("已暂停")
+                                Text(l.tr(zh: "已暂停", en: "Paused", de: "Pausiert"))
                                     .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded))
                                     .foregroundStyle(Color.goYellow)
                                     .padding(.horizontal, 7).padding(.vertical, 2)
@@ -178,7 +180,7 @@ struct GlobalWalkBanner: View {
                             } else {
                                 Circle().fill(Color.goPrimary).frame(width: 7, height: 7) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
                                     .shadow(color: Color.goPrimary.opacity(0.8), radius: 4) // ui-v4: allow live walk status glow
-                                Text("巡岛中")
+                                Text(l.tr(zh: "巡岛中", en: "Walking", de: "Unterwegs"))
                                     .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded))
                                     .foregroundStyle(Color.goPrimary)
                             }
@@ -202,11 +204,11 @@ struct GlobalWalkBanner: View {
 
             // 数据行
             HStack(spacing: 0) {
-                walkStatCell(label: "时长", accent: .goPrimary) {
+                walkStatCell(label: l.tr(zh: "时长", en: "Time", de: "Zeit"), accent: .goPrimary) {
                     walkElapsedLabel(fontSize: 26)
                 }
                 Rectangle().fill(Color.ohanaDivider).frame(width: 1, height: 40) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
-                walkStatCell(label: "距离", accent: .goTeal) {
+                walkStatCell(label: l.tr(zh: "距离", en: "Distance", de: "Distanz"), accent: .goTeal) {
                     HStack(alignment: .firstTextBaseline, spacing: 2) {
                         Text(String(format: "%.2f", locationProvider.totalDistance / 1000))
                             .font(OhanaFont.adaptive(size: 26, weight: .black, design: .rounded))
@@ -215,7 +217,7 @@ struct GlobalWalkBanner: View {
                     }
                 }
                 Rectangle().fill(Color.ohanaDivider).frame(width: 1, height: 40) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
-                walkStatCell(label: "便便", accent: .goYellow) {
+                walkStatCell(label: l.tr(zh: "便便", en: "Poop", de: "Häufchen"), accent: .goYellow) {
                     HStack(alignment: .firstTextBaseline, spacing: 2) {
                         Text("\(mgr.poopCount)")
                             .font(OhanaFont.adaptive(size: 26, weight: .black, design: .rounded))
@@ -236,7 +238,9 @@ struct GlobalWalkBanner: View {
                     UIImpactFeedbackGenerator(style: .light).impactOccurred()
                 } label: {
                     Label(
-                        mgr.phase == .running ? "暂停" : "继续",
+                        mgr.phase == .running
+                            ? l.tr(zh: "暂停", en: "Pause", de: "Pausieren")
+                            : l.tr(zh: "继续", en: "Resume", de: "Fortsetzen"),
                         systemImage: mgr.phase == .running ? "pause.fill" : "play.fill"
                     )
                     .font(OhanaFont.adaptive(size: 14, weight: .bold, design: .rounded))
@@ -263,7 +267,7 @@ struct GlobalWalkBanner: View {
                     // 立即进入翻转卡，避免先露出旧背景再显示新卡
                     showSummaryCard = true
                 } label: {
-                    Label("结束", systemImage: "stop.fill")
+                    Label(l.tr(zh: "结束", en: "Stop", de: "Beenden"), systemImage: "stop.fill")
                         .font(OhanaFont.adaptive(size: 14, weight: .bold, design: .rounded))
                         .foregroundStyle(Color.ohanaPrimaryText)
                         .frame(maxWidth: .infinity).padding(.vertical, 13)
@@ -368,7 +372,7 @@ struct GlobalWalkBanner: View {
                 HStack(spacing: 8) {
                     petAvatar(pet: pet, size: 36)
                     VStack(alignment: .leading, spacing: 1) {
-                        Text("巡岛完成 🎉")
+                        Text(l.tr(zh: "巡岛完成 🎉", en: "Walk complete 🎉", de: "Spaziergang fertig 🎉"))
                             .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
                             .foregroundStyle(Color.goPrimary)
                         Text(pet.name)
@@ -411,7 +415,7 @@ struct GlobalWalkBanner: View {
                             .overlay(
                                 HStack(spacing: 4) {
                                     Image(systemName: "map.fill").accessibilityHidden(true).font(OhanaFont.adaptive(size: 11, weight: .bold))
-                                    Text("在地图中查看")
+                                    Text(l.tr(zh: "在地图中查看", en: "View in Maps", de: "In Karten ansehen"))
                                         .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded))
                                 }
                                 .foregroundStyle(Color.ohanaPrimaryText)
@@ -425,7 +429,9 @@ struct GlobalWalkBanner: View {
                 } else if !coords.isEmpty {
                     WalkRouteTracePreview(
                         coordinates: coords,
-                        title: coords.count >= 2 ? "本次轨迹" : "本次定位"
+                        title: coords.count >= 2
+                            ? l.tr(zh: "本次轨迹", en: "Route", de: "Route")
+                            : l.tr(zh: "本次定位", en: "Location", de: "Standort")
                     )
                     .frame(maxWidth: .infinity)
                     .frame(height: 108)
@@ -436,7 +442,7 @@ struct GlobalWalkBanner: View {
                         .overlay(
                             HStack(spacing: 6) {
                                 Image(systemName: "map").accessibilityHidden(true).font(OhanaFont.adaptive(size: 20)).foregroundStyle(Color.ohanaPrimaryText.opacity(0.2))
-                                Text("地图生成中…").font(OhanaFont.adaptive(size: 12)).foregroundStyle(Color.ohanaPrimaryText.opacity(0.3))
+                                Text(l.tr(zh: "地图生成中…", en: "Map is being generated...", de: "Karte wird erstellt ...")).font(OhanaFont.adaptive(size: 12)).foregroundStyle(Color.ohanaPrimaryText.opacity(0.3))
                             }
                         )
                 }
@@ -446,13 +452,13 @@ struct GlobalWalkBanner: View {
             GoDashedDivider().padding(.horizontal, 18).padding(.top, 10)
 
             HStack(spacing: 0) {
-                summaryStatCell(label: "时长", value: formatElapsed(elapsed), accent: .goPrimary)
+                summaryStatCell(label: l.tr(zh: "时长", en: "Time", de: "Zeit"), value: formatElapsed(elapsed), accent: .goPrimary)
                 Rectangle().fill(Color.ohanaDivider).frame(width: 1, height: 36) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
-                summaryStatCell(label: "距离", value: distance >= 1000
+                summaryStatCell(label: l.tr(zh: "距离", en: "Distance", de: "Distanz"), value: distance >= 1000
                     ? String(format: "%.2f km", distance / 1000)
                     : String(format: "%.0f m", distance), accent: .goTeal)
                 Rectangle().fill(Color.ohanaDivider).frame(width: 1, height: 36) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
-                summaryStatCell(label: "便便", value: "\(poop) 💩", accent: .goYellow)
+                summaryStatCell(label: l.tr(zh: "便便", en: "Poop", de: "Häufchen"), value: "\(poop) 💩", accent: .goYellow)
             }
             .padding(.horizontal, 4)
             .padding(.vertical, 10)

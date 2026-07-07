@@ -51,7 +51,7 @@ struct PetWeightDashboardContent: View {
 
     @Environment(\.modelContext) private var modelContext
     @Environment(AppServices.self) private var appServices
-    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
 
     @State private var selectedRange: WeightRange = .days30
     @StateObject private var commandQueue = DeferredDomainCommandQueue()

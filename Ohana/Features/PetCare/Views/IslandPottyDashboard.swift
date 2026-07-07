@@ -58,7 +58,7 @@ struct IslandPottyDashboardContentView: View {
     let pottyLedgerEvents: [CareLedgerEvent]
 
     @Environment(\.dismiss) private var dismiss
-    @AppStorage("appLanguage") private var appLanguage = AppLanguage.fallbackCode
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
 
     @State private var selectedPetId: UUID? = nil
     @State private var sheetPet: Pet? = nil
@@ -287,7 +287,7 @@ struct IslandPottyDashboardContentView: View {
 
     private var rhythmStrip: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("10 日节奏条")
+            Text(l.tr(zh: "10 日节奏条", en: "10-day rhythm", de: "10-Tage-Rhythmus"))
                 .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(Color.goCardWhite.opacity(0.72))
 

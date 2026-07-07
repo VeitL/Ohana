@@ -12,19 +12,47 @@ import SwiftUI
 struct MilestoneConfig {
     let days: Int
     let emoji: String
-    let title: String
-    let subtitle: String
     let accentColor: Color
 
     static let milestones: [MilestoneConfig] = [
-        MilestoneConfig(days: 100, emoji: "🎉", title: "百日之交", subtitle: "相伴 100 天！感谢每一次陪伴", accentColor: .goPrimary),
-        MilestoneConfig(days: 365, emoji: "🌟", title: "一周年纪念", subtitle: "整整一年！你们的故事刚刚开始", accentColor: .goYellow),
-        MilestoneConfig(days: 500, emoji: "💎", title: "500 天传奇", subtitle: "500 天里程碑，你们是最棒的搭档！", accentColor: .goCardCyan),
-        MilestoneConfig(days: 1000, emoji: "👑", title: "千日王冠", subtitle: "1000 天！这段缘分已经成为传说", accentColor: .goOrange)
+        MilestoneConfig(days: 100, emoji: "🎉", accentColor: .goPrimary),
+        MilestoneConfig(days: 365, emoji: "🌟", accentColor: .goYellow),
+        MilestoneConfig(days: 500, emoji: "💎", accentColor: .goCardCyan),
+        MilestoneConfig(days: 1000, emoji: "👑", accentColor: .goOrange)
     ]
 
     static func match(days: Int) -> MilestoneConfig? {
         milestones.first { $0.days == days }
+    }
+
+    func title(_ l: L10n) -> String {
+        switch days {
+        case 100:
+            l.tr(zh: "百日之交", en: "100 days together", de: "100 Tage zusammen")
+        case 365:
+            l.tr(zh: "一周年纪念", en: "One-year anniversary", de: "Ein Jahr zusammen")
+        case 500:
+            l.tr(zh: "500 天传奇", en: "500-day legend", de: "500-Tage-Legende")
+        case 1000:
+            l.tr(zh: "千日王冠", en: "1,000-day crown", de: "1000-Tage-Krone")
+        default:
+            l.tr(zh: "\(days) 天纪念", en: "\(days)-day milestone", de: "\(days)-Tage-Meilenstein")
+        }
+    }
+
+    func subtitle(_ l: L10n) -> String {
+        switch days {
+        case 100:
+            l.tr(zh: "相伴 100 天！感谢每一次陪伴", en: "100 days together. Every moment counts.", de: "100 Tage zusammen. Jeder Moment zaehlt.")
+        case 365:
+            l.tr(zh: "整整一年！你们的故事刚刚开始", en: "A full year. Your story is only beginning.", de: "Ein ganzes Jahr. Eure Geschichte beginnt erst.")
+        case 500:
+            l.tr(zh: "500 天里程碑，你们是最棒的搭档！", en: "500 days together. What a wonderful team.", de: "500 Tage zusammen. Was fuer ein tolles Team.")
+        case 1000:
+            l.tr(zh: "1000 天！这段缘分已经成为传说", en: "1,000 days. This bond is already legendary.", de: "1000 Tage. Diese Verbindung ist legendaer.")
+        default:
+            l.tr(zh: "这一天值得好好庆祝", en: "This day deserves a little celebration.", de: "Dieser Tag verdient eine kleine Feier.")
+        }
     }
 }
 
@@ -54,6 +82,9 @@ struct MilestoneCelebrationOverlay: View {
     @ObservedObject private var workloadPolicy = AppWorkloadPolicy.shared
 
     @AppStorage("shop_equip_fx_firework") private var equipFxFirework: Bool = false
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
+
+    private var l: L10n { L10n(appLanguage) }
 
     private var shouldRunGlow: Bool {
         workloadPolicy.shouldRunRepeatingAnimation(isVisible: isVisible)
@@ -120,18 +151,18 @@ struct MilestoneCelebrationOverlay: View {
                             Text("\(milestone.days)")
                                 .font(OhanaFont.adaptive(size: 72, weight: .black, design: .rounded))
                                 .foregroundStyle(milestone.accentColor)
-                            Text("天")
+                            Text(l.tr(zh: "天", en: "days", de: "Tage"))
                                 .font(OhanaFont.adaptive(size: 28, weight: .bold, design: .rounded))
                                 .foregroundStyle(Color.ohanaPrimaryText.opacity(0.7))
                         }
 
                         // 标题
-                        Text(milestone.title)
+                        Text(milestone.title(l))
                             .font(OhanaFont.adaptive(size: 26, weight: .black, design: .rounded))
                             .foregroundStyle(Color.ohanaPrimaryText)
 
                         // 副标题
-                        Text(milestone.subtitle)
+                        Text(milestone.subtitle(l))
                             .font(OhanaFont.adaptive(size: 15, weight: .medium, design: .rounded))
                             .foregroundStyle(Color.ohanaPrimaryText.opacity(0.6))
                             .multilineTextAlignment(.center)
@@ -161,7 +192,7 @@ struct MilestoneCelebrationOverlay: View {
 
                 // 关闭按钮
                 Button(action: onDismiss) {
-                    Text("太棒了！")
+                    Text(l.tr(zh: "太棒了！", en: "Wonderful!", de: "Wunderbar!"))
                         .font(OhanaFont.adaptive(size: 17, weight: .black, design: .rounded))
                         .foregroundStyle(Color.arkInk)
                         .padding(.horizontal, 48).padding(.vertical, 16)

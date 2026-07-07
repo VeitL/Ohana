@@ -210,7 +210,8 @@ nonisolated enum VerticalSolidHomeSnapshotBuilder {
                 hiddenPetIDsRaw: source.hiddenPetIDsRaw,
                 homeCardOrderRaw: source.homeCardOrderRaw,
                 showDummyCards: source.showDummyCards,
-                now: now
+                now: now,
+                l: l
             ),
             pets: source.pets,
             humans: source.humans,

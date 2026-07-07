@@ -37,8 +37,8 @@ struct FocusWalletCardView: View {
 
     private let accent = Color(hex: "FF5A3D")
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
     @ObservedObject private var workloadPolicy = AppWorkloadPolicy.shared
-    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
 
     private var l: L10n { L10n(appLanguage) }
 

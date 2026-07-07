@@ -15,7 +15,7 @@ struct PetBondVaultContentView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
     @Environment(AppServices.self) private var appServices
-    @AppStorage("appLanguage") private var appLanguage = "zh"
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
     @StateObject private var commandQueue = DeferredDomainCommandQueue()
     @State private var unlockedIDs: Set<String> = []
     @State private var toast: String?

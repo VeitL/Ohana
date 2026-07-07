@@ -20,9 +20,9 @@ struct WalkTrackingCard: View {
 
     @Environment(AppServices.self) var appServices
     @Environment(\.modelContext) var modelContext
+    @Environment(\.ohanaAppLanguageCode) var appLanguage
     var mgr: PetWalkingManaging { appServices.walking }
     var locationMgr: LocationProviding { appServices.location }
-    @AppStorage("appLanguage") var appLanguage: String = "zh"
     @AppStorage("currentActiveHumanId") var activeHumanId: String = ""
     @AppStorage(RainbowWalkEffectKeys.route) var equipFxRainbowRoute = false
     @AppStorage(RainbowWalkEffectKeys.poop) var equipFxRainbowPoop = false

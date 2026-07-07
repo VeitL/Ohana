@@ -21,7 +21,7 @@ struct ExpenseHistoryContentView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(AppServices.self) private var appServices
     @AppStorage(AppCountry.storageKey) private var appCountry = AppCountry.detectedCode
-    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
 
     enum TimeRange: String, CaseIterable {
         case week = "本周"

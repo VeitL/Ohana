@@ -25,7 +25,7 @@ struct PetImageCropView: View {
     @State private var lastOffset: CGSize = .zero
     @State private var fitDisplaySize: CGSize = .zero
     @State private var containerSize: CGSize = .zero
-    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
 
     private var l: L10n { L10n(appLanguage) }
 

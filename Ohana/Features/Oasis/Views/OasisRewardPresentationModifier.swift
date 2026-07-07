@@ -14,7 +14,7 @@ struct OasisRewardPresentationModifier: ViewModifier {
     var onPresentCoconutLog: ((CoconutLogSubject?) -> Void)?
 
     @Environment(AppServices.self) private var appServices
-    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
 
     func body(content: Content) -> some View {
         content

@@ -13,7 +13,7 @@ struct FunctionMenuDestinationRouter: View {
     var isRouteDataLoaded = true
 
     @Environment(AppServices.self) private var appServices
-    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
 
     var body: some View {
         let decision = AppFeatureRouteGuard.functionDestinationDecision(

@@ -242,7 +242,8 @@ extension FocusCard {
     nonisolated static func from(
         _ pet: Pet,
         includeAvatarData: Bool = false,
-        homeWalkDistanceMeters: Double = 0
+        homeWalkDistanceMeters: Double = 0,
+        l: L10n = .current
     ) -> FocusCard {
         let isDog = pet.species.contains("狗") || pet.species.lowercased().contains("dog")
         let isCat = pet.species.contains("猫") || pet.species.lowercased().contains("cat")
@@ -281,8 +282,6 @@ extension FocusCard {
         }
 
         let hex = pet.safeThemeColorHex
-        let language = UserDefaults.standard.string(forKey: "appLanguage") ?? "zh"
-        let l = L10n(language)
         let hour = Calendar.current.component(.hour, from: Date())
         let togetherDays = pet.hasPassedAway ? pet.daysTogetherAtPassing : pet.daysTogether
         let togetherHeadline: String
@@ -307,7 +306,9 @@ extension FocusCard {
             id: pet.id,
             modelID: pet.persistentModelID,
             name: pet.name.isEmpty ? l.tr(zh: "未命名", en: "Unnamed", de: "Unbenannt") : pet.name,
-            kind: pet.hasPassedAway ? l.tr(zh: "彩虹桥", en: "Rainbow Bridge", de: "Regenbogenbrücke") : (pet.species.isEmpty ? "PET" : pet.species),
+            kind: pet.hasPassedAway
+                ? l.tr(zh: "彩虹桥", en: "Rainbow Bridge", de: "Regenbogenbrücke")
+                : (pet.species.isEmpty ? "PET" : pet.localizedSpeciesName(l: l)),
             emoji: pet.avatarEmoji.isEmpty ? "🐾" : pet.avatarEmoji,
             color: Color(hex: hex),
             streak: pet.currentStreak,
@@ -323,7 +324,7 @@ extension FocusCard {
             zodiacText: pet.birthday.map { Human.westernZodiacDisplay(for: $0, l: l) },
             humanEquivalentAgeText: pet.birthday.map { pet.humanEquivalentAgeTextForWallet(birthday: $0, l: l) },
             genderText: pet.genderSymbol + (pet.isNeutered ? l.tr(zh: " 已绝育", en: " neutered", de: " kastriert") : ""),
-            personalityHint: PetTagGreeting.homeSubtitleHint(pet: pet, hour: hour, l: L10n(language)),
+            personalityHint: PetTagGreeting.homeSubtitleHint(pet: pet, hour: hour, l: l),
             avatarImageData: avatarImageData,
             avatarImageSignature: avatarImageSignature,
             cardStyleRaw: pet.cardStyleRaw,

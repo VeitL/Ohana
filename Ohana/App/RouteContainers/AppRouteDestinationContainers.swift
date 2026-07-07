@@ -283,7 +283,7 @@ private struct AppSheetRouteDestination: View {
     let onHumanSavedFromAddEntity: (Human) -> Void
     let onCalendarEventDestination: (FocusHomeReminderDestination) -> Void
     let onHumanDoseTaken: (UUID) -> Void
-    @AppStorage("appLanguage") private var appLanguage = "zh"
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
 
     private var l: L10n { L10n(appLanguage) }
 

@@ -10,7 +10,7 @@ import SwiftUI
 struct WalletMotionLabView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
-    @AppStorage("appLanguage") private var appLanguage = "zh"
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
 
     @State private var selectedCardId: UUID?
     @State private var progress: CGFloat = 0

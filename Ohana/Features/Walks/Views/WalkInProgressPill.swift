@@ -12,8 +12,10 @@ struct WalkInProgressPill: View {
     var onTap: () -> Void = {}
 
     @Environment(AppServices.self) private var appServices
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
     @StateObject private var workloadPolicy = AppWorkloadPolicy.shared
 
+    private var l: L10n { L10n(appLanguage) }
     private var mgr: PetWalkingManaging { appServices.walking }
 
     private var walkClockInterval: TimeInterval {
@@ -48,7 +50,7 @@ struct WalkInProgressPill: View {
 
                 // 中：宠物名 + 时长
                 VStack(alignment: .leading, spacing: 1) {
-                    Text("\(pet.name) 正在巡岛")
+                    Text(l.tr(zh: "\(pet.name) 正在巡岛", en: "\(pet.name) is walking", de: "\(pet.name) ist unterwegs"))
                         .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
                         .foregroundStyle(Color.ohanaPrimaryText)
                         .lineLimit(1)

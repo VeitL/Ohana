@@ -79,7 +79,7 @@ struct PetMomentsHubView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
     @Environment(AppServices.self) private var appServices
-    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
     @AppStorage("currentActiveHumanId") private var activeHumanId = ""
 
     @State private var tab: PetMomentsTab = .highlights

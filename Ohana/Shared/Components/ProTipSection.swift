@@ -10,7 +10,7 @@ import SwiftUI
 
 struct ProTipSection: View {
     @Environment(\.colorScheme) private var colorScheme
-    @AppStorage("appLanguage") private var appLanguage = "zh"
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
     private var l: L10n { L10n(appLanguage) }
 
     // MARK: - 配色方案（深浅模式自适应）

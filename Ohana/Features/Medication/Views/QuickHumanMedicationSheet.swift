@@ -85,7 +85,7 @@ struct QuickHumanMedicationSheet: View {
 
     @Environment(\.modelContext) private var modelContext
     @Environment(AppServices.self) private var appServices
-    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
     @AppStorage(AppCountry.storageKey) private var appCountry = AppCountry.detectedCode
 
     @State private var medicationName = ""

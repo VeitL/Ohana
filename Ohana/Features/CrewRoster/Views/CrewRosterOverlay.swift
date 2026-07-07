@@ -76,7 +76,7 @@ struct CrewRosterOverlay: View {
     @State private var isRosterEditorContentMounted = false
     @Namespace private var rosterWalletNamespace
     @Namespace private var rosterHeroNamespace
-    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
     @AppStorage("currentActiveHumanId") private var activeHumanIdStr = ""
     @AppStorage(HomeCardVisibility.hiddenPetIDsKey) private var hiddenHomePetIDsRaw = ""
     @Environment(\.colorScheme) private var colorScheme
@@ -545,7 +545,7 @@ struct CrewRosterOverlay: View {
     // MARK: - Bento Dex 主体
     private var rosterFocusCards: [FocusCard] {
         let petCards = filteredPets.map { pet in
-            var card = FocusCard.from(pet, includeAvatarData: true)
+            var card = FocusCard.from(pet, includeAvatarData: true, l: l)
             card.isShownOnHome = effectivePetHomeVisibility(pet)
             return card
         }

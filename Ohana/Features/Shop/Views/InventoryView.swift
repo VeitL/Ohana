@@ -16,7 +16,7 @@ struct InventoryContentView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
     @Environment(AppServices.self) private var appServices
-    @AppStorage("appLanguage") private var appLanguage = "zh"
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
 
     // Equip states
     @AppStorage("shop_equipped_title") private var equippedTitle: String = ""
@@ -82,7 +82,7 @@ struct InventoryContentView: View {
                 ScrollView {
                     VStack(spacing: 24) {
                         if !myAppIcons.isEmpty {
-                            inventorySection(title: "App Icon", icon: "app.badge.fill") {
+                            inventorySection(title: l.tr(zh: "App 图标", en: "App Icon", de: "App-Symbol"), icon: "app.badge.fill") {
                                 ForEach(myAppIcons) { item in
                                     appIconRow(item)
                                 }
@@ -97,7 +97,7 @@ struct InventoryContentView: View {
 
                         // 1. 称号区
                         if !myTitles.isEmpty {
-                            inventorySection(title: "我的称号", icon: "rosette") {
+                            inventorySection(title: l.tr(zh: "我的称号", en: "My titles", de: "Meine Titel"), icon: "rosette") {
                                 ForEach(myTitles) { item in
                                     titleRow(item)
                                 }
@@ -106,7 +106,7 @@ struct InventoryContentView: View {
 
                         // 2. 特效区
                         if !myEffects.isEmpty {
-                            inventorySection(title: "外观与特效", icon: "wand.and.stars") {
+                            inventorySection(title: l.tr(zh: "外观与特效", en: "Looks and effects", de: "Looks und Effekte"), icon: "wand.and.stars") {
                                 ForEach(myEffects) { item in
                                     effectRow(item)
                                 }
@@ -124,15 +124,29 @@ struct InventoryContentView: View {
                         // 3. 消耗区
                         let isShieldActive = streakShieldExpiry.map { Date() < $0 } ?? false
                         if backdatePacks > 0 || isShieldActive || doubleBoostActive {
-                            inventorySection(title: "消耗品状态", icon: "bag") {
+                            inventorySection(title: l.tr(zh: "消耗品状态", en: "Consumables", de: "Verbrauchsartikel"), icon: "bag") {
                                 if doubleBoostActive {
-                                    consumableRow(emoji: "⚡️", name: "双倍椰子券", count: 1, suffix: "下次打卡生效")
+                                    consumableRow(
+                                        emoji: "⚡️",
+                                        name: l.tr(zh: "双倍椰子券", en: "Double coconut pass", de: "Doppel-Kokosnusspass"),
+                                        count: 1,
+                                        suffix: l.tr(zh: "下次打卡生效", en: "Applies to next check-in", de: "Gilt beim naechsten Check-in")
+                                    )
                                 }
                                 if backdatePacks > 0 {
-                                    consumableRow(emoji: "📅", name: "昨日补签卡", count: backdatePacks)
+                                    consumableRow(
+                                        emoji: "📅",
+                                        name: l.tr(zh: "昨日补签卡", en: "Yesterday make-up card", de: "Nachtragkarte fuer gestern"),
+                                        count: backdatePacks
+                                    )
                                 }
                                 if isShieldActive {
-                                    consumableRow(emoji: "🛡️", name: "Streak 保护盾", count: 1, suffix: "使用中")
+                                    consumableRow(
+                                        emoji: "🛡️",
+                                        name: l.tr(zh: "Streak 保护盾", en: "Streak shield", de: "Streak-Schild"),
+                                        count: 1,
+                                        suffix: l.tr(zh: "使用中", en: "In use", de: "Aktiv")
+                                    )
                                 }
                             }
                         }
@@ -142,10 +156,10 @@ struct InventoryContentView: View {
                                 Image(systemName: "shippingbox").accessibilityHidden(true)
                                     .font(OhanaFont.adaptive(size: 40))
                                     .foregroundStyle(Color.ohanaPrimaryText.opacity(0.2))
-                                Text("百宝箱空空如也")
+                                Text(l.tr(zh: "百宝箱空空如也", en: "Your treasure box is empty", de: "Deine Schatzkiste ist leer"))
                                     .font(OhanaFont.adaptive(size: 15, weight: .bold, design: .rounded))
                                     .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
-                                Text("前往椰子商店兑换更多有趣的道具吧！")
+                                Text(l.tr(zh: "前往椰子商店兑换更多有趣的道具吧！", en: "Visit the Coconut Shop to redeem more fun items.", de: "Besuche den Kokosnuss-Shop fuer weitere Items."))
                                     .font(OhanaFont.adaptive(size: 12, weight: .medium, design: .rounded))
                                     .foregroundStyle(Color.ohanaPrimaryText.opacity(0.3))
                             }
@@ -155,16 +169,16 @@ struct InventoryContentView: View {
                     .padding(20)
                 }
             }
-            .navigationTitle("我的百宝箱")
+            .navigationTitle(l.tr(zh: "我的百宝箱", en: "My treasure box", de: "Meine Schatzkiste"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    Button("关闭") { dismiss() }
+                    Button(l.tr(zh: "关闭", en: "Close", de: "Schliessen")) { dismiss() }
                 }
             }
         }
         .onAppear { loadConsumableInventory() }
-        .confirmationDialog("选择要绑定破框卡片的宠物", isPresented: $showPetPickerForPopout, titleVisibility: .visible) {
+        .confirmationDialog(l.tr(zh: "选择要绑定破框卡片的宠物", en: "Choose a pet for the popout card", de: "Waehle ein Haustier fuer die Popout-Karte"), isPresented: $showPetPickerForPopout, titleVisibility: .visible) {
             ForEach(activePets) { pet in
                 Button(pet.name) { equipPopoutPet = pet }
             }

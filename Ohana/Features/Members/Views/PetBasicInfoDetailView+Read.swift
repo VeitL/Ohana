@@ -18,7 +18,7 @@ extension PetBasicInfoDetailView {
 
             infoSection(title: l.tr(zh: "基本信息", en: "Basic info", de: "Basisdaten"), icon: "pawprint.fill", iconColor: Color.goPrimary) {
                 infoRow(label: l.tr(zh: "名字", en: "Name", de: "Name"), value: pet.name)
-                infoRow(label: l.tr(zh: "物种", en: "Species", de: "Art"), value: pet.species)
+                infoRow(label: l.tr(zh: "物种", en: "Species", de: "Art"), value: pet.localizedSpeciesName(l: l))
                 infoRow(label: l.tr(zh: "品种", en: "Breed", de: "Rasse"), value: pet.breed.isEmpty ? petProfileEmptyValue : pet.breed)
                 infoRow(label: l.tr(zh: "性别", en: "Gender", de: "Geschlecht"), value: localizedPetGenderSummary)
                 if let birthday = pet.birthday {

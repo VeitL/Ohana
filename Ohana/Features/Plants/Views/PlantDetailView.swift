@@ -16,7 +16,7 @@ struct PlantDetailContentView: View {
     @Environment(\.modelContext) var modelContext
     @Environment(\.dismiss) var dismiss
     @Environment(AppServices.self) var appServices
-    @AppStorage("appLanguage") var appLanguage = "zh"
+    @Environment(\.ohanaAppLanguageCode) var appLanguage
     @AppStorage("currentActiveHumanId") var activeHumanIdRaw = ""
     @AppStorage("ohana_onboarding_has_pets") var onboardingHasPets = true
     @AppStorage("ohana_onboarding_has_children") var onboardingHasChildren = false

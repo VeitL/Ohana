@@ -134,6 +134,36 @@ else
 fi
 
 echo
+echo "== App language storage ownership =="
+language_scan_roots=(Ohana)
+if [[ ${#targets[@]} -gt 0 ]]; then
+  language_scan_roots+=("${targets[@]}")
+fi
+language_storage_matches="$(rg -n '@AppStorage\("appLanguage"\)' "${language_scan_roots[@]}" --glob '*.swift' || true)"
+language_storage_violations=()
+if [[ -n "$language_storage_matches" ]]; then
+  while IFS= read -r match; do
+    file="${match%%:*}"
+    case "$file" in
+      Ohana/App/OhanaApp.swift|\
+      Ohana/Features/Settings/Views/SettingsView.swift|\
+      Ohana/Features/Onboarding/Views/OnboardingView.swift)
+        ;;
+      *)
+        language_storage_violations+=("$match")
+        ;;
+    esac
+  done <<< "$language_storage_matches"
+fi
+if [[ ${#language_storage_violations[@]} -eq 0 ]]; then
+  echo "ok  appLanguage AppStorage is owned by app root, settings, and onboarding only"
+else
+  printf '[localization-app-language-storage-owner] %s\n' "${language_storage_violations[@]}"
+  echo "Use @Environment(\\.ohanaAppLanguageCode) for read-only language access; only the app root, settings, and onboarding may subscribe to @AppStorage(\"appLanguage\")."
+  status=1
+fi
+
+echo
 echo "== Direct user-visible Chinese literals =="
 python_args=(--mode "$mode" --baseline "$hardcoded_chinese_baseline")
 if [[ "$update_baseline" == "1" ]]; then

@@ -18,7 +18,7 @@ struct PetMedicationContentView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var colorScheme
     @Environment(AppServices.self) private var appServices
-    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
 
     @State private var showingAddSheet = false
     @State private var selectedMedication: PetMedication?

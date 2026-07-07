@@ -10,7 +10,7 @@ import SwiftUI
 struct MotionPreviewLabView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @AppStorage("appLanguage") private var appLanguage = "zh"
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
 
     @State private var selectedSystem: MotionPreviewSystem = .capsule
     @State private var selectedChartSystem: MotionPreviewSystem = .flow

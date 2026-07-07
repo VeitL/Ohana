@@ -17,7 +17,7 @@ struct FamilyWeeklyReportDashboardContentView: View {
 
     @Environment(\.modelContext) private var modelContext
     @Environment(AppServices.self) private var appServices
-    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
     @State private var preparedShareText: String?
 
     private var l: L10n { L10n(appLanguage) }
@@ -52,7 +52,7 @@ struct FamilyWeeklyReportDashboardContentView: View {
             let id = entry.actorId ?? "unknown"
             guard id == "unknown" || visibleHumansById[id] != nil else { continue }
             let human = visibleHumansById[id]
-            let name = human?.name ?? "未指定"
+            let name = human?.name ?? l.tr(zh: "未指定", en: "Unassigned", de: "Nicht zugewiesen")
             let emoji = human?.avatarEmoji ?? "👤"
             var stat = dict[id] ?? MemberStat(id: id, name: name, emoji: emoji, count: 0, coconuts: 0)
             stat.count += 1
@@ -117,56 +117,70 @@ struct FamilyWeeklyReportDashboardContentView: View {
     }
 
     private var storyHeadline: String {
-        if allEntries.isEmpty { return "这周还在等待第一条照护故事" }
-        if let pet = topPet { return "\(pet.name) 这周被好好照顾了 \(pet.count) 次" }
-        return "这周的家庭照护已经留下记录"
+        if allEntries.isEmpty {
+            return l.tr(zh: "这周还在等待第一条照护故事", en: "This week is waiting for its first care story", de: "Diese Woche wartet noch auf die erste Pflegegeschichte")
+        }
+        if let pet = topPet {
+            return l.tr(zh: "\(pet.name) 这周被好好照顾了 \(pet.count) 次", en: "\(pet.name) was cared for \(pet.count) times this week", de: "\(pet.name) wurde diese Woche \(pet.count)-mal versorgt")
+        }
+        return l.tr(zh: "这周的家庭照护已经留下记录", en: "This week's family care has been recorded", de: "Die Familienpflege dieser Woche wurde festgehalten")
     }
 
     private var storyBody: String {
         guard !allEntries.isEmpty else {
-            return "完成一次喂食、陪玩、照片或健康记录后，周报会自动整理成可分享的家庭故事。"
+            return l.tr(zh: "完成一次喂食、陪玩、照片或健康记录后，周报会自动整理成可分享的家庭故事。", en: "After a feeding, play, photo, or health record, the weekly report turns it into a shareable family story.", de: "Nach Fütterung, Spielen, Foto oder Gesundheitsnotiz formt der Wochenbericht daraus eine teilbare Familiengeschichte.")
         }
         let leader = rankedMembers.first.map {
             SingleMemberFamilyShapePresentation.weeklyReportLeaderStory(name: $0.name, humanCount: visibleHumanCount, l: l)
-        } ?? "照护记录已同步"
-        let day = mostActiveDay.map { "\($0.date.formatted(.dateTime.weekday(.wide))) 最活跃" } ?? "每天都有记录"
+        } ?? l.tr(zh: "照护记录已同步", en: "Care records are synced", de: "Pflegeeinträge sind synchronisiert")
+        let day = mostActiveDay.map {
+            l.tr(zh: "\($0.date.formatted(.dateTime.weekday(.wide))) 最活跃", en: "\($0.date.formatted(.dateTime.weekday(.wide))) was the busiest day", de: "\($0.date.formatted(.dateTime.weekday(.wide))) war am aktivsten")
+        } ?? l.tr(zh: "每天都有记录", en: "Every day has a record", de: "Jeder Tag hat einen Eintrag")
         return "\(leader)，\(day)。\(weightStoryText) \(photoStoryText) \(healthStoryText)"
     }
 
     private var weightStoryText: String {
         guard let trend = weekWeightTrends.max(by: { abs($0.deltaKg) < abs($1.deltaKg) }) else {
-            return "体重趋势还缺少连续记录。"
+            return l.tr(zh: "体重趋势还缺少连续记录。", en: "Weight trends still need more continuous records.", de: "Für Gewichtstrends fehlen noch fortlaufende Einträge.")
         }
         if abs(trend.deltaKg) < 0.05 {
-            return "\(trend.petName) 体重稳定在 \(String(format: "%.1fkg", trend.latestKg))。"
+            return l.tr(zh: "\(trend.petName) 体重稳定在 \(String(format: "%.1fkg", trend.latestKg))。", en: "\(trend.petName)'s weight stayed around \(String(format: "%.1fkg", trend.latestKg)).", de: "\(trend.petName)s Gewicht blieb bei etwa \(String(format: "%.1fkg", trend.latestKg)).")
         }
         let sign = trend.deltaKg > 0 ? "+" : ""
-        return "\(trend.petName) 近 \(trend.days) 天体重 \(sign)\(String(format: "%.1fkg", trend.deltaKg))。"
+        return l.tr(zh: "\(trend.petName) 近 \(trend.days) 天体重 \(sign)\(String(format: "%.1fkg", trend.deltaKg))。", en: "\(trend.petName)'s weight changed \(sign)\(String(format: "%.1fkg", trend.deltaKg)) over \(trend.days) days.", de: "\(trend.petName)s Gewicht änderte sich in \(trend.days) Tagen um \(sign)\(String(format: "%.1fkg", trend.deltaKg)).")
     }
 
     private var photoStoryText: String {
         guard let memory = weekPhotoMemories.first else {
-            return "本周还没有照片回忆。"
+            return l.tr(zh: "本周还没有照片回忆。", en: "No photo memories yet this week.", de: "Diese Woche gibt es noch keine Fotoerinnerungen.")
         }
-        return "最新回忆是 \(memory.petName) 的照片。"
+        return l.tr(zh: "最新回忆是 \(memory.petName) 的照片。", en: "The latest memory is a photo of \(memory.petName).", de: "Die neueste Erinnerung ist ein Foto von \(memory.petName).")
     }
 
     private var healthStoryText: String {
         guard let first = healthAlerts.first else {
-            return "健康提醒正常。"
+            return l.tr(zh: "健康提醒正常。", en: "Health reminders look normal.", de: "Gesundheitshinweise sind unauffällig.")
         }
         let urgentCount = healthAlerts.count(where: { $0.severity == .urgent })
         if urgentCount > 0 {
-            return "\(urgentCount) 项紧急健康提醒：\(first.title)。"
+            return l.tr(zh: "\(urgentCount) 项紧急健康提醒：\(first.title)。", en: "\(urgentCount) urgent health reminders: \(first.title).", de: "\(urgentCount) dringende Gesundheitshinweise: \(first.title).")
         }
-        return "\(healthAlerts.count) 项健康提醒待留意：\(first.title)。"
+        return l.tr(zh: "\(healthAlerts.count) 项健康提醒待留意：\(first.title)。", en: "\(healthAlerts.count) health reminders need attention: \(first.title).", de: "\(healthAlerts.count) Gesundheitshinweise beachten: \(first.title).")
     }
 
     private var shareText: String {
-        let leader = rankedMembers.first.map { "\($0.emoji) \($0.name) \($0.count) 次" } ?? "暂无"
-        let petLine = topPet.map { "\($0.name) 被照顾 \($0.count) 次" } ?? "暂无宠物记录"
+        let leader = rankedMembers.first.map {
+            l.tr(zh: "\($0.emoji) \($0.name) \($0.count) 次", en: "\($0.emoji) \($0.name) \($0.count) times", de: "\($0.emoji) \($0.name) \($0.count)-mal")
+        } ?? l.tr(zh: "暂无", en: "None yet", de: "Noch nichts")
+        let petLine = topPet.map {
+            l.tr(zh: "\($0.name) 被照顾 \($0.count) 次", en: "\($0.name) was cared for \($0.count) times", de: "\($0.name) wurde \($0.count)-mal versorgt")
+        } ?? l.tr(zh: "暂无宠物记录", en: "No pet records yet", de: "Noch keine Tiereinträge")
         let leaderLabel = SingleMemberFamilyShapePresentation.weeklyReportShareLeaderLabel(humanCount: visibleHumanCount, l: l)
-        return "Ohana 本周家庭周报\n\(storyHeadline)\n\(storyBody)\n总照护 \(allEntries.count) 次\n\(leaderLabel)：\(leader)\n最受关注：\(petLine)"
+        return l.tr(
+            zh: "Ohana 本周家庭周报\n\(storyHeadline)\n\(storyBody)\n总照护 \(allEntries.count) 次\n\(leaderLabel)：\(leader)\n最受关注：\(petLine)",
+            en: "Ohana family weekly report\n\(storyHeadline)\n\(storyBody)\nTotal care: \(allEntries.count)\n\(leaderLabel): \(leader)\nMost cared for: \(petLine)",
+            de: "Ohana Familien-Wochenbericht\n\(storyHeadline)\n\(storyBody)\nPflege gesamt: \(allEntries.count)\n\(leaderLabel): \(leader)\nAm meisten versorgt: \(petLine)"
+        )
     }
 
     private var sharePreparationSignature: String {
@@ -199,7 +213,7 @@ struct FamilyWeeklyReportDashboardContentView: View {
                 .padding(.bottom, 40)
             }
         }
-        .navigationTitle("家庭周报")
+        .navigationTitle(l.tr(zh: "家庭周报", en: "Family report", de: "Familienbericht"))
         .navigationBarTitleDisplayMode(.inline)
         .task(id: sharePreparationSignature) {
             await prepareShareText()
@@ -216,7 +230,7 @@ struct FamilyWeeklyReportDashboardContentView: View {
     }
 
     private var shareButtonLabel: some View {
-        Label("分享", systemImage: "square.and.arrow.up")
+        Label(l.tr(zh: "分享", en: "Share", de: "Teilen"), systemImage: "square.and.arrow.up")
             .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
             .foregroundStyle(Color.arkInk)
             .padding(.horizontal, 12)
@@ -228,7 +242,7 @@ struct FamilyWeeklyReportDashboardContentView: View {
         VStack(alignment: .leading, spacing: 14) {
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("本周 Ohana")
+                    Text(l.tr(zh: "本周 Ohana", en: "This week in Ohana", de: "Diese Woche in Ohana"))
                         .font(OhanaFont.adaptive(size: 22, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     Text("\(weekInterval.start.formatted(.dateTime.month().day())) - \(weekInterval.end.formatted(.dateTime.month().day()))")
                         .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
@@ -244,14 +258,14 @@ struct FamilyWeeklyReportDashboardContentView: View {
                         shareButtonLabel
                     }
                     .disabled(true)
-                    .accessibilityLabel("周报分享内容准备中")
+                    .accessibilityLabel(l.tr(zh: "周报分享内容准备中", en: "Weekly report share text is being prepared", de: "Wochenbericht wird zum Teilen vorbereitet"))
                 }
             }
 
             HStack(spacing: 10) {
-                metric("照护", "\(allEntries.count)", .goPrimary)
-                metric("成员", "\(rankedMembers.count(where: { $0.id != "unknown" }))", .goTeal)
-                metric("椰子", "\(allEntries.reduce(0) { $0 + $1.coconuts })", .goYellow)
+                metric(l.tr(zh: "照护", en: "Care", de: "Pflege"), "\(allEntries.count)", .goPrimary)
+                metric(l.tr(zh: "成员", en: "Members", de: "Mitglieder"), "\(rankedMembers.count(where: { $0.id != "unknown" }))", .goTeal)
+                metric(l.tr(zh: "椰子", en: "Coconuts", de: "Kokosnüsse"), "\(allEntries.reduce(0) { $0 + $1.coconuts })", .goYellow)
             }
         }
         .padding(16)
@@ -261,7 +275,7 @@ struct FamilyWeeklyReportDashboardContentView: View {
 
     private var weeklyStoryCard: some View {
         VStack(alignment: .leading, spacing: 14) {
-            sectionHeader("本周故事", icon: "sparkles.rectangle.stack.fill")
+            sectionHeader(l.tr(zh: "本周故事", en: "Weekly story", de: "Wochengeschichte"), icon: "sparkles.rectangle.stack.fill")
             VStack(alignment: .leading, spacing: 6) {
                 Text(storyHeadline)
                     .font(OhanaFont.adaptive(size: 18, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
@@ -275,7 +289,7 @@ struct FamilyWeeklyReportDashboardContentView: View {
             HStack(spacing: 8) {
                 storyPill(
                     icon: isSingleVisibleHumanFamily ? "person.fill.checkmark" : "crown.fill",
-                    title: rankedMembers.first?.name ?? "暂无",
+                    title: rankedMembers.first?.name ?? l.tr(zh: "暂无", en: "None yet", de: "Noch nichts"),
                     subtitle: SingleMemberFamilyShapePresentation.weeklyReportLeaderPillSubtitle(
                         humanCount: visibleHumanCount,
                         l: l
@@ -284,14 +298,14 @@ struct FamilyWeeklyReportDashboardContentView: View {
                 )
                 storyPill(
                     icon: "calendar.badge.clock",
-                    title: mostActiveDay.map { $0.date.formatted(.dateTime.weekday(.abbreviated)) } ?? "暂无",
-                    subtitle: "最活跃日",
+                    title: mostActiveDay.map { $0.date.formatted(.dateTime.weekday(.abbreviated)) } ?? l.tr(zh: "暂无", en: "None yet", de: "Noch nichts"),
+                    subtitle: l.tr(zh: "最活跃日", en: "Busiest day", de: "Aktivster Tag"),
                     color: .goTeal
                 )
                 storyPill(
                     icon: "photo.fill",
                     title: "\(weekPhotoMemories.count)",
-                    subtitle: "照片回忆",
+                    subtitle: l.tr(zh: "照片回忆", en: "Photo memories", de: "Fotoerinnerungen"),
                     color: .goYellow
                 )
             }
@@ -311,7 +325,7 @@ struct FamilyWeeklyReportDashboardContentView: View {
                 icon: isSingleVisibleHumanFamily ? "person.fill.checkmark" : "person.2.fill"
             )
             if rankedMembers.isEmpty {
-                emptyText("本周还没有照护记录")
+                emptyText(l.tr(zh: "本周还没有照护记录", en: "No care records yet this week", de: "Diese Woche noch keine Pflegeeinträge"))
                     .accessibilityIdentifier("family-weekly-report-member-contribution-empty")
             } else {
                 ForEach(Array(rankedMembers.prefix(5).enumerated()), id: \.element.id) { index, stat in
@@ -320,7 +334,7 @@ struct FamilyWeeklyReportDashboardContentView: View {
                         Text(stat.emoji)
                         VStack(alignment: .leading, spacing: 2) {
                             Text(stat.name).font(OhanaFont.adaptive(size: 14, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                            Text("\(stat.count) 次照护 · +\(stat.coconuts)🥥").font(OhanaFont.adaptive(size: 11, weight: .medium, design: .rounded)).foregroundStyle(Color.ohanaSecondaryText) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                            Text(l.tr(zh: "\(stat.count) 次照护 · +\(stat.coconuts)🥥", en: "\(stat.count) care actions · +\(stat.coconuts)🥥", de: "\(stat.count) Pflegeaktionen · +\(stat.coconuts)🥥")).font(OhanaFont.adaptive(size: 11, weight: .medium, design: .rounded)).foregroundStyle(Color.ohanaSecondaryText) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         }
                         Spacer()
                     }
@@ -335,7 +349,7 @@ struct FamilyWeeklyReportDashboardContentView: View {
 
     private var memoryAndHealthCard: some View {
         VStack(alignment: .leading, spacing: 12) {
-            sectionHeader("成长回忆与健康提醒", icon: "heart.text.square.fill")
+            sectionHeader(l.tr(zh: "成长回忆与健康提醒", en: "Memories and health reminders", de: "Erinnerungen und Gesundheit"), icon: "heart.text.square.fill")
             if let memory = weekPhotoMemories.first {
                 HStack(spacing: 12) {
                     AsyncDecodedImageView(
@@ -359,7 +373,7 @@ struct FamilyWeeklyReportDashboardContentView: View {
                             .background(Color.goPrimary.opacity(0.14), in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
                     }
                     VStack(alignment: .leading, spacing: 3) {
-                        Text("\(memory.petName) 的本周回忆")
+                        Text(l.tr(zh: "\(memory.petName) 的本周回忆", en: "\(memory.petName)'s weekly memory", de: "\(memory.petName)s Wochenerinnerung"))
                             .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         Text(memory.note.isEmpty ? memory.date.formatted(.dateTime.weekday().hour().minute()) : memory.note)
                             .font(OhanaFont.adaptive(size: 11, weight: .medium, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
@@ -369,11 +383,11 @@ struct FamilyWeeklyReportDashboardContentView: View {
                     Spacer()
                 }
             } else {
-                emptyText("本周还没有照片回忆，下一次记录照片后会出现在这里")
+                emptyText(l.tr(zh: "本周还没有照片回忆，下一次记录照片后会出现在这里", en: "No photo memories this week. The next photo record will appear here.", de: "Diese Woche noch keine Fotoerinnerungen. Das nächste Foto erscheint hier."))
             }
 
             if healthAlerts.isEmpty {
-                statusLine(icon: "checkmark.seal.fill", text: "本周没有紧急健康提醒", color: .goTeal)
+                statusLine(icon: "checkmark.seal.fill", text: l.tr(zh: "本周没有紧急健康提醒", en: "No urgent health reminders this week", de: "Diese Woche keine dringenden Gesundheitshinweise"), color: .goTeal)
             } else {
                 ForEach(healthAlerts.prefix(3)) { alert in
                     statusLine(
@@ -399,17 +413,17 @@ struct FamilyWeeklyReportDashboardContentView: View {
 
     private var petCoverageCard: some View {
         VStack(alignment: .leading, spacing: 12) {
-            sectionHeader("宠物照护覆盖", icon: "pawprint.fill")
+            sectionHeader(l.tr(zh: "宠物照护覆盖", en: "Pet care coverage", de: "Pflegeabdeckung"), icon: "pawprint.fill")
             ForEach(activePets) { pet in
                 let count = entries(for: [pet], in: weekInterval).count
                 HStack {
                     FMPetAvatar(pet: pet, size: 34)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(pet.name).font(OhanaFont.adaptive(size: 14, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                        Text(count > 0 ? "本周 \(count) 次记录" : "本周暂无记录").font(OhanaFont.adaptive(size: 11, weight: .medium, design: .rounded)).foregroundStyle(Color.ohanaSecondaryText) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                        Text(count > 0 ? l.tr(zh: "本周 \(count) 次记录", en: "\(count) records this week", de: "\(count) Einträge diese Woche") : l.tr(zh: "本周暂无记录", en: "No records this week", de: "Diese Woche keine Einträge")).font(OhanaFont.adaptive(size: 11, weight: .medium, design: .rounded)).foregroundStyle(Color.ohanaSecondaryText) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     }
                     Spacer()
-                    Text(count > 0 ? "已照顾" : "待关注")
+                    Text(count > 0 ? l.tr(zh: "已照顾", en: "Covered", de: "Versorgt") : l.tr(zh: "待关注", en: "Needs attention", de: "Braucht Aufmerksamkeit"))
                         .font(OhanaFont.adaptive(size: 10, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(count > 0 ? Color.goPrimary : Color.goOrange)
                         .padding(.horizontal, 8).padding(.vertical, 4)
@@ -424,7 +438,7 @@ struct FamilyWeeklyReportDashboardContentView: View {
 
     private var recentActivityCard: some View {
         VStack(alignment: .leading, spacing: 12) {
-            sectionHeader("最近发生了什么", icon: "clock.arrow.circlepath")
+            sectionHeader(l.tr(zh: "最近发生了什么", en: "Recent activity", de: "Zuletzt passiert"), icon: "clock.arrow.circlepath")
             if allEntries.isEmpty {
                 emptyText(SingleMemberFamilyShapePresentation.weeklyReportRecentActivityEmptyText(
                     humanCount: visibleHumanCount,
@@ -459,7 +473,7 @@ struct FamilyWeeklyReportDashboardContentView: View {
 
     private var previousWeeksCard: some View {
         VStack(alignment: .leading, spacing: 12) {
-            sectionHeader("近 4 周趋势", icon: "chart.bar.fill")
+            sectionHeader(l.tr(zh: "近 4 周趋势", en: "Last 4 weeks", de: "Letzte 4 Wochen"), icon: "chart.bar.fill")
             HStack(alignment: .bottom, spacing: 10) {
                 ForEach(lastFourWeeks(), id: \.label) { week in
                     VStack(spacing: 6) {

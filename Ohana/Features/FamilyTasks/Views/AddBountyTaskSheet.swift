@@ -10,6 +10,7 @@ import SwiftUI
 struct AddBountyTaskSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
     let humans: [Human]
     let currentHumanId: String
     let onAdd: (BountyTask) -> Void
@@ -30,6 +31,7 @@ struct AddBountyTaskSheet: View {
     private var primaryText: Color { colorScheme == .dark ? .white : .black }
     private var secondaryText: Color { colorScheme == .dark ? .white.opacity(0.72) : .black.opacity(0.58) }
     private var tertiaryText: Color { colorScheme == .dark ? .white.opacity(0.45) : .black.opacity(0.4) }
+    private var l: L10n { L10n(appLanguage) }
 
     var body: some View {
         NavigationStack {
@@ -51,7 +53,7 @@ struct AddBountyTaskSheet: View {
                     .padding(.top, 20)
                 }
             }
-            .navigationTitle("发布悬赏")
+            .navigationTitle(l.tr(zh: "发布悬赏", en: "Post bounty", de: "Aufgabe ausschreiben"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbarBackground(Color.ohanaCardSurface, for: .navigationBar)
             .toolbar {
@@ -59,14 +61,14 @@ struct AddBountyTaskSheet: View {
                     Button {
                         dismiss()
                     } label: {
-                        Text("取消")
+                        Text(l.tr(zh: "取消", en: "Cancel", de: "Abbrechen"))
                             .font(OhanaFont.body(.semibold))
                             .foregroundStyle(secondaryText)
                     }
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button(action: publishTask) {
-                        Text("发布")
+                        Text(l.tr(zh: "发布", en: "Post", de: "Veröffentlichen"))
                             .font(OhanaFont.body(.bold))
                             .foregroundStyle(title.isEmpty ? Color.goPrimary.opacity(0.35) : Color.goPrimary)
                     }
@@ -79,7 +81,7 @@ struct AddBountyTaskSheet: View {
 
     private var emojiSelector: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("任务图标")
+            Text(l.tr(zh: "任务图标", en: "Task icon", de: "Aufgabensymbol"))
                 .font(OhanaFont.subheadline(.semibold))
                 .foregroundStyle(tertiaryText)
             ScrollView(.horizontal, showsIndicators: false) {
@@ -115,27 +117,27 @@ struct AddBountyTaskSheet: View {
     }
 
     private var titleField: some View {
-        formField(title: "任务标题") {
+        formField(title: l.tr(zh: "任务标题", en: "Task title", de: "Aufgabentitel")) {
             TextField("", text: $title) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
                 .font(OhanaFont.headline(.semibold))
                 .foregroundStyle(primaryText)
                 .tint(Color.goPrimary)
                 .placeholder(when: title.isEmpty) {
-                    Text("例如：帮我给猫铲屎")
+                    Text(l.tr(zh: "例如：帮我给猫铲屎", en: "Example: Scoop the litter box", de: "Beispiel: Katzenklo reinigen"))
                         .foregroundStyle(tertiaryText)
                 }
         }
     }
 
     private var descriptionField: some View {
-        formField(title: "任务说明（可选）") {
+        formField(title: l.tr(zh: "任务说明（可选）", en: "Task details (optional)", de: "Aufgabendetails (optional)")) {
             TextField("", text: $description, axis: .vertical) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
                 .font(OhanaFont.callout(.medium))
                 .foregroundStyle(primaryText)
                 .tint(Color.goPrimary)
                 .lineLimit(3)
                 .placeholder(when: description.isEmpty) {
-                    Text("描述任务内容...")
+                    Text(l.tr(zh: "描述任务内容...", en: "Describe the task...", de: "Beschreibe die Aufgabe ..."))
                         .foregroundStyle(tertiaryText)
                 }
         }
@@ -143,7 +145,7 @@ struct AddBountyTaskSheet: View {
 
     private var rewardSelector: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("椰子奖励")
+            Text(l.tr(zh: "椰子奖励", en: "Coconut reward", de: "Kokosnuss-Belohnung"))
                 .font(OhanaFont.subheadline(.semibold))
                 .foregroundStyle(tertiaryText)
             ScrollView(.horizontal, showsIndicators: false) {
@@ -187,7 +189,7 @@ struct AddBountyTaskSheet: View {
         if humans.count > 1 {
             VStack(alignment: .leading, spacing: 10) {
                 HStack(spacing: 6) {
-                    Text("指派给")
+                    Text(l.tr(zh: "指派给", en: "Assign to", de: "Zuweisen an"))
                         .font(OhanaFont.subheadline(.semibold))
                         .foregroundStyle(tertiaryText)
                     if assignedToId != nil {
@@ -198,7 +200,7 @@ struct AddBountyTaskSheet: View {
                 }
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 10) {
-                        assigneeOption(id: nil, emoji: "👥", name: "所有人可接")
+                        assigneeOption(id: nil, emoji: "👥", name: l.tr(zh: "所有人可接", en: "Anyone", de: "Alle"))
                         ForEach(humans.filter { $0.id.uuidString != currentHumanId }) { human in
                             assigneeOption(id: human.id.uuidString, emoji: human.avatarEmoji, name: human.name)
                         }
@@ -216,7 +218,7 @@ struct AddBountyTaskSheet: View {
                 Text(human.avatarEmoji)
                     .font(OhanaFont.title2())
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("发布人")
+                    Text(l.tr(zh: "发布人", en: "Posted by", de: "Erstellt von"))
                         .font(OhanaFont.caption2(.medium))
                         .foregroundStyle(tertiaryText)
                     Text(human.name)
@@ -224,7 +226,7 @@ struct AddBountyTaskSheet: View {
                         .foregroundStyle(primaryText)
                 }
                 Spacer()
-                Text("奖励 \(reward)🥥")
+                Text(l.tr(zh: "奖励 \(reward)🥥", en: "\(reward)🥥 reward", de: "\(reward)🥥 Belohnung"))
                     .font(OhanaFont.subheadline(.bold))
                     .foregroundStyle(Color.goYellow)
             }

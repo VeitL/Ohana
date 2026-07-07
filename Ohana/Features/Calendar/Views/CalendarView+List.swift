@@ -162,16 +162,17 @@ extension CalendarView {
     }
 
     func todayTimelineAnchor(date: Date, count: Int) -> some View {
-        HStack(spacing: 10) {
+        let l = L10n(AppLanguage.code)
+        return HStack(spacing: 10) {
             timelineDateBadge(date, isToday: true)
                 .frame(width: 40)
 
             VStack(alignment: .leading, spacing: 8) {
                 HStack(spacing: 8) {
-                    Text("今天")
+                    Text(l.tr(zh: "今天", en: "Today", de: "Heute"))
                         .font(OhanaFont.subheadline(.black))
                         .foregroundStyle(chipAccent)
-                    Text(count == 0 ? "暂无事件" : "\(count) 项")
+                    Text(count == 0 ? l.tr(zh: "暂无事件", en: "No events", de: "Keine Ereignisse") : l.tr(zh: "\(count) 项", en: "\(count) items", de: "\(count) Eintraege"))
                         .font(OhanaFont.footnote(.bold))
                         .foregroundStyle(classicPrimaryText.opacity(0.55))
                         .ohanaNumericMotion(count)
@@ -205,13 +206,14 @@ extension CalendarView {
     }
 
     var emptyTodayPill: some View {
-        HStack(spacing: 8) {
+        let l = L10n(AppLanguage.code)
+        return HStack(spacing: 8) {
             Image(systemName: "checkmark.circle.fill") // a11y: allow decorative empty-state icon
                 .font(OhanaFont.callout(.bold))
                 .symbolRenderingMode(.monochrome)
                 .foregroundStyle(chipAccent)
                 .accessibilityHidden(true)
-            Text("今天没有安排，保持轻松")
+            Text(l.tr(zh: "今天没有安排，保持轻松", en: "Nothing scheduled today. Take it easy.", de: "Heute steht nichts an. Mach es entspannt."))
                 .font(OhanaFont.subheadline(.bold))
                 .foregroundStyle(classicPrimaryText.opacity(0.66))
             Spacer()

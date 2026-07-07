@@ -15,7 +15,7 @@ struct VaccinePassportView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
     @Environment(AppServices.self) private var appServices
-    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
 
     @StateObject private var commandQueue = DeferredDomainCommandQueue()
     @State private var showingAdd = false
@@ -253,7 +253,7 @@ struct VaccinePassportView: View {
 private struct VaccineRow: View {
     let log: PetHealthLog
     let onDelete: () -> Void
-    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
 
     private var l: L10n { L10n(appLanguage) }
 
@@ -407,7 +407,7 @@ struct AddVaccineSheet: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
     @Environment(AppServices.self) private var appServices
-    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
 
     @StateObject private var commandQueue = DeferredDomainCommandQueue()
     @State private var vaccineName: String = ""

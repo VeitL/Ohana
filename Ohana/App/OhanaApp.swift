@@ -40,7 +40,8 @@ struct OhanaApp: App {
         WindowGroup {
             OhanaBootstrapRootView(
                 cloudSharingAppDelegate: cloudSharingAppDelegate,
-                preferredScheme: preferredScheme
+                preferredScheme: preferredScheme,
+                appLanguage: appLanguage
             )
             .onChange(of: appCountry) { _, _ in }
             .onChange(of: appCurrency) { _, _ in }
@@ -57,6 +58,7 @@ private struct OhanaBootstrapPayload {
 private struct OhanaBootstrapRootView: View {
     let cloudSharingAppDelegate: OhanaCloudSharingAppDelegate
     let preferredScheme: ColorScheme?
+    let appLanguage: String
 
     @State private var payload: OhanaBootstrapPayload?
     @State private var bootstrapStatus: OhanaBootstrapStatus = .preparing
@@ -90,7 +92,8 @@ private struct OhanaBootstrapRootView: View {
         }
         .tint(Color.goPrimary)
         .preferredColorScheme(preferredScheme)
-        .environment(\.locale, AppLanguage.swiftUIPreferredLocale)
+        .environment(\.locale, AppLanguage.swiftUIPreferredLocale(for: appLanguage))
+        .environment(\.ohanaAppLanguageCode, appLanguage)
         .onAppear(perform: startBootstrapIfNeeded)
         .onDisappear {
             bootstrapTask?.cancel()
@@ -198,7 +201,7 @@ private struct OhanaBootstrapShell: View {
     let status: OhanaBootstrapStatus
     let onRetry: () -> Void
 
-    @AppStorage("appLanguage") private var appLanguage: String = AppLanguage.code
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
 
     var body: some View {
         ZStack {

@@ -315,19 +315,19 @@ struct StardustView: View {
                     )
                     .frame(height: 340)
 
-                    Text("Lv.\(level) · 点击椰子采摘")
+                    Text("Lv.\(level) · Tap coconuts to harvest")
                         .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
                         .foregroundStyle(Color.ohanaPrimaryText.opacity(0.6))
 
                     HStack(spacing: 16) {
-                        Button("升级") {
+                        Button("Level up") {
                             if level < 10 { level += 1 }
                         }
                         .padding(.horizontal, 20).padding(.vertical, 10)
                         .background(Color.goPrimary, in: Capsule())
                         .foregroundStyle(Color.arkInk)
 
-                        Button("重置椰子") { harvested = [] }
+                        Button("Reset coconuts") { harvested = [] }
                             .padding(.horizontal, 20).padding(.vertical, 10)
                             .background(Color.ohanaControlFill, in: Capsule())
                             .foregroundStyle(Color.ohanaPrimaryText)

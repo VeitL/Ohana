@@ -344,7 +344,7 @@ private func fetch<T: PersistentModel>(
 }
 
 struct HumanRouteMissingEntityView: View {
-    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
     let kind: String
     private var l: L10n { L10n(appLanguage) }
 
@@ -378,7 +378,7 @@ struct HumanRouteMissingEntityView: View {
 }
 
 private struct HumanRouteLoadingEntityView: View {
-    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
     let kind: String
     private var l: L10n { L10n(appLanguage) }
 

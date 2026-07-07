@@ -29,11 +29,13 @@ struct ContentView: View {
     @State private var signaledOnboardingPrimaryHumanID: String?
     @State private var handledUITestHumanProfileRouteName: String?
     @State private var homeCardStateResetToken = UUID()
+    @State private var homeSurfaceLanguage = AppLanguage.code
+    @State private var homeSurfaceLanguageThawTask: Task<Void, Never>?
     @State private var didAutoPresentFirstPetPrompt = false
     @State private var autoPresentedFirstCarePetID: UUID?
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
     @AppStorage("ohana_has_onboarded") private var hasOnboarded: Bool = false
     @AppStorage("currentActiveHumanId") private var currentActiveHumanId: String = ""
-    @AppStorage("appLanguage") private var appLanguage: String = AppLanguage.code
     @Namespace private var heroNS
 
     var body: some View {
@@ -61,9 +63,13 @@ struct ContentView: View {
                     }
             }
             .id(appRoutes.rootIdentity)
+            .homeSurfaceLanguage(homeSurfaceLanguage)
+            .accessibilityHidden(appRoutes.sheet != nil || appRoutes.fullScreen != nil || appRoutes.overlay != nil)
 
             if hasOnboarded, !appRoutes.suppressesGlobalWalkBanner {
                 GlobalWalkBanner()
+                    .homeSurfaceLanguage(homeSurfaceLanguage)
+                    .accessibilityHidden(appRoutes.sheet != nil || appRoutes.fullScreen != nil || appRoutes.overlay != nil)
                     .zIndex(80)
             }
 
@@ -84,6 +90,7 @@ struct ContentView: View {
         }
         .animation(GoMotion.sheetEnter, value: onboardingJourneyPhase)
         .onAppear {
+            synchronizeHomeSurfaceLanguageIfAllowed(appLanguage)
             scheduleRootAppearHandoff()
             applyOnboardingPrimaryHumanIDIfNeeded()
             scheduleUITestHumanProfileRouteIfNeeded()
@@ -97,6 +104,19 @@ struct ContentView: View {
             onboardingCreatedEntitySignalTask = nil
             uiTestRouteTask?.cancel()
             uiTestRouteTask = nil
+            homeSurfaceLanguageThawTask?.cancel()
+            homeSurfaceLanguageThawTask = nil
+        }
+        .onChange(of: appLanguage) { _, newValue in
+            synchronizeHomeSurfaceLanguageIfAllowed(newValue)
+        }
+        .onChange(of: appRoutes.sheet) { _, newValue in
+            guard newValue != .settings else {
+                homeSurfaceLanguageThawTask?.cancel()
+                homeSurfaceLanguageThawTask = nil
+                return
+            }
+            thawHomeSurfaceLanguageAfterSheetDismissal()
         }
         .onChange(of: hasOnboarded) { _, hasOnboarded in
             guard hasOnboarded else { return }
@@ -143,6 +163,38 @@ struct ContentView: View {
             if newPhase == .active {
                 reconcileHumanProfileRequirement()
             }
+        }
+    }
+
+    private var isSettingsSheetPresented: Bool {
+        appRoutes.sheet == .settings
+    }
+
+    private func synchronizeHomeSurfaceLanguageIfAllowed(_ rawLanguage: String) {
+        guard !isSettingsSheetPresented else { return }
+        setHomeSurfaceLanguage(rawLanguage)
+    }
+
+    private func thawHomeSurfaceLanguageAfterSheetDismissal() {
+        homeSurfaceLanguageThawTask?.cancel()
+        let language = appLanguage
+        guard AppLanguage.normalize(homeSurfaceLanguage) != AppLanguage.normalize(language) else {
+            homeSurfaceLanguageThawTask = nil
+            return
+        }
+        homeSurfaceLanguageThawTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: 180) {
+            setHomeSurfaceLanguage(language)
+            homeSurfaceLanguageThawTask = nil
+        }
+    }
+
+    private func setHomeSurfaceLanguage(_ rawLanguage: String) {
+        let normalized = AppLanguage.normalize(rawLanguage)
+        guard homeSurfaceLanguage != normalized else { return }
+        var transaction = Transaction(animation: nil)
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            homeSurfaceLanguage = normalized
         }
     }
 
@@ -528,6 +580,14 @@ private extension ContentView {
             || environment["XCTestBundlePath"] != nil
             || environment["XCTestSessionIdentifier"] != nil
             || arguments.contains("-OHANA_UI_TESTS")
+    }
+}
+
+private extension View {
+    func homeSurfaceLanguage(_ rawLanguage: String) -> some View {
+        let normalized = AppLanguage.normalize(rawLanguage)
+        return environment(\.ohanaAppLanguageCode, normalized)
+            .environment(\.locale, AppLanguage.swiftUIPreferredLocale(for: normalized))
     }
 }
 

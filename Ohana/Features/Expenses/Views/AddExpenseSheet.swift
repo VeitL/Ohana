@@ -52,7 +52,7 @@ struct ExpenseReceiptPreviewViewer: View {
     let receipt: ExpenseReceiptAttachment
     let onClose: () -> Void
 
-    @AppStorage("appLanguage") var appLanguage = AppLanguage.code
+    @Environment(\.ohanaAppLanguageCode) var appLanguage
 
     var l: L10n { L10n(appLanguage) }
 
@@ -108,7 +108,7 @@ struct AddExpenseSheetContent: View {
     @Environment(\.dismiss) var dismiss
     @Environment(\.colorScheme) var colorScheme
     @Environment(AppServices.self) var appServices
-    @AppStorage("appLanguage") var appLanguage = "zh"
+    @Environment(\.ohanaAppLanguageCode) var appLanguage
     @AppStorage(AppCountry.storageKey) var appCountry = AppCountry.detectedCode
     @FocusState var inputFocused: Bool
 

@@ -35,6 +35,21 @@ enum HygieneType: String, Codable, CaseIterable {
         }
     }
 
+    func localizedLabel(_ l: L10n) -> String {
+        switch self {
+        case .teeth:
+            l.tr(zh: "刷牙", en: "Teeth", de: "Zähne")
+        case .nails:
+            l.tr(zh: "剪甲", en: "Nails", de: "Krallen")
+        case .ears:
+            l.tr(zh: "清耳", en: "Ears", de: "Ohren")
+        case .brushing:
+            l.tr(zh: "梳毛", en: "Brushing", de: "Bürsten")
+        case .bath:
+            l.tr(zh: "洗澡", en: "Bath", de: "Bad")
+        }
+    }
+
     /// 系统默认周期天数
     var defaultCycleDays: Int {
         switch self {

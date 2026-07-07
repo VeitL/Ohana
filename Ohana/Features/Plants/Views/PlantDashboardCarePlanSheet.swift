@@ -18,7 +18,7 @@ struct PlantDashboardCarePlanSheet: View {
     let onSkipTask: (PlantCareTaskSnapshot) -> Void
 
     @Environment(\.dismiss) private var dismiss
-    @AppStorage("appLanguage") private var appLanguage = "zh"
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
 
     private var l: L10n { L10n(appLanguage) }
 

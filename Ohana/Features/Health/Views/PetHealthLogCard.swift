@@ -10,7 +10,7 @@ struct PetHealthLogCard: View {
     let pet: Pet
     let healthLogs: [PetHealthLog]
     @Environment(\.modelContext) private var modelContext
-    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
     @State private var showingAllLogs = false
     private var l: L10n { L10n(appLanguage) }
 
@@ -168,7 +168,7 @@ struct HealthLogListView: View {
     let pet: Pet
     let healthLogs: [PetHealthLog]
     @Environment(\.modelContext) private var modelContext
-    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
     @State private var selectedType: HealthLogType? = nil
     private var l: L10n { L10n(appLanguage) }
 

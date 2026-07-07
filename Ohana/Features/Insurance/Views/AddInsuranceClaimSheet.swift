@@ -19,6 +19,7 @@ struct AddInsuranceClaimSheet: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
     @Environment(AppServices.self) private var appServices
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
 
     @State private var incidentDate = Date()
     @State private var totalExpenseInput = ""
@@ -54,6 +55,8 @@ struct AddInsuranceClaimSheet: View {
         totalExpenseDouble > 0 && claimedDouble > 0 && claimedDouble <= totalExpenseDouble
     }
 
+    private var l: L10n { L10n(appLanguage) }
+
     init(
         insurance: PetInsurance,
         pet: Pet,
@@ -82,7 +85,7 @@ struct AddInsuranceClaimSheet: View {
                                     .font(OhanaFont.adaptive(size: 13, weight: .medium, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                     .foregroundStyle(Color.ohanaSecondaryText)
                                 Spacer()
-                                Text("保额 \(insurance.coverageAmount > 0 ? AppCurrency.format(insurance.coverageAmount, fractionDigits: 0) : "—")")
+                                Text(coverageSummary)
                                     .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                     .foregroundStyle(Color.ohanaSecondaryText)
                             }
@@ -91,7 +94,7 @@ struct AddInsuranceClaimSheet: View {
                         }
 
                         // 就诊 / 事故日期
-                        DatePicker("就诊 / 事故日期", selection: $incidentDate, in: ...Date(), displayedComponents: .date)
+                        DatePicker(l.tr(zh: "就诊 / 事故日期", en: "Visit / incident date", de: "Behandlungs- / Vorfalldatum"), selection: $incidentDate, in: ...Date(), displayedComponents: .date)
                             .font(OhanaFont.adaptive(size: 14, weight: .medium, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .tint(Color.goPrimary)
                             .padding(14)
@@ -99,10 +102,10 @@ struct AddInsuranceClaimSheet: View {
 
                         // 金额区
                         VStack(spacing: 10) {
-                            amountRow(label: "本次总花费 *", placeholder: "0.00", text: $totalExpenseInput)
-                            amountRow(label: "申请报销金额 *", placeholder: "0.00", text: $claimedAmountInput)
+                            amountRow(label: l.tr(zh: "本次总花费 *", en: "Total expense *", de: "Gesamtkosten *"), placeholder: "0.00", text: $totalExpenseInput)
+                            amountRow(label: l.tr(zh: "申请报销金额 *", en: "Claim amount *", de: "Erstattungsbetrag *"), placeholder: "0.00", text: $claimedAmountInput)
                             if claimedDouble > totalExpenseDouble, totalExpenseDouble > 0 {
-                                Text("报销金额不能超过总花费")
+                                Text(l.tr(zh: "报销金额不能超过总花费", en: "Claim amount cannot exceed total expense", de: "Der Erstattungsbetrag darf die Gesamtkosten nicht überschreiten"))
                                     .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                     .foregroundStyle(Color(hex: "FF6B6B"))
                                     .padding(.horizontal, 4)
@@ -111,7 +114,7 @@ struct AddInsuranceClaimSheet: View {
 
                         // 关联花费记录
                         VStack(alignment: .leading, spacing: 8) {
-                            Text("关联花费记录（可选）")
+                            Text(l.tr(zh: "关联花费记录（可选）", en: "Linked expense (optional)", de: "Verknüpfte Ausgabe (optional)"))
                                 .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                 .foregroundStyle(Color.ohanaPrimaryText.opacity(0.45))
                             Button { showExpensePicker = true } label: {
@@ -121,7 +124,7 @@ struct AddInsuranceClaimSheet: View {
                                         .foregroundStyle(selectedExpense == nil ? .secondary : Color.goPrimary)
                                     if let exp = selectedExpense {
                                         VStack(alignment: .leading, spacing: 2) {
-                                            Text(exp.note.isEmpty ? exp.expenseCategory.rawValue : exp.note)
+                                            Text(exp.note.isEmpty ? l.expenseCategoryTitle(exp.expenseCategory) : exp.note)
                                                 .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                                 .foregroundStyle(Color.ohanaPrimaryText)
                                             Text("\(exp.date.formatted(.dateTime.month().day())) · \(AppCurrency.format(exp.amount, fractionDigits: 0))")
@@ -129,7 +132,7 @@ struct AddInsuranceClaimSheet: View {
                                                 .foregroundStyle(Color.ohanaSecondaryText)
                                         }
                                     } else {
-                                        Text("从医疗花费中关联")
+                                        Text(l.tr(zh: "从医疗花费中关联", en: "Link a medical expense", de: "Medizinische Ausgabe verknüpfen"))
                                             .font(OhanaFont.adaptive(size: 13, weight: .medium, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                             .foregroundStyle(Color.ohanaSecondaryText)
                                     }
@@ -157,7 +160,7 @@ struct AddInsuranceClaimSheet: View {
 
                         // 初始状态
                         VStack(alignment: .leading, spacing: 8) {
-                            Text("申请状态")
+                            Text(l.tr(zh: "申请状态", en: "Claim status", de: "Status"))
                                 .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                 .foregroundStyle(Color.ohanaPrimaryText.opacity(0.45))
                             HStack(spacing: 8) {
@@ -167,7 +170,7 @@ struct AddInsuranceClaimSheet: View {
                                             Circle()
                                                 .fill(Color(hex: status.colorHex))
                                                 .frame(width: 7, height: 7) // a11y: allow decorative non-interactive frame; hit area handled by parent
-                                            Text(status.rawValue)
+                                            Text(status.localizedLabel(l))
                                                 .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                                 .foregroundStyle(initialStatus == status ? Color.arkInk : .primary)
                                         }
@@ -185,7 +188,7 @@ struct AddInsuranceClaimSheet: View {
                         .goTranslucentCard(cornerRadius: OhanaRadius.row)
 
                         // 备注
-                        TextField("备注（诊断、病因等，可选）", text: $noteInput, axis: .vertical) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
+                        TextField(l.tr(zh: "备注（诊断、病因等，可选）", en: "Notes (diagnosis, cause, optional)", de: "Notizen (Diagnose, Ursache, optional)"), text: $noteInput, axis: .vertical) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
                             .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .lineLimit(3)
                             .padding(14)
@@ -196,7 +199,7 @@ struct AddInsuranceClaimSheet: View {
                             HStack(spacing: 8) {
                                 Image(systemName: "paperplane.fill") // a11y: allow decorative icon covered by surrounding text or control
                                     .font(OhanaFont.adaptive(size: 14, weight: .bold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                                Text(isSaving ? "提交中" : "提交报销申请")
+                                Text(isSaving ? l.tr(zh: "提交中", en: "Submitting", de: "Wird gesendet") : l.tr(zh: "提交报销申请", en: "Submit claim", de: "Erstattung einreichen"))
                                     .font(OhanaFont.adaptive(size: 16, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             }
                             .foregroundStyle(Color.arkInk)
@@ -212,10 +215,11 @@ struct AddInsuranceClaimSheet: View {
                     .padding(.horizontal, 16).padding(.top, 8)
                 }
             }
-            .navigationTitle("新增报销申请").navigationBarTitleDisplayMode(.inline)
+            .navigationTitle(l.tr(zh: "新增报销申请", en: "New claim", de: "Neue Erstattung"))
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("取消") { dismiss() }.foregroundStyle(Color.ohanaSecondaryText)
+                    Button(l.tr(zh: "取消", en: "Cancel", de: "Abbrechen")) { dismiss() }.foregroundStyle(Color.ohanaSecondaryText)
                 }
             }
             .sheet(isPresented: $showExpensePicker) {
@@ -248,6 +252,11 @@ struct AddInsuranceClaimSheet: View {
     }
 
     // MARK: - Sub-views
+
+    private var coverageSummary: String {
+        let amount = insurance.coverageAmount > 0 ? AppCurrency.format(insurance.coverageAmount, fractionDigits: 0) : "—"
+        return l.tr(zh: "保额 \(amount)", en: "Coverage \(amount)", de: "Deckung \(amount)")
+    }
 
     private func amountRow(label: String, placeholder: String, text: Binding<String>) -> some View {
         HStack {
@@ -329,6 +338,9 @@ private struct ExpenseLinkPickerSheet: View {
     let onSelect: (String) -> Void
 
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
+
+    private var l: L10n { L10n(appLanguage) }
 
     var body: some View {
         NavigationStack {
@@ -337,7 +349,7 @@ private struct ExpenseLinkPickerSheet: View {
                 Group {
                     if expenses.isEmpty {
                         VStack(spacing: 12) {
-                            Text("暂无医疗花费记录")
+                            Text(l.tr(zh: "暂无医疗花费记录", en: "No medical expense records", de: "Keine medizinischen Ausgaben"))
                                 .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                 .foregroundStyle(Color.ohanaSecondaryText)
                         }
@@ -351,7 +363,7 @@ private struct ExpenseLinkPickerSheet: View {
                                 } label: {
                                     HStack {
                                         VStack(alignment: .leading, spacing: 4) {
-                                            Text(exp.note.isEmpty ? exp.expenseCategory.rawValue : exp.note)
+                                            Text(exp.note.isEmpty ? l.expenseCategoryTitle(exp.expenseCategory) : exp.note)
                                                 .font(OhanaFont.adaptive(size: 14, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                                 .foregroundStyle(Color.ohanaPrimaryText)
                                             Text(exp.date.formatted(.dateTime.year().month().day()))
@@ -374,10 +386,11 @@ private struct ExpenseLinkPickerSheet: View {
                     }
                 }
             }
-            .navigationTitle("选择关联花费").navigationBarTitleDisplayMode(.inline)
+            .navigationTitle(l.tr(zh: "选择关联花费", en: "Choose expense", de: "Ausgabe auswählen"))
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("取消") { dismiss() }.foregroundStyle(Color.ohanaSecondaryText)
+                    Button(l.tr(zh: "取消", en: "Cancel", de: "Abbrechen")) { dismiss() }.foregroundStyle(Color.ohanaSecondaryText)
                 }
             }
         }

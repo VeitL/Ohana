@@ -20,10 +20,12 @@ enum ProtectionSection: String, CaseIterable, Identifiable {
         }
     }
 
-    var title: String {
+    func title(_ l: L10n) -> String {
         switch self {
-        case .documents: "证件"
-        case .insurance: "保险"
+        case .documents:
+            l.tr(zh: "证件", en: "Documents", de: "Dokumente")
+        case .insurance:
+            l.tr(zh: "保险", en: "Insurance", de: "Versicherung")
         }
     }
 
@@ -50,12 +52,16 @@ enum ProtectionRiskLevel: Equatable {
         }
     }
 
-    var label: String {
+    func label(_ l: L10n) -> String {
         switch self {
-        case .empty: "未建立"
-        case .protected: "保障中"
-        case .soon: "即将到期"
-        case .expired: "已过期"
+        case .empty:
+            l.tr(zh: "未建立", en: "Not set", de: "Nicht eingerichtet")
+        case .protected:
+            l.tr(zh: "保障中", en: "Covered", de: "Aktiv")
+        case .soon:
+            l.tr(zh: "即将到期", en: "Due soon", de: "Bald fällig")
+        case .expired:
+            l.tr(zh: "已过期", en: "Expired", de: "Abgelaufen")
         }
     }
 }
@@ -120,6 +126,8 @@ struct ProtectionCoreCard: View {
     let isSelected: Bool
     let onSelect: () -> Void
     let onAdd: () -> Void
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
+    private var l: L10n { L10n(appLanguage) }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -139,7 +147,7 @@ struct ProtectionCoreCard: View {
             }
 
             VStack(alignment: .leading, spacing: 2) {
-                Text(section.title)
+                Text(section.title(l))
                     .font(OhanaFont.subheadline(.black))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(1)
@@ -172,13 +180,13 @@ struct ProtectionCoreCard: View {
     }
 
     private var nextText: String {
-        guard let nextDate else { return risk.label }
-        return Self.shortDate(nextDate)
+        guard let nextDate else { return risk.label(l) }
+        return shortDate(nextDate)
     }
 
-    private static func shortDate(_ date: Date) -> String {
-        if Calendar.current.isDateInToday(date) { return "今天" }
-        if Calendar.current.isDateInTomorrow(date) { return "明天" }
+    private func shortDate(_ date: Date) -> String {
+        if Calendar.current.isDateInToday(date) { return l.tr(zh: "今天", en: "Today", de: "Heute") }
+        if Calendar.current.isDateInTomorrow(date) { return l.tr(zh: "明天", en: "Tomorrow", de: "Morgen") }
         return date.formatted(.dateTime.month().day())
     }
 }
@@ -236,6 +244,8 @@ struct DocumentDetailRow: View {
     let onDelete: () -> Void
 
     @State private var showingPreview = false
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
+    private var l: L10n { L10n(appLanguage) }
 
     private var expiryColor: Color {
         if doc.isExpired { return Color.goRed }
@@ -244,10 +254,10 @@ struct DocumentDetailRow: View {
     }
 
     private var statusText: String {
-        if doc.isExpired { return "已过期" }
-        if doc.isExpiringSoon { return "即将到期" }
-        if doc.expiryDate != nil { return "保障中" }
-        return "长期"
+        if doc.isExpired { return l.tr(zh: "已过期", en: "Expired", de: "Abgelaufen") }
+        if doc.isExpiringSoon { return l.tr(zh: "即将到期", en: "Due soon", de: "Bald fällig") }
+        if doc.expiryDate != nil { return l.tr(zh: "保障中", en: "Valid", de: "Gültig") }
+        return l.tr(zh: "长期", en: "Long-term", de: "Langfristig")
     }
 
     var body: some View {
@@ -258,12 +268,12 @@ struct DocumentDetailRow: View {
                     .frame(width: 42, height: 42) // a11y: allow decorative non-interactive frame; hit area handled by parent
 
                 VStack(alignment: .leading, spacing: 5) {
-                    Text(doc.title.isEmpty ? doc.category : doc.title)
+                    Text(doc.title.isEmpty ? doc.documentCategory.localizedLabel(l) : doc.title)
                         .font(OhanaFont.subheadline(.black))
                         .foregroundStyle(Color.ohanaPrimaryText)
                         .lineLimit(1)
                     HStack(spacing: 8) {
-                        Text(doc.category)
+                        Text(doc.documentCategory.localizedLabel(l))
                         if !doc.issuingAuthority.isEmpty { Text(doc.issuingAuthority) }
                         if let expiry = doc.expiryDate { Text(expiry.formatted(.dateTime.month().day())) }
                     }
@@ -310,13 +320,13 @@ struct DocumentDetailRow: View {
         .buttonStyle(ScaleButtonStyle())
         .contextMenu {
             Button { onDetail() } label: {
-                Label("查看详情", systemImage: "doc.text.magnifyingglass")
+                Label(l.tr(zh: "查看详情", en: "View details", de: "Details ansehen"), systemImage: "doc.text.magnifyingglass")
             }
             Button { onEdit() } label: {
-                Label("编辑证件", systemImage: "pencil")
+                Label(l.tr(zh: "编辑证件", en: "Edit document", de: "Dokument bearbeiten"), systemImage: "pencil")
             }
             Button(role: .destructive) { onDelete() } label: {
-                Label("删除证件", systemImage: "trash")
+                Label(l.tr(zh: "删除证件", en: "Delete document", de: "Dokument löschen"), systemImage: "trash")
             }
         }
         .fullScreenCover(isPresented: $showingPreview) {
@@ -389,6 +399,8 @@ struct ProtectionInsuranceRow: View {
     let onDetail: () -> Void
     let onEdit: () -> Void
     let onDelete: () -> Void
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
+    private var l: L10n { L10n(appLanguage) }
 
     private var statusColor: Color {
         let days = insurance.daysUntilRenewal
@@ -405,7 +417,7 @@ struct ProtectionInsuranceRow: View {
                     .foregroundStyle(Color.goPurple)
                     .frame(width: 42, height: 42) // a11y: allow decorative non-interactive frame; hit area handled by parent
                 VStack(alignment: .leading, spacing: 5) {
-                    Text(insurance.productName.isEmpty ? "宠物保险" : insurance.productName)
+                    Text(insurance.productName.isEmpty ? l.tr(zh: "宠物保险", en: "Pet insurance", de: "Tierversicherung") : insurance.productName)
                         .font(OhanaFont.subheadline(.black))
                         .foregroundStyle(Color.ohanaPrimaryText)
                         .lineLimit(1)
@@ -419,7 +431,7 @@ struct ProtectionInsuranceRow: View {
                     .lineLimit(1)
                 }
                 Spacer()
-                Text(insurance.renewalStatusLabel)
+                Text(renewalStatusLabel)
                     .font(OhanaFont.caption2(.black))
                     .foregroundStyle(statusColor)
                     .padding(.horizontal, 9)
@@ -432,14 +444,25 @@ struct ProtectionInsuranceRow: View {
         .buttonStyle(ScaleButtonStyle())
         .contextMenu {
             Button { onEdit() } label: {
-                Label("编辑保单", systemImage: "pencil")
+                Label(l.tr(zh: "编辑保单", en: "Edit policy", de: "Police bearbeiten"), systemImage: "pencil")
             }
             Button { onDetail() } label: {
-                Label("查看详情", systemImage: "doc.text.magnifyingglass")
+                Label(l.tr(zh: "查看详情", en: "View details", de: "Details ansehen"), systemImage: "doc.text.magnifyingglass")
             }
             Button(role: .destructive) { onDelete() } label: {
-                Label("删除保单", systemImage: "trash")
+                Label(l.tr(zh: "删除保单", en: "Delete policy", de: "Police löschen"), systemImage: "trash")
             }
         }
+    }
+
+    private var renewalStatusLabel: String {
+        let days = insurance.daysUntilRenewal
+        if days < 0 {
+            return l.tr(zh: "已过期", en: "Expired", de: "Abgelaufen")
+        }
+        if days <= 30 {
+            return l.tr(zh: "即将到期", en: "Due soon", de: "Bald fällig")
+        }
+        return l.tr(zh: "保障中", en: "Covered", de: "Aktiv")
     }
 }

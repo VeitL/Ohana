@@ -16,7 +16,7 @@ struct HumanBasicInfoDetailContentView: View {
     @Environment(AppServices.self) private var appServices
     @AppStorage("currentActiveHumanId") private var activeHumanIdStr = ""
     @AppStorage(HomeCardVisibility.hiddenPetIDsKey) private var hiddenHomePetIDsRaw = ""
-    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
 
     @StateObject private var commandQueue = DeferredDomainCommandQueue()
     private var activeHumanId: UUID? { UUID(uuidString: activeHumanIdStr) }
@@ -780,7 +780,7 @@ struct HumanLifecycleDangerZone: View {
     let onUndoPassedAway: () -> Void
     let onDelete: () -> Void
 
-    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
     @State private var passedDate = Date()
     @State private var showingPassedAlert = false
     @State private var showingUndoPassedAlert = false
@@ -953,7 +953,7 @@ private struct HumanDeleteConfirmationSheet: View {
     let onCancel: () -> Void
     let onDelete: () -> Void
 
-    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
     @State private var confirmName = ""
     @FocusState private var confirmNameFocused: Bool
     private var l: L10n { L10n(appLanguage) }

@@ -13,7 +13,7 @@ struct PetSharedCheckInView: View {
     let pets: [Pet]
 
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
-    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
 
     private var l: L10n { L10n(appLanguage) }
     private var activePets: [Pet] { pets.filter { !$0.hasPassedAway } }

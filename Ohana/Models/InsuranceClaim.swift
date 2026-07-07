@@ -51,6 +51,19 @@ enum InsurancePaymentFrequency: String, Codable, CaseIterable {
         default: 1
         }
     }
+
+    func localizedLabel(_ l: L10n) -> String {
+        switch self {
+        case .monthly:
+            l.tr(zh: "按月", en: "Monthly", de: "Monatlich")
+        case .quarterly:
+            l.tr(zh: "按季", en: "Quarterly", de: "Vierteljaehrlich")
+        case .annual:
+            l.tr(zh: "按年", en: "Annual", de: "Jaehrlich")
+        case .once:
+            l.tr(zh: "一次性", en: "One-time", de: "Einmalig")
+        }
+    }
 }
 
 // MARK: - 报销状态枚举
@@ -76,6 +89,19 @@ enum ClaimStatus: String, Codable, CaseIterable {
         case .processing: "clock.fill"
         case .approved: "checkmark.seal.fill"
         case .rejected: "xmark.seal.fill"
+        }
+    }
+
+    func localizedLabel(_ l: L10n) -> String {
+        switch self {
+        case .submitted:
+            l.tr(zh: "已提交", en: "Submitted", de: "Eingereicht")
+        case .processing:
+            l.tr(zh: "处理中", en: "Processing", de: "In Bearbeitung")
+        case .approved:
+            l.tr(zh: "已报销", en: "Approved", de: "Erstattet")
+        case .rejected:
+            l.tr(zh: "已拒绝", en: "Rejected", de: "Abgelehnt")
         }
     }
 }

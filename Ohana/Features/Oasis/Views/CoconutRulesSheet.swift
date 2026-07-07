@@ -9,7 +9,7 @@ import SwiftUI
 
 struct CoconutRulesSheet: View {
     @Environment(\.dismiss) private var dismiss
-    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
     @State private var appeared = false
 
     private var l: L10n { L10n(appLanguage) }

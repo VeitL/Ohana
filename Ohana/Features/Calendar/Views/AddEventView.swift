@@ -21,7 +21,7 @@ struct AddEventContentView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(AppServices.self) private var appServices
     @Environment(\.ohanaInlinePageSafeAreaInsets) private var inlinePageSafeAreaInsets
-    @AppStorage("appLanguage") private var appLanguage = AppLanguage.fallbackCode
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
     @AppStorage("currentActiveHumanId") private var currentActiveHumanId = ""
 
     @State private var title = ""

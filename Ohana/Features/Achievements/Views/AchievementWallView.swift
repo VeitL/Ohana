@@ -29,7 +29,7 @@ struct AchievementWallContentView: View {
     @Environment(\.modelContext) var modelContext
     @Environment(AppServices.self) var appServices
     @AppStorage("achievement_claimedRewardIDs") var claimedRewardRaw: String = ""
-    @AppStorage("appLanguage") var appLanguageRaw: String = AppLanguage.fallbackCode
+    @Environment(\.ohanaAppLanguageCode) var appLanguageRaw
 
     @State var selectedSubject: AchievementSubject?
     @State var selectedFilter: AchievementFilter = .all

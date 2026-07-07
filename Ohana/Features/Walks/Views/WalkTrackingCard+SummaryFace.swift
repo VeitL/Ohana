@@ -37,9 +37,9 @@ extension WalkTrackingCard {
                     }
 
                     HStack(spacing: 8) {
-                        summaryStatCell(label: "时间", value: formatElapsed(elapsed), accent: .goPrimary, identifier: "walk-tracking-summary-duration")
-                        summaryStatCell(label: "距离", value: distanceText(distance), accent: .goTeal, identifier: "walk-tracking-summary-distance")
-                        summaryStatCell(label: "便便", value: "\(poop)次", accent: .goYellow, identifier: "walk-tracking-summary-poop")
+                        summaryStatCell(label: L10n(appLanguage).tr(zh: "时间", en: "Time", de: "Zeit"), value: formatElapsed(elapsed), accent: .goPrimary, identifier: "walk-tracking-summary-duration")
+                        summaryStatCell(label: L10n(appLanguage).tr(zh: "距离", en: "Distance", de: "Distanz"), value: distanceText(distance), accent: .goTeal, identifier: "walk-tracking-summary-distance")
+                        summaryStatCell(label: L10n(appLanguage).tr(zh: "便便", en: "Poop", de: "Häufchen"), value: poopCountText(poop), accent: .goYellow, identifier: "walk-tracking-summary-poop")
                     }
                 }
                 .padding(.horizontal, 12)
@@ -89,11 +89,11 @@ extension WalkTrackingCard {
                 HStack(alignment: .top, spacing: 10) {
                     petAvatar(pet: pet, size: 38)
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("本次遛狗")
+                        Text(L10n(appLanguage).tr(zh: "本次遛狗", en: "This walk", de: "Dieser Spaziergang"))
                             .font(OhanaFont.caption2(.black))
                             .foregroundStyle(Color.goPrimary)
                             .tracking(1.2)
-                        Text("\(pet.name) 到家啦")
+                        Text(L10n(appLanguage).tr(zh: "\(pet.name) 到家啦", en: "\(pet.name) is home", de: "\(pet.name) ist zurück"))
                             .font(OhanaFont.callout(.black))
                             .foregroundStyle(Color.goCardWhite)
                             .lineLimit(1)
@@ -138,7 +138,7 @@ extension WalkTrackingCard {
         .frame(width: 44, height: 44)
         .contentShape(Circle())
         .buttonStyle(ScaleButtonStyle())
-        .accessibilityLabel("关闭遛狗摘要")
+        .accessibilityLabel(L10n(appLanguage).tr(zh: "关闭遛狗摘要", en: "Close walk summary", de: "Spaziergangsübersicht schließen"))
         .accessibilityIdentifier("walk-tracking-summary-close-action")
     }
 
@@ -156,7 +156,7 @@ extension WalkTrackingCard {
         .frame(width: 44, height: 44)
         .contentShape(Circle())
         .buttonStyle(ScaleButtonStyle())
-        .accessibilityLabel("编辑遛狗目标")
+        .accessibilityLabel(L10n(appLanguage).tr(zh: "编辑遛狗目标", en: "Edit walk goal", de: "Spaziergangsziel bearbeiten"))
         .accessibilityIdentifier("walk-tracking-summary-goal-action")
     }
 
@@ -172,7 +172,7 @@ extension WalkTrackingCard {
                     .frame(width: geo.size.width, height: geo.size.height)
                     .clipped()
                     .overlay(alignment: .bottomLeading) {
-                        Label("本次轨迹", systemImage: "map.fill")
+                        Label(L10n(appLanguage).tr(zh: "本次轨迹", en: "Route", de: "Route"), systemImage: "map.fill")
                             .font(OhanaFont.caption2(.bold))
                             .foregroundStyle(Color.goCardWhite)
                             .padding(.horizontal, 9)
@@ -184,7 +184,9 @@ extension WalkTrackingCard {
         } else if !previewCoords.isEmpty {
             WalkRouteTracePreview(
                 coordinates: previewCoords,
-                title: coords.count >= 2 ? "本次轨迹" : "本次定位"
+                title: coords.count >= 2
+                    ? L10n(appLanguage).tr(zh: "本次轨迹", en: "Route", de: "Route")
+                    : L10n(appLanguage).tr(zh: "本次定位", en: "Location", de: "Standort")
             )
         } else {
             RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous)
@@ -194,7 +196,7 @@ extension WalkTrackingCard {
                         Image(systemName: "map") // a11y: allow decorative icon covered by surrounding text or control
                             .font(OhanaFont.adaptive(size: 22, weight: .bold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(Color.goCardWhite.opacity(0.28))
-                        Text("本次轨迹生成中")
+                        Text(L10n(appLanguage).tr(zh: "本次轨迹生成中", en: "Route is being generated", de: "Route wird erstellt"))
                             .font(OhanaFont.caption(.bold))
                             .foregroundStyle(Color.goCardWhite.opacity(0.38))
                     }
@@ -211,7 +213,7 @@ extension WalkTrackingCard {
                 HStack(spacing: 10) {
                     goalProgressRing(progress: progress)
                     goalTextBlock(
-                        title: "本周目标",
+                        title: L10n(appLanguage).tr(zh: "本周目标", en: "Weekly goal", de: "Wochenziel"),
                         subtitle: String(format: "%.1f / %.0f km", thisWeekDistanceKm, pet.weeklyWalkGoalKm)
                     )
                     Spacer(minLength: 0)
@@ -223,8 +225,8 @@ extension WalkTrackingCard {
                     HStack(spacing: 10) {
                         goalFlagIcon
                         goalTextBlock(
-                            title: "还没有遛狗目标",
-                            subtitle: "设一个每周目标，之后会显示完成率"
+                            title: L10n(appLanguage).tr(zh: "还没有遛狗目标", en: "No walk goal yet", de: "Noch kein Spaziergangsziel"),
+                            subtitle: L10n(appLanguage).tr(zh: "设一个每周目标，之后会显示完成率", en: "Set a weekly goal to see progress here.", de: "Setze ein Wochenziel, um Fortschritt zu sehen.")
                         )
                         Spacer(minLength: 8)
                         editGoalButton
@@ -234,8 +236,8 @@ extension WalkTrackingCard {
                         HStack(spacing: 10) {
                             goalFlagIcon
                             goalTextBlock(
-                                title: "还没有遛狗目标",
-                                subtitle: "设一个每周目标，之后会显示完成率"
+                                title: L10n(appLanguage).tr(zh: "还没有遛狗目标", en: "No walk goal yet", de: "Noch kein Spaziergangsziel"),
+                                subtitle: L10n(appLanguage).tr(zh: "设一个每周目标，之后会显示完成率", en: "Set a weekly goal to see progress here.", de: "Setze ein Wochenziel, um Fortschritt zu sehen.")
                             )
                             Spacer(minLength: 0)
                         }
@@ -301,7 +303,7 @@ extension WalkTrackingCard {
             goalDraft = max(3, pet.weeklyWalkGoalKm)
             showingGoalSetter = true
         } label: {
-            Text("编辑目标")
+            Text(L10n(appLanguage).tr(zh: "编辑目标", en: "Edit goal", de: "Ziel ändern"))
                 .font(OhanaFont.caption(.black))
                 .foregroundStyle(Color.arkInk)
                 .lineLimit(1)
@@ -314,7 +316,7 @@ extension WalkTrackingCard {
 
     var walkGoalSetterSheet: some View {
         VStack(spacing: 20) {
-            Text("设定每周步行目标")
+            Text(L10n(appLanguage).tr(zh: "设定每周步行目标", en: "Set weekly walk goal", de: "Wochenziel festlegen"))
                 .font(OhanaFont.headline(.black))
                 .padding(.top, 20)
 
@@ -324,7 +326,7 @@ extension WalkTrackingCard {
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .contentTransition(.numericText())
                     .animation(GoMotion.feedback, value: goalDraft)
-                Text("km / 周")
+                Text(L10n(appLanguage).tr(zh: "km / 周", en: "km / week", de: "km / Woche"))
                     .font(OhanaFont.title3(.bold))
                     .foregroundStyle(Color.ohanaSecondaryText)
             }
@@ -339,7 +341,7 @@ extension WalkTrackingCard {
                 .buttonStyle(ScaleButtonStyle())
                 .disabled(goalDraft <= 0)
 
-                Text("每次 ±0.5 km")
+                Text(L10n(appLanguage).tr(zh: "每次 ±0.5 km", en: "±0.5 km per tap", de: "±0,5 km pro Tipp"))
                     .font(OhanaFont.caption(.medium))
                     .foregroundStyle(Color.ohanaSecondaryText)
 
@@ -363,7 +365,9 @@ extension WalkTrackingCard {
                 UINotificationFeedbackGenerator().notificationOccurred(.success)
                 showingGoalSetter = false
             } label: {
-                Text(goalDraft == 0 ? "清除目标" : "保存目标")
+                Text(goalDraft == 0
+                    ? L10n(appLanguage).tr(zh: "清除目标", en: "Clear goal", de: "Ziel löschen")
+                    : L10n(appLanguage).tr(zh: "保存目标", en: "Save goal", de: "Ziel speichern"))
                     .font(OhanaFont.callout(.black))
                     .foregroundStyle(Color.arkInk)
                     .frame(maxWidth: .infinity)
@@ -476,6 +480,10 @@ extension WalkTrackingCard {
 
     func distanceText(_ meters: Double) -> String {
         AppMeasurementSystem.formatDistanceMeters(meters, fractionDigits: 2)
+    }
+
+    func poopCountText(_ count: Int) -> String {
+        L10n(appLanguage).tr(zh: "\(count)次", en: "\(count)", de: "\(count)")
     }
 
     func weeklyGoalDisplay(_ km: Double) -> String {

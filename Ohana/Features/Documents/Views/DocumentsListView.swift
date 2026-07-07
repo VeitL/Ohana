@@ -17,6 +17,7 @@ struct DocumentsListContentView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(AppServices.self) private var appServices
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
     @State private var selectedSection: ProtectionSection = .documents
     @State private var activePopup: ActiveProtectionPopup?
     @State private var detailDoc: PetDocument?
@@ -25,7 +26,7 @@ struct DocumentsListContentView: View {
     @State private var deleteInsurance: PetInsurance?
     @StateObject private var commandQueue = DeferredDomainCommandQueue()
 
-    private var l: L10n { L10n() }
+    private var l: L10n { L10n(appLanguage) }
     private var state: PetProtectionDashboardState {
         PetProtectionDashboardState(documents: sortedDocs, insurances: sortedInsurances)
     }
@@ -106,12 +107,12 @@ struct DocumentsListContentView: View {
         .sheet(item: $selectedInsurance) { insurance in
             InsurancePolicyDetailSheet(insurance: insurance, pet: pet)
         }
-        .alert("删除证件？", isPresented: Binding(
+        .alert(l.tr(zh: "删除证件？", en: "Delete document?", de: "Dokument löschen?"), isPresented: Binding(
             get: { deleteDocument != nil },
             set: { if !$0 { deleteDocument = nil } }
         )) {
-            Button("取消", role: .cancel) { deleteDocument = nil }
-            Button("删除", role: .destructive) {
+            Button(l.tr(zh: "取消", en: "Cancel", de: "Abbrechen"), role: .cancel) { deleteDocument = nil }
+            Button(l.tr(zh: "删除", en: "Delete", de: "Löschen"), role: .destructive) {
                 if let target = deleteDocument {
                     let command = DomainCommand.petDocumentDelete(petID: pet.id, documentID: target.id)
                     commandQueue.enqueue(command) {
@@ -129,12 +130,12 @@ struct DocumentsListContentView: View {
                 deleteDocument = nil
             }
         }
-        .alert("删除保单？", isPresented: Binding(
+        .alert(l.tr(zh: "删除保单？", en: "Delete policy?", de: "Police löschen?"), isPresented: Binding(
             get: { deleteInsurance != nil },
             set: { if !$0 { deleteInsurance = nil } }
         )) {
-            Button("取消", role: .cancel) { deleteInsurance = nil }
-            Button("删除", role: .destructive) {
+            Button(l.tr(zh: "取消", en: "Cancel", de: "Abbrechen"), role: .cancel) { deleteInsurance = nil }
+            Button(l.tr(zh: "删除", en: "Delete", de: "Löschen"), role: .destructive) {
                 if let target = deleteInsurance {
                     let command = DomainCommand.insurancePolicy(
                         petID: pet.id,
@@ -162,7 +163,7 @@ struct DocumentsListContentView: View {
         HStack(spacing: 12) {
             ProtectionPetAvatar(pet: pet, size: 48)
             VStack(alignment: .leading, spacing: 2) {
-                Text("证件保障")
+                Text(l.tr(zh: "证件保障", en: "Documents and protection", de: "Dokumente und Schutz"))
                     .font(OhanaFont.title3(.black))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Text(pet.name)
@@ -186,9 +187,9 @@ struct DocumentsListContentView: View {
 
     private var statusStrip: some View {
         HStack(spacing: 12) {
-            statusMetric(title: "状态", value: overallRisk.label, tint: overallRisk.color)
-            statusMetric(title: "证件", value: "\(state.documentCount)", tint: ProtectionSection.documents.tint)
-            statusMetric(title: "保单", value: "\(state.insuranceCount)", tint: ProtectionSection.insurance.tint)
+            statusMetric(title: l.tr(zh: "状态", en: "Status", de: "Status"), value: overallRisk.label(l), tint: overallRisk.color)
+            statusMetric(title: ProtectionSection.documents.title(l), value: "\(state.documentCount)", tint: ProtectionSection.documents.tint)
+            statusMetric(title: l.tr(zh: "保单", en: "Policies", de: "Policen"), value: "\(state.insuranceCount)", tint: ProtectionSection.insurance.tint)
         }
     }
 
@@ -241,7 +242,7 @@ struct DocumentsListContentView: View {
     private var selectedSectionList: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Label(selectedSection.title, systemImage: selectedSection.icon)
+                Label(selectedSection.title(l), systemImage: selectedSection.icon)
                     .font(OhanaFont.headline(.black))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Spacer()
@@ -252,8 +253,8 @@ struct DocumentsListContentView: View {
                 if sortedDocs.isEmpty {
                     ProtectionEmptyState(
                         icon: "doc.badge.plus",
-                        title: "还没有证件",
-                        actionTitle: "添加证件",
+                        title: l.tr(zh: "还没有证件", en: "No documents yet", de: "Noch keine Dokumente"),
+                        actionTitle: l.tr(zh: "添加证件", en: "Add document", de: "Dokument hinzufügen"),
                         tint: selectedSection.tint
                     ) { openAdd(for: .documents) }
                 } else {
@@ -270,8 +271,8 @@ struct DocumentsListContentView: View {
                 if sortedInsurances.isEmpty {
                     ProtectionEmptyState(
                         icon: "shield",
-                        title: "还没有保单",
-                        actionTitle: "添加保单",
+                        title: l.tr(zh: "还没有保单", en: "No policies yet", de: "Noch keine Policen"),
+                        actionTitle: l.tr(zh: "添加保单", en: "Add policy", de: "Police hinzufügen"),
                         tint: selectedSection.tint
                     ) { openAdd(for: .insurance) }
                 } else {

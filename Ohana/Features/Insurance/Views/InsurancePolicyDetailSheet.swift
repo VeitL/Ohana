@@ -15,7 +15,7 @@ struct InsurancePolicyDetailSheet: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
     @Environment(AppServices.self) private var appServices
-    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
 
     @StateObject private var commandQueue = DeferredDomainCommandQueue()
     @State private var showEdit = false
@@ -249,7 +249,7 @@ struct InsurancePolicyDetailSheet: View {
                 Text(AppCurrency.format(claim.claimedAmount, fractionDigits: 0))
                     .font(OhanaFont.subheadline(.black))
                     .foregroundStyle(Color.ohanaPrimaryText)
-                Text(claim.claimStatus.rawValue)
+                Text(claim.claimStatus.localizedLabel(l))
                     .font(OhanaFont.caption2(.black))
                     .foregroundStyle(Color(hex: claim.claimStatus.colorHex))
             }
@@ -262,7 +262,11 @@ struct InsurancePolicyDetailSheet: View {
                     Button {
                         updateClaimStatus(claim, to: status)
                     } label: {
-                        Label("标记为：\(status.rawValue)", systemImage: status.sfSymbol)
+                        Label(l.tr(
+                            zh: "标记为：\(status.localizedLabel(l))",
+                            en: "Mark as: \(status.localizedLabel(l))",
+                            de: "Markieren als: \(status.localizedLabel(l))"
+                        ), systemImage: status.sfSymbol)
                     }
                 }
             }
@@ -270,7 +274,7 @@ struct InsurancePolicyDetailSheet: View {
             Button(role: .destructive) {
                 deleteClaim(claim)
             } label: {
-                Label("删除", systemImage: "trash")
+                Label(l.tr(zh: "删除", en: "Delete", de: "Loeschen"), systemImage: "trash")
             }
         }
     }
@@ -425,7 +429,7 @@ private struct InsuranceClaimPopup: View {
 
     @Environment(\.modelContext) private var modelContext
     @Environment(AppServices.self) private var appServices
-    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
 
     @StateObject private var commandQueue = DeferredDomainCommandQueue()
     @State private var visible = false

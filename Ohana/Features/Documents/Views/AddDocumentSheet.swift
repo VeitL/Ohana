@@ -55,6 +55,7 @@ struct AddDocumentContentSheet: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
     @Environment(AppServices.self) private var appServices
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
     @State private var title: String = ""
     @State private var selectedCategory: DocumentCategory = .other
     @State private var hasIssueDate = false
@@ -80,11 +81,12 @@ struct AddDocumentContentSheet: View {
     @State private var selectedPayerId: String? = nil
     @StateObject private var commandQueue = DeferredDomainCommandQueue()
     // B4: 自动预填名称
-    private var autoTitle: String { "\(pet.name)\(selectedCategory.rawValue)" }
+    private var autoTitle: String { "\(pet.name) \(selectedCategory.localizedLabel(l))" }
     private var showDocumentNumber: Bool { selectedCategory == .passport || selectedCategory == .registration }
     private var petThemeColor: Color {
         Color(hex: pet.safeThemeColorHex)
     }
+    private var l: L10n { L10n(appLanguage) }
 
     var body: some View {
         NavigationStack {
@@ -103,7 +105,7 @@ struct AddDocumentContentSheet: View {
                             VStack(alignment: .leading, spacing: 3) {
                                 Text(pet.name)
                                     .font(OhanaFont.adaptive(size: 17, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                                Text(selectedCategory.rawValue)
+                                Text(selectedCategory.localizedLabel(l))
                                     .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                     .foregroundStyle(petThemeColor)
                             }
@@ -120,7 +122,7 @@ struct AddDocumentContentSheet: View {
                                     Image(systemName: "tag.fill") // a11y: allow decorative icon covered by surrounding text or control
                                         .font(OhanaFont.adaptive(size: 13, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                         .foregroundStyle(petThemeColor)
-                                    Text("证件类型")
+                                    Text(l.tr(zh: "证件类型", en: "Document type", de: "Dokumenttyp"))
                                         .font(OhanaFont.adaptive(size: 14, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                 }
                                 ScrollView(.horizontal, showsIndicators: false) {
@@ -129,7 +131,7 @@ struct AddDocumentContentSheet: View {
                                             Button { selectedCategory = cat } label: {
                                                 HStack(spacing: 5) {
                                                     Text(cat.emoji)
-                                                    Text(cat.rawValue)
+                                                    Text(cat.localizedLabel(l))
                                                         .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                                 }
                                                 .foregroundStyle(selectedCategory == cat ? Color.arkInk : .primary)
@@ -147,7 +149,7 @@ struct AddDocumentContentSheet: View {
                         }
 
                         // ── 证件名称
-                        docRow(icon: "doc.text.fill", iconColor: .goTeal, label: "证件名称") {
+                        docRow(icon: "doc.text.fill", iconColor: .goTeal, label: l.tr(zh: "证件名称", en: "Document name", de: "Dokumentname")) {
                             GoDraftTextField( // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
                                 autoTitle,
                                 text: $title,
@@ -158,9 +160,9 @@ struct AddDocumentContentSheet: View {
                         }
 
                         // ── 颁发机构
-                        docRow(icon: "building.2.fill", iconColor: .goCardCyan, label: "颁发机构") {
+                        docRow(icon: "building.2.fill", iconColor: .goCardCyan, label: l.tr(zh: "颁发机构", en: "Issuer", de: "Aussteller")) {
                             GoDraftTextField( // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
-                                "动物检疫站、宠物医院…",
+                                l.tr(zh: "动物检疫站、宠物医院…", en: "Vet clinic, authority...", de: "Tierarzt, Behörde ..."),
                                 text: $issuingAuthority,
                                 capitalization: .words
                             )
@@ -169,7 +171,7 @@ struct AddDocumentContentSheet: View {
                         }
 
                         // ── 签发日期
-                        docRow(icon: "calendar.badge.checkmark", iconColor: .goPrimary, label: "签发日期") {
+                        docRow(icon: "calendar.badge.checkmark", iconColor: .goPrimary, label: l.tr(zh: "签发日期", en: "Issue date", de: "Ausstellungsdatum")) {
                             HStack(spacing: 10) {
                                 Toggle("", isOn: $hasIssueDate).tint(Color.goPrimary).labelsHidden()
                                 if hasIssueDate {
@@ -180,7 +182,7 @@ struct AddDocumentContentSheet: View {
                         }
 
                         // ── 有效期
-                        docRow(icon: "clock.badge.exclamationmark", iconColor: Color(hex: "FF3B30"), label: "有效期至") {
+                        docRow(icon: "clock.badge.exclamationmark", iconColor: Color(hex: "FF3B30"), label: l.tr(zh: "有效期至", en: "Expires on", de: "Gültig bis")) {
                             HStack(spacing: 10) {
                                 Toggle("", isOn: $hasExpiryDate).tint(Color(hex: "FF3B30")).labelsHidden()
                                 if hasExpiryDate {
@@ -190,7 +192,7 @@ struct AddDocumentContentSheet: View {
                             }
                         }
 
-                        docRow(icon: "\(AppCurrency.systemIconName).fill", iconColor: .goPrimary, label: "花费记账") {
+                        docRow(icon: "\(AppCurrency.systemIconName).fill", iconColor: .goPrimary, label: l.tr(zh: "花费记账", en: "Track cost", de: "Kosten erfassen")) {
                             HStack(spacing: 8) {
                                 Toggle("", isOn: $hasCost).tint(Color.goPrimary).labelsHidden()
                                 if hasCost {
@@ -216,7 +218,7 @@ struct AddDocumentContentSheet: View {
                                         Image(systemName: "creditcard.fill") // a11y: allow decorative icon covered by surrounding text or control
                                             .font(OhanaFont.adaptive(size: 13, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                             .foregroundStyle(petThemeColor.opacity(0.85))
-                                        Text("谁付的款")
+                                        Text(l.tr(zh: "谁付的款", en: "Paid by", de: "Bezahlt von"))
                                             .font(OhanaFont.adaptive(size: 14, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                     }
                                     ScrollView(.horizontal, showsIndicators: false) {
@@ -231,7 +233,7 @@ struct AddDocumentContentSheet: View {
                                                             .font(OhanaFont.adaptive(size: 16, weight: .bold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                                             .foregroundStyle(selectedPayerId == nil ? Color.arkInk : .primary.opacity(0.5))
                                                     }
-                                                    Text("未指定")
+                                                    Text(l.tr(zh: "未指定", en: "Not set", de: "Nicht festgelegt"))
                                                         .font(OhanaFont.adaptive(size: 10, weight: .medium, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                                         .foregroundStyle(Color.ohanaSecondaryText)
                                                 }
@@ -280,7 +282,7 @@ struct AddDocumentContentSheet: View {
                                     Image(systemName: "paperclip") // a11y: allow decorative icon covered by surrounding text or control
                                         .font(OhanaFont.adaptive(size: 13, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                         .foregroundStyle(Color.ohanaSecondaryText)
-                                    Text("附件" + (attachments.isEmpty ? "" : " (\(attachments.count))"))
+                                    Text(attachmentSectionTitle)
                                         .font(OhanaFont.adaptive(size: 14, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                 }
                                 .padding(.horizontal, 4)
@@ -308,7 +310,7 @@ struct AddDocumentContentSheet: View {
                                                         .frame(width: 40, height: 40) // a11y: allow decorative non-interactive frame; hit area handled by parent
                                                         .background(Color.goTeal.opacity(0.1), in: RoundedRectangle(cornerRadius: OhanaRadius.icon))
                                                 }
-                                                Text(att.filename.isEmpty ? (att.isImage ? "图片" : "文件") : att.filename)
+                                                Text(att.filename.isEmpty ? (att.isImage ? l.tr(zh: "图片", en: "Image", de: "Bild") : l.tr(zh: "文件", en: "File", de: "Datei")) : att.filename)
                                                     .font(OhanaFont.adaptive(size: 14, weight: .medium)).lineLimit(1) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                                 Spacer()
                                                 Button { attachments.removeAll { $0.id == att.id } } label: {
@@ -323,9 +325,9 @@ struct AddDocumentContentSheet: View {
                                 }
 
                                 HStack(spacing: 10) {
-                                    attachmentBtn(icon: "camera.fill", label: "拍照", color: petThemeColor) { presentCamera() }
+                                    attachmentBtn(icon: "camera.fill", label: l.tr(zh: "拍照", en: "Camera", de: "Kamera"), color: petThemeColor) { presentCamera() }
                                     PhotosPicker(selection: $photoPickerItems, maxSelectionCount: 10, matching: .images) {
-                                        attachmentBtnLabel(icon: "photo.fill", label: "相册", color: petThemeColor.opacity(0.85))
+                                        attachmentBtnLabel(icon: "photo.fill", label: l.tr(zh: "相册", en: "Photos", de: "Fotos"), color: petThemeColor.opacity(0.85))
                                     }
                                     .onChange(of: photoPickerItems) { _, items in
                                         Task {
@@ -346,15 +348,15 @@ struct AddDocumentContentSheet: View {
                                             await MainActor.run { photoPickerItems = [] }
                                         }
                                     }
-                                    attachmentBtn(icon: "doc.fill", label: "文件", color: Color.goOrange) { showingFilePicker = true }
+                                    attachmentBtn(icon: "doc.fill", label: l.tr(zh: "文件", en: "Files", de: "Dateien"), color: Color.goOrange) { showingFilePicker = true }
                                 }
                             }
                         }
 
                         // ── 备注
-                        docRow(icon: "note.text", iconColor: .secondary, label: "备注") {
+                        docRow(icon: "note.text", iconColor: .secondary, label: l.tr(zh: "备注", en: "Notes", de: "Notizen")) {
                             GoDraftTextField( // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
-                                "编号、附加信息…",
+                                l.tr(zh: "编号、附加信息…", en: "Number, extra details...", de: "Nummer, weitere Details ..."),
                                 text: $notes,
                                 axis: .vertical
                             )
@@ -365,9 +367,9 @@ struct AddDocumentContentSheet: View {
 
                         // ── 证件号码 (护照/登记证)
                         if showDocumentNumber {
-                            docRow(icon: "number.circle.fill", iconColor: .goCardCyan, label: selectedCategory == .passport ? "护照号码" : "证件号码") {
+                            docRow(icon: "number.circle.fill", iconColor: .goCardCyan, label: selectedCategory == .passport ? l.tr(zh: "护照号码", en: "Passport number", de: "Passnummer") : l.tr(zh: "证件号码", en: "Document number", de: "Dokumentnummer")) {
                                 GoDraftTextField( // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
-                                    "编号",
+                                    l.tr(zh: "编号", en: "Number", de: "Nummer"),
                                     text: $documentNumber
                                 )
                                 .font(OhanaFont.adaptive(size: 15, weight: .medium, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
@@ -384,7 +386,7 @@ struct AddDocumentContentSheet: View {
                         } label: {
                             HStack(spacing: 8) {
                                 Image(systemName: "checkmark") // a11y: allow decorative icon covered by surrounding text or control
-                                Text("保存证件")
+                                Text(l.tr(zh: "保存证件", en: "Save document", de: "Dokument speichern"))
                             }
                             .font(OhanaFont.adaptive(size: 16, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(Color.arkInk)
@@ -398,17 +400,17 @@ struct AddDocumentContentSheet: View {
                 }
                 .scrollDismissesKeyboard(.interactively)
             }
-            .navigationTitle("添加证件")
+            .navigationTitle(l.tr(zh: "添加证件", en: "Add document", de: "Dokument hinzufügen"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbarBackground(Color.ohanaCardSurface, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("取消") { dismiss() }
+                    Button(l.tr(zh: "取消", en: "Cancel", de: "Abbrechen")) { dismiss() }
                 }
                 ToolbarItemGroup(placement: .keyboard) {
                     Spacer()
-                    Button("完成") {
+                    Button(l.tr(zh: "完成", en: "Done", de: "Fertig")) {
                         GoKeyboard.dismiss()
                     }
                     .font(OhanaFont.adaptive(size: 15, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
@@ -436,10 +438,10 @@ struct AddDocumentContentSheet: View {
                 showingCamera = false
             }
         }
-        .alert("无法打开相机", isPresented: $showCameraPermissionAlert) {
-            Button("知道了", role: .cancel) {}
+        .alert(l.tr(zh: "无法打开相机", en: "Camera unavailable", de: "Kamera nicht verfügbar"), isPresented: $showCameraPermissionAlert) {
+            Button(l.tr(zh: "知道了", en: "OK", de: "OK"), role: .cancel) {}
         } message: {
-            Text("请在系统设置中允许 Ohana 访问相机。")
+            Text(l.tr(zh: "请在系统设置中允许 Ohana 访问相机。", en: "Allow Ohana to access the camera in System Settings.", de: "Erlaube Ohana den Kamerazugriff in den Systemeinstellungen."))
         }
         // F3: 附件图片全屏预览
         .fullScreenCover(item: $previewAttachment) { att in
@@ -501,6 +503,13 @@ struct AddDocumentContentSheet: View {
                 .foregroundStyle(Color.ohanaPrimaryText.opacity(0.55))
         }
         .frame(maxWidth: .infinity)
+    }
+
+    private var attachmentSectionTitle: String {
+        if attachments.isEmpty {
+            return l.tr(zh: "附件", en: "Attachments", de: "Anhänge")
+        }
+        return l.tr(zh: "附件 (\(attachments.count))", en: "Attachments (\(attachments.count))", de: "Anhänge (\(attachments.count))")
     }
 
     private func fieldCard(@ViewBuilder content: () -> some View) -> some View {

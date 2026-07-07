@@ -18,7 +18,7 @@ struct PlantBatchCareSheet: View {
     let onSkipTask: (PlantBatchCareSheetTask) -> Void
 
     @Environment(\.dismiss) private var dismiss
-    @AppStorage("appLanguage") private var appLanguage = "zh"
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
     @State private var selectedCareType: PlantCareType?
     @State private var selectedTaskIDs: Set<String>
     @State private var resolvedTaskIDs: Set<String> = []

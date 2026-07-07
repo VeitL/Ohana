@@ -21,7 +21,7 @@ struct HumanAccountSwitcherSheet: View {
     @AppStorage("currentActiveHumanId") private var activeHumanId = ""
     @AppStorage(HomeCardVisibility.hiddenPetIDsKey) private var hiddenHomePetIDsRaw = ""
     @AppStorage("goFocusHomeCardOrder.v1") private var homeCardOrderRaw = ""
-    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
 
     @State private var pendingHuman: Human? = nil
     @State private var pin = ""

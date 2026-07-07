@@ -17,8 +17,10 @@ struct FocusHomeCardContextMenu: View {
     let onOpenPet: (Pet) -> Void
 
     @Environment(AppServices.self) private var appServices
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
     @StateObject private var commandQueue = DeferredDomainCommandQueue()
 
+    private var l: L10n { L10n(appLanguage) }
     private var commandExecutor: HomeCommandExecutor { HomeCommandExecutor(modelContext: modelContext, services: appServices) }
 
     var body: some View {
@@ -27,20 +29,20 @@ struct FocusHomeCardContextMenu: View {
             Button {
                 quickFeed(pet)
             } label: {
-                Label("喂食 \(pet.name)", systemImage: "fork.knife")
+                Label(l.tr(zh: "喂食 \(pet.name)", en: "Feed \(pet.name)", de: "\(pet.name) fuettern"), systemImage: "fork.knife")
             }
 
             Button {
                 UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                 onWaterManagement(pet)
             } label: {
-                Label("水管理", systemImage: "water.waves")
+                Label(l.tr(zh: "水管理", en: "Water", de: "Wasser"), systemImage: "water.waves")
             }
 
             Button {
                 quickPotty(pet)
             } label: {
-                Label("噗噗打卡", systemImage: "drop.circle")
+                Label(l.tr(zh: "噗噗打卡", en: "Poop check-in", de: "Kot erfassen"), systemImage: "drop.circle")
             }
 
             Divider()
@@ -48,7 +50,7 @@ struct FocusHomeCardContextMenu: View {
             Button {
                 onOpenPet(pet)
             } label: {
-                Label("查看详情", systemImage: "arrow.right.circle")
+                Label(l.tr(zh: "查看详情", en: "View details", de: "Details anzeigen"), systemImage: "arrow.right.circle")
             }
         }
     }
@@ -62,8 +64,14 @@ struct FocusHomeCardContextMenu: View {
                 petID: petID,
                 executorId: currentUserId,
                 now: Date(),
-                antiRepeatTitle: "近期已喂食",
-                antiRepeatMessage: { warning in "\(warning.executorName) \(warning.minutesAgo)分钟前已喂过" },
+                antiRepeatTitle: l.tr(zh: "近期已喂食", en: "Recently fed", de: "Kuerzlich gefuettert"),
+                antiRepeatMessage: { warning in
+                    l.tr(
+                        zh: "\(warning.executorName) \(warning.minutesAgo)分钟前已喂过",
+                        en: "\(warning.executorName) fed \(warning.minutesAgo) minutes ago",
+                        de: "\(warning.executorName) hat vor \(warning.minutesAgo) Minuten gefuettert"
+                    )
+                },
                 openFeedDetail: { _, _ in },
                 showAntiRepeat: { _, _, pendingAction in pendingAction() },
                 startWalk: { _ in },

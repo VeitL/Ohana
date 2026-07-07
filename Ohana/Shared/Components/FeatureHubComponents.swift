@@ -656,6 +656,9 @@ private struct FeatureHubTile: View {
 
 struct PetMemorialBanner: View {
     let pet: Pet
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
+
+    private var l: L10n { L10n(appLanguage) }
 
     var body: some View {
         HStack(spacing: 12) {
@@ -665,7 +668,7 @@ struct PetMemorialBanner: View {
                 .frame(width: 40, height: 40) // a11y: allow decorative non-interactive frame; hit area handled by parent
                 .background(Color.goPurple.opacity(0.16), in: Circle())
             VStack(alignment: .leading, spacing: 3) {
-                Text("彩虹桥纪念模式")
+                Text(l.tr(zh: "彩虹桥纪念模式", en: "Rainbow Bridge memorial mode", de: "Regenbogenbruecken-Gedenkmodus"))
                     .font(OhanaFont.callout(.black))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Text(memorialDetail)
@@ -685,9 +688,13 @@ struct PetMemorialBanner: View {
     private var memorialDetail: String {
         let days = pet.daysTogetherAtPassing
         if let date = pet.passedAwayDate {
-            return "离世 \(date.formatted(.dateTime.year().month().day())) · 相伴 \(days) 天"
+            return l.tr(
+                zh: "离世 \(date.formatted(.dateTime.year().month().day())) · 相伴 \(days) 天",
+                en: "Passed \(date.formatted(.dateTime.year().month().day())) · \(days) days together",
+                de: "Verstorben am \(date.formatted(.dateTime.year().month().day())) · \(days) Tage zusammen"
+            )
         }
-        return "相伴 \(days) 天"
+        return l.tr(zh: "相伴 \(days) 天", en: "\(days) days together", de: "\(days) Tage zusammen")
     }
 }
 

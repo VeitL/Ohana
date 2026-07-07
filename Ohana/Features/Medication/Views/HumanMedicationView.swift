@@ -20,7 +20,7 @@ struct HumanMedicationContentView: View {
     @Environment(\.colorScheme) private var colorScheme
     @Environment(AppServices.self) private var appServices
     @AppStorage("currentActiveHumanId") private var activeHumanIdStr = ""
-    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
     @State private var showAddSheet = false
     @State private var editingMed: HumanMedication? = nil
     @State private var showToast = false

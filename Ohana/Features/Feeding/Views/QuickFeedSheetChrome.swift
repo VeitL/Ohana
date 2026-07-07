@@ -10,7 +10,7 @@ import UIKit
 
 struct TreatCelebrationOverlay: View {
     let tint: Color
-    @AppStorage("appLanguage") private var appLanguage = AppLanguage.fallbackCode
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
     @State private var isVisible = false
     @ObservedObject private var workloadPolicy = AppWorkloadPolicy.shared
 

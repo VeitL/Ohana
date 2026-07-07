@@ -21,7 +21,7 @@ struct IslandWealthDashboardContentView: View {
     @State private var selectedCoconutActorId: String? = nil
     @State private var chartProgress: Double = 0
     @AppStorage("currentActiveHumanId") private var activeHumanIdStr = ""
-    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
 
     private var l: L10n { L10n(appLanguage) }
 

@@ -13,7 +13,7 @@ struct CoHealthDashboardContentView: View {
 
     @Environment(AppServices.self) private var appServices
     @AppStorage("currentActiveHumanId") private var activeHumanIdStr = ""
-    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
     @State private var chartRevealProgress: CGFloat = 0.0
 
     private var activeHumanId: UUID? { UUID(uuidString: activeHumanIdStr) }

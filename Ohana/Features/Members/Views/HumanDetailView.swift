@@ -23,7 +23,7 @@ struct HumanDetailView: View {
     @Environment(AppServices.self) var appServices
     @AppStorage("currentActiveHumanId") var activeHumanIdStr = ""
     @AppStorage(HomeCardVisibility.hiddenPetIDsKey) var hiddenHomePetIDsRaw = ""
-    @AppStorage("appLanguage") var appLanguage = AppLanguage.code
+    @Environment(\.ohanaAppLanguageCode) var appLanguage
 
     init(
         human: Human,

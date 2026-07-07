@@ -72,7 +72,7 @@ private struct SettingsPlantReminderPanelContent: View {
 
     @Environment(\.modelContext) private var modelContext
     @Environment(AppServices.self) private var appServices
-    @AppStorage("appLanguage") private var appLanguage = "zh"
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
     @AppStorage("currentActiveHumanId") private var currentActiveHumanId = ""
     @State private var plantReminderDisplayState: [UUID: Bool] = [:]
     @State private var pendingPlantReminderUpdates: [UUID: PendingPlantReminderUpdate] = [:]

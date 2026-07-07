@@ -24,7 +24,7 @@ struct FamilyCollaborationPlaygroundView: View {
         var colorScheme: ColorScheme { self == .dark ? .dark : .light }
     }
 
-    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
     @State private var scenario: Scenario = .board
     @State private var previewMode: PreviewMode = .dark
     @State private var completedSlots: Set<String> = []

@@ -20,6 +20,7 @@ struct BountyBoardContentView: View {
     @Environment(AppServices.self) private var appServices
     @AppStorage("bountyTasks") private var tasksRaw: String = ""
     @AppStorage("currentActiveHumanId") private var activeHumanId: String = ""
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
     @State private var showAddTask = false
     @State private var selectedTab = 0 // 0=进行中 1=已完成 2=周报
     @State private var completedTaskId: UUID? = nil
@@ -60,6 +61,7 @@ struct BountyBoardContentView: View {
     private var primaryText: Color { colorScheme == .dark ? .white : .black }
     private var secondaryText: Color { colorScheme == .dark ? .white.opacity(0.72) : .black.opacity(0.58) }
     private var tertiaryText: Color { colorScheme == .dark ? .white.opacity(0.45) : .black.opacity(0.4) }
+    private var l: L10n { L10n(appLanguage) }
 
     var body: some View {
         NavigationStack {
@@ -86,7 +88,11 @@ struct BountyBoardContentView: View {
                                 weeklyReportContent
                             } else if selectedTab == 0 {
                                 if activeTasks.isEmpty {
-                                    emptyState(message: "还没有悬赏任务\n发布第一个任务，让家人来完成吧！")
+                                    emptyState(message: l.tr(
+                                        zh: "还没有悬赏任务\n发布第一个任务，让家人来完成吧！",
+                                        en: "No bounty tasks yet\nPost the first one for your family.",
+                                        de: "Noch keine Aufgaben\nErstelle die erste Familienaufgabe."
+                                    ))
                                 } else {
                                     ForEach(activeTasks) { task in
                                         taskCard(task, isActive: true)
@@ -94,7 +100,11 @@ struct BountyBoardContentView: View {
                                 }
                             } else {
                                 if completedTasks.isEmpty {
-                                    emptyState(message: "还没有完成的任务")
+                                    emptyState(message: l.tr(
+                                        zh: "还没有完成的任务",
+                                        en: "No completed tasks yet",
+                                        de: "Noch keine erledigten Aufgaben"
+                                    ))
                                 } else {
                                     // 近7天完成
                                     ForEach(recentCompleted) { task in
@@ -108,7 +118,11 @@ struct BountyBoardContentView: View {
                                             HStack(spacing: 8) {
                                                 Image(systemName: showArchive ? "chevron.down" : "chevron.right")
                                                     .font(OhanaFont.caption2(.bold))
-                                                Text("历史归档 (\(archivedCompleted.count))")
+                                                Text(l.tr(
+                                                    zh: "历史归档 (\(archivedCompleted.count))",
+                                                    en: "Archive (\(archivedCompleted.count))",
+                                                    de: "Archiv (\(archivedCompleted.count))"
+                                                ))
                                                     .font(OhanaFont.caption(.bold))
                                                 Spacer()
                                             }
@@ -132,7 +146,7 @@ struct BountyBoardContentView: View {
                     }
                 }
             }
-            .navigationTitle("家庭悬赏榜")
+            .navigationTitle(l.tr(zh: "家庭悬赏榜", en: "Family bounty board", de: "Familienaufgaben"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbarBackground(Color.ohanaCardSurface, for: .navigationBar)
             .toolbar {
@@ -140,7 +154,7 @@ struct BountyBoardContentView: View {
                     Button {
                         dismiss()
                     } label: {
-                        Text("关闭")
+                        Text(l.tr(zh: "关闭", en: "Close", de: "Schließen"))
                             .font(OhanaFont.body(.semibold))
                             .foregroundStyle(Color.goPrimary)
                     }
@@ -162,19 +176,23 @@ struct BountyBoardContentView: View {
                     }
                 }
             }
-            .confirmationDialog("确认完成", isPresented: $showCompleteConfirm, titleVisibility: .visible) {
-                Button("完成并领取奖励") {
+            .confirmationDialog(l.tr(zh: "确认完成", en: "Confirm completion", de: "Abschluss bestätigen"), isPresented: $showCompleteConfirm, titleVisibility: .visible) {
+                Button(l.tr(zh: "完成并领取奖励", en: "Complete and claim", de: "Erledigen und abholen")) {
                     if let id = pendingCompleteId {
                         runLegacyBountyCommand {
                             completeTask(id: id)
                         }
                     }
                 }
-                Button("取消", role: .cancel) {}
+                Button(l.tr(zh: "取消", en: "Cancel", de: "Abbrechen"), role: .cancel) {}
             } message: {
                 if let id = pendingCompleteId,
                    let task = tasks.first(where: { $0.id == id }) {
-                    Text("完成「\(task.title)」并领取 \(task.reward)🥥 奖励？")
+                    Text(l.tr(
+                        zh: "完成「\(task.title)」并领取 \(task.reward)🥥 奖励？",
+                        en: "Complete \"\(task.title)\" and claim \(task.reward)🥥?",
+                        de: "\"\(task.title)\" erledigen und \(task.reward)🥥 abholen?"
+                    ))
                 }
             }
         }
@@ -184,11 +202,11 @@ struct BountyBoardContentView: View {
     // MARK: - 统计 Header
     private var statsHeader: some View {
         HStack(spacing: 12) {
-            statCell(value: "\(activeTasks.count)", label: "进行中", accent: Color.goPrimary)
-            statCell(value: "\(completedTasks.count)", label: "已完成", accent: Color.goTeal)
+            statCell(value: "\(activeTasks.count)", label: l.tr(zh: "进行中", en: "Active", de: "Aktiv"), accent: Color.goPrimary)
+            statCell(value: "\(completedTasks.count)", label: l.tr(zh: "已完成", en: "Done", de: "Erledigt"), accent: Color.goTeal)
             statCell(
                 value: "\(completedTasks.reduce(0) { $0 + $1.reward })🥥",
-                label: "累计发放",
+                label: l.tr(zh: "累计发放", en: "Paid out", de: "Ausgezahlt"),
                 accent: Color.goYellow
             )
         }
@@ -218,9 +236,9 @@ struct BountyBoardContentView: View {
     // MARK: - Tab Picker
     private var tabPicker: some View {
         HStack(spacing: 8) {
-            tabButton(label: "进行中 (\(activeTasks.count))", idx: 0)
-            tabButton(label: "已完成 (\(completedTasks.count))", idx: 1)
-            tabButton(label: "周报", idx: 2)
+            tabButton(label: l.tr(zh: "进行中 (\(activeTasks.count))", en: "Active (\(activeTasks.count))", de: "Aktiv (\(activeTasks.count))"), idx: 0)
+            tabButton(label: l.tr(zh: "已完成 (\(completedTasks.count))", en: "Done (\(completedTasks.count))", de: "Erledigt (\(completedTasks.count))"), idx: 1)
+            tabButton(label: l.tr(zh: "周报", en: "Weekly", de: "Woche"), idx: 2)
             Spacer()
         }
     }
@@ -313,7 +331,7 @@ struct BountyBoardContentView: View {
                         in: Capsule()
                     )
                 } else {
-                    Text("发布")
+                    Text(l.tr(zh: "发布", en: "Posted", de: "Erstellt"))
                         .font(OhanaFont.caption(.medium))
                         .foregroundStyle(tertiaryText)
                 }
@@ -334,7 +352,7 @@ struct BountyBoardContentView: View {
                                 deleteTask(id: task.id)
                             }
                         } label: {
-                            Text("撤销")
+                            Text(l.tr(zh: "撤销", en: "Withdraw", de: "Zurückziehen"))
                                 .font(OhanaFont.caption(.semibold))
                                 .foregroundStyle(Color.goRed.opacity(0.8))
                                 .padding(.horizontal, 10).padding(.vertical, 5)
@@ -349,7 +367,7 @@ struct BountyBoardContentView: View {
                             HStack(spacing: 4) {
                                 Image(systemName: "checkmark").accessibilityHidden(true)
                                     .font(OhanaFont.caption2(.bold))
-                                Text("完成")
+                                Text(l.tr(zh: "完成", en: "Done", de: "Erledigt"))
                                     .font(OhanaFont.caption(.bold))
                             }
                             .foregroundStyle(Color.arkInk)
@@ -358,7 +376,7 @@ struct BountyBoardContentView: View {
                         }
                         .buttonStyle(ScaleButtonStyle())
                     } else {
-                        Text("指派中")
+                        Text(l.tr(zh: "指派中", en: "Assigned", de: "Zugewiesen"))
                             .font(OhanaFont.caption2(.semibold))
                             .foregroundStyle(tertiaryText)
                             .padding(.horizontal, 8).padding(.vertical, 4)
@@ -381,7 +399,11 @@ struct BountyBoardContentView: View {
 
             // 已完成时间
             if !isActive, let completedAt = task.completedAt {
-                Text("完成于 \(completedAt.formatted(date: .abbreviated, time: .omitted))")
+                Text(l.tr(
+                    zh: "完成于 \(completedAt.formatted(date: .abbreviated, time: .omitted))",
+                    en: "Completed \(completedAt.formatted(date: .abbreviated, time: .omitted))",
+                    de: "Erledigt am \(completedAt.formatted(date: .abbreviated, time: .omitted))"
+                ))
                     .font(OhanaFont.caption2(.medium))
                     .foregroundStyle(tertiaryText)
             }
@@ -531,7 +553,11 @@ struct BountyBoardContentView: View {
             weeklyHeader(total: total, topper: stats.first(where: { $0.count > 0 })?.human)
 
             if total == 0 {
-                emptyState(message: "本周还没有打卡记录\n快去主页给宠物打卡吧！")
+                emptyState(message: l.tr(
+                    zh: "本周还没有打卡记录\n快去主页给宠物打卡吧！",
+                    en: "No check-ins this week\nLog care from Home to fill this report.",
+                    de: "Diese Woche noch keine Einträge\nErfasse Pflege auf der Startseite."
+                ))
             } else {
                 VStack(spacing: 10) {
                     ForEach(stats) { s in
@@ -539,7 +565,11 @@ struct BountyBoardContentView: View {
                     }
                 }
 
-                Text("每周日 20:00 会推送本周家庭周报 · 可在系统通知中管理")
+                Text(l.tr(
+                    zh: "每周日 20:00 会推送本周家庭周报 · 可在系统通知中管理",
+                    en: "The weekly family report is sent Sundays at 20:00 · manage it in system notifications",
+                    de: "Der Wochenbericht kommt sonntags um 20:00 · verwalte ihn in den Systemmitteilungen"
+                ))
                     .font(OhanaFont.caption2(.medium))
                     .foregroundStyle(tertiaryText)
                     .padding(.top, 8)
@@ -554,7 +584,7 @@ struct BountyBoardContentView: View {
                 Image(systemName: "chart.bar.xaxis").accessibilityHidden(true)
                     .font(OhanaFont.subheadline(.bold))
                     .foregroundStyle(Color.goPrimary)
-                Text("本周家庭照护周报")
+                Text(l.tr(zh: "本周家庭照护周报", en: "Family care this week", de: "Familienpflege diese Woche"))
                     .font(OhanaFont.headline(.black))
                     .foregroundStyle(primaryText)
                 Spacer()
@@ -563,15 +593,15 @@ struct BountyBoardContentView: View {
                     .foregroundStyle(tertiaryText)
             }
             HStack(spacing: 12) {
-                statCell(value: "\(total)", label: "总打卡", accent: Color.goPrimary)
+                statCell(value: "\(total)", label: l.tr(zh: "总打卡", en: "Check-ins", de: "Einträge"), accent: Color.goPrimary)
                 if let topper {
                     statCell(
                         value: "\(topper.avatarEmoji) \(topper.name)",
-                        label: "本周最勤快",
+                        label: l.tr(zh: "本周最勤快", en: "Top helper", de: "Fleißigste Person"),
                         accent: Color.goYellow
                     )
                 } else {
-                    statCell(value: "—", label: "本周最勤快", accent: Color.goYellow.opacity(0.4))
+                    statCell(value: "—", label: l.tr(zh: "本周最勤快", en: "Top helper", de: "Fleißigste Person"), accent: Color.goYellow.opacity(0.4))
                 }
             }
         }
@@ -613,7 +643,7 @@ struct BountyBoardContentView: View {
                         .font(OhanaFont.subheadline(.bold))
                         .foregroundStyle(primaryText)
                     if isTop {
-                        Text("👑 最勤快")
+                        Text(l.tr(zh: "👑 最勤快", en: "👑 Top helper", de: "👑 Top"))
                             .font(OhanaFont.caption2(.black))
                             .foregroundStyle(Color.goYellow)
                             .padding(.horizontal, 6).padding(.vertical, 2)
@@ -661,7 +691,7 @@ struct BountyBoardContentView: View {
                         statChip("💰", "\(stat.expenseCount)")
                     }
                     if stat.count == 0 {
-                        Text("本周尚未打卡")
+                        Text(l.tr(zh: "本周尚未打卡", en: "No check-ins this week", de: "Diese Woche keine Einträge"))
                             .font(OhanaFont.caption2(.medium))
                             .foregroundStyle(tertiaryText)
                     }

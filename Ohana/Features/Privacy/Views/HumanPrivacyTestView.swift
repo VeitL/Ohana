@@ -12,7 +12,7 @@ struct HumanPrivacyTestView: View {
     let humans: [Human]
     @Environment(AppServices.self) private var appServices
     @AppStorage("currentActiveHumanId") private var activeHumanId = ""
-    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
 
     @State private var viewerId = ""
     @State private var targetId = ""

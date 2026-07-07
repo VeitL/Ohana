@@ -279,7 +279,7 @@ struct MemberPortraitCropView: View {
     let onComplete: (Data) -> Void
     let onCancel: () -> Void
 
-    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
     @State private var loadedImage: UIImage?
     @State private var loadErrorText = ""
     @State private var scale: CGFloat = 1

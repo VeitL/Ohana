@@ -14,6 +14,7 @@ struct WalkSummarySheet: View {
     @Environment(AppServices.self) private var appServices
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
     @StateObject private var commandQueue = DeferredDomainCommandQueue()
     @State private var selectedWalk: PetWalkLog? = nil
     @State private var showingGoalSetter = false
@@ -25,6 +26,7 @@ struct WalkSummarySheet: View {
 
     private let weeklyGoalStepKm: Double = 0.5
     private let weeklyGoalMaxKm: Double = 100
+    private var l: L10n { L10n(appLanguage) }
 
     private var activeWalks: [PetWalkLog] {
         WalkFeaturePolicy.activeWalkLogs(for: pet)
@@ -120,16 +122,16 @@ struct WalkSummarySheet: View {
             )
 
             VStack(alignment: .leading, spacing: 3) {
-                Text("遛狗详情")
+                Text(l.tr(zh: "遛狗详情", en: "Walk detail", de: "Spaziergang"))
                     .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.goPrimary)
                     .tracking(1.2)
-                Text("\(pet.name) 的路线记录")
+                Text(l.tr(zh: "\(pet.name) 的路线记录", en: "\(pet.name)'s routes", de: "\(pet.name)s Routen"))
                     .font(OhanaFont.adaptive(size: 24, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(1)
                     .minimumScaleFactor(0.75)
-                Text("目标、总览和历史轨迹")
+                Text(l.tr(zh: "目标、总览和历史轨迹", en: "Goals, overview, and route history", de: "Ziele, Übersicht und Routenverlauf"))
                     .font(OhanaFont.adaptive(size: 13, weight: .medium, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaSecondaryText)
             }
@@ -145,13 +147,30 @@ struct WalkSummarySheet: View {
         Date().timeIntervalSince(walk.startDate) < 600 // 10 分钟内完成的步行
     }
 
+    private func moodLabel(for rating: Int) -> String {
+        switch rating {
+        case 1:
+            l.tr(zh: "一般", en: "Okay", de: "Okay")
+        case 2:
+            l.tr(zh: "还行", en: "Fine", de: "Ganz gut")
+        case 3:
+            l.tr(zh: "不错", en: "Good", de: "Gut")
+        case 4:
+            l.tr(zh: "很好", en: "Great", de: "Sehr gut")
+        case 5:
+            l.tr(zh: "超棒！", en: "Amazing!", de: "Super!")
+        default:
+            ""
+        }
+    }
+
     private func walkMoodCard(walk: PetWalkLog) -> some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(spacing: 8) {
                 Image(systemName: "circle") // a11y: allow decorative icon covered by surrounding text or control
                     .font(OhanaFont.adaptive(size: 11, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.goPrimary)
-                Text("本次心情")
+                Text(l.tr(zh: "本次心情", en: "Walk mood", de: "Stimmung"))
                     .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaPrimaryText)
             }
@@ -170,15 +189,14 @@ struct WalkSummarySheet: View {
                 }
                 Spacer()
                 if draftMoodRating > 0 {
-                    let labels = ["", "一般", "还行", "不错", "很好", "超棒！"]
-                    Text(labels[draftMoodRating])
+                    Text(moodLabel(for: draftMoodRating))
                         .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.goYellow)
                 }
             }
 
             // 备注输入
-            TextField("记录今天发生的趣事... (可选)", text: $draftNotes, axis: .vertical) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
+            TextField(l.tr(zh: "记录今天发生的趣事... (可选)", en: "Note what happened today... (optional)", de: "Notiere, was heute passiert ist... (optional)"), text: $draftNotes, axis: .vertical) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
                 .font(OhanaFont.adaptive(size: 13, weight: .medium, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .lineLimit(1 ... 3)
                 .padding(10)
@@ -205,7 +223,7 @@ struct WalkSummarySheet: View {
                     withAnimation { moodSaved = true }
                 }
             } label: {
-                Text("保存")
+                Text(l.tr(zh: "保存", en: "Save", de: "Speichern"))
                     .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.arkInk)
                     .frame(maxWidth: .infinity)
@@ -245,7 +263,7 @@ struct WalkSummarySheet: View {
                 .frame(width: 56, height: 56)
 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("本周目标")
+                    Text(l.tr(zh: "本周目标", en: "Weekly goal", de: "Wochenziel"))
                         .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.ohanaPrimaryText.opacity(0.5))
                     if pet.weeklyWalkGoalKm > 0 {
@@ -258,16 +276,20 @@ struct WalkSummarySheet: View {
                                 .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                         }
                         if weeklyProgress >= 1.0 {
-                            Label("本周目标完成！", systemImage: "checkmark.circle.fill")
+                            Label(l.tr(zh: "本周目标完成！", en: "Weekly goal complete!", de: "Wochenziel geschafft!"), systemImage: "checkmark.circle.fill")
                                 .font(OhanaFont.adaptive(size: 11, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                 .foregroundStyle(Color.goPrimary)
                         } else {
-                            Text(String(format: "还差 %.1f km", pet.weeklyWalkGoalKm - thisWeekDistanceKm))
+                            Text(l.tr(
+                                zh: String(format: "还差 %.1f km", pet.weeklyWalkGoalKm - thisWeekDistanceKm),
+                                en: String(format: "%.1f km left", pet.weeklyWalkGoalKm - thisWeekDistanceKm),
+                                de: String(format: "Noch %.1f km", pet.weeklyWalkGoalKm - thisWeekDistanceKm)
+                            ))
                                 .font(OhanaFont.adaptive(size: 12, weight: .medium, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                 .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                         }
                     } else {
-                        Text("尚未设定目标")
+                        Text(l.tr(zh: "尚未设定目标", en: "No goal set", de: "Kein Ziel gesetzt"))
                             .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(Color.ohanaPrimaryText.opacity(0.3))
                     }
@@ -278,7 +300,7 @@ struct WalkSummarySheet: View {
                     goalDraft = pet.weeklyWalkGoalKm
                     showingGoalSetter = true
                 } label: {
-                    Text(pet.weeklyWalkGoalKm > 0 ? "修改" : "设定目标")
+                    Text(pet.weeklyWalkGoalKm > 0 ? l.tr(zh: "修改", en: "Edit", de: "Bearbeiten") : l.tr(zh: "设定目标", en: "Set goal", de: "Ziel setzen"))
                         .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.arkInk)
                         .padding(.horizontal, 14)
@@ -298,7 +320,7 @@ struct WalkSummarySheet: View {
 
     private var goalSetterSheet: some View {
         VStack(spacing: 20) {
-            Text("设定每周步行目标")
+            Text(l.tr(zh: "设定每周步行目标", en: "Set weekly walk goal", de: "Wochenziel festlegen"))
                 .font(OhanaFont.adaptive(size: 17, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .padding(.top, 20)
 
@@ -308,7 +330,7 @@ struct WalkSummarySheet: View {
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .contentTransition(.numericText())
                     .animation(GoMotion.feedback, value: goalDraft)
-                Text("km / 周")
+                Text(l.tr(zh: "km / 周", en: "km / week", de: "km / Woche"))
                     .font(OhanaFont.adaptive(size: 18, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaSecondaryText)
             }
@@ -326,7 +348,11 @@ struct WalkSummarySheet: View {
                 .buttonStyle(ScaleButtonStyle())
                 .disabled(goalDraft <= 0)
 
-                Text("每次 ±\(weeklyGoalStepKm == floor(weeklyGoalStepKm) ? String(format: "%.0f", weeklyGoalStepKm) : String(format: "%.1f", weeklyGoalStepKm)) km")
+                Text(l.tr(
+                    zh: "每次 ±\(weeklyGoalStepKm == floor(weeklyGoalStepKm) ? String(format: "%.0f", weeklyGoalStepKm) : String(format: "%.1f", weeklyGoalStepKm)) km",
+                    en: "Step ±\(weeklyGoalStepKm == floor(weeklyGoalStepKm) ? String(format: "%.0f", weeklyGoalStepKm) : String(format: "%.1f", weeklyGoalStepKm)) km",
+                    de: "Schritt ±\(weeklyGoalStepKm == floor(weeklyGoalStepKm) ? String(format: "%.0f", weeklyGoalStepKm) : String(format: "%.1f", weeklyGoalStepKm)) km"
+                ))
                     .font(OhanaFont.adaptive(size: 12, weight: .medium, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaSecondaryText)
 
@@ -359,7 +385,7 @@ struct WalkSummarySheet: View {
                     showingGoalSetter = false
                 }
             } label: {
-                Text(goalDraft == 0 ? "清除目标" : "保存目标")
+                Text(goalDraft == 0 ? l.tr(zh: "清除目标", en: "Clear goal", de: "Ziel löschen") : l.tr(zh: "保存目标", en: "Save goal", de: "Ziel speichern"))
                     .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.arkInk)
                     .frame(maxWidth: .infinity)
@@ -397,7 +423,9 @@ struct WalkSummarySheet: View {
                     .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaSecondaryText)
                 Spacer()
-                Text(thisWeekDistanceKm > 0 ? String(format: "本周 %.1f km", thisWeekDistanceKm) : "本周暂无记录")
+                Text(thisWeekDistanceKm > 0
+                    ? l.tr(zh: String(format: "本周 %.1f km", thisWeekDistanceKm), en: String(format: "%.1f km this week", thisWeekDistanceKm), de: String(format: "%.1f km diese Woche", thisWeekDistanceKm))
+                    : l.tr(zh: "本周暂无记录", en: "No walks this week", de: "Diese Woche keine Wege"))
                     .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.goPrimary)
                     .padding(.horizontal, 10)
@@ -406,9 +434,9 @@ struct WalkSummarySheet: View {
             }
 
             HStack(spacing: 10) {
-                statColumn(value: "\(sortedWalks.count)", label: "总次数", icon: "number", accent: Color.goPrimary)
-                statColumn(value: distanceFormatted(totalDistance), label: "总距离", icon: "arrow.left.and.right", accent: Color.goTeal)
-                statColumn(value: durationFormatted(totalDuration), label: "总时长", icon: "clock", accent: Color.goYellow)
+                statColumn(value: "\(sortedWalks.count)", label: l.tr(zh: "总次数", en: "Walks", de: "Runden"), icon: "number", accent: Color.goPrimary)
+                statColumn(value: distanceFormatted(totalDistance), label: l.tr(zh: "总距离", en: "Distance", de: "Distanz"), icon: "arrow.left.and.right", accent: Color.goTeal)
+                statColumn(value: durationFormatted(totalDuration), label: l.tr(zh: "总时长", en: "Duration", de: "Dauer"), icon: "clock", accent: Color.goYellow)
             }
         }
         .padding(16)
@@ -440,7 +468,7 @@ struct WalkSummarySheet: View {
     private var walkListSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Text("历史记录")
+                Text(l.tr(zh: "历史记录", en: "History", de: "Verlauf"))
                     .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Spacer()
@@ -462,7 +490,7 @@ struct WalkSummarySheet: View {
             }
 
             if sortedWalks.isEmpty {
-                Text("还没有巡岛记录")
+                Text(l.tr(zh: "还没有巡岛记录", en: "No walk records yet", de: "Noch keine Spaziergänge"))
                     .font(OhanaFont.adaptive(size: 14)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                     .frame(maxWidth: .infinity, alignment: .center)

@@ -153,7 +153,7 @@ struct MemberCompactDateRow: View {
     let stroke: Color
     let accent: Color
 
-    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
 
     private var formattedDate: String {
         let formatter = DateFormatter()
@@ -226,7 +226,7 @@ struct MemberCompactMBTIBar: View {
     let foreground: Color
     let onSelectionChanged: () -> Void
 
-    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
 
     private var l: L10n { L10n(appLanguage) }
     private var result: String {
@@ -285,7 +285,7 @@ struct MemberCompactCityPicker: View {
     @Binding var city: String
     @Binding var usesCustomCity: Bool
 
-    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
 
     private var l: L10n { L10n(appLanguage) }
     private var cities: [String] {

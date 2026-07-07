@@ -13,7 +13,7 @@ struct PetBasicInfoDetailView: View {
     @Environment(\.modelContext) var modelContext
     @Environment(\.dismiss) var dismiss
     @Environment(AppServices.self) var appServices
-    @AppStorage("appLanguage") var appLanguage = AppLanguage.code
+    @Environment(\.ohanaAppLanguageCode) var appLanguage
 
     @StateObject var commandQueue = DeferredDomainCommandQueue()
     @State var isEditing = false

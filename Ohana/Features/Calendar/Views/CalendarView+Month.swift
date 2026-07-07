@@ -49,9 +49,14 @@ extension CalendarView {
             }
             .padding(.horizontal, 20)
 
-            // Weekday header — 日一二三四五六
+            // Weekday header
+            let weekdayFormatter = DateFormatter()
+            let weekdaySymbols = {
+                weekdayFormatter.locale = AppLanguage.effectiveLocale
+                return weekdayFormatter.veryShortStandaloneWeekdaySymbols ?? weekdayFormatter.shortStandaloneWeekdaySymbols ?? []
+            }()
             HStack(spacing: 0) {
-                ForEach(["日", "一", "二", "三", "四", "五", "六"], id: \.self) { d in
+                ForEach(weekdaySymbols, id: \.self) { d in
                     Text(d)
                         .font(OhanaFont.caption(.bold))
                         .foregroundStyle(Color.ohanaPrimaryText.opacity(0.3))
@@ -115,7 +120,7 @@ extension CalendarView {
                                 .symbolRenderingMode(.monochrome)
                                 .foregroundStyle(Color.ohanaPrimaryText.opacity(0.35))
                                 .accessibilityHidden(true)
-                            Text("暂无事件")
+                            Text(l.tr(zh: "暂无事件", en: "No events", de: "Keine Ereignisse"))
                                 .font(OhanaFont.callout(.semibold))
                                 .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                         }

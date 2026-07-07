@@ -23,7 +23,7 @@ struct QuickPottyDetailSheet: View {
     @Environment(\.dismiss) var dismiss
     @Environment(\.colorScheme) var colorScheme
     @Environment(AppServices.self) var appServices
-    @AppStorage("appLanguage") var appLanguage = AppLanguage.fallbackCode
+    @Environment(\.ohanaAppLanguageCode) var appLanguage
     @StateObject var workloadPolicy = AppWorkloadPolicy.shared
     @StateObject var commandQueue = DeferredDomainCommandQueue()
     @State var activeSheet: ActiveSheet?

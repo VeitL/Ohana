@@ -20,7 +20,7 @@ struct AddPetMedicationSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var colorScheme
     @Environment(AppServices.self) private var appServices
-    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
     @AppStorage(AppCountry.storageKey) private var appCountry = AppCountry.detectedCode
 
     @StateObject private var commandQueue = DeferredDomainCommandQueue()
@@ -297,12 +297,12 @@ struct AddPetMedicationSheet: View {
 
         labeledField(l.tr(zh: "疗程设置", en: "Course", de: "Kur")) {
             VStack(alignment: .leading, spacing: 12) {
-                Toggle("有疗程期限", isOn: $hasCourseEnd)
+                Toggle(l.tr(zh: "有疗程期限", en: "Course has an end date", de: "Kur hat ein Enddatum"), isOn: $hasCourseEnd)
                     .tint(chromeAccent)
                 if hasCourseEnd {
-                    DatePicker("开始日期", selection: $startDate, displayedComponents: .date)
+                    DatePicker(l.tr(zh: "开始日期", en: "Start date", de: "Startdatum"), selection: $startDate, displayedComponents: .date)
                         .tint(chromeAccent)
-                    Text("疗程天数")
+                    Text(l.tr(zh: "疗程天数", en: "Course days", de: "Kurdauer"))
                         .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
                         .foregroundStyle(Color.ohanaSecondaryText)
                     HStack(alignment: .top, spacing: 8) {
@@ -320,7 +320,7 @@ struct AddPetMedicationSheet: View {
                         syncCoursePreset(from: new)
                     }
                 } else {
-                    Text("长期用药：不设置结束日期")
+                    Text(l.tr(zh: "长期用药：不设置结束日期", en: "Long-term medication: no end date", de: "Langzeitmedikation: kein Enddatum"))
                         .font(OhanaFont.adaptive(size: 12, weight: .medium, design: .rounded))
                         .foregroundStyle(Color.ohanaSecondaryText)
                 }
@@ -352,7 +352,7 @@ struct AddPetMedicationSheet: View {
                 HStack {
                     InlineNumericInput(
                         text: $remainingText,
-                        placeholder: "数量",
+                        placeholder: l.tr(zh: "数量", en: "Amount", de: "Menge"),
                         unit: doseUnit,
                         countryCode: AppCountry.code,
                         maxFractionDigits: 2,
@@ -368,7 +368,11 @@ struct AddPetMedicationSheet: View {
                         usesMiniKeypad: true
                     )
                 }
-                Text("填写后可在详情页查看余量与预估天数")
+                Text(l.tr(
+                    zh: "填写后可在详情页查看余量与预估天数",
+                    en: "Add this to see remaining amount and estimated days in details.",
+                    de: "Damit werden Restmenge und geschaetzte Tage in den Details angezeigt."
+                ))
                     .font(OhanaFont.adaptive(size: 11, weight: .medium, design: .rounded))
                     .foregroundStyle(.tertiary)
             }

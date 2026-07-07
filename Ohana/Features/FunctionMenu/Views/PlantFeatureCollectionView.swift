@@ -15,7 +15,7 @@ struct PlantFeatureCollectionView: View {
 
     @Environment(AppServices.self) private var appServices
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
-    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
 
     private var l: L10n { L10n(appLanguage) }
     private var currentTreeLevel: Int { appServices.oasisTree.treeLevel.rawValue }

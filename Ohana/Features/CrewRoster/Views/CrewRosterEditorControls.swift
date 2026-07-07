@@ -37,7 +37,7 @@ struct CrewRosterEditorMenuRow: View {
     let options: [String]
     var optionTitle: ((String) -> String)? = nil
 
-    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
 
     private var l: L10n { L10n(appLanguage) }
 
@@ -173,7 +173,7 @@ struct CrewRosterThemeSwatchRow: View {
     let title: String
     @Binding var selectedHex: String
 
-    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
 
     private var l: L10n { L10n(appLanguage) }
     private var themeHexes: [String] {

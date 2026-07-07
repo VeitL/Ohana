@@ -6,7 +6,7 @@ import SwiftUI
 struct FunctionMenuSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(AppServices.self) private var appServices
-    @AppStorage("appLanguage") private var appLanguage = "zh"
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
 
     let initialDestination: FMDest?
 

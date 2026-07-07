@@ -110,7 +110,7 @@ struct PlantCareFeatureDetailView: View {
 
     @Environment(\.modelContext) private var modelContext
     @Environment(AppServices.self) private var appServices
-    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
     @AppStorage("currentActiveHumanId") private var activeHumanIdRaw = ""
     @State private var logDraft: PlantCareFeatureLogDraft?
     @State private var waterPlanCalendarEnabled = true

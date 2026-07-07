@@ -14,7 +14,7 @@ struct CareLedgerAnalysisContentView: View {
     let humans: [Human]
 
     @State private var screenModel = CareLedgerAnalysisScreenModel()
-    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
     private var l: L10n { L10n(appLanguage) }
 
     var body: some View {

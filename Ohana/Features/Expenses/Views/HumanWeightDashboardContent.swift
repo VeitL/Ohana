@@ -16,7 +16,7 @@ struct HumanWeightDashboardContent: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(AppServices.self) private var appServices
     @AppStorage("currentActiveHumanId") private var activeHumanIdStr = ""
-    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
 
     @State private var selectedRange: PetWeightDashboardContent.WeightRange = .days30
     @StateObject private var commandQueue = DeferredDomainCommandQueue()

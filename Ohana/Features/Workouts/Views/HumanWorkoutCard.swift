@@ -15,7 +15,7 @@ struct HumanWorkoutCard: View {
     @Environment(\.modelContext) private var modelContext
     @State private var showAddSheet = false
     @State private var showWorkoutHistory = false
-    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
 
     private var sortedLogs: [HumanWorkoutLog] {
         human.workoutLogs.sorted { $0.date > $1.date }
@@ -237,7 +237,7 @@ struct AddWorkoutSheet: View {
     @State private var notes = ""
     @State private var isSaving = false
     @StateObject private var commandQueue = DeferredDomainCommandQueue()
-    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
 
     private var duration: Int { Int(durationStr) ?? 0 }
     private var distance: Double { Double(distanceStr.replacingOccurrences(of: ",", with: ".")) ?? 0 }
@@ -488,7 +488,7 @@ struct HumanWorkoutHistoryView: View {
     @StateObject private var commandQueue = DeferredDomainCommandQueue()
 
     @State private var showAddSheet = false
-    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
 
     private var activeHumanId: UUID? { UUID(uuidString: activeHumanIdStr) }
     private var isPrivacyLocked: Bool { human.isPrivate(.workout, viewedBy: activeHumanId) }

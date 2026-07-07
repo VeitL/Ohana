@@ -17,6 +17,7 @@ struct HygieneTodoSheet: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
     @Environment(AppServices.self) private var appServices
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
 
     @State private var startDate: Date
     @State private var startTime: Date
@@ -47,6 +48,8 @@ struct HygieneTodoSheet: View {
         _customNote = State(initialValue: "")
     }
 
+    private var l: L10n { L10n(appLanguage) }
+
     var body: some View {
         NavigationStack {
             ScrollView(showsIndicators: false) {
@@ -65,10 +68,10 @@ struct HygieneTodoSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("取消") { dismiss() }
+                    Button(l.tr(zh: "取消", en: "Cancel", de: "Abbrechen")) { dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("保存") { save() }
+                    Button(l.tr(zh: "保存", en: "Save", de: "Sichern")) { save() }
                         .fontWeight(.bold)
                         .foregroundStyle(accent)
                 }
@@ -86,10 +89,14 @@ struct HygieneTodoSheet: View {
                 .background(accent.opacity(0.14), in: Circle())
 
             VStack(alignment: .leading, spacing: 3) {
-                Text(type.rawValue)
+                Text(type.localizedLabel(l))
                     .font(OhanaFont.adaptive(size: 18, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
-                Text("为 \(pet.name) 添加护理计划")
+                Text(l.tr(
+                    zh: "为 \(pet.name) 添加护理计划",
+                    en: "Add a care plan for \(pet.name)",
+                    de: "Pflegeplan fuer \(pet.name) hinzufuegen"
+                ))
                     .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
                     .foregroundStyle(Color.ohanaSecondaryText)
             }
@@ -100,22 +107,22 @@ struct HygieneTodoSheet: View {
 
     private var scheduleSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            sectionTitle("时间")
+            sectionTitle(l.tr(zh: "时间", en: "Time", de: "Zeit"))
 
-            Toggle("全天", isOn: $isAllDay)
+            Toggle(l.tr(zh: "全天", en: "All day", de: "Ganztagig"), isOn: $isAllDay)
                 .tint(accent)
 
-            DatePicker("开始日期", selection: $startDate, displayedComponents: .date)
+            DatePicker(l.tr(zh: "开始日期", en: "Start date", de: "Startdatum"), selection: $startDate, displayedComponents: .date)
 
             if !isAllDay {
-                DatePicker("提醒时间", selection: $startTime, displayedComponents: .hourAndMinute)
+                DatePicker(l.tr(zh: "提醒时间", en: "Reminder time", de: "Erinnerungszeit"), selection: $startTime, displayedComponents: .hourAndMinute)
             }
 
-            Toggle("结束日期", isOn: $hasEndDate)
+            Toggle(l.tr(zh: "结束日期", en: "End date", de: "Enddatum"), isOn: $hasEndDate)
                 .tint(accent)
 
             if hasEndDate {
-                DatePicker("结束", selection: $endDate, displayedComponents: .date)
+                DatePicker(l.tr(zh: "结束", en: "Ends", de: "Endet"), selection: $endDate, displayedComponents: .date)
             }
         }
         .font(OhanaFont.adaptive(size: 14, weight: .bold, design: .rounded))
@@ -125,14 +132,14 @@ struct HygieneTodoSheet: View {
 
     private var recurrenceSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            sectionTitle("重复")
+            sectionTitle(l.tr(zh: "重复", en: "Repeat", de: "Wiederholen"))
 
             Stepper(value: $repeatDays, in: 0 ... 365) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(recurrenceLabel)
                         .font(OhanaFont.adaptive(size: 14, weight: .bold, design: .rounded))
                         .foregroundStyle(Color.ohanaPrimaryText)
-                    Text("0 表示只提醒一次")
+                    Text(l.tr(zh: "0 表示只提醒一次", en: "0 means remind only once", de: "0 bedeutet nur einmal erinnern"))
                         .font(OhanaFont.adaptive(size: 11, weight: .medium, design: .rounded))
                         .foregroundStyle(Color.ohanaSecondaryText)
                 }
@@ -144,9 +151,9 @@ struct HygieneTodoSheet: View {
 
     private var noteSection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            sectionTitle("备注")
+            sectionTitle(l.tr(zh: "备注", en: "Notes", de: "Notizen"))
 
-            TextField("可选", text: $customNote, axis: .vertical) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
+            TextField(l.tr(zh: "可选", en: "Optional", de: "Optional"), text: $customNote, axis: .vertical) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
                 .lineLimit(2 ... 4)
                 .textFieldStyle(.plain)
                 .font(OhanaFont.adaptive(size: 14, weight: .semibold, design: .rounded))
@@ -165,12 +172,12 @@ struct HygieneTodoSheet: View {
 
     private var recurrenceLabel: String {
         switch repeatDays {
-        case 0: "不重复"
-        case 1: "每天"
-        case 7: "每周"
-        case 14: "每两周"
-        case 30: "每月"
-        default: "每 \(repeatDays) 天"
+        case 0: l.tr(zh: "不重复", en: "Does not repeat", de: "Wiederholt sich nicht")
+        case 1: l.tr(zh: "每天", en: "Every day", de: "Jeden Tag")
+        case 7: l.tr(zh: "每周", en: "Every week", de: "Jede Woche")
+        case 14: l.tr(zh: "每两周", en: "Every two weeks", de: "Alle zwei Wochen")
+        case 30: l.tr(zh: "每月", en: "Every month", de: "Jeden Monat")
+        default: l.tr(zh: "每 \(repeatDays) 天", en: "Every \(repeatDays) days", de: "Alle \(repeatDays) Tage")
         }
     }
 

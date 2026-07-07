@@ -43,6 +43,31 @@ nonisolated enum HealthLogType: String, Codable, CaseIterable, Identifiable {
         default: false
         }
     }
+
+    func localizedLabel(_ l: L10n) -> String {
+        switch self {
+        case .general:
+            l.tr(zh: "常规", en: "General", de: "Allgemein")
+        case .vaccine:
+            l.tr(zh: "疫苗", en: "Vaccine", de: "Impfung")
+        case .medication:
+            l.tr(zh: "用药", en: "Medication", de: "Medikation")
+        case .dewormingInternal:
+            l.tr(zh: "体内驱虫", en: "Internal deworming", de: "Innere Entwurmung")
+        case .dewormingExternal:
+            l.tr(zh: "体外驱虫", en: "External deworming", de: "Äußere Entwurmung")
+        case .surgery:
+            l.tr(zh: "手术", en: "Surgery", de: "Operation")
+        case .dental:
+            l.tr(zh: "牙科", en: "Dental", de: "Zähne")
+        case .checkup:
+            l.tr(zh: "体检", en: "Checkup", de: "Check-up")
+        case .emergency:
+            l.tr(zh: "急诊", en: "Emergency", de: "Notfall")
+        case .other:
+            l.tr(zh: "其他", en: "Other", de: "Sonstiges")
+        }
+    }
 }
 
 @Model

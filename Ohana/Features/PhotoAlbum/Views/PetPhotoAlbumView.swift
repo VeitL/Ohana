@@ -18,6 +18,7 @@ struct PetPhotoAlbumView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
     @Environment(AppServices.self) private var appServices
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
     @State private var internalPickerItems: [PhotosPickerItem] = []
     @State private var selectedPhoto: PetPhotoAlbumPhotoItem? = nil
     @State private var showingPhotoDetail = false
@@ -42,8 +43,10 @@ struct PetPhotoAlbumView: View {
 
     private let columns = [GridItem(.flexible(), spacing: 3), GridItem(.flexible(), spacing: 3), GridItem(.flexible(), spacing: 3)]
 
+    private var l: L10n { L10n(appLanguage) }
+
     private var albumNavigationTitle: String {
-        L10n(AppLanguage.code).tr(
+        l.tr(
             zh: "\(pet.name)的相册",
             en: "\(pet.name)'s Album",
             de: "\(pet.name)s Album"
@@ -152,13 +155,13 @@ struct PetPhotoAlbumView: View {
                                             Button {
                                                 sharePhoto(photo)
                                             } label: {
-                                                Label("分享", systemImage: "square.and.arrow.up")
+                                                Label(l.tr(zh: "分享", en: "Share", de: "Teilen"), systemImage: "square.and.arrow.up")
                                             }
                                             Divider()
                                             Button(role: .destructive) {
                                                 deletePhoto(photo)
                                             } label: {
-                                                Label("删除", systemImage: "trash")
+                                                Label(l.tr(zh: "删除", en: "Delete", de: "Loeschen"), systemImage: "trash")
                                             }
                                         }
                                     }
@@ -178,10 +181,17 @@ struct PetPhotoAlbumView: View {
             Image(systemName: "photo.on.rectangle.angled") // a11y: allow decorative icon covered by surrounding text or control
                 .font(OhanaFont.metric(size: 56, .medium))
                 .foregroundStyle(Color.ohanaSecondaryText)
-            Text("暂无照片").font(OhanaFont.title3(.black))
-            Text("记录\(pet.name)的每一个精彩瞬间").font(OhanaFont.subheadline(.medium)).foregroundStyle(Color.ohanaSecondaryText)
+            Text(l.tr(zh: "暂无照片", en: "No photos yet", de: "Noch keine Fotos"))
+                .font(OhanaFont.title3(.black))
+            Text(l.tr(
+                zh: "记录\(pet.name)的每一个精彩瞬间",
+                en: "Capture every lovely moment with \(pet.name)",
+                de: "Halte jeden schoenen Moment mit \(pet.name) fest"
+            ))
+            .font(OhanaFont.subheadline(.medium))
+            .foregroundStyle(Color.ohanaSecondaryText)
             PhotosPicker(selection: pickerBinding, maxSelectionCount: 12, matching: .images) {
-                Text("添加第一张照片")
+                Text(l.tr(zh: "添加第一张照片", en: "Add the first photo", de: "Erstes Foto hinzufuegen"))
                     .font(OhanaFont.body(.black)).foregroundStyle(Color.arkInk)
                     .padding(.horizontal, 28).padding(.vertical, 12)
                     .background(Color.goPrimary, in: Capsule())

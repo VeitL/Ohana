@@ -18,7 +18,7 @@ struct FeatureAggregateView: View {
 
     @Environment(AppServices.self) private var appServices
     @AppStorage("currentActiveHumanId") private var activeHumanIdStr = ""
-    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
     @ObservedObject private var avatarPipeline = AvatarPipelineRegistry.current
     @State private var humanAvatarSignatures: [UUID: String] = [:]
     @State private var humanAvatarCacheKey = "feature-aggregate-human-avatar-empty"

@@ -12,7 +12,7 @@ struct CoconutShopView: View {
     @Environment(\.colorScheme) var colorScheme
     @Environment(AppServices.self) var appServices
 
-    @AppStorage("appLanguage") var appLanguage = "zh"
+    @Environment(\.ohanaAppLanguageCode) var appLanguage
     @AppStorage("currentActiveHumanId") var activeHumanId = ""
     @AppStorage("shop_equipped_title") var equippedTitle = ""
     @AppStorage("shop_equip_fx_lime_glow") var equipFxLimeGlow = false

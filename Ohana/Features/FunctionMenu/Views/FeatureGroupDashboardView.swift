@@ -18,7 +18,7 @@ struct FeatureGroupDashboardView: View {
     var petAggregateSummaries: [UUID: FunctionMenuPetAggregateSummary] = [:]
 
     @Environment(AppServices.self) private var appServices
-    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
     @State private var selectedItemID: String?
 
     private var activePets: [Pet] { pets.filter { !$0.hasPassedAway } }

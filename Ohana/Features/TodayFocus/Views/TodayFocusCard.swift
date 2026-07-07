@@ -63,7 +63,7 @@ struct TodayFocusCard: View {
     @Environment(\.colorScheme) var colorScheme
     @Environment(\.accessibilityReduceMotion) var reduceMotion
     @StateObject var workloadPolicy = AppWorkloadPolicy.shared
-    @AppStorage("appLanguage") var appLanguage = AppLanguage.code
+    @Environment(\.ohanaAppLanguageCode) var appLanguage
     @AppStorage("today_focus_enable_ambient_motion") var enablesAmbientMotion = false
 
     var l: L10n { L10n(appLanguage) }

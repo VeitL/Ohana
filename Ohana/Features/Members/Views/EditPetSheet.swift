@@ -16,6 +16,7 @@ struct EditPetContentSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
     @Environment(AppServices.self) private var appServices
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
 
     @StateObject private var commandQueue = DeferredDomainCommandQueue()
     @State private var showDuplicateNameAlert = false
@@ -36,6 +37,7 @@ struct EditPetContentSheet: View {
     @State private var dailyPortionGrams: Double = 0
     @State private var notes = ""
     @State private var themeColorHex = ""
+    private var l: L10n { L10n(appLanguage) }
 
     /// 全岛重名检查（忽略大小写/空格，排除自身原名）
     private var isNameDuplicate: Bool {
@@ -48,24 +50,24 @@ struct EditPetContentSheet: View {
     }
 
     var body: some View {
-        OhanaSheetWrapper(title: "编辑 \(pet.name)", onDismiss: { dismiss() }) {
+        OhanaSheetWrapper(title: l.tr(zh: "编辑 \(pet.name)", en: "Edit \(pet.name)", de: "\(pet.name) bearbeiten"), onDismiss: { dismiss() }) {
             VStack(spacing: 24) {
                 UltimateGlassCard {
                     VStack(spacing: 16) {
-                        sectionHeader("基本信息")
-                        formField("名字", text: $name)
-                        formField("物种", text: $species)
-                        formField("品种", text: $breed)
-                        formField("头像 Emoji", text: $avatarEmoji)
+                        sectionHeader(l.tr(zh: "基本信息", en: "Basic info", de: "Basisdaten"))
+                        formField(l.tr(zh: "名字", en: "Name", de: "Name"), text: $name)
+                        formField(l.tr(zh: "物种", en: "Species", de: "Tierart"), text: $species)
+                        formField(l.tr(zh: "品种", en: "Breed", de: "Rasse"), text: $breed)
+                        formField(l.tr(zh: "头像 Emoji", en: "Avatar emoji", de: "Avatar-Emoji"), text: $avatarEmoji)
 
-                        Picker("性别", selection: $gender) {
-                            Text("♂ 男孩").tag("male")
-                            Text("♀ 女孩").tag("female")
-                            Text("未知").tag("unknown")
+                        Picker(l.tr(zh: "性别", en: "Gender", de: "Geschlecht"), selection: $gender) {
+                            Text(l.tr(zh: "♂ 男孩", en: "♂ Boy", de: "♂ Junge")).tag("male")
+                            Text(l.tr(zh: "♀ 女孩", en: "♀ Girl", de: "♀ Mädchen")).tag("female")
+                            Text(l.tr(zh: "未知", en: "Unknown", de: "Unbekannt")).tag("unknown")
                         }
                         .pickerStyle(.segmented)
 
-                        Toggle("已绝育", isOn: $isNeutered)
+                        Toggle(l.tr(zh: "已绝育", en: "Neutered", de: "Kastriert"), isOn: $isNeutered)
                             .tint(.arkCoral)
                     }
                     .padding(16)
@@ -73,11 +75,11 @@ struct EditPetContentSheet: View {
 
                 UltimateGlassCard {
                     VStack(spacing: 16) {
-                        sectionHeader("日期")
-                        Toggle("设置生日", isOn: $hasBirthday)
+                        sectionHeader(l.tr(zh: "日期", en: "Dates", de: "Daten"))
+                        Toggle(l.tr(zh: "设置生日", en: "Set birthday", de: "Geburtstag setzen"), isOn: $hasBirthday)
                             .tint(.arkCoral)
                         if hasBirthday {
-                            DatePicker("生日", selection: $birthday, displayedComponents: .date)
+                            DatePicker(l.tr(zh: "生日", en: "Birthday", de: "Geburtstag"), selection: $birthday, displayedComponents: .date)
                         }
                     }
                     .padding(16)
@@ -85,29 +87,29 @@ struct EditPetContentSheet: View {
 
                 UltimateGlassCard {
                     VStack(spacing: 16) {
-                        sectionHeader("出生地")
-                        formField("国家", text: $birthCountry)
-                        formField("城市", text: $birthCity)
+                        sectionHeader(l.tr(zh: "出生地", en: "Birthplace", de: "Geburtsort"))
+                        formField(l.tr(zh: "国家", en: "Country", de: "Land"), text: $birthCountry)
+                        formField(l.tr(zh: "城市", en: "City", de: "Stadt"), text: $birthCity)
                     }
                     .padding(16)
                 }
 
                 UltimateGlassCard {
                     VStack(spacing: 16) {
-                        sectionHeader("健康信息")
-                        formField("芯片号", text: $microchipID)
-                        formField("兽医联系方式", text: $vetContact)
-                        formField("过敏原", text: $allergies)
+                        sectionHeader(l.tr(zh: "健康信息", en: "Health info", de: "Gesundheit"))
+                        formField(l.tr(zh: "芯片号", en: "Microchip", de: "Chipnummer"), text: $microchipID)
+                        formField(l.tr(zh: "兽医联系方式", en: "Vet contact", de: "Tierarztkontakt"), text: $vetContact)
+                        formField(l.tr(zh: "过敏原", en: "Allergies", de: "Allergien"), text: $allergies)
                     }
                     .padding(16)
                 }
 
                 UltimateGlassCard {
                     VStack(spacing: 16) {
-                        sectionHeader("饮食")
-                        formField("粮食品牌", text: $foodBrand)
+                        sectionHeader(l.tr(zh: "饮食", en: "Food", de: "Futter"))
+                        formField(l.tr(zh: "粮食品牌", en: "Food brand", de: "Futtermarke"), text: $foodBrand)
                         HStack {
-                            Text("每日喂食量 (g)")
+                            Text(l.tr(zh: "每日喂食量 (g)", en: "Daily portion (g)", de: "Tagesportion (g)"))
                                 .font(OhanaFont.footnote(.medium))
                                 .foregroundStyle(Color.ohanaSecondaryText)
                             Spacer()
@@ -133,7 +135,7 @@ struct EditPetContentSheet: View {
 
                 UltimateGlassCard {
                     VStack(spacing: 16) {
-                        sectionHeader("主题色")
+                        sectionHeader(l.tr(zh: "主题色", en: "Theme color", de: "Designfarbe"))
                         LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 6), spacing: 10) {
                             ForEach(PetThemeColor.allCases, id: \.rawValue) { tc in
                                 Button { themeColorHex = tc.hexValue } label: {
@@ -156,7 +158,7 @@ struct EditPetContentSheet: View {
 
                 UltimateGlassCard {
                     VStack(spacing: 16) {
-                        sectionHeader("备注")
+                        sectionHeader(l.tr(zh: "备注", en: "Notes", de: "Notizen"))
                         TextEditor(text: $notes)
                             .frame(height: 80)
                             .clipShape(RoundedRectangle(cornerRadius: OhanaRadius.chip))
@@ -171,7 +173,7 @@ struct EditPetContentSheet: View {
                     }
                     save()
                 } label: {
-                    Text("保存")
+                    Text(l.tr(zh: "保存", en: "Save", de: "Speichern"))
                         .font(OhanaFont.headline(.black))
                         .foregroundStyle(Color.arkInk)
                         .frame(maxWidth: .infinity)
@@ -183,10 +185,10 @@ struct EditPetContentSheet: View {
             .padding(.vertical, 16)
         }
         .onAppear { loadData() }
-        .alert("名字已被占用 🏠", isPresented: $showDuplicateNameAlert) {
-            Button("好的，我换一个", role: .cancel) {}
+        .alert(l.tr(zh: "名字已被占用 🏠", en: "Name already used 🏠", de: "Name schon vergeben 🏠"), isPresented: $showDuplicateNameAlert) {
+            Button(l.tr(zh: "好的，我换一个", en: "OK, I'll change it", de: "OK, ich ändere ihn"), role: .cancel) {}
         } message: {
-            Text("Ohana 里已经有一个叫「\(name.trimmingCharacters(in: .whitespaces))」的家人啦，换一个名字吧！")
+            Text(l.tr(zh: "Ohana 里已经有一个叫「\(name.trimmingCharacters(in: .whitespaces))」的家人啦，换一个名字吧！", en: "There is already a family member named \"\(name.trimmingCharacters(in: .whitespaces))\" in Ohana. Choose another name.", de: "In Ohana gibt es schon ein Familienmitglied namens \"\(name.trimmingCharacters(in: .whitespaces))\". Wähle einen anderen Namen."))
         }
     }
 

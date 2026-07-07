@@ -18,8 +18,8 @@ struct ExecutorPickerBar: View {
     var compact: Bool = false
 
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
     @AppStorage("currentActiveHumanId") private var activeHumanId: String = ""
-    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
     @ObservedObject private var avatarPipeline = AvatarPipelineRegistry.current
     @State private var showingExecutorSwitcher = false
     @State private var avatarSignature = ""

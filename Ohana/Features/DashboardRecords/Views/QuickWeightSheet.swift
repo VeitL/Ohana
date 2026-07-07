@@ -21,7 +21,7 @@ struct QuickWeightSheet: View {
     @State private var latestPetWeightLoadTask: Task<Void, Never>?
     @StateObject private var commandQueue = DeferredDomainCommandQueue()
     @AppStorage("currentActiveHumanId") private var activeHumanIdRaw = ""
-    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
 
     private var parsedWeight: Double? { CountryDecimalInput.parse(weightText, countryCode: AppCountry.code) }
     private var isValid: Bool {

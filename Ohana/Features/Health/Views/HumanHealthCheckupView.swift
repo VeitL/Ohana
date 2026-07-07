@@ -12,7 +12,7 @@ struct HumanHealthCheckupView: View {
     let human: Human
 
     @AppStorage("currentActiveHumanId") private var activeHumanIdStr = ""
-    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
     @AppStorage(AppCountry.storageKey) private var appCountry = AppCountry.detectedCode
 
     @State private var recordingMetric: HealthMetric?

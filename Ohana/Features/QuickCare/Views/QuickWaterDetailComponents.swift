@@ -419,7 +419,7 @@ struct WaterHeroCard: View {
     @State private var ripple = false
     @State private var isVisible = false
     @StateObject private var workloadPolicy = AppWorkloadPolicy.shared
-    @AppStorage("appLanguage") private var appLanguage = AppLanguage.fallbackCode
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
     @Environment(\.colorScheme) private var colorScheme
 
     private var shouldAnimateHero: Bool {
@@ -587,7 +587,7 @@ struct WaterAmountSettingsSheet: View {
     let onSave: () -> Void
 
     @State private var showsAmountKeypad = false
-    @AppStorage("appLanguage") private var appLanguage = AppLanguage.fallbackCode
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
 
     private var l: L10n { L10n(appLanguage) }
 
@@ -762,7 +762,7 @@ struct WaterChangeSettingsSheet: View {
     let onSave: () -> Void
     let onDelete: () -> Void
 
-    @AppStorage("appLanguage") private var appLanguage = AppLanguage.fallbackCode
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
 
     private var l: L10n { L10n(appLanguage) }
 
@@ -878,7 +878,7 @@ struct FilterSettingsSheet: View {
     let onSave: () -> Void
     let onDelete: () -> Void
 
-    @AppStorage("appLanguage") private var appLanguage = AppLanguage.fallbackCode
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
 
     private var l: L10n { L10n(appLanguage) }
 
@@ -986,7 +986,7 @@ struct WaterPlanSettingsSheet: View {
     let onSave: () -> Void
     let onDelete: () -> Void
 
-    @AppStorage("appLanguage") private var appLanguage = AppLanguage.fallbackCode
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
 
     private var l: L10n { L10n(appLanguage) }
 
@@ -1126,7 +1126,7 @@ struct WaterHistorySheet: View {
     let tintForLog: (QuickWaterLedgerEntry) -> Color
     let onDelete: (QuickWaterLedgerEntry) -> Void
 
-    @AppStorage("appLanguage") private var appLanguage = AppLanguage.fallbackCode
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
 
     private var l: L10n { L10n(appLanguage) }
 

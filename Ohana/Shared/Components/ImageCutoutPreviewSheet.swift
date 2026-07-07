@@ -13,6 +13,7 @@ struct ImageCutoutPreviewSheet: View {
     let onConfirm: (Data, Bool) -> Void
 
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
     @State private var cutoutImage: UIImage? = nil
     @State private var isProcessing = true
     @State private var cutoutFailed = false
@@ -22,6 +23,7 @@ struct ImageCutoutPreviewSheet: View {
 
     // 裁剪原图 JPEG
     private var originalData: Data? { image.jpegData(compressionQuality: 0.85) }
+    private var l: L10n { L10n(appLanguage) }
 
     var body: some View {
         ZStack {
@@ -35,10 +37,10 @@ struct ImageCutoutPreviewSheet: View {
                 // ── Header
                 HStack {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("选择头像样式")
+                        Text(l.tr(zh: "选择头像样式", en: "Choose avatar style", de: "Avatar-Stil wählen"))
                             .font(OhanaFont.adaptive(size: 18, weight: .black, design: .rounded))
                             .foregroundStyle(Color.ohanaPrimaryText)
-                        Text("点击任意一张完成选择")
+                        Text(l.tr(zh: "点击任意一张完成选择", en: "Tap either image to choose", de: "Tippe auf ein Bild zum Auswählen"))
                             .font(OhanaFont.adaptive(size: 12, weight: .medium, design: .rounded))
                             .foregroundStyle(Color.ohanaPrimaryText.opacity(0.45))
                     }
@@ -59,8 +61,8 @@ struct ImageCutoutPreviewSheet: View {
                     // 原图
                     imageOptionCard(
                         image: image,
-                        label: "保留背景",
-                        sublabel: "原始照片",
+                        label: l.tr(zh: "保留背景", en: "Keep background", de: "Hintergrund behalten"),
+                        sublabel: l.tr(zh: "原始照片", en: "Original photo", de: "Originalfoto"),
                         icon: "photo",
                         isSelected: selectedSide == .original,
                         isLoading: false
@@ -73,8 +75,8 @@ struct ImageCutoutPreviewSheet: View {
                     } else if let cutout = cutoutImage {
                         imageOptionCard(
                             image: cutout,
-                            label: "去除背景",
-                            sublabel: "贴纸描边效果",
+                            label: l.tr(zh: "去除背景", en: "Remove background", de: "Hintergrund entfernen"),
+                            sublabel: l.tr(zh: "贴纸描边效果", en: "Sticker outline", de: "Sticker-Kontur"),
                             icon: "sparkles",
                             isSelected: selectedSide == .cutout,
                             isLoading: false
@@ -91,14 +93,14 @@ struct ImageCutoutPreviewSheet: View {
 
                 // ── 底部提示
                 if !isProcessing, cutoutImage == nil {
-                    Label("无法识别主体，仅提供原图", systemImage: "exclamationmark.triangle")
+                    Label(l.tr(zh: "无法识别主体，仅提供原图", en: "Could not detect the subject. Original only.", de: "Motiv nicht erkannt. Nur Original verfügbar."), systemImage: "exclamationmark.triangle")
                         .font(OhanaFont.adaptive(size: 12, weight: .medium, design: .rounded))
                         .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                         .padding(.bottom, 8)
                 }
 
                 // ── 说明文字
-                Text("选择「去除背景」后，卡片正面将显示带白色描边的贴纸效果。")
+                Text(l.tr(zh: "选择「去除背景」后，卡片正面将显示带白色描边的贴纸效果。", en: "Choose Remove background to show a sticker-style avatar with a white outline.", de: "Wähle Hintergrund entfernen, um einen Sticker-Avatar mit weißer Kontur zu zeigen."))
                     .font(OhanaFont.adaptive(size: 11, weight: .medium, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText.opacity(0.3))
                     .multilineTextAlignment(.center)
@@ -174,7 +176,7 @@ struct ImageCutoutPreviewSheet: View {
                     ProgressView()
                         .tint(Color.goPrimary)
                         .scaleEffect(1.2)
-                    Text("AI 智能抠图中…")
+                    Text(l.tr(zh: "AI 智能抠图中…", en: "AI cutout in progress...", de: "AI-Freistellung läuft ..."))
                         .font(OhanaFont.adaptive(size: 11, weight: .medium, design: .rounded))
                         .foregroundStyle(Color.ohanaPrimaryText.opacity(0.5))
                 }
@@ -187,10 +189,10 @@ struct ImageCutoutPreviewSheet: View {
                     .strokeBorder(.white.opacity(0.08), lineWidth: 1) // ui-v4: allow pre-existing visual token debt surfaced by accessibility font migration; tracked by full-scope ratchet.
             )
 
-            Text("去除背景")
+            Text(l.tr(zh: "去除背景", en: "Remove background", de: "Hintergrund entfernen"))
                 .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
                 .foregroundStyle(Color.ohanaPrimaryText.opacity(0.5))
-            Text("处理中…")
+            Text(l.tr(zh: "处理中…", en: "Processing...", de: "Wird verarbeitet ..."))
                 .font(OhanaFont.adaptive(size: 10, weight: .medium, design: .rounded))
                 .foregroundStyle(Color.ohanaPrimaryText.opacity(0.3))
         }
@@ -205,7 +207,7 @@ struct ImageCutoutPreviewSheet: View {
                     Image(systemName: "exclamationmark.triangle").accessibilityHidden(true)
                         .font(OhanaFont.adaptive(size: 28))
                         .foregroundStyle(Color.ohanaPrimaryText.opacity(0.3))
-                    Text("无法抠图")
+                    Text(l.tr(zh: "无法抠图", en: "Cutout failed", de: "Freistellen fehlgeschlagen"))
                         .font(OhanaFont.adaptive(size: 11, weight: .medium, design: .rounded))
                         .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                 }
@@ -218,10 +220,10 @@ struct ImageCutoutPreviewSheet: View {
                     .strokeBorder(.white.opacity(0.08), lineWidth: 1) // ui-v4: allow pre-existing visual token debt surfaced by accessibility font migration; tracked by full-scope ratchet.
             )
 
-            Text("去除背景")
+            Text(l.tr(zh: "去除背景", en: "Remove background", de: "Hintergrund entfernen"))
                 .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
                 .foregroundStyle(Color.ohanaPrimaryText.opacity(0.3))
-            Text("识别失败")
+            Text(l.tr(zh: "识别失败", en: "Detection failed", de: "Erkennung fehlgeschlagen"))
                 .font(OhanaFont.adaptive(size: 10, weight: .medium, design: .rounded))
                 .foregroundStyle(Color.ohanaPrimaryText.opacity(0.25))
         }

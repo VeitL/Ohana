@@ -59,7 +59,7 @@ struct FamilyCollaborationDashboardView: View {
     var onOpenWeeklyReport: () -> Void
 
     @Environment(\.colorScheme) var colorScheme
-    @AppStorage("appLanguage") var appLanguage = AppLanguage.code
+    @Environment(\.ohanaAppLanguageCode) var appLanguage
     @AppStorage("currentActiveHumanId") var activeHumanId = ""
     @State var selectedPetId: UUID?
     @State var selectedTaskScope: TaskScope = .mine

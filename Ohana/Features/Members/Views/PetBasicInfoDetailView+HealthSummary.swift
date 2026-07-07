@@ -186,7 +186,7 @@ extension PetBasicInfoDetailView {
                 Image(systemName: "cross.case.fill") // a11y: allow decorative icon covered by surrounding text or control
                     .font(OhanaFont.adaptive(size: 13, weight: .bold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.goRed)
-                Text("就诊卡片")
+                Text(l.tr(zh: "就诊卡片", en: "Vet visit card", de: "Tierarztkarte"))
                     .font(OhanaFont.adaptive(size: 15, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Spacer()
@@ -199,17 +199,17 @@ extension PetBasicInfoDetailView {
                         vetVisitSummaryShareLabel
                     }
                     .disabled(true)
-                    .accessibilityLabel("就诊摘要准备中")
+                    .accessibilityLabel(l.tr(zh: "就诊摘要准备中", en: "Vet summary is being prepared", de: "Tierarztzusammenfassung wird vorbereitet"))
                 }
             }
 
             VStack(spacing: 8) {
-                compactSummaryRow("疫苗", vaccineSummaryText)
-                compactSummaryRow("过敏", pet.allergies.isEmpty ? "无记录" : pet.allergies)
-                compactSummaryRow("用药中", activeMedicationSummaryText)
-                compactSummaryRow("近期症状", recentSymptomSummaryText)
-                compactSummaryRow("保险", insuranceSummaryText)
-                compactSummaryRow("最近体重", recentWeightSummaryText)
+                compactSummaryRow(l.tr(zh: "疫苗", en: "Vaccines", de: "Impfungen"), vaccineSummaryText)
+                compactSummaryRow(l.tr(zh: "过敏", en: "Allergies", de: "Allergien"), pet.allergies.isEmpty ? l.tr(zh: "无记录", en: "No records", de: "Keine Eintraege") : pet.allergies)
+                compactSummaryRow(l.tr(zh: "用药中", en: "Medication", de: "Medikation"), activeMedicationSummaryText)
+                compactSummaryRow(l.tr(zh: "近期症状", en: "Recent symptoms", de: "Aktuelle Symptome"), recentSymptomSummaryText)
+                compactSummaryRow(l.tr(zh: "保险", en: "Insurance", de: "Versicherung"), insuranceSummaryText)
+                compactSummaryRow(l.tr(zh: "最近体重", en: "Latest weight", de: "Letztes Gewicht"), recentWeightSummaryText)
             }
         }
         .padding(16)
@@ -219,7 +219,7 @@ extension PetBasicInfoDetailView {
     var vetVisitSummaryShareLabel: some View {
         HStack(spacing: 5) {
             Image(systemName: "square.and.arrow.up") // a11y: allow decorative icon covered by surrounding text or control
-            Text("给兽医")
+            Text(l.tr(zh: "给兽医", en: "For vet", de: "Fuer Tierarzt"))
         }
         .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
         .foregroundStyle(Color.arkInk)
@@ -288,17 +288,49 @@ extension PetBasicInfoDetailView {
     }
 
     var vetVisitSummaryText: String {
-        """
-        \(pet.name) 就诊摘要
-        物种/品种：\(pet.species) / \(pet.breed.isEmpty ? "未填写" : pet.breed)
-        年龄：\(pet.ageText)
-        过敏：\(pet.allergies.isEmpty ? "无记录" : pet.allergies)
-        疫苗：\(vaccineSummaryText)
-        用药中：\(activeMedicationSummaryText)
-        近期症状：\(recentSymptomSummaryText)
-        保险：\(insuranceSummaryText)
-        最近体重：\(recentWeightSummaryText)
-        芯片号：\(pet.microchipID.isEmpty ? "未登记" : pet.microchipID)
-        """
+        let speciesBreed = Pet.localizedSpeciesBreedSummary(species: pet.species, breed: pet.breed, l: l)
+        let ageText = pet.hasPassedAway
+            ? pet.ageAtPassingText
+            : pet.birthday.map { pet.localizedAgeTextForWallet(birthday: $0, l: l) } ?? l.tr(zh: "未知", en: "Unknown", de: "Unbekannt")
+        let allergies = pet.allergies.isEmpty ? l.tr(zh: "无记录", en: "No record", de: "Kein Eintrag") : pet.allergies
+        let microchip = pet.microchipID.isEmpty ? l.tr(zh: "未登记", en: "Not registered", de: "Nicht registriert") : pet.microchipID
+        return l.tr(
+            zh: """
+            \(pet.name) 就诊摘要
+            物种/品种：\(speciesBreed.isEmpty ? "未填写" : speciesBreed)
+            年龄：\(ageText)
+            过敏：\(allergies)
+            疫苗：\(vaccineSummaryText)
+            用药中：\(activeMedicationSummaryText)
+            近期症状：\(recentSymptomSummaryText)
+            保险：\(insuranceSummaryText)
+            最近体重：\(recentWeightSummaryText)
+            芯片号：\(microchip)
+            """,
+            en: """
+            \(pet.name) vet visit summary
+            Species/Breed: \(speciesBreed.isEmpty ? "Not set" : speciesBreed)
+            Age: \(ageText)
+            Allergies: \(allergies)
+            Vaccines: \(vaccineSummaryText)
+            Active medication: \(activeMedicationSummaryText)
+            Recent symptoms: \(recentSymptomSummaryText)
+            Insurance: \(insuranceSummaryText)
+            Latest weight: \(recentWeightSummaryText)
+            Microchip: \(microchip)
+            """,
+            de: """
+            \(pet.name) Tierarzt-Zusammenfassung
+            Art/Rasse: \(speciesBreed.isEmpty ? "Nicht festgelegt" : speciesBreed)
+            Alter: \(ageText)
+            Allergien: \(allergies)
+            Impfungen: \(vaccineSummaryText)
+            Aktive Medikamente: \(activeMedicationSummaryText)
+            Aktuelle Symptome: \(recentSymptomSummaryText)
+            Versicherung: \(insuranceSummaryText)
+            Letztes Gewicht: \(recentWeightSummaryText)
+            Mikrochip: \(microchip)
+            """
+        )
     }
 }

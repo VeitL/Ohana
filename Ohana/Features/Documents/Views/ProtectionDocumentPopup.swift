@@ -18,7 +18,7 @@ struct ProtectionDocumentContentPopup: View {
 
     @Environment(\.modelContext) private var modelContext
     @Environment(AppServices.self) private var appServices
-    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
     @StateObject private var commandQueue = DeferredDomainCommandQueue()
     @State private var visible = false
     @State private var dragOffset: CGFloat = 0

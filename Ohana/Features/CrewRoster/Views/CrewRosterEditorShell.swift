@@ -15,7 +15,7 @@ struct CrewRosterEditorShell<Content: View>: View {
     let onSave: () -> Void
     @ViewBuilder let content: () -> Content
 
-    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
 
     private var l: L10n { L10n(appLanguage) }
 

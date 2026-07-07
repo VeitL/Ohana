@@ -15,7 +15,7 @@ struct RosterHomeVisibilityToggle: View {
     var identifier: String?
     let onChange: (Bool) -> Bool
 
-    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
     @State private var visualOverride: Bool?
 
     private var visualIsOn: Bool {
@@ -86,7 +86,7 @@ struct CrewRosterProfilePanel: View {
 
     @Environment(\.modelContext) private var modelContext
     @Environment(AppServices.self) private var appServices
-    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
     @AppStorage("currentActiveHumanId") private var activeHumanIdStr = ""
 
     @State private var isEditing = false
@@ -350,7 +350,7 @@ struct CrewRosterProfilePanel: View {
     private func petReadContent(_ pet: Pet) -> some View {
         VStack(spacing: 12) {
             profileSection(l.tr(zh: "身份", en: "Identity", de: "Identitaet"), icon: "pawprint.fill") {
-                infoRow(l.tr(zh: "物种", en: "Species", de: "Art"), emptyText(pet.species))
+                infoRow(l.tr(zh: "物种", en: "Species", de: "Art"), emptyText(pet.localizedSpeciesName(l: l)))
                 infoRow(l.tr(zh: "品种", en: "Breed", de: "Rasse"), emptyText(pet.breed))
                 infoRow(l.tr(zh: "年龄", en: "Age", de: "Alter"), pet.hasPassedAway ? pet.ageAtPassingText : pet.ageText)
                 infoRow(l.tr(zh: "性别", en: "Gender", de: "Geschlecht"), petGenderSummary(pet))

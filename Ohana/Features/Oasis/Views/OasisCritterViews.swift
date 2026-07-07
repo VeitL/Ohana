@@ -239,7 +239,7 @@ struct OasisCritterCodexView: View {
     @Environment(\.modelContext) var modelContext
     @Environment(\.colorScheme) var colorScheme
     @Environment(AppServices.self) var appServices
-    @AppStorage("appLanguage") var appLanguage = AppLanguage.code
+    @Environment(\.ohanaAppLanguageCode) var appLanguage
     @AppStorage("currentActiveHumanId") var currentActiveHumanId = ""
 
     @State var selectedCatalogId = OasisUpgradeRewardCatalog.firstCritterId

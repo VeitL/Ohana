@@ -21,8 +21,8 @@ struct SwipeableEventRow: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
     @Environment(AppServices.self) private var appServices
-    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
     @AppStorage(AppPerformanceMode.powerSavingKey) private var powerSavingMode = false
 
     @State private var offsetX: CGFloat = 0
@@ -90,7 +90,7 @@ struct SwipeableEventRow: View {
                         Image(systemName: leftProgress >= 1 ? "checkmark.circle.fill" : "checkmark.circle")
                             .font(OhanaFont.adaptive(size: 20, weight: .bold))
                             .symbolRenderingMode(.monochrome)
-                        Text("完成").font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
+                        Text(l.tr(zh: "完成", en: "Done", de: "Erledigt")).font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
                     }
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .opacity(min(1, leftProgress * 1.5))
@@ -109,7 +109,7 @@ struct SwipeableEventRow: View {
                         Image(systemName: "trash.fill").accessibilityHidden(true)
                             .font(OhanaFont.adaptive(size: 20, weight: .bold))
                             .symbolRenderingMode(.monochrome)
-                        Text("删除").font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
+                        Text(l.tr(zh: "删除", en: "Delete", de: "Löschen")).font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
                     }
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .opacity(min(1, rightProgress * 1.5))
@@ -132,21 +132,23 @@ struct SwipeableEventRow: View {
         }
         // F1+F2: 唯一删除确认弹窗，所有逻辑在此处理
         .confirmationDialog(
-            event.recurrenceDays > 0 ? "删除重复事件" : "删除「\(event.title)」",
+            event.recurrenceDays > 0
+                ? l.tr(zh: "删除重复事件", en: "Delete repeating event", de: "Wiederholten Termin löschen")
+                : l.tr(zh: "删除「\(event.title)」", en: "Delete \"\(event.title)\"", de: "\"\(event.title)\" löschen"),
             isPresented: $showDeleteConfirmAlert,
             titleVisibility: .visible
         ) {
             if event.recurrenceDays > 0 {
-                Button("仅删除此条", role: .destructive) { deleteEvent(scope: .singleOccurrence) }
-                Button("删除此条及之后所有重复", role: .destructive) { deleteEvent(scope: .thisAndFuture) }
+                Button(l.tr(zh: "仅删除此条", en: "Delete only this one", de: "Nur diesen Termin löschen"), role: .destructive) { deleteEvent(scope: .singleOccurrence) }
+                Button(l.tr(zh: "删除此条及之后所有重复", en: "Delete this and future repeats", de: "Diesen und zukünftige löschen"), role: .destructive) { deleteEvent(scope: .thisAndFuture) }
             } else {
-                Button("删除", role: .destructive) { triggerDelete() }
+                Button(l.tr(zh: "删除", en: "Delete", de: "Löschen"), role: .destructive) { triggerDelete() }
             }
-            Button("取消", role: .cancel) {}
+            Button(l.tr(zh: "取消", en: "Cancel", de: "Abbrechen"), role: .cancel) {}
         } message: {
             Text(event.recurrenceDays > 0
-                ? "这是一个重复事件，请选择删除方式"
-                : "确定要删除「\(event.title)」吗？此操作不可撤回。")
+                ? l.tr(zh: "这是一个重复事件，请选择删除方式", en: "This event repeats. Choose how to delete it.", de: "Dieser Termin wiederholt sich. Wähle die Löschart.")
+                : l.tr(zh: "确定要删除「\(event.title)」吗？此操作不可撤回。", en: "Delete \"\(event.title)\"? This cannot be undone.", de: "\"\(event.title)\" löschen? Dies kann nicht rückgängig gemacht werden."))
         }
         .onAppear {
             guard rowState == .overdue, !shouldReduceWork else {
@@ -240,7 +242,7 @@ struct SwipeableEventRow: View {
                     .opacity(leftProgress > 0 ? Double(max(0, 1 - leftProgress * 0.8)) : 1)
 
                 HStack(spacing: 6) {
-                    Text(event.eventType)
+                    Text(event.eventTypeEnum?.localizedLabel(l) ?? event.eventType)
                         .font(OhanaFont.adaptive(size: 10, weight: .bold, design: .rounded))
                         .foregroundStyle(eventNodeColor)
                         .padding(.horizontal, 7).padding(.vertical, 2)
@@ -253,7 +255,7 @@ struct SwipeableEventRow: View {
                             .foregroundStyle(timeSecondary.opacity(0.85))
                     }
                     if rowState == .overdue {
-                        Text("逾期")
+                        Text(l.tr(zh: "逾期", en: "Overdue", de: "Überfällig"))
                             .font(OhanaFont.adaptive(size: 9, weight: .black, design: .rounded))
                             .foregroundStyle(Color(hex: "FF5A00"))
                             .padding(.horizontal, 5).padding(.vertical, 1)
@@ -273,7 +275,7 @@ struct SwipeableEventRow: View {
                         .symbolRenderingMode(.monochrome)
                         .foregroundStyle(Color.goPrimary)
                 } else if event.isAllDay {
-                    Text("全天")
+                    Text(l.tr(zh: "全天", en: "All day", de: "Ganztägig"))
                         .font(OhanaFont.adaptive(size: 11, weight: .medium, design: .rounded))
                         .foregroundStyle(timeSecondary)
                 } else {
@@ -466,8 +468,8 @@ struct CalendarEventDetailPage: View {
     let onComplete: () -> Void
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
     @Environment(AppServices.self) private var appServices
-    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
     @State private var showDeleteConfirm = false
     @State private var showEditEvent = false
     private var l: L10n { L10n(appLanguage) }

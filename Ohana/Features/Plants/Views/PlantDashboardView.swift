@@ -174,7 +174,7 @@ struct PlantDashboardView: View {
 
     @Environment(\.modelContext) var modelContext
     @Environment(AppServices.self) var appServices
-    @AppStorage("appLanguage") var appLanguage = "zh"
+    @Environment(\.ohanaAppLanguageCode) var appLanguage
     @AppStorage("currentActiveHumanId") var activeHumanIdRaw = ""
     @AppStorage("plantQuickActionItems_v1") var plantQuickActionItemsRaw = ""
     @AppStorage("ohana_onboarding_has_pets") var onboardingHasPets = true

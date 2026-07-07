@@ -17,6 +17,19 @@ enum ExploreTimeRange: String, CaseIterable, Identifiable {
     case year = "年"
     case all = "全部"
     var id: String { rawValue }
+
+    func title(_ l: L10n) -> String {
+        switch self {
+        case .week:
+            l.tr(zh: "周", en: "Week", de: "Woche")
+        case .month:
+            l.tr(zh: "月", en: "Month", de: "Monat")
+        case .year:
+            l.tr(zh: "年", en: "Year", de: "Jahr")
+        case .all:
+            l.tr(zh: "全部", en: "All", de: "Alle")
+        }
+    }
 }
 
 // MARK: - Internal Models
@@ -50,8 +63,11 @@ struct IslandExplorationDashboardContentView: View {
     @State private var timeRange: ExploreTimeRange = .month
     @State private var animationProgress: Double = 0.0
 
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
     @AppStorage("shop_equipped_title") private var equippedTitle: String = ""
     @AppStorage("currentActiveHumanId") private var activeHumanId: String = ""
+
+    private var l: L10n { L10n(appLanguage) }
 
     // MARK: - Filtered logs
 
@@ -154,12 +170,18 @@ struct IslandExplorationDashboardContentView: View {
     private var funSubtitle: String {
         let km = totalMeters / 1000
         switch km {
-        case ..<1: return "才刚出发，岛屿等你去探索 🌿"
-        case ..<10: return "≈ 绕操场走了好几圈 🏃"
-        case ..<42: return "≈ 相当于城市漫步一整天 🏙️"
-        case ..<100: return "≈ 完成了一个全程马拉松 🏃"
-        case ..<500: return "≈ 徒步跨越了一座城市 🗺️"
-        default: return "≈ 几乎走了整个沿海线 🌊"
+        case ..<1:
+            return l.tr(zh: "才刚出发，岛屿等你去探索", en: "Just getting started. The island is waiting.", de: "Gerade erst gestartet. Die Insel wartet.")
+        case ..<10:
+            return l.tr(zh: "≈ 绕操场走了好几圈", en: "≈ Several laps around a track", de: "≈ Mehrere Stadionrunden")
+        case ..<42:
+            return l.tr(zh: "≈ 相当于城市漫步一整天", en: "≈ A full day of city strolling", de: "≈ Ein ganzer Tag Stadtspaziergang")
+        case ..<100:
+            return l.tr(zh: "≈ 完成了一个全程马拉松", en: "≈ A full marathon completed", de: "≈ Ein ganzer Marathon")
+        case ..<500:
+            return l.tr(zh: "≈ 徒步跨越了一座城市", en: "≈ Hiked across a city", de: "≈ Quer durch eine Stadt gewandert")
+        default:
+            return l.tr(zh: "≈ 几乎走了整个沿海线", en: "≈ Almost an entire coastline", de: "≈ Fast eine ganze Kueste")
         }
     }
 
@@ -222,7 +244,7 @@ struct IslandExplorationDashboardContentView: View {
             }
             .buttonStyle(ScaleButtonStyle())
             Spacer()
-            Text("全岛探索")
+            Text(l.tr(zh: "全岛探索", en: "Island exploration", de: "Inselerkundung"))
                 .font(OhanaFont.adaptive(size: 17, weight: .black, design: .rounded))
                 .foregroundStyle(Color.ohanaPrimaryText)
             Spacer()
@@ -238,7 +260,7 @@ struct IslandExplorationDashboardContentView: View {
             // 时间 filter
             Picker("", selection: $timeRange) {
                 ForEach(ExploreTimeRange.allCases) { r in
-                    Text(r.rawValue).tag(r)
+                    Text(r.title(l)).tag(r)
                 }
             }
             .pickerStyle(.segmented)
@@ -292,7 +314,8 @@ struct IslandExplorationDashboardContentView: View {
         HStack(spacing: 12) {
             // 左：巡岛王者
             bentoHalfCard(
-                title: "🐶 巡岛王者",
+                title: l.tr(zh: "巡岛王者", en: "Island champion", de: "Insel-Champion"),
+                symbol: "pawprint.fill",
                 accentColor: Color.goPrimary
             ) {
                 if let p = topPet {
@@ -310,13 +333,14 @@ struct IslandExplorationDashboardContentView: View {
                         .foregroundStyle(Color.goPrimary)
                     }
                 } else {
-                    emptyBentoLabel("暂无数据")
+                    emptyBentoLabel(l.tr(zh: "暂无数据", en: "No data yet", de: "Noch keine Daten"))
                 }
             }
 
             // 右：劳模铲屎官
             bentoHalfCard(
-                title: "🥾 劳模铲屎官",
+                title: l.tr(zh: "同行达人", en: "Top walking buddy", de: "Top-Spazierpartner"),
+                symbol: "figure.walk",
                 accentColor: Color.goTeal
             ) {
                 if let h = topHuman {
@@ -347,7 +371,7 @@ struct IslandExplorationDashboardContentView: View {
                         .foregroundStyle(Color.goTeal)
                     }
                 } else {
-                    emptyBentoLabel("暂无记录")
+                    emptyBentoLabel(l.tr(zh: "暂无记录", en: "No records yet", de: "Noch keine Eintraege"))
                 }
             }
         }
@@ -356,11 +380,12 @@ struct IslandExplorationDashboardContentView: View {
     @ViewBuilder
     private func bentoHalfCard(
         title: String,
+        symbol: String,
         accentColor: Color,
         @ViewBuilder content: () -> some View
     ) -> some View {
         VStack(spacing: 10) {
-            Text(title)
+            Label(title, systemImage: symbol)
                 .font(OhanaFont.adaptive(size: 10, weight: .black, design: .rounded))
                 .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                 .tracking(1)
@@ -389,14 +414,14 @@ struct IslandExplorationDashboardContentView: View {
 
     private var stackedBarChartCard: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("探索趋势")
+            Text(l.tr(zh: "探索趋势", en: "Exploration trend", de: "Erkundungstrend"))
                 .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
                 .foregroundStyle(Color.ohanaPrimaryText.opacity(0.5))
                 .tracking(1)
 
             let data = stackedPoints
             if data.isEmpty {
-                Text("暂无遛宠记录")
+                Text(l.tr(zh: "暂无遛宠记录", en: "No walk records yet", de: "Noch keine Spaziergaenge"))
                     .font(OhanaFont.adaptive(size: 11, weight: .medium))
                     .foregroundStyle(Color.ohanaPrimaryText.opacity(0.2))
                     .frame(maxWidth: .infinity, minHeight: 120, alignment: .center)
@@ -435,13 +460,13 @@ struct IslandExplorationDashboardContentView: View {
 
     private var leaderboardCard: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("里程贡献榜")
+            Text(l.tr(zh: "里程贡献榜", en: "Distance leaderboard", de: "Distanz-Rangliste"))
                 .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
                 .foregroundStyle(Color.ohanaPrimaryText.opacity(0.5))
                 .tracking(1)
 
             if petSummaries.isEmpty {
-                Text("暂无遛宠记录")
+                Text(l.tr(zh: "暂无遛宠记录", en: "No walk records yet", de: "Noch keine Spaziergaenge"))
                     .font(OhanaFont.adaptive(size: 11, weight: .medium))
                     .foregroundStyle(Color.ohanaPrimaryText.opacity(0.2))
                     .frame(maxWidth: .infinity, minHeight: 60, alignment: .center)

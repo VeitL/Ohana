@@ -22,7 +22,7 @@ struct GachaView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(AppServices.self) private var appServices
     @ObservedObject private var workloadPolicy = AppWorkloadPolicy.shared
-    @AppStorage("appLanguage") private var appLanguage: String = "zh"
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
     @AppStorage("currentActiveHumanId") private var activeHumanId: String = ""
     @AppStorage("gachaHistory") private var legacyHistoryRaw: String = ""
     @State private var selectedSeriesId = GachaSeriesCatalog.defaultSeriesId

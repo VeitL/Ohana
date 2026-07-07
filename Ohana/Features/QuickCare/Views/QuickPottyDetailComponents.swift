@@ -380,7 +380,7 @@ struct PoopHeroCard: View {
     @State private var bounce = false
     @State private var isVisible = false
     @StateObject private var workloadPolicy = AppWorkloadPolicy.shared
-    @AppStorage("appLanguage") private var appLanguage = AppLanguage.fallbackCode
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
     @Environment(\.colorScheme) private var colorScheme
 
     private var shouldAnimateHero: Bool {
@@ -493,7 +493,7 @@ struct PoopLogRow: View {
     var onClaim: ((UUID, Pet) -> Void)?
     let onDelete: () -> Void
 
-    @AppStorage("appLanguage") private var appLanguage = AppLanguage.fallbackCode
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
 
     private var l: L10n { L10n(appLanguage) }
 
@@ -639,7 +639,7 @@ struct PoopCheckInSheet: View {
     let primaryAction: () -> Void
     let secondaryAction: () -> Void
 
-    @AppStorage("appLanguage") private var appLanguage = AppLanguage.fallbackCode
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
 
     private var l: L10n { L10n(appLanguage) }
 
@@ -712,7 +712,7 @@ struct PottyTypeSheet: View {
     var onUnknownGroup: (() -> Void)?
     let onSelect: (PottyType) -> Void
 
-    @AppStorage("appLanguage") private var appLanguage = AppLanguage.fallbackCode
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
 
     private let columns = [
         GridItem(.flexible(), spacing: 12),
@@ -823,7 +823,7 @@ struct PoopCycleSettingsSheet: View {
     let onSave: () -> Void
     let onDelete: () -> Void
 
-    @AppStorage("appLanguage") private var appLanguage = AppLanguage.fallbackCode
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
     @State private var draftIntervalDays = 0
     @State private var draftAnchorDate = Date()
     @State private var draftReminderOn = false
@@ -942,7 +942,7 @@ struct PoopHistorySheet: View {
     var onClaim: ((UUID, Pet) -> Void)?
     let onDelete: (PoopLogItem) -> Void
 
-    @AppStorage("appLanguage") private var appLanguage = AppLanguage.fallbackCode
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
 
     private var l: L10n { L10n(appLanguage) }
 

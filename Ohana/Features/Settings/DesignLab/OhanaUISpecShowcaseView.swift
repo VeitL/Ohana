@@ -11,7 +11,7 @@ struct OhanaUISpecShowcaseView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
-    @AppStorage("appLanguage") private var appLanguage = "zh"
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
 
     @State private var selectedTab: OhanaUISpecShowcaseTab = .foundations
     @State private var sampleToggle = true

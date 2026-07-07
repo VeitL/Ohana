@@ -82,8 +82,10 @@ struct RainbowPoopPin: View {
     var size: CGFloat = 28
 
     @StateObject private var workloadPolicy = AppWorkloadPolicy.shared
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
     @State private var rotation: Double = 0
 
+    private var l: L10n { L10n(appLanguage) }
     private var shouldFlow: Bool {
         isRainbow && isFlowing && workloadPolicy.ambientMotionBudget(isVisible: true).allowsMotion
     }
@@ -122,7 +124,7 @@ struct RainbowPoopPin: View {
         }
         .frame(width: size, height: size)
         .shadow(color: Color.arkInk.opacity(0.28), radius: 5, y: 2) // ui-v4: allow map pin elevation.
-        .accessibilityLabel("便便位置")
+        .accessibilityLabel(l.tr(zh: "便便位置", en: "Poop location", de: "Kotposition"))
         .onAppear { updateFlow() }
         .onChange(of: shouldFlow) { _, _ in updateFlow() }
     }

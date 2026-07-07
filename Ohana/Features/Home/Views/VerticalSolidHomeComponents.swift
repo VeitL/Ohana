@@ -734,7 +734,7 @@ struct VerticalSolidHomeOasisFrozenTreeStage: View {
     let snapshot: OasisTreeRenderSnapshot
     var onOpenShop: (ShopItem.ShopCategory) -> Void = { _ in }
     @Environment(\.colorScheme) private var colorScheme
-    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
 
     private var l: L10n { L10n(appLanguage) }
 

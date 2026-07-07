@@ -63,7 +63,7 @@ struct DailyStreakDetailView: View {
     @Environment(AppServices.self) private var appServices
     @ObservedObject private var avatarPipeline = AvatarPipelineRegistry.current
     @AppStorage("currentActiveHumanId") private var currentActiveHumanId: String = ""
-    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
     @State private var selectedMonth = Date()
     @State private var checkedInDates: Set<String> = []
     @State private var makeupDates: Set<String> = []

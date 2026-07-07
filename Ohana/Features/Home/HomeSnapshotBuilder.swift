@@ -29,7 +29,8 @@ nonisolated enum HomeSnapshotBuilder {
             electronicPets: electronicPets,
             hiddenPetIDsRaw: hiddenPetIDsRaw,
             homeCardOrderRaw: homeCardOrderRaw,
-            showDummyCards: showDummyCards
+            showDummyCards: showDummyCards,
+            l: l
         )
         .map {
             decoratedStatusCard(

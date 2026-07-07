@@ -56,7 +56,7 @@ struct PetHealthArchiveView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.colorScheme) private var colorScheme
     @Environment(AppServices.self) private var appServices
-    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
     @State private var filter: PetHealthArchiveFilter = .all
     @State private var deletingItemIDs: Set<String> = []
     @StateObject private var commandQueue = DeferredDomainCommandQueue()

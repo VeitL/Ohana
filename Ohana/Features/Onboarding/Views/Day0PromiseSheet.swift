@@ -149,7 +149,7 @@ struct Day0PromiseContentSheet: View {
     let onDone: () -> Void
 
     @Environment(\.dismiss) private var dismiss
-    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
     @AppStorage("currentActiveHumanId") private var activeHumanId: String = ""
     @AppStorage("bountyTasks") private var tasksRaw: String = ""
 

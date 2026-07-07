@@ -15,7 +15,7 @@ struct PlantPhotoGallerySheet: View {
     let imageDataProvider: @Sendable (PlantDetailPhotoItem) async -> Data?
 
     @Environment(\.dismiss) private var dismiss
-    @AppStorage("appLanguage") private var appLanguage = "zh"
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
     @State private var selectedPhoto: SelectedPlantDetailPhoto?
 
     private var l: L10n { L10n(appLanguage) }
@@ -172,7 +172,7 @@ private struct PlantPhotoDetailSheet: View {
     let imageDataProvider: @Sendable () async -> Data?
 
     @Environment(\.dismiss) private var dismiss
-    @AppStorage("appLanguage") private var appLanguage = "zh"
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
 
     private var l: L10n { L10n(appLanguage) }
 

@@ -158,7 +158,11 @@ extension PetBasicInfoDetailView {
                             .lineLimit(1)
                             .minimumScaleFactor(0.65)
                             .accessibilityIdentifier("pet-basic-info-name-readback")
-                        Text("\(isEditing ? eSpecies : pet.species) · \(isEditing ? localizedBreedSummary(eBreed) : localizedBreedSummary(pet.breed))")
+                        Text(Pet.localizedSpeciesBreedSummary(
+                            species: isEditing ? eSpecies : pet.species,
+                            breed: isEditing ? eBreed : pet.breed,
+                            l: l
+                        ))
                             .font(OhanaFont.adaptive(size: 13, weight: .medium)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(Color.ohanaPrimaryText.opacity(0.5))
                             .lineLimit(1)

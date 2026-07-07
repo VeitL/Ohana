@@ -22,7 +22,7 @@ extension WalkTrackingCard {
                     mgr.start(pet: pet, modelContext: modelContext)
                     UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                 } label: {
-                    Label("出发", systemImage: "figure.walk")
+                    Label(L10n(appLanguage).tr(zh: "出发", en: "Start", de: "Starten"), systemImage: "figure.walk")
                         .font(OhanaFont.caption(.bold))
                         .foregroundStyle(Color.arkInk)
                         .padding(.horizontal, 16).padding(.vertical, 8)
@@ -50,7 +50,7 @@ extension WalkTrackingCard {
                     mgr.reset()
                     UIImpactFeedbackGenerator(style: .light).impactOccurred()
                 } label: {
-                    Label("再来", systemImage: "arrow.clockwise")
+                    Label(L10n(appLanguage).tr(zh: "再来", en: "Again", de: "Nochmal"), systemImage: "arrow.clockwise")
                         .font(OhanaFont.caption(.bold))
                         .foregroundStyle(Color.arkInk)
                         .padding(.horizontal, 16).padding(.vertical, 8)

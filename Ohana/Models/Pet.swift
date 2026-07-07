@@ -532,6 +532,55 @@ final class Pet {
         }
     }
 
+    static func localizedSpeciesName(_ rawSpecies: String, l: L10n) -> String {
+        let trimmed = rawSpecies.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return "" }
+        let normalized = trimmed.lowercased()
+        switch normalized {
+        case "狗", "dog", "dogs":
+            return l.tr(zh: "狗", en: "Dog", de: "Hund")
+        case "猫", "cat", "cats":
+            return l.tr(zh: "猫", en: "Cat", de: "Katze")
+        case "鱼", "fish", "aquarium", "aquatic":
+            return l.tr(zh: "鱼", en: "Fish", de: "Fisch")
+        case "鸟", "bird", "birds", "parrot":
+            return l.tr(zh: "鸟", en: "Bird", de: "Vogel")
+        case "兔子", "兔", "rabbit", "rabbits", "bunny":
+            return l.tr(zh: "兔子", en: "Rabbit", de: "Kaninchen")
+        case "爬宠", "reptile", "reptiles", "lizard", "snake", "gecko":
+            return l.tr(zh: "爬宠", en: "Reptile", de: "Reptil")
+        case "仓鼠", "hamster", "hamsters":
+            return l.tr(zh: "仓鼠", en: "Hamster", de: "Hamster")
+        case "其他", "other":
+            return l.tr(zh: "其他", en: "Other", de: "Andere")
+        default:
+            return trimmed
+        }
+    }
+
+    static func localizedSpeciesBreedSummary(species: String, breed: String, l: L10n) -> String {
+        let speciesName = localizedSpeciesName(species, l: l)
+        let trimmedBreed = breed.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !speciesName.isEmpty, !trimmedBreed.isEmpty {
+            return "\(speciesName) · \(trimmedBreed)"
+        }
+        if !speciesName.isEmpty {
+            return speciesName
+        }
+        if !trimmedBreed.isEmpty {
+            return trimmedBreed
+        }
+        return ""
+    }
+
+    func localizedSpeciesName(l: L10n) -> String {
+        Self.localizedSpeciesName(species, l: l)
+    }
+
+    func localizedSpeciesBreedSummary(l: L10n) -> String {
+        Self.localizedSpeciesBreedSummary(species: species, breed: breed, l: l)
+    }
+
     // MARK: - Rainbow Bridge（离世状态）
     var hasPassedAway: Bool { passedAwayDate != nil }
 

@@ -14,7 +14,7 @@ struct PetRetentionHubView: View {
 
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
-    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
 
     @State private var careLedgerEvents: [CareLedgerEvent]
     @State private var archiveMetrics: PetRetentionArchiveMetrics

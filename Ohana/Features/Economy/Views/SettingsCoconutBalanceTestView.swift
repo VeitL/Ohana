@@ -15,7 +15,7 @@ struct CoconutBalanceTestContentView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
     @Environment(AppServices.self) private var appServices
-    @AppStorage("appLanguage") private var appLanguage = "zh"
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
     @AppStorage("currentActiveHumanId") private var currentActiveHumanId = ""
     @State private var selectedHumanId = ""
     @State private var amountText = ""

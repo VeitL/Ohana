@@ -17,6 +17,9 @@ struct WalkTrackingFullScreen: View {
     var onMinimize: () -> Void = {}
 
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
+
+    private var l: L10n { L10n(appLanguage) }
 
     var body: some View {
         ZStack(alignment: .topLeading) {
@@ -43,7 +46,7 @@ struct WalkTrackingFullScreen: View {
             HStack(spacing: 5) {
                 Image(systemName: "chevron.down").accessibilityHidden(true)
                     .font(OhanaFont.adaptive(size: 12, weight: .heavy))
-                Text("收起")
+                Text(l.tr(zh: "收起", en: "Minimize", de: "Minimieren"))
                     .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
             }
             .foregroundStyle(Color.goCardWhite)

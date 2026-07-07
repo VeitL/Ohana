@@ -17,7 +17,7 @@ struct AddPlantView: View {
     @Environment(\.modelContext) var modelContext
     @Environment(\.accessibilityReduceMotion) var reduceMotion
     @Environment(AppServices.self) var appServices
-    @AppStorage("appLanguage") var appLanguage = "zh"
+    @Environment(\.ohanaAppLanguageCode) var appLanguage
 
     @StateObject var commandQueue = DeferredDomainCommandQueue()
     @StateObject var media = MemberAvatarMediaCoordinator()

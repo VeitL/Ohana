@@ -36,7 +36,7 @@ struct VerticalSolidHomeView: View {
     @StateObject var routeCoordinator = HomeRouteCoordinator()
     @StateObject var commandQueue = DeferredDomainCommandQueue()
 
-    @AppStorage("appLanguage") var appLanguage = AppLanguage.code
+    @Environment(\.ohanaAppLanguageCode) var appLanguage
     @AppStorage("currentActiveHumanId") var activeHumanIdRaw = ""
     @AppStorage(HomeCardVisibility.hiddenPetIDsKey) var hiddenPetIDsRaw = ""
     @AppStorage("goFocusHomeCardOrder.v1") var homeCardOrderRaw = ""

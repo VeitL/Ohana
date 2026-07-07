@@ -32,7 +32,7 @@ struct CrewRosterWalletScene<CardOverlay: View, MemberContent: View>: View {
     let onCollapse: () -> Void
     let onOpenEditor: (FocusCard) -> Void
     let onCloseEditor: () -> Void
-    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
     @AppStorage("shop_equip_fx_lime_glow") private var equipFxLimeGlow = false
     @AppStorage("shop_equip_fx_popout_card") private var equipFxPopoutCard = true
 

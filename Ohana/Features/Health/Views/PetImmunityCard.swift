@@ -10,6 +10,8 @@ struct PetImmunityCard: View {
     let pet: Pet
     let healthLogs: [PetHealthLog]
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
+    private var l: L10n { L10n(appLanguage) }
 
     init(pet: Pet, healthLogs: [PetHealthLog] = []) {
         self.pet = pet
@@ -22,13 +24,13 @@ struct PetImmunityCard: View {
                 Image(systemName: "shield.checkered").accessibilityHidden(true)
                     .font(OhanaFont.adaptive(size: 14, weight: .semibold))
                     .foregroundStyle(Color.goCardCyan)
-                Text("免疫健康")
+                Text(l.tr(zh: "免疫健康", en: "Immunity health", de: "Immunschutz"))
                     .font(OhanaFont.adaptive(size: 16, weight: .bold, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Spacer()
                 let urgentCount = upcomingCount
                 if urgentCount > 0 {
-                    Text("\(urgentCount) 项到期")
+                    Text(l.tr(zh: "\(urgentCount) 项到期", en: "\(urgentCount) due", de: "\(urgentCount) fällig"))
                         .font(OhanaFont.adaptive(size: 11, weight: .bold))
                         .foregroundStyle(Color.goRed)
                         .padding(.horizontal, 8).padding(.vertical, 3)
@@ -69,19 +71,19 @@ struct PetImmunityCard: View {
         }
 
         return [
-            ImmunityRow(icon: "💉", title: "疫苗",
+            ImmunityRow(icon: "💉", title: HealthLogType.vaccine.localizedLabel(l),
                         lastDate: vaccineLogs.first?.date,
                         nextDueDate: nextDue(vaccineLogs.first) { Calendar.current.date(byAdding: .year, value: 1, to: $0) },
                         note: vaccineLogs.first?.note ?? ""),
-            ImmunityRow(icon: "🪱", title: "体内驱虫",
+            ImmunityRow(icon: "🪱", title: HealthLogType.dewormingInternal.localizedLabel(l),
                         lastDate: dewormInternalLogs.first?.date,
                         nextDueDate: nextDue(dewormInternalLogs.first) { Calendar.current.date(byAdding: .month, value: 3, to: $0) },
                         note: dewormInternalLogs.first?.note ?? ""),
-            ImmunityRow(icon: "🐛", title: "体外驱虫",
+            ImmunityRow(icon: "🐛", title: HealthLogType.dewormingExternal.localizedLabel(l),
                         lastDate: dewormExternalLogs.first?.date,
                         nextDueDate: nextDue(dewormExternalLogs.first) { Calendar.current.date(byAdding: .month, value: 1, to: $0) },
                         note: dewormExternalLogs.first?.note ?? ""),
-            ImmunityRow(icon: "🩺", title: "年度体检",
+            ImmunityRow(icon: "🩺", title: l.tr(zh: "年度体检", en: "Annual checkup", de: "Jahres-Check-up"),
                         lastDate: checkupLogs.first?.date,
                         nextDueDate: nextDue(checkupLogs.first) { Calendar.current.date(byAdding: .year, value: 1, to: $0) },
                         note: checkupLogs.first?.note ?? "")
@@ -109,11 +111,11 @@ struct PetImmunityCard: View {
                     .font(OhanaFont.adaptive(size: 14, weight: .bold, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 if let last = row.lastDate {
-                    Text("上次: \(last, style: .date)")
+                    Text(l.tr(zh: "上次: \(last.formatted(.dateTime.year().month().day()))", en: "Last: \(last.formatted(.dateTime.year().month().day()))", de: "Zuletzt: \(last.formatted(.dateTime.year().month().day()))"))
                         .font(OhanaFont.adaptive(size: 11, weight: .medium))
                         .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                 } else {
-                    Text("尚未记录")
+                    Text(l.tr(zh: "尚未记录", en: "No record yet", de: "Noch kein Eintrag"))
                         .font(OhanaFont.adaptive(size: 11, weight: .medium))
                         .foregroundStyle(Color.ohanaPrimaryText.opacity(0.3))
                 }
@@ -121,13 +123,13 @@ struct PetImmunityCard: View {
             Spacer()
             if let days = daysUntilDue {
                 if isOverdue {
-                    Text("已逾期")
+                    Text(l.tr(zh: "已逾期", en: "Overdue", de: "Überfällig"))
                         .font(OhanaFont.adaptive(size: 11, weight: .black))
                         .foregroundStyle(Color.goRed)
                         .padding(.horizontal, 8).padding(.vertical, 3)
                         .background(Color.goRed.opacity(0.15), in: Capsule())
                 } else if isUrgent {
-                    Text("\(days)天后")
+                    Text(l.tr(zh: "\(days)天后", en: "In \(days)d", de: "In \(days) T."))
                         .font(OhanaFont.adaptive(size: 11, weight: .black))
                         .foregroundStyle(Color.goYellow)
                         .padding(.horizontal, 8).padding(.vertical, 3)

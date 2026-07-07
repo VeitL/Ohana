@@ -15,6 +15,7 @@ struct ProtectionInsurancePopup: View {
 
     @Environment(\.modelContext) private var modelContext
     @Environment(AppServices.self) private var appServices
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
     @State private var visible = false
     @State private var dragOffset: CGFloat = 0
     @State private var productName = ""
@@ -36,6 +37,7 @@ struct ProtectionInsurancePopup: View {
     @StateObject private var commandQueue = DeferredDomainCommandQueue()
 
     private var isEdit: Bool { existing != nil }
+    private var l: L10n { L10n(appLanguage) }
     private var animation: Animation { GoMotion.page }
     private var hiddenOffset: CGFloat { 780 }
     private var canSave: Bool { !productName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
@@ -187,7 +189,7 @@ struct ProtectionInsurancePopup: View {
                 usesMiniKeypad: true
             )
 
-            Toggle("保额", isOn: $hasCoverage)
+            Toggle(l.tr(zh: "保额", en: "Coverage amount", de: "Deckungssumme"), isOn: $hasCoverage)
                 .font(OhanaFont.caption(.bold))
                 .tint(Color.goPrimary)
             if hasCoverage {
@@ -209,7 +211,7 @@ struct ProtectionInsurancePopup: View {
 
     private var frequencyBlock: some View {
         popupBlock {
-            Text("缴费")
+            Text(l.tr(zh: "缴费", en: "Payment", de: "Zahlung"))
                 .font(OhanaFont.caption(.black))
                 .foregroundStyle(Color.ohanaSecondaryText)
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
@@ -217,7 +219,7 @@ struct ProtectionInsurancePopup: View {
                     Button {
                         withAnimation(GoMotion.feedback) { paymentFrequency = frequency }
                     } label: {
-                        Text(frequency.rawValue)
+                        Text(frequency.localizedLabel(l))
                             .font(OhanaFont.caption(.black))
                             .foregroundStyle(paymentFrequency == frequency ? Color.arkInk : Color.ohanaPrimaryText)
                             .frame(maxWidth: .infinity)
@@ -230,7 +232,7 @@ struct ProtectionInsurancePopup: View {
 
             if paymentFrequency == .monthly || paymentFrequency == .quarterly {
                 HStack {
-                    Text("付款日")
+                    Text(l.tr(zh: "付款日", en: "Payment day", de: "Zahlungstag"))
                         .font(OhanaFont.caption(.bold))
                         .foregroundStyle(Color.ohanaSecondaryText)
                     Spacer()

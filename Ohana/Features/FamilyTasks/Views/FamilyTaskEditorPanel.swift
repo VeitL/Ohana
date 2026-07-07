@@ -19,7 +19,7 @@ struct FamilyTaskEditorPanel: View {
     var onUpdateTask: (FamilyCollaborationTask, String, String, Human?, Int, Date?, String) -> Void
     var onDeleteTask: (FamilyCollaborationTask) -> Void
 
-    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
     @State private var title: String
     @State private var note: String
     @State private var selectedHumanId: String

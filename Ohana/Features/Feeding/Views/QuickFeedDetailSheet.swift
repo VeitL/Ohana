@@ -31,8 +31,8 @@ struct QuickFeedDetailSheet: View {
     let allSharedCareSessions: [SharedCareSession]
 
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
     @Environment(AppServices.self) private var appServices
-    @AppStorage("appLanguage") private var appLanguage = "zh"
     @AppStorage("defaultFeedGrams") private var defaultFeedGrams: Double = 0
 
     init(

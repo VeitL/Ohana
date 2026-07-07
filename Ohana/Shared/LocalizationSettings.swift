@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import SwiftUI
 
 // MARK: - App language (与设置页 `appLanguage` / `@AppStorage` 同步)
 
@@ -198,7 +199,11 @@ nonisolated enum AppLanguage {
 
     /// SwiftUI `Text` 等查 `Localizable.strings` 时使用，与 `en.lproj` / `zh-Hans` 资源一致。
     static var swiftUIPreferredLocale: Locale {
-        Locale(identifier: currentOption.swiftUILocaleIdentifier)
+        swiftUIPreferredLocale(for: code)
+    }
+
+    static func swiftUIPreferredLocale(for raw: String) -> Locale {
+        Locale(identifier: option(for: raw).swiftUILocaleIdentifier)
     }
 
     /// 例：`2026-04-19`，用于「每日只弹一次」等与展示语言无关的键。
@@ -208,6 +213,17 @@ nonisolated enum AppLanguage {
         f.timeZone = .current
         f.dateFormat = "yyyy-MM-dd"
         return f.string(from: Calendar.current.startOfDay(for: Date()))
+    }
+}
+
+private struct OhanaAppLanguageCodeKey: EnvironmentKey {
+    static let defaultValue: String = AppLanguage.code
+}
+
+extension EnvironmentValues {
+    var ohanaAppLanguageCode: String {
+        get { self[OhanaAppLanguageCodeKey.self] }
+        set { self[OhanaAppLanguageCodeKey.self] = AppLanguage.normalize(newValue) }
     }
 }
 

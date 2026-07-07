@@ -13,7 +13,7 @@ struct PetMomentsHubRouteContainer: View {
 
     @Environment(\.modelContext) private var modelContext
     @Environment(AppServices.self) private var appServices
-    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
     @State private var routeData = PetMomentsHubRouteData()
     @State private var routeDataGeneration = 0
     @State private var dataLoadTask: Task<Void, Never>?

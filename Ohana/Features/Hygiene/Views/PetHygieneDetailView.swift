@@ -26,6 +26,7 @@ struct PetHygieneDetailContentView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var colorScheme
     @Environment(AppServices.self) private var appServices
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
     @State private var groomingPlanTarget: HygieneType? = nil
     @StateObject private var commandQueue = DeferredDomainCommandQueue()
 
@@ -37,6 +38,7 @@ struct PetHygieneDetailContentView: View {
 
     private var isDark: Bool { colorScheme == .dark }
     private var chromeAccent: Color { isDark ? Color.goPrimary : Color.goBlue }
+    private var l: L10n { L10n(appLanguage) }
 
     private func daysSince(_ type: HygieneType) -> Int? {
         guard let last = hygieneEntries.first(where: { $0.type == type }) else { return nil }
@@ -71,14 +73,22 @@ struct PetHygieneDetailContentView: View {
 
     private func recurrenceLabel(_ days: Int) -> String {
         switch days {
-        case 0: "不重复"
-        case 1: "每天"
-        case 2: "每 2 天"
-        case 3: "每 3 天"
-        case 7: "每周"
-        case 14: "每两周"
-        case 30: "每月"
-        default: "每 \(days) 天"
+        case 0:
+            l.tr(zh: "不重复", en: "No repeat", de: "Keine Wiederholung")
+        case 1:
+            l.tr(zh: "每天", en: "Daily", de: "Täglich")
+        case 2:
+            l.tr(zh: "每 2 天", en: "Every 2 days", de: "Alle 2 Tage")
+        case 3:
+            l.tr(zh: "每 3 天", en: "Every 3 days", de: "Alle 3 Tage")
+        case 7:
+            l.tr(zh: "每周", en: "Weekly", de: "Wöchentlich")
+        case 14:
+            l.tr(zh: "每两周", en: "Every 2 weeks", de: "Alle 2 Wochen")
+        case 30:
+            l.tr(zh: "每月", en: "Monthly", de: "Monatlich")
+        default:
+            l.tr(zh: "每 \(days) 天", en: "Every \(days) days", de: "Alle \(days) Tage")
         }
     }
 
@@ -100,7 +110,7 @@ struct PetHygieneDetailContentView: View {
         let pts = monthStripPoints(type)
         let maxH: CGFloat = 22
         VStack(alignment: .leading, spacing: 6) {
-            Text("近 28 天")
+            Text(l.tr(zh: "近 28 天", en: "Last 28 days", de: "Letzte 28 Tage"))
                 .font(OhanaFont.adaptive(size: 10, weight: .bold, design: .rounded))
                 .foregroundStyle(Color.ohanaSecondaryText)
             HStack(spacing: 2) {
@@ -190,8 +200,8 @@ struct PetHygieneDetailContentView: View {
             .presentationDetents([.medium, .large])
             .presentationDragIndicator(.hidden)
         }
-        .alert("今天已经完成了", isPresented: $showSingleUseNotice) {
-            Button("知道了", role: .cancel) {}
+        .alert(l.tr(zh: "今天已经完成了", en: "Already done today", de: "Heute schon erledigt"), isPresented: $showSingleUseNotice) {
+            Button(l.tr(zh: "知道了", en: "OK", de: "OK"), role: .cancel) {}
         } message: {
             Text(singleUseNoticeMessage)
         }
@@ -211,7 +221,7 @@ struct PetHygieneDetailContentView: View {
                 Text(pet.name)
                     .font(OhanaFont.adaptive(size: 18, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
-                Text("护理")
+                Text(l.tr(zh: "护理", en: "Care", de: "Pflege"))
                     .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
                     .foregroundStyle(Color.ohanaSecondaryText)
             }
@@ -234,7 +244,9 @@ struct PetHygieneDetailContentView: View {
     private var monthlySummaryCard: some View {
         let totalTypes = max(HygieneType.allCases.count, 1)
         let progress = CGFloat(completedTodayCount) / CGFloat(totalTypes)
-        let headline = overdueTypes.isEmpty ? "今天的护理节奏很好" : "\(overdueTypes.count) 项护理需要关注"
+        let headline = overdueTypes.isEmpty
+            ? l.tr(zh: "今天的护理节奏很好", en: "Care rhythm looks good today", de: "Der Pflegerhythmus passt heute")
+            : l.tr(zh: "\(overdueTypes.count) 项护理需要关注", en: "\(overdueTypes.count) care items need attention", de: "\(overdueTypes.count) Pflegepunkte brauchen Aufmerksamkeit")
 
         return VStack(alignment: .leading, spacing: 16) {
             HStack(spacing: 14) {
@@ -249,7 +261,7 @@ struct PetHygieneDetailContentView: View {
                         Text("\(completedTodayCount)/\(totalTypes)")
                             .font(OhanaFont.adaptive(size: 17, weight: .black, design: .rounded))
                             .foregroundStyle(Color.ohanaPrimaryText)
-                        Text("今日")
+                        Text(l.tr(zh: "今日", en: "Today", de: "Heute"))
                             .font(OhanaFont.adaptive(size: 9, weight: .bold, design: .rounded))
                             .foregroundStyle(Color.ohanaSecondaryText)
                     }
@@ -260,7 +272,7 @@ struct PetHygieneDetailContentView: View {
                     Text(headline)
                         .font(OhanaFont.adaptive(size: 17, weight: .black, design: .rounded))
                         .foregroundStyle(Color.ohanaPrimaryText)
-                    Text(overdueTypes.isEmpty ? "继续保持，下一次护理会自动提醒。" : overdueTypes.map(\.rawValue).joined(separator: "、"))
+                    Text(overdueTypes.isEmpty ? l.tr(zh: "继续保持，下一次护理会自动提醒。", en: "Keep going. The next care item will remind you.", de: "Weiter so. Die nächste Pflege erinnert dich.") : overdueTypes.map { $0.localizedLabel(l) }.joined(separator: l.tr(zh: "、", en: ", ", de: ", ")))
                         .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded))
                         .foregroundStyle(overdueTypes.isEmpty ? .secondary : Color.goRed.opacity(0.9))
                         .lineLimit(2)
@@ -269,9 +281,9 @@ struct PetHygieneDetailContentView: View {
             }
 
             HStack(spacing: 8) {
-                overviewMetric(icon: "sparkle", value: "\(monthlyTotalCount)", label: "本月护理", tint: themeColor)
-                overviewMetric(icon: "bolt.fill", value: "\(currentStrike)", label: "连续打卡 strike", tint: Color.goOrange)
-                overviewMetric(icon: "clock", value: "\(overdueTypes.count)", label: "待护理", tint: overdueTypes.isEmpty ? themeColor : Color.goRed)
+                overviewMetric(icon: "sparkle", value: "\(monthlyTotalCount)", label: l.tr(zh: "本月护理", en: "This month", de: "Dieser Monat"), tint: themeColor)
+                overviewMetric(icon: "bolt.fill", value: "\(currentStrike)", label: l.tr(zh: "连续打卡", en: "Streak", de: "Serie"), tint: Color.goOrange)
+                overviewMetric(icon: "clock", value: "\(overdueTypes.count)", label: l.tr(zh: "待护理", en: "Due", de: "Fällig"), tint: overdueTypes.isEmpty ? themeColor : Color.goRed)
             }
         }
         .padding(.vertical, 6)
@@ -324,18 +336,18 @@ struct PetHygieneDetailContentView: View {
                 Image(systemName: type.systemIconName)
                     .font(OhanaFont.adaptive(size: 14, weight: .semibold))
                     .foregroundStyle(themeColor)
-                Text(type.rawValue)
+                Text(type.localizedLabel(l))
                     .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Spacer(minLength: 4)
                 if let d = days {
-                    Text(d == 0 ? "✓ 今天" : "\(d)天前")
+                    Text(d == 0 ? l.tr(zh: "✓ 今天", en: "✓ Today", de: "✓ Heute") : l.tr(zh: "\(d)天前", en: "\(d)d ago", de: "vor \(d) T."))
                         .font(OhanaFont.adaptive(size: 10, weight: .bold, design: .rounded))
                         .foregroundStyle(d == 0 ? themeColor : color)
                         .padding(.horizontal, 7).padding(.vertical, 3)
                         .background((d == 0 ? themeColor : color).opacity(0.14), in: Capsule())
                 } else {
-                    Text("未记录")
+                    Text(l.tr(zh: "未记录", en: "No record", de: "Kein Eintrag"))
                         .font(OhanaFont.adaptive(size: 10, weight: .medium))
                         .foregroundStyle(themeColor.opacity(0.55))
                         .padding(.horizontal, 7).padding(.vertical, 3)
@@ -348,7 +360,7 @@ struct PetHygieneDetailContentView: View {
                     HStack(spacing: 3) {
                         Image(systemName: "bell.badge.plus").accessibilityHidden(true)
                             .font(OhanaFont.adaptive(size: 10, weight: .bold))
-                        Text("计划")
+                        Text(l.tr(zh: "计划", en: "Plan", de: "Plan"))
                             .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded))
                     }
                     .foregroundStyle(themeColor)
@@ -368,7 +380,7 @@ struct PetHygieneDetailContentView: View {
                             .padding(.horizontal, 10).padding(.vertical, 5)
                             .background(themeColor.opacity(0.1), in: Capsule())
                     } else {
-                        Text("打卡")
+                        Text(l.tr(zh: "打卡", en: "Log", de: "Erfassen"))
                             .font(OhanaFont.adaptive(size: 11, weight: .black, design: .rounded))
                             .foregroundStyle(Color.goCardWhite)
                             .padding(.horizontal, 10).padding(.vertical, 5)
@@ -385,7 +397,7 @@ struct PetHygieneDetailContentView: View {
                     HStack(spacing: 4) {
                         Image(systemName: "bell.fill").accessibilityHidden(true)
                             .font(OhanaFont.adaptive(size: 10, weight: .bold))
-                        Text("已设计划")
+                        Text(l.tr(zh: "已设计划", en: "Plans set", de: "Geplante Pflege"))
                             .font(OhanaFont.adaptive(size: 10, weight: .heavy, design: .rounded))
                     }
                     .foregroundStyle(Color.ohanaPrimaryText.opacity(0.7))
@@ -401,7 +413,7 @@ struct PetHygieneDetailContentView: View {
                                     .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded))
                                     .foregroundStyle(Color.ohanaPrimaryText)
                                 if let ev = rem.event, ev.recurrenceDays > 0 {
-                                    Text("重复 · \(recurrenceLabel(ev.recurrenceDays))")
+                                    Text(l.tr(zh: "重复 · \(recurrenceLabel(ev.recurrenceDays))", en: "Repeats · \(recurrenceLabel(ev.recurrenceDays))", de: "Wiederholt · \(recurrenceLabel(ev.recurrenceDays))"))
                                         .font(OhanaFont.adaptive(size: 10, weight: .medium, design: .rounded))
                                         .foregroundStyle(Color.ohanaSecondaryText)
                                 }
@@ -431,7 +443,7 @@ struct PetHygieneDetailContentView: View {
                 Image(systemName: "repeat").accessibilityHidden(true)
                     .font(OhanaFont.adaptive(size: 9, weight: .semibold))
                     .foregroundStyle(themeColor.opacity(0.6))
-                Text("每\(effectiveDays)天\(isCustom ? " · 已自定义" : "")")
+                Text(cycleSummary(days: effectiveDays, isCustom: isCustom))
                     .font(OhanaFont.adaptive(size: 10, weight: .medium, design: .rounded))
                     .foregroundStyle(Color.ohanaSecondaryText.opacity(0.7))
                 Spacer()
@@ -469,7 +481,11 @@ struct PetHygieneDetailContentView: View {
 
     private func recordHygiene(_ type: HygieneType, doneToday: Bool) {
         guard !doneToday else {
-            singleUseNoticeMessage = "\(pet.name) 今天已经记录过\(type.rawValue)了，这类护理一天记录一次就够了。"
+            singleUseNoticeMessage = l.tr(
+                zh: "\(pet.name) 今天已经记录过\(type.localizedLabel(l))了，这类护理一天记录一次就够了。",
+                en: "\(pet.name) already has \(type.localizedLabel(l)) logged today. Once per day is enough for this care type.",
+                de: "\(type.localizedLabel(l)) wurde für \(pet.name) heute schon erfasst. Einmal pro Tag reicht."
+            )
             showSingleUseNotice = true
             UINotificationFeedbackGenerator().notificationOccurred(.warning)
             return
@@ -514,6 +530,12 @@ struct PetHygieneDetailContentView: View {
                 note: "pet.hygiene.detail.delete"
             )
         }
+    }
+
+    private func cycleSummary(days: Int, isCustom: Bool) -> String {
+        let base = l.tr(zh: "每\(days)天", en: "Every \(days) days", de: "Alle \(days) Tage")
+        guard isCustom else { return base }
+        return l.tr(zh: "\(base) · 已自定义", en: "\(base) · Custom", de: "\(base) · Eigene Einstellung")
     }
 }
 

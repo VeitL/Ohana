@@ -16,12 +16,13 @@ nonisolated enum FocusHomeCardDataSource {
         electronicPets: [OasisElectronicPet],
         hiddenPetIDsRaw: String,
         homeCardOrderRaw: String,
-        showDummyCards: Bool
+        showDummyCards: Bool,
+        l: L10n = .current
     ) -> [FocusCard] {
         let real = (
             pets
                 .filter { !$0.hasPassedAway && HomeCardVisibility.isPetVisible($0, raw: hiddenPetIDsRaw) }
-                .map { FocusCard.from($0, includeAvatarData: false) }
+                .map { FocusCard.from($0, includeAvatarData: false, l: l) }
                 + humans
                 .filter { $0.shouldShowOnHome && !$0.hasPassedAway }
                 .map { FocusCard.from($0, includeAvatarData: false) }

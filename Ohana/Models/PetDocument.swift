@@ -30,6 +30,23 @@ enum DocumentCategory: String, Codable, CaseIterable {
         case .other: "📎"
         }
     }
+
+    func localizedLabel(_ l: L10n) -> String {
+        switch self {
+        case .passport:
+            l.tr(zh: "护照", en: "Passport", de: "Pass")
+        case .vaccine:
+            l.tr(zh: "疫苗本", en: "Vaccine record", de: "Impfpass")
+        case .insurance:
+            l.tr(zh: "保险", en: "Insurance", de: "Versicherung")
+        case .medical:
+            l.tr(zh: "病历", en: "Medical record", de: "Akte")
+        case .registration:
+            l.tr(zh: "登记证", en: "Registration", de: "Registrierung")
+        case .other:
+            l.tr(zh: "其他", en: "Other", de: "Sonstiges")
+        }
+    }
 }
 
 // MARK: - PetDocumentAttachment (multi-attachment support)

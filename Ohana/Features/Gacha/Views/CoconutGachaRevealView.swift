@@ -136,7 +136,7 @@ struct CoconutGachaRevealView: View {
     var onCollectibleCardTap: (() -> Void)?
     var onCollectibleKeepTap: (() -> Void)?
 
-    @AppStorage("appLanguage") private var appLanguage: String = "zh"
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @ObservedObject private var workloadPolicy = AppWorkloadPolicy.shared
 

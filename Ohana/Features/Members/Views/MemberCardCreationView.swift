@@ -32,7 +32,7 @@ struct MemberCardCreationContentView: View {
     @Environment(\.accessibilityReduceMotion) var reduceMotion
     @Environment(\.memberCreationCardFlipProgress) var memberCreationCardFlipProgress
     @Environment(AppServices.self) var appServices
-    @AppStorage("appLanguage") var appLanguage = AppLanguage.code
+    @Environment(\.ohanaAppLanguageCode) var appLanguage
     @AppStorage(AppCountry.storageKey) var appCountry = AppCountry.detectedCode
     @AppStorage(Avatar2DAccess.extraPassInventoryKey) var avatarPassCount = 0
     @AppStorage(HomeCardVisibility.hiddenPetIDsKey) var hiddenHomePetIDsRaw = ""

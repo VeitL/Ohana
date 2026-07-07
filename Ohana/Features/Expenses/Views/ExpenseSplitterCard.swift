@@ -10,7 +10,7 @@ import SwiftUI
 struct ExpenseSplitterCard: View {
     let filteredLogs: [PetExpenseLog]
     let humans: [Human]
-    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
 
     private struct SplitResult: Identifiable {
         let id: UUID

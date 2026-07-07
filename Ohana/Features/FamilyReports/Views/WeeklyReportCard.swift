@@ -15,6 +15,7 @@ struct WeeklyReportCard: View {
     @State private var shareImage: UIImage? = nil
     @State private var pulseShare = false
     @State private var isVisible = false
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
     @ObservedObject private var workloadPolicy = AppWorkloadPolicy.shared
 
     init(pet: Pet, ledgerEvents: [CareLedgerEvent] = []) {
@@ -25,6 +26,8 @@ struct WeeklyReportCard: View {
     private var shouldPulseShare: Bool {
         workloadPolicy.shouldRunRepeatingAnimation(isVisible: isVisible)
     }
+
+    private var l: L10n { L10n(appLanguage) }
 
     private var weekStart: Date {
         Calendar.current.dateInterval(of: .weekOfYear, for: Date())?.start ?? Date()
@@ -72,7 +75,7 @@ struct WeeklyReportCard: View {
             HStack {
                 Image(systemName: "chart.bar.fill").accessibilityHidden(true)
                     .foregroundStyle(Color.goPrimary)
-                Text("本周小报")
+                Text(l.tr(zh: "本周小报", en: "Weekly report", de: "Wochenbericht"))
                     .font(OhanaFont.adaptive(size: 16, weight: .bold, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Spacer()
@@ -88,7 +91,7 @@ struct WeeklyReportCard: View {
                         HStack(spacing: 4) {
                             Image(systemName: "square.and.arrow.up").accessibilityHidden(true)
                                 .font(OhanaFont.adaptive(size: 11, weight: .bold))
-                            Text("分享")
+                            Text(l.tr(zh: "分享", en: "Share", de: "Teilen"))
                                 .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded))
                         }
                         .foregroundStyle(Color.arkInk)
@@ -118,17 +121,17 @@ struct WeeklyReportCard: View {
                 GridItem(.flexible(), spacing: 10),
                 GridItem(.flexible(), spacing: 10)
             ], spacing: 10) {
-                statBubble(emoji: "🚶", value: "\(weekWalkEvents.count)", label: "巡岛")
-                statBubble(emoji: "📏", value: distanceFormatted, label: "距离")
-                statBubble(emoji: "⏱️", value: durationFormatted, label: "时长")
-                statBubble(emoji: "💩", value: "\(weekPottyEvents.count)", label: "便便")
-                statBubble(emoji: "💰", value: AppCurrency.format(weekExpenses, fractionDigits: 0), label: "花费")
-                statBubble(emoji: "⚖️", value: latestWeight, label: "体重")
+                statBubble(emoji: "🚶", value: "\(weekWalkEvents.count)", label: l.tr(zh: "巡岛", en: "Walks", de: "Runden"))
+                statBubble(emoji: "📏", value: distanceFormatted, label: l.tr(zh: "距离", en: "Distance", de: "Distanz"))
+                statBubble(emoji: "⏱️", value: durationFormatted, label: l.tr(zh: "时长", en: "Time", de: "Zeit"))
+                statBubble(emoji: "💩", value: "\(weekPottyEvents.count)", label: l.tr(zh: "便便", en: "Poop", de: "Häufchen"))
+                statBubble(emoji: "💰", value: AppCurrency.format(weekExpenses, fractionDigits: 0), label: l.tr(zh: "花费", en: "Expense", de: "Ausgaben"))
+                statBubble(emoji: "⚖️", value: latestWeight, label: l.tr(zh: "体重", en: "Weight", de: "Gewicht"))
             }
 
             // 7天活跃热力图
             VStack(alignment: .leading, spacing: 6) {
-                Text("活跃天数")
+                Text(l.tr(zh: "活跃天数", en: "Active days", de: "Aktive Tage"))
                     .font(OhanaFont.adaptive(size: 12, weight: .medium))
                     .foregroundStyle(Color.ohanaSecondaryText)
 
@@ -246,7 +249,7 @@ struct WeeklyReportCard: View {
         VStack(alignment: .leading, spacing: 0) {
             // 顶部品牌条
             HStack {
-                Text("🏝️ Ohana 周报")
+                Text(l.tr(zh: "🏝️ Ohana 周报", en: "🏝️ Ohana weekly report", de: "🏝️ Ohana Wochenbericht"))
                     .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
                     .foregroundStyle(Color.goPrimary)
                 Spacer()
@@ -272,7 +275,7 @@ struct WeeklyReportCard: View {
                     Text(pet.name)
                         .font(OhanaFont.adaptive(size: 22, weight: .black, design: .rounded))
                         .foregroundStyle(Color.ohanaPrimaryText)
-                    Text("本周战绩")
+                    Text(l.tr(zh: "本周战绩", en: "This week's stats", de: "Diese Woche"))
                         .font(OhanaFont.adaptive(size: 12, weight: .medium))
                         .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                 }
@@ -286,7 +289,7 @@ struct WeeklyReportCard: View {
                     Text("\(activeDays)")
                         .font(OhanaFont.adaptive(size: 36, weight: .black, design: .rounded))
                         .foregroundStyle(Color.goPrimary)
-                    Text("活跃天")
+                    Text(l.tr(zh: "活跃天", en: "Active days", de: "Aktive Tage"))
                         .font(OhanaFont.adaptive(size: 10, weight: .bold, design: .rounded))
                         .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                 }
@@ -296,12 +299,12 @@ struct WeeklyReportCard: View {
 
             // 数据网格
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
-                posterStat(emoji: "🚶", value: "\(weekWalkEvents.count)次", label: "巡岛")
-                posterStat(emoji: "📏", value: distanceFormatted, label: "距离")
-                posterStat(emoji: "⏱️", value: durationFormatted, label: "时长")
-                posterStat(emoji: "💩", value: "\(weekPottyEvents.count)次", label: "便便")
-                posterStat(emoji: "💰", value: AppCurrency.format(weekExpenses, fractionDigits: 0), label: "花费")
-                posterStat(emoji: "⚖️", value: latestWeight, label: "体重")
+                posterStat(emoji: "🚶", value: l.tr(zh: "\(weekWalkEvents.count)次", en: "\(weekWalkEvents.count)", de: "\(weekWalkEvents.count)"), label: l.tr(zh: "巡岛", en: "Walks", de: "Runden"))
+                posterStat(emoji: "📏", value: distanceFormatted, label: l.tr(zh: "距离", en: "Distance", de: "Distanz"))
+                posterStat(emoji: "⏱️", value: durationFormatted, label: l.tr(zh: "时长", en: "Time", de: "Zeit"))
+                posterStat(emoji: "💩", value: l.tr(zh: "\(weekPottyEvents.count)次", en: "\(weekPottyEvents.count)", de: "\(weekPottyEvents.count)"), label: l.tr(zh: "便便", en: "Poop", de: "Häufchen"))
+                posterStat(emoji: "💰", value: AppCurrency.format(weekExpenses, fractionDigits: 0), label: l.tr(zh: "花费", en: "Expense", de: "Ausgaben"))
+                posterStat(emoji: "⚖️", value: latestWeight, label: l.tr(zh: "体重", en: "Weight", de: "Gewicht"))
             }
             .padding(.horizontal, 16)
 

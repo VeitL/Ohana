@@ -744,8 +744,8 @@ struct PetAllFeaturesSheet: View {
     }
 
     private var petSubtitle: String {
-        if !pet.breed.isEmpty { return "\(pet.species) · \(pet.breed)" }
-        if !pet.species.isEmpty { return pet.species }
+        let summary = pet.localizedSpeciesBreedSummary(l: l)
+        if !summary.isEmpty { return summary }
         return l.tr(zh: "宠物成员", en: "Pet member", de: "Tiermitglied")
     }
 

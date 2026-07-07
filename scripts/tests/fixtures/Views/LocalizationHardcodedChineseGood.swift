@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct LocalizationHardcodedChineseGood: View {
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
     private let title = L10n("fixture.title").tr(zh: "中文", en: "Localized")
 
     var body: some View {

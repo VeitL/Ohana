@@ -44,6 +44,31 @@ extension AvatarColorPreset {
         .init(name: "三花", hex: "D4A847"),
         .init(name: "虎纹", hex: "8B6914")
     ]
+
+    func localizedName(_ l: L10n) -> String {
+        switch name {
+        case "琥珀": l.tr(zh: "琥珀", en: "Amber", de: "Bernstein")
+        case "深棕": l.tr(zh: "深棕", en: "Dark brown", de: "Dunkelbraun")
+        case "浅棕": l.tr(zh: "浅棕", en: "Light brown", de: "Hellbraun")
+        case "蓝灰": l.tr(zh: "蓝灰", en: "Blue gray", de: "Blaugrau")
+        case "绿色": l.tr(zh: "绿色", en: "Green", de: "Gruen")
+        case "冰蓝": l.tr(zh: "冰蓝", en: "Ice blue", de: "Eisblau")
+        case "灰色": l.tr(zh: "灰色", en: "Gray", de: "Grau")
+        case "榛色": l.tr(zh: "榛色", en: "Hazel", de: "Haselnuss")
+        case "黑色": l.tr(zh: "黑色", en: "Black", de: "Schwarz")
+        case "象牙白": l.tr(zh: "象牙白", en: "Ivory", de: "Elfenbein")
+        case "奶油": l.tr(zh: "奶油", en: "Cream", de: "Creme")
+        case "金黄": l.tr(zh: "金黄", en: "Golden", de: "Gold")
+        case "姜橙": l.tr(zh: "姜橙", en: "Ginger", de: "Ingwer")
+        case "焦糖": l.tr(zh: "焦糖", en: "Caramel", de: "Karamell")
+        case "巧克力": l.tr(zh: "巧克力", en: "Chocolate", de: "Schokolade")
+        case "银灰": l.tr(zh: "银灰", en: "Silver gray", de: "Silbergrau")
+        case "炭黑": l.tr(zh: "炭黑", en: "Charcoal", de: "Anthrazit")
+        case "三花": l.tr(zh: "三花", en: "Calico", de: "Dreifarbig")
+        case "虎纹": l.tr(zh: "虎纹", en: "Tabby", de: "Getigert")
+        default: name
+        }
+    }
 }
 
 // MARK: - LayeredAvatarView
@@ -65,7 +90,9 @@ struct LayeredAvatarView: View {
     @State private var bodyPressScale: CGFloat = 1
     @State private var decodedAvatarImage: UIImage?
     @State private var decodedAvatarIsTransparent = false
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
 
+    private var l: L10n { L10n(appLanguage) }
     private var furColor: Color { Color(hex: furHex.isEmpty ? "D4A847" : furHex) }
     private var eyeColor: Color { Color(hex: eyeHex.isEmpty ? "D4A017" : eyeHex) }
     private var avatarSignature: String {
@@ -89,7 +116,7 @@ struct LayeredAvatarView: View {
         }
         .sheet(isPresented: $showEyePicker) {
             ColorPickerPopup(
-                title: "眼睛颜色",
+                title: l.tr(zh: "眼睛颜色", en: "Eye color", de: "Augenfarbe"),
                 presets: AvatarColorPreset.eyePresets,
                 selectedHex: $eyeHex
             )
@@ -98,7 +125,7 @@ struct LayeredAvatarView: View {
         }
         .sheet(isPresented: $showFurPicker) {
             ColorPickerPopup(
-                title: "毛发颜色",
+                title: l.tr(zh: "毛发颜色", en: "Fur color", de: "Fellfarbe"),
                 presets: AvatarColorPreset.furPresets,
                 selectedHex: $furHex
             )
@@ -255,7 +282,7 @@ struct LayeredAvatarView: View {
         HStack(spacing: 4) {
             Image(systemName: "hand.tap.fill") // a11y: allow decorative icon covered by surrounding text or control
                 .font(OhanaFont.adaptive(size: 9, weight: .bold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-            Text("点击捏脸")
+            Text(l.tr(zh: "点击捏脸", en: "Tap to customize", de: "Zum Anpassen tippen"))
                 .font(OhanaFont.adaptive(size: 9, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
         }
         .foregroundStyle(Color.goCardWhite)
@@ -293,7 +320,9 @@ struct ColorPickerPopup: View {
     @Binding var selectedHex: String
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
 
+    private var l: L10n { L10n(appLanguage) }
     private var surface: Color { colorScheme == .light ? .white : Color(hex: "1C1C1E") }
     private var bg: Color { colorScheme == .light ? Color(hex: "F5F5F7") : Color(hex: "0A0A0C") }
     private var textSec: Color { colorScheme == .light ? Color(hex: "8E8E93") : Color(hex: "64748B") }
@@ -358,7 +387,7 @@ struct ColorPickerPopup: View {
                 .scaleEffect(isSelected ? 1.1 : 1)
                 .animation(GoMotion.feedback, value: isSelected)
 
-                Text(preset.name)
+                Text(preset.localizedName(l))
                     .font(OhanaFont.adaptive(size: 10, weight: isSelected ? .bold : .medium, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(isSelected ? accent : textSec)
             }

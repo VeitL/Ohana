@@ -182,12 +182,15 @@ private struct FocusHomeWalletCardInteractionModifier<MenuContent: View>: ViewMo
     let onCollapsedDragChanged: (_ translationY: CGFloat) -> Void
     let onCollapsedDragEnded: (_ translationY: CGFloat) -> Void
     @ViewBuilder let contextMenuContent: () -> MenuContent
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
+
+    private var l: L10n { L10n(appLanguage) }
 
     func body(content: Content) -> some View {
         content
             .allowsHitTesting(!isExpanded || isHero || visualOpacity > 0.15)
             .accessibilityElement(children: .combine)
-            .accessibilityLabel("\(cardName) 的卡片")
+            .accessibilityLabel(l.tr(zh: "\(cardName) 的卡片", en: "\(cardName)'s card", de: "Karte von \(cardName)"))
             .accessibilityHint(accessibilityHint)
             .if(isExpanded && !isHero && !isAnyReorderDragging) { view in
                 view.contextMenu { contextMenuContent() }

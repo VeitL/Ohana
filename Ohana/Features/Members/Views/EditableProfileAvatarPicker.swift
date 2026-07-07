@@ -50,7 +50,7 @@ struct EditableProfileAvatarPicker: View {
     @State private var cropImageItem: IdentifiableCropImage? = nil
     @State private var cropPresentationTask: Task<Void, Never>? = nil
     @State private var isPasting = false
-    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
 
     private var l: L10n { L10n(appLanguage) }
 

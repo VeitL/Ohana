@@ -121,7 +121,7 @@ extension WalkTrackingCard {
                         Image(systemName: "map") // a11y: allow decorative icon covered by surrounding text or control
                             .font(OhanaFont.adaptive(size: 24)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(Color.goCardWhite.opacity(0.2))
-                        Text("暂无路线记录")
+                        Text(L10n(appLanguage).tr(zh: "暂无路线记录", en: "No route yet", de: "Noch keine Route"))
                             .font(OhanaFont.caption())
                             .foregroundStyle(Color.goCardWhite.opacity(0.2))
                     }

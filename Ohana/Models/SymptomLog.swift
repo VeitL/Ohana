@@ -24,6 +24,19 @@ enum SymptomSeverity: Int, Codable, CaseIterable {
         }
     }
 
+    func localizedLabel(_ l: L10n) -> String {
+        switch self {
+        case .mild:
+            l.tr(zh: "轻微", en: "Mild", de: "Leicht")
+        case .moderate:
+            l.tr(zh: "中度", en: "Moderate", de: "Mittel")
+        case .severe:
+            l.tr(zh: "严重", en: "Severe", de: "Schwer")
+        case .critical:
+            l.tr(zh: "紧急", en: "Critical", de: "Kritisch")
+        }
+    }
+
     var icon: String {
         switch self {
         case .mild: "exclamationmark.circle"

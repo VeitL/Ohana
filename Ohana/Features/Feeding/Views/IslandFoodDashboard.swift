@@ -19,7 +19,7 @@ struct IslandFoodDashboardContentView: View {
     let allSharedCareSessions: [SharedCareSession]
 
     @Environment(\.dismiss) private var dismiss
-    @AppStorage("appLanguage") private var appLanguage = AppLanguage.fallbackCode
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
 
     @State private var selectedPetId: UUID? = nil
     @State private var sheetPet: Pet? = nil

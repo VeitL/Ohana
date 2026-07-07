@@ -14,7 +14,7 @@ struct CrewRosterDeleteConfirmationSheet: View {
     let onCancel: () -> Void
     let onDelete: () -> Void
 
-    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
     @State private var confirmName = ""
 
     private var l: L10n { L10n(appLanguage) }

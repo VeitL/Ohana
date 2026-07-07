@@ -108,6 +108,65 @@ enum EventType: String, Codable, CaseIterable, Identifiable, Sendable {
         case .insurancePremium: "shield.fill"
         }
     }
+
+    func localizedLabel(_ l: L10n) -> String {
+        switch self {
+        case .birthday:
+            l.tr(zh: "生日", en: "Birthday", de: "Geburtstag")
+        case .anniversary:
+            l.tr(zh: "纪念日", en: "Anniversary", de: "Jahrestag")
+        case .daily:
+            l.tr(zh: "日常", en: "Daily", de: "Alltag")
+        case .health:
+            l.tr(zh: "健康", en: "Health", de: "Gesundheit")
+        case .task:
+            l.tr(zh: "任务", en: "Task", de: "Aufgabe")
+        case .shoppingList:
+            l.tr(zh: "购物清单", en: "Shopping list", de: "Einkaufsliste")
+        case .chore:
+            l.tr(zh: "家务分配", en: "Chore", de: "Haushalt")
+        case .vaccine:
+            l.tr(zh: "疫苗", en: "Vaccine", de: "Impfung")
+        case .externalDeworming:
+            l.tr(zh: "体外驱虫", en: "External deworming", de: "Äußere Entwurmung")
+        case .internalDeworming:
+            l.tr(zh: "体内驱虫", en: "Internal deworming", de: "Innere Entwurmung")
+        case .grooming:
+            l.tr(zh: "洗澡美容", en: "Grooming", de: "Pflege")
+        case .vetVisit:
+            l.tr(zh: "就医", en: "Vet visit", de: "Tierarzt")
+        case .foodChange:
+            l.tr(zh: "换粮", en: "Food change", de: "Futterwechsel")
+        case .litterBox:
+            l.tr(zh: "铲猫砂", en: "Litter box", de: "Katzenklo")
+        case .watering:
+            l.tr(zh: "浇水", en: "Watering", de: "Gießen")
+        case .fertilizing:
+            l.tr(zh: "施肥", en: "Fertilizing", de: "Düngen")
+        case .plantRepotting:
+            l.tr(zh: "植物换盆", en: "Repotting", de: "Umtopfen")
+        case .plantPruning:
+            l.tr(zh: "植物修剪", en: "Pruning", de: "Schneiden")
+        case .plantMisting:
+            l.tr(zh: "植物喷雾", en: "Misting", de: "Besprühen")
+        case .plantRotation:
+            l.tr(zh: "植物转盆", en: "Rotate plant", de: "Pflanze drehen")
+        case .plantLeafCleaning:
+            l.tr(zh: "清洁叶片", en: "Leaf cleaning", de: "Blätter reinigen")
+        case .plantPestCheck:
+            l.tr(zh: "病虫害检查", en: "Pest check", de: "Schädlingscheck")
+        case .plantHealthCheck:
+            l.tr(zh: "植物状态记录", en: "Plant status", de: "Pflanzenstatus")
+        case .medication:
+            l.tr(zh: "吃药", en: "Medication", de: "Medikament")
+        case .petMedication:
+            l.tr(zh: "宠物用药", en: "Pet medication", de: "Tiermedikation")
+        case .petMedicationDose:
+            l.tr(zh: "宠物喂药打卡", en: "Pet medication dose", de: "Tiermedikation erfasst")
+        case .insurancePremium:
+            l.tr(zh: "保险缴费", en: "Insurance premium", de: "Versicherungsbeitrag")
+        }
+    }
 }
 
 @Model

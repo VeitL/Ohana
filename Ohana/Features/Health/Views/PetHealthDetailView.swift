@@ -27,7 +27,7 @@ struct PetHealthDetailContentView: View {
     @Environment(\.dismiss) var dismiss
     @Environment(\.colorScheme) var colorScheme
     @Environment(AppServices.self) var appServices
-    @AppStorage("appLanguage") var appLanguage = "zh"
+    @Environment(\.ohanaAppLanguageCode) var appLanguage
     /// 健康页「+」与免疫条点按的路由
     @State var healthPlusDestination: HealthPlusDestination?
     @State var activeHealthSheet: ActiveHealthSheet?

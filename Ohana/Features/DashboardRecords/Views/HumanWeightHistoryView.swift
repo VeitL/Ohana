@@ -15,7 +15,7 @@ struct HumanWeightHistoryView: View {
     @Environment(AppServices.self) private var appServices
     @AppStorage("currentActiveHumanId") private var activeHumanIdStr = ""
     @AppStorage(AppCountry.storageKey) private var appCountry = AppCountry.detectedCode
-    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
 
     @State private var isInlineWeightComposerVisible = false
     @State private var showingWeightPopup = false

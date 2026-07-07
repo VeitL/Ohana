@@ -5,7 +5,7 @@ import SwiftUI
 struct AppBackgroundPickerSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var colorScheme
-    @AppStorage("appLanguage") private var appLanguage = "zh"
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
     @AppStorage("appBackgroundStyle") private var styleRaw: String = AppBackgroundStyle.goIsland.rawValue
     @AppStorage("appCustomBackgroundVersion") private var customBackgroundVersion = 0
 

@@ -15,6 +15,21 @@ enum ReminderStatus: String, Codable {
     case snoozed
     /// 计划喂食等到点仍未打卡（与「已完成」区分）
     case failed
+
+    func localizedLabel(_ l: L10n) -> String {
+        switch self {
+        case .pending:
+            l.tr(zh: "待处理", en: "Pending", de: "Offen")
+        case .completed:
+            l.tr(zh: "已完成", en: "Completed", de: "Erledigt")
+        case .skipped:
+            l.tr(zh: "已跳过", en: "Skipped", de: "Uebersprungen")
+        case .snoozed:
+            l.tr(zh: "已稍后提醒", en: "Snoozed", de: "Zurueckgestellt")
+        case .failed:
+            l.tr(zh: "失败", en: "Failed", de: "Fehlgeschlagen")
+        }
+    }
 }
 
 @Model

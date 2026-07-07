@@ -259,6 +259,9 @@ private func fetch<T: PersistentModel>(
 
 struct PetRouteMissingEntityView: View {
     let kind: String
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
+
+    private var l: L10n { L10n(appLanguage) }
 
     var body: some View {
         VStack(spacing: 14) {
@@ -266,7 +269,7 @@ struct PetRouteMissingEntityView: View {
                 .font(OhanaFont.title(.bold))
                 .foregroundStyle(Color.goPrimary)
                 .accessibilityHidden(true)
-            Text("内容已不可用")
+            Text(l.tr(zh: "内容已不可用", en: "Content is no longer available", de: "Inhalt ist nicht mehr verfuegbar"))
                 .font(OhanaFont.title3(.black))
                 .foregroundStyle(Color.ohanaPrimaryText)
             Text(kind)

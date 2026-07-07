@@ -15,7 +15,7 @@ private enum RequiredHumanIntroPalette {
 struct RequiredHumanProfileView: View {
     let onHumanSaved: (Human) -> Void
 
-    @AppStorage("appLanguage") private var appLanguage: String = AppLanguage.detectedCode
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
     @AppStorage(AppPerformanceMode.powerSavingKey) private var powerSavingMode = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 

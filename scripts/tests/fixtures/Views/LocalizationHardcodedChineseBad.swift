@@ -1,6 +1,8 @@
 import SwiftUI
 
 struct LocalizationHardcodedChineseBad: View {
+    @AppStorage("appLanguage") private var appLanguage = "zh"
+
     var body: some View {
         VStack {
             Text("硬编码中文")

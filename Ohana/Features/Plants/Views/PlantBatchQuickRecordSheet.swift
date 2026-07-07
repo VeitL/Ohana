@@ -16,7 +16,7 @@ struct PlantBatchQuickRecordSheet: View {
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
-    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
 
     @State private var selectedCareType: PlantCareType
     @State private var selectedPlantIDs: Set<UUID> = []

@@ -8,7 +8,7 @@ struct SettingsPetManagementSheet: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(AppServices.self) private var appServices
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
-    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
 
     @State private var showingDeletePetAlert = false
     @State private var petToDelete: Pet? = nil

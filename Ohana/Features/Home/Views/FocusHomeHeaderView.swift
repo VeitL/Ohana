@@ -17,7 +17,7 @@ struct FocusHomeHeaderView: View {
     let activeHumanDisplayName: String
     let activeHumanAvatarImage: UIImage?
     let activeHumanAvatarEmoji: String?
-    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
 
     let onStreak: () -> Void
     let onCoconut: () -> Void

@@ -149,7 +149,7 @@ struct OhanaGrowthOnboardingOverlay: View {
 
 struct GrowthUnlockFlowTestView: View {
     @Environment(\.dismiss) private var dismiss
-    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
     @State private var simulatedLevel = 1
     @State private var simulatedProgress = 0.48
     @State private var showsGuide = false

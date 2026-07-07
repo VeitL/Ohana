@@ -68,7 +68,7 @@ struct PlantCareLogSheet: View {
     let onSave: (PlantCareType, String, PlantHealthStatus, Data?) -> Void
 
     @Environment(\.dismiss) private var dismiss
-    @AppStorage("appLanguage") private var appLanguage = "zh"
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
     @State private var selectedCareCategory: PlantCareCategory
     @State private var selectedCareType: PlantCareType
     @State private var selectedHealthStatus: PlantHealthStatus

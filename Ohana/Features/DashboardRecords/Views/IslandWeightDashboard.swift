@@ -83,7 +83,7 @@ struct IslandWeightDashboardContentView: View {
     @Environment(\.colorScheme) private var colorScheme
     @Environment(AppServices.self) private var appServices
     @AppStorage("currentActiveHumanId") private var activeHumanIdStr = ""
-    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
 
     @State private var vm = IslandUnifiedStatsViewModel()
     @State private var weightTimeRange: WeightTimeFilter = .days30

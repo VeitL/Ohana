@@ -13,7 +13,7 @@ struct VerticalGlassHomeLabView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     @Environment(\.colorScheme) private var colorScheme
-    @AppStorage("appLanguage") private var appLanguage = "zh"
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
     @StateObject private var workloadPolicy = AppWorkloadPolicy.shared
 
     @State private var selectedTab: VerticalGlassHomeLabTab = .home
@@ -504,7 +504,7 @@ private struct VerticalGlassHomeLabStage: View {
 }
 
 private struct VerticalGlassHomeLabCardView: View {
-    @AppStorage("appLanguage") private var appLanguage = "zh"
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
 
     let card: VerticalGlassHomeLabCard
     let isExpanded: Bool

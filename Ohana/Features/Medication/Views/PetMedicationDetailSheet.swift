@@ -18,7 +18,7 @@ struct PetMedicationDetailContentSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var colorScheme
     @Environment(AppServices.self) private var appServices
-    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
 
     @StateObject private var commandQueue = DeferredDomainCommandQueue()
     @State private var showingEdit = false
@@ -56,6 +56,10 @@ struct PetMedicationDetailContentSheet: View {
         return rest
     }
 
+    private var localizedDose: String {
+        medication.dosage.isEmpty ? "—" : medication.dosage
+    }
+
     var body: some View {
         NavigationStack {
             ZStack {
@@ -83,7 +87,7 @@ struct PetMedicationDetailContentSheet: View {
                         historySection
 
                         if !noteBody.isEmpty {
-                            Text("备注：\(noteBody)")
+                            Text(l.tr(zh: "备注：\(noteBody)", en: "Note: \(noteBody)", de: "Notiz: \(noteBody)"))
                                 .font(OhanaFont.adaptive(size: 13, weight: .medium, design: .rounded))
                                 .foregroundStyle(Color.ohanaSecondaryText)
                                 .padding(.top, 4)
@@ -179,10 +183,14 @@ struct PetMedicationDetailContentSheet: View {
                 Circle()
                     .fill(Color(hex: medication.colorHex))
                     .frame(width: 14, height: 14) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
-                Text(medication.name.isEmpty ? "未命名药品" : medication.name)
+                Text(medication.name.isEmpty ? l.tr(zh: "未命名药品", en: "Unnamed medication", de: "Unbenanntes Medikament") : medication.name)
                     .font(OhanaFont.adaptive(size: 22, weight: .black, design: .rounded))
             }
-            Text("\(medication.frequency.rawValue) · 每次 \(medication.dosage.isEmpty ? "—" : medication.dosage)")
+            Text(l.tr(
+                zh: "\(localizedFrequency(medication.frequency)) · 每次 \(localizedDose)",
+                en: "\(localizedFrequency(medication.frequency)) · per dose \(localizedDose)",
+                de: "\(localizedFrequency(medication.frequency)) · pro Dosis \(localizedDose)"
+            ))
                 .font(OhanaFont.adaptive(size: 14, weight: .semibold, design: .rounded))
                 .foregroundStyle(Color.ohanaSecondaryText)
         }
@@ -203,7 +211,7 @@ struct PetMedicationDetailContentSheet: View {
         } label: {
             HStack {
                 Image(systemName: "checkmark.circle.fill").accessibilityHidden(true)
-                Text("记录今次喂药")
+                Text(l.tr(zh: "记录今次喂药", en: "Log this dose", de: "Diese Dosis eintragen"))
                 Spacer()
                 Text("+1 🥥")
                     .foregroundStyle(Color.ohanaSecondaryText)
@@ -252,7 +260,7 @@ struct PetMedicationDetailContentSheet: View {
 
     private var courseProgressCard: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("疗程进度")
+            Text(l.tr(zh: "疗程进度", en: "Course progress", de: "Verlauf"))
                 .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
                 .foregroundStyle(Color.ohanaSecondaryText)
             if let end = medication.endDate {
@@ -265,7 +273,7 @@ struct PetMedicationDetailContentSheet: View {
                 let dayIndex = min(total, passed + 1)
                 let p = min(1, Double(passed) / Double(total))
 
-                Text("第 \(dayIndex) / \(total) 天")
+                Text(l.tr(zh: "第 \(dayIndex) / \(total) 天", en: "Day \(dayIndex) / \(total)", de: "Tag \(dayIndex) / \(total)"))
                     .font(OhanaFont.adaptive(size: 28, weight: .black, design: .rounded))
                 ProgressView(value: p)
                     .tint(themeColor)
@@ -274,9 +282,9 @@ struct PetMedicationDetailContentSheet: View {
                     .font(OhanaFont.adaptive(size: 12, weight: .medium, design: .rounded))
                     .foregroundStyle(Color.ohanaSecondaryText)
             } else {
-                Text("长期用药")
+                Text(l.tr(zh: "长期用药", en: "Long-term medication", de: "Langzeitmedikation"))
                     .font(OhanaFont.adaptive(size: 20, weight: .black, design: .rounded))
-                Text("未设置结束日期")
+                Text(l.tr(zh: "未设置结束日期", en: "No end date set", de: "Kein Enddatum festgelegt"))
                     .font(OhanaFont.adaptive(size: 12, weight: .medium, design: .rounded))
                     .foregroundStyle(Color.ohanaSecondaryText)
             }
@@ -288,18 +296,18 @@ struct PetMedicationDetailContentSheet: View {
 
     private var bentoTodayStatus: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("今日状态")
+            Text(l.tr(zh: "今日状态", en: "Today", de: "Heute"))
                 .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
                 .foregroundStyle(Color.ohanaSecondaryText)
             if todayRequired == 0 {
-                Text("无需记录")
+                Text(l.tr(zh: "无需记录", en: "No dose needed", de: "Keine Dosis nötig"))
                     .font(OhanaFont.adaptive(size: 15, weight: .bold, design: .rounded))
             } else if todayDone >= todayRequired {
-                Label("已喂完", systemImage: "checkmark.circle.fill")
+                Label(l.tr(zh: "已喂完", en: "Done", de: "Erledigt"), systemImage: "checkmark.circle.fill")
                     .font(OhanaFont.adaptive(size: 15, weight: .bold, design: .rounded))
                     .foregroundStyle(themeColor)
             } else {
-                Text("还需 \(todayRequired - todayDone) 次")
+                Text(l.tr(zh: "还需 \(todayRequired - todayDone) 次", en: "\(todayRequired - todayDone) left", de: "Noch \(todayRequired - todayDone)"))
                     .font(OhanaFont.adaptive(size: 15, weight: .bold, design: .rounded))
                     .foregroundStyle(Color.goYellow)
             }
@@ -316,7 +324,7 @@ struct PetMedicationDetailContentSheet: View {
 
     private var bentoAdministration: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("喂药方式")
+            Text(l.tr(zh: "喂药方式", en: "How to give", de: "Gabe"))
                 .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
                 .foregroundStyle(Color.ohanaSecondaryText)
             HStack(spacing: 6) {
@@ -340,15 +348,19 @@ struct PetMedicationDetailContentSheet: View {
             HStack {
                 Image(systemName: "cube.box.fill").accessibilityHidden(true)
                     .foregroundStyle(themeColor)
-                Text("剩余药量")
+                Text(l.tr(zh: "剩余药量", en: "Remaining", de: "Vorrat"))
                     .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
                 Spacer()
-                Text("约 \(Int(remainingAmount)) 单位")
+                Text(l.tr(zh: "约 \(Int(remainingAmount)) 单位", en: "About \(Int(remainingAmount)) units", de: "Etwa \(Int(remainingAmount)) Einheiten"))
                     .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
             }
             ProgressView(value: min(1, remainingAmount / max(remainingAmount, 1)))
                 .tint(themeColor)
-            Text("按当前频次，预计还够约 \(max(estDays, 0)) 天")
+            Text(l.tr(
+                zh: "按当前频次，预计还够约 \(max(estDays, 0)) 天",
+                en: "At this schedule, about \(max(estDays, 0)) days left",
+                de: "Bei diesem Plan reichen sie noch ca. \(max(estDays, 0)) Tage"
+            ))
                 .font(OhanaFont.adaptive(size: 11, weight: .medium, design: .rounded))
                 .foregroundStyle(Color.ohanaSecondaryText)
         }
@@ -358,7 +370,7 @@ struct PetMedicationDetailContentSheet: View {
 
     private var historySection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("打卡历史")
+            Text(l.tr(zh: "打卡历史", en: "Dose history", de: "Verlauf"))
                 .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
                 .foregroundStyle(themeColor)
 
@@ -375,7 +387,7 @@ struct PetMedicationDetailContentSheet: View {
                         }
                         if row.missedCount > 0 {
                             ForEach(0 ..< row.missedCount, id: \.self) { _ in
-                                Label("漏喂", systemImage: "xmark.circle.fill")
+                                Label(l.tr(zh: "漏喂", en: "Missed", de: "Verpasst"), systemImage: "xmark.circle.fill")
                                     .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded))
                                     .foregroundStyle(Color.goRed.opacity(0.85))
                             }
@@ -411,8 +423,8 @@ struct PetMedicationDetailContentSheet: View {
             } else {
                 max(0, req - dayEvents.count)
             }
-            let title: String = if cal.isDateInToday(day) { "今天" }
-            else if cal.isDateInYesterday(day) { "昨天" }
+            let title: String = if cal.isDateInToday(day) { l.tr(zh: "今天", en: "Today", de: "Heute") }
+            else if cal.isDateInYesterday(day) { l.tr(zh: "昨天", en: "Yesterday", de: "Gestern") }
             else { day.formatted(.dateTime.month().day()) }
 
             if !dayEvents.isEmpty || missed > 0 {
@@ -432,5 +444,24 @@ struct PetMedicationDetailContentSheet: View {
         var rest = String(full[range.upperBound...]).trimmingCharacters(in: .whitespacesAndNewlines)
         if rest.hasPrefix("\n") { rest = String(rest.dropFirst()).trimmingCharacters(in: .whitespacesAndNewlines) }
         return (tag.isEmpty ? nil : tag, rest)
+    }
+
+    private func localizedFrequency(_ frequency: PetMedicationFrequency) -> String {
+        switch frequency {
+        case .daily:
+            l.tr(zh: "每天", en: "Daily", de: "Täglich")
+        case .twiceDaily:
+            l.tr(zh: "每天两次", en: "Twice daily", de: "Zweimal täglich")
+        case .threeTimesDaily:
+            l.tr(zh: "每天三次", en: "Three times daily", de: "Dreimal täglich")
+        case .everyOtherDay:
+            l.tr(zh: "隔天", en: "Every other day", de: "Alle zwei Tage")
+        case .weekly:
+            l.tr(zh: "每周", en: "Weekly", de: "Wöchentlich")
+        case .asNeeded:
+            l.tr(zh: "按需", en: "As needed", de: "Nach Bedarf")
+        case .custom:
+            l.tr(zh: "自定义", en: "Custom", de: "Benutzerdefiniert")
+        }
     }
 }

@@ -72,19 +72,23 @@ struct PetVetSummaryPDFSnapshot: Equatable {
     let keyDocuments: [DocumentRow]
     let latestWeightKg: Double?
     let weightPoints3Mo: [WeightPoint]
+    let languageCode: String
 
     var latestWeightText: String {
-        latestWeightKg.map { String(format: "%.1f kg", $0) } ?? "未记录"
+        let l = L10n(languageCode)
+        return latestWeightKg.map { String(format: "%.1f kg", $0) } ?? l.tr(zh: "未记录", en: "No record", de: "Kein Eintrag")
     }
 
     @MainActor
     static func load(pet: Pet, context: ModelContext, now: Date = Date()) -> PetVetSummaryPDFSnapshot {
         let petID = pet.id
-        let healthRows = fetchRecentHealthRows(petID: petID, context: context)
+        let languageCode = AppLanguage.code
+        let l = L10n(languageCode)
+        let healthRows = fetchRecentHealthRows(petID: petID, context: context, l: l)
         let medicationRows = fetchActiveMedicationRows(petID: petID, context: context, now: now)
-        let symptomRows = fetchRecentSymptomRows(petID: petID, context: context)
-        let insuranceRow = fetchActiveInsuranceRow(petID: petID, context: context)
-        let documentRows = fetchKeyDocumentRows(petID: petID, context: context)
+        let symptomRows = fetchRecentSymptomRows(petID: petID, context: context, l: l)
+        let insuranceRow = fetchActiveInsuranceRow(petID: petID, context: context, l: l)
+        let documentRows = fetchKeyDocumentRows(petID: petID, context: context, l: l)
         let latestWeightKg = fetchLatestWeightKg(petID: petID, context: context)
         let weightPoints = fetchWeightPoints3Mo(petID: petID, context: context, now: now)
 
@@ -108,12 +112,13 @@ struct PetVetSummaryPDFSnapshot: Equatable {
             activeInsurance: insuranceRow,
             keyDocuments: documentRows,
             latestWeightKg: latestWeightKg,
-            weightPoints3Mo: weightPoints
+            weightPoints3Mo: weightPoints,
+            languageCode: languageCode
         )
     }
 
     @MainActor
-    private static func fetchRecentHealthRows(petID: UUID, context: ModelContext) -> [HealthRow] {
+    private static func fetchRecentHealthRows(petID: UUID, context: ModelContext, l: L10n) -> [HealthRow] {
         var descriptor = FetchDescriptor<PetHealthLog>(
             predicate: #Predicate<PetHealthLog> { log in
                 log.pet?.id == petID
@@ -123,7 +128,13 @@ struct PetVetSummaryPDFSnapshot: Equatable {
         descriptor.fetchLimit = 8
         do {
             return try context.fetch(descriptor).map {
-                HealthRow(id: $0.id, date: $0.date, type: $0.type, note: $0.note, expirationDate: $0.expirationDate)
+                HealthRow(
+                    id: $0.id,
+                    date: $0.date,
+                    type: $0.healthLogType.localizedLabel(l),
+                    note: $0.note,
+                    expirationDate: $0.expirationDate
+                )
             }
         } catch {
             OhanaLog.warning("Vet PDF health fetch failed: \(error.localizedDescription)", category: "Documents")
@@ -151,7 +162,7 @@ struct PetVetSummaryPDFSnapshot: Equatable {
     }
 
     @MainActor
-    private static func fetchRecentSymptomRows(petID: UUID, context: ModelContext) -> [SymptomRow] {
+    private static func fetchRecentSymptomRows(petID: UUID, context: ModelContext, l: L10n) -> [SymptomRow] {
         var descriptor = FetchDescriptor<SymptomLog>(
             predicate: #Predicate<SymptomLog> { symptom in
                 symptom.pet?.id == petID
@@ -161,7 +172,7 @@ struct PetVetSummaryPDFSnapshot: Equatable {
         descriptor.fetchLimit = 3
         do {
             return try context.fetch(descriptor).map {
-                SymptomRow(id: $0.id, date: $0.date, symptomName: $0.symptomName, severityLabel: $0.severity.label)
+                SymptomRow(id: $0.id, date: $0.date, symptomName: $0.symptomName, severityLabel: $0.severity.localizedLabel(l))
             }
         } catch {
             OhanaLog.warning("Vet PDF symptom fetch failed: \(error.localizedDescription)", category: "Documents")
@@ -170,7 +181,7 @@ struct PetVetSummaryPDFSnapshot: Equatable {
     }
 
     @MainActor
-    private static func fetchActiveInsuranceRow(petID: UUID, context: ModelContext) -> InsuranceRow? {
+    private static func fetchActiveInsuranceRow(petID: UUID, context: ModelContext, l: L10n) -> InsuranceRow? {
         var descriptor = FetchDescriptor<PetInsurance>(
             predicate: #Predicate<PetInsurance> { insurance in
                 insurance.pet?.id == petID && insurance.isActive
@@ -185,7 +196,7 @@ struct PetVetSummaryPDFSnapshot: Equatable {
                 companyName: insurance.companyName,
                 productName: insurance.productName,
                 policyNumber: insurance.policyNumber,
-                renewalStatusLabel: insurance.renewalStatusLabel
+                renewalStatusLabel: renewalStatusLabel(for: insurance, l: l)
             )
         } catch {
             OhanaLog.warning("Vet PDF insurance fetch failed: \(error.localizedDescription)", category: "Documents")
@@ -194,7 +205,7 @@ struct PetVetSummaryPDFSnapshot: Equatable {
     }
 
     @MainActor
-    private static func fetchKeyDocumentRows(petID: UUID, context: ModelContext) -> [DocumentRow] {
+    private static func fetchKeyDocumentRows(petID: UUID, context: ModelContext, l: L10n) -> [DocumentRow] {
         let descriptor = FetchDescriptor<PetDocument>(
             predicate: #Predicate<PetDocument> { document in
                 document.pet?.id == petID
@@ -205,7 +216,7 @@ struct PetVetSummaryPDFSnapshot: Equatable {
                 .sorted { ($0.expiryDate ?? .distantFuture) < ($1.expiryDate ?? .distantFuture) }
                 .prefix(3)
                 .map {
-                    DocumentRow(id: $0.id, title: $0.title, category: $0.category, expiryDate: $0.expiryDate)
+                    DocumentRow(id: $0.id, title: $0.title, category: $0.documentCategory.localizedLabel(l), expiryDate: $0.expiryDate)
                 }
         } catch {
             OhanaLog.warning("Vet PDF document fetch failed: \(error.localizedDescription)", category: "Documents")
@@ -260,6 +271,17 @@ struct PetVetSummaryPDFSnapshot: Equatable {
             return []
         }
     }
+
+    private static func renewalStatusLabel(for insurance: PetInsurance, l: L10n) -> String {
+        let days = insurance.daysUntilRenewal
+        if days < 0 {
+            return l.tr(zh: "已过期", en: "Expired", de: "Abgelaufen")
+        }
+        if days <= 30 {
+            return l.tr(zh: "即将到期", en: "Due soon", de: "Bald fällig")
+        }
+        return l.tr(zh: "保障中", en: "Covered", de: "Aktiv")
+    }
 }
 
 // MARK: - PDF 渲染入口
@@ -276,7 +298,7 @@ enum PetVetSummaryPDFRenderer {
         renderer.scale = 2.0 // Retina
 
         let tmpURL = FileManager.default.temporaryDirectory
-            .appendingPathComponent("\(pet.name)_兽医档案_\(Self.datestamp()).pdf")
+            .appendingPathComponent("\(pet.name)_\(Self.localizedFilenameStem())_\(Self.datestamp()).pdf")
 
         // iOS 16+ native PDF rendering via ImageRenderer
         renderer.render { size, context in
@@ -296,6 +318,10 @@ enum PetVetSummaryPDFRenderer {
         f.dateFormat = "yyyyMMdd"
         return f.string(from: Date())
     }
+
+    private static func localizedFilenameStem() -> String {
+        L10n(AppLanguage.code).tr(zh: "兽医档案", en: "VetSummary", de: "Tierarztakte")
+    }
 }
 
 // MARK: - A4 PDF 内容视图
@@ -303,6 +329,7 @@ struct PetVetSummaryPDFView: View {
     let snapshot: PetVetSummaryPDFSnapshot
 
     private var themeColor: Color { Color(hex: snapshot.themeColorHex) }
+    private var l: L10n { L10n(snapshot.languageCode) }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -347,13 +374,13 @@ struct PetVetSummaryPDFView: View {
                 Text(snapshot.name)
                     .font(OhanaFont.adaptive(size: 22, weight: .black, design: .rounded))
                     .foregroundStyle(Color(hex: "1A1A2E"))
-                Text("\(snapshot.species) · \(snapshot.breed.isEmpty ? "未知品种" : snapshot.breed) · \(snapshot.genderSymbol)")
+                Text("\(snapshot.species) · \(snapshot.breed.isEmpty ? l.tr(zh: "未知品种", en: "Unknown breed", de: "Unbekannte Rasse") : snapshot.breed) · \(snapshot.genderSymbol)")
                     .font(OhanaFont.adaptive(size: 11, weight: .medium))
                     .foregroundStyle(Color.gray.opacity(0.7))
             }
             Spacer()
             VStack(alignment: .trailing, spacing: 3) {
-                Text("兽医档案")
+                Text(l.tr(zh: "兽医档案", en: "Vet summary", de: "Tierarztakte"))
                     .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
                     .foregroundStyle(themeColor)
                 Text(Date().formatted(.dateTime.year().month().day()))
@@ -371,13 +398,13 @@ struct PetVetSummaryPDFView: View {
     // MARK: - 基础信息
     private var pdfBasicInfo: some View {
         let cols: [(String, String)] = [
-            ("年龄", snapshot.ageText.isEmpty ? "未知" : snapshot.ageText),
-            ("体重", snapshot.latestWeightText),
-            ("归家日期", snapshot.homeDate.map { $0.formatted(.dateTime.year().month().day()) } ?? "未知"),
-            ("芯片号", snapshot.microchipID.isEmpty ? "未登记" : snapshot.microchipID)
+            (l.tr(zh: "年龄", en: "Age", de: "Alter"), snapshot.ageText.isEmpty ? l.tr(zh: "未知", en: "Unknown", de: "Unbekannt") : snapshot.ageText),
+            (l.tr(zh: "体重", en: "Weight", de: "Gewicht"), snapshot.latestWeightText),
+            (l.tr(zh: "归家日期", en: "Home date", de: "Einzug"), snapshot.homeDate.map { $0.formatted(.dateTime.year().month().day()) } ?? l.tr(zh: "未知", en: "Unknown", de: "Unbekannt")),
+            (l.tr(zh: "芯片号", en: "Microchip", de: "Chipnummer"), snapshot.microchipID.isEmpty ? l.tr(zh: "未登记", en: "Not registered", de: "Nicht eingetragen") : snapshot.microchipID)
         ]
         return VStack(alignment: .leading, spacing: 6) {
-            Text("基础信息")
+            Text(l.tr(zh: "基础信息", en: "Basic info", de: "Basisdaten"))
                 .font(OhanaFont.adaptive(size: 11, weight: .black)).foregroundStyle(.gray).tracking(1)
             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 4), spacing: 6) {
                 ForEach(cols, id: \.0) { label, value in
@@ -398,15 +425,15 @@ struct PetVetSummaryPDFView: View {
     // MARK: - 过敏 & 备注
     private var pdfAllergyNotes: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("就诊速览")
+            Text(l.tr(zh: "就诊速览", en: "Vet visit overview", de: "Tierarzt-Überblick"))
                 .font(OhanaFont.adaptive(size: 11, weight: .black)).foregroundStyle(.gray).tracking(1)
             LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 6) {
-                pdfSummaryCell("过敏史", snapshot.allergies.isEmpty ? "无记录" : snapshot.allergies)
-                pdfSummaryCell("用药中", medicationSummaryText)
-                pdfSummaryCell("最近症状", symptomSummaryText)
-                pdfSummaryCell("保险", insuranceSummaryText)
-                pdfSummaryCell("关键文档", documentSummaryText)
-                pdfSummaryCell("备注", snapshot.notes.isEmpty ? "暂无备注" : snapshot.notes)
+                pdfSummaryCell(l.tr(zh: "过敏史", en: "Allergies", de: "Allergien"), snapshot.allergies.isEmpty ? l.tr(zh: "无记录", en: "No record", de: "Kein Eintrag") : snapshot.allergies)
+                pdfSummaryCell(l.tr(zh: "用药中", en: "Active medication", de: "Aktive Medikation"), medicationSummaryText)
+                pdfSummaryCell(l.tr(zh: "最近症状", en: "Recent symptoms", de: "Aktuelle Symptome"), symptomSummaryText)
+                pdfSummaryCell(l.tr(zh: "保险", en: "Insurance", de: "Versicherung"), insuranceSummaryText)
+                pdfSummaryCell(l.tr(zh: "关键文档", en: "Key documents", de: "Wichtige Dokumente"), documentSummaryText)
+                pdfSummaryCell(l.tr(zh: "备注", en: "Notes", de: "Notizen"), snapshot.notes.isEmpty ? l.tr(zh: "暂无备注", en: "No notes", de: "Keine Notizen") : snapshot.notes)
             }
         }
     }
@@ -428,57 +455,57 @@ struct PetVetSummaryPDFView: View {
     }
 
     private var medicationSummaryText: String {
-        guard !snapshot.activeMedications.isEmpty else { return "无进行中用药" }
+        guard !snapshot.activeMedications.isEmpty else { return l.tr(zh: "无进行中用药", en: "No active medication", de: "Keine aktive Medikation") }
         return snapshot.activeMedications.prefix(3)
-            .map { "\($0.name.isEmpty ? "未命名药品" : $0.name) · \($0.dosage.isEmpty ? "按医嘱" : $0.dosage)" }
-            .joined(separator: "；")
+            .map { "\($0.name.isEmpty ? l.tr(zh: "未命名药品", en: "Unnamed medication", de: "Unbenanntes Medikament") : $0.name) · \($0.dosage.isEmpty ? l.tr(zh: "按医嘱", en: "As prescribed", de: "Nach Anweisung") : $0.dosage)" }
+            .joined(separator: l.tr(zh: "；", en: "; ", de: "; "))
     }
 
     private var symptomSummaryText: String {
-        guard !snapshot.recentSymptoms.isEmpty else { return "近况无症状记录" }
+        guard !snapshot.recentSymptoms.isEmpty else { return l.tr(zh: "近况无症状记录", en: "No recent symptom records", de: "Keine aktuellen Symptome") }
         return snapshot.recentSymptoms
             .map { "\($0.symptomName)（\($0.severityLabel)，\($0.date.formatted(.dateTime.month().day()))）" }
-            .joined(separator: "；")
+            .joined(separator: l.tr(zh: "；", en: "; ", de: "; "))
     }
 
     private var insuranceSummaryText: String {
-        guard let activeInsurance = snapshot.activeInsurance else { return "未登记保险" }
+        guard let activeInsurance = snapshot.activeInsurance else { return l.tr(zh: "未登记保险", en: "No insurance", de: "Keine Versicherung") }
         let name = activeInsurance.productName.isEmpty
-            ? (activeInsurance.companyName.isEmpty ? "保险" : activeInsurance.companyName)
+            ? (activeInsurance.companyName.isEmpty ? l.tr(zh: "保险", en: "Insurance", de: "Versicherung") : activeInsurance.companyName)
             : activeInsurance.productName
         let number = activeInsurance.policyNumber.isEmpty ? "" : " · \(activeInsurance.policyNumber)"
         return "\(name)\(number) · \(activeInsurance.renewalStatusLabel)"
     }
 
     private var documentSummaryText: String {
-        guard !snapshot.keyDocuments.isEmpty else { return "未上传关键文档" }
+        guard !snapshot.keyDocuments.isEmpty else { return l.tr(zh: "未上传关键文档", en: "No key documents", de: "Keine wichtigen Dokumente") }
         return snapshot.keyDocuments.map { doc in
             let title = doc.title.isEmpty ? doc.category : doc.title
             if let expiry = doc.expiryDate {
-                return "\(title) 至 \(expiry.formatted(.dateTime.year().month().day()))"
+                return l.tr(zh: "\(title) 至 \(expiry.formatted(.dateTime.year().month().day()))", en: "\(title) until \(expiry.formatted(.dateTime.year().month().day()))", de: "\(title) bis \(expiry.formatted(.dateTime.year().month().day()))")
             }
             return title
-        }.joined(separator: "；")
+        }.joined(separator: l.tr(zh: "；", en: "; ", de: "; "))
     }
 
     // MARK: - 健康记录表
     private var pdfHealthLogsTable: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("近期健康记录（最近8条）")
+            Text(l.tr(zh: "近期健康记录（最近8条）", en: "Recent health records (latest 8)", de: "Aktuelle Gesundheitsdaten (letzte 8)"))
                 .font(OhanaFont.adaptive(size: 11, weight: .black)).foregroundStyle(.gray).tracking(1)
 
             if snapshot.recentHealthLogs.isEmpty {
-                Text("暂无健康记录")
+                Text(l.tr(zh: "暂无健康记录", en: "No health records", de: "Keine Gesundheitsdaten"))
                     .font(OhanaFont.adaptive(size: 11)).foregroundStyle(.gray.opacity(0.5))
                     .padding(.vertical, 8)
             } else {
                 VStack(spacing: 0) {
                     // 表头
                     HStack {
-                        Text("日期").frame(width: 80, alignment: .leading)
-                        Text("类型").frame(width: 100, alignment: .leading)
-                        Text("备注").frame(maxWidth: .infinity, alignment: .leading)
-                        Text("有效期").frame(width: 90, alignment: .trailing)
+                        Text(l.tr(zh: "日期", en: "Date", de: "Datum")).frame(width: 80, alignment: .leading)
+                        Text(l.tr(zh: "类型", en: "Type", de: "Typ")).frame(width: 100, alignment: .leading)
+                        Text(l.tr(zh: "备注", en: "Notes", de: "Notizen")).frame(maxWidth: .infinity, alignment: .leading)
+                        Text(l.tr(zh: "有效期", en: "Expires", de: "Gültig bis")).frame(width: 90, alignment: .trailing)
                     }
                     .font(OhanaFont.adaptive(size: 9, weight: .bold))
                     .foregroundStyle(.gray.opacity(0.6))
@@ -520,7 +547,7 @@ struct PetVetSummaryPDFView: View {
     // MARK: - 3 个月体重图
     private var pdfWeightChart: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("近3个月体重趋势")
+            Text(l.tr(zh: "近3个月体重趋势", en: "Weight trend, last 3 months", de: "Gewichtstrend, 3 Monate"))
                 .font(OhanaFont.adaptive(size: 11, weight: .black)).foregroundStyle(.gray).tracking(1)
 
             OhanaMinimalTrendChart(
@@ -541,7 +568,7 @@ struct PetVetSummaryPDFView: View {
     // MARK: - Footer
     private var pdfFooter: some View {
         HStack {
-            Text("由 Ohana App 生成 · 仅供参考，非正式医疗文件")
+            Text(l.tr(zh: "由 Ohana App 生成 · 仅供参考，非正式医疗文件", en: "Generated by Ohana App · For reference only, not an official medical document", de: "Erstellt von Ohana App · Nur zur Referenz, kein offizielles medizinisches Dokument"))
                 .font(OhanaFont.adaptive(size: 8, weight: .medium))
                 .foregroundStyle(.gray.opacity(0.4))
             Spacer()
@@ -557,6 +584,8 @@ struct PetVetPDFShareSheet: View {
     let pdfURL: URL
     let pet: Pet
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
+    private var l: L10n { L10n(appLanguage) }
 
     var body: some View {
         NavigationStack {
@@ -573,10 +602,10 @@ struct PetVetPDFShareSheet: View {
                             Image(systemName: "doc.richtext.fill").accessibilityHidden(true)
                                 .font(OhanaFont.adaptive(size: 48))
                                 .foregroundStyle(pet.themeColor.color.opacity(0.8))
-                            Text("\(pet.name)_兽医档案.pdf")
+                            Text("\(pet.name)_\(l.tr(zh: "兽医档案", en: "VetSummary", de: "Tierarztakte")).pdf")
                                 .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
                                 .foregroundStyle(Color.ohanaPrimaryText.opacity(0.7))
-                            Text("A4 · 兽医健康档案")
+                            Text(l.tr(zh: "A4 · 兽医健康档案", en: "A4 · Vet health summary", de: "A4 · Tierarztakte"))
                                 .font(OhanaFont.adaptive(size: 11))
                                 .foregroundStyle(Color.ohanaPrimaryText.opacity(0.35))
                         }
@@ -584,12 +613,12 @@ struct PetVetPDFShareSheet: View {
                     .padding(.horizontal, 20)
 
                     // 分享按钮
-                    ShareLink(item: pdfURL, subject: Text("\(pet.name) 兽医档案"),
-                              message: Text("由 Ohana App 生成的宠物健康档案")) {
+                    ShareLink(item: pdfURL, subject: Text(l.tr(zh: "\(pet.name) 兽医档案", en: "\(pet.name) vet summary", de: "Tierarztakte von \(pet.name)")),
+                              message: Text(l.tr(zh: "由 Ohana App 生成的宠物健康档案", en: "Pet health summary generated by Ohana App", de: "Mit Ohana App erstellte Gesundheitsakte"))) {
                         HStack(spacing: 8) {
                             Image(systemName: "square.and.arrow.up").accessibilityHidden(true)
                                 .font(OhanaFont.adaptive(size: 15, weight: .bold))
-                            Text("分享 / 保存 PDF")
+                            Text(l.tr(zh: "分享 / 保存 PDF", en: "Share / save PDF", de: "PDF teilen / sichern"))
                                 .font(OhanaFont.adaptive(size: 16, weight: .black, design: .rounded))
                         }
                         .foregroundStyle(.black) // ui-v4: allow ink on PDF action preview
@@ -604,11 +633,11 @@ struct PetVetPDFShareSheet: View {
                 }
                 .padding(.top, 20)
             }
-            .navigationTitle("导出健康档案")
+            .navigationTitle(l.tr(zh: "导出健康档案", en: "Export health summary", de: "Gesundheitsakte exportieren"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("完成") { dismiss() }
+                    Button(l.tr(zh: "完成", en: "Done", de: "Fertig")) { dismiss() }
                 }
             }
         }

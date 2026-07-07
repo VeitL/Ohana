@@ -16,6 +16,7 @@ struct PetInsuranceContentView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(AppServices.self) private var appServices
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
     @State private var showingAdd = false
     @State private var selectedInsurance: PetInsurance?
     @State private var insuranceToEdit: PetInsurance?
@@ -31,6 +32,8 @@ struct PetInsuranceContentView: View {
         routeInsurances.sorted { $0.renewalDate > $1.renewalDate }
     }
 
+    private var l: L10n { L10n(appLanguage) }
+
     var body: some View {
         ZStack {
             if embedded {
@@ -44,11 +47,11 @@ struct PetInsuranceContentView: View {
                         OhanaAppBackground()
                         standaloneScroll
                     }
-                    .navigationTitle("🛡️ \(pet.name)的保险")
+                    .navigationTitle(l.tr(zh: "🛡️ \(pet.name)的保险", en: "🛡️ \(pet.name)'s insurance", de: "🛡️ Versicherung von \(pet.name)"))
                     .navigationBarTitleDisplayMode(.inline)
                     .toolbar {
                         ToolbarItem(placement: .topBarLeading) {
-                            Button("关闭") { dismiss() }
+                            Button(l.tr(zh: "关闭", en: "Close", de: "Schließen")) { dismiss() }
                         }
                         ToolbarItem(placement: .topBarTrailing) {
                             Button { showingAdd = true } label: {
@@ -79,7 +82,7 @@ struct PetInsuranceContentView: View {
     private var embeddedContent: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Text("保险")
+                Text(l.tr(zh: "保险", en: "Insurance", de: "Versicherung"))
                     .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Spacer()
@@ -120,11 +123,11 @@ struct PetInsuranceContentView: View {
 
     private var embeddedEmpty: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("暂无保单，可记录续期与保额")
+            Text(l.tr(zh: "暂无保单，可记录续期与保额", en: "No policies yet. Track renewals and coverage.", de: "Noch keine Police. Erneuerung und Deckung erfassen."))
                 .font(OhanaFont.adaptive(size: 12, weight: .medium, design: .rounded))
                 .foregroundStyle(Color.ohanaSecondaryText)
             Button { showingAdd = true } label: {
-                Text("添加保单")
+                Text(l.tr(zh: "添加保单", en: "Add policy", de: "Police hinzufügen"))
                     .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
                     .foregroundStyle(Color.arkInk)
                     .padding(.horizontal, 16).padding(.vertical, 8)
@@ -140,10 +143,16 @@ struct PetInsuranceContentView: View {
     private var emptyState: some View {
         VStack(spacing: 16) {
             Text("🛡️").font(OhanaFont.adaptive(size: 56))
-            Text("暂无保险记录").font(OhanaFont.adaptive(size: 17, weight: .black, design: .rounded))
-            Text("记录宠物保险保单，轻松追踪续期日期").font(OhanaFont.adaptive(size: 13, weight: .medium, design: .rounded)).foregroundStyle(Color.ohanaSecondaryText).multilineTextAlignment(.center)
+            Text(l.tr(zh: "暂无保险记录", en: "No insurance records", de: "Keine Versicherungen"))
+                .font(OhanaFont.adaptive(size: 17, weight: .black, design: .rounded))
+            Text(l.tr(zh: "记录宠物保险保单，轻松追踪续期日期", en: "Save policies and keep renewal dates easy to track.", de: "Policen speichern und Erneuerungen im Blick behalten."))
+                .font(OhanaFont.adaptive(size: 13, weight: .medium, design: .rounded))
+                .foregroundStyle(Color.ohanaSecondaryText)
+                .multilineTextAlignment(.center)
             Button { showingAdd = true } label: {
-                Text("添加保单").font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded)).foregroundStyle(Color.arkInk)
+                Text(l.tr(zh: "添加保单", en: "Add policy", de: "Police hinzufügen"))
+                    .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
+                    .foregroundStyle(Color.arkInk)
                     .padding(.horizontal, 28).padding(.vertical, 12)
                     .background(Color.goPrimary, in: Capsule())
             }.buttonStyle(ScaleButtonStyle())
@@ -158,10 +167,10 @@ struct PetInsuranceContentView: View {
                     HStack(spacing: 10) {
                         VStack(alignment: .leading, spacing: 3) {
                             HStack(spacing: 6) {
-                                Text(ins.productName.isEmpty ? "未命名保单" : ins.productName)
+                                Text(ins.productName.isEmpty ? l.tr(zh: "未命名保单", en: "Untitled policy", de: "Unbenannte Police") : ins.productName)
                                     .font(OhanaFont.adaptive(size: 16, weight: .black, design: .rounded))
                                     .foregroundStyle(Color.ohanaPrimaryText)
-                                Text(ins.renewalStatusLabel)
+                                Text(renewalStatusLabel(for: ins))
                                     .font(OhanaFont.adaptive(size: 10, weight: .bold, design: .rounded))
                                     .foregroundStyle(Color.arkInk)
                                     .padding(.horizontal, 8).padding(.vertical, 3)
@@ -180,18 +189,18 @@ struct PetInsuranceContentView: View {
                     }
 
                     HStack(spacing: 0) {
-                        statCell(label: "年费",
+                        statCell(label: l.tr(zh: "年费", en: "Annual", de: "Jährlich"),
                                  value: ins.annualPremium > 0 ? AppCurrency.format(ins.annualPremium, fractionDigits: 0) : "—")
                         Divider().frame(height: 32).opacity(0.2)
-                        statCell(label: "保额",
+                        statCell(label: l.tr(zh: "保额", en: "Coverage", de: "Deckung"),
                                  value: ins.coverageAmount > 0 ? AppCurrency.format(ins.coverageAmount, fractionDigits: 0) : "—")
                         Divider().frame(height: 32).opacity(0.2)
-                        statCell(label: "续期",
+                        statCell(label: l.tr(zh: "续期", en: "Renewal", de: "Erneuerung"),
                                  value: ins.renewalDate.formatted(.dateTime.year().month().day()))
                         if !ins.claims.isEmpty {
                             Divider().frame(height: 32).opacity(0.2)
-                            statCell(label: "报销",
-                                     value: "\(ins.claims.count) 条")
+                            statCell(label: l.tr(zh: "报销", en: "Claims", de: "Erstattungen"),
+                                     value: l.tr(zh: "\(ins.claims.count) 条", en: "\(ins.claims.count)", de: "\(ins.claims.count)"))
                         }
                     }
 
@@ -209,16 +218,16 @@ struct PetInsuranceContentView: View {
 
             Menu {
                 Button { insuranceToEdit = ins } label: {
-                    Label("编辑保单", systemImage: "pencil")
+                    Label(l.tr(zh: "编辑保单", en: "Edit policy", de: "Police bearbeiten"), systemImage: "pencil")
                 }
                 Button { selectedInsurance = ins } label: {
-                    Label("查看详情", systemImage: "info.circle")
+                    Label(l.tr(zh: "查看详情", en: "View details", de: "Details ansehen"), systemImage: "info.circle")
                 }
                 Divider()
                 Button(role: .destructive) {
                     deletePolicy(ins)
                 } label: {
-                    Label("删除", systemImage: "trash")
+                    Label(l.tr(zh: "删除", en: "Delete", de: "Löschen"), systemImage: "trash")
                 }
             } label: {
                 Image(systemName: "ellipsis.circle.fill").accessibilityHidden(true)
@@ -255,5 +264,16 @@ struct PetInsuranceContentView: View {
             Text(value).font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
             Text(label).font(OhanaFont.adaptive(size: 10, weight: .medium, design: .rounded)).foregroundStyle(Color.ohanaSecondaryText)
         }.frame(maxWidth: .infinity)
+    }
+
+    private func renewalStatusLabel(for insurance: PetInsurance) -> String {
+        let days = insurance.daysUntilRenewal
+        if days < 0 {
+            return l.tr(zh: "已过期", en: "Expired", de: "Abgelaufen")
+        }
+        if days <= 30 {
+            return l.tr(zh: "即将到期", en: "Due soon", de: "Bald fällig")
+        }
+        return l.tr(zh: "保障中", en: "Covered", de: "Aktiv")
     }
 }

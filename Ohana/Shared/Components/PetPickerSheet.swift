@@ -14,14 +14,17 @@ struct PetPickerSheet: View {
     let onSelect: (Pet) -> Void
 
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
+
+    private var l: L10n { L10n(appLanguage) }
 
     private var actionTitle: String {
         switch actionId {
-        case "walk": "选择要遛的狗"
-        case "health": "选择宠物查看健康"
-        case "groom": "选择要护理的宠物"
-        case "potty": "选择宠物记录排泄"
-        default: "选择宠物"
+        case "walk": l.tr(zh: "选择要遛的狗", en: "Choose a dog to walk", de: "Hund fuer Spaziergang waehlen")
+        case "health": l.tr(zh: "选择宠物查看健康", en: "Choose a pet for health", de: "Haustier fuer Gesundheit waehlen")
+        case "groom": l.tr(zh: "选择要护理的宠物", en: "Choose a pet to groom", de: "Haustier fuer Pflege waehlen")
+        case "potty": l.tr(zh: "选择宠物记录排泄", en: "Choose a pet for potty", de: "Haustier fuer Kot-Eintrag waehlen")
+        default: l.tr(zh: "选择宠物", en: "Choose a pet", de: "Haustier waehlen")
         }
     }
 
@@ -51,7 +54,7 @@ struct PetPickerSheet: View {
                         Text(actionTitle)
                             .font(OhanaFont.adaptive(size: 22, weight: .black, design: .rounded))
                             .foregroundStyle(Color.ohanaPrimaryText)
-                        Text("选择一只宠物继续")
+                        Text(l.tr(zh: "选择一只宠物继续", en: "Choose one pet to continue", de: "Waehle ein Haustier zum Fortfahren"))
                             .font(OhanaFont.adaptive(size: 14, weight: .medium))
                             .foregroundStyle(Color.ohanaSecondaryText)
                     }
@@ -79,7 +82,7 @@ struct PetPickerSheet: View {
                                     Text(pet.name)
                                         .font(OhanaFont.adaptive(size: 17, weight: .bold, design: .rounded))
                                         .foregroundStyle(Color.ohanaPrimaryText)
-                                    Text("\(pet.species) · \(pet.breed)")
+                                    Text(pet.localizedSpeciesBreedSummary(l: l))
                                         .font(OhanaFont.adaptive(size: 13, weight: .medium))
                                         .foregroundStyle(Color.ohanaSecondaryText)
                                         .lineLimit(1)

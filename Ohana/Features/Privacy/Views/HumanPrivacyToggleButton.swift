@@ -19,7 +19,7 @@ struct HumanPrivacyToggleButton: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(AppServices.self) private var appServices
     @AppStorage("currentActiveHumanId") private var activeHumanIdStr = ""
-    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
     @State private var optimisticIsPrivate: Bool?
     @StateObject private var commandQueue = DeferredDomainCommandQueue()
 
@@ -130,7 +130,7 @@ struct HumanPrivateDataNotice: View {
     let field: HumanPrivateField
 
     @AppStorage("currentActiveHumanId") private var activeHumanIdStr = ""
-    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
 
     private var isOwner: Bool {
         UUID(uuidString: activeHumanIdStr) == human.id

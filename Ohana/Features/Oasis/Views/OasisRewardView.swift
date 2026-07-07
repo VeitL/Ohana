@@ -406,7 +406,7 @@ struct OasisRewardView: View {
     @State var rescueBusyCleanupTask: Task<Void, Never>?
     @State var treeStageAppearTask: Task<Void, Never>?
     @State var treeHarvestBuffer = OasisTreeHarvestBuffer()
-    @AppStorage("appLanguage") var appLanguage = AppLanguage.code
+    @Environment(\.ohanaAppLanguageCode) var appLanguage
     @AppStorage(OasisPlantDecorStore.equippedSceneKey) var equippedPlantDecorScene = ""
     @AppStorage(OasisPlantDecorStore.equippedPotSkinKey) var equippedPlantPotSkin = ""
 
