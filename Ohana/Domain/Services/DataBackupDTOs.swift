@@ -158,6 +158,8 @@ nonisolated struct PetBackup: Codable {
     var coconutBalance: Int
     var passedAwayDate: String?
     var cardStyleRaw: String?
+    var avatarImageBase64: String?
+    var avatarImageRef: BackupMediaReference? = nil
     var cardPopoutImageBase64: String?
     var cardPopoutImageRef: BackupMediaReference? = nil
     var cardPopoutSourceRaw: String?
@@ -329,6 +331,8 @@ nonisolated struct PlantBackup: Codable {
     var isIndoorSuitable: Bool?
     var remindersEnabled: Bool?
     var archivedAt: String?
+    var avatarImageBase64: String?
+    var avatarImageRef: BackupMediaReference? = nil
 }
 
 nonisolated struct PlantCareLogBackup: Codable {
@@ -405,6 +409,10 @@ nonisolated struct PetWalkLogBackup: Codable {
     var sharedSessionId: String?
     var behaviorNotes: String?
     var moodRating: Int?
+    var mapSnapshotBase64: String?
+    var mapSnapshotRef: BackupMediaReference? = nil
+    var routeLocationsBase64: String?
+    var routeLocationsRef: BackupMediaReference? = nil
 }
 
 nonisolated struct PetWeightLogBackup: Codable {
@@ -494,6 +502,9 @@ nonisolated struct PetMilestoneBackup: Codable {
     var emoji: String
     var notes: String
     var petId: String?
+    var photoBase64: String?
+    var photoRef: BackupMediaReference? = nil
+    var location: String?
 }
 
 nonisolated struct HumanWeightLogBackup: Codable {

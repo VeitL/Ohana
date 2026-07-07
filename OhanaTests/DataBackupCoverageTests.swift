@@ -162,9 +162,101 @@ struct DataBackupCoverageTests {
         #expect(restoredBudgetEvent.createdAt == createdAt)
     }
 
+    @Test func backupPackageRoundTripsAllExternalStorageMediaFields() async throws {
+        let source = try makeInMemoryContainer()
+        let sourceContext = source.mainContext
+        let petAvatar = Data([10, 11, 12])
+        let plantAvatar = Data([20, 21, 22])
+        let walkMapSnapshot = Data([30, 31, 32])
+        let walkRouteLocations = Data([40, 41, 42])
+        let milestonePhoto = Data([50, 51, 52])
+
+        let pet = Pet(name: "Miso", species: "猫")
+        pet.id = try #require(UUID(uuidString: "66666666-6666-4666-8666-666666666666"))
+        pet.updateAvatarImageData(petAvatar)
+
+        let plant = Plant(name: "Monstera", species: "Monstera")
+        plant.id = try #require(UUID(uuidString: "77777777-7777-4777-8777-777777777777"))
+        plant.updateAvatarImageData(plantAvatar)
+
+        let walkLog = PetWalkLog(
+            startDate: Date(timeIntervalSinceReferenceDate: 8000),
+            pet: pet,
+            executorId: "human-1"
+        )
+        walkLog.id = try #require(UUID(uuidString: "88888888-8888-4888-8888-888888888888"))
+        walkLog.endDate = Date(timeIntervalSinceReferenceDate: 8600)
+        walkLog.distanceMeters = 1234
+        walkLog.mapSnapshotData = walkMapSnapshot
+        walkLog.routeLocationsData = walkRouteLocations
+
+        let milestone = PetMilestone(
+            date: Date(timeIntervalSinceReferenceDate: 9000),
+            title: "First climb",
+            emoji: "star",
+            notes: "window ledge",
+            pet: pet,
+            photoData: milestonePhoto,
+            location: "living room"
+        )
+        milestone.id = try #require(UUID(uuidString: "99999999-9999-4999-8999-999999999999"))
+
+        sourceContext.insert(pet)
+        sourceContext.insert(plant)
+        sourceContext.insert(walkLog)
+        sourceContext.insert(milestone)
+        try sourceContext.save()
+
+        let packageURL = try await TestDataBackupManagerProjection.manager.exportJSON(container: source)
+        let manifest = try #require(String(data: backupManifestData(from: packageURL), encoding: .utf8))
+
+        #expect(packageURL.pathExtension == DataBackupManager.packageFileExtension)
+        #expect(manifest.contains("\"avatarImageRef\""))
+        #expect(manifest.contains("\"mapSnapshotRef\""))
+        #expect(manifest.contains("\"routeLocationsRef\""))
+        #expect(manifest.contains("\"photoRef\""))
+        #expect(manifest.contains("pet-avatar-"))
+        #expect(manifest.contains("plant-avatar-"))
+        #expect(manifest.contains("pet-walk-map-snapshot-"))
+        #expect(manifest.contains("pet-walk-route-locations-"))
+        #expect(manifest.contains("pet-milestone-photo-"))
+        #expect(!manifest.contains(petAvatar.base64EncodedString()))
+        #expect(!manifest.contains(plantAvatar.base64EncodedString()))
+        #expect(!manifest.contains(walkMapSnapshot.base64EncodedString()))
+        #expect(!manifest.contains(walkRouteLocations.base64EncodedString()))
+        #expect(!manifest.contains(milestonePhoto.base64EncodedString()))
+
+        let target = try makeInMemoryContainer()
+        let targetContext = target.mainContext
+        try await TestDataBackupManagerProjection.manager.importJSON(
+            from: packageURL,
+            context: targetContext,
+            schedulePlantNotifications: false
+        )
+
+        let restoredPet = try #require(try targetContext.fetch(FetchDescriptor<Pet>()).first)
+        let restoredPlant = try #require(try targetContext.fetch(FetchDescriptor<Plant>()).first)
+        let restoredWalk = try #require(try targetContext.fetch(FetchDescriptor<PetWalkLog>()).first)
+        let restoredMilestone = try #require(try targetContext.fetch(FetchDescriptor<PetMilestone>()).first)
+
+        #expect(restoredPet.avatarImageData == petAvatar)
+        #expect(restoredPlant.avatarImageData == plantAvatar)
+        #expect(restoredWalk.mapSnapshotData == walkMapSnapshot)
+        #expect(restoredWalk.routeLocationsData == walkRouteLocations)
+        #expect(restoredMilestone.photoData == milestonePhoto)
+        #expect(restoredMilestone.location == "living room")
+        #expect(restoredPet.hasAvatarImageAttachment)
+        #expect(restoredPlant.hasAvatarImageAttachment)
+        #expect(restoredMilestone.hasPhotoAttachment)
+    }
+
     private func makeInMemoryContainer() throws -> ModelContainer {
         let schema = Schema(ArkSchemaV85.models)
         let config = ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)
         return try ModelContainer(for: schema, migrationPlan: ArkMigrationPlan.self, configurations: [config])
+    }
+
+    private func backupManifestData(from packageURL: URL) throws -> Data {
+        try Data(contentsOf: packageURL.appendingPathComponent(DataBackupManager.manifestFileName, isDirectory: false))
     }
 }

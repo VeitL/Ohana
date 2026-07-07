@@ -16,12 +16,17 @@ nonisolated protocol DataBackupMediaResolving {
 }
 
 nonisolated enum DataBackupMediaPurpose: String {
+    case petAvatar = "pet-avatar"
     case petCardPopout = "pet-card-popout"
     case humanAvatar = "human-avatar"
+    case plantAvatar = "plant-avatar"
     case plantCarePhoto = "plant-care-photo"
     case petDocumentAttachment = "pet-document-attachment"
     case petDocumentAttachmentFile = "pet-document-attachment-file"
+    case petMilestonePhoto = "pet-milestone-photo"
     case petPhoto = "pet-photo"
+    case petWalkMapSnapshot = "pet-walk-map-snapshot"
+    case petWalkRouteLocations = "pet-walk-route-locations"
     case symptomPhoto = "symptom-photo"
 }
 

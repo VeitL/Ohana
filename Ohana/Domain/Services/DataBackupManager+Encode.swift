@@ -14,6 +14,11 @@ nonisolated extension DataBackupManager {
     func nilIfEmpty(_ value: String) -> String? { value.isEmpty ? nil : value }
 
     func encodePet(_ p: Pet, mediaWriter: DataBackupMediaWriting? = nil) throws -> PetBackup {
+        let avatarImageRef = try mediaWriter?.write(
+            p.avatarImageData,
+            purpose: .petAvatar,
+            id: p.id.uuidString
+        )
         let cardPopoutImageRef = try mediaWriter?.write(
             p.cardPopoutImageData,
             purpose: .petCardPopout,
@@ -41,6 +46,8 @@ nonisolated extension DataBackupManager {
             coconutBalance: p.coconutBalance,
             passedAwayDate: d(p.passedAwayDate),
             cardStyleRaw: p.cardStyleRaw.isEmpty ? nil : p.cardStyleRaw,
+            avatarImageBase64: avatarImageRef == nil ? p.avatarImageData?.base64EncodedString() : nil,
+            avatarImageRef: avatarImageRef,
             cardPopoutImageBase64: cardPopoutImageRef == nil ? p.cardPopoutImageData?.base64EncodedString() : nil,
             cardPopoutImageRef: cardPopoutImageRef,
             cardPopoutSourceRaw: (p.cardPopoutSourceRaw ?? "").isEmpty ? nil : p.cardPopoutSourceRaw,
@@ -104,8 +111,13 @@ nonisolated extension DataBackupManager {
                         createdAt: d(h.createdAt), totalProsperity: h.totalProsperity)
     }
 
-    func encodePlant(_ p: Plant) -> PlantBackup {
-        PlantBackup(
+    func encodePlant(_ p: Plant, mediaWriter: DataBackupMediaWriting? = nil) throws -> PlantBackup {
+        let avatarImageRef = try mediaWriter?.write(
+            p.avatarImageData,
+            purpose: .plantAvatar,
+            id: p.id.uuidString
+        )
+        return PlantBackup(
             id: p.id.uuidString, name: p.name, species: p.species, avatarEmoji: p.avatarEmoji,
             location: p.location, notes: p.notes, createdAt: d(p.createdAt),
             lastWateredDate: d(p.lastWateredDate), wateringIntervalDays: p.wateringIntervalDays,
@@ -138,7 +150,9 @@ nonisolated extension DataBackupManager {
             isToxicToChildren: p.isToxicToChildren,
             isIndoorSuitable: p.isIndoorSuitable,
             remindersEnabled: p.remindersEnabled,
-            archivedAt: d(p.archivedAt)
+            archivedAt: d(p.archivedAt),
+            avatarImageBase64: avatarImageRef == nil ? p.avatarImageData?.base64EncodedString() : nil,
+            avatarImageRef: avatarImageRef
         )
     }
 
@@ -169,51 +183,6 @@ nonisolated extension DataBackupManager {
             relationshipTypeRaw: relationship.relationshipTypeRaw,
             note: relationship.note,
             createdAt: d(relationship.createdAt)
-        )
-    }
-
-    func decodePlantSnapshot(_ dto: PlantBackup) -> DomainPlantRehydrateSnapshot {
-        DomainPlantRehydrateSnapshot(
-            id: UUID(uuidString: dto.id) ?? UUID(),
-            name: dto.name,
-            species: dto.species,
-            avatarEmoji: dto.avatarEmoji,
-            location: dto.location,
-            notes: dto.notes,
-            createdAt: iso.date(from: dto.createdAt) ?? Date(),
-            lastWateredDate: dto.lastWateredDate.flatMap { iso.date(from: $0) },
-            wateringIntervalDays: dto.wateringIntervalDays,
-            lastFertilizedDate: dto.lastFertilizedDate.flatMap { iso.date(from: $0) },
-            fertilizingIntervalDays: dto.fertilizingIntervalDays,
-            themeColorHex: dto.themeColorHex ?? "4CAF50",
-            lastHealthCheckDate: dto.lastHealthCheckDate.flatMap { iso.date(from: $0) },
-            roomNameRaw: dto.roomNameRaw ?? "",
-            potDiameterCm: dto.potDiameterCm ?? 0,
-            potMaterialRaw: dto.potMaterialRaw ?? "",
-            soilTypeRaw: dto.soilTypeRaw ?? "",
-            isIndoor: dto.isIndoor ?? true,
-            windowDirection: PlantWindowDirection(rawValue: dto.windowDirectionRaw ?? "") ?? .unknown,
-            lightLevel: PlantLightLevel(rawValue: dto.lightLevelRaw ?? "") ?? .medium,
-            lastLightMeasurementLux: dto.lastLightMeasurementLux ?? 0,
-            lastLightMeasurementDate: dto.lastLightMeasurementDate.flatMap { iso.date(from: $0) },
-            humidityPreference: PlantHumidityPreference(rawValue: dto.humidityPreferenceRaw ?? "") ?? .standard,
-            temperaturePreference: PlantTemperaturePreference(rawValue: dto.temperaturePreferenceRaw ?? "") ?? .standard,
-            isNearClimateSource: dto.isNearClimateSource ?? false,
-            potHasDrainage: dto.potHasDrainage ?? true,
-            acquiredDate: dto.acquiredDate.flatMap { iso.date(from: $0) },
-            acquisitionSourceRaw: dto.acquisitionSourceRaw ?? "",
-            currentHeightCm: dto.currentHeightCm ?? 0,
-            currentSpreadCm: dto.currentSpreadCm ?? 0,
-            isHydroponic: dto.isHydroponic ?? false,
-            isSucculent: dto.isSucculent ?? false,
-            healthStatus: PlantHealthStatus(rawValue: dto.healthStatusRaw ?? "") ?? .stable,
-            catalogSpeciesId: dto.catalogSpeciesId ?? "",
-            isToxicToCats: dto.isToxicToCats ?? false,
-            isToxicToDogs: dto.isToxicToDogs ?? false,
-            isToxicToChildren: dto.isToxicToChildren ?? false,
-            isIndoorSuitable: dto.isIndoorSuitable ?? true,
-            remindersEnabled: dto.remindersEnabled ?? true,
-            archivedAt: dto.archivedAt.flatMap { iso.date(from: $0) }
         )
     }
 
@@ -258,16 +227,30 @@ nonisolated extension DataBackupManager {
         )
     }
 
-    func encodeWalkLog(_ l: PetWalkLog) -> PetWalkLogBackup {
-        PetWalkLogBackup(id: l.id.uuidString, startDate: d(l.startDate),
-                         endDate: d(l.endDate), distanceMeters: l.distanceMeters,
-                         coconutsEarned: l.coconutsEarned,
-                         executorId: l.executorId,
-                         executorIdsRaw: nilIfEmpty(SharedCareParticipantIDs.encode(l.executorIds)),
-                         petId: l.pet?.id.uuidString,
-                         sharedSessionId: l.sharedSessionId.isEmpty ? nil : l.sharedSessionId,
-                         behaviorNotes: l.behaviorNotes,
-                         moodRating: l.moodRating)
+    func encodeWalkLog(_ l: PetWalkLog, mediaWriter: DataBackupMediaWriting? = nil) throws -> PetWalkLogBackup {
+        let mapSnapshotRef = try mediaWriter?.write(
+            l.mapSnapshotData,
+            purpose: .petWalkMapSnapshot,
+            id: l.id.uuidString
+        )
+        let routeLocationsRef = try mediaWriter?.write(
+            l.routeLocationsData,
+            purpose: .petWalkRouteLocations,
+            id: l.id.uuidString
+        )
+        return PetWalkLogBackup(id: l.id.uuidString, startDate: d(l.startDate),
+                                endDate: d(l.endDate), distanceMeters: l.distanceMeters,
+                                coconutsEarned: l.coconutsEarned,
+                                executorId: l.executorId,
+                                executorIdsRaw: nilIfEmpty(SharedCareParticipantIDs.encode(l.executorIds)),
+                                petId: l.pet?.id.uuidString,
+                                sharedSessionId: l.sharedSessionId.isEmpty ? nil : l.sharedSessionId,
+                                behaviorNotes: l.behaviorNotes,
+                                moodRating: l.moodRating,
+                                mapSnapshotBase64: mapSnapshotRef == nil ? l.mapSnapshotData?.base64EncodedString() : nil,
+                                mapSnapshotRef: mapSnapshotRef,
+                                routeLocationsBase64: routeLocationsRef == nil ? l.routeLocationsData?.base64EncodedString() : nil,
+                                routeLocationsRef: routeLocationsRef)
     }
 
     func encodeWeightLog(_ l: PetWeightLog) -> PetWeightLogBackup {
@@ -344,9 +327,17 @@ nonisolated extension DataBackupManager {
         }
     }
 
-    func encodeMilestone(_ m: PetMilestone) -> PetMilestoneBackup {
-        PetMilestoneBackup(id: m.id.uuidString, date: d(m.date), title: m.title,
-                           emoji: m.emoji, notes: m.notes, petId: m.pet?.id.uuidString)
+    func encodeMilestone(_ m: PetMilestone, mediaWriter: DataBackupMediaWriting? = nil) throws -> PetMilestoneBackup {
+        let photoRef = try mediaWriter?.write(
+            m.photoData,
+            purpose: .petMilestonePhoto,
+            id: m.id.uuidString
+        )
+        return PetMilestoneBackup(id: m.id.uuidString, date: d(m.date), title: m.title,
+                                  emoji: m.emoji, notes: m.notes, petId: m.pet?.id.uuidString,
+                                  photoBase64: photoRef == nil ? m.photoData?.base64EncodedString() : nil,
+                                  photoRef: photoRef,
+                                  location: m.location.isEmpty ? nil : m.location)
     }
 
     func encodeHumanWeight(_ l: HumanWeightLog) -> HumanWeightLogBackup {

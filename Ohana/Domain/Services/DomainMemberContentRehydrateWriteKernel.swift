@@ -154,6 +154,8 @@ nonisolated struct DomainPetMilestoneRehydrateSnapshot: Equatable {
     let emoji: String
     let notes: String
     let petId: UUID?
+    let photoData: Data?
+    let location: String
 }
 
 nonisolated struct DomainHumanWeightLogRehydrateSnapshot: Equatable {
@@ -518,9 +520,12 @@ nonisolated enum DomainMemberContentRehydrateWriter {
             title: snapshot.title,
             emoji: snapshot.emoji,
             notes: snapshot.notes,
-            pet: try petReference(id: snapshot.petId, context: context)
+            pet: try petReference(id: snapshot.petId, context: context),
+            photoData: snapshot.photoData,
+            location: snapshot.location
         )
         milestone.id = snapshot.id
+        milestone.updatePhotoData(snapshot.photoData)
         context.insert(milestone)
         plan.consumeAuthorization()
         return DomainMemberContentRehydrateResult(inserted: true, plan: plan)

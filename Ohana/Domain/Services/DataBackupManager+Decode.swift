@@ -27,7 +27,11 @@ nonisolated extension DataBackupManager {
             gender: dto.gender,
             isNeutered: dto.isNeutered,
             avatarEmoji: dto.avatarEmoji,
-            avatarImageData: nil,
+            avatarImageData: try mediaData(
+                reference: dto.avatarImageRef,
+                legacyBase64: dto.avatarImageBase64,
+                resolver: mediaResolver
+            ),
             microchipID: dto.microchipID,
             vetContact: dto.vetContact,
             vetClinicName: "",
@@ -112,6 +116,59 @@ nonisolated extension DataBackupManager {
             name: dto.name,
             createdAt: parseDate(dto.createdAt) ?? Date(),
             totalProsperity: dto.totalProsperity
+        )
+    }
+
+    func decodePlantSnapshot(
+        _ dto: PlantBackup,
+        mediaResolver: DataBackupMediaResolving? = nil
+    ) throws -> DomainPlantRehydrateSnapshot {
+        DomainPlantRehydrateSnapshot(
+            id: UUID(uuidString: dto.id) ?? UUID(),
+            name: dto.name,
+            species: dto.species,
+            avatarEmoji: dto.avatarEmoji,
+            avatarImageData: try mediaData(
+                reference: dto.avatarImageRef,
+                legacyBase64: dto.avatarImageBase64,
+                resolver: mediaResolver
+            ),
+            location: dto.location,
+            notes: dto.notes,
+            createdAt: parseDate(dto.createdAt) ?? Date(),
+            lastWateredDate: parseDate(dto.lastWateredDate),
+            wateringIntervalDays: dto.wateringIntervalDays,
+            lastFertilizedDate: parseDate(dto.lastFertilizedDate),
+            fertilizingIntervalDays: dto.fertilizingIntervalDays,
+            themeColorHex: dto.themeColorHex ?? "4CAF50",
+            lastHealthCheckDate: parseDate(dto.lastHealthCheckDate),
+            roomNameRaw: dto.roomNameRaw ?? "",
+            potDiameterCm: dto.potDiameterCm ?? 0,
+            potMaterialRaw: dto.potMaterialRaw ?? "",
+            soilTypeRaw: dto.soilTypeRaw ?? "",
+            isIndoor: dto.isIndoor ?? true,
+            windowDirection: PlantWindowDirection(rawValue: dto.windowDirectionRaw ?? "") ?? .unknown,
+            lightLevel: PlantLightLevel(rawValue: dto.lightLevelRaw ?? "") ?? .medium,
+            lastLightMeasurementLux: dto.lastLightMeasurementLux ?? 0,
+            lastLightMeasurementDate: parseDate(dto.lastLightMeasurementDate),
+            humidityPreference: PlantHumidityPreference(rawValue: dto.humidityPreferenceRaw ?? "") ?? .standard,
+            temperaturePreference: PlantTemperaturePreference(rawValue: dto.temperaturePreferenceRaw ?? "") ?? .standard,
+            isNearClimateSource: dto.isNearClimateSource ?? false,
+            potHasDrainage: dto.potHasDrainage ?? true,
+            acquiredDate: parseDate(dto.acquiredDate),
+            acquisitionSourceRaw: dto.acquisitionSourceRaw ?? "",
+            currentHeightCm: dto.currentHeightCm ?? 0,
+            currentSpreadCm: dto.currentSpreadCm ?? 0,
+            isHydroponic: dto.isHydroponic ?? false,
+            isSucculent: dto.isSucculent ?? false,
+            healthStatus: PlantHealthStatus(rawValue: dto.healthStatusRaw ?? "") ?? .stable,
+            catalogSpeciesId: dto.catalogSpeciesId ?? "",
+            isToxicToCats: dto.isToxicToCats ?? false,
+            isToxicToDogs: dto.isToxicToDogs ?? false,
+            isToxicToChildren: dto.isToxicToChildren ?? false,
+            isIndoorSuitable: dto.isIndoorSuitable ?? true,
+            remindersEnabled: dto.remindersEnabled ?? true,
+            archivedAt: dto.archivedAt.flatMap { iso.date(from: $0) }
         )
     }
 
@@ -239,7 +296,10 @@ nonisolated extension DataBackupManager {
         )
     }
 
-    func decodeWalkLogSnapshot(_ dto: PetWalkLogBackup) -> DomainPetWalkLogRehydrateSnapshot {
+    func decodeWalkLogSnapshot(
+        _ dto: PetWalkLogBackup,
+        mediaResolver: DataBackupMediaResolving? = nil
+    ) throws -> DomainPetWalkLogRehydrateSnapshot {
         DomainPetWalkLogRehydrateSnapshot(
             id: UUID(uuidString: dto.id) ?? UUID(),
             startDate: parseDate(dto.startDate) ?? Date(),
@@ -250,8 +310,16 @@ nonisolated extension DataBackupManager {
             endDate: parseDate(dto.endDate),
             distanceMeters: dto.distanceMeters,
             coconutsEarned: dto.coconutsEarned,
-            mapSnapshotData: nil,
-            routeLocationsData: nil,
+            mapSnapshotData: try mediaData(
+                reference: dto.mapSnapshotRef,
+                legacyBase64: dto.mapSnapshotBase64,
+                resolver: mediaResolver
+            ),
+            routeLocationsData: try mediaData(
+                reference: dto.routeLocationsRef,
+                legacyBase64: dto.routeLocationsBase64,
+                resolver: mediaResolver
+            ),
             behaviorNotes: dto.behaviorNotes,
             moodRating: dto.moodRating ?? 0
         )
@@ -368,14 +436,23 @@ nonisolated extension DataBackupManager {
         )
     }
 
-    func decodeMilestoneSnapshot(_ dto: PetMilestoneBackup) -> DomainPetMilestoneRehydrateSnapshot {
+    func decodeMilestoneSnapshot(
+        _ dto: PetMilestoneBackup,
+        mediaResolver: DataBackupMediaResolving? = nil
+    ) throws -> DomainPetMilestoneRehydrateSnapshot {
         DomainPetMilestoneRehydrateSnapshot(
             id: UUID(uuidString: dto.id) ?? UUID(),
             date: parseDate(dto.date) ?? Date(),
             title: dto.title,
             emoji: dto.emoji,
             notes: dto.notes,
-            petId: dto.petId.flatMap(UUID.init(uuidString:))
+            petId: dto.petId.flatMap(UUID.init(uuidString:)),
+            photoData: try mediaData(
+                reference: dto.photoRef,
+                legacyBase64: dto.photoBase64,
+                resolver: mediaResolver
+            ),
+            location: dto.location ?? ""
         )
     }
 

@@ -298,9 +298,12 @@ final nonisolated class DataBackupManager: @unchecked Sendable {
 
         let petBackups = try pets.map { try encodePet($0, mediaWriter: mediaWriter) }
         let humanBackups = try humans.map { try encodeHuman($0, mediaWriter: mediaWriter) }
+        let plantBackups = try plants.map { try encodePlant($0, mediaWriter: mediaWriter) }
         let plantCareLogBackups = try plantCareLogs.map { try encodePlantCareLog($0, mediaWriter: mediaWriter) }
+        let petWalkLogBackups = try walkLogs.map { try encodeWalkLog($0, mediaWriter: mediaWriter) }
         let petDocumentBackups = try docs.map { try encodeDocument($0, mediaWriter: mediaWriter) }
         let petDocumentAttachmentBackups = try docs.flatMap { try encodeDocumentAttachments($0, mediaWriter: mediaWriter) }
+        let petMilestoneBackups = try milestones.map { try encodeMilestone($0, mediaWriter: mediaWriter) }
         let petPhotoLogBackups = try photos.map { try encodePhotoLog($0, mediaWriter: mediaWriter) }
         let symptomLogBackups = try symptoms.map { try encodeSymptomLog($0, mediaWriter: mediaWriter) }
         let mediaPackage = (mediaWriter as? DataBackupMediaPackageWriter).map {
@@ -320,12 +323,12 @@ final nonisolated class DataBackupManager: @unchecked Sendable {
             events: events.map(encodeEvent),
             reminders: reminders.map(encodeReminder),
             households: households.map(encodeHousehold),
-            plants: plants.map(encodePlant),
+            plants: plantBackups,
             petRelationships: petRelationships.map(encodePetRelationship),
             plantCareLogs: plantCareLogBackups,
             petCareLogs: careLogs.map(encodeCareLog),
             petPottyLogs: pottyLogs.map(encodePottyLog),
-            petWalkLogs: walkLogs.map(encodeWalkLog),
+            petWalkLogs: petWalkLogBackups,
             petWeightLogs: weightLogs.map(encodeWeightLog),
             petExpenseLogs: expLogs.map(encodeExpenseLog),
             petHealthLogs: healthLogs.map(encodeHealthLog),
@@ -333,7 +336,7 @@ final nonisolated class DataBackupManager: @unchecked Sendable {
             petFoodRecords: foodRecs.map(encodeFoodRecord),
             petDocuments: petDocumentBackups,
             petDocumentAttachments: petDocumentAttachmentBackups,
-            petMilestones: milestones.map(encodeMilestone),
+            petMilestones: petMilestoneBackups,
             petPhotoLogs: petPhotoLogBackups,
             petInsurances: insurances.map(encodeInsurance),
             insuranceClaims: claims.map(encodeInsuranceClaim),
@@ -417,7 +420,7 @@ final nonisolated class DataBackupManager: @unchecked Sendable {
         }
         for dto in backup.plants {
             try DomainGeneralRehydrateWriter.insertPlantIfNeeded(
-                snapshot: decodePlantSnapshot(dto),
+                snapshot: try decodePlantSnapshot(dto, mediaResolver: mediaResolver),
                 source: .backupRestore,
                 context: context
             )
@@ -479,7 +482,7 @@ final nonisolated class DataBackupManager: @unchecked Sendable {
         }
         for dto in backup.petWalkLogs {
             try DomainCareFactRehydrateWriter.insertPetWalkLogIfNeeded(
-                snapshot: decodeWalkLogSnapshot(dto),
+                snapshot: try decodeWalkLogSnapshot(dto, mediaResolver: mediaResolver),
                 source: .backupRestore,
                 context: context
             )
@@ -607,7 +610,7 @@ final nonisolated class DataBackupManager: @unchecked Sendable {
         }
         for dto in backup.petMilestones {
             try DomainMemberContentRehydrateWriter.insertPetMilestoneIfNeeded(
-                snapshot: decodeMilestoneSnapshot(dto),
+                snapshot: try decodeMilestoneSnapshot(dto, mediaResolver: mediaResolver),
                 source: .backupRestore,
                 context: context
             )

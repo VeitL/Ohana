@@ -96,6 +96,7 @@ nonisolated struct DomainPlantRehydrateSnapshot: Equatable {
     let name: String
     let species: String
     let avatarEmoji: String
+    let avatarImageData: Data?
     let location: String
     let notes: String
     let createdAt: Date
@@ -529,6 +530,7 @@ nonisolated enum DomainGeneralRehydrateWriter {
         plant.lastWateredDate = snapshot.lastWateredDate
         plant.lastFertilizedDate = snapshot.lastFertilizedDate
         plant.lastHealthCheckDate = snapshot.lastHealthCheckDate
+        plant.updateAvatarImageData(snapshot.avatarImageData)
         plan.consumeAuthorization()
         context.insert(plant)
         PlantUnlockPolicy.noteExistingPlantData()
@@ -1068,7 +1070,7 @@ nonisolated enum DomainGeneralRehydrateWriter {
         pet.gender = snapshot.gender
         pet.isNeutered = snapshot.isNeutered
         pet.avatarEmoji = snapshot.avatarEmoji
-        pet.avatarImageData = snapshot.avatarImageData
+        pet.updateAvatarImageData(snapshot.avatarImageData)
         pet.microchipID = snapshot.microchipID
         pet.vetContact = snapshot.vetContact
         pet.vetClinicName = snapshot.vetClinicName
@@ -1119,7 +1121,7 @@ nonisolated enum DomainGeneralRehydrateWriter {
         human.birthday = snapshot.birthday
         human.bloodType = snapshot.bloodType
         human.avatarEmoji = snapshot.avatarEmoji
-        human.avatarImageData = snapshot.avatarImageData
+        human.updateAvatarImageData(snapshot.avatarImageData)
         human.role = HumanProfileOptions.normalizedRole(snapshot.role)
         human.appleUserIdentifier = ""
         human.genderIdentityRaw = HumanProfileOptions.storedGenderIdentity(snapshot.genderIdentityRaw ?? "")
