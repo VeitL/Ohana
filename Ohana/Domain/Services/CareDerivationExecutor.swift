@@ -270,6 +270,10 @@ struct CareDerivationExecutor {
         )
     }
 
+    func publishFailure(command: DomainCommand, error: Error) {
+        revisions.publishFailure(command: command, error: error)
+    }
+
     private func publishRevisionIfNeeded(
         _ payload: CareWriteOutcome.RevisionPayload?,
         token: CareDerivationToken

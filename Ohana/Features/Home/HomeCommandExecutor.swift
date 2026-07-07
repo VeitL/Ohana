@@ -484,7 +484,7 @@ struct HomeCommandExecutor {
         do {
             result = try todayFocus.completeEvent(event, on: date, context: modelContext, executorId: resolvedExecutorId(executorId))
         } catch {
-            revisions.publishFailure(command: command, error: error)
+            derivations.publishFailure(command: command, error: error)
             return false
         }
         guard result.didChange, result.allowsDerivedEffects else {
