@@ -46,7 +46,7 @@
 - **P1 备份性能**：✅ 导出全表 fetch + encode 已迁到后台 `@ModelActor DataBackupActor`（见 2C）。
 - **P1 导入去重**：备份恢复 UI 写“自动去重”，但部分日志类当前直接插入，可能污染统计、提醒和账本。后续按 UUID 对全模型 upsert/skip，并给导入前加 schema、大小和来源预检。
 - **P1 后台任务与定位透明度**：`BGAppRefreshTask` 需要 expiration/cancel/failure 路径，避免后台任务超时仍占资源。后台定位总体集中在 `LocationManager` / `PetWalkingManager` 是正确方向，但 running walk 进入后台时应加强用户透明度，优先显示系统后台定位指示，并做真机锁屏路线验证。
-- **P2 包体与资源策略**：✅ 第一轮头像资源瘦身已完成。`Resources/Avatars/PetAvatarAssets` 仍作为 folder resource 整包复制，并在 App Bundle 中保持 `PetAvatarAssets` 目录名，但正式入库头像已重采样到 `450x600`，目录约降至 `94 MiB`；资源预算已下调到 `105 MiB`（pet avatars）/ `110 MiB`（Resources）。若后续目标压到 `<50 MiB`，再评估核心包 + 按需资源或下载型资源。
+- **P2 包体与资源策略**：✅ 第二轮头像资源瘦身已完成。`Resources/Avatars/PetAvatarAssets` 仍作为 folder resource 整包复制，并在 App Bundle 中保持 `PetAvatarAssets` 目录名；正式入库头像保持 `450x600` 透明 PNG 和现有文件名契约，已通过 lossless PNG recompression 将目录约降至 `54 MiB`，`Resources` 总量约降至 `74 MiB`。资源预算已下调到 `65 MiB`（pet avatars）/ `85 MiB`（Resources）。若后续目标压到 `<50 MiB`，再评估核心包 + 按需资源或下载型资源。
 - **P2 SwiftUI 热点拆分**：进行中。`MemberCardCreationView.swift` 已 4002 → 1734 行（见 2C）。剩余最大文件为 `AddPetWizardView.swift`（3122）、`PetHealthDetailView.swift`（2949）等，可同法继续拆分 presenter / data loader / 子视图。
 - **P3 发布完整性**：设置里的隐私政策、联系开发者等入口需要真实 action；通知 action/title 需要三语本地化；App Group entitlement 若没有真实共享容器使用，应移除或补齐用途说明。
 - **实施顺序**：先修 `PrivacyInfo.xcprivacy` 和权限声明一致性；再修备份安全与导入去重；随后修后台任务和定位透明度；最后处理包体优化与大 SwiftUI 文件拆分。
