@@ -178,29 +178,29 @@ struct CrewRosterProfilePanel: View {
         .onDisappear {
             avatarPipeline.cancel(key: humanAvatarCacheKey)
         }
-        .alert("确认标记离世", isPresented: $showingPetPassedAlert) {
-            Button("确认", role: .destructive) {
+        .alert(l.tr(zh: "确认标记离世", en: "Mark as passed away?", de: "Als verstorben markieren?"), isPresented: $showingPetPassedAlert) {
+            Button(l.tr(zh: "确认", en: "Confirm", de: "Bestaetigen"), role: .destructive) {
                 markPetPassedAway()
             }
-            Button("取消", role: .cancel) {}
+            Button(l.tr(zh: "取消", en: "Cancel", de: "Abbrechen"), role: .cancel) {}
         } message: {
-            Text("将进入纪念模式，并让未来照护安排退出活跃提醒。原有数据会保留，此操作可撤销。")
+            Text(l.tr(zh: "将进入纪念模式，并让未来照护安排退出活跃提醒。原有数据会保留，此操作可撤销。", en: "This pet will enter memorial mode and future care plans will leave active reminders. Existing data stays, and this can be undone.", de: "Dieses Haustier wechselt in den Gedenkmodus und kuenftige Pflegeplaene verlassen aktive Erinnerungen. Bestehende Daten bleiben erhalten und die Aktion kann rueckgaengig gemacht werden."))
         }
-        .alert("撤销离世标记", isPresented: $showingPetUndoPassedAlert) {
-            Button("撤销", role: .destructive) {
+        .alert(l.tr(zh: "撤销离世标记", en: "Undo passed-away mark?", de: "Verstorben-Markierung rueckgaengig machen?"), isPresented: $showingPetUndoPassedAlert) {
+            Button(l.tr(zh: "撤销", en: "Undo", de: "Rueckgaengig"), role: .destructive) {
                 undoPetPassedAway()
             }
-            Button("取消", role: .cancel) {}
+            Button(l.tr(zh: "取消", en: "Cancel", de: "Abbrechen"), role: .cancel) {}
         } message: {
-            Text("将清除离世日期，恢复为在世状态。")
+            Text(l.tr(zh: "将清除离世日期，恢复为在世状态。", en: "This clears the passed-away date and restores active status.", de: "Das Sterbedatum wird geloescht und der aktive Status wiederhergestellt."))
         }
-        .alert("仅清空所有记录", isPresented: $showingPetClearAlert) {
-            Button("取消", role: .cancel) {}
-            Button("清空记录", role: .destructive) {
+        .alert(l.tr(zh: "仅清空所有记录", en: "Clear records only?", de: "Nur Eintraege loeschen?"), isPresented: $showingPetClearAlert) {
+            Button(l.tr(zh: "取消", en: "Cancel", de: "Abbrechen"), role: .cancel) {}
+            Button(l.tr(zh: "清空记录", en: "Clear records", de: "Eintraege loeschen"), role: .destructive) {
                 clearPetActivityRecords()
             }
         } message: {
-            Text("将删除护理、体重、花费、健康、散步、喂食、清洁、里程碑、用药与相册等记录；保留名字、头像、品种与证件/保险档案。此操作不可撤销。")
+            Text(l.tr(zh: "将删除护理、体重、花费、健康、散步、喂食、清洁、里程碑、用药与相册等记录；保留名字、头像、品种与证件/保险档案。此操作不可撤销。", en: "This deletes care, weight, expense, health, walk, feeding, hygiene, milestone, medication, and photo records while keeping the name, avatar, breed, documents, and insurance profile. This cannot be undone.", de: "Dies loescht Pflege-, Gewichts-, Ausgaben-, Gesundheits-, Spaziergangs-, Fuetterungs-, Hygiene-, Meilenstein-, Medikamenten- und Fotoeintraege. Name, Avatar, Rasse, Dokumente und Versicherung bleiben erhalten. Das kann nicht rueckgaengig gemacht werden."))
         }
         .alert(l.tr(zh: "确认标记纪念模式", en: "Mark memorial mode?", de: "Gedenkmodus markieren?"), isPresented: $showingHumanPassedAlert) {
             Button(l.tr(zh: "确认", en: "Confirm", de: "Bestaetigen"), role: .destructive) {
@@ -218,9 +218,9 @@ struct CrewRosterProfilePanel: View {
         } message: {
             Text(l.tr(zh: "将清除该成员的纪念模式日期。", en: "This will clear the member's memorial-mode date.", de: "Das Datum fuer den Gedenkmodus dieses Mitglieds wird geloescht."))
         }
-        .alert("确认删除植物", isPresented: $showingPlantDeleteAlert) {
-            Button("取消", role: .cancel) {}
-            Button("删除", role: .destructive) {
+        .alert(l.tr(zh: "确认删除植物", en: "Delete plant?", de: "Pflanze loeschen?"), isPresented: $showingPlantDeleteAlert) {
+            Button(l.tr(zh: "取消", en: "Cancel", de: "Abbrechen"), role: .cancel) {}
+            Button(l.tr(zh: "删除", en: "Delete", de: "Loeschen"), role: .destructive) {
                 guard let plant else { return }
                 let result = MemberCommandExecutor(context: modelContext, services: appServices).deletePlant(
                     plant,
@@ -232,13 +232,15 @@ struct CrewRosterProfilePanel: View {
                 }
             }
         } message: {
-            Text("确定要删除 \(plant?.name ?? "这株植物") 吗？")
+            let plantName = plant?.name ?? l.tr(zh: "这株植物", en: "this plant", de: "diese Pflanze")
+            Text(l.tr(zh: "确定要删除 \(plantName) 吗？", en: "Delete \(plantName)?", de: "\(plantName) loeschen?"))
         }
         .sheet(isPresented: $showingPetDeleteSheet) {
+            let petName = pet?.name ?? l.tr(zh: "宠物", en: "pet", de: "Haustier")
             CrewRosterDeleteConfirmationSheet(
-                title: "彻底删除 \(pet?.name ?? "宠物")",
+                title: l.tr(zh: "彻底删除 \(petName)", en: "Delete \(petName) permanently", de: "\(petName) endgueltig loeschen"),
                 name: pet?.name ?? "",
-                warning: "这会删除宠物和所有关联记录，无法撤销。",
+                warning: l.tr(zh: "这会删除宠物和所有关联记录，无法撤销。", en: "This deletes the pet and all linked records. It cannot be undone.", de: "Dies loescht das Haustier und alle verknuepften Eintraege. Das kann nicht rueckgaengig gemacht werden."),
                 onCancel: { showingPetDeleteSheet = false },
                 onDelete: deletePetWithCascade
             )
@@ -347,30 +349,30 @@ struct CrewRosterProfilePanel: View {
 
     private func petReadContent(_ pet: Pet) -> some View {
         VStack(spacing: 12) {
-            profileSection("身份", icon: "pawprint.fill") {
-                infoRow("物种", emptyText(pet.species))
-                infoRow("品种", emptyText(pet.breed))
-                infoRow("年龄", pet.hasPassedAway ? pet.ageAtPassingText : pet.ageText)
-                infoRow("性别", pet.genderSymbol + (pet.isNeutered ? " · 已绝育" : ""))
-                infoRow("主题色", "#\(pet.safeThemeColorHex.uppercased())")
+            profileSection(l.tr(zh: "身份", en: "Identity", de: "Identitaet"), icon: "pawprint.fill") {
+                infoRow(l.tr(zh: "物种", en: "Species", de: "Art"), emptyText(pet.species))
+                infoRow(l.tr(zh: "品种", en: "Breed", de: "Rasse"), emptyText(pet.breed))
+                infoRow(l.tr(zh: "年龄", en: "Age", de: "Alter"), pet.hasPassedAway ? pet.ageAtPassingText : pet.ageText)
+                infoRow(l.tr(zh: "性别", en: "Gender", de: "Geschlecht"), petGenderSummary(pet))
+                infoRow(l.tr(zh: "主题色", en: "Accent color", de: "Akzentfarbe"), "#\(pet.safeThemeColorHex.uppercased())")
             }
-            profileSection("照护", icon: "heart.fill") {
-                infoRow("生日", formattedDate(pet.birthday))
-                infoRow("到家日", formattedDate(pet.homeDate))
-                infoRow("陪伴", pet.hasPassedAway ? "\(pet.daysTogetherAtPassing) 天" : "\(pet.daysTogether) 天")
-                infoRow("主粮", emptyText(pet.foodBrand))
-                infoRow("粮仓", pet.restockWeight > 0 ? "\(Int(pet.restockWeight)) g" : "未填写")
+            profileSection(l.tr(zh: "照护", en: "Care", de: "Pflege"), icon: "heart.fill") {
+                infoRow(l.tr(zh: "生日", en: "Birthday", de: "Geburtstag"), formattedDate(pet.birthday))
+                infoRow(l.tr(zh: "到家日", en: "Home date", de: "Einzugstag"), formattedDate(pet.homeDate))
+                infoRow(l.tr(zh: "陪伴", en: "Together", de: "Zusammen"), pet.hasPassedAway ? localizedDays(pet.daysTogetherAtPassing) : localizedDays(pet.daysTogether))
+                infoRow(l.tr(zh: "主粮", en: "Main food", de: "Hauptfutter"), emptyText(pet.foodBrand))
+                infoRow(l.tr(zh: "粮仓", en: "Food stock", de: "Futtervorrat"), pet.restockWeight > 0 ? "\(Int(pet.restockWeight)) g" : localizedEmptyValue)
             }
-            profileSection("保障", icon: "cross.case.fill") {
-                infoRow("芯片号", emptyText(pet.microchipID))
-                infoRow("医院", emptyText(pet.vetClinicName))
-                infoRow("医生", emptyText(pet.vetDoctorName))
-                infoRow("电话", emptyText(pet.vetContact))
-                infoRow("过敏", emptyText(pet.allergies))
-                infoRow("证件", "\(petSummary.documentCount)")
+            profileSection(l.tr(zh: "保障", en: "Protection", de: "Absicherung"), icon: "cross.case.fill") {
+                infoRow(l.tr(zh: "芯片号", en: "Microchip", de: "Mikrochip"), emptyText(pet.microchipID))
+                infoRow(l.tr(zh: "医院", en: "Clinic", de: "Praxis"), emptyText(pet.vetClinicName))
+                infoRow(l.tr(zh: "医生", en: "Doctor", de: "Tierarzt"), emptyText(pet.vetDoctorName))
+                infoRow(l.tr(zh: "电话", en: "Phone", de: "Telefon"), emptyText(pet.vetContact))
+                infoRow(l.tr(zh: "过敏", en: "Allergies", de: "Allergien"), emptyText(pet.allergies))
+                infoRow(l.tr(zh: "证件", en: "Documents", de: "Dokumente"), "\(petSummary.documentCount)")
             }
             if !pet.notes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                profileSection("备注", icon: "note.text") { paragraph(pet.notes) }
+                profileSection(l.tr(zh: "备注", en: "Notes", de: "Notizen"), icon: "note.text") { paragraph(pet.notes) }
             }
             petLifecycleSection(pet)
         }
@@ -408,18 +410,18 @@ struct CrewRosterProfilePanel: View {
 
     private func plantReadContent(_ plant: Plant) -> some View {
         VStack(spacing: 12) {
-            profileSection("植物", icon: "leaf.fill") {
-                infoRow("品种", emptyText(plant.species))
-                infoRow("位置", emptyText(plant.location))
-                infoRow("浇水间隔", "\(plant.wateringIntervalDays) 天")
-                infoRow("施肥间隔", "\(plant.fertilizingIntervalDays) 天")
-                infoRow("上次浇水", formattedDate(plant.lastWateredDate))
-                infoRow("上次施肥", formattedDate(plant.lastFertilizedDate))
+            profileSection(l.tr(zh: "植物", en: "Plant", de: "Pflanze"), icon: "leaf.fill") {
+                infoRow(l.tr(zh: "品种", en: "Species", de: "Art"), emptyText(plant.species))
+                infoRow(l.tr(zh: "位置", en: "Location", de: "Standort"), emptyText(plant.location))
+                infoRow(l.tr(zh: "浇水间隔", en: "Watering interval", de: "Giessintervall"), localizedDays(plant.wateringIntervalDays))
+                infoRow(l.tr(zh: "施肥间隔", en: "Fertilizing interval", de: "Duengeintervall"), localizedDays(plant.fertilizingIntervalDays))
+                infoRow(l.tr(zh: "上次浇水", en: "Last watered", de: "Zuletzt gegossen"), formattedDate(plant.lastWateredDate))
+                infoRow(l.tr(zh: "上次施肥", en: "Last fertilized", de: "Zuletzt geduengt"), formattedDate(plant.lastFertilizedDate))
             }
             if !plant.notes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                profileSection("备注", icon: "note.text") { paragraph(plant.notes) }
+                profileSection(l.tr(zh: "备注", en: "Notes", de: "Notizen"), icon: "note.text") { paragraph(plant.notes) }
             }
-            destructiveButton("删除植物", icon: "trash.fill", color: Color.goRed) {
+            destructiveButton(l.tr(zh: "删除植物", en: "Delete plant", de: "Pflanze loeschen"), icon: "trash.fill", color: Color.goRed) {
                 showingPlantDeleteAlert = true
             }
         }
@@ -442,15 +444,19 @@ struct CrewRosterProfilePanel: View {
 
     private var petEditContent: some View {
         VStack(spacing: 10) {
-            CrewRosterEditorTextField(title: "名字", text: $name, icon: "text.cursor") // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
-            CrewRosterEditorMenuRow(title: "物种", icon: "pawprint.fill", selection: $species, options: speciesOptions)
-            CrewRosterEditorTextField(title: "品种", text: $breed, icon: "tag.fill") // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
-            CrewRosterEditorSegmentedRow(title: "性别", selection: $gender, options: [("male", "男孩"), ("female", "女孩"), ("unknown", "未知")])
-            CrewRosterEditorToggleRow(title: "已绝育", icon: "checkmark.seal.fill", isOn: $isNeutered)
-            CrewRosterEditorDateToggleRow(title: "生日", icon: "gift.fill", isOn: $hasBirthday, date: $birthday, upperBound: Date())
-            CrewRosterEditorDateToggleRow(title: "到家日", icon: "house.fill", isOn: $hasHomeDate, date: $homeDate)
-            CrewRosterThemeSwatchRow(title: "主题色", selectedHex: $themeHex)
-            CrewRosterEditorTextField(title: "备注", text: $notes, icon: "note.text", axis: .vertical) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
+            CrewRosterEditorTextField(title: l.tr(zh: "名字", en: "Name", de: "Name"), text: $name, icon: "text.cursor") // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
+            CrewRosterEditorMenuRow(title: l.tr(zh: "物种", en: "Species", de: "Art"), icon: "pawprint.fill", selection: $species, options: speciesOptions)
+            CrewRosterEditorTextField(title: l.tr(zh: "品种", en: "Breed", de: "Rasse"), text: $breed, icon: "tag.fill") // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
+            CrewRosterEditorSegmentedRow(title: l.tr(zh: "性别", en: "Gender", de: "Geschlecht"), selection: $gender, options: [
+                ("male", l.tr(zh: "男孩", en: "Boy", de: "Junge")),
+                ("female", l.tr(zh: "女孩", en: "Girl", de: "Maedchen")),
+                ("unknown", l.tr(zh: "未知", en: "Unknown", de: "Unbekannt"))
+            ])
+            CrewRosterEditorToggleRow(title: l.tr(zh: "已绝育", en: "Neutered", de: "Kastriert"), icon: "checkmark.seal.fill", isOn: $isNeutered)
+            CrewRosterEditorDateToggleRow(title: l.tr(zh: "生日", en: "Birthday", de: "Geburtstag"), icon: "gift.fill", isOn: $hasBirthday, date: $birthday, upperBound: Date())
+            CrewRosterEditorDateToggleRow(title: l.tr(zh: "到家日", en: "Home date", de: "Einzugstag"), icon: "house.fill", isOn: $hasHomeDate, date: $homeDate)
+            CrewRosterThemeSwatchRow(title: l.tr(zh: "主题色", en: "Accent color", de: "Akzentfarbe"), selectedHex: $themeHex)
+            CrewRosterEditorTextField(title: l.tr(zh: "备注", en: "Notes", de: "Notizen"), text: $notes, icon: "note.text", axis: .vertical) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
         }
     }
 
@@ -487,36 +493,36 @@ struct CrewRosterProfilePanel: View {
 
     private var plantEditContent: some View {
         VStack(spacing: 10) {
-            CrewRosterEditorTextField(title: "名字", text: $name, icon: "text.cursor") // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
-            CrewRosterEditorTextField(title: "品种", text: $species, icon: "leaf.fill") // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
-            CrewRosterEditorTextField(title: "位置", text: $location, icon: "location.fill") // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
-            CrewRosterEditorStepperRow(title: "浇水间隔", icon: "drop.fill", value: $wateringDays, range: 1 ... 60, unit: "天")
-            CrewRosterEditorStepperRow(title: "施肥间隔", icon: "sparkles", value: $fertilizingDays, range: 1 ... 120, unit: "天")
-            CrewRosterThemeSwatchRow(title: "主题色", selectedHex: $themeHex)
-            CrewRosterEditorTextField(title: "备注", text: $notes, icon: "note.text", axis: .vertical) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
+            CrewRosterEditorTextField(title: l.tr(zh: "名字", en: "Name", de: "Name"), text: $name, icon: "text.cursor") // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
+            CrewRosterEditorTextField(title: l.tr(zh: "品种", en: "Species", de: "Art"), text: $species, icon: "leaf.fill") // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
+            CrewRosterEditorTextField(title: l.tr(zh: "位置", en: "Location", de: "Standort"), text: $location, icon: "location.fill") // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
+            CrewRosterEditorStepperRow(title: l.tr(zh: "浇水间隔", en: "Watering interval", de: "Giessintervall"), icon: "drop.fill", value: $wateringDays, range: 1 ... 60, unit: l.tr(zh: "天", en: "days", de: "Tage"))
+            CrewRosterEditorStepperRow(title: l.tr(zh: "施肥间隔", en: "Fertilizing interval", de: "Duengeintervall"), icon: "sparkles", value: $fertilizingDays, range: 1 ... 120, unit: l.tr(zh: "天", en: "days", de: "Tage"))
+            CrewRosterThemeSwatchRow(title: l.tr(zh: "主题色", en: "Accent color", de: "Akzentfarbe"), selectedHex: $themeHex)
+            CrewRosterEditorTextField(title: l.tr(zh: "备注", en: "Notes", de: "Notizen"), text: $notes, icon: "note.text", axis: .vertical) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
         }
     }
 
     private func petLifecycleSection(_ pet: Pet) -> some View {
-        profileSection("生命与危险操作", icon: "exclamationmark.triangle.fill") {
+        profileSection(l.tr(zh: "生命与危险操作", en: "Life & danger actions", de: "Leben & riskante Aktionen"), icon: "exclamationmark.triangle.fill") {
             if pet.hasPassedAway {
-                infoRow("离世日期", formattedDate(pet.passedAwayDate))
-                secondaryButton("撤销离世标记", icon: "arrow.uturn.backward", color: Color.goYellow) {
+                infoRow(l.tr(zh: "离世日期", en: "Passed-away date", de: "Sterbedatum"), formattedDate(pet.passedAwayDate))
+                secondaryButton(l.tr(zh: "撤销离世标记", en: "Undo passed-away mark", de: "Verstorben-Markierung rueckgaengig machen"), icon: "arrow.uturn.backward", color: Color.goYellow) {
                     showingPetUndoPassedAlert = true
                 }
             } else {
-                DatePicker("离世日期", selection: $passedDate, in: ...Date(), displayedComponents: .date)
+                DatePicker(l.tr(zh: "离世日期", en: "Passed-away date", de: "Sterbedatum"), selection: $passedDate, in: ...Date(), displayedComponents: .date)
                     .datePickerStyle(.compact)
                     .tint(Color.goPrimary)
                     .foregroundStyle(Color.goCardWhite)
-                secondaryButton("标记离世", icon: "rainbow", color: Color.goPurple) {
+                secondaryButton(l.tr(zh: "标记离世", en: "Mark as passed away", de: "Als verstorben markieren"), icon: "rainbow", color: Color.goPurple) {
                     showingPetPassedAlert = true
                 }
             }
-            secondaryButton("仅清空所有记录", icon: "eraser.fill", color: Color.goOrange) {
+            secondaryButton(l.tr(zh: "仅清空所有记录", en: "Clear records only", de: "Nur Eintraege loeschen"), icon: "eraser.fill", color: Color.goOrange) {
                 showingPetClearAlert = true
             }
-            destructiveButton("彻底删除 \(pet.name)", icon: "trash.fill", color: Color.goRed) {
+            destructiveButton(l.tr(zh: "彻底删除 \(pet.name)", en: "Delete \(pet.name) permanently", de: "\(pet.name) endgueltig loeschen"), icon: "trash.fill", color: Color.goRed) {
                 showingPetDeleteSheet = true
             }
         }
@@ -700,6 +706,15 @@ struct CrewRosterProfilePanel: View {
 
     private func formattedDate(_ date: Date?) -> String {
         date?.formatted(.dateTime.year().month().day()) ?? localizedEmptyValue
+    }
+
+    private func localizedDays(_ days: Int) -> String {
+        l.tr(zh: "\(days) 天", en: "\(days) days", de: "\(days) Tage")
+    }
+
+    private func petGenderSummary(_ pet: Pet) -> String {
+        guard pet.isNeutered else { return pet.genderSymbol }
+        return "\(pet.genderSymbol) · \(l.tr(zh: "已绝育", en: "Neutered", de: "Kastriert"))"
     }
 
     private func privacySummary(for human: Human) -> String {
