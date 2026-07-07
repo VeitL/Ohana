@@ -2848,6 +2848,25 @@ struct HomeCommandExecutorTests {
         #expect(source.contains("await reminderScheduling.cancelAndReschedule"))
     }
 
+    @Test func plantCareScheduleSyncStopsPlanSyncWhenPersistenceFails() throws {
+        let rootURL = repositoryRootURL()
+        let syncSource = try source("Ohana/Domain/Services/PlantCareScheduleSyncService.swift", rootURL: rootURL)
+        let calendarCommandSource = try source("Ohana/Features/Calendar/CalendarCommands.swift", rootURL: rootURL)
+
+        #expect(syncSource.contains("case persistenceFailed"))
+        #expect(syncSource.contains("var didPersist: Bool"))
+        #expect(syncSource.contains("let persistenceErrorDescription: String?"))
+        #expect(syncSource.contains("context.safeSaveResult(publishFailureEvent: true)"))
+        #expect(syncSource.components(separatedBy: "context.safeSaveResult(publishFailureEvent: true)").count - 1 == 2)
+        #expect(syncSource.components(separatedBy: "context.rollback()").count - 1 == 2)
+        #expect(!syncSource.contains("context.safeSave()"))
+        #expect(syncSource.contains("guard saveResult.didSave else"))
+        #expect(syncSource.contains("return .persistenceFailed("))
+        #expect(syncSource.contains("PlantCarePlanScheduleService.sync("))
+        #expect(calendarCommandSource.contains("let plantCareSyncResult = PlantCareScheduleSyncService.syncCompletedEvent"))
+        #expect(calendarCommandSource.contains("guard plantCareSyncResult.didPersist else"))
+    }
+
     @MainActor
     @Test func plantCareCommandServiceWritesEveryLaunchCareType() throws {
         let container = try makeInMemoryContainer()

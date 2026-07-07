@@ -554,7 +554,7 @@ enum CalendarEventCommandService {
             }
         }
         if shouldComplete, remindersToSync.isEmpty {
-            PlantCareScheduleSyncService.syncCompletedEvent(
+            let plantCareSyncResult = PlantCareScheduleSyncService.syncCompletedEvent(
                 event,
                 occurrenceDate: occurrenceDate,
                 executorId: executorId,
@@ -563,6 +563,19 @@ enum CalendarEventCommandService {
                 now: now,
                 scheduleNotifications: schedulePlantCareNotifications
             )
+            guard plantCareSyncResult.didPersist else {
+                return CalendarEventCompletionResult(
+                    eventID: event.id,
+                    isCompleted: event.recurrenceDays <= 0 ? event.isCompleted : event.isOccurrenceMarkedComplete(on: occurrenceDate),
+                    syncedReminderCount: 0,
+                    affectedSubjectIDs: affectedSubjectIDs,
+                    didChange: false,
+                    didWriteFact: false,
+                    allowsDerivedEffects: false,
+                    factDate: nil,
+                    operationDate: now
+                )
+            }
         }
         if remindersToSync.isEmpty {
             context.safeSave()

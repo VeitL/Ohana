@@ -27,10 +27,6 @@
       "context.safeSave()",
       "context.safeSave()"
     ],
-    "Ohana/Domain/Services/PlantCareScheduleSyncService.swift": [
-      "context.safeSave()",
-      "context.safeSave()"
-    ],
     "Ohana/Domain/Services/ReminderMaintenanceService.swift": [
       "context.safeSave()"
     ],

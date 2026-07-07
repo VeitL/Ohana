@@ -17,6 +17,7 @@ struct PlantCareScheduleSyncResult: Equatable {
         case unsupportedCareType
         case notGeneratedPlantPlan
         case unauthorized
+        case persistenceFailed
     }
 
     let action: Action
@@ -24,6 +25,42 @@ struct PlantCareScheduleSyncResult: Equatable {
     let logID: UUID?
     let ledgerEventID: UUID?
     let careType: PlantCareType?
+    let persistenceErrorDescription: String?
+
+    init(
+        action: Action,
+        plantID: UUID?,
+        logID: UUID?,
+        ledgerEventID: UUID?,
+        careType: PlantCareType?,
+        persistenceErrorDescription: String? = nil
+    ) {
+        self.action = action
+        self.plantID = plantID
+        self.logID = logID
+        self.ledgerEventID = ledgerEventID
+        self.careType = careType
+        self.persistenceErrorDescription = persistenceErrorDescription
+    }
+
+    var didPersist: Bool {
+        action != .persistenceFailed
+    }
+
+    static func persistenceFailed(
+        plantID: UUID?,
+        careType: PlantCareType?,
+        errorDescription: String?
+    ) -> PlantCareScheduleSyncResult {
+        PlantCareScheduleSyncResult(
+            action: .persistenceFailed,
+            plantID: plantID,
+            logID: nil,
+            ledgerEventID: nil,
+            careType: careType,
+            persistenceErrorDescription: errorDescription
+        )
+    }
 }
 
 @MainActor
@@ -170,7 +207,16 @@ enum PlantCareScheduleSyncService {
                 context: context,
                 save: false
             )
-            context.safeSave()
+            let saveResult = context.safeSaveResult(publishFailureEvent: true)
+            guard saveResult.didSave else {
+                context.rollback()
+                result = .persistenceFailed(
+                    plantID: plant.id,
+                    careType: type,
+                    errorDescription: saveResult.errorDescription
+                )
+                return
+            }
             PlantCarePlanScheduleService.sync(
                 plant: plant,
                 context: context,
@@ -277,7 +323,15 @@ enum PlantCareScheduleSyncService {
         log.plant = plant
         context.insert(log)
         CloudSyncMutationRecorder.markModified(plant, context: context, modifiedAt: now)
-        context.safeSave()
+        let saveResult = context.safeSaveResult(publishFailureEvent: true)
+        guard saveResult.didSave else {
+            context.rollback()
+            return .persistenceFailed(
+                plantID: plant.id,
+                careType: type,
+                errorDescription: saveResult.errorDescription
+            )
+        }
 
         PlantCarePlanScheduleService.sync(
             plant: plant,
