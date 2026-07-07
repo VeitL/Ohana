@@ -124,6 +124,29 @@ extension DomainGeneralRehydrateWriter {
         return try context.fetch(descriptor).first
     }
 
+    nonisolated static func fetchGachaOwnedItem(
+        ownerHumanId: String,
+        seriesId: String,
+        itemId: String,
+        context: ModelContext
+    ) throws -> GachaOwnedItem? {
+        let ownerHumanId = ownerHumanId.trimmingCharacters(in: .whitespacesAndNewlines)
+        let seriesId = seriesId.trimmingCharacters(in: .whitespacesAndNewlines)
+        let itemId = itemId.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !ownerHumanId.isEmpty, !seriesId.isEmpty, !itemId.isEmpty else {
+            return nil
+        }
+        var descriptor = FetchDescriptor<GachaOwnedItem>(
+            predicate: #Predicate<GachaOwnedItem> {
+                $0.ownerHumanId == ownerHumanId &&
+                    $0.seriesId == seriesId &&
+                    $0.itemId == itemId
+            }
+        )
+        descriptor.fetchLimit = 1
+        return try context.fetch(descriptor).first
+    }
+
     nonisolated static func fetchGachaDrawLog(id: UUID, context: ModelContext) throws -> GachaDrawLog? {
         var descriptor = FetchDescriptor<GachaDrawLog>(predicate: #Predicate<GachaDrawLog> { $0.id == id })
         descriptor.fetchLimit = 1

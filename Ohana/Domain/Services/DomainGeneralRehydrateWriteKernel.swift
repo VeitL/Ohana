@@ -974,6 +974,14 @@ nonisolated enum DomainGeneralRehydrateWriter {
         if let existing = try fetchGachaOwnedItem(id: snapshot.id, context: context) {
             item = existing
             inserted = false
+        } else if let existing = try fetchGachaOwnedItem(
+            ownerHumanId: snapshot.ownerHumanId,
+            seriesId: snapshot.seriesId,
+            itemId: snapshot.itemId,
+            context: context
+        ) {
+            item = existing
+            inserted = false
         } else {
             item = GachaOwnedItem()
             item.id = snapshot.id
@@ -1163,5 +1171,4 @@ nonisolated enum DomainGeneralRehydrateWriter {
         log.drawDate = snapshot.drawDate
         log.createdAt = snapshot.createdAt
     }
-
 }

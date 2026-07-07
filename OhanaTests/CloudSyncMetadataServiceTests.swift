@@ -2378,6 +2378,114 @@ struct CloudSyncMetadataServiceTests {
     }
 
     @MainActor
+    @Test func recordApplierDoesNotResurrectLocallyDeletedRecord() throws {
+        let container = try makeContainer()
+        let context = ModelContext(container)
+        let householdId = uuid("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")
+        let petId = uuid("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb")
+        let deletedAt = Date(timeIntervalSinceReferenceDate: 1000)
+        let remoteModifiedAt = Date(timeIntervalSinceReferenceDate: 2000)
+        let pet = Pet(name: "Momo")
+        pet.id = petId
+        context.insert(pet)
+        try CloudSyncMetadataService.markDeleted(
+            entityName: String(describing: Pet.self),
+            localRecordId: petId,
+            householdId: householdId,
+            deletedAt: deletedAt,
+            context: context
+        )
+        context.delete(pet)
+        try context.save()
+        let record = try makeRecordPayload(
+            entityName: String(describing: Pet.self),
+            recordType: String(describing: Pet.self),
+            localRecordId: petId,
+            householdId: householdId,
+            lastModifiedAt: remoteModifiedAt,
+            fields: [
+                "name": .string("Remote Momo"),
+                "species": .string("dog")
+            ]
+        ).makeCKRecord()
+
+        let result = try CloudSyncRecordApplier.apply(record, context: context)
+
+        #expect(result == .skippedStale(entityName: "Pet", localRecordId: normalized(petId)))
+        #expect(try fetchPet(id: petId, context: context) == nil)
+        let tombstone = try #require(try CloudSyncMetadataService.state(
+            entityName: String(describing: Pet.self),
+            localRecordId: petId,
+            context: context
+        ))
+        #expect(tombstone.isDeletionTombstone)
+        #expect(tombstone.deletedAt == deletedAt)
+        #expect(tombstone.hasPendingLocalChanges)
+    }
+
+    @MainActor
+    @Test func recordApplierMergesRemoteGachaOwnedItemByNaturalIdentity() throws {
+        let container = try makeContainer()
+        let context = ModelContext(container)
+        let householdId = uuid("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")
+        let ownerId = uuid("77777777-7777-4777-8777-777777777777")
+        let localOwnedId = uuid("88888888-8888-4888-8888-888888888888")
+        let remoteOwnedId = uuid("99999999-9999-4999-8999-999999999999")
+        let owner = Human(name: "Guan")
+        owner.id = ownerId
+        context.insert(owner)
+        context.insert(GachaOwnedItem(
+            ownerHumanId: ownerId.uuidString,
+            seriesId: GachaSeriesCatalog.defaultSeriesId,
+            itemId: "plush_coconut_sleepy",
+            rarity: .common,
+            ownedCount: 2,
+            firstObtainedAt: Date(timeIntervalSinceReferenceDate: 10),
+            latestObtainedAt: Date(timeIntervalSinceReferenceDate: 20)
+        ))
+        let existing = try #require(try context.fetch(FetchDescriptor<GachaOwnedItem>()).first)
+        existing.id = localOwnedId
+        let record = try makeRecordPayload(
+            entityName: String(describing: GachaOwnedItem.self),
+            recordType: String(describing: GachaOwnedItem.self),
+            localRecordId: remoteOwnedId,
+            householdId: householdId,
+            lastModifiedAt: Date(timeIntervalSinceReferenceDate: 3000),
+            fields: [
+                "ownerHumanId": .string(ownerId.uuidString),
+                "seriesId": .string(GachaSeriesCatalog.defaultSeriesId),
+                "itemId": .string("plush_coconut_sleepy"),
+                "rarityRaw": .string(GachaRarity.common.rawValue),
+                "isHidden": .bool(false),
+                "ownedCount": .int(5),
+                "firstObtainedAt": .date(Date(timeIntervalSinceReferenceDate: 10)),
+                "latestObtainedAt": .date(Date(timeIntervalSinceReferenceDate: 40)),
+                "createdAt": .date(Date(timeIntervalSinceReferenceDate: 10))
+            ]
+        ).makeCKRecord()
+
+        let result = try CloudSyncRecordApplier.apply(record, context: context)
+
+        #expect(result == .updated(entityName: "GachaOwnedItem", localRecordId: normalized(localOwnedId)))
+        let items = try context.fetch(FetchDescriptor<GachaOwnedItem>())
+        #expect(items.count == 1)
+        #expect(items.first?.id == localOwnedId)
+        #expect(items.first?.ownedCount == 5)
+        #expect(items.first?.latestObtainedAt == Date(timeIntervalSinceReferenceDate: 40))
+        let state = try #require(try CloudSyncMetadataService.state(
+            entityName: String(describing: GachaOwnedItem.self),
+            ckRecordName: record.recordID.recordName,
+            ckZoneName: record.recordID.zoneID.zoneName,
+            context: context
+        ))
+        #expect(state.localRecordId == normalized(localOwnedId))
+        #expect(state.recordKey == CloudSyncRecordState.recordKey(
+            entityName: String(describing: GachaOwnedItem.self),
+            localRecordId: localOwnedId
+        ))
+    }
+
+    @MainActor
     @Test func recordApplierSkipsMemberScopedFactsWithoutResolvedOwner() throws {
         let container = try makeContainer()
         let context = ModelContext(container)

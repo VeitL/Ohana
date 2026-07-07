@@ -36,7 +36,7 @@
 | --- | --- | --- | --- |
 | First-release-reachable repository code | None | No current repository-code P1 blocks the first release bar. | Keep this bucket empty unless a reachable launch blocker is found by current-code evidence. |
 | Review-gate / likely implemented locally | None | No current Domain review-gate P1 remains open after the 2026-06-25 local closure pass. | Keep this bucket empty unless a fresh pure review finds current-code P1 evidence. |
-| Deferred 1.x / first-release-unreachable | TFU-20260614-014 | CloudSync live-apply delete-wins, parent lifecycle, and natural identity are real work, but unreachable while `cloudKitDatabase: .none`. | Keep in CloudKit 1.x planning; do not mix into first-release burn-down unless CloudKit is enabled. |
+| Deferred 1.x / first-release-unreachable | TFU-20260614-014 | CloudSync live-apply delete-wins and Gacha natural identity are implemented locally, but true CloudKit validation is unreachable while `cloudKitDatabase: .none`. | Keep in CloudKit 1.x planning for enablement validation; do not mix into first-release burn-down unless CloudKit is enabled. |
 | External/manual validation | TFU-20260612-017, TFU-20260612-016, TFU-20260706-001 | Real iOS notification/UI/HealthKit behavior must be checked on device. Repo tests cannot close these alone. | Run GAP-9, GAP-6, and Human Workout HealthKit manual checks on a physical device. |
 
 ## Open Items
@@ -44,10 +44,10 @@
 ### TFU-20260614-014 - Enforce CloudSync Live-Apply Deletion Wins, Parent Lifecycle, And Natural Identity
 
 - Priority / bucket: P1, deferred CloudKit 1.x / first-release-unreachable.
-- Status: Open while CloudKit is disabled.
-- Why still open: live remote apply can resurrect newer remote `Pet`/`Human` rows over local tombstones, accept child records after parent deletion, and duplicate `GachaOwnedItem` ownership by random id instead of natural key.
-- Next action: add red tests for delete-wins, parent active/existence gating, and Gacha owned-item natural-key merge; then implement one CloudSync apply disposition layer.
-- Close when: those tests fail before and pass after the policy layer, CloudSync/physical-deletion/home/economy/derived audits pass, and a fresh Domain review reports P0/P1 = 0 for the reachable surface.
+- Status: Implemented locally on 2026-07-08; open only for CloudKit 1.x enablement validation while CloudKit remains disabled.
+- Why still open: repository tests now prove local tombstones block remote live-record resurrection and duplicate `GachaOwnedItem` records merge by owner + series + item natural identity. Live CloudKit sharing is still unreachable under the current `cloudKitDatabase: .none` configuration.
+- Next action: when CloudKit is enabled, run a true shared-zone merge/deletion pass plus a fresh Domain review over the enabled CloudSync surface.
+- Close when: CloudKit-enabled validation confirms delete-wins, parent lifecycle gating, natural identity, and downstream derived-state sync with no P0/P1 current-code findings.
 
 ### TFU-20260612-017 - Validate GAP-9 Memorial Mode On Real UI And Device Notifications
 

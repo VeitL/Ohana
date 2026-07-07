@@ -49,13 +49,16 @@ nonisolated struct CloudSyncRecordApplySummary: Equatable, Sendable {
 
 private nonisolated struct CloudSyncRecordApplyOutcome {
     let result: CloudSyncRecordApplyResult
+    let stateLocalRecordUUID: UUID?
     let notificationIdsToCancel: [String]
 
     init(
         result: CloudSyncRecordApplyResult,
+        stateLocalRecordUUID: UUID? = nil,
         notificationIdsToCancel: [String] = []
     ) {
         self.result = result
+        self.stateLocalRecordUUID = stateLocalRecordUUID
         self.notificationIdsToCancel = notificationIdsToCancel
     }
 }
@@ -85,14 +88,28 @@ nonisolated enum CloudSyncRecordApplier {
         guard supportsApply(for: descriptor.entityName) else {
             return .skippedUnsupported(entityName: descriptor.entityName)
         }
-        if let existingState = try CloudSyncMetadataService.state(recordKey: metadata.recordKey, context: context),
+        let existingState = try existingAppliedState(metadata: metadata, record: record, context: context)
+        let existingStateRecordUUID = localRecordUUID(from: existingState)
+        if let existingState,
            existingState.lastModifiedAt > metadata.lastModifiedAt {
             return .skippedStale(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
         }
 
         if metadata.isDeleted {
-            try deleteLocalModel(metadata: metadata, context: context)
-            let state = try upsertState(metadata: metadata, record: record, context: context)
+            let deletedRecordUUID = existingStateRecordUUID ?? metadata.localRecordUUID
+            try deleteLocalModel(
+                entityName: metadata.entityName,
+                localRecordUUID: deletedRecordUUID,
+                deletedAt: metadata.deletedAt ?? metadata.lastModifiedAt,
+                deletedByHumanId: normalizedDeletionActorId(metadata.deletedByHumanId),
+                context: context
+            )
+            let state = try upsertState(
+                metadata: metadata,
+                record: record,
+                context: context,
+                localRecordUUID: deletedRecordUUID
+            )
             state.isDeleted = true
             state.isDeletionTombstone = true
             state.deletedAt = metadata.deletedAt ?? metadata.lastModifiedAt
@@ -104,7 +121,15 @@ nonisolated enum CloudSyncRecordApplier {
                 ckZoneName: record.recordID.zoneID.zoneName,
                 syncedAt: Date()
             )
-            return .deleted(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
+            return .deleted(
+                entityName: metadata.entityName,
+                localRecordId: CloudSyncRecordState.normalizedRecordId(deletedRecordUUID)
+            )
+        }
+
+        if let existingState,
+           existingState.isDeletionTombstone || existingState.isDeleted {
+            return .skippedStale(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
         }
 
         let outcome = try applyLiveRecord(record, metadata: metadata, descriptor: descriptor, context: context)
@@ -112,7 +137,12 @@ nonisolated enum CloudSyncRecordApplier {
         if case .skippedUnsupported = result {
             return result
         }
-        let state = try upsertState(metadata: metadata, record: record, context: context)
+        let state = try upsertState(
+            metadata: metadata,
+            record: record,
+            context: context,
+            localRecordUUID: outcome.stateLocalRecordUUID ?? existingStateRecordUUID ?? metadata.localRecordUUID
+        )
         state.isDeleted = false
         state.isDeletionTombstone = false
         state.deletedAt = nil
@@ -217,14 +247,16 @@ nonisolated enum CloudSyncRecordApplier {
     private static func rehydrateApplyResult(
         inserted: Bool,
         didPersist: Bool,
+        localRecordUUID: UUID? = nil,
         metadata: RemoteMetadata
     ) -> CloudSyncRecordApplyResult {
         guard didPersist else {
             return .skippedUnsupported(entityName: metadata.entityName)
         }
+        let localRecordId = CloudSyncRecordState.normalizedRecordId(localRecordUUID ?? metadata.localRecordUUID)
         return inserted
-            ? .inserted(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
-            : .updated(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
+            ? .inserted(entityName: metadata.entityName, localRecordId: localRecordId)
+            : .updated(entityName: metadata.entityName, localRecordId: localRecordId)
     }
 
     private static func applyLiveRecord(
@@ -265,7 +297,7 @@ nonisolated enum CloudSyncRecordApplier {
         case String(describing: CoconutLedgerEntry.self):
             CloudSyncRecordApplyOutcome(result: try applyCoconutLedgerEntry(record, metadata: metadata, context: context))
         case String(describing: GachaOwnedItem.self):
-            CloudSyncRecordApplyOutcome(result: try applyGachaOwnedItem(record, metadata: metadata, context: context))
+            try applyGachaOwnedItem(record, metadata: metadata, context: context)
         case String(describing: GachaDrawLog.self):
             CloudSyncRecordApplyOutcome(result: try applyGachaDrawLog(record, metadata: metadata, context: context))
         case String(describing: ShopPurchaseRecord.self):
@@ -741,7 +773,7 @@ nonisolated enum CloudSyncRecordApplier {
         _ record: CKRecord,
         metadata: RemoteMetadata,
         context: ModelContext
-    ) throws -> CloudSyncRecordApplyResult {
+    ) throws -> CloudSyncRecordApplyOutcome {
         let existing = try fetchGachaOwnedItem(id: metadata.localRecordUUID, context: context)
         let result = try DomainGeneralRehydrateWriter.upsertGachaOwnedItem(
             snapshot: DomainGachaOwnedItemRehydrateSnapshot(
@@ -759,7 +791,16 @@ nonisolated enum CloudSyncRecordApplier {
             source: .cloudApply,
             context: context
         )
-        return rehydrateApplyResult(inserted: result.inserted, didPersist: result.didPersist, metadata: metadata)
+        let appliedLocalRecordUUID = result.model?.id
+        return CloudSyncRecordApplyOutcome(
+            result: rehydrateApplyResult(
+                inserted: result.inserted,
+                didPersist: result.didPersist,
+                localRecordUUID: appliedLocalRecordUUID,
+                metadata: metadata
+            ),
+            stateLocalRecordUUID: result.didPersist ? appliedLocalRecordUUID : nil
+        )
     }
 
     private static func applyGachaDrawLog(
@@ -830,13 +871,21 @@ nonisolated enum CloudSyncRecordApplier {
     private static func upsertState(
         metadata: RemoteMetadata,
         record: CKRecord,
-        context: ModelContext
+        context: ModelContext,
+        localRecordUUID: UUID? = nil
     ) throws -> CloudSyncRecordState {
-        try CloudSyncMetadataService.upsertAppliedRemoteState(
-            snapshot: CloudSyncAppliedRecordStateSnapshot(
-                recordKey: metadata.recordKey,
+        let stateLocalRecordUUID = localRecordUUID ?? metadata.localRecordUUID
+        let stateRecordKey = stateLocalRecordUUID == metadata.localRecordUUID
+            ? metadata.recordKey
+            : CloudSyncRecordState.recordKey(
                 entityName: metadata.entityName,
-                localRecordId: metadata.localRecordUUID,
+                localRecordId: stateLocalRecordUUID
+            )
+        return try CloudSyncMetadataService.upsertAppliedRemoteState(
+            snapshot: CloudSyncAppliedRecordStateSnapshot(
+                recordKey: stateRecordKey,
+                entityName: metadata.entityName,
+                localRecordId: stateLocalRecordUUID,
                 householdId: metadata.householdUUID,
                 ckZoneName: record.recordID.zoneID.zoneName,
                 ckRecordName: record.recordID.recordName,
@@ -853,6 +902,27 @@ nonisolated enum CloudSyncRecordApplier {
             ),
             context: context
         )
+    }
+
+    private static func existingAppliedState(
+        metadata: RemoteMetadata,
+        record: CKRecord,
+        context: ModelContext
+    ) throws -> CloudSyncRecordState? {
+        if let state = try CloudSyncMetadataService.state(recordKey: metadata.recordKey, context: context) {
+            return state
+        }
+        return try CloudSyncMetadataService.state(
+            entityName: metadata.entityName,
+            ckRecordName: record.recordID.recordName,
+            ckZoneName: record.recordID.zoneID.zoneName,
+            context: context
+        )
+    }
+
+    private static func localRecordUUID(from state: CloudSyncRecordState?) -> UUID? {
+        guard let state else { return nil }
+        return UUID(uuidString: state.localRecordId)
     }
 
     private static func deleteLocalModel(metadata: RemoteMetadata, context: ModelContext) throws {
