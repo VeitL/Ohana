@@ -14,6 +14,7 @@ struct PetMilestoneListContentView: View {
     let routeMilestones: [PetMilestone]
     @Environment(\.modelContext) private var modelContext
     @Environment(AppServices.self) private var appServices
+    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
 
     @State private var showAddSheet = false
     @State private var newTitle = ""
@@ -35,6 +36,8 @@ struct PetMilestoneListContentView: View {
     private var sortedMilestones: [PetMilestone] {
         routeMilestones.sorted { $0.date > $1.date }
     }
+
+    private var l: L10n { L10n(appLanguage) }
 
     var body: some View {
         ZStack(alignment: .bottom) {
@@ -59,7 +62,7 @@ struct PetMilestoneListContentView: View {
             Button { showAddSheet = true } label: {
                 HStack(spacing: 8) {
                     Image(systemName: "plus").font(OhanaFont.adaptive(size: 14, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                    Text("记录里程碑")
+                    Text(l.tr(zh: "记录里程碑", en: "Record milestone", de: "Meilenstein erfassen"))
                         .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 }
                 .foregroundStyle(Color.arkInk)
@@ -68,7 +71,7 @@ struct PetMilestoneListContentView: View {
             }
             .padding(.bottom, 28)
         }
-        .navigationTitle("里程碑")
+        .navigationTitle(l.tr(zh: "里程碑", en: "Milestones", de: "Meilensteine"))
         .navigationBarTitleDisplayMode(.inline)
         .sheet(isPresented: $showAddSheet) { addMilestoneSheet }
         .sheet(item: $selectedMilestone) { m in MilestoneDetailSheet(milestone: m, pet: pet) }
@@ -100,7 +103,7 @@ struct PetMilestoneListContentView: View {
                 Text(pet.name)
                     .font(OhanaFont.adaptive(size: 20, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaPrimaryText)
-                Text("\(sortedMilestones.count) 个重要时刻")
+                Text(l.tr(zh: "\(sortedMilestones.count) 个重要时刻", en: "\(sortedMilestones.count) important moments", de: "\(sortedMilestones.count) wichtige Momente"))
                     .font(OhanaFont.adaptive(size: 12, weight: .medium, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaPrimaryText.opacity(0.5))
             }
@@ -207,10 +210,10 @@ struct PetMilestoneListContentView: View {
     private var emptyState: some View {
         VStack(spacing: 16) {
             Text("🌱").font(OhanaFont.adaptive(size: 56)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-            Text("还没有里程碑记录")
+            Text(l.tr(zh: "还没有里程碑记录", en: "No milestones yet", de: "Noch keine Meilensteine"))
                 .font(OhanaFont.adaptive(size: 16, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(Color.ohanaPrimaryText)
-            Text("记录 \(pet.name) 的每一个重要时刻")
+            Text(l.tr(zh: "记录 \(pet.name) 的每一个重要时刻", en: "Capture every important moment with \(pet.name)", de: "Halte jeden wichtigen Moment mit \(pet.name) fest"))
                 .font(OhanaFont.adaptive(size: 13, weight: .medium)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                 .multilineTextAlignment(.center)
@@ -235,7 +238,7 @@ struct PetMilestoneListContentView: View {
                     Text("🎉").font(OhanaFont.adaptive(size: 26)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 }
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("记录里程碑")
+                    Text(l.tr(zh: "记录里程碑", en: "Record milestone", de: "Meilenstein erfassen"))
                         .font(OhanaFont.adaptive(size: 20, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.ohanaPrimaryText)
                     Text(pet.name)
@@ -250,7 +253,7 @@ struct PetMilestoneListContentView: View {
                 VStack(spacing: 12) {
                     // Emoji 快捷选
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("快捷 Emoji")
+                        Text(l.tr(zh: "快捷 Emoji", en: "Quick emoji", de: "Schnelles Emoji"))
                             .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                             .padding(.horizontal, 4)
@@ -276,7 +279,7 @@ struct PetMilestoneListContentView: View {
                             .goGlassBackground(RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
                             .foregroundStyle(Color.ohanaPrimaryText)
                         GoDraftTextField( // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
-                            "里程碑标题",
+                            l.tr(zh: "里程碑标题", en: "Milestone title", de: "Meilenstein-Titel"),
                             text: $newTitle,
                             capitalization: .sentences
                         )
@@ -293,7 +296,7 @@ struct PetMilestoneListContentView: View {
                         Image(systemName: "calendar") // a11y: allow decorative icon covered by surrounding text or control
                             .font(OhanaFont.adaptive(size: 13, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(Color.goPrimary)
-                        Text("日期")
+                        Text(l.tr(zh: "日期", en: "Date", de: "Datum"))
                             .font(OhanaFont.adaptive(size: 14, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(Color.ohanaPrimaryText)
                         Spacer()
@@ -312,7 +315,7 @@ struct PetMilestoneListContentView: View {
                                 .font(OhanaFont.adaptive(size: 14, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                 .foregroundStyle(Color.goYellow)
                             if newLocation.isEmpty {
-                                Text("地点（点此从地图选择）")
+                                Text(l.tr(zh: "地点（点此从地图选择）", en: "Location (choose from map)", de: "Ort (auf Karte auswählen)"))
                                     .font(OhanaFont.adaptive(size: 14)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                     .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                             } else {
@@ -333,7 +336,7 @@ struct PetMilestoneListContentView: View {
 
                     // 备注
                     GoDraftTextField( // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
-                        "备注（可选）",
+                        l.tr(zh: "备注（可选）", en: "Notes (optional)", de: "Notizen (optional)"),
                         text: $newNotes,
                         axis: .vertical
                     )
@@ -375,7 +378,7 @@ struct PetMilestoneListContentView: View {
                                 Image(systemName: "photo.badge.plus") // a11y: allow decorative icon covered by surrounding text or control
                                     .font(OhanaFont.adaptive(size: 16, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                     .foregroundStyle(Color.goPrimary)
-                                Text("添加照片（可选）")
+                                Text(l.tr(zh: "添加照片（可选）", en: "Add photo (optional)", de: "Foto hinzufügen (optional)"))
                                     .font(OhanaFont.adaptive(size: 14, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                     .foregroundStyle(Color.goPrimary)
                             }
@@ -427,7 +430,7 @@ struct PetMilestoneListContentView: View {
             } label: {
                 HStack(spacing: 8) {
                     Image(systemName: "checkmark").font(OhanaFont.adaptive(size: 14, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                    Text("保存里程碑").font(OhanaFont.adaptive(size: 16, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                    Text(l.tr(zh: "保存里程碑", en: "Save milestone", de: "Meilenstein speichern")).font(OhanaFont.adaptive(size: 16, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 }
                 .foregroundStyle(newTitle.isEmpty ? .primary.opacity(0.4) : Color.arkInk)
                 .frame(maxWidth: .infinity).padding(.vertical, 16)
@@ -456,11 +459,14 @@ struct PetMilestoneListContentView: View {
 struct MapLocationPickerSheet: View {
     @Binding var selectedLocation: String
     @Environment(\.dismiss) private var dismiss
+    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
 
     @State private var searchText = ""
     @State private var results: [MKMapItem] = []
     @State private var isSearching = false
     @State private var searchTask: Task<Void, Never>? = nil
+
+    private var l: L10n { L10n(appLanguage) }
 
     var body: some View {
         NavigationStack {
@@ -474,7 +480,7 @@ struct MapLocationPickerSheet: View {
                             .font(OhanaFont.adaptive(size: 14, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(Color.ohanaSecondaryText)
                         GoDraftTextField( // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
-                            "搜索地点、医院、公园…",
+                            l.tr(zh: "搜索地点、医院、公园…", en: "Search places, clinics, parks...", de: "Orte, Kliniken, Parks suchen..."),
                             text: $searchText,
                             commitDelayNanoseconds: 220_000_000,
                             submitLabel: .search,
@@ -507,7 +513,7 @@ struct MapLocationPickerSheet: View {
                     } else if results.isEmpty, !searchText.isEmpty {
                         VStack(spacing: 10) {
                             Image(systemName: "mappin.slash").font(OhanaFont.adaptive(size: 36)).foregroundStyle(Color.ohanaPrimaryText.opacity(0.3)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                            Text("没有找到匹配地点")
+                            Text(l.tr(zh: "没有找到匹配地点", en: "No matching places found", de: "Keine passenden Orte gefunden"))
                                 .font(OhanaFont.adaptive(size: 14, weight: .medium)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                 .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                         }.padding(.top, 60)
@@ -515,7 +521,7 @@ struct MapLocationPickerSheet: View {
                     } else if results.isEmpty {
                         VStack(spacing: 10) {
                             Image(systemName: "mappin.and.ellipse").font(OhanaFont.adaptive(size: 36)).foregroundStyle(Color.goYellow.opacity(0.4)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                            Text("输入地名开始搜索")
+                            Text(l.tr(zh: "输入地名开始搜索", en: "Enter a place name to search", de: "Ortsnamen eingeben, um zu suchen"))
                                 .font(OhanaFont.adaptive(size: 14, weight: .medium)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                 .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                         }.padding(.top, 60)
@@ -527,7 +533,7 @@ struct MapLocationPickerSheet: View {
                                 dismiss()
                             } label: {
                                 VStack(alignment: .leading, spacing: 4) {
-                                    Text(item.name ?? "未知地点")
+                                    Text(item.name ?? l.tr(zh: "未知地点", en: "Unknown place", de: "Unbekannter Ort"))
                                         .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                         .foregroundStyle(Color.ohanaPrimaryText)
                                     if let addr = mapItemAddress(item), addr != item.name {
@@ -548,15 +554,15 @@ struct MapLocationPickerSheet: View {
                     }
                 }
             }
-            .navigationTitle("选择地点")
+            .navigationTitle(l.tr(zh: "选择地点", en: "Choose location", de: "Ort auswählen"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    Button("取消") { dismiss() }
+                    Button(l.tr(zh: "取消", en: "Cancel", de: "Abbrechen")) { dismiss() }
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     if !searchText.isEmpty {
-                        Button("搜索") {
+                        Button(l.tr(zh: "搜索", en: "Search", de: "Suchen")) {
                             GoKeyboard.dismiss()
                             performSearch()
                         }
@@ -566,7 +572,7 @@ struct MapLocationPickerSheet: View {
                 }
                 ToolbarItemGroup(placement: .keyboard) {
                     Spacer()
-                    Button("完成") {
+                    Button(l.tr(zh: "完成", en: "Done", de: "Fertig")) {
                         GoKeyboard.dismiss()
                     }
                     .font(OhanaFont.adaptive(size: 15, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
@@ -633,9 +639,12 @@ private struct MilestoneDetailSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
     @Environment(AppServices.self) private var appServices
+    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
     @State private var showingPhoto = false
     @State private var showingDeleteAlert = false
     @StateObject private var commandQueue = DeferredDomainCommandQueue()
+
+    private var l: L10n { L10n(appLanguage) }
 
     var body: some View {
         NavigationStack {
@@ -730,7 +739,7 @@ private struct MilestoneDetailSheet: View {
                                         Image(systemName: "mappin.circle.fill").font(OhanaFont.adaptive(size: 18)).foregroundStyle(Color.goYellow) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                     }
                                     VStack(alignment: .leading, spacing: 2) {
-                                        Text("地址").font(OhanaFont.adaptive(size: 11, weight: .medium)).foregroundStyle(Color.ohanaPrimaryText.opacity(0.4)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                                        Text(l.tr(zh: "地址", en: "Address", de: "Adresse")).font(OhanaFont.adaptive(size: 11, weight: .medium)).foregroundStyle(Color.ohanaPrimaryText.opacity(0.4)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                         Text(milestone.location).font(OhanaFont.adaptive(size: 14, weight: .semibold, design: .rounded)).foregroundStyle(Color.ohanaPrimaryText).lineLimit(2) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                     }
                                     Spacer()
@@ -745,7 +754,7 @@ private struct MilestoneDetailSheet: View {
                         // 备注
                         if !milestone.notes.isEmpty {
                             VStack(alignment: .leading, spacing: 8) {
-                                Label("备注", systemImage: "note.text")
+                                Label(l.tr(zh: "备注", en: "Notes", de: "Notizen"), systemImage: "note.text")
                                     .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                     .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                                 Text(milestone.notes)
@@ -762,7 +771,7 @@ private struct MilestoneDetailSheet: View {
                     .padding(.horizontal, 16)
                 }
             }
-            .navigationTitle("里程碑详情")
+            .navigationTitle(l.tr(zh: "里程碑详情", en: "Milestone details", de: "Meilenstein-Details"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
@@ -776,9 +785,9 @@ private struct MilestoneDetailSheet: View {
                     }
                 }
             }
-            .alert("删除里程碑？", isPresented: $showingDeleteAlert) {
-                Button("取消", role: .cancel) {}
-                Button("删除", role: .destructive) {
+            .alert(l.tr(zh: "删除里程碑？", en: "Delete milestone?", de: "Meilenstein löschen?"), isPresented: $showingDeleteAlert) {
+                Button(l.tr(zh: "取消", en: "Cancel", de: "Abbrechen"), role: .cancel) {}
+                Button(l.tr(zh: "删除", en: "Delete", de: "Löschen"), role: .destructive) {
                     commandQueue.enqueue(.petMilestoneDelete(petID: pet.id, milestoneID: milestone.id)) {
                         PetMilestoneCommandExecutor(context: modelContext, services: appServices).deleteMilestone(
                             milestone,
@@ -788,7 +797,9 @@ private struct MilestoneDetailSheet: View {
                     }
                     dismiss()
                 }
-            } message: { Text("「\(milestone.title)」将被永久删除。") }
+            } message: {
+                Text(l.tr(zh: "「\(milestone.title)」将被永久删除。", en: "\"\(milestone.title)\" will be permanently deleted.", de: "\"\(milestone.title)\" wird dauerhaft gelöscht."))
+            }
         }
     }
 

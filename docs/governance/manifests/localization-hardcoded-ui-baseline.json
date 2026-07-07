@@ -347,32 +347,6 @@
       "Text(\"天\")",
       "Text(\"太棒了！\")"
     ],
-    "Ohana/Features/Milestones/Views/PetMilestoneListView.swift": [
-      ".alert(\"删除里程碑？\", isPresented: $showingDeleteAlert) {",
-      ".navigationTitle(\"选择地点\")",
-      ".navigationTitle(\"里程碑\")",
-      ".navigationTitle(\"里程碑详情\")",
-      "Button(\"删除\", role: .destructive) {",
-      "Button(\"取消\") { dismiss() }",
-      "Button(\"取消\", role: .cancel) {}",
-      "Button(\"完成\") {",
-      "Button(\"搜索\") {",
-      "Label(\"备注\", systemImage: \"note.text\")",
-      "Text(\"\\(sortedMilestones.count) 个重要时刻\")",
-      "Text(\"保存里程碑\").font(OhanaFont.adaptive(size: 16, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup",
-      "Text(\"地址\").font(OhanaFont.adaptive(size: 11, weight: .medium)).foregroundStyle(Color.ohanaPrimaryText.opacity(0.4)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup",
-      "Text(\"地点（点此从地图选择）\")",
-      "Text(\"快捷 Emoji\")",
-      "Text(\"日期\")",
-      "Text(\"没有找到匹配地点\")",
-      "Text(\"添加照片（可选）\")",
-      "Text(\"记录 \\(pet.name) 的每一个重要时刻\")",
-      "Text(\"记录里程碑\")",
-      "Text(\"记录里程碑\")",
-      "Text(\"输入地名开始搜索\")",
-      "Text(\"还没有里程碑记录\")",
-      "} message: { Text(\"「\\(milestone.title)」将被永久删除。\") }"
-    ],
     "Ohana/Features/Moments/QuickMomentOverlayRouteContainer.swift": [
       "Text(\"内容已不可用\")"
     ],
