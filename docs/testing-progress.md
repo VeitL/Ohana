@@ -254,6 +254,10 @@ economy, edit/cancel, memorial/delete, relaunch, and stale-route checks so a
 single run covers more realistic user behavior. Do not rebuild Human/Pet/Plant
 from zero unless the path being validated is first-run, empty-state, destructive
 cleanup, or a deliberately isolated regression.
+Use `scripts/run-dogfood-simulator.sh --status` before and after manual dogfood
+passes to verify the same pinned simulator, installed app, and data container
+are still present. Use `--require-data` when the pass depends on existing-user
+state; it fails fast instead of silently validating a fresh install.
 
 ## Phase Overview
 

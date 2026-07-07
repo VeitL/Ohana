@@ -12,14 +12,23 @@ BUNDLE_ID="${OHANA_BUNDLE_ID:-com.guanchen.li.Ohana}"
 CONFIGURATION="${CONFIGURATION:-Debug}"
 DERIVED_DATA_PATH="${OHANA_DOGFOOD_DERIVED_DATA_PATH:-${REPO_ROOT}/.build/DerivedData/dogfood}"
 BUILD_BEFORE_LAUNCH=1
+MODE="launch"
+REQUIRE_EXISTING_DATA=0
 
 usage() {
   cat <<'USAGE'
-Usage: scripts/run-dogfood-simulator.sh [--no-build] [--] [app launch args...]
+Usage: scripts/run-dogfood-simulator.sh [--no-build] [--status] [--require-data] [--] [app launch args...]
 
 Builds, installs, and launches Ohana on one pinned iOS Simulator without erasing
 or uninstalling the app. The first resolved simulator UDID is saved under
 .build/dogfood-simulator.udid so later runs keep using the same virtual phone.
+
+Options:
+  --no-build       Reuse an existing dogfood build before install/launch
+  --status         Print pinned simulator, install, and data-container status
+                   without booting, building, installing, launching, or erasing
+  --require-data   Status mode plus non-zero exit if the installed app data
+                   container or a persistence-store file is missing
 
 Environment:
   OHANA_DOGFOOD_SIMULATOR_UDID       Explicit simulator UDID to pin
@@ -38,6 +47,15 @@ while [[ $# -gt 0 ]]; do
       ;;
     --no-build)
       BUILD_BEFORE_LAUNCH=0
+      shift
+      ;;
+    --status)
+      MODE="status"
+      shift
+      ;;
+    --require-data)
+      MODE="status"
+      REQUIRE_EXISTING_DATA=1
       shift
       ;;
     --)
@@ -87,6 +105,26 @@ print(candidates[-1][1])
 ' "${SIMULATOR_NAME}"
 }
 
+simulator_metadata() {
+  local udid="$1"
+  xcrun simctl list devices available -j | python3 -c '
+import json, sys
+
+udid = sys.argv[1]
+data = json.load(sys.stdin)
+for runtime, devices in data.get("devices", {}).items():
+    for device in devices:
+        if device.get("udid") == udid and device.get("isAvailable"):
+            print("\t".join([
+                device.get("name", "unknown"),
+                device.get("state", "unknown"),
+                runtime,
+            ]))
+            raise SystemExit(0)
+raise SystemExit(1)
+' "${udid}"
+}
+
 choose_simulator_udid() {
   if [[ -n "${OHANA_DOGFOOD_SIMULATOR_UDID:-}" ]]; then
     printf '%s\n' "${OHANA_DOGFOOD_SIMULATOR_UDID}"
@@ -120,6 +158,78 @@ choose_simulator_udid() {
   printf '%s\n' "${resolved}"
 }
 
+relative_persistence_files() {
+  local data_container="$1"
+  find "${data_container}" -type f \( \
+    -name '*.store' -o \
+    -name '*.store-*' -o \
+    -name '*.sqlite' -o \
+    -name '*.sqlite-*' \
+  \) -print 2>/dev/null | sort | sed "s#^${data_container}/##"
+}
+
+print_status_and_validate() {
+  local metadata
+  metadata="$(simulator_metadata "${SIMULATOR_UDID}" || true)"
+
+  local simulator_name="${SIMULATOR_DISPLAY_NAME}"
+  local simulator_state="unknown"
+  local simulator_runtime="unknown"
+  if [[ -n "${metadata}" ]]; then
+    simulator_name="$(printf '%s' "${metadata}" | awk -F '\t' '{ print $1 }')"
+    simulator_state="$(printf '%s' "${metadata}" | awk -F '\t' '{ print $2 }')"
+    simulator_runtime="$(printf '%s' "${metadata}" | awk -F '\t' '{ print $3 }')"
+  fi
+
+  local app_container=""
+  local data_container=""
+  app_container="$(xcrun simctl get_app_container "${SIMULATOR_UDID}" "${BUNDLE_ID}" app 2>/dev/null || true)"
+  data_container="$(xcrun simctl get_app_container "${SIMULATOR_UDID}" "${BUNDLE_ID}" data 2>/dev/null || true)"
+
+  local persistence_count="0"
+  if [[ -n "${data_container}" && -d "${data_container}" ]]; then
+    persistence_count="$(relative_persistence_files "${data_container}" | wc -l | tr -d '[:space:]')"
+  fi
+
+  echo "Dogfood simulator status"
+  echo "  simulator: ${simulator_name} (${SIMULATOR_UDID})"
+  echo "  runtime: ${simulator_runtime}"
+  echo "  state: ${simulator_state}"
+  echo "  pin file: ${PIN_FILE}"
+  echo "  bundle id: ${BUNDLE_ID}"
+  echo "  derived data: ${DERIVED_DATA_PATH}"
+
+  if [[ -n "${app_container}" ]]; then
+    echo "  installed app: ${app_container}"
+  else
+    echo "  installed app: missing"
+  fi
+
+  if [[ -n "${data_container}" && -d "${data_container}" ]]; then
+    echo "  data container: ${data_container}"
+    echo "  persistence files: ${persistence_count}"
+    if [[ "${persistence_count}" != "0" ]]; then
+      relative_persistence_files "${data_container}" | sed -n '1,8s/^/    - /p'
+    fi
+  else
+    echo "  data container: missing"
+    echo "  persistence files: 0"
+  fi
+
+  echo "  status mode: read-only; no boot/build/install/launch/erase was performed"
+
+  if [[ "${REQUIRE_EXISTING_DATA}" == "1" ]]; then
+    if [[ -z "${app_container}" || -z "${data_container}" || ! -d "${data_container}" ]]; then
+      echo "Dogfood existing-data check failed: app or data container is missing." >&2
+      exit 67
+    fi
+    if [[ "${persistence_count}" == "0" ]]; then
+      echo "Dogfood existing-data check failed: no persistence-store files were found." >&2
+      exit 67
+    fi
+  fi
+}
+
 SIMULATOR_UDID="$(choose_simulator_udid)"
 SIMULATOR_DISPLAY_NAME="$(simulator_exists "${SIMULATOR_UDID}" || true)"
 if [[ -z "${SIMULATOR_DISPLAY_NAME}" ]]; then
@@ -128,6 +238,11 @@ if [[ -z "${SIMULATOR_DISPLAY_NAME}" ]]; then
 fi
 
 APP_PATH="${DERIVED_DATA_PATH}/Build/Products/${CONFIGURATION}-iphonesimulator/Ohana.app"
+
+if [[ "${MODE}" == "status" ]]; then
+  print_status_and_validate
+  exit 0
+fi
 
 if [[ "${BUILD_BEFORE_LAUNCH}" == "1" ]]; then
   echo "Dogfood simulator: ${SIMULATOR_DISPLAY_NAME} (${SIMULATOR_UDID})"
