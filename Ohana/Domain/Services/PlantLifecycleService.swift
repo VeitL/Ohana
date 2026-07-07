@@ -62,6 +62,12 @@ enum PlantLifecycleService {
                 removedReminderIDs: []
             )
         }
+        PlantCarePlanScheduleService.commitSideEffects(
+            for: removed,
+            context: context,
+            notifications: notifications,
+            defaults: defaults
+        )
         return PlantLifecycleTransitionResult(
             plantID: plant.id,
             action: "archive.mark",
@@ -118,6 +124,12 @@ enum PlantLifecycleService {
                 removedReminderIDs: []
             )
         }
+        PlantCarePlanScheduleService.commitSideEffects(
+            for: synced,
+            context: context,
+            notifications: notifications,
+            defaults: defaults
+        )
         return PlantLifecycleTransitionResult(
             plantID: plant.id,
             action: "archive.restore",

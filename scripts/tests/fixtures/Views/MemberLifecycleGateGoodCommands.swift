@@ -150,6 +150,15 @@ enum MemberLifecycleGateGoodCommandService {
         DomainScheduleEffectsDispatcher.dispatch(delete: result)
     }
 
+    static func deletePetReminderWithDeferredEffects(
+        event: Event,
+        mutation: AuthorizedDomainScheduleMutation,
+        context: ModelContext
+    ) -> [String] {
+        let result = DomainScheduleWriter.deleteEvent(event, mutation: mutation, context: context)
+        return result.notificationIdsToCancel
+    }
+
     static func completeReminder(
         reminder: Reminder,
         mutation: AuthorizedDomainScheduleMutation,

@@ -9,6 +9,11 @@
 import Foundation
 import SwiftData
 
+nonisolated struct PlantCarePlanDefaultWrite: Equatable, Sendable {
+    let key: String
+    let value: String
+}
+
 struct PlantCarePlanScheduleResult: Equatable {
     let plantID: UUID
     let eventIDs: [UUID]
@@ -16,6 +21,40 @@ struct PlantCarePlanScheduleResult: Equatable {
     let removedEventIDs: [UUID]
     let removedReminderIDs: [UUID]
     let scheduledReminderSync: Bool
+    let didPersist: Bool
+    let persistenceErrorDescription: String?
+    let reminderIDsToSchedule: [UUID]
+    let notificationIDsToCancel: [String]
+    let defaultWrites: [PlantCarePlanDefaultWrite]
+    let defaultRemovals: [String]
+
+    init(
+        plantID: UUID,
+        eventIDs: [UUID],
+        reminderIDs: [UUID],
+        removedEventIDs: [UUID],
+        removedReminderIDs: [UUID],
+        scheduledReminderSync: Bool,
+        didPersist: Bool = true,
+        persistenceErrorDescription: String? = nil,
+        reminderIDsToSchedule: [UUID] = [],
+        notificationIDsToCancel: [String] = [],
+        defaultWrites: [PlantCarePlanDefaultWrite] = [],
+        defaultRemovals: [String] = []
+    ) {
+        self.plantID = plantID
+        self.eventIDs = eventIDs
+        self.reminderIDs = reminderIDs
+        self.removedEventIDs = removedEventIDs
+        self.removedReminderIDs = removedReminderIDs
+        self.scheduledReminderSync = scheduledReminderSync
+        self.didPersist = didPersist
+        self.persistenceErrorDescription = persistenceErrorDescription
+        self.reminderIDsToSchedule = reminderIDsToSchedule
+        self.notificationIDsToCancel = notificationIDsToCancel
+        self.defaultWrites = defaultWrites
+        self.defaultRemovals = defaultRemovals
+    }
 
     static func empty(plantID: UUID) -> PlantCarePlanScheduleResult {
         PlantCarePlanScheduleResult(
@@ -25,6 +64,19 @@ struct PlantCarePlanScheduleResult: Equatable {
             removedEventIDs: [],
             removedReminderIDs: [],
             scheduledReminderSync: false
+        )
+    }
+
+    static func persistenceFailed(plantID: UUID, errorDescription: String?) -> PlantCarePlanScheduleResult {
+        PlantCarePlanScheduleResult(
+            plantID: plantID,
+            eventIDs: [],
+            reminderIDs: [],
+            removedEventIDs: [],
+            removedReminderIDs: [],
+            scheduledReminderSync: false,
+            didPersist: false,
+            persistenceErrorDescription: errorDescription
         )
     }
 }
@@ -55,7 +107,12 @@ enum PlantCarePlanScheduleService {
                 defaults: defaults
             )
             if saveChanges {
-                context.safeSave()
+                let saveResult = context.safeSaveResult(publishFailureEvent: true)
+                guard saveResult.didSave else {
+                    context.rollback()
+                    return .persistenceFailed(plantID: plant.id, errorDescription: saveResult.errorDescription)
+                }
+                commitSideEffects(for: removed, context: context, notifications: notifications, defaults: defaults)
             }
             return removed
         }
@@ -81,6 +138,9 @@ enum PlantCarePlanScheduleService {
         var remindersToSchedule: [Reminder] = []
         var removedEventIDs: [UUID] = []
         var removedReminderIDs: [UUID] = []
+        var notificationIDsToCancel: [String] = []
+        var defaultWrites: [PlantCarePlanDefaultWrite] = []
+        var defaultRemovals: [String] = []
 
         for task in tasks {
             if let outcome = upsertScheduledTask(
@@ -99,6 +159,8 @@ enum PlantCarePlanScheduleService {
                 }
                 removedEventIDs.append(contentsOf: outcome.removedEventIDs)
                 removedReminderIDs.append(contentsOf: outcome.removedReminderIDs)
+                notificationIDsToCancel.append(contentsOf: outcome.notificationIDsToCancel)
+                defaultWrites.append(contentsOf: outcome.defaultWrites)
             }
         }
 
@@ -113,27 +175,41 @@ enum PlantCarePlanScheduleService {
             )
             removedEventIDs.append(contentsOf: removed.removedEventIDs)
             removedReminderIDs.append(contentsOf: removed.removedReminderIDs)
-        }
-
-        if saveChanges {
-            context.safeSave()
+            notificationIDsToCancel.append(contentsOf: removed.notificationIDsToCancel)
+            defaultWrites.append(contentsOf: removed.defaultWrites)
+            defaultRemovals.append(contentsOf: removed.defaultRemovals)
         }
 
         let shouldScheduleReminders = scheduleNotifications && !remindersToSchedule.isEmpty
-        if shouldScheduleReminders {
-            for reminder in remindersToSchedule {
-                notifications.schedule(reminder: reminder)
-            }
-        }
-
-        return PlantCarePlanScheduleResult(
+        let result = PlantCarePlanScheduleResult(
             plantID: plant.id,
             eventIDs: eventIDs,
             reminderIDs: reminderIDs,
             removedEventIDs: removedEventIDs,
             removedReminderIDs: removedReminderIDs,
-            scheduledReminderSync: shouldScheduleReminders
+            scheduledReminderSync: shouldScheduleReminders,
+            reminderIDsToSchedule: shouldScheduleReminders ? remindersToSchedule.map(\.id) : [],
+            notificationIDsToCancel: notificationIDsToCancel,
+            defaultWrites: defaultWrites,
+            defaultRemovals: defaultRemovals
         )
+        if saveChanges {
+            let saveResult = context.safeSaveResult(publishFailureEvent: true)
+            guard saveResult.didSave else {
+                context.rollback()
+                return .persistenceFailed(plantID: plant.id, errorDescription: saveResult.errorDescription)
+            }
+            commitSideEffects(
+                notificationIDsToCancel: notificationIDsToCancel,
+                remindersToSchedule: remindersToSchedule,
+                defaultWrites: defaultWrites,
+                defaultRemovals: defaultRemovals,
+                notifications: notifications,
+                defaults: defaults
+            )
+        }
+
+        return result
     }
 
     @discardableResult
@@ -146,6 +222,8 @@ enum PlantCarePlanScheduleService {
     ) -> PlantCarePlanScheduleResult {
         var removedEventIDs: [UUID] = []
         var removedReminderIDs: [UUID] = []
+        var notificationIDsToCancel: [String] = []
+        var defaultRemovals: [String] = []
         for type in scheduledCareTypes {
             let removed = removeScheduledTask(
                 plant: plant,
@@ -157,6 +235,8 @@ enum PlantCarePlanScheduleService {
             )
             removedEventIDs.append(contentsOf: removed.removedEventIDs)
             removedReminderIDs.append(contentsOf: removed.removedReminderIDs)
+            notificationIDsToCancel.append(contentsOf: removed.notificationIDsToCancel)
+            defaultRemovals.append(contentsOf: removed.defaultRemovals)
         }
         return PlantCarePlanScheduleResult(
             plantID: plant.id,
@@ -164,7 +244,26 @@ enum PlantCarePlanScheduleService {
             reminderIDs: [],
             removedEventIDs: removedEventIDs,
             removedReminderIDs: removedReminderIDs,
-            scheduledReminderSync: false
+            scheduledReminderSync: false,
+            notificationIDsToCancel: notificationIDsToCancel,
+            defaultRemovals: defaultRemovals
+        )
+    }
+
+    static func commitSideEffects(
+        for result: PlantCarePlanScheduleResult,
+        context: ModelContext,
+        notifications: ReminderNotificationScheduling = ReminderNotificationSchedulerRegistry.current,
+        defaults: UserDefaults = .standard
+    ) {
+        guard result.didPersist else { return }
+        commitSideEffects(
+            notificationIDsToCancel: result.notificationIDsToCancel,
+            remindersToSchedule: fetchReminders(ids: result.reminderIDsToSchedule, context: context),
+            defaultWrites: result.defaultWrites,
+            defaultRemovals: result.defaultRemovals,
+            notifications: notifications,
+            defaults: defaults
         )
     }
 }
@@ -175,6 +274,8 @@ private extension PlantCarePlanScheduleService {
         let pendingReminder: Reminder?
         let removedEventIDs: [UUID]
         let removedReminderIDs: [UUID]
+        let notificationIDsToCancel: [String]
+        let defaultWrites: [PlantCarePlanDefaultWrite]
     }
 
     static func upsertScheduledTask(
@@ -205,7 +306,6 @@ private extension PlantCarePlanScheduleService {
         let reminderDate = reminderDate(for: task.dueDate, now: now, calendar: calendar, defaults: defaults)
 
         if let existing {
-            defaults.set(existing.id.uuidString, forKey: key)
             guard let mutation = DomainScheduleWriteAuthorizer.authorizeExistingEventUpdate(
                 event: existing,
                 intent: intent,
@@ -239,7 +339,9 @@ private extension PlantCarePlanScheduleService {
                 event: existing,
                 pendingReminder: reminderOutcome.pendingReminder,
                 removedEventIDs: [],
-                removedReminderIDs: reminderOutcome.removedReminderIDs
+                removedReminderIDs: reminderOutcome.removedReminderIDs,
+                notificationIDsToCancel: reminderOutcome.notificationIDsToCancel,
+                defaultWrites: [PlantCarePlanDefaultWrite(key: key, value: existing.id.uuidString)]
             )
         }
 
@@ -247,7 +349,6 @@ private extension PlantCarePlanScheduleService {
             return nil
         }
         let writeResult = DomainScheduleWriter.createEvent(plan: plan, context: context, maxReminderOccurrences: 1)
-        defaults.set(writeResult.event.id.uuidString, forKey: key)
         CloudSyncMutationRecorder.markModified(writeResult.event, context: context, modifiedAt: now)
         for reminder in writeResult.reminders {
             CloudSyncMutationRecorder.markModified(reminder, context: context, modifiedAt: now)
@@ -256,7 +357,9 @@ private extension PlantCarePlanScheduleService {
             event: writeResult.event,
             pendingReminder: writeResult.reminders.first,
             removedEventIDs: [],
-            removedReminderIDs: []
+            removedReminderIDs: [],
+            notificationIDsToCancel: [],
+            defaultWrites: [PlantCarePlanDefaultWrite(key: key, value: writeResult.event.id.uuidString)]
         )
     }
 
@@ -269,11 +372,18 @@ private extension PlantCarePlanScheduleService {
         defaults: UserDefaults
     ) -> PlantCarePlanScheduleResult {
         let key = storageKey(plant: plant, type: type)
-        defer { defaults.removeObject(forKey: key) }
         guard let event = storedPlanEvent(defaults.string(forKey: key), context: context)
             ?? matchingPlanEvent(plant: plant, type: type, context: context)
         else {
-            return .empty(plantID: plant.id)
+            return PlantCarePlanScheduleResult(
+                plantID: plant.id,
+                eventIDs: [],
+                reminderIDs: [],
+                removedEventIDs: [],
+                removedReminderIDs: [],
+                scheduledReminderSync: false,
+                defaultRemovals: [key]
+            )
         }
         guard let mutation = DomainScheduleWriteAuthorizer.authorizeExistingEventMutation(
             event: event,
@@ -284,14 +394,15 @@ private extension PlantCarePlanScheduleService {
             return .empty(plantID: plant.id)
         }
         let result = DomainScheduleWriter.deleteEvent(event, mutation: mutation, context: context, deletedAt: now)
-        DomainScheduleEffectsDispatcher.dispatch(delete: result, notifications: notifications)
         return PlantCarePlanScheduleResult(
             plantID: plant.id,
             eventIDs: [],
             reminderIDs: [],
             removedEventIDs: result.eventID.map { [$0] } ?? [],
             removedReminderIDs: result.reminderIDs,
-            scheduledReminderSync: false
+            scheduledReminderSync: false,
+            notificationIDsToCancel: result.notificationIdsToCancel,
+            defaultRemovals: [key]
         )
     }
 
@@ -302,7 +413,7 @@ private extension PlantCarePlanScheduleService {
         context: ModelContext,
         now: Date,
         notifications: ReminderNotificationScheduling
-    ) -> (pendingReminder: Reminder?, removedReminderIDs: [UUID]) {
+    ) -> (pendingReminder: Reminder?, removedReminderIDs: [UUID], notificationIDsToCancel: [String]) {
         let pendingReminders = event.reminders
             .filter(\.isPending)
             .sorted { $0.scheduledAt < $1.scheduledAt }
@@ -330,12 +441,13 @@ private extension PlantCarePlanScheduleService {
         }
 
         var removedReminderIDs: [UUID] = []
+        var notificationIDsToCancel: [String] = []
         for extra in pendingReminders.dropFirst() {
             let result = DomainScheduleWriter.deleteReminder(extra, mutation: mutation, context: context, deletedAt: now)
-            DomainScheduleEffectsDispatcher.dispatch(delete: result, notifications: notifications)
             removedReminderIDs.append(contentsOf: result.reminderIDs)
+            notificationIDsToCancel.append(contentsOf: result.notificationIdsToCancel)
         }
-        return (pendingReminder, removedReminderIDs)
+        return (pendingReminder, removedReminderIDs, notificationIDsToCancel)
     }
 
     static func removeReminders(
@@ -344,14 +456,15 @@ private extension PlantCarePlanScheduleService {
         context: ModelContext,
         now: Date,
         notifications: ReminderNotificationScheduling
-    ) -> (pendingReminder: Reminder?, removedReminderIDs: [UUID]) {
+    ) -> (pendingReminder: Reminder?, removedReminderIDs: [UUID], notificationIDsToCancel: [String]) {
         var removedReminderIDs: [UUID] = []
+        var notificationIDsToCancel: [String] = []
         for reminder in Array(event.reminders) {
             let result = DomainScheduleWriter.deleteReminder(reminder, mutation: mutation, context: context, deletedAt: now)
-            DomainScheduleEffectsDispatcher.dispatch(delete: result, notifications: notifications)
             removedReminderIDs.append(contentsOf: result.reminderIDs)
+            notificationIDsToCancel.append(contentsOf: result.notificationIdsToCancel)
         }
-        return (nil, removedReminderIDs)
+        return (nil, removedReminderIDs, notificationIDsToCancel)
     }
 
     static func makeIntent(
@@ -438,6 +551,41 @@ private extension PlantCarePlanScheduleService {
         let events = (try? context.fetch(descriptor)) ?? []
         return events.first { event in
             event.isAllDay && event.title.contains(planTitleMarker)
+        }
+    }
+
+    static func fetchReminders(ids: [UUID], context: ModelContext) -> [Reminder] {
+        ids.compactMap { id in
+            var descriptor = FetchDescriptor<Reminder>(
+                predicate: #Predicate<Reminder> { reminder in
+                    reminder.id == id
+                }
+            )
+            descriptor.fetchLimit = 1
+            return (try? context.fetch(descriptor))?.first
+        }
+    }
+
+    static func commitSideEffects(
+        notificationIDsToCancel: [String],
+        remindersToSchedule: [Reminder],
+        defaultWrites: [PlantCarePlanDefaultWrite],
+        defaultRemovals: [String],
+        notifications: ReminderNotificationScheduling,
+        defaults: UserDefaults
+    ) {
+        for key in Set(defaultRemovals) {
+            defaults.removeObject(forKey: key)
+        }
+        for write in defaultWrites {
+            defaults.set(write.value, forKey: write.key)
+        }
+        DomainRehydrateEffectsDispatcher.cancelNotifications(
+            notificationIDsToCancel,
+            notifications: notifications
+        )
+        for reminder in remindersToSchedule {
+            notifications.schedule(reminder: reminder)
         }
     }
 

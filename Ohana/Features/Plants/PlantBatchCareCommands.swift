@@ -229,6 +229,7 @@ enum PlantBatchCareCommandService {
         var items: [PlantBatchCareUndoItem] = []
         var restorePointsByPlantID: [UUID: PlantBatchCareRestorePoint] = [:]
         var touchedPlants: [Plant] = []
+        var scheduleResults: [PlantCarePlanScheduleResult] = []
         var estimatedCoconutDelta = 0
         let deferredEconomy = PlantBatchCareDeferredEconomyAwarder()
 
@@ -285,7 +286,7 @@ enum PlantBatchCareCommandService {
 
         if syncCarePlan {
             for plant in touchedPlants {
-                PlantCarePlanScheduleService.sync(
+                let scheduleResult = PlantCarePlanScheduleService.sync(
                     plant: plant,
                     context: context,
                     now: now,
@@ -293,6 +294,7 @@ enum PlantBatchCareCommandService {
                     scheduleNotifications: scheduleNotifications,
                     saveChanges: false
                 )
+                scheduleResults.append(scheduleResult)
             }
         }
         if !items.isEmpty {
@@ -309,6 +311,9 @@ enum PlantBatchCareCommandService {
                     persistenceErrorDescription: saveResult.errorDescription
                 )
             }
+        }
+        for scheduleResult in scheduleResults {
+            PlantCarePlanScheduleService.commitSideEffects(for: scheduleResult, context: context)
         }
 
         let restorePoints = Array(restorePointsByPlantID.values)
@@ -358,6 +363,8 @@ enum PlantBatchCareCommandService {
         var removedEventIDs: [UUID] = []
         var removedLedgerEventIDs: [UUID] = []
         var restoredPlantIDs: [UUID] = []
+        var notificationIDsToCancel: [String] = []
+        var scheduleResults: [PlantCarePlanScheduleResult] = []
 
         for item in token.items {
             if let event = fetchEvent(id: item.eventID, context: context),
@@ -368,10 +375,10 @@ enum PlantBatchCareCommandService {
                    context: context
                ) {
                 let result = DomainScheduleWriter.deleteEvent(event, mutation: mutation, context: context, deletedAt: now, deletedByHumanId: token.executorId)
-                DomainScheduleEffectsDispatcher.dispatch(delete: result)
                 if result.didDelete {
                     removedEventIDs.append(item.eventID)
                 }
+                notificationIDsToCancel.append(contentsOf: result.notificationIdsToCancel)
             }
 
             if let ledger = fetchLedgerEvent(id: item.ledgerEventID, context: context) {
@@ -393,7 +400,7 @@ enum PlantBatchCareCommandService {
             plant.lastHealthCheckDate = point.lastHealthCheckDate
             plant.healthStatusRaw = point.healthStatusRaw
             CloudSyncMutationRecorder.markModified(plant, context: context, modifiedAt: now)
-            PlantCarePlanScheduleService.sync(
+            let scheduleResult = PlantCarePlanScheduleService.sync(
                 plant: plant,
                 context: context,
                 now: now,
@@ -401,6 +408,7 @@ enum PlantBatchCareCommandService {
                 scheduleNotifications: false,
                 saveChanges: false
             )
+            scheduleResults.append(scheduleResult)
             restoredPlantIDs.append(point.plantID)
         }
 
@@ -420,6 +428,10 @@ enum PlantBatchCareCommandService {
                     persistenceErrorDescription: saveResult.errorDescription
                 )
             }
+        }
+        DomainRehydrateEffectsDispatcher.cancelNotifications(notificationIDsToCancel)
+        for scheduleResult in scheduleResults {
+            PlantCarePlanScheduleService.commitSideEffects(for: scheduleResult, context: context)
         }
 
         return PlantBatchCareUndoResult(

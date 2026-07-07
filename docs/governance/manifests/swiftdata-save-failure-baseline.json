@@ -23,10 +23,6 @@
     "Ohana/Domain/Services/MemberThemeColorMaintenanceService.swift": [
       "context.safeSave()"
     ],
-    "Ohana/Domain/Services/PlantCarePlanScheduleService.swift": [
-      "context.safeSave()",
-      "context.safeSave()"
-    ],
     "Ohana/Domain/Services/ReminderMaintenanceService.swift": [
       "context.safeSave()"
     ],

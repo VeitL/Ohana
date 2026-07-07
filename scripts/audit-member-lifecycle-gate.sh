@@ -367,6 +367,8 @@ AUTHORIZED_SCHEDULE_DELETE_CALL_RE = re.compile(
 )
 AUTHORIZED_SCHEDULE_DELETE_EFFECTS_RE = re.compile(
     r"DomainScheduleEffectsDispatcher\.dispatch\s*\(\s*delete:"
+    r"|notificationIdsToCancel"
+    r"|notificationIDsToCancel"
 )
 REHYDRATE_ENTRY_PATHS = {
     "Ohana/Domain/Services/DataBackupManager.swift",

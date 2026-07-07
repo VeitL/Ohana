@@ -2867,6 +2867,29 @@ struct HomeCommandExecutorTests {
         #expect(calendarCommandSource.contains("guard plantCareSyncResult.didPersist else"))
     }
 
+    @Test func plantCarePlanScheduleCommitsExternalEffectsOnlyAfterPersistence() throws {
+        let rootURL = repositoryRootURL()
+        let scheduleSource = try source("Ohana/Domain/Services/PlantCarePlanScheduleService.swift", rootURL: rootURL)
+        let lifecycleSource = try source("Ohana/Domain/Services/PlantLifecycleService.swift", rootURL: rootURL)
+        let batchSource = try source("Ohana/Features/Plants/PlantBatchCareCommands.swift", rootURL: rootURL)
+
+        #expect(scheduleSource.contains("let didPersist: Bool"))
+        #expect(scheduleSource.contains("let persistenceErrorDescription: String?"))
+        #expect(scheduleSource.contains("static func commitSideEffects("))
+        #expect(scheduleSource.contains("context.safeSaveResult(publishFailureEvent: true)"))
+        #expect(scheduleSource.components(separatedBy: "context.safeSaveResult(publishFailureEvent: true)").count - 1 == 2)
+        #expect(scheduleSource.contains("context.rollback()"))
+        #expect(!scheduleSource.contains("context.safeSave()"))
+        #expect(!scheduleSource.contains("DomainScheduleEffectsDispatcher.dispatch(delete:"))
+        #expect(scheduleSource.contains("DomainRehydrateEffectsDispatcher.cancelNotifications("))
+        #expect(scheduleSource.contains("defaults.set(write.value, forKey: write.key)"))
+        #expect(scheduleSource.contains("defaults.removeObject(forKey: key)"))
+        #expect(lifecycleSource.components(separatedBy: "PlantCarePlanScheduleService.commitSideEffects(").count - 1 == 2)
+        #expect(batchSource.contains("var scheduleResults: [PlantCarePlanScheduleResult]"))
+        #expect(batchSource.components(separatedBy: "PlantCarePlanScheduleService.commitSideEffects(for: scheduleResult").count - 1 == 2)
+        #expect(batchSource.contains("DomainRehydrateEffectsDispatcher.cancelNotifications(notificationIDsToCancel)"))
+    }
+
     @MainActor
     @Test func plantCareCommandServiceWritesEveryLaunchCareType() throws {
         let container = try makeInMemoryContainer()
