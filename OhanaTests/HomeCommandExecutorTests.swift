@@ -2815,6 +2815,23 @@ struct HomeCommandExecutorTests {
         #expect(crewSource.contains("if result.didPersist"))
     }
 
+    @Test func calendarTaskCompletionStopsWhenPersistenceFails() throws {
+        let rootURL = repositoryRootURL()
+        let syncSource = try source("Ohana/Domain/Services/CalendarTaskCompletionSyncService.swift", rootURL: rootURL)
+        let calendarCommandSource = try source("Ohana/Features/Calendar/CalendarCommands.swift", rootURL: rootURL)
+
+        #expect(syncSource.contains("case persistenceFailed"))
+        #expect(syncSource.contains("var didPersist: Bool"))
+        #expect(syncSource.contains("context.safeSaveResult(publishFailureEvent: true)"))
+        #expect(syncSource.contains("context.rollback()"))
+        #expect(syncSource.contains("economy.refreshProjectionAfterRollback(context: context)"))
+        #expect(syncSource.contains("CalendarGeneratedDeletionMutation"))
+        #expect(syncSource.contains("cooldownsToClear"))
+        #expect(syncSource.contains("economy.clearCooldown(petId: cooldown.petId, type: cooldown.action)"))
+        #expect(!syncSource.contains("context.safeSave()"))
+        #expect(calendarCommandSource.contains("guard syncResult.didPersist else"))
+    }
+
     @MainActor
     @Test func plantCareCommandServiceWritesEveryLaunchCareType() throws {
         let container = try makeInMemoryContainer()

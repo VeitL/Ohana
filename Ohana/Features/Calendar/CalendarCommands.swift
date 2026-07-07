@@ -484,6 +484,19 @@ enum CalendarEventCommandService {
                 operationDate: now
             )
             petTaskSyncResult = syncResult
+            guard syncResult.didPersist else {
+                return CalendarEventCompletionResult(
+                    eventID: event.id,
+                    isCompleted: event.recurrenceDays <= 0 ? event.isCompleted : event.isOccurrenceMarkedComplete(on: occurrenceDate),
+                    syncedReminderCount: 0,
+                    affectedSubjectIDs: affectedSubjectIDs,
+                    didChange: false,
+                    didWriteFact: false,
+                    allowsDerivedEffects: false,
+                    factDate: nil,
+                    operationDate: now
+                )
+            }
             if !shouldComplete && syncResult == .noOp {
                 return CalendarEventCompletionResult(
                     eventID: event.id,

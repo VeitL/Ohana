@@ -3,13 +3,6 @@
     "Ohana/Domain/Economy/CoconutWalletService.swift": [
       "context.safeSave()"
     ],
-    "Ohana/Domain/Services/CalendarTaskCompletionSyncService.swift": [
-      "context.safeSave()",
-      "context.safeSave()",
-      "context.safeSave()",
-      "if !ledgers.isEmpty { context.safeSave() }",
-      "if !records.isEmpty { context.safeSave() }"
-    ],
     "Ohana/Domain/Services/CareLedgerBackfillService.swift": [
       "context.safeSave()"
     ],
