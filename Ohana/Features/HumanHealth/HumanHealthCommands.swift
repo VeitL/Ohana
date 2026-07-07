@@ -13,6 +13,8 @@ struct HumanHealthMetricCommandResult {
     let logID: UUID
     let subjectID: UUID
     let metricKey: String
+    let didPersist: Bool
+    let persistenceErrorDescription: String?
 }
 
 struct HumanHealthMetricDeleteCommandResult: Equatable {
@@ -20,6 +22,7 @@ struct HumanHealthMetricDeleteCommandResult: Equatable {
     let metricKey: String
     let logID: UUID
     let didChange: Bool
+    let persistenceErrorDescription: String?
 }
 
 enum HumanHealthMetricCommandService {
@@ -52,12 +55,18 @@ enum HumanHealthMetricCommandService {
             notes: cleanNotes,
             context: context
         )
-        context.safeSave()
+        let saveResult = context.safeSaveResult(publishFailureEvent: true)
+        guard saveResult.didSave else {
+            context.rollback()
+            return nil
+        }
         return HumanHealthMetricCommandResult(
             log: log,
             logID: log.id,
             subjectID: human.id,
-            metricKey: metricKey
+            metricKey: metricKey,
+            didPersist: true,
+            persistenceErrorDescription: nil
         )
     }
 
@@ -73,7 +82,8 @@ enum HumanHealthMetricCommandService {
                 humanID: human.id,
                 metricKey: log.metricKey,
                 logID: log.id,
-                didChange: false
+                didChange: false,
+                persistenceErrorDescription: nil
             )
         }
         let logID = log.id
@@ -81,12 +91,23 @@ enum HumanHealthMetricCommandService {
         human.healthMetricLogs.removeAll { $0.id == logID }
         CloudSyncMutationRecorder.markDeleted(log, context: context)
         context.delete(log)
-        context.safeSave()
+        let saveResult = context.safeSaveResult(publishFailureEvent: true)
+        guard saveResult.didSave else {
+            context.rollback()
+            return HumanHealthMetricDeleteCommandResult(
+                humanID: human.id,
+                metricKey: metricKey,
+                logID: logID,
+                didChange: false,
+                persistenceErrorDescription: saveResult.errorDescription
+            )
+        }
         return HumanHealthMetricDeleteCommandResult(
             humanID: human.id,
             metricKey: metricKey,
             logID: logID,
-            didChange: true
+            didChange: true,
+            persistenceErrorDescription: nil
         )
     }
 }
@@ -107,6 +128,7 @@ struct HumanHealthReportCommandResult: Equatable {
     let reportID: UUID
     let reportType: String
     let didChange: Bool
+    let persistenceErrorDescription: String?
 }
 
 enum HumanHealthReportCommandService {
@@ -128,7 +150,8 @@ enum HumanHealthReportCommandService {
                 humanID: human.id,
                 reportID: UUID(),
                 reportType: input.reportType.rawValue,
-                didChange: false
+                didChange: false,
+                persistenceErrorDescription: nil
             )
         }
         let report = DomainMemberFactWriter.createHumanHealthReport(
@@ -144,12 +167,25 @@ enum HumanHealthReportCommandService {
             notes: input.notes.trimmingCharacters(in: .whitespacesAndNewlines),
             context: context
         )
-        context.safeSave()
+        let saveResult = context.safeSaveResult(publishFailureEvent: true)
+        guard saveResult.didSave else {
+            let reportID = report.id
+            let reportType = report.reportTypeRaw
+            context.rollback()
+            return HumanHealthReportCommandResult(
+                humanID: human.id,
+                reportID: reportID,
+                reportType: reportType,
+                didChange: false,
+                persistenceErrorDescription: saveResult.errorDescription
+            )
+        }
         return HumanHealthReportCommandResult(
             humanID: human.id,
             reportID: report.id,
             reportType: report.reportTypeRaw,
-            didChange: true
+            didChange: true,
+            persistenceErrorDescription: nil
         )
     }
 
@@ -166,7 +202,8 @@ enum HumanHealthReportCommandService {
                 humanID: human.id,
                 reportID: report.id,
                 reportType: report.reportTypeRaw,
-                didChange: false
+                didChange: false,
+                persistenceErrorDescription: nil
             )
         }
         report.humanId = human.id.uuidString
@@ -179,12 +216,25 @@ enum HumanHealthReportCommandService {
         report.summary = input.summary.trimmingCharacters(in: .whitespacesAndNewlines)
         report.notes = input.notes.trimmingCharacters(in: .whitespacesAndNewlines)
         CloudSyncMutationRecorder.markModified(report, context: context, modifiedAt: input.reportDate)
-        context.safeSave()
+        let saveResult = context.safeSaveResult(publishFailureEvent: true)
+        guard saveResult.didSave else {
+            let reportID = report.id
+            let reportType = report.reportTypeRaw
+            context.rollback()
+            return HumanHealthReportCommandResult(
+                humanID: human.id,
+                reportID: reportID,
+                reportType: reportType,
+                didChange: false,
+                persistenceErrorDescription: saveResult.errorDescription
+            )
+        }
         return HumanHealthReportCommandResult(
             humanID: human.id,
             reportID: report.id,
             reportType: report.reportTypeRaw,
-            didChange: true
+            didChange: true,
+            persistenceErrorDescription: nil
         )
     }
 
@@ -200,19 +250,31 @@ enum HumanHealthReportCommandService {
                 humanID: human.id,
                 reportID: report.id,
                 reportType: report.reportTypeRaw,
-                didChange: false
+                didChange: false,
+                persistenceErrorDescription: nil
             )
         }
         let reportID = report.id
         let reportType = report.reportTypeRaw
         CloudSyncMutationRecorder.markDeleted(report, context: context)
         context.delete(report)
-        context.safeSave()
+        let saveResult = context.safeSaveResult(publishFailureEvent: true)
+        guard saveResult.didSave else {
+            context.rollback()
+            return HumanHealthReportCommandResult(
+                humanID: human.id,
+                reportID: reportID,
+                reportType: reportType,
+                didChange: false,
+                persistenceErrorDescription: saveResult.errorDescription
+            )
+        }
         return HumanHealthReportCommandResult(
             humanID: human.id,
             reportID: reportID,
             reportType: reportType,
-            didChange: true
+            didChange: true,
+            persistenceErrorDescription: nil
         )
     }
 }

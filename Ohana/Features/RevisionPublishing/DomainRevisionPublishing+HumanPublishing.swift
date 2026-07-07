@@ -124,7 +124,7 @@ extension DomainRevisionPublishing {
             DomainMutationResult(
                 command: .humanHealthMetric(humanID: result.subjectID, metricKey: result.metricKey),
                 affectedEntityIDs: [result.subjectID, result.logID],
-                wroteBusinessFact: true,
+                wroteBusinessFact: result.didPersist,
                 note: note
             )
         )

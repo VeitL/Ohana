@@ -3120,6 +3120,21 @@ struct HomeCommandExecutorTests {
         #expect(carePlanSource.contains("saveChanges: Bool = true"))
     }
 
+    @Test func humanHealthCommandsGateRevisionsAndDismissalOnPersistence() throws {
+        let rootURL = repositoryRootURL()
+        let commandSource = try source("Ohana/Features/HumanHealth/HumanHealthCommands.swift", rootURL: rootURL)
+        let revisionSource = try source("Ohana/Features/RevisionPublishing/DomainRevisionPublishing+HumanPublishing.swift", rootURL: rootURL)
+        let reportViewSource = try source("Ohana/Features/HumanHealth/Views/HumanHealthReportView.swift", rootURL: rootURL)
+
+        #expect(commandSource.contains("let didPersist: Bool"))
+        #expect(commandSource.contains("let persistenceErrorDescription: String?"))
+        #expect(!commandSource.contains("context.safeSave()"))
+        #expect(commandSource.contains("context.safeSaveResult(publishFailureEvent: true)"))
+        #expect(commandSource.contains("context.rollback()"))
+        #expect(revisionSource.contains("wroteBusinessFact: result.didPersist"))
+        #expect(reportViewSource.contains("if result.didChange {\n                    dismiss()\n                } else {\n                    isSaving = false\n                }"))
+    }
+
     @MainActor
     @Test func memberDeletionServiceDeletesPetRelatedEventsAndQuickActions() throws {
         let container = try makeInMemoryContainer()
@@ -6096,6 +6111,8 @@ struct HomeCommandExecutorTests {
         #expect(logs.first?.notes == "fasting")
         #expect(result.subjectID == human.id)
         #expect(result.metricKey == "tsh")
+        #expect(result.didPersist)
+        #expect(result.persistenceErrorDescription == nil)
     }
 
     @MainActor
@@ -6127,6 +6144,8 @@ struct HomeCommandExecutorTests {
         #expect(deleteResult.humanID == human.id)
         #expect(deleteResult.metricKey == "hba1c")
         #expect(deleteResult.logID == result.logID)
+        #expect(deleteResult.didChange)
+        #expect(deleteResult.persistenceErrorDescription == nil)
         #expect(logs.isEmpty)
         #expect(human.healthMetricLogs.isEmpty)
     }
@@ -6159,6 +6178,8 @@ struct HomeCommandExecutorTests {
         #expect(createResult.humanID == human.id)
         #expect(createResult.reportID == report.id)
         #expect(createResult.reportType == HealthReportType.bloodTest.rawValue)
+        #expect(createResult.didChange)
+        #expect(createResult.persistenceErrorDescription == nil)
         #expect(report.humanId == human.id.uuidString)
         #expect(report.reportType == .bloodTest)
         #expect(report.conclusion == .attention)
@@ -6183,6 +6204,8 @@ struct HomeCommandExecutorTests {
             context: context
         )
         #expect(updateResult.reportID == report.id)
+        #expect(updateResult.didChange)
+        #expect(updateResult.persistenceErrorDescription == nil)
         #expect(report.reportType == .physical)
         #expect(report.conclusion == .normal)
         #expect(report.nextCheckDate == nil)
@@ -6194,6 +6217,8 @@ struct HomeCommandExecutorTests {
         #expect(deleteResult.humanID == human.id)
         #expect(deleteResult.reportID == report.id)
         #expect(deleteResult.reportType == HealthReportType.physical.rawValue)
+        #expect(deleteResult.didChange)
+        #expect(deleteResult.persistenceErrorDescription == nil)
         #expect(reports.isEmpty)
     }
 

@@ -561,22 +561,30 @@ struct AddHumanHealthReportSheet: View {
 
         if let report = editing {
             commandQueue.enqueue(.humanHealthReport(humanID: human.id, reportID: report.id, action: "update")) {
-                HumanHealthReportCommandExecutor(context: modelContext, services: appServices).updateReport(
+                let result = HumanHealthReportCommandExecutor(context: modelContext, services: appServices).updateReport(
                     report,
                     human: human,
                     input: input,
                     note: "humanHealthReport.update"
                 )
-                dismiss()
+                if result.didChange {
+                    dismiss()
+                } else {
+                    isSaving = false
+                }
             }
         } else {
             commandQueue.enqueue(.humanHealthReport(humanID: human.id, reportID: nil, action: "create")) {
-                HumanHealthReportCommandExecutor(context: modelContext, services: appServices).createReport(
+                let result = HumanHealthReportCommandExecutor(context: modelContext, services: appServices).createReport(
                     human: human,
                     input: input,
                     note: "humanHealthReport.create"
                 )
-                dismiss()
+                if result.didChange {
+                    dismiss()
+                } else {
+                    isSaving = false
+                }
             }
         }
     }
@@ -586,12 +594,16 @@ struct AddHumanHealthReportSheet: View {
         isSaving = true
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         commandQueue.enqueue(.humanHealthReport(humanID: human.id, reportID: report.id, action: "delete")) {
-            HumanHealthReportCommandExecutor(context: modelContext, services: appServices).deleteReport(
+            let result = HumanHealthReportCommandExecutor(context: modelContext, services: appServices).deleteReport(
                 report,
                 human: human,
                 note: "humanHealthReport.delete"
             )
-            dismiss()
+            if result.didChange {
+                dismiss()
+            } else {
+                isSaving = false
+            }
         }
     }
 }
