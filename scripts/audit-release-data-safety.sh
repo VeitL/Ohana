@@ -42,6 +42,7 @@ fi
 data_backup="Ohana/Domain/Services/DataBackupManager.swift"
 data_backup_dtos="Ohana/Domain/Services/DataBackupDTOs.swift"
 automatic_backup="Ohana/Domain/Services/AutomaticBackupService.swift"
+physical_deletion="Ohana/Domain/Services/PhysicalDeletionService.swift"
 data_backup_files=(
   "Ohana/Domain/Services/DataBackupManager.swift"
   "Ohana/Domain/Services/DataBackupManager+Encode.swift"
@@ -223,6 +224,12 @@ require_pattern "$automatic_backup" 'DataBackupManager\(\)\.exportJSON\(containe
 
 require_pattern "$automatic_backup" 'writeAutomaticBackup\(packageURL: URL, now: Date\)' \
   "Automatic backup file storage should receive and copy a backup package URL."
+
+reject_pattern "$physical_deletion" 'deleteRows\(fetchAll\(CoconutLedgerEntry\.self' \
+  "PhysicalDeletionService must preserve append-only CoconutLedgerEntry rows during member deletion."
+
+require_pattern "$physical_deletion" 'retireWalletAccounts\(ownerKind:' \
+  "PhysicalDeletionService should retire wallet accounts instead of deleting economy audit rows."
 
 require_pattern "$data_backup_dtos" 'struct PlantReminderPreferencesBackup' \
   "Plant reminder preferences should be represented in backup app state."

@@ -34,6 +34,50 @@ struct CoconutWalletReconciliationSummary: Equatable {
     }
 }
 
+nonisolated enum CoconutWalletAccountLifecycleMetadata {
+    private static let deletedOwnerKey = "deletedOwner"
+
+    static func isDeletedOwner(_ account: CoconutAccount) -> Bool {
+        boolValue(named: deletedOwnerKey, in: account.metadataJSON) == true
+    }
+
+    static func markDeletedOwner(_ account: CoconutAccount, deletedAt: Date) {
+        var object = jsonObject(from: account.metadataJSON)
+        object[deletedOwnerKey] = true
+        object["deletedOwnerAt"] = deletedAt.timeIntervalSince1970
+        object["deletedOwnerKind"] = account.ownerKindRaw
+        object["deletedOwnerId"] = account.ownerId
+        account.metadataJSON = encode(object)
+    }
+
+    private static func boolValue(named key: String, in json: String) -> Bool? {
+        guard let value = jsonObject(from: json)[key] else { return nil }
+        if let bool = value as? Bool { return bool }
+        if let string = value as? String { return NSString(string: string).boolValue }
+        if let number = value as? NSNumber { return number.boolValue }
+        return nil
+    }
+
+    private static func jsonObject(from json: String) -> [String: Any] {
+        let trimmed = json.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty,
+              let data = trimmed.data(using: .utf8),
+              let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            return [:]
+        }
+        return object
+    }
+
+    private static func encode(_ object: [String: Any]) -> String {
+        guard JSONSerialization.isValidJSONObject(object),
+              let data = try? JSONSerialization.data(withJSONObject: object, options: [.sortedKeys]),
+              let string = String(data: data, encoding: .utf8) else {
+            return #"{"deletedOwner":true}"#
+        }
+        return string
+    }
+}
+
 struct CoconutWalletDelta {
     var accountKey: String
     var ownerKind: CoconutWalletOwnerKind
@@ -399,7 +443,7 @@ enum CoconutWalletService {
             context: context,
             operation: "fetch coconut accounts for total balance"
         )
-        .filter { isFormalMemberAccount($0.ownerKind) }
+        .filter { isActiveFormalMemberAccount($0, context: context) }
         .reduce(0) { $0 + $1.balance }
     }
 
@@ -476,7 +520,7 @@ enum CoconutWalletService {
         )
         var replayedBalances: [String: Int] = [:]
         var replayMetadata: [String: CoconutLedgerEntry] = [:]
-        for entry in entries where entry.affectsBalance && isFormalMemberAccount(entry.ownerKind) {
+        for entry in entries where entry.affectsBalance && isActiveFormalMemberLedgerEntry(entry, context: context) {
             replayedBalances[entry.accountKey, default: 0] += entry.delta
             replayMetadata[entry.accountKey] = entry
         }
@@ -514,6 +558,14 @@ enum CoconutWalletService {
         }
 
         for account in accounts where isFormalMemberAccount(account.ownerKind) {
+            guard isActiveFormalMemberAccount(account, context: context) else {
+                if account.balance != 0 {
+                    account.balance = 0
+                    account.updatedAt = now
+                    correctedCount += 1
+                }
+                continue
+            }
             let replayedBalance = max(0, replayedBalances[account.accountKey] ?? 0)
             if account.balance != replayedBalance {
                 account.balance = replayedBalance
@@ -736,6 +788,53 @@ enum CoconutWalletService {
             true
         case .system:
             false
+        }
+    }
+
+    private nonisolated static func isActiveFormalMemberAccount(_ account: CoconutAccount, context: ModelContext) -> Bool {
+        guard isFormalMemberAccount(account.ownerKind),
+              !CoconutWalletAccountLifecycleMetadata.isDeletedOwner(account),
+              let id = UUID(uuidString: account.ownerId) else {
+            return false
+        }
+        do {
+            switch account.ownerKind {
+            case .human:
+                return try fetchHuman(id: id, context: context) != nil
+            case .pet:
+                return try fetchPet(id: id, context: context) != nil
+            case .system:
+                return false
+            }
+        } catch {
+            OhanaLog.warning(
+                "CoconutWalletService failed to verify wallet owner during active-account check: \(error.localizedDescription)",
+                category: "Economy"
+            )
+            return false
+        }
+    }
+
+    private nonisolated static func isActiveFormalMemberLedgerEntry(_ entry: CoconutLedgerEntry, context: ModelContext) -> Bool {
+        guard isFormalMemberAccount(entry.ownerKind),
+              let id = UUID(uuidString: entry.ownerId) else {
+            return false
+        }
+        do {
+            switch entry.ownerKind {
+            case .human:
+                return try fetchHuman(id: id, context: context) != nil
+            case .pet:
+                return try fetchPet(id: id, context: context) != nil
+            case .system:
+                return false
+            }
+        } catch {
+            OhanaLog.warning(
+                "CoconutWalletService failed to verify wallet owner during ledger replay: \(error.localizedDescription)",
+                category: "Economy"
+            )
+            return false
         }
     }
 

@@ -161,8 +161,6 @@ nonisolated enum CloudSyncEntityRegistry {
         deletionOwnership(InsuranceClaim.self, parent: .pet, reason: "insurance.claims"),
         deletionOwnership(SymptomLog.self, parent: .pet, reason: "pet relationship"),
         deletionOwnership(HeatCycleLog.self, parent: .pet, reason: "pet relationship"),
-        deletionOwnership(CoconutAccount.self, parent: .pet, reason: "ownerKind/ownerId"),
-        deletionOwnership(CoconutLedgerEntry.self, parent: .pet, reason: "owner/actor/subject/source"),
         deletionOwnership(CareLedgerEvent.self, parent: .pet, reason: "actor/subject/legacy source"),
         deletionOwnership(EconomyBudgetUsageEvent.self, parent: .pet, reason: "careObjectKey/scopeKey"),
 
@@ -179,8 +177,6 @@ nonisolated enum CloudSyncEntityRegistry {
         deletionOwnership(HumanWeightLog.self, parent: .human, reason: "human/executor"),
         deletionOwnership(HumanWorkoutLog.self, parent: .human, reason: "human relationship"),
         deletionOwnership(HumanHealthMetricLog.self, parent: .human, reason: "human relationship"),
-        deletionOwnership(CoconutAccount.self, parent: .human, reason: "ownerKind/ownerId"),
-        deletionOwnership(CoconutLedgerEntry.self, parent: .human, reason: "owner/actor/subject/source"),
         deletionOwnership(CareLedgerEvent.self, parent: .human, reason: "actor/subject"),
         deletionOwnership(EconomyBudgetUsageEvent.self, parent: .human, reason: "memberKey/scopeKey"),
         deletionOwnership(SharedCareSession.self, parent: .human, reason: "executorIds"),

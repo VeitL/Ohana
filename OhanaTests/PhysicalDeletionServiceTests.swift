@@ -237,8 +237,10 @@ struct PhysicalDeletionServiceTests {
         let careLedgers = try context.fetch(FetchDescriptor<CareLedgerEvent>())
         let careLogs = try context.fetch(FetchDescriptor<PetCareLog>())
 
-        #expect(accounts.allSatisfy { $0.ownerId != deletedPet.id.uuidString })
-        #expect(walletEntries.allSatisfy { $0.ownerId != deletedPet.id.uuidString && $0.subjectId != deletedPet.id.uuidString })
+        let retiredAccount = try #require(accounts.first { $0.ownerId == deletedPet.id.uuidString })
+        #expect(retiredAccount.balance == 0)
+        #expect(CoconutWalletAccountLifecycleMetadata.isDeletedOwner(retiredAccount))
+        #expect(walletEntries.map(\.id) == [walletEntry.id])
         #expect(careLedgers.allSatisfy { $0.subjectId != deletedPet.id.uuidString && $0.legacyModelId != deletedLog.id.uuidString })
         #expect(careLogs.allSatisfy { $0.pet?.id != deletedPet.id })
         #expect(careLogs.contains { $0.pet?.id == survivor.id })
@@ -252,11 +254,11 @@ struct PhysicalDeletionServiceTests {
         #expect(sessions.first?.stockOwnerPetId.isEmpty == true)
         #expect(sessions.first?.totalAmountGrams == survivorLog.amountGrams)
         #expect(CoconutWalletService.totalBalance(context: context) == 0)
-        #expect(deletionTombstone(CoconutLedgerEntry.self, id: walletEntry.id, context: context) != nil)
+        #expect(deletionTombstone(CoconutLedgerEntry.self, id: walletEntry.id, context: context) == nil)
         #expect(deletionTombstone(CareLedgerEvent.self, id: careLedger.id, context: context) != nil)
     }
 
-    @Test func deletePetReplaysSurvivingWalletBalancesAfterRemovingPetScopedLedger() throws {
+    @Test func deletePetRetainsPetScopedHumanRewardsWithoutRollback() throws {
         let container = try makeContainer()
         let context = container.mainContext
         let human = Human(name: "Guan")
@@ -300,10 +302,10 @@ struct PhysicalDeletionServiceTests {
 
         let accounts = try context.fetch(FetchDescriptor<CoconutAccount>())
         let remainingAccount = try #require(accounts.first { $0.accountKey == CoconutAccountKey.human(human.id) })
-        #expect(remainingAccount.balance == 0)
-        #expect(human.coconutBalance == 0)
-        #expect(try context.fetch(FetchDescriptor<CoconutLedgerEntry>()).isEmpty)
-        #expect(deletionTombstone(CoconutLedgerEntry.self, id: petCareReward.id, context: context) != nil)
+        #expect(remainingAccount.balance == 10)
+        #expect(human.coconutBalance == 10)
+        #expect(try context.fetch(FetchDescriptor<CoconutLedgerEntry>()).map(\.id) == [petCareReward.id])
+        #expect(deletionTombstone(CoconutLedgerEntry.self, id: petCareReward.id, context: context) == nil)
     }
 
     @Test func deletePetCascadesFirstReleaseRegisteredOwnedEntities() throws {
@@ -457,8 +459,11 @@ struct PhysicalDeletionServiceTests {
         #expect(try context.fetch(FetchDescriptor<InsuranceClaim>()).isEmpty)
         #expect(try context.fetch(FetchDescriptor<SymptomLog>()).isEmpty)
         #expect(try context.fetch(FetchDescriptor<HeatCycleLog>()).isEmpty)
-        #expect(try context.fetch(FetchDescriptor<CoconutAccount>()).isEmpty)
-        #expect(try context.fetch(FetchDescriptor<CoconutLedgerEntry>()).isEmpty)
+        let retiredAccount = try #require(try context.fetch(FetchDescriptor<CoconutAccount>()).first { $0.ownerId == pet.id.uuidString })
+        #expect(retiredAccount.balance == 0)
+        #expect(CoconutWalletAccountLifecycleMetadata.isDeletedOwner(retiredAccount))
+        #expect(try context.fetch(FetchDescriptor<CoconutLedgerEntry>()).map(\.id) == [walletEntry.id])
+        #expect(CoconutWalletService.totalBalance(context: context) == 0)
         #expect(try context.fetch(FetchDescriptor<CareLedgerEvent>()).isEmpty)
         #expect(try context.fetch(FetchDescriptor<EconomyBudgetUsageEvent>()).isEmpty)
         #expect(deletionTombstone(Pet.self, id: pet.id, context: context) != nil)
@@ -674,8 +679,11 @@ struct PhysicalDeletionServiceTests {
         #expect(try context.fetch(FetchDescriptor<HumanWeightLog>()).isEmpty)
         #expect(try context.fetch(FetchDescriptor<HumanWorkoutLog>()).isEmpty)
         #expect(try context.fetch(FetchDescriptor<HumanHealthMetricLog>()).isEmpty)
-        #expect(try context.fetch(FetchDescriptor<CoconutAccount>()).isEmpty)
-        #expect(try context.fetch(FetchDescriptor<CoconutLedgerEntry>()).isEmpty)
+        let retiredAccount = try #require(try context.fetch(FetchDescriptor<CoconutAccount>()).first { $0.ownerId == humanId })
+        #expect(retiredAccount.balance == 0)
+        #expect(CoconutWalletAccountLifecycleMetadata.isDeletedOwner(retiredAccount))
+        #expect(try context.fetch(FetchDescriptor<CoconutLedgerEntry>()).map(\.id) == [walletEntry.id])
+        #expect(CoconutWalletService.totalBalance(context: context) == 0)
         #expect(try context.fetch(FetchDescriptor<CareLedgerEvent>()).isEmpty)
         #expect(try context.fetch(FetchDescriptor<EconomyBudgetUsageEvent>()).isEmpty)
         #expect(try context.fetch(FetchDescriptor<SharedCareSession>()).isEmpty)

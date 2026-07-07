@@ -355,6 +355,77 @@ final class CoconutWalletServiceTests: XCTestCase {
         XCTAssertEqual(projection.coconutCount, 8)
     }
 
+    func testReconciliationDoesNotCreateAccountsForMissingLedgerOwners() throws {
+        let container = try makeContainer()
+        let context = ModelContext(container)
+        let deletedPetId = UUID()
+        let retainedLedger = CoconutLedgerEntry(
+            transactionKey: "deleted-owner-retained-ledger",
+            accountKey: CoconutAccountKey.pet(deletedPetId),
+            ownerKind: .pet,
+            ownerId: deletedPetId.uuidString,
+            ownerName: "Deleted pet",
+            delta: 9,
+            balanceBefore: 0,
+            balanceAfter: 9,
+            entryKind: .reward,
+            source: .careEvent,
+            title: "Historical reward",
+            emoji: "🥥"
+        )
+        context.insert(retainedLedger)
+        try context.save()
+
+        let summary = CoconutWalletService.reconcileFormalAccountBalancesWithLedger(context: context, saveChanges: false)
+
+        XCTAssertEqual(summary.createdAccountCount, 0)
+        XCTAssertTrue(try context.fetch(FetchDescriptor<CoconutAccount>()).isEmpty)
+        XCTAssertEqual(try context.fetch(FetchDescriptor<CoconutLedgerEntry>()).map(\.id), [retainedLedger.id])
+        XCTAssertEqual(CoconutWalletService.totalBalance(context: context), 0)
+    }
+
+    func testReconciliationKeepsRetiredDeletedOwnerAccountsOutOfActiveTotals() throws {
+        let container = try makeContainer()
+        let context = ModelContext(container)
+        let deletedHumanId = UUID()
+        let account = CoconutAccount(
+            accountKey: CoconutAccountKey.human(deletedHumanId),
+            ownerKind: .human,
+            ownerId: deletedHumanId.uuidString,
+            displayName: "Deleted human",
+            balance: 7
+        )
+        CoconutWalletAccountLifecycleMetadata.markDeletedOwner(
+            account,
+            deletedAt: Date(timeIntervalSinceReferenceDate: 1000)
+        )
+        let retainedLedger = CoconutLedgerEntry(
+            transactionKey: "deleted-human-retained-ledger",
+            accountKey: CoconutAccountKey.human(deletedHumanId),
+            ownerKind: .human,
+            ownerId: deletedHumanId.uuidString,
+            ownerName: "Deleted human",
+            delta: 7,
+            balanceBefore: 0,
+            balanceAfter: 7,
+            entryKind: .reward,
+            source: .careEvent,
+            title: "Historical reward",
+            emoji: "🥥"
+        )
+        context.insert(account)
+        context.insert(retainedLedger)
+        try context.save()
+
+        let summary = CoconutWalletService.reconcileFormalAccountBalancesWithLedger(context: context, saveChanges: false)
+
+        XCTAssertEqual(summary.createdAccountCount, 0)
+        XCTAssertEqual(account.balance, 0)
+        XCTAssertTrue(CoconutWalletAccountLifecycleMetadata.isDeletedOwner(account))
+        XCTAssertEqual(try context.fetch(FetchDescriptor<CoconutLedgerEntry>()).map(\.id), [retainedLedger.id])
+        XCTAssertEqual(CoconutWalletService.totalBalance(context: context), 0)
+    }
+
     func testWealthTotalsAndLeaderboardExcludeLegacySystemAccount() {
         let human = Human(name: "Guan")
         let pet = Pet(name: "Miso")

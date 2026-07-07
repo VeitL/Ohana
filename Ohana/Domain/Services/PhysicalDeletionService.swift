@@ -32,8 +32,6 @@ nonisolated enum PhysicalDeletionService {
         String(describing: InsuranceClaim.self),
         String(describing: SymptomLog.self),
         String(describing: HeatCycleLog.self),
-        String(describing: CoconutAccount.self),
-        String(describing: CoconutLedgerEntry.self),
         String(describing: CareLedgerEvent.self),
         String(describing: EconomyBudgetUsageEvent.self)
     ]
@@ -52,8 +50,6 @@ nonisolated enum PhysicalDeletionService {
         String(describing: HumanWeightLog.self),
         String(describing: HumanWorkoutLog.self),
         String(describing: HumanHealthMetricLog.self),
-        String(describing: CoconutAccount.self),
-        String(describing: CoconutLedgerEntry.self),
         String(describing: CareLedgerEvent.self),
         String(describing: EconomyBudgetUsageEvent.self),
         String(describing: SharedCareSession.self),
@@ -487,14 +483,7 @@ nonisolated enum PhysicalDeletionService {
             deletedByHumanId: deletedByHumanId
         )
         deletedCount += scrubRetainedPetFactsReferencingHuman(humanId: humanId, context: context, modifiedAt: deletedAt)
-        deletedCount += deleteRows(fetchAll(CoconutAccount.self, context: context).filter { account in
-            account.ownerKind == .human && idsMatch(account.ownerId, humanId)
-        }, context: context) { _ in }
-        deletedCount += deleteRows(fetchAll(CoconutLedgerEntry.self, context: context).filter { entry in
-            referencesHuman(entry, humanId: humanId)
-        }, context: context) {
-            CloudSyncMutationRecorder.markDeleted($0, context: context, deletedAt: deletedAt, deletedByHumanId: deletedByHumanId)
-        }
+        deletedCount += retireWalletAccounts(ownerKind: .human, ownerId: humanId, context: context, deletedAt: deletedAt)
         deletedCount += deleteRows(fetchAll(CareLedgerEvent.self, context: context).filter { event in
             referencesHuman(event, humanId: humanId)
         }, context: context) {
@@ -788,15 +777,7 @@ nonisolated enum PhysicalDeletionService {
         deletedAt: Date,
         deletedByHumanId: String?
     ) {
-        _ = deleteRows(fetchAll(CoconutAccount.self, context: context).filter { account in
-            account.ownerKind == .pet && idsMatch(account.ownerId, petId)
-        }, context: context) { _ in }
-
-        _ = deleteRows(fetchAll(CoconutLedgerEntry.self, context: context).filter { entry in
-            referencesPet(entry, petId: petId) || legacyModelIds.containsNormalized(entry.sourceModelId)
-        }, context: context) {
-            CloudSyncMutationRecorder.markDeleted($0, context: context, deletedAt: deletedAt, deletedByHumanId: deletedByHumanId)
-        }
+        _ = retireWalletAccounts(ownerKind: .pet, ownerId: petId, context: context, deletedAt: deletedAt)
 
         _ = deleteRows(fetchAll(CareLedgerEvent.self, context: context).filter { event in
             referencesPet(event, petId: petId) || legacyModelIds.containsNormalized(event.legacyModelId)
@@ -1076,20 +1057,8 @@ nonisolated enum PhysicalDeletionService {
         return changedCount
     }
 
-    private static func referencesPet(_ entry: CoconutLedgerEntry, petId: String) -> Bool {
-        (entry.ownerKind == .pet && idsMatch(entry.ownerId, petId)) ||
-            idsMatch(entry.actorId, petId) ||
-            idsMatch(entry.subjectId, petId)
-    }
-
     private static func referencesPet(_ event: CareLedgerEvent, petId: String) -> Bool {
         idsMatch(event.actorId, petId) || idsMatch(event.subjectId, petId)
-    }
-
-    private static func referencesHuman(_ entry: CoconutLedgerEntry, humanId: String) -> Bool {
-        (entry.ownerKind == .human && idsMatch(entry.ownerId, humanId)) ||
-            idsMatch(entry.actorId, humanId) ||
-            idsMatch(entry.subjectId, humanId)
     }
 
     private static func referencesHuman(_ event: CareLedgerEvent, humanId: String) -> Bool {
@@ -1128,6 +1097,25 @@ nonisolated enum PhysicalDeletionService {
             context.delete(row)
         }
         return rows.count
+    }
+
+    @discardableResult
+    private static func retireWalletAccounts(
+        ownerKind: CoconutWalletOwnerKind,
+        ownerId: String,
+        context: ModelContext,
+        deletedAt: Date
+    ) -> Int {
+        let accounts = fetchAll(CoconutAccount.self, context: context).filter { account in
+            account.ownerKind == ownerKind && idsMatch(account.ownerId, ownerId)
+        }
+        for account in accounts {
+            account.balance = 0
+            account.updatedAt = deletedAt
+            CoconutWalletAccountLifecycleMetadata.markDeletedOwner(account, deletedAt: deletedAt)
+            CloudSyncMutationRecorder.markModified(account, context: context, modifiedAt: deletedAt)
+        }
+        return accounts.count
     }
 
     private static func markGenericDeleted(
